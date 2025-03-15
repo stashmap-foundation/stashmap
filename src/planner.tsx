@@ -8,7 +8,6 @@ import {
   KIND_KNOWLEDGE_LIST,
   KIND_KNOWLEDGE_NODE,
   KIND_CONTACTLIST,
-  KIND_VIEWS,
   KIND_WORKSPACE,
   KIND_SETTINGS,
   KIND_MEMBERLIST,
@@ -23,7 +22,11 @@ import { viewsToJSON } from "./serializer";
 import { newDB } from "./knowledge";
 import { joinID, shortID } from "./connections";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
-import { useWorkspaceContext } from "./WorkspaceContext";
+import {
+  getWorkspaceFromID,
+  useActiveWorkspace,
+  useWorkspaceContext,
+} from "./WorkspaceContext";
 import { useRelaysToCreatePlan } from "./relays";
 import { useProjectContext } from "./ProjectContext";
 import { mergePublishResultsOfEvents } from "./commons/PublishingStatus";
@@ -274,21 +277,47 @@ export function planDeleteWorkspace(plan: Plan, workspaceID: LongID): Plan {
   };
 }
 
-export function planUpdateViews(plan: Plan, views: Views): Plan {
+export function planUpdateViews(
+  plan: Plan,
+  workspaceID: LongID,
+  views: Views
+): Plan {
   // filter previous events for views
   const publishEvents = plan.publishEvents.filterNot(
-    (event) => event.kind === KIND_VIEWS
+    (event) => event.kind === KIND_WORKSPACE
   );
+  const workspace = getWorkspaceFromID(
+    plan.workspaces,
+    workspaceID,
+    plan.user.publicKey
+  );
+  if (!workspace) {
+    return plan;
+  }
+
   const writeViewEvent = {
-    kind: KIND_VIEWS,
+    kind: KIND_WORKSPACE,
     pubkey: plan.user.publicKey,
     created_at: newTimestamp(),
-    tags: [],
+    tags: [
+      ["d", shortID(workspace.id)],
+      ["node", workspace.node],
+      workspace.project ? ["project", workspace.project] : [],
+    ],
     content: JSON.stringify(viewsToJSON(views)),
   };
+  const myWorkspaces = plan.workspaces.get(
+    plan.user.publicKey,
+    Map<ID, Workspace>()
+  );
+  const workspacesWithUpdatedViews = plan.workspaces.set(
+    plan.user.publicKey,
+    myWorkspaces.set(workspaceID, { ...workspace, views })
+  );
+
   return {
     ...plan,
-    views,
+    workspaces: workspacesWithUpdatedViews,
     publishEvents: publishEvents.push(
       setRelayConf(writeViewEvent, {
         defaultRelays: false,
@@ -328,7 +357,7 @@ export function planAddWorkspace(plan: Plan, workspace: Workspace): Plan {
       ["node", workspace.node],
       workspace.project ? ["project", workspace.project] : [],
     ],
-    content: "",
+    content: JSON.stringify(viewsToJSON(workspace.views)),
   };
   return {
     ...plan,
@@ -546,16 +575,19 @@ export function createPlan(
 
 export function usePlanner(): Planner {
   const data = useData();
-  const { activeWorkspace, workspaces } = useWorkspaceContext();
+  const { activeWorkspace: activeWorksapceID, workspaces } =
+    useWorkspaceContext();
+  const activeWorkspace = useActiveWorkspace();
   const relays = useRelaysToCreatePlan();
   const { projectID } = useProjectContext();
   const createPlanningContext = (): Plan => {
     return createPlan({
       ...data,
-      activeWorkspace,
+      activeWorkspace: activeWorksapceID,
       workspaces,
       relays,
       projectID,
+      views: activeWorkspace?.views || Map<string, View>(),
     });
   };
   const planningContext = React.useContext(PlanningContext);

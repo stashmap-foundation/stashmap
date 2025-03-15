@@ -38,7 +38,7 @@ function disconnectNode(plan: Plan, toDisconnect: LongID | ID): Plan {
       return rdx;
     }
     return planUpsertRelations(rdx, deleteRelations(relation, toDelete));
-  }, planUpdateViews(plan, updateViewPathsAfterDeleteNode(plan.views, toDisconnect)));
+  }, planUpdateViews(plan, plan.activeWorkspace, updateViewPathsAfterDeleteNode(plan.views, toDisconnect)));
 }
 
 export function DeleteWorkspace({

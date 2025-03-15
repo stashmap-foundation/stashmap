@@ -7,11 +7,11 @@ import { RelayInformation } from "nostr-tools/lib/types/nip11";
 import {
   KIND_KNOWLEDGE_NODE,
   KIND_CONTACTLIST,
-  KIND_VIEWS,
   KIND_SETTINGS,
   KIND_PROJECT,
   KIND_MEMBERLIST,
   KIND_RELAY_METADATA_EVENT,
+  KIND_WORKSPACE,
 } from "./nostr";
 import { DataContextProvider } from "./DataContext";
 import { findContacts, findMembers } from "./contacts";
@@ -60,7 +60,7 @@ export function newProcessedEvents(): ProcessedEvents {
 
 export const KIND_SEARCH = [KIND_KNOWLEDGE_NODE, KIND_PROJECT];
 
-export const KINDS_META = [KIND_SETTINGS, KIND_CONTACTLIST, KIND_VIEWS];
+export const KINDS_META = [KIND_SETTINGS, KIND_CONTACTLIST];
 
 function mergeEvents(
   processed: ProcessedEvents,
@@ -162,7 +162,7 @@ function Data({ user, children }: DataProps): JSX.Element {
     [
       {
         authors: [myPublicKey],
-        kinds: [KIND_SETTINGS, KIND_CONTACTLIST, KIND_VIEWS],
+        kinds: [KIND_SETTINGS, KIND_CONTACTLIST, KIND_WORKSPACE],
       },
     ],
     {

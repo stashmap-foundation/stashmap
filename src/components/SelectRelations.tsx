@@ -75,6 +75,7 @@ function DeleteRelationItem({ id }: { id: LongID }): JSX.Element | null {
     // TODO: deleteChildViews should only be necessary for the deleted relation not the other
     const plan = planUpdateViews(
       deleteRelationsPlan,
+      deleteRelationsPlan.activeWorkspace,
       updateView(deleteChildViews(views, viewPath), viewPath, {
         ...view,
         relations: getDefaultRelationForNode(
@@ -133,8 +134,10 @@ function useOnChangeRelations(): ChangeRelation {
 
   return (relations: Relations, expand: boolean): void => {
     const viewKeyOfAddToNode = addAddToNodeToPath(data, viewPath);
+    const createdPlan = createPlan();
     const plan = planUpdateViews(
-      createPlan(),
+      createdPlan,
+      createdPlan.activeWorkspace,
       updateView(data.views, viewPath, {
         ...view,
         relations: relations.id,
@@ -275,8 +278,10 @@ function useOnToggleExpanded(): (expand: boolean) => void {
     const viewKeyOfAddToNode = viewPathToString(
       addAddToNodeToPath(data, viewPath)
     );
+    const createdPlan = createPlan();
     const plan = planUpdateViews(
-      createPlan(),
+      createdPlan,
+      createdPlan.activeWorkspace,
       updateView(data.views, viewPath, {
         ...view,
         expanded: expand,

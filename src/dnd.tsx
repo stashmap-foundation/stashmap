@@ -106,7 +106,12 @@ export function dnd(
       sourceIndices.toArray(),
       dropIndex
     );
-    return planUpdateViews(updatedRelationsPlan, updatedViews);
+    // update views for the active workspace, because dnd is only available within the active workspace
+    return planUpdateViews(
+      updatedRelationsPlan,
+      plan.activeWorkspace,
+      updatedViews
+    );
   }
   const sourceNodes = List(
     sources.map((s) => {
@@ -128,7 +133,11 @@ export function dnd(
     sourceNodes.size,
     dropIndex
   );
-  return planUpdateViews(updatedRelationsPlan, updatedViews);
+  return planUpdateViews(
+    updatedRelationsPlan,
+    plan.activeWorkspace,
+    updatedViews
+  );
 }
 
 export function DND({ children }: { children: React.ReactNode }): JSX.Element {

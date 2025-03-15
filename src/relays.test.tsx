@@ -19,7 +19,7 @@ import {
 import { createPlan, planPublishRelayMetadata } from "./planner";
 import { execute } from "./executor";
 import { NavBar } from "./components/Navbar";
-import { KIND_SETTINGS, KIND_VIEWS } from "./nostr";
+import { KIND_SETTINGS, KIND_WORKSPACE } from "./nostr";
 import { flattenRelays } from "./relays";
 import { WorkspaceColumnView } from "./components/WorkspaceColumn";
 import Data from "./Data";
@@ -104,7 +104,7 @@ test("Write views on user relays", async () => {
   await userEvent.click(
     await screen.findByLabelText("increase width of Default Workspace")
   );
-  await findEvent(utils.relayPool, { kinds: [KIND_VIEWS] });
+  await findEvent(utils.relayPool, { kinds: [KIND_WORKSPACE] });
   expect(utils.relayPool.getPublishedOnRelays()).toEqual(
     TEST_RELAYS.map((r) => r.url)
   );

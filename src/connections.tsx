@@ -312,5 +312,6 @@ export function newWorkspace(nodeId: LongID, myself: PublicKey): Workspace {
     id: joinID(myself, v4()),
     node: nodeId,
     project: undefined,
+    views: Map<string, View>(),
   };
 }

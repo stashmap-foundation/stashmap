@@ -18,7 +18,7 @@ import { useReadRelays } from "./relays";
 import { shortID, splitID } from "./connections";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 
-function getWorkspaceFromID(
+export function getWorkspaceFromID(
   workspaces: Map<PublicKey, Workspaces>,
   id: LongID,
   myself: PublicKey
@@ -174,7 +174,7 @@ export function useWorkspaceContext(): WorkspaceContextType {
   return context;
 }
 
-function useActiveWorkspace(): Workspace | undefined {
+export function useActiveWorkspace(): Workspace | undefined {
   const { activeWorkspace, workspaces } = useWorkspaceContext();
   const { user } = useData();
   return getWorkspaceFromID(workspaces, activeWorkspace, user.publicKey);

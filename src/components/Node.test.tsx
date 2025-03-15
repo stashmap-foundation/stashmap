@@ -258,6 +258,7 @@ test("Edited node is shown in Tree View", async () => {
   );
   const planWithViews = planUpdateViews(
     plan,
+    plan.activeWorkspace,
     Map({
       [viewPathToString([
         { nodeID: pl.id, nodeIndex: 0 as NodeIndex, relationsID: "" as LongID },

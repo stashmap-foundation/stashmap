@@ -93,20 +93,7 @@ function jsonToView(view: Serializable): View | undefined {
   };
 }
 
-export function jsonToWorkspace(
-  workspaces: Serializable
-): { workspaces: List<LongID>; activeWorkspace: LongID } | undefined {
-  if (workspaces === undefined) {
-    return undefined;
-  }
-  const w = asObject(workspaces);
-  return {
-    workspaces: List<LongID>(asArray(w.w).map((i) => asString(i) as LongID)),
-    activeWorkspace: asString(w.a) as LongID,
-  };
-}
-
-export function jsonToViews(s: Serializable): Map<string, View> {
+function jsonToViews(s: Serializable): Map<string, View> {
   return Map(asObject(s))
     .map((v) => jsonToView(v))
     .filter((v, k) => {
@@ -225,6 +212,9 @@ export function eventToWorkspace(
     id: joinID(e.pubkey, id),
     node: findTag(e, "node") as LongID,
     project: findTag(e, "project") as LongID | undefined,
+    views: e.content
+      ? jsonToViews(JSON.parse(e.content) as Serializable)
+      : Map<string, View>(),
   };
   return [id, workspace];
 }

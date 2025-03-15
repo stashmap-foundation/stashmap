@@ -49,6 +49,7 @@ export function DisconnectBtn(): JSX.Element | null {
       const { nodeID, nodeIndex } = getLast(parseViewPath(path));
       return planUpdateViews(
         plan,
+        plan.activeWorkspace,
         updateViewPathsAfterDisconnect(
           plan.views,
           nodeID,
@@ -115,6 +116,7 @@ export function DisconnectNodeBtn(): JSX.Element | null {
     );
     const planAfterDisconnect = planUpdateViews(
       disconnectPlan,
+      disconnectPlan.activeWorkspace,
       updateViewPathsAfterDisconnect(
         disconnectPlan.views,
         parentNodeID,

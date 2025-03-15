@@ -19,9 +19,11 @@ export function ChangeColumnWidth(): JSX.Element | null {
     return null;
   }
   const onIncreaseColumnWidth = (): void => {
+    const plan = createPlan();
     executePlan(
       planUpdateViews(
-        createPlan(),
+        plan,
+        plan.activeWorkspace,
         updateView(views, viewContext, {
           ...view,
           width: view.width + 1,
@@ -30,9 +32,11 @@ export function ChangeColumnWidth(): JSX.Element | null {
     );
   };
   const onDecreaseColumnWidth = (): void => {
+    const newPlan = createPlan();
     executePlan(
       planUpdateViews(
-        createPlan(),
+        newPlan,
+        newPlan.activeWorkspace,
         updateView(views, viewContext, {
           ...view,
           width: Math.max(view.width - 1, 1),

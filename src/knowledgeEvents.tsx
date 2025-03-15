@@ -1,21 +1,14 @@
 import { List, Map } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
-import {
-  findTag,
-  getMostRecentReplacableEvent,
-  sortEvents,
-} from "./commons/useNostrQuery";
+import { findTag, sortEvents } from "./commons/useNostrQuery";
 import {
   KIND_DELETE,
   KIND_PROJECT,
   KIND_KNOWLEDGE_LIST,
   KIND_KNOWLEDGE_NODE,
-  KIND_VIEWS,
   KIND_WORKSPACE,
 } from "./nostr";
 import {
-  Serializable,
-  jsonToViews,
   eventToRelations,
   eventToTextOrProjectNode,
   eventToWorkspace,
@@ -117,17 +110,19 @@ export function findWorkspaces(events: List<UnsignedEvent>): Workspaces {
           node: workspace.node,
           id: workspace.id,
           project: undefined,
+          views: workspace.views,
         })
       : rdx;
   }, Map<ID, Workspace>());
 }
 
+function getViewsFromWorkspaces(workspaces: Workspaces): Views {
+  return workspaces.reduce((rdx, ws) => {
+    return ws.views !== undefined ? rdx.merge(ws.views) : rdx;
+  }, Map<string, View>());
+}
+
 export function findViews(events: List<UnsignedEvent>): Views {
-  const viewEvent = getMostRecentReplacableEvent(
-    events.filter((event) => event.kind === KIND_VIEWS)
-  );
-  if (viewEvent === undefined) {
-    return Map<string, View>();
-  }
-  return jsonToViews(JSON.parse(viewEvent.content) as Serializable);
+  const workspaces = findWorkspaces(events);
+  return getViewsFromWorkspaces(workspaces);
 }

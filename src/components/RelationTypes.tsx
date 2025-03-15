@@ -105,6 +105,7 @@ export function planAddNewRelationToNode(
   const createRelationPlan = planUpsertRelations(plan, relations);
   return planUpdateViews(
     createRelationPlan,
+    createRelationPlan.activeWorkspace,
     updateView(plan.views, viewPath, {
       ...view,
       relations: relations.id,
@@ -121,6 +122,7 @@ export function planAddVirtualListToView(
 ): Plan {
   return planUpdateViews(
     plan,
+    plan.activeWorkspace,
     updateView(plan.views, viewPath, {
       ...view,
       virtualLists: Set(view.virtualLists).add(virtualList).toArray(),
@@ -139,6 +141,7 @@ export function planRemoveVirtualListFromView(
 ): Plan {
   return planUpdateViews(
     plan,
+    plan.activeWorkspace,
     updateView(plan.views, viewPath, {
       ...view,
       virtualLists: Set(view.virtualLists).remove(virtualList).toArray(),

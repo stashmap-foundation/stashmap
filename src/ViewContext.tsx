@@ -542,6 +542,7 @@ export function upsertRelations(
   const planWithUpdatedView = didViewChange
     ? planUpdateViews(
         plan,
+        plan.activeWorkspace,
         moveChildViewsToNewRelation(
           plan.views,
           viewPath,

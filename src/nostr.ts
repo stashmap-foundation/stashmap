@@ -1,7 +1,5 @@
 export const KIND_SETTINGS = 11071;
 
-export const KIND_VIEWS = 11074;
-
 export const KIND_KNOWLEDGE_LIST = 34750;
 export const KIND_KNOWLEDGE_NODE = 34751;
 // TODO: Make this non-editable

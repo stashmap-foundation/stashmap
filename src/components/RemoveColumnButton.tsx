@@ -44,7 +44,11 @@ export function RemoveColumnButton(): JSX.Element | null {
       relationsID,
       nodeIndex
     );
-    const plan = planUpdateViews(updateRelationsPlan, updatedViews);
+    const plan = planUpdateViews(
+      updateRelationsPlan,
+      updateRelationsPlan.activeWorkspace,
+      updatedViews
+    );
     executePlan(plan);
     setState(switchOffMultiselect(multiselectBtns, selection, viewKey));
   };

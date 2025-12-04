@@ -326,7 +326,7 @@ export function planAddWorkspace(plan: Plan, workspace: Workspace): Plan {
     tags: [
       ["d", shortID(workspace.id)],
       ["node", workspace.node],
-      workspace.project ? ["project", workspace.project] : [],
+      ...(workspace.project ? [["project", workspace.project]] : []),
     ],
     content: "",
   };
@@ -410,18 +410,20 @@ export function planPublishSettings(plan: Plan, settings: Settings): Plan {
 }
 
 export function relayTags(relays: Relays): string[][] {
-  return relays.map((r) => {
-    if (r.read && r.write) {
-      return ["r", r.url];
-    }
-    if (r.read) {
-      return ["r", r.url, "read"];
-    }
-    if (r.write) {
-      return ["r", r.url, "write"];
-    }
-    return [];
-  });
+  return relays
+    .map((r) => {
+      if (r.read && r.write) {
+        return ["r", r.url];
+      }
+      if (r.read) {
+        return ["r", r.url, "read"];
+      }
+      if (r.write) {
+        return ["r", r.url, "write"];
+      }
+      return [];
+    })
+    .filter((tag) => tag.length > 0);
 }
 
 export function planPublishRelayMetadata(plan: Plan, relays: Relays): Plan {

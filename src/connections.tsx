@@ -1,6 +1,7 @@
 import { List, Set, Map } from "immutable";
 import { v4 } from "uuid";
 import { newRelations } from "./ViewContext";
+import { REFERENCED_BY } from "./constants";
 
 export function splitID(id: ID): [PublicKey | undefined, string] {
   const split = id.split("_");
@@ -33,8 +34,6 @@ export function getRelationsNoReferencedBy(
   const res = knowledgeDBs.get(myself)?.relations.get(relationID);
   return res;
 }
-
-export const REFERENCED_BY = "referencedby" as LongID;
 
 type ReferencedByHeadAndUpdated = Pick<Relations, "head" | "updated">;
 

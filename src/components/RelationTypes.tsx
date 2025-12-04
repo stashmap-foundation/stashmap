@@ -7,7 +7,8 @@ import {
   planUpsertRelations,
   usePlanner,
 } from "../planner";
-import { REFERENCED_BY, getRelationsNoReferencedBy } from "../connections";
+import { getRelationsNoReferencedBy } from "../connections";
+import { REFERENCED_BY } from "../constants";
 import {
   ViewPath,
   getDefaultRelationForNode,

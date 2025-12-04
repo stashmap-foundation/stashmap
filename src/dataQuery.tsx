@@ -8,7 +8,8 @@ import {
   KIND_PROJECT,
   KIND_WORKSPACE,
 } from "./nostr";
-import { splitID, REFERENCED_BY } from "./connections";
+import { splitID } from "./connections";
+import { REFERENCED_BY } from "./constants";
 import { ADD_TO_NODE, getNodeFromID, useNodeID } from "./ViewContext";
 import { MergeKnowledgeDB, useData } from "./DataContext";
 import { useApis } from "./Apis";

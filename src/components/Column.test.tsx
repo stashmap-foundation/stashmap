@@ -100,19 +100,12 @@ test("Show Referenced By", async () => {
     }
   );
   await screen.findByText("Bitcoin");
-  fireEvent.click(screen.getByLabelText("Add new Relations to Bitcoin"));
-  fireEvent.click((await screen.findAllByText("Referenced By"))[0]);
+  fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
   screen.getByLabelText("hide references to Bitcoin");
   expect(
     (await screen.findByLabelText("related to Bitcoin")).textContent
   ).toMatch(/Money1(.*)Alice Workspace2(.*)P2P Apps1/);
   // 3 References: WS, P2P Apps and Money, sorted according to relations.updated
-  screen.getByText("Referenced By (3)");
-
-  // Delete Referenced By
-  fireEvent.click(screen.getByLabelText("edit virtual list"));
-  fireEvent.click(await screen.findByText("Delete"));
-  expect(screen.queryByText("Referenced By (3)")).toBeNull();
 });
 
 test("If Node is the root we always show references when there are more than 0", async () => {
@@ -136,8 +129,7 @@ test("If Node is the root we always show references when there are more than 0",
   );
   await screen.findByText("Bitcoin");
   await screen.findByText("Bitcoin");
-  fireEvent.click(screen.getByLabelText("Add new Relations to Bitcoin"));
-  fireEvent.click(await screen.findByText("Referenced By"));
+  fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
   screen.getByLabelText("hide references to Bitcoin");
   expect(
     (await screen.findByLabelText("related to Bitcoin")).textContent

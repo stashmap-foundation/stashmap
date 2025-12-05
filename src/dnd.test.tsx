@@ -38,8 +38,7 @@ test("Dragging Source not available at Destination", async () => {
   );
 
   await screen.findByText("Bitcoin");
-  fireEvent.click(screen.getByLabelText("Add new Relations to Bitcoin"));
-  fireEvent.click((await screen.findAllByText("Referenced By"))[0]);
+  fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
   screen.getByLabelText("hide references to Bitcoin");
   const crypto = await screen.findByText("Cryptocurrencies");
   const addToMoney = await screen.findByLabelText("add to Money");

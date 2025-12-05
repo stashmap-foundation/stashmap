@@ -1,5 +1,5 @@
 import React, { CSSProperties } from "react";
-import { Dropdown } from "react-bootstrap";
+import { Dropdown, OverlayTrigger, Tooltip } from "react-bootstrap";
 import { List } from "immutable";
 import {
   addAddToNodeToPath,
@@ -23,45 +23,153 @@ import { REFERENCED_BY } from "../constants";
 import { useData } from "../DataContext";
 import { planDeleteRelations, planUpdateViews, usePlanner } from "../planner";
 import {
-  AddNewRelationsToNodeItem,
-  AddVirtualListToNodeItem,
   RELATION_TYPES,
+  VIRTUAL_LISTS,
   getRelationTypeByRelationsID,
-  planRemoveVirtualListFromView,
+  planAddNewRelationToNode,
+  planAddVirtualListToView,
 } from "./RelationTypes";
 
-function AddRelationsButton(): JSX.Element {
-  const [node] = useNode();
-  const ariaLabel = `Add new Relations to ${node?.text || ""}`;
+const tooltipConfig = {
+  modifiers: [],
+};
 
+function ConditionalTooltip({
+  show,
+  label,
+  id,
+  children,
+}: {
+  show: boolean;
+  label: string;
+  id: string;
+  children: React.ReactElement;
+}): JSX.Element {
+  if (!show) {
+    return children;
+  }
+
+  return (
+    <OverlayTrigger
+      placement="top"
+      overlay={<Tooltip id={`tooltip-${id}`}>{label}</Tooltip>}
+      popperConfig={tooltipConfig}
+    >
+      {children}
+    </OverlayTrigger>
+  );
+}
+
+function GhostButton({
+  color,
+  label,
+  onClick,
+  ariaLabel,
+  id,
+}: {
+  color: string;
+  label: string;
+  onClick: () => void;
+  ariaLabel: string;
+  id: string;
+}): JSX.Element {
   const style = {
     border: "0px",
-    color: "black",
+    borderLeft: `2px solid ${color}`,
+    color,
     backgroundColor: "inherit",
-    minHeight: "35px",
-    fontSize: "1.5rem",
+    opacity: 0.3,
+    width: "12px",
+    minHeight: "25px",
+    padding: 0,
   };
 
   return (
-    <Dropdown>
-      <Dropdown.Toggle
-        as="button"
-        className="no-shadow"
+    <ConditionalTooltip show label={label} id={id}>
+      <button
+        type="button"
+        onClick={onClick}
         style={style}
         aria-label={ariaLabel}
       >
-        <span>+</span>
-      </Dropdown.Toggle>
-      <Dropdown.Menu popperConfig={{ strategy: "fixed" }} renderOnMount>
-        {RELATION_TYPES.keySeq()
-          .toArray()
-          .map((id) => (
-            <AddNewRelationsToNodeItem key={id} relationTypeID={id} />
-          ))}
-        <Dropdown.Divider />
-        <AddVirtualListToNodeItem virtualListID={REFERENCED_BY} />
-      </Dropdown.Menu>
-    </Dropdown>
+        {" "}
+      </button>
+    </ConditionalTooltip>
+  );
+}
+
+function GhostRelationButton({
+  relationTypeID,
+}: {
+  relationTypeID: ID;
+}): JSX.Element {
+  const [node, view] = useNode();
+  const viewPath = useViewPath();
+  const { createPlan, executePlan } = usePlanner();
+  const relationType = RELATION_TYPES.get(relationTypeID, {
+    color: "black",
+    label: "",
+  });
+
+  const onClick = (): void => {
+    if (!node) {
+      throw new Error("Node not found");
+    }
+    const plan = planAddNewRelationToNode(
+      createPlan(),
+      node.id,
+      relationTypeID,
+      view,
+      viewPath
+    );
+    executePlan(plan);
+  };
+
+  return (
+    <GhostButton
+      color={relationType.color}
+      label={relationType.label}
+      onClick={onClick}
+      ariaLabel={`create ${relationType.label || "relation"}`}
+      id={relationTypeID}
+    />
+  );
+}
+
+function GhostVirtualListButton({
+  virtualListID,
+}: {
+  virtualListID: LongID;
+}): JSX.Element {
+  const [node, view] = useNode();
+  const viewPath = useViewPath();
+  const { createPlan, executePlan } = usePlanner();
+  const virtualList = VIRTUAL_LISTS.get(virtualListID, {
+    color: "black",
+    label: "",
+  });
+
+  const onClick = (): void => {
+    if (!node) {
+      throw new Error("Node not found");
+    }
+    const plan = planAddVirtualListToView(
+      createPlan(),
+      virtualListID,
+      view,
+      viewPath
+    );
+    executePlan(plan);
+  };
+
+  return (
+    <GhostButton
+      color="black"
+      label={virtualList.label}
+      onClick={onClick}
+      ariaLabel={`add ${virtualList.label || "virtual list"}`}
+      id={virtualListID}
+    />
   );
 }
 
@@ -84,32 +192,6 @@ function DeleteRelationItem({ id }: { id: LongID }): JSX.Element | null {
           user.publicKey
         ),
       })
-    );
-    executePlan(plan);
-  };
-  return (
-    <Dropdown.Item onClick={onClick}>
-      <span className="simple-icon-trash" />
-      <span className="ms-2">Delete</span>
-    </Dropdown.Item>
-  );
-}
-
-function DeleteVirtualListItem({ id }: { id: LongID }): JSX.Element | null {
-  const { createPlan, executePlan } = usePlanner();
-  const viewPath = useViewPath();
-  const [node, view] = useNode();
-
-  const onClick = (): void => {
-    if (!node) {
-      throw new Error("Node not found");
-    }
-    const plan = planRemoveVirtualListFromView(
-      createPlan(),
-      id,
-      view,
-      viewPath,
-      node.id
     );
     executePlan(plan);
   };
@@ -225,40 +307,6 @@ function EditRelationsDropdown({
   );
 }
 
-function EditVirtualListDropdown({
-  className,
-  style,
-}: {
-  className: string;
-  style: CSSProperties;
-}): JSX.Element | null {
-  const view = useNodeID()[1];
-  if (!view.relations) {
-    return null;
-  }
-
-  return (
-    <Dropdown>
-      <Dropdown.Toggle
-        as="button"
-        className={className}
-        aria-label="edit virtual list"
-        style={{
-          ...style,
-          borderLeftWidth: "1px",
-          borderLeftStyle: "solid",
-          borderLeftColor: "white",
-        }}
-      >
-        <span className="iconsminds-arrow-down" />
-      </Dropdown.Toggle>
-      <Dropdown.Menu popperConfig={{ strategy: "fixed" }} renderOnMount>
-        <DeleteVirtualListItem id={view.relations} />
-      </Dropdown.Menu>
-    </Dropdown>
-  );
-}
-
 type ShowRelationsButtonProps = {
   relationList: List<Relations>;
   readonly?: boolean;
@@ -320,9 +368,6 @@ function AutomaticRelationsButton({
       ? `hide ${hideShowLabel}`
       : `show ${hideShowLabel}`;
   const isActive = (isExpanded || alwaysOneSelected) && isSelected;
-  const className = `btn select-relation ${
-    isActive ? "opacity-none" : "deselected"
-  }`;
   const style = {
     border: "0px",
     borderLeft: `2px solid black`,
@@ -341,8 +386,9 @@ function AutomaticRelationsButton({
         }
       };
   const lbl = isActive ? label : relations.items.size;
+
   return (
-    <>
+    <ConditionalTooltip show={!isActive} label={label} id={relations.id}>
       <button
         type="button"
         aria-label={ariaLabel}
@@ -353,10 +399,7 @@ function AutomaticRelationsButton({
         {children}
         <span>{lbl}</span>
       </button>
-      {isActive && (
-        <EditVirtualListDropdown className={className} style={style} />
-      )}
-    </>
+    </ConditionalTooltip>
   );
 }
 
@@ -499,23 +542,29 @@ function SelectRelationsButton({
         }
       };
   return (
-    <>
-      <button
-        type="button"
-        onClick={onClick}
-        style={style}
-        aria-label={ariaLabel}
-      >
-        {label}
-      </button>
-      {isActive && (
-        <EditRelationsDropdown
-          className={className}
+    <ConditionalTooltip
+      show={!isActive}
+      label={relationType?.label || "relation"}
+      id={topRelation.id}
+    >
+      <span style={{ display: "flex" }}>
+        <button
+          type="button"
+          onClick={onClick}
           style={style}
-          otherRelations={otherRelations}
-        />
-      )}
-    </>
+          aria-label={ariaLabel}
+        >
+          {label}
+        </button>
+        {isActive && (
+          <EditRelationsDropdown
+            className={className}
+            style={style}
+            otherRelations={otherRelations}
+          />
+        )}
+      </span>
+    </ConditionalTooltip>
   );
 }
 
@@ -528,8 +577,6 @@ export function SelectRelations({
 }): JSX.Element | null {
   const { knowledgeDBs, user } = useData();
   const [nodeID, view] = useNodeID();
-  const displayReferencedByRelationsButton =
-    view.virtualLists && view.virtualLists.includes(REFERENCED_BY);
   const currentRelations = getRelations(
     knowledgeDBs,
     view.relations,
@@ -542,30 +589,73 @@ export function SelectRelations({
     nodeID
   );
 
-  const groupedByType = relations
-    .groupBy((r) => r.type)
-    .sortBy((r, t) => (currentRelations?.type === t ? 0 : 1));
+  const groupedByType = relations.groupBy((r) => r.type);
+
+  const allItems: { type: string; id: LongID }[] = [
+    ...RELATION_TYPES.keySeq()
+      .toArray()
+      .map((id) => ({ type: "relation" as const, id: id as LongID })),
+    ...VIRTUAL_LISTS.keySeq()
+      .toArray()
+      .map((id) => ({ type: "virtualList" as const, id: id as LongID })),
+  ];
+
+  const sortedItems = [...allItems].sort((a, b) => {
+    const isCurrentA =
+      a.type === "relation"
+        ? currentRelations?.type === a.id
+        : view.relations === a.id;
+    const isCurrentB =
+      b.type === "relation"
+        ? currentRelations?.type === b.id
+        : view.relations === b.id;
+
+    if (isCurrentA) return -1;
+    if (isCurrentB) return 1;
+    return 0;
+  });
 
   return (
     <div className="menu-layout font-size-small">
       <ul className="nav nav-underline gap-0">
-        {groupedByType.toArray().map(([type, r]) => (
-          <SelectRelationsButton
-            relationList={r.toList()}
-            readonly={readonly}
-            alwaysOneSelected={alwaysOneSelected}
-            currentSelectedRelations={currentRelations}
-            key={type}
-          />
-        ))}
-        {displayReferencedByRelationsButton && (
-          <ReferencedByRelationsButton
-            readonly={readonly}
-            alwaysOneSelected={alwaysOneSelected}
-            currentRelations={currentRelations}
-          />
-        )}
-        {!readonly && <AddRelationsButton />}
+        {sortedItems.map((item) => {
+          if (item.type === "relation") {
+            const relationsOfType = groupedByType.get(item.id);
+            if (relationsOfType) {
+              return (
+                <SelectRelationsButton
+                  relationList={relationsOfType.toList()}
+                  readonly={readonly}
+                  alwaysOneSelected={alwaysOneSelected}
+                  currentSelectedRelations={currentRelations}
+                  key={item.id}
+                />
+              );
+            }
+            if (readonly) {
+              return null;
+            }
+            return (
+              <GhostRelationButton relationTypeID={item.id} key={item.id} />
+            );
+          }
+          if (item.id === REFERENCED_BY) {
+            return (
+              <ReferencedByRelationsButton
+                readonly={readonly}
+                alwaysOneSelected={alwaysOneSelected}
+                currentRelations={currentRelations}
+                key={item.id}
+              />
+            );
+          }
+          if (readonly) {
+            return null;
+          }
+          return (
+            <GhostVirtualListButton virtualListID={item.id} key={item.id} />
+          );
+        })}
       </ul>
     </div>
   );

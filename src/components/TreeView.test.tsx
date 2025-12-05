@@ -43,8 +43,7 @@ test("Load Referenced By Nodes", async () => {
     }
   );
   await screen.findByText("Bitcoin");
-  fireEvent.click(screen.getByLabelText("Add new Relations to Bitcoin"));
-  fireEvent.click((await screen.findAllByText("Referenced By"))[0]);
+  fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
   screen.getByText("Referenced By (3)");
   await screen.findByText("Cryptocurrencies");
   await screen.findByText("P2P Apps");

@@ -34,17 +34,6 @@ const tooltipConfig = {
   modifiers: [],
 };
 
-// Map relation types to icons
-const RELATION_ICONS: Record<string, string> = {
-  "": "⬤", // relevant - large dot
-  little_relevant: "●", // medium dot
-  maybe_relevant: "·", // small dot
-  not_relevant: "○", // empty circle
-  confirms: "✓", // checkmark
-  contains: "▢", // box
-  contra: "✕", // x mark
-};
-
 function ConditionalTooltip({
   show,
   label,
@@ -77,7 +66,6 @@ function RelationButton({
   onClick,
   ariaLabel,
   id,
-  icon,
   count,
   isActive,
   disabled,
@@ -89,7 +77,6 @@ function RelationButton({
   onClick?: () => void;
   ariaLabel: string;
   id: string;
-  icon: string;
   count?: number;
   isActive?: boolean;
   disabled?: boolean;
@@ -98,36 +85,14 @@ function RelationButton({
 }): JSX.Element {
   const buttonStyle = {
     border: "0px",
+    borderLeft: `2px solid ${color}`,
     backgroundColor: "inherit",
     padding: "0 4px",
-    position: "relative" as const,
     minWidth: "12px",
     minHeight: "25px",
     color,
     display: "flex",
     alignItems: "center",
-  };
-
-  const lineStyle = {
-    width: "2px",
-    backgroundColor: color,
-    height: "calc(100% - 15px)",
-    position: "absolute" as const,
-    left: "0",
-    top: "15px",
-  };
-
-  const iconStyle = {
-    position: "absolute" as const,
-    top: "0",
-    left: "0",
-    transform: "translateX(-50%)",
-    fontSize: "10px",
-    color,
-    lineHeight: "1",
-    backgroundColor: "white",
-    borderRadius: "50%",
-    padding: "1px",
   };
 
   const countStyle = {
@@ -148,8 +113,6 @@ function RelationButton({
         aria-label={ariaLabel}
         disabled={disabled}
       >
-        <div style={lineStyle} />
-        <span style={iconStyle}>{icon}</span>
         {isActive ? (
           <span style={labelStyle}>{label}</span>
         ) : (
@@ -189,8 +152,6 @@ function GhostRelationButton({
     executePlan(plan);
   };
 
-  const icon = RELATION_ICONS[relationTypeID] || "●";
-
   return (
     <RelationButton
       color={relationType.color}
@@ -198,7 +159,6 @@ function GhostRelationButton({
       onClick={onClick}
       ariaLabel={`create ${relationType.label || "relation"}`}
       id={relationTypeID}
-      icon={icon}
     />
   );
 }
@@ -236,7 +196,6 @@ function GhostVirtualListButton({
       onClick={onClick}
       ariaLabel={`add ${virtualList.label || "virtual list"}`}
       id={virtualListID}
-      icon="🔗"
     />
   );
 }
@@ -412,7 +371,6 @@ function AutomaticRelationsButton({
   readonly,
   relations,
   hideShowLabel,
-  children,
   label,
 }: {
   hideShowLabel: string;
@@ -420,7 +378,6 @@ function AutomaticRelationsButton({
   readonly?: boolean;
   alwaysOneSelected?: boolean;
   currentRelations?: Relations;
-  children: React.ReactNode;
   label: string;
 }): JSX.Element | null {
   const view = useNode()[1];
@@ -447,9 +404,6 @@ function AutomaticRelationsButton({
       }
     };
 
-  // Extract icon from children (e.g., <span className="iconsminds-link" />)
-  const icon = typeof children === "string" ? children : "🔗";
-
   return (
     <RelationButton
       color="black"
@@ -457,7 +411,6 @@ function AutomaticRelationsButton({
       onClick={onClick}
       ariaLabel={ariaLabel}
       id={relations.id}
-      icon={icon}
       count={relations.items.size}
       isActive={isActive}
       disabled={preventDeselect || readonly}
@@ -496,9 +449,7 @@ function ReferencedByRelationsButton({
       alwaysOneSelected={alwaysOneSelected}
       currentRelations={currentRelations}
       label={`Referenced By (${referencedByRelations.items.size})`}
-    >
-      <span className="iconsminds-link" />
-    </AutomaticRelationsButton>
+    />
   );
 }
 
@@ -593,8 +544,6 @@ function SelectRelationsButton({
       }
     };
 
-  const icon = RELATION_ICONS[topRelation.type] || "●";
-
   const dropdownStyle = {
     borderTopColor: color,
     borderRightColor: color,
@@ -611,7 +560,6 @@ function SelectRelationsButton({
       onClick={onClick}
       ariaLabel={ariaLabel}
       id={topRelation.id}
-      icon={icon}
       count={relationSize}
       isActive={isActive}
       showTooltip={!isActive}

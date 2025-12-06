@@ -60,39 +60,108 @@ function ConditionalTooltip({
   );
 }
 
-function GhostButton({
+function RelationButton({
   color,
   label,
   onClick,
   ariaLabel,
   id,
+  count,
+  isActive,
+  disabled,
+  showTooltip,
+  tooltipLabel,
+  showVertical = true,
+  addGroupSpacing = false,
 }: {
   color: string;
   label: string;
-  onClick: () => void;
+  onClick?: () => void;
   ariaLabel: string;
   id: string;
+  count?: number;
+  isActive?: boolean;
+  disabled?: boolean;
+  showTooltip?: boolean;
+  tooltipLabel?: string;
+  showVertical?: boolean;
+  addGroupSpacing?: boolean;
 }): JSX.Element {
-  const style = {
-    border: "0px",
-    borderLeft: `2px solid ${color}`,
-    color,
-    backgroundColor: "inherit",
-    opacity: 0.3,
-    width: "12px",
-    minHeight: "25px",
-    padding: 0,
+  const buttonStyle = showVertical
+    ? {
+        border: "0px",
+        backgroundColor: "inherit",
+        padding: "0 4px",
+        position: "relative" as const,
+        minWidth: "12px",
+        minHeight: "25px",
+        height: "100%",
+        color,
+        display: "flex",
+        alignItems: "center",
+        marginRight: addGroupSpacing ? "8px" : undefined,
+      }
+    : {
+        border: "0px",
+        backgroundColor: "inherit",
+        padding: "4px 0",
+        position: "relative" as const,
+        minWidth: "25px",
+        minHeight: "25px",
+        color,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        marginRight: addGroupSpacing ? "8px" : undefined,
+      };
+
+  const lineStyle = showVertical
+    ? {
+        width: "2px",
+        backgroundColor: color,
+        height: "100%",
+        position: "absolute" as const,
+        left: "0",
+        top: "0",
+      }
+    : {
+        width: "100%",
+        height: "3px",
+        backgroundColor: color,
+        position: "absolute" as const,
+        left: "0",
+        top: "5px",
+      };
+
+  const countStyle = {
+    fontSize: "10px",
+    marginLeft: "2px",
+  };
+
+  const labelStyle = {
+    marginLeft: "2px",
   };
 
   return (
-    <ConditionalTooltip show label={label} id={id}>
+    <ConditionalTooltip
+      show={showTooltip !== false && !isActive}
+      label={tooltipLabel || label}
+      id={id}
+    >
       <button
         type="button"
         onClick={onClick}
-        style={style}
+        style={buttonStyle}
         aria-label={ariaLabel}
+        disabled={disabled}
       >
-        {" "}
+        <div style={lineStyle} />
+        {isActive ? (
+          <span style={labelStyle}>{label}</span>
+        ) : (
+          count !== undefined &&
+          count > 0 && <span style={countStyle}>{count}</span>
+        )}
       </button>
     </ConditionalTooltip>
   );
@@ -100,8 +169,12 @@ function GhostButton({
 
 function GhostRelationButton({
   relationTypeID,
+  showVertical,
+  addGroupSpacing,
 }: {
   relationTypeID: ID;
+  showVertical?: boolean;
+  addGroupSpacing?: boolean;
 }): JSX.Element {
   const [node, view] = useNode();
   const viewPath = useViewPath();
@@ -126,20 +199,26 @@ function GhostRelationButton({
   };
 
   return (
-    <GhostButton
+    <RelationButton
       color={relationType.color}
       label={relationType.label}
       onClick={onClick}
       ariaLabel={`create ${relationType.label || "relation"}`}
       id={relationTypeID}
+      showVertical={showVertical}
+      addGroupSpacing={addGroupSpacing}
     />
   );
 }
 
 function GhostVirtualListButton({
   virtualListID,
+  showVertical,
+  addGroupSpacing,
 }: {
   virtualListID: LongID;
+  showVertical?: boolean;
+  addGroupSpacing?: boolean;
 }): JSX.Element {
   const [node, view] = useNode();
   const viewPath = useViewPath();
@@ -163,12 +242,14 @@ function GhostVirtualListButton({
   };
 
   return (
-    <GhostButton
+    <RelationButton
       color="black"
       label={virtualList.label}
       onClick={onClick}
       ariaLabel={`add ${virtualList.label || "virtual list"}`}
       id={virtualListID}
+      showVertical={showVertical}
+      addGroupSpacing={addGroupSpacing}
     />
   );
 }
@@ -312,6 +393,8 @@ type ShowRelationsButtonProps = {
   readonly?: boolean;
   alwaysOneSelected?: boolean;
   currentSelectedRelations?: Relations;
+  showVertical?: boolean;
+  addGroupSpacing?: boolean;
 };
 
 function useOnToggleExpanded(): (expand: boolean) => void {
@@ -344,16 +427,18 @@ function AutomaticRelationsButton({
   readonly,
   relations,
   hideShowLabel,
-  children,
   label,
+  showVertical,
+  addGroupSpacing,
 }: {
   hideShowLabel: string;
   relations: Relations;
   readonly?: boolean;
   alwaysOneSelected?: boolean;
   currentRelations?: Relations;
-  children: React.ReactNode;
   label: string;
+  showVertical?: boolean;
+  addGroupSpacing?: boolean;
 }): JSX.Element | null {
   const view = useNode()[1];
   const onChangeRelations = useOnChangeRelations();
@@ -368,13 +453,6 @@ function AutomaticRelationsButton({
       ? `hide ${hideShowLabel}`
       : `show ${hideShowLabel}`;
   const isActive = (isExpanded || alwaysOneSelected) && isSelected;
-  const style = {
-    border: "0px",
-    borderLeft: `2px solid black`,
-    color: "black",
-    backgroundColor: "inherit",
-    minHeight: "25px",
-  };
   const preventDeselect = isActive && alwaysOneSelected;
   const onClick = preventDeselect
     ? undefined
@@ -385,21 +463,20 @@ function AutomaticRelationsButton({
           onChangeRelations(relations, true);
         }
       };
-  const lbl = isActive ? label : relations.items.size;
 
   return (
-    <ConditionalTooltip show={!isActive} label={label} id={relations.id}>
-      <button
-        type="button"
-        aria-label={ariaLabel}
-        disabled={preventDeselect || readonly}
-        style={style}
-        onClick={onClick}
-      >
-        {children}
-        <span>{lbl}</span>
-      </button>
-    </ConditionalTooltip>
+    <RelationButton
+      color="black"
+      label={label}
+      onClick={onClick}
+      ariaLabel={ariaLabel}
+      id={relations.id}
+      count={relations.items.size}
+      isActive={isActive}
+      disabled={preventDeselect || readonly}
+      showVertical={showVertical}
+      addGroupSpacing={addGroupSpacing}
+    />
   );
 }
 
@@ -407,10 +484,14 @@ function ReferencedByRelationsButton({
   alwaysOneSelected,
   currentRelations,
   readonly,
+  showVertical,
+  addGroupSpacing,
 }: {
   readonly?: boolean;
   alwaysOneSelected?: boolean;
   currentRelations?: Relations;
+  showVertical?: boolean;
+  addGroupSpacing?: boolean;
 }): JSX.Element | null {
   const [node] = useNode();
   const { knowledgeDBs, user } = useData();
@@ -434,9 +515,9 @@ function ReferencedByRelationsButton({
       alwaysOneSelected={alwaysOneSelected}
       currentRelations={currentRelations}
       label={`Referenced By (${referencedByRelations.items.size})`}
-    >
-      <span className="iconsminds-link" />
-    </AutomaticRelationsButton>
+      showVertical={showVertical}
+      addGroupSpacing={addGroupSpacing}
+    />
   );
 }
 
@@ -478,6 +559,8 @@ function SelectRelationsButton({
   readonly: ro,
   alwaysOneSelected,
   currentSelectedRelations,
+  showVertical,
+  addGroupSpacing,
 }: ShowRelationsButtonProps): JSX.Element | null {
   const [node, view] = useNode();
   const data = useData();
@@ -522,14 +605,6 @@ function SelectRelationsButton({
   }`;
 
   const color = relationType?.color || "black";
-  const style = {
-    borderTopColor: color,
-    borderRightColor: color,
-    border: "0px",
-    borderLeft: `2px solid ${color}`,
-    color,
-    backgroundColor: "inherit",
-  };
   const label = relationLabel(isActive, relationType, relationSize);
   const preventDeselect = isActive && alwaysOneSelected;
   const onClick = preventDeselect
@@ -541,30 +616,45 @@ function SelectRelationsButton({
           onChangeRelations(topRelation, true);
         }
       };
-  return (
-    <ConditionalTooltip
-      show={!isActive}
-      label={relationType?.label || "relation"}
+
+  const dropdownStyle = {
+    borderTopColor: color,
+    borderRightColor: color,
+    border: "0px",
+    borderLeft: `2px solid ${color}`,
+    color,
+    backgroundColor: "inherit",
+  };
+
+  const button = (
+    <RelationButton
+      color={color}
+      label={label}
+      onClick={onClick}
+      ariaLabel={ariaLabel}
       id={topRelation.id}
-    >
-      <span style={{ display: "flex" }}>
-        <button
-          type="button"
-          onClick={onClick}
-          style={style}
-          aria-label={ariaLabel}
-        >
-          {label}
-        </button>
-        {isActive && (
-          <EditRelationsDropdown
-            className={className}
-            style={style}
-            otherRelations={otherRelations}
-          />
-        )}
-      </span>
-    </ConditionalTooltip>
+      count={relationSize}
+      isActive={isActive}
+      showTooltip={!isActive}
+      tooltipLabel={relationType?.label || "relation"}
+      showVertical={showVertical}
+      addGroupSpacing={addGroupSpacing}
+    />
+  );
+
+  if (!isActive) {
+    return button;
+  }
+
+  return (
+    <span style={{ display: "flex" }}>
+      {button}
+      <EditRelationsDropdown
+        className={className}
+        style={dropdownStyle}
+        otherRelations={otherRelations}
+      />
+    </span>
   );
 }
 
@@ -591,6 +681,11 @@ export function SelectRelations({
 
   const groupedByType = relations.groupBy((r) => r.type);
 
+  // Determine if we should show vertical or horizontal bars
+  // Column headers (alwaysOneSelected) always vertical
+  // Regular notes: horizontal by default, vertical only when expanded
+  const showVertical = alwaysOneSelected || view.expanded === true;
+
   const allItems: { type: string; id: LongID }[] = [
     ...RELATION_TYPES.keySeq()
       .toArray()
@@ -600,25 +695,40 @@ export function SelectRelations({
       .map((id) => ({ type: "virtualList" as const, id: id as LongID })),
   ];
 
-  const sortedItems = [...allItems].sort((a, b) => {
-    const isCurrentA =
-      a.type === "relation"
-        ? currentRelations?.type === a.id
-        : view.relations === a.id;
-    const isCurrentB =
-      b.type === "relation"
-        ? currentRelations?.type === b.id
-        : view.relations === b.id;
+  // Only sort to show current relation first when expanded/vertical
+  const sortedItems = showVertical
+    ? [...allItems].sort((a, b) => {
+        const isCurrentA =
+          a.type === "relation"
+            ? currentRelations?.type === a.id
+            : view.relations === a.id;
+        const isCurrentB =
+          b.type === "relation"
+            ? currentRelations?.type === b.id
+            : view.relations === b.id;
 
-    if (isCurrentA) return -1;
-    if (isCurrentB) return 1;
-    return 0;
-  });
+        if (isCurrentA) return -1;
+        if (isCurrentB) return 1;
+        return 0;
+      })
+    : allItems;
+
+  // Define which IDs mark the end of a semantic group
+  const isEndOfGroup = (id: LongID): boolean => {
+    return (
+      id === "not_relevant" ||
+      id === "contra" ||
+      id === "contains" ||
+      id === REFERENCED_BY
+    );
+  };
 
   return (
     <div className="menu-layout font-size-small">
       <ul className="nav nav-underline gap-0">
         {sortedItems.map((item) => {
+          const addGroupSpacing = isEndOfGroup(item.id);
+
           if (item.type === "relation") {
             const relationsOfType = groupedByType.get(item.id);
             if (relationsOfType) {
@@ -628,6 +738,8 @@ export function SelectRelations({
                   readonly={readonly}
                   alwaysOneSelected={alwaysOneSelected}
                   currentSelectedRelations={currentRelations}
+                  showVertical={showVertical}
+                  addGroupSpacing={addGroupSpacing}
                   key={item.id}
                 />
               );
@@ -636,7 +748,12 @@ export function SelectRelations({
               return null;
             }
             return (
-              <GhostRelationButton relationTypeID={item.id} key={item.id} />
+              <GhostRelationButton
+                relationTypeID={item.id}
+                showVertical={showVertical}
+                addGroupSpacing={addGroupSpacing}
+                key={item.id}
+              />
             );
           }
           if (item.id === REFERENCED_BY) {
@@ -645,6 +762,8 @@ export function SelectRelations({
                 readonly={readonly}
                 alwaysOneSelected={alwaysOneSelected}
                 currentRelations={currentRelations}
+                showVertical={showVertical}
+                addGroupSpacing={addGroupSpacing}
                 key={item.id}
               />
             );
@@ -653,7 +772,12 @@ export function SelectRelations({
             return null;
           }
           return (
-            <GhostVirtualListButton virtualListID={item.id} key={item.id} />
+            <GhostVirtualListButton
+              virtualListID={item.id}
+              showVertical={showVertical}
+              addGroupSpacing={addGroupSpacing}
+              key={item.id}
+            />
           );
         })}
       </ul>

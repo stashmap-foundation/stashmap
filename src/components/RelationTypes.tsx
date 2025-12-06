@@ -21,61 +21,54 @@ import {
 export const DEFAULT_COLOR = "#027d86";
 
 export const COLORS = [
-  "#9c27b0",
-  "#673ab7",
-  "#3f51b5",
-  "#032343",
-  "#738dbb",
-  "#2196f3",
-  "#00bcd4",
-  "#009688",
-  "#4caf50",
-  "#8bc34a",
-  "#a1cb58",
-  "#e7c550",
-  "#ffc859",
-  "#ff9800",
-  "#8f2c3b",
-  "#c30202",
-  "#bf4d3e",
-  "#795548",
+  "#0288d1", // Bright blue - relevant to
+  "#00acc1", // Cyan - maybe relevant
+  "#26c6da", // Light cyan - little relevant
+  "#757575", // Dark gray - not relevant
+  "#2e7d32", // Dark green - confirms
+  "#c62828", // Dark red - contra
+  "#9c27b0", // Bright purple - contains
 ];
 
+// Semantic grouping: Relevance types, Evidence types, Structure types
 export const RELATION_TYPES = OrderedMap<RelationType>({
+  // Relevance group - Blue spectrum
   "": {
-    color: DEFAULT_COLOR,
+    color: COLORS[0], // Bright blue
     label: "relevant to",
     invertedRelationLabel: "relevant for",
   },
-  little_relevant: {
-    color: COLORS[3],
-    label: "little relevant to",
-    invertedRelationLabel: "little relevant for",
-  },
   maybe_relevant: {
-    color: COLORS[5],
+    color: COLORS[1], // Cyan
     label: "maybe relevant to",
     invertedRelationLabel: "maybe relevant for",
   },
+  little_relevant: {
+    color: COLORS[2], // Light cyan
+    label: "little relevant to",
+    invertedRelationLabel: "little relevant for",
+  },
   not_relevant: {
-    color: COLORS[0],
+    color: COLORS[3], // Dark gray
     label: "not relevant to",
     invertedRelationLabel: "not relevant for",
   },
+  // Evidence group
   confirms: {
-    color: COLORS[9],
+    color: COLORS[4], // Dark green
     label: "confirmed by",
     invertedRelationLabel: "confirms",
   },
-  contains: {
-    color: COLORS[2],
-    label: "contains",
-    invertedRelationLabel: "contained in",
-  },
   contra: {
-    color: COLORS[15],
+    color: COLORS[5], // Dark red
     label: "contradicted by",
     invertedRelationLabel: "contradicts",
+  },
+  // Structure group
+  contains: {
+    color: COLORS[6], // Purple
+    label: "contains",
+    invertedRelationLabel: "contained in",
   },
 });
 

@@ -71,6 +71,7 @@ function RelationButton({
   disabled,
   showTooltip,
   tooltipLabel,
+  showVertical = true,
 }: {
   color: string;
   label: string;
@@ -82,18 +83,33 @@ function RelationButton({
   disabled?: boolean;
   showTooltip?: boolean;
   tooltipLabel?: string;
+  showVertical?: boolean;
 }): JSX.Element {
-  const buttonStyle = {
-    border: "0px",
-    borderLeft: `2px solid ${color}`,
-    backgroundColor: "inherit",
-    padding: "0 4px",
-    minWidth: "12px",
-    minHeight: "25px",
-    color,
-    display: "flex",
-    alignItems: "center",
-  };
+  const buttonStyle = showVertical
+    ? {
+        border: "0px",
+        borderLeft: `2px solid ${color}`,
+        borderBottom: "0px",
+        backgroundColor: "inherit",
+        padding: "0 4px",
+        minWidth: "12px",
+        minHeight: "25px",
+        color,
+        display: "flex",
+        alignItems: "center",
+      }
+    : {
+        border: "0px",
+        borderLeft: "0px",
+        borderBottom: `2px solid ${color}`,
+        backgroundColor: "inherit",
+        padding: "4px 0",
+        minWidth: "25px",
+        minHeight: "12px",
+        color,
+        display: "flex",
+        alignItems: "center",
+      };
 
   const countStyle = {
     fontSize: "10px",
@@ -127,8 +143,10 @@ function RelationButton({
 
 function GhostRelationButton({
   relationTypeID,
+  showVertical,
 }: {
   relationTypeID: ID;
+  showVertical?: boolean;
 }): JSX.Element {
   const [node, view] = useNode();
   const viewPath = useViewPath();
@@ -159,14 +177,17 @@ function GhostRelationButton({
       onClick={onClick}
       ariaLabel={`create ${relationType.label || "relation"}`}
       id={relationTypeID}
+      showVertical={showVertical}
     />
   );
 }
 
 function GhostVirtualListButton({
   virtualListID,
+  showVertical,
 }: {
   virtualListID: LongID;
+  showVertical?: boolean;
 }): JSX.Element {
   const [node, view] = useNode();
   const viewPath = useViewPath();
@@ -196,6 +217,7 @@ function GhostVirtualListButton({
       onClick={onClick}
       ariaLabel={`add ${virtualList.label || "virtual list"}`}
       id={virtualListID}
+      showVertical={showVertical}
     />
   );
 }
@@ -339,6 +361,7 @@ type ShowRelationsButtonProps = {
   readonly?: boolean;
   alwaysOneSelected?: boolean;
   currentSelectedRelations?: Relations;
+  showVertical?: boolean;
 };
 
 function useOnToggleExpanded(): (expand: boolean) => void {
@@ -372,6 +395,7 @@ function AutomaticRelationsButton({
   relations,
   hideShowLabel,
   label,
+  showVertical,
 }: {
   hideShowLabel: string;
   relations: Relations;
@@ -379,6 +403,7 @@ function AutomaticRelationsButton({
   alwaysOneSelected?: boolean;
   currentRelations?: Relations;
   label: string;
+  showVertical?: boolean;
 }): JSX.Element | null {
   const view = useNode()[1];
   const onChangeRelations = useOnChangeRelations();
@@ -414,6 +439,7 @@ function AutomaticRelationsButton({
       count={relations.items.size}
       isActive={isActive}
       disabled={preventDeselect || readonly}
+      showVertical={showVertical}
     />
   );
 }
@@ -422,10 +448,12 @@ function ReferencedByRelationsButton({
   alwaysOneSelected,
   currentRelations,
   readonly,
+  showVertical,
 }: {
   readonly?: boolean;
   alwaysOneSelected?: boolean;
   currentRelations?: Relations;
+  showVertical?: boolean;
 }): JSX.Element | null {
   const [node] = useNode();
   const { knowledgeDBs, user } = useData();
@@ -449,6 +477,7 @@ function ReferencedByRelationsButton({
       alwaysOneSelected={alwaysOneSelected}
       currentRelations={currentRelations}
       label={`Referenced By (${referencedByRelations.items.size})`}
+      showVertical={showVertical}
     />
   );
 }
@@ -491,6 +520,7 @@ function SelectRelationsButton({
   readonly: ro,
   alwaysOneSelected,
   currentSelectedRelations,
+  showVertical,
 }: ShowRelationsButtonProps): JSX.Element | null {
   const [node, view] = useNode();
   const data = useData();
@@ -564,6 +594,7 @@ function SelectRelationsButton({
       isActive={isActive}
       showTooltip={!isActive}
       tooltipLabel={relationType?.label || "relation"}
+      showVertical={showVertical}
     />
   );
 
@@ -606,6 +637,11 @@ export function SelectRelations({
 
   const groupedByType = relations.groupBy((r) => r.type);
 
+  // Determine if we should show vertical or horizontal bars
+  // Column headers (alwaysOneSelected) always vertical
+  // Regular notes: horizontal by default, vertical only when expanded
+  const showVertical = alwaysOneSelected || view.expanded === true;
+
   const allItems: { type: string; id: LongID }[] = [
     ...RELATION_TYPES.keySeq()
       .toArray()
@@ -643,6 +679,7 @@ export function SelectRelations({
                   readonly={readonly}
                   alwaysOneSelected={alwaysOneSelected}
                   currentSelectedRelations={currentRelations}
+                  showVertical={showVertical}
                   key={item.id}
                 />
               );
@@ -651,7 +688,11 @@ export function SelectRelations({
               return null;
             }
             return (
-              <GhostRelationButton relationTypeID={item.id} key={item.id} />
+              <GhostRelationButton
+                relationTypeID={item.id}
+                showVertical={showVertical}
+                key={item.id}
+              />
             );
           }
           if (item.id === REFERENCED_BY) {
@@ -660,6 +701,7 @@ export function SelectRelations({
                 readonly={readonly}
                 alwaysOneSelected={alwaysOneSelected}
                 currentRelations={currentRelations}
+                showVertical={showVertical}
                 key={item.id}
               />
             );
@@ -668,7 +710,11 @@ export function SelectRelations({
             return null;
           }
           return (
-            <GhostVirtualListButton virtualListID={item.id} key={item.id} />
+            <GhostVirtualListButton
+              virtualListID={item.id}
+              showVertical={showVertical}
+              key={item.id}
+            />
           );
         })}
       </ul>

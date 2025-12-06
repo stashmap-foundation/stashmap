@@ -88,10 +88,9 @@ function RelationButton({
   const buttonStyle = showVertical
     ? {
         border: "0px",
-        borderLeft: `2px solid ${color}`,
-        borderTop: "0px",
         backgroundColor: "inherit",
         padding: "0 4px",
+        position: "relative" as const,
         minWidth: "12px",
         minHeight: "25px",
         color,
@@ -100,15 +99,32 @@ function RelationButton({
       }
     : {
         border: "0px",
-        borderLeft: "0px",
-        borderTop: `2px solid ${color}`,
         backgroundColor: "inherit",
         padding: "4px 0",
+        position: "relative" as const,
         minWidth: "25px",
-        minHeight: "12px",
+        minHeight: "25px",
         color,
         display: "flex",
         alignItems: "center",
+      };
+
+  const lineStyle = showVertical
+    ? {
+        width: "2px",
+        backgroundColor: color,
+        height: "100%",
+        position: "absolute" as const,
+        left: "0",
+        top: "0",
+      }
+    : {
+        width: "100%",
+        height: "2px",
+        backgroundColor: color,
+        position: "absolute" as const,
+        left: "0",
+        top: "5px",
       };
 
   const countStyle = {
@@ -129,6 +145,7 @@ function RelationButton({
         aria-label={ariaLabel}
         disabled={disabled}
       >
+        <div style={lineStyle} />
         {isActive ? (
           <span style={labelStyle}>{label}</span>
         ) : (

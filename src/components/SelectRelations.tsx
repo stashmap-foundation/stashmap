@@ -668,20 +668,23 @@ export function SelectRelations({
       .map((id) => ({ type: "virtualList" as const, id: id as LongID })),
   ];
 
-  const sortedItems = [...allItems].sort((a, b) => {
-    const isCurrentA =
-      a.type === "relation"
-        ? currentRelations?.type === a.id
-        : view.relations === a.id;
-    const isCurrentB =
-      b.type === "relation"
-        ? currentRelations?.type === b.id
-        : view.relations === b.id;
+  // Only sort to show current relation first when expanded/vertical
+  const sortedItems = showVertical
+    ? [...allItems].sort((a, b) => {
+        const isCurrentA =
+          a.type === "relation"
+            ? currentRelations?.type === a.id
+            : view.relations === a.id;
+        const isCurrentB =
+          b.type === "relation"
+            ? currentRelations?.type === b.id
+            : view.relations === b.id;
 
-    if (isCurrentA) return -1;
-    if (isCurrentB) return 1;
-    return 0;
-  });
+        if (isCurrentA) return -1;
+        if (isCurrentB) return 1;
+        return 0;
+      })
+    : allItems;
 
   return (
     <div className="menu-layout font-size-small">

@@ -104,11 +104,7 @@ test("Move View Settings on Delete", async () => {
   );
   await screen.findByText("C++");
   // Remove JAVA Node
-  await userEvent.click(
-    screen.getByLabelText("toggle multiselect Programming Languages")
-  );
-  await userEvent.click(screen.getByLabelText("select Java"));
-  await userEvent.click(screen.getByLabelText("disconnect 1 selected nodes"));
+  await userEvent.click(screen.getByLabelText("disconnect node Java"));
   // Ensure C is still expanded
   await screen.findByText("C++");
   screen.getByLabelText("hide items relevant for C");

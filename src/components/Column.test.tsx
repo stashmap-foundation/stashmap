@@ -133,6 +133,6 @@ test("If Node is the root we always show references when there are more than 0",
   screen.getByLabelText("hide references to Bitcoin");
   expect(
     (await screen.findByLabelText("related to Bitcoin")).textContent
-  ).toMatch(/Money1(.*)/);
+  ).toMatch(/Money(.*)/);
   screen.getByText("Referenced By (1)");
 });

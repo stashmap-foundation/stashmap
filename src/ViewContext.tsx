@@ -334,6 +334,16 @@ export function getParentView(viewContext: ViewPath): ViewPath | undefined {
   return popPath(viewContext);
 }
 
+export function popViewPath(
+  viewContext: ViewPath,
+  times: number
+): ViewPath | undefined {
+  return Array.from({ length: times }).reduce<ViewPath | undefined>(
+    (current) => (current ? getParentView(current) : undefined),
+    viewContext
+  );
+}
+
 export function getRelationIndex(
   data: Data,
   viewPath: ViewPath

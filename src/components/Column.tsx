@@ -1,11 +1,9 @@
 import React from "react";
-import { Card } from "react-bootstrap";
 import { useMediaQuery } from "react-responsive";
-import { NodeCard, UIColumn, UIColumnHeader } from "../commons/Ui";
+import { NodeCard, UIColumn } from "../commons/Ui";
 import { bulkAddRelations } from "../connections";
 import { FileDropZone } from "./FileDropZone";
 import { Indent } from "./Node";
-import { ColumnMenu } from "./Menu";
 import { useDeselectAllInView } from "./TemporaryViewContext";
 import { upsertRelations, useViewKey, useViewPath } from "../ViewContext";
 import { TreeView } from "./TreeView";
@@ -34,14 +32,9 @@ export function Column(): JSX.Element | null {
   return (
     <UIColumn>
       <FileDropZone onDrop={onDropFiles}>
-        <UIColumnHeader>
-          <DroppableContainer>
-            <DraggableNote />
-            <Card.Body className="p-0 overflow-y-hidden">
-              <ColumnMenu />
-            </Card.Body>
-          </DroppableContainer>
-        </UIColumnHeader>
+        <DroppableContainer>
+          <DraggableNote />
+        </DroppableContainer>
         <TreeView />
         <div>
           <DroppableContainer>
@@ -50,7 +43,7 @@ export function Column(): JSX.Element | null {
                 !isMobile ? "hover-light-bg border-top-strong" : undefined
               }
             >
-              <Indent levels={1} />
+              <Indent levels={2} />
               <AddNodeToNode />
             </NodeCard>
           </DroppableContainer>

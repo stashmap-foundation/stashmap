@@ -12,29 +12,15 @@ import { IS_MOBILE } from "./responsive";
 import { getRelations } from "../connections";
 import { useData } from "../DataContext";
 
-export function ColumnMenu(): JSX.Element {
-  const temporaryView = useTemporaryView();
-  const viewKey = useViewKey();
-  const isMultiSelectToggled = temporaryView.multiselectBtns.has(viewKey);
-  return (
-    <div className="flex-row-space-between font-size-big">
-      <div className="flex-row-start">
-        <ToggleMultiselect />
-        <div className="vertical-line ms-2 me-2" />
-        {!isMultiSelectToggled && (
-          <div className="menu-layout">
-            <SelectRelations alwaysOneSelected />
-          </div>
-        )}
-      </div>
-      <div className="flex-row-end p-1">
-        {isMultiSelectToggled && <DisconnectBtn />}
-      </div>
-    </div>
-  );
-}
-
-export function DetailViewMenu(): JSX.Element {
+function BaseMenu({
+  showMultiselectToggle = false,
+  alwaysOneSelected = false,
+  showMobileEditing = false,
+}: {
+  showMultiselectToggle?: boolean;
+  alwaysOneSelected?: boolean;
+  showMobileEditing?: boolean;
+}): JSX.Element {
   const temporaryView = useTemporaryView();
   const viewKey = useViewKey();
   const isMobile = useMediaQuery(IS_MOBILE);
@@ -42,12 +28,16 @@ export function DetailViewMenu(): JSX.Element {
   return (
     <div className="flex-row-space-between font-size-big">
       <div className="flex-row-start p-1">
-        <ToggleMultiselect />
-        <div className="vertical-line ms-2 me-2" />
+        {showMultiselectToggle && (
+          <>
+            <ToggleMultiselect />
+            <div className="vertical-line ms-2 me-2" />
+          </>
+        )}
         {!isMultiSelectToggled && (
           <div className="menu-layout">
-            <SelectRelations alwaysOneSelected />
-            {isMobile && <ToggleEditing />}
+            <SelectRelations alwaysOneSelected={alwaysOneSelected} />
+            {showMobileEditing && isMobile && <ToggleEditing />}
           </div>
         )}
       </div>
@@ -58,6 +48,10 @@ export function DetailViewMenu(): JSX.Element {
       )}
     </div>
   );
+}
+
+export function DetailViewMenu(): JSX.Element {
+  return <BaseMenu showMultiselectToggle alwaysOneSelected showMobileEditing />;
 }
 
 function useIsActionable(): boolean {

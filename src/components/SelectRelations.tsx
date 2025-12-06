@@ -94,7 +94,7 @@ function RelationButton({
         padding: "0 4px",
         position: "relative" as const,
         minWidth: "12px",
-        minHeight: "25px",
+        minHeight: "38px",
         height: "100%",
         color,
         display: "flex",
@@ -667,6 +667,7 @@ export function SelectRelations({
 }): JSX.Element | null {
   const { knowledgeDBs, user } = useData();
   const [nodeID, view] = useNodeID();
+  const viewPath = useViewPath();
   const currentRelations = getRelations(
     knowledgeDBs,
     view.relations,
@@ -682,9 +683,12 @@ export function SelectRelations({
   const groupedByType = relations.groupBy((r) => r.type);
 
   // Determine if we should show vertical or horizontal bars
-  // Column headers (alwaysOneSelected) always vertical
+  // Column headers (alwaysOneSelected or viewPath.length === 2) always vertical
   // Regular notes: horizontal by default, vertical only when expanded
-  const showVertical = alwaysOneSelected || view.expanded === true;
+  const isHeaderColumn = viewPath.length === 2;
+  const showVertical =
+    alwaysOneSelected || isHeaderColumn || view.expanded === true;
+  const forceOneSelected = alwaysOneSelected || isHeaderColumn;
 
   const allItems: { type: string; id: LongID }[] = [
     ...RELATION_TYPES.keySeq()
@@ -736,7 +740,7 @@ export function SelectRelations({
                 <SelectRelationsButton
                   relationList={relationsOfType.toList()}
                   readonly={readonly}
-                  alwaysOneSelected={alwaysOneSelected}
+                  alwaysOneSelected={forceOneSelected}
                   currentSelectedRelations={currentRelations}
                   showVertical={showVertical}
                   addGroupSpacing={addGroupSpacing}
@@ -760,7 +764,7 @@ export function SelectRelations({
             return (
               <ReferencedByRelationsButton
                 readonly={readonly}
-                alwaysOneSelected={alwaysOneSelected}
+                alwaysOneSelected={forceOneSelected}
                 currentRelations={currentRelations}
                 showVertical={showVertical}
                 addGroupSpacing={addGroupSpacing}

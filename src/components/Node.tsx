@@ -18,7 +18,8 @@ import {
   addAddToNodeToPath,
   getNodeIDFromView,
   useNodeID,
-  useParentNode,
+  getViewFromPath,
+  popViewPath,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -47,7 +48,7 @@ function getLevels(viewPath: ViewPath, isOpenInFullScreen: boolean): number {
   if (isOpenInFullScreen) {
     return viewPath.length - 1;
   }
-  return viewPath.length - 2;
+  return viewPath.length - 1;
 }
 
 export function useIsOpenInFullScreen(): boolean {
@@ -342,20 +343,38 @@ const INDENTATION = 10;
 const ARROW_WIDTH = 0;
 
 export function Indent({ levels }: { levels: number }): JSX.Element {
-  const parentView = useParentNode()[1];
+  const viewPath = useViewPath();
   const data = useData();
-  const [relationType] = parentView?.relations
-    ? getRelationTypeByRelationsID(data, parentView.relations)
-    : [undefined];
-  const color = relationType?.color || undefined;
-  const style = color
-    ? {
-        borderLeft: `2px solid ${color}`,
-      }
-    : {};
+
   return (
     <>
       {Array.from(Array(levels).keys()).map((k) => {
+        // For line at position k (where k > 0), pop back to get the ancestor view
+        // k=0: no line (just spacing)
+        // k=1: first line, pop back (levels - 1) times to get header column view
+        // k=2: second line, pop back (levels - 2) times to get first child view
+        // etc.
+        const color =
+          k > 0
+            ? (() => {
+                const pathForColor = popViewPath(viewPath, levels - k);
+                if (!pathForColor) {
+                  return undefined;
+                }
+                const viewForColor = getViewFromPath(data, pathForColor);
+                const [relationType] = viewForColor?.relations
+                  ? getRelationTypeByRelationsID(data, viewForColor.relations)
+                  : [undefined];
+                return relationType?.color || undefined;
+              })()
+            : undefined;
+
+        const style = color
+          ? {
+              borderLeft: `2px solid ${color}`,
+            }
+          : {};
+
         return (
           <div key={k} style={{ marginLeft: ARROW_WIDTH }}>
             <div style={{ width: INDENTATION }} />
@@ -410,7 +429,10 @@ export function getNodesInTree(
     },
     ctx
   );
-  return getLevels(parentPath, isOpenInFullScreen || false) === 0
+  // Don't add "Add Note" button for workspace root (levels === 0) or header column (parentPath.length === 1)
+  const isHeaderColumn = parentPath.length === 2;
+  return getLevels(parentPath, isOpenInFullScreen || false) === 0 ||
+    isHeaderColumn
     ? nodesInTree
     : nodesInTree.push(addNodePath);
 }
@@ -429,7 +451,6 @@ export function Node({
   const isAddToNode = useIsAddToNode();
   const isNodeBeingEdited = useIsEditingOn();
   const isMultiselect = useIsParentMultiselectBtnOn();
-  const displayMenu = levels > 0;
   const cls = !isMobile ? `${className || ""} hover-light-bg` : className;
 
   return (
@@ -456,7 +477,7 @@ export function Node({
             {!isNodeBeingEdited && isDesktopFullScreenTitleNode && (
               <InteractiveNodeContent editOnClick />
             )}
-            {displayMenu && <NodeMenu />}
+            <NodeMenu />
           </div>
         </>
       )}

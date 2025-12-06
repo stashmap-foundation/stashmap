@@ -41,41 +41,45 @@ export const COLORS = [
   "#795548",
 ];
 
+// Semantic grouping: Relevance types, Evidence types, Structure types
 export const RELATION_TYPES = OrderedMap<RelationType>({
+  // Relevance group - Green/Teal spectrum
   "": {
-    color: DEFAULT_COLOR,
+    color: "#00897b", // Strong teal
     label: "relevant to",
     invertedRelationLabel: "relevant for",
   },
-  little_relevant: {
-    color: COLORS[3],
-    label: "little relevant to",
-    invertedRelationLabel: "little relevant for",
-  },
   maybe_relevant: {
-    color: COLORS[5],
+    color: "#26a69a", // Medium teal
     label: "maybe relevant to",
     invertedRelationLabel: "maybe relevant for",
   },
+  little_relevant: {
+    color: "#80cbc4", // Light teal
+    label: "little relevant to",
+    invertedRelationLabel: "little relevant for",
+  },
   not_relevant: {
-    color: COLORS[0],
+    color: "#9e9e9e", // Gray
     label: "not relevant to",
     invertedRelationLabel: "not relevant for",
   },
+  // Evidence group
   confirms: {
-    color: COLORS[9],
+    color: "#43a047", // Strong green
     label: "confirmed by",
     invertedRelationLabel: "confirms",
   },
-  contains: {
-    color: COLORS[2],
-    label: "contains",
-    invertedRelationLabel: "contained in",
-  },
   contra: {
-    color: COLORS[15],
+    color: "#e53935", // Strong red
     label: "contradicted by",
     invertedRelationLabel: "contradicts",
+  },
+  // Structure group
+  contains: {
+    color: "#3949ab", // Strong indigo
+    label: "contains",
+    invertedRelationLabel: "contained in",
   },
 });
 

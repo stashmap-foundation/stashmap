@@ -111,6 +111,7 @@ function RelationButton({
       color,
       display: "flex",
       alignItems: "center",
+      justifyContent: "center",
       marginRight: addGroupSpacing ? "8px" : undefined,
     };
 

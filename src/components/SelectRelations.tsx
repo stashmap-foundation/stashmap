@@ -89,7 +89,7 @@ function RelationButton({
     ? {
         border: "0px",
         borderLeft: `2px solid ${color}`,
-        borderBottom: "0px",
+        borderTop: "0px",
         backgroundColor: "inherit",
         padding: "0 4px",
         minWidth: "12px",
@@ -101,7 +101,7 @@ function RelationButton({
     : {
         border: "0px",
         borderLeft: "0px",
-        borderBottom: `2px solid ${color}`,
+        borderTop: `2px solid ${color}`,
         backgroundColor: "inherit",
         padding: "4px 0",
         minWidth: "25px",

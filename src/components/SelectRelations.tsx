@@ -34,6 +34,17 @@ const tooltipConfig = {
   modifiers: [],
 };
 
+// Map relation types to icons
+const RELATION_ICONS: Record<string, string> = {
+  "": "⬤", // relevant - large dot
+  little_relevant: "●", // medium dot
+  maybe_relevant: "·", // small dot
+  not_relevant: "○", // empty circle
+  confirms: "✓", // checkmark
+  contains: "▢", // box
+  contra: "✕", // x mark
+};
+
 function ConditionalTooltip({
   show,
   label,
@@ -60,39 +71,92 @@ function ConditionalTooltip({
   );
 }
 
-function GhostButton({
+function RelationButton({
   color,
   label,
   onClick,
   ariaLabel,
   id,
+  icon,
+  count,
+  isActive,
+  disabled,
+  showTooltip,
+  tooltipLabel,
 }: {
   color: string;
   label: string;
-  onClick: () => void;
+  onClick?: () => void;
   ariaLabel: string;
   id: string;
+  icon: string;
+  count?: number;
+  isActive?: boolean;
+  disabled?: boolean;
+  showTooltip?: boolean;
+  tooltipLabel?: string;
 }): JSX.Element {
-  const style = {
+  const buttonStyle = {
     border: "0px",
-    borderLeft: `2px solid ${color}`,
-    color,
     backgroundColor: "inherit",
-    opacity: 0.3,
-    width: "12px",
+    padding: "0 4px",
+    position: "relative" as const,
+    minWidth: "12px",
     minHeight: "25px",
-    padding: 0,
+    color,
+    display: "flex",
+    alignItems: "center",
+  };
+
+  const lineStyle = {
+    width: "2px",
+    backgroundColor: color,
+    height: "calc(100% - 15px)",
+    position: "absolute" as const,
+    left: "0",
+    top: "15px",
+  };
+
+  const iconStyle = {
+    position: "absolute" as const,
+    top: "0",
+    left: "0",
+    transform: "translateX(-50%)",
+    fontSize: "10px",
+    color,
+    lineHeight: "1",
+    backgroundColor: "white",
+    borderRadius: "50%",
+    padding: "1px",
+  };
+
+  const countStyle = {
+    fontSize: "10px",
+    marginLeft: "2px",
+  };
+
+  const labelStyle = {
+    marginLeft: "2px",
   };
 
   return (
-    <ConditionalTooltip show label={label} id={id}>
+    <ConditionalTooltip show={showTooltip !== false && !isActive} label={tooltipLabel || label} id={id}>
       <button
         type="button"
         onClick={onClick}
-        style={style}
+        style={buttonStyle}
         aria-label={ariaLabel}
+        disabled={disabled}
       >
-        {" "}
+        <div style={lineStyle} />
+        <span style={iconStyle}>{icon}</span>
+        {isActive ? (
+          <span style={labelStyle}>{label}</span>
+        ) : (
+          count !== undefined && count > 0 && (
+            <span style={countStyle}>{count}</span>
+          )
+        )}
       </button>
     </ConditionalTooltip>
   );
@@ -125,13 +189,16 @@ function GhostRelationButton({
     executePlan(plan);
   };
 
+  const icon = RELATION_ICONS[relationTypeID] || "●";
+
   return (
-    <GhostButton
+    <RelationButton
       color={relationType.color}
       label={relationType.label}
       onClick={onClick}
       ariaLabel={`create ${relationType.label || "relation"}`}
       id={relationTypeID}
+      icon={icon}
     />
   );
 }
@@ -163,12 +230,13 @@ function GhostVirtualListButton({
   };
 
   return (
-    <GhostButton
+    <RelationButton
       color="black"
       label={virtualList.label}
       onClick={onClick}
       ariaLabel={`add ${virtualList.label || "virtual list"}`}
       id={virtualListID}
+      icon="🔗"
     />
   );
 }
@@ -368,38 +436,32 @@ function AutomaticRelationsButton({
       ? `hide ${hideShowLabel}`
       : `show ${hideShowLabel}`;
   const isActive = (isExpanded || alwaysOneSelected) && isSelected;
-  const style = {
-    border: "0px",
-    borderLeft: `2px solid black`,
-    color: "black",
-    backgroundColor: "inherit",
-    minHeight: "25px",
-  };
   const preventDeselect = isActive && alwaysOneSelected;
   const onClick = preventDeselect
     ? undefined
     : () => {
-        if (view.relations === relations.id) {
-          onToggleExpanded(!isExpanded);
-        } else {
-          onChangeRelations(relations, true);
-        }
-      };
-  const lbl = isActive ? label : relations.items.size;
+      if (view.relations === relations.id) {
+        onToggleExpanded(!isExpanded);
+      } else {
+        onChangeRelations(relations, true);
+      }
+    };
+
+  // Extract icon from children (e.g., <span className="iconsminds-link" />)
+  const icon = typeof children === "string" ? children : "🔗";
 
   return (
-    <ConditionalTooltip show={!isActive} label={label} id={relations.id}>
-      <button
-        type="button"
-        aria-label={ariaLabel}
-        disabled={preventDeselect || readonly}
-        style={style}
-        onClick={onClick}
-      >
-        {children}
-        <span>{lbl}</span>
-      </button>
-    </ConditionalTooltip>
+    <RelationButton
+      color="black"
+      label={label}
+      onClick={onClick}
+      ariaLabel={ariaLabel}
+      id={relations.id}
+      icon={icon}
+      count={relations.items.size}
+      isActive={isActive}
+      disabled={preventDeselect || readonly}
+    />
   );
 }
 
@@ -509,20 +571,31 @@ function SelectRelationsButton({
   const isExpanded = view.expanded === true;
   const ariaLabel =
     isExpanded && isSelected
-      ? `hide items ${relationType?.invertedRelationLabel || "list"} ${
-          node.text
-        }`
-      : `show items ${relationType?.invertedRelationLabel || "list"} ${
-          node.text
-        }`;
+      ? `hide items ${relationType?.invertedRelationLabel || "list"} ${node.text
+      }`
+      : `show items ${relationType?.invertedRelationLabel || "list"} ${node.text
+      }`;
 
   const isActive = (isExpanded || !!alwaysOneSelected) && isSelected;
-  const className = `btn select-relation no-shadow ${
-    isActive ? "opacity-none" : "deselected"
-  }`;
+  const className = `btn select-relation no-shadow ${isActive ? "opacity-none" : "deselected"
+    }`;
 
   const color = relationType?.color || "black";
-  const style = {
+  const label = relationLabel(isActive, relationType, relationSize);
+  const preventDeselect = isActive && alwaysOneSelected;
+  const onClick = preventDeselect
+    ? undefined
+    : () => {
+      if (view.relations === topRelation.id) {
+        onToggleExpanded(!isExpanded);
+      } else {
+        onChangeRelations(topRelation, true);
+      }
+    };
+
+  const icon = RELATION_ICONS[topRelation.type] || "●";
+
+  const dropdownStyle = {
     borderTopColor: color,
     borderRightColor: color,
     border: "0px",
@@ -530,41 +603,35 @@ function SelectRelationsButton({
     color,
     backgroundColor: "inherit",
   };
-  const label = relationLabel(isActive, relationType, relationSize);
-  const preventDeselect = isActive && alwaysOneSelected;
-  const onClick = preventDeselect
-    ? undefined
-    : () => {
-        if (view.relations === topRelation.id) {
-          onToggleExpanded(!isExpanded);
-        } else {
-          onChangeRelations(topRelation, true);
-        }
-      };
-  return (
-    <ConditionalTooltip
-      show={!isActive}
-      label={relationType?.label || "relation"}
+
+  const button = (
+    <RelationButton
+      color={color}
+      label={label}
+      onClick={onClick}
+      ariaLabel={ariaLabel}
       id={topRelation.id}
-    >
-      <span style={{ display: "flex" }}>
-        <button
-          type="button"
-          onClick={onClick}
-          style={style}
-          aria-label={ariaLabel}
-        >
-          {label}
-        </button>
-        {isActive && (
-          <EditRelationsDropdown
-            className={className}
-            style={style}
-            otherRelations={otherRelations}
-          />
-        )}
-      </span>
-    </ConditionalTooltip>
+      icon={icon}
+      count={relationSize}
+      isActive={isActive}
+      showTooltip={!isActive}
+      tooltipLabel={relationType?.label || "relation"}
+    />
+  );
+
+  if (!isActive) {
+    return button;
+  }
+
+  return (
+    <span style={{ display: "flex" }}>
+      {button}
+      <EditRelationsDropdown
+        className={className}
+        style={dropdownStyle}
+        otherRelations={otherRelations}
+      />
+    </span>
   );
 }
 

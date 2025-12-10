@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
 import { useMediaQuery } from "react-responsive";
-import { useLocation } from "react-router-dom";
 import ReactQuill from "react-quill";
 import { CloseButton, NodeCard } from "../commons/Ui";
 import { LoadingSpinnerButton } from "../commons/LoadingSpinnerButton";
@@ -264,7 +263,7 @@ export function AddColumn(): JSX.Element {
         onCreateNewNode={onCreateNewNode}
         onAddExistingNode={(id) => onAddNode(createPlan(), id)}
         ariaLabel="add node"
-        isSearchEnabledByShortcut={true}
+        isSearchEnabledByShortcut
       />
     </NodeCard>
   );

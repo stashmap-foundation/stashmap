@@ -390,7 +390,6 @@ function EditRelationsDropdown({
 
 type ShowRelationsButtonProps = {
   relationList: List<Relations>;
-  readonly?: boolean;
   alwaysOneSelected?: boolean;
   currentSelectedRelations?: Relations;
   showVertical?: boolean;
@@ -424,7 +423,6 @@ function useOnToggleExpanded(): (expand: boolean) => void {
 function AutomaticRelationsButton({
   alwaysOneSelected,
   currentRelations,
-  readonly,
   relations,
   hideShowLabel,
   label,
@@ -433,7 +431,6 @@ function AutomaticRelationsButton({
 }: {
   hideShowLabel: string;
   relations: Relations;
-  readonly?: boolean;
   alwaysOneSelected?: boolean;
   currentRelations?: Relations;
   label: string;
@@ -473,7 +470,7 @@ function AutomaticRelationsButton({
       id={relations.id}
       count={relations.items.size}
       isActive={isActive}
-      disabled={preventDeselect || readonly}
+      disabled={preventDeselect}
       showVertical={showVertical}
       addGroupSpacing={addGroupSpacing}
     />
@@ -483,11 +480,9 @@ function AutomaticRelationsButton({
 function ReferencedByRelationsButton({
   alwaysOneSelected,
   currentRelations,
-  readonly,
   showVertical,
   addGroupSpacing,
 }: {
-  readonly?: boolean;
   alwaysOneSelected?: boolean;
   currentRelations?: Relations;
   showVertical?: boolean;
@@ -511,7 +506,6 @@ function ReferencedByRelationsButton({
     <AutomaticRelationsButton
       hideShowLabel={`references to ${node.text}`}
       relations={referencedByRelations}
-      readonly={readonly}
       alwaysOneSelected={alwaysOneSelected}
       currentRelations={currentRelations}
       label={`Referenced By (${referencedByRelations.items.size})`}
@@ -556,7 +550,6 @@ function relationLabel(
 
 function SelectRelationsButton({
   relationList,
-  readonly: ro,
   alwaysOneSelected,
   currentSelectedRelations,
   showVertical,
@@ -564,7 +557,6 @@ function SelectRelationsButton({
 }: ShowRelationsButtonProps): JSX.Element | null {
   const [node, view] = useNode();
   const data = useData();
-  const readonly = ro === true;
   const onChangeRelations = useOnChangeRelations();
   const onToggleExpanded = useOnToggleExpanded();
   if (!node || !view || !onChangeRelations) {
@@ -580,14 +572,6 @@ function SelectRelationsButton({
   const otherRelations = sorted.filter((r) => r.id !== topRelation.id);
   const [relationType] = getRelationTypeByRelationsID(data, topRelation.id);
   const relationSize = topRelation.items.size;
-
-  if (readonly) {
-    return (
-      <div className="flex-start deselected">
-        <span className="font-size-small pe-1">{relationSize}</span>
-      </div>
-    );
-  }
 
   const isExpanded = view.expanded === true;
   const ariaLabel =
@@ -659,10 +643,8 @@ function SelectRelationsButton({
 }
 
 export function SelectRelations({
-  readonly,
   alwaysOneSelected,
 }: {
-  readonly?: boolean;
   alwaysOneSelected?: boolean;
 }): JSX.Element | null {
   const { knowledgeDBs, user } = useData();
@@ -739,7 +721,6 @@ export function SelectRelations({
               return (
                 <SelectRelationsButton
                   relationList={relationsOfType.toList()}
-                  readonly={readonly}
                   alwaysOneSelected={forceOneSelected}
                   currentSelectedRelations={currentRelations}
                   showVertical={showVertical}
@@ -747,9 +728,6 @@ export function SelectRelations({
                   key={item.id}
                 />
               );
-            }
-            if (readonly) {
-              return null;
             }
             return (
               <GhostRelationButton
@@ -763,7 +741,6 @@ export function SelectRelations({
           if (item.id === REFERENCED_BY) {
             return (
               <ReferencedByRelationsButton
-                readonly={readonly}
                 alwaysOneSelected={forceOneSelected}
                 currentRelations={currentRelations}
                 showVertical={showVertical}
@@ -771,9 +748,6 @@ export function SelectRelations({
                 key={item.id}
               />
             );
-          }
-          if (readonly) {
-            return null;
           }
           return (
             <GhostVirtualListButton

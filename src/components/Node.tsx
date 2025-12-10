@@ -1,7 +1,7 @@
 import { List } from "immutable";
 import React, { useEffect, useState } from "react";
 import { useMediaQuery } from "react-responsive";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import ReactQuill from "react-quill";
 import { textVide } from "text-vide";
 import DOMPurify from "dompurify";
@@ -12,7 +12,6 @@ import {
   useViewPath,
   ViewPath,
   useIsAddToNode,
-  getRoot,
   addNodeToPath,
   addAddToNodeToPath,
   getNodeIDFromView,
@@ -391,11 +390,7 @@ export function getNodesInTree(
         return nodesList.push(childPath);
       }
       if (childView.expanded) {
-        return getNodesInTree(
-          data,
-          childPath,
-          nodesList.push(childPath)
-        );
+        return getNodesInTree(data, childPath, nodesList.push(childPath));
       }
       return nodesList.push(childPath);
     },
@@ -403,8 +398,7 @@ export function getNodesInTree(
   );
   // Don't add "Add Note" button for workspace root (levels === 0) or header column (parentPath.length === 1)
   const isHeaderColumn = parentPath.length === 2;
-  return getLevels(parentPath) === 0 ||
-    isHeaderColumn
+  return getLevels(parentPath) === 0 || isHeaderColumn
     ? nodesInTree
     : nodesInTree.push(addNodePath);
 }
@@ -423,10 +417,7 @@ export function Node({
   const cls = !isMobile ? `${className || ""} hover-light-bg` : className;
 
   return (
-    <NodeCard
-      className={cls}
-      cardBodyClassName="ps-0 pt-4 pb-0"
-    >
+    <NodeCard className={cls} cardBodyClassName="ps-0 pt-4 pb-0">
       {levels > 0 && <Indent levels={levels} />}
       {isAddToNode && levels !== 1 && <AddNodeToNode />}
       {!isAddToNode && (

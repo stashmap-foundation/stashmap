@@ -35,7 +35,6 @@ import { shortID } from "../connections";
 import { useApis } from "../Apis";
 
 const LOAD_EXTRA = 10;
-const MAX_MODAL_VERTICAL_HEIGHT = 0.75;
 
 function VirtuosoForColumn({
   nodes,
@@ -69,7 +68,9 @@ function VirtuosoForColumn({
   const [totalListHeight, setTotalListHeight] = useState<number | undefined>(
     undefined
   );
-  const virtuosoStyle = { height: totalListHeight ? `${totalListHeight}px` : "1px" };
+  const virtuosoStyle = {
+    height: totalListHeight ? `${totalListHeight}px` : "1px",
+  };
 
   /* eslint-disable react/jsx-props-no-spreading */
   const Scroller = React.useCallback(
@@ -176,11 +177,7 @@ function Tree(): JSX.Element | null {
     endIndex: startIndexFromStorage,
   });
   const viewPath = useViewPath();
-  const nodes = getNodesInTree(
-    data,
-    viewPath,
-    List<ViewPath>()
-  );
+  const nodes = getNodesInTree(data, viewPath, List<ViewPath>());
   const [node] = useNode();
   const ariaLabel = node ? `related to ${node.text}` : undefined;
 

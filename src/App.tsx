@@ -1,9 +1,7 @@
 import React from "react";
 import { Route, Routes } from "react-router-dom";
-import { useMediaQuery } from "react-responsive";
 import Dashboard from "./components/Dashboard";
 import { Follow } from "./components/Follow";
-import { IS_MOBILE } from "./components/responsive";
 import { RelaysWrapper } from "./components/Relays";
 import { RequireLogin } from "./AppState";
 import { SignUp } from "./SignUp";
@@ -12,7 +10,6 @@ import { Profile } from "./components/Profile";
 import { JoinProject } from "./JoinProjext";
 
 export function App(): JSX.Element {
-  const isMobile = useMediaQuery(IS_MOBILE);
   return (
     <Routes>
       <Route element={<RequireLogin />}>

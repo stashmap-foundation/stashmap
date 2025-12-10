@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { useMediaQuery } from "react-responsive";
-import { matchPath, useLocation, useParams } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import ReactQuill from "react-quill";
 import { CloseButton, NodeCard } from "../commons/Ui";
 import { LoadingSpinnerButton } from "../commons/LoadingSpinnerButton";
@@ -19,8 +19,7 @@ import {
 import useModal from "./useModal";
 import { ESC, SearchModal } from "./SearchModal";
 import { IS_MOBILE } from "./responsive";
-import { Indent, useIsOpenInFullScreen } from "./Node";
-import { FULL_SCREEN_PATH } from "../App";
+import { Indent } from "./Node";
 import {
   openEditor,
   closeEditor,
@@ -153,19 +152,6 @@ function Editor({ onCreateNode, onClose }: EditorProps): JSX.Element {
   );
 }
 
-function useIsFullScreen(): boolean {
-  const location = useLocation();
-  return matchPath(FULL_SCREEN_PATH, location.pathname) !== null;
-}
-
-function useGetFullScreenViewRepo(): string | undefined {
-  const { openNodeID: id } = useParams<{
-    openNodeID: string;
-  }>();
-  const repo = useNode()[0];
-  return repo && id !== undefined && id === repo.id ? id : undefined;
-}
-
 type AddNodeProps = {
   onCreateNewNode: (text: string, imageUrl?: string) => void;
   onAddExistingNode: (nodeID: LongID) => void;
@@ -185,10 +171,6 @@ function AddNode({
     useInputElementFocus();
   const viewKey = useViewKey();
   const isEditorOpen = useIsEditorOpen();
-  const isFullScreen = useIsFullScreen();
-  const isRepoInFullScreen = useGetFullScreenViewRepo();
-  // disable shortcut for SearchModal if the AddNode Element in FullScreenView is opened
-  const disableSearchModal = isFullScreen && isRepoInFullScreen === undefined;
   const reset = (): void => {
     setIsInputElementInFocus(false);
     setEditorOpenState(closeEditor(editorOpenViews, viewKey));
@@ -200,9 +182,7 @@ function AddNode({
           openModal();
         }
       };
-      if (!disableSearchModal) {
-        window.addEventListener("keyup", handler);
-      }
+      window.addEventListener("keyup", handler);
       return () => {
         window.removeEventListener("keyup", handler);
         if (isOpen) {
@@ -211,7 +191,7 @@ function AddNode({
       };
     }
     return undefined;
-  }, [disableSearchModal, isInputElementInFocus]);
+  }, [isInputElementInFocus]);
 
   const createNewNode = (text: string, imageUrl?: string): void => {
     onCreateNewNode(text, imageUrl);
@@ -256,7 +236,6 @@ function AddNode({
 }
 
 export function AddColumn(): JSX.Element {
-  const isOpenInFullScreen = useIsOpenInFullScreen();
   const viewPath = useViewPath();
   const { createPlan, executePlan } = usePlanner();
 
@@ -285,7 +264,7 @@ export function AddColumn(): JSX.Element {
         onCreateNewNode={onCreateNewNode}
         onAddExistingNode={(id) => onAddNode(createPlan(), id)}
         ariaLabel="add node"
-        isSearchEnabledByShortcut={!isOpenInFullScreen}
+        isSearchEnabledByShortcut={true}
       />
     </NodeCard>
   );
@@ -293,7 +272,6 @@ export function AddColumn(): JSX.Element {
 
 export function AddNodeToNode(): JSX.Element | null {
   const isAddToNode = useIsAddToNode();
-  const isOpenInFullScreen = useIsOpenInFullScreen();
   const vContext = useViewPath();
   const { createPlan, executePlan } = usePlanner();
   const viewContext = isAddToNode ? getParentView(vContext) : vContext;
@@ -325,7 +303,7 @@ export function AddNodeToNode(): JSX.Element | null {
       onCreateNewNode={onCreateNewNode}
       onAddExistingNode={(id) => onAddNode(createPlan(), id)}
       ariaLabel={`add to ${shorten(node.text)}`}
-      isSearchEnabledByShortcut={isOpenInFullScreen && !isAddToNode}
+      isSearchEnabledByShortcut={!isAddToNode}
     />
   );
 }

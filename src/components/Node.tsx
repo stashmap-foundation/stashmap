@@ -1,11 +1,10 @@
 import { List } from "immutable";
 import React, { useEffect, useState } from "react";
 import { useMediaQuery } from "react-responsive";
-import { Link, matchPath, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import ReactQuill from "react-quill";
 import { textVide } from "text-vide";
 import DOMPurify from "dompurify";
-import { FULL_SCREEN_PATH } from "../App";
 import { getRelations } from "../connections";
 import {
   useNode,
@@ -44,23 +43,8 @@ import { useInputElementFocus } from "../commons/FocusContextProvider";
 import { CancelButton, NodeCard } from "../commons/Ui";
 import { useProjectContext } from "../ProjectContext";
 
-function getLevels(viewPath: ViewPath, isOpenInFullScreen: boolean): number {
-  if (isOpenInFullScreen) {
-    return viewPath.length - 1;
-  }
+function getLevels(viewPath: ViewPath): number {
   return viewPath.length - 1;
-}
-
-export function useIsOpenInFullScreen(): boolean {
-  const location = useLocation();
-  const { openNodeID: id } = useParams<{
-    openNodeID: string;
-  }>();
-  const viewPath = useViewPath();
-  if (matchPath(FULL_SCREEN_PATH, location.pathname) === null) {
-    return false;
-  }
-  return !!(id !== undefined && id === getRoot(viewPath).nodeID);
 }
 
 export function LoadingNode(): JSX.Element {
@@ -272,9 +256,6 @@ function NodeAutoLink({
 }: {
   children: React.ReactNode;
 }): JSX.Element | null {
-  const { openNodeID: id } = useParams<{
-    openNodeID: string;
-  }>();
   const { bookmarkedProjects } = useProjectContext();
   const [nodeID] = useNodeID();
   const [node] = useNode();
@@ -296,14 +277,7 @@ function NodeAutoLink({
     }
   }
 
-  const isMainNodeInFullscreenView = id !== undefined && id === nodeID;
-  return isMainNodeInFullscreenView ? (
-    <>{children}</>
-  ) : (
-    <Link className="no-underline" to={`/d/${escape(nodeID)}`}>
-      {children}
-    </Link>
-  );
+  return <>{children}</>;
 }
 
 function EditingNodeContent(): JSX.Element | null {
@@ -394,7 +368,6 @@ export function getNodesInTree(
   data: Data,
   parentPath: ViewPath,
   ctx: List<ViewPath>,
-  isOpenInFullScreen?: boolean,
   noExpansion?: boolean
 ): List<ViewPath> {
   const [parentNodeID, parentView] = getNodeIDFromView(data, parentPath);
@@ -421,8 +394,7 @@ export function getNodesInTree(
         return getNodesInTree(
           data,
           childPath,
-          nodesList.push(childPath),
-          isOpenInFullScreen
+          nodesList.push(childPath)
         );
       }
       return nodesList.push(childPath);
@@ -431,7 +403,7 @@ export function getNodesInTree(
   );
   // Don't add "Add Note" button for workspace root (levels === 0) or header column (parentPath.length === 1)
   const isHeaderColumn = parentPath.length === 2;
-  return getLevels(parentPath, isOpenInFullScreen || false) === 0 ||
+  return getLevels(parentPath) === 0 ||
     isHeaderColumn
     ? nodesInTree
     : nodesInTree.push(addNodePath);
@@ -444,10 +416,7 @@ export function Node({
 }): JSX.Element | null {
   const isMobile = useMediaQuery(IS_MOBILE);
   const viewPath = useViewPath();
-  const isOpenInFullScreen = useIsOpenInFullScreen();
-  const isDesktopFullScreen = !isMobile && isOpenInFullScreen;
-  const levels = getLevels(viewPath, isOpenInFullScreen);
-  const isDesktopFullScreenTitleNode = isDesktopFullScreen && levels === 0;
+  const levels = getLevels(viewPath);
   const isAddToNode = useIsAddToNode();
   const isNodeBeingEdited = useIsEditingOn();
   const isMultiselect = useIsParentMultiselectBtnOn();
@@ -456,9 +425,7 @@ export function Node({
   return (
     <NodeCard
       className={cls}
-      cardBodyClassName={
-        isDesktopFullScreen ? "ps-2 pt-2 pb-0" : `ps-0 pt-4 pb-0`
-      }
+      cardBodyClassName="ps-0 pt-4 pb-0"
     >
       {levels > 0 && <Indent levels={levels} />}
       {isAddToNode && levels !== 1 && <AddNodeToNode />}
@@ -467,15 +434,12 @@ export function Node({
           {isMultiselect && <NodeSelectbox />}
           <div className="flex-column w-100">
             {isNodeBeingEdited && <EditingNodeContent />}
-            {!isNodeBeingEdited && !isDesktopFullScreenTitleNode && (
+            {!isNodeBeingEdited && (
               <>
                 <NodeAutoLink>
                   <InteractiveNodeContent />
                 </NodeAutoLink>
               </>
-            )}
-            {!isNodeBeingEdited && isDesktopFullScreenTitleNode && (
-              <InteractiveNodeContent editOnClick />
             )}
             <NodeMenu />
           </div>

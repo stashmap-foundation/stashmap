@@ -9,7 +9,7 @@ import {
 import { useDndScrolling } from "react-dnd-scrolling";
 import { useLocation } from "react-router-dom";
 import { ListItem } from "./Draggable";
-import { getNodesInTree, useIsOpenInFullScreen } from "./Node";
+import { getNodesInTree } from "./Node";
 import {
   useNode,
   useViewPath,
@@ -37,7 +37,7 @@ import { useApis } from "../Apis";
 const LOAD_EXTRA = 10;
 const MAX_MODAL_VERTICAL_HEIGHT = 0.75;
 
-function VirtuosoForColumnAndFullScreenDesktop({
+function VirtuosoForColumn({
   nodes,
   startIndexFromStorage,
   range,
@@ -54,7 +54,6 @@ function VirtuosoForColumnAndFullScreenDesktop({
   onStopScrolling: (isScrolling: boolean) => void;
   ariaLabel: string | undefined;
 }): JSX.Element {
-  const isDesktopFullScreen = useIsOpenInFullScreen();
   const location = useLocation();
   const virtuosoRef = useRef<VirtuosoHandle>(null); // Step 2
   useEffect(() => {
@@ -70,18 +69,7 @@ function VirtuosoForColumnAndFullScreenDesktop({
   const [totalListHeight, setTotalListHeight] = useState<number | undefined>(
     undefined
   );
-  const desktopFullScreenStyle = totalListHeight
-    ? {
-        maxHeight: "100%",
-        height: `${Math.min(
-          window.innerHeight * MAX_MODAL_VERTICAL_HEIGHT,
-          totalListHeight
-        )}px`,
-      }
-    : { height: "1px" };
-  const virtuosoStyle = isDesktopFullScreen
-    ? desktopFullScreenStyle
-    : { height: totalListHeight ? `${totalListHeight}px` : "1px" };
+  const virtuosoStyle = { height: totalListHeight ? `${totalListHeight}px` : "1px" };
 
   /* eslint-disable react/jsx-props-no-spreading */
   const Scroller = React.useCallback(
@@ -182,7 +170,6 @@ function Tree(): JSX.Element | null {
   const { fileStore } = useApis();
   const { getLocalStorage, setLocalStorage } = fileStore;
   const scrollableId = useViewKey();
-  const isOpenInFullScreen = useIsOpenInFullScreen();
   const startIndexFromStorage = Number(getLocalStorage(scrollableId)) || 0;
   const [range, setRange] = useState<ListRange>({
     startIndex: startIndexFromStorage,
@@ -192,8 +179,7 @@ function Tree(): JSX.Element | null {
   const nodes = getNodesInTree(
     data,
     viewPath,
-    List<ViewPath>(),
-    isOpenInFullScreen
+    List<ViewPath>()
   );
   const [node] = useNode();
   const ariaLabel = node ? `related to ${node.text}` : undefined;
@@ -211,7 +197,7 @@ function Tree(): JSX.Element | null {
 
   return (
     <TreeViewNodeLoader nodes={nodes} range={range}>
-      <VirtuosoForColumnAndFullScreenDesktop
+      <VirtuosoForColumn
         nodes={nodes}
         range={range}
         setRange={setRange}

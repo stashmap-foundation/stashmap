@@ -95,7 +95,7 @@ test("Search works like spotlight", async () => {
   expect(screen.queryByPlaceholderText("Search")).toBeNull();
 });
 
-test("On Fullscreen, search also starts with press on slash key", async () => {
+test("Search starts with press on slash key", async () => {
   const [alice] = setup([ALICE]);
   await execute({
     ...alice(),

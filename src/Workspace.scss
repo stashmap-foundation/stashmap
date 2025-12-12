@@ -62,6 +62,46 @@ body {
   background: transparent !important;
 }
 
+.fullscreen-card {
+  height: 100%;
+  background-color: white;
+  border: $border-strong;
+  border-radius: 3px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.fullscreen-card-header {
+  flex-shrink: 0;
+  padding: 12px 16px;
+  border-bottom: $border-strong;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fullscreen-card-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.fullscreen-card-relations {
+  // SelectRelations will render here
+}
+
+.fullscreen-card-body {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+
+  > div {
+    height: 100%;
+  }
+}
+
 .workspace-columns {
   display: grid;
   grid-auto-columns: 375px;

@@ -26,7 +26,7 @@ export function AppLayout({
         id="app-container"
         className="menu-sub-hidden main-hidden sub-hidden h-100 d-flex flex-column"
       >
-        <NavBar logout={logout} />
+        {/* <NavBar logout={logout} /> */}
         {children}
       </div>
     </div>

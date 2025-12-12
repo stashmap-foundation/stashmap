@@ -193,10 +193,6 @@ export function getLast(viewContext: ViewPath): SubPath {
   return viewContext[viewContext.length - 1];
 }
 
-export function getRoot(viewContext: ViewPath): SubPath | SubPathWithRelations {
-  return viewContext[0];
-}
-
 export function getViewFromPath(data: Data, path: ViewPath): View {
   const { nodeID } = getLast(path);
   return (

@@ -405,19 +405,23 @@ export function getNodesInTree(
 
 export function Node({
   className,
+  cardBodyClassName,
 }: {
   className?: string;
+  cardBodyClassName?: string;
 }): JSX.Element | null {
-  const isMobile = useMediaQuery(IS_MOBILE);
+  const isDesktop = !useMediaQuery(IS_MOBILE);
   const viewPath = useViewPath();
   const levels = getLevels(viewPath);
   const isAddToNode = useIsAddToNode();
   const isNodeBeingEdited = useIsEditingOn();
   const isMultiselect = useIsParentMultiselectBtnOn();
-  const cls = !isMobile ? `${className || ""} hover-light-bg` : className;
+  const defaultCls = isDesktop ? "hover-light-bg" : "";
+  const cls = className !== undefined ? `${className}` : defaultCls;
+  const clsBody = cardBodyClassName || "ps-0 pt-4 pb-0";
 
   return (
-    <NodeCard className={cls} cardBodyClassName="ps-0 pt-4 pb-0">
+    <NodeCard className={cls} cardBodyClassName={clsBody}>
       {levels > 0 && <Indent levels={levels} />}
       {isAddToNode && levels !== 1 && <AddNodeToNode />}
       {!isAddToNode && (

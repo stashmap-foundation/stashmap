@@ -28,23 +28,16 @@ import { schnorr } from "@noble/curves/secp256k1";
 import { Container } from "react-dom";
 import { VirtuosoMockContext } from "react-virtuoso";
 import { v4 } from "uuid";
-import { findTag } from "./commons/useNostrQuery";
 import {
   FocusContext,
   FocusContextProvider,
 } from "./commons/FocusContextProvider";
-import {
-  KIND_CONTACTLIST,
-  KIND_PROJECT,
-  KIND_WORKSPACE,
-  newTimestamp,
-} from "./nostr";
+import { KIND_CONTACTLIST, KIND_PROJECT, newTimestamp } from "./nostr";
 import { RequireLogin, UNAUTHENTICATED_USER_PK } from "./AppState";
 import {
   Plan,
   createPlan,
   planAddContact,
-  planAddWorkspace,
   planRemoveContact,
   planUpsertNode,
   planUpsertRelations,
@@ -65,7 +58,6 @@ import {
   getRelationsNoReferencedBy,
   joinID,
   newNode,
-  newWorkspace,
   shortID,
 } from "./connections";
 import { newRelations } from "./ViewContext";
@@ -74,6 +66,7 @@ import { TemporaryViewProvider } from "./components/TemporaryViewContext";
 import { DND } from "./dnd";
 import { findContacts } from "./contacts";
 import { ProjectContextProvider } from "./ProjectContext";
+import { NavigationStackProvider } from "./NavigationStackContext";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 test.skip("skip", () => {});
@@ -214,7 +207,6 @@ type TestAppState = TestDataProps & TestApis;
 
 type TestDataProps = DataContextProps & {
   activeWorkspace: LongID;
-  workspaces: Map<PublicKey, Workspaces>;
   relays: AllRelays;
 };
 
@@ -232,7 +224,6 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
     preLoginEvents: List<UnsignedEvent>(),
   },
   views: Map<string, View>(),
-  workspaces: Map<PublicKey, Workspaces>(),
   activeWorkspace: joinID(STASHMAP_PUBLIC_KEY, "ws") as LongID,
   relays: {
     defaultRelays: [{ url: "wss://default.relay", read: true, write: true }],
@@ -304,10 +295,10 @@ export function findNodeByText(plan: Plan, text: string): KnowNode | undefined {
 function createInitialWorkspace(
   plan: Plan,
   activeWorkspace?: string
-): [Plan, workspaceID: LongID] {
+): [Plan, nodeID: LongID] {
   const wsNode = activeWorkspace
     ? findNodeByText(plan, activeWorkspace)
-    : newNode("Default Workspace", plan.user.publicKey);
+    : newNode("My Notes", plan.user.publicKey);
   if (!wsNode) {
     throw new Error(
       `Test Setup Error: No Node with text ${activeWorkspace} found`
@@ -315,10 +306,7 @@ function createInitialWorkspace(
   }
 
   const planWithNode = activeWorkspace ? plan : planUpsertNode(plan, wsNode);
-
-  const ws = newWorkspace(wsNode.id, plan.user.publicKey);
-  const planWithWS = planAddWorkspace(planWithNode, ws);
-  return [planWithWS, ws.id];
+  return [planWithNode, wsNode.id];
 }
 
 type RenderApis = Partial<TestApis> & {
@@ -326,54 +314,13 @@ type RenderApis = Partial<TestApis> & {
   includeFocusContext?: boolean;
   user?: User;
   defaultRelays?: Array<string>;
-  defaultWorkspace?: LongID;
 };
-
-export function createOrLoadDefaultWorkspace({
-  relayPool,
-}: {
-  relayPool: MockRelayPool;
-}): LongID {
-  const [stashmaps] = setup(
-    [
-      {
-        publicKey: STASHMAP_PUBLIC_KEY,
-        privateKey: hexToBytes(STASHMAP_PRIVATE_KEY),
-      },
-    ],
-    {
-      relayPool,
-    }
-  );
-  const existingWs = relayPool.getEvents().find((e) =>
-    matchFilter(
-      {
-        kinds: [KIND_WORKSPACE],
-        authors: [STASHMAP_PUBLIC_KEY],
-      },
-      e
-    )
-  );
-
-  if (existingWs) {
-    return joinID(STASHMAP_PUBLIC_KEY, findTag(existingWs, "d") as LongID);
-  }
-
-  const [createWsPlan, wsID] = createInitialWorkspace(createPlan(stashmaps()));
-  execute({
-    ...stashmaps(),
-    plan: createWsPlan,
-  });
-  return wsID;
-}
 
 export function renderApis(
   children: React.ReactElement,
   options?: RenderApis
 ): TestApis & RenderResult {
   const { fileStore, relayPool, finalizeEvent, nip11 } = applyApis(options);
-  const defaultWorkspaceID =
-    options?.defaultWorkspace || createOrLoadDefaultWorkspace({ relayPool });
 
   // If user is explicity undefined it will be overwritten, if not set default Alice is used
   const optionsWithDefaultUser = {
@@ -396,44 +343,45 @@ export function renderApis(
   window.history.pushState({}, "", options?.initialRoute || "/");
   const utils = render(
     <BrowserRouter>
-      <ApiProvider
-        apis={{
-          fileStore,
-          relayPool,
-          finalizeEvent,
-          nip11,
-          eventLoadingTimeout: 0,
-          timeToStorePreLoginEvents: 0,
-        }}
-      >
-        <NostrAuthContextProvider
-          defaultRelayUrls={
-            optionsWithDefaultUser.defaultRelays ||
-            TEST_RELAYS.map((r) => r.url)
-          }
-          defaultWorkspace={defaultWorkspaceID}
+      <NavigationStackProvider>
+        <ApiProvider
+          apis={{
+            fileStore,
+            relayPool,
+            finalizeEvent,
+            nip11,
+            eventLoadingTimeout: 0,
+            timeToStorePreLoginEvents: 0,
+          }}
         >
-          <ProjectContextProvider>
-            <VirtuosoMockContext.Provider
-              value={{ viewportHeight: 10000, itemHeight: 100 }}
-            >
-              {" "}
-              {options?.includeFocusContext === true ? (
-                <FocusContextProvider>{children}</FocusContextProvider>
-              ) : (
-                <FocusContext.Provider
-                  value={{
-                    isInputElementInFocus: true,
-                    setIsInputElementInFocus: jest.fn(),
-                  }}
-                >
-                  {children}
-                </FocusContext.Provider>
-              )}
-            </VirtuosoMockContext.Provider>
-          </ProjectContextProvider>
-        </NostrAuthContextProvider>
-      </ApiProvider>
+          <NostrAuthContextProvider
+            defaultRelayUrls={
+              optionsWithDefaultUser.defaultRelays ||
+              TEST_RELAYS.map((r) => r.url)
+            }
+          >
+            <ProjectContextProvider>
+              <VirtuosoMockContext.Provider
+                value={{ viewportHeight: 10000, itemHeight: 100 }}
+              >
+                {" "}
+                {options?.includeFocusContext === true ? (
+                  <FocusContextProvider>{children}</FocusContextProvider>
+                ) : (
+                  <FocusContext.Provider
+                    value={{
+                      isInputElementInFocus: true,
+                      setIsInputElementInFocus: jest.fn(),
+                    }}
+                  >
+                    {children}
+                  </FocusContext.Provider>
+                )}
+              </VirtuosoMockContext.Provider>
+            </ProjectContextProvider>
+          </NostrAuthContextProvider>
+        </ApiProvider>
+      </NavigationStackProvider>
     </BrowserRouter>
   );
   return {
@@ -496,7 +444,6 @@ export function renderWithTestData(
   children: React.ReactElement,
   options?: Partial<TestAppState> & {
     initialRoute?: string;
-    defaultWorkspace?: LongID;
   }
 ): TestAppState & RenderResult {
   const props = applyDefaults(options);
@@ -667,7 +614,7 @@ export async function setupTestDB(
     finalizeEvent: mockFinalizeEvent(),
   });
   return {
-    ...plan,
+    ...planWithWs,
     activeWorkspace: id,
   };
 }

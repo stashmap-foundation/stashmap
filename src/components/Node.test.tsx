@@ -2,7 +2,7 @@ import React from "react";
 import { fireEvent, screen } from "@testing-library/react";
 import { List, Map } from "immutable";
 import userEvent from "@testing-library/user-event";
-import { addRelationToRelations, newNode, newWorkspace } from "../connections";
+import { addRelationToRelations, newNode } from "../connections";
 import { DND } from "../dnd";
 import {
   ALICE,
@@ -26,7 +26,6 @@ import { Column } from "./Column";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
 import {
   createPlan,
-  planAddWorkspace,
   planBulkUpsertNodes,
   planUpdateViews,
   planUpsertNode,
@@ -36,6 +35,7 @@ import { execute } from "../executor";
 import { DraggableNote } from "./Draggable";
 import { TreeView } from "./TreeView";
 import { LoadNode } from "../dataQuery";
+import { ROOT } from "../types";
 
 test("Render non existing Node", async () => {
   const [alice] = setup([ALICE]);
@@ -247,14 +247,15 @@ test("Edited node is shown in Tree View", async () => {
   const oop = newNode("Object Oriented Programming languages", publicKey);
   const java = newNode("Java", publicKey);
 
-  const ws = newWorkspace(pl.id, publicKey);
-
   const plan = planUpsertRelations(
     planUpsertRelations(
-      planAddWorkspace(createPlan(alice()), ws),
-      addRelationToRelations(newRelations(pl.id, "", publicKey), oop.id)
+      planUpsertRelations(
+        createPlan(alice()),
+        addRelationToRelations(newRelations(pl.id, "", publicKey), oop.id)
+      ),
+      addRelationToRelations(newRelations(oop.id, "", publicKey), java.id)
     ),
-    addRelationToRelations(newRelations(oop.id, "", publicKey), java.id)
+    addRelationToRelations(newRelations(ROOT, "", publicKey), ROOT)
   );
   const planWithViews = planUpdateViews(
     plan,
@@ -289,7 +290,6 @@ test("Edited node is shown in Tree View", async () => {
     </RootViewContextProvider>,
     {
       ...alice(),
-      initialRoute: `/w/${ws.id}`,
     }
   );
   fireEvent.click(await screen.findByLabelText("edit Java"));

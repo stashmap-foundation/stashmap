@@ -118,10 +118,6 @@ export function isRemote(
   return remote !== undefined && remote !== myself;
 }
 
-export function isIDRemote(id: ID, myself: PublicKey): boolean {
-  return isRemote(splitID(id)[0], myself);
-}
-
 export function moveRelations(
   relations: Relations,
   indices: Array<number>,
@@ -303,13 +299,5 @@ export function newNode(
     id: joinID(myself, v4()),
     type: "text",
     imageUrl,
-  };
-}
-
-export function newWorkspace(nodeId: LongID, myself: PublicKey): Workspace {
-  return {
-    id: joinID(myself, v4()),
-    node: nodeId,
-    project: undefined,
   };
 }

@@ -94,7 +94,7 @@ function RelationButton({
         padding: "0 4px",
         position: "relative" as const,
         minWidth: "12px",
-        minHeight: "38px",
+        minHeight: "25px",
         height: "100%",
         color,
         display: "flex",
@@ -668,9 +668,10 @@ export function SelectRelations({
   // Column headers (alwaysOneSelected or viewPath.length === 2) always vertical
   // Regular notes: horizontal by default, vertical only when expanded
   const isHeaderColumn = viewPath.length === 2;
+  const isRoot = viewPath.length === 1;
   const showVertical =
-    alwaysOneSelected || isHeaderColumn || view.expanded === true;
-  const forceOneSelected = alwaysOneSelected || isHeaderColumn;
+    alwaysOneSelected || isHeaderColumn || isRoot || view.expanded === true;
+  const forceOneSelected = alwaysOneSelected || isHeaderColumn || isRoot;
 
   const allItems: { type: string; id: LongID }[] = [
     ...RELATION_TYPES.keySeq()

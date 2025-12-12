@@ -8,12 +8,10 @@ import {
   addRelationToRelations,
   bulkAddRelations,
   shortID,
-  newWorkspace,
 } from "./connections";
 import { execute } from "./executor";
 import {
   createPlan,
-  planAddWorkspace,
   planBulkUpsertNodes,
   planUpsertRelations,
 } from "./planner";
@@ -44,6 +42,7 @@ import { TreeView } from "./components/TreeView";
 import { LoadNode } from "./dataQuery";
 import { App } from "./App";
 import { RootViewOrWorkspaceIsLoading } from "./components/Dashboard";
+import { ROOT } from "./types";
 
 test("Move View Settings on Delete", async () => {
   const [alice] = setup([ALICE]);
@@ -53,27 +52,22 @@ test("Move View Settings on Delete", async () => {
   const cpp = newNode("C++", publicKey);
   const java = newNode("Java", publicKey);
   const pl = newNode("Programming Languages", publicKey);
-  const newWSNode = newNode("My Workspace", publicKey);
 
   const planWithNodes = planBulkUpsertNodes(createPlan(alice()), [
     c,
     cpp,
     java,
     pl,
-    newWSNode,
   ]);
 
-  const newWS = newWorkspace(newWSNode.id, publicKey);
-  const planWithWs = planAddWorkspace(planWithNodes, newWS);
-
   const wsRelations = addRelationToRelations(
-    newRelations(newWSNode.id, "", publicKey),
+    newRelations(ROOT, "", publicKey),
     pl.id
   );
   const planWithRelations = planUpsertRelations(
     planUpsertRelations(
       planUpsertRelations(
-        planWithWs,
+        planWithNodes,
         bulkAddRelations(newRelations(pl.id, "", publicKey), [c.id, java.id])
       ),
       wsRelations
@@ -94,7 +88,6 @@ test("Move View Settings on Delete", async () => {
     </Data>,
     {
       ...alice(),
-      initialRoute: `/w/${newWS.id}`,
     }
   );
   fireEvent.click(
@@ -189,6 +182,8 @@ test("Contact reorders list", async () => {
   const aliceDB = await setupTestDB(alice(), [["My Workspace", [pl]]], {
     activeWorkspace: "My Workspace",
   });
+  const myWorkspace = findNodeByText(aliceDB, "My Workspace") as KnowNode;
+
   const utils = renderWithTestData(
     <Data user={alice().user}>
       <RootViewOrWorkspaceIsLoading>
@@ -201,7 +196,7 @@ test("Contact reorders list", async () => {
     </Data>,
     {
       ...alice(),
-      initialRoute: `/w/${aliceDB.activeWorkspace}`,
+      initialRoute: `/w/${myWorkspace.id}`,
     }
   );
   await screen.findByText("FPL");
@@ -212,6 +207,10 @@ test("Contact reorders list", async () => {
   cleanup();
 
   // let bob remove OOP
+  const bobsWorkspace = findNodeByText(
+    bobsKnowledgeDB,
+    "Bobs Workspace"
+  ) as KnowNode;
   renderWithTestData(
     <Data user={bob().user}>
       <RootViewOrWorkspaceIsLoading>
@@ -224,7 +223,7 @@ test("Contact reorders list", async () => {
     </Data>,
     {
       ...bob(),
-      initialRoute: `/w/${bobsKnowledgeDB.activeWorkspace}`,
+      initialRoute: `/w/${bobsWorkspace.id}`,
     }
   );
   await userEvent.click(await screen.findByLabelText("edit OOP"));
@@ -243,7 +242,7 @@ test("Contact reorders list", async () => {
     </Data>,
     {
       ...alice(),
-      initialRoute: `/w/${aliceDB.activeWorkspace}`,
+      initialRoute: `/w/${myWorkspace.id}`,
     }
   );
   // OOP is gone, so are it's children

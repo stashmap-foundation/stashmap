@@ -18,7 +18,7 @@ import {
 } from "./utils.test";
 import { createPlan, planPublishRelayMetadata } from "./planner";
 import { execute } from "./executor";
-import { NavBar } from "./components/Navbar";
+import { NavbarControls } from "./components/NavbarControls";
 import { KIND_SETTINGS, KIND_VIEWS } from "./nostr";
 import { flattenRelays } from "./relays";
 import { WorkspaceColumnView } from "./components/WorkspaceColumn";
@@ -76,7 +76,7 @@ async function setupTest(): Promise<{
 
 test("Write Settings on user relays", async () => {
   const { alice, project } = await setupTest();
-  const utils = renderWithTestData(<NavBar logout={jest.fn()} />, {
+  const utils = renderWithTestData(<NavbarControls />, {
     ...alice(),
     initialRoute: `/?project=${project.id}`,
   });
@@ -102,7 +102,7 @@ test("Write views on user relays", async () => {
   );
   utils.relayPool.resetPublishedOnRelays();
   await userEvent.click(
-    await screen.findByLabelText("increase width of Default Workspace")
+    await screen.findByLabelText("increase width of My Notes")
   );
   await findEvent(utils.relayPool, { kinds: [KIND_VIEWS] });
   expect(utils.relayPool.getPublishedOnRelays()).toEqual(

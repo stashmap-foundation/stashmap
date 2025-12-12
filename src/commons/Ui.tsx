@@ -1,6 +1,5 @@
 import React, { CSSProperties } from "react";
 import { Badge as BSBadge, Card } from "react-bootstrap";
-import { Link } from "react-router-dom";
 
 export type Children = {
   children?: React.ReactNode;
@@ -75,64 +74,6 @@ export function UIColumn({
   return (
     <div className="mb-2 outer-node flex-col" key={keyString || "outer-node"}>
       <div className="flex-col max-height-100">{children}</div>
-    </div>
-  );
-}
-
-export function UIColumnBody({ children }: Children): JSX.Element {
-  return (
-    <div className="flex-col overflow-y-auto overflow-x-hidden height-100">
-      {children}
-    </div>
-  );
-}
-
-export function UIColumnHeader({ children }: Children): JSX.Element {
-  return <div className="outer-node-title">{children}</div>;
-}
-
-export function UIColumnContent({ children }: Children): JSX.Element {
-  return <div className="overflow-y-auto">{children}</div>;
-}
-
-export function UIColumnFooter({ children }: Children): JSX.Element {
-  return <div className="add-to-node">{children}</div>;
-}
-
-export function UINode({
-  children,
-}: {
-  children?: React.ReactNode;
-}): JSX.Element {
-  return (
-    <div className="inner-node">
-      <Card.Body className="p-2 pb-2 pt-4 d-flex flex-column justify-content-between h-100">
-        {children && children}
-      </Card.Body>
-    </div>
-  );
-}
-
-export function UINodeTitle({ children }: Children): JSX.Element {
-  return (
-    <div className="font-size-big mb-2">
-      <span className="pe-2">{children}</span>
-    </div>
-  );
-}
-
-export function UINodeBody({ children }: Children): JSX.Element {
-  return (
-    <div className="mb-0 h-100">
-      <div className="mb-4">{children}</div>
-    </div>
-  );
-}
-
-export function UINodeFooter({ children }: Children): JSX.Element {
-  return (
-    <div className="mb-2 d-flex justify-content-between align-items-center">
-      {children}
     </div>
   );
 }
@@ -242,38 +183,4 @@ export function CancelButton({
       <span className="visually-hidden">Cancel</span>
     </button>
   );
-}
-
-export function StandaloneCard({ children }: Children): JSX.Element {
-  return (
-    <div className="h-100">
-      <div id="app-container" className="h-100">
-        <main>
-          <div className="container">
-            <div className="h-100 row">
-              <div className="mx-auto my-auto col-12">
-                <Card className="auth-card card">
-                  <Card.Body className="form-side">{children}</Card.Body>
-                </Card>
-              </div>
-            </div>
-          </div>
-        </main>
-      </div>
-    </div>
-  );
-}
-
-export function OptionalLink({
-  children,
-  link,
-}: Children & { link?: string }): JSX.Element {
-  if (link) {
-    return (
-      <Link className="no-underline" to={link}>
-        {children && children}
-      </Link>
-    );
-  }
-  return <>{children && children}</>;
 }

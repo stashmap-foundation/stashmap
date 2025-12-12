@@ -49,7 +49,7 @@ test("Search works like spotlight", async () => {
 
   // Pressing enter adds first search result -which is a topic) to Column
   const searchButton = await screen.findByLabelText(
-    "search and attach to Default Workspace"
+    "search and attach to My Notes"
   );
   fireEvent.click(searchButton);
   const searchInput = await screen.findByLabelText("search input");
@@ -83,7 +83,7 @@ test("Search works like spotlight", async () => {
   await screen.findByText("My second search note ever made");
 
   const allSearchButtons = await screen.findByLabelText(
-    "search and attach to Default Workspace"
+    "search and attach to My Notes"
   );
   fireEvent.click(allSearchButtons);
   const searchInputField = await screen.findByLabelText("search input");
@@ -105,7 +105,7 @@ test("Search starts with press on slash key", async () => {
     ),
   });
   renderApp({ ...alice(), includeFocusContext: true });
-  await userEvent.type(await screen.findByText("Default Workspace"), "/");
+  await userEvent.type(await screen.findByText("My Notes"), "/");
   screen.getByPlaceholderText("Search");
   const searchInput = await screen.findByLabelText("search input");
   await userEvent.type(searchInput, "My s");

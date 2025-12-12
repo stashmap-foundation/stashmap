@@ -14,11 +14,7 @@ import {
   useLoginWithExtension,
 } from "./NostrAuthContext";
 import { useData } from "./DataContext";
-import {
-  planRewriteUnpublishedEvents,
-  planRewriteWorkspaceIDs,
-  usePlanner,
-} from "./planner";
+import { planRewriteUnpublishedEvents, usePlanner } from "./planner";
 import { execute } from "./executor";
 import { useApis } from "./Apis";
 import { KINDS_META } from "./Data";
@@ -213,11 +209,10 @@ export function SignInModal(): JSX.Element {
     const user = withExtension
       ? loginWithExtension(key as PublicKey)
       : login(key as string);
-    const planWithRewrittenEvents = planRewriteUnpublishedEvents(
+    const plan = planRewriteUnpublishedEvents(
       { ...createPlan(), user },
       publishEventsStatus.unsignedEvents
     );
-    const plan = planRewriteWorkspaceIDs(planWithRewrittenEvents);
     if (plan.publishEvents.size === 0) {
       navigate(referrer || "/");
       return;

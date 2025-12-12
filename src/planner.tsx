@@ -1,15 +1,13 @@
 import React, { Dispatch, SetStateAction } from "react";
-import { List, Map } from "immutable";
+import { List } from "immutable";
 import { UnsignedEvent, Event } from "nostr-tools";
 import crypto from "crypto";
-import { v4 } from "uuid";
 import {
   KIND_DELETE,
   KIND_KNOWLEDGE_LIST,
   KIND_KNOWLEDGE_NODE,
   KIND_CONTACTLIST,
   KIND_VIEWS,
-  KIND_WORKSPACE,
   KIND_SETTINGS,
   KIND_MEMBERLIST,
   KIND_RELAY_METADATA_EVENT,
@@ -21,17 +19,17 @@ import { execute, republishEvents } from "./executor";
 import { useApis } from "./Apis";
 import { viewsToJSON } from "./serializer";
 import { newDB } from "./knowledge";
-import { joinID, shortID } from "./connections";
+import { shortID } from "./connections";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useWorkspaceContext } from "./WorkspaceContext";
 import { useRelaysToCreatePlan } from "./relays";
 import { useProjectContext } from "./ProjectContext";
 import { mergePublishResultsOfEvents } from "./commons/PublishingStatus";
+import { ROOT } from "./types";
 
 export type Plan = Data & {
   publishEvents: List<UnsignedEvent & EventAttachment>;
   activeWorkspace: LongID;
-  workspaces: Map<PublicKey, Workspaces>;
   projectID: LongID | undefined;
   relays: AllRelays;
 };
@@ -230,6 +228,11 @@ function planDelete(plan: Plan, id: LongID | ID, kind: number): Plan {
 }
 
 export function planDeleteNode(plan: Plan, nodeID: LongID | ID): Plan {
+  // Prevent deletion of ROOT node
+  if (nodeID === ROOT) {
+    return plan;
+  }
+
   const deletePlan = planDelete(plan, nodeID, KIND_KNOWLEDGE_NODE);
   const userDB = plan.knowledgeDBs.get(deletePlan.user.publicKey, newDB());
   const updatedNodes = userDB.nodes.remove(shortID(nodeID));
@@ -254,23 +257,6 @@ export function planDeleteRelations(plan: Plan, relationsID: LongID): Plan {
   return {
     ...deletePlan,
     knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
-  };
-}
-
-export function planDeleteWorkspace(plan: Plan, workspaceID: LongID): Plan {
-  const deletePlan = planDelete(plan, workspaceID, KIND_WORKSPACE);
-  const myWorkspaces = plan.workspaces.get(
-    plan.user.publicKey,
-    Map<ID, Workspace>()
-  );
-  const myWorkspacesUpdated = myWorkspaces.remove(shortID(workspaceID));
-  const workspacesUpdated = plan.workspaces.set(
-    plan.user.publicKey,
-    myWorkspacesUpdated
-  );
-  return {
-    ...deletePlan,
-    workspaces: workspacesUpdated,
   };
 }
 
@@ -300,10 +286,6 @@ export function planUpdateViews(plan: Plan, views: Views): Plan {
   };
 }
 
-export function fallbackWorkspace(publicKey: PublicKey): LongID {
-  return joinID(publicKey, v4());
-}
-
 export function planBookmarkProject(plan: Plan, project: ProjectNode): Plan {
   const bookmarkEvent = {
     kind: KIND_JOIN_PROJECT,
@@ -315,24 +297,6 @@ export function planBookmarkProject(plan: Plan, project: ProjectNode): Plan {
   return {
     ...plan,
     publishEvents: plan.publishEvents.push(bookmarkEvent),
-  };
-}
-
-export function planAddWorkspace(plan: Plan, workspace: Workspace): Plan {
-  const workspaceEvent = {
-    kind: KIND_WORKSPACE,
-    pubkey: plan.user.publicKey,
-    created_at: newTimestamp(),
-    tags: [
-      ["d", shortID(workspace.id)],
-      ["node", workspace.node],
-      ...(workspace.project ? [["project", workspace.project]] : []),
-    ],
-    content: "",
-  };
-  return {
-    ...plan,
-    publishEvents: plan.publishEvents.push(workspaceEvent),
   };
 }
 
@@ -352,16 +316,6 @@ function rewriteIDs(event: UnsignedEvent): UnsignedEvent {
     ...event,
     content: replaceUnauthenticatedUser(event.content, event.pubkey),
     tags: replacedTags,
-  };
-}
-
-export function planRewriteWorkspaceIDs(plan: Plan): Plan {
-  return {
-    ...plan,
-    activeWorkspace: replaceUnauthenticatedUser(
-      plan.activeWorkspace,
-      plan.user.publicKey
-    ),
   };
 }
 
@@ -532,7 +486,6 @@ export function PlanningContextProvider({
 export function createPlan(
   props: Data & {
     activeWorkspace: LongID;
-    workspaces: Map<PublicKey, Workspaces>;
     publishEvents?: List<UnsignedEvent & EventAttachment>;
     relays: AllRelays;
     projectID?: LongID;
@@ -548,14 +501,13 @@ export function createPlan(
 
 export function usePlanner(): Planner {
   const data = useData();
-  const { activeWorkspace, workspaces } = useWorkspaceContext();
+  const { activeWorkspace } = useWorkspaceContext();
   const relays = useRelaysToCreatePlan();
   const { projectID } = useProjectContext();
   const createPlanningContext = (): Plan => {
     return createPlan({
       ...data,
       activeWorkspace,
-      workspaces,
       relays,
       projectID,
     });

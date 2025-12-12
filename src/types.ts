@@ -205,13 +205,6 @@ declare global {
     memberListProvider: PublicKey;
   };
 
-  type Workspace = {
-    id: LongID;
-    node: LongID;
-    project: LongID | undefined;
-  };
-  type Workspaces = Map<ID, Workspace>;
-
   type BookmarkedProjects = List<LongID>;
 
   type KnowNode = TextNode | ProjectNode;
@@ -232,3 +225,5 @@ declare global {
     relations: Map<ID, Relations>;
   };
 }
+
+export const ROOT: LongID = "ROOT" as LongID;

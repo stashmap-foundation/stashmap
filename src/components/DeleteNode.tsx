@@ -14,16 +14,13 @@ import { newDB } from "../knowledge";
 import {
   Plan,
   planDeleteNode,
-  planDeleteWorkspace,
   planUpdateViews,
   planUpsertRelations,
   usePlanner,
 } from "../planner";
 import { isMutableNode } from "./TemporaryViewContext";
-import {
-  findNewActiveWorkspace,
-  useWorkspaceContext,
-} from "../WorkspaceContext";
+import { useWorkspaceContext } from "../WorkspaceContext";
+import { ROOT } from "../types";
 
 function disconnectNode(plan: Plan, toDisconnect: LongID | ID): Plan {
   const myDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
@@ -58,14 +55,20 @@ export function DeleteWorkspace({
   }
 
   const deleteCurrentWorkspace = (): void => {
-    const plan = createPlan();
-    const deletePlan = planDeleteWorkspace(plan, activeWorkspace);
+    const planWithDisconnectedNode = disconnectNode(
+      createPlan(),
+      activeWorkspace
+    );
+    const planWithDeletedNode = planDeleteNode(
+      planWithDisconnectedNode,
+      activeWorkspace
+    );
 
-    executePlan(deletePlan);
-    const newActiveWs = findNewActiveWorkspace(deletePlan);
-    // new active ws
-    setCurrentWorkspace(newActiveWs);
-    navigate(newActiveWs ? `/w/${newActiveWs}` : "/");
+    executePlan(planWithDeletedNode);
+
+    // If deleting active node, navigate to ROOT
+    setCurrentWorkspace(ROOT);
+    navigate(`/w/${ROOT}`);
   };
 
   if (as === "item") {

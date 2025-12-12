@@ -9,7 +9,6 @@ import {
   typeNewNode,
   renderWithTestData,
   TEST_RELAYS,
-  createOrLoadDefaultWorkspace,
 } from "../utils.test";
 import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 import { WorkspaceView } from "./Workspace";
@@ -32,9 +31,6 @@ test("Publishing Status", async () => {
 test("Details of Publishing Status", async () => {
   const [alice] = setup([ALICE]);
   const utils = alice();
-  const defaultWS = createOrLoadDefaultWorkspace({
-    relayPool: utils.relayPool,
-  });
   const view = renderWithTestData(
     <>
       <RootViewOrWorkspaceIsLoading>
@@ -64,11 +60,13 @@ test("Details of Publishing Status", async () => {
         },
       } as unknown as MockRelayPool,
       relays: { ...utils.relays, userRelays: TEST_RELAYS },
-      defaultWorkspace: defaultWS,
     }
   );
   await typeNewNode(view, "Hello World");
-  await userEvent.click(await screen.findByLabelText("publishing status"));
+  const publishingStatusButtons = await screen.findAllByLabelText(
+    "publishing status"
+  );
+  await userEvent.click(publishingStatusButtons[0]);
   await screen.findByText("Publishing Status");
   await userEvent.click(
     screen.getByText("Relay wss://relay.test.first.success/:")

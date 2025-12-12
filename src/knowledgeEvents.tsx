@@ -11,14 +11,12 @@ import {
   KIND_KNOWLEDGE_LIST,
   KIND_KNOWLEDGE_NODE,
   KIND_VIEWS,
-  KIND_WORKSPACE,
 } from "./nostr";
 import {
   Serializable,
   jsonToViews,
   eventToRelations,
   eventToTextOrProjectNode,
-  eventToWorkspace,
 } from "./serializer";
 import { splitID } from "./connections";
 
@@ -95,31 +93,6 @@ export function findRelations(
     const id = splitID(relations.id)[1];
     return rdx.set(id, relations);
   }, Map<string, Relations>());
-}
-
-export function findWorkspaces(events: List<UnsignedEvent>): Workspaces {
-  const sorted = sortEvents(
-    events.filter(
-      (event) => event.kind === KIND_WORKSPACE || event.kind === KIND_DELETE
-    )
-  );
-  return sorted.reduce((rdx, event) => {
-    if (event.kind === KIND_DELETE) {
-      const [deletable, eventToDeleteId, deleteKind] = isDeletable(event, rdx);
-      if (deletable && `${deleteKind}` === `${KIND_WORKSPACE}`) {
-        return rdx.remove(eventToDeleteId);
-      }
-      return rdx;
-    }
-    const [id, workspace] = eventToWorkspace(event);
-    return id
-      ? rdx.set(id, {
-          node: workspace.node,
-          id: workspace.id,
-          project: undefined,
-        })
-      : rdx;
-  }, Map<ID, Workspace>());
 }
 
 export function findViews(events: List<UnsignedEvent>): Views {

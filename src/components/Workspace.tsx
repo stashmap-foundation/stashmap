@@ -7,13 +7,52 @@ import { EmptyColumn, WorkspaceColumnView } from "./WorkspaceColumn";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
 
 import { getRelations } from "../connections";
-import { PushNode, useNodeID } from "../ViewContext";
+import { PushNode, useNodeID, getNodeFromID } from "../ViewContext";
 import { DND } from "../dnd";
 import { useData } from "../DataContext";
+import { useStack, useNavigationStack } from "../NavigationStackContext";
+import { getRelationTypeByRelationsID } from "./RelationTypes";
+import { Node } from "./Node";
+
+function StackedLayer({
+  workspaceID,
+  onClick,
+}: {
+  workspaceID: LongID;
+  onClick: () => void;
+}): JSX.Element {
+  const { knowledgeDBs, user } = useData();
+  const workspaceNode = getNodeFromID(
+    knowledgeDBs,
+    workspaceID as string,
+    user.publicKey
+  );
+
+  return (
+    <div
+      className="stacked-layer"
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+    >
+      <div className="stacked-layer-title">
+        {workspaceNode?.text || "Loading..."}
+      </div>
+    </div>
+  );
+}
 
 export function WorkspaceView(): JSX.Element | null {
   const [workspaceID, view] = useNodeID();
-  const { knowledgeDBs, user } = useData();
+  const data = useData();
+  const stack = useStack();
+  const { popTo } = useNavigationStack();
 
   const ref = useRef<HTMLDivElement>(null);
 
@@ -35,31 +74,65 @@ export function WorkspaceView(): JSX.Element | null {
 
   /* eslint-disable react/no-array-index-key */
   const relations = getRelations(
-    knowledgeDBs,
+    data.knowledgeDBs,
     view.relations,
-    user.publicKey,
+    data.user.publicKey,
     workspaceID
   );
   const columns = relations ? relations.items.toArray() : [];
+
+  // Get relation color
+  const [relationType] = view.relations
+    ? getRelationTypeByRelationsID(data, view.relations)
+    : [undefined, undefined];
+  const relationColor = relationType?.color;
+
+  // Get stacked workspaces (all except the last one which is active)
+  const stackedWorkspaces = stack.slice(0, -1);
+
   return (
     <TemporaryViewProvider>
       <div className="position-relative flex-grow-1">
         <div className="position-absolute board overflow-y-hidden">
-          <DND>
-            <Scroller
-              ref={ref}
-              className="workspace-columns overflow-y-hidden h-100"
-            >
-              {columns.map((column, index) => {
-                return (
-                  <PushNode push={List([index])} key={index}>
-                    <WorkspaceColumnView />
-                  </PushNode>
-                );
-              })}
-              <EmptyColumn />
-            </Scroller>
-          </DND>
+          <div className="workspace-stack-container">
+            {/* Render stacked layers */}
+            {stackedWorkspaces.map((stackedWorkspaceID, index) => (
+              <StackedLayer
+                key={stackedWorkspaceID as string}
+                workspaceID={stackedWorkspaceID as LongID}
+                onClick={() => popTo(index)}
+              />
+            ))}
+
+            {/* Render active fullscreen card */}
+            <div className="fullscreen-card">
+              <div className="fullscreen-card-header">
+                <Node className="border-0" cardBodyClassName="ps-0 pb-0 pt-0" />
+              </div>
+              <div className="fullscreen-card-body">
+                <DND>
+                  <Scroller
+                    ref={ref}
+                    className="workspace-columns overflow-y-hidden h-100"
+                    style={
+                      {
+                        "--workspace-relation-color": relationColor,
+                      } as React.CSSProperties
+                    }
+                  >
+                    {columns.map((column, index) => {
+                      return (
+                        <PushNode push={List([index])} key={index}>
+                          <WorkspaceColumnView />
+                        </PushNode>
+                      );
+                    })}
+                    <EmptyColumn />
+                  </Scroller>
+                </DND>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </TemporaryViewProvider>

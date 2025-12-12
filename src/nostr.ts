@@ -6,12 +6,9 @@ export const KIND_KNOWLEDGE_LIST = 34750;
 export const KIND_KNOWLEDGE_NODE = 34751;
 // TODO: Make this non-editable
 export const KIND_PROJECT = 34752;
-export const KIND_WORKSPACE = 34753;
 
 // Should this be a DM?
 export const KIND_JOIN_PROJECT = 34754;
-// Essentially a markdown which is not editable
-export const KIND_KNOWLEDGE_NODE_COLLECTION = 2945;
 
 export const KIND_NIP05 = 0;
 export const KIND_CONTACTLIST = 3;

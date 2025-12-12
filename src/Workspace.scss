@@ -62,6 +62,86 @@ body {
   background: transparent !important;
 }
 
+.workspace-navbar-controls {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1000;
+}
+
+.workspace-stack-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+}
+
+.stacked-layer {
+  position: relative;
+  background-color: white;
+  border: $border-strong;
+  border-bottom: none;
+  border-top-left-radius: 3px;
+  border-top-right-radius: 3px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-left: 8px;
+  margin-right: 8px;
+  padding: 8px;
+
+  &:hover {
+    background-color: #f8f9fa;
+  }
+}
+
+.stacked-layer-title {
+  font-size: 1rem;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fullscreen-card {
+  flex: 1;
+  background-color: white;
+  border: $border-strong;
+  border-radius: 3px;
+  box-shadow: 0 0px 8px rgba(0, 0, 0, 0.1);
+  margin: 8px;
+  margin-top: 0px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.fullscreen-card-header {
+  flex-shrink: 0;
+  padding-left: 8px;
+  padding-top: 8px;
+  padding-bottom: 0px;
+  padding-right: 8px;
+  //border-bottom: $border-strong;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fullscreen-card-title {
+  font-size: 1rem;
+  font-weight: 400;
+}
+
+.fullscreen-card-body {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+
+  > div {
+    height: 100%;
+  }
+}
+
 .workspace-columns {
   display: grid;
   grid-auto-columns: 375px;
@@ -71,7 +151,6 @@ body {
   }
   grid-auto-flow: column;
   grid-gap: 8px;
-  padding-top: 8px;
   padding-left: 8px;
   padding-bottom: 8px;
   overflow-x: scroll;
@@ -276,6 +355,11 @@ body {
   border-radius: 3px;
   flex-grow: 0;
   background-color: white;
+}
+
+.workspace-columns .outer-node {
+  border-left-width: 2px;
+  border-left-color: var(--workspace-relation-color, $dark-gray);
 }
 
 .knowledge-exchange .outer-node {
@@ -656,6 +740,7 @@ to {
   justify-content: flex-start;
   overflow-y: auto;
   gap: 2px;
+  height: 100%;
 }
 
 .underline {

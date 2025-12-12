@@ -6,7 +6,6 @@ import {
   KIND_KNOWLEDGE_LIST,
   KIND_KNOWLEDGE_NODE,
   KIND_PROJECT,
-  KIND_WORKSPACE,
 } from "./nostr";
 import { splitID } from "./connections";
 import { REFERENCED_BY } from "./constants";
@@ -142,15 +141,6 @@ export function addListToFilters(
   };
 }
 
-export function addWorkspaceNodesToFilter(
-  filters: Filters,
-  workspaces: Workspaces
-): Filters {
-  return workspaces.reduce((rdx, workspace) => {
-    return addNodeToFilters(rdx, workspace.node);
-  }, filters);
-}
-
 export function createBaseFilter(
   contacts: Contacts,
   projectMembers: Members,
@@ -176,11 +166,7 @@ export function createBaseFilter(
     },
     deleteFilter: {
       kinds: [KIND_DELETE],
-      "#k": [
-        `${KIND_KNOWLEDGE_LIST}`,
-        `${KIND_KNOWLEDGE_NODE}`,
-        `${KIND_WORKSPACE}`,
-      ],
+      "#k": [`${KIND_KNOWLEDGE_LIST}`, `${KIND_KNOWLEDGE_NODE}`],
     },
     authors,
   } as Filters;

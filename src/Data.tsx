@@ -16,17 +16,13 @@ import {
 import { DataContextProvider } from "./DataContext";
 import { findContacts, findMembers } from "./contacts";
 import { useApis } from "./Apis";
-import {
-  findNodes,
-  findRelations,
-  findViews,
-  findWorkspaces,
-} from "./knowledgeEvents";
+import { findNodes, findRelations, findViews } from "./knowledgeEvents";
 import { DEFAULT_SETTINGS, findSettings } from "./settings";
 import { newDB } from "./knowledge";
 import { PlanningContextProvider } from "./planner";
 import { useProjectContext } from "./ProjectContext";
 import { WorkspaceContextProvider } from "./WorkspaceContext";
+import { NavigationStackProvider } from "./NavigationStackContext";
 import { flattenRelays, usePreloadRelays, findRelays } from "./relays";
 import { sortEventsDescending, useEventQuery } from "./commons/useNostrQuery";
 
@@ -42,7 +38,6 @@ type ProcessedEvents = {
   relays: Relays;
 
   views: Views;
-  workspaces: Map<ID, Workspace>;
   projectMembers: Members;
 };
 
@@ -53,7 +48,6 @@ export function newProcessedEvents(): ProcessedEvents {
     contacts: Map<PublicKey, Contact>(),
     relays: [],
     views: Map<string, View>(),
-    workspaces: Map<ID, Workspace>(),
     projectMembers: Map<PublicKey, Member>(),
   };
 }
@@ -80,7 +74,6 @@ function processEventsByAuthor(
   const contacts = findContacts(authorEvents);
   const nodes = findNodes(authorEvents);
   const relations = findRelations(authorEvents);
-  const workspaces = findWorkspaces(authorEvents);
   const views = findViews(authorEvents);
   const projectMembers = findMembers(authorEvents);
   const knowledgeDB = {
@@ -94,7 +87,6 @@ function processEventsByAuthor(
     knowledgeDB,
     relays,
     views,
-    workspaces,
     projectMembers,
   };
 }
@@ -262,11 +254,13 @@ function Data({ user, children }: DataProps): JSX.Element {
       projectMembers={projectMembers}
     >
       <WorkspaceContextProvider>
-        <PlanningContextProvider
-          setPublishEvents={setNewEventsAndPublishResults}
-        >
-          {children}
-        </PlanningContextProvider>
+        <NavigationStackProvider>
+          <PlanningContextProvider
+            setPublishEvents={setNewEventsAndPublishResults}
+          >
+            {children}
+          </PlanningContextProvider>
+        </NavigationStackProvider>
       </WorkspaceContextProvider>
     </DataContextProvider>
   );

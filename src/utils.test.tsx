@@ -305,7 +305,7 @@ export function findNodeByText(plan: Plan, text: string): KnowNode | undefined {
 function createInitialWorkspace(
   plan: Plan,
   activeWorkspace?: string
-): [Plan, workspaceID: LongID] {
+): [Plan, nodeID: LongID] {
   const wsNode = activeWorkspace
     ? findNodeByText(plan, activeWorkspace)
     : newNode("Default Workspace", plan.user.publicKey);
@@ -319,7 +319,7 @@ function createInitialWorkspace(
 
   const ws = newWorkspace(wsNode.id, plan.user.publicKey);
   const planWithWS = planAddWorkspace(planWithNode, ws);
-  return [planWithWS, ws.id];
+  return [planWithWS, wsNode.id];
 }
 
 type RenderApis = Partial<TestApis> & {
@@ -357,15 +357,18 @@ export function createOrLoadDefaultWorkspace({
   );
 
   if (existingWs) {
-    return joinID(STASHMAP_PUBLIC_KEY, findTag(existingWs, "d") as LongID);
+    const nodeID = findTag(existingWs, "node");
+    if (nodeID) {
+      return nodeID as LongID;
+    }
   }
 
-  const [createWsPlan, wsID] = createInitialWorkspace(createPlan(stashmaps()));
+  const [createWsPlan, nodeID] = createInitialWorkspace(createPlan(stashmaps()));
   execute({
     ...stashmaps(),
     plan: createWsPlan,
   });
-  return wsID;
+  return nodeID;
 }
 
 export function renderApis(
@@ -670,7 +673,7 @@ export async function setupTestDB(
     finalizeEvent: mockFinalizeEvent(),
   });
   return {
-    ...plan,
+    ...planWithWs,
     activeWorkspace: id,
   };
 }

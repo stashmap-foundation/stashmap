@@ -6,6 +6,7 @@ import { StandaloneCard } from "../commons/Ui";
 import { NavBar } from "./Navbar";
 
 import { WorkspaceView } from "./Workspace";
+import { NavbarControls } from "./NavbarControls";
 
 import { useLogout } from "../NostrAuthContext";
 import { LoadNode } from "../dataQuery";
@@ -27,7 +28,9 @@ export function AppLayout({
         id="app-container"
         className="menu-sub-hidden main-hidden sub-hidden h-100 d-flex flex-column"
       >
-        {/* <NavBar logout={logout} /> */}
+        <div className="workspace-navbar-controls">
+          <NavbarControls />
+        </div>
         {children}
       </div>
     </div>

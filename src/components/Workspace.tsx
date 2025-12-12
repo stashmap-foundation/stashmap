@@ -12,8 +12,9 @@ import { DND } from "../dnd";
 import { useData } from "../DataContext";
 import { SelectRelations } from "./SelectRelations";
 import { useNavigationStack } from "../NavigationStackContext";
-import { LongID } from "../types";
+import { LongID, ROOT } from "../types";
 import { getRelationTypeByRelationsID } from "./RelationTypes";
+import { NavbarControls } from "./NavbarControls";
 
 function StackedLayer({
   workspaceID,
@@ -81,6 +82,9 @@ export function WorkspaceView(): JSX.Element | null {
     <TemporaryViewProvider>
       <div className="position-relative flex-grow-1">
         <div className="position-absolute board overflow-y-hidden">
+          <div className="workspace-navbar-controls">
+            <NavbarControls />
+          </div>
           <div className="workspace-stack-container">
             {/* Render stacked layers */}
             {stackedWorkspaces.map((stackedWorkspaceID, index) => (

@@ -357,6 +357,11 @@ body {
   background-color: white;
 }
 
+.workspace-columns .outer-node {
+  border-left-width: 2px;
+  border-left-color: var(--workspace-relation-color, $dark-gray);
+}
+
 .knowledge-exchange .outer-node {
   max-height: 100%;
 }

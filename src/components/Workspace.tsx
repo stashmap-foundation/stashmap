@@ -13,6 +13,7 @@ import { useData } from "../DataContext";
 import { SelectRelations } from "./SelectRelations";
 import { useNavigationStack } from "../NavigationStackContext";
 import { LongID } from "../types";
+import { getRelationTypeByRelationsID } from "./RelationTypes";
 
 function StackedLayer({
   workspaceID,
@@ -66,6 +67,13 @@ export function WorkspaceView(): JSX.Element | null {
   const columns = relations ? relations.items.toArray() : [];
   const workspaceNode = getNodeFromID(knowledgeDBs, workspaceID, user.publicKey);
 
+  // Get relation color
+  const data = { knowledgeDBs, user };
+  const [relationType] = view.relations
+    ? getRelationTypeByRelationsID(data, view.relations)
+    : [undefined, undefined];
+  const relationColor = relationType?.color;
+
   // Get stacked workspaces (all except the last one which is active)
   const stackedWorkspaces = stack.slice(0, -1);
 
@@ -98,6 +106,11 @@ export function WorkspaceView(): JSX.Element | null {
                   <Scroller
                     ref={ref}
                     className="workspace-columns overflow-y-hidden h-100"
+                    style={
+                      {
+                        "--workspace-relation-color": relationColor,
+                      } as React.CSSProperties
+                    }
                   >
                     {columns.map((column, index) => {
                       return (

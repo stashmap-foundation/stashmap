@@ -89,49 +89,49 @@ function RelationButton({
 }): JSX.Element {
   const buttonStyle = showVertical
     ? {
-        border: "0px",
-        backgroundColor: "inherit",
-        padding: "0 4px",
-        position: "relative" as const,
-        minWidth: "12px",
-        minHeight: "38px",
-        height: "100%",
-        color,
-        display: "flex",
-        alignItems: "center",
-        marginRight: addGroupSpacing ? "8px" : undefined,
-      }
+      border: "0px",
+      backgroundColor: "inherit",
+      padding: "0 4px",
+      position: "relative" as const,
+      minWidth: "12px",
+      //minHeight: "38px",
+      height: "100%",
+      color,
+      display: "flex",
+      alignItems: "center",
+      marginRight: addGroupSpacing ? "8px" : undefined,
+    }
     : {
-        border: "0px",
-        backgroundColor: "inherit",
-        padding: "4px 0",
-        position: "relative" as const,
-        minWidth: "25px",
-        minHeight: "25px",
-        color,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        marginRight: addGroupSpacing ? "8px" : undefined,
-      };
+      border: "0px",
+      backgroundColor: "inherit",
+      padding: "4px 0",
+      position: "relative" as const,
+      minWidth: "25px",
+      minHeight: "25px",
+      color,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: addGroupSpacing ? "8px" : undefined,
+    };
 
   const lineStyle = showVertical
     ? {
-        width: "2px",
-        backgroundColor: color,
-        height: "100%",
-        position: "absolute" as const,
-        left: "0",
-        top: "0",
-      }
+      width: "2px",
+      backgroundColor: color,
+      height: "100%",
+      position: "absolute" as const,
+      left: "0",
+      top: "0",
+    }
     : {
-        width: "100%",
-        height: "3px",
-        backgroundColor: color,
-        position: "absolute" as const,
-        left: "0",
-        top: "5px",
-      };
+      width: "100%",
+      height: "3px",
+      backgroundColor: color,
+      position: "absolute" as const,
+      left: "0",
+      top: "5px",
+    };
 
   const countStyle = {
     fontSize: "10px",
@@ -454,12 +454,12 @@ function AutomaticRelationsButton({
   const onClick = preventDeselect
     ? undefined
     : () => {
-        if (view.relations === relations.id) {
-          onToggleExpanded(!isExpanded);
-        } else {
-          onChangeRelations(relations, true);
-        }
-      };
+      if (view.relations === relations.id) {
+        onToggleExpanded(!isExpanded);
+      } else {
+        onChangeRelations(relations, true);
+      }
+    };
 
   return (
     <RelationButton
@@ -576,17 +576,14 @@ function SelectRelationsButton({
   const isExpanded = view.expanded === true;
   const ariaLabel =
     isExpanded && isSelected
-      ? `hide items ${relationType?.invertedRelationLabel || "list"} ${
-          node.text
-        }`
-      : `show items ${relationType?.invertedRelationLabel || "list"} ${
-          node.text
-        }`;
+      ? `hide items ${relationType?.invertedRelationLabel || "list"} ${node.text
+      }`
+      : `show items ${relationType?.invertedRelationLabel || "list"} ${node.text
+      }`;
 
   const isActive = (isExpanded || !!alwaysOneSelected) && isSelected;
-  const className = `btn select-relation no-shadow ${
-    isActive ? "opacity-none" : "deselected"
-  }`;
+  const className = `btn select-relation no-shadow ${isActive ? "opacity-none" : "deselected"
+    }`;
 
   const color = relationType?.color || "black";
   const label = relationLabel(isActive, relationType, relationSize);
@@ -594,12 +591,12 @@ function SelectRelationsButton({
   const onClick = preventDeselect
     ? undefined
     : () => {
-        if (view.relations === topRelation.id) {
-          onToggleExpanded(!isExpanded);
-        } else {
-          onChangeRelations(topRelation, true);
-        }
-      };
+      if (view.relations === topRelation.id) {
+        onToggleExpanded(!isExpanded);
+      } else {
+        onChangeRelations(topRelation, true);
+      }
+    };
 
   const dropdownStyle = {
     borderTopColor: color,
@@ -684,19 +681,19 @@ export function SelectRelations({
   // Only sort to show current relation first when expanded/vertical
   const sortedItems = showVertical
     ? [...allItems].sort((a, b) => {
-        const isCurrentA =
-          a.type === "relation"
-            ? currentRelations?.type === a.id
-            : view.relations === a.id;
-        const isCurrentB =
-          b.type === "relation"
-            ? currentRelations?.type === b.id
-            : view.relations === b.id;
+      const isCurrentA =
+        a.type === "relation"
+          ? currentRelations?.type === a.id
+          : view.relations === a.id;
+      const isCurrentB =
+        b.type === "relation"
+          ? currentRelations?.type === b.id
+          : view.relations === b.id;
 
-        if (isCurrentA) return -1;
-        if (isCurrentB) return 1;
-        return 0;
-      })
+      if (isCurrentA) return -1;
+      if (isCurrentB) return 1;
+      return 0;
+    })
     : allItems;
 
   // Define which IDs mark the end of a semantic group

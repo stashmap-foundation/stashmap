@@ -62,13 +62,49 @@ body {
   background: transparent !important;
 }
 
-.fullscreen-card {
+.workspace-stack-container {
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-top: 8px;
+}
+
+.stacked-layer {
+  position: relative;
+  background-color: white;
+  border: $border-strong;
+  border-bottom: none;
+  border-top-left-radius: 3px;
+  border-top-right-radius: 3px;
+  //box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-left: 8px;
+  margin-right: 8px;
+ // margin-top: 8px;
+  padding: 8px;
+
+  &:hover {
+    background-color: #f8f9fa;
+  }
+}
+
+.stacked-layer-title {
+  font-size: 1rem;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fullscreen-card {
+  flex: 1;
   background-color: white;
   border: $border-strong;
   border-radius: 3px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0px 8px rgba(0, 0, 0, 0.1);
   margin: 8px;
+  margin-top: 0px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -76,16 +112,19 @@ body {
 
 .fullscreen-card-header {
   flex-shrink: 0;
-  padding: 12px 16px;
-  border-bottom: $border-strong;
+  padding-left: 8px;
+  padding-top: 8px;
+  padding-bottom: 0px;
+  padding-right: 8px;
+  //border-bottom: $border-strong;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
 .fullscreen-card-title {
-  font-size: 1.2rem;
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 400;
 }
 
 .fullscreen-card-relations {
@@ -111,7 +150,7 @@ body {
   }
   grid-auto-flow: column;
   grid-gap: 8px;
-  padding-top: 8px;
+ // padding-top: 8px;
   padding-left: 8px;
   padding-bottom: 8px;
   overflow-x: scroll;
@@ -170,7 +209,7 @@ body {
 
 .overflow-y-hidden {
   overflow-y: hidden;
-}
+} // How war away is the horizontal line from the tab bar
 
 .workspace-column {
   height: 100%;

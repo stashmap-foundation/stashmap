@@ -1,5 +1,5 @@
-import React from "react";
-import { Outlet } from "react-router-dom";
+import React, { useEffect } from "react";
+import { Outlet, useParams, useNavigate } from "react-router-dom";
 
 import { Card } from "react-bootstrap";
 import { StandaloneCard } from "../commons/Ui";
@@ -13,6 +13,7 @@ import { StorePreLoginContext } from "../StorePreLoginContext";
 import { useWorkspaceContext } from "../WorkspaceContext";
 import { RootViewContextProvider } from "../ViewContext";
 import { SelectWorkspaces } from "./SelectWorkspaces";
+import { LongID, ROOT } from "../types";
 
 export function AppLayout({
   children,
@@ -63,19 +64,27 @@ export function RootViewOrWorkspaceIsLoading({
 }: {
   children: React.ReactNode;
 }): JSX.Element {
-  const { workspace } = useWorkspaceContext();
-  if (!workspace) {
+  const { workspaceID } = useParams<{ workspaceID: string }>();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!workspaceID) {
+      navigate(`/w/${ROOT}`, { replace: true });
+    }
+  }, [workspaceID, navigate]);
+
+  if (!workspaceID) {
     return (
       <AppLayout>
         <StorePreLoginContext>
           <Outlet />
-          <WorkspaceIsLoading />
         </StorePreLoginContext>
       </AppLayout>
     );
   }
+
   return (
-    <RootViewContextProvider root={workspace.node}>
+    <RootViewContextProvider root={workspaceID as LongID}>
       <LoadNode waitForEose>
         <StorePreLoginContext>{children}</StorePreLoginContext>
       </LoadNode>

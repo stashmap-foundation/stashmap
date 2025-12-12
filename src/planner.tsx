@@ -27,6 +27,7 @@ import { useWorkspaceContext } from "./WorkspaceContext";
 import { useRelaysToCreatePlan } from "./relays";
 import { useProjectContext } from "./ProjectContext";
 import { mergePublishResultsOfEvents } from "./commons/PublishingStatus";
+import { ROOT } from "./types";
 
 export type Plan = Data & {
   publishEvents: List<UnsignedEvent & EventAttachment>;
@@ -230,6 +231,11 @@ function planDelete(plan: Plan, id: LongID | ID, kind: number): Plan {
 }
 
 export function planDeleteNode(plan: Plan, nodeID: LongID | ID): Plan {
+  // Prevent deletion of ROOT node
+  if (nodeID === ROOT) {
+    return plan;
+  }
+
   const deletePlan = planDelete(plan, nodeID, KIND_KNOWLEDGE_NODE);
   const userDB = plan.knowledgeDBs.get(deletePlan.user.publicKey, newDB());
   const updatedNodes = userDB.nodes.remove(shortID(nodeID));

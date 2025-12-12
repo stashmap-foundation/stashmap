@@ -16,6 +16,7 @@ import { App } from "./App";
 import { NostrAuthContextProvider } from "./NostrAuthContext";
 import { NostrProvider } from "./NostrProvider";
 import { ProjectContextProvider } from "./ProjectContext";
+import { NavigationStackProvider } from "./NavigationStackContext";
 
 const defaultRelayUrls = process.env.DEFAULT_RELAYS?.split(",");
 const defaultWorkspace = process.env.DEFAULT_WORKSPACE;
@@ -33,20 +34,22 @@ const root = document.getElementById("root");
 if (root !== null) {
   createRoot(root).render(
     <BrowserRouter>
-      <NostrProvider apis={{ fileStore: createFileStore() }}>
-        <NostrAuthContextProvider
-          defaultRelayUrls={defaultRelayUrls}
-          defaultWorkspace={
-            defaultWorkspace ? (defaultWorkspace as LongID) : undefined
-          }
-        >
-          <ProjectContextProvider>
-            <FocusContextProvider>
-              <App />
-            </FocusContextProvider>
-          </ProjectContextProvider>
-        </NostrAuthContextProvider>
-      </NostrProvider>
+      <NavigationStackProvider>
+        <NostrProvider apis={{ fileStore: createFileStore() }}>
+          <NostrAuthContextProvider
+            defaultRelayUrls={defaultRelayUrls}
+            defaultWorkspace={
+              defaultWorkspace ? (defaultWorkspace as LongID) : undefined
+            }
+          >
+            <ProjectContextProvider>
+              <FocusContextProvider>
+                <App />
+              </FocusContextProvider>
+            </ProjectContextProvider>
+          </NostrAuthContextProvider>
+        </NostrProvider>
+      </NavigationStackProvider>
     </BrowserRouter>
   );
 }

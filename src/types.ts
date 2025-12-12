@@ -232,3 +232,5 @@ declare global {
     relations: Map<ID, Relations>;
   };
 }
+
+export const ROOT: LongID = "ROOT" as LongID;

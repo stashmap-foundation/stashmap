@@ -68,13 +68,7 @@ export function RootViewOrWorkspaceIsLoading({
   children: React.ReactNode;
 }): JSX.Element {
   const { workspaceID } = useParams<{ workspaceID: string }>();
-  const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!workspaceID) {
-      navigate(`/w/${ROOT}`, { replace: true });
-    }
-  }, [workspaceID, navigate]);
 
   if (!workspaceID) {
     return (

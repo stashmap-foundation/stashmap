@@ -65,10 +65,12 @@ test("Details of Publishing Status", async () => {
       } as unknown as MockRelayPool,
       relays: { ...utils.relays, userRelays: TEST_RELAYS },
       defaultWorkspace: defaultWS,
+      initialRoute: `/w/${defaultWS}`,
     }
   );
   await typeNewNode(view, "Hello World");
-  await userEvent.click(await screen.findByLabelText("publishing status"));
+  const publishingStatusButtons = await screen.findAllByLabelText("publishing status");
+  await userEvent.click(publishingStatusButtons[0]);
   await screen.findByText("Publishing Status");
   await userEvent.click(
     screen.getByText("Relay wss://relay.test.first.success/:")

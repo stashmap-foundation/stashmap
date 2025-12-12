@@ -102,7 +102,7 @@ test("Default Relations are shown when adding a node from other User via search"
   });
 
   renderApp({ ...alice(), includeFocusContext: true });
-  await userEvent.type(await screen.findByText("Default Workspace"), "/");
+  await userEvent.type(await screen.findByText("My Notes"), "/");
   screen.getByPlaceholderText("Search");
   const searchInput = await screen.findByLabelText("search input");
   await userEvent.type(searchInput, "Object");

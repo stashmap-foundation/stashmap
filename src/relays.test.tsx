@@ -102,7 +102,7 @@ test("Write views on user relays", async () => {
   );
   utils.relayPool.resetPublishedOnRelays();
   await userEvent.click(
-    await screen.findByLabelText("increase width of Default Workspace")
+    await screen.findByLabelText("increase width of My Notes")
   );
   await findEvent(utils.relayPool, { kinds: [KIND_VIEWS] });
   expect(utils.relayPool.getPublishedOnRelays()).toEqual(

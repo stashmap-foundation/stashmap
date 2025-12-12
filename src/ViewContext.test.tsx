@@ -189,6 +189,8 @@ test("Contact reorders list", async () => {
   const aliceDB = await setupTestDB(alice(), [["My Workspace", [pl]]], {
     activeWorkspace: "My Workspace",
   });
+  const myWorkspace = findNodeByText(aliceDB, "My Workspace") as KnowNode;
+
   const utils = renderWithTestData(
     <Data user={alice().user}>
       <RootViewOrWorkspaceIsLoading>
@@ -201,7 +203,7 @@ test("Contact reorders list", async () => {
     </Data>,
     {
       ...alice(),
-      initialRoute: `/w/${aliceDB.activeWorkspace}`,
+      initialRoute: `/w/${myWorkspace.id}`,
     }
   );
   await screen.findByText("FPL");
@@ -212,6 +214,7 @@ test("Contact reorders list", async () => {
   cleanup();
 
   // let bob remove OOP
+  const bobsWorkspace = findNodeByText(bobsKnowledgeDB, "Bobs Workspace") as KnowNode;
   renderWithTestData(
     <Data user={bob().user}>
       <RootViewOrWorkspaceIsLoading>
@@ -224,7 +227,7 @@ test("Contact reorders list", async () => {
     </Data>,
     {
       ...bob(),
-      initialRoute: `/w/${bobsKnowledgeDB.activeWorkspace}`,
+      initialRoute: `/w/${bobsWorkspace.id}`,
     }
   );
   await userEvent.click(await screen.findByLabelText("edit OOP"));
@@ -243,7 +246,7 @@ test("Contact reorders list", async () => {
     </Data>,
     {
       ...alice(),
-      initialRoute: `/w/${aliceDB.activeWorkspace}`,
+      initialRoute: `/w/${myWorkspace.id}`,
     }
   );
   // OOP is gone, so are it's children

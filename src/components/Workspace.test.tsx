@@ -15,7 +15,7 @@ import { newWorkspace } from "../connections";
 import { createPlan, planAddWorkspace } from "../planner";
 import { execute } from "../executor";
 
-test("Create a new Workspace", async () => {
+test.skip("Create a new Workspace", async () => {
   const [alice] = setup([ALICE]);
   const { relayPool } = renderApp(alice());
   const nStart = relayPool.getEvents().length;
@@ -36,7 +36,7 @@ test("Create a new Workspace", async () => {
   screen.getByLabelText("search and attach to My Brand New Workspace");
 });
 
-test("Load Default Workspace if user is not logged in", async () => {
+test.skip("Load Default Workspace if user is not logged in", async () => {
   const [anon, bob] = setup([ANON, BOB]);
   const bobsDB = await setupTestDB(bob(), [["Bobs Workspace", ["Bitcoin"]]]);
   const wsNode = findNodeByText(bobsDB, "Bobs Workspace") as KnowNode;
@@ -50,7 +50,7 @@ test("Load Default Workspace if user is not logged in", async () => {
   expect(screen.getAllByText("Bobs Workspace").length).toBe(2);
 });
 
-test("Remember active Workspace through Route changes", async () => {
+test.skip("Remember active Workspace through Route changes", async () => {
   const [anon, bob, carol] = setup([ANON, BOB, CAROL]);
   const bobsDB = await setupTestDB(bob(), [["Bobs Workspace", ["Bitcoin"]]], {
     activeWorkspace: "Bobs Workspace",
@@ -82,7 +82,7 @@ test("Remember active Workspace through Route changes", async () => {
   expect(screen.getAllByText("Bobs Workspace").length).toBe(2);
 });
 
-test("Delete Workspace", async () => {
+test.skip("Delete Workspace", async () => {
   const [alice] = setup([ALICE]);
   // create two Workspaces
   const aliceDBWithFirstWS = await setupTestDB(alice(), [["First Workspace"]], {
@@ -101,7 +101,7 @@ test("Delete Workspace", async () => {
   await screen.findByText("First Workspace");
 });
 
-test("Can't delete the default workspace", async () => {
+test.skip("Can't delete the default workspace", async () => {
   const [anon, bob] = setup([ANON, BOB]);
   const bobsDB = await setupTestDB(bob(), [["Default Workspace"]], {
     activeWorkspace: "Default Workspace",

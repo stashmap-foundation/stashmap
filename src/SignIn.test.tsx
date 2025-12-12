@@ -127,8 +127,8 @@ test("Merge Views", async () => {
   const [bob, alice] = setup([BOB, ALICE]);
   const bobsDB = await setupTestDB(
     bob(),
-    [["Default Workspace", [["Bitcoin"], ["Nostr"]]]],
-    { activeWorkspace: "Default Workspace" }
+    [["My Notes", [["Bitcoin"], ["Nostr"]]]],
+    { activeWorkspace: "My Notes" }
   );
   renderApp({
     ...alice(),

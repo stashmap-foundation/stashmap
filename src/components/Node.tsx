@@ -14,13 +14,12 @@ import {
   useIsAddToNode,
   addNodeToPath,
   addAddToNodeToPath,
-  addDiffSectionToPath,
+  addDiffItemToPath,
   getDiffItemsForNode,
   getNodeIDFromView,
   useNodeID,
   getViewFromPath,
   popViewPath,
-  DIFF_SECTION,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -400,7 +399,7 @@ export function getNodesInTree(
           nodesList.push(childPath)
         );
 
-        // After expanded node's children, check for diff items
+        // After expanded node's children, add diff items as regular nodes
         const childRelations = getRelations(
           data.knowledgeDBs,
           childView.relations,
@@ -412,12 +411,17 @@ export function getNodesInTree(
             data.knowledgeDBs,
             data.user.publicKey,
             getNodeIDFromView(data, childPath)[0],
-            childRelations.type
+            childRelations.type,
+            childRelations.id
           );
-          if (diffItems.size > 0) {
-            const diffPath = addDiffSectionToPath(data, childPath);
-            return withChildren.push(diffPath);
-          }
+          // Append each diff item as a regular node path
+          return diffItems.reduce(
+            (list, diffItem, idx) =>
+              list.push(
+                addDiffItemToPath(data, childPath, diffItem.nodeID, idx)
+              ),
+            withChildren
+          );
         }
         return withChildren;
       }
@@ -431,30 +435,50 @@ export function getNodesInTree(
     data.knowledgeDBs,
     data.user.publicKey,
     parentNodeID,
-    relations.type
+    relations.type,
+    relations.id
   );
 
   // Don't add "Add Note" button for workspace root (levels === 0) or header column (parentPath.length === 1)
   const isHeaderColumn = parentPath.length === 2;
   const isRoot = getLevels(parentPath) === 0;
 
-  // Add diff section if there are diff items (at the parent level)
-  let result = nodesInTree;
-  if (diffItems.size > 0 && !isRoot && !isHeaderColumn) {
-    const diffPath = addDiffSectionToPath(data, parentPath);
-    result = result.push(diffPath);
-  }
+  // Add diff items at the parent level (after regular items, before Add Note)
+  // Always add them - useIsDiffItem() will handle the rendering
+  const withDiffItems =
+    diffItems.size > 0 && !isRoot
+      ? diffItems.reduce(
+          (list, diffItem, idx) =>
+            list.push(
+              addDiffItemToPath(data, parentPath, diffItem.nodeID, idx)
+            ),
+          nodesInTree
+        )
+      : nodesInTree;
 
   // Add "Add Note" button unless it's root or header column
-  return isRoot || isHeaderColumn ? result : result.push(addNodePath);
+  return isRoot || isHeaderColumn
+    ? withDiffItems
+    : withDiffItems.push(addNodePath);
+}
+
+function DiffItemIndicator(): JSX.Element {
+  return (
+    <span
+      className="iconsminds-conference diff-indicator"
+      title="From other users"
+    />
+  );
 }
 
 export function Node({
   className,
   cardBodyClassName,
+  isDiffItem,
 }: {
   className?: string;
   cardBodyClassName?: string;
+  isDiffItem?: boolean;
 }): JSX.Element | null {
   const isDesktop = !useMediaQuery(IS_MOBILE);
   const viewPath = useViewPath();
@@ -469,20 +493,21 @@ export function Node({
   return (
     <NodeCard className={cls} cardBodyClassName={clsBody}>
       {levels > 0 && <Indent levels={levels} />}
+      {isDiffItem && <DiffItemIndicator />}
       {isAddToNode && levels !== 1 && <AddNodeToNode />}
       {!isAddToNode && (
         <>
           {isMultiselect && <NodeSelectbox />}
           <div className="flex-column w-100">
-            {isNodeBeingEdited && <EditingNodeContent />}
-            {!isNodeBeingEdited && (
+            {isNodeBeingEdited && !isDiffItem && <EditingNodeContent />}
+            {(!isNodeBeingEdited || isDiffItem) && (
               <>
                 <NodeAutoLink>
-                  <InteractiveNodeContent />
+                  <InteractiveNodeContent editOnClick={!isDiffItem} />
                 </NodeAutoLink>
               </>
             )}
-            <NodeMenu />
+            {!isDiffItem && <NodeMenu />}
           </div>
         </>
       )}

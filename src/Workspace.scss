@@ -852,3 +852,50 @@ to {
 .tooltip-arrow {
     display: none !important;
 }
+
+// Diff items - nodes from other users that aren't in current user's list
+.diff-item-container {
+  background-color: rgba(0, 0, 0, 0.02);
+  border-left: 2px dashed rgba(0, 0, 0, 0.15);
+}
+
+.diff-item {
+  opacity: 0.85;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+.diff-item-card {
+  background-color: transparent;
+}
+
+.diff-indicator {
+  color: rgba(0, 0, 0, 0.5);
+  margin-right: 6px;
+  font-size: 0.9rem;
+}
+
+.diff-item-actions {
+  display: flex;
+  gap: 2px;
+
+  .btn {
+    padding: 2px 4px;
+    min-width: 28px;
+    min-height: 28px;
+
+    &:hover {
+      background-color: rgba(0, 0, 0, 0.1);
+    }
+  }
+
+  .simple-icon-check {
+    color: green;
+  }
+
+  .simple-icon-close {
+    color: rgba(0, 0, 0, 0.6);
+  }
+}

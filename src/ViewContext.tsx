@@ -3,6 +3,7 @@ import { List, Set as ImmutableSet, Map } from "immutable";
 import { v4 } from "uuid";
 import {
   getRelations,
+  getRelationsNoReferencedBy,
   isRemote,
   joinID,
   shortID,
@@ -17,7 +18,6 @@ import { RELATION_TYPES } from "./components/RelationTypes";
 export type NodeIndex = number & { readonly "": unique symbol };
 
 export const ADD_TO_NODE = "ADD_TO_NODE" as LongID;
-export const DIFF_SECTION = "DIFF_SECTION" as LongID;
 
 export type DiffItem = {
   nodeID: LongID;
@@ -31,13 +31,15 @@ export type DiffItem = {
  * Logic:
  * - Get current user's items for this relation type on this node
  * - Get all other users' relations of same type (excluding "not_relevant")
+ * - Exclude items that are in the currently viewed relation (to avoid duplication)
  * - Return items that exist in others' but not in user's (deduplicated)
  */
 export function getDiffItemsForNode(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
   nodeID: LongID | ID,
-  relationType: ID
+  relationType: ID,
+  currentRelationId?: LongID
 ): List<DiffItem> {
   const [, localID] = splitID(nodeID);
 
@@ -60,13 +62,26 @@ export function getDiffItemsForNode(
     .flatMap((r) => r.items)
     .toSet();
 
-  // Get all other users' relations of the same type
+  // Get items from the currently viewed relation (to exclude from diff)
+  const currentRelation = currentRelationId
+    ? getRelationsNoReferencedBy(knowledgeDBs, currentRelationId, myself)
+    : undefined;
+  const currentRelationItems: ImmutableSet<LongID | ID> = currentRelation
+    ? currentRelation.items.toSet()
+    : ImmutableSet<LongID | ID>();
+
+  // Get all other users' relations of the same type (excluding the currently viewed one)
   const otherRelations: List<Relations> = knowledgeDBs
     .filter((_, pk) => pk !== myself)
     .toList()
     .flatMap((db) =>
       db.relations
-        .filter((r) => r.head === localID && r.type === relationType)
+        .filter(
+          (r) =>
+            r.head === localID &&
+            r.type === relationType &&
+            r.id !== currentRelationId
+        )
         .toList()
     );
 
@@ -78,6 +93,7 @@ export function getDiffItemsForNode(
           (item: LongID | ID) =>
             !myItems.has(item) &&
             !myNotRelevantItems.has(item) &&
+            !currentRelationItems.has(item) &&
             !acc.find((d) => d.nodeID === item)
         )
         .map((item: LongID | ID) => ({
@@ -388,6 +404,26 @@ export function addNodeToPath(
   return [...pathWithRelations, { nodeID, nodeIndex }];
 }
 
+/**
+ * Add a diff item (from other users) to the path.
+ * Uses the parent's relation context but with a nodeID that's not in the user's own relation.
+ */
+export function addDiffItemToPath(
+  data: Data,
+  path: ViewPath,
+  nodeID: LongID,
+  diffIndex: number
+): ViewPath {
+  const relations = getRelationsFromView(data, path);
+  // Use 0 as nodeIndex since diff items don't have duplicates in our list
+  const nodeIndex = diffIndex as NodeIndex;
+  const pathWithRelations = addRelationsToLastElement(
+    path,
+    relations?.id || ("" as LongID)
+  );
+  return [...pathWithRelations, { nodeID, nodeIndex }];
+}
+
 function popPath(viewContext: ViewPath): ViewPath | undefined {
   const pathWithoutLast = viewContext.slice(0, -1) as SubPathWithRelations[];
   const parent = pathWithoutLast[pathWithoutLast.length - 1];
@@ -402,6 +438,35 @@ function popPath(viewContext: ViewPath): ViewPath | undefined {
 
 export function getParentView(viewContext: ViewPath): ViewPath | undefined {
   return popPath(viewContext);
+}
+
+/**
+ * Check if the current node is a diff item (from other users, not in the user's own relation).
+ */
+export function useIsDiffItem(): boolean {
+  const data = useData();
+  const viewPath = useViewPath();
+  const parentPath = getParentView(viewPath);
+
+  if (!parentPath) {
+    return false;
+  }
+
+  const [nodeID] = getNodeIDFromView(data, viewPath);
+
+  // ADD_TO_NODE is not a diff item
+  if (nodeID === ADD_TO_NODE) {
+    return false;
+  }
+
+  const parentRelations = getRelationsFromView(data, parentPath);
+
+  if (!parentRelations) {
+    return false;
+  }
+
+  // If the node is not in the parent's relation items, it's a diff item
+  return !parentRelations.items.includes(nodeID);
 }
 
 export function popViewPath(
@@ -516,21 +581,6 @@ export function useParentNode(): [KnowNode, View] | [undefined, undefined] {
 export function useIsAddToNode(): boolean {
   const viewContext = useViewPath();
   return getLast(viewContext).nodeID === ADD_TO_NODE;
-}
-
-export function useIsDiffSection(): boolean {
-  const viewContext = useViewPath();
-  return getLast(viewContext).nodeID === DIFF_SECTION;
-}
-
-export function addDiffSectionToPath(data: Data, path: ViewPath): ViewPath {
-  const relations = getRelationsFromView(data, path);
-  // DIFF_SECTION is unique per parent, so nodeIndex is 0
-  const nodeIndex = 0 as NodeIndex;
-  return [
-    ...addRelationsToLastElement(path, relations?.id || ("" as LongID)),
-    { nodeID: DIFF_SECTION, nodeIndex },
-  ];
 }
 
 export function useViewKey(): string {

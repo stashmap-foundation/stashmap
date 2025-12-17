@@ -1,14 +1,20 @@
 import React from "react";
 import { screen } from "@testing-library/react";
-import { addRelationToRelations, newNode } from "../connections";
+import { Map } from "immutable";
+import { addRelationToRelations, newNode, shortID } from "../connections";
 import { DND } from "../dnd";
 import { ALICE, BOB, renderWithTestData, setup, follow } from "../utils.test";
-import { RootViewContextProvider, newRelations } from "../ViewContext";
+import {
+  RootViewContextProvider,
+  newRelations,
+  getDiffItemsForNode,
+} from "../ViewContext";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
 import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
 import { execute } from "../executor";
 import { LoadNode } from "../dataQuery";
 import { Column } from "./Column";
+import { newDB } from "../knowledge";
 
 test("Shows dots when other user has a relation of same type", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
@@ -146,4 +152,104 @@ test("Shows dots when only other user has relation (current user has none)", asy
 
   // Should show indicator for Bob's version
   expect(screen.getByRole("img", { name: "1 other version" })).toBeDefined();
+});
+
+test("getDiffItemsForNode returns items from other users", () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  const { publicKey: alicePK } = alice().user;
+  const { publicKey: bobPK } = bob().user;
+
+  // Alice has item A in her relation
+  const parentNode = newNode("Parent Node", alicePK);
+  const aliceChildNode = newNode("Alice's Child", alicePK);
+  const aliceRelations = addRelationToRelations(
+    newRelations(parentNode.id, "", alicePK),
+    aliceChildNode.id
+  );
+
+  // Bob has item B in his relation (same parent, same type)
+  const bobChildNode = newNode("Bob's Child", bobPK);
+  const bobRelations = addRelationToRelations(
+    newRelations(parentNode.id, "", bobPK),
+    bobChildNode.id
+  );
+
+  // Build knowledgeDBs with both users' data
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>()
+    .set(alicePK, {
+      ...newDB(),
+      nodes: newDB()
+        .nodes.set(shortID(parentNode.id), parentNode)
+        .set(shortID(aliceChildNode.id), aliceChildNode),
+      relations: newDB().relations.set(
+        shortID(aliceRelations.id),
+        aliceRelations
+      ),
+    })
+    .set(bobPK, {
+      ...newDB(),
+      nodes: newDB().nodes.set(shortID(bobChildNode.id), bobChildNode),
+      relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
+    });
+
+  // Get diff items for Alice viewing her own relation
+  const diffItems = getDiffItemsForNode(
+    knowledgeDBs,
+    alicePK,
+    parentNode.id,
+    "", // relation type
+    aliceRelations.id
+  );
+
+  // Alice should see Bob's child as a diff item
+  expect(diffItems.size).toBe(1);
+  expect(diffItems.get(0)?.nodeID).toBe(bobChildNode.id);
+});
+
+test("Diff items are not included when saving a relation", () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  const { publicKey: alicePK } = alice().user;
+  const { publicKey: bobPK } = bob().user;
+
+  // Alice has item A in her relation
+  const parentNode = newNode("Parent Node", alicePK);
+  const aliceChildNode = newNode("Alice's Child", alicePK);
+  const aliceRelations = addRelationToRelations(
+    newRelations(parentNode.id, "", alicePK),
+    aliceChildNode.id
+  );
+
+  // Bob has item B in his relation (same parent, same type)
+  const bobChildNode = newNode("Bob's Child", bobPK);
+  const bobRelations = addRelationToRelations(
+    newRelations(parentNode.id, "", bobPK),
+    bobChildNode.id
+  );
+
+  // Build knowledgeDBs with both users' data
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>()
+    .set(alicePK, {
+      ...newDB(),
+      nodes: newDB()
+        .nodes.set(shortID(parentNode.id), parentNode)
+        .set(shortID(aliceChildNode.id), aliceChildNode),
+      relations: newDB().relations.set(
+        shortID(aliceRelations.id),
+        aliceRelations
+      ),
+    })
+    .set(bobPK, {
+      ...newDB(),
+      nodes: newDB().nodes.set(shortID(bobChildNode.id), bobChildNode),
+      relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
+    });
+
+  // Verify Alice's relation only contains her own item, not Bob's (diff item)
+  const aliceDB = knowledgeDBs.get(alicePK);
+  const savedRelation = aliceDB?.relations.get(shortID(aliceRelations.id));
+
+  expect(savedRelation?.items.size).toBe(1);
+  expect(savedRelation?.items.get(0)).toBe(aliceChildNode.id);
+  // Bob's child should NOT be in Alice's relation
+  expect(savedRelation?.items.includes(bobChildNode.id)).toBe(false);
 });

@@ -1,5 +1,5 @@
 import React from "react";
-import { List, Set, Map } from "immutable";
+import { List, Set as ImmutableSet, Map } from "immutable";
 import { v4 } from "uuid";
 import {
   getRelations,
@@ -17,6 +17,80 @@ import { RELATION_TYPES } from "./components/RelationTypes";
 export type NodeIndex = number & { readonly "": unique symbol };
 
 export const ADD_TO_NODE = "ADD_TO_NODE" as LongID;
+export const DIFF_SECTION = "DIFF_SECTION" as LongID;
+
+export type DiffItem = {
+  nodeID: LongID;
+  sourceRelationId: LongID;
+};
+
+/**
+ * Calculate items that other users have in their relation lists
+ * that the current user doesn't have.
+ *
+ * Logic:
+ * - Get current user's items for this relation type on this node
+ * - Get all other users' relations of same type (excluding "not_relevant")
+ * - Return items that exist in others' but not in user's (deduplicated)
+ */
+export function getDiffItemsForNode(
+  knowledgeDBs: KnowledgeDBs,
+  myself: PublicKey,
+  nodeID: LongID | ID,
+  relationType: ID
+): List<DiffItem> {
+  const [, localID] = splitID(nodeID);
+
+  // Get current user's items for this relation type
+  const myDB = knowledgeDBs.get(myself);
+  const myRelations = myDB?.relations
+    .filter((r) => r.head === localID && r.type === relationType)
+    .toList();
+  const myItems: ImmutableSet<LongID | ID> = (myRelations || List<Relations>())
+    .flatMap((r) => r.items)
+    .toSet();
+
+  // Also get user's "not_relevant" items to exclude them from diff
+  const myNotRelevantRelations = myDB?.relations
+    .filter((r) => r.head === localID && r.type === "not_relevant")
+    .toList();
+  const myNotRelevantItems: ImmutableSet<LongID | ID> = (
+    myNotRelevantRelations || List<Relations>()
+  )
+    .flatMap((r) => r.items)
+    .toSet();
+
+  // Get all other users' relations of the same type
+  const otherRelations: List<Relations> = knowledgeDBs
+    .filter((_, pk) => pk !== myself)
+    .toList()
+    .flatMap((db) =>
+      db.relations
+        .filter((r) => r.head === localID && r.type === relationType)
+        .toList()
+    );
+
+  // Collect items from others that user doesn't have, deduplicated
+  const diffItems = otherRelations.reduce(
+    (acc: List<DiffItem>, relations: Relations) => {
+      const newItems = relations.items
+        .filter(
+          (item: LongID | ID) =>
+            !myItems.has(item) &&
+            !myNotRelevantItems.has(item) &&
+            !acc.find((d) => d.nodeID === item)
+        )
+        .map((item: LongID | ID) => ({
+          nodeID: item as LongID,
+          sourceRelationId: relations.id,
+        }));
+      return acc.concat(newItems);
+    },
+    List<DiffItem>()
+  );
+
+  return diffItems;
+}
 
 type SubPath = {
   nodeID: LongID | ID;
@@ -444,6 +518,21 @@ export function useIsAddToNode(): boolean {
   return getLast(viewContext).nodeID === ADD_TO_NODE;
 }
 
+export function useIsDiffSection(): boolean {
+  const viewContext = useViewPath();
+  return getLast(viewContext).nodeID === DIFF_SECTION;
+}
+
+export function addDiffSectionToPath(data: Data, path: ViewPath): ViewPath {
+  const relations = getRelationsFromView(data, path);
+  // DIFF_SECTION is unique per parent, so nodeIndex is 0
+  const nodeIndex = 0 as NodeIndex;
+  return [
+    ...addRelationsToLastElement(path, relations?.id || ("" as LongID)),
+    { nodeID: DIFF_SECTION, nodeIndex },
+  ];
+}
+
 export function useViewKey(): string {
   return viewPathToString(useViewPath());
 }
@@ -574,22 +663,22 @@ export function upsertRelations(
  * ws:0:2
  * ws:0:2:0
  * */
-function getAllSubpaths(path: string): Set<string> {
+function getAllSubpaths(path: string): ImmutableSet<string> {
   return path.split(":").reduce((acc, p) => {
     const lastPath = acc.last(undefined);
     return acc.add(lastPath ? `${lastPath}:${p}` : `${p}`);
-  }, Set<string>());
+  }, ImmutableSet<string>());
 }
 
 function findViewsForRepo(
   data: Data,
   id: string,
   relationsID: ID
-): Set<string> {
+): ImmutableSet<string> {
   // include partial, non existing views
   const paths = data.views.reduce((acc, _, path) => {
     return acc.merge(getAllSubpaths(path));
-  }, Set<string>());
+  }, ImmutableSet<string>());
   return paths.filter((path) => {
     try {
       const [nodeID, view] = getNodeIDFromView(data, parseViewPath(path));

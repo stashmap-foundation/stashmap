@@ -14,10 +14,13 @@ import {
   useIsAddToNode,
   addNodeToPath,
   addAddToNodeToPath,
+  addDiffSectionToPath,
+  getDiffItemsForNode,
   getNodeIDFromView,
   useNodeID,
   getViewFromPath,
   popViewPath,
+  DIFF_SECTION,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -390,17 +393,60 @@ export function getNodesInTree(
         return nodesList.push(childPath);
       }
       if (childView.expanded) {
-        return getNodesInTree(data, childPath, nodesList.push(childPath));
+        // Recursively get children of expanded node
+        const withChildren = getNodesInTree(
+          data,
+          childPath,
+          nodesList.push(childPath)
+        );
+
+        // After expanded node's children, check for diff items
+        const childRelations = getRelations(
+          data.knowledgeDBs,
+          childView.relations,
+          data.user.publicKey,
+          getNodeIDFromView(data, childPath)[0]
+        );
+        if (childRelations) {
+          const diffItems = getDiffItemsForNode(
+            data.knowledgeDBs,
+            data.user.publicKey,
+            getNodeIDFromView(data, childPath)[0],
+            childRelations.type
+          );
+          if (diffItems.size > 0) {
+            const diffPath = addDiffSectionToPath(data, childPath);
+            return withChildren.push(diffPath);
+          }
+        }
+        return withChildren;
       }
       return nodesList.push(childPath);
     },
     ctx
   );
+
+  // Check for diff items at the parent level as well
+  const diffItems = getDiffItemsForNode(
+    data.knowledgeDBs,
+    data.user.publicKey,
+    parentNodeID,
+    relations.type
+  );
+
   // Don't add "Add Note" button for workspace root (levels === 0) or header column (parentPath.length === 1)
   const isHeaderColumn = parentPath.length === 2;
-  return getLevels(parentPath) === 0 || isHeaderColumn
-    ? nodesInTree
-    : nodesInTree.push(addNodePath);
+  const isRoot = getLevels(parentPath) === 0;
+
+  // Add diff section if there are diff items (at the parent level)
+  let result = nodesInTree;
+  if (diffItems.size > 0 && !isRoot && !isHeaderColumn) {
+    const diffPath = addDiffSectionToPath(data, parentPath);
+    result = result.push(diffPath);
+  }
+
+  // Add "Add Note" button unless it's root or header column
+  return isRoot || isHeaderColumn ? result : result.push(addNodePath);
 }
 
 export function Node({

@@ -2,7 +2,7 @@ import React from "react";
 import { fireEvent, screen } from "@testing-library/react";
 import { List, Map } from "immutable";
 import userEvent from "@testing-library/user-event";
-import { addRelationToRelations, newNode } from "../connections";
+import { addRelationToRelations, newNode, shortID } from "../connections";
 import { DND } from "../dnd";
 import {
   ALICE,
@@ -34,8 +34,10 @@ import {
 import { execute } from "../executor";
 import { DraggableNote } from "./Draggable";
 import { TreeView } from "./TreeView";
+import { getNodesInTree } from "./Node";
 import { LoadNode } from "../dataQuery";
 import { ROOT } from "../types";
+import { newDB } from "../knowledge";
 
 test("Render non existing Node", async () => {
   const [alice] = setup([ALICE]);
@@ -326,4 +328,95 @@ test("Delete node", async () => {
   await userEvent.click(screen.getByLabelText("edit My Note"));
   await userEvent.click(screen.getByLabelText("delete node"));
   expect(screen.queryByText("My Note")).toBeNull();
+});
+
+test("getNodesInTree includes diff items for nested expanded nodes", () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  const { publicKey: alicePK } = alice().user;
+  const { publicKey: bobPK } = bob().user;
+
+  // Alice creates: Parent -> Child (expanded) -> Grandchild
+  const parent = newNode("Parent", alicePK);
+  const child = newNode("Child", alicePK);
+  const aliceGrandchild = newNode("Alice's Grandchild", alicePK);
+
+  // Bob creates a grandchild under the same child node (diff item)
+  const bobGrandchild = newNode("Bob's Grandchild", bobPK);
+
+  // Alice's relations
+  const parentRelations = addRelationToRelations(
+    newRelations(parent.id, "", alicePK),
+    child.id
+  );
+  const childRelations = addRelationToRelations(
+    newRelations(child.id, "", alicePK),
+    aliceGrandchild.id
+  );
+
+  // Bob's relation for the same child node
+  const bobChildRelations = addRelationToRelations(
+    newRelations(child.id, "", bobPK),
+    bobGrandchild.id
+  );
+
+  // Build knowledgeDBs (relations are keyed by shortID)
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>()
+    .set(alicePK, {
+      nodes: newDB()
+        .nodes.set(shortID(parent.id), parent)
+        .set(shortID(child.id), child)
+        .set(shortID(aliceGrandchild.id), aliceGrandchild),
+      relations: newDB()
+        .relations.set(shortID(parentRelations.id), parentRelations)
+        .set(shortID(childRelations.id), childRelations),
+    })
+    .set(bobPK, {
+      nodes: newDB().nodes.set(shortID(bobGrandchild.id), bobGrandchild),
+      relations: newDB().relations.set(
+        shortID(bobChildRelations.id),
+        bobChildRelations
+      ),
+    });
+
+  // Views: parent is expanded, child is expanded
+  const parentPath = [
+    { nodeID: parent.id, nodeIndex: 0 as NodeIndex },
+  ] as const;
+  const childPath = [
+    {
+      nodeID: parent.id,
+      nodeIndex: 0 as NodeIndex,
+      relationsID: parentRelations.id,
+    },
+    { nodeID: child.id, nodeIndex: 0 as NodeIndex },
+  ] as const;
+
+  const views = Map<string, View>()
+    .set(viewPathToString(parentPath), {
+      width: 1,
+      relations: parentRelations.id,
+      expanded: true,
+    })
+    .set(viewPathToString(childPath), {
+      width: 1,
+      relations: childRelations.id,
+      expanded: true,
+    });
+
+  const data: Data = {
+    ...alice(),
+    knowledgeDBs,
+    views,
+  };
+
+  // Get nodes in tree starting from parent
+  const nodes = getNodesInTree(data, parentPath, List());
+
+  // Should include: child, aliceGrandchild, bobGrandchild (as diff item)
+  const nodeIDs = nodes.map((path) => path[path.length - 1].nodeID).toArray();
+
+  expect(nodeIDs).toContain(child.id);
+  expect(nodeIDs).toContain(aliceGrandchild.id);
+  // Bob's grandchild should appear as a diff item
+  expect(nodeIDs).toContain(bobGrandchild.id);
 });

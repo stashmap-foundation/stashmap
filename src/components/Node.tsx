@@ -393,37 +393,8 @@ export function getNodesInTree(
       }
       if (childView.expanded) {
         // Recursively get children of expanded node
-        const withChildren = getNodesInTree(
-          data,
-          childPath,
-          nodesList.push(childPath)
-        );
-
-        // After expanded node's children, add diff items as regular nodes
-        const childRelations = getRelations(
-          data.knowledgeDBs,
-          childView.relations,
-          data.user.publicKey,
-          getNodeIDFromView(data, childPath)[0]
-        );
-        if (childRelations) {
-          const diffItems = getDiffItemsForNode(
-            data.knowledgeDBs,
-            data.user.publicKey,
-            getNodeIDFromView(data, childPath)[0],
-            childRelations.type,
-            childRelations.id
-          );
-          // Append each diff item as a regular node path
-          return diffItems.reduce(
-            (list, diffItem, idx) =>
-              list.push(
-                addDiffItemToPath(data, childPath, diffItem.nodeID, idx)
-              ),
-            withChildren
-          );
-        }
-        return withChildren;
+        // The recursive call will handle adding diff items for childPath at its level
+        return getNodesInTree(data, childPath, nodesList.push(childPath));
       }
       return nodesList.push(childPath);
     },

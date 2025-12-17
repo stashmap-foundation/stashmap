@@ -9,6 +9,7 @@ import {
   upsertRelations,
   useNodeID,
   newRelations,
+  getNodeIDFromView,
 } from "../ViewContext";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable } from "./DroppableContainer";
@@ -18,9 +19,10 @@ import { ChangeColumnWidth } from "./ChangeColumnWidth";
 import { DisconnectNodeBtn } from "./DisconnectBtn";
 import { JoinProjectButton } from "../JoinProjext";
 import { FullscreenButton } from "./FullscreenButton";
-import { addRelationToRelations } from "../connections";
+import { addRelationToRelations, shortID } from "../connections";
 import { useData } from "../DataContext";
-import { usePlanner } from "../planner";
+import { usePlanner, planUpsertRelations } from "../planner";
+import { newDB } from "../knowledge";
 
 export type DragItemType = {
   path: ViewPath;
@@ -113,17 +115,28 @@ function DeclineDiffItemButton(): JSX.Element {
 
   const onClick = (): void => {
     if (!parentPath) return;
-    // Add to "not_relevant" relation type
-    const plan = upsertRelations(createPlan(), parentPath, (relations) => {
-      // Create a new "not_relevant" relation if needed, or add to existing
-      const notRelevantRelations = {
-        ...relations,
-        type: "not_relevant",
-        id: newRelations(relations.head, "not_relevant", data.user.publicKey)
-          .id,
-      };
-      return addRelationToRelations(notRelevantRelations, nodeID);
-    });
+
+    // Get the parent node ID (this is the HEAD for the not_relevant relation)
+    const [parentNodeID] = getNodeIDFromView(data, parentPath);
+    const headID = shortID(parentNodeID);
+
+    // Find existing "not_relevant" relation for this head, or create new one
+    const myRelations = data.knowledgeDBs.get(
+      data.user.publicKey,
+      newDB()
+    ).relations;
+    const existingNotRelevant = myRelations.find(
+      (r) => r.head === headID && r.type === "not_relevant"
+    );
+
+    const notRelevantRelation =
+      existingNotRelevant ||
+      newRelations(parentNodeID, "not_relevant", data.user.publicKey);
+
+    // Add only this item to the not_relevant relation
+    const updatedRelation = addRelationToRelations(notRelevantRelation, nodeID);
+
+    const plan = planUpsertRelations(createPlan(), updatedRelation);
     executePlan(plan);
   };
 

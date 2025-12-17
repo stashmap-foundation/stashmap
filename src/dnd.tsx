@@ -67,7 +67,8 @@ export function dnd(
   selection: OrderedSet<string>,
   source: string,
   to: ViewPath,
-  indexTo: number | undefined
+  indexTo: number | undefined,
+  isDiffItem?: boolean
 ): Plan {
   const rootView = to;
 
@@ -83,7 +84,9 @@ export function dnd(
 
   const [toNodeID, toV] = getNodeIDFromView(plan, toView);
 
+  // Diff items are always added, never moved (they're from other users)
   const move =
+    !isDiffItem &&
     dropIndex !== undefined &&
     fromRepoID !== undefined &&
     toNodeID === fromRepoID &&

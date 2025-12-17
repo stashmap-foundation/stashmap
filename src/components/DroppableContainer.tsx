@@ -13,6 +13,7 @@ import { NOTE_TYPE } from "./Node";
 
 export type DragItemType = {
   path: ViewPath;
+  isDiffItem?: boolean;
 };
 
 type DroppableContainerProps = {
@@ -109,7 +110,8 @@ export function useDroppable({
           selection,
           viewPathToString(item.path), // TODO: change parameter to path instead of string
           destination,
-          calcIndex(index, direction)
+          calcIndex(index, direction),
+          item.isDiffItem
         )
       );
       const parentKey = getParentKey(viewPathToString(item.path));

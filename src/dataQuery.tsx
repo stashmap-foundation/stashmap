@@ -135,9 +135,15 @@ export function addListToFilters(
     return addReferencedByToFilters(filters, nodeID);
   }
 
+  // Also query for ALL relations with this node as HEAD (for diff items from other users)
   return {
     ...addAuthorFromIDToFilters(filters, listID),
     knowledgeListbyID: addIDToFilter(filters.knowledgeListbyID, listID, "#d"),
+    knowledgeListByHead: addIDToFilter(
+      filters.knowledgeListByHead,
+      nodeID,
+      "#k"
+    ),
   };
 }
 

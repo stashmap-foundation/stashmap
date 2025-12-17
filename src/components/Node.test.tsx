@@ -2,7 +2,7 @@ import React from "react";
 import { fireEvent, screen } from "@testing-library/react";
 import { List, Map } from "immutable";
 import userEvent from "@testing-library/user-event";
-import { addRelationToRelations, newNode } from "../connections";
+import { addRelationToRelations, newNode, shortID } from "../connections";
 import { DND } from "../dnd";
 import {
   ALICE,
@@ -21,6 +21,7 @@ import {
   RootViewContextProvider,
   newRelations,
   viewPathToString,
+  getDiffItemsForNode,
 } from "../ViewContext";
 import { Column } from "./Column";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
@@ -34,8 +35,10 @@ import {
 import { execute } from "../executor";
 import { DraggableNote } from "./Draggable";
 import { TreeView } from "./TreeView";
+import { getNodesInTree } from "./Node";
 import { LoadNode } from "../dataQuery";
 import { ROOT } from "../types";
+import { newDB } from "../knowledge";
 
 test("Render non existing Node", async () => {
   const [alice] = setup([ALICE]);
@@ -326,4 +329,294 @@ test("Delete node", async () => {
   await userEvent.click(screen.getByLabelText("edit My Note"));
   await userEvent.click(screen.getByLabelText("delete node"));
   expect(screen.queryByText("My Note")).toBeNull();
+});
+
+test("getNodesInTree includes diff items for nested expanded nodes", () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  const { publicKey: alicePK } = alice().user;
+  const { publicKey: bobPK } = bob().user;
+
+  const parent = newNode("Parent", alicePK);
+  const child = newNode("Child", alicePK);
+  const aliceGrandchild = newNode("Alice's Grandchild", alicePK);
+  const bobGrandchild = newNode("Bob's Grandchild", bobPK);
+  const parentRelations = addRelationToRelations(
+    newRelations(parent.id, "", alicePK),
+    child.id
+  );
+  const childRelations = addRelationToRelations(
+    newRelations(child.id, "", alicePK),
+    aliceGrandchild.id
+  );
+  const bobChildRelations = addRelationToRelations(
+    newRelations(child.id, "", bobPK),
+    bobGrandchild.id
+  );
+
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>()
+    .set(alicePK, {
+      nodes: newDB()
+        .nodes.set(shortID(parent.id), parent)
+        .set(shortID(child.id), child)
+        .set(shortID(aliceGrandchild.id), aliceGrandchild),
+      relations: newDB()
+        .relations.set(shortID(parentRelations.id), parentRelations)
+        .set(shortID(childRelations.id), childRelations),
+    })
+    .set(bobPK, {
+      nodes: newDB().nodes.set(shortID(bobGrandchild.id), bobGrandchild),
+      relations: newDB().relations.set(
+        shortID(bobChildRelations.id),
+        bobChildRelations
+      ),
+    });
+
+  const parentPath = [
+    { nodeID: parent.id, nodeIndex: 0 as NodeIndex },
+  ] as const;
+  const childPath = [
+    {
+      nodeID: parent.id,
+      nodeIndex: 0 as NodeIndex,
+      relationsID: parentRelations.id,
+    },
+    { nodeID: child.id, nodeIndex: 0 as NodeIndex },
+  ] as const;
+
+  const views = Map<string, View>()
+    .set(viewPathToString(parentPath), {
+      width: 1,
+      relations: parentRelations.id,
+      expanded: true,
+    })
+    .set(viewPathToString(childPath), {
+      width: 1,
+      relations: childRelations.id,
+      expanded: true,
+    });
+
+  const data: Data = {
+    ...alice(),
+    knowledgeDBs,
+    views,
+  };
+
+  const nodes = getNodesInTree(data, parentPath, List());
+  const nodeIDs = nodes.map((path) => path[path.length - 1].nodeID).toArray();
+
+  expect(nodeIDs).toContain(child.id);
+  expect(nodeIDs).toContain(aliceGrandchild.id);
+  expect(nodeIDs).toContain(bobGrandchild.id);
+});
+
+test("getDiffItemsForNode returns items from other users not in current user's list", () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  const { publicKey: alicePK } = alice().user;
+  const { publicKey: bobPK } = bob().user;
+
+  const parent = newNode("Parent", alicePK);
+  const aliceChild = newNode("Alice's Child", alicePK);
+  const bobChild = newNode("Bob's Child", bobPK);
+
+  const aliceRelations = addRelationToRelations(
+    newRelations(parent.id, "", alicePK),
+    aliceChild.id
+  );
+  const bobRelations = addRelationToRelations(
+    newRelations(parent.id, "", bobPK),
+    bobChild.id
+  );
+
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>()
+    .set(alicePK, {
+      nodes: newDB()
+        .nodes.set(shortID(parent.id), parent)
+        .set(shortID(aliceChild.id), aliceChild),
+      relations: newDB().relations.set(
+        shortID(aliceRelations.id),
+        aliceRelations
+      ),
+    })
+    .set(bobPK, {
+      nodes: newDB().nodes.set(shortID(bobChild.id), bobChild),
+      relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
+    });
+
+  const diffItems = getDiffItemsForNode(
+    knowledgeDBs,
+    alicePK,
+    parent.id,
+    "",
+    aliceRelations.id
+  );
+
+  expect(diffItems.size).toBe(1);
+  expect(diffItems.get(0)?.nodeID).toBe(bobChild.id);
+});
+
+test("getDiffItemsForNode excludes items already in user's list", () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  const { publicKey: alicePK } = alice().user;
+  const { publicKey: bobPK } = bob().user;
+
+  const parent = newNode("Parent", alicePK);
+  const sharedChild = newNode("Shared Child", alicePK);
+
+  const aliceRelations = addRelationToRelations(
+    newRelations(parent.id, "", alicePK),
+    sharedChild.id
+  );
+  const bobRelations = addRelationToRelations(
+    newRelations(parent.id, "", bobPK),
+    sharedChild.id
+  );
+
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>()
+    .set(alicePK, {
+      nodes: newDB()
+        .nodes.set(shortID(parent.id), parent)
+        .set(shortID(sharedChild.id), sharedChild),
+      relations: newDB().relations.set(
+        shortID(aliceRelations.id),
+        aliceRelations
+      ),
+    })
+    .set(bobPK, {
+      nodes: newDB().nodes,
+      relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
+    });
+
+  const diffItems = getDiffItemsForNode(
+    knowledgeDBs,
+    alicePK,
+    parent.id,
+    "",
+    aliceRelations.id
+  );
+
+  expect(diffItems.size).toBe(0);
+});
+
+test("Diff item paths are correctly identified as diff items", () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  const { publicKey: alicePK } = alice().user;
+  const { publicKey: bobPK } = bob().user;
+
+  const root = newNode("Root", alicePK);
+  const parent = newNode("Parent", alicePK);
+  const aliceChild = newNode("Alice's Child", alicePK);
+  const bobChild = newNode("Bob's Child", bobPK);
+
+  const rootRelations = addRelationToRelations(
+    newRelations(root.id, "", alicePK),
+    parent.id
+  );
+  const parentRelations = addRelationToRelations(
+    newRelations(parent.id, "", alicePK),
+    aliceChild.id
+  );
+  const bobParentRelations = addRelationToRelations(
+    newRelations(parent.id, "", bobPK),
+    bobChild.id
+  );
+
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>()
+    .set(alicePK, {
+      nodes: newDB()
+        .nodes.set(shortID(root.id), root)
+        .set(shortID(parent.id), parent)
+        .set(shortID(aliceChild.id), aliceChild),
+      relations: newDB()
+        .relations.set(shortID(rootRelations.id), rootRelations)
+        .set(shortID(parentRelations.id), parentRelations),
+    })
+    .set(bobPK, {
+      nodes: newDB().nodes.set(shortID(bobChild.id), bobChild),
+      relations: newDB().relations.set(
+        shortID(bobParentRelations.id),
+        bobParentRelations
+      ),
+    });
+
+  const rootPath = [{ nodeID: root.id, nodeIndex: 0 as NodeIndex }] as const;
+  const parentPath = [
+    {
+      nodeID: root.id,
+      nodeIndex: 0 as NodeIndex,
+      relationsID: rootRelations.id,
+    },
+    { nodeID: parent.id, nodeIndex: 0 as NodeIndex },
+  ] as const;
+
+  const views = Map<string, View>()
+    .set(viewPathToString(rootPath), {
+      width: 1,
+      relations: rootRelations.id,
+      expanded: true,
+    })
+    .set(viewPathToString(parentPath), {
+      width: 1,
+      relations: parentRelations.id,
+      expanded: true,
+    });
+
+  const data: Data = {
+    ...alice(),
+    knowledgeDBs,
+    views,
+  };
+
+  const nodes = getNodesInTree(data, rootPath, List());
+  expect(nodes.size).toBeGreaterThanOrEqual(3);
+
+  const diffItemPath = nodes.find(
+    (path) => path[path.length - 1].nodeID === bobChild.id
+  );
+  expect(diffItemPath).toBeDefined();
+  expect(diffItemPath?.[diffItemPath.length - 1].isDiffItem).toBe(true);
+
+  const aliceChildPath = nodes.find(
+    (path) => path[path.length - 1].nodeID === aliceChild.id
+  );
+  expect(aliceChildPath).toBeDefined();
+  expect(
+    aliceChildPath?.[aliceChildPath.length - 1].isDiffItem
+  ).toBeUndefined();
+});
+
+test("getDiffItemsForNode should return no diff items for not_relevant relation type", () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  const { publicKey: alicePK } = alice().user;
+  const { publicKey: bobPK } = bob().user;
+
+  const parent = newNode("Parent", alicePK);
+  const bobChild = newNode("Bob's Child", bobPK);
+
+  const aliceRelations = newRelations(parent.id, "not_relevant", alicePK);
+  const bobRelations = addRelationToRelations(
+    newRelations(parent.id, "not_relevant", bobPK),
+    bobChild.id
+  );
+
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>()
+    .set(alicePK, {
+      nodes: newDB().nodes.set(shortID(parent.id), parent),
+      relations: newDB().relations.set(
+        shortID(aliceRelations.id),
+        aliceRelations
+      ),
+    })
+    .set(bobPK, {
+      nodes: newDB().nodes.set(shortID(bobChild.id), bobChild),
+      relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
+    });
+
+  const diffItems = getDiffItemsForNode(
+    knowledgeDBs,
+    alicePK,
+    parent.id,
+    "not_relevant",
+    aliceRelations.id
+  );
+  expect(diffItems.size).toBe(0);
 });

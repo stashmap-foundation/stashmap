@@ -14,6 +14,8 @@ import {
   useIsAddToNode,
   addNodeToPath,
   addAddToNodeToPath,
+  addDiffItemToPath,
+  getDiffItemsForNode,
   getNodeIDFromView,
   useNodeID,
   getViewFromPath,
@@ -30,6 +32,7 @@ import {
 import { IS_MOBILE } from "./responsive";
 import { AddNodeToNode, getImageUrlFromText } from "./AddNode";
 import { NodeMenu } from "./Menu";
+import { ReadonlyRelations } from "./SelectRelations";
 import { DeleteNode } from "./DeleteNode";
 import { useData } from "../DataContext";
 import { planUpsertNode, usePlanner } from "../planner";
@@ -390,25 +393,61 @@ export function getNodesInTree(
         return nodesList.push(childPath);
       }
       if (childView.expanded) {
+        // Recursively get children of expanded node
+        // The recursive call will handle adding diff items for childPath at its level
         return getNodesInTree(data, childPath, nodesList.push(childPath));
       }
       return nodesList.push(childPath);
     },
     ctx
   );
-  // Don't add "Add Note" button for workspace root (levels === 0) or header column (parentPath.length === 1)
+
+  const diffItems = getDiffItemsForNode(
+    data.knowledgeDBs,
+    data.user.publicKey,
+    parentNodeID,
+    relations.type,
+    relations.id
+  );
+
   const isHeaderColumn = parentPath.length === 2;
-  return getLevels(parentPath) === 0 || isHeaderColumn
-    ? nodesInTree
-    : nodesInTree.push(addNodePath);
+  const isRoot = getLevels(parentPath) === 0;
+
+  // Add diff items at the parent level (after regular items, before Add Note)
+  // Always add them - useIsDiffItem() will handle the rendering
+  const withDiffItems =
+    diffItems.size > 0 && !isRoot
+      ? diffItems.reduce(
+          (list, diffItem, idx) =>
+            list.push(
+              addDiffItemToPath(data, parentPath, diffItem.nodeID, idx)
+            ),
+          nodesInTree
+        )
+      : nodesInTree;
+
+  return isRoot || isHeaderColumn
+    ? withDiffItems
+    : withDiffItems.push(addNodePath);
+}
+
+function DiffItemIndicator(): JSX.Element {
+  return (
+    <span
+      className="iconsminds-conference diff-indicator"
+      title="From other users"
+    />
+  );
 }
 
 export function Node({
   className,
   cardBodyClassName,
+  isDiffItem,
 }: {
   className?: string;
   cardBodyClassName?: string;
+  isDiffItem?: boolean;
 }): JSX.Element | null {
   const isDesktop = !useMediaQuery(IS_MOBILE);
   const viewPath = useViewPath();
@@ -428,15 +467,17 @@ export function Node({
         <>
           {isMultiselect && <NodeSelectbox />}
           <div className="flex-column w-100">
-            {isNodeBeingEdited && <EditingNodeContent />}
-            {!isNodeBeingEdited && (
+            {isNodeBeingEdited && !isDiffItem && <EditingNodeContent />}
+            {(!isNodeBeingEdited || isDiffItem) && (
               <>
                 <NodeAutoLink>
-                  <InteractiveNodeContent />
+                  {isDiffItem && <DiffItemIndicator />}
+                  <InteractiveNodeContent editOnClick={!isDiffItem} />
                 </NodeAutoLink>
               </>
             )}
-            <NodeMenu />
+            {!isDiffItem && <NodeMenu />}
+            {isDiffItem && <ReadonlyRelations />}
           </div>
         </>
       )}

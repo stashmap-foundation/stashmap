@@ -709,6 +709,55 @@ function SelectRelationsButton({
   );
 }
 
+export function ReadonlyRelations(): JSX.Element | null {
+  const { knowledgeDBs, user } = useData();
+  const [nodeID] = useNodeID();
+  const relations = getAvailableRelationsForNode(
+    knowledgeDBs,
+    user.publicKey,
+    nodeID
+  );
+
+  const groupedByType = relations.groupBy((r) => r.type);
+
+  // Define which IDs mark the end of a semantic group
+  const isEndOfGroup = (id: string): boolean => {
+    return id === "not_relevant" || id === "contra" || id === "contains";
+  };
+
+  return (
+    <div className="menu-layout font-size-small">
+      <ul className="nav nav-underline gap-0">
+        {RELATION_TYPES.keySeq()
+          .toArray()
+          .map((relationTypeID) => {
+            const relationsOfType = groupedByType.get(relationTypeID);
+            const totalCount = relationsOfType
+              ? relationsOfType.reduce((sum, r) => sum + r.items.size, 0)
+              : 0;
+            const relationType = RELATION_TYPES.get(relationTypeID);
+            const color = relationType?.color || "black";
+            const addGroupSpacing = isEndOfGroup(relationTypeID);
+            return (
+              <RelationButton
+                key={relationTypeID}
+                color={color}
+                label={relationType?.label || ""}
+                ariaLabel={`${totalCount} ${relationType?.label || "items"}`}
+                id={relationTypeID}
+                count={totalCount}
+                isActive={false}
+                disabled
+                showVertical={false}
+                addGroupSpacing={addGroupSpacing}
+              />
+            );
+          })}
+      </ul>
+    </div>
+  );
+}
+
 export function SelectRelations({
   alwaysOneSelected,
 }: {

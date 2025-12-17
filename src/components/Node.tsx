@@ -32,6 +32,7 @@ import {
 import { IS_MOBILE } from "./responsive";
 import { AddNodeToNode, getImageUrlFromText } from "./AddNode";
 import { NodeMenu } from "./Menu";
+import { ReadonlyRelations } from "./SelectRelations";
 import { DeleteNode } from "./DeleteNode";
 import { useData } from "../DataContext";
 import { planUpsertNode, usePlanner } from "../planner";
@@ -464,7 +465,6 @@ export function Node({
   return (
     <NodeCard className={cls} cardBodyClassName={clsBody}>
       {levels > 0 && <Indent levels={levels} />}
-      {isDiffItem && <DiffItemIndicator />}
       {isAddToNode && levels !== 1 && <AddNodeToNode />}
       {!isAddToNode && (
         <>
@@ -474,11 +474,13 @@ export function Node({
             {(!isNodeBeingEdited || isDiffItem) && (
               <>
                 <NodeAutoLink>
+                  {isDiffItem && <DiffItemIndicator />}
                   <InteractiveNodeContent editOnClick={!isDiffItem} />
                 </NodeAutoLink>
               </>
             )}
             {!isDiffItem && <NodeMenu />}
+            {isDiffItem && <ReadonlyRelations />}
           </div>
         </>
       )}

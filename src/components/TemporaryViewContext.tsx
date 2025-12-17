@@ -225,7 +225,7 @@ export function ToggleEditing(): JSX.Element | null {
   return (
     <button
       type="button"
-      className="btn btn-borderless"
+      className="btn btn-borderless p-0"
       onClick={onClick}
       aria-label={ariaLabel}
     >

@@ -41,6 +41,11 @@ export function getDiffItemsForNode(
   relationType: ID,
   currentRelationId?: LongID
 ): List<DiffItem> {
+  // Don't show diff items for "not_relevant" relation type
+  if (relationType === "not_relevant") {
+    return List<DiffItem>();
+  }
+
   const [, localID] = splitID(nodeID);
 
   // Get current user's items for this relation type

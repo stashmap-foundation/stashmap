@@ -53,10 +53,10 @@ export function RemoveColumnButton(): JSX.Element | null {
     <button
       type="button"
       aria-label="close"
-      className="btn btn-borderless"
+      className="btn btn-borderless p-0"
       onClick={onClick}
     >
-      <span className="btn-close small" />
+      <span style={{ fontSize: "1.4rem" }}>×</span>
     </button>
   );
 }

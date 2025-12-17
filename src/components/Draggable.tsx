@@ -64,14 +64,12 @@ export function DraggableNote(): JSX.Element {
   return (
     <div className="visible-on-hover">
       <Draggable ref={ref} />
-      <div className="on-hover-menu left">
-        <RemoveColumnButton />
-      </div>
       <div className="on-hover-menu right">
         <ToggleEditing />
         <ChangeColumnWidth />
         <JoinProjectButton />
         <span className="always-visible">
+          <RemoveColumnButton />
           <FullscreenButton />
         </span>
       </div>
@@ -97,11 +95,11 @@ function AcceptDiffItemButton(): JSX.Element {
     <button
       type="button"
       aria-label="accept item"
-      className="btn btn-borderless"
+      className="btn btn-borderless p-0"
       onClick={onClick}
       title="Add to my list"
     >
-      <span className="simple-icon-check" />
+      <span style={{ fontSize: "1.4rem", color: "green" }}>✓</span>
     </button>
   );
 }
@@ -144,21 +142,21 @@ function DeclineDiffItemButton(): JSX.Element {
     <button
       type="button"
       aria-label="decline item"
-      className="btn btn-borderless"
+      className="btn btn-borderless p-0"
       onClick={onClick}
       title="Mark as not relevant"
     >
-      <span className="simple-icon-close" />
+      <span style={{ fontSize: "1.4rem" }}>×</span>
     </button>
   );
 }
 
 function DiffItemActions(): JSX.Element {
   return (
-    <div className="on-hover-menu right diff-item-actions">
-      <AcceptDiffItemButton />
-      <DeclineDiffItemButton />
+    <div className="on-hover-menu right">
       <span className="always-visible">
+        <AcceptDiffItemButton />
+        <DeclineDiffItemButton />
         <FullscreenButton />
       </span>
     </div>
@@ -231,9 +229,9 @@ export function ListItem({
       <div className="on-hover-menu right">
         <ToggleEditing />
         <span className="always-visible">
+          <DisconnectNodeBtn />
           <FullscreenButton />
         </span>
-        <DisconnectNodeBtn />
       </div>
     </div>
   );

@@ -14,11 +14,11 @@ export function FullscreenButton(): JSX.Element {
     <button
       type="button"
       aria-label="open fullscreen"
-      className="btn btn-borderless"
+      className="btn btn-borderless p-0"
       onClick={onClick}
       title="Open in fullscreen"
     >
-      <span className="simple-icon-size-fullscreen" />
+      <span className="iconsminds-layer-forward" />
     </button>
   );
 }

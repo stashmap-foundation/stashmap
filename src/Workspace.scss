@@ -625,9 +625,23 @@ body {
     top: 1px;
     height: min-content;
     visibility: hidden;
+    display: flex;
+    gap: 2px;
 
     .always-visible {
       visibility: visible;
+      display: flex;
+      gap: 2px;
+    }
+
+    .btn {
+      padding: 2px 4px;
+      min-width: 28px;
+      min-height: 28px;
+
+      &:hover {
+        background-color: rgba(0, 0, 0, 0.1);
+      }
     }
   }
 
@@ -876,25 +890,3 @@ to {
   font-size: 0.9rem;
 }
 
-.diff-item-actions {
-  display: flex;
-  gap: 2px;
-
-  .btn {
-    padding: 2px 4px;
-    min-width: 28px;
-    min-height: 28px;
-
-    &:hover {
-      background-color: rgba(0, 0, 0, 0.1);
-    }
-  }
-
-  .simple-icon-check {
-    color: green;
-  }
-
-  .simple-icon-close {
-    color: rgba(0, 0, 0, 0.6);
-  }
-}

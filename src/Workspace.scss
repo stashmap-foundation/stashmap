@@ -747,6 +747,27 @@ to {
   text-decoration: underline;
 }
 
+.other-versions-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 6px;
+
+  .dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    opacity: 0.7;
+  }
+
+  .plus {
+    font-size: 8px;
+    opacity: 0.7;
+    line-height: 1;
+  }
+}
+
 .select-relation .dropdown .btn {
   border-radius: 0 35px 35px 0 !important;
 }

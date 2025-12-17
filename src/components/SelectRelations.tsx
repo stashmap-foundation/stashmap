@@ -60,6 +60,43 @@ function ConditionalTooltip({
   );
 }
 
+function OtherVersionsDots({
+  count,
+  color,
+}: {
+  count: number;
+  color: string;
+}): JSX.Element {
+  const maxDots = 3;
+  const showPlus = count > maxDots;
+  const dotsToShow = showPlus ? maxDots - 1 : count;
+
+  if (count === 0) {
+    return <div className="other-versions-dots" />;
+  }
+
+  const label = count === 1 ? "1 other version" : `${count} other versions`;
+
+  return (
+    <div className="other-versions-dots" role="img" aria-label={label}>
+      {Array.from({ length: dotsToShow }).map((_, i) => (
+        <div
+          // Dots are identical and list never reorders
+          // eslint-disable-next-line react/no-array-index-key
+          key={i}
+          className="dot"
+          style={{ backgroundColor: color }}
+        />
+      ))}
+      {showPlus && (
+        <span className="plus" style={{ color }}>
+          +
+        </span>
+      )}
+    </div>
+  );
+}
+
 function RelationButton({
   color,
   label,
@@ -73,6 +110,7 @@ function RelationButton({
   tooltipLabel,
   showVertical = true,
   addGroupSpacing = false,
+  otherVersionsCount = 0,
 }: {
   color: string;
   label: string;
@@ -86,6 +124,7 @@ function RelationButton({
   tooltipLabel?: string;
   showVertical?: boolean;
   addGroupSpacing?: boolean;
+  otherVersionsCount?: number;
 }): JSX.Element {
   const buttonStyle = showVertical
     ? {
@@ -98,49 +137,63 @@ function RelationButton({
         height: "100%",
         color,
         display: "flex",
-        alignItems: "center",
+        alignItems: "flex-start",
         marginRight: addGroupSpacing ? "8px" : undefined,
       }
     : {
         border: "0px",
         backgroundColor: "inherit",
         padding: "4px 0",
-        position: "relative" as const,
         minWidth: "25px",
-        minHeight: "25px",
         color,
         display: "flex",
+        flexDirection: "column" as const,
         alignItems: "center",
-        justifyContent: "center",
         marginRight: addGroupSpacing ? "8px" : undefined,
       };
 
-  const lineStyle = showVertical
-    ? {
-        width: "2px",
-        backgroundColor: color,
-        height: "100%",
-        position: "absolute" as const,
-        left: "0",
-        top: "0",
-      }
-    : {
-        width: "100%",
-        height: "3px",
-        backgroundColor: color,
-        position: "absolute" as const,
-        left: "0",
-        top: "5px",
-      };
+  const lineStyleVertical = {
+    width: "2px",
+    backgroundColor: color,
+    height: "100%",
+    position: "absolute" as const,
+    left: "0",
+    top: "0",
+  };
+
+  const lineStyleHorizontal = {
+    width: "100%",
+    height: "3px",
+    backgroundColor: color,
+    marginTop: "2px",
+    marginBottom: "2px",
+  };
 
   const countStyle = {
     fontSize: "10px",
-    marginLeft: "2px",
   };
 
-  const labelStyle = {
-    marginLeft: "2px",
+  const labelStyle = {};
+
+  const verticalContentStyle = {
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "center",
+    marginLeft: "4px",
   };
+
+  const dots = <OtherVersionsDots count={otherVersionsCount} color={color} />;
+
+  const getCountOrLabel = (): JSX.Element => {
+    if (isActive) {
+      return <span style={labelStyle}>{label}</span>;
+    }
+    if (count !== undefined && count > 0) {
+      return <span style={countStyle}>{count}</span>;
+    }
+    return <span style={countStyle}>&nbsp;</span>;
+  };
+  const countOrLabel = getCountOrLabel();
 
   return (
     <ConditionalTooltip
@@ -155,12 +208,20 @@ function RelationButton({
         aria-label={ariaLabel}
         disabled={disabled}
       >
-        <div style={lineStyle} />
-        {isActive ? (
-          <span style={labelStyle}>{label}</span>
+        {showVertical ? (
+          <>
+            <div style={lineStyleVertical} />
+            <div style={verticalContentStyle}>
+              {countOrLabel}
+              {dots}
+            </div>
+          </>
         ) : (
-          count !== undefined &&
-          count > 0 && <span style={countStyle}>{count}</span>
+          <>
+            {dots}
+            <div style={lineStyleHorizontal} />
+            {countOrLabel}
+          </>
         )}
       </button>
     </ConditionalTooltip>
@@ -573,6 +634,11 @@ function SelectRelationsButton({
   const [relationType] = getRelationTypeByRelationsID(data, topRelation.id);
   const relationSize = topRelation.items.size;
 
+  // Count how many OTHER users have versions of this relation type
+  const otherVersionsCount = relationList.filter((r) =>
+    isRemote(splitID(r.id)[0], data.user.publicKey)
+  ).size;
+
   const isExpanded = view.expanded === true;
   const ariaLabel =
     isExpanded && isSelected
@@ -623,6 +689,7 @@ function SelectRelationsButton({
       tooltipLabel={relationType?.label || "relation"}
       showVertical={showVertical}
       addGroupSpacing={addGroupSpacing}
+      otherVersionsCount={otherVersionsCount}
     />
   );
 

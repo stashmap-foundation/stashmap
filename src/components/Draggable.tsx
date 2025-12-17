@@ -8,6 +8,7 @@ import { RemoveColumnButton } from "./RemoveColumnButton";
 import { ChangeColumnWidth } from "./ChangeColumnWidth";
 import { DisconnectNodeBtn } from "./DisconnectBtn";
 import { JoinProjectButton } from "../JoinProjext";
+import { FullscreenButton } from "./FullscreenButton";
 
 export type DragItemType = {
   path: ViewPath;
@@ -56,6 +57,9 @@ export function DraggableNote(): JSX.Element {
         <ToggleEditing />
         <ChangeColumnWidth />
         <JoinProjectButton />
+        <span className="always-visible">
+          <FullscreenButton />
+        </span>
       </div>
     </div>
   );
@@ -84,6 +88,9 @@ export function ListItem({
       <Draggable ref={ref} className={className} />
       <div className="on-hover-menu right">
         <ToggleEditing />
+        <span className="always-visible">
+          <FullscreenButton />
+        </span>
         <DisconnectNodeBtn />
       </div>
     </div>

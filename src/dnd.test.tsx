@@ -70,26 +70,19 @@ test("Diff items are always added, never moved", () => {
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
 
-  // Alice has a parent node with one child
   const parent = newNode("Parent", alicePK);
   const aliceChild = newNode("Alice's Child", alicePK);
-
-  // Bob has a child under the same parent (this would appear as a diff item)
   const bobChild = newNode("Bob's Child", bobPK);
 
-  // Alice's relations
   const aliceRelations = addRelationToRelations(
     newRelations(parent.id, "", alicePK),
     aliceChild.id
   );
-
-  // Bob's relations for the same parent node
   const bobRelations = addRelationToRelations(
     newRelations(parent.id, "", bobPK),
     bobChild.id
   );
 
-  // Build knowledgeDBs
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
       nodes: newDB()
@@ -105,7 +98,6 @@ test("Diff items are always added, never moved", () => {
       relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
     });
 
-  // Views: parent is expanded
   const parentPath = [
     {
       nodeID: parent.id,
@@ -131,8 +123,6 @@ test("Diff items are always added, never moved", () => {
     views
   );
 
-  // Simulate dragging Bob's child (diff item) into Alice's list at index 0
-  // The source path represents the diff item's virtual path
   const diffItemPath = [
     {
       nodeID: parent.id,
@@ -148,10 +138,9 @@ test("Diff items are always added, never moved", () => {
     viewPathToString(diffItemPath),
     parentPath,
     0,
-    true // isDiffItem = true
+    true
   );
 
-  // The result should have added Bob's child to Alice's relations
   const updatedRelations = result.knowledgeDBs
     .get(alicePK)
     ?.relations.get(shortID(aliceRelations.id));

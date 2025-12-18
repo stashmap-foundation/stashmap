@@ -159,7 +159,6 @@ test("getDiffItemsForNode returns items from other users", () => {
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
 
-  // Alice has item A in her relation
   const parentNode = newNode("Parent Node", alicePK);
   const aliceChildNode = newNode("Alice's Child", alicePK);
   const aliceRelations = addRelationToRelations(
@@ -167,14 +166,12 @@ test("getDiffItemsForNode returns items from other users", () => {
     aliceChildNode.id
   );
 
-  // Bob has item B in his relation (same parent, same type)
   const bobChildNode = newNode("Bob's Child", bobPK);
   const bobRelations = addRelationToRelations(
     newRelations(parentNode.id, "", bobPK),
     bobChildNode.id
   );
 
-  // Build knowledgeDBs with both users' data
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
       ...newDB(),
@@ -192,16 +189,14 @@ test("getDiffItemsForNode returns items from other users", () => {
       relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
     });
 
-  // Get diff items for Alice viewing her own relation
   const diffItems = getDiffItemsForNode(
     knowledgeDBs,
     alicePK,
     parentNode.id,
-    "", // relation type
+    "",
     aliceRelations.id
   );
 
-  // Alice should see Bob's child as a diff item
   expect(diffItems.size).toBe(1);
   expect(diffItems.get(0)?.nodeID).toBe(bobChildNode.id);
 });
@@ -211,7 +206,6 @@ test("Diff items are not included when saving a relation", () => {
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
 
-  // Alice has item A in her relation
   const parentNode = newNode("Parent Node", alicePK);
   const aliceChildNode = newNode("Alice's Child", alicePK);
   const aliceRelations = addRelationToRelations(
@@ -219,14 +213,12 @@ test("Diff items are not included when saving a relation", () => {
     aliceChildNode.id
   );
 
-  // Bob has item B in his relation (same parent, same type)
   const bobChildNode = newNode("Bob's Child", bobPK);
   const bobRelations = addRelationToRelations(
     newRelations(parentNode.id, "", bobPK),
     bobChildNode.id
   );
 
-  // Build knowledgeDBs with both users' data
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
       ...newDB(),
@@ -244,13 +236,11 @@ test("Diff items are not included when saving a relation", () => {
       relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
     });
 
-  // Verify Alice's relation only contains her own item, not Bob's (diff item)
   const aliceDB = knowledgeDBs.get(alicePK);
   const savedRelation = aliceDB?.relations.get(shortID(aliceRelations.id));
 
   expect(savedRelation?.items.size).toBe(1);
   expect(savedRelation?.items.get(0)).toBe(aliceChildNode.id);
-  // Bob's child should NOT be in Alice's relation
   expect(savedRelation?.items.includes(bobChildNode.id)).toBe(false);
 });
 
@@ -258,11 +248,8 @@ test("getDiffItemsForNode deduplicates items from multiple other users", () => {
   const [alice, bob] = setup([ALICE, BOB]);
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
-
-  // Create a third "user" by using a different key
   const carolPK = "carol_public_key" as PublicKey;
 
-  // Alice has item A in her relation
   const parentNode = newNode("Parent Node", alicePK);
   const aliceChildNode = newNode("Alice's Child", alicePK);
   const aliceRelations = addRelationToRelations(
@@ -270,20 +257,17 @@ test("getDiffItemsForNode deduplicates items from multiple other users", () => {
     aliceChildNode.id
   );
 
-  // Bob has item B in his relation
   const bobChildNode = newNode("Bob's Child", bobPK);
   const bobRelations = addRelationToRelations(
     newRelations(parentNode.id, "", bobPK),
     bobChildNode.id
   );
 
-  // Carol also has Bob's child (same nodeID, different user)
   const carolRelations = addRelationToRelations(
     newRelations(parentNode.id, "", carolPK),
-    bobChildNode.id // Same as Bob's child
+    bobChildNode.id
   );
 
-  // Build knowledgeDBs with all users' data
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
       ...newDB(),
@@ -308,7 +292,6 @@ test("getDiffItemsForNode deduplicates items from multiple other users", () => {
       ),
     });
 
-  // Get diff items for Alice viewing her own relation
   const diffItems = getDiffItemsForNode(
     knowledgeDBs,
     alicePK,
@@ -317,7 +300,6 @@ test("getDiffItemsForNode deduplicates items from multiple other users", () => {
     aliceRelations.id
   );
 
-  // Should only have Bob's child once (deduplicated)
   expect(diffItems.size).toBe(1);
   expect(diffItems.get(0)?.nodeID).toBe(bobChildNode.id);
 });

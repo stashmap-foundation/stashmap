@@ -253,3 +253,71 @@ test("Diff items are not included when saving a relation", () => {
   // Bob's child should NOT be in Alice's relation
   expect(savedRelation?.items.includes(bobChildNode.id)).toBe(false);
 });
+
+test("getDiffItemsForNode deduplicates items from multiple other users", () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  const { publicKey: alicePK } = alice().user;
+  const { publicKey: bobPK } = bob().user;
+
+  // Create a third "user" by using a different key
+  const carolPK = "carol_public_key" as PublicKey;
+
+  // Alice has item A in her relation
+  const parentNode = newNode("Parent Node", alicePK);
+  const aliceChildNode = newNode("Alice's Child", alicePK);
+  const aliceRelations = addRelationToRelations(
+    newRelations(parentNode.id, "", alicePK),
+    aliceChildNode.id
+  );
+
+  // Bob has item B in his relation
+  const bobChildNode = newNode("Bob's Child", bobPK);
+  const bobRelations = addRelationToRelations(
+    newRelations(parentNode.id, "", bobPK),
+    bobChildNode.id
+  );
+
+  // Carol also has Bob's child (same nodeID, different user)
+  const carolRelations = addRelationToRelations(
+    newRelations(parentNode.id, "", carolPK),
+    bobChildNode.id // Same as Bob's child
+  );
+
+  // Build knowledgeDBs with all users' data
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>()
+    .set(alicePK, {
+      ...newDB(),
+      nodes: newDB()
+        .nodes.set(shortID(parentNode.id), parentNode)
+        .set(shortID(aliceChildNode.id), aliceChildNode),
+      relations: newDB().relations.set(
+        shortID(aliceRelations.id),
+        aliceRelations
+      ),
+    })
+    .set(bobPK, {
+      ...newDB(),
+      nodes: newDB().nodes.set(shortID(bobChildNode.id), bobChildNode),
+      relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
+    })
+    .set(carolPK, {
+      ...newDB(),
+      relations: newDB().relations.set(
+        shortID(carolRelations.id),
+        carolRelations
+      ),
+    });
+
+  // Get diff items for Alice viewing her own relation
+  const diffItems = getDiffItemsForNode(
+    knowledgeDBs,
+    alicePK,
+    parentNode.id,
+    "",
+    aliceRelations.id
+  );
+
+  // Should only have Bob's child once (deduplicated)
+  expect(diffItems.size).toBe(1);
+  expect(diffItems.get(0)?.nodeID).toBe(bobChildNode.id);
+});

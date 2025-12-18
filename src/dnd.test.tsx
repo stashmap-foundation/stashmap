@@ -1,7 +1,9 @@
 import React from "react";
 import { fireEvent, screen } from "@testing-library/react";
+import { Map, OrderedSet } from "immutable";
 import {
   ALICE,
+  BOB,
   extractNodes,
   findNodeByText,
   renderWithTestData,
@@ -10,6 +12,15 @@ import {
 } from "./utils.test";
 import { WorkspaceView } from "./components/Workspace";
 import { RootViewOrWorkspaceIsLoading } from "./components/Dashboard";
+import { dnd } from "./dnd";
+import { addRelationToRelations, newNode, shortID } from "./connections";
+import {
+  NodeIndex,
+  newRelations,
+  viewPathToString,
+} from "./ViewContext";
+import { createPlan, planBulkUpsertNodes, planUpdateViews, planUpsertRelations } from "./planner";
+import { newDB } from "./knowledge";
 
 test("Dragging Source not available at Destination", async () => {
   const [alice] = setup([ALICE]);
@@ -51,4 +62,89 @@ test("Dragging Source not available at Destination", async () => {
   ]);
 
   fireEvent.click(screen.getByText("Money"));
+});
+
+test("Diff items are always added, never moved", () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  const { publicKey: alicePK } = alice().user;
+  const { publicKey: bobPK } = bob().user;
+
+  // Alice has a parent node with one child
+  const parent = newNode("Parent", alicePK);
+  const aliceChild = newNode("Alice's Child", alicePK);
+
+  // Bob has a child under the same parent (this would appear as a diff item)
+  const bobChild = newNode("Bob's Child", bobPK);
+
+  // Alice's relations
+  const aliceRelations = addRelationToRelations(
+    newRelations(parent.id, "", alicePK),
+    aliceChild.id
+  );
+
+  // Bob's relations for the same parent node
+  const bobRelations = addRelationToRelations(
+    newRelations(parent.id, "", bobPK),
+    bobChild.id
+  );
+
+  // Build knowledgeDBs
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>()
+    .set(alicePK, {
+      nodes: newDB()
+        .nodes.set(shortID(parent.id), parent)
+        .set(shortID(aliceChild.id), aliceChild),
+      relations: newDB().relations.set(shortID(aliceRelations.id), aliceRelations),
+    })
+    .set(bobPK, {
+      nodes: newDB().nodes.set(shortID(bobChild.id), bobChild),
+      relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
+    });
+
+  // Views: parent is expanded
+  const parentPath = [
+    { nodeID: parent.id, nodeIndex: 0 as NodeIndex, relationsID: aliceRelations.id },
+  ] as const;
+
+  const views = Map<string, View>().set(viewPathToString(parentPath), {
+    width: 1,
+    relations: aliceRelations.id,
+    expanded: true,
+  });
+
+  const plan = planUpdateViews(
+    planUpsertRelations(
+      planBulkUpsertNodes(
+        createPlan({ ...alice(), knowledgeDBs, views }),
+        [parent, aliceChild]
+      ),
+      aliceRelations
+    ),
+    views
+  );
+
+  // Simulate dragging Bob's child (diff item) into Alice's list at index 0
+  // The source path represents the diff item's virtual path
+  const diffItemPath = [
+    { nodeID: parent.id, nodeIndex: 0 as NodeIndex, relationsID: aliceRelations.id },
+    { nodeID: bobChild.id, nodeIndex: 0 as NodeIndex, isDiffItem: true },
+  ];
+
+  const result = dnd(
+    plan,
+    OrderedSet<string>(),
+    viewPathToString(diffItemPath),
+    parentPath,
+    0,
+    true // isDiffItem = true
+  );
+
+  // The result should have added Bob's child to Alice's relations
+  const updatedRelations = result.knowledgeDBs
+    .get(alicePK)
+    ?.relations.get(shortID(aliceRelations.id));
+
+  expect(updatedRelations?.items.size).toBe(2);
+  expect(updatedRelations?.items.toArray()).toContain(bobChild.id);
+  expect(updatedRelations?.items.toArray()).toContain(aliceChild.id);
 });

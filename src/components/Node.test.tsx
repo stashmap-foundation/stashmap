@@ -420,3 +420,234 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
   // Bob's grandchild should appear as a diff item
   expect(nodeIDs).toContain(bobGrandchild.id);
 });
+
+test("getDiffItemsForNode returns items from other users not in current user's list", () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  const { publicKey: alicePK } = alice().user;
+  const { publicKey: bobPK } = bob().user;
+
+  const parent = newNode("Parent", alicePK);
+  const aliceChild = newNode("Alice's Child", alicePK);
+  const bobChild = newNode("Bob's Child", bobPK);
+
+  // Alice's relations
+  const aliceRelations = addRelationToRelations(
+    newRelations(parent.id, "", alicePK),
+    aliceChild.id
+  );
+
+  // Bob's relations for the same parent
+  const bobRelations = addRelationToRelations(
+    newRelations(parent.id, "", bobPK),
+    bobChild.id
+  );
+
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>()
+    .set(alicePK, {
+      nodes: newDB()
+        .nodes.set(shortID(parent.id), parent)
+        .set(shortID(aliceChild.id), aliceChild),
+      relations: newDB().relations.set(shortID(aliceRelations.id), aliceRelations),
+    })
+    .set(bobPK, {
+      nodes: newDB().nodes.set(shortID(bobChild.id), bobChild),
+      relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
+    });
+
+  // Import getDiffItemsForNode
+  const { getDiffItemsForNode } = require("../ViewContext");
+
+  const diffItems = getDiffItemsForNode(
+    knowledgeDBs,
+    alicePK,
+    parent.id,
+    "", // relationType
+    aliceRelations.id
+  );
+
+  // Should return Bob's child as a diff item
+  expect(diffItems.size).toBe(1);
+  expect(diffItems.get(0)?.nodeID).toBe(bobChild.id);
+});
+
+test("getDiffItemsForNode excludes items already in user's list", () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  const { publicKey: alicePK } = alice().user;
+  const { publicKey: bobPK } = bob().user;
+
+  const parent = newNode("Parent", alicePK);
+  const sharedChild = newNode("Shared Child", alicePK);
+
+  // Both Alice and Bob have the same child
+  const aliceRelations = addRelationToRelations(
+    newRelations(parent.id, "", alicePK),
+    sharedChild.id
+  );
+  const bobRelations = addRelationToRelations(
+    newRelations(parent.id, "", bobPK),
+    sharedChild.id
+  );
+
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>()
+    .set(alicePK, {
+      nodes: newDB()
+        .nodes.set(shortID(parent.id), parent)
+        .set(shortID(sharedChild.id), sharedChild),
+      relations: newDB().relations.set(shortID(aliceRelations.id), aliceRelations),
+    })
+    .set(bobPK, {
+      nodes: newDB(),
+      relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
+    });
+
+  const { getDiffItemsForNode } = require("../ViewContext");
+
+  const diffItems = getDiffItemsForNode(
+    knowledgeDBs,
+    alicePK,
+    parent.id,
+    "",
+    aliceRelations.id
+  );
+
+  // Should return no diff items since the child is already in Alice's list
+  expect(diffItems.size).toBe(0);
+});
+
+test("Diff item paths are correctly identified as diff items", () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  const { publicKey: alicePK } = alice().user;
+  const { publicKey: bobPK } = bob().user;
+
+  // Create: Root -> Parent (expanded) -> Alice's Child / Bob's Child (diff)
+  const root = newNode("Root", alicePK);
+  const parent = newNode("Parent", alicePK);
+  const aliceChild = newNode("Alice's Child", alicePK);
+  const bobChild = newNode("Bob's Child", bobPK);
+
+  // Root -> Parent
+  const rootRelations = addRelationToRelations(
+    newRelations(root.id, "", alicePK),
+    parent.id
+  );
+
+  // Parent -> Alice's Child
+  const parentRelations = addRelationToRelations(
+    newRelations(parent.id, "", alicePK),
+    aliceChild.id
+  );
+
+  // Bob's relations: Parent -> Bob's Child (diff item)
+  const bobParentRelations = addRelationToRelations(
+    newRelations(parent.id, "", bobPK),
+    bobChild.id
+  );
+
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>()
+    .set(alicePK, {
+      nodes: newDB()
+        .nodes.set(shortID(root.id), root)
+        .set(shortID(parent.id), parent)
+        .set(shortID(aliceChild.id), aliceChild),
+      relations: newDB()
+        .relations.set(shortID(rootRelations.id), rootRelations)
+        .set(shortID(parentRelations.id), parentRelations),
+    })
+    .set(bobPK, {
+      nodes: newDB().nodes.set(shortID(bobChild.id), bobChild),
+      relations: newDB().relations.set(
+        shortID(bobParentRelations.id),
+        bobParentRelations
+      ),
+    });
+
+  // Root path (level 0)
+  const rootPath = [
+    { nodeID: root.id, nodeIndex: 0 as NodeIndex },
+  ] as const;
+
+  // Parent path (level 1) - diff items are shown at this level
+  const parentPath = [
+    { nodeID: root.id, nodeIndex: 0 as NodeIndex, relationsID: rootRelations.id },
+    { nodeID: parent.id, nodeIndex: 0 as NodeIndex },
+  ] as const;
+
+  const views = Map<string, View>()
+    .set(viewPathToString(rootPath), {
+      width: 1,
+      relations: rootRelations.id,
+      expanded: true,
+    })
+    .set(viewPathToString(parentPath), {
+      width: 1,
+      relations: parentRelations.id,
+      expanded: true,
+    });
+
+  const data: Data = {
+    ...alice(),
+    knowledgeDBs,
+    views,
+  };
+
+  // Get nodes in tree starting from root
+  const nodes = getNodesInTree(data, rootPath, List());
+
+  // Should have: parent, aliceChild, bobChild (diff), and Add Note button
+  expect(nodes.size).toBeGreaterThanOrEqual(3);
+
+  // The diff item path should have isDiffItem flag
+  const diffItemPath = nodes.find(
+    (path) => path[path.length - 1].nodeID === bobChild.id
+  );
+  expect(diffItemPath).toBeDefined();
+  expect(diffItemPath?.[diffItemPath.length - 1].isDiffItem).toBe(true);
+
+  // Alice's child should NOT have isDiffItem flag
+  const aliceChildPath = nodes.find(
+    (path) => path[path.length - 1].nodeID === aliceChild.id
+  );
+  expect(aliceChildPath).toBeDefined();
+  expect(aliceChildPath?.[aliceChildPath.length - 1].isDiffItem).toBeUndefined();
+});
+
+test("getDiffItemsForNode returns empty for not_relevant relation type", () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  const { publicKey: alicePK } = alice().user;
+  const { publicKey: bobPK } = bob().user;
+
+  const parent = newNode("Parent", alicePK);
+  const bobChild = newNode("Bob's Child", bobPK);
+
+  // Alice has a not_relevant relation
+  const aliceRelations = newRelations(parent.id, "not_relevant", alicePK);
+
+  // Bob has a not_relevant relation with a child
+  const bobRelations = addRelationToRelations(
+    newRelations(parent.id, "not_relevant", bobPK),
+    bobChild.id
+  );
+
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>()
+    .set(alicePK, {
+      nodes: newDB().nodes.set(shortID(parent.id), parent),
+      relations: newDB().relations.set(shortID(aliceRelations.id), aliceRelations),
+    })
+    .set(bobPK, {
+      nodes: newDB().nodes.set(shortID(bobChild.id), bobChild),
+      relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
+    });
+
+  const { getDiffItemsForNode } = require("../ViewContext");
+
+  const diffItems = getDiffItemsForNode(
+    knowledgeDBs,
+    alicePK,
+    parent.id,
+    "not_relevant",
+    aliceRelations.id
+  );
+
+  // Should return no diff items for not_relevant type
+  expect(diffItems.size).toBe(0);
+});

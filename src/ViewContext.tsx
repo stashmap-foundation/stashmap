@@ -426,7 +426,7 @@ export function addDiffItemToPath(
     path,
     relations?.id || ("" as LongID)
   );
-  return [...pathWithRelations, { nodeID, nodeIndex }];
+  return [...pathWithRelations, { nodeID, nodeIndex, isDiffItem: true }];
 }
 
 function popPath(viewContext: ViewPath): ViewPath | undefined {

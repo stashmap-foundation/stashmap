@@ -14,12 +14,13 @@ import { WorkspaceView } from "./components/Workspace";
 import { RootViewOrWorkspaceIsLoading } from "./components/Dashboard";
 import { dnd } from "./dnd";
 import { addRelationToRelations, newNode, shortID } from "./connections";
+import { NodeIndex, newRelations, viewPathToString } from "./ViewContext";
 import {
-  NodeIndex,
-  newRelations,
-  viewPathToString,
-} from "./ViewContext";
-import { createPlan, planBulkUpsertNodes, planUpdateViews, planUpsertRelations } from "./planner";
+  createPlan,
+  planBulkUpsertNodes,
+  planUpdateViews,
+  planUpsertRelations,
+} from "./planner";
 import { newDB } from "./knowledge";
 
 test("Dragging Source not available at Destination", async () => {
@@ -94,7 +95,10 @@ test("Diff items are always added, never moved", () => {
       nodes: newDB()
         .nodes.set(shortID(parent.id), parent)
         .set(shortID(aliceChild.id), aliceChild),
-      relations: newDB().relations.set(shortID(aliceRelations.id), aliceRelations),
+      relations: newDB().relations.set(
+        shortID(aliceRelations.id),
+        aliceRelations
+      ),
     })
     .set(bobPK, {
       nodes: newDB().nodes.set(shortID(bobChild.id), bobChild),
@@ -103,7 +107,11 @@ test("Diff items are always added, never moved", () => {
 
   // Views: parent is expanded
   const parentPath = [
-    { nodeID: parent.id, nodeIndex: 0 as NodeIndex, relationsID: aliceRelations.id },
+    {
+      nodeID: parent.id,
+      nodeIndex: 0 as NodeIndex,
+      relationsID: aliceRelations.id,
+    },
   ] as const;
 
   const views = Map<string, View>().set(viewPathToString(parentPath), {
@@ -114,10 +122,10 @@ test("Diff items are always added, never moved", () => {
 
   const plan = planUpdateViews(
     planUpsertRelations(
-      planBulkUpsertNodes(
-        createPlan({ ...alice(), knowledgeDBs, views }),
-        [parent, aliceChild]
-      ),
+      planBulkUpsertNodes(createPlan({ ...alice(), knowledgeDBs, views }), [
+        parent,
+        aliceChild,
+      ]),
       aliceRelations
     ),
     views
@@ -126,9 +134,13 @@ test("Diff items are always added, never moved", () => {
   // Simulate dragging Bob's child (diff item) into Alice's list at index 0
   // The source path represents the diff item's virtual path
   const diffItemPath = [
-    { nodeID: parent.id, nodeIndex: 0 as NodeIndex, relationsID: aliceRelations.id },
+    {
+      nodeID: parent.id,
+      nodeIndex: 0 as NodeIndex,
+      relationsID: aliceRelations.id,
+    },
     { nodeID: bobChild.id, nodeIndex: 0 as NodeIndex, isDiffItem: true },
-  ];
+  ] as const;
 
   const result = dnd(
     plan,

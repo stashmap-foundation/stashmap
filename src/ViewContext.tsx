@@ -116,6 +116,7 @@ export function getDiffItemsForNode(
 type SubPath = {
   nodeID: LongID | ID;
   nodeIndex: NodeIndex;
+  isDiffItem?: boolean;
 };
 
 type SubPathWithRelations = SubPath & {

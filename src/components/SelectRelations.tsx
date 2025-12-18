@@ -712,7 +712,11 @@ function SelectRelationsButton({
 export function ReadonlyRelations(): JSX.Element | null {
   const { knowledgeDBs, user } = useData();
   const [nodeID] = useNodeID();
-  const relations = getAvailableRelationsForNode(knowledgeDBs, user.publicKey, nodeID);
+  const relations = getAvailableRelationsForNode(
+    knowledgeDBs,
+    user.publicKey,
+    nodeID
+  );
 
   const groupedByType = relations.groupBy((r) => r.type);
 

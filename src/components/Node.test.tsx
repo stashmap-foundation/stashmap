@@ -21,6 +21,7 @@ import {
   RootViewContextProvider,
   newRelations,
   viewPathToString,
+  getDiffItemsForNode,
 } from "../ViewContext";
 import { Column } from "./Column";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
@@ -447,7 +448,10 @@ test("getDiffItemsForNode returns items from other users not in current user's l
       nodes: newDB()
         .nodes.set(shortID(parent.id), parent)
         .set(shortID(aliceChild.id), aliceChild),
-      relations: newDB().relations.set(shortID(aliceRelations.id), aliceRelations),
+      relations: newDB().relations.set(
+        shortID(aliceRelations.id),
+        aliceRelations
+      ),
     })
     .set(bobPK, {
       nodes: newDB().nodes.set(shortID(bobChild.id), bobChild),
@@ -455,7 +459,6 @@ test("getDiffItemsForNode returns items from other users not in current user's l
     });
 
   // Import getDiffItemsForNode
-  const { getDiffItemsForNode } = require("../ViewContext");
 
   const diffItems = getDiffItemsForNode(
     knowledgeDBs,
@@ -493,14 +496,15 @@ test("getDiffItemsForNode excludes items already in user's list", () => {
       nodes: newDB()
         .nodes.set(shortID(parent.id), parent)
         .set(shortID(sharedChild.id), sharedChild),
-      relations: newDB().relations.set(shortID(aliceRelations.id), aliceRelations),
+      relations: newDB().relations.set(
+        shortID(aliceRelations.id),
+        aliceRelations
+      ),
     })
     .set(bobPK, {
-      nodes: newDB(),
+      nodes: newDB().nodes,
       relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
     });
-
-  const { getDiffItemsForNode } = require("../ViewContext");
 
   const diffItems = getDiffItemsForNode(
     knowledgeDBs,
@@ -562,13 +566,15 @@ test("Diff item paths are correctly identified as diff items", () => {
     });
 
   // Root path (level 0)
-  const rootPath = [
-    { nodeID: root.id, nodeIndex: 0 as NodeIndex },
-  ] as const;
+  const rootPath = [{ nodeID: root.id, nodeIndex: 0 as NodeIndex }] as const;
 
   // Parent path (level 1) - diff items are shown at this level
   const parentPath = [
-    { nodeID: root.id, nodeIndex: 0 as NodeIndex, relationsID: rootRelations.id },
+    {
+      nodeID: root.id,
+      nodeIndex: 0 as NodeIndex,
+      relationsID: rootRelations.id,
+    },
     { nodeID: parent.id, nodeIndex: 0 as NodeIndex },
   ] as const;
 
@@ -608,7 +614,9 @@ test("Diff item paths are correctly identified as diff items", () => {
     (path) => path[path.length - 1].nodeID === aliceChild.id
   );
   expect(aliceChildPath).toBeDefined();
-  expect(aliceChildPath?.[aliceChildPath.length - 1].isDiffItem).toBeUndefined();
+  expect(
+    aliceChildPath?.[aliceChildPath.length - 1].isDiffItem
+  ).toBeUndefined();
 });
 
 test("getDiffItemsForNode returns empty for not_relevant relation type", () => {
@@ -631,14 +639,15 @@ test("getDiffItemsForNode returns empty for not_relevant relation type", () => {
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
       nodes: newDB().nodes.set(shortID(parent.id), parent),
-      relations: newDB().relations.set(shortID(aliceRelations.id), aliceRelations),
+      relations: newDB().relations.set(
+        shortID(aliceRelations.id),
+        aliceRelations
+      ),
     })
     .set(bobPK, {
       nodes: newDB().nodes.set(shortID(bobChild.id), bobChild),
       relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
     });
-
-  const { getDiffItemsForNode } = require("../ViewContext");
 
   const diffItems = getDiffItemsForNode(
     knowledgeDBs,

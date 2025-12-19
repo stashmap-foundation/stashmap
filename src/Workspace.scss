@@ -117,14 +117,16 @@ body {
 
 .fullscreen-card-header {
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fullscreen-card-title {
   padding-left: 8px;
   padding-top: 8px;
   padding-bottom: 0px;
   padding-right: 8px;
-  //border-bottom: $border-strong;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 
 .fullscreen-card-title {

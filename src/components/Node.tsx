@@ -456,7 +456,8 @@ export function Node({
   const isNodeBeingEdited = useIsEditingOn();
   const isMultiselect = useIsParentMultiselectBtnOn();
   const defaultCls = isDesktop ? "hover-light-bg" : "";
-  const cls = className !== undefined ? `${className}` : defaultCls;
+  const cls =
+    className !== undefined ? `${className} hover-light-bg` : defaultCls;
   const clsBody = cardBodyClassName || "ps-0 pt-4 pb-0";
 
   return (

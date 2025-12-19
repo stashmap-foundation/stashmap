@@ -107,7 +107,10 @@ export function WorkspaceView(): JSX.Element | null {
             {/* Render active fullscreen card */}
             <div className="fullscreen-card">
               <div className="fullscreen-card-header">
-                <Node className="border-0" cardBodyClassName="ps-0 pb-0 pt-0" />
+                <Node
+                  className="border-0"
+                  cardBodyClassName="pb-0 pt-8 pl-8 fullscreen-card-title"
+                />
               </div>
               <div className="fullscreen-card-body">
                 <DND>

@@ -1,10 +1,14 @@
 import React from "react";
-import { useNodeID } from "../ViewContext";
+import { useIsAddToNode, useNodeID } from "../ViewContext";
 import { useNavigationStack } from "../NavigationStackContext";
 
-export function FullscreenButton(): JSX.Element {
+export function FullscreenButton(): JSX.Element | null {
   const { push } = useNavigationStack();
   const [nodeID] = useNodeID();
+  const isAddToNode = useIsAddToNode();
+  if (isAddToNode) {
+    return null;
+  }
 
   const onClick = (): void => {
     push(nodeID);

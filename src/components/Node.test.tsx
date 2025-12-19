@@ -340,7 +340,6 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
   const child = newNode("Child", alicePK);
   const aliceGrandchild = newNode("Alice's Grandchild", alicePK);
   const bobGrandchild = newNode("Bob's Grandchild", bobPK);
-
   const parentRelations = addRelationToRelations(
     newRelations(parent.id, "", alicePK),
     child.id
@@ -585,7 +584,7 @@ test("Diff item paths are correctly identified as diff items", () => {
   ).toBeUndefined();
 });
 
-test("getDiffItemsForNode returns empty for not_relevant relation type", () => {
+test("getDiffItemsForNode should return no diff items for not_relevant relation type", () => {
   const [alice, bob] = setup([ALICE, BOB]);
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
@@ -619,7 +618,5 @@ test("getDiffItemsForNode returns empty for not_relevant relation type", () => {
     "not_relevant",
     aliceRelations.id
   );
-
-  // Should return no diff items for not_relevant type
   expect(diffItems.size).toBe(0);
 });

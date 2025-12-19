@@ -133,7 +133,6 @@ function DeclineDiffItemButton(): JSX.Element {
 
     // Add only this item to the not_relevant relation
     const updatedRelation = addRelationToRelations(notRelevantRelation, nodeID);
-
     const plan = planUpsertRelations(createPlan(), updatedRelation);
     executePlan(plan);
   };

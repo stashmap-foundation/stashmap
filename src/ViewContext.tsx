@@ -447,7 +447,7 @@ export function getParentView(viewContext: ViewPath): ViewPath | undefined {
 }
 
 /**
- * Check if the current node is a diff item (from other users, not in the user's own relation).
+ * Check if the current node is not in my list but in the list of another user.
  */
 export function useIsDiffItem(): boolean {
   const data = useData();
@@ -464,9 +464,7 @@ export function useIsDiffItem(): boolean {
   if (nodeID === ADD_TO_NODE) {
     return false;
   }
-
   const parentRelations = getRelationsFromView(data, parentPath);
-
   if (!parentRelations) {
     return false;
   }

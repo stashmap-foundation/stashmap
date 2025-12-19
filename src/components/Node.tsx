@@ -402,7 +402,6 @@ export function getNodesInTree(
     ctx
   );
 
-  // Check for diff items at the parent level as well
   const diffItems = getDiffItemsForNode(
     data.knowledgeDBs,
     data.user.publicKey,
@@ -411,7 +410,6 @@ export function getNodesInTree(
     relations.id
   );
 
-  // Don't add "Add Note" button for workspace root (levels === 0) or header column (parentPath.length === 1)
   const isHeaderColumn = parentPath.length === 2;
   const isRoot = getLevels(parentPath) === 0;
 
@@ -428,7 +426,6 @@ export function getNodesInTree(
         )
       : nodesInTree;
 
-  // Add "Add Note" button unless it's root or header column
   return isRoot || isHeaderColumn
     ? withDiffItems
     : withDiffItems.push(addNodePath);

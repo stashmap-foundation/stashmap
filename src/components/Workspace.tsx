@@ -10,7 +10,7 @@ import { getRelations } from "../connections";
 import { PushNode, useNodeID, getNodeFromID } from "../ViewContext";
 import { DND } from "../dnd";
 import { useData } from "../DataContext";
-import { useStack, useNavigationStack } from "../NavigationStackContext";
+import { usePaneNavigation } from "../SplitPanesContext";
 import { getRelationTypeByRelationsID } from "./RelationTypes";
 import { Node } from "./Node";
 
@@ -51,8 +51,7 @@ function StackedLayer({
 export function WorkspaceView(): JSX.Element | null {
   const [workspaceID, view] = useNodeID();
   const data = useData();
-  const stack = useStack();
-  const { popTo } = useNavigationStack();
+  const { stack, popTo } = usePaneNavigation();
 
   const ref = useRef<HTMLDivElement>(null);
 

@@ -892,3 +892,48 @@ to {
   font-size: 0.9rem;
 }
 
+// Split pane layout
+.split-pane-container {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  width: 100%;
+  gap: 4px;
+  padding: 4px;
+}
+
+.split-pane {
+  flex: 1;
+  min-width: 300px;
+  height: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: $border-strong;
+  border-radius: 3px;
+  background-color: white;
+  overflow: hidden;
+}
+
+.split-pane-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 10;
+  opacity: 0.6;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+.split-pane-add {
+  flex-shrink: 0;
+  align-self: center;
+  opacity: 0.6;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+

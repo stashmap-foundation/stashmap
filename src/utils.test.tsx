@@ -67,6 +67,12 @@ import { DND } from "./dnd";
 import { findContacts } from "./contacts";
 import { ProjectContextProvider } from "./ProjectContext";
 import { NavigationStackProvider } from "./NavigationStackContext";
+import {
+  SplitPanesProvider,
+  PaneNavigationProvider,
+  PaneIndexProvider,
+} from "./SplitPanesContext";
+import { ROOT } from "./types";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 test.skip("skip", () => {});
@@ -344,43 +350,49 @@ export function renderApis(
   const utils = render(
     <BrowserRouter>
       <NavigationStackProvider>
-        <ApiProvider
-          apis={{
-            fileStore,
-            relayPool,
-            finalizeEvent,
-            nip11,
-            eventLoadingTimeout: 0,
-            timeToStorePreLoginEvents: 0,
-          }}
-        >
-          <NostrAuthContextProvider
-            defaultRelayUrls={
-              optionsWithDefaultUser.defaultRelays ||
-              TEST_RELAYS.map((r) => r.url)
-            }
-          >
-            <ProjectContextProvider>
-              <VirtuosoMockContext.Provider
-                value={{ viewportHeight: 10000, itemHeight: 100 }}
+        <SplitPanesProvider>
+          <PaneIndexProvider index={0}>
+            <PaneNavigationProvider initialWorkspace={ROOT}>
+              <ApiProvider
+                apis={{
+                  fileStore,
+                  relayPool,
+                  finalizeEvent,
+                  nip11,
+                  eventLoadingTimeout: 0,
+                  timeToStorePreLoginEvents: 0,
+                }}
               >
-                {" "}
-                {options?.includeFocusContext === true ? (
-                  <FocusContextProvider>{children}</FocusContextProvider>
-                ) : (
-                  <FocusContext.Provider
-                    value={{
-                      isInputElementInFocus: true,
-                      setIsInputElementInFocus: jest.fn(),
-                    }}
-                  >
-                    {children}
-                  </FocusContext.Provider>
-                )}
-              </VirtuosoMockContext.Provider>
-            </ProjectContextProvider>
-          </NostrAuthContextProvider>
-        </ApiProvider>
+                <NostrAuthContextProvider
+                  defaultRelayUrls={
+                    optionsWithDefaultUser.defaultRelays ||
+                    TEST_RELAYS.map((r) => r.url)
+                  }
+                >
+                  <ProjectContextProvider>
+                    <VirtuosoMockContext.Provider
+                      value={{ viewportHeight: 10000, itemHeight: 100 }}
+                    >
+                      {" "}
+                      {options?.includeFocusContext === true ? (
+                        <FocusContextProvider>{children}</FocusContextProvider>
+                      ) : (
+                        <FocusContext.Provider
+                          value={{
+                            isInputElementInFocus: true,
+                            setIsInputElementInFocus: jest.fn(),
+                          }}
+                        >
+                          {children}
+                        </FocusContext.Provider>
+                      )}
+                    </VirtuosoMockContext.Provider>
+                  </ProjectContextProvider>
+                </NostrAuthContextProvider>
+              </ApiProvider>
+            </PaneNavigationProvider>
+          </PaneIndexProvider>
+        </SplitPanesProvider>
       </NavigationStackProvider>
     </BrowserRouter>
   );

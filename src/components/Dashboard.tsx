@@ -1,13 +1,18 @@
 import React from "react";
 import { Outlet } from "react-router-dom";
 
-import { WorkspaceView } from "./Workspace";
 import { NavbarControls } from "./NavbarControls";
-
+import { SplitPaneLayout } from "./SplitPaneLayout";
+import {
+  SplitPanesProvider,
+  PaneNavigationProvider,
+  PaneIndexProvider,
+  usePaneNavigation,
+} from "../SplitPanesContext";
+import { RootViewContextProvider } from "../ViewContext";
 import { LoadNode } from "../dataQuery";
 import { StorePreLoginContext } from "../StorePreLoginContext";
-import { RootViewContextProvider } from "../ViewContext";
-import { useStack } from "../NavigationStackContext";
+import { useWorkspaceContext } from "../WorkspaceContext";
 
 export function AppLayout({
   children,
@@ -29,16 +34,16 @@ export function AppLayout({
   );
 }
 
-export function RootViewOrWorkspaceIsLoading({
+// Inner component that uses pane navigation context
+function RootViewOrWorkspaceIsLoadingInner({
   children,
 }: {
   children: React.ReactNode;
 }): JSX.Element {
-  const stack = useStack();
-  const activeWorkspaceID = stack[stack.length - 1] as LongID;
+  const { activeWorkspace } = usePaneNavigation();
 
   return (
-    <RootViewContextProvider root={activeWorkspaceID}>
+    <RootViewContextProvider root={activeWorkspace as LongID}>
       <LoadNode waitForEose>
         <StorePreLoginContext>{children}</StorePreLoginContext>
       </LoadNode>
@@ -46,14 +51,37 @@ export function RootViewOrWorkspaceIsLoading({
   );
 }
 
+// Exported for tests - wraps with pane providers
+export function RootViewOrWorkspaceIsLoading({
+  children,
+}: {
+  children: React.ReactNode;
+}): JSX.Element {
+  const { activeWorkspace } = useWorkspaceContext();
+
+  return (
+    <SplitPanesProvider>
+      <PaneIndexProvider index={0}>
+        <PaneNavigationProvider initialWorkspace={activeWorkspace}>
+          <RootViewOrWorkspaceIsLoadingInner>
+            {children}
+          </RootViewOrWorkspaceIsLoadingInner>
+        </PaneNavigationProvider>
+      </PaneIndexProvider>
+    </SplitPanesProvider>
+  );
+}
+
 function Dashboard(): JSX.Element {
   return (
-    <RootViewOrWorkspaceIsLoading>
-      <AppLayout>
-        <Outlet />
-        <WorkspaceView />
-      </AppLayout>
-    </RootViewOrWorkspaceIsLoading>
+    <SplitPanesProvider>
+      <StorePreLoginContext>
+        <AppLayout>
+          <Outlet />
+          <SplitPaneLayout />
+        </AppLayout>
+      </StorePreLoginContext>
+    </SplitPanesProvider>
   );
 }
 export default Dashboard;

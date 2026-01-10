@@ -7,15 +7,29 @@ import {
   usePaneIndex,
   Pane,
 } from "../SplitPanesContext";
-import { RootViewContextProvider } from "../ViewContext";
+import {
+  RootViewContextProvider,
+  updateViewPathsAfterPaneDelete,
+} from "../ViewContext";
 import { LoadNode } from "../dataQuery";
 import { WorkspaceView } from "./Workspace";
 import { useWorkspaceContext } from "../WorkspaceContext";
+import { planUpdateViews, usePlanner } from "../planner";
 
 function PaneContent({ pane }: { pane: Pane }) {
   const { activeWorkspace } = usePaneNavigation();
   const { removePane } = useSplitPanes();
   const paneIndex = usePaneIndex();
+  const { createPlan, executePlan } = usePlanner();
+
+  const handleRemovePane = (): void => {
+    // Update view settings: delete views for this pane and shift indices
+    const plan = createPlan();
+    const updatedViews = updateViewPathsAfterPaneDelete(plan.views, paneIndex);
+    executePlan(planUpdateViews(plan, updatedViews));
+    // Remove the pane from state
+    removePane(pane.id);
+  };
 
   return (
     <div className="split-pane">
@@ -31,7 +45,7 @@ function PaneContent({ pane }: { pane: Pane }) {
         <button
           type="button"
           className="split-pane-close btn btn-borderless"
-          onClick={() => removePane(pane.id)}
+          onClick={handleRemovePane}
           aria-label="Close pane"
         >
           <span className="btn-close small" />

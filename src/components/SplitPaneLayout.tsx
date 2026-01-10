@@ -38,7 +38,7 @@ function PaneContent({ pane }: { pane: Pane }) {
         root={activeWorkspace as LongID}
         paneIndex={paneIndex}
       >
-        <LoadNode waitForEose>
+        <LoadNode >
           <WorkspaceView />
         </LoadNode>
       </RootViewContextProvider>

@@ -45,7 +45,7 @@ export function DeleteWorkspace({
   as?: "button" | "item";
   withCaption?: boolean;
 }): JSX.Element | null {
-  const { activeWorkspace, setCurrentWorkspace } = useWorkspaceContext();
+  const { activeWorkspace } = useWorkspaceContext();
   const data = useData();
   const { createPlan, executePlan } = usePlanner();
   const navigate = useNavigate();
@@ -67,7 +67,6 @@ export function DeleteWorkspace({
     executePlan(planWithDeletedNode);
 
     // If deleting active node, navigate to ROOT
-    setCurrentWorkspace(ROOT);
     navigate(`/w/${ROOT}`);
   };
 

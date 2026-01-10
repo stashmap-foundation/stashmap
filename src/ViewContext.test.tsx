@@ -82,9 +82,11 @@ test("Move View Settings on Delete", async () => {
 
   renderWithTestData(
     <Data user={alice().user}>
-      <RootViewOrWorkspaceIsLoading>
-        <WorkspaceView />
-      </RootViewOrWorkspaceIsLoading>
+      <RootViewContextProvider root={pl.id}>
+        <LoadNode waitForEose>
+          <TreeView />
+        </LoadNode>
+      </RootViewContextProvider>
     </Data>,
     {
       ...alice(),
@@ -377,12 +379,14 @@ test("View doesn't change if list is copied from contact", async () => {
     { activeWorkspace: "Bobs Workspace" }
   );
 
+  // Navigate directly to Programming Languages to see its children (OOP, FPL)
+  const pl = findNodeByText(bobsKnowledgeDB, "Programming Languages") as KnowNode;
   const utils = renderApp({
     ...alice(),
-    initialRoute: `/w/${bobsKnowledgeDB.activeWorkspace}`,
+    initialRoute: `/w/${pl.id}`,
   });
 
-  await screen.findByText("Bobs Workspace");
+  await screen.findByText("Programming Languages");
   expect(extractNodes(utils.container)).toEqual(["OOP", "FPL"]);
   await userEvent.click(screen.getByLabelText("show items relevant for OOP"));
   expect(extractNodes(utils.container)).toEqual(["OOP", "C++", "Java", "FPL"]);
@@ -422,14 +426,14 @@ test("Disconnect Nodes", async () => {
       activeWorkspace: "My Workspace",
     }
   );
+  // Navigate directly to Programming Languages to see its children
+  const pl = findNodeByText(aliceDB, "Programming Languages") as KnowNode;
   const { container } = renderWithTestData(<App />, {
     ...alice(),
-    initialRoute: `/w/${aliceDB.activeWorkspace}`,
+    initialRoute: `/w/${pl.id}`,
   });
   await screen.findByText("Programming Languages");
-  fireEvent.click(
-    screen.getByLabelText("show items relevant for Programming Languages")
-  );
+  // Children are visible directly since we're at Programming Languages level
 
   // disconnect nodes from relevant moves nodes to not relevant
   fireEvent.click(await screen.findByLabelText("disconnect node Java"));

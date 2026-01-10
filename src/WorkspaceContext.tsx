@@ -1,15 +1,11 @@
-import React, { createContext, useEffect, useState } from "react";
-import { useDefaultWorkspace } from "./NostrAuthContext";
+import React, { createContext } from "react";
 import { useData } from "./DataContext";
-import { useApis } from "./Apis";
 import { replaceUnauthenticatedUser } from "./planner";
 import { useWorkspaceFromURL } from "./KnowledgeDataContext";
-import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { ROOT } from "./types";
 
 type WorkspaceContextType = {
   activeWorkspace: LongID;
-  setCurrentWorkspace: React.Dispatch<React.SetStateAction<LongID | undefined>>;
 };
 
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(
@@ -22,37 +18,18 @@ export function WorkspaceContextProvider({
   children: React.ReactNode;
 }): JSX.Element {
   const { user } = useData();
-  const { fileStore } = useApis();
   const wsFromURL = useWorkspaceFromURL();
-  const defaultWorkspace = useDefaultWorkspace();
-  const [currentWorkspace, setCurrentWorkspace] = useState<LongID | undefined>(
-    undefined
-  );
 
-  // Simple priority: URL > state > localStorage > default > ROOT
+  // Simple: URL node or ROOT
   const activeWorkspace =
     wsFromURL !== undefined
       ? replaceUnauthenticatedUser(wsFromURL, user.publicKey)
-      : currentWorkspace ||
-        ((user.publicKey !== UNAUTHENTICATED_USER_PK &&
-          fileStore.getLocalStorage(
-            `${user.publicKey}:activeWs`
-          )) as LongID | null) ||
-        defaultWorkspace ||
-        ROOT;
-
-  // Save to localStorage when changed
-  useEffect(() => {
-    if (user.publicKey !== UNAUTHENTICATED_USER_PK) {
-      fileStore.setLocalStorage(`${user.publicKey}:activeWs`, activeWorkspace);
-    }
-  }, [activeWorkspace, user.publicKey, fileStore]);
+      : ROOT;
 
   return (
     <WorkspaceContext.Provider
       value={{
         activeWorkspace,
-        setCurrentWorkspace,
       }}
     >
       {children}

@@ -303,12 +303,14 @@ test("Calculate index from node index", () => {
 });
 
 test("Parse View path", () => {
-  expect(parseViewPath("root:1")).toEqual([{ nodeID: "root", nodeIndex: 1 }]);
-  expect(parseViewPath("root:0:rl:pl:0")).toEqual([
+  expect(parseViewPath("p0:root:1")).toEqual([0, { nodeID: "root", nodeIndex: 1 }]);
+  expect(parseViewPath("p0:root:0:rl:pl:0")).toEqual([
+    0,
     { nodeID: "root", nodeIndex: 0, relationsID: "rl" },
     { nodeID: "pl", nodeIndex: 0 },
   ]);
-  expect(parseViewPath("root:0:rl:pl:0:rl:oop:1")).toEqual([
+  expect(parseViewPath("p1:root:0:rl:pl:0:rl:oop:1")).toEqual([
+    1,
     { nodeID: "root", nodeIndex: 0, relationsID: "rl" },
     { nodeID: "pl", nodeIndex: 0, relationsID: "rl" },
     { nodeID: "oop", nodeIndex: 1 },

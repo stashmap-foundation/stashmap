@@ -8,6 +8,7 @@ import {
   PaneNavigationProvider,
   PaneIndexProvider,
   usePaneNavigation,
+  usePaneIndex,
 } from "../SplitPanesContext";
 import { RootViewContextProvider } from "../ViewContext";
 import { LoadNode } from "../dataQuery";
@@ -41,9 +42,10 @@ function RootViewOrWorkspaceIsLoadingInner({
   children: React.ReactNode;
 }): JSX.Element {
   const { activeWorkspace } = usePaneNavigation();
+  const paneIndex = usePaneIndex();
 
   return (
-    <RootViewContextProvider root={activeWorkspace as LongID}>
+    <RootViewContextProvider root={activeWorkspace as LongID} paneIndex={paneIndex}>
       <LoadNode waitForEose>
         <StorePreLoginContext>{children}</StorePreLoginContext>
       </LoadNode>

@@ -46,7 +46,8 @@ import { CancelButton, NodeCard } from "../commons/Ui";
 import { useProjectContext } from "../ProjectContext";
 
 function getLevels(viewPath: ViewPath): number {
-  return viewPath.length - 1;
+  // Subtract 2: one for pane index at position 0, one for the current node
+  return viewPath.length - 2;
 }
 
 export function LoadingNode(): JSX.Element {
@@ -410,7 +411,8 @@ export function getNodesInTree(
     relations.id
   );
 
-  const isHeaderColumn = parentPath.length === 2;
+  // Note: parentPath[0] is pane index, so length 3 = [paneIndex, parent, node]
+  const isHeaderColumn = parentPath.length === 3;
   const isRoot = getLevels(parentPath) === 0;
 
   // Add diff items at the parent level (after regular items, before Add Note)

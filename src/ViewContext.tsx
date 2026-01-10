@@ -124,8 +124,8 @@ type SubPathWithRelations = SubPath & {
 };
 
 export type ViewPath =
-  | readonly [SubPath]
-  | readonly [...SubPathWithRelations[], SubPath];
+  | readonly [number, SubPath]
+  | readonly [number, ...SubPathWithRelations[], SubPath];
 
 export const ViewContext = React.createContext<ViewPath | undefined>(undefined);
 
@@ -139,13 +139,21 @@ export function useViewPath(): ViewPath {
 
 export function parseViewPath(path: string): ViewPath {
   const pieces = path.split(":");
-  if (pieces.length < 2) {
+  if (pieces.length < 3) {
     throw new Error("Invalid view path");
   }
-  const nodeIndexEnd = parseInt(pieces[pieces.length - 1], 10) as NodeIndex;
-  const nodeIdEnd = pieces[pieces.length - 2] as LongID;
 
-  const beginning = pieces
+  // First piece is pane index (e.g., "p0")
+  const paneIndex = parseInt(pieces[0].substring(1), 10);
+  const pathPieces = pieces.slice(1);
+
+  const nodeIndexEnd = parseInt(
+    pathPieces[pathPieces.length - 1],
+    10
+  ) as NodeIndex;
+  const nodeIdEnd = pathPieces[pathPieces.length - 2] as LongID;
+
+  const beginning = pathPieces
     .slice(0, -2)
     .reduce(
       (
@@ -167,11 +175,16 @@ export function parseViewPath(path: string): ViewPath {
       },
       []
     );
-  return [...beginning, { nodeID: nodeIdEnd, nodeIndex: nodeIndexEnd }];
+  return [paneIndex, ...beginning, { nodeID: nodeIdEnd, nodeIndex: nodeIndexEnd }];
 }
 
 function convertViewPathToString(viewContext: ViewPath): string {
-  const withoutLastElement = viewContext.slice(0, -1) as SubPathWithRelations[];
+  const paneIndex = viewContext[0] as number;
+  const pathWithoutPane = viewContext.slice(1) as readonly SubPath[];
+  const withoutLastElement = pathWithoutPane.slice(
+    0,
+    -1
+  ) as SubPathWithRelations[];
   const beginning = withoutLastElement.reduce(
     (acc: string, subPath: SubPathWithRelations): string => {
       const postfix = `${subPath.nodeID}:${subPath.nodeIndex}:${subPath.relationsID}`;
@@ -179,9 +192,10 @@ function convertViewPathToString(viewContext: ViewPath): string {
     },
     ""
   );
-  const lastPath = viewContext[viewContext.length - 1];
+  const lastPath = pathWithoutPane[pathWithoutPane.length - 1];
   const end = `${lastPath.nodeID}:${lastPath.nodeIndex}`;
-  return beginning !== "" ? `${beginning}:${end}` : end;
+  const pathPart = beginning !== "" ? `${beginning}:${end}` : end;
+  return `p${paneIndex}:${pathPart}`;
 }
 
 // TODO: delete this export
@@ -286,7 +300,11 @@ export function getNodeFromID(
 }
 
 export function getLast(viewContext: ViewPath): SubPath {
-  return viewContext[viewContext.length - 1];
+  return viewContext[viewContext.length - 1] as SubPath;
+}
+
+export function getPaneIndex(viewContext: ViewPath): number {
+  return viewContext[0] as number;
 }
 
 export function getViewFromPath(data: Data, path: ViewPath): View {
@@ -375,19 +393,22 @@ export function calculateIndexFromNodeIndex(
 function addRelationsToLastElement(
   path: ViewPath,
   relationsID: LongID
-): SubPathWithRelations[] {
-  const pathWithoutParent = path.slice(0, -1) as SubPathWithRelations[];
-  return [...pathWithoutParent, { ...getLast(path), relationsID }];
+): [number, ...SubPathWithRelations[]] {
+  const paneIndex = getPaneIndex(path);
+  // Skip pane index (position 0) and last element
+  const middleElements = path.slice(1, -1) as SubPathWithRelations[];
+  return [paneIndex, ...middleElements, { ...getLast(path), relationsID }];
 }
 
 export function addAddToNodeToPath(data: Data, path: ViewPath): ViewPath {
   const relations = getRelationsFromView(data, path);
   // Assume there is only one Add to node per parent
   const nodeIndex = 0 as NodeIndex;
-  return [
-    ...addRelationsToLastElement(path, relations?.id || ("" as LongID)),
-    { nodeID: ADD_TO_NODE, nodeIndex },
-  ];
+  const withRelations = addRelationsToLastElement(
+    path,
+    relations?.id || ("" as LongID)
+  );
+  return [...withRelations, { nodeID: ADD_TO_NODE, nodeIndex }];
 }
 
 export function addNodeToPath(
@@ -431,12 +452,15 @@ export function addDiffItemToPath(
 }
 
 function popPath(viewContext: ViewPath): ViewPath | undefined {
-  const pathWithoutLast = viewContext.slice(0, -1) as SubPathWithRelations[];
+  const paneIndex = getPaneIndex(viewContext);
+  // Get elements after pane index, excluding the last one
+  const pathWithoutLast = viewContext.slice(1, -1) as SubPathWithRelations[];
   const parent = pathWithoutLast[pathWithoutLast.length - 1];
   if (!parent) {
     return undefined;
   }
   return [
+    paneIndex,
     ...pathWithoutLast.slice(0, -1),
     { nodeID: parent.nodeID, nodeIndex: parent.nodeIndex },
   ];
@@ -511,14 +535,19 @@ export function useRelationIndex(): number | undefined {
 export function RootViewContextProvider({
   children,
   root,
+  paneIndex = 0,
   indices, // TODO: only used in tests, get rid of it
 }: {
   children: React.ReactNode;
   root: LongID;
+  paneIndex?: number;
   indices?: List<number>;
 }): JSX.Element {
   const data = useData();
-  const startPath: ViewPath = [{ nodeID: root, nodeIndex: 0 as NodeIndex }];
+  const startPath: ViewPath = [
+    paneIndex,
+    { nodeID: root, nodeIndex: 0 as NodeIndex },
+  ];
   const finalPath = (indices || List<number>()).reduce(
     (acc, index) => addNodeToPath(data, acc, index),
     startPath

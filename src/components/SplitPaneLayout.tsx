@@ -4,6 +4,7 @@ import {
   PaneNavigationProvider,
   PaneIndexProvider,
   usePaneNavigation,
+  usePaneIndex,
   Pane,
 } from "../SplitPanesContext";
 import { RootViewContextProvider } from "../ViewContext";
@@ -11,18 +12,22 @@ import { LoadNode } from "../dataQuery";
 import { WorkspaceView } from "./Workspace";
 import { useWorkspaceContext } from "../WorkspaceContext";
 
-function PaneContent({ pane, index }: { pane: Pane; index: number }) {
+function PaneContent({ pane }: { pane: Pane }) {
   const { activeWorkspace } = usePaneNavigation();
   const { removePane } = useSplitPanes();
+  const paneIndex = usePaneIndex();
 
   return (
     <div className="split-pane">
-      <RootViewContextProvider root={activeWorkspace as LongID}>
+      <RootViewContextProvider
+        root={activeWorkspace as LongID}
+        paneIndex={paneIndex}
+      >
         <LoadNode waitForEose>
           <WorkspaceView />
         </LoadNode>
       </RootViewContextProvider>
-      {index > 0 && (
+      {paneIndex > 0 && (
         <button
           type="button"
           className="split-pane-close btn btn-borderless"
@@ -42,7 +47,7 @@ function PaneWrapper({ pane, index }: { pane: Pane; index: number }) {
   return (
     <PaneIndexProvider index={index}>
       <PaneNavigationProvider initialWorkspace={activeWorkspace}>
-        <PaneContent pane={pane} index={index} />
+        <PaneContent pane={pane} />
       </PaneNavigationProvider>
     </PaneIndexProvider>
   );

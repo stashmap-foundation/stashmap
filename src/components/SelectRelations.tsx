@@ -781,10 +781,11 @@ export function SelectRelations({
   const groupedByType = relations.groupBy((r) => r.type);
 
   // Determine if we should show vertical or horizontal bars
-  // Column headers (alwaysOneSelected or viewPath.length === 2) always vertical
+  // Column headers (alwaysOneSelected or viewPath.length === 3) always vertical
   // Regular notes: horizontal by default, vertical only when expanded
-  const isHeaderColumn = viewPath.length === 2;
-  const isRoot = viewPath.length === 1;
+  // Note: viewPath[0] is pane index, so length 3 = [paneIndex, parentWithRelations, node]
+  const isHeaderColumn = viewPath.length === 3;
+  const isRoot = viewPath.length === 2;
   const showVertical =
     alwaysOneSelected || isHeaderColumn || isRoot || view.expanded === true;
   const forceOneSelected = alwaysOneSelected || isHeaderColumn || isRoot;

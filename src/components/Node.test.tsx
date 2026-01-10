@@ -264,6 +264,7 @@ test("Edited node is shown in Tree View", async () => {
     plan,
     Map({
       [viewPathToString([
+        0,
         { nodeID: pl.id, nodeIndex: 0 as NodeIndex, relationsID: "" as LongID },
         { nodeID: oop.id, nodeIndex: 0 as NodeIndex },
       ])]: {
@@ -372,9 +373,11 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
     });
 
   const parentPath = [
+    0,
     { nodeID: parent.id, nodeIndex: 0 as NodeIndex },
   ] as const;
   const childPath = [
+    0,
     {
       nodeID: parent.id,
       nodeIndex: 0 as NodeIndex,
@@ -538,8 +541,9 @@ test("Diff item paths are correctly identified as diff items", () => {
       ),
     });
 
-  const rootPath = [{ nodeID: root.id, nodeIndex: 0 as NodeIndex }] as const;
+  const rootPath = [0, { nodeID: root.id, nodeIndex: 0 as NodeIndex }] as const;
   const parentPath = [
+    0,
     {
       nodeID: root.id,
       nodeIndex: 0 as NodeIndex,

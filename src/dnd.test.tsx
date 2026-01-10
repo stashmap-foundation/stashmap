@@ -99,6 +99,7 @@ test("Diff items are always added, never moved", () => {
     });
 
   const parentPath = [
+    0,
     {
       nodeID: parent.id,
       nodeIndex: 0 as NodeIndex,
@@ -124,6 +125,7 @@ test("Diff items are always added, never moved", () => {
   );
 
   const diffItemPath = [
+    0,
     {
       nodeID: parent.id,
       nodeIndex: 0 as NodeIndex,

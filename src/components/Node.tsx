@@ -46,8 +46,9 @@ import { CancelButton, NodeCard } from "../commons/Ui";
 import { useProjectContext } from "../ProjectContext";
 
 function getLevels(viewPath: ViewPath): number {
-  // Subtract 2: one for pane index at position 0, one for the current node
-  return viewPath.length - 2;
+  // Subtract 1: for pane index at position 0
+  // This gives: root = 1, first children = 2, nested = 3, etc.
+  return viewPath.length - 1;
 }
 
 export function LoadingNode(): JSX.Element {
@@ -411,9 +412,8 @@ export function getNodesInTree(
     relations.id
   );
 
-  // Note: parentPath[0] is pane index, so length 3 = [paneIndex, parent, node]
-  const isHeaderColumn = parentPath.length === 3;
-  const isRoot = getLevels(parentPath) === 0;
+  // Root has getLevels = 1 (path is [pane, root])
+  const isRoot = getLevels(parentPath) === 1;
 
   // Add diff items at the parent level (after regular items, before Add Note)
   // Always add them - useIsDiffItem() will handle the rendering
@@ -428,9 +428,8 @@ export function getNodesInTree(
         )
       : nodesInTree;
 
-  return isRoot || isHeaderColumn
-    ? withDiffItems
-    : withDiffItems.push(addNodePath);
+  // Add inline "Add Note" for all nodes including root
+  return withDiffItems.push(addNodePath);
 }
 
 function DiffItemIndicator(): JSX.Element {

@@ -44,6 +44,7 @@ import { LoadingSpinnerButton } from "../commons/LoadingSpinnerButton";
 import { useInputElementFocus } from "../commons/FocusContextProvider";
 import { CancelButton, NodeCard } from "../commons/Ui";
 import { useProjectContext } from "../ProjectContext";
+import { usePaneIndex } from "../SplitPanesContext";
 
 function getLevels(viewPath: ViewPath): number {
   // Subtract 1: for pane index at position 0
@@ -335,22 +336,22 @@ export function Indent({ levels }: { levels: number }): JSX.Element {
         const color =
           k > 0
             ? (() => {
-                const pathForColor = popViewPath(viewPath, levels - k);
-                if (!pathForColor) {
-                  return undefined;
-                }
-                const viewForColor = getViewFromPath(data, pathForColor);
-                const [relationType] = viewForColor?.relations
-                  ? getRelationTypeByRelationsID(data, viewForColor.relations)
-                  : [undefined];
-                return relationType?.color || undefined;
-              })()
+              const pathForColor = popViewPath(viewPath, levels - k);
+              if (!pathForColor) {
+                return undefined;
+              }
+              const viewForColor = getViewFromPath(data, pathForColor);
+              const [relationType] = viewForColor?.relations
+                ? getRelationTypeByRelationsID(data, viewForColor.relations)
+                : [undefined];
+              return relationType?.color || undefined;
+            })()
             : undefined;
 
         const style = color
           ? {
-              borderLeft: `2px solid ${color}`,
-            }
+            borderLeft: `2px solid ${color}`,
+          }
           : {};
 
         return (
@@ -420,12 +421,12 @@ export function getNodesInTree(
   const withDiffItems =
     diffItems.size > 0 && !isRoot
       ? diffItems.reduce(
-          (list, diffItem, idx) =>
-            list.push(
-              addDiffItemToPath(data, parentPath, diffItem.nodeID, idx)
-            ),
-          nodesInTree
-        )
+        (list, diffItem, idx) =>
+          list.push(
+            addDiffItemToPath(data, parentPath, diffItem.nodeID, idx)
+          ),
+        nodesInTree
+      )
       : nodesInTree;
 
   // Add inline "Add Note" for all nodes including root

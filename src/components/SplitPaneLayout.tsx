@@ -15,6 +15,7 @@ import { LoadNode } from "../dataQuery";
 import { WorkspaceView } from "./Workspace";
 import { useWorkspaceContext } from "../WorkspaceContext";
 import { planUpdateViews, usePlanner } from "../planner";
+import { ROOT } from "../types";
 
 function PaneContent({ pane }: { pane: Pane }) {
   const { activeWorkspace } = usePaneNavigation();
@@ -57,10 +58,12 @@ function PaneContent({ pane }: { pane: Pane }) {
 
 function PaneWrapper({ pane, index }: { pane: Pane; index: number }) {
   const { activeWorkspace } = useWorkspaceContext();
+  // First pane respects URL/localStorage workspace, additional panes start at ROOT
+  const initialWorkspace = index === 0 ? activeWorkspace : ROOT;
 
   return (
     <PaneIndexProvider index={index}>
-      <PaneNavigationProvider initialWorkspace={activeWorkspace}>
+      <PaneNavigationProvider initialWorkspace={initialWorkspace}>
         <PaneContent pane={pane} />
       </PaneNavigationProvider>
     </PaneIndexProvider>

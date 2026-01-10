@@ -2,13 +2,14 @@ import React from "react";
 
 import { TemporaryViewProvider } from "./TemporaryViewContext";
 
-import { useNodeID, getNodeFromID } from "../ViewContext";
+import { useNodeID, getNodeFromID, useViewPath } from "../ViewContext";
 import { DND } from "../dnd";
 import { useData } from "../DataContext";
-import { usePaneNavigation } from "../SplitPanesContext";
+import { usePaneNavigation, usePaneIndex } from "../SplitPanesContext";
 import { getRelationTypeByRelationsID } from "./RelationTypes";
 import { Node } from "./Node";
 import { TreeView } from "./TreeView";
+import { getRelations } from "../connections";
 
 function StackedLayer({
   workspaceID,

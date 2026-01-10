@@ -207,7 +207,9 @@ function getViewExactMatch(views: Views, path: ViewPath): View | undefined {
 }
 
 function findIndexOfRelationType(types: RelationTypes, type: ID): number {
-  return types.keySeq().findIndex((k) => k === type);
+  const index = types.keySeq().findIndex((k) => k === type);
+  // Return a high number for unknown types so they sort to the end
+  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
 }
 
 function sortRelationsAccordingToType(
@@ -216,9 +218,6 @@ function sortRelationsAccordingToType(
   return relations.sort((a, b) => {
     const indexA = findIndexOfRelationType(RELATION_TYPES, a.type);
     const indexB = findIndexOfRelationType(RELATION_TYPES, b.type);
-    if (indexA === undefined || indexB === undefined) {
-      return 0;
-    }
     return indexA - indexB;
   });
 }

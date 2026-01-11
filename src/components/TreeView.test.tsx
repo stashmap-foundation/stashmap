@@ -7,13 +7,13 @@ import {
   renderWithTestData,
   setup,
   setupTestDB,
+  RootViewOrWorkspaceIsLoading,
 } from "../utils.test";
 import Data from "../Data";
 import { LoadNode } from "../dataQuery";
 import { PushNode, RootViewContextProvider } from "../ViewContext";
 import { TreeView } from "./TreeView";
 import { DraggableNote } from "./Draggable";
-import { RootViewOrWorkspaceIsLoading } from "./Dashboard";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
 import { DND } from "../dnd";
 

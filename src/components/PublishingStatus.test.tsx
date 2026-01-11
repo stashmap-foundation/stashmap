@@ -9,11 +9,11 @@ import {
   typeNewNode,
   renderWithTestData,
   TEST_RELAYS,
+  RootViewOrWorkspaceIsLoading,
 } from "../utils.test";
 import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 import { WorkspaceView } from "./Workspace";
 import { MockRelayPool } from "../nostrMock.test";
-import { RootViewOrWorkspaceIsLoading } from "./Dashboard";
 
 test("Publishing Status", async () => {
   const [alice] = setup([ALICE]);

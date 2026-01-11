@@ -14,6 +14,7 @@ import {
   setupTestDB,
   TEST_RELAYS,
   UpdateState,
+  RootViewOrWorkspaceIsLoading,
 } from "./utils.test";
 import { createPlan, planPublishRelayMetadata } from "./planner";
 import { execute } from "./executor";
@@ -23,7 +24,6 @@ import { flattenRelays } from "./relays";
 import { TreeView } from "./components/TreeView";
 import { DraggableNote } from "./components/Draggable";
 import Data from "./Data";
-import { RootViewOrWorkspaceIsLoading } from "./components/Dashboard";
 
 test("Flatten relays", () => {
   expect(

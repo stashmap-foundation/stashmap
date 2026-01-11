@@ -3,17 +3,8 @@ import { Outlet } from "react-router-dom";
 
 import { NavbarControls } from "./NavbarControls";
 import { SplitPaneLayout } from "./SplitPaneLayout";
-import {
-  SplitPanesProvider,
-  PaneNavigationProvider,
-  PaneIndexProvider,
-  usePaneNavigation,
-  usePaneIndex,
-} from "../SplitPanesContext";
-import { RootViewContextProvider } from "../ViewContext";
-import { LoadNode } from "../dataQuery";
+import { SplitPanesProvider } from "../SplitPanesContext";
 import { StorePreLoginContext } from "../StorePreLoginContext";
-import { useWorkspaceContext } from "../WorkspaceContext";
 
 export function AppLayout({
   children,
@@ -32,48 +23,6 @@ export function AppLayout({
         {children}
       </div>
     </div>
-  );
-}
-
-// Inner component that uses pane navigation context
-function RootViewOrWorkspaceIsLoadingInner({
-  children,
-}: {
-  children: React.ReactNode;
-}): JSX.Element {
-  const { activeWorkspace } = usePaneNavigation();
-  const paneIndex = usePaneIndex();
-
-  return (
-    <RootViewContextProvider
-      root={activeWorkspace as LongID}
-      paneIndex={paneIndex}
-    >
-      <LoadNode waitForEose>
-        <StorePreLoginContext>{children}</StorePreLoginContext>
-      </LoadNode>
-    </RootViewContextProvider>
-  );
-}
-
-// Exported for tests - wraps with pane providers
-export function RootViewOrWorkspaceIsLoading({
-  children,
-}: {
-  children: React.ReactNode;
-}): JSX.Element {
-  const { activeWorkspace } = useWorkspaceContext();
-
-  return (
-    <SplitPanesProvider>
-      <PaneIndexProvider index={0}>
-        <PaneNavigationProvider initialWorkspace={activeWorkspace}>
-          <RootViewOrWorkspaceIsLoadingInner>
-            {children}
-          </RootViewOrWorkspaceIsLoadingInner>
-        </PaneNavigationProvider>
-      </PaneIndexProvider>
-    </SplitPanesProvider>
   );
 }
 

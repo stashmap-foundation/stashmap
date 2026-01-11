@@ -25,6 +25,7 @@ import {
   BOB,
   follow,
   renderApp,
+  RootViewOrWorkspaceIsLoading,
 } from "./utils.test";
 import {
   RootViewContextProvider,
@@ -41,7 +42,6 @@ import {
 import { TreeView } from "./components/TreeView";
 import { LoadNode } from "./dataQuery";
 import { App } from "./App";
-import { RootViewOrWorkspaceIsLoading } from "./components/Dashboard";
 import { ROOT } from "./types";
 
 test("Move View Settings on Delete", async () => {

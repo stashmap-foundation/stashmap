@@ -60,7 +60,10 @@ import {
   newNode,
   shortID,
 } from "./connections";
-import { newRelations } from "./ViewContext";
+import { newRelations, RootViewContextProvider } from "./ViewContext";
+import { LoadNode } from "./dataQuery";
+import { StorePreLoginContext } from "./StorePreLoginContext";
+import { useWorkspaceContext } from "./WorkspaceContext";
 import { newDB } from "./knowledge";
 import { TemporaryViewProvider } from "./components/TemporaryViewContext";
 import { DND } from "./dnd";
@@ -71,6 +74,8 @@ import {
   SplitPanesProvider,
   PaneNavigationProvider,
   PaneIndexProvider,
+  usePaneNavigation,
+  usePaneIndex,
 } from "./SplitPanesContext";
 import { ROOT } from "./types";
 
@@ -709,6 +714,46 @@ export async function findEvent(
     ).toBeGreaterThan(0);
   });
   return relayPool.getEvents().find((e) => matchFilter(filter, e));
+}
+
+function RootViewOrWorkspaceIsLoadingInner({
+  children,
+}: {
+  children: React.ReactNode;
+}): JSX.Element {
+  const { activeWorkspace } = usePaneNavigation();
+  const paneIndex = usePaneIndex();
+
+  return (
+    <RootViewContextProvider
+      root={activeWorkspace as LongID}
+      paneIndex={paneIndex}
+    >
+      <LoadNode waitForEose>
+        <StorePreLoginContext>{children}</StorePreLoginContext>
+      </LoadNode>
+    </RootViewContextProvider>
+  );
+}
+
+export function RootViewOrWorkspaceIsLoading({
+  children,
+}: {
+  children: React.ReactNode;
+}): JSX.Element {
+  const { activeWorkspace } = useWorkspaceContext();
+
+  return (
+    <SplitPanesProvider>
+      <PaneIndexProvider index={0}>
+        <PaneNavigationProvider initialWorkspace={activeWorkspace}>
+          <RootViewOrWorkspaceIsLoadingInner>
+            {children}
+          </RootViewOrWorkspaceIsLoadingInner>
+        </PaneNavigationProvider>
+      </PaneIndexProvider>
+    </SplitPanesProvider>
+  );
 }
 
 export { ALICE, UNAUTHENTICATED_BOB, UNAUTHENTICATED_CAROL, renderApp };

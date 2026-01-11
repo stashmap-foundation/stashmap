@@ -25,10 +25,10 @@ import { DeleteWorkspace } from "./DeleteNode";
 
 export function PaneSearchButton(): JSX.Element {
   const [showSearch, setShowSearch] = useState(false);
-  const { push } = usePaneNavigation();
+  const { replace } = usePaneNavigation();
 
   const onSelectNode = (nodeID: LongID): void => {
-    push(nodeID);
+    replace(nodeID);
     setShowSearch(false);
   };
 

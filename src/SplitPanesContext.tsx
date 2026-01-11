@@ -102,6 +102,7 @@ type PaneNavigationContextType = {
   push: (nodeID: LongID | ID) => void;
   pop: () => void;
   popTo: (index: number) => void;
+  replace: (nodeID: LongID | ID) => void;
 };
 
 const PaneNavigationContext = createContext<
@@ -147,6 +148,11 @@ export function PaneNavigationProvider({
     });
   }, []);
 
+  const replace = useCallback((nodeID: LongID | ID): void => {
+    setStack([nodeID]);
+    setActiveWorkspace(nodeID);
+  }, []);
+
   // Compute the full stack including activeWorkspace
   const fullStack =
     stack[stack.length - 1] !== activeWorkspace
@@ -160,8 +166,9 @@ export function PaneNavigationProvider({
       push,
       pop,
       popTo,
+      replace,
     }),
-    [fullStack, activeWorkspace, push, pop, popTo]
+    [fullStack, activeWorkspace, push, pop, popTo, replace]
   );
 
   return (

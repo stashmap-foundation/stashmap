@@ -20,6 +20,7 @@ import {
   useNodeID,
   getViewFromPath,
   popViewPath,
+  getDefaultRelationForNode,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -39,7 +40,10 @@ import { planUpsertNode, usePlanner } from "../planner";
 import { ReactQuillWrapper } from "./ReactQuillWrapper";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeIcon } from "./NodeIcon";
-import { getRelationTypeByRelationsID } from "./RelationTypes";
+import {
+  getRelationTypeByRelationsID,
+  RELATION_TYPES,
+} from "./RelationTypes";
 import { LoadingSpinnerButton } from "../commons/LoadingSpinnerButton";
 import { useInputElementFocus } from "../commons/FocusContextProvider";
 import { CancelButton, NodeCard } from "../commons/Ui";
@@ -341,10 +345,30 @@ export function Indent({ levels }: { levels: number }): JSX.Element {
                 return undefined;
               }
               const viewForColor = getViewFromPath(data, pathForColor);
-              const [relationType] = viewForColor?.relations
-                ? getRelationTypeByRelationsID(data, viewForColor.relations)
-                : [undefined];
-              return relationType?.color || undefined;
+              // If view has a relation, use its color
+              if (viewForColor?.relations) {
+                const [relationType] = getRelationTypeByRelationsID(
+                  data,
+                  viewForColor.relations
+                );
+                return relationType?.color || undefined;
+              }
+              // Otherwise, get the default relation for this node
+              const [nodeID] = getNodeIDFromView(data, pathForColor);
+              const defaultRelationID = getDefaultRelationForNode(
+                nodeID,
+                data.knowledgeDBs,
+                data.user.publicKey
+              );
+              if (defaultRelationID) {
+                const [relationType] = getRelationTypeByRelationsID(
+                  data,
+                  defaultRelationID
+                );
+                return relationType?.color || undefined;
+              }
+              // Fallback to the default relation type color
+              return RELATION_TYPES.get("")?.color;
             })()
             : undefined;
 

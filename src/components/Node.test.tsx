@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { List, Map } from "immutable";
 import userEvent from "@testing-library/user-event";
 import { addRelationToRelations, newNode, shortID } from "../connections";
@@ -10,10 +10,13 @@ import {
   createExampleProject,
   findNodeByText,
   follow,
+  matchSplitText,
   planUpsertProjectNode,
+  renderApp,
   renderWithTestData,
   setup,
   setupTestDB,
+  typeNewNode,
 } from "../utils.test";
 import {
   NodeIndex,
@@ -24,7 +27,8 @@ import {
   getDiffItemsForNode,
   getLast,
 } from "../ViewContext";
-import { Column } from "./Column";
+import { TreeView } from "./TreeView";
+import { DraggableNote } from "./Draggable";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
 import {
   createPlan,
@@ -34,8 +38,6 @@ import {
   planUpsertRelations,
 } from "../planner";
 import { execute } from "../executor";
-import { DraggableNote } from "./Draggable";
-import { TreeView } from "./TreeView";
 import { getNodesInTree } from "./Node";
 import { LoadNode } from "../dataQuery";
 import { ROOT } from "../types";
@@ -62,7 +64,10 @@ test("Render non existing Node", async () => {
       <TemporaryViewProvider>
         <DND>
           <LoadNode>
-            <Column />
+            <>
+              <DraggableNote />
+              <TreeView />
+            </>
           </LoadNode>
         </DND>
       </TemporaryViewProvider>
@@ -85,7 +90,10 @@ test("Render Project", async () => {
       <TemporaryViewProvider>
         <DND>
           <LoadNode>
-            <Column />
+            <>
+              <DraggableNote />
+              <TreeView />
+            </>
           </LoadNode>
         </DND>
       </TemporaryViewProvider>
@@ -118,7 +126,10 @@ test("Edit node via Column Menu", async () => {
       <LoadNode>
         <TemporaryViewProvider>
           <DND>
-            <Column />
+            <>
+              <DraggableNote />
+              <TreeView />
+            </>
           </DND>
         </TemporaryViewProvider>
       </LoadNode>
@@ -147,7 +158,10 @@ test("Can't edit Projects", async () => {
       <LoadNode>
         <TemporaryViewProvider>
           <DND>
-            <Column />
+            <>
+              <DraggableNote />
+              <TreeView />
+            </>
           </DND>
         </TemporaryViewProvider>
       </LoadNode>
@@ -167,7 +181,10 @@ test("Load Note from other User which is not a contact", async () => {
       <LoadNode>
         <TemporaryViewProvider>
           <DND>
-            <Column />
+            <>
+              <DraggableNote />
+              <TreeView />
+            </>
           </DND>
         </TemporaryViewProvider>
       </LoadNode>
@@ -187,7 +204,10 @@ test("Cannot edit remote Note", async () => {
       <LoadNode>
         <TemporaryViewProvider>
           <DND>
-            <Column />
+            <>
+              <DraggableNote />
+              <TreeView />
+            </>
           </DND>
         </TemporaryViewProvider>
       </LoadNode>
@@ -320,7 +340,10 @@ test("Delete node", async () => {
       <TemporaryViewProvider>
         <DND>
           <LoadNode>
-            <Column />
+            <>
+              <DraggableNote />
+              <TreeView />
+            </>
           </LoadNode>
         </DND>
       </TemporaryViewProvider>
@@ -626,4 +649,49 @@ test("getDiffItemsForNode should return no diff items for not_relevant relation 
     aliceRelations.id
   );
   expect(diffItems.size).toBe(0);
+});
+
+test("Multiple connections to same node", async () => {
+  const [alice] = setup([ALICE]);
+  const java = newNode("Java", alice().user.publicKey);
+  await execute({
+    ...alice(),
+    plan: planUpsertNode(createPlan(alice()), java),
+  });
+
+  const view = renderApp(alice());
+  await typeNewNode(view, "Programming Languages");
+
+  const expandButton = await screen.findByLabelText(
+    "create relevant to for Programming Languages"
+  );
+  fireEvent.click(expandButton);
+
+  const searchButton = await screen.findByLabelText(
+    "search and attach to Programming Languages"
+  );
+  fireEvent.click(searchButton);
+
+  const searchInput = await screen.findByLabelText("search input");
+  await userEvent.type(searchInput, "Jav");
+  await userEvent.click(await screen.findByText(matchSplitText("Java")));
+
+  const searchButton2 = await screen.findByLabelText(
+    "search and attach to Programming Languages"
+  );
+  fireEvent.click(searchButton2);
+  const searchInput2 = await screen.findByLabelText("search input");
+  await userEvent.type(searchInput2, "Jav");
+  await waitFor(() => {
+    expect(screen.getAllByText(matchSplitText("Java"))).toHaveLength(2);
+  });
+  await userEvent.click(screen.getAllByText(matchSplitText("Java"))[1]);
+
+  const fullscreenButtons = await screen.findAllByLabelText("open fullscreen");
+  fireEvent.click(fullscreenButtons[0]);
+
+  expect(
+    (await screen.findByLabelText("related to Programming Languages"))
+      .textContent
+  ).toMatch(/Java(.*)Java/);
 });

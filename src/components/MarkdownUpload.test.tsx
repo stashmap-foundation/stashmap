@@ -11,8 +11,11 @@ import { execute } from "../executor";
 import { createPlan, planUpsertRelations } from "../planner";
 import { ALICE, renderWithTestData, setup, UpdateState } from "../utils.test";
 import { planCreateNodesFromMarkdown } from "./FileDropZone";
-import { Column } from "./Column";
+import { TreeView } from "./TreeView";
+import { DraggableNote } from "./Draggable";
 import { addRelationToRelations, joinID } from "../connections";
+import { DND } from "../dnd";
+import { TemporaryViewProvider } from "./TemporaryViewContext";
 import { LoadNode } from "../dataQuery";
 
 const TEST_FILE = `# Programming Languages
@@ -49,7 +52,12 @@ async function uploadAndRenderMarkdown(alice: UpdateState): Promise<void> {
       <LoadNode waitForEose>
         <PushNode push={List([0])}>
           <LoadNode>
-            <Column />
+            <TemporaryViewProvider>
+              <DND>
+                <DraggableNote />
+                <TreeView />
+              </DND>
+            </TemporaryViewProvider>
           </LoadNode>
         </PushNode>
       </LoadNode>
@@ -86,7 +94,12 @@ test("Delete Node uploaded from Markdown", async () => {
       <LoadNode waitForEose>
         <PushNode push={List([0])}>
           <LoadNode>
-            <Column />
+            <TemporaryViewProvider>
+              <DND>
+                <DraggableNote />
+                <TreeView />
+              </DND>
+            </TemporaryViewProvider>
           </LoadNode>
         </PushNode>
       </LoadNode>

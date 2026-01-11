@@ -13,7 +13,8 @@ import { TemporaryViewProvider } from "./TemporaryViewContext";
 import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
 import { execute } from "../executor";
 import { LoadNode } from "../dataQuery";
-import { Column } from "./Column";
+import { TreeView } from "./TreeView";
+import { DraggableNote } from "./Draggable";
 import { newDB } from "../knowledge";
 
 test("Shows dots when other user has a relation of same type", async () => {
@@ -57,7 +58,10 @@ test("Shows dots when other user has a relation of same type", async () => {
       <TemporaryViewProvider>
         <DND>
           <LoadNode>
-            <Column />
+            <>
+              <DraggableNote />
+              <TreeView />
+            </>
           </LoadNode>
         </DND>
       </TemporaryViewProvider>
@@ -93,7 +97,10 @@ test("Shows no dots when user is the only one with a relation", async () => {
       <TemporaryViewProvider>
         <DND>
           <LoadNode>
-            <Column />
+            <>
+              <DraggableNote />
+              <TreeView />
+            </>
           </LoadNode>
         </DND>
       </TemporaryViewProvider>
@@ -140,7 +147,10 @@ test("Shows dots when only other user has relation (current user has none)", asy
       <TemporaryViewProvider>
         <DND>
           <LoadNode>
-            <Column />
+            <>
+              <DraggableNote />
+              <TreeView />
+            </>
           </LoadNode>
         </DND>
       </TemporaryViewProvider>

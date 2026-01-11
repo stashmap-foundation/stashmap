@@ -20,7 +20,8 @@ import { execute } from "./executor";
 import { PaneSettingsMenu } from "./components/SplitPaneLayout";
 import { KIND_SETTINGS, KIND_VIEWS } from "./nostr";
 import { flattenRelays } from "./relays";
-import { WorkspaceColumnView } from "./components/WorkspaceColumn";
+import { TreeView } from "./components/TreeView";
+import { DraggableNote } from "./components/Draggable";
 import Data from "./Data";
 import { RootViewOrWorkspaceIsLoading } from "./components/Dashboard";
 
@@ -91,7 +92,10 @@ test("Write views on user relays", async () => {
   const utils = renderWithTestData(
     <Data user={alice().user}>
       <RootViewOrWorkspaceIsLoading>
-        <WorkspaceColumnView />
+        <>
+          <DraggableNote />
+          <TreeView />
+        </>
       </RootViewOrWorkspaceIsLoading>
     </Data>,
     {

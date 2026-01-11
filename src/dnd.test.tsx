@@ -1,12 +1,14 @@
 import React from "react";
 import { fireEvent, screen } from "@testing-library/react";
 import { Map, OrderedSet } from "immutable";
+import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   BOB,
   extractNodes,
   findNodeByText,
   renderWithTestData,
+  renderApp,
   setup,
   setupTestDB,
 } from "./utils.test";
@@ -23,46 +25,66 @@ import {
 } from "./planner";
 import { newDB } from "./knowledge";
 
-test("Dragging Source not available at Destination", async () => {
+test("Drag node within tree view", async () => {
   const [alice] = setup([ALICE]);
-  // Cryptocurrencies => Bitcoin
-  // Money
-  const executedPlan = await setupTestDB(alice(), [
-    ["Cryptocurrencies", ["Bitcoin"]],
-    ["Money"],
-  ]);
-  const btc = findNodeByText(executedPlan, "Bitcoin");
-  const money = findNodeByText(executedPlan, "Money");
-  const planWithWs = await setupTestDB(
-    alice(),
-    [["My Workspace", [btc as KnowNode, money as KnowNode]]],
-
-    { activeWorkspace: "My Workspace" }
-  );
-  renderWithTestData(
-    <RootViewOrWorkspaceIsLoading>
-      <WorkspaceView />
-    </RootViewOrWorkspaceIsLoading>,
-    {
-      ...alice(),
-      initialRoute: `/w/${planWithWs.activeWorkspace}`,
-    }
-  );
-
-  await screen.findByText("Bitcoin");
-  fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
-  screen.getByLabelText("hide references to Bitcoin");
-  const crypto = await screen.findByText("Cryptocurrencies");
-  const addToMoney = await screen.findByLabelText("add to Money");
-
-  fireEvent.dragStart(crypto);
-  fireEvent.drop(addToMoney);
-
-  expect(extractNodes(screen.getAllByTestId("ws-col")[1])).toEqual([
-    "Cryptocurrencies",
+  const db = await setupTestDB(alice(), [
+    ["My Workspace", ["Item A", "Item B", "Item C"]],
   ]);
 
-  fireEvent.click(screen.getByText("Money"));
+  const ws = findNodeByText(db, "My Workspace") as KnowNode;
+  renderApp({
+    ...alice(),
+    initialRoute: `/w/${ws.id}`,
+  });
+
+  await screen.findByText("Item A");
+  await screen.findByText("Item B");
+  await screen.findByText("Item C");
+
+  expect(extractNodes(document.body)).toEqual(["Item A", "Item B", "Item C"]);
+
+  // Drag Item C to before Item A
+  const itemC = screen.getByText("Item C");
+  const itemA = screen.getByText("Item A");
+
+  fireEvent.dragStart(itemC);
+  fireEvent.drop(itemA);
+
+  // Item C should now be first
+  expect(extractNodes(document.body)).toEqual(["Item C", "Item A", "Item B"]);
+});
+
+test("Drag between split panes", async () => {
+  const [alice] = setup([ALICE]);
+  const db = await setupTestDB(alice(), [
+    ["My Workspace", ["Item A", "Item B", "Draggable Item"]],
+  ]);
+
+  const workspace = findNodeByText(db, "My Workspace") as KnowNode;
+
+  renderApp({
+    ...alice(),
+    initialRoute: `/w/${workspace.id}`,
+  });
+
+  await screen.findByText("My Workspace");
+  await screen.findByText("Draggable Item");
+
+  await userEvent.click(screen.getByLabelText("Add pane"));
+
+  expect(document.querySelectorAll(".split-pane").length).toBe(2);
+
+  const addToMyNotes = await screen.findByLabelText("add to My Notes");
+
+  // Drag Draggable Item from pane 1 to ROOT in pane 2
+  const draggableItem = screen.getByText("Draggable Item");
+  fireEvent.dragStart(draggableItem);
+  fireEvent.drop(addToMyNotes);
+
+  // Verify the item was added to My Notes (ROOT)
+  // It should now appear twice - once in My Workspace and once in My Notes
+  const allDraggableItems = screen.getAllByText("Draggable Item");
+  expect(allDraggableItems.length).toBe(2);
 });
 
 test("Diff items are always added, never moved", () => {

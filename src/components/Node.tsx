@@ -382,13 +382,14 @@ export function getNodesInTree(
     data.user.publicKey,
     parentNodeID
   );
+  const addNodePath = addAddToNodeToPath(data, parentPath);
   if (!relations) {
-    return ctx;
+    // No relations yet, but still show the add button so users can add their first item
+    return ctx.push(addNodePath);
   }
   const childPaths = relations.items.map((_, i) =>
     addNodeToPath(data, parentPath, i)
   );
-  const addNodePath = addAddToNodeToPath(data, parentPath);
   const nodesInTree = childPaths.reduce(
     (nodesList: List<ViewPath>, childPath: ViewPath) => {
       const childView = getNodeIDFromView(data, childPath)[1];

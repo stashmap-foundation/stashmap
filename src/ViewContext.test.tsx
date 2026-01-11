@@ -439,7 +439,6 @@ test("Disconnect Nodes", async () => {
     initialRoute: `/w/${pl.id}`,
   });
   await screen.findByText("Programming Languages");
-  // Children are visible directly since we're at Programming Languages level
 
   // disconnect nodes from relevant moves nodes to not relevant
   fireEvent.click(await screen.findByLabelText("disconnect node Java"));

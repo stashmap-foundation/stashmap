@@ -104,12 +104,10 @@ test("Write views on user relays", async () => {
     }
   );
   utils.relayPool.resetPublishedOnRelays();
-  // Clicking on a relation button triggers a view write
   fireEvent.click(
     await screen.findByLabelText("create relevant to for My Notes")
   );
   await findEvent(utils.relayPool, { kinds: [KIND_VIEWS] });
-  // Views should be written to user relays (may also go to project relays)
   const publishedRelays = utils.relayPool.getPublishedOnRelays();
   TEST_RELAYS.forEach((relay) => {
     expect(publishedRelays).toContain(relay.url);

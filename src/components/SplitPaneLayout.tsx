@@ -58,7 +58,6 @@ export function ClosePaneButton(): JSX.Element | null {
   const paneIndex = usePaneIndex();
   const { createPlan, executePlan } = usePlanner();
 
-  // Don't show close button for first pane
   if (paneIndex === 0) {
     return null;
   }

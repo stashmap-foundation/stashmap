@@ -17,7 +17,6 @@ const SplitPanesContext = createContext<SplitPanesContextType | undefined>(
   undefined
 );
 
-// Context to track which pane we're currently in
 const PaneIndexContext = createContext<number>(0);
 
 function generatePaneId(): string {
@@ -44,7 +43,6 @@ export function SplitPanesProvider({
 
   const removePane = useCallback((paneId: string) => {
     setPanes((prev) => {
-      // Don't remove if it's the last pane
       if (prev.length <= 1) {
         return prev;
       }
@@ -155,7 +153,6 @@ export function PaneNavigationProvider({
     setActiveWorkspace(nodeID);
   }, []);
 
-  // Compute the full stack including activeWorkspace
   const fullStack =
     stack[stack.length - 1] !== activeWorkspace
       ? [...stack, activeWorkspace]
@@ -190,7 +187,6 @@ export function usePaneNavigation(): PaneNavigationContextType {
   return context;
 }
 
-// Alias for compatibility - components can use this instead of useNavigationStack
 export function usePaneStack(): (LongID | ID)[] {
   return usePaneNavigation().stack;
 }

@@ -44,7 +44,6 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
   );
 }
 
-// Version that accepts a stack as prop (for stacked layers)
 export function OpenInSplitPaneButtonWithStack({
   stack,
 }: {

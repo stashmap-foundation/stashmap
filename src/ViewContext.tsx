@@ -212,7 +212,6 @@ function getViewExactMatch(views: Views, path: ViewPath): View | undefined {
 
 function findIndexOfRelationType(types: RelationTypes, type: ID): number {
   const index = types.keySeq().findIndex((k) => k === type);
-  // Return a high number for unknown types so they sort to the end
   return index === -1 ? Number.MAX_SAFE_INTEGER : index;
 }
 
@@ -974,21 +973,17 @@ export function updateViewPathsAfterPaneDelete(
   views: Views,
   removedPaneIndex: number
 ): Views {
-  return (
-    views
-      // Delete all views for the removed pane
-      .filterNot((_, key) => key.startsWith(`p${removedPaneIndex}:`))
-      // Shift down pane indices for views with higher indices
-      .mapKeys((key) => {
-        const match = key.match(/^p(\d+):/);
-        if (!match) return key;
-        const paneIndex = parseInt(match[1], 10);
-        if (paneIndex > removedPaneIndex) {
-          return key.replace(/^p\d+:/, `p${paneIndex - 1}:`);
-        }
-        return key;
-      })
-  );
+  return views
+    .filterNot((_, key) => key.startsWith(`p${removedPaneIndex}:`))
+    .mapKeys((key) => {
+      const match = key.match(/^p(\d+):/);
+      if (!match) return key;
+      const paneIndex = parseInt(match[1], 10);
+      if (paneIndex > removedPaneIndex) {
+        return key.replace(/^p\d+:/, `p${paneIndex - 1}:`);
+      }
+      return key;
+    });
 }
 
 export function bulkUpdateViewPathsAfterAddRelation(

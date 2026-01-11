@@ -82,61 +82,6 @@ export function ClosePaneButton(): JSX.Element | null {
     </button>
   );
 }
-
-/**
- * Smart button that either:
- * - Pops from stack if there are items on the stack
- * - Closes the pane if at root (only for panes > 0)
- * - Returns null for first pane at root
- */
-export function BackOrCloseButton(): JSX.Element | null {
-  const { removePane, panes } = useSplitPanes();
-  const paneIndex = usePaneIndex();
-  const { stack, pop } = usePaneNavigation();
-  const { createPlan, executePlan } = usePlanner();
-
-  const hasStack = stack.length > 1;
-
-  // If there's a stack, show back button
-  if (hasStack) {
-    return (
-      <button
-        type="button"
-        className="btn btn-borderless p-0"
-        onClick={pop}
-        aria-label="Go back"
-        title="Go back"
-      >
-        <span className="btn-close small" />
-      </button>
-    );
-  }
-
-  // At root - show close pane button only for panes > 0
-  if (paneIndex === 0) {
-    return null;
-  }
-
-  const handleRemovePane = (): void => {
-    const plan = createPlan();
-    const updatedViews = updateViewPathsAfterPaneDelete(plan.views, paneIndex);
-    executePlan(planUpdateViews(plan, updatedViews));
-    removePane(panes[paneIndex].id);
-  };
-
-  return (
-    <button
-      type="button"
-      className="btn btn-borderless p-0"
-      onClick={handleRemovePane}
-      aria-label="Close pane"
-      title="Close pane"
-    >
-      <span className="btn-close small" />
-    </button>
-  );
-}
-
 export function PaneSettingsMenu(): JSX.Element {
   const navigate = useNavigate();
   const logout = useLogout();

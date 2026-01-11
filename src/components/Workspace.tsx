@@ -11,7 +11,7 @@ import { Node } from "./Node";
 import { TreeView } from "./TreeView";
 import {
   OpenInSplitPaneButton,
-  OpenInSplitPaneButtonWithNodeID,
+  OpenInSplitPaneButtonWithStack,
 } from "./OpenInSplitPaneButton";
 import {
   PaneSearchButton,
@@ -22,11 +22,13 @@ import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 
 function StackedLayer({
   workspaceID,
+  stackUpToHere,
   onClick,
   showPaneControls,
   showFirstPaneControls,
 }: {
   workspaceID: LongID;
+  stackUpToHere: (LongID | ID)[];
   onClick: () => void;
   showPaneControls?: boolean;
   showFirstPaneControls?: boolean;
@@ -71,7 +73,7 @@ function StackedLayer({
           )}
           {showPaneControls && <ClosePaneButton />}
           {showPaneControls && <PaneSearchButton />}
-          <OpenInSplitPaneButtonWithNodeID nodeID={workspaceID} />
+          <OpenInSplitPaneButtonWithStack stack={stackUpToHere} />
         </span>
       </div>
     </div>
@@ -104,6 +106,7 @@ export function WorkspaceView(): JSX.Element | null {
               <StackedLayer
                 key={stackedWorkspaceID as string}
                 workspaceID={stackedWorkspaceID as LongID}
+                stackUpToHere={stack.slice(0, index + 1)}
                 onClick={() => popTo(index)}
                 showPaneControls={index === 0}
                 showFirstPaneControls={index === 0 && paneIndex === 0}

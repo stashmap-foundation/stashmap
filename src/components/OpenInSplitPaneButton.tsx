@@ -1,11 +1,16 @@
 import React from "react";
-import { useIsAddToNode, useNodeID } from "../ViewContext";
-import { useSplitPanes, usePaneIndex } from "../SplitPanesContext";
+import { useIsAddToNode, useViewPath } from "../ViewContext";
+import {
+  useSplitPanes,
+  usePaneIndex,
+  usePaneNavigation,
+} from "../SplitPanesContext";
 
 export function OpenInSplitPaneButton(): JSX.Element | null {
   const { addPaneAt } = useSplitPanes();
   const paneIndex = usePaneIndex();
-  const [nodeID] = useNodeID();
+  const { stack } = usePaneNavigation();
+  const viewPath = useViewPath();
   const isAddToNode = useIsAddToNode();
 
   if (isAddToNode) {
@@ -13,7 +18,14 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
   }
 
   const onClick = (): void => {
-    addPaneAt(paneIndex + 1, nodeID);
+    // Build the full path: pane navigation stack (without last element, which is the workspace root)
+    // + all node IDs from the ViewPath (skip pane index at position 0)
+    const paneStackWithoutWorkspace = stack.slice(0, -1);
+    const viewPathNodeIDs = viewPath
+      .slice(1)
+      .map((subPath) => (subPath as { nodeID: LongID | ID }).nodeID);
+    const fullStack = [...paneStackWithoutWorkspace, ...viewPathNodeIDs];
+    addPaneAt(paneIndex + 1, fullStack);
   };
 
   return (
@@ -29,17 +41,17 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
   );
 }
 
-// Version that accepts nodeID as prop (for stacked layers)
-export function OpenInSplitPaneButtonWithNodeID({
-  nodeID,
+// Version that accepts a stack as prop (for stacked layers)
+export function OpenInSplitPaneButtonWithStack({
+  stack,
 }: {
-  nodeID: LongID | ID;
+  stack: (LongID | ID)[];
 }): JSX.Element {
   const { addPaneAt } = useSplitPanes();
   const paneIndex = usePaneIndex();
 
   const onClick = (): void => {
-    addPaneAt(paneIndex + 1, nodeID);
+    addPaneAt(paneIndex + 1, stack);
   };
 
   return (

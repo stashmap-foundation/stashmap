@@ -272,3 +272,32 @@ export function LoadNode({
     </RegisterQuery>
   );
 }
+
+export function LoadStackNodes({
+  children,
+  nodeIDs,
+}: {
+  children: React.ReactNode;
+  nodeIDs: (LongID | ID)[];
+}): JSX.Element {
+  const { user, contacts, projectMembers } = useData();
+
+  const filter = nodeIDs.reduce(
+    (acc, nodeID) => addNodeToFilters(acc, nodeID),
+    createBaseFilter(contacts, projectMembers, user.publicKey)
+  );
+  const filterArray = filtersToFilterArray(filter);
+  const { knowledgeDBs, allEventsProcessed } =
+    useQueryKnowledgeData(filterArray);
+
+  return (
+    <RegisterQuery
+      nodesBeeingQueried={extractNodesFromQueries(filterArray)}
+      allEventsProcessed={allEventsProcessed}
+    >
+      <MergeKnowledgeDB knowledgeDBs={knowledgeDBs}>
+        {children}
+      </MergeKnowledgeDB>
+    </RegisterQuery>
+  );
+}

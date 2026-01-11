@@ -3,13 +3,13 @@ import { ROOT } from "./types";
 
 export type Pane = {
   id: string;
-  initialNode?: LongID | ID;
+  initialStack?: (LongID | ID)[];
 };
 
 type SplitPanesContextType = {
   panes: Pane[];
   addPane: () => void;
-  addPaneAt: (index: number, nodeID: LongID | ID) => void;
+  addPaneAt: (index: number, stack: (LongID | ID)[]) => void;
   removePane: (paneId: string) => void;
 };
 
@@ -35,9 +35,9 @@ export function SplitPanesProvider({
     setPanes((prev) => [...prev, { id: generatePaneId() }]);
   }, []);
 
-  const addPaneAt = useCallback((index: number, nodeID: LongID | ID) => {
+  const addPaneAt = useCallback((index: number, stack: (LongID | ID)[]) => {
     setPanes((prev) => {
-      const newPane = { id: generatePaneId(), initialNode: nodeID };
+      const newPane = { id: generatePaneId(), initialStack: stack };
       return [...prev.slice(0, index), newPane, ...prev.slice(index)];
     });
   }, []);
@@ -112,13 +112,15 @@ const PaneNavigationContext = createContext<
 export function PaneNavigationProvider({
   children,
   initialWorkspace,
+  initialStack,
 }: {
   children: React.ReactNode;
   initialWorkspace: LongID | ID;
+  initialStack?: (LongID | ID)[];
 }): JSX.Element {
-  const [stack, setStack] = useState<(LongID | ID)[]>([ROOT]);
+  const [stack, setStack] = useState<(LongID | ID)[]>(initialStack || [ROOT]);
   const [activeWorkspace, setActiveWorkspace] = useState<LongID | ID>(
-    initialWorkspace
+    initialStack ? initialStack[initialStack.length - 1] : initialWorkspace
   );
 
   const push = useCallback((nodeID: LongID | ID): void => {

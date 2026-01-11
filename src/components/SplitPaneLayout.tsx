@@ -13,7 +13,7 @@ import {
   RootViewContextProvider,
   updateViewPathsAfterPaneDelete,
 } from "../ViewContext";
-import { LoadNode } from "../dataQuery";
+import { LoadNode, LoadStackNodes } from "../dataQuery";
 import { WorkspaceView } from "./Workspace";
 import { useWorkspaceContext } from "../WorkspaceContext";
 import { planPublishSettings, planUpdateViews, usePlanner } from "../planner";
@@ -175,19 +175,21 @@ export function PaneSettingsMenu(): JSX.Element {
 }
 
 function PaneContent(): JSX.Element {
-  const { activeWorkspace } = usePaneNavigation();
+  const { activeWorkspace, stack } = usePaneNavigation();
   const paneIndex = usePaneIndex();
 
   return (
     <div className="split-pane">
-      <RootViewContextProvider
-        root={activeWorkspace as LongID}
-        paneIndex={paneIndex}
-      >
-        <LoadNode>
-          <WorkspaceView />
-        </LoadNode>
-      </RootViewContextProvider>
+      <LoadStackNodes nodeIDs={stack}>
+        <RootViewContextProvider
+          root={activeWorkspace as LongID}
+          paneIndex={paneIndex}
+        >
+          <LoadNode>
+            <WorkspaceView />
+          </LoadNode>
+        </RootViewContextProvider>
+      </LoadStackNodes>
     </div>
   );
 }
@@ -201,13 +203,15 @@ function PaneWrapper({
 }): JSX.Element {
   const { activeWorkspace } = useWorkspaceContext();
   // First pane respects URL/localStorage workspace
-  // Additional panes use initialNode if set, otherwise ROOT
-  const initialWorkspace =
-    index === 0 ? activeWorkspace : pane.initialNode || ROOT;
+  // Additional panes use initialStack if set
+  const initialWorkspace = index === 0 ? activeWorkspace : ROOT;
 
   return (
     <PaneIndexProvider index={index}>
-      <PaneNavigationProvider initialWorkspace={initialWorkspace}>
+      <PaneNavigationProvider
+        initialWorkspace={initialWorkspace}
+        initialStack={pane.initialStack}
+      >
         <PaneContent />
       </PaneNavigationProvider>
     </PaneIndexProvider>

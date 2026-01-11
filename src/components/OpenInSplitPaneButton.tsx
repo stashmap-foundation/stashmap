@@ -1,10 +1,12 @@
 import React from "react";
+import { useMediaQuery } from "react-responsive";
 import { useIsAddToNode, useViewPath } from "../ViewContext";
 import {
   useSplitPanes,
   usePaneIndex,
   usePaneNavigation,
 } from "../SplitPanesContext";
+import { IS_MOBILE } from "./responsive";
 
 export function OpenInSplitPaneButton(): JSX.Element | null {
   const { addPaneAt } = useSplitPanes();
@@ -12,8 +14,9 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
   const { stack } = usePaneNavigation();
   const viewPath = useViewPath();
   const isAddToNode = useIsAddToNode();
+  const isMobile = useMediaQuery(IS_MOBILE);
 
-  if (isAddToNode) {
+  if (isAddToNode || isMobile) {
     return null;
   }
 
@@ -46,9 +49,14 @@ export function OpenInSplitPaneButtonWithStack({
   stack,
 }: {
   stack: (LongID | ID)[];
-}): JSX.Element {
+}): JSX.Element | null {
   const { addPaneAt } = useSplitPanes();
   const paneIndex = usePaneIndex();
+  const isMobile = useMediaQuery(IS_MOBILE);
+
+  if (isMobile) {
+    return null;
+  }
 
   const onClick = (): void => {
     addPaneAt(paneIndex + 1, stack);

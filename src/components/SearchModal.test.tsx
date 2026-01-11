@@ -63,7 +63,11 @@ test("Search works like spotlight", async () => {
   expect(screen.queryByLabelText("search input")).toBeNull();
   await screen.findAllByText("My very first topic");
 
-  // Pressing down and enter adds second search result to Note
+  // Navigate to "My very first topic" to add children to it
+  const fullscreenButtons = await screen.findAllByLabelText("open fullscreen");
+  fireEvent.click(fullscreenButtons[0]); // Click fullscreen for the topic
+
+  // Now "My very first topic" is the workspace, find its add button
   const searchButtons = await screen.findAllByLabelText(
     "search and attach to My very first topic"
   );
@@ -82,6 +86,10 @@ test("Search works like spotlight", async () => {
   expect(screen.queryByLabelText("search input")).toBeNull();
   await screen.findByText("My second search note ever made");
 
+  // Navigate back to ROOT by clicking on the stacked layer
+  const stackedLayer = await screen.findByText("My Notes");
+  fireEvent.click(stackedLayer);
+
   const allSearchButtons = await screen.findByLabelText(
     "search and attach to My Notes"
   );
@@ -93,26 +101,6 @@ test("Search works like spotlight", async () => {
   expect(screen.queryByText("My first search note made")).toBeNull();
   await userEvent.type(searchInputField, "{escape}");
   expect(screen.queryByPlaceholderText("Search")).toBeNull();
-});
-
-test("Search starts with press on slash key", async () => {
-  const [alice] = setup([ALICE]);
-  await execute({
-    ...alice(),
-    plan: planUpsertNode(
-      createPlan(alice()),
-      newNode("My source", alice().user.publicKey)
-    ),
-  });
-  renderApp({ ...alice(), includeFocusContext: true });
-  await userEvent.type(await screen.findByText("My Notes"), "/");
-  screen.getByPlaceholderText("Search");
-  const searchInput = await screen.findByLabelText("search input");
-  await userEvent.type(searchInput, "My s");
-  const text = await screen.findByText(matchSplitText("My source"));
-  await userEvent.click(text);
-  expect(screen.queryByPlaceholderText("Search")).toBeNull();
-  await screen.findByText("My source");
 });
 
 test("Results from relays with nip-50 support will be shown unfiltered", async () => {

@@ -64,7 +64,14 @@ test("Link Nodes from other Users", async () => {
   });
   const view = renderApp({ ...alice(), includeFocusContext: true });
   await typeNewNode(view, "Programming Languages");
-  const searchButton = screen.getByLabelText(
+
+  // Expand "Programming Languages" by clicking its relation button
+  const expandButton = await screen.findByLabelText(
+    "create relevant to for Programming Languages"
+  );
+  fireEvent.click(expandButton);
+
+  const searchButton = await screen.findByLabelText(
     "search and attach to Programming Languages"
   );
   fireEvent.click(searchButton);
@@ -102,13 +109,20 @@ test("Default Relations are shown when adding a node from other User via search"
   });
 
   renderApp({ ...alice(), includeFocusContext: true });
-  await userEvent.type(await screen.findByText("My Notes"), "/");
-  screen.getByPlaceholderText("Search");
+
+  // Click search button to open search
+  const searchButton = await screen.findByLabelText("search and attach to My Notes");
+  fireEvent.click(searchButton);
   const searchInput = await screen.findByLabelText("search input");
   await userEvent.type(searchInput, "Object");
   fireEvent.click(
     await screen.findByText(matchSplitText("Object Oriented Languages"))
   );
+
+  // Open the added node in fullscreen to see its relations
+  const fullscreenButtons = await screen.findAllByLabelText("open fullscreen");
+  fireEvent.click(fullscreenButtons[0]);
+
   await screen.findByLabelText(
     "show items relevant for Object Oriented Languages"
   );

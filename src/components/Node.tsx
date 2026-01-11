@@ -382,11 +382,12 @@ export function getNodesInTree(
     data.user.publicKey,
     parentNodeID
   );
-  const addNodePath = addAddToNodeToPath(data, parentPath);
+
   if (!relations) {
-    // No relations yet, but still show the add button so users can add their first item
+    const addNodePath = addAddToNodeToPath(data, parentPath);
     return ctx.push(addNodePath);
   }
+
   const childPaths = relations.items.map((_, i) =>
     addNodeToPath(data, parentPath, i)
   );
@@ -414,23 +415,18 @@ export function getNodesInTree(
     relations.id
   );
 
-  // Root has getLevels = 1 (path is [pane, root])
-  const isRoot = getLevels(parentPath) === 1;
-
-  // Add diff items at the parent level (after regular items, before Add Note)
-  // Always add them - useIsDiffItem() will handle the rendering
   const withDiffItems =
-    diffItems.size > 0 && !isRoot
+    diffItems.size > 0
       ? diffItems.reduce(
-        (list, diffItem, idx) =>
-          list.push(
-            addDiffItemToPath(data, parentPath, diffItem.nodeID, idx)
-          ),
-        nodesInTree
-      )
+          (list, diffItem, idx) =>
+            list.push(
+              addDiffItemToPath(data, parentPath, diffItem.nodeID, idx)
+            ),
+          nodesInTree
+        )
       : nodesInTree;
 
-  // Add inline "Add Note" for all nodes including root
+  const addNodePath = addAddToNodeToPath(data, parentPath);
   return withDiffItems.push(addNodePath);
 }
 

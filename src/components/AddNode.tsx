@@ -54,7 +54,8 @@ function AddNodeButton({
 }
 
 function SearchButton({ onClick }: { onClick: () => void }): JSX.Element {
-  const [node] = useNode();
+  const isAddToNode = useIsAddToNode();
+  const [node] = isAddToNode ? useParentNode() : useNode();
   const ariaLabel = node ? `search and attach to ${node.text}` : "search";
   return (
     <button
@@ -302,7 +303,7 @@ export function AddNodeToNode(): JSX.Element | null {
       onCreateNewNode={onCreateNewNode}
       onAddExistingNode={(id) => onAddNode(createPlan(), id)}
       ariaLabel={`add to ${shorten(node.text)}`}
-      isSearchEnabledByShortcut={!isAddToNode}
+      isSearchEnabledByShortcut={false}
     />
   );
 }

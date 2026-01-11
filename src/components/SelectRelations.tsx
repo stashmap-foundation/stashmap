@@ -264,7 +264,7 @@ function GhostRelationButton({
       color={relationType.color}
       label={relationType.label}
       onClick={onClick}
-      ariaLabel={`create ${relationType.label || "relation"}`}
+      ariaLabel={`create ${relationType.label || "relation"} for ${node?.text || "node"}`}
       id={relationTypeID}
       showVertical={showVertical}
       addGroupSpacing={addGroupSpacing}

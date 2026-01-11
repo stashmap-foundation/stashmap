@@ -293,6 +293,11 @@ export function getNodeFromID(
   const db = knowledgeDBs.get(remote || myself, newDB());
   const node = db.nodes.get(knowID);
   if (!node && remote === undefined) {
+    // Check for special local nodes like ROOT that aren't stored in events
+    const defaultNode = newDB().nodes.get(knowID);
+    if (defaultNode) {
+      return defaultNode;
+    }
     return getNodeFromAnyDB(knowledgeDBs, knowID);
   }
   return node;

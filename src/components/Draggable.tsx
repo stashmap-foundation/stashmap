@@ -15,7 +15,6 @@ import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable } from "./DroppableContainer";
 import { ToggleEditing, useIsEditingOn } from "./TemporaryViewContext";
 import { RemoveColumnButton } from "./RemoveColumnButton";
-import { ChangeColumnWidth } from "./ChangeColumnWidth";
 import { DisconnectNodeBtn } from "./DisconnectBtn";
 import { JoinProjectButton } from "../JoinProjext";
 import { FullscreenButton } from "./FullscreenButton";
@@ -66,7 +65,6 @@ export function DraggableNote(): JSX.Element {
       <Draggable ref={ref} />
       <div className="on-hover-menu right">
         <ToggleEditing />
-        <ChangeColumnWidth />
         <JoinProjectButton />
         <span className="always-visible">
           <RemoveColumnButton />

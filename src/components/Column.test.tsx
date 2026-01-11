@@ -33,7 +33,14 @@ test("Multiple connections to same node", async () => {
 
   const view = renderApp(alice());
   await typeNewNode(view, "Programming Languages");
-  const searchButton = screen.getByLabelText(
+
+  // Expand "Programming Languages" by clicking its relation button
+  const expandButton = await screen.findByLabelText(
+    "create relevant to for Programming Languages"
+  );
+  fireEvent.click(expandButton);
+
+  const searchButton = await screen.findByLabelText(
     "search and attach to Programming Languages"
   );
   fireEvent.click(searchButton);
@@ -42,7 +49,10 @@ test("Multiple connections to same node", async () => {
   await userEvent.type(searchInput, "Jav");
   await userEvent.click(await screen.findByText(matchSplitText("Java")));
 
-  fireEvent.click(searchButton);
+  const searchButton2 = await screen.findByLabelText(
+    "search and attach to Programming Languages"
+  );
+  fireEvent.click(searchButton2);
   const searchInput2 = await screen.findByLabelText("search input");
   await userEvent.type(searchInput2, "Jav");
   await waitFor(() => {
@@ -50,31 +60,14 @@ test("Multiple connections to same node", async () => {
   });
   await userEvent.click(screen.getAllByText(matchSplitText("Java"))[1]);
 
+  // Navigate to "Programming Languages" to see its TreeView
+  const fullscreenButtons = await screen.findAllByLabelText("open fullscreen");
+  fireEvent.click(fullscreenButtons[0]);
+
   expect(
     (await screen.findByLabelText("related to Programming Languages"))
       .textContent
   ).toMatch(/Java(.*)Java/);
-});
-
-test("Change Column width", async () => {
-  const [alice] = setup([ALICE]);
-  const view = renderWithTestData(
-    <Data user={alice().user}>
-      <RootViewOrWorkspaceIsLoading>
-        <WorkspaceView />
-      </RootViewOrWorkspaceIsLoading>
-    </Data>
-  );
-  await typeNewNode(view, "Hello World");
-  expect(screen.queryByLabelText("decrease width")).toBeNull();
-  await userEvent.click(
-    await screen.findByLabelText("increase width of Hello World")
-  );
-  // I can decrease once
-  await userEvent.click(
-    await screen.findByLabelText("decrease width of Hello World")
-  );
-  expect(screen.queryByLabelText("decrease width of Hello World")).toBeNull();
 });
 
 test("Show Referenced By", async () => {

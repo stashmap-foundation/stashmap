@@ -18,7 +18,7 @@ import {
 } from "./utils.test";
 import { createPlan, planPublishRelayMetadata } from "./planner";
 import { execute } from "./executor";
-import { NavbarControls } from "./components/NavbarControls";
+import { PaneSettingsMenu } from "./components/SplitPaneLayout";
 import { KIND_SETTINGS, KIND_VIEWS } from "./nostr";
 import { flattenRelays } from "./relays";
 import { WorkspaceColumnView } from "./components/WorkspaceColumn";
@@ -76,7 +76,7 @@ async function setupTest(): Promise<{
 
 test("Write Settings on user relays", async () => {
   const { alice, project } = await setupTest();
-  const utils = renderWithTestData(<NavbarControls />, {
+  const utils = renderWithTestData(<PaneSettingsMenu />, {
     ...alice(),
     initialRoute: `/?project=${project.id}`,
   });

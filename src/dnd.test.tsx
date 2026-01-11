@@ -70,7 +70,9 @@ test("Drag between split panes", async () => {
   await screen.findByText("My Workspace");
   await screen.findByText("Draggable Item");
 
-  await userEvent.click(screen.getByLabelText("Add pane"));
+  // Click the first "open in split pane" button (on the workspace header)
+  const splitPaneButtons = screen.getAllByLabelText("open in split pane");
+  await userEvent.click(splitPaneButtons[0]);
 
   expect(document.querySelectorAll(".split-pane").length).toBe(2);
 

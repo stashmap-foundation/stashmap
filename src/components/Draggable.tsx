@@ -18,6 +18,7 @@ import { RemoveColumnButton } from "./RemoveColumnButton";
 import { DisconnectNodeBtn } from "./DisconnectBtn";
 import { JoinProjectButton } from "../JoinProjext";
 import { FullscreenButton } from "./FullscreenButton";
+import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 import { addRelationToRelations, shortID } from "../connections";
 import { useData } from "../DataContext";
 import { usePlanner, planUpsertRelations } from "../planner";
@@ -69,6 +70,7 @@ export function DraggableNote(): JSX.Element {
         <span className="always-visible">
           <RemoveColumnButton />
           <FullscreenButton />
+          <OpenInSplitPaneButton />
         </span>
       </div>
     </div>
@@ -155,6 +157,7 @@ function DiffItemActions(): JSX.Element {
         <AcceptDiffItemButton />
         <DeclineDiffItemButton />
         <FullscreenButton />
+        <OpenInSplitPaneButton />
       </span>
     </div>
   );
@@ -228,6 +231,7 @@ export function ListItem({
         <span className="always-visible">
           <DisconnectNodeBtn />
           <FullscreenButton />
+          <OpenInSplitPaneButton />
         </span>
       </div>
     </div>

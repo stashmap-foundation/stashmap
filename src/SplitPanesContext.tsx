@@ -3,11 +3,13 @@ import { ROOT } from "./types";
 
 export type Pane = {
   id: string;
+  initialNode?: LongID | ID;
 };
 
 type SplitPanesContextType = {
   panes: Pane[];
   addPane: () => void;
+  addPaneAt: (index: number, nodeID: LongID | ID) => void;
   removePane: (paneId: string) => void;
 };
 
@@ -35,6 +37,15 @@ export function SplitPanesProvider({
     setPanes((prev) => [...prev, { id: generatePaneId() }]);
   }, []);
 
+  const addPaneAt = useCallback((index: number, nodeID: LongID | ID) => {
+    setPanes((prev) => {
+      const newPane = { id: generatePaneId(), initialNode: nodeID };
+      const newPanes = [...prev];
+      newPanes.splice(index, 0, newPane);
+      return newPanes;
+    });
+  }, []);
+
   const removePane = useCallback((paneId: string) => {
     setPanes((prev) => {
       // Don't remove if it's the last pane
@@ -49,9 +60,10 @@ export function SplitPanesProvider({
     () => ({
       panes,
       addPane,
+      addPaneAt,
       removePane,
     }),
-    [panes, addPane, removePane]
+    [panes, addPane, addPaneAt, removePane]
   );
 
   return (

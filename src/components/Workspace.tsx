@@ -10,13 +10,25 @@ import { getRelationTypeByRelationsID } from "./RelationTypes";
 import { Node } from "./Node";
 import { TreeView } from "./TreeView";
 import { getRelations } from "../connections";
+import { OpenInSplitPaneButton, OpenInSplitPaneButtonWithNodeID } from "./OpenInSplitPaneButton";
+import { FullscreenButton } from "./FullscreenButton";
+import {
+  PaneSearchButton,
+  PaneSettingsMenu,
+  ClosePaneButton,
+} from "./SplitPaneLayout";
+import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 
 function StackedLayer({
   workspaceID,
   onClick,
+  showPaneControls,
+  showFirstPaneControls,
 }: {
   workspaceID: LongID;
   onClick: () => void;
+  showPaneControls?: boolean;
+  showFirstPaneControls?: boolean;
 }): JSX.Element {
   const { knowledgeDBs, user } = useData();
   const workspaceNode = getNodeFromID(
@@ -26,20 +38,40 @@ function StackedLayer({
   );
 
   return (
-    <div
-      className="stacked-layer"
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-      role="button"
-      tabIndex={0}
-    >
-      <div className="stacked-layer-title">
-        {workspaceNode?.text || "Loading..."}
+    <div className="stacked-layer visible-on-hover">
+      <div
+        className="stacked-layer-clickable"
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        role="button"
+        tabIndex={0}
+      >
+        <div className="stacked-layer-title">
+          {workspaceNode?.text || "Loading..."}
+        </div>
+      </div>
+      <div
+        className="on-hover-menu right"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        role="presentation"
+      >
+        <span className="always-visible">
+          {showFirstPaneControls && (
+            <>
+              <PublishingStatusWrapper />
+              <PaneSettingsMenu />
+            </>
+          )}
+          {showPaneControls && <ClosePaneButton />}
+          {showPaneControls && <PaneSearchButton />}
+          <OpenInSplitPaneButtonWithNodeID nodeID={workspaceID} />
+        </span>
       </div>
     </div>
   );
@@ -49,6 +81,7 @@ export function WorkspaceView(): JSX.Element | null {
   const [workspaceID, view] = useNodeID();
   const data = useData();
   const { stack, popTo } = usePaneNavigation();
+  const paneIndex = usePaneIndex();
 
   // Get relation color
   const [relationType] = view.relations
@@ -58,6 +91,7 @@ export function WorkspaceView(): JSX.Element | null {
 
   // Get stacked workspaces (all except the last one which is active)
   const stackedWorkspaces = stack.slice(0, -1);
+  const hasStack = stackedWorkspaces.length > 0;
 
   return (
     <TemporaryViewProvider>
@@ -70,16 +104,31 @@ export function WorkspaceView(): JSX.Element | null {
                 key={stackedWorkspaceID as string}
                 workspaceID={stackedWorkspaceID as LongID}
                 onClick={() => popTo(index)}
+                showPaneControls={index === 0}
+                showFirstPaneControls={index === 0 && paneIndex === 0}
               />
             ))}
 
             {/* Render active fullscreen card */}
             <div className="fullscreen-card">
-              <div className="fullscreen-card-header">
+              <div className="fullscreen-card-header visible-on-hover">
                 <Node
                   className="border-0"
                   cardBodyClassName="pb-0 pt-8 ps-0 fullscreen-card-title"
                 />
+                <div className="on-hover-menu right">
+                  <span className="always-visible">
+                    {!hasStack && paneIndex === 0 && (
+                      <>
+                        <PublishingStatusWrapper />
+                        <PaneSettingsMenu />
+                      </>
+                    )}
+                    {!hasStack && <ClosePaneButton />}
+                    {!hasStack && <PaneSearchButton />}
+                    <OpenInSplitPaneButton />
+                  </span>
+                </div>
               </div>
               <div
                 className="fullscreen-card-body overflow-y-auto"

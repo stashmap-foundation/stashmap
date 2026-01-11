@@ -1,0 +1,6 @@
+Search Bar
+ - Drag into search bar
+
+- When running out of space, split panes should be scrollable
+- Fix Menu
+- Fix: Use "/" to open seearch ina  new pane

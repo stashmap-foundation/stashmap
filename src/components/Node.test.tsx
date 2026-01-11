@@ -22,6 +22,7 @@ import {
   newRelations,
   viewPathToString,
   getDiffItemsForNode,
+  getLast,
 } from "../ViewContext";
 import { Column } from "./Column";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
@@ -405,7 +406,7 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
   };
 
   const nodes = getNodesInTree(data, parentPath, List());
-  const nodeIDs = nodes.map((path) => path[path.length - 1].nodeID).toArray();
+  const nodeIDs = nodes.map((path) => getLast(path).nodeID).toArray();
 
   expect(nodeIDs).toContain(child.id);
   expect(nodeIDs).toContain(aliceGrandchild.id);
@@ -574,17 +575,19 @@ test("Diff item paths are correctly identified as diff items", () => {
   expect(nodes.size).toBeGreaterThanOrEqual(3);
 
   const diffItemPath = nodes.find(
-    (path) => path[path.length - 1].nodeID === bobChild.id
+    (path) => getLast(path).nodeID === bobChild.id
   );
   expect(diffItemPath).toBeDefined();
-  expect(diffItemPath?.[diffItemPath.length - 1].isDiffItem).toBe(true);
+  expect(diffItemPath ? getLast(diffItemPath).isDiffItem : undefined).toBe(
+    true
+  );
 
   const aliceChildPath = nodes.find(
-    (path) => path[path.length - 1].nodeID === aliceChild.id
+    (path) => getLast(path).nodeID === aliceChild.id
   );
   expect(aliceChildPath).toBeDefined();
   expect(
-    aliceChildPath?.[aliceChildPath.length - 1].isDiffItem
+    aliceChildPath ? getLast(aliceChildPath).isDiffItem : undefined
   ).toBeUndefined();
 });
 

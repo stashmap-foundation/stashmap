@@ -31,9 +31,8 @@ import {
   useQueryKnowledgeData,
 } from "../dataQuery";
 import { RegisterQuery } from "../LoadingStatus";
-import { getRelations, shortID } from "../connections";
+import { shortID } from "../connections";
 import { useApis } from "../Apis";
-import { usePaneIndex } from "../SplitPanesContext";
 
 const LOAD_EXTRA = 10;
 
@@ -178,32 +177,8 @@ function Tree(): JSX.Element | null {
     endIndex: startIndexFromStorage,
   });
   const viewPath = useViewPath();
-  const paneIndex = usePaneIndex();
   const nodes = getNodesInTree(data, viewPath, List<ViewPath>());
-  const [node, view] = useNode();
-
-  // Debug logging for pane 2
-  if (paneIndex === 2) {
-    const nodeID = getLast(viewPath).nodeID;
-    const relations = getRelations(
-      data.knowledgeDBs,
-      view?.relations,
-      data.user.publicKey,
-      nodeID
-    );
-    /* eslint-disable no-console */
-    console.log("=== TreeView Debug (Pane 2) ===");
-    console.log("viewPath:", viewPath);
-    console.log("nodeID:", nodeID);
-    console.log("node text:", node?.text);
-    console.log("view:", view);
-    console.log("view.relations (ID):", view?.relations);
-    console.log("relations object:", relations);
-    console.log("relations type:", relations?.type);
-    console.log("relations items:", relations?.items?.toJS());
-    console.log("nodes in tree:", nodes.size);
-    /* eslint-enable no-console */
-  }
+  const [node] = useNode();
   const ariaLabel = node ? `related to ${node.text}` : undefined;
 
   const onStopScrolling = (isScrolling: boolean): void => {

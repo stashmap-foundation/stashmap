@@ -45,7 +45,10 @@ function RootViewOrWorkspaceIsLoadingInner({
   const paneIndex = usePaneIndex();
 
   return (
-    <RootViewContextProvider root={activeWorkspace as LongID} paneIndex={paneIndex}>
+    <RootViewContextProvider
+      root={activeWorkspace as LongID}
+      paneIndex={paneIndex}
+    >
       <LoadNode waitForEose>
         <StorePreLoginContext>{children}</StorePreLoginContext>
       </LoadNode>

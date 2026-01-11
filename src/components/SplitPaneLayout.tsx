@@ -16,14 +16,9 @@ import {
 import { LoadNode } from "../dataQuery";
 import { WorkspaceView } from "./Workspace";
 import { useWorkspaceContext } from "../WorkspaceContext";
-import {
-  planPublishSettings,
-  planUpdateViews,
-  usePlanner,
-} from "../planner";
+import { planPublishSettings, planUpdateViews, usePlanner } from "../planner";
 import { ROOT } from "../types";
 import { SearchModal } from "./SearchModal";
-import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 import { useData } from "../DataContext";
 import { isUserLoggedIn, useLogout } from "../NostrAuthContext";
 import { DeleteWorkspace } from "./DeleteNode";
@@ -49,7 +44,10 @@ export function PaneSearchButton(): JSX.Element {
         <span className="simple-icon-magnifier" />
       </button>
       {showSearch && (
-        <SearchModal onAddExistingNode={onSelectNode} onHide={() => setShowSearch(false)} />
+        <SearchModal
+          onAddExistingNode={onSelectNode}
+          onHide={() => setShowSearch(false)}
+        />
       )}
     </>
   );
@@ -231,7 +229,7 @@ export function PaneSettingsMenu(): JSX.Element {
   );
 }
 
-function PaneContent({ pane }: { pane: Pane }) {
+function PaneContent(): JSX.Element {
   const { activeWorkspace } = usePaneNavigation();
   const paneIndex = usePaneIndex();
 
@@ -249,7 +247,13 @@ function PaneContent({ pane }: { pane: Pane }) {
   );
 }
 
-function PaneWrapper({ pane, index }: { pane: Pane; index: number }) {
+function PaneWrapper({
+  pane,
+  index,
+}: {
+  pane: Pane;
+  index: number;
+}): JSX.Element {
   const { activeWorkspace } = useWorkspaceContext();
   // First pane respects URL/localStorage workspace
   // Additional panes use initialNode if set, otherwise ROOT
@@ -259,7 +263,7 @@ function PaneWrapper({ pane, index }: { pane: Pane; index: number }) {
   return (
     <PaneIndexProvider index={index}>
       <PaneNavigationProvider initialWorkspace={initialWorkspace}>
-        <PaneContent pane={pane} />
+        <PaneContent />
       </PaneNavigationProvider>
     </PaneIndexProvider>
   );

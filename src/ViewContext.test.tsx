@@ -37,7 +37,6 @@ import {
   getDefaultRelationForNode,
   PushNode,
 } from "./ViewContext";
-import { WorkspaceView } from "./components/Workspace";
 import { TreeView } from "./components/TreeView";
 import { LoadNode } from "./dataQuery";
 import { App } from "./App";
@@ -305,7 +304,10 @@ test("Calculate index from node index", () => {
 });
 
 test("Parse View path", () => {
-  expect(parseViewPath("p0:root:1")).toEqual([0, { nodeID: "root", nodeIndex: 1 }]);
+  expect(parseViewPath("p0:root:1")).toEqual([
+    0,
+    { nodeID: "root", nodeIndex: 1 },
+  ]);
   expect(parseViewPath("p0:root:0:rl:pl:0")).toEqual([
     0,
     { nodeID: "root", nodeIndex: 0, relationsID: "rl" },
@@ -380,7 +382,10 @@ test("View doesn't change if list is copied from contact", async () => {
   );
 
   // Navigate directly to Programming Languages to see its children (OOP, FPL)
-  const pl = findNodeByText(bobsKnowledgeDB, "Programming Languages") as KnowNode;
+  const pl = findNodeByText(
+    bobsKnowledgeDB,
+    "Programming Languages"
+  ) as KnowNode;
   const utils = renderApp({
     ...alice(),
     initialRoute: `/w/${pl.id}`,

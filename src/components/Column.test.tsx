@@ -16,7 +16,6 @@ import {
 import { newNode } from "../connections";
 import { execute } from "../executor";
 import { createPlan, planUpsertNode } from "../planner";
-import { WorkspaceView } from "./Workspace";
 import { PushNode, RootViewContextProvider } from "../ViewContext";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
 import { DND } from "../dnd";

@@ -112,4 +112,3 @@ test("Sign in persists created Notes", async () => {
   // After login the note is still there
   await screen.findByText("Hello World!");
 });
-

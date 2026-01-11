@@ -1,7 +1,6 @@
 import React from "react";
 import { Map } from "immutable";
 import { screen, fireEvent } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   BOB,
@@ -108,7 +107,7 @@ test("Write views on user relays", async () => {
   await findEvent(utils.relayPool, { kinds: [KIND_VIEWS] });
   // Views should be written to user relays (may also go to project relays)
   const publishedRelays = utils.relayPool.getPublishedOnRelays();
-  for (const relay of TEST_RELAYS) {
+  TEST_RELAYS.forEach((relay) => {
     expect(publishedRelays).toContain(relay.url);
-  }
+  });
 });

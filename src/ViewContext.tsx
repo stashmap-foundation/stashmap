@@ -175,7 +175,11 @@ export function parseViewPath(path: string): ViewPath {
       },
       []
     );
-  return [paneIndex, ...beginning, { nodeID: nodeIdEnd, nodeIndex: nodeIndexEnd }];
+  return [
+    paneIndex,
+    ...beginning,
+    { nodeID: nodeIdEnd, nodeIndex: nodeIndexEnd },
+  ];
 }
 
 function convertViewPathToString(viewContext: ViewPath): string {
@@ -970,19 +974,21 @@ export function updateViewPathsAfterPaneDelete(
   views: Views,
   removedPaneIndex: number
 ): Views {
-  return views
-    // Delete all views for the removed pane
-    .filterNot((_, key) => key.startsWith(`p${removedPaneIndex}:`))
-    // Shift down pane indices for views with higher indices
-    .mapKeys((key) => {
-      const match = key.match(/^p(\d+):/);
-      if (!match) return key;
-      const paneIndex = parseInt(match[1], 10);
-      if (paneIndex > removedPaneIndex) {
-        return key.replace(/^p\d+:/, `p${paneIndex - 1}:`);
-      }
-      return key;
-    });
+  return (
+    views
+      // Delete all views for the removed pane
+      .filterNot((_, key) => key.startsWith(`p${removedPaneIndex}:`))
+      // Shift down pane indices for views with higher indices
+      .mapKeys((key) => {
+        const match = key.match(/^p(\d+):/);
+        if (!match) return key;
+        const paneIndex = parseInt(match[1], 10);
+        if (paneIndex > removedPaneIndex) {
+          return key.replace(/^p\d+:/, `p${paneIndex - 1}:`);
+        }
+        return key;
+      })
+  );
 }
 
 export function bulkUpdateViewPathsAfterAddRelation(

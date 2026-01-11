@@ -1,4 +1,3 @@
-import React from "react";
 import { fireEvent, screen } from "@testing-library/react";
 import { Map, OrderedSet } from "immutable";
 import userEvent from "@testing-library/user-event";
@@ -7,13 +6,10 @@ import {
   BOB,
   extractNodes,
   findNodeByText,
-  renderWithTestData,
   renderApp,
   setup,
   setupTestDB,
 } from "./utils.test";
-import { WorkspaceView } from "./components/Workspace";
-import { RootViewOrWorkspaceIsLoading } from "./components/Dashboard";
 import { dnd } from "./dnd";
 import { addRelationToRelations, newNode, shortID } from "./connections";
 import { NodeIndex, newRelations, viewPathToString } from "./ViewContext";
@@ -74,6 +70,7 @@ test("Drag between split panes", async () => {
   const splitPaneButtons = screen.getAllByLabelText("open in split pane");
   await userEvent.click(splitPaneButtons[0]);
 
+  // eslint-disable-next-line testing-library/no-node-access
   expect(document.querySelectorAll(".split-pane").length).toBe(2);
 
   const addToMyNotes = await screen.findByLabelText("add to My Notes");

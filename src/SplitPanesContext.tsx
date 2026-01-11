@@ -20,10 +20,8 @@ const SplitPanesContext = createContext<SplitPanesContextType | undefined>(
 // Context to track which pane we're currently in
 const PaneIndexContext = createContext<number>(0);
 
-let paneIdCounter = 0;
 function generatePaneId(): string {
-  paneIdCounter += 1;
-  return `pane-${paneIdCounter}`;
+  return `pane-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
 export function SplitPanesProvider({
@@ -40,9 +38,7 @@ export function SplitPanesProvider({
   const addPaneAt = useCallback((index: number, nodeID: LongID | ID) => {
     setPanes((prev) => {
       const newPane = { id: generatePaneId(), initialNode: nodeID };
-      const newPanes = [...prev];
-      newPanes.splice(index, 0, newPane);
-      return newPanes;
+      return [...prev.slice(0, index), newPane, ...prev.slice(index)];
     });
   }, []);
 

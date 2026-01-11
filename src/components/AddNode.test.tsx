@@ -111,7 +111,9 @@ test("Default Relations are shown when adding a node from other User via search"
   renderApp({ ...alice(), includeFocusContext: true });
 
   // Click search button to open search
-  const searchButton = await screen.findByLabelText("search and attach to My Notes");
+  const searchButton = await screen.findByLabelText(
+    "search and attach to My Notes"
+  );
   fireEvent.click(searchButton);
   const searchInput = await screen.findByLabelText("search input");
   await userEvent.type(searchInput, "Object");

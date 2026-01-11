@@ -2,16 +2,17 @@ import React from "react";
 
 import { TemporaryViewProvider } from "./TemporaryViewContext";
 
-import { useNodeID, getNodeFromID, useViewPath } from "../ViewContext";
+import { useNodeID, getNodeFromID } from "../ViewContext";
 import { DND } from "../dnd";
 import { useData } from "../DataContext";
 import { usePaneNavigation, usePaneIndex } from "../SplitPanesContext";
 import { getRelationTypeByRelationsID } from "./RelationTypes";
 import { Node } from "./Node";
 import { TreeView } from "./TreeView";
-import { getRelations } from "../connections";
-import { OpenInSplitPaneButton, OpenInSplitPaneButtonWithNodeID } from "./OpenInSplitPaneButton";
-import { FullscreenButton } from "./FullscreenButton";
+import {
+  OpenInSplitPaneButton,
+  OpenInSplitPaneButtonWithNodeID,
+} from "./OpenInSplitPaneButton";
 import {
   PaneSearchButton,
   PaneSettingsMenu,
@@ -78,7 +79,7 @@ function StackedLayer({
 }
 
 export function WorkspaceView(): JSX.Element | null {
-  const [workspaceID, view] = useNodeID();
+  const [, view] = useNodeID();
   const data = useData();
   const { stack, popTo } = usePaneNavigation();
   const paneIndex = usePaneIndex();

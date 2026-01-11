@@ -33,6 +33,7 @@ import {
   newRelations,
   parseViewPath,
   updateViewPathsAfterDisconnect,
+  updateViewPathsAfterPaneDelete,
   NodeIndex,
   getDefaultRelationForNode,
   PushNode,
@@ -458,4 +459,26 @@ test("Disconnect Nodes", async () => {
   expect(screen.queryByText("C")).toBeNull();
 
   cleanup();
+});
+
+test("updateViewPathsAfterPaneDelete removes views for deleted pane and shifts indices", () => {
+  const views = Map<string, View>({
+    "p0:root:0": { expanded: false, width: 1 },
+    "p0:root:0:r:node1:0": { expanded: true, width: 1 },
+    "p1:root:0": { expanded: false, width: 1 },
+    "p1:root:0:r:node2:0": { expanded: true, width: 1 },
+    "p2:root:0": { expanded: false, width: 2 },
+    "p2:root:0:r:node3:0": { expanded: true, width: 1 },
+    "p3:root:0": { expanded: true, width: 3 },
+  });
+
+  const updatedViews = updateViewPathsAfterPaneDelete(views, 1);
+
+  expect(updatedViews.has("p0:root:0")).toBe(true);
+  expect(updatedViews.has("p0:root:0:r:node1:0")).toBe(true);
+  expect(updatedViews.has("p1:root:0:r:node2:0")).toBe(false);
+  expect(updatedViews.get("p1:root:0")?.width).toBe(2);
+  expect(updatedViews.get("p1:root:0:r:node3:0")?.expanded).toBe(true);
+  expect(updatedViews.get("p2:root:0")?.width).toBe(3);
+  expect(updatedViews.has("p3:root:0")).toBe(false);
 });

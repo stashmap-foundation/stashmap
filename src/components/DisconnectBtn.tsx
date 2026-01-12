@@ -1,5 +1,6 @@
 import React from "react";
-import { deleteRelations, getRelations } from "../connections";
+import { Set } from "immutable";
+import { getRelations, markItemsAsNotRelevant } from "../connections";
 import { REFERENCED_BY } from "../constants";
 import {
   useViewPath,
@@ -7,23 +8,18 @@ import {
   upsertRelations,
   getRelationForView,
   getLast,
-  updateViewPathsAfterDisconnect,
-  parseViewPath,
   calculateIndexFromNodeIndex,
   getParentView,
   getNodeIDFromView,
-  getAvailableRelationsForNode,
-  newRelations,
   getNodeFromView,
 } from "../ViewContext";
 import {
   switchOffMultiselect,
   useDeselectAllInView,
-  useGetSelectedInView,
   useSelectedIndices,
   useTemporaryView,
 } from "./TemporaryViewContext";
-import { planUpdateViews, planUpsertRelations, usePlanner } from "../planner";
+import { usePlanner } from "../planner";
 import { useData } from "../DataContext";
 import { usePaneNavigation } from "../SplitPanesContext";
 
@@ -35,7 +31,6 @@ export function DisconnectBtn(): JSX.Element | null {
   const viewContext = useViewPath();
   const viewKey = useViewKey();
   const selectedIndices = useSelectedIndices();
-  const selected = useGetSelectedInView()(viewKey);
   const deselectAllInView = useDeselectAllInView();
   if (selectedIndices.size === 0) {
     return null;
@@ -45,25 +40,14 @@ export function DisconnectBtn(): JSX.Element | null {
     if (!relations) {
       return;
     }
+    // Mark items as "not_relevant" instead of deleting them
     const disconnectPlan = upsertRelations(
       createPlan(),
       viewContext,
       stack,
-      (rel) => deleteRelations(rel, selectedIndices)
+      (rel) => markItemsAsNotRelevant(rel, selectedIndices)
     );
-    const finalPlan = selected.reduce((plan, path) => {
-      const { nodeID, nodeIndex } = getLast(parseViewPath(path));
-      return planUpdateViews(
-        plan,
-        updateViewPathsAfterDisconnect(
-          plan.views,
-          nodeID,
-          relations.id,
-          nodeIndex
-        )
-      );
-    }, disconnectPlan);
-    executePlan(finalPlan);
+    executePlan(disconnectPlan);
     deselectAllInView(viewKey);
     setState(switchOffMultiselect(multiselectBtns, selection, viewKey));
   };
@@ -113,28 +97,14 @@ export function DisconnectNodeBtn(): JSX.Element | null {
   }
 
   const onDisconnect = (): void => {
+    // Mark item as "not_relevant" instead of deleting it
     const disconnectPlan = upsertRelations(
       createPlan(),
       parentPath,
       stack,
-      (rel): Relations => {
-        return {
-          ...rel,
-          items: rel.items.delete(index),
-        };
-      }
+      (rel) => markItemsAsNotRelevant(rel, Set([index]))
     );
-    const finalPlan = planUpdateViews(
-      disconnectPlan,
-      updateViewPathsAfterDisconnect(
-        disconnectPlan.views,
-        parentNodeID,
-        relations.id,
-        nodeIndex
-      )
-    );
-    // TODO: Add "not_relevant" type to item instead of removing completely?
-    executePlan(finalPlan);
+    executePlan(disconnectPlan);
   };
 
   return (

@@ -433,8 +433,13 @@ export function getNodesInTree(
     return ctx.push(addNodePath);
   }
 
-  const childPaths = relations.items.map((_, i) =>
-    addNodeToPathWithRelations(parentPath, relations, i)
+  // Filter out "not_relevant" items from the view
+  const visibleItems = relations.items
+    .map((item, i) => ({ item, index: i }))
+    .filter(({ item }) => !item.types.includes("not_relevant"));
+
+  const childPaths = visibleItems.map(({ index }) =>
+    addNodeToPathWithRelations(parentPath, relations, index)
   );
   const nodesInTree = childPaths.reduce(
     (nodesList: List<ViewPath>, childPath: ViewPath) => {

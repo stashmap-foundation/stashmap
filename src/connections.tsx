@@ -196,6 +196,37 @@ export function deleteRelations(
   };
 }
 
+// Relevance types are mutually exclusive
+const RELEVANCE_TYPES = [
+  "",
+  "maybe_relevant",
+  "little_relevant",
+  "not_relevant",
+];
+
+export function markItemsAsNotRelevant(
+  relations: Relations,
+  indices: Set<number>
+): Relations {
+  const items = relations.items.map((item, index) => {
+    if (!indices.has(index)) {
+      return item;
+    }
+    // Remove other relevance types and add "not_relevant"
+    const typesWithoutRelevance = item.types.filter(
+      (t) => !RELEVANCE_TYPES.includes(t)
+    );
+    return {
+      ...item,
+      types: typesWithoutRelevance.push("not_relevant"),
+    };
+  });
+  return {
+    ...relations,
+    items,
+  };
+}
+
 export function isRemote(
   remote: PublicKey | undefined,
   myself: PublicKey

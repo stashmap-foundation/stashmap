@@ -24,7 +24,7 @@ test("Publishing Status", async () => {
   expect(await screen.findAllByText("100%")).toHaveLength(4);
   screen.getByText("Relay wss://relay.test.first.success/:");
   expect(
-    screen.getAllByText("3 of the last 3 events have been published")
+    screen.getAllByText("2 of the last 2 events have been published")
   ).toHaveLength(4);
 });
 
@@ -73,14 +73,14 @@ test("Details of Publishing Status", async () => {
   );
   screen.getByText("Relay wss://relay.test.fourth.success/:");
   expect(
-    screen.getAllByText("3 of the last 3 events have been published")
+    screen.getAllByText("2 of the last 2 events have been published")
   ).toHaveLength(2);
 
   screen.getByText("Relay wss://relay.test.third.rand/:");
-  screen.getByText("0 of the last 3 events have been published");
+  screen.getByText("0 of the last 2 events have been published");
   screen.getByText("Last rejection reason: Error: too many requests");
 
   screen.getByText("Relay wss://relay.test.second.fail/:");
-  screen.getByText("0 of the last 3 events have been published");
+  screen.getByText("0 of the last 2 events have been published");
   screen.getAllByText("Last rejection reason: Error: paid relay");
 });

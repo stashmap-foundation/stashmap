@@ -1,0 +1,34 @@
+- Mark item as not relevant by changing it's type
+- getRelationTypeByRelationsID needs to be deleted
+
+- change how "getAvailableRelationsForNode" handles remote relations
+- change Markdown upload to create two relations (one within context and one without context)
+
+- DeleteRelations?
+- Remove item from relations should add them to not relevant
+
+- Move the Choose relations button to the Menu
+
+
+Features:
+- Have user npub as ROOT
+- References are links
+- References can be dragged as well (which means they keep contet)
+- When Searching for node, open correct stack
+
+To Test:
+- DND
+- Remove Relations
+
+Future Features:
+- Use hashes as IDs
+
+Chores:
+- Remove "activeWorkspace"
+
+
+Fixes:
+
+- das login-menu mit publish status usw gehört semantisch nicht in die panes, sondern drüber, oder? (man ist ja nicht in einer pane eingeloggt und in der anderen nicht...)
+- wenn ausgeloggt ist der login überlappend mit dem pane buttonvisuell fände ich einen "add pane" button leaner (der müsste dann die gesamte view duplizieren)unabhängig von panes: 
+- der open in fullscreen button schaut für mich nach kopieren aus.

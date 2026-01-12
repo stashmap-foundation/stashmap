@@ -14,6 +14,7 @@ import { useData } from "./DataContext";
 import { Plan, planUpsertRelations, planUpdateViews } from "./planner";
 import { usePaneNavigation } from "./SplitPanesContext";
 import { RELATION_TYPES } from "./components/RelationTypes";
+import { REFERENCED_BY } from "./constants";
 
 // only exported for tests
 export type NodeIndex = number & { readonly "": unique symbol };
@@ -381,9 +382,10 @@ export function getNodeFromView(
  * This is the canonical read-only relation lookup function.
  *
  * Logic:
- * 1. If view has explicit relationsID AND it matches current context, use it
- * 2. Otherwise, find relation by (head, context)
- * 3. Returns undefined if no relation found (does not create)
+ * 1. If view has REFERENCED_BY, return Referenced By relations (special case)
+ * 2. If view has explicit relationsID AND it matches current context, use it
+ * 3. Otherwise, find relation by (head, context)
+ * 4. Returns undefined if no relation found (does not create)
  */
 export function getRelationForView(
   data: Data,
@@ -392,6 +394,16 @@ export function getRelationForView(
 ): Relations | undefined {
   const [nodeID, view] = getNodeIDFromView(data, viewPath);
   const context = getContextFromStackAndViewPath(stack, viewPath);
+
+  // Handle REFERENCED_BY specially - it's not context-based
+  if (view.relations === REFERENCED_BY) {
+    return getRelations(
+      data.knowledgeDBs,
+      REFERENCED_BY,
+      data.user.publicKey,
+      nodeID
+    );
+  }
 
   // Check if view's relation exists and matches current context
   if (view.relations) {

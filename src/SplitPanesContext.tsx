@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
-import { ROOT } from "./types";
 
 export type Pane = {
   id: string;
@@ -97,10 +96,8 @@ export function usePaneIndex(): number {
 type PaneNavigationContextType = {
   stack: (LongID | ID)[];
   activeWorkspace: LongID | ID;
-  push: (nodeID: LongID | ID) => void;
-  pop: () => void;
   popTo: (index: number) => void;
-  replace: (nodeID: LongID | ID) => void;
+  setStack: (path: (LongID | ID)[]) => void;
 };
 
 const PaneNavigationContext = createContext<
@@ -116,58 +113,32 @@ export function PaneNavigationProvider({
   initialWorkspace: LongID | ID;
   initialStack?: (LongID | ID)[];
 }): JSX.Element {
-  const [stack, setStack] = useState<(LongID | ID)[]>(initialStack || [ROOT]);
-  const [activeWorkspace, setActiveWorkspace] = useState<LongID | ID>(
-    initialStack ? initialStack[initialStack.length - 1] : initialWorkspace
+  const [stack, setStack] = useState<(LongID | ID)[]>(
+    initialStack || [initialWorkspace]
   );
 
-  const push = useCallback((nodeID: LongID | ID): void => {
-    setStack((prev) => [...prev, nodeID]);
-    setActiveWorkspace(nodeID);
-  }, []);
-
-  const pop = useCallback((): void => {
-    setStack((prev) => {
-      if (prev.length > 1) {
-        const newStack = prev.slice(0, -1);
-        setActiveWorkspace(newStack[newStack.length - 1]);
-        return newStack;
-      }
-      return prev;
-    });
-  }, []);
+  // activeWorkspace is always the last element of the stack
+  const activeWorkspace = stack[stack.length - 1];
 
   const popTo = useCallback((index: number): void => {
-    setStack((prev) => {
-      if (index >= 0 && index < prev.length) {
-        const newStack = prev.slice(0, index + 1);
-        setActiveWorkspace(newStack[newStack.length - 1]);
-        return newStack;
-      }
-      return prev;
-    });
+    setStack((prev) =>
+      index >= 0 && index < prev.length ? prev.slice(0, index + 1) : prev
+    );
   }, []);
 
-  const replace = useCallback((nodeID: LongID | ID): void => {
-    setStack([nodeID]);
-    setActiveWorkspace(nodeID);
+  const setStackFn = useCallback((path: (LongID | ID)[]): void => {
+    if (path.length === 0) return;
+    setStack(path);
   }, []);
-
-  const fullStack =
-    stack[stack.length - 1] !== activeWorkspace
-      ? [...stack, activeWorkspace]
-      : stack;
 
   const value = React.useMemo(
     () => ({
-      stack: fullStack,
+      stack,
       activeWorkspace,
-      push,
-      pop,
       popTo,
-      replace,
+      setStack: setStackFn,
     }),
-    [fullStack, activeWorkspace, push, pop, popTo, replace]
+    [stack, activeWorkspace, popTo, setStackFn]
   );
 
   return (

@@ -135,29 +135,30 @@ test("usePaneIndex returns correct index for different panes", () => {
 });
 
 function TestPaneNavigation(): JSX.Element {
-  const { stack, activeWorkspace, push, pop, popTo, replace } =
-    usePaneNavigation();
+  const { stack, activeWorkspace, popTo, setStack } = usePaneNavigation();
   return (
     <div>
       <div data-testid="stack">{stack.join(",")}</div>
       <div data-testid="active-workspace">{activeWorkspace}</div>
-      <button type="button" onClick={() => push("new-node" as LongID)}>
-        Push
-      </button>
-      <button type="button" onClick={pop}>
+      <button type="button" onClick={() => popTo(stack.length - 2)}>
         Pop
       </button>
       <button type="button" onClick={() => popTo(0)}>
         Pop To 0
       </button>
-      <button type="button" onClick={() => replace("replaced" as LongID)}>
-        Replace
+      <button
+        type="button"
+        onClick={() =>
+          setStack(["new1" as LongID, "new2" as LongID, "new3" as LongID])
+        }
+      >
+        Set Stack
       </button>
     </div>
   );
 }
 
-test("push adds nodeID to stack and updates activeWorkspace", () => {
+test("popTo(length-2) removes last item and updates activeWorkspace", () => {
   render(
     <SplitPanesProvider>
       <PaneIndexProvider index={0}>
@@ -168,34 +169,15 @@ test("push adds nodeID to stack and updates activeWorkspace", () => {
     </SplitPanesProvider>
   );
 
-  expect(screen.getByTestId("stack").textContent).toBe(ROOT);
-  expect(screen.getByTestId("active-workspace").textContent).toBe(ROOT);
-
-  fireEvent.click(screen.getByText("Push"));
-  expect(screen.getByTestId("stack").textContent).toBe(`${ROOT},new-node`);
-  expect(screen.getByTestId("active-workspace").textContent).toBe("new-node");
-});
-
-test("pop removes last item and updates activeWorkspace", () => {
-  render(
-    <SplitPanesProvider>
-      <PaneIndexProvider index={0}>
-        <PaneNavigationProvider initialWorkspace={ROOT}>
-          <TestPaneNavigation />
-        </PaneNavigationProvider>
-      </PaneIndexProvider>
-    </SplitPanesProvider>
-  );
-
-  fireEvent.click(screen.getByText("Push"));
-  expect(screen.getByTestId("stack").textContent).toBe(`${ROOT},new-node`);
+  fireEvent.click(screen.getByText("Set Stack"));
+  expect(screen.getByTestId("stack").textContent).toBe("new1,new2,new3");
 
   fireEvent.click(screen.getByText("Pop"));
-  expect(screen.getByTestId("stack").textContent).toBe(ROOT);
-  expect(screen.getByTestId("active-workspace").textContent).toBe(ROOT);
+  expect(screen.getByTestId("stack").textContent).toBe("new1,new2");
+  expect(screen.getByTestId("active-workspace").textContent).toBe("new2");
 });
 
-test("pop does not pop when stack has only one item", () => {
+test("popTo with invalid index does not change stack", () => {
   render(
     <SplitPanesProvider>
       <PaneIndexProvider index={0}>
@@ -224,18 +206,15 @@ test("popTo navigates to specific stack index", () => {
     </SplitPanesProvider>
   );
 
-  fireEvent.click(screen.getByText("Push"));
-  fireEvent.click(screen.getByText("Push"));
-  expect(screen.getByTestId("stack").textContent).toBe(
-    `${ROOT},new-node,new-node`
-  );
+  fireEvent.click(screen.getByText("Set Stack"));
+  expect(screen.getByTestId("stack").textContent).toBe("new1,new2,new3");
 
   fireEvent.click(screen.getByText("Pop To 0"));
-  expect(screen.getByTestId("stack").textContent).toBe(ROOT);
-  expect(screen.getByTestId("active-workspace").textContent).toBe(ROOT);
+  expect(screen.getByTestId("stack").textContent).toBe("new1");
+  expect(screen.getByTestId("active-workspace").textContent).toBe("new1");
 });
 
-test("replace clears stack and sets single node as workspace", () => {
+test("setStack replaces entire stack with new path", () => {
   render(
     <SplitPanesProvider>
       <PaneIndexProvider index={0}>
@@ -246,15 +225,11 @@ test("replace clears stack and sets single node as workspace", () => {
     </SplitPanesProvider>
   );
 
-  fireEvent.click(screen.getByText("Push"));
-  fireEvent.click(screen.getByText("Push"));
-  expect(screen.getByTestId("stack").textContent).toBe(
-    `${ROOT},new-node,new-node`
-  );
+  expect(screen.getByTestId("stack").textContent).toBe(ROOT);
 
-  fireEvent.click(screen.getByText("Replace"));
-  expect(screen.getByTestId("stack").textContent).toBe("replaced");
-  expect(screen.getByTestId("active-workspace").textContent).toBe("replaced");
+  fireEvent.click(screen.getByText("Set Stack"));
+  expect(screen.getByTestId("stack").textContent).toBe("new1,new2,new3");
+  expect(screen.getByTestId("active-workspace").textContent).toBe("new3");
 });
 
 test("initialStack sets initial stack and activeWorkspace", () => {

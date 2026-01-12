@@ -25,10 +25,11 @@ import { DeleteWorkspace } from "./DeleteNode";
 
 export function PaneSearchButton(): JSX.Element {
   const [showSearch, setShowSearch] = useState(false);
-  const { replace } = usePaneNavigation();
+  const { setStack } = usePaneNavigation();
+  const paneIndex = usePaneIndex();
 
   const onSelectNode = (nodeID: LongID): void => {
-    replace(nodeID);
+    setStack([nodeID]);
     setShowSearch(false);
   };
 
@@ -38,7 +39,7 @@ export function PaneSearchButton(): JSX.Element {
         type="button"
         className="split-pane-search btn btn-borderless"
         onClick={() => setShowSearch(true)}
-        aria-label="Search to change pane content"
+        aria-label={`Search to change pane ${paneIndex} content`}
         title="Search"
       >
         <span className="simple-icon-magnifier" />

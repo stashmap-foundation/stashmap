@@ -73,6 +73,13 @@ test("Drag between split panes", async () => {
   // eslint-disable-next-line testing-library/no-node-access
   expect(document.querySelectorAll(".split-pane").length).toBe(2);
 
+  // Navigate pane 1 to ROOT (My Notes) using search
+  await userEvent.click(
+    screen.getByLabelText("Search to change pane 1 content")
+  );
+  await userEvent.type(screen.getByPlaceholderText("Search"), "My Notes");
+  await userEvent.click(await screen.findByText("My Notes"));
+
   const addToMyNotes = await screen.findByLabelText("add to My Notes");
 
   // Drag Draggable Item from pane 1 to ROOT in pane 2

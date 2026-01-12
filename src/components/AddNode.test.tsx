@@ -49,10 +49,13 @@ test("Link Nodes from other Users", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
   await follow(alice, bob().user.publicKey);
 
+  // Bob creates OOP with Java as child, using context ['ROOT']
+  // This simulates Bob adding OOP to ROOT and then adding Java under it
   const oop = newNode("Object Oriented Languages", bob().user.publicKey);
   const java = newNode("Java", bob().user.publicKey);
+  const rootContext = List(["ROOT"]);
   const relations = addRelationToRelations(
-    newRelations(oop.id, List(), bob().user.publicKey),
+    newRelations(oop.id, rootContext, bob().user.publicKey),
     java.id
   );
   const plan = planUpsertRelations(
@@ -63,17 +66,11 @@ test("Link Nodes from other Users", async () => {
     ...bob(),
     plan,
   });
-  const view = renderApp({ ...alice(), includeFocusContext: true });
-  await typeNewNode(view, "Programming Languages");
+  renderApp({ ...alice(), includeFocusContext: true });
 
-  // Expand "Programming Languages" by clicking its relation button
-  const expandButton = await screen.findByLabelText(
-    "create relevant to for Programming Languages"
-  );
-  fireEvent.click(expandButton);
-
+  // Alice adds OOP to ROOT (My Notes) - same context as Bob used
   const searchButton = await screen.findByLabelText(
-    "search and attach to Programming Languages"
+    "search and attach to My Notes"
   );
   fireEvent.click(searchButton);
   const searchInput = await screen.findByLabelText("search input");
@@ -81,7 +78,9 @@ test("Link Nodes from other Users", async () => {
   fireEvent.click(
     await screen.findByText(matchSplitText("Object Oriented Languages"))
   );
-  // Open the relations
+
+  // OOP is now under ROOT with context ['ROOT'] - Bob's children should be visible
+  // Click to expand OOP and see its children
   fireEvent.click(
     await screen.findByLabelText(
       "show items relevant for Object Oriented Languages"
@@ -94,10 +93,12 @@ test("Default Relations are shown when adding a node from other User via search"
   const [alice, bob] = setup([ALICE, BOB]);
   await follow(alice, bob().user.publicKey);
 
+  // Bob creates OOP with Java as child, using context ['ROOT']
   const oop = newNode("Object Oriented Languages", bob().user.publicKey);
   const java = newNode("Java", bob().user.publicKey);
+  const rootContext = List(["ROOT"]);
   const relations = addRelationToRelations(
-    newRelations(oop.id, List(), bob().user.publicKey),
+    newRelations(oop.id, rootContext, bob().user.publicKey),
     java.id
   );
   const plan = planUpsertRelations(
@@ -111,7 +112,7 @@ test("Default Relations are shown when adding a node from other User via search"
 
   renderApp({ ...alice(), includeFocusContext: true });
 
-  // Click search button to open search
+  // Alice adds OOP to ROOT (My Notes) - same context as Bob used
   const searchButton = await screen.findByLabelText(
     "search and attach to My Notes"
   );
@@ -122,12 +123,11 @@ test("Default Relations are shown when adding a node from other User via search"
     await screen.findByText(matchSplitText("Object Oriented Languages"))
   );
 
-  // Open the added node in fullscreen to see its relations
-  const fullscreenButtons = await screen.findAllByLabelText("open fullscreen");
-  fireEvent.click(fullscreenButtons[0]);
-
-  await screen.findByLabelText(
-    "show items relevant for Object Oriented Languages"
+  // Click to expand OOP and see Bob's children
+  fireEvent.click(
+    await screen.findByLabelText(
+      "show items relevant for Object Oriented Languages"
+    )
   );
-  screen.getByText("Java");
+  await screen.findByText("Java");
 });

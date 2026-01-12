@@ -1,7 +1,91 @@
 import { List, Set, Map } from "immutable";
 import { v4 } from "uuid";
-import { newRelations } from "./ViewContext";
-import { REFERENCED_BY } from "./constants";
+import { newRelations, getNodeFromID } from "./ViewContext";
+import { REFERENCED_BY, REF_PREFIX } from "./constants";
+
+// Type guards for KnowNode union type
+export function isTextNode(node: KnowNode): node is TextNode {
+  return node.type === "text";
+}
+
+export function isProjectNode(node: KnowNode): node is ProjectNode {
+  return node.type === "project";
+}
+
+export function isReferenceNode(node: KnowNode): node is ReferenceNode {
+  return node.type === "reference";
+}
+
+export function hasImageUrl(
+  node: KnowNode
+): node is TextNode | ProjectNode {
+  return node.type === "text" || node.type === "project";
+}
+
+// Reference ID utilities
+// Format: "ref:targetId:context0:context1:..."
+export function isRefId(id: ID | LongID): boolean {
+  return id.startsWith(REF_PREFIX);
+}
+
+export function createRefId(context: Context, targetNode: ID): LongID {
+  const parts = [REF_PREFIX.slice(0, -1), ...context.toArray(), targetNode];
+  return parts.join(":") as LongID;
+}
+
+export function parseRefId(
+  refId: ID | LongID
+): { targetNode: ID; targetContext: Context } | undefined {
+  if (!isRefId(refId)) {
+    return undefined;
+  }
+  const parts = refId.split(":");
+  if (parts.length < 2) {
+    return undefined;
+  }
+  const targetNode = parts[parts.length - 1] as ID;
+  const targetContext = List(parts.slice(1, -1) as ID[]);
+  return { targetNode, targetContext };
+}
+
+export function extractNodeIdsFromRefId(refId: ID | LongID): List<ID> {
+  const parsed = parseRefId(refId);
+  if (!parsed) {
+    return List();
+  }
+  // Return all node IDs: target + context
+  return List<ID>([parsed.targetNode]).concat(parsed.targetContext);
+}
+
+export function buildReferenceNode(
+  refId: LongID,
+  knowledgeDBs: KnowledgeDBs,
+  myself: PublicKey
+): ReferenceNode | undefined {
+  const parsed = parseRefId(refId);
+  if (!parsed) {
+    return undefined;
+  }
+  const { targetNode, targetContext } = parsed;
+
+  // Build the display text by looking up each node
+  const getNodeText = (nodeId: ID): string => {
+    const node = getNodeFromID(knowledgeDBs, nodeId, myself);
+    return node?.text || "Loading...";
+  };
+
+  const contextTexts = targetContext.map(getNodeText);
+  const targetText = getNodeText(targetNode);
+  const displayText = contextTexts.push(targetText).join(" → ");
+
+  return {
+    id: refId,
+    type: "reference",
+    text: displayText,
+    targetNode,
+    targetContext,
+  };
+}
 
 export function splitID(id: ID): [PublicKey | undefined, string] {
   const split = id.split("_");
@@ -35,7 +119,11 @@ export function getRelationsNoReferencedBy(
   return res;
 }
 
-type ReferencedByHeadAndUpdated = Pick<Relations, "head" | "updated">;
+type ReferencedByPath = {
+  head: ID;
+  context: Context;
+  updated: number;
+};
 
 export function getReferencedByRelations(
   knowledgeDBs: KnowledgeDBs,
@@ -43,48 +131,34 @@ export function getReferencedByRelations(
   nodeID: LongID | ID
 ): Relations | undefined {
   const rel = newRelations(nodeID, List<ID>(), myself);
-  const referencesOfAllDBs = knowledgeDBs.reduce((r, knowledgeDB) => {
-    const relationsOfDB = knowledgeDB.relations.reduce((rdx, relations) => {
+
+  // Collect all (head, context) pairs where nodeID is referenced
+  const referencePaths = knowledgeDBs.reduce((acc, knowledgeDB) => {
+    return knowledgeDB.relations.reduce((rdx, relations) => {
       // Check if any item's nodeID matches
       if (relations.items.some((item) => item.nodeID === nodeID)) {
-        if (!rdx.find((item) => item.head === relations.head)) {
+        // Create unique key for deduplication: head + context
+        const pathKey = `${relations.head}:${relations.context.join(",")}`;
+        if (!rdx.some((p) => `${p.head}:${p.context.join(",")}` === pathKey)) {
           return rdx.push({
-            head: relations.head as LongID,
+            head: relations.head as ID,
+            context: relations.context,
             updated: relations.updated,
           });
         }
       }
       return rdx;
-    }, r);
-    return r.merge(relationsOfDB);
-  }, List<ReferencedByHeadAndUpdated>());
-  const items = referencesOfAllDBs
-    .filter(
-      (relation, index, self) =>
-        index === self.findIndex((t) => t.head === relation.head)
-    )
-    .sort((a, b) => a.updated - b.updated);
-  // This is a Tough one:
-  //
-  // Alice has a node Bitcoin with ID 1 and a List default-1
-  // Bob forks default-1 and references "blockchain" (list, id: default-fork-1, head: 1, items: [blockchain])
-  // Carol, who is connected with Bob, counts default-fork-1 as a reference, but will never be able to
-  // see the node "Bitcoin" because she doesn't query Alice node. The List default-1, doesn't mention how to
-  // get ID 1
-  //
-  // Simpler Case:
-  //
-  // Alice is not connected with Bob. Alice forks Bobs Bitcoin List default-1 to default-2.
-  // Alice References a new node "blockchain" in default-2.
-  //
-  // Alice will never see the "Bitcoin" node in references as she is not connected to Bob
-  //
-  // Why don't we make Head a full path?
+    }, acc);
+  }, List<ReferencedByPath>());
+
+  // Sort by updated time (newest first)
+  const sortedPaths = referencePaths.sort((a, b) => b.updated - a.updated);
+
   return {
     ...rel,
     id: REFERENCED_BY,
-    items: items.map((item) => ({
-      nodeID: item.head,
+    items: sortedPaths.map((path) => ({
+      nodeID: createRefId(path.context.push(path.head), nodeID as ID),
       types: List<ID>([""]),
     })),
   };

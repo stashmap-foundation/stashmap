@@ -191,10 +191,11 @@ declare global {
   type BasicNode = {
     id: LongID;
     text: string;
-    type: "text" | "project";
+    type: "text" | "project" | "reference";
   };
 
   type TextNode = BasicNode & {
+    type: "text";
     imageUrl?: string;
   };
 
@@ -202,6 +203,7 @@ declare global {
   // - contract
   // - geo
   type ProjectNode = BasicNode & {
+    type: "project";
     tokenSupply?: number;
     address?: string;
     imageUrl?: string;
@@ -217,9 +219,20 @@ declare global {
     memberListProvider: PublicKey;
   };
 
+  // A virtual node representing a path to another node
+  // ID format: "ref:targetId:context0:context1:..."
+  // Not stored on server - reconstructed from ID
+  type ReferenceNode = {
+    id: LongID;
+    type: "reference";
+    text: string; // Computed: "My Notes → Scholarium → Madeira"
+    targetNode: ID; // The node being referenced
+    targetContext: Context; // The path to reach it
+  };
+
   type BookmarkedProjects = List<LongID>;
 
-  type KnowNode = TextNode | ProjectNode;
+  type KnowNode = TextNode | ProjectNode | ReferenceNode;
 
   type Views = Map<string, View>;
 

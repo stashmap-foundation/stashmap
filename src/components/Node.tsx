@@ -31,6 +31,8 @@ import {
   useIsParentMultiselectBtnOn,
   isMutableNode,
 } from "./TemporaryViewContext";
+import { getReferencedByRelations, hasImageUrl } from "../connections";
+import { REFERENCED_BY } from "../constants";
 import { IS_MOBILE } from "./responsive";
 import { AddNodeToNode, getImageUrlFromText } from "./AddNode";
 import { NodeMenu } from "./Menu";
@@ -194,11 +196,14 @@ function NodeContent({ node }: { node: KnowNode }): JSX.Element {
   const isBionic = settings.bionicReading;
   const [isImageAccessible, setIsImageAccessible] = useState<boolean>(false);
 
+  // Get imageUrl only for nodes that support it (not ReferenceNode)
+  const imageUrl = hasImageUrl(node) ? node.imageUrl : undefined;
+
   useEffect(() => {
     const checkImageAccessibility = async (): Promise<void> => {
-      if (node.imageUrl) {
+      if (imageUrl) {
         try {
-          await fetch(node.imageUrl, {
+          await fetch(imageUrl, {
             method: "HEAD",
             mode: "no-cors",
           });
@@ -207,26 +212,26 @@ function NodeContent({ node }: { node: KnowNode }): JSX.Element {
         } catch {
           setIsImageAccessible(false);
           // eslint-disable-next-line no-console
-          console.warn(`Invalid URL: ${node.imageUrl}`);
+          console.warn(`Invalid URL: ${imageUrl}`);
         }
       }
     };
 
     checkImageAccessibility();
-  }, [node.imageUrl]);
-  const textToDisplay = node.imageUrl
-    ? node.text.replace(node.imageUrl, "")
+  }, [imageUrl]);
+  const textToDisplay = imageUrl
+    ? node.text.replace(imageUrl, "")
     : node.text;
 
   return (
     <span className="break-word">
       <NodeIcon node={node} />
       {isBionic ? <BionicText nodeText={textToDisplay} /> : textToDisplay}
-      {node.imageUrl && isImageAccessible && (
+      {imageUrl && isImageAccessible && (
         <div>
           <img
-            src={node.imageUrl}
-            alt={node.imageUrl}
+            src={imageUrl}
+            alt={imageUrl}
             style={{ maxWidth: "100%", height: "auto", marginTop: "10px" }}
           />
         </div>
@@ -292,7 +297,7 @@ function EditingNodeContent(): JSX.Element | null {
   const viewKey = useViewKey();
   const { editingViews, setEditingState } = useTemporaryView();
   const { setIsInputElementInFocus } = useInputElementFocus();
-  if (!node) {
+  if (!node || node.type !== "text") {
     return null;
   }
   const editNodeText = (text: string, imageUrl?: string): void => {
@@ -398,6 +403,24 @@ export function getNodesInTree(
   noExpansion?: boolean
 ): List<ViewPath> {
   const [parentNodeID, parentView] = getNodeIDFromView(data, parentPath);
+
+  // Handle REFERENCED_BY specially - it's not context-based
+  if (parentView.relations === REFERENCED_BY) {
+    const referencedByRelations = getReferencedByRelations(
+      data.knowledgeDBs,
+      data.user.publicKey,
+      parentNodeID
+    );
+    if (!referencedByRelations || referencedByRelations.items.size === 0) {
+      return ctx;
+    }
+    // Referenced By items are readonly - no expansion, no diff items, no add node
+    const childPaths = referencedByRelations.items.map((_, i) =>
+      addNodeToPathWithRelations(parentPath, referencedByRelations, i)
+    );
+    return ctx.concat(childPaths);
+  }
+
   const context = getContextFromStackAndViewPath(stack, parentPath);
   const relations = findOrCreateRelationsForContext(
     data.knowledgeDBs,

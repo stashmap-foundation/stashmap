@@ -194,22 +194,27 @@ export function eventToTextOrProjectNode(
   if (id === undefined) {
     return [undefined];
   }
-  const base = {
-    id: joinID(e.pubkey, id),
-    text: e.content,
-    // ts doesn't recognise this as a valid type
-    type: "text" as "text" | "project",
-  };
+  const nodeId = joinID(e.pubkey, id);
+  const text = e.content;
 
   if (e.kind === KIND_PROJECT) {
     try {
       const project = parseProject(e);
-      return project ? [id, { ...base, ...project }] : [undefined];
+      return project
+        ? [id, { id: nodeId, text, ...project }]
+        : [undefined];
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error(err);
       return [undefined];
     }
   }
-  return [id, { ...base, imageUrl: parseImageUrl(e) }];
+  // Return TextNode
+  const textNode: TextNode = {
+    id: nodeId,
+    text,
+    type: "text",
+    imageUrl: parseImageUrl(e),
+  };
+  return [id, textNode];
 }

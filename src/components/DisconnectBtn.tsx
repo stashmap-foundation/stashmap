@@ -1,5 +1,6 @@
 import React from "react";
 import { deleteRelations, getRelations } from "../connections";
+import { REFERENCED_BY } from "../constants";
 import {
   useViewPath,
   useViewKey,
@@ -91,6 +92,10 @@ export function DisconnectNodeBtn(): JSX.Element | null {
   }
   const [parentNodeID, parentView] = getNodeIDFromView(data, parentPath);
   if (!parentNodeID || !parentView) {
+    return null;
+  }
+  // Referenced By items are readonly - can't disconnect them
+  if (parentView.relations === REFERENCED_BY) {
     return null;
   }
   const relations = getRelations(

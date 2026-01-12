@@ -82,9 +82,13 @@ test("Show Referenced By with content details", async () => {
   await screen.findByText("Bitcoin");
   fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
   screen.getByLabelText("hide references to Bitcoin");
-  expect(
-    (await screen.findByLabelText("related to Bitcoin")).textContent
-  ).toMatch(/Money1(.*)Alice Workspace2(.*)P2P Apps1/);
+  // Reference nodes show full paths: "Context → Head"
+  // P2P Apps is nested under Alice Workspace, so shows "Alice Workspace → P2P Apps"
+  const content = (await screen.findByLabelText("related to Bitcoin"))
+    .textContent;
+  expect(content).toMatch(/Alice Workspace → P2P Apps/);
+  expect(content).toMatch(/Alice Workspace/);
+  expect(content).toMatch(/Money/);
 });
 
 test("Root node shows references when there are more than 0", async () => {

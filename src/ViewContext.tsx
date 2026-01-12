@@ -8,6 +8,8 @@ import {
   joinID,
   shortID,
   splitID,
+  isRefId,
+  buildReferenceNode,
 } from "./connections";
 import { newDB } from "./knowledge";
 import { useData } from "./DataContext";
@@ -329,6 +331,11 @@ export function getNodeFromID(
   id: ID | LongID,
   myself: PublicKey
 ): KnowNode | undefined {
+  // Handle ref IDs - build a virtual ReferenceNode
+  if (isRefId(id)) {
+    return buildReferenceNode(id as LongID, knowledgeDBs, myself);
+  }
+
   const [remote, knowID] = splitID(id);
   const db = knowledgeDBs.get(remote || myself, newDB());
   const node = db.nodes.get(knowID);

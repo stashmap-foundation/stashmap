@@ -1,20 +1,30 @@
 import React from "react";
-import { useIsAddToNode, useViewPath } from "../ViewContext";
+import { useIsAddToNode, useNodeID, useViewPath } from "../ViewContext";
 import { usePaneNavigation } from "../SplitPanesContext";
+import { isRefId, parseRefId } from "../connections";
 
 export function FullscreenButton(): JSX.Element | null {
   const { stack, setStack } = usePaneNavigation();
   const viewPath = useViewPath();
+  const [nodeID] = useNodeID();
   const isAddToNode = useIsAddToNode();
   if (isAddToNode) {
     return null;
   }
 
   const onClick = (): void => {
-    // Set the full path: stacked workspaces + viewPath node IDs.
-    // stack.slice(0, -1) = workspaces before current one
-    // viewPath[0] is pane index, slice(1) gives all tree path entries
     const stackedWorkspaces = stack.slice(0, -1);
+
+    if (isRefId(nodeID)) {
+      const parsed = parseRefId(nodeID);
+      if (parsed) {
+        const targetStack = [...parsed.targetContext.toArray(), parsed.targetNode];
+        setStack([...stackedWorkspaces, ...targetStack]);
+        return;
+      }
+    }
+
+    // Regular nodes: use viewPath node IDs
     const viewPathNodeIDs = viewPath
       .slice(1)
       .map((subPath) => (subPath as { nodeID: LongID | ID }).nodeID);

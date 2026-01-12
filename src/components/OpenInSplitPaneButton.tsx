@@ -1,18 +1,20 @@
 import React from "react";
 import { useMediaQuery } from "react-responsive";
-import { useIsAddToNode, useViewPath } from "../ViewContext";
+import { useIsAddToNode, useNodeID, useViewPath } from "../ViewContext";
 import {
   useSplitPanes,
   usePaneIndex,
   usePaneNavigation,
 } from "../SplitPanesContext";
 import { IS_MOBILE } from "./responsive";
+import { isRefId, parseRefId } from "../connections";
 
 export function OpenInSplitPaneButton(): JSX.Element | null {
   const { addPaneAt } = useSplitPanes();
   const paneIndex = usePaneIndex();
   const { stack } = usePaneNavigation();
   const viewPath = useViewPath();
+  const [nodeID] = useNodeID();
   const isAddToNode = useIsAddToNode();
   const isMobile = useMediaQuery(IS_MOBILE);
 
@@ -24,6 +26,17 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
     // Build the full path: pane navigation stack (without last element, which is the workspace root)
     // + all node IDs from the ViewPath (skip pane index at position 0)
     const paneStackWithoutWorkspace = stack.slice(0, -1);
+
+    if (isRefId(nodeID)) {
+      const parsed = parseRefId(nodeID);
+      if (parsed) {
+        const targetStack = [...parsed.targetContext.toArray(), parsed.targetNode];
+        addPaneAt(paneIndex + 1, [...paneStackWithoutWorkspace, ...targetStack]);
+        return;
+      }
+    }
+
+    // Regular nodes: use viewPath node IDs
     const viewPathNodeIDs = viewPath
       .slice(1)
       .map((subPath) => (subPath as { nodeID: LongID | ID }).nodeID);

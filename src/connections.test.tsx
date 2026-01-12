@@ -10,6 +10,7 @@ import {
   aggregateWeightedVotes,
   aggregateNegativeWeightedVotes,
   countRelevanceVoting,
+  parseRefId,
 } from "./connections";
 import { ALICE, BOB, CAROL } from "./utils.test";
 import { newRelations } from "./ViewContext";
@@ -109,9 +110,13 @@ test("get referenced by relations", () => {
     ALICE.publicKey,
     btc.id
   );
-  expect(getNodeIDs(referencedBy?.items || List())).toEqual(
-    List([shortID(money.id), shortID(crypto.id)])
-  );
+  const refIds = getNodeIDs(referencedBy?.items || List());
+  const parsed = refIds.map((refId) => parseRefId(refId));
+  // All targetNodes should be Bitcoin
+  expect(parsed.every((p) => p?.targetNode === btc.id)).toBe(true);
+  // Contexts should contain Money and Crypto as the parent nodes
+  const parents = parsed.map((p) => p?.targetContext.last()).toSet();
+  expect(parents).toEqual(List([money.id, crypto.id]).toSet());
 });
 
 test("count relation votes", () => {

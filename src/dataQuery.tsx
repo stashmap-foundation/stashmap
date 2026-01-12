@@ -7,7 +7,7 @@ import {
   KIND_KNOWLEDGE_NODE,
   KIND_PROJECT,
 } from "./nostr";
-import { splitID } from "./connections";
+import { splitID, isRefId, extractNodeIdsFromRefId } from "./connections";
 import { REFERENCED_BY } from "./constants";
 import { ADD_TO_NODE, getNodeFromID, useNodeID } from "./ViewContext";
 import { MergeKnowledgeDB, useData } from "./DataContext";
@@ -103,6 +103,15 @@ function addAuthorFromIDToFilters(filters: Filters, id: LongID | ID): Filters {
 }
 
 export function addNodeToFilters(filters: Filters, id: LongID | ID): Filters {
+  // If this is a ref ID, extract all node IDs from the path and add them
+  if (isRefId(id)) {
+    const nodeIds = extractNodeIdsFromRefId(id);
+    return nodeIds.reduce(
+      (acc, nodeId) => addNodeToFilters(acc, nodeId),
+      filters
+    );
+  }
+
   return {
     ...addAuthorFromIDToFilters(filters, id),
     knowledgeNodesByID: addIDToFilter(filters.knowledgeNodesByID, id, "#d"),

@@ -34,7 +34,7 @@ test("Load Referenced By Nodes", async () => {
     <Data user={alice().user}>
       <RootViewOrWorkspaceIsLoading>
         <PushNode push={List([0])}>
-          <LoadNode>
+          <LoadNode referencedBy>
             <TreeView />
           </LoadNode>
         </PushNode>
@@ -48,8 +48,9 @@ test("Load Referenced By Nodes", async () => {
   await screen.findByText("Bitcoin");
   fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
   screen.getByText("Referenced By (3)");
-  await screen.findByText("Cryptocurrencies");
-  await screen.findByText("P2P Apps");
+  // Reference nodes display as "Parent → Bitcoin" paths
+  await screen.findByText(/Cryptocurrencies/);
+  await screen.findByText(/P2P Apps/);
 });
 
 test("Show Referenced By with content details", async () => {

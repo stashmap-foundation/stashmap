@@ -133,16 +133,25 @@ export function getReferencedByRelations(
   const rel = newRelations(nodeID, List<ID>(), myself);
 
   // Collect all (head, context) pairs where nodeID is referenced
-  const referencePaths = knowledgeDBs.reduce((acc, knowledgeDB) => {
+  // We need to store FULL IDs (with author prefix) so they can be queried later
+  const referencePaths = knowledgeDBs.reduce((acc, knowledgeDB, author) => {
     return knowledgeDB.relations.reduce((rdx, relations) => {
       // Check if any item's nodeID matches
       if (relations.items.some((item) => item.nodeID === nodeID)) {
-        // Create unique key for deduplication: head + context
-        const pathKey = `${relations.head}:${relations.context.join(",")}`;
+        // Convert short IDs to full IDs using the author from this knowledgeDB
+        const fullHead = relations.head.includes("_")
+          ? relations.head
+          : joinID(author, relations.head);
+        const fullContext = relations.context.map((ctxId) =>
+          ctxId.includes("_") ? ctxId : joinID(author, ctxId)
+        );
+
+        // Create unique key for deduplication: head + context (using full IDs)
+        const pathKey = `${fullHead}:${fullContext.join(",")}`;
         if (!rdx.some((p) => `${p.head}:${p.context.join(",")}` === pathKey)) {
           return rdx.push({
-            head: relations.head as ID,
-            context: relations.context,
+            head: fullHead as ID,
+            context: fullContext,
             updated: relations.updated,
           });
         }

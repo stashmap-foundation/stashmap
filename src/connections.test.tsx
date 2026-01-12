@@ -114,7 +114,7 @@ test("get referenced by relations", () => {
   const parsed = refIds.map((refId) => parseRefId(refId));
   // All targetNodes should be Bitcoin
   expect(parsed.every((p) => p?.targetNode === btc.id)).toBe(true);
-  // Contexts should contain Money and Crypto as the parent nodes
+  // Contexts now contain full IDs (with author prefix) for proper querying
   const parents = parsed.map((p) => p?.targetContext.last()).toSet();
   expect(parents).toEqual(List([money.id, crypto.id]).toSet());
 });

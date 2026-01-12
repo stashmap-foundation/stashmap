@@ -16,9 +16,7 @@ export function isReferenceNode(node: KnowNode): node is ReferenceNode {
   return node.type === "reference";
 }
 
-export function hasImageUrl(
-  node: KnowNode
-): node is TextNode | ProjectNode {
+export function hasImageUrl(node: KnowNode): node is TextNode | ProjectNode {
   return node.type === "text" || node.type === "project";
 }
 

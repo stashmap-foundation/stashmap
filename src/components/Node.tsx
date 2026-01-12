@@ -219,9 +219,7 @@ function NodeContent({ node }: { node: KnowNode }): JSX.Element {
 
     checkImageAccessibility();
   }, [imageUrl]);
-  const textToDisplay = imageUrl
-    ? node.text.replace(imageUrl, "")
-    : node.text;
+  const textToDisplay = imageUrl ? node.text.replace(imageUrl, "") : node.text;
 
   return (
     <span className="break-word">

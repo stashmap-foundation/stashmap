@@ -18,7 +18,10 @@ export function FullscreenButton(): JSX.Element | null {
     if (isRefId(nodeID)) {
       const parsed = parseRefId(nodeID);
       if (parsed) {
-        const targetStack = [...parsed.targetContext.toArray(), parsed.targetNode];
+        const targetStack = [
+          ...parsed.targetContext.toArray(),
+          parsed.targetNode,
+        ];
         setStack([...stackedWorkspaces, ...targetStack]);
         return;
       }

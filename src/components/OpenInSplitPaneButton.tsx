@@ -30,8 +30,14 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
     if (isRefId(nodeID)) {
       const parsed = parseRefId(nodeID);
       if (parsed) {
-        const targetStack = [...parsed.targetContext.toArray(), parsed.targetNode];
-        addPaneAt(paneIndex + 1, [...paneStackWithoutWorkspace, ...targetStack]);
+        const targetStack = [
+          ...parsed.targetContext.toArray(),
+          parsed.targetNode,
+        ];
+        addPaneAt(paneIndex + 1, [
+          ...paneStackWithoutWorkspace,
+          ...targetStack,
+        ]);
         return;
       }
     }

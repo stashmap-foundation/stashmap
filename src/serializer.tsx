@@ -200,9 +200,7 @@ export function eventToTextOrProjectNode(
   if (e.kind === KIND_PROJECT) {
     try {
       const project = parseProject(e);
-      return project
-        ? [id, { id: nodeId, text, ...project }]
-        : [undefined];
+      return project ? [id, { id: nodeId, text, ...project }] : [undefined];
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error(err);

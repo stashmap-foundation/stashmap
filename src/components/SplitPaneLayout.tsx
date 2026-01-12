@@ -185,7 +185,7 @@ function PaneContent(): JSX.Element {
           root={activeWorkspace as LongID}
           paneIndex={paneIndex}
         >
-          <LoadNode>
+          <LoadNode referencedBy>
             <WorkspaceView />
           </LoadNode>
         </RootViewContextProvider>

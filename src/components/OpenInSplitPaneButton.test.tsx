@@ -12,6 +12,8 @@ import {
   OpenInSplitPaneButtonWithStack,
 } from "./OpenInSplitPaneButton";
 import { ROOT } from "../types";
+import { DataContextProvider } from "../DataContext";
+import { setup, ALICE } from "../utils.test";
 
 function PaneCountDisplay(): JSX.Element {
   const { panes } = useSplitPanes();
@@ -19,17 +21,21 @@ function PaneCountDisplay(): JSX.Element {
 }
 
 function renderWithContext(viewPath: ViewPath): void {
+  const [alice] = setup([ALICE]);
   render(
-    <SplitPanesProvider>
-      <PaneIndexProvider index={0}>
-        <PaneNavigationProvider initialWorkspace={ROOT}>
-          <ViewContext.Provider value={viewPath}>
-            <OpenInSplitPaneButton />
-            <PaneCountDisplay />
-          </ViewContext.Provider>
-        </PaneNavigationProvider>
-      </PaneIndexProvider>
-    </SplitPanesProvider>
+    // eslint-disable-next-line react/jsx-props-no-spreading
+    <DataContextProvider {...alice()}>
+      <SplitPanesProvider>
+        <PaneIndexProvider index={0}>
+          <PaneNavigationProvider initialWorkspace={ROOT}>
+            <ViewContext.Provider value={viewPath}>
+              <OpenInSplitPaneButton />
+              <PaneCountDisplay />
+            </ViewContext.Provider>
+          </PaneNavigationProvider>
+        </PaneIndexProvider>
+      </SplitPanesProvider>
+    </DataContextProvider>
   );
 }
 
@@ -59,16 +65,20 @@ test("clicking button calls addPaneAt and creates new pane", () => {
 
 test("OpenInSplitPaneButtonWithStack passes provided stack to addPaneAt", () => {
   const stack = [ROOT, "node1" as LongID, "node2" as LongID];
+  const [alice] = setup([ALICE]);
 
   render(
-    <SplitPanesProvider>
-      <PaneIndexProvider index={0}>
-        <PaneNavigationProvider initialWorkspace={ROOT}>
-          <OpenInSplitPaneButtonWithStack stack={stack} />
-          <PaneCountDisplay />
-        </PaneNavigationProvider>
-      </PaneIndexProvider>
-    </SplitPanesProvider>
+    // eslint-disable-next-line react/jsx-props-no-spreading
+    <DataContextProvider {...alice()}>
+      <SplitPanesProvider>
+        <PaneIndexProvider index={0}>
+          <PaneNavigationProvider initialWorkspace={ROOT}>
+            <OpenInSplitPaneButtonWithStack stack={stack} />
+            <PaneCountDisplay />
+          </PaneNavigationProvider>
+        </PaneIndexProvider>
+      </SplitPanesProvider>
+    </DataContextProvider>
   );
 
   expect(screen.getByTestId("pane-count").textContent).toBe("1");

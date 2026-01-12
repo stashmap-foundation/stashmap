@@ -26,7 +26,6 @@ import { usePaneNavigation } from "../SplitPanesContext";
 import {
   addListToFilters,
   addNodeToFilters,
-  addReferencedByToFilters,
   createBaseFilter,
   filtersToFilterArray,
   useQueryKnowledgeData,
@@ -143,13 +142,10 @@ export function TreeViewNodeLoader({
     ? nodeIDs.slice(range.startIndex, range.endIndex + 1 + LOAD_EXTRA) // +1 because slice doesn't include last element
     : nodeIDs;
 
-  const filter = nodeIDsWithRange.reduce((rdx, nodeID) => {
-    const filterWithNode = addReferencedByToFilters(
-      addNodeToFilters(rdx, nodeID),
-      nodeID
-    );
-    return filterWithNode;
-  }, baseFilter);
+  const filter = nodeIDsWithRange.reduce(
+    (rdx, nodeID) => addNodeToFilters(rdx, nodeID),
+    baseFilter
+  );
 
   const finalFilter = filtersToFilterArray(filter);
   const { knowledgeDBs: mergedDBs, allEventsProcessed } =

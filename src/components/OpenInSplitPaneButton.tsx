@@ -30,14 +30,13 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
     if (isRefId(nodeID)) {
       const parsed = parseRefId(nodeID);
       if (parsed) {
+        // For Reference nodes, use only the reference's path (context + target)
+        // Don't include the current pane's stack
         const targetStack = [
           ...parsed.targetContext.toArray(),
           parsed.targetNode,
         ];
-        addPaneAt(paneIndex + 1, [
-          ...paneStackWithoutWorkspace,
-          ...targetStack,
-        ]);
+        addPaneAt(paneIndex + 1, targetStack);
         return;
       }
     }

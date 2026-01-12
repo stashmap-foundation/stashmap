@@ -29,8 +29,9 @@ export type DiffItem = {
  * that the current user doesn't have.
  *
  * Logic:
- * - Get current user's items for this relation type on this node
- * - Get all other users' relations of same type (excluding "not_relevant")
+ * - Get current user's items for this node (filtered by type)
+ * - Get all other users' relations on same node
+ * - Filter to items that have the requested type and aren't "not_relevant"
  * - Exclude items that are in the currently viewed relation (to avoid duplication)
  * - Return items that exist in others' but not in user's (deduplicated)
  */
@@ -38,33 +39,38 @@ export function getDiffItemsForNode(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
   nodeID: LongID | ID,
-  relationType: ID,
+  filterType: ID,
   currentRelationId?: LongID
 ): List<DiffItem> {
-  // Don't show diff items for "not_relevant" relation type
-  if (relationType === "not_relevant") {
+  // Don't show diff items for "not_relevant" type
+  if (filterType === "not_relevant") {
     return List<DiffItem>();
   }
 
   const [, localID] = splitID(nodeID);
 
-  // Get current user's items for this relation type
+  // Get current user's items with the requested type
   const myDB = knowledgeDBs.get(myself);
   const myRelations = myDB?.relations
-    .filter((r) => r.head === localID && r.type === relationType)
+    .filter((r) => r.head === localID)
     .toList();
   const myItems: ImmutableSet<LongID | ID> = (myRelations || List<Relations>())
-    .flatMap((r) => r.items)
+    .flatMap((r) =>
+      r.items
+        .filter((item) => item.types.includes(filterType))
+        .map((item) => item.nodeID)
+    )
     .toSet();
 
   // Also get user's "not_relevant" items to exclude them from diff
-  const myNotRelevantRelations = myDB?.relations
-    .filter((r) => r.head === localID && r.type === "not_relevant")
-    .toList();
   const myNotRelevantItems: ImmutableSet<LongID | ID> = (
-    myNotRelevantRelations || List<Relations>()
+    myRelations || List<Relations>()
   )
-    .flatMap((r) => r.items)
+    .flatMap((r) =>
+      r.items
+        .filter((item) => item.types.includes("not_relevant"))
+        .map((item) => item.nodeID)
+    )
     .toSet();
 
   // Get items from the currently viewed relation (to exclude from diff)
@@ -72,21 +78,16 @@ export function getDiffItemsForNode(
     ? getRelationsNoReferencedBy(knowledgeDBs, currentRelationId, myself)
     : undefined;
   const currentRelationItems: ImmutableSet<LongID | ID> = currentRelation
-    ? currentRelation.items.toSet()
+    ? currentRelation.items.map((item) => item.nodeID).toSet()
     : ImmutableSet<LongID | ID>();
 
-  // Get all other users' relations of the same type (excluding the currently viewed one)
+  // Get all other users' relations on this node
   const otherRelations: List<Relations> = knowledgeDBs
     .filter((_, pk) => pk !== myself)
     .toList()
     .flatMap((db) =>
       db.relations
-        .filter(
-          (r) =>
-            r.head === localID &&
-            r.type === relationType &&
-            r.id !== currentRelationId
-        )
+        .filter((r) => r.head === localID && r.id !== currentRelationId)
         .toList()
     );
 
@@ -95,14 +96,16 @@ export function getDiffItemsForNode(
     (acc: List<DiffItem>, relations: Relations) => {
       const newItems = relations.items
         .filter(
-          (item: LongID | ID) =>
-            !myItems.has(item) &&
-            !myNotRelevantItems.has(item) &&
-            !currentRelationItems.has(item) &&
-            !acc.find((d) => d.nodeID === item)
+          (item: RelationItem) =>
+            item.types.includes(filterType) &&
+            !item.types.includes("not_relevant") &&
+            !myItems.has(item.nodeID) &&
+            !myNotRelevantItems.has(item.nodeID) &&
+            !currentRelationItems.has(item.nodeID) &&
+            !acc.find((d) => d.nodeID === item.nodeID)
         )
-        .map((item: LongID | ID) => ({
-          nodeID: item as LongID,
+        .map((item: RelationItem) => ({
+          nodeID: item.nodeID as LongID,
           sourceRelationId: relations.id,
         }));
       return acc.concat(newItems);
@@ -210,19 +213,9 @@ function getViewExactMatch(views: Views, path: ViewPath): View | undefined {
   return views.get(viewKey);
 }
 
-function findIndexOfRelationType(types: RelationTypes, type: ID): number {
-  const index = types.keySeq().findIndex((k) => k === type);
-  return index === -1 ? Number.MAX_SAFE_INTEGER : index;
-}
-
-function sortRelationsAccordingToType(
-  relations: List<Relations>
-): List<Relations> {
-  return relations.sort((a, b) => {
-    const indexA = findIndexOfRelationType(RELATION_TYPES, a.type);
-    const indexB = findIndexOfRelationType(RELATION_TYPES, b.type);
-    return indexA - indexB;
-  });
+// Sort relations by updated timestamp (most recent first)
+function sortRelationsByDate(relations: List<Relations>): List<Relations> {
+  return relations.sort((a, b) => b.updated - a.updated);
 }
 
 export function getAvailableRelationsForNode(
@@ -232,13 +225,13 @@ export function getAvailableRelationsForNode(
 ): List<Relations> {
   const myRelations = knowledgeDBs.get(myself, newDB()).relations;
   const [remote, localID] = splitID(id);
-  const relations: List<Relations> = sortRelationsAccordingToType(
+  const relations: List<Relations> = sortRelationsByDate(
     myRelations.filter((r) => r.head === localID).toList()
   );
 
   const preferredRemoteRelations: List<Relations> =
     remote && isRemote(remote, myself)
-      ? sortRelationsAccordingToType(
+      ? sortRelationsByDate(
           knowledgeDBs
             .get(remote, newDB())
             .relations.filter((r) => r.head === localID)
@@ -248,7 +241,7 @@ export function getAvailableRelationsForNode(
   const otherRelations: List<Relations> = knowledgeDBs
     .filter((_, k) => k !== myself && k !== remote)
     .map((db) =>
-      sortRelationsAccordingToType(
+      sortRelationsByDate(
         db.relations.filter((r) => r.head === localID).toList()
       )
     )
@@ -365,8 +358,9 @@ export function calculateNodeIndex(
     throw new Error(`No item found at index ${index}`);
   }
   // find same relation before this index
-  return relations.items.slice(0, index).filter((i) => i === item)
-    .size as NodeIndex;
+  return relations.items
+    .slice(0, index)
+    .filter((i) => i.nodeID === item.nodeID).size as NodeIndex;
 }
 
 export function calculateIndexFromNodeIndex(
@@ -381,7 +375,7 @@ export function calculateIndexFromNodeIndex(
       if (found) {
         return [acc, true];
       }
-      if (item === node) {
+      if (item.nodeID === node) {
         if (acc === nodeIndex) {
           return [idx, true];
         }
@@ -427,15 +421,15 @@ export function addNodeToPath(
   if (!relations) {
     throw new Error("Parent doesn't have relations, cannot add to path");
   }
-  const nodeID = relations.items.get(index);
-  if (!nodeID) {
+  const item = relations.items.get(index);
+  if (!item) {
     // eslint-disable-next-line no-console
     console.error("No node found in relations", relations, " at index", index);
     throw new Error("No node found in relation at index");
   }
   const nodeIndex = calculateNodeIndex(relations, index);
   const pathWithRelations = addRelationsToLastElement(path, relations.id);
-  return [...pathWithRelations, { nodeID, nodeIndex }];
+  return [...pathWithRelations, { nodeID: item.nodeID, nodeIndex }];
 }
 
 /**
@@ -501,7 +495,7 @@ export function useIsDiffItem(): boolean {
   }
 
   // If the node is not in the parent's relation items, it's a diff item
-  return !parentRelations.items.includes(nodeID);
+  return !parentRelations.items.some((item) => item.nodeID === nodeID);
 }
 
 export function popViewPath(
@@ -647,14 +641,14 @@ function getChildViews(views: Views, path: ViewPath): Views {
 
 export function newRelations(
   head: LongID | ID,
-  type: ID,
+  context: Context,
   myself: PublicKey
 ): Relations {
   return {
     head: shortID(head),
-    items: List<LongID>(),
+    items: List<RelationItem>(),
+    context,
     id: joinID(myself, v4()),
-    type,
     updated: Math.floor(Date.now() / 1000),
     author: myself,
   };
@@ -665,7 +659,7 @@ function createUpdatableRelations(
   myself: PublicKey,
   relationsID: ID,
   head: LongID | ID,
-  relationTypeID: ID
+  context: Context
 ): Relations {
   const [remote, id] = splitID(relationsID);
   if (remote && isRemote(remote, myself)) {
@@ -678,7 +672,7 @@ function createUpdatableRelations(
     );
     if (!remoteRelations) {
       // This should not happen
-      return newRelations(head, relationTypeID, myself);
+      return newRelations(head, context, myself);
     }
     // Make a copy
     return {
@@ -688,7 +682,7 @@ function createUpdatableRelations(
   }
   return knowledgeDBs
     .get(myself, newDB())
-    .relations.get(id, newRelations(head, relationTypeID, myself));
+    .relations.get(id, newRelations(head, context, myself));
 }
 
 function moveChildViewsToNewRelation(
@@ -715,12 +709,14 @@ export function upsertRelations(
   const [nodeID, nodeView] = getNodeIDFromView(plan, viewPath);
   // create new relations if this node doesn't have any
   const relationsID = nodeView.relations || v4();
+  // TODO: derive context from viewPath
+  const context = List<ID>();
   const relations = createUpdatableRelations(
     plan.knowledgeDBs,
     plan.user.publicKey,
     relationsID,
     nodeID,
-    "" // TODO: relation type?
+    context
   );
 
   const didViewChange = nodeView.relations !== relations.id;

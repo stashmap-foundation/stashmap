@@ -1,4 +1,5 @@
 import React from "react";
+import { List } from "immutable";
 import { useDropzone } from "react-dropzone";
 import MarkdownIt from "markdown-it";
 import { newNode, bulkAddRelations } from "../connections";
@@ -25,7 +26,7 @@ function createRelationsFromParagraphNodes(
   const topParagraph = nodes[0];
   const furtherParagraphs = nodes.slice(1);
   const relations = bulkAddRelations(
-    newRelations(topParagraph.id, "", myself),
+    newRelations(topParagraph.id, List(), myself),
     furtherParagraphs.map((n) => n.id)
   );
   return [relations, topParagraph.id];

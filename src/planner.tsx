@@ -156,7 +156,12 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
     ...userDB,
     relations: updatedRelations,
   };
-  const itemsAsTags = relations.items.toArray().map((i) => ["i", i]);
+  // Items with embedded types: ["i", nodeID, type1, type2, ...]
+  const itemsAsTags = relations.items
+    .toArray()
+    .map((item) => ["i", item.nodeID, ...item.types.toArray()]);
+  // Context tag: ["ctx", ancestorID1, ancestorID2, ...]
+  const contextTag = ["ctx", ...relations.context.toArray()];
   const updateRelationsEvent = {
     kind: KIND_KNOWLEDGE_LIST,
     pubkey: plan.user.publicKey,
@@ -167,7 +172,7 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
       ["k", shortID(relations.head)],
       // Full ID Head
       ["head", relations.head],
-      ["rel_type", relations.type],
+      contextTag,
       ...itemsAsTags,
     ],
     content: "",

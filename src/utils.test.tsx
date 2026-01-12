@@ -596,7 +596,7 @@ function createNodesAndRelations(
       : planWithNode;
     if (children) {
       // Create Relations for children
-      const relationForChildren = newRelations(node.id, "", rdx.user.publicKey);
+      const relationForChildren = newRelations(node.id, List(), rdx.user.publicKey);
       const planWithRelations = planUpsertRelations(
         planWithUpdatedRelation,
         relationForChildren

@@ -2,7 +2,8 @@ export const KIND_SETTINGS = 11071;
 
 export const KIND_VIEWS = 11074;
 
-export const KIND_KNOWLEDGE_LIST = 34750;
+// Changed from 34750 to 34760 for new context-aware relations format
+export const KIND_KNOWLEDGE_LIST = 34760;
 export const KIND_KNOWLEDGE_NODE = 34751;
 // TODO: Make this non-editable
 export const KIND_PROJECT = 34752;

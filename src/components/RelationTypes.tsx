@@ -1,6 +1,6 @@
 import React from "react";
 import { Dropdown } from "react-bootstrap";
-import { OrderedMap, Set } from "immutable";
+import { List, OrderedMap, Set } from "immutable";
 import {
   Plan,
   planUpdateViews,
@@ -91,11 +91,11 @@ export function useGetAllVirtualLists(): RelationTypes {
 export function planAddNewRelationToNode(
   plan: Plan,
   nodeID: LongID,
-  relationTypeID: ID,
+  context: Context,
   view: View,
   viewPath: ViewPath
 ): Plan {
-  const relations = newRelations(nodeID, relationTypeID, plan.user.publicKey);
+  const relations = newRelations(nodeID, context, plan.user.publicKey);
   const createRelationPlan = planUpsertRelations(plan, relations);
   return planUpdateViews(
     createRelationPlan,
@@ -165,12 +165,14 @@ export function getRelationTypeByRelationsID(
   if (!relations || relationsID === REFERENCED_BY) {
     return [undefined, undefined];
   }
-  const relationTypeID = relations.type;
+  // Default to "relevant" type since types are now per-item
+  const relationTypeID = "" as ID;
 
   const relationType = RELATION_TYPES.get(relationTypeID);
   return [relationType, relationTypeID];
 }
 
+// TODO: This component needs to be reworked - types are now per-item, not per-relation
 export function AddNewRelationsToNodeItem({
   relationTypeID,
 }: {
@@ -189,10 +191,11 @@ export function AddNewRelationsToNodeItem({
     if (!node) {
       throw new Error("Node not found");
     }
+    // Create new relation with empty context (types are now per-item)
     const plan = planAddNewRelationToNode(
       createPlan(),
       node.id,
-      relationTypeID,
+      List(), // Empty context
       view,
       viewPath
     );

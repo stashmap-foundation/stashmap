@@ -167,11 +167,23 @@ declare global {
     expanded?: boolean;
   };
 
+  // Context is the path of ancestor node IDs leading to the head node
+  // e.g., [scholarium-id, places-id] when viewing via "Scholarium > Places > Node"
+  type Context = List<ID>;
+
+  // Each item in a relation has its own types (one from each group allowed)
+  // Relevance group (mutually exclusive): "", "maybe_relevant", "little_relevant", "not_relevant"
+  // Evidence group (mutually exclusive): "confirms", "contra"
+  type RelationItem = {
+    nodeID: LongID | ID;
+    types: List<ID>;
+  };
+
   type Relations = {
-    items: List<LongID | ID>;
+    items: List<RelationItem>;
     head: ID;
+    context: Context;
     id: LongID;
-    type: ID;
     updated: number;
     author: PublicKey;
   };

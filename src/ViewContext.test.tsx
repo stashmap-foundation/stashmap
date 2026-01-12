@@ -61,18 +61,18 @@ test("Move View Settings on Delete", async () => {
   ]);
 
   const wsRelations = addRelationToRelations(
-    newRelations(ROOT, "", publicKey),
+    newRelations(ROOT, List(), publicKey),
     pl.id
   );
   const planWithRelations = planUpsertRelations(
     planUpsertRelations(
       planUpsertRelations(
         planWithNodes,
-        bulkAddRelations(newRelations(pl.id, "", publicKey), [c.id, java.id])
+        bulkAddRelations(newRelations(pl.id, List(), publicKey), [c.id, java.id])
       ),
       wsRelations
     ),
-    addRelationToRelations(newRelations(c.id, "", publicKey), cpp.id)
+    addRelationToRelations(newRelations(c.id, List(), publicKey), cpp.id)
   );
 
   await execute({
@@ -278,9 +278,21 @@ test("Alter View paths after disconnect", () => {
 });
 
 test("Calculate index from node index", () => {
+  // Items are now RelationItem objects with nodeID and types
   const relations: Relations = {
-    items: List(["pl", "oop", "pl", "pl", "java"]),
-  } as Relations;
+    items: List([
+      { nodeID: "pl" as LongID, types: List([""]) },
+      { nodeID: "oop" as LongID, types: List([""]) },
+      { nodeID: "pl" as LongID, types: List([""]) },
+      { nodeID: "pl" as LongID, types: List([""]) },
+      { nodeID: "java" as LongID, types: List([""]) },
+    ]),
+    head: "test" as ID,
+    context: List<ID>(),
+    id: "test" as LongID,
+    updated: 0,
+    author: ALICE.publicKey,
+  };
   expect(calculateNodeIndex(relations, 0)).toBe(0);
   expect(calculateNodeIndex(relations, 1)).toBe(0);
   expect(calculateNodeIndex(relations, 2)).toBe(1);
@@ -322,40 +334,41 @@ test("Parse View path", () => {
   ]);
 });
 
-test("Default Relations are deterministic", () => {
+test("Default Relations returns most recently updated relation", () => {
   const node = newNode("Node", ALICE.publicKey);
   const nodes = Map<KnowNode>({ [node.id]: node });
 
-  const pro = {
-    items: List<LongID>(),
-    id: "confirms" as LongID,
-    type: "confirms",
+  // With per-item types, relations are sorted by date (most recent first)
+  const older: Relations = {
+    items: List<RelationItem>(),
+    id: "older" as LongID,
+    context: List<ID>(),
     head: shortID(node.id),
-    updated: 0,
+    updated: 100,
     author: ALICE.publicKey,
   };
-  const contra = {
-    items: List<LongID>(),
-    id: "contra" as LongID,
-    type: "contra",
+  const newest: Relations = {
+    items: List<RelationItem>(),
+    id: "newest" as LongID,
+    context: List<ID>(),
     head: shortID(node.id),
-    updated: 0,
+    updated: 300, // Most recent
     author: ALICE.publicKey,
   };
-  const def = {
-    items: List<LongID>(),
-    id: "default" as LongID,
-    type: "",
+  const middle: Relations = {
+    items: List<RelationItem>(),
+    id: "middle" as LongID,
+    context: List<ID>(),
     head: shortID(node.id),
-    updated: 0,
+    updated: 200,
     author: ALICE.publicKey,
   };
 
   const relations = Map<ID, Relations>([
-    ["pro", pro],
-    ["default", def],
-    ["contra", contra],
-  ] as [string, Relations][]);
+    ["older", older],
+    ["newest", newest],
+    ["middle", middle],
+  ]);
 
   const defaultRelation = getDefaultRelationForNode(
     node.id,
@@ -365,7 +378,8 @@ test("Default Relations are deterministic", () => {
     ][]),
     ALICE.publicKey
   );
-  expect(defaultRelation).toEqual("default");
+  // Most recently updated relation should be returned
+  expect(defaultRelation).toEqual("newest");
 });
 
 test("View doesn't change if list is copied from contact", async () => {
@@ -440,22 +454,14 @@ test("Disconnect Nodes", async () => {
   });
   await screen.findByText("Programming Languages");
 
-  // disconnect nodes from relevant moves nodes to not relevant
+  // disconnect nodes removes them completely (types are now per-item)
   fireEvent.click(await screen.findByLabelText("disconnect node Java"));
   expect(screen.queryByText("Java")).toBeNull();
   expect(extractNodes(container)).toEqual(["C", "C++", "Rust"]);
-  fireEvent.click(await screen.findByLabelText("disconnect node C"));
-  expect(screen.queryByText("C")).toBeNull();
-  fireEvent.click(
-    await screen.findByLabelText(
-      "show items not relevant for Programming Languages"
-    )
-  );
-  expect(extractNodes(container)).toEqual(["Java", "C"]);
 
-  // disconnect node from not relevant removes node completely
   fireEvent.click(await screen.findByLabelText("disconnect node C"));
   expect(screen.queryByText("C")).toBeNull();
+  expect(extractNodes(container)).toEqual(["C++", "Rust"]);
 
   cleanup();
 });

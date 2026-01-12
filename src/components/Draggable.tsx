@@ -1,4 +1,5 @@
 import React, { useRef } from "react";
+import { List } from "immutable";
 import { ConnectableElement, useDrag } from "react-dnd";
 import {
   ViewPath,
@@ -118,21 +119,24 @@ function DeclineDiffItemButton(): JSX.Element {
     const [parentNodeID] = getNodeIDFromView(data, parentPath);
     const headID = shortID(parentNodeID);
 
-    // Find existing "not_relevant" relation for this head, or create new one
+    // TODO: Mark item as "not_relevant" by changing its type
+    // For now, just add as a new item with not_relevant type
     const myRelations = data.knowledgeDBs.get(
       data.user.publicKey,
       newDB()
     ).relations;
-    const existingNotRelevant = myRelations.find(
-      (r) => r.head === headID && r.type === "not_relevant"
+    const existingRelation = myRelations.find((r) => r.head === headID);
+
+    const relation =
+      existingRelation ||
+      newRelations(parentNodeID, List<ID>(), data.user.publicKey);
+
+    // Add this item with not_relevant type
+    const updatedRelation = addRelationToRelations(
+      relation,
+      nodeID,
+      List(["not_relevant"])
     );
-
-    const notRelevantRelation =
-      existingNotRelevant ||
-      newRelations(parentNodeID, "not_relevant", data.user.publicKey);
-
-    // Add only this item to the not_relevant relation
-    const updatedRelation = addRelationToRelations(notRelevantRelation, nodeID);
     const plan = planUpsertRelations(createPlan(), updatedRelation);
     executePlan(plan);
   };

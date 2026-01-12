@@ -1,5 +1,5 @@
 import { fireEvent, screen } from "@testing-library/react";
-import { Map, OrderedSet } from "immutable";
+import { List, Map, OrderedSet } from "immutable";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -96,11 +96,11 @@ test("Diff items are always added, never moved", () => {
   const bobChild = newNode("Bob's Child", bobPK);
 
   const aliceRelations = addRelationToRelations(
-    newRelations(parent.id, "", alicePK),
+    newRelations(parent.id, List(), alicePK),
     aliceChild.id
   );
   const bobRelations = addRelationToRelations(
-    newRelations(parent.id, "", bobPK),
+    newRelations(parent.id, List(), bobPK),
     bobChild.id
   );
 
@@ -169,6 +169,7 @@ test("Diff items are always added, never moved", () => {
     ?.relations.get(shortID(aliceRelations.id));
 
   expect(updatedRelations?.items.size).toBe(2);
-  expect(updatedRelations?.items.toArray()).toContain(bobChild.id);
-  expect(updatedRelations?.items.toArray()).toContain(aliceChild.id);
+  const nodeIDs = updatedRelations?.items.map((item) => item.nodeID).toArray();
+  expect(nodeIDs).toContain(bobChild.id);
+  expect(nodeIDs).toContain(aliceChild.id);
 });

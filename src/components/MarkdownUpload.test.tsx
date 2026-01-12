@@ -38,7 +38,7 @@ async function uploadAndRenderMarkdown(alice: UpdateState): Promise<void> {
   const addNodeToWS = planUpsertRelations(
     plan,
     addRelationToRelations(
-      newRelations(wsID, "", alice().user.publicKey),
+      newRelations(wsID, List(), alice().user.publicKey),
       topNodeID
     )
   );

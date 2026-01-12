@@ -122,7 +122,12 @@ export function dnd(
     plan,
     toView,
     (relations: Relations) => {
-      return bulkAddRelations(relations, sourceNodes.toArray(), dropIndex);
+      return bulkAddRelations(
+        relations,
+        sourceNodes.toArray(),
+        List([""]), // Default to "relevant" type
+        dropIndex
+      );
     }
   );
   const updatedViews = bulkUpdateViewPathsAfterAddRelation(

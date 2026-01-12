@@ -427,11 +427,12 @@ export function getNodesInTree(
     ctx
   );
 
+  // TODO: Filter diff items based on active type filters
   const diffItems = getDiffItemsForNode(
     data.knowledgeDBs,
     data.user.publicKey,
     parentNodeID,
-    relations.type,
+    "", // Default to "relevant" type for now
     relations.id
   );
 

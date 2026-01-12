@@ -249,10 +249,11 @@ function GhostRelationButton({
     if (!node) {
       throw new Error("Node not found");
     }
+    // Create new relation with empty context (context will be derived from view path)
     const plan = planAddNewRelationToNode(
       createPlan(),
       node.id,
-      relationTypeID,
+      List(),
       view,
       viewPath
     );
@@ -720,41 +721,22 @@ export function ReadonlyRelations(): JSX.Element | null {
     nodeID
   );
 
-  const groupedByType = relations.groupBy((r) => r.type);
-
-  // Define which IDs mark the end of a semantic group
-  const isEndOfGroup = (id: string): boolean => {
-    return id === "not_relevant" || id === "contra" || id === "contains";
-  };
+  // Since types are now per-item, just show total item count across all relations
+  const totalCount = relations.reduce((sum, r) => sum + r.items.size, 0);
 
   return (
     <div className="menu-layout font-size-small">
       <ul className="nav nav-underline gap-0">
-        {RELATION_TYPES.keySeq()
-          .toArray()
-          .map((relationTypeID) => {
-            const relationsOfType = groupedByType.get(relationTypeID);
-            const totalCount = relationsOfType
-              ? relationsOfType.reduce((sum, r) => sum + r.items.size, 0)
-              : 0;
-            const relationType = RELATION_TYPES.get(relationTypeID);
-            const color = relationType?.color || "black";
-            const addGroupSpacing = isEndOfGroup(relationTypeID);
-            return (
-              <RelationButton
-                key={relationTypeID}
-                color={color}
-                label={relationType?.label || ""}
-                ariaLabel={`${totalCount} ${relationType?.label || "items"}`}
-                id={relationTypeID}
-                count={totalCount}
-                isActive={false}
-                disabled
-                showVertical={false}
-                addGroupSpacing={addGroupSpacing}
-              />
-            );
-          })}
+        <RelationButton
+          color="black"
+          label="items"
+          ariaLabel={`${totalCount} items`}
+          id="items"
+          count={totalCount}
+          isActive={false}
+          disabled
+          showVertical={false}
+        />
       </ul>
     </div>
   );
@@ -780,8 +762,6 @@ export function SelectRelations({
     nodeID
   );
 
-  const groupedByType = relations.groupBy((r) => r.type);
-
   // Determine if we should show vertical or horizontal bars
   // Root always shows vertical, regular notes: horizontal by default, vertical when expanded
   // Note: viewPath[0] is pane index, so length 2 = [paneIndex, root]
@@ -789,92 +769,36 @@ export function SelectRelations({
   const showVertical = alwaysOneSelected || isRoot || view.expanded === true;
   const forceOneSelected = alwaysOneSelected || isRoot;
 
-  const allItems: { type: string; id: LongID }[] = [
-    ...RELATION_TYPES.keySeq()
-      .toArray()
-      .map((id) => ({ type: "relation" as const, id: id as LongID })),
-    ...VIRTUAL_LISTS.keySeq()
-      .toArray()
-      .map((id) => ({ type: "virtualList" as const, id: id as LongID })),
-  ];
-
-  // Only sort to show current relation first when expanded/vertical
-  const sortedItems = showVertical
-    ? [...allItems].sort((a, b) => {
-        const isCurrentA =
-          a.type === "relation"
-            ? currentRelations?.type === a.id
-            : view.relations === a.id;
-        const isCurrentB =
-          b.type === "relation"
-            ? currentRelations?.type === b.id
-            : view.relations === b.id;
-
-        if (isCurrentA) return -1;
-        if (isCurrentB) return 1;
-        return 0;
-      })
-    : allItems;
-
-  // Define which IDs mark the end of a semantic group
-  const isEndOfGroup = (id: LongID): boolean => {
-    return (
-      id === "not_relevant" ||
-      id === "contra" ||
-      id === "contains" ||
-      id === REFERENCED_BY
-    );
-  };
+  // Since types are now per-item, show all relations as a single list
+  // along with Referenced By option
+  const hasRelations = relations.size > 0;
 
   return (
     <div className="menu-layout font-size-small">
       <ul className="nav nav-underline gap-0">
-        {sortedItems.map((item) => {
-          const addGroupSpacing = isEndOfGroup(item.id);
-
-          if (item.type === "relation") {
-            const relationsOfType = groupedByType.get(item.id);
-            if (relationsOfType) {
-              return (
-                <SelectRelationsButton
-                  relationList={relationsOfType.toList()}
-                  alwaysOneSelected={forceOneSelected}
-                  currentSelectedRelations={currentRelations}
-                  showVertical={showVertical}
-                  addGroupSpacing={addGroupSpacing}
-                  key={item.id}
-                />
-              );
-            }
-            return (
-              <GhostRelationButton
-                relationTypeID={item.id}
-                showVertical={showVertical}
-                addGroupSpacing={addGroupSpacing}
-                key={item.id}
-              />
-            );
-          }
-          if (item.id === REFERENCED_BY) {
-            return (
-              <ReferencedByRelationsButton
-                alwaysOneSelected={forceOneSelected}
-                currentRelations={currentRelations}
-                showVertical={showVertical}
-                addGroupSpacing={addGroupSpacing}
-                key={item.id}
-              />
-            );
-          }
-          return (
-            <GhostVirtualListButton
-              virtualListID={item.id}
-              showVertical={showVertical}
-              addGroupSpacing={addGroupSpacing}
-              key={item.id}
-            />
-          );
-        })}
+        {/* Show existing relations or ghost button to create new */}
+        {hasRelations ? (
+          <SelectRelationsButton
+            relationList={relations}
+            alwaysOneSelected={forceOneSelected}
+            currentSelectedRelations={currentRelations}
+            showVertical={showVertical}
+            addGroupSpacing={false}
+          />
+        ) : (
+          <GhostRelationButton
+            relationTypeID={"" as ID}
+            showVertical={showVertical}
+            addGroupSpacing={false}
+          />
+        )}
+        {/* Referenced By toggle */}
+        <ReferencedByRelationsButton
+          alwaysOneSelected={forceOneSelected}
+          currentRelations={currentRelations}
+          showVertical={showVertical}
+          addGroupSpacing={false}
+        />
       </ul>
     </div>
   );

@@ -1,6 +1,6 @@
 import React from "react";
 import { screen } from "@testing-library/react";
-import { Map } from "immutable";
+import { List, Map } from "immutable";
 import { addRelationToRelations, newNode, shortID } from "../connections";
 import { DND } from "../dnd";
 import { ALICE, BOB, renderWithTestData, setup, follow } from "../utils.test";
@@ -25,7 +25,7 @@ test("Shows dots when other user has a relation of same type", async () => {
   const parentNode = newNode("Parent Node", alicePK);
   const childNode = newNode("Child Node", alicePK);
   const aliceRelations = addRelationToRelations(
-    newRelations(parentNode.id, "", alicePK),
+    newRelations(parentNode.id, List(), alicePK),
     childNode.id
   );
 
@@ -39,7 +39,7 @@ test("Shows dots when other user has a relation of same type", async () => {
   const { publicKey: bobPK } = bob().user;
   const bobChildNode = newNode("Bob's Child Node", bobPK);
   const bobRelations = addRelationToRelations(
-    newRelations(parentNode.id, "", bobPK),
+    newRelations(parentNode.id, List(), bobPK),
     bobChildNode.id
   );
 
@@ -82,7 +82,7 @@ test("Shows no dots when user is the only one with a relation", async () => {
   const parentNode = newNode("Parent Node", alicePK);
   const childNode = newNode("Child Node", alicePK);
   const aliceRelations = addRelationToRelations(
-    newRelations(parentNode.id, "", alicePK),
+    newRelations(parentNode.id, List(), alicePK),
     childNode.id
   );
 
@@ -128,7 +128,7 @@ test("Shows dots when only other user has relation (current user has none)", asy
   const { publicKey: bobPK } = bob().user;
   const bobChildNode = newNode("Bob's Child Node", bobPK);
   const bobRelations = addRelationToRelations(
-    newRelations(parentNode.id, "", bobPK),
+    newRelations(parentNode.id, List(), bobPK),
     bobChildNode.id
   );
 
@@ -172,13 +172,13 @@ test("getDiffItemsForNode returns items from other users", () => {
   const parentNode = newNode("Parent Node", alicePK);
   const aliceChildNode = newNode("Alice's Child", alicePK);
   const aliceRelations = addRelationToRelations(
-    newRelations(parentNode.id, "", alicePK),
+    newRelations(parentNode.id, List(), alicePK),
     aliceChildNode.id
   );
 
   const bobChildNode = newNode("Bob's Child", bobPK);
   const bobRelations = addRelationToRelations(
-    newRelations(parentNode.id, "", bobPK),
+    newRelations(parentNode.id, List(), bobPK),
     bobChildNode.id
   );
 
@@ -219,13 +219,13 @@ test("Diff items are not included when saving a relation", () => {
   const parentNode = newNode("Parent Node", alicePK);
   const aliceChildNode = newNode("Alice's Child", alicePK);
   const aliceRelations = addRelationToRelations(
-    newRelations(parentNode.id, "", alicePK),
+    newRelations(parentNode.id, List(), alicePK),
     aliceChildNode.id
   );
 
   const bobChildNode = newNode("Bob's Child", bobPK);
   const bobRelations = addRelationToRelations(
-    newRelations(parentNode.id, "", bobPK),
+    newRelations(parentNode.id, List(), bobPK),
     bobChildNode.id
   );
 
@@ -250,8 +250,11 @@ test("Diff items are not included when saving a relation", () => {
   const savedRelation = aliceDB?.relations.get(shortID(aliceRelations.id));
 
   expect(savedRelation?.items.size).toBe(1);
-  expect(savedRelation?.items.get(0)).toBe(aliceChildNode.id);
-  expect(savedRelation?.items.includes(bobChildNode.id)).toBe(false);
+  expect(savedRelation?.items.get(0)?.nodeID).toBe(aliceChildNode.id);
+  // Check that bob's child is not in alice's relation items
+  expect(
+    savedRelation?.items.some((item) => item.nodeID === bobChildNode.id)
+  ).toBe(false);
 });
 
 test("getDiffItemsForNode deduplicates items from multiple other users", () => {
@@ -263,18 +266,18 @@ test("getDiffItemsForNode deduplicates items from multiple other users", () => {
   const parentNode = newNode("Parent Node", alicePK);
   const aliceChildNode = newNode("Alice's Child", alicePK);
   const aliceRelations = addRelationToRelations(
-    newRelations(parentNode.id, "", alicePK),
+    newRelations(parentNode.id, List(), alicePK),
     aliceChildNode.id
   );
 
   const bobChildNode = newNode("Bob's Child", bobPK);
   const bobRelations = addRelationToRelations(
-    newRelations(parentNode.id, "", bobPK),
+    newRelations(parentNode.id, List(), bobPK),
     bobChildNode.id
   );
 
   const carolRelations = addRelationToRelations(
-    newRelations(parentNode.id, "", carolPK),
+    newRelations(parentNode.id, List(), carolPK),
     bobChildNode.id
   );
 

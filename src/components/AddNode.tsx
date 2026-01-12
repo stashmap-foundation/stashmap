@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { List } from "immutable";
 import { useMediaQuery } from "react-responsive";
 import ReactQuill from "react-quill";
 import { CloseButton, NodeCard } from "../commons/Ui";
@@ -245,7 +246,10 @@ export function AddColumn(): JSX.Element {
       viewPath,
       (relations) => ({
         ...relations,
-        items: relations.items.push(nodeID),
+        items: relations.items.push({
+          nodeID,
+          types: List([""]), // Default to "relevant"
+        }),
       })
     );
     executePlan(updateRelationsPlan);
@@ -286,7 +290,10 @@ export function AddNodeToNode(): JSX.Element | null {
       viewContext,
       (relations) => ({
         ...relations,
-        items: relations.items.push(nodeID),
+        items: relations.items.push({
+          nodeID,
+          types: List([""]), // Default to "relevant"
+        }),
       })
     );
     executePlan(updateRelationsPlan);

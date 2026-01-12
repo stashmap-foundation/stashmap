@@ -117,17 +117,28 @@ export function viewsToJSON(views: Map<string, View>): Serializable {
 export function eventToRelations(e: UnsignedEvent): Relations | undefined {
   const id = findTag(e, "d");
   const head = findTag(e, "k") as ID;
-  const type = findTag(e, "rel_type");
   const updated = e.created_at;
-  if (id === undefined || head === undefined || type === undefined) {
+  if (id === undefined || head === undefined) {
     return undefined;
   }
+
+  // Parse context from ctx tag
+  const contextTag = findAllTags(e, "ctx")?.[0];
+  const context = contextTag ? List(contextTag.map((c) => c as ID)) : List<ID>();
+
+  // Parse items with embedded types: ["i", nodeID, type1, type2, ...]
   const itemsAsTags = findAllTags(e, "i") || [];
-  const items = List(itemsAsTags.map((i) => i[0] as LongID));
+  const items = List(
+    itemsAsTags.map((tagValues) => ({
+      nodeID: tagValues[0] as LongID,
+      types: List(tagValues.slice(1) as ID[]),
+    }))
+  );
+
   return {
     id: joinID(e.pubkey, id),
     head,
-    type,
+    context,
     updated,
     items,
     author: e.pubkey as PublicKey,

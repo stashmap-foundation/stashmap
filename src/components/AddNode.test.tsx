@@ -1,5 +1,6 @@
 import { screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { List } from "immutable";
 import { addRelationToRelations, newNode } from "../connections";
 import {
   setup,
@@ -51,7 +52,7 @@ test("Link Nodes from other Users", async () => {
   const oop = newNode("Object Oriented Languages", bob().user.publicKey);
   const java = newNode("Java", bob().user.publicKey);
   const relations = addRelationToRelations(
-    newRelations(oop.id, "" as ID, bob().user.publicKey),
+    newRelations(oop.id, List(), bob().user.publicKey),
     java.id
   );
   const plan = planUpsertRelations(
@@ -96,7 +97,7 @@ test("Default Relations are shown when adding a node from other User via search"
   const oop = newNode("Object Oriented Languages", bob().user.publicKey);
   const java = newNode("Java", bob().user.publicKey);
   const relations = addRelationToRelations(
-    newRelations(oop.id, "" as ID, bob().user.publicKey),
+    newRelations(oop.id, List(), bob().user.publicKey),
     java.id
   );
   const plan = planUpsertRelations(

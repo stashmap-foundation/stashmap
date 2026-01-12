@@ -25,8 +25,8 @@ import { ROOT } from "../types";
 function disconnectNode(plan: Plan, toDisconnect: LongID | ID): Plan {
   const myDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
   return myDB.relations.reduce((rdx, relation) => {
-    const toDelete = relation.items.reduce((indices, id, idx) => {
-      if (id === toDisconnect) {
+    const toDelete = relation.items.reduce((indices, item, idx) => {
+      if (item.nodeID === toDisconnect) {
         return indices.add(idx);
       }
       return indices;

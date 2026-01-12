@@ -30,12 +30,10 @@ function sampleNodes(): {
   const d = newNode("c", ALICE.publicKey);
   const e = newNode("e", ALICE.publicKey);
 
-  const relations = bulkAddRelations(newRelations(a.id, "", ALICE.publicKey), [
-    b.id,
-    c.id,
-    d.id,
-    e.id,
-  ]);
+  const relations = bulkAddRelations(
+    newRelations(a.id, List(), ALICE.publicKey),
+    [b.id, c.id, d.id, e.id]
+  );
 
   const nodes = Map({
     [a.id]: a,
@@ -47,24 +45,31 @@ function sampleNodes(): {
   return { nodes, a, b, c, d, e, relations };
 }
 
+// Helper to extract nodeIDs from RelationItems for easier testing
+function getNodeIDs(items: List<RelationItem>): List<LongID | ID> {
+  return items.map((item) => item.nodeID);
+}
+
 test("Add new Connection", () => {
   const { b, c, d, e, relations } = sampleNodes();
   const n = newNode("hello", ALICE.publicKey);
   const updated = addRelationToRelations(relations, n.id);
-  expect(updated.items).toEqual(List([b.id, c.id, d.id, e.id, n.id]));
+  expect(getNodeIDs(updated.items)).toEqual(
+    List([b.id, c.id, d.id, e.id, n.id])
+  );
 });
 
 test("Position of new connection can be specified", () => {
   const { b, c, d, e, relations } = sampleNodes();
   const b0 = newNode("b0", ALICE.publicKey);
-  expect(addRelationToRelations(relations, b0.id, 0).items).toEqual(
-    List([b0.id, b.id, c.id, d.id, e.id])
-  );
+  expect(
+    getNodeIDs(addRelationToRelations(relations, b0.id, List([""]), 0).items)
+  ).toEqual(List([b0.id, b.id, c.id, d.id, e.id]));
 });
 
 test("Reorder existing connections", () => {
   const { b, c, d, e, relations } = sampleNodes();
-  expect(moveRelations(relations, [2], 0).items).toEqual(
+  expect(getNodeIDs(moveRelations(relations, [2], 0).items)).toEqual(
     List([d.id, b.id, c.id, e.id])
   );
 });
@@ -77,11 +82,11 @@ test("get referenced by relations", () => {
   const crypto = newNode("Crypto", BOB.publicKey);
 
   const moneyRelations = addRelationToRelations(
-    newRelations(money.id, "", ALICE.publicKey),
+    newRelations(money.id, List(), ALICE.publicKey),
     btc.id
   );
   const cryptoRelations = addRelationToRelations(
-    newRelations(crypto.id, "", BOB.publicKey),
+    newRelations(crypto.id, List(), BOB.publicKey),
     btc.id
   );
   const aliceDBWithRelations = {
@@ -104,7 +109,7 @@ test("get referenced by relations", () => {
     ALICE.publicKey,
     btc.id
   );
-  expect(referencedBy?.items).toEqual(
+  expect(getNodeIDs(referencedBy?.items || List())).toEqual(
     List([shortID(money.id), shortID(crypto.id)])
   );
 });
@@ -116,17 +121,21 @@ test("count relation votes", () => {
   const optionC = newNode("C", ALICE.publicKey);
   const optionD = newNode("D", ALICE.publicKey);
 
+  // Types are now per-item, use List(["PRO"]) for the type
   const aliceVotes = bulkAddRelations(
-    newRelations(vote.id, "PRO", ALICE.publicKey),
-    [optionA.id, optionB.id, optionC.id, optionD.id] // 5/11, 3/11, 2/11, 1/11 *10000
+    newRelations(vote.id, List(), ALICE.publicKey),
+    [optionA.id, optionB.id, optionC.id, optionD.id], // 5/11, 3/11, 2/11, 1/11 *10000
+    List(["PRO"])
   );
   const bobVotes = bulkAddRelations(
-    newRelations(vote.id, "PRO", BOB.publicKey),
-    [optionD.id, optionB.id, optionC.id, optionA.id] // 5/11, 3/11, 2/11, 1/11 *10000
+    newRelations(vote.id, List(), BOB.publicKey),
+    [optionD.id, optionB.id, optionC.id, optionA.id], // 5/11, 3/11, 2/11, 1/11 *10000
+    List(["PRO"])
   );
   const carolVotes = bulkAddRelations(
-    newRelations(vote.id, "PRO", CAROL.publicKey),
-    [optionA.id, optionB.id, optionC.id] // 3/6, 2/6, 1/6 *10000
+    newRelations(vote.id, List(), CAROL.publicKey),
+    [optionA.id, optionB.id, optionC.id], // 3/6, 2/6, 1/6 *10000
+    List(["PRO"])
   );
 
   expect(
@@ -141,11 +150,16 @@ test("count relation votes", () => {
   );
 });
 
+// Helper to create RelationItem from nodeID with type
+function makeItem(nodeID: string, type: string = ""): RelationItem {
+  return { nodeID: nodeID as LongID, types: List([type]) };
+}
+
 test("aggregate weighted votes", () => {
-  const alice = ["A", "B", "C", "D"];
-  const bob = ["B", "C", "D", "A"];
-  const carol = ["C", "A", "B"];
-  const dan = ["D"];
+  const alice = ["A", "B", "C", "D"].map((id) => makeItem(id, ""));
+  const bob = ["B", "C", "D", "A"].map((id) => makeItem(id, ""));
+  const carol = ["C", "A", "B"].map((id) => makeItem(id, ""));
+  const dan = ["D"].map((id) => makeItem(id, ""));
 
   const listsOfVotes = List([
     { items: List(alice), weight: 20 },
@@ -153,7 +167,7 @@ test("aggregate weighted votes", () => {
     { items: List(carol), weight: 10 },
     { items: List(dan), weight: 1 },
   ]);
-  expect(aggregateWeightedVotes(listsOfVotes)).toEqual(
+  expect(aggregateWeightedVotes(listsOfVotes, "")).toEqual(
     Map({
       A: 21.515151515151512, // 5/11*20 + 1/11*100 + 2/6*10
       B: 52.57575757575757, // 3/11*20 + 5/11*100 + 1/6*10
@@ -164,10 +178,10 @@ test("aggregate weighted votes", () => {
 });
 
 test("aggregate negative weighted votes", () => {
-  const alice = ["A", "B", "C", "D"];
-  const bob = ["B", "C", "D", "A"];
-  const carol = ["C", "A", "B"];
-  const dan = ["D"];
+  const alice = ["A", "B", "C", "D"].map((id) => makeItem(id, "not_relevant"));
+  const bob = ["B", "C", "D", "A"].map((id) => makeItem(id, "not_relevant"));
+  const carol = ["C", "A", "B"].map((id) => makeItem(id, "not_relevant"));
+  const dan = ["D"].map((id) => makeItem(id, "not_relevant"));
 
   const listsOfVotes = List([
     { items: List(alice), weight: 20 },
@@ -175,7 +189,7 @@ test("aggregate negative weighted votes", () => {
     { items: List(carol), weight: 10 },
     { items: List(dan), weight: 1 },
   ]);
-  expect(aggregateNegativeWeightedVotes(listsOfVotes)).toEqual(
+  expect(aggregateNegativeWeightedVotes(listsOfVotes, "not_relevant")).toEqual(
     Map({
       A: -65,
       B: -65,
@@ -195,18 +209,21 @@ test("count relation votes and also aggregate negative weights", () => {
   const optionF = newNode("F", ALICE.publicKey);
   const optionG = newNode("G", ALICE.publicKey);
 
-  // First Vote: multiple votes
+  // First Vote: multiple votes - types are now per-item
   const aliceVotes = bulkAddRelations(
-    newRelations(vote.id, "", ALICE.publicKey),
-    [optionA.id, optionB.id, optionC.id, optionD.id] // 5/11, 3/11, 2/11, 1/11 *10000
+    newRelations(vote.id, List(), ALICE.publicKey),
+    [optionA.id, optionB.id, optionC.id, optionD.id], // 5/11, 3/11, 2/11, 1/11 *10000
+    List([""])
   );
   const bobVotes = bulkAddRelations(
-    newRelations(vote.id, "not_relevant", BOB.publicKey),
-    [optionD.id, optionB.id, optionC.id, optionA.id] // 1/2, 1/2, 1/2, 1/2 *10000
+    newRelations(vote.id, List(), BOB.publicKey),
+    [optionD.id, optionB.id, optionC.id, optionA.id], // 1/2, 1/2, 1/2, 1/2 *10000
+    List(["not_relevant"])
   );
   const carolVotes = bulkAddRelations(
-    newRelations(vote.id, "", CAROL.publicKey),
-    [optionA.id, optionB.id, optionC.id] // 3/6, 2/6, 1/6 *10000
+    newRelations(vote.id, List(), CAROL.publicKey),
+    [optionA.id, optionB.id, optionC.id], // 3/6, 2/6, 1/6 *10000
+    List([""])
   );
 
   expect(
@@ -223,12 +240,14 @@ test("count relation votes and also aggregate negative weights", () => {
   // Second Vote: positive votes add up
   const secondVote = newNode("SECOND VOTING", ALICE.publicKey);
   const secondAliceVotes = bulkAddRelations(
-    newRelations(secondVote.id, "", ALICE.publicKey),
-    [optionA.id, optionB.id, optionC.id, optionD.id, optionE.id] // 8/19, 5/19, 3/19, 2/19, 1/19 *10000
+    newRelations(secondVote.id, List(), ALICE.publicKey),
+    [optionA.id, optionB.id, optionC.id, optionD.id, optionE.id], // 8/19, 5/19, 3/19, 2/19, 1/19 *10000
+    List([""])
   );
   const secondBobVotes = bulkAddRelations(
-    newRelations(secondVote.id, "", BOB.publicKey),
-    [optionB.id, optionC.id, optionD.id] // 3/6, 2/6, 1/6 *10000
+    newRelations(secondVote.id, List(), BOB.publicKey),
+    [optionB.id, optionC.id, optionD.id], // 3/6, 2/6, 1/6 *10000
+    List([""])
   );
   expect(
     countRelevanceVoting(
@@ -248,8 +267,9 @@ test("count relation votes and also aggregate negative weights", () => {
   // Third Vote: negative votes always count -1/2
   const thirdVote = newNode("THIRD VOTING", ALICE.publicKey);
   const thirdAliceVotes = bulkAddRelations(
-    newRelations(thirdVote.id, "not_relevant", ALICE.publicKey),
-    [optionA.id, optionB.id, optionC.id]
+    newRelations(thirdVote.id, List(), ALICE.publicKey),
+    [optionA.id, optionB.id, optionC.id],
+    List(["not_relevant"])
   );
 
   expect(countRelevanceVoting(List([thirdAliceVotes]), thirdVote.id)).toEqual(
@@ -263,7 +283,7 @@ test("count relation votes and also aggregate negative weights", () => {
   // Fourth Vote: positive votes are fibonacci-weighted sequence
   const fourthVote = newNode("FOURTH VOTING", ALICE.publicKey);
   const fourthAliceVotes = bulkAddRelations(
-    newRelations(fourthVote.id, "", ALICE.publicKey),
+    newRelations(fourthVote.id, List(), ALICE.publicKey),
     [
       optionA.id,
       optionB.id,
@@ -272,7 +292,8 @@ test("count relation votes and also aggregate negative weights", () => {
       optionE.id,
       optionF.id,
       optionG.id,
-    ] // 21/53, 13/53, 8/53, 5/53, 3/53, 2/53, 1/53 *10000
+    ], // 21/53, 13/53, 8/53, 5/53, 3/53, 2/53, 1/53 *10000
+    List([""])
   );
 
   expect(countRelevanceVoting(List([fourthAliceVotes]), fourthVote.id)).toEqual(
@@ -290,16 +311,19 @@ test("count relation votes and also aggregate negative weights", () => {
   // Fifth Vote: positive and negative votes cancel out
   const fifthVote = newNode("FIFTH VOTING", ALICE.publicKey);
   const fifthAliceVotes = bulkAddRelations(
-    newRelations(fifthVote.id, "", ALICE.publicKey),
-    [optionA.id] // 1
+    newRelations(fifthVote.id, List(), ALICE.publicKey),
+    [optionA.id], // 1
+    List([""])
   );
   const fifthBobVotes = bulkAddRelations(
-    newRelations(fifthVote.id, "not_relevant", BOB.publicKey),
-    [optionA.id] // -1/2,
+    newRelations(fifthVote.id, List(), BOB.publicKey),
+    [optionA.id], // -1/2,
+    List(["not_relevant"])
   );
   const fifthCarolVotes = bulkAddRelations(
-    newRelations(fifthVote.id, "not_relevant", CAROL.publicKey),
-    [optionA.id] // -1/2,
+    newRelations(fifthVote.id, List(), CAROL.publicKey),
+    [optionA.id], // -1/2,
+    List(["not_relevant"])
   );
   expect(
     countRelevanceVoting(

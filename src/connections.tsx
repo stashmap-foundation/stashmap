@@ -42,10 +42,11 @@ export function getReferencedByRelations(
   myself: PublicKey,
   nodeID: LongID | ID
 ): Relations | undefined {
-  const rel = newRelations(nodeID, REFERENCED_BY, myself);
+  const rel = newRelations(nodeID, List<ID>(), myself);
   const referencesOfAllDBs = knowledgeDBs.reduce((r, knowledgeDB) => {
     const relationsOfDB = knowledgeDB.relations.reduce((rdx, relations) => {
-      if (relations.items.includes(nodeID)) {
+      // Check if any item's nodeID matches
+      if (relations.items.some((item) => item.nodeID === nodeID)) {
         if (!rdx.find((item) => item.head === relations.head)) {
           return rdx.push({
             head: relations.head as LongID,
@@ -82,7 +83,10 @@ export function getReferencedByRelations(
   return {
     ...rel,
     id: REFERENCED_BY,
-    items: items.map((item) => item.head),
+    items: items.map((item) => ({
+      nodeID: item.head,
+      types: List<ID>([""]),
+    })),
   };
 }
 
@@ -141,11 +145,10 @@ function getSharesFromPublicKey(publicKey: PublicKey): number {
 
 function filterVoteRelationLists(
   relations: List<Relations>,
-  head: ID,
-  type: ID
+  head: ID
 ): List<Relations> {
   return relations.filter((relation) => {
-    return shortID(relation.head) === shortID(head) && relation.type === type;
+    return shortID(relation.head) === shortID(head);
   });
 }
 
@@ -181,45 +184,55 @@ function fibsum(n: number): number {
 }
 
 export function aggregateWeightedVotes(
-  listsOfVotes: List<{ items: List<LongID | ID>; weight: number }>
+  listsOfVotes: List<{ items: List<RelationItem>; weight: number }>,
+  filterType: ID
 ): Map<LongID | ID, number> {
   const votesPerItem = listsOfVotes.reduce((rdx, v) => {
     const { weight } = v;
-    const length = v.items.size;
+    // Filter items by type
+    const filteredItems = v.items.filter((item) =>
+      item.types.includes(filterType)
+    );
+    const length = filteredItems.size;
     const denominator = fibsum(length);
     if (length === 0) {
       return rdx;
     }
-    const updatedVotes = v.items.map((item, index) => {
+    const updatedVotes = filteredItems.map((item, index) => {
       const numerator = fib(length - index);
       const newVotes = (numerator / denominator) * weight;
-      const initialVotes = rdx.get(item) || 0;
-      return { item, votes: initialVotes + newVotes };
+      const initialVotes = rdx.get(item.nodeID) || 0;
+      return { nodeID: item.nodeID, votes: initialVotes + newVotes };
     });
-    return updatedVotes.reduce((red, { item, votes }) => {
-      return red.set(item, votes);
+    return updatedVotes.reduce((red, { nodeID, votes }) => {
+      return red.set(nodeID, votes);
     }, rdx);
   }, Map<LongID | ID, number>());
   return votesPerItem;
 }
 
 export function aggregateNegativeWeightedVotes(
-  listsOfVotes: List<{ items: List<LongID | ID>; weight: number }>
+  listsOfVotes: List<{ items: List<RelationItem>; weight: number }>,
+  filterType: ID
 ): Map<LongID | ID, number> {
   const votesPerItem = listsOfVotes.reduce((rdx, v) => {
     const { weight } = v;
-    const length = v.items.size;
+    // Filter items by type
+    const filteredItems = v.items.filter((item) =>
+      item.types.includes(filterType)
+    );
+    const length = filteredItems.size;
     if (length === 0) {
       return rdx;
     }
-    const updatedVotes = v.items.map((item) => {
+    const updatedVotes = filteredItems.map((item) => {
       // vote negative with half of the weight on each item
       const newVotes = -weight / 2;
-      const initialVotes = rdx.get(item) || 0;
-      return { item, votes: initialVotes + newVotes };
+      const initialVotes = rdx.get(item.nodeID) || 0;
+      return { nodeID: item.nodeID, votes: initialVotes + newVotes };
     });
-    return updatedVotes.reduce((red, { item, votes }) => {
-      return red.set(item, votes);
+    return updatedVotes.reduce((red, { nodeID, votes }) => {
+      return red.set(nodeID, votes);
     }, rdx);
   }, Map<LongID | ID, number>());
   return votesPerItem;
@@ -230,7 +243,7 @@ export function countRelationVotes(
   head: ID,
   type: ID
 ): Map<LongID | ID, number> {
-  const filteredVoteRelations = filterVoteRelationLists(relations, head, type);
+  const filteredVoteRelations = filterVoteRelationLists(relations, head);
   const latestVotesPerAuthor = getLatestvoteRelationListPerAuthor(
     filteredVoteRelations
   );
@@ -243,8 +256,8 @@ export function countRelationVotes(
     })
     .toList();
   return type === "not_relevant"
-    ? aggregateNegativeWeightedVotes(listsOfVotes)
-    : aggregateWeightedVotes(listsOfVotes);
+    ? aggregateNegativeWeightedVotes(listsOfVotes, type)
+    : aggregateWeightedVotes(listsOfVotes, type);
 }
 
 export function countRelevanceVoting(
@@ -262,10 +275,15 @@ export function countRelevanceVoting(
 export function addRelationToRelations(
   relations: Relations,
   objectID: LongID | ID,
+  types: List<ID> = List([""]), // Default to "relevant" type
   ord?: number
 ): Relations {
+  const newItem: RelationItem = {
+    nodeID: objectID,
+    types,
+  };
   const defaultOrder = relations.items.size;
-  const items = relations.items.push(objectID);
+  const items = relations.items.push(newItem);
   const relationsWithItems = {
     ...relations,
     items,
@@ -278,14 +296,12 @@ export function addRelationToRelations(
 export function bulkAddRelations(
   relations: Relations,
   objectIDs: Array<LongID | ID>,
+  types: List<ID> = List([""]),
   startPos?: number
 ): Relations {
   return objectIDs.reduce((rdx, id, currentIndex) => {
-    return addRelationToRelations(
-      rdx,
-      id,
-      startPos !== undefined ? startPos + currentIndex : undefined
-    );
+    const ord = startPos !== undefined ? startPos + currentIndex : undefined;
+    return addRelationToRelations(rdx, id, types, ord);
   }, relations);
 }
 

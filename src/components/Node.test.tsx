@@ -48,7 +48,7 @@ test("Render non existing Node", async () => {
   const { publicKey } = alice().user;
   const pl = newNode("Programming Languages", publicKey);
   const relations = addRelationToRelations(
-    newRelations(pl.id, "", publicKey),
+    newRelations(pl.id, List(), publicKey),
     "not-existing-id" as LongID
   );
   const plan = planUpsertRelations(
@@ -225,7 +225,7 @@ test("Edit node inline", async () => {
   // Menu doesn't show on root notes
   const plan = planUpsertRelations(
     createPlan(alice()),
-    addRelationToRelations(newRelations(note.id, "", publicKey), note.id)
+    addRelationToRelations(newRelations(note.id, List(), publicKey), note.id)
   );
   await execute({
     ...alice(),
@@ -275,11 +275,11 @@ test("Edited node is shown in Tree View", async () => {
     planUpsertRelations(
       planUpsertRelations(
         createPlan(alice()),
-        addRelationToRelations(newRelations(pl.id, "", publicKey), oop.id)
+        addRelationToRelations(newRelations(pl.id, List(), publicKey), oop.id)
       ),
-      addRelationToRelations(newRelations(oop.id, "", publicKey), java.id)
+      addRelationToRelations(newRelations(oop.id, List(), publicKey), java.id)
     ),
-    addRelationToRelations(newRelations(ROOT, "", publicKey), ROOT)
+    addRelationToRelations(newRelations(ROOT, List(), publicKey), ROOT)
   );
   const planWithViews = planUpdateViews(
     plan,
@@ -366,15 +366,15 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
   const aliceGrandchild = newNode("Alice's Grandchild", alicePK);
   const bobGrandchild = newNode("Bob's Grandchild", bobPK);
   const parentRelations = addRelationToRelations(
-    newRelations(parent.id, "", alicePK),
+    newRelations(parent.id, List(), alicePK),
     child.id
   );
   const childRelations = addRelationToRelations(
-    newRelations(child.id, "", alicePK),
+    newRelations(child.id, List(), alicePK),
     aliceGrandchild.id
   );
   const bobChildRelations = addRelationToRelations(
-    newRelations(child.id, "", bobPK),
+    newRelations(child.id, List(), bobPK),
     bobGrandchild.id
   );
 
@@ -446,11 +446,11 @@ test("getDiffItemsForNode returns items from other users not in current user's l
   const bobChild = newNode("Bob's Child", bobPK);
 
   const aliceRelations = addRelationToRelations(
-    newRelations(parent.id, "", alicePK),
+    newRelations(parent.id, List(), alicePK),
     aliceChild.id
   );
   const bobRelations = addRelationToRelations(
-    newRelations(parent.id, "", bobPK),
+    newRelations(parent.id, List(), bobPK),
     bobChild.id
   );
 
@@ -490,11 +490,11 @@ test("getDiffItemsForNode excludes items already in user's list", () => {
   const sharedChild = newNode("Shared Child", alicePK);
 
   const aliceRelations = addRelationToRelations(
-    newRelations(parent.id, "", alicePK),
+    newRelations(parent.id, List(), alicePK),
     sharedChild.id
   );
   const bobRelations = addRelationToRelations(
-    newRelations(parent.id, "", bobPK),
+    newRelations(parent.id, List(), bobPK),
     sharedChild.id
   );
 
@@ -535,15 +535,15 @@ test("Diff item paths are correctly identified as diff items", () => {
   const bobChild = newNode("Bob's Child", bobPK);
 
   const rootRelations = addRelationToRelations(
-    newRelations(root.id, "", alicePK),
+    newRelations(root.id, List(), alicePK),
     parent.id
   );
   const parentRelations = addRelationToRelations(
-    newRelations(parent.id, "", alicePK),
+    newRelations(parent.id, List(), alicePK),
     aliceChild.id
   );
   const bobParentRelations = addRelationToRelations(
-    newRelations(parent.id, "", bobPK),
+    newRelations(parent.id, List(), bobPK),
     bobChild.id
   );
 
@@ -622,10 +622,11 @@ test("getDiffItemsForNode should return no diff items for not_relevant relation 
   const parent = newNode("Parent", alicePK);
   const bobChild = newNode("Bob's Child", bobPK);
 
-  const aliceRelations = newRelations(parent.id, "not_relevant", alicePK);
+  const aliceRelations = newRelations(parent.id, List(), alicePK);
   const bobRelations = addRelationToRelations(
-    newRelations(parent.id, "not_relevant", bobPK),
-    bobChild.id
+    newRelations(parent.id, List(), bobPK),
+    bobChild.id,
+    List(["not_relevant"])
   );
 
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()

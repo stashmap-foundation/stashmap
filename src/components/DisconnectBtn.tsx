@@ -96,7 +96,6 @@ export function DisconnectNodeBtn(): JSX.Element | null {
   if (!relations) {
     return null;
   }
-  const relationType = relations.type;
   const index = calculateIndexFromNodeIndex(relations, nodeID, nodeIndex);
   if (index === undefined) {
     return null;
@@ -113,7 +112,7 @@ export function DisconnectNodeBtn(): JSX.Element | null {
         };
       }
     );
-    const planAfterDisconnect = planUpdateViews(
+    const finalPlan = planUpdateViews(
       disconnectPlan,
       updateViewPathsAfterDisconnect(
         disconnectPlan.views,
@@ -122,33 +121,7 @@ export function DisconnectNodeBtn(): JSX.Element | null {
         nodeIndex
       )
     );
-    // add to node to not_relevant relations, in case relationtype is relevant, little relevant or maybe relevant
-    const existingNotRelevantRelations = getAvailableRelationsForNode(
-      planAfterDisconnect.knowledgeDBs,
-      planAfterDisconnect.user.publicKey,
-      parentNodeID
-    ).find((r) => r.type === "not_relevant");
-    const notRelevantRelations =
-      existingNotRelevantRelations ||
-      newRelations(
-        parentNodeID,
-        "not_relevant",
-        planAfterDisconnect.user.publicKey
-      );
-    const planWithNotRelevantRelations = planUpsertRelations(
-      planAfterDisconnect,
-      notRelevantRelations
-    );
-
-    const finalPlan =
-      relationType === "" ||
-      relationType === "little_relevant" ||
-      relationType === "maybe_relevant"
-        ? planUpsertRelations(planWithNotRelevantRelations, {
-            ...notRelevantRelations,
-            items: notRelevantRelations.items.push(nodeID),
-          })
-        : planAfterDisconnect;
+    // TODO: Add "not_relevant" type to item instead of removing completely?
     executePlan(finalPlan);
   };
 

@@ -12,6 +12,7 @@ import {
 import { newDB } from "./knowledge";
 import { useData } from "./DataContext";
 import { Plan, planUpsertRelations, planUpdateViews } from "./planner";
+import { usePaneNavigation } from "./SplitPanesContext";
 import { RELATION_TYPES } from "./components/RelationTypes";
 
 // only exported for tests
@@ -375,6 +376,47 @@ export function getNodeFromView(
   return [node, view];
 }
 
+/**
+ * Get the relation for a view, considering both view preference and context.
+ * This is the canonical read-only relation lookup function.
+ *
+ * Logic:
+ * 1. If view has explicit relationsID AND it matches current context, use it
+ * 2. Otherwise, find relation by (head, context)
+ * 3. Returns undefined if no relation found (does not create)
+ */
+export function getRelationForView(
+  data: Data,
+  viewPath: ViewPath,
+  stack: (LongID | ID)[]
+): Relations | undefined {
+  const [nodeID, view] = getNodeIDFromView(data, viewPath);
+  const context = getContextFromStackAndViewPath(stack, viewPath);
+
+  // Check if view's relation exists and matches current context
+  if (view.relations) {
+    const viewRelations = getRelationsNoReferencedBy(
+      data.knowledgeDBs,
+      view.relations,
+      data.user.publicKey
+    );
+    if (viewRelations && contextsMatch(viewRelations.context, context)) {
+      return viewRelations;
+    }
+  }
+
+  // Find relation by (head, context)
+  return getAvailableRelationsForNode(
+    data.knowledgeDBs,
+    data.user.publicKey,
+    nodeID,
+    context
+  ).first();
+}
+
+/**
+ * @deprecated Use getRelationForView instead
+ */
 export function getRelationsFromView(
   data: Data,
   viewPath: ViewPath
@@ -557,14 +599,15 @@ export function popViewPath(
 
 export function getRelationIndex(
   data: Data,
-  viewPath: ViewPath
+  viewPath: ViewPath,
+  stack: (LongID | ID)[]
 ): number | undefined {
   const { nodeIndex, nodeID } = getLast(viewPath);
   const parentPath = getParentView(viewPath);
   if (!parentPath) {
     return undefined;
   }
-  const relations = getRelationsFromView(data, parentPath);
+  const relations = getRelationForView(data, parentPath, stack);
   if (!relations) {
     return undefined;
   }
@@ -577,7 +620,8 @@ export function getRelationIndex(
 export function useRelationIndex(): number | undefined {
   const path = useViewPath();
   const data = useData();
-  return getRelationIndex(data, path);
+  const { stack } = usePaneNavigation();
+  return getRelationIndex(data, path, stack);
 }
 
 export function RootViewContextProvider({

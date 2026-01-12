@@ -79,7 +79,10 @@ export function planCreateNodesFromMarkdown(
     List()
   );
   const planWithNodes = planBulkUpsertNodes(plan, nodes);
-  const planWithEmptyContextRelations = planUpsertRelations(planWithNodes, emptyContextRelations);
+  const planWithEmptyContextRelations = planUpsertRelations(
+    planWithNodes,
+    emptyContextRelations
+  );
 
   // Also create relations with the provided context if non-empty
   if (context.size > 0) {
@@ -88,7 +91,10 @@ export function planCreateNodesFromMarkdown(
       plan.user.publicKey,
       context
     );
-    return [planUpsertRelations(planWithEmptyContextRelations, contextRelations), topNodeID];
+    return [
+      planUpsertRelations(planWithEmptyContextRelations, contextRelations),
+      topNodeID,
+    ];
   }
 
   return [planWithEmptyContextRelations, topNodeID];

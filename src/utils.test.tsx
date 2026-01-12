@@ -597,7 +597,11 @@ function createNodesAndRelations(
       : planWithNode;
     if (children) {
       // Create relations with current context (path to this node)
-      const relationForChildren = newRelations(node.id, context, rdx.user.publicKey);
+      const relationForChildren = newRelations(
+        node.id,
+        context,
+        rdx.user.publicKey
+      );
       const planWithRelations = planUpsertRelations(
         planWithUpdatedRelation,
         relationForChildren

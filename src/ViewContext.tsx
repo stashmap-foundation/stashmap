@@ -262,7 +262,10 @@ export function getAvailableRelationsForNode(
       .toList()
   );
 
-  const remoteDB = remote && isRemote(remote, myself) ? knowledgeDBs.get(remote, newDB()) : undefined;
+  const remoteDB =
+    remote && isRemote(remote, myself)
+      ? knowledgeDBs.get(remote, newDB())
+      : undefined;
   const preferredRemoteRelations: List<Relations> = remoteDB
     ? sortRelationsByDate(
         remoteDB.relations
@@ -426,22 +429,6 @@ export function getRelationForView(
   ).first();
 }
 
-/**
- * @deprecated Use getRelationForView instead
- */
-export function getRelationsFromView(
-  data: Data,
-  viewPath: ViewPath
-): Relations | undefined {
-  const view = getViewFromPath(data, viewPath);
-  return getRelations(
-    data.knowledgeDBs,
-    view.relations,
-    data.user.publicKey,
-    getLast(viewPath).nodeID
-  );
-}
-
 export function calculateNodeIndex(
   relations: Relations,
   index: number
@@ -451,9 +438,8 @@ export function calculateNodeIndex(
     throw new Error(`No item found at index ${index}`);
   }
   // find same relation before this index
-  return relations.items
-    .slice(0, index)
-    .filter((i) => i.nodeID === item.nodeID).size as NodeIndex;
+  return relations.items.slice(0, index).filter((i) => i.nodeID === item.nodeID)
+    .size as NodeIndex;
 }
 
 export function calculateIndexFromNodeIndex(
@@ -494,8 +480,12 @@ function addRelationsToLastElement(
   return [paneIndex, ...middleElements, { ...getLast(path), relationsID }];
 }
 
-export function addAddToNodeToPath(data: Data, path: ViewPath): ViewPath {
-  const relations = getRelationsFromView(data, path);
+export function addAddToNodeToPath(
+  data: Data,
+  path: ViewPath,
+  stack: (LongID | ID)[]
+): ViewPath {
+  const relations = getRelationForView(data, path, stack);
   // Assume there is only one Add to node per parent
   const nodeIndex = 0 as NodeIndex;
   const withRelations = addRelationsToLastElement(
@@ -503,18 +493,6 @@ export function addAddToNodeToPath(data: Data, path: ViewPath): ViewPath {
     relations?.id || ("" as LongID)
   );
   return [...withRelations, { nodeID: ADD_TO_NODE, nodeIndex }];
-}
-
-export function addNodeToPath(
-  data: Data,
-  path: ViewPath,
-  index: number
-): ViewPath {
-  const relations = getRelationsFromView(data, path);
-  if (!relations) {
-    throw new Error("Parent doesn't have relations, cannot add to path");
-  }
-  return addNodeToPathWithRelations(path, relations, index);
 }
 
 export function addNodeToPathWithRelations(
@@ -533,6 +511,26 @@ export function addNodeToPathWithRelations(
   return [...pathWithRelations, { nodeID: item.nodeID, nodeIndex }];
 }
 
+export function addNodeToPath(
+  data: Data,
+  path: ViewPath,
+  index: number
+): ViewPath {
+  // For path-building, use the view's stored relations directly
+  // This is used by PushNode/RootViewContextProvider for navigation
+  const [nodeID, view] = getNodeIDFromView(data, path);
+  const relations = getRelations(
+    data.knowledgeDBs,
+    view.relations,
+    data.user.publicKey,
+    nodeID
+  );
+  if (!relations) {
+    throw new Error("Parent doesn't have relations, cannot add to path");
+  }
+  return addNodeToPathWithRelations(path, relations, index);
+}
+
 /**
  * Add a diff item (from other users) to the path.
  * Uses the parent's relation context but with a nodeID that's not in the user's own relation.
@@ -541,9 +539,10 @@ export function addDiffItemToPath(
   data: Data,
   path: ViewPath,
   nodeID: LongID,
-  diffIndex: number
+  diffIndex: number,
+  stack: (LongID | ID)[]
 ): ViewPath {
-  const relations = getRelationsFromView(data, path);
+  const relations = getRelationForView(data, path, stack);
   // Use 0 as nodeIndex since diff items don't have duplicates in our list
   const nodeIndex = diffIndex as NodeIndex;
   const pathWithRelations = addRelationsToLastElement(
@@ -578,6 +577,7 @@ export function getParentView(viewContext: ViewPath): ViewPath | undefined {
 export function useIsDiffItem(): boolean {
   const data = useData();
   const viewPath = useViewPath();
+  const { stack } = usePaneNavigation();
   const parentPath = getParentView(viewPath);
 
   if (!parentPath) {
@@ -590,7 +590,7 @@ export function useIsDiffItem(): boolean {
   if (nodeID === ADD_TO_NODE) {
     return false;
   }
-  const parentRelations = getRelationsFromView(data, parentPath);
+  const parentRelations = getRelationForView(data, parentPath, stack);
   if (!parentRelations) {
     return false;
   }

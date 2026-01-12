@@ -276,7 +276,7 @@ export function addRelationToRelations(
   relations: Relations,
   objectID: LongID | ID,
   types: List<ID> = List([""]), // Default to "relevant" type
-  ord?: number
+  ord: number | undefined = undefined
 ): Relations {
   const newItem: RelationItem = {
     nodeID: objectID,
@@ -297,7 +297,7 @@ export function bulkAddRelations(
   relations: Relations,
   objectIDs: Array<LongID | ID>,
   types: List<ID> = List([""]),
-  startPos?: number
+  startPos: number | undefined = undefined
 ): Relations {
   return objectIDs.reduce((rdx, id, currentIndex) => {
     const ord = startPos !== undefined ? startPos + currentIndex : undefined;

@@ -4,7 +4,7 @@ import {
   useViewPath,
   useViewKey,
   upsertRelations,
-  getRelationsFromView,
+  getRelationForView,
   getLast,
   updateViewPathsAfterDisconnect,
   parseViewPath,
@@ -40,7 +40,7 @@ export function DisconnectBtn(): JSX.Element | null {
     return null;
   }
   const onDisconnect = (): void => {
-    const relations = getRelationsFromView(data, viewContext);
+    const relations = getRelationForView(data, viewContext, stack);
     if (!relations) {
       return;
     }

@@ -408,7 +408,7 @@ export function getNodesInTree(
   );
 
   if (!relations) {
-    const addNodePath = addAddToNodeToPath(data, parentPath);
+    const addNodePath = addAddToNodeToPath(data, parentPath, stack);
     return ctx.push(addNodePath);
   }
 
@@ -424,7 +424,12 @@ export function getNodesInTree(
       if (childView.expanded) {
         // Recursively get children of expanded node
         // The recursive call will handle adding diff items for childPath at its level
-        return getNodesInTree(data, childPath, stack, nodesList.push(childPath));
+        return getNodesInTree(
+          data,
+          childPath,
+          stack,
+          nodesList.push(childPath)
+        );
       }
       return nodesList.push(childPath);
     },
@@ -445,13 +450,13 @@ export function getNodesInTree(
       ? diffItems.reduce(
           (list, diffItem, idx) =>
             list.push(
-              addDiffItemToPath(data, parentPath, diffItem.nodeID, idx)
+              addDiffItemToPath(data, parentPath, diffItem.nodeID, idx, stack)
             ),
           nodesInTree
         )
       : nodesInTree;
 
-  const addNodePath = addAddToNodeToPath(data, parentPath);
+  const addNodePath = addAddToNodeToPath(data, parentPath, stack);
   return withDiffItems.push(addNodePath);
 }
 

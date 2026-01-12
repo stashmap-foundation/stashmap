@@ -73,11 +73,17 @@ test("Move View Settings on Delete", async () => {
     planUpsertRelations(
       planUpsertRelations(
         planWithNodes,
-        bulkAddRelations(newRelations(pl.id, plChildrenContext, publicKey), [c.id, java.id])
+        bulkAddRelations(newRelations(pl.id, plChildrenContext, publicKey), [
+          c.id,
+          java.id,
+        ])
       ),
       wsRelations
     ),
-    addRelationToRelations(newRelations(c.id, cChildrenContext, publicKey), cpp.id)
+    addRelationToRelations(
+      newRelations(c.id, cChildrenContext, publicKey),
+      cpp.id
+    )
   );
 
   await execute({

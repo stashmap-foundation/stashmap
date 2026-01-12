@@ -323,6 +323,7 @@ type ChangeRelation = (relations: Relations, expand: boolean) => void;
 
 function useOnChangeRelations(): ChangeRelation {
   const data = useData();
+  const { stack } = usePaneNavigation();
   const { editorOpenViews, setEditorOpenState } = useTemporaryView();
   const viewPath = useViewPath();
   const { createPlan, executePlan } = usePlanner();
@@ -331,7 +332,7 @@ function useOnChangeRelations(): ChangeRelation {
   const deselectAllInView = useDeselectAllInView();
 
   return (relations: Relations, expand: boolean): void => {
-    const viewKeyOfAddToNode = addAddToNodeToPath(data, viewPath);
+    const viewKeyOfAddToNode = addAddToNodeToPath(data, viewPath, stack);
     const plan = planUpdateViews(
       createPlan(),
       updateView(data.views, viewPath, {
@@ -424,13 +425,14 @@ type ShowRelationsButtonProps = {
 
 function useOnToggleExpanded(): (expand: boolean) => void {
   const data = useData();
+  const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
   const viewPath = useViewPath();
   const view = useNodeID()[1];
   const { editorOpenViews, setEditorOpenState } = useTemporaryView();
   return (expand: boolean): void => {
     const viewKeyOfAddToNode = viewPathToString(
-      addAddToNodeToPath(data, viewPath)
+      addAddToNodeToPath(data, viewPath, stack)
     );
     const plan = planUpdateViews(
       createPlan(),

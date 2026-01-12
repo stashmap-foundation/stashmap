@@ -279,7 +279,10 @@ test("Edited node is shown in Tree View", async () => {
         addRelationToRelations(newRelations(pl.id, List(), publicKey), oop.id)
       ),
       // oop's relations have context=[pl] since oop is under pl
-      addRelationToRelations(newRelations(oop.id, List([shortID(pl.id)]), publicKey), java.id)
+      addRelationToRelations(
+        newRelations(oop.id, List([shortID(pl.id)]), publicKey),
+        java.id
+      )
     ),
     addRelationToRelations(newRelations(ROOT, List(), publicKey), ROOT)
   );

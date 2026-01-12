@@ -23,7 +23,6 @@ function getDropDestinationEndOfRoot(
   data: Data,
   root: ViewPath
 ): [ViewPath, number] {
-  // TODO: Replace everything here with getRelationsFromView
   const [rootNodeID, rootView] = getNodeIDFromView(data, root);
   const relations = getRelations(
     data.knowledgeDBs,

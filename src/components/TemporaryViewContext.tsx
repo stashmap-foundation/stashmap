@@ -12,6 +12,7 @@ import {
 } from "../ViewContext";
 import { getRelations, splitID } from "../connections";
 import { useData } from "../DataContext";
+import { usePaneNavigation } from "../SplitPanesContext";
 
 type MultiSelectionState = {
   selection: OrderedSet<string>;
@@ -88,12 +89,13 @@ export function getSelectedInView(
 function getSelectedIndices(
   data: Data,
   selection: OrderedSet<string>,
-  viewKey: string
+  viewKey: string,
+  stack: (LongID | ID)[]
 ): OrderedSet<number> {
   return getSelectedInView(selection, viewKey)
     .map((key) => {
       const path = parseViewPath(key);
-      return getRelationIndex(data, path);
+      return getRelationIndex(data, path, stack);
     })
     .filter((n) => n !== undefined) as OrderedSet<number>;
 }
@@ -101,8 +103,9 @@ function getSelectedIndices(
 export function useSelectedIndices(): OrderedSet<number> {
   const { selection } = useTemporaryView();
   const data = useData();
+  const { stack } = usePaneNavigation();
   const viewKey = useViewKey();
-  return getSelectedIndices(data, selection, viewKey);
+  return getSelectedIndices(data, selection, viewKey, stack);
 }
 
 export function useGetSelectedInView(): FindSelectedByPostfix {

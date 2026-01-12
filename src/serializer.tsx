@@ -124,7 +124,9 @@ export function eventToRelations(e: UnsignedEvent): Relations | undefined {
 
   // Parse context from ctx tag
   const contextTag = findAllTags(e, "ctx")?.[0];
-  const context = contextTag ? List(contextTag.map((c) => c as ID)) : List<ID>();
+  const context = contextTag
+    ? List(contextTag.map((c) => c as ID))
+    : List<ID>();
 
   // Parse items with embedded types: ["i", nodeID, type1, type2, ...]
   const itemsAsTags = findAllTags(e, "i") || [];

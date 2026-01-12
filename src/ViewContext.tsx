@@ -144,6 +144,15 @@ export function useViewPath(): ViewPath {
   return context;
 }
 
+// Encode nodeID to handle colons in ref IDs (ref:ctx:target format)
+function encodeNodeID(nodeID: string): string {
+  return nodeID.replace(/:/g, "%3A");
+}
+
+function decodeNodeID(encoded: string): string {
+  return encoded.replace(/%3A/g, ":");
+}
+
 export function parseViewPath(path: string): ViewPath {
   const pieces = path.split(":");
   if (pieces.length < 3) {
@@ -158,7 +167,7 @@ export function parseViewPath(path: string): ViewPath {
     pathPieces[pathPieces.length - 1],
     10
   ) as NodeIndex;
-  const nodeIdEnd = pathPieces[pathPieces.length - 2] as LongID;
+  const nodeIdEnd = decodeNodeID(pathPieces[pathPieces.length - 2]) as LongID;
 
   const beginning = pathPieces
     .slice(0, -2)
@@ -170,9 +179,9 @@ export function parseViewPath(path: string): ViewPath {
         subPaths
       ): SubPathWithRelations[] => {
         if (index % 3 === 0) {
-          const nodeID = piece as LongID;
+          const nodeID = decodeNodeID(piece) as LongID;
           const indexValue = parseInt(subPaths[index + 1], 10) as NodeIndex;
-          const relationID = subPaths[index + 2];
+          const relationID = decodeNodeID(subPaths[index + 2]);
           return [
             ...acc,
             { nodeID, nodeIndex: indexValue, relationsID: relationID },
@@ -198,13 +207,15 @@ function convertViewPathToString(viewContext: ViewPath): string {
   ) as SubPathWithRelations[];
   const beginning = withoutLastElement.reduce(
     (acc: string, subPath: SubPathWithRelations): string => {
-      const postfix = `${subPath.nodeID}:${subPath.nodeIndex}:${subPath.relationsID}`;
+      const postfix = `${encodeNodeID(subPath.nodeID)}:${
+        subPath.nodeIndex
+      }:${encodeNodeID(subPath.relationsID)}`;
       return acc !== "" ? `${acc}:${postfix}` : postfix;
     },
     ""
   );
   const lastPath = pathWithoutPane[pathWithoutPane.length - 1];
-  const end = `${lastPath.nodeID}:${lastPath.nodeIndex}`;
+  const end = `${encodeNodeID(lastPath.nodeID)}:${lastPath.nodeIndex}`;
   const pathPart = beginning !== "" ? `${beginning}:${end}` : end;
   return `p${paneIndex}:${pathPart}`;
 }

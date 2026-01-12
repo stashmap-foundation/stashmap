@@ -8,6 +8,7 @@ import {
   addRelationToRelations,
   bulkAddRelations,
   shortID,
+  createRefId,
 } from "./connections";
 import { execute } from "./executor";
 import {
@@ -33,11 +34,13 @@ import {
   calculateNodeIndex,
   newRelations,
   parseViewPath,
+  viewPathToString,
   updateViewPathsAfterDisconnect,
   updateViewPathsAfterPaneDelete,
   NodeIndex,
   getDefaultRelationForNode,
   PushNode,
+  ViewPath,
 } from "./ViewContext";
 import { TreeView } from "./components/TreeView";
 import { LoadNode } from "./dataQuery";
@@ -298,6 +301,48 @@ test("Parse View path", () => {
     { nodeID: "pl", nodeIndex: 0, relationsID: "rl" },
     { nodeID: "oop", nodeIndex: 1 },
   ]);
+});
+
+test("View path roundtrip preserves ref IDs with colons", () => {
+  // Create a ref ID that contains colons: ref:context1:context2:target
+  const refId = createRefId(List(["ctx1" as ID, "ctx2" as ID]), "target" as ID);
+  expect(refId).toBe("ref:ctx1:ctx2:target");
+
+  // Create a view path with the ref ID as the last node
+  const viewPath: ViewPath = [
+    0,
+    {
+      nodeID: "parent" as LongID,
+      nodeIndex: 0 as NodeIndex,
+      relationsID: "rel1",
+    },
+    { nodeID: refId, nodeIndex: 0 as NodeIndex },
+  ];
+
+  // Serialize to string and parse back
+  const serialized = viewPathToString(viewPath);
+  const parsed = parseViewPath(serialized);
+
+  // The ref ID should be preserved exactly
+  expect(parsed).toEqual(viewPath);
+  expect((parsed[2] as { nodeID: string }).nodeID).toBe("ref:ctx1:ctx2:target");
+});
+
+test("View path roundtrip preserves ref IDs in middle of path", () => {
+  // Ref ID in the middle of the path (with relationsID)
+  const refId = createRefId(List(["money" as ID]), "bitcoin" as ID);
+
+  const viewPath: ViewPath = [
+    1,
+    { nodeID: refId, nodeIndex: 2 as NodeIndex, relationsID: "someRelation" },
+    { nodeID: "child" as LongID, nodeIndex: 0 as NodeIndex },
+  ];
+
+  const serialized = viewPathToString(viewPath);
+  const parsed = parseViewPath(serialized);
+
+  expect(parsed).toEqual(viewPath);
+  expect((parsed[1] as { nodeID: string }).nodeID).toBe("ref:money:bitcoin");
 });
 
 test("Default Relations returns most recently updated relation", () => {

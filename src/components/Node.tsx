@@ -5,14 +5,13 @@ import { Link } from "react-router-dom";
 import ReactQuill from "react-quill";
 import { textVide } from "text-vide";
 import DOMPurify from "dompurify";
-import { getRelations } from "../connections";
 import {
   useNode,
   useViewKey,
   useViewPath,
   ViewPath,
   useIsAddToNode,
-  addNodeToPath,
+  addNodeToPathWithRelations,
   addAddToNodeToPath,
   addDiffItemToPath,
   getDiffItemsForNode,
@@ -21,6 +20,8 @@ import {
   getViewFromPath,
   popViewPath,
   getDefaultRelationForNode,
+  getContextFromStackAndViewPath,
+  findOrCreateRelationsForContext,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -392,15 +393,18 @@ export function Indent({ levels }: { levels: number }): JSX.Element {
 export function getNodesInTree(
   data: Data,
   parentPath: ViewPath,
+  stack: (LongID | ID)[],
   ctx: List<ViewPath>,
   noExpansion?: boolean
 ): List<ViewPath> {
   const [parentNodeID, parentView] = getNodeIDFromView(data, parentPath);
-  const relations = getRelations(
+  const context = getContextFromStackAndViewPath(stack, parentPath);
+  const relations = findOrCreateRelationsForContext(
     data.knowledgeDBs,
-    parentView.relations,
     data.user.publicKey,
-    parentNodeID
+    parentNodeID,
+    context,
+    parentView.relations
   );
 
   if (!relations) {
@@ -409,7 +413,7 @@ export function getNodesInTree(
   }
 
   const childPaths = relations.items.map((_, i) =>
-    addNodeToPath(data, parentPath, i)
+    addNodeToPathWithRelations(parentPath, relations, i)
   );
   const nodesInTree = childPaths.reduce(
     (nodesList: List<ViewPath>, childPath: ViewPath) => {
@@ -420,7 +424,7 @@ export function getNodesInTree(
       if (childView.expanded) {
         // Recursively get children of expanded node
         // The recursive call will handle adding diff items for childPath at its level
-        return getNodesInTree(data, childPath, nodesList.push(childPath));
+        return getNodesInTree(data, childPath, stack, nodesList.push(childPath));
       }
       return nodesList.push(childPath);
     },

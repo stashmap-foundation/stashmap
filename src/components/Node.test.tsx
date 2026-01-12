@@ -275,9 +275,11 @@ test("Edited node is shown in Tree View", async () => {
     planUpsertRelations(
       planUpsertRelations(
         createPlan(alice()),
+        // pl's relations have empty context (it's the root workspace)
         addRelationToRelations(newRelations(pl.id, List(), publicKey), oop.id)
       ),
-      addRelationToRelations(newRelations(oop.id, List(), publicKey), java.id)
+      // oop's relations have context=[pl] since oop is under pl
+      addRelationToRelations(newRelations(oop.id, List([shortID(pl.id)]), publicKey), java.id)
     ),
     addRelationToRelations(newRelations(ROOT, List(), publicKey), ROOT)
   );
@@ -369,12 +371,14 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
     newRelations(parent.id, List(), alicePK),
     child.id
   );
+  // child's relations have context=[parent] since child is under parent
+  const childContext = List([shortID(parent.id)]);
   const childRelations = addRelationToRelations(
-    newRelations(child.id, List(), alicePK),
+    newRelations(child.id, childContext, alicePK),
     aliceGrandchild.id
   );
   const bobChildRelations = addRelationToRelations(
-    newRelations(child.id, List(), bobPK),
+    newRelations(child.id, childContext, bobPK),
     bobGrandchild.id
   );
 
@@ -428,7 +432,7 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
     views,
   };
 
-  const nodes = getNodesInTree(data, parentPath, List());
+  const nodes = getNodesInTree(data, parentPath, [parent.id], List());
   const nodeIDs = nodes.map((path) => getLast(path).nodeID).toArray();
 
   expect(nodeIDs).toContain(child.id);
@@ -538,12 +542,14 @@ test("Diff item paths are correctly identified as diff items", () => {
     newRelations(root.id, List(), alicePK),
     parent.id
   );
+  // parent's relations have context=[root] since parent is under root
+  const parentContext = List([shortID(root.id)]);
   const parentRelations = addRelationToRelations(
-    newRelations(parent.id, List(), alicePK),
+    newRelations(parent.id, parentContext, alicePK),
     aliceChild.id
   );
   const bobParentRelations = addRelationToRelations(
-    newRelations(parent.id, List(), bobPK),
+    newRelations(parent.id, parentContext, bobPK),
     bobChild.id
   );
 
@@ -594,7 +600,7 @@ test("Diff item paths are correctly identified as diff items", () => {
     views,
   };
 
-  const nodes = getNodesInTree(data, rootPath, List());
+  const nodes = getNodesInTree(data, rootPath, [root.id], List());
   expect(nodes.size).toBeGreaterThanOrEqual(3);
 
   const diffItemPath = nodes.find(

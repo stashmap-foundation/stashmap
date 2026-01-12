@@ -24,9 +24,11 @@ import {
 } from "./TemporaryViewContext";
 import { planUpdateViews, planUpsertRelations, usePlanner } from "../planner";
 import { useData } from "../DataContext";
+import { usePaneNavigation } from "../SplitPanesContext";
 
 export function DisconnectBtn(): JSX.Element | null {
   const data = useData();
+  const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
   const { multiselectBtns, selection, setState } = useTemporaryView();
   const viewContext = useViewPath();
@@ -42,8 +44,11 @@ export function DisconnectBtn(): JSX.Element | null {
     if (!relations) {
       return;
     }
-    const disconnectPlan = upsertRelations(createPlan(), viewContext, (rel) =>
-      deleteRelations(rel, selectedIndices)
+    const disconnectPlan = upsertRelations(
+      createPlan(),
+      viewContext,
+      stack,
+      (rel) => deleteRelations(rel, selectedIndices)
     );
     const finalPlan = selected.reduce((plan, path) => {
       const { nodeID, nodeIndex } = getLast(parseViewPath(path));
@@ -76,6 +81,7 @@ export function DisconnectBtn(): JSX.Element | null {
 
 export function DisconnectNodeBtn(): JSX.Element | null {
   const data = useData();
+  const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
   const viewPath = useViewPath();
   const { nodeID, nodeIndex } = getLast(viewPath);
@@ -105,6 +111,7 @@ export function DisconnectNodeBtn(): JSX.Element | null {
     const disconnectPlan = upsertRelations(
       createPlan(),
       parentPath,
+      stack,
       (rel): Relations => {
         return {
           ...rel,

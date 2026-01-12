@@ -13,7 +13,7 @@ import { ALICE, renderWithTestData, setup, UpdateState } from "../utils.test";
 import { planCreateNodesFromMarkdown } from "./FileDropZone";
 import { TreeView } from "./TreeView";
 import { DraggableNote } from "./Draggable";
-import { addRelationToRelations, joinID } from "../connections";
+import { addRelationToRelations, joinID, shortID } from "../connections";
 import { DND } from "../dnd";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
 import { LoadNode } from "../dataQuery";
@@ -30,11 +30,13 @@ Python is a programming language
 `;
 
 async function uploadAndRenderMarkdown(alice: UpdateState): Promise<void> {
+  const wsID = joinID(alice().user.publicKey, "my-first-workspace");
+  // Pass context=[wsID] so relations are created for viewing under the workspace
   const [plan, topNodeID] = planCreateNodesFromMarkdown(
     createPlan(alice()),
-    TEST_FILE
+    TEST_FILE,
+    List([shortID(wsID)])
   );
-  const wsID = joinID(alice().user.publicKey, "my-first-workspace");
   const addNodeToWS = planUpsertRelations(
     plan,
     addRelationToRelations(

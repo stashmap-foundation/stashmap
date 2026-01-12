@@ -22,6 +22,7 @@ import {
   parseViewPath,
 } from "../ViewContext";
 import { MergeKnowledgeDB, useData } from "../DataContext";
+import { usePaneNavigation } from "../SplitPanesContext";
 import {
   addListToFilters,
   addNodeToFilters,
@@ -168,6 +169,7 @@ export function TreeViewNodeLoader({
 
 function Tree(): JSX.Element | null {
   const data = useData();
+  const { stack } = usePaneNavigation();
   const { fileStore } = useApis();
   const { getLocalStorage, setLocalStorage } = fileStore;
   const scrollableId = useViewKey();
@@ -177,7 +179,7 @@ function Tree(): JSX.Element | null {
     endIndex: startIndexFromStorage,
   });
   const viewPath = useViewPath();
-  const nodes = getNodesInTree(data, viewPath, List<ViewPath>());
+  const nodes = getNodesInTree(data, viewPath, stack, List<ViewPath>());
   const [node] = useNode();
   const ariaLabel = node ? `related to ${node.text}` : undefined;
 

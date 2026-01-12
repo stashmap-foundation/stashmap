@@ -11,12 +11,14 @@ import { getRelationsNoReferencedBy } from "../connections";
 import { REFERENCED_BY } from "../constants";
 import {
   ViewPath,
+  getContextFromStackAndViewPath,
   getDefaultRelationForNode,
   newRelations,
   updateView,
   useNode,
   useViewPath,
 } from "../ViewContext";
+import { usePaneNavigation } from "../SplitPanesContext";
 
 export const DEFAULT_COLOR = "#027d86";
 
@@ -180,6 +182,8 @@ export function AddNewRelationsToNodeItem({
 }): JSX.Element | null {
   const [node, view] = useNode();
   const viewPath = useViewPath();
+  const { stack } = usePaneNavigation();
+  const context = getContextFromStackAndViewPath(stack, viewPath);
   const { createPlan, executePlan } = usePlanner();
   const allRelationTypes = useGetAllRelationTypes();
   const relationType = allRelationTypes.get(relationTypeID, {
@@ -191,11 +195,10 @@ export function AddNewRelationsToNodeItem({
     if (!node) {
       throw new Error("Node not found");
     }
-    // Create new relation with empty context (types are now per-item)
     const plan = planAddNewRelationToNode(
       createPlan(),
       node.id,
-      List(), // Empty context
+      context,
       view,
       viewPath
     );

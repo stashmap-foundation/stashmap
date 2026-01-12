@@ -15,7 +15,6 @@ import {
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable } from "./DroppableContainer";
 import { ToggleEditing, useIsEditingOn } from "./TemporaryViewContext";
-import { RemoveColumnButton } from "./RemoveColumnButton";
 import { DisconnectNodeBtn } from "./DisconnectBtn";
 import { JoinProjectButton } from "../JoinProjext";
 import { FullscreenButton } from "./FullscreenButton";
@@ -24,6 +23,7 @@ import { addRelationToRelations, shortID } from "../connections";
 import { useData } from "../DataContext";
 import { usePlanner, planUpsertRelations } from "../planner";
 import { newDB } from "../knowledge";
+import { usePaneNavigation } from "../SplitPanesContext";
 
 export type DragItemType = {
   path: ViewPath;
@@ -69,7 +69,7 @@ export function DraggableNote(): JSX.Element {
         <ToggleEditing />
         <JoinProjectButton />
         <span className="always-visible">
-          <RemoveColumnButton />
+          <DisconnectNodeBtn />
           <FullscreenButton />
           <OpenInSplitPaneButton />
         </span>
@@ -81,12 +81,13 @@ export function DraggableNote(): JSX.Element {
 function AcceptDiffItemButton(): JSX.Element {
   const viewPath = useViewPath();
   const [nodeID] = useNodeID();
+  const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
   const parentPath = getParentView(viewPath);
 
   const onClick = (): void => {
     if (!parentPath) return;
-    const plan = upsertRelations(createPlan(), parentPath, (relations) =>
+    const plan = upsertRelations(createPlan(), parentPath, stack, (relations) =>
       addRelationToRelations(relations, nodeID)
     );
     executePlan(plan);

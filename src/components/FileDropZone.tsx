@@ -21,12 +21,13 @@ function convertToPlainText(html: string): string {
 
 function createRelationsFromParagraphNodes(
   nodes: KnowNode[],
-  myself: PublicKey
+  myself: PublicKey,
+  context: List<ID> = List()
 ): [relations: Relations, topNodeID: LongID] {
   const topParagraph = nodes[0];
   const furtherParagraphs = nodes.slice(1);
   const relations = bulkAddRelations(
-    newRelations(topParagraph.id, List(), myself),
+    newRelations(topParagraph.id, context, myself),
     furtherParagraphs.map((n) => n.id)
   );
   return [relations, topParagraph.id];
@@ -63,20 +64,34 @@ function splitMarkdownInChunkSizes(markdown: string): string[] {
 
 export function planCreateNodesFromMarkdown(
   plan: Plan,
-  markdown: string
+  markdown: string,
+  context: List<ID> = List()
 ): [Plan, topNodeID: LongID] {
   const splittedMarkdown = splitMarkdownInChunkSizes(markdown);
   const nodes = splittedMarkdown.reduce((rdx: KnowNode[], md: string) => {
     const mdNodes = createNodesFromMarkdown(md, plan.user.publicKey);
     return [...rdx, ...mdNodes];
   }, []);
-  const [relations, topNodeID] = createRelationsFromParagraphNodes(
+  // Always create relations with empty context (standalone)
+  const [emptyContextRelations, topNodeID] = createRelationsFromParagraphNodes(
     nodes,
-    plan.user.publicKey
+    plan.user.publicKey,
+    List()
   );
   const planWithNodes = planBulkUpsertNodes(plan, nodes);
-  const planWithRelations = planUpsertRelations(planWithNodes, relations);
-  return [planWithRelations, topNodeID];
+  const planWithEmptyContextRelations = planUpsertRelations(planWithNodes, emptyContextRelations);
+
+  // Also create relations with the provided context if non-empty
+  if (context.size > 0) {
+    const [contextRelations] = createRelationsFromParagraphNodes(
+      nodes,
+      plan.user.publicKey,
+      context
+    );
+    return [planUpsertRelations(planWithEmptyContextRelations, contextRelations), topNodeID];
+  }
+
+  return [planWithEmptyContextRelations, topNodeID];
 }
 
 type FileDropZoneProps = {

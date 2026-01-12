@@ -385,15 +385,11 @@ test("Default Relations returns most recently updated relation", () => {
 test("View doesn't change if list is copied from contact", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
   await follow(alice, bob().user.publicKey);
+  // Create Programming Languages at root level so it has empty context
   const bobsKnowledgeDB = await setupTestDB(
     bob(),
-    [
-      [
-        "Bobs Workspace",
-        [["Programming Languages", [["OOP", ["C++", "Java"]], ["FPL"]]]],
-      ],
-    ],
-    { activeWorkspace: "Bobs Workspace" }
+    [["Programming Languages", [["OOP", ["C++", "Java"]], ["FPL"]]]],
+    { activeWorkspace: "Programming Languages" }
   );
 
   // Navigate directly to Programming Languages to see its children (OOP, FPL)

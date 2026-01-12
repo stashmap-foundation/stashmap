@@ -167,6 +167,7 @@ test("Diff items are always added, never moved", () => {
     OrderedSet<string>(),
     viewPathToString(diffItemPath),
     parentPath,
+    [parent.id], // stack
     0,
     true
   );

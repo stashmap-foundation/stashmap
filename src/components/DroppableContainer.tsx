@@ -10,6 +10,7 @@ import {
   viewPathToString,
 } from "../ViewContext";
 import { NOTE_TYPE } from "./Node";
+import { usePaneNavigation } from "../SplitPanesContext";
 
 export type DragItemType = {
   path: ViewPath;
@@ -79,6 +80,7 @@ export function useDroppable({
 ] {
   const { setState, selection, multiselectBtns } = useTemporaryView();
   const { createPlan, executePlan } = usePlanner();
+  const { stack } = usePaneNavigation();
   const path = useViewPath();
 
   const isListItem = index !== undefined;
@@ -110,6 +112,7 @@ export function useDroppable({
           selection,
           viewPathToString(item.path), // TODO: change parameter to path instead of string
           destination,
+          stack,
           calcIndex(index, direction),
           item.isDiffItem
         )

@@ -28,6 +28,7 @@ import {
 } from "./TemporaryViewContext";
 import { Plan, planUpsertNode, usePlanner } from "../planner";
 import { ReactQuillWrapper } from "./ReactQuillWrapper";
+import { usePaneNavigation } from "../SplitPanesContext";
 
 function AddNodeButton({
   onClick,
@@ -238,12 +239,14 @@ function AddNode({
 
 export function AddColumn(): JSX.Element {
   const viewPath = useViewPath();
+  const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
 
   const onAddNode = (plan: Plan, nodeID: LongID): void => {
     const updateRelationsPlan = upsertRelations(
       plan,
       viewPath,
+      stack,
       (relations) => ({
         ...relations,
         items: relations.items.push({
@@ -277,6 +280,7 @@ export function AddColumn(): JSX.Element {
 export function AddNodeToNode(): JSX.Element | null {
   const isAddToNode = useIsAddToNode();
   const vContext = useViewPath();
+  const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
   const viewContext = isAddToNode ? getParentView(vContext) : vContext;
   const [node] = isAddToNode ? useParentNode() : useNode();
@@ -288,6 +292,7 @@ export function AddNodeToNode(): JSX.Element | null {
     const updateRelationsPlan = upsertRelations(
       plan,
       viewContext,
+      stack,
       (relations) => ({
         ...relations,
         items: relations.items.push({

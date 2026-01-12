@@ -564,7 +564,8 @@ type NodeDescription = [
 function createNodesAndRelations(
   plan: Plan,
   currentRelationsID: LongID | undefined,
-  nodes: NodeDescription[]
+  nodes: NodeDescription[],
+  context: Context = List()
 ): Plan {
   return List(nodes).reduce((rdx: Plan, nodeDescription: NodeDescription) => {
     const currentRelations = currentRelationsID
@@ -595,16 +596,19 @@ function createNodesAndRelations(
         )
       : planWithNode;
     if (children) {
-      // Create Relations for children
-      const relationForChildren = newRelations(node.id, List(), rdx.user.publicKey);
+      // Create relations with current context (path to this node)
+      const relationForChildren = newRelations(node.id, context, rdx.user.publicKey);
       const planWithRelations = planUpsertRelations(
         planWithUpdatedRelation,
         relationForChildren
       );
+      // Children's context includes this node (including workspace root)
+      const childContext = context.push(shortID(node.id));
       return createNodesAndRelations(
         planWithRelations,
         relationForChildren.id,
-        children
+        children,
+        childContext
       );
     }
     return planWithUpdatedRelation;

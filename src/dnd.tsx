@@ -37,9 +37,10 @@ function getDropDestinationEndOfRoot(
 export function getDropDestinationFromTreeView(
   data: Data,
   root: ViewPath,
+  stack: (LongID | ID)[],
   destinationIndex: number
 ): [ViewPath, number] {
-  const nodes = getNodesInTree(data, root, List<ViewPath>());
+  const nodes = getNodesInTree(data, root, stack, List<ViewPath>());
   const dropBefore = nodes.get(destinationIndex);
   if (!dropBefore) {
     return getDropDestinationEndOfRoot(data, root);
@@ -67,6 +68,7 @@ export function dnd(
   selection: OrderedSet<string>,
   source: string,
   to: ViewPath,
+  stack: (LongID | ID)[],
   indexTo: number | undefined,
   isDiffItem?: boolean
 ): Plan {
@@ -80,7 +82,7 @@ export function dnd(
   const [toView, dropIndex] =
     indexTo === undefined
       ? [rootView, undefined]
-      : getDropDestinationFromTreeView(plan, rootView, indexTo);
+      : getDropDestinationFromTreeView(plan, rootView, stack, indexTo);
 
   const [toNodeID, toV] = getNodeIDFromView(plan, toView);
 
@@ -99,6 +101,7 @@ export function dnd(
     const updatedRelationsPlan = upsertRelations(
       plan,
       toView,
+      stack,
       (relations: Relations) => {
         return moveRelations(relations, sourceIndices.toArray(), dropIndex);
       }
@@ -121,6 +124,7 @@ export function dnd(
   const updatedRelationsPlan = upsertRelations(
     plan,
     toView,
+    stack,
     (relations: Relations) => {
       return bulkAddRelations(
         relations,

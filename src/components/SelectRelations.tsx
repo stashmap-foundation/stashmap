@@ -3,9 +3,8 @@ import { Dropdown, OverlayTrigger, Tooltip } from "react-bootstrap";
 import { List } from "immutable";
 import {
   addAddToNodeToPath,
-  deleteChildViews,
   getAvailableRelationsForNode,
-  getDefaultRelationForNode,
+  getContextFromStackAndViewPath,
   updateView,
   useNode,
   useNodeID,
@@ -13,6 +12,7 @@ import {
   useViewPath,
   viewPathToString,
 } from "../ViewContext";
+import { usePaneNavigation } from "../SplitPanesContext";
 import {
   closeEditor,
   useDeselectAllInView,
@@ -21,7 +21,7 @@ import {
 import { getRelations, isRemote, splitID } from "../connections";
 import { REFERENCED_BY } from "../constants";
 import { useData } from "../DataContext";
-import { planDeleteRelations, planUpdateViews, usePlanner } from "../planner";
+import { planUpdateViews, usePlanner } from "../planner";
 import {
   RELATION_TYPES,
   VIRTUAL_LISTS,
@@ -239,6 +239,8 @@ function GhostRelationButton({
 }): JSX.Element {
   const [node, view] = useNode();
   const viewPath = useViewPath();
+  const { stack } = usePaneNavigation();
+  const context = getContextFromStackAndViewPath(stack, viewPath);
   const { createPlan, executePlan } = usePlanner();
   const relationType = RELATION_TYPES.get(relationTypeID, {
     color: "black",
@@ -249,11 +251,10 @@ function GhostRelationButton({
     if (!node) {
       throw new Error("Node not found");
     }
-    // Create new relation with empty context (context will be derived from view path)
     const plan = planAddNewRelationToNode(
       createPlan(),
       node.id,
-      List(),
+      context,
       view,
       viewPath
     );
@@ -315,36 +316,6 @@ function GhostVirtualListButton({
       showVertical={showVertical}
       addGroupSpacing={addGroupSpacing}
     />
-  );
-}
-
-function DeleteRelationItem({ id }: { id: LongID }): JSX.Element | null {
-  const { createPlan, executePlan } = usePlanner();
-  const { user, views } = useData();
-  const viewPath = useViewPath();
-  const [nodeID, view] = useNodeID();
-
-  const onClick = (): void => {
-    const deleteRelationsPlan = planDeleteRelations(createPlan(), id);
-    // TODO: deleteChildViews should only be necessary for the deleted relation not the other
-    const plan = planUpdateViews(
-      deleteRelationsPlan,
-      updateView(deleteChildViews(views, viewPath), viewPath, {
-        ...view,
-        relations: getDefaultRelationForNode(
-          nodeID,
-          deleteRelationsPlan.knowledgeDBs,
-          user.publicKey
-        ),
-      })
-    );
-    executePlan(plan);
-  };
-  return (
-    <Dropdown.Item onClick={onClick}>
-      <span className="simple-icon-trash" />
-      <span className="ms-2">Delete</span>
-    </Dropdown.Item>
   );
 }
 
@@ -413,17 +384,11 @@ function EditRelationsDropdown({
 }): JSX.Element | null {
   const view = useNodeID()[1];
   const { user } = useData();
-  if (!view.relations) {
+  if (!view.relations || otherRelations.size === 0) {
     return null;
   }
 
   const isRemoteRelation = isRemote(splitID(view.relations)[0], user.publicKey);
-
-  const isDeleteAvailable =
-    view.relations !== REFERENCED_BY && !isRemoteRelation;
-  if (!isDeleteAvailable && otherRelations.size === 0) {
-    return null;
-  }
 
   return (
     <Dropdown>
@@ -444,9 +409,6 @@ function EditRelationsDropdown({
         {otherRelations.map((r) => (
           <SelectOtherRelationsItem key={r.id} relations={r} />
         ))}
-        {otherRelations.size > 0 && isDeleteAvailable && <Dropdown.Divider />}
-
-        {isDeleteAvailable && <DeleteRelationItem id={view.relations} />}
       </Dropdown.Menu>
     </Dropdown>
   );
@@ -715,10 +677,14 @@ function SelectRelationsButton({
 export function ReadonlyRelations(): JSX.Element | null {
   const { knowledgeDBs, user } = useData();
   const [nodeID] = useNodeID();
+  const { stack } = usePaneNavigation();
+  const viewPath = useViewPath();
+  const context = getContextFromStackAndViewPath(stack, viewPath);
   const relations = getAvailableRelationsForNode(
     knowledgeDBs,
     user.publicKey,
-    nodeID
+    nodeID,
+    context
   );
 
   // Since types are now per-item, just show total item count across all relations
@@ -750,6 +716,8 @@ export function SelectRelations({
   const { knowledgeDBs, user } = useData();
   const [nodeID, view] = useNodeID();
   const viewPath = useViewPath();
+  const { stack } = usePaneNavigation();
+  const context = getContextFromStackAndViewPath(stack, viewPath);
   const currentRelations = getRelations(
     knowledgeDBs,
     view.relations,
@@ -759,7 +727,8 @@ export function SelectRelations({
   const relations = getAvailableRelationsForNode(
     knowledgeDBs,
     user.publicKey,
-    nodeID
+    nodeID,
+    context
   );
 
   // Determine if we should show vertical or horizontal bars

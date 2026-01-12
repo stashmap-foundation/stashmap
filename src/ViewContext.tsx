@@ -783,7 +783,7 @@ export function upsertRelations(
   const [nodeID, nodeView] = getNodeIDFromView(plan, viewPath);
   const context = getContextFromStackAndViewPath(stack, viewPath);
 
-  const relations = findOrCreateRelationsForContext(
+  const foundRelations = findOrCreateRelationsForContext(
     plan.knowledgeDBs,
     plan.user.publicKey,
     nodeID,
@@ -791,8 +791,20 @@ export function upsertRelations(
     nodeView.relations
   );
 
-  const oldRelationsID = nodeView.relations || relations.id;
-  const didViewChange = nodeView.relations !== relations.id;
+  // If relations belong to someone else, create a copy before modifying
+  const relations =
+    foundRelations.author !== plan.user.publicKey
+      ? createUpdatableRelations(
+          plan.knowledgeDBs,
+          plan.user.publicKey,
+          foundRelations.id,
+          nodeID,
+          context
+        )
+      : foundRelations;
+
+  const oldRelationsID = nodeView.relations || foundRelations.id;
+  const didViewChange = oldRelationsID !== relations.id;
   const planWithUpdatedView = didViewChange
     ? planUpdateViews(
         plan,

@@ -86,6 +86,18 @@ export function dnd(
 
   const [toNodeID, toV] = getNodeIDFromView(plan, toView);
 
+  console.log("dnd debug", {
+    source,
+    indexTo,
+    dropIndex,
+    fromRepoID,
+    toNodeID,
+    fromViewRelations: fromView.relations,
+    toVRelations: toV.relations,
+    sameParent: toNodeID === fromRepoID,
+    sameRelations: fromView.relations === toV.relations,
+  });
+
   // Diff items are always added, never moved (they're from other users)
   const move =
     !isDiffItem &&
@@ -98,12 +110,26 @@ export function dnd(
     const sourceIndices = List(
       sources.map((n) => getRelationIndex(plan, parseViewPath(n)))
     ).filter((n) => n !== undefined) as List<number>;
+    console.log("dnd move", {
+      sourceIndices: sourceIndices.toArray(),
+      dropIndex,
+    });
     const updatedRelationsPlan = upsertRelations(
       plan,
       toView,
       stack,
       (relations: Relations) => {
-        return moveRelations(relations, sourceIndices.toArray(), dropIndex);
+        console.log("dnd moveRelations", {
+          relationsId: relations.id,
+          itemsBefore: relations.items.map((i) => i.nodeID).toArray(),
+          sourceIndices: sourceIndices.toArray(),
+          dropIndex,
+        });
+        const moved = moveRelations(relations, sourceIndices.toArray(), dropIndex);
+        console.log("dnd moveRelations after", {
+          itemsAfter: moved.items.map((i) => i.nodeID).toArray(),
+        });
+        return moved;
       }
     );
     const updatedViews = updateViewPathsAfterMoveRelations(

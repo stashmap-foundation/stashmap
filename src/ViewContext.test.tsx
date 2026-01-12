@@ -64,15 +64,20 @@ test("Move View Settings on Delete", async () => {
     newRelations(ROOT, List(), publicKey),
     pl.id
   );
+  // When viewing with pl as root:
+  // - pl's children (c, java) have empty context (stack=[pl], stackContext=[], viewPathContext=[])
+  // - c's children (cpp) have context [shortID(pl)] (viewPath includes pl as ancestor)
+  const plChildrenContext = List<ID>();
+  const cChildrenContext = List<ID>([shortID(pl.id)]);
   const planWithRelations = planUpsertRelations(
     planUpsertRelations(
       planUpsertRelations(
         planWithNodes,
-        bulkAddRelations(newRelations(pl.id, List(), publicKey), [c.id, java.id])
+        bulkAddRelations(newRelations(pl.id, plChildrenContext, publicKey), [c.id, java.id])
       ),
       wsRelations
     ),
-    addRelationToRelations(newRelations(c.id, List(), publicKey), cpp.id)
+    addRelationToRelations(newRelations(c.id, cChildrenContext, publicKey), cpp.id)
   );
 
   await execute({
@@ -166,87 +171,42 @@ test("Move Node Up", async () => {
 test("Contact reorders list", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
   await follow(alice, bob().user.publicKey);
+  // Bob creates PL at root level so it has empty context
   const bobsKnowledgeDB = await setupTestDB(
     bob(),
-    [
-      [
-        "Bobs Workspace",
-        [["Programming Languages", [["OOP", ["C++", "Java"]], ["FPL"]]]],
-      ],
-    ],
-    { activeWorkspace: "Bobs Workspace" }
+    [["Programming Languages", [["OOP", ["C++", "Java"]], ["FPL"]]]],
+    { activeWorkspace: "Programming Languages" }
   );
   const pl = findNodeByText(
     bobsKnowledgeDB,
     "Programming Languages"
   ) as KnowNode;
 
-  const aliceDB = await setupTestDB(alice(), [["My Workspace", [pl]]], {
-    activeWorkspace: "My Workspace",
+  // Alice views PL directly (same empty context as Bob used)
+  const utils = renderApp({
+    ...alice(),
+    initialRoute: `/w/${pl.id}`,
   });
-  const myWorkspace = findNodeByText(aliceDB, "My Workspace") as KnowNode;
-
-  const utils = renderWithTestData(
-    <Data user={alice().user}>
-      <RootViewOrWorkspaceIsLoading>
-        <PushNode push={List([0])}>
-          <LoadNode>
-            <TreeView />
-          </LoadNode>
-        </PushNode>
-      </RootViewOrWorkspaceIsLoading>
-    </Data>,
-    {
-      ...alice(),
-      initialRoute: `/w/${myWorkspace.id}`,
-    }
-  );
-  await screen.findByText("FPL");
+  await screen.findByText("Programming Languages");
   expect(extractNodes(utils.container)).toEqual(["OOP", "FPL"]);
   await userEvent.click(screen.getByLabelText("show items relevant for OOP"));
   await screen.findByText("C++");
   expect(extractNodes(utils.container)).toEqual(["OOP", "C++", "Java", "FPL"]);
   cleanup();
 
-  // let bob remove OOP
-  const bobsWorkspace = findNodeByText(
-    bobsKnowledgeDB,
-    "Bobs Workspace"
-  ) as KnowNode;
-  renderWithTestData(
-    <Data user={bob().user}>
-      <RootViewOrWorkspaceIsLoading>
-        <PushNode push={List([0])}>
-          <LoadNode>
-            <TreeView />
-          </LoadNode>
-        </PushNode>
-      </RootViewOrWorkspaceIsLoading>
-    </Data>,
-    {
-      ...bob(),
-      initialRoute: `/w/${bobsWorkspace.id}`,
-    }
-  );
+  // let bob remove OOP (also at root level)
+  renderApp({
+    ...bob(),
+    initialRoute: `/w/${pl.id}`,
+  });
   await userEvent.click(await screen.findByLabelText("edit OOP"));
   await userEvent.click(screen.getByLabelText("delete node"));
   cleanup();
 
-  const { container } = renderWithTestData(
-    <Data user={alice().user}>
-      <RootViewOrWorkspaceIsLoading>
-        <PushNode push={List([0])}>
-          <LoadNode>
-            <TreeView />
-          </LoadNode>
-        </PushNode>
-      </RootViewOrWorkspaceIsLoading>
-    </Data>,
-    {
-      ...alice(),
-      initialRoute: `/w/${myWorkspace.id}`,
-    }
-  );
+  const { container } = renderApp({
+    ...alice(),
+    initialRoute: `/w/${pl.id}`,
+  });
   // OOP is gone, so are it's children
   await screen.findByText("FPL");
   expect(extractNodes(container)).toEqual(["FPL"]);
@@ -430,21 +390,17 @@ test("View doesn't change if list is copied from contact", async () => {
 
 test("Disconnect Nodes", async () => {
   const [alice] = setup([ALICE]);
+  // Create PL at root level so children have empty context
   const aliceDB = await setupTestDB(
     alice(),
-    [
-      [
-        "My Workspace",
-        [["Programming Languages", ["C", "C++", "Java", "Rust"]]],
-      ],
-    ],
+    [["Programming Languages", ["C", "C++", "Java", "Rust"]]],
     {
-      activeWorkspace: "My Workspace",
+      activeWorkspace: "Programming Languages",
     }
   );
-  // Navigate directly to Programming Languages to see its children
+  // Navigate directly to Programming Languages (root level, empty context)
   const pl = findNodeByText(aliceDB, "Programming Languages") as KnowNode;
-  const { container } = renderWithTestData(<App />, {
+  const { container } = renderApp({
     ...alice(),
     initialRoute: `/w/${pl.id}`,
   });

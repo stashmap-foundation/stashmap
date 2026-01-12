@@ -12,6 +12,8 @@
 
 Features:
 - Have user npub as ROOT
+- Drag and Drop From One Context to Another creates a Copy of the Relations
+- Drag and Drop From References to somewhere copies the Link?
 - References are links
 - References can be dragged as well (which means they keep contet)
 - When Searching for node, open correct stack

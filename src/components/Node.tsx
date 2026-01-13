@@ -77,8 +77,11 @@ function ExpandCollapseToggle(): JSX.Element | null {
   const { createPlan, executePlan } = usePlanner();
   const onChangeRelations = useOnChangeRelations();
   const onToggleExpanded = useOnToggleExpanded();
-  const isExpanded = view.expanded === true;
   const isReferencedBy = view.relations === REFERENCED_BY;
+
+  // Root nodes (header) are always expanded (alwaysOneSelected pattern from SelectRelations)
+  const isRoot = viewPath.length === 2;
+  const isExpanded = isRoot || view.expanded === true;
 
   // Get available relations filtered by context (same as SelectRelations)
   const context = getContextFromStackAndViewPath(stack, viewPath);
@@ -109,12 +112,17 @@ function ExpandCollapseToggle(): JSX.Element | null {
     ? REFERENCED_BY_COLOR
     : getFilterColor(view.typeFilters);
 
+  // Root nodes can't be collapsed (alwaysOneSelected pattern from SelectRelations)
+  const preventCollapse = isRoot && isExpanded;
+
   const onToggle = (): void => {
     if (hasRelations && topRelation) {
       // Has existing relations (same as SelectRelationsButton onClick)
       if (view.relations === topRelation.id) {
-        // Already using correct relation, just toggle expanded
-        onToggleExpanded(!isExpanded);
+        // Already using correct relation, toggle expanded (unless prevented)
+        if (!preventCollapse) {
+          onToggleExpanded(!isExpanded);
+        }
       } else {
         // Change to the correct relation and expand
         onChangeRelations(topRelation, true);
@@ -478,8 +486,12 @@ export function Indent({ levels }: { levels: number }): JSX.Element {
               }
               const ancestorView = getViewFromPath(data, pathForAncestor);
 
+              // Root nodes (header) are always expanded
+              const isAncestorRoot = pathForAncestor.length === 2;
+              const isAncestorExpanded = isAncestorRoot || ancestorView?.expanded;
+
               // Only show line if ancestor is expanded
-              if (!ancestorView?.expanded) {
+              if (!isAncestorExpanded) {
                 return { show: false, color: undefined };
               }
 

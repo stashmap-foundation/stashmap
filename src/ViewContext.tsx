@@ -1158,6 +1158,10 @@ export function updateViewPathsAfterPaneDelete(
     });
 }
 
+export function clearViewsForPane(views: Views, paneIndex: number): Views {
+  return views.filterNot((_, key) => key.startsWith(`p${paneIndex}:`));
+}
+
 export function bulkUpdateViewPathsAfterAddRelation(
   data: Data,
   repoPath: ViewPath,

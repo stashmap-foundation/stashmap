@@ -46,7 +46,9 @@ import {
 import { execute } from "./executor";
 import { ApiProvider, Apis, FinalizeEvent } from "./Apis";
 import { App } from "./App";
-import { DataContextProps } from "./DataContext";
+import { DataContextProps, DataContextProvider } from "./DataContext";
+import { WorkspaceContextProvider } from "./WorkspaceContext";
+import { PlanningContextProvider } from "./planner";
 import { MockRelayPool, mockRelayPool } from "./nostrMock.test";
 import { DEFAULT_SETTINGS } from "./settings";
 import {
@@ -325,6 +327,7 @@ type RenderApis = Partial<TestApis> & {
   includeFocusContext?: boolean;
   user?: User;
   defaultRelays?: Array<string>;
+  initialStack?: (LongID | ID)[];
 };
 
 export function renderApis(
@@ -357,45 +360,56 @@ export function renderApis(
       <NavigationStackProvider>
         <SplitPanesProvider>
           <PaneIndexProvider index={0}>
-            <PaneNavigationProvider initialWorkspace={ROOT}>
-              <ApiProvider
-                apis={{
-                  fileStore,
-                  relayPool,
-                  finalizeEvent,
-                  nip11,
-                  eventLoadingTimeout: 0,
-                  timeToStorePreLoginEvents: 0,
-                }}
-              >
-                <NostrAuthContextProvider
-                  defaultRelayUrls={
-                    optionsWithDefaultUser.defaultRelays ||
-                    TEST_RELAYS.map((r) => r.url)
-                  }
-                >
-                  <ProjectContextProvider>
-                    <VirtuosoMockContext.Provider
-                      value={{ viewportHeight: 10000, itemHeight: 100 }}
+            <ApiProvider
+              apis={{
+                fileStore,
+                relayPool,
+                finalizeEvent,
+                nip11,
+                eventLoadingTimeout: 0,
+                timeToStorePreLoginEvents: 0,
+              }}
+            >
+              <DataContextProvider {...DEFAULT_DATA_CONTEXT_PROPS}>
+                <WorkspaceContextProvider>
+                  <PlanningContextProvider setPublishEvents={() => {}}>
+                    <NostrAuthContextProvider
+                      defaultRelayUrls={
+                        optionsWithDefaultUser.defaultRelays ||
+                        TEST_RELAYS.map((r) => r.url)
+                      }
                     >
-                      {" "}
-                      {options?.includeFocusContext === true ? (
-                        <FocusContextProvider>{children}</FocusContextProvider>
-                      ) : (
-                        <FocusContext.Provider
-                          value={{
-                            isInputElementInFocus: true,
-                            setIsInputElementInFocus: jest.fn(),
-                          }}
+                      <ProjectContextProvider>
+                        <PaneNavigationProvider
+                          initialWorkspace={ROOT}
+                          initialStack={options?.initialStack}
                         >
-                          {children}
-                        </FocusContext.Provider>
-                      )}
-                    </VirtuosoMockContext.Provider>
-                  </ProjectContextProvider>
-                </NostrAuthContextProvider>
-              </ApiProvider>
-            </PaneNavigationProvider>
+                          <VirtuosoMockContext.Provider
+                            value={{ viewportHeight: 10000, itemHeight: 100 }}
+                          >
+                            {" "}
+                            {options?.includeFocusContext === true ? (
+                              <FocusContextProvider>
+                                {children}
+                              </FocusContextProvider>
+                            ) : (
+                              <FocusContext.Provider
+                                value={{
+                                  isInputElementInFocus: true,
+                                  setIsInputElementInFocus: jest.fn(),
+                                }}
+                              >
+                                {children}
+                              </FocusContext.Provider>
+                            )}
+                          </VirtuosoMockContext.Provider>
+                        </PaneNavigationProvider>
+                      </ProjectContextProvider>
+                    </NostrAuthContextProvider>
+                  </PlanningContextProvider>
+                </WorkspaceContextProvider>
+              </DataContextProvider>
+            </ApiProvider>
           </PaneIndexProvider>
         </SplitPanesProvider>
       </NavigationStackProvider>
@@ -764,4 +778,4 @@ export function RootViewOrWorkspaceIsLoading({
   );
 }
 
-export { ALICE, UNAUTHENTICATED_BOB, UNAUTHENTICATED_CAROL, renderApp };
+export { ALICE, UNAUTHENTICATED_BOB, UNAUTHENTICATED_CAROL, renderApp, mockRelayPool };

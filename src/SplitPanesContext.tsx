@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
+import { clearViewsForPane } from "./ViewContext";
+import { planUpdateViews, usePlanner } from "./planner";
 
 export type Pane = {
   id: string;
@@ -116,6 +118,8 @@ export function PaneNavigationProvider({
   const [stack, setStack] = useState<(LongID | ID)[]>(
     initialStack || [initialWorkspace]
   );
+  const paneIndex = usePaneIndex();
+  const { createPlan, executePlan } = usePlanner();
 
   // activeWorkspace is always the last element of the stack
   const activeWorkspace = stack[stack.length - 1];
@@ -126,10 +130,17 @@ export function PaneNavigationProvider({
     );
   }, []);
 
-  const setStackFn = useCallback((path: (LongID | ID)[]): void => {
-    if (path.length === 0) return;
-    setStack(path);
-  }, []);
+  const setStackFn = useCallback(
+    (path: (LongID | ID)[]): void => {
+      if (path.length === 0) return;
+      // Clear views for this pane when navigating
+      const plan = createPlan();
+      const clearedViews = clearViewsForPane(plan.views, paneIndex);
+      executePlan(planUpdateViews(plan, clearedViews));
+      setStack(path);
+    },
+    [createPlan, executePlan, paneIndex]
+  );
 
   const value = React.useMemo(
     () => ({

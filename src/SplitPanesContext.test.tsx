@@ -5,10 +5,10 @@ import {
   useSplitPanes,
   PaneIndexProvider,
   usePaneIndex,
-  PaneNavigationProvider,
   usePaneNavigation,
 } from "./SplitPanesContext";
 import { ROOT } from "./types";
+import { renderApis } from "./utils.test";
 
 function TestSplitPanes(): JSX.Element {
   const { panes, addPane, addPaneAt, removePane } = useSplitPanes();
@@ -159,15 +159,7 @@ function TestPaneNavigation(): JSX.Element {
 }
 
 test("popTo(length-2) removes last item and updates activeWorkspace", () => {
-  render(
-    <SplitPanesProvider>
-      <PaneIndexProvider index={0}>
-        <PaneNavigationProvider initialWorkspace={ROOT}>
-          <TestPaneNavigation />
-        </PaneNavigationProvider>
-      </PaneIndexProvider>
-    </SplitPanesProvider>
-  );
+  renderApis(<TestPaneNavigation />);
 
   fireEvent.click(screen.getByText("Set Stack"));
   expect(screen.getByTestId("stack").textContent).toBe("new1,new2,new3");
@@ -178,15 +170,7 @@ test("popTo(length-2) removes last item and updates activeWorkspace", () => {
 });
 
 test("popTo with invalid index does not change stack", () => {
-  render(
-    <SplitPanesProvider>
-      <PaneIndexProvider index={0}>
-        <PaneNavigationProvider initialWorkspace={ROOT}>
-          <TestPaneNavigation />
-        </PaneNavigationProvider>
-      </PaneIndexProvider>
-    </SplitPanesProvider>
-  );
+  renderApis(<TestPaneNavigation />);
 
   expect(screen.getByTestId("stack").textContent).toBe(ROOT);
 
@@ -196,15 +180,7 @@ test("popTo with invalid index does not change stack", () => {
 });
 
 test("popTo navigates to specific stack index", () => {
-  render(
-    <SplitPanesProvider>
-      <PaneIndexProvider index={0}>
-        <PaneNavigationProvider initialWorkspace={ROOT}>
-          <TestPaneNavigation />
-        </PaneNavigationProvider>
-      </PaneIndexProvider>
-    </SplitPanesProvider>
-  );
+  renderApis(<TestPaneNavigation />);
 
   fireEvent.click(screen.getByText("Set Stack"));
   expect(screen.getByTestId("stack").textContent).toBe("new1,new2,new3");
@@ -215,15 +191,7 @@ test("popTo navigates to specific stack index", () => {
 });
 
 test("setStack replaces entire stack with new path", () => {
-  render(
-    <SplitPanesProvider>
-      <PaneIndexProvider index={0}>
-        <PaneNavigationProvider initialWorkspace={ROOT}>
-          <TestPaneNavigation />
-        </PaneNavigationProvider>
-      </PaneIndexProvider>
-    </SplitPanesProvider>
-  );
+  renderApis(<TestPaneNavigation />);
 
   expect(screen.getByTestId("stack").textContent).toBe(ROOT);
 
@@ -239,18 +207,7 @@ test("initialStack sets initial stack and activeWorkspace", () => {
     "node3" as LongID,
   ];
 
-  render(
-    <SplitPanesProvider>
-      <PaneIndexProvider index={0}>
-        <PaneNavigationProvider
-          initialWorkspace={ROOT}
-          initialStack={initialStack}
-        >
-          <TestPaneNavigation />
-        </PaneNavigationProvider>
-      </PaneIndexProvider>
-    </SplitPanesProvider>
-  );
+  renderApis(<TestPaneNavigation />, { initialStack });
 
   expect(screen.getByTestId("stack").textContent).toBe("node1,node2,node3");
   expect(screen.getByTestId("active-workspace").textContent).toBe("node3");

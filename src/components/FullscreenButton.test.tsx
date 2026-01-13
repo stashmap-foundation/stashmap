@@ -1,17 +1,11 @@
 import React from "react";
 import { List } from "immutable";
-import { render, screen, fireEvent } from "@testing-library/react";
-import {
-  SplitPanesProvider,
-  PaneIndexProvider,
-  PaneNavigationProvider,
-  usePaneNavigation,
-} from "../SplitPanesContext";
+import { screen, fireEvent } from "@testing-library/react";
+import { usePaneNavigation } from "../SplitPanesContext";
 import { ViewContext, ViewPath, NodeIndex } from "../ViewContext";
 import { FullscreenButton } from "./FullscreenButton";
 import { ROOT } from "../types";
-import { DataContextProvider } from "../DataContext";
-import { setup, ALICE } from "../utils.test";
+import { renderApis } from "../utils.test";
 import { createRefId } from "../connections";
 
 function CurrentStackDisplay(): JSX.Element {
@@ -20,7 +14,6 @@ function CurrentStackDisplay(): JSX.Element {
 }
 
 test("Reference node opens with only reference path, not current pane stack", () => {
-  const [alice] = setup([ALICE]);
   // Create a ref ID: context is [contextNode], target is targetNode
   const contextNode = "context123" as ID;
   const targetNode = "target456" as ID;
@@ -45,23 +38,12 @@ test("Reference node opens with only reference path, not current pane stack", ()
     ROOT,
   ];
 
-  render(
-    // eslint-disable-next-line react/jsx-props-no-spreading
-    <DataContextProvider {...alice()}>
-      <SplitPanesProvider>
-        <PaneIndexProvider index={0}>
-          <PaneNavigationProvider
-            initialWorkspace={ROOT}
-            initialStack={initialStack}
-          >
-            <ViewContext.Provider value={viewPath}>
-              <FullscreenButton />
-              <CurrentStackDisplay />
-            </ViewContext.Provider>
-          </PaneNavigationProvider>
-        </PaneIndexProvider>
-      </SplitPanesProvider>
-    </DataContextProvider>
+  renderApis(
+    <ViewContext.Provider value={viewPath}>
+      <FullscreenButton />
+      <CurrentStackDisplay />
+    </ViewContext.Provider>,
+    { initialStack }
   );
 
   // Verify initial stack before clicking

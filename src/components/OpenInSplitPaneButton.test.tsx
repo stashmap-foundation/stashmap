@@ -1,20 +1,14 @@
 import React from "react";
 import { List } from "immutable";
-import { render, screen, fireEvent } from "@testing-library/react";
-import {
-  SplitPanesProvider,
-  PaneIndexProvider,
-  PaneNavigationProvider,
-  useSplitPanes,
-} from "../SplitPanesContext";
+import { screen, fireEvent } from "@testing-library/react";
+import { useSplitPanes } from "../SplitPanesContext";
 import { ViewContext, ADD_TO_NODE, ViewPath, NodeIndex } from "../ViewContext";
 import {
   OpenInSplitPaneButton,
   OpenInSplitPaneButtonWithStack,
 } from "./OpenInSplitPaneButton";
 import { ROOT } from "../types";
-import { DataContextProvider } from "../DataContext";
-import { setup, ALICE } from "../utils.test";
+import { renderApis } from "../utils.test";
 import { createRefId } from "../connections";
 
 function PaneCountDisplay(): JSX.Element {
@@ -30,21 +24,11 @@ function NewPaneStackDisplay(): JSX.Element {
 }
 
 function renderWithContext(viewPath: ViewPath): void {
-  const [alice] = setup([ALICE]);
-  render(
-    // eslint-disable-next-line react/jsx-props-no-spreading
-    <DataContextProvider {...alice()}>
-      <SplitPanesProvider>
-        <PaneIndexProvider index={0}>
-          <PaneNavigationProvider initialWorkspace={ROOT}>
-            <ViewContext.Provider value={viewPath}>
-              <OpenInSplitPaneButton />
-              <PaneCountDisplay />
-            </ViewContext.Provider>
-          </PaneNavigationProvider>
-        </PaneIndexProvider>
-      </SplitPanesProvider>
-    </DataContextProvider>
+  renderApis(
+    <ViewContext.Provider value={viewPath}>
+      <OpenInSplitPaneButton />
+      <PaneCountDisplay />
+    </ViewContext.Provider>
   );
 }
 
@@ -74,20 +58,12 @@ test("clicking button calls addPaneAt and creates new pane", () => {
 
 test("OpenInSplitPaneButtonWithStack passes provided stack to addPaneAt", () => {
   const stack = [ROOT, "node1" as LongID, "node2" as LongID];
-  const [alice] = setup([ALICE]);
 
-  render(
-    // eslint-disable-next-line react/jsx-props-no-spreading
-    <DataContextProvider {...alice()}>
-      <SplitPanesProvider>
-        <PaneIndexProvider index={0}>
-          <PaneNavigationProvider initialWorkspace={ROOT}>
-            <OpenInSplitPaneButtonWithStack stack={stack} />
-            <PaneCountDisplay />
-          </PaneNavigationProvider>
-        </PaneIndexProvider>
-      </SplitPanesProvider>
-    </DataContextProvider>
+  renderApis(
+    <>
+      <OpenInSplitPaneButtonWithStack stack={stack} />
+      <PaneCountDisplay />
+    </>
   );
 
   expect(screen.getByTestId("pane-count").textContent).toBe("1");
@@ -110,7 +86,6 @@ test("button is hidden for ADD_TO_NODE", () => {
 });
 
 test("Reference node opens with only reference path, not current pane stack", () => {
-  const [alice] = setup([ALICE]);
   // Create a ref ID: context is [contextNode], target is targetNode
   const contextNode = "context123" as ID;
   const targetNode = "target456" as ID;
@@ -128,21 +103,12 @@ test("Reference node opens with only reference path, not current pane stack", ()
     { nodeID: refId, nodeIndex: 0 as NodeIndex },
   ];
 
-  render(
-    // eslint-disable-next-line react/jsx-props-no-spreading
-    <DataContextProvider {...alice()}>
-      <SplitPanesProvider>
-        <PaneIndexProvider index={0}>
-          <PaneNavigationProvider initialWorkspace={ROOT}>
-            <ViewContext.Provider value={viewPath}>
-              <OpenInSplitPaneButton />
-              <PaneCountDisplay />
-              <NewPaneStackDisplay />
-            </ViewContext.Provider>
-          </PaneNavigationProvider>
-        </PaneIndexProvider>
-      </SplitPanesProvider>
-    </DataContextProvider>
+  renderApis(
+    <ViewContext.Provider value={viewPath}>
+      <OpenInSplitPaneButton />
+      <PaneCountDisplay />
+      <NewPaneStackDisplay />
+    </ViewContext.Provider>
   );
 
   fireEvent.click(screen.getByLabelText("open in split pane"));

@@ -114,9 +114,11 @@ test("get referenced by relations", () => {
   const parsed = refIds.map((refId) => parseRefId(refId));
   // All targetNodes should be Bitcoin
   expect(parsed.every((p) => p?.targetNode === btc.id)).toBe(true);
-  // Contexts now contain full IDs (with author prefix) for proper querying
+  // Contexts contain short IDs - getNodeFromID searches all DBs for short IDs
   const parents = parsed.map((p) => p?.targetContext.last()).toSet();
-  expect(parents).toEqual(List([money.id, crypto.id]).toSet());
+  expect(parents).toEqual(
+    List([shortID(money.id), shortID(crypto.id)] as ID[]).toSet()
+  );
 });
 
 test("count relation votes", () => {

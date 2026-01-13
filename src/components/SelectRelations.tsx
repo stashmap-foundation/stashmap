@@ -369,7 +369,7 @@ function SelectOtherRelationsItem({
       <Dropdown.Item onClick={() => onChangeRelations(relations, true)}>
         <div>
           <span>{relations.items.size} Notes</span>
-          <span>{remote && <span className="iconsminds-conference" />}</span>
+          <span>{remote && <span className="iconsminds-business-man" />}</span>
         </div>
         <div>
           <span>{new Date(relations.updated * 1000).toLocaleDateString()}</span>
@@ -408,7 +408,7 @@ function EditRelationsDropdown({
           borderLeftColor: "none",
         }}
       >
-        {isRemoteRelation && <span className="iconsminds-conference" />}
+        {isRemoteRelation && <span className="iconsminds-business-man" />}
         <span className="iconsminds-gear" />
       </Dropdown.Toggle>
       <Dropdown.Menu popperConfig={{ strategy: "fixed" }} renderOnMount>

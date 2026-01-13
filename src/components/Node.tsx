@@ -43,6 +43,7 @@ import { IS_MOBILE } from "./responsive";
 import { AddNodeToNode, getImageUrlFromText } from "./AddNode";
 import { NodeMenu } from "./Menu";
 import { ReadonlyRelations } from "./SelectRelations";
+import { ReferenceIndicators } from "./ReferenceIndicators";
 import { DeleteNode } from "./DeleteNode";
 import { useData } from "../DataContext";
 import { planUpsertNode, usePlanner } from "../planner";
@@ -242,6 +243,7 @@ function NodeContent({ node }: { node: KnowNode }): JSX.Element {
   return (
     <span className={`break-word ${isReference ? "reference-node" : ""}`}>
       <NodeIcon node={node} />
+      {isReference && <ReferenceIndicators refId={node.id} />}
       <span style={referenceStyle}>
         {isBionic ? <BionicText nodeText={textToDisplay} /> : textToDisplay}
       </span>
@@ -531,7 +533,7 @@ export function getNodesInTree(
 function DiffItemIndicator(): JSX.Element {
   return (
     <span
-      className="iconsminds-conference diff-indicator"
+      className="iconsminds-business-man diff-indicator"
       title="From other users"
     />
   );

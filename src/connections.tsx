@@ -66,6 +66,24 @@ export function getRefTargetStack(
   return [...parsed.targetContext.toArray(), parsed.targetNode];
 }
 
+// Extract the target node's relation info from a ref ID
+// For ref:ctx1:ctx2:target -> returns { head: target, context: [ctx1, ctx2] }
+// This is used to look up the target node's children in that context
+export function getRefTargetRelationInfo(
+  refId: ID | LongID
+): { head: ID; context: Context } | undefined {
+  const parsed = parseRefId(refId);
+  if (!parsed) {
+    return undefined;
+  }
+  const { targetNode, targetContext } = parsed;
+
+  return {
+    head: targetNode,
+    context: targetContext,
+  };
+}
+
 export function buildReferenceNode(
   refId: LongID,
   knowledgeDBs: KnowledgeDBs,

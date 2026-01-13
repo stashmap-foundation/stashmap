@@ -323,3 +323,154 @@ test("Referenced By deduplicates paths from multiple users", async () => {
   const referenceButtons = screen.getAllByLabelText(/Navigate to/);
   expect(referenceButtons).toHaveLength(1);
 });
+
+test("Reference indicators show item count", async () => {
+  const [alice] = setup([ALICE]);
+  const { publicKey: alicePK } = alice().user;
+
+  // Create hierarchy: Parent -> Child, and Child has its own children
+  const parent = newNode("Parent", alicePK);
+  const child = newNode("Child", alicePK);
+  const grandchild1 = newNode("Grandchild 1", alicePK);
+  const grandchild2 = newNode("Grandchild 2", alicePK);
+
+  // Parent -> Child
+  const parentRelations = addRelationToRelations(
+    newRelations(parent.id, List(), alicePK),
+    child.id
+  );
+
+  // Child -> Grandchild1, Grandchild2
+  const childRelations = addRelationToRelations(
+    addRelationToRelations(
+      newRelations(child.id, List(), alicePK),
+      grandchild1.id
+    ),
+    grandchild2.id
+  );
+
+  const plan = planUpsertRelations(
+    planUpsertRelations(
+      planUpsertNode(
+        planUpsertNode(
+          planUpsertNode(planUpsertNode(createPlan(alice()), parent), child),
+          grandchild1
+        ),
+        grandchild2
+      ),
+      parentRelations
+    ),
+    childRelations
+  );
+  await execute({ ...alice(), plan });
+
+  renderWithTestData(
+    <Data user={alice().user}>
+      <RootViewContextProvider root={child.id}>
+        <TemporaryViewProvider>
+          <DND>
+            <LoadNode referencedBy>
+              <>
+                <DraggableNote />
+                <TreeView />
+              </>
+            </LoadNode>
+          </DND>
+        </TemporaryViewProvider>
+      </RootViewContextProvider>
+    </Data>,
+    {
+      ...alice(),
+      initialRoute: `/d/${child.id}`,
+    }
+  );
+
+  await screen.findByText("Child");
+  fireEvent.click(screen.getByLabelText("show references to Child"));
+  await screen.findByText("Referenced By (2)");
+
+  // The reference "Parent" should show [2] because Child has 2 grandchildren
+  // when viewed from the Parent context
+  const indicators = await screen.findByText("[2]");
+  expect(indicators).toBeDefined();
+});
+
+test("Reference indicators show other users icon", async () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  const { publicKey: alicePK } = alice().user;
+  const { publicKey: bobPK } = bob().user;
+
+  // Alice creates Parent -> Child
+  const parent = newNode("Parent", alicePK);
+  const child = newNode("Child", alicePK);
+  const aliceGrandchild = newNode("Alice Grandchild", alicePK);
+
+  const parentRelations = addRelationToRelations(
+    newRelations(parent.id, List(), alicePK),
+    child.id
+  );
+
+  // Alice's version of Child's children
+  const aliceChildRelations = addRelationToRelations(
+    newRelations(child.id, List(), alicePK),
+    aliceGrandchild.id
+  );
+
+  const alicePlan = planUpsertRelations(
+    planUpsertRelations(
+      planUpsertNode(
+        planUpsertNode(planUpsertNode(createPlan(alice()), parent), child),
+        aliceGrandchild
+      ),
+      parentRelations
+    ),
+    aliceChildRelations
+  );
+  await execute({ ...alice(), plan: alicePlan });
+
+  // Bob creates his own version of Child's children
+  const bobGrandchild = newNode("Bob Grandchild", bobPK);
+  const bobChildRelations = addRelationToRelations(
+    newRelations(child.id, List(), bobPK),
+    bobGrandchild.id
+  );
+
+  const bobPlan = planUpsertRelations(
+    planUpsertNode(createPlan(bob()), bobGrandchild),
+    bobChildRelations
+  );
+  await execute({ ...bob(), plan: bobPlan });
+
+  // Alice follows Bob
+  await follow(alice, bob().user.publicKey);
+
+  renderWithTestData(
+    <Data user={alice().user}>
+      <RootViewContextProvider root={child.id}>
+        <TemporaryViewProvider>
+          <DND>
+            <LoadNode referencedBy>
+              <>
+                <DraggableNote />
+                <TreeView />
+              </>
+            </LoadNode>
+          </DND>
+        </TemporaryViewProvider>
+      </RootViewContextProvider>
+    </Data>,
+    {
+      ...alice(),
+      initialRoute: `/d/${child.id}`,
+    }
+  );
+
+  await screen.findByText("Child");
+  fireEvent.click(screen.getByLabelText("show references to Child"));
+  await screen.findByText("Referenced By (2)");
+
+  // Should show the business-man icon for 1 other user (Bob)
+  // The icon has a title attribute we can query
+  const otherUserIcon = await screen.findByTitle("1 other version");
+  expect(otherUserIcon).toBeDefined();
+});

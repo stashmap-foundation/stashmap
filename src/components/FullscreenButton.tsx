@@ -1,7 +1,7 @@
 import React from "react";
 import { useIsAddToNode, useNodeID, useViewPath } from "../ViewContext";
 import { usePaneNavigation } from "../SplitPanesContext";
-import { isRefId, parseRefId } from "../connections";
+import { getRefTargetStack } from "../connections";
 
 export function FullscreenButton(): JSX.Element | null {
   const { stack, setStack } = usePaneNavigation();
@@ -15,18 +15,11 @@ export function FullscreenButton(): JSX.Element | null {
   const onClick = (): void => {
     const stackedWorkspaces = stack.slice(0, -1);
 
-    if (isRefId(nodeID)) {
-      const parsed = parseRefId(nodeID);
-      if (parsed) {
-        // For Reference nodes, use only the reference's path (context + target)
-        // Don't include the current pane's stack
-        const targetStack = [
-          ...parsed.targetContext.toArray(),
-          parsed.targetNode,
-        ];
-        setStack(targetStack);
-        return;
-      }
+    // For Reference nodes, use only the reference's path (context + target)
+    const targetStack = getRefTargetStack(nodeID);
+    if (targetStack) {
+      setStack(targetStack);
+      return;
     }
 
     // Regular nodes: use viewPath node IDs

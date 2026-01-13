@@ -7,7 +7,7 @@ import {
   usePaneNavigation,
 } from "../SplitPanesContext";
 import { IS_MOBILE } from "./responsive";
-import { isRefId, parseRefId } from "../connections";
+import { getRefTargetStack } from "../connections";
 
 export function OpenInSplitPaneButton(): JSX.Element | null {
   const { addPaneAt } = useSplitPanes();
@@ -27,18 +27,11 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
     // + all node IDs from the ViewPath (skip pane index at position 0)
     const paneStackWithoutWorkspace = stack.slice(0, -1);
 
-    if (isRefId(nodeID)) {
-      const parsed = parseRefId(nodeID);
-      if (parsed) {
-        // For Reference nodes, use only the reference's path (context + target)
-        // Don't include the current pane's stack
-        const targetStack = [
-          ...parsed.targetContext.toArray(),
-          parsed.targetNode,
-        ];
-        addPaneAt(paneIndex + 1, targetStack);
-        return;
-      }
+    // For Reference nodes, use only the reference's path (context + target)
+    const targetStack = getRefTargetStack(nodeID);
+    if (targetStack) {
+      addPaneAt(paneIndex + 1, targetStack);
+      return;
     }
 
     // Regular nodes: use viewPath node IDs

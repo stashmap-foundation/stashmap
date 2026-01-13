@@ -55,6 +55,17 @@ export function extractNodeIdsFromRefId(refId: ID | LongID): List<ID> {
   return List<ID>([parsed.targetNode]).concat(parsed.targetContext);
 }
 
+// Get the navigation stack for a reference ID (context + target as array)
+export function getRefTargetStack(
+  refId: ID | LongID
+): (ID | LongID)[] | undefined {
+  const parsed = parseRefId(refId);
+  if (!parsed) {
+    return undefined;
+  }
+  return [...parsed.targetContext.toArray(), parsed.targetNode];
+}
+
 export function buildReferenceNode(
   refId: LongID,
   knowledgeDBs: KnowledgeDBs,

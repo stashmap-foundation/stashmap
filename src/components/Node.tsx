@@ -31,7 +31,12 @@ import {
   useIsParentMultiselectBtnOn,
   isMutableNode,
 } from "./TemporaryViewContext";
-import { getReferencedByRelations, hasImageUrl } from "../connections";
+import {
+  getReferencedByRelations,
+  hasImageUrl,
+  isReferenceNode,
+  getRefTargetStack,
+} from "../connections";
 import { REFERENCED_BY } from "../constants";
 import { IS_MOBILE } from "./responsive";
 import { AddNodeToNode, getImageUrlFromText } from "./AddNode";
@@ -48,6 +53,7 @@ import { LoadingSpinnerButton } from "../commons/LoadingSpinnerButton";
 import { useInputElementFocus } from "../commons/FocusContextProvider";
 import { CancelButton, NodeCard } from "../commons/Ui";
 import { useProjectContext } from "../ProjectContext";
+import { usePaneNavigation } from "../SplitPanesContext";
 
 function getLevels(viewPath: ViewPath): number {
   // Subtract 1: for pane index at position 0
@@ -195,6 +201,7 @@ function NodeContent({ node }: { node: KnowNode }): JSX.Element {
   const { settings } = useData();
   const isBionic = settings.bionicReading;
   const [isImageAccessible, setIsImageAccessible] = useState<boolean>(false);
+  const isReference = node.type === "reference";
 
   // Get imageUrl only for nodes that support it (not ReferenceNode)
   const imageUrl = hasImageUrl(node) ? node.imageUrl : undefined;
@@ -221,10 +228,22 @@ function NodeContent({ node }: { node: KnowNode }): JSX.Element {
   }, [imageUrl]);
   const textToDisplay = imageUrl ? node.text.replace(imageUrl, "") : node.text;
 
+  // Reference nodes get special link-like styling
+  const referenceStyle: React.CSSProperties = isReference
+    ? {
+        fontStyle: "italic",
+        color: "#5a7bad",
+        textDecoration: "none",
+        borderBottom: "1px dotted #8fadd4",
+      }
+    : {};
+
   return (
-    <span className="break-word">
+    <span className={`break-word ${isReference ? "reference-node" : ""}`}>
       <NodeIcon node={node} />
-      {isBionic ? <BionicText nodeText={textToDisplay} /> : textToDisplay}
+      <span style={referenceStyle}>
+        {isBionic ? <BionicText nodeText={textToDisplay} /> : textToDisplay}
+      </span>
       {imageUrl && isImageAccessible && (
         <div>
           <img
@@ -266,8 +285,30 @@ function NodeAutoLink({
   children: React.ReactNode;
 }): JSX.Element | null {
   const { bookmarkedProjects } = useProjectContext();
+  const { setStack } = usePaneNavigation();
   const [nodeID] = useNodeID();
   const [node] = useNode();
+
+  // Reference nodes navigate to their target location when clicked
+  if (node && isReferenceNode(node)) {
+    const targetStack = getRefTargetStack(node.id);
+    if (targetStack) {
+      const handleClick = (): void => {
+        setStack(targetStack);
+      };
+      return (
+        <button
+          type="button"
+          className="reference-link-btn"
+          onClick={handleClick}
+          aria-label={`Navigate to ${node.text}`}
+        >
+          {children}
+        </button>
+      );
+    }
+  }
+
   if (node && node.type === "project") {
     const project = node as ProjectNode;
     if (bookmarkedProjects.find((bookmark) => bookmark === nodeID)) {

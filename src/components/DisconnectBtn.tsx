@@ -1,6 +1,6 @@
 import React from "react";
 import { Set } from "immutable";
-import { getRelations, markItemsAsNotRelevant } from "../connections";
+import { markItemsAsNotRelevant } from "../connections";
 import { REFERENCED_BY } from "../constants";
 import {
   useViewPath,
@@ -10,8 +10,8 @@ import {
   getLast,
   calculateIndexFromNodeIndex,
   getParentView,
-  getNodeIDFromView,
   getNodeFromView,
+  getViewFromPath,
 } from "../ViewContext";
 import {
   switchOffMultiselect,
@@ -74,20 +74,17 @@ export function DisconnectNodeBtn(): JSX.Element | null {
   if (!parentPath) {
     return null;
   }
-  const [parentNodeID, parentView] = getNodeIDFromView(data, parentPath);
-  if (!parentNodeID || !parentView) {
+  const parentView = getViewFromPath(data, parentPath);
+  if (!parentView) {
     return null;
   }
   // Referenced By items are readonly - can't disconnect them
   if (parentView.relations === REFERENCED_BY) {
     return null;
   }
-  const relations = getRelations(
-    data.knowledgeDBs,
-    parentView.relations,
-    data.user.publicKey,
-    parentNodeID
-  );
+  // Use getRelationForView which handles the case where view.relations is not set
+  // by finding relations based on context
+  const relations = getRelationForView(data, parentPath, stack);
   if (!relations) {
     return null;
   }

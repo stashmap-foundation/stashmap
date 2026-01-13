@@ -474,3 +474,44 @@ test("Reference indicators show other users icon", async () => {
   const otherUserIcon = await screen.findByTitle("1 other version");
   expect(otherUserIcon).toBeDefined();
 });
+
+test("Disconnect button shows when view.relations is not explicitly set", async () => {
+  // This tests the fix for when a node is opened in split screen
+  // without view.relations being set - the disconnect button should still appear
+  const [alice] = setup([ALICE]);
+  const db = await setupTestDB(alice(), [["Parent", ["Child1", "Child2"]]]);
+  const parent = findNodeByText(db, "Parent") as KnowNode;
+
+  // RootViewContextProvider creates a view without relations explicitly set
+  // The component should find relations by context using getRelationForView
+  renderWithTestData(
+    <Data user={alice().user}>
+      <RootViewContextProvider root={parent.id}>
+        <TemporaryViewProvider>
+          <DND>
+            <LoadNode>
+              <>
+                <DraggableNote />
+                <TreeView />
+              </>
+            </LoadNode>
+          </DND>
+        </TemporaryViewProvider>
+      </RootViewContextProvider>
+    </Data>,
+    {
+      ...alice(),
+      initialRoute: `/d/${parent.id}`,
+    }
+  );
+
+  await screen.findByText("Parent");
+  // Root node is always expanded, children should already be visible
+  await screen.findByText("Child1");
+  await screen.findByText("Child2");
+
+  // The disconnect buttons should appear for the children
+  // even though view.relations was not explicitly set on the root
+  const disconnectButtons = screen.getAllByLabelText(/disconnect node/);
+  expect(disconnectButtons.length).toBe(2);
+});

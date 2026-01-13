@@ -71,6 +71,7 @@ export function DraggableNote(): JSX.Element {
         <ToggleEditing />
         <JoinProjectButton />
         <span className="always-visible">
+          <ReferencedByToggle />
           <VersionSelector />
           <DisconnectNodeBtn />
           <FullscreenButton />

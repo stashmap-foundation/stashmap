@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { List, Map } from "immutable";
 import Data from "./Data";
@@ -106,20 +106,21 @@ test("Move View Settings on Delete", async () => {
       ...alice(),
     }
   );
-  fireEvent.click(
-    await screen.findByLabelText("show items relevant for C", undefined, {
-      timeout: 5000,
-    })
-  );
+  // Find the expand button for C by locating C's container
+  const cElement = await screen.findByText("C", undefined, { timeout: 5000 });
+  const cContainer = cElement.closest(".visible-on-hover") as HTMLElement;
+  fireEvent.click(within(cContainer).getByLabelText("expand"));
+
   await screen.findByText("C++");
   // Remove JAVA Node
   await userEvent.click(screen.getByLabelText("disconnect node Java"));
   // Ensure C is still expanded
   await screen.findByText("C++");
-  screen.getByLabelText("hide items relevant for C");
+  within(cContainer).getByLabelText("collapse");
 
-  await userEvent.click(screen.getByLabelText("hide items relevant for C"));
-  screen.getByLabelText("show items relevant for C");
+  // Collapse C
+  await userEvent.click(within(cContainer).getByLabelText("collapse"));
+  within(cContainer).getByLabelText("expand");
   expect(screen.queryByText("C++")).toBeNull();
 });
 
@@ -148,7 +149,10 @@ test("Move Node Up", async () => {
   );
   await screen.findByText("FPL");
   expect(extractNodes(utils.container)).toEqual(["FPL", "OOP"]);
-  await userEvent.click(screen.getByLabelText("show items relevant for OOP"));
+  // Expand OOP by finding its container
+  const oopElement = screen.getByText("OOP");
+  const oopContainer = oopElement.closest(".visible-on-hover") as HTMLElement;
+  await userEvent.click(within(oopContainer).getByLabelText("expand"));
   expect(extractNodes(utils.container)).toEqual(["FPL", "OOP", "C++", "Java"]);
 
   const oop = screen.getByText("OOP");
@@ -198,7 +202,10 @@ test("Contact reorders list", async () => {
   });
   await screen.findByText("Programming Languages");
   expect(extractNodes(utils.container)).toEqual(["OOP", "FPL"]);
-  await userEvent.click(screen.getByLabelText("show items relevant for OOP"));
+  // Expand OOP by finding its container
+  const oopElement = screen.getByText("OOP");
+  const oopContainer = oopElement.closest(".visible-on-hover") as HTMLElement;
+  await userEvent.click(within(oopContainer).getByLabelText("expand"));
   await screen.findByText("C++");
   expect(extractNodes(utils.container)).toEqual(["OOP", "C++", "Java", "FPL"]);
   cleanup();
@@ -415,7 +422,10 @@ test("View doesn't change if list is copied from contact", async () => {
 
   await screen.findByText("Programming Languages");
   expect(extractNodes(utils.container)).toEqual(["OOP", "FPL"]);
-  await userEvent.click(screen.getByLabelText("show items relevant for OOP"));
+  // Expand OOP by finding its container
+  const oopElement = screen.getByText("OOP");
+  const oopContainer = oopElement.closest(".visible-on-hover") as HTMLElement;
+  await userEvent.click(within(oopContainer).getByLabelText("expand"));
   expect(extractNodes(utils.container)).toEqual(["OOP", "C++", "Java", "FPL"]);
 
   // add node to Programming Languages and check if view stays the same

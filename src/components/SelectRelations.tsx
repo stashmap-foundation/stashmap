@@ -875,6 +875,7 @@ export function ReferencedByToggle(): JSX.Element | null {
   }
 
   const isInReferencedBy = view.relations === REFERENCED_BY;
+  const isExpanded = view.expanded === true;
 
   // Get the top normal relation to switch back to
   const context = getContextFromStackAndViewPath(stack, viewPath);
@@ -888,21 +889,31 @@ export function ReferencedByToggle(): JSX.Element | null {
   const topNormalRelation = sorted.first();
 
   const onClick = (): void => {
-    if (isInReferencedBy && topNormalRelation) {
-      // Switch back to normal relations
-      onChangeRelations(topNormalRelation, true);
+    if (isInReferencedBy) {
+      if (isExpanded && topNormalRelation) {
+        // Switch back to normal relations
+        onChangeRelations(topNormalRelation, true);
+      } else if (!isExpanded) {
+        // Just expand Referenced By view
+        onChangeRelations(referencedByRelations, true);
+      }
     } else {
       // Switch to Referenced By
       onChangeRelations(referencedByRelations, true);
     }
   };
 
+  // Match old behavior: show "hide" only when both selected AND expanded
+  const ariaLabel = isInReferencedBy && isExpanded
+    ? `hide references to ${node.text}`
+    : `show references to ${node.text}`;
+
   return (
     <button
       type="button"
       className={`btn btn-borderless p-0 ${isInReferencedBy ? "active" : ""}`}
       onClick={onClick}
-      aria-label={`${referencedByRelations.items.size} references`}
+      aria-label={ariaLabel}
       title={isInReferencedBy ? "Show children" : "Show references"}
     >
       <span className="iconsminds-link-2" />

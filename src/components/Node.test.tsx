@@ -672,9 +672,8 @@ test("Multiple connections to same node", async () => {
   const view = renderApp(alice());
   await typeNewNode(view, "Programming Languages");
 
-  const expandButton = await screen.findByLabelText(
-    "create relevant to for Programming Languages"
-  );
+  // Expand the node to show children area
+  const expandButton = await screen.findByLabelText("expand");
   fireEvent.click(expandButton);
 
   const searchButton = await screen.findByLabelText(

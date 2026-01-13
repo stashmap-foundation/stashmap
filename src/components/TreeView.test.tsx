@@ -56,7 +56,8 @@ test("Load Referenced By Nodes", async () => {
   );
   await screen.findByText("Bitcoin");
   fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
-  screen.getByText("Referenced By (3)");
+  // After clicking, should be in Referenced By mode - button now says "hide"
+  await screen.findByLabelText("hide references to Bitcoin");
   // Reference nodes display as "Parent → Bitcoin" paths
   await screen.findByText(/Cryptocurrencies/);
   await screen.findByText(/P2P Apps/);
@@ -131,7 +132,6 @@ test("Root node shows references when there are more than 0", async () => {
   expect(
     (await screen.findByLabelText("related to Bitcoin")).textContent
   ).toMatch(/Money(.*)/);
-  screen.getByText("Referenced By (1)");
 });
 
 test("Referenced By items do not show relation selector", async () => {
@@ -165,7 +165,7 @@ test("Referenced By items do not show relation selector", async () => {
 
   // Open Referenced By view
   fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
-  await screen.findByText("Referenced By (1)");
+  await screen.findByLabelText("hide references to Bitcoin");
 
   // Wait for the reference item to appear
   await screen.findByText(/Money/);
@@ -207,7 +207,7 @@ test("Referenced By items still show navigation buttons", async () => {
 
   // Open Referenced By view
   fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
-  await screen.findByText("Referenced By (1)");
+  await screen.findByLabelText("hide references to Bitcoin");
 
   // Wait for the reference item to appear
   await screen.findByText(/Money/);
@@ -247,7 +247,7 @@ test("Referenced By shows node with list and empty context", async () => {
 
   // Open Referenced By view
   fireEvent.click(screen.getByLabelText("show references to Money"));
-  await screen.findByText("Referenced By (1)");
+  await screen.findByLabelText("hide references to Money");
 
   // The node with a list should appear in its own Referenced By
   // It should display just "Money" (the node name), not "Loading..."
@@ -387,7 +387,7 @@ test("Reference indicators show item count", async () => {
 
   await screen.findByText("Child");
   fireEvent.click(screen.getByLabelText("show references to Child"));
-  await screen.findByText("Referenced By (2)");
+  await screen.findByLabelText("hide references to Child");
 
   // The reference "Parent" should show [2] because Child has 2 grandchildren
   // when viewed from the Parent context
@@ -467,7 +467,7 @@ test("Reference indicators show other users icon", async () => {
 
   await screen.findByText("Child");
   fireEvent.click(screen.getByLabelText("show references to Child"));
-  await screen.findByText("Referenced By (2)");
+  await screen.findByLabelText("hide references to Child");
 
   // Should show the business-man icon for 1 other user (Bob)
   // The icon has a title attribute we can query

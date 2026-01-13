@@ -71,8 +71,9 @@ test("Shows dots when other user has a relation of same type", async () => {
 
   await screen.findByText("Parent Node");
 
-  // Check that dots are rendered for the relation that Bob also has
-  expect(screen.getByRole("img", { name: "1 other version" })).toBeDefined();
+  // The version selector should show when multiple versions are available
+  // Both Alice and Bob have versions, so there are 2 versions
+  expect(screen.getByLabelText("2 versions available")).toBeDefined();
 });
 
 test("Shows no dots when user is the only one with a relation", async () => {
@@ -110,8 +111,9 @@ test("Shows no dots when user is the only one with a relation", async () => {
 
   await screen.findByText("Parent Node");
 
-  // Should show no "other versions" indicator since Alice is the only one
-  expect(screen.queryByRole("img", { name: /other version/ })).toBeNull();
+  // Version selector should not appear when only one version exists
+  // There's no "versions available" button since Alice is the only one
+  expect(screen.queryByLabelText(/versions available/)).toBeNull();
 });
 
 test("Shows dots when only other user has relation (current user has none)", async () => {
@@ -160,8 +162,12 @@ test("Shows dots when only other user has relation (current user has none)", asy
 
   await screen.findByText("Parent Node");
 
-  // Should show indicator for Bob's version
-  expect(screen.getByRole("img", { name: "1 other version" })).toBeDefined();
+  // When only another user has a version (not the current user),
+  // there's just 1 version available, so no version selector is shown.
+  // But Bob's child should appear as a diff item.
+  expect(screen.queryByLabelText(/versions available/)).toBeNull();
+  // Bob's child should be visible as a diff item
+  await screen.findByText("Bob's Child Node");
 });
 
 test("getDiffItemsForNode returns items from other users", () => {

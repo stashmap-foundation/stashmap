@@ -81,11 +81,8 @@ test("Link Nodes from other Users", async () => {
 
   // OOP is now under ROOT with context ['ROOT'] - Bob's children should be visible
   // Click to expand OOP and see its children
-  fireEvent.click(
-    await screen.findByLabelText(
-      "show items relevant for Object Oriented Languages"
-    )
-  );
+  // The root node is already expanded, so OOP will have the "expand" button
+  fireEvent.click(await screen.findByLabelText("expand"));
   await screen.findByText("Java");
 });
 
@@ -124,10 +121,7 @@ test("Default Relations are shown when adding a node from other User via search"
   );
 
   // Click to expand OOP and see Bob's children
-  fireEvent.click(
-    await screen.findByLabelText(
-      "show items relevant for Object Oriented Languages"
-    )
-  );
+  // The root node is already expanded, so OOP will have the "expand" button
+  fireEvent.click(await screen.findByLabelText("expand"));
   await screen.findByText("Java");
 });

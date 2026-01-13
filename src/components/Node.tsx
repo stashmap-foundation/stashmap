@@ -11,6 +11,7 @@ import {
   useViewPath,
   ViewPath,
   useIsAddToNode,
+  useIsInReferencedByView,
   addNodeToPathWithRelations,
   addAddToNodeToPath,
   addDiffItemToPath,
@@ -551,10 +552,14 @@ export function Node({
   const isAddToNode = useIsAddToNode();
   const isNodeBeingEdited = useIsEditingOn();
   const isMultiselect = useIsParentMultiselectBtnOn();
+  const isInReferencedByView = useIsInReferencedByView();
   const defaultCls = isDesktop ? "hover-light-bg" : "";
   const cls =
     className !== undefined ? `${className} hover-light-bg` : defaultCls;
   const clsBody = cardBodyClassName || "ps-0 pt-4 pb-0";
+
+  // Don't show NodeMenu in Referenced By view or for diff items
+  const showNodeMenu = !isDiffItem && !isInReferencedByView;
 
   return (
     <NodeCard className={cls} cardBodyClassName={clsBody}>
@@ -573,7 +578,7 @@ export function Node({
                 </NodeAutoLink>
               </>
             )}
-            {!isDiffItem && <NodeMenu />}
+            {showNodeMenu && <NodeMenu />}
             {isDiffItem && <ReadonlyRelations />}
           </div>
         </>

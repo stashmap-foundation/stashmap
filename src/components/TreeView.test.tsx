@@ -124,3 +124,87 @@ test("Root node shows references when there are more than 0", async () => {
   ).toMatch(/Money(.*)/);
   screen.getByText("Referenced By (1)");
 });
+
+test("Referenced By items do not show relation selector", async () => {
+  const [alice] = setup([ALICE]);
+  const db = await setupTestDB(alice(), [["Money", ["Bitcoin"]]]);
+  const bitcoin = findNodeByText(db, "Bitcoin") as KnowNode;
+  renderWithTestData(
+    <Data user={alice().user}>
+      <RootViewContextProvider root={bitcoin.id}>
+        <TemporaryViewProvider>
+          <DND>
+            <LoadNode referencedBy>
+              <>
+                <DraggableNote />
+                <TreeView />
+              </>
+            </LoadNode>
+          </DND>
+        </TemporaryViewProvider>
+      </RootViewContextProvider>
+    </Data>,
+    {
+      ...alice(),
+      initialRoute: `/d/${bitcoin.id}`,
+    }
+  );
+  await screen.findByText("Bitcoin");
+
+  // The root node (Bitcoin) should have a relation selector
+  expect(screen.getByLabelText("show references to Bitcoin")).toBeDefined();
+
+  // Open Referenced By view
+  fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
+  await screen.findByText("Referenced By (1)");
+
+  // Wait for the reference item to appear
+  await screen.findByText(/Money/);
+
+  // The Referenced By items should NOT have relation selectors
+  // Only the root node (Bitcoin) should have one
+  const allRelationSelectors = screen.getAllByRole("button", {
+    name: /show references|hide references/,
+  });
+  // Should only find one - for the root Bitcoin node
+  expect(allRelationSelectors).toHaveLength(1);
+});
+
+test("Referenced By items still show navigation buttons", async () => {
+  const [alice] = setup([ALICE]);
+  const db = await setupTestDB(alice(), [["Money", ["Bitcoin"]]]);
+  const bitcoin = findNodeByText(db, "Bitcoin") as KnowNode;
+  renderWithTestData(
+    <Data user={alice().user}>
+      <RootViewContextProvider root={bitcoin.id}>
+        <TemporaryViewProvider>
+          <DND>
+            <LoadNode referencedBy>
+              <>
+                <DraggableNote />
+                <TreeView />
+              </>
+            </LoadNode>
+          </DND>
+        </TemporaryViewProvider>
+      </RootViewContextProvider>
+    </Data>,
+    {
+      ...alice(),
+      initialRoute: `/d/${bitcoin.id}`,
+    }
+  );
+  await screen.findByText("Bitcoin");
+
+  // Open Referenced By view
+  fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
+  await screen.findByText("Referenced By (1)");
+
+  // Wait for the reference item to appear
+  await screen.findByText(/Money/);
+
+  // Navigation buttons should still be available for Referenced By items
+  // The fullscreen button should be present
+  const fullscreenButtons = screen.getAllByLabelText("open fullscreen");
+  expect(fullscreenButtons.length).toBeGreaterThanOrEqual(1);
+});

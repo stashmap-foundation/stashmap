@@ -617,6 +617,23 @@ export function useIsDiffItem(): boolean {
   return !parentRelations.items.some((item) => item.nodeID === nodeID);
 }
 
+/**
+ * Check if we're currently viewing a Referenced By relation.
+ * Items in Referenced By view are readonly - no editing, no dropping onto them.
+ */
+export function useIsInReferencedByView(): boolean {
+  const data = useData();
+  const viewPath = useViewPath();
+  const parentPath = getParentView(viewPath);
+
+  if (!parentPath) {
+    return false;
+  }
+
+  const [, parentView] = getNodeIDFromView(data, parentPath);
+  return parentView?.relations === REFERENCED_BY;
+}
+
 export function popViewPath(
   viewContext: ViewPath,
   times: number

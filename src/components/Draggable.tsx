@@ -5,6 +5,7 @@ import {
   ViewPath,
   useIsAddToNode,
   useIsDiffItem,
+  useIsInReferencedByView,
   useViewPath,
   getParentView,
   upsertRelations,
@@ -206,8 +207,8 @@ export function ListItem({
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const isDiffItem = useIsDiffItem();
+  const isInReferencedByView = useIsInReferencedByView();
 
-  // Diff items are NOT droppable
   const [{ dragDirection }, drop] = useDroppable({
     destination: treeViewPath,
     index,
@@ -224,7 +225,11 @@ export function ListItem({
     );
   }
 
-  drop(ref);
+  // Referenced By view: items are draggable but NOT droppable (don't register drop)
+  if (!isInReferencedByView) {
+    drop(ref);
+  }
+
   const className = `${dragDirection === 1 ? "dragging-over-top" : ""} ${
     dragDirection === -1 ? "dragging-over-bottom" : ""
   }`;

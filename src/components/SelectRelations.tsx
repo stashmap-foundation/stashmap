@@ -18,7 +18,7 @@ import {
   useDeselectAllInView,
   useTemporaryView,
 } from "./TemporaryViewContext";
-import { getRelations, isRemote, splitID } from "../connections";
+import { getRelations, isRemote, splitID, isReferenceNode } from "../connections";
 import { REFERENCED_BY } from "../constants";
 import { useData } from "../DataContext";
 import { planUpdateViews, usePlanner } from "../planner";
@@ -519,6 +519,10 @@ function ReferencedByRelationsButton({
   const [node] = useNode();
   const { knowledgeDBs, user } = useData();
   if (!node) {
+    return null;
+  }
+  // Don't show Referenced By for Reference nodes (they are synthetic)
+  if (isReferenceNode(node)) {
     return null;
   }
   const referencedByRelations = getRelations(

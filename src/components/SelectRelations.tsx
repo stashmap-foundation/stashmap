@@ -783,3 +783,64 @@ export function SelectRelations({
     </div>
   );
 }
+
+export function VersionSelector(): JSX.Element | null {
+  const { knowledgeDBs, user } = useData();
+  const [nodeID, view] = useNodeID();
+  const viewPath = useViewPath();
+  const { stack } = usePaneNavigation();
+  const onChangeRelations = useOnChangeRelations();
+
+  const context = getContextFromStackAndViewPath(stack, viewPath);
+  const currentRelations = getRelations(
+    knowledgeDBs,
+    view.relations,
+    user.publicKey,
+    nodeID
+  );
+  const allRelations = getAvailableRelationsForNode(
+    knowledgeDBs,
+    user.publicKey,
+    nodeID,
+    context
+  );
+
+  // Only show when there are multiple relations to choose from
+  if (allRelations.size <= 1) {
+    return null;
+  }
+
+  const sorted = sortRelations(allRelations, user.publicKey);
+  const otherRelations = sorted.filter((r) => r.id !== currentRelations?.id);
+
+  return (
+    <Dropdown>
+      <Dropdown.Toggle
+        as="button"
+        className="btn btn-borderless p-0"
+        aria-label={`${allRelations.size} versions available`}
+      >
+        <span className="iconsminds-clock-back" />
+      </Dropdown.Toggle>
+      <Dropdown.Menu popperConfig={{ strategy: "fixed" }} renderOnMount>
+        {otherRelations.map((r) => {
+          const remote = isRemote(splitID(r.id)[0], user.publicKey);
+          return (
+            <Dropdown.Item
+              key={r.id}
+              onClick={() => onChangeRelations(r, true)}
+            >
+              <div className="d-flex justify-content-between align-items-center">
+                <span>{r.items.size} Notes</span>
+                {remote && <span className="iconsminds-business-man ms-2" />}
+              </div>
+              <div className="font-size-small text-muted">
+                {new Date(r.updated * 1000).toLocaleDateString()}
+              </div>
+            </Dropdown.Item>
+          );
+        })}
+      </Dropdown.Menu>
+    </Dropdown>
+  );
+}

@@ -20,6 +20,7 @@ import { DisconnectNodeBtn } from "./DisconnectBtn";
 import { JoinProjectButton } from "../JoinProjext";
 import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
+import { VersionSelector } from "./SelectRelations";
 import { addRelationToRelations, shortID } from "../connections";
 import { useData } from "../DataContext";
 import { usePlanner, planUpsertRelations } from "../planner";
@@ -70,6 +71,7 @@ export function DraggableNote(): JSX.Element {
         <ToggleEditing />
         <JoinProjectButton />
         <span className="always-visible">
+          <VersionSelector />
           <DisconnectNodeBtn />
           <FullscreenButton />
           <OpenInSplitPaneButton />
@@ -239,6 +241,7 @@ export function ListItem({
       <div className="on-hover-menu right">
         <ToggleEditing />
         <span className="always-visible">
+          <VersionSelector />
           <DisconnectNodeBtn />
           <FullscreenButton />
           <OpenInSplitPaneButton />

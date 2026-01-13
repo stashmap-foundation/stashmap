@@ -855,6 +855,16 @@ export function findOrCreateRelationsForContext(
     return viewRelations;
   }
 
+  // DEBUG - log when context doesn't match
+  if (viewRelations && !contextsMatch(viewRelations.context, context)) {
+    console.log("findOrCreateRelationsForContext CONTEXT MISMATCH", {
+      nodeID,
+      viewRelationsID,
+      viewRelationsContext: viewRelations.context.toArray(),
+      expectedContext: context.toArray(),
+    });
+  }
+
   // Find existing relation by (head, context) or create new one
   const existingRelations = getAvailableRelationsForNode(
     knowledgeDBs,
@@ -862,7 +872,19 @@ export function findOrCreateRelationsForContext(
     nodeID,
     context
   );
-  return existingRelations.first() || newRelations(nodeID, context, myself);
+
+  const result = existingRelations.first() || newRelations(nodeID, context, myself);
+
+  // DEBUG - log when creating new relations
+  if (!existingRelations.first()) {
+    console.log("findOrCreateRelationsForContext CREATING NEW", {
+      nodeID,
+      context: context.toArray(),
+      newRelationsId: result.id,
+    });
+  }
+
+  return result;
 }
 
 export function upsertRelations(

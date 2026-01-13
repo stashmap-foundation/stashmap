@@ -11,8 +11,10 @@ import { getRelationsNoReferencedBy } from "../connections";
 import { REFERENCED_BY } from "../constants";
 import {
   ViewPath,
+  contextsMatch,
   getContextFromStackAndViewPath,
   getDefaultRelationForNode,
+  getAvailableRelationsForNode,
   newRelations,
   updateView,
   useNode,
@@ -21,6 +23,49 @@ import {
 import { usePaneNavigation } from "../SplitPanesContext";
 
 export const DEFAULT_COLOR = "#027d86";
+export const REFERENCED_BY_COLOR = "#9c27b0"; // Purple for Referenced By view
+
+// Default type filters when none specified: relevant, maybe_relevant, confirms, contra
+export const DEFAULT_TYPE_FILTERS: ID[] = ["" as ID, "maybe_relevant" as ID, "confirms" as ID, "contra" as ID];
+
+// Convert hex color to RGB
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result
+    ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16),
+    }
+    : { r: 0, g: 0, b: 0 };
+}
+
+// Convert RGB to hex
+function rgbToHex(r: number, g: number, b: number): string {
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+}
+
+// Blend multiple colors by averaging RGB values
+export function blendColors(colors: string[]): string {
+  if (colors.length === 0) return "#757575"; // Gray fallback
+  if (colors.length === 1) return colors[0];
+
+  const rgbs = colors.map(hexToRgb);
+  const avgR = Math.round(rgbs.reduce((sum, c) => sum + c.r, 0) / rgbs.length);
+  const avgG = Math.round(rgbs.reduce((sum, c) => sum + c.g, 0) / rgbs.length);
+  const avgB = Math.round(rgbs.reduce((sum, c) => sum + c.b, 0) / rgbs.length);
+
+  return rgbToHex(avgR, avgG, avgB);
+}
+
+// Get blended color for active type filters
+export function getFilterColor(typeFilters: ID[] | undefined): string {
+  const activeFilters = typeFilters && typeFilters.length > 0 ? typeFilters : DEFAULT_TYPE_FILTERS;
+  const colors = activeFilters
+    .map((typeId) => RELATION_TYPES.get(typeId)?.color)
+    .filter((c): c is string => !!c);
+  return blendColors(colors);
+}
 
 export const COLORS = [
   "#0288d1", // Bright blue - relevant to
@@ -97,6 +142,66 @@ export function planAddNewRelationToNode(
   view: View,
   viewPath: ViewPath
 ): Plan {
+  const relations = newRelations(nodeID, context, plan.user.publicKey);
+  const createRelationPlan = planUpsertRelations(plan, relations);
+  return planUpdateViews(
+    createRelationPlan,
+    updateView(plan.views, viewPath, {
+      ...view,
+      relations: relations.id,
+      expanded: true,
+    })
+  );
+}
+
+// Unified function for expanding a node with proper relation handling
+// This ensures consistent logic whether triggered by triangle toggle or button
+export function planExpandNode(
+  plan: Plan,
+  nodeID: LongID | ID,
+  context: Context,
+  view: View,
+  viewPath: ViewPath
+): Plan {
+  // 1. Check if view.relations is valid (exists in DB) AND context matches
+  const currentRelations = view.relations
+    ? getRelationsNoReferencedBy(plan.knowledgeDBs, view.relations, plan.user.publicKey)
+    : undefined;
+
+  if (currentRelations && contextsMatch(currentRelations.context, context)) {
+    // Valid relations with matching context - just expand
+    console.log(">>> USING EXISTING RELATIONS");
+    return planUpdateViews(
+      plan,
+      updateView(plan.views, viewPath, {
+        ...view,
+        expanded: true,
+      })
+    );
+  }
+
+  // 2. Check for available relations for this (head, context)
+  const availableRelations = getAvailableRelationsForNode(
+    plan.knowledgeDBs,
+    plan.user.publicKey,
+    nodeID,
+    context
+  );
+
+  if (availableRelations.size > 0) {
+    // Use first available relation
+    const firstRelation = availableRelations.first()!;
+    return planUpdateViews(
+      plan,
+      updateView(plan.views, viewPath, {
+        ...view,
+        relations: firstRelation.id,
+        expanded: true,
+      })
+    );
+  }
+
+  // 3. No relations exist - create new one
   const relations = newRelations(nodeID, context, plan.user.publicKey);
   const createRelationPlan = planUpsertRelations(plan, relations);
   return planUpdateViews(

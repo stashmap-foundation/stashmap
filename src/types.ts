@@ -165,6 +165,8 @@ declare global {
     width: number;
     // Show children, only relevant for inner nodes
     expanded?: boolean;
+    // Type filters for children view (empty/undefined = defaults: relevant, maybe_relevant, confirms, contra)
+    typeFilters?: Array<ID>;
   };
 
   // Context is the path of ancestor node IDs leading to the head node

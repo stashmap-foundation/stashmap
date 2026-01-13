@@ -1,6 +1,6 @@
 import React from "react";
 import { Set } from "immutable";
-import { getRelations, markItemsAsNotRelevant } from "../connections";
+import { getRelations, markItemsAsNotRelevant, shortID } from "../connections";
 import { REFERENCED_BY } from "../constants";
 import {
   useViewPath,
@@ -88,6 +88,19 @@ export function DisconnectNodeBtn(): JSX.Element | null {
     data.user.publicKey,
     parentNodeID
   );
+
+  // DEBUG - filter for specific node
+  const debugRelations = "e4eda09c-1176-48fc-b578-84473bf4354e";
+  if (parentView.relations && shortID(parentView.relations) === debugRelations) {
+    console.log("DisconnectNodeBtn DEBUG", {
+      nodeID,
+      parentNodeID,
+      parentViewRelations: parentView.relations,
+      relationsFound: !!relations,
+      relations,
+    });
+  }
+
   if (!relations) {
     return null;
   }

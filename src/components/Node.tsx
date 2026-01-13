@@ -20,9 +20,9 @@ import {
   useNodeID,
   getViewFromPath,
   popViewPath,
-  getDefaultRelationForNode,
   getContextFromStackAndViewPath,
   findOrCreateRelationsForContext,
+  updateView,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -37,20 +37,20 @@ import {
   hasImageUrl,
   isReferenceNode,
   getRefTargetStack,
+  shortID,
 } from "../connections";
 import { REFERENCED_BY } from "../constants";
 import { IS_MOBILE } from "./responsive";
 import { AddNodeToNode, getImageUrlFromText } from "./AddNode";
-import { NodeMenu } from "./Menu";
 import { ReadonlyRelations } from "./SelectRelations";
 import { ReferenceIndicators } from "./ReferenceIndicators";
 import { DeleteNode } from "./DeleteNode";
 import { useData } from "../DataContext";
-import { planUpsertNode, usePlanner } from "../planner";
+import { planUpsertNode, planUpdateViews, usePlanner } from "../planner";
 import { ReactQuillWrapper } from "./ReactQuillWrapper";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeIcon } from "./NodeIcon";
-import { getRelationTypeByRelationsID, RELATION_TYPES } from "./RelationTypes";
+import { getFilterColor, REFERENCED_BY_COLOR, planExpandNode } from "./RelationTypes";
 import { LoadingSpinnerButton } from "../commons/LoadingSpinnerButton";
 import { useInputElementFocus } from "../commons/FocusContextProvider";
 import { CancelButton, NodeCard } from "../commons/Ui";
@@ -61,6 +61,61 @@ function getLevels(viewPath: ViewPath): number {
   // Subtract 1: for pane index at position 0
   // This gives: root = 1, first children = 2, nested = 3, etc.
   return viewPath.length - 1;
+}
+
+function ExpandCollapseToggle(): JSX.Element | null {
+  const data = useData();
+  const viewPath = useViewPath();
+  const [nodeID, view] = useNodeID();
+  const { stack } = usePaneNavigation();
+  const { createPlan, executePlan } = usePlanner();
+  const isExpanded = view.expanded === true;
+  const isReferencedBy = view.relations === REFERENCED_BY;
+
+  // Get color based on view state
+  const color = isReferencedBy
+    ? REFERENCED_BY_COLOR
+    : getFilterColor(view.typeFilters);
+
+  const onToggle = (): void => {
+    if (isExpanded) {
+      // Collapsing: just set expanded to false, preserve everything else
+      const plan = planUpdateViews(
+        createPlan(),
+        updateView(data.views, viewPath, {
+          ...view,
+          expanded: false,
+        })
+      );
+      executePlan(plan);
+    } else {
+      // Expanding: use unified logic to handle relations properly
+      const context = getContextFromStackAndViewPath(stack, viewPath);
+      const plan = planExpandNode(
+        createPlan(),
+        nodeID,
+        context,
+        view,
+        viewPath
+      );
+      executePlan(plan);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="expand-collapse-toggle"
+      aria-label={isExpanded ? "collapse" : "expand"}
+      aria-expanded={isExpanded}
+      style={{ color }}
+    >
+      <span className={`triangle ${isExpanded ? "expanded" : "collapsed"}`}>
+        {isExpanded ? "▼" : "▶"}
+      </span>
+    </button>
+  );
 }
 
 export function LoadingNode(): JSX.Element {
@@ -233,11 +288,11 @@ function NodeContent({ node }: { node: KnowNode }): JSX.Element {
   // Reference nodes get special link-like styling
   const referenceStyle: React.CSSProperties = isReference
     ? {
-        fontStyle: "italic",
-        color: "#5a7bad",
-        textDecoration: "none",
-        borderBottom: "1px dotted #8fadd4",
-      }
+      fontStyle: "italic",
+      color: "#5a7bad",
+      textDecoration: "none",
+      borderBottom: "1px dotted #8fadd4",
+    }
     : {};
 
   return (
@@ -367,7 +422,7 @@ function EditingNodeContent(): JSX.Element | null {
 }
 
 const INDENTATION = 10;
-const ARROW_WIDTH = 0;
+const ARROW_WIDTH = 6;
 
 export function Indent({ levels }: { levels: number }): JSX.Element {
   const viewPath = useViewPath();
@@ -381,51 +436,42 @@ export function Indent({ levels }: { levels: number }): JSX.Element {
         // k=1: first line, pop back (levels - 1) times to get header column view
         // k=2: second line, pop back (levels - 2) times to get first child view
         // etc.
-        const color =
+        const lineInfo =
           k > 0
             ? (() => {
-                const pathForColor = popViewPath(viewPath, levels - k);
-                if (!pathForColor) {
-                  return undefined;
-                }
-                const viewForColor = getViewFromPath(data, pathForColor);
-                // If view has a relation, use its color
-                if (viewForColor?.relations) {
-                  const [relationType] = getRelationTypeByRelationsID(
-                    data,
-                    viewForColor.relations
-                  );
-                  return relationType?.color || undefined;
-                }
-                // Otherwise, get the default relation for this node
-                const [nodeID] = getNodeIDFromView(data, pathForColor);
-                const defaultRelationID = getDefaultRelationForNode(
-                  nodeID,
-                  data.knowledgeDBs,
-                  data.user.publicKey
-                );
-                if (defaultRelationID) {
-                  const [relationType] = getRelationTypeByRelationsID(
-                    data,
-                    defaultRelationID
-                  );
-                  return relationType?.color || undefined;
-                }
-                // Fallback to the default relation type color
-                return RELATION_TYPES.get("")?.color;
-              })()
-            : undefined;
+              const pathForAncestor = popViewPath(viewPath, levels - k);
+              if (!pathForAncestor) {
+                return { show: false, color: undefined };
+              }
+              const ancestorView = getViewFromPath(data, pathForAncestor);
 
-        const style = color
-          ? {
-              borderLeft: `2px solid ${color}`,
-            }
+              // Only show line if ancestor is expanded
+              if (!ancestorView?.expanded) {
+                return { show: false, color: undefined };
+              }
+
+              // Get color based on view state
+              const isReferencedBy = ancestorView.relations === REFERENCED_BY;
+              const color = isReferencedBy
+                ? REFERENCED_BY_COLOR
+                : getFilterColor(ancestorView.typeFilters);
+
+              return { show: true, color };
+            })()
+            : { show: false, color: undefined };
+
+        const style = lineInfo.show && lineInfo.color
+          ? { borderLeft: `2px solid ${lineInfo.color}` }
           : {};
 
+        // k=0 is just initial spacing (no line), k>0 shows lines
+        const marginLeft = k === 0 ? 5 : ARROW_WIDTH;
+        const width = k === 0 ? 0 : INDENTATION;
+
         return (
-          <div key={k} style={{ marginLeft: ARROW_WIDTH }}>
-            <div style={{ width: INDENTATION }} />
-            {k !== 0 && (
+          <div key={k} style={{ marginLeft }}>
+            <div style={{ width }} />
+            {k !== 0 && lineInfo.show && (
               <div>
                 <div className="vl" style={style} />
               </div>
@@ -445,6 +491,7 @@ export function getNodesInTree(
   noExpansion?: boolean
 ): List<ViewPath> {
   const [parentNodeID, parentView] = getNodeIDFromView(data, parentPath);
+
 
   // Handle REFERENCED_BY specially - it's not context-based
   if (parentView.relations === REFERENCED_BY) {
@@ -487,7 +534,18 @@ export function getNodesInTree(
   );
   const nodesInTree = childPaths.reduce(
     (nodesList: List<ViewPath>, childPath: ViewPath) => {
-      const childView = getNodeIDFromView(data, childPath)[1];
+      const [childNodeID, childView] = getNodeIDFromView(data, childPath);
+
+      // DEBUG - log child view state
+      if (shortID(childView.relations || "") === "e4eda09c-1176-48fc-b578-84473bf4354e") {
+        console.log("DEBUG child check", {
+          childNodeID: shortID(childNodeID),
+          childViewRelations: childView.relations ? shortID(childView.relations) : undefined,
+          expanded: childView.expanded,
+          childPath,
+        });
+      }
+
       if (noExpansion) {
         return nodesList.push(childPath);
       }
@@ -518,12 +576,12 @@ export function getNodesInTree(
   const withDiffItems =
     diffItems.size > 0
       ? diffItems.reduce(
-          (list, diffItem, idx) =>
-            list.push(
-              addDiffItemToPath(data, parentPath, diffItem.nodeID, idx, stack)
-            ),
-          nodesInTree
-        )
+        (list, diffItem, idx) =>
+          list.push(
+            addDiffItemToPath(data, parentPath, diffItem.nodeID, idx, stack)
+          ),
+        nodesInTree
+      )
       : nodesInTree;
 
   const addNodePath = addAddToNodeToPath(data, parentPath, stack);
@@ -560,12 +618,14 @@ export function Node({
     className !== undefined ? `${className} hover-light-bg` : defaultCls;
   const clsBody = cardBodyClassName || "ps-0 pt-4 pb-0";
 
-  // Don't show NodeMenu in Referenced By view or for diff items
-  const showNodeMenu = !isDiffItem && !isInReferencedByView;
+  // Show expand/collapse for regular nodes (not AddToNode, not diff items, not in Referenced By)
+  const showExpandCollapse =
+    !isAddToNode && !isDiffItem && !isInReferencedByView;
 
   return (
     <NodeCard className={cls} cardBodyClassName={clsBody}>
       {levels > 0 && <Indent levels={levels} />}
+      {showExpandCollapse && <ExpandCollapseToggle />}
       {isAddToNode && levels !== 1 && <AddNodeToNode />}
       {!isAddToNode && (
         <>
@@ -580,7 +640,6 @@ export function Node({
                 </NodeAutoLink>
               </>
             )}
-            {showNodeMenu && <NodeMenu />}
             {isDiffItem && <ReadonlyRelations />}
           </div>
         </>

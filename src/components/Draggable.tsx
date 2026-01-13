@@ -20,7 +20,7 @@ import { DisconnectNodeBtn } from "./DisconnectBtn";
 import { JoinProjectButton } from "../JoinProjext";
 import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
-import { VersionSelector } from "./SelectRelations";
+import { VersionSelector, ReferencedByToggle } from "./SelectRelations";
 import { addRelationToRelations, shortID } from "../connections";
 import { useData } from "../DataContext";
 import { usePlanner, planUpsertRelations } from "../planner";
@@ -241,6 +241,7 @@ export function ListItem({
       <div className="on-hover-menu right">
         <ToggleEditing />
         <span className="always-visible">
+          <ReferencedByToggle />
           <VersionSelector />
           <DisconnectNodeBtn />
           <FullscreenButton />

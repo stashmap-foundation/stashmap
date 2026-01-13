@@ -844,3 +844,71 @@ export function VersionSelector(): JSX.Element | null {
     </Dropdown>
   );
 }
+
+export function ReferencedByToggle(): JSX.Element | null {
+  const { knowledgeDBs, user } = useData();
+  const [node] = useNode();
+  const [nodeID, view] = useNodeID();
+  const viewPath = useViewPath();
+  const { stack } = usePaneNavigation();
+  const onChangeRelations = useOnChangeRelations();
+
+  if (!node) {
+    return null;
+  }
+
+  // Don't show Referenced By for Reference nodes (they are synthetic)
+  if (isReferenceNode(node)) {
+    return null;
+  }
+
+  const referencedByRelations = getRelations(
+    knowledgeDBs,
+    REFERENCED_BY,
+    user.publicKey,
+    node.id
+  );
+
+  // Don't show if no references
+  if (!referencedByRelations || referencedByRelations.items.size === 0) {
+    return null;
+  }
+
+  const isInReferencedBy = view.relations === REFERENCED_BY;
+
+  // Get the top normal relation to switch back to
+  const context = getContextFromStackAndViewPath(stack, viewPath);
+  const normalRelations = getAvailableRelationsForNode(
+    knowledgeDBs,
+    user.publicKey,
+    nodeID,
+    context
+  );
+  const sorted = sortRelations(normalRelations, user.publicKey);
+  const topNormalRelation = sorted.first();
+
+  const onClick = (): void => {
+    if (isInReferencedBy && topNormalRelation) {
+      // Switch back to normal relations
+      onChangeRelations(topNormalRelation, true);
+    } else {
+      // Switch to Referenced By
+      onChangeRelations(referencedByRelations, true);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      className={`btn btn-borderless p-0 ${isInReferencedBy ? "active" : ""}`}
+      onClick={onClick}
+      aria-label={`${referencedByRelations.items.size} references`}
+      title={isInReferencedBy ? "Show children" : "Show references"}
+    >
+      <span className="iconsminds-link-2" />
+      <span className="ms-1 font-size-small">
+        {referencedByRelations.items.size}
+      </span>
+    </button>
+  );
+}

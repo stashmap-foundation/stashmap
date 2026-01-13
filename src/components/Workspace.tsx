@@ -18,7 +18,7 @@ import {
   PaneSettingsMenu,
   ClosePaneButton,
 } from "./SplitPaneLayout";
-import { VersionSelector } from "./SelectRelations";
+import { VersionSelector, ReferencedByToggle } from "./SelectRelations";
 import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 
 function StackedLayer({
@@ -131,6 +131,7 @@ export function WorkspaceView(): JSX.Element | null {
                     )}
                     {!hasStack && <ClosePaneButton />}
                     {!hasStack && <PaneSearchButton />}
+                    <ReferencedByToggle />
                     <VersionSelector />
                     <OpenInSplitPaneButton />
                   </span>

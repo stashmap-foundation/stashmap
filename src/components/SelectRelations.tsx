@@ -18,7 +18,12 @@ import {
   useDeselectAllInView,
   useTemporaryView,
 } from "./TemporaryViewContext";
-import { getRelations, isRemote, splitID, isReferenceNode } from "../connections";
+import {
+  getRelations,
+  isRemote,
+  splitID,
+  isReferenceNode,
+} from "../connections";
 import { REFERENCED_BY } from "../constants";
 import { useData } from "../DataContext";
 import { planUpdateViews, usePlanner } from "../planner";

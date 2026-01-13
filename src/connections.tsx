@@ -147,9 +147,7 @@ export function getReferencedByRelations(
   const referencePaths = knowledgeDBs.reduce((acc, knowledgeDB, author) => {
     return knowledgeDB.relations.reduce((rdx, relations) => {
       // Case 1: nodeID appears in another node's items
-      const isInItems = relations.items.some(
-        (item) => item.nodeID === nodeID
-      );
+      const isInItems = relations.items.some((item) => item.nodeID === nodeID);
 
       // Case 2: nodeID is the head of a list with empty context (has direct children)
       const isHeadWithEmptyContext =
@@ -166,10 +164,27 @@ export function getReferencedByRelations(
           ctxId.includes("_") ? ctxId : joinID(author, ctxId)
         );
 
-        // Create unique key for deduplication: head + context (using full IDs)
-        const pathKey = `${fullHead}:${fullContext.join(",")}`;
-        if (!rdx.some((p) => `${p.head}:${p.context.join(",")}` === pathKey)) {
+        // Deduplicate using SHORT IDs (logical node identity)
+        // Two paths are the same if they reference the same nodes, regardless of author
+        const headShort = shortID(fullHead);
+        const contextShorts = fullContext.map(shortID).join(",");
+        const pathKey = `${headShort}:${contextShorts}`;
+
+        const existingPath = rdx.find(
+          (p) =>
+            `${shortID(p.head)}:${p.context.map(shortID).join(",")}` === pathKey
+        );
+        if (!existingPath) {
           return rdx.push({
+            head: fullHead as ID,
+            context: fullContext,
+            updated: relations.updated,
+          });
+        }
+        // Update if this version is newer
+        if (relations.updated > existingPath.updated) {
+          const idx = rdx.indexOf(existingPath);
+          return rdx.set(idx, {
             head: fullHead as ID,
             context: fullContext,
             updated: relations.updated,

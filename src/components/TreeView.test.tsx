@@ -3,15 +3,24 @@ import { List } from "immutable";
 import { fireEvent, screen } from "@testing-library/react";
 import {
   ALICE,
+  BOB,
   findNodeByText,
+  follow,
   renderWithTestData,
   setup,
   setupTestDB,
   RootViewOrWorkspaceIsLoading,
 } from "../utils.test";
+import { newNode, addRelationToRelations } from "../connections";
+import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
+import { execute } from "../executor";
 import Data from "../Data";
 import { LoadNode } from "../dataQuery";
-import { PushNode, RootViewContextProvider } from "../ViewContext";
+import {
+  PushNode,
+  RootViewContextProvider,
+  newRelations,
+} from "../ViewContext";
 import { TreeView } from "./TreeView";
 import { DraggableNote } from "./Draggable";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
@@ -242,7 +251,75 @@ test("Referenced By shows node with list and empty context", async () => {
 
   // The node with a list should appear in its own Referenced By
   // It should display just "Money" (the node name), not "Loading..."
-  const content = (await screen.findByLabelText("related to Money")).textContent;
+  const content = (await screen.findByLabelText("related to Money"))
+    .textContent;
   expect(content).toMatch(/Money/);
   expect(content).not.toMatch(/Loading/);
+});
+
+test("Referenced By deduplicates paths from multiple users", async () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  const { publicKey: alicePK } = alice().user;
+  const { publicKey: bobPK } = bob().user;
+
+  // Alice creates "My Notes" and "Bitcoin" nodes
+  const myNotes = newNode("My Notes", alicePK);
+  const bitcoin = newNode("Bitcoin", alicePK);
+
+  // Alice creates a relation: My Notes -> Bitcoin
+  const aliceRelations = addRelationToRelations(
+    newRelations(myNotes.id, List(), alicePK),
+    bitcoin.id
+  );
+
+  const alicePlan = planUpsertRelations(
+    planUpsertNode(planUpsertNode(createPlan(alice()), myNotes), bitcoin),
+    aliceRelations
+  );
+  await execute({ ...alice(), plan: alicePlan });
+
+  // Bob creates a relation using the SAME head (Alice's My Notes) -> Bitcoin
+  // This simulates Bob also organizing Bitcoin under the same "My Notes" node
+  const bobRelations = addRelationToRelations(
+    newRelations(myNotes.id, List(), bobPK),
+    bitcoin.id
+  );
+
+  const bobPlan = planUpsertRelations(createPlan(bob()), bobRelations);
+  await execute({ ...bob(), plan: bobPlan });
+
+  // Alice follows Bob to see his data
+  await follow(alice, bob().user.publicKey);
+
+  renderWithTestData(
+    <Data user={alice().user}>
+      <RootViewContextProvider root={bitcoin.id}>
+        <TemporaryViewProvider>
+          <DND>
+            <LoadNode referencedBy>
+              <>
+                <DraggableNote />
+                <TreeView />
+              </>
+            </LoadNode>
+          </DND>
+        </TemporaryViewProvider>
+      </RootViewContextProvider>
+    </Data>,
+    {
+      ...alice(),
+      initialRoute: `/d/${bitcoin.id}`,
+    }
+  );
+
+  await screen.findByText("Bitcoin");
+  fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
+
+  // Wait for Referenced By to load
+  await screen.findByLabelText("related to Bitcoin");
+
+  // Should only show ONE reference path, not two (deduplication works)
+  // Both Alice and Bob have relations with head=My Notes containing Bitcoin
+  const referenceButtons = screen.getAllByLabelText(/Navigate to/);
+  expect(referenceButtons).toHaveLength(1);
 });

@@ -21,8 +21,8 @@ import {
   getViewFromPath,
   popViewPath,
   getContextFromStackAndViewPath,
+  getAvailableRelationsForNode,
   findOrCreateRelationsForContext,
-  updateView,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -34,23 +34,28 @@ import {
 } from "./TemporaryViewContext";
 import {
   getReferencedByRelations,
+  getRelations,
   hasImageUrl,
   isReferenceNode,
   getRefTargetStack,
-  shortID,
 } from "../connections";
 import { REFERENCED_BY } from "../constants";
 import { IS_MOBILE } from "./responsive";
 import { AddNodeToNode, getImageUrlFromText } from "./AddNode";
-import { ReadonlyRelations } from "./SelectRelations";
+import {
+  ReadonlyRelations,
+  sortRelations,
+  useOnChangeRelations,
+  useOnToggleExpanded,
+} from "./SelectRelations";
 import { ReferenceIndicators } from "./ReferenceIndicators";
 import { DeleteNode } from "./DeleteNode";
 import { useData } from "../DataContext";
-import { planUpsertNode, planUpdateViews, usePlanner } from "../planner";
+import { planUpsertNode, usePlanner } from "../planner";
 import { ReactQuillWrapper } from "./ReactQuillWrapper";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeIcon } from "./NodeIcon";
-import { getFilterColor, REFERENCED_BY_COLOR, planExpandNode } from "./RelationTypes";
+import { getFilterColor, REFERENCED_BY_COLOR, planAddNewRelationToNode } from "./RelationTypes";
 import { LoadingSpinnerButton } from "../commons/LoadingSpinnerButton";
 import { useInputElementFocus } from "../commons/FocusContextProvider";
 import { CancelButton, NodeCard } from "../commons/Ui";
@@ -66,11 +71,38 @@ function getLevels(viewPath: ViewPath): number {
 function ExpandCollapseToggle(): JSX.Element | null {
   const data = useData();
   const viewPath = useViewPath();
+  const [node] = useNode();
   const [nodeID, view] = useNodeID();
   const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
+  const onChangeRelations = useOnChangeRelations();
+  const onToggleExpanded = useOnToggleExpanded();
   const isExpanded = view.expanded === true;
   const isReferencedBy = view.relations === REFERENCED_BY;
+
+  // Get available relations filtered by context (same as SelectRelations)
+  const context = getContextFromStackAndViewPath(stack, viewPath);
+  const availableRelations = getAvailableRelationsForNode(
+    data.knowledgeDBs,
+    data.user.publicKey,
+    nodeID,
+    context
+  );
+  const hasRelations = availableRelations.size > 0;
+
+  // Get current relations (same as SelectRelations)
+  const currentRelations = getRelations(
+    data.knowledgeDBs,
+    view.relations,
+    data.user.publicKey,
+    nodeID
+  );
+
+  // Determine topRelation (same logic as SelectRelationsButton)
+  const isSelected =
+    availableRelations.filter((r) => r.id === currentRelations?.id).size > 0;
+  const sorted = sortRelations(availableRelations, data.user.publicKey);
+  const topRelation = isSelected ? currentRelations : sorted.first();
 
   // Get color based on view state
   const color = isReferencedBy
@@ -78,22 +110,23 @@ function ExpandCollapseToggle(): JSX.Element | null {
     : getFilterColor(view.typeFilters);
 
   const onToggle = (): void => {
-    if (isExpanded) {
-      // Collapsing: just set expanded to false, preserve everything else
-      const plan = planUpdateViews(
-        createPlan(),
-        updateView(data.views, viewPath, {
-          ...view,
-          expanded: false,
-        })
-      );
-      executePlan(plan);
+    if (hasRelations && topRelation) {
+      // Has existing relations (same as SelectRelationsButton onClick)
+      if (view.relations === topRelation.id) {
+        // Already using correct relation, just toggle expanded
+        onToggleExpanded(!isExpanded);
+      } else {
+        // Change to the correct relation and expand
+        onChangeRelations(topRelation, true);
+      }
     } else {
-      // Expanding: use unified logic to handle relations properly
-      const context = getContextFromStackAndViewPath(stack, viewPath);
-      const plan = planExpandNode(
+      // No relations exist, create new (same as GhostRelationButton onClick)
+      if (!node) {
+        return;
+      }
+      const plan = planAddNewRelationToNode(
         createPlan(),
-        nodeID,
+        node.id,
         context,
         view,
         viewPath
@@ -534,18 +567,7 @@ export function getNodesInTree(
   );
   const nodesInTree = childPaths.reduce(
     (nodesList: List<ViewPath>, childPath: ViewPath) => {
-      const [childNodeID, childView] = getNodeIDFromView(data, childPath);
-
-      // DEBUG - log child view state
-      if (shortID(childView.relations || "") === "e4eda09c-1176-48fc-b578-84473bf4354e") {
-        console.log("DEBUG child check", {
-          childNodeID: shortID(childNodeID),
-          childViewRelations: childView.relations ? shortID(childView.relations) : undefined,
-          expanded: childView.expanded,
-          childPath,
-        });
-      }
-
+      const childView = getNodeIDFromView(data, childPath)[1];
       if (noExpansion) {
         return nodesList.push(childPath);
       }

@@ -326,7 +326,7 @@ function GhostVirtualListButton({
 
 type ChangeRelation = (relations: Relations, expand: boolean) => void;
 
-function useOnChangeRelations(): ChangeRelation {
+export function useOnChangeRelations(): ChangeRelation {
   const data = useData();
   const { stack } = usePaneNavigation();
   const { editorOpenViews, setEditorOpenState } = useTemporaryView();
@@ -428,7 +428,7 @@ type ShowRelationsButtonProps = {
   addGroupSpacing?: boolean;
 };
 
-function useOnToggleExpanded(): (expand: boolean) => void {
+export function useOnToggleExpanded(): (expand: boolean) => void {
   const data = useData();
   const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
@@ -552,7 +552,7 @@ function ReferencedByRelationsButton({
   );
 }
 
-function sortRelations(
+export function sortRelations(
   relationList: List<Relations>,
   myself: PublicKey
 ): List<Relations> {

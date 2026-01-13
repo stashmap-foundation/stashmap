@@ -132,6 +132,7 @@ type ReferencedByPath = {
   head: ID;
   context: Context;
   updated: number;
+  pathKey: string;
 };
 
 export function getReferencedByRelations(
@@ -143,8 +144,8 @@ export function getReferencedByRelations(
   const targetShortID = shortID(nodeID);
 
   // Collect all (head, context) pairs where nodeID is referenced
-  // We need to store FULL IDs (with author prefix) so they can be queried later
-  const referencePaths = knowledgeDBs.reduce((acc, knowledgeDB, author) => {
+  // We use short IDs - getNodeFromID will search across all DBs to find actual nodes
+  const referencePaths = knowledgeDBs.reduce((acc, knowledgeDB) => {
     return knowledgeDB.relations.reduce((rdx, relations) => {
       // Case 1: nodeID appears in another node's items
       const isInItems = relations.items.some((item) => item.nodeID === nodeID);
@@ -156,38 +157,32 @@ export function getReferencedByRelations(
         relations.items.size > 0;
 
       if (isInItems || isHeadWithEmptyContext) {
-        // Convert short IDs to full IDs using the author from this knowledgeDB
-        const fullHead = relations.head.includes("_")
-          ? relations.head
-          : joinID(author, relations.head);
-        const fullContext = relations.context.map((ctxId) =>
-          ctxId.includes("_") ? ctxId : joinID(author, ctxId)
+        // Use short IDs for the path - getNodeFromID will search across all DBs
+        const headShort = shortID(relations.head) as ID;
+        const contextShorts = relations.context.map(
+          (ctxId) => shortID(ctxId) as ID
         );
 
-        // Deduplicate using SHORT IDs (logical node identity)
-        // Two paths are the same if they reference the same nodes, regardless of author
-        const headShort = shortID(fullHead);
-        const contextShorts = fullContext.map(shortID).join(",");
-        const pathKey = `${headShort}:${contextShorts}`;
+        // Deduplicate using short IDs (logical node identity)
+        const pathKey = `${headShort}:${contextShorts.join(",")}`;
 
-        const existingPath = rdx.find(
-          (p) =>
-            `${shortID(p.head)}:${p.context.map(shortID).join(",")}` === pathKey
-        );
+        const existingPath = rdx.find((p) => p.pathKey === pathKey);
         if (!existingPath) {
           return rdx.push({
-            head: fullHead as ID,
-            context: fullContext,
+            head: headShort as ID,
+            context: contextShorts,
             updated: relations.updated,
+            pathKey,
           });
         }
         // Update if this version is newer
         if (relations.updated > existingPath.updated) {
           const idx = rdx.indexOf(existingPath);
           return rdx.set(idx, {
-            head: fullHead as ID,
-            context: fullContext,
+            head: headShort as ID,
+            context: contextShorts,
             updated: relations.updated,
+            pathKey,
           });
         }
       }

@@ -208,3 +208,41 @@ test("Referenced By items still show navigation buttons", async () => {
   const fullscreenButtons = screen.getAllByLabelText("open fullscreen");
   expect(fullscreenButtons.length).toBeGreaterThanOrEqual(1);
 });
+
+test("Referenced By shows node with list and empty context", async () => {
+  const [alice] = setup([ALICE]);
+  // Create "Money" with a child "Bitcoin" - Money has a list with empty context
+  const db = await setupTestDB(alice(), [["Money", ["Bitcoin"]]]);
+  const money = findNodeByText(db, "Money") as KnowNode;
+  renderWithTestData(
+    <Data user={alice().user}>
+      <RootViewContextProvider root={money.id}>
+        <TemporaryViewProvider>
+          <DND>
+            <LoadNode referencedBy>
+              <>
+                <DraggableNote />
+                <TreeView />
+              </>
+            </LoadNode>
+          </DND>
+        </TemporaryViewProvider>
+      </RootViewContextProvider>
+    </Data>,
+    {
+      ...alice(),
+      initialRoute: `/d/${money.id}`,
+    }
+  );
+  await screen.findByText("Money");
+
+  // Open Referenced By view
+  fireEvent.click(screen.getByLabelText("show references to Money"));
+  await screen.findByText("Referenced By (1)");
+
+  // The node with a list should appear in its own Referenced By
+  // It should display just "Money" (the node name), not "Loading..."
+  const content = (await screen.findByLabelText("related to Money")).textContent;
+  expect(content).toMatch(/Money/);
+  expect(content).not.toMatch(/Loading/);
+});

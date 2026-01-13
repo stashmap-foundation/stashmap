@@ -140,13 +140,24 @@ export function getReferencedByRelations(
   nodeID: LongID | ID
 ): Relations | undefined {
   const rel = newRelations(nodeID, List<ID>(), myself);
+  const targetShortID = shortID(nodeID);
 
   // Collect all (head, context) pairs where nodeID is referenced
   // We need to store FULL IDs (with author prefix) so they can be queried later
   const referencePaths = knowledgeDBs.reduce((acc, knowledgeDB, author) => {
     return knowledgeDB.relations.reduce((rdx, relations) => {
-      // Check if any item's nodeID matches
-      if (relations.items.some((item) => item.nodeID === nodeID)) {
+      // Case 1: nodeID appears in another node's items
+      const isInItems = relations.items.some(
+        (item) => item.nodeID === nodeID
+      );
+
+      // Case 2: nodeID is the head of a list with empty context (has direct children)
+      const isHeadWithEmptyContext =
+        relations.head === targetShortID &&
+        relations.context.size === 0 &&
+        relations.items.size > 0;
+
+      if (isInItems || isHeadWithEmptyContext) {
         // Convert short IDs to full IDs using the author from this knowledgeDB
         const fullHead = relations.head.includes("_")
           ? relations.head
@@ -175,10 +186,22 @@ export function getReferencedByRelations(
   return {
     ...rel,
     id: REFERENCED_BY,
-    items: sortedPaths.map((path) => ({
-      nodeID: createRefId(path.context.push(path.head), nodeID as ID),
-      types: List<ID>([""]),
-    })),
+    items: sortedPaths.map((path) => {
+      // If context is empty and head equals the nodeID, this is a list with no context
+      // Create ref with empty context so it displays as just the node name
+      const isOwnList =
+        path.context.size === 0 && shortID(path.head) === targetShortID;
+      if (isOwnList) {
+        return {
+          nodeID: createRefId(List<ID>(), nodeID as ID),
+          types: List<ID>([""]),
+        };
+      }
+      return {
+        nodeID: createRefId(path.context.push(path.head), nodeID as ID),
+        types: List<ID>([""]),
+      };
+    }),
   };
 }
 

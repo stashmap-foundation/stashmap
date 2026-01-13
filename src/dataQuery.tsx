@@ -132,6 +132,8 @@ export function addReferencedByToFilters(
   return {
     ...addAuthorFromIDToFilters(filters, id),
     referencedBy: updatedFilter,
+    // Also query for relations where this node is the head (has direct children)
+    knowledgeListByHead: addIDToFilter(filters.knowledgeListByHead, id, "#k"),
   };
 }
 

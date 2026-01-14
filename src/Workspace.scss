@@ -97,6 +97,7 @@ body {
 .stacked-layer-clickable {
   flex: 1;
   padding: 8px;
+  padding-left: 108px; // Align with node text (left-menu width + some spacing)
   cursor: pointer;
 }
 
@@ -397,7 +398,7 @@ body {
 }
 
 .inner-node {
-  border-bottom: $border-light;
+  //border-bottom: $border-light;
 }
 
 .modal-header {
@@ -985,7 +986,7 @@ to {
   padding-top: 2px;
 
   > * {
-    visibility: visible; 
+    visibility: hidden; 
   }
 
   // Force consistent height on all elements

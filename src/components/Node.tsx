@@ -634,11 +634,11 @@ export function Node({
                 <NodeAutoLink>
                   {isDiffItem && <DiffItemIndicator />}
                   <InteractiveNodeContent editOnClick={!isDiffItem} />
-                  <span className="inline-node-actions">
-                    <FullscreenButton />
-                    <OpenInSplitPaneButton />
-                  </span>
                 </NodeAutoLink>
+                <span className="inline-node-actions">
+                  <FullscreenButton />
+                  <OpenInSplitPaneButton />
+                </span>
               </>
             )}
           </div>

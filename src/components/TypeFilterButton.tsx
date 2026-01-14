@@ -13,10 +13,11 @@ const COL_1_FILTERS: { id: Relevance; label: string; color: string }[] = [
   { id: "not_relevant", label: "Not Relevant", color: TYPE_COLORS.not_relevant },
 ];
 
-// Column 2: Evidence types (exclude undefined from Argument)
-const COL_2_FILTERS: { id: "confirms" | "contra"; label: string; color: string }[] = [
+// Column 2: Evidence types + Suggestions
+const COL_2_FILTERS: { id: "confirms" | "contra" | "suggestions"; label: string; color: string }[] = [
   { id: "confirms", label: "Confirms", color: TYPE_COLORS.confirms },
   { id: "contra", label: "Contradicts", color: TYPE_COLORS.contra },
+  { id: "suggestions", label: "Suggestions", color: TYPE_COLORS.suggestions },
 ];
 
 function FilterDot({
@@ -40,6 +41,8 @@ function FilterDot({
   );
 }
 
+type FilterId = Relevance | Argument | "suggestions";
+
 function FilterItem({
   id,
   label,
@@ -47,11 +50,11 @@ function FilterItem({
   isActive,
   onClick,
 }: {
-  id: Relevance | Argument;
+  id: FilterId;
   label: string;
   color: string;
   isActive: boolean;
-  onClick: (id: Relevance | Argument) => void;
+  onClick: (id: FilterId) => void;
 }): JSX.Element {
   return (
     <div
@@ -101,11 +104,10 @@ export function TypeFilterButton(): JSX.Element | null {
   // Get current filters (default if not set)
   const currentFilters = view.typeFilters || DEFAULT_TYPE_FILTERS;
 
-  const isFilterActive = (id: Relevance | Argument): boolean =>
-    currentFilters.includes(id as Relevance | Argument);
+  const isFilterActive = (id: FilterId): boolean => currentFilters.includes(id);
 
-  const handleFilterToggle = (id: Relevance | Argument): void => {
-    const isActive = currentFilters.includes(id as Relevance | Argument);
+  const handleFilterToggle = (id: FilterId): void => {
+    const isActive = currentFilters.includes(id);
     const newFilters = isActive
       ? currentFilters.filter((f) => f !== id)
       : [...currentFilters, id];
@@ -151,8 +153,7 @@ export function TypeFilterButton(): JSX.Element | null {
                 isActive={isFilterActive(f.id)}
               />
             ))}
-            {/* Padding dots to align columns */}
-            <FilterDot color={TYPE_COLORS.inactive} isActive={false} />
+            {/* Padding dot to align columns */}
             <FilterDot color={TYPE_COLORS.inactive} isActive={false} />
           </span>
         </span>

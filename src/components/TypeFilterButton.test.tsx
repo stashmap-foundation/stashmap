@@ -3,7 +3,9 @@ import { List } from "immutable";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import {
   ALICE,
+  BOB,
   findNodeByText,
+  follow,
   renderWithTestData,
   setup,
   setupTestDB,
@@ -381,6 +383,193 @@ describe("TypeFilterButton", () => {
     // (indicated by the item still being hidden after reopening)
     await waitFor(() => {
       expect(screen.queryByText("Maybe Relevant Item")).toBeNull();
+    });
+  });
+});
+
+describe("Suggestions filter", () => {
+  test("DEFAULT_TYPE_FILTERS includes suggestions", () => {
+    expect(DEFAULT_TYPE_FILTERS).toContain("suggestions");
+  });
+
+  test("TYPE_COLORS has suggestions color", () => {
+    expect(TYPE_COLORS.suggestions).toBe("#7b1fa2");
+  });
+
+  test("filter popover shows Suggestions option", async () => {
+    const [alice] = setup([ALICE]);
+    const db = await setupTestDB(alice(), [["Parent", ["Child"]]]);
+    const parent = findNodeByText(db, "Parent") as KnowNode;
+
+    renderWithTestData(
+      <Data user={alice().user}>
+        <RootViewContextProvider root={parent.id}>
+          <TemporaryViewProvider>
+            <DND>
+              <LoadNode>
+                <>
+                  <DraggableNote />
+                  <TreeView />
+                </>
+              </LoadNode>
+            </DND>
+          </TemporaryViewProvider>
+        </RootViewContextProvider>
+      </Data>,
+      {
+        ...alice(),
+        initialRoute: `/d/${parent.id}`,
+      }
+    );
+
+    await screen.findByText("Parent");
+
+    // Open filter popover
+    const filterButtons = screen.getAllByLabelText("filter suggestions");
+    fireEvent.click(filterButtons[0]);
+
+    // Suggestions option should be visible
+    await screen.findByText("Suggestions");
+  });
+
+  test("toggling off suggestions hides diff items from other users", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    const { publicKey: alicePK } = alice().user;
+    const { publicKey: bobPK } = bob().user;
+
+    // Alice creates Parent
+    const parent = newNode("Parent", alicePK);
+    const aliceRelations = newRelations(parent.id, List(), alicePK);
+
+    const alicePlan = planUpsertRelations(
+      planUpsertNode(createPlan(alice()), parent),
+      aliceRelations
+    );
+    await execute({ ...alice(), plan: alicePlan });
+
+    // Bob adds a child to the same parent
+    const bobChild = newNode("Bob Suggestion", bobPK);
+    const bobRelations = addRelationToRelations(
+      newRelations(parent.id, List(), bobPK),
+      bobChild.id
+    );
+
+    const bobPlan = planUpsertRelations(
+      planUpsertNode(createPlan(bob()), bobChild),
+      bobRelations
+    );
+    await execute({ ...bob(), plan: bobPlan });
+
+    // Alice follows Bob
+    await follow(alice, bobPK);
+
+    renderWithTestData(
+      <Data user={alice().user}>
+        <RootViewContextProvider root={parent.id}>
+          <TemporaryViewProvider>
+            <DND>
+              <LoadNode>
+                <>
+                  <DraggableNote />
+                  <TreeView />
+                </>
+              </LoadNode>
+            </DND>
+          </TemporaryViewProvider>
+        </RootViewContextProvider>
+      </Data>,
+      {
+        ...alice(),
+        initialRoute: `/d/${parent.id}`,
+      }
+    );
+
+    await screen.findByText("Parent");
+
+    // Bob's suggestion should be visible by default
+    await screen.findByText("Bob Suggestion");
+
+    // Open filter popover and toggle off Suggestions
+    const filterButtons = screen.getAllByLabelText("filter suggestions");
+    fireEvent.click(filterButtons[0]);
+    fireEvent.click(await screen.findByText("Suggestions"));
+
+    // Bob's suggestion should disappear
+    await waitFor(() => {
+      expect(screen.queryByText("Bob Suggestion")).toBeNull();
+    });
+  });
+
+  test("suggestions filter state persists", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    const { publicKey: alicePK } = alice().user;
+    const { publicKey: bobPK } = bob().user;
+
+    // Alice creates Parent
+    const parent = newNode("Parent", alicePK);
+    const aliceRelations = newRelations(parent.id, List(), alicePK);
+
+    const alicePlan = planUpsertRelations(
+      planUpsertNode(createPlan(alice()), parent),
+      aliceRelations
+    );
+    await execute({ ...alice(), plan: alicePlan });
+
+    // Bob adds a child
+    const bobChild = newNode("Bob Item", bobPK);
+    const bobRelations = addRelationToRelations(
+      newRelations(parent.id, List(), bobPK),
+      bobChild.id
+    );
+
+    const bobPlan = planUpsertRelations(
+      planUpsertNode(createPlan(bob()), bobChild),
+      bobRelations
+    );
+    await execute({ ...bob(), plan: bobPlan });
+
+    // Alice follows Bob
+    await follow(alice, bobPK);
+
+    renderWithTestData(
+      <Data user={alice().user}>
+        <RootViewContextProvider root={parent.id}>
+          <TemporaryViewProvider>
+            <DND>
+              <LoadNode>
+                <>
+                  <DraggableNote />
+                  <TreeView />
+                </>
+              </LoadNode>
+            </DND>
+          </TemporaryViewProvider>
+        </RootViewContextProvider>
+      </Data>,
+      {
+        ...alice(),
+        initialRoute: `/d/${parent.id}`,
+      }
+    );
+
+    await screen.findByText("Parent");
+    await screen.findByText("Bob Item");
+
+    // Toggle off Suggestions
+    const filterButtons = screen.getAllByLabelText("filter suggestions");
+    fireEvent.click(filterButtons[0]);
+    fireEvent.click(await screen.findByText("Suggestions"));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Bob Item")).toBeNull();
+    });
+
+    // Close popover by clicking outside
+    fireEvent.click(document.body);
+
+    // Bob's item should still be hidden (filter state persists)
+    await waitFor(() => {
+      expect(screen.queryByText("Bob Item")).toBeNull();
     });
   });
 });

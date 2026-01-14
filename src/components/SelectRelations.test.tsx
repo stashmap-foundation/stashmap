@@ -209,7 +209,7 @@ test("getDiffItemsForNode returns items from other users", () => {
     knowledgeDBs,
     alicePK,
     parentNode.id,
-    [""],
+    ["", "suggestions"],
     aliceRelations.id
   );
 
@@ -315,7 +315,7 @@ test("getDiffItemsForNode deduplicates items from multiple other users", () => {
     knowledgeDBs,
     alicePK,
     parentNode.id,
-    [""],
+    ["", "suggestions"],
     aliceRelations.id
   );
 

@@ -567,9 +567,13 @@ export function getNodesInTree(
 
   // Filter items based on view's typeFilters (default filters out "not_relevant")
   const activeFilters = parentView.typeFilters || DEFAULT_TYPE_FILTERS;
+  // Filter out "suggestions" to get only relevance/argument types for item matching
+  const itemFilters = activeFilters.filter(
+    (f): f is Relevance | Argument => f !== "suggestions"
+  );
   const visibleItems = relations.items
     .map((item, i) => ({ item, index: i }))
-    .filter(({ item }) => activeFilters.some((f) => itemMatchesType(item, f)));
+    .filter(({ item }) => itemFilters.some((f) => itemMatchesType(item, f)));
 
   const childPaths = visibleItems.map(({ index }) =>
     addNodeToPathWithRelations(parentPath, relations, index)

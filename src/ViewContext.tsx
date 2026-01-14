@@ -44,13 +44,23 @@ export function getDiffItemsForNode(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
   nodeID: LongID | ID,
-  filterTypes: (Relevance | Argument)[],
+  filterTypes: (Relevance | Argument | "suggestions")[],
   currentRelationId?: LongID
 ): List<DiffItem> {
   // If no filter types or empty array, return no diff items
   if (!filterTypes || filterTypes.length === 0) {
     return List<DiffItem>();
   }
+
+  // If "suggestions" is not in the filter types, don't show any diff items
+  if (!filterTypes.includes("suggestions")) {
+    return List<DiffItem>();
+  }
+
+  // Filter out "suggestions" to get only relevance/argument types for item matching
+  const itemFilters = filterTypes.filter(
+    (t): t is Relevance | Argument => t !== "suggestions"
+  );
 
   const [, localID] = splitID(nodeID);
 
@@ -93,7 +103,7 @@ export function getDiffItemsForNode(
         .filter(
           (item: RelationItem) =>
             // Item must match at least one of the filter types
-            filterTypes.some((t) => itemMatchesType(item, t)) &&
+            itemFilters.some((t) => itemMatchesType(item, t)) &&
             // Never show items the other user marked as not_relevant
             item.relevance !== "not_relevant" &&
             // Exclude items user already has (any type)

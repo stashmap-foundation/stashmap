@@ -20,6 +20,8 @@ const COL_2_FILTERS: { id: "confirms" | "contra" | "suggestions"; label: string;
   { id: "suggestions", label: "Suggestions", color: TYPE_COLORS.suggestions },
 ];
 
+export type FilterId = Relevance | Argument | "suggestions";
+
 function FilterDot({
   color,
   isActive,
@@ -41,7 +43,34 @@ function FilterDot({
   );
 }
 
-type FilterId = Relevance | Argument | "suggestions";
+/**
+ * Pure UI component that displays filter dots.
+ * Pass activeFilters to show which are colored, empty array for all gray.
+ */
+export function FilterDotsDisplay({
+  activeFilters,
+}: {
+  activeFilters: FilterId[];
+}): JSX.Element {
+  const isActive = (id: FilterId): boolean => activeFilters.includes(id);
+
+  return (
+    <span className="d-flex gap-0" style={{ lineHeight: 1 }}>
+      <span className="d-flex flex-column">
+        {COL_1_FILTERS.map((f) => (
+          <FilterDot key={f.id} color={f.color} isActive={isActive(f.id)} />
+        ))}
+      </span>
+      <span className="d-flex flex-column">
+        {COL_2_FILTERS.map((f) => (
+          <FilterDot key={f.id} color={f.color} isActive={isActive(f.id)} />
+        ))}
+        {/* Padding dot to align columns */}
+        <FilterDot color={TYPE_COLORS.inactive} isActive={false} />
+      </span>
+    </span>
+  );
+}
 
 function FilterItem({
   id,
@@ -136,29 +165,7 @@ export function TypeFilterButton(): JSX.Element | null {
         aria-label={`filter ${node.text}`}
         title="Filter suggestions from other users"
       >
-        {/* Two columns of dots representing filter state */}
-        <span className="d-flex gap-0" style={{ lineHeight: 1 }}>
-          <span className="d-flex flex-column">
-            {COL_1_FILTERS.map((f) => (
-              <FilterDot
-                key={f.id}
-                color={f.color}
-                isActive={isFilterActive(f.id)}
-              />
-            ))}
-          </span>
-          <span className="d-flex flex-column">
-            {COL_2_FILTERS.map((f) => (
-              <FilterDot
-                key={f.id}
-                color={f.color}
-                isActive={isFilterActive(f.id)}
-              />
-            ))}
-            {/* Padding dot to align columns */}
-            <FilterDot color={TYPE_COLORS.inactive} isActive={false} />
-          </span>
-        </span>
+        <FilterDotsDisplay activeFilters={currentFilters} />
       </button>
 
       <Overlay

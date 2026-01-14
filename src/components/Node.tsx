@@ -167,7 +167,6 @@ export function LoadingNode(): JSX.Element {
     <div className="ph-item">
       <div>
         <div className="ph-row">
-          <div className="ph-col-12" />
           <div className="ph-col-8" />
           <div className="ph-col-12 " />
           <div className="ph-col-4" />

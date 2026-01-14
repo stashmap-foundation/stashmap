@@ -1,63 +1,37 @@
 import React from "react";
-import { Set } from "immutable";
-import { markItemsAsNotRelevant } from "../connections";
-import { REFERENCED_BY } from "../constants";
-import {
-  useViewPath,
-  useViewKey,
-  upsertRelations,
-  getRelationForView,
-  getLast,
-  calculateIndexFromNodeIndex,
-  getParentView,
-  getNodeFromView,
-  getViewFromPath,
-} from "../ViewContext";
 import {
   switchOffMultiselect,
   useDeselectAllInView,
   useSelectedIndices,
   useTemporaryView,
 } from "./TemporaryViewContext";
-import { usePlanner } from "../planner";
-import { useData } from "../DataContext";
-import { usePaneNavigation } from "../SplitPanesContext";
+import { useViewKey } from "../ViewContext";
+import { useDisconnectMultiple, useDisconnectNode } from "./useUpdateRelevance";
 
 export function DisconnectBtn(): JSX.Element | null {
-  const data = useData();
-  const { stack } = usePaneNavigation();
-  const { createPlan, executePlan } = usePlanner();
   const { multiselectBtns, selection, setState } = useTemporaryView();
-  const viewContext = useViewPath();
   const viewKey = useViewKey();
   const selectedIndices = useSelectedIndices();
   const deselectAllInView = useDeselectAllInView();
-  if (selectedIndices.size === 0) {
+
+  const { disconnect, selectedCount } = useDisconnectMultiple(
+    selectedIndices,
+    () => {
+      deselectAllInView(viewKey);
+      setState(switchOffMultiselect(multiselectBtns, selection, viewKey));
+    }
+  );
+
+  if (selectedCount === 0) {
     return null;
   }
-  const onDisconnect = (): void => {
-    const relations = getRelationForView(data, viewContext, stack);
-    if (!relations) {
-      return;
-    }
-    // Mark items as "not_relevant" instead of deleting them
-    const disconnectPlan = upsertRelations(
-      createPlan(),
-      viewContext,
-      stack,
-      (rel) => markItemsAsNotRelevant(rel, selectedIndices)
-    );
-    executePlan(disconnectPlan);
-    deselectAllInView(viewKey);
-    setState(switchOffMultiselect(multiselectBtns, selection, viewKey));
-  };
 
   return (
     <button
       type="button"
       className="btn btn-borderless p-0"
-      onClick={onDisconnect}
-      aria-label={`disconnect ${selectedIndices.size} selected nodes`}
+      onClick={disconnect}
+      aria-label={`disconnect ${selectedCount} selected nodes`}
     >
       <span style={{ fontSize: "1.4rem" }}>×</span>
     </button>
@@ -65,51 +39,18 @@ export function DisconnectBtn(): JSX.Element | null {
 }
 
 export function DisconnectNodeBtn(): JSX.Element | null {
-  const data = useData();
-  const { stack } = usePaneNavigation();
-  const { createPlan, executePlan } = usePlanner();
-  const viewPath = useViewPath();
-  const { nodeID, nodeIndex } = getLast(viewPath);
-  const parentPath = getParentView(viewPath);
-  if (!parentPath) {
-    return null;
-  }
-  const parentView = getViewFromPath(data, parentPath);
-  if (!parentView) {
-    return null;
-  }
-  // Referenced By items are readonly - can't disconnect them
-  if (parentView.relations === REFERENCED_BY) {
-    return null;
-  }
-  // Use getRelationForView which handles the case where view.relations is not set
-  // by finding relations based on context
-  const relations = getRelationForView(data, parentPath, stack);
-  if (!relations) {
-    return null;
-  }
-  const index = calculateIndexFromNodeIndex(relations, nodeID, nodeIndex);
-  if (index === undefined) {
-    return null;
-  }
+  const { disconnect, isVisible, nodeText } = useDisconnectNode();
 
-  const onDisconnect = (): void => {
-    // Mark item as "not_relevant" instead of deleting it
-    const disconnectPlan = upsertRelations(
-      createPlan(),
-      parentPath,
-      stack,
-      (rel) => markItemsAsNotRelevant(rel, Set([index]))
-    );
-    executePlan(disconnectPlan);
-  };
+  if (!isVisible) {
+    return null;
+  }
 
   return (
     <button
       type="button"
       className="btn btn-borderless p-0"
-      onClick={onDisconnect}
-      aria-label={`disconnect node ${getNodeFromView(data, viewPath)[0]?.text}`}
+      onClick={disconnect}
+      aria-label={`disconnect node ${nodeText}`}
     >
       <span style={{ fontSize: "1.4rem" }}>×</span>
     </button>

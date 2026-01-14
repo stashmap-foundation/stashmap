@@ -16,7 +16,6 @@ import {
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable } from "./DroppableContainer";
 import { ToggleEditing, useIsEditingOn } from "./TemporaryViewContext";
-import { DisconnectNodeBtn } from "./DisconnectBtn";
 import { JoinProjectButton } from "../JoinProjext";
 import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
@@ -76,7 +75,6 @@ export function DraggableNote(): JSX.Element {
           <TypeFilterButton />
           <ReferencedByToggle />
           <VersionSelector />
-          <DisconnectNodeBtn />
           <FullscreenButton />
           <OpenInSplitPaneButton />
         </span>

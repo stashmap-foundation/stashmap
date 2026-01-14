@@ -1,59 +1,16 @@
 import React, { useState } from "react";
-import {
-  useRelationIndex,
-  useViewPath,
-  getParentView,
-  upsertRelations,
-  useIsInReferencedByView,
-  useIsAddToNode,
-  useNode,
-  getNodeIDFromView,
-} from "../ViewContext";
-import { updateItemRelevance, getRelations } from "../connections";
-import { usePlanner } from "../planner";
-import { usePaneNavigation } from "../SplitPanesContext";
-import { useData } from "../DataContext";
 import { TYPE_COLORS } from "../constants";
+import {
+  useUpdateRelevance,
+  relevanceToLevel,
+  RELEVANCE_LABELS,
+} from "./useUpdateRelevance";
 
-// Relevance mapped to levels:
-// "" (relevant) = 3
-// "maybe_relevant" = 2
-// "little_relevant" = 1
-// "not_relevant" = 0
-
-function relevanceToLevel(relevance: Relevance): number {
-  switch (relevance) {
-    case "":
-      return 3;
-    case "maybe_relevant":
-      return 2;
-    case "little_relevant":
-      return 1;
-    case "not_relevant":
-      return 0;
-    default:
-      return 3;
-  }
-}
-
-function levelToRelevance(level: number): Relevance {
-  switch (level) {
-    case 3:
-      return "";
-    case 2:
-      return "maybe_relevant";
-    case 1:
-      return "little_relevant";
-    case 0:
-      return "not_relevant";
-    default:
-      return "";
-  }
-}
-
-const LABELS = ["Not Relevant", "Little Relevant", "Maybe Relevant", "Relevant"];
-
-function getLevelColor(level: number, displayLevel: number, isNotRelevant: boolean): string {
+function getLevelColor(
+  level: number,
+  displayLevel: number,
+  isNotRelevant: boolean
+): string {
   if (isNotRelevant || level > displayLevel) {
     return TYPE_COLORS.inactive;
   }
@@ -72,42 +29,15 @@ function getLevelColor(level: number, displayLevel: number, isNotRelevant: boole
 
 export function RelevanceSelector(): JSX.Element | null {
   const [hoverLevel, setHoverLevel] = useState<number | null>(null);
-  const data = useData();
-  const viewPath = useViewPath();
-  const relationIndex = useRelationIndex();
-  const { stack } = usePaneNavigation();
-  const { createPlan, executePlan } = usePlanner();
-  const isInReferencedByView = useIsInReferencedByView();
-  const isAddToNode = useIsAddToNode();
-  const [node] = useNode();
-  const parentView = getParentView(viewPath);
+  const { currentRelevance, nodeText, setLevel, isVisible } =
+    useUpdateRelevance();
 
-  // Don't show for: Referenced By view, Add To Node row, or items without relation index
-  if (isInReferencedByView || isAddToNode || relationIndex === undefined || !parentView) {
+  if (!isVisible) {
     return null;
   }
 
-  const nodeText = node?.text || "";
-
-  const [parentNodeID, pView] = getNodeIDFromView(data, parentView);
-  const relations = getRelations(
-    data.knowledgeDBs,
-    pView.relations,
-    data.user.publicKey,
-    parentNodeID
-  );
-  const currentItem = relations?.items.get(relationIndex);
-  const currentRelevance = currentItem?.relevance || "";
   const currentLevel = relevanceToLevel(currentRelevance);
   const displayLevel = hoverLevel !== null ? hoverLevel : currentLevel;
-
-  const handleClick = (level: number): void => {
-    const plan = upsertRelations(createPlan(), parentView, stack, (rels) =>
-      updateItemRelevance(rels, relationIndex, levelToRelevance(level))
-    );
-    executePlan(plan);
-  };
-
   const isNotRelevant = displayLevel === 0;
 
   return (
@@ -123,11 +53,11 @@ export function RelevanceSelector(): JSX.Element | null {
         backgroundColor: "rgba(0,0,0,0.04)",
         cursor: "pointer",
       }}
-      title={LABELS[displayLevel]}
+      title={RELEVANCE_LABELS[displayLevel]}
     >
       {/* X for not relevant - on left */}
       <span
-        onClick={() => handleClick(0)}
+        onClick={() => setLevel(0)}
         onMouseEnter={() => setHoverLevel(0)}
         role="button"
         tabIndex={0}
@@ -135,7 +65,7 @@ export function RelevanceSelector(): JSX.Element | null {
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            handleClick(0);
+            setLevel(0);
           }
         }}
         style={{
@@ -149,7 +79,9 @@ export function RelevanceSelector(): JSX.Element | null {
           lineHeight: 1,
           borderRadius: "50%",
           color: isNotRelevant ? "#fff" : "#888",
-          backgroundColor: isNotRelevant ? TYPE_COLORS.not_relevant : "transparent",
+          backgroundColor: isNotRelevant
+            ? TYPE_COLORS.not_relevant
+            : "transparent",
           transition: "all 0.15s ease",
         }}
       >
@@ -160,14 +92,14 @@ export function RelevanceSelector(): JSX.Element | null {
       {[1, 2, 3].map((level) => (
         <span
           key={level}
-          onClick={() => handleClick(level)}
+          onClick={() => setLevel(level)}
           onMouseEnter={() => setHoverLevel(level)}
           role="button"
           tabIndex={0}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              handleClick(level);
+              setLevel(level);
             }
           }}
           style={{

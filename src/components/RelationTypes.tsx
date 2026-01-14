@@ -8,7 +8,7 @@ import {
   usePlanner,
 } from "../planner";
 import { getRelationsNoReferencedBy } from "../connections";
-import { REFERENCED_BY, DEFAULT_TYPE_FILTERS } from "../constants";
+import { REFERENCED_BY } from "../constants";
 import {
   ViewPath,
   contextsMatch,
@@ -24,45 +24,6 @@ import { usePaneNavigation } from "../SplitPanesContext";
 
 export const DEFAULT_COLOR = "#027d86";
 export const REFERENCED_BY_COLOR = "#9c27b0"; // Purple for Referenced By view
-
-// Convert hex color to RGB
-function hexToRgb(hex: string): { r: number; g: number; b: number } {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result
-    ? {
-      r: parseInt(result[1], 16),
-      g: parseInt(result[2], 16),
-      b: parseInt(result[3], 16),
-    }
-    : { r: 0, g: 0, b: 0 };
-}
-
-// Convert RGB to hex
-function rgbToHex(r: number, g: number, b: number): string {
-  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
-}
-
-// Blend multiple colors by averaging RGB values
-export function blendColors(colors: string[]): string {
-  if (colors.length === 0) return "#757575"; // Gray fallback
-  if (colors.length === 1) return colors[0];
-
-  const rgbs = colors.map(hexToRgb);
-  const avgR = Math.round(rgbs.reduce((sum, c) => sum + c.r, 0) / rgbs.length);
-  const avgG = Math.round(rgbs.reduce((sum, c) => sum + c.g, 0) / rgbs.length);
-  const avgB = Math.round(rgbs.reduce((sum, c) => sum + c.b, 0) / rgbs.length);
-
-  return rgbToHex(avgR, avgG, avgB);
-}
-
-// Get blended color for active type filters
-export function getFilterColor(typeFilters: ID[] | undefined): string {
-  const activeFilters = typeFilters && typeFilters.length > 0 ? typeFilters : DEFAULT_TYPE_FILTERS;
-  const colors = activeFilters
-    .map((typeId) => RELATION_TYPES.get(typeId)?.color)
-    .filter((c): c is string => !!c);
-  return blendColors(colors);
-}
 
 export const COLORS = [
   "#0288d1", // Bright blue - relevant to

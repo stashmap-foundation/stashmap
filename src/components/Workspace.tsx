@@ -2,11 +2,10 @@ import React from "react";
 
 import { TemporaryViewProvider } from "./TemporaryViewContext";
 
-import { useNodeID, getNodeFromID } from "../ViewContext";
+import { getNodeFromID } from "../ViewContext";
 import { DND } from "../dnd";
 import { useData } from "../DataContext";
 import { usePaneNavigation, usePaneIndex } from "../SplitPanesContext";
-import { getRelationTypeByRelationsID } from "./RelationTypes";
 import { Node } from "./Node";
 import { TreeView } from "./TreeView";
 import {
@@ -83,16 +82,8 @@ function StackedLayer({
 }
 
 export function WorkspaceView(): JSX.Element | null {
-  const [, view] = useNodeID();
-  const data = useData();
   const { stack, popTo } = usePaneNavigation();
   const paneIndex = usePaneIndex();
-
-  // Get relation color
-  const [relationType] = view.relations
-    ? getRelationTypeByRelationsID(data, view.relations)
-    : [undefined, undefined];
-  const relationColor = relationType?.color;
 
   // Get stacked workspaces (all except the last one which is active)
   const stackedWorkspaces = stack.slice(0, -1);
@@ -139,14 +130,7 @@ export function WorkspaceView(): JSX.Element | null {
                   </span>
                 </div>
               </div>
-              <div
-                className="fullscreen-card-body overflow-y-auto"
-                style={
-                  {
-                    "--workspace-relation-color": relationColor,
-                  } as React.CSSProperties
-                }
-              >
+              <div className="fullscreen-card-body overflow-y-auto">
                 <DND>
                   <TreeView />
                 </DND>

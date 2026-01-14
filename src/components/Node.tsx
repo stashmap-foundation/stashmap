@@ -55,7 +55,7 @@ import { planUpsertNode, usePlanner } from "../planner";
 import { ReactQuillWrapper } from "./ReactQuillWrapper";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeIcon } from "./NodeIcon";
-import { getFilterColor, REFERENCED_BY_COLOR, planAddNewRelationToNode } from "./RelationTypes";
+import { REFERENCED_BY_COLOR, planAddNewRelationToNode } from "./RelationTypes";
 import { LoadingSpinnerButton } from "../commons/LoadingSpinnerButton";
 import { useInputElementFocus } from "../commons/FocusContextProvider";
 import { CancelButton, NodeCard } from "../commons/Ui";
@@ -107,10 +107,8 @@ function ExpandCollapseToggle(): JSX.Element | null {
   const sorted = sortRelations(availableRelations, data.user.publicKey);
   const topRelation = isSelected ? currentRelations : sorted.first();
 
-  // Get color based on view state
-  const color = isReferencedBy
-    ? REFERENCED_BY_COLOR
-    : getFilterColor(view.typeFilters);
+  // Get color based on view state: purple for Referenced By, black for normal
+  const color = isReferencedBy ? REFERENCED_BY_COLOR : "black";
 
   // Root nodes can't be collapsed (alwaysOneSelected pattern from SelectRelations)
   const preventCollapse = isRoot && isExpanded;
@@ -495,11 +493,9 @@ export function Indent({ levels }: { levels: number }): JSX.Element {
                 return { show: false, color: undefined };
               }
 
-              // Get color based on view state
+              // Get color based on view state: purple for Referenced By, black for normal
               const isReferencedBy = ancestorView.relations === REFERENCED_BY;
-              const color = isReferencedBy
-                ? REFERENCED_BY_COLOR
-                : getFilterColor(ancestorView.typeFilters);
+              const color = isReferencedBy ? REFERENCED_BY_COLOR : "black";
 
               return { show: true, color };
             })()

@@ -367,7 +367,7 @@ body {
 
 .workspace-columns .outer-node {
   border-left-width: 2px;
-  border-left-color: var(--workspace-relation-color, $dark-gray);
+  border-left-color: $dark-gray;
 }
 
 .knowledge-exchange .outer-node {

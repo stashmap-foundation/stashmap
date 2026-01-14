@@ -10,6 +10,7 @@ import {
   splitID,
   isRefId,
   buildReferenceNode,
+  itemMatchesType,
 } from "./connections";
 import { newDB } from "./knowledge";
 import { useData } from "./DataContext";
@@ -43,7 +44,7 @@ export function getDiffItemsForNode(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
   nodeID: LongID | ID,
-  filterTypes: ID[],
+  filterTypes: (Relevance | Argument)[],
   currentRelationId?: LongID
 ): List<DiffItem> {
   // If no filter types or empty array, return no diff items
@@ -92,9 +93,9 @@ export function getDiffItemsForNode(
         .filter(
           (item: RelationItem) =>
             // Item must match at least one of the filter types
-            filterTypes.some((t) => item.types.includes(t)) &&
+            filterTypes.some((t) => itemMatchesType(item, t)) &&
             // Never show items the other user marked as not_relevant
-            !item.types.includes("not_relevant") &&
+            item.relevance !== "not_relevant" &&
             // Exclude items user already has (any type)
             !myAllItems.has(item.nodeID) &&
             !currentRelationItems.has(item.nodeID) &&

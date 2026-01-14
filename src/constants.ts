@@ -6,9 +6,9 @@ export const REF_PREFIX = "ref:";
 // Relevance: "" (relevant), "maybe_relevant" are ON by default
 // Evidence: "confirms", "contra" are ON by default
 // OFF by default: "little_relevant", "not_relevant"
-export const DEFAULT_TYPE_FILTERS: ID[] = [
-  "" as ID,
-  "maybe_relevant" as ID,
-  "confirms" as ID,
-  "contra" as ID,
+export const DEFAULT_TYPE_FILTERS: (Relevance | Argument)[] = [
+  "",
+  "maybe_relevant",
+  "confirms",
+  "contra",
 ];

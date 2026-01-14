@@ -905,7 +905,6 @@ to {
   height: 100%;
   width: 100%;
   gap: 4px;
-  padding: 4px;
   overflow-x: auto;
 }
 
@@ -915,8 +914,8 @@ to {
   position: relative;
   display: flex;
   flex-direction: column;
-  border: $border-strong;
-  border-radius: 3px;
+  //border: $border-strong;
+  //border-radius: 3px;
   background-color: white;
   overflow: hidden;
 }

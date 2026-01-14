@@ -156,10 +156,14 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
     ...userDB,
     relations: updatedRelations,
   };
-  // Items with embedded types: ["i", nodeID, type1, type2, ...]
+  // Items with relevance and optional argument: ["i", nodeID, relevance, argument?]
   const itemsAsTags = relations.items
     .toArray()
-    .map((item) => ["i", item.nodeID, ...item.types.toArray()]);
+    .map((item) =>
+      item.argument
+        ? ["i", item.nodeID, item.relevance, item.argument]
+        : ["i", item.nodeID, item.relevance]
+    );
   // Context tag: ["ctx", ancestorID1, ancestorID2, ...]
   const contextTag = ["ctx", ...relations.context.toArray()];
   const updateRelationsEvent = {

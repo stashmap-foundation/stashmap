@@ -251,7 +251,7 @@ export function AddColumn(): JSX.Element {
         ...relations,
         items: relations.items.push({
           nodeID,
-          types: List([""]), // Default to "relevant"
+          relevance: "", // Default to "relevant"
         }),
       })
     );
@@ -297,7 +297,7 @@ export function AddNodeToNode(): JSX.Element | null {
         ...relations,
         items: relations.items.push({
           nodeID,
-          types: List([""]), // Default to "relevant"
+          relevance: "", // Default to "relevant"
         }),
       })
     );

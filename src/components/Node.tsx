@@ -568,7 +568,7 @@ export function getNodesInTree(
   // Filter out "not_relevant" items from the view
   const visibleItems = relations.items
     .map((item, i) => ({ item, index: i }))
-    .filter(({ item }) => !item.types.includes("not_relevant"));
+    .filter(({ item }) => item.relevance !== "not_relevant");
 
   const childPaths = visibleItems.map(({ index }) =>
     addNodeToPathWithRelations(parentPath, relations, index)

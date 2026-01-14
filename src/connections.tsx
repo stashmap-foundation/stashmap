@@ -222,12 +222,12 @@ export function getReferencedByRelations(
       if (isOwnList) {
         return {
           nodeID: createRefId(List<ID>(), nodeID as ID),
-          types: List<ID>([""]),
+          relevance: "" as Relevance,
         };
       }
       return {
         nodeID: createRefId(path.context.push(path.head), nodeID as ID),
-        types: List<ID>([""]),
+        relevance: "" as Relevance,
       };
     }),
   };
@@ -258,14 +258,6 @@ export function deleteRelations(
   };
 }
 
-// Relevance types are mutually exclusive
-const RELEVANCE_TYPES = [
-  "",
-  "maybe_relevant",
-  "little_relevant",
-  "not_relevant",
-];
-
 export function markItemsAsNotRelevant(
   relations: Relations,
   indices: Set<number>
@@ -274,13 +266,9 @@ export function markItemsAsNotRelevant(
     if (!indices.has(index)) {
       return item;
     }
-    // Remove other relevance types and add "not_relevant"
-    const typesWithoutRelevance = item.types.filter(
-      (t) => !RELEVANCE_TYPES.includes(t)
-    );
     return {
       ...item,
-      types: typesWithoutRelevance.push("not_relevant"),
+      relevance: "not_relevant" as Relevance,
     };
   });
   return {
@@ -357,15 +345,26 @@ function fibsum(n: number): number {
   return fib(n + 2) - 2;
 }
 
+// Check if an item matches a filter type (relevance or argument)
+export function itemMatchesType(
+  item: RelationItem,
+  filterType: Relevance | Argument
+): boolean {
+  if (filterType === "confirms" || filterType === "contra") {
+    return item.argument === filterType;
+  }
+  return item.relevance === filterType;
+}
+
 export function aggregateWeightedVotes(
   listsOfVotes: List<{ items: List<RelationItem>; weight: number }>,
-  filterType: ID
+  filterType: Relevance | Argument
 ): Map<LongID | ID, number> {
   const votesPerItem = listsOfVotes.reduce((rdx, v) => {
     const { weight } = v;
     // Filter items by type
     const filteredItems = v.items.filter((item) =>
-      item.types.includes(filterType)
+      itemMatchesType(item, filterType)
     );
     const length = filteredItems.size;
     const denominator = fibsum(length);
@@ -387,13 +386,13 @@ export function aggregateWeightedVotes(
 
 export function aggregateNegativeWeightedVotes(
   listsOfVotes: List<{ items: List<RelationItem>; weight: number }>,
-  filterType: ID
+  filterType: Relevance | Argument
 ): Map<LongID | ID, number> {
   const votesPerItem = listsOfVotes.reduce((rdx, v) => {
     const { weight } = v;
     // Filter items by type
     const filteredItems = v.items.filter((item) =>
-      item.types.includes(filterType)
+      itemMatchesType(item, filterType)
     );
     const length = filteredItems.size;
     if (length === 0) {
@@ -415,7 +414,7 @@ export function aggregateNegativeWeightedVotes(
 export function countRelationVotes(
   relations: List<Relations>,
   head: ID,
-  type: ID
+  type: Relevance | Argument
 ): Map<LongID | ID, number> {
   const filteredVoteRelations = filterVoteRelationLists(relations, head);
   const latestVotesPerAuthor = getLatestvoteRelationListPerAuthor(
@@ -449,12 +448,14 @@ export function countRelevanceVoting(
 export function addRelationToRelations(
   relations: Relations,
   objectID: LongID | ID,
-  types: List<ID> = List([""]), // Default to "relevant" type
-  ord: number | undefined = undefined
+  relevance: Relevance = "",
+  argument?: Argument,
+  ord?: number
 ): Relations {
   const newItem: RelationItem = {
     nodeID: objectID,
-    types,
+    relevance,
+    argument,
   };
   const defaultOrder = relations.items.size;
   const items = relations.items.push(newItem);
@@ -470,12 +471,13 @@ export function addRelationToRelations(
 export function bulkAddRelations(
   relations: Relations,
   objectIDs: Array<LongID | ID>,
-  types: List<ID> = List([""]),
-  startPos: number | undefined = undefined
+  relevance: Relevance = "",
+  argument?: Argument,
+  startPos?: number
 ): Relations {
   return objectIDs.reduce((rdx, id, currentIndex) => {
     const ord = startPos !== undefined ? startPos + currentIndex : undefined;
-    return addRelationToRelations(rdx, id, types, ord);
+    return addRelationToRelations(rdx, id, relevance, argument, ord);
   }, relations);
 }
 

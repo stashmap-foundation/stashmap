@@ -93,7 +93,7 @@ function jsonToView(view: Serializable): View | undefined {
     expanded: a.e !== undefined ? asBoolean(a.e) : undefined,
     typeFilters:
       a.f !== undefined
-        ? asArray(a.f).map((id) => asString(id) as ID)
+        ? asArray(a.f).map((id) => asString(id) as Relevance | Argument)
         : undefined,
   };
 }
@@ -133,12 +133,13 @@ export function eventToRelations(e: UnsignedEvent): Relations | undefined {
     ? List(contextTag.map((c) => c as ID))
     : List<ID>();
 
-  // Parse items with embedded types: ["i", nodeID, type1, type2, ...]
+  // Parse items with relevance and optional argument: ["i", nodeID, relevance, argument?]
   const itemsAsTags = findAllTags(e, "i") || [];
   const items = List(
     itemsAsTags.map((tagValues) => ({
       nodeID: tagValues[0] as LongID,
-      types: List(tagValues.slice(1) as ID[]),
+      relevance: (tagValues[1] || "") as Relevance,
+      argument: tagValues[2] as Argument,
     }))
   );
 

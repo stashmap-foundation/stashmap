@@ -128,7 +128,8 @@ export function dnd(
       return bulkAddRelations(
         relations,
         sourceNodes.toArray(),
-        List([""]), // Default to "relevant" type
+        "", // Default to "relevant" relevance
+        undefined, // No argument
         dropIndex
       );
     }

@@ -635,7 +635,7 @@ test("getDiffItemsForNode should return no diff items for not_relevant relation 
   const bobRelations = addRelationToRelations(
     newRelations(parent.id, List(), bobPK),
     bobChild.id,
-    List(["not_relevant"])
+    "not_relevant"
   );
 
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()

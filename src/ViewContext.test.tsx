@@ -255,14 +255,14 @@ test("Alter View paths after disconnect", () => {
 });
 
 test("Calculate index from node index", () => {
-  // Items are now RelationItem objects with nodeID and types
+  // Items are now RelationItem objects with nodeID, relevance, and optional argument
   const relations: Relations = {
     items: List([
-      { nodeID: "pl" as LongID, types: List([""]) },
-      { nodeID: "oop" as LongID, types: List([""]) },
-      { nodeID: "pl" as LongID, types: List([""]) },
-      { nodeID: "pl" as LongID, types: List([""]) },
-      { nodeID: "java" as LongID, types: List([""]) },
+      { nodeID: "pl" as LongID, relevance: "" as Relevance },
+      { nodeID: "oop" as LongID, relevance: "" as Relevance },
+      { nodeID: "pl" as LongID, relevance: "" as Relevance },
+      { nodeID: "pl" as LongID, relevance: "" as Relevance },
+      { nodeID: "java" as LongID, relevance: "" as Relevance },
     ]),
     head: "test" as ID,
     context: List<ID>(),

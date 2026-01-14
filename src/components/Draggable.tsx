@@ -142,7 +142,7 @@ function DeclineDiffItemButton(): JSX.Element {
     const updatedRelation = addRelationToRelations(
       relation,
       nodeID,
-      List(["not_relevant"])
+      "not_relevant"
     );
     const plan = planUpsertRelations(createPlan(), updatedRelation);
     executePlan(plan);

@@ -6,17 +6,17 @@ import { DEFAULT_TYPE_FILTERS, REFERENCED_BY } from "../constants";
 
 // Filter type definitions with colors
 // Column 1: Relevance types (blue spectrum)
-const COL_1_FILTERS: { id: ID; label: string; color: string }[] = [
-  { id: "" as ID, label: "Relevant", color: "#0288d1" },
-  { id: "maybe_relevant" as ID, label: "Maybe Relevant", color: "#00acc1" },
-  { id: "little_relevant" as ID, label: "Little Relevant", color: "#26c6da" },
-  { id: "not_relevant" as ID, label: "Not Relevant", color: "#757575" },
+const COL_1_FILTERS: { id: Relevance; label: string; color: string }[] = [
+  { id: "", label: "Relevant", color: "#0288d1" },
+  { id: "maybe_relevant", label: "Maybe Relevant", color: "#00acc1" },
+  { id: "little_relevant", label: "Little Relevant", color: "#26c6da" },
+  { id: "not_relevant", label: "Not Relevant", color: "#757575" },
 ];
 
-// Column 2: Evidence types
-const COL_2_FILTERS: { id: ID; label: string; color: string }[] = [
-  { id: "confirms" as ID, label: "Confirms", color: "#2e7d32" },
-  { id: "contra" as ID, label: "Contradicts", color: "#c62828" },
+// Column 2: Evidence types (exclude undefined from Argument)
+const COL_2_FILTERS: { id: "confirms" | "contra"; label: string; color: string }[] = [
+  { id: "confirms", label: "Confirms", color: "#2e7d32" },
+  { id: "contra", label: "Contradicts", color: "#c62828" },
 ];
 
 // Gray color for inactive filters
@@ -50,11 +50,11 @@ function FilterItem({
   isActive,
   onClick,
 }: {
-  id: ID;
+  id: Relevance | Argument;
   label: string;
   color: string;
   isActive: boolean;
-  onClick: (id: ID) => void;
+  onClick: (id: Relevance | Argument) => void;
 }): JSX.Element {
   return (
     <div
@@ -104,10 +104,11 @@ export function TypeFilterButton(): JSX.Element | null {
   // Get current filters (default if not set)
   const currentFilters = view.typeFilters || DEFAULT_TYPE_FILTERS;
 
-  const isFilterActive = (id: ID): boolean => currentFilters.includes(id);
+  const isFilterActive = (id: Relevance | Argument): boolean =>
+    currentFilters.includes(id as Relevance | Argument);
 
-  const handleFilterToggle = (id: ID): void => {
-    const isActive = currentFilters.includes(id);
+  const handleFilterToggle = (id: Relevance | Argument): void => {
+    const isActive = currentFilters.includes(id as Relevance | Argument);
     const newFilters = isActive
       ? currentFilters.filter((f) => f !== id)
       : [...currentFilters, id];

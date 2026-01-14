@@ -166,19 +166,24 @@ declare global {
     // Show children, only relevant for inner nodes
     expanded?: boolean;
     // Type filters for children view (empty/undefined = defaults: relevant, maybe_relevant, confirms, contra)
-    typeFilters?: Array<ID>;
+    typeFilters?: Array<Relevance | Argument>;
   };
 
   // Context is the path of ancestor node IDs leading to the head node
   // e.g., [scholarium-id, places-id] when viewing via "Scholarium > Places > Node"
   type Context = List<ID>;
 
-  // Each item in a relation has its own types (one from each group allowed)
-  // Relevance group (mutually exclusive): "", "maybe_relevant", "little_relevant", "not_relevant"
-  // Evidence group (mutually exclusive): "confirms", "contra"
+  // Relevance levels for relation items
+  type Relevance = "" | "maybe_relevant" | "little_relevant" | "not_relevant";
+
+  // Argument types (evidence) for relation items
+  type Argument = "confirms" | "contra" | undefined;
+
+  // Each item in a relation has relevance and optional argument
   type RelationItem = {
     nodeID: LongID | ID;
-    types: List<ID>;
+    relevance: Relevance; // "" = relevant, "maybe_relevant", "little_relevant", "not_relevant"
+    argument?: Argument;  // "confirms", "contra", or undefined (neutral)
   };
 
   type Relations = {

@@ -43,38 +43,25 @@ export function getDiffItemsForNode(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
   nodeID: LongID | ID,
-  filterType: ID,
+  filterTypes: ID[],
   currentRelationId?: LongID
 ): List<DiffItem> {
-  // Don't show diff items for "not_relevant" type
-  if (filterType === "not_relevant") {
+  // If no filter types or empty array, return no diff items
+  if (!filterTypes || filterTypes.length === 0) {
     return List<DiffItem>();
   }
 
   const [, localID] = splitID(nodeID);
 
-  // Get current user's items with the requested type
+  // Get ALL items the current user has (any type) - we exclude these from suggestions
   const myDB = knowledgeDBs.get(myself);
   const myRelations = myDB?.relations
     .filter((r) => r.head === localID)
     .toList();
-  const myItems: ImmutableSet<LongID | ID> = (myRelations || List<Relations>())
-    .flatMap((r) =>
-      r.items
-        .filter((item) => item.types.includes(filterType))
-        .map((item) => item.nodeID)
-    )
-    .toSet();
-
-  // Also get user's "not_relevant" items to exclude them from diff
-  const myNotRelevantItems: ImmutableSet<LongID | ID> = (
+  const myAllItems: ImmutableSet<LongID | ID> = (
     myRelations || List<Relations>()
   )
-    .flatMap((r) =>
-      r.items
-        .filter((item) => item.types.includes("not_relevant"))
-        .map((item) => item.nodeID)
-    )
+    .flatMap((r) => r.items.map((item) => item.nodeID))
     .toSet();
 
   // Get items from the currently viewed relation (to exclude from diff)
@@ -95,17 +82,23 @@ export function getDiffItemsForNode(
         .toList()
     );
 
-  // Collect items from others that user doesn't have, deduplicated
+  // Collect items from others that:
+  // - Match any of the active filter types
+  // - Are not marked as "not_relevant" by the other user
+  // - User doesn't already have in their list (any type)
   const diffItems = otherRelations.reduce(
     (acc: List<DiffItem>, relations: Relations) => {
       const newItems = relations.items
         .filter(
           (item: RelationItem) =>
-            item.types.includes(filterType) &&
+            // Item must match at least one of the filter types
+            filterTypes.some((t) => item.types.includes(t)) &&
+            // Never show items the other user marked as not_relevant
             !item.types.includes("not_relevant") &&
-            !myItems.has(item.nodeID) &&
-            !myNotRelevantItems.has(item.nodeID) &&
+            // Exclude items user already has (any type)
+            !myAllItems.has(item.nodeID) &&
             !currentRelationItems.has(item.nodeID) &&
+            // Deduplicate across other users
             !acc.find((d) => d.nodeID === item.nodeID)
         )
         .map((item: RelationItem) => ({

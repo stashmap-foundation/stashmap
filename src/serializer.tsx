@@ -74,6 +74,7 @@ function viewToJSON(attributes: View): Serializable {
     o: attributes.relations,
     w: attributes.width,
     e: attributes.expanded !== undefined ? attributes.expanded : undefined,
+    f: attributes.typeFilters,
   };
 }
 
@@ -90,6 +91,10 @@ function jsonToView(view: Serializable): View | undefined {
     relations: a.o !== undefined ? (asString(a.o) as LongID) : undefined,
     width: a.w !== undefined ? asNumber(a.w) : 1,
     expanded: a.e !== undefined ? asBoolean(a.e) : undefined,
+    typeFilters:
+      a.f !== undefined
+        ? asArray(a.f).map((id) => asString(id) as ID)
+        : undefined,
   };
 }
 

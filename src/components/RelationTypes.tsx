@@ -8,7 +8,7 @@ import {
   usePlanner,
 } from "../planner";
 import { getRelationsNoReferencedBy } from "../connections";
-import { REFERENCED_BY } from "../constants";
+import { REFERENCED_BY, DEFAULT_TYPE_FILTERS } from "../constants";
 import {
   ViewPath,
   contextsMatch,
@@ -24,9 +24,6 @@ import { usePaneNavigation } from "../SplitPanesContext";
 
 export const DEFAULT_COLOR = "#027d86";
 export const REFERENCED_BY_COLOR = "#9c27b0"; // Purple for Referenced By view
-
-// Default type filters when none specified: relevant, maybe_relevant, confirms, contra
-export const DEFAULT_TYPE_FILTERS: ID[] = ["" as ID, "maybe_relevant" as ID, "confirms" as ID, "contra" as ID];
 
 // Convert hex color to RGB
 function hexToRgb(hex: string): { r: number; g: number; b: number } {

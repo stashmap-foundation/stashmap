@@ -480,7 +480,7 @@ test("getDiffItemsForNode returns items from other users not in current user's l
     knowledgeDBs,
     alicePK,
     parent.id,
-    "",
+    [""],
     aliceRelations.id
   );
 
@@ -524,7 +524,7 @@ test("getDiffItemsForNode excludes items already in user's list", () => {
     knowledgeDBs,
     alicePK,
     parent.id,
-    "",
+    [""],
     aliceRelations.id
   );
 
@@ -655,7 +655,7 @@ test("getDiffItemsForNode should return no diff items for not_relevant relation 
     knowledgeDBs,
     alicePK,
     parent.id,
-    "not_relevant",
+    ["not_relevant"],
     aliceRelations.id
   );
   expect(diffItems.size).toBe(0);

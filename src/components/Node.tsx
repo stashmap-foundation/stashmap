@@ -39,7 +39,7 @@ import {
   isReferenceNode,
   getRefTargetStack,
 } from "../connections";
-import { REFERENCED_BY } from "../constants";
+import { REFERENCED_BY, DEFAULT_TYPE_FILTERS } from "../constants";
 import { IS_MOBILE } from "./responsive";
 import { AddNodeToNode, getImageUrlFromText } from "./AddNode";
 import {
@@ -598,12 +598,13 @@ export function getNodesInTree(
     ctx
   );
 
-  // TODO: Filter diff items based on active type filters
+  // Get diff items based on active type filters from view settings
+  const typeFilters = parentView.typeFilters || DEFAULT_TYPE_FILTERS;
   const diffItems = getDiffItemsForNode(
     data.knowledgeDBs,
     data.user.publicKey,
     parentNodeID,
-    "", // Default to "relevant" type for now
+    typeFilters,
     relations.id
   );
 

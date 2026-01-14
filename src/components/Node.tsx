@@ -153,7 +153,7 @@ function ExpandCollapseToggle(): JSX.Element | null {
       className="expand-collapse-toggle"
       aria-label={isExpanded ? "collapse" : "expand"}
       aria-expanded={isExpanded}
-      style={{ color }}
+      style={{ color, backgroundColor: isReferencedBy ? "rgba(100, 140, 180, 0.1)" : undefined }}
     >
       <span className={`triangle ${isExpanded ? "expanded" : "collapsed"}`}>
         {isExpanded ? "▼" : "▶"}
@@ -466,18 +466,26 @@ function EditingNodeContent(): JSX.Element | null {
 }
 
 const INDENTATION = 25;
-const ARROW_WIDTH = 6;
+const ARROW_WIDTH = 0;
 
-export function Indent({ levels }: { levels: number }): JSX.Element {
+export function Indent({
+  levels,
+  backgroundColorForLast,
+}: {
+  levels: number;
+  backgroundColorForLast?: string;
+}): JSX.Element {
   // Simple indentation without vertical lines
   return (
     <>
       {Array.from(Array(levels).keys()).map((k) => {
         const marginLeft = k === 0 ? 5 : ARROW_WIDTH;
         const width = k === 0 ? 0 : INDENTATION;
+        const isLast = k === levels - 1;
+        const backgroundColor = isLast ? backgroundColorForLast : undefined;
 
         return (
-          <div key={k} style={{ marginLeft }}>
+          <div key={k} style={{ marginLeft, backgroundColor, alignSelf: "stretch" }}>
             <div style={{ width }} />
           </div>
         );
@@ -626,26 +634,41 @@ export function Node({
   const isNodeBeingEdited = useIsEditingOn();
   const isMultiselect = useIsParentMultiselectBtnOn();
   const isInReferencedByView = useIsInReferencedByView();
+  const [, view] = useNodeID();
   const { cardStyle, textStyle } = useItemStyle();
   const defaultCls = isDesktop ? "hover-light-bg" : "";
   const cls =
     className !== undefined ? `${className} hover-light-bg` : defaultCls;
   const clsBody = cardBodyClassName || "ps-0 pt-0 pb-0";
 
+  // Check if this node is the root of a Referenced By view
+  const isReferencedByRoot = view.relations === REFERENCED_BY;
+  // Show background for both the root and children in Referenced By view
+  const showReferencedByBackground = isReferencedByRoot || isInReferencedByView;
+
   // Show expand/collapse for regular nodes (not AddToNode, not diff items, not in Referenced By)
   const showExpandCollapse =
     !isAddToNode && !isDiffItem && !isInReferencedByView;
 
+  // Background color for Referenced By view
+  const referencedByBgColor = "rgba(100, 140, 180, 0.1)";
+  // Background style for Referenced By content (root and children)
+  const referencedByContentStyle: React.CSSProperties | undefined = showReferencedByBackground
+    ? { backgroundColor: referencedByBgColor }
+    : undefined;
+  // For children in Referenced By, color the last indent level to align with content
+  const indentBgColor = isInReferencedByView ? referencedByBgColor : undefined;
+
   return (
     <NodeCard className={cls} cardBodyClassName={clsBody} style={cardStyle}>
       <LeftMenu />
-      {levels > 0 && <Indent levels={levels} />}
+      {levels > 0 && <Indent levels={levels} backgroundColorForLast={indentBgColor} />}
       {showExpandCollapse && <ExpandCollapseToggle />}
       {isAddToNode && levels !== 1 && <AddNodeToNode />}
       {!isAddToNode && (
         <>
           {isMultiselect && <NodeSelectbox />}
-          <div className="flex-column w-100">
+          <div className="flex-column w-100" style={referencedByContentStyle}>
             {isNodeBeingEdited && !isDiffItem && <EditingNodeContent />}
             {(!isNodeBeingEdited || isDiffItem) && (
               <>

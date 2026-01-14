@@ -127,7 +127,7 @@ export function NodeCard({
     <Card className={`inner-node ${className || ""}`} style={style}>
       <Badge value={badgeValue} isLeft size={80} />
       <Card.Body className={cardBodyClassName || "ps-0 pb-2 pt-2"}>
-        <div className="d-flex align-items-start">{children}</div>
+        <div className="d-flex">{children}</div>
       </Card.Body>
     </Card>
   );

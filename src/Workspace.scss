@@ -877,27 +877,7 @@ to {
 }
 
 // Diff items - nodes from other users that aren't in current user's list
-.diff-item-container {
-  background-color: rgba(0, 0, 0, 0.02);
-}
-
-.diff-item {
-  opacity: 0.85;
-
-  &:hover {
-    opacity: 1;
-  }
-}
-
-.diff-item-card {
-  background-color: transparent;
-}
-
-.diff-indicator {
-  color: rgba(0, 0, 0, 0.5);
-  margin-right: 6px;
-  font-size: 0.9rem;
-}
+// Styling is now handled inline via the DiffItemIndicator badge
 
 // Split pane layout
 .split-pane-container {

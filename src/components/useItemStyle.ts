@@ -81,15 +81,9 @@ export function useItemStyle(): ItemStyle {
     return DEFAULT_STYLE;
   }
 
-  // Diff items get special styling
+  // Diff items: no special card styling, just the badge indicator
   if (isDiffItem) {
-    return {
-      cardStyle: {
-        opacity: 0.7,
-        borderLeft: `3px dashed ${TYPE_COLORS.suggestions}`,
-      },
-      textStyle: {},
-    };
+    return DEFAULT_STYLE;
   }
 
   // Get current item's relevance and argument

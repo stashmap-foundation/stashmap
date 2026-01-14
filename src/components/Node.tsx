@@ -40,7 +40,7 @@ import {
   getRefTargetStack,
   itemMatchesType,
 } from "../connections";
-import { REFERENCED_BY, DEFAULT_TYPE_FILTERS } from "../constants";
+import { REFERENCED_BY, DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 import { IS_MOBILE } from "./responsive";
 import { AddNodeToNode, getImageUrlFromText } from "./AddNode";
 import {
@@ -589,9 +589,24 @@ export function getNodesInTree(
 function DiffItemIndicator(): JSX.Element {
   return (
     <span
-      className="iconsminds-business-man diff-indicator"
-      title="From other users"
-    />
+      className="diff-indicator"
+      title="Suggestion from other users"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "3px",
+        padding: "1px 6px",
+        marginRight: "6px",
+        borderRadius: "10px",
+        backgroundColor: `${TYPE_COLORS.suggestions}25`,
+        color: TYPE_COLORS.suggestions,
+        fontSize: "0.75rem",
+        fontWeight: 500,
+      }}
+    >
+      <span className="iconsminds-business-man" style={{ fontSize: "0.8rem" }} />
+      Suggestion
+    </span>
   );
 }
 

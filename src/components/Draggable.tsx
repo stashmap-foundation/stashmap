@@ -1,5 +1,4 @@
 import React, { useRef } from "react";
-import { List } from "immutable";
 import { ConnectableElement, useDrag } from "react-dnd";
 import {
   ViewPath,
@@ -7,11 +6,6 @@ import {
   useIsDiffItem,
   useIsInReferencedByView,
   useViewPath,
-  getParentView,
-  upsertRelations,
-  useNodeID,
-  newRelations,
-  getNodeIDFromView,
 } from "../ViewContext";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable } from "./DroppableContainer";
@@ -21,12 +15,7 @@ import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 import { VersionSelector, ReferencedByToggle } from "./SelectRelations";
 import { TypeFilterButton } from "./TypeFilterButton";
-import { addRelationToRelations, shortID } from "../connections";
 import { RelevanceSelector } from "./RelevanceSelector";
-import { useData } from "../DataContext";
-import { usePlanner, planUpsertRelations } from "../planner";
-import { newDB } from "../knowledge";
-import { usePaneNavigation } from "../SplitPanesContext";
 
 export type DragItemType = {
   path: ViewPath;
@@ -83,89 +72,11 @@ export function DraggableNote(): JSX.Element {
   );
 }
 
-function AcceptDiffItemButton(): JSX.Element {
-  const viewPath = useViewPath();
-  const [nodeID] = useNodeID();
-  const { stack } = usePaneNavigation();
-  const { createPlan, executePlan } = usePlanner();
-  const parentPath = getParentView(viewPath);
-
-  const onClick = (): void => {
-    if (!parentPath) return;
-    const plan = upsertRelations(createPlan(), parentPath, stack, (relations) =>
-      addRelationToRelations(relations, nodeID)
-    );
-    executePlan(plan);
-  };
-
-  return (
-    <button
-      type="button"
-      aria-label="accept item"
-      className="btn btn-borderless p-0"
-      onClick={onClick}
-      title="Add to my list"
-    >
-      <span style={{ fontSize: "1.4rem", color: "green" }}>✓</span>
-    </button>
-  );
-}
-
-function DeclineDiffItemButton(): JSX.Element {
-  const data = useData();
-  const viewPath = useViewPath();
-  const [nodeID] = useNodeID();
-  const { createPlan, executePlan } = usePlanner();
-  const parentPath = getParentView(viewPath);
-
-  const onClick = (): void => {
-    if (!parentPath) return;
-
-    // Get the parent node ID (this is the HEAD for the not_relevant relation)
-    const [parentNodeID] = getNodeIDFromView(data, parentPath);
-    const headID = shortID(parentNodeID);
-
-    // TODO: Mark item as "not_relevant" by changing its type
-    // For now, just add as a new item with not_relevant type
-    const myRelations = data.knowledgeDBs.get(
-      data.user.publicKey,
-      newDB()
-    ).relations;
-    const existingRelation = myRelations.find((r) => r.head === headID);
-
-    const relation =
-      existingRelation ||
-      newRelations(parentNodeID, List<ID>(), data.user.publicKey);
-
-    // Add this item with not_relevant type
-    const updatedRelation = addRelationToRelations(
-      relation,
-      nodeID,
-      "not_relevant"
-    );
-    const plan = planUpsertRelations(createPlan(), updatedRelation);
-    executePlan(plan);
-  };
-
-  return (
-    <button
-      type="button"
-      aria-label="decline item"
-      className="btn btn-borderless p-0"
-      onClick={onClick}
-      title="Mark as not relevant"
-    >
-      <span style={{ fontSize: "1.4rem" }}>×</span>
-    </button>
-  );
-}
-
 function DiffItemActions(): JSX.Element {
   return (
     <div className="on-hover-menu right">
       <span className="always-visible">
-        <AcceptDiffItemButton />
-        <DeclineDiffItemButton />
+        <RelevanceSelector isDiffItem />
         <FullscreenButton />
         <OpenInSplitPaneButton />
       </span>

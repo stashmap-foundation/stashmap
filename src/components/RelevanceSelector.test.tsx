@@ -443,6 +443,209 @@ describe("Relevance filtering", () => {
   });
 });
 
+// Tests for diff item relevance selection
+describe("Diff item relevance selection", () => {
+  test("diff item shows RelevanceSelector with no dots selected", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    const { publicKey: alicePK } = alice().user;
+    const { publicKey: bobPK } = bob().user;
+
+    // Alice creates Parent
+    const parent = newNode("Parent", alicePK);
+    const aliceChild = newNode("Alice Child", alicePK);
+
+    const aliceRelations = addRelationToRelations(
+      newRelations(parent.id, List(), alicePK),
+      aliceChild.id
+    );
+
+    const alicePlan = planUpsertRelations(
+      planUpsertNode(planUpsertNode(createPlan(alice()), parent), aliceChild),
+      aliceRelations
+    );
+    await execute({ ...alice(), plan: alicePlan });
+
+    // Bob adds a different child to the same parent
+    const bobChild = newNode("Bob Child", bobPK);
+    const bobRelations = addRelationToRelations(
+      newRelations(parent.id, List(), bobPK),
+      bobChild.id
+    );
+
+    const bobPlan = planUpsertRelations(
+      planUpsertNode(createPlan(bob()), bobChild),
+      bobRelations
+    );
+    await execute({ ...bob(), plan: bobPlan });
+
+    // Alice follows Bob
+    await follow(alice, bobPK);
+
+    renderWithTestData(
+      <Data user={alice().user}>
+        <RootViewContextProvider root={parent.id}>
+          <TemporaryViewProvider>
+            <DND>
+              <LoadNode>
+                <>
+                  <DraggableNote />
+                  <TreeView />
+                </>
+              </LoadNode>
+            </DND>
+          </TemporaryViewProvider>
+        </RootViewContextProvider>
+      </Data>,
+      {
+        ...alice(),
+        initialRoute: `/d/${parent.id}`,
+      }
+    );
+
+    await screen.findByText("Parent");
+    await screen.findByText("Alice Child");
+
+    // Bob's child should appear as a diff item
+    await screen.findByText("Bob Child");
+
+    // Diff item should have a relevance selector with "Set relevance" title
+    // (indicating no dots selected)
+    const diffSelector = screen.getByTitle("Set relevance");
+    expect(diffSelector).toBeDefined();
+  });
+
+  test("clicking dot on diff item accepts it with that relevance", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    const { publicKey: alicePK } = alice().user;
+    const { publicKey: bobPK } = bob().user;
+
+    // Alice creates Parent
+    const parent = newNode("Parent", alicePK);
+    const aliceRelations = newRelations(parent.id, List(), alicePK);
+
+    const alicePlan = planUpsertRelations(
+      planUpsertNode(createPlan(alice()), parent),
+      aliceRelations
+    );
+    await execute({ ...alice(), plan: alicePlan });
+
+    // Bob adds a child to the same parent
+    const bobChild = newNode("Bob Child", bobPK);
+    const bobRelations = addRelationToRelations(
+      newRelations(parent.id, List(), bobPK),
+      bobChild.id
+    );
+
+    const bobPlan = planUpsertRelations(
+      planUpsertNode(createPlan(bob()), bobChild),
+      bobRelations
+    );
+    await execute({ ...bob(), plan: bobPlan });
+
+    // Alice follows Bob
+    await follow(alice, bobPK);
+
+    renderWithTestData(
+      <Data user={alice().user}>
+        <RootViewContextProvider root={parent.id}>
+          <TemporaryViewProvider>
+            <DND>
+              <LoadNode>
+                <>
+                  <DraggableNote />
+                  <TreeView />
+                </>
+              </LoadNode>
+            </DND>
+          </TemporaryViewProvider>
+        </RootViewContextProvider>
+      </Data>,
+      {
+        ...alice(),
+        initialRoute: `/d/${parent.id}`,
+      }
+    );
+
+    await screen.findByText("Parent");
+    await screen.findByText("Bob Child");
+
+    // Accept the diff item as "relevant" by clicking the third dot
+    const acceptButton = screen.getByLabelText("accept Bob Child as relevant");
+    fireEvent.click(acceptButton);
+
+    // After accepting, it should no longer be a diff item
+    // It should now show "Relevant" title (indicating it's now in Alice's list)
+    await waitFor(() => {
+      expect(screen.getByTitle("Relevant")).toBeDefined();
+    });
+  });
+
+  test("clicking X on diff item declines it as not relevant", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    const { publicKey: alicePK } = alice().user;
+    const { publicKey: bobPK } = bob().user;
+
+    // Alice creates Parent
+    const parent = newNode("Parent", alicePK);
+    const aliceRelations = newRelations(parent.id, List(), alicePK);
+
+    const alicePlan = planUpsertRelations(
+      planUpsertNode(createPlan(alice()), parent),
+      aliceRelations
+    );
+    await execute({ ...alice(), plan: alicePlan });
+
+    // Bob adds a child
+    const bobChild = newNode("Bob Child", bobPK);
+    const bobRelations = addRelationToRelations(
+      newRelations(parent.id, List(), bobPK),
+      bobChild.id
+    );
+
+    const bobPlan = planUpsertRelations(
+      planUpsertNode(createPlan(bob()), bobChild),
+      bobRelations
+    );
+    await execute({ ...bob(), plan: bobPlan });
+
+    // Alice follows Bob
+    await follow(alice, bobPK);
+
+    renderWithTestData(
+      <Data user={alice().user}>
+        <RootViewContextProvider root={parent.id}>
+          <TemporaryViewProvider>
+            <DND>
+              <LoadNode>
+                <>
+                  <DraggableNote />
+                  <TreeView />
+                </>
+              </LoadNode>
+            </DND>
+          </TemporaryViewProvider>
+        </RootViewContextProvider>
+      </Data>,
+      {
+        ...alice(),
+        initialRoute: `/d/${parent.id}`,
+      }
+    );
+
+    await screen.findByText("Parent");
+    await screen.findByText("Bob Child");
+
+    // Decline the diff item by clicking X
+    const declineButton = screen.getByLabelText("decline Bob Child");
+    fireEvent.click(declineButton);
+
+    // After declining, it should disappear (default filters exclude not_relevant)
+    await waitFor(() => {
+      expect(screen.queryByText("Bob Child")).toBeNull();
+    });
+  });
+});
+
 // Tests for multi-user relevance scenarios
 describe("Multi-user relevance", () => {
   test("each user can set different relevance for same item", async () => {

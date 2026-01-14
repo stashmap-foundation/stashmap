@@ -673,7 +673,6 @@ export function Node({
                 </NodeAutoLink>
               </>
             )}
-            {isDiffItem && <ReadonlyRelations />}
           </div>
         </>
       )}

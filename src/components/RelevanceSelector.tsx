@@ -3,8 +3,23 @@ import { TYPE_COLORS } from "../constants";
 import {
   useUpdateRelevance,
   relevanceToLevel,
+  levelToRelevance,
   RELEVANCE_LABELS,
 } from "./useUpdateRelevance";
+import {
+  useViewPath,
+  getParentView,
+  upsertRelations,
+  useNodeID,
+  useNode,
+} from "../ViewContext";
+import { addRelationToRelations } from "../connections";
+import { usePlanner } from "../planner";
+import { usePaneNavigation } from "../SplitPanesContext";
+
+type RelevanceSelectorProps = {
+  isDiffItem?: boolean;
+};
 
 function getLevelColor(
   level: number,
@@ -27,18 +42,60 @@ function getLevelColor(
   }
 }
 
-export function RelevanceSelector(): JSX.Element | null {
+export function RelevanceSelector({
+  isDiffItem = false,
+}: RelevanceSelectorProps): JSX.Element | null {
   const [hoverLevel, setHoverLevel] = useState<number | null>(null);
+
+  // Hooks for normal items (updating existing relevance)
   const { currentRelevance, nodeText, setLevel, isVisible } =
     useUpdateRelevance();
 
-  if (!isVisible) {
-    return null;
+  // Hooks for diff items (accepting with relevance)
+  const viewPath = useViewPath();
+  const [nodeID] = useNodeID();
+  const [node] = useNode();
+  const { stack } = usePaneNavigation();
+  const { createPlan, executePlan } = usePlanner();
+  const parentPath = getParentView(viewPath);
+
+  const diffNodeText = node?.text || "";
+
+  // For diff items, accept with the specified relevance level
+  const acceptWithLevel = (level: number): void => {
+    if (!parentPath) return;
+    const relevance = levelToRelevance(level);
+    const plan = upsertRelations(createPlan(), parentPath, stack, (relations) =>
+      addRelationToRelations(relations, nodeID, relevance)
+    );
+    executePlan(plan);
+  };
+
+  // Determine visibility
+  if (isDiffItem) {
+    if (!parentPath) return null;
+  } else {
+    if (!isVisible) return null;
   }
 
-  const currentLevel = relevanceToLevel(currentRelevance);
+  // For diff items: no selection initially (-1 means nothing selected)
+  // For normal items: use current relevance
+  const currentLevel = isDiffItem ? -1 : relevanceToLevel(currentRelevance);
   const displayLevel = hoverLevel !== null ? hoverLevel : currentLevel;
   const isNotRelevant = displayLevel === 0;
+  const displayText = isDiffItem ? diffNodeText : nodeText;
+
+  // Handler that works for both modes
+  const handleSetLevel = (level: number): void => {
+    if (isDiffItem) {
+      acceptWithLevel(level);
+    } else {
+      setLevel(level);
+    }
+  };
+
+  // For diff items with no hover, show all as inactive
+  const effectiveDisplayLevel = displayLevel === -1 ? -1 : displayLevel;
 
   return (
     <div
@@ -53,19 +110,19 @@ export function RelevanceSelector(): JSX.Element | null {
         backgroundColor: "rgba(0,0,0,0.04)",
         cursor: "pointer",
       }}
-      title={RELEVANCE_LABELS[displayLevel]}
+      title={effectiveDisplayLevel >= 0 ? RELEVANCE_LABELS[effectiveDisplayLevel] : "Set relevance"}
     >
       {/* X for not relevant - on left */}
       <span
-        onClick={() => setLevel(0)}
+        onClick={() => handleSetLevel(0)}
         onMouseEnter={() => setHoverLevel(0)}
         role="button"
         tabIndex={0}
-        aria-label={`mark ${nodeText} as not relevant`}
+        aria-label={isDiffItem ? `decline ${displayText}` : `mark ${displayText} as not relevant`}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            setLevel(0);
+            handleSetLevel(0);
           }
         }}
         style={{
@@ -92,21 +149,22 @@ export function RelevanceSelector(): JSX.Element | null {
       {[1, 2, 3].map((level) => (
         <span
           key={level}
-          onClick={() => setLevel(level)}
+          onClick={() => handleSetLevel(level)}
           onMouseEnter={() => setHoverLevel(level)}
           role="button"
           tabIndex={0}
+          aria-label={isDiffItem ? `accept ${displayText} as ${RELEVANCE_LABELS[level].toLowerCase()}` : undefined}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              setLevel(level);
+              handleSetLevel(level);
             }
           }}
           style={{
             width: "18px",
             height: "18px",
             borderRadius: "50%",
-            backgroundColor: getLevelColor(level, displayLevel, isNotRelevant),
+            backgroundColor: getLevelColor(level, effectiveDisplayLevel, isNotRelevant),
             transition: "all 0.15s ease",
           }}
         />

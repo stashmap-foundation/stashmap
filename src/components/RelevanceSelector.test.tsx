@@ -646,6 +646,196 @@ describe("Diff item relevance selection", () => {
   });
 });
 
+// Tests for removing items from list
+describe("Remove from list", () => {
+  test("not relevant item shows 'remove from list' aria-label", async () => {
+    const [alice] = setup([ALICE]);
+    const { publicKey: alicePK } = alice().user;
+
+    const parent = newNode("Parent", alicePK);
+    const child = newNode("Child", alicePK);
+
+    // Create relation with not_relevant status
+    const relations = addRelationToRelations(
+      newRelations(parent.id, List(), alicePK),
+      child.id,
+      "not_relevant"
+    );
+
+    const plan = planUpsertRelations(
+      planUpsertNode(planUpsertNode(createPlan(alice()), parent), child),
+      relations
+    );
+    await execute({ ...alice(), plan });
+
+    renderWithTestData(
+      <Data user={alice().user}>
+        <RootViewContextProvider root={parent.id}>
+          <TemporaryViewProvider>
+            <DND>
+              <LoadNode>
+                <>
+                  <DraggableNote />
+                  <TreeView />
+                </>
+              </LoadNode>
+            </DND>
+          </TemporaryViewProvider>
+        </RootViewContextProvider>
+      </Data>,
+      {
+        ...alice(),
+        initialRoute: `/d/${parent.id}`,
+      }
+    );
+
+    await screen.findByText("Parent");
+
+    // Enable not_relevant filter to see the child
+    const filterButtons = screen.getAllByLabelText("filter suggestions");
+    fireEvent.click(filterButtons[0]);
+    fireEvent.click(await screen.findByText("Not Relevant"));
+
+    // Child should now be visible
+    await screen.findByText("Child");
+
+    // The X button should now say "remove from list" instead of "mark as not relevant"
+    const removeBtn = screen.getByLabelText("remove Child from list");
+    expect(removeBtn).toBeDefined();
+  });
+
+  test("clicking X on not relevant item removes it completely from list", async () => {
+    const [alice] = setup([ALICE]);
+    const { publicKey: alicePK } = alice().user;
+
+    const parent = newNode("Parent", alicePK);
+    const child1 = newNode("Child1", alicePK);
+    const child2 = newNode("Child2", alicePK);
+
+    // Create relations - Child1 is not_relevant, Child2 is relevant
+    let relations = newRelations(parent.id, List(), alicePK);
+    relations = addRelationToRelations(relations, child1.id, "not_relevant");
+    relations = addRelationToRelations(relations, child2.id, "");
+
+    const plan = planUpsertRelations(
+      planUpsertNode(
+        planUpsertNode(planUpsertNode(createPlan(alice()), parent), child1),
+        child2
+      ),
+      relations
+    );
+    await execute({ ...alice(), plan });
+
+    renderWithTestData(
+      <Data user={alice().user}>
+        <RootViewContextProvider root={parent.id}>
+          <TemporaryViewProvider>
+            <DND>
+              <LoadNode>
+                <>
+                  <DraggableNote />
+                  <TreeView />
+                </>
+              </LoadNode>
+            </DND>
+          </TemporaryViewProvider>
+        </RootViewContextProvider>
+      </Data>,
+      {
+        ...alice(),
+        initialRoute: `/d/${parent.id}`,
+      }
+    );
+
+    await screen.findByText("Parent");
+    await screen.findByText("Child2");
+
+    // Enable not_relevant filter to see Child1
+    const filterButtons = screen.getAllByLabelText("filter suggestions");
+    fireEvent.click(filterButtons[0]);
+    fireEvent.click(await screen.findByText("Not Relevant"));
+
+    // Child1 should now be visible
+    await screen.findByText("Child1");
+
+    // Click the remove button to completely remove Child1
+    fireEvent.click(screen.getByLabelText("remove Child1 from list"));
+
+    // Child1 should disappear completely
+    await waitFor(() => {
+      expect(screen.queryByText("Child1")).toBeNull();
+    });
+
+    // Child2 should still be visible
+    expect(screen.getByText("Child2")).toBeDefined();
+
+    // Even with not_relevant filter enabled, Child1 should not reappear
+    // (because it was removed from the list, not just hidden)
+    expect(screen.queryByText("Child1")).toBeNull();
+  });
+
+  test("two-step deletion: first mark as not relevant, then remove", async () => {
+    const [alice] = setup([ALICE]);
+    const db = await setupTestDB(alice(), [["Parent", ["Child"]]]);
+    const parent = findNodeByText(db, "Parent") as KnowNode;
+
+    renderWithTestData(
+      <Data user={alice().user}>
+        <RootViewContextProvider root={parent.id}>
+          <TemporaryViewProvider>
+            <DND>
+              <LoadNode>
+                <>
+                  <DraggableNote />
+                  <TreeView />
+                </>
+              </LoadNode>
+            </DND>
+          </TemporaryViewProvider>
+        </RootViewContextProvider>
+      </Data>,
+      {
+        ...alice(),
+        initialRoute: `/d/${parent.id}`,
+      }
+    );
+
+    await screen.findByText("Parent");
+    await screen.findByText("Child");
+
+    // Step 1: Mark as not relevant
+    fireEvent.click(screen.getByLabelText("mark Child as not relevant"));
+
+    // Child should be hidden
+    await waitFor(() => {
+      expect(screen.queryByText("Child")).toBeNull();
+    });
+
+    // Enable not_relevant filter to see the child again
+    const filterButtons = screen.getAllByLabelText("filter suggestions");
+    fireEvent.click(filterButtons[0]);
+    fireEvent.click(await screen.findByText("Not Relevant"));
+
+    // Child should reappear
+    await screen.findByText("Child");
+
+    // Now the X button should say "remove from list"
+    const removeBtn = screen.getByLabelText("remove Child from list");
+    expect(removeBtn).toBeDefined();
+
+    // Step 2: Remove from list completely
+    fireEvent.click(removeBtn);
+
+    // Child should be completely gone
+    await waitFor(() => {
+      expect(screen.queryByText("Child")).toBeNull();
+    });
+
+    // Even with not_relevant filter still enabled, Child should not reappear
+    expect(screen.queryByText("Child")).toBeNull();
+  });
+});
+
 // Tests for multi-user relevance scenarios
 describe("Multi-user relevance", () => {
   test("each user can set different relevance for same item", async () => {

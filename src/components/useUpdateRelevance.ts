@@ -8,7 +8,8 @@ import {
   useNode,
   getNodeIDFromView,
 } from "../ViewContext";
-import { updateItemRelevance, getRelations } from "../connections";
+import { updateItemRelevance, getRelations, deleteRelations } from "../connections";
+import { Set } from "immutable";
 import { usePlanner } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { useData } from "../DataContext";
@@ -64,6 +65,7 @@ type UseUpdateRelevanceResult = {
   // Actions
   setRelevance: (relevance: Relevance) => void;
   setLevel: (level: number) => void;
+  removeFromList: () => void;
   // Visibility
   isVisible: boolean;
 };
@@ -119,12 +121,21 @@ export function useUpdateRelevance(): UseUpdateRelevanceResult {
     setRelevance(levelToRelevance(level));
   };
 
+  const removeFromList = (): void => {
+    if (!isVisible || !parentView || relationIndex === undefined) return;
+    const plan = upsertRelations(createPlan(), parentView, stack, (rels) =>
+      deleteRelations(rels, Set([relationIndex]))
+    );
+    executePlan(plan);
+  };
+
   return {
     currentRelevance,
     currentLevel,
     nodeText,
     setRelevance,
     setLevel,
+    removeFromList,
     isVisible,
   };
 }

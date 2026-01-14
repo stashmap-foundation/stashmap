@@ -48,7 +48,7 @@ export function RelevanceSelector({
   const [hoverLevel, setHoverLevel] = useState<number | null>(null);
 
   // Hooks for normal items (updating existing relevance)
-  const { currentRelevance, nodeText, setLevel, isVisible } =
+  const { currentRelevance, nodeText, setLevel, removeFromList, isVisible } =
     useUpdateRelevance();
 
   // Hooks for diff items (accepting with relevance)
@@ -94,6 +94,20 @@ export function RelevanceSelector({
     }
   };
 
+  // Check if item is already marked as not relevant (for showing remove option)
+  const isCurrentlyNotRelevant = !isDiffItem && currentLevel === 0;
+
+  // Handler for X button - marks as not relevant, or removes if already not relevant
+  const handleXClick = (): void => {
+    if (isDiffItem) {
+      acceptWithLevel(0); // Decline diff item
+    } else if (isCurrentlyNotRelevant) {
+      removeFromList(); // Completely remove from list
+    } else {
+      setLevel(0); // Mark as not relevant
+    }
+  };
+
   // For diff items with no hover, show all as inactive
   const effectiveDisplayLevel = displayLevel === -1 ? -1 : displayLevel;
 
@@ -112,17 +126,23 @@ export function RelevanceSelector({
       }}
       title={effectiveDisplayLevel >= 0 ? RELEVANCE_LABELS[effectiveDisplayLevel] : "Set relevance"}
     >
-      {/* X for not relevant - on left */}
+      {/* X for not relevant (or trash for remove) - on left */}
       <span
-        onClick={() => handleSetLevel(0)}
+        onClick={handleXClick}
         onMouseEnter={() => setHoverLevel(0)}
         role="button"
         tabIndex={0}
-        aria-label={isDiffItem ? `decline ${displayText}` : `mark ${displayText} as not relevant`}
+        aria-label={
+          isDiffItem
+            ? `decline ${displayText}`
+            : isCurrentlyNotRelevant
+            ? `remove ${displayText} from list`
+            : `mark ${displayText} as not relevant`
+        }
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            handleSetLevel(0);
+            handleXClick();
           }
         }}
         style={{
@@ -137,10 +157,13 @@ export function RelevanceSelector({
           borderRadius: "50%",
           color: isNotRelevant ? "#fff" : "#888",
           backgroundColor: isNotRelevant
-            ? TYPE_COLORS.not_relevant
+            ? isCurrentlyNotRelevant
+              ? "#c62828" // Red for permanent removal from list
+              : TYPE_COLORS.not_relevant
             : "transparent",
           transition: "all 0.15s ease",
         }}
+        title={isCurrentlyNotRelevant ? "Remove from list" : undefined}
       >
         ×
       </span>

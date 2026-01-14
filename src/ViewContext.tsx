@@ -1163,6 +1163,22 @@ export function clearViewsForPane(views: Views, paneIndex: number): Views {
   return views.filterNot((_, key) => key.startsWith(`p${paneIndex}:`));
 }
 
+export function updateViewPathsAfterPaneInsert(
+  views: Views,
+  insertedPaneIndex: number
+): Views {
+  // When inserting a pane at index N, shift all pane indices >= N up by 1
+  return views.mapKeys((key) => {
+    const match = key.match(/^p(\d+):/);
+    if (!match) return key;
+    const paneIndex = parseInt(match[1], 10);
+    if (paneIndex >= insertedPaneIndex) {
+      return key.replace(/^p\d+:/, `p${paneIndex + 1}:`);
+    }
+    return key;
+  });
+}
+
 export function bulkUpdateViewPathsAfterAddRelation(
   data: Data,
   repoPath: ViewPath,

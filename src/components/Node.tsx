@@ -62,6 +62,7 @@ import { CancelButton, NodeCard } from "../commons/Ui";
 import { useProjectContext } from "../ProjectContext";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { LeftMenu } from "./LeftMenu";
+import { RightMenu } from "./RightMenu";
 import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 
@@ -644,6 +645,7 @@ export function Node({
           </div>
         </>
       )}
+      <RightMenu />
     </NodeCard>
   );
 }

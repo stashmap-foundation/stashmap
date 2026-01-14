@@ -9,9 +9,7 @@ import {
 } from "../ViewContext";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable } from "./DroppableContainer";
-import { ToggleEditing, useIsEditingOn } from "./TemporaryViewContext";
-import { JoinProjectButton } from "../JoinProjext";
-import { RelevanceSelector } from "./RelevanceSelector";
+import { useIsEditingOn } from "./TemporaryViewContext";
 
 export type DragItemType = {
   path: ViewPath;
@@ -53,23 +51,10 @@ export function DraggableNote(): JSX.Element {
   return (
     <div className="visible-on-hover">
       <Draggable ref={ref} />
-      <div className="on-hover-menu right">
-        <ToggleEditing />
-        <JoinProjectButton />
-      </div>
     </div>
   );
 }
 
-function DiffItemActions(): JSX.Element {
-  return (
-    <div className="on-hover-menu right">
-      <span className="always-visible">
-        <RelevanceSelector isDiffItem />
-      </span>
-    </div>
-  );
-}
 
 function DraggableDiffItem({ className }: { className?: string }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
@@ -118,11 +103,10 @@ export function ListItem({
   });
 
   if (isDiffItem) {
-    // Diff items: draggable but NOT droppable, show accept/decline buttons
+    // Diff items: draggable but NOT droppable
     return (
       <div className="visible-on-hover diff-item-container">
         <DraggableDiffItem />
-        <DiffItemActions />
       </div>
     );
   }
@@ -138,12 +122,6 @@ export function ListItem({
   return (
     <div className="visible-on-hover">
       <Draggable ref={ref} className={className} />
-      <div className="on-hover-menu right">
-        <ToggleEditing />
-        <span className="always-visible">
-          <RelevanceSelector />
-        </span>
-      </div>
     </div>
   );
 }

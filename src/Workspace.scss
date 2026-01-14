@@ -1036,6 +1036,64 @@ to {
   visibility: visible;
 }
 
+// Node row - flex container for left-menu, item, right-menu
+.node-row {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  background: white;
+
+  .item {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+// Right menu - fixed width column for item controls (outside Node, in Draggable)
+.right-menu {
+  width: 150px;
+  min-width: 150px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 6px;
+  padding-top: 2px;
+
+  > * {
+    visibility: hidden;
+  }
+
+  // Force consistent height on all elements
+  > *, .dropdown, .btn {
+    height: 40px;
+    display: flex;
+    align-items: center;
+  }
+
+  // Make all buttons compact and borderless
+  .btn {
+    padding: 0;
+    margin: 0;
+    min-width: auto;
+    min-height: auto;
+    border: none;
+    background: transparent;
+    line-height: 1;
+
+    &:hover {
+      background: transparent;
+    }
+
+    &:focus {
+      box-shadow: none !important;
+    }
+  }
+}
+
+.visible-on-hover:hover .right-menu > * {
+  visibility: visible;
+}
+
 // Node text content padding
 .inner-node .flex-column.w-100 {
   padding-top: 10px;

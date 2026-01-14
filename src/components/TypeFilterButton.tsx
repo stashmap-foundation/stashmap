@@ -1,8 +1,8 @@
 import React, { useState, useRef } from "react";
 import { Overlay, Popover } from "react-bootstrap";
 import { planUpdateViews, usePlanner } from "../planner";
-import { updateView, useNode, useViewPath } from "../ViewContext";
-import { DEFAULT_TYPE_FILTERS } from "../constants";
+import { updateView, useNode, useViewPath, useIsInReferencedByView } from "../ViewContext";
+import { DEFAULT_TYPE_FILTERS, REFERENCED_BY } from "../constants";
 
 // Filter type definitions with colors
 // Column 1: Relevance types (blue spectrum)
@@ -90,8 +90,14 @@ export function TypeFilterButton(): JSX.Element | null {
   const [node, view] = useNode();
   const viewPath = useViewPath();
   const { createPlan, executePlan } = usePlanner();
+  const isInReferencedByView = useIsInReferencedByView();
 
   if (!node) {
+    return null;
+  }
+
+  // Don't show filter button in Referenced By mode (for root or items inside)
+  if (view.relations === REFERENCED_BY || isInReferencedByView) {
     return null;
   }
 

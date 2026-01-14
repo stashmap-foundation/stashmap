@@ -15,32 +15,32 @@ import { usePaneNavigation } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 
 // Relevance mapped to levels:
-// "" (relevant) = 3
-// "maybe_relevant" = 2
+// "relevant" = 3
+// "" (maybe relevant, default) = 2
 // "little_relevant" = 1
 // "not_relevant" = 0
 
 export function relevanceToLevel(relevance: Relevance): number {
   switch (relevance) {
-    case "":
+    case "relevant":
       return 3;
-    case "maybe_relevant":
+    case "":
       return 2;
     case "little_relevant":
       return 1;
     case "not_relevant":
       return 0;
     default:
-      return 3;
+      return 2;
   }
 }
 
 export function levelToRelevance(level: number): Relevance {
   switch (level) {
     case 3:
-      return "";
+      return "relevant";
     case 2:
-      return "maybe_relevant";
+      return "";
     case 1:
       return "little_relevant";
     case 0:

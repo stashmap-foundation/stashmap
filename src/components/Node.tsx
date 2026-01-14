@@ -65,6 +65,7 @@ import { LeftMenu } from "./LeftMenu";
 import { RightMenu } from "./RightMenu";
 import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
+import { useItemStyle } from "./useItemStyle";
 
 function getLevels(viewPath: ViewPath): number {
   // Subtract 1: for pane index at position 0
@@ -610,6 +611,7 @@ export function Node({
   const isNodeBeingEdited = useIsEditingOn();
   const isMultiselect = useIsParentMultiselectBtnOn();
   const isInReferencedByView = useIsInReferencedByView();
+  const { cardStyle, textStyle } = useItemStyle();
   const defaultCls = isDesktop ? "hover-light-bg" : "";
   const cls =
     className !== undefined ? `${className} hover-light-bg` : defaultCls;
@@ -620,7 +622,7 @@ export function Node({
     !isAddToNode && !isDiffItem && !isInReferencedByView;
 
   return (
-    <NodeCard className={cls} cardBodyClassName={clsBody}>
+    <NodeCard className={cls} cardBodyClassName={clsBody} style={cardStyle}>
       <LeftMenu />
       {levels > 0 && <Indent levels={levels} />}
       {showExpandCollapse && <ExpandCollapseToggle />}
@@ -634,7 +636,9 @@ export function Node({
               <>
                 <NodeAutoLink>
                   {isDiffItem && <DiffItemIndicator />}
-                  <InteractiveNodeContent editOnClick={!isDiffItem} />
+                  <span style={textStyle}>
+                    <InteractiveNodeContent editOnClick={!isDiffItem} />
+                  </span>
                 </NodeAutoLink>
                 <span className="inline-node-actions">
                   <FullscreenButton />

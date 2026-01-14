@@ -174,7 +174,7 @@ declare global {
   type Context = List<ID>;
 
   // Relevance levels for relation items
-  type Relevance = "" | "maybe_relevant" | "little_relevant" | "not_relevant";
+  type Relevance = "relevant" | "" | "little_relevant" | "not_relevant";
 
   // Argument types (evidence) for relation items
   type Argument = "confirms" | "contra" | undefined;
@@ -182,7 +182,7 @@ declare global {
   // Each item in a relation has relevance and optional argument
   type RelationItem = {
     nodeID: LongID | ID;
-    relevance: Relevance; // "" = relevant, "maybe_relevant", "little_relevant", "not_relevant"
+    relevance: Relevance; // "" = maybe relevant (default), "relevant", "little_relevant", "not_relevant"
     argument?: Argument;  // "confirms", "contra", or undefined (neutral)
   };
 

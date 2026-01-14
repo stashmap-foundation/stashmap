@@ -31,12 +31,12 @@ import {
 
 // Unit tests for helper functions
 describe("relevanceToLevel", () => {
-  test("maps empty string (relevant) to level 3", () => {
-    expect(relevanceToLevel("")).toBe(3);
+  test("maps relevant to level 3", () => {
+    expect(relevanceToLevel("relevant")).toBe(3);
   });
 
-  test("maps maybe_relevant to level 2", () => {
-    expect(relevanceToLevel("maybe_relevant")).toBe(2);
+  test("maps empty string (maybe relevant) to level 2", () => {
+    expect(relevanceToLevel("")).toBe(2);
   });
 
   test("maps little_relevant to level 1", () => {
@@ -47,18 +47,18 @@ describe("relevanceToLevel", () => {
     expect(relevanceToLevel("not_relevant")).toBe(0);
   });
 
-  test("defaults to level 3 for unknown values", () => {
-    expect(relevanceToLevel("unknown" as Relevance)).toBe(3);
+  test("defaults to level 2 for unknown values", () => {
+    expect(relevanceToLevel("unknown" as Relevance)).toBe(2);
   });
 });
 
 describe("levelToRelevance", () => {
-  test("maps level 3 to empty string (relevant)", () => {
-    expect(levelToRelevance(3)).toBe("");
+  test("maps level 3 to relevant", () => {
+    expect(levelToRelevance(3)).toBe("relevant");
   });
 
-  test("maps level 2 to maybe_relevant", () => {
-    expect(levelToRelevance(2)).toBe("maybe_relevant");
+  test("maps level 2 to empty string (maybe relevant)", () => {
+    expect(levelToRelevance(2)).toBe("");
   });
 
   test("maps level 1 to little_relevant", () => {
@@ -85,16 +85,16 @@ describe("RELEVANCE_LABELS", () => {
 });
 
 describe("itemMatchesType", () => {
-  test("matches relevant items with empty string filter", () => {
-    const item: RelationItem = { nodeID: "test" as ID, relevance: "" };
-    expect(itemMatchesType(item, "")).toBe(true);
-    expect(itemMatchesType(item, "maybe_relevant")).toBe(false);
+  test("matches relevant items", () => {
+    const item: RelationItem = { nodeID: "test" as ID, relevance: "relevant" };
+    expect(itemMatchesType(item, "relevant")).toBe(true);
+    expect(itemMatchesType(item, "")).toBe(false);
   });
 
-  test("matches maybe_relevant items", () => {
-    const item: RelationItem = { nodeID: "test" as ID, relevance: "maybe_relevant" };
-    expect(itemMatchesType(item, "maybe_relevant")).toBe(true);
-    expect(itemMatchesType(item, "")).toBe(false);
+  test("matches maybe relevant items with empty string filter", () => {
+    const item: RelationItem = { nodeID: "test" as ID, relevance: "" };
+    expect(itemMatchesType(item, "")).toBe(true);
+    expect(itemMatchesType(item, "relevant")).toBe(false);
   });
 
   test("matches little_relevant items", () => {
@@ -109,7 +109,7 @@ describe("itemMatchesType", () => {
     expect(itemMatchesType(item, "")).toBe(false);
   });
 
-  test("defaults undefined relevance to empty string (relevant)", () => {
+  test("defaults undefined relevance to empty string (maybe relevant)", () => {
     // Using 'as' to simulate legacy items without relevance set
     const item = { nodeID: "test" as ID } as RelationItem;
     expect(itemMatchesType(item, "")).toBe(true);
@@ -242,7 +242,7 @@ describe("RelevanceSelector", () => {
     expect(screen.getByText("Child2")).toBeDefined();
   });
 
-  test("item with default relevance shows all blue dots", async () => {
+  test("item with default relevance shows Maybe Relevant", async () => {
     const [alice] = setup([ALICE]);
     const db = await setupTestDB(alice(), [["Parent", ["Child"]]]);
     const parent = findNodeByText(db, "Parent") as KnowNode;
@@ -270,15 +270,15 @@ describe("RelevanceSelector", () => {
 
     await screen.findByText("Child");
 
-    // The relevance selector should exist and show "Relevant" title (all dots filled)
-    const selector = screen.getByTitle("Relevant");
+    // Default relevance is "" (maybe relevant), shown with 2 dots
+    const selector = screen.getByTitle("Maybe Relevant");
     expect(selector).toBeDefined();
   });
 });
 
 // Tests for relevance filtering
 describe("Relevance filtering", () => {
-  test("default filters show relevant and maybe_relevant items", async () => {
+  test("default filters show relevant and maybe relevant items", async () => {
     const [alice] = setup([ALICE]);
     const { publicKey: alicePK } = alice().user;
 
@@ -289,11 +289,14 @@ describe("Relevance filtering", () => {
     const notRelevant = newNode("Not Relevant Item", alicePK);
 
     // Create relations with different relevance levels
-    let relations = newRelations(parent.id, List(), alicePK);
-    relations = addRelationToRelations(relations, relevant.id, "");
-    relations = addRelationToRelations(relations, maybeRelevant.id, "maybe_relevant");
-    relations = addRelationToRelations(relations, littleRelevant.id, "little_relevant");
-    relations = addRelationToRelations(relations, notRelevant.id, "not_relevant");
+    const relations = [relevant, maybeRelevant, littleRelevant, notRelevant].reduce(
+      (rels, node, i) => addRelationToRelations(
+        rels,
+        node.id,
+        (["relevant", "", "little_relevant", "not_relevant"] as Relevance[])[i]
+      ),
+      newRelations(parent.id, List(), alicePK)
+    );
 
     const plan = planUpsertRelations(
       planUpsertNode(
@@ -336,7 +339,7 @@ describe("Relevance filtering", () => {
 
     await screen.findByText("Parent");
 
-    // Default filters include "" (relevant) and "maybe_relevant"
+    // Default filters include "relevant" and "" (maybe relevant)
     // but exclude "little_relevant" and "not_relevant"
     expect(screen.getByText("Relevant Item")).toBeDefined();
     expect(screen.getByText("Maybe Relevant Item")).toBeDefined();
@@ -391,14 +394,14 @@ describe("Relevance filtering", () => {
     expect(screen.getByText("Child3")).toBeDefined();
   });
 
-  test("items without explicit relevance default to relevant", async () => {
+  test("items without explicit relevance default to maybe relevant", async () => {
     const [alice] = setup([ALICE]);
     const { publicKey: alicePK } = alice().user;
 
     const parent = newNode("Parent", alicePK);
     const child = newNode("Child", alicePK);
 
-    // Create relation WITHOUT setting relevance (should default to relevant)
+    // Create relation WITHOUT setting relevance (should default to maybe relevant)
     const relations = addRelationToRelations(
       newRelations(parent.id, List(), alicePK),
       child.id
@@ -437,8 +440,8 @@ describe("Relevance filtering", () => {
     // Child should be visible (default relevance is "" which is included in default filters)
     expect(screen.getByText("Child")).toBeDefined();
 
-    // Relevance selector should show "Relevant" title
-    const selector = screen.getByTitle("Relevant");
+    // Relevance selector should show "Maybe Relevant" title (default)
+    const selector = screen.getByTitle("Maybe Relevant");
     expect(selector).toBeDefined();
   });
 });

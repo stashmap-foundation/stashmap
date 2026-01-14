@@ -391,7 +391,7 @@ export function itemMatchesType(
   if (filterType === "confirms" || filterType === "contra") {
     return item.argument === filterType;
   }
-  // Default relevance to "" (relevant) if undefined
+  // Default relevance to "" (maybe relevant) if undefined
   const relevance = item.relevance ?? "";
   return relevance === filterType;
 }

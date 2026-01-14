@@ -3,13 +3,13 @@ export const REFERENCED_BY = "referencedby" as LongID;
 export const REF_PREFIX = "ref:";
 
 // Default type filters for children view
-// Relevance: "" (relevant), "maybe_relevant" are ON by default
+// Relevance: "relevant", "" (maybe relevant) are ON by default
 // Evidence: "confirms", "contra" are ON by default
 // Suggestions from other users: ON by default
 // OFF by default: "little_relevant", "not_relevant"
 export const DEFAULT_TYPE_FILTERS: (Relevance | Argument | "suggestions")[] = [
+  "relevant",
   "",
-  "maybe_relevant",
   "confirms",
   "contra",
   "suggestions",

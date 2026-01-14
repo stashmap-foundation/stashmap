@@ -7,8 +7,8 @@ import { DEFAULT_TYPE_FILTERS, REFERENCED_BY, TYPE_COLORS } from "../constants";
 // Filter type definitions with colors
 // Column 1: Relevance types (blue spectrum)
 const COL_1_FILTERS: { id: Relevance; label: string; color: string }[] = [
-  { id: "", label: "Relevant", color: TYPE_COLORS.relevant },
-  { id: "maybe_relevant", label: "Maybe Relevant", color: TYPE_COLORS.maybe_relevant },
+  { id: "relevant", label: "Relevant", color: TYPE_COLORS.relevant },
+  { id: "", label: "Maybe Relevant", color: TYPE_COLORS.maybe_relevant },
   { id: "little_relevant", label: "Little Relevant", color: TYPE_COLORS.little_relevant },
   { id: "not_relevant", label: "Not Relevant", color: TYPE_COLORS.not_relevant },
 ];

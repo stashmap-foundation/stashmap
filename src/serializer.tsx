@@ -68,6 +68,55 @@ function asArray(obj: Serializable | undefined): Array<Serializable> {
   throw new Error(`${toString(obj)} is not an array`);
 }
 
+// Valid values for Relevance and Argument types
+const VALID_RELEVANCE: Relevance[] = ["relevant", "", "little_relevant", "not_relevant"];
+const VALID_ARGUMENT: Argument[] = ["confirms", "contra", undefined];
+
+function parseRelevance(value: string | undefined): Relevance {
+  if (value === undefined || !VALID_RELEVANCE.includes(value as Relevance)) {
+    return ""; // Default to maybe relevant
+  }
+  return value as Relevance;
+}
+
+function parseArgument(value: string | undefined): Argument {
+  if (value === undefined || value === "") {
+    return undefined;
+  }
+  if (!VALID_ARGUMENT.includes(value as Argument)) {
+    return undefined;
+  }
+  return value as Argument;
+}
+
+function parseTypeFilter(
+  value: string
+): Relevance | Argument | "suggestions" | null {
+  if (VALID_RELEVANCE.includes(value as Relevance)) {
+    return value as Relevance;
+  }
+  if (value === "confirms" || value === "contra") {
+    return value as Argument;
+  }
+  if (value === "suggestions") {
+    return "suggestions";
+  }
+  return null;
+}
+
+function parseTypeFilters(
+  arr: Array<Serializable>
+): Array<Relevance | Argument | "suggestions"> {
+  const result: Array<Relevance | Argument | "suggestions"> = [];
+  for (const item of arr) {
+    const parsed = parseTypeFilter(asString(item));
+    if (parsed !== null) {
+      result.push(parsed);
+    }
+  }
+  return result;
+}
+
 function viewToJSON(attributes: View): Serializable {
   return {
     v: attributes.virtualLists,
@@ -92,9 +141,7 @@ function jsonToView(view: Serializable): View | undefined {
     width: a.w !== undefined ? asNumber(a.w) : 1,
     expanded: a.e !== undefined ? asBoolean(a.e) : undefined,
     typeFilters:
-      a.f !== undefined
-        ? asArray(a.f).map((id) => asString(id) as Relevance | Argument)
-        : undefined,
+      a.f !== undefined ? parseTypeFilters(asArray(a.f)) : undefined,
   };
 }
 
@@ -134,12 +181,13 @@ export function eventToRelations(e: UnsignedEvent): Relations | undefined {
     : List<ID>();
 
   // Parse items with relevance and optional argument: ["i", nodeID, relevance, argument?]
+  // Invalid relevance/argument values are filtered to defaults
   const itemsAsTags = findAllTags(e, "i") || [];
   const items = List(
     itemsAsTags.map((tagValues) => ({
       nodeID: tagValues[0] as LongID,
-      relevance: (tagValues[1] || "") as Relevance,
-      argument: tagValues[2] as Argument,
+      relevance: parseRelevance(tagValues[1]),
+      argument: parseArgument(tagValues[2]),
     }))
   );
 

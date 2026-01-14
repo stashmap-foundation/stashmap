@@ -44,12 +44,12 @@ describe("TYPE_COLORS", () => {
 });
 
 describe("DEFAULT_TYPE_FILTERS", () => {
-  test("includes relevant (empty string)", () => {
-    expect(DEFAULT_TYPE_FILTERS).toContain("");
+  test("includes relevant", () => {
+    expect(DEFAULT_TYPE_FILTERS).toContain("relevant");
   });
 
-  test("includes maybe_relevant", () => {
-    expect(DEFAULT_TYPE_FILTERS).toContain("maybe_relevant");
+  test("includes maybe_relevant (empty string)", () => {
+    expect(DEFAULT_TYPE_FILTERS).toContain("");
   });
 
   test("includes confirms", () => {
@@ -152,8 +152,8 @@ describe("TypeFilterButton", () => {
 
     // Create relations with different relevance levels
     let relations = newRelations(parent.id, List(), alicePK);
-    relations = addRelationToRelations(relations, relevant.id, "");
-    relations = addRelationToRelations(relations, maybeRelevant.id, "maybe_relevant");
+    relations = addRelationToRelations(relations, relevant.id, "relevant");
+    relations = addRelationToRelations(relations, maybeRelevant.id, "");
 
     const plan = planUpsertRelations(
       planUpsertNode(
@@ -318,8 +318,8 @@ describe("TypeFilterButton", () => {
     const maybeRelevant = newNode("Maybe Relevant Item", alicePK);
 
     let relations = newRelations(parent.id, List(), alicePK);
-    relations = addRelationToRelations(relations, relevant.id, "");
-    relations = addRelationToRelations(relations, maybeRelevant.id, "maybe_relevant");
+    relations = addRelationToRelations(relations, relevant.id, "relevant");
+    relations = addRelationToRelations(relations, maybeRelevant.id, "");
 
     const plan = planUpsertRelations(
       planUpsertNode(
@@ -655,8 +655,8 @@ describe("Filter integration with RelevanceSelector", () => {
     await screen.findByText("Parent");
     await screen.findByText("Child");
 
-    // Child should have Relevant title initially
-    expect(screen.getByTitle("Relevant")).toBeDefined();
+    // Child should have Maybe Relevant title initially (default)
+    expect(screen.getByTitle("Maybe Relevant")).toBeDefined();
 
     // Mark as not relevant
     fireEvent.click(screen.getByLabelText("mark Child as not relevant"));

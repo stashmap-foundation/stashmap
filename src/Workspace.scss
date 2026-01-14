@@ -981,10 +981,17 @@ to {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 4px;
+  gap: 6px;
 
   > * {
     visibility: hidden;
+  }
+
+  // Force consistent height on all elements
+  > *, .dropdown, .btn {
+    height: 40px;
+    display: flex;
+    align-items: center;
   }
 
   // Make all buttons in left menu compact and borderless

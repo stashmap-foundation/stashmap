@@ -176,7 +176,7 @@ export function RelevanceSelector({
           onMouseEnter={() => setHoverLevel(level)}
           role="button"
           tabIndex={0}
-          aria-label={isDiffItem ? `accept ${displayText} as ${RELEVANCE_LABELS[level].toLowerCase()}` : undefined}
+          aria-label={isDiffItem ? `accept ${displayText} as ${RELEVANCE_LABELS[level].toLowerCase()}` : `set ${displayText} to ${RELEVANCE_LABELS[level].toLowerCase()}`}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();

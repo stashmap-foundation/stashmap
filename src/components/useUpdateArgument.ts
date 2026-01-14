@@ -5,9 +5,9 @@ import {
   upsertRelations,
   useIsInReferencedByView,
   useIsAddToNode,
-  getNodeIDFromView,
+  getRelationForView,
 } from "../ViewContext";
-import { updateItemArgument, getRelations } from "../connections";
+import { updateItemArgument } from "../connections";
 import { usePlanner } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { useData } from "../DataContext";
@@ -39,16 +39,10 @@ export function useUpdateArgument(): UseUpdateArgumentResult {
     relationIndex !== undefined &&
     parentView !== undefined;
 
-  // Get current argument
+  // Get current argument using same context-aware lookup as relationIndex
   let currentArgument: Argument = undefined;
   if (isVisible && parentView) {
-    const [parentNodeID, pView] = getNodeIDFromView(data, parentView);
-    const relations = getRelations(
-      data.knowledgeDBs,
-      pView.relations,
-      data.user.publicKey,
-      parentNodeID
-    );
+    const relations = getRelationForView(data, parentView, stack);
     const currentItem = relations?.items.get(relationIndex!);
     currentArgument = currentItem?.argument;
   }

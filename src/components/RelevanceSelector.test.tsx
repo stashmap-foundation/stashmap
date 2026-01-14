@@ -833,6 +833,117 @@ describe("Remove from list", () => {
   });
 });
 
+describe("Relation lookup consistency (regression)", () => {
+  test("setting relevance to little_relevant hides item from default filter", async () => {
+    const [alice] = setup([ALICE]);
+    const db = await setupTestDB(alice(), [["Parent", ["Child"]]]);
+    const parent = findNodeByText(db, "Parent") as KnowNode;
+
+    renderWithTestData(
+      <Data user={alice().user}>
+        <RootViewContextProvider root={parent.id}>
+          <TemporaryViewProvider>
+            <DND>
+              <LoadNode>
+                <>
+                  <DraggableNote />
+                  <TreeView />
+                </>
+              </LoadNode>
+            </DND>
+          </TemporaryViewProvider>
+        </RootViewContextProvider>
+      </Data>,
+      {
+        ...alice(),
+        initialRoute: `/d/${parent.id}`,
+      }
+    );
+
+    await screen.findByText("Parent");
+    await screen.findByText("Child");
+
+    // Click the first dot to set relevance to "little_relevant"
+    // This should hide the item since default filters exclude little_relevant
+    const firstDot = screen.getByLabelText("set Child to little relevant");
+    fireEvent.click(firstDot);
+
+    // The item should disappear because:
+    // 1. The relevance was actually written (not silently ignored)
+    // 2. Default filters exclude "little_relevant"
+    await waitFor(() => {
+      expect(screen.queryByText("Child")).toBeNull();
+    });
+
+    // Now enable little_relevant filter to verify the item still exists
+    fireEvent.click(screen.getByLabelText("filter Parent"));
+    fireEvent.click(await screen.findByText("Little Relevant"));
+
+    // Child should reappear, confirming the relevance was properly saved
+    await screen.findByText("Child");
+
+    // And it should show the correct relevance (1 dot = little relevant)
+    const selector = screen.getByTitle("Little Relevant");
+    expect(selector).toBeDefined();
+  });
+
+  test("setting relevance persists correctly on item accessed via nodeIndex", async () => {
+    const [alice] = setup([ALICE]);
+    const { publicKey: alicePK } = alice().user;
+
+    const parent = newNode("Parent", alicePK);
+    const child = newNode("Child", alicePK);
+
+    // Add the same child twice to create duplicate nodeIDs with different indices
+    let relations = newRelations(parent.id, List(), alicePK);
+    relations = addRelationToRelations(relations, child.id, "");
+    relations = addRelationToRelations(relations, child.id, "");
+
+    const plan = planUpsertRelations(
+      planUpsertNode(planUpsertNode(createPlan(alice()), parent), child),
+      relations
+    );
+    await execute({ ...alice(), plan });
+
+    renderWithTestData(
+      <Data user={alice().user}>
+        <RootViewContextProvider root={parent.id}>
+          <TemporaryViewProvider>
+            <DND>
+              <LoadNode>
+                <>
+                  <DraggableNote />
+                  <TreeView />
+                </>
+              </LoadNode>
+            </DND>
+          </TemporaryViewProvider>
+        </RootViewContextProvider>
+      </Data>,
+      {
+        ...alice(),
+        initialRoute: `/d/${parent.id}`,
+      }
+    );
+
+    await screen.findByText("Parent");
+
+    // Both instances of Child should be visible
+    const childElements = screen.getAllByText("Child");
+    expect(childElements.length).toBe(2);
+
+    // Mark the first Child as not relevant
+    const markNotRelevantBtns = screen.getAllByLabelText(/mark Child as not relevant/);
+    fireEvent.click(markNotRelevantBtns[0]);
+
+    // Only ONE Child should disappear (the one we clicked), not both
+    await waitFor(() => {
+      const remaining = screen.getAllByText("Child");
+      expect(remaining.length).toBe(1);
+    });
+  });
+});
+
 // Tests for multi-user relevance scenarios
 describe("Multi-user relevance", () => {
   test("each user can set different relevance for same item", async () => {

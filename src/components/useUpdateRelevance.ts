@@ -6,9 +6,9 @@ import {
   useIsInReferencedByView,
   useIsAddToNode,
   useNode,
-  getNodeIDFromView,
+  getRelationForView,
 } from "../ViewContext";
-import { updateItemRelevance, getRelations, deleteRelations } from "../connections";
+import { updateItemRelevance, deleteRelations } from "../connections";
 import { Set } from "immutable";
 import { usePlanner } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
@@ -92,16 +92,10 @@ export function useUpdateRelevance(): UseUpdateRelevanceResult {
     relationIndex !== undefined &&
     parentView !== undefined;
 
-  // Get current relevance
+  // Get current relevance using same context-aware lookup as relationIndex
   let currentRelevance: Relevance = "";
   if (isVisible && parentView) {
-    const [parentNodeID, pView] = getNodeIDFromView(data, parentView);
-    const relations = getRelations(
-      data.knowledgeDBs,
-      pView.relations,
-      data.user.publicKey,
-      parentNodeID
-    );
+    const relations = getRelationForView(data, parentView, stack);
     const currentItem = relations?.items.get(relationIndex!);
     currentRelevance = currentItem?.relevance || "";
   }

@@ -133,29 +133,29 @@ function RelationButton({
 }): JSX.Element {
   const buttonStyle = showVertical
     ? {
-        border: "0px",
-        backgroundColor: "inherit",
-        padding: "0 4px",
-        position: "relative" as const,
-        minWidth: "12px",
-        minHeight: "25px",
-        height: "100%",
-        color,
-        display: "flex",
-        alignItems: "flex-start",
-        marginRight: addGroupSpacing ? "8px" : undefined,
-      }
+      border: "0px",
+      backgroundColor: "inherit",
+      padding: "0 4px",
+      position: "relative" as const,
+      minWidth: "12px",
+      minHeight: "25px",
+      height: "100%",
+      color,
+      display: "flex",
+      alignItems: "flex-start",
+      marginRight: addGroupSpacing ? "8px" : undefined,
+    }
     : {
-        border: "0px",
-        backgroundColor: "inherit",
-        padding: "4px 0",
-        minWidth: "25px",
-        color,
-        display: "flex",
-        flexDirection: "column" as const,
-        alignItems: "center",
-        marginRight: addGroupSpacing ? "8px" : undefined,
-      };
+      border: "0px",
+      backgroundColor: "inherit",
+      padding: "4px 0",
+      minWidth: "25px",
+      color,
+      display: "flex",
+      flexDirection: "column" as const,
+      alignItems: "center",
+      marginRight: addGroupSpacing ? "8px" : undefined,
+    };
 
   const lineStyleVertical = {
     width: "2px",
@@ -271,9 +271,8 @@ function GhostRelationButton({
       color={relationType.color}
       label={relationType.label}
       onClick={onClick}
-      ariaLabel={`create ${relationType.label || "relation"} for ${
-        node?.text || "node"
-      }`}
+      ariaLabel={`create ${relationType.label || "relation"} for ${node?.text || "node"
+        }`}
       id={relationTypeID}
       showVertical={showVertical}
       addGroupSpacing={addGroupSpacing}
@@ -487,12 +486,12 @@ function AutomaticRelationsButton({
   const onClick = preventDeselect
     ? undefined
     : () => {
-        if (view.relations === relations.id) {
-          onToggleExpanded(!isExpanded);
-        } else {
-          onChangeRelations(relations, true);
-        }
-      };
+      if (view.relations === relations.id) {
+        onToggleExpanded(!isExpanded);
+      } else {
+        onChangeRelations(relations, true);
+      }
+    };
 
   return (
     <RelationButton
@@ -618,17 +617,14 @@ function SelectRelationsButton({
   const isExpanded = view.expanded === true;
   const ariaLabel =
     isExpanded && isSelected
-      ? `hide items ${relationType?.invertedRelationLabel || "list"} ${
-          node.text
-        }`
-      : `show items ${relationType?.invertedRelationLabel || "list"} ${
-          node.text
-        }`;
+      ? `hide items ${relationType?.invertedRelationLabel || "list"} ${node.text
+      }`
+      : `show items ${relationType?.invertedRelationLabel || "list"} ${node.text
+      }`;
 
   const isActive = (isExpanded || !!alwaysOneSelected) && isSelected;
-  const className = `btn select-relation no-shadow ${
-    isActive ? "opacity-none" : "deselected"
-  }`;
+  const className = `btn select-relation no-shadow ${isActive ? "opacity-none" : "deselected"
+    }`;
 
   const color = relationType?.color || "black";
   const label = relationLabel(isActive, relationType, relationSize);
@@ -636,12 +632,12 @@ function SelectRelationsButton({
   const onClick = preventDeselect
     ? undefined
     : () => {
-        if (view.relations === topRelation.id) {
-          onToggleExpanded(!isExpanded);
-        } else {
-          onChangeRelations(topRelation, true);
-        }
-      };
+      if (view.relations === topRelation.id) {
+        onToggleExpanded(!isExpanded);
+      } else {
+        onChangeRelations(topRelation, true);
+      }
+    };
 
   const dropdownStyle = {
     borderTopColor: color,
@@ -682,40 +678,6 @@ function SelectRelationsButton({
         otherRelations={otherRelations}
       />
     </span>
-  );
-}
-
-export function ReadonlyRelations(): JSX.Element | null {
-  const { knowledgeDBs, user } = useData();
-  const [nodeID] = useNodeID();
-  const { stack } = usePaneNavigation();
-  const viewPath = useViewPath();
-  const context = getContextFromStackAndViewPath(stack, viewPath);
-  const relations = getAvailableRelationsForNode(
-    knowledgeDBs,
-    user.publicKey,
-    nodeID,
-    context
-  );
-
-  // Since types are now per-item, just show total item count across all relations
-  const totalCount = relations.reduce((sum, r) => sum + r.items.size, 0);
-
-  return (
-    <div className="menu-layout font-size-small">
-      <ul className="nav nav-underline gap-0">
-        <RelationButton
-          color="black"
-          label="items"
-          ariaLabel={`${totalCount} items`}
-          id="items"
-          count={totalCount}
-          isActive={false}
-          disabled
-          showVertical={false}
-        />
-      </ul>
-    </div>
   );
 }
 

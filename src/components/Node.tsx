@@ -44,7 +44,6 @@ import { REFERENCED_BY, DEFAULT_TYPE_FILTERS } from "../constants";
 import { IS_MOBILE } from "./responsive";
 import { AddNodeToNode, getImageUrlFromText } from "./AddNode";
 import {
-  ReadonlyRelations,
   sortRelations,
   useOnChangeRelations,
   useOnToggleExpanded,

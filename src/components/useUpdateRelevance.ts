@@ -1,4 +1,3 @@
-import { Set } from "immutable";
 import {
   useRelationIndex,
   useViewPath,
@@ -8,20 +7,11 @@ import {
   useIsAddToNode,
   useNode,
   getNodeIDFromView,
-  getRelationForView,
-  calculateIndexFromNodeIndex,
-  getLast,
-  getViewFromPath,
 } from "../ViewContext";
-import {
-  updateItemRelevance,
-  getRelations,
-  markItemsAsNotRelevant,
-} from "../connections";
+import { updateItemRelevance, getRelations } from "../connections";
 import { usePlanner } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { useData } from "../DataContext";
-import { REFERENCED_BY } from "../constants";
 
 // Relevance mapped to levels:
 // "" (relevant) = 3
@@ -80,7 +70,7 @@ type UseUpdateRelevanceResult = {
 
 /**
  * Hook for updating item relevance.
- * Extracts common logic used by RelevanceSelector and DisconnectNodeBtn.
+ * Used by RelevanceSelector.
  */
 export function useUpdateRelevance(): UseUpdateRelevanceResult {
   const data = useData();
@@ -136,100 +126,5 @@ export function useUpdateRelevance(): UseUpdateRelevanceResult {
     setRelevance,
     setLevel,
     isVisible,
-  };
-}
-
-type UseDisconnectResult = {
-  // Action
-  disconnect: () => void;
-  // Visibility
-  isVisible: boolean;
-  nodeText: string;
-};
-
-/**
- * Hook for disconnecting a single node (marking as not relevant).
- * Used by DisconnectNodeBtn.
- */
-export function useDisconnectNode(): UseDisconnectResult {
-  const data = useData();
-  const { stack } = usePaneNavigation();
-  const { createPlan, executePlan } = usePlanner();
-  const viewPath = useViewPath();
-  const [node] = useNode();
-  const { nodeID, nodeIndex } = getLast(viewPath);
-  const parentPath = getParentView(viewPath);
-
-  const nodeText = node?.text || "";
-
-  // Check visibility conditions
-  let isVisible = false;
-  let relationIndex: number | undefined;
-
-  if (parentPath) {
-    const parentView = getViewFromPath(data, parentPath);
-    if (parentView && parentView.relations !== REFERENCED_BY) {
-      const relations = getRelationForView(data, parentPath, stack);
-      if (relations) {
-        relationIndex = calculateIndexFromNodeIndex(
-          relations,
-          nodeID,
-          nodeIndex
-        );
-        isVisible = relationIndex !== undefined;
-      }
-    }
-  }
-
-  const disconnect = (): void => {
-    if (!isVisible || !parentPath || relationIndex === undefined) return;
-    const plan = upsertRelations(createPlan(), parentPath, stack, (rel) =>
-      markItemsAsNotRelevant(rel, Set([relationIndex]))
-    );
-    executePlan(plan);
-  };
-
-  return {
-    disconnect,
-    isVisible,
-    nodeText,
-  };
-}
-
-type UseDisconnectMultipleResult = {
-  // Action
-  disconnect: () => void;
-  // Info
-  selectedCount: number;
-};
-
-/**
- * Hook for disconnecting multiple selected nodes.
- * Used by DisconnectBtn.
- */
-export function useDisconnectMultiple(
-  selectedIndices: Set<number>,
-  onAfterDisconnect?: () => void
-): UseDisconnectMultipleResult {
-  const data = useData();
-  const { stack } = usePaneNavigation();
-  const { createPlan, executePlan } = usePlanner();
-  const viewContext = useViewPath();
-
-  const disconnect = (): void => {
-    if (selectedIndices.size === 0) return;
-    const relations = getRelationForView(data, viewContext, stack);
-    if (!relations) return;
-
-    const plan = upsertRelations(createPlan(), viewContext, stack, (rel) =>
-      markItemsAsNotRelevant(rel, selectedIndices)
-    );
-    executePlan(plan);
-    onAfterDisconnect?.();
-  };
-
-  return {
-    disconnect,
-    selectedCount: selectedIndices.size,
   };
 }

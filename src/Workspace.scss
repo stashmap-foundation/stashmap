@@ -1040,3 +1040,31 @@ to {
   padding-top: 10px;
 }
 
+// Inline action buttons (fullscreen, split pane)
+.inline-node-actions {
+  display: inline;
+  margin-left: 4px;
+  visibility: hidden;
+
+  .btn {
+    padding: 0 2px;
+    margin: 0;
+    min-width: auto;
+    min-height: auto;
+    border: none;
+    background: transparent;
+    font-size: 0.85rem;
+    color: rgba(0, 0, 0, 0.4);
+    vertical-align: middle;
+
+    &:hover {
+      background: transparent;
+      color: rgba(0, 0, 0, 0.7);
+    }
+  }
+}
+
+.visible-on-hover:hover .inline-node-actions {
+  visibility: visible;
+}
+

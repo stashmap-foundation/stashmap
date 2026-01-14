@@ -62,6 +62,8 @@ import { CancelButton, NodeCard } from "../commons/Ui";
 import { useProjectContext } from "../ProjectContext";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { LeftMenu } from "./LeftMenu";
+import { FullscreenButton } from "./FullscreenButton";
+import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 
 function getLevels(viewPath: ViewPath): number {
   // Subtract 1: for pane index at position 0
@@ -632,6 +634,10 @@ export function Node({
                 <NodeAutoLink>
                   {isDiffItem && <DiffItemIndicator />}
                   <InteractiveNodeContent editOnClick={!isDiffItem} />
+                  <span className="inline-node-actions">
+                    <FullscreenButton />
+                    <OpenInSplitPaneButton />
+                  </span>
                 </NodeAutoLink>
               </>
             )}

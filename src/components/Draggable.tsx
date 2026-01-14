@@ -11,8 +11,6 @@ import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable } from "./DroppableContainer";
 import { ToggleEditing, useIsEditingOn } from "./TemporaryViewContext";
 import { JoinProjectButton } from "../JoinProjext";
-import { FullscreenButton } from "./FullscreenButton";
-import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 import { RelevanceSelector } from "./RelevanceSelector";
 
 export type DragItemType = {
@@ -58,10 +56,6 @@ export function DraggableNote(): JSX.Element {
       <div className="on-hover-menu right">
         <ToggleEditing />
         <JoinProjectButton />
-        <span className="always-visible">
-          <FullscreenButton />
-          <OpenInSplitPaneButton />
-        </span>
       </div>
     </div>
   );
@@ -72,8 +66,6 @@ function DiffItemActions(): JSX.Element {
     <div className="on-hover-menu right">
       <span className="always-visible">
         <RelevanceSelector isDiffItem />
-        <FullscreenButton />
-        <OpenInSplitPaneButton />
       </span>
     </div>
   );
@@ -150,8 +142,6 @@ export function ListItem({
         <ToggleEditing />
         <span className="always-visible">
           <RelevanceSelector />
-          <FullscreenButton />
-          <OpenInSplitPaneButton />
         </span>
       </div>
     </div>

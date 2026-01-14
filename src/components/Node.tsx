@@ -61,6 +61,7 @@ import { useInputElementFocus } from "../commons/FocusContextProvider";
 import { CancelButton, NodeCard } from "../commons/Ui";
 import { useProjectContext } from "../ProjectContext";
 import { usePaneNavigation } from "../SplitPanesContext";
+import { LeftMenu } from "./LeftMenu";
 
 function getLevels(viewPath: ViewPath): number {
   // Subtract 1: for pane index at position 0
@@ -660,6 +661,7 @@ export function Node({
 
   return (
     <NodeCard className={cls} cardBodyClassName={clsBody}>
+      <LeftMenu />
       {levels > 0 && <Indent levels={levels} />}
       {showExpandCollapse && <ExpandCollapseToggle />}
       {isAddToNode && levels !== 1 && <AddNodeToNode />}

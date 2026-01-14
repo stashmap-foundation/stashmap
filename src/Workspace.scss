@@ -974,3 +974,56 @@ to {
   }
 }
 
+// Left menu - fixed width column for children controls (inside Node)
+.left-menu {
+  width: 140px;
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+
+  > * {
+    visibility: hidden;
+  }
+
+  // Make all buttons in left menu compact and borderless
+  .btn {
+    padding: 0;
+    margin: 0;
+    min-width: auto;
+    min-height: auto;
+    border: none;
+    background: transparent;
+    line-height: 1;
+
+    &:hover {
+      background: transparent;
+    }
+
+    &:focus {
+      box-shadow: none !important;
+    }
+  }
+
+  // Dropdown toggles should also be compact
+  .dropdown-toggle {
+    padding: 0;
+    border: none;
+    background: transparent;
+
+    &::after {
+      display: none;
+    }
+
+    &:hover, &:focus {
+      background: transparent;
+      box-shadow: none !important;
+    }
+  }
+}
+
+.visible-on-hover:hover .left-menu > * {
+  visibility: visible;
+}
+

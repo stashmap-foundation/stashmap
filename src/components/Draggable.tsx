@@ -13,8 +13,6 @@ import { ToggleEditing, useIsEditingOn } from "./TemporaryViewContext";
 import { JoinProjectButton } from "../JoinProjext";
 import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
-import { VersionSelector, ReferencedByToggle } from "./SelectRelations";
-import { TypeFilterButton } from "./TypeFilterButton";
 import { RelevanceSelector } from "./RelevanceSelector";
 
 export type DragItemType = {
@@ -61,9 +59,6 @@ export function DraggableNote(): JSX.Element {
         <ToggleEditing />
         <JoinProjectButton />
         <span className="always-visible">
-          <TypeFilterButton />
-          <ReferencedByToggle />
-          <VersionSelector />
           <FullscreenButton />
           <OpenInSplitPaneButton />
         </span>
@@ -155,9 +150,6 @@ export function ListItem({
         <ToggleEditing />
         <span className="always-visible">
           <RelevanceSelector />
-          <TypeFilterButton />
-          <ReferencedByToggle />
-          <VersionSelector />
           <FullscreenButton />
           <OpenInSplitPaneButton />
         </span>

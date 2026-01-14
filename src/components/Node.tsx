@@ -461,63 +461,20 @@ function EditingNodeContent(): JSX.Element | null {
   );
 }
 
-const INDENTATION = 10;
+const INDENTATION = 25;
 const ARROW_WIDTH = 6;
 
 export function Indent({ levels }: { levels: number }): JSX.Element {
-  const viewPath = useViewPath();
-  const data = useData();
-
+  // Simple indentation without vertical lines
   return (
     <>
       {Array.from(Array(levels).keys()).map((k) => {
-        // For line at position k (where k > 0), pop back to get the ancestor view
-        // k=0: no line (just spacing)
-        // k=1: first line, pop back (levels - 1) times to get header column view
-        // k=2: second line, pop back (levels - 2) times to get first child view
-        // etc.
-        const lineInfo =
-          k > 0
-            ? (() => {
-              const pathForAncestor = popViewPath(viewPath, levels - k);
-              if (!pathForAncestor) {
-                return { show: false, color: undefined };
-              }
-              const ancestorView = getViewFromPath(data, pathForAncestor);
-
-              // Root nodes (header) are always expanded
-              const isAncestorRoot = pathForAncestor.length === 2;
-              const isAncestorExpanded = isAncestorRoot || ancestorView?.expanded;
-
-              // Only show line if ancestor is expanded
-              if (!isAncestorExpanded) {
-                return { show: false, color: undefined };
-              }
-
-              // Get color based on view state: purple for Referenced By, black for normal
-              const isReferencedBy = ancestorView.relations === REFERENCED_BY;
-              const color = isReferencedBy ? REFERENCED_BY_COLOR : "black";
-
-              return { show: true, color };
-            })()
-            : { show: false, color: undefined };
-
-        const style = lineInfo.show && lineInfo.color
-          ? { borderLeft: `2px solid ${lineInfo.color}` }
-          : {};
-
-        // k=0 is just initial spacing (no line), k>0 shows lines
         const marginLeft = k === 0 ? 5 : ARROW_WIDTH;
         const width = k === 0 ? 0 : INDENTATION;
 
         return (
           <div key={k} style={{ marginLeft }}>
             <div style={{ width }} />
-            {k !== 0 && lineInfo.show && (
-              <div>
-                <div className="vl" style={style} />
-              </div>
-            )}
           </div>
         );
       })}
@@ -653,7 +610,7 @@ export function Node({
   const defaultCls = isDesktop ? "hover-light-bg" : "";
   const cls =
     className !== undefined ? `${className} hover-light-bg` : defaultCls;
-  const clsBody = cardBodyClassName || "ps-0 pt-4 pb-0";
+  const clsBody = cardBodyClassName || "ps-0 pt-0 pb-0";
 
   // Show expand/collapse for regular nodes (not AddToNode, not diff items, not in Referenced By)
   const showExpandCollapse =

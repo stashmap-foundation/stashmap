@@ -953,6 +953,7 @@ to {
   background: none;
   border: none;
   padding: 0;
+  padding-top: 18px;
   margin: 0;
   cursor: pointer;
   display: flex;
@@ -963,7 +964,6 @@ to {
   color: rgba(0, 0, 0, 0.5);
   font-size: 10px;
   line-height: 1;
-  padding-top: 5px;
 
   &:hover {
     color: rgba(0, 0, 0, 0.8);
@@ -976,15 +976,16 @@ to {
 
 // Left menu - fixed width column for children controls (inside Node)
 .left-menu {
-  width: 140px;
-  min-width: 140px;
+  width: 100px;
+  min-width: 100px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: flex-end;
   gap: 6px;
+  padding-top: 2px;
 
   > * {
-    visibility: hidden;
+    visibility: visible; 
   }
 
   // Force consistent height on all elements
@@ -1032,5 +1033,10 @@ to {
 
 .visible-on-hover:hover .left-menu > * {
   visibility: visible;
+}
+
+// Node text content padding
+.inner-node .flex-column.w-100 {
+  padding-top: 10px;
 }
 

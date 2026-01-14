@@ -120,3 +120,24 @@ test("Reference node opens with only reference path, not current pane stack", ()
   );
   expect(newPaneStack).toEqual([contextNode, targetNode]);
 });
+
+test("OpenInSplitPaneButtonWithStack click does not bubble to parent onClick", () => {
+  const stack = [ROOT, "node1" as LongID];
+  const parentClickHandler = jest.fn();
+
+  renderApis(
+    <div onClick={parentClickHandler} role="presentation">
+      <span onClick={(e) => e.stopPropagation()} role="presentation">
+        <OpenInSplitPaneButtonWithStack stack={stack} />
+      </span>
+      <PaneCountDisplay />
+    </div>
+  );
+
+  fireEvent.click(screen.getByLabelText("open in split pane"));
+
+  // New pane should be created
+  expect(screen.getByTestId("pane-count").textContent).toBe("2");
+  // Parent click handler should NOT have been called
+  expect(parentClickHandler).not.toHaveBeenCalled();
+});

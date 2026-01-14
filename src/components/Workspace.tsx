@@ -8,10 +8,7 @@ import { useData } from "../DataContext";
 import { usePaneNavigation, usePaneIndex } from "../SplitPanesContext";
 import { Node } from "./Node";
 import { TreeView } from "./TreeView";
-import {
-  OpenInSplitPaneButton,
-  OpenInSplitPaneButtonWithStack,
-} from "./OpenInSplitPaneButton";
+import { OpenInSplitPaneButtonWithStack } from "./OpenInSplitPaneButton";
 import {
   PaneSearchButton,
   PaneSettingsMenu,
@@ -53,9 +50,16 @@ function StackedLayer({
         role="button"
         tabIndex={0}
       >
-        <div className="stacked-layer-title">
+        <span className="stacked-layer-title">
           {workspaceNode?.text || "Loading..."}
-        </div>
+        </span>
+        <span
+          className="inline-node-actions"
+          onClick={(e) => e.stopPropagation()}
+          role="presentation"
+        >
+          <OpenInSplitPaneButtonWithStack stack={stackUpToHere} />
+        </span>
       </div>
       <div
         className="on-hover-menu right"
@@ -72,7 +76,6 @@ function StackedLayer({
           )}
           {showPaneControls && <ClosePaneButton />}
           {showPaneControls && <PaneSearchButton />}
-          <OpenInSplitPaneButtonWithStack stack={stackUpToHere} />
         </span>
       </div>
     </div>
@@ -121,7 +124,6 @@ export function WorkspaceView(): JSX.Element | null {
                     )}
                     {!hasStack && <ClosePaneButton />}
                     {!hasStack && <PaneSearchButton />}
-                    <OpenInSplitPaneButton />
                   </span>
                 </div>
               </div>

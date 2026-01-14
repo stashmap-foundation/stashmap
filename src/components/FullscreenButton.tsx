@@ -8,7 +8,8 @@ export function FullscreenButton(): JSX.Element | null {
   const viewPath = useViewPath();
   const [nodeID] = useNodeID();
   const isAddToNode = useIsAddToNode();
-  if (isAddToNode) {
+  const isFullscreenNode = viewPath.length === 2;
+  if (isAddToNode || isFullscreenNode) {
     return null;
   }
 

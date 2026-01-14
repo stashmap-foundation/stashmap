@@ -114,7 +114,7 @@ test("Move View Settings on Delete", async () => {
 
   await screen.findByText("C++");
   // Remove JAVA Node
-  await userEvent.click(screen.getByLabelText("disconnect node Java"));
+  await userEvent.click(screen.getByLabelText("mark Java as not relevant"));
   // Ensure C is still expanded
   await screen.findByText("C++");
   within(cContainer).getByLabelText("collapse");
@@ -468,12 +468,12 @@ test("Disconnect Nodes", async () => {
   });
   await screen.findByText("Programming Languages");
 
-  // disconnect nodes removes them completely (types are now per-item)
-  fireEvent.click(await screen.findByLabelText("disconnect node Java"));
+  // marking nodes as not relevant removes them from the view
+  fireEvent.click(await screen.findByLabelText("mark Java as not relevant"));
   expect(screen.queryByText("Java")).toBeNull();
   expect(extractNodes(container)).toEqual(["C", "C++", "Rust"]);
 
-  fireEvent.click(await screen.findByLabelText("disconnect node C"));
+  fireEvent.click(await screen.findByLabelText("mark C as not relevant"));
   expect(screen.queryByText("C")).toBeNull();
   expect(extractNodes(container)).toEqual(["C++", "Rust"]);
 

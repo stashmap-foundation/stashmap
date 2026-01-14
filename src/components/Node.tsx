@@ -38,6 +38,7 @@ import {
   hasImageUrl,
   isReferenceNode,
   getRefTargetStack,
+  itemMatchesType,
 } from "../connections";
 import { REFERENCED_BY, DEFAULT_TYPE_FILTERS } from "../constants";
 import { IS_MOBILE } from "./responsive";
@@ -565,10 +566,11 @@ export function getNodesInTree(
     return ctx.push(addNodePath);
   }
 
-  // Filter out "not_relevant" items from the view
+  // Filter items based on view's typeFilters (default filters out "not_relevant")
+  const activeFilters = parentView.typeFilters || DEFAULT_TYPE_FILTERS;
   const visibleItems = relations.items
     .map((item, i) => ({ item, index: i }))
-    .filter(({ item }) => item.relevance !== "not_relevant");
+    .filter(({ item }) => activeFilters.some((f) => itemMatchesType(item, f)));
 
   const childPaths = visibleItems.map(({ index }) =>
     addNodeToPathWithRelations(parentPath, relations, index)

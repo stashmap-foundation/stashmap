@@ -510,8 +510,8 @@ test("Disconnect button shows when view.relations is not explicitly set", async 
   await screen.findByText("Child1");
   await screen.findByText("Child2");
 
-  // The disconnect buttons should appear for the children
+  // The relevance selectors should appear for the children
   // even though view.relations was not explicitly set on the root
-  const disconnectButtons = screen.getAllByLabelText(/disconnect node/);
-  expect(disconnectButtons.length).toBe(2);
+  const relevanceButtons = screen.getAllByLabelText(/mark .* as not relevant/);
+  expect(relevanceButtons.length).toBe(2);
 });

@@ -23,6 +23,7 @@ import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 import { VersionSelector, ReferencedByToggle } from "./SelectRelations";
 import { TypeFilterButton } from "./TypeFilterButton";
 import { addRelationToRelations, shortID } from "../connections";
+import { RelevanceSelector } from "./RelevanceSelector";
 import { useData } from "../DataContext";
 import { usePlanner, planUpsertRelations } from "../planner";
 import { newDB } from "../knowledge";
@@ -244,10 +245,10 @@ export function ListItem({
       <div className="on-hover-menu right">
         <ToggleEditing />
         <span className="always-visible">
+          <RelevanceSelector />
           <TypeFilterButton />
           <ReferencedByToggle />
           <VersionSelector />
-          <DisconnectNodeBtn />
           <FullscreenButton />
           <OpenInSplitPaneButton />
         </span>

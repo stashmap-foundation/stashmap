@@ -2,25 +2,22 @@ import React, { useState, useRef } from "react";
 import { Overlay, Popover } from "react-bootstrap";
 import { planUpdateViews, usePlanner } from "../planner";
 import { updateView, useNode, useViewPath, useIsInReferencedByView } from "../ViewContext";
-import { DEFAULT_TYPE_FILTERS, REFERENCED_BY } from "../constants";
+import { DEFAULT_TYPE_FILTERS, REFERENCED_BY, TYPE_COLORS } from "../constants";
 
 // Filter type definitions with colors
 // Column 1: Relevance types (blue spectrum)
 const COL_1_FILTERS: { id: Relevance; label: string; color: string }[] = [
-  { id: "", label: "Relevant", color: "#0288d1" },
-  { id: "maybe_relevant", label: "Maybe Relevant", color: "#00acc1" },
-  { id: "little_relevant", label: "Little Relevant", color: "#26c6da" },
-  { id: "not_relevant", label: "Not Relevant", color: "#757575" },
+  { id: "", label: "Relevant", color: TYPE_COLORS.relevant },
+  { id: "maybe_relevant", label: "Maybe Relevant", color: TYPE_COLORS.maybe_relevant },
+  { id: "little_relevant", label: "Little Relevant", color: TYPE_COLORS.little_relevant },
+  { id: "not_relevant", label: "Not Relevant", color: TYPE_COLORS.not_relevant },
 ];
 
 // Column 2: Evidence types (exclude undefined from Argument)
 const COL_2_FILTERS: { id: "confirms" | "contra"; label: string; color: string }[] = [
-  { id: "confirms", label: "Confirms", color: "#2e7d32" },
-  { id: "contra", label: "Contradicts", color: "#c62828" },
+  { id: "confirms", label: "Confirms", color: TYPE_COLORS.confirms },
+  { id: "contra", label: "Contradicts", color: TYPE_COLORS.contra },
 ];
-
-// Gray color for inactive filters
-const INACTIVE_COLOR = "#d0d0d0";
 
 function FilterDot({
   color,
@@ -36,7 +33,7 @@ function FilterDot({
         width: "6px",
         height: "6px",
         borderRadius: "50%",
-        backgroundColor: isActive ? color : INACTIVE_COLOR,
+        backgroundColor: isActive ? color : TYPE_COLORS.inactive,
         margin: "1px",
       }}
     />
@@ -76,7 +73,7 @@ function FilterItem({
           width: "10px",
           height: "10px",
           borderRadius: "50%",
-          backgroundColor: isActive ? color : INACTIVE_COLOR,
+          backgroundColor: isActive ? color : TYPE_COLORS.inactive,
         }}
       />
       <span style={{ color: isActive ? "inherit" : "#999" }}>{label}</span>
@@ -155,8 +152,8 @@ export function TypeFilterButton(): JSX.Element | null {
               />
             ))}
             {/* Padding dots to align columns */}
-            <FilterDot color={INACTIVE_COLOR} isActive={false} />
-            <FilterDot color={INACTIVE_COLOR} isActive={false} />
+            <FilterDot color={TYPE_COLORS.inactive} isActive={false} />
+            <FilterDot color={TYPE_COLORS.inactive} isActive={false} />
           </span>
         </span>
       </button>

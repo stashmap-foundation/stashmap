@@ -277,6 +277,44 @@ export function markItemsAsNotRelevant(
   };
 }
 
+export function updateItemRelevance(
+  relations: Relations,
+  index: number,
+  relevance: Relevance
+): Relations {
+  const item = relations.items.get(index);
+  if (!item) {
+    return relations;
+  }
+  const items = relations.items.set(index, {
+    ...item,
+    relevance,
+  });
+  return {
+    ...relations,
+    items,
+  };
+}
+
+export function updateItemArgument(
+  relations: Relations,
+  index: number,
+  argument: Argument
+): Relations {
+  const item = relations.items.get(index);
+  if (!item) {
+    return relations;
+  }
+  const items = relations.items.set(index, {
+    ...item,
+    argument,
+  });
+  return {
+    ...relations,
+    items,
+  };
+}
+
 export function isRemote(
   remote: PublicKey | undefined,
   myself: PublicKey
@@ -353,7 +391,9 @@ export function itemMatchesType(
   if (filterType === "confirms" || filterType === "contra") {
     return item.argument === filterType;
   }
-  return item.relevance === filterType;
+  // Default relevance to "" (relevant) if undefined
+  const relevance = item.relevance ?? "";
+  return relevance === filterType;
 }
 
 export function aggregateWeightedVotes(

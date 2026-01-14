@@ -69,6 +69,8 @@ function FilterItem({
       }}
       role="button"
       tabIndex={0}
+      aria-label={`toggle ${label} filter`}
+      aria-pressed={isActive}
     >
       <span
         style={{
@@ -131,7 +133,7 @@ export function TypeFilterButton(): JSX.Element | null {
         type="button"
         className="btn btn-borderless p-0"
         onClick={() => setShow(!show)}
-        aria-label="filter suggestions"
+        aria-label={`filter ${node.text}`}
         title="Filter suggestions from other users"
       >
         {/* Two columns of dots representing filter state */}

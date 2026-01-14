@@ -98,9 +98,8 @@ describe("TypeFilterButton", () => {
 
     await screen.findByText("Parent");
 
-    // Filter button should exist - get first one (parent's)
-    const filterButtons = screen.getAllByLabelText("filter suggestions");
-    expect(filterButtons.length).toBeGreaterThanOrEqual(1);
+    // Filter button should exist for the parent node
+    expect(screen.getByLabelText("filter Parent")).toBeDefined();
   });
 
   test("opens filter popover on click", async () => {
@@ -131,9 +130,8 @@ describe("TypeFilterButton", () => {
 
     await screen.findByText("Parent");
 
-    // Click filter button - get first one (parent's)
-    const filterButtons = screen.getAllByLabelText("filter suggestions");
-    fireEvent.click(filterButtons[0]);
+    // Click filter button for Parent
+    fireEvent.click(screen.getByLabelText("filter Parent"));
 
     // Popover should show filter options
     await screen.findByText("Relevant");
@@ -194,9 +192,8 @@ describe("TypeFilterButton", () => {
     await screen.findByText("Relevant Item");
     await screen.findByText("Maybe Relevant Item");
 
-    // Open filter popover - get first filter button (parent's)
-    const filterButtons = screen.getAllByLabelText("filter suggestions");
-    fireEvent.click(filterButtons[0]);
+    // Open filter popover for Parent
+    fireEvent.click(screen.getByLabelText("filter Parent"));
     await screen.findByText("Maybe Relevant");
 
     // Toggle off "Maybe Relevant" filter
@@ -263,9 +260,8 @@ describe("TypeFilterButton", () => {
     // Not Relevant Item should be hidden by default
     expect(screen.queryByText("Not Relevant Item")).toBeNull();
 
-    // Open filter popover - get first filter button (parent's)
-    const filterButtons = screen.getAllByLabelText("filter suggestions");
-    fireEvent.click(filterButtons[0]);
+    // Open filter popover for Parent
+    fireEvent.click(screen.getByLabelText("filter Parent"));
     await screen.findByText("Not Relevant");
 
     // Toggle on "Not Relevant" filter
@@ -310,7 +306,7 @@ describe("TypeFilterButton", () => {
 
     // Filter button should NOT be visible in Referenced By mode
     // The root node's filter button should be hidden
-    expect(screen.queryByLabelText("filter suggestions")).toBeNull();
+    expect(screen.queryByLabelText("filter Bitcoin")).toBeNull();
   });
 
   test("filter state persists across interactions", async () => {
@@ -361,9 +357,7 @@ describe("TypeFilterButton", () => {
     await screen.findByText("Parent");
 
     // Open filter popover and toggle off "Maybe Relevant"
-    // Get first filter button (parent's)
-    let filterButtons = screen.getAllByLabelText("filter suggestions");
-    fireEvent.click(filterButtons[0]);
+    fireEvent.click(screen.getByLabelText("filter Parent"));
     await screen.findByText("Maybe Relevant");
     fireEvent.click(screen.getByText("Maybe Relevant"));
 
@@ -376,8 +370,7 @@ describe("TypeFilterButton", () => {
     });
 
     // Reopen filter popover
-    filterButtons = screen.getAllByLabelText("filter suggestions");
-    fireEvent.click(filterButtons[0]);
+    fireEvent.click(screen.getByLabelText("filter Parent"));
 
     // The "Maybe Relevant" filter should still be toggled off
     // (indicated by the item still being hidden after reopening)
@@ -424,9 +417,8 @@ describe("Suggestions filter", () => {
 
     await screen.findByText("Parent");
 
-    // Open filter popover
-    const filterButtons = screen.getAllByLabelText("filter suggestions");
-    fireEvent.click(filterButtons[0]);
+    // Open filter popover for Parent
+    fireEvent.click(screen.getByLabelText("filter Parent"));
 
     // Suggestions option should be visible
     await screen.findByText("Suggestions");
@@ -490,8 +482,7 @@ describe("Suggestions filter", () => {
     await screen.findByText("Bob Suggestion");
 
     // Open filter popover and toggle off Suggestions
-    const filterButtons = screen.getAllByLabelText("filter suggestions");
-    fireEvent.click(filterButtons[0]);
+    fireEvent.click(screen.getByLabelText("filter Parent"));
     fireEvent.click(await screen.findByText("Suggestions"));
 
     // Bob's suggestion should disappear
@@ -556,8 +547,7 @@ describe("Suggestions filter", () => {
     await screen.findByText("Bob Item");
 
     // Toggle off Suggestions
-    const filterButtons = screen.getAllByLabelText("filter suggestions");
-    fireEvent.click(filterButtons[0]);
+    fireEvent.click(screen.getByLabelText("filter Parent"));
     fireEvent.click(await screen.findByText("Suggestions"));
 
     await waitFor(() => {
@@ -613,9 +603,8 @@ describe("Filter integration with RelevanceSelector", () => {
       expect(screen.queryByText("Child1")).toBeNull();
     });
 
-    // Enable not_relevant filter - get the first filter button (parent's)
-    const filterButtons = screen.getAllByLabelText("filter suggestions");
-    fireEvent.click(filterButtons[0]);
+    // Enable not_relevant filter for Parent
+    fireEvent.click(screen.getByLabelText("filter Parent"));
     await screen.findByText("Not Relevant");
     fireEvent.click(screen.getByText("Not Relevant"));
 
@@ -678,9 +667,7 @@ describe("Filter integration with RelevanceSelector", () => {
     });
 
     // Enable not_relevant filter to see the child again
-    // Get the first filter button (parent's)
-    const filterButtons = screen.getAllByLabelText("filter suggestions");
-    fireEvent.click(filterButtons[0]);
+    fireEvent.click(screen.getByLabelText("filter Parent"));
     fireEvent.click(await screen.findByText("Not Relevant"));
 
     // Child should reappear with Not Relevant title

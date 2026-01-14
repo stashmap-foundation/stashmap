@@ -692,8 +692,7 @@ describe("Remove from list", () => {
     await screen.findByText("Parent");
 
     // Enable not_relevant filter to see the child
-    const filterButtons = screen.getAllByLabelText("filter suggestions");
-    fireEvent.click(filterButtons[0]);
+    fireEvent.click(screen.getByLabelText("filter Parent"));
     fireEvent.click(await screen.findByText("Not Relevant"));
 
     // Child should now be visible
@@ -751,8 +750,7 @@ describe("Remove from list", () => {
     await screen.findByText("Child2");
 
     // Enable not_relevant filter to see Child1
-    const filterButtons = screen.getAllByLabelText("filter suggestions");
-    fireEvent.click(filterButtons[0]);
+    fireEvent.click(screen.getByLabelText("filter Parent"));
     fireEvent.click(await screen.findByText("Not Relevant"));
 
     // Child1 should now be visible
@@ -812,8 +810,7 @@ describe("Remove from list", () => {
     });
 
     // Enable not_relevant filter to see the child again
-    const filterButtons = screen.getAllByLabelText("filter suggestions");
-    fireEvent.click(filterButtons[0]);
+    fireEvent.click(screen.getByLabelText("filter Parent"));
     fireEvent.click(await screen.findByText("Not Relevant"));
 
     // Child should reappear

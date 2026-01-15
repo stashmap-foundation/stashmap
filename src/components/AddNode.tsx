@@ -1,5 +1,4 @@
 import React, { useEffect } from "react";
-import { List } from "immutable";
 import { useMediaQuery } from "react-responsive";
 import ReactQuill from "react-quill";
 import { CloseButton, NodeCard } from "../commons/Ui";

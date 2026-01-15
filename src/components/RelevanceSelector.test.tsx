@@ -10,15 +10,16 @@ import {
   setup,
   setupTestDB,
 } from "../utils.test";
-import { newNode, addRelationToRelations, itemMatchesType } from "../connections";
+import {
+  newNode,
+  addRelationToRelations,
+  itemMatchesType,
+} from "../connections";
 import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
 import { execute } from "../executor";
 import Data from "../Data";
 import { LoadNode } from "../dataQuery";
-import {
-  RootViewContextProvider,
-  newRelations,
-} from "../ViewContext";
+import { RootViewContextProvider, newRelations } from "../ViewContext";
 import { TreeView } from "./TreeView";
 import { DraggableNote } from "./Draggable";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
@@ -98,13 +99,19 @@ describe("itemMatchesType", () => {
   });
 
   test("matches little_relevant items", () => {
-    const item: RelationItem = { nodeID: "test" as ID, relevance: "little_relevant" };
+    const item: RelationItem = {
+      nodeID: "test" as ID,
+      relevance: "little_relevant",
+    };
     expect(itemMatchesType(item, "little_relevant")).toBe(true);
     expect(itemMatchesType(item, "")).toBe(false);
   });
 
   test("matches not_relevant items", () => {
-    const item: RelationItem = { nodeID: "test" as ID, relevance: "not_relevant" };
+    const item: RelationItem = {
+      nodeID: "test" as ID,
+      relevance: "not_relevant",
+    };
     expect(itemMatchesType(item, "not_relevant")).toBe(true);
     expect(itemMatchesType(item, "")).toBe(false);
   });
@@ -117,8 +124,16 @@ describe("itemMatchesType", () => {
   });
 
   test("matches argument types correctly", () => {
-    const confirmItem: RelationItem = { nodeID: "test" as ID, relevance: "", argument: "confirms" };
-    const contraItem: RelationItem = { nodeID: "test" as ID, relevance: "", argument: "contra" };
+    const confirmItem: RelationItem = {
+      nodeID: "test" as ID,
+      relevance: "",
+      argument: "confirms",
+    };
+    const contraItem: RelationItem = {
+      nodeID: "test" as ID,
+      relevance: "",
+      argument: "contra",
+    };
 
     expect(itemMatchesType(confirmItem, "confirms")).toBe(true);
     expect(itemMatchesType(confirmItem, "contra")).toBe(false);
@@ -160,7 +175,9 @@ describe("RelevanceSelector", () => {
     await screen.findByText("Child2");
 
     // Both children should have relevance selectors
-    const relevanceButtons = screen.getAllByLabelText(/mark .* as not relevant/);
+    const relevanceButtons = screen.getAllByLabelText(
+      /mark .* as not relevant/
+    );
     expect(relevanceButtons.length).toBe(2);
   });
 
@@ -195,7 +212,9 @@ describe("RelevanceSelector", () => {
     await screen.findByText(/Money/);
 
     // Referenced By items should NOT have relevance selectors
-    const relevanceButtons = screen.queryAllByLabelText(/mark .* as not relevant/);
+    const relevanceButtons = screen.queryAllByLabelText(
+      /mark .* as not relevant/
+    );
     expect(relevanceButtons.length).toBe(0);
   });
 
@@ -230,7 +249,9 @@ describe("RelevanceSelector", () => {
     await screen.findByText("Child2");
 
     // Click the X button to mark Child1 as not relevant
-    const markNotRelevantBtn = screen.getByLabelText("mark Child1 as not relevant");
+    const markNotRelevantBtn = screen.getByLabelText(
+      "mark Child1 as not relevant"
+    );
     fireEvent.click(markNotRelevantBtn);
 
     // Child1 should be hidden (default filters exclude not_relevant)
@@ -289,12 +310,20 @@ describe("Relevance filtering", () => {
     const notRelevant = newNode("Not Relevant Item", alicePK);
 
     // Create relations with different relevance levels
-    const relations = [relevant, maybeRelevant, littleRelevant, notRelevant].reduce(
-      (rels, node, i) => addRelationToRelations(
-        rels,
-        node.id,
-        (["relevant", "", "little_relevant", "not_relevant"] as Relevance[])[i]
-      ),
+    const relations = [
+      relevant,
+      maybeRelevant,
+      littleRelevant,
+      notRelevant,
+    ].reduce(
+      (rels, node, i) =>
+        addRelationToRelations(
+          rels,
+          node.id,
+          (["relevant", "", "little_relevant", "not_relevant"] as Relevance[])[
+            i
+          ]
+        ),
       newRelations(parent.id, List(), alicePK)
     );
 
@@ -349,7 +378,9 @@ describe("Relevance filtering", () => {
 
   test("changing relevance updates item visibility", async () => {
     const [alice] = setup([ALICE]);
-    const db = await setupTestDB(alice(), [["Parent", ["Child1", "Child2", "Child3"]]]);
+    const db = await setupTestDB(alice(), [
+      ["Parent", ["Child1", "Child2", "Child3"]],
+    ]);
     const parent = findNodeByText(db, "Parent") as KnowNode;
 
     renderWithTestData(
@@ -715,9 +746,15 @@ describe("Remove from list", () => {
     const child2 = newNode("Child2", alicePK);
 
     // Create relations - Child1 is not_relevant, Child2 is relevant
-    let relations = newRelations(parent.id, List(), alicePK);
-    relations = addRelationToRelations(relations, child1.id, "not_relevant");
-    relations = addRelationToRelations(relations, child2.id, "");
+    const relations = addRelationToRelations(
+      addRelationToRelations(
+        newRelations(parent.id, List(), alicePK),
+        child1.id,
+        "not_relevant"
+      ),
+      child2.id,
+      ""
+    );
 
     const plan = planUpsertRelations(
       planUpsertNode(
@@ -898,9 +935,15 @@ describe("Relation lookup consistency (regression)", () => {
     const child = newNode("Child", alicePK);
 
     // Add the same child twice to create duplicate nodeIDs with different indices
-    let relations = newRelations(parent.id, List(), alicePK);
-    relations = addRelationToRelations(relations, child.id, "");
-    relations = addRelationToRelations(relations, child.id, "");
+    const relations = addRelationToRelations(
+      addRelationToRelations(
+        newRelations(parent.id, List(), alicePK),
+        child.id,
+        ""
+      ),
+      child.id,
+      ""
+    );
 
     const plan = planUpsertRelations(
       planUpsertNode(planUpsertNode(createPlan(alice()), parent), child),
@@ -936,7 +979,9 @@ describe("Relation lookup consistency (regression)", () => {
     expect(childElements.length).toBe(2);
 
     // Mark the first Child as not relevant
-    const markNotRelevantBtns = screen.getAllByLabelText(/mark Child as not relevant/);
+    const markNotRelevantBtns = screen.getAllByLabelText(
+      /mark Child as not relevant/
+    );
     fireEvent.click(markNotRelevantBtns[0]);
 
     // Only ONE Child should disappear (the one we clicked), not both

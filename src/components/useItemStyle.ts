@@ -87,13 +87,18 @@ export function useItemStyle(): ItemStyle {
   }
 
   // Get current item's relevance and argument
-  const relations = parentView ? getRelationForView(data, parentView, stack) : undefined;
+  const relations = parentView
+    ? getRelationForView(data, parentView, stack)
+    : undefined;
   const currentItem = relations?.items.get(relationIndex ?? -1);
   const relevance = currentItem?.relevance || "";
   const argument = currentItem?.argument;
 
   return {
     cardStyle: {},
-    textStyle: { ...getRelevanceTextStyle(relevance), ...getArgumentTextStyle(argument) },
+    textStyle: {
+      ...getRelevanceTextStyle(relevance),
+      ...getArgumentTextStyle(argument),
+    },
   };
 }

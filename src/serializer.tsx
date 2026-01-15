@@ -69,7 +69,12 @@ function asArray(obj: Serializable | undefined): Array<Serializable> {
 }
 
 // Valid values for Relevance and Argument types
-const VALID_RELEVANCE: Relevance[] = ["relevant", "", "little_relevant", "not_relevant"];
+const VALID_RELEVANCE: Relevance[] = [
+  "relevant",
+  "",
+  "little_relevant",
+  "not_relevant",
+];
 const VALID_ARGUMENT: Argument[] = ["confirms", "contra", undefined];
 
 function parseRelevance(value: string | undefined): Relevance {
@@ -107,14 +112,12 @@ function parseTypeFilter(
 function parseTypeFilters(
   arr: Array<Serializable>
 ): Array<Relevance | Argument | "suggestions"> {
-  const result: Array<Relevance | Argument | "suggestions"> = [];
-  for (const item of arr) {
-    const parsed = parseTypeFilter(asString(item));
-    if (parsed !== null) {
-      result.push(parsed);
-    }
-  }
-  return result;
+  return arr
+    .map((item) => parseTypeFilter(asString(item)))
+    .filter(
+      (parsed): parsed is Relevance | Argument | "suggestions" =>
+        parsed !== null
+    );
 }
 
 function viewToJSON(attributes: View): Serializable {
@@ -140,8 +143,7 @@ function jsonToView(view: Serializable): View | undefined {
     relations: a.o !== undefined ? (asString(a.o) as LongID) : undefined,
     width: a.w !== undefined ? asNumber(a.w) : 1,
     expanded: a.e !== undefined ? asBoolean(a.e) : undefined,
-    typeFilters:
-      a.f !== undefined ? parseTypeFilters(asArray(a.f)) : undefined,
+    typeFilters: a.f !== undefined ? parseTypeFilters(asArray(a.f)) : undefined,
   };
 }
 

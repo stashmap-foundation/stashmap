@@ -15,10 +15,7 @@ import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
 import { execute } from "../executor";
 import Data from "../Data";
 import { LoadNode } from "../dataQuery";
-import {
-  RootViewContextProvider,
-  newRelations,
-} from "../ViewContext";
+import { RootViewContextProvider, newRelations } from "../ViewContext";
 import { TreeView } from "./TreeView";
 import { DraggableNote } from "./Draggable";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
@@ -151,16 +148,19 @@ describe("TypeFilterButton", () => {
     const maybeRelevant = newNode("Maybe Relevant Item", alicePK);
 
     // Create relations with different relevance levels
-    let relations = newRelations(parent.id, List(), alicePK);
-    relations = addRelationToRelations(relations, relevant.id, "relevant");
-    relations = addRelationToRelations(relations, maybeRelevant.id, "");
+    const relations = addRelationToRelations(
+      addRelationToRelations(
+        newRelations(parent.id, List(), alicePK),
+        relevant.id,
+        "relevant"
+      ),
+      maybeRelevant.id,
+      ""
+    );
 
     const plan = planUpsertRelations(
       planUpsertNode(
-        planUpsertNode(
-          planUpsertNode(createPlan(alice()), parent),
-          relevant
-        ),
+        planUpsertNode(planUpsertNode(createPlan(alice()), parent), relevant),
         maybeRelevant
       ),
       relations
@@ -217,16 +217,19 @@ describe("TypeFilterButton", () => {
     const notRelevant = newNode("Not Relevant Item", alicePK);
 
     // Create relations with different relevance levels
-    let relations = newRelations(parent.id, List(), alicePK);
-    relations = addRelationToRelations(relations, relevant.id, "");
-    relations = addRelationToRelations(relations, notRelevant.id, "not_relevant");
+    const relations = addRelationToRelations(
+      addRelationToRelations(
+        newRelations(parent.id, List(), alicePK),
+        relevant.id,
+        ""
+      ),
+      notRelevant.id,
+      "not_relevant"
+    );
 
     const plan = planUpsertRelations(
       planUpsertNode(
-        planUpsertNode(
-          planUpsertNode(createPlan(alice()), parent),
-          relevant
-        ),
+        planUpsertNode(planUpsertNode(createPlan(alice()), parent), relevant),
         notRelevant
       ),
       relations
@@ -317,16 +320,19 @@ describe("TypeFilterButton", () => {
     const relevant = newNode("Relevant Item", alicePK);
     const maybeRelevant = newNode("Maybe Relevant Item", alicePK);
 
-    let relations = newRelations(parent.id, List(), alicePK);
-    relations = addRelationToRelations(relations, relevant.id, "relevant");
-    relations = addRelationToRelations(relations, maybeRelevant.id, "");
+    const relations = addRelationToRelations(
+      addRelationToRelations(
+        newRelations(parent.id, List(), alicePK),
+        relevant.id,
+        "relevant"
+      ),
+      maybeRelevant.id,
+      ""
+    );
 
     const plan = planUpsertRelations(
       planUpsertNode(
-        planUpsertNode(
-          planUpsertNode(createPlan(alice()), parent),
-          relevant
-        ),
+        planUpsertNode(planUpsertNode(createPlan(alice()), parent), relevant),
         maybeRelevant
       ),
       relations

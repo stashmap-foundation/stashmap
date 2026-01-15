@@ -55,7 +55,6 @@ export function DraggableNote(): JSX.Element {
   );
 }
 
-
 function DraggableDiffItem({ className }: { className?: string }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const path = useViewPath();

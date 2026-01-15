@@ -673,7 +673,9 @@ test("Multiple connections to same node", async () => {
   await typeNewNode(view, "Programming Languages");
 
   // Expand the node to show children area
-  const expandButton = await screen.findByLabelText("expand");
+  const expandButton = await screen.findByLabelText(
+    "expand Programming Languages"
+  );
   fireEvent.click(expandButton);
 
   const searchButton = await screen.findByLabelText(

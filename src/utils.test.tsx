@@ -42,13 +42,16 @@ import {
   planUpsertNode,
   planUpsertRelations,
   relayTags,
+  PlanningContextProvider,
 } from "./planner";
 import { execute } from "./executor";
 import { ApiProvider, Apis, FinalizeEvent } from "./Apis";
 import { App } from "./App";
 import { DataContextProps, DataContextProvider } from "./DataContext";
-import { WorkspaceContextProvider } from "./WorkspaceContext";
-import { PlanningContextProvider } from "./planner";
+import {
+  WorkspaceContextProvider,
+  useWorkspaceContext,
+} from "./WorkspaceContext";
 import { MockRelayPool, mockRelayPool } from "./nostrMock.test";
 import { DEFAULT_SETTINGS } from "./settings";
 import {
@@ -65,7 +68,6 @@ import {
 import { newRelations, RootViewContextProvider } from "./ViewContext";
 import { LoadNode } from "./dataQuery";
 import { StorePreLoginContext } from "./StorePreLoginContext";
-import { useWorkspaceContext } from "./WorkspaceContext";
 import { newDB } from "./knowledge";
 import { TemporaryViewProvider } from "./components/TemporaryViewContext";
 import { DND } from "./dnd";
@@ -370,6 +372,7 @@ export function renderApis(
                 timeToStorePreLoginEvents: 0,
               }}
             >
+              {/* eslint-disable-next-line react/jsx-props-no-spreading */}
               <DataContextProvider {...DEFAULT_DATA_CONTEXT_PROPS}>
                 <WorkspaceContextProvider>
                   <PlanningContextProvider setPublishEvents={() => {}}>
@@ -778,4 +781,10 @@ export function RootViewOrWorkspaceIsLoading({
   );
 }
 
-export { ALICE, UNAUTHENTICATED_BOB, UNAUTHENTICATED_CAROL, renderApp, mockRelayPool };
+export {
+  ALICE,
+  UNAUTHENTICATED_BOB,
+  UNAUTHENTICATED_CAROL,
+  renderApp,
+  mockRelayPool,
+};

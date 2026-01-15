@@ -1,7 +1,12 @@
 import React, { useState, useRef } from "react";
 import { Overlay, Popover } from "react-bootstrap";
 import { planUpdateViews, usePlanner } from "../planner";
-import { updateView, useNode, useViewPath, useIsInReferencedByView } from "../ViewContext";
+import {
+  updateView,
+  useNode,
+  useViewPath,
+  useIsInReferencedByView,
+} from "../ViewContext";
 import { DEFAULT_TYPE_FILTERS, REFERENCED_BY, TYPE_COLORS } from "../constants";
 
 // Filter type definitions with colors
@@ -9,12 +14,24 @@ import { DEFAULT_TYPE_FILTERS, REFERENCED_BY, TYPE_COLORS } from "../constants";
 const COL_1_FILTERS: { id: Relevance; label: string; color: string }[] = [
   { id: "relevant", label: "Relevant", color: TYPE_COLORS.relevant },
   { id: "", label: "Maybe Relevant", color: TYPE_COLORS.maybe_relevant },
-  { id: "little_relevant", label: "Little Relevant", color: TYPE_COLORS.little_relevant },
-  { id: "not_relevant", label: "Not Relevant", color: TYPE_COLORS.not_relevant },
+  {
+    id: "little_relevant",
+    label: "Little Relevant",
+    color: TYPE_COLORS.little_relevant,
+  },
+  {
+    id: "not_relevant",
+    label: "Not Relevant",
+    color: TYPE_COLORS.not_relevant,
+  },
 ];
 
 // Column 2: Evidence types + Suggestions
-const COL_2_FILTERS: { id: "confirms" | "contra" | "suggestions"; label: string; color: string }[] = [
+const COL_2_FILTERS: {
+  id: "confirms" | "contra" | "suggestions";
+  label: string;
+  color: string;
+}[] = [
   { id: "confirms", label: "Confirms", color: TYPE_COLORS.confirms },
   { id: "contra", label: "Contradicts", color: TYPE_COLORS.contra },
   { id: "suggestions", label: "Suggestions", color: TYPE_COLORS.suggestions },

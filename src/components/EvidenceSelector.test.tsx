@@ -8,7 +8,11 @@ import {
   setup,
   setupTestDB,
 } from "../utils.test";
-import { newNode, addRelationToRelations, updateItemArgument } from "../connections";
+import {
+  newNode,
+  addRelationToRelations,
+  updateItemArgument,
+} from "../connections";
 import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
 import { execute } from "../executor";
 import Data from "../Data";
@@ -85,25 +89,22 @@ describe("EvidenceSelector", () => {
     await screen.findByText("Child");
 
     // Initial state: no evidence type
-    let evidenceBtn = screen.getByLabelText(/Evidence: No evidence type/);
-    expect(evidenceBtn).toBeDefined();
+    expect(screen.getByLabelText(/Evidence: No evidence type/)).toBeDefined();
 
     // Click 1: undefined -> confirms
-    fireEvent.click(evidenceBtn);
+    fireEvent.click(screen.getByLabelText(/Evidence: No evidence type/));
     await waitFor(() => {
       expect(screen.getByLabelText(/Evidence: Confirms/)).toBeDefined();
     });
 
     // Click 2: confirms -> contra
-    evidenceBtn = screen.getByLabelText(/Evidence: Confirms/);
-    fireEvent.click(evidenceBtn);
+    fireEvent.click(screen.getByLabelText(/Evidence: Confirms/));
     await waitFor(() => {
       expect(screen.getByLabelText(/Evidence: Contradicts/)).toBeDefined();
     });
 
     // Click 3: contra -> undefined
-    evidenceBtn = screen.getByLabelText(/Evidence: Contradicts/);
-    fireEvent.click(evidenceBtn);
+    fireEvent.click(screen.getByLabelText(/Evidence: Contradicts/));
     await waitFor(() => {
       expect(screen.getByLabelText(/Evidence: No evidence type/)).toBeDefined();
     });
@@ -272,7 +273,9 @@ describe("EvidenceSelector", () => {
     await screen.findByText("Child2");
 
     // Set Child1 to confirms
-    const evidenceButtons = screen.getAllByLabelText(/Evidence: No evidence type/);
+    const evidenceButtons = screen.getAllByLabelText(
+      /Evidence: No evidence type/
+    );
     fireEvent.click(evidenceButtons[0]);
 
     await waitFor(() => {
@@ -308,7 +311,11 @@ describe("updateItemArgument", () => {
   test("can set argument to undefined", () => {
     const relations: Relations = {
       items: List([
-        { nodeID: "node1" as ID, relevance: "" as Relevance, argument: "confirms" as Argument },
+        {
+          nodeID: "node1" as ID,
+          relevance: "" as Relevance,
+          argument: "confirms" as Argument,
+        },
       ]),
       head: "head" as ID,
       context: List(),
@@ -323,9 +330,7 @@ describe("updateItemArgument", () => {
 
   test("returns unchanged relations for invalid index", () => {
     const relations: Relations = {
-      items: List([
-        { nodeID: "node1" as ID, relevance: "" as Relevance },
-      ]),
+      items: List([{ nodeID: "node1" as ID, relevance: "" as Relevance }]),
       head: "head" as ID,
       context: List(),
       id: "rel1" as LongID,

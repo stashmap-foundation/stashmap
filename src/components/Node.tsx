@@ -18,8 +18,6 @@ import {
   getDiffItemsForNode,
   getNodeIDFromView,
   useNodeID,
-  getViewFromPath,
-  popViewPath,
   getContextFromStackAndViewPath,
   getAvailableRelationsForNode,
   findOrCreateRelationsForContext,
@@ -151,9 +149,16 @@ function ExpandCollapseToggle(): JSX.Element | null {
       type="button"
       onClick={onToggle}
       className="expand-collapse-toggle"
-      aria-label={isExpanded ? "collapse" : "expand"}
+      aria-label={
+        isExpanded ? `collapse ${node?.text}` : `expand ${node?.text}`
+      }
       aria-expanded={isExpanded}
-      style={{ color, backgroundColor: isReferencedBy ? "rgba(100, 140, 180, 0.1)" : undefined }}
+      style={{
+        color,
+        backgroundColor: isReferencedBy
+          ? "rgba(100, 140, 180, 0.1)"
+          : undefined,
+      }}
     >
       <span className={`triangle ${isExpanded ? "expanded" : "collapsed"}`}>
         {isExpanded ? "▼" : "▶"}
@@ -331,11 +336,11 @@ function NodeContent({ node }: { node: KnowNode }): JSX.Element {
   // Reference nodes get special link-like styling
   const referenceStyle: React.CSSProperties = isReference
     ? {
-      fontStyle: "italic",
-      color: "#5a7bad",
-      textDecoration: "none",
-      borderBottom: "1px dotted #8fadd4",
-    }
+        fontStyle: "italic",
+        color: "#5a7bad",
+        textDecoration: "none",
+        borderBottom: "1px dotted #8fadd4",
+      }
     : {};
 
   return (
@@ -484,7 +489,10 @@ export function Indent({
         const backgroundColor = isLast ? backgroundColorForLast : undefined;
 
         return (
-          <div key={k} style={{ marginLeft, backgroundColor, alignSelf: "stretch" }}>
+          <div
+            key={k}
+            style={{ marginLeft, backgroundColor, alignSelf: "stretch" }}
+          >
             <div style={{ width }} />
           </div>
         );
@@ -501,7 +509,6 @@ export function getNodesInTree(
   noExpansion?: boolean
 ): List<ViewPath> {
   const [parentNodeID, parentView] = getNodeIDFromView(data, parentPath);
-
 
   // Handle REFERENCED_BY specially - it's not context-based
   if (parentView.relations === REFERENCED_BY) {
@@ -581,12 +588,12 @@ export function getNodesInTree(
   const withDiffItems =
     diffItems.size > 0
       ? diffItems.reduce(
-        (list, diffItem, idx) =>
-          list.push(
-            addDiffItemToPath(data, parentPath, diffItem.nodeID, idx, stack)
-          ),
-        nodesInTree
-      )
+          (list, diffItem, idx) =>
+            list.push(
+              addDiffItemToPath(data, parentPath, diffItem.nodeID, idx, stack)
+            ),
+          nodesInTree
+        )
       : nodesInTree;
 
   const addNodePath = addAddToNodeToPath(data, parentPath, stack);
@@ -611,7 +618,10 @@ function DiffItemIndicator(): JSX.Element {
         fontWeight: 500,
       }}
     >
-      <span className="iconsminds-business-man" style={{ fontSize: "0.8rem" }} />
+      <span
+        className="iconsminds-business-man"
+        style={{ fontSize: "0.8rem" }}
+      />
       Suggestion
     </span>
   );
@@ -652,16 +662,19 @@ export function Node({
   // Background color for Referenced By view
   const referencedByBgColor = "rgba(100, 140, 180, 0.1)";
   // Background style for Referenced By content (root and children)
-  const referencedByContentStyle: React.CSSProperties | undefined = showReferencedByBackground
-    ? { backgroundColor: referencedByBgColor }
-    : undefined;
+  const referencedByContentStyle: React.CSSProperties | undefined =
+    showReferencedByBackground
+      ? { backgroundColor: referencedByBgColor }
+      : undefined;
   // For children in Referenced By, color the last indent level to align with content
   const indentBgColor = isInReferencedByView ? referencedByBgColor : undefined;
 
   return (
     <NodeCard className={cls} cardBodyClassName={clsBody} style={cardStyle}>
       <LeftMenu />
-      {levels > 0 && <Indent levels={levels} backgroundColorForLast={indentBgColor} />}
+      {levels > 0 && (
+        <Indent levels={levels} backgroundColorForLast={indentBgColor} />
+      )}
       {showExpandCollapse && <ExpandCollapseToggle />}
       {isAddToNode && levels !== 1 && <AddNodeToNode />}
       {!isAddToNode && (

@@ -40,12 +40,11 @@ export function useUpdateArgument(): UseUpdateArgumentResult {
     parentView !== undefined;
 
   // Get current argument using same context-aware lookup as relationIndex
-  let currentArgument: Argument = undefined;
-  if (isVisible && parentView) {
-    const relations = getRelationForView(data, parentView, stack);
-    const currentItem = relations?.items.get(relationIndex!);
-    currentArgument = currentItem?.argument;
-  }
+  const currentArgument: Argument =
+    isVisible && parentView
+      ? getRelationForView(data, parentView, stack)?.items.get(relationIndex!)
+          ?.argument
+      : undefined;
 
   const setArgument = (argument: Argument): void => {
     if (!isVisible || !parentView || relationIndex === undefined) return;

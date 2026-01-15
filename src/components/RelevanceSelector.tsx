@@ -42,6 +42,33 @@ function getLevelColor(
   }
 }
 
+function getXButtonAriaLabel(
+  isDiffItem: boolean,
+  isCurrentlyNotRelevant: boolean,
+  displayText: string
+): string {
+  if (isDiffItem) {
+    return `decline ${displayText}`;
+  }
+  if (isCurrentlyNotRelevant) {
+    return `remove ${displayText} from list`;
+  }
+  return `mark ${displayText} as not relevant`;
+}
+
+function getXButtonBackgroundColor(
+  isNotRelevant: boolean,
+  isCurrentlyNotRelevant: boolean
+): string {
+  if (!isNotRelevant) {
+    return "transparent";
+  }
+  if (isCurrentlyNotRelevant) {
+    return "#c62828"; // Red for permanent removal from list
+  }
+  return TYPE_COLORS.not_relevant;
+}
+
 export function RelevanceSelector({
   isDiffItem = false,
 }: RelevanceSelectorProps): JSX.Element | null {
@@ -74,9 +101,7 @@ export function RelevanceSelector({
   // Determine visibility
   if (isDiffItem) {
     if (!parentPath) return null;
-  } else {
-    if (!isVisible) return null;
-  }
+  } else if (!isVisible) return null;
 
   // For diff items: no selection initially (-1 means nothing selected)
   // For normal items: use current relevance
@@ -124,7 +149,11 @@ export function RelevanceSelector({
         backgroundColor: "rgba(0,0,0,0.04)",
         cursor: "pointer",
       }}
-      title={effectiveDisplayLevel >= 0 ? RELEVANCE_LABELS[effectiveDisplayLevel] : "Set relevance"}
+      title={
+        effectiveDisplayLevel >= 0
+          ? RELEVANCE_LABELS[effectiveDisplayLevel]
+          : "Set relevance"
+      }
     >
       {/* X for not relevant (or trash for remove) - on left */}
       <span
@@ -132,13 +161,11 @@ export function RelevanceSelector({
         onMouseEnter={() => setHoverLevel(0)}
         role="button"
         tabIndex={0}
-        aria-label={
-          isDiffItem
-            ? `decline ${displayText}`
-            : isCurrentlyNotRelevant
-            ? `remove ${displayText} from list`
-            : `mark ${displayText} as not relevant`
-        }
+        aria-label={getXButtonAriaLabel(
+          isDiffItem,
+          isCurrentlyNotRelevant,
+          displayText
+        )}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
@@ -156,11 +183,10 @@ export function RelevanceSelector({
           lineHeight: 1,
           borderRadius: "50%",
           color: isNotRelevant ? "#fff" : "#888",
-          backgroundColor: isNotRelevant
-            ? isCurrentlyNotRelevant
-              ? "#c62828" // Red for permanent removal from list
-              : TYPE_COLORS.not_relevant
-            : "transparent",
+          backgroundColor: getXButtonBackgroundColor(
+            isNotRelevant,
+            isCurrentlyNotRelevant
+          ),
           transition: "all 0.15s ease",
         }}
         title={isCurrentlyNotRelevant ? "Remove from list" : undefined}
@@ -176,7 +202,13 @@ export function RelevanceSelector({
           onMouseEnter={() => setHoverLevel(level)}
           role="button"
           tabIndex={0}
-          aria-label={isDiffItem ? `accept ${displayText} as ${RELEVANCE_LABELS[level].toLowerCase()}` : `set ${displayText} to ${RELEVANCE_LABELS[level].toLowerCase()}`}
+          aria-label={
+            isDiffItem
+              ? `accept ${displayText} as ${RELEVANCE_LABELS[
+                  level
+                ].toLowerCase()}`
+              : `set ${displayText} to ${RELEVANCE_LABELS[level].toLowerCase()}`
+          }
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
@@ -187,7 +219,11 @@ export function RelevanceSelector({
             width: "18px",
             height: "18px",
             borderRadius: "50%",
-            backgroundColor: getLevelColor(level, effectiveDisplayLevel, isNotRelevant),
+            backgroundColor: getLevelColor(
+              level,
+              effectiveDisplayLevel,
+              isNotRelevant
+            ),
             transition: "all 0.15s ease",
           }}
         />

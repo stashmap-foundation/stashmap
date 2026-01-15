@@ -33,7 +33,10 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
     // Shift view paths for panes at and after the insertion point
     const insertIndex = paneIndex + 1;
     const plan = createPlan();
-    const shiftedViews = updateViewPathsAfterPaneInsert(plan.views, insertIndex);
+    const shiftedViews = updateViewPathsAfterPaneInsert(
+      plan.views,
+      insertIndex
+    );
     executePlan(planUpdateViews(plan, shiftedViews));
 
     // Build the full path: pane navigation stack (without last element, which is the workspace root)
@@ -86,7 +89,10 @@ export function OpenInSplitPaneButtonWithStack({
     // Shift view paths for panes at and after the insertion point
     const insertIndex = paneIndex + 1;
     const plan = createPlan();
-    const shiftedViews = updateViewPathsAfterPaneInsert(plan.views, insertIndex);
+    const shiftedViews = updateViewPathsAfterPaneInsert(
+      plan.views,
+      insertIndex
+    );
     executePlan(planUpdateViews(plan, shiftedViews));
 
     addPaneAt(insertIndex, stack);

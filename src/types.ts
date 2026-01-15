@@ -183,7 +183,7 @@ declare global {
   type RelationItem = {
     nodeID: LongID | ID;
     relevance: Relevance; // "" = maybe relevant (default), "relevant", "little_relevant", "not_relevant"
-    argument?: Argument;  // "confirms", "contra", or undefined (neutral)
+    argument?: Argument; // "confirms", "contra", or undefined (neutral)
   };
 
   type Relations = {

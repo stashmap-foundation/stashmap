@@ -1,3 +1,4 @@
+import { Set } from "immutable";
 import {
   useRelationIndex,
   useViewPath,
@@ -9,7 +10,6 @@ import {
   getRelationForView,
 } from "../ViewContext";
 import { updateItemRelevance, deleteRelations } from "../connections";
-import { Set } from "immutable";
 import { usePlanner } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { useData } from "../DataContext";
@@ -93,12 +93,11 @@ export function useUpdateRelevance(): UseUpdateRelevanceResult {
     parentView !== undefined;
 
   // Get current relevance using same context-aware lookup as relationIndex
-  let currentRelevance: Relevance = "";
-  if (isVisible && parentView) {
-    const relations = getRelationForView(data, parentView, stack);
-    const currentItem = relations?.items.get(relationIndex!);
-    currentRelevance = currentItem?.relevance || "";
-  }
+  const currentRelevance: Relevance =
+    isVisible && parentView
+      ? getRelationForView(data, parentView, stack)?.items.get(relationIndex!)
+          ?.relevance || ""
+      : "";
 
   const currentLevel = relevanceToLevel(currentRelevance);
   const nodeText = node?.text || "";

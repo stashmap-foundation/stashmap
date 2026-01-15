@@ -219,9 +219,10 @@ export function ReferencedByToggle(): JSX.Element | null {
   };
 
   // Match old behavior: show "hide" only when both selected AND expanded
-  const ariaLabel = isInReferencedBy && isExpanded
-    ? `hide references to ${node.text}`
-    : `show references to ${node.text}`;
+  const ariaLabel =
+    isInReferencedBy && isExpanded
+      ? `hide references to ${node.text}`
+      : `show references to ${node.text}`;
 
   return (
     <button

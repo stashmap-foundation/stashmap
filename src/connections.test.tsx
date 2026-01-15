@@ -149,7 +149,11 @@ test("count relation votes", () => {
   );
 
   expect(
-    countRelationVotes(List([aliceVotes, bobVotes, carolVotes]), vote.id, "confirms")
+    countRelationVotes(
+      List([aliceVotes, bobVotes, carolVotes]),
+      vote.id,
+      "confirms"
+    )
   ).toEqual(
     Map({
       [optionA.id]: 10454.545454545454, // 5/11+1/11+3/6 *10000
@@ -163,10 +167,10 @@ test("count relation votes", () => {
 // Helper to create RelationItem from nodeID with relevance and optional argument
 function makeItem(
   nodeID: string,
-  relevance: Relevance = "",
+  relevance?: Relevance,
   argument?: Argument
 ): RelationItem {
-  return { nodeID: nodeID as LongID, relevance, argument };
+  return { nodeID: nodeID as LongID, relevance: relevance ?? "", argument };
 }
 
 test("aggregate weighted votes", () => {

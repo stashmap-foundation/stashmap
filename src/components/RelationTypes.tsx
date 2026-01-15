@@ -1,6 +1,6 @@
 import React from "react";
 import { Dropdown } from "react-bootstrap";
-import { List, OrderedMap, Set } from "immutable";
+import { OrderedMap, Set } from "immutable";
 import {
   Plan,
   planUpdateViews,
@@ -123,12 +123,15 @@ export function planExpandNode(
 ): Plan {
   // 1. Check if view.relations is valid (exists in DB) AND context matches
   const currentRelations = view.relations
-    ? getRelationsNoReferencedBy(plan.knowledgeDBs, view.relations, plan.user.publicKey)
+    ? getRelationsNoReferencedBy(
+        plan.knowledgeDBs,
+        view.relations,
+        plan.user.publicKey
+      )
     : undefined;
 
   if (currentRelations && contextsMatch(currentRelations.context, context)) {
     // Valid relations with matching context - just expand
-    console.log(">>> USING EXISTING RELATIONS");
     return planUpdateViews(
       plan,
       updateView(plan.views, viewPath, {

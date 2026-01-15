@@ -1,6 +1,10 @@
 import { joinID } from "./connections";
 import { KIND_KNOWLEDGE_LIST, KIND_PROJECT } from "./nostr";
-import { eventToTextOrProjectNode, eventToRelations, jsonToViews } from "./serializer";
+import {
+  eventToTextOrProjectNode,
+  eventToRelations,
+  jsonToViews,
+} from "./serializer";
 import { ALICE } from "./utils.test";
 
 test("parse project", () => {

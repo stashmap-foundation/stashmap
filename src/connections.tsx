@@ -488,13 +488,13 @@ export function countRelevanceVoting(
 export function addRelationToRelations(
   relations: Relations,
   objectID: LongID | ID,
-  relevance: Relevance = "",
+  relevance?: Relevance,
   argument?: Argument,
   ord?: number
 ): Relations {
   const newItem: RelationItem = {
     nodeID: objectID,
-    relevance,
+    relevance: relevance ?? "",
     argument,
   };
   const defaultOrder = relations.items.size;
@@ -511,7 +511,7 @@ export function addRelationToRelations(
 export function bulkAddRelations(
   relations: Relations,
   objectIDs: Array<LongID | ID>,
-  relevance: Relevance = "",
+  relevance?: Relevance,
   argument?: Argument,
   startPos?: number
 ): Relations {

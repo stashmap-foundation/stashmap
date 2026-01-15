@@ -55,7 +55,9 @@ export function EvidenceSelector(): JSX.Element | null {
         onMouseLeave={() => setIsHovered(false)}
         role="button"
         tabIndex={0}
-        aria-label={`Evidence: ${getArgumentLabel(currentArgument)}. Click to change.`}
+        aria-label={`Evidence: ${getArgumentLabel(
+          currentArgument
+        )}. Click to change.`}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();

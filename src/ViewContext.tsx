@@ -16,7 +16,6 @@ import { newDB } from "./knowledge";
 import { useData } from "./DataContext";
 import { Plan, planUpsertRelations, planUpdateViews } from "./planner";
 import { usePaneNavigation } from "./SplitPanesContext";
-import { RELATION_TYPES } from "./components/RelationTypes";
 import { REFERENCED_BY } from "./constants";
 
 // only exported for tests

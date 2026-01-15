@@ -1,16 +1,23 @@
 import React from "react";
-import { VersionSelector, useOnChangeRelations, sortRelations } from "./SelectRelations";
-import { TypeFilterButton, FilterDotsDisplay } from "./TypeFilterButton";
-import { useNode, useNodeID, useIsAddToNode, useIsInReferencedByView } from "../ViewContext";
-import { getRelations, isReferenceNode } from "../connections";
-import { useData } from "../DataContext";
-import { REFERENCED_BY, TYPE_COLORS } from "../constants";
-import { usePaneNavigation } from "../SplitPanesContext";
 import {
+  VersionSelector,
+  useOnChangeRelations,
+  sortRelations,
+} from "./SelectRelations";
+import { TypeFilterButton, FilterDotsDisplay } from "./TypeFilterButton";
+import {
+  useNode,
+  useNodeID,
+  useIsAddToNode,
+  useIsInReferencedByView,
   getAvailableRelationsForNode,
   getContextFromStackAndViewPath,
   useViewPath,
 } from "../ViewContext";
+import { getRelations, isReferenceNode } from "../connections";
+import { useData } from "../DataContext";
+import { REFERENCED_BY, TYPE_COLORS } from "../constants";
+import { usePaneNavigation } from "../SplitPanesContext";
 
 function useSwitchToNormalRelations(): (() => void) | undefined {
   const { knowledgeDBs, user } = useData();
@@ -74,7 +81,9 @@ function ReferenceDot(): JSX.Element | null {
   };
 
   // Purple for references
-  const dotColor = isInReferencedBy ? TYPE_COLORS.suggestions : TYPE_COLORS.inactive;
+  const dotColor = isInReferencedBy
+    ? TYPE_COLORS.suggestions
+    : TYPE_COLORS.inactive;
 
   const ariaLabel = isInReferencedBy
     ? `hide references to ${node.text}`
@@ -86,7 +95,9 @@ function ReferenceDot(): JSX.Element | null {
       className="btn btn-borderless p-0 d-flex align-items-center justify-content-center"
       onClick={handleClick}
       aria-label={ariaLabel}
-      title={isInReferencedBy ? "Show children" : `Show ${referenceCount} references`}
+      title={
+        isInReferencedBy ? "Show children" : `Show ${referenceCount} references`
+      }
       style={{
         width: "18px",
         height: "18px",

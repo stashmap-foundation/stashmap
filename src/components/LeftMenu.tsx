@@ -18,6 +18,7 @@ import { getRelations, isReferenceNode } from "../connections";
 import { useData } from "../DataContext";
 import { REFERENCED_BY, TYPE_COLORS } from "../constants";
 import { usePaneNavigation } from "../SplitPanesContext";
+import { SiblingSearchButton } from "./AddNode";
 
 function useSwitchToNormalRelations(): () => void {
   const { knowledgeDBs, user } = useData();
@@ -166,6 +167,7 @@ export function LeftMenu(): JSX.Element {
   return (
     <div className="left-menu">
       <VersionSelector />
+      <SiblingSearchButton />
       <FilterAndReferencesToggle />
     </div>
   );

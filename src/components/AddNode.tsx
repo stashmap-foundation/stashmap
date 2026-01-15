@@ -11,6 +11,7 @@ import {
   useViewPath,
   getParentView,
   useViewKey,
+  useRelationIndex,
   upsertRelations,
   updateViewPathsAfterAddRelation,
 } from "../ViewContext";
@@ -346,22 +347,28 @@ export function AddColumn(): JSX.Element {
   );
 }
 
-export function AddNodeToNode({
-  insertAtIndex,
-}: {
-  insertAtIndex?: number;
-} = {}): JSX.Element | null {
+// Hook to get the add node handler for sibling insert
+function useAddSiblingNode(insertAtIndex?: number): {
+  onAddNode: (plan: Plan, nodeID: LongID) => void;
+  onAddExistingNode: (nodeID: LongID) => void;
+  onCreateNewNode: (text: string, imageUrl?: string) => void;
+  node: KnowNode;
+} | null {
   const isAddToNode = useIsAddToNode();
   const vContext = useViewPath();
   const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
+
   // When insertAtIndex is provided, we're adding a sibling - use parent's view
   // When isAddToNode is true, the current path is ADD_TO_NODE - use parent's view
   // Otherwise, we're adding children to current node - use current view
   const isSiblingInsert = insertAtIndex !== undefined;
   const viewContext =
     isAddToNode || isSiblingInsert ? getParentView(vContext) : vContext;
-  const [node] = isAddToNode || isSiblingInsert ? useParentNode() : useNode();
+  const [nodeFromCurrent] = useNode();
+  const [nodeFromParent] = useParentNode();
+  const node = isAddToNode || isSiblingInsert ? nodeFromParent : nodeFromCurrent;
+
   if (!node || !viewContext) {
     return null;
   }
@@ -390,17 +397,56 @@ export function AddNodeToNode({
     executePlan(planUpdateViews(updatedRelationsPlan, updatedViews));
   };
 
+  const onAddExistingNode = (nodeID: LongID): void => {
+    onAddNode(createPlan(), nodeID);
+  };
+
   const onCreateNewNode = (text: string, imageUrl?: string): void => {
     const plan = createPlan();
     const n = newNode(text, plan.user.publicKey, imageUrl);
     onAddNode(planUpsertNode(plan, n), n.id);
   };
 
+  // node is guaranteed to be defined here (we return null above if it's undefined)
+  return { onAddNode, onAddExistingNode, onCreateNewNode, node: node as KnowNode };
+}
+
+export function SiblingSearchButton(): JSX.Element | null {
+  const { openModal, closeModal, isOpen } = useModal();
+  const relationIndex = useRelationIndex();
+  const insertAtIndex = relationIndex !== undefined ? relationIndex + 1 : undefined;
+  const handlers = useAddSiblingNode(insertAtIndex);
+
+  if (!handlers) {
+    return null;
+  }
+
+  return (
+    <>
+      {isOpen && (
+        <SearchModal onAddExistingNode={handlers.onAddExistingNode} onHide={closeModal} />
+      )}
+      <SearchButton onClick={openModal} />
+    </>
+  );
+}
+
+export function AddNodeToNode({
+  insertAtIndex,
+}: {
+  insertAtIndex?: number;
+} = {}): JSX.Element | null {
+  const handlers = useAddSiblingNode(insertAtIndex);
+
+  if (!handlers) {
+    return null;
+  }
+
   return (
     <AddNode
-      onCreateNewNode={onCreateNewNode}
-      onAddExistingNode={(id) => onAddNode(createPlan(), id)}
-      ariaLabel={`add to ${shorten(node.text)}`}
+      onCreateNewNode={handlers.onCreateNewNode}
+      onAddExistingNode={handlers.onAddExistingNode}
+      ariaLabel={`add to ${shorten(handlers.node.text)}`}
       isSearchEnabledByShortcut={false}
     />
   );

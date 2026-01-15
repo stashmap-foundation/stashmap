@@ -822,14 +822,14 @@ export function isExpanded(data: Data, viewKey: string): boolean {
   return isRoot || view.expanded === true;
 }
 
+export function useViewKey(): string {
+  return viewPathToString(useViewPath());
+}
+
 export function useIsExpanded(): boolean {
   const data = useData();
   const viewKey = useViewKey();
   return isExpanded(data, viewKey);
-}
-
-export function useViewKey(): string {
-  return viewPathToString(useViewPath());
 }
 
 export function getParentKey(viewKey: string): string {

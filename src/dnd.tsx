@@ -208,7 +208,8 @@ export function planAddToParent(
     plan,
     parentViewPath,
     stack,
-    (relations) => addRelationToRelations(relations, nodeID, "", undefined, insertAtIndex)
+    (relations) =>
+      addRelationToRelations(relations, nodeID, "", undefined, insertAtIndex)
   );
 
   const updatedViews = updateViewPathsAfterAddRelation(

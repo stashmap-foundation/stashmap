@@ -107,12 +107,14 @@ type CreateNodeEditorProps = {
   initialPosition: 'afterSibling' | 'asFirstChild';
   baseInsertAtIndex: number;
   baseLevels: number;
+  initialPortalTarget: string;
 };
 
 function CreateNodeEditor({
   initialPosition,
   baseInsertAtIndex,
   baseLevels,
+  initialPortalTarget,
 }: CreateNodeEditorProps): JSX.Element | null {
   const data = useData();
   const viewPath = useViewPath();
@@ -122,8 +124,10 @@ function CreateNodeEditor({
 
   // Internal state for position - can change when Tab is pressed
   const [position, setPosition] = useState(initialPosition);
-  // Portal target viewKey - when set, render into that node's portal target
-  const [portalTargetKey, setPortalTargetKey] = useState<string | null>(null);
+  // Portal target viewKey - always use portal to preserve state when target changes
+  const [portalTargetKey, setPortalTargetKey] = useState<string>(initialPortalTarget);
+  // Text to preserve across portal changes (which cause remount)
+  const [editorText, setEditorText] = useState("");
 
   // Compute derived values based on current position
   const levels = position === 'asFirstChild' ? baseLevels + 1 : baseLevels;
@@ -199,13 +203,16 @@ function CreateNodeEditor({
     }
   };
 
-  const onTab = (): void => {
+  const onTab = (text: string): void => {
     // Tab indents the editor - changes from sibling to child position
     // Don't create the node yet, just move the editor
     if (position === 'asFirstChild') {
       // Already at max indent level for this context
       return;
     }
+
+    // Preserve text before portal change (portal change causes remount)
+    setEditorText(text);
 
     // Expand the current node (ensure it has relations for children)
     const [nodeID, view] = getNodeIDFromView(data, viewPath);
@@ -232,19 +239,18 @@ function CreateNodeEditor({
         <span className="triangle collapsed">▶</span>
       </div>
       <div className="flex-column w-100" style={{ paddingTop: 10 }}>
-        <MiniEditor onSave={onCreateNode} onClose={closeCreateNodeEditor} onTab={onTab} />
+        <MiniEditor initialText={editorText} onSave={onCreateNode} onClose={closeCreateNodeEditor} onTab={onTab} />
       </div>
     </NodeCard>
   );
 
-  // If we have a portal target, render into that element
-  if (portalTargetKey) {
-    const portalTarget = document.getElementById(`editor-portal-${portalTargetKey}`);
-    if (portalTarget) {
-      return createPortal(editorContent, portalTarget);
-    }
+  // Always render via portal to preserve state when target changes
+  const portalTarget = document.getElementById(`editor-portal-${portalTargetKey}`);
+  if (portalTarget) {
+    return createPortal(editorContent, portalTarget);
   }
 
+  // Fallback if portal target doesn't exist yet
   return editorContent;
 }
 
@@ -306,6 +312,7 @@ export function ListItem({
           initialPosition={editorPosition}
           baseInsertAtIndex={baseInsertAtIndex}
           baseLevels={baseLevels}
+          initialPortalTarget={viewKey}
         />
       )}
     </>

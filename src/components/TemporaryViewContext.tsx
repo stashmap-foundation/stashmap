@@ -41,7 +41,7 @@ type EditorOpen = EditorOpenState & {
   setEditorOpenState: (editorOpenState: EditorOpenState) => void;
 };
 
-type CreateNodeEditorPosition = 'afterSibling' | 'asFirstChild';
+type CreateNodeEditorPosition = "afterSibling" | "asFirstChild";
 
 type CreateNodeEditorState = {
   viewKey: string;
@@ -306,7 +306,9 @@ export function TemporaryViewProvider({
   const data = useData();
 
   const openCreateNodeEditor = (viewKey: string, plan?: Plan): void => {
-    const position = isExpanded(plan || data, viewKey) ? 'asFirstChild' : 'afterSibling';
+    const position = isExpanded(plan || data, viewKey)
+      ? "asFirstChild"
+      : "afterSibling";
     setCreateNodeEditorState({ viewKey, position });
   };
 

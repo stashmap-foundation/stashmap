@@ -155,6 +155,13 @@ export function MiniEditor({
   };
 
   const handleBlur = (): void => {
+    const text = getText().trim();
+    if (!text) {
+      // Empty text on blur - close the editor (for CreateNodeEditor)
+      // For EditableContent (no onClose), this does nothing
+      onClose?.();
+      return;
+    }
     saveIfChanged();
   };
 

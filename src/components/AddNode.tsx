@@ -95,8 +95,9 @@ export async function getImageUrlFromText(
 type MiniEditorProps = {
   initialText?: string;
   onSave: (text: string, imageUrl?: string) => void;
-  onClose: () => void;
+  onClose?: () => void;
   onEnterCreateSibling?: () => void;
+  autoFocus?: boolean;
 };
 
 export function MiniEditor({
@@ -104,25 +105,50 @@ export function MiniEditor({
   onSave,
   onClose,
   onEnterCreateSibling,
+  autoFocus = true,
 }: MiniEditorProps): JSX.Element {
-  const [text, setText] = React.useState(initialText || "");
-  const inputRef = React.useRef<HTMLInputElement>(null);
+  const editorRef = React.useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.focus();
+    if (autoFocus && editorRef.current) {
+      editorRef.current.focus();
+      // Move cursor to end
+      const range = document.createRange();
+      range.selectNodeContents(editorRef.current);
+      range.collapse(false);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
     }
-  }, []);
+  }, [autoFocus]);
+
+  const getText = (): string => {
+    return editorRef.current?.textContent || "";
+  };
+
+  const saveIfChanged = async (): Promise<void> => {
+    const text = getText().trim();
+    if (text && text !== initialText) {
+      const imageUrl = await getImageUrlFromText(text);
+      onSave(text, imageUrl);
+    }
+  };
 
   const handleKeyDown = async (
-    e: React.KeyboardEvent<HTMLInputElement>
+    e: React.KeyboardEvent<HTMLSpanElement>
   ): Promise<void> => {
     if (e.key === "Escape") {
-      onClose();
+      // Reset to initial text and blur
+      if (editorRef.current) {
+        editorRef.current.textContent = initialText || "";
+      }
+      editorRef.current?.blur();
+      onClose?.();
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (!text.trim()) {
-        onClose();
+      const text = getText().trim();
+      if (!text) {
+        onClose?.();
         return;
       }
       const imageUrl = await getImageUrlFromText(text);
@@ -133,25 +159,57 @@ export function MiniEditor({
     }
   };
 
+  const handleBlur = (): void => {
+    saveIfChanged();
+  };
+
+  const handlePaste = (e: React.ClipboardEvent): void => {
+    e.preventDefault();
+    const text = e.clipboardData.getData("text/plain");
+    document.execCommand("insertText", false, text);
+  };
+
+  const moveCursorToEnd = (): void => {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+    const range = document.createRange();
+    range.selectNodeContents(editorRef.current);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  };
+
+  const handleWrapperClick = (e: React.MouseEvent): void => {
+    // Only handle clicks on the wrapper itself, not the contenteditable
+    if (e.target === e.currentTarget) {
+      moveCursorToEnd();
+    }
+  };
+
   return (
-    <input
-      ref={inputRef}
-      type="text"
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      onKeyDown={handleKeyDown}
-      className="mini-editor-input"
+    <span
+      onClick={handleWrapperClick}
       style={{
-        border: "2px solid transparent",
-        outline: "none",
-        width: "100%",
-        fontSize: "inherit",
-        fontFamily: "inherit",
-        backgroundColor: "transparent",
-        padding: 0,
-        margin: 0,
+        paddingRight: "30px",
+        cursor: "text",
       }}
-    />
+    >
+      <span
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        onKeyDown={handleKeyDown}
+        onBlur={handleBlur}
+        onPaste={handlePaste}
+        style={{
+          outline: "none",
+          minWidth: "1px",
+        }}
+      >
+        {initialText}
+      </span>
+    </span>
   );
 }
 

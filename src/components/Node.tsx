@@ -23,9 +23,7 @@ import {
 } from "../ViewContext";
 import {
   NodeSelectbox,
-  toggleEditing,
   useTemporaryView,
-  useIsEditingOn,
   useIsParentMultiselectBtnOn,
   isMutableNode,
 } from "./TemporaryViewContext";
@@ -51,7 +49,6 @@ import { planUpsertNode, usePlanner } from "../planner";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeIcon } from "./NodeIcon";
 import { planAddNewRelationToNode } from "./RelationTypes";
-import { useInputElementFocus } from "../commons/FocusContextProvider";
 import { NodeCard } from "../commons/Ui";
 import { useProjectContext } from "../ProjectContext";
 import { usePaneNavigation } from "../SplitPanesContext";
@@ -191,29 +188,6 @@ function ErrorContent(): JSX.Element {
   );
 }
 
-type InlineEditorProps = {
-  initialText: string;
-  onSave: (text: string, imageUrl?: string) => void;
-  onClose: () => void;
-  onEnterCreateSibling?: () => void;
-};
-
-function InlineEditor({
-  initialText,
-  onSave,
-  onClose,
-  onEnterCreateSibling,
-}: InlineEditorProps): JSX.Element {
-  return (
-    <MiniEditor
-      initialText={initialText}
-      onSave={onSave}
-      onClose={onClose}
-      onEnterCreateSibling={onEnterCreateSibling}
-    />
-  );
-}
-
 function BionicText({ nodeText }: { nodeText: string }): JSX.Element {
   // need sanitizing, i.e. removing <script>-tags or onClick handles
   // otherwise dangerouslySetInnerHTML allows Cross-Site Scripting (XSS) attacks
@@ -224,38 +198,6 @@ function BionicText({ nodeText }: { nodeText: string }): JSX.Element {
   });
   // eslint-disable-next-line react/no-danger
   return <div dangerouslySetInnerHTML={{ __html: bionicNodeText }} />;
-}
-
-function EditableNodeContent({
-  children,
-}: {
-  children: React.ReactNode;
-}): JSX.Element {
-  const { editingViews, setEditingState } = useTemporaryView();
-  const viewKey = useViewKey();
-  const handleInteraction = (
-    event:
-      | React.KeyboardEvent<HTMLButtonElement>
-      | React.MouseEvent<HTMLButtonElement>
-  ): void => {
-    if (
-      (event instanceof KeyboardEvent && event.key === "Enter") ||
-      event.type === "click"
-    ) {
-      setEditingState(toggleEditing(editingViews, viewKey));
-    }
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={handleInteraction}
-      onKeyDown={handleInteraction}
-      className="node-content-button cursor-on-hover w-100"
-    >
-      {children}
-    </button>
-  );
 }
 
 function NodeContent({ node }: { node: KnowNode }): JSX.Element {
@@ -292,11 +234,11 @@ function NodeContent({ node }: { node: KnowNode }): JSX.Element {
   // Reference nodes get special link-like styling
   const referenceStyle: React.CSSProperties = isReference
     ? {
-        fontStyle: "italic",
-        color: "#5a7bad",
-        textDecoration: "none",
-        borderBottom: "1px dotted #8fadd4",
-      }
+      fontStyle: "italic",
+      color: "#5a7bad",
+      textDecoration: "none",
+      borderBottom: "1px dotted #8fadd4",
+    }
     : {};
 
   return (
@@ -319,24 +261,56 @@ function NodeContent({ node }: { node: KnowNode }): JSX.Element {
   );
 }
 
-function InteractiveNodeContent({
-  editOnClick,
-}: {
-  editOnClick?: boolean;
-}): JSX.Element {
+function AlwaysEditableContent(): JSX.Element {
+  const [node] = useNode();
+  const { createPlan, executePlan } = usePlanner();
+  const viewKey = useViewKey();
+  const { setSiblingEditorAfterViewKey } = useTemporaryView();
+
+  if (!node || node.type !== "text") {
+    return <NodeContent node={node!} />;
+  }
+
+  const handleSave = (text: string, imageUrl?: string): void => {
+    const currentImageUrl = "imageUrl" in node ? node.imageUrl : undefined;
+    if (text !== node.text || imageUrl !== currentImageUrl) {
+      executePlan(
+        planUpsertNode(createPlan(), {
+          ...node,
+          text,
+          imageUrl,
+        } as KnowNode)
+      );
+    }
+  };
+
+  const handleEnterCreateSibling = (): void => {
+    setSiblingEditorAfterViewKey(viewKey);
+  };
+
+  return (
+    <MiniEditor
+      initialText={node.text}
+      onSave={handleSave}
+      onEnterCreateSibling={handleEnterCreateSibling}
+      autoFocus={false}
+    />
+  );
+}
+
+function InteractiveNodeContent(): JSX.Element {
   const { user } = useData();
   const [node] = useNode();
   const isLoading = useNodeIsLoading();
+
   if (isLoading) {
     return <LoadingNode />;
   }
   if (!node) {
     return <ErrorContent />;
   }
-  if (editOnClick && isMutableNode(node, user)) {
-    <EditableNodeContent>
-      <NodeContent node={node} />
-    </EditableNodeContent>;
+  if (isMutableNode(node, user)) {
+    return <AlwaysEditableContent />;
   }
   return <NodeContent node={node} />;
 }
@@ -390,46 +364,6 @@ function NodeAutoLink({
   }
 
   return <>{children}</>;
-}
-
-function EditingNodeContent(): JSX.Element | null {
-  const [node] = useNode();
-  const { createPlan, executePlan } = usePlanner();
-  const viewKey = useViewKey();
-  const {
-    editingViews,
-    setEditingState,
-    setSiblingEditorAfterViewKey,
-  } = useTemporaryView();
-  const { setIsInputElementInFocus } = useInputElementFocus();
-  if (!node || node.type !== "text") {
-    return null;
-  }
-  const closeEditor = (): void => {
-    setIsInputElementInFocus(false);
-    setEditingState(toggleEditing(editingViews, viewKey));
-  };
-  const handleSave = (text: string, imageUrl?: string): void => {
-    executePlan(
-      planUpsertNode(createPlan(), {
-        ...node,
-        text,
-        imageUrl,
-      })
-    );
-    closeEditor();
-  };
-  const handleEnterCreateSibling = (): void => {
-    setSiblingEditorAfterViewKey(viewKey);
-  };
-  return (
-    <InlineEditor
-      initialText={node.text}
-      onSave={handleSave}
-      onClose={closeEditor}
-      onEnterCreateSibling={handleEnterCreateSibling}
-    />
-  );
 }
 
 const INDENTATION = 25;
@@ -551,12 +485,12 @@ export function getNodesInTree(
   const withDiffItems =
     diffItems.size > 0
       ? diffItems.reduce(
-          (list, diffItem, idx) =>
-            list.push(
-              addDiffItemToPath(data, parentPath, diffItem.nodeID, idx, stack)
-            ),
-          nodesInTree
-        )
+        (list, diffItem, idx) =>
+          list.push(
+            addDiffItemToPath(data, parentPath, diffItem.nodeID, idx, stack)
+          ),
+        nodesInTree
+      )
       : nodesInTree;
 
   const addNodePath = addAddToNodeToPath(data, parentPath, stack);
@@ -603,7 +537,6 @@ export function Node({
   const viewPath = useViewPath();
   const levels = getLevels(viewPath);
   const isAddToNode = useIsAddToNode();
-  const isNodeBeingEdited = useIsEditingOn();
   const isMultiselect = useIsParentMultiselectBtnOn();
   const isInReferencedByView = useIsInReferencedByView();
   const [, view] = useNodeID();
@@ -650,22 +583,20 @@ export function Node({
       {!isAddToNode && (
         <>
           {isMultiselect && <NodeSelectbox />}
-          <div className="flex-column w-100" style={contentBackgroundStyle}>
-            {isNodeBeingEdited && !isDiffItem && <EditingNodeContent />}
-            {(!isNodeBeingEdited || isDiffItem) && (
-              <>
-                <NodeAutoLink>
-                  {isDiffItem && <DiffItemIndicator />}
-                  <span style={textStyle}>
-                    <InteractiveNodeContent editOnClick={!isDiffItem} />
-                  </span>
-                </NodeAutoLink>
-                <span className="inline-node-actions">
-                  <FullscreenButton />
-                  <OpenInSplitPaneButton />
-                </span>
-              </>
-            )}
+          <div
+            className="w-100"
+            style={{ paddingTop: 10, ...contentBackgroundStyle }}
+          >
+            <span style={textStyle}>
+              <NodeAutoLink>
+                {isDiffItem && <DiffItemIndicator />}
+                <InteractiveNodeContent />
+              </NodeAutoLink>
+            </span>
+            <span className="inline-node-actions">
+              <FullscreenButton />
+              <OpenInSplitPaneButton />
+            </span>
           </div>
         </>
       )}

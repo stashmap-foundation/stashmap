@@ -2,7 +2,6 @@ import React from "react";
 import { Dropdown } from "react-bootstrap";
 import { List } from "immutable";
 import {
-  addAddToNodeToPath,
   getAvailableRelationsForNode,
   getContextFromStackAndViewPath,
   updateView,
@@ -10,14 +9,9 @@ import {
   useNodeID,
   useViewKey,
   useViewPath,
-  viewPathToString,
 } from "../ViewContext";
 import { usePaneNavigation } from "../SplitPanesContext";
-import {
-  closeEditor,
-  useDeselectAllInView,
-  useTemporaryView,
-} from "./TemporaryViewContext";
+import { useDeselectAllInView } from "./TemporaryViewContext";
 import {
   getRelations,
   isRemote,
@@ -35,8 +29,6 @@ type ChangeRelation = (
 
 export function useOnChangeRelations(): ChangeRelation {
   const data = useData();
-  const { stack } = usePaneNavigation();
-  const { editorOpenViews, setEditorOpenState } = useTemporaryView();
   const viewPath = useViewPath();
   const { createPlan, executePlan } = usePlanner();
   const view = useNodeID()[1];
@@ -44,7 +36,6 @@ export function useOnChangeRelations(): ChangeRelation {
   const deselectAllInView = useDeselectAllInView();
 
   return (relations: Relations | undefined, expand: boolean): void => {
-    const viewKeyOfAddToNode = addAddToNodeToPath(data, viewPath, stack);
     const plan = planUpdateViews(
       createPlan(),
       updateView(data.views, viewPath, {
@@ -54,24 +45,17 @@ export function useOnChangeRelations(): ChangeRelation {
       })
     );
     executePlan(plan);
-    setEditorOpenState(
-      closeEditor(editorOpenViews, viewPathToString(viewKeyOfAddToNode))
-    );
     deselectAllInView(viewKey);
   };
 }
 
 export function useOnToggleExpanded(): (expand: boolean) => void {
   const data = useData();
-  const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
   const viewPath = useViewPath();
   const view = useNodeID()[1];
-  const { editorOpenViews, setEditorOpenState } = useTemporaryView();
+
   return (expand: boolean): void => {
-    const viewKeyOfAddToNode = viewPathToString(
-      addAddToNodeToPath(data, viewPath, stack)
-    );
     const plan = planUpdateViews(
       createPlan(),
       updateView(data.views, viewPath, {
@@ -80,9 +64,6 @@ export function useOnToggleExpanded(): (expand: boolean) => void {
       })
     );
     executePlan(plan);
-    if (!expand) {
-      setEditorOpenState(closeEditor(editorOpenViews, viewKeyOfAddToNode));
-    }
   };
 }
 

@@ -661,11 +661,18 @@ export function Node({
 
   // Background color for Referenced By view
   const referencedByBgColor = "rgba(100, 140, 180, 0.1)";
-  // Background style for Referenced By content (root and children)
-  const referencedByContentStyle: React.CSSProperties | undefined =
-    showReferencedByBackground
-      ? { backgroundColor: referencedByBgColor }
-      : undefined;
+  // Background style for content area based on view type
+  const getContentBackgroundStyle = (): React.CSSProperties | undefined => {
+    if (isDiffItem) {
+      // Suggestion items get orange background (no indent coloring needed)
+      return { backgroundColor: TYPE_COLORS.suggestions_bg };
+    }
+    if (showReferencedByBackground) {
+      return { backgroundColor: referencedByBgColor };
+    }
+    return undefined;
+  };
+  const contentBackgroundStyle = getContentBackgroundStyle();
   // For children in Referenced By, color the last indent level to align with content
   const indentBgColor = isInReferencedByView ? referencedByBgColor : undefined;
 
@@ -680,7 +687,7 @@ export function Node({
       {!isAddToNode && (
         <>
           {isMultiselect && <NodeSelectbox />}
-          <div className="flex-column w-100" style={referencedByContentStyle}>
+          <div className="flex-column w-100" style={contentBackgroundStyle}>
             {isNodeBeingEdited && !isDiffItem && <EditingNodeContent />}
             {(!isNodeBeingEdited || isDiffItem) && (
               <>

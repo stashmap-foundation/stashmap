@@ -20,9 +20,10 @@ export const TYPE_COLORS = {
   relevant: "#0288d1",
   maybe_relevant: "#00acc1",
   little_relevant: "#26c6da",
-  not_relevant: "#ff9800",
+  not_relevant: "#757575", // Gray for not relevant
   confirms: "#2e7d32",
   contra: "#c62828",
-  suggestions: "#7b1fa2", // Purple for suggestions from other users
+  suggestions: "#ff9800", // Orange for suggestions from other users
+  suggestions_bg: "#fff3e0", // Light orange background for suggestion blocks
   inactive: "#d0d0d0",
 };

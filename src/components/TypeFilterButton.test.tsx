@@ -27,7 +27,7 @@ describe("TYPE_COLORS", () => {
     expect(TYPE_COLORS.relevant).toBe("#0288d1");
     expect(TYPE_COLORS.maybe_relevant).toBe("#00acc1");
     expect(TYPE_COLORS.little_relevant).toBe("#26c6da");
-    expect(TYPE_COLORS.not_relevant).toBe("#ff9800");
+    expect(TYPE_COLORS.not_relevant).toBe("#757575");
   });
 
   test("has correct colors for argument types", () => {
@@ -392,7 +392,7 @@ describe("Suggestions filter", () => {
   });
 
   test("TYPE_COLORS has suggestions color", () => {
-    expect(TYPE_COLORS.suggestions).toBe("#7b1fa2");
+    expect(TYPE_COLORS.suggestions).toBe("#ff9800");
   });
 
   test("filter popover shows Suggestions option", async () => {

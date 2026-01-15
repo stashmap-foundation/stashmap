@@ -9,7 +9,6 @@ import {
   useViewKey,
   useViewPath,
   ViewPath,
-  useIsAddToNode,
   useIsInReferencedByView,
   addNodeToPathWithRelations,
   addDiffItemToPath,
@@ -19,10 +18,6 @@ import {
   getContextFromStackAndViewPath,
   getAvailableRelationsForNode,
   findOrCreateRelationsForContext,
-  getParentView,
-  useParentNode,
-  upsertRelations,
-  updateViewPathsAfterAddRelation,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -37,8 +32,6 @@ import {
   isReferenceNode,
   getRefTargetStack,
   itemMatchesType,
-  newNode,
-  addRelationToRelations,
 } from "../connections";
 import { REFERENCED_BY, DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 import { IS_MOBILE } from "./responsive";
@@ -50,7 +43,7 @@ import {
 } from "./SelectRelations";
 import { ReferenceIndicators } from "./ReferenceIndicators";
 import { useData } from "../DataContext";
-import { planUpsertNode, planUpdateViews, usePlanner } from "../planner";
+import { planUpsertNode, usePlanner } from "../planner";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeIcon } from "./NodeIcon";
 import { planAddNewRelationToNode } from "./RelationTypes";
@@ -266,33 +259,13 @@ function NodeContent({ node }: { node: KnowNode }): JSX.Element {
   );
 }
 
-type EditableContentProps = {
-  isCreateMode: boolean;
-  insertAtIndex?: number;
-};
-
-function EditableContent({ isCreateMode, insertAtIndex }: EditableContentProps): JSX.Element {
-  const isAddToNode = useIsAddToNode();
-  const viewPath = useViewPath();
+function EditableContent(): JSX.Element {
   const viewKey = useViewKey();
-  const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
   const { setSiblingEditorAfterViewKey } = useTemporaryView();
+  const [node] = useNode();
 
-  // Same logic as AddNodeToNode:
-  // When insertAtIndex is provided, we're adding a sibling - use parent's view
-  // When isAddToNode is true, the current path is ADD_TO_NODE - use parent's view
-  // Otherwise, we're adding children to current node - use current view
-  const isSiblingInsert = insertAtIndex !== undefined;
-  const viewContext =
-    isAddToNode || isSiblingInsert ? getParentView(viewPath) : viewPath;
-  // Call both hooks unconditionally (React rules of hooks), pick the right result
-  const [nodeFromCurrent] = useNode();
-  const [nodeFromParent] = useParentNode();
-  const node = isAddToNode || isSiblingInsert ? nodeFromParent : nodeFromCurrent;
-
-  // Edit mode: update existing node
-  const handleEditSave = (
+  const handleSave = (
     text: string,
     imageUrl?: string,
     submitted?: boolean
@@ -314,48 +287,16 @@ function EditableContent({ isCreateMode, insertAtIndex }: EditableContentProps):
     }
   };
 
-  // Create mode: create new node (same logic as AddNodeToNode)
-  const handleCreateSave = (text: string, imageUrl?: string): void => {
-    if (!viewContext) return;
-    const plan = createPlan();
-    const n = newNode(text, plan.user.publicKey, imageUrl);
-    const planWithNode = planUpsertNode(plan, n);
-
-    const updatedRelationsPlan = upsertRelations(
-      planWithNode,
-      viewContext,
-      stack,
-      (relations) =>
-        addRelationToRelations(
-          relations,
-          n.id,
-          "", // Default relevance
-          undefined, // No argument
-          insertAtIndex
-        )
-    );
-    // Update view paths after adding
-    const updatedViews = updateViewPathsAfterAddRelation(
-      updatedRelationsPlan,
-      viewContext,
-      insertAtIndex
-    );
-    executePlan(planUpdateViews(updatedRelationsPlan, updatedViews));
-    // For AddToNode, no sibling editor needed - AddToNode stays at the end
-  };
-
-  const handleSave = isCreateMode ? handleCreateSave : handleEditSave;
-
-  // For non-text nodes in edit mode, show read-only content
-  if (!isCreateMode && (!node || node.type !== "text")) {
+  // For non-text nodes, show read-only content
+  if (!node || node.type !== "text") {
     return <NodeContent node={node!} />;
   }
 
   return (
     <MiniEditor
-      initialText={isCreateMode ? "" : (node?.text || "")}
+      initialText={node.text}
       onSave={handleSave}
-      autoFocus={isCreateMode}
+      autoFocus={false}
     />
   );
 }
@@ -364,26 +305,21 @@ function InteractiveNodeContent(): JSX.Element {
   const { user } = useData();
   const [node] = useNode();
   const isLoading = useNodeIsLoading();
-  const isAddToNode = useIsAddToNode();
-
-  // Create mode: AddToNode position - check first (node is undefined for ADD_TO_NODE)
-  if (isAddToNode) {
-    return <EditableContent isCreateMode />;
-  }
 
   if (isLoading) {
     return <LoadingNode />;
   }
 
-  // Edit mode: existing mutable node
-  if (node && isMutableNode(node, user)) {
-    return <EditableContent isCreateMode={false} />;
-  }
-
-  // Read-only mode
   if (!node) {
     return <ErrorContent />;
   }
+
+  // Editable content for mutable nodes
+  if (isMutableNode(node, user)) {
+    return <EditableContent />;
+  }
+
+  // Read-only content
   return <NodeContent node={node} />;
 }
 
@@ -606,7 +542,6 @@ export function Node({
   const isDesktop = !useMediaQuery(IS_MOBILE);
   const viewPath = useViewPath();
   const levels = getLevels(viewPath);
-  const isAddToNode = useIsAddToNode();
   const isMultiselect = useIsParentMultiselectBtnOn();
   const isInReferencedByView = useIsInReferencedByView();
   const [, view] = useNodeID();
@@ -621,9 +556,8 @@ export function Node({
   // Show background for both the root and children in Referenced By view
   const showReferencedByBackground = isReferencedByRoot || isInReferencedByView;
 
-  // Show expand/collapse for regular nodes (not AddToNode, not diff items, not in Referenced By)
-  const showExpandCollapse =
-    !isAddToNode && !isDiffItem && !isInReferencedByView;
+  // Show expand/collapse for regular nodes (not diff items, not in Referenced By)
+  const showExpandCollapse = !isDiffItem && !isInReferencedByView;
 
   // Background color for Referenced By view
   const referencedByBgColor = "rgba(100, 140, 180, 0.1)";
@@ -660,12 +594,10 @@ export function Node({
             <InteractiveNodeContent />
           </NodeAutoLink>
         </span>
-        {!isAddToNode && (
-          <span className="inline-node-actions">
-            <FullscreenButton />
-            <OpenInSplitPaneButton />
-          </span>
-        )}
+        <span className="inline-node-actions">
+          <FullscreenButton />
+          <OpenInSplitPaneButton />
+        </span>
       </div>
       <RightMenu />
     </NodeCard>

@@ -14,6 +14,7 @@ import {
   useRelationIndex,
   upsertRelations,
   updateViewPathsAfterAddRelation,
+  useIsExpanded,
 } from "../ViewContext";
 import useModal from "./useModal";
 import { SearchModal } from "./SearchModal";
@@ -305,27 +306,36 @@ function AddNode({
   );
 }
 
-// Hook to get the add node handler for sibling insert
-function useAddSiblingNode(insertAtIndex?: number): {
+type AddNodeOptions = {
+  insertAtIndex?: number;
+  asFirstChild?: boolean;
+};
+
+// Hook to get the add node handler for sibling or first child insert
+function useAddSiblingNode(options?: AddNodeOptions): {
   onAddNode: (plan: Plan, nodeID: LongID) => void;
   onAddExistingNode: (nodeID: LongID) => void;
   onCreateNewNode: (text: string, imageUrl?: string) => void;
   node: KnowNode;
 } | null {
+  const { insertAtIndex, asFirstChild } = options || {};
   const isAddToNode = useIsAddToNode();
   const vContext = useViewPath();
   const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
 
-  // When insertAtIndex is provided, we're adding a sibling - use parent's view
+  // When asFirstChild is true, use current view and insert at position 0
+  // When insertAtIndex is provided (and not asFirstChild), we're adding a sibling - use parent's view
   // When isAddToNode is true, the current path is ADD_TO_NODE - use parent's view
   // Otherwise, we're adding children to current node - use current view
-  const isSiblingInsert = insertAtIndex !== undefined;
+  const isSiblingInsert = insertAtIndex !== undefined && !asFirstChild;
   const viewContext =
     isAddToNode || isSiblingInsert ? getParentView(vContext) : vContext;
   const [nodeFromCurrent] = useNode();
   const [nodeFromParent] = useParentNode();
   const node = isAddToNode || isSiblingInsert ? nodeFromParent : nodeFromCurrent;
+  // For first child, insert at position 0
+  const insertPosition = asFirstChild ? 0 : insertAtIndex;
 
   if (!node || !viewContext) {
     return null;
@@ -343,14 +353,14 @@ function useAddSiblingNode(insertAtIndex?: number): {
           nodeID,
           "", // Default to "relevant"
           undefined, // No argument
-          insertAtIndex
+          insertPosition
         )
     );
     // Update view paths when inserting at specific position
     const updatedViews = updateViewPathsAfterAddRelation(
       updatedRelationsPlan,
       viewContext,
-      insertAtIndex
+      insertPosition
     );
     executePlan(planUpdateViews(updatedRelationsPlan, updatedViews));
   };
@@ -372,8 +382,14 @@ function useAddSiblingNode(insertAtIndex?: number): {
 export function SiblingSearchButton(): JSX.Element | null {
   const { openModal, closeModal, isOpen } = useModal();
   const relationIndex = useRelationIndex();
-  const insertAtIndex = relationIndex !== undefined ? relationIndex + 1 : undefined;
-  const handlers = useAddSiblingNode(insertAtIndex);
+  const isNodeExpanded = useIsExpanded();
+
+  // If node is expanded, insert as first child; otherwise insert as sibling after current
+  const options: AddNodeOptions = isNodeExpanded
+    ? { asFirstChild: true }
+    : { insertAtIndex: relationIndex !== undefined ? relationIndex + 1 : undefined };
+
+  const handlers = useAddSiblingNode(options);
 
   if (!handlers) {
     return null;
@@ -394,7 +410,9 @@ export function AddNodeToNode({
 }: {
   insertAtIndex?: number;
 } = {}): JSX.Element | null {
-  const handlers = useAddSiblingNode(insertAtIndex);
+  const handlers = useAddSiblingNode(
+    insertAtIndex !== undefined ? { insertAtIndex } : undefined
+  );
 
   if (!handlers) {
     return null;

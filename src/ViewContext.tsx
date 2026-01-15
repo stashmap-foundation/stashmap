@@ -674,6 +674,46 @@ export function useRelationIndex(): number | undefined {
   return getRelationIndex(data, path, stack);
 }
 
+export type SiblingInfo = {
+  viewPath: ViewPath;
+  nodeID: LongID | ID;
+  view: View;
+};
+
+export function getPreviousSibling(
+  data: Data,
+  viewPath: ViewPath,
+  stack: (LongID | ID)[]
+): SiblingInfo | undefined {
+  const relationIndex = getRelationIndex(data, viewPath, stack);
+  if (relationIndex === undefined || relationIndex === 0) {
+    // No previous sibling (first item or error)
+    return undefined;
+  }
+
+  const parentPath = getParentView(viewPath);
+  if (!parentPath) {
+    return undefined;
+  }
+
+  // Get the previous sibling's path
+  const prevSiblingPath = addNodeToPath(data, parentPath, relationIndex - 1);
+  const [prevNodeID, prevView] = getNodeIDFromView(data, prevSiblingPath);
+
+  return {
+    viewPath: prevSiblingPath,
+    nodeID: prevNodeID,
+    view: prevView,
+  };
+}
+
+export function usePreviousSibling(): SiblingInfo | undefined {
+  const data = useData();
+  const viewPath = useViewPath();
+  const { stack } = usePaneNavigation();
+  return getPreviousSibling(data, viewPath, stack);
+}
+
 export function RootViewContextProvider({
   children,
   root,

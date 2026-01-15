@@ -1,9 +1,15 @@
 import React from "react";
-import { List, OrderedSet } from "immutable";
+import { List, OrderedSet, Set } from "immutable";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { getSelectedInView } from "./components/TemporaryViewContext";
-import { bulkAddRelations, getRelations, moveRelations } from "./connections";
+import {
+  bulkAddRelations,
+  getRelations,
+  moveRelations,
+  deleteRelations,
+  addRelationToRelations,
+} from "./connections";
 import {
   parseViewPath,
   upsertRelations,
@@ -12,9 +18,12 @@ import {
   getParentView,
   bulkUpdateViewPathsAfterAddRelation,
   updateViewPathsAfterMoveRelations,
+  updateViewPathsAfterDisconnect,
+  updateViewPathsAfterAddRelation,
   getRelationIndex,
   getNodeIDFromView,
   getParentNodeID,
+  getLast,
 } from "./ViewContext";
 import { getNodesInTree } from "./components/Node";
 import { Plan, planUpdateViews } from "./planner";
@@ -140,6 +149,74 @@ export function dnd(
     sourceNodes.size,
     dropIndex
   );
+  return planUpdateViews(updatedRelationsPlan, updatedViews);
+}
+
+/**
+ * Disconnect a node from its current parent.
+ * Returns the updated plan with the node removed from its parent's relations and views updated.
+ */
+export function planDisconnectFromParent(
+  plan: Plan,
+  viewPath: ViewPath,
+  stack: (LongID | ID)[]
+): Plan {
+  const parentPath = getParentView(viewPath);
+  if (!parentPath) {
+    return plan;
+  }
+
+  const relationIndex = getRelationIndex(plan, viewPath, stack);
+  if (relationIndex === undefined) {
+    return plan;
+  }
+
+  const { nodeID, nodeIndex } = getLast(viewPath);
+  const [, parentView] = getNodeIDFromView(plan, parentPath);
+
+  // Remove from parent's relations
+  const updatedRelationsPlan = upsertRelations(
+    plan,
+    parentPath,
+    stack,
+    (relations) => deleteRelations(relations, Set([relationIndex]))
+  );
+
+  // Update view paths
+  const updatedViews = updateViewPathsAfterDisconnect(
+    updatedRelationsPlan.views,
+    nodeID,
+    parentView.relations || ("" as LongID),
+    nodeIndex
+  );
+
+  return planUpdateViews(updatedRelationsPlan, updatedViews);
+}
+
+/**
+ * Add a node to a parent at a specific index.
+ * Returns the updated plan with the node added to the parent's relations and views updated.
+ */
+export function planAddToParent(
+  plan: Plan,
+  nodeID: LongID | ID,
+  parentViewPath: ViewPath,
+  stack: (LongID | ID)[],
+  insertAtIndex: number
+): Plan {
+  const updatedRelationsPlan = upsertRelations(
+    plan,
+    parentViewPath,
+    stack,
+    (relations) => addRelationToRelations(relations, nodeID, "", undefined, insertAtIndex)
+  );
+
+  const updatedViews = updateViewPathsAfterAddRelation(
+    updatedRelationsPlan,
+    parentViewPath,
+    insertAtIndex
+  );
+
   return planUpdateViews(updatedRelationsPlan, updatedViews);
 }
 

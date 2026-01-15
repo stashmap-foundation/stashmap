@@ -19,6 +19,11 @@ import {
   getContextFromStackAndViewPath,
   getAvailableRelationsForNode,
   findOrCreateRelationsForContext,
+  usePreviousSibling,
+  useRelationIndex,
+  getParentView,
+  upsertRelations,
+  viewPathToString,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -45,9 +50,10 @@ import {
 import { ReferenceIndicators } from "./ReferenceIndicators";
 import { useData } from "../DataContext";
 import { planUpsertNode, usePlanner } from "../planner";
+import { planDisconnectFromParent, planAddToParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeIcon } from "./NodeIcon";
-import { planAddNewRelationToNode } from "./RelationTypes";
+import { planAddNewRelationToNode, planExpandNode } from "./RelationTypes";
 import { NodeCard } from "../commons/Ui";
 import { useProjectContext } from "../ProjectContext";
 import { usePaneNavigation } from "../SplitPanesContext";
@@ -261,9 +267,13 @@ function NodeContent({ node }: { node: KnowNode }): JSX.Element {
 
 function EditableContent(): JSX.Element {
   const viewKey = useViewKey();
+  const viewPath = useViewPath();
+  const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
   const { openCreateNodeEditor } = useTemporaryView();
   const [node] = useNode();
+  const [nodeID] = useNodeID();
+  const prevSibling = usePreviousSibling();
 
   const handleSave = (
     text: string,
@@ -287,6 +297,32 @@ function EditableContent(): JSX.Element {
     }
   };
 
+  const handleTab = (_text: string): void => {
+    if (!prevSibling) {
+      return;
+    }
+
+    // Get context for the previous sibling
+    const context = getContextFromStackAndViewPath(stack, prevSibling.viewPath);
+
+    // Step 1: Expand the previous sibling (ensure it has relations)
+    let plan = planExpandNode(
+      createPlan(),
+      prevSibling.nodeID,
+      context,
+      prevSibling.view,
+      prevSibling.viewPath
+    );
+
+    // Step 2: Disconnect current node from current parent
+    plan = planDisconnectFromParent(plan, viewPath, stack);
+
+    // Step 3: Add current node to previous sibling at index 0
+    plan = planAddToParent(plan, nodeID, prevSibling.viewPath, stack, 0);
+
+    executePlan(plan);
+  };
+
   // For non-text nodes, show read-only content
   if (!node || node.type !== "text") {
     return <NodeContent node={node!} />;
@@ -296,6 +332,7 @@ function EditableContent(): JSX.Element {
     <MiniEditor
       initialText={node.text}
       onSave={handleSave}
+      onTab={handleTab}
       autoFocus={false}
     />
   );

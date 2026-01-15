@@ -98,6 +98,7 @@ type MiniEditorProps = {
   initialText?: string;
   onSave: (text: string, imageUrl?: string, submitted?: boolean) => void;
   onClose?: () => void;
+  onTab?: (text: string) => void;
   autoFocus?: boolean;
 };
 
@@ -105,6 +106,7 @@ export function MiniEditor({
   initialText,
   onSave,
   onClose,
+  onTab,
   autoFocus = true,
 }: MiniEditorProps): JSX.Element {
   const editorRef = React.useRef<HTMLSpanElement>(null);
@@ -134,6 +136,14 @@ export function MiniEditor({
     }
   };
 
+  const isCursorAtStart = (): boolean => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return false;
+    const range = sel.getRangeAt(0);
+    // Check if cursor is at the very beginning (offset 0, collapsed)
+    return range.collapsed && range.startOffset === 0;
+  };
+
   const handleKeyDown = async (
     e: React.KeyboardEvent<HTMLSpanElement>
   ): Promise<void> => {
@@ -151,6 +161,9 @@ export function MiniEditor({
       }
       const imageUrl = await getImageUrlFromText(text);
       onSave(text, imageUrl, true);
+    } else if (e.key === "Tab" && !e.shiftKey && onTab && isCursorAtStart()) {
+      e.preventDefault();
+      onTab(getText().trim());
     }
   };
 

@@ -13,12 +13,16 @@ import {
   updateViewPathsAfterAddRelation,
   addNodeToPathWithRelations,
   viewPathToString,
+  getContextFromStackAndViewPath,
+  getNodeIDFromView,
 } from "../ViewContext";
+import { useData } from "../DataContext";
+import { planExpandNode } from "./RelationTypes";
 import { NOTE_TYPE, Node, Indent } from "./Node";
 import { LeftMenu } from "./LeftMenu";
 import { useDroppable } from "./DroppableContainer";
 import { useIsEditingOn, useTemporaryView } from "./TemporaryViewContext";
-import { MiniEditor } from "./AddNode";
+import { MiniEditor, getImageUrlFromText } from "./AddNode";
 import { NodeCard } from "../commons/Ui";
 import { newNode, addRelationToRelations } from "../connections";
 import { planUpsertNode, planUpdateViews, usePlanner } from "../planner";
@@ -108,6 +112,7 @@ function CreateNodeEditor({
   insertAtIndex,
   levels,
 }: CreateNodeEditorProps): JSX.Element | null {
+  const data = useData();
   const viewPath = useViewPath();
   const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
@@ -177,6 +182,54 @@ function CreateNodeEditor({
     }
   };
 
+  const onTab = async (text: string): Promise<void> => {
+    // For CreateNodeEditor, Tab indents into the current node (viewPath),
+    // making the new node a child of the current node instead of a sibling
+    const [nodeID, view] = getNodeIDFromView(data, viewPath);
+    const context = getContextFromStackAndViewPath(stack, viewPath);
+
+    // Step 1: Expand the current node (ensure it has relations)
+    let plan = planExpandNode(
+      createPlan(),
+      nodeID,
+      context,
+      view,
+      viewPath
+    );
+
+    // Step 2: If there's text, create the node as first child
+    if (text) {
+      const imageUrl = await getImageUrlFromText(text);
+      const n = newNode(text, plan.user.publicKey, imageUrl);
+      plan = planUpsertNode(plan, n);
+
+      // Add to current node at index 0
+      let updatedRelations: Relations;
+      plan = upsertRelations(plan, viewPath, stack, (relations) => {
+        updatedRelations = addRelationToRelations(relations, n.id, "", undefined, 0);
+        return updatedRelations;
+      });
+      const updatedViews = updateViewPathsAfterAddRelation(plan, viewPath, 0);
+      plan = planUpdateViews(plan, updatedViews);
+
+      executePlan(plan);
+
+      // Open editor after the newly created node
+      // @ts-expect-error updatedRelations is assigned in the callback above
+      const newNodePath = addNodeToPathWithRelations(viewPath, updatedRelations, 0);
+      const newNodeViewKey = viewPathToString(newNodePath);
+      closeCreateNodeEditor();
+      openCreateNodeEditor(newNodeViewKey);
+    } else {
+      // No text - just expand and move editor to be first child
+      const viewKey = viewPathToString(viewPath);
+      executePlan(plan);
+      closeCreateNodeEditor();
+      // Pass plan to openCreateNodeEditor so it uses fresh expanded state
+      openCreateNodeEditor(viewKey, plan);
+    }
+  };
+
   return (
     <NodeCard className="hover-light-bg" cardBodyClassName="ps-0 pt-0 pb-0">
       <LeftMenu />
@@ -185,7 +238,7 @@ function CreateNodeEditor({
         <span className="triangle collapsed">▶</span>
       </div>
       <div className="flex-column w-100" style={{ paddingTop: 10 }}>
-        <MiniEditor onSave={onCreateNode} onClose={closeCreateNodeEditor} />
+        <MiniEditor onSave={onCreateNode} onClose={closeCreateNodeEditor} onTab={onTab} />
       </div>
     </NodeCard>
   );

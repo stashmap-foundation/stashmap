@@ -1,4 +1,3 @@
-import { Set } from "immutable";
 import {
   useRelationIndex,
   useViewPath,
@@ -9,10 +8,11 @@ import {
   useNode,
   getRelationForView,
 } from "../ViewContext";
-import { updateItemRelevance, deleteRelations } from "../connections";
+import { updateItemRelevance } from "../connections";
 import { usePlanner } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { useData } from "../DataContext";
+import { planDisconnectFromParent } from "../dnd";
 
 // Relevance mapped to levels:
 // "relevant" = 3
@@ -116,9 +116,7 @@ export function useUpdateRelevance(): UseUpdateRelevanceResult {
 
   const removeFromList = (): void => {
     if (!isVisible || !parentView || relationIndex === undefined) return;
-    const plan = upsertRelations(createPlan(), parentView, stack, (rels) =>
-      deleteRelations(rels, Set([relationIndex]))
-    );
+    const plan = planDisconnectFromParent(createPlan(), viewPath, stack);
     executePlan(plan);
   };
 

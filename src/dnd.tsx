@@ -194,7 +194,7 @@ export function planDisconnectFromParent(
 }
 
 /**
- * Add a node to a parent at a specific index.
+ * Add a node to a parent at a specific index (or at end if undefined).
  * Returns the updated plan with the node added to the parent's relations and views updated.
  */
 export function planAddToParent(
@@ -202,7 +202,7 @@ export function planAddToParent(
   nodeID: LongID | ID,
   parentViewPath: ViewPath,
   stack: (LongID | ID)[],
-  insertAtIndex: number
+  insertAtIndex?: number
 ): Plan {
   const updatedRelationsPlan = upsertRelations(
     plan,

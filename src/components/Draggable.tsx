@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ConnectableElement, useDrag } from "react-dnd";
 import {
   ViewPath,
@@ -15,6 +16,7 @@ import {
   viewPathToString,
   getContextFromStackAndViewPath,
   getNodeIDFromView,
+  getLastChild,
 } from "../ViewContext";
 import { useData } from "../DataContext";
 import { planExpandNode } from "./RelationTypes";
@@ -120,10 +122,13 @@ function CreateNodeEditor({
 
   // Internal state for position - can change when Tab is pressed
   const [position, setPosition] = useState(initialPosition);
+  // Portal target viewKey - when set, render into that node's portal target
+  const [portalTargetKey, setPortalTargetKey] = useState<string | null>(null);
 
   // Compute derived values based on current position
   const levels = position === 'asFirstChild' ? baseLevels + 1 : baseLevels;
-  const insertAtIndex = position === 'asFirstChild' ? 0 : baseInsertAtIndex;
+  // undefined = add at end of relations
+  const insertAtIndex = position === 'asFirstChild' ? undefined : baseInsertAtIndex;
 
   // Determine target path based on position:
   // - afterSibling: insert into parent's relations
@@ -157,12 +162,14 @@ function CreateNodeEditor({
       targetPath,
       stack,
       (relations) => {
+        // When insertAtIndex is undefined, add at end (use relations.items.size)
+        const actualInsertIndex = insertAtIndex ?? relations.items.size;
         updatedRelations = addRelationToRelations(
           relations,
           n.id,
           "", // Default to "relevant"
           undefined, // No argument
-          insertAtIndex
+          actualInsertIndex
         );
         return updatedRelations;
       }
@@ -179,8 +186,11 @@ function CreateNodeEditor({
     // Otherwise (blur), just close the editor
     if (submitted) {
       // Construct the proper viewKey using ViewContext functions
+      // When insertAtIndex is undefined (added at end), use last index
       // @ts-expect-error updatedRelations is assigned in the callback above
-      const newNodePath = addNodeToPathWithRelations(targetPath, updatedRelations, insertAtIndex);
+      const actualIndex = insertAtIndex ?? updatedRelations.items.size - 1;
+      // @ts-expect-error updatedRelations is assigned in the callback above
+      const newNodePath = addNodeToPathWithRelations(targetPath, updatedRelations, actualIndex);
       const newNodeViewKey = viewPathToString(newNodePath);
       // Chain to next sibling (new node is not expanded)
       openCreateNodeEditor(newNodeViewKey);
@@ -203,11 +213,18 @@ function CreateNodeEditor({
     const plan = planExpandNode(createPlan(), nodeID, context, view, viewPath);
     executePlan(plan);
 
+    // Find the last child to portal to (if any)
+    // Use plan data since we just expanded
+    const lastChild = getLastChild(plan, viewPath, stack);
+    if (lastChild) {
+      setPortalTargetKey(viewPathToString(lastChild));
+    }
+
     // Update internal position state - editor stays mounted, text preserved
     setPosition('asFirstChild');
   };
 
-  return (
+  const editorContent = (
     <NodeCard className="hover-light-bg" cardBodyClassName="ps-0 pt-0 pb-0">
       <LeftMenu />
       {levels > 0 && <Indent levels={levels} />}
@@ -219,6 +236,16 @@ function CreateNodeEditor({
       </div>
     </NodeCard>
   );
+
+  // If we have a portal target, render into that element
+  if (portalTargetKey) {
+    const portalTarget = document.getElementById(`editor-portal-${portalTargetKey}`);
+    if (portalTarget) {
+      return createPortal(editorContent, portalTarget);
+    }
+  }
+
+  return editorContent;
 }
 
 export function ListItem({
@@ -272,6 +299,8 @@ export function ListItem({
       <div className="visible-on-hover">
         <Draggable ref={ref} className={className} />
       </div>
+      {/* Portal target for CreateNodeEditor - placed after each node's children */}
+      <div id={`editor-portal-${viewKey}`} />
       {showEditor && editorPosition && (
         <CreateNodeEditor
           initialPosition={editorPosition}

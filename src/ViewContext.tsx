@@ -707,6 +707,22 @@ export function getPreviousSibling(
   };
 }
 
+/**
+ * Get the last direct child of a node, or undefined if no children.
+ */
+export function getLastChild(
+  data: Data,
+  viewPath: ViewPath,
+  stack: (LongID | ID)[]
+): ViewPath | undefined {
+  const relations = getRelationForView(data, viewPath, stack);
+  if (!relations || relations.items.size === 0) {
+    return undefined;
+  }
+  const lastIndex = relations.items.size - 1;
+  return addNodeToPathWithRelations(viewPath, relations, lastIndex);
+}
+
 export function usePreviousSibling(): SiblingInfo | undefined {
   const data = useData();
   const viewPath = useViewPath();

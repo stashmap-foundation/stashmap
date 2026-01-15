@@ -297,28 +297,38 @@ function EditableContent(): JSX.Element {
     }
   };
 
-  const handleTab = (_text: string): void => {
-    if (!prevSibling) {
+  const handleTab = (text: string): void => {
+    if (!prevSibling || !node || node.type !== "text") {
       return;
     }
 
-    // Get context for the previous sibling
-    const context = getContextFromStackAndViewPath(stack, prevSibling.viewPath);
+    let plan = createPlan();
 
-    // Step 1: Expand the previous sibling (ensure it has relations)
-    let plan = planExpandNode(
-      createPlan(),
+    // Step 1: Save text changes if any
+    const currentImageUrl = "imageUrl" in node ? node.imageUrl : undefined;
+    if (text !== node.text) {
+      plan = planUpsertNode(plan, {
+        ...node,
+        text,
+        imageUrl: currentImageUrl,
+      } as KnowNode);
+    }
+
+    // Step 2: Expand the previous sibling (ensure it has relations)
+    const context = getContextFromStackAndViewPath(stack, prevSibling.viewPath);
+    plan = planExpandNode(
+      plan,
       prevSibling.nodeID,
       context,
       prevSibling.view,
       prevSibling.viewPath
     );
 
-    // Step 2: Disconnect current node from current parent
+    // Step 3: Disconnect current node from current parent
     plan = planDisconnectFromParent(plan, viewPath, stack);
 
-    // Step 3: Add current node to previous sibling at index 0
-    plan = planAddToParent(plan, nodeID, prevSibling.viewPath, stack, 0);
+    // Step 4: Add current node to previous sibling at end
+    plan = planAddToParent(plan, nodeID, prevSibling.viewPath, stack);
 
     executePlan(plan);
   };

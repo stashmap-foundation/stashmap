@@ -16,7 +16,7 @@ import { NOTE_TYPE, Node, Indent } from "./Node";
 import { LeftMenu } from "./LeftMenu";
 import { useDroppable } from "./DroppableContainer";
 import { useIsEditingOn, useTemporaryView } from "./TemporaryViewContext";
-import { Editor } from "./AddNode";
+import { MiniEditor } from "./AddNode";
 import { NodeCard } from "../commons/Ui";
 import { newNode, addRelationToRelations } from "../connections";
 import { planUpsertNode, planUpdateViews, usePlanner } from "../planner";
@@ -156,8 +156,11 @@ function SiblingEditor({
     <NodeCard className="hover-light-bg" cardBodyClassName="ps-0 pt-0 pb-0">
       <LeftMenu />
       {levels > 0 && <Indent levels={levels} />}
+      <div className="expand-collapse-toggle" style={{ color: "black" }}>
+        <span className="triangle collapsed">▶</span>
+      </div>
       <div className="flex-column w-100">
-        <Editor onCreateNode={onCreateNode} onClose={onClose} />
+        <MiniEditor onSave={onCreateNode} onClose={onClose} />
       </div>
     </NodeCard>
   );

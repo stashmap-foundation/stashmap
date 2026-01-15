@@ -1,8 +1,6 @@
 import React, { useEffect } from "react";
 import { useMediaQuery } from "react-responsive";
-import ReactQuill from "react-quill";
-import { CloseButton, NodeCard } from "../commons/Ui";
-import { LoadingSpinnerButton } from "../commons/LoadingSpinnerButton";
+import { NodeCard } from "../commons/Ui";
 import { useInputElementFocus } from "../commons/FocusContextProvider";
 import { shorten } from "../KnowledgeDataContext";
 import { newNode, addRelationToRelations } from "../connections";
@@ -17,7 +15,7 @@ import {
   updateViewPathsAfterAddRelation,
 } from "../ViewContext";
 import useModal from "./useModal";
-import { ESC, SearchModal } from "./SearchModal";
+import { SearchModal } from "./SearchModal";
 import { IS_MOBILE } from "./responsive";
 import { Indent } from "./Node";
 import {
@@ -27,7 +25,6 @@ import {
   useIsEditorOpen,
 } from "./TemporaryViewContext";
 import { Plan, planUpsertNode, planUpdateViews, usePlanner } from "../planner";
-import { ReactQuillWrapper } from "./ReactQuillWrapper";
 import { usePaneNavigation } from "../SplitPanesContext";
 
 function AddNodeButton({
@@ -95,6 +92,70 @@ export async function getImageUrlFromText(
   /* eslint-enable functional/immutable-data */
 }
 
+type MiniEditorProps = {
+  initialText?: string;
+  onSave: (text: string, imageUrl?: string) => void;
+  onClose: () => void;
+  onEnterCreateSibling?: () => void;
+};
+
+export function MiniEditor({
+  initialText,
+  onSave,
+  onClose,
+  onEnterCreateSibling,
+}: MiniEditorProps): JSX.Element {
+  const [text, setText] = React.useState(initialText || "");
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
+
+  const handleKeyDown = async (
+    e: React.KeyboardEvent<HTMLInputElement>
+  ): Promise<void> => {
+    if (e.key === "Escape") {
+      onClose();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (!text.trim()) {
+        onClose();
+        return;
+      }
+      const imageUrl = await getImageUrlFromText(text);
+      onSave(text, imageUrl);
+      if (onEnterCreateSibling) {
+        onEnterCreateSibling();
+      }
+    }
+  };
+
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onKeyDown={handleKeyDown}
+      className="mini-editor-input"
+      style={{
+        border: "2px solid transparent",
+        outline: "none",
+        width: "100%",
+        fontSize: "inherit",
+        fontFamily: "inherit",
+        backgroundColor: "transparent",
+        padding: 0,
+        margin: 0,
+      }}
+    />
+  );
+}
+
+// Legacy Editor - wraps MiniEditor (kept for backward compatibility during transition)
 type EditorProps = {
   onCreateNode: (
     text: string,
@@ -105,52 +166,11 @@ type EditorProps = {
 };
 
 export function Editor({ onCreateNode, onClose }: EditorProps): JSX.Element {
-  const ref = React.createRef<ReactQuill>();
-
-  useEffect(() => {
-    if (ref.current) {
-      ref.current.focus();
-    }
-  }, []);
-
-  const onSave = async (relationType?: RelationType): Promise<void> => {
-    if (!ref.current) {
-      return;
-    }
-    const text = ref.current.getEditor().getText();
-    const imageUrl = await getImageUrlFromText(text);
-    const isNewLineAdded = text.endsWith("\n");
-    onCreateNode(
-      isNewLineAdded ? text.slice(0, -1) : text,
-      imageUrl,
-      relationType
-    );
-  };
-
   return (
-    <div className="editor">
-      <div className="scrolling-container pt-2 pb-2">
-        <ReactQuillWrapper
-          placeholder="Create a Note"
-          ref={ref}
-          onKeyDown={(e: KeyboardEvent) => {
-            if (e.keyCode === ESC) {
-              onClose();
-            }
-          }}
-        />
-      </div>
-      <div>
-        <LoadingSpinnerButton onClick={() => onSave()}>
-          Add Note
-        </LoadingSpinnerButton>
-        <CloseButton
-          onClose={() => {
-            onClose();
-          }}
-        />
-      </div>
-    </div>
+    <MiniEditor
+      onSave={(text, imageUrl) => onCreateNode(text, imageUrl)}
+      onClose={onClose}
+    />
   );
 }
 

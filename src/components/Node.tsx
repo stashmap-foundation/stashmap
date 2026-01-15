@@ -2,7 +2,6 @@ import { List } from "immutable";
 import React, { useEffect, useState } from "react";
 import { useMediaQuery } from "react-responsive";
 import { Link } from "react-router-dom";
-import ReactQuill from "react-quill";
 import { textVide } from "text-vide";
 import DOMPurify from "dompurify";
 import {
@@ -40,23 +39,20 @@ import {
 } from "../connections";
 import { REFERENCED_BY, DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 import { IS_MOBILE } from "./responsive";
-import { AddNodeToNode, getImageUrlFromText } from "./AddNode";
+import { AddNodeToNode, MiniEditor } from "./AddNode";
 import {
   sortRelations,
   useOnChangeRelations,
   useOnToggleExpanded,
 } from "./SelectRelations";
 import { ReferenceIndicators } from "./ReferenceIndicators";
-import { DeleteNode } from "./DeleteNode";
 import { useData } from "../DataContext";
 import { planUpsertNode, usePlanner } from "../planner";
-import { ReactQuillWrapper } from "./ReactQuillWrapper";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeIcon } from "./NodeIcon";
 import { planAddNewRelationToNode } from "./RelationTypes";
-import { LoadingSpinnerButton } from "../commons/LoadingSpinnerButton";
 import { useInputElementFocus } from "../commons/FocusContextProvider";
-import { CancelButton, NodeCard } from "../commons/Ui";
+import { NodeCard } from "../commons/Ui";
 import { useProjectContext } from "../ProjectContext";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { LeftMenu } from "./LeftMenu";
@@ -196,80 +192,25 @@ function ErrorContent(): JSX.Element {
 }
 
 type InlineEditorProps = {
-  onCreateNode: (text: string, imageUrl?: string) => void;
-  onStopEditing: () => void;
-  onEnterPressed?: (text: string) => void;
+  initialText: string;
+  onSave: (text: string, imageUrl?: string) => void;
+  onClose: () => void;
+  onEnterCreateSibling?: () => void;
 };
 
 function InlineEditor({
-  onCreateNode,
-  onStopEditing,
-  onEnterPressed,
+  initialText,
+  onSave,
+  onClose,
+  onEnterCreateSibling,
 }: InlineEditorProps): JSX.Element {
-  const [node] = useNode();
-  const ref = React.createRef<ReactQuill>();
-  if (!node) {
-    return <ErrorContent />;
-  }
-  useEffect(() => {
-    if (ref.current) {
-      ref.current.focus();
-      const quill = ref.current.getEditor();
-      quill.deleteText(0, 1000000);
-      quill.insertText(0, node.text);
-    }
-  }, []);
-  const onSave = async (): Promise<void> => {
-    if (!ref.current) {
-      return;
-    }
-    const text = ref.current.getEditor().getText();
-    const imageUrl = await getImageUrlFromText(text);
-    const isNewLineAdded = text.endsWith("\n");
-    onCreateNode(isNewLineAdded ? text.slice(0, -1) : text, imageUrl);
-  };
-
-  const handleKeyDown = (e: KeyboardEvent): void => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      if (onEnterPressed && ref.current) {
-        const text = ref.current.getEditor().getText();
-        const isNewLineAdded = text.endsWith("\n");
-        const cleanText = isNewLineAdded ? text.slice(0, -1) : text;
-        onEnterPressed(cleanText);
-      }
-    }
-  };
-
   return (
-    <>
-      <div className="editor pb-2">
-        <div className="scrolling-container flex-row-start w-100">
-          <ReactQuillWrapper ref={ref} onKeyDown={handleKeyDown} />
-        </div>
-      </div>
-      <div className="flex-row-space-between">
-        <DeleteNode
-          afterOnClick={() => {
-            onStopEditing();
-          }}
-        />
-        <div className="flex-row-end">
-          <LoadingSpinnerButton
-            className="btn font-size-small"
-            onClick={() => onSave()}
-            ariaLabel="save"
-          >
-            <span>Save</span>
-          </LoadingSpinnerButton>
-          <CancelButton
-            onClose={() => {
-              onStopEditing();
-            }}
-          />
-        </div>
-      </div>
-    </>
+    <MiniEditor
+      initialText={initialText}
+      onSave={onSave}
+      onClose={onClose}
+      onEnterCreateSibling={onEnterCreateSibling}
+    />
   );
 }
 
@@ -464,7 +405,11 @@ function EditingNodeContent(): JSX.Element | null {
   if (!node || node.type !== "text") {
     return null;
   }
-  const editNodeText = (text: string, imageUrl?: string): void => {
+  const closeEditor = (): void => {
+    setIsInputElementInFocus(false);
+    setEditingState(toggleEditing(editingViews, viewKey));
+  };
+  const handleSave = (text: string, imageUrl?: string): void => {
     executePlan(
       planUpsertNode(createPlan(), {
         ...node,
@@ -472,33 +417,17 @@ function EditingNodeContent(): JSX.Element | null {
         imageUrl,
       })
     );
+    closeEditor();
   };
-  const closeEditor = (): void => {
-    setIsInputElementInFocus(false);
-    setEditingState(toggleEditing(editingViews, viewKey));
-  };
-  const handleEnterPressed = async (text: string): Promise<void> => {
-    if (text.trim()) {
-      // Save the node
-      const imageUrl = await getImageUrlFromText(text);
-      editNodeText(text, imageUrl);
-      // Close editor
-      closeEditor();
-      // Set sibling editor state to show new editor below
-      setSiblingEditorAfterViewKey(viewKey);
-    } else {
-      // Empty text - just close
-      closeEditor();
-    }
+  const handleEnterCreateSibling = (): void => {
+    setSiblingEditorAfterViewKey(viewKey);
   };
   return (
     <InlineEditor
-      onCreateNode={(text, imageUrl) => {
-        editNodeText(text, imageUrl);
-        closeEditor();
-      }}
-      onStopEditing={closeEditor}
-      onEnterPressed={handleEnterPressed}
+      initialText={node.text}
+      onSave={handleSave}
+      onClose={closeEditor}
+      onEnterCreateSibling={handleEnterCreateSibling}
     />
   );
 }

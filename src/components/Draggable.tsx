@@ -6,10 +6,21 @@ import {
   useIsDiffItem,
   useIsInReferencedByView,
   useViewPath,
+  useViewKey,
+  useRelationIndex,
+  getParentView,
+  upsertRelations,
+  updateViewPathsAfterAddRelation,
 } from "../ViewContext";
-import { NOTE_TYPE, Node } from "./Node";
+import { NOTE_TYPE, Node, Indent } from "./Node";
+import { LeftMenu } from "./LeftMenu";
 import { useDroppable } from "./DroppableContainer";
-import { useIsEditingOn } from "./TemporaryViewContext";
+import { useIsEditingOn, useTemporaryView } from "./TemporaryViewContext";
+import { Editor } from "./AddNode";
+import { NodeCard } from "../commons/Ui";
+import { newNode, addRelationToRelations } from "../connections";
+import { planUpsertNode, planUpdateViews, usePlanner } from "../planner";
+import { usePaneNavigation } from "../SplitPanesContext";
 
 export type DragItemType = {
   path: ViewPath;
@@ -84,6 +95,74 @@ function DraggableDiffItem({ className }: { className?: string }): JSX.Element {
   );
 }
 
+function SiblingEditor({
+  insertAtIndex,
+  levels,
+}: {
+  insertAtIndex: number;
+  levels: number;
+}): JSX.Element | null {
+  const viewPath = useViewPath();
+  const { stack } = usePaneNavigation();
+  const { createPlan, executePlan } = usePlanner();
+  const { setSiblingEditorAfterViewKey } = useTemporaryView();
+
+  // Get parent view - that's where we insert the sibling
+  const parentPath = getParentView(viewPath);
+  if (!parentPath) {
+    return null;
+  }
+
+  const onClose = (): void => {
+    setSiblingEditorAfterViewKey(null);
+  };
+
+  const onCreateNode = async (text: string, imageUrl?: string): Promise<void> => {
+    const trimmedText = text.trim();
+    if (!trimmedText) {
+      onClose();
+      return;
+    }
+
+    const plan = createPlan();
+    const n = newNode(text, plan.user.publicKey, imageUrl);
+    const planWithNode = planUpsertNode(plan, n);
+
+    // Use addRelationToRelations which handles insertion at specific index
+    const updatedRelationsPlan = upsertRelations(
+      planWithNode,
+      parentPath,
+      stack,
+      (relations) =>
+        addRelationToRelations(
+          relations,
+          n.id,
+          "", // Default to "relevant"
+          undefined, // No argument
+          insertAtIndex
+        )
+    );
+    // Update view paths when inserting at specific position
+    const updatedViews = updateViewPathsAfterAddRelation(
+      updatedRelationsPlan,
+      parentPath,
+      insertAtIndex
+    );
+    executePlan(planUpdateViews(updatedRelationsPlan, updatedViews));
+    onClose();
+  };
+
+  return (
+    <NodeCard className="hover-light-bg" cardBodyClassName="ps-0 pt-0 pb-0">
+      <LeftMenu />
+      {levels > 0 && <Indent levels={levels} />}
+      <div className="flex-column w-100">
+        <Editor onCreateNode={onCreateNode} onClose={onClose} />
+      </div>
+    </NodeCard>
+  );
+}
+
 export function ListItem({
   index,
   treeViewPath,
@@ -94,6 +173,18 @@ export function ListItem({
   const ref = useRef<HTMLDivElement>(null);
   const isDiffItem = useIsDiffItem();
   const isInReferencedByView = useIsInReferencedByView();
+  const viewPath = useViewPath();
+  const viewKey = useViewKey();
+  const relationIndex = useRelationIndex();
+  const { siblingEditorAfterViewKey } = useTemporaryView();
+
+  // Check if we should show a sibling editor after this node
+  const showSiblingEditor = siblingEditorAfterViewKey === viewKey;
+  // Insert at the position after this node
+  const siblingInsertIndex =
+    relationIndex !== undefined ? relationIndex + 1 : undefined;
+  // Calculate indentation level (same as the current node)
+  const levels = viewPath.length - 1;
 
   const [{ dragDirection }, drop] = useDroppable({
     destination: treeViewPath,
@@ -119,8 +210,13 @@ export function ListItem({
     dragDirection === -1 ? "dragging-over-bottom" : ""
   }`;
   return (
-    <div className="visible-on-hover">
-      <Draggable ref={ref} className={className} />
-    </div>
+    <>
+      <div className="visible-on-hover">
+        <Draggable ref={ref} className={className} />
+      </div>
+      {showSiblingEditor && siblingInsertIndex !== undefined && (
+        <SiblingEditor insertAtIndex={siblingInsertIndex} levels={levels} />
+      )}
+    </>
   );
 }

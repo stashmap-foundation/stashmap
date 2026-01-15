@@ -39,7 +39,12 @@ type EditorOpen = EditorOpenState & {
   setEditorOpenState: (editorOpenState: EditorOpenState) => void;
 };
 
-type TemporaryView = MultiSelection & Editing & EditorOpen;
+type SiblingEditor = {
+  siblingEditorAfterViewKey: string | null;
+  setSiblingEditorAfterViewKey: (viewKey: string | null) => void;
+};
+
+type TemporaryView = MultiSelection & Editing & EditorOpen & SiblingEditor;
 
 type SetSelected = (selected: boolean) => void;
 type FindSelectedByPostfix = (postfix: string) => Set<string>;
@@ -286,6 +291,9 @@ export function TemporaryViewProvider({
   const [isEditorOpenState, setEditorOpenState] = useState<EditorOpenState>({
     editorOpenViews: Set<string>(),
   });
+  const [siblingEditorAfterViewKey, setSiblingEditorAfterViewKey] = useState<
+    string | null
+  >(null);
   return (
     <TemporaryViewContext.Provider
       value={{
@@ -296,6 +304,8 @@ export function TemporaryViewProvider({
         setEditingState,
         editorOpenViews: isEditorOpenState.editorOpenViews,
         setEditorOpenState,
+        siblingEditorAfterViewKey,
+        setSiblingEditorAfterViewKey,
       }}
     >
       {children}

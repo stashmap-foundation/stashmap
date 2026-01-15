@@ -198,11 +198,13 @@ function ErrorContent(): JSX.Element {
 type InlineEditorProps = {
   onCreateNode: (text: string, imageUrl?: string) => void;
   onStopEditing: () => void;
+  onEnterPressed?: (text: string) => void;
 };
 
 function InlineEditor({
   onCreateNode,
   onStopEditing,
+  onEnterPressed,
 }: InlineEditorProps): JSX.Element {
   const [node] = useNode();
   const ref = React.createRef<ReactQuill>();
@@ -226,11 +228,24 @@ function InlineEditor({
     const isNewLineAdded = text.endsWith("\n");
     onCreateNode(isNewLineAdded ? text.slice(0, -1) : text, imageUrl);
   };
+
+  const handleKeyDown = (e: KeyboardEvent): void => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (onEnterPressed && ref.current) {
+        const text = ref.current.getEditor().getText();
+        const isNewLineAdded = text.endsWith("\n");
+        const cleanText = isNewLineAdded ? text.slice(0, -1) : text;
+        onEnterPressed(cleanText);
+      }
+    }
+  };
+
   return (
     <>
       <div className="editor pb-2">
         <div className="scrolling-container flex-row-start w-100">
-          <ReactQuillWrapper ref={ref} />
+          <ReactQuillWrapper ref={ref} onKeyDown={handleKeyDown} />
         </div>
       </div>
       <div className="flex-row-space-between">
@@ -440,7 +455,11 @@ function EditingNodeContent(): JSX.Element | null {
   const [node] = useNode();
   const { createPlan, executePlan } = usePlanner();
   const viewKey = useViewKey();
-  const { editingViews, setEditingState } = useTemporaryView();
+  const {
+    editingViews,
+    setEditingState,
+    setSiblingEditorAfterViewKey,
+  } = useTemporaryView();
   const { setIsInputElementInFocus } = useInputElementFocus();
   if (!node || node.type !== "text") {
     return null;
@@ -458,6 +477,20 @@ function EditingNodeContent(): JSX.Element | null {
     setIsInputElementInFocus(false);
     setEditingState(toggleEditing(editingViews, viewKey));
   };
+  const handleEnterPressed = async (text: string): Promise<void> => {
+    if (text.trim()) {
+      // Save the node
+      const imageUrl = await getImageUrlFromText(text);
+      editNodeText(text, imageUrl);
+      // Close editor
+      closeEditor();
+      // Set sibling editor state to show new editor below
+      setSiblingEditorAfterViewKey(viewKey);
+    } else {
+      // Empty text - just close
+      closeEditor();
+    }
+  };
   return (
     <InlineEditor
       onCreateNode={(text, imageUrl) => {
@@ -465,6 +498,7 @@ function EditingNodeContent(): JSX.Element | null {
         closeEditor();
       }}
       onStopEditing={closeEditor}
+      onEnterPressed={handleEnterPressed}
     />
   );
 }

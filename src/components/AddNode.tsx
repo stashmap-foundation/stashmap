@@ -5,7 +5,7 @@ import { CloseButton, NodeCard } from "../commons/Ui";
 import { LoadingSpinnerButton } from "../commons/LoadingSpinnerButton";
 import { useInputElementFocus } from "../commons/FocusContextProvider";
 import { shorten } from "../KnowledgeDataContext";
-import { newNode } from "../connections";
+import { newNode, addRelationToRelations } from "../connections";
 import {
   useIsAddToNode,
   useParentNode,
@@ -14,6 +14,7 @@ import {
   getParentView,
   useViewKey,
   upsertRelations,
+  updateViewPathsAfterAddRelation,
 } from "../ViewContext";
 import useModal from "./useModal";
 import { ESC, SearchModal } from "./SearchModal";
@@ -25,7 +26,7 @@ import {
   useTemporaryView,
   useIsEditorOpen,
 } from "./TemporaryViewContext";
-import { Plan, planUpsertNode, usePlanner } from "../planner";
+import { Plan, planUpsertNode, planUpdateViews, usePlanner } from "../planner";
 import { ReactQuillWrapper } from "./ReactQuillWrapper";
 import { usePaneNavigation } from "../SplitPanesContext";
 
@@ -103,7 +104,7 @@ type EditorProps = {
   onClose: () => void;
 };
 
-function Editor({ onCreateNode, onClose }: EditorProps): JSX.Element {
+export function Editor({ onCreateNode, onClose }: EditorProps): JSX.Element {
   const ref = React.createRef<ReactQuill>();
 
   useEffect(() => {
@@ -276,31 +277,48 @@ export function AddColumn(): JSX.Element {
   );
 }
 
-export function AddNodeToNode(): JSX.Element | null {
+export function AddNodeToNode({
+  insertAtIndex,
+}: {
+  insertAtIndex?: number;
+} = {}): JSX.Element | null {
   const isAddToNode = useIsAddToNode();
   const vContext = useViewPath();
   const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
-  const viewContext = isAddToNode ? getParentView(vContext) : vContext;
-  const [node] = isAddToNode ? useParentNode() : useNode();
+  // When insertAtIndex is provided, we're adding a sibling - use parent's view
+  // When isAddToNode is true, the current path is ADD_TO_NODE - use parent's view
+  // Otherwise, we're adding children to current node - use current view
+  const isSiblingInsert = insertAtIndex !== undefined;
+  const viewContext =
+    isAddToNode || isSiblingInsert ? getParentView(vContext) : vContext;
+  const [node] = isAddToNode || isSiblingInsert ? useParentNode() : useNode();
   if (!node || !viewContext) {
     return null;
   }
 
   const onAddNode = (plan: Plan, nodeID: LongID): void => {
-    const updateRelationsPlan = upsertRelations(
+    // Use addRelationToRelations which handles insertion at specific index
+    const updatedRelationsPlan = upsertRelations(
       plan,
       viewContext,
       stack,
-      (relations) => ({
-        ...relations,
-        items: relations.items.push({
+      (relations) =>
+        addRelationToRelations(
+          relations,
           nodeID,
-          relevance: "", // Default to "relevant"
-        }),
-      })
+          "", // Default to "relevant"
+          undefined, // No argument
+          insertAtIndex
+        )
     );
-    executePlan(updateRelationsPlan);
+    // Update view paths when inserting at specific position
+    const updatedViews = updateViewPathsAfterAddRelation(
+      updatedRelationsPlan,
+      viewContext,
+      insertAtIndex
+    );
+    executePlan(planUpdateViews(updatedRelationsPlan, updatedViews));
   };
 
   const onCreateNewNode = (text: string, imageUrl?: string): void => {

@@ -305,46 +305,6 @@ function AddNode({
   );
 }
 
-export function AddColumn(): JSX.Element {
-  const viewPath = useViewPath();
-  const { stack } = usePaneNavigation();
-  const { createPlan, executePlan } = usePlanner();
-
-  const onAddNode = (plan: Plan, nodeID: LongID): void => {
-    const updateRelationsPlan = upsertRelations(
-      plan,
-      viewPath,
-      stack,
-      (relations) => ({
-        ...relations,
-        items: relations.items.push({
-          nodeID,
-          relevance: "", // Default to "relevant"
-        }),
-      })
-    );
-    executePlan(updateRelationsPlan);
-  };
-
-  const onCreateNewNode = (text: string, imageUrl?: string): void => {
-    const plan = createPlan();
-    const node = newNode(text, plan.user.publicKey, imageUrl);
-    onAddNode(planUpsertNode(plan, node), node.id);
-  };
-
-  return (
-    <NodeCard className="hover-light-bg">
-      <Indent levels={1} />
-      <AddNode
-        onCreateNewNode={onCreateNewNode}
-        onAddExistingNode={(id) => onAddNode(createPlan(), id)}
-        ariaLabel="add node"
-        isSearchEnabledByShortcut
-      />
-    </NodeCard>
-  );
-}
-
 // Hook to get the add node handler for sibling insert
 function useAddSiblingNode(insertAtIndex?: number): {
   onAddNode: (plan: Plan, nodeID: LongID) => void;

@@ -515,3 +515,70 @@ test("Disconnect button shows when view.relations is not explicitly set", async 
   const relevanceButtons = screen.getAllByLabelText(/mark .* as not relevant/);
   expect(relevanceButtons.length).toBe(2);
 });
+
+test("Can exit Referenced By mode even when node has no relations", async () => {
+  // This tests the fix for when a node has references TO it
+  // but no children/relations of its own - you should still be able
+  // to exit Referenced By mode
+  const [alice] = setup([ALICE]);
+  const { publicKey: alicePK } = alice().user;
+
+  // Create Bitcoin (no children) and Money -> Bitcoin (so Bitcoin has references)
+  const bitcoin = newNode("Bitcoin", alicePK);
+  const money = newNode("Money", alicePK);
+
+  // Money has Bitcoin as a child, but Bitcoin has no children
+  const moneyRelations = addRelationToRelations(
+    newRelations(money.id, List(), alicePK),
+    bitcoin.id
+  );
+
+  const plan = planUpsertRelations(
+    planUpsertNode(planUpsertNode(createPlan(alice()), bitcoin), money),
+    moneyRelations
+  );
+  await execute({ ...alice(), plan });
+
+  renderWithTestData(
+    <Data user={alice().user}>
+      <RootViewContextProvider root={bitcoin.id}>
+        <TemporaryViewProvider>
+          <DND>
+            <LoadNode referencedBy>
+              <>
+                <DraggableNote />
+                <TreeView />
+              </>
+            </LoadNode>
+          </DND>
+        </TemporaryViewProvider>
+      </RootViewContextProvider>
+    </Data>,
+    {
+      ...alice(),
+      initialRoute: `/d/${bitcoin.id}`,
+    }
+  );
+
+  await screen.findByText("Bitcoin");
+
+  // Filter button should be visible initially (not in Referenced By mode)
+  expect(screen.getByLabelText("filter Bitcoin")).toBeDefined();
+
+  // Enter Referenced By mode
+  fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
+  await screen.findByLabelText("hide references to Bitcoin");
+
+  // Filter should now be grayed (showing children button)
+  expect(screen.getByLabelText("show children of Bitcoin")).toBeDefined();
+
+  // Reference should be visible
+  await screen.findByText(/Money/);
+
+  // Exit Referenced By mode - this should work even though Bitcoin has no relations
+  fireEvent.click(screen.getByLabelText("hide references to Bitcoin"));
+
+  // Should be back to normal mode - filter button should be visible again
+  await screen.findByLabelText("filter Bitcoin");
+  expect(screen.getByLabelText("show references to Bitcoin")).toBeDefined();
+});

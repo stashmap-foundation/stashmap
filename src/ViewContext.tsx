@@ -758,6 +758,20 @@ export function useIsAddToNode(): boolean {
   return getLast(viewContext).nodeID === ADD_TO_NODE;
 }
 
+export function isExpanded(data: Data, viewKey: string): boolean {
+  const viewPath = parseViewPath(viewKey);
+  const view = getViewFromPath(data, viewPath);
+  // Root nodes (header) are always expanded (alwaysOneSelected pattern)
+  const isRoot = viewPath.length === 2;
+  return isRoot || view.expanded === true;
+}
+
+export function useIsExpanded(): boolean {
+  const data = useData();
+  const viewKey = useViewKey();
+  return isExpanded(data, viewKey);
+}
+
 export function useViewKey(): string {
   return viewPathToString(useViewPath());
 }

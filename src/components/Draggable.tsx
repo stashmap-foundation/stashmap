@@ -11,6 +11,8 @@ import {
   getParentView,
   upsertRelations,
   updateViewPathsAfterAddRelation,
+  addNodeToPathWithRelations,
+  viewPathToString,
 } from "../ViewContext";
 import { NOTE_TYPE, Node, Indent } from "./Node";
 import { LeftMenu } from "./LeftMenu";
@@ -95,28 +97,31 @@ function DraggableDiffItem({ className }: { className?: string }): JSX.Element {
   );
 }
 
-function SiblingEditor({
-  insertAtIndex,
-  levels,
-}: {
+type CreateNodeEditorProps = {
+  position: 'afterSibling' | 'asFirstChild';
   insertAtIndex: number;
   levels: number;
-}): JSX.Element | null {
+};
+
+function CreateNodeEditor({
+  position,
+  insertAtIndex,
+  levels,
+}: CreateNodeEditorProps): JSX.Element | null {
   const viewPath = useViewPath();
-  const viewKey = useViewKey();
   const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
-  const { setSiblingEditorAfterViewKey } = useTemporaryView();
+  const { openCreateNodeEditor, closeCreateNodeEditor } = useTemporaryView();
 
-  // Get parent view - that's where we insert the sibling
+  // Determine target path based on position:
+  // - afterSibling: insert into parent's relations
+  // - asFirstChild: insert into current node's relations
   const parentPath = getParentView(viewPath);
-  if (!parentPath) {
+  const targetPath = position === 'afterSibling' ? parentPath : viewPath;
+
+  if (!targetPath) {
     return null;
   }
-
-  const onClose = (): void => {
-    setSiblingEditorAfterViewKey(null);
-  };
 
   const onCreateNode = async (
     text: string,
@@ -125,7 +130,7 @@ function SiblingEditor({
   ): Promise<void> => {
     const trimmedText = text.trim();
     if (!trimmedText) {
-      onClose();
+      closeCreateNodeEditor();
       return;
     }
 
@@ -133,35 +138,39 @@ function SiblingEditor({
     const n = newNode(text, plan.user.publicKey, imageUrl);
     const planWithNode = planUpsertNode(plan, n);
 
-    // Use addRelationToRelations which handles insertion at specific index
+    // Capture the updated relations to construct the proper viewKey
+    let updatedRelations: Relations;
     const updatedRelationsPlan = upsertRelations(
       planWithNode,
-      parentPath,
+      targetPath,
       stack,
-      (relations) =>
-        addRelationToRelations(
+      (relations) => {
+        updatedRelations = addRelationToRelations(
           relations,
           n.id,
           "", // Default to "relevant"
           undefined, // No argument
           insertAtIndex
-        )
+        );
+        return updatedRelations;
+      }
     );
     // Update view paths when inserting at specific position
     const updatedViews = updateViewPathsAfterAddRelation(
       updatedRelationsPlan,
-      parentPath,
+      targetPath,
       insertAtIndex
     );
     executePlan(planUpdateViews(updatedRelationsPlan, updatedViews));
 
-    // If user pressed Enter, open sibling editor after the newly created node
+    // If user pressed Enter, open another editor after the newly created node
     if (submitted) {
-      // Compute the new node's viewKey: same prefix as current, but with new nodeID:0
-      const parts = viewKey.split(":");
-      const prefix = parts.slice(0, -2).join(":");
-      const newNodeViewKey = `${prefix}:${n.id}:0`;
-      setSiblingEditorAfterViewKey(newNodeViewKey);
+      // Construct the proper viewKey using ViewContext functions
+      // @ts-expect-error updatedRelations is assigned in the callback above
+      const newNodePath = addNodeToPathWithRelations(targetPath, updatedRelations, insertAtIndex);
+      const newNodeViewKey = viewPathToString(newNodePath);
+      // Chain to next sibling (new node is not expanded)
+      openCreateNodeEditor(newNodeViewKey);
     }
   };
 
@@ -173,7 +182,7 @@ function SiblingEditor({
         <span className="triangle collapsed">▶</span>
       </div>
       <div className="flex-column w-100" style={{ paddingTop: 10 }}>
-        <MiniEditor onSave={onCreateNode} onClose={onClose} />
+        <MiniEditor onSave={onCreateNode} onClose={closeCreateNodeEditor} />
       </div>
     </NodeCard>
   );
@@ -192,15 +201,24 @@ export function ListItem({
   const viewPath = useViewPath();
   const viewKey = useViewKey();
   const relationIndex = useRelationIndex();
-  const { siblingEditorAfterViewKey } = useTemporaryView();
+  const { createNodeEditorState } = useTemporaryView();
 
-  // Check if we should show a sibling editor after this node
-  const showSiblingEditor = siblingEditorAfterViewKey === viewKey;
-  // Insert at the position after this node
-  const siblingInsertIndex =
-    relationIndex !== undefined ? relationIndex + 1 : undefined;
-  // Calculate indentation level (same as the current node)
-  const levels = viewPath.length - 1;
+  // Check if we should show a create node editor after this node
+  const showEditor = createNodeEditorState?.viewKey === viewKey;
+  const editorPosition = createNodeEditorState?.position;
+
+  // Calculate values based on position
+  const currentLevels = viewPath.length - 1;
+  // afterSibling: same level, insert at relationIndex + 1
+  // asFirstChild: +1 level, insert at 0
+  const editorLevels =
+    editorPosition === 'asFirstChild' ? currentLevels + 1 : currentLevels;
+  const insertAtIndex =
+    editorPosition === 'asFirstChild'
+      ? 0
+      : relationIndex !== undefined
+        ? relationIndex + 1
+        : 0;
 
   const [{ dragDirection }, drop] = useDroppable({
     destination: treeViewPath,
@@ -230,8 +248,12 @@ export function ListItem({
       <div className="visible-on-hover">
         <Draggable ref={ref} className={className} />
       </div>
-      {showSiblingEditor && siblingInsertIndex !== undefined && (
-        <SiblingEditor insertAtIndex={siblingInsertIndex} levels={levels} />
+      {showEditor && editorPosition && (
+        <CreateNodeEditor
+          position={editorPosition}
+          insertAtIndex={insertAtIndex}
+          levels={editorLevels}
+        />
       )}
     </>
   );

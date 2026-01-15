@@ -10,6 +10,7 @@ import {
   useViewPath,
   ViewPath,
   useIsInReferencedByView,
+  useIsExpanded,
   addNodeToPathWithRelations,
   addDiffItemToPath,
   getDiffItemsForNode,
@@ -73,9 +74,8 @@ function ExpandCollapseToggle(): JSX.Element | null {
   const onToggleExpanded = useOnToggleExpanded();
   const isReferencedBy = view.relations === REFERENCED_BY;
 
-  // Root nodes (header) are always expanded (alwaysOneSelected pattern from SelectRelations)
   const isRoot = viewPath.length === 2;
-  const isExpanded = isRoot || view.expanded === true;
+  const isExpanded = useIsExpanded();
 
   // Get available relations filtered by context (same as SelectRelations)
   const context = getContextFromStackAndViewPath(stack, viewPath);
@@ -262,7 +262,7 @@ function NodeContent({ node }: { node: KnowNode }): JSX.Element {
 function EditableContent(): JSX.Element {
   const viewKey = useViewKey();
   const { createPlan, executePlan } = usePlanner();
-  const { setSiblingEditorAfterViewKey } = useTemporaryView();
+  const { openCreateNodeEditor } = useTemporaryView();
   const [node] = useNode();
 
   const handleSave = (
@@ -281,9 +281,9 @@ function EditableContent(): JSX.Element {
         } as KnowNode)
       );
     }
-    // If user pressed Enter, open sibling editor after this node
+    // If user pressed Enter, open create node editor (position determined by expansion state)
     if (submitted) {
-      setSiblingEditorAfterViewKey(viewKey);
+      openCreateNodeEditor(viewKey);
     }
   };
 

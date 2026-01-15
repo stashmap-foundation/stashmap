@@ -9,6 +9,7 @@ import {
   useParentNode,
   useRelationIndex,
   getRelationIndex,
+  isExpanded,
 } from "../ViewContext";
 import { getRelations, splitID } from "../connections";
 import { useData } from "../DataContext";
@@ -39,12 +40,20 @@ type EditorOpen = EditorOpenState & {
   setEditorOpenState: (editorOpenState: EditorOpenState) => void;
 };
 
-type SiblingEditor = {
-  siblingEditorAfterViewKey: string | null;
-  setSiblingEditorAfterViewKey: (viewKey: string | null) => void;
+type CreateNodeEditorPosition = 'afterSibling' | 'asFirstChild';
+
+type CreateNodeEditorState = {
+  viewKey: string;
+  position: CreateNodeEditorPosition;
+} | null;
+
+type CreateNodeEditor = {
+  createNodeEditorState: CreateNodeEditorState;
+  openCreateNodeEditor: (viewKey: string) => void;
+  closeCreateNodeEditor: () => void;
 };
 
-type TemporaryView = MultiSelection & Editing & EditorOpen & SiblingEditor;
+type TemporaryView = MultiSelection & Editing & EditorOpen & CreateNodeEditor;
 
 type SetSelected = (selected: boolean) => void;
 type FindSelectedByPostfix = (postfix: string) => Set<string>;
@@ -291,9 +300,19 @@ export function TemporaryViewProvider({
   const [isEditorOpenState, setEditorOpenState] = useState<EditorOpenState>({
     editorOpenViews: Set<string>(),
   });
-  const [siblingEditorAfterViewKey, setSiblingEditorAfterViewKey] = useState<
-    string | null
-  >(null);
+  const [createNodeEditorState, setCreateNodeEditorState] =
+    useState<CreateNodeEditorState>(null);
+  const data = useData();
+
+  const openCreateNodeEditor = (viewKey: string): void => {
+    const position = isExpanded(data, viewKey) ? 'asFirstChild' : 'afterSibling';
+    setCreateNodeEditorState({ viewKey, position });
+  };
+
+  const closeCreateNodeEditor = (): void => {
+    setCreateNodeEditorState(null);
+  };
+
   return (
     <TemporaryViewContext.Provider
       value={{
@@ -304,8 +323,9 @@ export function TemporaryViewProvider({
         setEditingState,
         editorOpenViews: isEditorOpenState.editorOpenViews,
         setEditorOpenState,
-        siblingEditorAfterViewKey,
-        setSiblingEditorAfterViewKey,
+        createNodeEditorState,
+        openCreateNodeEditor,
+        closeCreateNodeEditor,
       }}
     >
       {children}

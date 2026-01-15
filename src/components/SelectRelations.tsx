@@ -28,7 +28,10 @@ import { REFERENCED_BY } from "../constants";
 import { useData } from "../DataContext";
 import { planUpdateViews, usePlanner } from "../planner";
 
-type ChangeRelation = (relations: Relations, expand: boolean) => void;
+type ChangeRelation = (
+  relations: Relations | undefined,
+  expand: boolean
+) => void;
 
 export function useOnChangeRelations(): ChangeRelation {
   const data = useData();
@@ -40,13 +43,13 @@ export function useOnChangeRelations(): ChangeRelation {
   const viewKey = useViewKey();
   const deselectAllInView = useDeselectAllInView();
 
-  return (relations: Relations, expand: boolean): void => {
+  return (relations: Relations | undefined, expand: boolean): void => {
     const viewKeyOfAddToNode = addAddToNodeToPath(data, viewPath, stack);
     const plan = planUpdateViews(
       createPlan(),
       updateView(data.views, viewPath, {
         ...view,
-        relations: relations.id,
+        relations: relations?.id,
         expanded: expand,
       })
     );

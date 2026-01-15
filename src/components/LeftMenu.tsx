@@ -19,7 +19,7 @@ import { useData } from "../DataContext";
 import { REFERENCED_BY, TYPE_COLORS } from "../constants";
 import { usePaneNavigation } from "../SplitPanesContext";
 
-function useSwitchToNormalRelations(): (() => void) | undefined {
+function useSwitchToNormalRelations(): () => void {
   const { knowledgeDBs, user } = useData();
   const [nodeID] = useNodeID();
   const viewPath = useViewPath();
@@ -36,11 +36,8 @@ function useSwitchToNormalRelations(): (() => void) | undefined {
   const sorted = sortRelations(normalRelations, user.publicKey);
   const topNormalRelation = sorted.first();
 
-  if (!topNormalRelation) {
-    return undefined;
-  }
-
-  return () => onChangeRelations(topNormalRelation, true);
+  // Switch to normal relations if available, otherwise just exit Referenced By mode
+  return () => onChangeRelations(topNormalRelation, !!topNormalRelation);
 }
 
 function ReferenceDot(): JSX.Element | null {
@@ -70,9 +67,9 @@ function ReferenceDot(): JSX.Element | null {
 
   const handleClick = (): void => {
     if (isInReferencedBy) {
-      if (isExpanded && switchToNormal) {
+      if (isExpanded) {
         switchToNormal();
-      } else if (!isExpanded && referencedByRelations) {
+      } else if (referencedByRelations) {
         onChangeRelations(referencedByRelations, true);
       }
     } else if (referencedByRelations) {
@@ -119,7 +116,7 @@ function GrayedFilterDots(): JSX.Element | null {
   const [node] = useNode();
   const switchToNormal = useSwitchToNormalRelations();
 
-  if (!node || !switchToNormal) {
+  if (!node) {
     return null;
   }
 

@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { ConnectableElement, useDrag } from "react-dnd";
 import {
   ViewPath,
@@ -22,7 +22,7 @@ import { NOTE_TYPE, Node, Indent } from "./Node";
 import { LeftMenu } from "./LeftMenu";
 import { useDroppable } from "./DroppableContainer";
 import { useIsEditingOn, useTemporaryView } from "./TemporaryViewContext";
-import { MiniEditor, getImageUrlFromText } from "./AddNode";
+import { MiniEditor } from "./AddNode";
 import { NodeCard } from "../commons/Ui";
 import { newNode, addRelationToRelations } from "../connections";
 import { planUpsertNode, planUpdateViews, usePlanner } from "../planner";
@@ -102,21 +102,28 @@ function DraggableDiffItem({ className }: { className?: string }): JSX.Element {
 }
 
 type CreateNodeEditorProps = {
-  position: 'afterSibling' | 'asFirstChild';
-  insertAtIndex: number;
-  levels: number;
+  initialPosition: 'afterSibling' | 'asFirstChild';
+  baseInsertAtIndex: number;
+  baseLevels: number;
 };
 
 function CreateNodeEditor({
-  position,
-  insertAtIndex,
-  levels,
+  initialPosition,
+  baseInsertAtIndex,
+  baseLevels,
 }: CreateNodeEditorProps): JSX.Element | null {
   const data = useData();
   const viewPath = useViewPath();
   const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
   const { openCreateNodeEditor, closeCreateNodeEditor } = useTemporaryView();
+
+  // Internal state for position - can change when Tab is pressed
+  const [position, setPosition] = useState(initialPosition);
+
+  // Compute derived values based on current position
+  const levels = position === 'asFirstChild' ? baseLevels + 1 : baseLevels;
+  const insertAtIndex = position === 'asFirstChild' ? 0 : baseInsertAtIndex;
 
   // Determine target path based on position:
   // - afterSibling: insert into parent's relations
@@ -182,52 +189,22 @@ function CreateNodeEditor({
     }
   };
 
-  const onTab = async (text: string): Promise<void> => {
-    // For CreateNodeEditor, Tab indents into the current node (viewPath),
-    // making the new node a child of the current node instead of a sibling
+  const onTab = (): void => {
+    // Tab indents the editor - changes from sibling to child position
+    // Don't create the node yet, just move the editor
+    if (position === 'asFirstChild') {
+      // Already at max indent level for this context
+      return;
+    }
+
+    // Expand the current node (ensure it has relations for children)
     const [nodeID, view] = getNodeIDFromView(data, viewPath);
     const context = getContextFromStackAndViewPath(stack, viewPath);
+    const plan = planExpandNode(createPlan(), nodeID, context, view, viewPath);
+    executePlan(plan);
 
-    // Step 1: Expand the current node (ensure it has relations)
-    let plan = planExpandNode(
-      createPlan(),
-      nodeID,
-      context,
-      view,
-      viewPath
-    );
-
-    // Step 2: If there's text, create the node as first child
-    if (text) {
-      const imageUrl = await getImageUrlFromText(text);
-      const n = newNode(text, plan.user.publicKey, imageUrl);
-      plan = planUpsertNode(plan, n);
-
-      // Add to current node at index 0
-      let updatedRelations: Relations;
-      plan = upsertRelations(plan, viewPath, stack, (relations) => {
-        updatedRelations = addRelationToRelations(relations, n.id, "", undefined, 0);
-        return updatedRelations;
-      });
-      const updatedViews = updateViewPathsAfterAddRelation(plan, viewPath, 0);
-      plan = planUpdateViews(plan, updatedViews);
-
-      executePlan(plan);
-
-      // Open editor after the newly created node
-      // @ts-expect-error updatedRelations is assigned in the callback above
-      const newNodePath = addNodeToPathWithRelations(viewPath, updatedRelations, 0);
-      const newNodeViewKey = viewPathToString(newNodePath);
-      closeCreateNodeEditor();
-      openCreateNodeEditor(newNodeViewKey);
-    } else {
-      // No text - just expand and move editor to be first child
-      const viewKey = viewPathToString(viewPath);
-      executePlan(plan);
-      closeCreateNodeEditor();
-      // Pass plan to openCreateNodeEditor so it uses fresh expanded state
-      openCreateNodeEditor(viewKey, plan);
-    }
+    // Update internal position state - editor stays mounted, text preserved
+    setPosition('asFirstChild');
   };
 
   return (
@@ -263,18 +240,9 @@ export function ListItem({
   const showEditor = createNodeEditorState?.viewKey === viewKey;
   const editorPosition = createNodeEditorState?.position;
 
-  // Calculate values based on position
-  const currentLevels = viewPath.length - 1;
-  // afterSibling: same level, insert at relationIndex + 1
-  // asFirstChild: +1 level, insert at 0
-  const editorLevels =
-    editorPosition === 'asFirstChild' ? currentLevels + 1 : currentLevels;
-  const insertAtIndex =
-    editorPosition === 'asFirstChild'
-      ? 0
-      : relationIndex !== undefined
-        ? relationIndex + 1
-        : 0;
+  // Base values for editor - CreateNodeEditor will adjust based on its internal position state
+  const baseLevels = viewPath.length - 1;
+  const baseInsertAtIndex = relationIndex !== undefined ? relationIndex + 1 : 0;
 
   const [{ dragDirection }, drop] = useDroppable({
     destination: treeViewPath,
@@ -306,9 +274,9 @@ export function ListItem({
       </div>
       {showEditor && editorPosition && (
         <CreateNodeEditor
-          position={editorPosition}
-          insertAtIndex={insertAtIndex}
-          levels={editorLevels}
+          initialPosition={editorPosition}
+          baseInsertAtIndex={baseInsertAtIndex}
+          baseLevels={baseLevels}
         />
       )}
     </>

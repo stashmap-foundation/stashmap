@@ -304,7 +304,11 @@ function EditableContent(): JSX.Element {
 function InteractiveNodeContent(): JSX.Element {
   const { user } = useData();
   const [node] = useNode();
+  const [, view] = useNodeID();
   const isLoading = useNodeIsLoading();
+  const isInReferencedByView = useIsInReferencedByView();
+  // Also check if this is the root node of a Referenced By view
+  const isReferencedByRoot = view.relations === REFERENCED_BY;
 
   if (isLoading) {
     return <LoadingNode />;
@@ -314,8 +318,8 @@ function InteractiveNodeContent(): JSX.Element {
     return <ErrorContent />;
   }
 
-  // Editable content for mutable nodes
-  if (isMutableNode(node, user)) {
+  // Editable content for mutable nodes (but read-only in Referenced By view)
+  if (isMutableNode(node, user) && !isInReferencedByView && !isReferencedByRoot) {
     return <EditableContent />;
   }
 

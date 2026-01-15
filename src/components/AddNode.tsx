@@ -137,10 +137,8 @@ export function MiniEditor({
     e: React.KeyboardEvent<HTMLSpanElement>
   ): Promise<void> => {
     if (e.key === "Escape") {
-      // Reset to initial text and blur
-      if (editorRef.current) {
-        editorRef.current.textContent = initialText || "";
-      }
+      // Save current content and close (same as blur)
+      await saveIfChanged();
       editorRef.current?.blur();
       onClose?.();
     } else if (e.key === "Enter") {

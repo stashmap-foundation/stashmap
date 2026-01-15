@@ -94,9 +94,8 @@ export async function getImageUrlFromText(
 
 type MiniEditorProps = {
   initialText?: string;
-  onSave: (text: string, imageUrl?: string) => void;
+  onSave: (text: string, imageUrl?: string, submitted?: boolean) => void;
   onClose?: () => void;
-  onEnterCreateSibling?: () => void;
   autoFocus?: boolean;
 };
 
@@ -104,7 +103,6 @@ export function MiniEditor({
   initialText,
   onSave,
   onClose,
-  onEnterCreateSibling,
   autoFocus = true,
 }: MiniEditorProps): JSX.Element {
   const editorRef = React.useRef<HTMLSpanElement>(null);
@@ -152,10 +150,7 @@ export function MiniEditor({
         return;
       }
       const imageUrl = await getImageUrlFromText(text);
-      onSave(text, imageUrl);
-      if (onEnterCreateSibling) {
-        onEnterCreateSibling();
-      }
+      onSave(text, imageUrl, true);
     }
   };
 
@@ -215,11 +210,7 @@ export function MiniEditor({
 
 // Legacy Editor - wraps MiniEditor (kept for backward compatibility during transition)
 type EditorProps = {
-  onCreateNode: (
-    text: string,
-    imageUrl?: string,
-    relationType?: RelationType
-  ) => void;
+  onCreateNode: (text: string, imageUrl?: string) => void;
   onClose: () => void;
 };
 

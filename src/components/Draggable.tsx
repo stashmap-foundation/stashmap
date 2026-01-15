@@ -103,6 +103,7 @@ function SiblingEditor({
   levels: number;
 }): JSX.Element | null {
   const viewPath = useViewPath();
+  const viewKey = useViewKey();
   const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
   const { setSiblingEditorAfterViewKey } = useTemporaryView();
@@ -117,7 +118,11 @@ function SiblingEditor({
     setSiblingEditorAfterViewKey(null);
   };
 
-  const onCreateNode = async (text: string, imageUrl?: string): Promise<void> => {
+  const onCreateNode = async (
+    text: string,
+    imageUrl?: string,
+    submitted?: boolean
+  ): Promise<void> => {
     const trimmedText = text.trim();
     if (!trimmedText) {
       onClose();
@@ -149,7 +154,15 @@ function SiblingEditor({
       insertAtIndex
     );
     executePlan(planUpdateViews(updatedRelationsPlan, updatedViews));
-    onClose();
+
+    // If user pressed Enter, open sibling editor after the newly created node
+    if (submitted) {
+      // Compute the new node's viewKey: same prefix as current, but with new nodeID:0
+      const parts = viewKey.split(":");
+      const prefix = parts.slice(0, -2).join(":");
+      const newNodeViewKey = `${prefix}:${n.id}:0`;
+      setSiblingEditorAfterViewKey(newNodeViewKey);
+    }
   };
 
   return (
@@ -159,7 +172,7 @@ function SiblingEditor({
       <div className="expand-collapse-toggle" style={{ color: "black" }}>
         <span className="triangle collapsed">▶</span>
       </div>
-      <div className="flex-column w-100">
+      <div className="flex-column w-100" style={{ paddingTop: 10 }}>
         <MiniEditor onSave={onCreateNode} onClose={onClose} />
       </div>
     </NodeCard>

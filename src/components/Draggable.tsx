@@ -164,6 +164,7 @@ function CreateNodeEditor({
     executePlan(planUpdateViews(updatedRelationsPlan, updatedViews));
 
     // If user pressed Enter, open another editor after the newly created node
+    // Otherwise (blur), just close the editor
     if (submitted) {
       // Construct the proper viewKey using ViewContext functions
       // @ts-expect-error updatedRelations is assigned in the callback above
@@ -171,6 +172,8 @@ function CreateNodeEditor({
       const newNodeViewKey = viewPathToString(newNodePath);
       // Chain to next sibling (new node is not expanded)
       openCreateNodeEditor(newNodeViewKey);
+    } else {
+      closeCreateNodeEditor();
     }
   };
 

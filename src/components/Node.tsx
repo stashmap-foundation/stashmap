@@ -12,7 +12,6 @@ import {
   useIsAddToNode,
   useIsInReferencedByView,
   addNodeToPathWithRelations,
-  addAddToNodeToPath,
   addDiffItemToPath,
   getDiffItemsForNode,
   getNodeIDFromView,
@@ -507,8 +506,7 @@ export function getNodesInTree(
   );
 
   if (!relations) {
-    const addNodePath = addAddToNodeToPath(data, parentPath, stack);
-    return ctx.push(addNodePath);
+    return ctx;
   }
 
   // Filter items based on view's typeFilters (default filters out "not_relevant")
@@ -566,8 +564,7 @@ export function getNodesInTree(
       )
       : nodesInTree;
 
-  const addNodePath = addAddToNodeToPath(data, parentPath, stack);
-  return withDiffItems.push(addNodePath);
+  return withDiffItems;
 }
 
 function DiffItemIndicator(): JSX.Element {

@@ -180,7 +180,7 @@ export function TypeFilterButton(): JSX.Element | null {
         className="btn btn-borderless p-0"
         onClick={() => setShow(!show)}
         aria-label={`filter ${node.text}`}
-        title="Filter suggestions from other users"
+        title="Filter by relation type"
       >
         <FilterDotsDisplay activeFilters={currentFilters} />
       </button>

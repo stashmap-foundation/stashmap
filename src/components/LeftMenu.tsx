@@ -82,7 +82,7 @@ function ReferenceDot(): JSX.Element | null {
 
   // Purple for references
   const dotColor = isInReferencedBy
-    ? TYPE_COLORS.suggestions
+    ? TYPE_COLORS.referenced_by
     : TYPE_COLORS.inactive;
 
   const ariaLabel = isInReferencedBy

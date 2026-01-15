@@ -25,5 +25,6 @@ export const TYPE_COLORS = {
   contra: "#c62828",
   suggestions: "#ff9800", // Orange for suggestions from other users
   suggestions_bg: "#fff3e0", // Light orange background for suggestion blocks
+  referenced_by: "#9c27b0", // Purple for Referenced By view
   inactive: "#d0d0d0",
 };

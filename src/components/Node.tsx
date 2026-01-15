@@ -53,7 +53,7 @@ import { planUpsertNode, usePlanner } from "../planner";
 import { ReactQuillWrapper } from "./ReactQuillWrapper";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeIcon } from "./NodeIcon";
-import { REFERENCED_BY_COLOR, planAddNewRelationToNode } from "./RelationTypes";
+import { planAddNewRelationToNode } from "./RelationTypes";
 import { LoadingSpinnerButton } from "../commons/LoadingSpinnerButton";
 import { useInputElementFocus } from "../commons/FocusContextProvider";
 import { CancelButton, NodeCard } from "../commons/Ui";
@@ -111,7 +111,7 @@ function ExpandCollapseToggle(): JSX.Element | null {
   const topRelation = isSelected ? currentRelations : sorted.first();
 
   // Get color based on view state: purple for Referenced By, black for normal
-  const color = isReferencedBy ? REFERENCED_BY_COLOR : "black";
+  const color = isReferencedBy ? TYPE_COLORS.referenced_by : "black";
 
   // Root nodes can't be collapsed (alwaysOneSelected pattern from SelectRelations)
   const preventCollapse = isRoot && isExpanded;

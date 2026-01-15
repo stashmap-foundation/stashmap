@@ -23,7 +23,6 @@ import {
 import { usePaneNavigation } from "../SplitPanesContext";
 
 export const DEFAULT_COLOR = "#027d86";
-export const REFERENCED_BY_COLOR = "#9c27b0"; // Purple for Referenced By view
 
 export const COLORS = [
   "#0288d1", // Bright blue - relevant to

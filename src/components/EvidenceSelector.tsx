@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { TYPE_COLORS } from "../constants";
 import { useUpdateArgument } from "./useUpdateArgument";
+import { useNode } from "../ViewContext";
 
 function getArgumentColor(argument: Argument, isHovered: boolean): string {
   if (argument === "confirms") {
@@ -29,8 +30,11 @@ function getArgumentLabel(argument: Argument): string {
 export function EvidenceSelector(): JSX.Element | null {
   const [isHovered, setIsHovered] = useState(false);
   const { currentArgument, setArgument, isVisible } = useUpdateArgument();
+  const [node] = useNode();
 
   if (!isVisible) return null;
+
+  const nodeName = node?.text || "item";
 
   const handleClick = (): void => {
     setArgument(getNextArgument(currentArgument));
@@ -55,9 +59,9 @@ export function EvidenceSelector(): JSX.Element | null {
         onMouseLeave={() => setIsHovered(false)}
         role="button"
         tabIndex={0}
-        aria-label={`Evidence: ${getArgumentLabel(
+        aria-label={`Evidence for ${nodeName}: ${getArgumentLabel(
           currentArgument
-        )}. Click to change.`}
+        )}`}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();

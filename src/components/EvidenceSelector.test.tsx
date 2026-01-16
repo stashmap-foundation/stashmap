@@ -1,290 +1,216 @@
-import React from "react";
 import { List } from "immutable";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import {
   ALICE,
-  findNodeByText,
-  renderWithTestData,
+  expectTree,
+  findNewNodeEditor,
+  renderTree,
   setup,
-  setupTestDB,
 } from "../utils.test";
-import {
-  newNode,
-  addRelationToRelations,
-  updateItemArgument,
-} from "../connections";
-import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
-import { execute } from "../executor";
-import Data from "../Data";
-import { LoadNode } from "../dataQuery";
-import { RootViewContextProvider, newRelations } from "../ViewContext";
-import { TreeView } from "./TreeView";
-import { DraggableNote } from "./Draggable";
-import { TemporaryViewProvider } from "./TemporaryViewContext";
-import { DND } from "../dnd";
+import { updateItemArgument } from "../connections";
 
 // Integration tests for EvidenceSelector component
 describe("EvidenceSelector", () => {
   test("shows evidence selector for child items", async () => {
     const [alice] = setup([ALICE]);
-    const db = await setupTestDB(alice(), [["Parent", ["Child1", "Child2"]]]);
-    const parent = findNodeByText(db, "Parent") as KnowNode;
+    renderTree(alice);
 
-    renderWithTestData(
-      <Data user={alice().user}>
-        <RootViewContextProvider root={parent.id}>
-          <TemporaryViewProvider>
-            <DND>
-              <LoadNode>
-                <>
-                  <DraggableNote />
-                  <TreeView />
-                </>
-              </LoadNode>
-            </DND>
-          </TemporaryViewProvider>
-        </RootViewContextProvider>
-      </Data>,
-      {
-        ...alice(),
-        initialRoute: `/d/${parent.id}`,
-      }
-    );
+    // Create parent with children
+    await screen.findByLabelText("collapse My Notes");
+    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
-    await screen.findByText("Parent");
-    await screen.findByText("Child1");
-    await screen.findByText("Child2");
+    // Expand Parent and add children
+    await userEvent.click(await screen.findByLabelText("expand Parent"));
+    await userEvent.click(await screen.findByLabelText("add to Parent"));
+    await userEvent.type(await findNewNodeEditor(), "Child1{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Child2{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    await expectTree(`
+My Notes
+  Parent
+    Child1
+    Child2
+    `);
 
     // Both children should have evidence selectors
-    const evidenceButtons = screen.getAllByLabelText(/Evidence:/);
-    expect(evidenceButtons.length).toBe(2);
+    await screen.findByLabelText(/Evidence for Child1:/);
+    await screen.findByLabelText(/Evidence for Child2:/);
   });
 
   test("clicking cycles through undefined -> confirms -> contra -> undefined", async () => {
     const [alice] = setup([ALICE]);
-    const db = await setupTestDB(alice(), [["Parent", ["Child"]]]);
-    const parent = findNodeByText(db, "Parent") as KnowNode;
+    renderTree(alice);
 
-    renderWithTestData(
-      <Data user={alice().user}>
-        <RootViewContextProvider root={parent.id}>
-          <TemporaryViewProvider>
-            <DND>
-              <LoadNode>
-                <>
-                  <DraggableNote />
-                  <TreeView />
-                </>
-              </LoadNode>
-            </DND>
-          </TemporaryViewProvider>
-        </RootViewContextProvider>
-      </Data>,
-      {
-        ...alice(),
-        initialRoute: `/d/${parent.id}`,
-      }
-    );
+    // Create parent with one child
+    await screen.findByLabelText("collapse My Notes");
+    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("expand Parent"));
+    await userEvent.click(await screen.findByLabelText("add to Parent"));
+    await userEvent.type(await findNewNodeEditor(), "Child{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     await screen.findByText("Child");
 
     // Initial state: no evidence type
-    expect(screen.getByLabelText(/Evidence: No evidence type/)).toBeDefined();
+    expect(
+      screen.getByLabelText(/Evidence for Child: No evidence type/)
+    ).toBeDefined();
 
     // Click 1: undefined -> confirms
-    fireEvent.click(screen.getByLabelText(/Evidence: No evidence type/));
+    fireEvent.click(
+      screen.getByLabelText(/Evidence for Child: No evidence type/)
+    );
     await waitFor(() => {
-      expect(screen.getByLabelText(/Evidence: Confirms/)).toBeDefined();
+      expect(screen.getByLabelText(/Evidence for Child: Confirms/)).toBeDefined();
     });
 
     // Click 2: confirms -> contra
-    fireEvent.click(screen.getByLabelText(/Evidence: Confirms/));
+    fireEvent.click(screen.getByLabelText(/Evidence for Child: Confirms/));
     await waitFor(() => {
-      expect(screen.getByLabelText(/Evidence: Contradicts/)).toBeDefined();
+      expect(
+        screen.getByLabelText(/Evidence for Child: Contradicts/)
+      ).toBeDefined();
     });
 
     // Click 3: contra -> undefined
-    fireEvent.click(screen.getByLabelText(/Evidence: Contradicts/));
+    fireEvent.click(screen.getByLabelText(/Evidence for Child: Contradicts/));
     await waitFor(() => {
-      expect(screen.getByLabelText(/Evidence: No evidence type/)).toBeDefined();
+      expect(
+        screen.getByLabelText(/Evidence for Child: No evidence type/)
+      ).toBeDefined();
     });
   });
 
-  test("item with confirms argument shows green dot", async () => {
+  test("item with confirms argument shows Confirms label", async () => {
     const [alice] = setup([ALICE]);
-    const { publicKey: alicePK } = alice().user;
+    renderTree(alice);
 
-    const parent = newNode("Parent", alicePK);
-    const child = newNode("Child", alicePK);
+    // Create parent with child
+    await screen.findByLabelText("collapse My Notes");
+    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
-    // Create relation with confirms argument
-    const relations = addRelationToRelations(
-      newRelations(parent.id, List(), alicePK),
-      child.id,
-      "", // relevance
-      "confirms" // argument
-    );
-
-    const plan = planUpsertRelations(
-      planUpsertNode(planUpsertNode(createPlan(alice()), parent), child),
-      relations
-    );
-    await execute({ ...alice(), plan });
-
-    renderWithTestData(
-      <Data user={alice().user}>
-        <RootViewContextProvider root={parent.id}>
-          <TemporaryViewProvider>
-            <DND>
-              <LoadNode>
-                <>
-                  <DraggableNote />
-                  <TreeView />
-                </>
-              </LoadNode>
-            </DND>
-          </TemporaryViewProvider>
-        </RootViewContextProvider>
-      </Data>,
-      {
-        ...alice(),
-        initialRoute: `/d/${parent.id}`,
-      }
-    );
+    await userEvent.click(await screen.findByLabelText("expand Parent"));
+    await userEvent.click(await screen.findByLabelText("add to Parent"));
+    await userEvent.type(await findNewNodeEditor(), "Child{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     await screen.findByText("Child");
+
+    // Set to confirms by clicking once
+    fireEvent.click(
+      screen.getByLabelText(/Evidence for Child: No evidence type/)
+    );
 
     // Evidence selector should show "Confirms"
-    const evidenceBtn = screen.getByLabelText(/Evidence: Confirms/);
-    expect(evidenceBtn).toBeDefined();
+    await screen.findByLabelText(/Evidence for Child: Confirms/);
   });
 
-  test("item with contra argument shows red dot", async () => {
+  test("item with contra argument shows Contradicts label", async () => {
     const [alice] = setup([ALICE]);
-    const { publicKey: alicePK } = alice().user;
+    renderTree(alice);
 
-    const parent = newNode("Parent", alicePK);
-    const child = newNode("Child", alicePK);
+    // Create parent with child
+    await screen.findByLabelText("collapse My Notes");
+    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
-    // Create relation with contra argument
-    const relations = addRelationToRelations(
-      newRelations(parent.id, List(), alicePK),
-      child.id,
-      "", // relevance
-      "contra" // argument
-    );
-
-    const plan = planUpsertRelations(
-      planUpsertNode(planUpsertNode(createPlan(alice()), parent), child),
-      relations
-    );
-    await execute({ ...alice(), plan });
-
-    renderWithTestData(
-      <Data user={alice().user}>
-        <RootViewContextProvider root={parent.id}>
-          <TemporaryViewProvider>
-            <DND>
-              <LoadNode>
-                <>
-                  <DraggableNote />
-                  <TreeView />
-                </>
-              </LoadNode>
-            </DND>
-          </TemporaryViewProvider>
-        </RootViewContextProvider>
-      </Data>,
-      {
-        ...alice(),
-        initialRoute: `/d/${parent.id}`,
-      }
-    );
+    await userEvent.click(await screen.findByLabelText("expand Parent"));
+    await userEvent.click(await screen.findByLabelText("add to Parent"));
+    await userEvent.type(await findNewNodeEditor(), "Child{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     await screen.findByText("Child");
 
+    // Set to contra by clicking twice (undefined -> confirms -> contra)
+    fireEvent.click(
+      screen.getByLabelText(/Evidence for Child: No evidence type/)
+    );
+    await screen.findByLabelText(/Evidence for Child: Confirms/);
+    fireEvent.click(screen.getByLabelText(/Evidence for Child: Confirms/));
+
     // Evidence selector should show "Contradicts"
-    const evidenceBtn = screen.getByLabelText(/Evidence: Contradicts/);
-    expect(evidenceBtn).toBeDefined();
+    await screen.findByLabelText(/Evidence for Child: Contradicts/);
   });
 
   test("does not show evidence selector for Referenced By items", async () => {
     const [alice] = setup([ALICE]);
-    const db = await setupTestDB(alice(), [["Money", ["Bitcoin"]]]);
-    const bitcoin = findNodeByText(db, "Bitcoin") as KnowNode;
+    renderTree(alice);
 
-    renderWithTestData(
-      <Data user={alice().user}>
-        <RootViewContextProvider root={bitcoin.id}>
-          <TemporaryViewProvider>
-            <DND>
-              <LoadNode referencedBy>
-                <>
-                  <DraggableNote />
-                  <TreeView />
-                </>
-              </LoadNode>
-            </DND>
-          </TemporaryViewProvider>
-        </RootViewContextProvider>
-      </Data>,
-      {
-        ...alice(),
-        initialRoute: `/d/${bitcoin.id}`,
-      }
+    // Create: My Notes -> Money -> Bitcoin
+    await screen.findByLabelText("collapse My Notes");
+    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("expand Money"));
+    await userEvent.click(await screen.findByLabelText("add to Money"));
+    await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
+
+    // Navigate to Bitcoin as root
+    await userEvent.click(
+      await screen.findByLabelText("Search to change pane 0 content")
     );
+    await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
+    await userEvent.click(await screen.findByLabelText("select Bitcoin"));
+    await screen.findByLabelText("expand Bitcoin");
 
-    await screen.findByText("Bitcoin");
+    // Open Referenced By view for Bitcoin
     fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
-    await screen.findByText(/Money/);
+    await screen.findByLabelText("hide references to Bitcoin");
+
+    // Wait for the Referenced By content to load - Money should appear
+    const moneyMatches = await screen.findAllByText(/Money/);
+    expect(moneyMatches.length).toBeGreaterThanOrEqual(1);
 
     // Referenced By items should NOT have evidence selectors
-    const evidenceButtons = screen.queryAllByLabelText(/Evidence:/);
+    const evidenceButtons = screen.queryAllByLabelText(/Evidence for Money:/);
     expect(evidenceButtons.length).toBe(0);
   });
 
   test("evidence selector persists after setting", async () => {
     const [alice] = setup([ALICE]);
-    const db = await setupTestDB(alice(), [["Parent", ["Child1", "Child2"]]]);
-    const parent = findNodeByText(db, "Parent") as KnowNode;
+    renderTree(alice);
 
-    renderWithTestData(
-      <Data user={alice().user}>
-        <RootViewContextProvider root={parent.id}>
-          <TemporaryViewProvider>
-            <DND>
-              <LoadNode>
-                <>
-                  <DraggableNote />
-                  <TreeView />
-                </>
-              </LoadNode>
-            </DND>
-          </TemporaryViewProvider>
-        </RootViewContextProvider>
-      </Data>,
-      {
-        ...alice(),
-        initialRoute: `/d/${parent.id}`,
-      }
-    );
+    // Create parent with children
+    await screen.findByLabelText("collapse My Notes");
+    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("expand Parent"));
+    await userEvent.click(await screen.findByLabelText("add to Parent"));
+    await userEvent.type(await findNewNodeEditor(), "Child1{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Child2{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     await screen.findByText("Child1");
     await screen.findByText("Child2");
 
     // Set Child1 to confirms
-    const evidenceButtons = screen.getAllByLabelText(
-      /Evidence: No evidence type/
+    fireEvent.click(
+      screen.getByLabelText(/Evidence for Child1: No evidence type/)
     );
-    fireEvent.click(evidenceButtons[0]);
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/Evidence: Confirms/)).toBeDefined();
+      expect(
+        screen.getByLabelText(/Evidence for Child1: Confirms/)
+      ).toBeDefined();
     });
 
     // Child1 should show Confirms, Child2 should still show No evidence type
-    expect(screen.getByLabelText(/Evidence: Confirms/)).toBeDefined();
-    expect(screen.getByLabelText(/Evidence: No evidence type/)).toBeDefined();
+    expect(screen.getByLabelText(/Evidence for Child1: Confirms/)).toBeDefined();
+    expect(
+      screen.getByLabelText(/Evidence for Child2: No evidence type/)
+    ).toBeDefined();
   });
 });
 

@@ -562,14 +562,26 @@ export async function typeNewNode(
   view: RenderResult,
   text: string
 ): Promise<void> {
-  await userEvent.click(await screen.findByText("Add Note"));
-  /* eslint-disable testing-library/no-container */
-  /* eslint-disable testing-library/no-node-access */
-  const input = view.container.querySelector(
-    '[data-placeholder="Create a Note"]'
-  ) as Element;
-  await userEvent.type(input, text);
-  await userEvent.click(await screen.findByText("Add Note"));
+  // Click "Add Note" button to open editor
+  const addNoteButton = await screen.findByLabelText("add to My Notes");
+  await userEvent.click(addNoteButton);
+
+  // Find the empty editor that opened
+  const editors = await screen.findAllByRole("textbox", {
+    name: "note editor",
+  });
+  const emptyEditor = editors.find((e) => e.textContent === "");
+  if (!emptyEditor) {
+    throw new Error("No empty editor found after clicking Add Note button");
+  }
+
+  // Type the text in the editor
+  await userEvent.type(emptyEditor, text);
+
+  // Press Enter to create the node
+  await userEvent.type(emptyEditor, "{Enter}");
+
+  // Verify the text appears in the tree
   await screen.findByText(text);
 }
 
@@ -662,10 +674,27 @@ export async function setupTestDB(
 }
 
 export function extractNodes(container: Container): Array<string | null> {
-  const allDraggables = container.querySelectorAll(
+  /* eslint-disable testing-library/no-node-access */
+  // Find both read-only nodes (.break-word) and editable nodes ([role="textbox"])
+  const readOnlyNodes = container.querySelectorAll(
     "[data-item-index] .inner-node .break-word"
   );
-  return Array.from(allDraggables).map((el) => el.textContent);
+  const editableNodes = container.querySelectorAll(
+    '[data-item-index] .inner-node [role="textbox"][aria-label="note editor"]'
+  );
+  // Combine and sort by document order using toSorted() for immutability
+  const allNodes = [...Array.from(readOnlyNodes), ...Array.from(editableNodes)];
+  // Sort by document position to get correct order
+  /* eslint-disable functional/immutable-data, no-bitwise */
+  const sortedNodes = [...allNodes].sort((a, b) => {
+    const position = a.compareDocumentPosition(b);
+    if ((position & Node.DOCUMENT_POSITION_FOLLOWING) !== 0) return -1;
+    if ((position & Node.DOCUMENT_POSITION_PRECEDING) !== 0) return 1;
+    return 0;
+  });
+  /* eslint-enable functional/immutable-data, no-bitwise */
+  /* eslint-enable testing-library/no-node-access */
+  return sortedNodes.map((el) => el.textContent);
 }
 
 export function hexToRgb(hex: string): string {

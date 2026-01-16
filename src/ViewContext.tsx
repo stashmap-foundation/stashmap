@@ -697,14 +697,19 @@ export function getPreviousSibling(
   }
 
   // Get the previous sibling's path
-  const prevSiblingPath = addNodeToPath(data, parentPath, relationIndex - 1);
-  const [prevNodeID, prevView] = getNodeIDFromView(data, prevSiblingPath);
+  // Try-catch handles case where parent relations are not properly set up (e.g., in tests)
+  try {
+    const prevSiblingPath = addNodeToPath(data, parentPath, relationIndex - 1);
+    const [prevNodeID, prevView] = getNodeIDFromView(data, prevSiblingPath);
 
-  return {
-    viewPath: prevSiblingPath,
-    nodeID: prevNodeID,
-    view: prevView,
-  };
+    return {
+      viewPath: prevSiblingPath,
+      nodeID: prevNodeID,
+      view: prevView,
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 /**

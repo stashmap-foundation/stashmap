@@ -16,7 +16,6 @@ import {
   renderWithTestData,
   setup,
   setupTestDB,
-  typeNewNode,
 } from "../utils.test";
 import {
   NodeIndex,
@@ -105,11 +104,11 @@ test("Render Project", async () => {
 
 async function expectNode(text: string, editable: boolean): Promise<void> {
   const element = await screen.findByText(text);
-  // With inline editing, editable nodes are in a contentEditable span
-  // Non-editable nodes are plain text (not in contentEditable)
+  // With inline editing, editable nodes have role="textbox" or are inside one
+  // Check if element or its parent has contenteditable
   const isContentEditable =
     element.getAttribute("contenteditable") === "true" ||
-    element.closest("[contenteditable='true']") !== null;
+    element.getAttribute("role") === "textbox";
   if (editable) {
     expect(isContentEditable).toBe(true);
   } else {
@@ -326,12 +325,22 @@ test("Edited node is shown in Tree View", async () => {
       ...alice(),
     }
   );
-  fireEvent.click(await screen.findByLabelText("edit Java"));
-  await userEvent.keyboard(
-    "{backspace}{backspace}{backspace}{backspace}C++{enter}"
-  );
-  fireEvent.click(screen.getByLabelText("save"));
-  expect(screen.queryByText("Save")).toBeNull();
+  // With inline editing, "Java" is already editable - find the contenteditable textbox
+  const editors = await screen.findAllByRole("textbox", {
+    name: "note editor",
+  });
+  const javaEditor = editors.find((e) => e.textContent === "Java");
+  if (!javaEditor) {
+    throw new Error("Java editor not found");
+  }
+
+  // Clear and type new content using userEvent (selection then type)
+  // eslint-disable-next-line functional/immutable-data
+  javaEditor.textContent = "";
+  await userEvent.type(javaEditor, "C++");
+  fireEvent.blur(javaEditor);
+
+  // Verify the change was saved
   expect(screen.queryByText("Java")).toBeNull();
   await screen.findByText("C++");
 });
@@ -668,13 +677,21 @@ test("getDiffItemsForNode should return no diff items for not_relevant relation 
 test("Multiple connections to same node", async () => {
   const [alice] = setup([ALICE]);
   const java = newNode("Java", alice().user.publicKey);
+  const pl = newNode("Programming Languages", alice().user.publicKey);
+  const rootRelations = addRelationToRelations(
+    newRelations("ROOT", List(), alice().user.publicKey),
+    pl.id
+  );
   await execute({
     ...alice(),
-    plan: planUpsertNode(createPlan(alice()), java),
+    plan: planUpsertRelations(
+      planBulkUpsertNodes(createPlan(alice()), [java, pl]),
+      rootRelations
+    ),
   });
 
-  const view = renderApp(alice());
-  await typeNewNode(view, "Programming Languages");
+  renderApp(alice());
+  await screen.findByText("Programming Languages");
 
   // Expand the node to show children area
   const expandButton = await screen.findByLabelText(
@@ -709,4 +726,254 @@ test("Multiple connections to same node", async () => {
     (await screen.findByLabelText("related to Programming Languages"))
       .textContent
   ).toMatch(/Java(.*)Java/);
+});
+
+// Helper to find the empty CreateNodeEditor (the new editor without text)
+async function findEmptyEditor(): Promise<HTMLElement> {
+  const editors = await screen.findAllByRole("textbox", {
+    name: "note editor",
+  });
+  const emptyEditor = editors.find((e) => e.textContent === "");
+  if (!emptyEditor) {
+    throw new Error("No empty editor found");
+  }
+  return emptyEditor;
+}
+
+// Tests for inline node creation via keyboard
+describe("Inline Node Creation", () => {
+  test("Create new sibling node by pressing Enter on existing node", async () => {
+    const [alice] = setup([ALICE]);
+    const { publicKey } = alice().user;
+    // Create an initial editable node
+    const parent = newNode("Parent Node", publicKey);
+    const child = newNode("First Child", publicKey);
+    const relations = addRelationToRelations(
+      newRelations(parent.id, List(), publicKey),
+      child.id
+    );
+    await execute({
+      ...alice(),
+      plan: planUpsertRelations(
+        planUpsertNode(planUpsertNode(createPlan(alice()), parent), child),
+        relations
+      ),
+    });
+
+    renderWithTestData(
+      <RootViewContextProvider root={parent.id}>
+        <LoadNode waitForEose>
+          <TemporaryViewProvider>
+            <DND>
+              <>
+                <DraggableNote />
+                <TreeView />
+              </>
+            </DND>
+          </TemporaryViewProvider>
+        </LoadNode>
+      </RootViewContextProvider>,
+      alice()
+    );
+
+    // Find the child node's editable text
+    const childText = await screen.findByText("First Child");
+    await userEvent.click(childText);
+
+    // Press Enter to open the CreateNodeEditor for a new sibling
+    await userEvent.type(childText, "{Enter}");
+
+    // Find the new empty editor that opened
+    const newEditor = await findEmptyEditor();
+    expect(newEditor).toBeTruthy();
+
+    // Type the new node text
+    await userEvent.type(newEditor, "Second Child");
+
+    // Press Enter to save and create
+    await userEvent.type(newEditor, "{Enter}");
+
+    // Verify both nodes appear
+    await screen.findByText("First Child");
+    await screen.findByText("Second Child");
+  });
+
+  test("Create multiple sibling nodes by pressing Enter repeatedly", async () => {
+    const [alice] = setup([ALICE]);
+    const { publicKey } = alice().user;
+    // Create an initial editable node
+    const parent = newNode("Parent Node", publicKey);
+    const child = newNode("Node 1", publicKey);
+    const relations = addRelationToRelations(
+      newRelations(parent.id, List(), publicKey),
+      child.id
+    );
+    await execute({
+      ...alice(),
+      plan: planUpsertRelations(
+        planUpsertNode(planUpsertNode(createPlan(alice()), parent), child),
+        relations
+      ),
+    });
+
+    renderWithTestData(
+      <RootViewContextProvider root={parent.id}>
+        <LoadNode waitForEose>
+          <TemporaryViewProvider>
+            <DND>
+              <>
+                <DraggableNote />
+                <TreeView />
+              </>
+            </DND>
+          </TemporaryViewProvider>
+        </LoadNode>
+      </RootViewContextProvider>,
+      alice()
+    );
+
+    // Start from the first node
+    const node1Text = await screen.findByText("Node 1");
+    await userEvent.click(node1Text);
+    await userEvent.type(node1Text, "{Enter}");
+
+    // Create Node 2 - find the empty editor
+    const editor1 = await findEmptyEditor();
+    await userEvent.type(editor1, "Node 2{Enter}");
+
+    // Editor should chain - create Node 3
+    const editor2 = await findEmptyEditor();
+    await userEvent.type(editor2, "Node 3{Enter}");
+
+    // Create Node 4
+    const editor3 = await findEmptyEditor();
+    await userEvent.type(editor3, "Node 4");
+    // Blur to close without chaining
+    fireEvent.blur(editor3);
+
+    // Verify all nodes appear
+    await screen.findByText("Node 1");
+    await screen.findByText("Node 2");
+    await screen.findByText("Node 3");
+    await screen.findByText("Node 4");
+  });
+
+  test("Empty editor closes without creating a node", async () => {
+    const [alice] = setup([ALICE]);
+    const { publicKey } = alice().user;
+    const parent = newNode("Parent Node", publicKey);
+    const child = newNode("Existing Child", publicKey);
+    const relations = addRelationToRelations(
+      newRelations(parent.id, List(), publicKey),
+      child.id
+    );
+    await execute({
+      ...alice(),
+      plan: planUpsertRelations(
+        planUpsertNode(planUpsertNode(createPlan(alice()), parent), child),
+        relations
+      ),
+    });
+
+    renderWithTestData(
+      <RootViewContextProvider root={parent.id}>
+        <LoadNode waitForEose>
+          <TemporaryViewProvider>
+            <DND>
+              <>
+                <DraggableNote />
+                <TreeView />
+              </>
+            </DND>
+          </TemporaryViewProvider>
+        </LoadNode>
+      </RootViewContextProvider>,
+      alice()
+    );
+
+    const childText = await screen.findByText("Existing Child");
+    await userEvent.click(childText);
+    await userEvent.type(childText, "{Enter}");
+
+    // Find the empty editor that opened
+    const editor = await findEmptyEditor();
+
+    // Press Enter without typing anything - should close
+    await userEvent.type(editor, "{Enter}");
+
+    // Editor should be gone - wait for the empty editor to disappear
+    await waitFor(() => {
+      const editors = screen.queryAllByRole("textbox", { name: "note editor" });
+      const emptyEditors = editors.filter((e) => e.textContent === "");
+      expect(emptyEditors.length).toBe(0);
+    });
+
+    // Only the original child should exist
+    expect(screen.getAllByText(/Child/).length).toBe(1);
+  });
+
+  test("Creating node via UI sends correct Nostr events", async () => {
+    const [alice] = setup([ALICE]);
+    const { publicKey } = alice().user;
+    // Create an initial editable node
+    const parent = newNode("Parent", publicKey);
+    const child = newNode("Child", publicKey);
+    const relations = addRelationToRelations(
+      newRelations(parent.id, List(), publicKey),
+      child.id
+    );
+    await execute({
+      ...alice(),
+      plan: planUpsertRelations(
+        planUpsertNode(planUpsertNode(createPlan(alice()), parent), child),
+        relations
+      ),
+    });
+
+    // Reset relay pool to track only new events
+    alice().relayPool.resetPublishedOnRelays();
+
+    renderWithTestData(
+      <RootViewContextProvider root={parent.id}>
+        <LoadNode waitForEose>
+          <TemporaryViewProvider>
+            <DND>
+              <>
+                <DraggableNote />
+                <TreeView />
+              </>
+            </DND>
+          </TemporaryViewProvider>
+        </LoadNode>
+      </RootViewContextProvider>,
+      alice()
+    );
+
+    // Find child and press Enter to create sibling
+    const childText = await screen.findByText("Child");
+    await userEvent.click(childText);
+    await userEvent.type(childText, "{Enter}");
+
+    // Type in the new editor
+    const newEditor = await findEmptyEditor();
+    await userEvent.type(newEditor, "New Sibling");
+
+    // Blur to save
+    fireEvent.blur(newEditor);
+
+    // Wait for the new node to appear
+    await screen.findByText("New Sibling");
+
+    // Verify a knowledge node event was sent
+    const events = alice().relayPool.getEvents();
+    const nodeEvents = events.filter((e) => e.kind === 34751); // KIND_KNOWLEDGE_NODE
+    const newNodeEvent = nodeEvents.find((e) =>
+      e.content.includes("New Sibling")
+    );
+    expect(newNodeEvent).toBeTruthy();
+
+    // Verify a relations event was sent (kind 34760 = KIND_KNOWLEDGE_LIST)
+    const relationsEvents = events.filter((e) => e.kind === 34760);
+    expect(relationsEvents.length).toBeGreaterThan(0);
+  });
 });

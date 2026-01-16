@@ -2,11 +2,11 @@ import React from "react";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Event } from "nostr-tools";
+import { List } from "immutable";
 import {
   setup,
   ALICE,
   renderApp,
-  typeNewNode,
   renderWithTestData,
   TEST_RELAYS,
   RootViewOrWorkspaceIsLoading,
@@ -14,11 +14,29 @@ import {
 import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 import { WorkspaceView } from "./Workspace";
 import { MockRelayPool } from "../nostrMock.test";
+import { newNode, addRelationToRelations } from "../connections";
+import { execute } from "../executor";
+import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
+import { newRelations } from "../ViewContext";
 
 test("Publishing Status", async () => {
   const [alice] = setup([ALICE]);
-  const view = renderApp(alice());
-  await typeNewNode(view, "New Note");
+  // Create a node programmatically to trigger event publishing
+  const note = newNode("New Note", alice().user.publicKey);
+  const rootRelations = addRelationToRelations(
+    newRelations("ROOT", List(), alice().user.publicKey),
+    note.id
+  );
+  await execute({
+    ...alice(),
+    plan: planUpsertRelations(
+      planUpsertNode(createPlan(alice()), note),
+      rootRelations
+    ),
+  });
+
+  renderApp(alice());
+  await screen.findByText("New Note");
   await userEvent.click(screen.getByLabelText("publishing status"));
   await screen.findByText("Publishing Status");
   expect(await screen.findAllByText("100%")).toHaveLength(4);
@@ -31,7 +49,46 @@ test("Publishing Status", async () => {
 test("Details of Publishing Status", async () => {
   const [alice] = setup([ALICE]);
   const utils = alice();
-  const view = renderWithTestData(
+
+  // Create a node programmatically to trigger event publishing
+  const note = newNode("Hello World", utils.user.publicKey);
+  const rootRelations = addRelationToRelations(
+    newRelations("ROOT", List(), utils.user.publicKey),
+    note.id
+  );
+
+  // Mock relay pool with partial failures
+  const mockRelayPool = {
+    ...utils.relayPool,
+    publish: (_relays: Array<string>, event: Event): Promise<string>[] => {
+      if (event.kind === 34751) {
+        return [
+          Promise.resolve("fulfilled"),
+          Promise.reject(new Error("paid relay")),
+          Promise.reject(new Error("too many requests")),
+          Promise.resolve("fulfilled"),
+        ];
+      }
+      return [
+        Promise.resolve("fulfilled"),
+        Promise.reject(new Error("paid relay")),
+        Promise.resolve("fulfilled"),
+        Promise.resolve("fulfilled"),
+      ];
+    },
+  } as unknown as MockRelayPool;
+
+  // Execute the node creation with the mock relay pool
+  await execute({
+    ...utils,
+    relayPool: mockRelayPool,
+    plan: planUpsertRelations(
+      planUpsertNode(createPlan(utils), note),
+      rootRelations
+    ),
+  });
+
+  renderWithTestData(
     <>
       <RootViewOrWorkspaceIsLoading>
         <PublishingStatusWrapper />
@@ -40,29 +97,12 @@ test("Details of Publishing Status", async () => {
     </>,
     {
       ...utils,
-      relayPool: {
-        ...utils.relayPool,
-        publish: (relays: Array<string>, event: Event): Promise<string>[] => {
-          if (event.kind === 34751) {
-            return [
-              Promise.resolve("fulfilled"),
-              Promise.reject(new Error("paid relay")),
-              Promise.reject(new Error("too many requests")),
-              Promise.resolve("fulfilled"),
-            ];
-          }
-          return [
-            Promise.resolve("fulfilled"),
-            Promise.reject(new Error("paid relay")),
-            Promise.resolve("fulfilled"),
-            Promise.resolve("fulfilled"),
-          ];
-        },
-      } as unknown as MockRelayPool,
+      relayPool: mockRelayPool,
       relays: { ...utils.relays, userRelays: TEST_RELAYS },
     }
   );
-  await typeNewNode(view, "Hello World");
+
+  await screen.findByText("Hello World");
   const publishingStatusButtons = await screen.findAllByLabelText(
     "publishing status"
   );

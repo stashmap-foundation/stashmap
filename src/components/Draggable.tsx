@@ -12,11 +12,12 @@ import {
   getParentView,
   upsertRelations,
   updateViewPathsAfterAddRelation,
-  addNodeToPathWithRelations,
+  addNodeToPath,
   viewPathToString,
   getContextFromStackAndViewPath,
   getNodeIDFromView,
   getLastChild,
+  getRelationForView,
 } from "../ViewContext";
 import { useData } from "../DataContext";
 import { planExpandNode } from "./RelationTypes";
@@ -104,7 +105,7 @@ function DraggableDiffItem({ className }: { className?: string }): JSX.Element {
 }
 
 type CreateNodeEditorProps = {
-  initialPosition: 'afterSibling' | 'asFirstChild';
+  initialPosition: "afterSibling" | "asFirstChild";
   baseInsertAtIndex: number;
   baseLevels: number;
   initialPortalTarget: string;
@@ -125,30 +126,32 @@ function CreateNodeEditor({
   // Internal state for position - can change when Tab is pressed
   const [position, setPosition] = useState(initialPosition);
   // Portal target viewKey - always use portal to preserve state when target changes
-  const [portalTargetKey, setPortalTargetKey] = useState<string>(initialPortalTarget);
+  const [portalTargetKey, setPortalTargetKey] =
+    useState<string>(initialPortalTarget);
   // Text to preserve across portal changes (which cause remount)
   const [editorText, setEditorText] = useState("");
 
   // Compute derived values based on current position
-  const levels = position === 'asFirstChild' ? baseLevels + 1 : baseLevels;
+  const levels = position === "asFirstChild" ? baseLevels + 1 : baseLevels;
   // undefined = add at end of relations
-  const insertAtIndex = position === 'asFirstChild' ? undefined : baseInsertAtIndex;
+  const insertAtIndex =
+    position === "asFirstChild" ? undefined : baseInsertAtIndex;
 
   // Determine target path based on position:
   // - afterSibling: insert into parent's relations
   // - asFirstChild: insert into current node's relations
   const parentPath = getParentView(viewPath);
-  const targetPath = position === 'afterSibling' ? parentPath : viewPath;
+  const targetPath = position === "afterSibling" ? parentPath : viewPath;
 
   if (!targetPath) {
     return null;
   }
 
-  const onCreateNode = async (
+  const onCreateNode = (
     text: string,
     imageUrl?: string,
     submitted?: boolean
-  ): Promise<void> => {
+  ): void => {
     const trimmedText = text.trim();
     if (!trimmedText) {
       closeCreateNodeEditor();
@@ -159,24 +162,28 @@ function CreateNodeEditor({
     const n = newNode(text, plan.user.publicKey, imageUrl);
     const planWithNode = planUpsertNode(plan, n);
 
-    // Capture the updated relations to construct the proper viewKey
-    let updatedRelations: Relations;
+    // Get current relations to determine actual insert index before modifying
+    const currentRelations = getRelationForView(
+      planWithNode,
+      targetPath,
+      stack
+    );
+    const currentSize = currentRelations?.items.size ?? 0;
+    // When insertAtIndex is undefined, add at end (use current size)
+    const actualInsertIndex = insertAtIndex ?? currentSize;
+
     const updatedRelationsPlan = upsertRelations(
       planWithNode,
       targetPath,
       stack,
-      (relations) => {
-        // When insertAtIndex is undefined, add at end (use relations.items.size)
-        const actualInsertIndex = insertAtIndex ?? relations.items.size;
-        updatedRelations = addRelationToRelations(
+      (relations) =>
+        addRelationToRelations(
           relations,
           n.id,
           "", // Default to "relevant"
           undefined, // No argument
           actualInsertIndex
-        );
-        return updatedRelations;
-      }
+        )
     );
     // Update view paths when inserting at specific position
     const updatedViews = updateViewPathsAfterAddRelation(
@@ -189,12 +196,12 @@ function CreateNodeEditor({
     // If user pressed Enter, open another editor after the newly created node
     // Otherwise (blur), just close the editor
     if (submitted) {
-      // Construct the proper viewKey using ViewContext functions
-      // When insertAtIndex is undefined (added at end), use last index
-      // @ts-expect-error updatedRelations is assigned in the callback above
-      const actualIndex = insertAtIndex ?? updatedRelations.items.size - 1;
-      // @ts-expect-error updatedRelations is assigned in the callback above
-      const newNodePath = addNodeToPathWithRelations(targetPath, updatedRelations, actualIndex);
+      // Construct the path to the newly created node using the computed index
+      const newNodePath = addNodeToPath(
+        updatedRelationsPlan,
+        targetPath,
+        actualInsertIndex
+      );
       const newNodeViewKey = viewPathToString(newNodePath);
       // Chain to next sibling (new node is not expanded)
       openCreateNodeEditor(newNodeViewKey);
@@ -206,7 +213,7 @@ function CreateNodeEditor({
   const onTab = (text: string): void => {
     // Tab indents the editor - changes from sibling to child position
     // Don't create the node yet, just move the editor
-    if (position === 'asFirstChild') {
+    if (position === "asFirstChild") {
       // Already at max indent level for this context
       return;
     }
@@ -228,7 +235,7 @@ function CreateNodeEditor({
     }
 
     // Update internal position state - editor stays mounted, text preserved
-    setPosition('asFirstChild');
+    setPosition("asFirstChild");
   };
 
   const editorContent = (
@@ -239,13 +246,20 @@ function CreateNodeEditor({
         <span className="triangle collapsed">▶</span>
       </div>
       <div className="flex-column w-100" style={{ paddingTop: 10 }}>
-        <MiniEditor initialText={editorText} onSave={onCreateNode} onClose={closeCreateNodeEditor} onTab={onTab} />
+        <MiniEditor
+          initialText={editorText}
+          onSave={onCreateNode}
+          onClose={closeCreateNodeEditor}
+          onTab={onTab}
+        />
       </div>
     </NodeCard>
   );
 
   // Always render via portal to preserve state when target changes
-  const portalTarget = document.getElementById(`editor-portal-${portalTargetKey}`);
+  const portalTarget = document.getElementById(
+    `editor-portal-${portalTargetKey}`
+  );
   if (portalTarget) {
     return createPortal(editorContent, portalTarget);
   }

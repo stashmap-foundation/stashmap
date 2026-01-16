@@ -20,10 +20,6 @@ import {
   getAvailableRelationsForNode,
   findOrCreateRelationsForContext,
   usePreviousSibling,
-  useRelationIndex,
-  getParentView,
-  upsertRelations,
-  viewPathToString,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -238,11 +234,11 @@ function NodeContent({ node }: { node: KnowNode }): JSX.Element {
   // Reference nodes get special link-like styling
   const referenceStyle: React.CSSProperties = isReference
     ? {
-      fontStyle: "italic",
-      color: "#5a7bad",
-      textDecoration: "none",
-      borderBottom: "1px dotted #8fadd4",
-    }
+        fontStyle: "italic",
+        color: "#5a7bad",
+        textDecoration: "none",
+        borderBottom: "1px dotted #8fadd4",
+      }
     : {};
 
   return (
@@ -302,22 +298,23 @@ function EditableContent(): JSX.Element {
       return;
     }
 
-    let plan = createPlan();
+    const basePlan = createPlan();
 
     // Step 1: Save text changes if any
     const currentImageUrl = "imageUrl" in node ? node.imageUrl : undefined;
-    if (text !== node.text) {
-      plan = planUpsertNode(plan, {
-        ...node,
-        text,
-        imageUrl: currentImageUrl,
-      } as KnowNode);
-    }
+    const planWithText =
+      text !== node.text
+        ? planUpsertNode(basePlan, {
+            ...node,
+            text,
+            imageUrl: currentImageUrl,
+          } as KnowNode)
+        : basePlan;
 
     // Step 2: Expand the previous sibling (ensure it has relations)
     const context = getContextFromStackAndViewPath(stack, prevSibling.viewPath);
-    plan = planExpandNode(
-      plan,
+    const planWithExpand = planExpandNode(
+      planWithText,
       prevSibling.nodeID,
       context,
       prevSibling.view,
@@ -325,12 +322,21 @@ function EditableContent(): JSX.Element {
     );
 
     // Step 3: Disconnect current node from current parent
-    plan = planDisconnectFromParent(plan, viewPath, stack);
+    const planWithDisconnect = planDisconnectFromParent(
+      planWithExpand,
+      viewPath,
+      stack
+    );
 
     // Step 4: Add current node to previous sibling at end
-    plan = planAddToParent(plan, nodeID, prevSibling.viewPath, stack);
+    const finalPlan = planAddToParent(
+      planWithDisconnect,
+      nodeID,
+      prevSibling.viewPath,
+      stack
+    );
 
-    executePlan(plan);
+    executePlan(finalPlan);
   };
 
   // For non-text nodes, show read-only content
@@ -366,7 +372,11 @@ function InteractiveNodeContent(): JSX.Element {
   }
 
   // Editable content for mutable nodes (but read-only in Referenced By view)
-  if (isMutableNode(node, user) && !isInReferencedByView && !isReferencedByRoot) {
+  if (
+    isMutableNode(node, user) &&
+    !isInReferencedByView &&
+    !isReferencedByRoot
+  ) {
     return <EditableContent />;
   }
 
@@ -543,12 +553,12 @@ export function getNodesInTree(
   const withDiffItems =
     diffItems.size > 0
       ? diffItems.reduce(
-        (list, diffItem, idx) =>
-          list.push(
-            addDiffItemToPath(data, parentPath, diffItem.nodeID, idx, stack)
-          ),
-        nodesInTree
-      )
+          (list, diffItem, idx) =>
+            list.push(
+              addDiffItemToPath(data, parentPath, diffItem.nodeID, idx, stack)
+            ),
+          nodesInTree
+        )
       : nodesInTree;
 
   return withDiffItems;

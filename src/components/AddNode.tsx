@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
 import { useMediaQuery } from "react-responsive";
-import { NodeCard } from "../commons/Ui";
 import { useInputElementFocus } from "../commons/FocusContextProvider";
 import { shorten } from "../KnowledgeDataContext";
 import { newNode, addRelationToRelations } from "../connections";
@@ -19,7 +18,6 @@ import {
 import useModal from "./useModal";
 import { SearchModal } from "./SearchModal";
 import { IS_MOBILE } from "./responsive";
-import { Indent } from "./Node";
 import {
   openEditor,
   closeEditor,
@@ -204,7 +202,9 @@ export function MiniEditor({
 
   return (
     <span
+      role="presentation"
       onClick={handleWrapperClick}
+      onKeyDown={() => {}}
       style={{
         paddingRight: "30px",
         cursor: "text",
@@ -212,11 +212,14 @@ export function MiniEditor({
     >
       <span
         ref={editorRef}
+        role="textbox"
+        tabIndex={0}
         contentEditable
         suppressContentEditableWarning
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
         onPaste={handlePaste}
+        aria-label="note editor"
         style={{
           outline: "none",
           minWidth: "1px",
@@ -353,7 +356,8 @@ function useAddSiblingNode(options?: AddNodeOptions): {
     isAddToNode || isSiblingInsert ? getParentView(vContext) : vContext;
   const [nodeFromCurrent] = useNode();
   const [nodeFromParent] = useParentNode();
-  const node = isAddToNode || isSiblingInsert ? nodeFromParent : nodeFromCurrent;
+  const node =
+    isAddToNode || isSiblingInsert ? nodeFromParent : nodeFromCurrent;
   // For first child, insert at position 0
   const insertPosition = asFirstChild ? 0 : insertAtIndex;
 
@@ -396,7 +400,12 @@ function useAddSiblingNode(options?: AddNodeOptions): {
   };
 
   // node is guaranteed to be defined here (we return null above if it's undefined)
-  return { onAddNode, onAddExistingNode, onCreateNewNode, node: node as KnowNode };
+  return {
+    onAddNode,
+    onAddExistingNode,
+    onCreateNewNode,
+    node: node as KnowNode,
+  };
 }
 
 export function SiblingSearchButton(): JSX.Element | null {
@@ -407,7 +416,10 @@ export function SiblingSearchButton(): JSX.Element | null {
   // If node is expanded, insert as first child; otherwise insert as sibling after current
   const options: AddNodeOptions = isNodeExpanded
     ? { asFirstChild: true }
-    : { insertAtIndex: relationIndex !== undefined ? relationIndex + 1 : undefined };
+    : {
+        insertAtIndex:
+          relationIndex !== undefined ? relationIndex + 1 : undefined,
+      };
 
   const handlers = useAddSiblingNode(options);
 
@@ -418,7 +430,10 @@ export function SiblingSearchButton(): JSX.Element | null {
   return (
     <>
       {isOpen && (
-        <SearchModal onAddExistingNode={handlers.onAddExistingNode} onHide={closeModal} />
+        <SearchModal
+          onAddExistingNode={handlers.onAddExistingNode}
+          onHide={closeModal}
+        />
       )}
       <SearchButton onClick={openModal} />
     </>

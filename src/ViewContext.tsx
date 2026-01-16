@@ -837,6 +837,11 @@ export function useIsExpanded(): boolean {
   return isExpanded(data, viewKey);
 }
 
+export function useIsRoot(): boolean {
+  const viewPath = useViewPath();
+  return viewPath.length === 2;
+}
+
 export function getParentKey(viewKey: string): string {
   return viewKey.split(":").slice(0, -3).join(":");
 }

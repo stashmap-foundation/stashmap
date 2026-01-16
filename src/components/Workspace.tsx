@@ -2,11 +2,10 @@ import React from "react";
 
 import { TemporaryViewProvider } from "./TemporaryViewContext";
 
-import { getNodeFromID } from "../ViewContext";
+import { getNodeFromID, useViewPath } from "../ViewContext";
 import { DND } from "../dnd";
 import { useData } from "../DataContext";
 import { usePaneNavigation, usePaneIndex } from "../SplitPanesContext";
-import { Node } from "./Node";
 import { TreeView } from "./TreeView";
 import { ListItem } from "./Draggable";
 import { OpenInSplitPaneButtonWithStack } from "./OpenInSplitPaneButton";
@@ -16,6 +15,7 @@ import {
   ClosePaneButton,
 } from "./SplitPaneLayout";
 import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
+import { SignInMenuBtn } from "../SignIn";
 
 function StackedLayer({
   workspaceID,
@@ -83,6 +83,11 @@ function StackedLayer({
   );
 }
 
+function RootNode(): JSX.Element {
+  const viewPath = useViewPath();
+  return <ListItem index={0} treeViewPath={viewPath} />;
+}
+
 export function WorkspaceView(): JSX.Element | null {
   const { stack, popTo } = usePaneNavigation();
   const paneIndex = usePaneIndex();
@@ -110,29 +115,47 @@ export function WorkspaceView(): JSX.Element | null {
 
             {/* Render active fullscreen card */}
             <div className="fullscreen-card">
-              <div className="fullscreen-card-header visible-on-hover">
-                <Node
-                  className="border-0"
-                  cardBodyClassName="pb-0 pt-8 ps-0 fullscreen-card-title"
-                />
-                <div className="on-hover-menu right">
-                  <span className="always-visible">
+              <div className="fullscreen-card-body">
+                {/* Sticky header with controls */}
+                <div
+                  className="visible-on-hover"
+                  style={{
+                    position: "sticky",
+                    top: 0,
+                    zIndex: 10,
+                    backgroundColor: "white",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "4px 8px",
+                  }}
+                >
+                  {/* Left side: Settings, Publishing Status, Sign In */}
+                  <div
+                    className="always-visible"
+                    style={{ display: "flex", alignItems: "center", gap: "4px" }}
+                  >
                     {!hasStack && paneIndex === 0 && (
                       <>
                         <PublishingStatusWrapper />
                         <PaneSettingsMenu />
                       </>
                     )}
-                    {!hasStack && <ClosePaneButton />}
+                    <SignInMenuBtn />
+                  </div>
+                  {/* Right side: Search, Close */}
+                  <div
+                    className="always-visible"
+                    style={{ display: "flex", alignItems: "center", gap: "4px" }}
+                  >
                     {!hasStack && <PaneSearchButton />}
-                  </span>
+                    {!hasStack && <ClosePaneButton />}
+                  </div>
                 </div>
-              </div>
-              <div className="fullscreen-card-body overflow-y-auto">
                 <DND>
+                  <RootNode />
                   <TreeView />
                 </DND>
-                <RootCreateNodeEditor />
               </div>
             </div>
           </div>

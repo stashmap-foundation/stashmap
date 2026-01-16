@@ -143,12 +143,8 @@ body {
 
 .fullscreen-card-body {
   flex: 1;
-  overflow: hidden;
+  overflow-y: hidden;
   position: relative;
-
-  > div {
-    height: 100%;
-  }
 }
 
 .workspace-columns {

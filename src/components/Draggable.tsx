@@ -260,6 +260,7 @@ export function CreateNodeEditor({
           onSave={onCreateNode}
           onClose={closeEditor}
           onTab={onTab}
+          ariaLabel="new node editor"
         />
       </div>
     </NodeCard>

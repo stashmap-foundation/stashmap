@@ -6,6 +6,7 @@ import {
   renderWithTestData,
   setup,
   RootViewOrWorkspaceIsLoading,
+  findNewNodeEditor,
 } from "../utils.test";
 import { WorkspaceView } from "./Workspace";
 
@@ -90,18 +91,6 @@ async function expectTree(expected: string): Promise<void> {
     const actual = await getTreeStructure();
     expect(actual).toEqual(expectedNormalized);
   });
-}
-
-/**
- * Finds the empty "note editor" (for creating new nodes).
- */
-async function findNewNodeEditor(): Promise<HTMLElement> {
-  const editors = await screen.findAllByRole("textbox", { name: "note editor" });
-  const emptyEditor = editors.find((e) => e.textContent === "");
-  if (!emptyEditor) {
-    throw new Error("No empty editor found");
-  }
-  return emptyEditor;
 }
 
 /**

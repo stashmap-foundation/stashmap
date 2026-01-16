@@ -22,7 +22,8 @@ import {
   setup,
   setupTestDB,
   findNodeByText,
-  extractNodes,
+  expectTree,
+  findNewNodeEditor,
   BOB,
   follow,
   renderApp,
@@ -105,9 +106,14 @@ test("Move View Settings on Delete", async () => {
       ...alice(),
     }
   );
+  // Expand Programming Languages to see children
+  await screen.findByText("Programming Languages");
+  await userEvent.click(
+    screen.getByLabelText("expand Programming Languages")
+  );
   // Find and expand C
-  await screen.findByText("C", undefined, { timeout: 5000 });
-  fireEvent.click(screen.getByLabelText("expand C"));
+  await screen.findByText("C");
+  await userEvent.click(screen.getByLabelText("expand C"));
 
   await screen.findByText("C++");
   // Remove JAVA Node
@@ -145,21 +151,42 @@ test("Move Node Up", async () => {
     </Data>,
     alice()
   );
+  // Expand Programming Languages to see children
+  await screen.findByText("Programming Languages");
+  await userEvent.click(
+    screen.getByLabelText("expand Programming Languages")
+  );
   await screen.findByText("FPL");
-  expect(extractNodes(utils.container)).toEqual(["FPL", "OOP"]);
+  await expectTree(`
+  Programming Languages
+    FPL
+    OOP
+  `);
   // Expand OOP
   await userEvent.click(screen.getByLabelText("expand OOP"));
-  expect(extractNodes(utils.container)).toEqual(["FPL", "OOP", "C++", "Java"]);
+  await expectTree(`
+  Programming Languages
+    FPL
+    OOP
+      C++
+      Java
+  `);
 
   const oop = screen.getByText("OOP");
   const fpl = screen.getByText("FPL");
 
   fireEvent.dragStart(oop);
   fireEvent.drop(fpl);
-  expect(extractNodes(utils.container)).toEqual(["OOP", "C++", "Java", "FPL"]);
+  await expectTree(`
+  Programming Languages
+    OOP
+      C++
+      Java
+    FPL
+  `);
   cleanup();
 
-  const { container } = renderWithTestData(
+  renderWithTestData(
     <Data user={alice().user}>
       <RootViewContextProvider root={root}>
         <LoadNode waitForEose>
@@ -173,8 +200,14 @@ test("Move Node Up", async () => {
     </Data>,
     alice()
   );
-  await screen.findByText("FPL");
-  expect(extractNodes(container)).toEqual(["OOP", "C++", "Java", "FPL"]);
+  // View state should be preserved - OOP was moved before FPL and is still expanded
+  await expectTree(`
+  Programming Languages
+    OOP
+      C++
+      Java
+    FPL
+  `);
 });
 
 test("Contact reorders list", async () => {
@@ -192,16 +225,31 @@ test("Contact reorders list", async () => {
   ) as KnowNode;
 
   // Alice views PL directly (same empty context as Bob used)
-  const utils = renderApp({
+  renderApp({
     ...alice(),
     initialRoute: `/w/${pl.id}`,
   });
   await screen.findByText("Programming Languages");
-  expect(extractNodes(utils.container)).toEqual(["OOP", "FPL"]);
+
+  // Expand Programming Languages to see its children
+  await userEvent.click(
+    screen.getByLabelText("expand Programming Languages")
+  );
+  await expectTree(`
+Programming Languages
+  OOP
+  FPL
+  `);
+
   // Expand OOP
   await userEvent.click(screen.getByLabelText("expand OOP"));
-  await screen.findByText("C++");
-  expect(extractNodes(utils.container)).toEqual(["OOP", "C++", "Java", "FPL"]);
+  await expectTree(`
+Programming Languages
+  OOP
+    C++
+    Java
+  FPL
+  `);
   cleanup();
 
   // let bob remove OOP (also at root level)
@@ -209,17 +257,32 @@ test("Contact reorders list", async () => {
     ...bob(),
     initialRoute: `/w/${pl.id}`,
   });
-  await userEvent.click(await screen.findByLabelText("edit OOP"));
-  await userEvent.click(screen.getByLabelText("delete node"));
+  await screen.findByText("Programming Languages");
+  // Expand to see children
+  await userEvent.click(
+    screen.getByLabelText("expand Programming Languages")
+  );
+  // Step 1: Mark OOP as not relevant (hides it)
+  fireEvent.click(await screen.findByLabelText("mark OOP as not relevant"));
+
+  // Step 2: Enable not_relevant filter to see hidden items
+  await userEvent.click(screen.getByLabelText("filter Programming Languages"));
+  await userEvent.click(await screen.findByText("Not Relevant"));
+
+  // Step 3: Click "remove from list" to actually remove OOP
+  fireEvent.click(await screen.findByLabelText("remove OOP from list"));
   cleanup();
 
-  const { container } = renderApp({
+  renderApp({
     ...alice(),
     initialRoute: `/w/${pl.id}`,
   });
+  await screen.findByText("Programming Languages");
   // OOP is gone, so are it's children
-  await screen.findByText("FPL");
-  expect(extractNodes(container)).toEqual(["FPL"]);
+  await expectTree(`
+Programming Languages
+  FPL
+  `);
 });
 
 test("Alter View paths after disconnect", () => {
@@ -409,35 +472,47 @@ test("View doesn't change if list is copied from contact", async () => {
     bobsKnowledgeDB,
     "Programming Languages"
   ) as KnowNode;
-  const utils = renderApp({
+  renderApp({
     ...alice(),
     initialRoute: `/w/${pl.id}`,
   });
 
   await screen.findByText("Programming Languages");
-  expect(extractNodes(utils.container)).toEqual(["OOP", "FPL"]);
+  // Expand Programming Languages to see children
+  await userEvent.click(
+    screen.getByLabelText("expand Programming Languages")
+  );
+  await expectTree(`
+Programming Languages
+  OOP
+  FPL
+  `);
   // Expand OOP
   await userEvent.click(screen.getByLabelText("expand OOP"));
-  expect(extractNodes(utils.container)).toEqual(["OOP", "C++", "Java", "FPL"]);
+  await expectTree(`
+Programming Languages
+  OOP
+    C++
+    Java
+  FPL
+  `);
 
   // add node to Programming Languages and check if view stays the same
   await userEvent.click(
     await screen.findByLabelText("add to Programming Languages")
   );
-  /* eslint-disable testing-library/no-container */
-  /* eslint-disable testing-library/no-node-access */
-  const input = utils.container.querySelector(
-    '[data-placeholder="Create a Note"]'
-  ) as Element;
-  await userEvent.type(input, "added programming language");
-  await userEvent.click((await screen.findAllByText("Add Note"))[1]);
-  expect(extractNodes(utils.container)).toEqual([
-    "OOP",
-    "C++",
-    "Java",
-    "FPL",
-    "\nadded programming language",
-  ]);
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "added programming language{Escape}"
+  );
+  await expectTree(`
+Programming Languages
+  added programming language
+  OOP
+    C++
+    Java
+  FPL
+  `);
   cleanup();
 });
 
@@ -453,20 +528,38 @@ test("Disconnect Nodes", async () => {
   );
   // Navigate directly to Programming Languages (root level, empty context)
   const pl = findNodeByText(aliceDB, "Programming Languages") as KnowNode;
-  const { container } = renderApp({
+  renderApp({
     ...alice(),
     initialRoute: `/w/${pl.id}`,
   });
   await screen.findByText("Programming Languages");
+  // Expand Programming Languages to see children
+  await userEvent.click(
+    screen.getByLabelText("expand Programming Languages")
+  );
+  await expectTree(`
+Programming Languages
+  C
+  C++
+  Java
+  Rust
+  `);
 
   // marking nodes as not relevant removes them from the view
   fireEvent.click(await screen.findByLabelText("mark Java as not relevant"));
-  expect(screen.queryByText("Java")).toBeNull();
-  expect(extractNodes(container)).toEqual(["C", "C++", "Rust"]);
+  await expectTree(`
+Programming Languages
+  C
+  C++
+  Rust
+  `);
 
   fireEvent.click(await screen.findByLabelText("mark C as not relevant"));
-  expect(screen.queryByText("C")).toBeNull();
-  expect(extractNodes(container)).toEqual(["C++", "Rust"]);
+  await expectTree(`
+Programming Languages
+  C++
+  Rust
+  `);
 
   cleanup();
 });

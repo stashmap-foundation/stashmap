@@ -12,7 +12,6 @@ import { createPlan, planUpsertRelations } from "../planner";
 import { ALICE, renderWithTestData, setup, UpdateState } from "../utils.test";
 import { planCreateNodesFromMarkdown } from "./FileDropZone";
 import { TreeView } from "./TreeView";
-import { DraggableNote } from "./Draggable";
 import { addRelationToRelations, joinID, shortID } from "../connections";
 import { DND } from "../dnd";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
@@ -56,7 +55,6 @@ async function uploadAndRenderMarkdown(alice: UpdateState): Promise<void> {
           <LoadNode>
             <TemporaryViewProvider>
               <DND>
-                <DraggableNote />
                 <TreeView />
               </DND>
             </TemporaryViewProvider>
@@ -79,6 +77,10 @@ async function uploadAndRenderMarkdown(alice: UpdateState): Promise<void> {
 test("Markdown Upload", async () => {
   const [alice] = setup([ALICE]);
   await uploadAndRenderMarkdown(alice);
+  // Expand Programming Languages to see children
+  await userEvent.click(
+    await screen.findByLabelText("expand Programming Languages")
+  );
   // Verify the imported nodes exist by finding textboxes with their names
   const allTextboxes = await screen.findAllByRole("textbox");
   const javaTextbox = allTextboxes.find(
@@ -111,7 +113,6 @@ test.skip("Delete Node uploaded from Markdown", async () => {
           <LoadNode>
             <TemporaryViewProvider>
               <DND>
-                <DraggableNote />
                 <TreeView />
               </DND>
             </TemporaryViewProvider>
@@ -152,12 +153,12 @@ beforeAll(() => {
 
     // eslint-disable-next-line functional/immutable-data
     range.getBoundingClientRect = () =>
-      ({
-        height: 100,
-        width: 100,
-        x: 0,
-        y: 0,
-      } as DOMRect);
+    ({
+      height: 100,
+      width: 100,
+      x: 0,
+      y: 0,
+    } as DOMRect);
 
     // eslint-disable-next-line functional/immutable-data
     range.getClientRects = () => {

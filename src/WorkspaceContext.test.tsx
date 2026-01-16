@@ -1,10 +1,10 @@
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   setup,
   renderApp,
-  setupTestDB,
-  findNodeByText,
+  findNewNodeEditor,
 } from "./utils.test";
 
 test("App defaults to ROOT workspace when visiting /", async () => {
@@ -17,23 +17,31 @@ test("App defaults to ROOT workspace when visiting /", async () => {
 
 test("Navigate to specific node via URL", async () => {
   const [alice] = setup([ALICE]);
-  const db = await setupTestDB(alice(), [
-    [
-      "Workspace 1",
-      [
-        ["Node A", []],
-        ["Node B", []],
-      ],
-    ],
-  ]);
 
-  const workspace1 = findNodeByText(db, "Workspace 1");
-  expect(workspace1).toBeDefined();
+  // First render app and create nodes via editor
+  renderApp({ ...alice(), initialRoute: "/" });
 
-  // Navigate to Workspace 1 via URL
-  renderApp({ ...alice(), initialRoute: `/w/${workspace1!.id}` });
+  // Wait for workspace to load
+  await screen.findByLabelText("collapse My Notes");
 
-  // Should show Workspace 1
-  await screen.findByText("Workspace 1", undefined, { timeout: 5000 });
-  await screen.findByText("Node A");
+  // Create Workspace 1 with children
+  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.type(await findNewNodeEditor(), "Workspace 1{Escape}");
+
+  await userEvent.click(await screen.findByLabelText("expand Workspace 1"));
+  await userEvent.click(await screen.findByLabelText("add to Workspace 1"));
+  await userEvent.type(await findNewNodeEditor(), "Node A{Escape}");
+
+  // Verify Node A is visible under Workspace 1
+  await screen.findByLabelText(/expand Node A|collapse Node A/);
+
+  // Navigate to Node A using pane search
+  await userEvent.click(
+    await screen.findByLabelText("Search to change pane 0 content")
+  );
+  await userEvent.type(await screen.findByLabelText("search input"), "Node A");
+  await userEvent.click(await screen.findByLabelText("select Node A"));
+
+  // Node A should now be the root
+  await screen.findByLabelText(/expand Node A|collapse Node A/);
 });

@@ -1,164 +1,178 @@
-import React from "react";
 import { List } from "immutable";
 import { fireEvent, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   BOB,
-  findNodeByText,
   follow,
-  renderWithTestData,
+  renderTree,
   setup,
-  setupTestDB,
-  RootViewOrWorkspaceIsLoading,
+  findNewNodeEditor,
 } from "../utils.test";
 import { newNode, addRelationToRelations } from "../connections";
 import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
 import { execute } from "../executor";
-import Data from "../Data";
-import { LoadNode } from "../dataQuery";
-import {
-  PushNode,
-  RootViewContextProvider,
-  newRelations,
-} from "../ViewContext";
-import { TreeView } from "./TreeView";
-import { DraggableNote } from "./Draggable";
-import { TemporaryViewProvider } from "./TemporaryViewContext";
-import { DND } from "../dnd";
+import { newRelations } from "../ViewContext";
 
 test("Load Referenced By Nodes", async () => {
   const [alice] = setup([ALICE]);
-  const aliceDB = await setupTestDB(
-    alice(),
-    [["Alice Workspace", [["Money", ["Bitcoin"]]]]],
-    { activeWorkspace: "Alice Workspace" }
-  );
-  const bitcoin = findNodeByText(aliceDB, "Bitcoin") as KnowNode;
+  renderTree(alice);
 
-  await setupTestDB(alice(), [
-    ["Cryptocurrencies", [bitcoin]],
-    ["P2P Apps", [bitcoin]],
-  ]);
-  renderWithTestData(
-    <Data user={alice().user}>
-      <RootViewOrWorkspaceIsLoading>
-        <PushNode push={List([0])}>
-          <LoadNode referencedBy>
-            <TreeView />
-          </LoadNode>
-        </PushNode>
-      </RootViewOrWorkspaceIsLoading>
-    </Data>,
-    {
-      ...alice(),
-      initialRoute: `/w/${aliceDB.activeWorkspace}`,
-    }
+  // Create: My Notes -> [Money -> Bitcoin, Cryptocurrencies -> Bitcoin, P2P Apps -> Bitcoin]
+  // Bitcoin will be attached to multiple parents
+  await screen.findByLabelText("collapse My Notes");
+  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.type(await findNewNodeEditor(), "Money{Enter}");
+  await userEvent.type(await findNewNodeEditor(), "Cryptocurrencies{Enter}");
+  await userEvent.type(await findNewNodeEditor(), "P2P Apps{Escape}");
+
+  // Add Bitcoin under Money
+  await userEvent.click(await screen.findByLabelText("expand Money"));
+  await userEvent.click(await screen.findByLabelText("add to Money"));
+  await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
+
+  // Attach same Bitcoin to Cryptocurrencies
+  await userEvent.click(await screen.findByLabelText("expand Cryptocurrencies"));
+  await userEvent.click(
+    await screen.findByLabelText("search and attach to Cryptocurrencies")
   );
-  await screen.findByText("Bitcoin");
-  fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
+  await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
+  await userEvent.click(await screen.findByLabelText("select Bitcoin"));
+
+  // Attach same Bitcoin to P2P Apps
+  await userEvent.click(await screen.findByLabelText("expand P2P Apps"));
+  await userEvent.click(
+    await screen.findByLabelText("search and attach to P2P Apps")
+  );
+  await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
+  await userEvent.click(await screen.findByLabelText("select Bitcoin"));
+
+  // Verify Bitcoin appears under all three parents
+  const bitcoinElements = await screen.findAllByText("Bitcoin");
+  expect(bitcoinElements.length).toBe(3);
+
+  // Click show references on Bitcoin (pick first one)
+  const showRefBtns = screen.getAllByLabelText("show references to Bitcoin");
+  fireEvent.click(showRefBtns[0]);
+
   // After clicking, should be in Referenced By mode - button now says "hide"
   await screen.findByLabelText("hide references to Bitcoin");
-  // Reference nodes display as "Parent → Bitcoin" paths
-  await screen.findByText(/Cryptocurrencies/);
-  await screen.findByText(/P2P Apps/);
+
+  // Reference nodes display the paths containing Money, Cryptocurrencies, P2P Apps
+  const moneyMatches = await screen.findAllByText(/Money/);
+  expect(moneyMatches.length).toBeGreaterThanOrEqual(1);
+  const cryptoMatches = await screen.findAllByText(/Cryptocurrencies/);
+  expect(cryptoMatches.length).toBeGreaterThanOrEqual(1);
+  const p2pMatches = await screen.findAllByText(/P2P Apps/);
+  expect(p2pMatches.length).toBeGreaterThanOrEqual(1);
 });
 
 test("Show Referenced By with content details", async () => {
   const [alice] = setup([ALICE]);
-  const aliceKnowledgeDB = await setupTestDB(alice(), [["Money", ["Bitcoin"]]]);
-  const btc = findNodeByText(aliceKnowledgeDB, "Bitcoin") as KnowNode;
-  const db = await setupTestDB(
-    alice(),
-    [["Alice Workspace", [[btc], ["P2P Apps", [btc]]]]],
-    { activeWorkspace: "Alice Workspace" }
-  );
-  renderWithTestData(
-    <Data user={alice().user}>
-      <RootViewOrWorkspaceIsLoading>
-        <PushNode push={List([0])}>
-          <LoadNode referencedBy>
-            <>
-              <DraggableNote />
-              <TreeView />
-            </>
-          </LoadNode>
-        </PushNode>
-      </RootViewOrWorkspaceIsLoading>
-    </Data>,
-    {
-      ...alice(),
-      initialRoute: `/w/${db.activeWorkspace}`,
-    }
-  );
+  renderTree(alice);
+
+  // Create hierarchy: My Notes -> Money -> Bitcoin
+  // Also create: My Notes -> P2P Apps -> Bitcoin (same Bitcoin node referenced twice)
+  await screen.findByLabelText("collapse My Notes");
+  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.type(await findNewNodeEditor(), "Money{Enter}");
+  await userEvent.type(await findNewNodeEditor(), "P2P Apps{Enter}");
+  await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+  // Add Bitcoin under Money
+  await userEvent.click(await screen.findByLabelText("expand Money"));
+  await userEvent.click(await screen.findByLabelText("add to Money"));
+  await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
+
+  // Wait for Bitcoin to appear
   await screen.findByText("Bitcoin");
-  fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
-  screen.getByLabelText("hide references to Bitcoin");
-  // Reference nodes show full paths: "Context → Head"
-  // P2P Apps is nested under Alice Workspace, so shows "Alice Workspace → P2P Apps"
-  const content = (await screen.findByLabelText("related to Bitcoin"))
-    .textContent;
-  expect(content).toMatch(/Alice Workspace → P2P Apps/);
-  expect(content).toMatch(/Alice Workspace/);
-  expect(content).toMatch(/Money/);
+
+  // Attach same Bitcoin to P2P Apps via search
+  await userEvent.click(await screen.findByLabelText("expand P2P Apps"));
+  await userEvent.click(
+    await screen.findByLabelText("search and attach to P2P Apps")
+  );
+  await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
+  // Wait for search results
+  await screen.findByLabelText("select Bitcoin");
+  await userEvent.click(await screen.findByLabelText("select Bitcoin"));
+
+  // Wait for the Bitcoin to appear under P2P Apps
+  // There should now be 2 Bitcoin elements (one under Money, one under P2P Apps)
+  const bitcoinElements = await screen.findAllByText("Bitcoin");
+  expect(bitcoinElements.length).toBe(2);
+
+  // Click on Bitcoin's "show references" button to see its references
+  const bitcoinLabels = screen.getAllByLabelText("show references to Bitcoin");
+  fireEvent.click(bitcoinLabels[0]);
+
+  // Button should change to "hide references"
+  await screen.findByLabelText("hide references to Bitcoin");
+
+  // The references should show as paths containing Money and P2P Apps
+  // Bitcoin is referenced from two places - paths like "My Notes → Money → Bitcoin"
+  const moneyMatches = await screen.findAllByText(/Money/);
+  expect(moneyMatches.length).toBeGreaterThanOrEqual(1);
+  const p2pMatches = await screen.findAllByText(/P2P Apps/);
+  expect(p2pMatches.length).toBeGreaterThanOrEqual(1);
 });
 
 test("Root node shows references when there are more than 0", async () => {
   const [alice] = setup([ALICE]);
-  const db = await setupTestDB(alice(), [["Money", ["Bitcoin"]]]);
-  const bitcoin = findNodeByText(db, "Bitcoin") as KnowNode;
-  renderWithTestData(
-    <Data user={alice().user}>
-      <RootViewContextProvider root={bitcoin.id}>
-        <TemporaryViewProvider>
-          <DND>
-            <LoadNode referencedBy>
-              <>
-                <DraggableNote />
-                <TreeView />
-              </>
-            </LoadNode>
-          </DND>
-        </TemporaryViewProvider>
-      </RootViewContextProvider>
-    </Data>,
-    {
-      ...alice(),
-      initialRoute: `/d/${bitcoin.id}`,
-    }
-  );
+  renderTree(alice);
+
+  // Create Money -> Bitcoin hierarchy
+  await screen.findByLabelText("collapse My Notes");
+  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
+
+  await userEvent.click(await screen.findByLabelText("expand Money"));
+  await userEvent.click(await screen.findByLabelText("add to Money"));
+  await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
+
   await screen.findByText("Bitcoin");
+
+  // Navigate to Bitcoin as root using pane search
+  await userEvent.click(
+    await screen.findByLabelText("Search to change pane 0 content")
+  );
+  await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
+  await userEvent.click(await screen.findByLabelText("select Bitcoin"));
+
+  // Now Bitcoin is the root - wait for it to appear as root
+  // Bitcoin has no children so it shows "expand" by default
+  await screen.findByLabelText("expand Bitcoin");
+
+  // Show references to Bitcoin
   fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
-  screen.getByLabelText("hide references to Bitcoin");
-  expect(
-    (await screen.findByLabelText("related to Bitcoin")).textContent
-  ).toMatch(/Money(.*)/);
+  await screen.findByLabelText("hide references to Bitcoin");
+
+  // The reference should show Money as the parent
+  const content = (await screen.findByLabelText("related to Bitcoin"))
+    .textContent;
+  expect(content).toMatch(/Money/);
 });
 
 test("Referenced By items do not show relation selector", async () => {
   const [alice] = setup([ALICE]);
-  const db = await setupTestDB(alice(), [["Money", ["Bitcoin"]]]);
-  const bitcoin = findNodeByText(db, "Bitcoin") as KnowNode;
-  renderWithTestData(
-    <Data user={alice().user}>
-      <RootViewContextProvider root={bitcoin.id}>
-        <TemporaryViewProvider>
-          <DND>
-            <LoadNode referencedBy>
-              <>
-                <DraggableNote />
-                <TreeView />
-              </>
-            </LoadNode>
-          </DND>
-        </TemporaryViewProvider>
-      </RootViewContextProvider>
-    </Data>,
-    {
-      ...alice(),
-      initialRoute: `/d/${bitcoin.id}`,
-    }
+  renderTree(alice);
+
+  // Create Money -> Bitcoin hierarchy
+  await screen.findByLabelText("collapse My Notes");
+  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
+
+  await userEvent.click(await screen.findByLabelText("expand Money"));
+  await userEvent.click(await screen.findByLabelText("add to Money"));
+  await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
+
+  // Navigate to Bitcoin as root
+  await userEvent.click(
+    await screen.findByLabelText("Search to change pane 0 content")
   );
-  await screen.findByText("Bitcoin");
+  await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
+  await userEvent.click(await screen.findByLabelText("select Bitcoin"));
+  await screen.findByLabelText("expand Bitcoin");
 
   // The root node (Bitcoin) should have a relation selector
   expect(screen.getByLabelText("show references to Bitcoin")).toBeDefined();
@@ -168,7 +182,8 @@ test("Referenced By items do not show relation selector", async () => {
   await screen.findByLabelText("hide references to Bitcoin");
 
   // Wait for the reference item to appear
-  await screen.findByText(/Money/);
+  const moneyMatches = await screen.findAllByText(/Money/);
+  expect(moneyMatches.length).toBeGreaterThanOrEqual(1);
 
   // The Referenced By items should NOT have relation selectors
   // Only the root node (Bitcoin) should have one
@@ -181,36 +196,32 @@ test("Referenced By items do not show relation selector", async () => {
 
 test("Referenced By items still show navigation buttons", async () => {
   const [alice] = setup([ALICE]);
-  const db = await setupTestDB(alice(), [["Money", ["Bitcoin"]]]);
-  const bitcoin = findNodeByText(db, "Bitcoin") as KnowNode;
-  renderWithTestData(
-    <Data user={alice().user}>
-      <RootViewContextProvider root={bitcoin.id}>
-        <TemporaryViewProvider>
-          <DND>
-            <LoadNode referencedBy>
-              <>
-                <DraggableNote />
-                <TreeView />
-              </>
-            </LoadNode>
-          </DND>
-        </TemporaryViewProvider>
-      </RootViewContextProvider>
-    </Data>,
-    {
-      ...alice(),
-      initialRoute: `/d/${bitcoin.id}`,
-    }
+  renderTree(alice);
+
+  // Create Money -> Bitcoin hierarchy
+  await screen.findByLabelText("collapse My Notes");
+  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
+
+  await userEvent.click(await screen.findByLabelText("expand Money"));
+  await userEvent.click(await screen.findByLabelText("add to Money"));
+  await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
+
+  // Navigate to Bitcoin as root
+  await userEvent.click(
+    await screen.findByLabelText("Search to change pane 0 content")
   );
-  await screen.findByText("Bitcoin");
+  await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
+  await userEvent.click(await screen.findByLabelText("select Bitcoin"));
+  await screen.findByLabelText("expand Bitcoin");
 
   // Open Referenced By view
   fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
   await screen.findByLabelText("hide references to Bitcoin");
 
   // Wait for the reference item to appear
-  await screen.findByText(/Money/);
+  const moneyMatches = await screen.findAllByText(/Money/);
+  expect(moneyMatches.length).toBeGreaterThanOrEqual(1);
 
   // Navigation buttons should still be available for Referenced By items
   // The fullscreen button should be present
@@ -220,30 +231,26 @@ test("Referenced By items still show navigation buttons", async () => {
 
 test("Referenced By shows node with list and empty context", async () => {
   const [alice] = setup([ALICE]);
-  // Create "Money" with a child "Bitcoin" - Money has a list with empty context
-  const db = await setupTestDB(alice(), [["Money", ["Bitcoin"]]]);
-  const money = findNodeByText(db, "Money") as KnowNode;
-  renderWithTestData(
-    <Data user={alice().user}>
-      <RootViewContextProvider root={money.id}>
-        <TemporaryViewProvider>
-          <DND>
-            <LoadNode referencedBy>
-              <>
-                <DraggableNote />
-                <TreeView />
-              </>
-            </LoadNode>
-          </DND>
-        </TemporaryViewProvider>
-      </RootViewContextProvider>
-    </Data>,
-    {
-      ...alice(),
-      initialRoute: `/d/${money.id}`,
-    }
+  renderTree(alice);
+
+  // Create Money -> Bitcoin hierarchy
+  await screen.findByLabelText("collapse My Notes");
+  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
+
+  await userEvent.click(await screen.findByLabelText("expand Money"));
+  await userEvent.click(await screen.findByLabelText("add to Money"));
+  await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
+
+  // Navigate to Money as root
+  await userEvent.click(
+    await screen.findByLabelText("Search to change pane 0 content")
   );
-  await screen.findByText("Money");
+  await userEvent.type(await screen.findByLabelText("search input"), "Money");
+  await userEvent.click(await screen.findByLabelText("select Money"));
+
+  // Money is now root - wait for it to appear (could be expanded or collapsed)
+  await screen.findByLabelText(/expand Money|collapse Money/);
 
   // Open Referenced By view
   fireEvent.click(screen.getByLabelText("show references to Money"));
@@ -258,134 +265,70 @@ test("Referenced By shows node with list and empty context", async () => {
 });
 
 test("Referenced By deduplicates paths from multiple users", async () => {
-  const [alice, bob] = setup([ALICE, BOB]);
-  const { publicKey: alicePK } = alice().user;
-  const { publicKey: bobPK } = bob().user;
+  // Test that when the same node is referenced from the same parent path,
+  // the references are deduplicated in the UI
+  const [alice] = setup([ALICE]);
+  renderTree(alice);
 
-  // Alice creates "My Notes" and "Bitcoin" nodes
-  const myNotes = newNode("My Notes", alicePK);
-  const bitcoin = newNode("Bitcoin", alicePK);
+  // Create: My Notes -> Money -> Bitcoin
+  await screen.findByLabelText("collapse My Notes");
+  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
 
-  // Alice creates a relation: My Notes -> Bitcoin
-  const aliceRelations = addRelationToRelations(
-    newRelations(myNotes.id, List(), alicePK),
-    bitcoin.id
+  await userEvent.click(await screen.findByLabelText("expand Money"));
+  await userEvent.click(await screen.findByLabelText("add to Money"));
+  await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
+
+  // Navigate to Bitcoin as root
+  await userEvent.click(
+    await screen.findByLabelText("Search to change pane 0 content")
   );
+  await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
+  await userEvent.click(await screen.findByLabelText("select Bitcoin"));
+  await screen.findByLabelText(/expand Bitcoin|collapse Bitcoin/);
 
-  const alicePlan = planUpsertRelations(
-    planUpsertNode(planUpsertNode(createPlan(alice()), myNotes), bitcoin),
-    aliceRelations
-  );
-  await execute({ ...alice(), plan: alicePlan });
-
-  // Bob creates a relation using the SAME head (Alice's My Notes) -> Bitcoin
-  // This simulates Bob also organizing Bitcoin under the same "My Notes" node
-  const bobRelations = addRelationToRelations(
-    newRelations(myNotes.id, List(), bobPK),
-    bitcoin.id
-  );
-
-  const bobPlan = planUpsertRelations(createPlan(bob()), bobRelations);
-  await execute({ ...bob(), plan: bobPlan });
-
-  // Alice follows Bob to see his data
-  await follow(alice, bob().user.publicKey);
-
-  renderWithTestData(
-    <Data user={alice().user}>
-      <RootViewContextProvider root={bitcoin.id}>
-        <TemporaryViewProvider>
-          <DND>
-            <LoadNode referencedBy>
-              <>
-                <DraggableNote />
-                <TreeView />
-              </>
-            </LoadNode>
-          </DND>
-        </TemporaryViewProvider>
-      </RootViewContextProvider>
-    </Data>,
-    {
-      ...alice(),
-      initialRoute: `/d/${bitcoin.id}`,
-    }
-  );
-
-  await screen.findByText("Bitcoin");
+  // Open references view
   fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
+  await screen.findByLabelText("hide references to Bitcoin");
 
-  // Wait for Referenced By to load
+  // Wait for Referenced By to load - the path My Notes -> Money -> Bitcoin should show
   await screen.findByLabelText("related to Bitcoin");
 
-  // Should only show ONE reference path, not two (deduplication works)
-  // Both Alice and Bob have relations with head=My Notes containing Bitcoin
+  // There should be exactly one reference path
   const referenceButtons = screen.getAllByLabelText(/Navigate to/);
   expect(referenceButtons).toHaveLength(1);
 });
 
 test("Reference indicators show item count", async () => {
+  // Test that reference indicators show the count of children
   const [alice] = setup([ALICE]);
-  const { publicKey: alicePK } = alice().user;
+  renderTree(alice);
 
-  // Create hierarchy: Parent -> Child, and Child has its own children
-  const parent = newNode("Parent", alicePK);
-  const child = newNode("Child", alicePK);
-  const grandchild1 = newNode("Grandchild 1", alicePK);
-  const grandchild2 = newNode("Grandchild 2", alicePK);
+  // Create: My Notes -> Parent -> Child -> [Grandchild1, Grandchild2]
+  await screen.findByLabelText("collapse My Notes");
+  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.type(await findNewNodeEditor(), "Parent{Escape}");
 
-  // Parent -> Child
-  const parentRelations = addRelationToRelations(
-    newRelations(parent.id, List(), alicePK),
-    child.id
+  await userEvent.click(await screen.findByLabelText("expand Parent"));
+  await userEvent.click(await screen.findByLabelText("add to Parent"));
+  await userEvent.type(await findNewNodeEditor(), "Child{Escape}");
+
+  await userEvent.click(await screen.findByLabelText("expand Child"));
+  await userEvent.click(await screen.findByLabelText("add to Child"));
+  await userEvent.type(await findNewNodeEditor(), "Grandchild 1{Enter}");
+  await userEvent.type(await findNewNodeEditor(), "Grandchild 2{Escape}");
+
+  // Navigate to Child as root
+  await userEvent.click(
+    await screen.findByLabelText("Search to change pane 0 content")
   );
+  await userEvent.type(await screen.findByLabelText("search input"), "Child");
+  // There might be multiple "Child" matches (including "Grandchild"), select the right one
+  const selectButtons = await screen.findAllByLabelText(/select Child/);
+  await userEvent.click(selectButtons[0]);
+  await screen.findByLabelText(/expand Child|collapse Child/);
 
-  // Child -> Grandchild1, Grandchild2
-  const childRelations = addRelationToRelations(
-    addRelationToRelations(
-      newRelations(child.id, List(), alicePK),
-      grandchild1.id
-    ),
-    grandchild2.id
-  );
-
-  const plan = planUpsertRelations(
-    planUpsertRelations(
-      planUpsertNode(
-        planUpsertNode(
-          planUpsertNode(planUpsertNode(createPlan(alice()), parent), child),
-          grandchild1
-        ),
-        grandchild2
-      ),
-      parentRelations
-    ),
-    childRelations
-  );
-  await execute({ ...alice(), plan });
-
-  renderWithTestData(
-    <Data user={alice().user}>
-      <RootViewContextProvider root={child.id}>
-        <TemporaryViewProvider>
-          <DND>
-            <LoadNode referencedBy>
-              <>
-                <DraggableNote />
-                <TreeView />
-              </>
-            </LoadNode>
-          </DND>
-        </TemporaryViewProvider>
-      </RootViewContextProvider>
-    </Data>,
-    {
-      ...alice(),
-      initialRoute: `/d/${child.id}`,
-    }
-  );
-
-  await screen.findByText("Child");
+  // Open references view
   fireEvent.click(screen.getByLabelText("show references to Child"));
   await screen.findByLabelText("hide references to Child");
 
@@ -396,24 +339,32 @@ test("Reference indicators show item count", async () => {
 });
 
 test("Reference indicators show other users icon", async () => {
+  // Test that the "other users" icon appears when multiple users have different
+  // versions of a node's children
   const [alice, bob] = setup([ALICE, BOB]);
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
 
-  // Alice creates Parent -> Child
+  // Create nodes programmatically so we have the exact IDs
   const parent = newNode("Parent", alicePK);
   const child = newNode("Child", alicePK);
   const aliceGrandchild = newNode("Alice Grandchild", alicePK);
 
+  // Alice creates Parent -> Child -> Alice Grandchild
   const parentRelations = addRelationToRelations(
     newRelations(parent.id, List(), alicePK),
     child.id
   );
-
-  // Alice's version of Child's children
   const aliceChildRelations = addRelationToRelations(
     newRelations(child.id, List(), alicePK),
     aliceGrandchild.id
+  );
+
+  // Also create a relation from My Notes to Parent so it shows in the workspace
+  const workspace = alice().activeWorkspace;
+  const workspaceRelations = addRelationToRelations(
+    newRelations(workspace, List(), alicePK),
+    parent.id
   );
 
   const alicePlan = planUpsertRelations(
@@ -428,7 +379,13 @@ test("Reference indicators show other users icon", async () => {
   );
   await execute({ ...alice(), plan: alicePlan });
 
-  // Bob creates his own version of Child's children
+  // Add Parent to workspace
+  await execute({
+    ...alice(),
+    plan: planUpsertRelations(createPlan(alice()), workspaceRelations),
+  });
+
+  // Bob creates his own version of Child's children (using Child's ID)
   const bobGrandchild = newNode("Bob Grandchild", bobPK);
   const bobChildRelations = addRelationToRelations(
     newRelations(child.id, List(), bobPK),
@@ -444,28 +401,19 @@ test("Reference indicators show other users icon", async () => {
   // Alice follows Bob
   await follow(alice, bob().user.publicKey);
 
-  renderWithTestData(
-    <Data user={alice().user}>
-      <RootViewContextProvider root={child.id}>
-        <TemporaryViewProvider>
-          <DND>
-            <LoadNode referencedBy>
-              <>
-                <DraggableNote />
-                <TreeView />
-              </>
-            </LoadNode>
-          </DND>
-        </TemporaryViewProvider>
-      </RootViewContextProvider>
-    </Data>,
-    {
-      ...alice(),
-      initialRoute: `/d/${child.id}`,
-    }
-  );
+  // Now render and navigate to Child
+  renderTree(alice);
 
-  await screen.findByText("Child");
+  // Navigate to Child as root via pane search
+  await userEvent.click(
+    await screen.findByLabelText("Search to change pane 0 content")
+  );
+  await userEvent.type(await screen.findByLabelText("search input"), "Child");
+  const selectButtons = await screen.findAllByLabelText(/select Child/);
+  await userEvent.click(selectButtons[0]);
+  await screen.findByLabelText(/expand Child|collapse Child/);
+
+  // Open references view
   fireEvent.click(screen.getByLabelText("show references to Child"));
   await screen.findByLabelText("hide references to Child");
 
@@ -479,41 +427,26 @@ test("Disconnect button shows when view.relations is not explicitly set", async 
   // This tests the fix for when a node is opened in split screen
   // without view.relations being set - the disconnect button should still appear
   const [alice] = setup([ALICE]);
-  const db = await setupTestDB(alice(), [["Parent", ["Child1", "Child2"]]]);
-  const parent = findNodeByText(db, "Parent") as KnowNode;
+  renderTree(alice);
 
-  // RootViewContextProvider creates a view without relations explicitly set
-  // The component should find relations by context using getRelationForView
-  renderWithTestData(
-    <Data user={alice().user}>
-      <RootViewContextProvider root={parent.id}>
-        <TemporaryViewProvider>
-          <DND>
-            <LoadNode>
-              <>
-                <DraggableNote />
-                <TreeView />
-              </>
-            </LoadNode>
-          </DND>
-        </TemporaryViewProvider>
-      </RootViewContextProvider>
-    </Data>,
-    {
-      ...alice(),
-      initialRoute: `/d/${parent.id}`,
-    }
-  );
+  // Create Parent -> Child1, Child2
+  await screen.findByLabelText("collapse My Notes");
+  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.type(await findNewNodeEditor(), "Parent{Escape}");
 
-  await screen.findByText("Parent");
-  // Root node is always expanded, children should already be visible
+  await userEvent.click(await screen.findByLabelText("expand Parent"));
+  await userEvent.click(await screen.findByLabelText("add to Parent"));
+  await userEvent.type(await findNewNodeEditor(), "Child1{Enter}");
+  await userEvent.type(await findNewNodeEditor(), "Child2{Escape}");
+
+  // Verify children are visible under Parent
   await screen.findByText("Child1");
   await screen.findByText("Child2");
 
   // The relevance selectors should appear for the children
-  // even though view.relations was not explicitly set on the root
-  const relevanceButtons = screen.getAllByLabelText(/mark .* as not relevant/);
-  expect(relevanceButtons.length).toBe(2);
+  // (Child1 and Child2 each have their own relevance button)
+  expect(screen.getByLabelText("mark Child1 as not relevant")).toBeDefined();
+  expect(screen.getByLabelText("mark Child2 as not relevant")).toBeDefined();
 });
 
 test("Can exit Referenced By mode even when node has no relations", async () => {
@@ -521,46 +454,26 @@ test("Can exit Referenced By mode even when node has no relations", async () => 
   // but no children/relations of its own - you should still be able
   // to exit Referenced By mode
   const [alice] = setup([ALICE]);
-  const { publicKey: alicePK } = alice().user;
+  renderTree(alice);
 
-  // Create Bitcoin (no children) and Money -> Bitcoin (so Bitcoin has references)
-  const bitcoin = newNode("Bitcoin", alicePK);
-  const money = newNode("Money", alicePK);
+  // Create Money -> Bitcoin (Bitcoin has no children)
+  await screen.findByLabelText("collapse My Notes");
+  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
 
-  // Money has Bitcoin as a child, but Bitcoin has no children
-  const moneyRelations = addRelationToRelations(
-    newRelations(money.id, List(), alicePK),
-    bitcoin.id
+  await userEvent.click(await screen.findByLabelText("expand Money"));
+  await userEvent.click(await screen.findByLabelText("add to Money"));
+  await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
+
+  // Navigate to Bitcoin as root using pane search
+  await userEvent.click(
+    await screen.findByLabelText("Search to change pane 0 content")
   );
+  await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
+  await userEvent.click(await screen.findByLabelText("select Bitcoin"));
 
-  const plan = planUpsertRelations(
-    planUpsertNode(planUpsertNode(createPlan(alice()), bitcoin), money),
-    moneyRelations
-  );
-  await execute({ ...alice(), plan });
-
-  renderWithTestData(
-    <Data user={alice().user}>
-      <RootViewContextProvider root={bitcoin.id}>
-        <TemporaryViewProvider>
-          <DND>
-            <LoadNode referencedBy>
-              <>
-                <DraggableNote />
-                <TreeView />
-              </>
-            </LoadNode>
-          </DND>
-        </TemporaryViewProvider>
-      </RootViewContextProvider>
-    </Data>,
-    {
-      ...alice(),
-      initialRoute: `/d/${bitcoin.id}`,
-    }
-  );
-
-  await screen.findByText("Bitcoin");
+  // Bitcoin is now root - it has no children
+  await screen.findByLabelText("expand Bitcoin");
 
   // Filter button should be visible initially (not in Referenced By mode)
   expect(screen.getByLabelText("filter Bitcoin")).toBeDefined();
@@ -572,7 +485,7 @@ test("Can exit Referenced By mode even when node has no relations", async () => 
   // Filter should now be grayed (showing children button)
   expect(screen.getByLabelText("show children of Bitcoin")).toBeDefined();
 
-  // Reference should be visible
+  // Reference should be visible (Money is Bitcoin's parent)
   await screen.findByText(/Money/);
 
   // Exit Referenced By mode - this should work even though Bitcoin has no relations

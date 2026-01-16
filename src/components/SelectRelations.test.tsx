@@ -69,7 +69,7 @@ test("Shows dots when other user has a relation of same type", async () => {
     alice()
   );
 
-  await screen.findByText("Parent Node");
+  await screen.findByLabelText(/expand Parent Node|collapse Parent Node/);
 
   // The version selector should show when multiple versions are available
   // Both Alice and Bob have versions, so there are 2 versions
@@ -109,7 +109,7 @@ test("Shows no dots when user is the only one with a relation", async () => {
     alice()
   );
 
-  await screen.findByText("Parent Node");
+  await screen.findByLabelText(/expand Parent Node|collapse Parent Node/);
 
   // Version selector should not appear when only one version exists
   // There's no "versions available" button since Alice is the only one
@@ -160,14 +160,14 @@ test("Shows dots when only other user has relation (current user has none)", asy
     alice()
   );
 
-  await screen.findByText("Parent Node");
+  await screen.findByLabelText(/expand Parent Node|collapse Parent Node/);
 
   // When only another user has a version (not the current user),
   // there's just 1 version available, so no version selector is shown.
   // But Bob's child should appear as a diff item.
   expect(screen.queryByLabelText(/versions available/)).toBeNull();
   // Bob's child should be visible as a diff item
-  await screen.findByText("Bob's Child Node");
+  await screen.findByLabelText(/expand Bob's Child Node|collapse Bob's Child Node/);
 });
 
 test("getDiffItemsForNode returns items from other users", () => {

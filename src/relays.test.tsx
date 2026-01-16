@@ -91,7 +91,9 @@ test("Write views on user relays", async () => {
   );
   utils.relayPool.resetPublishedOnRelays();
   // The root node is always expanded, so click collapse to trigger a view save
-  fireEvent.click(await screen.findByLabelText("collapse My Notes"));
+  // May have multiple elements due to DraggableNote + TreeView
+  const collapseButtons = await screen.findAllByLabelText("collapse My Notes");
+  fireEvent.click(collapseButtons[0]);
   await findEvent(utils.relayPool, { kinds: [KIND_VIEWS] });
   const publishedRelays = utils.relayPool.getPublishedOnRelays();
   TEST_RELAYS.forEach((relay) => {

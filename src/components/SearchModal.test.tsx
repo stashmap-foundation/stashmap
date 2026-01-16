@@ -84,7 +84,22 @@ test("Search works like spotlight", async () => {
   await userEvent.type(secondSearchInput, "{arrowdown}");
   await userEvent.type(secondResult, "{enter}");
   expect(screen.queryByLabelText("search input")).toBeNull();
-  await screen.findByText("My second search note ever made");
+
+  // The parent might be collapsed, expand it to see the attached child
+  const parentCollapseBtn = screen.queryByLabelText(
+    "collapse My very first topic"
+  );
+  if (!parentCollapseBtn) {
+    const parentExpandBtn = await screen.findByLabelText(
+      "expand My very first topic"
+    );
+    await userEvent.click(parentExpandBtn);
+  }
+
+  // Now the attached node should be visible
+  await screen.findByLabelText(
+    /expand My second search note ever made|collapse My second search note ever made/
+  );
 
   // Navigate back to ROOT by clicking on the stacked layer
   const stackedLayer = await screen.findByText("My Notes");

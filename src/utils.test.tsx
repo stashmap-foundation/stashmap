@@ -70,6 +70,7 @@ import { LoadNode } from "./dataQuery";
 import { StorePreLoginContext } from "./StorePreLoginContext";
 import { newDB } from "./knowledge";
 import { TemporaryViewProvider } from "./components/TemporaryViewContext";
+import { WorkspaceView } from "./components/Workspace";
 import { DND } from "./dnd";
 import { findContacts } from "./contacts";
 import { ProjectContextProvider } from "./ProjectContext";
@@ -815,6 +816,142 @@ export function RootViewOrWorkspaceIsLoading({
       </PaneIndexProvider>
     </SplitPanesProvider>
   );
+}
+
+/**
+ * Gets the tree structure as a readable hierarchical string.
+ * Uses expand/collapse buttons to find nodes (these exist for all nodes).
+ *
+ * Example output:
+ *   My Notes
+ *     Bitcoin
+ *       P2P
+ *       Digital Gold
+ *     Ethereum
+ */
+export async function getTreeStructure(): Promise<string> {
+  await waitFor(() => {
+    expect(screen.queryByText("Loading...")).toBeNull();
+  });
+
+  // Find all expand/collapse buttons (every node has one)
+  const toggleButtons = screen.getAllByRole("button", {
+    name: /^(expand|collapse) /,
+  });
+
+  const lines: string[] = [];
+  const seenNodes = new globalThis.Set<string>();
+
+  toggleButtons.forEach((btn) => {
+    const ariaLabel = btn.getAttribute("aria-label") || "";
+    const text = ariaLabel.replace(/^(expand|collapse) /, "");
+
+    // Count indent levels by counting the wrapper divs inside .d-flex that come before the button
+    // Structure: .d-flex > .left-menu > [indent divs...] > button
+    // The first indent div is always there (even for root), so we count starting from -1
+    // eslint-disable-next-line testing-library/no-node-access
+    const dFlex = btn.closest(".d-flex");
+    let indentLevel = -1; // Start at -1 because there's always one structural div
+    if (dFlex) {
+      // eslint-disable-next-line testing-library/no-node-access
+      const children = Array.from(dFlex.children);
+      // Count divs between left-menu and the button
+      let countingIndents = false;
+      for (const child of children) {
+        // eslint-disable-next-line testing-library/no-node-access
+        if (child.classList.contains("left-menu")) {
+          countingIndents = true;
+          continue;
+        }
+        if (child === btn) break;
+        if (countingIndents && child.tagName === "DIV") {
+          indentLevel++;
+        }
+      }
+    }
+    // Clamp to 0 minimum
+    indentLevel = Math.max(0, indentLevel);
+
+    // Create unique key to skip duplicates (same text at same level)
+    const key = `${indentLevel}:${text}`;
+    if (seenNodes.has(key)) return;
+    seenNodes.add(key);
+
+    const indent = "  ".repeat(indentLevel);
+    lines.push(`${indent}${text}`);
+  });
+
+  return lines.join("\n");
+}
+
+/**
+ * Asserts the tree matches the expected structure.
+ * Pass a template string with 2-space indentation per level.
+ */
+export async function expectTree(expected: string): Promise<void> {
+  const expectedNormalized = expected
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter((line) => line.length > 0)
+    .join("\n");
+
+  await waitFor(async () => {
+    const actual = await getTreeStructure();
+    expect(actual).toEqual(expectedNormalized);
+  });
+}
+
+/**
+ * Finds the empty "note editor" (for creating new nodes).
+ */
+export async function findNewNodeEditor(): Promise<HTMLElement> {
+  const editors = await screen.findAllByRole("textbox", { name: "note editor" });
+  const emptyEditor = editors.find((e) => e.textContent === "");
+  if (!emptyEditor) {
+    throw new Error("No empty editor found");
+  }
+  return emptyEditor;
+}
+
+/**
+ * Standard test setup - renders the tree view.
+ * The root node "My Notes" is already visible and expanded.
+ */
+export function renderTree(user: ReturnType<typeof setup>[0]): RenderViewResult {
+  return renderWithTestData(
+    <RootViewOrWorkspaceIsLoading>
+      <WorkspaceView />
+    </RootViewOrWorkspaceIsLoading>,
+    user()
+  );
+}
+
+/**
+ * Creates a new node under "My Notes" and then changes the tree root to that node.
+ * Returns with the new node as the root of the tree view.
+ */
+export async function createAndSetAsRoot(nodeName: string): Promise<void> {
+  // First create the node under My Notes
+  (await screen.findAllByLabelText("collapse My Notes"))[0];
+  await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
+  await userEvent.type(await findNewNodeEditor(), `${nodeName}{Escape}`);
+
+  // Now use the pane search to change root to this node
+  await userEvent.click(
+    await screen.findByLabelText("Search to change pane 0 content")
+  );
+
+  // Type the node name in search
+  await userEvent.type(await screen.findByLabelText("search input"), nodeName);
+
+  // Click on the search result using its aria-label
+  await userEvent.click(await screen.findByLabelText(`select ${nodeName}`));
+
+  // Wait for the tree to update with new root
+  await waitFor(async () => {
+    const tree = await getTreeStructure();
+    expect(tree.startsWith(nodeName)).toBe(true);
+  });
 }
 
 export {

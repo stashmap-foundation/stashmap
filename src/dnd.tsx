@@ -49,7 +49,10 @@ export function getDropDestinationFromTreeView(
   destinationIndex: number
 ): [ViewPath, number] {
   const nodes = getNodesInTree(data, root, stack, List<ViewPath>());
-  const dropBefore = nodes.get(destinationIndex);
+  // Subtract 1 because the visual list includes root at index 0,
+  // but getNodesInTree doesn't include the root
+  const adjustedIndex = destinationIndex - 1;
+  const dropBefore = nodes.get(adjustedIndex);
   if (!dropBefore) {
     return getDropDestinationEndOfRoot(data, root);
   }

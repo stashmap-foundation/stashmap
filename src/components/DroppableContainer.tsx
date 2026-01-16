@@ -70,10 +70,12 @@ export function useDroppable({
   destination,
   index,
   ref,
+  isRoot,
 }: {
   destination: ViewPath;
   index?: number;
   ref: RefObject<HTMLElement>;
+  isRoot?: boolean;
 }): [
   { dragDirection: number | undefined; isOver: boolean },
   ConnectDropTarget
@@ -85,6 +87,16 @@ export function useDroppable({
 
   const isListItem = index !== undefined;
 
+  // Helper to adjust direction for root node (can't drop above root)
+  const adjustDirectionForRoot = (
+    direction: number | undefined
+  ): number | undefined => {
+    if (isRoot && direction === 1) {
+      return -1; // Treat top drop on root as bottom drop
+    }
+    return direction;
+  };
+
   return useDrop<
     DragItemType,
     DragItemType,
@@ -92,8 +104,9 @@ export function useDroppable({
   >({
     accept: NOTE_TYPE,
     collect(monitor) {
+      const rawDirection = calcDragDirection(ref, monitor, path);
       return {
-        dragDirection: calcDragDirection(ref, monitor, path),
+        dragDirection: adjustDirectionForRoot(rawDirection),
         isOver: monitor.isOver({ shallow: true }),
       };
     },
@@ -101,7 +114,8 @@ export function useDroppable({
       item: DragItemType,
       monitor: DropTargetMonitor<DragItemType, DragItemType>
     ) {
-      const direction = calcDragDirection(ref, monitor, path);
+      const rawDirection = calcDragDirection(ref, monitor, path);
+      const direction = adjustDirectionForRoot(rawDirection);
       if (isListItem && direction === undefined) {
         return item;
       }

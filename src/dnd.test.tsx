@@ -40,18 +40,18 @@ My Notes
   Item C
   `);
 
-  // Drag Item C and drop on Item A (inserts after the drop target)
+  // Drag Item C and drop on Item A (in test env, simulates dropping above = insert before)
   const itemC = screen.getByText("Item C");
   const itemA = screen.getByText("Item A");
 
   fireEvent.dragStart(itemC);
   fireEvent.drop(itemA);
 
-  // Item C should now be after Item A (dropped on A inserts after A)
+  // Item C should now be before Item A (at the first position)
   await expectTree(`
 My Notes
-  Item A
   Item C
+  Item A
   Item B
   `);
 });
@@ -94,13 +94,14 @@ My Notes
   // Wait for split pane to show Parent
   await screen.findByLabelText("collapse Parent");
 
-  // Drag Draggable Item from pane 0 (under Parent in My Notes view) to pane 1 (Parent as root)
+  // Drag Draggable Item from pane 0 (under Parent in My Notes view) to My Notes root
   // The item should now appear in both places
   const draggableItems = screen.getAllByText("Draggable Item");
-  const addToMyNotes = await screen.findByLabelText("add to My Notes");
+  // Drop on "My Notes" node itself (which is a drop target), not on the add button
+  const myNotesNodes = screen.getAllByText("My Notes");
 
   fireEvent.dragStart(draggableItems[0]);
-  fireEvent.drop(addToMyNotes);
+  fireEvent.drop(myNotesNodes[0]);
 
   // Verify the item was added to My Notes (it should appear multiple times now)
   const allDraggableItems = screen.getAllByText("Draggable Item");

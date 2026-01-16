@@ -300,10 +300,14 @@ export function ListItem({
   const baseLevels = viewPath.length - 1;
   const baseInsertAtIndex = relationIndex !== undefined ? relationIndex + 1 : 0;
 
+  // Root node (index 0) can't have siblings above it
+  const isRoot = index === 0;
+
   const [{ dragDirection }, drop] = useDroppable({
     destination: treeViewPath,
     index,
     ref,
+    isRoot,
   });
 
   if (isDiffItem) {

@@ -97,7 +97,7 @@ body {
 .stacked-layer-clickable {
   flex: 1;
   padding: 8px;
-  padding-left: 108px; // Align with node text (left-menu width + some spacing)
+  padding-left: 128px; // Align with node text (left-menu width + some spacing)
   cursor: pointer;
 }
 
@@ -953,8 +953,8 @@ to {
 
 // Left menu - fixed width column for children controls (inside Node)
 .left-menu {
-  width: 100px;
-  min-width: 100px;
+  width: 120px;
+  min-width: 120px;
   display: flex;
   align-items: flex-start;
   justify-content: flex-end;

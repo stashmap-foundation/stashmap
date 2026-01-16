@@ -111,7 +111,7 @@ type CreateNodeEditorProps = {
   initialPortalTarget: string;
 };
 
-function CreateNodeEditor({
+export function CreateNodeEditor({
   initialPosition,
   baseInsertAtIndex,
   baseLevels,

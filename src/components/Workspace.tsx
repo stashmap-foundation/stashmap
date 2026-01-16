@@ -8,6 +8,7 @@ import { useData } from "../DataContext";
 import { usePaneNavigation, usePaneIndex } from "../SplitPanesContext";
 import { Node } from "./Node";
 import { TreeView } from "./TreeView";
+import { ListItem } from "./Draggable";
 import { OpenInSplitPaneButtonWithStack } from "./OpenInSplitPaneButton";
 import {
   PaneSearchButton,
@@ -131,6 +132,7 @@ export function WorkspaceView(): JSX.Element | null {
                 <DND>
                   <TreeView />
                 </DND>
+                <RootCreateNodeEditor />
               </div>
             </div>
           </div>

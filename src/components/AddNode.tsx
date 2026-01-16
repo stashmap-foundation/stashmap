@@ -440,6 +440,32 @@ export function SiblingSearchButton(): JSX.Element | null {
   );
 }
 
+export function AddSiblingButton(): JSX.Element | null {
+  const { openCreateNodeEditor } = useTemporaryView();
+  const viewKey = useViewKey();
+  const [node] = useNode();
+
+  if (!node) {
+    return null;
+  }
+
+  const handleClick = (): void => {
+    openCreateNodeEditor(viewKey);
+  };
+
+  return (
+    <button
+      type="button"
+      className="btn btn-borderless p-0"
+      onClick={handleClick}
+      aria-label={`add to ${node.text}`}
+      title="Add note"
+    >
+      <span className="simple-icon-plus" />
+    </button>
+  );
+}
+
 export function AddNodeToNode({
   insertAtIndex,
 }: {

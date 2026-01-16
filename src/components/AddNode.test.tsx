@@ -38,6 +38,27 @@ test("Add New Note", async () => {
   await screen.findByText("Hello World");
 });
 
+test("Add note via + button on empty tree", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp(alice());
+
+  // Wait for My Notes to appear (ROOT node)
+  await screen.findByText("My Notes");
+
+  // Click the + button to add a note (aria-label="add to My Notes")
+  const addButton = await screen.findByLabelText("add to My Notes");
+  await userEvent.click(addButton);
+
+  // Find the editor that appears
+  const editor = await screen.findByRole("textbox", { name: "note editor" });
+
+  // Type a note and press Enter to save
+  await userEvent.type(editor, "My First Note{Enter}");
+
+  // Verify the note appears
+  await screen.findByText("My First Note");
+});
+
 test.skip("Write Nodes & List on Project Relays only", async () => {
   const [alice] = setup([ALICE]);
   const project = createExampleProject(alice().user.publicKey);

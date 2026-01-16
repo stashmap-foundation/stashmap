@@ -2,7 +2,7 @@ import React from "react";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { nip19 } from "nostr-tools";
-import { renderWithTestData, typeNewNode } from "./utils.test";
+import { renderWithTestData, findNewNodeEditor } from "./utils.test";
 import { App } from "./App";
 
 const npub = nip19.npubEncode(
@@ -78,7 +78,8 @@ test("Sign in persists created Notes", async () => {
     user: undefined,
     timeToStorePreLoginEvents: 0,
   });
-  typeNewNode(view, "Hello World!");
+  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.type(await findNewNodeEditor(), "Hello World!{Enter}");
   await userEvent.click(await screen.findByText("Sign in to Save"));
   await userEvent.type(
     await screen.findByPlaceholderText(

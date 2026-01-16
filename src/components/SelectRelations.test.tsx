@@ -1,5 +1,6 @@
 import React from "react";
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { List, Map } from "immutable";
 import { addRelationToRelations, newNode, shortID } from "../connections";
 import { DND } from "../dnd";
@@ -14,7 +15,6 @@ import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
 import { execute } from "../executor";
 import { LoadNode } from "../dataQuery";
 import { TreeView } from "./TreeView";
-import { DraggableNote } from "./Draggable";
 import { newDB } from "../knowledge";
 
 test("Shows dots when other user has a relation of same type", async () => {
@@ -58,10 +58,7 @@ test("Shows dots when other user has a relation of same type", async () => {
       <TemporaryViewProvider>
         <DND>
           <LoadNode>
-            <>
-              <DraggableNote />
-              <TreeView />
-            </>
+            <TreeView />
           </LoadNode>
         </DND>
       </TemporaryViewProvider>
@@ -98,10 +95,7 @@ test("Shows no dots when user is the only one with a relation", async () => {
       <TemporaryViewProvider>
         <DND>
           <LoadNode>
-            <>
-              <DraggableNote />
-              <TreeView />
-            </>
+            <TreeView />
           </LoadNode>
         </DND>
       </TemporaryViewProvider>
@@ -149,10 +143,7 @@ test("Shows dots when only other user has relation (current user has none)", asy
       <TemporaryViewProvider>
         <DND>
           <LoadNode>
-            <>
-              <DraggableNote />
-              <TreeView />
-            </>
+            <TreeView />
           </LoadNode>
         </DND>
       </TemporaryViewProvider>
@@ -160,7 +151,8 @@ test("Shows dots when only other user has relation (current user has none)", asy
     alice()
   );
 
-  await screen.findByLabelText(/expand Parent Node|collapse Parent Node/);
+  // Expand Parent Node to see diff items from Bob
+  await userEvent.click(await screen.findByLabelText("expand Parent Node"));
 
   // When only another user has a version (not the current user),
   // there's just 1 version available, so no version selector is shown.

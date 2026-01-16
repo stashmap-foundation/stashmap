@@ -12,6 +12,7 @@ import {
   createExampleProject,
   planUpsertProjectNode,
   findEvent,
+  findNewNodeEditor,
 } from "../utils.test";
 import { execute } from "../executor";
 import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
@@ -49,11 +50,8 @@ test("Add note via + button on empty tree", async () => {
   const addButton = await screen.findByLabelText("add to My Notes");
   await userEvent.click(addButton);
 
-  // Find the editor that appears
-  const editor = await screen.findByRole("textbox", { name: "note editor" });
-
   // Type a note and press Enter to save
-  await userEvent.type(editor, "My First Note{Enter}");
+  await userEvent.type(await findNewNodeEditor(), "My First Note{Enter}");
 
   // Verify the note appears
   await screen.findByText("My First Note");

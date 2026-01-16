@@ -20,6 +20,7 @@ import {
   getNodeIDFromView,
   getLast,
   parseViewPath,
+  isExpanded,
 } from "../ViewContext";
 import { MergeKnowledgeDB, useData } from "../DataContext";
 import { usePaneNavigation } from "../SplitPanesContext";
@@ -175,7 +176,13 @@ function Tree(): JSX.Element | null {
     endIndex: startIndexFromStorage,
   });
   const viewPath = useViewPath();
-  const nodes = getNodesInTree(data, viewPath, stack, List<ViewPath>());
+  const viewKey = viewPathToString(viewPath);
+  const isRootExpanded = isExpanded(data, viewKey);
+  const childNodes = isRootExpanded
+    ? getNodesInTree(data, viewPath, stack, List<ViewPath>())
+    : List<ViewPath>();
+  // Include ROOT as the first node, followed by its children
+  const nodes = List<ViewPath>([viewPath]).concat(childNodes);
   const [node] = useNode();
   const ariaLabel = node ? `related to ${node.text}` : undefined;
 

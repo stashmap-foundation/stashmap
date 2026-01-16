@@ -2,12 +2,11 @@ import React from "react";
 
 import { TemporaryViewProvider } from "./TemporaryViewContext";
 
-import { getNodeFromID, useViewPath } from "../ViewContext";
+import { getNodeFromID } from "../ViewContext";
 import { DND } from "../dnd";
 import { useData } from "../DataContext";
 import { usePaneNavigation, usePaneIndex } from "../SplitPanesContext";
 import { TreeView } from "./TreeView";
-import { ListItem } from "./Draggable";
 import { OpenInSplitPaneButtonWithStack } from "./OpenInSplitPaneButton";
 import {
   PaneSearchButton,
@@ -83,10 +82,6 @@ function StackedLayer({
   );
 }
 
-function RootNode(): JSX.Element {
-  const viewPath = useViewPath();
-  return <ListItem index={0} treeViewPath={viewPath} />;
-}
 
 export function WorkspaceView(): JSX.Element | null {
   const { stack, popTo } = usePaneNavigation();
@@ -153,7 +148,6 @@ export function WorkspaceView(): JSX.Element | null {
                   </div>
                 </div>
                 <DND>
-                  <RootNode />
                   <TreeView />
                 </DND>
               </div>

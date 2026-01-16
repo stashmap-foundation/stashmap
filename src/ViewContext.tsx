@@ -326,7 +326,8 @@ function getDefaultView(
   return {
     relations: getDefaultRelationForNode(id, knowledgeDBs, myself, context),
     width: 1,
-    expanded: false,
+    // ROOT starts expanded by default
+    expanded: id === "ROOT",
   };
 }
 
@@ -822,9 +823,7 @@ export function useIsAddToNode(): boolean {
 export function isExpanded(data: Data, viewKey: string): boolean {
   const viewPath = parseViewPath(viewKey);
   const view = getViewFromPath(data, viewPath);
-  // Root nodes (header) are always expanded (alwaysOneSelected pattern)
-  const isRoot = viewPath.length === 2;
-  return isRoot || view.expanded === true;
+  return view.expanded === true;
 }
 
 export function useViewKey(): string {

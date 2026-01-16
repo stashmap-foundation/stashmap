@@ -76,7 +76,6 @@ function ExpandCollapseToggle(): JSX.Element | null {
   const onToggleExpanded = useOnToggleExpanded();
   const isReferencedBy = view.relations === REFERENCED_BY;
 
-  const isRoot = viewPath.length === 2;
   const isExpanded = useIsExpanded();
 
   // Get available relations filtered by context (same as SelectRelations)
@@ -106,17 +105,12 @@ function ExpandCollapseToggle(): JSX.Element | null {
   // Get color based on view state: purple for Referenced By, black for normal
   const color = isReferencedBy ? TYPE_COLORS.referenced_by : "black";
 
-  // Root nodes can't be collapsed (alwaysOneSelected pattern from SelectRelations)
-  const preventCollapse = isRoot && isExpanded;
-
   const onToggle = (): void => {
     if (hasRelations && topRelation) {
       // Has existing relations (same as SelectRelationsButton onClick)
       if (view.relations === topRelation.id) {
-        // Already using correct relation, toggle expanded (unless prevented)
-        if (!preventCollapse) {
-          onToggleExpanded(!isExpanded);
-        }
+        // Toggle expanded state
+        onToggleExpanded(!isExpanded);
       } else {
         // Change to the correct relation and expand
         onChangeRelations(topRelation, true);

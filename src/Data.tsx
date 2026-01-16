@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import "./App.css";
-import { List, Map } from "immutable";
+import { List, Map, Set, OrderedSet } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
 // eslint-disable-next-line import/no-unresolved
 import { RelayInformation } from "nostr-tools/lib/types/nip11";
@@ -137,6 +137,14 @@ export function useRelaysInfo(
   return infos;
 }
 
+const DEFAULT_TEMPORARY_VIEW: TemporaryViewState = {
+  selection: OrderedSet<string>(),
+  multiselectBtns: Set<string>(),
+  editingViews: Set<string>(),
+  editorOpenViews: Set<string>(),
+  createNodeEditorState: null,
+};
+
 function Data({ user, children }: DataProps): JSX.Element {
   const myPublicKey = user.publicKey;
   const [newEventsAndPublishResults, setNewEventsAndPublishResults] =
@@ -145,6 +153,7 @@ function Data({ user, children }: DataProps): JSX.Element {
       results: Map(),
       isLoading: false,
       preLoginEvents: List(),
+      temporaryView: DEFAULT_TEMPORARY_VIEW,
     });
   const { isRelaysLoaded } = useProjectContext();
   const { relayPool } = useApis();

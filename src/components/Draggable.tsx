@@ -28,7 +28,13 @@ import { useIsEditingOn, useTemporaryView } from "./TemporaryViewContext";
 import { MiniEditor } from "./AddNode";
 import { NodeCard } from "../commons/Ui";
 import { newNode, addRelationToRelations } from "../connections";
-import { planUpsertNode, planUpdateViews, usePlanner } from "../planner";
+import {
+  planUpsertNode,
+  planUpdateViews,
+  usePlanner,
+  planOpenCreateNodeEditor,
+  planCloseCreateNodeEditor,
+} from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 
 export type DragItemType = {
@@ -121,7 +127,11 @@ export function CreateNodeEditor({
   const viewPath = useViewPath();
   const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
-  const { openCreateNodeEditor, closeCreateNodeEditor } = useTemporaryView();
+
+  // Helper to close the editor via planner
+  const closeEditor = (): void => {
+    executePlan(planCloseCreateNodeEditor(createPlan()));
+  };
 
   // Internal state for position - can change when Tab is pressed
   const [position, setPosition] = useState(initialPosition);
@@ -154,60 +164,50 @@ export function CreateNodeEditor({
   ): void => {
     const trimmedText = text.trim();
     if (!trimmedText) {
-      closeCreateNodeEditor();
+      closeEditor();
       return;
     }
 
-    const plan = createPlan();
+    let plan = createPlan();
     const n = newNode(text, plan.user.publicKey, imageUrl);
-    const planWithNode = planUpsertNode(plan, n);
+    plan = planUpsertNode(plan, n);
 
     // Get current relations to determine actual insert index before modifying
-    const currentRelations = getRelationForView(
-      planWithNode,
-      targetPath,
-      stack
-    );
+    const currentRelations = getRelationForView(plan, targetPath, stack);
     const currentSize = currentRelations?.items.size ?? 0;
     // When insertAtIndex is undefined, add at end (use current size)
     const actualInsertIndex = insertAtIndex ?? currentSize;
 
-    const updatedRelationsPlan = upsertRelations(
-      planWithNode,
-      targetPath,
-      stack,
-      (relations) =>
-        addRelationToRelations(
-          relations,
-          n.id,
-          "", // Default to "relevant"
-          undefined, // No argument
-          actualInsertIndex
-        )
+    plan = upsertRelations(plan, targetPath, stack, (relations) =>
+      addRelationToRelations(
+        relations,
+        n.id,
+        "", // Default to "relevant"
+        undefined, // No argument
+        actualInsertIndex
+      )
     );
     // Update view paths when inserting at specific position
     const updatedViews = updateViewPathsAfterAddRelation(
-      updatedRelationsPlan,
+      plan,
       targetPath,
       insertAtIndex
     );
-    executePlan(planUpdateViews(updatedRelationsPlan, updatedViews));
+    plan = planUpdateViews(plan, updatedViews);
 
     // If user pressed Enter, open another editor after the newly created node
     // Otherwise (blur), just close the editor
     if (submitted) {
       // Construct the path to the newly created node using the computed index
-      const newNodePath = addNodeToPath(
-        updatedRelationsPlan,
-        targetPath,
-        actualInsertIndex
-      );
+      const newNodePath = addNodeToPath(plan, targetPath, actualInsertIndex);
       const newNodeViewKey = viewPathToString(newNodePath);
       // Chain to next sibling (new node is not expanded)
-      openCreateNodeEditor(newNodeViewKey);
+      plan = planOpenCreateNodeEditor(plan, newNodeViewKey, "afterSibling");
     } else {
-      closeCreateNodeEditor();
+      plan = planCloseCreateNodeEditor(plan);
     }
+
+    executePlan(plan);
   };
 
   const onTab = (text: string): void => {
@@ -249,7 +249,7 @@ export function CreateNodeEditor({
         <MiniEditor
           initialText={editorText}
           onSave={onCreateNode}
-          onClose={closeCreateNodeEditor}
+          onClose={closeEditor}
           onTab={onTab}
         />
       </div>

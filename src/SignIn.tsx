@@ -230,12 +230,13 @@ export function SignInModal(): JSX.Element {
         relayPool,
         finalizeEvent,
       });
-      setPublishEvents(() => {
+      setPublishEvents((current) => {
         return {
           unsignedEvents: nonMergeEvents,
           results,
           isLoading: false,
           preLoginEvents: mergeEvents,
+          temporaryView: current.temporaryView,
         };
       });
     } else {
@@ -245,6 +246,7 @@ export function SignInModal(): JSX.Element {
           results: current.results,
           isLoading: true,
           preLoginEvents: mergeEvents,
+          temporaryView: current.temporaryView,
         };
       });
     }

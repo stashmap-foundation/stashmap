@@ -14,7 +14,9 @@ import {
   upsertRelations,
   updateViewPathsAfterAddRelation,
   useIsExpanded,
+  useIsRoot,
 } from "../ViewContext";
+import { planExpandAndOpenCreateNodeEditor } from "./RelationTypes";
 import useModal from "./useModal";
 import { SearchModal } from "./SearchModal";
 import { IS_MOBILE } from "./responsive";
@@ -142,14 +144,26 @@ export function MiniEditor({
     return range.collapsed && range.startOffset === 0;
   };
 
+  // Track if we're handling a key event to prevent blur from re-triggering save
+  const handlingKeyRef = React.useRef(false);
+
   const handleKeyDown = async (
     e: React.KeyboardEvent<HTMLSpanElement>
   ): Promise<void> => {
     if (e.key === "Escape") {
-      // Save current content and close (same as blur)
-      await saveIfChanged();
+      e.preventDefault();
+      handlingKeyRef.current = true;
+      const text = getText().trim();
+      if (text && text !== initialText) {
+        // Save changes - onSave will close the editor
+        const imageUrl = await getImageUrlFromText(text);
+        onSave(text, imageUrl);
+      } else {
+        // No changes, just close
+        onClose?.();
+      }
       editorRef.current?.blur();
-      onClose?.();
+      handlingKeyRef.current = false;
     } else if (e.key === "Enter") {
       e.preventDefault();
       const text = getText().trim();
@@ -166,6 +180,10 @@ export function MiniEditor({
   };
 
   const handleBlur = (): void => {
+    // Skip if we're handling a key event (ESC/Enter already handled save/close)
+    if (handlingKeyRef.current) {
+      return;
+    }
     const text = getText().trim();
     if (!text) {
       // Empty text on blur - close the editor (for CreateNodeEditor)
@@ -412,14 +430,17 @@ export function SiblingSearchButton(): JSX.Element | null {
   const { openModal, closeModal, isOpen } = useModal();
   const relationIndex = useRelationIndex();
   const isNodeExpanded = useIsExpanded();
+  const isRoot = useIsRoot();
 
+  // ROOT can't have siblings, so always insert as first child
   // If node is expanded, insert as first child; otherwise insert as sibling after current
-  const options: AddNodeOptions = isNodeExpanded
-    ? { asFirstChild: true }
-    : {
-        insertAtIndex:
-          relationIndex !== undefined ? relationIndex + 1 : undefined,
-      };
+  const options: AddNodeOptions =
+    isRoot || isNodeExpanded
+      ? { asFirstChild: true }
+      : {
+          insertAtIndex:
+            relationIndex !== undefined ? relationIndex + 1 : undefined,
+        };
 
   const handlers = useAddSiblingNode(options);
 
@@ -441,16 +462,18 @@ export function SiblingSearchButton(): JSX.Element | null {
 }
 
 export function AddSiblingButton(): JSX.Element | null {
-  const { openCreateNodeEditor } = useTemporaryView();
-  const viewKey = useViewKey();
+  const viewPath = useViewPath();
   const [node] = useNode();
+  const { stack } = usePaneNavigation();
+  const { createPlan, executePlan } = usePlanner();
 
   if (!node) {
     return null;
   }
 
   const handleClick = (): void => {
-    openCreateNodeEditor(viewKey);
+    const plan = planExpandAndOpenCreateNodeEditor(createPlan(), viewPath, stack);
+    executePlan(plan);
   };
 
   return (

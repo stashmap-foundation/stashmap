@@ -6,11 +6,11 @@ import { textVide } from "text-vide";
 import DOMPurify from "dompurify";
 import {
   useNode,
-  useViewKey,
   useViewPath,
   ViewPath,
   useIsInReferencedByView,
   useIsExpanded,
+  useIsRoot,
   addNodeToPathWithRelations,
   addDiffItemToPath,
   getDiffItemsForNode,
@@ -20,10 +20,10 @@ import {
   getAvailableRelationsForNode,
   findOrCreateRelationsForContext,
   usePreviousSibling,
+  getViewFromPath,
 } from "../ViewContext";
 import {
   NodeSelectbox,
-  useTemporaryView,
   useIsParentMultiselectBtnOn,
   isMutableNode,
 } from "./TemporaryViewContext";
@@ -49,7 +49,11 @@ import { planUpsertNode, usePlanner } from "../planner";
 import { planDisconnectFromParent, planAddToParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeIcon } from "./NodeIcon";
-import { planAddNewRelationToNode, planExpandNode } from "./RelationTypes";
+import {
+  planAddNewRelationToNode,
+  planExpandNode,
+  planExpandAndOpenCreateNodeEditor,
+} from "./RelationTypes";
 import { NodeCard } from "../commons/Ui";
 import { useProjectContext } from "../ProjectContext";
 import { usePaneNavigation } from "../SplitPanesContext";
@@ -256,11 +260,9 @@ function NodeContent({ node }: { node: KnowNode }): JSX.Element {
 }
 
 function EditableContent(): JSX.Element {
-  const viewKey = useViewKey();
   const viewPath = useViewPath();
   const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
-  const { openCreateNodeEditor } = useTemporaryView();
   const [node] = useNode();
   const [nodeID] = useNodeID();
   const prevSibling = usePreviousSibling();
@@ -272,18 +274,27 @@ function EditableContent(): JSX.Element {
   ): void => {
     if (!node || node.type !== "text") return;
     const currentImageUrl = "imageUrl" in node ? node.imageUrl : undefined;
-    if (text !== node.text || imageUrl !== currentImageUrl) {
-      executePlan(
-        planUpsertNode(createPlan(), {
-          ...node,
-          text,
-          imageUrl,
-        } as KnowNode)
-      );
+    const textChanged = text !== node.text || imageUrl !== currentImageUrl;
+
+    let plan = createPlan();
+
+    // Save text changes if any
+    if (textChanged) {
+      plan = planUpsertNode(plan, {
+        ...node,
+        text,
+        imageUrl,
+      } as KnowNode);
     }
+
     // If user pressed Enter, open create node editor (position determined by expansion state)
     if (submitted) {
-      openCreateNodeEditor(viewKey);
+      plan = planExpandAndOpenCreateNodeEditor(plan, viewPath, stack);
+    }
+
+    // Only execute if something changed
+    if (textChanged || submitted) {
+      executePlan(plan);
     }
   };
 

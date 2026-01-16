@@ -1,7 +1,7 @@
 import React from "react";
 // eslint-disable-next-line import/no-unresolved
 import { RelayInformation } from "nostr-tools/lib/types/nip11";
-import { List, Map } from "immutable";
+import { List, Map, Set, OrderedSet } from "immutable";
 import {
   render,
   screen,
@@ -237,6 +237,13 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
     unsignedEvents: List<UnsignedEvent>(),
     results: Map<string, PublishResultsOfEvent>(),
     preLoginEvents: List<UnsignedEvent>(),
+    temporaryView: {
+      selection: OrderedSet<string>(),
+      multiselectBtns: Set<string>(),
+      editingViews: Set<string>(),
+      editorOpenViews: Set<string>(),
+      createNodeEditorState: null,
+    },
   },
   views: Map<string, View>(),
   activeWorkspace: joinID(STASHMAP_PUBLIC_KEY, "ws") as LongID,

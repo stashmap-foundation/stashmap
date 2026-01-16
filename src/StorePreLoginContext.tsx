@@ -51,6 +51,7 @@ export function StorePreLoginContext({
           results,
           isLoading: false,
           preLoginEvents: List(),
+          temporaryView: current.temporaryView,
         };
       });
     },

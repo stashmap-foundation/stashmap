@@ -32,6 +32,7 @@ export type Plan = Data & {
   activeWorkspace: LongID;
   projectID: LongID | undefined;
   relays: AllRelays;
+  temporaryView: TemporaryViewState;
 };
 
 function newContactListEvent(contacts: Contacts, user: User): UnsignedEvent {
@@ -296,6 +297,32 @@ export function planUpdateViews(plan: Plan, views: Views): Plan {
   };
 }
 
+// Temporary view state plan functions
+
+export function planOpenCreateNodeEditor(
+  plan: Plan,
+  viewKey: string,
+  position: CreateNodeEditorPosition
+): Plan {
+  return {
+    ...plan,
+    temporaryView: {
+      ...plan.temporaryView,
+      createNodeEditorState: { viewKey, position },
+    },
+  };
+}
+
+export function planCloseCreateNodeEditor(plan: Plan): Plan {
+  return {
+    ...plan,
+    temporaryView: {
+      ...plan.temporaryView,
+      createNodeEditorState: null,
+    },
+  };
+}
+
 export function planBookmarkProject(plan: Plan, project: ProjectNode): Plan {
   const bookmarkEvent = {
     kind: KIND_JOIN_PROJECT,
@@ -436,12 +463,14 @@ export function PlanningContextProvider({
   const { relayPool, finalizeEvent } = useApis();
 
   const executePlan = async (plan: Plan): Promise<void> => {
+    // Apply events and temporary view state changes atomically
     setPublishEvents((prevStatus) => {
       return {
         unsignedEvents: prevStatus.unsignedEvents.merge(plan.publishEvents),
         results: prevStatus.results,
         isLoading: true,
         preLoginEvents: prevStatus.preLoginEvents,
+        temporaryView: plan.temporaryView,
       };
     });
 
@@ -453,10 +482,9 @@ export function PlanningContextProvider({
 
     setPublishEvents((prevStatus) => {
       return {
-        unsignedEvents: prevStatus.unsignedEvents,
+        ...prevStatus,
         results: mergePublishResultsOfEvents(prevStatus.results, results),
         isLoading: false,
-        preLoginEvents: prevStatus.preLoginEvents,
       };
     });
   };
@@ -472,10 +500,9 @@ export function PlanningContextProvider({
     });
     setPublishEvents((prevStatus) => {
       return {
-        unsignedEvents: prevStatus.unsignedEvents,
+        ...prevStatus,
         results: mergePublishResultsOfEvents(prevStatus.results, results),
         isLoading: false,
-        preLoginEvents: prevStatus.preLoginEvents,
       };
     });
   };
@@ -506,6 +533,8 @@ export function createPlan(
     projectID: props.projectID || undefined,
     publishEvents:
       props.publishEvents || List<UnsignedEvent & EventAttachment>([]),
+    // temporaryView comes from publishEventsStatus
+    temporaryView: props.publishEventsStatus.temporaryView,
   };
 }
 

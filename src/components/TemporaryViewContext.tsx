@@ -9,9 +9,7 @@ import {
   useParentNode,
   useRelationIndex,
   getRelationIndex,
-  isExpanded,
 } from "../ViewContext";
-import { Plan } from "../planner";
 import { getRelations, splitID } from "../connections";
 import { useData } from "../DataContext";
 import { usePaneNavigation } from "../SplitPanesContext";
@@ -41,17 +39,8 @@ type EditorOpen = EditorOpenState & {
   setEditorOpenState: (editorOpenState: EditorOpenState) => void;
 };
 
-type CreateNodeEditorPosition = "afterSibling" | "asFirstChild";
-
-type CreateNodeEditorState = {
-  viewKey: string;
-  position: CreateNodeEditorPosition;
-} | null;
-
 type CreateNodeEditor = {
   createNodeEditorState: CreateNodeEditorState;
-  openCreateNodeEditor: (viewKey: string, plan?: Plan) => void;
-  closeCreateNodeEditor: () => void;
 };
 
 type TemporaryView = MultiSelection & Editing & EditorOpen & CreateNodeEditor;
@@ -301,20 +290,10 @@ export function TemporaryViewProvider({
   const [isEditorOpenState, setEditorOpenState] = useState<EditorOpenState>({
     editorOpenViews: Set<string>(),
   });
-  const [createNodeEditorState, setCreateNodeEditorState] =
-    useState<CreateNodeEditorState>(null);
   const data = useData();
 
-  const openCreateNodeEditor = (viewKey: string, plan?: Plan): void => {
-    const position = isExpanded(plan || data, viewKey)
-      ? "asFirstChild"
-      : "afterSibling";
-    setCreateNodeEditorState({ viewKey, position });
-  };
-
-  const closeCreateNodeEditor = (): void => {
-    setCreateNodeEditorState(null);
-  };
+  // Read createNodeEditorState from data (managed by planner)
+  const { createNodeEditorState } = data.publishEventsStatus.temporaryView;
 
   return (
     <TemporaryViewContext.Provider
@@ -327,8 +306,6 @@ export function TemporaryViewProvider({
         editorOpenViews: isEditorOpenState.editorOpenViews,
         setEditorOpenState,
         createNodeEditorState,
-        openCreateNodeEditor,
-        closeCreateNodeEditor,
       }}
     >
       {children}

@@ -111,6 +111,7 @@ declare global {
 
   type EventState = PublishEvents<EventAttachment> & {
     preLoginEvents: List<UnsignedEvent & EventAttachment>;
+    temporaryView: TemporaryViewState;
   };
 
   type AllRelays = {
@@ -255,6 +256,26 @@ declare global {
   type KnowledgeData = {
     nodes: Map<ID, KnowNode>;
     relations: Map<ID, Relations>;
+  };
+
+  // Temporary UI state (not persisted to Nostr)
+  type CreateNodeEditorPosition = "afterSibling" | "asFirstChild";
+
+  type CreateNodeEditorState = {
+    viewKey: string;
+    position: CreateNodeEditorPosition;
+  } | null;
+
+  type TemporaryViewState = {
+    // Multiselect
+    selection: import("immutable").OrderedSet<string>;
+    multiselectBtns: import("immutable").Set<string>;
+    // Editing state
+    editingViews: import("immutable").Set<string>;
+    // AddToNode editor open state
+    editorOpenViews: import("immutable").Set<string>;
+    // Create node editor state
+    createNodeEditorState: CreateNodeEditorState;
   };
 }
 

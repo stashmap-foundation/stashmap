@@ -100,6 +100,7 @@ type MiniEditorProps = {
   onClose?: () => void;
   onTab?: (text: string) => void;
   autoFocus?: boolean;
+  ariaLabel?: string;
 };
 
 export function MiniEditor({
@@ -108,6 +109,7 @@ export function MiniEditor({
   onClose,
   onTab,
   autoFocus = true,
+  ariaLabel,
 }: MiniEditorProps): JSX.Element {
   const editorRef = React.useRef<HTMLSpanElement>(null);
 
@@ -237,7 +239,7 @@ export function MiniEditor({
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
         onPaste={handlePaste}
-        aria-label="note editor"
+        aria-label={ariaLabel || "note editor"}
         style={{
           outline: "none",
           minWidth: "1px",

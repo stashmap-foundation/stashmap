@@ -976,4 +976,76 @@ describe("Inline Node Creation", () => {
     const relationsEvents = events.filter((e) => e.kind === 34760);
     expect(relationsEvents.length).toBeGreaterThan(0);
   });
+
+  test("Enter on expanded parent inserts new child at BEGINNING of list", async () => {
+    const [alice] = setup([ALICE]);
+    const { publicKey } = alice().user;
+
+    // Create parent with two existing children
+    const parent = newNode("Parent", publicKey);
+    const child1 = newNode("Child 1", publicKey);
+    const child2 = newNode("Child 2", publicKey);
+
+    // Build relations with children in order: [child1, child2]
+    let relations = newRelations(parent.id, List(), publicKey);
+    relations = addRelationToRelations(relations, child1.id);
+    relations = addRelationToRelations(relations, child2.id);
+
+    await execute({
+      ...alice(),
+      plan: planUpsertRelations(
+        planBulkUpsertNodes(createPlan(alice()), [parent, child1, child2]),
+        relations
+      ),
+    });
+
+    renderWithTestData(
+      <RootViewContextProvider root={parent.id}>
+        <LoadNode waitForEose>
+          <TemporaryViewProvider>
+            <DND>
+              <>
+                <DraggableNote />
+                <TreeView />
+              </>
+            </DND>
+          </TemporaryViewProvider>
+        </LoadNode>
+      </RootViewContextProvider>,
+      alice()
+    );
+
+    // Expand the parent to show children (may have multiple due to references)
+    const expandButtons = await screen.findAllByLabelText("expand Parent");
+    fireEvent.click(expandButtons[0]);
+
+    // Wait for children to be visible
+    await screen.findByText("Child 1");
+    await screen.findByText("Child 2");
+
+    // Find and click on the parent node editor (first one)
+    const parentEditors = await screen.findAllByLabelText("edit Parent");
+    await userEvent.click(parentEditors[0]);
+
+    // Press Enter on the expanded parent - should open editor for first child position
+    await userEvent.keyboard("{Enter}");
+
+    // Find the new empty editor and type, then press Enter to save (not blur)
+    const newEditor = await findEmptyEditor();
+    await userEvent.type(newEditor, "New First Child{Enter}");
+
+    // Wait for new node to appear and verify tree order
+    await screen.findByText("New First Child");
+
+    // Verify order using aria-label "related to Parent" which contains root + children
+    const childrenContainer = await screen.findByLabelText("related to Parent");
+    const allNodeTexts = Array.from(
+      childrenContainer.querySelectorAll('[aria-label^="edit "]')
+    ).map((el) => el.textContent);
+
+    // First element is the root (Parent), rest are children
+    // Expected order of children: New First Child, Child 1, Child 2
+    const childTexts = allNodeTexts.slice(1); // Skip the root node
+    expect(childTexts).toEqual(["New First Child", "Child 1", "Child 2"]);
+  });
 });

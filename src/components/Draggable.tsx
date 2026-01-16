@@ -135,6 +135,8 @@ export function CreateNodeEditor({
 
   // Internal state for position - can change when Tab is pressed
   const [position, setPosition] = useState(initialPosition);
+  // Track if Tab was pressed to change position (affects insert index)
+  const [tabPressed, setTabPressed] = useState(false);
   // Portal target viewKey - always use portal to preserve state when target changes
   const [portalTargetKey, setPortalTargetKey] =
     useState<string>(initialPortalTarget);
@@ -143,9 +145,15 @@ export function CreateNodeEditor({
 
   // Compute derived values based on current position
   const levels = position === "asFirstChild" ? baseLevels + 1 : baseLevels;
-  // undefined = add at end of relations
+  // When asFirstChild from Enter (initial): insert at 0 (beginning)
+  // When asFirstChild from Tab: insert at end (undefined)
+  // When afterSibling: insert at baseInsertAtIndex
   const insertAtIndex =
-    position === "asFirstChild" ? undefined : baseInsertAtIndex;
+    position === "asFirstChild"
+      ? tabPressed
+        ? undefined // Tab indent: add at end of new parent's children
+        : 0 // Enter on expanded: add at beginning
+      : baseInsertAtIndex;
 
   // Determine target path based on position:
   // - afterSibling: insert into parent's relations
@@ -236,6 +244,7 @@ export function CreateNodeEditor({
 
     // Update internal position state - editor stays mounted, text preserved
     setPosition("asFirstChild");
+    setTabPressed(true); // Mark that Tab was pressed, so insert at end
   };
 
   const editorContent = (

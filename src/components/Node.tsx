@@ -337,6 +337,7 @@ function EditableContent(): JSX.Element {
       onSave={handleSave}
       onTab={handleTab}
       autoFocus={false}
+      ariaLabel={`edit ${node.text}`}
     />
   );
 }

@@ -3,24 +3,12 @@ import { List } from "immutable";
 import { getMostRecentReplacableEvent } from "./commons/useNostrQuery";
 import { KIND_SETTINGS } from "./nostr";
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function settingsFromEvent(event: UnsignedEvent): Settings {
-  try {
-    const compressedSettings = JSON.parse(
-      event.content
-    ) as CompressedSettingsFromStore;
-    return {
-      bionicReading: compressedSettings.b,
-    };
-  } catch (e) {
-    return {
-      bionicReading: false,
-    };
-  }
+  return {};
 }
 
-export const DEFAULT_SETTINGS = {
-  bionicReading: false,
-};
+export const DEFAULT_SETTINGS: Settings = {};
 
 export function findSettings(events: List<UnsignedEvent>): Settings {
   const settingsEvent = getMostRecentReplacableEvent(

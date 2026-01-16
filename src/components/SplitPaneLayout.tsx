@@ -16,7 +16,7 @@ import {
 import { LoadNode, LoadStackNodes } from "../dataQuery";
 import { WorkspaceView } from "./Workspace";
 import { useWorkspaceContext } from "../WorkspaceContext";
-import { planPublishSettings, planUpdateViews, usePlanner } from "../planner";
+import { planUpdateViews, usePlanner } from "../planner";
 import { ROOT } from "../types";
 import { SearchModal } from "./SearchModal";
 import { useData } from "../DataContext";
@@ -85,24 +85,8 @@ export function ClosePaneButton(): JSX.Element | null {
 export function PaneSettingsMenu(): JSX.Element {
   const navigate = useNavigate();
   const logout = useLogout();
-  const { createPlan, executePlan } = usePlanner();
-  const { settings, user } = useData();
-  const isBionic = settings.bionicReading;
+  const { user } = useData();
   const isLoggedIn = isUserLoggedIn(user);
-
-  const onToggleBionic = async (): Promise<void> => {
-    try {
-      await executePlan(
-        planPublishSettings(createPlan(), {
-          ...settings,
-          bionicReading: !isBionic,
-        })
-      );
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error(e);
-    }
-  };
 
   return (
     <Dropdown className="options-dropdown">
@@ -142,21 +126,6 @@ export function PaneSettingsMenu(): JSX.Element {
         >
           <span className="icon-nostr-logo d-block dropdown-item-icon" />
           <div className="workspace-selection-text">Relays</div>
-        </Dropdown.Item>
-        <Dropdown.Item
-          className="d-flex workspace-selection"
-          onClick={onToggleBionic}
-          aria-label={`switch bionic reading ${isBionic ? "off" : "on"}`}
-          tabIndex={0}
-        >
-          <span
-            className={`simple-icon-eyeglass d-block dropdown-item-icon ${
-              isBionic ? "bold" : ""
-            }`}
-          />
-          <div className="workspace-selection-text">
-            Turn {isBionic ? "off" : "on"} Bionic Reading
-          </div>
         </Dropdown.Item>
         {isLoggedIn && (
           <Dropdown.Item

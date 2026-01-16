@@ -2,8 +2,6 @@ import { List } from "immutable";
 import React, { useEffect, useState } from "react";
 import { useMediaQuery } from "react-responsive";
 import { Link } from "react-router-dom";
-import { textVide } from "text-vide";
-import DOMPurify from "dompurify";
 import {
   useNode,
   useViewPath,
@@ -186,21 +184,7 @@ function ErrorContent(): JSX.Element {
   );
 }
 
-function BionicText({ nodeText }: { nodeText: string }): JSX.Element {
-  // need sanitizing, i.e. removing <script>-tags or onClick handles
-  // otherwise dangerouslySetInnerHTML allows Cross-Site Scripting (XSS) attacks
-  const sanitizedNodeText = `<span>${DOMPurify.sanitize(nodeText)}</span>`;
-  const bionicNodeText = textVide(sanitizedNodeText, {
-    sep: ["<b>", "</b>"],
-    fixationPoint: 4,
-  });
-  // eslint-disable-next-line react/no-danger
-  return <div dangerouslySetInnerHTML={{ __html: bionicNodeText }} />;
-}
-
 function NodeContent({ node }: { node: KnowNode }): JSX.Element {
-  const { settings } = useData();
-  const isBionic = settings.bionicReading;
   const [isImageAccessible, setIsImageAccessible] = useState<boolean>(false);
   const isReference = node.type === "reference";
 
@@ -243,9 +227,7 @@ function NodeContent({ node }: { node: KnowNode }): JSX.Element {
     <span className={`break-word ${isReference ? "reference-node" : ""}`}>
       <NodeIcon node={node} />
       {isReference && <ReferenceIndicators refId={node.id} />}
-      <span style={referenceStyle}>
-        {isBionic ? <BionicText nodeText={textToDisplay} /> : textToDisplay}
-      </span>
+      <span style={referenceStyle}>{textToDisplay}</span>
       {imageUrl && isImageAccessible && (
         <div>
           <img

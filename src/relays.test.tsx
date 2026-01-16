@@ -18,8 +18,7 @@ import {
 } from "./utils.test";
 import { createPlan, planPublishRelayMetadata } from "./planner";
 import { execute } from "./executor";
-import { PaneSettingsMenu } from "./components/SplitPaneLayout";
-import { KIND_SETTINGS, KIND_VIEWS } from "./nostr";
+import { KIND_VIEWS } from "./nostr";
 import { flattenRelays } from "./relays";
 import { TreeView } from "./components/TreeView";
 import { DraggableNote } from "./components/Draggable";
@@ -73,19 +72,6 @@ async function setupTest(): Promise<{
   const bitcoin = findNodeByText(db, "Bitcoin") as KnowNode;
   return { alice, bob, project, workspace, bitcoin };
 }
-
-test("Write Settings on user relays", async () => {
-  const { alice, project } = await setupTest();
-  const utils = renderWithTestData(<PaneSettingsMenu />, {
-    ...alice(),
-    initialRoute: `/?project=${project.id}`,
-  });
-  fireEvent.click(screen.getByLabelText("open menu"));
-  fireEvent.click(await screen.findByLabelText("switch bionic reading on"));
-  const event = await findEvent(utils.relayPool, { kinds: [KIND_SETTINGS] });
-  await screen.findByLabelText("switch bionic reading off");
-  expect(event?.relays).toEqual(TEST_RELAYS.map((r) => r.url));
-});
 
 test("Write views on user relays", async () => {
   const { alice, project } = await setupTest();

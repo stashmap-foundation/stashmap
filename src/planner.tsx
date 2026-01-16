@@ -373,9 +373,9 @@ export function planRewriteUnpublishedEvents(
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function planPublishSettings(plan: Plan, settings: Settings): Plan {
   const compressedSettings: CompressedSettings = {
-    b: settings.bionicReading,
     v: "v1",
     n: crypto.randomBytes(8),
   };

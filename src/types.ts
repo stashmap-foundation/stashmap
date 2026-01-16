@@ -140,18 +140,15 @@ declare global {
     deleteLocalStorage: (key: string) => void;
   };
 
-  type Settings = {
-    bionicReading: boolean;
-  };
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  type Settings = {};
 
   type CompressedSettings = {
-    b: boolean; // bionicReading
     v: string;
     n: Buffer;
   };
 
   type CompressedSettingsFromStore = {
-    b: boolean;
     v: string;
     n: string;
   };

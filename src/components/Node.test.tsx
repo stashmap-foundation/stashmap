@@ -61,19 +61,20 @@ test("Render non existing Node", async () => {
       <TemporaryViewProvider>
         <DND>
           <LoadNode>
-            <>
-              <DraggableNote />
-              <TreeView />
-            </>
+            <TreeView />
           </LoadNode>
         </DND>
       </TemporaryViewProvider>
     </RootViewContextProvider>,
     alice()
   );
-  // May have multiple elements due to DraggableNote + TreeView rendering
-  const elements = await screen.findAllByText("Programming Languages");
-  expect(elements.length).toBeGreaterThan(0);
+  await screen.findByText("Programming Languages");
+
+  // Expand the node to see the child that points to a non-existent node
+  await userEvent.click(
+    await screen.findByLabelText("expand Programming Languages")
+  );
+
   await screen.findByText("Error: Node not found");
 });
 

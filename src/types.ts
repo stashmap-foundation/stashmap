@@ -261,6 +261,8 @@ declare global {
   type CreateNodeEditorState = {
     viewKey: string;
     position: CreateNodeEditorPosition;
+    text: string;
+    cursorPosition: number;
   } | null;
 
   type TemporaryViewState = {

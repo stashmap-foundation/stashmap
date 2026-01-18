@@ -21,6 +21,38 @@ import { WorkspaceView } from "./Workspace";
  *       Digital Gold
  *     Ethereum
  */
+function getIndentLevel(element: HTMLElement): number {
+  // Count indent levels by counting the wrapper divs inside .d-flex that come before the element
+  // Structure: .d-flex > .left-menu > [indent divs...] > expand-collapse-toggle > content
+  // The first indent div is always there (even for root), so we count starting from -1
+  // eslint-disable-next-line testing-library/no-node-access
+  const dFlex = element.closest(".d-flex");
+  let indentLevel = -1; // Start at -1 because there's always one structural div
+  if (dFlex) {
+    // eslint-disable-next-line testing-library/no-node-access
+    const children = Array.from(dFlex.children);
+    // Count divs between left-menu and the expand-collapse-toggle (where content starts)
+    let countingIndents = false;
+    for (const child of children) {
+      // eslint-disable-next-line testing-library/no-node-access
+      if (child.classList.contains("left-menu")) {
+        countingIndents = true;
+        continue;
+      }
+      // Stop counting at expand-collapse-toggle or when we find the element
+      // eslint-disable-next-line testing-library/no-node-access
+      if (child.classList.contains("expand-collapse-toggle")) break;
+      // eslint-disable-next-line testing-library/no-node-access
+      if (child === element || child.contains(element)) break;
+      if (countingIndents && child.tagName === "DIV") {
+        indentLevel++;
+      }
+    }
+  }
+  // Clamp to 0 minimum
+  return Math.max(0, indentLevel);
+}
+
 async function getTreeStructure(): Promise<string> {
   await waitFor(() => {
     expect(screen.queryByText("Loading...")).toBeNull();
@@ -31,38 +63,41 @@ async function getTreeStructure(): Promise<string> {
     name: /^(expand|collapse) /,
   });
 
+  // Find all new node editors
+  const editors = screen.queryAllByRole("textbox", {
+    name: "new node editor",
+  });
+
+  // Combine and sort by DOM order
+  type TreeElement = { element: HTMLElement; type: "node" | "editor" };
+  const elements: TreeElement[] = [
+    ...toggleButtons.map((el) => ({ element: el as HTMLElement, type: "node" as const })),
+    ...editors.map((el) => ({ element: el as HTMLElement, type: "editor" as const })),
+  ];
+
+  // Sort by document order
+  elements.sort((a, b) => {
+    const position = a.element.compareDocumentPosition(b.element);
+    if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+    if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+    return 0;
+  });
+
   const lines: string[] = [];
   const seen = new Set<string>();
 
-  toggleButtons.forEach((btn) => {
-    const ariaLabel = btn.getAttribute("aria-label") || "";
-    const text = ariaLabel.replace(/^(expand|collapse) /, "");
-
-    // Count indent levels by counting the wrapper divs inside .d-flex that come before the button
-    // Structure: .d-flex > .left-menu > [indent divs...] > button
-    // The first indent div is always there (even for root), so we count starting from -1
-    // eslint-disable-next-line testing-library/no-node-access
-    const dFlex = btn.closest(".d-flex");
-    let indentLevel = -1; // Start at -1 because there's always one structural div
-    if (dFlex) {
-      // eslint-disable-next-line testing-library/no-node-access
-      const children = Array.from(dFlex.children);
-      // Count divs between left-menu and the button
-      let countingIndents = false;
-      for (const child of children) {
-        // eslint-disable-next-line testing-library/no-node-access
-        if (child.classList.contains("left-menu")) {
-          countingIndents = true;
-          continue;
-        }
-        if (child === btn) break;
-        if (countingIndents && child.tagName === "DIV") {
-          indentLevel++;
-        }
-      }
+  elements.forEach(({ element, type }) => {
+    let text: string;
+    if (type === "node") {
+      const ariaLabel = element.getAttribute("aria-label") || "";
+      text = ariaLabel.replace(/^(expand|collapse) /, "");
+    } else {
+      // For editors, show [EDITOR] or [EDITOR: content] if there's text
+      const content = element.textContent?.trim();
+      text = content ? `[EDITOR: ${content}]` : "[EDITOR]";
     }
-    // Clamp to 0 minimum
-    indentLevel = Math.max(0, indentLevel);
+
+    const indentLevel = getIndentLevel(element);
 
     // Create unique key to skip duplicates (same text at same level)
     const key = `${indentLevel}:${text}`;
@@ -367,6 +402,49 @@ My Notes
   });
 
   describe("Tab Indent in New Editor - Insert at END of new parent", () => {
+    test("Tab on new editor - editor visually appears AFTER existing children", async () => {
+      const [alice] = setup([ALICE]);
+      renderTree(alice);
+
+      // First create Parent with existing children
+      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
+      await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+      // Expand Parent and add children A and B
+      await userEvent.click(await screen.findByLabelText("expand Parent"));
+      await userEvent.click(await screen.findByLabelText("add to Parent"));
+      await userEvent.type(await findNewNodeEditor(), "Child A{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "Child B{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+      // Collapse Parent, then Enter to get sibling editor, then Tab to indent
+      await userEvent.click(await screen.findByLabelText("collapse Parent"));
+      const parentEditor = await screen.findByLabelText("edit Parent");
+      await userEvent.click(parentEditor);
+      await userEvent.keyboard("{Enter}");
+
+      // Tab to indent under Parent
+      const editor = await findNewNodeEditor();
+      await userEvent.type(editor, "New Child");
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(true);
+      window.getSelection()?.removeAllRanges();
+      window.getSelection()?.addRange(range);
+      fireEvent.keyDown(editor, { key: "Tab" });
+
+      // The editor should now be visually AFTER Child B (at the end of Parent's children)
+      await expectTree(`
+My Notes
+  Parent
+    Child A
+    Child B
+    [EDITOR: New Child]
+      `);
+    });
+
     test("Tab on new editor indents to previous sibling (which has children)", async () => {
       const [alice] = setup([ALICE]);
       renderTree(alice);

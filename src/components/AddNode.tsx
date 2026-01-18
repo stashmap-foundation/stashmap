@@ -96,15 +96,17 @@ export async function getImageUrlFromText(
 
 type MiniEditorProps = {
   initialText?: string;
+  initialCursorPosition?: number;
   onSave: (text: string, imageUrl?: string, submitted?: boolean) => void;
   onClose?: () => void;
-  onTab?: (text: string) => void;
+  onTab?: (text: string, cursorPosition: number) => void;
   autoFocus?: boolean;
   ariaLabel?: string;
 };
 
 export function MiniEditor({
   initialText,
+  initialCursorPosition,
   onSave,
   onClose,
   onTab,
@@ -116,10 +118,18 @@ export function MiniEditor({
   useEffect(() => {
     if (autoFocus && editorRef.current) {
       editorRef.current.focus();
-      // Move cursor to end
       const range = document.createRange();
-      range.selectNodeContents(editorRef.current);
-      range.collapse(false);
+      const textNode = editorRef.current.firstChild;
+      if (textNode && initialCursorPosition !== undefined) {
+        // Set cursor at specific position
+        const pos = Math.min(initialCursorPosition, textNode.textContent?.length || 0);
+        range.setStart(textNode, pos);
+        range.setEnd(textNode, pos);
+      } else {
+        // Move cursor to end
+        range.selectNodeContents(editorRef.current);
+        range.collapse(false);
+      }
       const sel = window.getSelection();
       sel?.removeAllRanges();
       sel?.addRange(range);
@@ -136,6 +146,13 @@ export function MiniEditor({
       const imageUrl = await getImageUrlFromText(text);
       onSave(text, imageUrl);
     }
+  };
+
+  const getCursorPosition = (): number => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return 0;
+    const range = sel.getRangeAt(0);
+    return range.startOffset;
   };
 
   const isCursorAtStart = (): boolean => {
@@ -177,7 +194,7 @@ export function MiniEditor({
       onSave(text, imageUrl, true);
     } else if (e.key === "Tab" && !e.shiftKey && onTab && isCursorAtStart()) {
       e.preventDefault();
-      onTab(getText().trim());
+      onTab(getText().trim(), getCursorPosition());
     }
   };
 

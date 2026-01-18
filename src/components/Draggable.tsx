@@ -1,5 +1,4 @@
-import React, { useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import React, { useRef } from "react";
 import { ConnectableElement, useDrag } from "react-dnd";
 import {
   ViewPath,
@@ -16,8 +15,8 @@ import {
   viewPathToString,
   getContextFromStackAndViewPath,
   getNodeIDFromView,
-  getLastChild,
   getRelationForView,
+  getLastChild,
 } from "../ViewContext";
 import { useData } from "../DataContext";
 import { planExpandNode } from "./RelationTypes";
@@ -111,17 +110,19 @@ function DraggableDiffItem({ className }: { className?: string }): JSX.Element {
 }
 
 type CreateNodeEditorProps = {
-  initialPosition: "afterSibling" | "asFirstChild";
+  position: CreateNodeEditorPosition;
+  text: string;
+  cursorPosition: number;
   baseInsertAtIndex: number;
   baseLevels: number;
-  initialPortalTarget: string;
 };
 
 export function CreateNodeEditor({
-  initialPosition,
+  position,
+  text,
+  cursorPosition,
   baseInsertAtIndex,
   baseLevels,
-  initialPortalTarget,
 }: CreateNodeEditorProps): JSX.Element | null {
   const data = useData();
   const viewPath = useViewPath();
@@ -133,27 +134,12 @@ export function CreateNodeEditor({
     executePlan(planCloseCreateNodeEditor(createPlan()));
   };
 
-  // Internal state for position - can change when Tab is pressed
-  const [position, setPosition] = useState(initialPosition);
-  // Track if Tab was pressed to change position (affects insert index)
-  const [tabPressed, setTabPressed] = useState(false);
-  // Portal target viewKey - always use portal to preserve state when target changes
-  const [portalTargetKey, setPortalTargetKey] =
-    useState<string>(initialPortalTarget);
-  // Text to preserve across portal changes (which cause remount)
-  const [editorText, setEditorText] = useState("");
-
   // Compute derived values based on current position
-  const levels = position === "asFirstChild" ? baseLevels + 1 : baseLevels;
-  // When asFirstChild from Enter (initial): insert at 0 (beginning)
-  // When asFirstChild from Tab: insert at end (undefined)
-  // When afterSibling: insert at baseInsertAtIndex
-  const insertAtIndex =
-    position === "asFirstChild"
-      ? tabPressed
-        ? undefined // Tab indent: add at end of new parent's children
-        : 0 // Enter on expanded: add at beginning
-      : baseInsertAtIndex;
+  const isChildPosition = position === "asFirstChild";
+  const levels = isChildPosition ? baseLevels + 1 : baseLevels;
+  // asFirstChild: insert at 0 (beginning)
+  // afterSibling: insert at baseInsertAtIndex
+  const insertAtIndex = position === "asFirstChild" ? 0 : baseInsertAtIndex;
 
   // Determine target path based on position:
   // - afterSibling: insert into parent's relations
@@ -166,18 +152,18 @@ export function CreateNodeEditor({
   }
 
   const onCreateNode = (
-    text: string,
+    nodeText: string,
     imageUrl?: string,
     submitted?: boolean
   ): void => {
-    const trimmedText = text.trim();
+    const trimmedText = nodeText.trim();
     if (!trimmedText) {
       closeEditor();
       return;
     }
 
     let plan = createPlan();
-    const n = newNode(text, plan.user.publicKey, imageUrl);
+    const n = newNode(nodeText, plan.user.publicKey, imageUrl);
     plan = planUpsertNode(plan, n);
 
     // Get current relations to determine actual insert index before modifying
@@ -218,36 +204,46 @@ export function CreateNodeEditor({
     executePlan(plan);
   };
 
-  const onTab = (text: string): void => {
+  const onTab = (tabText: string, tabCursorPosition: number): void => {
     // Tab indents the editor - changes from sibling to child position
     // Don't create the node yet, just move the editor
-    if (position === "asFirstChild") {
+    if (isChildPosition) {
       // Already at max indent level for this context
       return;
     }
 
-    // Preserve text before portal change (portal change causes remount)
-    setEditorText(text);
-
     // Expand the current node (ensure it has relations for children)
     const [nodeID, view] = getNodeIDFromView(data, viewPath);
     const context = getContextFromStackAndViewPath(stack, viewPath);
-    const plan = planExpandNode(createPlan(), nodeID, context, view, viewPath);
-    executePlan(plan);
+    let plan = planExpandNode(createPlan(), nodeID, context, view, viewPath);
 
-    // Find the last child to portal to (if any)
-    // Use plan data since we just expanded
+    // Find the last child (if any) - use plan data since we just expanded
     const lastChild = getLastChild(plan, viewPath, stack);
-    if (lastChild) {
-      setPortalTargetKey(viewPathToString(lastChild));
-    }
 
-    // Update internal position state - editor stays mounted, text preserved
-    setPosition("asFirstChild");
-    setTabPressed(true); // Mark that Tab was pressed, so insert at end
+    // Open editor at the correct position:
+    // - If there's a last child: open after it (afterSibling)
+    // - If no children: open as first child of current node
+    if (lastChild) {
+      plan = planOpenCreateNodeEditor(
+        plan,
+        viewPathToString(lastChild),
+        "afterSibling",
+        tabText,
+        tabCursorPosition
+      );
+    } else {
+      plan = planOpenCreateNodeEditor(
+        plan,
+        viewPathToString(viewPath),
+        "asFirstChild",
+        tabText,
+        tabCursorPosition
+      );
+    }
+    executePlan(plan);
   };
 
-  const editorContent = (
+  return (
     <NodeCard className="hover-light-bg" cardBodyClassName="ps-0 pt-0 pb-0">
       <LeftMenu />
       {levels > 0 && <Indent levels={levels} />}
@@ -256,7 +252,8 @@ export function CreateNodeEditor({
       </div>
       <div className="flex-column w-100" style={{ paddingTop: 10 }}>
         <MiniEditor
-          initialText={editorText}
+          initialText={text}
+          initialCursorPosition={cursorPosition}
           onSave={onCreateNode}
           onClose={closeEditor}
           onTab={onTab}
@@ -265,17 +262,6 @@ export function CreateNodeEditor({
       </div>
     </NodeCard>
   );
-
-  // Always render via portal to preserve state when target changes
-  const portalTarget = document.getElementById(
-    `editor-portal-${portalTargetKey}`
-  );
-  if (portalTarget) {
-    return createPortal(editorContent, portalTarget);
-  }
-
-  // Fallback if portal target doesn't exist yet
-  return editorContent;
 }
 
 export function ListItem({
@@ -295,9 +281,8 @@ export function ListItem({
 
   // Check if we should show a create node editor after this node
   const showEditor = createNodeEditorState?.viewKey === viewKey;
-  const editorPosition = createNodeEditorState?.position;
 
-  // Base values for editor - CreateNodeEditor will adjust based on its internal position state
+  // Base values for editor
   const baseLevels = viewPath.length - 1;
   const baseInsertAtIndex = relationIndex !== undefined ? relationIndex + 1 : 0;
 
@@ -333,14 +318,13 @@ export function ListItem({
       <div className="visible-on-hover">
         <Draggable ref={ref} className={className} />
       </div>
-      {/* Portal target for CreateNodeEditor - placed after each node's children */}
-      <div id={`editor-portal-${viewKey}`} />
-      {showEditor && editorPosition && (
+      {showEditor && createNodeEditorState && (
         <CreateNodeEditor
-          initialPosition={editorPosition}
+          position={createNodeEditorState.position}
+          text={createNodeEditorState.text}
+          cursorPosition={createNodeEditorState.cursorPosition}
           baseInsertAtIndex={baseInsertAtIndex}
           baseLevels={baseLevels}
-          initialPortalTarget={viewKey}
         />
       )}
     </>

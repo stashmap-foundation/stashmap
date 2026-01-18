@@ -302,13 +302,15 @@ export function planUpdateViews(plan: Plan, views: Views): Plan {
 export function planOpenCreateNodeEditor(
   plan: Plan,
   viewKey: string,
-  position: CreateNodeEditorPosition
+  position: CreateNodeEditorPosition,
+  text: string = "",
+  cursorPosition: number = 0
 ): Plan {
   return {
     ...plan,
     temporaryView: {
       ...plan.temporaryView,
-      createNodeEditorState: { viewKey, position },
+      createNodeEditorState: { viewKey, position, text, cursorPosition },
     },
   };
 }

@@ -197,4 +197,74 @@ My Notes
         Barcelona
     `);
   });
+
+  test("Setting top version to not_relevant shows the previous version", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    // Create Holiday Destinations
+    await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
+    await userEvent.type(await findNewNodeEditor(), "Holiday Destinations{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    // Expand and add Barcelona
+    await userEvent.click(await screen.findByLabelText("expand Holiday Destinations"));
+    await userEvent.click(await screen.findByLabelText("add to Holiday Destinations"));
+    await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    Barcelona
+    `);
+
+    // Edit Barcelona to BCN
+    const barcelonaEditor = await screen.findByLabelText("edit Barcelona");
+    await userEvent.click(barcelonaEditor);
+    await userEvent.clear(barcelonaEditor);
+    await userEvent.type(barcelonaEditor, "BCN");
+    fireEvent.blur(barcelonaEditor);
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    BCN
+    `);
+
+    // Expand BCN to manually add ~Versions as a child
+    await userEvent.click(await screen.findByLabelText("expand BCN"));
+
+    // Add ~Versions as a child by typing it
+    await userEvent.click(await screen.findByLabelText("add to BCN"));
+    await userEvent.type(await findNewNodeEditor(), "~Versions{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    // Expand ~Versions to see all versions
+    await userEvent.click(await screen.findByLabelText("expand ~Versions"));
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    BCN
+      ~Versions
+        BCN
+        Barcelona
+    `);
+
+    // Mark the top version (BCN inside ~Versions) as not relevant
+    // There are two "mark BCN as not relevant" buttons - parent and inside ~Versions
+    const notRelevantButtons = await screen.findAllByLabelText("mark BCN as not relevant");
+    // The second one is inside ~Versions
+    fireEvent.click(notRelevantButtons[1]);
+
+    // Now the display should fall back to showing Barcelona (the previous version)
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    Barcelona
+      ~Versions
+        Barcelona
+    `);
+  });
 });

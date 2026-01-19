@@ -12,6 +12,7 @@ import {
   upsertRelations,
   useNodeID,
   useNode,
+  useDisplayText,
 } from "../ViewContext";
 import { addRelationToRelations } from "../connections";
 import { usePlanner } from "../planner";
@@ -75,7 +76,7 @@ export function RelevanceSelector({
   const [hoverLevel, setHoverLevel] = useState<number | null>(null);
 
   // Hooks for normal items (updating existing relevance)
-  const { currentRelevance, nodeText, setLevel, removeFromList, isVisible } =
+  const { currentRelevance, setLevel, removeFromList, isVisible } =
     useUpdateRelevance();
 
   // Hooks for diff items (accepting with relevance)
@@ -87,6 +88,7 @@ export function RelevanceSelector({
   const parentPath = getParentView(viewPath);
 
   const diffNodeText = node?.text || "";
+  const versionedDisplayText = useDisplayText();
 
   // For diff items, accept with the specified relevance level
   const acceptWithLevel = (level: number): void => {
@@ -108,7 +110,7 @@ export function RelevanceSelector({
   const currentLevel = isDiffItem ? -1 : relevanceToLevel(currentRelevance);
   const displayLevel = hoverLevel !== null ? hoverLevel : currentLevel;
   const isNotRelevant = displayLevel === 0;
-  const displayText = isDiffItem ? diffNodeText : nodeText;
+  const displayText = isDiffItem ? diffNodeText : versionedDisplayText;
 
   // Handler that works for both modes
   const handleSetLevel = (level: number): void => {

@@ -132,7 +132,69 @@ My Notes
 My Notes
   Holiday Destinations
     Barcelona
+    `);
+  });
+
+  test("~Versions list contains both original text and new version after first edit", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    // Create Holiday Destinations
+    await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
+    await userEvent.type(await findNewNodeEditor(), "Holiday Destinations{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    // Expand and add Barcelona
+    await userEvent.click(await screen.findByLabelText("expand Holiday Destinations"));
+    await userEvent.click(await screen.findByLabelText("add to Holiday Destinations"));
+    await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
     Barcelona
+    `);
+
+    // Edit Barcelona to BCN
+    const barcelonaEditor = await screen.findByLabelText("edit Barcelona");
+    await userEvent.click(barcelonaEditor);
+    await userEvent.clear(barcelonaEditor);
+    await userEvent.type(barcelonaEditor, "BCN");
+    fireEvent.blur(barcelonaEditor);
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    BCN
+    `);
+
+    // Expand BCN to manually add ~Versions as a child
+    await userEvent.click(await screen.findByLabelText("expand BCN"));
+
+    // Add ~Versions as a child by typing it (content-addressed ID will match existing ~Versions)
+    await userEvent.click(await screen.findByLabelText("add to BCN"));
+    await userEvent.type(await findNewNodeEditor(), "~Versions{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    BCN
+      ~Versions
+    `);
+
+    // Expand ~Versions to see all versions
+    await userEvent.click(await screen.findByLabelText("expand ~Versions"));
+
+    // ~Versions should contain both BCN (current/top) and Barcelona (original)
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    BCN
+      ~Versions
+        BCN
+        Barcelona
     `);
   });
 });

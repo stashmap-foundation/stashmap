@@ -226,6 +226,7 @@ export function planBulkUpsertNodes(plan: Plan, nodes: KnowNode[]): Plan {
  * Create a version for a node instead of modifying it directly.
  * Adds the new version to ~Versions in context [...context, originalNodeID].
  * If the version already exists in ~Versions, moves it to the top instead of adding a duplicate.
+ * Also ensures the original node ID is in ~Versions (for complete version history).
  */
 export function planCreateVersion(
   plan: Plan,
@@ -243,7 +244,7 @@ export function planCreateVersion(
 
   // 3. Get or create ~Versions relations
   const versionsContext = getVersionsContext(originalNodeID, context);
-  const versionsRelations =
+  let versionsRelations =
     getVersionsRelations(
       updatedPlan.knowledgeDBs,
       updatedPlan.user.publicKey,
@@ -252,9 +253,23 @@ export function planCreateVersion(
     ) ||
     newRelations(VERSIONS_NODE_ID, versionsContext, updatedPlan.user.publicKey);
 
-  // 4. Check if version already exists in ~Versions
+  // 4. Ensure original node ID is in ~Versions (add at end if not present)
+  const originalIndex = versionsRelations.items.findIndex(
+    (item) => item.nodeID === originalNodeID
+  );
+  if (originalIndex < 0) {
+    versionsRelations = addRelationToRelations(
+      versionsRelations,
+      originalNodeID,
+      "",
+      undefined,
+      versionsRelations.items.size
+    );
+  }
+
+  // 5. Check if new version already exists in ~Versions
   const existingIndex = versionsRelations.items.findIndex(
-    (item) => shortID(item.nodeID) === shortID(versionNode.id)
+    (item) => item.nodeID === versionNode.id
   );
 
   let withVersion: Relations;

@@ -1,6 +1,6 @@
 import { List, Set, Map } from "immutable";
 import crypto from "crypto";
-import { newRelations, getNodeFromID } from "./ViewContext";
+import { newRelations, getNodeFromID, getVersionedDisplayText } from "./ViewContext";
 import { REFERENCED_BY, REF_PREFIX } from "./constants";
 
 // Content-addressed node ID generation
@@ -97,13 +97,35 @@ export function buildReferenceNode(
   const { targetNode, targetContext } = parsed;
 
   // Build the display text by looking up each node
-  const getNodeText = (nodeId: ID): string => {
+  // Use versioned text if available, walking through context incrementally
+  const getNodeTextWithVersion = (
+    nodeId: ID,
+    contextUpToNode: List<ID>
+  ): string => {
+    const versionedText = getVersionedDisplayText(
+      knowledgeDBs,
+      myself,
+      nodeId,
+      contextUpToNode
+    );
+    if (versionedText) {
+      return versionedText;
+    }
     const node = getNodeFromID(knowledgeDBs, nodeId, myself);
     return node?.text || "Loading...";
   };
 
-  const contextTexts = targetContext.map(getNodeText);
-  const targetText = getNodeText(targetNode);
+  // Build context incrementally as we walk through the path
+  const contextTexts = targetContext.reduce(
+    (acc, nodeId, index) => {
+      const contextUpToHere = targetContext.slice(0, index);
+      const text = getNodeTextWithVersion(nodeId, contextUpToHere);
+      return acc.push(text);
+    },
+    List<string>()
+  );
+
+  const targetText = getNodeTextWithVersion(targetNode, targetContext);
   const displayText = contextTexts.push(targetText).join(" → ");
 
   return {

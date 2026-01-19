@@ -9,6 +9,50 @@ import {
 } from "../utils.test";
 
 describe("Version Display", () => {
+  test("Reference node displays versioned text in path", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    // Create: My Notes -> Holiday Destinations -> Barcelona
+    await userEvent.click(
+      (
+        await screen.findAllByLabelText("add to My Notes")
+      )[0]
+    );
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Holiday Destinations{Enter}"
+    );
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    await userEvent.click(
+      await screen.findByLabelText("expand Holiday Destinations")
+    );
+    await userEvent.click(
+      await screen.findByLabelText("add to Holiday Destinations")
+    );
+    await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    // Edit Barcelona to BCN
+    const barcelonaEditor = await screen.findByLabelText("edit Barcelona");
+    await userEvent.click(barcelonaEditor);
+    await userEvent.clear(barcelonaEditor);
+    await userEvent.type(barcelonaEditor, "BCN");
+    fireEvent.blur(barcelonaEditor);
+
+    // Verify BCN is displayed
+    await screen.findByLabelText("edit BCN");
+
+    // Show "Referenced By" for BCN
+    fireEvent.click(await screen.findByLabelText("show references to BCN"));
+    await screen.findByLabelText("hide references to BCN");
+
+    // The reference path should show versioned text "BCN" (not "Barcelona")
+    // The full path is "My Notes → Holiday Destinations → BCN"
+    await screen.findByText("My Notes → Holiday Destinations → BCN");
+  });
+
   test("Editing a node creates a version and displays the new text", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);

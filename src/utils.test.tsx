@@ -772,6 +772,43 @@ export function RootViewOrWorkspaceIsLoading({
  *       Digital Gold
  *     Ethereum
  */
+function getIndentLevel(element: HTMLElement): number {
+  // Count indent levels by counting the wrapper divs inside .d-flex that come before the element
+  // Structure: .d-flex > .left-menu > [indent divs...] > expand-collapse-toggle > content
+  // The first indent div is always there (even for root), so we count starting from -1
+  // eslint-disable-next-line testing-library/no-node-access
+  const dFlex = element.closest(".d-flex");
+  if (!dFlex) {
+    return 0;
+  }
+  // eslint-disable-next-line testing-library/no-node-access
+  const children = Array.from(dFlex.children);
+  // eslint-disable-next-line functional/no-let
+  let countingIndents = false;
+  // eslint-disable-next-line functional/no-let
+  let indentLevel = -1; // Start at -1 because there's always one structural div
+  // eslint-disable-next-line no-restricted-syntax
+  for (const child of children) {
+    // eslint-disable-next-line testing-library/no-node-access
+    if (child.classList.contains("left-menu")) {
+      countingIndents = true;
+      // eslint-disable-next-line no-continue
+      continue;
+    }
+    // Stop counting at expand-collapse-toggle or when we find the element
+    // eslint-disable-next-line testing-library/no-node-access
+    if (child.classList.contains("expand-collapse-toggle")) break;
+    // eslint-disable-next-line testing-library/no-node-access
+    if (child === element || child.contains(element)) break;
+    if (countingIndents && child.tagName === "DIV") {
+      // eslint-disable-next-line no-plusplus
+      indentLevel++;
+    }
+  }
+  // Clamp to 0 minimum
+  return Math.max(0, indentLevel);
+}
+
 export async function getTreeStructure(): Promise<string> {
   await waitFor(() => {
     expect(screen.queryByText("Loading...")).toBeNull();
@@ -782,47 +819,59 @@ export async function getTreeStructure(): Promise<string> {
     name: /^(expand|collapse) /,
   });
 
-  const lines: string[] = [];
-  const seenNodes = new globalThis.Set<string>();
-
-  toggleButtons.forEach((btn) => {
-    const ariaLabel = btn.getAttribute("aria-label") || "";
-    const text = ariaLabel.replace(/^(expand|collapse) /, "");
-
-    // Count indent levels by counting the wrapper divs inside .d-flex that come before the button
-    // Structure: .d-flex > .left-menu > [indent divs...] > button
-    // The first indent div is always there (even for root), so we count starting from -1
-    // eslint-disable-next-line testing-library/no-node-access
-    const dFlex = btn.closest(".d-flex");
-    let indentLevel = -1; // Start at -1 because there's always one structural div
-    if (dFlex) {
-      // eslint-disable-next-line testing-library/no-node-access
-      const children = Array.from(dFlex.children);
-      // Count divs between left-menu and the button
-      let countingIndents = false;
-      for (const child of children) {
-        // eslint-disable-next-line testing-library/no-node-access
-        if (child.classList.contains("left-menu")) {
-          countingIndents = true;
-          continue;
-        }
-        if (child === btn) break;
-        if (countingIndents && child.tagName === "DIV") {
-          indentLevel++;
-        }
-      }
-    }
-    // Clamp to 0 minimum
-    indentLevel = Math.max(0, indentLevel);
-
-    // Create unique key to skip duplicates (same text at same level)
-    const key = `${indentLevel}:${text}`;
-    if (seenNodes.has(key)) return;
-    seenNodes.add(key);
-
-    const indent = "  ".repeat(indentLevel);
-    lines.push(`${indent}${text}`);
+  // Find all new node editors
+  const editors = screen.queryAllByRole("textbox", {
+    name: "new node editor",
   });
+
+  // Combine and sort by DOM order
+  type TreeElement = { element: HTMLElement; type: "node" | "editor" };
+  const elements: TreeElement[] = [
+    ...toggleButtons.map((el) => ({
+      element: el as HTMLElement,
+      type: "node" as const,
+    })),
+    ...editors.map((el) => ({
+      element: el as HTMLElement,
+      type: "editor" as const,
+    })),
+  ];
+
+  // Sort by document order (creates a new sorted array)
+  const sortedElements = [...elements].sort((a, b) => {
+    const position = a.element.compareDocumentPosition(b.element);
+    // eslint-disable-next-line no-bitwise
+    if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+    // eslint-disable-next-line no-bitwise
+    if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+    return 0;
+  });
+
+  const seen = new globalThis.Set<string>();
+
+  const lines = sortedElements
+    .map(({ element, type }) => {
+      const text =
+        type === "node"
+          ? (element.getAttribute("aria-label") || "").replace(
+              /^(expand|collapse) /,
+              ""
+            )
+          : element.textContent?.trim()
+            ? `[EDITOR: ${element.textContent.trim()}]`
+            : "[EDITOR]";
+
+      const indentLevel = getIndentLevel(element);
+
+      // Create unique key to skip duplicates (same text at same level)
+      const key = `${indentLevel}:${text}`;
+      if (seen.has(key)) return null;
+      seen.add(key);
+
+      const indent = "  ".repeat(indentLevel);
+      return `${indent}${text}`;
+    })
+    .filter((line): line is string => line !== null);
 
   return lines.join("\n");
 }

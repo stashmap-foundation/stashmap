@@ -122,6 +122,7 @@ export function MiniEditor({
 
   // Reset when initialText prop changes (e.g., navigating to different node)
   useEffect(() => {
+    // eslint-disable-next-line functional/immutable-data
     lastSavedTextRef.current = initialText;
   }, [initialText]);
 
@@ -156,6 +157,7 @@ export function MiniEditor({
   const saveIfChanged = async (): Promise<void> => {
     const text = getText().trim();
     if (text && text !== lastSavedTextRef.current) {
+      // eslint-disable-next-line functional/immutable-data
       lastSavedTextRef.current = text; // Update immediately to prevent duplicate saves
       const imageUrl = await getImageUrlFromText(text);
       onSave(text, imageUrl);
@@ -185,10 +187,12 @@ export function MiniEditor({
   ): Promise<void> => {
     if (e.key === "Escape") {
       e.preventDefault();
+      // eslint-disable-next-line functional/immutable-data
       handlingKeyRef.current = true;
       const text = getText().trim();
       if (text && text !== lastSavedTextRef.current) {
         // Save changes - onSave will close the editor
+        // eslint-disable-next-line functional/immutable-data
         lastSavedTextRef.current = text; // Update immediately to prevent duplicate saves
         const imageUrl = await getImageUrlFromText(text);
         onSave(text, imageUrl);
@@ -197,6 +201,7 @@ export function MiniEditor({
         onClose?.();
       }
       editorRef.current?.blur();
+      // eslint-disable-next-line functional/immutable-data
       handlingKeyRef.current = false;
     } else if (e.key === "Enter") {
       e.preventDefault();
@@ -205,6 +210,7 @@ export function MiniEditor({
         onClose?.();
         return;
       }
+      // eslint-disable-next-line functional/immutable-data
       lastSavedTextRef.current = text; // Update immediately to prevent duplicate saves
       const imageUrl = await getImageUrlFromText(text);
       onSave(text, imageUrl, true);

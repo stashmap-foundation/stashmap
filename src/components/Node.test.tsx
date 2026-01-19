@@ -11,6 +11,7 @@ import {
   renderApp,
   renderWithTestData,
   setup,
+  expectTree,
 } from "../utils.test";
 import {
   NodeIndex,
@@ -922,9 +923,13 @@ describe.skip("Inline Node Creation", () => {
     const child2 = newNode("Child 2");
 
     // Build relations with children in order: [child1, child2]
-    let relations = newRelations(parent.id, List(), publicKey);
-    relations = addRelationToRelations(relations, child1.id);
-    relations = addRelationToRelations(relations, child2.id);
+    const relations = addRelationToRelations(
+      addRelationToRelations(
+        newRelations(parent.id, List(), publicKey),
+        child1.id
+      ),
+      child2.id
+    );
 
     await execute({
       ...alice(),
@@ -969,18 +974,12 @@ describe.skip("Inline Node Creation", () => {
     const newEditor = await findEmptyEditor();
     await userEvent.type(newEditor, "New First Child{Enter}");
 
-    // Wait for new node to appear and verify tree order
-    await screen.findByText("New First Child");
-
-    // Verify order using aria-label "related to Parent" which contains root + children
-    const childrenContainer = await screen.findByLabelText("related to Parent");
-    const allNodeTexts = Array.from(
-      childrenContainer.querySelectorAll('[aria-label^="edit "]')
-    ).map((el) => el.textContent);
-
-    // First element is the root (Parent), rest are children
-    // Expected order of children: New First Child, Child 1, Child 2
-    const childTexts = allNodeTexts.slice(1); // Skip the root node
-    expect(childTexts).toEqual(["New First Child", "Child 1", "Child 2"]);
+    // Verify tree order: New First Child should be first among children
+    await expectTree(`
+      Parent
+        New First Child
+        Child 1
+        Child 2
+    `);
   });
 });

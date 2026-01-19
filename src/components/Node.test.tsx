@@ -94,7 +94,6 @@ async function expectNode(text: string, editable: boolean): Promise<void> {
 
 test("Edit node inline", async () => {
   const [alice] = setup([ALICE]);
-  const { publicKey } = alice().user;
   const note = newNode("My Note");
   await execute({
     ...alice(),
@@ -283,7 +282,6 @@ test.skip("Edited node is shown in Tree View", async () => {
 
 test.skip("Delete node", async () => {
   const [alice] = setup([ALICE]);
-  const { publicKey } = alice().user;
   const note = newNode("My Note");
   await execute({
     ...alice(),

@@ -7,7 +7,6 @@ import {
   ViewPath,
   useIsInReferencedByView,
   useIsExpanded,
-  useIsRoot,
   addNodeToPathWithRelations,
   addDiffItemToPath,
   getDiffItemsForNode,
@@ -17,7 +16,6 @@ import {
   getAvailableRelationsForNode,
   findOrCreateRelationsForContext,
   usePreviousSibling,
-  getViewFromPath,
   useDisplayText,
 } from "../ViewContext";
 import {
@@ -318,7 +316,6 @@ function EditableContent(): JSX.Element {
 }
 
 function InteractiveNodeContent(): JSX.Element {
-  const { user } = useData();
   const [node] = useNode();
   const [nodeID, view] = useNodeID();
   const displayText = useDisplayText();
@@ -336,11 +333,7 @@ function InteractiveNodeContent(): JSX.Element {
   }
 
   // Editable content for mutable nodes (but read-only in Referenced By view)
-  if (
-    isMutableNode(node, user) &&
-    !isInReferencedByView &&
-    !isReferencedByRoot
-  ) {
+  if (isMutableNode(node) && !isInReferencedByView && !isReferencedByRoot) {
     return <EditableContent />;
   }
 

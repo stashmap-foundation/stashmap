@@ -11,7 +11,6 @@ import { useLocation } from "react-router-dom";
 import { ListItem } from "./Draggable";
 import { getNodesInTree } from "./Node";
 import {
-  useNode,
   useViewPath,
   ViewPath,
   viewPathToString,

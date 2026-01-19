@@ -43,13 +43,6 @@ function asNumber(obj: Serializable | undefined): number {
   throw new Error(`${toString(obj)} is not a number`);
 }
 
-function parseNumber(obj: Serializable | undefined): number {
-  if (typeof obj === "string") {
-    return parseFloat(obj);
-  }
-  return asNumber(obj);
-}
-
 function asBoolean(obj: Serializable | undefined): boolean {
   if (typeof obj === "boolean") {
     return obj;

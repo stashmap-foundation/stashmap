@@ -1,6 +1,4 @@
 import React, { useEffect } from "react";
-import { useMediaQuery } from "react-responsive";
-import { useInputElementFocus } from "../commons/FocusContextProvider";
 import { addRelationToRelations } from "../connections";
 import {
   useIsAddToNode,
@@ -8,7 +6,6 @@ import {
   useNode,
   useViewPath,
   getParentView,
-  useViewKey,
   useRelationIndex,
   upsertRelations,
   updateViewPathsAfterAddRelation,
@@ -20,40 +17,8 @@ import {
 import { planExpandAndOpenCreateNodeEditor } from "./RelationTypes";
 import useModal from "./useModal";
 import { SearchModal } from "./SearchModal";
-import { IS_MOBILE } from "./responsive";
-import {
-  openEditor,
-  closeEditor,
-  useTemporaryView,
-  useIsEditorOpen,
-} from "./TemporaryViewContext";
 import { Plan, planUpdateViews, usePlanner, planCreateNode } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
-
-function AddNodeButton({
-  onClick,
-  ariaLabel,
-}: {
-  onClick: () => void;
-  ariaLabel: string;
-}): JSX.Element {
-  const isInline = useIsAddToNode() || useMediaQuery(IS_MOBILE);
-  const className = isInline
-    ? "add-node-button black-dimmed hover-black-dimmed"
-    : "add-node-button background-transparent";
-  return (
-    <button
-      type="button"
-      className={className}
-      aria-label={ariaLabel}
-      onClick={onClick}
-    >
-      {!isInline && <span className="simple-icon-plus me-2" />}
-      <span>Add Note</span>
-      <span>{}</span>
-    </button>
-  );
-}
 
 function SearchButton({ onClick }: { onClick: () => void }): JSX.Element {
   const displayText = useDisplayText();
@@ -298,89 +263,6 @@ type EditorProps = {
 
 export function Editor({ onCreateNode, onClose }: EditorProps): JSX.Element {
   return <MiniEditor onSave={(text) => onCreateNode(text)} onClose={onClose} />;
-}
-
-type AddNodeProps = {
-  onCreateNewNode: (text: string) => void;
-  onAddExistingNode: (nodeID: ID) => void;
-  ariaLabel: string;
-  isSearchEnabledByShortcut?: boolean;
-};
-
-function AddNode({
-  ariaLabel,
-  onCreateNewNode,
-  onAddExistingNode,
-  isSearchEnabledByShortcut,
-}: AddNodeProps): JSX.Element {
-  const { openModal, closeModal, isOpen } = useModal();
-  const { editorOpenViews, setEditorOpenState } = useTemporaryView();
-  const { isInputElementInFocus, setIsInputElementInFocus } =
-    useInputElementFocus();
-  const viewKey = useViewKey();
-  const isEditorOpen = useIsEditorOpen();
-  const reset = (): void => {
-    setIsInputElementInFocus(false);
-    setEditorOpenState(closeEditor(editorOpenViews, viewKey));
-  };
-  useEffect((): (() => void) | undefined => {
-    if (isSearchEnabledByShortcut && !isInputElementInFocus) {
-      const handler = (event: KeyboardEvent): void => {
-        if (event.key === "/" && !isOpen) {
-          openModal();
-        }
-      };
-      window.addEventListener("keyup", handler);
-      return () => {
-        window.removeEventListener("keyup", handler);
-        if (isOpen) {
-          closeModal();
-        }
-      };
-    }
-    return undefined;
-  }, [isInputElementInFocus]);
-
-  const createNewNode = (text: string): void => {
-    onCreateNewNode(text);
-    reset();
-  };
-
-  const onAddExistingRepo = (id: ID): void => {
-    if (isOpen) {
-      closeModal();
-    }
-    onAddExistingNode(id);
-  };
-
-  return (
-    <>
-      {isOpen && (
-        <SearchModal
-          onAddExistingNode={onAddExistingRepo}
-          onHide={closeModal}
-        />
-      )}
-      <div className="w-100">
-        {!isEditorOpen && (
-          <div className="d-flex">
-            <AddNodeButton
-              ariaLabel={ariaLabel}
-              onClick={() => {
-                setEditorOpenState(openEditor(editorOpenViews, viewKey));
-              }}
-            />
-            <div className="flex-row-end">
-              <SearchButton onClick={openModal} />
-            </div>
-          </div>
-        )}
-        {isEditorOpen && (
-          <Editor onCreateNode={createNewNode} onClose={reset} />
-        )}
-      </div>
-    </>
-  );
 }
 
 type AddNodeOptions = {

@@ -135,7 +135,7 @@ test("Move Node Up", async () => {
     ],
   ]);
   const root = (findNodeByText(executedPlan, "My Workspace") as KnowNode).id;
-  const utils = renderWithTestData(
+  renderWithTestData(
     <Data user={alice().user}>
       <RootViewContextProvider root={root}>
         <LoadNode waitForEose>

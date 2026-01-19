@@ -17,12 +17,9 @@ import {
   ANON,
   ALICE_PRIVATE_KEY,
   CAROL,
-  findEvent,
 } from "../utils.test";
 import { Follow } from "./Follow";
 import { App } from "../App";
-import { execute } from "../executor";
-import { createPlan } from "../planner";
 
 beforeEach(() => {
   nip05.useFetchImplementation(async () =>

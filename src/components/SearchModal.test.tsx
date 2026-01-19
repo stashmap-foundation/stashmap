@@ -3,29 +3,20 @@ import { screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 // eslint-disable-next-line import/no-unresolved
 import { BasicRelayInformation } from "nostr-tools/lib/types/nip11";
-import { Map } from "immutable";
 import { SearchModal } from "./SearchModal";
 import { newNode } from "../connections";
 import {
   ALICE,
-  BOB,
-  CAROL,
   matchSplitText,
   renderApp,
   renderWithTestData,
   setup,
 } from "../utils.test";
-import {
-  createPlan,
-  planBulkUpsertNodes,
-  planUpsertMemberlist,
-  planUpsertNode,
-} from "../planner";
+import { createPlan, planBulkUpsertNodes, planUpsertNode } from "../planner";
 import { execute } from "../executor";
 
 test("Search works like spotlight", async () => {
   const [alice] = setup([ALICE]);
-  const { publicKey } = alice().user;
 
   const note = newNode("My very first search note made");
   const secondNote = newNode("My second search note ever made");

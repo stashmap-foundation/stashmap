@@ -114,7 +114,6 @@ test("Shows dots when only other user has relation (current user has none)", asy
   const [alice, bob] = setup([ALICE, BOB]);
 
   // Alice creates just the parent node, no relations
-  const { publicKey: alicePK } = alice().user;
   const parentNode = newNode("Parent Node");
 
   const alicePlan = planUpsertNode(createPlan(alice()), parentNode);

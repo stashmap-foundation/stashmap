@@ -14,7 +14,6 @@ import {
 import { execute } from "../executor";
 import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
 import { newRelations } from "../ViewContext";
-import { KIND_KNOWLEDGE_NODE } from "../nostr";
 
 test("Add New Note", async () => {
   const [alice] = setup([ALICE]);

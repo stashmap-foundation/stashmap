@@ -27,12 +27,11 @@ import { sha256 } from "@noble/hashes/sha256";
 import { schnorr } from "@noble/curves/secp256k1";
 import { Container } from "react-dom";
 import { VirtuosoMockContext } from "react-virtuoso";
-import { v4 } from "uuid";
 import {
   FocusContext,
   FocusContextProvider,
 } from "./commons/FocusContextProvider";
-import { KIND_CONTACTLIST, newTimestamp } from "./nostr";
+import { KIND_CONTACTLIST } from "./nostr";
 import { RequireLogin, UNAUTHENTICATED_USER_PK } from "./AppState";
 import {
   Plan,
@@ -41,7 +40,6 @@ import {
   planRemoveContact,
   planUpsertNode,
   planUpsertRelations,
-  relayTags,
   PlanningContextProvider,
 } from "./planner";
 import { execute } from "./executor";

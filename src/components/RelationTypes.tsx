@@ -7,7 +7,6 @@ import {
   planUpsertRelations,
   usePlanner,
   planOpenCreateNodeEditor,
-  planCloseCreateNodeEditor,
 } from "../planner";
 import { getRelationsNoReferencedBy } from "../connections";
 import { REFERENCED_BY } from "../constants";

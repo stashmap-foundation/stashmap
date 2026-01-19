@@ -102,13 +102,12 @@ export function DeleteNode({
   withCaption?: boolean;
   afterOnClick: () => void;
 }): JSX.Element | null {
-  const data = useData();
   const [nodeID] = useNodeID();
   const [node] = useNode();
   const navigate = useNavigate();
   const { createPlan, executePlan } = usePlanner();
 
-  if (!isMutableNode(node, data.user)) {
+  if (!isMutableNode(node)) {
     return null;
   }
   const deleteNode = (): void => {

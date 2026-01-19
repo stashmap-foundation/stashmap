@@ -9,7 +9,6 @@ import {
   KIND_CONTACTLIST,
   KIND_VIEWS,
   KIND_SETTINGS,
-  KIND_MEMBERLIST,
   KIND_RELAY_METADATA_EVENT,
 } from "./nostr";
 import { DataContextProvider } from "./DataContext";

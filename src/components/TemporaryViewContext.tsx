@@ -215,22 +215,17 @@ export function toggleEditing(
 }
 
 // With content-addressed IDs (hash of text), any text node is mutable
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function isMutableNode(
-  node: KnowNode | undefined,
-  _user: User
-): boolean {
+export function isMutableNode(node: KnowNode | undefined): boolean {
   return !!node && node.type === "text";
 }
 
 export function ToggleEditing(): JSX.Element | null {
-  const { user } = useData();
   const [node] = useNode();
   const displayText = useDisplayText();
   const ariaLabel = displayText ? `edit ${displayText}` : undefined;
   const { editingViews, setEditingState } = useTemporaryView();
   const viewKey = useViewKey();
-  if (!isMutableNode(node, user)) {
+  if (!isMutableNode(node)) {
     return null;
   }
   const onClick = (): void =>
@@ -321,7 +316,6 @@ export function TemporaryViewProvider({
 }
 
 export function NodeSelectbox(): JSX.Element | null {
-  const [node] = useNode();
   const displayText = useDisplayText();
   const { knowledgeDBs, user } = useData();
   const [parentNode, parentView] = useParentNode();

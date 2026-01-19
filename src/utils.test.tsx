@@ -53,7 +53,6 @@ import {
   useWorkspaceContext,
 } from "./WorkspaceContext";
 import { MockRelayPool, mockRelayPool } from "./nostrMock.test";
-import { DEFAULT_SETTINGS } from "./settings";
 import {
   NostrAuthContextProvider,
   isUserLoggedInWithSeed,
@@ -229,7 +228,6 @@ type TestDataProps = DataContextProps & {
 const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
   user: ALICE,
   contacts: Map<PublicKey, Contact>(),
-  settings: DEFAULT_SETTINGS,
   contactsRelays: Map<PublicKey, Relays>(),
   knowledgeDBs: Map<PublicKey, KnowledgeData>(),
   relaysInfos: Map<string, RelayInformation | undefined>(),
@@ -849,17 +847,23 @@ export async function getTreeStructure(): Promise<string> {
 
   const seen = new globalThis.Set<string>();
 
+  const getElementText = (
+    element: HTMLElement,
+    type: "node" | "editor"
+  ): string => {
+    if (type === "node") {
+      return (element.getAttribute("aria-label") || "").replace(
+        /^(expand|collapse) /,
+        ""
+      );
+    }
+    const content = element.textContent?.trim();
+    return content ? `[EDITOR: ${content}]` : "[EDITOR]";
+  };
+
   const lines = sortedElements
     .map(({ element, type }) => {
-      const text =
-        type === "node"
-          ? (element.getAttribute("aria-label") || "").replace(
-              /^(expand|collapse) /,
-              ""
-            )
-          : element.textContent?.trim()
-            ? `[EDITOR: ${element.textContent.trim()}]`
-            : "[EDITOR]";
+      const text = getElementText(element, type);
 
       const indentLevel = getIndentLevel(element);
 
@@ -921,7 +925,7 @@ export function renderTree(
  */
 export async function createAndSetAsRoot(nodeName: string): Promise<void> {
   // First create the node under My Notes
-  (await screen.findAllByLabelText("collapse My Notes"))[0];
+  await screen.findByLabelText("collapse My Notes");
   await userEvent.click(
     (
       await screen.findAllByLabelText("add to My Notes")

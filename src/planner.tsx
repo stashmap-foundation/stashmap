@@ -1,14 +1,12 @@
 import React, { Dispatch, SetStateAction } from "react";
 import { List } from "immutable";
 import { UnsignedEvent, Event } from "nostr-tools";
-import crypto from "crypto";
 import {
   KIND_DELETE,
   KIND_KNOWLEDGE_LIST,
   KIND_KNOWLEDGE_NODE,
   KIND_CONTACTLIST,
   KIND_VIEWS,
-  KIND_SETTINGS,
   KIND_MEMBERLIST,
   KIND_RELAY_METADATA_EVENT,
   newTimestamp,
@@ -473,33 +471,6 @@ export function planRewriteUnpublishedEvents(
   return {
     ...plan,
     publishEvents: rewrittenEvents,
-  };
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function planPublishSettings(plan: Plan, settings: Settings): Plan {
-  const compressedSettings: CompressedSettings = {
-    v: "v1",
-    n: crypto.randomBytes(8),
-  };
-  const content = JSON.stringify(compressedSettings);
-  const publishSettingsEvent = {
-    kind: KIND_SETTINGS,
-    pubkey: plan.user.publicKey,
-    created_at: Math.floor(Date.now() / 1000),
-    tags: [],
-    content,
-  };
-  return {
-    ...plan,
-    publishEvents: plan.publishEvents.push(
-      setRelayConf(publishSettingsEvent, {
-        defaultRelays: false,
-        user: true,
-
-        contacts: false,
-      })
-    ),
   };
 }
 

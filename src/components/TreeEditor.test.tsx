@@ -1,5 +1,4 @@
-import React from "react";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -18,7 +17,7 @@ describe("Tree Editor - Comprehensive Tests", () => {
       renderTree(alice);
 
       // Root "My Notes" is already visible and expanded
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
 
       // Click plus button to add a child
       await userEvent.click(
@@ -45,7 +44,7 @@ My Notes
       const [alice] = setup([ALICE]);
       renderTree(alice);
 
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -70,7 +69,7 @@ My Notes
       const [alice] = setup([ALICE]);
       renderTree(alice);
 
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -90,7 +89,7 @@ My Notes
       const [alice] = setup([ALICE]);
       renderTree(alice);
 
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -108,7 +107,7 @@ My Notes
       const [alice] = setup([ALICE]);
       renderTree(alice);
 
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -133,7 +132,7 @@ My Notes
       renderTree(alice);
 
       // Create Parent with children
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -173,7 +172,7 @@ My Notes
       renderTree(alice);
 
       // Create Parent node
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -222,7 +221,7 @@ My Notes
       renderTree(alice);
 
       // Create siblings
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -259,7 +258,7 @@ My Notes
       renderTree(alice);
 
       // Create siblings
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -300,7 +299,7 @@ My Notes
       const [alice] = setup([ALICE]);
       renderTree(alice);
 
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -331,7 +330,7 @@ My Notes
       const [alice] = setup([ALICE]);
       renderTree(alice);
 
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -365,7 +364,7 @@ My Notes
       renderTree(alice);
 
       // First create Parent with existing children
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -395,7 +394,7 @@ My Notes
       range.collapse(true);
       window.getSelection()?.removeAllRanges();
       window.getSelection()?.addRange(range);
-      fireEvent.keyDown(editor, { key: "Tab" });
+      await userEvent.keyboard("{Tab}");
 
       // The editor should now be visually AFTER Child B (at the end of Parent's children)
       await expectTree(`
@@ -412,7 +411,7 @@ My Notes
       renderTree(alice);
 
       // Create Parent with a child using proper Enter chaining
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -430,7 +429,7 @@ My Notes
       range1.collapse(true);
       window.getSelection()?.removeAllRanges();
       window.getSelection()?.addRange(range1);
-      fireEvent.keyDown(editor1, { key: "Tab" });
+      await userEvent.keyboard("{Tab}");
 
       // Submit - this creates Existing Child under Parent
       await userEvent.type(editor1, "{Enter}");
@@ -455,7 +454,7 @@ My Notes
       renderTree(alice);
 
       // Create an empty parent (no children)
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -472,7 +471,7 @@ My Notes
       range.collapse(true);
       window.getSelection()?.removeAllRanges();
       window.getSelection()?.addRange(range);
-      fireEvent.keyDown(editor, { key: "Tab" });
+      await userEvent.keyboard("{Tab}");
 
       // Editor should now be a child of Empty Parent
       await expectTree(`
@@ -489,7 +488,7 @@ My Notes
       renderTree(alice);
 
       // Create an empty parent (no children)
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -507,7 +506,7 @@ My Notes
       range.collapse(true);
       window.getSelection()?.removeAllRanges();
       window.getSelection()?.addRange(range);
-      fireEvent.keyDown(editor, { key: "Tab" });
+      await userEvent.keyboard("{Tab}");
 
       await userEvent.type(editor, "{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
@@ -526,7 +525,7 @@ My Notes
       renderTree(alice);
 
       // Create two siblings
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -554,7 +553,7 @@ My Notes
       window.getSelection()?.removeAllRanges();
       window.getSelection()?.addRange(range);
 
-      fireEvent.keyDown(secondEditor, { key: "Tab" });
+      await userEvent.keyboard("{Tab}");
 
       // Wait for move to complete - Second should now be under First (level 2)
       // Tab auto-expands the target node, so Second should be visible immediately
@@ -570,7 +569,7 @@ My Notes
       renderTree(alice);
 
       // Create First with children, then Second
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -605,7 +604,7 @@ My Notes
       window.getSelection()?.removeAllRanges();
       window.getSelection()?.addRange(range);
 
-      fireEvent.keyDown(secondEditor, { key: "Tab" });
+      await userEvent.keyboard("{Tab}");
 
       // Second should be at END of First's children
       await expectTree(`
@@ -624,7 +623,7 @@ My Notes
       renderTree(alice);
 
       // Create Parent with children
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -661,7 +660,7 @@ My Notes
       renderTree(alice);
 
       // Create Parent with children
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -701,7 +700,7 @@ My Notes
       renderTree(alice);
 
       // Create a node
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -731,7 +730,7 @@ My Notes
       const [alice] = setup([ALICE]);
       renderTree(alice);
 
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
 
       // Click plus on root
       await userEvent.click(
@@ -755,7 +754,7 @@ My Notes
       renderTree(alice);
 
       // Create nodes
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -811,7 +810,7 @@ My Notes
       renderTree(alice);
 
       // Create nodes
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -862,7 +861,7 @@ My Notes
       const [alice] = setup([ALICE]);
       renderTree(alice);
 
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -898,7 +897,7 @@ My Notes
       renderTree(alice);
 
       // Create nested structure: Parent > Child > Grandchild
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -954,7 +953,7 @@ My Notes
       renderTree(alice);
 
       // Create two siblings
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -982,7 +981,7 @@ My Notes
       window.getSelection()?.addRange(range);
 
       // Tab should do nothing when cursor is not at start
-      fireEvent.keyDown(secondEditor, { key: "Tab" });
+      await userEvent.keyboard("{Tab}");
 
       // Tree should remain unchanged
       await expectTree(`
@@ -997,7 +996,7 @@ My Notes
       renderTree(alice);
 
       // Create a single child
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -1023,7 +1022,7 @@ My Notes
       window.getSelection()?.addRange(range);
 
       // Tab should do nothing (no previous sibling to indent under)
-      fireEvent.keyDown(onlyChildEditor, { key: "Tab" });
+      await userEvent.keyboard("{Tab}");
 
       // Tree should remain unchanged
       await expectTree(`
@@ -1037,7 +1036,7 @@ My Notes
       renderTree(alice);
 
       // Create two siblings where First has NO children
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -1063,7 +1062,7 @@ My Notes
       window.getSelection()?.removeAllRanges();
       window.getSelection()?.addRange(range);
 
-      fireEvent.keyDown(willMoveEditor, { key: "Tab" });
+      await userEvent.keyboard("{Tab}");
 
       // Will Move should now be FIRST (and only) child of Empty Parent
       await expectTree(`
@@ -1078,7 +1077,7 @@ My Notes
       renderTree(alice);
 
       // Create Parent with children, then a sibling
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -1120,7 +1119,7 @@ My Notes
       window.getSelection()?.removeAllRanges();
       window.getSelection()?.addRange(range);
 
-      fireEvent.keyDown(willMoveEditor, { key: "Tab" });
+      await userEvent.keyboard("{Tab}");
 
       // Will Move should now be LAST child (after Child B)
       await expectTree(`
@@ -1261,7 +1260,7 @@ Custom Root
       window.getSelection()?.removeAllRanges();
       window.getSelection()?.addRange(range);
 
-      fireEvent.keyDown(secondEditor, { key: "Tab" });
+      await userEvent.keyboard("{Tab}");
 
       await expectTree(`
 Custom Root
@@ -1289,7 +1288,7 @@ Custom Root
       range.collapse(true);
       window.getSelection()?.removeAllRanges();
       window.getSelection()?.addRange(range);
-      fireEvent.keyDown(editor, { key: "Tab" });
+      await userEvent.keyboard("{Tab}");
 
       await userEvent.type(editor, "{Enter}");
 
@@ -1324,7 +1323,7 @@ Custom Root
       range.collapse(true);
       window.getSelection()?.removeAllRanges();
       window.getSelection()?.addRange(range);
-      fireEvent.keyDown(editor, { key: "Tab" });
+      await userEvent.keyboard("{Tab}");
 
       await userEvent.type(editor, "{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
@@ -1404,7 +1403,7 @@ Custom Root
       const [alice] = setup([ALICE]);
       renderTree(alice);
 
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -1412,9 +1411,11 @@ Custom Root
       );
 
       // Rapid creation
-      for (let i = 1; i <= 5; i++) {
-        await userEvent.type(await findNewNodeEditor(), `Item ${i}{Enter}`);
-      }
+      await userEvent.type(await findNewNodeEditor(), "Item 1{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "Item 2{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "Item 3{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "Item 4{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "Item 5{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
       await expectTree(`
@@ -1431,7 +1432,7 @@ My Notes
       const [alice] = setup([ALICE]);
       renderTree(alice);
 
-      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await screen.findByLabelText("collapse My Notes");
       await userEvent.click(
         (
           await screen.findAllByLabelText("add to My Notes")
@@ -1440,7 +1441,7 @@ My Notes
 
       const editor = await findNewNodeEditor();
       await userEvent.type(editor, "Saved by Blur");
-      fireEvent.blur(editor);
+      editor.blur();
 
       await expectTree(`
 My Notes

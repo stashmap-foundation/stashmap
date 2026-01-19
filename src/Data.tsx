@@ -16,7 +16,6 @@ import { DataContextProvider } from "./DataContext";
 import { findContacts, findMembers } from "./contacts";
 import { useApis } from "./Apis";
 import { findNodes, findRelations, findViews } from "./knowledgeEvents";
-import { DEFAULT_SETTINGS, findSettings } from "./settings";
 import { newDB } from "./knowledge";
 import { PlanningContextProvider } from "./planner";
 import { useUserRelayContext } from "./UserRelayContext";
@@ -31,18 +30,15 @@ type DataProps = {
 };
 
 type ProcessedEvents = {
-  settings: Settings;
   knowledgeDB: KnowledgeData;
   contacts: Contacts;
   relays: Relays;
-
   views: Views;
   projectMembers: Members;
 };
 
 export function newProcessedEvents(): ProcessedEvents {
   return {
-    settings: DEFAULT_SETTINGS,
     knowledgeDB: newDB(),
     contacts: Map<PublicKey, Contact>(),
     relays: [],
@@ -69,7 +65,6 @@ function mergeEvents(
 function processEventsByAuthor(
   authorEvents: List<UnsignedEvent | Event>
 ): ProcessedEvents {
-  const settings = findSettings(authorEvents);
   const contacts = findContacts(authorEvents);
   const nodes = findNodes(authorEvents);
   const relations = findRelations(authorEvents);
@@ -81,7 +76,6 @@ function processEventsByAuthor(
   };
   const relays = findRelays(authorEvents);
   return {
-    settings,
     contacts,
     knowledgeDB,
     relays,
@@ -225,7 +219,6 @@ function Data({ user, children }: DataProps): JSX.Element {
     <DataContextProvider
       contacts={contacts}
       user={user}
-      settings={processedMetaEvents.settings}
       contactsRelays={contactsRelays}
       knowledgeDBs={Map<PublicKey, KnowledgeData>()}
       relaysInfos={searchRelaysInfo}

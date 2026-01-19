@@ -122,7 +122,6 @@ declare global {
   type Data = {
     contacts: Contacts;
     user: User;
-    settings: Settings;
     contactsRelays: Map<PublicKey, Relays>;
     knowledgeDBs: KnowledgeDBs;
     relaysInfos: Map<string, RelayInformation | undefined>;
@@ -137,9 +136,6 @@ declare global {
     getLocalStorage: (key: string) => string | null;
     deleteLocalStorage: (key: string) => void;
   };
-
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  type Settings = {};
 
   type CompressedSettings = {
     v: string;

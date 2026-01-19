@@ -1,7 +1,11 @@
 import React from "react";
 
-export function NodeIcon({ node }: { node: KnowNode }): JSX.Element | null {
-  if (node.type === "reference") {
+export function NodeIcon({
+  nodeType,
+}: {
+  nodeType: KnowNode["type"];
+}): JSX.Element | null {
+  if (nodeType === "reference") {
     return (
       <span
         className="iconsminds-link reference-icon"

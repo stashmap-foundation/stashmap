@@ -18,6 +18,7 @@ import {
   findOrCreateRelationsForContext,
   usePreviousSibling,
   getViewFromPath,
+  getVersionedDisplayText,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -181,10 +182,33 @@ function ErrorContent(): JSX.Element {
   );
 }
 
-function NodeContent({ node }: { node: KnowNode }): JSX.Element {
-  const isReference = node.type === "reference";
+function useDisplayText(): string {
+  const data = useData();
+  const viewPath = useViewPath();
+  const { stack } = usePaneNavigation();
+  const [node] = useNode();
+  const [nodeID] = useNodeID();
+  const context = getContextFromStackAndViewPath(stack, viewPath);
+  const versionedText = getVersionedDisplayText(
+    data.knowledgeDBs,
+    data.user.publicKey,
+    nodeID,
+    context
+  );
+  return versionedText ?? node?.text ?? "";
+}
 
-  // Reference nodes get special link-like styling
+function NodeContent({
+  nodeType,
+  nodeId,
+  text,
+}: {
+  nodeType: KnowNode["type"];
+  nodeId: LongID | ID;
+  text: string;
+}): JSX.Element {
+  const isReference = nodeType === "reference";
+
   const referenceStyle: React.CSSProperties = isReference
     ? {
         fontStyle: "italic",
@@ -196,9 +220,9 @@ function NodeContent({ node }: { node: KnowNode }): JSX.Element {
 
   return (
     <span className={`break-word ${isReference ? "reference-node" : ""}`}>
-      <NodeIcon node={node} />
-      {isReference && <ReferenceIndicators refId={node.id} />}
-      <span style={referenceStyle}>{node.text}</span>
+      <NodeIcon nodeType={nodeType} />
+      {isReference && <ReferenceIndicators refId={nodeId} />}
+      <span style={referenceStyle}>{text}</span>
     </span>
   );
 }
@@ -209,11 +233,12 @@ function EditableContent(): JSX.Element {
   const { createPlan, executePlan } = usePlanner();
   const [node] = useNode();
   const [nodeID] = useNodeID();
+  const displayText = useDisplayText();
   const prevSibling = usePreviousSibling();
 
   const handleSave = (text: string, _imageUrl?: string, submitted?: boolean): void => {
     if (!node || node.type !== "text") return;
-    const textChanged = text !== node.text;
+    const textChanged = text !== displayText;
 
     let plan = createPlan();
 
@@ -245,7 +270,7 @@ function EditableContent(): JSX.Element {
 
     // Step 1: Save text changes if any
     const planWithText =
-      text !== node.text
+      text !== displayText
         ? planUpsertNode(basePlan, {
             ...node,
             text,
@@ -282,16 +307,18 @@ function EditableContent(): JSX.Element {
 
   // For non-text nodes, show read-only content
   if (!node || node.type !== "text") {
-    return <NodeContent node={node!} />;
+    return (
+      <NodeContent nodeType={node!.type} nodeId={nodeID} text={displayText} />
+    );
   }
 
   return (
     <MiniEditor
-      initialText={node.text}
+      initialText={displayText}
       onSave={handleSave}
       onTab={handleTab}
       autoFocus={false}
-      ariaLabel={`edit ${node.text}`}
+      ariaLabel={`edit ${displayText}`}
     />
   );
 }
@@ -299,7 +326,8 @@ function EditableContent(): JSX.Element {
 function InteractiveNodeContent(): JSX.Element {
   const { user } = useData();
   const [node] = useNode();
-  const [, view] = useNodeID();
+  const [nodeID, view] = useNodeID();
+  const displayText = useDisplayText();
   const isLoading = useNodeIsLoading();
   const isInReferencedByView = useIsInReferencedByView();
   // Also check if this is the root node of a Referenced By view
@@ -323,7 +351,9 @@ function InteractiveNodeContent(): JSX.Element {
   }
 
   // Read-only content
-  return <NodeContent node={node} />;
+  return (
+    <NodeContent nodeType={node.type} nodeId={nodeID} text={displayText} />
+  );
 }
 
 function NodeAutoLink({

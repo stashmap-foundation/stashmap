@@ -7,7 +7,6 @@ import { DND } from "../dnd";
 import {
   ALICE,
   BOB,
-  follow,
   matchSplitText,
   renderApp,
   renderWithTestData,
@@ -156,33 +155,6 @@ test("Load Note from other User which is not a contact", async () => {
   // May have multiple elements
   const elements = await screen.findAllByText("Bobs Note");
   expect(elements.length).toBeGreaterThan(0);
-});
-
-test("Cannot edit remote Note", async () => {
-  const [alice, bob] = setup([ALICE, BOB]);
-  await follow(alice, bob().user.publicKey);
-  // Create Bob's note directly without setupTestDB
-  const bobsNote = newNode("Bobs Remote Note");
-  await execute({
-    ...bob(),
-    plan: planUpsertNode(createPlan(bob()), bobsNote),
-  });
-  renderWithTestData(
-    <RootViewContextProvider root={bobsNote.id}>
-      <LoadNode>
-        <TemporaryViewProvider>
-          <DND>
-            <>
-              <DraggableNote />
-              <TreeView />
-            </>
-          </DND>
-        </TemporaryViewProvider>
-      </LoadNode>
-    </RootViewContextProvider>,
-    alice()
-  );
-  await expectNode("Bobs Remote Note", false);
 });
 
 test("Edit nested node inline", async () => {

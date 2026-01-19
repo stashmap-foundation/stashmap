@@ -270,7 +270,7 @@ function Search({
               >
                 {" "}
                 <div className="white-space-normal">
-                  <NodeIcon node={node} />
+                  <NodeIcon nodeType={node.type} />
                   <HighlightedText nodeText={node.text} searchInput={filter} />
                 </div>
               </div>

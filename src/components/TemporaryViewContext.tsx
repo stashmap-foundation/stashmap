@@ -10,7 +10,7 @@ import {
   useRelationIndex,
   getRelationIndex,
 } from "../ViewContext";
-import { getRelations, splitID } from "../connections";
+import { getRelations } from "../connections";
 import { useData } from "../DataContext";
 import { usePaneNavigation } from "../SplitPanesContext";
 
@@ -211,10 +211,10 @@ export function toggleEditing(
   };
 }
 
-export function isMutableNode(node: KnowNode | undefined, user: User): boolean {
-  return (
-    !!node && node.type === "text" && splitID(node.id)[0] === user.publicKey
-  );
+// With content-addressed IDs (hash of text), any text node is mutable
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function isMutableNode(node: KnowNode | undefined, _user: User): boolean {
+  return !!node && node.type === "text";
 }
 
 export function ToggleEditing(): JSX.Element | null {

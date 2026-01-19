@@ -10,9 +10,7 @@ import {
   ALICE,
   BOB,
   CAROL,
-  createExampleProject,
   matchSplitText,
-  planUpsertProjectNode,
   renderApp,
   renderWithTestData,
   setup,
@@ -168,60 +166,3 @@ test("Client side filtering when relay does not support nip-50", async () => {
   });
 });
 
-test("Search for Projects", async () => {
-  const [alice] = setup([ALICE]);
-  await execute({
-    ...alice(),
-    plan: planUpsertProjectNode(
-      createPlan(alice()),
-      createExampleProject(alice().user.publicKey)
-    ),
-  });
-  renderWithTestData(
-    <SearchModal onAddExistingNode={jest.fn()} onHide={jest.fn()} />,
-    alice()
-  );
-  const searchInput = await screen.findByLabelText("search input");
-  await userEvent.type(searchInput, "Winch");
-  await screen.findByText(matchSplitText("Winchester Mystery House"));
-});
-
-test("Find Project Members Notes", async () => {
-  const [alice, bob, carol] = setup([ALICE, BOB, CAROL]);
-  const project = createExampleProject(CAROL.publicKey);
-  await execute({
-    ...carol(),
-    plan: planUpsertProjectNode(createPlan(carol()), project),
-  });
-  await execute({
-    ...carol(),
-    plan: planUpsertMemberlist(
-      createPlan(carol()),
-      Map<PublicKey, Member>({
-        [ALICE.publicKey]: {
-          ...ALICE,
-          votes: 10000,
-        },
-        [BOB.publicKey]: {
-          ...BOB,
-          votes: 10000,
-        },
-      })
-    ),
-  });
-  await execute({
-    ...bob(),
-    plan: planBulkUpsertNodes(createPlan(bob()), [newNode("Bitcoin")]),
-  });
-  // Alice finds Bob's notes because he is a project member as well
-  renderWithTestData(
-    <SearchModal onAddExistingNode={jest.fn()} onHide={jest.fn()} />,
-    {
-      ...alice(),
-      initialRoute: `/?project=${project.id}`,
-    }
-  );
-  const searchInput = await screen.findByLabelText("search input");
-  await userEvent.type(searchInput, "Bit");
-  await screen.findByText(matchSplitText("Bitcoin"));
-});

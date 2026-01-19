@@ -15,7 +15,7 @@ import "react-quill/dist/quill.bubble.css";
 import { App } from "./App";
 import { NostrAuthContextProvider } from "./NostrAuthContext";
 import { NostrProvider } from "./NostrProvider";
-import { ProjectContextProvider } from "./ProjectContext";
+import { UserRelayContextProvider } from "./UserRelayContext";
 
 const defaultRelayUrls = process.env.DEFAULT_RELAYS?.split(",");
 const defaultWorkspace = process.env.DEFAULT_WORKSPACE;
@@ -40,11 +40,11 @@ if (root !== null) {
             defaultWorkspace ? (defaultWorkspace as LongID) : undefined
           }
         >
-          <ProjectContextProvider>
+          <UserRelayContextProvider>
             <FocusContextProvider>
               <App />
             </FocusContextProvider>
-          </ProjectContextProvider>
+          </UserRelayContextProvider>
         </NostrAuthContextProvider>
       </NostrProvider>
     </BrowserRouter>

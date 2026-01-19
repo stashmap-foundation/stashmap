@@ -9,7 +9,6 @@ import {
   KIND_CONTACTLIST,
   KIND_VIEWS,
   KIND_SETTINGS,
-  KIND_PROJECT,
   KIND_MEMBERLIST,
   KIND_RELAY_METADATA_EVENT,
 } from "./nostr";
@@ -20,7 +19,7 @@ import { findNodes, findRelations, findViews } from "./knowledgeEvents";
 import { DEFAULT_SETTINGS, findSettings } from "./settings";
 import { newDB } from "./knowledge";
 import { PlanningContextProvider } from "./planner";
-import { useProjectContext } from "./ProjectContext";
+import { useUserRelayContext } from "./UserRelayContext";
 import { WorkspaceContextProvider } from "./WorkspaceContext";
 import { NavigationStackProvider } from "./NavigationStackContext";
 import { flattenRelays, usePreloadRelays, findRelays } from "./relays";
@@ -52,7 +51,7 @@ export function newProcessedEvents(): ProcessedEvents {
   };
 }
 
-export const KIND_SEARCH = [KIND_KNOWLEDGE_NODE, KIND_PROJECT];
+export const KIND_SEARCH = [KIND_KNOWLEDGE_NODE];
 
 export const KINDS_META = [KIND_SETTINGS, KIND_CONTACTLIST, KIND_VIEWS];
 
@@ -155,7 +154,7 @@ function Data({ user, children }: DataProps): JSX.Element {
       preLoginEvents: List(),
       temporaryView: DEFAULT_TEMPORARY_VIEW,
     });
-  const { isRelaysLoaded } = useProjectContext();
+  const { isRelaysLoaded } = useUserRelayContext();
   const { relayPool } = useApis();
 
   const { events: mE, eose: metaEventsEose } = useEventQuery(
@@ -197,7 +196,7 @@ function Data({ user, children }: DataProps): JSX.Element {
       readFromRelays: usePreloadRelays({
         defaultRelays: true,
         user: true,
-        project: true,
+        
       }),
       enabled: metaEventsEose,
     }
@@ -215,40 +214,14 @@ function Data({ user, children }: DataProps): JSX.Element {
       ...usePreloadRelays({
         defaultRelays: false,
         user: true,
-        project: true,
+        
       }),
       ...flattenRelays(contactsRelays),
     ],
     isRelaysLoaded
   );
 
-  const { project } = useProjectContext();
-
-  // Load Projects members
-  const { events: membersEvents } = useEventQuery(
-    relayPool,
-    [
-      {
-        authors: project ? [project.memberListProvider] : [],
-        kinds: [KIND_MEMBERLIST],
-      },
-    ],
-    {
-      enabled: !!project,
-      readFromRelays: usePreloadRelays({
-        user: true,
-        project: true,
-      }),
-    }
-  );
-  const processedEvents = project?.memberListProvider
-    ? processEvents(membersEvents.valueSeq().toList()).get(
-        project.memberListProvider,
-        newProcessedEvents()
-      )
-    : newProcessedEvents();
-  const projectMembers =
-    processedEvents.projectMembers || Map<PublicKey, Member>();
+  const projectMembers = Map<PublicKey, Member>();
 
   return (
     <DataContextProvider

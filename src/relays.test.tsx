@@ -4,11 +4,9 @@ import { screen, fireEvent } from "@testing-library/react";
 import {
   ALICE,
   BOB,
-  createExampleProject,
   findEvent,
   findNodeByText,
   follow,
-  planUpsertProjectNode,
   renderWithTestData,
   setup,
   setupTestDB,
@@ -47,12 +45,10 @@ test("Flatten relays", () => {
 async function setupTest(): Promise<{
   alice: UpdateState;
   bob: UpdateState;
-  project: ProjectNode;
   workspace: KnowNode;
   bitcoin: KnowNode;
 }> {
   const [alice, bob] = setup([ALICE, BOB]);
-  const project = createExampleProject(alice().user.publicKey);
   await follow(alice, bob().user.publicKey);
   const planPublishRelays = planPublishRelayMetadata(createPlan(bob()), [
     { url: "wss://relay.bob.lol/", read: true, write: true },
@@ -61,20 +57,16 @@ async function setupTest(): Promise<{
     ...bob(),
     plan: planPublishRelays,
   });
-  await execute({
-    ...alice(),
-    plan: planUpsertProjectNode(createPlan(alice()), project),
-  });
   const db = await setupTestDB(alice(), [
     ["Alice Workspace", [["Bitcoin", ["P2P", "Digital Gold"]]]],
   ]);
   const workspace = findNodeByText(db, "Alice Workspace") as KnowNode;
   const bitcoin = findNodeByText(db, "Bitcoin") as KnowNode;
-  return { alice, bob, project, workspace, bitcoin };
+  return { alice, bob, workspace, bitcoin };
 }
 
 test("Write views on user relays", async () => {
-  const { alice, project } = await setupTest();
+  const { alice } = await setupTest();
   const utils = renderWithTestData(
     <Data user={alice().user}>
       <RootViewOrWorkspaceIsLoading>
@@ -86,7 +78,6 @@ test("Write views on user relays", async () => {
     </Data>,
     {
       ...alice(),
-      initialRoute: `/?project=${project.id}`,
     }
   );
   utils.relayPool.resetPublishedOnRelays();

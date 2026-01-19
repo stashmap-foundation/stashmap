@@ -7,7 +7,6 @@ import { RequireLogin } from "./AppState";
 import { SignUp } from "./SignUp";
 import { SignInModal } from "./SignIn";
 import { Profile } from "./components/Profile";
-import { JoinProject } from "./JoinProjext";
 
 export function App(): JSX.Element {
   return (
@@ -20,7 +19,6 @@ export function App(): JSX.Element {
           <Route path="/relays" element={<RelaysWrapper />} />
           <Route path="/signin" element={<SignInModal />} />
           <Route path="/signup" element={<SignUp />} />
-          <Route path="/join/:projectID" element={<JoinProject />} />
         </Route>
       </Route>
     </Routes>

@@ -5,7 +5,6 @@ import {
   KIND_DELETE,
   KIND_KNOWLEDGE_LIST,
   KIND_KNOWLEDGE_NODE,
-  KIND_PROJECT,
 } from "./nostr";
 import { splitID, isRefId, extractNodeIdsFromRefId } from "./connections";
 import { REFERENCED_BY } from "./constants";
@@ -173,7 +172,7 @@ export function createBaseFilter(
       kinds: [KIND_KNOWLEDGE_LIST],
     },
     knowledgeNodesByID: {
-      kinds: [KIND_KNOWLEDGE_NODE, KIND_PROJECT],
+      kinds: [KIND_KNOWLEDGE_NODE],
     },
     knowledgeListByHead: {
       kinds: [KIND_KNOWLEDGE_LIST],
@@ -212,7 +211,7 @@ export function useQueryKnowledgeData(filters: Filter[]): {
   const { events, eose } = useEventQuery(relayPool, filters, {
     readFromRelays: useReadRelays({
       user: true,
-      project: true,
+      
       contacts: true,
     }),
     enabled: !disabled,

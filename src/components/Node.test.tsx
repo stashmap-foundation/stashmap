@@ -7,10 +7,8 @@ import { DND } from "../dnd";
 import {
   ALICE,
   BOB,
-  createExampleProject,
   follow,
   matchSplitText,
-  planUpsertProjectNode,
   renderApp,
   renderWithTestData,
   setup,
@@ -78,33 +76,6 @@ test("Render non existing Node", async () => {
   await screen.findByText("Error: Node not found");
 });
 
-test("Render Project", async () => {
-  const [alice] = setup([ALICE]);
-  const project = createExampleProject(alice().user.publicKey);
-  await execute({
-    ...alice(),
-    plan: planUpsertProjectNode(createPlan(alice()), project),
-  });
-  renderWithTestData(
-    <RootViewContextProvider root={project.id}>
-      <TemporaryViewProvider>
-        <DND>
-          <LoadNode>
-            <>
-              <DraggableNote />
-              <TreeView />
-            </>
-          </LoadNode>
-        </DND>
-      </TemporaryViewProvider>
-    </RootViewContextProvider>,
-    alice()
-  );
-  // May have multiple elements
-  const elements = await screen.findAllByText("Winchester Mystery House");
-  expect(elements.length).toBeGreaterThan(0);
-});
-
 async function expectNode(text: string, editable: boolean): Promise<void> {
   const elements = await screen.findAllByText(text);
   // Pick the first element for checking
@@ -156,31 +127,6 @@ test("Edit node inline", async () => {
   fireEvent.blur(textElement);
   const editedElements = await screen.findAllByText("My edited Note");
   expect(editedElements.length).toBeGreaterThan(0);
-});
-
-test("Can't edit Projects", async () => {
-  const [alice] = setup([ALICE]);
-  const project = createExampleProject(alice().user.publicKey);
-  await execute({
-    ...alice(),
-    plan: planUpsertProjectNode(createPlan(alice()), project),
-  });
-  renderWithTestData(
-    <RootViewContextProvider root={project.id}>
-      <LoadNode>
-        <TemporaryViewProvider>
-          <DND>
-            <>
-              <DraggableNote />
-              <TreeView />
-            </>
-          </DND>
-        </TemporaryViewProvider>
-      </LoadNode>
-    </RootViewContextProvider>,
-    alice()
-  );
-  await expectNode("Winchester Mystery House", false);
 });
 
 test("Load Note from other User which is not a contact", async () => {

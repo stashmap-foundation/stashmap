@@ -17,16 +17,8 @@ export function isTextNode(node: KnowNode): node is TextNode {
   return node.type === "text";
 }
 
-export function isProjectNode(node: KnowNode): node is ProjectNode {
-  return node.type === "project";
-}
-
 export function isReferenceNode(node: KnowNode): node is ReferenceNode {
   return node.type === "reference";
-}
-
-export function hasImageUrl(node: KnowNode): node is TextNode | ProjectNode {
-  return node.type === "text" || node.type === "project";
 }
 
 // Reference ID utilities

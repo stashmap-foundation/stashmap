@@ -13,11 +13,8 @@ import {
   BOB,
   renderWithTestData,
   CAROL,
-  createExampleProject,
-  planUpsertProjectNode,
 } from "../utils.test";
-import { createPlan, relayTags } from "../planner";
-import { execute } from "../executor";
+import { relayTags } from "../planner";
 
 const filterRelayMetadataEvents = (event: Event): boolean =>
   event.kind === KIND_RELAY_METADATA_EVENT;
@@ -78,23 +75,6 @@ test("Remove a Relay and add a suggested Relay", async () => {
       content: "",
     })
   );
-});
-
-// TODO: The Relays component is broken, this test worked accidentally.
-// Fix and enable this test. ( Out of scrope for PR)
-test.skip("Use Project Relays when in project mode", async () => {
-  const [alice] = setup([ALICE]);
-  const project = createExampleProject(alice().user.publicKey);
-  await execute({
-    ...alice(),
-    plan: planUpsertProjectNode(createPlan(alice()), project),
-  });
-  renderApp({
-    ...alice(),
-    initialRoute: `/relays?project=${project.id}`,
-  });
-  await screen.findByText("wss://winchester.deedsats.com/");
-  screen.getByText("wss://nos.lol/");
 });
 
 test("Add a new Relay", async () => {

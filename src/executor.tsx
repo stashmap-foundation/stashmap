@@ -109,9 +109,7 @@ export async function execute({
       const writeRelayUrls = applyWriteRelayConfig(
         plan.relays.defaultRelays,
         plan.relays.userRelays,
-        plan.relays.projectRelays,
         plan.relays.contactsRelays,
-        plan.projectID !== undefined,
         writeRelayConf
       );
       return publishEvent(

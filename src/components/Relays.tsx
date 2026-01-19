@@ -19,7 +19,6 @@ import {
 import { useData } from "../DataContext";
 import { useDefaultRelays } from "../NostrAuthContext";
 import { planPublishRelayMetadata, usePlanner } from "../planner";
-import { useProjectContext } from "../ProjectContext";
 
 type ReadWriteButtonProps = {
   isPressed: boolean;
@@ -421,18 +420,14 @@ export function RelaysWrapper(): JSX.Element {
   const defaultRelays = useDefaultRelays();
   const { contactsRelays } = useData();
   const relays = useRelaysForRelayManagement();
-  const { projectID } = useProjectContext();
   const submit = async (relayState: Relays): Promise<void> => {
-    if (projectID) {
-      return;
-    }
     const plan = planPublishRelayMetadata(createPlan(), relayState);
     await executePlan(plan);
     navigate("/");
   };
   return (
     <Relays
-      readonly={!!projectID}
+      readonly={false}
       defaultRelays={defaultRelays}
       relays={relays}
       contactsRelays={contactsRelays}

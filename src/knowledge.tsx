@@ -13,7 +13,3 @@ export function newDB(): KnowledgeData {
     relations: Map<ID, Relations>(),
   };
 }
-
-export function isProjectNode(node: KnowNode): node is ProjectNode {
-  return node.type === "project";
-}

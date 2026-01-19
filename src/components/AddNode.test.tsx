@@ -9,9 +9,6 @@ import {
   matchSplitText,
   renderApp,
   follow,
-  createExampleProject,
-  planUpsertProjectNode,
-  findEvent,
   findNewNodeEditor,
 } from "../utils.test";
 import { execute } from "../executor";
@@ -55,38 +52,6 @@ test("Add note via + button on empty tree", async () => {
 
   // Verify the note appears
   await screen.findByText("My First Note");
-});
-
-test.skip("Write Nodes & List on Project Relays only", async () => {
-  const [alice] = setup([ALICE]);
-  const project = createExampleProject(alice().user.publicKey);
-  // Create a note and add to project BEFORE rendering
-  const note = newNode("Hello World");
-  const projectRelations = addRelationToRelations(
-    newRelations(project.id, List(), alice().user.publicKey),
-    note.id
-  );
-  await execute({
-    ...alice(),
-    plan: planUpsertRelations(
-      planUpsertNode(planUpsertProjectNode(createPlan(alice()), project), note),
-      projectRelations
-    ),
-  });
-  // Reset relays before rendering to track only render-triggered publishes
-  alice().relayPool.resetPublishedOnRelays();
-  renderApp({
-    ...alice(),
-    initialRoute: `/?project=${project.id}`,
-  });
-  // Verify the note appears
-  await screen.findByText("Hello World");
-  // Check that project relays were used
-  const nodeEvent = await findEvent(alice().relayPool, {
-    kinds: [KIND_KNOWLEDGE_NODE],
-    authors: [alice().user.publicKey],
-  });
-  expect(nodeEvent?.relays).toEqual(["wss://winchester.deedsats.com/"]);
 });
 
 test("Link Nodes from other Users", async () => {

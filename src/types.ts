@@ -100,7 +100,6 @@ declare global {
   type WriteRelayConf = {
     defaultRelays?: boolean;
     user?: boolean;
-    project?: boolean;
     contacts?: boolean;
     extraRelays?: Relays;
   };
@@ -117,7 +116,6 @@ declare global {
   type AllRelays = {
     defaultRelays: Relays;
     userRelays: Relays;
-    projectRelays: Relays;
     contactsRelays: Relays;
   };
 
@@ -196,31 +194,11 @@ declare global {
   type BasicNode = {
     id: ID;
     text: string;
-    type: "text" | "project" | "reference";
+    type: "text" | "reference";
   };
 
   type TextNode = BasicNode & {
     type: "text";
-  };
-
-  // Other Fields which we don't use
-  // - contract
-  // - geo
-  type ProjectNode = BasicNode & {
-    type: "project";
-    tokenSupply?: number;
-    address?: string;
-    imageUrl?: string;
-    // Ideally this should be changeable through a running election
-    relays: Relays;
-    perpetualVotes?: LongID;
-    quarterlyVotes?: LongID;
-    dashboardInternal?: LongID;
-    dashboardPublic?: LongID;
-    website?: LongID;
-    app?: LongID;
-    createdAt: Date;
-    memberListProvider: PublicKey;
   };
 
   // A virtual node representing a path to another node
@@ -234,9 +212,7 @@ declare global {
     targetContext: Context; // The path to reach it
   };
 
-  type BookmarkedProjects = List<ID>;
-
-  type KnowNode = TextNode | ProjectNode | ReferenceNode;
+  type KnowNode = TextNode | ReferenceNode;
 
   type Views = Map<string, View>;
 

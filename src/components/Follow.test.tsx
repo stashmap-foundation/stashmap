@@ -17,8 +17,6 @@ import {
   ANON,
   ALICE_PRIVATE_KEY,
   CAROL,
-  createExampleProject,
-  planUpsertProjectNode,
   findEvent,
 } from "../utils.test";
 import { Follow } from "./Follow";
@@ -203,32 +201,6 @@ test("follow sends nip-02 event", async () => {
       content: "",
     })
   );
-});
-
-test("Following in Project Context uses users relays and not projects relays", async () => {
-  const [alice] = setup([ALICE]);
-  const project = createExampleProject(alice().user.publicKey);
-  await execute({
-    ...alice(),
-    plan: planUpsertProjectNode(createPlan(alice()), project),
-  });
-
-  const npub = nip19.npubEncode(BOB_PUBLIC_KEY);
-
-  const { relayPool } = renderWithTestData(<Follow />, {
-    ...alice(),
-    initialRoute: `/?project=${project.id}`,
-  });
-  const input = await screen.findByLabelText("find user");
-  await userEvent.type(input, npub);
-  fireEvent.click(screen.getByText("Find"));
-  relayPool.resetPublishedOnRelays();
-
-  const followBtn = await screen.findByLabelText("follow user");
-  fireEvent.click(followBtn);
-  await screen.findByText("You follow this User");
-  const event = await findEvent(relayPool, { kinds: [KIND_CONTACTLIST] });
-  expect(event?.relays).toEqual(TEST_RELAYS.map((r) => r.url));
 });
 
 test("unfollow sends nip-02 event", async () => {

@@ -32,7 +32,7 @@ import {
   FocusContext,
   FocusContextProvider,
 } from "./commons/FocusContextProvider";
-import { KIND_CONTACTLIST, KIND_PROJECT, newTimestamp } from "./nostr";
+import { KIND_CONTACTLIST, newTimestamp } from "./nostr";
 import { RequireLogin, UNAUTHENTICATED_USER_PK } from "./AppState";
 import {
   Plan,
@@ -73,7 +73,7 @@ import { TemporaryViewProvider } from "./components/TemporaryViewContext";
 import { WorkspaceView } from "./components/Workspace";
 import { DND } from "./dnd";
 import { findContacts } from "./contacts";
-import { ProjectContextProvider } from "./ProjectContext";
+import { UserRelayContextProvider } from "./UserRelayContext";
 import { NavigationStackProvider } from "./NavigationStackContext";
 import {
   SplitPanesProvider,
@@ -251,7 +251,6 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
   relays: {
     defaultRelays: [{ url: "wss://default.relay", read: true, write: true }],
     userRelays: [{ url: "wss://user.relay", read: true, write: true }],
-    projectRelays: [{ url: "wss://project.relay", read: true, write: true }],
     contactsRelays: [{ url: "wss://contacts.relay", read: true, write: true }],
   },
   projectMembers: Map<PublicKey, Member>(),
@@ -390,7 +389,7 @@ export function renderApis(
                         TEST_RELAYS.map((r) => r.url)
                       }
                     >
-                      <ProjectContextProvider>
+                      <UserRelayContextProvider>
                         <PaneNavigationProvider
                           initialWorkspace={ROOT}
                           initialStack={options?.initialStack}
@@ -415,7 +414,7 @@ export function renderApis(
                             )}
                           </VirtuosoMockContext.Provider>
                         </PaneNavigationProvider>
-                      </ProjectContextProvider>
+                      </UserRelayContextProvider>
                     </NostrAuthContextProvider>
                   </PlanningContextProvider>
                 </WorkspaceContextProvider>
@@ -708,60 +707,6 @@ export function hexToRgb(hex: string): string {
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
   return `rgb(${r}, ${g}, ${b})`;
-}
-
-// Move this to planner.tsx whenever we support creating projects
-export function planUpsertProjectNode(plan: Plan, node: ProjectNode): Plan {
-  const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
-  const updatedNodes = userDB.nodes.set(shortID(node.id), node);
-  const updatedDB = {
-    ...userDB,
-    nodes: updatedNodes,
-  };
-  const updateNodeEvent = {
-    kind: KIND_PROJECT,
-    pubkey: plan.user.publicKey,
-    created_at: newTimestamp(),
-    tags: [
-      ["d", shortID(node.id)],
-      ["memberListProvider", node.memberListProvider],
-      ...(node.address ? [["address", node.address]] : []),
-      ...(node.imageUrl ? [["imageUrl", `url ${node.imageUrl}`]] : []),
-      ...(node.perpetualVotes ? [["perpetualVotes", node.perpetualVotes]] : []),
-      ...(node.quarterlyVotes ? [["quarterlyVotes", node.quarterlyVotes]] : []),
-      // Needs to be indexed by relays so we can see if a dashboard is part of a project
-      ...(node.dashboardInternal ? [["c", node.dashboardInternal]] : []),
-      ...(node.dashboardPublic
-        ? [["dashboardPublic", node.dashboardPublic]]
-        : []),
-      ...(node.tokenSupply ? [["tokenSupply", `${node.tokenSupply}`]] : []),
-      ...relayTags(node.relays),
-    ],
-    content: node.text,
-  };
-  return {
-    ...plan,
-    knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
-    publishEvents: plan.publishEvents.push(updateNodeEvent),
-  };
-}
-
-export function createExampleProject(publicKey: PublicKey): ProjectNode {
-  return {
-    createdAt: new Date(),
-    id: joinID(publicKey, v4()),
-    text: "Winchester Mystery House",
-    address: "525 S. Winchester Blvd. San Jose, CA 95128",
-    memberListProvider: CAROL.publicKey,
-    type: "project",
-    imageUrl:
-      "url https://partnersinternational.pl/wp-content/uploads/2023/03/Premium-real-estate-office-Warsaw.jpg",
-    relays: [
-      { url: "wss://winchester.deedsats.com/", write: true, read: true },
-      { url: "wss://nos.lol/", write: false, read: true },
-    ],
-    tokenSupply: 1000000,
-  };
 }
 
 export async function findEvent(

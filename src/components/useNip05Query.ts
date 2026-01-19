@@ -26,7 +26,7 @@ export function useNip05Query(
         // We don't know anything about this user yet, so let's look everywhere
         defaultRelays: true,
         user: true,
-        project: true,
+        
         contacts: true,
       }),
     }

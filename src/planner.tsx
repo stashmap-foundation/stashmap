@@ -12,7 +12,6 @@ import {
   KIND_MEMBERLIST,
   KIND_RELAY_METADATA_EVENT,
   newTimestamp,
-  KIND_JOIN_PROJECT,
 } from "./nostr";
 import { useData } from "./DataContext";
 import { execute, republishEvents } from "./executor";
@@ -23,14 +22,12 @@ import { shortID } from "./connections";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useWorkspaceContext } from "./WorkspaceContext";
 import { useRelaysToCreatePlan } from "./relays";
-import { useProjectContext } from "./ProjectContext";
 import { mergePublishResultsOfEvents } from "./commons/PublishingStatus";
 import { ROOT } from "./types";
 
 export type Plan = Data & {
   publishEvents: List<UnsignedEvent & EventAttachment>;
   activeWorkspace: ID;
-  projectID: LongID | undefined;
   relays: AllRelays;
   temporaryView: TemporaryViewState;
 };
@@ -85,7 +82,7 @@ export function planAddContact(plan: Plan, publicKey: PublicKey): Plan {
       setRelayConf(contactListEvent, {
         defaultRelays: false,
         user: true,
-        project: false,
+        
         contacts: false,
       })
     ),
@@ -109,7 +106,7 @@ export function planUpsertMemberlist(plan: Plan, members: Members): Plan {
       setRelayConf(memberListEvent, {
         defaultRelays: false,
         user: false,
-        project: true,
+        
         contacts: false,
       })
     ),
@@ -283,7 +280,7 @@ export function planUpdateViews(plan: Plan, views: Views): Plan {
       setRelayConf(writeViewEvent, {
         defaultRelays: false,
         user: true,
-        project: false,
+        
         contacts: false,
       })
     ),
@@ -315,20 +312,6 @@ export function planCloseCreateNodeEditor(plan: Plan): Plan {
       ...plan.temporaryView,
       createNodeEditorState: null,
     },
-  };
-}
-
-export function planBookmarkProject(plan: Plan, project: ProjectNode): Plan {
-  const bookmarkEvent = {
-    kind: KIND_JOIN_PROJECT,
-    pubkey: plan.user.publicKey,
-    created_at: newTimestamp(),
-    tags: [["project", project.id]],
-    content: "",
-  };
-  return {
-    ...plan,
-    publishEvents: plan.publishEvents.push(bookmarkEvent),
   };
 }
 
@@ -388,7 +371,7 @@ export function planPublishSettings(plan: Plan, settings: Settings): Plan {
       setRelayConf(publishSettingsEvent, {
         defaultRelays: false,
         user: true,
-        project: false,
+        
         contacts: false,
       })
     ),
@@ -520,12 +503,10 @@ export function createPlan(
     activeWorkspace: ID;
     publishEvents?: List<UnsignedEvent & EventAttachment>;
     relays: AllRelays;
-    projectID?: LongID;
   }
 ): Plan {
   return {
     ...props,
-    projectID: props.projectID || undefined,
     publishEvents:
       props.publishEvents || List<UnsignedEvent & EventAttachment>([]),
     // temporaryView comes from publishEventsStatus
@@ -537,13 +518,11 @@ export function usePlanner(): Planner {
   const data = useData();
   const { activeWorkspace } = useWorkspaceContext();
   const relays = useRelaysToCreatePlan();
-  const { projectID } = useProjectContext();
   const createPlanningContext = (): Plan => {
     return createPlan({
       ...data,
       activeWorkspace,
       relays,
-      projectID,
     });
   };
   const planningContext = React.useContext(PlanningContext);

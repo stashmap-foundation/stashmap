@@ -2,8 +2,7 @@ import { Map, List } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
 import { parseViewPath } from "./ViewContext";
 import { joinID, hashText } from "./connections";
-import { KIND_PROJECT } from "./nostr";
-import { findAllRelays, findAllTags, findTag } from "./commons/useNostrQuery";
+import { findAllTags, findTag } from "./commons/useNostrQuery";
 
 export type Serializable =
   | string
@@ -203,47 +202,7 @@ export function eventToRelations(e: UnsignedEvent): Relations | undefined {
   };
 }
 
-function parseImageUrl(e: UnsignedEvent): string | undefined {
-  const imageUrl = findTag(e, "imeta");
-  return !!imageUrl && imageUrl.startsWith("url ")
-    ? imageUrl.slice(4)
-    : undefined;
-}
-
-function parseProject(
-  e: UnsignedEvent
-): Omit<ProjectNode, "id" | "text"> | undefined {
-  const address = findTag(e, "address");
-  const perpetualVotes = findTag(e, "perpetualVotes") as LongID | undefined;
-  const quarterlyVotes = findTag(e, "quarterlyVotes") as LongID | undefined;
-  const dashboardInternal = findTag(e, "c") as LongID | undefined;
-  const dashboardPublic = findTag(e, "dashboardPublic") as LongID | undefined;
-  const tokenSupplyTag = findTag(e, "tokenSupply");
-  const tokenSupply = tokenSupplyTag ? parseNumber(tokenSupplyTag) : undefined;
-  const memberListProvider = findTag(e, "memberListProvider") as
-    | PublicKey
-    | undefined;
-  if (!memberListProvider) {
-    // eslint-disable-next-line no-console
-    console.error("Can't parse project, memberListProvider is missing");
-    return undefined;
-  }
-  return {
-    address,
-    relays: findAllRelays(e),
-    imageUrl: parseImageUrl(e),
-    perpetualVotes,
-    quarterlyVotes,
-    dashboardInternal,
-    dashboardPublic,
-    tokenSupply,
-    createdAt: new Date(e.created_at * 1000),
-    memberListProvider,
-    type: "project",
-  };
-}
-
-export function eventToTextOrProjectNode(
+export function eventToTextNode(
   e: UnsignedEvent
 ): [id: string, node: KnowNode] | [undefined] {
   const id = findTag(e, "d");

@@ -6,7 +6,7 @@ import {
   ModalNodeBody,
   ModalNodeTitle,
 } from "../commons/ModalNodeComponents";
-import { KIND_DELETE, KIND_KNOWLEDGE_NODE, KIND_PROJECT } from "../nostr";
+import { KIND_DELETE, KIND_KNOWLEDGE_NODE } from "../nostr";
 import { useData } from "../DataContext";
 import { newDB } from "../knowledge";
 import { useApis } from "../Apis";
@@ -99,7 +99,7 @@ function useSearchQuery(
     {
       authors,
       kinds: [KIND_DELETE],
-      "#k": [`${KIND_KNOWLEDGE_NODE}`, `${KIND_PROJECT}`],
+      "#k": [`${KIND_KNOWLEDGE_NODE}`],
     },
   ];
 
@@ -112,7 +112,6 @@ function useSearchQuery(
       enabled,
       readFromRelays: useReadRelays({
         user: true,
-        project: true,
         contacts: true,
       }),
       discardOld: true,
@@ -127,14 +126,11 @@ function useSearchQuery(
 
   const groupByKind = events.groupBy((event) => event.kind);
   const knowledgeEvents = groupByKind.get(KIND_KNOWLEDGE_NODE);
-  const projectEvents = groupByKind.get(KIND_PROJECT);
   const deleteEvents = groupByKind.get(KIND_DELETE);
 
   const nodesFromKnowledgeEvents = findNodes(
-    (projectEvents?.toList() || List()).merge(
-      (knowledgeEvents?.toList() || List()).merge(
-        deleteEvents?.toList() || List()
-      )
+    (knowledgeEvents?.toList() || List()).merge(
+      deleteEvents?.toList() || List()
     )
   );
 
@@ -159,7 +155,7 @@ function Search({
   const relays = useReadRelays({
     defaultRelays: false,
     user: true,
-    project: true,
+    
     contacts: true,
   });
 

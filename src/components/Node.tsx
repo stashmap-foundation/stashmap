@@ -1,7 +1,6 @@
 import { List } from "immutable";
 import React from "react";
 import { useMediaQuery } from "react-responsive";
-import { Link } from "react-router-dom";
 import {
   useNode,
   useViewPath,
@@ -52,7 +51,6 @@ import {
   planExpandAndOpenCreateNodeEditor,
 } from "./RelationTypes";
 import { NodeCard } from "../commons/Ui";
-import { useProjectContext } from "../ProjectContext";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { LeftMenu } from "./LeftMenu";
 import { RightMenu } from "./RightMenu";
@@ -333,9 +331,7 @@ function NodeAutoLink({
 }: {
   children: React.ReactNode;
 }): JSX.Element | null {
-  const { bookmarkedProjects } = useProjectContext();
   const { setStack } = usePaneNavigation();
-  const [nodeID] = useNodeID();
   const [node] = useNode();
 
   // Reference nodes navigate to their target location when clicked
@@ -355,24 +351,6 @@ function NodeAutoLink({
           {children}
         </button>
       );
-    }
-  }
-
-  if (node && node.type === "project") {
-    const project = node as ProjectNode;
-    if (bookmarkedProjects.find((bookmark) => bookmark === nodeID)) {
-      if (project.dashboardInternal) {
-        return (
-          <Link
-            className="no-underline"
-            to={`/w/${escape(project.dashboardInternal)}?p=${escape(
-              project.id
-            )}`}
-          >
-            {children}
-          </Link>
-        );
-      }
     }
   }
 

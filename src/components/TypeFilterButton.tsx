@@ -6,6 +6,7 @@ import {
   useNode,
   useViewPath,
   useIsInReferencedByView,
+  useDisplayText,
 } from "../ViewContext";
 import { DEFAULT_TYPE_FILTERS, REFERENCED_BY, TYPE_COLORS } from "../constants";
 
@@ -136,6 +137,7 @@ export function TypeFilterButton(): JSX.Element | null {
   const [show, setShow] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [node, view] = useNode();
+  const displayText = useDisplayText();
   const viewPath = useViewPath();
   const { createPlan, executePlan } = usePlanner();
   const isInReferencedByView = useIsInReferencedByView();
@@ -179,7 +181,7 @@ export function TypeFilterButton(): JSX.Element | null {
         type="button"
         className="btn btn-borderless p-0"
         onClick={() => setShow(!show)}
-        aria-label={`filter ${node.text}`}
+        aria-label={`filter ${displayText}`}
         title="Filter by relation type"
       >
         <FilterDotsDisplay activeFilters={currentFilters} />

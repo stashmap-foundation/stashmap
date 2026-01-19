@@ -13,6 +13,7 @@ import {
   getAvailableRelationsForNode,
   getContextFromStackAndViewPath,
   useViewPath,
+  useDisplayText,
 } from "../ViewContext";
 import { getRelations, isReferenceNode } from "../connections";
 import { useData } from "../DataContext";
@@ -44,6 +45,7 @@ function useSwitchToNormalRelations(): () => void {
 function ReferenceDot(): JSX.Element | null {
   const { knowledgeDBs, user } = useData();
   const [node, view] = useNode();
+  const displayText = useDisplayText();
   const onChangeRelations = useOnChangeRelations();
   const switchToNormal = useSwitchToNormalRelations();
 
@@ -84,8 +86,8 @@ function ReferenceDot(): JSX.Element | null {
     : TYPE_COLORS.inactive;
 
   const ariaLabel = isInReferencedBy
-    ? `hide references to ${node.text}`
-    : `show references to ${node.text}`;
+    ? `hide references to ${displayText}`
+    : `show references to ${displayText}`;
 
   return (
     <button
@@ -115,6 +117,7 @@ function ReferenceDot(): JSX.Element | null {
 
 function GrayedFilterDots(): JSX.Element | null {
   const [node] = useNode();
+  const displayText = useDisplayText();
   const switchToNormal = useSwitchToNormalRelations();
 
   if (!node) {
@@ -126,7 +129,7 @@ function GrayedFilterDots(): JSX.Element | null {
       type="button"
       className="btn btn-borderless p-0"
       onClick={switchToNormal}
-      aria-label={`show children of ${node.text}`}
+      aria-label={`show children of ${displayText}`}
       title="Switch to children view"
     >
       <FilterDotsDisplay activeFilters={[]} />

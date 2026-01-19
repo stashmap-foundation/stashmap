@@ -891,6 +891,22 @@ export function useNode(): [KnowNode, View] | [undefined, undefined] {
   return getNodeFromView(useData(), useViewPath());
 }
 
+export function useDisplayText(): string {
+  const data = useData();
+  const viewPath = useViewPath();
+  const { stack } = usePaneNavigation();
+  const [node] = useNode();
+  const [nodeID] = useNodeID();
+  const context = getContextFromStackAndViewPath(stack, viewPath);
+  const versionedText = getVersionedDisplayText(
+    data.knowledgeDBs,
+    data.user.publicKey,
+    nodeID,
+    context
+  );
+  return versionedText ?? node?.text ?? "";
+}
+
 export function getParentNode(
   data: Data,
   viewPath: ViewPath

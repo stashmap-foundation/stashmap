@@ -1,7 +1,6 @@
 import React, { useEffect } from "react";
 import { useMediaQuery } from "react-responsive";
 import { useInputElementFocus } from "../commons/FocusContextProvider";
-import { shorten } from "../KnowledgeDataContext";
 import { newNode, addRelationToRelations } from "../connections";
 import {
   useIsAddToNode,
@@ -15,6 +14,7 @@ import {
   updateViewPathsAfterAddRelation,
   useIsExpanded,
   useIsRoot,
+  useDisplayText,
 } from "../ViewContext";
 import { planExpandAndOpenCreateNodeEditor } from "./RelationTypes";
 import useModal from "./useModal";
@@ -55,9 +55,8 @@ function AddNodeButton({
 }
 
 function SearchButton({ onClick }: { onClick: () => void }): JSX.Element {
-  const isAddToNode = useIsAddToNode();
-  const [node] = isAddToNode ? useParentNode() : useNode();
-  const ariaLabel = node ? `search and attach to ${node.text}` : "search";
+  const displayText = useDisplayText();
+  const ariaLabel = displayText ? `search and attach to ${displayText}` : "search";
   return (
     <button
       className="btn btn-borderless p-0"
@@ -483,6 +482,7 @@ export function SiblingSearchButton(): JSX.Element | null {
 export function AddSiblingButton(): JSX.Element | null {
   const viewPath = useViewPath();
   const [node] = useNode();
+  const displayText = useDisplayText();
   const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
 
@@ -500,7 +500,7 @@ export function AddSiblingButton(): JSX.Element | null {
       type="button"
       className="btn btn-borderless p-0"
       onClick={handleClick}
-      aria-label={`add to ${node.text}`}
+      aria-label={`add to ${displayText}`}
       title="Add note"
     >
       <span className="simple-icon-plus" />
@@ -508,25 +508,3 @@ export function AddSiblingButton(): JSX.Element | null {
   );
 }
 
-export function AddNodeToNode({
-  insertAtIndex,
-}: {
-  insertAtIndex?: number;
-} = {}): JSX.Element | null {
-  const handlers = useAddSiblingNode(
-    insertAtIndex !== undefined ? { insertAtIndex } : undefined
-  );
-
-  if (!handlers) {
-    return null;
-  }
-
-  return (
-    <AddNode
-      onCreateNewNode={handlers.onCreateNewNode}
-      onAddExistingNode={handlers.onAddExistingNode}
-      ariaLabel={`add to ${shorten(handlers.node.text)}`}
-      isSearchEnabledByShortcut={false}
-    />
-  );
-}

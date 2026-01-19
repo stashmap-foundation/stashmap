@@ -9,6 +9,7 @@ import {
   useNodeID,
   useViewKey,
   useViewPath,
+  useDisplayText,
 } from "../ViewContext";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { useDeselectAllInView } from "./TemporaryViewContext";
@@ -147,6 +148,7 @@ export function VersionSelector(): JSX.Element | null {
 export function ReferencedByToggle(): JSX.Element | null {
   const { knowledgeDBs, user } = useData();
   const [node] = useNode();
+  const displayText = useDisplayText();
   const [nodeID, view] = useNodeID();
   const viewPath = useViewPath();
   const { stack } = usePaneNavigation();
@@ -205,8 +207,8 @@ export function ReferencedByToggle(): JSX.Element | null {
   // Match old behavior: show "hide" only when both selected AND expanded
   const ariaLabel =
     isInReferencedBy && isExpanded
-      ? `hide references to ${node.text}`
-      : `show references to ${node.text}`;
+      ? `hide references to ${displayText}`
+      : `show references to ${displayText}`;
 
   return (
     <button

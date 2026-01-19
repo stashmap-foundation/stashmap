@@ -18,7 +18,7 @@ import {
   findOrCreateRelationsForContext,
   usePreviousSibling,
   getViewFromPath,
-  getVersionedDisplayText,
+  useDisplayText,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -183,22 +183,6 @@ function ErrorContent(): JSX.Element {
   );
 }
 
-function useDisplayText(): string {
-  const data = useData();
-  const viewPath = useViewPath();
-  const { stack } = usePaneNavigation();
-  const [node] = useNode();
-  const [nodeID] = useNodeID();
-  const context = getContextFromStackAndViewPath(stack, viewPath);
-  const versionedText = getVersionedDisplayText(
-    data.knowledgeDBs,
-    data.user.publicKey,
-    nodeID,
-    context
-  );
-  return versionedText ?? node?.text ?? "";
-}
-
 function NodeContent({
   nodeType,
   nodeId,
@@ -360,6 +344,7 @@ function NodeAutoLink({
 }): JSX.Element | null {
   const { setStack } = usePaneNavigation();
   const [node] = useNode();
+  const displayText = useDisplayText();
 
   // Reference nodes navigate to their target location when clicked
   if (node && isReferenceNode(node)) {
@@ -373,7 +358,7 @@ function NodeAutoLink({
           type="button"
           className="reference-link-btn"
           onClick={handleClick}
-          aria-label={`Navigate to ${node.text}`}
+          aria-label={`Navigate to ${displayText}`}
         >
           {children}
         </button>

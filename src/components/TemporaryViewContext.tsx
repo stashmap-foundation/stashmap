@@ -9,6 +9,7 @@ import {
   useParentNode,
   useRelationIndex,
   getRelationIndex,
+  useDisplayText,
 } from "../ViewContext";
 import { getRelations } from "../connections";
 import { useData } from "../DataContext";
@@ -171,8 +172,8 @@ function toggleMultiselect(
 }
 
 export function ToggleMultiselect(): JSX.Element {
-  const [node] = useNode();
-  const ariaLabel = node ? `toggle multiselect ${node.text}` : undefined;
+  const displayText = useDisplayText();
+  const ariaLabel = displayText ? `toggle multiselect ${displayText}` : undefined;
   const { selection, setState, multiselectBtns } = useTemporaryView();
   const viewKey = useViewKey();
   const onClick = (): void =>
@@ -220,7 +221,8 @@ export function isMutableNode(node: KnowNode | undefined, _user: User): boolean 
 export function ToggleEditing(): JSX.Element | null {
   const { user } = useData();
   const [node] = useNode();
-  const ariaLabel = node ? `edit ${node.text}` : undefined;
+  const displayText = useDisplayText();
+  const ariaLabel = displayText ? `edit ${displayText}` : undefined;
   const { editingViews, setEditingState } = useTemporaryView();
   const viewKey = useViewKey();
   if (!isMutableNode(node, user)) {
@@ -315,6 +317,7 @@ export function TemporaryViewProvider({
 
 export function NodeSelectbox(): JSX.Element | null {
   const [node] = useNode();
+  const displayText = useDisplayText();
   const { knowledgeDBs, user } = useData();
   const [parentNode, parentView] = useParentNode();
   const relationIndex = useRelationIndex();
@@ -339,8 +342,8 @@ export function NodeSelectbox(): JSX.Element | null {
     relationIndex !== undefined &&
     relationIndex >= relations.items.size;
 
-  const ariaLabel = node
-    ? `${checked ? "deselect" : "select"} ${node.text}`
+  const ariaLabel = displayText
+    ? `${checked ? "deselect" : "select"} ${displayText}`
     : undefined;
 
   if (isSubjectNode) {

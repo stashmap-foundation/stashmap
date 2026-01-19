@@ -21,6 +21,7 @@ import {
   getLast,
   parseViewPath,
   isExpanded,
+  useDisplayText,
 } from "../ViewContext";
 import { MergeKnowledgeDB, useData } from "../DataContext";
 import { usePaneNavigation } from "../SplitPanesContext";
@@ -183,8 +184,8 @@ function Tree(): JSX.Element | null {
     : List<ViewPath>();
   // Include ROOT as the first node, followed by its children
   const nodes = List<ViewPath>([viewPath]).concat(childNodes);
-  const [node] = useNode();
-  const ariaLabel = node ? `related to ${node.text}` : undefined;
+  const displayText = useDisplayText();
+  const ariaLabel = displayText ? `related to ${displayText}` : undefined;
 
   const onStopScrolling = (isScrolling: boolean): void => {
     // don't set the storage if the index is 0 since onStopStrolling is called on initial render

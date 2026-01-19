@@ -113,6 +113,14 @@ export function MiniEditor({
   ariaLabel,
 }: MiniEditorProps): JSX.Element {
   const editorRef = React.useRef<HTMLSpanElement>(null);
+  // Track last saved text to prevent duplicate saves when blur fires multiple times
+  // before React re-renders with updated initialText
+  const lastSavedTextRef = React.useRef(initialText);
+
+  // Reset when initialText prop changes (e.g., navigating to different node)
+  useEffect(() => {
+    lastSavedTextRef.current = initialText;
+  }, [initialText]);
 
   useEffect(() => {
     if (autoFocus && editorRef.current) {
@@ -141,7 +149,8 @@ export function MiniEditor({
 
   const saveIfChanged = async (): Promise<void> => {
     const text = getText().trim();
-    if (text && text !== initialText) {
+    if (text && text !== lastSavedTextRef.current) {
+      lastSavedTextRef.current = text; // Update immediately to prevent duplicate saves
       const imageUrl = await getImageUrlFromText(text);
       onSave(text, imageUrl);
     }
@@ -172,8 +181,9 @@ export function MiniEditor({
       e.preventDefault();
       handlingKeyRef.current = true;
       const text = getText().trim();
-      if (text && text !== initialText) {
+      if (text && text !== lastSavedTextRef.current) {
         // Save changes - onSave will close the editor
+        lastSavedTextRef.current = text; // Update immediately to prevent duplicate saves
         const imageUrl = await getImageUrlFromText(text);
         onSave(text, imageUrl);
       } else {
@@ -189,6 +199,7 @@ export function MiniEditor({
         onClose?.();
         return;
       }
+      lastSavedTextRef.current = text; // Update immediately to prevent duplicate saves
       const imageUrl = await getImageUrlFromText(text);
       onSave(text, imageUrl, true);
     } else if (e.key === "Tab" && !e.shiftKey && onTab && isCursorAtStart()) {

@@ -43,7 +43,7 @@ import { newDB } from "../knowledge";
 test("Render non existing Node", async () => {
   const [alice] = setup([ALICE]);
   const { publicKey } = alice().user;
-  const pl = newNode("Programming Languages", publicKey);
+  const pl = newNode("Programming Languages");
   const relations = addRelationToRelations(
     newRelations(pl.id, List(), publicKey),
     "not-existing-id" as LongID
@@ -124,7 +124,7 @@ async function expectNode(text: string, editable: boolean): Promise<void> {
 test("Edit node inline", async () => {
   const [alice] = setup([ALICE]);
   const { publicKey } = alice().user;
-  const note = newNode("My Note", publicKey);
+  const note = newNode("My Note");
   await execute({
     ...alice(),
     plan: planUpsertNode(createPlan(alice()), note),
@@ -186,7 +186,7 @@ test("Can't edit Projects", async () => {
 test("Load Note from other User which is not a contact", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
   // Create Bob's note directly without setupTestDB
-  const bobsNote = newNode("Bobs Note", bob().user.publicKey);
+  const bobsNote = newNode("Bobs Note");
   await execute({
     ...bob(),
     plan: planUpsertNode(createPlan(bob()), bobsNote),
@@ -216,7 +216,7 @@ test("Cannot edit remote Note", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
   await follow(alice, bob().user.publicKey);
   // Create Bob's note directly without setupTestDB
-  const bobsNote = newNode("Bobs Remote Note", bob().user.publicKey);
+  const bobsNote = newNode("Bobs Remote Note");
   await execute({
     ...bob(),
     plan: planUpsertNode(createPlan(bob()), bobsNote),
@@ -242,7 +242,7 @@ test("Cannot edit remote Note", async () => {
 test("Edit nested node inline", async () => {
   const [alice] = setup([ALICE]);
   const { publicKey } = alice().user;
-  const note = newNode("My Note", publicKey);
+  const note = newNode("My Note");
   // Connect the note with itself so it's not the root note
   const plan = planUpsertRelations(
     createPlan(alice()),
@@ -287,9 +287,9 @@ test("Edit nested node inline", async () => {
 test.skip("Edited node is shown in Tree View", async () => {
   const [alice] = setup([ALICE]);
   const { publicKey } = alice().user;
-  const pl = newNode("Programming Languages", publicKey);
-  const oop = newNode("Object Oriented Programming languages", publicKey);
-  const java = newNode("Java", publicKey);
+  const pl = newNode("Programming Languages");
+  const oop = newNode("Object Oriented Programming languages");
+  const java = newNode("Java");
 
   const plan = planUpsertRelations(
     planUpsertRelations(
@@ -365,7 +365,7 @@ test.skip("Edited node is shown in Tree View", async () => {
 test.skip("Delete node", async () => {
   const [alice] = setup([ALICE]);
   const { publicKey } = alice().user;
-  const note = newNode("My Note", publicKey);
+  const note = newNode("My Note");
   await execute({
     ...alice(),
     plan: planUpsertNode(createPlan(alice()), note),
@@ -396,10 +396,10 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
 
-  const parent = newNode("Parent", alicePK);
-  const child = newNode("Child", alicePK);
-  const aliceGrandchild = newNode("Alice's Grandchild", alicePK);
-  const bobGrandchild = newNode("Bob's Grandchild", bobPK);
+  const parent = newNode("Parent");
+  const child = newNode("Child");
+  const aliceGrandchild = newNode("Alice's Grandchild");
+  const bobGrandchild = newNode("Bob's Grandchild");
   const parentRelations = addRelationToRelations(
     newRelations(parent.id, List(), alicePK),
     child.id
@@ -478,9 +478,9 @@ test("getDiffItemsForNode returns items from other users not in current user's l
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
 
-  const parent = newNode("Parent", alicePK);
-  const aliceChild = newNode("Alice's Child", alicePK);
-  const bobChild = newNode("Bob's Child", bobPK);
+  const parent = newNode("Parent");
+  const aliceChild = newNode("Alice's Child");
+  const bobChild = newNode("Bob's Child");
 
   const aliceRelations = addRelationToRelations(
     newRelations(parent.id, List(), alicePK),
@@ -523,8 +523,8 @@ test("getDiffItemsForNode excludes items already in user's list", () => {
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
 
-  const parent = newNode("Parent", alicePK);
-  const sharedChild = newNode("Shared Child", alicePK);
+  const parent = newNode("Parent");
+  const sharedChild = newNode("Shared Child");
 
   const aliceRelations = addRelationToRelations(
     newRelations(parent.id, List(), alicePK),
@@ -566,10 +566,10 @@ test("Diff item paths are correctly identified as diff items", () => {
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
 
-  const root = newNode("Root", alicePK);
-  const parent = newNode("Parent", alicePK);
-  const aliceChild = newNode("Alice's Child", alicePK);
-  const bobChild = newNode("Bob's Child", bobPK);
+  const root = newNode("Root");
+  const parent = newNode("Parent");
+  const aliceChild = newNode("Alice's Child");
+  const bobChild = newNode("Bob's Child");
 
   const rootRelations = addRelationToRelations(
     newRelations(root.id, List(), alicePK),
@@ -658,8 +658,8 @@ test("getDiffItemsForNode should return no diff items for not_relevant relation 
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
 
-  const parent = newNode("Parent", alicePK);
-  const bobChild = newNode("Bob's Child", bobPK);
+  const parent = newNode("Parent");
+  const bobChild = newNode("Bob's Child");
 
   const aliceRelations = newRelations(parent.id, List(), alicePK);
   const bobRelations = addRelationToRelations(
@@ -693,8 +693,8 @@ test("getDiffItemsForNode should return no diff items for not_relevant relation 
 
 test.skip("Multiple connections to same node", async () => {
   const [alice] = setup([ALICE]);
-  const java = newNode("Java", alice().user.publicKey);
-  const pl = newNode("Programming Languages", alice().user.publicKey);
+  const java = newNode("Java");
+  const pl = newNode("Programming Languages");
   const rootRelations = addRelationToRelations(
     newRelations("ROOT", List(), alice().user.publicKey),
     pl.id
@@ -763,8 +763,8 @@ describe.skip("Inline Node Creation", () => {
     const [alice] = setup([ALICE]);
     const { publicKey } = alice().user;
     // Create an initial editable node
-    const parent = newNode("Parent Node", publicKey);
-    const child = newNode("First Child", publicKey);
+    const parent = newNode("Parent Node");
+    const child = newNode("First Child");
     const relations = addRelationToRelations(
       newRelations(parent.id, List(), publicKey),
       child.id
@@ -819,8 +819,8 @@ describe.skip("Inline Node Creation", () => {
     const [alice] = setup([ALICE]);
     const { publicKey } = alice().user;
     // Create an initial editable node
-    const parent = newNode("Parent Node", publicKey);
-    const child = newNode("Node 1", publicKey);
+    const parent = newNode("Parent Node");
+    const child = newNode("Node 1");
     const relations = addRelationToRelations(
       newRelations(parent.id, List(), publicKey),
       child.id
@@ -878,8 +878,8 @@ describe.skip("Inline Node Creation", () => {
   test("Empty editor closes without creating a node", async () => {
     const [alice] = setup([ALICE]);
     const { publicKey } = alice().user;
-    const parent = newNode("Parent Node", publicKey);
-    const child = newNode("Existing Child", publicKey);
+    const parent = newNode("Parent Node");
+    const child = newNode("Existing Child");
     const relations = addRelationToRelations(
       newRelations(parent.id, List(), publicKey),
       child.id
@@ -933,8 +933,8 @@ describe.skip("Inline Node Creation", () => {
     const [alice] = setup([ALICE]);
     const { publicKey } = alice().user;
     // Create an initial editable node
-    const parent = newNode("Parent", publicKey);
-    const child = newNode("Child", publicKey);
+    const parent = newNode("Parent");
+    const child = newNode("Child");
     const relations = addRelationToRelations(
       newRelations(parent.id, List(), publicKey),
       child.id
@@ -999,9 +999,9 @@ describe.skip("Inline Node Creation", () => {
     const { publicKey } = alice().user;
 
     // Create parent with two existing children
-    const parent = newNode("Parent", publicKey);
-    const child1 = newNode("Child 1", publicKey);
-    const child2 = newNode("Child 2", publicKey);
+    const parent = newNode("Parent");
+    const child1 = newNode("Child 1");
+    const child2 = newNode("Child 2");
 
     // Build relations with children in order: [child1, child2]
     let relations = newRelations(parent.id, List(), publicKey);

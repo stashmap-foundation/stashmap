@@ -25,11 +25,11 @@ function sampleNodes(): {
   d: KnowNode;
   e: KnowNode;
 } {
-  const a = newNode("a", ALICE.publicKey);
-  const b = newNode("b", ALICE.publicKey);
-  const c = newNode("c", ALICE.publicKey);
-  const d = newNode("c", ALICE.publicKey);
-  const e = newNode("e", ALICE.publicKey);
+  const a = newNode("a");
+  const b = newNode("b");
+  const c = newNode("c");
+  const d = newNode("c");
+  const e = newNode("e");
 
   const relations = bulkAddRelations(
     newRelations(a.id, List(), ALICE.publicKey),
@@ -53,7 +53,7 @@ function getNodeIDs(items: List<RelationItem>): List<LongID | ID> {
 
 test("Add new Connection", () => {
   const { b, c, d, e, relations } = sampleNodes();
-  const n = newNode("hello", ALICE.publicKey);
+  const n = newNode("hello");
   const updated = addRelationToRelations(relations, n.id);
   expect(getNodeIDs(updated.items)).toEqual(
     List([b.id, c.id, d.id, e.id, n.id])
@@ -62,7 +62,7 @@ test("Add new Connection", () => {
 
 test("Position of new connection can be specified", () => {
   const { b, c, d, e, relations } = sampleNodes();
-  const b0 = newNode("b0", ALICE.publicKey);
+  const b0 = newNode("b0");
   expect(
     getNodeIDs(addRelationToRelations(relations, b0.id, "", undefined, 0).items)
   ).toEqual(List([b0.id, b.id, c.id, d.id, e.id]));
@@ -78,9 +78,9 @@ test("Reorder existing connections", () => {
 test("get referenced by relations", () => {
   const aliceDB = newDB();
   const bobsDB = newDB();
-  const btc = newNode("Bitcoin", ALICE.publicKey);
-  const money = newNode("Money", ALICE.publicKey);
-  const crypto = newNode("Crypto", BOB.publicKey);
+  const btc = newNode("Bitcoin");
+  const money = newNode("Money");
+  const crypto = newNode("Crypto");
 
   const moneyRelations = addRelationToRelations(
     newRelations(money.id, List(), ALICE.publicKey),
@@ -122,11 +122,11 @@ test("get referenced by relations", () => {
 });
 
 test("count relation votes", () => {
-  const vote = newNode("VOTING", ALICE.publicKey);
-  const optionA = newNode("A", ALICE.publicKey);
-  const optionB = newNode("B", ALICE.publicKey);
-  const optionC = newNode("C", ALICE.publicKey);
-  const optionD = newNode("D", ALICE.publicKey);
+  const vote = newNode("VOTING");
+  const optionA = newNode("A");
+  const optionB = newNode("B");
+  const optionC = newNode("C");
+  const optionD = newNode("D");
 
   // Items with "confirms" argument for positive voting
   const aliceVotes = bulkAddRelations(
@@ -218,14 +218,14 @@ test("aggregate negative weighted votes", () => {
 });
 
 test("count relation votes and also aggregate negative weights", () => {
-  const vote = newNode("VOTING", ALICE.publicKey);
-  const optionA = newNode("A", ALICE.publicKey);
-  const optionB = newNode("B", ALICE.publicKey);
-  const optionC = newNode("C", ALICE.publicKey);
-  const optionD = newNode("D", ALICE.publicKey);
-  const optionE = newNode("E", ALICE.publicKey);
-  const optionF = newNode("F", ALICE.publicKey);
-  const optionG = newNode("G", ALICE.publicKey);
+  const vote = newNode("VOTING");
+  const optionA = newNode("A");
+  const optionB = newNode("B");
+  const optionC = newNode("C");
+  const optionD = newNode("D");
+  const optionE = newNode("E");
+  const optionF = newNode("F");
+  const optionG = newNode("G");
 
   // First Vote: multiple votes - types are now per-item
   const aliceVotes = bulkAddRelations(
@@ -256,7 +256,7 @@ test("count relation votes and also aggregate negative weights", () => {
   );
 
   // Second Vote: positive votes add up
-  const secondVote = newNode("SECOND VOTING", ALICE.publicKey);
+  const secondVote = newNode("SECOND VOTING");
   const secondAliceVotes = bulkAddRelations(
     newRelations(secondVote.id, List(), ALICE.publicKey),
     [optionA.id, optionB.id, optionC.id, optionD.id, optionE.id], // 8/19, 5/19, 3/19, 2/19, 1/19 *10000
@@ -283,7 +283,7 @@ test("count relation votes and also aggregate negative weights", () => {
   );
 
   // Third Vote: negative votes always count -1/2
-  const thirdVote = newNode("THIRD VOTING", ALICE.publicKey);
+  const thirdVote = newNode("THIRD VOTING");
   const thirdAliceVotes = bulkAddRelations(
     newRelations(thirdVote.id, List(), ALICE.publicKey),
     [optionA.id, optionB.id, optionC.id],
@@ -299,7 +299,7 @@ test("count relation votes and also aggregate negative weights", () => {
   );
 
   // Fourth Vote: positive votes are fibonacci-weighted sequence
-  const fourthVote = newNode("FOURTH VOTING", ALICE.publicKey);
+  const fourthVote = newNode("FOURTH VOTING");
   const fourthAliceVotes = bulkAddRelations(
     newRelations(fourthVote.id, List(), ALICE.publicKey),
     [
@@ -327,7 +327,7 @@ test("count relation votes and also aggregate negative weights", () => {
   );
 
   // Fifth Vote: positive and negative votes cancel out
-  const fifthVote = newNode("FIFTH VOTING", ALICE.publicKey);
+  const fifthVote = newNode("FIFTH VOTING");
   const fifthAliceVotes = bulkAddRelations(
     newRelations(fifthVote.id, List(), ALICE.publicKey),
     [optionA.id], // 1

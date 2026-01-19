@@ -194,14 +194,13 @@ declare global {
   };
 
   type BasicNode = {
-    id: LongID;
+    id: ID;
     text: string;
     type: "text" | "project" | "reference";
   };
 
   type TextNode = BasicNode & {
     type: "text";
-    imageUrl?: string;
   };
 
   // Other Fields which we don't use
@@ -235,7 +234,7 @@ declare global {
     targetContext: Context; // The path to reach it
   };
 
-  type BookmarkedProjects = List<LongID>;
+  type BookmarkedProjects = List<ID>;
 
   type KnowNode = TextNode | ProjectNode | ReferenceNode;
 

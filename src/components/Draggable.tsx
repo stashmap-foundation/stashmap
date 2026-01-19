@@ -163,7 +163,7 @@ export function CreateNodeEditor({
     }
 
     let plan = createPlan();
-    const n = newNode(nodeText, plan.user.publicKey, imageUrl);
+    const n = newNode(nodeText);
     plan = planUpsertNode(plan, n);
 
     // Get current relations to determine actual insert index before modifying

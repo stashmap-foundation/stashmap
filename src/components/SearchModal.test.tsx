@@ -29,10 +29,10 @@ test("Search works like spotlight", async () => {
   const [alice] = setup([ALICE]);
   const { publicKey } = alice().user;
 
-  const note = newNode("My very first search note made", publicKey);
-  const secondNote = newNode("My second search note ever made", publicKey);
-  const thirdNote = newNode("My third search note made", publicKey);
-  const topic = newNode("My very first topic", publicKey);
+  const note = newNode("My very first search note made");
+  const secondNote = newNode("My second search note ever made");
+  const thirdNote = newNode("My third search note made");
+  const topic = newNode("My very first topic");
 
   await execute({
     ...alice(),
@@ -122,10 +122,7 @@ test("Results from relays with nip-50 support will be shown unfiltered", async (
   const [alice] = setup([ALICE]);
   await execute({
     ...alice(),
-    plan: planUpsertNode(
-      createPlan(alice()),
-      newNode("Bitcoin", alice().user.publicKey)
-    ),
+    plan: planUpsertNode(createPlan(alice()), newNode("Bitcoin")),
   });
   renderWithTestData(
     <SearchModal onAddExistingNode={jest.fn()} onHide={jest.fn()} />,
@@ -152,8 +149,8 @@ test("Client side filtering when relay does not support nip-50", async () => {
   await execute({
     ...alice(),
     plan: planBulkUpsertNodes(createPlan(alice()), [
-      newNode("Bitcoin", alice().user.publicKey),
-      newNode("Bircoin", alice().user.publicKey),
+      newNode("Bitcoin"),
+      newNode("Bircoin"),
     ]),
   });
   renderWithTestData(
@@ -214,9 +211,7 @@ test("Find Project Members Notes", async () => {
   });
   await execute({
     ...bob(),
-    plan: planBulkUpsertNodes(createPlan(bob()), [
-      newNode("Bitcoin", bob().user.publicKey),
-    ]),
+    plan: planBulkUpsertNodes(createPlan(bob()), [newNode("Bitcoin")]),
   });
   // Alice finds Bob's notes because he is a project member as well
   renderWithTestData(

@@ -346,9 +346,9 @@ test("Reference indicators show other users icon", async () => {
   const { publicKey: bobPK } = bob().user;
 
   // Create nodes programmatically so we have the exact IDs
-  const parent = newNode("Parent", alicePK);
-  const child = newNode("Child", alicePK);
-  const aliceGrandchild = newNode("Alice Grandchild", alicePK);
+  const parent = newNode("Parent");
+  const child = newNode("Child");
+  const aliceGrandchild = newNode("Alice Grandchild");
 
   // Alice creates Parent -> Child -> Alice Grandchild
   const parentRelations = addRelationToRelations(
@@ -386,7 +386,7 @@ test("Reference indicators show other users icon", async () => {
   });
 
   // Bob creates his own version of Child's children (using Child's ID)
-  const bobGrandchild = newNode("Bob Grandchild", bobPK);
+  const bobGrandchild = newNode("Bob Grandchild");
   const bobChildRelations = addRelationToRelations(
     newRelations(child.id, List(), bobPK),
     bobGrandchild.id

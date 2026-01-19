@@ -79,9 +79,9 @@ export function sanitizeFilter(
 export function filtersToFilterArray(filters: Filters): Filter[] {
   const { authors } = filters;
   return [
-    // No need for an author filter when loading a specific ID
     sanitizeFilter({ ...filters.knowledgeListbyID, authors }, "#d"),
-    sanitizeFilter({ ...filters.knowledgeNodesByID, authors }, "#d"),
+    // Content-addressed nodes can be found by ID regardless of author
+    sanitizeFilter({ ...filters.knowledgeNodesByID }, "#d"),
     sanitizeFilter({ ...filters.knowledgeListByHead, authors }, "#k"),
     sanitizeFilter({ ...filters.referencedBy, authors }, "#i"),
     sanitizeFilter({ ...filters.deleteFilter, authors }, "#k"),

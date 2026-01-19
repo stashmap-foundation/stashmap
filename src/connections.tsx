@@ -1,7 +1,16 @@
 import { List, Set, Map } from "immutable";
-import { v4 } from "uuid";
+import crypto from "crypto";
 import { newRelations, getNodeFromID } from "./ViewContext";
 import { REFERENCED_BY, REF_PREFIX } from "./constants";
+
+// Content-addressed node ID generation
+// Node ID = sha256(text).slice(0, 32) - no author prefix
+export function hashText(text: string): ID {
+  return crypto.createHash("sha256").update(text).digest("hex").slice(0, 32);
+}
+
+// Pre-computed hash for the ~Versions node
+export const VERSIONS_NODE_ID = hashText("~Versions");
 
 // Type guards for KnowNode union type
 export function isTextNode(node: KnowNode): node is TextNode {
@@ -521,15 +530,10 @@ export function bulkAddRelations(
   }, relations);
 }
 
-export function newNode(
-  text: string,
-  myself: PublicKey,
-  imageUrl?: string
-): KnowNode {
+export function newNode(text: string): KnowNode {
   return {
     text,
-    id: joinID(myself, v4()),
+    id: hashText(text), // Content-addressed: ID = hash(text)
     type: "text",
-    imageUrl,
   };
 }

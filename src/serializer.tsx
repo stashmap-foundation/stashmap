@@ -1,7 +1,7 @@
 import { Map, List } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
 import { parseViewPath } from "./ViewContext";
-import { joinID } from "./connections";
+import { joinID, hashText } from "./connections";
 import { KIND_PROJECT } from "./nostr";
 import { findAllRelays, findAllTags, findTag } from "./commons/useNostrQuery";
 
@@ -250,25 +250,20 @@ export function eventToTextOrProjectNode(
   if (id === undefined) {
     return [undefined];
   }
-  const nodeId = joinID(e.pubkey, id);
   const text = e.content;
 
-  if (e.kind === KIND_PROJECT) {
-    try {
-      const project = parseProject(e);
-      return project ? [id, { id: nodeId, text, ...project }] : [undefined];
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error(err);
-      return [undefined];
-    }
+  // Verify content-addressed ID matches the hash of the text
+  const expectedHash = hashText(text);
+  if (id !== expectedHash) {
+    // eslint-disable-next-line no-console
+    console.warn(`Node ID mismatch: expected ${expectedHash}, got ${id}`);
+    return [undefined];
   }
-  // Return TextNode
+
   const textNode: TextNode = {
-    id: nodeId,
+    id: id as ID,
     text,
     type: "text",
-    imageUrl: parseImageUrl(e),
   };
   return [id, textNode];
 }

@@ -1,5 +1,5 @@
 import { List } from "immutable";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useMediaQuery } from "react-responsive";
 import { Link } from "react-router-dom";
 import {
@@ -28,7 +28,6 @@ import {
 import {
   getReferencedByRelations,
   getRelations,
-  hasImageUrl,
   isReferenceNode,
   getRefTargetStack,
   itemMatchesType,
@@ -185,33 +184,7 @@ function ErrorContent(): JSX.Element {
 }
 
 function NodeContent({ node }: { node: KnowNode }): JSX.Element {
-  const [isImageAccessible, setIsImageAccessible] = useState<boolean>(false);
   const isReference = node.type === "reference";
-
-  // Get imageUrl only for nodes that support it (not ReferenceNode)
-  const imageUrl = hasImageUrl(node) ? node.imageUrl : undefined;
-
-  useEffect(() => {
-    const checkImageAccessibility = async (): Promise<void> => {
-      if (imageUrl) {
-        try {
-          await fetch(imageUrl, {
-            method: "HEAD",
-            mode: "no-cors",
-          });
-          // Since the response is opaque, we assume the image is accessible
-          setIsImageAccessible(true);
-        } catch {
-          setIsImageAccessible(false);
-          // eslint-disable-next-line no-console
-          console.warn(`Invalid URL: ${imageUrl}`);
-        }
-      }
-    };
-
-    checkImageAccessibility();
-  }, [imageUrl]);
-  const textToDisplay = imageUrl ? node.text.replace(imageUrl, "") : node.text;
 
   // Reference nodes get special link-like styling
   const referenceStyle: React.CSSProperties = isReference
@@ -227,16 +200,7 @@ function NodeContent({ node }: { node: KnowNode }): JSX.Element {
     <span className={`break-word ${isReference ? "reference-node" : ""}`}>
       <NodeIcon node={node} />
       {isReference && <ReferenceIndicators refId={node.id} />}
-      <span style={referenceStyle}>{textToDisplay}</span>
-      {imageUrl && isImageAccessible && (
-        <div>
-          <img
-            src={imageUrl}
-            alt={imageUrl}
-            style={{ maxWidth: "100%", height: "auto", marginTop: "10px" }}
-          />
-        </div>
-      )}
+      <span style={referenceStyle}>{node.text}</span>
     </span>
   );
 }
@@ -249,14 +213,9 @@ function EditableContent(): JSX.Element {
   const [nodeID] = useNodeID();
   const prevSibling = usePreviousSibling();
 
-  const handleSave = (
-    text: string,
-    imageUrl?: string,
-    submitted?: boolean
-  ): void => {
+  const handleSave = (text: string, _imageUrl?: string, submitted?: boolean): void => {
     if (!node || node.type !== "text") return;
-    const currentImageUrl = "imageUrl" in node ? node.imageUrl : undefined;
-    const textChanged = text !== node.text || imageUrl !== currentImageUrl;
+    const textChanged = text !== node.text;
 
     let plan = createPlan();
 
@@ -265,8 +224,7 @@ function EditableContent(): JSX.Element {
       plan = planUpsertNode(plan, {
         ...node,
         text,
-        imageUrl,
-      } as KnowNode);
+      });
     }
 
     // If user pressed Enter, open create node editor (position determined by expansion state)
@@ -288,14 +246,12 @@ function EditableContent(): JSX.Element {
     const basePlan = createPlan();
 
     // Step 1: Save text changes if any
-    const currentImageUrl = "imageUrl" in node ? node.imageUrl : undefined;
     const planWithText =
       text !== node.text
         ? planUpsertNode(basePlan, {
             ...node,
             text,
-            imageUrl: currentImageUrl,
-          } as KnowNode)
+          })
         : basePlan;
 
     // Step 2: Expand the previous sibling (ensure it has relations)

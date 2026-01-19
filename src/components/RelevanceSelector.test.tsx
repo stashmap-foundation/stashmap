@@ -348,8 +348,8 @@ describe("Diff item relevance selection", () => {
     const { publicKey: bobPK } = bob().user;
 
     // Alice creates Parent
-    const parent = newNode("Parent", alicePK);
-    const aliceChild = newNode("Alice Child", alicePK);
+    const parent = newNode("Parent");
+    const aliceChild = newNode("Alice Child");
 
     const aliceRelations = addRelationToRelations(
       newRelations(parent.id, List(), alicePK),
@@ -363,7 +363,7 @@ describe("Diff item relevance selection", () => {
     await execute({ ...alice(), plan: alicePlan });
 
     // Bob adds a different child to the same parent
-    const bobChild = newNode("Bob Child", bobPK);
+    const bobChild = newNode("Bob Child");
     const bobRelations = addRelationToRelations(
       newRelations(parent.id, List(), bobPK),
       bobChild.id
@@ -407,7 +407,7 @@ describe("Diff item relevance selection", () => {
     const { publicKey: bobPK } = bob().user;
 
     // Alice creates Parent
-    const parent = newNode("Parent", alicePK);
+    const parent = newNode("Parent");
     const aliceRelations = newRelations(parent.id, List(), alicePK);
 
     const alicePlan = planUpsertRelations(
@@ -417,7 +417,7 @@ describe("Diff item relevance selection", () => {
     await execute({ ...alice(), plan: alicePlan });
 
     // Bob adds a child to the same parent
-    const bobChild = newNode("Bob Child", bobPK);
+    const bobChild = newNode("Bob Child");
     const bobRelations = addRelationToRelations(
       newRelations(parent.id, List(), bobPK),
       bobChild.id
@@ -463,7 +463,7 @@ describe("Diff item relevance selection", () => {
     const { publicKey: bobPK } = bob().user;
 
     // Alice creates Parent
-    const parent = newNode("Parent", alicePK);
+    const parent = newNode("Parent");
     const aliceRelations = newRelations(parent.id, List(), alicePK);
 
     const alicePlan = planUpsertRelations(
@@ -473,7 +473,7 @@ describe("Diff item relevance selection", () => {
     await execute({ ...alice(), plan: alicePlan });
 
     // Bob adds a child
-    const bobChild = newNode("Bob Child", bobPK);
+    const bobChild = newNode("Bob Child");
     const bobRelations = addRelationToRelations(
       newRelations(parent.id, List(), bobPK),
       bobChild.id
@@ -692,8 +692,8 @@ describe("Relation lookup consistency (regression)", () => {
     const [alice] = setup([ALICE]);
     const { publicKey: alicePK } = alice().user;
 
-    const parent = newNode("Parent", alicePK);
-    const child = newNode("Child", alicePK);
+    const parent = newNode("Parent");
+    const child = newNode("Child");
 
     // Add the same child twice to create duplicate nodeIDs with different indices
     const relations = addRelationToRelations(
@@ -750,8 +750,8 @@ describe("Multi-user relevance", () => {
     const { publicKey: bobPK } = bob().user;
 
     // Alice creates Parent -> Child
-    const parent = newNode("Parent", alicePK);
-    const child = newNode("Child", alicePK);
+    const parent = newNode("Parent");
+    const child = newNode("Child");
 
     // Alice marks Child as relevant (default)
     const aliceRelations = addRelationToRelations(

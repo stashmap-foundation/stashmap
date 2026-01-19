@@ -318,10 +318,10 @@ export function findNodeByText(plan: Plan, text: string): KnowNode | undefined {
 function createInitialWorkspace(
   plan: Plan,
   activeWorkspace?: string
-): [Plan, nodeID: LongID] {
+): [Plan, nodeID: ID] {
   const wsNode = activeWorkspace
     ? findNodeByText(plan, activeWorkspace)
-    : newNode("My Notes", plan.user.publicKey);
+    : newNode("My Notes");
   if (!wsNode) {
     throw new Error(
       `Test Setup Error: No Node with text ${activeWorkspace} found`
@@ -619,9 +619,7 @@ function createNodesAndRelations(
       ? (nodeDescription[1] as NodeDescription[] | undefined)
       : undefined;
     const node =
-      typeof textOrNode === "string"
-        ? newNode(textOrNode, rdx.user.publicKey)
-        : textOrNode;
+      typeof textOrNode === "string" ? newNode(textOrNode) : textOrNode;
     // no need to upsert if it's already a node
     const planWithNode =
       typeof textOrNode === "string" ? planUpsertNode(rdx, node) : rdx;

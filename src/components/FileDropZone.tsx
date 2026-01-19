@@ -23,7 +23,7 @@ function createRelationsFromParagraphNodes(
   nodes: KnowNode[],
   myself: PublicKey,
   context: List<ID> = List()
-): [relations: Relations, topNodeID: LongID] {
+): [relations: Relations, topNodeID: ID] {
   const topParagraph = nodes[0];
   const furtherParagraphs = nodes.slice(1);
   const relations = bulkAddRelations(
@@ -33,17 +33,14 @@ function createRelationsFromParagraphNodes(
   return [relations, topParagraph.id];
 }
 
-export function createNodesFromMarkdown(
-  markdown: string,
-  myself: PublicKey
-): KnowNode[] {
+export function createNodesFromMarkdown(markdown: string): KnowNode[] {
   const markdownParagraphs = markdown.split("\n\n");
   const plainTextParagraphs = markdownParagraphs.map((paragraph: string) => {
     const md = new MarkdownIt();
     return convertToPlainText(md.render(paragraph));
   });
   return plainTextParagraphs.map((paragraph) => {
-    return newNode(paragraph, myself);
+    return newNode(paragraph);
   });
 }
 
@@ -66,10 +63,10 @@ export function planCreateNodesFromMarkdown(
   plan: Plan,
   markdown: string,
   context: List<ID> = List()
-): [Plan, topNodeID: LongID] {
+): [Plan, topNodeID: ID] {
   const splittedMarkdown = splitMarkdownInChunkSizes(markdown);
   const nodes = splittedMarkdown.reduce((rdx: KnowNode[], md: string) => {
-    const mdNodes = createNodesFromMarkdown(md, plan.user.publicKey);
+    const mdNodes = createNodesFromMarkdown(md);
     return [...rdx, ...mdNodes];
   }, []);
   // Always create relations with empty context (standalone)
@@ -102,12 +99,12 @@ export function planCreateNodesFromMarkdown(
 
 type FileDropZoneProps = {
   children: React.ReactNode;
-  onDrop: (plan: Plan, topNodes: Array<LongID>) => void;
+  onDrop: (plan: Plan, topNodes: Array<ID>) => void;
 };
 
 type MarkdownReducer = {
   plan: Plan;
-  topNodeIDs: LongID[];
+  topNodeIDs: ID[];
 };
 
 /* eslint-disable react/jsx-props-no-spreading */
@@ -135,8 +132,8 @@ export function FileDropZone({
           });
         })
       );
-      const mdNodes = markdowns.reduce(
-        (rdx: MarkdownReducer, markdown: string) => {
+      const mdNodes = markdowns.reduce<MarkdownReducer>(
+        (rdx, markdown) => {
           const [plan, topNodeID] = planCreateNodesFromMarkdown(
             rdx.plan,
             markdown
@@ -148,7 +145,7 @@ export function FileDropZone({
         },
         {
           plan: createPlan(),
-          topNodeIDs: [],
+          topNodeIDs: [] as ID[],
         }
       );
       onDrop(mdNodes.plan, mdNodes.topNodeIDs);

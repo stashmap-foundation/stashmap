@@ -270,22 +270,22 @@ export function MiniEditor({
 
 // Legacy Editor - wraps MiniEditor (kept for backward compatibility during transition)
 type EditorProps = {
-  onCreateNode: (text: string, imageUrl?: string) => void;
+  onCreateNode: (text: string) => void;
   onClose: () => void;
 };
 
 export function Editor({ onCreateNode, onClose }: EditorProps): JSX.Element {
   return (
     <MiniEditor
-      onSave={(text, imageUrl) => onCreateNode(text, imageUrl)}
+      onSave={(text) => onCreateNode(text)}
       onClose={onClose}
     />
   );
 }
 
 type AddNodeProps = {
-  onCreateNewNode: (text: string, imageUrl?: string) => void;
-  onAddExistingNode: (nodeID: LongID) => void;
+  onCreateNewNode: (text: string) => void;
+  onAddExistingNode: (nodeID: ID) => void;
   ariaLabel: string;
   isSearchEnabledByShortcut?: boolean;
 };
@@ -324,12 +324,12 @@ function AddNode({
     return undefined;
   }, [isInputElementInFocus]);
 
-  const createNewNode = (text: string, imageUrl?: string): void => {
-    onCreateNewNode(text, imageUrl);
+  const createNewNode = (text: string): void => {
+    onCreateNewNode(text);
     reset();
   };
 
-  const onAddExistingRepo = (id: LongID): void => {
+  const onAddExistingRepo = (id: ID): void => {
     if (isOpen) {
       closeModal();
     }
@@ -373,9 +373,9 @@ type AddNodeOptions = {
 
 // Hook to get the add node handler for sibling or first child insert
 function useAddSiblingNode(options?: AddNodeOptions): {
-  onAddNode: (plan: Plan, nodeID: LongID) => void;
-  onAddExistingNode: (nodeID: LongID) => void;
-  onCreateNewNode: (text: string, imageUrl?: string) => void;
+  onAddNode: (plan: Plan, nodeID: ID) => void;
+  onAddExistingNode: (nodeID: ID) => void;
+  onCreateNewNode: (text: string) => void;
   node: KnowNode;
 } | null {
   const { insertAtIndex, asFirstChild } = options || {};
@@ -402,7 +402,7 @@ function useAddSiblingNode(options?: AddNodeOptions): {
     return null;
   }
 
-  const onAddNode = (plan: Plan, nodeID: LongID): void => {
+  const onAddNode = (plan: Plan, nodeID: ID): void => {
     // Use addRelationToRelations which handles insertion at specific index
     const updatedRelationsPlan = upsertRelations(
       plan,
@@ -426,13 +426,13 @@ function useAddSiblingNode(options?: AddNodeOptions): {
     executePlan(planUpdateViews(updatedRelationsPlan, updatedViews));
   };
 
-  const onAddExistingNode = (nodeID: LongID): void => {
+  const onAddExistingNode = (nodeID: ID): void => {
     onAddNode(createPlan(), nodeID);
   };
 
-  const onCreateNewNode = (text: string, imageUrl?: string): void => {
+  const onCreateNewNode = (text: string): void => {
     const plan = createPlan();
-    const n = newNode(text, plan.user.publicKey, imageUrl);
+    const n = newNode(text);
     onAddNode(planUpsertNode(plan, n), n.id);
   };
 

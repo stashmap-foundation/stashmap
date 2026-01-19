@@ -51,10 +51,10 @@ test("Move View Settings on Delete", async () => {
   const [alice] = setup([ALICE]);
   const { publicKey } = alice().user;
 
-  const c = newNode("C", publicKey);
-  const cpp = newNode("C++", publicKey);
-  const java = newNode("Java", publicKey);
-  const pl = newNode("Programming Languages", publicKey);
+  const c = newNode("C");
+  const cpp = newNode("C++");
+  const java = newNode("Java");
+  const pl = newNode("Programming Languages");
 
   const planWithNodes = planBulkUpsertNodes(createPlan(alice()), [
     c,
@@ -410,7 +410,7 @@ test("View path roundtrip preserves ref IDs in middle of path", () => {
 });
 
 test("Default Relations returns most recently updated relation", () => {
-  const node = newNode("Node", ALICE.publicKey);
+  const node = newNode("Node");
   const nodes = Map<KnowNode>({ [node.id]: node });
 
   // With per-item types, relations are sorted by date (most recent first)

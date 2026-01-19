@@ -743,7 +743,7 @@ export function RootViewContextProvider({
   indices, // TODO: only used in tests, get rid of it
 }: {
   children: React.ReactNode;
-  root: LongID;
+  root: LongID | ID;
   paneIndex?: number;
   indices?: List<number>;
 }): JSX.Element {

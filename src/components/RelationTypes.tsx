@@ -101,7 +101,7 @@ export function useGetAllVirtualLists(): RelationTypes {
 
 export function planAddNewRelationToNode(
   plan: Plan,
-  nodeID: LongID,
+  nodeID: ID,
   context: Context,
   view: View,
   viewPath: ViewPath

@@ -113,9 +113,9 @@ test("Diff items are always added, never moved", () => {
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
 
-  const parent = newNode("Parent", alicePK);
-  const aliceChild = newNode("Alice's Child", alicePK);
-  const bobChild = newNode("Bob's Child", bobPK);
+  const parent = newNode("Parent");
+  const aliceChild = newNode("Alice's Child");
+  const bobChild = newNode("Bob's Child");
 
   const aliceRelations = addRelationToRelations(
     newRelations(parent.id, List(), alicePK),

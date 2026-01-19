@@ -19,7 +19,7 @@ import { execute, republishEvents } from "./executor";
 import { useApis } from "./Apis";
 import { viewsToJSON } from "./serializer";
 import { newDB } from "./knowledge";
-import { shortID, hasImageUrl } from "./connections";
+import { shortID } from "./connections";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useWorkspaceContext } from "./WorkspaceContext";
 import { useRelaysToCreatePlan } from "./relays";
@@ -29,7 +29,7 @@ import { ROOT } from "./types";
 
 export type Plan = Data & {
   publishEvents: List<UnsignedEvent & EventAttachment>;
-  activeWorkspace: LongID;
+  activeWorkspace: ID;
   projectID: LongID | undefined;
   relays: AllRelays;
   temporaryView: TemporaryViewState;
@@ -196,18 +196,11 @@ export function planUpsertNode(plan: Plan, node: KnowNode): Plan {
     ...userDB,
     nodes: updatedNodes,
   };
-  const imageUrl = hasImageUrl(node) ? node.imageUrl : undefined;
   const updateNodeEvent = {
     kind: KIND_KNOWLEDGE_NODE,
     pubkey: plan.user.publicKey,
     created_at: newTimestamp(),
-    tags:
-      imageUrl !== undefined
-        ? [
-            ["d", shortID(node.id)],
-            ["imeta", `url ${imageUrl}`],
-          ]
-        : [["d", shortID(node.id)]],
+    tags: [["d", shortID(node.id)]],
     content: node.text,
   };
   return {
@@ -524,7 +517,7 @@ export function PlanningContextProvider({
 
 export function createPlan(
   props: Data & {
-    activeWorkspace: LongID;
+    activeWorkspace: ID;
     publishEvents?: List<UnsignedEvent & EventAttachment>;
     relays: AllRelays;
     projectID?: LongID;

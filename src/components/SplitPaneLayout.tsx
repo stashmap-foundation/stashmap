@@ -28,7 +28,7 @@ export function PaneSearchButton(): JSX.Element {
   const { setStack } = usePaneNavigation();
   const paneIndex = usePaneIndex();
 
-  const onSelectNode = (nodeID: LongID): void => {
+  const onSelectNode = (nodeID: ID): void => {
     setStack([nodeID]);
     setShowSearch(false);
   };

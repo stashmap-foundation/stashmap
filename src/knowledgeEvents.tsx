@@ -28,7 +28,7 @@ function isTextNodeOrProject(kind: number | string): boolean {
 // Only listen to delete events where the signer created the node or relation
 function isDeletable(
   event: UnsignedEvent | undefined,
-  nodes: Map<string, { id: LongID }>
+  nodes: Map<string, { id: ID }>
 ): [false] | [true, string, string] {
   if (!event) {
     return [false];

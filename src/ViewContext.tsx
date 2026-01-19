@@ -373,6 +373,7 @@ export function getNodeFromID(
 export type TypeFilters = (Relevance | Argument | "suggestions")[];
 
 export const VERSION_FILTERS: TypeFilters = [
+  "",
   "relevant",
   "little_relevant",
   "confirms",
@@ -417,23 +418,50 @@ export function getRelationItems(
 }
 
 /**
+ * Get the context for looking up versions of a node.
+ * This is the path TO the node plus the node's ID.
+ */
+export function getVersionsContext(nodeID: ID, context: Context): Context {
+  return context.push(nodeID);
+}
+
+/**
+ * Get the versions relations for a node.
+ */
+export function getVersionsRelations(
+  knowledgeDBs: KnowledgeDBs,
+  myself: PublicKey,
+  nodeID: ID,
+  context: Context
+): Relations | undefined {
+  const versionsContext = getVersionsContext(nodeID, context);
+  return getAvailableRelationsForNode(
+    knowledgeDBs,
+    myself,
+    VERSIONS_NODE_ID,
+    versionsContext,
+    true
+  ).first();
+}
+
+/**
  * Get versioned display text for a node.
  */
 export function getVersionedDisplayText(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
-  nodeID: LongID | ID,
+  nodeID: ID,
   context: Context
 ): string | undefined {
-  const versionsContext = context.push(nodeID as ID);
-  const versions = getRelationItems(
+  const versionsRelations = getVersionsRelations(
     knowledgeDBs,
     myself,
-    VERSIONS_NODE_ID,
-    versionsContext,
-    VERSION_FILTERS,
-    true
+    nodeID,
+    context
   );
+  if (!versionsRelations) return undefined;
+
+  const versions = filterRelationItems(versionsRelations.items, VERSION_FILTERS);
   const firstVersion = versions.first();
   if (!firstVersion) return undefined;
   return getNodeFromID(knowledgeDBs, firstVersion.nodeID, myself)?.text;

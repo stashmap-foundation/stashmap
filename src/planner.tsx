@@ -18,7 +18,17 @@ import { execute, republishEvents } from "./executor";
 import { useApis } from "./Apis";
 import { viewsToJSON } from "./serializer";
 import { newDB } from "./knowledge";
-import { shortID } from "./connections";
+import {
+  shortID,
+  newNode,
+  addRelationToRelations,
+  VERSIONS_NODE_ID,
+} from "./connections";
+import {
+  newRelations,
+  getVersionsContext,
+  getVersionsRelations,
+} from "./ViewContext";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useWorkspaceContext } from "./WorkspaceContext";
 import { useRelaysToCreatePlan } from "./relays";
@@ -209,6 +219,45 @@ export function planUpsertNode(plan: Plan, node: KnowNode): Plan {
 
 export function planBulkUpsertNodes(plan: Plan, nodes: KnowNode[]): Plan {
   return nodes.reduce((p, node) => planUpsertNode(p, node), plan);
+}
+
+/**
+ * Create a version for a node instead of modifying it directly.
+ * Adds the new version to ~Versions in context [...context, originalNodeID]
+ */
+export function planCreateVersion(
+  plan: Plan,
+  originalNodeID: ID,
+  newText: string,
+  context: List<ID>
+): Plan {
+  // 1. Create new version node
+  const versionNode = newNode(newText);
+  let updatedPlan = planUpsertNode(plan, versionNode);
+
+  // 2. Ensure ~Versions node exists
+  const versionsNode = newNode("~Versions");
+  updatedPlan = planUpsertNode(updatedPlan, versionsNode);
+
+  // 3. Add version as first child of ~Versions
+  const versionsContext = getVersionsContext(originalNodeID, context);
+  const versionsRelations =
+    getVersionsRelations(
+      updatedPlan.knowledgeDBs,
+      updatedPlan.user.publicKey,
+      originalNodeID,
+      context
+    ) ||
+    newRelations(VERSIONS_NODE_ID, versionsContext, updatedPlan.user.publicKey);
+
+  const withVersion = addRelationToRelations(
+    versionsRelations,
+    versionNode.id,
+    "",
+    undefined,
+    0
+  );
+  return planUpsertRelations(updatedPlan, withVersion);
 }
 
 function planDelete(plan: Plan, id: LongID | ID, kind: number): Plan {

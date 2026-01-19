@@ -86,7 +86,7 @@ function VirtuosoForColumn({
   /* eslint-enable react/jsx-props-no-spreading */
   return (
     <div
-      className="max-height-100 overflow-hidden background-dark"
+      className="max-height-100 overflow-hidden"
       aria-label={ariaLabel}
       style={virtuosoStyle}
     >

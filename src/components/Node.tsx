@@ -42,7 +42,7 @@ import {
 } from "./SelectRelations";
 import { ReferenceIndicators } from "./ReferenceIndicators";
 import { useData } from "../DataContext";
-import { planUpsertNode, usePlanner } from "../planner";
+import { planCreateVersion, usePlanner } from "../planner";
 import { planDisconnectFromParent, planAddToParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeIcon } from "./NodeIcon";
@@ -72,6 +72,7 @@ function ExpandCollapseToggle(): JSX.Element | null {
   const [nodeID, view] = useNodeID();
   const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
+  const displayText = useDisplayText();
   const onChangeRelations = useOnChangeRelations();
   const onToggleExpanded = useOnToggleExpanded();
   const isReferencedBy = view.relations === REFERENCED_BY;
@@ -137,7 +138,7 @@ function ExpandCollapseToggle(): JSX.Element | null {
       onClick={onToggle}
       className="expand-collapse-toggle"
       aria-label={
-        isExpanded ? `collapse ${node?.text}` : `expand ${node?.text}`
+        isExpanded ? `collapse ${displayText}` : `expand ${displayText}`
       }
       aria-expanded={isExpanded}
       style={{
@@ -242,12 +243,10 @@ function EditableContent(): JSX.Element {
 
     let plan = createPlan();
 
-    // Save text changes if any
+    // Save text changes by creating a version
     if (textChanged) {
-      plan = planUpsertNode(plan, {
-        ...node,
-        text,
-      });
+      const context = getContextFromStackAndViewPath(stack, viewPath);
+      plan = planCreateVersion(plan, nodeID, text, context);
     }
 
     // If user pressed Enter, open create node editor (position determined by expansion state)
@@ -267,22 +266,20 @@ function EditableContent(): JSX.Element {
     }
 
     const basePlan = createPlan();
+    const context = getContextFromStackAndViewPath(stack, viewPath);
 
-    // Step 1: Save text changes if any
+    // Step 1: Save text changes if any (as version)
     const planWithText =
       text !== displayText
-        ? planUpsertNode(basePlan, {
-            ...node,
-            text,
-          })
+        ? planCreateVersion(basePlan, nodeID, text, context)
         : basePlan;
 
     // Step 2: Expand the previous sibling (ensure it has relations)
-    const context = getContextFromStackAndViewPath(stack, prevSibling.viewPath);
+    const prevSiblingContext = getContextFromStackAndViewPath(stack, prevSibling.viewPath);
     const planWithExpand = planExpandNode(
       planWithText,
       prevSibling.nodeID,
-      context,
+      prevSiblingContext,
       prevSibling.view,
       prevSibling.viewPath
     );

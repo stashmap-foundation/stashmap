@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { useMediaQuery } from "react-responsive";
 import { useInputElementFocus } from "../commons/FocusContextProvider";
-import { newNode, addRelationToRelations } from "../connections";
+import { addRelationToRelations } from "../connections";
 import {
   useIsAddToNode,
   useParentNode,
@@ -15,6 +15,7 @@ import {
   useIsExpanded,
   useIsRoot,
   useDisplayText,
+  getContextFromStackAndViewPath,
 } from "../ViewContext";
 import { planExpandAndOpenCreateNodeEditor } from "./RelationTypes";
 import useModal from "./useModal";
@@ -26,7 +27,7 @@ import {
   useTemporaryView,
   useIsEditorOpen,
 } from "./TemporaryViewContext";
-import { Plan, planUpsertNode, planUpdateViews, usePlanner } from "../planner";
+import { Plan, planUpdateViews, usePlanner, planCreateNode } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 
 function AddNodeButton({
@@ -441,9 +442,12 @@ function useAddSiblingNode(options?: AddNodeOptions): {
   };
 
   const onCreateNewNode = (text: string): void => {
-    const plan = createPlan();
-    const n = newNode(text);
-    onAddNode(planUpsertNode(plan, n), n.id);
+    // Build context including parent node's ID (where we're adding the child)
+    const baseContext = getContextFromStackAndViewPath(stack, viewContext);
+    const context = baseContext.push(node.id as ID);
+    // Create node with version awareness
+    const [plan, n] = planCreateNode(createPlan(), text, context);
+    onAddNode(plan, n.id);
   };
 
   // node is guaranteed to be defined here (we return null above if it's undefined)

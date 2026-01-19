@@ -2,6 +2,7 @@
 
 - To run typescript use: npm run typescript
 - Reuse code! If you find yourself copying and pasting code, consider refactoring it into a reusable function or component.
+- We program purely functional, don't use let or var, only const.
 
 ## Testing
 

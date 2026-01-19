@@ -22,6 +22,7 @@ import {
   shortID,
   newNode,
   addRelationToRelations,
+  moveRelations,
   VERSIONS_NODE_ID,
 } from "./connections";
 import {
@@ -223,7 +224,8 @@ export function planBulkUpsertNodes(plan: Plan, nodes: KnowNode[]): Plan {
 
 /**
  * Create a version for a node instead of modifying it directly.
- * Adds the new version to ~Versions in context [...context, originalNodeID]
+ * Adds the new version to ~Versions in context [...context, originalNodeID].
+ * If the version already exists in ~Versions, moves it to the top instead of adding a duplicate.
  */
 export function planCreateVersion(
   plan: Plan,
@@ -239,7 +241,7 @@ export function planCreateVersion(
   const versionsNode = newNode("~Versions");
   updatedPlan = planUpsertNode(updatedPlan, versionsNode);
 
-  // 3. Add version as first child of ~Versions
+  // 3. Get or create ~Versions relations
   const versionsContext = getVersionsContext(originalNodeID, context);
   const versionsRelations =
     getVersionsRelations(
@@ -250,14 +252,75 @@ export function planCreateVersion(
     ) ||
     newRelations(VERSIONS_NODE_ID, versionsContext, updatedPlan.user.publicKey);
 
-  const withVersion = addRelationToRelations(
-    versionsRelations,
-    versionNode.id,
-    "",
-    undefined,
-    0
+  // 4. Check if version already exists in ~Versions
+  const existingIndex = versionsRelations.items.findIndex(
+    (item) => shortID(item.nodeID) === shortID(versionNode.id)
   );
+
+  let withVersion: Relations;
+  if (existingIndex >= 0) {
+    // Version exists - move it to the top
+    withVersion = moveRelations(versionsRelations, [existingIndex], 0);
+  } else {
+    // Version doesn't exist - add at top
+    withVersion = addRelationToRelations(
+      versionsRelations,
+      versionNode.id,
+      "",
+      undefined,
+      0
+    );
+  }
   return planUpsertRelations(updatedPlan, withVersion);
+}
+
+/**
+ * When adding a node that already has ~Versions in this context,
+ * ensure the node's own text is at the top of versions.
+ * This handles the case where a node was previously versioned,
+ * and we're now adding it again with its original text.
+ */
+function planEnsureVersionForNode(
+  plan: Plan,
+  node: KnowNode,
+  context: List<ID>
+): Plan {
+  // Check if this node has existing ~Versions in this context
+  const versionsRelations = getVersionsRelations(
+    plan.knowledgeDBs,
+    plan.user.publicKey,
+    node.id,
+    context
+  );
+
+  if (!versionsRelations || versionsRelations.items.size === 0) {
+    // No existing versions, nothing to do
+    return plan;
+  }
+
+  // Node has versions - ensure the node's text is the active version
+  return planCreateVersion(plan, node.id, node.text, context);
+}
+
+/**
+ * Create a new node and add it to the plan, handling version awareness.
+ * If the node (by content-addressed ID) already has ~Versions in this context,
+ * ensures the typed text becomes the active version.
+ *
+ * @param plan - The current plan
+ * @param text - The text for the new node
+ * @param context - The context where the node will be added (should include parent's ID)
+ * @returns [updatedPlan, newNode] - The updated plan and the created node
+ */
+export function planCreateNode(
+  plan: Plan,
+  text: string,
+  context: List<ID>
+): [Plan, KnowNode] {
+  const node = newNode(text);
+  let updatedPlan = planUpsertNode(plan, node);
+  updatedPlan = planEnsureVersionForNode(updatedPlan, node, context);
+  return [updatedPlan, node];
 }
 
 function planDelete(plan: Plan, id: LongID | ID, kind: number): Plan {

@@ -26,13 +26,13 @@ import { useDroppable } from "./DroppableContainer";
 import { useIsEditingOn, useTemporaryView } from "./TemporaryViewContext";
 import { MiniEditor } from "./AddNode";
 import { NodeCard } from "../commons/Ui";
-import { newNode, addRelationToRelations } from "../connections";
+import { addRelationToRelations } from "../connections";
 import {
-  planUpsertNode,
   planUpdateViews,
   usePlanner,
   planOpenCreateNodeEditor,
   planCloseCreateNodeEditor,
+  planCreateNode,
 } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 
@@ -153,7 +153,7 @@ export function CreateNodeEditor({
 
   const onCreateNode = (
     nodeText: string,
-    imageUrl?: string,
+    _imageUrl?: string,
     submitted?: boolean
   ): void => {
     const trimmedText = nodeText.trim();
@@ -162,9 +162,13 @@ export function CreateNodeEditor({
       return;
     }
 
-    let plan = createPlan();
-    const n = newNode(nodeText);
-    plan = planUpsertNode(plan, n);
+    // Build context including target node's ID (where we're adding the child)
+    const [targetNodeID] = getNodeIDFromView(data, targetPath);
+    const baseContext = getContextFromStackAndViewPath(stack, targetPath);
+    const context = baseContext.push(targetNodeID as ID);
+
+    // Create node with version awareness
+    let [plan, n] = planCreateNode(createPlan(), nodeText, context);
 
     // Get current relations to determine actual insert index before modifying
     const currentRelations = getRelationForView(plan, targetPath, stack);

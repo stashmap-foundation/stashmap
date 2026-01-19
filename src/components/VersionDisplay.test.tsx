@@ -85,4 +85,54 @@ My Notes
   Version 3
     `);
   });
+
+  test("Creating a node with same text as previously versioned node shows the typed text", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    // Create Holiday Destinations
+    await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
+    await userEvent.type(await findNewNodeEditor(), "Holiday Destinations{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    // Expand and add Barcelona
+    await userEvent.click(await screen.findByLabelText("expand Holiday Destinations"));
+    await userEvent.click(await screen.findByLabelText("add to Holiday Destinations"));
+    await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    Barcelona
+    `);
+
+    // Edit Barcelona to BCN
+    const barcelonaEditor = await screen.findByLabelText("edit Barcelona");
+    await userEvent.click(barcelonaEditor);
+    await userEvent.clear(barcelonaEditor);
+    await userEvent.type(barcelonaEditor, "BCN");
+    fireEvent.blur(barcelonaEditor);
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    BCN
+    `);
+
+    // Now create another node with text "Barcelona" (same content-addressed ID)
+    // This adds "Barcelona" to top of ~Versions, so BOTH nodes show "Barcelona"
+    // (they're the same node with the same ~Versions)
+    await userEvent.click(await screen.findByLabelText("add to Holiday Destinations"));
+    await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    // Both references to the same node show the same versioned text
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    Barcelona
+    Barcelona
+    `);
+  });
 });

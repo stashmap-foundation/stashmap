@@ -1,6 +1,10 @@
 import { List, Set, Map } from "immutable";
 import crypto from "crypto";
-import { newRelations, getNodeFromID, getVersionedDisplayText } from "./ViewContext";
+import {
+  newRelations,
+  getNodeFromID,
+  getVersionedDisplayText,
+} from "./ViewContext";
 import { REFERENCED_BY, REF_PREFIX } from "./constants";
 
 // Content-addressed node ID generation
@@ -116,14 +120,11 @@ export function buildReferenceNode(
   };
 
   // Build context incrementally as we walk through the path
-  const contextTexts = targetContext.reduce(
-    (acc, nodeId, index) => {
-      const contextUpToHere = targetContext.slice(0, index);
-      const text = getNodeTextWithVersion(nodeId, contextUpToHere);
-      return acc.push(text);
-    },
-    List<string>()
-  );
+  const contextTexts = targetContext.reduce((acc, nodeId, index) => {
+    const contextUpToHere = targetContext.slice(0, index);
+    const text = getNodeTextWithVersion(nodeId, contextUpToHere);
+    return acc.push(text);
+  }, List<string>());
 
   const targetText = getNodeTextWithVersion(targetNode, targetContext);
   const displayText = contextTexts.push(targetText).join(" → ");

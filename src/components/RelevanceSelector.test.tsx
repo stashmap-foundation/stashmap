@@ -185,7 +185,10 @@ My Notes
     await userEvent.click(
       await screen.findByLabelText("Search to change pane 0 content")
     );
-    await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
+    await userEvent.type(
+      await screen.findByLabelText("search input"),
+      "Bitcoin"
+    );
     await userEvent.click(await screen.findByLabelText("select Bitcoin"));
     await screen.findByLabelText("expand Bitcoin");
 
@@ -384,7 +387,10 @@ describe("Diff item relevance selection", () => {
     await userEvent.click(
       await screen.findByLabelText("Search to change pane 0 content")
     );
-    await userEvent.type(await screen.findByLabelText("search input"), "Parent");
+    await userEvent.type(
+      await screen.findByLabelText("search input"),
+      "Parent"
+    );
     await userEvent.click(await screen.findByLabelText("select Parent"));
 
     // Expand Parent to see children
@@ -438,7 +444,10 @@ describe("Diff item relevance selection", () => {
     await userEvent.click(
       await screen.findByLabelText("Search to change pane 0 content")
     );
-    await userEvent.type(await screen.findByLabelText("search input"), "Parent");
+    await userEvent.type(
+      await screen.findByLabelText("search input"),
+      "Parent"
+    );
     await userEvent.click(await screen.findByLabelText("select Parent"));
 
     // Expand Parent to see children
@@ -494,7 +503,10 @@ describe("Diff item relevance selection", () => {
     await userEvent.click(
       await screen.findByLabelText("Search to change pane 0 content")
     );
-    await userEvent.type(await screen.findByLabelText("search input"), "Parent");
+    await userEvent.type(
+      await screen.findByLabelText("search input"),
+      "Parent"
+    );
     await userEvent.click(await screen.findByLabelText("select Parent"));
 
     // Expand Parent to see children
@@ -718,7 +730,10 @@ describe("Relation lookup consistency (regression)", () => {
     await userEvent.click(
       await screen.findByLabelText("Search to change pane 0 content")
     );
-    await userEvent.type(await screen.findByLabelText("search input"), "Parent");
+    await userEvent.type(
+      await screen.findByLabelText("search input"),
+      "Parent"
+    );
     await userEvent.click(await screen.findByLabelText("select Parent"));
 
     // Expand Parent to see children
@@ -785,7 +800,10 @@ describe("Multi-user relevance", () => {
     await userEvent.click(
       await screen.findByLabelText("Search to change pane 0 content")
     );
-    await userEvent.type(await screen.findByLabelText("search input"), "Parent");
+    await userEvent.type(
+      await screen.findByLabelText("search input"),
+      "Parent"
+    );
     await userEvent.click(await screen.findByLabelText("select Parent"));
 
     // Expand Parent to see children

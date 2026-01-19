@@ -17,11 +17,7 @@ describe("MiniEditor", () => {
     test("multiple blur events with same text only call onSave once", async () => {
       const onSave = jest.fn();
       render(
-        <MiniEditor
-          initialText="Original"
-          onSave={onSave}
-          autoFocus={false}
-        />
+        <MiniEditor initialText="Original" onSave={onSave} autoFocus={false} />
       );
 
       const editor = screen.getByRole("textbox");
@@ -45,11 +41,7 @@ describe("MiniEditor", () => {
     test("blur with unchanged text does not call onSave", async () => {
       const onSave = jest.fn();
       render(
-        <MiniEditor
-          initialText="Original"
-          onSave={onSave}
-          autoFocus={false}
-        />
+        <MiniEditor initialText="Original" onSave={onSave} autoFocus={false} />
       );
 
       const editor = screen.getByRole("textbox");
@@ -64,11 +56,7 @@ describe("MiniEditor", () => {
     test("Escape key with changed text calls onSave once", async () => {
       const onSave = jest.fn();
       render(
-        <MiniEditor
-          initialText="Original"
-          onSave={onSave}
-          autoFocus={false}
-        />
+        <MiniEditor initialText="Original" onSave={onSave} autoFocus={false} />
       );
 
       const editor = screen.getByRole("textbox");
@@ -76,7 +64,7 @@ describe("MiniEditor", () => {
       await userEvent.type(editor, "Changed");
 
       // Press Escape
-      fireEvent.keyDown(editor, { key: "Escape" });
+      await userEvent.keyboard("{Escape}");
 
       await waitFor(() => {
         expect(onSave).toHaveBeenCalledTimes(1);
@@ -87,11 +75,7 @@ describe("MiniEditor", () => {
     test("Enter key calls onSave with submitted flag", async () => {
       const onSave = jest.fn();
       render(
-        <MiniEditor
-          initialText="Original"
-          onSave={onSave}
-          autoFocus={false}
-        />
+        <MiniEditor initialText="Original" onSave={onSave} autoFocus={false} />
       );
 
       const editor = screen.getByRole("textbox");
@@ -99,7 +83,7 @@ describe("MiniEditor", () => {
       await userEvent.type(editor, "Changed");
 
       // Press Enter
-      fireEvent.keyDown(editor, { key: "Enter" });
+      await userEvent.keyboard("{Enter}");
 
       await waitFor(() => {
         expect(onSave).toHaveBeenCalledTimes(1);
@@ -110,11 +94,7 @@ describe("MiniEditor", () => {
     test("Enter followed by blur does not duplicate save", async () => {
       const onSave = jest.fn();
       render(
-        <MiniEditor
-          initialText="Original"
-          onSave={onSave}
-          autoFocus={false}
-        />
+        <MiniEditor initialText="Original" onSave={onSave} autoFocus={false} />
       );
 
       const editor = screen.getByRole("textbox");
@@ -122,7 +102,7 @@ describe("MiniEditor", () => {
       await userEvent.type(editor, "Changed");
 
       // Press Enter then blur (simulating focus moving away after Enter)
-      fireEvent.keyDown(editor, { key: "Enter" });
+      await userEvent.keyboard("{Enter}");
       fireEvent.blur(editor);
 
       await waitFor(() => {
@@ -133,11 +113,7 @@ describe("MiniEditor", () => {
     test("initialText prop change resets tracking, allowing new save", async () => {
       const onSave = jest.fn();
       const { rerender } = render(
-        <MiniEditor
-          initialText="First"
-          onSave={onSave}
-          autoFocus={false}
-        />
+        <MiniEditor initialText="First" onSave={onSave} autoFocus={false} />
       );
 
       const editor = screen.getByRole("textbox");
@@ -153,11 +129,7 @@ describe("MiniEditor", () => {
 
       // Simulate prop change (e.g., version was created, displayText updated)
       rerender(
-        <MiniEditor
-          initialText="Changed"
-          onSave={onSave}
-          autoFocus={false}
-        />
+        <MiniEditor initialText="Changed" onSave={onSave} autoFocus={false} />
       );
 
       // Now edit again
@@ -174,20 +146,12 @@ describe("MiniEditor", () => {
     test("same text typed after prop update does not trigger save", async () => {
       const onSave = jest.fn();
       const { rerender } = render(
-        <MiniEditor
-          initialText="Original"
-          onSave={onSave}
-          autoFocus={false}
-        />
+        <MiniEditor initialText="Original" onSave={onSave} autoFocus={false} />
       );
 
       // Simulate initialText updated to "Updated" (from external change)
       rerender(
-        <MiniEditor
-          initialText="Updated"
-          onSave={onSave}
-          autoFocus={false}
-        />
+        <MiniEditor initialText="Updated" onSave={onSave} autoFocus={false} />
       );
 
       const editor = screen.getByRole("textbox");

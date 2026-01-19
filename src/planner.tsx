@@ -93,7 +93,7 @@ export function planAddContact(plan: Plan, publicKey: PublicKey): Plan {
       setRelayConf(contactListEvent, {
         defaultRelays: false,
         user: true,
-        
+
         contacts: false,
       })
     ),
@@ -117,7 +117,7 @@ export function planUpsertMemberlist(plan: Plan, members: Members): Plan {
       setRelayConf(memberListEvent, {
         defaultRelays: false,
         user: false,
-        
+
         contacts: false,
       })
     ),
@@ -236,15 +236,15 @@ export function planCreateVersion(
 ): Plan {
   // 1. Create new version node
   const versionNode = newNode(newText);
-  let updatedPlan = planUpsertNode(plan, versionNode);
+  const planWithVersionNode = planUpsertNode(plan, versionNode);
 
   // 2. Ensure ~Versions node exists
   const versionsNode = newNode("~Versions");
-  updatedPlan = planUpsertNode(updatedPlan, versionsNode);
+  const updatedPlan = planUpsertNode(planWithVersionNode, versionsNode);
 
   // 3. Get or create ~Versions relations
   const versionsContext = getVersionsContext(originalNodeID, context);
-  let versionsRelations =
+  const baseVersionsRelations =
     getVersionsRelations(
       updatedPlan.knowledgeDBs,
       updatedPlan.user.publicKey,
@@ -254,38 +254,36 @@ export function planCreateVersion(
     newRelations(VERSIONS_NODE_ID, versionsContext, updatedPlan.user.publicKey);
 
   // 4. Ensure original node ID is in ~Versions (add at end if not present)
-  const originalIndex = versionsRelations.items.findIndex(
+  const originalIndex = baseVersionsRelations.items.findIndex(
     (item) => item.nodeID === originalNodeID
   );
-  if (originalIndex < 0) {
-    versionsRelations = addRelationToRelations(
-      versionsRelations,
-      originalNodeID,
-      "",
-      undefined,
-      versionsRelations.items.size
-    );
-  }
+  const versionsWithOriginal =
+    originalIndex < 0
+      ? addRelationToRelations(
+          baseVersionsRelations,
+          originalNodeID,
+          "",
+          undefined,
+          baseVersionsRelations.items.size
+        )
+      : baseVersionsRelations;
 
   // 5. Check if new version already exists in ~Versions
-  const existingIndex = versionsRelations.items.findIndex(
+  const existingIndex = versionsWithOriginal.items.findIndex(
     (item) => item.nodeID === versionNode.id
   );
 
-  let withVersion: Relations;
-  if (existingIndex >= 0) {
-    // Version exists - move it to the top
-    withVersion = moveRelations(versionsRelations, [existingIndex], 0);
-  } else {
-    // Version doesn't exist - add at top
-    withVersion = addRelationToRelations(
-      versionsRelations,
-      versionNode.id,
-      "",
-      undefined,
-      0
-    );
-  }
+  const withVersion =
+    existingIndex >= 0
+      ? moveRelations(versionsWithOriginal, [existingIndex], 0)
+      : addRelationToRelations(
+          versionsWithOriginal,
+          versionNode.id,
+          "",
+          undefined,
+          0
+        );
+
   return planUpsertRelations(updatedPlan, withVersion);
 }
 
@@ -333,8 +331,8 @@ export function planCreateNode(
   context: List<ID>
 ): [Plan, KnowNode] {
   const node = newNode(text);
-  let updatedPlan = planUpsertNode(plan, node);
-  updatedPlan = planEnsureVersionForNode(updatedPlan, node, context);
+  const planWithNode = planUpsertNode(plan, node);
+  const updatedPlan = planEnsureVersionForNode(planWithNode, node, context);
   return [updatedPlan, node];
 }
 
@@ -407,7 +405,7 @@ export function planUpdateViews(plan: Plan, views: Views): Plan {
       setRelayConf(writeViewEvent, {
         defaultRelays: false,
         user: true,
-        
+
         contacts: false,
       })
     ),
@@ -498,7 +496,7 @@ export function planPublishSettings(plan: Plan, settings: Settings): Plan {
       setRelayConf(publishSettingsEvent, {
         defaultRelays: false,
         user: true,
-        
+
         contacts: false,
       })
     ),

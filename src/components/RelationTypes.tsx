@@ -203,18 +203,20 @@ export function planExpandAndOpenCreateNodeEditor(
   const position = getInsertPosition(plan, viewPath);
   const nodeIsExpanded = isExpanded(plan, viewKey);
 
-  let resultPlan = plan;
-
   // If inserting as first child but node is collapsed, expand it first
-  if (position === "asFirstChild" && !nodeIsExpanded) {
-    const view = getViewFromPath(plan, viewPath);
-    const [nodeID] = getNodeIDFromView(plan, viewPath);
-    const context = getContextFromStackAndViewPath(stack, viewPath);
-    resultPlan = planExpandNode(resultPlan, nodeID, context, view, viewPath);
-  }
+  const expandedPlan =
+    position === "asFirstChild" && !nodeIsExpanded
+      ? planExpandNode(
+          plan,
+          getNodeIDFromView(plan, viewPath)[0],
+          getContextFromStackAndViewPath(stack, viewPath),
+          getViewFromPath(plan, viewPath),
+          viewPath
+        )
+      : plan;
 
   // Open the create node editor
-  return planOpenCreateNodeEditor(resultPlan, viewKey, position);
+  return planOpenCreateNodeEditor(expandedPlan, viewKey, position);
 }
 
 // Helper to parse viewKey and call planExpandAndOpenCreateNodeEditor

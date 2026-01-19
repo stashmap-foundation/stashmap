@@ -68,7 +68,9 @@ My Notes
       screen.getByLabelText(/Evidence for Child: No evidence type/)
     );
     await waitFor(() => {
-      expect(screen.getByLabelText(/Evidence for Child: Confirms/)).toBeDefined();
+      expect(
+        screen.getByLabelText(/Evidence for Child: Confirms/)
+      ).toBeDefined();
     });
 
     // Click 2: confirms -> contra
@@ -159,7 +161,10 @@ My Notes
     await userEvent.click(
       await screen.findByLabelText("Search to change pane 0 content")
     );
-    await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
+    await userEvent.type(
+      await screen.findByLabelText("search input"),
+      "Bitcoin"
+    );
     await userEvent.click(await screen.findByLabelText("select Bitcoin"));
     await screen.findByLabelText("expand Bitcoin");
 
@@ -207,7 +212,9 @@ My Notes
     });
 
     // Child1 should show Confirms, Child2 should still show No evidence type
-    expect(screen.getByLabelText(/Evidence for Child1: Confirms/)).toBeDefined();
+    expect(
+      screen.getByLabelText(/Evidence for Child1: Confirms/)
+    ).toBeDefined();
     expect(
       screen.getByLabelText(/Evidence for Child2: No evidence type/)
     ).toBeDefined();

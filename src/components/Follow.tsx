@@ -216,7 +216,7 @@ export function Follow(): JSX.Element {
       writeRelayConf: {
         user: true,
         defaultRelays: false,
-        
+
         contacts: false,
       },
     };

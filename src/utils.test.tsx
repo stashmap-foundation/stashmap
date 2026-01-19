@@ -855,7 +855,9 @@ export async function findNewNodeEditor(): Promise<HTMLElement> {
  * Standard test setup - renders the tree view.
  * The root node "My Notes" is already visible and expanded.
  */
-export function renderTree(user: ReturnType<typeof setup>[0]): RenderViewResult {
+export function renderTree(
+  user: ReturnType<typeof setup>[0]
+): RenderViewResult {
   return renderWithTestData(
     <RootViewOrWorkspaceIsLoading>
       <WorkspaceView />
@@ -871,7 +873,11 @@ export function renderTree(user: ReturnType<typeof setup>[0]): RenderViewResult 
 export async function createAndSetAsRoot(nodeName: string): Promise<void> {
   // First create the node under My Notes
   (await screen.findAllByLabelText("collapse My Notes"))[0];
-  await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
+  await userEvent.click(
+    (
+      await screen.findAllByLabelText("add to My Notes")
+    )[0]
+  );
   await userEvent.type(await findNewNodeEditor(), `${nodeName}{Escape}`);
 
   // Now use the pane search to change root to this node

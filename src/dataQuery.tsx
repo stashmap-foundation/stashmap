@@ -1,11 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Filter } from "nostr-tools";
 import { Set } from "immutable";
-import {
-  KIND_DELETE,
-  KIND_KNOWLEDGE_LIST,
-  KIND_KNOWLEDGE_NODE,
-} from "./nostr";
+import { KIND_DELETE, KIND_KNOWLEDGE_LIST, KIND_KNOWLEDGE_NODE } from "./nostr";
 import { splitID, isRefId, extractNodeIdsFromRefId } from "./connections";
 import { REFERENCED_BY } from "./constants";
 import { ADD_TO_NODE, getNodeFromID, useNodeID } from "./ViewContext";
@@ -211,7 +207,7 @@ export function useQueryKnowledgeData(filters: Filter[]): {
   const { events, eose } = useEventQuery(relayPool, filters, {
     readFromRelays: useReadRelays({
       user: true,
-      
+
       contacts: true,
     }),
     enabled: !disabled,

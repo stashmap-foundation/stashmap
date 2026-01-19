@@ -173,7 +173,9 @@ function toggleMultiselect(
 
 export function ToggleMultiselect(): JSX.Element {
   const displayText = useDisplayText();
-  const ariaLabel = displayText ? `toggle multiselect ${displayText}` : undefined;
+  const ariaLabel = displayText
+    ? `toggle multiselect ${displayText}`
+    : undefined;
   const { selection, setState, multiselectBtns } = useTemporaryView();
   const viewKey = useViewKey();
   const onClick = (): void =>
@@ -214,7 +216,10 @@ export function toggleEditing(
 
 // With content-addressed IDs (hash of text), any text node is mutable
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function isMutableNode(node: KnowNode | undefined, _user: User): boolean {
+export function isMutableNode(
+  node: KnowNode | undefined,
+  _user: User
+): boolean {
   return !!node && node.type === "text";
 }
 

@@ -153,12 +153,12 @@ beforeAll(() => {
 
     // eslint-disable-next-line functional/immutable-data
     range.getBoundingClientRect = () =>
-    ({
-      height: 100,
-      width: 100,
-      x: 0,
-      y: 0,
-    } as DOMRect);
+      ({
+        height: 100,
+        width: 100,
+        x: 0,
+        y: 0,
+      } as DOMRect);
 
     // eslint-disable-next-line functional/immutable-data
     range.getClientRects = () => {

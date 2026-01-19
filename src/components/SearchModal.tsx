@@ -155,7 +155,7 @@ function Search({
   const relays = useReadRelays({
     defaultRelays: false,
     user: true,
-    
+
     contacts: true,
   });
 

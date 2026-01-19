@@ -14,14 +14,25 @@ describe("Version Display", () => {
     renderTree(alice);
 
     // Create a parent node and a child "Barcelona"
-    (await screen.findAllByLabelText("collapse My Notes"))[0];
-    await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
-    await userEvent.type(await findNewNodeEditor(), "Holiday Destinations{Enter}");
+    await screen.findByLabelText("collapse My Notes");
+    await userEvent.click(
+      (
+        await screen.findAllByLabelText("add to My Notes")
+      )[0]
+    );
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Holiday Destinations{Enter}"
+    );
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     // Expand and add Barcelona as child
-    await userEvent.click(await screen.findByLabelText("expand Holiday Destinations"));
-    await userEvent.click(await screen.findByLabelText("add to Holiday Destinations"));
+    await userEvent.click(
+      await screen.findByLabelText("expand Holiday Destinations")
+    );
+    await userEvent.click(
+      await screen.findByLabelText("add to Holiday Destinations")
+    );
     await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -51,8 +62,12 @@ My Notes
     renderTree(alice);
 
     // Create a node
-    (await screen.findAllByLabelText("collapse My Notes"))[0];
-    await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
+    await screen.findByLabelText("collapse My Notes");
+    await userEvent.click(
+      (
+        await screen.findAllByLabelText("add to My Notes")
+      )[0]
+    );
     await userEvent.type(await findNewNodeEditor(), "Version 1{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -91,13 +106,24 @@ My Notes
     renderTree(alice);
 
     // Create Holiday Destinations
-    await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
-    await userEvent.type(await findNewNodeEditor(), "Holiday Destinations{Enter}");
+    await userEvent.click(
+      (
+        await screen.findAllByLabelText("add to My Notes")
+      )[0]
+    );
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Holiday Destinations{Enter}"
+    );
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     // Expand and add Barcelona
-    await userEvent.click(await screen.findByLabelText("expand Holiday Destinations"));
-    await userEvent.click(await screen.findByLabelText("add to Holiday Destinations"));
+    await userEvent.click(
+      await screen.findByLabelText("expand Holiday Destinations")
+    );
+    await userEvent.click(
+      await screen.findByLabelText("add to Holiday Destinations")
+    );
     await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -123,7 +149,9 @@ My Notes
     // Now create another node with text "Barcelona" (same content-addressed ID)
     // This adds "Barcelona" to top of ~Versions, so BOTH nodes show "Barcelona"
     // (they're the same node with the same ~Versions)
-    await userEvent.click(await screen.findByLabelText("add to Holiday Destinations"));
+    await userEvent.click(
+      await screen.findByLabelText("add to Holiday Destinations")
+    );
     await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -140,13 +168,24 @@ My Notes
     renderTree(alice);
 
     // Create Holiday Destinations
-    await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
-    await userEvent.type(await findNewNodeEditor(), "Holiday Destinations{Enter}");
+    await userEvent.click(
+      (
+        await screen.findAllByLabelText("add to My Notes")
+      )[0]
+    );
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Holiday Destinations{Enter}"
+    );
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     // Expand and add Barcelona
-    await userEvent.click(await screen.findByLabelText("expand Holiday Destinations"));
-    await userEvent.click(await screen.findByLabelText("add to Holiday Destinations"));
+    await userEvent.click(
+      await screen.findByLabelText("expand Holiday Destinations")
+    );
+    await userEvent.click(
+      await screen.findByLabelText("add to Holiday Destinations")
+    );
     await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -203,13 +242,24 @@ My Notes
     renderTree(alice);
 
     // Create Holiday Destinations
-    await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
-    await userEvent.type(await findNewNodeEditor(), "Holiday Destinations{Enter}");
+    await userEvent.click(
+      (
+        await screen.findAllByLabelText("add to My Notes")
+      )[0]
+    );
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Holiday Destinations{Enter}"
+    );
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     // Expand and add Barcelona
-    await userEvent.click(await screen.findByLabelText("expand Holiday Destinations"));
-    await userEvent.click(await screen.findByLabelText("add to Holiday Destinations"));
+    await userEvent.click(
+      await screen.findByLabelText("expand Holiday Destinations")
+    );
+    await userEvent.click(
+      await screen.findByLabelText("add to Holiday Destinations")
+    );
     await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -254,7 +304,9 @@ My Notes
 
     // Mark the top version (BCN inside ~Versions) as not relevant
     // There are two "mark BCN as not relevant" buttons - parent and inside ~Versions
-    const notRelevantButtons = await screen.findAllByLabelText("mark BCN as not relevant");
+    const notRelevantButtons = await screen.findAllByLabelText(
+      "mark BCN as not relevant"
+    );
     // The second one is inside ~Versions
     fireEvent.click(notRelevantButtons[1]);
 

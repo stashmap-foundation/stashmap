@@ -57,7 +57,9 @@ function AddNodeButton({
 
 function SearchButton({ onClick }: { onClick: () => void }): JSX.Element {
   const displayText = useDisplayText();
-  const ariaLabel = displayText ? `search and attach to ${displayText}` : "search";
+  const ariaLabel = displayText
+    ? `search and attach to ${displayText}`
+    : "search";
   return (
     <button
       className="btn btn-borderless p-0"
@@ -130,7 +132,10 @@ export function MiniEditor({
       const textNode = editorRef.current.firstChild;
       if (textNode && initialCursorPosition !== undefined) {
         // Set cursor at specific position
-        const pos = Math.min(initialCursorPosition, textNode.textContent?.length || 0);
+        const pos = Math.min(
+          initialCursorPosition,
+          textNode.textContent?.length || 0
+        );
         range.setStart(textNode, pos);
         range.setEnd(textNode, pos);
       } else {
@@ -286,12 +291,7 @@ type EditorProps = {
 };
 
 export function Editor({ onCreateNode, onClose }: EditorProps): JSX.Element {
-  return (
-    <MiniEditor
-      onSave={(text) => onCreateNode(text)}
-      onClose={onClose}
-    />
-  );
+  return <MiniEditor onSave={(text) => onCreateNode(text)} onClose={onClose} />;
 }
 
 type AddNodeProps = {
@@ -506,7 +506,11 @@ export function AddSiblingButton(): JSX.Element | null {
   }
 
   const handleClick = (): void => {
-    const plan = planExpandAndOpenCreateNodeEditor(createPlan(), viewPath, stack);
+    const plan = planExpandAndOpenCreateNodeEditor(
+      createPlan(),
+      viewPath,
+      stack
+    );
     executePlan(plan);
   };
 
@@ -522,4 +526,3 @@ export function AddSiblingButton(): JSX.Element | null {
     </button>
   );
 }
-

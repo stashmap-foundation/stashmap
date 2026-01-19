@@ -159,7 +159,9 @@ test("Shows dots when only other user has relation (current user has none)", asy
   // But Bob's child should appear as a diff item.
   expect(screen.queryByLabelText(/versions available/)).toBeNull();
   // Bob's child should be visible as a diff item
-  await screen.findByLabelText(/expand Bob's Child Node|collapse Bob's Child Node/);
+  await screen.findByLabelText(
+    /expand Bob's Child Node|collapse Bob's Child Node/
+  );
 });
 
 test("getDiffItemsForNode returns items from other users", () => {

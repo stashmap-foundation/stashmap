@@ -82,7 +82,6 @@ function StackedLayer({
   );
 }
 
-
 export function WorkspaceView(): JSX.Element | null {
   const { stack, popTo } = usePaneNavigation();
   const paneIndex = usePaneIndex();
@@ -128,7 +127,11 @@ export function WorkspaceView(): JSX.Element | null {
                   {/* Left side: Settings, Publishing Status, Sign In */}
                   <div
                     className="always-visible"
-                    style={{ display: "flex", alignItems: "center", gap: "4px" }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
                   >
                     {!hasStack && paneIndex === 0 && (
                       <>
@@ -141,7 +144,11 @@ export function WorkspaceView(): JSX.Element | null {
                   {/* Right side: Search, Close */}
                   <div
                     className="always-visible"
-                    style={{ display: "flex", alignItems: "center", gap: "4px" }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
                   >
                     {!hasStack && <PaneSearchButton />}
                     {!hasStack && <ClosePaneButton />}

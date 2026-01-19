@@ -32,7 +32,9 @@ test("Load Referenced By Nodes", async () => {
   await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
 
   // Attach same Bitcoin to Cryptocurrencies
-  await userEvent.click(await screen.findByLabelText("expand Cryptocurrencies"));
+  await userEvent.click(
+    await screen.findByLabelText("expand Cryptocurrencies")
+  );
   await userEvent.click(
     await screen.findByLabelText("search and attach to Cryptocurrencies")
   );

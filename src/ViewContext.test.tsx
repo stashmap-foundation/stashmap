@@ -108,9 +108,7 @@ test("Move View Settings on Delete", async () => {
   );
   // Expand Programming Languages to see children
   await screen.findByText("Programming Languages");
-  await userEvent.click(
-    screen.getByLabelText("expand Programming Languages")
-  );
+  await userEvent.click(screen.getByLabelText("expand Programming Languages"));
   // Find and expand C
   await screen.findByText("C");
   await userEvent.click(screen.getByLabelText("expand C"));
@@ -153,9 +151,7 @@ test("Move Node Up", async () => {
   );
   // Expand Programming Languages to see children
   await screen.findByText("Programming Languages");
-  await userEvent.click(
-    screen.getByLabelText("expand Programming Languages")
-  );
+  await userEvent.click(screen.getByLabelText("expand Programming Languages"));
   await screen.findByText("FPL");
   await expectTree(`
   Programming Languages
@@ -232,9 +228,7 @@ test("Contact reorders list", async () => {
   await screen.findByText("Programming Languages");
 
   // Expand Programming Languages to see its children
-  await userEvent.click(
-    screen.getByLabelText("expand Programming Languages")
-  );
+  await userEvent.click(screen.getByLabelText("expand Programming Languages"));
   await expectTree(`
 Programming Languages
   OOP
@@ -259,9 +253,7 @@ Programming Languages
   });
   await screen.findByText("Programming Languages");
   // Expand to see children
-  await userEvent.click(
-    screen.getByLabelText("expand Programming Languages")
-  );
+  await userEvent.click(screen.getByLabelText("expand Programming Languages"));
   // Step 1: Mark OOP as not relevant (hides it)
   fireEvent.click(await screen.findByLabelText("mark OOP as not relevant"));
 
@@ -479,9 +471,7 @@ test("View doesn't change if list is copied from contact", async () => {
 
   await screen.findByText("Programming Languages");
   // Expand Programming Languages to see children
-  await userEvent.click(
-    screen.getByLabelText("expand Programming Languages")
-  );
+  await userEvent.click(screen.getByLabelText("expand Programming Languages"));
   await expectTree(`
 Programming Languages
   OOP
@@ -534,9 +524,7 @@ test("Disconnect Nodes", async () => {
   });
   await screen.findByText("Programming Languages");
   // Expand Programming Languages to see children
-  await userEvent.click(
-    screen.getByLabelText("expand Programming Languages")
-  );
+  await userEvent.click(screen.getByLabelText("expand Programming Languages"));
   await expectTree(`
 Programming Languages
   C

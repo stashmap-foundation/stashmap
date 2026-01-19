@@ -168,44 +168,52 @@ export function CreateNodeEditor({
     const context = baseContext.push(targetNodeID as ID);
 
     // Create node with version awareness
-    let [plan, n] = planCreateNode(createPlan(), nodeText, context);
+    const [planWithNode, n] = planCreateNode(createPlan(), nodeText, context);
 
     // Get current relations to determine actual insert index before modifying
-    const currentRelations = getRelationForView(plan, targetPath, stack);
+    const currentRelations = getRelationForView(
+      planWithNode,
+      targetPath,
+      stack
+    );
     const currentSize = currentRelations?.items.size ?? 0;
     // When insertAtIndex is undefined, add at end (use current size)
     const actualInsertIndex = insertAtIndex ?? currentSize;
 
-    plan = upsertRelations(plan, targetPath, stack, (relations) =>
-      addRelationToRelations(
-        relations,
-        n.id,
-        "", // Default to "relevant"
-        undefined, // No argument
-        actualInsertIndex
-      )
+    const planWithRelations = upsertRelations(
+      planWithNode,
+      targetPath,
+      stack,
+      (relations) =>
+        addRelationToRelations(
+          relations,
+          n.id,
+          "", // Default to "relevant"
+          undefined, // No argument
+          actualInsertIndex
+        )
     );
     // Update view paths when inserting at specific position
     const updatedViews = updateViewPathsAfterAddRelation(
-      plan,
+      planWithRelations,
       targetPath,
       insertAtIndex
     );
-    plan = planUpdateViews(plan, updatedViews);
+    const planWithViews = planUpdateViews(planWithRelations, updatedViews);
 
     // If user pressed Enter, open another editor after the newly created node
     // Otherwise (blur), just close the editor
-    if (submitted) {
-      // Construct the path to the newly created node using the computed index
-      const newNodePath = addNodeToPath(plan, targetPath, actualInsertIndex);
-      const newNodeViewKey = viewPathToString(newNodePath);
-      // Chain to next sibling (new node is not expanded)
-      plan = planOpenCreateNodeEditor(plan, newNodeViewKey, "afterSibling");
-    } else {
-      plan = planCloseCreateNodeEditor(plan);
-    }
+    const finalPlan = submitted
+      ? planOpenCreateNodeEditor(
+          planWithViews,
+          viewPathToString(
+            addNodeToPath(planWithViews, targetPath, actualInsertIndex)
+          ),
+          "afterSibling"
+        )
+      : planCloseCreateNodeEditor(planWithViews);
 
-    executePlan(plan);
+    executePlan(finalPlan);
   };
 
   const onTab = (tabText: string, tabCursorPosition: number): void => {
@@ -219,32 +227,36 @@ export function CreateNodeEditor({
     // Expand the current node (ensure it has relations for children)
     const [nodeID, view] = getNodeIDFromView(data, viewPath);
     const context = getContextFromStackAndViewPath(stack, viewPath);
-    let plan = planExpandNode(createPlan(), nodeID, context, view, viewPath);
+    const expandedPlan = planExpandNode(
+      createPlan(),
+      nodeID,
+      context,
+      view,
+      viewPath
+    );
 
     // Find the last child (if any) - use plan data since we just expanded
-    const lastChild = getLastChild(plan, viewPath, stack);
+    const lastChild = getLastChild(expandedPlan, viewPath, stack);
 
     // Open editor at the correct position:
     // - If there's a last child: open after it (afterSibling)
     // - If no children: open as first child of current node
-    if (lastChild) {
-      plan = planOpenCreateNodeEditor(
-        plan,
-        viewPathToString(lastChild),
-        "afterSibling",
-        tabText,
-        tabCursorPosition
-      );
-    } else {
-      plan = planOpenCreateNodeEditor(
-        plan,
-        viewPathToString(viewPath),
-        "asFirstChild",
-        tabText,
-        tabCursorPosition
-      );
-    }
-    executePlan(plan);
+    const finalPlan = lastChild
+      ? planOpenCreateNodeEditor(
+          expandedPlan,
+          viewPathToString(lastChild),
+          "afterSibling",
+          tabText,
+          tabCursorPosition
+        )
+      : planOpenCreateNodeEditor(
+          expandedPlan,
+          viewPathToString(viewPath),
+          "asFirstChild",
+          tabText,
+          tabCursorPosition
+        );
+    executePlan(finalPlan);
   };
 
   return (

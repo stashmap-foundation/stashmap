@@ -221,27 +221,37 @@ function EditableContent(): JSX.Element {
   const displayText = useDisplayText();
   const prevSibling = usePreviousSibling();
 
-  const handleSave = (text: string, _imageUrl?: string, submitted?: boolean): void => {
+  const handleSave = (
+    text: string,
+    _imageUrl?: string,
+    submitted?: boolean
+  ): void => {
     if (!node || node.type !== "text") return;
     const textChanged = text !== displayText;
 
-    let plan = createPlan();
+    // Only execute if something changed
+    if (!textChanged && !submitted) {
+      return;
+    }
+
+    const basePlan = createPlan();
 
     // Save text changes by creating a version
-    if (textChanged) {
-      const context = getContextFromStackAndViewPath(stack, viewPath);
-      plan = planCreateVersion(plan, nodeID, text, context);
-    }
+    const planWithVersion = textChanged
+      ? planCreateVersion(
+          basePlan,
+          nodeID,
+          text,
+          getContextFromStackAndViewPath(stack, viewPath)
+        )
+      : basePlan;
 
     // If user pressed Enter, open create node editor (position determined by expansion state)
-    if (submitted) {
-      plan = planExpandAndOpenCreateNodeEditor(plan, viewPath, stack);
-    }
+    const finalPlan = submitted
+      ? planExpandAndOpenCreateNodeEditor(planWithVersion, viewPath, stack)
+      : planWithVersion;
 
-    // Only execute if something changed
-    if (textChanged || submitted) {
-      executePlan(plan);
-    }
+    executePlan(finalPlan);
   };
 
   const handleTab = (text: string): void => {
@@ -259,7 +269,10 @@ function EditableContent(): JSX.Element {
         : basePlan;
 
     // Step 2: Expand the previous sibling (ensure it has relations)
-    const prevSiblingContext = getContextFromStackAndViewPath(stack, prevSibling.viewPath);
+    const prevSiblingContext = getContextFromStackAndViewPath(
+      stack,
+      prevSibling.viewPath
+    );
     const planWithExpand = planExpandNode(
       planWithText,
       prevSibling.nodeID,

@@ -195,7 +195,10 @@ My Notes
     await userEvent.click(
       await screen.findByLabelText("Search to change pane 0 content")
     );
-    await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
+    await userEvent.type(
+      await screen.findByLabelText("search input"),
+      "Bitcoin"
+    );
     await userEvent.click(await screen.findByLabelText("select Bitcoin"));
     await screen.findByLabelText("expand Bitcoin");
 

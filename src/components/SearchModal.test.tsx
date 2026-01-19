@@ -165,4 +165,3 @@ test("Client side filtering when relay does not support nip-50", async () => {
     expect(screen.queryByText("Bircoin")).toBeNull();
   });
 });
-

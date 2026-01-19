@@ -211,8 +211,9 @@ function convertViewPathToString(viewContext: ViewPath): string {
   ) as SubPathWithRelations[];
   const beginning = withoutLastElement.reduce(
     (acc: string, subPath: SubPathWithRelations): string => {
-      const postfix = `${encodeNodeID(subPath.nodeID)}:${subPath.nodeIndex
-        }:${encodeNodeID(subPath.relationsID)}`;
+      const postfix = `${encodeNodeID(subPath.nodeID)}:${
+        subPath.nodeIndex
+      }:${encodeNodeID(subPath.relationsID)}`;
       return acc !== "" ? `${acc}:${postfix}` : postfix;
     },
     ""
@@ -269,7 +270,7 @@ export function getAvailableRelationsForNode(
   myself: PublicKey,
   id: LongID | ID,
   context: Context = List(),
-  onlyMine?: boolean
+  onlyMine: boolean = false
 ): List<Relations> {
   const myRelations = knowledgeDBs.get(myself, newDB()).relations;
   const [remote, localID] = splitID(id);
@@ -289,12 +290,12 @@ export function getAvailableRelationsForNode(
       : undefined;
   const preferredRemoteRelations: List<Relations> = remoteDB
     ? sortRelationsByDate(
-      remoteDB.relations
-        .filter(
-          (r) => r.head === localID && contextsMatch(r.context, context)
-        )
-        .toList()
-    )
+        remoteDB.relations
+          .filter(
+            (r) => r.head === localID && contextsMatch(r.context, context)
+          )
+          .toList()
+      )
     : List<Relations>();
   const otherRelations: List<Relations> = knowledgeDBs
     .filter((_, k) => k !== myself && k !== remote)
@@ -461,7 +462,10 @@ export function getVersionedDisplayText(
   );
   if (!versionsRelations) return undefined;
 
-  const versions = filterRelationItems(versionsRelations.items, VERSION_FILTERS);
+  const versions = filterRelationItems(
+    versionsRelations.items,
+    VERSION_FILTERS
+  );
   const firstVersion = versions.first();
   if (!firstVersion) return undefined;
   return getNodeFromID(knowledgeDBs, firstVersion.nodeID, myself)?.text;
@@ -1087,29 +1091,29 @@ export function upsertRelations(
   const relations =
     foundRelations.author !== plan.user.publicKey
       ? createUpdatableRelations(
-        plan.knowledgeDBs,
-        plan.user.publicKey,
-        foundRelations.id,
-        nodeID,
-        context
-      )
+          plan.knowledgeDBs,
+          plan.user.publicKey,
+          foundRelations.id,
+          nodeID,
+          context
+        )
       : foundRelations;
 
   const oldRelationsID = nodeView.relations || foundRelations.id;
   const didViewChange = oldRelationsID !== relations.id;
   const planWithUpdatedView = didViewChange
     ? planUpdateViews(
-      plan,
-      moveChildViewsToNewRelation(
-        plan.views,
-        viewPath,
-        oldRelationsID,
-        relations.id
-      ).set(viewPathToString(viewPath), {
-        ...nodeView,
-        relations: relations.id,
-      })
-    )
+        plan,
+        moveChildViewsToNewRelation(
+          plan.views,
+          viewPath,
+          oldRelationsID,
+          relations.id
+        ).set(viewPathToString(viewPath), {
+          ...nodeView,
+          relations: relations.id,
+        })
+      )
     : plan;
 
   const updatedRelations = modify(relations);

@@ -196,7 +196,6 @@ function Data({ user, children }: DataProps): JSX.Element {
       readFromRelays: usePreloadRelays({
         defaultRelays: true,
         user: true,
-        
       }),
       enabled: metaEventsEose,
     }
@@ -214,7 +213,6 @@ function Data({ user, children }: DataProps): JSX.Element {
       ...usePreloadRelays({
         defaultRelays: false,
         user: true,
-        
       }),
       ...flattenRelays(contactsRelays),
     ],

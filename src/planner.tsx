@@ -225,13 +225,35 @@ export function planBulkUpsertNodes(plan: Plan, nodes: KnowNode[]): Plan {
  * Adds the new version to ~Versions in context [...context, originalNodeID].
  * If the version already exists in ~Versions, moves it to the top instead of adding a duplicate.
  * Also ensures the original node ID is in ~Versions (for complete version history).
+ *
+ * Nested version handling: If editing a node that's inside a ~Versions list,
+ * adds the new version as a sibling instead of creating recursive ~Versions.
+ *
+ * Example: Editing BCN inside Barcelona's ~Versions:
+ *   Tree: ROOT → Barcelona → ~Versions → BCN
+ *   editContext = [ROOT, Barcelona, VERSIONS_NODE_ID]
+ *   - originalNodeID = Barcelona (context.get(-2), the node that owns ~Versions)
+ *   - context = [ROOT] (slice(0, -2), Barcelona's context without Barcelona or ~Versions)
+ *   - versionsContext = [ROOT, Barcelona] (used to look up the ~Versions relation)
  */
 export function planCreateVersion(
   plan: Plan,
-  originalNodeID: ID,
+  editedNodeID: ID,
   newText: string,
-  context: List<ID>
+  editContext: List<ID>
 ): Plan {
+  // Handle nested versions: if editing a node inside ~Versions list,
+  // add the new version as a sibling instead of creating recursive ~Versions
+  const isInsideVersions = editContext.last() === VERSIONS_NODE_ID;
+
+  const [originalNodeID, context]: [ID, List<ID>] =
+    isInsideVersions && editContext.size >= 2
+      ? [
+          editContext.get(editContext.size - 2) as ID, // The node that owns ~Versions
+          editContext.slice(0, -2).toList(), // Context to that node
+        ]
+      : [editedNodeID, editContext];
+
   // 1. Create new version node
   const versionNode = newNode(newText);
   const planWithVersionNode = planUpsertNode(plan, versionNode);
@@ -266,20 +288,30 @@ export function planCreateVersion(
         )
       : baseVersionsRelations;
 
-  // 5. Check if new version already exists in ~Versions
+  // 5. Determine insert position
+  // If editing inside ~Versions, insert at the same position as the edited node
+  // Otherwise, insert at position 0 (top)
+  const editedNodePosition = isInsideVersions
+    ? versionsWithOriginal.items.findIndex(
+        (item) => item.nodeID === editedNodeID
+      )
+    : -1;
+  const insertPosition = editedNodePosition >= 0 ? editedNodePosition : 0;
+
+  // 6. Check if new version already exists in ~Versions
   const existingIndex = versionsWithOriginal.items.findIndex(
     (item) => item.nodeID === versionNode.id
   );
 
   const withVersion =
     existingIndex >= 0
-      ? moveRelations(versionsWithOriginal, [existingIndex], 0)
+      ? moveRelations(versionsWithOriginal, [existingIndex], insertPosition)
       : addRelationToRelations(
           versionsWithOriginal,
           versionNode.id,
           "",
           undefined,
-          0
+          insertPosition
         );
 
   return planUpsertRelations(updatedPlan, withVersion);

@@ -237,6 +237,184 @@ My Notes
     `);
   });
 
+  test("Editing a version inside ~Versions inserts new version at same position", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    // Create Holiday Destinations
+    await userEvent.click(
+      (
+        await screen.findAllByLabelText("add to My Notes")
+      )[0]
+    );
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Holiday Destinations{Enter}"
+    );
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    // Expand and add Barcelona
+    await userEvent.click(
+      await screen.findByLabelText("expand Holiday Destinations")
+    );
+    await userEvent.click(
+      await screen.findByLabelText("add to Holiday Destinations")
+    );
+    await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    // Edit Barcelona to BCN (first edit)
+    const barcelonaEditor = await screen.findByLabelText("edit Barcelona");
+    await userEvent.click(barcelonaEditor);
+    await userEvent.clear(barcelonaEditor);
+    await userEvent.type(barcelonaEditor, "BCN");
+    fireEvent.blur(barcelonaEditor);
+
+    // Edit BCN to V3 (second edit)
+    const bcnEditor = await screen.findByLabelText("edit BCN");
+    await userEvent.click(bcnEditor);
+    await userEvent.clear(bcnEditor);
+    await userEvent.type(bcnEditor, "V3");
+    fireEvent.blur(bcnEditor);
+
+    // Now we have ~Versions: [V3, BCN, Barcelona]
+    // Expand V3 and add ~Versions as a child to see them
+    await userEvent.click(await screen.findByLabelText("expand V3"));
+    await userEvent.click(await screen.findByLabelText("add to V3"));
+    await userEvent.type(await findNewNodeEditor(), "~Versions{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand ~Versions"));
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    V3
+      ~Versions
+        V3
+        BCN
+        Barcelona
+    `);
+
+    // Now edit BCN (at position 1 inside ~Versions) to "BCN-updated"
+    // BCN only appears inside ~Versions (parent shows "V3")
+    const bcnInsideVersions = await screen.findByLabelText("edit BCN");
+    await userEvent.click(bcnInsideVersions);
+    await userEvent.clear(bcnInsideVersions);
+    await userEvent.type(bcnInsideVersions, "BCN-updated");
+    fireEvent.blur(bcnInsideVersions);
+
+    // The new version should be inserted at the same position (1),
+    // and BCN should shift down to position 2
+    // Result: [V3, BCN-updated, BCN, Barcelona]
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    V3
+      ~Versions
+        V3
+        BCN-updated
+        BCN
+        Barcelona
+    `);
+  });
+
+  test("Pressing Enter while editing inside ~Versions opens editor at correct position", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    // Create Holiday Destinations
+    await userEvent.click(
+      (
+        await screen.findAllByLabelText("add to My Notes")
+      )[0]
+    );
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Holiday Destinations{Enter}"
+    );
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    // Expand and add Barcelona
+    await userEvent.click(
+      await screen.findByLabelText("expand Holiday Destinations")
+    );
+    await userEvent.click(
+      await screen.findByLabelText("add to Holiday Destinations")
+    );
+    await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    // Edit Barcelona to BCN (first edit)
+    const barcelonaEditor = await screen.findByLabelText("edit Barcelona");
+    await userEvent.click(barcelonaEditor);
+    await userEvent.clear(barcelonaEditor);
+    await userEvent.type(barcelonaEditor, "BCN");
+    fireEvent.blur(barcelonaEditor);
+
+    // Edit BCN to V3 (second edit)
+    const bcnEditor = await screen.findByLabelText("edit BCN");
+    await userEvent.click(bcnEditor);
+    await userEvent.clear(bcnEditor);
+    await userEvent.type(bcnEditor, "V3");
+    fireEvent.blur(bcnEditor);
+
+    // Now we have ~Versions: [V3, BCN, Barcelona]
+    // Expand V3 and add ~Versions as a child to see them
+    await userEvent.click(await screen.findByLabelText("expand V3"));
+    await userEvent.click(await screen.findByLabelText("add to V3"));
+    await userEvent.type(await findNewNodeEditor(), "~Versions{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand ~Versions"));
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    V3
+      ~Versions
+        V3
+        BCN
+        Barcelona
+    `);
+
+    // Now edit BCN (at position 1 inside ~Versions) and press Enter
+    // BCN only appears inside ~Versions (parent shows "V3")
+    const bcnInsideVersions = await screen.findByLabelText("edit BCN");
+    await userEvent.click(bcnInsideVersions);
+    await userEvent.clear(bcnInsideVersions);
+    await userEvent.type(bcnInsideVersions, "BCN-updated{Enter}");
+
+    // BUG: Editor appears after BCN instead of after BCN-updated.
+    // When pressing Enter after editing inside ~Versions, the editor opens relative to the
+    // edited node (which shifted down) rather than relative to the newly inserted version.
+    // Ideal: [V3, BCN-updated, [EDITOR], BCN, Barcelona]
+    // Actual: [V3, BCN-updated, BCN, [EDITOR], Barcelona]
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    V3
+      ~Versions
+        V3
+        BCN-updated
+        BCN
+        [EDITOR]
+        Barcelona
+    `);
+
+    // Close the editor
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    V3
+      ~Versions
+        V3
+        BCN-updated
+        BCN
+        Barcelona
+    `);
+  });
+
   test("Setting top version to not_relevant shows the previous version", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);

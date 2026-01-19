@@ -263,6 +263,42 @@ My Notes
   });
 
   describe("Enter on Expanded Node - Insert at BEGINNING", () => {
+    test("Enter on expanded node - editor appears BEFORE existing children", async () => {
+      const [alice] = setup([ALICE]);
+      renderTree(alice);
+
+      // Create Parent with children
+      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
+      await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+      await userEvent.click(await screen.findByLabelText("expand Parent"));
+      await userEvent.click(await screen.findByLabelText("add to Parent"));
+      await userEvent.type(await findNewNodeEditor(), "Child A{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "Child B{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+      // Press Enter on expanded Parent - editor should appear BEFORE children
+      const parentEditor = await screen.findByLabelText("edit Parent");
+      await userEvent.click(parentEditor);
+      await userEvent.keyboard("{Enter}");
+
+      const editor = await findNewNodeEditor();
+      await userEvent.type(editor, "New First");
+
+      // Editor should be BEFORE Child A and Child B
+      await expectTree(`
+My Notes
+  Parent
+    [EDITOR: New First]
+    Child A
+    Child B
+      `);
+
+      await userEvent.type(editor, "{Escape}");
+    });
+
     test("Enter on expanded node inserts new child at BEGINNING", async () => {
       const [alice] = setup([ALICE]);
       renderTree(alice);
@@ -308,6 +344,39 @@ My Notes
   });
 
   describe("Enter on Collapsed Node - Insert as Sibling AFTER", () => {
+    test("Enter on collapsed node - editor appears AFTER the node", async () => {
+      const [alice] = setup([ALICE]);
+      renderTree(alice);
+
+      // Create siblings
+      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
+
+      await userEvent.type(await findNewNodeEditor(), "Node 1{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "Node 2{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "Node 3{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+      // Press Enter on Node 2 - editor should appear after Node 2
+      const node2Editor = await screen.findByLabelText("edit Node 2");
+      await userEvent.click(node2Editor);
+      await userEvent.keyboard("{Enter}");
+
+      const editor = await findNewNodeEditor();
+      await userEvent.type(editor, "New Node");
+
+      // Editor should be after Node 2 and before Node 3
+      await expectTree(`
+My Notes
+  Node 1
+  Node 2
+  [EDITOR: New Node]
+  Node 3
+      `);
+
+      await userEvent.type(editor, "{Escape}");
+    });
+
     test("Enter on collapsed node inserts sibling after it", async () => {
       const [alice] = setup([ALICE]);
       renderTree(alice);
@@ -484,6 +553,36 @@ My Notes
       `);
     });
 
+    test("Tab on new editor to empty node - editor appears as first child", async () => {
+      const [alice] = setup([ALICE]);
+      renderTree(alice);
+
+      // Create an empty parent (no children)
+      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
+      await userEvent.type(await findNewNodeEditor(), "Empty Parent{Enter}");
+
+      // Tab to indent under Empty Parent
+      const editor = await findNewNodeEditor();
+      await userEvent.type(editor, "First Child");
+
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(true);
+      window.getSelection()?.removeAllRanges();
+      window.getSelection()?.addRange(range);
+      fireEvent.keyDown(editor, { key: "Tab" });
+
+      // Editor should now be a child of Empty Parent
+      await expectTree(`
+My Notes
+  Empty Parent
+    [EDITOR: First Child]
+      `);
+
+      await userEvent.type(editor, "{Escape}");
+    });
+
     test("Tab on new editor to empty node (no children) creates first child", async () => {
       const [alice] = setup([ALICE]);
       renderTree(alice);
@@ -607,6 +706,39 @@ My Notes
   });
 
   describe("Plus Button Behavior", () => {
+    test("Plus button on expanded node - editor appears BEFORE existing children", async () => {
+      const [alice] = setup([ALICE]);
+      renderTree(alice);
+
+      // Create Parent with children
+      (await screen.findAllByLabelText("collapse My Notes"))[0];
+      await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
+      await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+      await userEvent.click(await screen.findByLabelText("expand Parent"));
+      await userEvent.click(await screen.findByLabelText("add to Parent"));
+      await userEvent.type(await findNewNodeEditor(), "Child 1{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "Child 2{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+      // Click plus on expanded Parent - editor should appear BEFORE children
+      await userEvent.click(await screen.findByLabelText("add to Parent"));
+
+      const editor = await findNewNodeEditor();
+      await userEvent.type(editor, "New First");
+
+      await expectTree(`
+My Notes
+  Parent
+    [EDITOR: New First]
+    Child 1
+    Child 2
+      `);
+
+      await userEvent.type(editor, "{Escape}");
+    });
+
     test("Plus button on expanded node with children opens editor at BEGINNING", async () => {
       const [alice] = setup([ALICE]);
       renderTree(alice);

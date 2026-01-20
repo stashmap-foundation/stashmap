@@ -1,6 +1,7 @@
 import React from "react";
 import { Map } from "immutable";
 import { newDB } from "./knowledge";
+import { injectEmptyNodesIntoKnowledgeDBs } from "./connections";
 
 export type DataContextProps = Data;
 
@@ -65,11 +66,20 @@ export function MergeKnowledgeDB({
       ];
     })
   );
+
+  // Inject empty placeholder nodes based on temporaryView.emptyNodePositions
+  const { emptyNodePositions } = data.publishEventsStatus.temporaryView;
+  const dbsWithEmptyNodes = injectEmptyNodesIntoKnowledgeDBs(
+    mergedDBs,
+    emptyNodePositions,
+    data.user.publicKey
+  );
+
   return (
     <DataContext.Provider
       value={{
         ...data,
-        knowledgeDBs: mergedDBs,
+        knowledgeDBs: dbsWithEmptyNodes,
       }}
     >
       {children}

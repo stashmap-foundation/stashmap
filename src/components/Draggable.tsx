@@ -6,35 +6,10 @@ import {
   useIsDiffItem,
   useIsInReferencedByView,
   useViewPath,
-  useViewKey,
-  useRelationIndex,
-  getParentView,
-  upsertRelations,
-  updateViewPathsAfterAddRelation,
-  addNodeToPath,
-  viewPathToString,
-  getContextFromStackAndViewPath,
-  getNodeIDFromView,
-  getRelationForView,
-  getLastChild,
 } from "../ViewContext";
-import { useData } from "../DataContext";
-import { planExpandNode } from "./RelationTypes";
-import { NOTE_TYPE, Node, Indent } from "./Node";
-import { LeftMenu } from "./LeftMenu";
+import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable } from "./DroppableContainer";
-import { useIsEditingOn, useTemporaryView } from "./TemporaryViewContext";
-import { MiniEditor } from "./AddNode";
-import { NodeCard } from "../commons/Ui";
-import { addRelationToRelations } from "../connections";
-import {
-  planUpdateViews,
-  usePlanner,
-  planOpenCreateNodeEditor,
-  planCloseCreateNodeEditor,
-  planCreateNode,
-} from "../planner";
-import { usePaneNavigation } from "../SplitPanesContext";
+import { useIsEditingOn } from "./TemporaryViewContext";
 
 export type DragItemType = {
   path: ViewPath;
@@ -109,177 +84,6 @@ function DraggableDiffItem({ className }: { className?: string }): JSX.Element {
   );
 }
 
-type CreateNodeEditorProps = {
-  position: CreateNodeEditorPosition;
-  text: string;
-  cursorPosition: number;
-  baseInsertAtIndex: number;
-  baseLevels: number;
-};
-
-export function CreateNodeEditor({
-  position,
-  text,
-  cursorPosition,
-  baseInsertAtIndex,
-  baseLevels,
-}: CreateNodeEditorProps): JSX.Element | null {
-  const data = useData();
-  const viewPath = useViewPath();
-  const { stack } = usePaneNavigation();
-  const { createPlan, executePlan } = usePlanner();
-
-  // Helper to close the editor via planner
-  const closeEditor = (): void => {
-    executePlan(planCloseCreateNodeEditor(createPlan()));
-  };
-
-  // Compute derived values based on current position
-  const isChildPosition = position === "asFirstChild";
-  const levels = isChildPosition ? baseLevels + 1 : baseLevels;
-  // asFirstChild: insert at 0 (beginning)
-  // afterSibling: insert at baseInsertAtIndex
-  const insertAtIndex = position === "asFirstChild" ? 0 : baseInsertAtIndex;
-
-  // Determine target path based on position:
-  // - afterSibling: insert into parent's relations
-  // - asFirstChild: insert into current node's relations
-  const parentPath = getParentView(viewPath);
-  const targetPath = position === "afterSibling" ? parentPath : viewPath;
-
-  if (!targetPath) {
-    return null;
-  }
-
-  const onCreateNode = (
-    nodeText: string,
-    _imageUrl?: string,
-    submitted?: boolean
-  ): void => {
-    const trimmedText = nodeText.trim();
-    if (!trimmedText) {
-      closeEditor();
-      return;
-    }
-
-    // Build context including target node's ID (where we're adding the child)
-    const [targetNodeID] = getNodeIDFromView(data, targetPath);
-    const baseContext = getContextFromStackAndViewPath(stack, targetPath);
-    const context = baseContext.push(targetNodeID as ID);
-
-    // Create node with version awareness
-    const [planWithNode, n] = planCreateNode(createPlan(), nodeText, context);
-
-    // Get current relations to determine actual insert index before modifying
-    const currentRelations = getRelationForView(
-      planWithNode,
-      targetPath,
-      stack
-    );
-    const currentSize = currentRelations?.items.size ?? 0;
-    // When insertAtIndex is undefined, add at end (use current size)
-    const actualInsertIndex = insertAtIndex ?? currentSize;
-
-    const planWithRelations = upsertRelations(
-      planWithNode,
-      targetPath,
-      stack,
-      (relations) =>
-        addRelationToRelations(
-          relations,
-          n.id,
-          "", // Default to "relevant"
-          undefined, // No argument
-          actualInsertIndex
-        )
-    );
-    // Update view paths when inserting at specific position
-    const updatedViews = updateViewPathsAfterAddRelation(
-      planWithRelations,
-      targetPath,
-      insertAtIndex
-    );
-    const planWithViews = planUpdateViews(planWithRelations, updatedViews);
-
-    // If user pressed Enter, open another editor after the newly created node
-    // Otherwise (blur), just close the editor
-    const finalPlan = submitted
-      ? planOpenCreateNodeEditor(
-          planWithViews,
-          viewPathToString(
-            addNodeToPath(planWithViews, targetPath, actualInsertIndex)
-          ),
-          "afterSibling"
-        )
-      : planCloseCreateNodeEditor(planWithViews);
-
-    executePlan(finalPlan);
-  };
-
-  const onTab = (tabText: string, tabCursorPosition: number): void => {
-    // Tab indents the editor - changes from sibling to child position
-    // Don't create the node yet, just move the editor
-    if (isChildPosition) {
-      // Already at max indent level for this context
-      return;
-    }
-
-    // Expand the current node (ensure it has relations for children)
-    const [nodeID, view] = getNodeIDFromView(data, viewPath);
-    const context = getContextFromStackAndViewPath(stack, viewPath);
-    const expandedPlan = planExpandNode(
-      createPlan(),
-      nodeID,
-      context,
-      view,
-      viewPath
-    );
-
-    // Find the last child (if any) - use plan data since we just expanded
-    const lastChild = getLastChild(expandedPlan, viewPath, stack);
-
-    // Open editor at the correct position:
-    // - If there's a last child: open after it (afterSibling)
-    // - If no children: open as first child of current node
-    const finalPlan = lastChild
-      ? planOpenCreateNodeEditor(
-          expandedPlan,
-          viewPathToString(lastChild),
-          "afterSibling",
-          tabText,
-          tabCursorPosition
-        )
-      : planOpenCreateNodeEditor(
-          expandedPlan,
-          viewPathToString(viewPath),
-          "asFirstChild",
-          tabText,
-          tabCursorPosition
-        );
-    executePlan(finalPlan);
-  };
-
-  return (
-    <NodeCard className="hover-light-bg" cardBodyClassName="ps-0 pt-0 pb-0">
-      <LeftMenu />
-      {levels > 0 && <Indent levels={levels} />}
-      <div className="expand-collapse-toggle" style={{ color: "black" }}>
-        <span className="triangle collapsed">▶</span>
-      </div>
-      <div className="flex-column w-100" style={{ paddingTop: 10 }}>
-        <MiniEditor
-          initialText={text}
-          initialCursorPosition={cursorPosition}
-          onSave={onCreateNode}
-          onClose={closeEditor}
-          onTab={onTab}
-          ariaLabel="new node editor"
-        />
-      </div>
-    </NodeCard>
-  );
-}
-
 export function ListItem({
   index,
   treeViewPath,
@@ -290,17 +94,6 @@ export function ListItem({
   const ref = useRef<HTMLDivElement>(null);
   const isDiffItem = useIsDiffItem();
   const isInReferencedByView = useIsInReferencedByView();
-  const viewPath = useViewPath();
-  const viewKey = useViewKey();
-  const relationIndex = useRelationIndex();
-  const { createNodeEditorState } = useTemporaryView();
-
-  // Check if we should show a create node editor after this node
-  const showEditor = createNodeEditorState?.viewKey === viewKey;
-
-  // Base values for editor
-  const baseLevels = viewPath.length - 1;
-  const baseInsertAtIndex = relationIndex !== undefined ? relationIndex + 1 : 0;
 
   // Root node (index 0) can't have siblings above it
   const isRoot = index === 0;
@@ -330,19 +123,8 @@ export function ListItem({
     dragDirection === -1 ? "dragging-over-bottom" : ""
   }`;
   return (
-    <>
-      <div className="visible-on-hover">
-        <Draggable ref={ref} className={className} />
-      </div>
-      {showEditor && createNodeEditorState && (
-        <CreateNodeEditor
-          position={createNodeEditorState.position}
-          text={createNodeEditorState.text}
-          cursorPosition={createNodeEditorState.cursorPosition}
-          baseInsertAtIndex={baseInsertAtIndex}
-          baseLevels={baseLevels}
-        />
-      )}
-    </>
+    <div className="visible-on-hover">
+      <Draggable ref={ref} className={className} />
+    </div>
   );
 }

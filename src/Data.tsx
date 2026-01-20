@@ -134,7 +134,8 @@ const DEFAULT_TEMPORARY_VIEW: TemporaryViewState = {
   multiselectBtns: Set<string>(),
   editingViews: Set<string>(),
   editorOpenViews: Set<string>(),
-  createNodeEditorState: null,
+  draftTexts: Map<string, string>(),
+  emptyNodePositions: Map<LongID, number>(),
 };
 
 function Data({ user, children }: DataProps): JSX.Element {

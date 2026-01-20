@@ -40,11 +40,7 @@ type EditorOpen = EditorOpenState & {
   setEditorOpenState: (editorOpenState: EditorOpenState) => void;
 };
 
-type CreateNodeEditor = {
-  createNodeEditorState: CreateNodeEditorState;
-};
-
-type TemporaryView = MultiSelection & Editing & EditorOpen & CreateNodeEditor;
+type TemporaryView = MultiSelection & Editing & EditorOpen;
 
 type SetSelected = (selected: boolean) => void;
 type FindSelectedByPostfix = (postfix: string) => Set<string>;
@@ -292,10 +288,6 @@ export function TemporaryViewProvider({
   const [isEditorOpenState, setEditorOpenState] = useState<EditorOpenState>({
     editorOpenViews: Set<string>(),
   });
-  const data = useData();
-
-  // Read createNodeEditorState from data (managed by planner)
-  const { createNodeEditorState } = data.publishEventsStatus.temporaryView;
 
   return (
     <TemporaryViewContext.Provider
@@ -307,7 +299,6 @@ export function TemporaryViewProvider({
         setEditingState,
         editorOpenViews: isEditorOpenState.editorOpenViews,
         setEditorOpenState,
-        createNodeEditorState,
       }}
     >
       {children}

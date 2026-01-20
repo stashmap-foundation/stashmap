@@ -526,6 +526,13 @@ export function getRelationForView(
   const [nodeID, view] = getNodeIDFromView(data, viewPath);
   const context = getContextFromStackAndViewPath(stack, viewPath);
 
+  console.log("getRelationForView", {
+    nodeID,
+    viewRelations: view.relations,
+    context: context.toArray(),
+    viewPath,
+  });
+
   // Handle REFERENCED_BY specially - it's not context-based
   if (view.relations === REFERENCED_BY) {
     return getRelations(
@@ -543,18 +550,21 @@ export function getRelationForView(
       view.relations,
       data.user.publicKey
     );
+    console.log("viewRelations from view.relations", viewRelations?.id, "contextMatch", viewRelations && contextsMatch(viewRelations.context, context));
     if (viewRelations && contextsMatch(viewRelations.context, context)) {
       return viewRelations;
     }
   }
 
   // Find relation by (head, context)
-  return getAvailableRelationsForNode(
+  const available = getAvailableRelationsForNode(
     data.knowledgeDBs,
     data.user.publicKey,
     nodeID,
     context
-  ).first();
+  );
+  console.log("getAvailableRelationsForNode", available.size, available.first()?.id);
+  return available.first();
 }
 
 export function calculateNodeIndex(
@@ -771,6 +781,11 @@ export function getRelationIndex(
   if (nodeID === ADD_TO_NODE) {
     return relations.items.size;
   }
+  console.log("calculateIndexFromNodeIndex", {
+    searchingFor: nodeID,
+    nodeIndex,
+    itemsInRelations: relations.items.map((i) => i.nodeID).toArray(),
+  });
   return calculateIndexFromNodeIndex(relations, nodeID, nodeIndex);
 }
 
@@ -961,6 +976,24 @@ export function useIsExpanded(): boolean {
 export function useIsRoot(): boolean {
   const viewPath = useViewPath();
   return viewPath.length === 2;
+}
+
+/**
+ * Get the target path and insert index for adding a new node after this one.
+ * Same logic as DND: if root or expanded → insert as first child, else → insert as sibling.
+ */
+export function useNextInsertPosition(): [ViewPath, number] | null {
+  const viewPath = useViewPath();
+  const parentPath = getParentView(viewPath);
+  const isExpanded = useIsExpanded();
+  const isRoot = useIsRoot();
+  const relationIndex = useRelationIndex();
+
+  if (!parentPath && !isRoot) return null;
+
+  const targetPath = isRoot || isExpanded ? viewPath : parentPath!;
+  const insertIndex = isRoot || isExpanded ? 0 : (relationIndex ?? 0) + 1;
+  return [targetPath, insertIndex];
 }
 
 export function getParentKey(viewKey: string): string {

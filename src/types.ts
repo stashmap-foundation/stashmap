@@ -1,4 +1,4 @@
-import { Map, OrderedMap, List } from "immutable";
+import { Map, OrderedMap, List, OrderedSet, Set } from "immutable";
 import { Event, EventTemplate, UnsignedEvent } from "nostr-tools";
 // eslint-disable-next-line import/no-unresolved
 import { RelayInformation } from "nostr-tools/lib/types/nip11";
@@ -227,25 +227,18 @@ declare global {
   };
 
   // Temporary UI state (not persisted to Nostr)
-  type CreateNodeEditorPosition = "afterSibling" | "asFirstChild";
-
-  type CreateNodeEditorState = {
-    viewKey: string;
-    position: CreateNodeEditorPosition;
-    text: string;
-    cursorPosition: number;
-  } | null;
-
   type TemporaryViewState = {
     // Multiselect
-    selection: import("immutable").OrderedSet<string>;
-    multiselectBtns: import("immutable").Set<string>;
+    selection: OrderedSet<string>;
+    multiselectBtns: Set<string>;
     // Editing state
-    editingViews: import("immutable").Set<string>;
+    editingViews: Set<string>;
     // AddToNode editor open state
-    editorOpenViews: import("immutable").Set<string>;
-    // Create node editor state
-    createNodeEditorState: CreateNodeEditorState;
+    editorOpenViews: Set<string>;
+    // Draft texts: draftID → current text being typed
+    draftTexts: Map<string, string>;
+    // Empty node positions: relationsID → index where empty node should be inserted
+    emptyNodePositions: Map<LongID, number>;
   };
 }
 

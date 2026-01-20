@@ -16,6 +16,9 @@ export function hashText(text: string): ID {
 // Pre-computed hash for the ~Versions node
 export const VERSIONS_NODE_ID = hashText("~Versions");
 
+// Pre-computed hash for empty node (used as placeholder when creating new nodes)
+export const EMPTY_NODE_ID = hashText("") as ID;
+
 // Type guards for KnowNode union type
 export function isTextNode(node: KnowNode): node is TextNode {
   return node.type === "text";
@@ -562,4 +565,55 @@ export function newNode(text: string): KnowNode {
     id: hashText(text), // Content-addressed: ID = hash(text)
     type: "text",
   };
+}
+
+// Check if a node ID is the empty placeholder node
+export function isEmptyNodeID(id: LongID | ID): boolean {
+  return id === EMPTY_NODE_ID;
+}
+
+// Inject empty nodes back into relations based on emptyNodePositions
+// This is called after processEvents to add empty placeholder nodes
+// that were filtered out before relay publishing
+export function injectEmptyNodesIntoKnowledgeDBs(
+  knowledgeDBs: KnowledgeDBs,
+  emptyNodePositions: Map<LongID, number>,
+  myself: PublicKey
+): KnowledgeDBs {
+  if (emptyNodePositions.size === 0) {
+    return knowledgeDBs;
+  }
+
+  const myDB = knowledgeDBs.get(myself);
+  if (!myDB) {
+    return knowledgeDBs;
+  }
+
+  // For each empty node position, insert into the corresponding relations
+  const updatedRelations = emptyNodePositions.reduce(
+    (relations, index, relationsID) => {
+      const shortRelationsID = splitID(relationsID)[1];
+      const existingRelations = relations.get(shortRelationsID);
+      if (!existingRelations) {
+        return relations;
+      }
+
+      // Insert empty node at the specified index
+      const emptyItem: RelationItem = {
+        nodeID: EMPTY_NODE_ID as LongID,
+        relevance: "",
+      };
+      const updatedItems = existingRelations.items.insert(index, emptyItem);
+      return relations.set(shortRelationsID, {
+        ...existingRelations,
+        items: updatedItems,
+      });
+    },
+    myDB.relations
+  );
+
+  return knowledgeDBs.set(myself, {
+    ...myDB,
+    relations: updatedRelations,
+  });
 }

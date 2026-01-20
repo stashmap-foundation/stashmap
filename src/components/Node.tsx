@@ -17,6 +17,10 @@ import {
   findOrCreateRelationsForContext,
   usePreviousSibling,
   useDisplayText,
+  getParentView,
+  useNextInsertPosition,
+  useRelationIndex,
+  getLast,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -29,6 +33,8 @@ import {
   isReferenceNode,
   getRefTargetStack,
   itemMatchesType,
+  isEmptyNodeID,
+  EMPTY_NODE_ID,
 } from "../connections";
 import { REFERENCED_BY, DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 import { IS_MOBILE } from "./responsive";
@@ -40,15 +46,16 @@ import {
 } from "./SelectRelations";
 import { ReferenceIndicators } from "./ReferenceIndicators";
 import { useData } from "../DataContext";
-import { planCreateVersion, usePlanner } from "../planner";
+import {
+  planCreateVersion,
+  usePlanner,
+  planCreateNode,
+  planRemoveEmptyNodePosition,
+} from "../planner";
 import { planDisconnectFromParent, planAddToParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeIcon } from "./NodeIcon";
-import {
-  planAddNewRelationToNode,
-  planExpandNode,
-  planExpandAndOpenCreateNodeEditor,
-} from "./RelationTypes";
+import { planAddNewRelationToNode, planExpandNode } from "./RelationTypes";
 import { NodeCard } from "../commons/Ui";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { LeftMenu } from "./LeftMenu";
@@ -194,11 +201,11 @@ function NodeContent({
 
   const referenceStyle: React.CSSProperties = isReference
     ? {
-        fontStyle: "italic",
-        color: "#5a7bad",
-        textDecoration: "none",
-        borderBottom: "1px dotted #8fadd4",
-      }
+      fontStyle: "italic",
+      color: "#5a7bad",
+      textDecoration: "none",
+      borderBottom: "1px dotted #8fadd4",
+    }
     : {};
 
   return (
@@ -218,38 +225,87 @@ function EditableContent(): JSX.Element {
   const [nodeID] = useNodeID();
   const displayText = useDisplayText();
   const prevSibling = usePreviousSibling();
+  const parentPath = getParentView(viewPath);
+  const nextInsertPosition = useNextInsertPosition();
+  const relationIndex = useRelationIndex();
+
+  // Check if this is an empty placeholder node
+  const isEmptyNode = isEmptyNodeID(nodeID);
 
   const handleSave = (
     text: string,
     _imageUrl?: string,
     submitted?: boolean
   ): void => {
-    if (!node || node.type !== "text") return;
-    const textChanged = text !== displayText;
+    const trimmedText = text.trim();
+    let plan = createPlan();
 
-    // Only execute if something changed
-    if (!textChanged && !submitted) {
-      return;
+    // Handle empty placeholder nodes
+    if (isEmptyNode) {
+      if (!parentPath) return;
+      const [, parentView] = getNodeIDFromView(plan, parentPath);
+      const relationsID = parentView.relations;
+
+      if (!trimmedText) {
+        // Empty text on blur/escape → just remove from emptyNodePositions
+        if (relationsID) {
+          executePlan(planRemoveEmptyNodePosition(plan, relationsID));
+        }
+        return;
+      }
+
+      // Create real node and add at the position where empty node was
+      const [planWithNode, newNode] = planCreateNode(plan, trimmedText);
+      // Get position from emptyNodePositions before removing it
+      const emptyNodeIndex: number = relationsID
+        ? plan.temporaryView.emptyNodePositions.get(relationsID) ?? 0
+        : 0;
+      // Remove empty node position and add real node at same position
+      const planWithoutEmpty = relationsID
+        ? planRemoveEmptyNodePosition(planWithNode, relationsID)
+        : planWithNode;
+      plan = planAddToParent(
+        planWithoutEmpty,
+        newNode.id,
+        parentPath,
+        stack,
+        emptyNodeIndex
+      );
+    } else {
+      // Handle regular nodes
+      if (!node || node.type !== "text") return;
+      const textChanged = trimmedText !== displayText;
+
+      // Only execute if something changed
+      if (!textChanged && !submitted) {
+        return;
+      }
+
+      // Save text changes by creating a version
+      if (textChanged) {
+        plan = planCreateVersion(
+          plan,
+          nodeID,
+          trimmedText,
+          getContextFromStackAndViewPath(stack, viewPath)
+        );
+      }
     }
 
-    const basePlan = createPlan();
+    // If user pressed Enter, add a new empty node
+    if (submitted && nextInsertPosition) {
+      const [targetPath, insertIndex] = nextInsertPosition;
+      const [planWithEmpty] = planCreateNode(plan, "");
+      plan = planAddToParent(
+        planWithEmpty,
+        EMPTY_NODE_ID,
+        targetPath,
+        stack,
+        insertIndex
+      );
+    }
 
-    // Save text changes by creating a version
-    const planWithVersion = textChanged
-      ? planCreateVersion(
-          basePlan,
-          nodeID,
-          text,
-          getContextFromStackAndViewPath(stack, viewPath)
-        )
-      : basePlan;
-
-    // If user pressed Enter, open create node editor (position determined by expansion state)
-    const finalPlan = submitted
-      ? planExpandAndOpenCreateNodeEditor(planWithVersion, viewPath, stack)
-      : planWithVersion;
-
-    executePlan(finalPlan);
+    executePlan(plan);
   };
 
   const handleTab = (text: string): void => {
@@ -297,8 +353,19 @@ function EditableContent(): JSX.Element {
     executePlan(finalPlan);
   };
 
-  // For non-text nodes, show read-only content
-  if (!node || node.type !== "text") {
+  // Handle closing empty node editor (Escape with no text)
+  const handleClose = (): void => {
+    if (!isEmptyNode || !parentPath) return;
+    const plan = createPlan();
+    const [, parentView] = getNodeIDFromView(plan, parentPath);
+    const relationsID = parentView.relations;
+    if (relationsID) {
+      executePlan(planRemoveEmptyNodePosition(plan, relationsID));
+    }
+  };
+
+  // For non-text nodes (and non-empty nodes), show read-only content
+  if (!isEmptyNode && (!node || node.type !== "text")) {
     return (
       <NodeContent nodeType={node!.type} nodeId={nodeID} text={displayText} />
     );
@@ -309,8 +376,9 @@ function EditableContent(): JSX.Element {
       initialText={displayText}
       onSave={handleSave}
       onTab={handleTab}
-      autoFocus={false}
-      ariaLabel={`edit ${displayText}`}
+      onClose={isEmptyNode ? handleClose : undefined}
+      autoFocus={isEmptyNode}
+      ariaLabel={isEmptyNode ? "new node editor" : `edit ${displayText}`}
     />
   );
 }
@@ -323,9 +391,15 @@ function InteractiveNodeContent(): JSX.Element {
   const isInReferencedByView = useIsInReferencedByView();
   // Also check if this is the root node of a Referenced By view
   const isReferencedByRoot = view.relations === REFERENCED_BY;
+  const isEmptyNode = isEmptyNodeID(nodeID);
 
   if (isLoading) {
     return <LoadingNode />;
+  }
+
+  // For empty placeholder nodes, always render EditableContent
+  if (isEmptyNode) {
+    return <EditableContent />;
   }
 
   if (!node) {
@@ -493,12 +567,12 @@ export function getNodesInTree(
   const withDiffItems =
     diffItems.size > 0
       ? diffItems.reduce(
-          (list, diffItem, idx) =>
-            list.push(
-              addDiffItemToPath(data, parentPath, diffItem.nodeID, idx, stack)
-            ),
-          nodesInTree
-        )
+        (list, diffItem, idx) =>
+          list.push(
+            addDiffItemToPath(data, parentPath, diffItem.nodeID, idx, stack)
+          ),
+        nodesInTree
+      )
       : nodesInTree;
 
   return withDiffItems;
@@ -545,7 +619,8 @@ export function Node({
   const levels = getLevels(viewPath);
   const isMultiselect = useIsParentMultiselectBtnOn();
   const isInReferencedByView = useIsInReferencedByView();
-  const [, view] = useNodeID();
+  const [nodeID, view] = useNodeID();
+  const isEmptyNode = isEmptyNodeID(nodeID);
   const { cardStyle, textStyle } = useItemStyle();
   const defaultCls = isDesktop ? "hover-light-bg" : "";
   const cls =
@@ -557,7 +632,7 @@ export function Node({
   // Show background for both the root and children in Referenced By view
   const showReferencedByBackground = isReferencedByRoot || isInReferencedByView;
 
-  // Show expand/collapse for regular nodes (not diff items, not in Referenced By)
+  // Show expand/collapse for regular nodes (not diff items, not in Referenced By, not empty nodes)
   const showExpandCollapse = !isDiffItem && !isInReferencedByView;
 
   // Background color for Referenced By view

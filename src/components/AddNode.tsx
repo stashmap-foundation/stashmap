@@ -6,15 +6,13 @@ import {
   useNode,
   useViewPath,
   getParentView,
-  useRelationIndex,
   upsertRelations,
   updateViewPathsAfterAddRelation,
+  useDisplayText,
+  useNextInsertPosition,
   useIsExpanded,
   useIsRoot,
-  useDisplayText,
-  getContextFromStackAndViewPath,
 } from "../ViewContext";
-import { planExpandAndOpenCreateNodeEditor } from "./RelationTypes";
 import useModal from "./useModal";
 import { SearchModal } from "./SearchModal";
 import { Plan, planUpdateViews, usePlanner, planCreateNode } from "../planner";
@@ -330,11 +328,7 @@ function useAddSiblingNode(options?: AddNodeOptions): {
   };
 
   const onCreateNewNode = (text: string): void => {
-    // Build context including parent node's ID (where we're adding the child)
-    const baseContext = getContextFromStackAndViewPath(stack, viewContext);
-    const context = baseContext.push(node.id as ID);
-    // Create node with version awareness
-    const [plan, n] = planCreateNode(createPlan(), text, context);
+    const [plan, n] = planCreateNode(createPlan(), text);
     onAddNode(plan, n.id);
   };
 
@@ -349,23 +343,13 @@ function useAddSiblingNode(options?: AddNodeOptions): {
 
 export function SiblingSearchButton(): JSX.Element | null {
   const { openModal, closeModal, isOpen } = useModal();
-  const relationIndex = useRelationIndex();
-  const isNodeExpanded = useIsExpanded();
-  const isRoot = useIsRoot();
+  const nextInsertPosition = useNextInsertPosition();
 
-  // ROOT can't have siblings, so always insert as first child
-  // If node is expanded, insert as first child; otherwise insert as sibling after current
-  const options: AddNodeOptions =
-    isRoot || isNodeExpanded
-      ? { asFirstChild: true }
-      : {
-          insertAtIndex:
-            relationIndex !== undefined ? relationIndex + 1 : undefined,
-        };
+  const handlers = useAddSiblingNode(
+    nextInsertPosition ? { insertAtIndex: nextInsertPosition[1] } : undefined
+  );
 
-  const handlers = useAddSiblingNode(options);
-
-  if (!handlers) {
+  if (!handlers || !nextInsertPosition) {
     return null;
   }
 
@@ -383,23 +367,29 @@ export function SiblingSearchButton(): JSX.Element | null {
 }
 
 export function AddSiblingButton(): JSX.Element | null {
-  const viewPath = useViewPath();
-  const [node] = useNode();
   const displayText = useDisplayText();
-  const { stack } = usePaneNavigation();
-  const { createPlan, executePlan } = usePlanner();
+  const nextInsertPosition = useNextInsertPosition();
+  const isExpanded = useIsExpanded();
+  const isRoot = useIsRoot();
 
-  if (!node) {
+  // When root or expanded, insert as first child of current node
+  // Otherwise, insert as sibling after current node
+  const isFirstChildInsert = isRoot || isExpanded;
+
+  const handlers = useAddSiblingNode(
+    nextInsertPosition
+      ? isFirstChildInsert
+        ? { asFirstChild: true }
+        : { insertAtIndex: nextInsertPosition[1] }
+      : undefined
+  );
+
+  if (!handlers || !nextInsertPosition) {
     return null;
   }
 
   const handleClick = (): void => {
-    const plan = planExpandAndOpenCreateNodeEditor(
-      createPlan(),
-      viewPath,
-      stack
-    );
-    executePlan(plan);
+    handlers.onCreateNewNode("");
   };
 
   return (

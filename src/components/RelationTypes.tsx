@@ -6,7 +6,6 @@ import {
   planUpdateViews,
   planUpsertRelations,
   usePlanner,
-  planOpenCreateNodeEditor,
 } from "../planner";
 import { getRelationsNoReferencedBy } from "../connections";
 import { REFERENCED_BY } from "../constants";
@@ -20,11 +19,6 @@ import {
   updateView,
   useNode,
   useViewPath,
-  isExpanded,
-  getViewFromPath,
-  getNodeIDFromView,
-  viewPathToString,
-  parseViewPath,
 } from "../ViewContext";
 import { usePaneNavigation } from "../SplitPanesContext";
 
@@ -178,54 +172,6 @@ export function planExpandNode(
       expanded: true,
     })
   );
-}
-
-// Helper to determine insert position based on whether node is ROOT or expanded
-export function getInsertPosition(
-  plan: Plan,
-  viewPath: ViewPath
-): CreateNodeEditorPosition {
-  const isRoot = viewPath.length === 2;
-  const viewKey = viewPathToString(viewPath);
-  const nodeIsExpanded = isExpanded(plan, viewKey);
-  return isRoot || nodeIsExpanded ? "asFirstChild" : "afterSibling";
-}
-
-// Combined plan: expand node if needed and open create node editor
-// This is the main entry point for opening the create node editor
-export function planExpandAndOpenCreateNodeEditor(
-  plan: Plan,
-  viewPath: ViewPath,
-  stack: (LongID | ID)[]
-): Plan {
-  const viewKey = viewPathToString(viewPath);
-  const position = getInsertPosition(plan, viewPath);
-  const nodeIsExpanded = isExpanded(plan, viewKey);
-
-  // If inserting as first child but node is collapsed, expand it first
-  const expandedPlan =
-    position === "asFirstChild" && !nodeIsExpanded
-      ? planExpandNode(
-          plan,
-          getNodeIDFromView(plan, viewPath)[0],
-          getContextFromStackAndViewPath(stack, viewPath),
-          getViewFromPath(plan, viewPath),
-          viewPath
-        )
-      : plan;
-
-  // Open the create node editor
-  return planOpenCreateNodeEditor(expandedPlan, viewKey, position);
-}
-
-// Helper to parse viewKey and call planExpandAndOpenCreateNodeEditor
-export function planExpandAndOpenCreateNodeEditorByKey(
-  plan: Plan,
-  viewKey: string,
-  stack: (LongID | ID)[]
-): Plan {
-  const viewPath = parseViewPath(viewKey);
-  return planExpandAndOpenCreateNodeEditor(plan, viewPath, stack);
 }
 
 export function planAddVirtualListToView(

@@ -239,7 +239,8 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
       multiselectBtns: Set<string>(),
       editingViews: Set<string>(),
       editorOpenViews: Set<string>(),
-      createNodeEditorState: null,
+      draftTexts: Map<string, string>(),
+      emptyNodePositions: Map<LongID, number>(),
     },
   },
   views: Map<string, View>(),
@@ -880,6 +881,8 @@ export async function expectTree(expected: string): Promise<void> {
 
   await waitFor(async () => {
     const actual = await getTreeStructure();
+    console.log("ACTUAL TREE:\n", actual);
+    console.log("EXPECTED TREE:\n", expectedNormalized);
     expect(actual).toEqual(expectedNormalized);
   });
 }

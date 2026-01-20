@@ -1,5 +1,5 @@
 import React, { Dispatch, SetStateAction } from "react";
-import { List } from "immutable";
+import { List, Map } from "immutable";
 import { UnsignedEvent, Event } from "nostr-tools";
 import {
   KIND_DELETE,
@@ -18,15 +18,20 @@ import { viewsToJSON } from "./serializer";
 import { newDB } from "./knowledge";
 import {
   shortID,
+  joinID,
   newNode,
   addRelationToRelations,
   moveRelations,
   VERSIONS_NODE_ID,
+  EMPTY_NODE_ID,
+  isEmptyNodeID,
 } from "./connections";
 import {
   newRelations,
   getVersionsContext,
   getVersionsRelations,
+  upsertRelations,
+  ViewPath,
 } from "./ViewContext";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useWorkspaceContext } from "./WorkspaceContext";
@@ -355,15 +360,10 @@ function planEnsureVersionForNode(
  * @param context - The context where the node will be added (should include parent's ID)
  * @returns [updatedPlan, newNode] - The updated plan and the created node
  */
-export function planCreateNode(
-  plan: Plan,
-  text: string,
-  context: List<ID>
-): [Plan, KnowNode] {
+export function planCreateNode(plan: Plan, text: string): [Plan, KnowNode] {
   const node = newNode(text);
   const planWithNode = planUpsertNode(plan, node);
-  const updatedPlan = planEnsureVersionForNode(planWithNode, node, context);
-  return [updatedPlan, node];
+  return [planWithNode, node];
 }
 
 function planDelete(plan: Plan, id: LongID | ID, kind: number): Plan {
@@ -439,34 +439,6 @@ export function planUpdateViews(plan: Plan, views: Views): Plan {
         contacts: false,
       })
     ),
-  };
-}
-
-// Temporary view state plan functions
-
-export function planOpenCreateNodeEditor(
-  plan: Plan,
-  viewKey: string,
-  position: CreateNodeEditorPosition,
-  text: string = "",
-  cursorPosition: number = 0
-): Plan {
-  return {
-    ...plan,
-    temporaryView: {
-      ...plan.temporaryView,
-      createNodeEditorState: { viewKey, position, text, cursorPosition },
-    },
-  };
-}
-
-export function planCloseCreateNodeEditor(plan: Plan): Plan {
-  return {
-    ...plan,
-    temporaryView: {
-      ...plan.temporaryView,
-      createNodeEditorState: null,
-    },
   };
 }
 
@@ -559,6 +531,74 @@ type Context = Pick<
 
 const PlanningContext = React.createContext<Context | undefined>(undefined);
 
+// Filter out empty placeholder nodes from events and extract their positions
+// Returns filtered events and a function to update emptyNodePositions
+// For each relations event: if it has empty node, set position; if not, delete position
+function filterEmptyNodesFromEvents(
+  events: List<UnsignedEvent & EventAttachment>,
+  existingPositions: Map<LongID, number>
+): {
+  filteredEvents: List<UnsignedEvent & EventAttachment>;
+  emptyNodePositions: Map<LongID, number>;
+} {
+  let emptyNodePositions = existingPositions;
+
+  const filteredEvents = events
+    .map((event) => {
+      if (event.kind === KIND_KNOWLEDGE_LIST) {
+        // Check if head is empty node - skip entire event
+        const headTag = event.tags.find((t) => t[0] === "head");
+        if (headTag && isEmptyNodeID(headTag[1])) {
+          return null;
+        }
+
+        const dTag = event.tags.find((t) => t[0] === "d");
+        if (dTag) {
+          const relationsID = joinID(event.pubkey, dTag[1]);
+          const itemTags = event.tags.filter((t) => t[0] === "i");
+          const emptyNodeIndex = itemTags.findIndex((tag) =>
+            isEmptyNodeID(tag[1])
+          );
+
+          if (emptyNodeIndex !== -1) {
+            // Has empty node - set position
+            emptyNodePositions = emptyNodePositions.set(
+              relationsID,
+              emptyNodeIndex
+            );
+          } else {
+            // No empty node - remove any existing position
+            emptyNodePositions = emptyNodePositions.delete(relationsID);
+          }
+        }
+
+        // Filter empty node items from relations
+        const filteredTags = event.tags.filter((tag) => {
+          if (tag[0] === "i") {
+            return !isEmptyNodeID(tag[1]);
+          }
+          return true;
+        });
+
+        return { ...event, tags: filteredTags };
+      }
+
+      if (event.kind === KIND_KNOWLEDGE_NODE) {
+        // Skip empty node events (nodes with empty text)
+        if (event.content === "") {
+          return null;
+        }
+      }
+
+      return event;
+    })
+    .filter(
+      (event): event is UnsignedEvent & EventAttachment => event !== null
+    );
+
+  return { filteredEvents, emptyNodePositions };
+}
+
 export function PlanningContextProvider({
   children,
   setPublishEvents,
@@ -569,19 +609,39 @@ export function PlanningContextProvider({
   const { relayPool, finalizeEvent } = useApis();
 
   const executePlan = async (plan: Plan): Promise<void> => {
-    // Apply events and temporary view state changes atomically
+    // Track filtered events for relay publishing (set inside state updater)
+    let filteredEventsForRelay = plan.publishEvents;
+
+    // 1. FILTERED events → unsignedEvents (empty nodes stored separately in temporaryView)
     setPublishEvents((prevStatus) => {
+      // Use plan's emptyNodePositions as starting point (already has current state + any removals)
+      // Filter empty nodes from events, updating positions as we go
+      const { filteredEvents, emptyNodePositions } = filterEmptyNodesFromEvents(
+        plan.publishEvents,
+        plan.temporaryView.emptyNodePositions
+      );
+      filteredEventsForRelay = filteredEvents;
+
       return {
-        unsignedEvents: prevStatus.unsignedEvents.merge(plan.publishEvents),
+        unsignedEvents: prevStatus.unsignedEvents.merge(filteredEvents),
         results: prevStatus.results,
         isLoading: true,
         preLoginEvents: prevStatus.preLoginEvents,
-        temporaryView: plan.temporaryView,
+        temporaryView: {
+          ...plan.temporaryView,
+          emptyNodePositions,
+        },
       };
     });
 
+    // 2. FILTERED events → relay publishing
+    const filteredPlan = {
+      ...plan,
+      publishEvents: filteredEventsForRelay,
+    };
+
     const results = await execute({
-      plan,
+      plan: filteredPlan,
       relayPool,
       finalizeEvent,
     });
@@ -663,5 +723,21 @@ export function usePlanner(): Planner {
     executePlan: planningContext.executePlan,
     republishEvents: planningContext.republishEvents,
     setPublishEvents: planningContext.setPublishEvents,
+  };
+}
+
+// Plan function to remove an empty node position (for closing empty editor)
+export function planRemoveEmptyNodePosition(
+  plan: Plan,
+  relationsID: LongID
+): Plan {
+  return {
+    ...plan,
+    temporaryView: {
+      ...plan.temporaryView,
+      emptyNodePositions: plan.temporaryView.emptyNodePositions.delete(
+        relationsID
+      ),
+    },
   };
 }

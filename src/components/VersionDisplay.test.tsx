@@ -428,11 +428,6 @@ My Notes
     await userEvent.clear(bcnInsideVersions);
     await userEvent.type(bcnInsideVersions, "BCN-updated{Enter}");
 
-    // BUG: Editor appears after BCN instead of after BCN-updated.
-    // When pressing Enter after editing inside ~Versions, the editor opens relative to the
-    // edited node (which shifted down) rather than relative to the newly inserted version.
-    // Ideal: [V3, BCN-updated, [NEW NODE], BCN, Barcelona]
-    // Actual: [V3, BCN-updated, BCN, [NEW NODE], Barcelona]
     await expectTree(`
 My Notes
   Holiday Destinations
@@ -440,8 +435,8 @@ My Notes
       ~Versions
         V3
         BCN-updated
-        BCN
         [NEW NODE]
+        BCN
         Barcelona
     `);
 

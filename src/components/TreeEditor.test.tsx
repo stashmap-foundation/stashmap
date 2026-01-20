@@ -159,7 +159,7 @@ My Notes
       await expectTree(`
 My Notes
   Parent
-    [EDITOR: New First]
+    [NEW NODE: New First]
     Child A
     Child B
       `);
@@ -246,7 +246,7 @@ My Notes
 My Notes
   Node 1
   Node 2
-  [EDITOR: New Node]
+  [NEW NODE: New Node]
   Node 3
       `);
 
@@ -396,13 +396,13 @@ My Notes
       window.getSelection()?.addRange(range);
       await userEvent.keyboard("{Tab}");
 
-      // The editor should now be visually AFTER Child B (at the end of Parent's children)
+      // Tab materializes and moves the node - it appears AFTER Child B
       await expectTree(`
 My Notes
   Parent
     Child A
     Child B
-    [EDITOR: New Child]
+    New Child
       `);
     });
 
@@ -431,21 +431,33 @@ My Notes
       window.getSelection()?.addRange(range1);
       await userEvent.keyboard("{Tab}");
 
-      // Submit - this creates Existing Child under Parent
-      await userEvent.type(editor1, "{Enter}");
-
-      // Now in another chained editor (afterSibling of Existing Child, inside Parent)
-      // Tab again to stay at same level, or just create another child
-      const editor2 = await findNewNodeEditor();
-      await userEvent.type(editor2, "Will Be Indented{Enter}");
-      await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-      // Both children should be under Parent (Tab auto-expands)
+      // Tab materializes and moves Existing Child under Parent (auto-expands)
       await expectTree(`
 My Notes
   Parent
     Existing Child
-    Will Be Indented
+      `);
+
+      // Collapse Parent, then add a sibling after it (via plus button on collapsed Parent)
+      await userEvent.click(await screen.findByLabelText("collapse Parent"));
+      await userEvent.click(await screen.findByLabelText("add to Parent"));
+      const editor2 = await findNewNodeEditor();
+      await userEvent.type(editor2, "Second Child");
+
+      // Move cursor to start and Tab - should go to END of Parent's children
+      const range2 = document.createRange();
+      range2.selectNodeContents(editor2);
+      range2.collapse(true);
+      window.getSelection()?.removeAllRanges();
+      window.getSelection()?.addRange(range2);
+      await userEvent.keyboard("{Tab}");
+
+      // Both children should be under Parent
+      await expectTree(`
+My Notes
+  Parent
+    Existing Child
+    Second Child
       `);
     });
 
@@ -473,14 +485,12 @@ My Notes
       window.getSelection()?.addRange(range);
       await userEvent.keyboard("{Tab}");
 
-      // Editor should now be a child of Empty Parent
+      // Tab materializes and moves the node under Empty Parent
       await expectTree(`
 My Notes
   Empty Parent
-    [EDITOR: First Child]
+    First Child
       `);
-
-      await userEvent.type(editor, "{Escape}");
     });
 
     test("Tab on new editor to empty node (no children) creates first child", async () => {
@@ -508,9 +518,7 @@ My Notes
       window.getSelection()?.addRange(range);
       await userEvent.keyboard("{Tab}");
 
-      await userEvent.type(editor, "{Enter}");
-      await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
+      // Tab materializes and moves the node under Empty Parent
       await expectTree(`
 My Notes
   Empty Parent
@@ -647,7 +655,7 @@ My Notes
       await expectTree(`
 My Notes
   Parent
-    [EDITOR: New First]
+    [NEW NODE: New First]
     Child 1
     Child 2
       `);

@@ -260,10 +260,16 @@ function EditableContent(): JSX.Element {
       const emptyNodeIndex: number = relationsID
         ? plan.temporaryView.emptyNodePositions.get(relationsID) ?? 0
         : 0;
+      // Disconnect empty node from parent (it's injected in knowledgeDBs)
+      const planWithDisconnect = planDisconnectFromParent(
+        planWithNode,
+        viewPath,
+        stack
+      );
       // Remove empty node position and add real node at same position
       const planWithoutEmpty = relationsID
-        ? planRemoveEmptyNodePosition(planWithNode, relationsID)
-        : planWithNode;
+        ? planRemoveEmptyNodePosition(planWithDisconnect, relationsID)
+        : planWithDisconnect;
       plan = planAddToParent(
         planWithoutEmpty,
         newNode.id,
@@ -309,13 +315,67 @@ function EditableContent(): JSX.Element {
   };
 
   const handleTab = (text: string): void => {
-    if (!prevSibling || !node || node.type !== "text") {
+    if (!prevSibling) {
+      return;
+    }
+
+    // For regular nodes, check node type
+    if (!isEmptyNode && (!node || node.type !== "text")) {
       return;
     }
 
     const basePlan = createPlan();
     const context = getContextFromStackAndViewPath(stack, viewPath);
+    const trimmedText = text.trim();
 
+    // Handle empty nodes: materialize with text first
+    if (isEmptyNode) {
+      if (!parentPath) return;
+      const [, parentView] = getNodeIDFromView(basePlan, parentPath);
+      const relationsID = parentView.relations;
+
+      // Create real node with the text (or empty if no text)
+      const nodeText = trimmedText || "";
+      const [planWithNode, newNode] = planCreateNode(basePlan, nodeText);
+
+      // Disconnect empty node from parent
+      const planWithDisconnect = planDisconnectFromParent(
+        planWithNode,
+        viewPath,
+        stack
+      );
+
+      // Remove empty node position
+      const planWithoutEmpty = relationsID
+        ? planRemoveEmptyNodePosition(planWithDisconnect, relationsID)
+        : planWithDisconnect;
+
+      // Expand previous sibling
+      const prevSiblingContext = getContextFromStackAndViewPath(
+        stack,
+        prevSibling.viewPath
+      );
+      const planWithExpand = planExpandNode(
+        planWithoutEmpty,
+        prevSibling.nodeID,
+        prevSiblingContext,
+        prevSibling.view,
+        prevSibling.viewPath
+      );
+
+      // Add real node to previous sibling at end
+      const finalPlan = planAddToParent(
+        planWithExpand,
+        newNode.id,
+        prevSibling.viewPath,
+        stack
+      );
+
+      executePlan(finalPlan);
+      return;
+    }
+
+    // Handle regular nodes
     // Step 1: Save text changes if any (as version)
     const planWithText =
       text !== displayText

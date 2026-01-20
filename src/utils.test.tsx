@@ -855,7 +855,7 @@ export async function getTreeStructure(): Promise<string> {
       );
     }
     const content = element.textContent?.trim();
-    return content ? `[EDITOR: ${content}]` : "[EDITOR]";
+    return content ? `[NEW NODE: ${content}]` : "[NEW NODE]";
   };
 
   const lines = sortedElements.map(({ element, type }) => {

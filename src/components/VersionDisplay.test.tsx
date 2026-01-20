@@ -204,6 +204,7 @@ My Notes
 My Notes
   Holiday Destinations
     Barcelona
+    Barcelona
     `);
   });
 
@@ -540,5 +541,83 @@ My Notes
       ~Versions
         Barcelona
     `);
+  });
+
+  test("Reference path filters out ~Versions and deduplicates", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    // Create two parent nodes: Holiday Destinations and Cities in Spain
+    await userEvent.click(
+      (
+        await screen.findAllByLabelText("add to My Notes")
+      )[0]
+    );
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Holiday Destinations{Enter}"
+    );
+    await userEvent.type(await findNewNodeEditor(), "Cities in Spain{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    // Add Barcelona under Holiday Destinations
+    await userEvent.click(
+      await screen.findByLabelText("expand Holiday Destinations")
+    );
+    await userEvent.click(
+      await screen.findByLabelText("add to Holiday Destinations")
+    );
+    await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    // Add Barcelona under Cities in Spain using keyboard
+    // Press Enter on Cities in Spain editor to create sibling, then Tab to indent
+    const citiesEditor = await screen.findByLabelText("edit Cities in Spain");
+    await userEvent.click(citiesEditor);
+    await userEvent.type(citiesEditor, "{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Tab}Barcelona{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    Barcelona
+  Cities in Spain
+    Barcelona
+    `);
+
+    // Edit Barcelona under Cities in Spain to BCN
+    // This creates ~Versions with [BCN, Barcelona] only for that context
+    // Holiday Destinations → Barcelona is unaffected (different context)
+    const barcelonaEditors = await screen.findAllByLabelText("edit Barcelona");
+    // The second one is under Cities in Spain
+    await userEvent.click(barcelonaEditors[1]);
+    await userEvent.clear(barcelonaEditors[1]);
+    await userEvent.type(barcelonaEditors[1], "BCN");
+    fireEvent.blur(barcelonaEditors[1]);
+
+    // Holiday Destinations still shows Barcelona, Cities in Spain shows BCN
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    Barcelona
+  Cities in Spain
+    BCN
+    `);
+
+    // Show "Referenced By" for Barcelona (under Holiday Destinations)
+    fireEvent.click(
+      await screen.findByLabelText("show references to Barcelona")
+    );
+    await screen.findByLabelText("hide references to Barcelona");
+
+    // Should show two references:
+    // - "My Notes → Holiday Destinations → Barcelona" (direct)
+    // - "My Notes → Cities in Spain → BCN" (filtered from "...BCN → ~Versions → Barcelona")
+    await screen.findByText("My Notes → Holiday Destinations → Barcelona");
+    await screen.findByText("My Notes → Cities in Spain → BCN");
+
+    // Verify the unfiltered path is NOT shown
+    expect(screen.queryByText(/Cities in Spain → BCN → ~Versions/)).toBeNull();
   });
 });

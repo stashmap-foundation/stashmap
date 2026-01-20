@@ -238,22 +238,33 @@ export function getReferencedByRelations(
   return {
     ...rel,
     id: REFERENCED_BY,
-    items: sortedPaths.map((path) => {
-      // If context is empty and head equals the nodeID, this is a list with no context
-      // Create ref with empty context so it displays as just the node name
-      const isOwnList =
-        path.context.size === 0 && shortID(path.head) === targetShortID;
-      if (isOwnList) {
-        return {
-          nodeID: createRefId(List<ID>(), nodeID as ID),
-          relevance: "" as Relevance,
-        };
-      }
-      return {
-        nodeID: createRefId(path.context.push(path.head), nodeID as ID),
+    items: sortedPaths
+      .map((path) => {
+        // If context is empty and head equals the nodeID, this is a list with no context
+        // Create ref with empty context so it displays as just the node name
+        const isOwnList =
+          path.context.size === 0 && shortID(path.head) === targetShortID;
+        if (isOwnList) {
+          return createRefId(List<ID>(), nodeID as ID);
+        }
+
+        // If the node is inside ~Versions, point to the parent node instead
+        // This also deduplicates: all versions inside ~Versions map to the same parent
+        if (path.head === VERSIONS_NODE_ID && path.context.size > 0) {
+          const parentNode = path.context.last() as ID;
+          const parentContext = path.context.slice(0, -1);
+          return createRefId(parentContext, parentNode);
+        }
+
+        return createRefId(path.context.push(path.head), nodeID as ID);
+      })
+      // Deduplicate refIds (multiple versions inside ~Versions map to the same parent)
+      .toOrderedSet()
+      .toList()
+      .map((refId) => ({
+        nodeID: refId,
         relevance: "" as Relevance,
-      };
-    }),
+      })),
   };
 }
 

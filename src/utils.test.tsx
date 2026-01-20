@@ -843,8 +843,6 @@ export async function getTreeStructure(): Promise<string> {
     return 0;
   });
 
-  const seen = new globalThis.Set<string>();
-
   const getElementText = (
     element: HTMLElement,
     type: "node" | "editor"
@@ -859,21 +857,12 @@ export async function getTreeStructure(): Promise<string> {
     return content ? `[EDITOR: ${content}]` : "[EDITOR]";
   };
 
-  const lines = sortedElements
-    .map(({ element, type }) => {
-      const text = getElementText(element, type);
-
-      const indentLevel = getIndentLevel(element);
-
-      // Create unique key to skip duplicates (same text at same level)
-      const key = `${indentLevel}:${text}`;
-      if (seen.has(key)) return null;
-      seen.add(key);
-
-      const indent = "  ".repeat(indentLevel);
-      return `${indent}${text}`;
-    })
-    .filter((line): line is string => line !== null);
+  const lines = sortedElements.map(({ element, type }) => {
+    const text = getElementText(element, type);
+    const indentLevel = getIndentLevel(element);
+    const indent = "  ".repeat(indentLevel);
+    return `${indent}${text}`;
+  });
 
   return lines.join("\n");
 }

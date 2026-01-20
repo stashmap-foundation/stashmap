@@ -1133,7 +1133,9 @@ export function upsertRelations(
       : foundRelations;
 
   const oldRelationsID = nodeView.relations || foundRelations.id;
-  const didViewChange = oldRelationsID !== relations.id;
+  // Check if view needs update: either relations ID changed, or view didn't have relations yet
+  const didViewChange =
+    nodeView.relations === undefined || oldRelationsID !== relations.id;
   const planWithUpdatedView = didViewChange
     ? planUpdateViews(
         plan,

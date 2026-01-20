@@ -24,6 +24,7 @@ import {
   getNodeIDFromView,
   getParentNodeID,
   getLast,
+  viewPathToString,
 } from "./ViewContext";
 import { getNodesInTree } from "./components/Node";
 import { Plan, planUpdateViews } from "./planner";
@@ -199,6 +200,7 @@ export function planDisconnectFromParent(
 /**
  * Add a node to a parent at a specific index (or at end if undefined).
  * Returns the updated plan with the node added to the parent's relations and views updated.
+ * Also expands the parent so the new child is visible.
  */
 export function planAddToParent(
   plan: Plan,
@@ -221,7 +223,17 @@ export function planAddToParent(
     insertAtIndex
   );
 
-  return planUpdateViews(updatedRelationsPlan, updatedViews);
+  // Also expand the parent so the new child is visible
+  const parentViewKey = viewPathToString(parentViewPath);
+  const existingParentView = updatedViews.get(parentViewKey);
+  const viewsWithExpand = existingParentView
+    ? updatedViews.set(parentViewKey, {
+        ...existingParentView,
+        expanded: true,
+      })
+    : updatedViews;
+
+  return planUpdateViews(updatedRelationsPlan, viewsWithExpand);
 }
 
 export function DND({ children }: { children: React.ReactNode }): JSX.Element {

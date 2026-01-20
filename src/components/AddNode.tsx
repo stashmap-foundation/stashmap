@@ -1,13 +1,10 @@
 import React, { useEffect } from "react";
-import { addRelationToRelations } from "../connections";
 import {
   useIsAddToNode,
   useParentNode,
   useNode,
   useViewPath,
   getParentView,
-  upsertRelations,
-  updateViewPathsAfterAddRelation,
   useDisplayText,
   useNextInsertPosition,
   useIsExpanded,
@@ -15,8 +12,9 @@ import {
 } from "../ViewContext";
 import useModal from "./useModal";
 import { SearchModal } from "./SearchModal";
-import { Plan, planUpdateViews, usePlanner, planCreateNode } from "../planner";
+import { Plan, usePlanner, planCreateNode } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
+import { planAddToParent } from "../dnd";
 
 function SearchButton({ onClick }: { onClick: () => void }): JSX.Element {
   const displayText = useDisplayText();
@@ -300,27 +298,14 @@ function useAddSiblingNode(options?: AddNodeOptions): {
   }
 
   const onAddNode = (plan: Plan, nodeID: ID): void => {
-    // Use addRelationToRelations which handles insertion at specific index
-    const updatedRelationsPlan = upsertRelations(
+    const updatedPlan = planAddToParent(
       plan,
+      nodeID,
       viewContext,
       stack,
-      (relations) =>
-        addRelationToRelations(
-          relations,
-          nodeID,
-          "", // Default to "relevant"
-          undefined, // No argument
-          insertPosition
-        )
-    );
-    // Update view paths when inserting at specific position
-    const updatedViews = updateViewPathsAfterAddRelation(
-      updatedRelationsPlan,
-      viewContext,
       insertPosition
     );
-    executePlan(planUpdateViews(updatedRelationsPlan, updatedViews));
+    executePlan(updatedPlan);
   };
 
   const onAddExistingNode = (nodeID: ID): void => {
@@ -344,9 +329,19 @@ function useAddSiblingNode(options?: AddNodeOptions): {
 export function SiblingSearchButton(): JSX.Element | null {
   const { openModal, closeModal, isOpen } = useModal();
   const nextInsertPosition = useNextInsertPosition();
+  const isExpanded = useIsExpanded();
+  const isRoot = useIsRoot();
+
+  // When root or expanded, insert as first child of current node
+  // Otherwise, insert as sibling after current node
+  const isFirstChildInsert = isRoot || isExpanded;
 
   const handlers = useAddSiblingNode(
-    nextInsertPosition ? { insertAtIndex: nextInsertPosition[1] } : undefined
+    nextInsertPosition
+      ? isFirstChildInsert
+        ? { asFirstChild: true }
+        : { insertAtIndex: nextInsertPosition[1] }
+      : undefined
   );
 
   if (!handlers || !nextInsertPosition) {

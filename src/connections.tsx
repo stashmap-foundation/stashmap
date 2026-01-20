@@ -612,8 +612,13 @@ export function injectEmptyNodesIntoKnowledgeDBs(
     myDB.relations
   );
 
+  // Also add the empty node to the nodes map so useNode() can find it
+  const emptyNode = newNode("");
+  const updatedNodes = myDB.nodes.set(shortID(EMPTY_NODE_ID), emptyNode);
+
   return knowledgeDBs.set(myself, {
     ...myDB,
+    nodes: updatedNodes,
     relations: updatedRelations,
   });
 }

@@ -1298,7 +1298,10 @@ Custom Root
       window.getSelection()?.addRange(range);
       await userEvent.keyboard("{Tab}");
 
-      await userEvent.type(editor, "{Enter}");
+      // After Tab on empty node, the empty node is replaced with real node "First Child"
+      // Find the new editor for "First Child" and press Enter to chain
+      const firstChildEditor = await screen.findByLabelText("edit First Child");
+      await userEvent.type(firstChildEditor, "{Enter}");
 
       // Another child via chaining (already at correct level)
       await userEvent.type(await findNewNodeEditor(), "Second Child{Enter}");
@@ -1333,7 +1336,12 @@ Custom Root
       window.getSelection()?.addRange(range);
       await userEvent.keyboard("{Tab}");
 
-      await userEvent.type(editor, "{Enter}");
+      // After Tab on empty node, the empty node is replaced with real node "Becomes Child"
+      // Find the new editor for "Becomes Child" and press Enter to chain
+      const becomesChildEditor = await screen.findByLabelText(
+        "edit Becomes Child"
+      );
+      await userEvent.type(becomesChildEditor, "{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
       await expectTree(`

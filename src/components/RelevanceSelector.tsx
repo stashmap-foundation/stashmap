@@ -16,6 +16,7 @@ import {
 import { usePlanner } from "../planner";
 import { planAddToParent } from "../dnd";
 import { usePaneNavigation } from "../SplitPanesContext";
+import { preventEditorBlurIfSameNode } from "./AddNode";
 
 type RelevanceSelectorProps = {
   isDiffItem?: boolean;
@@ -157,6 +158,7 @@ export function RelevanceSelector({
       {/* X for not relevant (or trash for remove) - on left */}
       <span
         onClick={handleXClick}
+        onMouseDown={preventEditorBlurIfSameNode}
         onMouseEnter={() => setHoverLevel(0)}
         role="button"
         tabIndex={0}
@@ -198,6 +200,7 @@ export function RelevanceSelector({
         <span
           key={level}
           onClick={() => handleSetLevel(level)}
+          onMouseDown={preventEditorBlurIfSameNode}
           onMouseEnter={() => setHoverLevel(level)}
           role="button"
           tabIndex={0}

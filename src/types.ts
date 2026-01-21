@@ -108,9 +108,8 @@ declare global {
     writeRelayConf?: WriteRelayConf;
   };
 
-  // Temporary events for UI state that should never be published
   type TemporaryEvent =
-    | { type: "ADD_EMPTY_NODE"; relationsID: LongID; index: number }
+    | { type: "ADD_EMPTY_NODE"; relationsID: LongID; index: number; relationItem: RelationItem }
     | { type: "REMOVE_EMPTY_NODE"; relationsID: LongID };
 
   type EventState = PublishEvents<EventAttachment> & {

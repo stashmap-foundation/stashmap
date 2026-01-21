@@ -25,6 +25,7 @@ import {
   EMPTY_NODE_ID,
   isEmptyNodeID,
   getRelationsNoReferencedBy,
+  computeEmptyNodeMetadata,
 } from "./connections";
 import {
   newRelations,
@@ -38,6 +39,9 @@ import {
   contextsMatch,
   getAvailableRelationsForNode,
   getContextFromStackAndViewPath,
+  getParentView,
+  getNodeFromID,
+  getVersionedDisplayText,
 } from "./ViewContext";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useWorkspaceContext } from "./WorkspaceContext";
@@ -371,6 +375,82 @@ export function planCreateNode(plan: Plan, text: string): [Plan, KnowNode] {
   const node = newNode(text);
   const planWithNode = planUpsertNode(plan, node);
   return [planWithNode, node];
+}
+
+/**
+ * Save node text - either materialize an empty node or create a version for existing node.
+ * Returns the updated plan, or null if nothing to save.
+ */
+export function planSaveNode(
+  plan: Plan,
+  text: string,
+  viewPath: ViewPath,
+  stack: (LongID | ID)[],
+  relevance?: Relevance,
+  argument?: Argument
+): Plan | null {
+  const trimmedText = text.trim();
+  const [nodeID] = getNodeIDFromView(plan, viewPath);
+  const parentPath = getParentView(viewPath);
+
+  if (isEmptyNodeID(nodeID)) {
+    if (!parentPath) return null;
+    const [parentNodeID, parentView] = getNodeIDFromView(plan, parentPath);
+    const relationsID = parentView.relations;
+
+    if (!trimmedText) {
+      return relationsID ? planRemoveEmptyNodePosition(plan, relationsID) : null;
+    }
+
+    const [planWithNode, createdNode] = planCreateNode(plan, trimmedText);
+
+    const parentContext = getContextFromStackAndViewPath(stack, parentPath);
+    const nodeContext = parentContext.push(parentNodeID);
+    const existingVersions = getVersionsRelations(
+      planWithNode.knowledgeDBs,
+      planWithNode.user.publicKey,
+      createdNode.id,
+      nodeContext
+    );
+    const planWithVersion = existingVersions
+      ? planCreateVersion(planWithNode, createdNode.id, trimmedText, nodeContext)
+      : planWithNode;
+
+    const emptyNodeMetadata = computeEmptyNodeMetadata(
+      plan.publishEventsStatus.temporaryEvents
+    );
+    const metadata = relationsID ? emptyNodeMetadata.get(relationsID) : undefined;
+    const emptyNodeIndex = metadata?.index ?? 0;
+
+    const planWithoutEmpty = relationsID
+      ? planRemoveEmptyNodePosition(planWithVersion, relationsID)
+      : planWithVersion;
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { planAddToParent } = require("./dnd");
+    return planAddToParent(
+      planWithoutEmpty,
+      createdNode.id,
+      parentPath,
+      stack,
+      emptyNodeIndex,
+      relevance ?? metadata?.relationItem.relevance,
+      argument ?? metadata?.relationItem.argument
+    );
+  }
+
+  const node = getNodeFromID(plan.knowledgeDBs, nodeID, plan.user.publicKey);
+  if (!node || node.type !== "text") return null;
+
+  const context = getContextFromStackAndViewPath(stack, viewPath);
+  const displayText =
+    getVersionedDisplayText(plan.knowledgeDBs, plan.user.publicKey, nodeID, context) ??
+    node.text ??
+    "";
+
+  if (trimmedText === displayText) return null;
+
+  return planCreateVersion(plan, nodeID, trimmedText, context);
 }
 
 function planDelete(plan: Plan, id: LongID | ID, kind: number): Plan {
@@ -877,6 +957,37 @@ export function planSetEmptyNodePosition(
       type: "ADD_EMPTY_NODE",
       relationsID,
       index: insertIndex,
+      relationItem: { nodeID: EMPTY_NODE_ID, relevance: "" },
+    }),
+  };
+}
+
+export function planUpdateEmptyNodeMetadata(
+  plan: Plan,
+  relationsID: LongID,
+  metadata: { relevance?: Relevance; argument?: Argument }
+): Plan {
+  const currentMetadata = computeEmptyNodeMetadata(
+    plan.publishEventsStatus.temporaryEvents
+  );
+  const existing = currentMetadata.get(relationsID);
+  if (!existing) {
+    return plan;
+  }
+
+  const updatedRelationItem: RelationItem = {
+    ...existing.relationItem,
+    relevance: metadata.relevance ?? existing.relationItem.relevance,
+    argument: metadata.argument ?? existing.relationItem.argument,
+  };
+
+  return {
+    ...plan,
+    temporaryEvents: plan.temporaryEvents.push({
+      type: "ADD_EMPTY_NODE",
+      relationsID,
+      index: existing.index,
+      relationItem: updatedRelationItem,
     }),
   };
 }

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { TYPE_COLORS } from "../constants";
 import { useUpdateArgument } from "./useUpdateArgument";
 import { useNode } from "../ViewContext";
+import { preventEditorBlurIfSameNode } from "./AddNode";
 
 function getArgumentColor(argument: Argument, isHovered: boolean): string {
   if (argument === "confirms") {
@@ -55,6 +56,7 @@ export function EvidenceSelector(): JSX.Element | null {
     >
       <span
         onClick={handleClick}
+        onMouseDown={preventEditorBlurIfSameNode}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         role="button"

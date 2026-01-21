@@ -35,7 +35,7 @@ import {
   getRefTargetStack,
   itemMatchesType,
   isEmptyNodeID,
-  computeEmptyNodePositions,
+  computeEmptyNodeMetadata,
 } from "../connections";
 import { REFERENCED_BY, DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 import { IS_MOBILE } from "./responsive";
@@ -65,6 +65,7 @@ import { RightMenu } from "./RightMenu";
 import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 import { useItemStyle } from "./useItemStyle";
+import { EditorTextProvider } from "./EditorTextContext";
 
 function getLevels(viewPath: ViewPath): number {
   // Subtract 1: for pane index at position 0
@@ -267,24 +268,25 @@ function EditableContent(): JSX.Element {
         ? planCreateVersion(planWithNode, newNode.id, trimmedText, nodeContext)
         : planWithNode;
 
-      // Get position from temporaryEvents before removing it
-      const emptyNodePositions = computeEmptyNodePositions(
+      // Get metadata from temporaryEvents before removing it
+      const emptyNodeMetadata = computeEmptyNodeMetadata(
         plan.publishEventsStatus.temporaryEvents
       );
-      const emptyNodeIndex: number = relationsID
-        ? emptyNodePositions.get(relationsID) ?? 0
-        : 0;
+      const metadata = relationsID ? emptyNodeMetadata.get(relationsID) : undefined;
+      const emptyNodeIndex = metadata?.index ?? 0;
       // Remove empty node position (no need to "disconnect" - empty node is only injected at read time)
       const planWithoutEmpty = relationsID
         ? planRemoveEmptyNodePosition(planWithVersion, relationsID)
         : planWithVersion;
-      // Add the real node at the same position
+      // Add the real node at the same position with preserved metadata
       plan = planAddToParent(
         planWithoutEmpty,
         newNode.id,
         parentPath,
         stack,
-        emptyNodeIndex
+        emptyNodeIndex,
+        metadata?.relationItem.relevance,
+        metadata?.relationItem.argument
       );
     } else {
       // Handle regular nodes
@@ -715,30 +717,32 @@ export function Node({
   const indentBgColor = isInReferencedByView ? referencedByBgColor : undefined;
 
   return (
-    <NodeCard className={cls} cardBodyClassName={clsBody} style={cardStyle}>
-      <LeftMenu />
-      {levels > 0 && (
-        <Indent levels={levels} backgroundColorForLast={indentBgColor} />
-      )}
-      {showExpandCollapse && <ExpandCollapseToggle />}
-      {isMultiselect && <NodeSelectbox />}
-      <div
-        className="w-100"
-        style={{ paddingTop: 10, ...contentBackgroundStyle }}
-      >
-        <span style={textStyle}>
-          <NodeAutoLink>
-            {isDiffItem && <DiffItemIndicator />}
-            <InteractiveNodeContent />
-          </NodeAutoLink>
-        </span>
-        <span className="inline-node-actions">
-          <FullscreenButton />
-          <OpenInSplitPaneButton />
-        </span>
-      </div>
-      <RightMenu />
-    </NodeCard>
+    <EditorTextProvider>
+      <NodeCard className={cls} cardBodyClassName={clsBody} style={cardStyle}>
+        <LeftMenu />
+        {levels > 0 && (
+          <Indent levels={levels} backgroundColorForLast={indentBgColor} />
+        )}
+        {showExpandCollapse && <ExpandCollapseToggle />}
+        {isMultiselect && <NodeSelectbox />}
+        <div
+          className="w-100"
+          style={{ paddingTop: 10, ...contentBackgroundStyle }}
+        >
+          <span style={textStyle}>
+            <NodeAutoLink>
+              {isDiffItem && <DiffItemIndicator />}
+              <InteractiveNodeContent />
+            </NodeAutoLink>
+          </span>
+          <span className="inline-node-actions">
+            <FullscreenButton />
+            <OpenInSplitPaneButton />
+          </span>
+        </div>
+        <RightMenu />
+      </NodeCard>
+    </EditorTextProvider>
   );
 }
 

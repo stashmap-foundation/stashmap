@@ -10,11 +10,26 @@ import {
   useIsExpanded,
   useIsRoot,
 } from "../ViewContext";
+import { useEditorText } from "./EditorTextContext";
 import useModal from "./useModal";
 import { SearchModal } from "./SearchModal";
 import { usePlanner, planSetEmptyNodePosition } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { planAddToParent } from "../dnd";
+
+/**
+ * Prevents a button from stealing focus from an editor in the same node row.
+ * Use as onMouseDown handler on buttons that should not blur the editor.
+ *
+ * - If the active element (editor) is in the same .inner-node container, prevents default
+ * - If the active element is in a different row, allows normal focus behavior
+ */
+export function preventEditorBlurIfSameNode(e: React.MouseEvent): void {
+  const nodeContainer = (e.currentTarget as HTMLElement).closest(".inner-node");
+  if (nodeContainer?.contains(document.activeElement)) {
+    e.preventDefault();
+  }
+}
 
 function SearchButton({ onClick }: { onClick: () => void }): JSX.Element {
   const displayText = useDisplayText();
@@ -114,6 +129,12 @@ export function MiniEditor({
   const getText = (): string => {
     return editorRef.current?.textContent || "";
   };
+
+  const editorTextContext = useEditorText();
+  useEffect(() => {
+    editorTextContext?.registerGetText(getText);
+    return () => editorTextContext?.registerGetText(() => "");
+  }, [editorTextContext]);
 
   const saveIfChanged = async (): Promise<void> => {
     const text = getText().trim();

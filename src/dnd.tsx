@@ -187,7 +187,8 @@ export function planAddToParent(
   parentViewPath: ViewPath,
   stack: (LongID | ID)[],
   insertAtIndex?: number,
-  relevance?: Relevance
+  relevance?: Relevance,
+  argument?: Argument
 ): Plan {
   const nodeIDsArray = Array.isArray(nodeIDs) ? nodeIDs : [nodeIDs];
   if (nodeIDsArray.length === 0) {
@@ -211,7 +212,7 @@ export function planAddToParent(
     parentViewPath,
     stack,
     (relations) =>
-      bulkAddRelations(relations, nodeIDsArray, relevance, undefined, insertAtIndex)
+      bulkAddRelations(relations, nodeIDsArray, relevance, argument, insertAtIndex)
   );
 
   // 3. Update view paths for the new children

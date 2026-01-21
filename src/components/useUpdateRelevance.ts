@@ -6,10 +6,12 @@ import {
   useIsInReferencedByView,
   useIsAddToNode,
   useNode,
+  useNodeID,
   getRelationForView,
+  getNodeIDFromView,
 } from "../ViewContext";
-import { updateItemRelevance } from "../connections";
-import { usePlanner } from "../planner";
+import { updateItemRelevance, isEmptyNodeID } from "../connections";
+import { usePlanner, planUpdateEmptyNodeMetadata } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 import { planDisconnectFromParent } from "../dnd";
@@ -102,7 +104,18 @@ export function useUpdateRelevance(): UseUpdateRelevanceResult {
   const currentLevel = relevanceToLevel(currentRelevance);
   const nodeText = node?.text || "";
 
+  const [nodeID] = useNodeID();
+  const isEmptyNode = isEmptyNodeID(nodeID);
+  const relationsID = parentView
+    ? getNodeIDFromView(data, parentView)[1].relations
+    : undefined;
+
   const setRelevance = (relevance: Relevance): void => {
+    if (isEmptyNode && relationsID) {
+      executePlan(planUpdateEmptyNodeMetadata(createPlan(), relationsID, { relevance }));
+      return;
+    }
+
     if (!isVisible || !parentView || relationIndex === undefined) return;
     const plan = upsertRelations(createPlan(), parentView, stack, (rels) =>
       updateItemRelevance(rels, relationIndex, relevance)

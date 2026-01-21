@@ -572,19 +572,34 @@ export function isEmptyNodeID(id: LongID | ID): boolean {
   return id === EMPTY_NODE_ID;
 }
 
-// Compute current empty node positions from temporary events
-// Events are processed in order: ADD sets a position, REMOVE clears it
+export type EmptyNodeData = {
+  index: number;
+  relationItem: RelationItem;
+};
+
+// Compute current empty node data from temporary events
+// Events are processed in order: ADD sets data, REMOVE clears it
+export function computeEmptyNodeMetadata(
+  temporaryEvents: List<TemporaryEvent>
+): Map<LongID, EmptyNodeData> {
+  return temporaryEvents.reduce((metadata, event) => {
+    if (event.type === "ADD_EMPTY_NODE") {
+      return metadata.set(event.relationsID, {
+        index: event.index,
+        relationItem: event.relationItem,
+      });
+    } else if (event.type === "REMOVE_EMPTY_NODE") {
+      return metadata.delete(event.relationsID);
+    }
+    return metadata;
+  }, Map<LongID, EmptyNodeData>());
+}
+
+// Convenience function for when only positions are needed
 export function computeEmptyNodePositions(
   temporaryEvents: List<TemporaryEvent>
 ): Map<LongID, number> {
-  return temporaryEvents.reduce((positions, event) => {
-    if (event.type === "ADD_EMPTY_NODE") {
-      return positions.set(event.relationsID, event.index);
-    } else if (event.type === "REMOVE_EMPTY_NODE") {
-      return positions.delete(event.relationsID);
-    }
-    return positions;
-  }, Map<LongID, number>());
+  return computeEmptyNodeMetadata(temporaryEvents).map((data) => data.index);
 }
 
 // Inject empty nodes back into relations based on temporaryEvents
@@ -594,10 +609,10 @@ export function injectEmptyNodesIntoKnowledgeDBs(
   temporaryEvents: List<TemporaryEvent>,
   myself: PublicKey
 ): KnowledgeDBs {
-  // Compute current positions from event stream
-  const emptyNodePositions = computeEmptyNodePositions(temporaryEvents);
+  // Compute current metadata from event stream
+  const emptyNodeMetadata = computeEmptyNodeMetadata(temporaryEvents);
 
-  if (emptyNodePositions.size === 0) {
+  if (emptyNodeMetadata.size === 0) {
     return knowledgeDBs;
   }
 
@@ -606,9 +621,9 @@ export function injectEmptyNodesIntoKnowledgeDBs(
     return knowledgeDBs;
   }
 
-  // For each empty node position, insert into the corresponding relations
-  const updatedRelations = emptyNodePositions.reduce(
-    (relations, index, relationsID) => {
+  // For each empty node, insert into the corresponding relations with its metadata
+  const updatedRelations = emptyNodeMetadata.reduce(
+    (relations, data, relationsID) => {
       const shortRelationsID = splitID(relationsID)[1];
       const existingRelations = relations.get(shortRelationsID);
       if (!existingRelations) {
@@ -623,12 +638,11 @@ export function injectEmptyNodesIntoKnowledgeDBs(
         return relations;
       }
 
-      // Insert empty node at the specified index
-      const emptyItem: RelationItem = {
-        nodeID: EMPTY_NODE_ID as LongID,
-        relevance: "",
-      };
-      const updatedItems = existingRelations.items.insert(index, emptyItem);
+      // Insert empty node at the specified index with its metadata (relevance, argument)
+      const updatedItems = existingRelations.items.insert(
+        data.index,
+        data.relationItem
+      );
       return relations.set(shortRelationsID, {
         ...existingRelations,
         items: updatedItems,

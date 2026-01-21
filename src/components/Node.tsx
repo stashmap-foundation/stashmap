@@ -21,6 +21,7 @@ import {
   useNextInsertPosition,
   useRelationIndex,
   getLast,
+  getVersionsRelations,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -245,7 +246,7 @@ function EditableContent(): JSX.Element {
     // Handle empty placeholder nodes
     if (isEmptyNode) {
       if (!parentPath) return;
-      const [, parentView] = getNodeIDFromView(plan, parentPath);
+      const [parentNodeID, parentView] = getNodeIDFromView(plan, parentPath);
       const relationsID = parentView.relations;
 
       if (!trimmedText) {
@@ -258,6 +259,21 @@ function EditableContent(): JSX.Element {
 
       // Create real node and add at the position where empty node was
       const [planWithNode, newNode] = planCreateNode(plan, trimmedText);
+
+      // Check if this node already has versions - if so, add typed text to top of versions
+      // The context for versions is the path TO the node (including parent), not TO the parent
+      const parentContext = getContextFromStackAndViewPath(stack, parentPath);
+      const nodeContext = parentContext.push(parentNodeID);
+      const existingVersions = getVersionsRelations(
+        planWithNode.knowledgeDBs,
+        planWithNode.user.publicKey,
+        newNode.id,
+        nodeContext
+      );
+      const planWithVersion = existingVersions
+        ? planCreateVersion(planWithNode, newNode.id, trimmedText, nodeContext)
+        : planWithNode;
+
       // Get position from temporaryEvents before removing it
       const emptyNodePositions = computeEmptyNodePositions(
         plan.publishEventsStatus.temporaryEvents
@@ -267,8 +283,8 @@ function EditableContent(): JSX.Element {
         : 0;
       // Remove empty node position (no need to "disconnect" - empty node is only injected at read time)
       const planWithoutEmpty = relationsID
-        ? planRemoveEmptyNodePosition(planWithNode, relationsID)
-        : planWithNode;
+        ? planRemoveEmptyNodePosition(planWithVersion, relationsID)
+        : planWithVersion;
       // Add the real node at the same position
       plan = planAddToParent(
         planWithoutEmpty,

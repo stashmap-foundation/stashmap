@@ -211,32 +211,42 @@ test("Edited node is shown in Tree View", async () => {
   const oop = newNode("Object Oriented Programming languages");
   const java = newNode("Java");
 
+  // Create relations objects to get their IDs
+  const plRelations = addRelationToRelations(
+    newRelations(pl.id, List(), publicKey),
+    oop.id
+  );
+  const oopContext = List([shortID(pl.id)]);
+  const oopRelations = addRelationToRelations(
+    newRelations(oop.id, oopContext, publicKey),
+    java.id
+  );
+
   const plan = planUpsertRelations(
     planUpsertRelations(
       planUpsertRelations(
         createPlan(alice()),
-        // pl's relations have empty context (it's the root workspace)
-        addRelationToRelations(newRelations(pl.id, List(), publicKey), oop.id)
+        plRelations
       ),
-      // oop's relations have context=[pl] since oop is under pl
-      addRelationToRelations(
-        newRelations(oop.id, List([shortID(pl.id)]), publicKey),
-        java.id
-      )
+      oopRelations
     ),
     addRelationToRelations(newRelations(ROOT, List(), publicKey), ROOT)
   );
+
+  // Set up view for oop with its actual relations ID
+  const oopPath = [
+    0,
+    { nodeID: pl.id, nodeIndex: 0 as NodeIndex, relationsID: plRelations.id },
+    { nodeID: oop.id, nodeIndex: 0 as NodeIndex },
+  ] as const;
+
   const planWithViews = planUpdateViews(
     plan,
     Map({
-      [viewPathToString([
-        0,
-        { nodeID: pl.id, nodeIndex: 0 as NodeIndex, relationsID: "" as LongID },
-        { nodeID: oop.id, nodeIndex: 0 as NodeIndex },
-      ])]: {
+      [viewPathToString(oopPath)]: {
         expanded: true,
         width: 1,
-        relations: "" as LongID,
+        relations: oopRelations.id,
       },
     })
   );
@@ -262,18 +272,11 @@ test("Edited node is shown in Tree View", async () => {
       ...alice(),
     }
   );
-  // With inline editing, "Java" is already editable - find the contenteditable textbox
-  const editors = await screen.findAllByRole("textbox", {
-    name: "note editor",
-  });
-  const javaEditor = editors.find((e) => e.textContent === "Java");
-  if (!javaEditor) {
-    throw new Error("Java editor not found");
-  }
+  // With inline editing, find the Java node's editor
+  const javaEditor = await screen.findByLabelText("edit Java");
 
-  // Clear and type new content using userEvent (selection then type)
-  // eslint-disable-next-line functional/immutable-data
-  javaEditor.textContent = "";
+  // Clear and type new content using userEvent
+  await userEvent.clear(javaEditor);
   await userEvent.type(javaEditor, "C++");
   fireEvent.blur(javaEditor);
 

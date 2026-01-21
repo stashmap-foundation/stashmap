@@ -861,12 +861,12 @@ export function planSetEmptyNodePosition(
   const planWithExpanded = view.expanded
     ? planWithOwnRelations
     : planUpdateViews(
-        planWithOwnRelations,
-        updateView(planWithOwnRelations.views, parentPath, {
-          ...view,
-          expanded: true,
-        })
-      );
+      planWithOwnRelations,
+      updateView(planWithOwnRelations.views, parentPath, {
+        ...view,
+        expanded: true,
+      })
+    );
 
   // 4. Add temporary event to show empty node at position
   return {

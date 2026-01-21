@@ -12,6 +12,7 @@ import {
   buildReferenceNode,
   itemMatchesType,
   VERSIONS_NODE_ID,
+  addRelationToRelations,
 } from "./connections";
 import { newDB } from "./knowledge";
 import { useData } from "./DataContext";
@@ -1085,7 +1086,21 @@ export function findOrCreateRelationsForContext(
     context
   );
 
-  return existingRelations.first() || newRelations(nodeID, context, myself);
+  if (existingRelations.first()) {
+    return existingRelations.first() as Relations;
+  }
+
+  // Create new relations
+  const newRels = newRelations(nodeID, context, myself);
+
+  // If this is ~Versions, prepopulate with the original node
+  // The versionsContext is [...path, originalNodeID], so originalNodeID is context.last()
+  if (nodeID === VERSIONS_NODE_ID && context.size > 0) {
+    const originalNodeID = context.last() as ID;
+    return addRelationToRelations(newRels, originalNodeID, "");
+  }
+
+  return newRels;
 }
 
 export function upsertRelations(

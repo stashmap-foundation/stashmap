@@ -58,7 +58,6 @@ import {
 import { planDisconnectFromParent, planAddToParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeIcon } from "./NodeIcon";
-import { planAddNewRelationToNode } from "./RelationTypes";
 import { NodeCard } from "../commons/Ui";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { LeftMenu } from "./LeftMenu";
@@ -125,17 +124,11 @@ function ExpandCollapseToggle(): JSX.Element | null {
         onChangeRelations(topRelation, true);
       }
     } else {
-      // No relations exist, create new (same as GhostRelationButton onClick)
+      // No relations exist, create and expand (uses planExpandNode for ~Versions prepopulation)
       if (!node) {
         return;
       }
-      const plan = planAddNewRelationToNode(
-        createPlan(),
-        node.id,
-        context,
-        view,
-        viewPath
-      );
+      const plan = planExpandNode(createPlan(), node.id, context, view, viewPath);
       executePlan(plan);
     }
   };

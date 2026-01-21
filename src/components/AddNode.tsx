@@ -12,7 +12,7 @@ import {
 } from "../ViewContext";
 import useModal from "./useModal";
 import { SearchModal } from "./SearchModal";
-import { Plan, usePlanner, planCreateNode, planSetEmptyNodePosition } from "../planner";
+import { usePlanner, planSetEmptyNodePosition } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { planAddToParent } from "../dnd";
 
@@ -265,13 +265,9 @@ type AddNodeOptions = {
   asFirstChild?: boolean;
 };
 
-// Hook to get the add node handler for sibling or first child insert
-function useAddSiblingNode(options?: AddNodeOptions): {
-  onAddNode: (plan: Plan, nodeID: ID) => void;
-  onAddExistingNode: (nodeID: ID) => void;
-  onCreateNewNode: (text: string) => void;
-  node: KnowNode;
-} | null {
+// Hook to add an existing node to the current context
+// Returns a function to add a node, or null if context is invalid
+function useAddExistingNode(options?: AddNodeOptions): ((nodeID: ID) => void) | null {
   const { insertAtIndex, asFirstChild } = options || {};
   const isAddToNode = useIsAddToNode();
   const vContext = useViewPath();
@@ -289,39 +285,15 @@ function useAddSiblingNode(options?: AddNodeOptions): {
   const [nodeFromParent] = useParentNode();
   const node =
     isAddToNode || isSiblingInsert ? nodeFromParent : nodeFromCurrent;
-  // For first child, insert at position 0
   const insertPosition = asFirstChild ? 0 : insertAtIndex;
 
   if (!node || !viewContext) {
     return null;
   }
 
-  const onAddNode = (plan: Plan, nodeID: ID): void => {
-    const updatedPlan = planAddToParent(
-      plan,
-      nodeID,
-      viewContext,
-      stack,
-      insertPosition
-    );
-    executePlan(updatedPlan);
-  };
-
-  const onAddExistingNode = (nodeID: ID): void => {
-    onAddNode(createPlan(), nodeID);
-  };
-
-  const onCreateNewNode = (text: string): void => {
-    const [plan, n] = planCreateNode(createPlan(), text);
-    onAddNode(plan, n.id);
-  };
-
-  // node is guaranteed to be defined here (we return null above if it's undefined)
-  return {
-    onAddNode,
-    onAddExistingNode,
-    onCreateNewNode,
-    node: node as KnowNode,
+  return (nodeID: ID): void => {
+    const plan = planAddToParent(createPlan(), nodeID, viewContext, stack, insertPosition);
+    executePlan(plan);
   };
 }
 
@@ -335,7 +307,7 @@ export function SiblingSearchButton(): JSX.Element | null {
   // Otherwise, insert as sibling after current node
   const isFirstChildInsert = isRoot || isExpanded;
 
-  const handlers = useAddSiblingNode(
+  const onAddExistingNode = useAddExistingNode(
     nextInsertPosition
       ? isFirstChildInsert
         ? { asFirstChild: true }
@@ -343,7 +315,7 @@ export function SiblingSearchButton(): JSX.Element | null {
       : undefined
   );
 
-  if (!handlers || !nextInsertPosition) {
+  if (!onAddExistingNode || !nextInsertPosition) {
     return null;
   }
 
@@ -351,7 +323,7 @@ export function SiblingSearchButton(): JSX.Element | null {
     <>
       {isOpen && (
         <SearchModal
-          onAddExistingNode={handlers.onAddExistingNode}
+          onAddExistingNode={onAddExistingNode}
           onHide={closeModal}
         />
       )}

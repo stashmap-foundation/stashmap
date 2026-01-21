@@ -24,10 +24,10 @@ import {
   getNodeIDFromView,
   getParentNodeID,
   getLast,
-  viewPathToString,
+  getContextFromStackAndViewPath,
 } from "./ViewContext";
 import { getNodesInTree } from "./components/Node";
-import { Plan, planUpdateViews } from "./planner";
+import { Plan, planUpdateViews, planExpandNode } from "./planner";
 
 function getDropDestinationEndOfRoot(
   data: Data,
@@ -133,8 +133,13 @@ export function dnd(
       return nodeID;
     })
   );
+
+  // Ensure parent is expanded and relations exist (with ~Versions prepopulation)
+  const toContext = getContextFromStackAndViewPath(stack, toView);
+  const planWithExpand = planExpandNode(plan, toNodeID, toContext, toV, toView);
+
   const updatedRelationsPlan = upsertRelations(
-    plan,
+    planWithExpand,
     toView,
     stack,
     (relations: Relations) => {
@@ -200,7 +205,7 @@ export function planDisconnectFromParent(
 /**
  * Add a node to a parent at a specific index (or at end if undefined).
  * Returns the updated plan with the node added to the parent's relations and views updated.
- * Also expands the parent so the new child is visible.
+ * Uses planExpandNode to ensure relations exist (with ~Versions prepopulation) and expand.
  */
 export function planAddToParent(
   plan: Plan,
@@ -209,31 +214,35 @@ export function planAddToParent(
   stack: (LongID | ID)[],
   insertAtIndex?: number
 ): Plan {
-  const updatedRelationsPlan = upsertRelations(
+  // 1. Use planExpandNode to ensure relations exist and parent is expanded
+  // This handles: finding existing relations, ~Versions prepopulation, expansion
+  const [parentNodeID, parentView] = getNodeIDFromView(plan, parentViewPath);
+  const context = getContextFromStackAndViewPath(stack, parentViewPath);
+  const planWithExpand = planExpandNode(
     plan,
+    parentNodeID,
+    context,
+    parentView,
+    parentViewPath
+  );
+
+  // 2. Add the node to the relations (relations now guaranteed to exist)
+  const updatedRelationsPlan = upsertRelations(
+    planWithExpand,
     parentViewPath,
     stack,
     (relations) =>
       addRelationToRelations(relations, nodeID, "", undefined, insertAtIndex)
   );
 
+  // 3. Update view paths for the new child
   const updatedViews = updateViewPathsAfterAddRelation(
     updatedRelationsPlan,
     parentViewPath,
     insertAtIndex
   );
 
-  // Also expand the parent so the new child is visible
-  const parentViewKey = viewPathToString(parentViewPath);
-  const existingParentView = updatedViews.get(parentViewKey);
-  const viewsWithExpand = existingParentView
-    ? updatedViews.set(parentViewKey, {
-        ...existingParentView,
-        expanded: true,
-      })
-    : updatedViews;
-
-  return planUpdateViews(updatedRelationsPlan, viewsWithExpand);
+  return planUpdateViews(updatedRelationsPlan, updatedViews);
 }
 
 export function DND({ children }: { children: React.ReactNode }): JSX.Element {

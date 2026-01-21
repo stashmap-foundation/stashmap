@@ -590,20 +590,11 @@ export function PlanningContextProvider({
     // (empty nodes are injected at read time, so modifications include them)
     const filteredEvents = filterEmptyNodesFromEvents(plan.publishEvents);
 
-    console.log("executePlan called", {
-      publishEventsCount: filteredEvents.size,
-      planTemporaryEvents: plan.temporaryEvents.toJS(),
-    });
-
     // If no events to publish, just update temporaryView/temporaryEvents in a single call
     // This avoids rapid isLoading true→false transitions that cause race conditions
     if (filteredEvents.size === 0) {
       setPublishEvents((prevStatus) => {
         const newTemporaryEvents = prevStatus.temporaryEvents.concat(plan.temporaryEvents);
-        console.log("setPublishEvents (no events)", {
-          prevTemporaryEvents: prevStatus.temporaryEvents.toJS(),
-          newTemporaryEvents: newTemporaryEvents.toJS(),
-        });
         return {
           ...prevStatus,
           temporaryView: plan.temporaryView,
@@ -616,10 +607,6 @@ export function PlanningContextProvider({
     // Normal flow for when we have events to publish
     setPublishEvents((prevStatus) => {
       const newTemporaryEvents = prevStatus.temporaryEvents.concat(plan.temporaryEvents);
-      console.log("setPublishEvents (with events, isLoading=true)", {
-        prevTemporaryEvents: prevStatus.temporaryEvents.toJS(),
-        newTemporaryEvents: newTemporaryEvents.toJS(),
-      });
       return {
         unsignedEvents: prevStatus.unsignedEvents.merge(filteredEvents),
         results: prevStatus.results,

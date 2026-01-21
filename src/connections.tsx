@@ -597,11 +597,6 @@ export function injectEmptyNodesIntoKnowledgeDBs(
   // Compute current positions from event stream
   const emptyNodePositions = computeEmptyNodePositions(temporaryEvents);
 
-  console.log("injectEmptyNodesIntoKnowledgeDBs", {
-    temporaryEvents: temporaryEvents.toJS(),
-    emptyNodePositions: Object.fromEntries(emptyNodePositions.entries()),
-  });
-
   if (emptyNodePositions.size === 0) {
     return knowledgeDBs;
   }
@@ -617,6 +612,14 @@ export function injectEmptyNodesIntoKnowledgeDBs(
       const shortRelationsID = splitID(relationsID)[1];
       const existingRelations = relations.get(shortRelationsID);
       if (!existingRelations) {
+        return relations;
+      }
+
+      // Check if empty node is already injected (from parent MergeKnowledgeDB)
+      const alreadyHasEmpty = existingRelations.items.some(
+        (item) => item.nodeID === EMPTY_NODE_ID
+      );
+      if (alreadyHasEmpty) {
         return relations;
       }
 

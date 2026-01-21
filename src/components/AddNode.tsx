@@ -67,9 +67,6 @@ type MiniEditorProps = {
   ariaLabel?: string;
 };
 
-// Track component instances to detect recreation
-let miniEditorInstanceCounter = 0;
-
 export function MiniEditor({
   initialText,
   initialCursorPosition,
@@ -79,24 +76,10 @@ export function MiniEditor({
   autoFocus = true,
   ariaLabel,
 }: MiniEditorProps): JSX.Element {
-  // eslint-disable-next-line no-plusplus
-  const instanceId = React.useRef(++miniEditorInstanceCounter);
   const editorRef = React.useRef<HTMLSpanElement>(null);
   // Track last saved text to prevent duplicate saves when blur fires multiple times
   // before React re-renders with updated initialText
   const lastSavedTextRef = React.useRef(initialText);
-  // Track if component is mounted to ignore blur during unmount
-  const isMountedRef = React.useRef(true);
-
-  // Set isMounted to false on unmount
-  useEffect(() => {
-    // eslint-disable-next-line functional/immutable-data
-    isMountedRef.current = true;
-    return () => {
-      // eslint-disable-next-line functional/immutable-data
-      isMountedRef.current = false;
-    };
-  }, []);
 
   // Reset when initialText prop changes (e.g., navigating to different node)
   useEffect(() => {
@@ -106,16 +89,7 @@ export function MiniEditor({
 
   useEffect(() => {
     if (autoFocus && editorRef.current) {
-      console.log("MiniEditor autoFocus effect running", {
-        instanceId: instanceId.current,
-        ariaLabel,
-        activeElementBefore: document.activeElement?.getAttribute?.("aria-label")
-      });
       editorRef.current.focus();
-      console.log("MiniEditor after focus()", {
-        activeElementAfter: document.activeElement?.getAttribute?.("aria-label"),
-        isSelf: document.activeElement === editorRef.current
-      });
       const range = document.createRange();
       const textNode = editorRef.current.firstChild;
       if (textNode && initialCursorPosition !== undefined) {
@@ -214,30 +188,8 @@ export function MiniEditor({
     }
 
     const text = getText().trim();
-    console.log("MiniEditor handleBlur", {
-      instanceId: instanceId.current,
-      text,
-      ariaLabel,
-      activeElement: document.activeElement?.getAttribute?.("aria-label"),
-    });
-
     if (!text) {
-      // Defer close check - if React is recreating the component, focus will return
-      // This prevents closing during React reconciliation cycles
-      requestAnimationFrame(() => {
-        // Check if focus returned to this editor (React remounted it)
-        if (document.activeElement === editorRef.current) {
-          console.log("MiniEditor blur IGNORED (focus returned)", { ariaLabel });
-          return;
-        }
-        // Check if component was unmounted
-        if (!isMountedRef.current) {
-          console.log("MiniEditor blur IGNORED (unmounted)", { ariaLabel });
-          return;
-        }
-        console.log("MiniEditor blur -> closing", { ariaLabel });
-        onClose?.();
-      });
+      onClose?.();
       return;
     }
     saveIfChanged();
@@ -271,7 +223,7 @@ export function MiniEditor({
     <span
       role="presentation"
       onClick={handleWrapperClick}
-      onKeyDown={() => {}}
+      onKeyDown={() => { }}
       style={{
         paddingRight: "30px",
         cursor: "text",

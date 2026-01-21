@@ -19,9 +19,6 @@ import {
   useDisplayText,
   getParentView,
   useNextInsertPosition,
-  useRelationIndex,
-  getLast,
-  getVersionsRelations,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -35,7 +32,6 @@ import {
   getRefTargetStack,
   itemMatchesType,
   isEmptyNodeID,
-  computeEmptyNodeMetadata,
 } from "../connections";
 import { REFERENCED_BY, DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 import { IS_MOBILE } from "./responsive";
@@ -48,12 +44,13 @@ import {
 import { ReferenceIndicators } from "./ReferenceIndicators";
 import { useData } from "../DataContext";
 import {
-  planCreateVersion,
   usePlanner,
-  planCreateNode,
-  planRemoveEmptyNodePosition,
   planSetEmptyNodePosition,
+  planSaveNode,
   planExpandNode,
+  planRemoveEmptyNodePosition,
+  planCreateNode,
+  planCreateVersion,
 } from "../planner";
 import { planDisconnectFromParent, planAddToParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
@@ -224,9 +221,6 @@ function EditableContent(): JSX.Element {
   const prevSibling = usePreviousSibling();
   const parentPath = getParentView(viewPath);
   const nextInsertPosition = useNextInsertPosition();
-  const relationIndex = useRelationIndex();
-
-  // Check if this is an empty placeholder node
   const isEmptyNode = isEmptyNodeID(nodeID);
 
   const handleSave = (
@@ -234,82 +228,14 @@ function EditableContent(): JSX.Element {
     _imageUrl?: string,
     submitted?: boolean
   ): void => {
-    const trimmedText = text.trim();
-    let plan = createPlan();
+    let plan = planSaveNode(createPlan(), text, viewPath, stack);
 
-    // Handle empty placeholder nodes
-    if (isEmptyNode) {
-      if (!parentPath) return;
-      const [parentNodeID, parentView] = getNodeIDFromView(plan, parentPath);
-      const relationsID = parentView.relations;
-
-      if (!trimmedText) {
-        // Empty text on blur/escape → just remove from emptyNodePositions
-        if (relationsID) {
-          executePlan(planRemoveEmptyNodePosition(plan, relationsID));
-        }
-        return;
-      }
-
-      // Create real node and add at the position where empty node was
-      const [planWithNode, newNode] = planCreateNode(plan, trimmedText);
-
-      // Check if this node already has versions - if so, add typed text to top of versions
-      // The context for versions is the path TO the node (including parent), not TO the parent
-      const parentContext = getContextFromStackAndViewPath(stack, parentPath);
-      const nodeContext = parentContext.push(parentNodeID);
-      const existingVersions = getVersionsRelations(
-        planWithNode.knowledgeDBs,
-        planWithNode.user.publicKey,
-        newNode.id,
-        nodeContext
-      );
-      const planWithVersion = existingVersions
-        ? planCreateVersion(planWithNode, newNode.id, trimmedText, nodeContext)
-        : planWithNode;
-
-      // Get metadata from temporaryEvents before removing it
-      const emptyNodeMetadata = computeEmptyNodeMetadata(
-        plan.publishEventsStatus.temporaryEvents
-      );
-      const metadata = relationsID ? emptyNodeMetadata.get(relationsID) : undefined;
-      const emptyNodeIndex = metadata?.index ?? 0;
-      // Remove empty node position (no need to "disconnect" - empty node is only injected at read time)
-      const planWithoutEmpty = relationsID
-        ? planRemoveEmptyNodePosition(planWithVersion, relationsID)
-        : planWithVersion;
-      // Add the real node at the same position with preserved metadata
-      plan = planAddToParent(
-        planWithoutEmpty,
-        newNode.id,
-        parentPath,
-        stack,
-        emptyNodeIndex,
-        metadata?.relationItem.relevance,
-        metadata?.relationItem.argument
-      );
-    } else {
-      // Handle regular nodes
-      if (!node || node.type !== "text") return;
-      const textChanged = trimmedText !== displayText;
-
-      // Only execute if something changed
-      if (!textChanged && !submitted) {
-        return;
-      }
-
-      // Save text changes by creating a version
-      if (textChanged) {
-        plan = planCreateVersion(
-          plan,
-          nodeID,
-          trimmedText,
-          getContextFromStackAndViewPath(stack, viewPath)
-        );
-      }
+    if (!plan && !submitted) {
+      return;
     }
 
-    // If user pressed Enter, add a new empty node position (no events created)
+    plan = plan ?? createPlan();
+
     if (submitted && nextInsertPosition) {
       const [targetPath, insertIndex] = nextInsertPosition;
       plan = planSetEmptyNodePosition(plan, targetPath, stack, insertIndex);

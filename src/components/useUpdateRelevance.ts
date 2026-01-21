@@ -11,10 +11,11 @@ import {
   getNodeIDFromView,
 } from "../ViewContext";
 import { updateItemRelevance, isEmptyNodeID } from "../connections";
-import { usePlanner, planUpdateEmptyNodeMetadata } from "../planner";
+import { usePlanner, planUpdateEmptyNodeMetadata, planSaveNode } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 import { planDisconnectFromParent } from "../dnd";
+import { useEditorText } from "./EditorTextContext";
 
 // Relevance mapped to levels:
 // "relevant" = 3

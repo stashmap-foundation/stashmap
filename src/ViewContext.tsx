@@ -598,7 +598,7 @@ export function calculateIndexFromNodeIndex(
   return res[0];
 }
 
-function addRelationsToLastElement(
+export function addRelationsToLastElement(
   path: ViewPath,
   relationsID: LongID
 ): [number, ...SubPathWithRelations[]] {
@@ -1152,7 +1152,7 @@ export function upsertRelations(
 
   // 5. Skip event only if: found own relations AND items unchanged
   if (isOwn && foundRelations.items.equals(updatedRelations.items)) {
-    return planWithUpdatedView;
+    //return planWithUpdatedView;
   }
 
   return planUpsertRelations(planWithUpdatedView, updatedRelations);

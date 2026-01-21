@@ -870,4 +870,43 @@ My Notes
     Child 2
     `);
   });
+
+  test("Create sibling with renderApp (full app integration)", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    // Wait for root to be visible and expanded
+    await screen.findByLabelText("collapse My Notes");
+
+    // Create first child
+    await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
+    await userEvent.type(await findNewNodeEditor(), "First Child{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    await expectTree(`
+My Notes
+  First Child
+    `);
+
+    // Click on First Child and press Enter to create sibling
+    const childEditor = await screen.findByLabelText("edit First Child");
+    await userEvent.click(childEditor);
+    await userEvent.keyboard("{Enter}");
+
+    // Verify empty editor appeared after First Child
+    await expectTree(`
+My Notes
+  First Child
+  [NEW NODE]
+    `);
+
+    // Type the new node text and save
+    await userEvent.type(await findNewNodeEditor(), "Second Child{Escape}");
+
+    await expectTree(`
+My Notes
+  First Child
+  Second Child
+    `);
+  });
 });

@@ -572,22 +572,42 @@ export function isEmptyNodeID(id: LongID | ID): boolean {
   return id === EMPTY_NODE_ID;
 }
 
-// Inject empty nodes back into relations based on emptyNodePositions
+// Compute current empty node positions from temporary events
+// Events are processed in order: ADD sets a position, REMOVE clears it
+export function computeEmptyNodePositions(
+  temporaryEvents: List<TemporaryEvent>
+): Map<LongID, number> {
+  return temporaryEvents.reduce((positions, event) => {
+    if (event.type === "ADD_EMPTY_NODE") {
+      return positions.set(event.relationsID, event.index);
+    } else if (event.type === "REMOVE_EMPTY_NODE") {
+      return positions.delete(event.relationsID);
+    }
+    return positions;
+  }, Map<LongID, number>());
+}
+
+// Inject empty nodes back into relations based on temporaryEvents
 // This is called after processEvents to add empty placeholder nodes
-// that were filtered out before relay publishing
 export function injectEmptyNodesIntoKnowledgeDBs(
   knowledgeDBs: KnowledgeDBs,
-  emptyNodePositions: Map<LongID, number>,
+  temporaryEvents: List<TemporaryEvent>,
   myself: PublicKey
 ): KnowledgeDBs {
-  console.log("injectEmptyNodesIntoKnowledgeDBs called, positions:", emptyNodePositions.toJS());
+  // Compute current positions from event stream
+  const emptyNodePositions = computeEmptyNodePositions(temporaryEvents);
+
+  console.log("injectEmptyNodesIntoKnowledgeDBs", {
+    temporaryEvents: temporaryEvents.toJS(),
+    emptyNodePositions: Object.fromEntries(emptyNodePositions.entries()),
+  });
+
   if (emptyNodePositions.size === 0) {
     return knowledgeDBs;
   }
 
   const myDB = knowledgeDBs.get(myself);
   if (!myDB) {
-    console.log("injectEmptyNodesIntoKnowledgeDBs: no myDB");
     return knowledgeDBs;
   }
 
@@ -596,7 +616,6 @@ export function injectEmptyNodesIntoKnowledgeDBs(
     (relations, index, relationsID) => {
       const shortRelationsID = splitID(relationsID)[1];
       const existingRelations = relations.get(shortRelationsID);
-      console.log("inject: looking for", shortRelationsID, "found:", !!existingRelations);
       if (!existingRelations) {
         return relations;
       }

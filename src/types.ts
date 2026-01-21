@@ -108,9 +108,15 @@ declare global {
     writeRelayConf?: WriteRelayConf;
   };
 
+  // Temporary events for UI state that should never be published
+  type TemporaryEvent =
+    | { type: "ADD_EMPTY_NODE"; relationsID: LongID; index: number }
+    | { type: "REMOVE_EMPTY_NODE"; relationsID: LongID };
+
   type EventState = PublishEvents<EventAttachment> & {
     preLoginEvents: List<UnsignedEvent & EventAttachment>;
     temporaryView: TemporaryViewState;
+    temporaryEvents: List<TemporaryEvent>;
   };
 
   type AllRelays = {
@@ -237,8 +243,6 @@ declare global {
     editorOpenViews: Set<string>;
     // Draft texts: draftID → current text being typed
     draftTexts: Map<string, string>;
-    // Empty node positions: relationsID → index where empty node should be inserted
-    emptyNodePositions: Map<LongID, number>;
   };
 }
 

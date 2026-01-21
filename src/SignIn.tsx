@@ -237,6 +237,7 @@ export function SignInModal(): JSX.Element {
           isLoading: false,
           preLoginEvents: mergeEvents,
           temporaryView: current.temporaryView,
+          temporaryEvents: current.temporaryEvents,
         };
       });
     } else {
@@ -247,6 +248,7 @@ export function SignInModal(): JSX.Element {
           isLoading: true,
           preLoginEvents: mergeEvents,
           temporaryView: current.temporaryView,
+          temporaryEvents: current.temporaryEvents,
         };
       });
     }

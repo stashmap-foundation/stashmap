@@ -48,6 +48,8 @@ export function MergeKnowledgeDB({
   knowledgeDBs: KnowledgeDBs;
 }): JSX.Element {
   const data = useData();
+  const { temporaryEvents } = data.publishEventsStatus;
+  const myself = data.user.publicKey;
 
   const existingDBs = data.knowledgeDBs;
   const allUsers = knowledgeDBs
@@ -67,19 +69,18 @@ export function MergeKnowledgeDB({
     })
   );
 
-  // Inject empty placeholder nodes based on temporaryView.emptyNodePositions
-  const { emptyNodePositions } = data.publishEventsStatus.temporaryView;
-  const dbsWithEmptyNodes = injectEmptyNodesIntoKnowledgeDBs(
+  // Inject empty nodes after merging
+  const injectedDBs = injectEmptyNodesIntoKnowledgeDBs(
     mergedDBs,
-    emptyNodePositions,
-    data.user.publicKey
+    temporaryEvents,
+    myself
   );
 
   return (
     <DataContext.Provider
       value={{
         ...data,
-        knowledgeDBs: dbsWithEmptyNodes,
+        knowledgeDBs: injectedDBs,
       }}
     >
       {children}

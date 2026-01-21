@@ -48,6 +48,7 @@ export type Plan = Data & {
   activeWorkspace: ID;
   relays: AllRelays;
   temporaryView: TemporaryViewState;
+  temporaryEvents: List<TemporaryEvent>;
 };
 
 function newContactListEvent(contacts: Contacts, user: User): UnsignedEvent {
@@ -584,26 +585,48 @@ export function PlanningContextProvider({
 }): JSX.Element {
   const { relayPool, finalizeEvent } = useApis();
 
-  let executePlanCallId = 0;
   const executePlan = async (plan: Plan): Promise<void> => {
-    const callId = ++executePlanCallId;
     // Filter empty nodes from events before publishing
     // (empty nodes are injected at read time, so modifications include them)
     const filteredEvents = filterEmptyNodesFromEvents(plan.publishEvents);
 
-    // DEBUG: Log events being published
-    // eslint-disable-next-line no-console
-    console.log(`[${callId}] EVENTS:`, filteredEvents.size, "positions:", plan.temporaryView.emptyNodePositions.toJS());
-    if (plan.temporaryView.emptyNodePositions.size === 0) {
-      console.trace("executePlan with EMPTY positions");
+    console.log("executePlan called", {
+      publishEventsCount: filteredEvents.size,
+      planTemporaryEvents: plan.temporaryEvents.toJS(),
+    });
+
+    // If no events to publish, just update temporaryView/temporaryEvents in a single call
+    // This avoids rapid isLoading true→false transitions that cause race conditions
+    if (filteredEvents.size === 0) {
+      setPublishEvents((prevStatus) => {
+        const newTemporaryEvents = prevStatus.temporaryEvents.concat(plan.temporaryEvents);
+        console.log("setPublishEvents (no events)", {
+          prevTemporaryEvents: prevStatus.temporaryEvents.toJS(),
+          newTemporaryEvents: newTemporaryEvents.toJS(),
+        });
+        return {
+          ...prevStatus,
+          temporaryView: plan.temporaryView,
+          temporaryEvents: newTemporaryEvents,
+        };
+      });
+      return;
     }
+
+    // Normal flow for when we have events to publish
     setPublishEvents((prevStatus) => {
+      const newTemporaryEvents = prevStatus.temporaryEvents.concat(plan.temporaryEvents);
+      console.log("setPublishEvents (with events, isLoading=true)", {
+        prevTemporaryEvents: prevStatus.temporaryEvents.toJS(),
+        newTemporaryEvents: newTemporaryEvents.toJS(),
+      });
       return {
         unsignedEvents: prevStatus.unsignedEvents.merge(filteredEvents),
         results: prevStatus.results,
         isLoading: true,
         preLoginEvents: prevStatus.preLoginEvents,
         temporaryView: plan.temporaryView,
+        temporaryEvents: newTemporaryEvents,
       };
     });
 
@@ -673,6 +696,8 @@ export function createPlan(
       props.publishEvents || List<UnsignedEvent & EventAttachment>([]),
     // temporaryView comes from publishEventsStatus
     temporaryView: props.publishEventsStatus.temporaryView,
+    // Each plan starts with empty temporaryEvents - they get concatenated in executePlan
+    temporaryEvents: List<TemporaryEvent>(),
   };
 }
 
@@ -750,12 +775,10 @@ export function planRemoveEmptyNodePosition(
       plan.user.publicKey,
       relationsID
     ),
-    temporaryView: {
-      ...plan.temporaryView,
-      emptyNodePositions: plan.temporaryView.emptyNodePositions.delete(
-        relationsID
-      ),
-    },
+    temporaryEvents: plan.temporaryEvents.push({
+      type: "REMOVE_EMPTY_NODE",
+      relationsID,
+    }),
   };
 }
 
@@ -858,15 +881,13 @@ export function planSetEmptyNodePosition(
         })
       );
 
-  // 4. Store position in emptyNodePositions
+  // 4. Add temporary event to show empty node at position
   return {
     ...planWithExpanded,
-    temporaryView: {
-      ...planWithExpanded.temporaryView,
-      emptyNodePositions: planWithExpanded.temporaryView.emptyNodePositions.set(
-        relationsID,
-        insertIndex
-      ),
-    },
+    temporaryEvents: planWithExpanded.temporaryEvents.push({
+      type: "ADD_EMPTY_NODE",
+      relationsID,
+      index: insertIndex,
+    }),
   };
 }

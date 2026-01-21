@@ -34,6 +34,7 @@ import {
   getRefTargetStack,
   itemMatchesType,
   isEmptyNodeID,
+  computeEmptyNodePositions,
 } from "../connections";
 import { REFERENCED_BY, DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 import { IS_MOBILE } from "./responsive";
@@ -257,9 +258,12 @@ function EditableContent(): JSX.Element {
 
       // Create real node and add at the position where empty node was
       const [planWithNode, newNode] = planCreateNode(plan, trimmedText);
-      // Get position from emptyNodePositions before removing it
+      // Get position from temporaryEvents before removing it
+      const emptyNodePositions = computeEmptyNodePositions(
+        plan.publishEventsStatus.temporaryEvents
+      );
       const emptyNodeIndex: number = relationsID
-        ? plan.temporaryView.emptyNodePositions.get(relationsID) ?? 0
+        ? emptyNodePositions.get(relationsID) ?? 0
         : 0;
       // Remove empty node position (no need to "disconnect" - empty node is only injected at read time)
       const planWithoutEmpty = relationsID

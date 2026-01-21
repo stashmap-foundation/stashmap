@@ -135,7 +135,6 @@ const DEFAULT_TEMPORARY_VIEW: TemporaryViewState = {
   editingViews: Set<string>(),
   editorOpenViews: Set<string>(),
   draftTexts: Map<string, string>(),
-  emptyNodePositions: Map<LongID, number>(),
 };
 
 function Data({ user, children }: DataProps): JSX.Element {
@@ -147,6 +146,7 @@ function Data({ user, children }: DataProps): JSX.Element {
       isLoading: false,
       preLoginEvents: List(),
       temporaryView: DEFAULT_TEMPORARY_VIEW,
+      temporaryEvents: List(),
     });
   const { isRelaysLoaded } = useUserRelayContext();
   const { relayPool } = useApis();

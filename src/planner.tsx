@@ -37,6 +37,7 @@ import {
   updateView,
   contextsMatch,
   getAvailableRelationsForNode,
+  getContextFromStackAndViewPath,
 } from "./ViewContext";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useWorkspaceContext } from "./WorkspaceContext";
@@ -848,26 +849,26 @@ export function planSetEmptyNodePosition(
   stack: (LongID | ID)[],
   insertIndex: number
 ): Plan {
-  // 1. Ensure we have our own relations (copies remote if needed, no event if unchanged)
+  // 1. Ensure we have our own editable relations (copies remote if needed)
   const planWithOwnRelations = upsertRelations(plan, parentPath, stack, (r) => r);
 
-  // 2. Get relationsID and ensure expanded
-  const [, view] = getNodeIDFromView(planWithOwnRelations, parentPath);
+  // 2. Use planExpandNode for consistent expansion handling
+  const [parentNodeID, parentView] = getNodeIDFromView(planWithOwnRelations, parentPath);
+  const context = getContextFromStackAndViewPath(stack, parentPath);
+  const planWithExpanded = planExpandNode(
+    planWithOwnRelations,
+    parentNodeID,
+    context,
+    parentView,
+    parentPath
+  );
+
+  // 3. Get relationsID (guaranteed to exist after above steps)
+  const [, view] = getNodeIDFromView(planWithExpanded, parentPath);
   const relationsID = view.relations;
   if (!relationsID) {
     return plan; // Shouldn't happen, but defensive
   }
-
-  // 3. Expand if not already
-  const planWithExpanded = view.expanded
-    ? planWithOwnRelations
-    : planUpdateViews(
-      planWithOwnRelations,
-      updateView(planWithOwnRelations.views, parentPath, {
-        ...view,
-        expanded: true,
-      })
-    );
 
   // 4. Add temporary event to show empty node at position
   return {

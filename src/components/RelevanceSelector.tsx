@@ -9,13 +9,12 @@ import {
 import {
   useViewPath,
   getParentView,
-  upsertRelations,
   useNodeID,
   useNode,
   useDisplayText,
 } from "../ViewContext";
-import { addRelationToRelations } from "../connections";
 import { usePlanner } from "../planner";
+import { planAddToParent } from "../dnd";
 import { usePaneNavigation } from "../SplitPanesContext";
 
 type RelevanceSelectorProps = {
@@ -94,9 +93,7 @@ export function RelevanceSelector({
   const acceptWithLevel = (level: number): void => {
     if (!parentPath) return;
     const relevance = levelToRelevance(level);
-    const plan = upsertRelations(createPlan(), parentPath, stack, (relations) =>
-      addRelationToRelations(relations, nodeID, relevance)
-    );
+    const plan = planAddToParent(createPlan(), nodeID, parentPath, stack, undefined, relevance);
     executePlan(plan);
   };
 

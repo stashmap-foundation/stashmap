@@ -8,7 +8,6 @@ import {
   getRelations,
   moveRelations,
   deleteRelations,
-  addRelationToRelations,
 } from "./connections";
 import {
   parseViewPath,
@@ -19,7 +18,6 @@ import {
   bulkUpdateViewPathsAfterAddRelation,
   updateViewPathsAfterMoveRelations,
   updateViewPathsAfterDisconnect,
-  updateViewPathsAfterAddRelation,
   getRelationIndex,
   getNodeIDFromView,
   getParentNodeID,
@@ -126,39 +124,15 @@ export function dnd(
     );
     return planUpdateViews(updatedRelationsPlan, updatedViews);
   }
-  const sourceNodes = List(
-    sources.map((s) => {
+  const sourceNodeIDs = sources
+    .map((s) => {
       const path = parseViewPath(s);
       const [nodeID] = getNodeIDFromView(plan, path);
       return nodeID;
     })
-  );
+    .toArray();
 
-  // Ensure parent is expanded and relations exist (with ~Versions prepopulation)
-  const toContext = getContextFromStackAndViewPath(stack, toView);
-  const planWithExpand = planExpandNode(plan, toNodeID, toContext, toV, toView);
-
-  const updatedRelationsPlan = upsertRelations(
-    planWithExpand,
-    toView,
-    stack,
-    (relations: Relations) => {
-      return bulkAddRelations(
-        relations,
-        sourceNodes.toArray(),
-        "", // Default to "relevant" relevance
-        undefined, // No argument
-        dropIndex
-      );
-    }
-  );
-  const updatedViews = bulkUpdateViewPathsAfterAddRelation(
-    updatedRelationsPlan,
-    toView,
-    sourceNodes.size,
-    dropIndex
-  );
-  return planUpdateViews(updatedRelationsPlan, updatedViews);
+  return planAddToParent(plan, sourceNodeIDs, toView, stack, dropIndex);
 }
 
 /**
@@ -203,19 +177,24 @@ export function planDisconnectFromParent(
 }
 
 /**
- * Add a node to a parent at a specific index (or at end if undefined).
- * Returns the updated plan with the node added to the parent's relations and views updated.
+ * Add one or more nodes to a parent at a specific index (or at end if undefined).
+ * Returns the updated plan with nodes added to the parent's relations and views updated.
  * Uses planExpandNode to ensure relations exist (with ~Versions prepopulation) and expand.
  */
 export function planAddToParent(
   plan: Plan,
-  nodeID: LongID | ID,
+  nodeIDs: LongID | ID | (LongID | ID)[],
   parentViewPath: ViewPath,
   stack: (LongID | ID)[],
-  insertAtIndex?: number
+  insertAtIndex?: number,
+  relevance?: Relevance
 ): Plan {
+  const nodeIDsArray = Array.isArray(nodeIDs) ? nodeIDs : [nodeIDs];
+  if (nodeIDsArray.length === 0) {
+    return plan;
+  }
+
   // 1. Use planExpandNode to ensure relations exist and parent is expanded
-  // This handles: finding existing relations, ~Versions prepopulation, expansion
   const [parentNodeID, parentView] = getNodeIDFromView(plan, parentViewPath);
   const context = getContextFromStackAndViewPath(stack, parentViewPath);
   const planWithExpand = planExpandNode(
@@ -226,19 +205,20 @@ export function planAddToParent(
     parentViewPath
   );
 
-  // 2. Add the node to the relations (relations now guaranteed to exist)
+  // 2. Add the nodes to the relations (relations now guaranteed to exist)
   const updatedRelationsPlan = upsertRelations(
     planWithExpand,
     parentViewPath,
     stack,
     (relations) =>
-      addRelationToRelations(relations, nodeID, "", undefined, insertAtIndex)
+      bulkAddRelations(relations, nodeIDsArray, relevance, undefined, insertAtIndex)
   );
 
-  // 3. Update view paths for the new child
-  const updatedViews = updateViewPathsAfterAddRelation(
+  // 3. Update view paths for the new children
+  const updatedViews = bulkUpdateViewPathsAfterAddRelation(
     updatedRelationsPlan,
     parentViewPath,
+    nodeIDsArray.length,
     insertAtIndex
   );
 

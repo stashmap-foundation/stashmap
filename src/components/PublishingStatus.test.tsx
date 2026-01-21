@@ -20,12 +20,18 @@ test("Publishing Status", async () => {
   renderApp(alice());
   await userEvent.click(await screen.findByLabelText("add to My Notes"));
   await userEvent.type(await findNewNodeEditor(), "New Note{Enter}");
+  await userEvent.type(await findNewNodeEditor(), "{Escape}");
   await userEvent.click(screen.getByLabelText("publishing status"));
   await screen.findByText("Publishing Status");
   expect(await screen.findAllByText("100%")).toHaveLength(4);
   screen.getByText("Relay wss://relay.test.first.success/:");
+  // Events created when clicking "add" and typing "New Note{Enter}{Escape}":
+  // 1. Relations for "My Notes" (created on click)
+  // 2. Node event for "New Note"
+  // 3. Relations update (adding "New Note" to "My Notes")
+  // 4-5. Additional events from expand/views updates
   expect(
-    screen.getAllByText("3 of the last 3 events have been published")
+    screen.getAllByText("5 of the last 5 events have been published")
   ).toHaveLength(4);
 });
 
@@ -74,14 +80,14 @@ test("Details of Publishing Status", async () => {
   );
   screen.getByText("Relay wss://relay.test.fourth.success/:");
   expect(
-    screen.getAllByText("3 of the last 3 events have been published")
+    screen.getAllByText("5 of the last 5 events have been published")
   ).toHaveLength(2);
 
   screen.getByText("Relay wss://relay.test.third.rand/:");
-  screen.getByText("2 of the last 3 events have been published");
+  screen.getByText("4 of the last 5 events have been published");
   screen.getByText("Last rejection reason: Error: too many requests");
 
   screen.getByText("Relay wss://relay.test.second.fail/:");
-  screen.getByText("0 of the last 3 events have been published");
+  screen.getByText("0 of the last 5 events have been published");
   screen.getAllByText("Last rejection reason: Error: paid relay");
 });

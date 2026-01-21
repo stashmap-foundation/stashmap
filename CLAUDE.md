@@ -6,6 +6,7 @@
 
 ## Testing
 
+- In order to create test data, just use the keyboard. For example, Holiday Destinations{Enter}{Tab}Spain{Enter}France{Enter} will create a nice Tree with Holiday Destinations as root and Spain and France as children.
 - VERY IMPORTANT: Look at existing tests for examples and how we write tests. It will also show you which helpers to use.
 - DON'T EVER .skip an existing test. If you can't fix it, let it fail and ask for help.
 - Don't do html access in tests, use aria-labels

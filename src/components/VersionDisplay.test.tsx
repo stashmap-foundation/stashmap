@@ -615,4 +615,27 @@ My Notes
     // Verify the unfiltered path is NOT shown
     expect(screen.queryByText(/Cities in Spain → BCN → ~Versions/)).toBeNull();
   });
+
+  test("Manually adding ~Versions to a node without versions prepopulates with original", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    // Create a node that has never been edited (no ~Versions yet)
+    // Press Enter on My Notes to create first child
+    const myNotesEditor = await screen.findByLabelText("edit My Notes");
+    await userEvent.click(myNotesEditor);
+    await userEvent.keyboard("{Enter}");
+    // Create "Original Text", then Tab to indent next node as child, add ~Versions, Tab to go inside, Enter
+    await userEvent.type(await findNewNodeEditor(), "Original Text{Enter}{Tab}~Versions{Enter}{Tab}");
+
+    // ~Versions should be expanded and contain "Original Text" as the original version
+    // Plus there should be an empty editor for the new node
+    await expectTree(`
+My Notes
+  
+    ~Versions
+      [NEW NODE]
+      Original Text
+    `);
+  });
 });

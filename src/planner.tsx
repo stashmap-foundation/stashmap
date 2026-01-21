@@ -28,6 +28,7 @@ import {
 } from "./connections";
 import {
   newRelations,
+  newRelationsForNode,
   getVersionsContext,
   getVersionsRelations,
   upsertRelations,
@@ -826,8 +827,8 @@ export function planExpandNode(
     );
   }
 
-  // 3. No relations exist - create new one
-  const relations = newRelations(nodeID, context, plan.user.publicKey);
+  // 3. No relations exist - create new one (prepopulates ~Versions with original node)
+  const relations = newRelationsForNode(nodeID, context, plan.user.publicKey);
   const createRelationPlan = planUpsertRelations(plan, relations);
   return planUpdateViews(
     createRelationPlan,

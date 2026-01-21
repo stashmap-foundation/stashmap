@@ -1015,6 +1015,21 @@ export function newRelations(
   };
 }
 
+// Creates new relations, prepopulating ~Versions with the original node
+// The versionsContext is [...path, originalNodeID], so originalNodeID is context.last()
+export function newRelationsForNode(
+  nodeID: LongID | ID,
+  context: Context,
+  myself: PublicKey
+): Relations {
+  const relations = newRelations(nodeID, context, myself);
+  if (shortID(nodeID) === VERSIONS_NODE_ID && context.size > 0) {
+    const originalNodeID = context.last() as ID;
+    return addRelationToRelations(relations, originalNodeID, "");
+  }
+  return relations;
+}
+
 function createUpdatableRelations(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
@@ -1090,17 +1105,7 @@ export function findOrCreateRelationsForContext(
     return existingRelations.first() as Relations;
   }
 
-  // Create new relations
-  const newRels = newRelations(nodeID, context, myself);
-
-  // If this is ~Versions, prepopulate with the original node
-  // The versionsContext is [...path, originalNodeID], so originalNodeID is context.last()
-  if (nodeID === VERSIONS_NODE_ID && context.size > 0) {
-    const originalNodeID = context.last() as ID;
-    return addRelationToRelations(newRels, originalNodeID, "");
-  }
-
-  return newRels;
+  return newRelationsForNode(nodeID, context, myself);
 }
 
 export function upsertRelations(
@@ -1141,7 +1146,7 @@ export function upsertRelations(
         nodeID,
         context
       )
-      : newRelations(nodeID, context, plan.user.publicKey);
+      : newRelationsForNode(nodeID, context, plan.user.publicKey);
 
   // 3. Update view if needed
   const oldRelationsID = nodeView.relations || relations.id;

@@ -12,6 +12,8 @@ import {
   renderWithTestData,
   setup,
   expectTree,
+  renderTree,
+  findNewNodeEditor,
 } from "../utils.test";
 import {
   NodeIndex,
@@ -202,7 +204,7 @@ test("Edit nested node inline", async () => {
   await screen.findByText("My edited Note");
 });
 
-test.skip("Edited node is shown in Tree View", async () => {
+test("Edited node is shown in Tree View", async () => {
   const [alice] = setup([ALICE]);
   const { publicKey } = alice().user;
   const pl = newNode("Programming Languages");
@@ -662,244 +664,160 @@ test.skip("Multiple connections to same node", async () => {
   ).toMatch(/Java(.*)Java/);
 });
 
-// Helper to find the empty CreateNodeEditor (the new editor without text)
-async function findEmptyEditor(): Promise<HTMLElement> {
-  const editors = await screen.findAllByRole("textbox", {
-    name: "note editor",
-  });
-  const emptyEditor = editors.find((e) => e.textContent === "");
-  if (!emptyEditor) {
-    throw new Error("No empty editor found");
-  }
-  return emptyEditor;
-}
-
-// Tests for inline node creation via keyboard - covered by TreeEditor.test.tsx
-describe.skip("Inline Node Creation", () => {
+// Tests for inline node creation via keyboard
+describe("Inline Node Creation", () => {
   test("Create new sibling node by pressing Enter on existing node", async () => {
     const [alice] = setup([ALICE]);
-    const { publicKey } = alice().user;
-    // Create an initial editable node
-    const parent = newNode("Parent Node");
-    const child = newNode("First Child");
-    const relations = addRelationToRelations(
-      newRelations(parent.id, List(), publicKey),
-      child.id
-    );
-    await execute({
-      ...alice(),
-      plan: planUpsertRelations(
-        planUpsertNode(planUpsertNode(createPlan(alice()), parent), child),
-        relations
-      ),
-    });
+    renderTree(alice);
 
-    renderWithTestData(
-      <RootViewContextProvider root={parent.id}>
-        <LoadNode waitForEose>
-          <TemporaryViewProvider>
-            <DND>
-              <>
-                <DraggableNote />
-                <TreeView />
-              </>
-            </DND>
-          </TemporaryViewProvider>
-        </LoadNode>
-      </RootViewContextProvider>,
-      alice()
-    );
+    // Create first child
+    await screen.findByLabelText("collapse My Notes");
+    await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
+    await userEvent.type(await findNewNodeEditor(), "First Child{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
-    // Find the child node's editable text
-    const childText = await screen.findByText("First Child");
-    await userEvent.click(childText);
+    await expectTree(`
+My Notes
+  First Child
+    `);
 
-    // Press Enter to open the CreateNodeEditor for a new sibling
-    await userEvent.type(childText, "{Enter}");
+    // Click on First Child and press Enter to create sibling
+    const childEditor = await screen.findByLabelText("edit First Child");
+    await userEvent.click(childEditor);
+    await userEvent.keyboard("{Enter}");
 
-    // Find the new empty editor that opened
-    const newEditor = await findEmptyEditor();
-    expect(newEditor).toBeTruthy();
+    // Verify empty editor appeared after First Child
+    await expectTree(`
+My Notes
+  First Child
+  [NEW NODE]
+    `);
 
     // Type the new node text
-    await userEvent.type(newEditor, "Second Child");
+    await userEvent.type(await findNewNodeEditor(), "Second Child");
 
-    // Press Enter to save and create
-    await userEvent.type(newEditor, "{Enter}");
+    await expectTree(`
+My Notes
+  First Child
+  [NEW NODE: Second Child]
+    `);
 
-    // Verify both nodes appear
-    await screen.findByText("First Child");
-    await screen.findByText("Second Child");
+    // Press Enter to save and create another sibling
+    await userEvent.keyboard("{Enter}");
+
+    await expectTree(`
+My Notes
+  First Child
+  Second Child
+  [NEW NODE]
+    `);
+
+    // Close the editor
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    await expectTree(`
+My Notes
+  First Child
+  Second Child
+    `);
   });
 
   test("Create multiple sibling nodes by pressing Enter repeatedly", async () => {
     const [alice] = setup([ALICE]);
-    const { publicKey } = alice().user;
-    // Create an initial editable node
-    const parent = newNode("Parent Node");
-    const child = newNode("Node 1");
-    const relations = addRelationToRelations(
-      newRelations(parent.id, List(), publicKey),
-      child.id
-    );
-    await execute({
-      ...alice(),
-      plan: planUpsertRelations(
-        planUpsertNode(planUpsertNode(createPlan(alice()), parent), child),
-        relations
-      ),
-    });
+    renderTree(alice);
 
-    renderWithTestData(
-      <RootViewContextProvider root={parent.id}>
-        <LoadNode waitForEose>
-          <TemporaryViewProvider>
-            <DND>
-              <>
-                <DraggableNote />
-                <TreeView />
-              </>
-            </DND>
-          </TemporaryViewProvider>
-        </LoadNode>
-      </RootViewContextProvider>,
-      alice()
-    );
+    // Create first node
+    await screen.findByLabelText("collapse My Notes");
+    await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
+    await userEvent.type(await findNewNodeEditor(), "Node 1{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
-    // Start from the first node
-    const node1Text = await screen.findByText("Node 1");
-    await userEvent.click(node1Text);
-    await userEvent.type(node1Text, "{Enter}");
+    // Click on Node 1 and press Enter to start chaining
+    const node1Editor = await screen.findByLabelText("edit Node 1");
+    await userEvent.click(node1Editor);
+    await userEvent.keyboard("{Enter}");
 
-    // Create Node 2 - find the empty editor
-    const editor1 = await findEmptyEditor();
-    await userEvent.type(editor1, "Node 2{Enter}");
+    // Create Node 2, 3, 4 by chaining Enter
+    await userEvent.type(await findNewNodeEditor(), "Node 2{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Node 3{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Node 4{Escape}");
 
-    // Editor should chain - create Node 3
-    const editor2 = await findEmptyEditor();
-    await userEvent.type(editor2, "Node 3{Enter}");
-
-    // Create Node 4
-    const editor3 = await findEmptyEditor();
-    await userEvent.type(editor3, "Node 4");
-    // Blur to close without chaining
-    fireEvent.blur(editor3);
-
-    // Verify all nodes appear
-    await screen.findByText("Node 1");
-    await screen.findByText("Node 2");
-    await screen.findByText("Node 3");
-    await screen.findByText("Node 4");
+    await expectTree(`
+My Notes
+  Node 1
+  Node 2
+  Node 3
+  Node 4
+    `);
   });
 
   test("Empty editor closes without creating a node", async () => {
     const [alice] = setup([ALICE]);
-    const { publicKey } = alice().user;
-    const parent = newNode("Parent Node");
-    const child = newNode("Existing Child");
-    const relations = addRelationToRelations(
-      newRelations(parent.id, List(), publicKey),
-      child.id
-    );
-    await execute({
-      ...alice(),
-      plan: planUpsertRelations(
-        planUpsertNode(planUpsertNode(createPlan(alice()), parent), child),
-        relations
-      ),
-    });
+    renderTree(alice);
 
-    renderWithTestData(
-      <RootViewContextProvider root={parent.id}>
-        <LoadNode waitForEose>
-          <TemporaryViewProvider>
-            <DND>
-              <>
-                <DraggableNote />
-                <TreeView />
-              </>
-            </DND>
-          </TemporaryViewProvider>
-        </LoadNode>
-      </RootViewContextProvider>,
-      alice()
-    );
+    // Create a child node
+    await screen.findByLabelText("collapse My Notes");
+    await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
+    await userEvent.type(await findNewNodeEditor(), "Existing Child{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
-    const childText = await screen.findByText("Existing Child");
-    await userEvent.click(childText);
-    await userEvent.type(childText, "{Enter}");
+    await expectTree(`
+My Notes
+  Existing Child
+    `);
 
-    // Find the empty editor that opened
-    const editor = await findEmptyEditor();
+    // Click on Existing Child and press Enter to open editor
+    const childEditor = await screen.findByLabelText("edit Existing Child");
+    await userEvent.click(childEditor);
+    await userEvent.keyboard("{Enter}");
+
+    await expectTree(`
+My Notes
+  Existing Child
+  [NEW NODE]
+    `);
 
     // Press Enter without typing anything - should close
-    await userEvent.type(editor, "{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Enter}");
 
-    // Editor should be gone - wait for the empty editor to disappear
-    await waitFor(() => {
-      const editors = screen.queryAllByRole("textbox", { name: "note editor" });
-      const emptyEditors = editors.filter((e) => e.textContent === "");
-      expect(emptyEditors.length).toBe(0);
-    });
-
-    // Only the original child should exist
-    expect(screen.getAllByText(/Child/).length).toBe(1);
+    // Editor should be gone, only the original child should exist
+    await expectTree(`
+My Notes
+  Existing Child
+    `);
   });
 
   test("Creating node via UI sends correct Nostr events", async () => {
     const [alice] = setup([ALICE]);
-    const { publicKey } = alice().user;
-    // Create an initial editable node
-    const parent = newNode("Parent");
-    const child = newNode("Child");
-    const relations = addRelationToRelations(
-      newRelations(parent.id, List(), publicKey),
-      child.id
-    );
-    await execute({
-      ...alice(),
-      plan: planUpsertRelations(
-        planUpsertNode(planUpsertNode(createPlan(alice()), parent), child),
-        relations
-      ),
-    });
+    const utils = alice();
 
     // Reset relay pool to track only new events
-    alice().relayPool.resetPublishedOnRelays();
+    utils.relayPool.resetPublishedOnRelays();
 
-    renderWithTestData(
-      <RootViewContextProvider root={parent.id}>
-        <LoadNode waitForEose>
-          <TemporaryViewProvider>
-            <DND>
-              <>
-                <DraggableNote />
-                <TreeView />
-              </>
-            </DND>
-          </TemporaryViewProvider>
-        </LoadNode>
-      </RootViewContextProvider>,
-      alice()
-    );
+    renderTree(alice);
 
-    // Find child and press Enter to create sibling
-    const childText = await screen.findByText("Child");
-    await userEvent.click(childText);
-    await userEvent.type(childText, "{Enter}");
+    // Create a child node
+    await screen.findByLabelText("collapse My Notes");
+    await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
+    await userEvent.type(await findNewNodeEditor(), "Child{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
-    // Type in the new editor
-    const newEditor = await findEmptyEditor();
-    await userEvent.type(newEditor, "New Sibling");
+    // Reset again to only track sibling creation events
+    utils.relayPool.resetPublishedOnRelays();
 
-    // Blur to save
-    fireEvent.blur(newEditor);
+    // Click on Child and press Enter to create sibling
+    const childEditor = await screen.findByLabelText("edit Child");
+    await userEvent.click(childEditor);
+    await userEvent.keyboard("{Enter}");
+
+    // Type in the new editor and save with Escape
+    await userEvent.type(await findNewNodeEditor(), "New Sibling{Escape}");
 
     // Wait for the new node to appear
-    await screen.findByText("New Sibling");
+    await screen.findByLabelText("edit New Sibling");
 
     // Verify a knowledge node event was sent
-    const events = alice().relayPool.getEvents();
+    const events = utils.relayPool.getEvents();
     const nodeEvents = events.filter((e) => e.kind === 34751); // KIND_KNOWLEDGE_NODE
     const newNodeEvent = nodeEvents.find((e) =>
       e.content.includes("New Sibling")
@@ -913,71 +831,43 @@ describe.skip("Inline Node Creation", () => {
 
   test("Enter on expanded parent inserts new child at BEGINNING of list", async () => {
     const [alice] = setup([ALICE]);
-    const { publicKey } = alice().user;
+    renderTree(alice);
 
-    // Create parent with two existing children
-    const parent = newNode("Parent");
-    const child1 = newNode("Child 1");
-    const child2 = newNode("Child 2");
+    // Create parent with two children
+    await screen.findByLabelText("collapse My Notes");
+    await userEvent.click((await screen.findAllByLabelText("add to My Notes"))[0]);
+    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
-    // Build relations with children in order: [child1, child2]
-    const relations = addRelationToRelations(
-      addRelationToRelations(
-        newRelations(parent.id, List(), publicKey),
-        child1.id
-      ),
-      child2.id
-    );
+    // Expand Parent and add children
+    await userEvent.click(await screen.findByLabelText("expand Parent"));
+    await userEvent.click(await screen.findByLabelText("add to Parent"));
+    await userEvent.type(await findNewNodeEditor(), "Child 1{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Child 2{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
-    await execute({
-      ...alice(),
-      plan: planUpsertRelations(
-        planBulkUpsertNodes(createPlan(alice()), [parent, child1, child2]),
-        relations
-      ),
-    });
+    await expectTree(`
+My Notes
+  Parent
+    Child 1
+    Child 2
+    `);
 
-    renderWithTestData(
-      <RootViewContextProvider root={parent.id}>
-        <LoadNode waitForEose>
-          <TemporaryViewProvider>
-            <DND>
-              <>
-                <DraggableNote />
-                <TreeView />
-              </>
-            </DND>
-          </TemporaryViewProvider>
-        </LoadNode>
-      </RootViewContextProvider>,
-      alice()
-    );
-
-    // Expand the parent to show children (may have multiple due to references)
-    const expandButtons = await screen.findAllByLabelText("expand Parent");
-    fireEvent.click(expandButtons[0]);
-
-    // Wait for children to be visible
-    await screen.findByText("Child 1");
-    await screen.findByText("Child 2");
-
-    // Find and click on the parent node editor (first one)
-    const parentEditors = await screen.findAllByLabelText("edit Parent");
-    await userEvent.click(parentEditors[0]);
-
-    // Press Enter on the expanded parent - should open editor for first child position
+    // Click on expanded Parent and press Enter - should open editor at BEGINNING
+    const parentEditor = await screen.findByLabelText("edit Parent");
+    await userEvent.click(parentEditor);
     await userEvent.keyboard("{Enter}");
 
-    // Find the new empty editor and type, then press Enter to save (not blur)
-    const newEditor = await findEmptyEditor();
-    await userEvent.type(newEditor, "New First Child{Enter}");
+    // Type and save
+    await userEvent.type(await findNewNodeEditor(), "New First Child{Escape}");
 
     // Verify tree order: New First Child should be first among children
     await expectTree(`
-      Parent
-        New First Child
-        Child 1
-        Child 2
+My Notes
+  Parent
+    New First Child
+    Child 1
+    Child 2
     `);
   });
 });

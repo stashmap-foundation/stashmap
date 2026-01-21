@@ -6,21 +6,20 @@ import {
   planUpdateViews,
   planUpsertRelations,
   usePlanner,
+  planExpandNode,
 } from "../planner";
-import { getRelationsNoReferencedBy } from "../connections";
 import { REFERENCED_BY } from "../constants";
 import {
   ViewPath,
-  contextsMatch,
   getContextFromStackAndViewPath,
   getDefaultRelationForNode,
-  getAvailableRelationsForNode,
   newRelations,
   updateView,
   useNode,
   useViewPath,
 } from "../ViewContext";
 import { usePaneNavigation } from "../SplitPanesContext";
+import { getRelationsNoReferencedBy } from "../connections";
 
 export const DEFAULT_COLOR = "#027d86";
 
@@ -99,69 +98,6 @@ export function planAddNewRelationToNode(
   view: View,
   viewPath: ViewPath
 ): Plan {
-  const relations = newRelations(nodeID, context, plan.user.publicKey);
-  const createRelationPlan = planUpsertRelations(plan, relations);
-  return planUpdateViews(
-    createRelationPlan,
-    updateView(plan.views, viewPath, {
-      ...view,
-      relations: relations.id,
-      expanded: true,
-    })
-  );
-}
-
-// Unified function for expanding a node with proper relation handling
-// This ensures consistent logic whether triggered by triangle toggle or button
-export function planExpandNode(
-  plan: Plan,
-  nodeID: LongID | ID,
-  context: Context,
-  view: View,
-  viewPath: ViewPath
-): Plan {
-  // 1. Check if view.relations is valid (exists in DB) AND context matches
-  const currentRelations = view.relations
-    ? getRelationsNoReferencedBy(
-        plan.knowledgeDBs,
-        view.relations,
-        plan.user.publicKey
-      )
-    : undefined;
-
-  if (currentRelations && contextsMatch(currentRelations.context, context)) {
-    // Valid relations with matching context - just expand
-    return planUpdateViews(
-      plan,
-      updateView(plan.views, viewPath, {
-        ...view,
-        expanded: true,
-      })
-    );
-  }
-
-  // 2. Check for available relations for this (head, context)
-  const availableRelations = getAvailableRelationsForNode(
-    plan.knowledgeDBs,
-    plan.user.publicKey,
-    nodeID,
-    context
-  );
-
-  if (availableRelations.size > 0) {
-    // Use first available relation
-    const firstRelation = availableRelations.first()!;
-    return planUpdateViews(
-      plan,
-      updateView(plan.views, viewPath, {
-        ...view,
-        relations: firstRelation.id,
-        expanded: true,
-      })
-    );
-  }
-
-  // 3. No relations exist - create new one
   const relations = newRelations(nodeID, context, plan.user.publicKey);
   const createRelationPlan = planUpsertRelations(plan, relations);
   return planUpdateViews(

@@ -12,7 +12,7 @@ import {
 } from "../ViewContext";
 import useModal from "./useModal";
 import { SearchModal } from "./SearchModal";
-import { Plan, usePlanner, planCreateNode } from "../planner";
+import { Plan, usePlanner, planCreateNode, planSetEmptyNodePosition } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { planAddToParent } from "../dnd";
 
@@ -182,11 +182,12 @@ export function MiniEditor({
   };
 
   const handleBlur = (): void => {
+    const text = getText().trim();
+    console.log("MiniEditor handleBlur", { text, handlingKey: handlingKeyRef.current });
     // Skip if we're handling a key event (ESC/Enter already handled save/close)
     if (handlingKeyRef.current) {
       return;
     }
-    const text = getText().trim();
     if (!text) {
       // Empty text on blur - close the editor (for CreateNodeEditor)
       // For EditableContent (no onClose), this does nothing
@@ -364,27 +365,18 @@ export function SiblingSearchButton(): JSX.Element | null {
 export function AddSiblingButton(): JSX.Element | null {
   const displayText = useDisplayText();
   const nextInsertPosition = useNextInsertPosition();
-  const isExpanded = useIsExpanded();
-  const isRoot = useIsRoot();
+  const { stack } = usePaneNavigation();
+  const { createPlan, executePlan } = usePlanner();
 
-  // When root or expanded, insert as first child of current node
-  // Otherwise, insert as sibling after current node
-  const isFirstChildInsert = isRoot || isExpanded;
-
-  const handlers = useAddSiblingNode(
-    nextInsertPosition
-      ? isFirstChildInsert
-        ? { asFirstChild: true }
-        : { insertAtIndex: nextInsertPosition[1] }
-      : undefined
-  );
-
-  if (!handlers || !nextInsertPosition) {
+  if (!nextInsertPosition) {
     return null;
   }
 
   const handleClick = (): void => {
-    handlers.onCreateNewNode("");
+    const [targetPath, insertIndex] = nextInsertPosition;
+    const plan = planSetEmptyNodePosition(createPlan(), targetPath, stack, insertIndex);
+    console.log("AddSiblingButton handleClick - positions before executePlan:", plan.temporaryView.emptyNodePositions.toJS());
+    executePlan(plan);
   };
 
   return (

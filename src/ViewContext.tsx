@@ -211,9 +211,8 @@ function convertViewPathToString(viewContext: ViewPath): string {
   ) as SubPathWithRelations[];
   const beginning = withoutLastElement.reduce(
     (acc: string, subPath: SubPathWithRelations): string => {
-      const postfix = `${encodeNodeID(subPath.nodeID)}:${
-        subPath.nodeIndex
-      }:${encodeNodeID(subPath.relationsID)}`;
+      const postfix = `${encodeNodeID(subPath.nodeID)}:${subPath.nodeIndex
+        }:${encodeNodeID(subPath.relationsID)}`;
       return acc !== "" ? `${acc}:${postfix}` : postfix;
     },
     ""
@@ -290,12 +289,12 @@ export function getAvailableRelationsForNode(
       : undefined;
   const preferredRemoteRelations: List<Relations> = remoteDB
     ? sortRelationsByDate(
-        remoteDB.relations
-          .filter(
-            (r) => r.head === localID && contextsMatch(r.context, context)
-          )
-          .toList()
-      )
+      remoteDB.relations
+        .filter(
+          (r) => r.head === localID && contextsMatch(r.context, context)
+        )
+        .toList()
+    )
     : List<Relations>();
   const otherRelations: List<Relations> = knowledgeDBs
     .filter((_, k) => k !== myself && k !== remote)
@@ -526,13 +525,6 @@ export function getRelationForView(
   const [nodeID, view] = getNodeIDFromView(data, viewPath);
   const context = getContextFromStackAndViewPath(stack, viewPath);
 
-  console.log("getRelationForView", {
-    nodeID,
-    viewRelations: view.relations,
-    context: context.toArray(),
-    viewPath,
-  });
-
   // Handle REFERENCED_BY specially - it's not context-based
   if (view.relations === REFERENCED_BY) {
     return getRelations(
@@ -550,7 +542,6 @@ export function getRelationForView(
       view.relations,
       data.user.publicKey
     );
-    console.log("viewRelations from view.relations", viewRelations?.id, "contextMatch", viewRelations && contextsMatch(viewRelations.context, context));
     if (viewRelations && contextsMatch(viewRelations.context, context)) {
       return viewRelations;
     }
@@ -563,7 +554,6 @@ export function getRelationForView(
     nodeID,
     context
   );
-  console.log("getAvailableRelationsForNode", available.size, available.first()?.id);
   return available.first();
 }
 
@@ -781,11 +771,6 @@ export function getRelationIndex(
   if (nodeID === ADD_TO_NODE) {
     return relations.items.size;
   }
-  console.log("calculateIndexFromNodeIndex", {
-    searchingFor: nodeID,
-    nodeIndex,
-    itemsInRelations: relations.items.map((i) => i.nodeID).toArray(),
-  });
   return calculateIndexFromNodeIndex(relations, nodeID, nodeIndex);
 }
 
@@ -1112,46 +1097,64 @@ export function upsertRelations(
   const [nodeID, nodeView] = getNodeIDFromView(plan, viewPath);
   const context = getContextFromStackAndViewPath(stack, viewPath);
 
-  const foundRelations = findOrCreateRelationsForContext(
-    plan.knowledgeDBs,
-    plan.user.publicKey,
-    nodeID,
-    context,
-    nodeView.relations
-  );
+  // 1. Try to find existing relations
+  const viewRelations = nodeView.relations
+    ? getRelationsNoReferencedBy(plan.knowledgeDBs, nodeView.relations, plan.user.publicKey)
+    : undefined;
 
-  // If relations belong to someone else, create a copy before modifying
-  const relations =
-    foundRelations.author !== plan.user.publicKey
+  const existingFromView = viewRelations && contextsMatch(viewRelations.context, context)
+    ? viewRelations
+    : undefined;
+
+  const existingByContext = existingFromView
+    ? undefined
+    : getAvailableRelationsForNode(plan.knowledgeDBs, plan.user.publicKey, nodeID, context).first();
+
+  const foundRelations = existingFromView || existingByContext;
+
+  // 2. Determine what we have: found own, found remote, or need to create
+  const isOwn = foundRelations && foundRelations.author === plan.user.publicKey;
+  const isRemote = foundRelations && foundRelations.author !== plan.user.publicKey;
+
+  const relations = isOwn
+    ? foundRelations
+    : isRemote
       ? createUpdatableRelations(
-          plan.knowledgeDBs,
-          plan.user.publicKey,
-          foundRelations.id,
-          nodeID,
-          context
-        )
-      : foundRelations;
+        plan.knowledgeDBs,
+        plan.user.publicKey,
+        foundRelations.id,
+        nodeID,
+        context
+      )
+      : newRelations(nodeID, context, plan.user.publicKey);
 
-  const oldRelationsID = nodeView.relations || foundRelations.id;
-  // Check if view needs update: either relations ID changed, or view didn't have relations yet
+  // 3. Update view if needed
+  const oldRelationsID = nodeView.relations || relations.id;
   const didViewChange =
     nodeView.relations === undefined || oldRelationsID !== relations.id;
   const planWithUpdatedView = didViewChange
     ? planUpdateViews(
-        plan,
-        moveChildViewsToNewRelation(
-          plan.views,
-          viewPath,
-          oldRelationsID,
-          relations.id
-        ).set(viewPathToString(viewPath), {
-          ...nodeView,
-          relations: relations.id,
-        })
-      )
+      plan,
+      moveChildViewsToNewRelation(
+        plan.views,
+        viewPath,
+        oldRelationsID,
+        relations.id
+      ).set(viewPathToString(viewPath), {
+        ...nodeView,
+        relations: relations.id,
+      })
+    )
     : plan;
 
+  // 4. Apply modification
   const updatedRelations = modify(relations);
+
+  // 5. Skip event only if: found own relations AND items unchanged
+  if (isOwn && foundRelations.items.equals(updatedRelations.items)) {
+    return planWithUpdatedView;
+  }
+
   return planUpsertRelations(planWithUpdatedView, updatedRelations);
 }
 

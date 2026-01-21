@@ -580,12 +580,14 @@ export function injectEmptyNodesIntoKnowledgeDBs(
   emptyNodePositions: Map<LongID, number>,
   myself: PublicKey
 ): KnowledgeDBs {
+  console.log("injectEmptyNodesIntoKnowledgeDBs called, positions:", emptyNodePositions.toJS());
   if (emptyNodePositions.size === 0) {
     return knowledgeDBs;
   }
 
   const myDB = knowledgeDBs.get(myself);
   if (!myDB) {
+    console.log("injectEmptyNodesIntoKnowledgeDBs: no myDB");
     return knowledgeDBs;
   }
 
@@ -594,6 +596,7 @@ export function injectEmptyNodesIntoKnowledgeDBs(
     (relations, index, relationsID) => {
       const shortRelationsID = splitID(relationsID)[1];
       const existingRelations = relations.get(shortRelationsID);
+      console.log("inject: looking for", shortRelationsID, "found:", !!existingRelations);
       if (!existingRelations) {
         return relations;
       }

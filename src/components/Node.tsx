@@ -34,7 +34,6 @@ import {
   getRefTargetStack,
   itemMatchesType,
   isEmptyNodeID,
-  EMPTY_NODE_ID,
 } from "../connections";
 import { REFERENCED_BY, DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 import { IS_MOBILE } from "./responsive";
@@ -51,11 +50,13 @@ import {
   usePlanner,
   planCreateNode,
   planRemoveEmptyNodePosition,
+  planSetEmptyNodePosition,
+  planExpandNode,
 } from "../planner";
 import { planDisconnectFromParent, planAddToParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeIcon } from "./NodeIcon";
-import { planAddNewRelationToNode, planExpandNode } from "./RelationTypes";
+import { planAddNewRelationToNode } from "./RelationTypes";
 import { NodeCard } from "../commons/Ui";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { LeftMenu } from "./LeftMenu";
@@ -260,16 +261,11 @@ function EditableContent(): JSX.Element {
       const emptyNodeIndex: number = relationsID
         ? plan.temporaryView.emptyNodePositions.get(relationsID) ?? 0
         : 0;
-      // Disconnect empty node from parent (it's injected in knowledgeDBs)
-      const planWithDisconnect = planDisconnectFromParent(
-        planWithNode,
-        viewPath,
-        stack
-      );
-      // Remove empty node position and add real node at same position
+      // Remove empty node position (no need to "disconnect" - empty node is only injected at read time)
       const planWithoutEmpty = relationsID
-        ? planRemoveEmptyNodePosition(planWithDisconnect, relationsID)
-        : planWithDisconnect;
+        ? planRemoveEmptyNodePosition(planWithNode, relationsID)
+        : planWithNode;
+      // Add the real node at the same position
       plan = planAddToParent(
         planWithoutEmpty,
         newNode.id,
@@ -298,17 +294,10 @@ function EditableContent(): JSX.Element {
       }
     }
 
-    // If user pressed Enter, add a new empty node
+    // If user pressed Enter, add a new empty node position (no events created)
     if (submitted && nextInsertPosition) {
       const [targetPath, insertIndex] = nextInsertPosition;
-      const [planWithEmpty] = planCreateNode(plan, "");
-      plan = planAddToParent(
-        planWithEmpty,
-        EMPTY_NODE_ID,
-        targetPath,
-        stack,
-        insertIndex
-      );
+      plan = planSetEmptyNodePosition(plan, targetPath, stack, insertIndex);
     }
 
     executePlan(plan);
@@ -328,27 +317,16 @@ function EditableContent(): JSX.Element {
     const context = getContextFromStackAndViewPath(stack, viewPath);
     const trimmedText = text.trim();
 
-    // Handle empty nodes: materialize with text first
+    // Handle empty nodes: materialize with text, or move empty position if no text
     if (isEmptyNode) {
       if (!parentPath) return;
       const [, parentView] = getNodeIDFromView(basePlan, parentPath);
       const relationsID = parentView.relations;
 
-      // Create real node with the text (or empty if no text)
-      const nodeText = trimmedText || "";
-      const [planWithNode, newNode] = planCreateNode(basePlan, nodeText);
-
-      // Disconnect empty node from parent
-      const planWithDisconnect = planDisconnectFromParent(
-        planWithNode,
-        viewPath,
-        stack
-      );
-
-      // Remove empty node position
+      // Remove empty node position from old parent
       const planWithoutEmpty = relationsID
-        ? planRemoveEmptyNodePosition(planWithDisconnect, relationsID)
-        : planWithDisconnect;
+        ? planRemoveEmptyNodePosition(basePlan, relationsID)
+        : basePlan;
 
       // Expand previous sibling
       const prevSiblingContext = getContextFromStackAndViewPath(
@@ -363,15 +341,26 @@ function EditableContent(): JSX.Element {
         prevSibling.viewPath
       );
 
-      // Add real node to previous sibling at end
-      const finalPlan = planAddToParent(
-        planWithExpand,
-        newNode.id,
-        prevSibling.viewPath,
-        stack
-      );
-
-      executePlan(finalPlan);
+      if (trimmedText) {
+        // Has text - create real node and add to previous sibling
+        const [planWithNode, newNode] = planCreateNode(planWithExpand, trimmedText);
+        const finalPlan = planAddToParent(
+          planWithNode,
+          newNode.id,
+          prevSibling.viewPath,
+          stack
+        );
+        executePlan(finalPlan);
+      } else {
+        // No text - just move empty position to previous sibling (at end)
+        const finalPlan = planSetEmptyNodePosition(
+          planWithExpand,
+          prevSibling.viewPath,
+          stack,
+          0 // Insert at end (will be only child or after existing children)
+        );
+        executePlan(finalPlan);
+      }
       return;
     }
 

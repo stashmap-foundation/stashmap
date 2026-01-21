@@ -1,5 +1,5 @@
 import React, { Dispatch, SetStateAction } from "react";
-import { List, Map } from "immutable";
+import { List } from "immutable";
 import { UnsignedEvent, Event } from "nostr-tools";
 import {
   KIND_DELETE,
@@ -18,13 +18,13 @@ import { viewsToJSON } from "./serializer";
 import { newDB } from "./knowledge";
 import {
   shortID,
-  joinID,
   newNode,
   addRelationToRelations,
   moveRelations,
   VERSIONS_NODE_ID,
   EMPTY_NODE_ID,
   isEmptyNodeID,
+  getRelationsNoReferencedBy,
 } from "./connections";
 import {
   newRelations,
@@ -32,6 +32,10 @@ import {
   getVersionsRelations,
   upsertRelations,
   ViewPath,
+  getNodeIDFromView,
+  updateView,
+  contextsMatch,
+  getAvailableRelationsForNode,
 } from "./ViewContext";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useWorkspaceContext } from "./WorkspaceContext";
@@ -254,9 +258,9 @@ export function planCreateVersion(
   const [originalNodeID, context]: [ID, List<ID>] =
     isInsideVersions && editContext.size >= 2
       ? [
-          editContext.get(editContext.size - 2) as ID, // The node that owns ~Versions
-          editContext.slice(0, -2).toList(), // Context to that node
-        ]
+        editContext.get(editContext.size - 2) as ID, // The node that owns ~Versions
+        editContext.slice(0, -2).toList(), // Context to that node
+      ]
       : [editedNodeID, editContext];
 
   // 1. Create new version node
@@ -285,12 +289,12 @@ export function planCreateVersion(
   const versionsWithOriginal =
     originalIndex < 0
       ? addRelationToRelations(
-          baseVersionsRelations,
-          originalNodeID,
-          "",
-          undefined,
-          baseVersionsRelations.items.size
-        )
+        baseVersionsRelations,
+        originalNodeID,
+        "",
+        undefined,
+        baseVersionsRelations.items.size
+      )
       : baseVersionsRelations;
 
   // 5. Determine insert position
@@ -298,8 +302,8 @@ export function planCreateVersion(
   // Otherwise, insert at position 0 (top)
   const editedNodePosition = isInsideVersions
     ? versionsWithOriginal.items.findIndex(
-        (item) => item.nodeID === editedNodeID
-      )
+      (item) => item.nodeID === editedNodeID
+    )
     : -1;
   const insertPosition = editedNodePosition >= 0 ? editedNodePosition : 0;
 
@@ -312,12 +316,12 @@ export function planCreateVersion(
     existingIndex >= 0
       ? moveRelations(versionsWithOriginal, [existingIndex], insertPosition)
       : addRelationToRelations(
-          versionsWithOriginal,
-          versionNode.id,
-          "",
-          undefined,
-          insertPosition
-        );
+        versionsWithOriginal,
+        versionNode.id,
+        "",
+        undefined,
+        insertPosition
+      );
 
   return planUpsertRelations(updatedPlan, withVersion);
 }
@@ -524,52 +528,26 @@ type Planner = {
   setPublishEvents: Dispatch<SetStateAction<EventState>>;
 };
 
-type Context = Pick<
+type PlanningContextValue = Pick<
   Planner,
   "executePlan" | "republishEvents" | "setPublishEvents"
 >;
 
-const PlanningContext = React.createContext<Context | undefined>(undefined);
+const PlanningContext = React.createContext<PlanningContextValue | undefined>(undefined);
 
-// Filter out empty placeholder nodes from events and extract their positions
-// Returns filtered events and a function to update emptyNodePositions
-// For each relations event: if it has empty node, set position; if not, delete position
+// Filter out empty placeholder nodes from events before publishing
+// Empty nodes are injected at read time via injectEmptyNodesIntoKnowledgeDBs,
+// so any relations modification will include them - we need to filter before publishing
 function filterEmptyNodesFromEvents(
-  events: List<UnsignedEvent & EventAttachment>,
-  existingPositions: Map<LongID, number>
-): {
-  filteredEvents: List<UnsignedEvent & EventAttachment>;
-  emptyNodePositions: Map<LongID, number>;
-} {
-  let emptyNodePositions = existingPositions;
-
-  const filteredEvents = events
+  events: List<UnsignedEvent & EventAttachment>
+): List<UnsignedEvent & EventAttachment> {
+  return events
     .map((event) => {
       if (event.kind === KIND_KNOWLEDGE_LIST) {
-        // Check if head is empty node - skip entire event
+        // Check if head is empty node - skip entire event (shouldn't happen)
         const headTag = event.tags.find((t) => t[0] === "head");
         if (headTag && isEmptyNodeID(headTag[1])) {
           return null;
-        }
-
-        const dTag = event.tags.find((t) => t[0] === "d");
-        if (dTag) {
-          const relationsID = joinID(event.pubkey, dTag[1]);
-          const itemTags = event.tags.filter((t) => t[0] === "i");
-          const emptyNodeIndex = itemTags.findIndex((tag) =>
-            isEmptyNodeID(tag[1])
-          );
-
-          if (emptyNodeIndex !== -1) {
-            // Has empty node - set position
-            emptyNodePositions = emptyNodePositions.set(
-              relationsID,
-              emptyNodeIndex
-            );
-          } else {
-            // No empty node - remove any existing position
-            emptyNodePositions = emptyNodePositions.delete(relationsID);
-          }
         }
 
         // Filter empty node items from relations
@@ -584,7 +562,7 @@ function filterEmptyNodesFromEvents(
       }
 
       if (event.kind === KIND_KNOWLEDGE_NODE) {
-        // Skip empty node events (nodes with empty text)
+        // Skip empty node events (shouldn't happen)
         if (event.content === "") {
           return null;
         }
@@ -595,8 +573,6 @@ function filterEmptyNodesFromEvents(
     .filter(
       (event): event is UnsignedEvent & EventAttachment => event !== null
     );
-
-  return { filteredEvents, emptyNodePositions };
 }
 
 export function PlanningContextProvider({
@@ -608,36 +584,33 @@ export function PlanningContextProvider({
 }): JSX.Element {
   const { relayPool, finalizeEvent } = useApis();
 
+  let executePlanCallId = 0;
   const executePlan = async (plan: Plan): Promise<void> => {
-    // Track filtered events for relay publishing (set inside state updater)
-    let filteredEventsForRelay = plan.publishEvents;
+    const callId = ++executePlanCallId;
+    // Filter empty nodes from events before publishing
+    // (empty nodes are injected at read time, so modifications include them)
+    const filteredEvents = filterEmptyNodesFromEvents(plan.publishEvents);
 
-    // 1. FILTERED events → unsignedEvents (empty nodes stored separately in temporaryView)
+    // DEBUG: Log events being published
+    // eslint-disable-next-line no-console
+    console.log(`[${callId}] EVENTS:`, filteredEvents.size, "positions:", plan.temporaryView.emptyNodePositions.toJS());
+    if (plan.temporaryView.emptyNodePositions.size === 0) {
+      console.trace("executePlan with EMPTY positions");
+    }
     setPublishEvents((prevStatus) => {
-      // Use plan's emptyNodePositions as starting point (already has current state + any removals)
-      // Filter empty nodes from events, updating positions as we go
-      const { filteredEvents, emptyNodePositions } = filterEmptyNodesFromEvents(
-        plan.publishEvents,
-        plan.temporaryView.emptyNodePositions
-      );
-      filteredEventsForRelay = filteredEvents;
-
       return {
         unsignedEvents: prevStatus.unsignedEvents.merge(filteredEvents),
         results: prevStatus.results,
         isLoading: true,
         preLoginEvents: prevStatus.preLoginEvents,
-        temporaryView: {
-          ...plan.temporaryView,
-          emptyNodePositions,
-        },
+        temporaryView: plan.temporaryView,
       };
     });
 
-    // 2. FILTERED events → relay publishing
+    // FILTERED events → relay publishing
     const filteredPlan = {
       ...plan,
-      publishEvents: filteredEventsForRelay,
+      publishEvents: filteredEvents,
     };
 
     const results = await execute({
@@ -659,6 +632,7 @@ export function PlanningContextProvider({
     events: List<Event>,
     relayUrl: string
   ): Promise<void> => {
+    console.log(">>>> REPUBLISH EVENTS ON RELAY:", relayUrl, events.size);
     const results = await republishEvents({
       events,
       relayPool,
@@ -726,17 +700,172 @@ export function usePlanner(): Planner {
   };
 }
 
+// Helper to remove empty node items from relations in local knowledgeDBs
+function removeEmptyNodeFromKnowledgeDBs(
+  knowledgeDBs: KnowledgeDBs,
+  publicKey: PublicKey,
+  relationsID: LongID
+): KnowledgeDBs {
+  const myDB = knowledgeDBs.get(publicKey);
+  if (!myDB) {
+    return knowledgeDBs;
+  }
+
+  const shortRelationsID = relationsID.includes("_")
+    ? relationsID.split("_")[1]
+    : relationsID;
+  const existingRelations = myDB.relations.get(shortRelationsID);
+  if (!existingRelations) {
+    return knowledgeDBs;
+  }
+
+  // Filter out empty node items
+  const filteredItems = existingRelations.items.filter(
+    (item) => !isEmptyNodeID(item.nodeID)
+  );
+  if (filteredItems.size === existingRelations.items.size) {
+    return knowledgeDBs; // No empty nodes found
+  }
+
+  const updatedRelations = myDB.relations.set(shortRelationsID, {
+    ...existingRelations,
+    items: filteredItems,
+  });
+  return knowledgeDBs.set(publicKey, {
+    ...myDB,
+    relations: updatedRelations,
+  });
+}
+
 // Plan function to remove an empty node position (for closing empty editor)
+// Also removes the injected empty node from local knowledgeDBs (no event published)
 export function planRemoveEmptyNodePosition(
   plan: Plan,
   relationsID: LongID
 ): Plan {
   return {
     ...plan,
+    knowledgeDBs: removeEmptyNodeFromKnowledgeDBs(
+      plan.knowledgeDBs,
+      plan.user.publicKey,
+      relationsID
+    ),
     temporaryView: {
       ...plan.temporaryView,
       emptyNodePositions: plan.temporaryView.emptyNodePositions.delete(
         relationsID
+      ),
+    },
+  };
+}
+
+// Unified function for expanding a node with proper relation handling
+// Creates relations only if none exist (like toggle does)
+export function planExpandNode(
+  plan: Plan,
+  nodeID: LongID | ID,
+  context: Context,
+  view: View,
+  viewPath: ViewPath
+): Plan {
+  // 1. Check if view.relations is valid (exists in DB) AND context matches
+  const currentRelations = view.relations
+    ? getRelationsNoReferencedBy(
+      plan.knowledgeDBs,
+      view.relations,
+      plan.user.publicKey
+    )
+    : undefined;
+
+  if (currentRelations && contextsMatch(currentRelations.context, context)) {
+    // Valid relations with matching context - expand only if not already expanded
+    if (view.expanded) {
+      return plan; // Already expanded with correct relations, no update needed
+    }
+    return planUpdateViews(
+      plan,
+      updateView(plan.views, viewPath, {
+        ...view,
+        expanded: true,
+      })
+    );
+  }
+
+  // 2. Check for available relations for this (head, context)
+  const availableRelations = getAvailableRelationsForNode(
+    plan.knowledgeDBs,
+    plan.user.publicKey,
+    nodeID,
+    context
+  );
+
+  if (availableRelations.size > 0) {
+    // Use first available relation
+    const firstRelation = availableRelations.first()!;
+    // Only update if relations or expanded state differs
+    if (view.relations === firstRelation.id && view.expanded) {
+      return plan; // Already in correct state
+    }
+    return planUpdateViews(
+      plan,
+      updateView(plan.views, viewPath, {
+        ...view,
+        relations: firstRelation.id,
+        expanded: true,
+      })
+    );
+  }
+
+  // 3. No relations exist - create new one
+  const relations = newRelations(nodeID, context, plan.user.publicKey);
+  const createRelationPlan = planUpsertRelations(plan, relations);
+  return planUpdateViews(
+    createRelationPlan,
+    updateView(plan.views, viewPath, {
+      ...view,
+      relations: relations.id,
+      expanded: true,
+    })
+  );
+}
+
+// Plan function to set an empty node position (for creating new node editor)
+// This is simpler than creating actual node events - just stores where to inject
+export function planSetEmptyNodePosition(
+  plan: Plan,
+  parentPath: ViewPath,
+  stack: (LongID | ID)[],
+  insertIndex: number
+): Plan {
+  // 1. Ensure we have our own relations (copies remote if needed, no event if unchanged)
+  const planWithOwnRelations = upsertRelations(plan, parentPath, stack, (r) => r);
+
+  // 2. Get relationsID and ensure expanded
+  const [, view] = getNodeIDFromView(planWithOwnRelations, parentPath);
+  const relationsID = view.relations;
+  if (!relationsID) {
+    return plan; // Shouldn't happen, but defensive
+  }
+
+  // 3. Expand if not already
+  const planWithExpanded = view.expanded
+    ? planWithOwnRelations
+    : planUpdateViews(
+        planWithOwnRelations,
+        updateView(planWithOwnRelations.views, parentPath, {
+          ...view,
+          expanded: true,
+        })
+      );
+
+  // 4. Store position in emptyNodePositions
+  return {
+    ...planWithExpanded,
+    temporaryView: {
+      ...planWithExpanded.temporaryView,
+      emptyNodePositions: planWithExpanded.temporaryView.emptyNodePositions.set(
+        relationsID,
+        insertIndex
       ),
     },
   };

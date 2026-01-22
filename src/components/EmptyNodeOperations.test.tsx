@@ -105,7 +105,6 @@ describe("Empty node with typed text - argument", () => {
     await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Evidence");
 
-    // Click the evidence selector to set "confirms"
     const evidenceButton = screen.getByLabelText(/Evidence for Evidence/);
     fireEvent.click(evidenceButton);
 
@@ -115,10 +114,56 @@ My Notes
     Evidence
     `);
 
-    // Check green background (confirms color) - style is on parent span
     const evidenceNode = await screen.findByLabelText("edit Evidence");
     const styledSpan = evidenceNode.closest("span[style*='background']") as HTMLElement;
     expect(styledSpan?.style.backgroundColor).toContain("46, 125, 50");
+  });
+
+  test("clicking argument while editing existing node saves edit", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    const myNotesEditor = await screen.findByLabelText("edit My Notes");
+    await userEvent.click(myNotesEditor);
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child{Escape}");
+
+    await expectTree(`
+My Notes
+  Parent
+    Child
+    `);
+
+    const childEditor = await screen.findByLabelText("edit Child");
+    await userEvent.click(childEditor);
+    await userEvent.clear(childEditor);
+    await userEvent.type(childEditor, "Edited");
+
+    const evidenceButton = screen.getByLabelText(/Evidence for Edited/);
+    fireEvent.click(evidenceButton);
+
+    await expectTree(`
+My Notes
+  Parent
+    Edited
+    `);
+
+    const editedNode = await screen.findByLabelText("edit Edited");
+    const styledSpan = editedNode.closest("span[style*='background']") as HTMLElement;
+    expect(styledSpan?.style.backgroundColor).toContain("46, 125, 50");
+
+    cleanup();
+    renderTree(alice);
+
+    await expectTree(`
+My Notes
+  Parent
+    Edited
+    `);
+
+    const rerenderedNode = await screen.findByLabelText("edit Edited");
+    const rerenderedStyledSpan = rerenderedNode.closest("span[style*='background']") as HTMLElement;
+    expect(rerenderedStyledSpan?.style.backgroundColor).toContain("46, 125, 50");
   });
 });
 
@@ -138,26 +183,35 @@ My Notes
     Original
     `);
 
-    // Edit the node text
     const editor = await screen.findByLabelText("edit Original");
     await userEvent.click(editor);
     await userEvent.clear(editor);
     await userEvent.type(editor, "Edited");
 
-    // Change relevance while editing - this should save the text AND set relevance
     fireEvent.click(screen.getByLabelText("set Edited to relevant"));
 
-    // Text should be saved and node should show new text with bold styling
     await expectTree(`
 My Notes
   Parent
     Edited
     `);
 
-    // Check bold styling - style is on parent span
     const editedNode = await screen.findByLabelText("edit Edited");
     const styledSpan = editedNode.closest("span[style*='font-weight']") as HTMLElement;
     expect(styledSpan?.style.fontWeight).toBe("600");
+
+    cleanup();
+    renderTree(alice);
+
+    await expectTree(`
+My Notes
+  Parent
+    Edited
+    `);
+
+    const rerenderedNode = await screen.findByLabelText("edit Edited");
+    const rerenderedStyledSpan = rerenderedNode.closest("span[style*='font-weight']") as HTMLElement;
+    expect(rerenderedStyledSpan?.style.fontWeight).toBe("600");
   });
 });
 
@@ -202,9 +256,78 @@ My Notes
     // Verify we can find the new node editor
     await findNewNodeEditor();
   });
+
+  test("clicking add while editing existing node saves edit", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    const myNotesEditor = await screen.findByLabelText("edit My Notes");
+    await userEvent.click(myNotesEditor);
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child{Escape}");
+
+    await expectTree(`
+My Notes
+  Parent
+    Child
+    `);
+
+    const childEditor = await screen.findByLabelText("edit Child");
+    await userEvent.click(childEditor);
+    await userEvent.clear(childEditor);
+    await userEvent.type(childEditor, "Edited");
+
+    fireEvent.click(screen.getByLabelText("add to Edited"));
+
+    await userEvent.type(await findNewNodeEditor(), "NewSibling{Escape}");
+
+    await expectTree(`
+My Notes
+  Parent
+    Edited
+    NewSibling
+    `);
+
+    cleanup();
+    renderTree(alice);
+
+    await expectTree(`
+My Notes
+  Parent
+    Edited
+    NewSibling
+    `);
+  });
 });
 
 describe("Empty node - search button saves and adds", () => {
+  test("clicking search on empty node without text inserts result at correct position", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    const myNotesEditor = await screen.findByLabelText("edit My Notes");
+    await userEvent.click(myNotesEditor);
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child1{Enter}Child2{Enter}");
+
+    // Now we have an empty node after Child2 - click search without typing any text
+    // Empty node with no text has aria-label "search"
+    fireEvent.click(screen.getByLabelText("search"));
+
+    const searchInput = await screen.findByLabelText("search input");
+    await userEvent.type(searchInput, "My Notes");
+    await userEvent.click(await screen.findByLabelText("select My Notes"));
+
+    // Result should be inserted after Child2, not above Child1
+    await expectTree(`
+My Notes
+  Parent
+    Child1
+    Child2
+    My Notes
+    `);
+  });
+
   test("clicking search on empty node, adding result materializes node and adds result", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);

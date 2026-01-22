@@ -9,7 +9,7 @@ import {
 import { useEditorText } from "./EditorTextContext";
 import useModal from "./useModal";
 import { SearchModal } from "./SearchModal";
-import { usePlanner, planSetEmptyNodePosition, planSaveNodeAndEnsureRelations, planInsertNode } from "../planner";
+import { usePlanner, planSetEmptyNodePosition, planSaveNodeAndEnsureRelations, planAddToParent } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 
 /**
@@ -313,9 +313,10 @@ export function SiblingSearchButton(): JSX.Element | null {
   }
 
   const handleAddWithSave = (nodeIDToAdd: ID): void => {
+    const [targetPath, insertIndex] = nextInsertPosition;
     const editorText = editorTextContext?.text ?? "";
     let plan = planSaveNodeAndEnsureRelations(createPlan(), editorText, viewPath, stack);
-    plan = planInsertNode(plan, nodeIDToAdd, viewPath, stack);
+    plan = planAddToParent(plan, nodeIDToAdd, targetPath, stack, insertIndex);
     executePlan(plan);
   };
 

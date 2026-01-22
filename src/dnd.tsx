@@ -4,7 +4,6 @@ import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { getSelectedInView } from "./components/TemporaryViewContext";
 import {
-  bulkAddRelations,
   getRelations,
   moveRelations,
   deleteRelations,
@@ -15,17 +14,15 @@ import {
   getParentKey,
   ViewPath,
   getParentView,
-  bulkUpdateViewPathsAfterAddRelation,
   updateViewPathsAfterMoveRelations,
   updateViewPathsAfterDisconnect,
   getRelationIndex,
   getNodeIDFromView,
   getParentNodeID,
   getLast,
-  getContextFromStackAndViewPath,
 } from "./ViewContext";
 import { getNodesInTree } from "./components/Node";
-import { Plan, planUpdateViews, planExpandNode } from "./planner";
+import { Plan, planUpdateViews, planAddToParent } from "./planner";
 
 function getDropDestinationEndOfRoot(
   data: Data,
@@ -171,56 +168,6 @@ export function planDisconnectFromParent(
     nodeID,
     parentView.relations || ("" as LongID),
     nodeIndex
-  );
-
-  return planUpdateViews(updatedRelationsPlan, updatedViews);
-}
-
-/**
- * Add one or more nodes to a parent at a specific index (or at end if undefined).
- * Returns the updated plan with nodes added to the parent's relations and views updated.
- * Uses planExpandNode to ensure relations exist (with ~Versions prepopulation) and expand.
- */
-export function planAddToParent(
-  plan: Plan,
-  nodeIDs: LongID | ID | (LongID | ID)[],
-  parentViewPath: ViewPath,
-  stack: (LongID | ID)[],
-  insertAtIndex?: number,
-  relevance?: Relevance,
-  argument?: Argument
-): Plan {
-  const nodeIDsArray = Array.isArray(nodeIDs) ? nodeIDs : [nodeIDs];
-  if (nodeIDsArray.length === 0) {
-    return plan;
-  }
-
-  // 1. Use planExpandNode to ensure relations exist and parent is expanded
-  const [parentNodeID, parentView] = getNodeIDFromView(plan, parentViewPath);
-  const context = getContextFromStackAndViewPath(stack, parentViewPath);
-  const planWithExpand = planExpandNode(
-    plan,
-    parentNodeID,
-    context,
-    parentView,
-    parentViewPath
-  );
-
-  // 2. Add the nodes to the relations (relations now guaranteed to exist)
-  const updatedRelationsPlan = upsertRelations(
-    planWithExpand,
-    parentViewPath,
-    stack,
-    (relations) =>
-      bulkAddRelations(relations, nodeIDsArray, relevance, argument, insertAtIndex)
-  );
-
-  // 3. Update view paths for the new children
-  const updatedViews = bulkUpdateViewPathsAfterAddRelation(
-    updatedRelationsPlan,
-    parentViewPath,
-    nodeIDsArray.length,
-    insertAtIndex
   );
 
   return planUpdateViews(updatedRelationsPlan, updatedViews);

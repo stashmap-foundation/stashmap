@@ -21,6 +21,7 @@ import {
   newNode,
   addRelationToRelations,
   moveRelations,
+  bulkAddRelations,
   VERSIONS_NODE_ID,
   EMPTY_NODE_ID,
   isEmptyNodeID,
@@ -42,6 +43,7 @@ import {
   getParentView,
   getNodeFromID,
   getVersionedDisplayText,
+  bulkUpdateViewPathsAfterAddRelation,
 } from "./ViewContext";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useWorkspaceContext } from "./WorkspaceContext";
@@ -426,8 +428,6 @@ export function planSaveNodeAndEnsureRelations(
       ? planRemoveEmptyNodePosition(planWithVersion, relationsID)
       : planWithVersion;
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { planAddToParent } = require("./dnd");
     return planAddToParent(
       planWithoutEmpty,
       createdNode.id,
@@ -990,4 +990,46 @@ export function planUpdateEmptyNodeMetadata(
       relationItem: updatedRelationItem,
     }),
   };
+}
+
+export function planAddToParent(
+  plan: Plan,
+  nodeIDs: LongID | ID | (LongID | ID)[],
+  parentViewPath: ViewPath,
+  stack: (LongID | ID)[],
+  insertAtIndex?: number,
+  relevance?: Relevance,
+  argument?: Argument
+): Plan {
+  const nodeIDsArray = Array.isArray(nodeIDs) ? nodeIDs : [nodeIDs];
+  if (nodeIDsArray.length === 0) {
+    return plan;
+  }
+
+  const [parentNodeID, parentView] = getNodeIDFromView(plan, parentViewPath);
+  const context = getContextFromStackAndViewPath(stack, parentViewPath);
+  const planWithExpand = planExpandNode(
+    plan,
+    parentNodeID,
+    context,
+    parentView,
+    parentViewPath
+  );
+
+  const updatedRelationsPlan = upsertRelations(
+    planWithExpand,
+    parentViewPath,
+    stack,
+    (relations) =>
+      bulkAddRelations(relations, nodeIDsArray, relevance, argument, insertAtIndex)
+  );
+
+  const updatedViews = bulkUpdateViewPathsAfterAddRelation(
+    updatedRelationsPlan,
+    parentViewPath,
+    nodeIDsArray.length,
+    insertAtIndex
+  );
+
+  return planUpdateViews(updatedRelationsPlan, updatedViews);
 }

@@ -12,9 +12,8 @@ import {
 import { useEditorText } from "./EditorTextContext";
 import useModal from "./useModal";
 import { SearchModal } from "./SearchModal";
-import { usePlanner, planSetEmptyNodePosition, planSaveNodeAndEnsureRelations, Plan } from "../planner";
+import { usePlanner, planSetEmptyNodePosition, planSaveNodeAndEnsureRelations, Plan, planAddToParent } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
-import { planAddToParent } from "../dnd";
 
 /**
  * Prevents a button from stealing focus from an editor in the same node row.

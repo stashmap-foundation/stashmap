@@ -51,8 +51,9 @@ import {
   planRemoveEmptyNodePosition,
   planCreateNode,
   planCreateVersion,
+  planAddToParent,
 } from "../planner";
-import { planDisconnectFromParent, planAddToParent } from "../dnd";
+import { planDisconnectFromParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeIcon } from "./NodeIcon";
 import { NodeCard } from "../commons/Ui";

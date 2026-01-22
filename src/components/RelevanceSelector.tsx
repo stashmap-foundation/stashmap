@@ -13,8 +13,7 @@ import {
   useNode,
   useDisplayText,
 } from "../ViewContext";
-import { usePlanner } from "../planner";
-import { planAddToParent } from "../dnd";
+import { usePlanner, planAddToParent } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { preventEditorBlurIfSameNode } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";

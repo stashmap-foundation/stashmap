@@ -233,6 +233,41 @@ describe("Empty node - filter button", () => {
 });
 
 describe("Empty node - add button materializes first", () => {
+  test("clicking add on empty node without text inserts new node at correct position", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    const myNotesEditor = await screen.findByLabelText("edit My Notes");
+    await userEvent.click(myNotesEditor);
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child1{Enter}Child2{Enter}");
+
+    // Now we have an empty node after Child2 - click add on the empty node row
+    await userEvent.click(await screen.findByLabelText("add to"));
+
+    // New empty node should be inserted after Child2, not above Child1
+    await userEvent.type(await findNewNodeEditor(), "Child3{Escape}");
+
+    await expectTree(`
+My Notes
+  Parent
+    Child1
+    Child2
+    Child3
+    `);
+
+    cleanup();
+    renderTree(alice);
+
+    await expectTree(`
+My Notes
+  Parent
+    Child1
+    Child2
+    Child3
+    `);
+  });
+
   test("clicking add on empty node with text materializes it first", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
@@ -319,6 +354,17 @@ describe("Empty node - search button saves and adds", () => {
     await userEvent.click(await screen.findByLabelText("select My Notes"));
 
     // Result should be inserted after Child2, not above Child1
+    await expectTree(`
+My Notes
+  Parent
+    Child1
+    Child2
+    My Notes
+    `);
+
+    cleanup();
+    renderTree(alice);
+
     await expectTree(`
 My Notes
   Parent

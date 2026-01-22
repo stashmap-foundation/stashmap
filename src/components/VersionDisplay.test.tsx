@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -99,6 +99,16 @@ My Notes
   Holiday Destinations
     BCN
     `);
+
+    // Verify edit persists after re-render
+    cleanup();
+    renderTree(alice);
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    BCN
+    `);
   });
 
   test("Multiple edits to the same node show the latest version", async () => {
@@ -138,6 +148,15 @@ My Notes
     await userEvent.clear(editor2);
     await userEvent.type(editor2, "Version 3");
     fireEvent.blur(editor2);
+
+    await expectTree(`
+My Notes
+  Version 3
+    `);
+
+    // Verify edits persist after re-render
+    cleanup();
+    renderTree(alice);
 
     await expectTree(`
 My Notes

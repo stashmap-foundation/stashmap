@@ -52,6 +52,7 @@ import {
   planCreateNode,
   planCreateVersion,
   planAddToParent,
+  planDeepCopyNodeWithView,
 } from "../planner";
 import { planDisconnectFromParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
@@ -332,41 +333,45 @@ function EditableContent(): JSX.Element {
     }
 
     // Handle regular nodes
-    // Step 1: Save text changes if any
-    const planWithText = planSaveNodeAndEnsureRelations(
-      basePlan,
-      text,
-      viewPath,
-      stack
-    );
-
-    // Step 2: Expand the previous sibling (ensure it has relations)
+    // Step 1: Expand the previous sibling (ensure it has relations)
     const prevSiblingContext = getContextFromStackAndViewPath(
       stack,
       prevSibling.viewPath
     );
     const planWithExpand = planExpandNode(
-      planWithText,
+      basePlan,
       prevSibling.nodeID,
       prevSiblingContext,
       prevSibling.view,
       prevSibling.viewPath
     );
 
+    // Step 2: Deep copy node to previous sibling (copies node + all descendants + views)
+    // Must happen BEFORE disconnect so views are still available to copy
+    const planWithDeepCopy = planDeepCopyNodeWithView(
+      planWithExpand,
+      nodeID,
+      context,
+      viewPath,
+      prevSibling.viewPath,
+      stack
+    );
+
     // Step 3: Disconnect current node from current parent
     const planWithDisconnect = planDisconnectFromParent(
-      planWithExpand,
+      planWithDeepCopy,
       viewPath,
       stack
     );
 
-    // Step 4: Add current node to previous sibling at end
-    const finalPlan = planAddToParent(
-      planWithDisconnect,
-      nodeID,
-      prevSibling.viewPath,
-      stack
-    );
+    // Step 4: Save text changes in NEW context (if any)
+    // The node's new context is prevSiblingContext + prevSibling's ID
+    const newContext = prevSiblingContext.push(prevSibling.nodeID);
+    const displayText = node?.text ?? "";
+    const hasTextChanges = trimmedText !== displayText;
+    const finalPlan = hasTextChanges
+      ? planCreateVersion(planWithDisconnect, nodeID, trimmedText, newContext)
+      : planWithDisconnect;
 
     executePlan(finalPlan);
   };

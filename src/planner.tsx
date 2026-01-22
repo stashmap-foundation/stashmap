@@ -44,6 +44,11 @@ import {
   getNodeFromID,
   getVersionedDisplayText,
   bulkUpdateViewPathsAfterAddRelation,
+  getDescendantRelations,
+  copyViewsWithNewPrefix,
+  viewPathToString,
+  getRelationForView,
+  addNodeToPathWithRelations,
 } from "./ViewContext";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useWorkspaceContext } from "./WorkspaceContext";
@@ -520,6 +525,92 @@ export function planAddToParent(
   );
 
   return planUpdateViews(updatedRelationsPlan, updatedViews);
+}
+
+export function planDeepCopyNode(
+  plan: Plan,
+  sourceNodeID: LongID | ID,
+  sourceContext: Context,
+  targetParentViewPath: ViewPath,
+  stack: (LongID | ID)[],
+  insertAtIndex?: number
+): Plan {
+  const targetParentContext = getContextFromStackAndViewPath(stack, targetParentViewPath);
+  const [targetParentNodeID] = getNodeIDFromView(plan, targetParentViewPath);
+  const nodeNewContext = targetParentContext.push(shortID(targetParentNodeID));
+
+  const planWithNode = planAddToParent(
+    plan,
+    sourceNodeID,
+    targetParentViewPath,
+    stack,
+    insertAtIndex
+  );
+
+  const descendants = getDescendantRelations(
+    plan.knowledgeDBs,
+    sourceNodeID,
+    sourceContext
+  );
+
+  return descendants.reduce((accPlan, relation) => {
+    const isDirectChildrenRelation =
+      relation.head === shortID(sourceNodeID) &&
+      contextsMatch(relation.context, sourceContext);
+
+    const newContext = isDirectChildrenRelation
+      ? nodeNewContext
+      : nodeNewContext.concat(relation.context.skip(sourceContext.size));
+
+    const baseRelation = newRelations(relation.head, newContext, accPlan.user.publicKey);
+    const newRelation: Relations = {
+      ...baseRelation,
+      items: relation.items,
+    };
+
+    return planUpsertRelations(accPlan, newRelation);
+  }, planWithNode);
+}
+
+export function planDeepCopyNodeWithView(
+  plan: Plan,
+  sourceNodeID: LongID | ID,
+  sourceContext: Context,
+  sourceViewPath: ViewPath,
+  targetParentViewPath: ViewPath,
+  stack: (LongID | ID)[],
+  insertAtIndex?: number
+): Plan {
+  const planWithCopy = planDeepCopyNode(
+    plan,
+    sourceNodeID,
+    sourceContext,
+    targetParentViewPath,
+    stack,
+    insertAtIndex
+  );
+
+  const relations = getRelationForView(planWithCopy, targetParentViewPath, stack);
+  if (!relations || relations.items.size === 0) {
+    return planWithCopy;
+  }
+
+  const targetIndex = insertAtIndex ?? relations.items.size - 1;
+  const targetViewPath = addNodeToPathWithRelations(
+    targetParentViewPath,
+    relations,
+    targetIndex
+  );
+
+  const sourceKey = viewPathToString(sourceViewPath);
+  const targetKey = viewPathToString(targetViewPath);
+  const updatedViews = copyViewsWithNewPrefix(
+    planWithCopy.views,
+    sourceKey,
+    targetKey
+  );
+
+  return planUpdateViews(planWithCopy, updatedViews);
 }
 
 /**

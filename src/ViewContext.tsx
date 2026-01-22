@@ -265,6 +265,30 @@ export function contextsMatch(a: Context, b: Context): boolean {
   return a.equals(b);
 }
 
+export function contextStartsWith(context: Context, prefix: Context): boolean {
+  if (prefix.size > context.size) return false;
+  return context.take(prefix.size).equals(prefix);
+}
+
+export function getDescendantRelations(
+  knowledgeDBs: KnowledgeDBs,
+  nodeID: LongID | ID,
+  rootContext: Context
+): List<Relations> {
+  const localID = shortID(nodeID);
+  const childContext = rootContext.push(localID);
+
+  return knowledgeDBs
+    .valueSeq()
+    .flatMap((db) => db.relations.valueSeq())
+    .filter(
+      (relations) =>
+        (relations.head === localID && contextsMatch(relations.context, rootContext)) ||
+        contextStartsWith(relations.context, childContext)
+    )
+    .toList();
+}
+
 export function getAvailableRelationsForNode(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
@@ -978,6 +1002,20 @@ export function deleteChildViews(views: Views, path: ViewPath): Views {
 function getChildViews(views: Views, path: ViewPath): Views {
   const key = viewPathToString(path);
   return views.filter((v, k) => k.startsWith(key) && k !== key);
+}
+
+export function copyViewsWithNewPrefix(
+  views: Views,
+  sourceKey: string,
+  targetKey: string
+): Views {
+  const viewsToCopy = views.filter(
+    (_, k) => k.startsWith(sourceKey + ":") || k === sourceKey
+  );
+  return viewsToCopy.reduce((acc, view, key) => {
+    const newKey = targetKey + key.slice(sourceKey.length);
+    return acc.set(newKey, view);
+  }, views);
 }
 
 export function newRelations(

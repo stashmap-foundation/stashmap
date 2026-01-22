@@ -147,10 +147,6 @@ export function MiniEditor({
   };
 
   const editorTextContext = useEditorText();
-  useEffect(() => {
-    editorTextContext?.registerGetText(getText);
-    return () => editorTextContext?.registerGetText(() => "");
-  }, [editorTextContext]);
 
   const handleInput = (): void => {
     editorTextContext?.setText(getText());
@@ -362,7 +358,7 @@ export function SiblingSearchButton(): JSX.Element | null {
   }
 
   const handleAddWithSave = (nodeIDToAdd: ID): void => {
-    const editorText = editorTextContext?.getText() ?? "";
+    const editorText = editorTextContext?.text ?? "";
     let plan = planSaveNodeAndEnsureRelations(createPlan(), editorText, viewPath, stack);
     plan = planAddExistingNode({
       plan,
@@ -408,7 +404,7 @@ export function AddSiblingButton(): JSX.Element | null {
     const [targetPath, insertIndex] = nextInsertPosition;
     let plan = createPlan();
 
-    const currentEditorText = editorTextContext?.getText() ?? "";
+    const currentEditorText = editorTextContext?.text ?? "";
     if (currentEditorText.trim()) {
       plan = planSaveNodeAndEnsureRelations(plan, currentEditorText, viewPath, stack);
     }

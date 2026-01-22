@@ -79,7 +79,7 @@ export function useRelationItemContext(): RelationItemContext {
     updater: (relations: Relations, index: number) => Relations,
     metadata: { relevance?: Relevance; argument?: Argument }
   ): void => {
-    const editorText = editorTextContext?.getText() ?? "";
+    const editorText = editorTextContext?.text ?? "";
     const hasEditorText = editorText.trim().length > 0;
 
     if (isEmptyNode) {

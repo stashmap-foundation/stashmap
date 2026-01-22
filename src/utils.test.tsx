@@ -879,14 +879,17 @@ export async function expectTree(expected: string): Promise<void> {
     .filter((line) => line.length > 0)
     .join("\n");
 
-  await waitFor(async () => {
-    const actual = await getTreeStructure();
-    if (actual !== expectedNormalized) {
-      console.log("ACTUAL TREE:\n" + actual);
-      console.log("EXPECTED TREE:\n" + expectedNormalized);
-    }
-    expect(actual).toEqual(expectedNormalized);
-  });
+  let lastActual = "";
+  try {
+    await waitFor(async () => {
+      lastActual = await getTreeStructure();
+      expect(lastActual).toEqual(expectedNormalized);
+    });
+  } catch (e) {
+    console.log("ACTUAL TREE:\n" + lastActual);
+    console.log("EXPECTED TREE:\n" + expectedNormalized);
+    throw e;
+  }
 }
 
 /**

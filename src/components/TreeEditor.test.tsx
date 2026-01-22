@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -1457,7 +1457,7 @@ My Notes
 
       const editor = await findNewNodeEditor();
       await userEvent.type(editor, "Saved by Blur");
-      editor.blur();
+      fireEvent.blur(editor);
 
       await expectTree(`
 My Notes

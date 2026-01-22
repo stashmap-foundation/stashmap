@@ -934,9 +934,12 @@ export function useIsExpanded(): boolean {
   return isExpanded(data, viewKey);
 }
 
-export function useIsRoot(): boolean {
-  const viewPath = useViewPath();
+export function isRoot(viewPath: ViewPath): boolean {
   return viewPath.length === 2;
+}
+
+export function useIsRoot(): boolean {
+  return isRoot(useViewPath());
 }
 
 /**

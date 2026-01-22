@@ -44,6 +44,10 @@ import {
   getNodeFromID,
   getVersionedDisplayText,
   bulkUpdateViewPathsAfterAddRelation,
+  isExpanded,
+  isRoot,
+  viewPathToString,
+  getRelationIndex,
 } from "./ViewContext";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useWorkspaceContext } from "./WorkspaceContext";
@@ -1032,4 +1036,26 @@ export function planAddToParent(
   );
 
   return planUpdateViews(updatedRelationsPlan, updatedViews);
+}
+
+export function planInsertNode(
+  plan: Plan,
+  nodeIDToAdd: LongID | ID,
+  viewPath: ViewPath,
+  stack: (LongID | ID)[]
+): Plan {
+  const isNodeRoot = isRoot(viewPath);
+  const isNodeExpanded = isExpanded(plan, viewPathToString(viewPath));
+  const isFirstChildInsert = isNodeRoot || isNodeExpanded;
+
+  const parentPath = getParentView(viewPath);
+  if (!parentPath && !isNodeRoot) {
+    return plan;
+  }
+
+  const targetPath = isFirstChildInsert ? viewPath : parentPath!;
+  const relationIndex = getRelationIndex(plan, viewPath, stack);
+  const insertIndex = isFirstChildInsert ? 0 : (relationIndex ?? 0) + 1;
+
+  return planAddToParent(plan, nodeIDToAdd, targetPath, stack, insertIndex);
 }

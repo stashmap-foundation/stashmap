@@ -4,7 +4,6 @@ import {
   useViewPath,
   getParentView,
   useIsInReferencedByView,
-  useIsAddToNode,
   useIsDiffItem,
   getRelationForView,
 } from "../ViewContext";
@@ -72,12 +71,10 @@ export function useItemStyle(): ItemStyle {
   const relationIndex = useRelationIndex();
   const { stack } = usePaneNavigation();
   const isInReferencedByView = useIsInReferencedByView();
-  const isAddToNode = useIsAddToNode();
   const isDiffItem = useIsDiffItem();
   const parentView = getParentView(viewPath);
 
-  // No styling for add-to-node or referenced-by items
-  if (isAddToNode || isInReferencedByView) {
+  if (isInReferencedByView) {
     return DEFAULT_STYLE;
   }
 

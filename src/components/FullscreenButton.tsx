@@ -1,5 +1,5 @@
 import React from "react";
-import { useIsAddToNode, useNodeID, useViewPath } from "../ViewContext";
+import { useNodeID, useViewPath } from "../ViewContext";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { getRefTargetStack } from "../connections";
 
@@ -7,9 +7,8 @@ export function FullscreenButton(): JSX.Element | null {
   const { stack, setStack } = usePaneNavigation();
   const viewPath = useViewPath();
   const [nodeID] = useNodeID();
-  const isAddToNode = useIsAddToNode();
   const isFullscreenNode = viewPath.length === 2;
-  if (isAddToNode || isFullscreenNode) {
+  if (isFullscreenNode) {
     return null;
   }
 

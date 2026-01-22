@@ -8,7 +8,6 @@ import { TypeFilterButton, FilterDotsDisplay } from "./TypeFilterButton";
 import {
   useNode,
   useNodeID,
-  useIsAddToNode,
   useIsInReferencedByView,
   getAvailableRelationsForNode,
   getContextFromStackAndViewPath,
@@ -138,12 +137,10 @@ function GrayedFilterDots(): JSX.Element | null {
 }
 
 function FilterAndReferencesToggle(): JSX.Element | null {
-  const isAddToNode = useIsAddToNode();
   const isInReferencedByView = useIsInReferencedByView();
   const [node, view] = useNode();
 
-  // Don't show in Add Note mode or when inside Referenced By view
-  if (isAddToNode || isInReferencedByView || !node) {
+  if (isInReferencedByView || !node) {
     return null;
   }
 

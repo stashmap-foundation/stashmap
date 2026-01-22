@@ -2,7 +2,7 @@ import React from "react";
 import { List } from "immutable";
 import { screen, fireEvent } from "@testing-library/react";
 import { useSplitPanes } from "../SplitPanesContext";
-import { ViewContext, ADD_TO_NODE, ViewPath, NodeIndex } from "../ViewContext";
+import { ViewContext, ViewPath, NodeIndex } from "../ViewContext";
 import {
   OpenInSplitPaneButton,
   OpenInSplitPaneButtonWithStack,
@@ -71,18 +71,6 @@ test("OpenInSplitPaneButtonWithStack passes provided stack to addPaneAt", () => 
   fireEvent.click(screen.getByLabelText("open in split pane"));
 
   expect(screen.getByTestId("pane-count").textContent).toBe("2");
-});
-
-test("button is hidden for ADD_TO_NODE", () => {
-  const viewPath: ViewPath = [
-    0,
-    { nodeID: ROOT, nodeIndex: 0 as NodeIndex, relationsID: "" },
-    { nodeID: ADD_TO_NODE, nodeIndex: 0 as NodeIndex },
-  ];
-
-  renderWithContext(viewPath);
-
-  expect(screen.queryByLabelText("open in split pane")).toBeNull();
 });
 
 test("Reference node opens with only reference path, not current pane stack", () => {

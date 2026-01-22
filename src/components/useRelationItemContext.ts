@@ -4,7 +4,6 @@ import {
   getParentView,
   upsertRelations,
   useIsInReferencedByView,
-  useIsAddToNode,
   useNode,
   useNodeID,
   getRelationForView,
@@ -50,7 +49,6 @@ export function useRelationItemContext(): RelationItemContext {
   const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
   const isInReferencedByView = useIsInReferencedByView();
-  const isAddToNode = useIsAddToNode();
   const [node] = useNode();
   const parentView = getParentView(viewPath);
 
@@ -62,10 +60,8 @@ export function useRelationItemContext(): RelationItemContext {
   const editorTextContext = useEditorText();
   const nodeText = node?.text || "";
 
-  // Determine visibility
   const isVisible =
     !isInReferencedByView &&
-    !isAddToNode &&
     relationIndex !== undefined &&
     parentView !== undefined;
 

@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
 import {
-  useIsAddToNode,
   useViewPath,
   getParentView,
   useDisplayText,
@@ -308,28 +307,20 @@ type PlanAddExistingNodeParams = {
   nodeIDToAdd: ID;
   viewPath: ViewPath;
   stack: (LongID | ID)[];
-  isAddToNode: boolean;
   insertAtIndex?: number;
   asFirstChild?: boolean;
 };
 
-// Add an existing node to a parent
-// When asFirstChild is true, use current view and insert at position 0
-// When insertAtIndex is provided (and not asFirstChild), we're adding a sibling - use parent's view
-// When isAddToNode is true, the current path is ADD_TO_NODE - use parent's view
-// Otherwise, we're adding children to current node - use current view
 function planAddExistingNode({
   plan,
   nodeIDToAdd,
   viewPath,
   stack,
-  isAddToNode,
   insertAtIndex,
   asFirstChild,
 }: PlanAddExistingNodeParams): Plan {
   const isSiblingInsert = insertAtIndex !== undefined && !asFirstChild;
-  const viewContext =
-    isAddToNode || isSiblingInsert ? getParentView(viewPath) : viewPath;
+  const viewContext = isSiblingInsert ? getParentView(viewPath) : viewPath;
   const insertPosition = asFirstChild ? 0 : insertAtIndex;
 
   if (!viewContext) {
@@ -348,7 +339,6 @@ export function SiblingSearchButton(): JSX.Element | null {
   const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
   const editorTextContext = useEditorText();
-  const isAddToNode = useIsAddToNode();
 
   const isFirstChildInsert = isRoot || isExpanded;
 
@@ -364,7 +354,6 @@ export function SiblingSearchButton(): JSX.Element | null {
       nodeIDToAdd,
       viewPath,
       stack,
-      isAddToNode,
       insertAtIndex: isFirstChildInsert ? undefined : nextInsertPosition[1],
       asFirstChild: isFirstChildInsert,
     });

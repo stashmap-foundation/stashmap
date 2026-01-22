@@ -24,8 +24,6 @@ import { REFERENCED_BY } from "./constants";
 // only exported for tests
 export type NodeIndex = number & { readonly "": unique symbol };
 
-export const ADD_TO_NODE = "ADD_TO_NODE" as LongID;
-
 export type DiffItem = {
   nodeID: LongID;
   sourceRelationId: LongID;
@@ -613,21 +611,6 @@ export function addRelationsToLastElement(
   return [paneIndex, ...middleElements, { ...getLast(path), relationsID }];
 }
 
-export function addAddToNodeToPath(
-  data: Data,
-  path: ViewPath,
-  stack: (LongID | ID)[]
-): ViewPath {
-  const relations = getRelationForView(data, path, stack);
-  // Assume there is only one Add to node per parent
-  const nodeIndex = 0 as NodeIndex;
-  const withRelations = addRelationsToLastElement(
-    path,
-    relations?.id || ("" as LongID)
-  );
-  return [...withRelations, { nodeID: ADD_TO_NODE, nodeIndex }];
-}
-
 export function addNodeToPathWithRelations(
   path: ViewPath,
   relations: Relations,
@@ -718,11 +701,6 @@ export function useIsDiffItem(): boolean {
   }
 
   const [nodeID] = getNodeIDFromView(data, viewPath);
-
-  // ADD_TO_NODE is not a diff item
-  if (nodeID === ADD_TO_NODE) {
-    return false;
-  }
   const parentRelations = getRelationForView(data, parentPath, stack);
   if (!parentRelations) {
     return false;
@@ -772,9 +750,6 @@ export function getRelationIndex(
   const relations = getRelationForView(data, parentPath, stack);
   if (!relations) {
     return undefined;
-  }
-  if (nodeID === ADD_TO_NODE) {
-    return relations.items.size;
   }
   return calculateIndexFromNodeIndex(relations, nodeID, nodeIndex);
 }
@@ -941,11 +916,6 @@ export function getParentNodeID(
 
 export function useParentNode(): [KnowNode, View] | [undefined, undefined] {
   return getParentNode(useData(), useViewPath());
-}
-
-export function useIsAddToNode(): boolean {
-  const viewContext = useViewPath();
-  return getLast(viewContext).nodeID === ADD_TO_NODE;
 }
 
 export function isExpanded(data: Data, viewKey: string): boolean {

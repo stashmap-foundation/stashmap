@@ -2,7 +2,6 @@ import React, { useRef } from "react";
 import { ConnectableElement, useDrag } from "react-dnd";
 import {
   ViewPath,
-  useIsAddToNode,
   useIsDiffItem,
   useIsInReferencedByView,
   useViewPath,
@@ -24,11 +23,10 @@ type DraggableProps = {
 const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
   ({ className }: DraggableProps, ref): JSX.Element => {
     const path = useViewPath();
-    const isAddToNode = useIsAddToNode();
     const isNodeBeeingEdited = useIsEditingOn();
     const [nodeID] = useNodeID();
     const isEmptyNode = isEmptyNodeID(nodeID);
-    const disableDrag = isAddToNode || isNodeBeeingEdited || isEmptyNode;
+    const disableDrag = isNodeBeeingEdited || isEmptyNode;
 
     const [{ isDragging }, drag] = useDrag({
       type: NOTE_TYPE,

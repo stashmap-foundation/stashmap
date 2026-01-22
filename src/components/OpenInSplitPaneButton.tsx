@@ -1,7 +1,6 @@
 import React from "react";
 import { useMediaQuery } from "react-responsive";
 import {
-  useIsAddToNode,
   useNodeID,
   useViewPath,
   updateViewPathsAfterPaneInsert,
@@ -21,11 +20,10 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
   const { stack } = usePaneNavigation();
   const viewPath = useViewPath();
   const [nodeID] = useNodeID();
-  const isAddToNode = useIsAddToNode();
   const isMobile = useMediaQuery(IS_MOBILE);
   const { createPlan, executePlan } = usePlanner();
 
-  if (isAddToNode || isMobile) {
+  if (isMobile) {
     return null;
   }
 

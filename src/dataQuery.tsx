@@ -5,7 +5,6 @@ import { KIND_DELETE, KIND_KNOWLEDGE_LIST, KIND_KNOWLEDGE_NODE } from "./nostr";
 import { splitID, isRefId, extractNodeIdsFromRefId, VERSIONS_NODE_ID } from "./connections";
 import { REFERENCED_BY } from "./constants";
 import {
-  ADD_TO_NODE,
   getNodeFromID,
   getNodeIDFromView,
   useNodeID,
@@ -28,9 +27,6 @@ function addIDToFilter(
   id: LongID | ID,
   tag: `#${string}`
 ): Filter {
-  if (id === ADD_TO_NODE) {
-    return filter;
-  }
   const d = filter[tag] || [];
   const local = splitID(id)[1];
   // TODO: Add unknown remotes? Or even better create a filter for each unknown remote to query specific ids
@@ -94,9 +90,6 @@ export function filtersToFilterArray(filters: Filters): Filter[] {
 }
 
 function addAuthorFromIDToFilters(filters: Filters, id: LongID | ID): Filters {
-  if (id === ADD_TO_NODE) {
-    return filters;
-  }
   const author = splitID(id)[0];
   const isNewAuthor = author && !filters.authors.includes(author);
   const authors = isNewAuthor ? [...filters.authors, author] : filters.authors;

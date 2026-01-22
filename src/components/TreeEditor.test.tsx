@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -1136,6 +1136,56 @@ My Notes
     Child A
     Child B
     Will Move
+      `);
+    });
+
+    test("editing node text and pressing Tab to indent persists both changes", async () => {
+      const [alice] = setup([ALICE]);
+      renderTree(alice);
+
+      const myNotesEditor = await screen.findByLabelText("edit My Notes");
+      await userEvent.click(myNotesEditor);
+      await userEvent.keyboard("{Enter}");
+      await userEvent.type(
+        await findNewNodeEditor(),
+        "Sibling{Enter}Sibling 2{Escape}"
+      );
+
+      await expectTree(`
+My Notes
+  Sibling
+  Sibling 2
+      `);
+
+      const sibling2Editor = await screen.findByLabelText("edit Sibling 2");
+      await userEvent.click(sibling2Editor);
+      await userEvent.clear(sibling2Editor);
+      await userEvent.type(sibling2Editor, "Child");
+
+      // Verify the editor text changed by checking its content
+      expect(sibling2Editor.textContent).toBe("Child");
+
+      const range = document.createRange();
+      range.selectNodeContents(sibling2Editor);
+      range.collapse(true);
+      window.getSelection()?.removeAllRanges();
+      window.getSelection()?.addRange(range);
+
+      await userEvent.keyboard("{Tab}");
+
+      await expectTree(`
+My Notes
+  Sibling
+    Child
+      `);
+
+      cleanup();
+      renderTree(alice);
+
+      await expectTree(`
+My Notes
+  Sibling
+    Child
       `);
     });
   });

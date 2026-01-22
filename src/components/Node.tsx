@@ -332,11 +332,13 @@ function EditableContent(): JSX.Element {
     }
 
     // Handle regular nodes
-    // Step 1: Save text changes if any (as version)
-    const planWithText =
-      text !== displayText
-        ? planCreateVersion(basePlan, nodeID, text, context)
-        : basePlan;
+    // Step 1: Save text changes if any
+    const planWithText = planSaveNodeAndEnsureRelations(
+      basePlan,
+      text,
+      viewPath,
+      stack
+    );
 
     // Step 2: Expand the previous sibling (ensure it has relations)
     const prevSiblingContext = getContextFromStackAndViewPath(

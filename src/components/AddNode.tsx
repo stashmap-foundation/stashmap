@@ -1,19 +1,18 @@
 import React, { useEffect } from "react";
 import {
   useIsAddToNode,
-  useParentNode,
-  useNode,
   useViewPath,
   getParentView,
   useDisplayText,
   useNextInsertPosition,
   useIsExpanded,
   useIsRoot,
+  ViewPath,
 } from "../ViewContext";
 import { useEditorText } from "./EditorTextContext";
 import useModal from "./useModal";
 import { SearchModal } from "./SearchModal";
-import { usePlanner, planSetEmptyNodePosition, planSaveNode } from "../planner";
+import { usePlanner, planSetEmptyNodePosition, planSaveNodeAndEnsureRelations, Plan } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { planAddToParent } from "../dnd";
 
@@ -223,9 +222,15 @@ export function MiniEditor({
     }
   };
 
-  const handleBlur = (): void => {
+  const handleBlur = (e: React.FocusEvent): void => {
     // Skip if we're handling a key event (ESC/Enter already handled save/close)
     if (handlingKeyRef.current) {
+      return;
+    }
+
+    // Skip if focus moved to a modal (e.g., search modal opened from same row)
+    const relatedTarget = e.relatedTarget as HTMLElement | null;
+    if (relatedTarget?.closest(".modal")) {
       return;
     }
 
@@ -303,41 +308,40 @@ export function Editor({ onCreateNode, onClose }: EditorProps): JSX.Element {
   return <MiniEditor onSave={(text) => onCreateNode(text)} onClose={onClose} />;
 }
 
-type AddNodeOptions = {
+type PlanAddExistingNodeParams = {
+  plan: Plan;
+  nodeIDToAdd: ID;
+  viewPath: ViewPath;
+  stack: (LongID | ID)[];
+  isAddToNode: boolean;
   insertAtIndex?: number;
   asFirstChild?: boolean;
 };
 
-// Hook to add an existing node to the current context
-// Returns a function to add a node, or null if context is invalid
-function useAddExistingNode(options?: AddNodeOptions): ((nodeID: ID) => void) | null {
-  const { insertAtIndex, asFirstChild } = options || {};
-  const isAddToNode = useIsAddToNode();
-  const vContext = useViewPath();
-  const { stack } = usePaneNavigation();
-  const { createPlan, executePlan } = usePlanner();
-
-  // When asFirstChild is true, use current view and insert at position 0
-  // When insertAtIndex is provided (and not asFirstChild), we're adding a sibling - use parent's view
-  // When isAddToNode is true, the current path is ADD_TO_NODE - use parent's view
-  // Otherwise, we're adding children to current node - use current view
+// Add an existing node to a parent
+// When asFirstChild is true, use current view and insert at position 0
+// When insertAtIndex is provided (and not asFirstChild), we're adding a sibling - use parent's view
+// When isAddToNode is true, the current path is ADD_TO_NODE - use parent's view
+// Otherwise, we're adding children to current node - use current view
+function planAddExistingNode({
+  plan,
+  nodeIDToAdd,
+  viewPath,
+  stack,
+  isAddToNode,
+  insertAtIndex,
+  asFirstChild,
+}: PlanAddExistingNodeParams): Plan {
   const isSiblingInsert = insertAtIndex !== undefined && !asFirstChild;
   const viewContext =
-    isAddToNode || isSiblingInsert ? getParentView(vContext) : vContext;
-  const [nodeFromCurrent] = useNode();
-  const [nodeFromParent] = useParentNode();
-  const node =
-    isAddToNode || isSiblingInsert ? nodeFromParent : nodeFromCurrent;
+    isAddToNode || isSiblingInsert ? getParentView(viewPath) : viewPath;
   const insertPosition = asFirstChild ? 0 : insertAtIndex;
 
-  if (!node || !viewContext) {
-    return null;
+  if (!viewContext) {
+    return plan;
   }
 
-  return (nodeID: ID): void => {
-    const plan = planAddToParent(createPlan(), nodeID, viewContext, stack, insertPosition);
-    executePlan(plan);
-  };
+  return planAddToParent(plan, nodeIDToAdd, viewContext, stack, insertPosition);
 }
 
 export function SiblingSearchButton(): JSX.Element | null {
@@ -349,30 +353,27 @@ export function SiblingSearchButton(): JSX.Element | null {
   const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
   const editorTextContext = useEditorText();
+  const isAddToNode = useIsAddToNode();
 
   const isFirstChildInsert = isRoot || isExpanded;
 
-  const onAddExistingNode = useAddExistingNode(
-    nextInsertPosition
-      ? isFirstChildInsert
-        ? { asFirstChild: true }
-        : { insertAtIndex: nextInsertPosition[1] }
-      : undefined
-  );
-
-  if (!onAddExistingNode || !nextInsertPosition) {
+  if (!nextInsertPosition) {
     return null;
   }
 
-  const handleAddWithSave = (nodeID: ID): void => {
+  const handleAddWithSave = (nodeIDToAdd: ID): void => {
     const editorText = editorTextContext?.getText() ?? "";
-    if (editorText.trim()) {
-      const plan = planSaveNode(createPlan(), editorText, viewPath, stack);
-      if (plan) {
-        executePlan(plan);
-      }
-    }
-    onAddExistingNode(nodeID);
+    let plan = planSaveNodeAndEnsureRelations(createPlan(), editorText, viewPath, stack);
+    plan = planAddExistingNode({
+      plan,
+      nodeIDToAdd,
+      viewPath,
+      stack,
+      isAddToNode,
+      insertAtIndex: isFirstChildInsert ? undefined : nextInsertPosition[1],
+      asFirstChild: isFirstChildInsert,
+    });
+    executePlan(plan);
   };
 
   return (
@@ -407,11 +408,9 @@ export function AddSiblingButton(): JSX.Element | null {
     const [targetPath, insertIndex] = nextInsertPosition;
     let plan = createPlan();
 
-    // Save any text in the editor first (works for both empty and edited nodes)
     const currentEditorText = editorTextContext?.getText() ?? "";
     if (currentEditorText.trim()) {
-      const savedPlan = planSaveNode(plan, currentEditorText, viewPath, stack);
-      plan = savedPlan ?? plan;
+      plan = planSaveNodeAndEnsureRelations(plan, currentEditorText, viewPath, stack);
     }
 
     plan = planSetEmptyNodePosition(plan, targetPath, stack, insertIndex);

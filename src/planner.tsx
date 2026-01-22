@@ -381,25 +381,25 @@ export function planCreateNode(plan: Plan, text: string): [Plan, KnowNode] {
  * Save node text - either materialize an empty node or create a version for existing node.
  * Returns the updated plan, or null if nothing to save.
  */
-export function planSaveNode(
+export function planSaveNodeAndEnsureRelations(
   plan: Plan,
   text: string,
   viewPath: ViewPath,
   stack: (LongID | ID)[],
   relevance?: Relevance,
   argument?: Argument
-): Plan | null {
+): Plan {
   const trimmedText = text.trim();
   const [nodeID] = getNodeIDFromView(plan, viewPath);
   const parentPath = getParentView(viewPath);
 
   if (isEmptyNodeID(nodeID)) {
-    if (!parentPath) return null;
+    if (!parentPath) return plan;
     const [parentNodeID, parentView] = getNodeIDFromView(plan, parentPath);
     const relationsID = parentView.relations;
 
     if (!trimmedText) {
-      return relationsID ? planRemoveEmptyNodePosition(plan, relationsID) : null;
+      return relationsID ? planRemoveEmptyNodePosition(plan, relationsID) : plan;
     }
 
     const [planWithNode, createdNode] = planCreateNode(plan, trimmedText);
@@ -440,7 +440,7 @@ export function planSaveNode(
   }
 
   const node = getNodeFromID(plan.knowledgeDBs, nodeID, plan.user.publicKey);
-  if (!node || node.type !== "text") return null;
+  if (!node || node.type !== "text") return plan;
 
   const context = getContextFromStackAndViewPath(stack, viewPath);
   const displayText =
@@ -448,7 +448,7 @@ export function planSaveNode(
     node.text ??
     "";
 
-  if (trimmedText === displayText) return null;
+  if (trimmedText === displayText) return plan;
 
   return planCreateVersion(plan, nodeID, trimmedText, context);
 }

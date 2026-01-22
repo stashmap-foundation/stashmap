@@ -46,7 +46,7 @@ import { useData } from "../DataContext";
 import {
   usePlanner,
   planSetEmptyNodePosition,
-  planSaveNode,
+  planSaveNodeAndEnsureRelations,
   planExpandNode,
   planRemoveEmptyNodePosition,
   planCreateNode,
@@ -237,13 +237,7 @@ function EditableContent(): JSX.Element {
     _imageUrl?: string,
     submitted?: boolean
   ): void => {
-    let plan = planSaveNode(createPlan(), text, viewPath, stack);
-
-    if (!plan && !submitted) {
-      return;
-    }
-
-    plan = plan ?? createPlan();
+    let plan = planSaveNodeAndEnsureRelations(createPlan(), text, viewPath, stack);
 
     if (submitted && nextInsertPosition) {
       const [targetPath, insertIndex] = nextInsertPosition;

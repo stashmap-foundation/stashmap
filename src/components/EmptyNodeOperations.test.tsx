@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -204,8 +204,8 @@ My Notes
   });
 });
 
-describe("Empty node - search button opens modal", () => {
-  test("clicking search on empty node opens modal", async () => {
+describe("Empty node - search button saves and adds", () => {
+  test("clicking search on empty node, adding result materializes node and adds result", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -214,11 +214,61 @@ describe("Empty node - search button opens modal", () => {
     await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child");
 
-    const searchButton = screen.getByLabelText("search and attach to Child");
-    console.log("Button tag:", searchButton.tagName);
+    fireEvent.click(screen.getByLabelText("search and attach to Child"));
 
-    await userEvent.click(searchButton);
+    const searchInput = await screen.findByLabelText("search input");
+    await userEvent.type(searchInput, "My Notes");
+    await userEvent.click(await screen.findByLabelText("select My Notes"));
 
-    await screen.findByLabelText("search input");
+    await expectTree(`
+My Notes
+  Parent
+    Child
+    My Notes
+    `);
+  });
+
+  test("clicking search while editing existing node saves edit and adds result", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    const myNotesEditor = await screen.findByLabelText("edit My Notes");
+    await userEvent.click(myNotesEditor);
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child{Escape}");
+
+    await expectTree(`
+My Notes
+  Parent
+    Child
+    `);
+
+    const childEditor = await screen.findByLabelText("edit Child");
+    await userEvent.click(childEditor);
+    await userEvent.clear(childEditor);
+    await userEvent.type(childEditor, "Edited");
+
+    fireEvent.click(screen.getByLabelText("search and attach to Edited"));
+
+    const searchInput = await screen.findByLabelText("search input");
+    await userEvent.type(searchInput, "My Notes");
+    await userEvent.click(await screen.findByLabelText("select My Notes"));
+
+    await expectTree(`
+My Notes
+  Parent
+    Edited
+    My Notes
+    `);
+
+    cleanup();
+    renderTree(alice);
+
+    await expectTree(`
+My Notes
+  Parent
+    Edited
+    My Notes
+    `);
   });
 });

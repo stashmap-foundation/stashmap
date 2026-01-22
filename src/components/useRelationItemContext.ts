@@ -12,7 +12,7 @@ import {
   ViewPath,
 } from "../ViewContext";
 import { isEmptyNodeID } from "../connections";
-import { usePlanner, planUpdateEmptyNodeMetadata, planSaveNode, Plan } from "../planner";
+import { usePlanner, planUpdateEmptyNodeMetadata, planSaveNodeAndEnsureRelations, Plan } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 import { useEditorText } from "./EditorTextContext";
@@ -39,7 +39,7 @@ type RelationItemContext = {
  * Shared hook for relation item context.
  * Used by useUpdateRelevance and useUpdateArgument.
  * Provides common data and an updateMetadata function that handles:
- * - Empty nodes with text: materialize via planSaveNode
+ * - Empty nodes with text: materialize via planSaveNodeAndEnsureRelations
  * - Empty nodes without text: update via planUpdateEmptyNodeMetadata
  * - Regular nodes: optionally save text, then update relations
  */
@@ -85,7 +85,7 @@ export function useRelationItemContext(): RelationItemContext {
     if (isEmptyNode) {
       if (!relationsID) return;
       if (hasEditorText) {
-        const plan = planSaveNode(
+        const plan = planSaveNodeAndEnsureRelations(
           createPlan(),
           editorText,
           viewPath,
@@ -93,7 +93,7 @@ export function useRelationItemContext(): RelationItemContext {
           metadata.relevance,
           metadata.argument
         );
-        if (plan) executePlan(plan);
+        executePlan(plan);
       } else {
         executePlan(planUpdateEmptyNodeMetadata(createPlan(), relationsID, metadata));
       }
@@ -106,8 +106,7 @@ export function useRelationItemContext(): RelationItemContext {
     let plan: Plan = createPlan();
 
     if (textChanged) {
-      const savedPlan = planSaveNode(plan, editorText, viewPath, stack);
-      plan = savedPlan ?? plan;
+      plan = planSaveNodeAndEnsureRelations(plan, editorText, viewPath, stack);
     }
 
     plan = upsertRelations(plan, parentView, stack, (rels) =>

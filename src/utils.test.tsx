@@ -881,6 +881,10 @@ export async function expectTree(expected: string): Promise<void> {
 
   await waitFor(async () => {
     const actual = await getTreeStructure();
+    if (actual !== expectedNormalized) {
+      console.log("ACTUAL TREE:\n" + actual);
+      console.log("EXPECTED TREE:\n" + expectedNormalized);
+    }
     expect(actual).toEqual(expectedNormalized);
   });
 }

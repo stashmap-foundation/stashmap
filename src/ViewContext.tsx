@@ -950,14 +950,15 @@ export function useIsRoot(): boolean {
 export function useNextInsertPosition(): [ViewPath, number] | null {
   const viewPath = useViewPath();
   const parentPath = getParentView(viewPath);
-  const isExpanded = useIsExpanded();
-  const isRoot = useIsRoot();
+  const nodeIsExpanded = useIsExpanded();
+  const nodeIsRoot = useIsRoot();
   const relationIndex = useRelationIndex();
 
-  if (!parentPath && !isRoot) return null;
+  if (!parentPath && !nodeIsRoot) return null;
 
-  const targetPath = isRoot || isExpanded ? viewPath : parentPath!;
-  const insertIndex = isRoot || isExpanded ? 0 : (relationIndex ?? 0) + 1;
+  const targetPath = nodeIsRoot || nodeIsExpanded ? viewPath : parentPath!;
+  const insertIndex =
+    nodeIsRoot || nodeIsExpanded ? 0 : (relationIndex ?? 0) + 1;
   return [targetPath, insertIndex];
 }
 
@@ -1122,21 +1123,27 @@ export function upsertRelations(
   const foundRelations = existingFromView || existingByContext;
 
   // 2. Determine what we have: found own, found remote, or need to create
-  const isOwn = foundRelations && foundRelations.author === plan.user.publicKey;
-  const isRemote =
+  const isOwnRelations =
+    foundRelations && foundRelations.author === plan.user.publicKey;
+  const isRemoteRelations =
     foundRelations && foundRelations.author !== plan.user.publicKey;
 
-  const relations = isOwn
-    ? foundRelations
-    : isRemote
-    ? createUpdatableRelations(
+  const getRelationsToUse = (): Relations => {
+    if (isOwnRelations) {
+      return foundRelations;
+    }
+    if (isRemoteRelations) {
+      return createUpdatableRelations(
         plan.knowledgeDBs,
         plan.user.publicKey,
         foundRelations.id,
         nodeID,
         context
-      )
-    : newRelationsForNode(nodeID, context, plan.user.publicKey);
+      );
+    }
+    return newRelationsForNode(nodeID, context, plan.user.publicKey);
+  };
+  const relations = getRelationsToUse();
 
   // 3. Update view if needed
   const oldRelationsID = nodeView.relations || relations.id;
@@ -1161,7 +1168,7 @@ export function upsertRelations(
   const updatedRelations = modify(relations);
 
   // 5. Skip event only if: found own relations AND items unchanged
-  if (isOwn && foundRelations.items.equals(updatedRelations.items)) {
+  if (isOwnRelations && foundRelations.items.equals(updatedRelations.items)) {
     return planWithUpdatedView;
   }
 

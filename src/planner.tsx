@@ -335,32 +335,191 @@ export function planCreateVersion(
   return planUpsertRelations(updatedPlan, withVersion);
 }
 
-/**
- * When adding a node that already has ~Versions in this context,
- * ensure the node's own text is at the top of versions.
- * This handles the case where a node was previously versioned,
- * and we're now adding it again with its original text.
- */
-function planEnsureVersionForNode(
+function removeEmptyNodeFromKnowledgeDBs(
+  knowledgeDBs: KnowledgeDBs,
+  publicKey: PublicKey,
+  relationsID: LongID
+): KnowledgeDBs {
+  const myDB = knowledgeDBs.get(publicKey);
+  if (!myDB) {
+    return knowledgeDBs;
+  }
+
+  const shortRelationsID = relationsID.includes("_")
+    ? relationsID.split("_")[1]
+    : relationsID;
+  const existingRelations = myDB.relations.get(shortRelationsID);
+  if (!existingRelations) {
+    return knowledgeDBs;
+  }
+
+  const filteredItems = existingRelations.items.filter(
+    (item) => !isEmptyNodeID(item.nodeID)
+  );
+  if (filteredItems.size === existingRelations.items.size) {
+    return knowledgeDBs;
+  }
+
+  const updatedRelations = myDB.relations.set(shortRelationsID, {
+    ...existingRelations,
+    items: filteredItems,
+  });
+  return knowledgeDBs.set(publicKey, {
+    ...myDB,
+    relations: updatedRelations,
+  });
+}
+
+export function planUpdateViews(plan: Plan, views: Views): Plan {
+  const publishEvents = plan.publishEvents.filterNot(
+    (event) => event.kind === KIND_VIEWS
+  );
+  const writeViewEvent = {
+    kind: KIND_VIEWS,
+    pubkey: plan.user.publicKey,
+    created_at: newTimestamp(),
+    tags: [],
+    content: JSON.stringify(viewsToJSON(views)),
+  };
+  return {
+    ...plan,
+    views,
+    publishEvents: publishEvents.push(
+      setRelayConf(writeViewEvent, {
+        defaultRelays: false,
+        user: true,
+        contacts: false,
+      })
+    ),
+  };
+}
+
+export function planRemoveEmptyNodePosition(
   plan: Plan,
-  node: KnowNode,
-  context: List<ID>
+  relationsID: LongID
 ): Plan {
-  // Check if this node has existing ~Versions in this context
-  const versionsRelations = getVersionsRelations(
+  return {
+    ...plan,
+    knowledgeDBs: removeEmptyNodeFromKnowledgeDBs(
+      plan.knowledgeDBs,
+      plan.user.publicKey,
+      relationsID
+    ),
+    temporaryEvents: plan.temporaryEvents.push({
+      type: "REMOVE_EMPTY_NODE",
+      relationsID,
+    }),
+  };
+}
+
+export function planExpandNode(
+  plan: Plan,
+  nodeID: LongID | ID,
+  context: Context,
+  view: View,
+  viewPath: ViewPath
+): Plan {
+  const currentRelations = view.relations
+    ? getRelationsNoReferencedBy(
+        plan.knowledgeDBs,
+        view.relations,
+        plan.user.publicKey
+      )
+    : undefined;
+
+  if (currentRelations && contextsMatch(currentRelations.context, context)) {
+    if (view.expanded) {
+      return plan;
+    }
+    return planUpdateViews(
+      plan,
+      updateView(plan.views, viewPath, {
+        ...view,
+        expanded: true,
+      })
+    );
+  }
+
+  const availableRelations = getAvailableRelationsForNode(
     plan.knowledgeDBs,
     plan.user.publicKey,
-    node.id,
+    nodeID,
     context
   );
 
-  if (!versionsRelations || versionsRelations.items.size === 0) {
-    // No existing versions, nothing to do
+  if (availableRelations.size > 0) {
+    const firstRelation = availableRelations.first()!;
+    if (view.relations === firstRelation.id && view.expanded) {
+      return plan;
+    }
+    return planUpdateViews(
+      plan,
+      updateView(plan.views, viewPath, {
+        ...view,
+        relations: firstRelation.id,
+        expanded: true,
+      })
+    );
+  }
+
+  const relations = newRelationsForNode(nodeID, context, plan.user.publicKey);
+  const createRelationPlan = planUpsertRelations(plan, relations);
+  return planUpdateViews(
+    createRelationPlan,
+    updateView(plan.views, viewPath, {
+      ...view,
+      relations: relations.id,
+      expanded: true,
+    })
+  );
+}
+
+export function planAddToParent(
+  plan: Plan,
+  nodeIDs: LongID | ID | (LongID | ID)[],
+  parentViewPath: ViewPath,
+  stack: (LongID | ID)[],
+  insertAtIndex?: number,
+  relevance?: Relevance,
+  argument?: Argument
+): Plan {
+  const nodeIDsArray = Array.isArray(nodeIDs) ? nodeIDs : [nodeIDs];
+  if (nodeIDsArray.length === 0) {
     return plan;
   }
 
-  // Node has versions - ensure the node's text is the active version
-  return planCreateVersion(plan, node.id, node.text, context);
+  const [parentNodeID, parentView] = getNodeIDFromView(plan, parentViewPath);
+  const context = getContextFromStackAndViewPath(stack, parentViewPath);
+  const planWithExpand = planExpandNode(
+    plan,
+    parentNodeID,
+    context,
+    parentView,
+    parentViewPath
+  );
+
+  const updatedRelationsPlan = upsertRelations(
+    planWithExpand,
+    parentViewPath,
+    stack,
+    (relations) =>
+      bulkAddRelations(
+        relations,
+        nodeIDsArray,
+        relevance,
+        argument,
+        insertAtIndex
+      )
+  );
+
+  const updatedViews = bulkUpdateViewPathsAfterAddRelation(
+    updatedRelationsPlan,
+    parentViewPath,
+    nodeIDsArray.length,
+    insertAtIndex
+  );
+
+  return planUpdateViews(updatedRelationsPlan, updatedViews);
 }
 
 /**
@@ -514,32 +673,6 @@ export function planDeleteRelations(plan: Plan, relationsID: LongID): Plan {
   return {
     ...deletePlan,
     knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
-  };
-}
-
-export function planUpdateViews(plan: Plan, views: Views): Plan {
-  // filter previous events for views
-  const publishEvents = plan.publishEvents.filterNot(
-    (event) => event.kind === KIND_VIEWS
-  );
-  const writeViewEvent = {
-    kind: KIND_VIEWS,
-    pubkey: plan.user.publicKey,
-    created_at: newTimestamp(),
-    tags: [],
-    content: JSON.stringify(viewsToJSON(views)),
-  };
-  return {
-    ...plan,
-    views,
-    publishEvents: publishEvents.push(
-      setRelayConf(writeViewEvent, {
-        defaultRelays: false,
-        user: true,
-
-        contacts: false,
-      })
-    ),
   };
 }
 
@@ -814,133 +947,6 @@ export function usePlanner(): Planner {
   };
 }
 
-// Helper to remove empty node items from relations in local knowledgeDBs
-function removeEmptyNodeFromKnowledgeDBs(
-  knowledgeDBs: KnowledgeDBs,
-  publicKey: PublicKey,
-  relationsID: LongID
-): KnowledgeDBs {
-  const myDB = knowledgeDBs.get(publicKey);
-  if (!myDB) {
-    return knowledgeDBs;
-  }
-
-  const shortRelationsID = relationsID.includes("_")
-    ? relationsID.split("_")[1]
-    : relationsID;
-  const existingRelations = myDB.relations.get(shortRelationsID);
-  if (!existingRelations) {
-    return knowledgeDBs;
-  }
-
-  // Filter out empty node items
-  const filteredItems = existingRelations.items.filter(
-    (item) => !isEmptyNodeID(item.nodeID)
-  );
-  if (filteredItems.size === existingRelations.items.size) {
-    return knowledgeDBs; // No empty nodes found
-  }
-
-  const updatedRelations = myDB.relations.set(shortRelationsID, {
-    ...existingRelations,
-    items: filteredItems,
-  });
-  return knowledgeDBs.set(publicKey, {
-    ...myDB,
-    relations: updatedRelations,
-  });
-}
-
-// Plan function to remove an empty node position (for closing empty editor)
-// Also removes the injected empty node from local knowledgeDBs (no event published)
-export function planRemoveEmptyNodePosition(
-  plan: Plan,
-  relationsID: LongID
-): Plan {
-  return {
-    ...plan,
-    knowledgeDBs: removeEmptyNodeFromKnowledgeDBs(
-      plan.knowledgeDBs,
-      plan.user.publicKey,
-      relationsID
-    ),
-    temporaryEvents: plan.temporaryEvents.push({
-      type: "REMOVE_EMPTY_NODE",
-      relationsID,
-    }),
-  };
-}
-
-// Unified function for expanding a node with proper relation handling
-// Creates relations only if none exist (like toggle does)
-export function planExpandNode(
-  plan: Plan,
-  nodeID: LongID | ID,
-  context: Context,
-  view: View,
-  viewPath: ViewPath
-): Plan {
-  // 1. Check if view.relations is valid (exists in DB) AND context matches
-  const currentRelations = view.relations
-    ? getRelationsNoReferencedBy(
-        plan.knowledgeDBs,
-        view.relations,
-        plan.user.publicKey
-      )
-    : undefined;
-
-  if (currentRelations && contextsMatch(currentRelations.context, context)) {
-    // Valid relations with matching context - expand only if not already expanded
-    if (view.expanded) {
-      return plan; // Already expanded with correct relations, no update needed
-    }
-    return planUpdateViews(
-      plan,
-      updateView(plan.views, viewPath, {
-        ...view,
-        expanded: true,
-      })
-    );
-  }
-
-  // 2. Check for available relations for this (head, context)
-  const availableRelations = getAvailableRelationsForNode(
-    plan.knowledgeDBs,
-    plan.user.publicKey,
-    nodeID,
-    context
-  );
-
-  if (availableRelations.size > 0) {
-    // Use first available relation
-    const firstRelation = availableRelations.first()!;
-    // Only update if relations or expanded state differs
-    if (view.relations === firstRelation.id && view.expanded) {
-      return plan; // Already in correct state
-    }
-    return planUpdateViews(
-      plan,
-      updateView(plan.views, viewPath, {
-        ...view,
-        relations: firstRelation.id,
-        expanded: true,
-      })
-    );
-  }
-
-  // 3. No relations exist - create new one (prepopulates ~Versions with original node)
-  const relations = newRelationsForNode(nodeID, context, plan.user.publicKey);
-  const createRelationPlan = planUpsertRelations(plan, relations);
-  return planUpdateViews(
-    createRelationPlan,
-    updateView(plan.views, viewPath, {
-      ...view,
-      relations: relations.id,
-      expanded: true,
-    })
-  );
-}
-
 // Plan function to set an empty node position (for creating new node editor)
 // This is simpler than creating actual node events - just stores where to inject
 export function planSetEmptyNodePosition(
@@ -1018,52 +1024,4 @@ export function planUpdateEmptyNodeMetadata(
       relationItem: updatedRelationItem,
     }),
   };
-}
-
-export function planAddToParent(
-  plan: Plan,
-  nodeIDs: LongID | ID | (LongID | ID)[],
-  parentViewPath: ViewPath,
-  stack: (LongID | ID)[],
-  insertAtIndex?: number,
-  relevance?: Relevance,
-  argument?: Argument
-): Plan {
-  const nodeIDsArray = Array.isArray(nodeIDs) ? nodeIDs : [nodeIDs];
-  if (nodeIDsArray.length === 0) {
-    return plan;
-  }
-
-  const [parentNodeID, parentView] = getNodeIDFromView(plan, parentViewPath);
-  const context = getContextFromStackAndViewPath(stack, parentViewPath);
-  const planWithExpand = planExpandNode(
-    plan,
-    parentNodeID,
-    context,
-    parentView,
-    parentViewPath
-  );
-
-  const updatedRelationsPlan = upsertRelations(
-    planWithExpand,
-    parentViewPath,
-    stack,
-    (relations) =>
-      bulkAddRelations(
-        relations,
-        nodeIDsArray,
-        relevance,
-        argument,
-        insertAtIndex
-      )
-  );
-
-  const updatedViews = bulkUpdateViewPathsAfterAddRelation(
-    updatedRelationsPlan,
-    parentViewPath,
-    nodeIDsArray.length,
-    insertAtIndex
-  );
-
-  return planUpdateViews(updatedRelationsPlan, updatedViews);
 }

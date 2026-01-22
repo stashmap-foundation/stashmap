@@ -106,13 +106,13 @@ export function useRelationItemContext(): RelationItemContext {
     if (!isVisible || !parentView || relationIndex === undefined) return;
 
     const textChanged = hasEditorText && editorText !== nodeText;
-    let plan: Plan = createPlan();
+    const basePlan: Plan = createPlan();
 
-    if (textChanged) {
-      plan = planSaveNodeAndEnsureRelations(plan, editorText, viewPath, stack);
-    }
+    const planWithSave = textChanged
+      ? planSaveNodeAndEnsureRelations(basePlan, editorText, viewPath, stack)
+      : basePlan;
 
-    plan = upsertRelations(plan, parentView, stack, (rels) =>
+    const plan = upsertRelations(planWithSave, parentView, stack, (rels) =>
       updater(rels, relationIndex)
     );
     executePlan(plan);

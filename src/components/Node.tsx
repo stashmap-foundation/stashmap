@@ -219,7 +219,10 @@ function NodeContent({
     : {};
 
   return (
-    <span className={`break-word ${isReference ? "reference-node" : ""}`}>
+    <span
+      className={`break-word ${isReference ? "reference-node" : ""}`}
+      data-testid={isReference ? "reference-node" : undefined}
+    >
       <NodeIcon nodeType={nodeType} />
       {isReference && <ReferenceIndicators refId={nodeId} />}
       <span style={referenceStyle}>{text}</span>
@@ -244,17 +247,22 @@ function EditableContent(): JSX.Element {
     _imageUrl?: string,
     submitted?: boolean
   ): void => {
-    let plan = planSaveNodeAndEnsureRelations(
+    const basePlan = planSaveNodeAndEnsureRelations(
       createPlan(),
       text,
       viewPath,
       stack
     );
 
-    if (submitted && nextInsertPosition) {
-      const [targetPath, insertIndex] = nextInsertPosition;
-      plan = planSetEmptyNodePosition(plan, targetPath, stack, insertIndex);
-    }
+    const plan =
+      submitted && nextInsertPosition
+        ? planSetEmptyNodePosition(
+            basePlan,
+            nextInsertPosition[0],
+            stack,
+            nextInsertPosition[1]
+          )
+        : basePlan;
 
     executePlan(plan);
   };
@@ -627,8 +635,7 @@ export function Node({
   const levels = getLevels(viewPath);
   const isMultiselect = useIsParentMultiselectBtnOn();
   const isInReferencedByView = useIsInReferencedByView();
-  const [nodeID, view] = useNodeID();
-  const isEmptyNode = isEmptyNodeID(nodeID);
+  const [, view] = useNodeID();
   const { cardStyle, textStyle } = useItemStyle();
   const defaultCls = isDesktop ? "hover-light-bg" : "";
   const cls =

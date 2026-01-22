@@ -1,12 +1,7 @@
-import React, { useRef } from "react";
+import React from "react";
 import { Map } from "immutable";
 import { newDB } from "./knowledge";
-import {
-  injectEmptyNodesIntoKnowledgeDBs,
-  VERSIONS_NODE_ID,
-} from "./connections";
-
-const mergeIdCounter = 0;
+import { injectEmptyNodesIntoKnowledgeDBs } from "./connections";
 
 export type DataContextProps = Data;
 

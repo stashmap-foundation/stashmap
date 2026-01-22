@@ -250,46 +250,6 @@ export function useQueryKnowledgeData(filters: Filter[]): {
   return { knowledgeDBs, eose, allEventsProcessed };
 }
 
-export function LoadNode({
-  children,
-  waitForEose,
-  referencedBy,
-}: {
-  children: React.ReactNode;
-  waitForEose?: boolean;
-  referencedBy?: boolean;
-}): JSX.Element {
-  const [nodeID] = useNodeID();
-  const { user, contacts, projectMembers } = useData();
-
-  const nodeFilter = addNodeToFilters(
-    createBaseFilter(contacts, projectMembers, user.publicKey),
-    nodeID
-  );
-  const filter = referencedBy
-    ? addReferencedByToFilters(nodeFilter, nodeID)
-    : nodeFilter;
-  const filterArray = filtersToFilterArray(filter);
-  const { knowledgeDBs, eose, allEventsProcessed } =
-    useQueryKnowledgeData(filterArray);
-  if (isUserLoggedIn(user) && waitForEose === true && !eose) {
-    const haveNode = getNodeFromID(knowledgeDBs, nodeID, user.publicKey);
-    if (!haveNode) {
-      return <div className="loading" aria-label="loading" />;
-    }
-  }
-  return (
-    <RegisterQuery
-      nodesBeeingQueried={extractNodesFromQueries(filterArray)}
-      allEventsProcessed={allEventsProcessed}
-    >
-      <MergeKnowledgeDB knowledgeDBs={knowledgeDBs}>
-        <LoadMissingVersionNodes>{children}</LoadMissingVersionNodes>
-      </MergeKnowledgeDB>
-    </RegisterQuery>
-  );
-}
-
 export function LoadNodeContent({
   children,
   nodeIDs,
@@ -333,35 +293,35 @@ export function LoadMissingVersionNodes({
 
   const viewPaths = nodes ?? List([contextViewPath]);
 
-  const missingVersionNodeIDs: ID[] = [];
-  viewPaths.forEach((viewPath) => {
-    const [nodeID] = nodes
-      ? getNodeIDFromView(data, viewPath)
-      : [contextNodeID];
-    const context = getContextFromStackAndViewPath(stack, viewPath);
-    const versionsRel = getVersionsRelations(
-      data.knowledgeDBs,
-      data.user.publicKey,
-      nodeID,
-      context
-    );
-    if (versionsRel) {
-      const firstVersionID = versionsRel.items.first()?.nodeID;
-      if (firstVersionID) {
-        const firstVersionNode = getNodeFromID(
-          data.knowledgeDBs,
-          firstVersionID,
-          data.user.publicKey
-        );
-        if (
-          !firstVersionNode &&
-          !missingVersionNodeIDs.includes(firstVersionID)
-        ) {
-          missingVersionNodeIDs.push(firstVersionID);
+  const missingVersionNodeIDs: ID[] = viewPaths.reduce<ID[]>(
+    (acc, viewPath) => {
+      const [nodeID] = nodes
+        ? getNodeIDFromView(data, viewPath)
+        : [contextNodeID];
+      const context = getContextFromStackAndViewPath(stack, viewPath);
+      const versionsRel = getVersionsRelations(
+        data.knowledgeDBs,
+        data.user.publicKey,
+        nodeID,
+        context
+      );
+      if (versionsRel) {
+        const firstVersionID = versionsRel.items.first()?.nodeID;
+        if (firstVersionID) {
+          const firstVersionNode = getNodeFromID(
+            data.knowledgeDBs,
+            firstVersionID,
+            data.user.publicKey
+          );
+          if (!firstVersionNode && !acc.includes(firstVersionID)) {
+            return [...acc, firstVersionID];
+          }
         }
       }
-    }
-  });
+      return acc;
+    },
+    []
+  );
 
   if (missingVersionNodeIDs.length > 0) {
     return (
@@ -372,4 +332,44 @@ export function LoadMissingVersionNodes({
   }
 
   return <>{children}</>;
+}
+
+export function LoadNode({
+  children,
+  waitForEose,
+  referencedBy,
+}: {
+  children: React.ReactNode;
+  waitForEose?: boolean;
+  referencedBy?: boolean;
+}): JSX.Element {
+  const [nodeID] = useNodeID();
+  const { user, contacts, projectMembers } = useData();
+
+  const nodeFilter = addNodeToFilters(
+    createBaseFilter(contacts, projectMembers, user.publicKey),
+    nodeID
+  );
+  const filter = referencedBy
+    ? addReferencedByToFilters(nodeFilter, nodeID)
+    : nodeFilter;
+  const filterArray = filtersToFilterArray(filter);
+  const { knowledgeDBs, eose, allEventsProcessed } =
+    useQueryKnowledgeData(filterArray);
+  if (isUserLoggedIn(user) && waitForEose === true && !eose) {
+    const haveNode = getNodeFromID(knowledgeDBs, nodeID, user.publicKey);
+    if (!haveNode) {
+      return <div className="loading" aria-label="loading" />;
+    }
+  }
+  return (
+    <RegisterQuery
+      nodesBeeingQueried={extractNodesFromQueries(filterArray)}
+      allEventsProcessed={allEventsProcessed}
+    >
+      <MergeKnowledgeDB knowledgeDBs={knowledgeDBs}>
+        <LoadMissingVersionNodes>{children}</LoadMissingVersionNodes>
+      </MergeKnowledgeDB>
+    </RegisterQuery>
+  );
 }

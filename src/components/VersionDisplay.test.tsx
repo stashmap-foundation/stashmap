@@ -48,9 +48,23 @@ describe("Version Display", () => {
     fireEvent.click(await screen.findByLabelText("show references to BCN"));
     await screen.findByLabelText("hide references to BCN");
 
-    // The reference path should show versioned text "BCN" (not "Barcelona")
-    // The full path is "My Notes → Holiday Destinations → BCN"
-    await screen.findByText("My Notes → Holiday Destinations → BCN");
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    BCN
+      My Notes → Holiday Destinations → BCN
+    `);
+
+    cleanup();
+    renderTree(alice);
+
+    await screen.findByLabelText("hide references to BCN");
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    BCN
+      My Notes → Holiday Destinations → BCN
+    `);
   });
 
   test("Editing a node creates a version and displays the new text", async () => {
@@ -225,6 +239,16 @@ My Notes
     Barcelona
     Barcelona
     `);
+
+    cleanup();
+    renderTree(alice);
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    Barcelona
+    Barcelona
+    `);
   });
 
   test("~Versions list contains both original text and new version after first edit", async () => {
@@ -291,6 +315,18 @@ My Notes
     await userEvent.click(await screen.findByLabelText("expand ~Versions"));
 
     // ~Versions should contain both BCN (current/top) and Barcelona (original)
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    BCN
+      ~Versions
+        BCN
+        Barcelona
+    `);
+
+    cleanup();
+    renderTree(alice);
+
     await expectTree(`
 My Notes
   Holiday Destinations
@@ -370,6 +406,20 @@ My Notes
     // The new version should be inserted at the same position (1),
     // and BCN should shift down to position 2
     // Result: [V3, BCN-updated, BCN, Barcelona]
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    V3
+      ~Versions
+        V3
+        BCN-updated
+        BCN
+        Barcelona
+    `);
+
+    cleanup();
+    renderTree(alice);
+
     await expectTree(`
 My Notes
   Holiday Destinations
@@ -555,6 +605,17 @@ My Notes
       ~Versions
         Barcelona
     `);
+
+    cleanup();
+    renderTree(alice);
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    Barcelona
+      ~Versions
+        Barcelona
+    `);
   });
 
   test("Reference path filters out ~Versions and deduplicates", async () => {
@@ -628,11 +689,28 @@ My Notes
     // Should show two references:
     // - "My Notes → Holiday Destinations → Barcelona" (direct)
     // - "My Notes → Cities in Spain → BCN" (filtered from "...BCN → ~Versions → Barcelona")
-    await screen.findByText("My Notes → Holiday Destinations → Barcelona");
-    await screen.findByText("My Notes → Cities in Spain → BCN");
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    Barcelona
+      My Notes → Cities in Spain → BCN
+      My Notes → Holiday Destinations → Barcelona
+  Cities in Spain
+    BCN
+    `);
 
-    // Verify the unfiltered path is NOT shown
-    expect(screen.queryByText(/Cities in Spain → BCN → ~Versions/)).toBeNull();
+    cleanup();
+    renderTree(alice);
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    Barcelona
+      My Notes → Cities in Spain → BCN
+      My Notes → Holiday Destinations → Barcelona
+  Cities in Spain
+    BCN
+    `);
   });
 
   test("Manually adding ~Versions to a node without versions prepopulates with original", async () => {

@@ -821,8 +821,11 @@ export async function getTreeStructure(): Promise<string> {
     name: "new node editor",
   });
 
+  // Find all reference nodes (paths like "My Notes → Holiday Destinations → BCN")
+  const referenceNodes = document.querySelectorAll(".reference-node");
+
   // Combine and sort by DOM order
-  type TreeElement = { element: HTMLElement; type: "node" | "editor" };
+  type TreeElement = { element: HTMLElement; type: "node" | "editor" | "reference" };
   const elements: TreeElement[] = [
     ...toggleButtons.map((el) => ({
       element: el as HTMLElement,
@@ -831,6 +834,10 @@ export async function getTreeStructure(): Promise<string> {
     ...editors.map((el) => ({
       element: el as HTMLElement,
       type: "editor" as const,
+    })),
+    ...Array.from(referenceNodes).map((el) => ({
+      element: el as HTMLElement,
+      type: "reference" as const,
     })),
   ];
 
@@ -846,13 +853,16 @@ export async function getTreeStructure(): Promise<string> {
 
   const getElementText = (
     element: HTMLElement,
-    type: "node" | "editor"
+    type: "node" | "editor" | "reference"
   ): string => {
     if (type === "node") {
       return (element.getAttribute("aria-label") || "").replace(
         /^(expand|collapse) /,
         ""
       );
+    }
+    if (type === "reference") {
+      return element.textContent?.trim() || "";
     }
     const content = element.textContent?.trim();
     return content ? `[NEW NODE: ${content}]` : "[NEW NODE]";

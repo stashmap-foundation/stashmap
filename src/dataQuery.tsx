@@ -1,16 +1,18 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Filter } from "nostr-tools";
-import { Set } from "immutable";
+import { List, Set } from "immutable";
 import { KIND_DELETE, KIND_KNOWLEDGE_LIST, KIND_KNOWLEDGE_NODE } from "./nostr";
 import { splitID, isRefId, extractNodeIdsFromRefId, VERSIONS_NODE_ID } from "./connections";
 import { REFERENCED_BY } from "./constants";
 import {
   ADD_TO_NODE,
   getNodeFromID,
+  getNodeIDFromView,
   useNodeID,
   getVersionsRelations,
   getContextFromStackAndViewPath,
   useViewPath,
+  ViewPath,
 } from "./ViewContext";
 import { usePaneNavigation } from "./SplitPanesContext";
 import { MergeKnowledgeDB, useData } from "./DataContext";
@@ -284,9 +286,9 @@ export function LoadNode({
       allEventsProcessed={allEventsProcessed}
     >
       <MergeKnowledgeDB knowledgeDBs={knowledgeDBs}>
-        <LoadVersionNode>
+        <LoadMissingVersionNodes>
           {children}
-        </LoadVersionNode>
+        </LoadMissingVersionNodes>
       </MergeKnowledgeDB>
     </RegisterQuery>
   );
@@ -321,31 +323,50 @@ export function LoadNodeContent({
   );
 }
 
-function LoadVersionNode({
+export function LoadMissingVersionNodes({
   children,
+  nodes,
 }: {
   children: React.ReactNode;
+  nodes?: List<ViewPath>;
 }): JSX.Element {
   const data = useData();
-  const [nodeID] = useNodeID();
-  const viewPath = useViewPath();
+  const [contextNodeID] = useNodeID();
+  const contextViewPath = useViewPath();
   const { stack } = usePaneNavigation();
-  const context = getContextFromStackAndViewPath(stack, viewPath);
 
-  const versionsRel = getVersionsRelations(
-    data.knowledgeDBs,
-    data.user.publicKey,
-    nodeID,
-    context
-  );
-  const firstVersionID = versionsRel?.items.first()?.nodeID;
-  const firstVersionNode = firstVersionID
-    ? getNodeFromID(data.knowledgeDBs, firstVersionID, data.user.publicKey)
-    : undefined;
+  const viewPaths = nodes ?? List([contextViewPath]);
 
-  if (firstVersionID && !firstVersionNode) {
+  const missingVersionNodeIDs: ID[] = [];
+  viewPaths.forEach((viewPath) => {
+    const [nodeID] = nodes
+      ? getNodeIDFromView(data, viewPath)
+      : [contextNodeID];
+    const context = getContextFromStackAndViewPath(stack, viewPath);
+    const versionsRel = getVersionsRelations(
+      data.knowledgeDBs,
+      data.user.publicKey,
+      nodeID,
+      context
+    );
+    if (versionsRel) {
+      const firstVersionID = versionsRel.items.first()?.nodeID;
+      if (firstVersionID) {
+        const firstVersionNode = getNodeFromID(
+          data.knowledgeDBs,
+          firstVersionID,
+          data.user.publicKey
+        );
+        if (!firstVersionNode && !missingVersionNodeIDs.includes(firstVersionID)) {
+          missingVersionNodeIDs.push(firstVersionID);
+        }
+      }
+    }
+  });
+
+  if (missingVersionNodeIDs.length > 0) {
     return (
-      <LoadNodeContent nodeIDs={[firstVersionID]}>
+      <LoadNodeContent nodeIDs={missingVersionNodeIDs}>
         {children}
       </LoadNodeContent>
     );

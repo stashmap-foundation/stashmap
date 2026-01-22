@@ -2,9 +2,17 @@ import React, { useEffect, useRef, useState } from "react";
 import { Filter } from "nostr-tools";
 import { Set } from "immutable";
 import { KIND_DELETE, KIND_KNOWLEDGE_LIST, KIND_KNOWLEDGE_NODE } from "./nostr";
-import { splitID, isRefId, extractNodeIdsFromRefId } from "./connections";
+import { splitID, isRefId, extractNodeIdsFromRefId, VERSIONS_NODE_ID } from "./connections";
 import { REFERENCED_BY } from "./constants";
-import { ADD_TO_NODE, getNodeFromID, useNodeID } from "./ViewContext";
+import {
+  ADD_TO_NODE,
+  getNodeFromID,
+  useNodeID,
+  getVersionsRelations,
+  getContextFromStackAndViewPath,
+  useViewPath,
+} from "./ViewContext";
+import { usePaneNavigation } from "./SplitPanesContext";
 import { MergeKnowledgeDB, useData } from "./DataContext";
 import { useApis } from "./Apis";
 import { processEvents } from "./Data";
@@ -110,7 +118,11 @@ export function addNodeToFilters(filters: Filters, id: LongID | ID): Filters {
   return {
     ...addAuthorFromIDToFilters(filters, id),
     knowledgeNodesByID: addIDToFilter(filters.knowledgeNodesByID, id, "#d"),
-    knowledgeListByHead: addIDToFilter(filters.knowledgeListByHead, id, "#k"),
+    knowledgeListByHead: addIDToFilter(
+      addIDToFilter(filters.knowledgeListByHead, id, "#k"),
+      VERSIONS_NODE_ID,
+      "#k"
+    ),
   };
 }
 
@@ -232,9 +244,8 @@ export function useQueryKnowledgeData(filters: Filter[]): {
     }, eventLoadingTimeout) as unknown as number;
   }, [events.size, eose, JSON.stringify(filters), disabled]);
 
-  const processedEvents = processEvents(
-    events.valueSeq().toList().merge(unpublishedEvents)
-  );
+  const allEvents = events.valueSeq().toList().merge(unpublishedEvents);
+  const processedEvents = processEvents(allEvents);
   const knowledgeDBs = processedEvents.map((data) => data.knowledgeDB);
   return { knowledgeDBs, eose, allEventsProcessed };
 }
@@ -273,13 +284,15 @@ export function LoadNode({
       allEventsProcessed={allEventsProcessed}
     >
       <MergeKnowledgeDB knowledgeDBs={knowledgeDBs}>
-        {children}
+        <LoadVersionNode>
+          {children}
+        </LoadVersionNode>
       </MergeKnowledgeDB>
     </RegisterQuery>
   );
 }
 
-export function LoadStackNodes({
+export function LoadNodeContent({
   children,
   nodeIDs,
 }: {
@@ -306,4 +319,37 @@ export function LoadStackNodes({
       </MergeKnowledgeDB>
     </RegisterQuery>
   );
+}
+
+function LoadVersionNode({
+  children,
+}: {
+  children: React.ReactNode;
+}): JSX.Element {
+  const data = useData();
+  const [nodeID] = useNodeID();
+  const viewPath = useViewPath();
+  const { stack } = usePaneNavigation();
+  const context = getContextFromStackAndViewPath(stack, viewPath);
+
+  const versionsRel = getVersionsRelations(
+    data.knowledgeDBs,
+    data.user.publicKey,
+    nodeID,
+    context
+  );
+  const firstVersionID = versionsRel?.items.first()?.nodeID;
+  const firstVersionNode = firstVersionID
+    ? getNodeFromID(data.knowledgeDBs, firstVersionID, data.user.publicKey)
+    : undefined;
+
+  if (firstVersionID && !firstVersionNode) {
+    return (
+      <LoadNodeContent nodeIDs={[firstVersionID]}>
+        {children}
+      </LoadNodeContent>
+    );
+  }
+
+  return <>{children}</>;
 }

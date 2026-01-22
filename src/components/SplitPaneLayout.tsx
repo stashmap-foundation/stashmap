@@ -13,7 +13,7 @@ import {
   RootViewContextProvider,
   updateViewPathsAfterPaneDelete,
 } from "../ViewContext";
-import { LoadNode, LoadStackNodes } from "../dataQuery";
+import { LoadNode, LoadNodeContent } from "../dataQuery";
 import { WorkspaceView } from "./Workspace";
 import { useWorkspaceContext } from "../WorkspaceContext";
 import { planUpdateViews, usePlanner } from "../planner";
@@ -149,7 +149,7 @@ function PaneContent(): JSX.Element {
 
   return (
     <div className="split-pane">
-      <LoadStackNodes nodeIDs={stack}>
+      <LoadNodeContent nodeIDs={stack}>
         <RootViewContextProvider
           root={activeWorkspace as LongID}
           paneIndex={paneIndex}
@@ -158,7 +158,7 @@ function PaneContent(): JSX.Element {
             <WorkspaceView />
           </LoadNode>
         </RootViewContextProvider>
-      </LoadStackNodes>
+      </LoadNodeContent>
     </div>
   );
 }

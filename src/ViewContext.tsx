@@ -12,6 +12,7 @@ import {
   buildReferenceNode,
   itemMatchesType,
   VERSIONS_NODE_ID,
+  EMPTY_NODE_ID,
   addRelationToRelations,
 } from "./connections";
 import { newDB } from "./knowledge";
@@ -436,13 +437,14 @@ export function getVersionsRelations(
   context: Context
 ): Relations | undefined {
   const versionsContext = getVersionsContext(nodeID, context);
-  return getAvailableRelationsForNode(
+  const result = getAvailableRelationsForNode(
     knowledgeDBs,
     myself,
     VERSIONS_NODE_ID,
     versionsContext,
     true
   ).first();
+  return result;
 }
 
 /**
@@ -454,6 +456,8 @@ export function getVersionedDisplayText(
   nodeID: ID,
   context: Context
 ): string | undefined {
+  if (nodeID === EMPTY_NODE_ID) return undefined;
+
   const versionsRelations = getVersionsRelations(
     knowledgeDBs,
     myself,
@@ -909,7 +913,8 @@ export function useDisplayText(): string {
     nodeID,
     context
   );
-  return versionedText ?? node?.text ?? "";
+  const result = versionedText ?? node?.text ?? "";
+  return result;
 }
 
 export function getParentNode(

@@ -21,6 +21,9 @@ import {
   parseViewPath,
   isExpanded,
   useDisplayText,
+  getVersionsRelations,
+  getContextFromStackAndViewPath,
+  getNodeFromID,
 } from "../ViewContext";
 import { MergeKnowledgeDB, useData } from "../DataContext";
 import { usePaneNavigation } from "../SplitPanesContext";
@@ -30,6 +33,7 @@ import {
   createBaseFilter,
   filtersToFilterArray,
   useQueryKnowledgeData,
+  LoadNodeContent,
 } from "../dataQuery";
 import { RegisterQuery } from "../LoadingStatus";
 import { shortID } from "../connections";
@@ -121,6 +125,52 @@ function VirtuosoForColumn({
   );
 }
 
+function LoadMissingVersionNodes({
+  children,
+  nodes,
+}: {
+  children: React.ReactNode;
+  nodes: List<ViewPath>;
+}): JSX.Element {
+  const data = useData();
+  const { stack } = usePaneNavigation();
+
+  const missingVersionNodeIDs: ID[] = [];
+  nodes.forEach((viewPath) => {
+    const [nodeID] = getNodeIDFromView(data, viewPath);
+    const context = getContextFromStackAndViewPath(stack, viewPath);
+    const versionsRel = getVersionsRelations(
+      data.knowledgeDBs,
+      data.user.publicKey,
+      nodeID,
+      context
+    );
+    if (versionsRel) {
+      const firstVersionID = versionsRel.items.first()?.nodeID;
+      if (firstVersionID) {
+        const firstVersionNode = getNodeFromID(
+          data.knowledgeDBs,
+          firstVersionID,
+          data.user.publicKey
+        );
+        if (!firstVersionNode && !missingVersionNodeIDs.includes(firstVersionID)) {
+          missingVersionNodeIDs.push(firstVersionID);
+        }
+      }
+    }
+  });
+
+  if (missingVersionNodeIDs.length > 0) {
+    return (
+      <LoadNodeContent nodeIDs={missingVersionNodeIDs}>
+        {children}
+      </LoadNodeContent>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 export function TreeViewNodeLoader({
   children,
   nodes,
@@ -154,12 +204,14 @@ export function TreeViewNodeLoader({
 
   return (
     <MergeKnowledgeDB knowledgeDBs={mergedDBs}>
-      <RegisterQuery
-        nodesBeeingQueried={nodeIDs.map((longID) => shortID(longID)).toArray()}
-        allEventsProcessed={allEventsProcessed}
-      >
-        {children}
-      </RegisterQuery>
+      <LoadMissingVersionNodes nodes={nodes}>
+        <RegisterQuery
+          nodesBeeingQueried={nodeIDs.map((longID) => shortID(longID)).toArray()}
+          allEventsProcessed={allEventsProcessed}
+        >
+          {children}
+        </RegisterQuery>
+      </LoadMissingVersionNodes>
     </MergeKnowledgeDB>
   );
 }

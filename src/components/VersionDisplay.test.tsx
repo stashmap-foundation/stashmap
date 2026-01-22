@@ -657,4 +657,32 @@ My Notes
       Original Text
     `);
   });
+
+  test("Editing root node persists after reload", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await screen.findByLabelText("collapse My Notes");
+
+    await expectTree(`
+My Notes
+    `);
+
+    const myNotesEditor = await screen.findByLabelText("edit My Notes");
+    await userEvent.click(myNotesEditor);
+    await userEvent.clear(myNotesEditor);
+    await userEvent.type(myNotesEditor, "My Dashboard");
+    fireEvent.blur(myNotesEditor);
+
+    await expectTree(`
+My Dashboard
+    `);
+
+    cleanup();
+    renderTree(alice);
+
+    await expectTree(`
+My Dashboard
+    `);
+  });
 });

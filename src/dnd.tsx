@@ -3,11 +3,7 @@ import { List, OrderedSet, Set } from "immutable";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { getSelectedInView } from "./components/TemporaryViewContext";
-import {
-  getRelations,
-  moveRelations,
-  deleteRelations,
-} from "./connections";
+import { getRelations, moveRelations, deleteRelations } from "./connections";
 import {
   parseViewPath,
   upsertRelations,

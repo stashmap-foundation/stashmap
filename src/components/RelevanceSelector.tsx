@@ -96,7 +96,14 @@ export function RelevanceSelector({
   const acceptWithLevel = (level: number): void => {
     if (!parentPath) return;
     const relevance = levelToRelevance(level);
-    const plan = planAddToParent(createPlan(), nodeID, parentPath, stack, undefined, relevance);
+    const plan = planAddToParent(
+      createPlan(),
+      nodeID,
+      parentPath,
+      stack,
+      undefined,
+      relevance
+    );
     executePlan(plan);
   };
 

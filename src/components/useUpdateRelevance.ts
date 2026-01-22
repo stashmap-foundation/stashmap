@@ -67,13 +67,8 @@ type UseUpdateRelevanceResult = {
 export function useUpdateRelevance(): UseUpdateRelevanceResult {
   const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
-  const {
-    isVisible,
-    nodeText,
-    currentItem,
-    viewPath,
-    updateMetadata,
-  } = useRelationItemContext();
+  const { isVisible, nodeText, currentItem, viewPath, updateMetadata } =
+    useRelationItemContext();
 
   const currentRelevance = currentItem?.relevance ?? "";
   const currentLevel = relevanceToLevel(currentRelevance);

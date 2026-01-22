@@ -44,10 +44,6 @@ import {
   getNodeFromID,
   getVersionedDisplayText,
   bulkUpdateViewPathsAfterAddRelation,
-  isExpanded,
-  isRoot,
-  viewPathToString,
-  getRelationIndex,
 } from "./ViewContext";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useWorkspaceContext } from "./WorkspaceContext";
@@ -271,9 +267,9 @@ export function planCreateVersion(
   const [originalNodeID, context]: [ID, List<ID>] =
     isInsideVersions && editContext.size >= 2
       ? [
-        editContext.get(editContext.size - 2) as ID, // The node that owns ~Versions
-        editContext.slice(0, -2).toList(), // Context to that node
-      ]
+          editContext.get(editContext.size - 2) as ID, // The node that owns ~Versions
+          editContext.slice(0, -2).toList(), // Context to that node
+        ]
       : [editedNodeID, editContext];
 
   // 1. Create new version node
@@ -302,12 +298,12 @@ export function planCreateVersion(
   const versionsWithOriginal =
     originalIndex < 0
       ? addRelationToRelations(
-        baseVersionsRelations,
-        originalNodeID,
-        "",
-        undefined,
-        baseVersionsRelations.items.size
-      )
+          baseVersionsRelations,
+          originalNodeID,
+          "",
+          undefined,
+          baseVersionsRelations.items.size
+        )
       : baseVersionsRelations;
 
   // 5. Determine insert position
@@ -315,8 +311,8 @@ export function planCreateVersion(
   // Otherwise, insert at position 0 (top)
   const editedNodePosition = isInsideVersions
     ? versionsWithOriginal.items.findIndex(
-      (item) => item.nodeID === editedNodeID
-    )
+        (item) => item.nodeID === editedNodeID
+      )
     : -1;
   const insertPosition = editedNodePosition >= 0 ? editedNodePosition : 0;
 
@@ -329,12 +325,12 @@ export function planCreateVersion(
     existingIndex >= 0
       ? moveRelations(versionsWithOriginal, [existingIndex], insertPosition)
       : addRelationToRelations(
-        versionsWithOriginal,
-        versionNode.id,
-        "",
-        undefined,
-        insertPosition
-      );
+          versionsWithOriginal,
+          versionNode.id,
+          "",
+          undefined,
+          insertPosition
+        );
 
   return planUpsertRelations(updatedPlan, withVersion);
 }
@@ -405,7 +401,9 @@ export function planSaveNodeAndEnsureRelations(
     const relationsID = parentView.relations;
 
     if (!trimmedText) {
-      return relationsID ? planRemoveEmptyNodePosition(plan, relationsID) : plan;
+      return relationsID
+        ? planRemoveEmptyNodePosition(plan, relationsID)
+        : plan;
     }
 
     const [planWithNode, createdNode] = planCreateNode(plan, trimmedText);
@@ -419,13 +417,20 @@ export function planSaveNodeAndEnsureRelations(
       nodeContext
     );
     const planWithVersion = existingVersions
-      ? planCreateVersion(planWithNode, createdNode.id, trimmedText, nodeContext)
+      ? planCreateVersion(
+          planWithNode,
+          createdNode.id,
+          trimmedText,
+          nodeContext
+        )
       : planWithNode;
 
     const emptyNodeMetadata = computeEmptyNodeMetadata(
       plan.publishEventsStatus.temporaryEvents
     );
-    const metadata = relationsID ? emptyNodeMetadata.get(relationsID) : undefined;
+    const metadata = relationsID
+      ? emptyNodeMetadata.get(relationsID)
+      : undefined;
     const emptyNodeIndex = metadata?.index ?? 0;
 
     const planWithoutEmpty = relationsID
@@ -448,7 +453,12 @@ export function planSaveNodeAndEnsureRelations(
 
   const context = getContextFromStackAndViewPath(stack, viewPath);
   const displayText =
-    getVersionedDisplayText(plan.knowledgeDBs, plan.user.publicKey, nodeID, context) ??
+    getVersionedDisplayText(
+      plan.knowledgeDBs,
+      plan.user.publicKey,
+      nodeID,
+      context
+    ) ??
     node.text ??
     "";
 
@@ -620,7 +630,9 @@ type PlanningContextValue = Pick<
   "executePlan" | "republishEvents" | "setPublishEvents"
 >;
 
-const PlanningContext = React.createContext<PlanningContextValue | undefined>(undefined);
+const PlanningContext = React.createContext<PlanningContextValue | undefined>(
+  undefined
+);
 
 // Filter out empty placeholder nodes from events before publishing
 // Empty nodes are injected at read time via injectEmptyNodesIntoKnowledgeDBs,
@@ -680,7 +692,9 @@ export function PlanningContextProvider({
     // This avoids rapid isLoading true→false transitions that cause race conditions
     if (filteredEvents.size === 0) {
       setPublishEvents((prevStatus) => {
-        const newTemporaryEvents = prevStatus.temporaryEvents.concat(plan.temporaryEvents);
+        const newTemporaryEvents = prevStatus.temporaryEvents.concat(
+          plan.temporaryEvents
+        );
         return {
           ...prevStatus,
           temporaryView: plan.temporaryView,
@@ -692,7 +706,9 @@ export function PlanningContextProvider({
 
     // Normal flow for when we have events to publish
     setPublishEvents((prevStatus) => {
-      const newTemporaryEvents = prevStatus.temporaryEvents.concat(plan.temporaryEvents);
+      const newTemporaryEvents = prevStatus.temporaryEvents.concat(
+        plan.temporaryEvents
+      );
       return {
         unsignedEvents: prevStatus.unsignedEvents.merge(filteredEvents),
         results: prevStatus.results,
@@ -867,10 +883,10 @@ export function planExpandNode(
   // 1. Check if view.relations is valid (exists in DB) AND context matches
   const currentRelations = view.relations
     ? getRelationsNoReferencedBy(
-      plan.knowledgeDBs,
-      view.relations,
-      plan.user.publicKey
-    )
+        plan.knowledgeDBs,
+        view.relations,
+        plan.user.publicKey
+      )
     : undefined;
 
   if (currentRelations && contextsMatch(currentRelations.context, context)) {
@@ -934,10 +950,18 @@ export function planSetEmptyNodePosition(
   insertIndex: number
 ): Plan {
   // 1. Ensure we have our own editable relations (copies remote if needed)
-  const planWithOwnRelations = upsertRelations(plan, parentPath, stack, (r) => r);
+  const planWithOwnRelations = upsertRelations(
+    plan,
+    parentPath,
+    stack,
+    (r) => r
+  );
 
   // 2. Use planExpandNode for consistent expansion handling
-  const [parentNodeID, parentView] = getNodeIDFromView(planWithOwnRelations, parentPath);
+  const [parentNodeID, parentView] = getNodeIDFromView(
+    planWithOwnRelations,
+    parentPath
+  );
   const context = getContextFromStackAndViewPath(stack, parentPath);
   const planWithExpanded = planExpandNode(
     planWithOwnRelations,
@@ -1025,7 +1049,13 @@ export function planAddToParent(
     parentViewPath,
     stack,
     (relations) =>
-      bulkAddRelations(relations, nodeIDsArray, relevance, argument, insertAtIndex)
+      bulkAddRelations(
+        relations,
+        nodeIDsArray,
+        relevance,
+        argument,
+        insertAtIndex
+      )
   );
 
   const updatedViews = bulkUpdateViewPathsAfterAddRelation(

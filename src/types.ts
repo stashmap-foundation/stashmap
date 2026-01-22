@@ -109,7 +109,12 @@ declare global {
   };
 
   type TemporaryEvent =
-    | { type: "ADD_EMPTY_NODE"; relationsID: LongID; index: number; relationItem: RelationItem }
+    | {
+        type: "ADD_EMPTY_NODE";
+        relationsID: LongID;
+        index: number;
+        relationItem: RelationItem;
+      }
     | { type: "REMOVE_EMPTY_NODE"; relationsID: LongID };
 
   type EventState = PublishEvents<EventAttachment> & {

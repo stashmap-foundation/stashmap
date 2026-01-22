@@ -723,7 +723,10 @@ My Notes
     await userEvent.click(myNotesEditor);
     await userEvent.keyboard("{Enter}");
     // Create "Original Text", then Tab to indent next node as child, add ~Versions, Tab to go inside, Enter
-    await userEvent.type(await findNewNodeEditor(), "Original Text{Enter}{Tab}~Versions{Enter}{Tab}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Original Text{Enter}{Tab}~Versions{Enter}{Tab}"
+    );
 
     // ~Versions should be expanded and contain "Original Text" as the original version
     // Plus there should be an empty editor for the new node

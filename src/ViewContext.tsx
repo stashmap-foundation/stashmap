@@ -211,8 +211,9 @@ function convertViewPathToString(viewContext: ViewPath): string {
   ) as SubPathWithRelations[];
   const beginning = withoutLastElement.reduce(
     (acc: string, subPath: SubPathWithRelations): string => {
-      const postfix = `${encodeNodeID(subPath.nodeID)}:${subPath.nodeIndex
-        }:${encodeNodeID(subPath.relationsID)}`;
+      const postfix = `${encodeNodeID(subPath.nodeID)}:${
+        subPath.nodeIndex
+      }:${encodeNodeID(subPath.relationsID)}`;
       return acc !== "" ? `${acc}:${postfix}` : postfix;
     },
     ""
@@ -289,12 +290,12 @@ export function getAvailableRelationsForNode(
       : undefined;
   const preferredRemoteRelations: List<Relations> = remoteDB
     ? sortRelationsByDate(
-      remoteDB.relations
-        .filter(
-          (r) => r.head === localID && contextsMatch(r.context, context)
-        )
-        .toList()
-    )
+        remoteDB.relations
+          .filter(
+            (r) => r.head === localID && contextsMatch(r.context, context)
+          )
+          .toList()
+      )
     : List<Relations>();
   const otherRelations: List<Relations> = knowledgeDBs
     .filter((_, k) => k !== myself && k !== remote)
@@ -1097,34 +1098,45 @@ export function upsertRelations(
 
   // 1. Try to find existing relations
   const viewRelations = nodeView.relations
-    ? getRelationsNoReferencedBy(plan.knowledgeDBs, nodeView.relations, plan.user.publicKey)
+    ? getRelationsNoReferencedBy(
+        plan.knowledgeDBs,
+        nodeView.relations,
+        plan.user.publicKey
+      )
     : undefined;
 
-  const existingFromView = viewRelations && contextsMatch(viewRelations.context, context)
-    ? viewRelations
-    : undefined;
+  const existingFromView =
+    viewRelations && contextsMatch(viewRelations.context, context)
+      ? viewRelations
+      : undefined;
 
   const existingByContext = existingFromView
     ? undefined
-    : getAvailableRelationsForNode(plan.knowledgeDBs, plan.user.publicKey, nodeID, context).first();
+    : getAvailableRelationsForNode(
+        plan.knowledgeDBs,
+        plan.user.publicKey,
+        nodeID,
+        context
+      ).first();
 
   const foundRelations = existingFromView || existingByContext;
 
   // 2. Determine what we have: found own, found remote, or need to create
   const isOwn = foundRelations && foundRelations.author === plan.user.publicKey;
-  const isRemote = foundRelations && foundRelations.author !== plan.user.publicKey;
+  const isRemote =
+    foundRelations && foundRelations.author !== plan.user.publicKey;
 
   const relations = isOwn
     ? foundRelations
     : isRemote
-      ? createUpdatableRelations(
+    ? createUpdatableRelations(
         plan.knowledgeDBs,
         plan.user.publicKey,
         foundRelations.id,
         nodeID,
         context
       )
-      : newRelationsForNode(nodeID, context, plan.user.publicKey);
+    : newRelationsForNode(nodeID, context, plan.user.publicKey);
 
   // 3. Update view if needed
   const oldRelationsID = nodeView.relations || relations.id;
@@ -1132,17 +1144,17 @@ export function upsertRelations(
     nodeView.relations === undefined || oldRelationsID !== relations.id;
   const planWithUpdatedView = didViewChange
     ? planUpdateViews(
-      plan,
-      moveChildViewsToNewRelation(
-        plan.views,
-        viewPath,
-        oldRelationsID,
-        relations.id
-      ).set(viewPathToString(viewPath), {
-        ...nodeView,
-        relations: relations.id,
-      })
-    )
+        plan,
+        moveChildViewsToNewRelation(
+          plan.views,
+          viewPath,
+          oldRelationsID,
+          relations.id
+        ).set(viewPathToString(viewPath), {
+          ...nodeView,
+          relations: relations.id,
+        })
+      )
     : plan;
 
   // 4. Apply modification

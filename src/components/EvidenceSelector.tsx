@@ -39,7 +39,8 @@ export function EvidenceSelector(): JSX.Element | null {
 
   if (!isVisible) return null;
 
-  const nodeName = editorText.trim() || versionedDisplayText || node?.text || "item";
+  const nodeName =
+    editorText.trim() || versionedDisplayText || node?.text || "item";
 
   const handleClick = (): void => {
     setArgument(getNextArgument(currentArgument));

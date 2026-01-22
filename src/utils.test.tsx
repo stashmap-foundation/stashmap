@@ -82,7 +82,7 @@ import {
 import { ROOT } from "./types";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
-test.skip("skip", () => { });
+test.skip("skip", () => {});
 
 export const ALICE_PRIVATE_KEY =
   "04d22f1cf58c28647c7b7dc198dcbc4de860948933e56001ab9fc17e1b8d072e";
@@ -349,11 +349,11 @@ export function renderApis(
   };
   const user =
     optionsWithDefaultUser.user &&
-      isUserLoggedInWithSeed(optionsWithDefaultUser.user)
+    isUserLoggedInWithSeed(optionsWithDefaultUser.user)
       ? {
-        privateKey: optionsWithDefaultUser.user.privateKey,
-        publicKey: optionsWithDefaultUser.user.publicKey,
-      }
+          privateKey: optionsWithDefaultUser.user.privateKey,
+          publicKey: optionsWithDefaultUser.user.publicKey,
+        }
       : undefined;
   if (user && user.publicKey && !user.privateKey) {
     fileStore.setLocalStorage("publicKey", user.publicKey);
@@ -379,7 +379,7 @@ export function renderApis(
               {/* eslint-disable-next-line react/jsx-props-no-spreading */}
               <DataContextProvider {...DEFAULT_DATA_CONTEXT_PROPS}>
                 <WorkspaceContextProvider>
-                  <PlanningContextProvider setPublishEvents={() => { }}>
+                  <PlanningContextProvider setPublishEvents={() => {}}>
                     <NostrAuthContextProvider
                       defaultRelayUrls={
                         optionsWithDefaultUser.defaultRelays ||
@@ -603,10 +603,10 @@ function createNodesAndRelations(
   return List(nodes).reduce((rdx: Plan, nodeDescription: NodeDescription) => {
     const currentRelations = currentRelationsID
       ? getRelationsNoReferencedBy(
-        rdx.knowledgeDBs,
-        currentRelationsID,
-        rdx.user.publicKey
-      )
+          rdx.knowledgeDBs,
+          currentRelationsID,
+          rdx.user.publicKey
+        )
       : undefined;
     const textOrNode = Array.isArray(nodeDescription)
       ? nodeDescription[0]
@@ -622,9 +622,9 @@ function createNodesAndRelations(
     // Add Node to current relation
     const planWithUpdatedRelation = currentRelations
       ? planUpsertRelations(
-        planWithNode,
-        addRelationToRelations(currentRelations, node.id)
-      )
+          planWithNode,
+          addRelationToRelations(currentRelations, node.id)
+        )
       : planWithNode;
     if (children) {
       // Create relations with current context (path to this node)
@@ -825,7 +825,10 @@ export async function getTreeStructure(): Promise<string> {
   const referenceNodes = document.querySelectorAll(".reference-node");
 
   // Combine and sort by DOM order
-  type TreeElement = { element: HTMLElement; type: "node" | "editor" | "reference" };
+  type TreeElement = {
+    element: HTMLElement;
+    type: "node" | "editor" | "reference";
+  };
   const elements: TreeElement[] = [
     ...toggleButtons.map((el) => ({
       element: el as HTMLElement,
@@ -896,8 +899,8 @@ export async function expectTree(expected: string): Promise<void> {
       expect(lastActual).toEqual(expectedNormalized);
     });
   } catch (e) {
-    console.log("ACTUAL TREE:\n" + lastActual);
-    console.log("EXPECTED TREE:\n" + expectedNormalized);
+    console.log(`ACTUAL TREE:\n${lastActual}`);
+    console.log(`EXPECTED TREE:\n${expectedNormalized}`);
     throw e;
   }
 }

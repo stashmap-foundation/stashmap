@@ -588,7 +588,8 @@ export function computeEmptyNodeMetadata(
         index: event.index,
         relationItem: event.relationItem,
       });
-    } else if (event.type === "REMOVE_EMPTY_NODE") {
+    }
+    if (event.type === "REMOVE_EMPTY_NODE") {
       return metadata.delete(event.relationsID);
     }
     return metadata;

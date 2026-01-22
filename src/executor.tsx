@@ -83,26 +83,26 @@ export async function execute({
   };
   const finalizedEvents = isUserLoggedInWithExtension(user)
     ? List<{ event: VerifiedEvent; writeRelayConf?: WriteRelayConf }>(
-      await Promise.all(
-        plan.publishEvents.map(async (e) => {
-          const { writeRelayConf } = e;
-          // eslint-disable-next-line functional/immutable-data
-          delete e.writeRelayConf;
-          const signedEvent = await signEventWithExtension(e);
-          return { event: signedEvent as VerifiedEvent, writeRelayConf };
-        })
+        await Promise.all(
+          plan.publishEvents.map(async (e) => {
+            const { writeRelayConf } = e;
+            // eslint-disable-next-line functional/immutable-data
+            delete e.writeRelayConf;
+            const signedEvent = await signEventWithExtension(e);
+            return { event: signedEvent as VerifiedEvent, writeRelayConf };
+          })
+        )
       )
-    )
     : plan.publishEvents.map((e) => {
-      const { writeRelayConf } = e;
-      // eslint-disable-next-line functional/immutable-data
-      delete e.writeRelayConf;
-      const event = finalizeEvent(
-        e,
-        (user as KeyPair).privateKey
-      ) as VerifiedEvent;
-      return { event, writeRelayConf };
-    });
+        const { writeRelayConf } = e;
+        // eslint-disable-next-line functional/immutable-data
+        delete e.writeRelayConf;
+        const event = finalizeEvent(
+          e,
+          (user as KeyPair).privateKey
+        ) as VerifiedEvent;
+        return { event, writeRelayConf };
+      });
 
   const results = await Promise.all(
     finalizedEvents.toArray().map(({ event, writeRelayConf }) => {

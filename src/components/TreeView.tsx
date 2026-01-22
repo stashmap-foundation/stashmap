@@ -157,7 +157,9 @@ export function TreeViewNodeLoader({
     <MergeKnowledgeDB knowledgeDBs={mergedDBs}>
       <LoadMissingVersionNodes nodes={nodes}>
         <RegisterQuery
-          nodesBeeingQueried={nodeIDs.map((longID) => shortID(longID)).toArray()}
+          nodesBeeingQueried={nodeIDs
+            .map((longID) => shortID(longID))
+            .toArray()}
           allEventsProcessed={allEventsProcessed}
         >
           {children}

@@ -1,15 +1,18 @@
 import React, { useEffect } from "react";
 import {
   useViewPath,
-  getParentView,
   useDisplayText,
   useNextInsertPosition,
-  ViewPath,
 } from "../ViewContext";
 import { useEditorText } from "./EditorTextContext";
 import useModal from "./useModal";
 import { SearchModal } from "./SearchModal";
-import { usePlanner, planSetEmptyNodePosition, planSaveNodeAndEnsureRelations, planAddToParent } from "../planner";
+import {
+  usePlanner,
+  planSetEmptyNodePosition,
+  planSaveNodeAndEnsureRelations,
+  planAddToParent,
+} from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 
 /**
@@ -262,7 +265,7 @@ export function MiniEditor({
     <span
       role="presentation"
       onClick={handleWrapperClick}
-      onKeyDown={() => { }}
+      onKeyDown={() => {}}
       style={{
         paddingRight: "30px",
         cursor: "text",
@@ -315,8 +318,19 @@ export function SiblingSearchButton(): JSX.Element | null {
   const handleAddWithSave = (nodeIDToAdd: ID): void => {
     const [targetPath, insertIndex] = nextInsertPosition;
     const editorText = editorTextContext?.text ?? "";
-    let plan = planSaveNodeAndEnsureRelations(createPlan(), editorText, viewPath, stack);
-    plan = planAddToParent(plan, nodeIDToAdd, targetPath, stack, insertIndex);
+    const planWithSave = planSaveNodeAndEnsureRelations(
+      createPlan(),
+      editorText,
+      viewPath,
+      stack
+    );
+    const plan = planAddToParent(
+      planWithSave,
+      nodeIDToAdd,
+      targetPath,
+      stack,
+      insertIndex
+    );
     executePlan(plan);
   };
 
@@ -328,7 +342,10 @@ export function SiblingSearchButton(): JSX.Element | null {
           onHide={closeModal}
         />
       )}
-      <SearchButton onClick={openModal} onMouseDown={preventEditorBlurIfSameNode} />
+      <SearchButton
+        onClick={openModal}
+        onMouseDown={preventEditorBlurIfSameNode}
+      />
     </>
   );
 }
@@ -350,14 +367,24 @@ export function AddSiblingButton(): JSX.Element | null {
 
   const handleClick = (): void => {
     const [targetPath, insertIndex] = nextInsertPosition;
-    let plan = createPlan();
+    const basePlan = createPlan();
 
     const currentEditorText = editorTextContext?.text ?? "";
-    if (currentEditorText.trim()) {
-      plan = planSaveNodeAndEnsureRelations(plan, currentEditorText, viewPath, stack);
-    }
+    const planWithSave = currentEditorText.trim()
+      ? planSaveNodeAndEnsureRelations(
+          basePlan,
+          currentEditorText,
+          viewPath,
+          stack
+        )
+      : basePlan;
 
-    plan = planSetEmptyNodePosition(plan, targetPath, stack, insertIndex);
+    const plan = planSetEmptyNodePosition(
+      planWithSave,
+      targetPath,
+      stack,
+      insertIndex
+    );
     executePlan(plan);
   };
 

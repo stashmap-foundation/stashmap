@@ -133,7 +133,13 @@ function ExpandCollapseToggle(): JSX.Element | null {
       if (!node) {
         return;
       }
-      const plan = planExpandNode(createPlan(), node.id, context, view, viewPath);
+      const plan = planExpandNode(
+        createPlan(),
+        node.id,
+        context,
+        view,
+        viewPath
+      );
       executePlan(plan);
     }
   };
@@ -205,11 +211,11 @@ function NodeContent({
 
   const referenceStyle: React.CSSProperties = isReference
     ? {
-      fontStyle: "italic",
-      color: "#5a7bad",
-      textDecoration: "none",
-      borderBottom: "1px dotted #8fadd4",
-    }
+        fontStyle: "italic",
+        color: "#5a7bad",
+        textDecoration: "none",
+        borderBottom: "1px dotted #8fadd4",
+      }
     : {};
 
   return (
@@ -238,7 +244,12 @@ function EditableContent(): JSX.Element {
     _imageUrl?: string,
     submitted?: boolean
   ): void => {
-    let plan = planSaveNodeAndEnsureRelations(createPlan(), text, viewPath, stack);
+    let plan = planSaveNodeAndEnsureRelations(
+      createPlan(),
+      text,
+      viewPath,
+      stack
+    );
 
     if (submitted && nextInsertPosition) {
       const [targetPath, insertIndex] = nextInsertPosition;
@@ -288,7 +299,10 @@ function EditableContent(): JSX.Element {
 
       if (trimmedText) {
         // Has text - create real node and add to previous sibling
-        const [planWithNode, newNode] = planCreateNode(planWithExpand, trimmedText);
+        const [planWithNode, newNode] = planCreateNode(
+          planWithExpand,
+          trimmedText
+        );
         const finalPlan = planAddToParent(
           planWithNode,
           newNode.id,
@@ -561,12 +575,12 @@ export function getNodesInTree(
   const withDiffItems =
     diffItems.size > 0
       ? diffItems.reduce(
-        (list, diffItem, idx) =>
-          list.push(
-            addDiffItemToPath(data, parentPath, diffItem.nodeID, idx, stack)
-          ),
-        nodesInTree
-      )
+          (list, diffItem, idx) =>
+            list.push(
+              addDiffItemToPath(data, parentPath, diffItem.nodeID, idx, stack)
+            ),
+          nodesInTree
+        )
       : nodesInTree;
 
   return withDiffItems;

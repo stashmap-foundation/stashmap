@@ -2,7 +2,12 @@ import React, { useEffect, useRef, useState } from "react";
 import { Filter } from "nostr-tools";
 import { List, Set } from "immutable";
 import { KIND_DELETE, KIND_KNOWLEDGE_LIST, KIND_KNOWLEDGE_NODE } from "./nostr";
-import { splitID, isRefId, extractNodeIdsFromRefId, VERSIONS_NODE_ID } from "./connections";
+import {
+  splitID,
+  isRefId,
+  extractNodeIdsFromRefId,
+  VERSIONS_NODE_ID,
+} from "./connections";
 import { REFERENCED_BY } from "./constants";
 import {
   getNodeFromID,
@@ -279,9 +284,7 @@ export function LoadNode({
       allEventsProcessed={allEventsProcessed}
     >
       <MergeKnowledgeDB knowledgeDBs={knowledgeDBs}>
-        <LoadMissingVersionNodes>
-          {children}
-        </LoadMissingVersionNodes>
+        <LoadMissingVersionNodes>{children}</LoadMissingVersionNodes>
       </MergeKnowledgeDB>
     </RegisterQuery>
   );
@@ -350,7 +353,10 @@ export function LoadMissingVersionNodes({
           firstVersionID,
           data.user.publicKey
         );
-        if (!firstVersionNode && !missingVersionNodeIDs.includes(firstVersionID)) {
+        if (
+          !firstVersionNode &&
+          !missingVersionNodeIDs.includes(firstVersionID)
+        ) {
           missingVersionNodeIDs.push(firstVersionID);
         }
       }

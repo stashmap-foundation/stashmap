@@ -1,3 +1,4 @@
+/* eslint-disable testing-library/no-node-access */
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
@@ -30,7 +31,9 @@ My Notes
 
     // Check bold styling (fontWeight: 600) - style is on parent span
     const childNode = await screen.findByLabelText("edit Child");
-    const styledSpan = childNode.closest("span[style*='font-weight']") as HTMLElement;
+    const styledSpan = childNode.closest(
+      "span[style*='font-weight']"
+    ) as HTMLElement;
     expect(styledSpan?.style.fontWeight).toBe("600");
   });
 
@@ -63,7 +66,9 @@ My Notes
 
     // Check opacity styling - style is on parent span
     const fadedNode = await screen.findByLabelText("edit Faded");
-    const styledSpan = fadedNode.closest("span[style*='opacity']") as HTMLElement;
+    const styledSpan = fadedNode.closest(
+      "span[style*='opacity']"
+    ) as HTMLElement;
     expect(styledSpan?.style.opacity).toBe("0.5");
   });
 
@@ -89,7 +94,9 @@ My Notes
 
     // Check strikethrough and opacity styling - style is on parent span
     const hiddenNode = await screen.findByLabelText("edit Hidden");
-    const styledSpan = hiddenNode.closest("span[style*='opacity']") as HTMLElement;
+    const styledSpan = hiddenNode.closest(
+      "span[style*='opacity']"
+    ) as HTMLElement;
     expect(styledSpan?.style.opacity).toBe("0.4");
     expect(styledSpan?.style.textDecoration).toBe("line-through");
   });
@@ -103,7 +110,10 @@ describe("Empty node with typed text - argument", () => {
     const myNotesEditor = await screen.findByLabelText("edit My Notes");
     await userEvent.click(myNotesEditor);
     await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Evidence");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Parent{Enter}{Tab}Evidence"
+    );
 
     const evidenceButton = screen.getByLabelText(/Evidence for Evidence/);
     fireEvent.click(evidenceButton);
@@ -115,7 +125,9 @@ My Notes
     `);
 
     const evidenceNode = await screen.findByLabelText("edit Evidence");
-    const styledSpan = evidenceNode.closest("span[style*='background']") as HTMLElement;
+    const styledSpan = evidenceNode.closest(
+      "span[style*='background']"
+    ) as HTMLElement;
     expect(styledSpan?.style.backgroundColor).toContain("46, 125, 50");
   });
 
@@ -126,7 +138,10 @@ My Notes
     const myNotesEditor = await screen.findByLabelText("edit My Notes");
     await userEvent.click(myNotesEditor);
     await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child{Escape}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Parent{Enter}{Tab}Child{Escape}"
+    );
 
     await expectTree(`
 My Notes
@@ -149,7 +164,9 @@ My Notes
     `);
 
     const editedNode = await screen.findByLabelText("edit Edited");
-    const styledSpan = editedNode.closest("span[style*='background']") as HTMLElement;
+    const styledSpan = editedNode.closest(
+      "span[style*='background']"
+    ) as HTMLElement;
     expect(styledSpan?.style.backgroundColor).toContain("46, 125, 50");
 
     cleanup();
@@ -162,8 +179,12 @@ My Notes
     `);
 
     const rerenderedNode = await screen.findByLabelText("edit Edited");
-    const rerenderedStyledSpan = rerenderedNode.closest("span[style*='background']") as HTMLElement;
-    expect(rerenderedStyledSpan?.style.backgroundColor).toContain("46, 125, 50");
+    const rerenderedStyledSpan = rerenderedNode.closest(
+      "span[style*='background']"
+    ) as HTMLElement;
+    expect(rerenderedStyledSpan?.style.backgroundColor).toContain(
+      "46, 125, 50"
+    );
   });
 });
 
@@ -175,7 +196,10 @@ describe("Editing existing node - relevance", () => {
     const myNotesEditor = await screen.findByLabelText("edit My Notes");
     await userEvent.click(myNotesEditor);
     await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Original{Escape}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Parent{Enter}{Tab}Original{Escape}"
+    );
 
     await expectTree(`
 My Notes
@@ -197,7 +221,9 @@ My Notes
     `);
 
     const editedNode = await screen.findByLabelText("edit Edited");
-    const styledSpan = editedNode.closest("span[style*='font-weight']") as HTMLElement;
+    const styledSpan = editedNode.closest(
+      "span[style*='font-weight']"
+    ) as HTMLElement;
     expect(styledSpan?.style.fontWeight).toBe("600");
 
     cleanup();
@@ -210,7 +236,9 @@ My Notes
     `);
 
     const rerenderedNode = await screen.findByLabelText("edit Edited");
-    const rerenderedStyledSpan = rerenderedNode.closest("span[style*='font-weight']") as HTMLElement;
+    const rerenderedStyledSpan = rerenderedNode.closest(
+      "span[style*='font-weight']"
+    ) as HTMLElement;
     expect(rerenderedStyledSpan?.style.fontWeight).toBe("600");
   });
 });
@@ -240,7 +268,10 @@ describe("Empty node - add button materializes first", () => {
     const myNotesEditor = await screen.findByLabelText("edit My Notes");
     await userEvent.click(myNotesEditor);
     await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child1{Enter}Child2{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Parent{Enter}{Tab}Child1{Enter}Child2{Enter}"
+    );
 
     // Now we have an empty node after Child2 - click add on the empty node row
     await userEvent.click(await screen.findByLabelText("add to"));
@@ -299,7 +330,10 @@ My Notes
     const myNotesEditor = await screen.findByLabelText("edit My Notes");
     await userEvent.click(myNotesEditor);
     await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child{Escape}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Parent{Enter}{Tab}Child{Escape}"
+    );
 
     await expectTree(`
 My Notes
@@ -343,7 +377,10 @@ describe("Empty node - search button saves and adds", () => {
     const myNotesEditor = await screen.findByLabelText("edit My Notes");
     await userEvent.click(myNotesEditor);
     await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child1{Enter}Child2{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Parent{Enter}{Tab}Child1{Enter}Child2{Enter}"
+    );
 
     // Now we have an empty node after Child2 - click search without typing any text
     // Empty node with no text has aria-label "search"
@@ -404,7 +441,10 @@ My Notes
     const myNotesEditor = await screen.findByLabelText("edit My Notes");
     await userEvent.click(myNotesEditor);
     await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child{Escape}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Parent{Enter}{Tab}Child{Escape}"
+    );
 
     await expectTree(`
 My Notes

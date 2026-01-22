@@ -11,7 +11,12 @@ import {
   ViewPath,
 } from "../ViewContext";
 import { isEmptyNodeID } from "../connections";
-import { usePlanner, planUpdateEmptyNodeMetadata, planSaveNodeAndEnsureRelations, Plan } from "../planner";
+import {
+  usePlanner,
+  planUpdateEmptyNodeMetadata,
+  planSaveNodeAndEnsureRelations,
+  Plan,
+} from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 import { useEditorText } from "./EditorTextContext";
@@ -91,7 +96,9 @@ export function useRelationItemContext(): RelationItemContext {
         );
         executePlan(plan);
       } else {
-        executePlan(planUpdateEmptyNodeMetadata(createPlan(), relationsID, metadata));
+        executePlan(
+          planUpdateEmptyNodeMetadata(createPlan(), relationsID, metadata)
+        );
       }
       return;
     }

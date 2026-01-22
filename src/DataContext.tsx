@@ -1,9 +1,12 @@
 import React, { useRef } from "react";
 import { Map } from "immutable";
 import { newDB } from "./knowledge";
-import { injectEmptyNodesIntoKnowledgeDBs, VERSIONS_NODE_ID } from "./connections";
+import {
+  injectEmptyNodesIntoKnowledgeDBs,
+  VERSIONS_NODE_ID,
+} from "./connections";
 
-let mergeIdCounter = 0;
+const mergeIdCounter = 0;
 
 export type DataContextProps = Data;
 
@@ -70,7 +73,6 @@ export function MergeKnowledgeDB({
       ];
     })
   );
-
 
   // Inject empty nodes after merging
   const injectedDBs = injectEmptyNodesIntoKnowledgeDBs(

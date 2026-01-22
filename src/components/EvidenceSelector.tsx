@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { TYPE_COLORS } from "../constants";
 import { useUpdateArgument } from "./useUpdateArgument";
-import { useNode } from "../ViewContext";
+import { useNode, useDisplayText } from "../ViewContext";
 import { preventEditorBlurIfSameNode } from "./AddNode";
+import { useEditorText } from "./EditorTextContext";
 
 function getArgumentColor(argument: Argument, isHovered: boolean): string {
   if (argument === "confirms") {
@@ -32,10 +33,13 @@ export function EvidenceSelector(): JSX.Element | null {
   const [isHovered, setIsHovered] = useState(false);
   const { currentArgument, setArgument, isVisible } = useUpdateArgument();
   const [node] = useNode();
+  const versionedDisplayText = useDisplayText();
+  const editorTextContext = useEditorText();
+  const editorText = editorTextContext?.text ?? "";
 
   if (!isVisible) return null;
 
-  const nodeName = node?.text || "item";
+  const nodeName = editorText.trim() || versionedDisplayText || node?.text || "item";
 
   const handleClick = (): void => {
     setArgument(getNextArgument(currentArgument));

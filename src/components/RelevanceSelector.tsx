@@ -17,6 +17,7 @@ import { usePlanner } from "../planner";
 import { planAddToParent } from "../dnd";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { preventEditorBlurIfSameNode } from "./AddNode";
+import { useEditorText } from "./EditorTextContext";
 
 type RelevanceSelectorProps = {
   isDiffItem?: boolean;
@@ -89,6 +90,8 @@ export function RelevanceSelector({
 
   const diffNodeText = node?.text || "";
   const versionedDisplayText = useDisplayText();
+  const editorTextContext = useEditorText();
+  const editorText = editorTextContext?.text ?? "";
 
   // For diff items, accept with the specified relevance level
   const acceptWithLevel = (level: number): void => {
@@ -108,7 +111,9 @@ export function RelevanceSelector({
   const currentLevel = isDiffItem ? -1 : relevanceToLevel(currentRelevance);
   const displayLevel = hoverLevel !== null ? hoverLevel : currentLevel;
   const isNotRelevant = displayLevel === 0;
-  const displayText = isDiffItem ? diffNodeText : versionedDisplayText;
+  const displayText = isDiffItem
+    ? diffNodeText
+    : editorText.trim() || versionedDisplayText;
 
   // Handler that works for both modes
   const handleSetLevel = (level: number): void => {

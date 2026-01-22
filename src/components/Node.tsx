@@ -35,7 +35,7 @@ import {
 } from "../connections";
 import { REFERENCED_BY, DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 import { IS_MOBILE } from "./responsive";
-import { MiniEditor } from "./AddNode";
+import { MiniEditor, preventEditorBlurIfSameNode } from "./AddNode";
 import {
   sortRelations,
   useOnChangeRelations,
@@ -83,6 +83,7 @@ function ExpandCollapseToggle(): JSX.Element | null {
   const isReferencedBy = view.relations === REFERENCED_BY;
 
   const isExpanded = useIsExpanded();
+  const isEmptyNode = isEmptyNodeID(nodeID);
 
   // Get available relations filtered by context (same as SelectRelations)
   const context = getContextFromStackAndViewPath(stack, viewPath);
@@ -109,9 +110,14 @@ function ExpandCollapseToggle(): JSX.Element | null {
   const topRelation = isSelected ? currentRelations : sorted.first();
 
   // Get color based on view state: purple for Referenced By, black for normal
-  const color = isReferencedBy ? TYPE_COLORS.referenced_by : "black";
+  // Reduce opacity for disabled empty nodes
+  const baseColor = isReferencedBy ? TYPE_COLORS.referenced_by : "black";
+  const color = isEmptyNode ? "#ccc" : baseColor;
 
   const onToggle = (): void => {
+    // Don't allow expanding empty nodes
+    if (isEmptyNode) return;
+
     if (hasRelations && topRelation) {
       // Has existing relations (same as SelectRelationsButton onClick)
       if (view.relations === topRelation.id) {
@@ -135,6 +141,8 @@ function ExpandCollapseToggle(): JSX.Element | null {
     <button
       type="button"
       onClick={onToggle}
+      onMouseDown={preventEditorBlurIfSameNode}
+      disabled={isEmptyNode}
       className="expand-collapse-toggle"
       aria-label={
         isExpanded ? `collapse ${displayText}` : `expand ${displayText}`
@@ -145,6 +153,7 @@ function ExpandCollapseToggle(): JSX.Element | null {
         backgroundColor: isReferencedBy
           ? "rgba(100, 140, 180, 0.1)"
           : undefined,
+        cursor: isEmptyNode ? "default" : "pointer",
       }}
     >
       <span className={`triangle ${isExpanded ? "expanded" : "collapsed"}`}>

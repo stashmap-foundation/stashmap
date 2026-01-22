@@ -6,7 +6,9 @@ import {
   useIsDiffItem,
   useIsInReferencedByView,
   useViewPath,
+  useNodeID,
 } from "../ViewContext";
+import { isEmptyNodeID } from "../connections";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable } from "./DroppableContainer";
 import { useIsEditingOn } from "./TemporaryViewContext";
@@ -24,7 +26,9 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     const path = useViewPath();
     const isAddToNode = useIsAddToNode();
     const isNodeBeeingEdited = useIsEditingOn();
-    const disableDrag = isAddToNode || isNodeBeeingEdited;
+    const [nodeID] = useNodeID();
+    const isEmptyNode = isEmptyNodeID(nodeID);
+    const disableDrag = isAddToNode || isNodeBeeingEdited || isEmptyNode;
 
     const [{ isDragging }, drag] = useDrag({
       type: NOTE_TYPE,

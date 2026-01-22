@@ -1,21 +1,8 @@
-import {
-  useRelationIndex,
-  useViewPath,
-  getParentView,
-  upsertRelations,
-  useIsInReferencedByView,
-  useIsAddToNode,
-  useNode,
-  useNodeID,
-  getRelationForView,
-  getNodeIDFromView,
-} from "../ViewContext";
-import { updateItemRelevance, isEmptyNodeID } from "../connections";
-import { usePlanner, planUpdateEmptyNodeMetadata, planSaveNode } from "../planner";
+import { updateItemRelevance } from "../connections";
+import { usePlanner } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
-import { useData } from "../DataContext";
 import { planDisconnectFromParent } from "../dnd";
-import { useEditorText } from "./EditorTextContext";
+import { useRelationItemContext } from "./useRelationItemContext";
 
 // Relevance mapped to levels:
 // "relevant" = 3
@@ -78,50 +65,24 @@ type UseUpdateRelevanceResult = {
  * Used by RelevanceSelector.
  */
 export function useUpdateRelevance(): UseUpdateRelevanceResult {
-  const data = useData();
-  const viewPath = useViewPath();
-  const relationIndex = useRelationIndex();
   const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
-  const isInReferencedByView = useIsInReferencedByView();
-  const isAddToNode = useIsAddToNode();
-  const [node] = useNode();
-  const parentView = getParentView(viewPath);
+  const {
+    isVisible,
+    nodeText,
+    currentItem,
+    viewPath,
+    updateMetadata,
+  } = useRelationItemContext();
 
-  // Determine visibility
-  const isVisible =
-    !isInReferencedByView &&
-    !isAddToNode &&
-    relationIndex !== undefined &&
-    parentView !== undefined;
-
-  // Get current relevance using same context-aware lookup as relationIndex
-  const currentRelevance: Relevance =
-    isVisible && parentView
-      ? getRelationForView(data, parentView, stack)?.items.get(relationIndex!)
-          ?.relevance || ""
-      : "";
-
+  const currentRelevance = currentItem?.relevance ?? "";
   const currentLevel = relevanceToLevel(currentRelevance);
-  const nodeText = node?.text || "";
-
-  const [nodeID] = useNodeID();
-  const isEmptyNode = isEmptyNodeID(nodeID);
-  const relationsID = parentView
-    ? getNodeIDFromView(data, parentView)[1].relations
-    : undefined;
 
   const setRelevance = (relevance: Relevance): void => {
-    if (isEmptyNode && relationsID) {
-      executePlan(planUpdateEmptyNodeMetadata(createPlan(), relationsID, { relevance }));
-      return;
-    }
-
-    if (!isVisible || !parentView || relationIndex === undefined) return;
-    const plan = upsertRelations(createPlan(), parentView, stack, (rels) =>
-      updateItemRelevance(rels, relationIndex, relevance)
+    updateMetadata(
+      (rels, index) => updateItemRelevance(rels, index, relevance),
+      { relevance }
     );
-    executePlan(plan);
   };
 
   const setLevel = (level: number): void => {
@@ -129,7 +90,7 @@ export function useUpdateRelevance(): UseUpdateRelevanceResult {
   };
 
   const removeFromList = (): void => {
-    if (!isVisible || !parentView || relationIndex === undefined) return;
+    if (!isVisible) return;
     const plan = planDisconnectFromParent(createPlan(), viewPath, stack);
     executePlan(plan);
   };

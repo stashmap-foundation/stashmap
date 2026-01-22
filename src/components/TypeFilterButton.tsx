@@ -4,11 +4,15 @@ import { planUpdateViews, usePlanner } from "../planner";
 import {
   updateView,
   useNode,
+  useNodeID,
   useViewPath,
   useIsInReferencedByView,
   useDisplayText,
 } from "../ViewContext";
+import { isEmptyNodeID } from "../connections";
 import { DEFAULT_TYPE_FILTERS, REFERENCED_BY, TYPE_COLORS } from "../constants";
+import { preventEditorBlurIfSameNode } from "./AddNode";
+import { useEditorText } from "./EditorTextContext";
 
 // Filter type definitions with colors
 // Column 1: Relevance types (blue spectrum)
@@ -137,10 +141,15 @@ export function TypeFilterButton(): JSX.Element | null {
   const [show, setShow] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [node, view] = useNode();
-  const displayText = useDisplayText();
+  const [nodeID] = useNodeID();
+  const versionedDisplayText = useDisplayText();
   const viewPath = useViewPath();
   const { createPlan, executePlan } = usePlanner();
   const isInReferencedByView = useIsInReferencedByView();
+  const isEmptyNode = isEmptyNodeID(nodeID);
+  const editorTextContext = useEditorText();
+  const editorText = editorTextContext?.text ?? "";
+  const displayText = editorText.trim() || versionedDisplayText;
 
   if (!node) {
     return null;
@@ -149,6 +158,23 @@ export function TypeFilterButton(): JSX.Element | null {
   // Don't show filter button in Referenced By mode (for root or items inside)
   if (view.relations === REFERENCED_BY || isInReferencedByView) {
     return null;
+  }
+
+  // Show disabled filter button for empty nodes
+  if (isEmptyNode) {
+    return (
+      <button
+        type="button"
+        className="btn btn-borderless p-0"
+        onMouseDown={preventEditorBlurIfSameNode}
+        disabled
+        aria-label={`filter ${displayText}`}
+        title="Save node first to filter"
+        style={{ opacity: 0.4, cursor: "default" }}
+      >
+        <FilterDotsDisplay activeFilters={[]} />
+      </button>
+    );
   }
 
   // Get current filters (default if not set)

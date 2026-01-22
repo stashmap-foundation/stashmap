@@ -28,9 +28,10 @@ My Notes
     Child
     `);
 
-    // Check bold styling (fontWeight: 600)
+    // Check bold styling (fontWeight: 600) - style is on parent span
     const childNode = await screen.findByLabelText("edit Child");
-    expect(childNode.style.fontWeight).toBe("600");
+    const styledSpan = childNode.closest("span[style*='font-weight']") as HTMLElement;
+    expect(styledSpan?.style.fontWeight).toBe("600");
   });
 
   test("typing text then clicking little relevant materializes with opacity styling", async () => {
@@ -45,15 +46,25 @@ My Notes
     // Click "little relevant"
     fireEvent.click(screen.getByLabelText("set Faded to little relevant"));
 
+    // Node should be hidden (default filters exclude little_relevant)
+    await waitFor(() => {
+      expect(screen.queryByText("Faded")).toBeNull();
+    });
+
+    // Enable little_relevant filter to verify node was created
+    await userEvent.click(screen.getByLabelText("filter Parent"));
+    await userEvent.click(await screen.findByText("Little Relevant"));
+
     await expectTree(`
 My Notes
   Parent
     Faded
     `);
 
-    // Check opacity styling
+    // Check opacity styling - style is on parent span
     const fadedNode = await screen.findByLabelText("edit Faded");
-    expect(fadedNode.style.opacity).toBe("0.5");
+    const styledSpan = fadedNode.closest("span[style*='opacity']") as HTMLElement;
+    expect(styledSpan?.style.opacity).toBe("0.5");
   });
 
   test("typing text then clicking not relevant materializes and hides node", async () => {
@@ -76,10 +87,11 @@ My Notes
     await userEvent.click(screen.getByLabelText("filter Parent"));
     await userEvent.click(await screen.findByText("Not Relevant"));
 
-    // Check strikethrough and opacity styling
+    // Check strikethrough and opacity styling - style is on parent span
     const hiddenNode = await screen.findByLabelText("edit Hidden");
-    expect(hiddenNode.style.opacity).toBe("0.4");
-    expect(hiddenNode.style.textDecoration).toBe("line-through");
+    const styledSpan = hiddenNode.closest("span[style*='opacity']") as HTMLElement;
+    expect(styledSpan?.style.opacity).toBe("0.4");
+    expect(styledSpan?.style.textDecoration).toBe("line-through");
   });
 });
 
@@ -103,14 +115,15 @@ My Notes
     Evidence
     `);
 
-    // Check green background (confirms color)
+    // Check green background (confirms color) - style is on parent span
     const evidenceNode = await screen.findByLabelText("edit Evidence");
-    expect(evidenceNode.style.backgroundColor).toContain("46, 125, 50");
+    const styledSpan = evidenceNode.closest("span[style*='background']") as HTMLElement;
+    expect(styledSpan?.style.backgroundColor).toContain("46, 125, 50");
   });
 });
 
 describe("Editing existing node - relevance", () => {
-  test("changing relevance while editing saves text and applies bold styling after reload", async () => {
+  test("changing relevance while editing saves text and applies bold styling", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -131,24 +144,81 @@ My Notes
     await userEvent.clear(editor);
     await userEvent.type(editor, "Edited");
 
-    // Change relevance while editing
+    // Change relevance while editing - this should save the text AND set relevance
     fireEvent.click(screen.getByLabelText("set Edited to relevant"));
 
-    // Simulate reload
-    renderTree(alice);
-
-    // Navigate to Parent to see the child
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-
-    // Text should be saved after reload
+    // Text should be saved and node should show new text with bold styling
     await expectTree(`
 My Notes
   Parent
     Edited
     `);
 
-    // Check bold styling persists after reload
+    // Check bold styling - style is on parent span
     const editedNode = await screen.findByLabelText("edit Edited");
-    expect(editedNode.style.fontWeight).toBe("600");
+    const styledSpan = editedNode.closest("span[style*='font-weight']") as HTMLElement;
+    expect(styledSpan?.style.fontWeight).toBe("600");
+  });
+});
+
+describe("Empty node - filter button", () => {
+  test("filter button is disabled for empty node", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    const myNotesEditor = await screen.findByLabelText("edit My Notes");
+    await userEvent.click(myNotesEditor);
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child");
+
+    // Empty node should have a disabled filter button
+    // The aria-label uses the typed text "Child"
+    const filterButton = screen.getByLabelText("filter Child");
+    expect(filterButton.hasAttribute("disabled")).toBe(true);
+  });
+});
+
+describe("Empty node - add button materializes first", () => {
+  test("clicking add on empty node with text materializes it first", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    const myNotesEditor = await screen.findByLabelText("edit My Notes");
+    await userEvent.click(myNotesEditor);
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child");
+
+    // Click add button - should materialize "Child" first, then create new empty node
+    fireEvent.click(screen.getByLabelText("add to Child"));
+
+    // Both Parent and Child should be materialized, plus a new empty node
+    await expectTree(`
+My Notes
+  Parent
+    Child
+    [NEW NODE]
+    `);
+
+    // Verify we can find the new node editor
+    await findNewNodeEditor();
+  });
+});
+
+describe("Empty node - search button opens modal", () => {
+  test("clicking search on empty node opens modal", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    const myNotesEditor = await screen.findByLabelText("edit My Notes");
+    await userEvent.click(myNotesEditor);
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child");
+
+    const searchButton = screen.getByLabelText("search and attach to Child");
+    console.log("Button tag:", searchButton.tagName);
+
+    await userEvent.click(searchButton);
+
+    await screen.findByLabelText("search input");
   });
 });

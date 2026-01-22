@@ -1,16 +1,5 @@
-import {
-  useRelationIndex,
-  useViewPath,
-  getParentView,
-  upsertRelations,
-  useIsInReferencedByView,
-  useIsAddToNode,
-  getRelationForView,
-} from "../ViewContext";
 import { updateItemArgument } from "../connections";
-import { usePlanner } from "../planner";
-import { usePaneNavigation } from "../SplitPanesContext";
-import { useData } from "../DataContext";
+import { useRelationItemContext } from "./useRelationItemContext";
 
 type UseUpdateArgumentResult = {
   currentArgument: Argument;
@@ -23,35 +12,15 @@ type UseUpdateArgumentResult = {
  * Used by EvidenceSelector.
  */
 export function useUpdateArgument(): UseUpdateArgumentResult {
-  const data = useData();
-  const viewPath = useViewPath();
-  const relationIndex = useRelationIndex();
-  const { stack } = usePaneNavigation();
-  const { createPlan, executePlan } = usePlanner();
-  const isInReferencedByView = useIsInReferencedByView();
-  const isAddToNode = useIsAddToNode();
-  const parentView = getParentView(viewPath);
+  const { isVisible, currentItem, updateMetadata } = useRelationItemContext();
 
-  // Determine visibility
-  const isVisible =
-    !isInReferencedByView &&
-    !isAddToNode &&
-    relationIndex !== undefined &&
-    parentView !== undefined;
-
-  // Get current argument using same context-aware lookup as relationIndex
-  const currentArgument: Argument =
-    isVisible && parentView
-      ? getRelationForView(data, parentView, stack)?.items.get(relationIndex!)
-          ?.argument
-      : undefined;
+  const currentArgument = currentItem?.argument;
 
   const setArgument = (argument: Argument): void => {
-    if (!isVisible || !parentView || relationIndex === undefined) return;
-    const plan = upsertRelations(createPlan(), parentView, stack, (rels) =>
-      updateItemArgument(rels, relationIndex, argument)
+    updateMetadata(
+      (rels, index) => updateItemArgument(rels, index, argument),
+      { argument }
     );
-    executePlan(plan);
   };
 
   return {

@@ -13,7 +13,7 @@ import {
 import { useEditorText } from "./EditorTextContext";
 import useModal from "./useModal";
 import { SearchModal } from "./SearchModal";
-import { usePlanner, planSetEmptyNodePosition } from "../planner";
+import { usePlanner, planSetEmptyNodePosition, planSaveNode } from "../planner";
 import { usePaneNavigation } from "../SplitPanesContext";
 import { planAddToParent } from "../dnd";
 
@@ -31,21 +31,38 @@ export function preventEditorBlurIfSameNode(e: React.MouseEvent): void {
   }
 }
 
-function SearchButton({ onClick }: { onClick: () => void }): JSX.Element {
-  const displayText = useDisplayText();
+function SearchButton({
+  onClick,
+  onMouseDown,
+}: {
+  onClick: () => void;
+  onMouseDown?: (e: React.MouseEvent) => void;
+}): JSX.Element {
+  const versionedDisplayText = useDisplayText();
+  const editorTextContext = useEditorText();
+  const editorText = editorTextContext?.text ?? "";
+  const displayText = editorText.trim() || versionedDisplayText;
   const ariaLabel = displayText
     ? `search and attach to ${displayText}`
     : "search";
   return (
-    <button
+    <span
       className="btn btn-borderless p-0"
-      type="button"
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onMouseDown={onMouseDown}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       aria-label={ariaLabel}
     >
       <span className="simple-icon-magnifier" />
       <span className="visually-hidden">Search</span>
-    </button>
+    </span>
   );
 }
 
@@ -135,6 +152,10 @@ export function MiniEditor({
     editorTextContext?.registerGetText(getText);
     return () => editorTextContext?.registerGetText(() => "");
   }, [editorTextContext]);
+
+  const handleInput = (): void => {
+    editorTextContext?.setText(getText());
+  };
 
   const saveIfChanged = async (): Promise<void> => {
     const text = getText().trim();
@@ -259,6 +280,7 @@ export function MiniEditor({
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
         onPaste={handlePaste}
+        onInput={handleInput}
         aria-label={ariaLabel || "note editor"}
         style={{
           outline: "none",
@@ -323,9 +345,11 @@ export function SiblingSearchButton(): JSX.Element | null {
   const nextInsertPosition = useNextInsertPosition();
   const isExpanded = useIsExpanded();
   const isRoot = useIsRoot();
+  const viewPath = useViewPath();
+  const { stack } = usePaneNavigation();
+  const { createPlan, executePlan } = usePlanner();
+  const editorTextContext = useEditorText();
 
-  // When root or expanded, insert as first child of current node
-  // Otherwise, insert as sibling after current node
   const isFirstChildInsert = isRoot || isExpanded;
 
   const onAddExistingNode = useAddExistingNode(
@@ -340,24 +364,40 @@ export function SiblingSearchButton(): JSX.Element | null {
     return null;
   }
 
+  const handleAddWithSave = (nodeID: ID): void => {
+    const editorText = editorTextContext?.getText() ?? "";
+    if (editorText.trim()) {
+      const plan = planSaveNode(createPlan(), editorText, viewPath, stack);
+      if (plan) {
+        executePlan(plan);
+      }
+    }
+    onAddExistingNode(nodeID);
+  };
+
   return (
     <>
       {isOpen && (
         <SearchModal
-          onAddExistingNode={onAddExistingNode}
+          onAddExistingNode={handleAddWithSave}
           onHide={closeModal}
         />
       )}
-      <SearchButton onClick={openModal} />
+      <SearchButton onClick={openModal} onMouseDown={preventEditorBlurIfSameNode} />
     </>
   );
 }
 
 export function AddSiblingButton(): JSX.Element | null {
-  const displayText = useDisplayText();
+  const versionedDisplayText = useDisplayText();
   const nextInsertPosition = useNextInsertPosition();
   const { stack } = usePaneNavigation();
   const { createPlan, executePlan } = usePlanner();
+  const viewPath = useViewPath();
+  const editorTextContext = useEditorText();
+
+  const editorText = editorTextContext?.text ?? "";
+  const displayText = editorText.trim() || versionedDisplayText;
 
   if (!nextInsertPosition) {
     return null;
@@ -365,19 +405,36 @@ export function AddSiblingButton(): JSX.Element | null {
 
   const handleClick = (): void => {
     const [targetPath, insertIndex] = nextInsertPosition;
-    const plan = planSetEmptyNodePosition(createPlan(), targetPath, stack, insertIndex);
+    let plan = createPlan();
+
+    // Save any text in the editor first (works for both empty and edited nodes)
+    const currentEditorText = editorTextContext?.getText() ?? "";
+    if (currentEditorText.trim()) {
+      const savedPlan = planSaveNode(plan, currentEditorText, viewPath, stack);
+      plan = savedPlan ?? plan;
+    }
+
+    plan = planSetEmptyNodePosition(plan, targetPath, stack, insertIndex);
     executePlan(plan);
   };
 
   return (
-    <button
-      type="button"
+    <span
+      role="button"
+      tabIndex={0}
       className="btn btn-borderless p-0"
       onClick={handleClick}
+      onMouseDown={preventEditorBlurIfSameNode}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleClick();
+        }
+      }}
       aria-label={`add to ${displayText}`}
       title="Add note"
     >
       <span className="simple-icon-plus" />
-    </button>
+    </span>
   );
 }

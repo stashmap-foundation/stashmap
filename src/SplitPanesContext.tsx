@@ -97,7 +97,7 @@ export function usePaneIndex(): number {
 // Pane-specific navigation (not URL-coupled)
 type PaneNavigationContextType = {
   stack: (LongID | ID)[];
-  activeWorkspace: LongID | ID;
+  rootNodeID: ID;
   popTo: (index: number) => void;
   setStack: (path: (LongID | ID)[]) => void;
 };
@@ -121,8 +121,7 @@ export function PaneNavigationProvider({
   const paneIndex = usePaneIndex();
   const { createPlan, executePlan } = usePlanner();
 
-  // activeWorkspace is always the last element of the stack
-  const activeWorkspace = stack[stack.length - 1];
+  const rootNodeID = stack[stack.length - 1] as ID;
 
   const popTo = useCallback((index: number): void => {
     setStack((prev) =>
@@ -133,7 +132,6 @@ export function PaneNavigationProvider({
   const setStackFn = useCallback(
     (path: (LongID | ID)[]): void => {
       if (path.length === 0) return;
-      // Clear views for this pane when navigating
       const plan = createPlan();
       const clearedViews = clearViewsForPane(plan.views, paneIndex);
       executePlan(planUpdateViews(plan, clearedViews));
@@ -145,11 +143,11 @@ export function PaneNavigationProvider({
   const value = React.useMemo(
     () => ({
       stack,
-      activeWorkspace,
+      rootNodeID,
       popTo,
       setStack: setStackFn,
     }),
-    [stack, activeWorkspace, popTo, setStackFn]
+    [stack, rootNodeID, popTo, setStackFn]
   );
 
   return (

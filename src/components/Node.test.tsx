@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { List, Map } from "immutable";
 import userEvent from "@testing-library/user-event";
 import { addRelationToRelations, newNode, shortID } from "../connections";
@@ -17,7 +17,6 @@ import {
 } from "../utils.test";
 import {
   NodeIndex,
-  PushNode,
   RootViewContextProvider,
   newRelations,
   viewPathToString,
@@ -30,14 +29,12 @@ import { TemporaryViewProvider } from "./TemporaryViewContext";
 import {
   createPlan,
   planBulkUpsertNodes,
-  planUpdateViews,
   planUpsertNode,
   planUpsertRelations,
 } from "../planner";
 import { execute } from "../executor";
 import { getNodesInTree } from "./Node";
-import { LoadNode } from "../dataQuery";
-import { ROOT } from "../types";
+import { LoadData } from "../dataQuery";
 import { newDB } from "../knowledge";
 
 test("Render non existing Node", async () => {
@@ -57,15 +54,15 @@ test("Render non existing Node", async () => {
     plan,
   });
   renderWithTestData(
-    <RootViewContextProvider root={pl.id}>
-      <TemporaryViewProvider>
-        <DND>
-          <LoadNode>
+    <LoadData nodeIDs={[pl.id]} descendants referencedBy lists>
+      <RootViewContextProvider root={pl.id}>
+        <TemporaryViewProvider>
+          <DND>
             <TreeView />
-          </LoadNode>
-        </DND>
-      </TemporaryViewProvider>
-    </RootViewContextProvider>,
+          </DND>
+        </TemporaryViewProvider>
+      </RootViewContextProvider>
+    </LoadData>,
     alice()
   );
   await screen.findByText("Programming Languages");
@@ -102,8 +99,8 @@ test("Edit node inline", async () => {
     plan: planUpsertNode(createPlan(alice()), note),
   });
   renderWithTestData(
-    <RootViewContextProvider root={note.id}>
-      <LoadNode>
+    <LoadData nodeIDs={[note.id]} descendants referencedBy lists>
+      <RootViewContextProvider root={note.id}>
         <TemporaryViewProvider>
           <DND>
             <>
@@ -112,8 +109,8 @@ test("Edit node inline", async () => {
             </>
           </DND>
         </TemporaryViewProvider>
-      </LoadNode>
-    </RootViewContextProvider>,
+      </RootViewContextProvider>
+    </LoadData>,
     alice()
   );
   await expectNode("My Note", true);
@@ -140,8 +137,8 @@ test("Load Note from other User which is not a contact", async () => {
   });
 
   renderWithTestData(
-    <RootViewContextProvider root={bobsNote.id}>
-      <LoadNode>
+    <LoadData nodeIDs={[bobsNote.id]} descendants referencedBy lists>
+      <RootViewContextProvider root={bobsNote.id}>
         <TemporaryViewProvider>
           <DND>
             <>
@@ -150,8 +147,8 @@ test("Load Note from other User which is not a contact", async () => {
             </>
           </DND>
         </TemporaryViewProvider>
-      </LoadNode>
-    </RootViewContextProvider>,
+      </RootViewContextProvider>
+    </LoadData>,
     alice()
   );
   // May have multiple elements
@@ -161,125 +158,60 @@ test("Load Note from other User which is not a contact", async () => {
 
 test("Edit nested node inline", async () => {
   const [alice] = setup([ALICE]);
-  const { publicKey } = alice().user;
-  const note = newNode("My Note");
-  // Connect the note with itself so it's not the root note
-  const plan = planUpsertRelations(
-    createPlan(alice()),
-    addRelationToRelations(newRelations(note.id, List(), publicKey), note.id)
+  renderTree(alice);
+
+  const myNotesEditor = await screen.findByLabelText("edit My Notes");
+  await userEvent.click(myNotesEditor);
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "Parent{Enter}{Tab}Nested Node{Escape}"
   );
-  await execute({
-    ...alice(),
-    plan: planUpsertNode(plan, note),
-  });
-  renderWithTestData(
-    <RootViewContextProvider root={note.id}>
-      <LoadNode waitForEose>
-        <PushNode push={List([0])}>
-          <LoadNode waitForEose>
-            <PushNode push={List([0])}>
-              <TemporaryViewProvider>
-                <DND>
-                  <LoadNode>
-                    <DraggableNote />
-                  </LoadNode>
-                </DND>
-              </TemporaryViewProvider>
-            </PushNode>
-          </LoadNode>
-        </PushNode>
-      </LoadNode>
-    </RootViewContextProvider>,
-    {
-      ...alice(),
-      initialRoute: `/d/${note.id}`,
-    }
-  );
-  // With inline editing, find and click the text to edit directly
-  const textElement = await screen.findByText("My Note");
-  await userEvent.click(textElement);
-  await userEvent.clear(textElement);
-  await userEvent.type(textElement, "My edited Note");
-  fireEvent.blur(textElement);
-  await screen.findByText("My edited Note");
+
+  await expectTree(`
+My Notes
+  Parent
+    Nested Node
+  `);
+
+  const nestedEditor = await screen.findByLabelText("edit Nested Node");
+  await userEvent.click(nestedEditor);
+  await userEvent.clear(nestedEditor);
+  await userEvent.type(nestedEditor, "My edited Note{Escape}");
+
+  await screen.findByLabelText("edit My edited Note");
 });
 
 test("Edited node is shown in Tree View", async () => {
   const [alice] = setup([ALICE]);
-  const { publicKey } = alice().user;
-  const pl = newNode("Programming Languages");
-  const oop = newNode("Object Oriented Programming languages");
-  const java = newNode("Java");
+  renderTree(alice);
 
-  // Create relations objects to get their IDs
-  const plRelations = addRelationToRelations(
-    newRelations(pl.id, List(), publicKey),
-    oop.id
-  );
-  const oopContext = List([shortID(pl.id)]);
-  const oopRelations = addRelationToRelations(
-    newRelations(oop.id, oopContext, publicKey),
-    java.id
+  const myNotesEditor = await screen.findByLabelText("edit My Notes");
+  await userEvent.click(myNotesEditor);
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "OOP Languages{Enter}{Tab}Java{Escape}"
   );
 
-  const plan = planUpsertRelations(
-    planUpsertRelations(
-      planUpsertRelations(createPlan(alice()), plRelations),
-      oopRelations
-    ),
-    addRelationToRelations(newRelations(ROOT, List(), publicKey), ROOT)
-  );
-
-  // Set up view for oop with its actual relations ID
-  const oopPath = [
-    0,
-    { nodeID: pl.id, nodeIndex: 0 as NodeIndex, relationsID: plRelations.id },
-    { nodeID: oop.id, nodeIndex: 0 as NodeIndex },
-  ] as const;
-
-  const planWithViews = planUpdateViews(
-    plan,
-    Map({
-      [viewPathToString(oopPath)]: {
-        expanded: true,
-        width: 1,
-        relations: oopRelations.id,
-      },
-    })
-  );
-  await execute({
-    ...alice(),
-    plan: planBulkUpsertNodes(planWithViews, [pl, oop, java]),
-  });
-  renderWithTestData(
-    <RootViewContextProvider root={pl.id}>
-      <LoadNode waitForEose>
-        <PushNode push={List([0])}>
-          <TemporaryViewProvider>
-            <DND>
-              <LoadNode>
-                <TreeView />
-              </LoadNode>
-            </DND>
-          </TemporaryViewProvider>
-        </PushNode>
-      </LoadNode>
-    </RootViewContextProvider>,
-    {
-      ...alice(),
-    }
-  );
-  // With inline editing, find the Java node's editor
   const javaEditor = await screen.findByLabelText("edit Java");
-
-  // Clear and type new content using userEvent
   await userEvent.clear(javaEditor);
-  await userEvent.type(javaEditor, "C++");
-  fireEvent.blur(javaEditor);
+  await userEvent.type(javaEditor, "C++{Escape}");
 
-  // Verify the change was saved
-  expect(screen.queryByText("Java")).toBeNull();
-  await screen.findByText("C++");
+  await expectTree(`
+My Notes
+  OOP Languages
+    C++
+  `);
+
+  cleanup();
+  renderTree(alice);
+
+  await expectTree(`
+My Notes
+  OOP Languages
+    C++
+  `);
 });
 
 test.skip("Delete node", async () => {
@@ -290,18 +222,18 @@ test.skip("Delete node", async () => {
     plan: planUpsertNode(createPlan(alice()), note),
   });
   renderWithTestData(
-    <RootViewContextProvider root={note.id}>
-      <TemporaryViewProvider>
-        <DND>
-          <LoadNode>
+    <LoadData nodeIDs={[note.id]} descendants referencedBy lists>
+      <RootViewContextProvider root={note.id}>
+        <TemporaryViewProvider>
+          <DND>
             <>
               <DraggableNote />
               <TreeView />
             </>
-          </LoadNode>
-        </DND>
-      </TemporaryViewProvider>
-    </RootViewContextProvider>,
+          </DND>
+        </TemporaryViewProvider>
+      </RootViewContextProvider>
+    </LoadData>,
     alice()
   );
   await screen.findByText("My Note");

@@ -35,10 +35,12 @@ function createRelationsFromParagraphNodes(
 
 export function createNodesFromMarkdown(markdown: string): KnowNode[] {
   const markdownParagraphs = markdown.split("\n\n");
-  const plainTextParagraphs = markdownParagraphs.map((paragraph: string) => {
-    const md = new MarkdownIt();
-    return convertToPlainText(md.render(paragraph));
-  });
+  const plainTextParagraphs = markdownParagraphs
+    .map((paragraph: string) => {
+      const md = new MarkdownIt();
+      return convertToPlainText(md.render(paragraph)).trim();
+    })
+    .filter((paragraph) => paragraph !== "");
   return plainTextParagraphs.map((paragraph) => {
     return newNode(paragraph);
   });

@@ -135,11 +135,11 @@ test("usePaneIndex returns correct index for different panes", () => {
 });
 
 function TestPaneNavigation(): JSX.Element {
-  const { stack, activeWorkspace, popTo, setStack } = usePaneNavigation();
+  const { stack, rootNodeID, popTo, setStack } = usePaneNavigation();
   return (
     <div>
       <div data-testid="stack">{stack.join(",")}</div>
-      <div data-testid="active-workspace">{activeWorkspace}</div>
+      <div data-testid="root-node-id">{rootNodeID}</div>
       <button type="button" onClick={() => popTo(stack.length - 2)}>
         Pop
       </button>
@@ -158,7 +158,7 @@ function TestPaneNavigation(): JSX.Element {
   );
 }
 
-test("popTo(length-2) removes last item and updates activeWorkspace", () => {
+test("popTo(length-2) removes last item and updates rootNodeID", () => {
   renderApis(<TestPaneNavigation />);
 
   fireEvent.click(screen.getByText("Set Stack"));
@@ -166,7 +166,7 @@ test("popTo(length-2) removes last item and updates activeWorkspace", () => {
 
   fireEvent.click(screen.getByText("Pop"));
   expect(screen.getByTestId("stack").textContent).toBe("new1,new2");
-  expect(screen.getByTestId("active-workspace").textContent).toBe("new2");
+  expect(screen.getByTestId("root-node-id").textContent).toBe("new2");
 });
 
 test("popTo with invalid index does not change stack", () => {
@@ -176,7 +176,7 @@ test("popTo with invalid index does not change stack", () => {
 
   fireEvent.click(screen.getByText("Pop"));
   expect(screen.getByTestId("stack").textContent).toBe(ROOT);
-  expect(screen.getByTestId("active-workspace").textContent).toBe(ROOT);
+  expect(screen.getByTestId("root-node-id").textContent).toBe(ROOT);
 });
 
 test("popTo navigates to specific stack index", () => {
@@ -187,7 +187,7 @@ test("popTo navigates to specific stack index", () => {
 
   fireEvent.click(screen.getByText("Pop To 0"));
   expect(screen.getByTestId("stack").textContent).toBe("new1");
-  expect(screen.getByTestId("active-workspace").textContent).toBe("new1");
+  expect(screen.getByTestId("root-node-id").textContent).toBe("new1");
 });
 
 test("setStack replaces entire stack with new path", () => {
@@ -197,10 +197,10 @@ test("setStack replaces entire stack with new path", () => {
 
   fireEvent.click(screen.getByText("Set Stack"));
   expect(screen.getByTestId("stack").textContent).toBe("new1,new2,new3");
-  expect(screen.getByTestId("active-workspace").textContent).toBe("new3");
+  expect(screen.getByTestId("root-node-id").textContent).toBe("new3");
 });
 
-test("initialStack sets initial stack and activeWorkspace", () => {
+test("initialStack sets initial stack and rootNodeID", () => {
   const initialStack = [
     "node1" as LongID,
     "node2" as LongID,
@@ -210,5 +210,5 @@ test("initialStack sets initial stack and activeWorkspace", () => {
   renderApis(<TestPaneNavigation />, { initialStack });
 
   expect(screen.getByTestId("stack").textContent).toBe("node1,node2,node3");
-  expect(screen.getByTestId("active-workspace").textContent).toBe("node3");
+  expect(screen.getByTestId("root-node-id").textContent).toBe("node3");
 });

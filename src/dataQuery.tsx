@@ -23,7 +23,6 @@ import { MergeKnowledgeDB, useData } from "./DataContext";
 import { useApis } from "./Apis";
 import { processEvents } from "./Data";
 import { RegisterQuery, extractNodesFromQueries } from "./LoadingStatus";
-import { isUserLoggedIn } from "./NostrAuthContext";
 import { useReadRelays } from "./relays";
 import { useEventQuery } from "./commons/useNostrQuery";
 
@@ -280,19 +279,34 @@ export function useQueryKnowledgeData(filters: Filter[]): {
   return { knowledgeDBs, eose, allEventsProcessed };
 }
 
-export function LoadNodeContent({
+export function LoadData({
   children,
   nodeIDs,
+  descendants,
+  referencedBy,
+  lists,
 }: {
   children: React.ReactNode;
-  nodeIDs: (LongID | ID)[];
+  nodeIDs: ID[];
+  descendants?: boolean;
+  referencedBy?: boolean;
+  lists?: boolean;
 }): JSX.Element {
   const { user, contacts, projectMembers } = useData();
 
-  const filter = nodeIDs.reduce(
-    (acc, nodeID) => addNodeToFilters(acc, nodeID, true),
-    createBaseFilter(contacts, projectMembers, user.publicKey)
-  );
+  const baseFilter = createBaseFilter(contacts, projectMembers, user.publicKey);
+
+  const filter = nodeIDs.reduce((acc, nodeID) => {
+    const withNode = addNodeToFilters(acc, nodeID, lists);
+    const withDescendants = descendants
+      ? addDescendantsToFilters(withNode, nodeID)
+      : withNode;
+    const withReferencedBy = referencedBy
+      ? addReferencedByToFilters(withDescendants, nodeID)
+      : withDescendants;
+    return withReferencedBy;
+  }, baseFilter);
+
   const filterArray = filtersToFilterArray(filter);
   const { knowledgeDBs, allEventsProcessed } =
     useQueryKnowledgeData(filterArray);
@@ -355,52 +369,11 @@ export function LoadMissingVersionNodes({
 
   if (missingVersionNodeIDs.length > 0) {
     return (
-      <LoadNodeContent nodeIDs={missingVersionNodeIDs}>
+      <LoadData nodeIDs={missingVersionNodeIDs}>
         {children}
-      </LoadNodeContent>
+      </LoadData>
     );
   }
 
   return <>{children}</>;
-}
-
-export function LoadNode({
-  children,
-  waitForEose,
-  referencedBy,
-}: {
-  children: React.ReactNode;
-  waitForEose?: boolean;
-  referencedBy?: boolean;
-}): JSX.Element {
-  const [nodeID] = useNodeID();
-  const { user, contacts, projectMembers } = useData();
-
-  const nodeFilter = addNodeToFilters(
-    createBaseFilter(contacts, projectMembers, user.publicKey),
-    nodeID,
-    true
-  );
-  const filter = referencedBy
-    ? addReferencedByToFilters(nodeFilter, nodeID)
-    : nodeFilter;
-  const filterArray = filtersToFilterArray(filter);
-  const { knowledgeDBs, eose, allEventsProcessed } =
-    useQueryKnowledgeData(filterArray);
-  if (isUserLoggedIn(user) && waitForEose === true && !eose) {
-    const haveNode = getNodeFromID(knowledgeDBs, nodeID, user.publicKey);
-    if (!haveNode) {
-      return <div className="loading" aria-label="loading" />;
-    }
-  }
-  return (
-    <RegisterQuery
-      nodesBeeingQueried={extractNodesFromQueries(filterArray)}
-      allEventsProcessed={allEventsProcessed}
-    >
-      <MergeKnowledgeDB knowledgeDBs={knowledgeDBs}>
-        <LoadMissingVersionNodes>{children}</LoadMissingVersionNodes>
-      </MergeKnowledgeDB>
-    </RegisterQuery>
-  );
 }

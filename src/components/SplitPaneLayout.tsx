@@ -13,7 +13,7 @@ import {
   RootViewContextProvider,
   updateViewPathsAfterPaneDelete,
 } from "../ViewContext";
-import { LoadNode, LoadNodeContent } from "../dataQuery";
+import { LoadData } from "../dataQuery";
 import { WorkspaceView } from "./Workspace";
 import { useWorkspaceContext } from "../WorkspaceContext";
 import { planUpdateViews, usePlanner } from "../planner";
@@ -144,21 +144,21 @@ export function PaneSettingsMenu(): JSX.Element {
 }
 
 function PaneContent(): JSX.Element {
-  const { activeWorkspace, stack } = usePaneNavigation();
+  const { rootNodeID, stack } = usePaneNavigation();
   const paneIndex = usePaneIndex();
 
   return (
     <div className="split-pane">
-      <LoadNodeContent nodeIDs={stack}>
-        <RootViewContextProvider
-          root={activeWorkspace as LongID}
-          paneIndex={paneIndex}
-        >
-          <LoadNode referencedBy>
+      <LoadData nodeIDs={stack}>
+        <LoadData nodeIDs={[rootNodeID]} descendants referencedBy lists>
+          <RootViewContextProvider
+            root={rootNodeID as LongID}
+            paneIndex={paneIndex}
+          >
             <WorkspaceView />
-          </LoadNode>
-        </RootViewContextProvider>
-      </LoadNodeContent>
+          </RootViewContextProvider>
+        </LoadData>
+      </LoadData>
     </div>
   );
 }

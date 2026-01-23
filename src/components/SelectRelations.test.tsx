@@ -13,7 +13,7 @@ import {
 import { TemporaryViewProvider } from "./TemporaryViewContext";
 import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
 import { execute } from "../executor";
-import { LoadNode } from "../dataQuery";
+import { LoadData } from "../dataQuery";
 import { TreeView } from "./TreeView";
 import { newDB } from "../knowledge";
 
@@ -54,15 +54,15 @@ test("Shows dots when other user has a relation of same type", async () => {
 
   // Render from Alice's perspective
   renderWithTestData(
-    <RootViewContextProvider root={parentNode.id}>
-      <TemporaryViewProvider>
-        <DND>
-          <LoadNode>
+    <LoadData nodeIDs={[parentNode.id]} descendants referencedBy lists>
+      <RootViewContextProvider root={parentNode.id}>
+        <TemporaryViewProvider>
+          <DND>
             <TreeView />
-          </LoadNode>
-        </DND>
-      </TemporaryViewProvider>
-    </RootViewContextProvider>,
+          </DND>
+        </TemporaryViewProvider>
+      </RootViewContextProvider>
+    </LoadData>,
     alice()
   );
 
@@ -91,15 +91,15 @@ test("Shows no dots when user is the only one with a relation", async () => {
   await execute({ ...alice(), plan });
 
   renderWithTestData(
-    <RootViewContextProvider root={parentNode.id}>
-      <TemporaryViewProvider>
-        <DND>
-          <LoadNode>
+    <LoadData nodeIDs={[parentNode.id]} descendants referencedBy lists>
+      <RootViewContextProvider root={parentNode.id}>
+        <TemporaryViewProvider>
+          <DND>
             <TreeView />
-          </LoadNode>
-        </DND>
-      </TemporaryViewProvider>
-    </RootViewContextProvider>,
+          </DND>
+        </TemporaryViewProvider>
+      </RootViewContextProvider>
+    </LoadData>,
     alice()
   );
 
@@ -138,15 +138,15 @@ test("Shows dots when only other user has relation (current user has none)", asy
 
   // Render from Alice's perspective - she has no local version but should see Bob's
   renderWithTestData(
-    <RootViewContextProvider root={parentNode.id}>
-      <TemporaryViewProvider>
-        <DND>
-          <LoadNode>
+    <LoadData nodeIDs={[parentNode.id]} descendants referencedBy lists>
+      <RootViewContextProvider root={parentNode.id}>
+        <TemporaryViewProvider>
+          <DND>
             <TreeView />
-          </LoadNode>
-        </DND>
-      </TemporaryViewProvider>
-    </RootViewContextProvider>,
+          </DND>
+        </TemporaryViewProvider>
+      </RootViewContextProvider>
+    </LoadData>,
     alice()
   );
 

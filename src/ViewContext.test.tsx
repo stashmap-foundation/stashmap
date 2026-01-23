@@ -27,6 +27,7 @@ import {
   BOB,
   follow,
   renderApp,
+  renderTree,
 } from "./utils.test";
 import {
   RootViewContextProvider,
@@ -40,11 +41,10 @@ import {
   updateViewPathsAfterPaneInsert,
   NodeIndex,
   getDefaultRelationForNode,
-  PushNode,
   ViewPath,
 } from "./ViewContext";
 import { TreeView } from "./components/TreeView";
-import { LoadNode } from "./dataQuery";
+import { LoadData } from "./dataQuery";
 import { ROOT } from "./types";
 
 test("Move View Settings on Delete", async () => {
@@ -95,16 +95,12 @@ test("Move View Settings on Delete", async () => {
   });
 
   renderWithTestData(
-    <Data user={alice().user}>
+    <LoadData nodeIDs={[pl.id]} descendants referencedBy lists>
       <RootViewContextProvider root={pl.id}>
-        <LoadNode waitForEose>
-          <TreeView />
-        </LoadNode>
+        <TreeView />
       </RootViewContextProvider>
-    </Data>,
-    {
-      ...alice(),
-    }
+    </LoadData>,
+    alice()
   );
   // Expand Programming Languages to see children
   await screen.findByText("Programming Languages");
@@ -128,39 +124,19 @@ test("Move View Settings on Delete", async () => {
 
 test("Move Node Up", async () => {
   const [alice] = setup([ALICE]);
-  const executedPlan = await setupTestDB(alice(), [
-    [
-      "My Workspace",
-      [["Programming Languages", [["FPL"], ["OOP", ["C++", "Java"]]]]],
-    ],
-  ]);
-  const root = (findNodeByText(executedPlan, "My Workspace") as KnowNode).id;
-  renderWithTestData(
-    <Data user={alice().user}>
-      <RootViewContextProvider root={root}>
-        <LoadNode waitForEose>
-          <PushNode push={List([0])}>
-            <LoadNode>
-              <TreeView />
-            </LoadNode>
-          </PushNode>
-        </LoadNode>
-      </RootViewContextProvider>
-    </Data>,
-    alice()
+  renderTree(alice);
+
+  // Create: My Notes → Programming Languages → FPL, OOP → C++, Java
+  const myNotesEditor = await screen.findByLabelText("edit My Notes");
+  await userEvent.click(myNotesEditor);
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "Programming Languages{Enter}{Tab}FPL{Enter}OOP{Enter}{Tab}C++{Enter}Java{Escape}"
   );
-  // Expand Programming Languages to see children
-  await screen.findByText("Programming Languages");
-  await userEvent.click(screen.getByLabelText("expand Programming Languages"));
-  await screen.findByText("FPL");
+
   await expectTree(`
-  Programming Languages
-    FPL
-    OOP
-  `);
-  // Expand OOP
-  await userEvent.click(screen.getByLabelText("expand OOP"));
-  await expectTree(`
+My Notes
   Programming Languages
     FPL
     OOP
@@ -174,6 +150,7 @@ test("Move Node Up", async () => {
   fireEvent.dragStart(oop);
   fireEvent.drop(fpl);
   await expectTree(`
+My Notes
   Programming Languages
     OOP
       C++
@@ -182,22 +159,10 @@ test("Move Node Up", async () => {
   `);
   cleanup();
 
-  renderWithTestData(
-    <Data user={alice().user}>
-      <RootViewContextProvider root={root}>
-        <LoadNode waitForEose>
-          <PushNode push={List([0])}>
-            <LoadNode>
-              <TreeView />
-            </LoadNode>
-          </PushNode>
-        </LoadNode>
-      </RootViewContextProvider>
-    </Data>,
-    alice()
-  );
+  renderTree(alice);
   // View state should be preserved - OOP was moved before FPL and is still expanded
   await expectTree(`
+My Notes
   Programming Languages
     OOP
       C++

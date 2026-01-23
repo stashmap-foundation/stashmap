@@ -27,7 +27,6 @@ import { usePaneNavigation } from "../SplitPanesContext";
 import {
   addListToFilters,
   addNodeToFilters,
-  addDescendantsToFilters,
   createBaseFilter,
   filtersToFilterArray,
   useQueryKnowledgeData,
@@ -246,19 +245,14 @@ function Tree(): JSX.Element | null {
 export function TreeView(): JSX.Element {
   const data = useData();
   const key = useViewKey();
-  const viewPath = useViewPath();
-  const rootNodeID = getLast(viewPath).nodeID;
   const baseFilter = createBaseFilter(
     data.contacts,
     data.projectMembers,
     data.user.publicKey
   );
 
-  // Query root's lists (#k) and all descendants (#c)
-  const filterWithRoot = addNodeToFilters(baseFilter, rootNodeID, true);
-  const filterWithDescendants = addDescendantsToFilters(filterWithRoot, rootNodeID);
-
-  // Find all Lists attached to all Nodes and subnodes of this tree
+  // Find all Lists attached to expanded nodes in this tree
+  // (descendants are already loaded by SplitPaneLayout)
   const lists = data.views
     .filter(
       (view, path) =>
@@ -272,7 +266,7 @@ export function TreeView(): JSX.Element {
   const listsFilter = lists.reduce(
     (rdx, listID, path) =>
       addListToFilters(rdx, listID, getLast(parseViewPath(path)).nodeID),
-    filterWithDescendants
+    baseFilter
   );
   const { knowledgeDBs } = useQueryKnowledgeData(
     filtersToFilterArray(listsFilter)

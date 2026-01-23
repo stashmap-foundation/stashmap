@@ -63,7 +63,7 @@ import {
   shortID,
 } from "./connections";
 import { newRelations, RootViewContextProvider } from "./ViewContext";
-import { LoadNode } from "./dataQuery";
+import { LoadData } from "./dataQuery";
 import { StorePreLoginContext } from "./StorePreLoginContext";
 import { newDB } from "./knowledge";
 import { TemporaryViewProvider } from "./components/TemporaryViewContext";
@@ -723,18 +723,20 @@ function RootViewOrWorkspaceIsLoadingInner({
 }: {
   children: React.ReactNode;
 }): JSX.Element {
-  const { activeWorkspace } = usePaneNavigation();
+  const { rootNodeID, stack } = usePaneNavigation();
   const paneIndex = usePaneIndex();
 
   return (
-    <RootViewContextProvider
-      root={activeWorkspace as LongID}
-      paneIndex={paneIndex}
-    >
-      <LoadNode waitForEose>
-        <StorePreLoginContext>{children}</StorePreLoginContext>
-      </LoadNode>
-    </RootViewContextProvider>
+    <LoadData nodeIDs={stack}>
+      <LoadData nodeIDs={[rootNodeID]} descendants referencedBy lists>
+        <RootViewContextProvider
+          root={rootNodeID as LongID}
+          paneIndex={paneIndex}
+        >
+          <StorePreLoginContext>{children}</StorePreLoginContext>
+        </RootViewContextProvider>
+      </LoadData>
+    </LoadData>
   );
 }
 

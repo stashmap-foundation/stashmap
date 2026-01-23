@@ -670,7 +670,7 @@ export function addNodeToPath(
   index: number
 ): ViewPath {
   // For path-building, use the view's stored relations directly
-  // This is used by PushNode/RootViewContextProvider for navigation
+  // This is used by RootViewContextProvider for navigation
   const [nodeID, view] = getNodeIDFromView(data, path);
   const relations = getRelations(
     data.knowledgeDBs,
@@ -878,24 +878,6 @@ export function RootViewContextProvider({
   const finalPath = (indices || List<number>()).reduce(
     (acc, index) => addNodeToPath(data, acc, index),
     startPath
-  );
-  return (
-    <ViewContext.Provider value={finalPath}>{children}</ViewContext.Provider>
-  );
-}
-
-export function PushNode({
-  children,
-  push,
-}: {
-  children: React.ReactNode;
-  push: List<number>;
-}): JSX.Element {
-  const data = useData();
-  const existingPath = useViewPath();
-  const finalPath = push.reduce(
-    (acc, index) => addNodeToPath(data, acc, index),
-    existingPath
   );
   return (
     <ViewContext.Provider value={finalPath}>{children}</ViewContext.Provider>

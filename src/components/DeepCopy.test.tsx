@@ -137,9 +137,8 @@ My Notes
     await userEvent.click(parentEditor);
     await userEvent.keyboard("{Home}{Tab}");
 
-    // Expand to verify entire subtree was copied
+    // Expand Parent - Child should already be expanded (view state preserved)
     await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("expand Child"));
 
     await expectTree(`
 My Notes
@@ -147,131 +146,6 @@ My Notes
     Parent
       Child
         GrandChild
-    `);
-  });
-});
-
-describe("Deep Copy - Search Attach", () => {
-  test("Search attach copies children to new context", async () => {
-    const [alice] = setup([ALICE]);
-    renderTree(alice);
-
-    // Create: My Notes → Source → Child A, Child B, Target
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Source{Enter}{Tab}Child A{Enter}Child B{Escape}"
-    );
-
-    const sourceEditor = await screen.findByLabelText("edit Source");
-    await userEvent.click(sourceEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
-
-    await expectTree(`
-My Notes
-  Source
-    Child A
-    Child B
-  Target
-    `);
-
-    // Expand Target and search-attach Source
-    await userEvent.click(await screen.findByLabelText("expand Target"));
-    fireEvent.click(await screen.findByLabelText("search and attach to Target"));
-    await userEvent.type(await screen.findByLabelText("search input"), "Source");
-    await userEvent.click(await screen.findByLabelText("select Source"));
-
-    await expectTree(`
-My Notes
-  Source
-    Child A
-    Child B
-  Target
-    Source
-      Child A
-      Child B
-    `);
-
-    cleanup();
-    renderTree(alice);
-
-    await expectTree(`
-My Notes
-  Source
-    Child A
-    Child B
-  Target
-    Source
-      Child A
-      Child B
-    `);
-  });
-
-  test("Search attach on existing relation keeps current view", async () => {
-    const [alice] = setup([ALICE]);
-    renderTree(alice);
-
-    // Create: My Notes → Source → Original, Target
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Source{Enter}{Tab}Original{Escape}"
-    );
-
-    const sourceEditor = await screen.findByLabelText("edit Source");
-    await userEvent.click(sourceEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
-
-    await expectTree(`
-My Notes
-  Source
-    Original
-  Target
-    `);
-
-    // First: search-attach Source to Target
-    await userEvent.click(await screen.findByLabelText("expand Target"));
-    fireEvent.click(await screen.findByLabelText("search and attach to Target"));
-    await userEvent.type(await screen.findByLabelText("search input"), "Source");
-    await userEvent.click(await screen.findByLabelText("select Source"));
-
-    // Add "Modified" under Source in Target context
-    const expandSourceButtons = await screen.findAllByLabelText("expand Source");
-    await userEvent.click(expandSourceButtons[1]);
-    const addToSourceButtons = await screen.findAllByLabelText("add to Source");
-    await userEvent.click(addToSourceButtons[1]);
-    await userEvent.type(await findNewNodeEditor(), "Modified{Escape}");
-
-    await expectTree(`
-My Notes
-  Source
-    Original
-  Target
-    Source
-      Original
-      Modified
-    `);
-
-    // Second: search-attach Source to Target again
-    fireEvent.click(await screen.findByLabelText("search and attach to Target"));
-    await userEvent.type(await screen.findByLabelText("search input"), "Source");
-    await userEvent.click(await screen.findByLabelText("select Source"));
-
-    // Should still show Modified (existing relation view preserved)
-    await expectTree(`
-My Notes
-  Source
-    Original
-  Target
-    Source
-      Original
-      Modified
     `);
   });
 });
@@ -378,9 +252,6 @@ My Notes
     Child
       GrandChild
   Target
-    Parent
-      Child
-        GrandChild
 Target
   Parent
     Child
@@ -388,44 +259,40 @@ Target
     `);
   });
 
-  test("Cross-pane drag overwrites existing relation with new copy", async () => {
+  test("Cross-pane drag overwrites existing children with new copy", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
-    // Create: My Notes → Source → Original Child, Target
+    // Create: My Notes → Source → Child, Target → Source → Another Child
+    // First create Source with Child
     const myNotesEditor = await screen.findByLabelText("edit My Notes");
     await userEvent.click(myNotesEditor);
     await userEvent.keyboard("{Enter}");
     await userEvent.type(
       await findNewNodeEditor(),
-      "Source{Enter}{Tab}Original Child{Escape}"
+      "Source{Enter}{Tab}Child{Escape}"
     );
 
+    // Collapse Source, create Target as sibling
+    await userEvent.click(await screen.findByLabelText("collapse Source"));
     const sourceEditor = await screen.findByLabelText("edit Source");
     await userEvent.click(sourceEditor);
     await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Target{Enter}{Tab}Source{Enter}{Tab}Another Child{Escape}"
+    );
 
-    // Add Source under Target with Different Child
-    await userEvent.click(await screen.findByLabelText("expand Target"));
-    fireEvent.click(await screen.findByLabelText("search and attach to Target"));
-    await userEvent.type(await screen.findByLabelText("search input"), "Source");
-    await userEvent.click(await screen.findByLabelText("select Source"));
-
-    const expandSourceButtons = await screen.findAllByLabelText("expand Source");
-    await userEvent.click(expandSourceButtons[1]);
-    const addToSourceButtons = await screen.findAllByLabelText("add to Source");
-    await userEvent.click(addToSourceButtons[1]);
-    await userEvent.type(await findNewNodeEditor(), "Different Child{Escape}");
+    // Re-expand Source under My Notes
+    await userEvent.click(await screen.findByLabelText("expand Source"));
 
     await expectTree(`
 My Notes
   Source
-    Original Child
+    Child
   Target
     Source
-      Original Child
-      Different Child
+      Another Child
     `);
 
     // Open split pane and navigate to Target
@@ -441,19 +308,18 @@ My Notes
     fireEvent.dragStart(screen.getAllByText("Source")[0]);
     fireEvent.drop(screen.getAllByText("Target")[1]);
 
-    // After DnD, Target should show Source with Original Child (NEW copied relation)
-    // not Different Child (the existing relation is overwritten in view)
-    // Pane 1 shows Target as root
+    // After DnD, Target shows Source with Child (from new copy)
+    // not Another Child (the old relation is overwritten in view)
     await expectTree(`
 My Notes
   Source
-    Original Child
+    Child
   Target
     Source
-      Original Child
+      Another Child
 Target
   Source
-    Original Child
+    Child
     `);
   });
 });

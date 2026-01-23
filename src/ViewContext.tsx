@@ -1012,6 +1012,26 @@ export function copyViewsWithNewPrefix(
   }, views);
 }
 
+export function copyViewsWithRelationsMapping(
+  views: Views,
+  sourceKey: string,
+  targetKey: string,
+  relationsIdMapping: Map<LongID, LongID>
+): Views {
+  const viewsToCopy = views.filter(
+    (_, k) => k.startsWith(sourceKey + ":") || k === sourceKey
+  );
+  return viewsToCopy.reduce((acc, view, key) => {
+    const suffix = key.slice(sourceKey.length);
+    const mappedSuffix = relationsIdMapping.reduce(
+      (s, newId, oldId) => s.split(oldId).join(newId),
+      suffix
+    );
+    const newKey = targetKey + mappedSuffix;
+    return acc.set(newKey, view);
+  }, views);
+}
+
 export function newRelations(
   head: LongID | ID,
   context: Context,

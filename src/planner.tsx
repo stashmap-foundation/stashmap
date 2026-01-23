@@ -1,5 +1,5 @@
 import React, { Dispatch, SetStateAction } from "react";
-import { List } from "immutable";
+import { List, Map } from "immutable";
 import { UnsignedEvent, Event } from "nostr-tools";
 import {
   KIND_DELETE,
@@ -46,6 +46,7 @@ import {
   bulkUpdateViewPathsAfterAddRelation,
   getDescendantRelations,
   copyViewsWithNewPrefix,
+  copyViewsWithRelationsMapping,
   viewPathToString,
   getRelationForView,
   addNodeToPathWithRelations,
@@ -527,6 +528,8 @@ export function planAddToParent(
   return planUpdateViews(updatedRelationsPlan, updatedViews);
 }
 
+type RelationsIdMapping = Map<LongID, LongID>;
+
 export function planDeepCopyNode(
   plan: Plan,
   sourceNodeID: LongID | ID,
@@ -534,7 +537,7 @@ export function planDeepCopyNode(
   targetParentViewPath: ViewPath,
   stack: (LongID | ID)[],
   insertAtIndex?: number
-): Plan {
+): [Plan, RelationsIdMapping] {
   const targetParentContext = getContextFromStackAndViewPath(stack, targetParentViewPath);
   const [targetParentNodeID] = getNodeIDFromView(plan, targetParentViewPath);
   const nodeNewContext = targetParentContext.push(shortID(targetParentNodeID));
@@ -553,23 +556,31 @@ export function planDeepCopyNode(
     sourceContext
   );
 
-  return descendants.reduce((accPlan, relation) => {
-    const isDirectChildrenRelation =
-      relation.head === shortID(sourceNodeID) &&
-      contextsMatch(relation.context, sourceContext);
+  const [finalPlan, mapping] = descendants.reduce(
+    ([accPlan, accMapping], relation) => {
+      const isDirectChildrenRelation =
+        relation.head === shortID(sourceNodeID) &&
+        contextsMatch(relation.context, sourceContext);
 
-    const newContext = isDirectChildrenRelation
-      ? nodeNewContext
-      : nodeNewContext.concat(relation.context.skip(sourceContext.size));
+      const newContext = isDirectChildrenRelation
+        ? nodeNewContext
+        : nodeNewContext.concat(relation.context.skip(sourceContext.size));
 
-    const baseRelation = newRelations(relation.head, newContext, accPlan.user.publicKey);
-    const newRelation: Relations = {
-      ...baseRelation,
-      items: relation.items,
-    };
+      const baseRelation = newRelations(relation.head, newContext, accPlan.user.publicKey);
+      const newRelation: Relations = {
+        ...baseRelation,
+        items: relation.items,
+      };
 
-    return planUpsertRelations(accPlan, newRelation);
-  }, planWithNode);
+      return [
+        planUpsertRelations(accPlan, newRelation),
+        accMapping.set(relation.id, newRelation.id),
+      ] as [Plan, RelationsIdMapping];
+    },
+    [planWithNode, Map<LongID, LongID>()] as [Plan, RelationsIdMapping]
+  );
+
+  return [finalPlan, mapping];
 }
 
 export function planDeepCopyNodeWithView(
@@ -581,7 +592,7 @@ export function planDeepCopyNodeWithView(
   stack: (LongID | ID)[],
   insertAtIndex?: number
 ): Plan {
-  const planWithCopy = planDeepCopyNode(
+  const [planWithCopy, relationsIdMapping] = planDeepCopyNode(
     plan,
     sourceNodeID,
     sourceContext,
@@ -604,10 +615,12 @@ export function planDeepCopyNodeWithView(
 
   const sourceKey = viewPathToString(sourceViewPath);
   const targetKey = viewPathToString(targetViewPath);
-  const updatedViews = copyViewsWithNewPrefix(
+
+  const updatedViews = copyViewsWithRelationsMapping(
     planWithCopy.views,
     sourceKey,
-    targetKey
+    targetKey,
+    relationsIdMapping
   );
 
   return planUpdateViews(planWithCopy, updatedViews);

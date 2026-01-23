@@ -63,6 +63,7 @@ type Filters = {
   knowledgeListbyID: Filter;
   knowledgeNodesByID: Filter;
   knowledgeListByHead: Filter;
+  knowledgeListByContext: Filter;
   referencedBy: Filter;
   deleteFilter: Filter;
   authors: PublicKey[];
@@ -89,6 +90,7 @@ export function filtersToFilterArray(filters: Filters): Filter[] {
     // Content-addressed nodes can be found by ID regardless of author
     sanitizeFilter({ ...filters.knowledgeNodesByID }, "#d"),
     sanitizeFilter({ ...filters.knowledgeListByHead, authors }, "#k"),
+    sanitizeFilter({ ...filters.knowledgeListByContext, authors }, "#c"),
     sanitizeFilter({ ...filters.referencedBy, authors }, "#i"),
     sanitizeFilter({ ...filters.deleteFilter, authors }, "#k"),
   ].filter((f) => f !== undefined) as Filter[];
@@ -105,19 +107,30 @@ function addAuthorFromIDToFilters(filters: Filters, id: LongID | ID): Filters {
   };
 }
 
-export function addNodeToFilters(filters: Filters, id: LongID | ID): Filters {
-  // If this is a ref ID, extract all node IDs from the path and add them
+export function addNodeToFilters(
+  filters: Filters,
+  id: LongID | ID,
+  includeListQuery: boolean = false
+): Filters {
   if (isRefId(id)) {
     const nodeIds = extractNodeIdsFromRefId(id);
     return nodeIds.reduce(
-      (acc, nodeId) => addNodeToFilters(acc, nodeId),
+      (acc, nodeId) => addNodeToFilters(acc, nodeId, includeListQuery),
       filters
     );
   }
 
-  return {
+  const baseFilters = {
     ...addAuthorFromIDToFilters(filters, id),
     knowledgeNodesByID: addIDToFilter(filters.knowledgeNodesByID, id, "#d"),
+  };
+
+  if (!includeListQuery) {
+    return baseFilters;
+  }
+
+  return {
+    ...baseFilters,
     knowledgeListByHead: addIDToFilter(
       addIDToFilter(filters.knowledgeListByHead, id, "#k"),
       VERSIONS_NODE_ID,
@@ -165,6 +178,20 @@ export function addListToFilters(
   };
 }
 
+export function addDescendantsToFilters(
+  filters: Filters,
+  nodeID: LongID | ID
+): Filters {
+  return {
+    ...filters,
+    knowledgeListByContext: addIDToFilter(
+      filters.knowledgeListByContext,
+      nodeID,
+      "#c"
+    ),
+  };
+}
+
 export function createBaseFilter(
   contacts: Contacts,
   projectMembers: Members,
@@ -185,6 +212,9 @@ export function createBaseFilter(
     knowledgeListByHead: {
       kinds: [KIND_KNOWLEDGE_LIST],
     },
+    knowledgeListByContext: {
+      kinds: [KIND_KNOWLEDGE_LIST],
+    },
     referencedBy: {
       kinds: [KIND_KNOWLEDGE_LIST],
     },
@@ -193,7 +223,7 @@ export function createBaseFilter(
       "#k": [`${KIND_KNOWLEDGE_LIST}`, `${KIND_KNOWLEDGE_NODE}`],
     },
     authors,
-  } as Filters;
+  };
 }
 
 function isOnlyDelete(filters: Filter[]): boolean {
@@ -260,7 +290,7 @@ export function LoadNodeContent({
   const { user, contacts, projectMembers } = useData();
 
   const filter = nodeIDs.reduce(
-    (acc, nodeID) => addNodeToFilters(acc, nodeID),
+    (acc, nodeID) => addNodeToFilters(acc, nodeID, true),
     createBaseFilter(contacts, projectMembers, user.publicKey)
   );
   const filterArray = filtersToFilterArray(filter);
@@ -348,7 +378,8 @@ export function LoadNode({
 
   const nodeFilter = addNodeToFilters(
     createBaseFilter(contacts, projectMembers, user.publicKey),
-    nodeID
+    nodeID,
+    true
   );
   const filter = referencedBy
     ? addReferencedByToFilters(nodeFilter, nodeID)

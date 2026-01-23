@@ -27,6 +27,7 @@ import { usePaneNavigation } from "../SplitPanesContext";
 import {
   addListToFilters,
   addNodeToFilters,
+  addDescendantsToFilters,
   createBaseFilter,
   filtersToFilterArray,
   useQueryKnowledgeData,
@@ -35,6 +36,31 @@ import {
 import { RegisterQuery } from "../LoadingStatus";
 import { shortID } from "../connections";
 import { useApis } from "../Apis";
+
+function getAncestorPaths(path: string, rootKey: string): string[] {
+  const ancestors: string[] = [];
+  const suffix = path.slice(rootKey.length);
+  const parts = suffix.split(":");
+
+  let current = rootKey;
+  for (let i = 1; i < parts.length - 3; i += 3) {
+    current = `${current}:${parts[i]}:${parts[i + 1]}:${parts[i + 2]}`;
+    ancestors.push(current);
+  }
+  return ancestors;
+}
+
+export function areAllAncestorsExpanded(
+  views: Views,
+  path: string,
+  rootKey: string
+): boolean {
+  const ancestorPaths = getAncestorPaths(path, rootKey);
+  return ancestorPaths.every((ancestorPath) => {
+    const view = views.get(ancestorPath);
+    return view?.expanded === true;
+  });
+}
 
 const LOAD_EXTRA = 10;
 
@@ -220,23 +246,33 @@ function Tree(): JSX.Element | null {
 export function TreeView(): JSX.Element {
   const data = useData();
   const key = useViewKey();
-  const filter = createBaseFilter(
+  const viewPath = useViewPath();
+  const rootNodeID = getLast(viewPath).nodeID;
+  const baseFilter = createBaseFilter(
     data.contacts,
     data.projectMembers,
     data.user.publicKey
   );
 
+  // Query root's lists (#k) and all descendants (#c)
+  const filterWithRoot = addNodeToFilters(baseFilter, rootNodeID, true);
+  const filterWithDescendants = addDescendantsToFilters(filterWithRoot, rootNodeID);
+
   // Find all Lists attached to all Nodes and subnodes of this tree
   const lists = data.views
     .filter(
-      (view, path) => path.startsWith(key) && view.expanded && path !== key
+      (view, path) =>
+        path.startsWith(key) &&
+        view.expanded &&
+        path !== key &&
+        areAllAncestorsExpanded(data.views, path, key)
     )
     .map((view) => view.relations || ("" as LongID))
     .filter((r) => r !== "");
   const listsFilter = lists.reduce(
     (rdx, listID, path) =>
       addListToFilters(rdx, listID, getLast(parseViewPath(path)).nodeID),
-    filter
+    filterWithDescendants
   );
   const { knowledgeDBs } = useQueryKnowledgeData(
     filtersToFilterArray(listsFilter)

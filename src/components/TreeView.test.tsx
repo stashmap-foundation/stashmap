@@ -1,4 +1,4 @@
-import { List } from "immutable";
+import { List, Map } from "immutable";
 import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
@@ -13,6 +13,7 @@ import { newNode, addRelationToRelations } from "../connections";
 import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
 import { execute } from "../executor";
 import { newRelations } from "../ViewContext";
+import { areAllAncestorsExpanded } from "./TreeView";
 
 test("Load Referenced By Nodes", async () => {
   const [alice] = setup([ALICE]);
@@ -496,4 +497,36 @@ test("Can exit Referenced By mode even when node has no relations", async () => 
   // Should be back to normal mode - filter button should be visible again
   await screen.findByLabelText("filter Bitcoin");
   expect(screen.getByLabelText("show references to Bitcoin")).toBeDefined();
+});
+
+describe("areAllAncestorsExpanded", () => {
+  test("returns false when parent is collapsed", () => {
+    const rootKey = "p0:rootNode:0";
+    const parentKey = "p0:rootNode:0:rootRel:parentNode:0";
+    const childKey = "p0:rootNode:0:rootRel:parentNode:0:parentRel:childNode:0";
+
+    const views: Views = Map({
+      [rootKey]: { width: 100, expanded: true, relations: "rootRel" as LongID },
+      [parentKey]: { width: 100, expanded: false, relations: "parentRel" as LongID },
+      [childKey]: { width: 100, expanded: true, relations: "childRel" as LongID },
+    });
+
+    expect(areAllAncestorsExpanded(views, childKey, rootKey)).toBe(false);
+    expect(areAllAncestorsExpanded(views, parentKey, rootKey)).toBe(true);
+  });
+
+  test("returns true when all ancestors are expanded", () => {
+    const rootKey = "p0:rootNode:0";
+    const parentKey = "p0:rootNode:0:rootRel:parentNode:0";
+    const childKey = "p0:rootNode:0:rootRel:parentNode:0:parentRel:childNode:0";
+
+    const views: Views = Map({
+      [rootKey]: { width: 100, expanded: true, relations: "rootRel" as LongID },
+      [parentKey]: { width: 100, expanded: true, relations: "parentRel" as LongID },
+      [childKey]: { width: 100, expanded: true, relations: "childRel" as LongID },
+    });
+
+    expect(areAllAncestorsExpanded(views, childKey, rootKey)).toBe(true);
+    expect(areAllAncestorsExpanded(views, parentKey, rootKey)).toBe(true);
+  });
 });

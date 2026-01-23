@@ -194,8 +194,8 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
         ? ["i", item.nodeID, item.relevance, item.argument]
         : ["i", item.nodeID, item.relevance]
     );
-  // Context tag: ["ctx", ancestorID1, ancestorID2, ...]
-  const contextTag = ["ctx", ...relations.context.toArray()];
+  // Context tags: ["c", id] for each ancestor (enables relay-level context queries)
+  const contextTags = relations.context.toArray().map((id) => ["c", id]);
   const updateRelationsEvent = {
     kind: KIND_KNOWLEDGE_LIST,
     pubkey: plan.user.publicKey,
@@ -206,7 +206,7 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
       ["k", shortID(relations.head)],
       // Full ID Head
       ["head", relations.head],
-      contextTag,
+      ...contextTags,
       ...itemsAsTags,
     ],
     content: "",

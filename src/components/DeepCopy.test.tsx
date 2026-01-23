@@ -99,6 +99,56 @@ My Notes
     Child
     `);
   });
+
+  test("Tab indent copies collapsed children after reload", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    // Create: My Notes → Sibling, Parent → Child → GrandChild
+    const myNotesEditor = await screen.findByLabelText("edit My Notes");
+    await userEvent.click(myNotesEditor);
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Sibling{Enter}Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Sibling
+  Parent
+    Child
+      GrandChild
+    `);
+
+    // Collapse Parent and reload
+    await userEvent.click(await screen.findByLabelText("collapse Parent"));
+    cleanup();
+    renderTree(alice);
+
+    await expectTree(`
+My Notes
+  Sibling
+  Parent
+    `);
+
+    // Tab on Parent to move under Sibling
+    const parentEditor = await screen.findByLabelText("edit Parent");
+    await userEvent.click(parentEditor);
+    await userEvent.keyboard("{Home}{Tab}");
+
+    // Expand to verify entire subtree was copied
+    await userEvent.click(await screen.findByLabelText("expand Parent"));
+    await userEvent.click(await screen.findByLabelText("expand Child"));
+
+    await expectTree(`
+My Notes
+  Sibling
+    Parent
+      Child
+        GrandChild
+    `);
+  });
 });
 
 describe("Deep Copy - Search Attach", () => {

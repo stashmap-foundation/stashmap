@@ -168,11 +168,9 @@ export function eventToRelations(e: UnsignedEvent): Relations | undefined {
     return undefined;
   }
 
-  // Parse context from ctx tag
-  const contextTag = findAllTags(e, "ctx")?.[0];
-  const context = contextTag
-    ? List(contextTag.map((c) => c as ID))
-    : List<ID>();
+  // Parse context from multiple "c" tags (each tag is ["c", ancestorID])
+  const contextTags = findAllTags(e, "c") || [];
+  const context = List(contextTags.map((tag) => tag[0] as ID));
 
   // Parse items with relevance and optional argument: ["i", nodeID, relevance, argument?]
   // Invalid relevance/argument values are filtered to defaults

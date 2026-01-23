@@ -563,26 +563,38 @@ export function getRelationForView(
     );
   }
 
-  // Check if view's relation exists and matches current context
-  if (view.relations) {
-    const viewRelations = getRelationsNoReferencedBy(
-      data.knowledgeDBs,
-      view.relations,
-      data.user.publicKey
-    );
-    if (viewRelations && contextsMatch(viewRelations.context, context)) {
-      return viewRelations;
-    }
-  }
-
-  // Find relation by (head, context)
-  const available = getAvailableRelationsForNode(
+  return getActiveRelationForNode(
     data.knowledgeDBs,
     data.user.publicKey,
     nodeID,
-    context
+    context,
+    view.relations
   );
-  return available.first();
+}
+
+/**
+ * Centralized function to determine which relation to display for a node.
+ * Works without requiring a full viewPath - useful for deep copy of collapsed nodes.
+ *
+ * Logic:
+ * 1. If viewRelations is set AND matches current context, use it
+ * 2. Otherwise, use priority-based selection (our relations first, then others by date)
+ */
+export function getActiveRelationForNode(
+  knowledgeDBs: KnowledgeDBs,
+  myself: PublicKey,
+  nodeID: LongID | ID,
+  context: Context,
+  viewRelations?: LongID
+): Relations | undefined {
+  if (viewRelations && viewRelations !== REFERENCED_BY) {
+    const relations = getRelationsNoReferencedBy(knowledgeDBs, viewRelations, myself);
+    if (relations && contextsMatch(relations.context, context)) {
+      return relations;
+    }
+  }
+
+  return getAvailableRelationsForNode(knowledgeDBs, myself, nodeID, context).first();
 }
 
 export function calculateNodeIndex(

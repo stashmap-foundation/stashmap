@@ -313,12 +313,14 @@ My Notes
     fireEvent.drop(screen.getAllByText("My Notes")[0]);
 
     // Child A should appear under My Notes (deep copied)
+    // Pane 1 shows Source as root
     await expectTree(`
 My Notes
   Child A
   Source
     Child A
     Child B
+Source
     `);
   });
 
@@ -326,7 +328,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
-    // Create: My Notes → Parent → Child → GrandChild
+    // Create: My Notes → Parent → Child → GrandChild, then add Target
     const myNotesEditor = await screen.findByLabelText("edit My Notes");
     await userEvent.click(myNotesEditor);
     await userEvent.keyboard("{Enter}");
@@ -335,32 +337,51 @@ My Notes
       "Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
     );
 
+    // Add Target as sibling to Parent (collapse Parent first so Enter creates sibling)
+    await userEvent.click(await screen.findByLabelText("collapse Parent"));
+    const parentEditor = await screen.findByLabelText("edit Parent");
+    await userEvent.click(parentEditor);
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+    // Re-expand Parent
+    await userEvent.click(await screen.findByLabelText("expand Parent"));
+
+    // Expand Target
+    await userEvent.click(await screen.findByLabelText("expand Target"));
+
     await expectTree(`
 My Notes
   Parent
     Child
       GrandChild
+  Target
     `);
 
-    // Open split pane and navigate to Parent
+    // Open split pane and navigate to Target
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
     await userEvent.click(
       await screen.findByLabelText("Search to change pane 1 content")
     );
-    await userEvent.type(await screen.findByLabelText("search input"), "Parent");
-    await userEvent.click(await screen.findByLabelText("select Parent"));
-    await screen.findByLabelText("collapse Parent");
+    await userEvent.type(await screen.findByLabelText("search input"), "Target");
+    await userEvent.click(await screen.findByLabelText("select Target"));
+    await screen.findByLabelText("collapse Target");
 
-    // Drag Parent from pane 0 to My Notes
+    // Drag Parent from pane 0 to Target in pane 1 (cross-pane = deep copy)
     fireEvent.dragStart(screen.getAllByText("Parent")[0]);
-    fireEvent.drop(screen.getAllByText("My Notes")[0]);
+    fireEvent.drop(screen.getAllByText("Target")[1]);
 
-    // Parent with Child and GrandChild should be deep copied under My Notes
+    // Parent with Child and GrandChild should be deep copied under Target
+    // Pane 1 shows Target as root
     await expectTree(`
 My Notes
   Parent
     Child
       GrandChild
+  Target
+    Parent
+      Child
+        GrandChild
+Target
   Parent
     Child
       GrandChild
@@ -422,6 +443,7 @@ My Notes
 
     // After DnD, Target should show Source with Original Child (NEW copied relation)
     // not Different Child (the existing relation is overwritten in view)
+    // Pane 1 shows Target as root
     await expectTree(`
 My Notes
   Source
@@ -429,6 +451,9 @@ My Notes
   Target
     Source
       Original Child
+Target
+  Source
+    Original Child
     `);
   });
 });

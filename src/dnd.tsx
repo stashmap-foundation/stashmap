@@ -16,9 +16,15 @@ import {
   getNodeIDFromView,
   getParentNodeID,
   getLast,
+  getContextFromStackAndViewPath,
 } from "./ViewContext";
 import { getNodesInTree } from "./components/Node";
-import { Plan, planUpdateViews, planAddToParent } from "./planner";
+import {
+  Plan,
+  planUpdateViews,
+  planDeepCopyNodeWithView,
+  planExpandNode,
+} from "./planner";
 
 function getDropDestinationEndOfRoot(
   data: Data,
@@ -117,15 +123,32 @@ export function dnd(
     );
     return planUpdateViews(updatedRelationsPlan, updatedViews);
   }
-  const sourceNodeIDs = sources
-    .map((s) => {
-      const path = parseViewPath(s);
-      const [nodeID] = getNodeIDFromView(plan, path);
-      return nodeID;
-    })
-    .toArray();
+  // Deep copy each source node to target (copies node + all descendants + views)
+  const [, toViewData] = getNodeIDFromView(plan, toView);
+  const toContext = getContextFromStackAndViewPath(stack, toView);
 
-  return planAddToParent(plan, sourceNodeIDs, toView, stack, dropIndex);
+  // Ensure target is expanded
+  const expandedPlan = toViewData.expanded
+    ? plan
+    : planExpandNode(plan, toNodeID, toContext, toViewData, toView);
+
+  // Deep copy each source
+  return sources.toList().reduce((accPlan: Plan, s: string, idx: number) => {
+    const sourcePath = parseViewPath(s);
+    const [sourceNodeID] = getNodeIDFromView(accPlan, sourcePath);
+    const sourceContext = getContextFromStackAndViewPath(stack, sourcePath);
+    const insertAt = dropIndex !== undefined ? dropIndex + idx : undefined;
+
+    return planDeepCopyNodeWithView(
+      accPlan,
+      sourceNodeID,
+      sourceContext,
+      sourcePath,
+      toView,
+      stack,
+      insertAt
+    );
+  }, expandedPlan);
 }
 
 /**

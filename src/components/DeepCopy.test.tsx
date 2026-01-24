@@ -2,8 +2,10 @@ import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
+  BOB,
   expectTree,
   findNewNodeEditor,
+  follow,
   renderApp,
   renderTree,
   setup,
@@ -320,6 +322,97 @@ My Notes
 Target
   Source
     Child
+    `);
+  });
+});
+
+describe("Deep Copy - ~Versions Handling", () => {
+  test("Copied ~Versions from another user are taken over", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    // Bob creates BobFolder → Original and edits Original
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "BobFolder{Enter}{Tab}Original{Escape}"
+    );
+
+    // Bob edits "Original" to "Bob Edited" - this creates a ~Versions entry
+    const sourceEditor = await screen.findByLabelText("edit Original");
+    await userEvent.click(sourceEditor);
+    await userEvent.clear(sourceEditor);
+    await userEvent.type(sourceEditor, "Bob Edited");
+    fireEvent.blur(sourceEditor);
+
+    // Wait for the edit to be reflected
+    await screen.findByLabelText("edit Bob Edited");
+
+    await expectTree(`
+My Notes
+  BobFolder
+    Bob Edited
+    `);
+
+    cleanup();
+
+    // Alice follows Bob
+    await follow(alice, bob().user.publicKey);
+
+    // Alice renders and creates Target
+    // BobFolder appears as diff item because Alice follows Bob
+    renderApp(alice());
+    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand Target"));
+
+    await expectTree(`
+My Notes
+  Target
+  BobFolder
+    `);
+
+    // Expand BobFolder diff item to see its children
+    await userEvent.click(await screen.findByLabelText("expand BobFolder"));
+
+    // Note: Alice sees "Original" because onlyMine=true ignores Bob's ~Versions
+    await expectTree(`
+My Notes
+  Target
+  BobFolder
+    Original
+    `);
+
+    // Open split pane and navigate pane 1 to Target
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await userEvent.click(
+      await screen.findByLabelText("Search to change pane 1 content")
+    );
+    await userEvent.type(await screen.findByLabelText("search input"), "Target");
+    await userEvent.click(await screen.findByLabelText("select Target"));
+
+    await expectTree(`
+My Notes
+  Target
+  BobFolder
+    Original
+Target
+    `);
+
+    // Drag BobFolder from pane 0 to Target in pane 1 (cross-pane deep copy)
+    fireEvent.dragStart(screen.getAllByText("BobFolder")[0]);
+    fireEvent.drop(screen.getAllByText("Target")[1]);
+
+    // After copy, Alice sees "Bob Edited" because Bob's ~Versions were copied
+    // and became Alice's ~Versions for that context
+    await expectTree(`
+My Notes
+  Target
+  BobFolder
+    Original
+Target
+  BobFolder
+    Bob Edited
     `);
   });
 });

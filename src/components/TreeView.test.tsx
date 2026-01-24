@@ -507,8 +507,16 @@ describe("areAllAncestorsExpanded", () => {
 
     const views: Views = Map({
       [rootKey]: { width: 100, expanded: true, relations: "rootRel" as LongID },
-      [parentKey]: { width: 100, expanded: false, relations: "parentRel" as LongID },
-      [childKey]: { width: 100, expanded: true, relations: "childRel" as LongID },
+      [parentKey]: {
+        width: 100,
+        expanded: false,
+        relations: "parentRel" as LongID,
+      },
+      [childKey]: {
+        width: 100,
+        expanded: true,
+        relations: "childRel" as LongID,
+      },
     });
 
     expect(areAllAncestorsExpanded(views, childKey, rootKey)).toBe(false);
@@ -522,8 +530,16 @@ describe("areAllAncestorsExpanded", () => {
 
     const views: Views = Map({
       [rootKey]: { width: 100, expanded: true, relations: "rootRel" as LongID },
-      [parentKey]: { width: 100, expanded: true, relations: "parentRel" as LongID },
-      [childKey]: { width: 100, expanded: true, relations: "childRel" as LongID },
+      [parentKey]: {
+        width: 100,
+        expanded: true,
+        relations: "parentRel" as LongID,
+      },
+      [childKey]: {
+        width: 100,
+        expanded: true,
+        relations: "childRel" as LongID,
+      },
     });
 
     expect(areAllAncestorsExpanded(views, childKey, rootKey)).toBe(true);

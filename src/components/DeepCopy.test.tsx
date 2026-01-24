@@ -180,7 +180,10 @@ My Notes
     await userEvent.click(
       await screen.findByLabelText("Search to change pane 1 content")
     );
-    await userEvent.type(await screen.findByLabelText("search input"), "Source");
+    await userEvent.type(
+      await screen.findByLabelText("search input"),
+      "Source"
+    );
     await userEvent.click(await screen.findByLabelText("select Source"));
     await screen.findByLabelText("collapse Source");
 
@@ -238,7 +241,10 @@ My Notes
     await userEvent.click(
       await screen.findByLabelText("Search to change pane 1 content")
     );
-    await userEvent.type(await screen.findByLabelText("search input"), "Target");
+    await userEvent.type(
+      await screen.findByLabelText("search input"),
+      "Target"
+    );
     await userEvent.click(await screen.findByLabelText("select Target"));
     await screen.findByLabelText("collapse Target");
 
@@ -302,7 +308,10 @@ My Notes
     await userEvent.click(
       await screen.findByLabelText("Search to change pane 1 content")
     );
-    await userEvent.type(await screen.findByLabelText("search input"), "Target");
+    await userEvent.type(
+      await screen.findByLabelText("search input"),
+      "Target"
+    );
     await userEvent.click(await screen.findByLabelText("select Target"));
     await screen.findByLabelText("collapse Target");
 
@@ -388,7 +397,10 @@ My Notes
     await userEvent.click(
       await screen.findByLabelText("Search to change pane 1 content")
     );
-    await userEvent.type(await screen.findByLabelText("search input"), "Target");
+    await userEvent.type(
+      await screen.findByLabelText("search input"),
+      "Target"
+    );
     await userEvent.click(await screen.findByLabelText("select Target"));
 
     await expectTree(`

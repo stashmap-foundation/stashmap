@@ -37,16 +37,22 @@ import { shortID } from "../connections";
 import { useApis } from "../Apis";
 
 function getAncestorPaths(path: string, rootKey: string): string[] {
-  const ancestors: string[] = [];
   const suffix = path.slice(rootKey.length);
   const parts = suffix.split(":");
 
-  let current = rootKey;
-  for (let i = 1; i < parts.length - 3; i += 3) {
-    current = `${current}:${parts[i]}:${parts[i + 1]}:${parts[i + 2]}`;
-    ancestors.push(current);
-  }
-  return ancestors;
+  const numTriplets = Math.floor((parts.length - 4) / 3);
+  const triplets = Array.from({ length: numTriplets }, (_, idx) => {
+    const i = 1 + idx * 3;
+    return [parts[i], parts[i + 1], parts[i + 2]] as const;
+  });
+
+  return triplets.reduce<{ current: string; ancestors: string[] }>(
+    (acc, [a, b, c]) => {
+      const next = `${acc.current}:${a}:${b}:${c}`;
+      return { current: next, ancestors: [...acc.ancestors, next] };
+    },
+    { current: rootKey, ancestors: [] }
+  ).ancestors;
 }
 
 export function areAllAncestorsExpanded(

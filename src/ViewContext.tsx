@@ -283,7 +283,8 @@ export function getDescendantRelations(
     .flatMap((db) => db.relations.valueSeq())
     .filter(
       (relations) =>
-        (relations.head === localID && contextsMatch(relations.context, rootContext)) ||
+        (relations.head === localID &&
+          contextsMatch(relations.context, rootContext)) ||
         contextStartsWith(relations.context, childContext)
     )
     .toList();
@@ -536,6 +537,40 @@ export function getNodeFromView(
 }
 
 /**
+ * Centralized function to determine which relation to display for a node.
+ * Works without requiring a full viewPath - useful for deep copy of collapsed nodes.
+ *
+ * Logic:
+ * 1. If viewRelations is set AND matches current context, use it
+ * 2. Otherwise, use priority-based selection (our relations first, then others by date)
+ */
+export function getActiveRelationForNode(
+  knowledgeDBs: KnowledgeDBs,
+  myself: PublicKey,
+  nodeID: LongID | ID,
+  context: Context,
+  viewRelations?: LongID
+): Relations | undefined {
+  if (viewRelations && viewRelations !== REFERENCED_BY) {
+    const relations = getRelationsNoReferencedBy(
+      knowledgeDBs,
+      viewRelations,
+      myself
+    );
+    if (relations && contextsMatch(relations.context, context)) {
+      return relations;
+    }
+  }
+
+  return getAvailableRelationsForNode(
+    knowledgeDBs,
+    myself,
+    nodeID,
+    context
+  ).first();
+}
+
+/**
  * Get the relation for a view, considering both view preference and context.
  * This is the canonical read-only relation lookup function.
  *
@@ -570,31 +605,6 @@ export function getRelationForView(
     context,
     view.relations
   );
-}
-
-/**
- * Centralized function to determine which relation to display for a node.
- * Works without requiring a full viewPath - useful for deep copy of collapsed nodes.
- *
- * Logic:
- * 1. If viewRelations is set AND matches current context, use it
- * 2. Otherwise, use priority-based selection (our relations first, then others by date)
- */
-export function getActiveRelationForNode(
-  knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey,
-  nodeID: LongID | ID,
-  context: Context,
-  viewRelations?: LongID
-): Relations | undefined {
-  if (viewRelations && viewRelations !== REFERENCED_BY) {
-    const relations = getRelationsNoReferencedBy(knowledgeDBs, viewRelations, myself);
-    if (relations && contextsMatch(relations.context, context)) {
-      return relations;
-    }
-  }
-
-  return getAvailableRelationsForNode(knowledgeDBs, myself, nodeID, context).first();
 }
 
 export function calculateNodeIndex(
@@ -1004,7 +1014,7 @@ export function copyViewsWithNewPrefix(
   targetKey: string
 ): Views {
   const viewsToCopy = views.filter(
-    (_, k) => k.startsWith(sourceKey + ":") || k === sourceKey
+    (_, k) => k.startsWith(`${sourceKey}:`) || k === sourceKey
   );
   return viewsToCopy.reduce((acc, view, key) => {
     const newKey = targetKey + key.slice(sourceKey.length);
@@ -1019,7 +1029,7 @@ export function copyViewsWithRelationsMapping(
   relationsIdMapping: Map<LongID, LongID>
 ): Views {
   const viewsToCopy = views.filter(
-    (_, k) => k.startsWith(sourceKey + ":") || k === sourceKey
+    (_, k) => k.startsWith(`${sourceKey}:`) || k === sourceKey
   );
   return viewsToCopy.reduce((acc, view, key) => {
     const suffix = key.slice(sourceKey.length);
@@ -1498,7 +1508,7 @@ export function bulkUpdateViewPathsAfterAddRelation(
 ): Views {
   return List<undefined>([])
     .set(nAdds - 1, undefined)
-    .reduce((rdx, i, currentIndex) => {
+    .reduce((rdx, _, currentIndex) => {
       return updateViewPathsAfterAddRelation(
         { ...data, views: rdx },
         repoPath,

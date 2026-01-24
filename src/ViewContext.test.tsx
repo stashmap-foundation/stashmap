@@ -2,7 +2,6 @@ import React from "react";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { List, Map } from "immutable";
-import Data from "./Data";
 import {
   newNode,
   addRelationToRelations,

@@ -368,11 +368,7 @@ export function LoadMissingVersionNodes({
   );
 
   if (missingVersionNodeIDs.length > 0) {
-    return (
-      <LoadData nodeIDs={missingVersionNodeIDs}>
-        {children}
-      </LoadData>
-    );
+    return <LoadData nodeIDs={missingVersionNodeIDs}>{children}</LoadData>;
   }
 
   return <>{children}</>;

@@ -1,10 +1,16 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { List } from "immutable";
 import { newRelations } from "../ViewContext";
 import { execute } from "../executor";
 import { createPlan, planUpsertRelations } from "../planner";
-import { ALICE, renderTree, setup, UpdateState, expectTree } from "../utils.test";
+import {
+  ALICE,
+  renderTree,
+  setup,
+  UpdateState,
+  expectTree,
+} from "../utils.test";
 import { planCreateNodesFromMarkdown } from "./FileDropZone";
 import { addRelationToRelations, joinID, shortID } from "../connections";
 
@@ -50,7 +56,9 @@ async function navigateToProgrammingLanguages(): Promise<void> {
   await userEvent.click(
     await screen.findByLabelText("select Programming Languages")
   );
-  await screen.findByLabelText(/expand Programming Languages|collapse Programming Languages/);
+  await screen.findByLabelText(
+    /expand Programming Languages|collapse Programming Languages/
+  );
 }
 
 test("Markdown Upload creates correct tree structure", async () => {

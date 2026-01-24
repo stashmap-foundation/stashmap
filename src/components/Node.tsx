@@ -367,8 +367,8 @@ function EditableContent(): JSX.Element {
     // Step 4: Save text changes in NEW context (if any)
     // The node's new context is prevSiblingContext + prevSibling's ID
     const newContext = prevSiblingContext.push(prevSibling.nodeID);
-    const displayText = node?.text ?? "";
-    const hasTextChanges = trimmedText !== displayText;
+    const originalNodeText = node?.text ?? "";
+    const hasTextChanges = trimmedText !== originalNodeText;
     const finalPlan = hasTextChanges
       ? planCreateVersion(planWithDisconnect, nodeID, trimmedText, newContext)
       : planWithDisconnect;

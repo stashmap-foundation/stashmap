@@ -45,7 +45,6 @@ import {
   getVersionedDisplayText,
   bulkUpdateViewPathsAfterAddRelation,
   getDescendantRelations,
-  copyViewsWithNewPrefix,
   copyViewsWithRelationsMapping,
   viewPathToString,
   getRelationForView,
@@ -538,7 +537,10 @@ export function planDeepCopyNode(
   stack: (LongID | ID)[],
   insertAtIndex?: number
 ): [Plan, RelationsIdMapping] {
-  const targetParentContext = getContextFromStackAndViewPath(stack, targetParentViewPath);
+  const targetParentContext = getContextFromStackAndViewPath(
+    stack,
+    targetParentViewPath
+  );
   const [targetParentNodeID] = getNodeIDFromView(plan, targetParentViewPath);
   const nodeNewContext = targetParentContext.push(shortID(targetParentNodeID));
 
@@ -566,7 +568,11 @@ export function planDeepCopyNode(
         ? nodeNewContext
         : nodeNewContext.concat(relation.context.skip(sourceContext.size));
 
-      const baseRelation = newRelations(relation.head, newContext, accPlan.user.publicKey);
+      const baseRelation = newRelations(
+        relation.head,
+        newContext,
+        accPlan.user.publicKey
+      );
       const newRelation: Relations = {
         ...baseRelation,
         items: relation.items,
@@ -601,7 +607,11 @@ export function planDeepCopyNodeWithView(
     insertAtIndex
   );
 
-  const relations = getRelationForView(planWithCopy, targetParentViewPath, stack);
+  const relations = getRelationForView(
+    planWithCopy,
+    targetParentViewPath,
+    stack
+  );
   if (!relations || relations.items.size === 0) {
     return planWithCopy;
   }
@@ -981,7 +991,6 @@ export function PlanningContextProvider({
     events: List<Event>,
     relayUrl: string
   ): Promise<void> => {
-    console.log(">>>> REPUBLISH EVENTS ON RELAY:", relayUrl, events.size);
     const results = await republishEvents({
       events,
       relayPool,

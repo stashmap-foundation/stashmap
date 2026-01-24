@@ -894,14 +894,19 @@ export async function expectTree(expected: string): Promise<void> {
     .filter((line) => line.length > 0)
     .join("\n");
 
-  await waitFor(async () => {
+  try {
+    await waitFor(async () => {
+      const actual = await getTreeStructure();
+      expect(actual).toEqual(expectedNormalized);
+    });
+  } catch (error) {
     const actual = await getTreeStructure();
-    if (actual !== expectedNormalized) {
-      console.log(`ACTUAL TREE:\n${actual}`);
-      console.log(`EXPECTED TREE:\n${expectedNormalized}`);
-    }
-    expect(actual).toEqual(expectedNormalized);
-  });
+    // eslint-disable-next-line no-console
+    console.log(`ACTUAL TREE:\n${actual}`);
+    // eslint-disable-next-line no-console
+    console.log(`EXPECTED TREE:\n${expectedNormalized}`);
+    throw error;
+  }
 }
 
 /**

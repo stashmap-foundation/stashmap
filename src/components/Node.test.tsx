@@ -316,7 +316,14 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
     views,
   };
 
-  const nodes = getNodesInTree(data, parentPath, [parent.id], List());
+  const nodes = getNodesInTree(
+    data,
+    parentPath,
+    [parent.id],
+    List(),
+    alicePK,
+    undefined
+  );
   const nodeIDs = nodes.map((path) => getLast(path).nodeID).toArray();
 
   expect(nodeIDs).toContain(child.id);
@@ -484,7 +491,14 @@ test("Diff item paths are correctly identified as diff items", () => {
     views,
   };
 
-  const nodes = getNodesInTree(data, rootPath, [root.id], List());
+  const nodes = getNodesInTree(
+    data,
+    rootPath,
+    [root.id],
+    List(),
+    alicePK,
+    undefined
+  );
   expect(nodes.size).toBeGreaterThanOrEqual(3);
 
   const diffItemPath = nodes.find(

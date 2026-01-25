@@ -211,9 +211,8 @@ function convertViewPathToString(viewContext: ViewPath): string {
   ) as SubPathWithRelations[];
   const beginning = withoutLastElement.reduce(
     (acc: string, subPath: SubPathWithRelations): string => {
-      const postfix = `${encodeNodeID(subPath.nodeID)}:${
-        subPath.nodeIndex
-      }:${encodeNodeID(subPath.relationsID)}`;
+      const postfix = `${encodeNodeID(subPath.nodeID)}:${subPath.nodeIndex
+        }:${encodeNodeID(subPath.relationsID)}`;
       return acc !== "" ? `${acc}:${postfix}` : postfix;
     },
     ""
@@ -315,12 +314,12 @@ export function getAvailableRelationsForNode(
       : undefined;
   const preferredRemoteRelations: List<Relations> = remoteDB
     ? sortRelationsByDate(
-        remoteDB.relations
-          .filter(
-            (r) => r.head === localID && contextsMatch(r.context, context)
-          )
-          .toList()
-      )
+      remoteDB.relations
+        .filter(
+          (r) => r.head === localID && contextsMatch(r.context, context)
+        )
+        .toList()
+    )
     : List<Relations>();
   const otherRelations: List<Relations> = knowledgeDBs
     .filter((_, k) => k !== myself && k !== remote)
@@ -419,28 +418,6 @@ export function filterRelationItems(
   return items.filter((item) =>
     itemFilters.some((f) => itemMatchesType(item, f))
   );
-}
-
-/**
- * Get filtered relation items for a node in a context.
- */
-export function getRelationItems(
-  knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey,
-  nodeID: LongID | ID,
-  context: Context,
-  filters: TypeFilters,
-  onlyMine?: boolean
-): List<RelationItem> {
-  const relations = getAvailableRelationsForNode(
-    knowledgeDBs,
-    myself,
-    nodeID,
-    context,
-    onlyMine
-  ).first();
-  if (!relations) return List();
-  return filterRelationItems(relations.items, filters);
 }
 
 /**
@@ -1150,6 +1127,36 @@ export function findOrCreateRelationsForContext(
   return newRelationsForNode(nodeID, context, myself);
 }
 
+function getNewestRelationFromAuthor(
+  knowledgeDBs: KnowledgeDBs,
+  author: PublicKey,
+  nodeID: LongID | ID,
+  context: Context
+): Relations | undefined {
+  const localID = shortID(nodeID);
+  const authorDB = knowledgeDBs.get(author, newDB());
+  const relations = sortRelationsByDate(
+    authorDB.relations
+      .filter((r) => r.head === localID && contextsMatch(r.context, context))
+      .toList()
+  );
+  return relations.first();
+}
+
+export function getRelationsForContext(
+  knowledgeDBs: KnowledgeDBs,
+  paneAuthor: PublicKey,
+  nodeID: LongID | ID,
+  context: Context,
+  rootRelation: LongID | undefined,
+  isRoot: boolean
+): Relations | undefined {
+  if (isRoot && rootRelation) {
+    return getRelationsNoReferencedBy(knowledgeDBs, rootRelation, paneAuthor);
+  }
+  return getNewestRelationFromAuthor(knowledgeDBs, paneAuthor, nodeID, context);
+}
+
 export function upsertRelations(
   plan: Plan,
   viewPath: ViewPath,
@@ -1162,10 +1169,10 @@ export function upsertRelations(
   // 1. Try to find existing relations
   const viewRelations = nodeView.relations
     ? getRelationsNoReferencedBy(
-        plan.knowledgeDBs,
-        nodeView.relations,
-        plan.user.publicKey
-      )
+      plan.knowledgeDBs,
+      nodeView.relations,
+      plan.user.publicKey
+    )
     : undefined;
 
   const existingFromView =
@@ -1176,11 +1183,11 @@ export function upsertRelations(
   const existingByContext = existingFromView
     ? undefined
     : getAvailableRelationsForNode(
-        plan.knowledgeDBs,
-        plan.user.publicKey,
-        nodeID,
-        context
-      ).first();
+      plan.knowledgeDBs,
+      plan.user.publicKey,
+      nodeID,
+      context
+    ).first();
 
   const foundRelations = existingFromView || existingByContext;
 
@@ -1213,17 +1220,17 @@ export function upsertRelations(
     nodeView.relations === undefined || oldRelationsID !== relations.id;
   const planWithUpdatedView = didViewChange
     ? planUpdateViews(
-        plan,
-        moveChildViewsToNewRelation(
-          plan.views,
-          viewPath,
-          oldRelationsID,
-          relations.id
-        ).set(viewPathToString(viewPath), {
-          ...nodeView,
-          relations: relations.id,
-        })
-      )
+      plan,
+      moveChildViewsToNewRelation(
+        plan.views,
+        viewPath,
+        oldRelationsID,
+        relations.id
+      ).set(viewPathToString(viewPath), {
+        ...nodeView,
+        relations: relations.id,
+      })
+    )
     : plan;
 
   // 4. Apply modification

@@ -44,9 +44,18 @@ export function getDropDestinationFromTreeView(
   data: Data,
   root: ViewPath,
   stack: (LongID | ID)[],
-  destinationIndex: number
+  destinationIndex: number,
+  paneAuthor: PublicKey,
+  rootRelation: LongID | undefined
 ): [ViewPath, number] {
-  const nodes = getNodesInTree(data, root, stack, List<ViewPath>());
+  const nodes = getNodesInTree(
+    data,
+    root,
+    stack,
+    List<ViewPath>(),
+    paneAuthor,
+    rootRelation
+  );
   // Subtract 1 because the visual list includes root at index 0,
   // but getNodesInTree doesn't include the root
   const adjustedIndex = destinationIndex - 1;
@@ -79,6 +88,8 @@ export function dnd(
   to: ViewPath,
   stack: (LongID | ID)[],
   indexTo: number | undefined,
+  paneAuthor: PublicKey,
+  rootRelation: LongID | undefined,
   isDiffItem?: boolean
 ): Plan {
   const rootView = to;
@@ -91,7 +102,14 @@ export function dnd(
   const [toView, dropIndex] =
     indexTo === undefined
       ? [rootView, undefined]
-      : getDropDestinationFromTreeView(plan, rootView, stack, indexTo);
+      : getDropDestinationFromTreeView(
+          plan,
+          rootView,
+          stack,
+          indexTo,
+          paneAuthor,
+          rootRelation
+        );
 
   const [toNodeID, toV] = getNodeIDFromView(plan, toView);
 

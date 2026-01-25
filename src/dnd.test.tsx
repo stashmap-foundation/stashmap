@@ -184,6 +184,8 @@ test("Diff items are always added, never moved", () => {
     parentPath,
     [parent.id], // stack
     0,
+    alicePK,
+    undefined,
     true
   );
 

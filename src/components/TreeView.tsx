@@ -23,7 +23,7 @@ import {
   useDisplayText,
 } from "../ViewContext";
 import { MergeKnowledgeDB, useData } from "../DataContext";
-import { usePaneStack } from "../SplitPanesContext";
+import { usePaneStack, useCurrentPane } from "../SplitPanesContext";
 import {
   addListToFilters,
   addNodeToFilters,
@@ -203,6 +203,7 @@ export function TreeViewNodeLoader({
 function Tree(): JSX.Element | null {
   const data = useData();
   const stack = usePaneStack();
+  const pane = useCurrentPane();
   const { fileStore } = useApis();
   const { getLocalStorage, setLocalStorage } = fileStore;
   const scrollableId = useViewKey();
@@ -215,7 +216,14 @@ function Tree(): JSX.Element | null {
   const viewKey = viewPathToString(viewPath);
   const isRootExpanded = isExpanded(data, viewKey);
   const childNodes = isRootExpanded
-    ? getNodesInTree(data, viewPath, stack, List<ViewPath>())
+    ? getNodesInTree(
+        data,
+        viewPath,
+        stack,
+        List<ViewPath>(),
+        pane.author,
+        pane.rootRelation
+      )
     : List<ViewPath>();
   // Include ROOT as the first node, followed by its children
   const nodes = List<ViewPath>([viewPath]).concat(childNodes);

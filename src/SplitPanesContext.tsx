@@ -1,8 +1,15 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+} from "react";
 import { clearViewsForPane } from "./ViewContext";
 import { planUpdateViews, usePlanner } from "./planner";
 import { useData } from "./DataContext";
 import { useWorkspaceContext } from "./WorkspaceContext";
+import { UNAUTHENTICATED_USER_PK } from "./AppState";
 
 export type Pane = {
   id: string;
@@ -44,6 +51,18 @@ export function SplitPanesProvider({
   const [panes, setPanes] = useState<Pane[]>([
     { id: generatePaneId(), stack: [activeWorkspace], author: user.publicKey },
   ]);
+
+  useEffect(() => {
+    if (user.publicKey !== UNAUTHENTICATED_USER_PK) {
+      setPanes((prev) =>
+        prev.map((pane) =>
+          pane.author === UNAUTHENTICATED_USER_PK
+            ? { ...pane, author: user.publicKey }
+            : pane
+        )
+      );
+    }
+  }, [user.publicKey]);
 
   const addPaneAt = useCallback(
     (

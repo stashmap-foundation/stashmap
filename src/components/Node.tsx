@@ -14,11 +14,12 @@ import {
   useNodeID,
   getContextFromStackAndViewPath,
   getAvailableRelationsForNode,
-  findOrCreateRelationsForContext,
+  getRelationsForContext,
   usePreviousSibling,
   useDisplayText,
   getParentView,
   useNextInsertPosition,
+  isRoot,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -519,6 +520,8 @@ export function getNodesInTree(
   parentPath: ViewPath,
   stack: (LongID | ID)[],
   ctx: List<ViewPath>,
+  paneAuthor: PublicKey,
+  rootRelation: LongID | undefined,
   noExpansion?: boolean
 ): List<ViewPath> {
   const [parentNodeID, parentView] = getNodeIDFromView(data, parentPath);
@@ -541,17 +544,14 @@ export function getNodesInTree(
   }
 
   const context = getContextFromStackAndViewPath(stack, parentPath);
-  const relations = findOrCreateRelationsForContext(
+  const relations = getRelationsForContext(
     data.knowledgeDBs,
-    data.user.publicKey,
+    paneAuthor,
     parentNodeID,
     context,
-    parentView.relations
+    rootRelation,
+    isRoot(parentPath)
   );
-
-  if (!relations) {
-    return ctx;
-  }
 
   // Filter items based on view's typeFilters (default filters out "not_relevant")
   const activeFilters = parentView.typeFilters || DEFAULT_TYPE_FILTERS;
@@ -559,33 +559,30 @@ export function getNodesInTree(
   const itemFilters = activeFilters.filter(
     (f): f is Relevance | Argument => f !== "suggestions"
   );
-  const visibleItems = relations.items
-    .map((item, i) => ({ item, index: i }))
-    .filter(({ item }) => itemFilters.some((f) => itemMatchesType(item, f)));
 
-  const childPaths = visibleItems.map(({ index }) =>
-    addNodeToPathWithRelations(parentPath, relations, index)
-  );
-  const nodesInTree = childPaths.reduce(
-    (nodesList: List<ViewPath>, childPath: ViewPath) => {
-      const childView = getNodeIDFromView(data, childPath)[1];
-      if (noExpansion) {
-        return nodesList.push(childPath);
-      }
-      if (childView.expanded) {
-        // Recursively get children of expanded node
-        // The recursive call will handle adding diff items for childPath at its level
-        return getNodesInTree(
-          data,
-          childPath,
-          stack,
-          nodesList.push(childPath)
-        );
-      }
-      return nodesList.push(childPath);
-    },
-    ctx
-  );
+  const nodesInTree = relations
+    ? relations.items
+        .map((item, i) => ({ item, index: i }))
+        .filter(({ item }) => itemFilters.some((f) => itemMatchesType(item, f)))
+        .map(({ index }) => addNodeToPathWithRelations(parentPath, relations, index))
+        .reduce((nodesList: List<ViewPath>, childPath: ViewPath) => {
+          const childView = getNodeIDFromView(data, childPath)[1];
+          if (noExpansion) {
+            return nodesList.push(childPath);
+          }
+          if (childView.expanded) {
+            return getNodesInTree(
+              data,
+              childPath,
+              stack,
+              nodesList.push(childPath),
+              paneAuthor,
+              rootRelation
+            );
+          }
+          return nodesList.push(childPath);
+        }, ctx)
+    : ctx;
 
   // Get diff items based on active type filters from view settings
   const typeFilters = parentView.typeFilters || DEFAULT_TYPE_FILTERS;
@@ -594,7 +591,7 @@ export function getNodesInTree(
     data.user.publicKey,
     parentNodeID,
     typeFilters,
-    relations.id
+    relations?.id
   );
 
   const withDiffItems =

@@ -10,7 +10,7 @@ import {
   viewPathToString,
 } from "../ViewContext";
 import { NOTE_TYPE } from "./Node";
-import { usePaneStack } from "../SplitPanesContext";
+import { usePaneStack, useCurrentPane } from "../SplitPanesContext";
 
 export type DragItemType = {
   path: ViewPath;
@@ -83,6 +83,7 @@ export function useDroppable({
   const { setState, selection, multiselectBtns } = useTemporaryView();
   const { createPlan, executePlan } = usePlanner();
   const stack = usePaneStack();
+  const pane = useCurrentPane();
   const path = useViewPath();
 
   const isListItem = index !== undefined;
@@ -128,6 +129,8 @@ export function useDroppable({
           destination,
           stack,
           calcIndex(index, direction),
+          pane.author,
+          pane.rootRelation,
           item.isDiffItem
         )
       );

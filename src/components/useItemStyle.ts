@@ -7,7 +7,7 @@ import {
   useIsDiffItem,
   getRelationForView,
 } from "../ViewContext";
-import { usePaneNavigation } from "../SplitPanesContext";
+import { usePaneStack } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 import { TYPE_COLORS } from "../constants";
 
@@ -69,7 +69,7 @@ export function useItemStyle(): ItemStyle {
   const data = useData();
   const viewPath = useViewPath();
   const relationIndex = useRelationIndex();
-  const { stack } = usePaneNavigation();
+  const stack = usePaneStack();
   const isInReferencedByView = useIsInReferencedByView();
   const isDiffItem = useIsDiffItem();
   const parentView = getParentView(viewPath);

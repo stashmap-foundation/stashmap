@@ -1,23 +1,14 @@
 import React from "react";
 import { screen } from "@testing-library/react";
-import {
-  PaneIndexProvider,
-  PaneNavigationProvider,
-} from "../SplitPanesContext";
+import { PaneIndexProvider } from "../SplitPanesContext";
 import { ClosePaneButton } from "./SplitPaneLayout";
-import { ROOT } from "../types";
-import { ALICE, renderApis } from "../utils.test";
-import Data from "../Data";
+import { renderApis } from "../utils.test";
 
 test("ClosePaneButton returns null for pane index 0", () => {
   renderApis(
-    <Data user={ALICE}>
-      <PaneIndexProvider index={0}>
-        <PaneNavigationProvider initialWorkspace={ROOT} author={ALICE.publicKey}>
-          <ClosePaneButton />
-        </PaneNavigationProvider>
-      </PaneIndexProvider>
-    </Data>
+    <PaneIndexProvider index={0}>
+      <ClosePaneButton />
+    </PaneIndexProvider>
   );
 
   expect(screen.queryByLabelText("Close pane")).toBeNull();
@@ -25,13 +16,9 @@ test("ClosePaneButton returns null for pane index 0", () => {
 
 test("ClosePaneButton renders for pane index > 0", () => {
   renderApis(
-    <Data user={ALICE}>
-      <PaneIndexProvider index={1}>
-        <PaneNavigationProvider initialWorkspace={ROOT} author={ALICE.publicKey}>
-          <ClosePaneButton />
-        </PaneNavigationProvider>
-      </PaneIndexProvider>
-    </Data>
+    <PaneIndexProvider index={1}>
+      <ClosePaneButton />
+    </PaneIndexProvider>
   );
 
   expect(screen.getByLabelText("Close pane")).toBeTruthy();

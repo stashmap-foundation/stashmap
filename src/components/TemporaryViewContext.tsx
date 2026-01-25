@@ -13,7 +13,7 @@ import {
 } from "../ViewContext";
 import { getRelations } from "../connections";
 import { useData } from "../DataContext";
-import { usePaneNavigation } from "../SplitPanesContext";
+import { usePaneStack } from "../SplitPanesContext";
 
 type MultiSelectionState = {
   selection: OrderedSet<string>;
@@ -104,7 +104,7 @@ function getSelectedIndices(
 export function useSelectedIndices(): OrderedSet<number> {
   const { selection } = useTemporaryView();
   const data = useData();
-  const { stack } = usePaneNavigation();
+  const stack = usePaneStack();
   const viewKey = useViewKey();
   return getSelectedIndices(data, selection, viewKey, stack);
 }

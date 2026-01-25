@@ -4,7 +4,7 @@ import {
   useSplitPanes,
   PaneIndexProvider,
   usePaneIndex,
-  usePaneNavigation,
+  useCurrentPane,
 } from "./SplitPanesContext";
 import { ROOT } from "./types";
 import { renderApis, ALICE } from "./utils.test";
@@ -17,9 +17,7 @@ function TestSplitPanes(): JSX.Element {
       <div data-testid="pane-ids">{panes.map((p) => p.id).join(",")}</div>
       <button
         type="button"
-        onClick={() =>
-          addPaneAt(panes.length, [ROOT], ALICE.publicKey)
-        }
+        onClick={() => addPaneAt(panes.length, [ROOT], ALICE.publicKey)}
       >
         Add Pane
       </button>
@@ -121,12 +119,25 @@ test("usePaneIndex returns correct index for different panes", () => {
 });
 
 function TestPaneNavigation(): JSX.Element {
-  const { stack, rootNodeID, popTo, setStack } = usePaneNavigation();
+  const { setPane } = useSplitPanes();
+  const pane = useCurrentPane();
+  const rootNodeID = pane.stack[pane.stack.length - 1];
+
+  const popTo = (index: number): void => {
+    if (index >= 0 && index < pane.stack.length) {
+      setPane({ ...pane, stack: pane.stack.slice(0, index + 1) });
+    }
+  };
+
+  const setStack = (newStack: (LongID | ID)[]): void => {
+    setPane({ ...pane, stack: newStack });
+  };
+
   return (
     <div>
-      <div data-testid="stack">{stack.join(",")}</div>
+      <div data-testid="stack">{pane.stack.join(",")}</div>
       <div data-testid="root-node-id">{rootNodeID}</div>
-      <button type="button" onClick={() => popTo(stack.length - 2)}>
+      <button type="button" onClick={() => popTo(pane.stack.length - 2)}>
         Pop
       </button>
       <button type="button" onClick={() => popTo(0)}>
@@ -176,7 +187,7 @@ test("popTo navigates to specific stack index", () => {
   expect(screen.getByTestId("root-node-id").textContent).toBe("new1");
 });
 
-test("setStack replaces entire stack with new path", () => {
+test("setPane replaces entire stack with new path", () => {
   renderApis(<TestPaneNavigation />);
 
   expect(screen.getByTestId("stack").textContent).toBe(ROOT);
@@ -184,17 +195,4 @@ test("setStack replaces entire stack with new path", () => {
   fireEvent.click(screen.getByText("Set Stack"));
   expect(screen.getByTestId("stack").textContent).toBe("new1,new2,new3");
   expect(screen.getByTestId("root-node-id").textContent).toBe("new3");
-});
-
-test("initialStack sets initial stack and rootNodeID", () => {
-  const initialStack = [
-    "node1" as LongID,
-    "node2" as LongID,
-    "node3" as LongID,
-  ];
-
-  renderApis(<TestPaneNavigation />, { initialStack });
-
-  expect(screen.getByTestId("stack").textContent).toBe("node1,node2,node3");
-  expect(screen.getByTestId("root-node-id").textContent).toBe("node3");
 });

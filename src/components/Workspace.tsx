@@ -5,7 +5,12 @@ import { TemporaryViewProvider } from "./TemporaryViewContext";
 import { getNodeFromID } from "../ViewContext";
 import { DND } from "../dnd";
 import { useData } from "../DataContext";
-import { usePaneNavigation, usePaneIndex } from "../SplitPanesContext";
+import {
+  useSplitPanes,
+  useCurrentPane,
+  usePaneStack,
+  usePaneIndex,
+} from "../SplitPanesContext";
 import { TreeView } from "./TreeView";
 import { OpenInSplitPaneButtonWithStack } from "./OpenInSplitPaneButton";
 import {
@@ -83,8 +88,14 @@ function StackedLayer({
 }
 
 export function WorkspaceView(): JSX.Element | null {
-  const { stack, popTo } = usePaneNavigation();
+  const { setPane } = useSplitPanes();
+  const pane = useCurrentPane();
+  const stack = usePaneStack();
   const paneIndex = usePaneIndex();
+
+  const popTo = (index: number): void => {
+    setPane({ ...pane, stack: stack.slice(0, index + 1) });
+  };
 
   // Get stacked workspaces (all except the last one which is active)
   const stackedWorkspaces = stack.slice(0, -1);
@@ -96,16 +107,18 @@ export function WorkspaceView(): JSX.Element | null {
         <div className="position-absolute board">
           <div className="workspace-stack-container">
             {/* Render stacked layers */}
-            {stackedWorkspaces.map((stackedWorkspaceID, index) => (
-              <StackedLayer
-                key={stackedWorkspaceID as string}
-                workspaceID={stackedWorkspaceID as LongID}
-                stackUpToHere={stack.slice(0, index + 1)}
-                onClick={() => popTo(index)}
-                showPaneControls={index === 0}
-                showFirstPaneControls={index === 0 && paneIndex === 0}
-              />
-            ))}
+            {stackedWorkspaces.map(
+              (stackedWorkspaceID: LongID | ID, index: number) => (
+                <StackedLayer
+                  key={stackedWorkspaceID as string}
+                  workspaceID={stackedWorkspaceID as LongID}
+                  stackUpToHere={stack.slice(0, index + 1)}
+                  onClick={() => popTo(index)}
+                  showPaneControls={index === 0}
+                  showFirstPaneControls={index === 0 && paneIndex === 0}
+                />
+              )
+            )}
 
             {/* Render active fullscreen card */}
             <div className="fullscreen-card">

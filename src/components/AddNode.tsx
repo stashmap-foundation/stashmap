@@ -13,7 +13,7 @@ import {
   planSaveNodeAndEnsureRelations,
   planAddToParent,
 } from "../planner";
-import { usePaneNavigation } from "../SplitPanesContext";
+import { usePaneStack } from "../SplitPanesContext";
 
 /**
  * Prevents a button from stealing focus from an editor in the same node row.
@@ -307,7 +307,7 @@ export function SiblingSearchButton(): JSX.Element | null {
   const { openModal, closeModal, isOpen } = useModal();
   const nextInsertPosition = useNextInsertPosition();
   const viewPath = useViewPath();
-  const { stack } = usePaneNavigation();
+  const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
   const editorTextContext = useEditorText();
 
@@ -353,7 +353,7 @@ export function SiblingSearchButton(): JSX.Element | null {
 export function AddSiblingButton(): JSX.Element | null {
   const versionedDisplayText = useDisplayText();
   const nextInsertPosition = useNextInsertPosition();
-  const { stack } = usePaneNavigation();
+  const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
   const viewPath = useViewPath();
   const editorTextContext = useEditorText();

@@ -45,11 +45,8 @@ import {
 import { execute } from "./executor";
 import { ApiProvider, Apis, FinalizeEvent } from "./Apis";
 import { App } from "./App";
-import { DataContextProps, DataContextProvider, useData } from "./DataContext";
-import {
-  WorkspaceContextProvider,
-  useWorkspaceContext,
-} from "./WorkspaceContext";
+import { DataContextProps, DataContextProvider } from "./DataContext";
+import { WorkspaceContextProvider } from "./WorkspaceContext";
 import { MockRelayPool, mockRelayPool } from "./nostrMock.test";
 import {
   NostrAuthContextProvider,
@@ -74,12 +71,10 @@ import { UserRelayContextProvider } from "./UserRelayContext";
 import { NavigationStackProvider } from "./NavigationStackContext";
 import {
   SplitPanesProvider,
-  PaneNavigationProvider,
   PaneIndexProvider,
-  usePaneNavigation,
+  useCurrentPane,
   usePaneIndex,
 } from "./SplitPanesContext";
-import { ROOT } from "./types";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 test.skip("skip", () => {});
@@ -387,34 +382,24 @@ export function renderApis(
                   <UserRelayContextProvider>
                     <SplitPanesProvider>
                       <PaneIndexProvider index={0}>
-                        <PaneNavigationProvider
-                          initialWorkspace={ROOT}
-                          initialStack={options?.initialStack}
-                          author={
-                            optionsWithDefaultUser.user?.publicKey ||
-                            UNAUTHENTICATED_USER_PK
-                          }
+                        <VirtuosoMockContext.Provider
+                          value={{ viewportHeight: 10000, itemHeight: 100 }}
                         >
-                          <VirtuosoMockContext.Provider
-                            value={{ viewportHeight: 10000, itemHeight: 100 }}
-                          >
-                            {" "}
-                            {options?.includeFocusContext === true ? (
-                              <FocusContextProvider>
-                                {children}
-                              </FocusContextProvider>
-                            ) : (
-                              <FocusContext.Provider
-                                value={{
-                                  isInputElementInFocus: true,
-                                  setIsInputElementInFocus: jest.fn(),
-                                }}
-                              >
-                                {children}
-                              </FocusContext.Provider>
-                            )}
-                          </VirtuosoMockContext.Provider>
-                        </PaneNavigationProvider>
+                          {options?.includeFocusContext === true ? (
+                            <FocusContextProvider>
+                              {children}
+                            </FocusContextProvider>
+                          ) : (
+                            <FocusContext.Provider
+                              value={{
+                                isInputElementInFocus: true,
+                                setIsInputElementInFocus: jest.fn(),
+                              }}
+                            >
+                              {children}
+                            </FocusContext.Provider>
+                          )}
+                        </VirtuosoMockContext.Provider>
                       </PaneIndexProvider>
                     </SplitPanesProvider>
                   </UserRelayContextProvider>
@@ -727,11 +712,12 @@ function RootViewOrWorkspaceIsLoadingInner({
 }: {
   children: React.ReactNode;
 }): JSX.Element {
-  const { rootNodeID, stack } = usePaneNavigation();
+  const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
+  const rootNodeID = pane.stack[pane.stack.length - 1];
 
   return (
-    <LoadData nodeIDs={stack}>
+    <LoadData nodeIDs={pane.stack}>
       <LoadData nodeIDs={[rootNodeID]} descendants referencedBy lists>
         <RootViewContextProvider
           root={rootNodeID as LongID}
@@ -749,20 +735,12 @@ export function RootViewOrWorkspaceIsLoading({
 }: {
   children: React.ReactNode;
 }): JSX.Element {
-  const { activeWorkspace } = useWorkspaceContext();
-  const { user } = useData();
-
   return (
     <SplitPanesProvider>
       <PaneIndexProvider index={0}>
-        <PaneNavigationProvider
-          initialWorkspace={activeWorkspace}
-          author={user.publicKey}
-        >
-          <RootViewOrWorkspaceIsLoadingInner>
-            {children}
-          </RootViewOrWorkspaceIsLoadingInner>
-        </PaneNavigationProvider>
+        <RootViewOrWorkspaceIsLoadingInner>
+          {children}
+        </RootViewOrWorkspaceIsLoadingInner>
       </PaneIndexProvider>
     </SplitPanesProvider>
   );

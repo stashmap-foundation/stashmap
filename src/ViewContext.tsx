@@ -18,7 +18,7 @@ import {
 import { newDB } from "./knowledge";
 import { useData } from "./DataContext";
 import { Plan, planUpsertRelations, planUpdateViews } from "./planner";
-import { usePaneNavigation } from "./SplitPanesContext";
+import { usePaneStack } from "./SplitPanesContext";
 import { REFERENCED_BY } from "./constants";
 
 // only exported for tests
@@ -740,7 +740,7 @@ export function getParentView(viewContext: ViewPath): ViewPath | undefined {
 export function useIsDiffItem(): boolean {
   const data = useData();
   const viewPath = useViewPath();
-  const { stack } = usePaneNavigation();
+  const stack = usePaneStack();
   const parentPath = getParentView(viewPath);
 
   if (!parentPath) {
@@ -804,7 +804,7 @@ export function getRelationIndex(
 export function useRelationIndex(): number | undefined {
   const path = useViewPath();
   const data = useData();
-  const { stack } = usePaneNavigation();
+  const stack = usePaneStack();
   return getRelationIndex(data, path, stack);
 }
 
@@ -865,7 +865,7 @@ export function getLastChild(
 export function usePreviousSibling(): SiblingInfo | undefined {
   const data = useData();
   const viewPath = useViewPath();
-  const { stack } = usePaneNavigation();
+  const stack = usePaneStack();
   return getPreviousSibling(data, viewPath, stack);
 }
 
@@ -907,7 +907,7 @@ export function useNode(): [KnowNode, View] | [undefined, undefined] {
 export function useDisplayText(): string {
   const data = useData();
   const viewPath = useViewPath();
-  const { stack } = usePaneNavigation();
+  const stack = usePaneStack();
   const [node] = useNode();
   const [nodeID] = useNodeID();
   const context = getContextFromStackAndViewPath(stack, viewPath);

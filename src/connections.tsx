@@ -195,6 +195,39 @@ export function getRelationsNoReferencedBy(
   return res;
 }
 
+type RefTargetInfo = {
+  stack: (ID | LongID)[];
+  author: PublicKey;
+};
+
+export function getRefTargetInfo(
+  refId: ID | LongID,
+  knowledgeDBs: KnowledgeDBs,
+  myself: PublicKey
+): RefTargetInfo | undefined {
+  if (isConcreteRefId(refId)) {
+    const relationID = parseConcreteRefId(refId);
+    if (!relationID) return undefined;
+    const relation = getRelationsNoReferencedBy(
+      knowledgeDBs,
+      relationID,
+      myself
+    );
+    if (!relation) return undefined;
+    return {
+      stack: [...relation.context.toArray(), relation.head],
+      author: relation.author,
+    };
+  }
+
+  const parsed = parseAbstractRefId(refId);
+  if (!parsed) return undefined;
+  return {
+    stack: [...parsed.targetContext.toArray(), parsed.targetNode],
+    author: myself,
+  };
+}
+
 type ReferencedByPath = {
   head: ID;
   context: Context;

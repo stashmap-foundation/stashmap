@@ -17,7 +17,7 @@ import {
   planSaveNodeAndEnsureRelations,
   Plan,
 } from "../planner";
-import { usePaneNavigation } from "../SplitPanesContext";
+import { usePaneStack } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 import { useEditorText } from "./EditorTextContext";
 
@@ -51,7 +51,7 @@ export function useRelationItemContext(): RelationItemContext {
   const data = useData();
   const viewPath = useViewPath();
   const relationIndex = useRelationIndex();
-  const { stack } = usePaneNavigation();
+  const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
   const isInReferencedByView = useIsInReferencedByView();
   const [node] = useNode();

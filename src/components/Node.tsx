@@ -29,7 +29,7 @@ import {
   getReferencedByRelations,
   getRelations,
   isReferenceNode,
-  getRefTargetStack,
+  getRefTargetInfo,
   itemMatchesType,
   isEmptyNodeID,
 } from "../connections";
@@ -58,7 +58,11 @@ import { planDisconnectFromParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeIcon } from "./NodeIcon";
 import { NodeCard } from "../commons/Ui";
-import { usePaneNavigation } from "../SplitPanesContext";
+import {
+  usePaneStack,
+  useSplitPanes,
+  useCurrentPane,
+} from "../SplitPanesContext";
 import { LeftMenu } from "./LeftMenu";
 import { RightMenu } from "./RightMenu";
 import { FullscreenButton } from "./FullscreenButton";
@@ -77,7 +81,7 @@ function ExpandCollapseToggle(): JSX.Element | null {
   const viewPath = useViewPath();
   const [node] = useNode();
   const [nodeID, view] = useNodeID();
-  const { stack } = usePaneNavigation();
+  const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
   const displayText = useDisplayText();
   const onChangeRelations = useOnChangeRelations();
@@ -233,7 +237,7 @@ function NodeContent({
 
 function EditableContent(): JSX.Element {
   const viewPath = useViewPath();
-  const { stack } = usePaneNavigation();
+  const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
   const [node] = useNode();
   const [nodeID] = useNodeID();
@@ -445,16 +449,17 @@ function NodeAutoLink({
 }: {
   children: React.ReactNode;
 }): JSX.Element | null {
-  const { setStack } = usePaneNavigation();
+  const { setPane } = useSplitPanes();
+  const pane = useCurrentPane();
+  const { knowledgeDBs, user } = useData();
   const [node] = useNode();
   const displayText = useDisplayText();
 
-  // Reference nodes navigate to their target location when clicked
   if (node && isReferenceNode(node)) {
-    const targetStack = getRefTargetStack(node.id);
-    if (targetStack) {
+    const refInfo = getRefTargetInfo(node.id, knowledgeDBs, user.publicKey);
+    if (refInfo) {
       const handleClick = (): void => {
-        setStack(targetStack);
+        setPane({ ...pane, stack: refInfo.stack, author: refInfo.author });
       };
       return (
         <button

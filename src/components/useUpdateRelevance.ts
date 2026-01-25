@@ -1,6 +1,6 @@
 import { updateItemRelevance } from "../connections";
 import { usePlanner } from "../planner";
-import { usePaneNavigation } from "../SplitPanesContext";
+import { usePaneStack } from "../SplitPanesContext";
 import { planDisconnectFromParent } from "../dnd";
 import { useRelationItemContext } from "./useRelationItemContext";
 
@@ -65,7 +65,7 @@ type UseUpdateRelevanceResult = {
  * Used by RelevanceSelector.
  */
 export function useUpdateRelevance(): UseUpdateRelevanceResult {
-  const { stack } = usePaneNavigation();
+  const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
   const { isVisible, nodeText, currentItem, viewPath, updateMetadata } =
     useRelationItemContext();

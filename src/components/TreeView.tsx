@@ -23,7 +23,7 @@ import {
   useDisplayText,
 } from "../ViewContext";
 import { MergeKnowledgeDB, useData } from "../DataContext";
-import { usePaneNavigation } from "../SplitPanesContext";
+import { usePaneStack } from "../SplitPanesContext";
 import {
   addListToFilters,
   addNodeToFilters,
@@ -202,7 +202,7 @@ export function TreeViewNodeLoader({
 
 function Tree(): JSX.Element | null {
   const data = useData();
-  const { stack } = usePaneNavigation();
+  const stack = usePaneStack();
   const { fileStore } = useApis();
   const { getLocalStorage, setLocalStorage } = fileStore;
   const scrollableId = useViewKey();

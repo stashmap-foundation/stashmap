@@ -3,11 +3,9 @@ import { Dropdown } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import {
   useSplitPanes,
-  PaneNavigationProvider,
   PaneIndexProvider,
-  usePaneNavigation,
   usePaneIndex,
-  Pane,
+  useCurrentPane,
 } from "../SplitPanesContext";
 import {
   RootViewContextProvider,
@@ -15,9 +13,7 @@ import {
 } from "../ViewContext";
 import { LoadData } from "../dataQuery";
 import { WorkspaceView } from "./Workspace";
-import { useWorkspaceContext } from "../WorkspaceContext";
 import { planUpdateViews, usePlanner } from "../planner";
-import { ROOT } from "../types";
 import { SearchModal } from "./SearchModal";
 import { useData } from "../DataContext";
 import { isUserLoggedIn, useLogout } from "../NostrAuthContext";
@@ -25,11 +21,12 @@ import { DeleteWorkspace } from "./DeleteNode";
 
 export function PaneSearchButton(): JSX.Element {
   const [showSearch, setShowSearch] = useState(false);
-  const { setStack } = usePaneNavigation();
+  const { setPane } = useSplitPanes();
+  const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
 
   const onSelectNode = (nodeID: ID): void => {
-    setStack([nodeID]);
+    setPane({ ...pane, stack: [nodeID] });
     setShowSearch(false);
   };
 
@@ -144,12 +141,13 @@ export function PaneSettingsMenu(): JSX.Element {
 }
 
 function PaneContent(): JSX.Element {
-  const { rootNodeID, stack } = usePaneNavigation();
+  const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
+  const rootNodeID = pane.stack[pane.stack.length - 1];
 
   return (
     <div className="split-pane">
-      <LoadData nodeIDs={stack}>
+      <LoadData nodeIDs={pane.stack}>
         <LoadData nodeIDs={[rootNodeID]} descendants referencedBy lists>
           <RootViewContextProvider
             root={rootNodeID as LongID}
@@ -163,25 +161,10 @@ function PaneContent(): JSX.Element {
   );
 }
 
-function PaneWrapper({
-  pane,
-  index,
-}: {
-  pane: Pane;
-  index: number;
-}): JSX.Element {
-  const { activeWorkspace } = useWorkspaceContext();
-  const initialWorkspace = index === 0 ? activeWorkspace : ROOT;
-
+function PaneWrapper({ index }: { index: number }): JSX.Element {
   return (
     <PaneIndexProvider index={index}>
-      <PaneNavigationProvider
-        initialWorkspace={initialWorkspace}
-        initialStack={pane.initialStack}
-        author={pane.author}
-      >
-        <PaneContent />
-      </PaneNavigationProvider>
+      <PaneContent />
     </PaneIndexProvider>
   );
 }
@@ -192,7 +175,7 @@ export function SplitPaneLayout(): JSX.Element {
   return (
     <div className="split-pane-container">
       {panes.map((pane, index) => (
-        <PaneWrapper key={pane.id} pane={pane} index={index} />
+        <PaneWrapper key={pane.id} index={index} />
       ))}
     </div>
   );

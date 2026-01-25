@@ -11,7 +11,7 @@ import {
   useViewPath,
   useDisplayText,
 } from "../ViewContext";
-import { usePaneNavigation } from "../SplitPanesContext";
+import { usePaneStack } from "../SplitPanesContext";
 import { useDeselectAllInView } from "./TemporaryViewContext";
 import {
   getRelations,
@@ -88,7 +88,7 @@ export function VersionSelector(): JSX.Element | null {
   const { knowledgeDBs, user } = useData();
   const [nodeID, view] = useNodeID();
   const viewPath = useViewPath();
-  const { stack } = usePaneNavigation();
+  const stack = usePaneStack();
   const onChangeRelations = useOnChangeRelations();
 
   const context = getContextFromStackAndViewPath(stack, viewPath);
@@ -151,7 +151,7 @@ export function ReferencedByToggle(): JSX.Element | null {
   const displayText = useDisplayText();
   const [nodeID, view] = useNodeID();
   const viewPath = useViewPath();
-  const { stack } = usePaneNavigation();
+  const stack = usePaneStack();
   const onChangeRelations = useOnChangeRelations();
 
   if (!node) {

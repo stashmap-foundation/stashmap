@@ -17,14 +17,14 @@ import {
 import { getRelations, isReferenceNode } from "../connections";
 import { useData } from "../DataContext";
 import { REFERENCED_BY, TYPE_COLORS } from "../constants";
-import { usePaneNavigation } from "../SplitPanesContext";
+import { usePaneStack } from "../SplitPanesContext";
 import { SiblingSearchButton, AddSiblingButton } from "./AddNode";
 
 function useSwitchToNormalRelations(): () => void {
   const { knowledgeDBs, user } = useData();
   const [nodeID] = useNodeID();
   const viewPath = useViewPath();
-  const { stack } = usePaneNavigation();
+  const stack = usePaneStack();
   const onChangeRelations = useOnChangeRelations();
 
   const context = getContextFromStackAndViewPath(stack, viewPath);

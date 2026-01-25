@@ -18,7 +18,7 @@ import {
   useViewPath,
   ViewPath,
 } from "./ViewContext";
-import { usePaneNavigation } from "./SplitPanesContext";
+import { usePaneStack } from "./SplitPanesContext";
 import { MergeKnowledgeDB, useData } from "./DataContext";
 import { useApis } from "./Apis";
 import { processEvents } from "./Data";
@@ -333,7 +333,7 @@ export function LoadMissingVersionNodes({
   const data = useData();
   const [contextNodeID] = useNodeID();
   const contextViewPath = useViewPath();
-  const { stack } = usePaneNavigation();
+  const stack = usePaneStack();
 
   const viewPaths = nodes ?? List([contextViewPath]);
 

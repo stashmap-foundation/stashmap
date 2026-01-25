@@ -1,32 +1,37 @@
 import React from "react";
 import { useNodeID, useViewPath } from "../ViewContext";
-import { usePaneNavigation } from "../SplitPanesContext";
-import { getRefTargetStack } from "../connections";
+import {
+  useSplitPanes,
+  useCurrentPane,
+  usePaneStack,
+} from "../SplitPanesContext";
+import { getRefTargetInfo } from "../connections";
+import { useData } from "../DataContext";
 
 export function FullscreenButton(): JSX.Element | null {
-  const { stack, setStack } = usePaneNavigation();
+  const { setPane } = useSplitPanes();
+  const pane = useCurrentPane();
+  const stack = usePaneStack();
   const viewPath = useViewPath();
   const [nodeID] = useNodeID();
+  const { knowledgeDBs, user } = useData();
   const isFullscreenNode = viewPath.length === 2;
   if (isFullscreenNode) {
     return null;
   }
 
   const onClick = (): void => {
-    const stackedWorkspaces = stack.slice(0, -1);
-
-    // For Reference nodes, use only the reference's path (context + target)
-    const targetStack = getRefTargetStack(nodeID);
-    if (targetStack) {
-      setStack(targetStack);
+    const refInfo = getRefTargetInfo(nodeID, knowledgeDBs, user.publicKey);
+    if (refInfo) {
+      setPane({ ...pane, stack: refInfo.stack, author: refInfo.author });
       return;
     }
 
-    // Regular nodes: use viewPath node IDs
+    const stackedWorkspaces = stack.slice(0, -1);
     const viewPathNodeIDs = viewPath
       .slice(1)
       .map((subPath) => (subPath as { nodeID: LongID | ID }).nodeID);
-    setStack([...stackedWorkspaces, ...viewPathNodeIDs]);
+    setPane({ ...pane, stack: [...stackedWorkspaces, ...viewPathNodeIDs] });
   };
 
   return (

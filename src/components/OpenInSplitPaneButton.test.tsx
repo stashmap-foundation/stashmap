@@ -18,8 +18,7 @@ function PaneCountDisplay(): JSX.Element {
 
 function NewPaneStackDisplay(): JSX.Element {
   const { panes } = useSplitPanes();
-  // Get the second pane's initial stack (if it exists)
-  const newPaneStack = panes[1]?.initialStack || [];
+  const newPaneStack = panes[1]?.stack || [];
   return <div data-testid="new-pane-stack">{JSON.stringify(newPaneStack)}</div>;
 }
 

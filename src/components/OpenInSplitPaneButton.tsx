@@ -8,27 +8,30 @@ import {
 import {
   useSplitPanes,
   usePaneIndex,
-  usePaneNavigation,
+  usePaneStack,
+  usePaneAuthor,
 } from "../SplitPanesContext";
 import { IS_MOBILE } from "./responsive";
-import { getRefTargetStack } from "../connections";
+import { getRefTargetInfo } from "../connections";
 import { planUpdateViews, usePlanner } from "../planner";
+import { useData } from "../DataContext";
 
 export function OpenInSplitPaneButton(): JSX.Element | null {
   const { addPaneAt } = useSplitPanes();
   const paneIndex = usePaneIndex();
-  const { stack } = usePaneNavigation();
+  const stack = usePaneStack();
+  const currentAuthor = usePaneAuthor();
   const viewPath = useViewPath();
   const [nodeID] = useNodeID();
   const isMobile = useMediaQuery(IS_MOBILE);
   const { createPlan, executePlan } = usePlanner();
+  const { knowledgeDBs, user } = useData();
 
   if (isMobile) {
     return null;
   }
 
   const onClick = (): void => {
-    // Shift view paths for panes at and after the insertion point
     const insertIndex = paneIndex + 1;
     const plan = createPlan();
     const shiftedViews = updateViewPathsAfterPaneInsert(
@@ -37,23 +40,19 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
     );
     executePlan(planUpdateViews(plan, shiftedViews));
 
-    // Build the full path: pane navigation stack (without last element, which is the workspace root)
-    // + all node IDs from the ViewPath (skip pane index at position 0)
     const paneStackWithoutWorkspace = stack.slice(0, -1);
 
-    // For Reference nodes, use only the reference's path (context + target)
-    const targetStack = getRefTargetStack(nodeID);
-    if (targetStack) {
-      addPaneAt(insertIndex, targetStack);
+    const refInfo = getRefTargetInfo(nodeID, knowledgeDBs, user.publicKey);
+    if (refInfo) {
+      addPaneAt(insertIndex, refInfo.stack, refInfo.author);
       return;
     }
 
-    // Regular nodes: use viewPath node IDs
     const viewPathNodeIDs = viewPath
       .slice(1)
       .map((subPath) => (subPath as { nodeID: LongID | ID }).nodeID);
     const fullStack = [...paneStackWithoutWorkspace, ...viewPathNodeIDs];
-    addPaneAt(insertIndex, fullStack);
+    addPaneAt(insertIndex, fullStack, currentAuthor);
   };
 
   return (
@@ -76,6 +75,7 @@ export function OpenInSplitPaneButtonWithStack({
 }): JSX.Element | null {
   const { addPaneAt } = useSplitPanes();
   const paneIndex = usePaneIndex();
+  const author = usePaneAuthor();
   const isMobile = useMediaQuery(IS_MOBILE);
   const { createPlan, executePlan } = usePlanner();
 
@@ -84,7 +84,6 @@ export function OpenInSplitPaneButtonWithStack({
   }
 
   const onClick = (): void => {
-    // Shift view paths for panes at and after the insertion point
     const insertIndex = paneIndex + 1;
     const plan = createPlan();
     const shiftedViews = updateViewPathsAfterPaneInsert(
@@ -93,7 +92,7 @@ export function OpenInSplitPaneButtonWithStack({
     );
     executePlan(planUpdateViews(plan, shiftedViews));
 
-    addPaneAt(insertIndex, stack);
+    addPaneAt(insertIndex, stack, author);
   };
 
   return (

@@ -325,7 +325,10 @@ test("Parse View path", () => {
 
 test("View path roundtrip preserves ref IDs with colons", () => {
   // Create a ref ID that contains colons: ref:context1:context2:target
-  const refId = createAbstractRefId(List(["ctx1" as ID, "ctx2" as ID]), "target" as ID);
+  const refId = createAbstractRefId(
+    List(["ctx1" as ID, "ctx2" as ID]),
+    "target" as ID
+  );
   expect(refId).toBe("ref:ctx1:ctx2:target");
 
   // Create a view path with the ref ID as the last node

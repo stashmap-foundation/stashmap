@@ -44,7 +44,12 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
 
     const refInfo = getRefTargetInfo(nodeID, knowledgeDBs, user.publicKey);
     if (refInfo) {
-      addPaneAt(insertIndex, refInfo.stack, refInfo.author);
+      addPaneAt(
+        insertIndex,
+        refInfo.stack,
+        refInfo.author,
+        refInfo.rootRelation
+      );
       return;
     }
 

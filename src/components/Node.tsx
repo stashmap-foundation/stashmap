@@ -459,7 +459,12 @@ function NodeAutoLink({
     const refInfo = getRefTargetInfo(node.id, knowledgeDBs, user.publicKey);
     if (refInfo) {
       const handleClick = (): void => {
-        setPane({ ...pane, stack: refInfo.stack, author: refInfo.author });
+        setPane({
+          ...pane,
+          stack: refInfo.stack,
+          author: refInfo.author,
+          rootRelation: refInfo.rootRelation,
+        });
       };
       return (
         <button

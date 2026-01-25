@@ -23,7 +23,12 @@ export function FullscreenButton(): JSX.Element | null {
   const onClick = (): void => {
     const refInfo = getRefTargetInfo(nodeID, knowledgeDBs, user.publicKey);
     if (refInfo) {
-      setPane({ ...pane, stack: refInfo.stack, author: refInfo.author });
+      setPane({
+        ...pane,
+        stack: refInfo.stack,
+        author: refInfo.author,
+        rootRelation: refInfo.rootRelation,
+      });
       return;
     }
 
@@ -31,7 +36,11 @@ export function FullscreenButton(): JSX.Element | null {
     const viewPathNodeIDs = viewPath
       .slice(1)
       .map((subPath) => (subPath as { nodeID: LongID | ID }).nodeID);
-    setPane({ ...pane, stack: [...stackedWorkspaces, ...viewPathNodeIDs] });
+    setPane({
+      ...pane,
+      stack: [...stackedWorkspaces, ...viewPathNodeIDs],
+      rootRelation: undefined,
+    });
   };
 
   return (

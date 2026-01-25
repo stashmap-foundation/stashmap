@@ -198,6 +198,7 @@ export function getRelationsNoReferencedBy(
 type RefTargetInfo = {
   stack: (ID | LongID)[];
   author: PublicKey;
+  rootRelation?: LongID;
 };
 
 export function getRefTargetInfo(
@@ -217,6 +218,7 @@ export function getRefTargetInfo(
     return {
       stack: [...relation.context.toArray(), relation.head],
       author: relation.author,
+      rootRelation: relationID,
     };
   }
 

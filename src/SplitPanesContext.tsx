@@ -8,11 +8,17 @@ export type Pane = {
   id: string;
   stack: (LongID | ID)[];
   author: PublicKey;
+  rootRelation?: LongID;
 };
 
 type SplitPanesContextType = {
   panes: Pane[];
-  addPaneAt: (index: number, stack: (LongID | ID)[], author: PublicKey) => void;
+  addPaneAt: (
+    index: number,
+    stack: (LongID | ID)[],
+    author: PublicKey,
+    rootRelation?: LongID
+  ) => void;
   removePane: (paneId: string) => void;
   setPane: (pane: Pane) => void;
 };
@@ -40,9 +46,19 @@ export function SplitPanesProvider({
   ]);
 
   const addPaneAt = useCallback(
-    (index: number, stack: (LongID | ID)[], author: PublicKey) => {
+    (
+      index: number,
+      stack: (LongID | ID)[],
+      author: PublicKey,
+      rootRelation?: LongID
+    ) => {
       setPanes((prev) => {
-        const newPane: Pane = { id: generatePaneId(), stack, author };
+        const newPane: Pane = {
+          id: generatePaneId(),
+          stack,
+          author,
+          rootRelation,
+        };
         return [...prev.slice(0, index), newPane, ...prev.slice(index)];
       });
     },

@@ -1,27 +1,33 @@
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { screen, fireEvent } from "@testing-library/react";
 import {
-  SplitPanesProvider,
   useSplitPanes,
   PaneIndexProvider,
   usePaneIndex,
   usePaneNavigation,
 } from "./SplitPanesContext";
 import { ROOT } from "./types";
-import { renderApis } from "./utils.test";
+import { renderApis, ALICE } from "./utils.test";
 
 function TestSplitPanes(): JSX.Element {
-  const { panes, addPane, addPaneAt, removePane } = useSplitPanes();
+  const { panes, addPaneAt, removePane } = useSplitPanes();
   return (
     <div>
       <div data-testid="pane-count">{panes.length}</div>
       <div data-testid="pane-ids">{panes.map((p) => p.id).join(",")}</div>
-      <button type="button" onClick={addPane}>
+      <button
+        type="button"
+        onClick={() =>
+          addPaneAt(panes.length, [ROOT], ALICE.publicKey)
+        }
+      >
         Add Pane
       </button>
       <button
         type="button"
-        onClick={() => addPaneAt(1, ["node1" as LongID, "node2" as LongID])}
+        onClick={() =>
+          addPaneAt(1, ["node1" as LongID, "node2" as LongID], ALICE.publicKey)
+        }
       >
         Add Pane At 1
       </button>
@@ -35,12 +41,8 @@ function TestSplitPanes(): JSX.Element {
   );
 }
 
-test("addPane adds a new pane to the end", () => {
-  render(
-    <SplitPanesProvider>
-      <TestSplitPanes />
-    </SplitPanesProvider>
-  );
+test("addPaneAt adds a new pane to the end", () => {
+  renderApis(<TestSplitPanes />);
 
   expect(screen.getByTestId("pane-count").textContent).toBe("1");
 
@@ -52,11 +54,7 @@ test("addPane adds a new pane to the end", () => {
 });
 
 test("addPaneAt inserts pane at specific index with initialStack", () => {
-  render(
-    <SplitPanesProvider>
-      <TestSplitPanes />
-    </SplitPanesProvider>
-  );
+  renderApis(<TestSplitPanes />);
 
   fireEvent.click(screen.getByText("Add Pane"));
   expect(screen.getByTestId("pane-count").textContent).toBe("2");
@@ -74,11 +72,7 @@ test("addPaneAt inserts pane at specific index with initialStack", () => {
 });
 
 test("removePane removes pane by id", () => {
-  render(
-    <SplitPanesProvider>
-      <TestSplitPanes />
-    </SplitPanesProvider>
-  );
+  renderApis(<TestSplitPanes />);
 
   fireEvent.click(screen.getByText("Add Pane"));
   fireEvent.click(screen.getByText("Add Pane"));
@@ -95,11 +89,7 @@ test("removePane removes pane by id", () => {
 });
 
 test("removePane does not remove the last pane", () => {
-  render(
-    <SplitPanesProvider>
-      <TestSplitPanes />
-    </SplitPanesProvider>
-  );
+  renderApis(<TestSplitPanes />);
 
   expect(screen.getByTestId("pane-count").textContent).toBe("1");
 
@@ -113,23 +103,19 @@ function TestPaneIndexInner(): JSX.Element {
 }
 
 test("usePaneIndex returns correct index", () => {
-  render(
-    <SplitPanesProvider>
-      <PaneIndexProvider index={0}>
-        <TestPaneIndexInner />
-      </PaneIndexProvider>
-    </SplitPanesProvider>
+  renderApis(
+    <PaneIndexProvider index={0}>
+      <TestPaneIndexInner />
+    </PaneIndexProvider>
   );
   expect(screen.getByTestId("pane-index").textContent).toBe("0");
 });
 
 test("usePaneIndex returns correct index for different panes", () => {
-  render(
-    <SplitPanesProvider>
-      <PaneIndexProvider index={5}>
-        <TestPaneIndexInner />
-      </PaneIndexProvider>
-    </SplitPanesProvider>
+  renderApis(
+    <PaneIndexProvider index={5}>
+      <TestPaneIndexInner />
+    </PaneIndexProvider>
   );
   expect(screen.getByTestId("pane-index").textContent).toBe("5");
 });

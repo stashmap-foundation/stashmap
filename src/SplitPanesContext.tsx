@@ -1,16 +1,17 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 import { clearViewsForPane } from "./ViewContext";
 import { planUpdateViews, usePlanner } from "./planner";
+import { useData } from "./DataContext";
 
 export type Pane = {
   id: string;
   initialStack?: (LongID | ID)[];
+  author: PublicKey;
 };
 
 type SplitPanesContextType = {
   panes: Pane[];
-  addPane: () => void;
-  addPaneAt: (index: number, stack: (LongID | ID)[]) => void;
+  addPaneAt: (index: number, stack: (LongID | ID)[], author: PublicKey) => void;
   removePane: (paneId: string) => void;
 };
 
@@ -29,18 +30,20 @@ export function SplitPanesProvider({
 }: {
   children: React.ReactNode;
 }): JSX.Element {
-  const [panes, setPanes] = useState<Pane[]>([{ id: generatePaneId() }]);
+  const { user } = useData();
+  const [panes, setPanes] = useState<Pane[]>([
+    { id: generatePaneId(), author: user.publicKey },
+  ]);
 
-  const addPane = useCallback(() => {
-    setPanes((prev) => [...prev, { id: generatePaneId() }]);
-  }, []);
-
-  const addPaneAt = useCallback((index: number, stack: (LongID | ID)[]) => {
-    setPanes((prev) => {
-      const newPane = { id: generatePaneId(), initialStack: stack };
-      return [...prev.slice(0, index), newPane, ...prev.slice(index)];
-    });
-  }, []);
+  const addPaneAt = useCallback(
+    (index: number, stack: (LongID | ID)[], author: PublicKey) => {
+      setPanes((prev) => {
+        const newPane = { id: generatePaneId(), initialStack: stack, author };
+        return [...prev.slice(0, index), newPane, ...prev.slice(index)];
+      });
+    },
+    []
+  );
 
   const removePane = useCallback((paneId: string) => {
     setPanes((prev) => {
@@ -54,11 +57,10 @@ export function SplitPanesProvider({
   const value = React.useMemo(
     () => ({
       panes,
-      addPane,
       addPaneAt,
       removePane,
     }),
-    [panes, addPane, addPaneAt, removePane]
+    [panes, addPaneAt, removePane]
   );
 
   return (
@@ -98,6 +100,7 @@ export function usePaneIndex(): number {
 type PaneNavigationContextType = {
   stack: (LongID | ID)[];
   rootNodeID: ID;
+  author: PublicKey;
   popTo: (index: number) => void;
   setStack: (path: (LongID | ID)[]) => void;
 };
@@ -110,10 +113,12 @@ export function PaneNavigationProvider({
   children,
   initialWorkspace,
   initialStack,
+  author,
 }: {
   children: React.ReactNode;
   initialWorkspace: LongID | ID;
   initialStack?: (LongID | ID)[];
+  author: PublicKey;
 }): JSX.Element {
   const [stack, setStack] = useState<(LongID | ID)[]>(
     initialStack || [initialWorkspace]
@@ -144,10 +149,11 @@ export function PaneNavigationProvider({
     () => ({
       stack,
       rootNodeID,
+      author,
       popTo,
       setStack: setStackFn,
     }),
-    [stack, rootNodeID, popTo, setStackFn]
+    [stack, rootNodeID, author, popTo, setStackFn]
   );
 
   return (
@@ -169,4 +175,8 @@ export function usePaneNavigation(): PaneNavigationContextType {
 
 export function usePaneStack(): (LongID | ID)[] {
   return usePaneNavigation().stack;
+}
+
+export function usePaneAuthor(): PublicKey {
+  return usePaneNavigation().author;
 }

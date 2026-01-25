@@ -171,8 +171,6 @@ function PaneWrapper({
   index: number;
 }): JSX.Element {
   const { activeWorkspace } = useWorkspaceContext();
-  // First pane respects URL/localStorage workspace
-  // Additional panes use initialStack if set
   const initialWorkspace = index === 0 ? activeWorkspace : ROOT;
 
   return (
@@ -180,6 +178,7 @@ function PaneWrapper({
       <PaneNavigationProvider
         initialWorkspace={initialWorkspace}
         initialStack={pane.initialStack}
+        author={pane.author}
       >
         <PaneContent />
       </PaneNavigationProvider>

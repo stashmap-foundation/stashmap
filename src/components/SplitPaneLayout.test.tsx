@@ -13,7 +13,7 @@ test("ClosePaneButton returns null for pane index 0", () => {
   renderApis(
     <Data user={ALICE}>
       <PaneIndexProvider index={0}>
-        <PaneNavigationProvider initialWorkspace={ROOT}>
+        <PaneNavigationProvider initialWorkspace={ROOT} author={ALICE.publicKey}>
           <ClosePaneButton />
         </PaneNavigationProvider>
       </PaneIndexProvider>
@@ -27,7 +27,7 @@ test("ClosePaneButton renders for pane index > 0", () => {
   renderApis(
     <Data user={ALICE}>
       <PaneIndexProvider index={1}>
-        <PaneNavigationProvider initialWorkspace={ROOT}>
+        <PaneNavigationProvider initialWorkspace={ROOT} author={ALICE.publicKey}>
           <ClosePaneButton />
         </PaneNavigationProvider>
       </PaneIndexProvider>

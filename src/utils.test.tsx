@@ -45,7 +45,7 @@ import {
 import { execute } from "./executor";
 import { ApiProvider, Apis, FinalizeEvent } from "./Apis";
 import { App } from "./App";
-import { DataContextProps, DataContextProvider } from "./DataContext";
+import { DataContextProps, DataContextProvider, useData } from "./DataContext";
 import {
   WorkspaceContextProvider,
   useWorkspaceContext,
@@ -364,32 +364,36 @@ export function renderApis(
   const utils = render(
     <BrowserRouter>
       <NavigationStackProvider>
-        <SplitPanesProvider>
-          <PaneIndexProvider index={0}>
-            <ApiProvider
-              apis={{
-                fileStore,
-                relayPool,
-                finalizeEvent,
-                nip11,
-                eventLoadingTimeout: 0,
-                timeToStorePreLoginEvents: 0,
-              }}
-            >
-              {/* eslint-disable-next-line react/jsx-props-no-spreading */}
-              <DataContextProvider {...DEFAULT_DATA_CONTEXT_PROPS}>
-                <WorkspaceContextProvider>
-                  <PlanningContextProvider setPublishEvents={() => {}}>
-                    <NostrAuthContextProvider
-                      defaultRelayUrls={
-                        optionsWithDefaultUser.defaultRelays ||
-                        TEST_RELAYS.map((r) => r.url)
-                      }
-                    >
-                      <UserRelayContextProvider>
+        <ApiProvider
+          apis={{
+            fileStore,
+            relayPool,
+            finalizeEvent,
+            nip11,
+            eventLoadingTimeout: 0,
+            timeToStorePreLoginEvents: 0,
+          }}
+        >
+          {/* eslint-disable-next-line react/jsx-props-no-spreading */}
+          <DataContextProvider {...DEFAULT_DATA_CONTEXT_PROPS}>
+            <WorkspaceContextProvider>
+              <PlanningContextProvider setPublishEvents={() => {}}>
+                <NostrAuthContextProvider
+                  defaultRelayUrls={
+                    optionsWithDefaultUser.defaultRelays ||
+                    TEST_RELAYS.map((r) => r.url)
+                  }
+                >
+                  <UserRelayContextProvider>
+                    <SplitPanesProvider>
+                      <PaneIndexProvider index={0}>
                         <PaneNavigationProvider
                           initialWorkspace={ROOT}
                           initialStack={options?.initialStack}
+                          author={
+                            optionsWithDefaultUser.user?.publicKey ||
+                            UNAUTHENTICATED_USER_PK
+                          }
                         >
                           <VirtuosoMockContext.Provider
                             value={{ viewportHeight: 10000, itemHeight: 100 }}
@@ -411,14 +415,14 @@ export function renderApis(
                             )}
                           </VirtuosoMockContext.Provider>
                         </PaneNavigationProvider>
-                      </UserRelayContextProvider>
-                    </NostrAuthContextProvider>
-                  </PlanningContextProvider>
-                </WorkspaceContextProvider>
-              </DataContextProvider>
-            </ApiProvider>
-          </PaneIndexProvider>
-        </SplitPanesProvider>
+                      </PaneIndexProvider>
+                    </SplitPanesProvider>
+                  </UserRelayContextProvider>
+                </NostrAuthContextProvider>
+              </PlanningContextProvider>
+            </WorkspaceContextProvider>
+          </DataContextProvider>
+        </ApiProvider>
       </NavigationStackProvider>
     </BrowserRouter>
   );
@@ -746,11 +750,15 @@ export function RootViewOrWorkspaceIsLoading({
   children: React.ReactNode;
 }): JSX.Element {
   const { activeWorkspace } = useWorkspaceContext();
+  const { user } = useData();
 
   return (
     <SplitPanesProvider>
       <PaneIndexProvider index={0}>
-        <PaneNavigationProvider initialWorkspace={activeWorkspace}>
+        <PaneNavigationProvider
+          initialWorkspace={activeWorkspace}
+          author={user.publicKey}
+        >
           <RootViewOrWorkspaceIsLoadingInner>
             {children}
           </RootViewOrWorkspaceIsLoadingInner>

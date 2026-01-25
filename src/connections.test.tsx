@@ -10,7 +10,7 @@ import {
   aggregateWeightedVotes,
   aggregateNegativeWeightedVotes,
   countRelevanceVoting,
-  parseRefId,
+  parseAbstractRefId,
 } from "./connections";
 import { ALICE, BOB, CAROL } from "./utils.test";
 import { newRelations } from "./ViewContext";
@@ -111,7 +111,7 @@ test("get referenced by relations", () => {
     btc.id
   );
   const refIds = getNodeIDs(referencedBy?.items || List());
-  const parsed = refIds.map((refId) => parseRefId(refId));
+  const parsed = refIds.map((refId) => parseAbstractRefId(refId));
   // All targetNodes should be Bitcoin
   expect(parsed.every((p) => p?.targetNode === btc.id)).toBe(true);
   // Contexts contain short IDs - getNodeFromID searches all DBs for short IDs

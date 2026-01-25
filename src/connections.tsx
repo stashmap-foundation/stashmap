@@ -29,20 +29,35 @@ export function isReferenceNode(node: KnowNode): node is ReferenceNode {
 }
 
 // Reference ID utilities
-// Format: "ref:targetId:context0:context1:..."
+// Abstract format: "ref:context0:context1:nodeID" - groups all versions for (context, node)
+// Concrete format: "cref:relationID" - specific version/list (relation has context, head, author)
+const CONCRETE_REF_PREFIX = "cref:";
+
 export function isRefId(id: ID | LongID): boolean {
+  return id.startsWith(REF_PREFIX) || id.startsWith(CONCRETE_REF_PREFIX);
+}
+
+export function isAbstractRefId(id: ID | LongID): boolean {
   return id.startsWith(REF_PREFIX);
 }
 
-export function createRefId(context: Context, targetNode: ID): LongID {
+export function isConcreteRefId(id: ID | LongID): boolean {
+  return id.startsWith(CONCRETE_REF_PREFIX);
+}
+
+export function createAbstractRefId(context: Context, targetNode: ID): LongID {
   const parts = [REF_PREFIX.slice(0, -1), ...context.toArray(), targetNode];
   return parts.join(":") as LongID;
 }
 
-export function parseRefId(
+export function createConcreteRefId(relationID: LongID): LongID {
+  return `${CONCRETE_REF_PREFIX}${relationID}` as LongID;
+}
+
+export function parseAbstractRefId(
   refId: ID | LongID
 ): { targetNode: ID; targetContext: Context } | undefined {
-  if (!isRefId(refId)) {
+  if (!isAbstractRefId(refId)) {
     return undefined;
   }
   const parts = refId.split(":");
@@ -54,8 +69,15 @@ export function parseRefId(
   return { targetNode, targetContext };
 }
 
+export function parseConcreteRefId(refId: ID | LongID): LongID | undefined {
+  if (!isConcreteRefId(refId)) {
+    return undefined;
+  }
+  return refId.slice(CONCRETE_REF_PREFIX.length) as LongID;
+}
+
 export function extractNodeIdsFromRefId(refId: ID | LongID): List<ID> {
-  const parsed = parseRefId(refId);
+  const parsed = parseAbstractRefId(refId);
   if (!parsed) {
     return List();
   }
@@ -67,7 +89,7 @@ export function extractNodeIdsFromRefId(refId: ID | LongID): List<ID> {
 export function getRefTargetStack(
   refId: ID | LongID
 ): (ID | LongID)[] | undefined {
-  const parsed = parseRefId(refId);
+  const parsed = parseAbstractRefId(refId);
   if (!parsed) {
     return undefined;
   }
@@ -80,7 +102,7 @@ export function getRefTargetStack(
 export function getRefTargetRelationInfo(
   refId: ID | LongID
 ): { head: ID; context: Context } | undefined {
-  const parsed = parseRefId(refId);
+  const parsed = parseAbstractRefId(refId);
   if (!parsed) {
     return undefined;
   }
@@ -97,7 +119,7 @@ export function buildReferenceNode(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey
 ): ReferenceNode | undefined {
-  const parsed = parseRefId(refId);
+  const parsed = parseAbstractRefId(refId);
   if (!parsed) {
     return undefined;
   }
@@ -248,7 +270,7 @@ export function getReferencedByRelations(
         const isOwnList =
           path.context.size === 0 && shortID(path.head) === targetShortID;
         if (isOwnList) {
-          return createRefId(List<ID>(), nodeID as ID);
+          return createAbstractRefId(List<ID>(), nodeID as ID);
         }
 
         // If the node is inside ~Versions, point to the parent node instead
@@ -256,10 +278,10 @@ export function getReferencedByRelations(
         if (path.head === VERSIONS_NODE_ID && path.context.size > 0) {
           const parentNode = path.context.last() as ID;
           const parentContext = path.context.slice(0, -1);
-          return createRefId(parentContext, parentNode);
+          return createAbstractRefId(parentContext, parentNode);
         }
 
-        return createRefId(path.context.push(path.head), nodeID as ID);
+        return createAbstractRefId(path.context.push(path.head), nodeID as ID);
       })
       // Deduplicate refIds (multiple versions inside ~Versions map to the same parent)
       .toOrderedSet()

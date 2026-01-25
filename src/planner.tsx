@@ -196,6 +196,8 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
     );
   // Context tags: ["c", id] for each ancestor (enables relay-level context queries)
   const contextTags = relations.context.toArray().map((id) => ["c", id]);
+  // basedOn tag: ["b", relationID] - tracks what this relation was forked from
+  const basedOnTag = relations.basedOn ? [["b", relations.basedOn]] : [];
   const updateRelationsEvent = {
     kind: KIND_KNOWLEDGE_LIST,
     pubkey: plan.user.publicKey,
@@ -207,6 +209,7 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
       // Full ID Head
       ["head", relations.head],
       ...contextTags,
+      ...basedOnTag,
       ...itemsAsTags,
     ],
     content: "",

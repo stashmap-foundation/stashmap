@@ -6,7 +6,7 @@ import { ViewContext, ViewPath, NodeIndex } from "../ViewContext";
 import { FullscreenButton } from "./FullscreenButton";
 import { ROOT } from "../types";
 import { renderApis } from "../utils.test";
-import { createRefId } from "../connections";
+import { createAbstractRefId } from "../connections";
 
 function CurrentStackDisplay(): JSX.Element {
   const { stack } = usePaneNavigation();
@@ -17,7 +17,7 @@ test("Reference node opens with only reference path, not current pane stack", ()
   // Create a ref ID: context is [contextNode], target is targetNode
   const contextNode = "context123" as ID;
   const targetNode = "target456" as ID;
-  const refId = createRefId(List([contextNode]), targetNode);
+  const refId = createAbstractRefId(List([contextNode]), targetNode);
 
   // ViewPath with the ref ID as the current node
   const viewPath: ViewPath = [

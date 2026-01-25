@@ -7,7 +7,7 @@ import {
   addRelationToRelations,
   bulkAddRelations,
   shortID,
-  createRefId,
+  createAbstractRefId,
 } from "./connections";
 import { execute } from "./executor";
 import {
@@ -325,7 +325,7 @@ test("Parse View path", () => {
 
 test("View path roundtrip preserves ref IDs with colons", () => {
   // Create a ref ID that contains colons: ref:context1:context2:target
-  const refId = createRefId(List(["ctx1" as ID, "ctx2" as ID]), "target" as ID);
+  const refId = createAbstractRefId(List(["ctx1" as ID, "ctx2" as ID]), "target" as ID);
   expect(refId).toBe("ref:ctx1:ctx2:target");
 
   // Create a view path with the ref ID as the last node
@@ -350,7 +350,7 @@ test("View path roundtrip preserves ref IDs with colons", () => {
 
 test("View path roundtrip preserves ref IDs in middle of path", () => {
   // Ref ID in the middle of the path (with relationsID)
-  const refId = createRefId(List(["money" as ID]), "bitcoin" as ID);
+  const refId = createAbstractRefId(List(["money" as ID]), "bitcoin" as ID);
 
   const viewPath: ViewPath = [
     1,

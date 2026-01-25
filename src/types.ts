@@ -195,6 +195,7 @@ declare global {
     id: LongID;
     updated: number;
     author: PublicKey;
+    basedOn?: LongID;
   };
 
   type BasicNode = {

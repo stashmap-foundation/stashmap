@@ -172,6 +172,9 @@ export function eventToRelations(e: UnsignedEvent): Relations | undefined {
   const contextTags = findAllTags(e, "c") || [];
   const context = List(contextTags.map((tag) => tag[0] as ID));
 
+  // Parse basedOn from "b" tag: ["b", relationID]
+  const basedOn = findTag(e, "b") as LongID | undefined;
+
   // Parse items with relevance and optional argument: ["i", nodeID, relevance, argument?]
   // Invalid relevance/argument values are filtered to defaults
   const itemsAsTags = findAllTags(e, "i") || [];
@@ -190,6 +193,7 @@ export function eventToRelations(e: UnsignedEvent): Relations | undefined {
     updated,
     items,
     author: e.pubkey as PublicKey,
+    basedOn,
   };
 }
 

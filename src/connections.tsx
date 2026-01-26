@@ -245,8 +245,7 @@ export function getRelationsNoReferencedBy(
   if (remote) {
     return knowledgeDBs.get(remote)?.relations.get(id);
   }
-  const res = knowledgeDBs.get(myself)?.relations.get(relationID);
-  return res;
+  return knowledgeDBs.get(myself)?.relations.get(relationID);
 }
 
 type RefTargetInfo = {

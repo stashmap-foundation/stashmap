@@ -13,7 +13,6 @@ import {
   getNodeIDFromView,
   useNodeID,
   getContextFromStackAndViewPath,
-  getAvailableRelationsForNode,
   getRelationsForContext,
   usePreviousSibling,
   useDisplayText,
@@ -29,7 +28,6 @@ import {
 import {
   getReferencedByRelations,
   getConcreteRefsForAbstract,
-  getRelations,
   isReferenceNode,
   getRefTargetInfo,
   itemMatchesType,
@@ -40,11 +38,7 @@ import {
 import { REFERENCED_BY, DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 import { IS_MOBILE } from "./responsive";
 import { MiniEditor, preventEditorBlurIfSameNode } from "./AddNode";
-import {
-  sortRelations,
-  useOnChangeRelations,
-  useOnToggleExpanded,
-} from "./SelectRelations";
+import { useOnToggleExpanded } from "./SelectRelations";
 import { ReferenceIndicators } from "./ReferenceIndicators";
 import { useData } from "../DataContext";
 import {
@@ -81,76 +75,20 @@ function getLevels(viewPath: ViewPath): number {
 }
 
 function ExpandCollapseToggle(): JSX.Element | null {
-  const data = useData();
-  const viewPath = useViewPath();
-  const [node] = useNode();
   const [nodeID, view] = useNodeID();
-  const stack = usePaneStack();
-  const { createPlan, executePlan } = usePlanner();
   const displayText = useDisplayText();
-  const onChangeRelations = useOnChangeRelations();
   const onToggleExpanded = useOnToggleExpanded();
   const isReferencedBy = view.relations === REFERENCED_BY;
 
   const isExpanded = useIsExpanded();
   const isEmptyNode = isEmptyNodeID(nodeID);
 
-  // Get available relations filtered by context (same as SelectRelations)
-  const context = getContextFromStackAndViewPath(stack, viewPath);
-  const availableRelations = getAvailableRelationsForNode(
-    data.knowledgeDBs,
-    data.user.publicKey,
-    nodeID,
-    context
-  );
-  const hasRelations = availableRelations.size > 0;
-
-  // Get current relations (same as SelectRelations)
-  const currentRelations = getRelations(
-    data.knowledgeDBs,
-    view.relations,
-    data.user.publicKey,
-    nodeID
-  );
-
-  // Determine topRelation (same logic as SelectRelationsButton)
-  const isSelected =
-    availableRelations.filter((r) => r.id === currentRelations?.id).size > 0;
-  const sorted = sortRelations(availableRelations, data.user.publicKey);
-  const topRelation = isSelected ? currentRelations : sorted.first();
-
-  // Get color based on view state: purple for Referenced By, black for normal
-  // Reduce opacity for disabled empty nodes
   const baseColor = isReferencedBy ? TYPE_COLORS.referenced_by : "black";
   const color = isEmptyNode ? "#ccc" : baseColor;
 
   const onToggle = (): void => {
-    // Don't allow expanding empty nodes
     if (isEmptyNode) return;
-
-    if (hasRelations && topRelation) {
-      // Has existing relations (same as SelectRelationsButton onClick)
-      if (view.relations === topRelation.id) {
-        // Toggle expanded state
-        onToggleExpanded(!isExpanded);
-      } else {
-        // Change to the correct relation and expand
-        onChangeRelations(topRelation, true);
-      }
-    } else {
-      // No relations exist, create and expand (uses planExpandNode for ~Versions prepopulation)
-      if (!node) {
-        return;
-      }
-      const plan = planExpandNode(
-        createPlan(),
-        node.id,
-        context,
-        view,
-        viewPath
-      );
-      executePlan(plan);
-    }
+    onToggleExpanded(!isExpanded);
   };
 
   return (

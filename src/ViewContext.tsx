@@ -18,7 +18,7 @@ import {
 import { newDB } from "./knowledge";
 import { useData } from "./DataContext";
 import { Plan, planUpsertRelations, planUpdateViews } from "./planner";
-import { usePaneStack } from "./SplitPanesContext";
+import { usePaneStack, useCurrentPane } from "./SplitPanesContext";
 import { REFERENCED_BY } from "./constants";
 
 // only exported for tests
@@ -718,6 +718,7 @@ export function useIsDiffItem(): boolean {
   const data = useData();
   const viewPath = useViewPath();
   const stack = usePaneStack();
+  const pane = useCurrentPane();
   const parentPath = getParentView(viewPath);
 
   if (!parentPath) {
@@ -725,7 +726,26 @@ export function useIsDiffItem(): boolean {
   }
 
   const [nodeID] = getNodeIDFromView(data, viewPath);
-  const parentRelations = getRelationForView(data, parentPath, stack);
+  const [parentNodeID] = getNodeIDFromView(data, parentPath);
+
+  // Reference nodes are never diff items
+  if (isRefId(nodeID)) {
+    return false;
+  }
+
+
+  // No suggestions when viewing another user's content
+  if (pane.author !== data.user.publicKey) {
+    return false;
+  }
+
+  const context = getContextFromStackAndViewPath(stack, parentPath);
+  const parentRelations = getNewestRelationFromAuthor(
+    data.knowledgeDBs,
+    pane.author,
+    parentNodeID,
+    context
+  );
   if (!parentRelations) {
     return false;
   }
@@ -1152,9 +1172,12 @@ export function getRelationsForContext(
   isRoot: boolean
 ): Relations | undefined {
   if (isRoot && rootRelation) {
-    return getRelationsNoReferencedBy(knowledgeDBs, rootRelation, paneAuthor);
+    const rel = getRelationsNoReferencedBy(knowledgeDBs, rootRelation, paneAuthor);
+    console.log("getRelationsForContext ROOT: rootRel=" + rootRelation?.slice(0, 20) + " found=" + !!rel + " items=" + rel?.items.size);
+    return rel;
   }
-  return getNewestRelationFromAuthor(knowledgeDBs, paneAuthor, nodeID, context);
+  const rel = getNewestRelationFromAuthor(knowledgeDBs, paneAuthor, nodeID, context);
+  return rel;
 }
 
 export function upsertRelations(

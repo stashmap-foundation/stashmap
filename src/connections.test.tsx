@@ -93,12 +93,12 @@ test("get referenced by relations", () => {
   );
   const aliceDBWithRelations = {
     ...aliceDB,
-    relations: Map({ [money.id]: moneyRelations }),
+    relations: Map({ [shortID(moneyRelations.id)]: moneyRelations }),
     nodes: Map({ [btc.id]: btc, [money.id]: money }),
   };
   const bobDBWithRelations = {
     ...bobsDB,
-    relations: Map({ [crypto.id]: cryptoRelations }),
+    relations: Map({ [shortID(cryptoRelations.id)]: cryptoRelations }),
     nodes: Map({ [crypto.id]: crypto }),
   };
   const dbs = Map({

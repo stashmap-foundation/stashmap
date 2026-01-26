@@ -1173,7 +1173,6 @@ export function getRelationsForContext(
 ): Relations | undefined {
   if (isRoot && rootRelation) {
     const rel = getRelationsNoReferencedBy(knowledgeDBs, rootRelation, paneAuthor);
-    console.log("getRelationsForContext ROOT: rootRel=" + rootRelation?.slice(0, 20) + " found=" + !!rel + " items=" + rel?.items.size);
     return rel;
   }
   const rel = getNewestRelationFromAuthor(knowledgeDBs, paneAuthor, nodeID, context);

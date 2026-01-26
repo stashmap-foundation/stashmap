@@ -79,7 +79,6 @@ My Notes
 
     cleanup();
 
-    console.log(">>>>>>> HERE IT'S GETTING INTERESTING <<<<<<<");
     renderTree(alice);
     await userEvent.click(
       await screen.findByLabelText("show references to Barcelona")

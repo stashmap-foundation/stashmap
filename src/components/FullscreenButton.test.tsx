@@ -36,7 +36,7 @@ test("Reference node opens with only reference path, not current pane stack", ()
     </ViewContext.Provider>
   );
 
-  fireEvent.click(screen.getByLabelText("open fullscreen"));
+  fireEvent.click(screen.getByLabelText("open Loading... → Loading... in fullscreen"));
 
   const currentStack = JSON.parse(
     screen.getByTestId("current-stack").textContent || "[]"

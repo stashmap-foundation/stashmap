@@ -131,7 +131,6 @@ My Notes
     cleanup();
 
     renderTree(alice);
-    await userEvent.click(await screen.findByLabelText("expand Cities"));
     await userEvent.click(
       await screen.findByLabelText("show references to Barcelona")
     );
@@ -139,13 +138,23 @@ My Notes
       await screen.findByLabelText("expand My Notes → Cities → Barcelona")
     );
 
-    await screen.findByText("My Notes → Cities → Barcelona (1 item)");
+    await expectTree(`
+My Notes
+  Cities
+    Barcelona
+      My Notes → Cities → Barcelona
+        My Notes → Cities → Barcelona (1)
+        My Notes → Cities → Barcelona (1)
+    `);
 
-    await userEvent.click(
-      await screen.findByLabelText(
-        "open My Notes → Cities → Barcelona (1 item) in fullscreen"
-      )
+    const fullscreenButtons = await screen.findAllByLabelText(
+      "open My Notes → Cities → Barcelona (1) in fullscreen"
     );
+    // Click the first one (Bob's ref is more recent, so sorted first)
+    await userEvent.click(fullscreenButtons[0]);
+
+    // Barcelona needs to be expanded to show children
+    await userEvent.click(await screen.findByLabelText("expand Barcelona"));
 
     await expectTree(`
 Barcelona

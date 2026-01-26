@@ -1,5 +1,5 @@
 import React from "react";
-import { useNodeID, useViewPath } from "../ViewContext";
+import { useNodeID, useViewPath, useDisplayText } from "../ViewContext";
 import {
   useSplitPanes,
   useCurrentPane,
@@ -15,6 +15,7 @@ export function FullscreenButton(): JSX.Element | null {
   const viewPath = useViewPath();
   const [nodeID] = useNodeID();
   const { knowledgeDBs, user } = useData();
+  const displayText = useDisplayText();
   const isFullscreenNode = viewPath.length === 2;
   if (isFullscreenNode) {
     return null;
@@ -43,10 +44,14 @@ export function FullscreenButton(): JSX.Element | null {
     });
   };
 
+  const ariaLabel = displayText
+    ? `open ${displayText} in fullscreen`
+    : "open fullscreen";
+
   return (
     <button
       type="button"
-      aria-label="open fullscreen"
+      aria-label={ariaLabel}
       className="btn btn-borderless p-0"
       onClick={onClick}
       title="Open in fullscreen"

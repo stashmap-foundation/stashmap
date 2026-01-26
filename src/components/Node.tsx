@@ -557,14 +557,11 @@ export function getNodesInTree(
       data.user.publicKey,
       parentNodeID
     );
-    if (parentNodeID.startsWith("062dda")) {
-      console.log("Barcelona REFERENCED_BY:", relations?.items.size, "items:", relations?.items.map(i => i.nodeID.slice(0, 20)).toJS(), "ctx size:", ctx.size);
-    }
     if (!relations || relations.items.size === 0) {
       return ctx;
     }
     // Check if children are expanded and recurse
-    const result = relations.items.reduce((nodesList, _, i) => {
+    return relations.items.reduce((nodesList, _, i) => {
       const childPath = addNodeToPathWithRelations(parentPath, relations, i);
       const [childNodeID, childView] = getNodeIDFromView(data, childPath);
       if (childView.expanded && isAbstractRefId(childNodeID)) {
@@ -579,10 +576,6 @@ export function getNodesInTree(
       }
       return nodesList.push(childPath);
     }, ctx);
-    if (parentNodeID.startsWith("062dda")) {
-      console.log("Barcelona returning:", result.size, "nodes, last nodeID:", result.last() ? (result.last()[result.last().length-1] as any)?.nodeID?.slice(0,15) : "none");
-    }
-    return result;
   }
   const context = getContextFromStackAndViewPath(stack, parentPath);
   const relations = getRelationsForContext(

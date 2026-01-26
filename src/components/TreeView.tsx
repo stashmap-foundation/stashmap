@@ -227,9 +227,6 @@ function Tree(): JSX.Element | null {
     : List<ViewPath>();
   // Include ROOT as the first node, followed by its children
   const nodes = List<ViewPath>([viewPath]).concat(childNodes);
-  if (childNodes.size >= 3) {
-    console.log("TreeView render, childNodes:", childNodes.size, childNodes.map(p => (p[p.length-1] as any)?.nodeID?.slice(0,10)).toJS());
-  }
   const displayText = useDisplayText();
   const ariaLabel = displayText ? `related to ${displayText}` : undefined;
 

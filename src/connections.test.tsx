@@ -10,7 +10,8 @@ import {
   aggregateWeightedVotes,
   aggregateNegativeWeightedVotes,
   countRelevanceVoting,
-  parseAbstractRefId,
+  parseConcreteRefId,
+  getRelationsNoReferencedBy,
 } from "./connections";
 import { ALICE, BOB, CAROL } from "./utils.test";
 import { newRelations } from "./ViewContext";
@@ -111,12 +112,18 @@ test("get referenced by relations", () => {
     btc.id
   );
   const refIds = getNodeIDs(referencedBy?.items || List());
-  const parsed = refIds.map((refId) => parseAbstractRefId(refId));
-  // All targetNodes should be Bitcoin
-  expect(parsed.every((p) => p?.targetNode === btc.id)).toBe(true);
-  // Contexts contain short IDs - getNodeFromID searches all DBs for short IDs
-  const parents = parsed.map((p) => p?.targetContext.last()).toSet();
-  expect(parents).toEqual(
+  // With single refs per context, we now get concrete refs
+  const parsed = refIds.map((refId) => parseConcreteRefId(refId));
+  // All refs should have a targetNode (btc is IN items, not HEAD)
+  expect(parsed.every((p) => p?.targetNode === shortID(btc.id))).toBe(true);
+  // Get the parent heads from the relations
+  const relationHeads = parsed
+    .map((p) => {
+      const rel = getRelationsNoReferencedBy(dbs as KnowledgeDBs, p?.relationID, ALICE.publicKey);
+      return rel?.head;
+    })
+    .toSet();
+  expect(relationHeads).toEqual(
     List([shortID(money.id), shortID(crypto.id)] as ID[]).toSet()
   );
 });

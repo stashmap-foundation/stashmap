@@ -52,7 +52,7 @@ describe("Version Display", () => {
 My Notes
   Holiday Destinations
     BCN
-      My Notes → Holiday Destinations → BCN
+      My Notes → Holiday Destinations (1) → BCN
     `);
 
     cleanup();
@@ -63,7 +63,7 @@ My Notes
 My Notes
   Holiday Destinations
     BCN
-      My Notes → Holiday Destinations → BCN
+      My Notes → Holiday Destinations (1) → BCN
     `);
   });
 
@@ -687,14 +687,14 @@ My Notes
     await screen.findByLabelText("hide references to Barcelona");
 
     // Should show two references:
-    // - "My Notes → Holiday Destinations → Barcelona" (direct)
-    // - "My Notes → Cities in Spain → BCN" (filtered from "...BCN → ~Versions → Barcelona")
+    // - "My Notes → Holiday Destinations (1) → Barcelona" (direct, concrete ref)
+    // - "My Notes → Cities in Spain (1) → BCN" (filtered from "...BCN → ~Versions → Barcelona")
     await expectTree(`
 My Notes
   Holiday Destinations
     Barcelona
-      My Notes → Cities in Spain → BCN
-      My Notes → Holiday Destinations → Barcelona
+      My Notes → Holiday Destinations (1) → Barcelona
+      My Notes → Cities in Spain (1) → BCN
   Cities in Spain
     BCN
     `);
@@ -706,8 +706,8 @@ My Notes
 My Notes
   Holiday Destinations
     Barcelona
-      My Notes → Cities in Spain → BCN
-      My Notes → Holiday Destinations → Barcelona
+      My Notes → Holiday Destinations (1) → Barcelona
+      My Notes → Cities in Spain (1) → BCN
   Cities in Spain
     BCN
     `);

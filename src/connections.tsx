@@ -316,6 +316,50 @@ export function getConcreteRefs(
         });
       }
       if (isInItems) {
+        // HEAD case: relation.head = ~Versions, target in items
+        // context = [Holiday Destinations, BCN], head = ~Versions
+        // Need: context = [Holiday Destinations], head = BCN (as HEAD ref)
+        if (relation.head === VERSIONS_NODE_ID && relationContext.size > 0) {
+          const parentNodeID = relationContext.last() as ID;
+          const parentContext = relationContext.butLast().toList() as Context;
+          const parentRelation = knowledgeDB.relations.find(
+            (r) =>
+              r.head === parentNodeID &&
+              r.context.equals(parentContext) &&
+              r.author === relation.author
+          );
+          if (parentRelation) {
+            return rdx.push({
+              relationID: parentRelation.id,
+              context: parentContext,
+              updated: relation.updated,
+              isInItems: false,
+            });
+          }
+          return rdx;
+        }
+        // IN case: ~Versions is last in context
+        // context = [Holiday Destinations, BCN, ~Versions], head = Barcelona
+        // Need: context = [Holiday Destinations], head = BCN (as HEAD ref)
+        if (relationContext.last() === VERSIONS_NODE_ID && relationContext.size >= 2) {
+          const parentNodeID = relationContext.get(relationContext.size - 2) as ID;
+          const parentContext = relationContext.slice(0, relationContext.size - 2).toList() as Context;
+          const parentRelation = knowledgeDB.relations.find(
+            (r) =>
+              r.head === parentNodeID &&
+              r.context.equals(parentContext) &&
+              r.author === relation.author
+          );
+          if (parentRelation) {
+            return rdx.push({
+              relationID: parentRelation.id,
+              context: parentContext,
+              updated: relation.updated,
+              isInItems: false,
+            });
+          }
+          return rdx;
+        }
         return rdx.push({
           relationID: relation.id,
           context: relationContext.push(relation.head as ID),

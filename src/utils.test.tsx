@@ -810,7 +810,16 @@ export async function getTreeStructure(): Promise<string> {
   });
 
   // Find all reference nodes (paths like "My Notes → Holiday Destinations → BCN")
-  const referenceNodes = screen.queryAllByTestId("reference-node");
+  // But exclude those that have an expand/collapse button (they're already counted above)
+  const referenceNodes = screen.queryAllByTestId("reference-node").filter(
+    (refNode) => {
+      // Check if this reference node is inside a node that has an expand/collapse button
+      const parentNode = refNode.closest(".inner-node");
+      if (!parentNode) return true;
+      const hasToggleButton = parentNode.querySelector("button[aria-label^='expand '], button[aria-label^='collapse ']");
+      return !hasToggleButton;
+    }
+  );
 
   // Combine and sort by DOM order
   type TreeElement = {

@@ -14,7 +14,7 @@ import {
   useViewPath,
   useDisplayText,
 } from "../ViewContext";
-import { getRelations, isReferenceNode } from "../connections";
+import { getRelations, getConcreteRefs, isReferenceNode } from "../connections";
 import { useData } from "../DataContext";
 import { REFERENCED_BY, TYPE_COLORS } from "../constants";
 import { usePaneStack } from "../SplitPanesContext";
@@ -52,17 +52,19 @@ function ReferenceDot(): JSX.Element | null {
     return null;
   }
 
+  const concreteRefs = getConcreteRefs(knowledgeDBs, node.id);
+  const referenceCount = concreteRefs.size;
+
+  if (referenceCount === 0) {
+    return null;
+  }
+
   const referencedByRelations = getRelations(
     knowledgeDBs,
     REFERENCED_BY,
     user.publicKey,
     node.id
   );
-  const referenceCount = referencedByRelations?.items.size || 0;
-
-  if (referenceCount === 0) {
-    return null;
-  }
 
   const isInReferencedBy = view.relations === REFERENCED_BY;
   const isExpanded = view.expanded === true;

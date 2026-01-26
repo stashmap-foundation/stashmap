@@ -50,7 +50,10 @@ export function createAbstractRefId(context: Context, targetNode: ID): LongID {
   return parts.join(":") as LongID;
 }
 
-export function createConcreteRefId(relationID: LongID): LongID {
+export function createConcreteRefId(relationID: LongID, targetNode?: ID): LongID {
+  if (targetNode) {
+    return `${CONCRETE_REF_PREFIX}${relationID}:${targetNode}` as LongID;
+  }
   return `${CONCRETE_REF_PREFIX}${relationID}` as LongID;
 }
 
@@ -69,11 +72,20 @@ export function parseAbstractRefId(
   return { targetNode, targetContext };
 }
 
-export function parseConcreteRefId(refId: ID | LongID): LongID | undefined {
+export function parseConcreteRefId(
+  refId: ID | LongID
+): { relationID: LongID; targetNode?: ID } | undefined {
   if (!isConcreteRefId(refId)) {
     return undefined;
   }
-  return refId.slice(CONCRETE_REF_PREFIX.length) as LongID;
+  const content = refId.slice(CONCRETE_REF_PREFIX.length);
+  const colonIndex = content.indexOf(":");
+  if (colonIndex === -1) {
+    return { relationID: content as LongID };
+  }
+  const relationID = content.slice(0, colonIndex) as LongID;
+  const targetNode = content.slice(colonIndex + 1) as ID;
+  return { relationID, targetNode };
 }
 
 export function extractNodeIdsFromRefId(refId: ID | LongID): List<ID> {
@@ -114,19 +126,12 @@ export function getRefTargetRelationInfo(
   };
 }
 
-export function buildReferenceNode(
-  refId: LongID,
+function buildRefDisplayText(
   knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey
-): ReferenceNode | undefined {
-  const parsed = parseAbstractRefId(refId);
-  if (!parsed) {
-    return undefined;
-  }
-  const { targetNode, targetContext } = parsed;
-
-  // Build the display text by looking up each node
-  // Use versioned text if available, walking through context incrementally
+  myself: PublicKey,
+  targetNode: ID,
+  targetContext: Context
+): string {
   const getNodeTextWithVersion = (
     nodeId: ID,
     contextUpToNode: List<ID>
@@ -144,7 +149,6 @@ export function buildReferenceNode(
     return node?.text || "Loading...";
   };
 
-  // Build context incrementally as we walk through the path
   const contextTexts = targetContext.reduce((acc, nodeId, index) => {
     const contextUpToHere = targetContext.slice(0, index);
     const text = getNodeTextWithVersion(nodeId, contextUpToHere);
@@ -152,7 +156,57 @@ export function buildReferenceNode(
   }, List<string>());
 
   const targetText = getNodeTextWithVersion(targetNode, targetContext);
-  const displayText = contextTexts.push(targetText).join(" → ");
+  return contextTexts.push(targetText).join(" → ");
+}
+
+export function buildReferenceNode(
+  refId: LongID,
+  knowledgeDBs: KnowledgeDBs,
+  myself: PublicKey
+): ReferenceNode | undefined {
+  if (isConcreteRefId(refId)) {
+    const parsed = parseConcreteRefId(refId);
+    if (!parsed) return undefined;
+    const { relationID, targetNode } = parsed;
+    const relation = getRelationsNoReferencedBy(knowledgeDBs, relationID, myself);
+    if (!relation) return undefined;
+
+    const relationContext = relation.context.map((id) => shortID(id) as ID);
+    const itemCount = relation.items.size;
+
+    if (!targetNode) {
+      const head = relation.head as ID;
+      const baseText = buildRefDisplayText(knowledgeDBs, myself, head, relationContext);
+      const displayText = `${baseText} (${itemCount})`;
+      return {
+        id: refId,
+        type: "reference",
+        text: displayText,
+        targetNode: head,
+        targetContext: relationContext,
+      };
+    }
+
+    const contextWithHead = relationContext.push(relation.head as ID);
+    const headText = buildRefDisplayText(knowledgeDBs, myself, relation.head as ID, relationContext);
+    const targetOnly = buildRefDisplayText(knowledgeDBs, myself, targetNode, contextWithHead).split(" → ").pop() || "";
+    const displayText = `${headText} (${itemCount}) → ${targetOnly}`;
+
+    return {
+      id: refId,
+      type: "reference",
+      text: displayText,
+      targetNode,
+      targetContext: contextWithHead,
+    };
+  }
+
+  const parsed = parseAbstractRefId(refId);
+  if (!parsed) {
+    return undefined;
+  }
+  const { targetNode, targetContext } = parsed;
+  const displayText = buildRefDisplayText(knowledgeDBs, myself, targetNode, targetContext);
 
   return {
     id: refId,
@@ -207,16 +261,20 @@ export function getRefTargetInfo(
   myself: PublicKey
 ): RefTargetInfo | undefined {
   if (isConcreteRefId(refId)) {
-    const relationID = parseConcreteRefId(refId);
-    if (!relationID) return undefined;
+    const parsed = parseConcreteRefId(refId);
+    if (!parsed) return undefined;
+    const { relationID, targetNode } = parsed;
     const relation = getRelationsNoReferencedBy(
       knowledgeDBs,
       relationID,
       myself
     );
     if (!relation) return undefined;
+    const stack = targetNode
+      ? [...relation.context.toArray(), relation.head, targetNode]
+      : [...relation.context.toArray(), relation.head];
     return {
-      stack: [...relation.context.toArray(), relation.head],
+      stack,
       author: relation.author,
       rootRelation: relationID,
     };
@@ -230,12 +288,88 @@ export function getRefTargetInfo(
   };
 }
 
-type ReferencedByPath = {
-  head: ID;
+type ReferencedByRef = {
+  relationID: LongID;
   context: Context;
   updated: number;
-  pathKey: string;
+  isInItems: boolean;
 };
+
+export function getConcreteRefs(
+  knowledgeDBs: KnowledgeDBs,
+  nodeID: LongID | ID,
+  filterContext?: Context
+): List<ReferencedByRef> {
+  const targetShortID = shortID(nodeID);
+  let allRefs = knowledgeDBs.reduce((acc, knowledgeDB) => {
+    return knowledgeDB.relations.reduce((rdx, relation) => {
+      const relationContext = relation.context.map((id) => shortID(id) as ID);
+      const isInItems = relation.items.some((item) => item.nodeID === nodeID);
+      const isHeadWithChildren =
+        relation.head === targetShortID && relation.items.size > 0;
+
+      if (isHeadWithChildren) {
+        return rdx.push({
+          relationID: relation.id,
+          context: relationContext,
+          updated: relation.updated,
+          isInItems: false,
+        });
+      }
+      if (isInItems) {
+        return rdx.push({
+          relationID: relation.id,
+          context: relationContext.push(relation.head as ID),
+          updated: relation.updated,
+          isInItems: true,
+        });
+      }
+      return rdx;
+    }, acc);
+  }, List<ReferencedByRef>());
+
+  if (filterContext) {
+    allRefs = allRefs.filter((ref) => ref.context.equals(filterContext));
+  }
+
+  // Filter out IN refs when HEAD refs exist for the same context
+  const grouped = allRefs.groupBy((ref) => ref.context.join(":"));
+  return grouped
+    .map((grp) => {
+      const hasHead = grp.some((r) => !r.isInItems);
+      return hasHead ? grp.filter((r) => !r.isInItems).toList() : grp.toList();
+    })
+    .valueSeq()
+    .flatMap((grp): List<ReferencedByRef> => grp)
+    .toList();
+}
+
+function groupConcreteRefs(
+  refs: List<ReferencedByRef>,
+  targetShortID: ID
+): List<{ nodeID: LongID; relevance: Relevance }> {
+  const grouped = refs.groupBy((ref) => ref.context.join(":"));
+
+  return grouped
+    .map((grp) => grp.sortBy((r) => -r.updated).toList())
+    .valueSeq()
+    .flatMap((grp) => {
+      if (grp.size === 1) {
+        const ref = grp.first()!;
+        return List([
+          {
+            nodeID: ref.isInItems
+              ? createConcreteRefId(ref.relationID, targetShortID)
+              : createConcreteRefId(ref.relationID),
+            relevance: "" as Relevance,
+          },
+        ]);
+      }
+      const abstractId = createAbstractRefId(grp.first()!.context, targetShortID);
+      return List([{ nodeID: abstractId, relevance: "" as Relevance }]);
+    })
+    .toList();
+}
 
 export function getReferencedByRelations(
   knowledgeDBs: KnowledgeDBs,
@@ -243,89 +377,40 @@ export function getReferencedByRelations(
   nodeID: LongID | ID
 ): Relations | undefined {
   const rel = newRelations(nodeID, List<ID>(), myself);
-  const targetShortID = shortID(nodeID);
-
-  // Collect all (head, context) pairs where nodeID is referenced
-  // We use short IDs - getNodeFromID will search across all DBs to find actual nodes
-  const referencePaths = knowledgeDBs.reduce((acc, knowledgeDB) => {
-    return knowledgeDB.relations.reduce((rdx, relations) => {
-      // Case 1: nodeID appears in another node's items
-      const isInItems = relations.items.some((item) => item.nodeID === nodeID);
-
-      // Case 2: nodeID is the head of a list with empty context (has direct children)
-      const isHeadWithEmptyContext =
-        relations.head === targetShortID &&
-        relations.context.size === 0 &&
-        relations.items.size > 0;
-
-      if (isInItems || isHeadWithEmptyContext) {
-        // Use short IDs for the path - getNodeFromID will search across all DBs
-        const headShort = shortID(relations.head) as ID;
-        const contextShorts = relations.context.map(
-          (ctxId) => shortID(ctxId) as ID
-        );
-
-        // Deduplicate using short IDs (logical node identity)
-        const pathKey = `${headShort}:${contextShorts.join(",")}`;
-
-        const existingPath = rdx.find((p) => p.pathKey === pathKey);
-        if (!existingPath) {
-          return rdx.push({
-            head: headShort as ID,
-            context: contextShorts,
-            updated: relations.updated,
-            pathKey,
-          });
-        }
-        // Update if this version is newer
-        if (relations.updated > existingPath.updated) {
-          const idx = rdx.indexOf(existingPath);
-          return rdx.set(idx, {
-            head: headShort as ID,
-            context: contextShorts,
-            updated: relations.updated,
-            pathKey,
-          });
-        }
-      }
-      return rdx;
-    }, acc);
-  }, List<ReferencedByPath>());
-
-  // Sort by updated time (newest first)
-  const sortedPaths = referencePaths.sort((a, b) => b.updated - a.updated);
+  const targetShortID = shortID(nodeID) as ID;
+  const allRefs = getConcreteRefs(knowledgeDBs, nodeID);
+  const items = groupConcreteRefs(allRefs, targetShortID);
 
   return {
     ...rel,
     id: REFERENCED_BY,
-    items: sortedPaths
-      .map((path) => {
-        // If context is empty and head equals the nodeID, this is a list with no context
-        // Create ref with empty context so it displays as just the node name
-        const isOwnList =
-          path.context.size === 0 && shortID(path.head) === targetShortID;
-        if (isOwnList) {
-          return createAbstractRefId(List<ID>(), nodeID as ID);
-        }
-
-        // If the node is inside ~Versions, point to the parent node instead
-        // This also deduplicates: all versions inside ~Versions map to the same parent
-        if (path.head === VERSIONS_NODE_ID && path.context.size > 0) {
-          const parentNode = path.context.last() as ID;
-          const parentContext = path.context.slice(0, -1);
-          return createAbstractRefId(parentContext, parentNode);
-        }
-
-        return createAbstractRefId(path.context.push(path.head), nodeID as ID);
-      })
-      // Deduplicate refIds (multiple versions inside ~Versions map to the same parent)
-      .toOrderedSet()
-      .toList()
-      .map((refId) => ({
-        nodeID: refId,
-        relevance: "" as Relevance,
-      })),
+    items,
   };
+}
+
+export function getConcreteRefsForAbstract(
+  knowledgeDBs: KnowledgeDBs,
+  myself: PublicKey,
+  abstractRefId: LongID
+): Relations | undefined {
+  const parsed = parseAbstractRefId(abstractRefId);
+  if (!parsed) return undefined;
+  const { targetNode, targetContext } = parsed;
+
+  const rel = newRelations(targetNode, List<ID>(), myself);
+  const allRefs = getConcreteRefs(knowledgeDBs, targetNode, targetContext);
+
+  const items = allRefs
+    .sortBy((r) => -r.updated)
+    .map((ref) => ({
+      nodeID: ref.isInItems
+        ? createConcreteRefId(ref.relationID, targetNode)
+        : createConcreteRefId(ref.relationID),
+      relevance: "" as Relevance,
+    }))
+    .toList();
+
+  return { ...rel, id: abstractRefId, items };
 }
 
 export function getRelations(
@@ -336,6 +421,9 @@ export function getRelations(
 ): Relations | undefined {
   if (relationID === REFERENCED_BY) {
     return getReferencedByRelations(knowledgeDBs, myself, nodeID);
+  }
+  if (relationID && isAbstractRefId(relationID)) {
+    return getConcreteRefsForAbstract(knowledgeDBs, myself, relationID as LongID);
   }
   return getRelationsNoReferencedBy(knowledgeDBs, relationID, myself);
 }

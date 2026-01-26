@@ -28,11 +28,14 @@ import {
 } from "./TemporaryViewContext";
 import {
   getReferencedByRelations,
+  getConcreteRefsForAbstract,
   getRelations,
   isReferenceNode,
   getRefTargetInfo,
   itemMatchesType,
   isEmptyNodeID,
+  isAbstractRefId,
+  isConcreteRefId,
 } from "../connections";
 import { REFERENCED_BY, DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 import { IS_MOBILE } from "./responsive";
@@ -526,23 +529,61 @@ export function getNodesInTree(
 ): List<ViewPath> {
   const [parentNodeID, parentView] = getNodeIDFromView(data, parentPath);
 
-  // Handle REFERENCED_BY specially - it's not context-based
-  if (parentView.relations === REFERENCED_BY) {
-    const referencedByRelations = getReferencedByRelations(
+  // Handle abstract refs - their children are concrete refs, can be expanded
+  if (isAbstractRefId(parentNodeID)) {
+    const relations = getConcreteRefsForAbstract(
       data.knowledgeDBs,
       data.user.publicKey,
-      parentNodeID
+      parentNodeID as LongID
     );
-    if (!referencedByRelations || referencedByRelations.items.size === 0) {
+    if (!relations || relations.items.size === 0) {
       return ctx;
     }
-    // Referenced By items are readonly - no expansion, no diff items, no add node
-    const childPaths = referencedByRelations.items.map((_, i) =>
-      addNodeToPathWithRelations(parentPath, referencedByRelations, i)
+    const childPaths = relations.items.map((_, i) =>
+      addNodeToPathWithRelations(parentPath, relations, i)
     );
     return ctx.concat(childPaths);
   }
 
+  // Handle concrete refs - terminal nodes, no children
+  if (isConcreteRefId(parentNodeID)) {
+    return ctx;
+  }
+
+  // Handle REFERENCED_BY view - shows abstract/concrete refs
+  if (parentView.relations === REFERENCED_BY) {
+    const relations = getReferencedByRelations(
+      data.knowledgeDBs,
+      data.user.publicKey,
+      parentNodeID
+    );
+    if (parentNodeID.startsWith("062dda")) {
+      console.log("Barcelona REFERENCED_BY:", relations?.items.size, "items:", relations?.items.map(i => i.nodeID.slice(0, 20)).toJS(), "ctx size:", ctx.size);
+    }
+    if (!relations || relations.items.size === 0) {
+      return ctx;
+    }
+    // Check if children are expanded and recurse
+    const result = relations.items.reduce((nodesList, _, i) => {
+      const childPath = addNodeToPathWithRelations(parentPath, relations, i);
+      const [childNodeID, childView] = getNodeIDFromView(data, childPath);
+      if (childView.expanded && isAbstractRefId(childNodeID)) {
+        return getNodesInTree(
+          data,
+          childPath,
+          stack,
+          nodesList.push(childPath),
+          paneAuthor,
+          rootRelation
+        );
+      }
+      return nodesList.push(childPath);
+    }, ctx);
+    if (parentNodeID.startsWith("062dda")) {
+      console.log("Barcelona returning:", result.size, "nodes, last nodeID:", result.last() ? (result.last()[result.last().length-1] as any)?.nodeID?.slice(0,15) : "none");
+    }
+    return result;
+  }
   const context = getContextFromStackAndViewPath(stack, parentPath);
   const relations = getRelationsForContext(
     data.knowledgeDBs,
@@ -656,13 +697,19 @@ export function Node({
     className !== undefined ? `${className} hover-light-bg` : defaultCls;
   const clsBody = cardBodyClassName || "ps-0 pt-0 pb-0";
 
+  const [nodeID] = useNodeID();
+
   // Check if this node is the root of a Referenced By view
   const isReferencedByRoot = view.relations === REFERENCED_BY;
   // Show background for both the root and children in Referenced By view
   const showReferencedByBackground = isReferencedByRoot || isInReferencedByView;
 
+  // Abstract refs can be expanded to show concrete refs
+  const isAbstractRef = isAbstractRefId(nodeID);
+
   // Show expand/collapse for regular nodes (not diff items, not in Referenced By, not empty nodes)
-  const showExpandCollapse = !isDiffItem && !isInReferencedByView;
+  // Also show for abstract refs which need expand to show concrete refs
+  const showExpandCollapse = !isDiffItem && (!isInReferencedByView || isAbstractRef);
 
   // Background color for Referenced By view
   const referencedByBgColor = "rgba(100, 140, 180, 0.1)";

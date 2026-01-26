@@ -375,8 +375,15 @@ export function getConcreteRefs(
     allRefs = allRefs.filter((ref) => ref.context.equals(filterContext));
   }
 
+  // Dedupe by relationID (same relation can be reached via multiple paths, e.g. direct + via ~Versions)
+  const dedupedByRelationID = allRefs
+    .groupBy((ref) => ref.relationID)
+    .map((grp) => grp.first()!)
+    .valueSeq()
+    .toList();
+
   // Filter out IN refs when HEAD refs exist for the same context
-  const grouped = allRefs.groupBy((ref) => ref.context.join(":"));
+  const grouped = dedupedByRelationID.groupBy((ref) => ref.context.join(":"));
   return grouped
     .map((grp) => {
       const hasHead = grp.some((r) => !r.isInItems);

@@ -161,4 +161,42 @@ Barcelona
   Bob child
     `);
   });
+
+  test("Edited node with ~Versions shows only one reference (deduplication)", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    // Create: My Notes → Test A → ~Versions → Test B
+    // Then the node shows as "Test B" because that's the latest version
+    // Test A appears automatically under ~Versions since it's the original
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Test A{Enter}{Tab}~Versions{Enter}{Tab}Test B{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Test B
+    ~Versions
+      Test B
+      Test A
+    `);
+
+    // Show Referenced By for Test B (click the first one - the main node)
+    const showRefsButtons = await screen.findAllByLabelText(
+      "show references to Test B"
+    );
+    await userEvent.click(showRefsButtons[0]);
+
+    // With deduplication, there's only ONE concrete reference (no abstract wrapper)
+    // The same relation is reached via two paths (direct HEAD + via ~Versions),
+    // but we deduplicate by relationID
+    await expectTree(`
+My Notes
+  Test B
+    My Notes → Test B (1)
+    `);
+  });
 });

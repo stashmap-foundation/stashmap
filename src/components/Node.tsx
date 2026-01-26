@@ -637,10 +637,13 @@ export function Node({
 
   // Abstract refs can be expanded to show concrete refs
   const isAbstractRef = isAbstractRefId(nodeID);
+  // Concrete refs are terminal - no children, no toggle
+  const isConcreteRef = isConcreteRefId(nodeID);
 
   // Show expand/collapse for regular nodes (not diff items, not in Referenced By, not empty nodes)
   // Also show for abstract refs which need expand to show concrete refs
-  const showExpandCollapse = !isDiffItem && (!isInReferencedByView || isAbstractRef);
+  // Never show for concrete refs - they are terminal nodes
+  const showExpandCollapse = !isDiffItem && !isConcreteRef && (!isInReferencedByView || isAbstractRef);
 
   // Background color for Referenced By view
   const referencedByBgColor = "rgba(100, 140, 180, 0.1)";

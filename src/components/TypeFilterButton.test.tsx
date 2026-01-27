@@ -263,8 +263,8 @@ describe("Suggestions filter", () => {
     expect(DEFAULT_TYPE_FILTERS).toContain("suggestions");
   });
 
-  test("TYPE_COLORS has suggestions color", () => {
-    expect(TYPE_COLORS.suggestions).toBe("#ff9800");
+  test("TYPE_COLORS has other_user color for suggestions", () => {
+    expect(TYPE_COLORS.other_user).toBe("#d4826a");
   });
 
   test("filter popover shows Suggestions option", async () => {

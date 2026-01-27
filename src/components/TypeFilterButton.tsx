@@ -39,7 +39,7 @@ const COL_2_FILTERS: {
 }[] = [
   { id: "confirms", label: "Confirms", color: TYPE_COLORS.confirms },
   { id: "contra", label: "Contradicts", color: TYPE_COLORS.contra },
-  { id: "suggestions", label: "Suggestions", color: TYPE_COLORS.suggestions },
+  { id: "suggestions", label: "Suggestions", color: TYPE_COLORS.other_user },
 ];
 
 export type FilterId = Relevance | Argument | "suggestions";

@@ -23,8 +23,8 @@ export const TYPE_COLORS = {
   not_relevant: "#757575", // Gray for not relevant
   confirms: "#2e7d32",
   contra: "#c62828",
-  suggestions: "#ff9800", // Orange for suggestions from other users
-  suggestions_bg: "#fff3e0", // Light orange background for suggestion blocks
+  other_user: "#d4826a", // Coral for other user's content badge
+  other_user_bg: "#ffebe5", // Light coral/peach background for other user's content
   referenced_by: "#9c27b0", // Purple for Referenced By view
   inactive: "#d0d0d0",
 };

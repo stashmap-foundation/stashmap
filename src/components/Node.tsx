@@ -619,8 +619,8 @@ function DiffItemIndicator(): JSX.Element {
         padding: "1px 6px",
         marginRight: "6px",
         borderRadius: "10px",
-        backgroundColor: `${TYPE_COLORS.suggestions}25`,
-        color: TYPE_COLORS.suggestions,
+        backgroundColor: `${TYPE_COLORS.other_user}40`,
+        color: TYPE_COLORS.other_user,
         fontSize: "0.75rem",
         fontWeight: 500,
       }}
@@ -678,8 +678,7 @@ export function Node({
   // Background style for content area based on view type
   const getContentBackgroundStyle = (): React.CSSProperties | undefined => {
     if (isDiffItem) {
-      // Suggestion items get orange background (no indent coloring needed)
-      return { backgroundColor: TYPE_COLORS.suggestions_bg };
+      return { backgroundColor: TYPE_COLORS.other_user_bg };
     }
     if (showReferencedByBackground) {
       return { backgroundColor: referencedByBgColor };

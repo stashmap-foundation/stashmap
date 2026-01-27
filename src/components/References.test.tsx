@@ -100,7 +100,7 @@ My Notes
   Cities
     Barcelona
       My Notes → Cities → Barcelona
-        My Notes → Cities → Barcelona (1)
+        [O] My Notes → Cities → Barcelona (1)
         My Notes → Cities → Barcelona (1)
     `);
   });
@@ -142,7 +142,7 @@ My Notes
   Cities
     Barcelona
       My Notes → Cities → Barcelona
-        My Notes → Cities → Barcelona (1)
+        [O] My Notes → Cities → Barcelona (1)
         My Notes → Cities → Barcelona (1)
     `);
 

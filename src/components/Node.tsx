@@ -6,6 +6,7 @@ import {
   useViewPath,
   ViewPath,
   useIsInReferencedByView,
+  useReferencedByDepth,
   useIsExpanded,
   addNodeToPathWithRelations,
   addDiffItemToPath,
@@ -81,12 +82,14 @@ function ExpandCollapseToggle(): JSX.Element | null {
   const [nodeID, view] = useNodeID();
   const displayText = useDisplayText();
   const onToggleExpanded = useOnToggleExpanded();
-  const isReferencedBy = view.relations === REFERENCED_BY;
+  const isReferencedByRoot = view.relations === REFERENCED_BY;
+  const isInReferencedByView = useIsInReferencedByView();
+  const showReferencedByStyle = isReferencedByRoot || isInReferencedByView;
 
   const isExpanded = useIsExpanded();
   const isEmptyNode = isEmptyNodeID(nodeID);
 
-  const baseColor = isReferencedBy ? TYPE_COLORS.referenced_by : "black";
+  const baseColor = showReferencedByStyle ? TYPE_COLORS.referenced_by : "black";
   const color = isEmptyNode ? "#ccc" : baseColor;
 
   const onToggle = (): void => {
@@ -107,7 +110,7 @@ function ExpandCollapseToggle(): JSX.Element | null {
       aria-expanded={isExpanded}
       style={{
         color,
-        backgroundColor: isReferencedBy
+        backgroundColor: showReferencedByStyle
           ? "rgba(100, 140, 180, 0.1)"
           : undefined,
         cursor: isEmptyNode ? "default" : "pointer",
@@ -447,24 +450,32 @@ const ARROW_WIDTH = 0;
 
 export function Indent({
   levels,
-  backgroundColorForLast,
+  backgroundColor,
+  colorLevels,
 }: {
   levels: number;
-  backgroundColorForLast?: string;
+  backgroundColor?: string;
+  colorLevels?: number;
 }): JSX.Element {
-  // Simple indentation without vertical lines
   return (
     <>
       {Array.from(Array(levels).keys()).map((k) => {
         const marginLeft = k === 0 ? 5 : ARROW_WIDTH;
         const width = k === 0 ? 0 : INDENTATION;
-        const isLast = k === levels - 1;
-        const backgroundColor = isLast ? backgroundColorForLast : undefined;
+        const levelsFromRight = levels - k;
+        const shouldColor =
+          backgroundColor && colorLevels !== undefined
+            ? levelsFromRight <= colorLevels
+            : !!backgroundColor;
 
         return (
           <div
             key={k}
-            style={{ marginLeft, backgroundColor, alignSelf: "stretch" }}
+            style={{
+              marginLeft,
+              backgroundColor: shouldColor ? backgroundColor : undefined,
+              alignSelf: "stretch",
+            }}
           >
             <div style={{ width }} />
           </div>
@@ -636,7 +647,8 @@ export function Node({
   const viewPath = useViewPath();
   const levels = getLevels(viewPath);
   const isMultiselect = useIsParentMultiselectBtnOn();
-  const isInReferencedByView = useIsInReferencedByView();
+  const referencedByDepth = useReferencedByDepth();
+  const isInReferencedByView = referencedByDepth !== undefined;
   const [, view] = useNodeID();
   const { cardStyle, textStyle } = useItemStyle();
   const defaultCls = isDesktop ? "hover-light-bg" : "";
@@ -688,9 +700,23 @@ export function Node({
       >
         <LeftMenu />
         {levels > 0 && (
-          <Indent levels={levels} backgroundColorForLast={indentBgColor} />
+          <Indent
+            levels={levels}
+            backgroundColor={indentBgColor}
+            colorLevels={referencedByDepth}
+          />
         )}
         {showExpandCollapse && <ExpandCollapseToggle />}
+        {isConcreteRef && (
+          <div
+            style={{
+              width: 16,
+              flexShrink: 0,
+              alignSelf: "stretch",
+              backgroundColor: indentBgColor,
+            }}
+          />
+        )}
         {isMultiselect && <NodeSelectbox />}
         <div
           className="w-100"

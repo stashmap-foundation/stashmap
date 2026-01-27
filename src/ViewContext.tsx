@@ -761,20 +761,40 @@ export function useIsDiffItem(): boolean {
 }
 
 /**
- * Check if we're currently viewing a Referenced By relation.
+ * Check if we're anywhere within a Referenced By view.
  * Items in Referenced By view are readonly - no editing, no dropping onto them.
+ * Walks up all ancestors to check if any has relations === REFERENCED_BY.
  */
 export function useIsInReferencedByView(): boolean {
+  return useReferencedByDepth() !== undefined;
+}
+
+/**
+ * Returns how many levels deep we are inside a Referenced By view.
+ * Returns undefined if not in a Referenced By view.
+ * Returns 1 for direct children of the Referenced By root, 2 for grandchildren, etc.
+ */
+export function useReferencedByDepth(): number | undefined {
   const data = useData();
   const viewPath = useViewPath();
-  const parentPath = getParentView(viewPath);
 
-  if (!parentPath) {
-    return false;
+  let depth = 0;
+  let currentPath: ViewPath | undefined = getParentView(viewPath);
+  while (currentPath) {
+    depth += 1;
+    const [, view] = getNodeIDFromView(data, currentPath);
+    if (view?.relations === REFERENCED_BY) {
+      return depth;
+    }
+    currentPath = getParentView(currentPath);
   }
+  return undefined;
+}
 
-  const [, parentView] = getNodeIDFromView(data, parentPath);
-  return parentView?.relations === REFERENCED_BY;
+export function useIsOtherUserContent(): boolean {
+  const { user } = useData();
+  const pane = useCurrentPane();
+  return pane.author !== user.publicKey;
 }
 
 export function popViewPath(

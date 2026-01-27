@@ -102,5 +102,5 @@
   color: inherit;
   text-align: inherit;
   cursor: pointer;
-  width: 100%;
+  display: inline;
 }

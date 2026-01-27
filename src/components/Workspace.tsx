@@ -66,23 +66,6 @@ function StackedLayer({
           <OpenInSplitPaneButtonWithStack stack={stackUpToHere} />
         </span>
       </div>
-      <div
-        className="on-hover-menu right"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-        role="presentation"
-      >
-        <span className="always-visible">
-          {showFirstPaneControls && (
-            <>
-              <PublishingStatusWrapper />
-              <PaneSettingsMenu />
-            </>
-          )}
-          {showPaneControls && <ClosePaneButton />}
-          {showPaneControls && <PaneSearchButton />}
-        </span>
-      </div>
     </div>
   );
 }
@@ -105,7 +88,53 @@ export function WorkspaceView(): JSX.Element | null {
     <TemporaryViewProvider>
       <div className="position-relative flex-grow-1">
         <div className="position-absolute board">
+
           <div className="workspace-stack-container">
+
+            {/* Sticky header with controls */}
+            <div
+              className="visible-on-hover"
+              style={{
+                position: "sticky",
+                top: 0,
+                zIndex: 10,
+                backgroundColor: "white",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "4px 8px",
+              }}
+            >
+              {/* Left side: Settings, Publishing Status, Sign In */}
+              <div
+                className="always-visible"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                }}
+              >
+                {!hasStack && paneIndex === 0 && (
+                  <>
+                    <PublishingStatusWrapper />
+                    <PaneSettingsMenu />
+                    <SignInMenuBtn />
+                  </>
+                )}
+              </div>
+              {/* Right side: Search, Close */}
+              <div
+                className="always-visible"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                }}
+              >
+                {<PaneSearchButton />}
+                {<ClosePaneButton />}
+              </div>
+            </div>
             {/* Render stacked layers */}
             {stackedWorkspaces.map(
               (stackedWorkspaceID: LongID | ID, index: number) => (
@@ -123,50 +152,6 @@ export function WorkspaceView(): JSX.Element | null {
             {/* Render active fullscreen card */}
             <div className="fullscreen-card">
               <div className="fullscreen-card-body">
-                {/* Sticky header with controls */}
-                <div
-                  className="visible-on-hover"
-                  style={{
-                    position: "sticky",
-                    top: 0,
-                    zIndex: 10,
-                    backgroundColor: "white",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "4px 8px",
-                  }}
-                >
-                  {/* Left side: Settings, Publishing Status, Sign In */}
-                  <div
-                    className="always-visible"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                    }}
-                  >
-                    {!hasStack && paneIndex === 0 && (
-                      <>
-                        <PublishingStatusWrapper />
-                        <PaneSettingsMenu />
-                      </>
-                    )}
-                    <SignInMenuBtn />
-                  </div>
-                  {/* Right side: Search, Close */}
-                  <div
-                    className="always-visible"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                    }}
-                  >
-                    {!hasStack && <PaneSearchButton />}
-                    {!hasStack && <ClosePaneButton />}
-                  </div>
-                </div>
                 <DND>
                   <TreeView />
                 </DND>

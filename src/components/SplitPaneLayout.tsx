@@ -143,10 +143,16 @@ export function PaneSettingsMenu(): JSX.Element {
 function PaneContent(): JSX.Element {
   const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
+  const { user } = useData();
   const rootNodeID = pane.stack[pane.stack.length - 1];
+  const isOtherUserContent = pane.author !== user.publicKey;
+
+  const paneClassName = isOtherUserContent
+    ? "split-pane other-user-pane"
+    : "split-pane";
 
   return (
-    <div className="split-pane">
+    <div className={paneClassName}>
       <LoadData nodeIDs={pane.stack}>
         <LoadData nodeIDs={[rootNodeID]} descendants referencedBy lists>
           <RootViewContextProvider

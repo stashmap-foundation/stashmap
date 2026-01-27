@@ -170,74 +170,87 @@ My Notes
   `);
 });
 
-test("Contact reorders list", async () => {
+test("Contact views list via concrete reference", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
-  await follow(alice, bob().user.publicKey);
-  // Bob creates PL at root level so it has empty context
-  const bobsKnowledgeDB = await setupTestDB(
-    bob(),
-    [["Programming Languages", [["OOP", ["C++", "Java"]], ["FPL"]]]],
-    { activeWorkspace: "Programming Languages" }
+  await follow(bob, alice().user.publicKey);
+
+  // Alice creates Cities with Paris and London
+  renderTree(alice);
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "Cities{Enter}{Tab}Paris{Enter}London{Escape}"
   );
-  const pl = findNodeByText(
-    bobsKnowledgeDB,
-    "Programming Languages"
-  ) as KnowNode;
 
-  // Alice views PL directly (same empty context as Bob used)
-  renderApp({
-    ...alice(),
-    initialRoute: `/w/${pl.id}`,
-  });
-  await screen.findByText("Programming Languages");
-
-  // Expand Programming Languages to see its children
-  await userEvent.click(screen.getByLabelText("expand Programming Languages"));
   await expectTree(`
-Programming Languages
-  OOP
-  FPL
-  `);
-
-  // Expand OOP
-  await userEvent.click(screen.getByLabelText("expand OOP"));
-  await expectTree(`
-Programming Languages
-  OOP
-    C++
-    Java
-  FPL
+My Notes
+  Cities
+    Paris
+    London
   `);
   cleanup();
 
-  // let bob remove OOP (also at root level)
-  renderApp({
-    ...bob(),
-    initialRoute: `/w/${pl.id}`,
-  });
-  await screen.findByText("Programming Languages");
-  // Expand to see children
-  await userEvent.click(screen.getByLabelText("expand Programming Languages"));
-  // Step 1: Mark OOP as not relevant (hides it)
-  fireEvent.click(await screen.findByLabelText("mark OOP as not relevant"));
+  // Bob creates same structure: Cities → Paris (same context as Alice)
+  renderTree(bob);
+  await expectTree(`
+My Notes
+  `);
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "Cities{Enter}{Tab}Paris{Escape}"
+  );
 
-  // Step 2: Enable not_relevant filter to see hidden items
-  await userEvent.click(screen.getByLabelText("filter Programming Languages"));
-  await userEvent.click(await screen.findByText("Not Relevant"));
+  await expectTree(`
+My Notes
+  Cities
+    Paris
+  `);
 
-  // Step 3: Click "remove from list" to actually remove OOP
-  fireEvent.click(await screen.findByLabelText("remove OOP from list"));
+  // Show Referenced By for Paris to find Alice's reference
+  await userEvent.click(await screen.findByLabelText("expand Cities"));
+  const showRefButtons = await screen.findAllByLabelText(
+    "show references to Paris"
+  );
+  await userEvent.click(showRefButtons[0]);
+
+  // Both Alice and Bob have Paris in same context, so abstract ref groups them
+  await userEvent.click(
+    await screen.findByLabelText("expand My Notes → Cities → Paris")
+  );
+
+  await expectTree(`
+My Notes
+  Cities
+    Paris
+      My Notes → Cities → Paris
+        My Notes → Cities (1) → Paris
+        [O] My Notes → Cities (2) → Paris
+  `);
+
+  // Click on Alice's concrete reference (marked with [O]) to open her list
+  await userEvent.click(
+    await screen.findByLabelText(
+      "open My Notes → Cities (2) → Paris in fullscreen"
+    )
+  );
+
+  // Now Bob is viewing Alice's Paris - it has no children
+  await expectTree(`
+Paris
+  `);
   cleanup();
 
-  renderApp({
-    ...alice(),
-    initialRoute: `/w/${pl.id}`,
-  });
-  await screen.findByText("Programming Languages");
-  // OOP is gone, so are it's children
+  // Alice's list remains unchanged
+  renderTree(alice);
+  await userEvent.click(await screen.findByLabelText("expand Cities"));
   await expectTree(`
-Programming Languages
-  FPL
+My Notes
+  Cities
+    Paris
+    London
   `);
 });
 

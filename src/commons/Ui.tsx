@@ -114,6 +114,7 @@ type KnowledgeNodeCardProps = {
   style?: CSSProperties | undefined;
   className?: string;
   cardBodyClassName?: string;
+  "data-suggestion"?: string;
 };
 
 export function NodeCard({
@@ -122,9 +123,14 @@ export function NodeCard({
   style,
   className,
   cardBodyClassName,
+  "data-suggestion": dataSuggestion,
 }: Partial<Children> & KnowledgeNodeCardProps): JSX.Element {
   return (
-    <Card className={`inner-node ${className || ""}`} style={style}>
+    <Card
+      className={`inner-node ${className || ""}`}
+      style={style}
+      data-suggestion={dataSuggestion}
+    >
       <Badge value={badgeValue} isLeft size={80} />
       <Card.Body className={cardBodyClassName || "ps-0 pb-2 pt-2"}>
         <div className="d-flex">{children}</div>

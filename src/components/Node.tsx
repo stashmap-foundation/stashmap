@@ -34,6 +34,8 @@ import {
   isEmptyNodeID,
   isAbstractRefId,
   isConcreteRefId,
+  parseConcreteRefId,
+  getRelationsNoReferencedBy,
 } from "../connections";
 import { REFERENCED_BY, DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 import { IS_MOBILE } from "./responsive";
@@ -154,7 +156,21 @@ function NodeContent({
   nodeId: LongID | ID;
   text: string;
 }): JSX.Element {
+  const { knowledgeDBs, user } = useData();
   const isReference = nodeType === "reference";
+  const isConcreteRef = isConcreteRefId(nodeId);
+
+  const isOtherUser = (() => {
+    if (!isConcreteRef) return false;
+    const parsed = parseConcreteRefId(nodeId);
+    if (!parsed) return false;
+    const relation = getRelationsNoReferencedBy(
+      knowledgeDBs,
+      parsed.relationID,
+      user.publicKey
+    );
+    return relation ? relation.author !== user.publicKey : false;
+  })();
 
   const referenceStyle: React.CSSProperties = isReference
     ? {
@@ -169,6 +185,7 @@ function NodeContent({
     <span
       className={`break-word ${isReference ? "reference-node" : ""}`}
       data-testid={isReference ? "reference-node" : undefined}
+      data-other-user={isOtherUser ? "true" : undefined}
     >
       <NodeIcon nodeType={nodeType} />
       {isReference && <ReferenceIndicators refId={nodeId} />}
@@ -664,7 +681,12 @@ export function Node({
 
   return (
     <EditorTextProvider>
-      <NodeCard className={cls} cardBodyClassName={clsBody} style={cardStyle}>
+      <NodeCard
+        className={cls}
+        cardBodyClassName={clsBody}
+        style={cardStyle}
+        data-suggestion={isDiffItem ? "true" : undefined}
+      >
         <LeftMenu />
         {levels > 0 && (
           <Indent levels={levels} backgroundColorForLast={indentBgColor} />

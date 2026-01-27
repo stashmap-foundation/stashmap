@@ -856,13 +856,18 @@ export async function getTreeStructure(): Promise<string> {
     type: "node" | "editor" | "reference"
   ): string => {
     if (type === "node") {
-      return (element.getAttribute("aria-label") || "").replace(
+      const text = (element.getAttribute("aria-label") || "").replace(
         /^(expand|collapse) /,
         ""
       );
+      const nodeCard = element.closest("[data-suggestion]");
+      const isSuggestion = nodeCard?.getAttribute("data-suggestion") === "true";
+      return isSuggestion ? `[S] ${text}` : text;
     }
     if (type === "reference") {
-      return element.textContent?.trim() || "";
+      const text = element.textContent?.trim() || "";
+      const isOtherUser = element.getAttribute("data-other-user") === "true";
+      return isOtherUser ? `[O] ${text}` : text;
     }
     const content = element.textContent?.trim();
     return content ? `[NEW NODE: ${content}]` : "[NEW NODE]";

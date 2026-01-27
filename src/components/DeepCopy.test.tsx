@@ -378,7 +378,7 @@ My Notes
     await expectTree(`
 My Notes
   Target
-  BobFolder
+  [S] BobFolder
     `);
 
     // Expand BobFolder diff item to see its children

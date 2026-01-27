@@ -1,10 +1,19 @@
 import React from "react";
-import { screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { List, Map } from "immutable";
 import { addRelationToRelations, newNode, shortID } from "../connections";
 import { DND } from "../dnd";
-import { ALICE, BOB, renderWithTestData, setup, follow } from "../utils.test";
+import {
+  ALICE,
+  BOB,
+  renderWithTestData,
+  setup,
+  follow,
+  renderTree,
+  findNewNodeEditor,
+  expectTree,
+} from "../utils.test";
 import {
   RootViewContextProvider,
   newRelations,
@@ -112,55 +121,42 @@ test("Shows no dots when user is the only one with a relation", async () => {
 
 test("Shows dots when only other user has relation (current user has none)", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
-
-  // Alice creates just the parent node, no relations
-  const parentNode = newNode("Parent Node");
-
-  const alicePlan = planUpsertNode(createPlan(alice()), parentNode);
-  await execute({ ...alice(), plan: alicePlan });
-
-  // Bob creates a "relevant" relation on Alice's node
-  const { publicKey: bobPK } = bob().user;
-  const bobChildNode = newNode("Bob's Child Node");
-  const bobRelations = addRelationToRelations(
-    newRelations(parentNode.id, List(), bobPK),
-    bobChildNode.id
-  );
-
-  const bobPlan = planUpsertRelations(
-    planUpsertNode(createPlan(bob()), bobChildNode),
-    bobRelations
-  );
-  await execute({ ...bob(), plan: bobPlan });
-
-  // Alice follows Bob to see his data
   await follow(alice, bob().user.publicKey);
 
-  // Render from Alice's perspective - she has no local version but should see Bob's
-  renderWithTestData(
-    <LoadData nodeIDs={[parentNode.id]} descendants referencedBy lists>
-      <RootViewContextProvider root={parentNode.id}>
-        <TemporaryViewProvider>
-          <DND>
-            <TreeView />
-          </DND>
-        </TemporaryViewProvider>
-      </RootViewContextProvider>
-    </LoadData>,
-    alice()
+  // Bob creates Parent Node with a child
+  renderTree(bob);
+  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "Parent Node{Enter}{Tab}Bob Child{Escape}"
   );
 
-  // Expand Parent Node to see diff items from Bob
+  await expectTree(`
+My Notes
+  Parent Node
+    Bob Child
+  `);
+
+  cleanup();
+
+  // Alice creates just Parent Node (no children)
+  renderTree(alice);
+  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.type(await findNewNodeEditor(), "Parent Node{Escape}");
+
+  await expectTree(`
+My Notes
+  Parent Node
+  `);
+
+  // Expand Parent Node - Bob's child should appear as a suggestion
   await userEvent.click(await screen.findByLabelText("expand Parent Node"));
 
-  // When only another user has a version (not the current user),
-  // there's just 1 version available, so no version selector is shown.
-  // But Bob's child should appear as a diff item.
-  expect(screen.queryByLabelText(/versions available/)).toBeNull();
-  // Bob's child should be visible as a diff item
-  await screen.findByLabelText(
-    /expand Bob's Child Node|collapse Bob's Child Node/
-  );
+  await expectTree(`
+My Notes
+  Parent Node
+    [S] Bob Child
+  `);
 });
 
 test("getDiffItemsForNode returns items from other users", () => {

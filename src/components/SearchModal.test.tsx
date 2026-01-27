@@ -53,7 +53,7 @@ test("Search works like spotlight", async () => {
   await screen.findAllByText("My very first topic");
 
   // Navigate to "My very first topic" to add children to it
-  const fullscreenButtons = await screen.findAllByLabelText("open fullscreen");
+  const fullscreenButtons = await screen.findAllByLabelText(/open.*in fullscreen/);
   fireEvent.click(fullscreenButtons[0]); // Click fullscreen for the topic
 
   // Now "My very first topic" is the workspace, find its add button

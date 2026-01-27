@@ -193,8 +193,10 @@ My Notes
 
   // Bob creates same structure: Cities → Paris (same context as Alice)
   renderTree(bob);
+  // Bob sees Alice's Cities as a suggestion (she's a contact)
   await expectTree(`
 My Notes
+  [S] Cities
   `);
   await userEvent.click(await screen.findByLabelText("edit My Notes"));
   await userEvent.keyboard("{Enter}");
@@ -207,45 +209,47 @@ My Notes
 My Notes
   Cities
     Paris
+    [S] London
   `);
 
-  // Show Referenced By for Paris to find Alice's reference
-  await userEvent.click(await screen.findByLabelText("expand Cities"));
-  const showRefButtons = await screen.findAllByLabelText(
-    "show references to Paris"
-  );
-  await userEvent.click(showRefButtons[0]);
-
-  // Both Alice and Bob have Paris in same context, so abstract ref groups them
+  // Show Referenced By for Cities to find Alice's reference
+  // Cities is already expanded from typing Tab above
   await userEvent.click(
-    await screen.findByLabelText("expand My Notes → Cities → Paris")
+    await screen.findByLabelText("show references to Cities")
+  );
+
+  // Both Alice and Bob have Cities in same context, so abstract ref groups them
+  await userEvent.click(
+    await screen.findByLabelText("expand My Notes → Cities")
   );
 
   await expectTree(`
 My Notes
   Cities
-    Paris
-      My Notes → Cities → Paris
-        My Notes → Cities (1) → Paris
-        [O] My Notes → Cities (2) → Paris
+    My Notes → Cities
+      My Notes → Cities (1)
+      [O] My Notes → Cities (2)
   `);
 
   // Click on Alice's concrete reference (marked with [O]) to open her list
   await userEvent.click(
     await screen.findByLabelText(
-      "open My Notes → Cities (2) → Paris in fullscreen"
+      "open My Notes → Cities (2) in fullscreen"
     )
   );
 
-  // Now Bob is viewing Alice's Paris - it has no children
+  // Now Bob is viewing Alice's Cities - expand to see her items
+  await userEvent.click(await screen.findByLabelText("expand Cities"));
   await expectTree(`
-Paris
+Cities
+  Paris
+  London
   `);
   cleanup();
 
   // Alice's list remains unchanged
   renderTree(alice);
-  await userEvent.click(await screen.findByLabelText("expand Cities"));
+  // Cities might be expanded or collapsed - just check the content
   await expectTree(`
 My Notes
   Cities

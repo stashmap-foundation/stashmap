@@ -721,6 +721,12 @@ export function useIsDiffItem(): boolean {
   const pane = useCurrentPane();
   const parentPath = getParentView(viewPath);
 
+  // Check if the path itself marks this as a diff item (from addDiffItemToPath)
+  const pathElement = getLast(viewPath);
+  if (pathElement.isDiffItem) {
+    return true;
+  }
+
   if (!parentPath) {
     return false;
   }
@@ -732,7 +738,6 @@ export function useIsDiffItem(): boolean {
   if (isRefId(nodeID)) {
     return false;
   }
-
 
   // No suggestions when viewing another user's content
   if (pane.author !== data.user.publicKey) {
@@ -1172,11 +1177,9 @@ export function getRelationsForContext(
   isRoot: boolean
 ): Relations | undefined {
   if (isRoot && rootRelation) {
-    const rel = getRelationsNoReferencedBy(knowledgeDBs, rootRelation, paneAuthor);
-    return rel;
+    return getRelationsNoReferencedBy(knowledgeDBs, rootRelation, paneAuthor);
   }
-  const rel = getNewestRelationFromAuthor(knowledgeDBs, paneAuthor, nodeID, context);
-  return rel;
+  return getNewestRelationFromAuthor(knowledgeDBs, paneAuthor, nodeID, context);
 }
 
 export function upsertRelations(
@@ -1188,7 +1191,7 @@ export function upsertRelations(
   const [nodeID, nodeView] = getNodeIDFromView(plan, viewPath);
   const context = getContextFromStackAndViewPath(stack, viewPath);
 
-  // 1. Try to find existing relations
+  // 1. Try to find user's own existing relations (don't inherit from other users)
   const viewRelations = nodeView.relations
     ? getRelationsNoReferencedBy(
       plan.knowledgeDBs,
@@ -1198,7 +1201,9 @@ export function upsertRelations(
     : undefined;
 
   const existingFromView =
-    viewRelations && contextsMatch(viewRelations.context, context)
+    viewRelations &&
+    viewRelations.author === plan.user.publicKey &&
+    contextsMatch(viewRelations.context, context)
       ? viewRelations
       : undefined;
 
@@ -1208,33 +1213,14 @@ export function upsertRelations(
       plan.knowledgeDBs,
       plan.user.publicKey,
       nodeID,
-      context
+      context,
+      true // onlyMine - don't inherit from other users
     ).first();
 
   const foundRelations = existingFromView || existingByContext;
 
-  // 2. Determine what we have: found own, found remote, or need to create
-  const isOwnRelations =
-    foundRelations && foundRelations.author === plan.user.publicKey;
-  const isRemoteRelations =
-    foundRelations && foundRelations.author !== plan.user.publicKey;
-
-  const getRelationsToUse = (): Relations => {
-    if (isOwnRelations) {
-      return foundRelations;
-    }
-    if (isRemoteRelations) {
-      return createUpdatableRelations(
-        plan.knowledgeDBs,
-        plan.user.publicKey,
-        foundRelations.id,
-        nodeID,
-        context
-      );
-    }
-    return newRelationsForNode(nodeID, context, plan.user.publicKey);
-  };
-  const relations = getRelationsToUse();
+  // 2. Use found relations or create new
+  const relations = foundRelations || newRelationsForNode(nodeID, context, plan.user.publicKey);
 
   // 3. Update view if needed
   const oldRelationsID = nodeView.relations || relations.id;
@@ -1259,7 +1245,7 @@ export function upsertRelations(
   const updatedRelations = modify(relations);
 
   // 5. Skip event only if: found own relations AND items unchanged
-  if (isOwnRelations && foundRelations.items.equals(updatedRelations.items)) {
+  if (foundRelations && foundRelations.items.equals(updatedRelations.items)) {
     return planWithUpdatedView;
   }
 

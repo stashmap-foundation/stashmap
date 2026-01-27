@@ -821,10 +821,21 @@ export async function getTreeStructure(): Promise<string> {
     }
   );
 
+  // Find all suggestion nodes (diff items from other users)
+  // These don't have expand/collapse buttons, so we find them via data-suggestion attribute
+  const suggestionCards = document.querySelectorAll('[data-suggestion="true"]');
+  const suggestionNodes = Array.from(suggestionCards).map((card) => {
+    // Find the text content - look for the editor or text span
+    const editor = card.querySelector('[role="textbox"]');
+    if (editor) return editor as HTMLElement;
+    const textSpan = card.querySelector('.break-word');
+    return textSpan as HTMLElement;
+  }).filter((el): el is HTMLElement => el !== null);
+
   // Combine and sort by DOM order
   type TreeElement = {
     element: HTMLElement;
-    type: "node" | "editor" | "reference";
+    type: "node" | "editor" | "reference" | "suggestion";
   };
   const elements: TreeElement[] = [
     ...toggleButtons.map((el) => ({
@@ -838,6 +849,10 @@ export async function getTreeStructure(): Promise<string> {
     ...referenceNodes.map((el) => ({
       element: el as HTMLElement,
       type: "reference" as const,
+    })),
+    ...suggestionNodes.map((el) => ({
+      element: el as HTMLElement,
+      type: "suggestion" as const,
     })),
   ];
 
@@ -853,7 +868,7 @@ export async function getTreeStructure(): Promise<string> {
 
   const getElementText = (
     element: HTMLElement,
-    type: "node" | "editor" | "reference"
+    type: "node" | "editor" | "reference" | "suggestion"
   ): string => {
     if (type === "node") {
       const text = (element.getAttribute("aria-label") || "").replace(
@@ -868,6 +883,10 @@ export async function getTreeStructure(): Promise<string> {
       const text = element.textContent?.trim() || "";
       const isOtherUser = element.getAttribute("data-other-user") === "true";
       return isOtherUser ? `[O] ${text}` : text;
+    }
+    if (type === "suggestion") {
+      const text = element.textContent?.trim() || "";
+      return `[S] ${text}`;
     }
     const content = element.textContent?.trim();
     return content ? `[NEW NODE: ${content}]` : "[NEW NODE]";

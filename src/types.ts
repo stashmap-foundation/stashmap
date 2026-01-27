@@ -129,6 +129,13 @@ declare global {
     contactsRelays: Relays;
   };
 
+  type Pane = {
+    id: string;
+    stack: (LongID | ID)[];
+    author: PublicKey;
+    rootRelation?: LongID;
+  };
+
   type Data = {
     contacts: Contacts;
     user: User;
@@ -139,6 +146,7 @@ declare global {
     projectMembers: Members;
 
     views: Views;
+    panes: Pane[];
   };
 
   type LocalStorage = {

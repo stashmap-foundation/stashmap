@@ -70,7 +70,6 @@ import { findContacts } from "./contacts";
 import { UserRelayContextProvider } from "./UserRelayContext";
 import { NavigationStackProvider } from "./NavigationStackContext";
 import {
-  SplitPanesProvider,
   PaneIndexProvider,
   useCurrentPane,
   usePaneIndex,
@@ -246,6 +245,7 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
     contactsRelays: [{ url: "wss://contacts.relay", read: true, write: true }],
   },
   projectMembers: Map<PublicKey, Member>(),
+  panes: [],
 };
 
 function applyDefaults(props?: Partial<TestAppState>): TestAppState {
@@ -380,28 +380,26 @@ export function renderApis(
                   }
                 >
                   <UserRelayContextProvider>
-                    <SplitPanesProvider>
-                      <PaneIndexProvider index={0}>
-                        <VirtuosoMockContext.Provider
-                          value={{ viewportHeight: 10000, itemHeight: 100 }}
-                        >
-                          {options?.includeFocusContext === true ? (
-                            <FocusContextProvider>
-                              {children}
-                            </FocusContextProvider>
-                          ) : (
-                            <FocusContext.Provider
-                              value={{
-                                isInputElementInFocus: true,
-                                setIsInputElementInFocus: jest.fn(),
-                              }}
-                            >
-                              {children}
-                            </FocusContext.Provider>
-                          )}
-                        </VirtuosoMockContext.Provider>
-                      </PaneIndexProvider>
-                    </SplitPanesProvider>
+                    <PaneIndexProvider index={0}>
+                      <VirtuosoMockContext.Provider
+                        value={{ viewportHeight: 10000, itemHeight: 100 }}
+                      >
+                        {options?.includeFocusContext === true ? (
+                          <FocusContextProvider>
+                            {children}
+                          </FocusContextProvider>
+                        ) : (
+                          <FocusContext.Provider
+                            value={{
+                              isInputElementInFocus: true,
+                              setIsInputElementInFocus: jest.fn(),
+                            }}
+                          >
+                            {children}
+                          </FocusContext.Provider>
+                        )}
+                      </VirtuosoMockContext.Provider>
+                    </PaneIndexProvider>
                   </UserRelayContextProvider>
                 </NostrAuthContextProvider>
               </PlanningContextProvider>
@@ -736,13 +734,11 @@ export function RootViewOrWorkspaceIsLoading({
   children: React.ReactNode;
 }): JSX.Element {
   return (
-    <SplitPanesProvider>
-      <PaneIndexProvider index={0}>
-        <RootViewOrWorkspaceIsLoadingInner>
-          {children}
-        </RootViewOrWorkspaceIsLoadingInner>
-      </PaneIndexProvider>
-    </SplitPanesProvider>
+    <PaneIndexProvider index={0}>
+      <RootViewOrWorkspaceIsLoadingInner>
+        {children}
+      </RootViewOrWorkspaceIsLoadingInner>
+    </PaneIndexProvider>
   );
 }
 

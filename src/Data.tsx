@@ -14,7 +14,7 @@ import {
 import { DataContextProvider } from "./DataContext";
 import { findContacts, findMembers } from "./contacts";
 import { useApis } from "./Apis";
-import { findNodes, findRelations, findViews } from "./knowledgeEvents";
+import { findNodes, findRelations, findViews, findPanes } from "./knowledgeEvents";
 import { newDB } from "./knowledge";
 import { PlanningContextProvider } from "./planner";
 import { useUserRelayContext } from "./UserRelayContext";
@@ -22,6 +22,8 @@ import { WorkspaceContextProvider } from "./WorkspaceContext";
 import { NavigationStackProvider } from "./NavigationStackContext";
 import { flattenRelays, usePreloadRelays, findRelays } from "./relays";
 import { sortEventsDescending, useEventQuery } from "./commons/useNostrQuery";
+import { ROOT } from "./types";
+import { generatePaneId } from "./SplitPanesContext";
 
 type DataProps = {
   user: User;
@@ -33,6 +35,7 @@ type ProcessedEvents = {
   contacts: Contacts;
   relays: Relays;
   views: Views;
+  panes: Pane[];
   projectMembers: Members;
 };
 
@@ -42,6 +45,7 @@ export function newProcessedEvents(): ProcessedEvents {
     contacts: Map<PublicKey, Contact>(),
     relays: [],
     views: Map<string, View>(),
+    panes: [],
     projectMembers: Map<PublicKey, Member>(),
   };
 }
@@ -68,6 +72,7 @@ function processEventsByAuthor(
   const nodes = findNodes(authorEvents);
   const relations = findRelations(authorEvents);
   const views = findViews(authorEvents);
+  const panes = findPanes(authorEvents);
   const projectMembers = findMembers(authorEvents);
   const knowledgeDB = {
     nodes,
@@ -79,6 +84,7 @@ function processEventsByAuthor(
     knowledgeDB,
     relays,
     views,
+    panes,
     projectMembers,
   };
 }
@@ -224,6 +230,11 @@ function Data({ user, children }: DataProps): JSX.Element {
       relaysInfos={searchRelaysInfo}
       publishEventsStatus={newEventsAndPublishResults}
       views={processedMetaEvents.views}
+      panes={
+        processedMetaEvents.panes.length > 0
+          ? processedMetaEvents.panes
+          : [{ id: generatePaneId(), stack: [ROOT], author: user.publicKey }]
+      }
       projectMembers={projectMembers}
     >
       <WorkspaceContextProvider>

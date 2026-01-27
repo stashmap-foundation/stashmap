@@ -1,6 +1,6 @@
 import { updateItemRelevance } from "../connections";
 import { usePlanner } from "../planner";
-import { usePaneStack, usePaneAuthor } from "../SplitPanesContext";
+import { usePaneStack } from "../SplitPanesContext";
 import { planDisconnectFromParent } from "../dnd";
 import { useRelationItemContext } from "./useRelationItemContext";
 
@@ -66,7 +66,6 @@ type UseUpdateRelevanceResult = {
  */
 export function useUpdateRelevance(): UseUpdateRelevanceResult {
   const stack = usePaneStack();
-  const paneAuthor = usePaneAuthor();
   const { createPlan, executePlan } = usePlanner();
   const { isVisible, nodeText, currentItem, viewPath, updateMetadata } =
     useRelationItemContext();
@@ -87,7 +86,7 @@ export function useUpdateRelevance(): UseUpdateRelevanceResult {
 
   const removeFromList = (): void => {
     if (!isVisible) return;
-    const plan = planDisconnectFromParent(createPlan(), viewPath, stack, paneAuthor);
+    const plan = planDisconnectFromParent(createPlan(), viewPath, stack);
     executePlan(plan);
   };
 

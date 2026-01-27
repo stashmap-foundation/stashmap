@@ -14,7 +14,7 @@ import {
 import { useData } from "./DataContext";
 import { execute, republishEvents } from "./executor";
 import { useApis } from "./Apis";
-import { viewsToJSON } from "./serializer";
+import { viewDataToJSON } from "./serializer";
 import { newDB } from "./knowledge";
 import {
   shortID,
@@ -55,6 +55,11 @@ import { useWorkspaceContext } from "./WorkspaceContext";
 import { useRelaysToCreatePlan } from "./relays";
 import { mergePublishResultsOfEvents } from "./commons/PublishingStatus";
 import { ROOT } from "./types";
+
+export function getPane(plan: Plan | Data, viewPath: ViewPath): Pane {
+  const paneIndex = viewPath[0];
+  return plan.panes[paneIndex];
+}
 
 export type Plan = Data & {
   publishEvents: List<UnsignedEvent & EventAttachment>;
@@ -378,7 +383,7 @@ function removeEmptyNodeFromKnowledgeDBs(
   });
 }
 
-export function planUpdateViews(plan: Plan, views: Views): Plan {
+function planUpdateViewData(plan: Plan, views: Views, panes: Pane[]): Plan {
   const publishEvents = plan.publishEvents.filterNot(
     (event) => event.kind === KIND_VIEWS
   );
@@ -387,11 +392,12 @@ export function planUpdateViews(plan: Plan, views: Views): Plan {
     pubkey: plan.user.publicKey,
     created_at: newTimestamp(),
     tags: [],
-    content: JSON.stringify(viewsToJSON(views)),
+    content: JSON.stringify(viewDataToJSON(views, panes)),
   };
   return {
     ...plan,
     views,
+    panes,
     publishEvents: publishEvents.push(
       setRelayConf(writeViewEvent, {
         defaultRelays: false,
@@ -400,6 +406,14 @@ export function planUpdateViews(plan: Plan, views: Views): Plan {
       })
     ),
   };
+}
+
+export function planUpdateViews(plan: Plan, views: Views): Plan {
+  return planUpdateViewData(plan, views, plan.panes);
+}
+
+export function planUpdatePanes(plan: Plan, panes: Pane[]): Plan {
+  return planUpdateViewData(plan, plan.views, panes);
 }
 
 export function planRemoveEmptyNodePosition(
@@ -487,7 +501,6 @@ export function planAddToParent(
   nodeIDs: LongID | ID | (LongID | ID)[],
   parentViewPath: ViewPath,
   stack: (LongID | ID)[],
-  paneAuthor: PublicKey,
   insertAtIndex?: number,
   relevance?: Relevance,
   argument?: Argument
@@ -518,8 +531,7 @@ export function planAddToParent(
         relevance,
         argument,
         insertAtIndex
-      ),
-    paneAuthor
+      )
   );
 
   const updatedViews = bulkUpdateViewPathsAfterAddRelation(
@@ -569,20 +581,26 @@ function planCopyDescendantRelations(
   );
 }
 
-export function planCopyRelationsFromAuthor(
+export function planFork(
   plan: Plan,
-  sourceAuthor: PublicKey,
-  nodeID: LongID | ID,
-  context: Context
+  viewPath: ViewPath,
+  stack: (LongID | ID)[]
 ): Plan {
-  const [finalPlan] = planCopyDescendantRelations(
+  const pane = getPane(plan, viewPath);
+  const [nodeID] = getNodeIDFromView(plan, viewPath);
+  const context = getContextFromStackAndViewPath(stack, viewPath);
+  const [planWithRelations] = planCopyDescendantRelations(
     plan,
     nodeID,
     context,
     (relation) => relation.context,
-    (relation) => relation.author === sourceAuthor
+    (relation) => relation.author === pane.author
   );
-  return finalPlan;
+  const paneIndex = viewPath[0];
+  const newPanes = planWithRelations.panes.map((p, i) =>
+    i === paneIndex ? { ...p, author: plan.user.publicKey } : p
+  );
+  return planUpdatePanes(planWithRelations, newPanes);
 }
 
 export function planDeepCopyNode(
@@ -605,7 +623,6 @@ export function planDeepCopyNode(
     sourceNodeID,
     targetParentViewPath,
     stack,
-    plan.user.publicKey,
     insertAtIndex
   );
 
@@ -698,7 +715,6 @@ export function planSaveNodeAndEnsureRelations(
   text: string,
   viewPath: ViewPath,
   stack: (LongID | ID)[],
-  paneAuthor: PublicKey,
   relevance?: Relevance,
   argument?: Argument
 ): Plan {
@@ -753,7 +769,6 @@ export function planSaveNodeAndEnsureRelations(
       createdNode.id,
       parentPath,
       stack,
-      paneAuthor,
       emptyNodeIndex,
       relevance ?? metadata?.relationItem.relevance,
       argument ?? metadata?.relationItem.argument
@@ -1105,16 +1120,14 @@ export function planSetEmptyNodePosition(
   plan: Plan,
   parentPath: ViewPath,
   stack: (LongID | ID)[],
-  insertIndex: number,
-  paneAuthor: PublicKey
+  insertIndex: number
 ): Plan {
   // 1. Ensure we have our own editable relations (copies remote if needed)
   const planWithOwnRelations = upsertRelations(
     plan,
     parentPath,
     stack,
-    (r) => r,
-    paneAuthor
+    (r) => r
   );
 
   // 2. Use planExpandNode for consistent expansion handling

@@ -156,9 +156,11 @@ test("Diff items are always added, never moved", () => {
     expanded: true,
   });
 
+  const panes = [{ id: "pane-0", stack: [parent.id], author: alicePK }];
+
   const plan = planUpdateViews(
     planUpsertRelations(
-      planBulkUpsertNodes(createPlan({ ...alice(), knowledgeDBs, views }), [
+      planBulkUpsertNodes(createPlan({ ...alice(), knowledgeDBs, views, panes }), [
         parent,
         aliceChild,
       ]),
@@ -184,7 +186,6 @@ test("Diff items are always added, never moved", () => {
     parentPath,
     [parent.id], // stack
     0,
-    alicePK,
     undefined,
     true
   );

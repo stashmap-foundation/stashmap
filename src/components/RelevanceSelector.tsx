@@ -14,7 +14,7 @@ import {
   useDisplayText,
 } from "../ViewContext";
 import { usePlanner, planAddToParent } from "../planner";
-import { usePaneStack, usePaneAuthor } from "../SplitPanesContext";
+import { usePaneStack } from "../SplitPanesContext";
 import { preventEditorBlurIfSameNode } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
 
@@ -84,7 +84,6 @@ export function RelevanceSelector({
   const [nodeID] = useNodeID();
   const [node] = useNode();
   const stack = usePaneStack();
-  const paneAuthor = usePaneAuthor();
   const { createPlan, executePlan } = usePlanner();
   const parentPath = getParentView(viewPath);
 
@@ -102,7 +101,6 @@ export function RelevanceSelector({
       nodeID,
       parentPath,
       stack,
-      paneAuthor,
       undefined,
       relevance
     );

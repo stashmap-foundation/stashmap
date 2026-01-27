@@ -45,7 +45,6 @@ export function getDropDestinationFromTreeView(
   root: ViewPath,
   stack: (LongID | ID)[],
   destinationIndex: number,
-  paneAuthor: PublicKey,
   rootRelation: LongID | undefined
 ): [ViewPath, number] {
   const nodes = getNodesInTree(
@@ -53,7 +52,6 @@ export function getDropDestinationFromTreeView(
     root,
     stack,
     List<ViewPath>(),
-    paneAuthor,
     rootRelation
   );
   // Subtract 1 because the visual list includes root at index 0,
@@ -88,7 +86,6 @@ export function dnd(
   to: ViewPath,
   stack: (LongID | ID)[],
   indexTo: number | undefined,
-  paneAuthor: PublicKey,
   rootRelation: LongID | undefined,
   isDiffItem?: boolean
 ): Plan {
@@ -107,7 +104,6 @@ export function dnd(
           rootView,
           stack,
           indexTo,
-          paneAuthor,
           rootRelation
         );
 
@@ -131,8 +127,7 @@ export function dnd(
       stack,
       (relations: Relations) => {
         return moveRelations(relations, sourceIndices.toArray(), dropIndex);
-      },
-      paneAuthor
+      }
     );
     const updatedViews = updateViewPathsAfterMoveRelations(
       updatedRelationsPlan,
@@ -177,8 +172,7 @@ export function dnd(
 export function planDisconnectFromParent(
   plan: Plan,
   viewPath: ViewPath,
-  stack: (LongID | ID)[],
-  paneAuthor: PublicKey
+  stack: (LongID | ID)[]
 ): Plan {
   const parentPath = getParentView(viewPath);
   if (!parentPath) {
@@ -198,8 +192,7 @@ export function planDisconnectFromParent(
     plan,
     parentPath,
     stack,
-    (relations) => deleteRelations(relations, Set([relationIndex])),
-    paneAuthor
+    (relations) => deleteRelations(relations, Set([relationIndex]))
   );
 
   // Update view paths

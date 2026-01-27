@@ -13,7 +13,7 @@ import {
   planSaveNodeAndEnsureRelations,
   planAddToParent,
 } from "../planner";
-import { usePaneStack, usePaneAuthor } from "../SplitPanesContext";
+import { usePaneStack } from "../SplitPanesContext";
 
 /**
  * Prevents a button from stealing focus from an editor in the same node row.
@@ -308,7 +308,6 @@ export function SiblingSearchButton(): JSX.Element | null {
   const nextInsertPosition = useNextInsertPosition();
   const viewPath = useViewPath();
   const stack = usePaneStack();
-  const paneAuthor = usePaneAuthor();
   const { createPlan, executePlan } = usePlanner();
   const editorTextContext = useEditorText();
 
@@ -323,15 +322,13 @@ export function SiblingSearchButton(): JSX.Element | null {
       createPlan(),
       editorText,
       viewPath,
-      stack,
-      paneAuthor
+      stack
     );
     const plan = planAddToParent(
       planWithSave,
       nodeIDToAdd,
       targetPath,
       stack,
-      paneAuthor,
       insertIndex
     );
     executePlan(plan);
@@ -357,7 +354,6 @@ export function AddSiblingButton(): JSX.Element | null {
   const versionedDisplayText = useDisplayText();
   const nextInsertPosition = useNextInsertPosition();
   const stack = usePaneStack();
-  const paneAuthor = usePaneAuthor();
   const { createPlan, executePlan } = usePlanner();
   const viewPath = useViewPath();
   const editorTextContext = useEditorText();
@@ -379,8 +375,7 @@ export function AddSiblingButton(): JSX.Element | null {
           basePlan,
           currentEditorText,
           viewPath,
-          stack,
-          paneAuthor
+          stack
         )
       : basePlan;
 
@@ -388,8 +383,7 @@ export function AddSiblingButton(): JSX.Element | null {
       planWithSave,
       targetPath,
       stack,
-      insertIndex,
-      paneAuthor
+      insertIndex
     );
     executePlan(plan);
   };

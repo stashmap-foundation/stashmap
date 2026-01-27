@@ -3,7 +3,6 @@ import { Outlet } from "react-router-dom";
 
 import { NavbarControls } from "./NavbarControls";
 import { SplitPaneLayout } from "./SplitPaneLayout";
-import { SplitPanesProvider } from "../SplitPanesContext";
 import { StorePreLoginContext } from "../StorePreLoginContext";
 
 export function AppLayout({
@@ -28,14 +27,12 @@ export function AppLayout({
 
 function Dashboard(): JSX.Element {
   return (
-    <SplitPanesProvider>
-      <StorePreLoginContext>
-        <AppLayout>
-          <Outlet />
-          <SplitPaneLayout />
-        </AppLayout>
-      </StorePreLoginContext>
-    </SplitPanesProvider>
+    <StorePreLoginContext>
+      <AppLayout>
+        <Outlet />
+        <SplitPaneLayout />
+      </AppLayout>
+    </StorePreLoginContext>
   );
 }
 export default Dashboard;

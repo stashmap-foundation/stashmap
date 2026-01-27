@@ -53,6 +53,7 @@ import {
   planCreateVersion,
   planAddToParent,
   planDeepCopyNodeWithView,
+  getPane,
 } from "../planner";
 import { planDisconnectFromParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
@@ -62,7 +63,6 @@ import {
   usePaneStack,
   useSplitPanes,
   useCurrentPane,
-  usePaneAuthor,
 } from "../SplitPanesContext";
 import { LeftMenu } from "./LeftMenu";
 import { RightMenu } from "./RightMenu";
@@ -198,7 +198,6 @@ function NodeContent({
 function EditableContent(): JSX.Element {
   const viewPath = useViewPath();
   const stack = usePaneStack();
-  const paneAuthor = usePaneAuthor();
   const { createPlan, executePlan } = usePlanner();
   const [node] = useNode();
   const [nodeID] = useNodeID();
@@ -217,8 +216,7 @@ function EditableContent(): JSX.Element {
       createPlan(),
       text,
       viewPath,
-      stack,
-      paneAuthor
+      stack
     );
 
     const plan =
@@ -227,8 +225,7 @@ function EditableContent(): JSX.Element {
             basePlan,
             nextInsertPosition[0],
             stack,
-            nextInsertPosition[1],
-            paneAuthor
+            nextInsertPosition[1]
           )
         : basePlan;
 
@@ -283,8 +280,7 @@ function EditableContent(): JSX.Element {
           planWithNode,
           newNode.id,
           prevSibling.viewPath,
-          stack,
-          paneAuthor
+          stack
         );
         executePlan(finalPlan);
       } else {
@@ -293,8 +289,7 @@ function EditableContent(): JSX.Element {
           planWithExpand,
           prevSibling.viewPath,
           stack,
-          0, // Insert at end (will be only child or after existing children)
-          paneAuthor
+          0 // Insert at end (will be only child or after existing children)
         );
         executePlan(finalPlan);
       }
@@ -330,8 +325,7 @@ function EditableContent(): JSX.Element {
     const planWithDisconnect = planDisconnectFromParent(
       planWithDeepCopy,
       viewPath,
-      stack,
-      paneAuthor
+      stack
     );
 
     // Step 4: Save text changes in NEW context (if any)
@@ -485,11 +479,11 @@ export function getNodesInTree(
   parentPath: ViewPath,
   stack: (LongID | ID)[],
   ctx: List<ViewPath>,
-  paneAuthor: PublicKey,
   rootRelation: LongID | undefined,
   noExpansion?: boolean
 ): List<ViewPath> {
   const [parentNodeID, parentView] = getNodeIDFromView(data, parentPath);
+  const paneAuthor = getPane(data, parentPath).author;
 
   // Handle abstract refs - their children are concrete refs, can be expanded
   if (isAbstractRefId(parentNodeID)) {
@@ -532,7 +526,6 @@ export function getNodesInTree(
           childPath,
           stack,
           nodesList.push(childPath),
-          paneAuthor,
           rootRelation
         );
       }
@@ -572,7 +565,6 @@ export function getNodesInTree(
               childPath,
               stack,
               nodesList.push(childPath),
-              paneAuthor,
               rootRelation
             );
           }

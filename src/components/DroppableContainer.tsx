@@ -129,7 +129,6 @@ export function useDroppable({
           destination,
           stack,
           calcIndex(index, direction),
-          pane.author,
           pane.rootRelation,
           item.isDiffItem
         )

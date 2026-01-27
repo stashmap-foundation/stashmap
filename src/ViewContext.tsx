@@ -17,7 +17,7 @@ import {
 } from "./connections";
 import { newDB } from "./knowledge";
 import { useData } from "./DataContext";
-import { Plan, planUpsertRelations, planUpdateViews, planCopyRelationsFromAuthor } from "./planner";
+import { Plan, planUpsertRelations, planUpdateViews, planFork, getPane } from "./planner";
 import { usePaneStack, useCurrentPane } from "./SplitPanesContext";
 import { REFERENCED_BY } from "./constants";
 
@@ -1186,18 +1186,18 @@ export function upsertRelations(
   plan: Plan,
   viewPath: ViewPath,
   stack: (LongID | ID)[],
-  modify: (relations: Relations) => Relations,
-  paneAuthor: PublicKey
+  modify: (relations: Relations) => Relations
 ): Plan {
+  const pane = getPane(plan, viewPath);
   const [nodeID, nodeView] = getNodeIDFromView(plan, viewPath);
   const context = getContextFromStackAndViewPath(stack, viewPath);
 
-  // 1. Deep copy from paneAuthor if editing another user's content
-  const basePlan = paneAuthor !== plan.user.publicKey
-    ? planCopyRelationsFromAuthor(plan, paneAuthor, nodeID, context)
+  // 1. Fork if editing another user's content
+  const basePlan = pane.author !== plan.user.publicKey
+    ? planFork(plan, viewPath, stack)
     : plan;
 
-  // 2. Get relations for context (now will find copied relations if copy happened)
+  // 2. Get relations for context (now will find copied relations if fork happened)
   const foundRelations = getNewestRelationFromAuthor(
     basePlan.knowledgeDBs,
     basePlan.user.publicKey,

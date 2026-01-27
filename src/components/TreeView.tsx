@@ -221,7 +221,6 @@ function Tree(): JSX.Element | null {
         viewPath,
         stack,
         List<ViewPath>(),
-        pane.author,
         pane.rootRelation
       )
     : List<ViewPath>();

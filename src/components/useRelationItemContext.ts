@@ -17,7 +17,7 @@ import {
   planSaveNodeAndEnsureRelations,
   Plan,
 } from "../planner";
-import { usePaneStack, usePaneAuthor } from "../SplitPanesContext";
+import { usePaneStack } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 import { useEditorText } from "./EditorTextContext";
 
@@ -56,7 +56,6 @@ export function useRelationItemContext(): RelationItemContext {
   const isInReferencedByView = useIsInReferencedByView();
   const [node] = useNode();
   const parentView = getParentView(viewPath);
-  const paneAuthor = usePaneAuthor();
 
   const [nodeID] = useNodeID();
   const isEmptyNode = isEmptyNodeID(nodeID);
@@ -92,7 +91,6 @@ export function useRelationItemContext(): RelationItemContext {
           editorText,
           viewPath,
           stack,
-          paneAuthor,
           metadata.relevance,
           metadata.argument
         );
@@ -111,12 +109,11 @@ export function useRelationItemContext(): RelationItemContext {
     const basePlan: Plan = createPlan();
 
     const planWithSave = textChanged
-      ? planSaveNodeAndEnsureRelations(basePlan, editorText, viewPath, stack, paneAuthor)
+      ? planSaveNodeAndEnsureRelations(basePlan, editorText, viewPath, stack)
       : basePlan;
 
     const plan = upsertRelations(planWithSave, parentView, stack, (rels) =>
-      updater(rels, relationIndex),
-      paneAuthor
+      updater(rels, relationIndex)
     );
     executePlan(plan);
   };

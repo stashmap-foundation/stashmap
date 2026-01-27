@@ -314,6 +314,7 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
     ...alice(),
     knowledgeDBs,
     views,
+    panes: [{ id: "pane-0", stack: [parent.id], author: alicePK }],
   };
 
   const nodes = getNodesInTree(
@@ -321,7 +322,6 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
     parentPath,
     [parent.id],
     List(),
-    alicePK,
     undefined
   );
   const nodeIDs = nodes.map((path) => getLast(path).nodeID).toArray();
@@ -489,6 +489,7 @@ test("Diff item paths are correctly identified as diff items", () => {
     ...alice(),
     knowledgeDBs,
     views,
+    panes: [{ id: "pane-0", stack: [root.id], author: alicePK }],
   };
 
   const nodes = getNodesInTree(
@@ -496,7 +497,6 @@ test("Diff item paths are correctly identified as diff items", () => {
     rootPath,
     [root.id],
     List(),
-    alicePK,
     undefined
   );
   expect(nodes.size).toBeGreaterThanOrEqual(3);

@@ -14,6 +14,7 @@ import {
 import {
   Serializable,
   jsonToViews,
+  jsonToPanes,
   eventToRelations,
   eventToTextNode,
 } from "./serializer";
@@ -102,4 +103,14 @@ export function findViews(events: List<UnsignedEvent>): Views {
     return Map<string, View>();
   }
   return jsonToViews(JSON.parse(viewEvent.content) as Serializable);
+}
+
+export function findPanes(events: List<UnsignedEvent>): Pane[] {
+  const viewEvent = getMostRecentReplacableEvent(
+    events.filter((event) => event.kind === KIND_VIEWS)
+  );
+  if (viewEvent === undefined) {
+    return [];
+  }
+  return jsonToPanes(JSON.parse(viewEvent.content) as Serializable);
 }

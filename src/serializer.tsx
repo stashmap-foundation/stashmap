@@ -140,14 +140,17 @@ function jsonToView(view: Serializable): View | undefined {
 }
 
 export function jsonToViews(s: Serializable): Map<string, View> {
-  return Map(asObject(s))
+  const obj = asObject(s);
+  if (obj.views === undefined) {
+    return Map<string, View>();
+  }
+  return Map(asObject(obj.views))
     .map((v) => jsonToView(v))
     .filter((v, k) => {
       if (v === undefined) {
         return false;
       }
       try {
-        // Test if view path is valid
         parseViewPath(k);
         return true;
       } catch {
@@ -156,8 +159,43 @@ export function jsonToViews(s: Serializable): Map<string, View> {
     }) as Map<string, View>;
 }
 
-export function viewsToJSON(views: Map<string, View>): Serializable {
-  return views.map((v) => viewToJSON(v)).toJSON();
+function paneToJSON(pane: Pane): Serializable {
+  return {
+    i: pane.id,
+    s: pane.stack,
+    a: pane.author,
+    r: pane.rootRelation,
+  };
+}
+
+function jsonToPane(s: Serializable): Pane | undefined {
+  if (s === null || s === undefined) {
+    return undefined;
+  }
+  const obj = asObject(s);
+  return {
+    id: asString(obj.i),
+    stack: asArray(obj.s).map((id) => asString(id) as LongID | ID),
+    author: asString(obj.a) as PublicKey,
+    rootRelation: obj.r !== undefined ? (asString(obj.r) as LongID) : undefined,
+  };
+}
+
+export function jsonToPanes(s: Serializable): Pane[] {
+  const obj = asObject(s);
+  if (obj.panes === undefined) {
+    return [];
+  }
+  return asArray(obj.panes)
+    .map((p) => jsonToPane(p))
+    .filter((p): p is Pane => p !== undefined);
+}
+
+export function viewDataToJSON(views: Map<string, View>, panes: Pane[]): Serializable {
+  return {
+    views: views.map((v) => viewToJSON(v)).toJSON(),
+    panes: panes.map((p) => paneToJSON(p)),
+  };
 }
 
 export function eventToRelations(e: UnsignedEvent): Relations | undefined {

@@ -46,7 +46,6 @@ import { execute } from "./executor";
 import { ApiProvider, Apis, FinalizeEvent } from "./Apis";
 import { App } from "./App";
 import { DataContextProps, DataContextProvider } from "./DataContext";
-import { WorkspaceContextProvider } from "./WorkspaceContext";
 import { MockRelayPool, mockRelayPool } from "./nostrMock.test";
 import {
   NostrAuthContextProvider,
@@ -214,7 +213,6 @@ export type UpdateState = () => TestAppState;
 type TestAppState = TestDataProps & TestApis;
 
 type TestDataProps = DataContextProps & {
-  activeWorkspace: LongID;
   relays: AllRelays;
 };
 
@@ -239,7 +237,6 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
     temporaryEvents: List(),
   },
   views: Map<string, View>(),
-  activeWorkspace: joinID(STASHMAP_PUBLIC_KEY, "ws") as LongID,
   relays: {
     defaultRelays: [{ url: "wss://default.relay", read: true, write: true }],
     userRelays: [{ url: "wss://user.relay", read: true, write: true }],
@@ -307,21 +304,19 @@ export function findNodeByText(plan: Plan, text: string): KnowNode | undefined {
     .nodes.find((node) => node.text === text);
 }
 
-function createInitialWorkspace(
+function createInitialRoot(
   plan: Plan,
-  activeWorkspace?: string
+  rootText?: string
 ): [Plan, nodeID: ID] {
-  const wsNode = activeWorkspace
-    ? findNodeByText(plan, activeWorkspace)
+  const rootNode = rootText
+    ? findNodeByText(plan, rootText)
     : newNode("My Notes");
-  if (!wsNode) {
-    throw new Error(
-      `Test Setup Error: No Node with text ${activeWorkspace} found`
-    );
+  if (!rootNode) {
+    throw new Error(`Test Setup Error: No Node with text ${rootText} found`);
   }
 
-  const planWithNode = activeWorkspace ? plan : planUpsertNode(plan, wsNode);
-  return [planWithNode, wsNode.id];
+  const planWithNode = rootText ? plan : planUpsertNode(plan, rootNode);
+  return [planWithNode, rootNode.id];
 }
 
 type RenderApis = Partial<TestApis> & {
@@ -372,39 +367,37 @@ export function renderApis(
         >
           {/* eslint-disable-next-line react/jsx-props-no-spreading */}
           <DataContextProvider {...DEFAULT_DATA_CONTEXT_PROPS}>
-            <WorkspaceContextProvider>
-              <PlanningContextProvider setPublishEvents={() => {}}>
-                <NostrAuthContextProvider
-                  defaultRelayUrls={
-                    optionsWithDefaultUser.defaultRelays ||
-                    TEST_RELAYS.map((r) => r.url)
-                  }
-                >
-                  <UserRelayContextProvider>
-                    <PaneIndexProvider index={0}>
-                      <VirtuosoMockContext.Provider
-                        value={{ viewportHeight: 10000, itemHeight: 100 }}
-                      >
-                        {options?.includeFocusContext === true ? (
-                          <FocusContextProvider>
-                            {children}
-                          </FocusContextProvider>
-                        ) : (
-                          <FocusContext.Provider
-                            value={{
-                              isInputElementInFocus: true,
-                              setIsInputElementInFocus: jest.fn(),
-                            }}
-                          >
-                            {children}
-                          </FocusContext.Provider>
-                        )}
-                      </VirtuosoMockContext.Provider>
-                    </PaneIndexProvider>
-                  </UserRelayContextProvider>
-                </NostrAuthContextProvider>
-              </PlanningContextProvider>
-            </WorkspaceContextProvider>
+            <PlanningContextProvider setPublishEvents={() => {}}>
+              <NostrAuthContextProvider
+                defaultRelayUrls={
+                  optionsWithDefaultUser.defaultRelays ||
+                  TEST_RELAYS.map((r) => r.url)
+                }
+              >
+                <UserRelayContextProvider>
+                  <PaneIndexProvider index={0}>
+                    <VirtuosoMockContext.Provider
+                      value={{ viewportHeight: 10000, itemHeight: 100 }}
+                    >
+                      {options?.includeFocusContext === true ? (
+                        <FocusContextProvider>
+                          {children}
+                        </FocusContextProvider>
+                      ) : (
+                        <FocusContext.Provider
+                          value={{
+                            isInputElementInFocus: true,
+                            setIsInputElementInFocus: jest.fn(),
+                          }}
+                        >
+                          {children}
+                        </FocusContext.Provider>
+                      )}
+                    </VirtuosoMockContext.Provider>
+                  </PaneIndexProvider>
+                </UserRelayContextProvider>
+              </NostrAuthContextProvider>
+            </PlanningContextProvider>
           </DataContextProvider>
         </ApiProvider>
       </NavigationStackProvider>
@@ -639,7 +632,7 @@ function createNodesAndRelations(
 }
 
 type Options = {
-  activeWorkspace: string;
+  root: string;
 };
 
 export async function setupTestDB(
@@ -648,19 +641,17 @@ export async function setupTestDB(
   options?: Options
 ): Promise<Plan> {
   const plan = createNodesAndRelations(createPlan(appState), undefined, nodes);
-  const [planWithWs, id] = options?.activeWorkspace
-    ? createInitialWorkspace(plan, options?.activeWorkspace)
-    : [plan, appState.activeWorkspace];
+  const defaultRoot = appState.panes[0].stack[appState.panes[0].stack.length - 1];
+  const [planWithRoot, id] = options?.root
+    ? createInitialRoot(plan, options.root)
+    : [plan, defaultRoot];
 
   await execute({
     ...appState,
-    plan: planWithWs,
+    plan: planWithRoot,
     finalizeEvent: mockFinalizeEvent(),
   });
-  return {
-    ...planWithWs,
-    activeWorkspace: id,
-  };
+  return planWithRoot;
 }
 
 export function extractNodes(container: Container): Array<string | null> {

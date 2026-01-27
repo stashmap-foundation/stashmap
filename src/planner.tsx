@@ -51,7 +51,6 @@ import {
   addNodeToPathWithRelations,
 } from "./ViewContext";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
-import { useWorkspaceContext } from "./WorkspaceContext";
 import { useRelaysToCreatePlan } from "./relays";
 import { mergePublishResultsOfEvents } from "./commons/PublishingStatus";
 import { ROOT } from "./types";
@@ -63,7 +62,6 @@ export function getPane(plan: Plan | Data, viewPath: ViewPath): Pane {
 
 export type Plan = Data & {
   publishEvents: List<UnsignedEvent & EventAttachment>;
-  activeWorkspace: ID;
   relays: AllRelays;
   temporaryView: TemporaryViewState;
   temporaryEvents: List<TemporaryEvent>;
@@ -1074,7 +1072,6 @@ export function PlanningContextProvider({
 
 export function createPlan(
   props: Data & {
-    activeWorkspace: ID;
     publishEvents?: List<UnsignedEvent & EventAttachment>;
     relays: AllRelays;
   }
@@ -1083,21 +1080,17 @@ export function createPlan(
     ...props,
     publishEvents:
       props.publishEvents || List<UnsignedEvent & EventAttachment>([]),
-    // temporaryView comes from publishEventsStatus
     temporaryView: props.publishEventsStatus.temporaryView,
-    // Each plan starts with empty temporaryEvents - they get concatenated in executePlan
     temporaryEvents: List<TemporaryEvent>(),
   };
 }
 
 export function usePlanner(): Planner {
   const data = useData();
-  const { activeWorkspace } = useWorkspaceContext();
   const relays = useRelaysToCreatePlan();
   const createPlanningContext = (): Plan => {
     return createPlan({
       ...data,
-      activeWorkspace,
       relays,
     });
   };

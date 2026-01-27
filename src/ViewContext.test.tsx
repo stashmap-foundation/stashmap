@@ -512,7 +512,7 @@ test("Disconnect Nodes", async () => {
     alice(),
     [["Programming Languages", ["C", "C++", "Java", "Rust"]]],
     {
-      activeWorkspace: "Programming Languages",
+      root: "Programming Languages",
     }
   );
   // Navigate directly to Programming Languages (root level, empty context)

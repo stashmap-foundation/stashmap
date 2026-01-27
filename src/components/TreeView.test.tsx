@@ -364,7 +364,8 @@ test("Reference indicators show other users icon", async () => {
   );
 
   // Also create a relation from My Notes to Parent so it shows in the workspace
-  const workspace = alice().activeWorkspace;
+  const aliceState = alice();
+  const workspace = aliceState.panes[0].stack[aliceState.panes[0].stack.length - 1];
   const workspaceRelations = addRelationToRelations(
     newRelations(workspace, List(), alicePK),
     parent.id

@@ -41,6 +41,11 @@ export function usePaneAuthor(): PublicKey {
   return useCurrentPane().author;
 }
 
+export function useRoot(): ID {
+  const pane = useCurrentPane();
+  return pane.stack[pane.stack.length - 1] as ID;
+}
+
 type PaneOperations = {
   panes: Pane[];
   addPaneAt: (

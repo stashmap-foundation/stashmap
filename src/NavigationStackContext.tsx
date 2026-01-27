@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { ROOT } from "./types";
-import { useWorkspaceContext } from "./WorkspaceContext";
 
 interface NavigationStackContextType {
   stack: (LongID | ID)[];
@@ -58,16 +57,4 @@ export function useNavigationStack(): NavigationStackContextType {
     );
   }
   return context;
-}
-
-export function useStack(): (LongID | ID)[] {
-  const { stack } = useNavigationStack();
-  const { activeWorkspace } = useWorkspaceContext();
-
-  // If stack's last item doesn't match activeWorkspace, append it
-  if (stack[stack.length - 1] !== activeWorkspace) {
-    return stack.concat(activeWorkspace);
-  }
-
-  return stack;
 }

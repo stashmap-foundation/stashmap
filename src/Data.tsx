@@ -18,15 +18,15 @@ import { findNodes, findRelations, findViews, findPanes } from "./knowledgeEvent
 import { newDB } from "./knowledge";
 import { PlanningContextProvider } from "./planner";
 import { useUserRelayContext } from "./UserRelayContext";
-import { WorkspaceContextProvider } from "./WorkspaceContext";
 import { NavigationStackProvider } from "./NavigationStackContext";
 import { flattenRelays, usePreloadRelays, findRelays } from "./relays";
 import { sortEventsDescending, useEventQuery } from "./commons/useNostrQuery";
 import { ROOT } from "./types";
+import { useRootFromURL } from "./KnowledgeDataContext";
 
-const defaultPane = (author: PublicKey): Pane => ({
+const defaultPane = (author: PublicKey, workspace: LongID | ID): Pane => ({
   id: "pane-0",
-  stack: [ROOT],
+  stack: [workspace],
   author,
 });
 
@@ -150,6 +150,7 @@ const DEFAULT_TEMPORARY_VIEW: TemporaryViewState = {
 
 function Data({ user, children }: DataProps): JSX.Element {
   const myPublicKey = user.publicKey;
+  const rootFromURL = useRootFromURL();
   const [newEventsAndPublishResults, setNewEventsAndPublishResults] =
     useState<EventState>({
       unsignedEvents: List(),
@@ -238,19 +239,17 @@ function Data({ user, children }: DataProps): JSX.Element {
       panes={
         processedMetaEvents.panes.length > 0
           ? processedMetaEvents.panes
-          : [defaultPane(user.publicKey)]
+          : [defaultPane(user.publicKey, rootFromURL || ROOT)]
       }
       projectMembers={projectMembers}
     >
-      <WorkspaceContextProvider>
-        <NavigationStackProvider>
-          <PlanningContextProvider
-            setPublishEvents={setNewEventsAndPublishResults}
-          >
-            {children}
-          </PlanningContextProvider>
-        </NavigationStackProvider>
-      </WorkspaceContextProvider>
+      <NavigationStackProvider>
+        <PlanningContextProvider
+          setPublishEvents={setNewEventsAndPublishResults}
+        >
+          {children}
+        </PlanningContextProvider>
+      </NavigationStackProvider>
     </DataContextProvider>
   );
 }

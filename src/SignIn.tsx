@@ -253,7 +253,8 @@ export function SignInModal(): JSX.Element {
       });
     }
     storeMergeEvents(mergeEvents.map((e) => e.kind));
-    navigate(referrer || `/w/${plan.activeWorkspace}`);
+    const root = plan.panes[0].stack[plan.panes[0].stack.length - 1];
+    navigate(referrer || `/w/${root}`);
   };
   return (
     <Modal show onHide={onHide}>

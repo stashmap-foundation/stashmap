@@ -19,7 +19,7 @@ import {
   usePlanner,
 } from "../planner";
 import { isMutableNode } from "./TemporaryViewContext";
-import { useWorkspaceContext } from "../WorkspaceContext";
+import { useRoot } from "../SplitPanesContext";
 import { ROOT } from "../types";
 
 function disconnectNode(plan: Plan, toDisconnect: LongID | ID): Plan {
@@ -45,24 +45,18 @@ export function DeleteWorkspace({
   as?: "button" | "item";
   withCaption?: boolean;
 }): JSX.Element | null {
-  const { activeWorkspace } = useWorkspaceContext();
+  const root = useRoot();
   const data = useData();
   const { createPlan, executePlan } = usePlanner();
   const navigate = useNavigate();
 
-  if (isRemote(splitID(activeWorkspace)[0], data.user.publicKey)) {
+  if (isRemote(splitID(root)[0], data.user.publicKey)) {
     return null;
   }
 
   const deleteCurrentWorkspace = (): void => {
-    const planWithDisconnectedNode = disconnectNode(
-      createPlan(),
-      activeWorkspace
-    );
-    const planWithDeletedNode = planDeleteNode(
-      planWithDisconnectedNode,
-      activeWorkspace
-    );
+    const planWithDisconnectedNode = disconnectNode(createPlan(), root);
+    const planWithDeletedNode = planDeleteNode(planWithDisconnectedNode, root);
 
     executePlan(planWithDeletedNode);
 

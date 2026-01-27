@@ -5,16 +5,16 @@ export function shorten(nodeText: string): string {
   return nodeText.substr(0, 30);
 }
 
-export function useWorkspaceFromURL(): LongID | undefined {
+export function useRootFromURL(): ID | undefined {
   const params = useParams<{
-    workspaceID?: LongID;
+    workspaceID?: ID;
   }>();
-  const wsID = params.workspaceID;
-  const [lastWSFromURL, setLastWSFromURL] = useState<LongID | undefined>(wsID);
+  const rootID = params.workspaceID;
+  const [lastRootFromURL, setLastRootFromURL] = useState<ID | undefined>(rootID);
   useEffect(() => {
-    if (wsID !== lastWSFromURL && wsID) {
-      setLastWSFromURL(wsID);
+    if (rootID !== lastRootFromURL && rootID) {
+      setLastRootFromURL(rootID);
     }
-  }, [wsID]);
-  return lastWSFromURL;
+  }, [rootID]);
+  return lastRootFromURL;
 }

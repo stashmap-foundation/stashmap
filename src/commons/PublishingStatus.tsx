@@ -192,7 +192,6 @@ export function PublishingStatus<T = void>({
         id="publishing-status-dropdown"
         key="publishing-status-dropdown"
         className="btn"
-        style={{ paddingTop: "6px", paddingBottom: "4px" }}
         aria-label="publishing status"
         tabIndex={0}
       >

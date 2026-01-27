@@ -62,89 +62,133 @@ body {
   background: transparent !important;
 }
 
-.workspace-navbar-controls {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 1000;
-}
+// =============================================================================
+// PANE LAYOUT - Clean Notion-style design
+// =============================================================================
 
-.workspace-stack-container {
+.pane-wrapper {
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding-top: 8px;
+  background-color: #ffffff;
+  position: relative;
 }
 
-.stacked-layer {
-  position: relative;
-  display: flex;
-  align-items: center;
-  background-color: white;
-  border: $border-strong;
-  border-bottom: none;
-  border-top-left-radius: 3px;
-  border-top-right-radius: 3px;
-  transition: background-color 0.2s;
-  margin-left: 8px;
-  margin-right: 8px;
+// Other user's content - subtle left accent
+.pane-other-user {
+  border-left: 3px solid #d4826a;
 
-  &:hover {
-    background-color: #f8f9fa;
+  .pane-header {
+    background-color: #fdf8f6;
   }
 }
 
-.stacked-layer-clickable {
-  flex: 1;
-  padding: 8px;
-  padding-left: 128px; // Align with node text (left-menu width + some spacing)
-  cursor: pointer;
+// Header bar - always visible, consistent position
+.pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  min-height: 44px;
+  background-color: #fafafa;
+  border-bottom: 1px solid #eee;
+  flex-shrink: 0;
 }
 
-.stacked-layer-title {
-  font-size: 1rem;
-  font-weight: 400;
+.pane-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.pane-header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+// Breadcrumb navigation
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  color: #6b6b6b;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.breadcrumb-link {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  margin: 0;
+  font-size: 14px;
+  color: #6b6b6b;
+  cursor: pointer;
+  border-radius: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+
+  &:hover {
+    background-color: #f0f0f0;
+    color: #333;
+  }
+}
+
+.breadcrumb-separator {
+  color: #ccc;
+  flex-shrink: 0;
+}
+
+.breadcrumb-current {
+  color: #333;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.fullscreen-card {
-  flex: 1;
-  background-color: white;
-  border: $border-strong;
-  border-radius: 3px;
-  box-shadow: 0 0px 8px rgba(0, 0, 0, 0.1);
-  margin: 8px;
-  margin-top: 0px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.fullscreen-card-header {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.fullscreen-card-title {
-  padding-left: 0px;
-  padding-top: 8px;
-  padding-bottom: 0px;
-  padding-right: 8px;
-}
-
-.fullscreen-card-title {
-  font-size: 1rem;
-  font-weight: 400;
-}
-
-.fullscreen-card-body {
+// Main content area
+.pane-content {
   flex: 1;
   overflow-y: auto;
   position: relative;
+}
+
+// Header button styles
+.pane-header {
+  .btn {
+    padding: 4px 8px;
+    min-width: auto;
+    min-height: auto;
+    border: none;
+    background: transparent;
+    color: #6b6b6b;
+    font-size: 14px;
+
+    &:hover {
+      background-color: #f0f0f0;
+      color: #333;
+    }
+
+    &:focus {
+      box-shadow: none !important;
+    }
+  }
+
+  .dropdown-toggle::after {
+    display: none;
+  }
+
+  .options-dropdown .btn {
+    padding: 4px;
+  }
 }
 
 .workspace-columns {
@@ -875,13 +919,17 @@ to {
 // Diff items - nodes from other users that aren't in current user's list
 // Styling is now handled inline via the DiffItemIndicator badge
 
-// Split pane layout
+// =============================================================================
+// SPLIT PANE LAYOUT
+// =============================================================================
+
 .split-pane-container {
   display: flex;
   flex-direction: row;
   height: 100%;
   width: 100%;
-  gap: 4px;
+  gap: 1px;
+  background-color: #e5e5e5;
   overflow-x: auto;
 }
 
@@ -891,27 +939,17 @@ to {
   position: relative;
   display: flex;
   flex-direction: column;
-  //border: $border-strong;
-  //border-radius: 3px;
   background-color: white;
   overflow: hidden;
-}
 
-.fullscreen-card-header,
-.stacked-layer {
-  .on-hover-menu {
-    .dropdown-toggle::after {
-      display: none;
-    }
+  &:first-child {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
 
-    // Make all buttons consistent size
-    .btn {
-      padding: 0;
-      border: none;
-      background: none;
-      line-height: 1;
-      font-size: 1rem;
-    }
+  &:last-child {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
   }
 }
 
@@ -1017,7 +1055,7 @@ to {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
-  background: white;
+  background: transparent;
 
   .item {
     flex: 1;

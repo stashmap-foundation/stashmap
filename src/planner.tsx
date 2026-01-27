@@ -487,6 +487,7 @@ export function planAddToParent(
   nodeIDs: LongID | ID | (LongID | ID)[],
   parentViewPath: ViewPath,
   stack: (LongID | ID)[],
+  paneAuthor: PublicKey,
   insertAtIndex?: number,
   relevance?: Relevance,
   argument?: Argument
@@ -517,7 +518,8 @@ export function planAddToParent(
         relevance,
         argument,
         insertAtIndex
-      )
+      ),
+    paneAuthor
   );
 
   const updatedViews = bulkUpdateViewPathsAfterAddRelation(
@@ -531,6 +533,57 @@ export function planAddToParent(
 }
 
 type RelationsIdMapping = Map<LongID, LongID>;
+
+function planCopyDescendantRelations(
+  plan: Plan,
+  sourceNodeID: LongID | ID,
+  sourceContext: Context,
+  transformContext: (relation: Relations) => Context,
+  filterRelation?: (relation: Relations) => boolean
+): [Plan, RelationsIdMapping] {
+  const descendants = getDescendantRelations(
+    plan.knowledgeDBs,
+    sourceNodeID,
+    sourceContext
+  ).filter(filterRelation ?? (() => true));
+
+  return descendants.reduce(
+    ([accPlan, accMapping], relation) => {
+      const newContext = transformContext(relation);
+      const baseRelation = newRelations(
+        relation.head,
+        newContext,
+        accPlan.user.publicKey
+      );
+      const newRelation: Relations = {
+        ...baseRelation,
+        items: relation.items,
+      };
+
+      return [
+        planUpsertRelations(accPlan, newRelation),
+        accMapping.set(relation.id, newRelation.id),
+      ] as [Plan, RelationsIdMapping];
+    },
+    [plan, Map<LongID, LongID>()] as [Plan, RelationsIdMapping]
+  );
+}
+
+export function planCopyRelationsFromAuthor(
+  plan: Plan,
+  sourceAuthor: PublicKey,
+  nodeID: LongID | ID,
+  context: Context
+): Plan {
+  const [finalPlan] = planCopyDescendantRelations(
+    plan,
+    nodeID,
+    context,
+    (relation) => relation.context,
+    (relation) => relation.author === sourceAuthor
+  );
+  return finalPlan;
+}
 
 export function planDeepCopyNode(
   plan: Plan,
@@ -552,41 +605,22 @@ export function planDeepCopyNode(
     sourceNodeID,
     targetParentViewPath,
     stack,
+    plan.user.publicKey,
     insertAtIndex
   );
 
-  const descendants = getDescendantRelations(
-    plan.knowledgeDBs,
+  const [finalPlan, mapping] = planCopyDescendantRelations(
+    planWithNode,
     sourceNodeID,
-    sourceContext
-  );
-
-  const [finalPlan, mapping] = descendants.reduce(
-    ([accPlan, accMapping], relation) => {
+    sourceContext,
+    (relation) => {
       const isDirectChildrenRelation =
         relation.head === shortID(sourceNodeID) &&
         contextsMatch(relation.context, sourceContext);
-
-      const newContext = isDirectChildrenRelation
+      return isDirectChildrenRelation
         ? nodeNewContext
         : nodeNewContext.concat(relation.context.skip(sourceContext.size));
-
-      const baseRelation = newRelations(
-        relation.head,
-        newContext,
-        accPlan.user.publicKey
-      );
-      const newRelation: Relations = {
-        ...baseRelation,
-        items: relation.items,
-      };
-
-      return [
-        planUpsertRelations(accPlan, newRelation),
-        accMapping.set(relation.id, newRelation.id),
-      ] as [Plan, RelationsIdMapping];
-    },
-    [planWithNode, Map<LongID, LongID>()] as [Plan, RelationsIdMapping]
+    }
   );
 
   return [finalPlan, mapping];
@@ -664,6 +698,7 @@ export function planSaveNodeAndEnsureRelations(
   text: string,
   viewPath: ViewPath,
   stack: (LongID | ID)[],
+  paneAuthor: PublicKey,
   relevance?: Relevance,
   argument?: Argument
 ): Plan {
@@ -718,6 +753,7 @@ export function planSaveNodeAndEnsureRelations(
       createdNode.id,
       parentPath,
       stack,
+      paneAuthor,
       emptyNodeIndex,
       relevance ?? metadata?.relationItem.relevance,
       argument ?? metadata?.relationItem.argument
@@ -1069,14 +1105,16 @@ export function planSetEmptyNodePosition(
   plan: Plan,
   parentPath: ViewPath,
   stack: (LongID | ID)[],
-  insertIndex: number
+  insertIndex: number,
+  paneAuthor: PublicKey
 ): Plan {
   // 1. Ensure we have our own editable relations (copies remote if needed)
   const planWithOwnRelations = upsertRelations(
     plan,
     parentPath,
     stack,
-    (r) => r
+    (r) => r,
+    paneAuthor
   );
 
   // 2. Use planExpandNode for consistent expansion handling

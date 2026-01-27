@@ -131,7 +131,8 @@ export function dnd(
       stack,
       (relations: Relations) => {
         return moveRelations(relations, sourceIndices.toArray(), dropIndex);
-      }
+      },
+      paneAuthor
     );
     const updatedViews = updateViewPathsAfterMoveRelations(
       updatedRelationsPlan,
@@ -176,7 +177,8 @@ export function dnd(
 export function planDisconnectFromParent(
   plan: Plan,
   viewPath: ViewPath,
-  stack: (LongID | ID)[]
+  stack: (LongID | ID)[],
+  paneAuthor: PublicKey
 ): Plan {
   const parentPath = getParentView(viewPath);
   if (!parentPath) {
@@ -196,7 +198,8 @@ export function planDisconnectFromParent(
     plan,
     parentPath,
     stack,
-    (relations) => deleteRelations(relations, Set([relationIndex]))
+    (relations) => deleteRelations(relations, Set([relationIndex])),
+    paneAuthor
   );
 
   // Update view paths

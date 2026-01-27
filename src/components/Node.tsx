@@ -62,6 +62,7 @@ import {
   usePaneStack,
   useSplitPanes,
   useCurrentPane,
+  usePaneAuthor,
 } from "../SplitPanesContext";
 import { LeftMenu } from "./LeftMenu";
 import { RightMenu } from "./RightMenu";
@@ -197,6 +198,7 @@ function NodeContent({
 function EditableContent(): JSX.Element {
   const viewPath = useViewPath();
   const stack = usePaneStack();
+  const paneAuthor = usePaneAuthor();
   const { createPlan, executePlan } = usePlanner();
   const [node] = useNode();
   const [nodeID] = useNodeID();
@@ -215,7 +217,8 @@ function EditableContent(): JSX.Element {
       createPlan(),
       text,
       viewPath,
-      stack
+      stack,
+      paneAuthor
     );
 
     const plan =
@@ -224,7 +227,8 @@ function EditableContent(): JSX.Element {
             basePlan,
             nextInsertPosition[0],
             stack,
-            nextInsertPosition[1]
+            nextInsertPosition[1],
+            paneAuthor
           )
         : basePlan;
 
@@ -279,7 +283,8 @@ function EditableContent(): JSX.Element {
           planWithNode,
           newNode.id,
           prevSibling.viewPath,
-          stack
+          stack,
+          paneAuthor
         );
         executePlan(finalPlan);
       } else {
@@ -288,7 +293,8 @@ function EditableContent(): JSX.Element {
           planWithExpand,
           prevSibling.viewPath,
           stack,
-          0 // Insert at end (will be only child or after existing children)
+          0, // Insert at end (will be only child or after existing children)
+          paneAuthor
         );
         executePlan(finalPlan);
       }
@@ -324,7 +330,8 @@ function EditableContent(): JSX.Element {
     const planWithDisconnect = planDisconnectFromParent(
       planWithDeepCopy,
       viewPath,
-      stack
+      stack,
+      paneAuthor
     );
 
     // Step 4: Save text changes in NEW context (if any)

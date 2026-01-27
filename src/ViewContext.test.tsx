@@ -433,48 +433,64 @@ test("Default Relations returns most recently updated relation", () => {
   expect(defaultRelation).toEqual("newest");
 });
 
-test("View doesn't change if list is copied from contact", async () => {
+test("View doesn't change if list is forked from contact", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
   await follow(alice, bob().user.publicKey);
-  // Create Programming Languages at root level so it has empty context
-  const bobsKnowledgeDB = await setupTestDB(
-    bob(),
-    [["Programming Languages", [["OOP", ["C++", "Java"]], ["FPL"]]]],
-    { activeWorkspace: "Programming Languages" }
+
+  renderTree(bob);
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "Programming Languages{Enter}{Tab}OOP{Enter}{Tab}C++{Enter}Java{Escape}"
+  );
+  await expectTree(`
+My Notes
+  Programming Languages
+    OOP
+      C++
+      Java
+  `);
+  cleanup();
+
+  renderTree(alice);
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(await findNewNodeEditor(), "Programming Languages{Escape}");
+  await expectTree(`
+My Notes
+  Programming Languages
+  `);
+  await userEvent.click(
+    await screen.findByLabelText("show references to Programming Languages")
+  );
+  await expectTree(`
+My Notes
+  Programming Languages
+    [O] My Notes → Programming Languages (1)
+  `);
+
+  await userEvent.click(
+    await screen.findByLabelText(
+      "open My Notes → Programming Languages (1) in fullscreen"
+    )
   );
 
-  // Navigate directly to Programming Languages to see its children (OOP, FPL)
-  const pl = findNodeByText(
-    bobsKnowledgeDB,
-    "Programming Languages"
-  ) as KnowNode;
-  renderApp({
-    ...alice(),
-    initialRoute: `/w/${pl.id}`,
-  });
-
-  await screen.findByText("Programming Languages");
-  // Expand Programming Languages to see children
-  await userEvent.click(screen.getByLabelText("expand Programming Languages"));
-  await expectTree(`
-Programming Languages
-  OOP
-  FPL
-  `);
-  // Expand OOP
-  await userEvent.click(screen.getByLabelText("expand OOP"));
+  await userEvent.click(
+    await screen.findByLabelText("expand Programming Languages")
+  );
+  await userEvent.click(await screen.findByLabelText("expand OOP"));
   await expectTree(`
 Programming Languages
   OOP
     C++
     Java
-  FPL
   `);
 
-  // add node to Programming Languages and check if view stays the same
-  await userEvent.click(
-    await screen.findByLabelText("add to Programming Languages")
-  );
+  const addButton = await screen.findByLabelText("add to Programming Languages");
+  console.log("Found add button:", addButton);
+  await userEvent.click(addButton);
+  console.log("Clicked add button, waiting for editor...");
   await userEvent.type(
     await findNewNodeEditor(),
     "added programming language{Escape}"
@@ -485,7 +501,6 @@ Programming Languages
   OOP
     C++
     Java
-  FPL
   `);
   cleanup();
 });

@@ -17,7 +17,7 @@ import {
 } from "./connections";
 import { newDB } from "./knowledge";
 import { useData } from "./DataContext";
-import { Plan, planUpsertRelations, planUpdateViews } from "./planner";
+import { Plan, planUpsertRelations, planUpdateViews, planCopyRelationsFromAuthor } from "./planner";
 import { usePaneStack, useCurrentPane } from "./SplitPanesContext";
 import { REFERENCED_BY } from "./constants";
 
@@ -1186,51 +1186,37 @@ export function upsertRelations(
   plan: Plan,
   viewPath: ViewPath,
   stack: (LongID | ID)[],
-  modify: (relations: Relations) => Relations
+  modify: (relations: Relations) => Relations,
+  paneAuthor: PublicKey
 ): Plan {
   const [nodeID, nodeView] = getNodeIDFromView(plan, viewPath);
   const context = getContextFromStackAndViewPath(stack, viewPath);
 
-  // 1. Try to find user's own existing relations (don't inherit from other users)
-  const viewRelations = nodeView.relations
-    ? getRelationsNoReferencedBy(
-      plan.knowledgeDBs,
-      nodeView.relations,
-      plan.user.publicKey
-    )
-    : undefined;
+  // 1. Deep copy from paneAuthor if editing another user's content
+  const basePlan = paneAuthor !== plan.user.publicKey
+    ? planCopyRelationsFromAuthor(plan, paneAuthor, nodeID, context)
+    : plan;
 
-  const existingFromView =
-    viewRelations &&
-    viewRelations.author === plan.user.publicKey &&
-    contextsMatch(viewRelations.context, context)
-      ? viewRelations
-      : undefined;
+  // 2. Get relations for context (now will find copied relations if copy happened)
+  const foundRelations = getNewestRelationFromAuthor(
+    basePlan.knowledgeDBs,
+    basePlan.user.publicKey,
+    nodeID,
+    context
+  );
 
-  const existingByContext = existingFromView
-    ? undefined
-    : getAvailableRelationsForNode(
-      plan.knowledgeDBs,
-      plan.user.publicKey,
-      nodeID,
-      context,
-      true // onlyMine - don't inherit from other users
-    ).first();
+  // 3. Use found relations or create new
+  const relations = foundRelations || newRelationsForNode(nodeID, context, basePlan.user.publicKey);
 
-  const foundRelations = existingFromView || existingByContext;
-
-  // 2. Use found relations or create new
-  const relations = foundRelations || newRelationsForNode(nodeID, context, plan.user.publicKey);
-
-  // 3. Update view if needed
+  // 4. Update view if needed
   const oldRelationsID = nodeView.relations || relations.id;
   const didViewChange =
     nodeView.relations === undefined || oldRelationsID !== relations.id;
   const planWithUpdatedView = didViewChange
     ? planUpdateViews(
-      plan,
+      basePlan,
       moveChildViewsToNewRelation(
-        plan.views,
+        basePlan.views,
         viewPath,
         oldRelationsID,
         relations.id
@@ -1239,12 +1225,12 @@ export function upsertRelations(
         relations: relations.id,
       })
     )
-    : plan;
+    : basePlan;
 
-  // 4. Apply modification
+  // 5. Apply modification
   const updatedRelations = modify(relations);
 
-  // 5. Skip event only if: found own relations AND items unchanged
+  // 6. Skip event only if: found own relations AND items unchanged
   if (foundRelations && foundRelations.items.equals(updatedRelations.items)) {
     return planWithUpdatedView;
   }

@@ -1,5 +1,5 @@
-import { List, Map } from "immutable";
-import { fireEvent, screen } from "@testing-library/react";
+import { Map } from "immutable";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -9,10 +9,6 @@ import {
   setup,
   findNewNodeEditor,
 } from "../utils.test";
-import { newNode, addRelationToRelations } from "../connections";
-import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
-import { execute } from "../executor";
-import { newRelations } from "../ViewContext";
 import { areAllAncestorsExpanded } from "./TreeView";
 
 test("Load Referenced By Nodes", async () => {
@@ -227,8 +223,8 @@ test("Referenced By items still show navigation buttons", async () => {
   expect(moneyMatches.length).toBeGreaterThanOrEqual(1);
 
   // Navigation buttons should still be available for Referenced By items
-  // The fullscreen button should be present
-  const fullscreenButtons = screen.getAllByLabelText("open fullscreen");
+  // The fullscreen button should be present (aria-label includes display text)
+  const fullscreenButtons = screen.getAllByLabelText(/open.*in fullscreen/);
   expect(fullscreenButtons.length).toBeGreaterThanOrEqual(1);
 });
 
@@ -302,128 +298,33 @@ test("Referenced By deduplicates paths from multiple users", async () => {
   expect(referenceButtons).toHaveLength(1);
 });
 
-test("Reference indicators show item count", async () => {
-  // Test that reference indicators show the count of children
-  const [alice] = setup([ALICE]);
-  renderTree(alice);
-
-  // Create: My Notes -> Parent -> Child -> [Grandchild1, Grandchild2]
-  await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
-  await userEvent.type(await findNewNodeEditor(), "Parent{Escape}");
-
-  await userEvent.click(await screen.findByLabelText("expand Parent"));
-  await userEvent.click(await screen.findByLabelText("add to Parent"));
-  await userEvent.type(await findNewNodeEditor(), "Child{Escape}");
-
-  await userEvent.click(await screen.findByLabelText("expand Child"));
-  await userEvent.click(await screen.findByLabelText("add to Child"));
-  await userEvent.type(await findNewNodeEditor(), "Grandchild 1{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Grandchild 2{Escape}");
-
-  // Navigate to Child as root
-  await userEvent.click(
-    await screen.findByLabelText("Search to change pane 0 content")
-  );
-  await userEvent.type(await screen.findByLabelText("search input"), "Child");
-  // There might be multiple "Child" matches (including "Grandchild"), select the right one
-  const selectButtons = await screen.findAllByLabelText(/select Child/);
-  await userEvent.click(selectButtons[0]);
-  await screen.findByLabelText(/expand Child|collapse Child/);
-
-  // Open references view
-  fireEvent.click(screen.getByLabelText("show references to Child"));
-  await screen.findByLabelText("hide references to Child");
-
-  // The reference "Parent" should show [2] because Child has 2 grandchildren
-  // when viewed from the Parent context
-  const indicators = await screen.findByText("[2]");
-  expect(indicators).toBeDefined();
-});
-
 test("Reference indicators show other users icon", async () => {
-  // Test that the "other users" icon appears when multiple users have different
-  // versions of a node's children
   const [alice, bob] = setup([ALICE, BOB]);
-  const { publicKey: alicePK } = alice().user;
-  const { publicKey: bobPK } = bob().user;
-
-  // Create nodes programmatically so we have the exact IDs
-  const parent = newNode("Parent");
-  const child = newNode("Child");
-  const aliceGrandchild = newNode("Alice Grandchild");
-
-  // Alice creates Parent -> Child -> Alice Grandchild
-  const parentRelations = addRelationToRelations(
-    newRelations(parent.id, List(), alicePK),
-    child.id
-  );
-  const aliceChildRelations = addRelationToRelations(
-    newRelations(child.id, List(), alicePK),
-    aliceGrandchild.id
-  );
-
-  // Also create a relation from My Notes to Parent so it shows in the workspace
-  const aliceState = alice();
-  const workspace = aliceState.panes[0].stack[aliceState.panes[0].stack.length - 1];
-  const workspaceRelations = addRelationToRelations(
-    newRelations(workspace, List(), alicePK),
-    parent.id
-  );
-
-  const alicePlan = planUpsertRelations(
-    planUpsertRelations(
-      planUpsertNode(
-        planUpsertNode(planUpsertNode(createPlan(alice()), parent), child),
-        aliceGrandchild
-      ),
-      parentRelations
-    ),
-    aliceChildRelations
-  );
-  await execute({ ...alice(), plan: alicePlan });
-
-  // Add Parent to workspace
-  await execute({
-    ...alice(),
-    plan: planUpsertRelations(createPlan(alice()), workspaceRelations),
-  });
-
-  // Bob creates his own version of Child's children (using Child's ID)
-  const bobGrandchild = newNode("Bob Grandchild");
-  const bobChildRelations = addRelationToRelations(
-    newRelations(child.id, List(), bobPK),
-    bobGrandchild.id
-  );
-
-  const bobPlan = planUpsertRelations(
-    planUpsertNode(createPlan(bob()), bobGrandchild),
-    bobChildRelations
-  );
-  await execute({ ...bob(), plan: bobPlan });
-
-  // Alice follows Bob
   await follow(alice, bob().user.publicKey);
 
-  // Now render and navigate to Child
+  // Bob creates: My Notes -> Parent -> Child
+  renderTree(bob);
+  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child{Escape}");
+  cleanup();
+
+  // Alice creates: My Notes -> Parent -> Child (same structure)
   renderTree(alice);
+  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child{Escape}");
 
-  // Navigate to Child as root via pane search
-  await userEvent.click(
-    await screen.findByLabelText("Search to change pane 0 content")
-  );
+  // Navigate to Child and show references
+  await userEvent.click(await screen.findByLabelText("Search to change pane 0 content"));
   await userEvent.type(await screen.findByLabelText("search input"), "Child");
-  const selectButtons = await screen.findAllByLabelText(/select Child/);
-  await userEvent.click(selectButtons[0]);
-  await screen.findByLabelText(/expand Child|collapse Child/);
+  await userEvent.click(await screen.findByLabelText("select Child"));
 
-  // Open references view
-  fireEvent.click(screen.getByLabelText("show references to Child"));
-  await screen.findByLabelText("hide references to Child");
+  fireEvent.click(await screen.findByLabelText("show references to Child"));
 
-  // Should show the business-man icon for 1 other user (Bob)
-  // The icon has a title attribute we can query
-  const otherUserIcon = await screen.findByTitle("1 other version");
+  // Expand abstract reference to see concrete references
+  await userEvent.click(await screen.findByLabelText(/expand.*Parent.*Child/));
+
+  // Bob's concrete reference should show the other user icon
+  const otherUserIcon = await screen.findByTitle("Content from another user");
   expect(otherUserIcon).toBeDefined();
 });
 

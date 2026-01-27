@@ -74,6 +74,7 @@ import {
   useCurrentPane,
   usePaneIndex,
 } from "./SplitPanesContext";
+import { ROOT } from "./types";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 test.skip("skip", () => {});
@@ -245,7 +246,7 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
     contactsRelays: [{ url: "wss://contacts.relay", read: true, write: true }],
   },
   projectMembers: Map<PublicKey, Member>(),
-  panes: [],
+  panes: [{ id: "pane-0", stack: [ROOT], author: ALICE.publicKey }],
 };
 
 function applyDefaults(props?: Partial<TestAppState>): TestAppState {

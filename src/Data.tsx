@@ -23,7 +23,12 @@ import { NavigationStackProvider } from "./NavigationStackContext";
 import { flattenRelays, usePreloadRelays, findRelays } from "./relays";
 import { sortEventsDescending, useEventQuery } from "./commons/useNostrQuery";
 import { ROOT } from "./types";
-import { generatePaneId } from "./SplitPanesContext";
+
+const defaultPane = (author: PublicKey): Pane => ({
+  id: "pane-0",
+  stack: [ROOT],
+  author,
+});
 
 type DataProps = {
   user: User;
@@ -233,7 +238,7 @@ function Data({ user, children }: DataProps): JSX.Element {
       panes={
         processedMetaEvents.panes.length > 0
           ? processedMetaEvents.panes
-          : [{ id: generatePaneId(), stack: [ROOT], author: user.publicKey }]
+          : [defaultPane(user.publicKey)]
       }
       projectMembers={projectMembers}
     >

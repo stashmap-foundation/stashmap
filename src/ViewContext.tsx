@@ -277,16 +277,17 @@ export function getDescendantRelations(
   const localID = shortID(nodeID);
   const childContext = rootContext.push(localID);
 
-  return knowledgeDBs
+  const allRelations = knowledgeDBs
     .valueSeq()
     .flatMap((db) => db.relations.valueSeq())
-    .filter(
-      (relations) =>
-        (relations.head === localID &&
-          contextsMatch(relations.context, rootContext)) ||
-        contextStartsWith(relations.context, childContext)
-    )
     .toList();
+
+  return allRelations.filter(
+    (relations) =>
+      (relations.head === localID &&
+        contextsMatch(relations.context, rootContext)) ||
+      contextStartsWith(relations.context, childContext)
+  );
 }
 
 export function getAvailableRelationsForNode(
@@ -1174,9 +1175,9 @@ export function getRelationsForContext(
   nodeID: LongID | ID,
   context: Context,
   rootRelation: LongID | undefined,
-  isRoot: boolean
+  isRootNode: boolean
 ): Relations | undefined {
-  if (isRoot && rootRelation) {
+  if (isRootNode && rootRelation) {
     return getRelationsNoReferencedBy(knowledgeDBs, rootRelation, paneAuthor);
   }
   return getNewestRelationFromAuthor(knowledgeDBs, paneAuthor, nodeID, context);

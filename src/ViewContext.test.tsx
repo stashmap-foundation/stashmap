@@ -488,9 +488,7 @@ Programming Languages
   `);
 
   const addButton = await screen.findByLabelText("add to Programming Languages");
-  console.log("Found add button:", addButton);
   await userEvent.click(addButton);
-  console.log("Clicked add button, waiting for editor...");
   await userEvent.type(
     await findNewNodeEditor(),
     "added programming language{Escape}"

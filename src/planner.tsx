@@ -49,6 +49,8 @@ import {
   viewPathToString,
   getRelationForView,
   addNodeToPathWithRelations,
+  getRelationsForContext,
+  isRoot,
 } from "./ViewContext";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useRelaysToCreatePlan } from "./relays";
@@ -579,6 +581,19 @@ function planCopyDescendantRelations(
   );
 }
 
+function updateViewsWithRelationsMapping(
+  views: Views,
+  relationsIdMapping: Map<LongID, LongID>
+): Views {
+  return views.mapEntries(([key, view]) => {
+    const newKey = relationsIdMapping.reduce(
+      (k, newId, oldId) => k.split(oldId).join(newId),
+      key
+    );
+    return [newKey, view];
+  });
+}
+
 export function planFork(
   plan: Plan,
   viewPath: ViewPath,
@@ -587,18 +602,25 @@ export function planFork(
   const pane = getPane(plan, viewPath);
   const [nodeID] = getNodeIDFromView(plan, viewPath);
   const context = getContextFromStackAndViewPath(stack, viewPath);
-  const [planWithRelations] = planCopyDescendantRelations(
+  const [planWithRelations, relationsIdMapping] = planCopyDescendantRelations(
     plan,
     nodeID,
     context,
     (relation) => relation.context,
     (relation) => relation.author === pane.author
   );
-  const paneIndex = viewPath[0];
-  const newPanes = planWithRelations.panes.map((p, i) =>
-    i === paneIndex ? { ...p, author: plan.user.publicKey } : p
+  const updatedViews = updateViewsWithRelationsMapping(
+    planWithRelations.views,
+    relationsIdMapping
   );
-  return planUpdatePanes(planWithRelations, newPanes);
+  const planWithUpdatedViews = planUpdateViews(planWithRelations, updatedViews);
+  const paneIndex = viewPath[0];
+  const newPanes = planWithUpdatedViews.panes.map((p, i) =>
+    i === paneIndex
+      ? { ...p, author: plan.user.publicKey, rootRelation: undefined }
+      : p
+  );
+  return planUpdatePanes(planWithUpdatedViews, newPanes);
 }
 
 export function planDeepCopyNode(
@@ -1137,11 +1159,18 @@ export function planSetEmptyNodePosition(
     parentPath
   );
 
-  // 3. Get relationsID (guaranteed to exist after above steps)
-  const [, view] = getNodeIDFromView(planWithExpanded, parentPath);
-  const relationsID = view.relations;
-  if (!relationsID) {
-    return plan; // Shouldn't happen, but defensive
+  // 3. Get relations from context using pane author (handles forked relations correctly)
+  const pane = getPane(planWithExpanded, parentPath);
+  const relations = getRelationsForContext(
+    planWithExpanded.knowledgeDBs,
+    pane.author,
+    parentNodeID,
+    context,
+    pane.rootRelation,
+    isRoot(parentPath)
+  );
+  if (!relations) {
+    return plan;
   }
 
   // 4. Add temporary event to show empty node at position
@@ -1149,7 +1178,7 @@ export function planSetEmptyNodePosition(
     ...planWithExpanded,
     temporaryEvents: planWithExpanded.temporaryEvents.push({
       type: "ADD_EMPTY_NODE",
-      relationsID,
+      relationsID: relations.id,
       index: insertIndex,
       relationItem: { nodeID: EMPTY_NODE_ID, relevance: "" },
     }),

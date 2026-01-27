@@ -8,7 +8,7 @@ import {
   OpenInSplitPaneButtonWithStack,
 } from "./OpenInSplitPaneButton";
 import { ROOT } from "../types";
-import { renderApis } from "../utils.test";
+import { renderApis, renderWithTestData } from "../utils.test";
 import { createAbstractRefId } from "../connections";
 
 function PaneCountDisplay(): JSX.Element {
@@ -23,7 +23,7 @@ function NewPaneStackDisplay(): JSX.Element {
 }
 
 function renderWithContext(viewPath: ViewPath): void {
-  renderApis(
+  renderWithTestData(
     <ViewContext.Provider value={viewPath}>
       <OpenInSplitPaneButton />
       <PaneCountDisplay />
@@ -31,15 +31,15 @@ function renderWithContext(viewPath: ViewPath): void {
   );
 }
 
-test("button renders on desktop", () => {
+test("button renders on desktop", async () => {
   const viewPath: ViewPath = [0, { nodeID: ROOT, nodeIndex: 0 as NodeIndex }];
 
   renderWithContext(viewPath);
 
-  expect(screen.getByLabelText("open in split pane")).toBeTruthy();
+  expect(await screen.findByLabelText("open in split pane")).toBeTruthy();
 });
 
-test("clicking button calls addPaneAt and creates new pane", () => {
+test("clicking button calls addPaneAt and creates new pane", async () => {
   const viewPath: ViewPath = [
     0,
     { nodeID: ROOT, nodeIndex: 0 as NodeIndex, relationsID: "" },
@@ -48,6 +48,7 @@ test("clicking button calls addPaneAt and creates new pane", () => {
 
   renderWithContext(viewPath);
 
+  await screen.findByTestId("pane-count");
   expect(screen.getByTestId("pane-count").textContent).toBe("1");
 
   fireEvent.click(screen.getByLabelText("open in split pane"));
@@ -55,16 +56,17 @@ test("clicking button calls addPaneAt and creates new pane", () => {
   expect(screen.getByTestId("pane-count").textContent).toBe("2");
 });
 
-test("OpenInSplitPaneButtonWithStack passes provided stack to addPaneAt", () => {
+test("OpenInSplitPaneButtonWithStack passes provided stack to addPaneAt", async () => {
   const stack = [ROOT, "node1" as LongID, "node2" as LongID];
 
-  renderApis(
+  renderWithTestData(
     <>
       <OpenInSplitPaneButtonWithStack stack={stack} />
       <PaneCountDisplay />
     </>
   );
 
+  await screen.findByTestId("pane-count");
   expect(screen.getByTestId("pane-count").textContent).toBe("1");
 
   fireEvent.click(screen.getByLabelText("open in split pane"));
@@ -72,13 +74,11 @@ test("OpenInSplitPaneButtonWithStack passes provided stack to addPaneAt", () => 
   expect(screen.getByTestId("pane-count").textContent).toBe("2");
 });
 
-test("Reference node opens with only reference path, not current pane stack", () => {
-  // Create a ref ID: context is [contextNode], target is targetNode
+test("Reference node opens with only reference path, not current pane stack", async () => {
   const contextNode = "context123" as ID;
   const targetNode = "target456" as ID;
   const refId = createAbstractRefId(List([contextNode]), targetNode);
 
-  // ViewPath with the ref ID as the current node
   const viewPath: ViewPath = [
     0,
     { nodeID: ROOT, nodeIndex: 0 as NodeIndex, relationsID: "" },
@@ -90,7 +90,7 @@ test("Reference node opens with only reference path, not current pane stack", ()
     { nodeID: refId, nodeIndex: 0 as NodeIndex },
   ];
 
-  renderApis(
+  renderWithTestData(
     <ViewContext.Provider value={viewPath}>
       <OpenInSplitPaneButton />
       <PaneCountDisplay />
@@ -98,21 +98,20 @@ test("Reference node opens with only reference path, not current pane stack", ()
     </ViewContext.Provider>
   );
 
+  await screen.findByTestId("pane-count");
   fireEvent.click(screen.getByLabelText("open in split pane"));
 
-  // The new pane should only have the reference path [contextNode, targetNode]
-  // NOT the current pane's stack
   const newPaneStack = JSON.parse(
     screen.getByTestId("new-pane-stack").textContent || "[]"
   );
   expect(newPaneStack).toEqual([contextNode, targetNode]);
 });
 
-test("OpenInSplitPaneButtonWithStack click does not bubble to parent onClick", () => {
+test("OpenInSplitPaneButtonWithStack click does not bubble to parent onClick", async () => {
   const stack = [ROOT, "node1" as LongID];
   const parentClickHandler = jest.fn();
 
-  renderApis(
+  renderWithTestData(
     <div onClick={parentClickHandler} role="presentation">
       <span onClick={(e) => e.stopPropagation()} role="presentation">
         <OpenInSplitPaneButtonWithStack stack={stack} />
@@ -121,10 +120,9 @@ test("OpenInSplitPaneButtonWithStack click does not bubble to parent onClick", (
     </div>
   );
 
+  await screen.findByTestId("pane-count");
   fireEvent.click(screen.getByLabelText("open in split pane"));
 
-  // New pane should be created
   expect(screen.getByTestId("pane-count").textContent).toBe("2");
-  // Parent click handler should NOT have been called
   expect(parentClickHandler).not.toHaveBeenCalled();
 });

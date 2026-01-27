@@ -5,7 +5,7 @@ import { usePaneStack } from "../SplitPanesContext";
 import { ViewContext, ViewPath, NodeIndex } from "../ViewContext";
 import { FullscreenButton } from "./FullscreenButton";
 import { ROOT } from "../types";
-import { renderApis } from "../utils.test";
+import { renderWithTestData } from "../utils.test";
 import { createAbstractRefId } from "../connections";
 
 function CurrentStackDisplay(): JSX.Element {
@@ -13,7 +13,7 @@ function CurrentStackDisplay(): JSX.Element {
   return <div data-testid="current-stack">{JSON.stringify(stack)}</div>;
 }
 
-test("Reference node opens with only reference path, not current pane stack", () => {
+test("Reference node opens with only reference path, not current pane stack", async () => {
   const contextNode = "context123" as ID;
   const targetNode = "target456" as ID;
   const refId = createAbstractRefId(List([contextNode]), targetNode);
@@ -29,13 +29,14 @@ test("Reference node opens with only reference path, not current pane stack", ()
     { nodeID: refId, nodeIndex: 0 as NodeIndex },
   ];
 
-  renderApis(
+  renderWithTestData(
     <ViewContext.Provider value={viewPath}>
       <FullscreenButton />
       <CurrentStackDisplay />
     </ViewContext.Provider>
   );
 
+  await screen.findByTestId("current-stack");
   fireEvent.click(screen.getByLabelText("open Loading... → Loading... in fullscreen"));
 
   const currentStack = JSON.parse(

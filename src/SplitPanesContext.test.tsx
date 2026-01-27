@@ -7,7 +7,7 @@ import {
   useCurrentPane,
 } from "./SplitPanesContext";
 import { ROOT } from "./types";
-import { renderApis, ALICE } from "./utils.test";
+import { renderApis, renderWithTestData, ALICE } from "./utils.test";
 
 function TestSplitPanes(): JSX.Element {
   const { panes, addPaneAt, removePane } = useSplitPanes();
@@ -39,9 +39,10 @@ function TestSplitPanes(): JSX.Element {
   );
 }
 
-test("addPaneAt adds a new pane to the end", () => {
-  renderApis(<TestSplitPanes />);
+test("addPaneAt adds a new pane to the end", async () => {
+  renderWithTestData(<TestSplitPanes />);
 
+  await screen.findByTestId("pane-count");
   expect(screen.getByTestId("pane-count").textContent).toBe("1");
 
   fireEvent.click(screen.getByText("Add Pane"));
@@ -51,9 +52,10 @@ test("addPaneAt adds a new pane to the end", () => {
   expect(screen.getByTestId("pane-count").textContent).toBe("3");
 });
 
-test("addPaneAt inserts pane at specific index with initialStack", () => {
-  renderApis(<TestSplitPanes />);
+test("addPaneAt inserts pane at specific index with initialStack", async () => {
+  renderWithTestData(<TestSplitPanes />);
 
+  await screen.findByTestId("pane-count");
   fireEvent.click(screen.getByText("Add Pane"));
   expect(screen.getByTestId("pane-count").textContent).toBe("2");
 
@@ -69,9 +71,10 @@ test("addPaneAt inserts pane at specific index with initialStack", () => {
   expect(paneIdsAfter?.[1]).not.toBe(paneIdsBefore?.[1]);
 });
 
-test("removePane removes pane by id", () => {
-  renderApis(<TestSplitPanes />);
+test("removePane removes pane by id", async () => {
+  renderWithTestData(<TestSplitPanes />);
 
+  await screen.findByTestId("pane-count");
   fireEvent.click(screen.getByText("Add Pane"));
   fireEvent.click(screen.getByText("Add Pane"));
   expect(screen.getByTestId("pane-count").textContent).toBe("3");
@@ -86,9 +89,10 @@ test("removePane removes pane by id", () => {
   expect(paneIdsAfter?.[1]).toBe(paneIdsBefore?.[2]);
 });
 
-test("removePane does not remove the last pane", () => {
-  renderApis(<TestSplitPanes />);
+test("removePane does not remove the last pane", async () => {
+  renderWithTestData(<TestSplitPanes />);
 
+  await screen.findByTestId("pane-count");
   expect(screen.getByTestId("pane-count").textContent).toBe("1");
 
   fireEvent.click(screen.getByText("Remove First Pane"));
@@ -155,9 +159,10 @@ function TestPaneNavigation(): JSX.Element {
   );
 }
 
-test("popTo(length-2) removes last item and updates rootNodeID", () => {
-  renderApis(<TestPaneNavigation />);
+test("popTo(length-2) removes last item and updates rootNodeID", async () => {
+  renderWithTestData(<TestPaneNavigation />);
 
+  await screen.findByTestId("stack");
   fireEvent.click(screen.getByText("Set Stack"));
   expect(screen.getByTestId("stack").textContent).toBe("new1,new2,new3");
 
@@ -166,9 +171,10 @@ test("popTo(length-2) removes last item and updates rootNodeID", () => {
   expect(screen.getByTestId("root-node-id").textContent).toBe("new2");
 });
 
-test("popTo with invalid index does not change stack", () => {
-  renderApis(<TestPaneNavigation />);
+test("popTo with invalid index does not change stack", async () => {
+  renderWithTestData(<TestPaneNavigation />);
 
+  await screen.findByTestId("stack");
   expect(screen.getByTestId("stack").textContent).toBe(ROOT);
 
   fireEvent.click(screen.getByText("Pop"));
@@ -176,9 +182,10 @@ test("popTo with invalid index does not change stack", () => {
   expect(screen.getByTestId("root-node-id").textContent).toBe(ROOT);
 });
 
-test("popTo navigates to specific stack index", () => {
-  renderApis(<TestPaneNavigation />);
+test("popTo navigates to specific stack index", async () => {
+  renderWithTestData(<TestPaneNavigation />);
 
+  await screen.findByTestId("stack");
   fireEvent.click(screen.getByText("Set Stack"));
   expect(screen.getByTestId("stack").textContent).toBe("new1,new2,new3");
 
@@ -187,9 +194,10 @@ test("popTo navigates to specific stack index", () => {
   expect(screen.getByTestId("root-node-id").textContent).toBe("new1");
 });
 
-test("setPane replaces entire stack with new path", () => {
-  renderApis(<TestPaneNavigation />);
+test("setPane replaces entire stack with new path", async () => {
+  renderWithTestData(<TestPaneNavigation />);
 
+  await screen.findByTestId("stack");
   expect(screen.getByTestId("stack").textContent).toBe(ROOT);
 
   fireEvent.click(screen.getByText("Set Stack"));

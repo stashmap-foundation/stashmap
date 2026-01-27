@@ -124,18 +124,19 @@ describe("eventToRelations basedOn parsing", () => {
 
 describe("jsonToViews validation", () => {
   test("filters invalid typeFilter values", () => {
-    // View path format: "p{paneIndex}:{nodeId}:{nodeIndex}"
     const json = {
-      "p0:node1:0": {
-        f: [
-          "relevant", // valid
-          "", // valid (maybe relevant)
-          "confirms", // valid
-          "contra", // valid
-          "suggestions", // valid
-          "invalid_filter", // invalid -> filtered out
-          "old_type", // invalid -> filtered out
-        ],
+      views: {
+        "p0:node1:0": {
+          f: [
+            "relevant",
+            "",
+            "confirms",
+            "contra",
+            "suggestions",
+            "invalid_filter",
+            "old_type",
+          ],
+        },
       },
     };
 
@@ -153,8 +154,10 @@ describe("jsonToViews validation", () => {
 
   test("handles empty typeFilters", () => {
     const json = {
-      "p0:node2:0": {
-        f: [],
+      views: {
+        "p0:node2:0": {
+          f: [],
+        },
       },
     };
 
@@ -166,7 +169,9 @@ describe("jsonToViews validation", () => {
 
   test("handles undefined typeFilters", () => {
     const json = {
-      "p0:node3:0": {},
+      views: {
+        "p0:node3:0": {},
+      },
     };
 
     const views = jsonToViews(json);

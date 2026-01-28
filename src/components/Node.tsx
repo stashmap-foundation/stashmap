@@ -574,9 +574,20 @@ export function getNodesInTree(
         if (!refs || refs.items.size === 0) {
           return nodesList;
         }
-        // Add each reference as a child
+        // Add each reference as a child, checking for expansion
         return refs.items.reduce((innerList: List<ViewPath>, _, i: number) => {
           const refPath = addNodeToPathWithRelations(parentPath, refs, i);
+          const [childNodeID, childView] = getNodeIDFromView(data, refPath);
+          // Recurse into expanded abstract refs to show their concrete children
+          if (childView.expanded && isAbstractRefId(childNodeID)) {
+            return getNodesInTree(
+              data,
+              refPath,
+              stack,
+              innerList.push(refPath),
+              rootRelation
+            );
+          }
           return innerList.push(refPath);
         }, nodesList);
       },

@@ -707,14 +707,20 @@ export function Node({
         )}
         {showExpandCollapse && <ExpandCollapseToggle />}
         {isConcreteRef && (
-          <div
+          <button
+            type="button"
+            disabled
+            className="expand-collapse-toggle"
+            aria-label="concrete reference"
+            aria-hidden="true"
             style={{
-              width: 16,
-              flexShrink: 0,
-              alignSelf: "stretch",
+              color: "transparent",
+              cursor: "default",
               backgroundColor: indentBgColor,
             }}
-          />
+          >
+            <span className="triangle collapsed">▶</span>
+          </button>
         )}
         {isMultiselect && <NodeSelectbox />}
         <div

@@ -18,6 +18,7 @@ export const KIND_MEMBERLIST = 34850;
 
 export const KIND_RELAY_METADATA_EVENT = 10002;
 export const DEFAULT_RELAYS: Relays = [
+  { url: "wss://nostr.nodesmap.com/", read: true, write: true },
   { url: "wss://relay.damus.io/", read: true, write: true },
   { url: "wss://relay.primal.net/", read: true, write: true },
   { url: "wss://nos.lol/", read: true, write: true },

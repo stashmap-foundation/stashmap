@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Dropdown } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import {
@@ -12,42 +12,75 @@ import {
   updateViewPathsAfterPaneDelete,
 } from "../ViewContext";
 import { LoadData } from "../dataQuery";
+import { LoadSearchData } from "../LoadSearchData";
 import { WorkspaceView } from "./Workspace";
 import { planUpdateViews, usePlanner } from "../planner";
-import { SearchModal } from "./SearchModal";
 import { useData } from "../DataContext";
 import { isUserLoggedIn, useLogout } from "../NostrAuthContext";
 import { DeleteWorkspace } from "./DeleteNode";
+import { createSearchId } from "../connections";
 
 export function PaneSearchButton(): JSX.Element {
-  const [showSearch, setShowSearch] = useState(false);
   const { setPane } = useSplitPanes();
   const pane = useCurrentPane();
-  const paneIndex = usePaneIndex();
+  const { user } = useData();
+  const [showInput, setShowInput] = useState(false);
+  const [query, setQuery] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const onSelectNode = (nodeID: ID): void => {
-    setPane({ ...pane, stack: [nodeID] });
-    setShowSearch(false);
+  useEffect(() => {
+    if (showInput && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [showInput]);
+
+  const handleSubmit = (): void => {
+    if (query.trim()) {
+      const searchId = createSearchId(query.trim());
+      setPane({ ...pane, stack: [searchId], author: user.publicKey, rootRelation: undefined });
+      setShowInput(false);
+      setQuery("");
+    }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent): void => {
+    if (e.key === "Enter") {
+      handleSubmit();
+    } else if (e.key === "Escape") {
+      setShowInput(false);
+      setQuery("");
+    }
+  };
+
+  if (showInput) {
+    return (
+      <input
+        ref={inputRef}
+        type="text"
+        className="search-input-inline"
+        placeholder="Search..."
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onBlur={() => {
+          setShowInput(false);
+          setQuery("");
+        }}
+        aria-label="Search query"
+      />
+    );
+  }
+
   return (
-    <>
-      <button
-        type="button"
-        className="split-pane-search btn btn-borderless"
-        onClick={() => setShowSearch(true)}
-        aria-label={`Search to change pane ${paneIndex} content`}
-        title="Search"
-      >
-        <span className="simple-icon-magnifier" />
-      </button>
-      {showSearch && (
-        <SearchModal
-          onAddExistingNode={onSelectNode}
-          onHide={() => setShowSearch(false)}
-        />
-      )}
-    </>
+    <button
+      type="button"
+      className="split-pane-search btn btn-borderless"
+      onClick={() => setShowInput(true)}
+      aria-label="Search"
+      title="Search"
+    >
+      <span className="simple-icon-magnifier" />
+    </button>
   );
 }
 
@@ -79,6 +112,8 @@ export function ClosePaneButton(): JSX.Element | null {
     </button>
   );
 }
+
+
 export function PaneSettingsMenu(): JSX.Element {
   const navigate = useNavigate();
   const logout = useLogout();
@@ -153,16 +188,18 @@ function PaneContent(): JSX.Element {
 
   return (
     <div className={paneClassName}>
-      <LoadData nodeIDs={pane.stack}>
-        <LoadData nodeIDs={[rootNodeID]} descendants referencedBy lists>
-          <RootViewContextProvider
-            root={rootNodeID as LongID}
-            paneIndex={paneIndex}
-          >
-            <WorkspaceView />
-          </RootViewContextProvider>
+      <LoadSearchData nodeIDs={pane.stack}>
+        <LoadData nodeIDs={pane.stack}>
+          <LoadData nodeIDs={[rootNodeID]} descendants referencedBy lists>
+            <RootViewContextProvider
+              root={rootNodeID as LongID}
+              paneIndex={paneIndex}
+            >
+              <WorkspaceView />
+            </RootViewContextProvider>
+          </LoadData>
         </LoadData>
-      </LoadData>
+      </LoadSearchData>
     </div>
   );
 }

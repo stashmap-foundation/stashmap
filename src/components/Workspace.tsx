@@ -17,6 +17,7 @@ import {
   PaneSettingsMenu,
   ClosePaneButton,
 } from "./SplitPaneLayout";
+import { NewPaneButton } from "./OpenInSplitPaneButton";
 import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 import { SignInMenuBtn } from "../SignIn";
 import { usePlanner, planForkPane } from "../planner";
@@ -127,6 +128,7 @@ function PaneHeader(): JSX.Element {
       </div>
       <div className="pane-header-right">
         <ForkButton />
+        <NewPaneButton />
         <PaneSearchButton />
         <ClosePaneButton />
       </div>

@@ -9,6 +9,8 @@ import {
   shortID,
   splitID,
   isRefId,
+  isSearchId,
+  parseSearchId,
   buildReferenceNode,
   itemMatchesType,
   VERSIONS_NODE_ID,
@@ -357,8 +359,7 @@ function getDefaultView(
   return {
     relations: getDefaultRelationForNode(id, knowledgeDBs, myself, context),
     width: 1,
-    // ROOT starts expanded by default
-    expanded: id === "ROOT",
+    expanded: id === "ROOT" || isSearchId(id as ID),
   };
 }
 
@@ -380,6 +381,16 @@ export function getNodeFromID(
   // Handle ref IDs - build a virtual ReferenceNode
   if (isRefId(id)) {
     return buildReferenceNode(id as LongID, knowledgeDBs, myself);
+  }
+
+  // Handle search IDs - build virtual node from ID
+  if (isSearchId(id as ID)) {
+    const query = parseSearchId(id as ID);
+    return {
+      id: id as ID,
+      text: `Search: ${query}`,
+      type: "text",
+    };
   }
 
   const [remote, knowID] = splitID(id);
@@ -1181,6 +1192,15 @@ function getNewestRelationFromAuthor(
 ): Relations | undefined {
   const localID = shortID(nodeID);
   const authorDB = knowledgeDBs.get(author, newDB());
+  if (isSearchId(nodeID as ID)) {
+    console.log("getNewestRelationFromAuthor SEARCH", {
+      localID,
+      nodeID,
+      context: context.toArray(),
+      authorDBRelationsCount: authorDB.relations.size,
+      allHeads: authorDB.relations.map((r) => r.head).toArray(),
+    });
+  }
   const relations = sortRelationsByDate(
     authorDB.relations
       .filter((r) => r.head === localID && contextsMatch(r.context, context))
@@ -1197,6 +1217,9 @@ export function getRelationsForContext(
   rootRelation: LongID | undefined,
   isRootNode: boolean
 ): Relations | undefined {
+  if (isSearchId(nodeID as ID)) {
+    console.log("getRelationsForContext SEARCH", { nodeID, isRootNode, rootRelation, context: context.toArray() });
+  }
   if (isRootNode && rootRelation) {
     return getRelationsNoReferencedBy(knowledgeDBs, rootRelation, paneAuthor);
   }

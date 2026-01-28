@@ -53,20 +53,20 @@ type SearchModalProps = {
   onHide: () => void;
 };
 
-function filterForKeyword(
+export function filterForKeyword(
   nodes: Map<string, KnowNode>,
   filter: string
 ): Map<string, KnowNode> {
   return filter === ""
     ? Map<string, KnowNode>()
     : nodes
-        .filter((node) => {
-          return isMatch(filter, node.text);
-        })
-        .slice(0, 25);
+      .filter((node) => {
+        return isMatch(filter, node.text);
+      })
+      .slice(0, 25);
 }
 
-function useSearchQuery(
+export function useSearchQuery(
   query: string,
   relays: Relays,
   nip50: boolean
@@ -89,9 +89,9 @@ function useSearchQuery(
 
   const filter = nip50
     ? {
-        ...basicFilter,
-        search: query,
-      }
+      ...basicFilter,
+      search: query,
+    }
     : basicFilter;
 
   const searchFilters = [
@@ -121,8 +121,8 @@ function useSearchQuery(
   const events = nip50
     ? preFilteredEvents
     : preFilteredEvents.filter(
-        (event) => event.kind === KIND_DELETE || isMatch(query, event.content)
-      );
+      (event) => event.kind === KIND_DELETE || isMatch(query, event.content)
+    );
 
   const groupByKind = events.groupBy((event) => event.kind);
   const knowledgeEvents = groupByKind.get(KIND_KNOWLEDGE_NODE);
@@ -251,9 +251,8 @@ function Search({
               <div
                 key={node.id}
                 ref={i === suggestionIndex ? searchResultRef : undefined}
-                className={`${
-                  i === suggestionIndex ? "active" : ""
-                } dropdown-item w-100 search-dropdown`}
+                className={`${i === suggestionIndex ? "active" : ""
+                  } dropdown-item w-100 search-dropdown`}
                 role="button"
                 onClick={() => {
                   onAddExistingNode(node.id);

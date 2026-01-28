@@ -134,6 +134,7 @@ declare global {
     stack: (LongID | ID)[];
     author: PublicKey;
     rootRelation?: LongID;
+    searchQuery?: string;
   };
 
   type Data = {

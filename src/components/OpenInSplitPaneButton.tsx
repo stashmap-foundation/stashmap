@@ -15,6 +15,7 @@ import { IS_MOBILE } from "./responsive";
 import { getRefTargetInfo } from "../connections";
 import { planUpdateViews, usePlanner } from "../planner";
 import { useData } from "../DataContext";
+import { ROOT } from "../types";
 
 export function OpenInSplitPaneButton(): JSX.Element | null {
   const { addPaneAt } = useSplitPanes();
@@ -107,6 +108,41 @@ export function OpenInSplitPaneButtonWithStack({
       className="btn btn-borderless p-0"
       onClick={onClick}
       title="Open in new split pane"
+    >
+      <span className="iconsminds-left-to-right" />
+    </button>
+  );
+}
+
+export function NewPaneButton(): JSX.Element | null {
+  const { addPaneAt } = useSplitPanes();
+  const paneIndex = usePaneIndex();
+  const { user } = useData();
+  const isMobile = useMediaQuery(IS_MOBILE);
+  const { createPlan, executePlan } = usePlanner();
+
+  if (isMobile) {
+    return null;
+  }
+
+  const onClick = (): void => {
+    const insertIndex = paneIndex + 1;
+    const plan = createPlan();
+    const shiftedViews = updateViewPathsAfterPaneInsert(
+      plan.views,
+      insertIndex
+    );
+    executePlan(planUpdateViews(plan, shiftedViews));
+    addPaneAt(insertIndex, [ROOT], user.publicKey);
+  };
+
+  return (
+    <button
+      type="button"
+      aria-label="Open new pane"
+      className="btn btn-borderless p-0"
+      onClick={onClick}
+      title="Open new pane"
     >
       <span className="iconsminds-left-to-right" />
     </button>

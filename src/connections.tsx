@@ -5,7 +5,7 @@ import {
   getNodeFromID,
   getVersionedDisplayText,
 } from "./ViewContext";
-import { REFERENCED_BY, REF_PREFIX } from "./constants";
+import { REFERENCED_BY, REF_PREFIX, SEARCH_PREFIX } from "./constants";
 
 // Content-addressed node ID generation
 // Node ID = sha256(text).slice(0, 32) - no author prefix
@@ -48,6 +48,21 @@ export function isConcreteRefId(id: ID | LongID): boolean {
 export function createAbstractRefId(context: Context, targetNode: ID): LongID {
   const parts = [REF_PREFIX.slice(0, -1), ...context.toArray(), targetNode];
   return parts.join(":") as LongID;
+}
+
+export function isSearchId(id: ID): boolean {
+  return id.startsWith(SEARCH_PREFIX);
+}
+
+export function createSearchId(query: string): ID {
+  return `${SEARCH_PREFIX}${query}` as ID;
+}
+
+export function parseSearchId(id: ID): string | undefined {
+  if (!isSearchId(id)) {
+    return undefined;
+  }
+  return id.slice(SEARCH_PREFIX.length);
 }
 
 export function createConcreteRefId(relationID: LongID, targetNode?: ID): LongID {
@@ -230,6 +245,9 @@ export function joinID(remote: PublicKey | string, id: string): LongID {
 }
 
 export function shortID(id: ID): string {
+  if (isSearchId(id)) {
+    return id;
+  }
   return splitID(id)[1];
 }
 
@@ -461,6 +479,19 @@ export function getConcreteRefsForAbstract(
     .toList();
 
   return { ...rel, id: abstractRefId, items };
+}
+
+export function getSearchRelations(
+  searchId: ID,
+  foundNodeIDs: List<ID>,
+  myself: PublicKey
+): Relations {
+  const rel = newRelations(searchId, List<ID>(), myself);
+  const items = foundNodeIDs.map((nodeID) => ({
+    nodeID: createAbstractRefId(List<ID>(), nodeID),
+    relevance: "" as Relevance,
+  }));
+  return { ...rel, id: searchId as LongID, items };
 }
 
 export function getRelations(

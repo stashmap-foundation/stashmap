@@ -280,9 +280,9 @@ export function planCreateVersion(
   const [originalNodeID, context]: [ID, List<ID>] =
     isInsideVersions && editContext.size >= 2
       ? [
-          editContext.get(editContext.size - 2) as ID, // The node that owns ~Versions
-          editContext.slice(0, -2).toList(), // Context to that node
-        ]
+        editContext.get(editContext.size - 2) as ID, // The node that owns ~Versions
+        editContext.slice(0, -2).toList(), // Context to that node
+      ]
       : [editedNodeID, editContext];
 
   // 1. Create new version node
@@ -311,12 +311,12 @@ export function planCreateVersion(
   const versionsWithOriginal =
     originalIndex < 0
       ? addRelationToRelations(
-          baseVersionsRelations,
-          originalNodeID,
-          "",
-          undefined,
-          baseVersionsRelations.items.size
-        )
+        baseVersionsRelations,
+        originalNodeID,
+        "",
+        undefined,
+        baseVersionsRelations.items.size
+      )
       : baseVersionsRelations;
 
   // 5. Determine insert position
@@ -324,8 +324,8 @@ export function planCreateVersion(
   // Otherwise, insert at position 0 (top)
   const editedNodePosition = isInsideVersions
     ? versionsWithOriginal.items.findIndex(
-        (item) => item.nodeID === editedNodeID
-      )
+      (item) => item.nodeID === editedNodeID
+    )
     : -1;
   const insertPosition = editedNodePosition >= 0 ? editedNodePosition : 0;
 
@@ -338,12 +338,12 @@ export function planCreateVersion(
     existingIndex >= 0
       ? moveRelations(versionsWithOriginal, [existingIndex], insertPosition)
       : addRelationToRelations(
-          versionsWithOriginal,
-          versionNode.id,
-          "",
-          undefined,
-          insertPosition
-        );
+        versionsWithOriginal,
+        versionNode.id,
+        "",
+        undefined,
+        insertPosition
+      );
 
   return planUpsertRelations(updatedPlan, withVersion);
 }
@@ -443,10 +443,10 @@ export function planExpandNode(
 ): Plan {
   const currentRelations = view.relations
     ? getRelationsNoReferencedBy(
-        plan.knowledgeDBs,
-        view.relations,
-        plan.user.publicKey
-      )
+      plan.knowledgeDBs,
+      view.relations,
+      plan.user.publicKey
+    )
     : undefined;
 
   if (currentRelations && contextsMatch(currentRelations.context, context)) {
@@ -512,7 +512,6 @@ export function planAddToParent(
 
   const [parentNodeID, parentView] = getNodeIDFromView(plan, parentViewPath);
   const context = getContextFromStackAndViewPath(stack, parentViewPath);
-  console.log("planAddToParent", { parentNodeID, nodeIDs: nodeIDsArray, stack, context: context.toArray() });
   const planWithExpand = planExpandNode(
     plan,
     parentNodeID,
@@ -770,11 +769,11 @@ export function planSaveNodeAndEnsureRelations(
     );
     const planWithVersion = existingVersions
       ? planCreateVersion(
-          planWithNode,
-          createdNode.id,
-          trimmedText,
-          nodeContext
-        )
+        planWithNode,
+        createdNode.id,
+        trimmedText,
+        nodeContext
+      )
       : planWithNode;
 
     const emptyNodeMetadata = computeEmptyNodeMetadata(

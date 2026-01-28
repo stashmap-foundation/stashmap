@@ -430,7 +430,6 @@ function NodeAutoLink({
     const refInfo = getRefTargetInfo(node.id, knowledgeDBs, user.publicKey);
     if (refInfo) {
       const handleClick = (): void => {
-        console.log("NodeAutoLink handleClick", { nodeId: node.id, refInfo, paneId: pane.id });
         setPane({
           ...pane,
           stack: refInfo.stack,

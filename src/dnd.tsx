@@ -90,7 +90,6 @@ export function dnd(
   rootRelation: LongID | undefined,
   isDiffItem?: boolean
 ): Plan {
-  console.log("dnd called", { source, to, stack, indexTo, rootRelation, isDiffItem });
   const rootView = to;
 
   const sourceViewPath = parseViewPath(source);

@@ -117,7 +117,6 @@ export function useDroppable({
     ) {
       const rawDirection = calcDragDirection(ref, monitor, path);
       const direction = adjustDirectionForRoot(rawDirection);
-      console.log("drop handler", { rawDirection, direction, isListItem, isOver: monitor.isOver({ shallow: true }), path, itemPath: item.path, destination });
       if (isListItem && direction === undefined) {
         return item;
       }

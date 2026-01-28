@@ -1194,15 +1194,6 @@ function getNewestRelationFromAuthor(
 ): Relations | undefined {
   const localID = shortID(nodeID);
   const authorDB = knowledgeDBs.get(author, newDB());
-  if (isSearchId(nodeID as ID)) {
-    console.log("getNewestRelationFromAuthor SEARCH", {
-      localID,
-      nodeID,
-      context: context.toArray(),
-      authorDBRelationsCount: authorDB.relations.size,
-      allHeads: authorDB.relations.map((r) => r.head).toArray(),
-    });
-  }
   const relations = sortRelationsByDate(
     authorDB.relations
       .filter((r) => r.head === localID && contextsMatch(r.context, context))
@@ -1219,19 +1210,10 @@ export function getRelationsForContext(
   rootRelation: LongID | undefined,
   isRootNode: boolean
 ): Relations | undefined {
-  if (isSearchId(nodeID as ID)) {
-    console.log("getRelationsForContext SEARCH", { nodeID, isRootNode, rootRelation, context: context.toArray() });
-  }
   if (isRootNode && rootRelation) {
-    const result = getRelationsNoReferencedBy(knowledgeDBs, rootRelation, paneAuthor);
-    console.log("getRelationsForContext ROOT with rootRelation", { nodeID, rootRelation, paneAuthor, resultItems: result?.items.toJS() });
-    return result;
+    return getRelationsNoReferencedBy(knowledgeDBs, rootRelation, paneAuthor);
   }
-  const result = getNewestRelationFromAuthor(knowledgeDBs, paneAuthor, nodeID, context);
-  if ((nodeID as string).startsWith("978")) {
-    console.log("getRelationsForContext Target", { nodeID, context: context.toArray(), isRootNode, resultItems: result?.items.toJS() });
-  }
-  return result;
+  return getNewestRelationFromAuthor(knowledgeDBs, paneAuthor, nodeID, context);
 }
 
 export function upsertRelations(

@@ -1227,7 +1227,11 @@ export function getRelationsForContext(
     console.log("getRelationsForContext ROOT with rootRelation", { nodeID, rootRelation, paneAuthor, resultItems: result?.items.toJS() });
     return result;
   }
-  return getNewestRelationFromAuthor(knowledgeDBs, paneAuthor, nodeID, context);
+  const result = getNewestRelationFromAuthor(knowledgeDBs, paneAuthor, nodeID, context);
+  if ((nodeID as string).startsWith("978")) {
+    console.log("getRelationsForContext Target", { nodeID, context: context.toArray(), isRootNode, resultItems: result?.items.toJS() });
+  }
+  return result;
 }
 
 export function upsertRelations(

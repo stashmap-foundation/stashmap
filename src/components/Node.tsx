@@ -525,8 +525,15 @@ export function getNodesInTree(
     return ctx;
   }
 
-  // Handle REFERENCED_BY view - shows abstract/concrete refs
-  if (parentView.relations === REFERENCED_BY) {
+  // Check if this node is a direct child of a search node
+  const grandparentPath = getParentView(parentPath);
+  const [grandparentNodeID] = grandparentPath
+    ? getNodeIDFromView(data, grandparentPath)
+    : [undefined];
+  const isGrandchildOfSearch = grandparentNodeID && isSearchId(grandparentNodeID as ID);
+
+  // Handle REFERENCED_BY view or search result children - show refs
+  if (parentView.relations === REFERENCED_BY || isGrandchildOfSearch) {
     const relations = getReferencedByRelations(
       data.knowledgeDBs,
       data.user.publicKey,
@@ -535,9 +542,11 @@ export function getNodesInTree(
     if (!relations || relations.items.size === 0) {
       return ctx;
     }
+    // For search results, add refs as children of search node (grandparent), not the result node
+    const refParentPath = isGrandchildOfSearch && grandparentPath ? grandparentPath : parentPath;
     // Check if children are expanded and recurse
     return relations.items.reduce((nodesList, _, i) => {
-      const childPath = addNodeToPathWithRelations(parentPath, relations, i);
+      const childPath = addNodeToPathWithRelations(refParentPath, relations, i);
       const [childNodeID, childView] = getNodeIDFromView(data, childPath);
       if (childView.expanded && isAbstractRefId(childNodeID)) {
         return getNodesInTree(
@@ -552,58 +561,18 @@ export function getNodesInTree(
     }, ctx);
   }
 
-  // Handle Search nodes - show references for each search result
-  if (isSearchId(parentNodeID as ID)) {
-    const searchRelation = getRelations(
-      data.knowledgeDBs,
-      parentNodeID as ID,
-      data.user.publicKey,
-      parentNodeID
-    );
-    if (!searchRelation || searchRelation.items.size === 0) {
-      return ctx;
-    }
-    // For each search result, get its references and show them
-    return searchRelation.items.reduce(
-      (nodesList: List<ViewPath>, item: RelationItem) => {
-        const refs = getReferencedByRelations(
-          data.knowledgeDBs,
-          data.user.publicKey,
-          item.nodeID
-        );
-        if (!refs || refs.items.size === 0) {
-          return nodesList;
-        }
-        // Add each reference as a child, checking for expansion
-        return refs.items.reduce((innerList: List<ViewPath>, _, i: number) => {
-          const refPath = addNodeToPathWithRelations(parentPath, refs, i);
-          const [childNodeID, childView] = getNodeIDFromView(data, refPath);
-          // Recurse into expanded abstract refs to show their concrete children
-          if (childView.expanded && isAbstractRefId(childNodeID)) {
-            return getNodesInTree(
-              data,
-              refPath,
-              stack,
-              innerList.push(refPath),
-              rootRelation
-            );
-          }
-          return innerList.push(refPath);
-        }, nodesList);
-      },
-      ctx
-    );
-  }
-
   const context = getContextFromStackAndViewPath(stack, parentPath);
-  const relations = getRelationsForContext(
-    data.knowledgeDBs,
-    paneAuthor,
-    parentNodeID,
-    context,
-    rootRelation,
-    isRoot(parentPath)
-  );
+  // Search nodes store their relation by search ID, not by context
+  const relations = isSearchId(parentNodeID as ID)
+    ? getRelations(data.knowledgeDBs, parentNodeID as ID, data.user.publicKey, parentNodeID)
+    : getRelationsForContext(
+      data.knowledgeDBs,
+      paneAuthor,
+      parentNodeID,
+      context,
+      rootRelation,
+      isRoot(parentPath)
+    );
 
   // Filter items based on view's typeFilters (default filters out "not_relevant")
   const activeFilters = parentView.typeFilters || DEFAULT_TYPE_FILTERS;
@@ -622,12 +591,14 @@ export function getNodesInTree(
         if (noExpansion) {
           return nodesList.push(childPath);
         }
-        if (childView.expanded) {
+        if (childView.expanded || isSearchId(parentNodeID as ID)) {
+          // Skip adding search result nodes themselves - only show their refs
+          const updatedList = isSearchId(parentNodeID as ID) ? nodesList : nodesList.push(childPath);
           return getNodesInTree(
             data,
             childPath,
             stack,
-            nodesList.push(childPath),
+            updatedList,
             rootRelation
           );
         }

@@ -3,6 +3,7 @@ import {
   useViewPath,
   useDisplayText,
   useNextInsertPosition,
+  useIsInReferencedByView,
 } from "../ViewContext";
 import { useEditorText } from "./EditorTextContext";
 import useModal from "./useModal";
@@ -13,7 +14,7 @@ import {
   planSaveNodeAndEnsureRelations,
   planAddToParent,
 } from "../planner";
-import { usePaneStack } from "../SplitPanesContext";
+import { usePaneStack, useIsViewingOtherUserContent } from "../SplitPanesContext";
 
 /**
  * Prevents a button from stealing focus from an editor in the same node row.
@@ -310,8 +311,10 @@ export function SiblingSearchButton(): JSX.Element | null {
   const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
   const editorTextContext = useEditorText();
+  const isViewingOtherUserContent = useIsViewingOtherUserContent();
+  const isInReferencedByView = useIsInReferencedByView();
 
-  if (!nextInsertPosition) {
+  if (!nextInsertPosition || isViewingOtherUserContent || isInReferencedByView) {
     return null;
   }
 
@@ -357,11 +360,13 @@ export function AddSiblingButton(): JSX.Element | null {
   const { createPlan, executePlan } = usePlanner();
   const viewPath = useViewPath();
   const editorTextContext = useEditorText();
+  const isViewingOtherUserContent = useIsViewingOtherUserContent();
+  const isInReferencedByView = useIsInReferencedByView();
 
   const editorText = editorTextContext?.text ?? "";
   const displayText = editorText.trim() || versionedDisplayText;
 
-  if (!nextInsertPosition) {
+  if (!nextInsertPosition || isViewingOtherUserContent || isInReferencedByView) {
     return null;
   }
 

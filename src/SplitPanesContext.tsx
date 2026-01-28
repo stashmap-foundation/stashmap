@@ -41,6 +41,12 @@ export function usePaneAuthor(): PublicKey {
   return useCurrentPane().author;
 }
 
+export function useIsViewingOtherUserContent(): boolean {
+  const { user } = useData();
+  const paneAuthor = usePaneAuthor();
+  return paneAuthor !== user.publicKey;
+}
+
 export function useRoot(): ID {
   const pane = useCurrentPane();
   return pane.stack[pane.stack.length - 1] as ID;

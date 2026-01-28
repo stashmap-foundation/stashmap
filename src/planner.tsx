@@ -594,18 +594,22 @@ function updateViewsWithRelationsMapping(
   });
 }
 
-export function planFork(
+export function planForkPane(
   plan: Plan,
   viewPath: ViewPath,
   stack: (LongID | ID)[]
 ): Plan {
   const pane = getPane(plan, viewPath);
-  const [nodeID] = getNodeIDFromView(plan, viewPath);
   const context = getContextFromStackAndViewPath(stack, viewPath);
+  const entryNodeID = context.first();
+  if (!entryNodeID) {
+    return plan;
+  }
+  const entryContext = List<ID>();
   const [planWithRelations, relationsIdMapping] = planCopyDescendantRelations(
     plan,
-    nodeID,
-    context,
+    entryNodeID,
+    entryContext,
     (relation) => relation.context,
     (relation) => relation.author === pane.author
   );

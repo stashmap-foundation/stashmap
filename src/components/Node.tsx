@@ -64,6 +64,7 @@ import {
   usePaneStack,
   useSplitPanes,
   useCurrentPane,
+  useIsViewingOtherUserContent,
 } from "../SplitPanesContext";
 import { LeftMenu } from "./LeftMenu";
 import { RightMenu } from "./RightMenu";
@@ -379,25 +380,29 @@ function InteractiveNodeContent(): JSX.Element {
   const displayText = useDisplayText();
   const isLoading = useNodeIsLoading();
   const isInReferencedByView = useIsInReferencedByView();
+  const isViewingOtherUserContent = useIsViewingOtherUserContent();
   // Also check if this is the root node of a Referenced By view
   const isReferencedByRoot = view.relations === REFERENCED_BY;
   const isEmptyNode = isEmptyNodeID(nodeID);
+
+  const isReadonly =
+    isInReferencedByView || isReferencedByRoot || isViewingOtherUserContent;
 
   if (isLoading) {
     return <LoadingNode />;
   }
 
-  // For empty placeholder nodes, always render EditableContent
+  // For empty placeholder nodes, render EditableContent only if not readonly
   if (isEmptyNode) {
-    return <EditableContent />;
+    return isReadonly ? <></> : <EditableContent />;
   }
 
   if (!node) {
     return <ErrorContent />;
   }
 
-  // Editable content for mutable nodes (but read-only in Referenced By view)
-  if (isMutableNode(node) && !isInReferencedByView && !isReferencedByRoot) {
+  // Editable content for mutable nodes (but read-only when viewing others' content)
+  if (isMutableNode(node) && !isReadonly) {
     return <EditableContent />;
   }
 

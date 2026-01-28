@@ -1,7 +1,7 @@
 import React from "react";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
 
-import { getNodeFromID } from "../ViewContext";
+import { getNodeFromID, useViewPath } from "../ViewContext";
 import { DND } from "../dnd";
 import { useData } from "../DataContext";
 import {
@@ -9,6 +9,7 @@ import {
   useCurrentPane,
   usePaneStack,
   usePaneIndex,
+  useIsViewingOtherUserContent,
 } from "../SplitPanesContext";
 import { TreeView } from "./TreeView";
 import {
@@ -18,6 +19,7 @@ import {
 } from "./SplitPaneLayout";
 import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 import { SignInMenuBtn } from "../SignIn";
+import { usePlanner, planForkPane } from "../planner";
 
 function BreadcrumbItem({
   nodeID,
@@ -79,6 +81,34 @@ function Breadcrumbs(): JSX.Element | null {
   );
 }
 
+function ForkButton(): JSX.Element | null {
+  const isViewingOtherUserContent = useIsViewingOtherUserContent();
+  const viewPath = useViewPath();
+  const stack = usePaneStack();
+  const { createPlan, executePlan } = usePlanner();
+
+  if (!isViewingOtherUserContent) {
+    return null;
+  }
+
+  const handleFork = (): void => {
+    const plan = planForkPane(createPlan(), viewPath, stack);
+    executePlan(plan);
+  };
+
+  return (
+    <button
+      type="button"
+      className="btn btn-borderless"
+      onClick={handleFork}
+      aria-label="fork to make your own copy"
+      title="Fork to make your own copy"
+    >
+      Fork
+    </button>
+  );
+}
+
 function PaneHeader(): JSX.Element {
   const paneIndex = usePaneIndex();
   const isFirstPane = paneIndex === 0;
@@ -96,6 +126,7 @@ function PaneHeader(): JSX.Element {
         <Breadcrumbs />
       </div>
       <div className="pane-header-right">
+        <ForkButton />
         <PaneSearchButton />
         <ClosePaneButton />
       </div>

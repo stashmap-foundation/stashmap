@@ -17,7 +17,7 @@ import {
 } from "./connections";
 import { newDB } from "./knowledge";
 import { useData } from "./DataContext";
-import { Plan, planUpsertRelations, planUpdateViews, planFork, getPane } from "./planner";
+import { Plan, planUpsertRelations, planUpdateViews, planForkPane, getPane } from "./planner";
 import { usePaneStack, useCurrentPane } from "./SplitPanesContext";
 import { REFERENCED_BY } from "./constants";
 
@@ -1213,9 +1213,9 @@ export function upsertRelations(
   const [nodeID, nodeView] = getNodeIDFromView(plan, viewPath);
   const context = getContextFromStackAndViewPath(stack, viewPath);
 
-  // 1. Fork if editing another user's content
+  // 1. Fork if editing another user's content (legacy - editing now disabled for other users)
   const basePlan = pane.author !== plan.user.publicKey
-    ? planFork(plan, viewPath, stack)
+    ? planForkPane(plan, viewPath, stack)
     : plan;
 
   // 2. Get relations for context (now will find copied relations if fork happened)

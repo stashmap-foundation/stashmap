@@ -7,6 +7,7 @@ import {
   useViewPath,
   useNodeID,
 } from "../ViewContext";
+import { useIsViewingOtherUserContent } from "../SplitPanesContext";
 import { isEmptyNodeID } from "../connections";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable } from "./DroppableContainer";
@@ -96,6 +97,9 @@ export function ListItem({
   const ref = useRef<HTMLDivElement>(null);
   const isDiffItem = useIsDiffItem();
   const isInReferencedByView = useIsInReferencedByView();
+  const isViewingOtherUserContent = useIsViewingOtherUserContent();
+
+  const isReadonly = isInReferencedByView || isViewingOtherUserContent;
 
   // Root node (index 0) can't have siblings above it
   const isRoot = index === 0;
@@ -116,8 +120,8 @@ export function ListItem({
     );
   }
 
-  // Referenced By view: items are draggable but NOT droppable (don't register drop)
-  if (!isInReferencedByView) {
+  // Readonly views: items are draggable but NOT droppable (don't register drop)
+  if (!isReadonly) {
     drop(ref);
   }
 

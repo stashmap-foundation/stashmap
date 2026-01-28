@@ -17,7 +17,7 @@ import {
 import { getRelations, getConcreteRefs, isReferenceNode } from "../connections";
 import { useData } from "../DataContext";
 import { REFERENCED_BY, TYPE_COLORS } from "../constants";
-import { usePaneStack } from "../SplitPanesContext";
+import { usePaneStack, useIsViewingOtherUserContent } from "../SplitPanesContext";
 import { SiblingSearchButton, AddSiblingButton } from "./AddNode";
 
 function useSwitchToNormalRelations(): () => void {

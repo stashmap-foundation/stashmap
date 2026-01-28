@@ -1,14 +1,18 @@
 import React from "react";
-import { useIsDiffItem, useIsRoot } from "../ViewContext";
+import { useIsDiffItem, useIsRoot, useIsInReferencedByView } from "../ViewContext";
+import { useIsViewingOtherUserContent } from "../SplitPanesContext";
 import { RelevanceSelector } from "./RelevanceSelector";
 import { EvidenceSelector } from "./EvidenceSelector";
 
 export function RightMenu(): JSX.Element | null {
   const isDiffItem = useIsDiffItem();
   const isRoot = useIsRoot();
+  const isViewingOtherUserContent = useIsViewingOtherUserContent();
+  const isInReferencedByView = useIsInReferencedByView();
 
-  // Root node doesn't have relevance/evidence settings
-  if (isRoot) {
+  const isReadonly = isViewingOtherUserContent || isInReferencedByView;
+
+  if (isRoot || isReadonly) {
     return null;
   }
 

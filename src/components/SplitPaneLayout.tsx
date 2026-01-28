@@ -66,17 +66,18 @@ export function PaneSearchButton(): JSX.Element {
           setShowInput(false);
           setQuery("");
         }}
-        aria-label="Search query"
+        aria-label="search input"
       />
     );
   }
 
+  const paneIndex = usePaneIndex();
   return (
     <button
       type="button"
       className="split-pane-search btn btn-borderless"
       onClick={() => setShowInput(true)}
-      aria-label="Search"
+      aria-label={`Search to change pane ${paneIndex} content`}
       title="Search"
     >
       <span className="simple-icon-magnifier" />

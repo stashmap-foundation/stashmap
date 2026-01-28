@@ -4,6 +4,7 @@ import {
   ALICE,
   expectTree,
   findNewNodeEditor,
+  navigateToNodeViaSearch,
   renderTree,
   setup,
 } from "../utils.test";
@@ -192,14 +193,7 @@ My Notes
     await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
 
     // Navigate to Bitcoin as root
-    await userEvent.click(
-      await screen.findByLabelText("Search to change pane 0 content")
-    );
-    await userEvent.type(
-      await screen.findByLabelText("search input"),
-      "Bitcoin"
-    );
-    await userEvent.click(await screen.findByLabelText("select Bitcoin"));
+    await navigateToNodeViaSearch(0, "Bitcoin");
     await screen.findByLabelText("expand Bitcoin");
 
     // Filter button should exist initially

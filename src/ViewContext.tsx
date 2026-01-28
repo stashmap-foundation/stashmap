@@ -793,8 +793,8 @@ export function useReferencedByDepth(): number | undefined {
   let currentPath: ViewPath | undefined = getParentView(viewPath);
   while (currentPath) {
     depth += 1;
-    const [, view] = getNodeIDFromView(data, currentPath);
-    if (view?.relations === REFERENCED_BY) {
+    const [nodeID, view] = getNodeIDFromView(data, currentPath);
+    if (view?.relations === REFERENCED_BY || isSearchId(nodeID as ID)) {
       return depth;
     }
     currentPath = getParentView(currentPath);

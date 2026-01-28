@@ -60,6 +60,7 @@ import {
 } from "./connections";
 import { newRelations, RootViewContextProvider } from "./ViewContext";
 import { LoadData } from "./dataQuery";
+import { LoadSearchData } from "./LoadSearchData";
 import { StorePreLoginContext } from "./StorePreLoginContext";
 import { newDB } from "./knowledge";
 import { TemporaryViewProvider } from "./components/TemporaryViewContext";
@@ -707,16 +708,18 @@ function RootViewOrWorkspaceIsLoadingInner({
   const rootNodeID = pane.stack[pane.stack.length - 1];
 
   return (
-    <LoadData nodeIDs={pane.stack}>
-      <LoadData nodeIDs={[rootNodeID]} descendants referencedBy lists>
-        <RootViewContextProvider
-          root={rootNodeID as LongID}
-          paneIndex={paneIndex}
-        >
-          <StorePreLoginContext>{children}</StorePreLoginContext>
-        </RootViewContextProvider>
+    <LoadSearchData nodeIDs={pane.stack}>
+      <LoadData nodeIDs={pane.stack}>
+        <LoadData nodeIDs={[rootNodeID]} descendants referencedBy lists>
+          <RootViewContextProvider
+            root={rootNodeID as LongID}
+            paneIndex={paneIndex}
+          >
+            <StorePreLoginContext>{children}</StorePreLoginContext>
+          </RootViewContextProvider>
+        </LoadData>
       </LoadData>
-    </LoadData>
+    </LoadSearchData>
   );
 }
 
@@ -957,13 +960,50 @@ export async function createAndSetAsRoot(nodeName: string): Promise<void> {
     await screen.findByLabelText("Search to change pane 0 content")
   );
 
-  // Type the node name in search
-  await userEvent.type(await screen.findByLabelText("search input"), nodeName);
+  // Type the node name and press Enter to submit search
+  await userEvent.type(
+    await screen.findByLabelText("search input"),
+    `${nodeName}{Enter}`
+  );
 
-  // Click on the search result using its aria-label
-  await userEvent.click(await screen.findByLabelText(`select ${nodeName}`));
+  // Click fullscreen button on the search result reference
+  // The aria-label is "open X in fullscreen" where X is the reference display text
+  await userEvent.click(
+    await screen.findByRole("button", {
+      name: new RegExp(`open.*${nodeName}.*in fullscreen`, "i"),
+    })
+  );
 
   // Wait for the tree to update with new root
+  await waitFor(async () => {
+    const tree = await getTreeStructure();
+    expect(tree.startsWith(nodeName)).toBe(true);
+  });
+}
+
+export async function navigateToNodeViaSearch(
+  paneIndex: number,
+  nodeName: string
+): Promise<void> {
+  await userEvent.click(
+    await screen.findByLabelText(`Search to change pane ${paneIndex} content`)
+  );
+  await userEvent.type(
+    await screen.findByLabelText("search input"),
+    `${nodeName}{Enter}`
+  );
+  // Wait for search results with references to load
+  await waitFor(async () => {
+    const tree = await getTreeStructure();
+    expect(tree).toMatch(new RegExp(`→.*${nodeName}`, "i"));
+  });
+  // Click on the first reference to navigate (NodeAutoLink wraps refs in clickable button)
+  // Use findAllByRole since there may be multiple references to the same node
+  const navigateButtons = await screen.findAllByRole("button", {
+    name: new RegExp(`Navigate to.*${nodeName}`, "i"),
+  });
+  await userEvent.click(navigateButtons[0]);
+  // Wait for navigation to complete
   await waitFor(async () => {
     const tree = await getTreeStructure();
     expect(tree.startsWith(nodeName)).toBe(true);

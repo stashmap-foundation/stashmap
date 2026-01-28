@@ -3,7 +3,14 @@ import { Map, List } from "immutable";
 import { isSearchId, parseSearchId, getSearchRelations } from "./connections";
 import { MergeKnowledgeDB, useData } from "./DataContext";
 import { useReadRelays } from "./relays";
-import { useSearchQuery } from "./components/SearchModal";
+import { useSearchQuery, filterForKeyword } from "./components/SearchModal";
+
+function getAllNodesFromDBs(knowledgeDBs: KnowledgeDBs): Map<string, KnowNode> {
+  return knowledgeDBs.reduce(
+    (acc, db) => acc.merge(db.nodes),
+    Map<string, KnowNode>()
+  );
+}
 
 export function LoadSearchData({
   children,
@@ -12,7 +19,7 @@ export function LoadSearchData({
   children: React.ReactNode;
   nodeIDs: (ID | LongID)[];
 }): JSX.Element {
-  const { user, relaysInfos } = useData();
+  const { user, relaysInfos, knowledgeDBs } = useData();
   const relays = useReadRelays({ user: true, contacts: true });
 
   const nip50Relays = relays.filter((r) => {
@@ -27,14 +34,15 @@ export function LoadSearchData({
   const firstSearch = searchEntries[0];
   const query = firstSearch?.query || "";
 
-  console.log("LoadSearchData", { nodeIDs, query, firstSearch, relaysCount: relays.length, rootID: nodeIDs[nodeIDs.length - 1] });
-
   const [searchResults] = useSearchQuery(query, nip50Relays, true);
   const [slowSearchResults] = useSearchQuery(query, relays, false);
 
-  const allSearchResults = slowSearchResults.merge(searchResults);
+  const localNodes = getAllNodesFromDBs(knowledgeDBs);
+  const localSearchResults = filterForKeyword(localNodes, query);
 
-  console.log("LoadSearchData results", { searchResultsCount: searchResults.size, slowSearchResultsCount: slowSearchResults.size, allCount: allSearchResults.size });
+  const allSearchResults = localSearchResults.merge(
+    slowSearchResults.merge(searchResults)
+  );
 
   if (!firstSearch) {
     return <>{children}</>;
@@ -47,8 +55,6 @@ export function LoadSearchData({
     foundNodeIDs,
     user.publicKey
   );
-
-  console.log("LoadSearchData synthetic", { searchId, foundNodeIDs: foundNodeIDs.toArray(), searchRelations });
 
   const syntheticDB: KnowledgeData = {
     nodes: allSearchResults as Map<ID, KnowNode>,

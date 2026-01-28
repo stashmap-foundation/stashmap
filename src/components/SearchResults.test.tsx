@@ -1,4 +1,4 @@
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -6,7 +6,6 @@ import {
   findNewNodeEditor,
   renderApp,
   setup,
-  getTreeStructure,
 } from "../utils.test";
 
 describe("Search Results", () => {
@@ -31,48 +30,30 @@ My Notes
     `);
 
     // Click search button
-    await userEvent.click(await screen.findByLabelText("Search"));
+    await userEvent.click(
+      await screen.findByLabelText("Search to change pane 0 content")
+    );
 
     // Type search query and submit
     await userEvent.type(
-      await screen.findByLabelText("Search query"),
+      await screen.findByLabelText("search input"),
       "Apple{Enter}"
     );
 
-    // Wait for search to complete and debug output
-    await waitFor(async () => {
-      const tree = await getTreeStructure();
-      console.log("Current tree:", tree);
-    });
-
-    // Should show search results with search query as root
-    // Expand to see results
-    await userEvent.click(await screen.findByLabelText("expand Search: Apple"));
-
-    // Debug after expand
-    await waitFor(async () => {
-      const tree = await getTreeStructure();
-      console.log("After expand:", tree);
-    });
-
+    // Search nodes expand by default, results shown as references with context
     await expectTree(`
 Search: Apple
-  Apple pie recipe
-  Apple cider
+  My Notes (3) → Apple pie recipe
+  My Notes (3) → Apple cider
     `);
 
     cleanup();
     renderApp(alice());
 
-    await waitFor(async () => {
-      const tree = await getTreeStructure();
-      console.log("After cleanup/rerender:", tree);
-    });
-
     await expectTree(`
 Search: Apple
-  Apple pie recipe
-  Apple cider
+  My Notes (3) → Apple pie recipe
+  My Notes (3) → Apple cider
     `);
   });
 });

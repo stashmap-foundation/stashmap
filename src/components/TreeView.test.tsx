@@ -1,5 +1,5 @@
 import { Map } from "immutable";
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -8,6 +8,8 @@ import {
   renderTree,
   setup,
   findNewNodeEditor,
+  navigateToNodeViaSearch,
+  getTreeStructure,
 } from "../utils.test";
 import { areAllAncestorsExpanded } from "./TreeView";
 
@@ -132,11 +134,7 @@ test("Root node shows references when there are more than 0", async () => {
   await screen.findByText("Bitcoin");
 
   // Navigate to Bitcoin as root using pane search
-  await userEvent.click(
-    await screen.findByLabelText("Search to change pane 0 content")
-  );
-  await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
-  await userEvent.click(await screen.findByLabelText("select Bitcoin"));
+  await navigateToNodeViaSearch(0, "Bitcoin");
 
   // Now Bitcoin is the root - wait for it to appear as root
   // Bitcoin has no children so it shows "expand" by default
@@ -166,11 +164,7 @@ test("Referenced By items do not show relation selector", async () => {
   await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
 
   // Navigate to Bitcoin as root
-  await userEvent.click(
-    await screen.findByLabelText("Search to change pane 0 content")
-  );
-  await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
-  await userEvent.click(await screen.findByLabelText("select Bitcoin"));
+  await navigateToNodeViaSearch(0, "Bitcoin");
   await screen.findByLabelText("expand Bitcoin");
 
   // The root node (Bitcoin) should have a relation selector
@@ -207,11 +201,7 @@ test("Referenced By items still show navigation buttons", async () => {
   await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
 
   // Navigate to Bitcoin as root
-  await userEvent.click(
-    await screen.findByLabelText("Search to change pane 0 content")
-  );
-  await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
-  await userEvent.click(await screen.findByLabelText("select Bitcoin"));
+  await navigateToNodeViaSearch(0, "Bitcoin");
   await screen.findByLabelText("expand Bitcoin");
 
   // Open Referenced By view
@@ -242,11 +232,7 @@ test("Referenced By shows node with list and empty context", async () => {
   await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
 
   // Navigate to Money as root
-  await userEvent.click(
-    await screen.findByLabelText("Search to change pane 0 content")
-  );
-  await userEvent.type(await screen.findByLabelText("search input"), "Money");
-  await userEvent.click(await screen.findByLabelText("select Money"));
+  await navigateToNodeViaSearch(0, "Money");
 
   // Money is now root - wait for it to appear (could be expanded or collapsed)
   await screen.findByLabelText(/expand Money|collapse Money/);
@@ -279,11 +265,7 @@ test("Referenced By deduplicates paths from multiple users", async () => {
   await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
 
   // Navigate to Bitcoin as root
-  await userEvent.click(
-    await screen.findByLabelText("Search to change pane 0 content")
-  );
-  await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
-  await userEvent.click(await screen.findByLabelText("select Bitcoin"));
+  await navigateToNodeViaSearch(0, "Bitcoin");
   await screen.findByLabelText(/expand Bitcoin|collapse Bitcoin/);
 
   // Open references view
@@ -293,8 +275,10 @@ test("Referenced By deduplicates paths from multiple users", async () => {
   // Wait for Referenced By to load - the path My Notes -> Money -> Bitcoin should show
   await screen.findByLabelText("related to Bitcoin");
 
-  // There should be exactly one reference path
-  const referenceButtons = screen.getAllByLabelText(/Navigate to/);
+  // There should be exactly one reference path (not counting breadcrumb links)
+  const referenceButtons = screen
+    .getAllByLabelText(/Navigate to/)
+    .filter((btn) => btn.classList.contains("reference-link-btn"));
   expect(referenceButtons).toHaveLength(1);
 });
 
@@ -314,9 +298,7 @@ test("Reference indicators show other users icon", async () => {
   await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child{Escape}");
 
   // Navigate to Child and show references
-  await userEvent.click(await screen.findByLabelText("Search to change pane 0 content"));
-  await userEvent.type(await screen.findByLabelText("search input"), "Child");
-  await userEvent.click(await screen.findByLabelText("select Child"));
+  await navigateToNodeViaSearch(0, "Child");
 
   fireEvent.click(await screen.findByLabelText("show references to Child"));
 
@@ -371,11 +353,7 @@ test("Can exit Referenced By mode even when node has no relations", async () => 
   await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
 
   // Navigate to Bitcoin as root using pane search
-  await userEvent.click(
-    await screen.findByLabelText("Search to change pane 0 content")
-  );
-  await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
-  await userEvent.click(await screen.findByLabelText("select Bitcoin"));
+  await navigateToNodeViaSearch(0, "Bitcoin");
 
   // Bitcoin is now root - it has no children
   await screen.findByLabelText("expand Bitcoin");
@@ -391,7 +369,11 @@ test("Can exit Referenced By mode even when node has no relations", async () => 
   expect(screen.getByLabelText("show children of Bitcoin")).toBeDefined();
 
   // Reference should be visible (Money is Bitcoin's parent)
-  await screen.findByText(/Money/);
+  // Wait for references to load - look for the reference path containing Money
+  await waitFor(async () => {
+    const tree = await getTreeStructure();
+    expect(tree).toMatch(/Money/);
+  });
 
   // Exit Referenced By mode - this should work even though Bitcoin has no relations
   fireEvent.click(screen.getByLabelText("hide references to Bitcoin"));

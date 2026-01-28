@@ -6,6 +6,7 @@ import { execute } from "../executor";
 import { createPlan, planUpsertRelations } from "../planner";
 import {
   ALICE,
+  navigateToNodeViaSearch,
   renderTree,
   setup,
   UpdateState,
@@ -46,16 +47,7 @@ async function uploadMarkdown(alice: UpdateState): Promise<void> {
 }
 
 async function navigateToProgrammingLanguages(): Promise<void> {
-  await userEvent.click(
-    await screen.findByLabelText("Search to change pane 0 content")
-  );
-  await userEvent.type(
-    await screen.findByLabelText("search input"),
-    "Programming Languages"
-  );
-  await userEvent.click(
-    await screen.findByLabelText("select Programming Languages")
-  );
+  await navigateToNodeViaSearch(0, "Programming Languages");
   await screen.findByLabelText(
     /expand Programming Languages|collapse Programming Languages/
   );
@@ -99,16 +91,7 @@ Programming Languages OOP
   cleanup();
   renderTree(alice);
 
-  await userEvent.click(
-    await screen.findByLabelText("Search to change pane 0 content")
-  );
-  await userEvent.type(
-    await screen.findByLabelText("search input"),
-    "Programming Languages OOP"
-  );
-  await userEvent.click(
-    await screen.findByLabelText("select Programming Languages OOP")
-  );
+  await navigateToNodeViaSearch(0, "Programming Languages");
 
   await expectTree(`
 Programming Languages OOP

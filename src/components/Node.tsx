@@ -37,6 +37,9 @@ import {
   isConcreteRefId,
   parseConcreteRefId,
   getRelationsNoReferencedBy,
+  isSearchId,
+  getConcreteRefs,
+  getRelations,
 } from "../connections";
 import { REFERENCED_BY, DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 import { IS_MOBILE } from "./responsive";
@@ -179,11 +182,11 @@ function NodeContent({
 
   const referenceStyle: React.CSSProperties = isReference
     ? {
-        fontStyle: "italic",
-        color: "#5a7bad",
-        textDecoration: "none",
-        borderBottom: "1px dotted #8fadd4",
-      }
+      fontStyle: "italic",
+      color: "#5a7bad",
+      textDecoration: "none",
+      borderBottom: "1px dotted #8fadd4",
+    }
     : {};
 
   return (
@@ -226,11 +229,11 @@ function EditableContent(): JSX.Element {
     const plan =
       submitted && nextInsertPosition
         ? planSetEmptyNodePosition(
-            basePlan,
-            nextInsertPosition[0],
-            stack,
-            nextInsertPosition[1]
-          )
+          basePlan,
+          nextInsertPosition[0],
+          stack,
+          nextInsertPosition[1]
+        )
         : basePlan;
 
     executePlan(plan);
@@ -548,6 +551,39 @@ export function getNodesInTree(
       return nodesList.push(childPath);
     }, ctx);
   }
+
+  // Handle Search nodes - show references for each search result
+  if (isSearchId(parentNodeID as ID)) {
+    const searchRelation = getRelations(
+      data.knowledgeDBs,
+      parentNodeID as ID,
+      data.user.publicKey,
+      parentNodeID
+    );
+    if (!searchRelation || searchRelation.items.size === 0) {
+      return ctx;
+    }
+    // For each search result, get its references and show them
+    return searchRelation.items.reduce(
+      (nodesList: List<ViewPath>, item: RelationItem) => {
+        const refs = getReferencedByRelations(
+          data.knowledgeDBs,
+          data.user.publicKey,
+          item.nodeID
+        );
+        if (!refs || refs.items.size === 0) {
+          return nodesList;
+        }
+        // Add each reference as a child
+        return refs.items.reduce((innerList: List<ViewPath>, _, i: number) => {
+          const refPath = addNodeToPathWithRelations(parentPath, refs, i);
+          return innerList.push(refPath);
+        }, nodesList);
+      },
+      ctx
+    );
+  }
+
   const context = getContextFromStackAndViewPath(stack, parentPath);
   const relations = getRelationsForContext(
     data.knowledgeDBs,
@@ -567,25 +603,25 @@ export function getNodesInTree(
 
   const nodesInTree = relations
     ? relations.items
-        .map((item, i) => ({ item, index: i }))
-        .filter(({ item }) => itemFilters.some((f) => itemMatchesType(item, f)))
-        .map(({ index }) => addNodeToPathWithRelations(parentPath, relations, index))
-        .reduce((nodesList: List<ViewPath>, childPath: ViewPath) => {
-          const childView = getNodeIDFromView(data, childPath)[1];
-          if (noExpansion) {
-            return nodesList.push(childPath);
-          }
-          if (childView.expanded) {
-            return getNodesInTree(
-              data,
-              childPath,
-              stack,
-              nodesList.push(childPath),
-              rootRelation
-            );
-          }
+      .map((item, i) => ({ item, index: i }))
+      .filter(({ item }) => itemFilters.some((f) => itemMatchesType(item, f)))
+      .map(({ index }) => addNodeToPathWithRelations(parentPath, relations, index))
+      .reduce((nodesList: List<ViewPath>, childPath: ViewPath) => {
+        const childView = getNodeIDFromView(data, childPath)[1];
+        if (noExpansion) {
           return nodesList.push(childPath);
-        }, ctx)
+        }
+        if (childView.expanded) {
+          return getNodesInTree(
+            data,
+            childPath,
+            stack,
+            nodesList.push(childPath),
+            rootRelation
+          );
+        }
+        return nodesList.push(childPath);
+      }, ctx)
     : ctx;
 
   // Get diff items based on active type filters from view settings
@@ -601,12 +637,12 @@ export function getNodesInTree(
   const withDiffItems =
     diffItems.size > 0
       ? diffItems.reduce(
-          (list, diffItem, idx) =>
-            list.push(
-              addDiffItemToPath(data, parentPath, diffItem.nodeID, idx, stack)
-            ),
-          nodesInTree
-        )
+        (list, diffItem, idx) =>
+          list.push(
+            addDiffItemToPath(data, parentPath, diffItem.nodeID, idx, stack)
+          ),
+        nodesInTree
+      )
       : nodesInTree;
 
   return withDiffItems;

@@ -18,7 +18,7 @@ import {
   eventToRelations,
   eventToTextNode,
 } from "./serializer";
-import { splitID } from "./connections";
+import { splitID, isSearchId } from "./connections";
 
 function isTextNode(kind: number | string): boolean {
   const kindAsNumber = typeof kind === "string" ? parseInt(kind, 10) : kind;
@@ -88,6 +88,9 @@ export function findRelations(
     }
     const relations = eventToRelations(event);
     if (!relations) {
+      return rdx;
+    }
+    if (isSearchId(relations.head as ID)) {
       return rdx;
     }
     const id = splitID(relations.id)[1];

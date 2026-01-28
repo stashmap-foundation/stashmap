@@ -6,6 +6,7 @@ import {
   expectTree,
   findNewNodeEditor,
   follow,
+  navigateToNodeViaSearch,
   renderApp,
   renderTree,
   setup,
@@ -177,14 +178,7 @@ My Notes
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
 
     // Navigate pane 1 to Source
-    await userEvent.click(
-      await screen.findByLabelText("Search to change pane 1 content")
-    );
-    await userEvent.type(
-      await screen.findByLabelText("search input"),
-      "Source"
-    );
-    await userEvent.click(await screen.findByLabelText("select Source"));
+    await navigateToNodeViaSearch(1, "Source");
     await screen.findByLabelText("collapse Source");
 
     // Drag Child A from pane 0 to My Notes
@@ -238,14 +232,7 @@ My Notes
 
     // Open split pane and navigate to Target
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-    await userEvent.click(
-      await screen.findByLabelText("Search to change pane 1 content")
-    );
-    await userEvent.type(
-      await screen.findByLabelText("search input"),
-      "Target"
-    );
-    await userEvent.click(await screen.findByLabelText("select Target"));
+    await navigateToNodeViaSearch(1, "Target");
     await screen.findByLabelText("collapse Target");
 
     // Drag Parent from pane 0 to Target in pane 1 (cross-pane = deep copy)
@@ -305,14 +292,7 @@ My Notes
 
     // Open split pane and navigate to Target
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-    await userEvent.click(
-      await screen.findByLabelText("Search to change pane 1 content")
-    );
-    await userEvent.type(
-      await screen.findByLabelText("search input"),
-      "Target"
-    );
-    await userEvent.click(await screen.findByLabelText("select Target"));
+    await navigateToNodeViaSearch(1, "Target");
     await screen.findByLabelText("collapse Target");
 
     // Drag Source from pane 0 to Target in pane 1
@@ -394,14 +374,7 @@ My Notes
 
     // Open split pane and navigate pane 1 to Target
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-    await userEvent.click(
-      await screen.findByLabelText("Search to change pane 1 content")
-    );
-    await userEvent.type(
-      await screen.findByLabelText("search input"),
-      "Target"
-    );
-    await userEvent.click(await screen.findByLabelText("select Target"));
+    await navigateToNodeViaSearch(1, "Target");
 
     await expectTree(`
 My Notes

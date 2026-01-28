@@ -6,6 +6,7 @@ import {
   BOB,
   expectTree,
   findNewNodeEditor,
+  navigateToNodeViaSearch,
   renderApp,
   renderTree,
   setup,
@@ -85,11 +86,7 @@ My Notes
   await userEvent.click(splitPaneButtons[0]);
 
   // Navigate pane 1 to Parent using search
-  await userEvent.click(
-    await screen.findByLabelText("Search to change pane 1 content")
-  );
-  await userEvent.type(await screen.findByLabelText("search input"), "Parent");
-  await userEvent.click(await screen.findByLabelText("select Parent"));
+  await navigateToNodeViaSearch(1, "Parent");
 
   // Wait for split pane to show Parent
   await screen.findByLabelText("collapse Parent");

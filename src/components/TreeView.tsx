@@ -33,8 +33,9 @@ import {
   LoadMissingVersionNodes,
 } from "../dataQuery";
 import { RegisterQuery } from "../LoadingStatus";
-import { shortID } from "../connections";
+import { shortID, isSearchId, getRelations } from "../connections";
 import { useApis } from "../Apis";
+import { addReferencedByToFilters } from "../dataQuery";
 
 function getAncestorPaths(path: string, rootKey: string): string[] {
   const suffix = path.slice(rootKey.length);
@@ -258,6 +259,8 @@ function Tree(): JSX.Element | null {
 export function TreeView(): JSX.Element {
   const data = useData();
   const key = useViewKey();
+  const viewPath = useViewPath();
+  const rootNodeID = getLast(viewPath).nodeID;
   const baseFilter = createBaseFilter(
     data.contacts,
     data.projectMembers,
@@ -281,8 +284,29 @@ export function TreeView(): JSX.Element {
       addListToFilters(rdx, listID, getLast(parseViewPath(path)).nodeID),
     baseFilter
   );
+
+  // For search nodes, add REFERENCED_BY queries for each search result
+  const searchFilter = (() => {
+    if (!isSearchId(rootNodeID as ID)) {
+      return listsFilter;
+    }
+    const searchRelation = getRelations(
+      data.knowledgeDBs,
+      rootNodeID as ID,
+      data.user.publicKey,
+      rootNodeID
+    );
+    if (!searchRelation) {
+      return listsFilter;
+    }
+    return searchRelation.items.reduce(
+      (rdx, item) => addReferencedByToFilters(rdx, item.nodeID),
+      listsFilter
+    );
+  })();
+
   const { knowledgeDBs } = useQueryKnowledgeData(
-    filtersToFilterArray(listsFilter)
+    filtersToFilterArray(searchFilter)
   );
 
   return (

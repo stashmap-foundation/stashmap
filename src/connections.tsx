@@ -320,6 +320,13 @@ export function getConcreteRefs(
   const targetShortID = shortID(nodeID);
   let allRefs = knowledgeDBs.reduce((acc, knowledgeDB) => {
     return knowledgeDB.relations.reduce((rdx, relation) => {
+      // Skip search relations - they're virtual and shouldn't be shown as refs
+      if (
+        isSearchId(relation.head as ID) ||
+        relation.context.some((id) => isSearchId(id as ID))
+      ) {
+        return rdx;
+      }
       const relationContext = relation.context.map((id) => shortID(id) as ID);
       const isInItems = relation.items.some((item) => item.nodeID === nodeID);
       const isHeadWithChildren =
@@ -487,8 +494,9 @@ export function getSearchRelations(
   myself: PublicKey
 ): Relations {
   const rel = newRelations(searchId, List<ID>(), myself);
-  const items = foundNodeIDs.map((nodeID) => ({
-    nodeID: createAbstractRefId(List<ID>(), nodeID),
+  const uniqueNodeIDs = foundNodeIDs.toSet().toList();
+  const items = uniqueNodeIDs.map((nodeID) => ({
+    nodeID: nodeID as LongID,
     relevance: "" as Relevance,
   }));
   return { ...rel, id: searchId as LongID, items };

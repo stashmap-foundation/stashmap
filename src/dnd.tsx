@@ -24,6 +24,7 @@ import {
   planUpdateViews,
   planDeepCopyNodeWithView,
   planExpandNode,
+  getPane,
 } from "./planner";
 
 function getDropDestinationEndOfRoot(
@@ -89,6 +90,7 @@ export function dnd(
   rootRelation: LongID | undefined,
   isDiffItem?: boolean
 ): Plan {
+  console.log("dnd called", { source, to, stack, indexTo, rootRelation, isDiffItem });
   const rootView = to;
 
   const sourceViewPath = parseViewPath(source);
@@ -150,7 +152,8 @@ export function dnd(
   return sources.toList().reduce((accPlan: Plan, s: string, idx: number) => {
     const sourcePath = parseViewPath(s);
     const [sourceNodeID] = getNodeIDFromView(accPlan, sourcePath);
-    const sourceContext = getContextFromStackAndViewPath(stack, sourcePath);
+    const sourceStack = getPane(accPlan, sourcePath).stack;
+    const sourceContext = getContextFromStackAndViewPath(sourceStack, sourcePath);
     const insertAt = dropIndex !== undefined ? dropIndex + idx : undefined;
 
     return planDeepCopyNodeWithView(

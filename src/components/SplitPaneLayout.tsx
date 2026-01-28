@@ -182,6 +182,7 @@ function PaneContent(): JSX.Element {
   const { user } = useData();
   const rootNodeID = pane.stack[pane.stack.length - 1];
   const isOtherUserContent = pane.author !== user.publicKey;
+  console.log("PaneContent render", { paneIndex, paneId: pane.id, rootNodeID, stack: pane.stack });
 
   const paneClassName = isOtherUserContent
     ? "split-pane other-user-pane"

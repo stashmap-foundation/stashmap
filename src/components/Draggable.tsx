@@ -78,9 +78,8 @@ function DraggableDiffItem({ className }: { className?: string }): JSX.Element {
   return (
     <div
       ref={ref}
-      className={`item diff-item ${isDragging ? "is-dragging" : ""} ${
-        className || ""
-      }`}
+      className={`item diff-item ${isDragging ? "is-dragging" : ""} ${className || ""
+        }`}
     >
       <Node className={className} isDiffItem />
     </div>
@@ -98,11 +97,8 @@ export function ListItem({
   const isDiffItem = useIsDiffItem();
   const isInReferencedByView = useIsInReferencedByView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
-  const viewPath = useViewPath();
 
   const isReadonly = isInReferencedByView || isViewingOtherUserContent;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _unused = viewPath;
 
   // Root node (index 0) can't have siblings above it
   const isRoot = index === 0;
@@ -128,9 +124,8 @@ export function ListItem({
     drop(ref);
   }
 
-  const className = `${dragDirection === 1 ? "dragging-over-top" : ""} ${
-    dragDirection === -1 ? "dragging-over-bottom" : ""
-  }`;
+  const className = `${dragDirection === 1 ? "dragging-over-top" : ""} ${dragDirection === -1 ? "dragging-over-bottom" : ""
+    }`;
   return (
     <div className="visible-on-hover">
       <Draggable ref={ref} className={className} />

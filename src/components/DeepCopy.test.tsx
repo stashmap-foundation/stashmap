@@ -234,10 +234,18 @@ My Notes
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
     await navigateToNodeViaSearch(1, "Target");
     await screen.findByLabelText("collapse Target");
+    const targetEls = screen.getAllByText("Target");
+    console.log(">>>>>>>> Target elements count:", targetEls.length);
+    targetEls.forEach((el, i) => console.log(`Target[${i}] parent:`, el.parentElement?.className, "closest .item:", el.closest('.item')?.className));
+
+    // Get the droppable Target elements (those inside .item containers)
+    const droppableTargets = targetEls.filter(el => el.closest('.item'));
+    console.log(">>>>>>>> Droppable targets count:", droppableTargets.length);
 
     // Drag Parent from pane 0 to Target in pane 1 (cross-pane = deep copy)
     fireEvent.dragStart(screen.getAllByText("Parent")[0]);
-    fireEvent.drop(screen.getAllByText("Target")[1]);
+    // Use the second droppable target (first is pane 0, second is pane 1)
+    fireEvent.drop(droppableTargets[1]);
 
     // Parent with Child and GrandChild should be deep copied under Target
     // Pane 1 shows Target as root

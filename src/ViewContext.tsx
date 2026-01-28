@@ -1223,7 +1223,9 @@ export function getRelationsForContext(
     console.log("getRelationsForContext SEARCH", { nodeID, isRootNode, rootRelation, context: context.toArray() });
   }
   if (isRootNode && rootRelation) {
-    return getRelationsNoReferencedBy(knowledgeDBs, rootRelation, paneAuthor);
+    const result = getRelationsNoReferencedBy(knowledgeDBs, rootRelation, paneAuthor);
+    console.log("getRelationsForContext ROOT with rootRelation", { nodeID, rootRelation, paneAuthor, resultItems: result?.items.toJS() });
+    return result;
   }
   return getNewestRelationFromAuthor(knowledgeDBs, paneAuthor, nodeID, context);
 }

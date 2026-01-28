@@ -290,10 +290,12 @@ export function getRefTargetInfo(
     const stack = targetNode
       ? [...relation.context.toArray(), relation.head, targetNode]
       : [...relation.context.toArray(), relation.head];
+    // Only lock to rootRelation when opening the relation head directly.
+    // When targetNode exists, we're navigating TO that node - use its own relations for children.
     return {
       stack,
       author: relation.author,
-      rootRelation: relationID,
+      rootRelation: targetNode ? undefined : relationID,
     };
   }
 

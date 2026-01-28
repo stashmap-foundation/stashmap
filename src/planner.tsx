@@ -512,6 +512,7 @@ export function planAddToParent(
 
   const [parentNodeID, parentView] = getNodeIDFromView(plan, parentViewPath);
   const context = getContextFromStackAndViewPath(stack, parentViewPath);
+  console.log("planAddToParent", { parentNodeID, nodeIDs: nodeIDsArray, stack, context: context.toArray() });
   const planWithExpand = planExpandNode(
     plan,
     parentNodeID,

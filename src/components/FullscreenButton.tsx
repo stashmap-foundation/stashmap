@@ -24,6 +24,7 @@ export function FullscreenButton(): JSX.Element | null {
   const onClick = (): void => {
     const refInfo = getRefTargetInfo(nodeID, knowledgeDBs, user.publicKey);
     if (refInfo) {
+      console.log("FullscreenButton refInfo", { nodeID, refInfo });
       setPane({
         ...pane,
         stack: refInfo.stack,
@@ -37,6 +38,7 @@ export function FullscreenButton(): JSX.Element | null {
     const viewPathNodeIDs = viewPath
       .slice(1)
       .map((subPath) => (subPath as { nodeID: LongID | ID }).nodeID);
+    console.log("FullscreenButton fallback", { nodeID, stack, stackedWorkspaces, viewPath, viewPathNodeIDs, newStack: [...stackedWorkspaces, ...viewPathNodeIDs] });
     setPane({
       ...pane,
       stack: [...stackedWorkspaces, ...viewPathNodeIDs],

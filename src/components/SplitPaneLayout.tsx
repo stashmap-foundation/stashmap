@@ -14,7 +14,7 @@ import {
 import { LoadData } from "../dataQuery";
 import { LoadSearchData } from "../LoadSearchData";
 import { WorkspaceView } from "./Workspace";
-import { planUpdateViews, usePlanner } from "../planner";
+import { planUpdateViews, planUpdatePanes, usePlanner } from "../planner";
 import { useData } from "../DataContext";
 import { isUserLoggedIn, useLogout } from "../NostrAuthContext";
 import { DeleteWorkspace } from "./DeleteNode";
@@ -86,7 +86,7 @@ export function PaneSearchButton(): JSX.Element {
 }
 
 export function ClosePaneButton(): JSX.Element | null {
-  const { removePane, panes } = useSplitPanes();
+  const { panes } = useSplitPanes();
   const paneIndex = usePaneIndex();
   const { createPlan, executePlan } = usePlanner();
 
@@ -95,10 +95,14 @@ export function ClosePaneButton(): JSX.Element | null {
   }
 
   const handleRemovePane = (): void => {
+    if (panes.length <= 1) {
+      return;
+    }
     const plan = createPlan();
     const updatedViews = updateViewPathsAfterPaneDelete(plan.views, paneIndex);
-    executePlan(planUpdateViews(plan, updatedViews));
-    removePane(panes[paneIndex].id);
+    const newPanes = panes.filter((p) => p.id !== panes[paneIndex].id);
+    const planWithViews = planUpdateViews(plan, updatedViews);
+    executePlan(planUpdatePanes(planWithViews, newPanes));
   };
 
   return (
@@ -219,7 +223,7 @@ export function SplitPaneLayout(): JSX.Element {
   return (
     <div className="split-pane-container">
       {panes.map((pane, index) => (
-        <PaneWrapper key={pane.id} index={index} />
+        <PaneWrapper key={`${pane.id}-${index}`} index={index} />
       ))}
     </div>
   );

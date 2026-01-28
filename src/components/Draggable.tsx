@@ -98,8 +98,11 @@ export function ListItem({
   const isDiffItem = useIsDiffItem();
   const isInReferencedByView = useIsInReferencedByView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
+  const viewPath = useViewPath();
 
   const isReadonly = isInReferencedByView || isViewingOtherUserContent;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _unused = viewPath;
 
   // Root node (index 0) can't have siblings above it
   const isRoot = index === 0;

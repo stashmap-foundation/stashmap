@@ -994,8 +994,10 @@ export async function navigateToNodeViaSearch(
   );
   // Wait for search results with references to load
   await waitFor(async () => {
-    const tree = await getTreeStructure();
-    expect(tree).toMatch(new RegExp(`→.*${nodeName}`, "i"));
+    const navigateButtons = screen.queryAllByRole("button", {
+      name: new RegExp(`Navigate to.*${nodeName}`, "i"),
+    });
+    expect(navigateButtons.length).toBeGreaterThan(0);
   });
   // Click on the first reference to navigate (NodeAutoLink wraps refs in clickable button)
   // Use findAllByRole since there may be multiple references to the same node
@@ -1003,10 +1005,13 @@ export async function navigateToNodeViaSearch(
     name: new RegExp(`Navigate to.*${nodeName}`, "i"),
   });
   await userEvent.click(navigateButtons[0]);
-  // Wait for navigation to complete
+  // Wait for navigation to complete - look for expand/collapse button for the node
+  // Use findAllByLabelText since multiple panes may have the same node
   await waitFor(async () => {
-    const tree = await getTreeStructure();
-    expect(tree.startsWith(nodeName)).toBe(true);
+    const buttons = screen.queryAllByLabelText(
+      new RegExp(`(expand|collapse) ${nodeName}`)
+    );
+    expect(buttons.length).toBeGreaterThan(0);
   });
 }
 

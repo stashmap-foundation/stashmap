@@ -399,12 +399,16 @@ describe("Diff item relevance selection", () => {
     const { publicKey: alicePK } = alice().user;
     const { publicKey: bobPK } = bob().user;
 
-    // Alice creates Parent
+    // Alice creates Parent with a child (needed for search to find it as a reference)
     const parent = newNode("Parent");
-    const aliceRelations = newRelations(parent.id, List(), alicePK);
+    const aliceChild = newNode("Alice Child");
+    const aliceRelations = addRelationToRelations(
+      newRelations(parent.id, List(), alicePK),
+      aliceChild.id
+    );
 
     const alicePlan = planUpsertRelations(
-      planUpsertNode(createPlan(alice()), parent),
+      planUpsertNode(planUpsertNode(createPlan(alice()), parent), aliceChild),
       aliceRelations
     );
     await execute({ ...alice(), plan: alicePlan });
@@ -451,12 +455,16 @@ describe("Diff item relevance selection", () => {
     const { publicKey: alicePK } = alice().user;
     const { publicKey: bobPK } = bob().user;
 
-    // Alice creates Parent
+    // Alice creates Parent with a child (needed for search to find it as a reference)
     const parent = newNode("Parent");
-    const aliceRelations = newRelations(parent.id, List(), alicePK);
+    const aliceChild = newNode("Alice Child");
+    const aliceRelations = addRelationToRelations(
+      newRelations(parent.id, List(), alicePK),
+      aliceChild.id
+    );
 
     const alicePlan = planUpsertRelations(
-      planUpsertNode(createPlan(alice()), parent),
+      planUpsertNode(planUpsertNode(createPlan(alice()), parent), aliceChild),
       aliceRelations
     );
     await execute({ ...alice(), plan: alicePlan });

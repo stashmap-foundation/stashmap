@@ -498,9 +498,10 @@ export function getPaneIndex(viewContext: ViewPath): number {
 
 export function getViewFromPath(data: Data, path: ViewPath): View {
   const { nodeID } = getLast(path);
+  const paneAuthor = getPane(data, path).author;
   return (
     getViewExactMatch(data.views, path) ||
-    getDefaultView(nodeID, data.knowledgeDBs, data.user.publicKey)
+    getDefaultView(nodeID, data.knowledgeDBs, paneAuthor)
   );
 }
 
@@ -576,20 +577,21 @@ export function getRelationForView(
 ): Relations | undefined {
   const [nodeID, view] = getNodeIDFromView(data, viewPath);
   const context = getContextFromStackAndViewPath(stack, viewPath);
+  const paneAuthor = getPane(data, viewPath).author;
 
   // Handle REFERENCED_BY specially - it's not context-based
   if (view.relations === REFERENCED_BY) {
     return getRelations(
       data.knowledgeDBs,
       REFERENCED_BY,
-      data.user.publicKey,
+      paneAuthor,
       nodeID
     );
   }
 
   return getActiveRelationForNode(
     data.knowledgeDBs,
-    data.user.publicKey,
+    paneAuthor,
     nodeID,
     context,
     view.relations

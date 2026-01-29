@@ -92,7 +92,8 @@ function ExpandCollapseToggle(): JSX.Element | null {
   const onToggleExpanded = useOnToggleExpanded();
   const isReferencedByRoot = isReferencedByView(view);
   const isInReferencedByView = useIsInReferencedByView();
-  const showReferencedByStyle = isReferencedByRoot || isInReferencedByView;
+  const isSearchNode = isSearchId(nodeID as ID);
+  const showReferencedByStyle = isReferencedByRoot || isInReferencedByView || isSearchNode;
 
   const isExpanded = useIsExpanded();
   const isEmptyNode = isEmptyNodeID(nodeID);
@@ -683,8 +684,10 @@ export function Node({
 
   // Check if this node is the root of a Referenced By view
   const isReferencedByRoot = isReferencedByView(view);
-  // Show background for both the root and children in Referenced By view
-  const showReferencedByBackground = isReferencedByRoot || isInReferencedByView;
+  // Check if this is a search node
+  const isSearchNode = isSearchId(nodeID as ID);
+  // Show background for Referenced By views and search results
+  const showReferencedByBackground = isReferencedByRoot || isInReferencedByView || isSearchNode;
 
   // Abstract refs can be expanded to show concrete refs
   const isAbstractRef = isAbstractRefId(nodeID);

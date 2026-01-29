@@ -8,14 +8,17 @@ export function NodeIcon({
   if (nodeType === "reference") {
     return (
       <span
-        className="iconsminds-link reference-icon"
+        className="reference-icon"
         title="Reference"
+        aria-hidden="true"
         style={{
           marginRight: "6px",
           fontSize: "0.9em",
-          color: "#6c8ebf",
+          color: "var(--violet)",
         }}
-      />
+      >
+        ⤶
+      </span>
     );
   }
   return null;

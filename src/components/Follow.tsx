@@ -179,7 +179,7 @@ export function Follow(): JSX.Element {
                         pasteFromClipboard(inputElementAriaLabel, setInput)
                       }
                     >
-                      <span className="iconsminds-file-clipboard" />
+                      <span aria-hidden="true">⎘</span>
                     </Button>
                   </div>
                 </div>
@@ -257,7 +257,7 @@ export function Follow(): JSX.Element {
               disabled={!isFollowing}
               type="button"
             >
-              <span className="simple-icon-user-unfollow d-block" />
+              <span className="d-block" aria-hidden="true">👤−</span>
             </Button>
           </div>
           <div className="ms-2">
@@ -268,7 +268,7 @@ export function Follow(): JSX.Element {
               disabled={isFollowing}
               type="button"
             >
-              <span className="simple-icon-user-follow d-block" />
+              <span className="d-block" aria-hidden="true">👤+</span>
             </Button>
           </div>
         </div>

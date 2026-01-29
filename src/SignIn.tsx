@@ -292,7 +292,7 @@ export function SignInMenuBtn(): JSX.Element | null {
       onClick={() => navigate("/signin")}
     >
       {unsavedChanges && <span style={{ color: "red" }}>Sign in to Save</span>}
-      {!unsavedChanges && <span className="simple-icon-login" />}
+      {!unsavedChanges && <span aria-hidden="true">↪</span>}
     </Button>
   );
 }

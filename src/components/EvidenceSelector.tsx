@@ -12,8 +12,13 @@ function getArgumentColor(argument: Argument, isHovered: boolean): string {
   if (argument === "contra") {
     return TYPE_COLORS.contra;
   }
-  // No argument set - show inactive, slightly highlighted on hover
-  return isHovered ? "#b0b0b0" : TYPE_COLORS.inactive;
+  return isHovered ? "var(--base00)" : "var(--base01)";
+}
+
+function getArgumentSymbol(argument: Argument): string {
+  if (argument === "confirms") return "✓";
+  if (argument === "contra") return "✗";
+  return "";
 }
 
 function getNextArgument(current: Argument): Argument {
@@ -47,42 +52,34 @@ export function EvidenceSelector(): JSX.Element | null {
   };
 
   return (
-    <div
+    <span
       className="evidence-selector"
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        padding: "2px 6px",
-        borderRadius: "12px",
-        backgroundColor: "rgba(0,0,0,0.04)",
-        cursor: "pointer",
-      }}
+      onClick={handleClick}
+      onMouseDown={preventEditorBlurIfSameNode}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      role="button"
+      tabIndex={0}
+      aria-label={`Evidence for ${nodeName}: ${getArgumentLabel(
+        currentArgument
+      )}`}
       title={getArgumentLabel(currentArgument)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleClick();
+        }
+      }}
+      style={{
+        cursor: "pointer",
+        color: getArgumentColor(currentArgument, isHovered),
+        transition: "color 0.15s ease",
+        fontSize: "1rem",
+        fontWeight: "bold",
+        marginRight: "4px",
+      }}
     >
-      <span
-        onClick={handleClick}
-        onMouseDown={preventEditorBlurIfSameNode}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        role="button"
-        tabIndex={0}
-        aria-label={`Evidence for ${nodeName}: ${getArgumentLabel(
-          currentArgument
-        )}`}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            handleClick();
-          }
-        }}
-        style={{
-          width: "18px",
-          height: "18px",
-          borderRadius: "50%",
-          backgroundColor: getArgumentColor(currentArgument, isHovered),
-          transition: "all 0.15s ease",
-        }}
-      />
-    </div>
+      {getArgumentSymbol(currentArgument)}
+    </span>
   );
 }

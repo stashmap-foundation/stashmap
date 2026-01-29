@@ -1,17 +1,6 @@
 @import "./assets/css/sass/_mixins.scss";
 @import "./triangle_mixin.scss";
 
-$theme-color-blue: #145388;
-$warning-color: #b69329;
-
-$light-color: rgb(239, 243, 244);
-$dark-gray: rgba(200, 200, 200, 1);
-
-$border-strong: 1px solid $dark-gray;
-$border-light: 1px solid $light-color;
-
-$font: "Nunito", sans-serif;
-
 $ph-gutter: 10;
 $ph-border: 0;
 @import "../node_modules/placeholder-loading/src/scss/placeholder-loading.scss";
@@ -24,38 +13,34 @@ body {
   position: relative;
   height: 100%;
   overflow: hidden;
-  font-size: 16px;
-  font-family: $font;
-  font-weight: 400;
-  line-height: 1.5rem;
 }
 
 .border-strong {
-  border: $border-strong
+  border: none;
 }
 
 .border-top-strong {
-  border-top: $border-strong;
+  border-top: none;
 }
 
 .border-bottom-strong {
-  border-bottom: $border-strong;
+  border-bottom: none;
 }
 
 .border-right-strong {
-  border-right: $border-strong;
+  border-right: none;
 }
 
 .border-bottom-light {
-  border-bottom: $border-light;
+  border-bottom: none;
 }
 
 .background-dark {
-  background: $dark-gray;
+  background: var(--base02);
 }
 
 .background-white {
-  background-color: white;
+  background-color: var(--base03);
 }
 
 .background-transparent {
@@ -63,35 +48,35 @@ body {
 }
 
 // =============================================================================
-// PANE LAYOUT - Clean Notion-style design
+// PANE LAYOUT - Solarized calm design
 // =============================================================================
 
 .pane-wrapper {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background-color: #ffffff;
+  background-color: var(--base03);
   position: relative;
 }
 
 // Other user's content - subtle left accent
 .pane-other-user {
-  border-left: 3px solid #d4826a;
+  border-left: 3px solid var(--orange);
 
   .pane-header {
-    background-color: #fdf8f6;
+    background-color: var(--base03);
   }
 }
 
-// Header bar - always visible, consistent position
+// Header bar - minimal, consistent position
 .pane-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 8px 16px;
   min-height: 44px;
-  background-color: #fafafa;
-  border-bottom: 1px solid #eee;
+  background-color: var(--base03);
+  border-bottom: none;
   flex-shrink: 0;
 }
 
@@ -116,7 +101,7 @@ body {
   align-items: center;
   gap: 4px;
   font-size: 14px;
-  color: #6b6b6b;
+  color: var(--base00);
   min-width: 0;
   overflow: hidden;
 }
@@ -127,7 +112,7 @@ body {
   padding: 2px 4px;
   margin: 0;
   font-size: 14px;
-  color: #6b6b6b;
+  color: var(--base00);
   cursor: pointer;
   border-radius: 3px;
   white-space: nowrap;
@@ -136,18 +121,18 @@ body {
   max-width: 150px;
 
   &:hover {
-    background-color: #f0f0f0;
-    color: #333;
+    background-color: var(--base02);
+    color: var(--base1);
   }
 }
 
 .breadcrumb-separator {
-  color: #ccc;
+  color: var(--base01);
   flex-shrink: 0;
 }
 
 .breadcrumb-current {
-  color: #333;
+  color: var(--base1);
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -159,6 +144,7 @@ body {
   flex: 1;
   overflow-y: auto;
   position: relative;
+  padding: 16px;
 }
 
 // Header button styles
@@ -169,12 +155,12 @@ body {
     min-height: auto;
     border: none;
     background: transparent;
-    color: #6b6b6b;
+    color: var(--base00);
     font-size: 14px;
 
     &:hover {
-      background-color: #f0f0f0;
-      color: #333;
+      background-color: var(--base03);
+      color: var(--base1);
     }
 
     &:focus {
@@ -199,11 +185,12 @@ body {
     scroll-snap-type: x mandatory;
   }
   grid-auto-flow: column;
-  grid-gap: 8px;
+  grid-gap: 1px;
   padding-left: 8px;
   padding-bottom: 8px;
   overflow-x: scroll;
   position: relative;
+  background-color: var(--base01);
 }
 
 .btn {
@@ -211,29 +198,32 @@ body {
   padding: 5px;
   min-width: 38px;
   min-height: 35px;
-  font-size: 1rem;
+  font-size: 1.1rem;
+  border: none;
+  background: transparent;
+  color: var(--base01);
+  transition: color 150ms ease;
 
   &:not(.btn-primary):not(.btn-success):not(.btn-outline-dark) {
     &:hover,
     &:active {
-      background: $dark-gray;
+      background: transparent;
+      color: var(--base0);
     }
   }
-
-  border: $border-strong;
 }
 
 .pressed {
-  box-shadow: inset 3px rgba(0, 0, 0, 0.125);
-  background-color: rgba(200, 200, 200, 0.5);
-  border: inset 1px black;
+  background-color: var(--base02);
+  border: 1px solid var(--base01);
 }
 
 .input-group:focus-within,
 .dropdown-toggle:focus,
 .dropdown-item:focus,
 .btn:focus {
-  box-shadow: 0 0 0 0.08rem rgba(0, 0, 0, 0.5) !important;
+  box-shadow: none !important;
+  background-color: var(--base02);
 }
 
 .btn-borderless {
@@ -264,6 +254,7 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
+  background-color: var(--base03);
   @include respond-below(xs) {
       scroll-snap-align: start;
   }
@@ -324,16 +315,19 @@ body {
   border: 0px;
   width: 100%;
   text-align: left;
-  background: white;
+  background: var(--base03);
+  color: var(--base01);
+  transition: color 150ms ease;
 
   &:hover,
   &:active {
-    background: $light-color;
+    background: var(--base02);
+    color: var(--base0);
   }
 }
 
 .outer-node-title {
-  border-bottom: $border-strong;
+  border-bottom: none;
   font-size: 20px;
 }
 
@@ -362,13 +356,13 @@ body {
 
 .editor {
   border-radius: 3px;
-  font-family: $font;
+  font-family: system-ui, -apple-system, sans-serif;
   font-size: 16px;
 }
 
 .editor .ql-container {
   font-size: 16px;
-  font-family: $font;
+  font-family: system-ui, -apple-system, sans-serif;
 }
 
 .ql-editor {
@@ -377,13 +371,13 @@ body {
 
 .ql-editor.ql-blank::before {
   left: 0 !important;
-  color: grey;
-  font-family: $font;
+  color: var(--base01);
+  font-family: system-ui, -apple-system, sans-serif;
   font-size: 16px;
 }
 
 .dragging-over {
-  background-color: #ebecf0;
+  background-color: var(--base02);
   height: 64px;
 }
 
@@ -400,15 +394,14 @@ body {
 }
 
 .outer-node {
-  border: $border-strong;
-  border-radius: 3px;
+  border: none;
+  border-radius: 0;
   flex-grow: 0;
-  background-color: white;
+  background-color: var(--base03);
 }
 
 .workspace-columns .outer-node {
-  border-left-width: 2px;
-  border-left-color: $dark-gray;
+  border: none;
 }
 
 .knowledge-exchange .outer-node {
@@ -430,15 +423,11 @@ body {
 }
 
 .modal .modal-header {
-    border-bottom: $border-strong;
+    border-bottom: none;
 }
 
 .modal-node-title .inner-node {
   border-bottom: none;
-}
-
-.inner-node {
-  //border-bottom: $border-light;
 }
 
 .modal-header {
@@ -448,27 +437,29 @@ body {
 
 .modal-content {
   border-radius: 0px;
+  background-color: var(--base03);
+  color: var(--base0);
 }
 
 .hover-light-bg {
   &:hover {
-    background: $light-color;
+    background: var(--base02);
 
     .ph-item {
-        background: $light-color;
+        background: var(--base02);
     }
   }
 }
 
 .black-dimmed {
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--base00);
 }
 
 .hover-black-dimmed {
   background: transparent;
   transition: none !important;
   &:hover {
-    color: rgb(0, 0, 0) !important;
+    color: var(--base1) !important;
     opacity: 1 !important;
   }
 }
@@ -490,11 +481,11 @@ body {
 }
 
 .danger {
-  color: red;
+  color: var(--red);
 }
 
 .success {
-  color: green;
+  color: var(--green);
 }
 
 .icon-large {
@@ -514,14 +505,41 @@ body {
 }
 
 .dropdown-menu {
-  border-radius: 3px;
+  border-radius: 4px;
+  background: var(--base02);
+  border: 1px solid var(--base01);
+  box-shadow: none;
+}
+
+.dropdown-item {
+  color: var(--base0);
+
+  &:hover,
+  &:focus {
+    background: var(--base03);
+    color: var(--base1);
+  }
+
+  &:active {
+    background: var(--base03);
+    color: var(--base1);
+  }
+}
+
+.dropdown-divider {
+  border-color: var(--base01);
 }
 
 .search-input {
   outline: none;
+  background: var(--base03);
+  color: var(--base0);
+  border: 1px solid var(--base01);
+
    &:active,
    &:focus {
     outline: none;
+    background: var(--base02);
    }
 }
 
@@ -534,11 +552,13 @@ body {
   border: 0px;
   background-color: transparent;
   padding: 0px;
+  color: var(--base01);
+  transition: color 150ms ease;
 
   &:hover,
   &:focus,
   &:active {
-  border-radius: 50%;
+    color: var(--base0);
   }
 }
 
@@ -555,7 +575,7 @@ body {
 }
 
 .vl {
-  border-left: 2px solid rgba(0, 0, 0, 0.1);
+  border-left: 2px solid var(--base01);
   position: absolute;
   top: 0px;
   bottom: 0px;
@@ -569,7 +589,7 @@ body {
   padding: 2px 2px;
   display: flex;
   flex-wrap: nowrap;
-  background-color: white;
+  background-color: var(--base03);
 }
 
 .navbar .navbar-left {
@@ -595,18 +615,17 @@ body {
   .dropdown-submenu-toggle {
     padding: 0.75rem 0.75rem;
     border: 0;
-    background: white;
-    color: #212121;
+    background: var(--base02);
+    color: var(--base0);
 
     &:hover,
     &:focus {
-      background: #f8f8f8;
-      background-color: #f8f8f8;
-      color: #212121;
+      background: var(--base03);
+      color: var(--base1);
     }
     &.active,
     &:active {
-      color: #212121;
+      color: var(--base1);
       text-decoration: none;
     }
   }
@@ -635,7 +654,7 @@ body {
   }
 
   .dropdown-item-border-bottom {
-    border-bottom: solid thin;
+    border-bottom: 1px solid var(--base01);
   }
 }
 
@@ -655,7 +674,7 @@ body {
 }
 
 .font-size-small {
-  font-family: $font;
+  font-family: system-ui, -apple-system, sans-serif;
   font-size: 0.8rem;
 }
 
@@ -673,11 +692,14 @@ body {
     position: absolute;
     top: 1px;
     height: min-content;
+    opacity: 0;
     visibility: hidden;
     display: flex;
     gap: 2px;
+    transition: opacity 150ms ease;
 
     .always-visible {
+      opacity: 1;
       visibility: visible;
       display: flex;
       gap: 2px;
@@ -687,15 +709,18 @@ body {
       padding: 2px 4px;
       min-width: 28px;
       min-height: 28px;
+      color: var(--base01);
 
       &:hover {
-        background-color: rgba(0, 0, 0, 0.1);
+        background-color: var(--base02);
+        color: var(--base0);
       }
     }
   }
 
   &:hover {
     .on-hover-menu {
+      opacity: 1;
       visibility: visible;
     }
   }
@@ -711,9 +736,14 @@ body {
 
 .btn-close {
   font-size: 1.5rem;
+  color: var(--base01);
 
   &:after {
-    content: "✕";
+    content: "\00d7";
+  }
+
+  &:hover {
+    color: var(--base0);
   }
 
   &.small {
@@ -731,13 +761,13 @@ body {
 }
 
 .workspace-selection-text {
-  font-family: $font;
+  font-family: system-ui, -apple-system, sans-serif;
   font-size: 18px;
   margin-left: 5px;
 }
 
 .navbar-title {
-  font-family: $font;
+  font-family: system-ui, -apple-system, sans-serif;
   font-size: 18px;
   overflow: hidden;
   justify-content: end;
@@ -745,9 +775,9 @@ body {
 
 .project-selection {
   padding-left: 5px;
-  font-family: $font;
+  font-family: system-ui, -apple-system, sans-serif;
   font-size: 24px;
-  color: black;
+  color: var(--base1);
 }
 
 .circle-picker {
@@ -756,7 +786,7 @@ body {
 
 
 .black-muted {
-  color: rgba(0, 0, 0, 0.8);
+  color: var(--base00);
 }
 
 .white-space-normal {
@@ -794,7 +824,7 @@ to {
 .vertical-line {
   width: 1px;
   height: 100%;
-  background-color: $light-color;
+  background-color: var(--base01);
 }
 
 .menu-layout {
@@ -880,11 +910,11 @@ to {
 }
 
 .dragging-over-top {
-  box-shadow: inset 0 2px 0 $theme-color-blue;
+  box-shadow: inset 0 2px 0 var(--blue);
 }
 
 .dragging-over-bottom {
-  box-shadow: inset 0 -2px 0 $theme-color-blue;
+  box-shadow: inset 0 -2px 0 var(--blue);
 }
 
 .no-shadow {
@@ -916,9 +946,6 @@ to {
     display: none !important;
 }
 
-// Diff items - nodes from other users that aren't in current user's list
-// Styling is now handled inline via the DiffItemIndicator badge
-
 // =============================================================================
 // SPLIT PANE LAYOUT
 // =============================================================================
@@ -929,7 +956,7 @@ to {
   height: 100%;
   width: 100%;
   gap: 1px;
-  background-color: #e5e5e5;
+  background-color: var(--base01);
   overflow-x: auto;
 }
 
@@ -939,7 +966,7 @@ to {
   position: relative;
   display: flex;
   flex-direction: column;
-  background-color: white;
+  background-color: var(--base03);
   overflow: hidden;
 
   &:first-child {
@@ -956,10 +983,13 @@ to {
 .split-pane-add {
   flex-shrink: 0;
   align-self: center;
+  color: var(--base01);
   opacity: 0.6;
+  transition: opacity 150ms ease;
 
   &:hover {
     opacity: 1;
+    color: var(--base0);
   }
 }
 
@@ -976,12 +1006,13 @@ to {
   justify-content: center;
   width: 16px;
   min-width: 16px;
-  color: rgba(0, 0, 0, 0.5);
+  color: var(--base01);
   font-size: 10px;
   line-height: 1;
+  transition: color 150ms ease;
 
   &:hover {
-    color: rgba(0, 0, 0, 0.8);
+    color: var(--base0);
   }
 
   .triangle {
@@ -1000,7 +1031,9 @@ to {
   padding-top: 2px;
 
   > * {
-    visibility: hidden; 
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 150ms ease;
   }
 
   // Force consistent height on all elements
@@ -1019,9 +1052,11 @@ to {
     border: none;
     background: transparent;
     line-height: 1;
+    color: var(--base01);
 
     &:hover {
       background: transparent;
+      color: var(--base0);
     }
 
     &:focus {
@@ -1047,6 +1082,7 @@ to {
 }
 
 .visible-on-hover:hover .left-menu > * {
+  opacity: 1;
   visibility: visible;
 }
 
@@ -1074,7 +1110,9 @@ to {
   padding-top: 2px;
 
   > * {
+    opacity: 0;
     visibility: hidden;
+    transition: opacity 150ms ease;
   }
 
   // Force consistent height on all elements
@@ -1093,9 +1131,11 @@ to {
     border: none;
     background: transparent;
     line-height: 1;
+    color: var(--base01);
 
     &:hover {
       background: transparent;
+      color: var(--base0);
     }
 
     &:focus {
@@ -1105,6 +1145,7 @@ to {
 }
 
 .visible-on-hover:hover .right-menu > * {
+  opacity: 1;
   visibility: visible;
 }
 
@@ -1117,7 +1158,9 @@ to {
 .inline-node-actions {
   display: inline;
   margin-left: 4px;
+  opacity: 0;
   visibility: hidden;
+  transition: opacity 150ms ease;
 
   .btn {
     padding: 0 2px;
@@ -1127,17 +1170,140 @@ to {
     border: none;
     background: transparent;
     font-size: 0.85rem;
-    color: rgba(0, 0, 0, 0.4);
+    color: var(--base01);
     vertical-align: middle;
 
     &:hover {
       background: transparent;
-      color: rgba(0, 0, 0, 0.7);
+      color: var(--base0);
     }
   }
 }
 
 .visible-on-hover:hover .inline-node-actions {
+  opacity: 1;
   visibility: visible;
 }
 
+// Node focused state - subtle background
+.node-focused {
+  background-color: var(--base02);
+}
+
+// Editable focus state
+input:focus,
+[contenteditable]:focus {
+  outline: none;
+  background-color: var(--base02);
+}
+
+// Form controls
+.form-control {
+  background-color: var(--base03);
+  color: var(--base0);
+  border: 1px solid var(--base01);
+
+  &:focus {
+    background-color: var(--base02);
+    color: var(--base0);
+    border-color: var(--base01);
+    box-shadow: none;
+  }
+
+  &:disabled {
+    background-color: var(--base02);
+    color: var(--base00);
+  }
+}
+
+// Card styling - no borders, content breathes
+.card {
+  background-color: var(--base03);
+  border: none;
+}
+
+// Modal styling
+.modal-header,
+.modal-footer {
+  background-color: var(--base02);
+  border-color: var(--base01);
+}
+
+.modal-body {
+  background-color: var(--base03);
+}
+
+// Button variants
+.btn-primary {
+  background-color: var(--blue);
+  border-color: var(--blue);
+  color: var(--base03);
+
+  &:hover,
+  &:focus,
+  &:active {
+    background-color: var(--blue);
+    border-color: var(--blue);
+    filter: brightness(1.1);
+  }
+}
+
+.btn-success {
+  background-color: var(--green);
+  border-color: var(--green);
+  color: var(--base03);
+
+  &:hover,
+  &:focus,
+  &:active {
+    background-color: var(--green);
+    border-color: var(--green);
+    filter: brightness(1.1);
+  }
+}
+
+.btn-outline-dark {
+  border-color: var(--base01);
+  color: var(--base0);
+
+  &:hover {
+    background-color: var(--base02);
+    color: var(--base1);
+  }
+}
+
+// Reference link button
+.reference-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: inherit;
+}
+
+// Search input inline
+.search-input-inline {
+  background: var(--base03);
+  color: var(--base0);
+  border: 1px solid var(--base01);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 14px;
+
+  &:focus {
+    outline: none;
+    background: var(--base02);
+  }
+}
+
+// Progress bar
+.progress-bar {
+  background-color: var(--green);
+}
+
+.progress {
+  background-color: var(--base02);
+}

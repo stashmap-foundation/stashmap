@@ -22,8 +22,8 @@ export function ToggleArrowButton({
       className="toggle-button"
       aria-label={aria}
     >
-      {!expanded && <span className="simple-icon-arrow-right" />}
-      {expanded && <span className="simple-icon-arrow-down" />}
+      {!expanded && <span aria-hidden="true">▶</span>}
+      {expanded && <span aria-hidden="true">▼</span>}
       {children && children}
     </button>
   );

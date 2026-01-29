@@ -69,7 +69,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
       onClick={onClick}
       title="Open in new split pane"
     >
-      <span className="iconsminds-left-to-right" />
+      <span aria-hidden="true">⊞</span>
     </button>
   );
 }
@@ -109,7 +109,7 @@ export function OpenInSplitPaneButtonWithStack({
       onClick={onClick}
       title="Open in new split pane"
     >
-      <span className="iconsminds-left-to-right" />
+      <span aria-hidden="true">⊞</span>
     </button>
   );
 }
@@ -144,7 +144,7 @@ export function NewPaneButton(): JSX.Element | null {
       onClick={onClick}
       title="Open new pane"
     >
-      <span className="iconsminds-left-to-right" />
+      <span aria-hidden="true">⊞</span>
     </button>
   );
 }

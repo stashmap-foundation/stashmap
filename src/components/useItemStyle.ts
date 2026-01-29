@@ -28,9 +28,9 @@ function getRelevanceTextStyle(relevance: Relevance): CSSProperties {
     case "": // Maybe relevant (default) - normal text
       return {};
     case "little_relevant":
-      return { opacity: 0.5 };
+      return { color: "var(--base01)" };
     case "not_relevant":
-      return { opacity: 0.4, textDecoration: "line-through" };
+      return { textDecoration: "line-through", color: "var(--base01)" };
     default:
       return {};
   }

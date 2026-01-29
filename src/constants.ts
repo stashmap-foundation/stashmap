@@ -16,16 +16,16 @@ export const DEFAULT_TYPE_FILTERS: (Relevance | Argument | "suggestions")[] = [
   "suggestions",
 ];
 
-// Colors for relevance and argument types
+// Solarized accent colors for relevance and argument types
 export const TYPE_COLORS = {
-  relevant: "#0288d1",
-  maybe_relevant: "#00acc1",
-  little_relevant: "#26c6da",
-  not_relevant: "#757575", // Gray for not relevant
-  confirms: "#2e7d32",
-  contra: "#c62828",
-  other_user: "#d4826a", // Coral for other user's content badge
-  other_user_bg: "#ffebe5", // Light coral/peach background for other user's content
-  referenced_by: "#9c27b0", // Purple for Referenced By view
-  inactive: "#d0d0d0",
+  relevant: "#268bd2",     // Blue - primary, relevant
+  maybe_relevant: "#2aa198", // Cyan - maybe relevant
+  little_relevant: "#b58900", // Yellow - little relevant
+  not_relevant: "#93a1a1", // Base01 - muted
+  confirms: "#859900",     // Green - confirms, success
+  contra: "#dc322f",       // Red - contra, errors
+  other_user: "#cb4b16",   // Orange - other user content
+  other_user_bg: "#cb4b1620", // Orange with transparency
+  referenced_by: "#6c71c4", // Violet - referenced by
+  inactive: "#eee8d5",     // Base02 - inactive/chrome
 };

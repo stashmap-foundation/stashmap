@@ -98,8 +98,8 @@ function ExpandCollapseToggle(): JSX.Element | null {
   const isExpanded = useIsExpanded();
   const isEmptyNode = isEmptyNodeID(nodeID);
 
-  const baseColor = showReferencedByStyle ? TYPE_COLORS.referenced_by : "black";
-  const color = isEmptyNode ? "#ccc" : baseColor;
+  const baseColor = showReferencedByStyle ? TYPE_COLORS.referenced_by : "var(--base01)";
+  const color = isEmptyNode ? "var(--base02)" : baseColor;
 
   const onToggle = (): void => {
     if (isEmptyNode) return;
@@ -119,9 +119,6 @@ function ExpandCollapseToggle(): JSX.Element | null {
       aria-expanded={isExpanded}
       style={{
         color,
-        backgroundColor: showReferencedByStyle
-          ? "rgba(100, 140, 180, 0.1)"
-          : undefined,
         cursor: isEmptyNode ? "default" : "pointer",
       }}
     >
@@ -637,23 +634,13 @@ function DiffItemIndicator(): JSX.Element {
       className="diff-indicator"
       title="Suggestion from other users"
       style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "3px",
-        padding: "1px 6px",
-        marginRight: "6px",
-        borderRadius: "10px",
-        backgroundColor: `${TYPE_COLORS.other_user}40`,
         color: TYPE_COLORS.other_user,
-        fontSize: "0.75rem",
-        fontWeight: 500,
+        marginRight: "6px",
+        fontSize: "1rem",
       }}
+      aria-hidden="true"
     >
-      <span
-        className="iconsminds-business-man"
-        style={{ fontSize: "0.8rem" }}
-      />
-      Suggestion
+      ●
     </span>
   );
 }
@@ -699,21 +686,18 @@ export function Node({
   // Never show for concrete refs - they are terminal nodes
   const showExpandCollapse = !isDiffItem && !isConcreteRef && (!isInReferencedByView || isAbstractRef);
 
-  // Background color for Referenced By view
-  const referencedByBgColor = "rgba(100, 140, 180, 0.1)";
-  // Background style for content area based on view type
-  const getContentBackgroundStyle = (): React.CSSProperties | undefined => {
+  // Styling for Referenced By view - violet color, no background
+  // Diff items just get orange text, no background
+  const getContentStyle = (): React.CSSProperties | undefined => {
     if (isDiffItem) {
-      return { backgroundColor: TYPE_COLORS.other_user_bg };
+      return { color: TYPE_COLORS.other_user };
     }
     if (showReferencedByBackground) {
-      return { backgroundColor: referencedByBgColor };
+      return { color: TYPE_COLORS.referenced_by };
     }
     return undefined;
   };
-  const contentBackgroundStyle = getContentBackgroundStyle();
-  // For children in Referenced By, color the last indent level to align with content
-  const indentBgColor = isInReferencedByView ? referencedByBgColor : undefined;
+  const contentBackgroundStyle = getContentStyle();
 
   return (
     <EditorTextProvider>
@@ -727,7 +711,6 @@ export function Node({
         {levels > 0 && (
           <Indent
             levels={levels}
-            backgroundColor={indentBgColor}
             colorLevels={referencedByDepth}
           />
         )}
@@ -742,7 +725,6 @@ export function Node({
             style={{
               color: "transparent",
               cursor: "default",
-              backgroundColor: indentBgColor,
             }}
           >
             <span className="triangle collapsed">▶</span>

@@ -52,10 +52,12 @@ export function ReferenceIndicators({
       }}
     >
       <span
-        className="iconsminds-business-man"
         title="Content from another user"
+        aria-hidden="true"
         style={{ marginRight: "4px" }}
-      />
+      >
+        👤
+      </span>
     </span>
   );
 }

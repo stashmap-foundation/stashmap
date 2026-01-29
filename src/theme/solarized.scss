@@ -1,0 +1,85 @@
+// Solarized Theme
+// A calm, focused interface that disappears so you can think.
+
+:root {
+  // Light theme (default)
+  --base03: #fdf6e3; // Background (cream)
+  --base02: #eee8d5; // Chrome/hover/focus
+  --base01: #93a1a1; // Muted text, borders
+  --base00: #839496; // Secondary text
+  --base0: #657b83;  // Body text
+  --base1: #586e75;  // Primary/emphasized text
+
+  // Accent colors (same in both themes)
+  --red: #dc322f;     // Contra, errors, remove
+  --green: #859900;   // Confirms, success
+  --yellow: #b58900;  // Warnings
+  --blue: #268bd2;    // Primary, links, relevant
+  --cyan: #2aa198;    // Maybe relevant
+  --orange: #cb4b16;  // Other user content
+  --violet: #6c71c4;  // Referenced By
+  --magenta: #d33682; // Special highlights
+}
+
+.dark-theme {
+  --base03: #002b36; // Background (dark blue)
+  --base02: #073642; // Chrome/hover/focus
+  --base01: #586e75; // Muted text, borders
+  --base00: #657b83; // Secondary text
+  --base0: #839496;  // Body text
+  --base1: #93a1a1;  // Primary/emphasized text
+}
+
+// Base layout - critical for content to render
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--base03);
+  color: var(--base0);
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+#root {
+  height: 100%;
+}
+
+// Custom scrollbar styling
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--base02);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--base01);
+}
+
+// Focus states - subtle, calm
+*:focus {
+  outline: none;
+}
+
+// Progressive disclosure - controls fade in on hover
+.node-controls {
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.node-row:hover .node-controls,
+.visible-on-hover:hover .node-controls {
+  opacity: 1;
+}

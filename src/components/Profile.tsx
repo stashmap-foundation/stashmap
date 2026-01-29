@@ -54,11 +54,9 @@ function UserPublicIdentifier({
               className="btn-borderless background-white"
               onClick={copyToClipboard}
             >
-              <span
-                className={
-                  showCopiedSuccess ? "iconsminds-yes" : "iconsminds-files"
-                }
-              />
+              <span aria-hidden="true">
+                {showCopiedSuccess ? "✓" : "⎘"}
+              </span>
             </Button>
             <Button
               className={`btn btn-borderless ${
@@ -66,7 +64,7 @@ function UserPublicIdentifier({
               }`}
               onClick={toggleQrCode}
             >
-              <span className="iconsminds-qr-code" />
+              <span aria-hidden="true">▣</span>
             </Button>
           </div>
         </div>

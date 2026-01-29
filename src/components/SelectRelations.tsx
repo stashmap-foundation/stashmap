@@ -113,8 +113,9 @@ export function ReferencedByToggle(): JSX.Element | null {
       onClick={onClick}
       aria-label={ariaLabel}
       title={isInReferencedBy ? "Show children" : "Show references"}
+      style={{ color: "var(--violet)" }}
     >
-      <span className="iconsminds-link-2" />
+      <span aria-hidden="true">⤶</span>
       <span className="ms-1 font-size-small">
         {referencedByRelations.items.size}
       </span>

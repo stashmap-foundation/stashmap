@@ -123,13 +123,12 @@ function RelayPublishStatus({
           </div>
           <div className="ms-2 flex-row-center align-center icon-large">
             <div className="flex-col align-center">
-              <div
-                className={
-                  isWarning
-                    ? "simple-icon-exclamation danger"
-                    : "simple-icon-check success"
-                }
-              />
+              <span
+                className={isWarning ? "danger" : "success"}
+                aria-hidden="true"
+              >
+                {isWarning ? "⚠" : "✓"}
+              </span>
               {numberRejected > 0 && (
                 <LoadingSpinnerButton
                   className="btn mt-2 font-size-small"
@@ -198,7 +197,7 @@ export function PublishingStatus<T = void>({
         {publishEventsStatus.isLoading === true ? (
           <Spinner role="status" size="sm" />
         ) : (
-          <span className="simple-icon-info" style={{ color: warningColor }} />
+          <span style={{ color: warningColor }} aria-hidden="true">ℹ</span>
         )}
       </Dropdown.Toggle>
       <Dropdown.Menu

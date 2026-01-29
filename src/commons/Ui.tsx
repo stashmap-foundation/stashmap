@@ -185,7 +185,7 @@ export function CancelButton({
 }): JSX.Element {
   return (
     <button className="btn btn-borderless p-0" type="button" onClick={onClose}>
-      <span className="simple-icon-ban" />
+      <span aria-hidden="true">⊘</span>
       <span className="visually-hidden">Cancel</span>
     </button>
   );

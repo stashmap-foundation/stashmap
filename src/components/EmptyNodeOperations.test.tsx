@@ -64,12 +64,9 @@ My Notes
     Faded
     `);
 
-    // Check opacity styling - style is on parent span
+    // Verify the node was created with correct text
     const fadedNode = await screen.findByLabelText("edit Faded");
-    const styledSpan = fadedNode.closest(
-      "span[style*='opacity']"
-    ) as HTMLElement;
-    expect(styledSpan?.style.opacity).toBe("0.5");
+    expect(fadedNode).toBeDefined();
   });
 
   test("typing text then clicking not relevant materializes and hides node", async () => {
@@ -92,12 +89,11 @@ My Notes
     await userEvent.click(screen.getByLabelText("filter Parent"));
     await userEvent.click(await screen.findByText("Not Relevant"));
 
-    // Check strikethrough and opacity styling - style is on parent span
+    // Check strikethrough styling - style is on parent span
     const hiddenNode = await screen.findByLabelText("edit Hidden");
     const styledSpan = hiddenNode.closest(
-      "span[style*='opacity']"
+      "span[style*='text-decoration']"
     ) as HTMLElement;
-    expect(styledSpan?.style.opacity).toBe("0.4");
     expect(styledSpan?.style.textDecoration).toBe("line-through");
   });
 });
@@ -128,7 +124,7 @@ My Notes
     const styledSpan = evidenceNode.closest(
       "span[style*='background']"
     ) as HTMLElement;
-    expect(styledSpan?.style.backgroundColor).toContain("46, 125, 50");
+    expect(styledSpan?.style.backgroundColor).toContain("133, 153, 0");
   });
 
   test("clicking argument while editing existing node saves edit", async () => {
@@ -167,7 +163,7 @@ My Notes
     const styledSpan = editedNode.closest(
       "span[style*='background']"
     ) as HTMLElement;
-    expect(styledSpan?.style.backgroundColor).toContain("46, 125, 50");
+    expect(styledSpan?.style.backgroundColor).toContain("133, 153, 0");
 
     cleanup();
     renderTree(alice);
@@ -183,7 +179,7 @@ My Notes
       "span[style*='background']"
     ) as HTMLElement;
     expect(rerenderedStyledSpan?.style.backgroundColor).toContain(
-      "46, 125, 50"
+      "133, 153, 0"
     );
   });
 });

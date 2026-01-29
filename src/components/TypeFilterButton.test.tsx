@@ -12,19 +12,19 @@ import { DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 
 describe("TYPE_COLORS", () => {
   test("has correct colors for relevance types", () => {
-    expect(TYPE_COLORS.relevant).toBe("#0288d1");
-    expect(TYPE_COLORS.maybe_relevant).toBe("#00acc1");
-    expect(TYPE_COLORS.little_relevant).toBe("#26c6da");
-    expect(TYPE_COLORS.not_relevant).toBe("#757575");
+    expect(TYPE_COLORS.relevant).toBe("#268bd2");
+    expect(TYPE_COLORS.maybe_relevant).toBe("#2aa198");
+    expect(TYPE_COLORS.little_relevant).toBe("#b58900");
+    expect(TYPE_COLORS.not_relevant).toBe("#93a1a1");
   });
 
   test("has correct colors for argument types", () => {
-    expect(TYPE_COLORS.confirms).toBe("#2e7d32");
-    expect(TYPE_COLORS.contra).toBe("#c62828");
+    expect(TYPE_COLORS.confirms).toBe("#859900");
+    expect(TYPE_COLORS.contra).toBe("#dc322f");
   });
 
   test("has inactive color", () => {
-    expect(TYPE_COLORS.inactive).toBe("#d0d0d0");
+    expect(TYPE_COLORS.inactive).toBe("#eee8d5");
   });
 });
 
@@ -258,7 +258,7 @@ describe("Suggestions filter", () => {
   });
 
   test("TYPE_COLORS has other_user color for suggestions", () => {
-    expect(TYPE_COLORS.other_user).toBe("#d4826a");
+    expect(TYPE_COLORS.other_user).toBe("#cb4b16");
   });
 
   test("filter popover shows Suggestions option", async () => {

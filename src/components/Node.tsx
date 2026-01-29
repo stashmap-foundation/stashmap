@@ -42,6 +42,7 @@ import {
   isSearchId,
   getConcreteRefs,
   getRelations,
+  computeEmptyNodeMetadata,
 } from "../connections";
 import { REFERENCED_BY, DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 import { IS_MOBILE } from "./responsive";
@@ -67,6 +68,7 @@ import { NodeIcon } from "./NodeIcon";
 import { NodeCard } from "../commons/Ui";
 import {
   usePaneStack,
+  usePaneIndex,
   useSplitPanes,
   useCurrentPane,
   useIsViewingOtherUserContent,
@@ -207,6 +209,8 @@ function NodeContent({
 function EditableContent(): JSX.Element {
   const viewPath = useViewPath();
   const stack = usePaneStack();
+  const paneIndex = usePaneIndex();
+  const data = useData();
   const { createPlan, executePlan } = usePlanner();
   const [node] = useNode();
   const [nodeID] = useNodeID();
@@ -215,6 +219,11 @@ function EditableContent(): JSX.Element {
   const parentPath = getParentView(viewPath);
   const nextInsertPosition = useNextInsertPosition();
   const isEmptyNode = isEmptyNodeID(nodeID);
+
+  const emptyNodeMetadata = computeEmptyNodeMetadata(data.publishEventsStatus.temporaryEvents);
+  const parentRelation = parentPath ? getRelationForView(data, parentPath, stack) : undefined;
+  const emptyData = parentRelation ? emptyNodeMetadata.get(parentRelation.id) : undefined;
+  const shouldAutoFocus = isEmptyNode && emptyData?.paneIndex === paneIndex;
 
   const handleSave = (
     text: string,
@@ -363,7 +372,7 @@ function EditableContent(): JSX.Element {
       onSave={handleSave}
       onTab={handleTab}
       onClose={isEmptyNode ? handleClose : undefined}
-      autoFocus={isEmptyNode}
+      autoFocus={shouldAutoFocus}
       ariaLabel={isEmptyNode ? "new node editor" : `edit ${displayText}`}
     />
   );
@@ -565,7 +574,6 @@ export function getNodesInTree(
       rootRelation,
       isRoot(parentPath)
     );
-
   // Filter items based on view's typeFilters (default filters out "not_relevant")
   const activeFilters = parentView.typeFilters || DEFAULT_TYPE_FILTERS;
   // Filter out "suggestions" to get only relevance/argument types for item matching

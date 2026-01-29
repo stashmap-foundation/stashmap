@@ -554,13 +554,13 @@ Programming Languages
 
 test("updateViewPathsAfterPaneDelete removes views for deleted pane and shifts indices", () => {
   const views = Map<string, View>({
-    "p0:root:0": { expanded: false, width: 1 },
-    "p0:root:0:r:node1:0": { expanded: true, width: 1 },
-    "p1:root:0": { expanded: false, width: 1 },
-    "p1:root:0:r:node2:0": { expanded: true, width: 1 },
-    "p2:root:0": { expanded: false, width: 2 },
-    "p2:root:0:r:node3:0": { expanded: true, width: 1 },
-    "p3:root:0": { expanded: true, width: 3 },
+    "p0:root:0": { viewingMode: undefined, expanded: false },
+    "p0:root:0:r:node1:0": { viewingMode: undefined, expanded: true },
+    "p1:root:0": { viewingMode: undefined, expanded: false },
+    "p1:root:0:r:node2:0": { viewingMode: undefined, expanded: true },
+    "p2:root:0": { viewingMode: "REFERENCED_BY", expanded: false },
+    "p2:root:0:r:node3:0": { viewingMode: undefined, expanded: true },
+    "p3:root:0": { viewingMode: undefined, expanded: true },
   });
 
   const updatedViews = updateViewPathsAfterPaneDelete(views, 1);
@@ -568,19 +568,19 @@ test("updateViewPathsAfterPaneDelete removes views for deleted pane and shifts i
   expect(updatedViews.has("p0:root:0")).toBe(true);
   expect(updatedViews.has("p0:root:0:r:node1:0")).toBe(true);
   expect(updatedViews.has("p1:root:0:r:node2:0")).toBe(false);
-  expect(updatedViews.get("p1:root:0")?.width).toBe(2);
+  expect(updatedViews.get("p1:root:0")?.viewingMode).toBe("REFERENCED_BY");
   expect(updatedViews.get("p1:root:0:r:node3:0")?.expanded).toBe(true);
-  expect(updatedViews.get("p2:root:0")?.width).toBe(3);
+  expect(updatedViews.get("p2:root:0")?.expanded).toBe(true);
   expect(updatedViews.has("p3:root:0")).toBe(false);
 });
 
 test("updateViewPathsAfterPaneInsert shifts pane indices at and after insertion point", () => {
   const views = Map<string, View>({
-    "p0:root:0": { expanded: false, width: 1 },
-    "p0:root:0:r:node1:0": { expanded: true, width: 1 },
-    "p1:root:0": { expanded: false, width: 2 },
-    "p1:root:0:r:node2:0": { expanded: true, width: 1 },
-    "p2:root:0": { expanded: true, width: 3 },
+    "p0:root:0": { viewingMode: undefined, expanded: false },
+    "p0:root:0:r:node1:0": { viewingMode: undefined, expanded: true },
+    "p1:root:0": { viewingMode: "REFERENCED_BY", expanded: false },
+    "p1:root:0:r:node2:0": { viewingMode: undefined, expanded: true },
+    "p2:root:0": { viewingMode: undefined, expanded: true },
   });
 
   // Insert a pane at index 1, so pane 1 becomes pane 2, pane 2 becomes pane 3
@@ -588,16 +588,16 @@ test("updateViewPathsAfterPaneInsert shifts pane indices at and after insertion 
 
   // Pane 0 stays the same
   expect(updatedViews.has("p0:root:0")).toBe(true);
-  expect(updatedViews.get("p0:root:0")?.width).toBe(1);
+  expect(updatedViews.get("p0:root:0")?.expanded).toBe(false);
   expect(updatedViews.has("p0:root:0:r:node1:0")).toBe(true);
 
   // Old pane 1 is now pane 2
   expect(updatedViews.has("p1:root:0")).toBe(false);
   expect(updatedViews.has("p2:root:0")).toBe(true);
-  expect(updatedViews.get("p2:root:0")?.width).toBe(2);
+  expect(updatedViews.get("p2:root:0")?.viewingMode).toBe("REFERENCED_BY");
   expect(updatedViews.has("p2:root:0:r:node2:0")).toBe(true);
 
   // Old pane 2 is now pane 3
   expect(updatedViews.has("p3:root:0")).toBe(true);
-  expect(updatedViews.get("p3:root:0")?.width).toBe(3);
+  expect(updatedViews.get("p3:root:0")?.expanded).toBe(true);
 });

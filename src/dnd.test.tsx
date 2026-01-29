@@ -148,8 +148,7 @@ test("Diff items are always added, never moved", () => {
   ] as const;
 
   const views = Map<string, View>().set(viewPathToString(parentPath), {
-    width: 1,
-    relations: aliceRelations.id,
+    viewingMode: undefined,
     expanded: true,
   });
 

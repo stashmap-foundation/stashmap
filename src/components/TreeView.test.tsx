@@ -310,9 +310,8 @@ test("Reference indicators show other users icon", async () => {
   expect(otherUserIcon).toBeDefined();
 });
 
-test("Disconnect button shows when view.relations is not explicitly set", async () => {
-  // This tests the fix for when a node is opened in split screen
-  // without view.relations being set - the disconnect button should still appear
+test("Relevance selector shows when node is expanded", async () => {
+  // This tests that child nodes show relevance selectors when visible
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
@@ -390,17 +389,9 @@ describe("areAllAncestorsExpanded", () => {
     const childKey = "p0:rootNode:0:rootRel:parentNode:0:parentRel:childNode:0";
 
     const views: Views = Map({
-      [rootKey]: { width: 100, expanded: true, relations: "rootRel" as LongID },
-      [parentKey]: {
-        width: 100,
-        expanded: false,
-        relations: "parentRel" as LongID,
-      },
-      [childKey]: {
-        width: 100,
-        expanded: true,
-        relations: "childRel" as LongID,
-      },
+      [rootKey]: { viewingMode: undefined, expanded: true },
+      [parentKey]: { viewingMode: undefined, expanded: false },
+      [childKey]: { viewingMode: undefined, expanded: true },
     });
 
     expect(areAllAncestorsExpanded(views, childKey, rootKey)).toBe(false);
@@ -413,17 +404,9 @@ describe("areAllAncestorsExpanded", () => {
     const childKey = "p0:rootNode:0:rootRel:parentNode:0:parentRel:childNode:0";
 
     const views: Views = Map({
-      [rootKey]: { width: 100, expanded: true, relations: "rootRel" as LongID },
-      [parentKey]: {
-        width: 100,
-        expanded: true,
-        relations: "parentRel" as LongID,
-      },
-      [childKey]: {
-        width: 100,
-        expanded: true,
-        relations: "childRel" as LongID,
-      },
+      [rootKey]: { viewingMode: undefined, expanded: true },
+      [parentKey]: { viewingMode: undefined, expanded: true },
+      [childKey]: { viewingMode: undefined, expanded: true },
     });
 
     expect(areAllAncestorsExpanded(views, childKey, rootKey)).toBe(true);

@@ -69,7 +69,6 @@ export function MergeKnowledgeDB({
     })
   );
 
-  // Inject empty nodes after merging
   const injectedDBs = injectEmptyNodesIntoKnowledgeDBs(
     mergedDBs,
     temporaryEvents,

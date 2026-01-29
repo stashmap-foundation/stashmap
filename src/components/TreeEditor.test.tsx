@@ -6,6 +6,7 @@ import {
   findNewNodeEditor,
   expectTree,
   renderTree,
+  renderApp,
   createAndSetAsRoot,
   getTreeStructure,
 } from "../utils.test";
@@ -1460,6 +1461,131 @@ Custom Root
   L1
     L2
       L3
+      `);
+    });
+  });
+
+  describe("Root Node Operations", () => {
+    test("Enter on root node creates child at beginning", async () => {
+      const [alice] = setup([ALICE]);
+      renderTree(alice);
+
+      // First add some children to root using plus button
+      await screen.findByLabelText("collapse My Notes");
+      await userEvent.click(
+        (
+          await screen.findAllByLabelText("add to My Notes")
+        )[0]
+      );
+      await userEvent.type(await findNewNodeEditor(), "Child 1{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "Child 2{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+      await expectTree(`
+My Notes
+  Child 1
+  Child 2
+      `);
+
+      // Now press Enter on root node (My Notes) - should create child at beginning
+      const rootEditor = await screen.findByLabelText("edit My Notes");
+      await userEvent.click(rootEditor);
+      await userEvent.keyboard("{Enter}");
+
+      // New editor should appear before Child 1
+      await userEvent.type(await findNewNodeEditor(), "New First Child{Escape}");
+
+      await expectTree(`
+My Notes
+  New First Child
+  Child 1
+  Child 2
+      `);
+    });
+
+    test("Enter on direct child of root creates sibling after it", async () => {
+      const [alice] = setup([ALICE]);
+      renderTree(alice);
+
+      // Create children under root
+      await screen.findByLabelText("collapse My Notes");
+      await userEvent.click(
+        (
+          await screen.findAllByLabelText("add to My Notes")
+        )[0]
+      );
+      await userEvent.type(await findNewNodeEditor(), "First{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "Second{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+      await expectTree(`
+My Notes
+  First
+  Second
+      `);
+
+      // Press Enter on First - should create sibling after it
+      const firstEditor = await screen.findByLabelText("edit First");
+      await userEvent.click(firstEditor);
+      await userEvent.keyboard("{Enter}");
+
+      await userEvent.type(await findNewNodeEditor(), "After First{Escape}");
+
+      await expectTree(`
+My Notes
+  First
+  After First
+  Second
+      `);
+    });
+
+    test("Enter on root creates child when second pane is open", async () => {
+      const [alice] = setup([ALICE]);
+      renderApp(alice());
+
+      // Create a child first
+      await screen.findByLabelText("collapse My Notes");
+      await userEvent.click(
+        (
+          await screen.findAllByLabelText("add to My Notes")
+        )[0]
+      );
+      await userEvent.type(await findNewNodeEditor(), "Existing Child{Escape}");
+
+      await expectTree(`
+My Notes
+  Existing Child
+      `);
+
+      // Open My Notes in a second pane
+      await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+
+      // Wait for second pane - tree shows both panes
+      await expectTree(`
+My Notes
+  Existing Child
+My Notes
+  Existing Child
+      `);
+
+      // Press Enter on root in the first pane to create new child
+      const rootEditors = await screen.findAllByLabelText("edit My Notes");
+      await userEvent.click(rootEditors[0]);
+      await userEvent.keyboard("{Enter}");
+
+      // New node editor should appear in both panes, but only pane 0 has autoFocus
+      const editors = await screen.findAllByLabelText("new node editor");
+      expect(editors).toHaveLength(2);
+      await userEvent.type(editors[0], "New Child{Escape}");
+
+      // Both panes should show the new child
+      await expectTree(`
+My Notes
+  New Child
+  Existing Child
+My Notes
+  New Child
+  Existing Child
       `);
     });
   });

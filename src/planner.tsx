@@ -51,6 +51,7 @@ import {
   addNodeToPathWithRelations,
   getRelationsForContext,
   isRoot,
+  getPaneIndex,
 } from "./ViewContext";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useRelaysToCreatePlan } from "./relays";
@@ -1121,7 +1122,6 @@ export function planSetEmptyNodePosition(
     isRoot(parentPath)
   );
   if (!relations) {
-    console.log(">>>>> NO RELATIONS");
     return plan;
   }
 
@@ -1133,6 +1133,7 @@ export function planSetEmptyNodePosition(
       relationsID: relations.id,
       index: insertIndex,
       relationItem: { nodeID: EMPTY_NODE_ID, relevance: "" },
+      paneIndex: getPaneIndex(parentPath),
     }),
   };
 }
@@ -1163,6 +1164,7 @@ export function planUpdateEmptyNodeMetadata(
       relationsID,
       index: existing.index,
       relationItem: updatedRelationItem,
+      paneIndex: existing.paneIndex,
     }),
   };
 }

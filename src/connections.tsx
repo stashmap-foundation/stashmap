@@ -811,6 +811,7 @@ export function isEmptyNodeID(id: LongID | ID): boolean {
 export type EmptyNodeData = {
   index: number;
   relationItem: RelationItem;
+  paneIndex: number;
 };
 
 // Compute current empty node data from temporary events
@@ -823,6 +824,7 @@ export function computeEmptyNodeMetadata(
       return metadata.set(event.relationsID, {
         index: event.index,
         relationItem: event.relationItem,
+        paneIndex: event.paneIndex,
       });
     }
     if (event.type === "REMOVE_EMPTY_NODE") {

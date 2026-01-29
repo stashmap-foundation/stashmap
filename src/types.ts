@@ -114,6 +114,7 @@ declare global {
       relationsID: LongID;
       index: number;
       relationItem: RelationItem;
+      paneIndex: number;
     }
     | { type: "REMOVE_EMPTY_NODE"; relationsID: LongID };
 

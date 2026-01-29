@@ -300,13 +300,11 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
 
   const views = Map<string, View>()
     .set(viewPathToString(parentPath), {
-      width: 1,
-      relations: parentRelations.id,
+      viewingMode: undefined,
       expanded: true,
     })
     .set(viewPathToString(childPath), {
-      width: 1,
-      relations: childRelations.id,
+      viewingMode: undefined,
       expanded: true,
     });
 
@@ -475,13 +473,11 @@ test("Diff item paths are correctly identified as diff items", () => {
 
   const views = Map<string, View>()
     .set(viewPathToString(rootPath), {
-      width: 1,
-      relations: rootRelations.id,
+      viewingMode: undefined,
       expanded: true,
     })
     .set(viewPathToString(parentPath), {
-      width: 1,
-      relations: parentRelations.id,
+      viewingMode: undefined,
       expanded: true,
     });
 

@@ -521,40 +521,6 @@ export function getNodeFromView(
 }
 
 /**
- * Centralized function to determine which relation to display for a node.
- * Works without requiring a full viewPath - useful for deep copy of collapsed nodes.
- *
- * Logic:
- * 1. If viewRelations is set AND matches current context, use it
- * 2. Otherwise, use priority-based selection (our relations first, then others by date)
- */
-export function getActiveRelationForNode(
-  knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey,
-  nodeID: LongID | ID,
-  context: Context,
-  viewRelations?: LongID
-): Relations | undefined {
-  if (viewRelations && viewRelations !== REFERENCED_BY) {
-    const relations = getRelationsNoReferencedBy(
-      knowledgeDBs,
-      viewRelations,
-      myself
-    );
-    if (relations && contextsMatch(relations.context, context)) {
-      return relations;
-    }
-  }
-
-  return getAvailableRelationsForNode(
-    knowledgeDBs,
-    myself,
-    nodeID,
-    context
-  ).first();
-}
-
-/**
  * Get the relation for a view, considering view mode and context.
  * This is the canonical read-only relation lookup function.
  *
@@ -1256,7 +1222,7 @@ function getAllSubpaths(path: string): ImmutableSet<string> {
   }, ImmutableSet<string>());
 }
 
-function findViewsForRepo(
+function findParentViewPathsForRelation(
   data: Data,
   relationsID: LongID
 ): ImmutableSet<string> {
@@ -1345,7 +1311,7 @@ export function updateViewPathsAfterMoveRelations(
   if (startPosition === undefined) {
     return data.views;
   }
-  const viewKeys = findViewsForRepo(data, relationsID);
+  const viewKeys = findParentViewPathsForRelation(data, relationsID);
   const sortedViewKeys = viewKeys.sort(
     (a, b) => b.split(":").length - a.split(":").length
   );
@@ -1362,7 +1328,7 @@ export function updateViewPathsAfterAddRelation(
   if (ord === undefined) {
     return data.views;
   }
-  const viewKeys = findViewsForRepo(data, relationsID);
+  const viewKeys = findParentViewPathsForRelation(data, relationsID);
 
   const sortedViewKeys = viewKeys.sort(
     (a, b) => b.split(":").length - a.split(":").length

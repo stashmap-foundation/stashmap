@@ -1263,7 +1263,14 @@ function findViewsForRepo(
   const paths = data.views.reduce((acc, _, path) => {
     return acc.merge(getAllSubpaths(path));
   }, ImmutableSet<string>());
-  return paths.filter((path) => path.includes(`:${relationsID}:`));
+  const pattern = `:${relationsID}:`;
+  return paths
+    .filter((path) => path.includes(pattern))
+    .map((path) => {
+      const idx = path.indexOf(pattern);
+      return path.substring(0, idx + pattern.length - 1);
+    })
+    .toSet();
 }
 
 function updateRelationViews(

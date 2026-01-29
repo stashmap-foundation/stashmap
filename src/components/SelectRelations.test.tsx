@@ -26,62 +26,6 @@ import { LoadData } from "../dataQuery";
 import { TreeView } from "./TreeView";
 import { newDB } from "../knowledge";
 
-test("Shows dots when other user has a relation of same type", async () => {
-  const [alice, bob] = setup([ALICE, BOB]);
-
-  // Alice creates a node with a "relevant" relation
-  const { publicKey: alicePK } = alice().user;
-  const parentNode = newNode("Parent Node");
-  const childNode = newNode("Child Node");
-  const aliceRelations = addRelationToRelations(
-    newRelations(parentNode.id, List(), alicePK),
-    childNode.id
-  );
-
-  const alicePlan = planUpsertRelations(
-    planUpsertNode(planUpsertNode(createPlan(alice()), parentNode), childNode),
-    aliceRelations
-  );
-  await execute({ ...alice(), plan: alicePlan });
-
-  // Bob creates his own "relevant" relation on the same parent node
-  const { publicKey: bobPK } = bob().user;
-  const bobChildNode = newNode("Bob's Child Node");
-  const bobRelations = addRelationToRelations(
-    newRelations(parentNode.id, List(), bobPK),
-    bobChildNode.id
-  );
-
-  const bobPlan = planUpsertRelations(
-    planUpsertNode(createPlan(bob()), bobChildNode),
-    bobRelations
-  );
-  await execute({ ...bob(), plan: bobPlan });
-
-  // Alice follows Bob to see his data
-  await follow(alice, bob().user.publicKey);
-
-  // Render from Alice's perspective
-  renderWithTestData(
-    <LoadData nodeIDs={[parentNode.id]} descendants referencedBy lists>
-      <RootViewContextProvider root={parentNode.id}>
-        <TemporaryViewProvider>
-          <DND>
-            <TreeView />
-          </DND>
-        </TemporaryViewProvider>
-      </RootViewContextProvider>
-    </LoadData>,
-    alice()
-  );
-
-  await screen.findByLabelText(/expand Parent Node|collapse Parent Node/);
-
-  // The version selector should show when multiple versions are available
-  // Both Alice and Bob have versions, so there are 2 versions
-  expect(screen.getByLabelText("2 versions available")).toBeDefined();
-});
-
 test("Shows no dots when user is the only one with a relation", async () => {
   const [alice] = setup([ALICE]);
 

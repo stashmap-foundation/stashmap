@@ -8,9 +8,10 @@ import {
   useViewPath,
   useIsInReferencedByView,
   useDisplayText,
+  isReferencedByView,
 } from "../ViewContext";
 import { isEmptyNodeID } from "../connections";
-import { DEFAULT_TYPE_FILTERS, REFERENCED_BY, TYPE_COLORS } from "../constants";
+import { DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 import { preventEditorBlurIfSameNode } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
 
@@ -156,7 +157,7 @@ export function TypeFilterButton(): JSX.Element | null {
   }
 
   // Don't show filter button in Referenced By mode (for root or items inside)
-  if (view.relations === REFERENCED_BY || isInReferencedByView) {
+  if (isReferencedByView(view) || isInReferencedByView) {
     return null;
   }
 

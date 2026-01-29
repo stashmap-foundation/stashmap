@@ -25,8 +25,8 @@ import {
 import { MergeKnowledgeDB, useData } from "../DataContext";
 import { usePaneStack, useCurrentPane } from "../SplitPanesContext";
 import {
-  addListToFilters,
   addNodeToFilters,
+  addReferencedByToFilters,
   createBaseFilter,
   filtersToFilterArray,
   useQueryKnowledgeData,
@@ -35,7 +35,6 @@ import {
 import { RegisterQuery } from "../LoadingStatus";
 import { shortID, isSearchId, getRelations } from "../connections";
 import { useApis } from "../Apis";
-import { addReferencedByToFilters } from "../dataQuery";
 
 function getAncestorPaths(path: string, rootKey: string): string[] {
   const suffix = path.slice(rootKey.length);
@@ -267,28 +266,26 @@ export function TreeView(): JSX.Element {
     data.user.publicKey
   );
 
-  // Find all Lists attached to expanded nodes in this tree
-  // (descendants are already loaded by SplitPaneLayout)
-  const lists = data.views
+  // Add REFERENCED_BY filters for views in referenced-by mode
+  const referencedByNodeIDs = data.views
     .filter(
       (view, path) =>
         path.startsWith(key) &&
-        view.expanded &&
-        path !== key &&
+        view.viewingMode === "REFERENCED_BY" &&
         areAllAncestorsExpanded(data.views, path, key)
     )
-    .map((view) => view.relations || ("" as LongID))
-    .filter((r) => r !== "");
-  const listsFilter = lists.reduce(
-    (rdx, listID, path) =>
-      addListToFilters(rdx, listID, getLast(parseViewPath(path)).nodeID),
+    .map((_, path) => getLast(parseViewPath(path)).nodeID)
+    .valueSeq()
+    .toArray();
+  const referencedByFilter = referencedByNodeIDs.reduce(
+    (rdx, nodeID) => addReferencedByToFilters(rdx, nodeID),
     baseFilter
   );
 
   // For search nodes, add REFERENCED_BY queries for each search result
   const searchFilter = (() => {
     if (!isSearchId(rootNodeID as ID)) {
-      return listsFilter;
+      return referencedByFilter;
     }
     const searchRelation = getRelations(
       data.knowledgeDBs,
@@ -297,11 +294,11 @@ export function TreeView(): JSX.Element {
       rootNodeID
     );
     if (!searchRelation) {
-      return listsFilter;
+      return referencedByFilter;
     }
     return searchRelation.items.reduce(
       (rdx, item) => addReferencedByToFilters(rdx, item.nodeID),
-      listsFilter
+      referencedByFilter
     );
   })();
 

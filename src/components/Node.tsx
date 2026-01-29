@@ -20,6 +20,8 @@ import {
   getParentView,
   useNextInsertPosition,
   isRoot,
+  isReferencedByView,
+  getRelationForView,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -86,7 +88,7 @@ function ExpandCollapseToggle(): JSX.Element | null {
   const [nodeID, view] = useNodeID();
   const displayText = useDisplayText();
   const onToggleExpanded = useOnToggleExpanded();
-  const isReferencedByRoot = view.relations === REFERENCED_BY;
+  const isReferencedByRoot = isReferencedByView(view);
   const isInReferencedByView = useIsInReferencedByView();
   const showReferencedByStyle = isReferencedByRoot || isInReferencedByView;
 
@@ -256,23 +258,16 @@ function EditableContent(): JSX.Element {
     // Handle empty nodes: materialize with text, or move empty position if no text
     if (isEmptyNode) {
       if (!parentPath) return;
-      const [, parentView] = getNodeIDFromView(basePlan, parentPath);
-      const relationsID = parentView.relations;
+      const parentRelation = getRelationForView(basePlan, parentPath, stack);
 
       // Remove empty node position from old parent
-      const planWithoutEmpty = relationsID
-        ? planRemoveEmptyNodePosition(basePlan, relationsID)
+      const planWithoutEmpty = parentRelation
+        ? planRemoveEmptyNodePosition(basePlan, parentRelation.id)
         : basePlan;
 
       // Expand previous sibling
-      const prevSiblingContext = getContextFromStackAndViewPath(
-        stack,
-        prevSibling.viewPath
-      );
       const planWithExpand = planExpandNode(
         planWithoutEmpty,
-        prevSibling.nodeID,
-        prevSiblingContext,
         prevSibling.view,
         prevSibling.viewPath
       );
@@ -304,15 +299,13 @@ function EditableContent(): JSX.Element {
     }
 
     // Handle regular nodes
-    // Step 1: Expand the previous sibling (ensure it has relations)
+    // Step 1: Expand the previous sibling
     const prevSiblingContext = getContextFromStackAndViewPath(
       stack,
       prevSibling.viewPath
     );
     const planWithExpand = planExpandNode(
       basePlan,
-      prevSibling.nodeID,
-      prevSiblingContext,
       prevSibling.view,
       prevSibling.viewPath
     );
@@ -351,10 +344,9 @@ function EditableContent(): JSX.Element {
   const handleClose = (): void => {
     if (!isEmptyNode || !parentPath) return;
     const plan = createPlan();
-    const [, parentView] = getNodeIDFromView(plan, parentPath);
-    const relationsID = parentView.relations;
-    if (relationsID) {
-      executePlan(planRemoveEmptyNodePosition(plan, relationsID));
+    const parentRelation = getRelationForView(plan, parentPath, stack);
+    if (parentRelation) {
+      executePlan(planRemoveEmptyNodePosition(plan, parentRelation.id));
     }
   };
 
@@ -385,7 +377,7 @@ function InteractiveNodeContent(): JSX.Element {
   const isInReferencedByView = useIsInReferencedByView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   // Also check if this is the root node of a Referenced By view
-  const isReferencedByRoot = view.relations === REFERENCED_BY;
+  const isReferencedByRoot = isReferencedByView(view);
   const isEmptyNode = isEmptyNodeID(nodeID);
 
   const isReadonly =
@@ -496,7 +488,7 @@ export function Indent({
 export function getNodesInTree(
   data: Data,
   parentPath: ViewPath,
-  stack: (LongID | ID)[],
+  stack: ID[],
   ctx: List<ViewPath>,
   rootRelation: LongID | undefined,
   noExpansion?: boolean
@@ -533,7 +525,7 @@ export function getNodesInTree(
   const isGrandchildOfSearch = grandparentNodeID && isSearchId(grandparentNodeID as ID);
 
   // Handle REFERENCED_BY view or search result children - show refs
-  if (parentView.relations === REFERENCED_BY || isGrandchildOfSearch) {
+  if (isReferencedByView(parentView) || isGrandchildOfSearch) {
     const relations = getReferencedByRelations(
       data.knowledgeDBs,
       data.user.publicKey,
@@ -682,7 +674,7 @@ export function Node({
   const [nodeID] = useNodeID();
 
   // Check if this node is the root of a Referenced By view
-  const isReferencedByRoot = view.relations === REFERENCED_BY;
+  const isReferencedByRoot = isReferencedByView(view);
   // Show background for both the root and children in Referenced By view
   const showReferencedByBackground = isReferencedByRoot || isInReferencedByView;
 

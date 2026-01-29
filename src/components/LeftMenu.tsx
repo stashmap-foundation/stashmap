@@ -1,51 +1,27 @@
 import React from "react";
-import {
-  VersionSelector,
-  useOnChangeRelations,
-  sortRelations,
-} from "./SelectRelations";
+import { useOnChangeViewingMode } from "./SelectRelations";
 import { TypeFilterButton, FilterDotsDisplay } from "./TypeFilterButton";
 import {
   useNode,
-  useNodeID,
   useIsInReferencedByView,
-  getAvailableRelationsForNode,
-  getContextFromStackAndViewPath,
-  useViewPath,
   useDisplayText,
+  isReferencedByView,
 } from "../ViewContext";
-import { getRelations, getConcreteRefs, isReferenceNode } from "../connections";
+import { getConcreteRefs, isReferenceNode } from "../connections";
 import { useData } from "../DataContext";
-import { REFERENCED_BY, TYPE_COLORS } from "../constants";
-import { usePaneStack, useIsViewingOtherUserContent } from "../SplitPanesContext";
+import { TYPE_COLORS } from "../constants";
 import { SiblingSearchButton, AddSiblingButton } from "./AddNode";
 
 function useSwitchToNormalRelations(): () => void {
-  const { knowledgeDBs, user } = useData();
-  const [nodeID] = useNodeID();
-  const viewPath = useViewPath();
-  const stack = usePaneStack();
-  const onChangeRelations = useOnChangeRelations();
-
-  const context = getContextFromStackAndViewPath(stack, viewPath);
-  const normalRelations = getAvailableRelationsForNode(
-    knowledgeDBs,
-    user.publicKey,
-    nodeID,
-    context
-  );
-  const sorted = sortRelations(normalRelations, user.publicKey);
-  const topNormalRelation = sorted.first();
-
-  // Switch to normal relations if available, otherwise just exit Referenced By mode
-  return () => onChangeRelations(topNormalRelation, !!topNormalRelation);
+  const onChangeViewingMode = useOnChangeViewingMode();
+  return () => onChangeViewingMode(undefined, true);
 }
 
 function ReferenceDot(): JSX.Element | null {
-  const { knowledgeDBs, user } = useData();
+  const { knowledgeDBs } = useData();
   const [node, view] = useNode();
   const displayText = useDisplayText();
-  const onChangeRelations = useOnChangeRelations();
+  const onChangeViewingMode = useOnChangeViewingMode();
   const switchToNormal = useSwitchToNormalRelations();
 
   if (!node || isReferenceNode(node)) {
@@ -59,25 +35,18 @@ function ReferenceDot(): JSX.Element | null {
     return null;
   }
 
-  const referencedByRelations = getRelations(
-    knowledgeDBs,
-    REFERENCED_BY,
-    user.publicKey,
-    node.id
-  );
-
-  const isInReferencedBy = view.relations === REFERENCED_BY;
+  const isInReferencedBy = isReferencedByView(view);
   const isExpanded = view.expanded === true;
 
   const handleClick = (): void => {
     if (isInReferencedBy) {
       if (isExpanded) {
         switchToNormal();
-      } else if (referencedByRelations) {
-        onChangeRelations(referencedByRelations, true);
+      } else {
+        onChangeViewingMode("REFERENCED_BY", true);
       }
-    } else if (referencedByRelations) {
-      onChangeRelations(referencedByRelations, true);
+    } else {
+      onChangeViewingMode("REFERENCED_BY", true);
     }
   };
 
@@ -146,7 +115,7 @@ function FilterAndReferencesToggle(): JSX.Element | null {
     return null;
   }
 
-  const isInReferencedBy = view?.relations === REFERENCED_BY;
+  const isInReferencedBy = view && isReferencedByView(view);
 
   return (
     <div
@@ -168,7 +137,6 @@ function FilterAndReferencesToggle(): JSX.Element | null {
 export function LeftMenu(): JSX.Element {
   return (
     <div className="left-menu">
-      <VersionSelector />
       <AddSiblingButton />
       <SiblingSearchButton />
       <FilterAndReferencesToggle />

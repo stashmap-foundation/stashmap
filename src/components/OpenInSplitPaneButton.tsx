@@ -77,7 +77,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
 export function OpenInSplitPaneButtonWithStack({
   stack,
 }: {
-  stack: (LongID | ID)[];
+  stack: ID[];
 }): JSX.Element | null {
   const { addPaneAt } = useSplitPanes();
   const paneIndex = usePaneIndex();

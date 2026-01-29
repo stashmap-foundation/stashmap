@@ -10,8 +10,10 @@ import {
   useRelationIndex,
   getRelationIndex,
   useDisplayText,
+  useViewPath,
+  getParentView,
+  getRelationForView,
 } from "../ViewContext";
-import { getRelations } from "../connections";
 import { useData } from "../DataContext";
 import { usePaneStack } from "../SplitPanesContext";
 
@@ -91,7 +93,7 @@ function getSelectedIndices(
   data: Data,
   selection: OrderedSet<string>,
   viewKey: string,
-  stack: (LongID | ID)[]
+  stack: ID[]
 ): OrderedSet<number> {
   return getSelectedInView(selection, viewKey)
     .map((key) => {
@@ -308,8 +310,10 @@ export function TemporaryViewProvider({
 
 export function NodeSelectbox(): JSX.Element | null {
   const displayText = useDisplayText();
-  const { knowledgeDBs, user } = useData();
+  const data = useData();
   const [parentNode, parentView] = useParentNode();
+  const viewPath = useViewPath();
+  const stack = usePaneStack();
   const relationIndex = useRelationIndex();
   const checked = useIsSelected();
   const setSelected = useSetSelected();
@@ -317,12 +321,10 @@ export function NodeSelectbox(): JSX.Element | null {
     return null;
   }
 
-  const relations = getRelations(
-    knowledgeDBs,
-    parentView.relations,
-    user.publicKey,
-    parentNode.id
-  );
+  const parentPath = getParentView(viewPath);
+  const relations = parentPath
+    ? getRelationForView(data, parentPath, stack as ID[])
+    : undefined;
   if (!relations) {
     return null;
   }

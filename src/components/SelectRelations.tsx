@@ -1,34 +1,25 @@
 import React from "react";
-import { Dropdown } from "react-bootstrap";
-import { List } from "immutable";
 import {
-  getAvailableRelationsForNode,
-  getContextFromStackAndViewPath,
   updateView,
   useNode,
   useNodeID,
   useViewKey,
   useViewPath,
   useDisplayText,
+  isReferencedByView,
 } from "../ViewContext";
-import { usePaneStack } from "../SplitPanesContext";
 import { useDeselectAllInView } from "./TemporaryViewContext";
-import {
-  getRelations,
-  isRemote,
-  splitID,
-  isReferenceNode,
-} from "../connections";
+import { getRelations, isReferenceNode } from "../connections";
 import { REFERENCED_BY } from "../constants";
 import { useData } from "../DataContext";
 import { planUpdateViews, usePlanner } from "../planner";
 
-type ChangeRelation = (
-  relations: Relations | undefined,
+type ChangeViewingMode = (
+  viewingMode: "REFERENCED_BY" | undefined,
   expand: boolean
 ) => void;
 
-export function useOnChangeRelations(): ChangeRelation {
+export function useOnChangeViewingMode(): ChangeViewingMode {
   const data = useData();
   const viewPath = useViewPath();
   const { createPlan, executePlan } = usePlanner();
@@ -36,12 +27,12 @@ export function useOnChangeRelations(): ChangeRelation {
   const viewKey = useViewKey();
   const deselectAllInView = useDeselectAllInView();
 
-  return (relations: Relations | undefined, expand: boolean): void => {
+  return (viewingMode: "REFERENCED_BY" | undefined, expand: boolean): void => {
     const plan = planUpdateViews(
       createPlan(),
       updateView(data.views, viewPath, {
         ...view,
-        relations: relations?.id,
+        viewingMode,
         expanded: expand,
       })
     );
@@ -68,97 +59,17 @@ export function useOnToggleExpanded(): (expand: boolean) => void {
   };
 }
 
-export function sortRelations(
-  relationList: List<Relations>,
-  myself: PublicKey
-): List<Relations> {
-  return relationList.sort((rA, rB) => {
-    // Sort by date, but the one relation which is not remote comes always first
-    if (!isRemote(splitID(rA.id)[0], myself)) {
-      return -1;
-    }
-    if (!isRemote(splitID(rB.id)[0], myself)) {
-      return 1;
-    }
-    return rB.updated - rA.updated;
-  });
-}
-
-export function VersionSelector(): JSX.Element | null {
-  const { knowledgeDBs, user } = useData();
-  const [nodeID, view] = useNodeID();
-  const viewPath = useViewPath();
-  const stack = usePaneStack();
-  const onChangeRelations = useOnChangeRelations();
-
-  const context = getContextFromStackAndViewPath(stack, viewPath);
-  const currentRelations = getRelations(
-    knowledgeDBs,
-    view.relations,
-    user.publicKey,
-    nodeID
-  );
-  const allRelations = getAvailableRelationsForNode(
-    knowledgeDBs,
-    user.publicKey,
-    nodeID,
-    context
-  );
-
-  // Only show when there are multiple relations to choose from
-  if (allRelations.size <= 1) {
-    return null;
-  }
-
-  const sorted = sortRelations(allRelations, user.publicKey);
-  const otherRelations = sorted.filter((r) => r.id !== currentRelations?.id);
-
-  return (
-    <Dropdown>
-      <Dropdown.Toggle
-        as="button"
-        className="btn btn-borderless p-0"
-        aria-label={`${allRelations.size} versions available`}
-      >
-        <span className="iconsminds-clock-back" />
-      </Dropdown.Toggle>
-      <Dropdown.Menu popperConfig={{ strategy: "fixed" }} renderOnMount>
-        {otherRelations.map((r) => {
-          const remote = isRemote(splitID(r.id)[0], user.publicKey);
-          return (
-            <Dropdown.Item
-              key={r.id}
-              onClick={() => onChangeRelations(r, true)}
-            >
-              <div className="d-flex justify-content-between align-items-center">
-                <span>{r.items.size} Notes</span>
-                {remote && <span className="iconsminds-business-man ms-2" />}
-              </div>
-              <div className="font-size-small text-muted">
-                {new Date(r.updated * 1000).toLocaleDateString()}
-              </div>
-            </Dropdown.Item>
-          );
-        })}
-      </Dropdown.Menu>
-    </Dropdown>
-  );
-}
-
 export function ReferencedByToggle(): JSX.Element | null {
   const { knowledgeDBs, user } = useData();
   const [node] = useNode();
   const displayText = useDisplayText();
-  const [nodeID, view] = useNodeID();
-  const viewPath = useViewPath();
-  const stack = usePaneStack();
-  const onChangeRelations = useOnChangeRelations();
+  const [, view] = useNodeID();
+  const onChangeViewingMode = useOnChangeViewingMode();
 
   if (!node) {
     return null;
   }
 
-  // Don't show Referenced By for Reference nodes (they are synthetic)
   if (isReferenceNode(node)) {
     return null;
   }
@@ -170,37 +81,22 @@ export function ReferencedByToggle(): JSX.Element | null {
     node.id
   );
 
-  // Don't show if no references
   if (!referencedByRelations || referencedByRelations.items.size === 0) {
     return null;
   }
 
-  const isInReferencedBy = view.relations === REFERENCED_BY;
+  const isInReferencedBy = isReferencedByView(view);
   const isExpanded = view.expanded === true;
-
-  // Get the top normal relation to switch back to
-  const context = getContextFromStackAndViewPath(stack, viewPath);
-  const normalRelations = getAvailableRelationsForNode(
-    knowledgeDBs,
-    user.publicKey,
-    nodeID,
-    context
-  );
-  const sorted = sortRelations(normalRelations, user.publicKey);
-  const topNormalRelation = sorted.first();
 
   const onClick = (): void => {
     if (isInReferencedBy) {
-      if (isExpanded && topNormalRelation) {
-        // Switch back to normal relations
-        onChangeRelations(topNormalRelation, true);
-      } else if (!isExpanded) {
-        // Just expand Referenced By view
-        onChangeRelations(referencedByRelations, true);
+      if (isExpanded) {
+        onChangeViewingMode(undefined, true);
+      } else {
+        onChangeViewingMode("REFERENCED_BY", true);
       }
     } else {
-      // Switch to Referenced By
-      onChangeRelations(referencedByRelations, true);
+      onChangeViewingMode("REFERENCED_BY", true);
     }
   };
 

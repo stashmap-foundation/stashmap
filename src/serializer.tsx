@@ -115,7 +115,7 @@ function parseTypeFilters(
 function viewToJSON(attributes: View): Serializable {
   return {
     v: attributes.virtualLists,
-    o: attributes.relations,
+    m: attributes.viewingMode,
     w: attributes.width,
     e: attributes.expanded !== undefined ? attributes.expanded : undefined,
     f: attributes.typeFilters,
@@ -132,7 +132,7 @@ function jsonToView(view: Serializable): View | undefined {
       a.v !== undefined
         ? asArray(a.v).map((list) => asString(list) as LongID)
         : undefined,
-    relations: a.o !== undefined ? (asString(a.o) as LongID) : undefined,
+    viewingMode: a.m === "REFERENCED_BY" ? "REFERENCED_BY" : undefined,
     width: a.w !== undefined ? asNumber(a.w) : 1,
     expanded: a.e !== undefined ? asBoolean(a.e) : undefined,
     typeFilters: a.f !== undefined ? parseTypeFilters(asArray(a.f)) : undefined,

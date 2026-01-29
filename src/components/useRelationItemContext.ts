@@ -60,7 +60,7 @@ export function useRelationItemContext(): RelationItemContext {
   const [nodeID] = useNodeID();
   const isEmptyNode = isEmptyNodeID(nodeID);
   const relationsID = parentView
-    ? getNodeIDFromView(data, parentView)[1].relations
+    ? getRelationForView(data, parentView, stack)?.id
     : undefined;
   const editorTextContext = useEditorText();
   const nodeText = node?.text || "";

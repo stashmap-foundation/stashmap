@@ -33,7 +33,7 @@ export function useCurrentPane(): Pane {
   return panes[paneIndex];
 }
 
-export function usePaneStack(): (LongID | ID)[] {
+export function usePaneStack(): ID[] {
   return useCurrentPane().stack;
 }
 
@@ -56,7 +56,7 @@ type PaneOperations = {
   panes: Pane[];
   addPaneAt: (
     index: number,
-    stack: (LongID | ID)[],
+    stack: ID[],
     author: PublicKey,
     rootRelation?: LongID
   ) => void;
@@ -70,7 +70,7 @@ export function useSplitPanes(): PaneOperations {
 
   const addPaneAt = (
     index: number,
-    stack: (LongID | ID)[],
+    stack: ID[],
     author: PublicKey,
     rootRelation?: LongID
   ): void => {

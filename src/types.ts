@@ -131,7 +131,7 @@ declare global {
 
   type Pane = {
     id: string;
-    stack: (LongID | ID)[];
+    stack: ID[];
     author: PublicKey;
     rootRelation?: LongID;
     searchQuery?: string;
@@ -172,7 +172,7 @@ declare global {
 
   type View = {
     virtualLists?: Array<LongID>;
-    relations?: LongID;
+    viewingMode: "REFERENCED_BY" | undefined;
     width: number;
     // Show children, only relevant for inner nodes
     expanded?: boolean;

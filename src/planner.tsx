@@ -436,61 +436,16 @@ export function planRemoveEmptyNodePosition(
 
 export function planExpandNode(
   plan: Plan,
-  nodeID: LongID | ID,
-  context: Context,
   view: View,
   viewPath: ViewPath
 ): Plan {
-  const currentRelations = view.relations
-    ? getRelationsNoReferencedBy(
-      plan.knowledgeDBs,
-      view.relations,
-      plan.user.publicKey
-    )
-    : undefined;
-
-  if (currentRelations && contextsMatch(currentRelations.context, context)) {
-    if (view.expanded) {
-      return plan;
-    }
-    return planUpdateViews(
-      plan,
-      updateView(plan.views, viewPath, {
-        ...view,
-        expanded: true,
-      })
-    );
+  if (view.expanded) {
+    return plan;
   }
-
-  const availableRelations = getAvailableRelationsForNode(
-    plan.knowledgeDBs,
-    plan.user.publicKey,
-    nodeID,
-    context
-  );
-
-  if (availableRelations.size > 0) {
-    const firstRelation = availableRelations.first()!;
-    if (view.relations === firstRelation.id && view.expanded) {
-      return plan;
-    }
-    return planUpdateViews(
-      plan,
-      updateView(plan.views, viewPath, {
-        ...view,
-        relations: firstRelation.id,
-        expanded: true,
-      })
-    );
-  }
-
-  const relations = newRelationsForNode(nodeID, context, plan.user.publicKey);
-  const createRelationPlan = planUpsertRelations(plan, relations);
   return planUpdateViews(
-    createRelationPlan,
+    plan,
     updateView(plan.views, viewPath, {
       ...view,
-      relations: relations.id,
       expanded: true,
     })
   );
@@ -500,7 +455,7 @@ export function planAddToParent(
   plan: Plan,
   nodeIDs: LongID | ID | (LongID | ID)[],
   parentViewPath: ViewPath,
-  stack: (LongID | ID)[],
+  stack: ID[],
   insertAtIndex?: number,
   relevance?: Relevance,
   argument?: Argument
@@ -510,15 +465,8 @@ export function planAddToParent(
     return plan;
   }
 
-  const [parentNodeID, parentView] = getNodeIDFromView(plan, parentViewPath);
-  const context = getContextFromStackAndViewPath(stack, parentViewPath);
-  const planWithExpand = planExpandNode(
-    plan,
-    parentNodeID,
-    context,
-    parentView,
-    parentViewPath
-  );
+  const [, parentView] = getNodeIDFromView(plan, parentViewPath);
+  const planWithExpand = planExpandNode(plan, parentView, parentViewPath);
 
   const updatedRelationsPlan = upsertRelations(
     planWithExpand,
@@ -537,6 +485,7 @@ export function planAddToParent(
   const updatedViews = bulkUpdateViewPathsAfterAddRelation(
     updatedRelationsPlan,
     parentViewPath,
+    stack as ID[],
     nodeIDsArray.length,
     insertAtIndex
   );
@@ -597,7 +546,7 @@ function updateViewsWithRelationsMapping(
 export function planForkPane(
   plan: Plan,
   viewPath: ViewPath,
-  stack: (LongID | ID)[]
+  stack: ID[]
 ): Plan {
   const pane = getPane(plan, viewPath);
   const context = getContextFromStackAndViewPath(stack, viewPath);
@@ -632,7 +581,7 @@ export function planDeepCopyNode(
   sourceNodeID: LongID | ID,
   sourceContext: Context,
   targetParentViewPath: ViewPath,
-  stack: (LongID | ID)[],
+  stack: ID[],
   insertAtIndex?: number
 ): [Plan, RelationsIdMapping] {
   const targetParentContext = getContextFromStackAndViewPath(
@@ -673,7 +622,7 @@ export function planDeepCopyNodeWithView(
   sourceContext: Context,
   sourceViewPath: ViewPath,
   targetParentViewPath: ViewPath,
-  stack: (LongID | ID)[],
+  stack: ID[],
   insertAtIndex?: number
 ): Plan {
   const [planWithCopy, relationsIdMapping] = planDeepCopyNode(
@@ -738,7 +687,7 @@ export function planSaveNodeAndEnsureRelations(
   plan: Plan,
   text: string,
   viewPath: ViewPath,
-  stack: (LongID | ID)[],
+  stack: ID[],
   relevance?: Relevance,
   argument?: Argument
 ): Plan {
@@ -748,12 +697,12 @@ export function planSaveNodeAndEnsureRelations(
 
   if (isEmptyNodeID(nodeID)) {
     if (!parentPath) return plan;
-    const [parentNodeID, parentView] = getNodeIDFromView(plan, parentPath);
-    const relationsID = parentView.relations;
+    const [parentNodeID] = getNodeIDFromView(plan, parentPath);
+    const relations = getRelationForView(plan, parentPath, stack);
 
     if (!trimmedText) {
-      return relationsID
-        ? planRemoveEmptyNodePosition(plan, relationsID)
+      return relations
+        ? planRemoveEmptyNodePosition(plan, relations.id)
         : plan;
     }
 
@@ -779,13 +728,13 @@ export function planSaveNodeAndEnsureRelations(
     const emptyNodeMetadata = computeEmptyNodeMetadata(
       plan.publishEventsStatus.temporaryEvents
     );
-    const metadata = relationsID
-      ? emptyNodeMetadata.get(relationsID)
+    const metadata = relations
+      ? emptyNodeMetadata.get(relations.id)
       : undefined;
     const emptyNodeIndex = metadata?.index ?? 0;
 
-    const planWithoutEmpty = relationsID
-      ? planRemoveEmptyNodePosition(planWithVersion, relationsID)
+    const planWithoutEmpty = relations
+      ? planRemoveEmptyNodePosition(planWithVersion, relations.id)
       : planWithVersion;
 
     return planAddToParent(
@@ -1138,7 +1087,7 @@ export function usePlanner(): Planner {
 export function planSetEmptyNodePosition(
   plan: Plan,
   parentPath: ViewPath,
-  stack: (LongID | ID)[],
+  stack: ID[],
   insertIndex: number
 ): Plan {
   // 1. Ensure we have our own editable relations (copies remote if needed)
@@ -1157,8 +1106,6 @@ export function planSetEmptyNodePosition(
   const context = getContextFromStackAndViewPath(stack, parentPath);
   const planWithExpanded = planExpandNode(
     planWithOwnRelations,
-    parentNodeID,
-    context,
     parentView,
     parentPath
   );

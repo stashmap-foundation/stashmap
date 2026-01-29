@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { ROOT } from "./types";
 
 interface NavigationStackContextType {
-  stack: (LongID | ID)[];
-  push: (nodeID: LongID | ID) => void;
+  stack: ID[];
+  push: (nodeID: ID) => void;
   pop: () => void;
   popTo: (index: number) => void;
 }
@@ -18,10 +18,10 @@ export function NavigationStackProvider({
 }: {
   children: ReactNode;
 }): JSX.Element {
-  const [stack, setStack] = useState<(LongID | ID)[]>([ROOT]);
+  const [stack, setStack] = useState<ID[]>([ROOT]);
   const navigate = useNavigate();
 
-  const push = (nodeID: LongID | ID): void => {
+  const push = (nodeID: ID): void => {
     setStack((prev) => [...prev, nodeID]);
     navigate(`/w/${nodeID}`);
   };

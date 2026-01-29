@@ -3,7 +3,7 @@ import { List, OrderedSet, Set } from "immutable";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { getSelectedInView } from "./components/TemporaryViewContext";
-import { getRelations, moveRelations, deleteRelations } from "./connections";
+import { moveRelations, deleteRelations } from "./connections";
 import {
   parseViewPath,
   upsertRelations,
@@ -14,9 +14,9 @@ import {
   updateViewPathsAfterDisconnect,
   getRelationIndex,
   getNodeIDFromView,
-  getParentNodeID,
   getLast,
   getContextFromStackAndViewPath,
+  getRelationForView,
 } from "./ViewContext";
 import { getNodesInTree } from "./components/Node";
 import {
@@ -29,22 +29,17 @@ import {
 
 function getDropDestinationEndOfRoot(
   data: Data,
-  root: ViewPath
+  root: ViewPath,
+  stack: ID[]
 ): [ViewPath, number] {
-  const [rootNodeID, rootView] = getNodeIDFromView(data, root);
-  const relations = getRelations(
-    data.knowledgeDBs,
-    rootView.relations,
-    data.user.publicKey,
-    rootNodeID
-  );
+  const relations = getRelationForView(data, root, stack);
   return [root, relations?.items.size || 0];
 }
 
 export function getDropDestinationFromTreeView(
   data: Data,
   root: ViewPath,
-  stack: (LongID | ID)[],
+  stack: ID[],
   destinationIndex: number,
   rootRelation: LongID | undefined
 ): [ViewPath, number] {
@@ -60,11 +55,11 @@ export function getDropDestinationFromTreeView(
   const adjustedIndex = destinationIndex - 1;
   const dropBefore = nodes.get(adjustedIndex);
   if (!dropBefore) {
-    return getDropDestinationEndOfRoot(data, root);
+    return getDropDestinationEndOfRoot(data, root, stack);
   }
   const parentView = getParentView(dropBefore);
   if (!parentView) {
-    return getDropDestinationEndOfRoot(data, root);
+    return getDropDestinationEndOfRoot(data, root, stack);
   }
   // new index is the current index of the sibling
   const index = getRelationIndex(data, dropBefore, stack);
@@ -85,7 +80,7 @@ export function dnd(
   selection: OrderedSet<string>,
   source: string,
   to: ViewPath,
-  stack: (LongID | ID)[],
+  stack: ID[],
   indexTo: number | undefined,
   rootRelation: LongID | undefined,
   isDiffItem?: boolean
@@ -96,7 +91,7 @@ export function dnd(
   const selectedSources = getSelectedInView(selection, getParentKey(source));
   const sources = selection.contains(source) ? selectedSources : List([source]);
 
-  const [fromRepoID, fromView] = getParentNodeID(plan, sourceViewPath);
+  const sourceParentPath = getParentView(sourceViewPath);
   const [toView, dropIndex] =
     indexTo === undefined
       ? [rootView, undefined]
@@ -108,15 +103,19 @@ export function dnd(
           rootRelation
         );
 
-  const [toNodeID, toV] = getNodeIDFromView(plan, toView);
+  const [toNodeID] = getNodeIDFromView(plan, toView);
+  const fromRelation = sourceParentPath
+    ? getRelationForView(plan, sourceParentPath, stack)
+    : undefined;
+  const toRelation = getRelationForView(plan, toView, stack);
 
   // Diff items are always added, never moved (they're from other users)
   const move =
     !isDiffItem &&
     dropIndex !== undefined &&
-    fromRepoID !== undefined &&
-    toNodeID === fromRepoID &&
-    fromView.relations === toV.relations;
+    fromRelation !== undefined &&
+    toRelation !== undefined &&
+    fromRelation.id === toRelation.id;
 
   if (move) {
     const sourceIndices = List(
@@ -132,7 +131,7 @@ export function dnd(
     );
     const updatedViews = updateViewPathsAfterMoveRelations(
       updatedRelationsPlan,
-      toView,
+      toRelation.id,
       sourceIndices.toArray(),
       dropIndex
     );
@@ -145,7 +144,7 @@ export function dnd(
   // Ensure target is expanded
   const expandedPlan = toViewData.expanded
     ? plan
-    : planExpandNode(plan, toNodeID, toContext, toViewData, toView);
+    : planExpandNode(plan, toViewData, toView);
 
   // Deep copy each source
   return sources.toList().reduce((accPlan: Plan, s: string, idx: number) => {
@@ -174,7 +173,7 @@ export function dnd(
 export function planDisconnectFromParent(
   plan: Plan,
   viewPath: ViewPath,
-  stack: (LongID | ID)[]
+  stack: ID[]
 ): Plan {
   const parentPath = getParentView(viewPath);
   if (!parentPath) {
@@ -187,7 +186,10 @@ export function planDisconnectFromParent(
   }
 
   const { nodeID, nodeIndex } = getLast(viewPath);
-  const [, parentView] = getNodeIDFromView(plan, parentPath);
+  const parentRelation = getRelationForView(plan, parentPath, stack);
+  if (!parentRelation) {
+    return plan;
+  }
 
   // Remove from parent's relations
   const updatedRelationsPlan = upsertRelations(
@@ -201,7 +203,7 @@ export function planDisconnectFromParent(
   const updatedViews = updateViewPathsAfterDisconnect(
     updatedRelationsPlan.views,
     nodeID,
-    parentView.relations || ("" as LongID),
+    parentRelation.id,
     nodeIndex
   );
 

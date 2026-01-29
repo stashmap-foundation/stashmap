@@ -18,7 +18,7 @@ function getArgumentColor(argument: Argument, isHovered: boolean): string {
 function getArgumentSymbol(argument: Argument): string {
   if (argument === "confirms") return "✓";
   if (argument === "contra") return "✗";
-  return "";
+  return "○";
 }
 
 function getNextArgument(current: Argument): Argument {
@@ -51,9 +51,12 @@ export function EvidenceSelector(): JSX.Element | null {
     setArgument(getNextArgument(currentArgument));
   };
 
+  const hasArgument = currentArgument !== undefined;
+
   return (
     <span
       className="evidence-selector"
+      data-has-argument={hasArgument ? "true" : undefined}
       onClick={handleClick}
       onMouseDown={preventEditorBlurIfSameNode}
       onMouseEnter={() => setIsHovered(true)}

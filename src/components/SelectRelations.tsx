@@ -115,7 +115,7 @@ export function ReferencedByToggle(): JSX.Element | null {
       title={isInReferencedBy ? "Show children" : "Show references"}
       style={{ color: "var(--violet)" }}
     >
-      <span aria-hidden="true">⤶</span>
+      <span className="icon" aria-hidden="true">⤶</span>
       <span className="ms-1 font-size-small">
         {referencedByRelations.items.size}
       </span>

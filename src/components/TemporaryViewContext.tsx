@@ -186,7 +186,7 @@ export function ToggleMultiselect(): JSX.Element {
       onClick={onClick}
       aria-label={ariaLabel}
     >
-      <span aria-hidden="true">✓</span>
+      <span className="icon" aria-hidden="true">✓</span>
     </button>
   );
 }
@@ -236,7 +236,7 @@ export function ToggleEditing(): JSX.Element | null {
       onClick={onClick}
       aria-label={ariaLabel}
     >
-      <span aria-hidden="true">✎</span>
+      <span className="icon" aria-hidden="true">✎</span>
     </button>
   );
 }

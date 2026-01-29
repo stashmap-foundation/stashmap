@@ -80,7 +80,7 @@ export function PaneSearchButton(): JSX.Element {
       aria-label={`Search to change pane ${paneIndex} content`}
       title="Search"
     >
-      <span aria-hidden="true">⌕</span>
+      <span className="icon" aria-hidden="true">⌕</span>
     </button>
   );
 }
@@ -113,7 +113,7 @@ export function ClosePaneButton(): JSX.Element | null {
       aria-label="Close pane"
       title="Close pane"
     >
-      <span className="btn-close small" />
+      <span className="icon" aria-hidden="true">×</span>
     </button>
   );
 }
@@ -133,7 +133,7 @@ export function PaneSettingsMenu(): JSX.Element {
         aria-label="open menu"
         tabIndex={0}
       >
-        <span aria-hidden="true">⋮</span>
+        <span className="icon" aria-hidden="true">⋮</span>
       </Dropdown.Toggle>
       <Dropdown.Menu>
         <DeleteWorkspace as="item" />
@@ -143,7 +143,7 @@ export function PaneSettingsMenu(): JSX.Element {
           aria-label="show profile"
           tabIndex={0}
         >
-          <span className="d-block dropdown-item-icon" aria-hidden="true">👤</span>
+          <span className="d-block dropdown-item-icon icon" aria-hidden="true">👤</span>
           <div className="workspace-selection-text">Profile</div>
         </Dropdown.Item>
         <Dropdown.Item
@@ -152,7 +152,7 @@ export function PaneSettingsMenu(): JSX.Element {
           aria-label="follow user"
           tabIndex={0}
         >
-          <span className="d-block dropdown-item-icon" aria-hidden="true">👥</span>
+          <span className="d-block dropdown-item-icon icon" aria-hidden="true">👥</span>
           <div className="workspace-selection-text">Follow User</div>
         </Dropdown.Item>
         <Dropdown.Item
@@ -171,7 +171,7 @@ export function PaneSettingsMenu(): JSX.Element {
             aria-label="logout"
             tabIndex={0}
           >
-            <span className="d-block dropdown-item-icon" aria-hidden="true">↪</span>
+            <span className="d-block dropdown-item-icon icon" aria-hidden="true">↪</span>
             <div className="workspace-selection-text">Log Out</div>
           </Dropdown.Item>
         )}

@@ -322,7 +322,7 @@ export function AddSiblingButton(): JSX.Element | null {
       aria-label={`add to ${displayText}`}
       title="Add note"
     >
-      <span aria-hidden="true">+</span>
+      <span className="icon" aria-hidden="true">+</span>
     </span>
   );
 }

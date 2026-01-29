@@ -4,6 +4,7 @@ import { Outlet } from "react-router-dom";
 import { NavbarControls } from "./NavbarControls";
 import { SplitPaneLayout } from "./SplitPaneLayout";
 import { StorePreLoginContext } from "../StorePreLoginContext";
+import { DND } from "../dnd";
 
 export function AppLayout({
   children,
@@ -30,7 +31,9 @@ function Dashboard(): JSX.Element {
     <StorePreLoginContext>
       <AppLayout>
         <Outlet />
-        <SplitPaneLayout />
+        <DND>
+          <SplitPaneLayout />
+        </DND>
       </AppLayout>
     </StorePreLoginContext>
   );

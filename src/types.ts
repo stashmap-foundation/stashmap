@@ -71,8 +71,8 @@ declare global {
   export type User =
     | KeyPair
     | {
-        publicKey: PublicKey;
-      };
+      publicKey: PublicKey;
+    };
 
   export type Contact = {
     publicKey: PublicKey;
@@ -110,11 +110,11 @@ declare global {
 
   type TemporaryEvent =
     | {
-        type: "ADD_EMPTY_NODE";
-        relationsID: LongID;
-        index: number;
-        relationItem: RelationItem;
-      }
+      type: "ADD_EMPTY_NODE";
+      relationsID: LongID;
+      index: number;
+      relationItem: RelationItem;
+    }
     | { type: "REMOVE_EMPTY_NODE"; relationsID: LongID };
 
   type EventState = PublishEvents<EventAttachment> & {
@@ -171,9 +171,7 @@ declare global {
   type LongID = string & { readonly "": unique symbol };
 
   type View = {
-    virtualLists?: Array<LongID>;
     viewingMode: "REFERENCED_BY" | undefined;
-    width: number;
     // Show children, only relevant for inner nodes
     expanded?: boolean;
     // Type filters for children view (empty/undefined = defaults: relevant, maybe_relevant, confirms, contra, suggestions)

@@ -1121,6 +1121,7 @@ export function planSetEmptyNodePosition(
     isRoot(parentPath)
   );
   if (!relations) {
+    console.log(">>>>> NO RELATIONS");
     return plan;
   }
 

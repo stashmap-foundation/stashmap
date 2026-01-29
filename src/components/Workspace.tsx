@@ -2,7 +2,6 @@ import React from "react";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
 
 import { getNodeFromID, useViewPath } from "../ViewContext";
-import { DND } from "../dnd";
 import { useData } from "../DataContext";
 import {
   useSplitPanes,
@@ -146,9 +145,7 @@ export function WorkspaceView(): JSX.Element | null {
       <div className={`pane-wrapper ${isOtherUser ? "pane-other-user" : ""}`}>
         <PaneHeader />
         <div className="pane-content">
-          <DND>
-            <TreeView />
-          </DND>
+          <TreeView />
         </div>
       </div>
     </TemporaryViewProvider>

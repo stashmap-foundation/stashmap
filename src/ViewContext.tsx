@@ -353,7 +353,6 @@ export function getDefaultRelationForNode(
 function getDefaultView(id: ID): View {
   return {
     viewingMode: undefined,
-    width: 1,
     expanded: id === "ROOT" || isSearchId(id),
   };
 }
@@ -715,6 +714,7 @@ export function getParentView(viewContext: ViewPath): ViewPath | undefined {
  * Check if the current node is not in my list but in the list of another user.
  */
 export function useIsDiffItem(): boolean {
+  return false;
   const data = useData();
   const viewPath = useViewPath();
   const stack = usePaneStack();
@@ -765,6 +765,7 @@ export function useIsDiffItem(): boolean {
  * Walks up all ancestors to check if any has relations === REFERENCED_BY.
  */
 export function useIsInReferencedByView(): boolean {
+  return false;
   return useReferencedByDepth() !== undefined;
 }
 

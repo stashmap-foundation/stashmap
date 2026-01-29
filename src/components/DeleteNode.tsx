@@ -70,7 +70,7 @@ export function DeleteWorkspace({
         className="d-flex workspace-selection dropdown-item-border-bottom"
         tabIndex={0}
       >
-        <span className="d-block dropdown-item-icon icon" aria-hidden="true">×</span>
+        <span className="d-block dropdown-item-icon" aria-hidden="true">×</span>
         <div className="workspace-selection-text">Delete Workspace</div>
       </Dropdown.Item>
     );
@@ -83,7 +83,7 @@ export function DeleteWorkspace({
       className="btn font-size-small"
       ariaLabel="delete workspace"
     >
-      <span className="icon" aria-hidden="true">×</span>
+      <span aria-hidden="true">×</span>
       {withCaption && <span className="ms-2">Delete Workspace</span>}
     </Button>
   );
@@ -123,7 +123,7 @@ export function DeleteNode({
       className="btn font-size-small"
       ariaLabel="delete node"
     >
-      <span className="icon" aria-hidden="true">×</span>
+      <span aria-hidden="true">×</span>
       {withCaption && <span className="ms-2">Delete</span>}
     </Button>
   );

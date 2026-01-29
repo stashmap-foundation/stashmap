@@ -54,7 +54,7 @@ function UserPublicIdentifier({
               className="btn-borderless background-white"
               onClick={copyToClipboard}
             >
-              <span className="icon" aria-hidden="true">
+              <span aria-hidden="true">
                 {showCopiedSuccess ? "✓" : "⎘"}
               </span>
             </Button>
@@ -64,7 +64,7 @@ function UserPublicIdentifier({
               }`}
               onClick={toggleQrCode}
             >
-              <span className="icon" aria-hidden="true">▣</span>
+              <span aria-hidden="true">▣</span>
             </Button>
           </div>
         </div>

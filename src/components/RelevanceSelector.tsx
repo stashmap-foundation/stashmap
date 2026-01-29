@@ -151,23 +151,14 @@ export function RelevanceSelector({
     <div
       className="relevance-selector"
       onMouseLeave={() => setHoverLevel(null)}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "2px",
-        padding: "2px 6px",
-        borderRadius: "12px",
-        backgroundColor: "rgba(0,0,0,0.04)",
-        cursor: "pointer",
-      }}
       title={
         effectiveDisplayLevel >= 0
           ? RELEVANCE_LABELS[effectiveDisplayLevel]
           : "Set relevance"
       }
     >
-      {/* X for not relevant (or trash for remove) - on left */}
       <span
+        className="relevance-x"
         onClick={handleXClick}
         onMouseDown={preventEditorBlurIfSameNode}
         onMouseEnter={() => setHoverLevel(0)}
@@ -185,31 +176,21 @@ export function RelevanceSelector({
           }
         }}
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: "18px",
-          height: "18px",
-          fontSize: "1.2rem",
-          fontWeight: 600,
-          lineHeight: 1,
-          borderRadius: "50%",
           color: isNotRelevant ? "#fff" : "#888",
           backgroundColor: getXButtonBackgroundColor(
             isNotRelevant,
             isCurrentlyNotRelevant
           ),
-          transition: "all 0.15s ease",
         }}
         title={isCurrentlyNotRelevant ? "Remove from list" : undefined}
       >
         ×
       </span>
 
-      {/* Dots for levels 1-3 */}
       {[1, 2, 3].map((level) => (
         <span
           key={level}
+          className="relevance-dot"
           onClick={() => handleSetLevel(level)}
           onMouseDown={preventEditorBlurIfSameNode}
           onMouseEnter={() => setHoverLevel(level)}
@@ -218,8 +199,8 @@ export function RelevanceSelector({
           aria-label={
             isDiffItem
               ? `accept ${displayText} as ${RELEVANCE_LABELS[
-                  level
-                ].toLowerCase()}`
+                level
+              ].toLowerCase()}`
               : `set ${displayText} to ${RELEVANCE_LABELS[level].toLowerCase()}`
           }
           onKeyDown={(e) => {
@@ -229,15 +210,11 @@ export function RelevanceSelector({
             }
           }}
           style={{
-            width: "18px",
-            height: "18px",
-            borderRadius: "50%",
             backgroundColor: getLevelColor(
               level,
               effectiveDisplayLevel,
               isNotRelevant
             ),
-            transition: "all 0.15s ease",
           }}
         />
       ))}

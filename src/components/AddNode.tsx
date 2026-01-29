@@ -227,17 +227,15 @@ export function MiniEditor({
   return (
     <span
       role="presentation"
+      className="mini-editor-wrapper"
       onClick={handleWrapperClick}
       onKeyDown={() => {}}
-      style={{
-        paddingRight: "30px",
-        cursor: "text",
-      }}
     >
       <span
         ref={editorRef}
         role="textbox"
         tabIndex={0}
+        className="mini-editor"
         contentEditable
         suppressContentEditableWarning
         onKeyDown={handleKeyDown}
@@ -245,10 +243,6 @@ export function MiniEditor({
         onPaste={handlePaste}
         onInput={handleInput}
         aria-label={ariaLabel || "note editor"}
-        style={{
-          outline: "none",
-          minWidth: "1px",
-        }}
       >
         {initialText}
       </span>
@@ -322,7 +316,7 @@ export function AddSiblingButton(): JSX.Element | null {
       aria-label={`add to ${displayText}`}
       title="Add note"
     >
-      <span className="icon" aria-hidden="true">+</span>
+      <span aria-hidden="true">+</span>
     </span>
   );
 }

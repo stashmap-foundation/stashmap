@@ -62,23 +62,13 @@ function ReferenceDot(): JSX.Element | null {
   return (
     <button
       type="button"
-      className="btn btn-borderless p-0 d-flex align-items-center justify-content-center"
+      className="btn btn-borderless p-0 reference-dot"
       onClick={handleClick}
       aria-label={ariaLabel}
       title={
         isInReferencedBy ? "Show children" : `Show ${referenceCount} references`
       }
-      style={{
-        width: "18px",
-        height: "18px",
-        borderRadius: "50%",
-        backgroundColor: dotColor,
-        color: "white",
-        fontSize: "0.65rem",
-        fontWeight: 600,
-        lineHeight: 1,
-        minWidth: "18px",
-      }}
+      style={{ backgroundColor: dotColor }}
     >
       {referenceCount}
     </button>
@@ -118,16 +108,7 @@ function FilterAndReferencesToggle(): JSX.Element | null {
   const isInReferencedBy = view && isReferencedByView(view);
 
   return (
-    <div
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "4px",
-        padding: "2px 6px",
-        borderRadius: "12px",
-        backgroundColor: "rgba(0,0,0,0.04)",
-      }}
-    >
+    <div className="filter-references-toggle">
       <ReferenceDot />
       {isInReferencedBy ? <GrayedFilterDots /> : <TypeFilterButton />}
     </div>

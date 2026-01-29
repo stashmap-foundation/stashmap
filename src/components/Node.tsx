@@ -98,13 +98,16 @@ function ExpandCollapseToggle(): JSX.Element | null {
   const isExpanded = useIsExpanded();
   const isEmptyNode = isEmptyNodeID(nodeID);
 
-  const baseColor = showReferencedByStyle ? TYPE_COLORS.referenced_by : "var(--base01)";
-  const color = isEmptyNode ? "var(--base02)" : baseColor;
-
   const onToggle = (): void => {
     if (isEmptyNode) return;
     onToggleExpanded(!isExpanded);
   };
+
+  const toggleClass = [
+    "expand-collapse-toggle",
+    showReferencedByStyle ? "toggle-referenced-by" : "",
+    isEmptyNode ? "toggle-disabled" : "",
+  ].filter(Boolean).join(" ");
 
   return (
     <button
@@ -112,15 +115,11 @@ function ExpandCollapseToggle(): JSX.Element | null {
       onClick={onToggle}
       onMouseDown={preventEditorBlurIfSameNode}
       disabled={isEmptyNode}
-      className="expand-collapse-toggle"
+      className={toggleClass}
       aria-label={
         isExpanded ? `collapse ${displayText}` : `expand ${displayText}`
       }
       aria-expanded={isExpanded}
-      style={{
-        color,
-        cursor: isEmptyNode ? "default" : "pointer",
-      }}
     >
       <span className={`triangle ${isExpanded ? "expanded" : "collapsed"}`}>
         {isExpanded ? "▼" : "▶"}
@@ -185,9 +184,9 @@ function NodeContent({
   const referenceStyle: React.CSSProperties = isReference
     ? {
       fontStyle: "italic",
-      color: "#5a7bad",
+      color: "var(--blue)",
       textDecoration: "none",
-      borderBottom: "1px dotted #8fadd4",
+      borderBottom: "1px dotted var(--cyan)",
     }
     : {};
 
@@ -633,11 +632,6 @@ function DiffItemIndicator(): JSX.Element {
     <span
       className="diff-indicator"
       title="Suggestion from other users"
-      style={{
-        color: TYPE_COLORS.other_user,
-        marginRight: "6px",
-        fontSize: "1rem",
-      }}
       aria-hidden="true"
     >
       ●
@@ -686,18 +680,17 @@ export function Node({
   // Never show for concrete refs - they are terminal nodes
   const showExpandCollapse = !isDiffItem && !isConcreteRef && (!isInReferencedByView || isAbstractRef);
 
-  // Styling for Referenced By view - violet color, no background
-  // Diff items just get orange text, no background
-  const getContentStyle = (): React.CSSProperties | undefined => {
+  // Content class for styling based on view mode
+  const getContentClass = (): string => {
     if (isDiffItem) {
-      return { color: TYPE_COLORS.other_user };
+      return "content-diff-item";
     }
     if (showReferencedByBackground) {
-      return { color: TYPE_COLORS.referenced_by };
+      return "content-referenced-by";
     }
-    return undefined;
+    return "";
   };
-  const contentBackgroundStyle = getContentStyle();
+  const contentClass = getContentClass();
 
   return (
     <EditorTextProvider>
@@ -719,22 +712,15 @@ export function Node({
           <button
             type="button"
             disabled
-            className="expand-collapse-toggle"
+            className="expand-collapse-toggle toggle-hidden"
             aria-label="concrete reference"
             aria-hidden="true"
-            style={{
-              color: "transparent",
-              cursor: "default",
-            }}
           >
             <span className="triangle collapsed">▶</span>
           </button>
         )}
         {isMultiselect && <NodeSelectbox />}
-        <div
-          className="w-100"
-          style={{ paddingTop: 10, ...contentBackgroundStyle }}
-        >
+        <div className={`w-100 node-content-wrapper ${contentClass}`}>
           <span style={textStyle}>
             <NodeAutoLink>
               {isDiffItem && <DiffItemIndicator />}

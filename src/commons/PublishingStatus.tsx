@@ -197,7 +197,7 @@ export function PublishingStatus<T = void>({
         {publishEventsStatus.isLoading === true ? (
           <Spinner role="status" size="sm" />
         ) : (
-          <span className="icon" style={{ color: warningColor }} aria-hidden="true">ℹ</span>
+          <span style={{ color: warningColor }} aria-hidden="true">ℹ</span>
         )}
       </Dropdown.Toggle>
       <Dropdown.Menu

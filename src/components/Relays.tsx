@@ -61,7 +61,7 @@ function DeleteRelayButton({
       className="btn font-size-small"
       ariaLabel={ariaLabel}
     >
-      <span className="icon" aria-hidden="true">×</span>
+      <span aria-hidden="true">×</span>
     </Button>
   );
 }
@@ -76,7 +76,7 @@ function AddRelayButton({
       className="btn font-size-small"
       ariaLabel={ariaLabel}
     >
-      <span className="icon" aria-hidden="true">+</span>
+      <span aria-hidden="true">+</span>
     </Button>
   );
 }
@@ -273,7 +273,7 @@ function NewRelay({ onSave }: NewRelayProps): JSX.Element {
                   pasteFromClipboard(inputElementAriaLabel, setInput)
                 }
               >
-                <span className="icon" aria-hidden="true">⎘</span>
+                <span aria-hidden="true">⎘</span>
               </Button>
             </div>
           </div>

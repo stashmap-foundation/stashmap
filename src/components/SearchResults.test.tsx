@@ -126,4 +126,77 @@ Search: Shared Topic
     [O] My Notes (1) → Shared Topic
     `);
   });
+
+  test("Search result context paths never show Loading text", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Barcelona{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    Spain
+      Barcelona
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText("Search to change pane 0 content")
+    );
+    await userEvent.type(
+      await screen.findByLabelText("search input"),
+      "Barcelona{Enter}"
+    );
+
+    await expectTree(`
+Search: Barcelona
+  My Notes → Holiday Destinations → Spain (1) → Barcelona
+    `);
+
+    expect(screen.queryByText(/Loading/)).toBeNull();
+  });
+
+  test("Cross-user search result context paths never show Loading text", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderApp(bob());
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Barcelona{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    Spain
+      Barcelona
+    `);
+
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    renderApp(alice());
+
+    await userEvent.click(
+      await screen.findByLabelText("Search to change pane 0 content")
+    );
+    await userEvent.type(
+      await screen.findByLabelText("search input"),
+      "Barcelona{Enter}"
+    );
+
+    await expectTree(`
+Search: Barcelona
+  [O] My Notes → Holiday Destinations → Spain (1) → Barcelona
+    `);
+
+    expect(screen.queryByText(/Loading/)).toBeNull();
+  });
 });

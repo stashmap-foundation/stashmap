@@ -198,4 +198,39 @@ My Notes
     My Notes → Test B (1)
     `);
   });
+
+  test("Concrete reference paths never show Loading text", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Level1{Enter}{Tab}Level2{Enter}{Tab}Level3{Enter}{Tab}Target{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Level1
+    Level2
+      Level3
+        Target
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText("show references to Target")
+    );
+
+    await expectTree(`
+My Notes
+  Level1
+    Level2
+      Level3
+        Target
+          My Notes → Level1 → Level2 → Level3 (1) → Target
+    `);
+
+    expect(screen.queryByText(/Loading/)).toBeNull();
+  });
 });

@@ -33,7 +33,14 @@ import {
   LoadMissingVersionNodes,
 } from "../dataQuery";
 import { RegisterQuery } from "../LoadingStatus";
-import { shortID, isSearchId, getRelations } from "../connections";
+import {
+  shortID,
+  isSearchId,
+  getRelations,
+  isConcreteRefId,
+  parseConcreteRefId,
+  getRelationsNoReferencedBy,
+} from "../connections";
 import { useApis } from "../Apis";
 
 function getAncestorPaths(path: string, rootKey: string): string[] {
@@ -175,10 +182,33 @@ export function TreeViewNodeLoader({
     ? nodeIDs.slice(range.startIndex, range.endIndex + 1 + LOAD_EXTRA) // +1 because slice doesn't include last element
     : nodeIDs;
 
-  const filter = nodeIDsWithRange.reduce(
-    (rdx, nodeID) => addNodeToFilters(rdx, nodeID),
-    baseFilter
-  );
+  const filter = nodeIDsWithRange.reduce((rdx, nodeID) => {
+    const withNode = addNodeToFilters(rdx, nodeID);
+
+    if (!isConcreteRefId(nodeID)) {
+      return withNode;
+    }
+
+    const parsed = parseConcreteRefId(nodeID);
+    if (!parsed) {
+      return withNode;
+    }
+
+    const relation = getRelationsNoReferencedBy(
+      data.knowledgeDBs,
+      parsed.relationID,
+      data.user.publicKey
+    );
+    if (!relation) {
+      return withNode;
+    }
+
+    const contextNodes = [...relation.context.toArray(), relation.head] as ID[];
+    return contextNodes.reduce(
+      (acc, contextNodeID) => addNodeToFilters(acc, contextNodeID),
+      withNode
+    );
+  }, baseFilter);
 
   const finalFilter = filtersToFilterArray(filter);
   const { knowledgeDBs: mergedDBs, allEventsProcessed } =

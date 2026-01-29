@@ -10,7 +10,7 @@ import {
 import { getConcreteRefs, isReferenceNode } from "../connections";
 import { useData } from "../DataContext";
 import { TYPE_COLORS } from "../constants";
-import { SiblingSearchButton, AddSiblingButton } from "./AddNode";
+import { AddSiblingButton } from "./AddNode";
 
 function useSwitchToNormalRelations(): () => void {
   const onChangeViewingMode = useOnChangeViewingMode();
@@ -138,7 +138,6 @@ export function LeftMenu(): JSX.Element {
   return (
     <div className="left-menu">
       <AddSiblingButton />
-      <SiblingSearchButton />
       <FilterAndReferencesToggle />
     </div>
   );

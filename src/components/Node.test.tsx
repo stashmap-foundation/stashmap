@@ -552,60 +552,6 @@ test("getDiffItemsForNode should return no diff items for not_relevant relation 
   expect(diffItems.size).toBe(0);
 });
 
-test.skip("Multiple connections to same node", async () => {
-  const [alice] = setup([ALICE]);
-  const java = newNode("Java");
-  const pl = newNode("Programming Languages");
-  const rootRelations = addRelationToRelations(
-    newRelations("ROOT", List(), alice().user.publicKey),
-    pl.id
-  );
-  await execute({
-    ...alice(),
-    plan: planUpsertRelations(
-      planBulkUpsertNodes(createPlan(alice()), [java, pl]),
-      rootRelations
-    ),
-  });
-
-  renderApp(alice());
-  await screen.findByText("Programming Languages");
-
-  // Expand the node to show children area
-  const expandButton = await screen.findByLabelText(
-    "expand Programming Languages"
-  );
-  fireEvent.click(expandButton);
-
-  const searchButton = await screen.findByLabelText(
-    "search and attach to Programming Languages"
-  );
-  fireEvent.click(searchButton);
-
-  const searchInput = await screen.findByLabelText("search input");
-  await userEvent.type(searchInput, "Jav");
-  await userEvent.click(await screen.findByText(matchSplitText("Java")));
-
-  const searchButton2 = await screen.findByLabelText(
-    "search and attach to Programming Languages"
-  );
-  fireEvent.click(searchButton2);
-  const searchInput2 = await screen.findByLabelText("search input");
-  await userEvent.type(searchInput2, "Jav");
-  await waitFor(() => {
-    expect(screen.getAllByText(matchSplitText("Java"))).toHaveLength(2);
-  });
-  await userEvent.click(screen.getAllByText(matchSplitText("Java"))[1]);
-
-  const fullscreenButtons = await screen.findAllByLabelText("open fullscreen");
-  fireEvent.click(fullscreenButtons[0]);
-
-  expect(
-    (await screen.findByLabelText("related to Programming Languages"))
-      .textContent
-  ).toMatch(/Java(.*)Java/);
-});
-
 // Tests for inline node creation via keyboard
 describe("Inline Node Creation", () => {
   test("Create new sibling node by pressing Enter on existing node", async () => {

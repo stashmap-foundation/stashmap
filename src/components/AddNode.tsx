@@ -6,13 +6,10 @@ import {
   useIsInReferencedByView,
 } from "../ViewContext";
 import { useEditorText } from "./EditorTextContext";
-import useModal from "./useModal";
-import { SearchModal } from "./SearchModal";
 import {
   usePlanner,
   planSetEmptyNodePosition,
   planSaveNodeAndEnsureRelations,
-  planAddToParent,
 } from "../planner";
 import { usePaneStack, useIsViewingOtherUserContent } from "../SplitPanesContext";
 
@@ -28,41 +25,6 @@ export function preventEditorBlurIfSameNode(e: React.MouseEvent): void {
   if (nodeContainer?.contains(document.activeElement)) {
     e.preventDefault();
   }
-}
-
-function SearchButton({
-  onClick,
-  onMouseDown,
-}: {
-  onClick: () => void;
-  onMouseDown?: (e: React.MouseEvent) => void;
-}): JSX.Element {
-  const versionedDisplayText = useDisplayText();
-  const editorTextContext = useEditorText();
-  const editorText = editorTextContext?.text ?? "";
-  const displayText = editorText.trim() || versionedDisplayText;
-  const ariaLabel = displayText
-    ? `search and attach to ${displayText}`
-    : "search";
-  return (
-    <span
-      className="btn btn-borderless p-0"
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onMouseDown={onMouseDown}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-      aria-label={ariaLabel}
-    >
-      <span className="simple-icon-magnifier" />
-      <span className="visually-hidden">Search</span>
-    </span>
-  );
 }
 
 function getUrlFromText(text: string): string | undefined {
@@ -302,55 +264,6 @@ type EditorProps = {
 
 export function Editor({ onCreateNode, onClose }: EditorProps): JSX.Element {
   return <MiniEditor onSave={(text) => onCreateNode(text)} onClose={onClose} />;
-}
-
-export function SiblingSearchButton(): JSX.Element | null {
-  const { openModal, closeModal, isOpen } = useModal();
-  const nextInsertPosition = useNextInsertPosition();
-  const viewPath = useViewPath();
-  const stack = usePaneStack();
-  const { createPlan, executePlan } = usePlanner();
-  const editorTextContext = useEditorText();
-  const isViewingOtherUserContent = useIsViewingOtherUserContent();
-  const isInReferencedByView = useIsInReferencedByView();
-
-  if (!nextInsertPosition || isViewingOtherUserContent || isInReferencedByView) {
-    return null;
-  }
-
-  const handleAddWithSave = (nodeIDToAdd: ID): void => {
-    const [targetPath, insertIndex] = nextInsertPosition;
-    const editorText = editorTextContext?.text ?? "";
-    const planWithSave = planSaveNodeAndEnsureRelations(
-      createPlan(),
-      editorText,
-      viewPath,
-      stack
-    );
-    const plan = planAddToParent(
-      planWithSave,
-      nodeIDToAdd,
-      targetPath,
-      stack,
-      insertIndex
-    );
-    executePlan(plan);
-  };
-
-  return (
-    <>
-      {isOpen && (
-        <SearchModal
-          onAddExistingNode={handleAddWithSave}
-          onHide={closeModal}
-        />
-      )}
-      <SearchButton
-        onClick={openModal}
-        onMouseDown={preventEditorBlurIfSameNode}
-      />
-    </>
-  );
 }
 
 export function AddSiblingButton(): JSX.Element | null {

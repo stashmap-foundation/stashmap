@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   BOB,
+  expectTree,
   follow,
   renderTree,
   setup,
@@ -17,40 +18,38 @@ test("Load Referenced By Nodes", async () => {
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
-  // Create: My Notes -> [Money -> Bitcoin, Cryptocurrencies -> Bitcoin, P2P Apps -> Bitcoin]
-  // Bitcoin will be attached to multiple parents
-  await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
-  await userEvent.type(await findNewNodeEditor(), "Money{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Cryptocurrencies{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "P2P Apps{Escape}");
-
-  // Add Bitcoin under Money
-  await userEvent.click(await screen.findByLabelText("expand Money"));
-  await userEvent.click(await screen.findByLabelText("add to Money"));
-  await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
-
-  // Attach same Bitcoin to Cryptocurrencies
-  await userEvent.click(
-    await screen.findByLabelText("expand Cryptocurrencies")
+  // Create: My Notes -> Money -> Bitcoin, Cryptocurrencies -> Bitcoin, P2P Apps -> Bitcoin
+  // Since nodes are content-addressed, typing "Bitcoin" multiple times creates the same node
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "Money{Enter}{Tab}Bitcoin{Escape}"
   );
-  await userEvent.click(
-    await screen.findByLabelText("search and attach to Cryptocurrencies")
-  );
-  await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
-  await userEvent.click(await screen.findByLabelText("select Bitcoin"));
 
-  // Attach same Bitcoin to P2P Apps
-  await userEvent.click(await screen.findByLabelText("expand P2P Apps"));
-  await userEvent.click(
-    await screen.findByLabelText("search and attach to P2P Apps")
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "Cryptocurrencies{Enter}{Tab}Bitcoin{Escape}"
   );
-  await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
-  await userEvent.click(await screen.findByLabelText("select Bitcoin"));
 
-  // Verify Bitcoin appears under all three parents
-  const bitcoinElements = await screen.findAllByText("Bitcoin");
-  expect(bitcoinElements.length).toBe(3);
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "P2P Apps{Enter}{Tab}Bitcoin{Escape}"
+  );
+
+  await expectTree(`
+My Notes
+  P2P Apps
+    Bitcoin
+  Cryptocurrencies
+    Bitcoin
+  Money
+    Bitcoin
+  `);
 
   // Click show references on Bitcoin (pick first one)
   const showRefBtns = screen.getAllByLabelText("show references to Bitcoin");
@@ -72,36 +71,29 @@ test("Show Referenced By with content details", async () => {
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
-  // Create hierarchy: My Notes -> Money -> Bitcoin
-  // Also create: My Notes -> P2P Apps -> Bitcoin (same Bitcoin node referenced twice)
-  await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
-  await userEvent.type(await findNewNodeEditor(), "Money{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "P2P Apps{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-  // Add Bitcoin under Money
-  await userEvent.click(await screen.findByLabelText("expand Money"));
-  await userEvent.click(await screen.findByLabelText("add to Money"));
-  await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
-
-  // Wait for Bitcoin to appear
-  await screen.findByText("Bitcoin");
-
-  // Attach same Bitcoin to P2P Apps via search
-  await userEvent.click(await screen.findByLabelText("expand P2P Apps"));
-  await userEvent.click(
-    await screen.findByLabelText("search and attach to P2P Apps")
+  // Create: My Notes -> Money -> Bitcoin, P2P Apps -> Bitcoin
+  // Since nodes are content-addressed, typing "Bitcoin" twice creates the same node
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "Money{Enter}{Tab}Bitcoin{Escape}"
   );
-  await userEvent.type(await screen.findByLabelText("search input"), "Bitcoin");
-  // Wait for search results
-  await screen.findByLabelText("select Bitcoin");
-  await userEvent.click(await screen.findByLabelText("select Bitcoin"));
 
-  // Wait for the Bitcoin to appear under P2P Apps
-  // There should now be 2 Bitcoin elements (one under Money, one under P2P Apps)
-  const bitcoinElements = await screen.findAllByText("Bitcoin");
-  expect(bitcoinElements.length).toBe(2);
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "P2P Apps{Enter}{Tab}Bitcoin{Escape}"
+  );
+
+  await expectTree(`
+My Notes
+  P2P Apps
+    Bitcoin
+  Money
+    Bitcoin
+  `);
 
   // Click on Bitcoin's "show references" button to see its references
   const bitcoinLabels = screen.getAllByLabelText("show references to Bitcoin");
@@ -111,7 +103,6 @@ test("Show Referenced By with content details", async () => {
   await screen.findByLabelText("hide references to Bitcoin");
 
   // The references should show as paths containing Money and P2P Apps
-  // Bitcoin is referenced from two places - paths like "My Notes → Money → Bitcoin"
   const moneyMatches = await screen.findAllByText(/Money/);
   expect(moneyMatches.length).toBeGreaterThanOrEqual(1);
   const p2pMatches = await screen.findAllByText(/P2P Apps/);

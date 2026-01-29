@@ -1,86 +1,83 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { List } from "immutable";
+// eslint-disable-next-line import/no-unresolved
+import { BasicRelayInformation } from "nostr-tools/lib/types/nip11";
 import {
+  renderApp,
+  setup,
   ALICE,
   expectTree,
   findNewNodeEditor,
-  renderTree,
-  setup,
 } from "../utils.test";
-import { newNode, addRelationToRelations } from "../connections";
-import { newRelations } from "../ViewContext";
-import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
-import { execute } from "../executor";
 
 describe("Search", () => {
-  test("Search finds nodes that are children of other nodes", async () => {
+  test("NIP-50 relay search returns results that might not match client-side filter", async () => {
     const [alice] = setup([ALICE]);
-    renderTree(alice);
+    renderApp({
+      ...alice(),
+      nip11: {
+        searchDebounce: 0,
+        fetchRelayInformation: () => {
+          return Promise.resolve({
+            supported_nips: [50],
+          } as BasicRelayInformation);
+        },
+      },
+    });
 
-    // Create a node under My Notes
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("add to My Notes"));
-    await userEvent.type(await findNewNodeEditor(), "Findable Child{Escape}");
+    const myNotesEditor = await screen.findByLabelText("edit My Notes");
+    await userEvent.click(myNotesEditor);
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
 
     await expectTree(`
 My Notes
-  Findable Child
+  Bitcoin
     `);
 
-    // Search for the node
     await userEvent.click(
       await screen.findByLabelText("Search to change pane 0 content")
     );
-    await userEvent.type(
-      await screen.findByLabelText("search input"),
-      "Findable Child{Enter}"
-    );
+    const searchInput = await screen.findByLabelText("search input");
+    await userEvent.type(searchInput, "Bitcorn{Enter}");
 
-    // Should find the node as a reference showing where it's referenced from
     await expectTree(`
-Search: Findable Child
-  My Notes (1) → Findable Child
+Search: Bitcorn
+  My Notes (1) → Bitcoin
     `);
   });
 
-  test("Search finds nodes that are list heads (have children but no parent)", async () => {
+  test("Client side filtering excludes non-matching results", async () => {
     const [alice] = setup([ALICE]);
-    const { publicKey: alicePK } = alice().user;
+    renderApp(alice());
 
-    // Create a node that is a list head (has children but isn't in any other list)
-    const parentNode = newNode("Orphan Parent");
-    const childNode = newNode("Child of Orphan");
-
-    const relations = addRelationToRelations(
-      newRelations(parentNode.id, List(), alicePK),
-      childNode.id
+    const myNotesEditor = await screen.findByLabelText("edit My Notes");
+    await userEvent.click(myNotesEditor);
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Bitcoin{Enter}Bircoin{Escape}"
     );
 
-    const plan = planUpsertRelations(
-      planUpsertNode(
-        planUpsertNode(createPlan(alice()), parentNode),
-        childNode
-      ),
-      relations
-    );
-    await execute({ ...alice(), plan });
+    await expectTree(`
+My Notes
+  Bitcoin
+  Bircoin
+    `);
 
-    renderTree(alice);
-
-    // Search for the parent node
     await userEvent.click(
       await screen.findByLabelText("Search to change pane 0 content")
     );
-    await userEvent.type(
-      await screen.findByLabelText("search input"),
-      "Orphan Parent{Enter}"
-    );
+    const searchInput = await screen.findByLabelText("search input");
+    await userEvent.type(searchInput, "Bitcoin{Enter}");
 
-    // Should find the node - shown with item count since it's a list head
     await expectTree(`
-Search: Orphan Parent
-  Orphan Parent (1)
+Search: Bitcoin
+  My Notes (2) → Bitcoin
     `);
+
+    await waitFor(() => {
+      expect(screen.queryByText("Bircoin")).toBeNull();
+    });
   });
 });

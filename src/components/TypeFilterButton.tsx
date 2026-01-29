@@ -54,14 +54,8 @@ function FilterDot({
 }): JSX.Element {
   return (
     <span
-      style={{
-        display: "inline-block",
-        width: "6px",
-        height: "6px",
-        borderRadius: "50%",
-        backgroundColor: isActive ? color : TYPE_COLORS.inactive,
-        margin: "1px",
-      }}
+      className="filter-dot"
+      style={{ backgroundColor: isActive ? color : TYPE_COLORS.inactive }}
     />
   );
 }
@@ -78,7 +72,7 @@ export function FilterDotsDisplay({
   const isActive = (id: FilterId): boolean => activeFilters.includes(id);
 
   return (
-    <span className="d-flex gap-0" style={{ lineHeight: 1 }}>
+    <span className="d-flex gap-0">
       <span className="d-flex flex-column">
         {COL_1_FILTERS.map((f) => (
           <FilterDot key={f.id} color={f.color} isActive={isActive(f.id)} />
@@ -88,7 +82,6 @@ export function FilterDotsDisplay({
         {COL_2_FILTERS.map((f) => (
           <FilterDot key={f.id} color={f.color} isActive={isActive(f.id)} />
         ))}
-        {/* Padding dot to align columns */}
         <FilterDot color={TYPE_COLORS.inactive} isActive={false} />
       </span>
     </span>
@@ -110,8 +103,7 @@ function FilterItem({
 }): JSX.Element {
   return (
     <div
-      className="d-flex align-items-center gap-2 mb-1"
-      style={{ fontSize: "0.85rem", cursor: "pointer" }}
+      className="filter-item"
       onClick={() => onClick(id)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -125,15 +117,10 @@ function FilterItem({
       aria-pressed={isActive}
     >
       <span
-        style={{
-          display: "inline-block",
-          width: "10px",
-          height: "10px",
-          borderRadius: "50%",
-          backgroundColor: isActive ? color : TYPE_COLORS.inactive,
-        }}
+        className="filter-dot filter-dot-large"
+        style={{ backgroundColor: isActive ? color : TYPE_COLORS.inactive }}
       />
-      <span style={{ color: isActive ? "inherit" : "#999" }}>{label}</span>
+      <span className={isActive ? "" : "text-muted"}>{label}</span>
     </div>
   );
 }
@@ -166,7 +153,7 @@ export function TypeFilterButton(): JSX.Element | null {
     return (
       <button
         type="button"
-        className="btn btn-borderless p-0"
+        className="btn btn-icon"
         onMouseDown={preventEditorBlurIfSameNode}
         disabled
         aria-label={`filter ${displayText}`}
@@ -206,7 +193,7 @@ export function TypeFilterButton(): JSX.Element | null {
       <button
         ref={buttonRef}
         type="button"
-        className="btn btn-borderless p-0"
+        className="btn btn-icon"
         onClick={() => setShow(!show)}
         aria-label={`filter ${displayText}`}
         title="Filter by relation type"

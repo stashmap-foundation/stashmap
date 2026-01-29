@@ -158,23 +158,17 @@ export function Follow(): JSX.Element {
           <Form onSubmit={onSubmit}>
             <div className="d-flex m-2 align-items-center">
               <InputGroup>
-                <div style={{ position: "relative", flexGrow: 1 }}>
+                <div className="input-with-overlay">
                   <FormControlWrapper
                     aria-label={inputElementAriaLabel}
                     defaultValue=""
                     onChange={onChange}
                     placeholder="Enter npub, nprofile or nostr address"
-                    className="p-2 w-100"
+                    className="form-control w-100"
                   />
-                  <div
-                    style={{
-                      position: "absolute",
-                      right: "10px",
-                      top: "15%",
-                    }}
-                  >
+                  <div className="input-overlay-buttons">
                     <Button
-                      className="btn-borderless background-transparent"
+                      className="btn btn-icon"
                       onClick={() =>
                         pasteFromClipboard(inputElementAriaLabel, setInput)
                       }
@@ -246,8 +240,7 @@ export function Follow(): JSX.Element {
             value={npub}
             readOnly
             disabled
-            className="p-2"
-            style={{ flexGrow: 1 }}
+            className="form-control flex-grow-1"
           />
           <div className="ms-4">
             <Button

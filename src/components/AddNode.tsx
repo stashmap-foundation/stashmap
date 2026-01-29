@@ -304,7 +304,7 @@ export function AddSiblingButton(): JSX.Element | null {
     <span
       role="button"
       tabIndex={0}
-      className="btn btn-borderless p-0"
+      className="btn btn-icon"
       onClick={handleClick}
       onMouseDown={preventEditorBlurIfSameNode}
       onKeyDown={(e) => {

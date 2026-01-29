@@ -182,7 +182,7 @@ export function ToggleMultiselect(): JSX.Element {
   return (
     <button
       type="button"
-      className="btn btn-borderless"
+      className="btn"
       onClick={onClick}
       aria-label={ariaLabel}
     >
@@ -232,7 +232,7 @@ export function ToggleEditing(): JSX.Element | null {
   return (
     <button
       type="button"
-      className="btn btn-borderless p-0"
+      className="btn btn-icon"
       onClick={onClick}
       aria-label={ariaLabel}
     >

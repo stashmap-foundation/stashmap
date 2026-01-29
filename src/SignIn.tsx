@@ -165,7 +165,7 @@ function SignInWithExtension({
         <div className="black-muted m-3">- OR -</div>
         <div>
           <Button
-            className="btn btn-borderless underline mb-3"
+            className="btn underline mb-3"
             onClick={() => {
               navigate("/signup", {
                 state: { referrer: pathname + search + hash },
@@ -291,7 +291,7 @@ export function SignInMenuBtn(): JSX.Element | null {
       className="btn font-size-small"
       onClick={() => navigate("/signin")}
     >
-      {unsavedChanges && <span style={{ color: "red" }}>Sign in to Save</span>}
+      {unsavedChanges && <span className="text-danger">Sign in to Save</span>}
       {!unsavedChanges && <span aria-hidden="true">↪</span>}
     </Button>
   );

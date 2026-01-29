@@ -109,7 +109,7 @@ export function ReferencedByToggle(): JSX.Element | null {
   return (
     <button
       type="button"
-      className={`btn btn-borderless p-0 ${isInReferencedBy ? "active" : ""}`}
+      className={`btn btn-icon ${isInReferencedBy ? "active" : ""}`}
       onClick={onClick}
       aria-label={ariaLabel}
       title={isInReferencedBy ? "Show children" : "Show references"}

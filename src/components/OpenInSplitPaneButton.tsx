@@ -65,7 +65,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
     <button
       type="button"
       aria-label="open in split pane"
-      className="btn btn-borderless p-0"
+      className="btn btn-icon"
       onClick={onClick}
       title="Open in new split pane"
     >
@@ -105,7 +105,7 @@ export function OpenInSplitPaneButtonWithStack({
     <button
       type="button"
       aria-label="open in split pane"
-      className="btn btn-borderless p-0"
+      className="btn btn-icon"
       onClick={onClick}
       title="Open in new split pane"
     >
@@ -140,7 +140,7 @@ export function NewPaneButton(): JSX.Element | null {
     <button
       type="button"
       aria-label="Open new pane"
-      className="btn btn-borderless p-0"
+      className="btn btn-icon"
       onClick={onClick}
       title="Open new pane"
     >

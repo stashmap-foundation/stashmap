@@ -171,7 +171,7 @@ export function Button({
 
 export function CloseButton({ onClose }: { onClose: () => void }): JSX.Element {
   return (
-    <button className="btn btn-borderless p-0" type="button" onClick={onClose}>
+    <button className="btn btn-icon" type="button" onClick={onClose}>
       <span aria-hidden="true">×</span>
       <span className="visually-hidden">Close</span>
     </button>
@@ -184,7 +184,7 @@ export function CancelButton({
   onClose: () => void;
 }): JSX.Element {
   return (
-    <button className="btn btn-borderless p-0" type="button" onClick={onClose}>
+    <button className="btn btn-icon" type="button" onClick={onClose}>
       <span aria-hidden="true">⊘</span>
       <span className="visually-hidden">Cancel</span>
     </button>

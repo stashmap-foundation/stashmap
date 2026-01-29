@@ -75,7 +75,7 @@ export function PaneSearchButton(): JSX.Element {
   return (
     <button
       type="button"
-      className="split-pane-search btn btn-borderless"
+      className="btn btn-icon"
       onClick={() => setShowInput(true)}
       aria-label={`Search to change pane ${paneIndex} content`}
       title="Search"
@@ -108,7 +108,7 @@ export function ClosePaneButton(): JSX.Element | null {
   return (
     <button
       type="button"
-      className="btn btn-borderless p-0"
+      className="btn btn-icon"
       onClick={handleRemovePane}
       aria-label="Close pane"
       title="Close pane"

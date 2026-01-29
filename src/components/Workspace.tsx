@@ -99,7 +99,7 @@ function ForkButton(): JSX.Element | null {
   return (
     <button
       type="button"
-      className="btn btn-borderless"
+      className="btn"
       onClick={handleFork}
       aria-label="fork to make your own copy"
       title="Fork to make your own copy"

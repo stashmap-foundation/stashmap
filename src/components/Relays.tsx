@@ -253,22 +253,16 @@ function NewRelay({ onSave }: NewRelayProps): JSX.Element {
     <RelayCard className="black-dimmed" ariaLabel="new relay card">
       <div className="m-1 mt-2 w-90">
         <InputGroup>
-          <div style={{ position: "relative", flexGrow: 1 }}>
+          <div className="input-with-overlay">
             <InputElementWrapper
               aria-label={inputElementAriaLabel}
               onChange={onChange}
               placeholder="wss://"
-              className="p-2 w-100"
+              className="form-control w-100"
             />
-            <div
-              style={{
-                position: "absolute",
-                right: "10px",
-                top: "15%",
-              }}
-            >
+            <div className="input-overlay-buttons">
               <Button
-                className="btn-borderless background-transparent"
+                className="btn btn-icon"
                 onClick={() =>
                   pasteFromClipboard(inputElementAriaLabel, setInput)
                 }

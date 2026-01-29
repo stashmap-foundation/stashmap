@@ -36,32 +36,19 @@ function UserPublicIdentifier({
           : `Your nostr ${identifierName}:`}
       </div>
       <InputGroup>
-        <div style={{ position: "relative", flexGrow: 1, maxWidth: "42rem" }}>
+        <div className="input-with-overlay" style={{ maxWidth: "42rem" }}>
           <FormControlWrapper
             aria-label={identifierName}
             defaultValue={identifier}
             disabled
-            className="p-2 btn-borderless background-transparent font-size-medium"
+            className="form-control"
           />
-          <div
-            style={{
-              position: "absolute",
-              right: "2px",
-              top: "10%",
-            }}
-          >
-            <Button
-              className="btn-borderless background-white"
-              onClick={copyToClipboard}
-            >
-              <span aria-hidden="true">
-                {showCopiedSuccess ? "✓" : "⎘"}
-              </span>
+          <div className="input-overlay-buttons">
+            <Button className="btn btn-icon" onClick={copyToClipboard}>
+              <span aria-hidden="true">{showCopiedSuccess ? "✓" : "⎘"}</span>
             </Button>
             <Button
-              className={`btn btn-borderless ${
-                isQRToggled ? "background-dark" : "background-white"
-              }`}
+              className={`btn btn-icon ${isQRToggled ? "pressed" : ""}`}
               onClick={toggleQrCode}
             >
               <span aria-hidden="true">▣</span>

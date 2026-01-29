@@ -65,7 +65,7 @@ function getXButtonBackgroundColor(
     return "transparent";
   }
   if (isCurrentlyNotRelevant) {
-    return "#c62828"; // Red for permanent removal from list
+    return "var(--red)";
   }
   return TYPE_COLORS.not_relevant;
 }
@@ -176,7 +176,7 @@ export function RelevanceSelector({
           }
         }}
         style={{
-          color: isNotRelevant ? "#fff" : "#888",
+          color: isNotRelevant ? "var(--base03)" : "var(--base01)",
           backgroundColor: getXButtonBackgroundColor(
             isNotRelevant,
             isCurrentlyNotRelevant

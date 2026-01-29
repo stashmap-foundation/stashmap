@@ -16,8 +16,8 @@ function getArgumentColor(argument: Argument, isHovered: boolean): string {
 }
 
 function getArgumentSymbol(argument: Argument): string {
-  if (argument === "confirms") return "✓";
-  if (argument === "contra") return "✗";
+  if (argument === "confirms") return "+";
+  if (argument === "contra") return "−";
   return "○";
 }
 
@@ -73,14 +73,7 @@ export function EvidenceSelector(): JSX.Element | null {
           handleClick();
         }
       }}
-      style={{
-        cursor: "pointer",
-        color: getArgumentColor(currentArgument, isHovered),
-        transition: "color 0.15s ease",
-        fontSize: "1rem",
-        fontWeight: "bold",
-        marginRight: "4px",
-      }}
+      style={{ color: getArgumentColor(currentArgument, isHovered) }}
     >
       {getArgumentSymbol(currentArgument)}
     </span>

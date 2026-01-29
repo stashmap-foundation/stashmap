@@ -1268,7 +1268,7 @@ function findViewsForRepo(
     .filter((path) => path.includes(pattern))
     .map((path) => {
       const idx = path.indexOf(pattern);
-      return path.substring(0, idx + pattern.length - 1);
+      return path.substring(0, idx);
     })
     .toSet();
 }

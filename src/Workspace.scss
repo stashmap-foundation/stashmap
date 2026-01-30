@@ -63,7 +63,15 @@ body {
 }
 
 .pane-other-user {
-  border-left: 3px solid var(--orange);
+  border-left: 3px solid var(--violet);
+
+  .pane-header .breadcrumbs,
+  .pane-header .breadcrumb-link,
+  .pane-header .breadcrumb-current,
+  .pane-header .breadcrumb-separator,
+  .pane-header .btn {
+    color: var(--violet);
+  }
 }
 
 .pane-header {
@@ -341,14 +349,14 @@ body {
 
 // Diff item indicator (suggestions from other users)
 .diff-indicator {
-  color: var(--orange);
+  color: var(--violet);
   margin-right: 6px;
   font-size: 1rem;
 }
 
 // Content styling for different view modes
 .content-diff-item {
-  color: var(--orange);
+  color: var(--violet);
 }
 
 // Referenced-by view - cyan text for distinction

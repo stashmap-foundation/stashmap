@@ -24,8 +24,8 @@ export const TYPE_COLORS = {
   not_relevant: "#93a1a1", // Base01 - muted
   confirms: "#859900",     // Green - confirms, success
   contra: "#dc322f",       // Red - contra, errors
-  other_user: "#cb4b16",   // Orange - other user content
-  other_user_bg: "#cb4b1620", // Orange with transparency
+  other_user: "#6c71c4",   // Violet - other user content
+  other_user_bg: "#6c71c420", // Violet with transparency
   referenced_by: "#268bd2", // Blue - referenced by
   inactive: "#93a1a1",     // Base01 - visible on base02/base03
 };

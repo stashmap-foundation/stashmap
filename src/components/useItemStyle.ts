@@ -38,18 +38,10 @@ function getRelevanceTextStyle(relevance: Relevance): CSSProperties {
 
 function getArgumentTextStyle(argument: Argument): CSSProperties {
   if (argument === "confirms") {
-    return {
-      backgroundColor: `${TYPE_COLORS.confirms}20`, // 20 = 12% in hex
-      borderRadius: "3px",
-      padding: "0 4px",
-    };
+    return { color: TYPE_COLORS.confirms };
   }
   if (argument === "contra") {
-    return {
-      backgroundColor: `${TYPE_COLORS.contra}20`,
-      borderRadius: "3px",
-      padding: "0 4px",
-    };
+    return { color: TYPE_COLORS.contra };
   }
   return {};
 }

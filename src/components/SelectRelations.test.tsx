@@ -149,7 +149,7 @@ test("getDiffItemsForNode returns items from other users", () => {
   );
 
   expect(diffItems.size).toBe(1);
-  expect(diffItems.get(0)?.nodeID).toBe(bobChildNode.id);
+  expect(diffItems.get(0)).toBe(bobChildNode.id);
 });
 
 test("Diff items are not included when saving a relation", () => {
@@ -255,5 +255,5 @@ test("getDiffItemsForNode deduplicates items from multiple other users", () => {
   );
 
   expect(diffItems.size).toBe(1);
-  expect(diffItems.get(0)?.nodeID).toBe(bobChildNode.id);
+  expect(diffItems.get(0)).toBe(bobChildNode.id);
 });

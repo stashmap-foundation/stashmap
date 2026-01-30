@@ -5,11 +5,12 @@ import {
   useNode,
   useViewPath,
   ViewPath,
+  NodeIndex,
   useIsInReferencedByView,
   useReferencedByDepth,
   useIsExpanded,
   addNodeToPathWithRelations,
-  addDiffItemToPath,
+  addRelationsToLastElement,
   getDiffItemsForNode,
   getNodeIDFromView,
   useNodeID,
@@ -589,22 +590,29 @@ export function getNodesInTree(
       }, ctx)
     : ctx;
 
-  // Get diff items based on pane-level type filters
   const diffItems = getDiffItemsForNode(
     data.knowledgeDBs,
     data.user.publicKey,
     parentNodeID,
     activeFilters,
-    relations?.id
+    relations?.id,
+    context
   );
 
   const withDiffItems =
     diffItems.size > 0
       ? diffItems.reduce(
-        (list, diffItem, idx) =>
-          list.push(
-            addDiffItemToPath(data, parentPath, diffItem.nodeID, idx, stack)
-          ),
+        (list, suggestionId, idx) => {
+          const pathWithRelations = addRelationsToLastElement(
+            parentPath,
+            relations?.id || ("" as LongID)
+          );
+          const suggestionPath: ViewPath = [
+            ...pathWithRelations,
+            { nodeID: suggestionId, nodeIndex: idx as NodeIndex },
+          ];
+          return list.push(suggestionPath);
+        },
         nodesInTree
       )
       : nodesInTree;

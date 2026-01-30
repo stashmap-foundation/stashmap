@@ -16,6 +16,10 @@ import {
   VERSIONS_NODE_ID,
   EMPTY_NODE_ID,
   addRelationToRelations,
+  isConcreteRefId,
+  parseConcreteRefId,
+  getConcreteRefs,
+  groupConcreteRefs,
 } from "./connections";
 import { newDB } from "./knowledge";
 import { useData } from "./DataContext";
@@ -26,47 +30,36 @@ import { REFERENCED_BY } from "./constants";
 // only exported for tests
 export type NodeIndex = number & { readonly "": unique symbol };
 
-export type DiffItem = {
-  nodeID: LongID;
-  sourceRelationId: LongID;
-};
-
 /**
  * Calculate items that other users have in their relation lists
  * that the current user doesn't have.
  *
- * Logic:
- * - Get current user's items for this node (filtered by type)
- * - Get all other users' relations on same node
- * - Filter to items that have the requested type and aren't "not_relevant"
- * - Exclude items that are in the currently viewed relation (to avoid duplication)
- * - Return items that exist in others' but not in user's (deduplicated)
+ * Returns either:
+ * - Plain nodeID for leaf suggestions (no children in any user's context)
+ * - Abstract/concrete ref ID for expandable suggestions (grouped by context)
  */
 export function getDiffItemsForNode(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
   nodeID: LongID | ID,
   filterTypes: (Relevance | Argument | "suggestions")[],
-  currentRelationId?: LongID
-): List<DiffItem> {
-  // If no filter types or empty array, return no diff items
+  currentRelationId?: LongID,
+  parentContext?: Context
+): List<LongID | ID> {
   if (!filterTypes || filterTypes.length === 0) {
-    return List<DiffItem>();
+    return List<LongID | ID>();
   }
 
-  // If "suggestions" is not in the filter types, don't show any diff items
   if (!filterTypes.includes("suggestions")) {
-    return List<DiffItem>();
+    return List<LongID | ID>();
   }
 
-  // Filter out "suggestions" to get only relevance/argument types for item matching
   const itemFilters = filterTypes.filter(
     (t): t is Relevance | Argument => t !== "suggestions"
   );
 
   const [, localID] = splitID(nodeID);
 
-  // Get ALL items the current user has (any type) - we exclude these from suggestions
   const myDB = knowledgeDBs.get(myself);
   const myRelations = myDB?.relations
     .filter((r) => r.head === localID)
@@ -77,7 +70,6 @@ export function getDiffItemsForNode(
     .flatMap((r) => r.items.map((item) => item.nodeID))
     .toSet();
 
-  // Get items from the currently viewed relation (to exclude from diff)
   const currentRelation = currentRelationId
     ? getRelationsNoReferencedBy(knowledgeDBs, currentRelationId, myself)
     : undefined;
@@ -85,51 +77,59 @@ export function getDiffItemsForNode(
     ? currentRelation.items.map((item) => item.nodeID).toSet()
     : ImmutableSet<LongID | ID>();
 
-  // Get all other users' relations on this node
+  const contextToMatch = parentContext || List<ID>();
   const otherRelations: List<Relations> = knowledgeDBs
     .filter((_, pk) => pk !== myself)
     .toList()
     .flatMap((db) =>
       db.relations
-        .filter((r) => r.head === localID && r.id !== currentRelationId)
+        .filter((r) =>
+          r.head === localID &&
+          r.id !== currentRelationId &&
+          contextsMatch(r.context, contextToMatch)
+        )
         .toList()
     );
 
-  // Collect items from others that:
-  // - Match any of the active filter types
-  // - Are not marked as "not_relevant" by the other user
-  // - User doesn't already have in their list (any type)
-  const diffItems = otherRelations.reduce(
-    (acc: List<DiffItem>, relations: Relations) => {
+  const candidateNodeIDs = otherRelations.reduce(
+    (acc: ImmutableSet<ID>, relations: Relations) => {
       const newItems = relations.items
         .filter(
           (item: RelationItem) =>
-            // Item must match at least one of the filter types
             itemFilters.some((t) => itemMatchesType(item, t)) &&
-            // Never show items the other user marked as not_relevant
             item.relevance !== "not_relevant" &&
-            // Exclude items user already has (any type)
             !myAllItems.has(item.nodeID) &&
-            !currentRelationItems.has(item.nodeID) &&
-            // Deduplicate across other users
-            !acc.find((d) => d.nodeID === item.nodeID)
+            !currentRelationItems.has(item.nodeID)
         )
-        .map((item: RelationItem) => ({
-          nodeID: item.nodeID as LongID,
-          sourceRelationId: relations.id,
-        }));
-      return acc.concat(newItems);
+        .map((item: RelationItem) => shortID(item.nodeID) as ID);
+      return acc.union(newItems);
     },
-    List<DiffItem>()
+    ImmutableSet<ID>()
   );
 
-  return diffItems;
+  if (candidateNodeIDs.size === 0) {
+    return List<LongID | ID>();
+  }
+
+  const itemContext = parentContext ? parentContext.push(localID as ID) : List<ID>([localID as ID]);
+
+  return candidateNodeIDs.reduce(
+    (acc, candidateID) => {
+      const refs = getConcreteRefs(knowledgeDBs, candidateID, itemContext);
+      const headRefs = refs.filter((ref) => !ref.isInItems);
+      if (headRefs.size > 0) {
+        const grouped = groupConcreteRefs(headRefs, candidateID);
+        return acc.concat(grouped.map((item) => item.nodeID));
+      }
+      return acc.push(candidateID as LongID | ID);
+    },
+    List<LongID | ID>()
+  );
 }
 
 type SubPath = {
   nodeID: LongID | ID;
   nodeIndex: NodeIndex;
-  isDiffItem?: boolean;
 };
 
 type SubPathWithRelations = SubPath & {
@@ -636,27 +636,6 @@ export function addNodeToPath(
   return addNodeToPathWithRelations(path, relations, index);
 }
 
-/**
- * Add a diff item (from other users) to the path.
- * Uses the parent's relation context but with a nodeID that's not in the user's own relation.
- */
-export function addDiffItemToPath(
-  data: Data,
-  path: ViewPath,
-  nodeID: LongID,
-  diffIndex: number,
-  stack: ID[]
-): ViewPath {
-  const relations = getRelationForView(data, path, stack);
-  // Use 0 as nodeIndex since diff items don't have duplicates in our list
-  const nodeIndex = diffIndex as NodeIndex;
-  const pathWithRelations = addRelationsToLastElement(
-    path,
-    relations?.id || ("" as LongID)
-  );
-  return [...pathWithRelations, { nodeID, nodeIndex, isDiffItem: true }];
-}
-
 function popPath(viewContext: ViewPath): ViewPath | undefined {
   const paneIndex = getPaneIndex(viewContext);
   // Get elements after pane index, excluding the last one
@@ -677,7 +656,10 @@ export function getParentView(viewContext: ViewPath): ViewPath | undefined {
 }
 
 /**
- * Check if the current node is not in my list but in the list of another user.
+ * Check if the current node is a suggestion (from another user).
+ * A node is a suggestion if:
+ * 1. It's a concrete ref from another user with matching context (expandable suggestion), OR
+ * 2. It's a plain nodeID not in the current user's parent relation (leaf suggestion)
  */
 export function useIsDiffItem(): boolean {
   const data = useData();
@@ -686,20 +668,34 @@ export function useIsDiffItem(): boolean {
   const pane = useCurrentPane();
   const parentPath = getParentView(viewPath);
 
-  // Check if the path itself marks this as a diff item (from addDiffItemToPath)
-  const pathElement = getLast(viewPath);
-  if (pathElement.isDiffItem) {
-    return true;
-  }
-
   if (!parentPath) {
     return false;
   }
 
   const [nodeID] = getNodeIDFromView(data, viewPath);
   const [parentNodeID] = getNodeIDFromView(data, parentPath);
+  const context = getContextFromStackAndViewPath(stack, parentPath);
+  const childContext = getContextFromStackAndViewPath(stack, viewPath);
 
-  // Reference nodes are never diff items
+  // Concrete refs from other users with matching context are expandable suggestions
+  if (isConcreteRefId(nodeID)) {
+    const parsed = parseConcreteRefId(nodeID);
+    if (parsed) {
+      const relation = getRelationsNoReferencedBy(
+        data.knowledgeDBs,
+        parsed.relationID,
+        data.user.publicKey
+      );
+      if (relation && relation.author !== data.user.publicKey) {
+        if (contextsMatch(relation.context, childContext)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // Abstract refs are not suggestions (they're from Referenced By view)
   if (isRefId(nodeID)) {
     return false;
   }
@@ -709,7 +705,6 @@ export function useIsDiffItem(): boolean {
     return false;
   }
 
-  const context = getContextFromStackAndViewPath(stack, parentPath);
   const parentRelations = getNewestRelationFromAuthor(
     data.knowledgeDBs,
     pane.author,
@@ -717,10 +712,9 @@ export function useIsDiffItem(): boolean {
     context
   );
   if (!parentRelations) {
-    return false;
+    return true;
   }
 
-  // If the node is not in the parent's relation items, it's a diff item
   return !parentRelations.items.some((item) => item.nodeID === nodeID);
 }
 

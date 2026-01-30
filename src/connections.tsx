@@ -421,7 +421,7 @@ export function getConcreteRefs(
     .toList();
 }
 
-function groupConcreteRefs(
+export function groupConcreteRefs(
   refs: List<ReferencedByRef>,
   targetShortID: ID
 ): List<{ nodeID: LongID; relevance: Relevance }> {

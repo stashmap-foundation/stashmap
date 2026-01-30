@@ -226,9 +226,19 @@ body {
 }
 
 .btn-icon {
-  padding: 8px;
-  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 4px;
+  font-size: 1.1rem;
   line-height: 1;
+  color: var(--base01);
+
+  &:hover {
+    color: var(--base0);
+  }
 }
 
 .btn-close {
@@ -288,7 +298,7 @@ body {
 .node-row {
   display: flex;
   flex-direction: row;
-  align-items: flex-start;
+  align-items: center;
   background: transparent;
 
   .item {
@@ -347,10 +357,7 @@ body {
 
 // Reference node styling
 .reference-node {
-  font-style: italic;
   color: var(--blue);
-  text-decoration: none;
-  border-bottom: 1px dotted var(--cyan);
 }
 
 // Expand/collapse toggle
@@ -835,6 +842,14 @@ input:focus,
   border: none;
 }
 
+.card-body {
+  padding: 8px 0;
+}
+
+.inner-node .card-body {
+  padding: 8px 0;
+}
+
 // ============================================
 // 11. NAVBAR
 // ============================================
@@ -972,15 +987,28 @@ input:focus,
 // 14. RELEVANCE SELECTOR
 // ============================================
 
-.relevance-selector {
+.pill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 10px;
+  justify-content: center;
   height: 32px;
-  border-radius: 16px;
+  padding: 0 12px;
+  border-radius: 20px;
   background-color: var(--base02);
   border: 1px solid var(--base01);
+  color: var(--base01);
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    border-color: var(--base0);
+    color: var(--base0);
+  }
+}
+
+.relevance-selector {
+  gap: 4px;
+  padding: 0 10px;
 }
 
 .relevance-x {
@@ -1005,19 +1033,10 @@ input:focus,
 
 // Evidence selector (confirms/contra)
 .evidence-selector {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   min-width: 32px;
-  height: 32px;
   font-size: 1.2rem;
   font-weight: 600;
   line-height: 1;
-  cursor: pointer;
-  transition: color 0.15s ease;
-  background-color: var(--base02);
-  border: 1px solid var(--base01);
-  border-radius: 16px;
 }
 
 // ============================================
@@ -1028,33 +1047,8 @@ input:focus,
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 6px;
-  border-radius: 12px;
-  background-color: var(--base02);
 }
 
-.reference-dot {
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 10px;
-  border: none;
-  background: var(--base02);
-  color: var(--base0);
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-
-  &:hover {
-    background: var(--base01);
-    color: var(--base03);
-  }
-}
 
 // ============================================
 // 16. OTHER VERSIONS DOTS
@@ -1277,11 +1271,11 @@ input:focus,
 }
 
 .bitcoin-orange {
-  color: #f7931a;
+  color: var(--orange);
 }
 
 .navbar-project {
-  border-bottom: 5px solid #f7931a;
+  border-bottom: 5px solid var(--orange);
 }
 
 .tooltip-arrow {
@@ -1341,8 +1335,8 @@ input:focus,
 
 .filter-dot {
   display: inline-block;
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   margin: 1px;
 }

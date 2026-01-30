@@ -153,7 +153,7 @@ export function TypeFilterButton(): JSX.Element | null {
     return (
       <button
         type="button"
-        className="btn btn-icon"
+        className="pill"
         onMouseDown={preventEditorBlurIfSameNode}
         disabled
         aria-label={`filter ${displayText}`}
@@ -193,7 +193,7 @@ export function TypeFilterButton(): JSX.Element | null {
       <button
         ref={buttonRef}
         type="button"
-        className="btn btn-icon"
+        className="pill"
         onClick={() => setShow(!show)}
         aria-label={`filter ${displayText}`}
         title="Filter by relation type"

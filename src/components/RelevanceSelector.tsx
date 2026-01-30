@@ -149,7 +149,7 @@ export function RelevanceSelector({
 
   return (
     <div
-      className="relevance-selector"
+      className="pill relevance-selector"
       onMouseLeave={() => setHoverLevel(null)}
       title={
         effectiveDisplayLevel >= 0

@@ -304,7 +304,7 @@ export function AddSiblingButton(): JSX.Element | null {
     <span
       role="button"
       tabIndex={0}
-      className="btn btn-icon"
+      className="pill"
       onClick={handleClick}
       onMouseDown={preventEditorBlurIfSameNode}
       onKeyDown={(e) => {
@@ -316,7 +316,7 @@ export function AddSiblingButton(): JSX.Element | null {
       aria-label={`add to ${displayText}`}
       title="Add note"
     >
-      <span aria-hidden="true">+</span>
+      +
     </span>
   );
 }

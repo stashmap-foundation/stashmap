@@ -181,15 +181,6 @@ function NodeContent({
     return relation ? relation.author !== user.publicKey : false;
   })();
 
-  const referenceStyle: React.CSSProperties = isReference
-    ? {
-      fontStyle: "italic",
-      color: "var(--blue)",
-      textDecoration: "none",
-      borderBottom: "1px dotted var(--cyan)",
-    }
-    : {};
-
   return (
     <span
       className={`break-word ${isReference ? "reference-node" : ""}`}
@@ -198,7 +189,7 @@ function NodeContent({
     >
       <NodeIcon nodeType={nodeType} />
       {isReference && <ReferenceIndicators refId={nodeId} />}
-      <span style={referenceStyle}>{text}</span>
+      {text}
     </span>
   );
 }

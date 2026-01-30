@@ -62,7 +62,7 @@ function ReferenceDot(): JSX.Element | null {
   return (
     <button
       type="button"
-      className="reference-dot"
+      className="pill"
       onClick={handleClick}
       aria-label={ariaLabel}
       title={
@@ -87,7 +87,7 @@ function GrayedFilterDots(): JSX.Element | null {
   return (
     <button
       type="button"
-      className="btn btn-icon"
+      className="pill"
       onClick={switchToNormal}
       aria-label={`show children of ${displayText}`}
       title="Switch to children view"

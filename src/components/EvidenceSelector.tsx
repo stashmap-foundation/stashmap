@@ -55,7 +55,7 @@ export function EvidenceSelector(): JSX.Element | null {
 
   return (
     <span
-      className="evidence-selector"
+      className="pill evidence-selector"
       data-has-argument={hasArgument ? "true" : undefined}
       onClick={handleClick}
       onMouseDown={preventEditorBlurIfSameNode}

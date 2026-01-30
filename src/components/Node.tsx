@@ -1,28 +1,20 @@
-import { List } from "immutable";
 import React from "react";
 import { useMediaQuery } from "react-responsive";
 import {
   useNode,
   useViewPath,
   ViewPath,
-  NodeIndex,
   useIsInReferencedByView,
   useReferencedByDepth,
   useIsExpanded,
-  addNodeToPathWithRelations,
-  addRelationsToLastElement,
-  getDiffItemsForNode,
-  getNodeIDFromView,
   useNodeID,
-  getContextFromStackAndViewPath,
-  getRelationsForContext,
   usePreviousSibling,
   useDisplayText,
   getParentView,
   useNextInsertPosition,
-  isRoot,
-  isReferencedByView,
   getRelationForView,
+  isReferencedByView,
+  getContextFromStackAndViewPath,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -30,11 +22,8 @@ import {
   isMutableNode,
 } from "./TemporaryViewContext";
 import {
-  getReferencedByRelations,
-  getConcreteRefsForAbstract,
   isReferenceNode,
   getRefTargetInfo,
-  itemMatchesType,
   isEmptyNodeID,
   isAbstractRefId,
   isConcreteRefId,
@@ -42,10 +31,9 @@ import {
   getRelationsNoReferencedBy,
   isSearchId,
   getConcreteRefs,
-  getRelations,
   computeEmptyNodeMetadata,
 } from "../connections";
-import { REFERENCED_BY, DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
+import { TYPE_COLORS } from "../constants";
 import { IS_MOBILE } from "./responsive";
 import { MiniEditor, preventEditorBlurIfSameNode } from "./AddNode";
 import { useOnToggleExpanded } from "./SelectRelations";
@@ -61,7 +49,6 @@ import {
   planCreateVersion,
   planAddToParent,
   planDeepCopyNodeWithView,
-  getPane,
 } from "../planner";
 import { planDisconnectFromParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
@@ -80,6 +67,7 @@ import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 import { useItemStyle } from "./useItemStyle";
 import { EditorTextProvider } from "./EditorTextContext";
+export { getNodesInTree } from "../treeTraversal";
 
 function getLevels(viewPath: ViewPath): number {
   // Subtract 1: for pane index at position 0
@@ -477,149 +465,6 @@ export function Indent({
   );
 }
 
-export function getNodesInTree(
-  data: Data,
-  parentPath: ViewPath,
-  stack: ID[],
-  ctx: List<ViewPath>,
-  rootRelation: LongID | undefined,
-  noExpansion?: boolean
-): List<ViewPath> {
-  const [parentNodeID, parentView] = getNodeIDFromView(data, parentPath);
-  const paneAuthor = getPane(data, parentPath).author;
-
-  // Handle abstract refs - their children are concrete refs, can be expanded
-  if (isAbstractRefId(parentNodeID)) {
-    const relations = getConcreteRefsForAbstract(
-      data.knowledgeDBs,
-      data.user.publicKey,
-      parentNodeID as LongID
-    );
-    if (!relations || relations.items.size === 0) {
-      return ctx;
-    }
-    const childPaths = relations.items.map((_, i) =>
-      addNodeToPathWithRelations(parentPath, relations, i)
-    );
-    return ctx.concat(childPaths);
-  }
-
-  // Handle concrete refs - terminal nodes, no children
-  if (isConcreteRefId(parentNodeID)) {
-    return ctx;
-  }
-
-  // Check if this node is a direct child of a search node
-  const grandparentPath = getParentView(parentPath);
-  const [grandparentNodeID] = grandparentPath
-    ? getNodeIDFromView(data, grandparentPath)
-    : [undefined];
-  const isGrandchildOfSearch = grandparentNodeID && isSearchId(grandparentNodeID as ID);
-
-  // Handle REFERENCED_BY view or search result children - show refs
-  if (isReferencedByView(parentView) || isGrandchildOfSearch) {
-    const relations = getReferencedByRelations(
-      data.knowledgeDBs,
-      data.user.publicKey,
-      parentNodeID
-    );
-    if (!relations || relations.items.size === 0) {
-      return ctx;
-    }
-    // For search results, add refs as children of search node (grandparent), not the result node
-    const refParentPath = isGrandchildOfSearch && grandparentPath ? grandparentPath : parentPath;
-    // Check if children are expanded and recurse
-    return relations.items.reduce((nodesList, _, i) => {
-      const childPath = addNodeToPathWithRelations(refParentPath, relations, i);
-      const [childNodeID, childView] = getNodeIDFromView(data, childPath);
-      if (childView.expanded && isAbstractRefId(childNodeID)) {
-        return getNodesInTree(
-          data,
-          childPath,
-          stack,
-          nodesList.push(childPath),
-          rootRelation
-        );
-      }
-      return nodesList.push(childPath);
-    }, ctx);
-  }
-
-  const context = getContextFromStackAndViewPath(stack, parentPath);
-  // Search nodes store their relation by search ID, not by context
-  const relations = isSearchId(parentNodeID as ID)
-    ? getRelations(data.knowledgeDBs, parentNodeID as ID, data.user.publicKey, parentNodeID)
-    : getRelationsForContext(
-      data.knowledgeDBs,
-      paneAuthor,
-      parentNodeID,
-      context,
-      rootRelation,
-      isRoot(parentPath)
-    );
-  // Filter items based on pane-level typeFilters (default filters out "not_relevant")
-  const pane = getPane(data, parentPath);
-  const activeFilters = pane.typeFilters || DEFAULT_TYPE_FILTERS;
-  // Filter out "suggestions" to get only relevance/argument types for item matching
-  const itemFilters = activeFilters.filter(
-    (f): f is Relevance | Argument => f !== "suggestions"
-  );
-
-  const nodesInTree = relations
-    ? relations.items
-      .map((item, i) => ({ item, index: i }))
-      .filter(({ item }) => itemFilters.some((f) => itemMatchesType(item, f)))
-      .map(({ index }) => addNodeToPathWithRelations(parentPath, relations, index))
-      .reduce((nodesList: List<ViewPath>, childPath: ViewPath) => {
-        const childView = getNodeIDFromView(data, childPath)[1];
-        if (noExpansion) {
-          return nodesList.push(childPath);
-        }
-        if (childView.expanded || isSearchId(parentNodeID as ID)) {
-          // Skip adding search result nodes themselves - only show their refs
-          const updatedList = isSearchId(parentNodeID as ID) ? nodesList : nodesList.push(childPath);
-          return getNodesInTree(
-            data,
-            childPath,
-            stack,
-            updatedList,
-            rootRelation
-          );
-        }
-        return nodesList.push(childPath);
-      }, ctx)
-    : ctx;
-
-  const diffItems = getDiffItemsForNode(
-    data.knowledgeDBs,
-    data.user.publicKey,
-    parentNodeID,
-    activeFilters,
-    relations?.id,
-    context
-  );
-
-  const withDiffItems =
-    diffItems.size > 0
-      ? diffItems.reduce(
-        (list, suggestionId, idx) => {
-          const pathWithRelations = addRelationsToLastElement(
-            parentPath,
-            relations?.id || ("" as LongID)
-          );
-          const suggestionPath: ViewPath = [
-            ...pathWithRelations,
-            { nodeID: suggestionId, nodeIndex: idx as NodeIndex },
-          ];
-          return list.push(suggestionPath);
-        },
-        nodesInTree
-      )
-      : nodesInTree;
-
-  return withDiffItems;
-}
-
 function DiffItemIndicator(): JSX.Element {
   return (
     <span
@@ -670,10 +515,15 @@ export function Node({
   // Check if this is any kind of reference node
   const isReference = isAbstractRef || isConcreteRef;
 
-  // Show expand/collapse for regular nodes (not diff items, not in Referenced By, not empty nodes)
-  // Also show for abstract refs which need expand to show concrete refs
-  // Never show for concrete refs - they are terminal nodes
-  const showExpandCollapse = !isDiffItem && !isConcreteRef && (!isInReferencedByView || isAbstractRef);
+  // Show expand/collapse for:
+  // - Regular nodes (not in Referenced By view)
+  // - Abstract refs (to show concrete refs)
+  // - Suggestions that are concrete refs (to show source author's children)
+  const isSuggestionWithChildren = isDiffItem && isConcreteRef;
+  const showExpandCollapse =
+    (!isDiffItem && !isConcreteRef && !isInReferencedByView) ||
+    isAbstractRef ||
+    isSuggestionWithChildren;
 
   // Content class for styling based on view mode
   const getContentClass = (): string => {

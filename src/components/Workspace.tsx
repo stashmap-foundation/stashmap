@@ -153,7 +153,7 @@ function PaneStatusLine(): JSX.Element {
         <CurrentNodeName />
       </div>
       {isViewingOtherUserContent && (
-        <div className="status-segment">
+        <div className="status-segment status-segment-other">
           other
         </div>
       )}

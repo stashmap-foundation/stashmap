@@ -1,6 +1,5 @@
 import React from "react";
 import { List, Map } from "immutable";
-import { Dropdown, Spinner, ProgressBar } from "react-bootstrap";
 import { Event } from "nostr-tools";
 import { LoadingSpinnerButton } from "./LoadingSpinnerButton";
 
@@ -39,6 +38,7 @@ function transformPublishResults(
 function getStatusCount(status: PublishResultsOfRelay, type: string): number {
   return status.filter((s) => s.status === type).size;
 }
+
 function getLastRejectedReason(
   status: PublishResultsOfRelay
 ): string | undefined {
@@ -49,36 +49,7 @@ function getLastRejectedReason(
   return lastRejected ? lastRejected.reason : undefined;
 }
 
-function getPublishingDetails(
-  totalNumber: number,
-  numberFulfilled: number
-): string {
-  if (totalNumber === 0) {
-    return "No events were attempted to be published";
-  }
-  if (totalNumber === 1) {
-    return `The last event ${
-      numberFulfilled === 1 ? "has" : "has not"
-    } been published`;
-  }
-  return `${numberFulfilled} of the last ${totalNumber} events have been published`;
-}
-
-function getWarningDetails(status: PublishResultsOfRelay): {
-  percentage: number;
-  isWarning: boolean;
-  warningVariant: "danger" | "warning";
-} {
-  const numberFulfilled = getStatusCount(status, "fulfilled");
-  const numberRejected = getStatusCount(status, "rejected");
-  const totalNumber = numberFulfilled + numberRejected;
-  const percentage = Math.round((numberFulfilled / totalNumber) * 100);
-  const isWarning = percentage < 80;
-  const warningVariant = percentage < 50 ? "danger" : "warning";
-  return { percentage, isWarning, warningVariant };
-}
-
-function RelayPublishStatus({
+function RelayRow({
   status,
   relayUrl,
   republishEvents,
@@ -89,81 +60,39 @@ function RelayPublishStatus({
 }): JSX.Element {
   const numberFulfilled = getStatusCount(status, "fulfilled");
   const numberRejected = getStatusCount(status, "rejected");
-  const totalNumber = numberFulfilled + numberRejected;
-  const publishingDetails = getPublishingDetails(totalNumber, numberFulfilled);
-  const { percentage, isWarning, warningVariant } = getWarningDetails(status);
-  const lastRejectedReason = getLastRejectedReason(status);
+  const total = numberFulfilled + numberRejected;
   const rejectedEvents = status
     .filter((s) => s.status === "rejected")
     .valueSeq()
     .toList() as List<Event>;
+  const lastError = getLastRejectedReason(status);
+
+  const relayName = relayUrl.replace("wss://", "").replace("ws://", "");
+
   return (
-    <>
-      <Dropdown.Divider />
-      <Dropdown.Item
-        onClick={(event) => {
-          event?.stopPropagation();
-        }}
-      >
-        <div className="flex-row-space-between">
-          <div className="w-80 break-word" style={{ whiteSpace: "normal" }}>
-            <div className="bold">{`Relay ${relayUrl}:`}</div>
-            <ProgressBar
-              now={percentage}
-              label={`${percentage}%`}
-              variant={isWarning ? warningVariant : "success"}
-              style={{
-                height: "1.5rem",
-              }}
-            />
-            <div className="mt-1"> {publishingDetails} </div>
-            {lastRejectedReason && (
-              <div>{`Last rejection reason: ${lastRejectedReason}`}</div>
-            )}
-          </div>
-          <div className="ms-2 flex-row-center align-center icon-large">
-            <div className="flex-col align-center">
-              <span
-                className={isWarning ? "danger" : "success"}
-                aria-hidden="true"
-              >
-                {isWarning ? "⚠" : "✓"}
-              </span>
-              {numberRejected > 0 && (
-                <LoadingSpinnerButton
-                  className="btn mt-2 font-size-small"
-                  ariaLabel={`resend rejected events to relay ${relayUrl}`}
-                  onClick={() => republishEvents(rejectedEvents, relayUrl)}
-                >
-                  Resend
-                </LoadingSpinnerButton>
-              )}
-            </div>
-          </div>
-        </div>
-      </Dropdown.Item>
-    </>
+    <div className="publish-relay-row">
+      <div className="publish-relay-info">
+        <span className="publish-relay-name">{relayName}</span>
+        <span className="publish-relay-stats">
+          {numberRejected > 0 ? (
+            <span className="text-danger">{numberFulfilled}/{total}</span>
+          ) : (
+            <span className="text-success">{numberFulfilled}/{total}</span>
+          )}
+        </span>
+        {lastError && <span className="publish-relay-error">{String(lastError)}</span>}
+      </div>
+      {numberRejected > 0 && (
+        <LoadingSpinnerButton
+          className="publish-resend-btn"
+          ariaLabel={`resend to ${relayName}`}
+          onClick={() => republishEvents(rejectedEvents, relayUrl)}
+        >
+          resend
+        </LoadingSpinnerButton>
+      )}
+    </div>
   );
-}
-
-type StatusColor = "red" | "brown" | "green";
-
-function getStatusColor(publishResults: PublishResultsRelayMap): StatusColor {
-  const isDanger = publishResults.some(
-    (status) =>
-      getWarningDetails(status).isWarning &&
-      getWarningDetails(status).warningVariant === "danger"
-  );
-  if (isDanger) {
-    return "red";
-  }
-  const isWarning = publishResults.some(
-    (status) => getWarningDetails(status).isWarning
-  );
-  if (isWarning) {
-    return "brown";
-  }
-  return "green";
 }
 
 type PublishingStatusProps<T = void> = {
@@ -175,76 +104,47 @@ type PublishingStatusProps<T = void> = {
 export function PublishingStatusContent<T = void>({
   publishEventsStatus,
   republishEvents,
-}: Omit<PublishingStatusProps<T>, "isMobile">): JSX.Element | null {
+}: Omit<PublishingStatusProps<T>, "isMobile">): JSX.Element {
   if (publishEventsStatus.results.size === 0) {
-    return null;
+    return (
+      <div className="publish-status-content">
+        <div className="publish-status-empty">All changes synced</div>
+      </div>
+    );
   }
+
   const publishResultsRelayMap = transformPublishResults(
     publishEventsStatus.results
   );
+
   return (
-    <>
-      <Dropdown.Item key="publishing-status-header" className="black-muted">
-        <div className="project-selection">
-          <h2>Publishing Status</h2>
-        </div>
-      </Dropdown.Item>
+    <div className="publish-status-content">
       {publishResultsRelayMap
-        .map((status, relayUrl) => {
-          return (
-            <RelayPublishStatus
-              status={status}
-              relayUrl={relayUrl}
-              republishEvents={republishEvents}
-              key={`publishing-status ${relayUrl}`}
-            />
-          );
-        })
+        .map((status, relayUrl) => (
+          <RelayRow
+            key={relayUrl}
+            status={status}
+            relayUrl={relayUrl}
+            republishEvents={republishEvents}
+          />
+        ))
         .valueSeq()}
-    </>
+    </div>
   );
 }
 
 export function PublishingStatus<T = void>({
-  isMobile,
   publishEventsStatus,
   republishEvents,
-}: PublishingStatusProps<T>): JSX.Element | null {
+}: Omit<PublishingStatusProps<T>, "isMobile">): JSX.Element | null {
   if (publishEventsStatus.results.size === 0) {
     return null;
   }
-  const publishResultsRelayMap = transformPublishResults(
-    publishEventsStatus.results
-  );
-  const warningColor = getStatusColor(publishResultsRelayMap);
+
   return (
-    <Dropdown>
-      <Dropdown.Toggle
-        as="button"
-        id="publishing-status-dropdown"
-        key="publishing-status-dropdown"
-        className="btn"
-        aria-label="publishing status"
-        tabIndex={0}
-      >
-        {publishEventsStatus.isLoading === true ? (
-          <Spinner role="status" size="sm" />
-        ) : (
-          <span style={{ color: warningColor }} aria-hidden="true">ℹ</span>
-        )}
-      </Dropdown.Toggle>
-      <Dropdown.Menu
-        style={
-          isMobile
-            ? { position: "absolute", width: "100vw" }
-            : { width: "30rem" }
-        }
-      >
-        <PublishingStatusContent
-          publishEventsStatus={publishEventsStatus}
-          republishEvents={republishEvents}
-        />
-      </Dropdown.Menu>
-    </Dropdown>
+    <PublishingStatusContent
+      publishEventsStatus={publishEventsStatus}
+      republishEvents={republishEvents}
+    />
   );
 }

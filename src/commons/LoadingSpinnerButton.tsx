@@ -44,8 +44,8 @@ export function LoadingSpinnerButton({
   };
   if (loading) {
     return (
-      <div style={{ paddingTop: "6px", paddingBottom: "4px" }}>
-        <Spinner animation="border" role="status" />
+      <div style={{ display: "inline-flex", alignItems: "center", padding: "2px 8px" }}>
+        <Spinner animation="border" role="status" size="sm" />
       </div>
     );
   }

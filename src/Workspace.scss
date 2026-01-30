@@ -1411,8 +1411,22 @@ input:focus,
   display: flex;
   align-items: center;
   padding: 0 10px;
-  background: var(--base01);
+  background: var(--base00);
   color: var(--base03);
+
+  .status-btn,
+  .dropdown-toggle {
+    color: var(--base03);
+  }
+}
+
+.status-segment-dark {
+  background: var(--base01);
+}
+
+.status-segment-other {
+  background: var(--base01);
+  color: var(--violet);
 }
 
 .status-segment-warning {
@@ -1422,7 +1436,7 @@ input:focus,
 
 .status-segment-error {
   background: var(--red);
-  color: var(--base3);
+  color: var(--base03);
 }
 
 .status-spacer {
@@ -1457,12 +1471,12 @@ input:focus,
 
 .status-segment-error {
   background: var(--red);
-  color: var(--base3);
+  color: var(--base03);
 
   .status-btn {
-    color: var(--base3);
+    color: var(--base03);
     &:hover {
-      color: var(--base2);
+      color: var(--base03);
     }
   }
 }
@@ -1528,12 +1542,76 @@ input:focus,
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  border: none;
+  border: 2px solid;
+  box-sizing: border-box;
   padding: 0;
   cursor: pointer;
   transition: transform 0.1s ease;
 
   &:hover {
     transform: scale(1.2);
+  }
+}
+
+// ============================================
+// 25. PUBLISHING STATUS POPUP
+// ============================================
+
+.publish-status-content {
+  padding: 8px 0;
+  min-width: 200px;
+}
+
+.publish-status-empty {
+  padding: 8px 12px;
+  color: var(--base00);
+  font-size: 0.85rem;
+}
+
+.publish-relay-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+
+  &:hover {
+    background: var(--base02);
+  }
+}
+
+.publish-relay-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.publish-relay-error {
+  color: var(--red);
+  font-size: 0.75rem;
+  width: 100%;
+}
+
+.publish-relay-name {
+  color: var(--base0);
+}
+
+.publish-relay-stats {
+  font-size: 0.8rem;
+}
+
+.publish-resend-btn {
+  background: var(--base02);
+  border: 1px solid var(--base01);
+  border-radius: 3px;
+  color: var(--base0);
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--base01);
+    color: var(--base1);
   }
 }

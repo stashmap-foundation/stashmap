@@ -24,7 +24,7 @@ function getStatusInfo(publishEventsStatus: PublishEvents<unknown>): {
     return { text: "error", segmentClass: "status-segment-error" };
   }
 
-  return { text: "synced", segmentClass: "" };
+  return { text: "synced", segmentClass: "status-segment-dark" };
 }
 
 export function PublishingStatusWrapper(): JSX.Element {

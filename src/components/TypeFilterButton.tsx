@@ -49,11 +49,15 @@ function ClickableFilterDot({
   isActive: boolean;
   onClick: (id: FilterId) => void;
 }): JSX.Element {
+  const style = isActive
+    ? { backgroundColor: color, borderColor: color }
+    : { backgroundColor: "transparent", borderColor: TYPE_COLORS.inactive };
+
   return (
     <button
       type="button"
       className="clickable-filter-dot"
-      style={{ backgroundColor: isActive ? color : TYPE_COLORS.inactive }}
+      style={style}
       onClick={() => onClick(id)}
       aria-label={`toggle ${label} filter`}
       aria-pressed={isActive}

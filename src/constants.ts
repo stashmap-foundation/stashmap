@@ -27,5 +27,5 @@ export const TYPE_COLORS = {
   other_user: "#6c71c4",   // Violet - other user content
   other_user_bg: "#6c71c420", // Violet with transparency
   referenced_by: "#2aa198", // Cyan - referenced by
-  inactive: "#93a1a1",     // Base01 - visible on base02/base03
+  inactive: "#586e75",     // Base01 (darker) - clearly dimmed
 };

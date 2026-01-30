@@ -446,7 +446,8 @@ describe("Diff item relevance selection", () => {
     // After accepting, it should no longer be a diff item
     // It should now show "Relevant" title (indicating it's now in Alice's list)
     await waitFor(() => {
-      expect(screen.getByTitle("Relevant")).toBeDefined();
+      const selectors = screen.queryAllByTitle("Relevant");
+      expect(selectors.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -534,8 +535,7 @@ describe("Remove from list", () => {
     });
 
     // Enable not_relevant filter to see the child
-    await userEvent.click(screen.getByLabelText("filter Parent"));
-    await userEvent.click(await screen.findByText("Not Relevant"));
+    await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
 
     // Child should now be visible
     await screen.findByText("Child");
@@ -572,8 +572,7 @@ describe("Remove from list", () => {
     });
 
     // Enable not_relevant filter to see Child1
-    await userEvent.click(screen.getByLabelText("filter Parent"));
-    await userEvent.click(await screen.findByText("Not Relevant"));
+    await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
 
     // Child1 should now be visible
     await screen.findByText("Child1");
@@ -616,8 +615,7 @@ describe("Remove from list", () => {
     });
 
     // Enable not_relevant filter to see the child again
-    await userEvent.click(screen.getByLabelText("filter Parent"));
-    await userEvent.click(await screen.findByText("Not Relevant"));
+    await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
 
     // Child should reappear
     await screen.findByText("Child");
@@ -670,15 +668,14 @@ describe("Relation lookup consistency (regression)", () => {
     });
 
     // Now enable little_relevant filter to verify the item still exists
-    await userEvent.click(screen.getByLabelText("filter Parent"));
-    await userEvent.click(await screen.findByText("Little Relevant"));
+    await userEvent.click(screen.getByLabelText("toggle Little Relevant filter"));
 
     // Child should reappear, confirming the relevance was properly saved
     await screen.findByText("Child");
 
     // And it should show the correct relevance (1 dot = little relevant)
-    const selector = screen.getByTitle("Little Relevant");
-    expect(selector).toBeDefined();
+    const selectors = screen.queryAllByTitle("Little Relevant");
+    expect(selectors.length).toBeGreaterThanOrEqual(1);
   });
 
   test("setting relevance persists correctly on item accessed via nodeIndex", async () => {

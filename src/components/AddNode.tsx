@@ -187,8 +187,8 @@ export function MiniEditor({
     }
 
     // Skip if focus moved to a modal (e.g., search modal opened from same row)
-    const relatedTarget = e.relatedTarget as HTMLElement | null;
-    if (relatedTarget?.closest(".modal")) {
+    const relatedTarget = e.relatedTarget;
+    if (relatedTarget instanceof HTMLElement && relatedTarget.closest(".modal")) {
       return;
     }
 

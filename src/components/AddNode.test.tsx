@@ -37,7 +37,7 @@ test("Add note via + button on empty tree", async () => {
   renderApp(alice());
 
   // Wait for My Notes to appear (ROOT node)
-  await screen.findByText("My Notes");
+  await screen.findByLabelText("collapse My Notes");
 
   // Click the + button to add a note (aria-label="add to My Notes")
   const addButton = await screen.findByLabelText("add to My Notes");

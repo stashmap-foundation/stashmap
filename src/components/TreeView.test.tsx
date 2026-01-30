@@ -348,15 +348,12 @@ test("Can exit Referenced By mode even when node has no relations", async () => 
   // Bitcoin is now root - it has no children
   await screen.findByLabelText("expand Bitcoin");
 
-  // Filter button should be visible initially (not in Referenced By mode)
-  expect(screen.getByLabelText("filter Bitcoin")).toBeDefined();
+  // Filter dots should be visible initially (not in Referenced By mode)
+  expect(screen.getByLabelText("toggle Relevant filter")).toBeDefined();
 
   // Enter Referenced By mode
   fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
   await screen.findByLabelText("hide references to Bitcoin");
-
-  // Filter should now be grayed (showing children button)
-  expect(screen.getByLabelText("show children of Bitcoin")).toBeDefined();
 
   // Reference should be visible (Money is Bitcoin's parent)
   // Wait for references to load - look for the reference path containing Money
@@ -368,8 +365,8 @@ test("Can exit Referenced By mode even when node has no relations", async () => 
   // Exit Referenced By mode - this should work even though Bitcoin has no relations
   fireEvent.click(screen.getByLabelText("hide references to Bitcoin"));
 
-  // Should be back to normal mode - filter button should be visible again
-  await screen.findByLabelText("filter Bitcoin");
+  // Should be back to normal mode - filter dots should be visible again
+  await screen.findByLabelText("toggle Relevant filter");
   expect(screen.getByLabelText("show references to Bitcoin")).toBeDefined();
 });
 

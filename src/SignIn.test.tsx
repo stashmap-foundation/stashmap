@@ -19,7 +19,7 @@ test("Login and logout with seed phrase", async () => {
     "leader monkey parrot ring guide accident before fence cannon height naive bean{enter}"
   );
 
-  await screen.findByText("My Notes", undefined, {
+  await screen.findByLabelText("collapse My Notes", undefined, {
     timeout: 5000,
   });
 
@@ -80,7 +80,7 @@ test("Sign in persists created Notes", async () => {
   });
   await userEvent.click(await screen.findByLabelText("add to My Notes"));
   await userEvent.type(await findNewNodeEditor(), "Hello World!{Enter}");
-  await userEvent.click(await screen.findByText("Sign in to Save"));
+  await userEvent.click(await screen.findByLabelText("sign in to save changes"));
   await userEvent.type(
     await screen.findByPlaceholderText(
       "nsec, private key or mnemonic (12 words)"

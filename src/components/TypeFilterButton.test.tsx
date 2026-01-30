@@ -13,7 +13,7 @@ import { DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 describe("TYPE_COLORS", () => {
   test("has correct colors for relevance types", () => {
     expect(TYPE_COLORS.relevant).toBe("#268bd2");
-    expect(TYPE_COLORS.maybe_relevant).toBe("#2aa198");
+    expect(TYPE_COLORS.maybe_relevant).toBe("#d33682");
     expect(TYPE_COLORS.little_relevant).toBe("#b58900");
     expect(TYPE_COLORS.not_relevant).toBe("#93a1a1");
   });
@@ -24,7 +24,7 @@ describe("TYPE_COLORS", () => {
   });
 
   test("has inactive color", () => {
-    expect(TYPE_COLORS.inactive).toBe("#eee8d5");
+    expect(TYPE_COLORS.inactive).toBe("#586e75");
   });
 });
 
@@ -76,11 +76,13 @@ My Notes
     Child
     `);
 
-    // Filter button should exist for the parent node
-    expect(screen.getByLabelText("filter Parent")).toBeDefined();
+    // Inline filter dots should exist in the pane header
+    expect(screen.getByLabelText("toggle Relevant filter")).toBeDefined();
+    expect(screen.getByLabelText("toggle Maybe Relevant filter")).toBeDefined();
+    expect(screen.getByLabelText("toggle Not Relevant filter")).toBeDefined();
   });
 
-  test("opens filter popover on click", async () => {
+  test("inline filter dots are clickable", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -95,16 +97,13 @@ My Notes
     await userEvent.type(await findNewNodeEditor(), "Child{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
-    // Click filter button for Parent
-    fireEvent.click(screen.getByLabelText("filter Parent"));
-
-    // Popover should show filter options
-    await screen.findByText("Relevant");
-    await screen.findByText("Maybe Relevant");
-    await screen.findByText("Little Relevant");
-    await screen.findByText("Not Relevant");
-    await screen.findByText("Confirms");
-    await screen.findByText("Contradicts");
+    // Inline filter dots should exist
+    expect(screen.getByLabelText("toggle Relevant filter")).toBeDefined();
+    expect(screen.getByLabelText("toggle Maybe Relevant filter")).toBeDefined();
+    expect(screen.getByLabelText("toggle Little Relevant filter")).toBeDefined();
+    expect(screen.getByLabelText("toggle Not Relevant filter")).toBeDefined();
+    expect(screen.getByLabelText("toggle Confirms filter")).toBeDefined();
+    expect(screen.getByLabelText("toggle Contradicts filter")).toBeDefined();
   });
 
   test("toggling filter hides/shows items", async () => {
@@ -126,12 +125,8 @@ My Notes
     await screen.findByText("Item One");
     await screen.findByText("Item Two");
 
-    // Open filter popover for Parent
-    fireEvent.click(screen.getByLabelText("filter Parent"));
-    await screen.findByText("Maybe Relevant");
-
-    // Toggle off "Maybe Relevant" filter (default relevance for new items)
-    fireEvent.click(screen.getByText("Maybe Relevant"));
+    // Toggle off "Maybe Relevant" filter using inline dot (default relevance for new items)
+    fireEvent.click(screen.getByLabelText("toggle Maybe Relevant filter"));
 
     // Items should be hidden (they have default/maybe_relevant relevance)
     await waitFor(() => {
@@ -170,16 +165,14 @@ My Notes
     // Visible Item should still be visible
     expect(screen.getByText("Visible Item")).toBeDefined();
 
-    // Open filter popover for Parent and enable "Not Relevant"
-    fireEvent.click(screen.getByLabelText("filter Parent"));
-    await screen.findByText("Not Relevant");
-    fireEvent.click(screen.getByText("Not Relevant"));
+    // Enable "Not Relevant" filter using inline dot
+    fireEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
 
     // Hidden Item should now be visible
     await screen.findByText("Hidden Item");
   });
 
-  test("does not show filter button in Referenced By mode", async () => {
+  test("inline filter dots are always visible in pane header", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -196,15 +189,15 @@ My Notes
     await navigateToNodeViaSearch(0, "Bitcoin");
     await screen.findByLabelText("expand Bitcoin");
 
-    // Filter button should exist initially
-    expect(screen.getByLabelText("filter Bitcoin")).toBeDefined();
+    // Inline filter dots should exist in pane header
+    expect(screen.getByLabelText("toggle Relevant filter")).toBeDefined();
 
     // Switch to Referenced By view
     fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
     await screen.findByLabelText("hide references to Bitcoin");
 
-    // Filter button should NOT be visible in Referenced By mode
-    expect(screen.queryByLabelText("filter Bitcoin")).toBeNull();
+    // Inline filter dots should still be visible (they're in pane header)
+    expect(screen.getByLabelText("toggle Relevant filter")).toBeDefined();
   });
 
   test("filter state persists across interactions", async () => {
@@ -224,28 +217,21 @@ My Notes
 
     await screen.findByText("Test Item");
 
-    // Open filter popover and toggle off "Maybe Relevant"
-    // Note: must use userEvent.click for popovers to work correctly
-    await userEvent.click(screen.getByLabelText("filter Parent"));
-    await screen.findByText("Maybe Relevant");
-    await userEvent.click(screen.getByText("Maybe Relevant"));
+    // Toggle off "Maybe Relevant" filter using inline dot
+    await userEvent.click(screen.getByLabelText("toggle Maybe Relevant filter"));
 
     // Item should be hidden
     await waitFor(() => {
       expect(screen.queryByText("Test Item")).toBeNull();
     });
 
-    // Close popover by clicking outside
-    await userEvent.click(document.body);
-
     // Item should still be hidden (filter state persists)
     await waitFor(() => {
       expect(screen.queryByText("Test Item")).toBeNull();
     });
 
-    // Reopen filter popover and re-enable "Maybe Relevant"
-    await userEvent.click(screen.getByLabelText("filter Parent"));
-    await userEvent.click(await screen.findByText("Maybe Relevant"));
+    // Re-enable "Maybe Relevant" filter
+    await userEvent.click(screen.getByLabelText("toggle Maybe Relevant filter"));
 
     // Item should reappear
     await screen.findByText("Test Item");
@@ -258,10 +244,10 @@ describe("Suggestions filter", () => {
   });
 
   test("TYPE_COLORS has other_user color for suggestions", () => {
-    expect(TYPE_COLORS.other_user).toBe("#cb4b16");
+    expect(TYPE_COLORS.other_user).toBe("#6c71c4");
   });
 
-  test("filter popover shows Suggestions option", async () => {
+  test("inline filter dots include Suggestions option", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -276,11 +262,8 @@ describe("Suggestions filter", () => {
     await userEvent.type(await findNewNodeEditor(), "Child{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
-    // Open filter popover for Parent
-    fireEvent.click(screen.getByLabelText("filter Parent"));
-
-    // Suggestions option should be visible
-    await screen.findByText("Suggestions");
+    // Suggestions filter dot should be visible in pane header
+    expect(screen.getByLabelText("toggle Suggestions filter")).toBeDefined();
   });
 });
 
@@ -312,10 +295,8 @@ describe("Filter integration with RelevanceSelector", () => {
       expect(screen.queryByText("Child1")).toBeNull();
     });
 
-    // Enable not_relevant filter for Parent
-    fireEvent.click(screen.getByLabelText("filter Parent"));
-    await screen.findByText("Not Relevant");
-    fireEvent.click(screen.getByText("Not Relevant"));
+    // Enable not_relevant filter using inline dot
+    fireEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
 
     // Child1 should reappear
     await screen.findByText("Child1");
@@ -352,11 +333,12 @@ describe("Filter integration with RelevanceSelector", () => {
     });
 
     // Enable not_relevant filter to see the child again
-    fireEvent.click(screen.getByLabelText("filter Parent"));
-    fireEvent.click(await screen.findByText("Not Relevant"));
+    fireEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
 
-    // Child should reappear with Not Relevant title
+    // Child should reappear with Not Relevant relevance
     await screen.findByText("Child");
-    expect(screen.getByTitle("Not Relevant")).toBeDefined();
+    // There are two elements with "Not Relevant" title (filter dot and relevance selector)
+    const notRelevantElements = screen.getAllByTitle("Not Relevant");
+    expect(notRelevantElements.length).toBeGreaterThanOrEqual(2);
   });
 });

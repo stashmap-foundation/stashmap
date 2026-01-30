@@ -10,13 +10,12 @@ import {
   setup,
 } from "../utils.test";
 
-async function deleteItem(itemName: string, parentName: string): Promise<void> {
+async function deleteItem(itemName: string, _parentName: string): Promise<void> {
   fireEvent.click(screen.getByLabelText(`mark ${itemName} as not relevant`));
   await waitFor(() => {
     expect(screen.queryByText(itemName)).toBeNull();
   });
-  await userEvent.click(screen.getByLabelText(`filter ${parentName}`));
-  await userEvent.click(await screen.findByText("Not Relevant"));
+  await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
   await screen.findByText(itemName);
   fireEvent.click(screen.getByLabelText(`remove ${itemName} from list`));
   await waitFor(() => {

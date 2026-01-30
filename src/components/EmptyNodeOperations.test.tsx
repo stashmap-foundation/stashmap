@@ -55,8 +55,7 @@ My Notes
     });
 
     // Enable little_relevant filter to verify node was created
-    await userEvent.click(screen.getByLabelText("filter Parent"));
-    await userEvent.click(await screen.findByText("Little Relevant"));
+    await userEvent.click(screen.getByLabelText("toggle Little Relevant filter"));
 
     await expectTree(`
 My Notes
@@ -86,8 +85,7 @@ My Notes
     });
 
     // Enable not_relevant filter to verify node was created
-    await userEvent.click(screen.getByLabelText("filter Parent"));
-    await userEvent.click(await screen.findByText("Not Relevant"));
+    await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
 
     // Check strikethrough styling - style is on parent span
     const hiddenNode = await screen.findByLabelText("edit Hidden");
@@ -122,9 +120,10 @@ My Notes
 
     const evidenceNode = await screen.findByLabelText("edit Evidence");
     const styledSpan = evidenceNode.closest(
-      "span[style*='background']"
+      "span[style*='color']"
     ) as HTMLElement;
-    expect(styledSpan?.style.backgroundColor).toContain("133, 153, 0");
+    // Green color for confirms is #859900 = rgb(133, 153, 0)
+    expect(styledSpan?.style.color).toContain("133, 153, 0");
   });
 
   test("clicking argument while editing existing node saves edit", async () => {
@@ -161,9 +160,10 @@ My Notes
 
     const editedNode = await screen.findByLabelText("edit Edited");
     const styledSpan = editedNode.closest(
-      "span[style*='background']"
+      "span[style*='color']"
     ) as HTMLElement;
-    expect(styledSpan?.style.backgroundColor).toContain("133, 153, 0");
+    // Green color for confirms is #859900 = rgb(133, 153, 0)
+    expect(styledSpan?.style.color).toContain("133, 153, 0");
 
     cleanup();
     renderTree(alice);
@@ -176,9 +176,10 @@ My Notes
 
     const rerenderedNode = await screen.findByLabelText("edit Edited");
     const rerenderedStyledSpan = rerenderedNode.closest(
-      "span[style*='background']"
+      "span[style*='color']"
     ) as HTMLElement;
-    expect(rerenderedStyledSpan?.style.backgroundColor).toContain(
+    // Green color for confirms is #859900 = rgb(133, 153, 0)
+    expect(rerenderedStyledSpan?.style.color).toContain(
       "133, 153, 0"
     );
   });
@@ -239,8 +240,8 @@ My Notes
   });
 });
 
-describe("Empty node - filter button", () => {
-  test("filter button is disabled for empty node", async () => {
+describe("Filter dots in pane header", () => {
+  test("pane filter dots are always enabled", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -249,10 +250,9 @@ describe("Empty node - filter button", () => {
     await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child");
 
-    // Empty node should have a disabled filter button
-    // The aria-label uses the typed text "Child"
-    const filterButton = screen.getByLabelText("filter Child");
-    expect(filterButton.hasAttribute("disabled")).toBe(true);
+    // Pane-level filter dots should always be enabled
+    const filterButton = screen.getByLabelText("toggle Relevant filter");
+    expect(filterButton.hasAttribute("disabled")).toBe(false);
   });
 });
 

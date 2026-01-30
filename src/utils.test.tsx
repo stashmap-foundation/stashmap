@@ -749,40 +749,27 @@ export function RootViewOrWorkspaceIsLoading({
  *     Ethereum
  */
 function getIndentLevel(element: HTMLElement): number {
-  // Count indent levels by counting the wrapper divs inside .d-flex that come before the element
-  // Structure: .d-flex > .left-menu > [indent divs...] > expand-collapse-toggle > content
-  // The first indent div is always there (even for root), so we count starting from -1
+  // Count indent levels by counting .indent-spacer direct children inside the node's .d-flex
+  // Structure: .inner-node > Card.Body > .d-flex > .indicator-gutter > [.indent-spacer divs...] > expand-collapse-toggle
+  // Note: getLevels() in Node.tsx returns root=1, children=2, etc. so we subtract 1 for 0-based indent
   // eslint-disable-next-line testing-library/no-node-access
-  const dFlex = element.closest(".d-flex");
-  if (!dFlex) {
+  const innerNode = element.closest(".inner-node");
+  if (!innerNode) {
     return 0;
   }
   // eslint-disable-next-line testing-library/no-node-access
-  const children = Array.from(dFlex.children);
-  // eslint-disable-next-line functional/no-let
-  let countingIndents = false;
-  // eslint-disable-next-line functional/no-let
-  let indentLevel = -1; // Start at -1 because there's always one structural div
-  // eslint-disable-next-line no-restricted-syntax
-  for (const child of children) {
-    // eslint-disable-next-line testing-library/no-node-access
-    if (child.classList.contains("left-menu")) {
-      countingIndents = true;
-      // eslint-disable-next-line no-continue
-      continue;
-    }
-    // Stop counting at expand-collapse-toggle or when we find the element
-    // eslint-disable-next-line testing-library/no-node-access
-    if (child.classList.contains("expand-collapse-toggle")) break;
-    // eslint-disable-next-line testing-library/no-node-access
-    if (child === element || child.contains(element)) break;
-    if (countingIndents && child.tagName === "DIV") {
-      // eslint-disable-next-line no-plusplus
-      indentLevel++;
-    }
+  const dFlex = innerNode.querySelector(".d-flex");
+  if (!dFlex) {
+    return 0;
   }
-  // Clamp to 0 minimum
-  return Math.max(0, indentLevel);
+  // Count only direct children with indent-spacer class
+  // eslint-disable-next-line testing-library/no-node-access
+  const directChildren = Array.from(dFlex.children);
+  const count = directChildren.filter((child) =>
+    // eslint-disable-next-line testing-library/no-node-access
+    child.classList.contains("indent-spacer")
+  ).length;
+  return Math.max(0, count - 1);
 }
 
 export async function getTreeStructure(): Promise<string> {
@@ -871,8 +858,9 @@ export async function getTreeStructure(): Promise<string> {
       return isSuggestion ? `[S] ${text}` : text;
     }
     if (type === "reference") {
-      const text = element.textContent?.trim() || "";
       const isOtherUser = element.getAttribute("data-other-user") === "true";
+      const rawText = element.textContent?.trim() || "";
+      const text = isOtherUser ? rawText.replace(/👤/g, "") : rawText;
       return isOtherUser ? `[O] ${text}` : text;
     }
     if (type === "suggestion") {

@@ -464,7 +464,7 @@ export function Indent({
         return (
           <div
             key={k}
-            className={showBorder ? "indent-border" : undefined}
+            className={`indent-spacer${showBorder ? " indent-border" : ""}`}
             style={{
               marginLeft,
               minWidth: width,

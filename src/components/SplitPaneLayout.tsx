@@ -23,6 +23,7 @@ import { createSearchId } from "../connections";
 export function PaneSearchButton(): JSX.Element {
   const { setPane } = useSplitPanes();
   const pane = useCurrentPane();
+  const paneIndex = usePaneIndex();
   const { user } = useData();
   const [showInput, setShowInput] = useState(false);
   const [query, setQuery] = useState("");
@@ -76,7 +77,7 @@ export function PaneSearchButton(): JSX.Element {
       type="button"
       className="btn btn-icon"
       onClick={() => setShowInput(true)}
-      aria-label="search"
+      aria-label={`Search to change pane ${paneIndex} content`}
       title="Search"
     >
       <span aria-hidden="true">/</span>

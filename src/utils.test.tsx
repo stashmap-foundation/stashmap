@@ -727,7 +727,7 @@ export function RootViewOrWorkspaceIsLoading({
 
 /**
  * Gets the tree structure as a readable hierarchical string.
- * Uses expand/collapse buttons to find nodes (these exist for all nodes).
+ * Iterates through all .item rows once and classifies each one.
  *
  * Example output:
  *   My Notes
@@ -756,108 +756,107 @@ function getIndentLevel(element: HTMLElement): number {
   return Math.max(0, count - 1);
 }
 
+type RowInfo = {
+  element: HTMLElement;
+  text: string;
+  indentLevel: number;
+};
+
+function classifyRow(row: Element): RowInfo | null {
+  /* eslint-disable testing-library/no-node-access */
+  const toggleButton = row.querySelector(
+    "button[aria-label^='expand '], button[aria-label^='collapse ']"
+  );
+  const newNodeEditor = row.querySelector(
+    '[role="textbox"][aria-label="new node editor"]'
+  );
+  const innerNode = row.querySelector(".inner-node");
+  const isSuggestion = innerNode?.getAttribute("data-suggestion") === "true";
+  const referenceNode = row.querySelector('[data-testid="reference-node"]');
+  const isOtherUser = referenceNode?.getAttribute("data-other-user") === "true";
+  const noteEditor = innerNode?.querySelector(
+    '[role="textbox"][aria-label^="edit "]'
+  );
+  /* eslint-enable testing-library/no-node-access */
+
+  if (newNodeEditor) {
+    const content = newNodeEditor.textContent?.trim();
+    const text = content ? `[NEW NODE: ${content}]` : "[NEW NODE]";
+    return {
+      element: newNodeEditor as HTMLElement,
+      text,
+      indentLevel: getIndentLevel(newNodeEditor as HTMLElement),
+    };
+  }
+
+  if (toggleButton) {
+    let rawText = (toggleButton.getAttribute("aria-label") || "").replace(
+      /^(expand|collapse) /,
+      ""
+    );
+    if (!rawText) {
+      /* eslint-disable testing-library/no-node-access */
+      const textSpan = innerNode?.querySelector(".break-word");
+      /* eslint-enable testing-library/no-node-access */
+      rawText =
+        noteEditor?.textContent?.trim() || textSpan?.textContent?.trim() || "";
+    }
+    if (!rawText) {
+      return null;
+    }
+    const prefix = isSuggestion ? "[S] " : isOtherUser ? "[O] " : "";
+    return {
+      element: toggleButton as HTMLElement,
+      text: `${prefix}${rawText}`,
+      indentLevel: getIndentLevel(toggleButton as HTMLElement),
+    };
+  }
+
+  if (referenceNode) {
+    const rawText = referenceNode.textContent?.trim() || "";
+    const cleanText = rawText.replace(/👤/g, "").trim();
+    const prefix = isSuggestion ? "[S] " : isOtherUser ? "[O] " : "";
+    return {
+      element: referenceNode as HTMLElement,
+      text: `${prefix}${cleanText}`,
+      indentLevel: getIndentLevel(referenceNode as HTMLElement),
+    };
+  }
+
+  if (isSuggestion && innerNode) {
+    /* eslint-disable testing-library/no-node-access */
+    const textSpan = innerNode.querySelector(".break-word");
+    /* eslint-enable testing-library/no-node-access */
+    const rawText =
+      textSpan?.textContent?.trim() || noteEditor?.textContent?.trim() || "";
+    return {
+      element: innerNode as HTMLElement,
+      text: `[S] ${rawText}`,
+      indentLevel: getIndentLevel(innerNode as HTMLElement),
+    };
+  }
+
+  return null;
+}
+
 export async function getTreeStructure(): Promise<string> {
   await waitFor(() => {
     expect(screen.queryByText("Loading...")).toBeNull();
   });
 
-  // Find all expand/collapse buttons (every node has one)
-  const toggleButtons = screen.getAllByRole("button", {
-    name: /^(expand|collapse) /,
+  /* eslint-disable testing-library/no-node-access */
+  const allRows = document.querySelectorAll(".item");
+  /* eslint-enable testing-library/no-node-access */
+
+  const rowInfos: RowInfo[] = [];
+  allRows.forEach((row) => {
+    const info = classifyRow(row);
+    if (info) {
+      rowInfos.push(info);
+    }
   });
 
-  // Find all new node editors
-  const editors = screen.queryAllByRole("textbox", {
-    name: "new node editor",
-  });
-
-  // Find all reference nodes (paths like "My Notes → Holiday Destinations → BCN")
-  // But exclude those that have an expand/collapse button (they're already counted above)
-  const referenceNodes = screen.queryAllByTestId("reference-node").filter(
-    (refNode) => {
-      // Check if this reference node is inside a node that has an expand/collapse button
-      const parentNode = refNode.closest(".inner-node");
-      if (!parentNode) return true;
-      const hasToggleButton = parentNode.querySelector("button[aria-label^='expand '], button[aria-label^='collapse ']");
-      return !hasToggleButton;
-    }
-  );
-
-  // Find all suggestion nodes (diff items from other users)
-  // These don't have expand/collapse buttons, so we find them via data-suggestion attribute
-  const suggestionCards = document.querySelectorAll('[data-suggestion="true"]');
-  const suggestionNodes = Array.from(suggestionCards).map((card) => {
-    // Find the text content - look for the editor or text span
-    const editor = card.querySelector('[role="textbox"]');
-    if (editor) return editor as HTMLElement;
-    const textSpan = card.querySelector('.break-word');
-    return textSpan as HTMLElement;
-  }).filter((el): el is HTMLElement => el !== null);
-
-  // Combine and sort by DOM order
-  type TreeElement = {
-    element: HTMLElement;
-    type: "node" | "editor" | "reference" | "suggestion";
-  };
-  const elements: TreeElement[] = [
-    ...toggleButtons.map((el) => ({
-      element: el as HTMLElement,
-      type: "node" as const,
-    })),
-    ...editors.map((el) => ({
-      element: el as HTMLElement,
-      type: "editor" as const,
-    })),
-    ...referenceNodes.map((el) => ({
-      element: el as HTMLElement,
-      type: "reference" as const,
-    })),
-    ...suggestionNodes.map((el) => ({
-      element: el as HTMLElement,
-      type: "suggestion" as const,
-    })),
-  ];
-
-  // Sort by document order (creates a new sorted array)
-  const sortedElements = [...elements].sort((a, b) => {
-    const position = a.element.compareDocumentPosition(b.element);
-    // eslint-disable-next-line no-bitwise
-    if (position & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
-    // eslint-disable-next-line no-bitwise
-    if (position & Node.DOCUMENT_POSITION_PRECEDING) return 1;
-    return 0;
-  });
-
-  const getElementText = (
-    element: HTMLElement,
-    type: "node" | "editor" | "reference" | "suggestion"
-  ): string => {
-    if (type === "node") {
-      const text = (element.getAttribute("aria-label") || "").replace(
-        /^(expand|collapse) /,
-        ""
-      );
-      const nodeCard = element.closest("[data-suggestion]");
-      const isSuggestion = nodeCard?.getAttribute("data-suggestion") === "true";
-      return isSuggestion ? `[S] ${text}` : text;
-    }
-    if (type === "reference") {
-      const isOtherUser = element.getAttribute("data-other-user") === "true";
-      const rawText = element.textContent?.trim() || "";
-      const text = isOtherUser ? rawText.replace(/👤/g, "") : rawText;
-      return isOtherUser ? `[O] ${text}` : text;
-    }
-    if (type === "suggestion") {
-      const text = element.textContent?.trim() || "";
-      return `[S] ${text}`;
-    }
-    const content = element.textContent?.trim();
-    return content ? `[NEW NODE: ${content}]` : "[NEW NODE]";
-  };
-
-  const lines = sortedElements.map(({ element, type }) => {
-    const text = getElementText(element, type);
-    const indentLevel = getIndentLevel(element);
+  const lines = rowInfos.map(({ text, indentLevel }) => {
     const indent = "  ".repeat(indentLevel);
     return `${indent}${text}`;
   });

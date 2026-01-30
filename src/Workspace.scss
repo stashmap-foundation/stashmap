@@ -354,30 +354,38 @@ body {
   font-size: 1rem;
 }
 
+// Argument indicator (+/- for confirms/contra)
+.argument-indicator {
+  margin-right: 6px;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
 // Content styling for different view modes
+// Text stays normal (base0), only indicators are colored
 .content-diff-item {
-  color: var(--violet);
+  // Text is normal, indicator (●) handles the violet color
 }
 
-// Referenced-by view - cyan text for distinction
+// Referenced-by view - text stays normal, border provides context
 .content-referenced-by {
-  color: var(--cyan);
+  // Text is normal (base0), cyan left border provides context
 }
 
-// Reference node styling - cyan text
+// Reference node styling - text stays normal
 .reference-node {
-  color: var(--cyan);
+  // Text is normal, cyan reference icon (⤶) provides context
 }
 
 .reference-icon {
   margin-right: 6px;
   font-size: 0.9em;
-  color: var(--blue);
+  color: var(--cyan);
 }
 
 .indent-border {
   align-self: stretch;
-  border-left: 3px solid var(--blue);
+  border-left: 3px solid var(--cyan);
 }
 
 
@@ -410,7 +418,7 @@ body {
   }
 
   &.toggle-referenced-by {
-    color: var(--blue);
+    color: var(--cyan);
   }
 
   &.toggle-disabled {
@@ -543,9 +551,11 @@ body {
 .left-menu {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 4px;
   padding-right: 8px;
-  min-width: 120px;
+  width: 130px;
+  flex-shrink: 0;
 
   > * {
     opacity: 0;

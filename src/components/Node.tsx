@@ -640,7 +640,7 @@ export function Node({
   const referencedByDepth = useReferencedByDepth();
   const isInReferencedByView = referencedByDepth !== undefined;
   const [, view] = useNodeID();
-  const { cardStyle, textStyle } = useItemStyle();
+  const { cardStyle, textStyle, argumentIndicator } = useItemStyle();
   const defaultCls = isDesktop ? "hover-light-bg" : "";
   const cls =
     className !== undefined ? `${className} hover-light-bg` : defaultCls;
@@ -706,6 +706,15 @@ export function Node({
         )}
         {isMultiselect && <NodeSelectbox />}
         <div className={`w-100 node-content-wrapper ${contentClass}`}>
+          {argumentIndicator.symbol && (
+            <span
+              className="argument-indicator"
+              style={{ color: argumentIndicator.color || undefined }}
+              aria-label={argumentIndicator.symbol === "+" ? "confirms" : "contradicts"}
+            >
+              {argumentIndicator.symbol}
+            </span>
+          )}
           <span style={textStyle}>
             <NodeAutoLink>
               {isDiffItem && <DiffItemIndicator />}

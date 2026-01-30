@@ -26,6 +26,6 @@ export const TYPE_COLORS = {
   contra: "#dc322f",       // Red - contra, errors
   other_user: "#cb4b16",   // Orange - other user content
   other_user_bg: "#cb4b1620", // Orange with transparency
-  referenced_by: "#6c71c4", // Violet - referenced by
-  inactive: "#eee8d5",     // Base02 - inactive/chrome
+  referenced_by: "#268bd2", // Blue - referenced by
+  inactive: "#93a1a1",     // Base01 - visible on base02/base03
 };

@@ -50,8 +50,7 @@ function ReferenceDot(): JSX.Element | null {
     }
   };
 
-  // Purple for references
-  const dotColor = isInReferencedBy
+  const textColor = isInReferencedBy
     ? TYPE_COLORS.referenced_by
     : TYPE_COLORS.inactive;
 
@@ -68,7 +67,7 @@ function ReferenceDot(): JSX.Element | null {
       title={
         isInReferencedBy ? "Show children" : `Show ${referenceCount} references`
       }
-      style={{ backgroundColor: dotColor }}
+      style={{ color: textColor }}
     >
       {referenceCount}
     </button>

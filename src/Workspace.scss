@@ -1054,17 +1054,14 @@ input:focus,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 20px;
-  background-color: var(--base02);
-  border: 1px solid var(--base01);
+  padding: 4px;
+  background: none;
+  border: none;
   color: var(--base01);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: color 0.15s ease;
 
   &:hover {
-    border-color: var(--base0);
     color: var(--base0);
   }
 }

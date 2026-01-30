@@ -16,7 +16,8 @@ test("Closing a middle pane does not crash", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
 
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Test Node{Escape}");
 
   await expectTree(`

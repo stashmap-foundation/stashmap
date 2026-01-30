@@ -37,7 +37,8 @@ describe("View State Preservation - Reorder Within Same List", () => {
     );
 
     await userEvent.click(await screen.findByLabelText("expand A"));
-    await userEvent.click(await screen.findByLabelText("add to A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "ChildOfA{Escape}");
 
     await expectTree(`
@@ -77,7 +78,8 @@ My Notes
     );
 
     await userEvent.click(await screen.findByLabelText("expand C"));
-    await userEvent.click(await screen.findByLabelText("add to C"));
+    await userEvent.click(await screen.findByLabelText("edit C"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "ChildOfC{Escape}");
 
     await expectTree(`
@@ -117,11 +119,13 @@ My Notes
     );
 
     await userEvent.click(await screen.findByLabelText("expand A"));
-    await userEvent.click(await screen.findByLabelText("add to A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "ChildOfA{Escape}");
 
     await userEvent.click(await screen.findByLabelText("expand C"));
-    await userEvent.click(await screen.findByLabelText("add to C"));
+    await userEvent.click(await screen.findByLabelText("edit C"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "ChildOfC{Escape}");
 
     await expectTree(`
@@ -205,7 +209,8 @@ describe("View State Preservation - Indent/Outdent (Tab/Shift+Tab)", () => {
     );
 
     await userEvent.click(await screen.findByLabelText("expand Target"));
-    await userEvent.click(await screen.findByLabelText("add to Target"));
+    await userEvent.click(await screen.findByLabelText("edit Target"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Child{Escape}");
 
     await expectTree(`
@@ -283,11 +288,13 @@ My Notes
     );
 
     await userEvent.click(await screen.findByLabelText("expand A"));
-    await userEvent.click(await screen.findByLabelText("add to A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "ChildOfA{Escape}");
 
     await userEvent.click(await screen.findByLabelText("expand C"));
-    await userEvent.click(await screen.findByLabelText("add to C"));
+    await userEvent.click(await screen.findByLabelText("edit C"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "ChildOfC{Escape}");
 
     await expectTree(`
@@ -474,7 +481,8 @@ My Notes
 
     await screen.findByLabelText("collapse A");
 
-    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "New{Escape}");
 
     fireEvent.dragStart(screen.getByText("New"));
@@ -548,7 +556,8 @@ My Notes
 
     await screen.findByLabelText("collapse A");
 
-    await userEvent.click(await screen.findByLabelText("add to Parent"));
+    await userEvent.click(await screen.findByLabelText("edit Parent"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "New{Escape}");
 
     await expectTree(`
@@ -648,11 +657,13 @@ My Notes
     );
 
     await userEvent.click(await screen.findByLabelText("expand A"));
-    await userEvent.click(await screen.findByLabelText("add to A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "ChildOfA{Escape}");
 
     await userEvent.click(await screen.findByLabelText("expand C"));
-    await userEvent.click(await screen.findByLabelText("add to C"));
+    await userEvent.click(await screen.findByLabelText("edit C"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "ChildOfC{Escape}");
 
     await expectTree(`
@@ -741,11 +752,13 @@ My Notes
     );
 
     await userEvent.click(await screen.findByLabelText("expand A"));
-    await userEvent.click(await screen.findByLabelText("add to A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "ChildOfA{Escape}");
 
     await userEvent.click(await screen.findByLabelText("expand B"));
-    await userEvent.click(await screen.findByLabelText("add to B"));
+    await userEvent.click(await screen.findByLabelText("edit B"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "ChildOfB{Escape}");
 
     await expectTree(`
@@ -766,7 +779,8 @@ My Notes
     await screen.findByLabelText("collapse A");
     await screen.findByLabelText("collapse B");
 
-    await userEvent.click(await screen.findByLabelText("add to B"));
+    await userEvent.click(await screen.findByLabelText("edit B"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "NewChild{Escape}");
 
     await screen.findByLabelText("collapse A");
@@ -802,11 +816,13 @@ My Notes
     );
 
     await userEvent.click(await screen.findByLabelText("expand A"));
-    await userEvent.click(await screen.findByLabelText("add to A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "ChildOfA{Escape}");
 
     await userEvent.click(await screen.findByLabelText("expand C"));
-    await userEvent.click(await screen.findByLabelText("add to C"));
+    await userEvent.click(await screen.findByLabelText("edit C"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "ChildOfC{Escape}");
 
     await expectTree(`

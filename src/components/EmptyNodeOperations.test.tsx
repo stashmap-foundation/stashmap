@@ -256,8 +256,8 @@ describe("Filter dots in pane header", () => {
   });
 });
 
-describe("Empty node - add button materializes first", () => {
-  test("clicking add on empty node without text inserts new node at correct position", async () => {
+describe("Empty node - keyboard navigation", () => {
+  test("pressing Enter on empty node inserts new node at correct position", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -266,14 +266,8 @@ describe("Empty node - add button materializes first", () => {
     await userEvent.keyboard("{Enter}");
     await userEvent.type(
       await findNewNodeEditor(),
-      "Parent{Enter}{Tab}Child1{Enter}Child2{Enter}"
+      "Parent{Enter}{Tab}Child1{Enter}Child2{Enter}Child3{Escape}"
     );
-
-    // Now we have an empty node after Child2 - click add on the empty node row
-    await userEvent.click(await screen.findByLabelText("add to"));
-
-    // New empty node should be inserted after Child2, not above Child1
-    await userEvent.type(await findNewNodeEditor(), "Child3{Escape}");
 
     await expectTree(`
 My Notes
@@ -295,19 +289,15 @@ My Notes
     `);
   });
 
-  test("clicking add on empty node with text materializes it first", async () => {
+  test("pressing Enter on node with text materializes it first", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
     const myNotesEditor = await screen.findByLabelText("edit My Notes");
     await userEvent.click(myNotesEditor);
     await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child");
+    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child{Enter}");
 
-    // Click add button - should materialize "Child" first, then create new empty node
-    fireEvent.click(screen.getByLabelText("add to Child"));
-
-    // Both Parent and Child should be materialized, plus a new empty node
     await expectTree(`
 My Notes
   Parent
@@ -315,11 +305,10 @@ My Notes
     [NEW NODE]
     `);
 
-    // Verify we can find the new node editor
     await findNewNodeEditor();
   });
 
-  test("clicking add while editing existing node saves edit", async () => {
+  test("pressing Enter while editing existing node saves edit and creates sibling", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -342,7 +331,7 @@ My Notes
     await userEvent.clear(childEditor);
     await userEvent.type(childEditor, "Edited");
 
-    fireEvent.click(screen.getByLabelText("add to Edited"));
+    await userEvent.keyboard("{Enter}");
 
     await userEvent.type(await findNewNodeEditor(), "NewSibling{Escape}");
 

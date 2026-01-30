@@ -548,24 +548,12 @@ export async function typeNewNode(
   view: RenderResult,
   text: string
 ): Promise<void> {
-  // Click "Add Note" button to open editor
-  const addNoteButton = await screen.findByLabelText("add to My Notes");
-  await userEvent.click(addNoteButton);
+  // Click on My Notes editor and press Enter to create a new node
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
 
-  // Find the empty editor that opened
-  const editors = await screen.findAllByRole("textbox", {
-    name: "note editor",
-  });
-  const emptyEditor = editors.find((e) => e.textContent === "");
-  if (!emptyEditor) {
-    throw new Error("No empty editor found after clicking Add Note button");
-  }
-
-  // Type the text in the editor
-  await userEvent.type(emptyEditor, text);
-
-  // Press Enter to create the node
-  await userEvent.type(emptyEditor, "{Enter}");
+  // Type the text in the new node editor and press Enter to save
+  await userEvent.type(await findNewNodeEditor(), `${text}{Enter}`);
 
   // Verify the text appears in the tree
   await screen.findByText(text);
@@ -934,13 +922,10 @@ export function renderTree(
  * Returns with the new node as the root of the tree view.
  */
 export async function createAndSetAsRoot(nodeName: string): Promise<void> {
-  // First create the node under My Notes
+  // First create the node under My Notes using keyboard
   await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(
-    (
-      await screen.findAllByLabelText("add to My Notes")
-    )[0]
-  );
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), `${nodeName}{Escape}`);
 
   // Now use the pane search to change root to this node

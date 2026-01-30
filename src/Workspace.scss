@@ -165,8 +165,6 @@ body {
 .break-word { overflow-wrap: anywhere; }
 .white-space-normal { white-space: normal; }
 
-.font-size-big { font-size: 1.2rem; }
-.font-size-medium { font-size: 1rem; }
 .font-size-small { font-size: 0.8rem; }
 
 // ============================================
@@ -291,54 +289,6 @@ body {
   background-color: var(--base03);
 }
 
-.outer-node-container {
-  display: flex;
-  flex-direction: column;
-}
-
-.outer-node-title {
-  font-size: 20px;
-}
-
-.outer-node-title .inner-node {
-  padding: 1rem;
-}
-
-.node-row {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  background: transparent;
-
-  .item {
-    flex: 1;
-    min-width: 0;
-  }
-}
-
-.node-focused {
-  background-color: var(--base02);
-}
-
-.node-content-button {
-  background: none;
-  padding: 0;
-  margin: 0;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  text-align: inherit;
-  border: 2px solid transparent;
-
-  &.cursor-on-hover {
-    &:hover,
-    &:focus,
-    &:active {
-      cursor: text;
-    }
-  }
-}
-
 // Node content wrapper - no extra padding, align with row
 .node-content-wrapper {
   display: flex;
@@ -403,19 +353,11 @@ body {
   color: var(--base01);
 }
 
-// All content stays base0 - gutter indicators and borders provide context
-.content-referenced-by,
-.reference-node,
-.content-diff-item {
-  // normal base0 text
-}
-
 .reference-icon {
   margin-right: 6px;
   font-size: 0.9em;
   color: var(--cyan);
 }
-
 
 
 // Expand/collapse toggle
@@ -458,22 +400,6 @@ body {
   &.toggle-hidden {
     color: transparent;
     cursor: default;
-  }
-}
-
-// Add node button
-.add-node-button {
-  border: 0;
-  width: 100%;
-  text-align: left;
-  background: var(--base03);
-  color: var(--base01);
-  transition: color 150ms ease;
-
-  &:hover,
-  &:active {
-    background: var(--base02);
-    color: var(--base0);
   }
 }
 
@@ -652,21 +578,6 @@ body {
   }
 }
 
-.search-input {
-  outline: none;
-  background: var(--base03);
-  color: var(--base0);
-  border: 1px solid var(--base01);
-  border-radius: 4px;
-  padding: 6px 10px;
-
-  &:active,
-  &:focus {
-    outline: none;
-    background: var(--base02);
-  }
-}
-
 .search-input-inline {
   background: var(--base03);
   color: var(--base0);
@@ -749,7 +660,6 @@ input:focus,
 }
 
 .pane-header .dropdown-toggle::after,
-.outer-node-title .dropdown-toggle::after,
 .navbar-right .dropdown-toggle::after,
 .menu-layout .dropdown-toggle::after {
   display: none;
@@ -758,6 +668,7 @@ input:focus,
 .options-dropdown {
   .dropdown-menu {
     padding: 0;
+
   }
 
   .dropdown-submenu-toggle {
@@ -922,19 +833,6 @@ input:focus,
     display: flex;
     justify-content: flex-end;
   }
-}
-
-.navbar-title {
-  font-size: 18px;
-  overflow: hidden;
-  justify-content: end;
-}
-
-.workspace-title {
-  font-size: 1.2rem;
-  padding: 5px;
-  margin-right: 5px;
-  white-space: nowrap;
 }
 
 .workspace-selection {

@@ -28,7 +28,8 @@ test("Drag node within tree view", async () => {
 
   // Create nodes using the editor
   await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Item A{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Item B{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Item C{Enter}");
@@ -63,13 +64,14 @@ test("Drag between split panes", async () => {
 
   // Create a node with children using the editor
   await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
-  await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "{Escape}");
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(await findNewNodeEditor(), "Parent{Escape}");
 
   // Expand Parent and add children
   await userEvent.click(await screen.findByLabelText("expand Parent"));
-  await userEvent.click(await screen.findByLabelText("add to Parent"));
+  await userEvent.click(await screen.findByLabelText("edit Parent"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Child A{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Draggable Item{Enter}");
   await userEvent.type(await findNewNodeEditor(), "{Escape}");

@@ -115,11 +115,13 @@ test("Root node shows references when there are more than 0", async () => {
 
   // Create Money -> Bitcoin hierarchy
   await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
 
   await userEvent.click(await screen.findByLabelText("expand Money"));
-  await userEvent.click(await screen.findByLabelText("add to Money"));
+  await userEvent.click(await screen.findByLabelText("edit Money"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
 
   await screen.findByText("Bitcoin");
@@ -147,11 +149,13 @@ test("Referenced By items do not show relation selector", async () => {
 
   // Create Money -> Bitcoin hierarchy
   await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
 
   await userEvent.click(await screen.findByLabelText("expand Money"));
-  await userEvent.click(await screen.findByLabelText("add to Money"));
+  await userEvent.click(await screen.findByLabelText("edit Money"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
 
   // Navigate to Bitcoin as root
@@ -184,11 +188,13 @@ test("Referenced By items still show navigation buttons", async () => {
 
   // Create Money -> Bitcoin hierarchy
   await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
 
   await userEvent.click(await screen.findByLabelText("expand Money"));
-  await userEvent.click(await screen.findByLabelText("add to Money"));
+  await userEvent.click(await screen.findByLabelText("edit Money"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
 
   // Navigate to Bitcoin as root
@@ -215,11 +221,13 @@ test("Referenced By shows node with list and empty context", async () => {
 
   // Create Money -> Bitcoin hierarchy
   await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
 
   await userEvent.click(await screen.findByLabelText("expand Money"));
-  await userEvent.click(await screen.findByLabelText("add to Money"));
+  await userEvent.click(await screen.findByLabelText("edit Money"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
 
   // Navigate to Money as root
@@ -248,11 +256,13 @@ test("Referenced By deduplicates paths from multiple users", async () => {
 
   // Create: My Notes -> Money -> Bitcoin
   await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
 
   await userEvent.click(await screen.findByLabelText("expand Money"));
-  await userEvent.click(await screen.findByLabelText("add to Money"));
+  await userEvent.click(await screen.findByLabelText("edit Money"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
 
   // Navigate to Bitcoin as root
@@ -279,13 +289,15 @@ test("Reference indicators show other users icon", async () => {
 
   // Bob creates: My Notes -> Parent -> Child
   renderTree(bob);
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child{Escape}");
   cleanup();
 
   // Alice creates: My Notes -> Parent -> Child (same structure)
   renderTree(alice);
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child{Escape}");
 
   // Navigate to Child and show references
@@ -308,11 +320,13 @@ test("Relevance selector shows when node is expanded", async () => {
 
   // Create Parent -> Child1, Child2
   await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Parent{Escape}");
 
   await userEvent.click(await screen.findByLabelText("expand Parent"));
-  await userEvent.click(await screen.findByLabelText("add to Parent"));
+  await userEvent.click(await screen.findByLabelText("edit Parent"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Child1{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Child2{Escape}");
 
@@ -335,11 +349,13 @@ test("Can exit Referenced By mode even when node has no relations", async () => 
 
   // Create Money -> Bitcoin (Bitcoin has no children)
   await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
 
   await userEvent.click(await screen.findByLabelText("expand Money"));
-  await userEvent.click(await screen.findByLabelText("add to Money"));
+  await userEvent.click(await screen.findByLabelText("edit Money"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
 
   // Navigate to Bitcoin as root using pane search

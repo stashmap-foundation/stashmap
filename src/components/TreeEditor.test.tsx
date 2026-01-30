@@ -20,12 +20,9 @@ describe("Tree Editor - Comprehensive Tests", () => {
       // Root "My Notes" is already visible and expanded
       await screen.findByLabelText("collapse My Notes");
 
-      // Click plus button to add a child
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      // Click edit and press Enter to add a child
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
 
       // Type and submit with Enter
       const editor = await findNewNodeEditor();
@@ -46,11 +43,8 @@ My Notes
       renderTree(alice);
 
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
 
       // Create three nodes in sequence using Enter chaining
       await userEvent.type(await findNewNodeEditor(), "Node 1{Enter}");
@@ -71,11 +65,8 @@ My Notes
       renderTree(alice);
 
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
 
       // Press Enter on empty editor
       await userEvent.type(await findNewNodeEditor(), "{Enter}");
@@ -91,11 +82,8 @@ My Notes
       renderTree(alice);
 
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
 
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -109,11 +97,8 @@ My Notes
       renderTree(alice);
 
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
 
       await userEvent.type(
         await findNewNodeEditor(),
@@ -134,16 +119,14 @@ My Notes
 
       // Create Parent with children
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
       await userEvent.click(await screen.findByLabelText("expand Parent"));
-      await userEvent.click(await screen.findByLabelText("add to Parent"));
+      await userEvent.click(await screen.findByLabelText("edit Parent"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Child A{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Child B{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
@@ -174,17 +157,15 @@ My Notes
 
       // Create Parent node
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
       // Expand Parent and add children
       await userEvent.click(await screen.findByLabelText("expand Parent"));
-      await userEvent.click(await screen.findByLabelText("add to Parent"));
+      await userEvent.click(await screen.findByLabelText("edit Parent"));
+      await userEvent.keyboard("{Enter}");
 
       await userEvent.type(await findNewNodeEditor(), "Child A{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Child B{Enter}");
@@ -223,11 +204,8 @@ My Notes
 
       // Create siblings
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
 
       await userEvent.type(await findNewNodeEditor(), "Node 1{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Node 2{Enter}");
@@ -260,11 +238,8 @@ My Notes
 
       // Create siblings
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
 
       await userEvent.type(await findNewNodeEditor(), "Node 1{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Node 2{Enter}");
@@ -301,11 +276,8 @@ My Notes
       renderTree(alice);
 
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
 
       await userEvent.type(await findNewNodeEditor(), "First{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Second{Enter}");
@@ -332,11 +304,8 @@ My Notes
       renderTree(alice);
 
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
 
       await userEvent.type(await findNewNodeEditor(), "First{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Last{Enter}");
@@ -366,17 +335,15 @@ My Notes
 
       // First create Parent with existing children
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
       // Expand Parent and add children A and B
       await userEvent.click(await screen.findByLabelText("expand Parent"));
-      await userEvent.click(await screen.findByLabelText("add to Parent"));
+      await userEvent.click(await screen.findByLabelText("edit Parent"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Child A{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Child B{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
@@ -413,11 +380,8 @@ My Notes
 
       // Create Parent with a child using proper Enter chaining
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
 
       // Chained editor is in afterSibling position - Tab to indent under Parent
@@ -439,9 +403,10 @@ My Notes
     Existing Child
       `);
 
-      // Collapse Parent, then add a sibling after it (via plus button on collapsed Parent)
+      // Collapse Parent, then add a sibling after it (via edit + Enter on collapsed Parent)
       await userEvent.click(await screen.findByLabelText("collapse Parent"));
-      await userEvent.click(await screen.findByLabelText("add to Parent"));
+      await userEvent.click(await screen.findByLabelText("edit Parent"));
+      await userEvent.keyboard("{Enter}");
       const editor2 = await findNewNodeEditor();
       await userEvent.type(editor2, "Second Child");
 
@@ -468,11 +433,8 @@ My Notes
 
       // Create an empty parent (no children)
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Empty Parent{Enter}");
 
       // Tab to indent under Empty Parent
@@ -500,11 +462,8 @@ My Notes
 
       // Create an empty parent (no children)
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Empty Parent{Enter}");
 
       // Now we're in editor for sibling - Tab to indent under Empty Parent
@@ -535,11 +494,8 @@ My Notes
 
       // Create two siblings
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
 
       await userEvent.type(await findNewNodeEditor(), "First{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Second{Enter}");
@@ -579,18 +535,16 @@ My Notes
 
       // Create First with children, then Second
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "First{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Second{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
       // Expand First and add children
       await userEvent.click(await screen.findByLabelText("expand First"));
-      await userEvent.click(await screen.findByLabelText("add to First"));
+      await userEvent.click(await screen.findByLabelText("edit First"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Child A{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Child B{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
@@ -633,22 +587,21 @@ My Notes
 
       // Create Parent with children
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
       await userEvent.click(await screen.findByLabelText("expand Parent"));
-      await userEvent.click(await screen.findByLabelText("add to Parent"));
+      await userEvent.click(await screen.findByLabelText("edit Parent"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Child 1{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Child 2{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
-      // Click plus on expanded Parent - editor should appear BEFORE children
-      await userEvent.click(await screen.findByLabelText("add to Parent"));
+      // Click edit and Enter on expanded Parent - editor should appear BEFORE children
+      await userEvent.click(await screen.findByLabelText("edit Parent"));
+      await userEvent.keyboard("{Enter}");
 
       const editor = await findNewNodeEditor();
       await userEvent.type(editor, "New First");
@@ -670,17 +623,15 @@ My Notes
 
       // Create Parent with children
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
       // Expand and add children
       await userEvent.click(await screen.findByLabelText("expand Parent"));
-      await userEvent.click(await screen.findByLabelText("add to Parent"));
+      await userEvent.click(await screen.findByLabelText("edit Parent"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Child 1{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -690,8 +641,9 @@ My Notes
     Child 1
       `);
 
-      // Click plus on expanded Parent (which now has collapse button)
-      await userEvent.click(await screen.findByLabelText("add to Parent"));
+      // Click edit and Enter on expanded Parent (which now has collapse button)
+      await userEvent.click(await screen.findByLabelText("edit Parent"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "New First{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -710,11 +662,8 @@ My Notes
 
       // Create a node
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Node{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -723,8 +672,9 @@ My Notes
   Node
       `);
 
-      // Click plus on collapsed Node - adds sibling after (not child)
-      await userEvent.click(await screen.findByLabelText("add to Node"));
+      // Click edit and Enter on collapsed Node - adds sibling after (not child)
+      await userEvent.click(await screen.findByLabelText("edit Node"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Sibling{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -741,12 +691,9 @@ My Notes
 
       await screen.findByLabelText("collapse My Notes");
 
-      // Click plus on root
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      // Click edit and Enter on root
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Root Child{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -763,11 +710,8 @@ My Notes
       renderTree(alice);
 
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
 
       // Create Level 1
       await userEvent.type(await findNewNodeEditor(), "Level 1{Enter}");
@@ -775,13 +719,15 @@ My Notes
 
       // Expand Level 1 and create Level 2
       await userEvent.click(await screen.findByLabelText("expand Level 1"));
-      await userEvent.click(await screen.findByLabelText("add to Level 1"));
+      await userEvent.click(await screen.findByLabelText("edit Level 1"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Level 2{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
       // Expand Level 2 and create Level 3
       await userEvent.click(await screen.findByLabelText("expand Level 2"));
-      await userEvent.click(await screen.findByLabelText("add to Level 2"));
+      await userEvent.click(await screen.findByLabelText("edit Level 2"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Level 3{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -799,21 +745,20 @@ My Notes
 
       // Create nested structure: Parent > Child > Grandchild
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
       await userEvent.click(await screen.findByLabelText("expand Parent"));
-      await userEvent.click(await screen.findByLabelText("add to Parent"));
+      await userEvent.click(await screen.findByLabelText("edit Parent"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Child{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
       await userEvent.click(await screen.findByLabelText("expand Child"));
-      await userEvent.click(await screen.findByLabelText("add to Child"));
+      await userEvent.click(await screen.findByLabelText("edit Child"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Grandchild 1{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Grandchild 2{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
@@ -855,11 +800,8 @@ My Notes
 
       // Create two siblings
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "First{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Second{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
@@ -898,11 +840,8 @@ My Notes
 
       // Create a single child
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Only Child{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -938,11 +877,8 @@ My Notes
 
       // Create two siblings where First has NO children
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Empty Parent{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Will Move{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
@@ -979,11 +915,8 @@ My Notes
 
       // Create Parent with children, then a sibling
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(
         await findNewNodeEditor(),
         "Parent With Kids{Enter}"
@@ -996,8 +929,9 @@ My Notes
         await screen.findByLabelText("expand Parent With Kids")
       );
       await userEvent.click(
-        await screen.findByLabelText("add to Parent With Kids")
+        await screen.findByLabelText("edit Parent With Kids")
       );
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Child A{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Child B{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
@@ -1096,7 +1030,8 @@ Custom Root
       `);
 
       // Add children using plus button
-      await userEvent.click(await screen.findByLabelText("add to Custom Root"));
+      await userEvent.click(await screen.findByLabelText("edit Custom Root"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Child 1{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Child 2{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
@@ -1115,7 +1050,8 @@ Custom Root
       await createAndSetAsRoot("Custom Root");
 
       // Add children
-      await userEvent.click(await screen.findByLabelText("add to Custom Root"));
+      await userEvent.click(await screen.findByLabelText("edit Custom Root"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "A{Enter}");
       await userEvent.type(await findNewNodeEditor(), "B{Enter}");
       await userEvent.type(await findNewNodeEditor(), "C{Enter}");
@@ -1152,12 +1088,14 @@ Custom Root
       await createAndSetAsRoot("Custom Root");
 
       // Add a child and expand it
-      await userEvent.click(await screen.findByLabelText("add to Custom Root"));
+      await userEvent.click(await screen.findByLabelText("edit Custom Root"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
       await userEvent.click(await screen.findByLabelText("expand Parent"));
-      await userEvent.click(await screen.findByLabelText("add to Parent"));
+      await userEvent.click(await screen.findByLabelText("edit Parent"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Existing Child{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -1190,7 +1128,8 @@ Custom Root
       await createAndSetAsRoot("Custom Root");
 
       // Add siblings
-      await userEvent.click(await screen.findByLabelText("add to Custom Root"));
+      await userEvent.click(await screen.findByLabelText("edit Custom Root"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "First{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Second{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
@@ -1227,7 +1166,8 @@ Custom Root
       await createAndSetAsRoot("Custom Root");
 
       // Create Parent with a child using Enter chaining + Tab
-      await userEvent.click(await screen.findByLabelText("add to Custom Root"));
+      await userEvent.click(await screen.findByLabelText("edit Custom Root"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
 
       // Chained editor - Tab to indent under Parent
@@ -1265,7 +1205,8 @@ Custom Root
       await createAndSetAsRoot("Custom Root");
 
       // Create Empty Parent, then Tab new editor to indent
-      await userEvent.click(await screen.findByLabelText("add to Custom Root"));
+      await userEvent.click(await screen.findByLabelText("edit Custom Root"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Empty Parent{Enter}");
 
       // Chained editor - Tab to indent under Empty Parent
@@ -1300,7 +1241,8 @@ Custom Root
 
       await createAndSetAsRoot("Custom Root");
 
-      await userEvent.click(await screen.findByLabelText("add to Custom Root"));
+      await userEvent.click(await screen.findByLabelText("edit Custom Root"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Target{Enter}");
       await userEvent.type(await findNewNodeEditor(), "After{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
@@ -1311,8 +1253,9 @@ Custom Root
   After
       `);
 
-      // Click plus on collapsed Target
-      await userEvent.click(await screen.findByLabelText("add to Target"));
+      // Click edit and Enter on collapsed Target
+      await userEvent.click(await screen.findByLabelText("edit Target"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "New Sibling{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -1332,19 +1275,22 @@ Custom Root
       await createAndSetAsRoot("Custom Root");
 
       // Create L1
-      await userEvent.click(await screen.findByLabelText("add to Custom Root"));
+      await userEvent.click(await screen.findByLabelText("edit Custom Root"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "L1{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
       // Create L2 under L1
       await userEvent.click(await screen.findByLabelText("expand L1"));
-      await userEvent.click(await screen.findByLabelText("add to L1"));
+      await userEvent.click(await screen.findByLabelText("edit L1"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "L2{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
       // Create L3 under L2
       await userEvent.click(await screen.findByLabelText("expand L2"));
-      await userEvent.click(await screen.findByLabelText("add to L2"));
+      await userEvent.click(await screen.findByLabelText("edit L2"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "L3{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -1364,11 +1310,8 @@ Custom Root
 
       // First add some children to root using plus button
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Child 1{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Child 2{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
@@ -1401,11 +1344,8 @@ My Notes
 
       // Create children under root
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "First{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Second{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
@@ -1437,11 +1377,8 @@ My Notes
 
       // Create a child first
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
       await userEvent.type(await findNewNodeEditor(), "Existing Child{Escape}");
 
       await expectTree(`
@@ -1488,11 +1425,8 @@ My Notes
       renderTree(alice);
 
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
 
       // Rapid creation
       await userEvent.type(await findNewNodeEditor(), "Item 1{Enter}");
@@ -1517,11 +1451,8 @@ My Notes
       renderTree(alice);
 
       await screen.findByLabelText("collapse My Notes");
-      await userEvent.click(
-        (
-          await screen.findAllByLabelText("add to My Notes")
-        )[0]
-      );
+      await userEvent.click(await screen.findByLabelText("edit My Notes"));
+      await userEvent.keyboard("{Enter}");
 
       const editor = await findNewNodeEditor();
       await userEvent.type(editor, "Saved by Blur");

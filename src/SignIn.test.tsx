@@ -78,7 +78,8 @@ test("Sign in persists created Notes", async () => {
     user: undefined,
     timeToStorePreLoginEvents: 0,
   });
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Hello World!{Enter}");
   await userEvent.click(await screen.findByLabelText("sign in to save changes"));
   await userEvent.type(

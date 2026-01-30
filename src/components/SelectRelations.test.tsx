@@ -69,7 +69,8 @@ test("Shows dots when only other user has relation (current user has none)", asy
 
   // Bob creates Parent Node with a child
   renderTree(bob);
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(
     await findNewNodeEditor(),
     "Parent Node{Enter}{Tab}Bob Child{Escape}"
@@ -85,7 +86,8 @@ My Notes
 
   // Alice creates just Parent Node (no children)
   renderTree(alice);
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Parent Node{Escape}");
 
   await expectTree(`

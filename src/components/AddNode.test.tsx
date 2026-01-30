@@ -32,16 +32,16 @@ test("Add New Note", async () => {
   await screen.findByText("Hello World");
 });
 
-test("Add note via + button on empty tree", async () => {
+test("Add note via keyboard on empty tree", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
 
   // Wait for My Notes to appear (ROOT node)
   await screen.findByLabelText("collapse My Notes");
 
-  // Click the + button to add a note (aria-label="add to My Notes")
-  const addButton = await screen.findByLabelText("add to My Notes");
-  await userEvent.click(addButton);
+  // Click the editor and press Enter to create a new node
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
 
   // Type a note and press Enter to save
   await userEvent.type(await findNewNodeEditor(), "My First Note{Enter}");

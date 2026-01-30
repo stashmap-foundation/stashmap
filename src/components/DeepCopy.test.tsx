@@ -28,7 +28,8 @@ describe("Deep Copy - Tab Indent", () => {
 
     // Now add GrandChild under Parent
     await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("add to Parent"));
+    await userEvent.click(await screen.findByLabelText("edit Parent"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "GrandChild{Escape}");
 
     await expectTree(`
@@ -329,7 +330,8 @@ describe("Deep Copy - ~Versions Handling", () => {
 
     // Bob creates BobFolder → Original and edits Original
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(
       await findNewNodeEditor(),
       "BobFolder{Enter}{Tab}Original{Escape}"
@@ -359,7 +361,8 @@ My Notes
     // Alice renders and creates Target
     // BobFolder appears as diff item because Alice follows Bob
     renderApp(alice());
-    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
     await userEvent.click(await screen.findByLabelText("expand Target"));
 

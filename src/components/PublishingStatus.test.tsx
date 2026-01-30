@@ -18,7 +18,8 @@ import { MockRelayPool } from "../nostrMock.test";
 test("Publishing Status", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "New Note{Enter}");
   await userEvent.type(await findNewNodeEditor(), "{Escape}");
   await userEvent.click(screen.getByLabelText("publishing status"));
@@ -60,7 +61,8 @@ test("Details of Publishing Status", async () => {
       relays: { ...utils.relays, userRelays: TEST_RELAYS },
     }
   );
-  await userEvent.click(await screen.findByLabelText("add to My Notes"));
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Hello World{Enter}");
   const publishingStatusButtons = await screen.findAllByLabelText(
     "publishing status"

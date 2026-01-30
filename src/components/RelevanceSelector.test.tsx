@@ -145,12 +145,14 @@ describe("RelevanceSelector", () => {
 
     // Create Parent with children
     await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("add to Parent"));
+    await userEvent.click(await screen.findByLabelText("edit Parent"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Child1{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Child2{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
@@ -175,11 +177,13 @@ My Notes
 
     // Create: My Notes -> Money -> Bitcoin
     await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
 
     await userEvent.click(await screen.findByLabelText("expand Money"));
-    await userEvent.click(await screen.findByLabelText("add to Money"));
+    await userEvent.click(await screen.findByLabelText("edit Money"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
 
     // Navigate to Bitcoin as root
@@ -207,12 +211,14 @@ My Notes
 
     // Create Parent with children
     await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("add to Parent"));
+    await userEvent.click(await screen.findByLabelText("edit Parent"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Child1{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Child2{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
@@ -238,12 +244,14 @@ My Notes
 
     // Create Parent with a child
     await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("add to Parent"));
+    await userEvent.click(await screen.findByLabelText("edit Parent"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Child{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -263,12 +271,14 @@ describe("Relevance filtering", () => {
 
     // Create Parent with a child (default relevance is maybe relevant)
     await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("add to Parent"));
+    await userEvent.click(await screen.findByLabelText("edit Parent"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Visible Item{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -282,12 +292,14 @@ describe("Relevance filtering", () => {
 
     // Create Parent with children
     await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("add to Parent"));
+    await userEvent.click(await screen.findByLabelText("edit Parent"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Child1{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Child2{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Child3{Enter}");
@@ -319,12 +331,14 @@ describe("Relevance filtering", () => {
 
     // Create Parent with a child
     await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("add to Parent"));
+    await userEvent.click(await screen.findByLabelText("edit Parent"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Child{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -515,12 +529,14 @@ describe("Remove from list", () => {
 
     // Create Parent with a child
     await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("add to Parent"));
+    await userEvent.click(await screen.findByLabelText("edit Parent"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Child{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -551,12 +567,14 @@ describe("Remove from list", () => {
 
     // Create Parent with children
     await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("add to Parent"));
+    await userEvent.click(await screen.findByLabelText("edit Parent"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Child1{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Child2{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
@@ -595,12 +613,14 @@ describe("Remove from list", () => {
 
     // Create Parent with a child
     await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("add to Parent"));
+    await userEvent.click(await screen.findByLabelText("edit Parent"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Child{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -644,12 +664,14 @@ describe("Relation lookup consistency (regression)", () => {
 
     // Create Parent with a child
     await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("add to My Notes"));
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("add to Parent"));
+    await userEvent.click(await screen.findByLabelText("edit Parent"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Child{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 

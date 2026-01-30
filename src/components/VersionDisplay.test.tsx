@@ -14,11 +14,8 @@ describe("Version Display", () => {
     renderTree(alice);
 
     // Create: My Notes -> Holiday Destinations -> Barcelona
-    await userEvent.click(
-      (
-        await screen.findAllByLabelText("add to My Notes")
-      )[0]
-    );
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(
       await findNewNodeEditor(),
       "Holiday Destinations{Enter}"
@@ -29,8 +26,9 @@ describe("Version Display", () => {
       await screen.findByLabelText("expand Holiday Destinations")
     );
     await userEvent.click(
-      await screen.findByLabelText("add to Holiday Destinations")
+      await screen.findByLabelText("edit Holiday Destinations")
     );
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -73,11 +71,8 @@ My Notes
 
     // Create a parent node and a child "Barcelona"
     await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(
-      (
-        await screen.findAllByLabelText("add to My Notes")
-      )[0]
-    );
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(
       await findNewNodeEditor(),
       "Holiday Destinations{Enter}"
@@ -89,8 +84,9 @@ My Notes
       await screen.findByLabelText("expand Holiday Destinations")
     );
     await userEvent.click(
-      await screen.findByLabelText("add to Holiday Destinations")
+      await screen.findByLabelText("edit Holiday Destinations")
     );
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -131,11 +127,8 @@ My Notes
 
     // Create a node
     await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(
-      (
-        await screen.findAllByLabelText("add to My Notes")
-      )[0]
-    );
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Version 1{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -183,11 +176,8 @@ My Notes
     renderTree(alice);
 
     // Create Holiday Destinations
-    await userEvent.click(
-      (
-        await screen.findAllByLabelText("add to My Notes")
-      )[0]
-    );
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(
       await findNewNodeEditor(),
       "Holiday Destinations{Enter}"
@@ -199,8 +189,9 @@ My Notes
       await screen.findByLabelText("expand Holiday Destinations")
     );
     await userEvent.click(
-      await screen.findByLabelText("add to Holiday Destinations")
+      await screen.findByLabelText("edit Holiday Destinations")
     );
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -227,8 +218,9 @@ My Notes
     // This adds "Barcelona" to top of ~Versions, so BOTH nodes show "Barcelona"
     // (they're the same node with the same ~Versions)
     await userEvent.click(
-      await screen.findByLabelText("add to Holiday Destinations")
+      await screen.findByLabelText("edit Holiday Destinations")
     );
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -256,11 +248,8 @@ My Notes
     renderTree(alice);
 
     // Create Holiday Destinations
-    await userEvent.click(
-      (
-        await screen.findAllByLabelText("add to My Notes")
-      )[0]
-    );
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(
       await findNewNodeEditor(),
       "Holiday Destinations{Enter}"
@@ -272,8 +261,9 @@ My Notes
       await screen.findByLabelText("expand Holiday Destinations")
     );
     await userEvent.click(
-      await screen.findByLabelText("add to Holiday Destinations")
+      await screen.findByLabelText("edit Holiday Destinations")
     );
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -300,7 +290,8 @@ My Notes
     await userEvent.click(await screen.findByLabelText("expand BCN"));
 
     // Add ~Versions as a child by typing it (content-addressed ID will match existing ~Versions)
-    await userEvent.click(await screen.findByLabelText("add to BCN"));
+    await userEvent.click(await screen.findByLabelText("edit BCN"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "~Versions{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -342,11 +333,8 @@ My Notes
     renderTree(alice);
 
     // Create Holiday Destinations
-    await userEvent.click(
-      (
-        await screen.findAllByLabelText("add to My Notes")
-      )[0]
-    );
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(
       await findNewNodeEditor(),
       "Holiday Destinations{Enter}"
@@ -358,8 +346,9 @@ My Notes
       await screen.findByLabelText("expand Holiday Destinations")
     );
     await userEvent.click(
-      await screen.findByLabelText("add to Holiday Destinations")
+      await screen.findByLabelText("edit Holiday Destinations")
     );
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -380,7 +369,8 @@ My Notes
     // Now we have ~Versions: [V3, BCN, Barcelona]
     // Expand V3 and add ~Versions as a child to see them
     await userEvent.click(await screen.findByLabelText("expand V3"));
-    await userEvent.click(await screen.findByLabelText("add to V3"));
+    await userEvent.click(await screen.findByLabelText("edit V3"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "~Versions{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
     await userEvent.click(await screen.findByLabelText("expand ~Versions"));
@@ -437,11 +427,8 @@ My Notes
     renderTree(alice);
 
     // Create Holiday Destinations
-    await userEvent.click(
-      (
-        await screen.findAllByLabelText("add to My Notes")
-      )[0]
-    );
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(
       await findNewNodeEditor(),
       "Holiday Destinations{Enter}"
@@ -453,8 +440,9 @@ My Notes
       await screen.findByLabelText("expand Holiday Destinations")
     );
     await userEvent.click(
-      await screen.findByLabelText("add to Holiday Destinations")
+      await screen.findByLabelText("edit Holiday Destinations")
     );
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -475,7 +463,8 @@ My Notes
     // Now we have ~Versions: [V3, BCN, Barcelona]
     // Expand V3 and add ~Versions as a child to see them
     await userEvent.click(await screen.findByLabelText("expand V3"));
-    await userEvent.click(await screen.findByLabelText("add to V3"));
+    await userEvent.click(await screen.findByLabelText("edit V3"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "~Versions{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
     await userEvent.click(await screen.findByLabelText("expand ~Versions"));
@@ -529,11 +518,8 @@ My Notes
     renderTree(alice);
 
     // Create Holiday Destinations
-    await userEvent.click(
-      (
-        await screen.findAllByLabelText("add to My Notes")
-      )[0]
-    );
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(
       await findNewNodeEditor(),
       "Holiday Destinations{Enter}"
@@ -545,8 +531,9 @@ My Notes
       await screen.findByLabelText("expand Holiday Destinations")
     );
     await userEvent.click(
-      await screen.findByLabelText("add to Holiday Destinations")
+      await screen.findByLabelText("edit Holiday Destinations")
     );
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -573,7 +560,8 @@ My Notes
     await userEvent.click(await screen.findByLabelText("expand BCN"));
 
     // Add ~Versions as a child by typing it
-    await userEvent.click(await screen.findByLabelText("add to BCN"));
+    await userEvent.click(await screen.findByLabelText("edit BCN"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "~Versions{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
@@ -623,11 +611,8 @@ My Notes
     renderTree(alice);
 
     // Create two parent nodes: Holiday Destinations and Cities in Spain
-    await userEvent.click(
-      (
-        await screen.findAllByLabelText("add to My Notes")
-      )[0]
-    );
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(
       await findNewNodeEditor(),
       "Holiday Destinations{Enter}"
@@ -640,8 +625,9 @@ My Notes
       await screen.findByLabelText("expand Holiday Destinations")
     );
     await userEvent.click(
-      await screen.findByLabelText("add to Holiday Destinations")
+      await screen.findByLabelText("edit Holiday Destinations")
     );
+    await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 

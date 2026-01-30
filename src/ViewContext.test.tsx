@@ -490,8 +490,8 @@ Programming Languages
   // Fork to make it Alice's own copy (can't edit other user's content directly)
   await userEvent.click(await screen.findByLabelText("fork to make your own copy"));
 
-  const addButton = await screen.findByLabelText("add to Programming Languages");
-  await userEvent.click(addButton);
+  await userEvent.click(await screen.findByLabelText("edit Programming Languages"));
+  await userEvent.keyboard("{Enter}");
   await userEvent.type(
     await findNewNodeEditor(),
     "added programming language{Escape}"

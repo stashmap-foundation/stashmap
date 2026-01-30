@@ -1,17 +1,5 @@
 import React, { useEffect } from "react";
-import {
-  useViewPath,
-  useDisplayText,
-  useNextInsertPosition,
-  useIsInReferencedByView,
-} from "../ViewContext";
 import { useEditorText } from "./EditorTextContext";
-import {
-  usePlanner,
-  planSetEmptyNodePosition,
-  planSaveNodeAndEnsureRelations,
-} from "../planner";
-import { usePaneStack, useIsViewingOtherUserContent } from "../SplitPanesContext";
 
 /**
  * Prevents a button from stealing focus from an editor in the same node row.
@@ -260,63 +248,3 @@ export function Editor({ onCreateNode, onClose }: EditorProps): JSX.Element {
   return <MiniEditor onSave={(text) => onCreateNode(text)} onClose={onClose} />;
 }
 
-export function AddSiblingButton(): JSX.Element | null {
-  const versionedDisplayText = useDisplayText();
-  const nextInsertPosition = useNextInsertPosition();
-  const stack = usePaneStack();
-  const { createPlan, executePlan } = usePlanner();
-  const viewPath = useViewPath();
-  const editorTextContext = useEditorText();
-  const isViewingOtherUserContent = useIsViewingOtherUserContent();
-  const isInReferencedByView = useIsInReferencedByView();
-
-  const editorText = editorTextContext?.text ?? "";
-  const displayText = editorText.trim() || versionedDisplayText;
-
-  if (!nextInsertPosition || isViewingOtherUserContent || isInReferencedByView) {
-    return null;
-  }
-
-  const handleClick = (): void => {
-    const [targetPath, insertIndex] = nextInsertPosition;
-    const basePlan = createPlan();
-
-    const currentEditorText = editorTextContext?.text ?? "";
-    const planWithSave = currentEditorText.trim()
-      ? planSaveNodeAndEnsureRelations(
-          basePlan,
-          currentEditorText,
-          viewPath,
-          stack
-        )
-      : basePlan;
-
-    const plan = planSetEmptyNodePosition(
-      planWithSave,
-      targetPath,
-      stack,
-      insertIndex
-    );
-    executePlan(plan);
-  };
-
-  return (
-    <span
-      role="button"
-      tabIndex={0}
-      className="pill"
-      onClick={handleClick}
-      onMouseDown={preventEditorBlurIfSameNode}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          handleClick();
-        }
-      }}
-      aria-label={`add to ${displayText}`}
-      title="Add note"
-    >
-      +
-    </span>
-  );
-}

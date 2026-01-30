@@ -4,22 +4,22 @@ import { useIsViewingOtherUserContent } from "../SplitPanesContext";
 import { RelevanceSelector } from "./RelevanceSelector";
 import { EvidenceSelector } from "./EvidenceSelector";
 
-export function RightMenu(): JSX.Element | null {
+export function RightMenu(): JSX.Element {
   const isDiffItem = useIsDiffItem();
   const isRoot = useIsRoot();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const isInReferencedByView = useIsInReferencedByView();
 
-  const isReadonly = isViewingOtherUserContent || isInReferencedByView;
-
-  if (isRoot || isReadonly) {
-    return null;
-  }
+  const isReadonly = isRoot || isViewingOtherUserContent || isInReferencedByView;
 
   return (
     <div className="right-menu">
-      <RelevanceSelector isDiffItem={isDiffItem} />
-      {!isDiffItem && <EvidenceSelector />}
+      {!isReadonly && (
+        <>
+          <RelevanceSelector isDiffItem={isDiffItem} />
+          {!isDiffItem && <EvidenceSelector />}
+        </>
+      )}
     </div>
   );
 }

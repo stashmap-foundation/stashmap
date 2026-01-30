@@ -352,7 +352,7 @@ body {
 }
 
 .content-referenced-by {
-  color: var(--violet);
+  color: var(--blue);
 }
 
 // Reference node styling
@@ -389,7 +389,7 @@ body {
   }
 
   &.toggle-referenced-by {
-    color: var(--violet);
+    color: var(--blue);
   }
 
   &.toggle-disabled {
@@ -522,8 +522,9 @@ body {
 .left-menu {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   padding-right: 8px;
+  min-width: 120px;
 
   > * {
     opacity: 0;
@@ -541,9 +542,11 @@ body {
 .right-menu {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
   padding-left: 8px;
   margin-left: auto;
+  min-width: 120px;
 
   > * {
     opacity: 0;

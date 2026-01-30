@@ -470,12 +470,11 @@ export function Indent({
             key={k}
             style={{
               marginLeft,
+              minWidth: width,
               backgroundColor: shouldColor ? backgroundColor : undefined,
               alignSelf: "stretch",
             }}
-          >
-            <div style={{ width }} />
-          </div>
+          />
         );
       })}
     </>

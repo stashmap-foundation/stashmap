@@ -237,10 +237,9 @@ body {
   align-items: center;
   justify-content: center;
   min-width: 24px;
-  min-height: 24px;
-  padding: 4px;
-  font-size: 1.1rem;
-  line-height: 1;
+  height: var(--row-height, 22px);
+  padding: 0 4px;
+  font-size: 1rem;
   color: var(--base01);
 
   &:hover {
@@ -289,18 +288,23 @@ body {
   background-color: var(--base03);
 }
 
-// Node content wrapper - no extra padding, align with row
+// Node content wrapper - flex to allow text to wrap while controls stay on first line
 .node-content-wrapper {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   flex: 1;
   min-width: 0;
+  min-height: var(--row-height, 1.4em);
 }
 
 // Reference count - on the right side
 .ref-count-column {
   text-align: right;
+  height: var(--row-height, 1.4em);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .ref-count-btn {
@@ -312,6 +316,9 @@ body {
   font-size: inherit;
   cursor: pointer;
   color: var(--base01);
+  height: var(--row-height, 1.4em);
+  display: flex;
+  align-items: center;
 
   &:hover {
     color: var(--base0);
@@ -332,6 +339,7 @@ body {
 // Indicator gutter - fixed column for semantic indicators
 .indicator-gutter {
   width: 20px;
+  height: var(--row-height, 22px);
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -372,10 +380,9 @@ body {
   justify-content: center;
   width: 20px;
   min-width: 20px;
-  height: 24px;
+  height: var(--row-height, 22px);
   color: var(--base01);
   font-size: 0.7rem;
-  line-height: 1;
   transition: color 150ms ease;
   flex-shrink: 0;
 
@@ -511,6 +518,7 @@ body {
   padding-left: 8px;
   margin-left: auto;
   flex-shrink: 0;
+  height: var(--row-height, 1.4em);
 
   // Relevance and evidence slots - content on hover only
   .relevance-slot,
@@ -541,6 +549,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  height: var(--row-height, 1.4em);
   opacity: 0;
   visibility: hidden;
   transition: opacity 150ms ease;
@@ -797,18 +806,19 @@ input:focus,
 .card-body {
   padding: 12px 0;
   min-height: 44px;
-  display: flex;
-  align-items: stretch;
   overflow: hidden;
-}
-
-.card-body > div {
-  display: flex;
-  align-items: center;
 }
 
 .inner-node .card-body {
   padding: 12px 0;
+}
+
+// Node row - the main container for all node content
+.node-row {
+  --row-height: 22px;
+  display: flex;
+  align-items: flex-start;
+  line-height: 22px;
 }
 
 // ============================================
@@ -939,7 +949,8 @@ input:focus,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
+  padding: 0 4px;
+  height: var(--row-height, 1.4em);
   background: none;
   border: none;
   color: var(--base01);
@@ -957,16 +968,16 @@ input:focus,
 }
 
 .relevance-x {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   width: 20px;
   height: 20px;
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 600;
-  line-height: 1;
+  line-height: 0;
   border-radius: 50%;
   cursor: pointer;
+  padding-bottom: 2px;
 }
 
 .relevance-dot {
@@ -981,7 +992,6 @@ input:focus,
   min-width: 32px;
   font-size: 1.2rem;
   font-weight: 600;
-  line-height: 1;
 }
 
 // ============================================

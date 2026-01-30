@@ -447,11 +447,9 @@ const ARROW_WIDTH = 0;
 
 export function Indent({
   levels,
-  backgroundColor,
   colorLevels,
 }: {
   levels: number;
-  backgroundColor?: string;
   colorLevels?: number;
 }): JSX.Element {
   return (
@@ -460,19 +458,16 @@ export function Indent({
         const marginLeft = k === 0 ? 5 : ARROW_WIDTH;
         const width = k === 0 ? 0 : INDENTATION;
         const levelsFromRight = levels - k;
-        const shouldColor =
-          backgroundColor && colorLevels !== undefined
-            ? levelsFromRight <= colorLevels
-            : !!backgroundColor;
+        const showBorder =
+          colorLevels !== undefined && levelsFromRight === colorLevels;
 
         return (
           <div
             key={k}
+            className={showBorder ? "indent-border" : undefined}
             style={{
               marginLeft,
               minWidth: width,
-              backgroundColor: shouldColor ? backgroundColor : undefined,
-              alignSelf: "stretch",
             }}
           />
         );

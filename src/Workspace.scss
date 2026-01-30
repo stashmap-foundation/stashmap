@@ -351,14 +351,27 @@ body {
   color: var(--orange);
 }
 
+// Referenced-by view - cyan text for distinction
 .content-referenced-by {
+  color: var(--cyan);
+}
+
+// Reference node styling - cyan text
+.reference-node {
+  color: var(--cyan);
+}
+
+.reference-icon {
+  margin-right: 6px;
+  font-size: 0.9em;
   color: var(--blue);
 }
 
-// Reference node styling
-.reference-node {
-  color: var(--blue);
+.indent-border {
+  align-self: stretch;
+  border-left: 3px solid var(--blue);
 }
+
 
 // Expand/collapse toggle
 .expand-collapse-toggle {
@@ -847,11 +860,19 @@ input:focus,
 }
 
 .card-body {
-  padding: 8px 0;
+  padding: 12px 0;
+  min-height: 44px;
+  display: flex;
+  align-items: stretch;
+}
+
+.card-body > div {
+  display: flex;
+  align-items: center;
 }
 
 .inner-node .card-body {
-  padding: 8px 0;
+  padding: 12px 0;
 }
 
 // ============================================

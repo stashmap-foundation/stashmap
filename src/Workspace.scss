@@ -102,6 +102,7 @@ body {
 .pane-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   position: relative;
   padding: 16px;
 }
@@ -347,6 +348,37 @@ body {
   min-width: 0;
 }
 
+// Reference count - on the right side
+.ref-count-column {
+  text-align: right;
+}
+
+.ref-count-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  color: var(--base01);
+
+  &:hover {
+    color: var(--base0);
+  }
+
+  &.show-on-row-hover {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 150ms ease;
+  }
+}
+
+.visible-on-hover:hover .ref-count-btn.show-on-row-hover {
+  opacity: 1;
+  visibility: visible;
+}
+
 // Indicator gutter - fixed column for semantic indicators
 .indicator-gutter {
   width: 20px;
@@ -359,13 +391,16 @@ body {
 // Diff item indicator (suggestions from other users)
 .diff-indicator {
   color: var(--violet);
-  font-size: 0.5rem;
 }
 
 // Reference indicator in gutter
 .reference-indicator {
   color: var(--cyan);
-  font-size: 0.9rem;
+}
+
+// Placeholder dot for regular items (makes gutter dense)
+.gutter-placeholder {
+  color: var(--base01);
 }
 
 // All content stays base0 - gutter indicators and borders provide context
@@ -541,46 +576,36 @@ body {
   .right { right: 1px; }
 }
 
-// Left menu - controls before the triangle
-.left-menu {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-  padding-right: 8px;
-  width: 130px;
-  flex-shrink: 0;
-
-  > * {
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 150ms ease;
-  }
-}
-
-.visible-on-hover:hover .left-menu > * {
-  opacity: 1;
-  visibility: visible;
-}
-
 // Right menu - controls after the text
 .right-menu {
-  display: flex;
+  display: grid;
+  grid-template-columns: 40px 110px 42px;
   align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
+  gap: 4px;
   padding-left: 8px;
   margin-left: auto;
-  min-width: 120px;
+  flex-shrink: 0;
 
-  > * {
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 150ms ease;
+  // Relevance and evidence slots - content on hover only
+  .relevance-slot,
+  .evidence-slot {
+    > * {
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 150ms ease;
+    }
+  }
+
+  // Ref count always visible (when > 1)
+  .ref-count-btn:not(.show-on-row-hover) {
+    opacity: 1;
+    visibility: visible;
   }
 }
 
-.visible-on-hover:hover .right-menu > * {
+.visible-on-hover:hover .right-menu .relevance-slot > *,
+.visible-on-hover:hover .right-menu .evidence-slot > *,
+.visible-on-hover:hover .right-menu .ref-count-btn.show-on-row-hover {
   opacity: 1;
   visibility: visible;
 }
@@ -876,6 +901,7 @@ input:focus,
   min-height: 44px;
   display: flex;
   align-items: stretch;
+  overflow: hidden;
 }
 
 .card-body > div {

@@ -136,6 +136,7 @@ declare global {
     author: PublicKey;
     rootRelation?: LongID;
     searchQuery?: string;
+    typeFilters?: (Relevance | Argument | "suggestions")[];
   };
 
   type Data = {

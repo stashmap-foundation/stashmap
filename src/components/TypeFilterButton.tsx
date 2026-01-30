@@ -1,19 +1,9 @@
 import React, { useState, useRef } from "react";
 import { Overlay, Popover } from "react-bootstrap";
-import { planUpdateViews, usePlanner } from "../planner";
-import {
-  updateView,
-  useNode,
-  useNodeID,
-  useViewPath,
-  useIsInReferencedByView,
-  useDisplayText,
-  isReferencedByView,
-} from "../ViewContext";
-import { isEmptyNodeID } from "../connections";
+import { planUpdatePanes, usePlanner } from "../planner";
+import { useData } from "../DataContext";
+import { useCurrentPane } from "../SplitPanesContext";
 import { DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
-import { preventEditorBlurIfSameNode } from "./AddNode";
-import { useEditorText } from "./EditorTextContext";
 
 // Filter type definitions with colors
 // Column 1: Relevance types (blue spectrum)
@@ -125,48 +115,14 @@ function FilterItem({
   );
 }
 
-export function TypeFilterButton(): JSX.Element | null {
+export function PaneFilterButton(): JSX.Element {
   const [show, setShow] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const [node, view] = useNode();
-  const [nodeID] = useNodeID();
-  const versionedDisplayText = useDisplayText();
-  const viewPath = useViewPath();
+  const pane = useCurrentPane();
+  const { panes } = useData();
   const { createPlan, executePlan } = usePlanner();
-  const isInReferencedByView = useIsInReferencedByView();
-  const isEmptyNode = isEmptyNodeID(nodeID);
-  const editorTextContext = useEditorText();
-  const editorText = editorTextContext?.text ?? "";
-  const displayText = editorText.trim() || versionedDisplayText;
 
-  if (!node) {
-    return null;
-  }
-
-  // Don't show filter button in Referenced By mode (for root or items inside)
-  if (isReferencedByView(view) || isInReferencedByView) {
-    return null;
-  }
-
-  // Show disabled filter button for empty nodes
-  if (isEmptyNode) {
-    return (
-      <button
-        type="button"
-        className="pill"
-        onMouseDown={preventEditorBlurIfSameNode}
-        disabled
-        aria-label={`filter ${displayText}`}
-        title="Save node first to filter"
-        style={{ opacity: 0.4, cursor: "default" }}
-      >
-        <FilterDotsDisplay activeFilters={[]} />
-      </button>
-    );
-  }
-
-  // Get current filters (default if not set)
-  const currentFilters = view.typeFilters || DEFAULT_TYPE_FILTERS;
+  const currentFilters = pane.typeFilters || DEFAULT_TYPE_FILTERS;
 
   const isFilterActive = (id: FilterId): boolean => currentFilters.includes(id);
 
@@ -176,16 +132,10 @@ export function TypeFilterButton(): JSX.Element | null {
       ? currentFilters.filter((f) => f !== id)
       : [...currentFilters, id];
 
+    const updatedPane = { ...pane, typeFilters: newFilters };
+    const newPanes = panes.map((p) => (p.id === pane.id ? updatedPane : p));
     const plan = createPlan();
-    executePlan(
-      planUpdateViews(
-        plan,
-        updateView(plan.views, viewPath, {
-          ...view,
-          typeFilters: newFilters,
-        })
-      )
-    );
+    executePlan(planUpdatePanes(plan, newPanes));
   };
 
   return (
@@ -193,10 +143,10 @@ export function TypeFilterButton(): JSX.Element | null {
       <button
         ref={buttonRef}
         type="button"
-        className="pill"
+        className="btn"
         onClick={() => setShow(!show)}
-        aria-label={`filter ${displayText}`}
-        title="Filter by relation type"
+        aria-label="filter pane"
+        title="Filter by type"
       >
         <FilterDotsDisplay activeFilters={currentFilters} />
       </button>
@@ -208,10 +158,9 @@ export function TypeFilterButton(): JSX.Element | null {
         rootClose
         onHide={() => setShow(false)}
       >
-        <Popover id="type-filter-popover">
+        <Popover id="pane-filter-popover">
           <Popover.Body>
             <div className="d-flex gap-4">
-              {/* Column 1: Relevance filters */}
               <div>
                 {COL_1_FILTERS.map((f) => (
                   <FilterItem
@@ -224,8 +173,6 @@ export function TypeFilterButton(): JSX.Element | null {
                   />
                 ))}
               </div>
-
-              {/* Column 2: Evidence filters */}
               <div>
                 {COL_2_FILTERS.map((f) => (
                   <FilterItem

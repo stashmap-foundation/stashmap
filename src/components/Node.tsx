@@ -73,7 +73,7 @@ import {
   useCurrentPane,
   useIsViewingOtherUserContent,
 } from "../SplitPanesContext";
-import { LeftMenu } from "./LeftMenu";
+import { ReferenceCount } from "./ReferenceCount";
 import { RightMenu } from "./RightMenu";
 import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
@@ -556,8 +556,9 @@ export function getNodesInTree(
       rootRelation,
       isRoot(parentPath)
     );
-  // Filter items based on view's typeFilters (default filters out "not_relevant")
-  const activeFilters = parentView.typeFilters || DEFAULT_TYPE_FILTERS;
+  // Filter items based on pane-level typeFilters (default filters out "not_relevant")
+  const pane = getPane(data, parentPath);
+  const activeFilters = pane.typeFilters || DEFAULT_TYPE_FILTERS;
   // Filter out "suggestions" to get only relevance/argument types for item matching
   const itemFilters = activeFilters.filter(
     (f): f is Relevance | Argument => f !== "suggestions"
@@ -588,13 +589,12 @@ export function getNodesInTree(
       }, ctx)
     : ctx;
 
-  // Get diff items based on active type filters from view settings
-  const typeFilters = parentView.typeFilters || DEFAULT_TYPE_FILTERS;
+  // Get diff items based on pane-level type filters
   const diffItems = getDiffItemsForNode(
     data.knowledgeDBs,
     data.user.publicKey,
     parentNodeID,
-    typeFilters,
+    activeFilters,
     relations?.id
   );
 
@@ -687,7 +687,6 @@ export function Node({
         style={cardStyle}
         data-suggestion={isDiffItem ? "true" : undefined}
       >
-        <LeftMenu />
         <div className="indicator-gutter">
           {isDiffItem && <DiffItemIndicator />}
           {(showReferencedByBackground || isReference) && !isDiffItem && (

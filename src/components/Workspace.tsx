@@ -16,6 +16,7 @@ import {
   PaneSettingsMenu,
   ClosePaneButton,
 } from "./SplitPaneLayout";
+import { PaneFilterButton } from "./TypeFilterButton";
 import { NewPaneButton } from "./OpenInSplitPaneButton";
 import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 import { SignInMenuBtn } from "../SignIn";
@@ -127,6 +128,7 @@ function PaneHeader(): JSX.Element {
       </div>
       <div className="pane-header-right">
         <ForkButton />
+        <PaneFilterButton />
         <NewPaneButton />
         <PaneSearchButton />
         <ClosePaneButton />

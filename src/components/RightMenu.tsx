@@ -3,6 +3,7 @@ import { useIsDiffItem, useIsRoot, useIsInReferencedByView } from "../ViewContex
 import { useIsViewingOtherUserContent } from "../SplitPanesContext";
 import { RelevanceSelector } from "./RelevanceSelector";
 import { EvidenceSelector } from "./EvidenceSelector";
+import { ReferenceCount } from "./ReferenceCount";
 
 export function RightMenu(): JSX.Element {
   const isDiffItem = useIsDiffItem();
@@ -14,12 +15,13 @@ export function RightMenu(): JSX.Element {
 
   return (
     <div className="right-menu">
-      {!isReadonly && (
-        <>
-          <RelevanceSelector isDiffItem={isDiffItem} />
-          {!isDiffItem && <EvidenceSelector />}
-        </>
-      )}
+      <ReferenceCount />
+      <div className="relevance-slot">
+        {!isReadonly && <RelevanceSelector isDiffItem={isDiffItem} />}
+      </div>
+      <div className="evidence-slot">
+        {!isReadonly && !isDiffItem && <EvidenceSelector />}
+      </div>
     </div>
   );
 }

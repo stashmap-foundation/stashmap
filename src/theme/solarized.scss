@@ -10,6 +10,9 @@
   --base0: #657b83;  // Body text
   --base1: #586e75;  // Primary/emphasized text
 
+  // Semantic colors
+  --non-editable: var(--base01); // Read-only content
+
   // Accent colors (same in both themes)
   --red: #dc322f;     // Contra, errors, remove
   --green: #859900;   // Confirms, success
@@ -28,6 +31,9 @@
   --base00: #657b83; // Secondary text
   --base0: #839496;  // Body text
   --base1: #93a1a1;  // Primary/emphasized text
+
+  // Semantic colors
+  --non-editable: var(--base01);
 }
 
 // Base layout - critical for content to render

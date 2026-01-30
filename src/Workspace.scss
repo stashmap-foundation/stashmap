@@ -347,34 +347,32 @@ body {
   min-width: 0;
 }
 
+// Indicator gutter - fixed column for semantic indicators
+.indicator-gutter {
+  width: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 // Diff item indicator (suggestions from other users)
 .diff-indicator {
   color: var(--violet);
-  margin-right: 6px;
-  font-size: 1rem;
+  font-size: 0.5rem;
 }
 
-// Argument indicator (+/- for confirms/contra)
-.argument-indicator {
-  margin-right: 6px;
-  font-weight: 700;
-  font-size: 1rem;
+// Reference indicator in gutter
+.reference-indicator {
+  color: var(--cyan);
+  font-size: 0.9rem;
 }
 
-// Content styling for different view modes
-// Text stays normal (base0), only indicators are colored
+// All content stays base0 - gutter indicators and borders provide context
+.content-referenced-by,
+.reference-node,
 .content-diff-item {
-  // Text is normal, indicator (●) handles the violet color
-}
-
-// Referenced-by view - text stays normal, border provides context
-.content-referenced-by {
-  // Text is normal (base0), cyan left border provides context
-}
-
-// Reference node styling - text stays normal
-.reference-node {
-  // Text is normal, cyan reference icon (⤶) provides context
+  // normal base0 text
 }
 
 .reference-icon {
@@ -383,10 +381,6 @@ body {
   color: var(--cyan);
 }
 
-.indent-border {
-  align-self: stretch;
-  border-left: 3px solid var(--cyan);
-}
 
 
 // Expand/collapse toggle

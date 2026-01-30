@@ -5,12 +5,6 @@ export function NodeIcon({
 }: {
   nodeType: KnowNode["type"];
 }): JSX.Element | null {
-  if (nodeType === "reference") {
-    return (
-      <span className="reference-icon" title="Reference" aria-hidden="true">
-        ⤶
-      </span>
-    );
-  }
+  // Reference icon now rendered in indicator gutter (Node.tsx)
   return null;
 }

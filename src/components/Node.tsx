@@ -640,7 +640,7 @@ export function Node({
   const referencedByDepth = useReferencedByDepth();
   const isInReferencedByView = referencedByDepth !== undefined;
   const [, view] = useNodeID();
-  const { cardStyle, textStyle, argumentIndicator } = useItemStyle();
+  const { cardStyle, textStyle } = useItemStyle();
   const defaultCls = isDesktop ? "hover-light-bg" : "";
   const cls =
     className !== undefined ? `${className} hover-light-bg` : defaultCls;
@@ -659,6 +659,8 @@ export function Node({
   const isAbstractRef = isAbstractRefId(nodeID);
   // Concrete refs are terminal - no children, no toggle
   const isConcreteRef = isConcreteRefId(nodeID);
+  // Check if this is any kind of reference node
+  const isReference = isAbstractRef || isConcreteRef;
 
   // Show expand/collapse for regular nodes (not diff items, not in Referenced By, not empty nodes)
   // Also show for abstract refs which need expand to show concrete refs
@@ -686,6 +688,12 @@ export function Node({
         data-suggestion={isDiffItem ? "true" : undefined}
       >
         <LeftMenu />
+        <div className="indicator-gutter">
+          {isDiffItem && <DiffItemIndicator />}
+          {(showReferencedByBackground || isReference) && !isDiffItem && (
+            <span className="reference-indicator" aria-label="reference">⤶</span>
+          )}
+        </div>
         {levels > 0 && (
           <Indent
             levels={levels}
@@ -706,18 +714,8 @@ export function Node({
         )}
         {isMultiselect && <NodeSelectbox />}
         <div className={`w-100 node-content-wrapper ${contentClass}`}>
-          {argumentIndicator.symbol && (
-            <span
-              className="argument-indicator"
-              style={{ color: argumentIndicator.color || undefined }}
-              aria-label={argumentIndicator.symbol === "+" ? "confirms" : "contradicts"}
-            >
-              {argumentIndicator.symbol}
-            </span>
-          )}
           <span style={textStyle}>
             <NodeAutoLink>
-              {isDiffItem && <DiffItemIndicator />}
               <InteractiveNodeContent />
             </NodeAutoLink>
           </span>

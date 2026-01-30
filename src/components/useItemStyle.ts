@@ -11,26 +11,14 @@ import { usePaneStack } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 import { TYPE_COLORS } from "../constants";
 
-type ArgumentIndicator = {
-  symbol: "+" | "−" | null;
-  color: string | null;
-};
-
 type ItemStyle = {
   cardStyle: CSSProperties;
   textStyle: CSSProperties;
-  argumentIndicator: ArgumentIndicator;
-};
-
-const DEFAULT_INDICATOR: ArgumentIndicator = {
-  symbol: null,
-  color: null,
 };
 
 const DEFAULT_STYLE: ItemStyle = {
   cardStyle: {},
   textStyle: {},
-  argumentIndicator: DEFAULT_INDICATOR,
 };
 
 function getRelevanceTextStyle(relevance: Relevance): CSSProperties {
@@ -48,14 +36,14 @@ function getRelevanceTextStyle(relevance: Relevance): CSSProperties {
   }
 }
 
-function getArgumentIndicator(argument: Argument | undefined): ArgumentIndicator {
+function getArgumentTextStyle(argument: Argument | undefined): CSSProperties {
   if (argument === "confirms") {
-    return { symbol: "+", color: TYPE_COLORS.confirms };
+    return { color: TYPE_COLORS.confirms };
   }
   if (argument === "contra") {
-    return { symbol: "−", color: TYPE_COLORS.contra };
+    return { color: TYPE_COLORS.contra };
   }
-  return DEFAULT_INDICATOR;
+  return {};
 }
 
 /**
@@ -97,7 +85,9 @@ export function useItemStyle(): ItemStyle {
 
   return {
     cardStyle: {},
-    textStyle: getRelevanceTextStyle(relevance),
-    argumentIndicator: getArgumentIndicator(argument),
+    textStyle: {
+      ...getRelevanceTextStyle(relevance),
+      ...getArgumentTextStyle(argument),
+    },
   };
 }

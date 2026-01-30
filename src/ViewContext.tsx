@@ -20,6 +20,7 @@ import {
   parseConcreteRefId,
   getConcreteRefs,
   groupConcreteRefs,
+  isAbstractRefId,
 } from "./connections";
 import { newDB } from "./knowledge";
 import { useData } from "./DataContext";
@@ -266,6 +267,19 @@ export function contextsMatch(a: Context, b: Context): boolean {
   return a.equals(b);
 }
 
+export function isSuggestion(
+  nodeID: LongID | ID,
+  parentRelation: Relations | undefined
+): boolean {
+  if (!parentRelation) {
+    return true;
+  }
+  if (parentRelation.id === REFERENCED_BY || isSearchId(parentRelation.head as ID)) {
+    return false;
+  }
+  return !parentRelation.items.some((item) => item.nodeID === nodeID);
+}
+
 export function contextStartsWith(context: Context, prefix: Context): boolean {
   if (prefix.size > context.size) return false;
   return context.take(prefix.size).equals(prefix);
@@ -374,11 +388,12 @@ function getNodeFromAnyDB(
 export function getNodeFromID(
   knowledgeDBs: KnowledgeDBs,
   id: ID | LongID,
-  myself: PublicKey
+  myself: PublicKey,
+  parentRelation?: Relations
 ): KnowNode | undefined {
   // Handle ref IDs - build a virtual ReferenceNode
   if (isRefId(id)) {
-    return buildReferenceNode(id as LongID, knowledgeDBs, myself);
+    return buildReferenceNode(id as LongID, knowledgeDBs, myself, parentRelation);
   }
 
   // Handle search IDs - build virtual node from ID
@@ -510,10 +525,11 @@ export function getNodeIDFromView(
 
 export function getNodeFromView(
   data: Data,
-  viewPath: ViewPath
+  viewPath: ViewPath,
+  parentRelation: Relations | undefined
 ): [KnowNode, View] | [undefined, undefined] {
   const [nodeID, view] = getNodeIDFromView(data, viewPath);
-  const node = getNodeFromID(data.knowledgeDBs, nodeID, data.user.publicKey);
+  const node = getNodeFromID(data.knowledgeDBs, nodeID, data.user.publicKey, parentRelation);
   if (!node) {
     return [undefined, undefined];
   }
@@ -541,6 +557,15 @@ export function getRelationForView(
     return getRelations(
       data.knowledgeDBs,
       REFERENCED_BY,
+      pane.author,
+      nodeID
+    );
+  }
+
+  if (isAbstractRefId(nodeID)) {
+    return getRelations(
+      data.knowledgeDBs,
+      nodeID as LongID,
       pane.author,
       nodeID
     );
@@ -653,6 +678,18 @@ function popPath(viewContext: ViewPath): ViewPath | undefined {
 
 export function getParentView(viewContext: ViewPath): ViewPath | undefined {
   return popPath(viewContext);
+}
+
+export function getParentRelation(
+  data: Data,
+  viewPath: ViewPath,
+  stack: ID[]
+): Relations | undefined {
+  const parentPath = getParentView(viewPath);
+  if (!parentPath) {
+    return undefined;
+  }
+  return getRelationForView(data, parentPath, stack);
 }
 
 /**
@@ -771,11 +808,7 @@ export function getRelationIndex(
   stack: ID[]
 ): number | undefined {
   const { nodeIndex, nodeID } = getLast(viewPath);
-  const parentPath = getParentView(viewPath);
-  if (!parentPath) {
-    return undefined;
-  }
-  const relations = getRelationForView(data, parentPath, stack);
+  const relations = getParentRelation(data, viewPath, stack);
   if (!relations) {
     return undefined;
   }
@@ -883,7 +916,11 @@ export function useNodeID(): [LongID | ID, View] {
 }
 
 export function useNode(): [KnowNode, View] | [undefined, undefined] {
-  return getNodeFromView(useData(), useViewPath());
+  const data = useData();
+  const viewPath = useViewPath();
+  const stack = usePaneStack();
+  const parentRelation = getParentRelation(data, viewPath, stack);
+  return getNodeFromView(data, viewPath, parentRelation);
 }
 
 export function useDisplayText(): string {
@@ -905,13 +942,15 @@ export function useDisplayText(): string {
 
 export function getParentNode(
   data: Data,
-  viewPath: ViewPath
+  viewPath: ViewPath,
+  stack: ID[]
 ): [KnowNode, View] | [undefined, undefined] {
   const parentPath = getParentView(viewPath);
   if (!parentPath) {
     return [undefined, undefined];
   }
-  return getNodeFromView(data, parentPath);
+  const grandparentRelation = getParentRelation(data, parentPath, stack);
+  return getNodeFromView(data, parentPath, grandparentRelation);
 }
 
 export function getParentNodeID(
@@ -926,7 +965,10 @@ export function getParentNodeID(
 }
 
 export function useParentNode(): [KnowNode, View] | [undefined, undefined] {
-  return getParentNode(useData(), useViewPath());
+  const data = useData();
+  const viewPath = useViewPath();
+  const stack = usePaneStack();
+  return getParentNode(data, viewPath, stack);
 }
 
 export function isExpanded(data: Data, viewKey: string): boolean {

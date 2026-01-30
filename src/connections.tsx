@@ -4,6 +4,7 @@ import {
   newRelations,
   getNodeFromID,
   getVersionedDisplayText,
+  isSuggestion,
 } from "./ViewContext";
 import { REFERENCED_BY, REF_PREFIX, SEARCH_PREFIX } from "./constants";
 
@@ -145,7 +146,8 @@ function buildRefDisplayText(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
   targetNode: ID,
-  targetContext: Context
+  targetContext: Context,
+  targetOnly?: boolean
 ): string {
   const getNodeTextWithVersion = (
     nodeId: ID,
@@ -164,20 +166,26 @@ function buildRefDisplayText(
     return node?.text || "Loading...";
   };
 
+  const targetText = getNodeTextWithVersion(targetNode, targetContext);
+
+  if (targetOnly) {
+    return targetText;
+  }
+
   const contextTexts = targetContext.reduce((acc, nodeId, index) => {
     const contextUpToHere = targetContext.slice(0, index);
     const text = getNodeTextWithVersion(nodeId, contextUpToHere);
     return acc.push(text);
   }, List<string>());
 
-  const targetText = getNodeTextWithVersion(targetNode, targetContext);
   return contextTexts.push(targetText).join(" → ");
 }
 
 export function buildReferenceNode(
   refId: LongID,
   knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey
+  myself: PublicKey,
+  parentRelation?: Relations
 ): ReferenceNode | undefined {
   if (isConcreteRefId(refId)) {
     const parsed = parseConcreteRefId(refId);
@@ -188,11 +196,12 @@ export function buildReferenceNode(
 
     const relationContext = relation.context.map((id) => shortID(id) as ID);
     const itemCount = relation.items.size;
+    const showTargetOnly = isSuggestion(refId, parentRelation);
 
     if (!targetNode) {
       const head = relation.head as ID;
-      const baseText = buildRefDisplayText(knowledgeDBs, myself, head, relationContext);
-      const displayText = `${baseText} (${itemCount})`;
+      const baseText = buildRefDisplayText(knowledgeDBs, myself, head, relationContext, showTargetOnly);
+      const displayText = showTargetOnly ? baseText : `${baseText} (${itemCount})`;
       return {
         id: refId,
         type: "reference",
@@ -204,8 +213,10 @@ export function buildReferenceNode(
 
     const contextWithHead = relationContext.push(relation.head as ID);
     const headText = buildRefDisplayText(knowledgeDBs, myself, relation.head as ID, relationContext);
-    const targetOnly = buildRefDisplayText(knowledgeDBs, myself, targetNode, contextWithHead).split(" → ").pop() || "";
-    const displayText = `${headText} (${itemCount}) → ${targetOnly}`;
+    const targetText = buildRefDisplayText(knowledgeDBs, myself, targetNode, contextWithHead, true);
+    const displayText = showTargetOnly
+      ? targetText
+      : `${headText} (${itemCount}) → ${targetText}`;
 
     return {
       id: refId,

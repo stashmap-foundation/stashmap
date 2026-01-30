@@ -2,10 +2,9 @@ import { CSSProperties } from "react";
 import {
   useRelationIndex,
   useViewPath,
-  getParentView,
   useIsInReferencedByView,
   useIsDiffItem,
-  getRelationForView,
+  getParentRelation,
 } from "../ViewContext";
 import { usePaneStack } from "../SplitPanesContext";
 import { useData } from "../DataContext";
@@ -64,7 +63,6 @@ export function useItemStyle(): ItemStyle {
   const stack = usePaneStack();
   const isInReferencedByView = useIsInReferencedByView();
   const isDiffItem = useIsDiffItem();
-  const parentView = getParentView(viewPath);
 
   if (isInReferencedByView) {
     return DEFAULT_STYLE;
@@ -76,9 +74,7 @@ export function useItemStyle(): ItemStyle {
   }
 
   // Get current item's relevance and argument
-  const relations = parentView
-    ? getRelationForView(data, parentView, stack)
-    : undefined;
+  const relations = getParentRelation(data, viewPath, stack);
   const currentItem = relations?.items.get(relationIndex ?? -1);
   const relevance = currentItem?.relevance || "";
   const argument = currentItem?.argument;

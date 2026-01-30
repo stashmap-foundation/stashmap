@@ -104,7 +104,7 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
-  padding: 16px;
+  padding-left: 16px;
 }
 
 // Split pane layout
@@ -1411,19 +1411,18 @@ input:focus,
   display: flex;
   align-items: center;
   padding: 0 10px;
-  background: var(--base02);
-  color: var(--base0);
+  background: var(--base01);
+  color: var(--base03);
 }
 
-.status-segment-left {
-  min-width: 80px;
-  border-right: 1px solid var(--base01);
+.status-segment-warning {
+  background: var(--yellow);
+  color: var(--base03);
 }
 
-.status-segment-right {
-  min-width: 36px;
-  justify-content: center;
-  border-left: 1px solid var(--base01);
+.status-segment-error {
+  background: var(--red);
+  color: var(--base3);
 }
 
 .status-spacer {
@@ -1469,8 +1468,14 @@ input:focus,
 }
 
 .status-dropdown {
+  display: flex;
+
   .dropdown-toggle::after {
     display: none;
+  }
+
+  .status-segment {
+    cursor: pointer;
   }
 }
 

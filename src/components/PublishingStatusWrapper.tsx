@@ -6,18 +6,14 @@ import { IS_MOBILE } from "./responsive";
 import { usePlanner } from "../planner";
 import { PublishingStatusContent } from "../commons/PublishingStatus";
 
-function getStatusText(publishEventsStatus: PublishEvents<unknown>): {
+function getStatusInfo(publishEventsStatus: PublishEvents<unknown>): {
   text: string;
-  className: string;
+  segmentClass: string;
 } {
   const { isLoading, results } = publishEventsStatus;
 
   if (isLoading) {
-    return { text: "syncing...", className: "text-warning" };
-  }
-
-  if (results.size === 0) {
-    return { text: "synced", className: "text-muted" };
+    return { text: "syncing...", segmentClass: "status-segment-warning" };
   }
 
   const hasErrors = results.some((r) =>
@@ -25,24 +21,25 @@ function getStatusText(publishEventsStatus: PublishEvents<unknown>): {
   );
 
   if (hasErrors) {
-    return { text: "error", className: "text-danger" };
+    return { text: "error", segmentClass: "status-segment-error" };
   }
 
-  return { text: "synced", className: "text-success" };
+  return { text: "synced", segmentClass: "" };
 }
 
 export function PublishingStatusWrapper(): JSX.Element {
   const isMobile = useMediaQuery(IS_MOBILE);
   const { publishEventsStatus } = useData();
   const { republishEvents } = usePlanner();
-  const { text, className } = getStatusText(publishEventsStatus);
+  const { text, segmentClass } = getStatusInfo(publishEventsStatus);
 
   return (
     <Dropdown className="status-dropdown">
       <Dropdown.Toggle
-        as="button"
-        className={`status-btn ${className}`}
+        as="div"
+        className={`status-segment ${segmentClass}`}
         aria-label="publishing status"
+        role="button"
       >
         {text}
       </Dropdown.Toggle>

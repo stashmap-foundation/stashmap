@@ -9,6 +9,8 @@
   --base00: #839496; // Secondary text
   --base0: #657b83;  // Body text
   --base1: #586e75;  // Primary/emphasized text
+  --base2: #073642;  // Dark text (for light backgrounds)
+  --base3: #002b36;  // Darkest text (for light backgrounds)
 
   // Semantic colors
   --non-editable: var(--base01); // Read-only content
@@ -31,6 +33,8 @@
   --base00: #657b83; // Secondary text
   --base0: #839496;  // Body text
   --base1: #93a1a1;  // Primary/emphasized text
+  --base2: #eee8d5;  // Light text on dark
+  --base3: #fdf6e3;  // Lightest text on dark
 
   // Semantic colors
   --non-editable: var(--base01);

@@ -81,8 +81,8 @@ function SignInWithSeed({
 
   return (
     <Form onSubmit={onSubmit}>
-      <div className="flex-row-space-between align-center mb-3">
-        <Form.Group controlId="inputSeed" className="w-80">
+      <div className="flex-row-space-between align-center mb-3 gap-2">
+        <Form.Group controlId="inputSeed" className="flex-grow-1">
           <ErrorMessage error={error} setError={setError} />
           <Form.Control
             type="password"
@@ -90,7 +90,7 @@ function SignInWithSeed({
             required
           />
         </Form.Group>
-        <div className="float-end">
+        <div>
           {loading ? (
             <div aria-label="loading" className="spinner-border" />
           ) : (

@@ -131,14 +131,15 @@ function ForkButton(): JSX.Element | null {
 }
 
 
-function StatusSegment({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}): JSX.Element {
-  return <div className={`status-segment ${className}`}>{children}</div>;
+function CurrentNodeName(): JSX.Element {
+  const { knowledgeDBs, user } = useData();
+  const stack = usePaneStack();
+  const currentNodeID = stack[stack.length - 1];
+  const node = getNodeFromID(knowledgeDBs, currentNodeID as string, user.publicKey);
+  const displayName = node?.text || "...";
+  const truncated = displayName.length > 20 ? `${displayName.slice(0, 20)}…` : displayName;
+
+  return <span>{truncated}</span>;
 }
 
 function PaneStatusLine(): JSX.Element {
@@ -148,14 +149,21 @@ function PaneStatusLine(): JSX.Element {
 
   return (
     <footer className="pane-status-line">
-      <StatusSegment className="status-segment-left">
-        {isFirstPane && <PublishingStatusWrapper />}
-        {!isFirstPane && isViewingOtherUserContent && <span className="text-violet">other</span>}
-      </StatusSegment>
+      <div className="status-segment">
+        <CurrentNodeName />
+      </div>
+      {isViewingOtherUserContent && (
+        <div className="status-segment">
+          other
+        </div>
+      )}
       <div className="status-spacer" />
-      <StatusSegment className="status-segment-right">
-        {isFirstPane && <PaneSettingsMenu />}
-      </StatusSegment>
+      {isFirstPane && <PublishingStatusWrapper />}
+      {isFirstPane && (
+        <div className="status-segment">
+          <PaneSettingsMenu />
+        </div>
+      )}
     </footer>
   );
 }

@@ -737,22 +737,18 @@ export function RootViewOrWorkspaceIsLoading({
  *     Ethereum
  */
 function getIndentLevel(element: HTMLElement): number {
-  // Count indent levels by counting .indent-spacer direct children inside the node's .d-flex
-  // Structure: .inner-node > Card.Body > .d-flex > .indicator-gutter > [.indent-spacer divs...] > expand-collapse-toggle
-  // Note: getLevels() in Node.tsx returns root=1, children=2, etc. so we subtract 1 for 0-based indent
   // eslint-disable-next-line testing-library/no-node-access
   const innerNode = element.closest(".inner-node");
   if (!innerNode) {
     return 0;
   }
   // eslint-disable-next-line testing-library/no-node-access
-  const dFlex = innerNode.querySelector(".d-flex");
-  if (!dFlex) {
+  const nodeRow = innerNode.querySelector(".node-row");
+  if (!nodeRow) {
     return 0;
   }
-  // Count only direct children with indent-spacer class
   // eslint-disable-next-line testing-library/no-node-access
-  const directChildren = Array.from(dFlex.children);
+  const directChildren = Array.from(nodeRow.children);
   const count = directChildren.filter((child) =>
     // eslint-disable-next-line testing-library/no-node-access
     child.classList.contains("indent-spacer")

@@ -67,7 +67,7 @@ export function ReferenceCount(): JSX.Element {
         title={isInReferencedBy ? "Show children" : `Show ${referenceCount} references`}
         style={{ color: textColor }}
       >
-        {referenceCount}
+        ⤶{referenceCount}
       </button>
     </div>
   );

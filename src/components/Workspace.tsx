@@ -16,7 +16,7 @@ import {
   PaneSettingsMenu,
   ClosePaneButton,
 } from "./SplitPaneLayout";
-import { PaneFilterButton } from "./TypeFilterButton";
+import { InlineFilterDots } from "./TypeFilterButton";
 import { NewPaneButton } from "./OpenInSplitPaneButton";
 import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 import { SignInMenuBtn } from "../SignIn";
@@ -82,6 +82,27 @@ function Breadcrumbs(): JSX.Element | null {
   );
 }
 
+function PaneHeader(): JSX.Element {
+  const paneIndex = usePaneIndex();
+  const isFirstPane = paneIndex === 0;
+
+  return (
+    <header className="pane-header">
+      <div className="pane-header-left">
+        <Breadcrumbs />
+        <ForkButton />
+        {isFirstPane && <SignInMenuBtn />}
+      </div>
+      <div className="pane-header-right">
+        <InlineFilterDots />
+        <PaneSearchButton />
+        <NewPaneButton />
+        <ClosePaneButton />
+      </div>
+    </header>
+  );
+}
+
 function ForkButton(): JSX.Element | null {
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const viewPath = useViewPath();
@@ -100,40 +121,42 @@ function ForkButton(): JSX.Element | null {
   return (
     <button
       type="button"
-      className="btn"
+      className="header-action-btn"
       onClick={handleFork}
       aria-label="fork to make your own copy"
-      title="Fork to make your own copy"
     >
-      Fork
+      fork
     </button>
   );
 }
 
-function PaneHeader(): JSX.Element {
+
+function StatusSegment({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}): JSX.Element {
+  return <div className={`status-segment ${className}`}>{children}</div>;
+}
+
+function PaneStatusLine(): JSX.Element {
   const paneIndex = usePaneIndex();
   const isFirstPane = paneIndex === 0;
+  const isViewingOtherUserContent = useIsViewingOtherUserContent();
 
   return (
-    <header className="pane-header">
-      <div className="pane-header-left">
-        {isFirstPane && (
-          <>
-            <PaneSettingsMenu />
-            <PublishingStatusWrapper />
-            <SignInMenuBtn />
-          </>
-        )}
-        <Breadcrumbs />
-      </div>
-      <div className="pane-header-right">
-        <ForkButton />
-        <PaneFilterButton />
-        <NewPaneButton />
-        <PaneSearchButton />
-        <ClosePaneButton />
-      </div>
-    </header>
+    <footer className="pane-status-line">
+      <StatusSegment className="status-segment-left">
+        {isFirstPane && <PublishingStatusWrapper />}
+        {!isFirstPane && isViewingOtherUserContent && <span className="text-violet">other</span>}
+      </StatusSegment>
+      <div className="status-spacer" />
+      <StatusSegment className="status-segment-right">
+        {isFirstPane && <PaneSettingsMenu />}
+      </StatusSegment>
+    </footer>
   );
 }
 
@@ -149,6 +172,7 @@ export function WorkspaceView(): JSX.Element | null {
         <div className="pane-content">
           <TreeView />
         </div>
+        <PaneStatusLine />
       </div>
     </TemporaryViewProvider>
   );

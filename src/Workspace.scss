@@ -618,19 +618,6 @@ body {
   opacity: 0;
   visibility: hidden;
   transition: opacity 150ms ease;
-
-  .btn {
-    padding: 2px 6px;
-    min-width: 24px;
-    min-height: 24px;
-    font-size: 0.9rem;
-    color: var(--base01);
-    background: transparent;
-
-    &:hover {
-      color: var(--base0);
-    }
-  }
 }
 
 .visible-on-hover:hover .inline-node-actions {
@@ -684,11 +671,11 @@ body {
   background: var(--base03);
   color: var(--base0);
   border: 1px solid var(--base01);
-  border-radius: 4px;
-  padding: 8px 12px;
-  font-size: 1rem;
-  height: 44px;
-  min-width: 150px;
+  border-radius: 3px;
+  padding: 2px 8px;
+  font-size: 0.85rem;
+  height: 24px;
+  width: 100px;
 
   &:focus {
     outline: none;
@@ -1342,15 +1329,6 @@ input:focus,
   display: none !important;
 }
 
-// Pane header button styles
-.pane-header .btn {
-  min-width: 44px;
-  min-height: 44px;
-}
-
-.pane-header .options-dropdown .btn {
-  padding: 8px;
-}
 
 // Preserve workspace column overflow
 .flex-grow-1 .workspace-column {
@@ -1413,4 +1391,144 @@ input:focus,
   margin-bottom: 4px;
   font-size: 0.85rem;
   cursor: pointer;
+}
+
+// ============================================
+// 22. PANE STATUS LINE (vim-style segmented)
+// ============================================
+
+.pane-status-line {
+  display: flex;
+  align-items: stretch;
+  font-size: 0.85rem;
+  background: var(--base02);
+  flex-shrink: 0;
+  height: 24px;
+  border-bottom: 1px solid var(--base01);
+}
+
+.status-segment {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  background: var(--base02);
+  color: var(--base0);
+}
+
+.status-segment-left {
+  min-width: 80px;
+  border-right: 1px solid var(--base01);
+}
+
+.status-segment-right {
+  min-width: 36px;
+  justify-content: center;
+  border-left: 1px solid var(--base01);
+}
+
+.status-spacer {
+  flex: 1;
+}
+
+.status-btn {
+  background: none;
+  border: none;
+  color: var(--base0);
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.85rem;
+  line-height: 24px;
+
+  &:hover {
+    color: var(--base1);
+  }
+
+  &.text-warning {
+    color: var(--yellow);
+  }
+
+  &.text-success {
+    color: var(--green);
+  }
+
+  &.text-danger {
+    color: var(--red);
+  }
+}
+
+.status-segment-error {
+  background: var(--red);
+  color: var(--base3);
+
+  .status-btn {
+    color: var(--base3);
+    &:hover {
+      color: var(--base2);
+    }
+  }
+}
+
+.status-dropdown {
+  .dropdown-toggle::after {
+    display: none;
+  }
+}
+
+// ============================================
+// 23. HEADER ACTION BUTTONS
+// ============================================
+
+.header-action-btn {
+  background: var(--base02);
+  border: none;
+  border-radius: 3px;
+  color: var(--base0);
+  cursor: pointer;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+  margin-left: 8px;
+
+  &:hover {
+    background: var(--base01);
+    color: var(--base1);
+  }
+}
+
+.header-action-btn-danger {
+  background: var(--red);
+  color: var(--base3);
+
+  &:hover {
+    background: var(--red);
+    filter: brightness(1.1);
+  }
+}
+
+// ============================================
+// 24. INLINE FILTER DOTS
+// ============================================
+
+.inline-filter-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-group {
+  display: flex;
+  gap: 2px;
+}
+
+.clickable-filter-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+
+  &:hover {
+    transform: scale(1.2);
+  }
 }

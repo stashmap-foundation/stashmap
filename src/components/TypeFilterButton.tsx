@@ -1,13 +1,10 @@
-import React, { useState, useRef } from "react";
-import { Overlay, Popover } from "react-bootstrap";
+import React from "react";
 import { planUpdatePanes, usePlanner } from "../planner";
 import { useData } from "../DataContext";
 import { useCurrentPane } from "../SplitPanesContext";
 import { DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 
-// Filter type definitions with colors
-// Column 1: Relevance types (blue spectrum)
-const COL_1_FILTERS: { id: Relevance; label: string; color: string }[] = [
+const RELEVANCE_FILTERS: { id: Relevance; label: string; color: string }[] = [
   { id: "relevant", label: "Relevant", color: TYPE_COLORS.relevant },
   { id: "", label: "Maybe Relevant", color: TYPE_COLORS.maybe_relevant },
   {
@@ -22,18 +19,48 @@ const COL_1_FILTERS: { id: Relevance; label: string; color: string }[] = [
   },
 ];
 
-// Column 2: Evidence types + Suggestions
-const COL_2_FILTERS: {
-  id: "confirms" | "contra" | "suggestions";
+const ARGUMENT_FILTERS: {
+  id: "confirms" | "contra";
   label: string;
   color: string;
 }[] = [
   { id: "confirms", label: "Confirms", color: TYPE_COLORS.confirms },
   { id: "contra", label: "Contradicts", color: TYPE_COLORS.contra },
-  { id: "suggestions", label: "Suggestions", color: TYPE_COLORS.other_user },
 ];
 
+const SUGGESTIONS_FILTER = {
+  id: "suggestions" as const,
+  label: "Suggestions",
+  color: TYPE_COLORS.other_user,
+};
+
 export type FilterId = Relevance | Argument | "suggestions";
+
+function ClickableFilterDot({
+  id,
+  label,
+  color,
+  isActive,
+  onClick,
+}: {
+  id: FilterId;
+  label: string;
+  color: string;
+  isActive: boolean;
+  onClick: (id: FilterId) => void;
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      className="clickable-filter-dot"
+      style={{ backgroundColor: isActive ? color : TYPE_COLORS.inactive }}
+      onClick={() => onClick(id)}
+      aria-label={`toggle ${label} filter`}
+      aria-pressed={isActive}
+      title={label}
+    />
+  );
+}
 
 function FilterDot({
   color,
@@ -50,10 +77,6 @@ function FilterDot({
   );
 }
 
-/**
- * Pure UI component that displays filter dots.
- * Pass activeFilters to show which are colored, empty array for all gray.
- */
 export function FilterDotsDisplay({
   activeFilters,
 }: {
@@ -64,12 +87,12 @@ export function FilterDotsDisplay({
   return (
     <span className="d-flex gap-0">
       <span className="d-flex flex-column">
-        {COL_1_FILTERS.map((f) => (
+        {RELEVANCE_FILTERS.map((f) => (
           <FilterDot key={f.id} color={f.color} isActive={isActive(f.id)} />
         ))}
       </span>
       <span className="d-flex flex-column">
-        {COL_2_FILTERS.map((f) => (
+        {ARGUMENT_FILTERS.map((f) => (
           <FilterDot key={f.id} color={f.color} isActive={isActive(f.id)} />
         ))}
         <FilterDot color={TYPE_COLORS.inactive} isActive={false} />
@@ -78,46 +101,18 @@ export function FilterDotsDisplay({
   );
 }
 
-function FilterItem({
-  id,
-  label,
-  color,
-  isActive,
-  onClick,
-}: {
-  id: FilterId;
-  label: string;
-  color: string;
-  isActive: boolean;
-  onClick: (id: FilterId) => void;
-}): JSX.Element {
+export function TypeFilterButton(): JSX.Element {
+  const pane = useCurrentPane();
+  const currentFilters = pane.typeFilters || DEFAULT_TYPE_FILTERS;
+
   return (
-    <div
-      className="filter-item"
-      onClick={() => onClick(id)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onClick(id);
-        }
-      }}
-      role="button"
-      tabIndex={0}
-      aria-label={`toggle ${label} filter`}
-      aria-pressed={isActive}
-    >
-      <span
-        className="filter-dot filter-dot-large"
-        style={{ backgroundColor: isActive ? color : TYPE_COLORS.inactive }}
-      />
-      <span className={isActive ? "" : "text-muted"}>{label}</span>
-    </div>
+    <button type="button" className="pill" aria-label="filter children by type">
+      <FilterDotsDisplay activeFilters={currentFilters} />
+    </button>
   );
 }
 
-export function PaneFilterButton(): JSX.Element {
-  const [show, setShow] = useState(false);
-  const buttonRef = useRef<HTMLButtonElement>(null);
+export function InlineFilterDots(): JSX.Element {
   const pane = useCurrentPane();
   const { panes } = useData();
   const { createPlan, executePlan } = usePlanner();
@@ -139,56 +134,38 @@ export function PaneFilterButton(): JSX.Element {
   };
 
   return (
-    <>
-      <button
-        ref={buttonRef}
-        type="button"
-        className="btn"
-        onClick={() => setShow(!show)}
-        aria-label="filter pane"
-        title="Filter by type"
-      >
-        <FilterDotsDisplay activeFilters={currentFilters} />
-      </button>
-
-      <Overlay
-        target={buttonRef.current}
-        show={show}
-        placement="bottom"
-        rootClose
-        onHide={() => setShow(false)}
-      >
-        <Popover id="pane-filter-popover">
-          <Popover.Body>
-            <div className="d-flex gap-4">
-              <div>
-                {COL_1_FILTERS.map((f) => (
-                  <FilterItem
-                    key={f.id}
-                    id={f.id}
-                    label={f.label}
-                    color={f.color}
-                    isActive={isFilterActive(f.id)}
-                    onClick={handleFilterToggle}
-                  />
-                ))}
-              </div>
-              <div>
-                {COL_2_FILTERS.map((f) => (
-                  <FilterItem
-                    key={f.id}
-                    id={f.id}
-                    label={f.label}
-                    color={f.color}
-                    isActive={isFilterActive(f.id)}
-                    onClick={handleFilterToggle}
-                  />
-                ))}
-              </div>
-            </div>
-          </Popover.Body>
-        </Popover>
-      </Overlay>
-    </>
+    <div className="inline-filter-dots">
+      <span className="filter-group">
+        {RELEVANCE_FILTERS.map((f) => (
+          <ClickableFilterDot
+            key={f.id}
+            id={f.id}
+            label={f.label}
+            color={f.color}
+            isActive={isFilterActive(f.id)}
+            onClick={handleFilterToggle}
+          />
+        ))}
+      </span>
+      <span className="filter-group">
+        {ARGUMENT_FILTERS.map((f) => (
+          <ClickableFilterDot
+            key={f.id}
+            id={f.id}
+            label={f.label}
+            color={f.color}
+            isActive={isFilterActive(f.id)}
+            onClick={handleFilterToggle}
+          />
+        ))}
+      </span>
+      <ClickableFilterDot
+        id={SUGGESTIONS_FILTER.id}
+        label={SUGGESTIONS_FILTER.label}
+        color={SUGGESTIONS_FILTER.color}
+        isActive={isFilterActive(SUGGESTIONS_FILTER.id)}
+        onClick={handleFilterToggle}
+      />
+    </div>
   );
 }

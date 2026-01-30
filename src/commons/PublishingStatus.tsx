@@ -172,6 +172,39 @@ type PublishingStatusProps<T = void> = {
   republishEvents: RepublishEvents;
 };
 
+export function PublishingStatusContent<T = void>({
+  publishEventsStatus,
+  republishEvents,
+}: Omit<PublishingStatusProps<T>, "isMobile">): JSX.Element | null {
+  if (publishEventsStatus.results.size === 0) {
+    return null;
+  }
+  const publishResultsRelayMap = transformPublishResults(
+    publishEventsStatus.results
+  );
+  return (
+    <>
+      <Dropdown.Item key="publishing-status-header" className="black-muted">
+        <div className="project-selection">
+          <h2>Publishing Status</h2>
+        </div>
+      </Dropdown.Item>
+      {publishResultsRelayMap
+        .map((status, relayUrl) => {
+          return (
+            <RelayPublishStatus
+              status={status}
+              relayUrl={relayUrl}
+              republishEvents={republishEvents}
+              key={`publishing-status ${relayUrl}`}
+            />
+          );
+        })
+        .valueSeq()}
+    </>
+  );
+}
+
 export function PublishingStatus<T = void>({
   isMobile,
   publishEventsStatus,
@@ -207,24 +240,10 @@ export function PublishingStatus<T = void>({
             : { width: "30rem" }
         }
       >
-        <Dropdown.Item key="publishing-status-header" className="black-muted">
-          <div className="project-selection">
-            <h2>Publishing Status</h2>
-          </div>
-        </Dropdown.Item>
-        {publishResultsRelayMap
-          .map((status, relayUrl) => {
-            return (
-              <RelayPublishStatus
-                status={status}
-                relayUrl={relayUrl}
-                republishEvents={republishEvents}
-                // eslint-disable-next-line react/no-array-index-key
-                key={`publishing-status ${relayUrl}`}
-              />
-            );
-          })
-          .valueSeq()}
+        <PublishingStatusContent
+          publishEventsStatus={publishEventsStatus}
+          republishEvents={republishEvents}
+        />
       </Dropdown.Menu>
     </Dropdown>
   );

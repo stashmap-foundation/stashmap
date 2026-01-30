@@ -286,13 +286,13 @@ export function SignInMenuBtn(): JSX.Element | null {
     return null;
   }
   return (
-    <Button
-      ariaLabel="sign in"
-      className="btn font-size-small"
+    <button
+      type="button"
+      className={`header-action-btn${unsavedChanges ? " header-action-btn-danger" : ""}`}
       onClick={() => navigate("/signin")}
+      aria-label={unsavedChanges ? "sign in to save changes" : "sign in"}
     >
-      {unsavedChanges && <span className="text-danger">Sign in to Save</span>}
-      {!unsavedChanges && <span aria-hidden="true">↪</span>}
-    </Button>
+      sign in
+    </button>
   );
 }

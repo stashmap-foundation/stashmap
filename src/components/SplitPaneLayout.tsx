@@ -71,16 +71,15 @@ export function PaneSearchButton(): JSX.Element {
     );
   }
 
-  const paneIndex = usePaneIndex();
   return (
     <button
       type="button"
       className="btn btn-icon"
       onClick={() => setShowInput(true)}
-      aria-label={`Search to change pane ${paneIndex} content`}
+      aria-label="search"
       title="Search"
     >
-      <span aria-hidden="true">⌕</span>
+      <span aria-hidden="true">/</span>
     </button>
   );
 }
@@ -126,14 +125,14 @@ export function PaneSettingsMenu(): JSX.Element {
   const isLoggedIn = isUserLoggedIn(user);
 
   return (
-    <Dropdown className="options-dropdown">
+    <Dropdown className="options-dropdown status-dropdown">
       <Dropdown.Toggle
         as="button"
-        className="btn"
+        className="status-btn"
         aria-label="open menu"
         tabIndex={0}
       >
-        <span aria-hidden="true">⋮</span>
+        ≡
       </Dropdown.Toggle>
       <Dropdown.Menu>
         <DeleteWorkspace as="item" />

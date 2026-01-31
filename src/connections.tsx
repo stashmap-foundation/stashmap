@@ -527,6 +527,12 @@ export function getRelations(
   if (relationID && isAbstractRefId(relationID)) {
     return getConcreteRefsForAbstract(knowledgeDBs, myself, relationID as LongID);
   }
+  if (relationID && isConcreteRefId(relationID)) {
+    const parsed = parseConcreteRefId(relationID);
+    if (parsed) {
+      return getRelationsNoReferencedBy(knowledgeDBs, parsed.relationID, myself);
+    }
+  }
   return getRelationsNoReferencedBy(knowledgeDBs, relationID, myself);
 }
 

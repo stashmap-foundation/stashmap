@@ -11,6 +11,7 @@ import {
   getParentView,
   isRoot,
   isReferencedByView,
+  getEffectiveAuthor,
 } from "./ViewContext";
 import {
   getReferencedByRelations,
@@ -20,6 +21,7 @@ import {
   isConcreteRefId,
   isSearchId,
   getRelations,
+  parseConcreteRefId,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
 import { getPane } from "./planner";
@@ -42,8 +44,24 @@ function getChildrenForAbstractRef(
     .toList();
 }
 
-function getChildrenForConcreteRef(): List<ViewPath> {
-  return List();
+function getChildrenForConcreteRef(
+  data: Data,
+  parentPath: ViewPath,
+  parentNodeID: LongID | ID
+): List<ViewPath> {
+  const sourceRelation = getRelations(
+    data.knowledgeDBs,
+    parentNodeID,
+    data.user.publicKey,
+    parentNodeID
+  );
+  if (!sourceRelation || sourceRelation.items.size === 0) {
+    return List();
+  }
+
+  return sourceRelation.items
+    .map((_, i) => addNodeToPathWithRelations(parentPath, sourceRelation, i))
+    .toList();
 }
 
 function getChildrenForReferencedBy(
@@ -75,7 +93,7 @@ function getChildrenForRegularNode(
   stack: ID[],
   rootRelation: LongID | undefined
 ): List<ViewPath> {
-  const paneAuthor = getPane(data, parentPath).author;
+  const author = getEffectiveAuthor(data, parentPath, stack);
   const context = getContextFromStackAndViewPath(stack, parentPath);
   const pane = getPane(data, parentPath);
   const activeFilters = pane.typeFilters || DEFAULT_TYPE_FILTERS;
@@ -93,7 +111,7 @@ function getChildrenForRegularNode(
     )
     : getRelationsForContext(
       data.knowledgeDBs,
-      paneAuthor,
+      author,
       parentNodeID,
       context,
       rootRelation,
@@ -148,7 +166,7 @@ function getChildNodes(
   }
 
   if (isConcreteRefId(parentNodeID)) {
-    return getChildrenForConcreteRef();
+    return getChildrenForConcreteRef(data, parentPath, parentNodeID);
   }
 
   const grandparentPath = getParentView(parentPath);

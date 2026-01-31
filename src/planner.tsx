@@ -38,7 +38,6 @@ import {
   getNodeIDFromView,
   updateView,
   contextsMatch,
-  getAvailableRelationsForNode,
   getContextFromStackAndViewPath,
   getParentView,
   getNodeFromID,

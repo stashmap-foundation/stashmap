@@ -39,7 +39,6 @@ import {
   updateViewPathsAfterPaneDelete,
   updateViewPathsAfterPaneInsert,
   NodeIndex,
-  getDefaultRelationForNode,
   ViewPath,
 } from "./ViewContext";
 import { TreeView } from "./components/TreeView";
@@ -383,54 +382,6 @@ test("View path roundtrip preserves ref IDs in middle of path", () => {
 
   expect(parsed).toEqual(viewPath);
   expect((parsed[1] as { nodeID: string }).nodeID).toBe("ref:money:bitcoin");
-});
-
-test("Default Relations returns most recently updated relation", () => {
-  const node = newNode("Node");
-  const nodes = Map<KnowNode>({ [node.id]: node });
-
-  // With per-item types, relations are sorted by date (most recent first)
-  const older: Relations = {
-    items: List<RelationItem>(),
-    id: "older" as LongID,
-    context: List<ID>(),
-    head: shortID(node.id),
-    updated: 100,
-    author: ALICE.publicKey,
-  };
-  const newest: Relations = {
-    items: List<RelationItem>(),
-    id: "newest" as LongID,
-    context: List<ID>(),
-    head: shortID(node.id),
-    updated: 300, // Most recent
-    author: ALICE.publicKey,
-  };
-  const middle: Relations = {
-    items: List<RelationItem>(),
-    id: "middle" as LongID,
-    context: List<ID>(),
-    head: shortID(node.id),
-    updated: 200,
-    author: ALICE.publicKey,
-  };
-
-  const relations = Map<ID, Relations>([
-    ["older", older],
-    ["newest", newest],
-    ["middle", middle],
-  ]);
-
-  const defaultRelation = getDefaultRelationForNode(
-    node.id,
-    Map<PublicKey, KnowledgeData>([[ALICE.publicKey, { relations, nodes }]] as [
-      PublicKey,
-      KnowledgeData
-    ][]),
-    ALICE.publicKey
-  );
-  // Most recently updated relation should be returned
-  expect(defaultRelation).toEqual("newest");
 });
 
 test("View doesn't change if list is forked from contact", async () => {

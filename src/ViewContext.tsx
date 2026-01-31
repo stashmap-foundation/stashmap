@@ -306,64 +306,6 @@ export function getDescendantRelations(
   );
 }
 
-export function getAvailableRelationsForNode(
-  knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey,
-  id: LongID | ID,
-  context: Context = List(),
-  onlyMine: boolean = false
-): List<Relations> {
-  const myRelations = knowledgeDBs.get(myself, newDB()).relations;
-  const [remote, localID] = splitID(id);
-  const relations: List<Relations> = sortRelationsByDate(
-    myRelations
-      .filter((r) => r.head === localID && contextsMatch(r.context, context))
-      .toList()
-  );
-
-  if (onlyMine) {
-    return relations;
-  }
-
-  const remoteDB =
-    remote && isRemote(remote, myself)
-      ? knowledgeDBs.get(remote, newDB())
-      : undefined;
-  const preferredRemoteRelations: List<Relations> = remoteDB
-    ? sortRelationsByDate(
-      remoteDB.relations
-        .filter(
-          (r) => r.head === localID && contextsMatch(r.context, context)
-        )
-        .toList()
-    )
-    : List<Relations>();
-  const otherRelations: List<Relations> = knowledgeDBs
-    .filter((_, k) => k !== myself && k !== remote)
-    .map((db) =>
-      sortRelationsByDate(
-        db.relations
-          .filter(
-            (r) => r.head === localID && contextsMatch(r.context, context)
-          )
-          .toList()
-      )
-    )
-    .toList()
-    .flatten(1) as List<Relations>;
-  return relations.concat(preferredRemoteRelations).concat(otherRelations);
-}
-
-export function getDefaultRelationForNode(
-  id: LongID | ID,
-  knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey,
-  context: Context = List()
-): LongID | undefined {
-  return getAvailableRelationsForNode(knowledgeDBs, myself, id, context).first()
-    ?.id;
-}
-
 function getDefaultView(id: ID): View {
   return {
     viewingMode: undefined,
@@ -458,19 +400,19 @@ export function getVersionsContext(nodeID: ID, context: Context): Context {
  */
 export function getVersionsRelations(
   knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey,
+  author: PublicKey,
   nodeID: ID,
   context: Context
 ): Relations | undefined {
   const versionsContext = getVersionsContext(nodeID, context);
-  const result = getAvailableRelationsForNode(
+  return getRelationsForContext(
     knowledgeDBs,
-    myself,
+    author,
     VERSIONS_NODE_ID,
     versionsContext,
-    true
-  ).first();
-  return result;
+    undefined,
+    false
+  );
 }
 
 /**
@@ -562,7 +504,7 @@ export function getRelationForView(
     );
   }
 
-  if (isAbstractRefId(nodeID)) {
+  if (isAbstractRefId(nodeID) || isConcreteRefId(nodeID)) {
     return getRelations(
       data.knowledgeDBs,
       nodeID as LongID,
@@ -692,6 +634,16 @@ export function getParentRelation(
   return getRelationForView(data, parentPath, stack);
 }
 
+export function getEffectiveAuthor(
+  data: Data,
+  viewPath: ViewPath,
+  stack: ID[]
+): PublicKey {
+  const pane = getPane(data, viewPath);
+  const parentRelation = getParentRelation(data, viewPath, stack);
+  return parentRelation?.author || pane.author;
+}
+
 /**
  * Check if the current node is a suggestion (from another user).
  * A node is a suggestion if:
@@ -723,7 +675,8 @@ export function useIsDiffItem(): boolean {
         parsed.relationID,
         data.user.publicKey
       );
-      if (relation && relation.author !== data.user.publicKey) {
+      const effectiveAuthor = getEffectiveAuthor(data, viewPath, stack);
+      if (relation && relation.author !== effectiveAuthor) {
         if (contextsMatch(relation.context, childContext)) {
           return true;
         }
@@ -738,13 +691,14 @@ export function useIsDiffItem(): boolean {
   }
 
   // No suggestions when viewing another user's content
-  if (pane.author !== data.user.publicKey) {
+  const effectiveAuthor = getEffectiveAuthor(data, viewPath, stack);
+  if (effectiveAuthor !== data.user.publicKey) {
     return false;
   }
 
   const parentRelations = getNewestRelationFromAuthor(
     data.knowledgeDBs,
-    pane.author,
+    effectiveAuthor,
     parentNodeID,
     context
   );
@@ -929,10 +883,15 @@ export function useDisplayText(): string {
   const stack = usePaneStack();
   const [node] = useNode();
   const [nodeID] = useNodeID();
-  const context = getContextFromStackAndViewPath(stack, viewPath);
+  const parentRelation = getParentRelation(data, viewPath, stack);
+  const context = parentRelation
+    ? parentRelation.context.push(parentRelation.head)
+    : getContextFromStackAndViewPath(stack, viewPath);
+  const effectiveAuthor = getEffectiveAuthor(data, viewPath, stack);
+  console.log("useDisplayText:", shortID(nodeID), "author:", effectiveAuthor.slice(0, 8), "ctx:", context.toJS(), "parentHead:", parentRelation?.head);
   const versionedText = getVersionedDisplayText(
     data.knowledgeDBs,
-    data.user.publicKey,
+    effectiveAuthor,
     nodeID,
     context
   );
@@ -1141,37 +1100,6 @@ function moveChildViewsToNewRelation(
   }, Map<string, View>());
 
   return viewsWithDeletedChildViews.merge(movedChildViews);
-}
-
-export function findOrCreateRelationsForContext(
-  knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey,
-  nodeID: LongID | ID,
-  context: Context,
-  viewRelationsID: ID | undefined
-): Relations {
-  // Check if view's relation has matching context
-  const viewRelations = viewRelationsID
-    ? getRelationsNoReferencedBy(knowledgeDBs, viewRelationsID, myself)
-    : undefined;
-
-  if (viewRelations && contextsMatch(viewRelations.context, context)) {
-    return viewRelations;
-  }
-
-  // Find existing relation by (head, context) or create new one
-  const existingRelations = getAvailableRelationsForNode(
-    knowledgeDBs,
-    myself,
-    nodeID,
-    context
-  );
-
-  if (existingRelations.first()) {
-    return existingRelations.first() as Relations;
-  }
-
-  return newRelationsForNode(nodeID, context, myself);
 }
 
 function getNewestRelationFromAuthor(

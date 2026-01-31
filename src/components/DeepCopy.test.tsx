@@ -373,14 +373,14 @@ My Notes
     `);
 
     // Expand BobFolder diff item to see its children
+    console.log("=== ABOUT TO EXPAND BOBFOLDER ===");
     await userEvent.click(await screen.findByLabelText("expand BobFolder"));
 
-    // Note: Alice sees "Original" because onlyMine=true ignores Bob's ~Versions
     await expectTree(`
 My Notes
   Target
-  BobFolder
-    Original
+  [S] BobFolder
+    Bob Edited
     `);
 
     // Open split pane and navigate pane 1 to Target

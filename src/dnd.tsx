@@ -85,6 +85,7 @@ export function dnd(
   rootRelation: LongID | undefined,
   isDiffItem?: boolean
 ): Plan {
+  console.log("DND executed:", { source, to, indexTo, isDiffItem });
   const rootView = to;
 
   const sourceViewPath = parseViewPath(source);
@@ -96,12 +97,12 @@ export function dnd(
     indexTo === undefined
       ? [rootView, undefined]
       : getDropDestinationFromTreeView(
-          plan,
-          rootView,
-          stack,
-          indexTo,
-          rootRelation
-        );
+        plan,
+        rootView,
+        stack,
+        indexTo,
+        rootRelation
+      );
 
   const [toNodeID] = getNodeIDFromView(plan, toView);
   const fromRelation = sourceParentPath
@@ -139,7 +140,6 @@ export function dnd(
   }
   // Deep copy each source node to target (copies node + all descendants + views)
   const [, toViewData] = getNodeIDFromView(plan, toView);
-  const toContext = getContext(plan, toView, stack);
 
   // Ensure target is expanded
   const expandedPlan = toViewData.expanded

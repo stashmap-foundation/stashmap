@@ -27,6 +27,8 @@ import {
   isEmptyNodeID,
   getRelationsNoReferencedBy,
   computeEmptyNodeMetadata,
+  isConcreteRefId,
+  parseConcreteRefId,
 } from "./connections";
 import {
   newRelations,
@@ -584,13 +586,31 @@ export function planDeepCopyNode(
   stack: ID[],
   insertAtIndex?: number
 ): [Plan, RelationsIdMapping] {
+  // Resolve crefs to their actual content
+  let resolvedNodeID = sourceNodeID;
+  let resolvedContext = sourceContext;
+  if (isConcreteRefId(sourceNodeID)) {
+    const parsed = parseConcreteRefId(sourceNodeID);
+    if (parsed) {
+      const sourceRelation = getRelationsNoReferencedBy(
+        plan.knowledgeDBs,
+        parsed.relationID,
+        plan.user.publicKey
+      );
+      if (sourceRelation) {
+        resolvedNodeID = sourceRelation.head;
+        resolvedContext = sourceRelation.context;
+      }
+    }
+  }
+
   const targetParentContext = getContext(plan, targetParentViewPath, stack);
   const [targetParentNodeID] = getNodeIDFromView(plan, targetParentViewPath);
   const nodeNewContext = targetParentContext.push(shortID(targetParentNodeID));
 
   const planWithNode = planAddToParent(
     plan,
-    sourceNodeID,
+    resolvedNodeID,
     targetParentViewPath,
     stack,
     insertAtIndex
@@ -598,15 +618,15 @@ export function planDeepCopyNode(
 
   const [finalPlan, mapping] = planCopyDescendantRelations(
     planWithNode,
-    sourceNodeID,
-    sourceContext,
+    resolvedNodeID,
+    resolvedContext,
     (relation) => {
       const isDirectChildrenRelation =
-        relation.head === shortID(sourceNodeID) &&
-        contextsMatch(relation.context, sourceContext);
+        relation.head === resolvedNodeID &&
+        contextsMatch(relation.context, resolvedContext);
       return isDirectChildrenRelation
         ? nodeNewContext
-        : nodeNewContext.concat(relation.context.skip(sourceContext.size));
+        : nodeNewContext.concat(relation.context.skip(resolvedContext.size));
     }
   );
 

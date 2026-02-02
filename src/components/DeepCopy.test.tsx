@@ -396,16 +396,28 @@ Target
     `);
 
     // Drag BobFolder from pane 0 to Target in pane 1 (cross-pane deep copy)
-    fireEvent.dragStart(screen.getAllByText("BobFolder")[0]);
-    fireEvent.drop(screen.getAllByText("Target")[1]);
+    // Filter for droppable targets (inside .item containers, excludes breadcrumbs)
+    const bobFolderElements = screen.getAllByText("BobFolder");
+    const droppableTargets = screen.getAllByText("Target").filter(el => el.closest('.item'));
+    console.log("=== BEFORE DND ===");
+    console.log("BobFolder elements:", bobFolderElements.length);
+    console.log("Droppable targets:", droppableTargets.length);
+    console.log("BobFolder[0] closest .item:", bobFolderElements[0].closest('.item')?.className);
+    console.log("Bob's publicKey:", bob().user.publicKey);
+    console.log("Bob's knowledgeDBs keys:", bob().knowledgeDBs.keySeq().toArray());
+    console.log("Bob's relations in bob's view:", bob().knowledgeDBs.get(bob().user.publicKey)?.relations.keySeq().toArray());
+    console.log("Alice's knowledgeDBs keys:", alice().knowledgeDBs.keySeq().toArray());
+    fireEvent.dragStart(bobFolderElements[0]);
+    fireEvent.drop(droppableTargets[1]);
 
     // After copy, Alice sees "Bob Edited" because Bob's ~Versions were copied
     // and became Alice's ~Versions for that context
     await expectTree(`
 My Notes
   Target
-  BobFolder
-    Original
+    BobFolder
+  [S] BobFolder
+    Bob Edited
 Target
   BobFolder
     Bob Edited

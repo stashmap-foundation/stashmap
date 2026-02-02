@@ -189,6 +189,11 @@ export function addDescendantsToFilters(
       nodeID,
       "#c"
     ),
+    knowledgeListByHead: addIDToFilter(
+      filters.knowledgeListByHead,
+      nodeID,
+      "#k"
+    ),
   };
 }
 

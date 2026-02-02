@@ -1079,53 +1079,6 @@ export function newRelationsForNode(
   return relations;
 }
 
-function createUpdatableRelations(
-  knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey,
-  relationsID: ID,
-  head: LongID | ID,
-  context: Context
-): Relations {
-  const [remote, id] = splitID(relationsID);
-  if (remote && isRemote(remote, myself)) {
-    // copy remote relations
-    const remoteRelations = getRelations(
-      knowledgeDBs,
-      relationsID,
-      myself,
-      head
-    );
-    if (!remoteRelations) {
-      // This should not happen
-      return newRelations(head, context, myself);
-    }
-    // Make a copy
-    return {
-      ...remoteRelations,
-      id: joinID(myself, v4()),
-    };
-  }
-  return knowledgeDBs
-    .get(myself, newDB())
-    .relations.get(id, newRelations(head, context, myself));
-}
-
-function moveChildViewsToNewRelation(
-  views: Views,
-  viewPath: ViewPath,
-  oldRelationsID: string,
-  newRelationsID: string
-): Views {
-  const viewsWithDeletedChildViews = deleteChildViews(views, viewPath);
-  const childViews = getChildViews(views, viewPath);
-  const movedChildViews = childViews.reduce((rdx, v, k) => {
-    const newKey = k.replace(oldRelationsID, newRelationsID);
-    return rdx.set(newKey, v);
-  }, Map<string, View>());
-
-  return viewsWithDeletedChildViews.merge(movedChildViews);
-}
-
 function getNewestRelationFromAuthor(
   knowledgeDBs: KnowledgeDBs,
   author: PublicKey,

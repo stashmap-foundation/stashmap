@@ -27,6 +27,8 @@ import { usePaneStack, useCurrentPane } from "../SplitPanesContext";
 import {
   addNodeToFilters,
   addReferencedByToFilters,
+  addDescendantsToFilters,
+  addListToFilters,
   createBaseFilter,
   filtersToFilterArray,
   useQueryKnowledgeData,
@@ -194,20 +196,23 @@ export function TreeViewNodeLoader({
       return withNode;
     }
 
+    const withRelation = addListToFilters(withNode, parsed.relationID, nodeID);
+
     const relation = getRelationsNoReferencedBy(
       data.knowledgeDBs,
       parsed.relationID,
       data.user.publicKey
     );
     if (!relation) {
-      return withNode;
+      return withRelation;
     }
 
     const contextNodes = [...relation.context.toArray(), relation.head] as ID[];
-    return contextNodes.reduce(
+    const withContextNodes = contextNodes.reduce(
       (acc, contextNodeID) => addNodeToFilters(acc, contextNodeID),
-      withNode
+      withRelation
     );
+    return addDescendantsToFilters(withContextNodes, relation.head);
   }, baseFilter);
 
   const finalFilter = filtersToFilterArray(filter);

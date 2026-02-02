@@ -8,7 +8,7 @@ import {
   useNodeID,
 } from "../ViewContext";
 import { useIsViewingOtherUserContent } from "../SplitPanesContext";
-import { isEmptyNodeID } from "../connections";
+import { isEmptyNodeID, isAbstractRefId } from "../connections";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable } from "./DroppableContainer";
 import { useIsEditingOn } from "./TemporaryViewContext";
@@ -27,7 +27,8 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     const isNodeBeeingEdited = useIsEditingOn();
     const [nodeID] = useNodeID();
     const isEmptyNode = isEmptyNodeID(nodeID);
-    const disableDrag = isNodeBeeingEdited || isEmptyNode;
+    const isAbstractRef = isAbstractRefId(nodeID);
+    const disableDrag = isNodeBeeingEdited || isEmptyNode || isAbstractRef;
 
     const [{ isDragging }, drag] = useDrag({
       type: NOTE_TYPE,

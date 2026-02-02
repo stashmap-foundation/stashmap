@@ -1,7 +1,6 @@
 import { Filter } from "nostr-tools";
 import React from "react";
 import { useNode, useNodeID } from "./ViewContext";
-import { shortID } from "./connections";
 
 const QueryContext = React.createContext<
   { nodesBeeingQueried: string[]; allEventsProcessed: boolean } | undefined
@@ -37,6 +36,5 @@ export function useNodeIsLoading(): boolean {
   if (node || !context || context.allEventsProcessed) {
     return false;
   }
-  const id = shortID(nodeID);
-  return context.nodesBeeingQueried.includes(id);
+  return context.nodesBeeingQueried.includes(nodeID);
 }

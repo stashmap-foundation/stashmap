@@ -117,7 +117,9 @@ export function getDiffItemsForNode(
   return candidateNodeIDs.reduce(
     (acc, candidateID) => {
       const refs = getConcreteRefs(knowledgeDBs, candidateID, itemContext);
-      const headRefs = refs.filter((ref) => !ref.isInItems);
+      const headRefs = refs.filter(
+        (ref) => !ref.isInItems && splitID(ref.relationID)[0] !== myself
+      );
       if (headRefs.size > 0) {
         const grouped = groupConcreteRefs(headRefs, candidateID);
         return acc.concat(grouped.map((item) => item.nodeID));
@@ -229,28 +231,44 @@ function convertViewPathToString(viewContext: ViewPath): string {
 // TODO: delete this export
 export const viewPathToString = convertViewPathToString;
 
-/**
- * Derives the context (path of ancestor IDs) from the pane stack and view path.
- * Context is used to show different children based on how you navigated to a node.
- *
- * @param stack - The pane navigation stack (from usePaneNavigation)
- * @param viewPath - The tree path within current workspace (from useViewPath)
- * @returns Context (List<ID>) representing the path TO the current node (excluding the node itself)
- */
-export function getContextFromStackAndViewPath(
-  stack: ID[],
-  viewPath: ViewPath
+function getContextFromStack(stack: ID[]): Context {
+  return List(stack.slice(0, -1));
+}
+
+export function getContext(
+  data: Data,
+  viewPath: ViewPath,
+  stack: ID[]
 ): Context {
-  // Stack without last element (activeWorkspace) - these are the stacked workspaces
-  const stackContext = stack.slice(0, -1).map((id) => shortID(id));
+  if (isRoot(viewPath)) {
+    return getContextFromStack(stack);
+  }
 
-  // ViewPath without pane index (first) and current node (last)
-  // This gives us the path within the current workspace leading to the current node
-  const viewPathContext = viewPath
-    .slice(1, -1)
-    .map((subPath) => shortID((subPath as { nodeID: LongID | ID }).nodeID));
+  // viewPath structure: [paneIndex, ...SubPathWithRelations[], SubPath]
+  // The second-to-last element has relationsID pointing to the relation
+  // that contains the current node. We look it up and derive context from it.
+  const parentElement = viewPath[viewPath.length - 2] as SubPathWithRelations;
 
-  return List([...stackContext, ...viewPathContext]);
+  if (parentElement.relationsID) {
+    const parentRelation = getRelations(
+      data.knowledgeDBs,
+      parentElement.relationsID,
+      data.user.publicKey,
+      parentElement.nodeID
+    );
+    if (parentRelation) {
+      return parentRelation.context.push(parentRelation.head);
+    }
+  }
+
+  // Parent relation not found (e.g., diff items where parent has no relation yet).
+  // Traverse back to grandparent and derive context from there.
+  const parentPath = getParentView(viewPath);
+  if (!parentPath) {
+    throw new Error("Cannot determine context: no parent path found");
+  }
+  const parentContext = getContext(data, parentPath, stack);
+  return parentContext.push(parentElement.nodeID);
 }
 
 function getViewExactMatch(views: Views, path: ViewPath): View | undefined {
@@ -492,7 +510,7 @@ export function getRelationForView(
   stack: ID[]
 ): Relations | undefined {
   const [nodeID, view] = getNodeIDFromView(data, viewPath);
-  const context = getContextFromStackAndViewPath(stack, viewPath);
+  const context = getContext(data, viewPath, stack);
   const pane = getPane(data, viewPath);
 
   if (view.viewingMode === "REFERENCED_BY") {
@@ -624,23 +642,34 @@ export function getParentView(viewContext: ViewPath): ViewPath | undefined {
 
 export function getParentRelation(
   data: Data,
-  viewPath: ViewPath,
-  stack: ID[]
+  viewPath: ViewPath
 ): Relations | undefined {
-  const parentPath = getParentView(viewPath);
-  if (!parentPath) {
+  if (isRoot(viewPath)) {
     return undefined;
   }
-  return getRelationForView(data, parentPath, stack);
+
+  // viewPath structure: [paneIndex, ...SubPathWithRelations[], SubPath]
+  // The second-to-last element has relationsID pointing to the relation
+  // that contains the current node.
+  const parentElement = viewPath[viewPath.length - 2] as SubPathWithRelations;
+  if (!parentElement.relationsID) {
+    return undefined;
+  }
+
+  return getRelations(
+    data.knowledgeDBs,
+    parentElement.relationsID,
+    data.user.publicKey,
+    parentElement.nodeID
+  );
 }
 
 export function getEffectiveAuthor(
   data: Data,
-  viewPath: ViewPath,
-  stack: ID[]
+  viewPath: ViewPath
 ): PublicKey {
   const pane = getPane(data, viewPath);
-  const parentRelation = getParentRelation(data, viewPath, stack);
+  const parentRelation = getParentRelation(data, viewPath);
   return parentRelation?.author || pane.author;
 }
 
@@ -663,8 +692,8 @@ export function useIsDiffItem(): boolean {
 
   const [nodeID] = getNodeIDFromView(data, viewPath);
   const [parentNodeID] = getNodeIDFromView(data, parentPath);
-  const context = getContextFromStackAndViewPath(stack, parentPath);
-  const childContext = getContextFromStackAndViewPath(stack, viewPath);
+  const context = getContext(data, parentPath, stack);
+  const childContext = getContext(data, viewPath, stack);
 
   // Concrete refs from other users with matching context are expandable suggestions
   if (isConcreteRefId(nodeID)) {
@@ -675,7 +704,7 @@ export function useIsDiffItem(): boolean {
         parsed.relationID,
         data.user.publicKey
       );
-      const effectiveAuthor = getEffectiveAuthor(data, viewPath, stack);
+      const effectiveAuthor = getEffectiveAuthor(data, viewPath);
       if (relation && relation.author !== effectiveAuthor) {
         if (contextsMatch(relation.context, childContext)) {
           return true;
@@ -691,7 +720,7 @@ export function useIsDiffItem(): boolean {
   }
 
   // No suggestions when viewing another user's content
-  const effectiveAuthor = getEffectiveAuthor(data, viewPath, stack);
+  const effectiveAuthor = getEffectiveAuthor(data, viewPath);
   if (effectiveAuthor !== data.user.publicKey) {
     return false;
   }
@@ -762,7 +791,7 @@ export function getRelationIndex(
   stack: ID[]
 ): number | undefined {
   const { nodeIndex, nodeID } = getLast(viewPath);
-  const relations = getParentRelation(data, viewPath, stack);
+  const relations = getParentRelation(data, viewPath);
   if (!relations) {
     return undefined;
   }
@@ -873,7 +902,7 @@ export function useNode(): [KnowNode, View] | [undefined, undefined] {
   const data = useData();
   const viewPath = useViewPath();
   const stack = usePaneStack();
-  const parentRelation = getParentRelation(data, viewPath, stack);
+  const parentRelation = getParentRelation(data, viewPath);
   return getNodeFromView(data, viewPath, parentRelation);
 }
 
@@ -883,20 +912,15 @@ export function useDisplayText(): string {
   const stack = usePaneStack();
   const [node] = useNode();
   const [nodeID] = useNodeID();
-  const parentRelation = getParentRelation(data, viewPath, stack);
-  const context = parentRelation
-    ? parentRelation.context.push(parentRelation.head)
-    : getContextFromStackAndViewPath(stack, viewPath);
-  const effectiveAuthor = getEffectiveAuthor(data, viewPath, stack);
-  console.log("useDisplayText:", shortID(nodeID), "author:", effectiveAuthor.slice(0, 8), "ctx:", context.toJS(), "parentHead:", parentRelation?.head);
+  const context = getContext(data, viewPath, stack);
+  const effectiveAuthor = getEffectiveAuthor(data, viewPath);
   const versionedText = getVersionedDisplayText(
     data.knowledgeDBs,
     effectiveAuthor,
     nodeID,
     context
   );
-  const result = versionedText ?? node?.text ?? "";
-  return result;
+  return versionedText ?? node?.text ?? "";
 }
 
 export function getParentNode(
@@ -908,7 +932,7 @@ export function getParentNode(
   if (!parentPath) {
     return [undefined, undefined];
   }
-  const grandparentRelation = getParentRelation(data, parentPath, stack);
+  const grandparentRelation = getParentRelation(data, parentPath);
   return getNodeFromView(data, parentPath, grandparentRelation);
 }
 
@@ -1140,7 +1164,7 @@ export function upsertRelations(
 ): Plan {
   const pane = getPane(plan, viewPath);
   const [nodeID] = getNodeIDFromView(plan, viewPath);
-  const context = getContextFromStackAndViewPath(stack, viewPath);
+  const context = getContext(plan, viewPath, stack);
 
   // Get current relation from context
   const currentRelation = getRelationsForContext(

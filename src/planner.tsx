@@ -38,7 +38,7 @@ import {
   getNodeIDFromView,
   updateView,
   contextsMatch,
-  getContextFromStackAndViewPath,
+  getContext,
   getParentView,
   getNodeFromID,
   getVersionedDisplayText,
@@ -549,7 +549,7 @@ export function planForkPane(
   stack: ID[]
 ): Plan {
   const pane = getPane(plan, viewPath);
-  const context = getContextFromStackAndViewPath(stack, viewPath);
+  const context = getContext(plan, viewPath, stack);
   const entryNodeID = context.first();
   if (!entryNodeID) {
     return plan;
@@ -584,10 +584,7 @@ export function planDeepCopyNode(
   stack: ID[],
   insertAtIndex?: number
 ): [Plan, RelationsIdMapping] {
-  const targetParentContext = getContextFromStackAndViewPath(
-    stack,
-    targetParentViewPath
-  );
+  const targetParentContext = getContext(plan, targetParentViewPath, stack);
   const [targetParentNodeID] = getNodeIDFromView(plan, targetParentViewPath);
   const nodeNewContext = targetParentContext.push(shortID(targetParentNodeID));
 
@@ -708,7 +705,7 @@ export function planSaveNodeAndEnsureRelations(
 
     const [planWithNode, createdNode] = planCreateNode(plan, trimmedText);
 
-    const parentContext = getContextFromStackAndViewPath(stack, parentPath);
+    const parentContext = getContext(plan, parentPath, stack);
     const nodeContext = parentContext.push(parentNodeID);
     const existingVersions = getVersionsRelations(
       planWithNode.knowledgeDBs,
@@ -751,7 +748,7 @@ export function planSaveNodeAndEnsureRelations(
   const node = getNodeFromID(plan.knowledgeDBs, nodeID, plan.user.publicKey);
   if (!node || node.type !== "text") return plan;
 
-  const context = getContextFromStackAndViewPath(stack, viewPath);
+  const context = getContext(plan, viewPath, stack);
   const displayText =
     getVersionedDisplayText(
       plan.knowledgeDBs,
@@ -1103,7 +1100,7 @@ export function planSetEmptyNodePosition(
     planWithOwnRelations,
     parentPath
   );
-  const context = getContextFromStackAndViewPath(stack, parentPath);
+  const context = getContext(plan, parentPath, stack);
   const planWithExpanded = planExpandNode(
     planWithOwnRelations,
     parentView,

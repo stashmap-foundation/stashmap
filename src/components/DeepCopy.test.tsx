@@ -390,8 +390,8 @@ My Notes
     await expectTree(`
 My Notes
   Target
-  BobFolder
-    Original
+  [S] BobFolder
+    Bob Edited
 Target
     `);
 

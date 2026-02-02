@@ -14,7 +14,7 @@ import {
   useNextInsertPosition,
   getRelationForView,
   isReferencedByView,
-  getContextFromStackAndViewPath,
+  getContext,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -238,7 +238,7 @@ function EditableContent(): JSX.Element {
     }
 
     const basePlan = createPlan();
-    const context = getContextFromStackAndViewPath(stack, viewPath);
+    const context = getContext(basePlan, viewPath, stack);
     const trimmedText = text.trim();
 
     // Handle empty nodes: materialize with text, or move empty position if no text
@@ -286,10 +286,7 @@ function EditableContent(): JSX.Element {
 
     // Handle regular nodes
     // Step 1: Expand the previous sibling
-    const prevSiblingContext = getContextFromStackAndViewPath(
-      stack,
-      prevSibling.viewPath
-    );
+    const prevSiblingContext = getContext(basePlan, prevSibling.viewPath, stack);
     const planWithExpand = planExpandNode(
       basePlan,
       prevSibling.view,

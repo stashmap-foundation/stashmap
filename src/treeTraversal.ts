@@ -6,7 +6,7 @@ import {
   addRelationsToLastElement,
   getDiffItemsForNode,
   getNodeIDFromView,
-  getContextFromStackAndViewPath,
+  getContext,
   getRelationsForContext,
   getParentView,
   isRoot,
@@ -93,8 +93,8 @@ function getChildrenForRegularNode(
   stack: ID[],
   rootRelation: LongID | undefined
 ): List<ViewPath> {
-  const author = getEffectiveAuthor(data, parentPath, stack);
-  const context = getContextFromStackAndViewPath(stack, parentPath);
+  const author = getEffectiveAuthor(data, parentPath);
+  const context = getContext(data, parentPath, stack);
   const pane = getPane(data, parentPath);
   const activeFilters = pane.typeFilters || DEFAULT_TYPE_FILTERS;
   const itemFilters = activeFilters.filter(

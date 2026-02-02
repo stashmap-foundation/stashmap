@@ -15,7 +15,7 @@ import {
   getRelationIndex,
   getNodeIDFromView,
   getLast,
-  getContextFromStackAndViewPath,
+  getContext,
   getRelationForView,
 } from "./ViewContext";
 import { getNodesInTree } from "./components/Node";
@@ -139,7 +139,7 @@ export function dnd(
   }
   // Deep copy each source node to target (copies node + all descendants + views)
   const [, toViewData] = getNodeIDFromView(plan, toView);
-  const toContext = getContextFromStackAndViewPath(stack, toView);
+  const toContext = getContext(plan, toView, stack);
 
   // Ensure target is expanded
   const expandedPlan = toViewData.expanded
@@ -151,7 +151,7 @@ export function dnd(
     const sourcePath = parseViewPath(s);
     const [sourceNodeID] = getNodeIDFromView(accPlan, sourcePath);
     const sourceStack = getPane(accPlan, sourcePath).stack;
-    const sourceContext = getContextFromStackAndViewPath(sourceStack, sourcePath);
+    const sourceContext = getContext(accPlan, sourcePath, sourceStack);
     const insertAt = dropIndex !== undefined ? dropIndex + idx : undefined;
 
     return planDeepCopyNodeWithView(

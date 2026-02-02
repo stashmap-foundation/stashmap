@@ -340,7 +340,7 @@ export function getConcreteRefs(
       ) {
         return rdx;
       }
-      const relationContext = relation.context.map((id) => shortID(id) as ID);
+      const relationContext = relation.context;
       const isInItems = relation.items.some((item) => item.nodeID === nodeID);
       const isHeadWithChildren =
         relation.head === targetShortID && relation.items.size > 0;

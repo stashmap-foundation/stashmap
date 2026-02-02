@@ -14,7 +14,8 @@ import {
   getNodeIDFromView,
   useNodeID,
   getVersionsRelations,
-  getContextFromStackAndViewPath,
+  getContext,
+  getEffectiveAuthor,
   useViewPath,
   ViewPath,
 } from "./ViewContext";
@@ -342,10 +343,11 @@ export function LoadMissingVersionNodes({
       const [nodeID] = nodes
         ? getNodeIDFromView(data, viewPath)
         : [contextNodeID];
-      const context = getContextFromStackAndViewPath(stack, viewPath);
+      const context = getContext(data, viewPath, stack);
+      const effectiveAuthor = getEffectiveAuthor(data, viewPath);
       const versionsRel = getVersionsRelations(
         data.knowledgeDBs,
-        data.user.publicKey,
+        effectiveAuthor,
         nodeID,
         context
       );
@@ -355,7 +357,7 @@ export function LoadMissingVersionNodes({
           const firstVersionNode = getNodeFromID(
             data.knowledgeDBs,
             firstVersionID,
-            data.user.publicKey
+            effectiveAuthor
           );
           if (!firstVersionNode && !acc.includes(firstVersionID)) {
             return [...acc, firstVersionID];

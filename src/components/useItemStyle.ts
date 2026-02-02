@@ -6,7 +6,6 @@ import {
   useIsDiffItem,
   getParentRelation,
 } from "../ViewContext";
-import { usePaneStack } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 import { TYPE_COLORS } from "../constants";
 
@@ -60,7 +59,6 @@ export function useItemStyle(): ItemStyle {
   const data = useData();
   const viewPath = useViewPath();
   const relationIndex = useRelationIndex();
-  const stack = usePaneStack();
   const isInReferencedByView = useIsInReferencedByView();
   const isDiffItem = useIsDiffItem();
 
@@ -74,7 +72,7 @@ export function useItemStyle(): ItemStyle {
   }
 
   // Get current item's relevance and argument
-  const relations = getParentRelation(data, viewPath, stack);
+  const relations = getParentRelation(data, viewPath);
   const currentItem = relations?.items.get(relationIndex ?? -1);
   const relevance = currentItem?.relevance || "";
   const argument = currentItem?.argument;

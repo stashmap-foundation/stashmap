@@ -85,7 +85,7 @@ export function PaneSearchButton(): JSX.Element {
       aria-label={`Search to change pane ${paneIndex} content`}
       title="Search"
     >
-      <span aria-hidden="true">/</span>
+      <span aria-hidden="true">🔍</span>
     </button>
   );
 }

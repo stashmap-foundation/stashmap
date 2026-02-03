@@ -96,11 +96,11 @@ My Notes
   // Drag Draggable Item from pane 0 (under Parent in My Notes view) to My Notes root
   // The item should now appear in both places
   const draggableItems = screen.getAllByText("Draggable Item");
-  // Drop on "My Notes" node itself (which is a drop target), not on the add button
-  const myNotesNodes = screen.getAllByText("My Notes");
+  // Drop on "My Notes" collapse button to target the tree node (not breadcrumb)
+  const myNotesToggle = screen.getAllByLabelText("collapse My Notes")[0];
 
   fireEvent.dragStart(draggableItems[0]);
-  fireEvent.drop(myNotesNodes[0]);
+  fireEvent.drop(myNotesToggle);
 
   // Verify the item was added to My Notes (it should appear multiple times now)
   const allDraggableItems = screen.getAllByText("Draggable Item");

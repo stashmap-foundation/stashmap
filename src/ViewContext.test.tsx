@@ -478,9 +478,10 @@ test("Disconnect Nodes", async () => {
     ...alice(),
     initialRoute: `/w/${pl.id}`,
   });
-  await screen.findByText("Programming Languages");
   // Expand Programming Languages to see children
-  await userEvent.click(screen.getByLabelText("expand Programming Languages"));
+  await userEvent.click(
+    await screen.findByLabelText("expand Programming Languages")
+  );
   await expectTree(`
 Programming Languages
   C

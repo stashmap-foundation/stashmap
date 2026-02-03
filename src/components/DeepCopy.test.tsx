@@ -183,9 +183,9 @@ My Notes
     await navigateToNodeViaSearch(1, "Source");
     await screen.findByLabelText("collapse Source");
 
-    // Drag Child A from pane 0 to My Notes
+    // Drag Child A from pane 0 to My Notes (use collapse button to target tree node, not breadcrumb)
     fireEvent.dragStart(screen.getAllByText("Child A")[0]);
-    fireEvent.drop(screen.getAllByText("My Notes")[0]);
+    fireEvent.drop(screen.getAllByLabelText("collapse My Notes")[0]);
 
     // Child A should appear under My Notes (deep copied)
     // Pane 1 shows Source as root

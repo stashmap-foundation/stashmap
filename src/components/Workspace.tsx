@@ -58,7 +58,7 @@ function BreadcrumbItem({
   );
 }
 
-function Breadcrumbs(): JSX.Element | null {
+function Breadcrumbs(): JSX.Element {
   const { setPane } = useSplitPanes();
   const pane = useCurrentPane();
   const stack = usePaneStack();
@@ -66,10 +66,6 @@ function Breadcrumbs(): JSX.Element | null {
   const popTo = (index: number): void => {
     setPane({ ...pane, stack: stack.slice(0, index + 1) });
   };
-
-  if (stack.length <= 1) {
-    return null;
-  }
 
   return (
     <nav className="breadcrumbs" aria-label="Navigation breadcrumbs">

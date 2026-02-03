@@ -11,7 +11,8 @@ import {
   KIND_SETTINGS,
   KIND_RELAY_METADATA_EVENT,
 } from "./nostr";
-import { DataContextProvider } from "./DataContext";
+import { DataContextProvider, MergeKnowledgeDB } from "./DataContext";
+import { EventCacheProvider } from "./EventCache";
 import { findContacts, findMembers } from "./contacts";
 import { useApis } from "./Apis";
 import { findNodes, findRelations, findViews, findPanes } from "./knowledgeEvents";
@@ -243,13 +244,17 @@ function Data({ user, children }: DataProps): JSX.Element {
       }
       projectMembers={projectMembers}
     >
-      <NavigationStackProvider>
-        <PlanningContextProvider
-          setPublishEvents={setNewEventsAndPublishResults}
-        >
-          {children}
-        </PlanningContextProvider>
-      </NavigationStackProvider>
+      <EventCacheProvider unpublishedEvents={newEventsAndPublishResults.unsignedEvents}>
+        <MergeKnowledgeDB>
+          <NavigationStackProvider>
+            <PlanningContextProvider
+              setPublishEvents={setNewEventsAndPublishResults}
+            >
+              {children}
+            </PlanningContextProvider>
+          </NavigationStackProvider>
+        </MergeKnowledgeDB>
+      </EventCacheProvider>
     </DataContextProvider>
   );
 }

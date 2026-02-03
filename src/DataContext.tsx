@@ -2,6 +2,7 @@ import React from "react";
 import { Map } from "immutable";
 import { newDB } from "./knowledge";
 import { injectEmptyNodesIntoKnowledgeDBs } from "./connections";
+import { useCachedKnowledgeDBs } from "./EventCache";
 
 export type DataContextProps = Data;
 
@@ -40,37 +41,36 @@ function mergeDBNodesAndRelations(
   };
 }
 
+function mergeKnowledgeDBs(
+  a: KnowledgeDBs,
+  b: KnowledgeDBs
+): KnowledgeDBs {
+  const allUsers = a.keySeq().toSet().union(b.keySeq().toSet());
+  return Map<PublicKey, KnowledgeData>(
+    allUsers.toArray().map((userPK) => {
+      return [userPK, mergeDBNodesAndRelations(a.get(userPK), b.get(userPK))];
+    })
+  );
+}
+
 export function MergeKnowledgeDB({
   children,
   knowledgeDBs,
 }: {
   children: React.ReactNode;
-  knowledgeDBs: KnowledgeDBs;
+  knowledgeDBs?: KnowledgeDBs;
 }): JSX.Element {
   const data = useData();
   const { temporaryEvents } = data.publishEventsStatus;
   const myself = data.user.publicKey;
 
-  const existingDBs = data.knowledgeDBs;
-  const allUsers = knowledgeDBs
-    .keySeq()
-    .toSet()
-    .union(existingDBs.keySeq().toSet());
-
-  const mergedDBs = Map<PublicKey, KnowledgeData>(
-    allUsers.toArray().map((userPK) => {
-      return [
-        userPK,
-        mergeDBNodesAndRelations(
-          existingDBs.get(userPK),
-          knowledgeDBs.get(userPK)
-        ),
-      ];
-    })
-  );
+  const cachedDBs = useCachedKnowledgeDBs();
+  const baseDBs = knowledgeDBs
+    ? mergeKnowledgeDBs(cachedDBs, knowledgeDBs)
+    : cachedDBs;
 
   const injectedDBs = injectEmptyNodesIntoKnowledgeDBs(
-    mergedDBs,
+    baseDBs,
     temporaryEvents,
     myself
   );

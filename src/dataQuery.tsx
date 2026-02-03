@@ -20,12 +20,12 @@ import {
   ViewPath,
 } from "./ViewContext";
 import { usePaneStack } from "./SplitPanesContext";
-import { MergeKnowledgeDB, useData } from "./DataContext";
+import { useData } from "./DataContext";
 import { useApis } from "./Apis";
-import { processEvents } from "./Data";
 import { RegisterQuery, extractNodesFromQueries } from "./LoadingStatus";
 import { useReadRelays } from "./relays";
 import { useEventQuery } from "./commons/useNostrQuery";
+import { useEventCache } from "./EventCache";
 
 function addIDToFilter(
   filter: Filter,
@@ -240,34 +240,29 @@ function isOnlyDelete(filters: Filter[]): boolean {
 }
 
 export function useQueryKnowledgeData(filters: Filter[]): {
-  knowledgeDBs: KnowledgeDBs;
-  eose: boolean;
   allEventsProcessed: boolean;
 } {
-  const { publishEventsStatus } = useData();
-  const unpublishedEvents = publishEventsStatus.unsignedEvents;
   const { relayPool, eventLoadingTimeout } = useApis();
   const [allEventsProcessed, setAllEventsProcessed] = useState(false);
   const setAllEventsProcessedTimeout = useRef<number | undefined>(undefined);
+
+  const eventCache = useEventCache();
 
   const disabled = isOnlyDelete(filters) || filters.length === 0;
   const { events, eose } = useEventQuery(relayPool, filters, {
     readFromRelays: useReadRelays({
       user: true,
-
       contacts: true,
     }),
     enabled: !disabled,
   });
 
-  /**
-   * Sometimes eose gets fired before all events are processed.
-   *
-   * This is a workaround to wait for all events to be processed before setting allEventsProcessed to true.
-   * With dashboards with a lot of events a lot of time can pass between eose and the first
-   * event being processed, therefore we need to select a huge timeout. User will see an
-   * error message instead of the loading indicator if a note was not loaded by then.
-   */
+  useEffect(() => {
+    if (eventCache && events.size > 0) {
+      eventCache.addEvents(events);
+    }
+  }, [eventCache, events]);
+
   useEffect(() => {
     if (!eose || disabled) {
       return;
@@ -277,12 +272,9 @@ export function useQueryKnowledgeData(filters: Filter[]): {
     setAllEventsProcessedTimeout.current = setTimeout(() => {
       setAllEventsProcessed(true);
     }, eventLoadingTimeout) as unknown as number;
-  }, [events.size, eose, JSON.stringify(filters), disabled]);
+  }, [events.size, eose, JSON.stringify(filters), disabled, eventLoadingTimeout]);
 
-  const allEvents = events.valueSeq().toList().merge(unpublishedEvents);
-  const processedEvents = processEvents(allEvents);
-  const knowledgeDBs = processedEvents.map((data) => data.knowledgeDB);
-  return { knowledgeDBs, eose, allEventsProcessed };
+  return { allEventsProcessed };
 }
 
 export function LoadData({
@@ -314,17 +306,14 @@ export function LoadData({
   }, baseFilter);
 
   const filterArray = filtersToFilterArray(filter);
-  const { knowledgeDBs, allEventsProcessed } =
-    useQueryKnowledgeData(filterArray);
+  const { allEventsProcessed } = useQueryKnowledgeData(filterArray);
 
   return (
     <RegisterQuery
       nodesBeeingQueried={extractNodesFromQueries(filterArray)}
       allEventsProcessed={allEventsProcessed}
     >
-      <MergeKnowledgeDB knowledgeDBs={knowledgeDBs}>
-        {children}
-      </MergeKnowledgeDB>
+      {children}
     </RegisterQuery>
   );
 }

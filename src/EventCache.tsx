@@ -1,0 +1,67 @@
+import React, { useCallback } from "react";
+import { List, Map } from "immutable";
+import { Event, UnsignedEvent } from "nostr-tools";
+import { processEvents } from "./Data";
+
+type EventCacheState = {
+  knowledgeDBs: KnowledgeDBs;
+  addEvents: (events: Map<string, Event | UnsignedEvent>) => void;
+};
+
+const EventCacheContext = React.createContext<EventCacheState | undefined>(
+  undefined
+);
+
+export function EventCacheProvider({
+  children,
+  unpublishedEvents,
+}: {
+  children: React.ReactNode;
+  unpublishedEvents: List<UnsignedEvent>;
+}): JSX.Element {
+  const [events, setEvents] = React.useState<Map<string, Event | UnsignedEvent>>(
+    Map()
+  );
+
+  const addEvents = useCallback(
+    (newEvents: Map<string, Event | UnsignedEvent>) => {
+      setEvents((prev) => {
+        const newKeys = newEvents.keySeq().filter((k) => !prev.has(k));
+        if (newKeys.isEmpty()) {
+          return prev;
+        }
+        return prev.merge(newEvents.filter((_, k) => newKeys.includes(k)));
+      });
+    },
+    []
+  );
+
+  const knowledgeDBs = React.useMemo(() => {
+    const allEvents = events.valueSeq().toList().concat(unpublishedEvents);
+    const processed = processEvents(allEvents);
+    return processed.map((data) => data.knowledgeDB);
+  }, [events, unpublishedEvents]);
+
+  const contextValue = React.useMemo(
+    () => ({
+      knowledgeDBs,
+      addEvents,
+    }),
+    [knowledgeDBs, addEvents]
+  );
+
+  return (
+    <EventCacheContext.Provider value={contextValue}>
+      {children}
+    </EventCacheContext.Provider>
+  );
+}
+
+export function useEventCache(): EventCacheState | undefined {
+  return React.useContext(EventCacheContext);
+}
+
+export function useCachedKnowledgeDBs(): KnowledgeDBs {
+  const context = React.useContext(EventCacheContext);
+  return context?.knowledgeDBs || Map();
+}

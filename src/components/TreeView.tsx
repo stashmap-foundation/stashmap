@@ -22,7 +22,7 @@ import {
   isExpanded,
   useDisplayText,
 } from "../ViewContext";
-import { MergeKnowledgeDB, useData } from "../DataContext";
+import { useData } from "../DataContext";
 import { usePaneStack, useCurrentPane } from "../SplitPanesContext";
 import {
   addNodeToFilters,
@@ -216,22 +216,19 @@ export function TreeViewNodeLoader({
   }, baseFilter);
 
   const finalFilter = filtersToFilterArray(filter);
-  const { knowledgeDBs: mergedDBs, allEventsProcessed } =
-    useQueryKnowledgeData(finalFilter);
+  const { allEventsProcessed } = useQueryKnowledgeData(finalFilter);
 
   return (
-    <MergeKnowledgeDB knowledgeDBs={mergedDBs}>
-      <LoadMissingVersionNodes nodes={nodes}>
-        <RegisterQuery
-          nodesBeeingQueried={nodeIDs
-            .map((longID) => shortID(longID))
-            .toArray()}
-          allEventsProcessed={allEventsProcessed}
-        >
-          {children}
-        </RegisterQuery>
-      </LoadMissingVersionNodes>
-    </MergeKnowledgeDB>
+    <LoadMissingVersionNodes nodes={nodes}>
+      <RegisterQuery
+        nodesBeeingQueried={nodeIDs
+          .map((longID) => shortID(longID))
+          .toArray()}
+        allEventsProcessed={allEventsProcessed}
+      >
+        {children}
+      </RegisterQuery>
+    </LoadMissingVersionNodes>
   );
 }
 
@@ -337,13 +334,7 @@ export function TreeView(): JSX.Element {
     );
   })();
 
-  const { knowledgeDBs } = useQueryKnowledgeData(
-    filtersToFilterArray(searchFilter)
-  );
+  useQueryKnowledgeData(filtersToFilterArray(searchFilter));
 
-  return (
-    <MergeKnowledgeDB knowledgeDBs={knowledgeDBs}>
-      <Tree />
-    </MergeKnowledgeDB>
-  );
+  return <Tree />;
 }

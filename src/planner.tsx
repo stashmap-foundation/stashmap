@@ -584,7 +584,9 @@ export function planDeepCopyNode(
   sourceContext: Context,
   targetParentViewPath: ViewPath,
   stack: ID[],
-  insertAtIndex?: number
+  insertAtIndex?: number,
+  relevance?: Relevance,
+  argument?: Argument
 ): [Plan, RelationsIdMapping] {
   // Resolve crefs to their actual content
   let resolvedNodeID = sourceNodeID;
@@ -613,7 +615,9 @@ export function planDeepCopyNode(
     resolvedNodeID,
     targetParentViewPath,
     stack,
-    insertAtIndex
+    insertAtIndex,
+    relevance,
+    argument
   );
 
   const [finalPlan, mapping] = planCopyDescendantRelations(

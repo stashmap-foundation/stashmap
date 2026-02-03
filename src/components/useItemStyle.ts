@@ -3,7 +3,7 @@ import {
   useRelationIndex,
   useViewPath,
   useIsInReferencedByView,
-  useIsDiffItem,
+  useIsSuggestion,
   getParentRelation,
 } from "../ViewContext";
 import { useData } from "../DataContext";
@@ -60,14 +60,14 @@ export function useItemStyle(): ItemStyle {
   const viewPath = useViewPath();
   const relationIndex = useRelationIndex();
   const isInReferencedByView = useIsInReferencedByView();
-  const isDiffItem = useIsDiffItem();
+  const isSuggestion = useIsSuggestion();
 
   if (isInReferencedByView) {
     return DEFAULT_STYLE;
   }
 
-  // Diff items: no special card styling, just the badge indicator
-  if (isDiffItem) {
+  // Suggestions: no special card styling, just the badge indicator
+  if (isSuggestion) {
     return DEFAULT_STYLE;
   }
 

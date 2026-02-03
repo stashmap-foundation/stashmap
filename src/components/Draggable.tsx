@@ -2,7 +2,7 @@ import React, { useRef } from "react";
 import { ConnectableElement, useDrag } from "react-dnd";
 import {
   ViewPath,
-  useIsDiffItem,
+  useIsSuggestion,
   useIsInReferencedByView,
   useViewPath,
   useNodeID,
@@ -59,15 +59,15 @@ export function DraggableNote(): JSX.Element {
   );
 }
 
-function DraggableDiffItem({ className }: { className?: string }): JSX.Element {
+function DraggableSuggestion({ className }: { className?: string }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const path = useViewPath();
 
-  // Diff items are draggable but NOT droppable
+  // Suggestions are draggable but NOT droppable
   const [{ isDragging }, drag] = useDrag({
     type: NOTE_TYPE,
     item: () => {
-      return { path, isDiffItem: true };
+      return { path, isSuggestion: true };
     },
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging(),
@@ -79,10 +79,10 @@ function DraggableDiffItem({ className }: { className?: string }): JSX.Element {
   return (
     <div
       ref={ref}
-      className={`item diff-item ${isDragging ? "is-dragging" : ""} ${className || ""
+      className={`item suggestion-item ${isDragging ? "is-dragging" : ""} ${className || ""
         }`}
     >
-      <Node className={className} isDiffItem />
+      <Node className={className} isSuggestion />
     </div>
   );
 }
@@ -95,7 +95,7 @@ export function ListItem({
   treeViewPath: ViewPath;
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
-  const isDiffItem = useIsDiffItem();
+  const isSuggestion = useIsSuggestion();
   const isInReferencedByView = useIsInReferencedByView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
 
@@ -111,11 +111,11 @@ export function ListItem({
     isRoot,
   });
 
-  if (isDiffItem) {
-    // Diff items: draggable but NOT droppable
+  if (isSuggestion) {
+    // Suggestions: draggable but NOT droppable
     return (
-      <div className="visible-on-hover diff-item-container">
-        <DraggableDiffItem />
+      <div className="visible-on-hover suggestion-item-container">
+        <DraggableSuggestion />
       </div>
     );
   }

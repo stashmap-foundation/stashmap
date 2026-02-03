@@ -1,5 +1,5 @@
 import { List } from "immutable";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -797,5 +797,194 @@ describe("Multi-user relevance", () => {
 
     // Child should be visible because Alice's relevance is "" (relevant)
     await screen.findByText("Child");
+  });
+});
+
+describe("Accepting suggestions via RelevanceSelector", () => {
+  test("accepting with level 3 sets relevance to relevant", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "BobItem{Escape}");
+
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+
+    await expectTree(`
+My Notes
+  [S] BobItem
+    `);
+
+    fireEvent.click(screen.getByLabelText("accept BobItem as relevant"));
+
+    await expectTree(`
+My Notes
+  BobItem
+    `);
+
+    await screen.findByLabelText("set BobItem to relevant");
+  });
+
+  test("accepting with level 2 sets relevance to maybe relevant", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "BobItem{Escape}");
+
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+
+    await expectTree(`
+My Notes
+  [S] BobItem
+    `);
+
+    fireEvent.click(screen.getByLabelText("accept BobItem as maybe relevant"));
+
+    await expectTree(`
+My Notes
+  BobItem
+    `);
+
+    await screen.findByLabelText("set BobItem to maybe relevant");
+  });
+
+  test("accepting with level 1 sets relevance to little relevant", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "BobItem{Escape}");
+
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+
+    await userEvent.click(screen.getByLabelText("toggle Little Relevant filter"));
+
+    await expectTree(`
+My Notes
+  [S] BobItem
+    `);
+
+    fireEvent.click(screen.getByLabelText("accept BobItem as little relevant"));
+
+    await expectTree(`
+My Notes
+  BobItem
+    `);
+
+    await screen.findByLabelText("set BobItem to little relevant");
+  });
+
+  test("declining suggestion sets relevance to not_relevant", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "BobItem{Escape}");
+
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+
+    await expectTree(`
+My Notes
+  [S] BobItem
+    `);
+
+    fireEvent.click(screen.getByLabelText("decline BobItem"));
+
+    await expectTree(`
+My Notes
+    `);
+
+    await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
+
+    await expectTree(`
+My Notes
+  BobItem
+    `);
+
+    await screen.findByLabelText("remove BobItem from list");
+  });
+
+  test("accepted item is no longer a suggestion", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "BobItem{Escape}");
+
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+
+    const suggestionItem = await screen.findByText("BobItem");
+    expect(suggestionItem.closest("[data-suggestion]")?.getAttribute("data-suggestion")).toBe("true");
+
+    fireEvent.click(screen.getByLabelText("accept BobItem as relevant"));
+
+    await screen.findByLabelText("set BobItem to relevant");
+
+    const acceptedItem = screen.getByText("BobItem");
+    expect(acceptedItem.closest("[data-suggestion]")).toBeNull();
+  });
+
+  test("cref suggestion resolves correctly with relevance", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "BobFolder{Enter}{Tab}BobChild{Escape}"
+    );
+
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+
+    await expectTree(`
+My Notes
+  [S] BobFolder
+    `);
+
+    fireEvent.click(screen.getByLabelText("accept BobFolder as little relevant"));
+
+    await userEvent.click(screen.getByLabelText("toggle Little Relevant filter"));
+
+    await expectTree(`
+My Notes
+  BobFolder
+    `);
+
+    await screen.findByLabelText("set BobFolder to little relevant");
+
+    await userEvent.click(await screen.findByLabelText("expand BobFolder"));
+
+    await expectTree(`
+My Notes
+  BobFolder
+    BobChild
+    `);
+
+    expect(screen.getByText("BobFolder").textContent).toBe("BobFolder");
   });
 });

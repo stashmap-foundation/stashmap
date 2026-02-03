@@ -83,9 +83,9 @@ export function dnd(
   stack: ID[],
   indexTo: number | undefined,
   rootRelation: LongID | undefined,
-  isDiffItem?: boolean
+  isSuggestion?: boolean
 ): Plan {
-  console.log("DND executed:", { source, to, indexTo, isDiffItem });
+  console.log("DND executed:", { source, to, indexTo, isSuggestion });
   const rootView = to;
 
   const sourceViewPath = parseViewPath(source);
@@ -110,9 +110,9 @@ export function dnd(
     : undefined;
   const toRelation = getRelationForView(plan, toView, stack);
 
-  // Diff items are always added, never moved (they're from other users)
+  // Suggestions are always added, never moved (they're from other users)
   const move =
-    !isDiffItem &&
+    !isSuggestion &&
     dropIndex !== undefined &&
     fromRelation !== undefined &&
     toRelation !== undefined &&

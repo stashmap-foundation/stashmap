@@ -298,6 +298,22 @@ export function isSuggestion(
   return !parentRelation.items.some((item) => item.nodeID === nodeID);
 }
 
+export function useIsSuggestion(): boolean {
+  const data = useData();
+  const viewPath = useViewPath();
+  const stack = usePaneStack();
+  const parentPath = getParentView(viewPath);
+
+  if (!parentPath) {
+    return false;
+  }
+
+  const [nodeID] = getNodeIDFromView(data, viewPath);
+  const parentRelation = getRelationForView(data, parentPath, stack);
+
+  return isSuggestion(nodeID, parentRelation);
+}
+
 export function contextStartsWith(context: Context, prefix: Context): boolean {
   if (prefix.size > context.size) return false;
   return context.take(prefix.size).equals(prefix);
@@ -679,65 +695,6 @@ export function getEffectiveAuthor(
  * 1. It's a concrete ref from another user with matching context (expandable suggestion), OR
  * 2. It's a plain nodeID not in the current user's parent relation (leaf suggestion)
  */
-export function useIsDiffItem(): boolean {
-  const data = useData();
-  const viewPath = useViewPath();
-  const stack = usePaneStack();
-  const pane = useCurrentPane();
-  const parentPath = getParentView(viewPath);
-
-  if (!parentPath) {
-    return false;
-  }
-
-  const [nodeID] = getNodeIDFromView(data, viewPath);
-  const [parentNodeID] = getNodeIDFromView(data, parentPath);
-  const context = getContext(data, parentPath, stack);
-  const childContext = getContext(data, viewPath, stack);
-
-  // Concrete refs from other users with matching context are expandable suggestions
-  if (isConcreteRefId(nodeID)) {
-    const parsed = parseConcreteRefId(nodeID);
-    if (parsed) {
-      const relation = getRelationsNoReferencedBy(
-        data.knowledgeDBs,
-        parsed.relationID,
-        data.user.publicKey
-      );
-      const effectiveAuthor = getEffectiveAuthor(data, viewPath);
-      if (relation && relation.author !== effectiveAuthor) {
-        if (contextsMatch(relation.context, childContext)) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  // Abstract refs are not suggestions (they're from Referenced By view)
-  if (isRefId(nodeID)) {
-    return false;
-  }
-
-  // No suggestions when viewing another user's content
-  const effectiveAuthor = getEffectiveAuthor(data, viewPath);
-  if (effectiveAuthor !== data.user.publicKey) {
-    return false;
-  }
-
-  const parentRelations = getNewestRelationFromAuthor(
-    data.knowledgeDBs,
-    effectiveAuthor,
-    parentNodeID,
-    context
-  );
-  if (!parentRelations) {
-    return true;
-  }
-
-  return !parentRelations.items.some((item) => item.nodeID === nodeID);
-}
-
 /**
  * Check if we're anywhere within a Referenced By view.
  * Items in Referenced By view are readonly - no editing, no dropping onto them.

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -422,5 +422,617 @@ Target
   BobFolder
     Bob Edited
     `);
+  });
+});
+
+describe("Deep Copy - Suggestion DnD", () => {
+  test("A1: Same-pane DnD suggestion as sibling accepts and removes suggestion", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    // Bob creates BobItem
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "BobItem{Escape}");
+
+    await expectTree(`
+My Notes
+  BobItem
+    `);
+
+    cleanup();
+
+    // Alice follows Bob and creates Target
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+
+    await expectTree(`
+My Notes
+  Target
+  [S] BobItem
+    `);
+
+    // Drag [S] BobItem and drop on Target (same pane = sibling reorder)
+    // This should accept the suggestion and place it before Target
+    fireEvent.dragStart(screen.getByText("BobItem"));
+    fireEvent.drop(screen.getByText("Target"));
+
+    // BobItem should be accepted (no [S] prefix) and placed before Target
+    // The original suggestion should be GONE (not duplicated)
+    await expectTree(`
+My Notes
+  BobItem
+  Target
+    `);
+  });
+
+  test("A2: Cross-pane DnD suggestion into expanded node with no children", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    // Bob creates BobItem
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "BobItem{Escape}");
+
+    await expectTree(`
+My Notes
+  BobItem
+    `);
+
+    cleanup();
+
+    // Alice follows Bob and creates Target
+    await follow(alice, bob().user.publicKey);
+    renderApp(alice());
+
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand Target"));
+
+    await expectTree(`
+My Notes
+  Target
+  [S] BobItem
+    `);
+
+    // Open split pane and navigate to Target
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Target");
+
+    // Drag [S] BobItem from pane 0 to Target in pane 1
+    const bobItemElements = screen.getAllByText("BobItem");
+    const droppableTargets = screen
+      .getAllByText("Target")
+      .filter((el) => el.closest(".item"));
+    fireEvent.dragStart(bobItemElements[0]);
+    fireEvent.drop(droppableTargets[1]);
+
+    // BobItem should appear under Target (as child) without [S] prefix
+    // Original [S] BobItem remains in pane 0 (cross-pane copies, doesn't move)
+    await expectTree(`
+My Notes
+  Target
+    BobItem
+  [S] BobItem
+Target
+  BobItem
+    `);
+  });
+
+  test("B1: Same-pane DnD suggestion with collapsed children deep copies all including grandchildren", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    // Bob creates Folder with children and grandchildren
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Folder{Enter}{Tab}Child{Enter}{Tab}GrandChild1{Enter}GrandChild2{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Folder
+    Child
+      GrandChild1
+      GrandChild2
+    `);
+
+    cleanup();
+
+    // Alice follows Bob and creates Target
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+
+    // [S] Folder is collapsed by default
+    await expectTree(`
+My Notes
+  Target
+  [S] Folder
+    `);
+
+    // Drag collapsed [S] Folder and drop on Target (same pane = sibling)
+    fireEvent.dragStart(screen.getByText("Folder"));
+    fireEvent.drop(screen.getByText("Target"));
+
+    // Folder should be accepted (no [S]) and placed before Target
+    await expectTree(`
+My Notes
+  Folder
+  Target
+    `);
+
+    // Expand Folder to verify Child was deep copied
+    await userEvent.click(await screen.findByLabelText("expand Folder"));
+
+    await expectTree(`
+My Notes
+  Folder
+    Child
+  Target
+    `);
+
+    // Expand Child to verify GrandChildren were deep copied
+    await userEvent.click(await screen.findByLabelText("expand Child"));
+
+    await expectTree(`
+My Notes
+  Folder
+    Child
+      GrandChild1
+      GrandChild2
+  Target
+    `);
+  });
+
+  test("B2: Cross-pane DnD suggestion with collapsed children deep copies all including grandchildren", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    // Bob creates Folder with children and grandchildren
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Folder{Enter}{Tab}Child{Enter}{Tab}GrandChild1{Enter}GrandChild2{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Folder
+    Child
+      GrandChild1
+      GrandChild2
+    `);
+
+    cleanup();
+
+    // Alice follows Bob and creates Target
+    await follow(alice, bob().user.publicKey);
+    renderApp(alice());
+
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand Target"));
+
+    // [S] Folder is collapsed by default
+    await expectTree(`
+My Notes
+  Target
+  [S] Folder
+    `);
+
+    // Open split pane and navigate to Target
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Target");
+
+    // Drag collapsed [S] Folder from pane 0 to Target in pane 1
+    const folderElements = screen.getAllByText("Folder");
+    const droppableTargets = screen
+      .getAllByText("Target")
+      .filter((el) => el.closest(".item"));
+    fireEvent.dragStart(folderElements[0]);
+    fireEvent.drop(droppableTargets[1]);
+
+    // Folder should appear under Target (cross-pane keeps original [S] Folder)
+    await expectTree(`
+My Notes
+  Target
+    Folder
+  [S] Folder
+Target
+  Folder
+    `);
+
+    // Expand Folder in pane 1 to verify Child was deep copied
+    // There are 3 Folder expand buttons: pane 0's Target->Folder, pane 0's [S] Folder, pane 1's Folder
+    const expandFolderBtns = screen.getAllByLabelText("expand Folder");
+    await userEvent.click(expandFolderBtns[2]);
+
+    await expectTree(`
+My Notes
+  Target
+    Folder
+  [S] Folder
+Target
+  Folder
+    Child
+    `);
+
+    // Expand Child in pane 1 to verify GrandChildren were deep copied
+    const expandChildBtns = screen.getAllByLabelText("expand Child");
+    await userEvent.click(expandChildBtns[0]);
+
+    await expectTree(`
+My Notes
+  Target
+    Folder
+  [S] Folder
+Target
+  Folder
+    Child
+      GrandChild1
+      GrandChild2
+    `);
+  });
+
+  test("C1: Same-pane DnD suggestion into node with existing children preserves both", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    // Bob creates Folder with BobChild
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "BobFolder{Enter}{Tab}BobChild{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  BobFolder
+    BobChild
+    `);
+
+    cleanup();
+
+    // Alice creates Target with AliceChild
+    renderTree(alice);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Target{Enter}{Tab}AliceChild{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Target
+    AliceChild
+    `);
+
+    cleanup();
+
+    // Alice follows Bob
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+
+    await expectTree(`
+My Notes
+  Target
+    AliceChild
+  [S] BobFolder
+    `);
+
+    // Drag [S] BobFolder and drop on AliceChild (inserts before AliceChild as sibling under Target)
+    fireEvent.dragStart(screen.getByText("BobFolder"));
+    fireEvent.drop(screen.getByText("AliceChild"));
+
+    // BobFolder should be added under Target, AliceChild preserved
+    // [S] BobFolder remains because it's at a different parent (My Notes vs Target)
+    await expectTree(`
+My Notes
+  Target
+    BobFolder
+    AliceChild
+  [S] BobFolder
+    `);
+
+    // Expand BobFolder to verify BobChild was deep copied (first is the copied one under Target)
+    const expandBobFolderBtns = screen.getAllByLabelText("expand BobFolder");
+    await userEvent.click(expandBobFolderBtns[0]);
+
+    await expectTree(`
+My Notes
+  Target
+    BobFolder
+      BobChild
+    AliceChild
+  [S] BobFolder
+    `);
+  });
+
+  test("C2: Cross-pane DnD suggestion into node with existing children preserves both", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    // Bob creates Folder with BobChild and BobGrandChild
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "BobFolder{Enter}{Tab}BobChild{Enter}{Tab}BobGrandChild{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  BobFolder
+    BobChild
+      BobGrandChild
+    `);
+
+    cleanup();
+
+    // Alice creates Target with AliceChild
+    renderTree(alice);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Target{Enter}{Tab}AliceChild{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Target
+    AliceChild
+    `);
+
+    cleanup();
+
+    // Alice follows Bob
+    await follow(alice, bob().user.publicKey);
+    renderApp(alice());
+
+    await expectTree(`
+My Notes
+  Target
+    AliceChild
+  [S] BobFolder
+    `);
+
+    // Open split pane and navigate to Target
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Target");
+
+    await expectTree(`
+My Notes
+  Target
+    AliceChild
+  [S] BobFolder
+Target
+    `);
+
+    // Drag [S] BobFolder from pane 0 to Target root in pane 1
+    const bobFolderElements = screen.getAllByText("BobFolder");
+    const droppableTargets = screen
+      .getAllByText("Target")
+      .filter((el) => el.closest(".item"));
+    fireEvent.dragStart(bobFolderElements[0]);
+    fireEvent.drop(droppableTargets[1]);
+
+    // BobFolder should be added under Target as child (dropping expands Target)
+    // [S] BobFolder remains in pane 0 (cross-pane copies, doesn't remove)
+    await expectTree(`
+My Notes
+  Target
+    BobFolder
+    AliceChild
+  [S] BobFolder
+Target
+  BobFolder
+  AliceChild
+    `);
+
+    // Expand BobFolder in pane 1 to verify deep copy
+    // There are 3 BobFolders: pane 0's Target->BobFolder, pane 0's [S] BobFolder, pane 1's BobFolder
+    const expandBobFolderBtns = screen.getAllByLabelText("expand BobFolder");
+    await userEvent.click(expandBobFolderBtns[2]);
+
+    await expectTree(`
+My Notes
+  Target
+    BobFolder
+    AliceChild
+  [S] BobFolder
+Target
+  BobFolder
+    BobChild
+  AliceChild
+    `);
+
+    // Expand BobChild to verify grandchildren were deep copied
+    const expandBobChildBtns = screen.getAllByLabelText("expand BobChild");
+    await userEvent.click(expandBobChildBtns[0]);
+
+    await expectTree(`
+My Notes
+  Target
+    BobFolder
+    AliceChild
+  [S] BobFolder
+Target
+  BobFolder
+    BobChild
+      BobGrandChild
+  AliceChild
+    `);
+  });
+});
+
+describe("Deep Copy - Relevance Selector Bugs", () => {
+  test("D: Accepting suggestion via relevance selector does not create duplicates", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    // Bob creates BobItem
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "BobItem{Escape}");
+
+    await expectTree(`
+My Notes
+  BobItem
+    `);
+
+    cleanup();
+
+    // Alice follows Bob
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+
+    // Alice sees [S] BobItem as suggestion
+    await expectTree(`
+My Notes
+  [S] BobItem
+    `);
+
+    // Alice clicks relevance selector to mark as "relevant" (accept)
+    const acceptBtn = screen.getByLabelText("accept BobItem as relevant");
+    fireEvent.click(acceptBtn);
+
+    // Should have exactly ONE BobItem (no duplicates, no [S] prefix)
+    await expectTree(`
+My Notes
+  BobItem
+    `);
+
+    // Verify there's only one BobItem element (not duplicated)
+    const bobItems = screen.getAllByText("BobItem");
+    expect(bobItems.length).toBe(1);
+  });
+
+  test("D2: Accept then delete suggestion should not multiply duplicates", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    // Bob creates BobItem
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "BobItem{Escape}");
+
+    await expectTree(`
+My Notes
+  BobItem
+    `);
+
+    cleanup();
+
+    // Alice follows Bob
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+
+    // Alice sees [S] BobItem
+    await expectTree(`
+My Notes
+  [S] BobItem
+    `);
+
+    // Accept the suggestion
+    const acceptBtn = screen.getByLabelText("accept BobItem as relevant");
+    fireEvent.click(acceptBtn);
+
+    await expectTree(`
+My Notes
+  BobItem
+    `);
+
+    // Now mark it as not relevant (delete it)
+    const markNotRelevant = screen.getByLabelText("mark BobItem as not relevant");
+    fireEvent.click(markNotRelevant);
+
+    // Enable not_relevant filter to see it again
+    await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
+
+    // Should see exactly ONE BobItem (not multiplied)
+    const bobItems = screen.getAllByText("BobItem");
+    expect(bobItems.length).toBe(1);
+
+    // Remove from list completely
+    const removeBtn = screen.getByLabelText("remove BobItem from list");
+    fireEvent.click(removeBtn);
+
+    // The suggestion should reappear (since we removed Alice's copy)
+    // but there should only be ONE [S] BobItem, not multiple
+    await screen.findByText("BobItem");
+
+    const allBobItems = screen.getAllByText("BobItem");
+    expect(allBobItems.length).toBe(1);
+  });
+
+  test("D3: Suggestion with children - accept via relevance should not show full cref path", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    // Bob creates BobFolder with child
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "BobFolder{Enter}{Tab}BobChild{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  BobFolder
+    BobChild
+    `);
+
+    cleanup();
+
+    // Alice follows Bob
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+
+    // Alice sees [S] BobFolder
+    await expectTree(`
+My Notes
+  [S] BobFolder
+    `);
+
+    // Alice accepts BobFolder via relevance selector
+    const acceptBtn = screen.getByLabelText("accept BobFolder as relevant");
+    fireEvent.click(acceptBtn);
+
+    // Should show BobFolder (resolved text, not full cref path)
+    await expectTree(`
+My Notes
+  BobFolder
+    `);
+
+    // Expand to verify children were copied
+    await userEvent.click(await screen.findByLabelText("expand BobFolder"));
+
+    await expectTree(`
+My Notes
+  BobFolder
+    BobChild
+    `);
+
+    // Verify text shows "BobFolder" not something like "cref:abc123:..."
+    const folderText = screen.getByText("BobFolder");
+    expect(folderText.textContent).toBe("BobFolder");
   });
 });

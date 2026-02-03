@@ -462,10 +462,10 @@ export function Indent({
   );
 }
 
-function DiffItemIndicator(): JSX.Element {
+function SuggestionIndicator(): JSX.Element {
   return (
     <span
-      className="diff-indicator"
+      className="suggestion-indicator"
       title="Suggestion from other users"
       aria-hidden="true"
     >
@@ -477,11 +477,11 @@ function DiffItemIndicator(): JSX.Element {
 export function Node({
   className,
   cardBodyClassName,
-  isDiffItem,
+  isSuggestion,
 }: {
   className?: string;
   cardBodyClassName?: string;
-  isDiffItem?: boolean;
+  isSuggestion?: boolean;
 }): JSX.Element | null {
   const isDesktop = !useMediaQuery(IS_MOBILE);
   const viewPath = useViewPath();
@@ -516,16 +516,16 @@ export function Node({
   // - Regular nodes (not in Referenced By view)
   // - Abstract refs (to show concrete refs)
   // - Suggestions that are concrete refs (to show source author's children)
-  const isSuggestionWithChildren = isDiffItem && isConcreteRef;
+  const isSuggestionWithChildren = isSuggestion && isConcreteRef;
   const showExpandCollapse =
-    (!isDiffItem && !isConcreteRef && !isInReferencedByView) ||
+    (!isSuggestion && !isConcreteRef && !isInReferencedByView) ||
     isAbstractRef ||
     isSuggestionWithChildren;
 
   // Content class for styling based on view mode
   const getContentClass = (): string => {
-    if (isDiffItem) {
-      return "content-diff-item";
+    if (isSuggestion) {
+      return "content-suggestion";
     }
     if (showReferencedByBackground) {
       return "content-referenced-by";
@@ -540,11 +540,11 @@ export function Node({
         className={cls}
         cardBodyClassName={clsBody}
         style={cardStyle}
-        data-suggestion={isDiffItem ? "true" : undefined}
+        data-suggestion={isSuggestion ? "true" : undefined}
       >
         <div className="indicator-gutter">
-          {isDiffItem && <DiffItemIndicator />}
-          {(showReferencedByBackground || isReference) && !isDiffItem && (
+          {isSuggestion && <SuggestionIndicator />}
+          {(showReferencedByBackground || isReference) && !isSuggestion && (
             <span className="reference-indicator" aria-label="reference">⤶</span>
           )}
         </div>
@@ -555,7 +555,7 @@ export function Node({
           />
         )}
         {showExpandCollapse && <ExpandCollapseToggle />}
-        {isConcreteRef && (
+        {isConcreteRef && !showExpandCollapse && (
           <button
             type="button"
             disabled

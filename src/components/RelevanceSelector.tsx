@@ -12,14 +12,15 @@ import {
   useNodeID,
   useNode,
   useDisplayText,
+  getContext,
 } from "../ViewContext";
-import { usePlanner, planAddToParent } from "../planner";
+import { usePlanner, planDeepCopyNode } from "../planner";
 import { usePaneStack } from "../SplitPanesContext";
 import { preventEditorBlurIfSameNode } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
 
 type RelevanceSelectorProps = {
-  isDiffItem?: boolean;
+  isSuggestion?: boolean;
 };
 
 function getLevelColor(
@@ -44,11 +45,11 @@ function getLevelColor(
 }
 
 function getXButtonAriaLabel(
-  isDiffItem: boolean,
+  isSuggestion: boolean,
   isCurrentlyNotRelevant: boolean,
   displayText: string
 ): string {
-  if (isDiffItem) {
+  if (isSuggestion) {
     return `decline ${displayText}`;
   }
   if (isCurrentlyNotRelevant) {
@@ -71,7 +72,7 @@ function getXButtonBackgroundColor(
 }
 
 export function RelevanceSelector({
-  isDiffItem = false,
+  isSuggestion = false,
 }: RelevanceSelectorProps): JSX.Element | null {
   const [hoverLevel, setHoverLevel] = useState<number | null>(null);
 
@@ -79,7 +80,7 @@ export function RelevanceSelector({
   const { currentRelevance, setLevel, removeFromList, isVisible } =
     useUpdateRelevance();
 
-  // Hooks for diff items (accepting with relevance)
+  // Hooks for suggestions (accepting with relevance)
   const viewPath = useViewPath();
   const [nodeID] = useNodeID();
   const [node] = useNode();
@@ -87,18 +88,21 @@ export function RelevanceSelector({
   const { createPlan, executePlan } = usePlanner();
   const parentPath = getParentView(viewPath);
 
-  const diffNodeText = node?.text || "";
+  const suggestionNodeText = node?.text || "";
   const versionedDisplayText = useDisplayText();
   const editorTextContext = useEditorText();
   const editorText = editorTextContext?.text ?? "";
 
-  // For diff items, accept with the specified relevance level
+  // For suggestions, accept with the specified relevance level
+  // Uses planDeepCopyNode to resolve crefs and copy children
   const acceptWithLevel = (level: number): void => {
     if (!parentPath) return;
     const relevance = levelToRelevance(level);
-    const plan = planAddToParent(
+    const sourceContext = getContext(createPlan(), viewPath, stack);
+    const [plan] = planDeepCopyNode(
       createPlan(),
       nodeID,
+      sourceContext,
       parentPath,
       stack,
       undefined,
@@ -108,22 +112,22 @@ export function RelevanceSelector({
   };
 
   // Determine visibility
-  if (isDiffItem) {
+  if (isSuggestion) {
     if (!parentPath) return null;
   } else if (!isVisible) return null;
 
-  // For diff items: no selection initially (-1 means nothing selected)
+  // For suggestions: no selection initially (-1 means nothing selected)
   // For normal items: use current relevance
-  const currentLevel = isDiffItem ? -1 : relevanceToLevel(currentRelevance);
+  const currentLevel = isSuggestion ? -1 : relevanceToLevel(currentRelevance);
   const displayLevel = hoverLevel !== null ? hoverLevel : currentLevel;
   const isNotRelevant = displayLevel === 0;
-  const displayText = isDiffItem
-    ? diffNodeText
+  const displayText = isSuggestion
+    ? suggestionNodeText
     : editorText.trim() || versionedDisplayText;
 
   // Handler that works for both modes
   const handleSetLevel = (level: number): void => {
-    if (isDiffItem) {
+    if (isSuggestion) {
       acceptWithLevel(level);
     } else {
       setLevel(level);
@@ -131,12 +135,12 @@ export function RelevanceSelector({
   };
 
   // Check if item is already marked as not relevant (for showing remove option)
-  const isCurrentlyNotRelevant = !isDiffItem && currentLevel === 0;
+  const isCurrentlyNotRelevant = !isSuggestion && currentLevel === 0;
 
   // Handler for X button - marks as not relevant, or removes if already not relevant
   const handleXClick = (): void => {
-    if (isDiffItem) {
-      acceptWithLevel(0); // Decline diff item
+    if (isSuggestion) {
+      acceptWithLevel(0); // Decline suggestion
     } else if (isCurrentlyNotRelevant) {
       removeFromList(); // Completely remove from list
     } else {
@@ -144,7 +148,7 @@ export function RelevanceSelector({
     }
   };
 
-  // For diff items with no hover, show all as inactive
+  // For suggestions with no hover, show all as inactive
   const effectiveDisplayLevel = displayLevel === -1 ? -1 : displayLevel;
 
   return (
@@ -165,7 +169,7 @@ export function RelevanceSelector({
         role="button"
         tabIndex={0}
         aria-label={getXButtonAriaLabel(
-          isDiffItem,
+          isSuggestion,
           isCurrentlyNotRelevant,
           displayText
         )}
@@ -197,7 +201,7 @@ export function RelevanceSelector({
           role="button"
           tabIndex={0}
           aria-label={
-            isDiffItem
+            isSuggestion
               ? `accept ${displayText} as ${RELEVANCE_LABELS[
                 level
               ].toLowerCase()}`

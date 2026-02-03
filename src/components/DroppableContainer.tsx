@@ -14,7 +14,7 @@ import { usePaneStack, useCurrentPane } from "../SplitPanesContext";
 
 export type DragItemType = {
   path: ViewPath;
-  isDiffItem?: boolean;
+  isSuggestion?: boolean;
 };
 
 type DroppableContainerProps = {
@@ -130,7 +130,7 @@ export function useDroppable({
           stack,
           calcIndex(index, direction),
           pane.rootRelation,
-          item.isDiffItem
+          item.isSuggestion
         )
       );
       const parentKey = getParentKey(viewPathToString(item.path));

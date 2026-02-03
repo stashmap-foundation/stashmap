@@ -1,6 +1,5 @@
 import React from "react";
-import { useIsSuggestion, useIsRoot, useIsInReferencedByView } from "../ViewContext";
-import { useIsViewingOtherUserContent } from "../SplitPanesContext";
+import { useIsSuggestion, useIsRoot, useIsInReferencedByView, useIsViewingOtherUserContent } from "../ViewContext";
 import { RelevanceSelector } from "./RelevanceSelector";
 import { EvidenceSelector } from "./EvidenceSelector";
 import { ReferenceCount } from "./ReferenceCount";

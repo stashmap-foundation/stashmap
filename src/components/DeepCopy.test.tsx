@@ -1,8 +1,9 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   BOB,
+  CAROL,
   expectTree,
   findNewNodeEditor,
   follow,
@@ -1035,4 +1036,182 @@ My Notes
     const folderText = screen.getByText("BobFolder");
     expect(folderText.textContent).toBe("BobFolder");
   });
+});
+
+describe("Deep Copy - Simple Suggestion DnD (No Children)", () => {
+  test("E1: Same-pane DnD simple suggestion becomes sibling", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "BobItem{Escape}");
+
+    await expectTree(`
+My Notes
+  BobItem
+    `);
+
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+
+    await expectTree(`
+My Notes
+  Target
+  [S] BobItem
+    `);
+
+    fireEvent.dragStart(screen.getByText("BobItem"));
+    fireEvent.drop(screen.getByText("Target"));
+
+    await expectTree(`
+My Notes
+  BobItem
+  Target
+    `);
+  });
+
+  test("E2: Cross-pane DnD simple suggestion into target", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "BobItem{Escape}");
+
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    renderApp(alice());
+
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("expand Target"));
+
+    await expectTree(`
+My Notes
+  Target
+  [S] BobItem
+    `);
+
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Target");
+
+    const droppableTargets = screen
+      .getAllByText("Target")
+      .filter((el) => el.closest(".item"));
+    fireEvent.dragStart(screen.getAllByText("BobItem")[0]);
+    fireEvent.drop(droppableTargets[1]);
+
+    await expectTree(`
+My Notes
+  Target
+    BobItem
+  [S] BobItem
+Target
+  BobItem
+    `);
+  });
+});
+
+describe("Deep Copy - Edit Restrictions", () => {
+  test("I: Abstract references cannot be dragged", async () => {
+    const [alice, bob, carol] = setup([ALICE, BOB, CAROL]);
+
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Holiday Destinations{Enter}{Tab}Barcelona{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    Barcelona
+    `);
+
+    cleanup();
+
+    renderTree(carol);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Holiday Destinations{Enter}{Tab}Malaga{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    Malaga
+    `);
+
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    await follow(alice, carol().user.publicKey);
+    renderTree(alice);
+
+    await expectTree(`
+My Notes
+  [S] My Notes → Holiday Destinations
+    `);
+
+    const holidayItem = screen.getByText("My Notes → Holiday Destinations").closest(".item");
+    expect(holidayItem).not.toBeNull();
+    expect(holidayItem?.getAttribute("draggable")).not.toBe("true");
+  });
+
+  test("H: Children of suggestions cannot be edited", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(bob);
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "BobFolder{Enter}{Tab}BobChild{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  BobFolder
+    BobChild
+    `);
+
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+
+    await expectTree(`
+My Notes
+  [S] BobFolder
+    `);
+
+    await userEvent.click(await screen.findByLabelText("expand BobFolder"));
+
+    await expectTree(`
+My Notes
+  [S] BobFolder
+    BobChild
+    `);
+
+    const bobChildItem = screen.getByText("BobChild").closest(".item");
+    expect(bobChildItem).not.toBeNull();
+
+    const editButton = bobChildItem?.querySelector('[aria-label="edit BobChild"]');
+    expect(editButton).toBeNull();
+  });
+
 });

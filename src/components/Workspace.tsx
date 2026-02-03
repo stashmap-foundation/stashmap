@@ -1,14 +1,13 @@
 import React from "react";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
 
-import { getNodeFromID, useViewPath } from "../ViewContext";
+import { getNodeFromID, useViewPath, useIsViewingOtherUserContent } from "../ViewContext";
 import { useData } from "../DataContext";
 import {
   useSplitPanes,
   useCurrentPane,
   usePaneStack,
   usePaneIndex,
-  useIsViewingOtherUserContent,
 } from "../SplitPanesContext";
 import { TreeView } from "./TreeView";
 import {

@@ -689,6 +689,18 @@ export function getEffectiveAuthor(
   return parentRelation?.author || pane.author;
 }
 
+export function useEffectiveAuthor(): PublicKey {
+  const data = useData();
+  const viewPath = useViewPath();
+  return getEffectiveAuthor(data, viewPath);
+}
+
+export function useIsViewingOtherUserContent(): boolean {
+  const { user } = useData();
+  const effectiveAuthor = useEffectiveAuthor();
+  return effectiveAuthor !== user.publicKey;
+}
+
 /**
  * Check if the current node is a suggestion (from another user).
  * A node is a suggestion if:

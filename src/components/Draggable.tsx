@@ -6,8 +6,8 @@ import {
   useIsInReferencedByView,
   useViewPath,
   useNodeID,
+  useIsViewingOtherUserContent,
 } from "../ViewContext";
-import { useIsViewingOtherUserContent } from "../SplitPanesContext";
 import { isEmptyNodeID, isAbstractRefId } from "../connections";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable } from "./DroppableContainer";
@@ -62,8 +62,9 @@ export function DraggableNote(): JSX.Element {
 function DraggableSuggestion({ className }: { className?: string }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const path = useViewPath();
+  const [nodeID] = useNodeID();
+  const isAbstractRef = isAbstractRefId(nodeID);
 
-  // Suggestions are draggable but NOT droppable
   const [{ isDragging }, drag] = useDrag({
     type: NOTE_TYPE,
     item: () => {
@@ -74,7 +75,9 @@ function DraggableSuggestion({ className }: { className?: string }): JSX.Element
     }),
   });
 
-  drag(ref as ConnectableElement);
+  if (!isAbstractRef) {
+    drag(ref as ConnectableElement);
+  }
 
   return (
     <div

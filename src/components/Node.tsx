@@ -15,6 +15,7 @@ import {
   getRelationForView,
   isReferencedByView,
   getContext,
+  useIsViewingOtherUserContent,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -59,7 +60,6 @@ import {
   usePaneIndex,
   useSplitPanes,
   useCurrentPane,
-  useIsViewingOtherUserContent,
 } from "../SplitPanesContext";
 import { ReferenceCount } from "./ReferenceCount";
 import { RightMenu } from "./RightMenu";

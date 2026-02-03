@@ -118,31 +118,11 @@ function ExpandCollapseToggle(): JSX.Element | null {
 }
 
 export function LoadingNode(): JSX.Element {
-  return (
-    <div className="ph-item">
-      <div>
-        <div className="ph-row">
-          <div className="ph-col-8" />
-          <div className="ph-col-12 " />
-          <div className="ph-col-4" />
-        </div>
-      </div>
-    </div>
-  );
+  return <span className="skeleton-bar" />;
 }
 
 function ErrorContent(): JSX.Element {
-  return (
-    <div>
-      <b>Error: Node not found</b>
-      <p>The node you requested could not be found. Possible reasons are:</p>
-      <ul>
-        <li>You do not have permission to see this node.</li>
-        <li>The node has been deleted.</li>
-      </ul>
-      <p>Please check your permissions and try again.</p>
-    </div>
-  );
+  return <span className="text-danger">Error: Node not found</span>;
 }
 
 function NodeContent({

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
 
 import {
@@ -24,6 +24,7 @@ import { NewPaneButton } from "./OpenInSplitPaneButton";
 import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 import { SignInMenuBtn } from "../SignIn";
 import { usePlanner, planForkPane } from "../planner";
+import { LOG_NODE_ID } from "../connections";
 
 function BreadcrumbItem({
   nodeID,
@@ -108,9 +109,79 @@ function ForkButton(): JSX.Element | null {
   );
 }
 
+function HomeButton(): JSX.Element | null {
+  const { setPane } = useSplitPanes();
+  const pane = useCurrentPane();
+  const { knowledgeDBs, user } = useData();
+
+  const logNode = getNodeFromID(knowledgeDBs, LOG_NODE_ID, user.publicKey);
+  if (!logNode) {
+    return null;
+  }
+
+  const handleClick = (): void => {
+    setPane({ ...pane, stack: [LOG_NODE_ID] });
+  };
+
+  return (
+    <button
+      type="button"
+      className="btn btn-icon"
+      onClick={handleClick}
+      aria-label="Navigate to Log"
+      title="Log"
+    >
+      <span aria-hidden="true">⌂</span>
+    </button>
+  );
+}
+
+function NewNoteButton(): JSX.Element {
+  const { setPane } = useSplitPanes();
+  const pane = useCurrentPane();
+
+  const handleClick = (): void => {
+    setPane({ ...pane, stack: [] });
+  };
+
+  return (
+    <button
+      type="button"
+      className="btn btn-icon"
+      onClick={handleClick}
+      aria-label="Create new note"
+      title="New Note"
+    >
+      <span aria-hidden="true">+</span>
+    </button>
+  );
+}
+
+function useHomeShortcut(): void {
+  const { setPane } = useSplitPanes();
+  const pane = useCurrentPane();
+  const { knowledgeDBs, user } = useData();
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "h") {
+        const logNode = getNodeFromID(knowledgeDBs, LOG_NODE_ID, user.publicKey);
+        if (logNode) {
+          e.preventDefault();
+          setPane({ ...pane, stack: [LOG_NODE_ID] });
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [setPane, pane, knowledgeDBs, user.publicKey]);
+}
+
 function PaneHeader(): JSX.Element {
   const paneIndex = usePaneIndex();
   const isFirstPane = paneIndex === 0;
+  useHomeShortcut();
 
   return (
     <header className="pane-header">
@@ -120,6 +191,8 @@ function PaneHeader(): JSX.Element {
         {isFirstPane && <SignInMenuBtn />}
       </div>
       <div className="pane-header-right">
+        <HomeButton />
+        <NewNoteButton />
         <InlineFilterDots />
         <PaneSearchButton />
         <NewPaneButton />
@@ -133,6 +206,11 @@ function CurrentNodeName(): JSX.Element {
   const { knowledgeDBs, user } = useData();
   const stack = usePaneStack();
   const currentNodeID = stack[stack.length - 1];
+
+  if (!currentNodeID) {
+    return <span>New Note</span>;
+  }
+
   const node = getNodeFromID(
     knowledgeDBs,
     currentNodeID as string,

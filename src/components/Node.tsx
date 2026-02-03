@@ -185,7 +185,9 @@ function EditableContent(): JSX.Element {
   const emptyData = parentRelation
     ? emptyNodeMetadata.get(parentRelation.id)
     : undefined;
-  const shouldAutoFocus = isEmptyNode && emptyData?.paneIndex === paneIndex;
+  const isRootEmptyNode = isEmptyNode && !parentPath;
+  const shouldAutoFocus =
+    isEmptyNode && (isRootEmptyNode || emptyData?.paneIndex === paneIndex);
 
   const handleSave = (
     text: string,
@@ -199,14 +201,15 @@ function EditableContent(): JSX.Element {
       stack
     );
 
+    console.log("handleSave", { text, submitted, nextInsertPosition });
     const plan =
       submitted && nextInsertPosition
         ? planSetEmptyNodePosition(
-            basePlan,
-            nextInsertPosition[0],
-            stack,
-            nextInsertPosition[1]
-          )
+          basePlan,
+          nextInsertPosition[0],
+          stack,
+          nextInsertPosition[1]
+        )
         : basePlan;
 
     executePlan(plan);

@@ -29,6 +29,8 @@ import {
   computeEmptyNodeMetadata,
   isConcreteRefId,
   parseConcreteRefId,
+  createAbstractRefId,
+  LOG_NODE_ID,
 } from "./connections";
 import {
   newRelations,
@@ -56,7 +58,6 @@ import {
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useRelaysToCreatePlan } from "./relays";
 import { mergePublishResultsOfEvents } from "./commons/PublishingStatus";
-import { ROOT } from "./types";
 
 export function getPane(plan: Plan | Data, viewPath: ViewPath): Pane {
   const paneIndex = viewPath[0];
@@ -706,6 +707,60 @@ export function planCreateNode(plan: Plan, text: string): [Plan, KnowNode] {
   return [planWithNode, node];
 }
 
+function ensureLogNode(plan: Plan): Plan {
+  const existingLog = getNodeFromID(
+    plan.knowledgeDBs,
+    LOG_NODE_ID,
+    plan.user.publicKey
+  );
+  if (existingLog) {
+    return plan;
+  }
+  const logNode: KnowNode = {
+    id: LOG_NODE_ID,
+    text: "~Log",
+    type: "text",
+  };
+  return planUpsertNode(plan, logNode);
+}
+
+function planCreateNoteAtRoot(
+  plan: Plan,
+  text: string,
+  viewPath: ViewPath
+): Plan {
+  const [planWithNode, createdNode] = planCreateNode(plan, text);
+  const planWithLog = ensureLogNode(planWithNode);
+
+  const logRelations = getRelationsForContext(
+    planWithLog.knowledgeDBs,
+    planWithLog.user.publicKey,
+    LOG_NODE_ID,
+    List<ID>(),
+    undefined,
+    false
+  );
+
+  const relations =
+    logRelations || newRelations(LOG_NODE_ID, List<ID>(), plan.user.publicKey);
+  const refId = createAbstractRefId(List<ID>(), createdNode.id);
+  const updatedRelations = addRelationToRelations(
+    relations,
+    refId,
+    "",
+    undefined,
+    0
+  );
+  const planWithRelations = planUpsertRelations(planWithLog, updatedRelations);
+
+  const paneIndex = getPaneIndex(viewPath);
+  const newPanes = planWithRelations.panes.map((p, i) =>
+    i === paneIndex ? { ...p, stack: [createdNode.id] } : p
+  );
+
+  return planUpdatePanes(planWithRelations, newPanes);
+}
+
 /**
  * Save node text - either materialize an empty node or create a version for existing node.
  * Returns the updated plan, or null if nothing to save.
@@ -723,7 +778,10 @@ export function planSaveNodeAndEnsureRelations(
   const parentPath = getParentView(viewPath);
 
   if (isEmptyNodeID(nodeID)) {
-    if (!parentPath) return plan;
+    if (!parentPath) {
+      if (!trimmedText) return plan;
+      return planCreateNoteAtRoot(plan, trimmedText, viewPath);
+    }
     const [parentNodeID] = getNodeIDFromView(plan, parentPath);
     const relations = getRelationForView(plan, parentPath, stack);
 
@@ -810,8 +868,8 @@ function planDelete(plan: Plan, id: LongID | ID, kind: number): Plan {
 }
 
 export function planDeleteNode(plan: Plan, nodeID: LongID | ID): Plan {
-  // Prevent deletion of ROOT node
-  if (nodeID === ROOT) {
+  // Prevent deletion of empty placeholder node
+  if (isEmptyNodeID(nodeID)) {
     return plan;
   }
 

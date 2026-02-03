@@ -17,6 +17,9 @@ export function hashText(text: string): ID {
 // Pre-computed hash for the ~Versions node
 export const VERSIONS_NODE_ID = hashText("~Versions");
 
+// Pre-computed hash for the ~Log node (home page, linked to root-level notes)
+export const LOG_NODE_ID = hashText("~Log");
+
 // Pre-computed hash for empty node (used as placeholder when creating new nodes)
 export const EMPTY_NODE_ID = hashText("") as ID;
 

@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { ROOT } from "./types";
 
 interface NavigationStackContextType {
   stack: ID[];
@@ -18,7 +17,7 @@ export function NavigationStackProvider({
 }: {
   children: ReactNode;
 }): JSX.Element {
-  const [stack, setStack] = useState<ID[]>([ROOT]);
+  const [stack, setStack] = useState<ID[]>([]);
   const navigate = useNavigate();
 
   const push = (nodeID: ID): void => {

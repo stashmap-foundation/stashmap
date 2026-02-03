@@ -27,12 +27,11 @@ import { useUserRelayContext } from "./UserRelayContext";
 import { NavigationStackProvider } from "./NavigationStackContext";
 import { flattenRelays, usePreloadRelays, findRelays } from "./relays";
 import { sortEventsDescending, useEventQuery } from "./commons/useNostrQuery";
-import { ROOT } from "./types";
 import { useRootFromURL } from "./KnowledgeDataContext";
 
-const defaultPane = (author: PublicKey, rootNodeID: LongID | ID): Pane => ({
+const defaultPane = (author: PublicKey, rootNodeID?: LongID | ID): Pane => ({
   id: "pane-0",
-  stack: [rootNodeID],
+  stack: rootNodeID ? [rootNodeID] : [],
   author,
 });
 
@@ -245,7 +244,7 @@ function Data({ user, children }: DataProps): JSX.Element {
       panes={
         processedMetaEvents.panes.length > 0
           ? processedMetaEvents.panes
-          : [defaultPane(user.publicKey, rootFromURL || ROOT)]
+          : [defaultPane(user.publicKey, rootFromURL)]
       }
       projectMembers={projectMembers}
     >

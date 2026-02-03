@@ -6,7 +6,6 @@ import {
   usePaneIndex,
   useCurrentPane,
 } from "./SplitPanesContext";
-import { ROOT } from "./types";
 import { renderApis, renderWithTestData, ALICE } from "./utils.test";
 
 function TestSplitPanes(): JSX.Element {

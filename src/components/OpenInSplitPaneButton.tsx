@@ -15,7 +15,6 @@ import { IS_MOBILE } from "./responsive";
 import { getRefTargetInfo } from "../connections";
 import { planUpdateViews, usePlanner } from "../planner";
 import { useData } from "../DataContext";
-import { ROOT } from "../types";
 
 export function OpenInSplitPaneButton(): JSX.Element | null {
   const { addPaneAt } = useSplitPanes();
@@ -133,7 +132,7 @@ export function NewPaneButton(): JSX.Element | null {
       insertIndex
     );
     executePlan(planUpdateViews(plan, shiftedViews));
-    addPaneAt(insertIndex, [ROOT], user.publicKey);
+    addPaneAt(insertIndex, [], user.publicKey);
   };
 
   return (

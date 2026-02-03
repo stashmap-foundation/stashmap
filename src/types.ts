@@ -259,5 +259,3 @@ declare global {
     draftTexts: Map<string, string>;
   };
 }
-
-export const ROOT: LongID = "ROOT" as LongID;

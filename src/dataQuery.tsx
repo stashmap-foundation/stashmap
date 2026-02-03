@@ -272,7 +272,13 @@ export function useQueryKnowledgeData(filters: Filter[]): {
     setAllEventsProcessedTimeout.current = setTimeout(() => {
       setAllEventsProcessed(true);
     }, eventLoadingTimeout) as unknown as number;
-  }, [events.size, eose, JSON.stringify(filters), disabled, eventLoadingTimeout]);
+  }, [
+    events.size,
+    eose,
+    JSON.stringify(filters),
+    disabled,
+    eventLoadingTimeout,
+  ]);
 
   return { allEventsProcessed };
 }

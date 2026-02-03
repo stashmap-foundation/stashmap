@@ -92,13 +92,12 @@ export function getSelectedInView(
 function getSelectedIndices(
   data: Data,
   selection: OrderedSet<string>,
-  viewKey: string,
-  stack: ID[]
+  viewKey: string
 ): OrderedSet<number> {
   return getSelectedInView(selection, viewKey)
     .map((key) => {
       const path = parseViewPath(key);
-      return getRelationIndex(data, path, stack);
+      return getRelationIndex(data, path);
     })
     .filter((n) => n !== undefined) as OrderedSet<number>;
 }
@@ -106,9 +105,8 @@ function getSelectedIndices(
 export function useSelectedIndices(): OrderedSet<number> {
   const { selection } = useTemporaryView();
   const data = useData();
-  const stack = usePaneStack();
   const viewKey = useViewKey();
-  return getSelectedIndices(data, selection, viewKey, stack);
+  return getSelectedIndices(data, selection, viewKey);
 }
 
 export function useGetSelectedInView(): FindSelectedByPostfix {

@@ -70,7 +70,9 @@ export function DeleteWorkspace({
         className="d-flex workspace-selection dropdown-item-border-bottom"
         tabIndex={0}
       >
-        <span className="d-block dropdown-item-icon" aria-hidden="true">×</span>
+        <span className="d-block dropdown-item-icon" aria-hidden="true">
+          ×
+        </span>
         <div className="workspace-selection-text">Delete Workspace</div>
       </Dropdown.Item>
     );

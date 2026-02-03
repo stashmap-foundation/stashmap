@@ -36,13 +36,6 @@ function asString(obj: Serializable | undefined): string {
   throw new Error(`${toString(obj)} is not a string`);
 }
 
-function asNumber(obj: Serializable | undefined): number {
-  if (typeof obj === "number") {
-    return obj;
-  }
-  throw new Error(`${toString(obj)} is not a number`);
-}
-
 function asBoolean(obj: Serializable | undefined): boolean {
   if (typeof obj === "boolean") {
     return obj;
@@ -172,7 +165,10 @@ function jsonToPane(s: Serializable): Pane | undefined {
     stack: asArray(obj.s).map((id) => asString(id) as LongID | ID),
     author: asString(obj.a) as PublicKey,
     rootRelation: obj.r !== undefined ? (asString(obj.r) as LongID) : undefined,
-    typeFilters: obj.t !== undefined ? asArray(obj.t).map((f) => asString(f)) as Pane["typeFilters"] : undefined,
+    typeFilters:
+      obj.t !== undefined
+        ? (asArray(obj.t).map((f) => asString(f)) as Pane["typeFilters"])
+        : undefined,
   };
 }
 
@@ -186,7 +182,10 @@ export function jsonToPanes(s: Serializable): Pane[] {
     .filter((p): p is Pane => p !== undefined);
 }
 
-export function viewDataToJSON(views: Map<string, View>, panes: Pane[]): Serializable {
+export function viewDataToJSON(
+  views: Map<string, View>,
+  panes: Pane[]
+): Serializable {
   return {
     views: views.map((v) => viewToJSON(v)).toJSON(),
     panes: panes.map((p) => paneToJSON(p)),

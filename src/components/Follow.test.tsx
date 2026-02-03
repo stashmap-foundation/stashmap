@@ -240,7 +240,9 @@ test("follow a new user before signin doesn't delete existing contacts after sig
   await screen.findByText("You follow this User");
   fireEvent.click(await screen.findByLabelText("Close"));
 
-  await userEvent.click(await screen.findByLabelText("sign in to save changes"));
+  await userEvent.click(
+    await screen.findByLabelText("sign in to save changes")
+  );
   await userEvent.type(
     await screen.findByPlaceholderText(
       "nsec, private key or mnemonic (12 words)"

@@ -1,10 +1,6 @@
 import React from "react";
 import { useOnChangeViewingMode } from "./SelectRelations";
-import {
-  useNode,
-  useDisplayText,
-  isReferencedByView,
-} from "../ViewContext";
+import { useNode, useDisplayText, isReferencedByView } from "../ViewContext";
 import { getConcreteRefs, isReferenceNode } from "../connections";
 import { useData } from "../DataContext";
 import { TYPE_COLORS } from "../constants";
@@ -64,7 +60,11 @@ export function ReferenceCount(): JSX.Element {
         className={`ref-count-btn${alwaysVisible ? "" : " show-on-row-hover"}`}
         onClick={handleClick}
         aria-label={ariaLabel}
-        title={isInReferencedBy ? "Show children" : `Show ${referenceCount} references`}
+        title={
+          isInReferencedBy
+            ? "Show children"
+            : `Show ${referenceCount} references`
+        }
         style={{ color: textColor }}
       >
         ⤶{referenceCount}

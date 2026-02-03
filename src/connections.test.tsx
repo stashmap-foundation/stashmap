@@ -119,7 +119,11 @@ test("get referenced by relations", () => {
   // Get the parent heads from the relations
   const relationHeads = parsed
     .map((p) => {
-      const rel = getRelationsNoReferencedBy(dbs as KnowledgeDBs, p?.relationID, ALICE.publicKey);
+      const rel = getRelationsNoReferencedBy(
+        dbs as KnowledgeDBs,
+        p?.relationID,
+        ALICE.publicKey
+      );
       return rel?.head;
     })
     .toSet();

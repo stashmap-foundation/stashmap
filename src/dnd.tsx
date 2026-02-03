@@ -62,7 +62,7 @@ export function getDropDestinationFromTreeView(
     return getDropDestinationEndOfRoot(data, root, stack);
   }
   // new index is the current index of the sibling
-  const index = getRelationIndex(data, dropBefore, stack);
+  const index = getRelationIndex(data, dropBefore);
   return [parentView, index || 0];
 }
 
@@ -85,7 +85,6 @@ export function dnd(
   rootRelation: LongID | undefined,
   isSuggestion?: boolean
 ): Plan {
-  console.log("DND executed:", { source, to, indexTo, isSuggestion });
   const rootView = to;
 
   const sourceViewPath = parseViewPath(source);
@@ -97,14 +96,13 @@ export function dnd(
     indexTo === undefined
       ? [rootView, undefined]
       : getDropDestinationFromTreeView(
-        plan,
-        rootView,
-        stack,
-        indexTo,
-        rootRelation
-      );
+          plan,
+          rootView,
+          stack,
+          indexTo,
+          rootRelation
+        );
 
-  const [toNodeID] = getNodeIDFromView(plan, toView);
   const fromRelation = sourceParentPath
     ? getRelationForView(plan, sourceParentPath, stack)
     : undefined;
@@ -120,7 +118,7 @@ export function dnd(
 
   if (move) {
     const sourceIndices = List(
-      sources.map((n) => getRelationIndex(plan, parseViewPath(n), stack))
+      sources.map((n) => getRelationIndex(plan, parseViewPath(n)))
     ).filter((n) => n !== undefined) as List<number>;
     const updatedRelationsPlan = upsertRelations(
       plan,
@@ -180,7 +178,7 @@ export function planDisconnectFromParent(
     return plan;
   }
 
-  const relationIndex = getRelationIndex(plan, viewPath, stack);
+  const relationIndex = getRelationIndex(plan, viewPath);
   if (relationIndex === undefined) {
     return plan;
   }

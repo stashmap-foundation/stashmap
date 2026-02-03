@@ -69,7 +69,9 @@ My Notes
   Topic
     `);
 
-    await userEvent.click(await screen.findByLabelText("show references to Topic"));
+    await userEvent.click(
+      await screen.findByLabelText("show references to Topic")
+    );
 
     await expectTree(`
 My Notes
@@ -112,7 +114,9 @@ My Notes
     [S] BobChild
     `);
 
-    await userEvent.click(await screen.findByLabelText("show references to Topic"));
+    await userEvent.click(
+      await screen.findByLabelText("show references to Topic")
+    );
 
     await expectTree(`
 My Notes
@@ -120,7 +124,9 @@ My Notes
     My Notes → Topic
     `);
 
-    await userEvent.click(await screen.findByLabelText("expand My Notes → Topic"));
+    await userEvent.click(
+      await screen.findByLabelText("expand My Notes → Topic")
+    );
 
     await expectTree(`
 My Notes
@@ -198,7 +204,9 @@ My Notes
     [S] BobChild
     `);
 
-    await userEvent.click(await screen.findByLabelText("show references to Shared"));
+    await userEvent.click(
+      await screen.findByLabelText("show references to Shared")
+    );
 
     await expectTree(`
 My Notes
@@ -206,7 +214,9 @@ My Notes
     My Notes → Shared
     `);
 
-    await userEvent.click(await screen.findByLabelText("expand My Notes → Shared"));
+    await userEvent.click(
+      await screen.findByLabelText("expand My Notes → Shared")
+    );
 
     await expectTree(`
 My Notes

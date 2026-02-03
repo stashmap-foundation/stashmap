@@ -32,7 +32,6 @@ import {
 } from "./connections";
 import {
   newRelations,
-  newRelationsForNode,
   getVersionsContext,
   getVersionsRelations,
   upsertRelations,
@@ -282,9 +281,9 @@ export function planCreateVersion(
   const [originalNodeID, context]: [ID, List<ID>] =
     isInsideVersions && editContext.size >= 2
       ? [
-        editContext.get(editContext.size - 2) as ID, // The node that owns ~Versions
-        editContext.slice(0, -2).toList(), // Context to that node
-      ]
+          editContext.get(editContext.size - 2) as ID, // The node that owns ~Versions
+          editContext.slice(0, -2).toList(), // Context to that node
+        ]
       : [editedNodeID, editContext];
 
   // 1. Create new version node
@@ -313,12 +312,12 @@ export function planCreateVersion(
   const versionsWithOriginal =
     originalIndex < 0
       ? addRelationToRelations(
-        baseVersionsRelations,
-        originalNodeID,
-        "",
-        undefined,
-        baseVersionsRelations.items.size
-      )
+          baseVersionsRelations,
+          originalNodeID,
+          "",
+          undefined,
+          baseVersionsRelations.items.size
+        )
       : baseVersionsRelations;
 
   // 5. Determine insert position
@@ -326,8 +325,8 @@ export function planCreateVersion(
   // Otherwise, insert at position 0 (top)
   const editedNodePosition = isInsideVersions
     ? versionsWithOriginal.items.findIndex(
-      (item) => item.nodeID === editedNodeID
-    )
+        (item) => item.nodeID === editedNodeID
+      )
     : -1;
   const insertPosition = editedNodePosition >= 0 ? editedNodePosition : 0;
 
@@ -340,12 +339,12 @@ export function planCreateVersion(
     existingIndex >= 0
       ? moveRelations(versionsWithOriginal, [existingIndex], insertPosition)
       : addRelationToRelations(
-        versionsWithOriginal,
-        versionNode.id,
-        "",
-        undefined,
-        insertPosition
-      );
+          versionsWithOriginal,
+          versionNode.id,
+          "",
+          undefined,
+          insertPosition
+        );
 
   return planUpsertRelations(updatedPlan, withVersion);
 }
@@ -589,22 +588,29 @@ export function planDeepCopyNode(
   argument?: Argument
 ): [Plan, RelationsIdMapping] {
   // Resolve crefs to their actual content
-  let resolvedNodeID = sourceNodeID;
-  let resolvedContext = sourceContext;
-  if (isConcreteRefId(sourceNodeID)) {
-    const parsed = parseConcreteRefId(sourceNodeID);
-    if (parsed) {
-      const sourceRelation = getRelationsNoReferencedBy(
-        plan.knowledgeDBs,
-        parsed.relationID,
-        plan.user.publicKey
-      );
-      if (sourceRelation) {
-        resolvedNodeID = sourceRelation.head;
-        resolvedContext = sourceRelation.context;
+  const resolveSource = (): { nodeID: LongID | ID; context: Context } => {
+    if (isConcreteRefId(sourceNodeID)) {
+      const parsed = parseConcreteRefId(sourceNodeID);
+      if (parsed) {
+        const sourceRelation = getRelationsNoReferencedBy(
+          plan.knowledgeDBs,
+          parsed.relationID,
+          plan.user.publicKey
+        );
+        if (sourceRelation) {
+          return {
+            nodeID: sourceRelation.head,
+            context: sourceRelation.context,
+          };
+        }
       }
     }
-  }
+    return { nodeID: sourceNodeID, context: sourceContext };
+  };
+
+  const resolved = resolveSource();
+  const resolvedNodeID = resolved.nodeID;
+  const resolvedContext = resolved.context;
 
   const targetParentContext = getContext(plan, targetParentViewPath, stack);
   const [targetParentNodeID] = getNodeIDFromView(plan, targetParentViewPath);
@@ -722,9 +728,7 @@ export function planSaveNodeAndEnsureRelations(
     const relations = getRelationForView(plan, parentPath, stack);
 
     if (!trimmedText) {
-      return relations
-        ? planRemoveEmptyNodePosition(plan, relations.id)
-        : plan;
+      return relations ? planRemoveEmptyNodePosition(plan, relations.id) : plan;
     }
 
     const [planWithNode, createdNode] = planCreateNode(plan, trimmedText);
@@ -739,11 +743,11 @@ export function planSaveNodeAndEnsureRelations(
     );
     const planWithVersion = existingVersions
       ? planCreateVersion(
-        planWithNode,
-        createdNode.id,
-        trimmedText,
-        nodeContext
-      )
+          planWithNode,
+          createdNode.id,
+          trimmedText,
+          nodeContext
+        )
       : planWithNode;
 
     const emptyNodeMetadata = computeEmptyNodeMetadata(

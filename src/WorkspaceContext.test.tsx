@@ -12,7 +12,9 @@ test("App defaults to ROOT workspace when visiting /", async () => {
   renderApp({ ...alice(), initialRoute: "/" });
 
   // Should load ROOT workspace
-  await screen.findByLabelText("collapse My Notes", undefined, { timeout: 5000 });
+  await screen.findByLabelText("collapse My Notes", undefined, {
+    timeout: 5000,
+  });
 });
 
 test("Navigate to specific node via URL", async () => {

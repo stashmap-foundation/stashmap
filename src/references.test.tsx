@@ -31,7 +31,11 @@ describe("getConcreteRefs", () => {
 
     // My Notes → Stuff (Stuff is HEAD, has children)
     const stuffRelations = bulkAddRelations(
-      newRelations(stuff.id, List([shortID(myNotes.id)] as ID[]), ALICE.publicKey),
+      newRelations(
+        stuff.id,
+        List([shortID(myNotes.id)] as ID[]),
+        ALICE.publicKey
+      ),
       [child1.id]
     );
 
@@ -39,7 +43,11 @@ describe("getConcreteRefs", () => {
       [ALICE.publicKey]: {
         ...newDB(),
         relations: Map({ [shortID(stuffRelations.id)]: stuffRelations }),
-        nodes: Map({ [myNotes.id]: myNotes, [stuff.id]: stuff, [child1.id]: child1 }),
+        nodes: Map({
+          [myNotes.id]: myNotes,
+          [stuff.id]: stuff,
+          [child1.id]: child1,
+        }),
       },
     }) as KnowledgeDBs;
 
@@ -85,7 +93,11 @@ describe("getConcreteRefs", () => {
     );
     // Stuff has children at context [My Notes] (HEAD ref)
     const stuffRelations = bulkAddRelations(
-      newRelations(stuff.id, List([shortID(myNotes.id)] as ID[]), ALICE.publicKey),
+      newRelations(
+        stuff.id,
+        List([shortID(myNotes.id)] as ID[]),
+        ALICE.publicKey
+      ),
       [child1.id]
     );
 
@@ -96,7 +108,11 @@ describe("getConcreteRefs", () => {
           [shortID(myNotesRelations.id)]: myNotesRelations,
           [shortID(stuffRelations.id)]: stuffRelations,
         }),
-        nodes: Map({ [myNotes.id]: myNotes, [stuff.id]: stuff, [child1.id]: child1 }),
+        nodes: Map({
+          [myNotes.id]: myNotes,
+          [stuff.id]: stuff,
+          [child1.id]: child1,
+        }),
       },
     }) as KnowledgeDBs;
 
@@ -116,7 +132,11 @@ describe("getConcreteRefs", () => {
 
     // My Notes → Stuff
     const stuffRelations = bulkAddRelations(
-      newRelations(stuff.id, List([shortID(myNotes.id)] as ID[]), ALICE.publicKey),
+      newRelations(
+        stuff.id,
+        List([shortID(myNotes.id)] as ID[]),
+        ALICE.publicKey
+      ),
       [newNode("child").id]
     );
     // ~Versions relation under Stuff: head=~Versions, context=[My Notes, Stuff], items=[Stuff v2]
@@ -136,7 +156,11 @@ describe("getConcreteRefs", () => {
           [shortID(stuffRelations.id)]: stuffRelations,
           [shortID(versionsRelations.id)]: versionsRelations,
         }),
-        nodes: Map({ [myNotes.id]: myNotes, [stuff.id]: stuff, [stuffV2.id]: stuffV2 }),
+        nodes: Map({
+          [myNotes.id]: myNotes,
+          [stuff.id]: stuff,
+          [stuffV2.id]: stuffV2,
+        }),
       },
     }) as KnowledgeDBs;
 
@@ -159,14 +183,22 @@ describe("getConcreteRefs", () => {
 
     // Parent relation: My Notes → Stuff (with children)
     const stuffRelations = bulkAddRelations(
-      newRelations(stuff.id, List([shortID(myNotes.id)] as ID[]), ALICE.publicKey),
+      newRelations(
+        stuff.id,
+        List([shortID(myNotes.id)] as ID[]),
+        ALICE.publicKey
+      ),
       [newNode("other").id]
     );
     // Relation with ~Versions in context, someChild is IN items
     const versionRelation = addRelationToRelations(
       newRelations(
         someVersion.id,
-        List([shortID(myNotes.id), shortID(stuff.id), VERSIONS_NODE_ID] as ID[]),
+        List([
+          shortID(myNotes.id),
+          shortID(stuff.id),
+          VERSIONS_NODE_ID,
+        ] as ID[]),
         ALICE.publicKey
       ),
       someChild.id
@@ -208,7 +240,11 @@ describe("getConcreteRefs", () => {
 
     // Direct relation: My Notes → Stuff with children
     const stuffRelations = bulkAddRelations(
-      newRelations(stuff.id, List([shortID(myNotes.id)] as ID[]), BOB.publicKey),
+      newRelations(
+        stuff.id,
+        List([shortID(myNotes.id)] as ID[]),
+        BOB.publicKey
+      ),
       [child.id]
     );
     // ~Versions relation that would also resolve to stuffRelations
@@ -228,7 +264,11 @@ describe("getConcreteRefs", () => {
           [shortID(stuffRelations.id)]: stuffRelations,
           [shortID(versionsRelations.id)]: versionsRelations,
         }),
-        nodes: Map({ [myNotes.id]: myNotes, [stuff.id]: stuff, [stuffV2.id]: stuffV2 }),
+        nodes: Map({
+          [myNotes.id]: myNotes,
+          [stuff.id]: stuff,
+          [stuffV2.id]: stuffV2,
+        }),
       },
     }) as KnowledgeDBs;
 
@@ -258,10 +298,15 @@ describe("getReferencedByRelations grouping", () => {
       },
     }) as KnowledgeDBs;
 
-    const referencedBy = getReferencedByRelations(dbs, ALICE.publicKey, stuff.id);
+    const referencedBy = getReferencedByRelations(
+      dbs,
+      ALICE.publicKey,
+      stuff.id
+    );
     expect(referencedBy?.items.size).toBe(1);
-    const refId = referencedBy?.items.first()!.nodeID;
-    expect(isConcreteRefId(refId!)).toBe(true);
+    const firstItem = referencedBy!.items.first();
+    const refId = firstItem!.nodeID;
+    expect(isConcreteRefId(refId)).toBe(true);
   });
 
   test("multiple refs same context (different authors) becomes abstract ref", () => {
@@ -290,12 +335,17 @@ describe("getReferencedByRelations grouping", () => {
       },
     }) as KnowledgeDBs;
 
-    const referencedBy = getReferencedByRelations(dbs, ALICE.publicKey, stuff.id);
+    const referencedBy = getReferencedByRelations(
+      dbs,
+      ALICE.publicKey,
+      stuff.id
+    );
     expect(referencedBy?.items.size).toBe(1);
-    const refId = referencedBy?.items.first()!.nodeID;
-    expect(isAbstractRefId(refId!)).toBe(true);
+    const firstItem = referencedBy!.items.first();
+    const refId = firstItem!.nodeID;
+    expect(isAbstractRefId(refId)).toBe(true);
     // Should be ref:myNotes:stuff
-    const parsed = parseAbstractRefId(refId!);
+    const parsed = parseAbstractRefId(refId);
     expect(parsed?.targetNode).toBe(shortID(stuff.id));
     expect(parsed?.targetContext.last()).toBe(shortID(myNotes.id));
   });
@@ -321,15 +371,25 @@ describe("getReferencedByRelations grouping", () => {
           [shortID(myNotesRelations.id)]: myNotesRelations,
           [shortID(workRelations.id)]: workRelations,
         }),
-        nodes: Map({ [myNotes.id]: myNotes, [work.id]: work, [stuff.id]: stuff }),
+        nodes: Map({
+          [myNotes.id]: myNotes,
+          [work.id]: work,
+          [stuff.id]: stuff,
+        }),
       },
     }) as KnowledgeDBs;
 
-    const referencedBy = getReferencedByRelations(dbs, ALICE.publicKey, stuff.id);
+    const referencedBy = getReferencedByRelations(
+      dbs,
+      ALICE.publicKey,
+      stuff.id
+    );
     // Should get 2 separate refs (different contexts)
     expect(referencedBy?.items.size).toBe(2);
     // Both should be concrete refs (single ref per context)
-    expect(referencedBy?.items.every((item) => isConcreteRefId(item.nodeID))).toBe(true);
+    expect(
+      referencedBy?.items.every((item) => isConcreteRefId(item.nodeID))
+    ).toBe(true);
   });
 
   test("Alice and Bob same list, Bob also has ~Versions - only 2 refs total", () => {
@@ -346,12 +406,20 @@ describe("getReferencedByRelations grouping", () => {
 
     // Alice's relation
     const aliceStuffRelations = bulkAddRelations(
-      newRelations(stuff.id, List([shortID(myNotes.id)] as ID[]), ALICE.publicKey),
+      newRelations(
+        stuff.id,
+        List([shortID(myNotes.id)] as ID[]),
+        ALICE.publicKey
+      ),
       [child.id]
     );
     // Bob's direct relation
     const bobStuffRelations = bulkAddRelations(
-      newRelations(stuff.id, List([shortID(myNotes.id)] as ID[]), BOB.publicKey),
+      newRelations(
+        stuff.id,
+        List([shortID(myNotes.id)] as ID[]),
+        BOB.publicKey
+      ),
       [child.id]
     );
     // Bob's ~Versions relation (resolves to bobStuffRelations)
@@ -367,7 +435,9 @@ describe("getReferencedByRelations grouping", () => {
     const dbs = Map({
       [ALICE.publicKey]: {
         ...newDB(),
-        relations: Map({ [shortID(aliceStuffRelations.id)]: aliceStuffRelations }),
+        relations: Map({
+          [shortID(aliceStuffRelations.id)]: aliceStuffRelations,
+        }),
         nodes: Map({ [myNotes.id]: myNotes, [stuff.id]: stuff }),
       },
       [BOB.publicKey]: {
@@ -376,15 +446,24 @@ describe("getReferencedByRelations grouping", () => {
           [shortID(bobStuffRelations.id)]: bobStuffRelations,
           [shortID(bobVersionsRelations.id)]: bobVersionsRelations,
         }),
-        nodes: Map({ [myNotes.id]: myNotes, [stuff.id]: stuff, [stuffV2.id]: stuffV2 }),
+        nodes: Map({
+          [myNotes.id]: myNotes,
+          [stuff.id]: stuff,
+          [stuffV2.id]: stuffV2,
+        }),
       },
     }) as KnowledgeDBs;
 
     // Looking for refs to Stuff
-    const referencedBy = getReferencedByRelations(dbs, ALICE.publicKey, stuff.id);
+    const referencedBy = getReferencedByRelations(
+      dbs,
+      ALICE.publicKey,
+      stuff.id
+    );
     // Should be 1 abstract ref (Alice and Bob in same context [My Notes])
     expect(referencedBy?.items.size).toBe(1);
-    expect(isAbstractRefId(referencedBy?.items.first()!.nodeID!)).toBe(true);
+    const firstItem = referencedBy!.items.first();
+    expect(isAbstractRefId(firstItem!.nodeID)).toBe(true);
   });
 
   test("Alice and Bob same list, Bob also has ~Versions - version node refs", () => {
@@ -397,12 +476,20 @@ describe("getReferencedByRelations grouping", () => {
 
     // Alice's relation (doesn't have stuffV2)
     const aliceStuffRelations = bulkAddRelations(
-      newRelations(stuff.id, List([shortID(myNotes.id)] as ID[]), ALICE.publicKey),
+      newRelations(
+        stuff.id,
+        List([shortID(myNotes.id)] as ID[]),
+        ALICE.publicKey
+      ),
       [child.id]
     );
     // Bob's direct relation
     const bobStuffRelations = bulkAddRelations(
-      newRelations(stuff.id, List([shortID(myNotes.id)] as ID[]), BOB.publicKey),
+      newRelations(
+        stuff.id,
+        List([shortID(myNotes.id)] as ID[]),
+        BOB.publicKey
+      ),
       [child.id]
     );
     // Bob's ~Versions relation containing stuffV2
@@ -418,7 +505,9 @@ describe("getReferencedByRelations grouping", () => {
     const dbs = Map({
       [ALICE.publicKey]: {
         ...newDB(),
-        relations: Map({ [shortID(aliceStuffRelations.id)]: aliceStuffRelations }),
+        relations: Map({
+          [shortID(aliceStuffRelations.id)]: aliceStuffRelations,
+        }),
         nodes: Map({ [myNotes.id]: myNotes, [stuff.id]: stuff }),
       },
       [BOB.publicKey]: {
@@ -427,17 +516,26 @@ describe("getReferencedByRelations grouping", () => {
           [shortID(bobStuffRelations.id)]: bobStuffRelations,
           [shortID(bobVersionsRelations.id)]: bobVersionsRelations,
         }),
-        nodes: Map({ [myNotes.id]: myNotes, [stuff.id]: stuff, [stuffV2.id]: stuffV2 }),
+        nodes: Map({
+          [myNotes.id]: myNotes,
+          [stuff.id]: stuff,
+          [stuffV2.id]: stuffV2,
+        }),
       },
     }) as KnowledgeDBs;
 
     // Looking for refs to stuffV2
-    const referencedBy = getReferencedByRelations(dbs, ALICE.publicKey, stuffV2.id);
+    const referencedBy = getReferencedByRelations(
+      dbs,
+      ALICE.publicKey,
+      stuffV2.id
+    );
     // Should be 1 concrete ref (only Bob has stuffV2 via ~Versions)
     expect(referencedBy?.items.size).toBe(1);
-    expect(isConcreteRefId(referencedBy?.items.first()!.nodeID!)).toBe(true);
+    const firstItem = referencedBy!.items.first();
+    expect(isConcreteRefId(firstItem!.nodeID)).toBe(true);
     // Should point to bobStuffRelations (the parent)
-    const parsed = parseConcreteRefId(referencedBy?.items.first()!.nodeID!);
+    const parsed = parseConcreteRefId(firstItem!.nodeID);
     expect(parsed?.relationID).toBe(bobStuffRelations.id);
   });
 
@@ -476,9 +574,14 @@ describe("getReferencedByRelations grouping", () => {
       },
     }) as KnowledgeDBs;
 
-    const referencedBy = getReferencedByRelations(dbs, ALICE.publicKey, stuff.id);
+    const referencedBy = getReferencedByRelations(
+      dbs,
+      ALICE.publicKey,
+      stuff.id
+    );
     expect(referencedBy?.items.size).toBe(1);
-    expect(isAbstractRefId(referencedBy?.items.first()!.nodeID!)).toBe(true);
+    const firstItem = referencedBy!.items.first();
+    expect(isAbstractRefId(firstItem!.nodeID)).toBe(true);
   });
 
   test("nested context refs", () => {
@@ -489,7 +592,11 @@ describe("getReferencedByRelations grouping", () => {
 
     // Projects has Stuff as child, context is [My Notes]
     const projectsRelations = addRelationToRelations(
-      newRelations(projects.id, List([shortID(myNotes.id)] as ID[]), ALICE.publicKey),
+      newRelations(
+        projects.id,
+        List([shortID(myNotes.id)] as ID[]),
+        ALICE.publicKey
+      ),
       stuff.id
     );
 
@@ -497,15 +604,28 @@ describe("getReferencedByRelations grouping", () => {
       [ALICE.publicKey]: {
         ...newDB(),
         relations: Map({ [shortID(projectsRelations.id)]: projectsRelations }),
-        nodes: Map({ [myNotes.id]: myNotes, [projects.id]: projects, [stuff.id]: stuff }),
+        nodes: Map({
+          [myNotes.id]: myNotes,
+          [projects.id]: projects,
+          [stuff.id]: stuff,
+        }),
       },
     }) as KnowledgeDBs;
 
-    const referencedBy = getReferencedByRelations(dbs, ALICE.publicKey, stuff.id);
+    const referencedBy = getReferencedByRelations(
+      dbs,
+      ALICE.publicKey,
+      stuff.id
+    );
     expect(referencedBy?.items.size).toBe(1);
     // Context should be [My Notes, Projects]
-    const parsed = parseConcreteRefId(referencedBy?.items.first()!.nodeID!);
-    const rel = getRelationsNoReferencedBy(dbs, parsed?.relationID, ALICE.publicKey);
+    const firstItem = referencedBy!.items.first();
+    const parsed = parseConcreteRefId(firstItem!.nodeID);
+    const rel = getRelationsNoReferencedBy(
+      dbs,
+      parsed?.relationID,
+      ALICE.publicKey
+    );
     expect(rel?.context.toArray()).toEqual([shortID(myNotes.id)]);
     expect(rel?.head).toBe(shortID(projects.id));
   });
@@ -523,7 +643,11 @@ describe("getReferencedByRelations grouping", () => {
     );
     // HEAD ref: Stuff has children at context [My Notes]
     const stuffRelations = bulkAddRelations(
-      newRelations(stuff.id, List([shortID(myNotes.id)] as ID[]), BOB.publicKey),
+      newRelations(
+        stuff.id,
+        List([shortID(myNotes.id)] as ID[]),
+        BOB.publicKey
+      ),
       [child.id]
     );
 
@@ -534,14 +658,23 @@ describe("getReferencedByRelations grouping", () => {
           [shortID(myNotesRelations.id)]: myNotesRelations,
           [shortID(stuffRelations.id)]: stuffRelations,
         }),
-        nodes: Map({ [myNotes.id]: myNotes, [stuff.id]: stuff, [child.id]: child }),
+        nodes: Map({
+          [myNotes.id]: myNotes,
+          [stuff.id]: stuff,
+          [child.id]: child,
+        }),
       },
     }) as KnowledgeDBs;
 
-    const referencedBy = getReferencedByRelations(dbs, ALICE.publicKey, stuff.id);
+    const referencedBy = getReferencedByRelations(
+      dbs,
+      ALICE.publicKey,
+      stuff.id
+    );
     // Should only get 1 ref (HEAD wins over IN)
     expect(referencedBy?.items.size).toBe(1);
-    const parsed = parseConcreteRefId(referencedBy?.items.first()!.nodeID!);
+    const firstItem = referencedBy!.items.first();
+    const parsed = parseConcreteRefId(firstItem!.nodeID);
     expect(parsed?.relationID).toBe(stuffRelations.id);
   });
 
@@ -554,7 +687,11 @@ describe("getReferencedByRelations grouping", () => {
 
     // Parent relation
     const stuffRelations = bulkAddRelations(
-      newRelations(stuff.id, List([shortID(myNotes.id)] as ID[]), ALICE.publicKey),
+      newRelations(
+        stuff.id,
+        List([shortID(myNotes.id)] as ID[]),
+        ALICE.publicKey
+      ),
       [child.id]
     );
     // ~Versions with multiple versions
@@ -586,11 +723,17 @@ describe("getReferencedByRelations grouping", () => {
     // Refs to stuffV1
     const refsV1 = getReferencedByRelations(dbs, ALICE.publicKey, stuffV1.id);
     expect(refsV1?.items.size).toBe(1);
-    expect(parseConcreteRefId(refsV1?.items.first()!.nodeID!)?.relationID).toBe(stuffRelations.id);
+    const v1FirstItem = refsV1!.items.first();
+    expect(parseConcreteRefId(v1FirstItem!.nodeID)?.relationID).toBe(
+      stuffRelations.id
+    );
 
     // Refs to stuffV2
     const refsV2 = getReferencedByRelations(dbs, ALICE.publicKey, stuffV2.id);
     expect(refsV2?.items.size).toBe(1);
-    expect(parseConcreteRefId(refsV2?.items.first()!.nodeID!)?.relationID).toBe(stuffRelations.id);
+    const v2FirstItem = refsV2!.items.first();
+    expect(parseConcreteRefId(v2FirstItem!.nodeID)?.relationID).toBe(
+      stuffRelations.id
+    );
   });
 });

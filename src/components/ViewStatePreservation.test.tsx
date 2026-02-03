@@ -10,7 +10,7 @@ import {
   setup,
 } from "../utils.test";
 
-async function deleteItem(itemName: string, _parentName: string): Promise<void> {
+async function deleteItem(itemName: string): Promise<void> {
   fireEvent.click(screen.getByLabelText(`mark ${itemName} as not relevant`));
   await waitFor(() => {
     expect(screen.queryByText(itemName)).toBeNull();
@@ -360,11 +360,12 @@ My Notes
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
     await navigateToNodeViaSearch(1, "Target");
 
-    const targetElements = screen
-      .getAllByText("Target")
-      .filter((el) => el.closest(".item"));
+    // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
+    const targetToggleBtns = screen.getAllByLabelText(
+      /(?:expand|collapse) Target/
+    );
     fireEvent.dragStart(screen.getAllByText("Source")[0]);
-    fireEvent.drop(targetElements[1]);
+    fireEvent.drop(targetToggleBtns[1]);
 
     const collapseButtons = screen.getAllByLabelText("collapse Source");
     expect(collapseButtons.length).toBeGreaterThanOrEqual(2);
@@ -404,11 +405,12 @@ My Notes
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
     await navigateToNodeViaSearch(1, "Target");
 
-    const targetElements = screen
-      .getAllByText("Target")
-      .filter((el) => el.closest(".item"));
+    // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
+    const targetToggleBtns = screen.getAllByLabelText(
+      /(?:expand|collapse) Target/
+    );
     fireEvent.dragStart(screen.getAllByText("Parent")[0]);
-    fireEvent.drop(targetElements[1]);
+    fireEvent.drop(targetToggleBtns[1]);
 
     const collapseParentButtons = screen.getAllByLabelText("collapse Parent");
     expect(collapseParentButtons.length).toBeGreaterThanOrEqual(2);
@@ -449,11 +451,12 @@ My Notes
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
     await navigateToNodeViaSearch(1, "Target");
 
-    const targetElements = screen
-      .getAllByText("Target")
-      .filter((el) => el.closest(".item"));
+    // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
+    const targetToggleBtns = screen.getAllByLabelText(
+      /(?:expand|collapse) Target/
+    );
     fireEvent.dragStart(screen.getAllByText("Source")[0]);
-    fireEvent.drop(targetElements[1]);
+    fireEvent.drop(targetToggleBtns[1]);
 
     const collapseSourceButtons = screen.getAllByLabelText("collapse Source");
     expect(collapseSourceButtons.length).toBeGreaterThanOrEqual(2);
@@ -594,7 +597,7 @@ My Notes
 
     await screen.findByLabelText("collapse Keeper");
 
-    await deleteItem("ToDelete", "My Notes");
+    await deleteItem("ToDelete");
 
     await expectTree(`
 My Notes
@@ -633,7 +636,7 @@ My Notes
 
     await screen.findByLabelText("collapse Keeper");
 
-    await deleteItem("ToDelete", "My Notes");
+    await deleteItem("ToDelete");
 
     await expectTree(`
 My Notes
@@ -678,7 +681,7 @@ My Notes
     await screen.findByLabelText("collapse A");
     await screen.findByLabelText("collapse C");
 
-    await deleteItem("ToDelete", "My Notes");
+    await deleteItem("ToDelete");
 
     await expectTree(`
 My Notes

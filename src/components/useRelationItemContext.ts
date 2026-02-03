@@ -7,7 +7,6 @@ import {
   useNode,
   useNodeID,
   getRelationForView,
-  getNodeIDFromView,
   ViewPath,
 } from "../ViewContext";
 import { isEmptyNodeID } from "../connections";

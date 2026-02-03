@@ -59,7 +59,11 @@ export function DraggableNote(): JSX.Element {
   );
 }
 
-function DraggableSuggestion({ className }: { className?: string }): JSX.Element {
+function DraggableSuggestion({
+  className,
+}: {
+  className?: string;
+}): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const path = useViewPath();
   const [nodeID] = useNodeID();
@@ -82,8 +86,9 @@ function DraggableSuggestion({ className }: { className?: string }): JSX.Element
   return (
     <div
       ref={ref}
-      className={`item suggestion-item ${isDragging ? "is-dragging" : ""} ${className || ""
-        }`}
+      className={`item suggestion-item ${isDragging ? "is-dragging" : ""} ${
+        className || ""
+      }`}
     >
       <Node className={className} isSuggestion />
     </div>
@@ -128,8 +133,9 @@ export function ListItem({
     drop(ref);
   }
 
-  const className = `${dragDirection === 1 ? "dragging-over-top" : ""} ${dragDirection === -1 ? "dragging-over-bottom" : ""
-    }`;
+  const className = `${dragDirection === 1 ? "dragging-over-top" : ""} ${
+    dragDirection === -1 ? "dragging-over-bottom" : ""
+  }`;
   return (
     <div className="visible-on-hover">
       <Draggable ref={ref} className={className} />

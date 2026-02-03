@@ -203,8 +203,8 @@ export function RelevanceSelector({
           aria-label={
             isSuggestion
               ? `accept ${displayText} as ${RELEVANCE_LABELS[
-                level
-              ].toLowerCase()}`
+                  level
+                ].toLowerCase()}`
               : `set ${displayText} to ${RELEVANCE_LABELS[level].toLowerCase()}`
           }
           onKeyDown={(e) => {

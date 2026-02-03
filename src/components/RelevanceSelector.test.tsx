@@ -690,7 +690,9 @@ describe("Relation lookup consistency (regression)", () => {
     });
 
     // Now enable little_relevant filter to verify the item still exists
-    await userEvent.click(screen.getByLabelText("toggle Little Relevant filter"));
+    await userEvent.click(
+      screen.getByLabelText("toggle Little Relevant filter")
+    );
 
     // Child should reappear, confirming the relevance was properly saved
     await screen.findByText("Child");
@@ -870,7 +872,9 @@ My Notes
     await follow(alice, bob().user.publicKey);
     renderTree(alice);
 
-    await userEvent.click(screen.getByLabelText("toggle Little Relevant filter"));
+    await userEvent.click(
+      screen.getByLabelText("toggle Little Relevant filter")
+    );
 
     await expectTree(`
 My Notes
@@ -934,15 +938,19 @@ My Notes
     await follow(alice, bob().user.publicKey);
     renderTree(alice);
 
-    const suggestionItem = await screen.findByText("BobItem");
-    expect(suggestionItem.closest("[data-suggestion]")?.getAttribute("data-suggestion")).toBe("true");
+    await expectTree(`
+My Notes
+  [S] BobItem
+    `);
 
     fireEvent.click(screen.getByLabelText("accept BobItem as relevant"));
 
     await screen.findByLabelText("set BobItem to relevant");
 
-    const acceptedItem = screen.getByText("BobItem");
-    expect(acceptedItem.closest("[data-suggestion]")).toBeNull();
+    await expectTree(`
+My Notes
+  BobItem
+    `);
   });
 
   test("cref suggestion resolves correctly with relevance", async () => {
@@ -966,9 +974,13 @@ My Notes
   [S] BobFolder
     `);
 
-    fireEvent.click(screen.getByLabelText("accept BobFolder as little relevant"));
+    fireEvent.click(
+      screen.getByLabelText("accept BobFolder as little relevant")
+    );
 
-    await userEvent.click(screen.getByLabelText("toggle Little Relevant filter"));
+    await userEvent.click(
+      screen.getByLabelText("toggle Little Relevant filter")
+    );
 
     await expectTree(`
 My Notes

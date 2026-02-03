@@ -18,14 +18,14 @@ export const DEFAULT_TYPE_FILTERS: (Relevance | Argument | "suggestions")[] = [
 
 // Solarized accent colors for relevance and argument types
 export const TYPE_COLORS = {
-  relevant: "#268bd2",     // Blue - primary, relevant
+  relevant: "#268bd2", // Blue - primary, relevant
   maybe_relevant: "#d33682", // Magenta - maybe relevant
   little_relevant: "#b58900", // Yellow - little relevant
   not_relevant: "#93a1a1", // Base01 - muted
-  confirms: "#859900",     // Green - confirms, success
-  contra: "#dc322f",       // Red - contra, errors
-  other_user: "#6c71c4",   // Violet - other user content
+  confirms: "#859900", // Green - confirms, success
+  contra: "#dc322f", // Red - contra, errors
+  other_user: "#6c71c4", // Violet - other user content
   other_user_bg: "#6c71c420", // Violet with transparency
   referenced_by: "#2aa198", // Cyan - referenced by
-  inactive: "#586e75",     // Base01 (darker) - clearly dimmed
+  inactive: "#586e75", // Base01 (darker) - clearly dimmed
 };

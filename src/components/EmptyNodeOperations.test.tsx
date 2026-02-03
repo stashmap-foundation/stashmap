@@ -55,7 +55,9 @@ My Notes
     });
 
     // Enable little_relevant filter to verify node was created
-    await userEvent.click(screen.getByLabelText("toggle Little Relevant filter"));
+    await userEvent.click(
+      screen.getByLabelText("toggle Little Relevant filter")
+    );
 
     await expectTree(`
 My Notes
@@ -179,9 +181,7 @@ My Notes
       "span[style*='color']"
     ) as HTMLElement;
     // Green color for confirms is #859900 = rgb(133, 153, 0)
-    expect(rerenderedStyledSpan?.style.color).toContain(
-      "133, 153, 0"
-    );
+    expect(rerenderedStyledSpan?.style.color).toContain("133, 153, 0");
   });
 });
 
@@ -296,7 +296,10 @@ My Notes
     const myNotesEditor = await screen.findByLabelText("edit My Notes");
     await userEvent.click(myNotesEditor);
     await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "Parent{Enter}{Tab}Child{Enter}"
+    );
 
     await expectTree(`
 My Notes

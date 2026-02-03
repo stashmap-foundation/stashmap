@@ -38,7 +38,12 @@ export function PaneSearchButton(): JSX.Element {
   const handleSubmit = (): void => {
     if (query.trim()) {
       const searchId = createSearchId(query.trim());
-      setPane({ ...pane, stack: [searchId], author: user.publicKey, rootRelation: undefined });
+      setPane({
+        ...pane,
+        stack: [searchId],
+        author: user.publicKey,
+        rootRelation: undefined,
+      });
       setShowInput(false);
       setQuery("");
     }
@@ -118,7 +123,6 @@ export function ClosePaneButton(): JSX.Element | null {
   );
 }
 
-
 export function PaneSettingsMenu(): JSX.Element {
   const navigate = useNavigate();
   const logout = useLogout();
@@ -143,7 +147,9 @@ export function PaneSettingsMenu(): JSX.Element {
           aria-label="show profile"
           tabIndex={0}
         >
-          <span className="d-block dropdown-item-icon" aria-hidden="true">👤</span>
+          <span className="d-block dropdown-item-icon" aria-hidden="true">
+            👤
+          </span>
           <div className="workspace-selection-text">Profile</div>
         </Dropdown.Item>
         <Dropdown.Item
@@ -152,7 +158,9 @@ export function PaneSettingsMenu(): JSX.Element {
           aria-label="follow user"
           tabIndex={0}
         >
-          <span className="d-block dropdown-item-icon" aria-hidden="true">👥</span>
+          <span className="d-block dropdown-item-icon" aria-hidden="true">
+            👥
+          </span>
           <div className="workspace-selection-text">Follow User</div>
         </Dropdown.Item>
         <Dropdown.Item
@@ -171,7 +179,9 @@ export function PaneSettingsMenu(): JSX.Element {
             aria-label="logout"
             tabIndex={0}
           >
-            <span className="d-block dropdown-item-icon" aria-hidden="true">↪</span>
+            <span className="d-block dropdown-item-icon" aria-hidden="true">
+              ↪
+            </span>
             <div className="workspace-selection-text">Log Out</div>
           </Dropdown.Item>
         )}
@@ -223,6 +233,7 @@ export function SplitPaneLayout(): JSX.Element {
   return (
     <div className="split-pane-container">
       {panes.map((pane, index) => (
+        // eslint-disable-next-line react/no-array-index-key
         <PaneWrapper key={`${pane.id}-${index}`} index={index} />
       ))}
     </div>

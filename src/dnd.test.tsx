@@ -158,10 +158,10 @@ test("Diff items are always added, never moved", () => {
 
   const plan = planUpdateViews(
     planUpsertRelations(
-      planBulkUpsertNodes(createPlan({ ...alice(), knowledgeDBs, views, panes }), [
-        parent,
-        aliceChild,
-      ]),
+      planBulkUpsertNodes(
+        createPlan({ ...alice(), knowledgeDBs, views, panes }),
+        [parent, aliceChild]
+      ),
       aliceRelations
     ),
     views

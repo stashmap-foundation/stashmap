@@ -10,7 +10,9 @@ export function useRootFromURL(): ID | undefined {
     workspaceID?: ID;
   }>();
   const rootID = params.workspaceID;
-  const [lastRootFromURL, setLastRootFromURL] = useState<ID | undefined>(rootID);
+  const [lastRootFromURL, setLastRootFromURL] = useState<ID | undefined>(
+    rootID
+  );
   useEffect(() => {
     if (rootID !== lastRootFromURL && rootID) {
       setLastRootFromURL(rootID);

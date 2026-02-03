@@ -71,8 +71,8 @@ declare global {
   export type User =
     | KeyPair
     | {
-      publicKey: PublicKey;
-    };
+        publicKey: PublicKey;
+      };
 
   export type Contact = {
     publicKey: PublicKey;
@@ -110,12 +110,12 @@ declare global {
 
   type TemporaryEvent =
     | {
-      type: "ADD_EMPTY_NODE";
-      relationsID: LongID;
-      index: number;
-      relationItem: RelationItem;
-      paneIndex: number;
-    }
+        type: "ADD_EMPTY_NODE";
+        relationsID: LongID;
+        index: number;
+        relationItem: RelationItem;
+        paneIndex: number;
+      }
     | { type: "REMOVE_EMPTY_NODE"; relationsID: LongID };
 
   type EventState = PublishEvents<EventAttachment> & {

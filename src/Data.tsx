@@ -15,7 +15,12 @@ import { DataContextProvider, MergeKnowledgeDB } from "./DataContext";
 import { EventCacheProvider } from "./EventCache";
 import { findContacts, findMembers } from "./contacts";
 import { useApis } from "./Apis";
-import { findNodes, findRelations, findViews, findPanes } from "./knowledgeEvents";
+import {
+  findNodes,
+  findRelations,
+  findViews,
+  findPanes,
+} from "./knowledgeEvents";
 import { newDB } from "./knowledge";
 import { PlanningContextProvider } from "./planner";
 import { useUserRelayContext } from "./UserRelayContext";
@@ -244,7 +249,9 @@ function Data({ user, children }: DataProps): JSX.Element {
       }
       projectMembers={projectMembers}
     >
-      <EventCacheProvider unpublishedEvents={newEventsAndPublishResults.unsignedEvents}>
+      <EventCacheProvider
+        unpublishedEvents={newEventsAndPublishResults.unsignedEvents}
+      >
         <MergeKnowledgeDB>
           <NavigationStackProvider>
             <PlanningContextProvider

@@ -1,13 +1,18 @@
 import React from "react";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { List, Map } from "immutable";
 import userEvent from "@testing-library/user-event";
-import { addRelationToRelations, newNode, shortID, isConcreteRefId, parseConcreteRefId } from "../connections";
+import {
+  addRelationToRelations,
+  newNode,
+  shortID,
+  isConcreteRefId,
+  parseConcreteRefId,
+} from "../connections";
 import { DND } from "../dnd";
 import {
   ALICE,
   BOB,
-  matchSplitText,
   renderApp,
   renderWithTestData,
   setup,
@@ -26,12 +31,7 @@ import {
 import { TreeView } from "./TreeView";
 import { DraggableNote } from "./Draggable";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
-import {
-  createPlan,
-  planBulkUpsertNodes,
-  planUpsertNode,
-  planUpsertRelations,
-} from "../planner";
+import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
 import { execute } from "../executor";
 import { getNodesInTree } from "./Node";
 import { LoadData } from "../dataQuery";
@@ -488,13 +488,7 @@ test("Diff item paths are correctly identified as diff items", () => {
     panes: [{ id: "pane-0", stack: [root.id], author: alicePK }],
   };
 
-  const nodes = getNodesInTree(
-    data,
-    rootPath,
-    [root.id],
-    List(),
-    undefined
-  );
+  const nodes = getNodesInTree(data, rootPath, [root.id], List(), undefined);
   expect(nodes.size).toBeGreaterThanOrEqual(3);
 
   const diffItemPath = nodes.find(
@@ -563,7 +557,10 @@ test("getDiffItemsForNode returns plain nodeID for leaf suggestions (no children
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
       nodes: newDB().nodes.set(shortID(parent.id), parent),
-      relations: newDB().relations.set(shortID(aliceRelations.id), aliceRelations),
+      relations: newDB().relations.set(
+        shortID(aliceRelations.id),
+        aliceRelations
+      ),
     })
     .set(bobPK, {
       nodes: newDB().nodes.set(shortID(bobLeafChild.id), bobLeafChild),
@@ -607,7 +604,10 @@ test("getDiffItemsForNode returns concrete ref for expandable suggestions (has c
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
       nodes: newDB().nodes.set(shortID(parent.id), parent),
-      relations: newDB().relations.set(shortID(aliceRelations.id), aliceRelations),
+      relations: newDB().relations.set(
+        shortID(aliceRelations.id),
+        aliceRelations
+      ),
     })
     .set(bobPK, {
       nodes: newDB()
@@ -657,14 +657,20 @@ test("getDiffItemsForNode only returns suggestions from matching context", () =>
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
       nodes: newDB().nodes.set(shortID(parent.id), parent),
-      relations: newDB().relations.set(shortID(aliceRelations.id), aliceRelations),
+      relations: newDB().relations.set(
+        shortID(aliceRelations.id),
+        aliceRelations
+      ),
     })
     .set(bobPK, {
       nodes: newDB()
         .nodes.set(shortID(bobChildSameContext.id), bobChildSameContext)
         .set(shortID(bobChildDiffContext.id), bobChildDiffContext),
       relations: newDB()
-        .relations.set(shortID(bobRelationsSameContext.id), bobRelationsSameContext)
+        .relations.set(
+          shortID(bobRelationsSameContext.id),
+          bobRelationsSameContext
+        )
         .set(shortID(bobRelationsDiffContext.id), bobRelationsDiffContext),
     });
 

@@ -1,7 +1,11 @@
 import React from "react";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
 
-import { getNodeFromID, useViewPath, useIsViewingOtherUserContent } from "../ViewContext";
+import {
+  getNodeFromID,
+  useViewPath,
+  useIsViewingOtherUserContent,
+} from "../ViewContext";
 import { useData } from "../DataContext";
 import {
   useSplitPanes,
@@ -81,27 +85,6 @@ function Breadcrumbs(): JSX.Element | null {
   );
 }
 
-function PaneHeader(): JSX.Element {
-  const paneIndex = usePaneIndex();
-  const isFirstPane = paneIndex === 0;
-
-  return (
-    <header className="pane-header">
-      <div className="pane-header-left">
-        <Breadcrumbs />
-        <ForkButton />
-        {isFirstPane && <SignInMenuBtn />}
-      </div>
-      <div className="pane-header-right">
-        <InlineFilterDots />
-        <PaneSearchButton />
-        <NewPaneButton />
-        <ClosePaneButton />
-      </div>
-    </header>
-  );
-}
-
 function ForkButton(): JSX.Element | null {
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const viewPath = useViewPath();
@@ -129,14 +112,39 @@ function ForkButton(): JSX.Element | null {
   );
 }
 
+function PaneHeader(): JSX.Element {
+  const paneIndex = usePaneIndex();
+  const isFirstPane = paneIndex === 0;
+
+  return (
+    <header className="pane-header">
+      <div className="pane-header-left">
+        <Breadcrumbs />
+        <ForkButton />
+        {isFirstPane && <SignInMenuBtn />}
+      </div>
+      <div className="pane-header-right">
+        <InlineFilterDots />
+        <PaneSearchButton />
+        <NewPaneButton />
+        <ClosePaneButton />
+      </div>
+    </header>
+  );
+}
 
 function CurrentNodeName(): JSX.Element {
   const { knowledgeDBs, user } = useData();
   const stack = usePaneStack();
   const currentNodeID = stack[stack.length - 1];
-  const node = getNodeFromID(knowledgeDBs, currentNodeID as string, user.publicKey);
+  const node = getNodeFromID(
+    knowledgeDBs,
+    currentNodeID as string,
+    user.publicKey
+  );
   const displayName = node?.text || "...";
-  const truncated = displayName.length > 20 ? `${displayName.slice(0, 20)}…` : displayName;
+  const truncated =
+    displayName.length > 20 ? `${displayName.slice(0, 20)}…` : displayName;
 
   return <span>{truncated}</span>;
 }
@@ -152,9 +160,7 @@ function PaneStatusLine(): JSX.Element {
         <CurrentNodeName />
       </div>
       {isViewingOtherUserContent && (
-        <div className="status-segment status-segment-other">
-          other
-        </div>
+        <div className="status-segment status-segment-other">other</div>
       )}
       <div className="status-spacer" />
       {isFirstPane && <PublishingStatusWrapper />}

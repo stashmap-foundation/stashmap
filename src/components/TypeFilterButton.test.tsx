@@ -104,7 +104,9 @@ My Notes
     // Inline filter dots should exist
     expect(screen.getByLabelText("toggle Relevant filter")).toBeDefined();
     expect(screen.getByLabelText("toggle Maybe Relevant filter")).toBeDefined();
-    expect(screen.getByLabelText("toggle Little Relevant filter")).toBeDefined();
+    expect(
+      screen.getByLabelText("toggle Little Relevant filter")
+    ).toBeDefined();
     expect(screen.getByLabelText("toggle Not Relevant filter")).toBeDefined();
     expect(screen.getByLabelText("toggle Confirms filter")).toBeDefined();
     expect(screen.getByLabelText("toggle Contradicts filter")).toBeDefined();
@@ -230,7 +232,9 @@ My Notes
     await screen.findByText("Test Item");
 
     // Toggle off "Maybe Relevant" filter using inline dot
-    await userEvent.click(screen.getByLabelText("toggle Maybe Relevant filter"));
+    await userEvent.click(
+      screen.getByLabelText("toggle Maybe Relevant filter")
+    );
 
     // Item should be hidden
     await waitFor(() => {
@@ -243,7 +247,9 @@ My Notes
     });
 
     // Re-enable "Maybe Relevant" filter
-    await userEvent.click(screen.getByLabelText("toggle Maybe Relevant filter"));
+    await userEvent.click(
+      screen.getByLabelText("toggle Maybe Relevant filter")
+    );
 
     // Item should reappear
     await screen.findByText("Test Item");

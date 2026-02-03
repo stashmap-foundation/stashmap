@@ -237,12 +237,14 @@ My Notes
     await navigateToNodeViaSearch(1, "Target");
     await screen.findByLabelText("collapse Target");
 
-    // Get droppable Target elements (those inside .item containers, excludes breadcrumbs)
-    const droppableTargets = screen.getAllByText("Target").filter(el => el.closest('.item'));
+    // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
+    const targetToggleBtns = screen.getAllByLabelText(
+      /(?:expand|collapse) Target/
+    );
 
     // Drag Parent from pane 0 to Target in pane 1 (cross-pane = deep copy)
     fireEvent.dragStart(screen.getAllByText("Parent")[0]);
-    fireEvent.drop(droppableTargets[1]);
+    fireEvent.drop(targetToggleBtns[1]);
 
     // Parent with Child and GrandChild should be deep copied under Target
     // Pane 1 shows Target as root
@@ -304,10 +306,12 @@ My Notes
     await screen.findByLabelText("collapse Target");
 
     // Drag Source from pane 0 to Target in pane 1
-    // Filter to droppable targets (those inside .item containers)
-    const targetEls = screen.getAllByText("Target").filter(el => el.closest('.item'));
+    // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
+    const targetToggleBtns = screen.getAllByLabelText(
+      /(?:expand|collapse) Target/
+    );
     fireEvent.dragStart(screen.getAllByText("Source")[0]);
-    fireEvent.drop(targetEls[1]);
+    fireEvent.drop(targetToggleBtns[1]);
 
     // After DnD, Target shows Source with Child (from new copy)
     // not Another Child (the old relation is overwritten in view)
@@ -374,7 +378,6 @@ My Notes
     `);
 
     // Expand BobFolder diff item to see its children
-    console.log("=== ABOUT TO EXPAND BOBFOLDER ===");
     await userEvent.click(await screen.findByLabelText("expand BobFolder"));
 
     await expectTree(`
@@ -397,19 +400,13 @@ Target
     `);
 
     // Drag BobFolder from pane 0 to Target in pane 1 (cross-pane deep copy)
-    // Filter for droppable targets (inside .item containers, excludes breadcrumbs)
+    // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
     const bobFolderElements = screen.getAllByText("BobFolder");
-    const droppableTargets = screen.getAllByText("Target").filter(el => el.closest('.item'));
-    console.log("=== BEFORE DND ===");
-    console.log("BobFolder elements:", bobFolderElements.length);
-    console.log("Droppable targets:", droppableTargets.length);
-    console.log("BobFolder[0] closest .item:", bobFolderElements[0].closest('.item')?.className);
-    console.log("Bob's publicKey:", bob().user.publicKey);
-    console.log("Bob's knowledgeDBs keys:", bob().knowledgeDBs.keySeq().toArray());
-    console.log("Bob's relations in bob's view:", bob().knowledgeDBs.get(bob().user.publicKey)?.relations.keySeq().toArray());
-    console.log("Alice's knowledgeDBs keys:", alice().knowledgeDBs.keySeq().toArray());
+    const targetToggleBtns = screen.getAllByLabelText(
+      /(?:expand|collapse) Target/
+    );
     fireEvent.dragStart(bobFolderElements[0]);
-    fireEvent.drop(droppableTargets[1]);
+    fireEvent.drop(targetToggleBtns[1]);
 
     // After copy, Alice sees "Bob Edited" because Bob's ~Versions were copied
     // and became Alice's ~Versions for that context
@@ -507,12 +504,13 @@ My Notes
     await navigateToNodeViaSearch(1, "Target");
 
     // Drag [S] BobItem from pane 0 to Target in pane 1
+    // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
     const bobItemElements = screen.getAllByText("BobItem");
-    const droppableTargets = screen
-      .getAllByText("Target")
-      .filter((el) => el.closest(".item"));
+    const targetToggleBtns = screen.getAllByLabelText(
+      /(?:expand|collapse) Target/
+    );
     fireEvent.dragStart(bobItemElements[0]);
-    fireEvent.drop(droppableTargets[1]);
+    fireEvent.drop(targetToggleBtns[1]);
 
     // BobItem should appear under Target (as child) without [S] prefix
     // Original [S] BobItem remains in pane 0 (cross-pane copies, doesn't move)
@@ -640,12 +638,13 @@ My Notes
     await navigateToNodeViaSearch(1, "Target");
 
     // Drag collapsed [S] Folder from pane 0 to Target in pane 1
+    // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
     const folderElements = screen.getAllByText("Folder");
-    const droppableTargets = screen
-      .getAllByText("Target")
-      .filter((el) => el.closest(".item"));
+    const targetToggleBtns = screen.getAllByLabelText(
+      /(?:expand|collapse) Target/
+    );
     fireEvent.dragStart(folderElements[0]);
-    fireEvent.drop(droppableTargets[1]);
+    fireEvent.drop(targetToggleBtns[1]);
 
     // Folder should appear under Target (cross-pane keeps original [S] Folder)
     await expectTree(`
@@ -827,12 +826,13 @@ Target
     `);
 
     // Drag [S] BobFolder from pane 0 to Target root in pane 1
+    // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
     const bobFolderElements = screen.getAllByText("BobFolder");
-    const droppableTargets = screen
-      .getAllByText("Target")
-      .filter((el) => el.closest(".item"));
+    const targetToggleBtns = screen.getAllByLabelText(
+      /(?:expand|collapse) Target/
+    );
     fireEvent.dragStart(bobFolderElements[0]);
-    fireEvent.drop(droppableTargets[1]);
+    fireEvent.drop(targetToggleBtns[1]);
 
     // BobFolder should be added under Target as child (dropping expands Target)
     // [S] BobFolder remains in pane 0 (cross-pane copies, doesn't remove)
@@ -961,7 +961,9 @@ My Notes
     `);
 
     // Now mark it as not relevant (delete it)
-    const markNotRelevant = screen.getByLabelText("mark BobItem as not relevant");
+    const markNotRelevant = screen.getByLabelText(
+      "mark BobItem as not relevant"
+    );
     fireEvent.click(markNotRelevant);
 
     // Enable not_relevant filter to see it again
@@ -1105,11 +1107,12 @@ My Notes
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
     await navigateToNodeViaSearch(1, "Target");
 
-    const droppableTargets = screen
-      .getAllByText("Target")
-      .filter((el) => el.closest(".item"));
+    // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
+    const targetToggleBtns = screen.getAllByLabelText(
+      /(?:expand|collapse) Target/
+    );
     fireEvent.dragStart(screen.getAllByText("BobItem")[0]);
-    fireEvent.drop(droppableTargets[1]);
+    fireEvent.drop(targetToggleBtns[1]);
 
     await expectTree(`
 My Notes
@@ -1167,7 +1170,10 @@ My Notes
   [S] My Notes → Holiday Destinations
     `);
 
-    const holidayItem = screen.getByText("My Notes → Holiday Destinations").closest(".item");
+    // Verify abstract references are not draggable by checking the draggable attribute
+    const holidayText = screen.getByText("My Notes → Holiday Destinations");
+    // eslint-disable-next-line testing-library/no-node-access
+    const holidayItem = holidayText.closest(".item");
     expect(holidayItem).not.toBeNull();
     expect(holidayItem?.getAttribute("draggable")).not.toBe("true");
   });
@@ -1207,11 +1213,7 @@ My Notes
     BobChild
     `);
 
-    const bobChildItem = screen.getByText("BobChild").closest(".item");
-    expect(bobChildItem).not.toBeNull();
-
-    const editButton = bobChildItem?.querySelector('[aria-label="edit BobChild"]');
-    expect(editButton).toBeNull();
+    // Children of suggestions should not have edit buttons
+    expect(screen.queryByLabelText("edit BobChild")).toBeNull();
   });
-
 });

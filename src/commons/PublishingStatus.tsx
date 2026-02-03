@@ -75,12 +75,18 @@ function RelayRow({
         <span className="publish-relay-name">{relayName}</span>
         <span className="publish-relay-stats">
           {numberRejected > 0 ? (
-            <span className="text-danger">{numberFulfilled}/{total}</span>
+            <span className="text-danger">
+              {numberFulfilled}/{total}
+            </span>
           ) : (
-            <span className="text-success">{numberFulfilled}/{total}</span>
+            <span className="text-success">
+              {numberFulfilled}/{total}
+            </span>
           )}
         </span>
-        {lastError && <span className="publish-relay-error">{String(lastError)}</span>}
+        {lastError && (
+          <span className="publish-relay-error">{String(lastError)}</span>
+        )}
       </div>
       {numberRejected > 0 && (
         <LoadingSpinnerButton
@@ -119,16 +125,14 @@ export function PublishingStatusContent<T = void>({
 
   return (
     <div className="publish-status-content">
-      {publishResultsRelayMap
-        .map((status, relayUrl) => (
-          <RelayRow
-            key={relayUrl}
-            status={status}
-            relayUrl={relayUrl}
-            republishEvents={republishEvents}
-          />
-        ))
-        .valueSeq()}
+      {publishResultsRelayMap.entrySeq().map(([relayUrl, status]) => (
+        <RelayRow
+          key={relayUrl}
+          status={status}
+          relayUrl={relayUrl}
+          republishEvents={republishEvents}
+        />
+      ))}
     </div>
   );
 }

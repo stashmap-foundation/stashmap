@@ -19,9 +19,9 @@ export function EventCacheProvider({
   children: React.ReactNode;
   unpublishedEvents: List<UnsignedEvent>;
 }): JSX.Element {
-  const [events, setEvents] = React.useState<Map<string, Event | UnsignedEvent>>(
-    Map()
-  );
+  const [events, setEvents] = React.useState<
+    Map<string, Event | UnsignedEvent>
+  >(Map());
 
   const addEvents = useCallback(
     (newEvents: Map<string, Event | UnsignedEvent>) => {

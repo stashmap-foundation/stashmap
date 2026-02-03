@@ -29,7 +29,9 @@ export function LoadSearchData({
   const searchEntries = nodeIDs
     .filter((id) => isSearchId(id as ID))
     .map((id) => ({ id, query: parseSearchId(id as ID) }))
-    .filter((entry): entry is { id: ID | LongID; query: string } => !!entry.query);
+    .filter(
+      (entry): entry is { id: ID | LongID; query: string } => !!entry.query
+    );
 
   const firstSearch = searchEntries[0];
   const query = firstSearch?.query || "";

@@ -66,7 +66,10 @@ export function parseSearchId(id: ID): string | undefined {
   return id.slice(SEARCH_PREFIX.length);
 }
 
-export function createConcreteRefId(relationID: LongID, targetNode?: ID): LongID {
+export function createConcreteRefId(
+  relationID: LongID,
+  targetNode?: ID
+): LongID {
   if (targetNode) {
     return `${CONCRETE_REF_PREFIX}${relationID}:${targetNode}` as LongID;
   }
@@ -142,6 +145,40 @@ export function getRefTargetRelationInfo(
   };
 }
 
+export function splitID(id: ID): [PublicKey | undefined, string] {
+  const split = id.split("_");
+  if (split.length === 1) {
+    return [undefined, split[0]];
+  }
+  return [split[0] as PublicKey, split.slice(1).join(":")];
+}
+
+export function joinID(remote: PublicKey | string, id: string): LongID {
+  return `${remote}_${id}` as LongID;
+}
+
+export function shortID(id: ID): string {
+  if (isSearchId(id)) {
+    return id;
+  }
+  return splitID(id)[1];
+}
+
+export function getRelationsNoReferencedBy(
+  knowledgeDBs: KnowledgeDBs,
+  relationID: ID | undefined,
+  myself: PublicKey
+): Relations | undefined {
+  if (!relationID) {
+    return undefined;
+  }
+  const [remote, id] = splitID(relationID);
+  if (remote) {
+    return knowledgeDBs.get(remote)?.relations.get(id);
+  }
+  return knowledgeDBs.get(myself)?.relations.get(relationID);
+}
+
 function buildRefDisplayText(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
@@ -191,7 +228,11 @@ export function buildReferenceNode(
     const parsed = parseConcreteRefId(refId);
     if (!parsed) return undefined;
     const { relationID, targetNode } = parsed;
-    const relation = getRelationsNoReferencedBy(knowledgeDBs, relationID, myself);
+    const relation = getRelationsNoReferencedBy(
+      knowledgeDBs,
+      relationID,
+      myself
+    );
     if (!relation) return undefined;
 
     const relationContext = relation.context.map((id) => shortID(id) as ID);
@@ -200,8 +241,16 @@ export function buildReferenceNode(
 
     if (!targetNode) {
       const head = relation.head as ID;
-      const baseText = buildRefDisplayText(knowledgeDBs, myself, head, relationContext, showTargetOnly);
-      const displayText = showTargetOnly ? baseText : `${baseText} (${itemCount})`;
+      const baseText = buildRefDisplayText(
+        knowledgeDBs,
+        myself,
+        head,
+        relationContext,
+        showTargetOnly
+      );
+      const displayText = showTargetOnly
+        ? baseText
+        : `${baseText} (${itemCount})`;
       return {
         id: refId,
         type: "reference",
@@ -212,8 +261,19 @@ export function buildReferenceNode(
     }
 
     const contextWithHead = relationContext.push(relation.head as ID);
-    const headText = buildRefDisplayText(knowledgeDBs, myself, relation.head as ID, relationContext);
-    const targetText = buildRefDisplayText(knowledgeDBs, myself, targetNode, contextWithHead, true);
+    const headText = buildRefDisplayText(
+      knowledgeDBs,
+      myself,
+      relation.head as ID,
+      relationContext
+    );
+    const targetText = buildRefDisplayText(
+      knowledgeDBs,
+      myself,
+      targetNode,
+      contextWithHead,
+      true
+    );
     const displayText = showTargetOnly
       ? targetText
       : `${headText} (${itemCount}) → ${targetText}`;
@@ -232,7 +292,12 @@ export function buildReferenceNode(
     return undefined;
   }
   const { targetNode, targetContext } = parsed;
-  const displayText = buildRefDisplayText(knowledgeDBs, myself, targetNode, targetContext);
+  const displayText = buildRefDisplayText(
+    knowledgeDBs,
+    myself,
+    targetNode,
+    targetContext
+  );
 
   return {
     id: refId,
@@ -241,40 +306,6 @@ export function buildReferenceNode(
     targetNode,
     targetContext,
   };
-}
-
-export function splitID(id: ID): [PublicKey | undefined, string] {
-  const split = id.split("_");
-  if (split.length === 1) {
-    return [undefined, split[0]];
-  }
-  return [split[0] as PublicKey, split.slice(1).join(":")];
-}
-
-export function joinID(remote: PublicKey | string, id: string): LongID {
-  return `${remote}_${id}` as LongID;
-}
-
-export function shortID(id: ID): string {
-  if (isSearchId(id)) {
-    return id;
-  }
-  return splitID(id)[1];
-}
-
-export function getRelationsNoReferencedBy(
-  knowledgeDBs: KnowledgeDBs,
-  relationID: ID | undefined,
-  myself: PublicKey
-): Relations | undefined {
-  if (!relationID) {
-    return undefined;
-  }
-  const [remote, id] = splitID(relationID);
-  if (remote) {
-    return knowledgeDBs.get(remote)?.relations.get(id);
-  }
-  return knowledgeDBs.get(myself)?.relations.get(relationID);
 }
 
 type RefTargetInfo = {
@@ -331,7 +362,7 @@ export function getConcreteRefs(
   filterContext?: Context
 ): List<ReferencedByRef> {
   const targetShortID = shortID(nodeID);
-  let allRefs = knowledgeDBs.reduce((acc, knowledgeDB) => {
+  const rawRefs = knowledgeDBs.reduce((acc, knowledgeDB) => {
     return knowledgeDB.relations.reduce((rdx, relation) => {
       // Skip search relations - they're virtual and shouldn't be shown as refs
       if (
@@ -379,9 +410,16 @@ export function getConcreteRefs(
         // IN case: ~Versions is last in context
         // context = [Holiday Destinations, BCN, ~Versions], head = Barcelona
         // Need: context = [Holiday Destinations], head = BCN (as HEAD ref)
-        if (relationContext.last() === VERSIONS_NODE_ID && relationContext.size >= 2) {
-          const parentNodeID = relationContext.get(relationContext.size - 2) as ID;
-          const parentContext = relationContext.slice(0, relationContext.size - 2).toList() as Context;
+        if (
+          relationContext.last() === VERSIONS_NODE_ID &&
+          relationContext.size >= 2
+        ) {
+          const parentNodeID = relationContext.get(
+            relationContext.size - 2
+          ) as ID;
+          const parentContext = relationContext
+            .slice(0, relationContext.size - 2)
+            .toList() as Context;
           const parentRelation = knowledgeDB.relations.find(
             (r) =>
               r.head === parentNodeID &&
@@ -409,9 +447,9 @@ export function getConcreteRefs(
     }, acc);
   }, List<ReferencedByRef>());
 
-  if (filterContext) {
-    allRefs = allRefs.filter((ref) => ref.context.equals(filterContext));
-  }
+  const allRefs = filterContext
+    ? rawRefs.filter((ref) => ref.context.equals(filterContext))
+    : rawRefs;
 
   // Dedupe by relationID (same relation can be reached via multiple paths, e.g. direct + via ~Versions)
   const dedupedByRelationID = allRefs
@@ -453,7 +491,10 @@ export function groupConcreteRefs(
           },
         ]);
       }
-      const abstractId = createAbstractRefId(grp.first()!.context, targetShortID);
+      const abstractId = createAbstractRefId(
+        grp.first()!.context,
+        targetShortID
+      );
       return List([{ nodeID: abstractId, relevance: "" as Relevance }]);
     })
     .toList();
@@ -525,12 +566,20 @@ export function getRelations(
     return getReferencedByRelations(knowledgeDBs, myself, nodeID);
   }
   if (relationID && isAbstractRefId(relationID)) {
-    return getConcreteRefsForAbstract(knowledgeDBs, myself, relationID as LongID);
+    return getConcreteRefsForAbstract(
+      knowledgeDBs,
+      myself,
+      relationID as LongID
+    );
   }
   if (relationID && isConcreteRefId(relationID)) {
     const parsed = parseConcreteRefId(relationID);
     if (parsed) {
-      return getRelationsNoReferencedBy(knowledgeDBs, parsed.relationID, myself);
+      return getRelationsNoReferencedBy(
+        knowledgeDBs,
+        parsed.relationID,
+        myself
+      );
     }
   }
   return getRelationsNoReferencedBy(knowledgeDBs, relationID, myself);

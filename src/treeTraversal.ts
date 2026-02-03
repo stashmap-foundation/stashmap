@@ -21,7 +21,6 @@ import {
   isConcreteRefId,
   isSearchId,
   getRelations,
-  parseConcreteRefId,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
 import { getPane } from "./planner";
@@ -104,30 +103,32 @@ function getChildrenForRegularNode(
 
   const relations = isSearchId(parentNodeID as ID)
     ? getRelations(
-      data.knowledgeDBs,
-      parentNodeID as ID,
-      data.user.publicKey,
-      parentNodeID
-    )
+        data.knowledgeDBs,
+        parentNodeID as ID,
+        data.user.publicKey,
+        parentNodeID
+      )
     : getRelationsForContext(
-      data.knowledgeDBs,
-      author,
-      parentNodeID,
-      context,
-      rootRelation,
-      isRoot(parentPath)
-    );
+        data.knowledgeDBs,
+        author,
+        parentNodeID,
+        context,
+        rootRelation,
+        isRoot(parentPath)
+      );
 
   const relationPaths = relations
     ? relations.items
-      .map((item, i) => ({ item, index: i }))
-      .filter(({ item }) =>
-        itemFilters.some((f: Relevance | Argument) => itemMatchesType(item, f))
-      )
-      .map(({ index }) =>
-        addNodeToPathWithRelations(parentPath, relations, index)
-      )
-      .toList()
+        .map((item, i) => ({ item, index: i }))
+        .filter(({ item }) =>
+          itemFilters.some((f: Relevance | Argument) =>
+            itemMatchesType(item, f)
+          )
+        )
+        .map(({ index }) =>
+          addNodeToPathWithRelations(parentPath, relations, index)
+        )
+        .toList()
     : List<ViewPath>();
 
   const diffItems = getDiffItemsForNode(

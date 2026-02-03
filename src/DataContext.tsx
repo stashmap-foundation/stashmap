@@ -41,10 +41,7 @@ function mergeDBNodesAndRelations(
   };
 }
 
-function mergeKnowledgeDBs(
-  a: KnowledgeDBs,
-  b: KnowledgeDBs
-): KnowledgeDBs {
+function mergeKnowledgeDBs(a: KnowledgeDBs, b: KnowledgeDBs): KnowledgeDBs {
   const allUsers = a.keySeq().toSet().union(b.keySeq().toSet());
   return Map<PublicKey, KnowledgeData>(
     allUsers.toArray().map((userPK) => {

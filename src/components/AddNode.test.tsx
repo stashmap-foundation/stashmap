@@ -2,12 +2,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { List } from "immutable";
 import { addRelationToRelations, newNode } from "../connections";
-import {
-  setup,
-  ALICE,
-  renderApp,
-  findNewNodeEditor,
-} from "../utils.test";
+import { setup, ALICE, renderApp, findNewNodeEditor } from "../utils.test";
 import { execute } from "../executor";
 import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
 import { newRelations } from "../ViewContext";
@@ -49,4 +44,3 @@ test("Add note via keyboard on empty tree", async () => {
   // Verify the note appears
   await screen.findByText("My First Note");
 });
-

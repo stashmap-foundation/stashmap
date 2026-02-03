@@ -221,9 +221,7 @@ export function TreeViewNodeLoader({
   return (
     <LoadMissingVersionNodes nodes={nodes}>
       <RegisterQuery
-        nodesBeeingQueried={nodeIDs
-          .map((longID) => shortID(longID))
-          .toArray()}
+        nodesBeeingQueried={nodeIDs.map((longID) => shortID(longID)).toArray()}
         allEventsProcessed={allEventsProcessed}
       >
         {children}
@@ -248,13 +246,7 @@ function Tree(): JSX.Element | null {
   const viewKey = viewPathToString(viewPath);
   const isRootExpanded = isExpanded(data, viewKey);
   const childNodes = isRootExpanded
-    ? getNodesInTree(
-        data,
-        viewPath,
-        stack,
-        List<ViewPath>(),
-        pane.rootRelation
-      )
+    ? getNodesInTree(data, viewPath, stack, List<ViewPath>(), pane.rootRelation)
     : List<ViewPath>();
   // Include ROOT as the first node, followed by its children
   const nodes = List<ViewPath>([viewPath]).concat(childNodes);

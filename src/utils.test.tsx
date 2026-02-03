@@ -54,7 +54,6 @@ import {
 import {
   addRelationToRelations,
   getRelationsNoReferencedBy,
-  joinID,
   newNode,
   shortID,
 } from "./connections";
@@ -305,10 +304,7 @@ export function findNodeByText(plan: Plan, text: string): KnowNode | undefined {
     .nodes.find((node) => node.text === text);
 }
 
-function createInitialRoot(
-  plan: Plan,
-  rootText?: string
-): [Plan, nodeID: ID] {
+function createInitialRoot(plan: Plan, rootText?: string): [Plan, nodeID: ID] {
   const rootNode = rootText
     ? findNodeByText(plan, rootText)
     : newNode("My Notes");
@@ -381,9 +377,7 @@ export function renderApis(
                       value={{ viewportHeight: 10000, itemHeight: 100 }}
                     >
                       {options?.includeFocusContext === true ? (
-                        <FocusContextProvider>
-                          {children}
-                        </FocusContextProvider>
+                        <FocusContextProvider>{children}</FocusContextProvider>
                       ) : (
                         <FocusContext.Provider
                           value={{
@@ -544,6 +538,13 @@ export function matchSplitText(text: string): MatcherFunction {
   return customTextMatcher;
 }
 
+/**
+ * Finds the empty "note editor" (for creating new nodes).
+ */
+export async function findNewNodeEditor(): Promise<HTMLElement> {
+  return screen.findByRole("textbox", { name: "new node editor" });
+}
+
 export async function typeNewNode(
   view: RenderResult,
   text: string
@@ -630,8 +631,9 @@ export async function setupTestDB(
   options?: Options
 ): Promise<Plan> {
   const plan = createNodesAndRelations(createPlan(appState), undefined, nodes);
-  const defaultRoot = appState.panes[0].stack[appState.panes[0].stack.length - 1];
-  const [planWithRoot, id] = options?.root
+  const defaultRoot =
+    appState.panes[0].stack[appState.panes[0].stack.length - 1];
+  const [planWithRoot] = options?.root
     ? createInitialRoot(plan, options.root)
     : [plan, defaultRoot];
 
@@ -790,24 +792,33 @@ function classifyRow(row: Element): RowInfo | null {
   }
 
   if (toggleButton) {
-    let rawText = (toggleButton.getAttribute("aria-label") || "").replace(
-      /^(expand|collapse) /,
-      ""
-    );
-    if (!rawText) {
+    const getRawText = (): string => {
+      const labelText = (toggleButton.getAttribute("aria-label") || "").replace(
+        /^(expand|collapse) /,
+        ""
+      );
+      if (labelText) {
+        return labelText;
+      }
       /* eslint-disable testing-library/no-node-access */
       const textSpan = innerNode?.querySelector(".break-word");
       /* eslint-enable testing-library/no-node-access */
-      rawText =
-        noteEditor?.textContent?.trim() || textSpan?.textContent?.trim() || "";
-    }
+      return (
+        noteEditor?.textContent?.trim() || textSpan?.textContent?.trim() || ""
+      );
+    };
+    const rawText = getRawText();
     if (!rawText) {
       return null;
     }
-    const prefix = isSuggestion ? "[S] " : isOtherUser ? "[O] " : "";
+    const getPrefix = (): string => {
+      if (isSuggestion) return "[S] ";
+      if (isOtherUser) return "[O] ";
+      return "";
+    };
     return {
       element: toggleButton as HTMLElement,
-      text: `${prefix}${rawText}`,
+      text: `${getPrefix()}${rawText}`,
       indentLevel: getIndentLevel(toggleButton as HTMLElement),
     };
   }
@@ -815,10 +826,14 @@ function classifyRow(row: Element): RowInfo | null {
   if (referenceNode) {
     const rawText = referenceNode.textContent?.trim() || "";
     const cleanText = rawText.replace(/👤/g, "").trim();
-    const prefix = isSuggestion ? "[S] " : isOtherUser ? "[O] " : "";
+    const getPrefix = (): string => {
+      if (isSuggestion) return "[S] ";
+      if (isOtherUser) return "[O] ";
+      return "";
+    };
     return {
       element: referenceNode as HTMLElement,
-      text: `${prefix}${cleanText}`,
+      text: `${getPrefix()}${cleanText}`,
       indentLevel: getIndentLevel(referenceNode as HTMLElement),
     };
   }
@@ -848,13 +863,9 @@ export async function getTreeStructure(): Promise<string> {
   const allRows = document.querySelectorAll(".item");
   /* eslint-enable testing-library/no-node-access */
 
-  const rowInfos: RowInfo[] = [];
-  allRows.forEach((row) => {
-    const info = classifyRow(row);
-    if (info) {
-      rowInfos.push(info);
-    }
-  });
+  const rowInfos: RowInfo[] = Array.from(allRows)
+    .map((row) => classifyRow(row))
+    .filter((info): info is RowInfo => info !== null);
 
   const lines = rowInfos.map(({ text, indentLevel }) => {
     const indent = "  ".repeat(indentLevel);
@@ -888,13 +899,6 @@ export async function expectTree(expected: string): Promise<void> {
     console.log(`EXPECTED TREE:\n${expectedNormalized}`);
     throw error;
   }
-}
-
-/**
- * Finds the empty "note editor" (for creating new nodes).
- */
-export async function findNewNodeEditor(): Promise<HTMLElement> {
-  return screen.findByRole("textbox", { name: "new node editor" });
 }
 
 /**
@@ -961,7 +965,7 @@ export async function navigateToNodeViaSearch(
     `${nodeName}{Enter}`
   );
   // Wait for search results with references to load
-  await waitFor(async () => {
+  await waitFor(() => {
     const navigateButtons = screen.queryAllByRole("button", {
       name: new RegExp(`Navigate to.*${nodeName}`, "i"),
     });
@@ -975,7 +979,7 @@ export async function navigateToNodeViaSearch(
   await userEvent.click(navigateButtons[0]);
   // Wait for navigation to complete - look for expand/collapse button for the node
   // Use findAllByLabelText since multiple panes may have the same node
-  await waitFor(async () => {
+  await waitFor(() => {
     const buttons = screen.queryAllByLabelText(
       new RegExp(`(expand|collapse) ${nodeName}`)
     );

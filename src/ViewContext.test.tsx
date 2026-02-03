@@ -232,9 +232,7 @@ My Notes
 
   // Click on Alice's concrete reference (marked with [O]) to open her list
   await userEvent.click(
-    await screen.findByLabelText(
-      "open My Notes → Cities (2) in fullscreen"
-    )
+    await screen.findByLabelText("open My Notes → Cities (2) in fullscreen")
   );
 
   // Now Bob is viewing Alice's Cities - expand to see her items
@@ -407,7 +405,10 @@ My Notes
   renderTree(alice);
   await userEvent.click(await screen.findByLabelText("edit My Notes"));
   await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Programming Languages{Escape}");
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "Programming Languages{Escape}"
+  );
   await expectTree(`
 My Notes
   Programming Languages
@@ -439,9 +440,13 @@ Programming Languages
   `);
 
   // Fork to make it Alice's own copy (can't edit other user's content directly)
-  await userEvent.click(await screen.findByLabelText("fork to make your own copy"));
+  await userEvent.click(
+    await screen.findByLabelText("fork to make your own copy")
+  );
 
-  await userEvent.click(await screen.findByLabelText("edit Programming Languages"));
+  await userEvent.click(
+    await screen.findByLabelText("edit Programming Languages")
+  );
   await userEvent.keyboard("{Enter}");
   await userEvent.type(
     await findNewNodeEditor(),

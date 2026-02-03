@@ -1,5 +1,10 @@
 import React from "react";
-import { useIsSuggestion, useIsRoot, useIsInReferencedByView, useIsViewingOtherUserContent } from "../ViewContext";
+import {
+  useIsSuggestion,
+  useIsRoot,
+  useIsInReferencedByView,
+  useIsViewingOtherUserContent,
+} from "../ViewContext";
 import { RelevanceSelector } from "./RelevanceSelector";
 import { EvidenceSelector } from "./EvidenceSelector";
 import { ReferenceCount } from "./ReferenceCount";
@@ -10,7 +15,8 @@ export function RightMenu(): JSX.Element {
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const isInReferencedByView = useIsInReferencedByView();
 
-  const isReadonly = isRoot || isViewingOtherUserContent || isInReferencedByView;
+  const isReadonly =
+    isRoot || isViewingOtherUserContent || isInReferencedByView;
 
   return (
     <div className="right-menu">

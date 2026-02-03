@@ -291,14 +291,20 @@ test("Reference indicators show other users icon", async () => {
   renderTree(bob);
   await userEvent.click(await screen.findByLabelText("edit My Notes"));
   await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child{Escape}");
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "Parent{Enter}{Tab}Child{Escape}"
+  );
   cleanup();
 
   // Alice creates: My Notes -> Parent -> Child (same structure)
   renderTree(alice);
   await userEvent.click(await screen.findByLabelText("edit My Notes"));
   await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child{Escape}");
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "Parent{Enter}{Tab}Child{Escape}"
+  );
 
   // Navigate to Child and show references
   await navigateToNodeViaSearch(0, "Child");

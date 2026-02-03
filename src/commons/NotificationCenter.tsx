@@ -24,7 +24,9 @@ export function NotificationCenter(): JSX.Element | null {
         tabIndex={0}
       >
         <Badge ariaLabel="number of notifications" value={notifications.size} />
-        <span className="d-block" aria-hidden="true">🔔</span>
+        <span className="d-block" aria-hidden="true">
+          🔔
+        </span>
       </Dropdown.Toggle>
       <Dropdown.Menu>
         <Dropdown.Item

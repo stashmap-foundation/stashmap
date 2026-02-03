@@ -31,10 +31,8 @@ import {
   parseConcreteRefId,
   getRelationsNoReferencedBy,
   isSearchId,
-  getConcreteRefs,
   computeEmptyNodeMetadata,
 } from "../connections";
-import { TYPE_COLORS } from "../constants";
 import { IS_MOBILE } from "./responsive";
 import { MiniEditor, preventEditorBlurIfSameNode } from "./AddNode";
 import { useOnToggleExpanded } from "./SelectRelations";
@@ -53,7 +51,6 @@ import {
 } from "../planner";
 import { planDisconnectFromParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
-import { NodeIcon } from "./NodeIcon";
 import { NodeCard } from "../commons/Ui";
 import {
   usePaneStack,
@@ -61,12 +58,12 @@ import {
   useSplitPanes,
   useCurrentPane,
 } from "../SplitPanesContext";
-import { ReferenceCount } from "./ReferenceCount";
 import { RightMenu } from "./RightMenu";
 import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 import { useItemStyle } from "./useItemStyle";
 import { EditorTextProvider } from "./EditorTextContext";
+
 export { getNodesInTree } from "../treeTraversal";
 
 function getLevels(viewPath: ViewPath): number {
@@ -82,7 +79,8 @@ function ExpandCollapseToggle(): JSX.Element | null {
   const isReferencedByRoot = isReferencedByView(view);
   const isInReferencedByView = useIsInReferencedByView();
   const isSearchNode = isSearchId(nodeID as ID);
-  const showReferencedByStyle = isReferencedByRoot || isInReferencedByView || isSearchNode;
+  const showReferencedByStyle =
+    isReferencedByRoot || isInReferencedByView || isSearchNode;
 
   const isExpanded = useIsExpanded();
   const isEmptyNode = isEmptyNodeID(nodeID);
@@ -96,7 +94,9 @@ function ExpandCollapseToggle(): JSX.Element | null {
     "expand-collapse-toggle",
     showReferencedByStyle ? "toggle-referenced-by" : "",
     isEmptyNode ? "toggle-disabled" : "",
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <button
@@ -176,7 +176,6 @@ function NodeContent({
       data-testid={isReference ? "reference-node" : undefined}
       data-other-user={isOtherUser ? "true" : undefined}
     >
-      <NodeIcon nodeType={nodeType} />
       {isReference && <ReferenceIndicators refId={nodeId} />}
       {text}
     </span>
@@ -197,9 +196,15 @@ function EditableContent(): JSX.Element {
   const nextInsertPosition = useNextInsertPosition();
   const isEmptyNode = isEmptyNodeID(nodeID);
 
-  const emptyNodeMetadata = computeEmptyNodeMetadata(data.publishEventsStatus.temporaryEvents);
-  const parentRelation = parentPath ? getRelationForView(data, parentPath, stack) : undefined;
-  const emptyData = parentRelation ? emptyNodeMetadata.get(parentRelation.id) : undefined;
+  const emptyNodeMetadata = computeEmptyNodeMetadata(
+    data.publishEventsStatus.temporaryEvents
+  );
+  const parentRelation = parentPath
+    ? getRelationForView(data, parentPath, stack)
+    : undefined;
+  const emptyData = parentRelation
+    ? emptyNodeMetadata.get(parentRelation.id)
+    : undefined;
   const shouldAutoFocus = isEmptyNode && emptyData?.paneIndex === paneIndex;
 
   const handleSave = (
@@ -217,11 +222,11 @@ function EditableContent(): JSX.Element {
     const plan =
       submitted && nextInsertPosition
         ? planSetEmptyNodePosition(
-          basePlan,
-          nextInsertPosition[0],
-          stack,
-          nextInsertPosition[1]
-        )
+            basePlan,
+            nextInsertPosition[0],
+            stack,
+            nextInsertPosition[1]
+          )
         : basePlan;
 
     executePlan(plan);
@@ -244,11 +249,15 @@ function EditableContent(): JSX.Element {
     // Handle empty nodes: materialize with text, or move empty position if no text
     if (isEmptyNode) {
       if (!parentPath) return;
-      const parentRelation = getRelationForView(basePlan, parentPath, stack);
+      const currentParentRelation = getRelationForView(
+        basePlan,
+        parentPath,
+        stack
+      );
 
       // Remove empty node position from old parent
-      const planWithoutEmpty = parentRelation
-        ? planRemoveEmptyNodePosition(basePlan, parentRelation.id)
+      const planWithoutEmpty = currentParentRelation
+        ? planRemoveEmptyNodePosition(basePlan, currentParentRelation.id)
         : basePlan;
 
       // Expand previous sibling
@@ -286,7 +295,11 @@ function EditableContent(): JSX.Element {
 
     // Handle regular nodes
     // Step 1: Expand the previous sibling
-    const prevSiblingContext = getContext(basePlan, prevSibling.viewPath, stack);
+    const prevSiblingContext = getContext(
+      basePlan,
+      prevSibling.viewPath,
+      stack
+    );
     const planWithExpand = planExpandNode(
       basePlan,
       prevSibling.view,
@@ -327,9 +340,9 @@ function EditableContent(): JSX.Element {
   const handleClose = (): void => {
     if (!isEmptyNode || !parentPath) return;
     const plan = createPlan();
-    const parentRelation = getRelationForView(plan, parentPath, stack);
-    if (parentRelation) {
-      executePlan(planRemoveEmptyNodePosition(plan, parentRelation.id));
+    const closeParentRelation = getRelationForView(plan, parentPath, stack);
+    if (closeParentRelation) {
+      executePlan(planRemoveEmptyNodePosition(plan, closeParentRelation.id));
     }
   };
 
@@ -503,7 +516,8 @@ export function Node({
   // Check if this is a search node
   const isSearchNode = isSearchId(nodeID as ID);
   // Show background for Referenced By views and search results
-  const showReferencedByBackground = isReferencedByRoot || isInReferencedByView || isSearchNode;
+  const showReferencedByBackground =
+    isReferencedByRoot || isInReferencedByView || isSearchNode;
 
   // Abstract refs can be expanded to show concrete refs
   const isAbstractRef = isAbstractRefId(nodeID);
@@ -545,14 +559,13 @@ export function Node({
         <div className="indicator-gutter">
           {isSuggestion && <SuggestionIndicator />}
           {(showReferencedByBackground || isReference) && !isSuggestion && (
-            <span className="reference-indicator" aria-label="reference">⤶</span>
+            <span className="reference-indicator" aria-label="reference">
+              ⤶
+            </span>
           )}
         </div>
         {levels > 0 && (
-          <Indent
-            levels={levels}
-            colorLevels={referencedByDepth}
-          />
+          <Indent levels={levels} colorLevels={referencedByDepth} />
         )}
         {showExpandCollapse && <ExpandCollapseToggle />}
         {isConcreteRef && !showExpandCollapse && (

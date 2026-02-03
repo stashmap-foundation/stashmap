@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -8,7 +8,6 @@ import {
   renderTree,
   renderApp,
   createAndSetAsRoot,
-  getTreeStructure,
 } from "../utils.test";
 
 describe("Tree Editor - Comprehensive Tests", () => {
@@ -1328,7 +1327,10 @@ My Notes
       await userEvent.keyboard("{Enter}");
 
       // New editor should appear before Child 1
-      await userEvent.type(await findNewNodeEditor(), "New First Child{Escape}");
+      await userEvent.type(
+        await findNewNodeEditor(),
+        "New First Child{Escape}"
+      );
 
       await expectTree(`
 My Notes

@@ -81,7 +81,9 @@ test("Sign in persists created Notes", async () => {
   await userEvent.click(await screen.findByLabelText("edit My Notes"));
   await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Hello World!{Enter}");
-  await userEvent.click(await screen.findByLabelText("sign in to save changes"));
+  await userEvent.click(
+    await screen.findByLabelText("sign in to save changes")
+  );
   await userEvent.type(
     await screen.findByPlaceholderText(
       "nsec, private key or mnemonic (12 words)"

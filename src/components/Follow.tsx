@@ -250,7 +250,9 @@ export function Follow(): JSX.Element {
               disabled={!isFollowing}
               type="button"
             >
-              <span className="d-block" aria-hidden="true">👤−</span>
+              <span className="d-block" aria-hidden="true">
+                👤−
+              </span>
             </Button>
           </div>
           <div className="ms-2">
@@ -261,7 +263,9 @@ export function Follow(): JSX.Element {
               disabled={isFollowing}
               type="button"
             >
-              <span className="d-block" aria-hidden="true">👤+</span>
+              <span className="d-block" aria-hidden="true">
+                👤+
+              </span>
             </Button>
           </div>
         </div>

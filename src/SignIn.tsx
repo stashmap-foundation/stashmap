@@ -288,7 +288,9 @@ export function SignInMenuBtn(): JSX.Element | null {
   return (
     <button
       type="button"
-      className={`header-action-btn${unsavedChanges ? " header-action-btn-danger" : ""}`}
+      className={`header-action-btn${
+        unsavedChanges ? " header-action-btn-danger" : ""
+      }`}
       onClick={() => navigate("/signin")}
       aria-label={unsavedChanges ? "sign in to save changes" : "sign in"}
     >

@@ -8,7 +8,7 @@ import {
   OpenInSplitPaneButtonWithStack,
 } from "./OpenInSplitPaneButton";
 import { ROOT } from "../types";
-import { renderApis, renderWithTestData } from "../utils.test";
+import { renderWithTestData } from "../utils.test";
 import { createAbstractRefId } from "../connections";
 
 function PaneCountDisplay(): JSX.Element {

@@ -175,8 +175,11 @@ export function MiniEditor({
     }
 
     // Skip if focus moved to a modal (e.g., search modal opened from same row)
-    const relatedTarget = e.relatedTarget;
-    if (relatedTarget instanceof HTMLElement && relatedTarget.closest(".modal")) {
+    const { relatedTarget } = e;
+    if (
+      relatedTarget instanceof HTMLElement &&
+      relatedTarget.closest(".modal")
+    ) {
       return;
     }
 
@@ -247,4 +250,3 @@ type EditorProps = {
 export function Editor({ onCreateNode, onClose }: EditorProps): JSX.Element {
   return <MiniEditor onSave={(text) => onCreateNode(text)} onClose={onClose} />;
 }
-

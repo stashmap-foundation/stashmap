@@ -173,7 +173,7 @@ function PaneStatusLine(): JSX.Element {
   );
 }
 
-export function WorkspaceView(): JSX.Element | null {
+export function PaneView(): JSX.Element | null {
   const pane = useCurrentPane();
   const { user } = useData();
   const isOtherUser = pane.author !== user.publicKey;

@@ -7,11 +7,11 @@ import {
   findNodeByText,
 } from "./utils.test";
 
-test("App defaults to ROOT workspace when visiting /", async () => {
+test("App defaults to ROOT pane when visiting /", async () => {
   const [alice] = setup([ALICE]);
   renderApp({ ...alice(), initialRoute: "/" });
 
-  // Should load ROOT workspace
+  // Should load ROOT pane
   await screen.findByLabelText("collapse My Notes", undefined, {
     timeout: 5000,
   });

@@ -30,9 +30,9 @@ import { sortEventsDescending, useEventQuery } from "./commons/useNostrQuery";
 import { ROOT } from "./types";
 import { useRootFromURL } from "./KnowledgeDataContext";
 
-const defaultPane = (author: PublicKey, workspace: LongID | ID): Pane => ({
+const defaultPane = (author: PublicKey, rootNodeID: LongID | ID): Pane => ({
   id: "pane-0",
-  stack: [workspace],
+  stack: [rootNodeID],
   author,
 });
 

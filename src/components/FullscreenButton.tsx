@@ -33,13 +33,13 @@ export function FullscreenButton(): JSX.Element | null {
       return;
     }
 
-    const stackedWorkspaces = stack.slice(0, -1);
+    const stackedNodes = stack.slice(0, -1);
     const viewPathNodeIDs = viewPath
       .slice(1)
       .map((subPath) => (subPath as { nodeID: LongID | ID }).nodeID);
     setPane({
       ...pane,
-      stack: [...stackedWorkspaces, ...viewPathNodeIDs],
+      stack: [...stackedNodes, ...viewPathNodeIDs],
       rootRelation: undefined,
     });
   };

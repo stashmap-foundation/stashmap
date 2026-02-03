@@ -17,7 +17,7 @@ export function AppLayout({
         id="app-container"
         className="menu-sub-hidden main-hidden sub-hidden h-100 d-flex flex-column"
       >
-        <div className="workspace-navbar-controls">
+        <div className="navbar-controls">
           <NavbarControls />
         </div>
         {children}

@@ -8,11 +8,11 @@ import {
   renderApp,
   renderWithTestData,
   TEST_RELAYS,
-  RootViewOrWorkspaceIsLoading,
+  RootViewOrPaneIsLoading,
   findNewNodeEditor,
 } from "../utils.test";
 import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
-import { WorkspaceView } from "./Workspace";
+import { PaneView } from "./Workspace";
 import { MockRelayPool } from "../nostrMock.test";
 
 test("Publishing Status", async () => {
@@ -33,10 +33,10 @@ test("Details of Publishing Status", async () => {
   const utils = alice();
   renderWithTestData(
     <>
-      <RootViewOrWorkspaceIsLoading>
+      <RootViewOrPaneIsLoading>
         <PublishingStatusWrapper />
-        <WorkspaceView />
-      </RootViewOrWorkspaceIsLoading>
+        <PaneView />
+      </RootViewOrPaneIsLoading>
     </>,
     {
       ...utils,

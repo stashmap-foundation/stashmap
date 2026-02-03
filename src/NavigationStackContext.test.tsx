@@ -7,7 +7,7 @@ import {
   findNodeByText,
 } from "./utils.test";
 
-test("Navigation stack starts with ROOT workspace", async () => {
+test("Navigation stack starts with ROOT pane", async () => {
   const [alice] = setup([ALICE]);
   renderApp({ ...alice(), initialRoute: "/" });
 
@@ -17,10 +17,10 @@ test("Navigation stack starts with ROOT workspace", async () => {
 
   // Stack should only contain ROOT (My Notes)
   const stackLayers = screen.queryAllByRole("button", { name: /Loading.../ });
-  expect(stackLayers.length).toBe(0); // No stacked layers, only active workspace
+  expect(stackLayers.length).toBe(0); // No stacked layers, only active pane
 });
 
-test("Push workspace to navigation stack", async () => {
+test("Push node to navigation stack", async () => {
   const [alice] = setup([ALICE]);
   const db = await setupTestDB(alice(), [
     ["Workspace 1", []],
@@ -30,7 +30,7 @@ test("Push workspace to navigation stack", async () => {
   const workspace1 = findNodeByText(db, "Workspace 1");
   const workspace2 = findNodeByText(db, "Workspace 2");
 
-  // Start at workspace 1
+  // Start at node 1
   renderApp({ ...alice(), initialRoute: `/w/${workspace1!.id}` });
   await screen.findByLabelText(
     /expand Workspace 1|collapse Workspace 1/,
@@ -38,7 +38,7 @@ test("Push workspace to navigation stack", async () => {
     { timeout: 5000 }
   );
 
-  // Navigate to workspace 2 (should push to stack)
+  // Navigate to node 2 (should push to stack)
   window.history.pushState({}, "", `/w/${workspace2!.id}`);
 
   // Manually trigger navigation by re-rendering
@@ -48,7 +48,7 @@ test("Push workspace to navigation stack", async () => {
   });
 });
 
-test("Pop from navigation stack returns to previous workspace", async () => {
+test("Pop from navigation stack returns to previous node", async () => {
   const [alice] = setup([ALICE]);
   const db = await setupTestDB(alice(), [
     ["Workspace 1", []],
@@ -58,7 +58,7 @@ test("Pop from navigation stack returns to previous workspace", async () => {
   const workspace1 = findNodeByText(db, "Workspace 1");
   const workspace2 = findNodeByText(db, "Workspace 2");
 
-  // Navigate: ROOT -> Workspace 1 -> Workspace 2
+  // Navigate: ROOT -> Node 1 -> Node 2
   renderApp({ ...alice(), initialRoute: `/w/${workspace1!.id}` });
   await screen.findByLabelText(
     /expand Workspace 1|collapse Workspace 1/,
@@ -66,7 +66,7 @@ test("Pop from navigation stack returns to previous workspace", async () => {
     { timeout: 5000 }
   );
 
-  // Navigate to workspace 2
+  // Navigate to node 2
   window.history.pushState({}, "", `/w/${workspace2!.id}`);
 
   // Pop back (browser back button)
@@ -80,7 +80,7 @@ test("Pop from navigation stack returns to previous workspace", async () => {
   );
 });
 
-test("PopTo navigates to specific workspace in stack", async () => {
+test("PopTo navigates to specific node in stack", async () => {
   const [alice] = setup([ALICE]);
   const db = await setupTestDB(alice(), [
     ["Workspace 1", []],
@@ -117,7 +117,7 @@ test("PopTo navigates to specific workspace in stack", async () => {
   );
 });
 
-test("Stacked workspaces show as layers", async () => {
+test("Stacked nodes show as layers", async () => {
   const [alice] = setup([ALICE]);
   const db = await setupTestDB(alice(), [
     ["Base Workspace", []],
@@ -134,7 +134,7 @@ test("Stacked workspaces show as layers", async () => {
     { timeout: 5000 }
   );
 
-  // Navigate to top workspace (simulating stack push)
+  // Navigate to top node (simulating stack push)
   window.history.pushState({}, "", `/w/${topWorkspace!.id}`);
 
   await waitFor(

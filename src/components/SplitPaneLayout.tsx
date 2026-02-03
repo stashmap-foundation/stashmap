@@ -13,11 +13,10 @@ import {
 } from "../ViewContext";
 import { LoadData } from "../dataQuery";
 import { LoadSearchData } from "../LoadSearchData";
-import { WorkspaceView } from "./Workspace";
+import { PaneView } from "./Workspace";
 import { planUpdateViews, planUpdatePanes, usePlanner } from "../planner";
 import { useData } from "../DataContext";
 import { isUserLoggedIn, useLogout } from "../NostrAuthContext";
-import { DeleteWorkspace } from "./DeleteNode";
 import { createSearchId } from "../connections";
 
 export function PaneSearchButton(): JSX.Element {
@@ -140,9 +139,8 @@ export function PaneSettingsMenu(): JSX.Element {
         ≡
       </Dropdown.Toggle>
       <Dropdown.Menu>
-        <DeleteWorkspace as="item" />
         <Dropdown.Item
-          className="d-flex workspace-selection"
+          className="d-flex menu-item"
           onClick={() => navigate("/profile")}
           aria-label="show profile"
           tabIndex={0}
@@ -150,10 +148,10 @@ export function PaneSettingsMenu(): JSX.Element {
           <span className="d-block dropdown-item-icon" aria-hidden="true">
             👤
           </span>
-          <div className="workspace-selection-text">Profile</div>
+          <div className="menu-item-text">Profile</div>
         </Dropdown.Item>
         <Dropdown.Item
-          className="d-flex workspace-selection"
+          className="d-flex menu-item"
           onClick={() => navigate("/follow")}
           aria-label="follow user"
           tabIndex={0}
@@ -161,20 +159,20 @@ export function PaneSettingsMenu(): JSX.Element {
           <span className="d-block dropdown-item-icon" aria-hidden="true">
             👥
           </span>
-          <div className="workspace-selection-text">Follow User</div>
+          <div className="menu-item-text">Follow User</div>
         </Dropdown.Item>
         <Dropdown.Item
-          className="d-flex workspace-selection"
+          className="d-flex menu-item"
           onClick={() => navigate("/relays")}
           aria-label="edit relays"
           tabIndex={0}
         >
           <span className="icon-nostr-logo d-block dropdown-item-icon" />
-          <div className="workspace-selection-text">Relays</div>
+          <div className="menu-item-text">Relays</div>
         </Dropdown.Item>
         {isLoggedIn && (
           <Dropdown.Item
-            className="d-flex workspace-selection"
+            className="d-flex menu-item"
             onClick={logout}
             aria-label="logout"
             tabIndex={0}
@@ -182,7 +180,7 @@ export function PaneSettingsMenu(): JSX.Element {
             <span className="d-block dropdown-item-icon" aria-hidden="true">
               ↪
             </span>
-            <div className="workspace-selection-text">Log Out</div>
+            <div className="menu-item-text">Log Out</div>
           </Dropdown.Item>
         )}
       </Dropdown.Menu>
@@ -210,7 +208,7 @@ function PaneContent(): JSX.Element {
               root={rootNodeID as LongID}
               paneIndex={paneIndex}
             >
-              <WorkspaceView />
+              <PaneView />
             </RootViewContextProvider>
           </LoadData>
         </LoadData>

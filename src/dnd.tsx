@@ -66,7 +66,7 @@ export function getDropDestinationFromTreeView(
   return [parentView, index || 0];
 }
 
-// Workspace
+// Pane Root
 // drag 18fbe5b5-6516-4cdb-adde-860bf47c9eb0:0:0 to 18fbe5b5-6516-4cdb-adde-860bf47c9eb0 [new] [0]
 //
 // Inner Node

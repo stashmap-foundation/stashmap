@@ -46,7 +46,7 @@ export function Badge({
   );
 }
 
-export function WorkspaceColumn({
+export function PaneColumn({
   children,
   columnSpan,
   dataTestId,
@@ -56,8 +56,8 @@ export function WorkspaceColumn({
 }): JSX.Element {
   return (
     <div
-      className="workspace-column"
-      data-testid={dataTestId || "ws-col"}
+      className="pane-column"
+      data-testid={dataTestId || "pane-col"}
       style={columnSpan ? { gridColumn: `span ${columnSpan}` } : {}}
     >
       {children}

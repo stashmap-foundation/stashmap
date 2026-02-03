@@ -16,7 +16,7 @@ import { NostrProvider } from "./NostrProvider";
 import { UserRelayContextProvider } from "./UserRelayContext";
 
 const defaultRelayUrls = process.env.DEFAULT_RELAYS?.split(",");
-const defaultWorkspace = process.env.DEFAULT_WORKSPACE;
+const defaultPaneRoot = process.env.DEFAULT_WORKSPACE;
 
 function createFileStore(): LocalStorage {
   return {
@@ -34,8 +34,8 @@ if (root !== null) {
       <NostrProvider apis={{ fileStore: createFileStore() }}>
         <NostrAuthContextProvider
           defaultRelayUrls={defaultRelayUrls}
-          defaultWorkspace={
-            defaultWorkspace ? (defaultWorkspace as LongID) : undefined
+          defaultPaneRoot={
+            defaultPaneRoot ? (defaultPaneRoot as LongID) : undefined
           }
         >
           <UserRelayContextProvider>

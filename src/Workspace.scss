@@ -25,7 +25,7 @@ body {
 // 2. LAYOUT
 // ============================================
 
-.workspace-columns {
+.pane-columns {
   display: grid;
   grid-auto-columns: 375px;
   @include respond-below(xs) {
@@ -41,7 +41,7 @@ body {
   background-color: var(--base01);
 }
 
-.workspace-column {
+.pane-column {
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -728,7 +728,7 @@ input:focus,
     font-weight: bold;
   }
 
-  .workspace-selection-text {
+  .menu-item-text {
     font-size: 16px;
     margin-left: 0;
   }
@@ -856,11 +856,11 @@ input:focus,
   }
 }
 
-.workspace-selection {
+.menu-item {
   justify-content: flex-start;
 }
 
-.workspace-selection-text {
+.menu-item-text {
   font-size: 18px;
   margin-left: 5px;
 }
@@ -1245,8 +1245,8 @@ input:focus,
 }
 
 
-// Preserve workspace column overflow
-.flex-grow-1 .workspace-column {
+// Preserve pane column overflow
+.flex-grow-1 .pane-column {
   position: relative;
   height: 100%;
   overflow-y: hidden;

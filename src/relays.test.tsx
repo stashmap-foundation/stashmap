@@ -12,7 +12,7 @@ import {
   setupTestDB,
   TEST_RELAYS,
   UpdateState,
-  RootViewOrWorkspaceIsLoading,
+  RootViewOrPaneIsLoading,
 } from "./utils.test";
 import { createPlan, planPublishRelayMetadata } from "./planner";
 import { execute } from "./executor";
@@ -69,12 +69,12 @@ test("Write views on user relays", async () => {
   const { alice } = await setupTest();
   const utils = renderWithTestData(
     <Data user={alice().user}>
-      <RootViewOrWorkspaceIsLoading>
+      <RootViewOrPaneIsLoading>
         <>
           <DraggableNote />
           <TreeView />
         </>
-      </RootViewOrWorkspaceIsLoading>
+      </RootViewOrPaneIsLoading>
     </Data>,
     {
       ...alice(),

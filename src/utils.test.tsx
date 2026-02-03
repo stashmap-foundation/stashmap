@@ -63,7 +63,7 @@ import { LoadSearchData } from "./LoadSearchData";
 import { StorePreLoginContext } from "./StorePreLoginContext";
 import { newDB } from "./knowledge";
 import { TemporaryViewProvider } from "./components/TemporaryViewContext";
-import { WorkspaceView } from "./components/Workspace";
+import { PaneView } from "./components/Workspace";
 import { DND } from "./dnd";
 import { findContacts } from "./contacts";
 import { UserRelayContextProvider } from "./UserRelayContext";
@@ -608,7 +608,7 @@ function createNodesAndRelations(
         planWithUpdatedRelation,
         relationForChildren
       );
-      // Children's context includes this node (including workspace root)
+      // Children's context includes this node (including pane root)
       const childContext = context.push(shortID(node.id));
       return createNodesAndRelations(
         planWithRelations,
@@ -688,7 +688,7 @@ export async function findEvent(
   return relayPool.getEvents().find((e) => matchFilter(filter, e));
 }
 
-function RootViewOrWorkspaceIsLoadingInner({
+function RootViewOrPaneIsLoadingInner({
   children,
 }: {
   children: React.ReactNode;
@@ -713,16 +713,14 @@ function RootViewOrWorkspaceIsLoadingInner({
   );
 }
 
-export function RootViewOrWorkspaceIsLoading({
+export function RootViewOrPaneIsLoading({
   children,
 }: {
   children: React.ReactNode;
 }): JSX.Element {
   return (
     <PaneIndexProvider index={0}>
-      <RootViewOrWorkspaceIsLoadingInner>
-        {children}
-      </RootViewOrWorkspaceIsLoadingInner>
+      <RootViewOrPaneIsLoadingInner>{children}</RootViewOrPaneIsLoadingInner>
     </PaneIndexProvider>
   );
 }
@@ -909,9 +907,9 @@ export function renderTree(
   user: ReturnType<typeof setup>[0]
 ): RenderViewResult {
   return renderWithTestData(
-    <RootViewOrWorkspaceIsLoading>
-      <WorkspaceView />
-    </RootViewOrWorkspaceIsLoading>,
+    <RootViewOrPaneIsLoading>
+      <PaneView />
+    </RootViewOrPaneIsLoading>,
     user()
   );
 }

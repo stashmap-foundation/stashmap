@@ -30,7 +30,7 @@ export function NotificationCenter(): JSX.Element | null {
       </Dropdown.Toggle>
       <Dropdown.Menu>
         <Dropdown.Item
-          className="d-flex workspace-selection"
+          className="d-flex menu-item"
           key="notification-center-item"
         >
           <div className="bold">
@@ -43,7 +43,7 @@ export function NotificationCenter(): JSX.Element | null {
               <div key={`notification-center-item ${id}`}>
                 <Dropdown.Divider />
                 <Dropdown.Item
-                  className="d-flex workspace-selection"
+                  className="d-flex menu-item"
                   onClick={(): void => {
                     if (notification.navigateToLink) {
                       navigate(`${notification.navigateToLink}`);

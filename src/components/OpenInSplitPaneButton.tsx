@@ -41,7 +41,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
     );
     executePlan(planUpdateViews(plan, shiftedViews));
 
-    const paneStackWithoutWorkspace = stack.slice(0, -1);
+    const paneStackWithoutRoot = stack.slice(0, -1);
 
     const refInfo = getRefTargetInfo(nodeID, knowledgeDBs, user.publicKey);
     if (refInfo) {
@@ -57,7 +57,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
     const viewPathNodeIDs = viewPath
       .slice(1)
       .map((subPath) => (subPath as { nodeID: LongID | ID }).nodeID);
-    const fullStack = [...paneStackWithoutWorkspace, ...viewPathNodeIDs];
+    const fullStack = [...paneStackWithoutRoot, ...viewPathNodeIDs];
     addPaneAt(insertIndex, fullStack, currentAuthor);
   };
 

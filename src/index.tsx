@@ -9,7 +9,6 @@ import "./assets/fonts/nostr/css/nostr.css";
 import "./editor.css";
 import "./Workspace.scss";
 import "./App.css";
-import "react-quill/dist/quill.bubble.css";
 import { App } from "./App";
 import { NostrAuthContextProvider } from "./NostrAuthContext";
 import { NostrProvider } from "./NostrProvider";

@@ -1335,6 +1335,17 @@ input:focus,
   }
 }
 
+.status-segment .dropdown-toggle.status-btn,
+.status-segment button.status-btn,
+.status-segment .status-btn {
+  &, &:hover, &:focus, &:active, &:focus-visible, &.show {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+}
+
 .status-segment-dark {
   background: var(--base01);
 }

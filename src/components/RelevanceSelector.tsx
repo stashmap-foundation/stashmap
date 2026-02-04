@@ -39,12 +39,13 @@ function getLevelColor(
   level: number,
   displayLevel: number,
   isNotRelevant: boolean,
-  isContains: boolean
+  isContains: boolean,
+  isTogglingOff: boolean
 ): string {
-  if (isNotRelevant || isContains || level > displayLevel) {
+  if (isNotRelevant || isContains || isTogglingOff || level !== displayLevel) {
     return TYPE_COLORS.inactive;
   }
-  return LEVEL_COLORS[displayLevel] || TYPE_COLORS.inactive;
+  return LEVEL_COLORS[level] || TYPE_COLORS.inactive;
 }
 
 function getXButtonAriaLabel(
@@ -214,7 +215,8 @@ export function RelevanceSelector({
               level,
               effectiveDisplayLevel,
               isNotRelevant,
-              isContains
+              isContains,
+              hoverLevel !== null && hoverLevel === currentLevel
             ),
           }}
         >

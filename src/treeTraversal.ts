@@ -88,23 +88,18 @@ function itemPassesFilters(
   item: RelationItem,
   activeFilters: (Relevance | Argument | "suggestions" | "contains")[]
 ): boolean {
-  const hasArgumentFilter =
-    activeFilters.includes("confirms") || activeFilters.includes("contra");
-
-  if (hasArgumentFilter) {
-    const matchesArgument =
-      (activeFilters.includes("confirms") && item.argument === "confirms") ||
-      (activeFilters.includes("contra") && item.argument === "contra");
-    if (!matchesArgument) return false;
-  }
-
-  const relevance = item.relevance;
-  if (relevance !== undefined && !activeFilters.includes(relevance)) {
+  const relevanceFilter =
+    item.relevance === undefined ? "contains" : item.relevance;
+  if (!activeFilters.includes(relevanceFilter)) {
     return false;
   }
 
-  if (relevance === undefined && item.argument === undefined) {
-    if (!activeFilters.includes("contains")) return false;
+  const hasArgumentFilter =
+    activeFilters.includes("confirms") || activeFilters.includes("contra");
+  if (hasArgumentFilter) {
+    if (!item.argument || !activeFilters.includes(item.argument)) {
+      return false;
+    }
   }
 
   return true;

@@ -142,25 +142,9 @@ export function InlineFilterDots(): JSX.Element {
 
   const handleFilterToggle = (id: FilterId): void => {
     const isActive = currentFilters.includes(id);
-    const isArgument = id === "confirms" || id === "contra";
-    const isContains = id === "contains";
-
     const newFilters: FilterId[] = isActive
       ? currentFilters.filter((f) => f !== id)
-      : (() => {
-          if (isArgument) {
-            return [...currentFilters.filter((f) => f !== "contains"), id];
-          }
-          if (isContains) {
-            return [
-              ...currentFilters.filter(
-                (f) => f !== "confirms" && f !== "contra"
-              ),
-              id,
-            ];
-          }
-          return [...currentFilters, id];
-        })();
+      : [...currentFilters, id];
 
     const updatedPane = { ...pane, typeFilters: newFilters };
     const newPanes = panes.map((p) => (p.id === pane.id ? updatedPane : p));

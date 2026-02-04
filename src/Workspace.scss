@@ -370,6 +370,8 @@ body {
 // Suggestion indicator (suggestions from other users)
 .suggestion-indicator {
   color: var(--violet);
+  font-weight: bold;
+  font-family: monospace;
 }
 
 // Reference indicator in gutter
@@ -409,11 +411,9 @@ body {
   color: var(--cyan);
 }
 
-// Wiki-style reference brackets [[]]
+// Reference brackets [[]]
 .reference-bracket {
   color: var(--cyan);
-  font-weight: 600;
-  font-family: monospace;
 }
 
 

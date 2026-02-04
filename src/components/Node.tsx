@@ -139,8 +139,10 @@ function NodeContent({
   text: string;
 }): JSX.Element {
   const { knowledgeDBs, user } = useData();
+  const isSuggestion = useIsSuggestion();
   const isReference = nodeType === "reference";
   const isConcreteRef = isConcreteRefId(nodeId);
+  const showBrackets = isReference && !isSuggestion;
 
   const isOtherUser = (() => {
     if (!isConcreteRef) return false;
@@ -156,14 +158,14 @@ function NodeContent({
 
   return (
     <span
-      className={`break-word ${isReference ? "reference-node" : ""}`}
+      className={`break-word ${showBrackets ? "reference-node" : ""}`}
       data-testid={isReference ? "reference-node" : undefined}
       data-other-user={isOtherUser ? "true" : undefined}
     >
-      {isReference && <ReferenceIndicators refId={nodeId} />}
-      {isReference && <span className="reference-bracket">[[</span>}
-      {text}
-      {isReference && <span className="reference-bracket">]]</span>}
+      {showBrackets && <ReferenceIndicators refId={nodeId} />}
+      {showBrackets && <span className="reference-bracket">[[</span>}
+      <span className={showBrackets ? "reference-text" : ""}>{text}</span>
+      {showBrackets && <span className="reference-bracket">]]</span>}
     </span>
   );
 }
@@ -487,7 +489,7 @@ function SuggestionIndicator(): JSX.Element {
       title="Suggestion from other users"
       aria-hidden="true"
     >
-      ●
+      @
     </span>
   );
 }

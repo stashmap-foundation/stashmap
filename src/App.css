@@ -72,35 +72,3 @@
   height: 100%;
 }
 
-/* Reference node styling */
-.reference-node {
-  cursor: pointer;
-}
-
-.reference-node:hover span {
-  color: #3d6499 !important;
-  border-bottom-color: #5a7bad !important;
-  border-bottom-style: solid !important;
-}
-
-.reference-icon {
-  opacity: 0.8;
-}
-
-.reference-node:hover .reference-icon {
-  opacity: 1;
-  color: #3d6499 !important;
-}
-
-/* Reference link button - removes default button styling */
-.reference-link-btn {
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  font: inherit;
-  color: inherit;
-  text-align: inherit;
-  cursor: pointer;
-  display: inline;
-}

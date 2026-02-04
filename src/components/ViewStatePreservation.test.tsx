@@ -420,14 +420,14 @@ My Notes
 
     await userEvent.click(await screen.findByLabelText("edit My Notes"));
     await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "New{Escape}");
+    await userEvent.type(await findNewNodeEditor(), "Inserted{Escape}");
 
-    fireEvent.dragStart(screen.getByText("New"));
+    fireEvent.dragStart(screen.getByText("Inserted"));
     fireEvent.drop(screen.getByText("A"));
 
     await expectTree(`
 My Notes
-  New
+  Inserted
   A
     ChildOfA
     `);
@@ -453,12 +453,12 @@ My Notes
     const aEditor = await screen.findByLabelText("edit A");
     await userEvent.click(aEditor);
     await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "New{Escape}");
+    await userEvent.type(await findNewNodeEditor(), "Inserted{Escape}");
 
     await expectTree(`
 My Notes
   A
-  New
+  Inserted
   B
     ChildOfB
     `);
@@ -485,12 +485,12 @@ My Notes
 
     await userEvent.click(await screen.findByLabelText("edit Parent"));
     await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "New{Escape}");
+    await userEvent.type(await findNewNodeEditor(), "Inserted{Escape}");
 
     await expectTree(`
 My Notes
   Parent
-    New
+    Inserted
     A
       ChildOfA
     `);

@@ -23,6 +23,18 @@ type RelevanceSelectorProps = {
   isSuggestion?: boolean;
 };
 
+const LEVEL_SYMBOLS: Record<number, string> = {
+  1: "~",
+  2: "?",
+  3: "!",
+};
+
+const LEVEL_COLORS: Record<number, string> = {
+  1: TYPE_COLORS.little_relevant,
+  2: TYPE_COLORS.maybe_relevant,
+  3: TYPE_COLORS.relevant,
+};
+
 function getLevelColor(
   level: number,
   displayLevel: number,
@@ -32,16 +44,7 @@ function getLevelColor(
   if (isNotRelevant || isContains || level > displayLevel) {
     return TYPE_COLORS.inactive;
   }
-  switch (displayLevel) {
-    case 3:
-      return TYPE_COLORS.relevant;
-    case 2:
-      return TYPE_COLORS.maybe_relevant;
-    case 1:
-      return TYPE_COLORS.little_relevant;
-    default:
-      return TYPE_COLORS.inactive;
-  }
+  return LEVEL_COLORS[displayLevel] || TYPE_COLORS.inactive;
 }
 
 function getXButtonAriaLabel(
@@ -56,19 +59,6 @@ function getXButtonAriaLabel(
     return `remove ${displayText} from list`;
   }
   return `mark ${displayText} as not relevant`;
-}
-
-function getXButtonBackgroundColor(
-  isNotRelevant: boolean,
-  isCurrentlyNotRelevant: boolean
-): string {
-  if (!isNotRelevant) {
-    return "transparent";
-  }
-  if (isCurrentlyNotRelevant) {
-    return "var(--red)";
-  }
-  return TYPE_COLORS.not_relevant;
 }
 
 export function RelevanceSelector({
@@ -166,7 +156,7 @@ export function RelevanceSelector({
       title={getTitle()}
     >
       <span
-        className="relevance-x"
+        className="relevance-symbol"
         onClick={handleXClick}
         onMouseDown={preventEditorBlurIfSameNode}
         onMouseEnter={() => setHoverLevel(0)}
@@ -184,21 +174,21 @@ export function RelevanceSelector({
           }
         }}
         style={{
-          color: isNotRelevant ? "var(--base03)" : "var(--base01)",
-          backgroundColor: getXButtonBackgroundColor(
-            isNotRelevant,
-            isCurrentlyNotRelevant
-          ),
+          color: isNotRelevant
+            ? isCurrentlyNotRelevant
+              ? "var(--red)"
+              : TYPE_COLORS.not_relevant
+            : TYPE_COLORS.inactive,
         }}
         title={isCurrentlyNotRelevant ? "Remove from list" : undefined}
       >
-        ×
+        x
       </span>
 
       {[1, 2, 3].map((level) => (
         <span
           key={level}
-          className="relevance-dot"
+          className="relevance-symbol"
           onClick={() => handleSetLevel(level)}
           onMouseDown={preventEditorBlurIfSameNode}
           onMouseEnter={() => setHoverLevel(level)}
@@ -218,14 +208,16 @@ export function RelevanceSelector({
             }
           }}
           style={{
-            backgroundColor: getLevelColor(
+            color: getLevelColor(
               level,
               effectiveDisplayLevel,
               isNotRelevant,
               isContains
             ),
           }}
-        />
+        >
+          {LEVEL_SYMBOLS[level]}
+        </span>
       ))}
     </div>
   );

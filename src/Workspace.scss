@@ -367,6 +367,12 @@ body {
   color: var(--cyan);
 }
 
+// Maybe relevant indicator in gutter
+.maybe-relevant-indicator {
+  color: var(--magenta);
+  font-weight: bold;
+}
+
 // Placeholder dot for regular items (makes gutter dense)
 .gutter-placeholder {
   color: var(--base01);
@@ -974,8 +980,25 @@ input:focus,
 }
 
 .relevance-selector {
-  gap: 4px;
-  padding: 0 10px;
+  gap: 2px;
+  padding: 0 6px;
+}
+
+.relevance-symbol {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  font-size: 14px;
+  font-weight: bold;
+  font-family: monospace;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+
+  &:hover {
+    transform: scale(1.2);
+  }
 }
 
 .relevance-x {
@@ -1459,6 +1482,12 @@ input:focus,
   gap: 6px;
 }
 
+.inline-filter-symbols {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .filter-group {
   display: flex;
   gap: 2px;
@@ -1477,6 +1506,34 @@ input:focus,
   &:hover {
     transform: scale(1.2);
   }
+}
+
+.clickable-filter-symbol {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  font-family: monospace;
+  line-height: 1;
+  transition: transform 0.1s ease;
+
+  &:hover {
+    transform: scale(1.2);
+  }
+}
+
+.filter-symbol {
+  font-size: 12px;
+  font-weight: bold;
+  font-family: monospace;
+  padding: 0 1px;
+}
+
+.filter-symbols-display {
+  display: flex;
+  gap: 2px;
 }
 
 // ============================================

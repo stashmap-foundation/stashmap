@@ -147,12 +147,11 @@ function NewNoteButton(): JSX.Element {
   return (
     <button
       type="button"
-      className="btn btn-icon"
+      className="btn btn-sm"
       onClick={handleClick}
       aria-label="Create new note"
-      title="New Note"
     >
-      <span aria-hidden="true">+</span>
+      New
     </button>
   );
 }

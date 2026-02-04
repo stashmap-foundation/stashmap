@@ -8,89 +8,99 @@ const RELEVANCE_FILTERS: {
   id: Relevance | "contains";
   label: string;
   color: string;
+  symbol: string;
 }[] = [
-  { id: "relevant", label: "Relevant", color: TYPE_COLORS.relevant },
+  { id: "relevant", label: "Relevant", color: TYPE_COLORS.relevant, symbol: "!" },
   {
     id: "maybe_relevant",
     label: "Maybe Relevant",
     color: TYPE_COLORS.maybe_relevant,
+    symbol: "?",
   },
   {
     id: "little_relevant",
     label: "Little Relevant",
     color: TYPE_COLORS.little_relevant,
+    symbol: "~",
   },
   {
     id: "not_relevant",
     label: "Not Relevant",
     color: TYPE_COLORS.not_relevant,
+    symbol: "x",
   },
-  { id: "contains", label: "Contains", color: TYPE_COLORS.contains },
+  { id: "contains", label: "Contains", color: TYPE_COLORS.contains, symbol: "o" },
 ];
 
 const ARGUMENT_FILTERS: {
   id: "confirms" | "contra";
   label: string;
   color: string;
+  symbol: string;
 }[] = [
-  { id: "confirms", label: "Confirms", color: TYPE_COLORS.confirms },
-  { id: "contra", label: "Contradicts", color: TYPE_COLORS.contra },
+  { id: "confirms", label: "Confirms", color: TYPE_COLORS.confirms, symbol: "+" },
+  { id: "contra", label: "Contradicts", color: TYPE_COLORS.contra, symbol: "-" },
 ];
 
 const SUGGESTIONS_FILTER = {
   id: "suggestions" as const,
   label: "Suggestions",
   color: TYPE_COLORS.other_user,
+  symbol: "@",
 };
 
 export type FilterId = Relevance | Argument | "suggestions" | "contains";
 
-function ClickableFilterDot({
+function ClickableFilterSymbol({
   id,
   label,
   color,
+  symbol,
   isActive,
   onClick,
 }: {
   id: FilterId;
   label: string;
   color: string;
+  symbol: string;
   isActive: boolean;
   onClick: (id: FilterId) => void;
 }): JSX.Element {
-  const style = isActive
-    ? { backgroundColor: color, borderColor: color }
-    : { backgroundColor: "transparent", borderColor: TYPE_COLORS.inactive };
-
   return (
     <button
       type="button"
-      className="clickable-filter-dot"
-      style={style}
+      className="clickable-filter-symbol"
+      style={{ color: isActive ? color : TYPE_COLORS.inactive }}
       onClick={() => onClick(id)}
       aria-label={`toggle ${label} filter`}
       aria-pressed={isActive}
       title={label}
-    />
+    >
+      {symbol}
+    </button>
   );
 }
 
-function FilterDot({
+function FilterSymbol({
   color,
+  symbol,
   isActive,
 }: {
   color: string;
+  symbol: string;
   isActive: boolean;
 }): JSX.Element {
   return (
     <span
-      className="filter-dot"
-      style={{ backgroundColor: isActive ? color : TYPE_COLORS.inactive }}
-    />
+      className="filter-symbol"
+      style={{ color: isActive ? color : TYPE_COLORS.inactive }}
+    >
+      {symbol}
+    </span>
   );
 }
 
-export function FilterDotsDisplay({
+export function FilterSymbolsDisplay({
   activeFilters,
 }: {
   activeFilters: FilterId[];
@@ -98,18 +108,14 @@ export function FilterDotsDisplay({
   const isActive = (id: FilterId): boolean => activeFilters.includes(id);
 
   return (
-    <span className="d-flex gap-0">
-      <span className="d-flex flex-column">
-        {RELEVANCE_FILTERS.map((f) => (
-          <FilterDot key={f.id} color={f.color} isActive={isActive(f.id)} />
-        ))}
-      </span>
-      <span className="d-flex flex-column">
-        {ARGUMENT_FILTERS.map((f) => (
-          <FilterDot key={f.id} color={f.color} isActive={isActive(f.id)} />
-        ))}
-        <FilterDot color={TYPE_COLORS.inactive} isActive={false} />
-      </span>
+    <span className="filter-symbols-display">
+      {RELEVANCE_FILTERS.map((f) => (
+        <FilterSymbol key={f.id} color={f.color} symbol={f.symbol} isActive={isActive(f.id)} />
+      ))}
+      {ARGUMENT_FILTERS.map((f) => (
+        <FilterSymbol key={f.id} color={f.color} symbol={f.symbol} isActive={isActive(f.id)} />
+      ))}
+      <FilterSymbol color={SUGGESTIONS_FILTER.color} symbol={SUGGESTIONS_FILTER.symbol} isActive={isActive("suggestions")} />
     </span>
   );
 }
@@ -120,7 +126,7 @@ export function TypeFilterButton(): JSX.Element {
 
   return (
     <button type="button" className="pill" aria-label="filter children by type">
-      <FilterDotsDisplay activeFilters={currentFilters} />
+      <FilterSymbolsDisplay activeFilters={currentFilters} />
     </button>
   );
 }
@@ -163,14 +169,15 @@ export function InlineFilterDots(): JSX.Element {
   };
 
   return (
-    <div className="inline-filter-dots">
+    <div className="inline-filter-symbols">
       <span className="filter-group">
         {RELEVANCE_FILTERS.map((f) => (
-          <ClickableFilterDot
+          <ClickableFilterSymbol
             key={f.id}
             id={f.id}
             label={f.label}
             color={f.color}
+            symbol={f.symbol}
             isActive={isFilterActive(f.id)}
             onClick={handleFilterToggle}
           />
@@ -178,20 +185,22 @@ export function InlineFilterDots(): JSX.Element {
       </span>
       <span className="filter-group">
         {ARGUMENT_FILTERS.map((f) => (
-          <ClickableFilterDot
+          <ClickableFilterSymbol
             key={f.id}
             id={f.id}
             label={f.label}
             color={f.color}
+            symbol={f.symbol}
             isActive={isFilterActive(f.id)}
             onClick={handleFilterToggle}
           />
         ))}
       </span>
-      <ClickableFilterDot
+      <ClickableFilterSymbol
         id={SUGGESTIONS_FILTER.id}
         label={SUGGESTIONS_FILTER.label}
         color={SUGGESTIONS_FILTER.color}
+        symbol={SUGGESTIONS_FILTER.symbol}
         isActive={isFilterActive(SUGGESTIONS_FILTER.id)}
         onClick={handleFilterToggle}
       />

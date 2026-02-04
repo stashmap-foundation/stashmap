@@ -19,6 +19,7 @@ import {
   expectTree,
   renderTree,
   findNewNodeEditor,
+  type,
 } from "../utils.test";
 import {
   NodeIndex,
@@ -160,13 +161,7 @@ test("Edit nested node inline", async () => {
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
-  const myNotesEditor = await screen.findByLabelText("edit My Notes");
-  await userEvent.click(myNotesEditor);
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(
-    await findNewNodeEditor(),
-    "Parent{Enter}{Tab}Nested Node{Escape}"
-  );
+  await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Nested Node{Escape}");
 
   await expectTree(`
 My Notes
@@ -186,13 +181,7 @@ test("Edited node is shown in Tree View", async () => {
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
-  const myNotesEditor = await screen.findByLabelText("edit My Notes");
-  await userEvent.click(myNotesEditor);
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(
-    await findNewNodeEditor(),
-    "OOP Languages{Enter}{Tab}Java{Escape}"
-  );
+  await type("My Notes{Enter}{Tab}OOP Languages{Enter}{Tab}Java{Escape}");
 
   const javaEditor = await screen.findByLabelText("edit Java");
   await userEvent.clear(javaEditor);
@@ -693,12 +682,7 @@ describe("Inline Node Creation", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create first child
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "First Child{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await type("My Notes{Enter}{Tab}First Child{Escape}");
 
     await expectTree(`
 My Notes
@@ -750,12 +734,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create first node
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Node 1{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await type("My Notes{Enter}{Tab}Node 1{Escape}");
 
     // Click on Node 1 and press Enter to start chaining
     const node1Editor = await screen.findByLabelText("edit Node 1");
@@ -780,12 +759,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create a child node
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Existing Child{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await type("My Notes{Enter}{Tab}Existing Child{Escape}");
 
     await expectTree(`
 My Notes
@@ -822,12 +796,7 @@ My Notes
 
     renderTree(alice);
 
-    // Create a child node
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Child{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await type("My Notes{Enter}{Tab}Child{Escape}");
 
     // Reset again to only track sibling creation events
     utils.relayPool.resetPublishedOnRelays();
@@ -860,20 +829,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create parent with two children
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-    // Expand Parent and add children
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("edit Parent"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Child 1{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Child 2{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child 1{Enter}Child 2{Escape}");
 
     await expectTree(`
 My Notes
@@ -904,14 +860,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
-    // Wait for root to be visible and expanded
-    await screen.findByLabelText("collapse My Notes");
-
-    // Create first child
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "First Child{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await type("My Notes{Enter}{Tab}First Child{Escape}");
 
     await expectTree(`
 My Notes

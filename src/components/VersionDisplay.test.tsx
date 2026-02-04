@@ -6,6 +6,7 @@ import {
   expectTree,
   findNewNodeEditor,
   renderTree,
+  type,
 } from "../utils.test";
 
 describe("Version Display", () => {

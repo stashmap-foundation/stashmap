@@ -6,34 +6,35 @@ import { ClosePaneButton } from "./SplitPaneLayout";
 import {
   ALICE,
   expectTree,
-  findNewNodeEditor,
   renderApis,
   renderApp,
   setup,
+  type,
 } from "../utils.test";
 
 test("Closing a middle pane does not crash", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
 
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Test Node{Escape}");
+  await type("Root{Enter}Test Node{Escape}");
 
   await expectTree(`
-My Notes
+Root
   Test Node
   `);
 
   await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+  await userEvent.click(await screen.findByLabelText("expand Root"));
+
   await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+  await userEvent.click(await screen.findByLabelText("expand Root"));
 
   await expectTree(`
-My Notes
+Root
   Test Node
-My Notes
+Root
   Test Node
-My Notes
+Root
   Test Node
   `);
 
@@ -41,9 +42,9 @@ My Notes
   await userEvent.click(closeButtons[0]);
 
   await expectTree(`
-My Notes
+Root
   Test Node
-My Notes
+Root
   Test Node
   `);
 });

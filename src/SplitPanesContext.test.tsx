@@ -16,7 +16,7 @@ function TestSplitPanes(): JSX.Element {
       <div data-testid="pane-ids">{panes.map((p) => p.id).join(",")}</div>
       <button
         type="button"
-        onClick={() => addPaneAt(panes.length, [ROOT], ALICE.publicKey)}
+        onClick={() => addPaneAt(panes.length, [], ALICE.publicKey)}
       >
         Add Pane
       </button>
@@ -174,11 +174,11 @@ test("popTo with invalid index does not change stack", async () => {
   renderWithTestData(<TestPaneNavigation />);
 
   await screen.findByTestId("stack");
-  expect(screen.getByTestId("stack").textContent).toBe(ROOT);
+  expect(screen.getByTestId("stack").textContent).toBe("");
 
   fireEvent.click(screen.getByText("Pop"));
-  expect(screen.getByTestId("stack").textContent).toBe(ROOT);
-  expect(screen.getByTestId("root-node-id").textContent).toBe(ROOT);
+  expect(screen.getByTestId("stack").textContent).toBe("");
+  expect(screen.getByTestId("root-node-id").textContent).toBe("");
 });
 
 test("popTo navigates to specific stack index", async () => {
@@ -197,7 +197,7 @@ test("setPane replaces entire stack with new path", async () => {
   renderWithTestData(<TestPaneNavigation />);
 
   await screen.findByTestId("stack");
-  expect(screen.getByTestId("stack").textContent).toBe(ROOT);
+  expect(screen.getByTestId("stack").textContent).toBe("");
 
   fireEvent.click(screen.getByText("Set Stack"));
   expect(screen.getByTestId("stack").textContent).toBe("new1,new2,new3");

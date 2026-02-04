@@ -27,6 +27,7 @@ import {
   follow,
   renderApp,
   renderTree,
+  type,
 } from "./utils.test";
 import {
   RootViewContextProvider,
@@ -43,7 +44,7 @@ import {
 } from "./ViewContext";
 import { TreeView } from "./components/TreeView";
 import { LoadData } from "./dataQuery";
-import { ROOT } from "./types";
+const TEST_ROOT = "testRoot" as LongID;
 
 test("Move View Settings on Delete", async () => {
   const [alice] = setup([ALICE]);
@@ -62,7 +63,7 @@ test("Move View Settings on Delete", async () => {
   ]);
 
   const wsRelations = addRelationToRelations(
-    newRelations(ROOT, List(), publicKey),
+    newRelations(TEST_ROOT, List(), publicKey),
     pl.id
   );
   // When viewing with pl as root:
@@ -124,14 +125,7 @@ test("Move Node Up", async () => {
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
-  // Create: My Notes → Programming Languages → FPL, OOP → C++, Java
-  const myNotesEditor = await screen.findByLabelText("edit My Notes");
-  await userEvent.click(myNotesEditor);
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(
-    await findNewNodeEditor(),
-    "Programming Languages{Enter}{Tab}FPL{Enter}OOP{Enter}{Tab}C++{Enter}Java{Escape}"
-  );
+  await type("My Notes{Enter}{Tab}Programming Languages{Enter}{Tab}FPL{Enter}OOP{Enter}{Tab}C++{Enter}Java{Escape}");
 
   await expectTree(`
 My Notes
@@ -175,12 +169,7 @@ test("Contact views list via concrete reference", async () => {
 
   // Alice creates Cities with Paris and London
   renderTree(alice);
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(
-    await findNewNodeEditor(),
-    "Cities{Enter}{Tab}Paris{Enter}London{Escape}"
-  );
+  await type("My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}");
 
   await expectTree(`
 My Notes
@@ -192,17 +181,16 @@ My Notes
 
   // Bob creates same structure: Cities → Paris (same context as Alice)
   renderTree(bob);
-  // Bob sees Alice's Cities as a suggestion (she's a contact)
+  // Bob creates My Notes, then sees Alice's Cities as a suggestion
+  await type("My Notes{Escape}");
+  await userEvent.click(await screen.findByLabelText("expand My Notes"));
   await expectTree(`
 My Notes
   [S] Cities
   `);
   await userEvent.click(await screen.findByLabelText("edit My Notes"));
   await userEvent.keyboard("{Enter}");
-  await userEvent.type(
-    await findNewNodeEditor(),
-    "Cities{Enter}{Tab}Paris{Escape}"
-  );
+  await userEvent.type(await findNewNodeEditor(), "Cities{Enter}{Tab}Paris{Escape}");
 
   await expectTree(`
 My Notes
@@ -387,12 +375,7 @@ test("View doesn't change if list is forked from contact", async () => {
   await follow(alice, bob().user.publicKey);
 
   renderTree(bob);
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(
-    await findNewNodeEditor(),
-    "Programming Languages{Enter}{Tab}OOP{Enter}{Tab}C++{Enter}Java{Escape}"
-  );
+  await type("My Notes{Enter}{Tab}Programming Languages{Enter}{Tab}OOP{Enter}{Tab}C++{Enter}Java{Escape}");
   await expectTree(`
 My Notes
   Programming Languages
@@ -403,12 +386,7 @@ My Notes
   cleanup();
 
   renderTree(alice);
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(
-    await findNewNodeEditor(),
-    "Programming Languages{Escape}"
-  );
+  await type("My Notes{Enter}{Tab}Programming Languages{Escape}");
   await expectTree(`
 My Notes
   Programming Languages

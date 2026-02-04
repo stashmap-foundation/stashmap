@@ -9,6 +9,7 @@ import {
   renderApp,
   findNewNodeEditor,
   expectTree,
+  type,
 } from "../utils.test";
 
 describe("Suggestion Display", () => {
@@ -17,12 +18,7 @@ describe("Suggestion Display", () => {
     await follow(alice, bob().user.publicKey);
 
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Holiday Destinations{Enter}{Tab}Spain{Enter}France{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Enter}France{Escape}");
 
     await expectTree(`
 My Notes
@@ -33,6 +29,8 @@ My Notes
     cleanup();
 
     renderTree(alice);
+    await type("My Notes{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand My Notes"));
     await expectTree(`
 My Notes
   [S] Holiday Destinations
@@ -44,12 +42,7 @@ My Notes
     await follow(alice, bob().user.publicKey);
 
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Topic{Enter}{Tab}Child1{Enter}Child2{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}Child1{Enter}Child2{Escape}");
 
     await expectTree(`
 My Notes
@@ -60,9 +53,7 @@ My Notes
     cleanup();
 
     renderTree(alice);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Topic{Escape}");
+    await type("My Notes{Enter}{Tab}Topic{Escape}");
 
     await expectTree(`
 My Notes
@@ -85,12 +76,7 @@ My Notes
     await follow(alice, bob().user.publicKey);
 
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Topic{Enter}{Tab}BobChild{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}BobChild{Escape}");
 
     await expectTree(`
 My Notes
@@ -100,12 +86,7 @@ My Notes
     cleanup();
 
     renderTree(alice);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Topic{Enter}{Tab}AliceChild{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}AliceChild{Escape}");
 
     await expectTree(`
 My Notes
@@ -141,12 +122,7 @@ My Notes
     const [alice] = setup([ALICE]);
 
     renderApp(alice());
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Barcelona{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Barcelona{Escape}");
 
     await expectTree(`
 My Notes
@@ -175,12 +151,7 @@ Search: Barcelona
     await follow(bob, alice().user.publicKey);
 
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Shared{Enter}{Tab}BobChild{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}Shared{Enter}{Tab}BobChild{Escape}");
 
     await expectTree(`
 My Notes
@@ -190,12 +161,7 @@ My Notes
     cleanup();
 
     renderTree(alice);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Shared{Enter}{Tab}AliceChild{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}Shared{Enter}{Tab}AliceChild{Escape}");
 
     await expectTree(`
 My Notes
@@ -232,12 +198,7 @@ My Notes
     await follow(alice, bob().user.publicKey);
 
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Recipes{Enter}{Tab}Pasta{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}Recipes{Enter}{Tab}Pasta{Escape}");
 
     await expectTree(`
 My Notes
@@ -247,9 +208,7 @@ My Notes
     cleanup();
 
     renderTree(alice);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Recipes{Escape}");
+    await type("My Notes{Enter}{Tab}Recipes{Escape}");
 
     await expectTree(`
 My Notes

@@ -7,15 +7,15 @@ import {
   findNodeByText,
 } from "./utils.test";
 
-test("Navigation stack starts with ROOT pane", async () => {
+test("Navigation stack starts with empty pane showing new node editor", async () => {
   const [alice] = setup([ALICE]);
   renderApp({ ...alice(), initialRoute: "/" });
 
-  await screen.findByLabelText("collapse My Notes", undefined, {
+  await screen.findByLabelText("new node editor", undefined, {
     timeout: 5000,
   });
 
-  // Stack should only contain ROOT (My Notes)
+  // Stack is empty, pane shows new node editor
   const stackLayers = screen.queryAllByRole("button", { name: /Loading.../ });
   expect(stackLayers.length).toBe(0); // No stacked layers, only active pane
 });

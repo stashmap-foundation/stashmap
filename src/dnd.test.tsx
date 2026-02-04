@@ -10,6 +10,7 @@ import {
   renderApp,
   renderTree,
   setup,
+  type,
 } from "./utils.test";
 import { dnd } from "./dnd";
 import { addRelationToRelations, newNode, shortID } from "./connections";
@@ -26,32 +27,23 @@ test("Drag node within tree view", async () => {
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
-  // Create nodes using the editor
-  await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Item A{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Item B{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Item C{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "{Escape}");
+  await type("Root{Enter}Item A{Enter}Item B{Enter}Item C{Escape}");
 
   await expectTree(`
-My Notes
+Root
   Item A
   Item B
   Item C
   `);
 
-  // Drag Item C and drop on Item A (in test env, simulates dropping above = insert before)
   const itemC = screen.getByText("Item C");
   const itemA = screen.getByText("Item A");
 
   fireEvent.dragStart(itemC);
   fireEvent.drop(itemA);
 
-  // Item C should now be before Item A (at the first position)
   await expectTree(`
-My Notes
+Root
   Item C
   Item A
   Item B
@@ -62,47 +54,34 @@ test("Drag between split panes", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
 
-  // Create a node with children using the editor
-  await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Parent{Escape}");
+  await type("Root{Enter}Parent{Escape}");
 
-  // Expand Parent and add children
   await userEvent.click(await screen.findByLabelText("expand Parent"));
   await userEvent.click(await screen.findByLabelText("edit Parent"));
   await userEvent.keyboard("{Enter}");
   await userEvent.type(await findNewNodeEditor(), "Child A{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Draggable Item{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "{Escape}");
+  await userEvent.type(await findNewNodeEditor(), "Draggable Item{Escape}");
 
   await expectTree(`
-My Notes
+Root
   Parent
     Child A
     Draggable Item
   `);
 
-  // Open split pane - click on the first one (for My Notes)
   const splitPaneButtons = screen.getAllByLabelText("open in split pane");
   await userEvent.click(splitPaneButtons[0]);
 
-  // Navigate pane 1 to Parent using search
   await navigateToNodeViaSearch(1, "Parent");
 
-  // Wait for split pane to show Parent
   await screen.findByLabelText("collapse Parent");
 
-  // Drag Draggable Item from pane 0 (under Parent in My Notes view) to My Notes root
-  // The item should now appear in both places
   const draggableItems = screen.getAllByText("Draggable Item");
-  // Drop on "My Notes" collapse button to target the tree node (not breadcrumb)
-  const myNotesToggle = screen.getAllByLabelText("collapse My Notes")[0];
+  const rootToggle = screen.getAllByLabelText("collapse Root")[0];
 
   fireEvent.dragStart(draggableItems[0]);
-  fireEvent.drop(myNotesToggle);
+  fireEvent.drop(rootToggle);
 
-  // Verify the item was added to My Notes (it should appear multiple times now)
   const allDraggableItems = screen.getAllByText("Draggable Item");
   expect(allDraggableItems.length).toBeGreaterThanOrEqual(2);
 });

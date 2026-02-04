@@ -13,3 +13,41 @@
 - Don't do html access in tests, use aria-labels
 - When writing tests, we prefer to use await findBy instead of queryBy. We prefer to test for one element with full aria label then multiple elements. We prefer to find concrete elements over expect(foo.length).toBe(2)
 - prefer expectTree over extractNodes in tests
+
+### Write Integration Tests, Not Unit Tests with Mocked Contexts
+
+BAD - Unit test with mocked ViewContext and fake node IDs:
+```tsx
+const viewPath: ViewPath = [
+  0,
+  { nodeID: "fakeRoot" as LongID, nodeIndex: 0 as NodeIndex },
+  { nodeID: refId, nodeIndex: 0 as NodeIndex },
+];
+renderWithTestData(
+  <ViewContext.Provider value={viewPath}>
+    <FullscreenButton />
+  </ViewContext.Provider>
+);
+```
+
+GOOD - Integration test that creates real nodes and tests real behavior:
+```tsx
+renderTree(bob);
+await userEvent.type(
+  await findNewNodeEditor(),
+  "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Escape}"
+);
+// ... setup alice, follow bob ...
+renderTree(alice);
+await userEvent.click(
+  await screen.findByLabelText("open Holiday Destinations in fullscreen")
+);
+await screen.findByLabelText("Navigate to My Notes"); // verify breadcrumb
+```
+
+Key principles:
+- Tests start with empty editor (findNewNodeEditor) and type to create nodes
+- Use renderTree(user) or renderApp(user()) to render the full app
+- Verify behavior through UI (aria-labels, expectTree) not internal state
+- Each test creates its own data by typing, no shared setup with pre-existing nodes
+- Test the actual user flow, not isolated components with mocked contexts

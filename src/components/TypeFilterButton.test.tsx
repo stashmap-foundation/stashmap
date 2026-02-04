@@ -7,6 +7,7 @@ import {
   navigateToNodeViaSearch,
   renderTree,
   setup,
+  type,
 } from "../utils.test";
 import { DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 
@@ -59,18 +60,7 @@ describe("TypeFilterButton", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create Parent with a child
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("edit Parent"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Child{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
 
     await expectTree(`
 My Notes
@@ -88,18 +78,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create Parent with a child
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("edit Parent"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Child{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
 
     // Inline filter dots should exist
     expect(screen.getByLabelText("toggle Relevant filter")).toBeDefined();
@@ -116,19 +95,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create Parent with children
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("edit Parent"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Item One{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Item Two{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Item One{Enter}Item Two{Escape}");
 
     await screen.findByText("Item One");
     await screen.findByText("Item Two");
@@ -147,19 +114,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create Parent with children
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("edit Parent"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Visible Item{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Hidden Item{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Visible Item{Enter}Hidden Item{Escape}");
 
     await screen.findByText("Visible Item");
     await screen.findByText("Hidden Item");
@@ -186,16 +141,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create: My Notes -> Money -> Bitcoin
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("expand Money"));
-    await userEvent.click(await screen.findByLabelText("edit Money"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
+    await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
 
     // Navigate to Bitcoin as root
     await navigateToNodeViaSearch(0, "Bitcoin");
@@ -216,18 +162,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create Parent with a child
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("edit Parent"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Test Item{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Test Item{Escape}");
 
     await screen.findByText("Test Item");
 
@@ -269,18 +204,7 @@ describe("Suggestions filter", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create Parent with a child
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("edit Parent"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Child{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
 
     // Suggestions filter dot should be visible in pane header
     expect(screen.getByLabelText("toggle Suggestions filter")).toBeDefined();
@@ -292,19 +216,7 @@ describe("Filter integration with RelevanceSelector", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create Parent with children
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("edit Parent"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Child1{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Child2{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child1{Enter}Child2{Escape}");
 
     await screen.findByText("Child1");
     await screen.findByText("Child2");
@@ -328,18 +240,7 @@ describe("Filter integration with RelevanceSelector", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create Parent with a child
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("edit Parent"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Child{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
 
     await screen.findByText("Child");
 

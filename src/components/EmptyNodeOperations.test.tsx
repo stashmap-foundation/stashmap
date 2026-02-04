@@ -7,6 +7,7 @@ import {
   findNewNodeEditor,
   renderTree,
   setup,
+  type,
 } from "../utils.test";
 
 describe("Empty node with typed text - relevance", () => {
@@ -14,10 +15,7 @@ describe("Empty node with typed text - relevance", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child");
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child");
 
     // Click "relevant" while text is typed but not saved
     fireEvent.click(screen.getByLabelText("set Child to relevant"));
@@ -41,10 +39,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Faded");
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Faded");
 
     // Click "little relevant"
     fireEvent.click(screen.getByLabelText("set Faded to little relevant"));
@@ -74,10 +69,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Hidden");
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Hidden");
 
     fireEvent.click(screen.getByLabelText("mark Hidden as not relevant"));
 
@@ -103,13 +95,7 @@ describe("Empty node with typed text - argument", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Parent{Enter}{Tab}Evidence"
-    );
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Evidence");
 
     const evidenceButton = screen.getByLabelText(/Evidence for Evidence/);
     fireEvent.click(evidenceButton);
@@ -132,13 +118,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Parent{Enter}{Tab}Child{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
 
     await expectTree(`
 My Notes
@@ -190,13 +170,7 @@ describe("Editing existing node - relevance", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Parent{Enter}{Tab}Original{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Original{Escape}");
 
     await expectTree(`
 My Notes
@@ -245,10 +219,7 @@ describe("Filter dots in pane header", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Enter}{Tab}Child");
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child");
 
     // Pane-level filter dots should always be enabled
     const filterButton = screen.getByLabelText("toggle Relevant filter");
@@ -261,13 +232,7 @@ describe("Empty node - keyboard navigation", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Parent{Enter}{Tab}Child1{Enter}Child2{Enter}Child3{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child1{Enter}Child2{Enter}Child3{Escape}");
 
     await expectTree(`
 My Notes
@@ -293,13 +258,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Parent{Enter}{Tab}Child{Enter}"
-    );
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}");
 
     await expectTree(`
 My Notes
@@ -315,13 +274,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Parent{Enter}{Tab}Child{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
 
     await expectTree(`
 My Notes

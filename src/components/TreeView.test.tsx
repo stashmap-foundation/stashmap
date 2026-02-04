@@ -11,6 +11,7 @@ import {
   findNewNodeEditor,
   navigateToNodeViaSearch,
   getTreeStructure,
+  type,
 } from "../utils.test";
 import { areAllAncestorsExpanded } from "./TreeView";
 
@@ -18,22 +19,13 @@ test("Load Referenced By Nodes", async () => {
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
-  // Create: My Notes -> Money -> Bitcoin, Cryptocurrencies -> Bitcoin, P2P Apps -> Bitcoin
-  // Since nodes are content-addressed, typing "Bitcoin" multiple times creates the same node
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(
-    await findNewNodeEditor(),
-    "Money{Enter}{Tab}Bitcoin{Escape}"
-  );
-
+  await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
   await userEvent.click(await screen.findByLabelText("edit My Notes"));
   await userEvent.keyboard("{Enter}");
   await userEvent.type(
     await findNewNodeEditor(),
     "Cryptocurrencies{Enter}{Tab}Bitcoin{Escape}"
   );
-
   await userEvent.click(await screen.findByLabelText("edit My Notes"));
   await userEvent.keyboard("{Enter}");
   await userEvent.type(
@@ -71,15 +63,7 @@ test("Show Referenced By with content details", async () => {
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
-  // Create: My Notes -> Money -> Bitcoin, P2P Apps -> Bitcoin
-  // Since nodes are content-addressed, typing "Bitcoin" twice creates the same node
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(
-    await findNewNodeEditor(),
-    "Money{Enter}{Tab}Bitcoin{Escape}"
-  );
-
+  await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
   await userEvent.click(await screen.findByLabelText("edit My Notes"));
   await userEvent.keyboard("{Enter}");
   await userEvent.type(
@@ -113,16 +97,7 @@ test("Root node shows references when there are more than 0", async () => {
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
-  // Create Money -> Bitcoin hierarchy
-  await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
-
-  await userEvent.click(await screen.findByLabelText("expand Money"));
-  await userEvent.click(await screen.findByLabelText("edit Money"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
+  await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
 
   await screen.findByText("Bitcoin");
 
@@ -147,16 +122,7 @@ test("Referenced By items do not show relation selector", async () => {
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
-  // Create Money -> Bitcoin hierarchy
-  await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
-
-  await userEvent.click(await screen.findByLabelText("expand Money"));
-  await userEvent.click(await screen.findByLabelText("edit Money"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
+  await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
 
   // Navigate to Bitcoin as root
   await navigateToNodeViaSearch(0, "Bitcoin");
@@ -186,16 +152,7 @@ test("Referenced By items still show navigation buttons", async () => {
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
-  // Create Money -> Bitcoin hierarchy
-  await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
-
-  await userEvent.click(await screen.findByLabelText("expand Money"));
-  await userEvent.click(await screen.findByLabelText("edit Money"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
+  await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
 
   // Navigate to Bitcoin as root
   await navigateToNodeViaSearch(0, "Bitcoin");
@@ -219,16 +176,7 @@ test("Referenced By shows node with list and empty context", async () => {
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
-  // Create Money -> Bitcoin hierarchy
-  await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
-
-  await userEvent.click(await screen.findByLabelText("expand Money"));
-  await userEvent.click(await screen.findByLabelText("edit Money"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
+  await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
 
   // Navigate to Money as root
   await navigateToNodeViaSearch(0, "Money");
@@ -254,16 +202,7 @@ test("Referenced By deduplicates paths from multiple users", async () => {
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
-  // Create: My Notes -> Money -> Bitcoin
-  await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
-
-  await userEvent.click(await screen.findByLabelText("expand Money"));
-  await userEvent.click(await screen.findByLabelText("edit Money"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
+  await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
 
   // Navigate to Bitcoin as root
   await navigateToNodeViaSearch(0, "Bitcoin");
@@ -289,22 +228,12 @@ test("Reference indicators show other users icon", async () => {
 
   // Bob creates: My Notes -> Parent -> Child
   renderTree(bob);
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(
-    await findNewNodeEditor(),
-    "Parent{Enter}{Tab}Child{Escape}"
-  );
+  await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
   cleanup();
 
   // Alice creates: My Notes -> Parent -> Child (same structure)
   renderTree(alice);
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(
-    await findNewNodeEditor(),
-    "Parent{Enter}{Tab}Child{Escape}"
-  );
+  await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
 
   // Navigate to Child and show references
   await navigateToNodeViaSearch(0, "Child");
@@ -324,17 +253,7 @@ test("Relevance selector shows when node is expanded", async () => {
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
-  // Create Parent -> Child1, Child2
-  await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Parent{Escape}");
-
-  await userEvent.click(await screen.findByLabelText("expand Parent"));
-  await userEvent.click(await screen.findByLabelText("edit Parent"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Child1{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Child2{Escape}");
+  await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child1{Enter}Child2{Escape}");
 
   // Verify children are visible under Parent
   await screen.findByText("Child1");
@@ -353,16 +272,7 @@ test("Can exit Referenced By mode even when node has no relations", async () => 
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
-  // Create Money -> Bitcoin (Bitcoin has no children)
-  await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
-
-  await userEvent.click(await screen.findByLabelText("expand Money"));
-  await userEvent.click(await screen.findByLabelText("edit Money"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
+  await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
 
   // Navigate to Bitcoin as root using pane search
   await navigateToNodeViaSearch(0, "Bitcoin");

@@ -19,7 +19,7 @@ test("Login and logout with seed phrase", async () => {
     "leader monkey parrot ring guide accident before fence cannon height naive bean{enter}"
   );
 
-  await screen.findByLabelText("collapse My Notes", undefined, {
+  await screen.findByLabelText("new node editor", undefined, {
     timeout: 5000,
   });
 
@@ -78,9 +78,7 @@ test("Sign in persists created Notes", async () => {
     user: undefined,
     timeToStorePreLoginEvents: 0,
   });
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Hello World!{Enter}");
+  await userEvent.type(await findNewNodeEditor(), "Hello World!{Escape}");
   await userEvent.click(
     await screen.findByLabelText("sign in to save changes")
   );
@@ -91,20 +89,17 @@ test("Sign in persists created Notes", async () => {
     "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a{enter}"
   );
 
-  // After login the note is still there
-  await screen.findByText("Hello World!");
-  // Logout and clear screen
+  await screen.findByLabelText("edit Hello World!");
   fireEvent.click(await screen.findByLabelText("open menu"));
   fireEvent.click(await screen.findByLabelText("logout"));
   cleanup();
 
-  // Open App
   renderWithTestData(<App />, {
     relayPool: view.relayPool,
     fileStore: view.fileStore,
     user: undefined,
   });
-  expect(screen.queryAllByText("Hello World!").length).toBe(0);
+  expect(screen.queryAllByLabelText("edit Hello World!").length).toBe(0);
 
   await userEvent.click(await screen.findByLabelText("sign in"));
   await userEvent.type(
@@ -113,6 +108,5 @@ test("Sign in persists created Notes", async () => {
     ),
     "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a{enter}"
   );
-  // After login the note is still there
-  await screen.findByText("Hello World!");
+  await screen.findByLabelText("edit Hello World!");
 });

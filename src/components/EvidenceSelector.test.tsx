@@ -1,44 +1,29 @@
 import { List } from "immutable";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   expectTree,
-  findNewNodeEditor,
   navigateToNodeViaSearch,
   renderTree,
   setup,
+  type,
 } from "../utils.test";
 import { updateItemArgument } from "../connections";
 
-// Integration tests for EvidenceSelector component
 describe("EvidenceSelector", () => {
   test("shows evidence selector for child items", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create parent with children
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Escape}");
-
-    // Expand Parent and add children
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("edit Parent"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Child1{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Child2{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await type("Root{Enter}Parent{Enter}{Tab}Child1{Enter}Child2{Escape}");
 
     await expectTree(`
-My Notes
+Root
   Parent
     Child1
     Child2
     `);
 
-    // Both children should have evidence selectors
     await screen.findByLabelText(/Evidence for Child1:/);
     await screen.findByLabelText(/Evidence for Child2:/);
   });
@@ -47,25 +32,14 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create parent with one child
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("edit Parent"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Child{Escape}");
+    await type("Root{Enter}Parent{Enter}{Tab}Child{Escape}");
 
     await screen.findByText("Child");
 
-    // Initial state: no evidence type
     expect(
       screen.getByLabelText(/Evidence for Child: No evidence type/)
     ).toBeDefined();
 
-    // Click 1: undefined -> confirms
     fireEvent.click(
       screen.getByLabelText(/Evidence for Child: No evidence type/)
     );
@@ -75,7 +49,6 @@ My Notes
       ).toBeDefined();
     });
 
-    // Click 2: confirms -> contra
     fireEvent.click(screen.getByLabelText(/Evidence for Child: Confirms/));
     await waitFor(() => {
       expect(
@@ -83,7 +56,6 @@ My Notes
       ).toBeDefined();
     });
 
-    // Click 3: contra -> undefined
     fireEvent.click(screen.getByLabelText(/Evidence for Child: Contradicts/));
     await waitFor(() => {
       expect(
@@ -96,25 +68,14 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create parent with child
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("edit Parent"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Child{Escape}");
+    await type("Root{Enter}Parent{Enter}{Tab}Child{Escape}");
 
     await screen.findByText("Child");
 
-    // Set to confirms by clicking once
     fireEvent.click(
       screen.getByLabelText(/Evidence for Child: No evidence type/)
     );
 
-    // Evidence selector should show "Confirms"
     await screen.findByLabelText(/Evidence for Child: Confirms/);
   });
 
@@ -122,27 +83,16 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create parent with child
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("edit Parent"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Child{Escape}");
+    await type("Root{Enter}Parent{Enter}{Tab}Child{Escape}");
 
     await screen.findByText("Child");
 
-    // Set to contra by clicking twice (undefined -> confirms -> contra)
     fireEvent.click(
       screen.getByLabelText(/Evidence for Child: No evidence type/)
     );
     await screen.findByLabelText(/Evidence for Child: Confirms/);
     fireEvent.click(screen.getByLabelText(/Evidence for Child: Confirms/));
 
-    // Evidence selector should show "Contradicts"
     await screen.findByLabelText(/Evidence for Child: Contradicts/);
   });
 
@@ -150,30 +100,17 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create: My Notes -> Money -> Bitcoin
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Money{Escape}");
+    await type("Root{Enter}Money{Enter}{Tab}Bitcoin{Escape}");
 
-    await userEvent.click(await screen.findByLabelText("expand Money"));
-    await userEvent.click(await screen.findByLabelText("edit Money"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Bitcoin{Escape}");
-
-    // Navigate to Bitcoin as root
     await navigateToNodeViaSearch(0, "Bitcoin");
     await screen.findByLabelText("expand Bitcoin");
 
-    // Open Referenced By view for Bitcoin
     fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
     await screen.findByLabelText("hide references to Bitcoin");
 
-    // Wait for the Referenced By content to load - Money should appear
     const moneyMatches = await screen.findAllByText(/Money/);
     expect(moneyMatches.length).toBeGreaterThanOrEqual(1);
 
-    // Referenced By items should NOT have evidence selectors
     const evidenceButtons = screen.queryAllByLabelText(/Evidence for Money:/);
     expect(evidenceButtons.length).toBe(0);
   });
@@ -182,23 +119,11 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create parent with children
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Parent{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("edit Parent"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Child1{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Child2{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await type("Root{Enter}Parent{Enter}{Tab}Child1{Enter}Child2{Escape}");
 
     await screen.findByText("Child1");
     await screen.findByText("Child2");
 
-    // Set Child1 to confirms
     fireEvent.click(
       screen.getByLabelText(/Evidence for Child1: No evidence type/)
     );
@@ -209,7 +134,6 @@ My Notes
       ).toBeDefined();
     });
 
-    // Child1 should show Confirms, Child2 should still show No evidence type
     expect(
       screen.getByLabelText(/Evidence for Child1: Confirms/)
     ).toBeDefined();

@@ -11,8 +11,8 @@ import {
   setup,
   follow,
   renderTree,
-  findNewNodeEditor,
   expectTree,
+  type,
 } from "../utils.test";
 import {
   RootViewContextProvider,
@@ -67,39 +67,29 @@ test("Shows dots when only other user has relation (current user has none)", asy
   const [alice, bob] = setup([ALICE, BOB]);
   await follow(alice, bob().user.publicKey);
 
-  // Bob creates Parent Node with a child
   renderTree(bob);
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(
-    await findNewNodeEditor(),
-    "Parent Node{Enter}{Tab}Bob Child{Escape}"
-  );
+  await type("Root{Enter}Parent Node{Enter}{Tab}Bob Child{Escape}");
 
   await expectTree(`
-My Notes
+Root
   Parent Node
     Bob Child
   `);
 
   cleanup();
 
-  // Alice creates just Parent Node (no children)
   renderTree(alice);
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Parent Node{Escape}");
+  await type("Root{Enter}Parent Node{Escape}");
 
   await expectTree(`
-My Notes
+Root
   Parent Node
   `);
 
-  // Expand Parent Node - Bob's child should appear as a suggestion
   await userEvent.click(await screen.findByLabelText("expand Parent Node"));
 
   await expectTree(`
-My Notes
+Root
   Parent Node
     [S] Bob Child
   `);

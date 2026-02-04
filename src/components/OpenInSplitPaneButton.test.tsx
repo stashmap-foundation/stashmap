@@ -7,9 +7,10 @@ import {
   OpenInSplitPaneButton,
   OpenInSplitPaneButtonWithStack,
 } from "./OpenInSplitPaneButton";
-import { ROOT } from "../types";
 import { renderWithTestData } from "../utils.test";
 import { createAbstractRefId } from "../connections";
+
+const TEST_ROOT = "testRoot" as LongID;
 
 function PaneCountDisplay(): JSX.Element {
   const { panes } = useSplitPanes();
@@ -32,7 +33,7 @@ function renderWithContext(viewPath: ViewPath): void {
 }
 
 test("button renders on desktop", async () => {
-  const viewPath: ViewPath = [0, { nodeID: ROOT, nodeIndex: 0 as NodeIndex }];
+  const viewPath: ViewPath = [0, { nodeID: TEST_ROOT, nodeIndex: 0 as NodeIndex }];
 
   renderWithContext(viewPath);
 
@@ -42,7 +43,7 @@ test("button renders on desktop", async () => {
 test("clicking button calls addPaneAt and creates new pane", async () => {
   const viewPath: ViewPath = [
     0,
-    { nodeID: ROOT, nodeIndex: 0 as NodeIndex, relationsID: "" },
+    { nodeID: TEST_ROOT, nodeIndex: 0 as NodeIndex, relationsID: "" },
     { nodeID: "node1" as LongID, nodeIndex: 0 as NodeIndex },
   ];
 
@@ -57,7 +58,7 @@ test("clicking button calls addPaneAt and creates new pane", async () => {
 });
 
 test("OpenInSplitPaneButtonWithStack passes provided stack to addPaneAt", async () => {
-  const stack = [ROOT, "node1" as LongID, "node2" as LongID];
+  const stack = [TEST_ROOT, "node1" as LongID, "node2" as LongID];
 
   renderWithTestData(
     <>
@@ -81,7 +82,7 @@ test("Reference node opens with only reference path, not current pane stack", as
 
   const viewPath: ViewPath = [
     0,
-    { nodeID: ROOT, nodeIndex: 0 as NodeIndex, relationsID: "" },
+    { nodeID: TEST_ROOT, nodeIndex: 0 as NodeIndex, relationsID: "" },
     {
       nodeID: "someParent" as LongID,
       nodeIndex: 0 as NodeIndex,
@@ -108,7 +109,7 @@ test("Reference node opens with only reference path, not current pane stack", as
 });
 
 test("OpenInSplitPaneButtonWithStack click does not bubble to parent onClick", async () => {
-  const stack = [ROOT, "node1" as LongID];
+  const stack = [TEST_ROOT, "node1" as LongID];
   const parentClickHandler = jest.fn();
 
   renderWithTestData(

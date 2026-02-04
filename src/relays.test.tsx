@@ -1,4 +1,3 @@
-import React from "react";
 import { Map } from "immutable";
 import { screen, fireEvent } from "@testing-library/react";
 import {
@@ -7,20 +6,16 @@ import {
   findEvent,
   findNodeByText,
   follow,
-  renderWithTestData,
+  renderApp,
   setup,
   setupTestDB,
   TEST_RELAYS,
   UpdateState,
-  RootViewOrPaneIsLoading,
 } from "./utils.test";
 import { createPlan, planPublishRelayMetadata } from "./planner";
 import { execute } from "./executor";
 import { KIND_VIEWS } from "./nostr";
 import { flattenRelays } from "./relays";
-import { TreeView } from "./components/TreeView";
-import { DraggableNote } from "./components/Draggable";
-import Data from "./Data";
 
 test("Flatten relays", () => {
   expect(
@@ -66,27 +61,26 @@ async function setupTest(): Promise<{
 }
 
 test("Write views on user relays", async () => {
-  const { alice } = await setupTest();
-  const utils = renderWithTestData(
-    <Data user={alice().user}>
-      <RootViewOrPaneIsLoading>
-        <>
-          <DraggableNote />
-          <TreeView />
-        </>
-      </RootViewOrPaneIsLoading>
-    </Data>,
-    {
-      ...alice(),
-    }
+  const { alice, workspace } = await setupTest();
+  const aliceData = alice();
+  aliceData.relayPool.resetPublishedOnRelays();
+
+  renderApp({
+    ...aliceData,
+    initialRoute: `/w/${workspace.id}`,
+  });
+
+  const expandButton = await screen.findByLabelText(
+    "expand Alice Workspace",
+    undefined,
+    { timeout: 5000 }
   );
-  utils.relayPool.resetPublishedOnRelays();
-  // The root node is always expanded, so click collapse to trigger a view save
-  // May have multiple elements due to DraggableNote + TreeView
-  const collapseButtons = await screen.findAllByLabelText("collapse My Notes");
-  fireEvent.click(collapseButtons[0]);
-  await findEvent(utils.relayPool, { kinds: [KIND_VIEWS] });
-  const publishedRelays = utils.relayPool.getPublishedOnRelays();
+  fireEvent.click(expandButton);
+
+  const collapseButton = await screen.findByLabelText("collapse Alice Workspace");
+  fireEvent.click(collapseButton);
+  await findEvent(aliceData.relayPool, { kinds: [KIND_VIEWS] });
+  const publishedRelays = aliceData.relayPool.getPublishedOnRelays();
   TEST_RELAYS.forEach((relay) => {
     expect(publishedRelays).toContain(relay.url);
   });

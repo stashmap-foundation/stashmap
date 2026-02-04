@@ -7,12 +7,12 @@ import {
   findNodeByText,
 } from "./utils.test";
 
-test("App defaults to ROOT pane when visiting /", async () => {
+test("App defaults to empty pane with new node editor when visiting /", async () => {
   const [alice] = setup([ALICE]);
   renderApp({ ...alice(), initialRoute: "/" });
 
-  // Should load ROOT pane
-  await screen.findByLabelText("collapse My Notes", undefined, {
+  // Should show empty pane with new node editor
+  await screen.findByLabelText("new node editor", undefined, {
     timeout: 5000,
   });
 });

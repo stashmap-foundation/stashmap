@@ -4,10 +4,10 @@ import {
   ALICE,
   BOB,
   expectTree,
-  findNewNodeEditor,
   follow,
   renderTree,
   setup,
+  type,
 } from "../utils.test";
 
 describe("References in Referenced By", () => {
@@ -15,15 +15,10 @@ describe("References in Referenced By", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Cities{Enter}{Tab}Barcelona{Enter}{Tab}Sagrada Familia{Escape}"
-    );
+    await type("Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Sagrada Familia{Escape}");
 
     await expectTree(`
-My Notes
+Notes
   Cities
     Barcelona
       Sagrada Familia
@@ -34,10 +29,10 @@ My Notes
     );
 
     await expectTree(`
-My Notes
+Notes
   Cities
     Barcelona
-      My Notes → Cities → Barcelona (1)
+      Notes → Cities → Barcelona (1)
     `);
   });
 
@@ -46,15 +41,10 @@ My Notes
     await follow(alice, bob().user.publicKey);
 
     renderTree(alice);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Cities{Enter}{Tab}Barcelona{Enter}{Tab}Alice child{Escape}"
-    );
+    await type("Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Alice child{Escape}");
 
     await expectTree(`
-My Notes
+Notes
   Cities
     Barcelona
       Alice child
@@ -63,15 +53,10 @@ My Notes
     cleanup();
 
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Cities{Enter}{Tab}Barcelona{Enter}{Tab}Bob child{Escape}"
-    );
+    await type("Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Bob child{Escape}");
 
     await expectTree(`
-My Notes
+Notes
   Cities
     Barcelona
       Bob child
@@ -85,23 +70,23 @@ My Notes
     );
 
     await expectTree(`
-My Notes
+Notes
   Cities
     Barcelona
-      My Notes → Cities → Barcelona
+      Notes → Cities → Barcelona
     `);
 
     await userEvent.click(
-      await screen.findByLabelText("expand My Notes → Cities → Barcelona")
+      await screen.findByLabelText("expand Notes → Cities → Barcelona")
     );
 
     await expectTree(`
-My Notes
+Notes
   Cities
     Barcelona
-      My Notes → Cities → Barcelona
-        [O] My Notes → Cities → Barcelona (1)
-        My Notes → Cities → Barcelona (1)
+      Notes → Cities → Barcelona
+        [O] Notes → Cities → Barcelona (1)
+        Notes → Cities → Barcelona (1)
     `);
   });
 
@@ -110,22 +95,12 @@ My Notes
     await follow(alice, bob().user.publicKey);
 
     renderTree(alice);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Cities{Enter}{Tab}Barcelona{Enter}{Tab}Alice child{Escape}"
-    );
+    await type("Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Alice child{Escape}");
 
     cleanup();
 
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Cities{Enter}{Tab}Barcelona{Enter}{Tab}Bob child{Escape}"
-    );
+    await type("Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Bob child{Escape}");
 
     cleanup();
 
@@ -134,25 +109,23 @@ My Notes
       await screen.findByLabelText("show references to Barcelona")
     );
     await userEvent.click(
-      await screen.findByLabelText("expand My Notes → Cities → Barcelona")
+      await screen.findByLabelText("expand Notes → Cities → Barcelona")
     );
 
     await expectTree(`
-My Notes
+Notes
   Cities
     Barcelona
-      My Notes → Cities → Barcelona
-        [O] My Notes → Cities → Barcelona (1)
-        My Notes → Cities → Barcelona (1)
+      Notes → Cities → Barcelona
+        [O] Notes → Cities → Barcelona (1)
+        Notes → Cities → Barcelona (1)
     `);
 
     const fullscreenButtons = await screen.findAllByLabelText(
-      "open My Notes → Cities → Barcelona (1) in fullscreen"
+      "open Notes → Cities → Barcelona (1) in fullscreen"
     );
-    // Click the first one (Bob's ref is more recent, so sorted first)
     await userEvent.click(fullscreenButtons[0]);
 
-    // Barcelona needs to be expanded to show children
     await userEvent.click(await screen.findByLabelText("expand Barcelona"));
 
     await expectTree(`
@@ -165,37 +138,25 @@ Barcelona
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create: My Notes → Test A → ~Versions → Test B
-    // Then the node shows as "Test B" because that's the latest version
-    // Test A appears automatically under ~Versions since it's the original
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Test A{Enter}{Tab}~Versions{Enter}{Tab}Test B{Escape}"
-    );
+    await type("Notes{Enter}Test A{Enter}{Tab}~Versions{Enter}{Tab}Test B{Escape}");
 
     await expectTree(`
-My Notes
+Notes
   Test B
     ~Versions
       Test B
       Test A
     `);
 
-    // Show Referenced By for Test B (click the first one - the main node)
     const showRefsButtons = await screen.findAllByLabelText(
       "show references to Test B"
     );
     await userEvent.click(showRefsButtons[0]);
 
-    // With deduplication, there's only ONE concrete reference (no abstract wrapper)
-    // The same relation is reached via two paths (direct HEAD + via ~Versions),
-    // but we deduplicate by relationID
     await expectTree(`
-My Notes
+Notes
   Test B
-    My Notes → Test B (1)
+    Notes → Test B (1)
     `);
   });
 
@@ -203,15 +164,10 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Level1{Enter}{Tab}Level2{Enter}{Tab}Level3{Enter}{Tab}Target{Escape}"
-    );
+    await type("Notes{Enter}Level1{Enter}{Tab}Level2{Enter}{Tab}Level3{Enter}{Tab}Target{Escape}");
 
     await expectTree(`
-My Notes
+Notes
   Level1
     Level2
       Level3
@@ -223,12 +179,12 @@ My Notes
     );
 
     await expectTree(`
-My Notes
+Notes
   Level1
     Level2
       Level3
         Target
-          My Notes → Level1 → Level2 → Level3 (1) → Target
+          Notes → Level1 → Level2 → Level3 (1) → Target
     `);
 
     expect(screen.queryByText(/Loading/)).toBeNull();

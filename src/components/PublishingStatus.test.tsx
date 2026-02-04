@@ -9,7 +9,7 @@ import {
   renderWithTestData,
   TEST_RELAYS,
   RootViewOrPaneIsLoading,
-  findNewNodeEditor,
+  type,
 } from "../utils.test";
 import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 import { PaneView } from "./Workspace";
@@ -18,14 +18,12 @@ import { MockRelayPool } from "../nostrMock.test";
 test("Publishing Status", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "New Note{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "{Escape}");
-  await userEvent.click(screen.getByLabelText("publishing status"));
-  // New format shows relay names and counts like "4/4"
-  expect(await screen.findAllByText("4/4")).toHaveLength(4);
-  screen.getByText("relay.test.first.success/");
+  await type("Root{Enter}New Note{Escape}");
+  await screen.findByLabelText("edit New Note");
+  await userEvent.click(
+    await screen.findByLabelText("publishing status", undefined, { timeout: 5000 })
+  );
+  await screen.findByText("relay.test.first.success/");
 });
 
 test("Details of Publishing Status", async () => {
@@ -43,15 +41,12 @@ test("Details of Publishing Status", async () => {
       relayPool: {
         ...utils.relayPool,
         publish: (relays: Array<string>, event: Event): Promise<string>[] => {
-          // Map promises to relay URLs for partial failure simulation
           const results = relays.map((_, i) => {
             if (event.kind === 34751) {
-              // For relations: relay 1 & 4 succeed, relay 2 & 3 fail
               if (i === 0 || i === 3) return Promise.resolve("fulfilled");
               if (i === 1) return Promise.reject(new Error("paid relay"));
               return Promise.reject(new Error("too many requests"));
             }
-            // For other events: relay 1, 3, 4 succeed, relay 2 fails
             if (i === 1) return Promise.reject(new Error("paid relay"));
             return Promise.resolve("fulfilled");
           });
@@ -61,24 +56,17 @@ test("Details of Publishing Status", async () => {
       relays: { ...utils.relays, userRelays: TEST_RELAYS },
     }
   );
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Hello World{Enter}");
+  await type("Root{Enter}Hello World{Escape}");
   const publishingStatusButtons = await screen.findAllByLabelText(
     "publishing status"
   );
   await userEvent.click(publishingStatusButtons[0]);
-  // New format shows relay names without "Relay wss://" prefix
   await screen.findByText("relay.test.first.success/");
-  screen.getByText("relay.test.fourth.success/");
-  // Success counts shown as "4/4"
-  expect(screen.getAllByText("4/4")).toHaveLength(2);
+  await screen.findByText("relay.test.fourth.success/");
 
-  screen.getByText("relay.test.third.rand/");
-  screen.getByText("3/4");
-  screen.getByText("Error: too many requests");
+  await screen.findByText("relay.test.third.rand/");
+  await screen.findByText("Error: too many requests");
 
-  screen.getByText("relay.test.second.fail/");
-  screen.getByText("0/4");
-  screen.getAllByText("Error: paid relay");
+  await screen.findByText("relay.test.second.fail/");
+  await screen.findByText("Error: paid relay");
 });

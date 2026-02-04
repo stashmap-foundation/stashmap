@@ -8,6 +8,7 @@ import {
   follow,
   renderApp,
   setup,
+  type,
 } from "../utils.test";
 
 describe("Search Results", () => {
@@ -15,38 +16,27 @@ describe("Search Results", () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
-    // Create some nodes to search for
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Apple pie recipe{Enter}Banana bread{Enter}Apple cider{Escape}"
-    );
+    await type("Notes{Enter}Apple pie recipe{Enter}Banana bread{Enter}Apple cider{Escape}");
 
     await expectTree(`
-My Notes
+Notes
   Apple pie recipe
   Banana bread
   Apple cider
     `);
 
-    // Click search button
     await userEvent.click(
       await screen.findByLabelText("Search to change pane 0 content")
     );
-
-    // Type search query and submit
     await userEvent.type(
       await screen.findByLabelText("search input"),
       "Apple{Enter}"
     );
 
-    // Search nodes expand by default, results shown as references with context
     await expectTree(`
 Search: Apple
-  My Notes (3) → Apple pie recipe
-  My Notes (3) → Apple cider
+  Notes (3) → Apple pie recipe
+  Notes (3) → Apple cider
     `);
 
     cleanup();
@@ -54,50 +44,44 @@ Search: Apple
 
     await expectTree(`
 Search: Apple
-  My Notes (3) → Apple pie recipe
-  My Notes (3) → Apple cider
+  Notes (3) → Apple pie recipe
+  Notes (3) → Apple cider
     `);
   });
 
   test("Search abstract reference can be expanded to show concrete refs", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
 
-    // Bob creates "Shared Topic" under My Notes
     renderApp(bob());
-    const bobNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(bobNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Shared Topic{Escape}");
+    await type("Notes{Enter}Shared Topic{Escape}");
 
     await expectTree(`
-My Notes
+Notes
   Shared Topic
     `);
 
     cleanup();
 
-    // Alice follows Bob - now Alice can see Bob's content
     await follow(alice, bob().user.publicKey);
     renderApp(alice());
 
-    // Alice should see Bob's Shared Topic as a diff item
+    await type("Notes{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand Notes"));
+
     await expectTree(`
-My Notes
+Notes
   [S] Shared Topic
     `);
 
-    // Alice creates her own "Shared Topic" under My Notes (same content-addressed node)
-    const aliceNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(aliceNotesEditor);
+    await userEvent.click(await screen.findByLabelText("edit Notes"));
     await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Shared Topic{Escape}");
 
     await expectTree(`
-My Notes
+Notes
   Shared Topic
     `);
 
-    // Search for "Shared Topic"
     await userEvent.click(
       await screen.findByLabelText("Search to change pane 0 content")
     );
@@ -106,24 +90,20 @@ My Notes
       "Shared Topic{Enter}"
     );
 
-    // Should show abstract ref (multiple refs from same context - Alice's and Bob's)
     await expectTree(`
 Search: Shared Topic
-  My Notes → Shared Topic
+  Notes → Shared Topic
     `);
 
-    // Expand the abstract reference
     await userEvent.click(
-      await screen.findByLabelText("expand My Notes → Shared Topic")
+      await screen.findByLabelText("expand Notes → Shared Topic")
     );
 
-    // Should show concrete refs (one for each relation - Alice's and Bob's)
-    // [O] indicates the ref is from another user (Bob)
     await expectTree(`
 Search: Shared Topic
-  My Notes → Shared Topic
-    My Notes (1) → Shared Topic
-    [O] My Notes (1) → Shared Topic
+  Notes → Shared Topic
+    Notes (1) → Shared Topic
+    [O] Notes (1) → Shared Topic
     `);
   });
 
@@ -131,15 +111,10 @@ Search: Shared Topic
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Barcelona{Escape}"
-    );
+    await type("Notes{Enter}Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Barcelona{Escape}");
 
     await expectTree(`
-My Notes
+Notes
   Holiday Destinations
     Spain
       Barcelona
@@ -155,7 +130,7 @@ My Notes
 
     await expectTree(`
 Search: Barcelona
-  My Notes → Holiday Destinations → Spain (1) → Barcelona
+  Notes → Holiday Destinations → Spain (1) → Barcelona
     `);
 
     expect(screen.queryByText(/Loading/)).toBeNull();
@@ -165,15 +140,10 @@ Search: Barcelona
     const [alice, bob] = setup([ALICE, BOB]);
 
     renderApp(bob());
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Barcelona{Escape}"
-    );
+    await type("Notes{Enter}Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Barcelona{Escape}");
 
     await expectTree(`
-My Notes
+Notes
   Holiday Destinations
     Spain
       Barcelona
@@ -194,7 +164,7 @@ My Notes
 
     await expectTree(`
 Search: Barcelona
-  [O] My Notes → Holiday Destinations → Spain (1) → Barcelona
+  [O] Notes → Holiday Destinations → Spain (1) → Barcelona
     `);
 
     expect(screen.queryByText(/Loading/)).toBeNull();

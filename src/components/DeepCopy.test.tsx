@@ -1106,4 +1106,29 @@ My Notes
     // Children of suggestions should not have edit buttons
     expect(screen.queryByLabelText("edit BobChild")).toBeNull();
   });
+
+  test("I: Single node suggestions (without children) cannot be edited", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(bob);
+    await type("My Notes{Enter}{Tab}BobLeafNode{Escape}");
+
+    await expectTree(`
+My Notes
+  BobLeafNode
+    `);
+
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+    await type("My Notes{Escape}");
+
+    await expectTree(`
+My Notes
+  [S] BobLeafNode
+    `);
+
+    expect(screen.queryByLabelText("edit BobLeafNode")).toBeNull();
+  });
 });

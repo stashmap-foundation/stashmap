@@ -17,6 +17,7 @@ import {
   isReferencedByView,
   getContext,
   useIsViewingOtherUserContent,
+  useIsSuggestion,
   viewPathToString,
 } from "../ViewContext";
 import {
@@ -371,12 +372,15 @@ function InteractiveNodeContent(): JSX.Element {
   const isLoading = useNodeIsLoading();
   const isInReferencedByView = useIsInReferencedByView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
-  // Also check if this is the root node of a Referenced By view
+  const isSuggestionNode = useIsSuggestion();
   const isReferencedByRoot = isReferencedByView(view);
   const isEmptyNode = isEmptyNodeID(nodeID);
 
   const isReadonly =
-    isInReferencedByView || isReferencedByRoot || isViewingOtherUserContent;
+    isInReferencedByView ||
+    isReferencedByRoot ||
+    isViewingOtherUserContent ||
+    isSuggestionNode;
 
   if (isLoading) {
     return <LoadingNode />;

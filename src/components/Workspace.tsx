@@ -120,7 +120,7 @@ function HomeButton(): JSX.Element | null {
   }
 
   const handleClick = (): void => {
-    setPane({ ...pane, stack: [LOG_NODE_ID] });
+    setPane({ ...pane, stack: [LOG_NODE_ID], rootRelation: undefined });
   };
 
   return (
@@ -141,7 +141,7 @@ function NewNoteButton(): JSX.Element {
   const pane = useCurrentPane();
 
   const handleClick = (): void => {
-    setPane({ ...pane, stack: [] });
+    setPane({ ...pane, stack: [], rootRelation: undefined });
   };
 
   return (
@@ -172,7 +172,7 @@ function useHomeShortcut(): void {
         );
         if (logNode) {
           e.preventDefault();
-          setPane({ ...pane, stack: [LOG_NODE_ID] });
+          setPane({ ...pane, stack: [LOG_NODE_ID], rootRelation: undefined });
         }
       }
     };

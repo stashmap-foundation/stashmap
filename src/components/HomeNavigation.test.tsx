@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -149,6 +149,88 @@ My Notes
       await waitFor(() => {
         expect(screen.getByText("My Notes")).toBeDefined();
       });
+    });
+
+    test("Home button and ~Log with multiple notes survives reload", async () => {
+      const [alice] = setup([ALICE]);
+      renderApp(alice());
+
+      await type("First Note{Escape}");
+      await userEvent.click(await screen.findByLabelText("Create new note"));
+      await type("Second Note{Escape}");
+      await userEvent.click(await screen.findByLabelText("Create new note"));
+      await type("Third Note{Escape}");
+
+      await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+      await expectTree(`
+~Log
+  Third Note
+  Second Note
+  First Note
+      `);
+
+      cleanup();
+      renderApp(alice());
+
+      await screen.findByLabelText("Navigate to Log");
+
+      await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+      await expectTree(`
+~Log
+  Third Note
+  Second Note
+  First Note
+      `);
+    });
+
+    test("clicking note in ~Log navigates to node with children", async () => {
+      const [alice] = setup([ALICE]);
+      renderApp(alice());
+
+      await type("My Notes{Enter}{Tab}Child One{Enter}Child Two{Escape}");
+
+      await expectTree(`
+My Notes
+  Child One
+  Child Two
+      `);
+
+      await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+      await expectTree(`
+~Log
+  My Notes
+      `);
+
+      await userEvent.click(await screen.findByText("My Notes"));
+
+      await expectTree(`
+My Notes
+  Child One
+  Child Two
+      `);
+    });
+
+    test("Home button remains visible after clicking reference in ~Log", async () => {
+      const [alice] = setup([ALICE]);
+      renderApp(alice());
+
+      await type("My Notes{Enter}{Tab}Child{Escape}");
+
+      await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+      await screen.findByLabelText("Navigate to Log");
+
+      await userEvent.click(await screen.findByText("My Notes"));
+
+      await screen.findByLabelText("Navigate to Log");
+
+      cleanup();
+      renderApp(alice());
+
+      await screen.findByLabelText("Navigate to Log");
     });
   });
 });

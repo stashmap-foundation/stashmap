@@ -14,7 +14,7 @@ import {
 import { LoadData } from "../dataQuery";
 import { LoadSearchData } from "../LoadSearchData";
 import { PaneView } from "./Workspace";
-import { EMPTY_NODE_ID, createSearchId } from "../connections";
+import { EMPTY_NODE_ID, createSearchId, LOG_NODE_ID } from "../connections";
 import { planUpdateViews, planUpdatePanes, usePlanner } from "../planner";
 import { useData } from "../DataContext";
 import { isUserLoggedIn, useLogout } from "../NostrAuthContext";
@@ -203,13 +203,15 @@ function PaneContent(): JSX.Element {
     <div className={paneClassName}>
       <LoadSearchData nodeIDs={pane.stack}>
         <LoadData nodeIDs={pane.stack}>
-          <LoadData nodeIDs={[rootNodeID]} descendants referencedBy lists>
-            <RootViewContextProvider
-              root={rootNodeID as LongID}
-              paneIndex={paneIndex}
-            >
-              <PaneView />
-            </RootViewContextProvider>
+          <LoadData nodeIDs={[LOG_NODE_ID]} lists>
+            <LoadData nodeIDs={[rootNodeID]} descendants referencedBy lists>
+              <RootViewContextProvider
+                root={rootNodeID as LongID}
+                paneIndex={paneIndex}
+              >
+                <PaneView />
+              </RootViewContextProvider>
+            </LoadData>
           </LoadData>
         </LoadData>
       </LoadSearchData>

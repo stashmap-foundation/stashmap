@@ -253,7 +253,9 @@ test("Relevance selector shows when node is expanded", async () => {
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
-  await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child1{Enter}Child2{Escape}");
+  await type(
+    "My Notes{Enter}{Tab}Parent{Enter}{Tab}Child1{Enter}Child2{Escape}"
+  );
 
   // Verify children are visible under Parent
   await screen.findByText("Child1");

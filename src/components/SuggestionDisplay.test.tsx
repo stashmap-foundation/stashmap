@@ -18,7 +18,9 @@ describe("Suggestion Display", () => {
     await follow(alice, bob().user.publicKey);
 
     renderTree(bob);
-    await type("My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Enter}France{Escape}");
+    await type(
+      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Enter}France{Escape}"
+    );
 
     await expectTree(`
 My Notes
@@ -42,7 +44,9 @@ My Notes
     await follow(alice, bob().user.publicKey);
 
     renderTree(bob);
-    await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}Child1{Enter}Child2{Escape}");
+    await type(
+      "My Notes{Enter}{Tab}Topic{Enter}{Tab}Child1{Enter}Child2{Escape}"
+    );
 
     await expectTree(`
 My Notes
@@ -122,7 +126,9 @@ My Notes
     const [alice] = setup([ALICE]);
 
     renderApp(alice());
-    await type("My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Barcelona{Escape}");
+    await type(
+      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Barcelona{Escape}"
+    );
 
     await expectTree(`
 My Notes

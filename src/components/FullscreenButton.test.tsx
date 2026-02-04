@@ -51,6 +51,8 @@ Holiday Destinations
   `);
 
   await screen.findByLabelText("Navigate to My Notes");
-  expect(screen.queryByLabelText("Navigate to Holiday Destinations")).toBeNull();
+  expect(
+    screen.queryByLabelText("Navigate to Holiday Destinations")
+  ).toBeNull();
   expect(screen.queryByTestId("current-stack")).toBeNull();
 });

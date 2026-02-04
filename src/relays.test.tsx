@@ -77,7 +77,9 @@ test("Write views on user relays", async () => {
   );
   fireEvent.click(expandButton);
 
-  const collapseButton = await screen.findByLabelText("collapse Alice Workspace");
+  const collapseButton = await screen.findByLabelText(
+    "collapse Alice Workspace"
+  );
   fireEvent.click(collapseButton);
   await findEvent(aliceData.relayPool, { kinds: [KIND_VIEWS] });
   const publishedRelays = aliceData.relayPool.getPublishedOnRelays();

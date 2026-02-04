@@ -232,7 +232,9 @@ describe("Empty node - keyboard navigation", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child1{Enter}Child2{Enter}Child3{Escape}");
+    await type(
+      "My Notes{Enter}{Tab}Parent{Enter}{Tab}Child1{Enter}Child2{Enter}Child3{Escape}"
+    );
 
     await expectTree(`
 My Notes

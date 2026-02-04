@@ -8,6 +8,7 @@ import {
   renderApp,
   renderTree,
   setup,
+  type,
 } from "../utils.test";
 
 async function deleteItem(itemName: string): Promise<void> {
@@ -28,18 +29,13 @@ describe("View State Preservation - Reorder Within Same List", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const rootEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(rootEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "A{Enter}B{Enter}C{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}");
 
-    await userEvent.click(await screen.findByLabelText("expand A"));
+    await userEvent.click(await screen.findByLabelText("collapse A"));
     await userEvent.click(await screen.findByLabelText("edit A"));
     await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "ChildOfA{Escape}");
+    await userEvent.type(await findNewNodeEditor(), "B{Enter}C{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand A"));
 
     await expectTree(`
 My Notes
@@ -69,18 +65,9 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const rootEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(rootEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "A{Enter}B{Enter}C{Escape}"
+    await type(
+      "My Notes{Enter}{Tab}A{Enter}B{Enter}C{Enter}{Tab}ChildOfC{Escape}"
     );
-
-    await userEvent.click(await screen.findByLabelText("expand C"));
-    await userEvent.click(await screen.findByLabelText("edit C"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "ChildOfC{Escape}");
 
     await expectTree(`
 My Notes
@@ -110,23 +97,16 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const rootEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(rootEditor);
+    await type("My Notes{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
     await userEvent.keyboard("{Enter}");
     await userEvent.type(
       await findNewNodeEditor(),
-      "A{Enter}B{Enter}C{Escape}"
+      "B{Enter}C{Enter}{Tab}ChildOfC{Escape}"
     );
-
     await userEvent.click(await screen.findByLabelText("expand A"));
-    await userEvent.click(await screen.findByLabelText("edit A"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "ChildOfA{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("expand C"));
-    await userEvent.click(await screen.findByLabelText("edit C"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "ChildOfC{Escape}");
 
     await expectTree(`
 My Notes
@@ -160,12 +140,8 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const rootEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(rootEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "A{Enter}B{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
+    await type(
+      "My Notes{Enter}{Tab}A{Enter}B{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
     );
 
     await expectTree(`
@@ -200,18 +176,9 @@ describe("View State Preservation - Indent/Outdent (Tab/Shift+Tab)", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const rootEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(rootEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Sibling{Enter}Target{Escape}"
+    await type(
+      "My Notes{Enter}{Tab}Sibling{Enter}Target{Enter}{Tab}Child{Escape}"
     );
-
-    await userEvent.click(await screen.findByLabelText("expand Target"));
-    await userEvent.click(await screen.findByLabelText("edit Target"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Child{Escape}");
 
     await expectTree(`
 My Notes
@@ -240,12 +207,8 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const rootEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(rootEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Sibling{Enter}Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
+    await type(
+      "My Notes{Enter}{Tab}Sibling{Enter}Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
     );
 
     await expectTree(`
@@ -279,23 +242,16 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const rootEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(rootEditor);
+    await type("My Notes{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
     await userEvent.keyboard("{Enter}");
     await userEvent.type(
       await findNewNodeEditor(),
-      "A{Enter}B{Enter}C{Escape}"
+      "B{Enter}C{Enter}{Tab}ChildOfC{Escape}"
     );
-
     await userEvent.click(await screen.findByLabelText("expand A"));
-    await userEvent.click(await screen.findByLabelText("edit A"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "ChildOfA{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("expand C"));
-    await userEvent.click(await screen.findByLabelText("edit C"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "ChildOfC{Escape}");
 
     await expectTree(`
 My Notes
@@ -332,13 +288,7 @@ describe("View State Preservation - Cross-Pane DnD (Copy)", () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
-    const rootEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(rootEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Source{Enter}{Tab}Child{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}Source{Enter}{Tab}Child{Escape}");
 
     await userEvent.click(await screen.findByLabelText("collapse Source"));
     const sourceEditor = await screen.findByLabelText("edit Source");
@@ -375,12 +325,8 @@ My Notes
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
-    const rootEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(rootEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
+    await type(
+      "My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
     );
 
     await userEvent.click(await screen.findByLabelText("collapse Parent"));
@@ -423,13 +369,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
-    const rootEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(rootEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Source{Enter}{Tab}Child{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}Source{Enter}{Tab}Child{Escape}");
 
     await userEvent.click(await screen.findByLabelText("collapse Source"));
     const sourceEditor = await screen.findByLabelText("edit Source");
@@ -468,13 +408,7 @@ describe("View State Preservation - Insert Operations", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const rootEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(rootEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "A{Enter}{Tab}ChildOfA{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}");
 
     await expectTree(`
 My Notes
@@ -505,13 +439,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const rootEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(rootEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "A{Enter}B{Enter}{Tab}ChildOfB{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}A{Enter}B{Enter}{Tab}ChildOfB{Escape}");
 
     await expectTree(`
 My Notes
@@ -542,12 +470,8 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const rootEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(rootEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Parent{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}"
+    await type(
+      "My Notes{Enter}{Tab}Parent{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}"
     );
 
     await expectTree(`
@@ -580,12 +504,8 @@ describe("View State Preservation - Delete Operations", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const rootEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(rootEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "ToDelete{Enter}Keeper{Enter}{Tab}Child{Escape}"
+    await type(
+      "My Notes{Enter}{Tab}ToDelete{Enter}Keeper{Enter}{Tab}Child{Escape}"
     );
 
     await expectTree(`
@@ -612,13 +532,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const rootEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(rootEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Keeper{Enter}{Tab}Child{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}Keeper{Enter}{Tab}Child{Escape}");
 
     await userEvent.click(await screen.findByLabelText("collapse Keeper"));
     const keeperEditor = await screen.findByLabelText("edit Keeper");
@@ -651,23 +565,16 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const rootEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(rootEditor);
+    await type("My Notes{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
     await userEvent.keyboard("{Enter}");
     await userEvent.type(
       await findNewNodeEditor(),
-      "A{Enter}ToDelete{Enter}C{Escape}"
+      "ToDelete{Enter}C{Enter}{Tab}ChildOfC{Escape}"
     );
-
     await userEvent.click(await screen.findByLabelText("expand A"));
-    await userEvent.click(await screen.findByLabelText("edit A"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "ChildOfA{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("expand C"));
-    await userEvent.click(await screen.findByLabelText("edit C"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "ChildOfC{Escape}");
 
     await expectTree(`
 My Notes
@@ -701,12 +608,8 @@ describe("View State Preservation - Complex Tree Operations", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const rootEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(rootEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Target{Enter}Source{Enter}{Tab}L1{Enter}{Tab}L2{Enter}{Tab}L3{Escape}"
+    await type(
+      "My Notes{Enter}{Tab}Target{Enter}Source{Enter}{Tab}L1{Enter}{Tab}L2{Enter}{Tab}L3{Escape}"
     );
 
     await userEvent.click(await screen.findByLabelText("expand Target"));
@@ -746,23 +649,22 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const rootEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(rootEditor);
+    await type("My Notes{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
     await userEvent.keyboard("{Enter}");
     await userEvent.type(
       await findNewNodeEditor(),
-      "A{Enter}B{Enter}C{Escape}"
+      "B{Enter}{Tab}ChildOfB{Escape}"
     );
 
-    await userEvent.click(await screen.findByLabelText("expand A"));
-    await userEvent.click(await screen.findByLabelText("edit A"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "ChildOfA{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("expand B"));
+    await userEvent.click(await screen.findByLabelText("collapse B"));
     await userEvent.click(await screen.findByLabelText("edit B"));
     await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "ChildOfB{Escape}");
+    await userEvent.type(await findNewNodeEditor(), "C{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand A"));
+    await userEvent.click(await screen.findByLabelText("expand B"));
 
     await expectTree(`
 My Notes
@@ -810,23 +712,16 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    const rootEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(rootEditor);
+    await type("My Notes{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
     await userEvent.keyboard("{Enter}");
     await userEvent.type(
       await findNewNodeEditor(),
-      "A{Enter}B{Enter}C{Escape}"
+      "B{Enter}C{Enter}{Tab}ChildOfC{Escape}"
     );
-
     await userEvent.click(await screen.findByLabelText("expand A"));
-    await userEvent.click(await screen.findByLabelText("edit A"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "ChildOfA{Escape}");
-
-    await userEvent.click(await screen.findByLabelText("expand C"));
-    await userEvent.click(await screen.findByLabelText("edit C"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "ChildOfC{Escape}");
 
     await expectTree(`
 My Notes

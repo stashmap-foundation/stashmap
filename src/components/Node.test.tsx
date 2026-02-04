@@ -829,7 +829,9 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child 1{Enter}Child 2{Escape}");
+    await type(
+      "My Notes{Enter}{Tab}Parent{Enter}{Tab}Child 1{Enter}Child 2{Escape}"
+    );
 
     await expectTree(`
 My Notes

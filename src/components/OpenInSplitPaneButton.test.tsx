@@ -33,7 +33,10 @@ function renderWithContext(viewPath: ViewPath): void {
 }
 
 test("button renders on desktop", async () => {
-  const viewPath: ViewPath = [0, { nodeID: TEST_ROOT, nodeIndex: 0 as NodeIndex }];
+  const viewPath: ViewPath = [
+    0,
+    { nodeID: TEST_ROOT, nodeIndex: 0 as NodeIndex },
+  ];
 
   renderWithContext(viewPath);
 

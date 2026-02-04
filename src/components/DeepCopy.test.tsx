@@ -11,6 +11,7 @@ import {
   renderApp,
   renderTree,
   setup,
+  type,
 } from "../utils.test";
 
 describe("Deep Copy - Tab Indent", () => {
@@ -18,20 +19,9 @@ describe("Deep Copy - Tab Indent", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create: My Notes → Sibling, Parent (Tab moves to PREVIOUS sibling)
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Sibling{Enter}Parent{Escape}"
+    await type(
+      "My Notes{Enter}{Tab}Sibling{Enter}Parent{Enter}{Tab}GrandChild{Escape}"
     );
-
-    // Now add GrandChild under Parent
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("edit Parent"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "GrandChild{Escape}");
 
     await expectTree(`
 My Notes
@@ -67,14 +57,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create: My Notes → Sibling, Sibling 2
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Sibling{Enter}Sibling 2{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}Sibling{Enter}Sibling 2{Escape}");
 
     await expectTree(`
 My Notes
@@ -109,13 +92,8 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create: My Notes → Sibling, Parent → Child → GrandChild
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Sibling{Enter}Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
+    await type(
+      "My Notes{Enter}{Tab}Sibling{Enter}Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
     );
 
     await expectTree(`
@@ -160,13 +138,8 @@ describe("Deep Copy - Cross-Pane DnD", () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
-    // Create: My Notes → Source → Child A, Child B
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Source{Enter}{Tab}Child A{Enter}Child B{Escape}"
+    await type(
+      "My Notes{Enter}{Tab}Source{Enter}{Tab}Child A{Enter}Child B{Escape}"
     );
 
     await expectTree(`
@@ -203,13 +176,8 @@ Source
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
-    // Create: My Notes → Parent → Child → GrandChild, then add Target
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
+    await type(
+      "My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
     );
 
     // Add Target as sibling to Parent (collapse Parent first so Enter creates sibling)
@@ -268,15 +236,7 @@ Target
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
-    // Create: My Notes → Source → Child, Target → Source → Another Child
-    // First create Source with Child
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Source{Enter}{Tab}Child{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}Source{Enter}{Tab}Child{Escape}");
 
     // Collapse Source, create Target as sibling
     await userEvent.click(await screen.findByLabelText("collapse Source"));
@@ -335,12 +295,7 @@ describe("Deep Copy - ~Versions Handling", () => {
 
     // Bob creates BobFolder → Original and edits Original
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "BobFolder{Enter}{Tab}Original{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}BobFolder{Enter}{Tab}Original{Escape}");
 
     // Bob edits "Original" to "Bob Edited" - this creates a ~Versions entry
     const sourceEditor = await screen.findByLabelText("edit Original");
@@ -366,9 +321,7 @@ My Notes
     // Alice renders and creates Target
     // BobFolder appears as diff item because Alice follows Bob
     renderApp(alice());
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+    await type("My Notes{Enter}{Tab}Target{Escape}");
     await userEvent.click(await screen.findByLabelText("expand Target"));
 
     await expectTree(`
@@ -429,9 +382,7 @@ describe("Deep Copy - Suggestion DnD", () => {
 
     // Bob creates BobItem
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "BobItem{Escape}");
+    await type("My Notes{Enter}{Tab}BobItem{Escape}");
 
     await expectTree(`
 My Notes
@@ -443,10 +394,7 @@ My Notes
     // Alice follows Bob and creates Target
     await follow(alice, bob().user.publicKey);
     renderTree(alice);
-
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+    await type("My Notes{Enter}{Tab}Target{Escape}");
 
     await expectTree(`
 My Notes
@@ -473,9 +421,7 @@ My Notes
 
     // Bob creates BobItem
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "BobItem{Escape}");
+    await type("My Notes{Enter}{Tab}BobItem{Escape}");
 
     await expectTree(`
 My Notes
@@ -487,10 +433,7 @@ My Notes
     // Alice follows Bob and creates Target
     await follow(alice, bob().user.publicKey);
     renderApp(alice());
-
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+    await type("My Notes{Enter}{Tab}Target{Escape}");
     await userEvent.click(await screen.findByLabelText("expand Target"));
 
     await expectTree(`
@@ -529,11 +472,8 @@ Target
 
     // Bob creates Folder with children and grandchildren
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Folder{Enter}{Tab}Child{Enter}{Tab}GrandChild1{Enter}GrandChild2{Escape}"
+    await type(
+      "My Notes{Enter}{Tab}Folder{Enter}{Tab}Child{Enter}{Tab}GrandChild1{Enter}GrandChild2{Escape}"
     );
 
     await expectTree(`
@@ -549,10 +489,7 @@ My Notes
     // Alice follows Bob and creates Target
     await follow(alice, bob().user.publicKey);
     renderTree(alice);
-
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+    await type("My Notes{Enter}{Tab}Target{Escape}");
 
     // [S] Folder is collapsed by default
     await expectTree(`
@@ -600,11 +537,8 @@ My Notes
 
     // Bob creates Folder with children and grandchildren
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Folder{Enter}{Tab}Child{Enter}{Tab}GrandChild1{Enter}GrandChild2{Escape}"
+    await type(
+      "My Notes{Enter}{Tab}Folder{Enter}{Tab}Child{Enter}{Tab}GrandChild1{Enter}GrandChild2{Escape}"
     );
 
     await expectTree(`
@@ -620,10 +554,7 @@ My Notes
     // Alice follows Bob and creates Target
     await follow(alice, bob().user.publicKey);
     renderApp(alice());
-
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+    await type("My Notes{Enter}{Tab}Target{Escape}");
     await userEvent.click(await screen.findByLabelText("expand Target"));
 
     // [S] Folder is collapsed by default
@@ -693,12 +624,7 @@ Target
 
     // Bob creates Folder with BobChild
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "BobFolder{Enter}{Tab}BobChild{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}BobFolder{Enter}{Tab}BobChild{Escape}");
 
     await expectTree(`
 My Notes
@@ -710,12 +636,7 @@ My Notes
 
     // Alice creates Target with AliceChild
     renderTree(alice);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Target{Enter}{Tab}AliceChild{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}Target{Enter}{Tab}AliceChild{Escape}");
 
     await expectTree(`
 My Notes
@@ -769,11 +690,8 @@ My Notes
 
     // Bob creates Folder with BobChild and BobGrandChild
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "BobFolder{Enter}{Tab}BobChild{Enter}{Tab}BobGrandChild{Escape}"
+    await type(
+      "My Notes{Enter}{Tab}BobFolder{Enter}{Tab}BobChild{Enter}{Tab}BobGrandChild{Escape}"
     );
 
     await expectTree(`
@@ -787,12 +705,7 @@ My Notes
 
     // Alice creates Target with AliceChild
     renderTree(alice);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Target{Enter}{Tab}AliceChild{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}Target{Enter}{Tab}AliceChild{Escape}");
 
     await expectTree(`
 My Notes
@@ -889,9 +802,7 @@ describe("Deep Copy - Relevance Selector Bugs", () => {
 
     // Bob creates BobItem
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "BobItem{Escape}");
+    await type("My Notes{Enter}{Tab}BobItem{Escape}");
 
     await expectTree(`
 My Notes
@@ -903,6 +814,8 @@ My Notes
     // Alice follows Bob
     await follow(alice, bob().user.publicKey);
     renderTree(alice);
+    await type("My Notes{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand My Notes"));
 
     // Alice sees [S] BobItem as suggestion
     await expectTree(`
@@ -930,9 +843,7 @@ My Notes
 
     // Bob creates BobItem
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "BobItem{Escape}");
+    await type("My Notes{Enter}{Tab}BobItem{Escape}");
 
     await expectTree(`
 My Notes
@@ -944,6 +855,8 @@ My Notes
     // Alice follows Bob
     await follow(alice, bob().user.publicKey);
     renderTree(alice);
+    await type("My Notes{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand My Notes"));
 
     // Alice sees [S] BobItem
     await expectTree(`
@@ -990,12 +903,7 @@ My Notes
 
     // Bob creates BobFolder with child
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "BobFolder{Enter}{Tab}BobChild{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}BobFolder{Enter}{Tab}BobChild{Escape}");
 
     await expectTree(`
 My Notes
@@ -1008,6 +916,8 @@ My Notes
     // Alice follows Bob
     await follow(alice, bob().user.publicKey);
     renderTree(alice);
+    await type("My Notes{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand My Notes"));
 
     // Alice sees [S] BobFolder
     await expectTree(`
@@ -1045,9 +955,7 @@ describe("Deep Copy - Simple Suggestion DnD (No Children)", () => {
     const [alice, bob] = setup([ALICE, BOB]);
 
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "BobItem{Escape}");
+    await type("My Notes{Enter}{Tab}BobItem{Escape}");
 
     await expectTree(`
 My Notes
@@ -1058,10 +966,7 @@ My Notes
 
     await follow(alice, bob().user.publicKey);
     renderTree(alice);
-
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+    await type("My Notes{Enter}{Tab}Target{Escape}");
 
     await expectTree(`
 My Notes
@@ -1083,18 +988,13 @@ My Notes
     const [alice, bob] = setup([ALICE, BOB]);
 
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "BobItem{Escape}");
+    await type("My Notes{Enter}{Tab}BobItem{Escape}");
 
     cleanup();
 
     await follow(alice, bob().user.publicKey);
     renderApp(alice());
-
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+    await type("My Notes{Enter}{Tab}Target{Escape}");
 
     await userEvent.click(await screen.findByLabelText("expand Target"));
 
@@ -1130,11 +1030,8 @@ describe("Deep Copy - Edit Restrictions", () => {
     const [alice, bob, carol] = setup([ALICE, BOB, CAROL]);
 
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Holiday Destinations{Enter}{Tab}Barcelona{Escape}"
+    await type(
+      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Escape}"
     );
 
     await expectTree(`
@@ -1146,11 +1043,8 @@ My Notes
     cleanup();
 
     renderTree(carol);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Holiday Destinations{Enter}{Tab}Malaga{Escape}"
+    await type(
+      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Malaga{Escape}"
     );
 
     await expectTree(`
@@ -1164,6 +1058,8 @@ My Notes
     await follow(alice, bob().user.publicKey);
     await follow(alice, carol().user.publicKey);
     renderTree(alice);
+    await type("My Notes{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand My Notes"));
 
     await expectTree(`
 My Notes
@@ -1182,12 +1078,7 @@ My Notes
     const [alice, bob] = setup([ALICE, BOB]);
 
     renderTree(bob);
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "BobFolder{Enter}{Tab}BobChild{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}BobFolder{Enter}{Tab}BobChild{Escape}");
 
     await expectTree(`
 My Notes
@@ -1199,6 +1090,8 @@ My Notes
 
     await follow(alice, bob().user.publicKey);
     renderTree(alice);
+    await type("My Notes{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand My Notes"));
 
     await expectTree(`
 My Notes

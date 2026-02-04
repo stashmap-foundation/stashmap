@@ -15,7 +15,9 @@ describe("References in Referenced By", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    await type("Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Sagrada Familia{Escape}");
+    await type(
+      "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Sagrada Familia{Escape}"
+    );
 
     await expectTree(`
 Notes
@@ -41,7 +43,9 @@ Notes
     await follow(alice, bob().user.publicKey);
 
     renderTree(alice);
-    await type("Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Alice child{Escape}");
+    await type(
+      "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Alice child{Escape}"
+    );
 
     await expectTree(`
 Notes
@@ -53,7 +57,9 @@ Notes
     cleanup();
 
     renderTree(bob);
-    await type("Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Bob child{Escape}");
+    await type(
+      "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Bob child{Escape}"
+    );
 
     await expectTree(`
 Notes
@@ -95,12 +101,16 @@ Notes
     await follow(alice, bob().user.publicKey);
 
     renderTree(alice);
-    await type("Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Alice child{Escape}");
+    await type(
+      "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Alice child{Escape}"
+    );
 
     cleanup();
 
     renderTree(bob);
-    await type("Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Bob child{Escape}");
+    await type(
+      "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Bob child{Escape}"
+    );
 
     cleanup();
 
@@ -138,7 +148,9 @@ Barcelona
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    await type("Notes{Enter}Test A{Enter}{Tab}~Versions{Enter}{Tab}Test B{Escape}");
+    await type(
+      "Notes{Enter}Test A{Enter}{Tab}~Versions{Enter}{Tab}Test B{Escape}"
+    );
 
     await expectTree(`
 Notes
@@ -164,7 +176,9 @@ Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    await type("Notes{Enter}Level1{Enter}{Tab}Level2{Enter}{Tab}Level3{Enter}{Tab}Target{Escape}");
+    await type(
+      "Notes{Enter}Level1{Enter}{Tab}Level2{Enter}{Tab}Level3{Enter}{Tab}Target{Escape}"
+    );
 
     await expectTree(`
 Notes

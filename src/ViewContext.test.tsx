@@ -44,6 +44,7 @@ import {
 } from "./ViewContext";
 import { TreeView } from "./components/TreeView";
 import { LoadData } from "./dataQuery";
+
 const TEST_ROOT = "testRoot" as LongID;
 
 test("Move View Settings on Delete", async () => {
@@ -125,7 +126,9 @@ test("Move Node Up", async () => {
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
-  await type("My Notes{Enter}{Tab}Programming Languages{Enter}{Tab}FPL{Enter}OOP{Enter}{Tab}C++{Enter}Java{Escape}");
+  await type(
+    "My Notes{Enter}{Tab}Programming Languages{Enter}{Tab}FPL{Enter}OOP{Enter}{Tab}C++{Enter}Java{Escape}"
+  );
 
   await expectTree(`
 My Notes
@@ -169,7 +172,9 @@ test("Contact views list via concrete reference", async () => {
 
   // Alice creates Cities with Paris and London
   renderTree(alice);
-  await type("My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}");
+  await type(
+    "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
+  );
 
   await expectTree(`
 My Notes
@@ -190,7 +195,10 @@ My Notes
   `);
   await userEvent.click(await screen.findByLabelText("edit My Notes"));
   await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Cities{Enter}{Tab}Paris{Escape}");
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "Cities{Enter}{Tab}Paris{Escape}"
+  );
 
   await expectTree(`
 My Notes
@@ -375,7 +383,9 @@ test("View doesn't change if list is forked from contact", async () => {
   await follow(alice, bob().user.publicKey);
 
   renderTree(bob);
-  await type("My Notes{Enter}{Tab}Programming Languages{Enter}{Tab}OOP{Enter}{Tab}C++{Enter}Java{Escape}");
+  await type(
+    "My Notes{Enter}{Tab}Programming Languages{Enter}{Tab}OOP{Enter}{Tab}C++{Enter}Java{Escape}"
+  );
   await expectTree(`
 My Notes
   Programming Languages

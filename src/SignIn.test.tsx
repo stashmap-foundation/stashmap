@@ -89,7 +89,9 @@ test("Sign in persists created Notes", async () => {
     "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a{enter}"
   );
 
-  await screen.findByLabelText("edit Hello World!");
+  await screen.findByLabelText("edit Hello World!", undefined, {
+    timeout: 5000,
+  });
   fireEvent.click(await screen.findByLabelText("open menu"));
   fireEvent.click(await screen.findByLabelText("logout"));
   cleanup();
@@ -108,5 +110,7 @@ test("Sign in persists created Notes", async () => {
     ),
     "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a{enter}"
   );
-  await screen.findByLabelText("edit Hello World!");
+  await screen.findByLabelText("edit Hello World!", undefined, {
+    timeout: 5000,
+  });
 });

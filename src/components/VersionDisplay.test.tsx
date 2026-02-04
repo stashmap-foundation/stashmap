@@ -14,24 +14,9 @@ describe("Version Display", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create: My Notes -> Holiday Destinations -> Barcelona
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Holiday Destinations{Enter}"
+    await type(
+      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Escape}"
     );
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-    await userEvent.click(
-      await screen.findByLabelText("expand Holiday Destinations")
-    );
-    await userEvent.click(
-      await screen.findByLabelText("edit Holiday Destinations")
-    );
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     // Edit Barcelona to BCN
     const barcelonaEditor = await screen.findByLabelText("edit Barcelona");
@@ -70,26 +55,9 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create a parent node and a child "Barcelona"
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Holiday Destinations{Enter}"
+    await type(
+      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Escape}"
     );
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-    // Expand and add Barcelona as child
-    await userEvent.click(
-      await screen.findByLabelText("expand Holiday Destinations")
-    );
-    await userEvent.click(
-      await screen.findByLabelText("edit Holiday Destinations")
-    );
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     await expectTree(`
 My Notes
@@ -126,12 +94,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create a node
-    await screen.findByLabelText("collapse My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Version 1{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await type("My Notes{Enter}{Tab}Version 1{Escape}");
 
     await expectTree(`
 My Notes
@@ -176,25 +139,9 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create Holiday Destinations
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Holiday Destinations{Enter}"
+    await type(
+      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Escape}"
     );
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-    // Expand and add Barcelona
-    await userEvent.click(
-      await screen.findByLabelText("expand Holiday Destinations")
-    );
-    await userEvent.click(
-      await screen.findByLabelText("edit Holiday Destinations")
-    );
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     await expectTree(`
 My Notes
@@ -248,25 +195,9 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create Holiday Destinations
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Holiday Destinations{Enter}"
+    await type(
+      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Escape}"
     );
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-    // Expand and add Barcelona
-    await userEvent.click(
-      await screen.findByLabelText("expand Holiday Destinations")
-    );
-    await userEvent.click(
-      await screen.findByLabelText("edit Holiday Destinations")
-    );
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     await expectTree(`
 My Notes
@@ -333,25 +264,9 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create Holiday Destinations
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Holiday Destinations{Enter}"
+    await type(
+      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Escape}"
     );
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-    // Expand and add Barcelona
-    await userEvent.click(
-      await screen.findByLabelText("expand Holiday Destinations")
-    );
-    await userEvent.click(
-      await screen.findByLabelText("edit Holiday Destinations")
-    );
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     // Edit Barcelona to BCN (first edit)
     const barcelonaEditor = await screen.findByLabelText("edit Barcelona");
@@ -427,25 +342,9 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create Holiday Destinations
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Holiday Destinations{Enter}"
+    await type(
+      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Escape}"
     );
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-    // Expand and add Barcelona
-    await userEvent.click(
-      await screen.findByLabelText("expand Holiday Destinations")
-    );
-    await userEvent.click(
-      await screen.findByLabelText("edit Holiday Destinations")
-    );
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     // Edit Barcelona to BCN (first edit)
     const barcelonaEditor = await screen.findByLabelText("edit Barcelona");
@@ -518,25 +417,9 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create Holiday Destinations
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Holiday Destinations{Enter}"
+    await type(
+      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Escape}"
     );
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-    // Expand and add Barcelona
-    await userEvent.click(
-      await screen.findByLabelText("expand Holiday Destinations")
-    );
-    await userEvent.click(
-      await screen.findByLabelText("edit Holiday Destinations")
-    );
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     await expectTree(`
 My Notes
@@ -611,40 +494,21 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create two parent nodes: Holiday Destinations and Cities in Spain
+    await type(
+      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Escape}"
+    );
     await userEvent.click(await screen.findByLabelText("edit My Notes"));
     await userEvent.keyboard("{Enter}");
     await userEvent.type(
       await findNewNodeEditor(),
-      "Holiday Destinations{Enter}"
+      "Cities in Spain{Enter}{Tab}Barcelona{Escape}"
     );
-    await userEvent.type(await findNewNodeEditor(), "Cities in Spain{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-    // Add Barcelona under Holiday Destinations
-    await userEvent.click(
-      await screen.findByLabelText("expand Holiday Destinations")
-    );
-    await userEvent.click(
-      await screen.findByLabelText("edit Holiday Destinations")
-    );
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
-
-    // Add Barcelona under Cities in Spain using keyboard
-    // Press Enter on Cities in Spain editor to create sibling, then Tab to indent
-    const citiesEditor = await screen.findByLabelText("edit Cities in Spain");
-    await userEvent.click(citiesEditor);
-    await userEvent.type(citiesEditor, "{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Tab}Barcelona{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
     await expectTree(`
 My Notes
-  Holiday Destinations
-    Barcelona
   Cities in Spain
+    Barcelona
+  Holiday Destinations
     Barcelona
     `);
 
@@ -652,19 +516,19 @@ My Notes
     // This creates ~Versions with [BCN, Barcelona] only for that context
     // Holiday Destinations → Barcelona is unaffected (different context)
     const barcelonaEditors = await screen.findAllByLabelText("edit Barcelona");
-    // The second one is under Cities in Spain
-    await userEvent.click(barcelonaEditors[1]);
-    await userEvent.clear(barcelonaEditors[1]);
-    await userEvent.type(barcelonaEditors[1], "BCN");
-    fireEvent.blur(barcelonaEditors[1]);
+    // The first one is under Cities in Spain (it was added last, so appears first)
+    await userEvent.click(barcelonaEditors[0]);
+    await userEvent.clear(barcelonaEditors[0]);
+    await userEvent.type(barcelonaEditors[0], "BCN");
+    fireEvent.blur(barcelonaEditors[0]);
 
     // Holiday Destinations still shows Barcelona, Cities in Spain shows BCN
     await expectTree(`
 My Notes
-  Holiday Destinations
-    Barcelona
   Cities in Spain
     BCN
+  Holiday Destinations
+    Barcelona
     `);
 
     // Show "Referenced By" for Barcelona (under Holiday Destinations)
@@ -678,12 +542,12 @@ My Notes
     // - "My Notes → Cities in Spain (1) → BCN" (filtered from "...BCN → ~Versions → Barcelona")
     await expectTree(`
 My Notes
+  Cities in Spain
+    BCN
   Holiday Destinations
     Barcelona
       My Notes → Holiday Destinations (1) → Barcelona
       My Notes → Cities in Spain (1) → BCN
-  Cities in Spain
-    BCN
     `);
 
     cleanup();
@@ -691,12 +555,12 @@ My Notes
 
     await expectTree(`
 My Notes
+  Cities in Spain
+    BCN
   Holiday Destinations
     Barcelona
       My Notes → Holiday Destinations (1) → Barcelona
       My Notes → Cities in Spain (1) → BCN
-  Cities in Spain
-    BCN
     `);
   });
 
@@ -704,22 +568,15 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    // Create a node that has never been edited (no ~Versions yet)
-    // Press Enter on My Notes to create first child
-    const myNotesEditor = await screen.findByLabelText("edit My Notes");
-    await userEvent.click(myNotesEditor);
-    await userEvent.keyboard("{Enter}");
-    // Create "Original Text", then Tab to indent next node as child, add ~Versions, Tab to go inside, Enter
-    await userEvent.type(
-      await findNewNodeEditor(),
-      "Original Text{Enter}{Tab}~Versions{Enter}{Tab}"
+    await type(
+      "My Notes{Enter}{Tab}Original Text{Enter}{Tab}~Versions{Enter}{Tab}"
     );
 
     // ~Versions should be expanded and contain "Original Text" as the original version
     // Plus there should be an empty editor for the new node
     await expectTree(`
 My Notes
-  
+
     ~Versions
       [NEW NODE]
       Original Text
@@ -730,7 +587,7 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    await screen.findByLabelText("collapse My Notes");
+    await type("My Notes{Escape}");
 
     await expectTree(`
 My Notes

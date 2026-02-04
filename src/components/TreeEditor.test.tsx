@@ -73,7 +73,9 @@ My Notes
     test("Create multiple siblings with Enter chaining", async () => {
       const [alice] = setup([ALICE]);
       renderTree(alice);
-      await type("My Notes{Enter}{Tab}Node 1{Enter}Node 2{Enter}Node 3{Escape}");
+      await type(
+        "My Notes{Enter}{Tab}Node 1{Enter}Node 2{Enter}Node 3{Escape}"
+      );
 
       await expectTree(`
 My Notes
@@ -119,7 +121,9 @@ Parent
     test("Enter on expanded node - editor appears BEFORE existing children", async () => {
       const [alice] = setup([ALICE]);
       renderTree(alice);
-      await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child A{Enter}Child B{Escape}");
+      await type(
+        "My Notes{Enter}{Tab}Parent{Enter}{Tab}Child A{Enter}Child B{Escape}"
+      );
 
       await expectTree(`
 My Notes
@@ -149,7 +153,9 @@ My Notes
     test("Enter on expanded node inserts new child at BEGINNING", async () => {
       const [alice] = setup([ALICE]);
       renderTree(alice);
-      await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child A{Enter}Child B{Escape}");
+      await type(
+        "My Notes{Enter}{Tab}Parent{Enter}{Tab}Child A{Enter}Child B{Escape}"
+      );
 
       await expectTree(`
 My Notes
@@ -179,7 +185,9 @@ My Notes
     test("Enter on collapsed node - editor appears AFTER the node", async () => {
       const [alice] = setup([ALICE]);
       renderTree(alice);
-      await type("My Notes{Enter}{Tab}Node 1{Enter}Node 2{Enter}Node 3{Escape}");
+      await type(
+        "My Notes{Enter}{Tab}Node 1{Enter}Node 2{Enter}Node 3{Escape}"
+      );
 
       const node2Editor = await screen.findByLabelText("edit Node 2");
       await userEvent.click(node2Editor);
@@ -202,7 +210,9 @@ My Notes
     test("Enter on collapsed node inserts sibling after it", async () => {
       const [alice] = setup([ALICE]);
       renderTree(alice);
-      await type("My Notes{Enter}{Tab}Node 1{Enter}Node 2{Enter}Node 3{Escape}");
+      await type(
+        "My Notes{Enter}{Tab}Node 1{Enter}Node 2{Enter}Node 3{Escape}"
+      );
 
       await expectTree(`
 My Notes
@@ -272,7 +282,9 @@ My Notes
     test("Tab on new editor - editor visually appears AFTER existing children", async () => {
       const [alice] = setup([ALICE]);
       renderTree(alice);
-      await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child A{Enter}Child B{Escape}");
+      await type(
+        "My Notes{Enter}{Tab}Parent{Enter}{Tab}Child A{Enter}Child B{Escape}"
+      );
 
       await userEvent.click(await screen.findByLabelText("collapse Parent"));
       const parentEditor = await screen.findByLabelText("edit Parent");
@@ -417,7 +429,9 @@ My Notes
     test("Tab on existing node with previous sibling that has children - goes to END", async () => {
       const [alice] = setup([ALICE]);
       renderTree(alice);
-      await type("My Notes{Enter}{Tab}First{Enter}{Tab}Child A{Enter}Child B{Escape}");
+      await type(
+        "My Notes{Enter}{Tab}First{Enter}{Tab}Child A{Enter}Child B{Escape}"
+      );
 
       await userEvent.click(await screen.findByLabelText("collapse First"));
       await userEvent.click(await screen.findByLabelText("edit First"));
@@ -459,7 +473,9 @@ My Notes
     test("Enter on expanded node - editor appears BEFORE existing children", async () => {
       const [alice] = setup([ALICE]);
       renderTree(alice);
-      await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child 1{Enter}Child 2{Escape}");
+      await type(
+        "My Notes{Enter}{Tab}Parent{Enter}{Tab}Child 1{Enter}Child 2{Escape}"
+      );
 
       await userEvent.click(await screen.findByLabelText("edit Parent"));
       await userEvent.keyboard("{Enter}");
@@ -540,7 +556,9 @@ Parent
     test("Create deeply nested structure", async () => {
       const [alice] = setup([ALICE]);
       renderTree(alice);
-      await type("My Notes{Enter}{Tab}Level 1{Enter}{Tab}Level 2{Enter}{Tab}Level 3{Escape}");
+      await type(
+        "My Notes{Enter}{Tab}Level 1{Enter}{Tab}Level 2{Enter}{Tab}Level 3{Escape}"
+      );
 
       await expectTree(`
 My Notes
@@ -553,7 +571,9 @@ My Notes
     test("Enter on deeply nested expanded node inserts at beginning", async () => {
       const [alice] = setup([ALICE]);
       renderTree(alice);
-      await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}{Tab}Grandchild 1{Enter}Grandchild 2{Escape}");
+      await type(
+        "My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}{Tab}Grandchild 1{Enter}Grandchild 2{Escape}"
+      );
 
       await expectTree(`
 My Notes
@@ -681,7 +701,10 @@ Parent
         await screen.findByLabelText("edit Parent With Kids")
       );
       await userEvent.keyboard("{Enter}");
-      await userEvent.type(await findNewNodeEditor(), "Child A{Enter}Child B{Escape}");
+      await userEvent.type(
+        await findNewNodeEditor(),
+        "Child A{Enter}Child B{Escape}"
+      );
 
       await expectTree(`
 Root
@@ -1057,7 +1080,10 @@ Root
       const rootEditor = await screen.findByLabelText("edit Root");
       await userEvent.click(rootEditor);
       await userEvent.keyboard("{Enter}");
-      await userEvent.type(await findNewNodeEditor(), "New First Child{Escape}");
+      await userEvent.type(
+        await findNewNodeEditor(),
+        "New First Child{Escape}"
+      );
 
       await expectTree(`
 Root

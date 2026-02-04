@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   expectTree,
-  findNewNodeEditor,
   navigateToNodeViaSearch,
   renderTree,
   setup,
@@ -95,7 +94,9 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Item One{Enter}Item Two{Escape}");
+    await type(
+      "My Notes{Enter}{Tab}Parent{Enter}{Tab}Item One{Enter}Item Two{Escape}"
+    );
 
     await screen.findByText("Item One");
     await screen.findByText("Item Two");
@@ -114,7 +115,9 @@ My Notes
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Visible Item{Enter}Hidden Item{Escape}");
+    await type(
+      "My Notes{Enter}{Tab}Parent{Enter}{Tab}Visible Item{Enter}Hidden Item{Escape}"
+    );
 
     await screen.findByText("Visible Item");
     await screen.findByText("Hidden Item");
@@ -216,7 +219,9 @@ describe("Filter integration with RelevanceSelector", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child1{Enter}Child2{Escape}");
+    await type(
+      "My Notes{Enter}{Tab}Parent{Enter}{Tab}Child1{Enter}Child2{Escape}"
+    );
 
     await screen.findByText("Child1");
     await screen.findByText("Child2");

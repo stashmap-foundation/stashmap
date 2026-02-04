@@ -21,7 +21,9 @@ test("Publishing Status", async () => {
   await type("Root{Enter}New Note{Escape}");
   await screen.findByLabelText("edit New Note");
   await userEvent.click(
-    await screen.findByLabelText("publishing status", undefined, { timeout: 5000 })
+    await screen.findByLabelText("publishing status", undefined, {
+      timeout: 5000,
+    })
   );
   await screen.findByText("relay.test.first.success/");
 });

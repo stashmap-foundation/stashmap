@@ -16,7 +16,9 @@ describe("Search Results", () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
-    await type("Notes{Enter}Apple pie recipe{Enter}Banana bread{Enter}Apple cider{Escape}");
+    await type(
+      "Notes{Enter}Apple pie recipe{Enter}Banana bread{Enter}Apple cider{Escape}"
+    );
 
     await expectTree(`
 Notes
@@ -111,7 +113,9 @@ Search: Shared Topic
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
-    await type("Notes{Enter}Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Barcelona{Escape}");
+    await type(
+      "Notes{Enter}Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Barcelona{Escape}"
+    );
 
     await expectTree(`
 Notes
@@ -140,7 +144,9 @@ Search: Barcelona
     const [alice, bob] = setup([ALICE, BOB]);
 
     renderApp(bob());
-    await type("Notes{Enter}Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Barcelona{Escape}");
+    await type(
+      "Notes{Enter}Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Barcelona{Escape}"
+    );
 
     await expectTree(`
 Notes

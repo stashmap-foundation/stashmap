@@ -68,10 +68,12 @@ function mergeEvents(
   processed: ProcessedEvents,
   events: List<UnsignedEvent | Event>
 ): ProcessedEvents {
+  const mergedPanes = findPanes(events);
   return {
     ...processed,
     contacts: processed.contacts.merge(findContacts(events)),
     views: findViews(events).merge(processed.views),
+    panes: mergedPanes.length > 0 ? mergedPanes : processed.panes,
   };
 }
 

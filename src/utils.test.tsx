@@ -56,6 +56,7 @@ import {
   getRelationsNoReferencedBy,
   newNode,
   shortID,
+  EMPTY_NODE_ID,
 } from "./connections";
 import { newRelations, RootViewContextProvider } from "./ViewContext";
 import { LoadData } from "./dataQuery";
@@ -73,7 +74,6 @@ import {
   useCurrentPane,
   usePaneIndex,
 } from "./SplitPanesContext";
-import { EMPTY_NODE_ID } from "./connections";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 test.skip("skip", () => {});

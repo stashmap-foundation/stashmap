@@ -199,18 +199,20 @@ export function SignInModal(): JSX.Element {
   };
   const storeMergeEvents = useStorePreLoginEvents();
 
-  const signIn = async ({
+  const signIn = ({
     withExtension,
     key,
   }: {
     withExtension: boolean;
     key: string | PublicKey;
-  }): Promise<void> => {
+  }): void => {
+    const preLoginPlan = createPlan();
+
     const user = withExtension
       ? loginWithExtension(key as PublicKey)
       : login(key as string);
     const plan = planRewriteUnpublishedEvents(
-      { ...createPlan(), user },
+      { ...preLoginPlan, user },
       publishEventsStatus.unsignedEvents
     );
     if (plan.publishEvents.size === 0) {
@@ -225,25 +227,9 @@ export function SignInModal(): JSX.Element {
     );
 
     if (nonMergeEvents.size > 0) {
-      const results = await execute({
-        plan: { ...plan, publishEvents: nonMergeEvents },
-        relayPool,
-        finalizeEvent,
-      });
       setPublishEvents((current) => {
         return {
           unsignedEvents: nonMergeEvents,
-          results,
-          isLoading: false,
-          preLoginEvents: mergeEvents,
-          temporaryView: current.temporaryView,
-          temporaryEvents: current.temporaryEvents,
-        };
-      });
-    } else {
-      setPublishEvents((current) => {
-        return {
-          unsignedEvents: current.unsignedEvents,
           results: current.results,
           isLoading: true,
           preLoginEvents: mergeEvents,
@@ -251,10 +237,33 @@ export function SignInModal(): JSX.Element {
           temporaryEvents: current.temporaryEvents,
         };
       });
+      execute({
+        plan: { ...plan, publishEvents: nonMergeEvents },
+        relayPool,
+        finalizeEvent,
+      }).then((results) => {
+        setPublishEvents((current) => {
+          return {
+            ...current,
+            results,
+            isLoading: false,
+          };
+        });
+      });
+    } else {
+      setPublishEvents((current) => {
+        return {
+          unsignedEvents: current.unsignedEvents,
+          results: current.results,
+          isLoading: false,
+          preLoginEvents: mergeEvents,
+          temporaryView: current.temporaryView,
+          temporaryEvents: current.temporaryEvents,
+        };
+      });
     }
     storeMergeEvents(mergeEvents.map((e) => e.kind));
-    const root = plan.panes[0].stack[plan.panes[0].stack.length - 1];
-    navigate(referrer || `/w/${root}`);
+    setTimeout(() => navigate(referrer || "/"), 0);
   };
   return (
     <Modal show onHide={onHide}>

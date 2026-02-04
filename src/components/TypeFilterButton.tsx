@@ -10,7 +10,12 @@ const RELEVANCE_FILTERS: {
   color: string;
   symbol: string;
 }[] = [
-  { id: "relevant", label: "Relevant", color: TYPE_COLORS.relevant, symbol: "!" },
+  {
+    id: "relevant",
+    label: "Relevant",
+    color: TYPE_COLORS.relevant,
+    symbol: "!",
+  },
   {
     id: "maybe_relevant",
     label: "Maybe Relevant",
@@ -29,7 +34,12 @@ const RELEVANCE_FILTERS: {
     color: TYPE_COLORS.not_relevant,
     symbol: "x",
   },
-  { id: "contains", label: "Contains", color: TYPE_COLORS.contains, symbol: "o" },
+  {
+    id: "contains",
+    label: "Contains",
+    color: TYPE_COLORS.contains,
+    symbol: "o",
+  },
 ];
 
 const ARGUMENT_FILTERS: {
@@ -38,8 +48,18 @@ const ARGUMENT_FILTERS: {
   color: string;
   symbol: string;
 }[] = [
-  { id: "confirms", label: "Confirms", color: TYPE_COLORS.confirms, symbol: "+" },
-  { id: "contra", label: "Contradicts", color: TYPE_COLORS.contra, symbol: "-" },
+  {
+    id: "confirms",
+    label: "Confirms",
+    color: TYPE_COLORS.confirms,
+    symbol: "+",
+  },
+  {
+    id: "contra",
+    label: "Contradicts",
+    color: TYPE_COLORS.contra,
+    symbol: "-",
+  },
 ];
 
 const SUGGESTIONS_FILTER = {
@@ -110,12 +130,26 @@ export function FilterSymbolsDisplay({
   return (
     <span className="filter-symbols-display">
       {RELEVANCE_FILTERS.map((f) => (
-        <FilterSymbol key={f.id} color={f.color} symbol={f.symbol} isActive={isActive(f.id)} />
+        <FilterSymbol
+          key={f.id}
+          color={f.color}
+          symbol={f.symbol}
+          isActive={isActive(f.id)}
+        />
       ))}
       {ARGUMENT_FILTERS.map((f) => (
-        <FilterSymbol key={f.id} color={f.color} symbol={f.symbol} isActive={isActive(f.id)} />
+        <FilterSymbol
+          key={f.id}
+          color={f.color}
+          symbol={f.symbol}
+          isActive={isActive(f.id)}
+        />
       ))}
-      <FilterSymbol color={SUGGESTIONS_FILTER.color} symbol={SUGGESTIONS_FILTER.symbol} isActive={isActive("suggestions")} />
+      <FilterSymbol
+        color={SUGGESTIONS_FILTER.color}
+        symbol={SUGGESTIONS_FILTER.symbol}
+        isActive={isActive("suggestions")}
+      />
     </span>
   );
 }

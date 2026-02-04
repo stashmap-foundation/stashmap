@@ -13,12 +13,7 @@ export const DEFAULT_TYPE_FILTERS: (
   | Argument
   | "suggestions"
   | "contains"
-)[] = [
-  "relevant",
-  "maybe_relevant",
-  "contains",
-  "suggestions",
-];
+)[] = ["relevant", "maybe_relevant", "contains", "suggestions"];
 
 // Solarized accent colors for relevance and argument types
 export const TYPE_COLORS = {

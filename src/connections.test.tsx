@@ -65,7 +65,9 @@ test("Position of new connection can be specified", () => {
   const { b, c, d, e, relations } = sampleNodes();
   const b0 = newNode("b0");
   expect(
-    getNodeIDs(addRelationToRelations(relations, b0.id, undefined, undefined, 0).items)
+    getNodeIDs(
+      addRelationToRelations(relations, b0.id, undefined, undefined, 0).items
+    )
   ).toEqual(List([b0.id, b.id, c.id, d.id, e.id]));
 });
 

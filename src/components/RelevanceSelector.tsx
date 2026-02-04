@@ -177,11 +177,14 @@ export function RelevanceSelector({
           }
         }}
         style={{
-          color: isNotRelevant
-            ? isCurrentlyNotRelevant
+          color: (() => {
+            if (!isNotRelevant) {
+              return TYPE_COLORS.inactive;
+            }
+            return isCurrentlyNotRelevant
               ? "var(--red)"
-              : TYPE_COLORS.not_relevant
-            : TYPE_COLORS.inactive,
+              : TYPE_COLORS.not_relevant;
+          })(),
         }}
         title={isCurrentlyNotRelevant ? "Remove from list" : undefined}
       >

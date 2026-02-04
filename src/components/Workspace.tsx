@@ -165,7 +165,11 @@ function useHomeShortcut(): void {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       if ((e.metaKey || e.ctrlKey) && e.key === "h") {
-        const logNode = getNodeFromID(knowledgeDBs, LOG_NODE_ID, user.publicKey);
+        const logNode = getNodeFromID(
+          knowledgeDBs,
+          LOG_NODE_ID,
+          user.publicKey
+        );
         if (logNode) {
           e.preventDefault();
           setPane({ ...pane, stack: [LOG_NODE_ID] });

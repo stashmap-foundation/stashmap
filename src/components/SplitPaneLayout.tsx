@@ -14,11 +14,10 @@ import {
 import { LoadData } from "../dataQuery";
 import { LoadSearchData } from "../LoadSearchData";
 import { PaneView } from "./Workspace";
-import { EMPTY_NODE_ID } from "../connections";
+import { EMPTY_NODE_ID, createSearchId } from "../connections";
 import { planUpdateViews, planUpdatePanes, usePlanner } from "../planner";
 import { useData } from "../DataContext";
 import { isUserLoggedIn, useLogout } from "../NostrAuthContext";
-import { createSearchId } from "../connections";
 
 export function PaneSearchButton(): JSX.Element {
   const { setPane } = useSplitPanes();

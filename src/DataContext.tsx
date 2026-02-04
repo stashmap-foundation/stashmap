@@ -63,7 +63,7 @@ export function MergeKnowledgeDB({
 
   const cachedDBs = useCachedKnowledgeDBs();
   const baseDBs = knowledgeDBs
-    ? mergeKnowledgeDBs(cachedDBs, knowledgeDBs)
+    ? mergeKnowledgeDBs(knowledgeDBs, cachedDBs)
     : cachedDBs;
 
   const injectedDBs = injectEmptyNodesIntoKnowledgeDBs(

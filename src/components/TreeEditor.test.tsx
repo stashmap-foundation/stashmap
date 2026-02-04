@@ -11,6 +11,52 @@ import {
 } from "../utils.test";
 
 describe("Tree Editor - Comprehensive Tests", () => {
+  describe("Root Empty Node Flow", () => {
+    test("Create node from empty pane and press Enter to chain", async () => {
+      const [alice] = setup([ALICE], {
+        panes: [{ id: "pane-0", stack: [], author: ALICE.publicKey }],
+      });
+      renderTree(alice);
+
+      const editor = await findNewNodeEditor();
+      await userEvent.type(editor, "My First Note{Enter}");
+
+      const chainedEditor = await findNewNodeEditor();
+      await userEvent.type(chainedEditor, "Second Note{Escape}");
+
+      await expectTree(`
+My First Note
+  Second Note
+      `);
+    });
+
+    test("Empty Enter on root empty node closes editor without creating", async () => {
+      const [alice] = setup([ALICE], {
+        panes: [{ id: "pane-0", stack: [], author: ALICE.publicKey }],
+      });
+      renderTree(alice);
+
+      const editor = await findNewNodeEditor();
+      await userEvent.type(editor, "{Enter}");
+
+      expect(screen.queryByLabelText("new node editor")).toBeNull();
+    });
+
+    test("Escape on root empty node with text saves and closes", async () => {
+      const [alice] = setup([ALICE], {
+        panes: [{ id: "pane-0", stack: [], author: ALICE.publicKey }],
+      });
+      renderTree(alice);
+
+      const editor = await findNewNodeEditor();
+      await userEvent.type(editor, "Saved Note{Escape}");
+
+      await expectTree(`
+Saved Note
+      `);
+    });
+  });
+
   describe("Basic Node Creation", () => {
     test("Create first child using plus button on root", async () => {
       const [alice] = setup([ALICE]);

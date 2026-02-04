@@ -7,11 +7,12 @@ import {
   useIsInReferencedByView,
   useReferencedByDepth,
   useIsExpanded,
+  useIsRoot,
+  useRelationIndex,
   useNodeID,
   usePreviousSibling,
   useDisplayText,
   getParentView,
-  useNextInsertPosition,
   getRelationForView,
   isReferencedByView,
   getContext,
@@ -42,6 +43,7 @@ import {
   usePlanner,
   planSetEmptyNodePosition,
   planSaveNodeAndEnsureRelations,
+  getNextInsertPosition,
   planExpandNode,
   planRemoveEmptyNodePosition,
   planCreateNode,
@@ -173,7 +175,9 @@ function EditableContent(): JSX.Element {
   const displayText = useDisplayText();
   const prevSibling = usePreviousSibling();
   const parentPath = getParentView(viewPath);
-  const nextInsertPosition = useNextInsertPosition();
+  const nodeIsExpanded = useIsExpanded();
+  const nodeIsRoot = useIsRoot();
+  const relationIndex = useRelationIndex();
   const isEmptyNode = isEmptyNodeID(nodeID);
 
   const emptyNodeMetadata = computeEmptyNodeMetadata(
@@ -194,24 +198,34 @@ function EditableContent(): JSX.Element {
     _imageUrl?: string,
     submitted?: boolean
   ): void => {
-    const basePlan = planSaveNodeAndEnsureRelations(
-      createPlan(),
-      text,
-      viewPath,
-      stack
+    const { plan: basePlan, viewPath: updatedViewPath } =
+      planSaveNodeAndEnsureRelations(createPlan(), text, viewPath, stack);
+
+    if (!submitted || !text.trim()) {
+      executePlan(basePlan);
+      return;
+    }
+
+    const nextPosition = getNextInsertPosition(
+      basePlan,
+      updatedViewPath,
+      nodeIsRoot,
+      nodeIsExpanded,
+      relationIndex
     );
 
-    console.log("handleSave", { text, submitted, nextInsertPosition });
-    const plan =
-      submitted && nextInsertPosition
-        ? planSetEmptyNodePosition(
-          basePlan,
-          nextInsertPosition[0],
-          stack,
-          nextInsertPosition[1]
-        )
-        : basePlan;
+    if (!nextPosition) {
+      executePlan(basePlan);
+      return;
+    }
 
+    const [targetPath, newStack, insertIndex] = nextPosition;
+    const plan = planSetEmptyNodePosition(
+      basePlan,
+      targetPath,
+      newStack,
+      insertIndex
+    );
     executePlan(plan);
   };
 

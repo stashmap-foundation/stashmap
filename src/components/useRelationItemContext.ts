@@ -85,7 +85,7 @@ export function useRelationItemContext(): RelationItemContext {
     if (isEmptyNode) {
       if (!relationsID) return;
       if (hasEditorText) {
-        const plan = planSaveNodeAndEnsureRelations(
+        const { plan } = planSaveNodeAndEnsureRelations(
           createPlan(),
           editorText,
           viewPath,
@@ -107,9 +107,9 @@ export function useRelationItemContext(): RelationItemContext {
     const textChanged = hasEditorText && editorText !== nodeText;
     const basePlan: Plan = createPlan();
 
-    const planWithSave = textChanged
+    const { plan: planWithSave } = textChanged
       ? planSaveNodeAndEnsureRelations(basePlan, editorText, viewPath, stack)
-      : basePlan;
+      : { plan: basePlan };
 
     const plan = upsertRelations(planWithSave, parentView, stack, (rels) =>
       updater(rels, relationIndex)

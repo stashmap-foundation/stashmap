@@ -74,6 +74,7 @@ import {
   usePaneIndex,
 } from "./SplitPanesContext";
 import { ROOT } from "./types";
+import { EMPTY_NODE_ID } from "./connections";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 test.skip("skip", () => {});
@@ -695,7 +696,7 @@ function RootViewOrPaneIsLoadingInner({
 }): JSX.Element {
   const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
-  const rootNodeID = pane.stack[pane.stack.length - 1];
+  const rootNodeID = pane.stack[pane.stack.length - 1] || EMPTY_NODE_ID;
 
   return (
     <LoadSearchData nodeIDs={pane.stack}>

@@ -38,6 +38,7 @@ import {
   getVersionsRelations,
   upsertRelations,
   ViewPath,
+  NodeIndex,
   getNodeIDFromView,
   updateView,
   contextsMatch,
@@ -724,11 +725,16 @@ function ensureLogNode(plan: Plan): Plan {
   return planUpsertNode(plan, logNode);
 }
 
+export type SaveNodeResult = {
+  plan: Plan;
+  viewPath: ViewPath;
+};
+
 function planCreateNoteAtRoot(
   plan: Plan,
   text: string,
   viewPath: ViewPath
-): Plan {
+): SaveNodeResult {
   const [planWithNode, createdNode] = planCreateNode(plan, text);
   const planWithLog = ensureLogNode(planWithNode);
 
@@ -758,12 +764,18 @@ function planCreateNoteAtRoot(
     i === paneIndex ? { ...p, stack: [createdNode.id] } : p
   );
 
-  return planUpdatePanes(planWithRelations, newPanes);
+  const resultPlan = planUpdatePanes(planWithRelations, newPanes);
+  const newViewPath: ViewPath = [
+    paneIndex,
+    { nodeID: createdNode.id, nodeIndex: 0 as NodeIndex },
+  ];
+
+  return { plan: resultPlan, viewPath: newViewPath };
 }
 
 /**
  * Save node text - either materialize an empty node or create a version for existing node.
- * Returns the updated plan, or null if nothing to save.
+ * Returns the updated plan and the viewPath of the saved node.
  */
 export function planSaveNodeAndEnsureRelations(
   plan: Plan,
@@ -772,21 +784,24 @@ export function planSaveNodeAndEnsureRelations(
   stack: ID[],
   relevance?: Relevance,
   argument?: Argument
-): Plan {
+): SaveNodeResult {
   const trimmedText = text.trim();
   const [nodeID] = getNodeIDFromView(plan, viewPath);
   const parentPath = getParentView(viewPath);
 
   if (isEmptyNodeID(nodeID)) {
     if (!parentPath) {
-      if (!trimmedText) return plan;
+      if (!trimmedText) return { plan, viewPath };
       return planCreateNoteAtRoot(plan, trimmedText, viewPath);
     }
     const [parentNodeID] = getNodeIDFromView(plan, parentPath);
     const relations = getRelationForView(plan, parentPath, stack);
 
     if (!trimmedText) {
-      return relations ? planRemoveEmptyNodePosition(plan, relations.id) : plan;
+      const resultPlan = relations
+        ? planRemoveEmptyNodePosition(plan, relations.id)
+        : plan;
+      return { plan: resultPlan, viewPath };
     }
 
     const [planWithNode, createdNode] = planCreateNode(plan, trimmedText);
@@ -820,7 +835,7 @@ export function planSaveNodeAndEnsureRelations(
       ? planRemoveEmptyNodePosition(planWithVersion, relations.id)
       : planWithVersion;
 
-    return planAddToParent(
+    const resultPlan = planAddToParent(
       planWithoutEmpty,
       createdNode.id,
       parentPath,
@@ -829,10 +844,11 @@ export function planSaveNodeAndEnsureRelations(
       relevance ?? metadata?.relationItem.relevance,
       argument ?? metadata?.relationItem.argument
     );
+    return { plan: resultPlan, viewPath };
   }
 
   const node = getNodeFromID(plan.knowledgeDBs, nodeID, plan.user.publicKey);
-  if (!node || node.type !== "text") return plan;
+  if (!node || node.type !== "text") return { plan, viewPath };
 
   const context = getContext(plan, viewPath, stack);
   const displayText =
@@ -845,9 +861,32 @@ export function planSaveNodeAndEnsureRelations(
     node.text ??
     "";
 
-  if (trimmedText === displayText) return plan;
+  if (trimmedText === displayText) return { plan, viewPath };
 
-  return planCreateVersion(plan, nodeID, trimmedText, context);
+  return {
+    plan: planCreateVersion(plan, nodeID, trimmedText, context),
+    viewPath,
+  };
+}
+
+export function getNextInsertPosition(
+  plan: Plan,
+  viewPath: ViewPath,
+  nodeIsRoot: boolean,
+  nodeIsExpanded: boolean,
+  relationIndex: number | undefined
+): [ViewPath, ID[], number] | null {
+  const paneIndex = viewPath[0];
+  const { stack } = plan.panes[paneIndex];
+
+  if (nodeIsRoot || nodeIsExpanded) {
+    return [viewPath, stack, 0];
+  }
+
+  const parentPath = getParentView(viewPath);
+  if (!parentPath) return null;
+
+  return [parentPath, stack, (relationIndex ?? 0) + 1];
 }
 
 function planDelete(plan: Plan, id: LongID | ID, kind: number): Plan {

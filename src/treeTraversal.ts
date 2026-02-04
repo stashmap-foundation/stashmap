@@ -19,6 +19,7 @@ import {
   isAbstractRefId,
   isConcreteRefId,
   isSearchId,
+  isEmptyNodeID,
   getRelations,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
@@ -88,6 +89,10 @@ function itemPassesFilters(
   item: RelationItem,
   activeFilters: (Relevance | Argument | "suggestions" | "contains")[]
 ): boolean {
+  if (isEmptyNodeID(item.nodeID)) {
+    return true;
+  }
+
   const relevanceFilter =
     item.relevance === undefined ? "contains" : item.relevance;
   if (!activeFilters.includes(relevanceFilter)) {

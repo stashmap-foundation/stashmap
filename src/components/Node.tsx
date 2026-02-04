@@ -17,6 +17,7 @@ import {
   isReferencedByView,
   getContext,
   useIsViewingOtherUserContent,
+  viewPathToString,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -352,6 +353,7 @@ function EditableContent(): JSX.Element {
 
   return (
     <MiniEditor
+      key={`${viewPathToString(viewPath)}:${relationIndex}`}
       initialText={displayText}
       onSave={handleSave}
       onTab={handleTab}

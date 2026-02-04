@@ -227,6 +227,29 @@ describe("Filter dots in pane header", () => {
   });
 });
 
+describe("Empty node with filters", () => {
+  test("pressing Enter to create sibling works when contains filter is disabled", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("Root{Enter}{Tab}First{Escape}");
+
+    fireEvent.click(screen.getByLabelText("set First to relevant"));
+
+    await userEvent.click(screen.getByLabelText("toggle Contains filter"));
+
+    const firstEditor = await screen.findByLabelText("edit First");
+    await userEvent.click(firstEditor);
+    await userEvent.keyboard("{Enter}Second{Enter}");
+
+    await expectTree(`
+Root
+  First
+  [NEW NODE]
+    `);
+  });
+});
+
 describe("Empty node - keyboard navigation", () => {
   test("pressing Enter on empty node inserts new node at correct position", async () => {
     const [alice] = setup([ALICE]);

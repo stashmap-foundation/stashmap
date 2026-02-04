@@ -32,7 +32,6 @@ My Notes
 
     renderTree(alice);
     await type("My Notes{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand My Notes"));
     await expectTree(`
 My Notes
   [S] Holiday Destinations

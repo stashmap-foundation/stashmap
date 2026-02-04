@@ -68,7 +68,6 @@ Notes
     renderApp(alice());
 
     await type("Notes{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand Notes"));
 
     await expectTree(`
 Notes

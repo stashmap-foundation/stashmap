@@ -24,10 +24,12 @@ Root
   `);
 
   await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-  await userEvent.click(await screen.findByLabelText("expand Root"));
+  const collapseRootButtons1 = await screen.findAllByLabelText("collapse Root");
+  expect(collapseRootButtons1.length).toBe(2);
 
   await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-  await userEvent.click(await screen.findByLabelText("expand Root"));
+  const collapseRootButtons2 = await screen.findAllByLabelText("collapse Root");
+  expect(collapseRootButtons2.length).toBe(3);
 
   await expectTree(`
 Root

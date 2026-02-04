@@ -70,15 +70,10 @@ test("Write views on user relays", async () => {
     initialRoute: `/w/${workspace.id}`,
   });
 
-  const expandButton = await screen.findByLabelText(
-    "expand Alice Workspace",
+  const collapseButton = await screen.findByLabelText(
+    "collapse Alice Workspace",
     undefined,
     { timeout: 5000 }
-  );
-  fireEvent.click(expandButton);
-
-  const collapseButton = await screen.findByLabelText(
-    "collapse Alice Workspace"
   );
   fireEvent.click(collapseButton);
   await findEvent(aliceData.relayPool, { kinds: [KIND_VIEWS] });

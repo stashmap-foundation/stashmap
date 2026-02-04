@@ -105,8 +105,7 @@ test("Root node shows references when there are more than 0", async () => {
   await navigateToNodeViaSearch(0, "Bitcoin");
 
   // Now Bitcoin is the root - wait for it to appear as root
-  // Bitcoin has no children so it shows "expand" by default
-  await screen.findByLabelText("expand Bitcoin");
+  await screen.findByLabelText("collapse Bitcoin");
 
   // Show references to Bitcoin
   fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
@@ -126,7 +125,7 @@ test("Referenced By items do not show relation selector", async () => {
 
   // Navigate to Bitcoin as root
   await navigateToNodeViaSearch(0, "Bitcoin");
-  await screen.findByLabelText("expand Bitcoin");
+  await screen.findByLabelText("collapse Bitcoin");
 
   // The root node (Bitcoin) should have a relation selector
   expect(screen.getByLabelText("show references to Bitcoin")).toBeDefined();
@@ -156,7 +155,7 @@ test("Referenced By items still show navigation buttons", async () => {
 
   // Navigate to Bitcoin as root
   await navigateToNodeViaSearch(0, "Bitcoin");
-  await screen.findByLabelText("expand Bitcoin");
+  await screen.findByLabelText("collapse Bitcoin");
 
   // Open Referenced By view
   fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
@@ -280,7 +279,7 @@ test("Can exit Referenced By mode even when node has no relations", async () => 
   await navigateToNodeViaSearch(0, "Bitcoin");
 
   // Bitcoin is now root - it has no children
-  await screen.findByLabelText("expand Bitcoin");
+  await screen.findByLabelText("collapse Bitcoin");
 
   // Filter dots should be visible initially (not in Referenced By mode)
   expect(screen.getByLabelText("toggle Relevant filter")).toBeDefined();

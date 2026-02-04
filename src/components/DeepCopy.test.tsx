@@ -152,16 +152,15 @@ My Notes
     // Open split pane
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
 
-    // Navigate pane 1 to Source
+    // Navigate pane 1 to Source (Source has no children as root, so no expand/collapse)
     await navigateToNodeViaSearch(1, "Source");
-    await screen.findByLabelText("collapse Source");
 
     // Drag Child A from pane 0 to My Notes (use collapse button to target tree node, not breadcrumb)
     fireEvent.dragStart(screen.getAllByText("Child A")[0]);
     fireEvent.drop(screen.getAllByLabelText("collapse My Notes")[0]);
 
     // Child A should appear under My Notes (deep copied)
-    // Pane 1 shows Source as root
+    // Pane 1 shows Source as root with children
     await expectTree(`
 My Notes
   Child A
@@ -169,6 +168,8 @@ My Notes
     Child A
     Child B
 Source
+  Child A
+  Child B
     `);
   });
 
@@ -203,9 +204,9 @@ My Notes
     // Open split pane and navigate to Target
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
     await navigateToNodeViaSearch(1, "Target");
-    await screen.findByLabelText("collapse Target");
 
     // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
+    // Target in pane 0 has expand, Target in pane 1 has collapse (root expanded by default but no children yet)
     const targetToggleBtns = screen.getAllByLabelText(
       /(?:expand|collapse) Target/
     );
@@ -736,6 +737,7 @@ My Notes
     AliceChild
   [S] BobFolder
 Target
+  AliceChild
     `);
 
     // Drag [S] BobFolder from pane 0 to Target root in pane 1
@@ -815,7 +817,6 @@ My Notes
     await follow(alice, bob().user.publicKey);
     renderTree(alice);
     await type("My Notes{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand My Notes"));
 
     // Alice sees [S] BobItem as suggestion
     await expectTree(`
@@ -856,7 +857,6 @@ My Notes
     await follow(alice, bob().user.publicKey);
     renderTree(alice);
     await type("My Notes{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand My Notes"));
 
     // Alice sees [S] BobItem
     await expectTree(`
@@ -917,7 +917,6 @@ My Notes
     await follow(alice, bob().user.publicKey);
     renderTree(alice);
     await type("My Notes{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand My Notes"));
 
     // Alice sees [S] BobFolder
     await expectTree(`
@@ -1059,7 +1058,6 @@ My Notes
     await follow(alice, carol().user.publicKey);
     renderTree(alice);
     await type("My Notes{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand My Notes"));
 
     await expectTree(`
 My Notes
@@ -1091,7 +1089,6 @@ My Notes
     await follow(alice, bob().user.publicKey);
     renderTree(alice);
     await type("My Notes{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand My Notes"));
 
     await expectTree(`
 My Notes

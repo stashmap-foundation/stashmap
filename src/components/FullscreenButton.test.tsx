@@ -31,7 +31,6 @@ My Notes
 
   renderTree(alice);
   await userEvent.type(await findNewNodeEditor(), "My Notes{Escape}");
-  await userEvent.click(await screen.findByLabelText("expand My Notes"));
 
   await expectTree(`
 My Notes
@@ -40,9 +39,6 @@ My Notes
 
   await userEvent.click(
     await screen.findByLabelText("open Holiday Destinations in fullscreen")
-  );
-  await userEvent.click(
-    await screen.findByLabelText("expand Holiday Destinations")
   );
 
   await expectTree(`

@@ -102,10 +102,7 @@ test("Move View Settings on Delete", async () => {
     </LoadData>,
     alice()
   );
-  // Expand Programming Languages to see children
-  await screen.findByText("Programming Languages");
-  await userEvent.click(screen.getByLabelText("expand Programming Languages"));
-  // Find and expand C
+  // Root is expanded by default, find and expand C
   await screen.findByText("C");
   await userEvent.click(screen.getByLabelText("expand C"));
 
@@ -188,7 +185,6 @@ My Notes
   renderTree(bob);
   // Bob creates My Notes, then sees Alice's Cities as a suggestion
   await type("My Notes{Escape}");
-  await userEvent.click(await screen.findByLabelText("expand My Notes"));
   await expectTree(`
 My Notes
   [S] Cities
@@ -231,8 +227,7 @@ My Notes
     await screen.findByLabelText("open My Notes → Cities (2) in fullscreen")
   );
 
-  // Now Bob is viewing Alice's Cities - expand to see her items
-  await userEvent.click(await screen.findByLabelText("expand Cities"));
+  // Now Bob is viewing Alice's Cities - root is expanded by default
   await expectTree(`
 Cities
   Paris
@@ -416,9 +411,7 @@ My Notes
     )
   );
 
-  await userEvent.click(
-    await screen.findByLabelText("expand Programming Languages")
-  );
+  // Root is expanded by default
   await userEvent.click(await screen.findByLabelText("expand OOP"));
   await expectTree(`
 Programming Languages
@@ -466,10 +459,7 @@ test("Disconnect Nodes", async () => {
     ...alice(),
     initialRoute: `/w/${pl.id}`,
   });
-  // Expand Programming Languages to see children
-  await userEvent.click(
-    await screen.findByLabelText("expand Programming Languages")
-  );
+  // Root is expanded by default
   await expectTree(`
 Programming Languages
   C

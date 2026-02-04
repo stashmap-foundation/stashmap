@@ -167,9 +167,8 @@ My Notes
 
     await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
 
-    // Navigate to Bitcoin as root
     await navigateToNodeViaSearch(0, "Bitcoin");
-    await screen.findByLabelText("expand Bitcoin");
+    await screen.findByLabelText("collapse Bitcoin");
 
     // Switch to Referenced By view
     fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
@@ -321,9 +320,6 @@ describe("Diff item relevance selection", () => {
     // Navigate to Parent
     await navigateToNodeViaSearch(0, "Parent");
 
-    // Expand Parent to see children
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-
     await screen.findByText("Alice Child");
 
     // Bob's child should appear as a diff item
@@ -374,9 +370,6 @@ describe("Diff item relevance selection", () => {
 
     // Navigate to Parent
     await navigateToNodeViaSearch(0, "Parent");
-
-    // Expand Parent to see children
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
 
     await screen.findByText("Bob Child");
 
@@ -431,9 +424,6 @@ describe("Diff item relevance selection", () => {
 
     // Navigate to Parent
     await navigateToNodeViaSearch(0, "Parent");
-
-    // Expand Parent to see children
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
 
     await screen.findByText("Bob Child");
 
@@ -615,9 +605,6 @@ describe("Relation lookup consistency (regression)", () => {
     // Navigate to Parent
     await navigateToNodeViaSearch(0, "Parent");
 
-    // Expand Parent to see children
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-
     // Both instances of Child should be visible
     const childElements = await screen.findAllByText("Child");
     expect(childElements.length).toBe(2);
@@ -678,9 +665,6 @@ describe("Multi-user relevance", () => {
     // Navigate to Parent
     await navigateToNodeViaSearch(0, "Parent");
 
-    // Expand Parent to see children
-    await userEvent.click(await screen.findByLabelText("expand Parent"));
-
     // Child should be visible because Alice's relevance is "" (relevant)
     await screen.findByText("Child");
   });
@@ -698,7 +682,6 @@ describe("Accepting suggestions via RelevanceSelector", () => {
     await follow(alice, bob().user.publicKey);
     renderTree(alice);
     await type("My Notes{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand My Notes"));
 
     await expectTree(`
 My Notes
@@ -726,7 +709,6 @@ My Notes
     await follow(alice, bob().user.publicKey);
     renderTree(alice);
     await type("My Notes{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand My Notes"));
 
     await expectTree(`
 My Notes
@@ -754,7 +736,6 @@ My Notes
     await follow(alice, bob().user.publicKey);
     renderTree(alice);
     await type("My Notes{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand My Notes"));
 
     await userEvent.click(
       screen.getByLabelText("toggle Little Relevant filter")
@@ -786,7 +767,6 @@ My Notes
     await follow(alice, bob().user.publicKey);
     renderTree(alice);
     await type("My Notes{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand My Notes"));
 
     await expectTree(`
 My Notes
@@ -820,7 +800,6 @@ My Notes
     await follow(alice, bob().user.publicKey);
     renderTree(alice);
     await type("My Notes{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand My Notes"));
 
     await expectTree(`
 My Notes
@@ -848,7 +827,6 @@ My Notes
     await follow(alice, bob().user.publicKey);
     renderTree(alice);
     await type("My Notes{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand My Notes"));
 
     await expectTree(`
 My Notes

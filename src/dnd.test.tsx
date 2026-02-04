@@ -74,7 +74,10 @@ Root
 
   await navigateToNodeViaSearch(1, "Parent");
 
-  await screen.findByLabelText("collapse Parent");
+  const collapseParentButtons = await screen.findAllByLabelText(
+    "collapse Parent"
+  );
+  expect(collapseParentButtons.length).toBe(2);
 
   const draggableItems = screen.getAllByText("Draggable Item");
   const rootToggle = screen.getAllByLabelText("collapse Root")[0];

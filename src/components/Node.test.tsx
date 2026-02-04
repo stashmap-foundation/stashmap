@@ -68,11 +68,7 @@ test("Render non existing Node", async () => {
   );
   await screen.findByText("Programming Languages");
 
-  // Expand the node to see the child that points to a non-existent node
-  await userEvent.click(
-    await screen.findByLabelText("expand Programming Languages")
-  );
-
+  // Root node is expanded by default, so the child that points to non-existent node is visible
   await screen.findByText("Error: Node not found");
 });
 

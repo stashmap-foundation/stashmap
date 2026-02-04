@@ -103,7 +103,7 @@ Root
     await type("Root{Enter}Money{Enter}{Tab}Bitcoin{Escape}");
 
     await navigateToNodeViaSearch(0, "Bitcoin");
-    await screen.findByLabelText("expand Bitcoin");
+    await screen.findByLabelText("collapse Bitcoin");
 
     fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
     await screen.findByLabelText("hide references to Bitcoin");

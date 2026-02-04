@@ -136,8 +136,6 @@ Notes
     );
     await userEvent.click(fullscreenButtons[0]);
 
-    await userEvent.click(await screen.findByLabelText("expand Barcelona"));
-
     await expectTree(`
 Barcelona
   Bob child

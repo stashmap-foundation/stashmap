@@ -59,9 +59,6 @@ test("Markdown Upload creates correct tree structure", async () => {
   renderTree(alice);
 
   await navigateToProgrammingLanguages();
-  await userEvent.click(
-    await screen.findByLabelText("expand Programming Languages")
-  );
 
   await expectTree(`
 Programming Languages
@@ -86,6 +83,10 @@ test("Edit Node uploaded from Markdown", async () => {
 
   await expectTree(`
 Programming Languages OOP
+  Java
+  Java is a programming language
+  Python
+  Python is a programming language
   `);
 
   cleanup();
@@ -95,6 +96,10 @@ Programming Languages OOP
 
   await expectTree(`
 Programming Languages OOP
+  Java
+  Java is a programming language
+  Python
+  Python is a programming language
   `);
 });
 
@@ -104,9 +109,6 @@ test("Delete Node uploaded from Markdown", async () => {
   renderTree(alice);
 
   await navigateToProgrammingLanguages();
-  await userEvent.click(
-    await screen.findByLabelText("expand Programming Languages")
-  );
 
   await expectTree(`
 Programming Languages
@@ -129,9 +131,6 @@ Programming Languages
   renderTree(alice);
 
   await navigateToProgrammingLanguages();
-  await userEvent.click(
-    await screen.findByLabelText("expand Programming Languages")
-  );
 
   await expectTree(`
 Programming Languages

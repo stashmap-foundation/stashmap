@@ -310,16 +310,18 @@ export function getLast(viewContext: ViewPath): SubPath {
   return viewContext[viewContext.length - 1] as SubPath;
 }
 
-function getDefaultView(id: ID): View {
+function getDefaultView(id: ID, isRootNode: boolean): View {
   return {
     viewingMode: undefined,
-    expanded: id === "ROOT" || isSearchId(id),
+    expanded: isRootNode || isSearchId(id),
   };
 }
 
 export function getViewFromPath(data: Data, path: ViewPath): View {
   const { nodeID } = getLast(path);
-  return getViewExactMatch(data.views, path) || getDefaultView(nodeID);
+  return (
+    getViewExactMatch(data.views, path) || getDefaultView(nodeID, isRoot(path))
+  );
 }
 
 function getNewestRelationFromAuthor(

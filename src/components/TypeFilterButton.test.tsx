@@ -148,7 +148,7 @@ My Notes
 
     // Navigate to Bitcoin as root
     await navigateToNodeViaSearch(0, "Bitcoin");
-    await screen.findByLabelText("expand Bitcoin");
+    await screen.findByLabelText("collapse Bitcoin");
 
     // Inline filter dots should exist in pane header
     expect(screen.getByLabelText("toggle Relevant filter")).toBeDefined();

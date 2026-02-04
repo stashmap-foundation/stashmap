@@ -81,24 +81,6 @@ body {
   }
 }
 
-.readonly-banner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 16px;
-  background-color: var(--readonly-banner-bg);
-  color: var(--base3);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  flex-shrink: 0;
-}
-
-.readonly-banner-text {
-  font-family: monospace;
-}
-
 .pane-header {
   display: flex;
   align-items: center;
@@ -395,10 +377,25 @@ body {
   color: var(--cyan);
 }
 
+// Relevant indicator in gutter
+.relevant-indicator {
+  color: var(--blue);
+  font-weight: bold;
+  font-family: monospace;
+}
+
 // Maybe relevant indicator in gutter
 .maybe-relevant-indicator {
   color: var(--magenta);
   font-weight: bold;
+  font-family: monospace;
+}
+
+// Little relevant indicator in gutter
+.little-relevant-indicator {
+  color: var(--yellow);
+  font-weight: bold;
+  font-family: monospace;
 }
 
 // Placeholder dot for regular items (makes gutter dense)
@@ -495,6 +492,10 @@ body {
   font: inherit;
   cursor: pointer;
   text-align: inherit;
+
+  &:hover .reference-node {
+    text-decoration: underline;
+  }
 }
 
 // Dragging states
@@ -1408,10 +1409,6 @@ input:focus,
   background: var(--base01);
 }
 
-.status-segment-other {
-  background: var(--base01);
-  color: var(--violet);
-}
 
 .status-segment-warning {
   background: var(--yellow);
@@ -1425,6 +1422,19 @@ input:focus,
 
 .status-spacer {
   flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &.status-readonly {
+    background: var(--violet);
+    color: var(--base3);
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-family: monospace;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
 }
 
 .status-btn {

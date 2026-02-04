@@ -563,6 +563,15 @@ export function Node({
       >
         <div className="indicator-gutter">
           {isSuggestion && <SuggestionIndicator />}
+          {relevance === "relevant" && !isSuggestion && (
+            <span
+              className="relevant-indicator"
+              title="Relevant"
+              aria-hidden="true"
+            >
+              !
+            </span>
+          )}
           {relevance === "maybe_relevant" && !isSuggestion && (
             <span
               className="maybe-relevant-indicator"
@@ -570,6 +579,15 @@ export function Node({
               aria-hidden="true"
             >
               ?
+            </span>
+          )}
+          {relevance === "little_relevant" && !isSuggestion && (
+            <span
+              className="little-relevant-indicator"
+              title="Little Relevant"
+              aria-hidden="true"
+            >
+              ~
             </span>
           )}
           {(showReferencedByBackground || isReference) && !isSuggestion && (

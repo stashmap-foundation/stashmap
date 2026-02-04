@@ -11,7 +11,7 @@ import {
 } from "../utils.test";
 
 describe("Empty node with typed text - relevance", () => {
-  test("typing text then clicking relevant materializes node with bold styling", async () => {
+  test("typing text then clicking relevant materializes node with gutter indicator", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -27,12 +27,10 @@ My Notes
     Child
     `);
 
-    // Check bold styling (fontWeight: 600) - style is on parent span
-    const childNode = await screen.findByLabelText("edit Child");
-    const styledSpan = childNode.closest(
-      "span[style*='font-weight']"
-    ) as HTMLElement;
-    expect(styledSpan?.style.fontWeight).toBe("600");
+    // Check for "!" indicator in gutter (relevance is now shown in gutter, not as text styling)
+    await waitFor(() => {
+      expect(document.querySelector(".relevant-indicator")).toBeTruthy();
+    });
   });
 
   test("typing text then clicking little relevant materializes with opacity styling", async () => {
@@ -166,7 +164,7 @@ My Notes
 });
 
 describe("Editing existing node - relevance", () => {
-  test("changing relevance while editing saves text and applies bold styling", async () => {
+  test("changing relevance while editing saves text and shows gutter indicator", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -191,11 +189,10 @@ My Notes
     Edited
     `);
 
-    const editedNode = await screen.findByLabelText("edit Edited");
-    const styledSpan = editedNode.closest(
-      "span[style*='font-weight']"
-    ) as HTMLElement;
-    expect(styledSpan?.style.fontWeight).toBe("600");
+    // Check for "!" indicator in gutter (relevance is now shown in gutter, not as text styling)
+    await waitFor(() => {
+      expect(document.querySelector(".relevant-indicator")).toBeTruthy();
+    });
 
     cleanup();
     renderTree(alice);
@@ -206,11 +203,10 @@ My Notes
     Edited
     `);
 
-    const rerenderedNode = await screen.findByLabelText("edit Edited");
-    const rerenderedStyledSpan = rerenderedNode.closest(
-      "span[style*='font-weight']"
-    ) as HTMLElement;
-    expect(rerenderedStyledSpan?.style.fontWeight).toBe("600");
+    // Check indicator persists after re-render
+    await waitFor(() => {
+      expect(document.querySelector(".relevant-indicator")).toBeTruthy();
+    });
   });
 });
 

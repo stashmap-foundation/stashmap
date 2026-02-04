@@ -181,22 +181,6 @@ function useHomeShortcut(): void {
   }, [setPane, pane, knowledgeDBs, user.publicKey]);
 }
 
-function ReadonlyBanner(): JSX.Element | null {
-  const pane = useCurrentPane();
-  const { user } = useData();
-  const isOtherUser = pane.author !== user.publicKey;
-
-  if (!isOtherUser) {
-    return null;
-  }
-
-  return (
-    <div className="readonly-banner" aria-label="viewing other user content read only">
-      <span className="readonly-banner-text">READ ONLY</span>
-    </div>
-  );
-}
-
 function PaneHeader(): JSX.Element {
   const paneIndex = usePaneIndex();
   const isFirstPane = paneIndex === 0;
@@ -252,10 +236,9 @@ function PaneStatusLine(): JSX.Element {
       <div className="status-segment">
         <CurrentNodeName />
       </div>
-      {isViewingOtherUserContent && (
-        <div className="status-segment status-segment-other">other</div>
-      )}
-      <div className="status-spacer" />
+      <div className={`status-spacer ${isViewingOtherUserContent ? "status-readonly" : ""}`}>
+        {isViewingOtherUserContent && "READONLY"}
+      </div>
       {isFirstPane && <PublishingStatusWrapper />}
       {isFirstPane && (
         <div className="status-segment">
@@ -276,7 +259,6 @@ export function PaneView(): JSX.Element | null {
       <div
         className={`pane-wrapper ${isOtherUser ? "pane-other-user pane-readonly-mode" : ""}`}
       >
-        <ReadonlyBanner />
         <PaneHeader />
         <div className="pane-content">
           <TreeView />

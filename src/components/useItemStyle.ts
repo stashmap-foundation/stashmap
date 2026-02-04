@@ -24,13 +24,13 @@ const DEFAULT_STYLE: ItemStyle = {
 function getRelevanceTextStyle(relevance: Relevance): CSSProperties {
   switch (relevance) {
     case "relevant":
-      return { fontWeight: 600 };
+      return {};
     case "maybe_relevant":
       return {};
     case undefined:
       return {};
     case "little_relevant":
-      return { color: "var(--base01)" };
+      return {};
     case "not_relevant":
       return { textDecoration: "line-through", color: "var(--base01)" };
     default:
@@ -49,15 +49,14 @@ function getArgumentTextStyle(argument: Argument | undefined): CSSProperties {
 }
 
 /**
- * Hook that returns styling based on item's relevance, argument, and diff status.
+ * Hook that returns styling based on item's relevance, argument, and suggestion status.
  *
  * Styling rules:
- * - Relevant: bold text
- * - Maybe relevant: normal text
- * - Little relevant: 60% opacity
- * - Contra: light red background
- * - Confirms: light green background
- * - Diff items: 70% opacity + dashed left border
+ * - Suggestions: gray text (non-editable content)
+ * - Not relevant: line-through + gray text
+ * - Contra: red text
+ * - Confirms: green text
+ * - Relevance indicators (! ? ~) are shown in gutter, not as text styling
  */
 export function useItemStyle(): ItemStyle {
   const data = useData();
@@ -70,9 +69,13 @@ export function useItemStyle(): ItemStyle {
     return DEFAULT_STYLE;
   }
 
-  // Suggestions: no special card styling, just the badge indicator
+  // Suggestions: gray text for non-editable content
   if (isSuggestion) {
-    return DEFAULT_STYLE;
+    return {
+      cardStyle: {},
+      textStyle: { color: "var(--base01)" },
+      relevance: undefined,
+    };
   }
 
   // Get current item's relevance and argument

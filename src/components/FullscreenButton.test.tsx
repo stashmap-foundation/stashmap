@@ -1,48 +1,56 @@
-import React from "react";
-import { List } from "immutable";
-import { screen, fireEvent } from "@testing-library/react";
-import { usePaneStack } from "../SplitPanesContext";
-import { ViewContext, ViewPath, NodeIndex } from "../ViewContext";
-import { FullscreenButton } from "./FullscreenButton";
-import { ROOT } from "../types";
-import { renderWithTestData } from "../utils.test";
-import { createAbstractRefId } from "../connections";
-
-function CurrentStackDisplay(): JSX.Element {
-  const stack = usePaneStack();
-  return <div data-testid="current-stack">{JSON.stringify(stack)}</div>;
-}
+import { cleanup, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import {
+  ALICE,
+  BOB,
+  expectTree,
+  findNewNodeEditor,
+  follow,
+  renderTree,
+  setup,
+} from "../utils.test";
 
 test("Reference node opens with only reference path, not current pane stack", async () => {
-  const contextNode = "context123" as ID;
-  const targetNode = "target456" as ID;
-  const refId = createAbstractRefId(List([contextNode]), targetNode);
+  const [alice, bob] = setup([ALICE, BOB]);
 
-  const viewPath: ViewPath = [
-    0,
-    { nodeID: ROOT, nodeIndex: 0 as NodeIndex, relationsID: "" },
-    {
-      nodeID: "someParent" as LongID,
-      nodeIndex: 0 as NodeIndex,
-      relationsID: "",
-    },
-    { nodeID: refId, nodeIndex: 0 as NodeIndex },
-  ];
-
-  renderWithTestData(
-    <ViewContext.Provider value={viewPath}>
-      <FullscreenButton />
-      <CurrentStackDisplay />
-    </ViewContext.Provider>
+  renderTree(bob);
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Escape}"
   );
 
-  await screen.findByTestId("current-stack");
-  fireEvent.click(
-    screen.getByLabelText("open Loading... → Loading... in fullscreen")
+  await expectTree(`
+My Notes
+  Holiday Destinations
+    Spain
+  `);
+
+  cleanup();
+
+  await follow(alice, bob().user.publicKey);
+
+  renderTree(alice);
+  await userEvent.type(await findNewNodeEditor(), "My Notes{Escape}");
+  await userEvent.click(await screen.findByLabelText("expand My Notes"));
+
+  await expectTree(`
+My Notes
+  [S] Holiday Destinations
+  `);
+
+  await userEvent.click(
+    await screen.findByLabelText("open Holiday Destinations in fullscreen")
+  );
+  await userEvent.click(
+    await screen.findByLabelText("expand Holiday Destinations")
   );
 
-  const currentStack = JSON.parse(
-    screen.getByTestId("current-stack").textContent || "[]"
-  );
-  expect(currentStack).toEqual([contextNode, targetNode]);
+  await expectTree(`
+Holiday Destinations
+  Spain
+  `);
+
+  await screen.findByLabelText("Navigate to My Notes");
+  expect(screen.queryByLabelText("Navigate to Holiday Destinations")).toBeNull();
+  expect(screen.queryByTestId("current-stack")).toBeNull();
 });

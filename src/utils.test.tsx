@@ -73,7 +73,6 @@ import {
   useCurrentPane,
   usePaneIndex,
 } from "./SplitPanesContext";
-import { ROOT } from "./types";
 import { EMPTY_NODE_ID } from "./connections";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
@@ -244,7 +243,7 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
     contactsRelays: [{ url: "wss://contacts.relay", read: true, write: true }],
   },
   projectMembers: Map<PublicKey, Member>(),
-  panes: [{ id: "pane-0", stack: [ROOT], author: ALICE.publicKey }],
+  panes: [{ id: "pane-0", stack: [], author: ALICE.publicKey }],
 };
 
 function applyDefaults(props?: Partial<TestAppState>): TestAppState {
@@ -546,19 +545,11 @@ export async function findNewNodeEditor(): Promise<HTMLElement> {
   return screen.findByRole("textbox", { name: "new node editor" });
 }
 
-export async function typeNewNode(
-  view: RenderResult,
-  text: string
-): Promise<void> {
-  // Click on My Notes editor and press Enter to create a new node
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-
-  // Type the text in the new node editor and press Enter to save
-  await userEvent.type(await findNewNodeEditor(), `${text}{Enter}`);
-
-  // Verify the text appears in the tree
-  await screen.findByText(text);
+/**
+ * Types text in the new node editor. Shortcut for userEvent.type(await findNewNodeEditor(), text).
+ */
+export async function type(text: string): Promise<void> {
+  await userEvent.type(await findNewNodeEditor(), text);
 }
 
 type NodeDescription = [
@@ -915,41 +906,8 @@ export function renderTree(
   );
 }
 
-/**
- * Creates a new node under "My Notes" and then changes the tree root to that node.
- * Returns with the new node as the root of the tree view.
- */
 export async function createAndSetAsRoot(nodeName: string): Promise<void> {
-  // First create the node under My Notes using keyboard
-  await screen.findByLabelText("collapse My Notes");
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), `${nodeName}{Escape}`);
-
-  // Now use the pane search to change root to this node
-  await userEvent.click(
-    await screen.findByLabelText("Search to change pane 0 content")
-  );
-
-  // Type the node name and press Enter to submit search
-  await userEvent.type(
-    await screen.findByLabelText("search input"),
-    `${nodeName}{Enter}`
-  );
-
-  // Click fullscreen button on the search result reference
-  // The aria-label is "open X in fullscreen" where X is the reference display text
-  await userEvent.click(
-    await screen.findByRole("button", {
-      name: new RegExp(`open.*${nodeName}.*in fullscreen`, "i"),
-    })
-  );
-
-  // Wait for the tree to update with new root
-  await waitFor(async () => {
-    const tree = await getTreeStructure();
-    expect(tree.startsWith(nodeName)).toBe(true);
-  });
+  await type(`${nodeName}{Escape}`);
 }
 
 export async function navigateToNodeViaSearch(

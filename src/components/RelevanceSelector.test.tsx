@@ -243,6 +243,29 @@ My Notes
     const selectors = screen.queryAllByTitle("Contains");
     expect(selectors.length).toBeGreaterThanOrEqual(1);
   });
+
+  test("clicking current relevance level toggles it back to contains", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
+
+    await screen.findByText("Child");
+
+    fireEvent.click(screen.getByLabelText("set Child to relevant"));
+
+    await waitFor(() => {
+      const selectors = screen.queryAllByTitle("Relevant");
+      expect(selectors.length).toBeGreaterThanOrEqual(1);
+    });
+
+    fireEvent.click(screen.getByLabelText("set Child to relevant"));
+
+    await waitFor(() => {
+      const selectors = screen.queryAllByTitle("Contains");
+      expect(selectors.length).toBeGreaterThanOrEqual(1);
+    });
+  });
 });
 
 // Tests for relevance filtering

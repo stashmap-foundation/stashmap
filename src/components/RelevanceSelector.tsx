@@ -120,6 +120,8 @@ export function RelevanceSelector({
   const handleSetLevel = (level: number): void => {
     if (isSuggestion) {
       acceptWithLevel(level);
+    } else if (level === currentLevel) {
+      setLevel(-1);
     } else {
       setLevel(level);
     }

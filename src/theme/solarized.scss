@@ -15,6 +15,10 @@
   // Semantic colors
   --non-editable: var(--base01); // Read-only content
 
+  // Readonly mode colors (viewing other user's content)
+  --readonly-banner-bg: var(--violet);
+  --readonly-text-opacity: 0.6;
+
   // Accent colors (same in both themes)
   --red: #dc322f;     // Contra, errors, remove
   --green: #859900;   // Confirms, success
@@ -38,6 +42,10 @@
 
   // Semantic colors
   --non-editable: var(--base01);
+
+  // Readonly mode colors (viewing other user's content)
+  --readonly-banner-bg: var(--violet);
+  --readonly-text-opacity: 0.55;
 }
 
 // Base layout - critical for content to render

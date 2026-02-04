@@ -815,7 +815,11 @@ function classifyRow(row: Element): RowInfo | null {
 
   if (referenceNode) {
     const rawText = referenceNode.textContent?.trim() || "";
-    const cleanText = rawText.replace(/👤/g, "").trim();
+    const cleanText = rawText
+      .replace(/👤/g, "")
+      .replace(/^\[\[/, "")
+      .replace(/\]\]$/, "")
+      .trim();
     const getPrefix = (): string => {
       if (isSuggestion) return "[S] ";
       if (isOtherUser) return "[O] ";

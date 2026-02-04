@@ -71,6 +71,34 @@ body {
   }
 }
 
+// ============================================
+// READONLY MODE (viewing other user's content)
+// ============================================
+
+.pane-readonly-mode {
+  .pane-content {
+    opacity: var(--readonly-text-opacity);
+  }
+}
+
+.readonly-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 16px;
+  background-color: var(--readonly-banner-bg);
+  color: var(--base3);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.readonly-banner-text {
+  font-family: monospace;
+}
+
 .pane-header {
   display: flex;
   align-items: center;
@@ -382,6 +410,13 @@ body {
   margin-right: 6px;
   font-size: 0.9em;
   color: var(--cyan);
+}
+
+// Wiki-style reference brackets [[]]
+.reference-bracket {
+  color: var(--cyan);
+  font-weight: 600;
+  font-family: monospace;
 }
 
 

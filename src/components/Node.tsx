@@ -161,7 +161,9 @@ function NodeContent({
       data-other-user={isOtherUser ? "true" : undefined}
     >
       {isReference && <ReferenceIndicators refId={nodeId} />}
+      {isReference && <span className="reference-bracket">[[</span>}
       {text}
+      {isReference && <span className="reference-bracket">]]</span>}
     </span>
   );
 }

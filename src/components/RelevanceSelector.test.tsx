@@ -31,8 +31,12 @@ describe("relevanceToLevel", () => {
     expect(relevanceToLevel("relevant")).toBe(3);
   });
 
-  test("maps empty string (maybe relevant) to level 2", () => {
-    expect(relevanceToLevel("")).toBe(2);
+  test("maps maybe_relevant to level 2", () => {
+    expect(relevanceToLevel("maybe_relevant")).toBe(2);
+  });
+
+  test("maps undefined (contains) to level -1", () => {
+    expect(relevanceToLevel(undefined)).toBe(-1);
   });
 
   test("maps little_relevant to level 1", () => {
@@ -43,8 +47,8 @@ describe("relevanceToLevel", () => {
     expect(relevanceToLevel("not_relevant")).toBe(0);
   });
 
-  test("defaults to level 2 for unknown values", () => {
-    expect(relevanceToLevel("unknown" as Relevance)).toBe(2);
+  test("defaults to level -1 for unknown values", () => {
+    expect(relevanceToLevel("unknown" as Relevance)).toBe(-1);
   });
 });
 
@@ -53,8 +57,8 @@ describe("levelToRelevance", () => {
     expect(levelToRelevance(3)).toBe("relevant");
   });
 
-  test("maps level 2 to empty string (maybe relevant)", () => {
-    expect(levelToRelevance(2)).toBe("");
+  test("maps level 2 to maybe_relevant", () => {
+    expect(levelToRelevance(2)).toBe("maybe_relevant");
   });
 
   test("maps level 1 to little_relevant", () => {
@@ -65,14 +69,16 @@ describe("levelToRelevance", () => {
     expect(levelToRelevance(0)).toBe("not_relevant");
   });
 
-  test("defaults to empty string for unknown levels", () => {
-    expect(levelToRelevance(5)).toBe("");
-    expect(levelToRelevance(-1)).toBe("");
+  test("defaults to undefined for unknown levels", () => {
+    expect(levelToRelevance(5)).toBe(undefined);
+    expect(levelToRelevance(-1)).toBe(undefined);
+    expect(levelToRelevance(4)).toBe(undefined);
   });
 });
 
 describe("RELEVANCE_LABELS", () => {
   test("has correct labels for all levels", () => {
+    expect(RELEVANCE_LABELS[-1]).toBe("Contains");
     expect(RELEVANCE_LABELS[0]).toBe("Not Relevant");
     expect(RELEVANCE_LABELS[1]).toBe("Little Relevant");
     expect(RELEVANCE_LABELS[2]).toBe("Maybe Relevant");
@@ -84,12 +90,21 @@ describe("itemMatchesType", () => {
   test("matches relevant items", () => {
     const item: RelationItem = { nodeID: "test" as ID, relevance: "relevant" };
     expect(itemMatchesType(item, "relevant")).toBe(true);
-    expect(itemMatchesType(item, "")).toBe(false);
+    expect(itemMatchesType(item, "contains")).toBe(false);
   });
 
-  test("matches maybe relevant items with empty string filter", () => {
-    const item: RelationItem = { nodeID: "test" as ID, relevance: "" };
-    expect(itemMatchesType(item, "")).toBe(true);
+  test("matches maybe_relevant items", () => {
+    const item: RelationItem = {
+      nodeID: "test" as ID,
+      relevance: "maybe_relevant",
+    };
+    expect(itemMatchesType(item, "maybe_relevant")).toBe(true);
+    expect(itemMatchesType(item, "relevant")).toBe(false);
+  });
+
+  test("matches contains items with undefined relevance", () => {
+    const item: RelationItem = { nodeID: "test" as ID, relevance: undefined };
+    expect(itemMatchesType(item, "contains")).toBe(true);
     expect(itemMatchesType(item, "relevant")).toBe(false);
   });
 
@@ -99,7 +114,7 @@ describe("itemMatchesType", () => {
       relevance: "little_relevant",
     };
     expect(itemMatchesType(item, "little_relevant")).toBe(true);
-    expect(itemMatchesType(item, "")).toBe(false);
+    expect(itemMatchesType(item, "contains")).toBe(false);
   });
 
   test("matches not_relevant items", () => {
@@ -108,25 +123,33 @@ describe("itemMatchesType", () => {
       relevance: "not_relevant",
     };
     expect(itemMatchesType(item, "not_relevant")).toBe(true);
-    expect(itemMatchesType(item, "")).toBe(false);
+    expect(itemMatchesType(item, "contains")).toBe(false);
   });
 
-  test("defaults undefined relevance to empty string (maybe relevant)", () => {
-    // Using 'as' to simulate legacy items without relevance set
-    const item = { nodeID: "test" as ID } as RelationItem;
-    expect(itemMatchesType(item, "")).toBe(true);
-    expect(itemMatchesType(item, "not_relevant")).toBe(false);
+  test("contains filter only matches items with undefined relevance AND undefined argument", () => {
+    const itemWithArg: RelationItem = {
+      nodeID: "test" as ID,
+      relevance: undefined,
+      argument: "confirms",
+    };
+    expect(itemMatchesType(itemWithArg, "contains")).toBe(false);
+
+    const itemWithoutArg: RelationItem = {
+      nodeID: "test" as ID,
+      relevance: undefined,
+    };
+    expect(itemMatchesType(itemWithoutArg, "contains")).toBe(true);
   });
 
   test("matches argument types correctly", () => {
     const confirmItem: RelationItem = {
       nodeID: "test" as ID,
-      relevance: "",
+      relevance: undefined,
       argument: "confirms",
     };
     const contraItem: RelationItem = {
       nodeID: "test" as ID,
-      relevance: "",
+      relevance: undefined,
       argument: "contra",
     };
 
@@ -199,7 +222,7 @@ My Notes
     // Click the X button to mark Child1 as not relevant
     fireEvent.click(screen.getByLabelText("mark Child1 as not relevant"));
 
-    // Child1 should be hidden (default filters exclude not_relevant)
+    // Child1 should be hidden (not_relevant filter is OFF by default)
     await waitFor(() => {
       expect(screen.queryByText("Child1")).toBeNull();
     });
@@ -208,7 +231,7 @@ My Notes
     expect(screen.getByText("Child2")).toBeDefined();
   });
 
-  test("item with default relevance shows Maybe Relevant", async () => {
+  test("item with default relevance shows Contains", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -216,8 +239,8 @@ My Notes
 
     await screen.findByText("Child");
 
-    // Default relevance is "" (maybe relevant), shown with 2 dots
-    const selectors = screen.queryAllByTitle("Maybe Relevant");
+    // Default relevance is undefined (contains), shown with Contains title
+    const selectors = screen.queryAllByTitle("Contains");
     expect(selectors.length).toBeGreaterThanOrEqual(1);
   });
 });
@@ -234,7 +257,7 @@ describe("Relevance filtering", () => {
     await screen.findByText("Visible Item");
   });
 
-  test("changing relevance updates item visibility", async () => {
+  test("marking items as not relevant hides them", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -246,19 +269,19 @@ describe("Relevance filtering", () => {
     await screen.findByText("Child2");
     await screen.findByText("Child3");
 
-    // Mark Child1 as not relevant
+    // Mark Child1 as not relevant - it should be hidden
     fireEvent.click(screen.getByLabelText("mark Child1 as not relevant"));
     await waitFor(() => {
       expect(screen.queryByText("Child1")).toBeNull();
     });
 
-    // Mark Child2 as not relevant
+    // Mark Child2 as not relevant - it should be hidden
     fireEvent.click(screen.getByLabelText("mark Child2 as not relevant"));
     await waitFor(() => {
       expect(screen.queryByText("Child2")).toBeNull();
     });
 
-    // Child3 should still be visible
+    // Only Child3 should still be visible
     expect(screen.getByText("Child3")).toBeDefined();
   });
 
@@ -268,11 +291,11 @@ describe("Relevance filtering", () => {
 
     await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
 
-    // Child should be visible (default relevance is "" which is included in default filters)
+    // Child should be visible (default relevance is undefined/contains which is included in default filters)
     await screen.findByText("Child");
 
-    // Relevance selector should show "Maybe Relevant" title (default)
-    const selectors = screen.queryAllByTitle("Maybe Relevant");
+    // Relevance selector should show "Contains" title (default)
+    const selectors = screen.queryAllByTitle("Contains");
     expect(selectors.length).toBeGreaterThanOrEqual(1);
   });
 });
@@ -448,10 +471,8 @@ describe("Remove from list", () => {
 
     await screen.findByText("Child");
 
-    // Mark as not relevant
+    // Mark as not relevant - child gets hidden
     fireEvent.click(screen.getByLabelText("mark Child as not relevant"));
-
-    // Child should be hidden
     await waitFor(() => {
       expect(screen.queryByText("Child")).toBeNull();
     });
@@ -478,17 +499,14 @@ describe("Remove from list", () => {
     await screen.findByText("Child1");
     await screen.findByText("Child2");
 
-    // Mark Child1 as not relevant
+    // Mark Child1 as not relevant - it gets hidden
     fireEvent.click(screen.getByLabelText("mark Child1 as not relevant"));
-
     await waitFor(() => {
       expect(screen.queryByText("Child1")).toBeNull();
     });
 
     // Enable not_relevant filter to see Child1
     await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
-
-    // Child1 should now be visible
     await screen.findByText("Child1");
 
     // Click the remove button to completely remove Child1
@@ -511,22 +529,18 @@ describe("Remove from list", () => {
 
     await screen.findByText("Child");
 
-    // Step 1: Mark as not relevant
+    // Step 1: Mark as not relevant - child gets hidden
     fireEvent.click(screen.getByLabelText("mark Child as not relevant"));
-
-    // Child should be hidden
     await waitFor(() => {
       expect(screen.queryByText("Child")).toBeNull();
     });
 
     // Enable not_relevant filter to see the child again
     await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
-
-    // Child should reappear
     await screen.findByText("Child");
 
     // Now the X button should say "remove from list"
-    const removeBtn = screen.getByLabelText("remove Child from list");
+    const removeBtn = await screen.findByLabelText("remove Child from list");
     expect(removeBtn).toBeDefined();
 
     // Step 2: Remove from list completely
@@ -537,13 +551,13 @@ describe("Remove from list", () => {
       expect(screen.queryByText("Child")).toBeNull();
     });
 
-    // Even with not_relevant filter still enabled, Child should not reappear
+    // Even with not_relevant filter enabled, Child should not reappear
     expect(screen.queryByText("Child")).toBeNull();
   });
 });
 
 describe("Relation lookup consistency (regression)", () => {
-  test("setting relevance to little_relevant hides item from default filter", async () => {
+  test("setting relevance to little_relevant hides item", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -552,23 +566,20 @@ describe("Relation lookup consistency (regression)", () => {
     await screen.findByText("Child");
 
     // Click the first dot to set relevance to "little_relevant"
-    // This should hide the item since default filters exclude little_relevant
     const firstDot = screen.getByLabelText("set Child to little relevant");
     fireEvent.click(firstDot);
 
-    // The item should disappear because:
-    // 1. The relevance was actually written (not silently ignored)
-    // 2. Default filters exclude "little_relevant"
+    // Item should be hidden (little_relevant filter is OFF by default)
     await waitFor(() => {
       expect(screen.queryByText("Child")).toBeNull();
     });
 
-    // Now enable little_relevant filter to verify the item still exists
+    // Enable little_relevant filter to verify the item still exists
     await userEvent.click(
       screen.getByLabelText("toggle Little Relevant filter")
     );
 
-    // Child should reappear, confirming the relevance was properly saved
+    // Child should reappear
     await screen.findByText("Child");
 
     // And it should show the correct relevance (1 dot = little relevant)
@@ -583,15 +594,14 @@ describe("Relation lookup consistency (regression)", () => {
     const parent = newNode("Parent");
     const child = newNode("Child");
 
-    // Add the same child twice to create duplicate nodeIDs with different indices
     const relations = addRelationToRelations(
       addRelationToRelations(
         newRelations(parent.id, List(), alicePK),
         child.id,
-        ""
+        undefined
       ),
       child.id,
-      ""
+      undefined
     );
 
     const plan = planUpsertRelations(
@@ -602,20 +612,17 @@ describe("Relation lookup consistency (regression)", () => {
 
     renderTree(alice);
 
-    // Navigate to Parent
     await navigateToNodeViaSearch(0, "Parent");
 
-    // Both instances of Child should be visible
     const childElements = await screen.findAllByText("Child");
     expect(childElements.length).toBe(2);
 
-    // Mark the first Child as not relevant
     const markNotRelevantBtns = screen.getAllByLabelText(
       /mark Child as not relevant/
     );
     fireEvent.click(markNotRelevantBtns[0]);
 
-    // Only ONE Child should disappear (the one we clicked), not both
+    // Only ONE Child should disappear (not_relevant filter is OFF by default)
     await waitFor(() => {
       const remaining = screen.getAllByText("Child");
       expect(remaining.length).toBe(1);
@@ -638,7 +645,7 @@ describe("Multi-user relevance", () => {
     const aliceRelations = addRelationToRelations(
       newRelations(parent.id, List(), alicePK),
       child.id,
-      "" // relevant
+      undefined // contains (default)
     );
 
     const alicePlan = planUpsertRelations(

@@ -4,15 +4,19 @@ export const REF_PREFIX = "ref:";
 export const SEARCH_PREFIX = "~Search:";
 
 // Default type filters for children view
-// Relevance: "relevant", "" (maybe relevant) are ON by default
-// Evidence: "confirms", "contra" are ON by default
+// Relevance filters: show relevant, maybe_relevant, and contains by default
+// little_relevant and not_relevant are hidden by default
+// Contains: items with undefined relevance and undefined argument
 // Suggestions from other users: ON by default
-// OFF by default: "little_relevant", "not_relevant"
-export const DEFAULT_TYPE_FILTERS: (Relevance | Argument | "suggestions")[] = [
+export const DEFAULT_TYPE_FILTERS: (
+  | Relevance
+  | Argument
+  | "suggestions"
+  | "contains"
+)[] = [
   "relevant",
-  "",
-  "confirms",
-  "contra",
+  "maybe_relevant",
+  "contains",
   "suggestions",
 ];
 
@@ -22,6 +26,7 @@ export const TYPE_COLORS = {
   maybe_relevant: "#d33682", // Magenta - maybe relevant
   little_relevant: "#b58900", // Yellow - little relevant
   not_relevant: "#93a1a1", // Base01 - muted
+  contains: "#cb4b16", // Orange - contains/default
   confirms: "#859900", // Green - confirms, success
   contra: "#dc322f", // Red - contra, errors
   other_user: "#6c71c4", // Violet - other user content

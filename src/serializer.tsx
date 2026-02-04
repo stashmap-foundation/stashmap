@@ -56,17 +56,21 @@ function asArray(obj: Serializable | undefined): Array<Serializable> {
 // Valid values for Relevance and Argument types
 const VALID_RELEVANCE: Relevance[] = [
   "relevant",
-  "",
+  "maybe_relevant",
   "little_relevant",
   "not_relevant",
+  undefined,
 ];
 const VALID_ARGUMENT: Argument[] = ["confirms", "contra", undefined];
 
 function parseRelevance(value: string | undefined): Relevance {
-  if (value === undefined || !VALID_RELEVANCE.includes(value as Relevance)) {
-    return ""; // Default to maybe relevant
+  if (value === undefined || value === "") {
+    return undefined;
   }
-  return value as Relevance;
+  if (VALID_RELEVANCE.includes(value as Relevance)) {
+    return value as Relevance;
+  }
+  return undefined;
 }
 
 function parseArgument(value: string | undefined): Argument {
@@ -81,8 +85,19 @@ function parseArgument(value: string | undefined): Argument {
 
 function parseTypeFilter(
   value: string
-): Relevance | Argument | "suggestions" | null {
-  if (VALID_RELEVANCE.includes(value as Relevance)) {
+): Relevance | Argument | "suggestions" | "contains" | null {
+  if (value === "contains") {
+    return "contains";
+  }
+  if (value === "" || value === "undefined") {
+    return "contains";
+  }
+  if (
+    value === "relevant" ||
+    value === "maybe_relevant" ||
+    value === "little_relevant" ||
+    value === "not_relevant"
+  ) {
     return value as Relevance;
   }
   if (value === "confirms" || value === "contra") {
@@ -96,11 +111,11 @@ function parseTypeFilter(
 
 function parseTypeFilters(
   arr: Array<Serializable>
-): Array<Relevance | Argument | "suggestions"> {
+): Array<Relevance | Argument | "suggestions" | "contains"> {
   return arr
     .map((item) => parseTypeFilter(asString(item)))
     .filter(
-      (parsed): parsed is Relevance | Argument | "suggestions" =>
+      (parsed): parsed is Relevance | Argument | "suggestions" | "contains" =>
         parsed !== null
     );
 }

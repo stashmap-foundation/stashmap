@@ -490,7 +490,7 @@ export function groupConcreteRefs(
             nodeID: ref.isInItems
               ? createConcreteRefId(ref.relationID, targetShortID)
               : createConcreteRefId(ref.relationID),
-            relevance: "" as Relevance,
+            relevance: undefined as Relevance,
           },
         ]);
       }
@@ -498,7 +498,7 @@ export function groupConcreteRefs(
         grp.first()!.context,
         targetShortID
       );
-      return List([{ nodeID: abstractId, relevance: "" as Relevance }]);
+      return List([{ nodeID: abstractId, relevance: undefined as Relevance }]);
     })
     .toList();
 }
@@ -538,7 +538,7 @@ export function getConcreteRefsForAbstract(
       nodeID: ref.isInItems
         ? createConcreteRefId(ref.relationID, targetNode)
         : createConcreteRefId(ref.relationID),
-      relevance: "" as Relevance,
+      relevance: undefined as Relevance,
     }))
     .toList();
 
@@ -554,7 +554,7 @@ export function getSearchRelations(
   const uniqueNodeIDs = foundNodeIDs.toSet().toList();
   const items = uniqueNodeIDs.map((nodeID) => ({
     nodeID: nodeID as LongID,
-    relevance: "" as Relevance,
+    relevance: undefined as Relevance,
   }));
   return { ...rel, id: searchId as LongID, items };
 }
@@ -726,22 +726,23 @@ function fibsum(n: number): number {
   return fib(n + 2) - 2;
 }
 
-// Check if an item matches a filter type (relevance or argument)
+// Check if an item matches a filter type (relevance, argument, or contains)
 export function itemMatchesType(
   item: RelationItem,
-  filterType: Relevance | Argument
+  filterType: Relevance | Argument | "contains"
 ): boolean {
   if (filterType === "confirms" || filterType === "contra") {
     return item.argument === filterType;
   }
-  // Default relevance to "" (maybe relevant) if undefined
-  const relevance = item.relevance ?? "";
-  return relevance === filterType;
+  if (filterType === "contains") {
+    return item.relevance === undefined && item.argument === undefined;
+  }
+  return item.relevance === filterType;
 }
 
 export function aggregateWeightedVotes(
   listsOfVotes: List<{ items: List<RelationItem>; weight: number }>,
-  filterType: Relevance | Argument
+  filterType: Relevance | Argument | "contains"
 ): Map<LongID | ID, number> {
   const votesPerItem = listsOfVotes.reduce((rdx, v) => {
     const { weight } = v;
@@ -769,7 +770,7 @@ export function aggregateWeightedVotes(
 
 export function aggregateNegativeWeightedVotes(
   listsOfVotes: List<{ items: List<RelationItem>; weight: number }>,
-  filterType: Relevance | Argument
+  filterType: Relevance | Argument | "contains"
 ): Map<LongID | ID, number> {
   const votesPerItem = listsOfVotes.reduce((rdx, v) => {
     const { weight } = v;
@@ -797,7 +798,7 @@ export function aggregateNegativeWeightedVotes(
 export function countRelationVotes(
   relations: List<Relations>,
   head: ID,
-  type: Relevance | Argument
+  type: Relevance | Argument | "contains"
 ): Map<LongID | ID, number> {
   const filteredVoteRelations = filterVoteRelationLists(relations, head);
   const latestVotesPerAuthor = getLatestvoteRelationListPerAuthor(
@@ -820,7 +821,7 @@ export function countRelevanceVoting(
   relations: List<Relations>,
   head: ID
 ): Map<LongID | ID, number> {
-  const positiveVotes = countRelationVotes(relations, head, "");
+  const positiveVotes = countRelationVotes(relations, head, "contains");
   const negativeVotes = countRelationVotes(relations, head, "not_relevant");
   return negativeVotes.reduce((rdx, negativeVote, key) => {
     const positiveVote = positiveVotes.get(key, 0);
@@ -837,7 +838,7 @@ export function addRelationToRelations(
 ): Relations {
   const newItem: RelationItem = {
     nodeID: objectID,
-    relevance: relevance ?? "",
+    relevance,
     argument,
   };
   const defaultOrder = relations.items.size;

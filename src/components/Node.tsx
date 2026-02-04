@@ -500,7 +500,7 @@ export function Node({
   const referencedByDepth = useReferencedByDepth();
   const isInReferencedByView = referencedByDepth !== undefined;
   const [, view] = useNodeID();
-  const { cardStyle, textStyle } = useItemStyle();
+  const { cardStyle, textStyle, relevance } = useItemStyle();
   const defaultCls = isDesktop ? "hover-light-bg" : "";
   const cls =
     className !== undefined ? `${className} hover-light-bg` : defaultCls;
@@ -555,6 +555,15 @@ export function Node({
       >
         <div className="indicator-gutter">
           {isSuggestion && <SuggestionIndicator />}
+          {relevance === "maybe_relevant" && !isSuggestion && (
+            <span
+              className="maybe-relevant-indicator"
+              title="Maybe Relevant"
+              aria-hidden="true"
+            >
+              ?
+            </span>
+          )}
           {(showReferencedByBackground || isReference) && !isSuggestion && (
             <span className="reference-indicator" aria-label="reference">
               ⤶

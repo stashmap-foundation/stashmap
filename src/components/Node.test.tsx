@@ -351,7 +351,7 @@ test("getDiffItemsForNode returns items from other users not in current user's l
     knowledgeDBs,
     alicePK,
     parent.id,
-    ["", "suggestions"],
+    ["contains", "suggestions"],
     aliceRelations.id
   );
 
@@ -395,7 +395,7 @@ test("getDiffItemsForNode excludes items already in user's list", () => {
     knowledgeDBs,
     alicePK,
     parent.id,
-    ["", "suggestions"],
+    ["contains", "suggestions"],
     aliceRelations.id
   );
 
@@ -556,7 +556,7 @@ test("getDiffItemsForNode returns plain nodeID for leaf suggestions (no children
     knowledgeDBs,
     alicePK,
     parent.id,
-    ["", "suggestions"],
+    ["contains", "suggestions"],
     aliceRelations.id,
     List()
   );
@@ -607,7 +607,7 @@ test("getDiffItemsForNode returns concrete ref for expandable suggestions (has c
     knowledgeDBs,
     alicePK,
     parent.id,
-    ["", "suggestions"],
+    ["contains", "suggestions"],
     aliceRelations.id,
     List()
   );
@@ -663,7 +663,7 @@ test("getDiffItemsForNode only returns suggestions from matching context", () =>
     knowledgeDBs,
     alicePK,
     parent.id,
-    ["", "suggestions"],
+    ["contains", "suggestions"],
     aliceRelations.id,
     List()
   );

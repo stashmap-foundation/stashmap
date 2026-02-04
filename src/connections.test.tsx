@@ -65,7 +65,7 @@ test("Position of new connection can be specified", () => {
   const { b, c, d, e, relations } = sampleNodes();
   const b0 = newNode("b0");
   expect(
-    getNodeIDs(addRelationToRelations(relations, b0.id, "", undefined, 0).items)
+    getNodeIDs(addRelationToRelations(relations, b0.id, undefined, undefined, 0).items)
   ).toEqual(List([b0.id, b.id, c.id, d.id, e.id]));
 });
 
@@ -143,19 +143,19 @@ test("count relation votes", () => {
   const aliceVotes = bulkAddRelations(
     newRelations(vote.id, List(), ALICE.publicKey),
     [optionA.id, optionB.id, optionC.id, optionD.id], // 5/11, 3/11, 2/11, 1/11 *10000
-    "",
+    undefined,
     "confirms"
   );
   const bobVotes = bulkAddRelations(
     newRelations(vote.id, List(), BOB.publicKey),
     [optionD.id, optionB.id, optionC.id, optionA.id], // 5/11, 3/11, 2/11, 1/11 *10000
-    "",
+    undefined,
     "confirms"
   );
   const carolVotes = bulkAddRelations(
     newRelations(vote.id, List(), CAROL.publicKey),
     [optionA.id, optionB.id, optionC.id], // 3/6, 2/6, 1/6 *10000
-    "",
+    undefined,
     "confirms"
   );
 
@@ -181,14 +181,14 @@ function makeItem(
   relevance?: Relevance,
   argument?: Argument
 ): RelationItem {
-  return { nodeID: nodeID as LongID, relevance: relevance ?? "", argument };
+  return { nodeID: nodeID as LongID, relevance, argument };
 }
 
 test("aggregate weighted votes", () => {
-  const alice = ["A", "B", "C", "D"].map((id) => makeItem(id, ""));
-  const bob = ["B", "C", "D", "A"].map((id) => makeItem(id, ""));
-  const carol = ["C", "A", "B"].map((id) => makeItem(id, ""));
-  const dan = ["D"].map((id) => makeItem(id, ""));
+  const alice = ["A", "B", "C", "D"].map((id) => makeItem(id, undefined));
+  const bob = ["B", "C", "D", "A"].map((id) => makeItem(id, undefined));
+  const carol = ["C", "A", "B"].map((id) => makeItem(id, undefined));
+  const dan = ["D"].map((id) => makeItem(id, undefined));
 
   const listsOfVotes = List([
     { items: List(alice), weight: 20 },
@@ -196,7 +196,7 @@ test("aggregate weighted votes", () => {
     { items: List(carol), weight: 10 },
     { items: List(dan), weight: 1 },
   ]);
-  expect(aggregateWeightedVotes(listsOfVotes, "")).toEqual(
+  expect(aggregateWeightedVotes(listsOfVotes, "contains")).toEqual(
     Map({
       A: 21.515151515151512, // 5/11*20 + 1/11*100 + 2/6*10
       B: 52.57575757575757, // 3/11*20 + 5/11*100 + 1/6*10
@@ -242,7 +242,7 @@ test("count relation votes and also aggregate negative weights", () => {
   const aliceVotes = bulkAddRelations(
     newRelations(vote.id, List(), ALICE.publicKey),
     [optionA.id, optionB.id, optionC.id, optionD.id], // 5/11, 3/11, 2/11, 1/11 *10000
-    ""
+    undefined
   );
   const bobVotes = bulkAddRelations(
     newRelations(vote.id, List(), BOB.publicKey),
@@ -252,7 +252,7 @@ test("count relation votes and also aggregate negative weights", () => {
   const carolVotes = bulkAddRelations(
     newRelations(vote.id, List(), CAROL.publicKey),
     [optionA.id, optionB.id, optionC.id], // 3/6, 2/6, 1/6 *10000
-    ""
+    undefined
   );
 
   expect(
@@ -271,12 +271,12 @@ test("count relation votes and also aggregate negative weights", () => {
   const secondAliceVotes = bulkAddRelations(
     newRelations(secondVote.id, List(), ALICE.publicKey),
     [optionA.id, optionB.id, optionC.id, optionD.id, optionE.id], // 8/19, 5/19, 3/19, 2/19, 1/19 *10000
-    ""
+    undefined
   );
   const secondBobVotes = bulkAddRelations(
     newRelations(secondVote.id, List(), BOB.publicKey),
     [optionB.id, optionC.id, optionD.id], // 3/6, 2/6, 1/6 *10000
-    ""
+    undefined
   );
   expect(
     countRelevanceVoting(
@@ -322,7 +322,7 @@ test("count relation votes and also aggregate negative weights", () => {
       optionF.id,
       optionG.id,
     ], // 21/53, 13/53, 8/53, 5/53, 3/53, 2/53, 1/53 *10000
-    ""
+    undefined
   );
 
   expect(countRelevanceVoting(List([fourthAliceVotes]), fourthVote.id)).toEqual(
@@ -342,7 +342,7 @@ test("count relation votes and also aggregate negative weights", () => {
   const fifthAliceVotes = bulkAddRelations(
     newRelations(fifthVote.id, List(), ALICE.publicKey),
     [optionA.id], // 1
-    ""
+    undefined
   );
   const fifthBobVotes = bulkAddRelations(
     newRelations(fifthVote.id, List(), BOB.publicKey),

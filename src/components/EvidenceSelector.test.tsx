@@ -148,8 +148,8 @@ describe("updateItemArgument", () => {
   test("updates argument on existing item", () => {
     const relations: Relations = {
       items: List([
-        { nodeID: "node1" as ID, relevance: "" as Relevance },
-        { nodeID: "node2" as ID, relevance: "" as Relevance },
+        { nodeID: "node1" as ID, relevance: undefined as Relevance },
+        { nodeID: "node2" as ID, relevance: undefined as Relevance },
       ]),
       head: "head" as ID,
       context: List(),
@@ -168,7 +168,7 @@ describe("updateItemArgument", () => {
       items: List([
         {
           nodeID: "node1" as ID,
-          relevance: "" as Relevance,
+          relevance: undefined as Relevance,
           argument: "confirms" as Argument,
         },
       ]),
@@ -185,7 +185,7 @@ describe("updateItemArgument", () => {
 
   test("returns unchanged relations for invalid index", () => {
     const relations: Relations = {
-      items: List([{ nodeID: "node1" as ID, relevance: "" as Relevance }]),
+      items: List([{ nodeID: "node1" as ID, relevance: undefined as Relevance }]),
       head: "head" as ID,
       context: List(),
       id: "rel1" as LongID,

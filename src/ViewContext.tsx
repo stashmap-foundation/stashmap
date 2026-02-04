@@ -45,7 +45,7 @@ export function getDiffItemsForNode(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
   nodeID: LongID | ID,
-  filterTypes: (Relevance | Argument | "suggestions")[],
+  filterTypes: (Relevance | Argument | "suggestions" | "contains")[],
   currentRelationId?: LongID,
   parentContext?: Context
 ): List<LongID | ID> {
@@ -58,7 +58,8 @@ export function getDiffItemsForNode(
   }
 
   const itemFilters = filterTypes.filter(
-    (t): t is Relevance | Argument => t !== "suggestions"
+    (t): t is Relevance | Argument | "contains" =>
+      t !== "suggestions" && t !== undefined
   );
 
   const [, localID] = splitID(nodeID);
@@ -526,12 +527,12 @@ export function getNodeFromID(
   return node;
 }
 
-export type TypeFilters = (Relevance | Argument | "suggestions")[];
+export type TypeFilters = (Relevance | Argument | "suggestions" | "contains")[];
 
 export const VERSION_FILTERS: TypeFilters = [
-  "",
   "relevant",
   "little_relevant",
+  "contains",
   "confirms",
   "contra",
 ];
@@ -544,7 +545,8 @@ export function filterRelationItems(
   filters: TypeFilters
 ): List<RelationItem> {
   const itemFilters = filters.filter(
-    (f): f is Relevance | Argument => f !== "suggestions"
+    (f): f is Relevance | Argument | "contains" =>
+      f !== "suggestions" && f !== undefined
   );
   return items.filter((item) =>
     itemFilters.some((f) => itemMatchesType(item, f))
@@ -1058,7 +1060,7 @@ export function newRelationsForNode(
   const relations = newRelations(nodeID, context, myself);
   if (shortID(nodeID) === VERSIONS_NODE_ID && context.size > 0) {
     const originalNodeID = context.last() as ID;
-    return addRelationToRelations(relations, originalNodeID, "");
+    return addRelationToRelations(relations, originalNodeID);
   }
   return relations;
 }

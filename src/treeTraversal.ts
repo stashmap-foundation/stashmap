@@ -16,7 +16,6 @@ import {
 import {
   getReferencedByRelations,
   getConcreteRefsForAbstract,
-  itemMatchesType,
   isAbstractRefId,
   isConcreteRefId,
   isSearchId,
@@ -85,6 +84,32 @@ function getChildrenForReferencedBy(
     .toList();
 }
 
+function itemPassesFilters(
+  item: RelationItem,
+  activeFilters: (Relevance | Argument | "suggestions" | "contains")[]
+): boolean {
+  const hasArgumentFilter =
+    activeFilters.includes("confirms") || activeFilters.includes("contra");
+
+  if (hasArgumentFilter) {
+    const matchesArgument =
+      (activeFilters.includes("confirms") && item.argument === "confirms") ||
+      (activeFilters.includes("contra") && item.argument === "contra");
+    if (!matchesArgument) return false;
+  }
+
+  const relevance = item.relevance;
+  if (relevance !== undefined && !activeFilters.includes(relevance)) {
+    return false;
+  }
+
+  if (relevance === undefined && item.argument === undefined) {
+    if (!activeFilters.includes("contains")) return false;
+  }
+
+  return true;
+}
+
 function getChildrenForRegularNode(
   data: Data,
   parentPath: ViewPath,
@@ -96,10 +121,6 @@ function getChildrenForRegularNode(
   const context = getContext(data, parentPath, stack);
   const pane = getPane(data, parentPath);
   const activeFilters = pane.typeFilters || DEFAULT_TYPE_FILTERS;
-  const itemFilters = activeFilters.filter(
-    (f: Relevance | Argument | "suggestions"): f is Relevance | Argument =>
-      f !== "suggestions"
-  );
 
   const relations = isSearchId(parentNodeID as ID)
     ? getRelations(
@@ -120,11 +141,7 @@ function getChildrenForRegularNode(
   const relationPaths = relations
     ? relations.items
         .map((item, i) => ({ item, index: i }))
-        .filter(({ item }) =>
-          itemFilters.some((f: Relevance | Argument) =>
-            itemMatchesType(item, f)
-          )
-        )
+        .filter(({ item }) => itemPassesFilters(item, activeFilters))
         .map(({ index }) =>
           addNodeToPathWithRelations(parentPath, relations, index)
         )

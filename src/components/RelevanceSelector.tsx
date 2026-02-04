@@ -26,12 +26,12 @@ type RelevanceSelectorProps = {
 function getLevelColor(
   level: number,
   displayLevel: number,
-  isNotRelevant: boolean
+  isNotRelevant: boolean,
+  isContains: boolean
 ): string {
-  if (isNotRelevant || level > displayLevel) {
+  if (isNotRelevant || isContains || level > displayLevel) {
     return TYPE_COLORS.inactive;
   }
-  // Color based on the current display level (not the individual dot)
   switch (displayLevel) {
     case 3:
       return TYPE_COLORS.relevant;
@@ -121,6 +121,7 @@ export function RelevanceSelector({
   const currentLevel = isSuggestion ? -1 : relevanceToLevel(currentRelevance);
   const displayLevel = hoverLevel !== null ? hoverLevel : currentLevel;
   const isNotRelevant = displayLevel === 0;
+  const isContains = displayLevel === -1;
   const displayText = isSuggestion
     ? suggestionNodeText
     : editorText.trim() || versionedDisplayText;
@@ -151,15 +152,18 @@ export function RelevanceSelector({
   // For suggestions with no hover, show all as inactive
   const effectiveDisplayLevel = displayLevel === -1 ? -1 : displayLevel;
 
+  const getTitle = (): string => {
+    if (effectiveDisplayLevel >= 0) {
+      return RELEVANCE_LABELS[effectiveDisplayLevel];
+    }
+    return isSuggestion ? "Set relevance" : RELEVANCE_LABELS[-1];
+  };
+
   return (
     <div
       className="pill relevance-selector"
       onMouseLeave={() => setHoverLevel(null)}
-      title={
-        effectiveDisplayLevel >= 0
-          ? RELEVANCE_LABELS[effectiveDisplayLevel]
-          : "Set relevance"
-      }
+      title={getTitle()}
     >
       <span
         className="relevance-x"
@@ -217,7 +221,8 @@ export function RelevanceSelector({
             backgroundColor: getLevelColor(
               level,
               effectiveDisplayLevel,
-              isNotRelevant
+              isNotRelevant,
+              isContains
             ),
           }}
         />

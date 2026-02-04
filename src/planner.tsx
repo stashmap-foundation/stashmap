@@ -195,13 +195,13 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
     relations: updatedRelations,
   };
   // Items with relevance and optional argument: ["i", nodeID, relevance, argument?]
-  const itemsAsTags = relations.items
-    .toArray()
-    .map((item) =>
-      item.argument
-        ? ["i", item.nodeID, item.relevance, item.argument]
-        : ["i", item.nodeID, item.relevance]
-    );
+  // relevance undefined is serialized as empty string ""
+  const itemsAsTags = relations.items.toArray().map((item) => {
+    const relevanceStr = item.relevance ?? "";
+    return item.argument
+      ? ["i", item.nodeID, relevanceStr, item.argument]
+      : ["i", item.nodeID, relevanceStr];
+  });
   // Context tags: ["c", id] for each ancestor (enables relay-level context queries)
   const contextTags = relations.context.toArray().map((id) => ["c", id]);
   // basedOn tag: ["b", relationID] - tracks what this relation was forked from
@@ -316,7 +316,7 @@ export function planCreateVersion(
       ? addRelationToRelations(
           baseVersionsRelations,
           originalNodeID,
-          "",
+          undefined,
           undefined,
           baseVersionsRelations.items.size
         )
@@ -343,7 +343,7 @@ export function planCreateVersion(
       : addRelationToRelations(
           versionsWithOriginal,
           versionNode.id,
-          "",
+          undefined,
           undefined,
           insertPosition
         );
@@ -753,7 +753,7 @@ function planCreateNoteAtRoot(
   const updatedRelations = addRelationToRelations(
     relations,
     refId,
-    "",
+    undefined,
     undefined,
     0
   );
@@ -1253,7 +1253,7 @@ export function planSetEmptyNodePosition(
       type: "ADD_EMPTY_NODE",
       relationsID: relations.id,
       index: insertIndex,
-      relationItem: { nodeID: EMPTY_NODE_ID, relevance: "" },
+      relationItem: { nodeID: EMPTY_NODE_ID, relevance: undefined },
       paneIndex: getPaneIndex(parentPath),
     }),
   };

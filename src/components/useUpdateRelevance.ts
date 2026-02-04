@@ -4,24 +4,27 @@ import { usePaneStack } from "../SplitPanesContext";
 import { planDisconnectFromParent } from "../dnd";
 import { useRelationItemContext } from "./useRelationItemContext";
 
-// Relevance mapped to levels:
-// "relevant" = 3
-// "" (maybe relevant, default) = 2
-// "little_relevant" = 1
-// "not_relevant" = 0
+// Relevance mapped to levels (for 3-dot UI):
+// "relevant" = 3 (3 dots)
+// "maybe_relevant" = 2 (2 dots)
+// "little_relevant" = 1 (1 dot)
+// "not_relevant" = 0 (X button)
+// undefined (contains, default) = -1 (no dots selected)
 
 export function relevanceToLevel(relevance: Relevance): number {
   switch (relevance) {
     case "relevant":
       return 3;
-    case "":
+    case "maybe_relevant":
       return 2;
     case "little_relevant":
       return 1;
     case "not_relevant":
       return 0;
+    case undefined:
+      return -1;
     default:
-      return 2;
+      return -1;
   }
 }
 
@@ -30,22 +33,23 @@ export function levelToRelevance(level: number): Relevance {
     case 3:
       return "relevant";
     case 2:
-      return "";
+      return "maybe_relevant";
     case 1:
       return "little_relevant";
     case 0:
       return "not_relevant";
     default:
-      return "";
+      return undefined;
   }
 }
 
-export const RELEVANCE_LABELS = [
-  "Not Relevant",
-  "Little Relevant",
-  "Maybe Relevant",
-  "Relevant",
-];
+export const RELEVANCE_LABELS: Record<number, string> = {
+  [-1]: "Contains",
+  0: "Not Relevant",
+  1: "Little Relevant",
+  2: "Maybe Relevant",
+  3: "Relevant",
+};
 
 type UseUpdateRelevanceResult = {
   // Current state
@@ -70,7 +74,9 @@ export function useUpdateRelevance(): UseUpdateRelevanceResult {
   const { isVisible, nodeText, currentItem, viewPath, updateMetadata } =
     useRelationItemContext();
 
-  const currentRelevance = currentItem?.relevance ?? "";
+  const rawRelevance = currentItem?.relevance;
+  const currentRelevance: Relevance =
+    (rawRelevance as string) === "" ? undefined : rawRelevance;
   const currentLevel = relevanceToLevel(currentRelevance);
 
   const setRelevance = (relevance: Relevance): void => {

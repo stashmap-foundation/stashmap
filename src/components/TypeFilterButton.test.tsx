@@ -33,16 +33,20 @@ describe("DEFAULT_TYPE_FILTERS", () => {
     expect(DEFAULT_TYPE_FILTERS).toContain("relevant");
   });
 
-  test("includes maybe_relevant (empty string)", () => {
-    expect(DEFAULT_TYPE_FILTERS).toContain("");
+  test("includes maybe_relevant", () => {
+    expect(DEFAULT_TYPE_FILTERS).toContain("maybe_relevant");
   });
 
-  test("includes confirms", () => {
-    expect(DEFAULT_TYPE_FILTERS).toContain("confirms");
+  test("includes contains", () => {
+    expect(DEFAULT_TYPE_FILTERS).toContain("contains");
   });
 
-  test("includes contra", () => {
-    expect(DEFAULT_TYPE_FILTERS).toContain("contra");
+  test("excludes confirms by default", () => {
+    expect(DEFAULT_TYPE_FILTERS).not.toContain("confirms");
+  });
+
+  test("excludes contra by default", () => {
+    expect(DEFAULT_TYPE_FILTERS).not.toContain("contra");
   });
 
   test("excludes little_relevant by default", () => {
@@ -101,10 +105,10 @@ My Notes
     await screen.findByText("Item One");
     await screen.findByText("Item Two");
 
-    // Toggle off "Maybe Relevant" filter using inline dot (default relevance for new items)
-    fireEvent.click(screen.getByLabelText("toggle Maybe Relevant filter"));
+    // Toggle off "Contains" filter using inline dot (default relevance for new items is undefined/contains)
+    fireEvent.click(screen.getByLabelText("toggle Contains filter"));
 
-    // Items should be hidden (they have default/maybe_relevant relevance)
+    // Items should be hidden (they have default/contains relevance)
     await waitFor(() => {
       expect(screen.queryByText("Item One")).toBeNull();
       expect(screen.queryByText("Item Two")).toBeNull();
@@ -169,10 +173,8 @@ My Notes
 
     await screen.findByText("Test Item");
 
-    // Toggle off "Maybe Relevant" filter using inline dot
-    await userEvent.click(
-      screen.getByLabelText("toggle Maybe Relevant filter")
-    );
+    // Toggle off "Contains" filter using inline dot (default relevance for new items is undefined/contains)
+    await userEvent.click(screen.getByLabelText("toggle Contains filter"));
 
     // Item should be hidden
     await waitFor(() => {
@@ -184,10 +186,8 @@ My Notes
       expect(screen.queryByText("Test Item")).toBeNull();
     });
 
-    // Re-enable "Maybe Relevant" filter
-    await userEvent.click(
-      screen.getByLabelText("toggle Maybe Relevant filter")
-    );
+    // Re-enable "Contains" filter
+    await userEvent.click(screen.getByLabelText("toggle Contains filter"));
 
     // Item should reappear
     await screen.findByText("Test Item");

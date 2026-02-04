@@ -12,18 +12,22 @@ import { TYPE_COLORS } from "../constants";
 type ItemStyle = {
   cardStyle: CSSProperties;
   textStyle: CSSProperties;
+  relevance: Relevance;
 };
 
 const DEFAULT_STYLE: ItemStyle = {
   cardStyle: {},
   textStyle: {},
+  relevance: undefined,
 };
 
 function getRelevanceTextStyle(relevance: Relevance): CSSProperties {
   switch (relevance) {
     case "relevant":
       return { fontWeight: 600 };
-    case "": // Maybe relevant (default) - normal text
+    case "maybe_relevant":
+      return {};
+    case undefined:
       return {};
     case "little_relevant":
       return { color: "var(--base01)" };
@@ -74,14 +78,18 @@ export function useItemStyle(): ItemStyle {
   // Get current item's relevance and argument
   const relations = getParentRelation(data, viewPath);
   const currentItem = relations?.items.get(relationIndex ?? -1);
-  const relevance = currentItem?.relevance || "";
+  const relevance = currentItem?.relevance;
   const argument = currentItem?.argument;
+
+  const normalizedRelevance =
+    relevance === ("" as string) ? undefined : relevance;
 
   return {
     cardStyle: {},
     textStyle: {
-      ...getRelevanceTextStyle(relevance),
+      ...getRelevanceTextStyle(normalizedRelevance),
       ...getArgumentTextStyle(argument),
     },
+    relevance: normalizedRelevance,
   };
 }

@@ -3,17 +3,17 @@ import { eventToRelations, jsonToViews } from "./serializer";
 import { ALICE } from "./utils.test";
 
 describe("eventToRelations validation", () => {
-  test("filters invalid relevance values to default (empty string)", () => {
+  test("filters invalid relevance values to undefined (contains)", () => {
     const event = {
       kind: KIND_KNOWLEDGE_LIST,
       tags: [
         ["d", "rel-123"],
         ["k", "head-node"],
         ["i", "node1", "relevant"], // valid
-        ["i", "node2", "invalid_relevance"], // invalid -> ""
-        ["i", "node3", ""], // valid (maybe relevant)
+        ["i", "node2", "invalid_relevance"], // invalid -> undefined
+        ["i", "node3", ""], // empty string -> undefined (contains)
         ["i", "node4", "little_relevant"], // valid
-        ["i", "node5", "old_type_that_no_longer_exists"], // invalid -> ""
+        ["i", "node5", "old_type_that_no_longer_exists"], // invalid -> undefined
       ],
       pubkey: ALICE.publicKey,
       content: "",
@@ -24,10 +24,10 @@ describe("eventToRelations validation", () => {
     expect(relations).toBeDefined();
     expect(relations!.items.size).toBe(5);
     expect(relations!.items.get(0)?.relevance).toBe("relevant");
-    expect(relations!.items.get(1)?.relevance).toBe(""); // filtered to default
-    expect(relations!.items.get(2)?.relevance).toBe("");
+    expect(relations!.items.get(1)?.relevance).toBeUndefined(); // filtered to default
+    expect(relations!.items.get(2)?.relevance).toBeUndefined(); // empty -> undefined
     expect(relations!.items.get(3)?.relevance).toBe("little_relevant");
-    expect(relations!.items.get(4)?.relevance).toBe(""); // filtered to default
+    expect(relations!.items.get(4)?.relevance).toBeUndefined(); // filtered to default
   });
 
   test("filters invalid argument values to undefined", () => {
@@ -129,7 +129,7 @@ describe("jsonToViews validation", () => {
         "p0:node1:0": {
           f: [
             "relevant",
-            "",
+            "", // empty string is migrated to "contains"
             "confirms",
             "contra",
             "suggestions",
@@ -145,7 +145,7 @@ describe("jsonToViews validation", () => {
     expect(view).toBeDefined();
     expect(view!.typeFilters).toEqual([
       "relevant",
-      "",
+      "contains", // "" migrated to "contains"
       "confirms",
       "contra",
       "suggestions",

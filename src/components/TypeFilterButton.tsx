@@ -4,9 +4,17 @@ import { useData } from "../DataContext";
 import { useCurrentPane } from "../SplitPanesContext";
 import { DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 
-const RELEVANCE_FILTERS: { id: Relevance; label: string; color: string }[] = [
+const RELEVANCE_FILTERS: {
+  id: Relevance | "contains";
+  label: string;
+  color: string;
+}[] = [
   { id: "relevant", label: "Relevant", color: TYPE_COLORS.relevant },
-  { id: "", label: "Maybe Relevant", color: TYPE_COLORS.maybe_relevant },
+  {
+    id: "maybe_relevant",
+    label: "Maybe Relevant",
+    color: TYPE_COLORS.maybe_relevant,
+  },
   {
     id: "little_relevant",
     label: "Little Relevant",
@@ -17,6 +25,7 @@ const RELEVANCE_FILTERS: { id: Relevance; label: string; color: string }[] = [
     label: "Not Relevant",
     color: TYPE_COLORS.not_relevant,
   },
+  { id: "contains", label: "Contains", color: TYPE_COLORS.contains },
 ];
 
 const ARGUMENT_FILTERS: {
@@ -34,7 +43,7 @@ const SUGGESTIONS_FILTER = {
   color: TYPE_COLORS.other_user,
 };
 
-export type FilterId = Relevance | Argument | "suggestions";
+export type FilterId = Relevance | Argument | "suggestions" | "contains";
 
 function ClickableFilterDot({
   id,
@@ -127,9 +136,25 @@ export function InlineFilterDots(): JSX.Element {
 
   const handleFilterToggle = (id: FilterId): void => {
     const isActive = currentFilters.includes(id);
-    const newFilters = isActive
+    const isArgument = id === "confirms" || id === "contra";
+    const isContains = id === "contains";
+
+    const newFilters: FilterId[] = isActive
       ? currentFilters.filter((f) => f !== id)
-      : [...currentFilters, id];
+      : (() => {
+          if (isArgument) {
+            return [...currentFilters.filter((f) => f !== "contains"), id];
+          }
+          if (isContains) {
+            return [
+              ...currentFilters.filter(
+                (f) => f !== "confirms" && f !== "contra"
+              ),
+              id,
+            ];
+          }
+          return [...currentFilters, id];
+        })();
 
     const updatedPane = { ...pane, typeFilters: newFilters };
     const newPanes = panes.map((p) => (p.id === pane.id ? updatedPane : p));

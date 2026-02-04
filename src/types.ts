@@ -136,7 +136,7 @@ declare global {
     author: PublicKey;
     rootRelation?: LongID;
     searchQuery?: string;
-    typeFilters?: (Relevance | Argument | "suggestions")[];
+    typeFilters?: (Relevance | Argument | "suggestions" | "contains")[];
   };
 
   type Data = {
@@ -176,8 +176,8 @@ declare global {
     viewingMode: "REFERENCED_BY" | undefined;
     // Show children, only relevant for inner nodes
     expanded?: boolean;
-    // Type filters for children view (empty/undefined = defaults: relevant, maybe_relevant, confirms, contra, suggestions)
-    typeFilters?: Array<Relevance | Argument | "suggestions">;
+    // Type filters for children view (empty/undefined = defaults: relevant, maybe_relevant, contains, suggestions)
+    typeFilters?: Array<Relevance | Argument | "suggestions" | "contains">;
   };
 
   // Context is the path of ancestor node IDs leading to the head node
@@ -185,7 +185,13 @@ declare global {
   type Context = List<ID>;
 
   // Relevance levels for relation items
-  type Relevance = "relevant" | "" | "little_relevant" | "not_relevant";
+  // undefined = "contains" (no relevance set, default for new items)
+  type Relevance =
+    | "relevant"
+    | "maybe_relevant"
+    | "little_relevant"
+    | "not_relevant"
+    | undefined;
 
   // Argument types (evidence) for relation items
   type Argument = "confirms" | "contra" | undefined;
@@ -193,7 +199,7 @@ declare global {
   // Each item in a relation has relevance and optional argument
   type RelationItem = {
     nodeID: LongID | ID;
-    relevance: Relevance; // "" = maybe relevant (default), "relevant", "little_relevant", "not_relevant"
+    relevance: Relevance; // undefined = contains (default), "relevant", "maybe_relevant", "little_relevant", "not_relevant"
     argument?: Argument; // "confirms", "contra", or undefined (neutral)
   };
 

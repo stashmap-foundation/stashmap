@@ -120,7 +120,12 @@ function HomeButton(): JSX.Element | null {
   }
 
   const handleClick = (): void => {
-    setPane({ ...pane, stack: [LOG_NODE_ID], rootRelation: undefined });
+    setPane({
+      ...pane,
+      author: user.publicKey,
+      stack: [LOG_NODE_ID],
+      rootRelation: undefined,
+    });
   };
 
   return (
@@ -171,7 +176,12 @@ function useHomeShortcut(): void {
         );
         if (logNode) {
           e.preventDefault();
-          setPane({ ...pane, stack: [LOG_NODE_ID], rootRelation: undefined });
+          setPane({
+            ...pane,
+            author: user.publicKey,
+            stack: [LOG_NODE_ID],
+            rootRelation: undefined,
+          });
         }
       }
     };

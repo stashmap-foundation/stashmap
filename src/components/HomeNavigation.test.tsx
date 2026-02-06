@@ -2,8 +2,11 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
+  BOB,
   expectTree,
+  follow,
   renderApp,
+  renderTree,
   setup,
   type,
   navigateToNodeViaSearch,
@@ -38,6 +41,40 @@ describe("Home Navigation", () => {
       await userEvent.click(await screen.findByLabelText("Navigate to Log"));
 
       await screen.findByLabelText("collapse ~Log");
+    });
+
+    test("clicking home button from another user's content navigates to your own ~Log", async () => {
+      const [alice, bob] = setup([ALICE, BOB]);
+      await follow(alice, bob().user.publicKey);
+
+      renderTree(bob);
+      await type(
+        "My Notes{Enter}{Tab}Programming Languages{Enter}{Tab}Rust{Escape}"
+      );
+      cleanup();
+
+      renderTree(alice);
+      await type("Alice Home Note{Escape}");
+      await userEvent.click(await screen.findByLabelText("Create new note"));
+      await type("My Notes{Enter}{Tab}Programming Languages{Escape}");
+
+      await userEvent.click(
+        await screen.findByLabelText("show references to Programming Languages")
+      );
+      await userEvent.click(
+        await screen.findByLabelText(
+          "open My Notes → Programming Languages (1) in fullscreen"
+        )
+      );
+      await screen.findByText("READONLY");
+
+      await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+      await screen.findByLabelText("collapse ~Log");
+      await waitFor(() => {
+        expect(screen.queryByText("READONLY")).toBeNull();
+      });
+      await screen.findByText("Alice Home Note");
     });
   });
 

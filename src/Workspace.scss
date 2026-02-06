@@ -1601,12 +1601,12 @@ input:focus,
 .inline-filter-symbols {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 0;
 }
 
 .filter-group {
   display: flex;
-  gap: 2px;
+  gap: 0;
 }
 
 .clickable-filter-dot {
@@ -1626,20 +1626,18 @@ input:focus,
 
 .clickable-filter-symbol {
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  padding: 1px 3px;
+  border: none;
+  border-radius: 0;
+  padding: 3px 4px;
   cursor: pointer;
   font-size: 14px;
   font-weight: bold;
   font-family: monospace;
   line-height: 1;
-  transition: transform 0.1s ease, background-color 0.1s ease,
-    border-color 0.1s ease;
+  transition: transform 0.1s ease, background-color 0.1s ease;
 
   &[aria-pressed="true"] {
-    background: var(--base02);
-    border-color: var(--base01);
+    background: var(--base3);
   }
 
   &:hover {

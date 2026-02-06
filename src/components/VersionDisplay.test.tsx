@@ -9,6 +9,18 @@ import {
   type,
 } from "../utils.test";
 
+const addChildViaTab = async (
+  parentLabel: string,
+  childText: string
+): Promise<void> => {
+  await userEvent.click(await screen.findByLabelText(`edit ${parentLabel}`));
+  await userEvent.keyboard("{Enter}");
+  const newNodeEditor = await findNewNodeEditor();
+  await userEvent.type(newNodeEditor, childText);
+  await userEvent.click(newNodeEditor);
+  await userEvent.keyboard("{Home}{Tab}");
+};
+
 describe("Version Display", () => {
   test("Reference node displays versioned text in path", async () => {
     const [alice] = setup([ALICE]);
@@ -218,14 +230,8 @@ My Notes
     BCN
     `);
 
-    // Expand BCN to manually add ~Versions as a child
-    await userEvent.click(await screen.findByLabelText("expand BCN"));
-
-    // Add ~Versions as a child by typing it (content-addressed ID will match existing ~Versions)
-    await userEvent.click(await screen.findByLabelText("edit BCN"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "~Versions{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    // Add ~Versions as a child via Tab indentation.
+    await addChildViaTab("BCN", "~Versions");
 
     await expectTree(`
 My Notes
@@ -283,12 +289,7 @@ My Notes
     fireEvent.blur(bcnEditor);
 
     // Now we have ~Versions: [V3, BCN, Barcelona]
-    // Expand V3 and add ~Versions as a child to see them
-    await userEvent.click(await screen.findByLabelText("expand V3"));
-    await userEvent.click(await screen.findByLabelText("edit V3"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "~Versions{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await addChildViaTab("V3", "~Versions");
     await userEvent.click(await screen.findByLabelText("expand ~Versions"));
 
     await expectTree(`
@@ -361,12 +362,7 @@ My Notes
     fireEvent.blur(bcnEditor);
 
     // Now we have ~Versions: [V3, BCN, Barcelona]
-    // Expand V3 and add ~Versions as a child to see them
-    await userEvent.click(await screen.findByLabelText("expand V3"));
-    await userEvent.click(await screen.findByLabelText("edit V3"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "~Versions{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    await addChildViaTab("V3", "~Versions");
     await userEvent.click(await screen.findByLabelText("expand ~Versions"));
 
     await expectTree(`
@@ -440,14 +436,8 @@ My Notes
     BCN
     `);
 
-    // Expand BCN to manually add ~Versions as a child
-    await userEvent.click(await screen.findByLabelText("expand BCN"));
-
-    // Add ~Versions as a child by typing it
-    await userEvent.click(await screen.findByLabelText("edit BCN"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "~Versions{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+    // Add ~Versions as a child via Tab indentation.
+    await addChildViaTab("BCN", "~Versions");
 
     // Expand ~Versions to see all versions
     await userEvent.click(await screen.findByLabelText("expand ~Versions"));

@@ -191,7 +191,7 @@ My Notes
     await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
 
     await navigateToNodeViaSearch(0, "Bitcoin");
-    await screen.findByLabelText("collapse Bitcoin");
+    await screen.findByRole("treeitem", { name: "Bitcoin" });
 
     // Switch to Referenced By view
     fireEvent.click(screen.getByLabelText("show references to Bitcoin"));

@@ -5,7 +5,6 @@ import {
   ALICE,
   BOB,
   expectTree,
-  findNewNodeEditor,
   navigateToNodeViaSearch,
   renderApp,
   renderTree,
@@ -54,13 +53,9 @@ test("Drag between split panes", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
 
-  await type("Root{Enter}Parent{Escape}");
-
-  await userEvent.click(await screen.findByLabelText("expand Parent"));
-  await userEvent.click(await screen.findByLabelText("edit Parent"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Child A{Enter}");
-  await userEvent.type(await findNewNodeEditor(), "Draggable Item{Escape}");
+  await type(
+    "Root{Enter}Parent{Enter}{Tab}Child A{Enter}Draggable Item{Escape}"
+  );
 
   await expectTree(`
 Root

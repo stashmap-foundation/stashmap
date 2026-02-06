@@ -32,11 +32,7 @@ test("Push node to navigation stack", async () => {
 
   // Start at node 1
   renderApp({ ...alice(), initialRoute: `/w/${workspace1!.id}` });
-  await screen.findByLabelText(
-    /expand Workspace 1|collapse Workspace 1/,
-    undefined,
-    { timeout: 5000 }
-  );
+  await screen.findByRole("treeitem", { name: "Workspace 1" });
 
   // Navigate to node 2 (should push to stack)
   window.history.pushState({}, "", `/w/${workspace2!.id}`);
@@ -60,11 +56,7 @@ test("Pop from navigation stack returns to previous node", async () => {
 
   // Navigate: ROOT -> Node 1 -> Node 2
   renderApp({ ...alice(), initialRoute: `/w/${workspace1!.id}` });
-  await screen.findByLabelText(
-    /expand Workspace 1|collapse Workspace 1/,
-    undefined,
-    { timeout: 5000 }
-  );
+  await screen.findByRole("treeitem", { name: "Workspace 1" });
 
   // Navigate to node 2
   window.history.pushState({}, "", `/w/${workspace2!.id}`);
@@ -94,11 +86,7 @@ test("PopTo navigates to specific node in stack", async () => {
 
   // Build a stack: ROOT -> W1 -> W2 -> W3
   renderApp({ ...alice(), initialRoute: `/w/${workspace1!.id}` });
-  await screen.findByLabelText(
-    /expand Workspace 1|collapse Workspace 1/,
-    undefined,
-    { timeout: 5000 }
-  );
+  await screen.findByRole("treeitem", { name: "Workspace 1" });
 
   // Push W2
   window.history.pushState({}, "", `/w/${workspace2!.id}`);
@@ -128,11 +116,7 @@ test("Stacked nodes show as layers", async () => {
   const topWorkspace = findNodeByText(db, "Top Workspace");
 
   renderApp({ ...alice(), initialRoute: `/w/${baseWorkspace!.id}` });
-  await screen.findByLabelText(
-    /expand Base Workspace|collapse Base Workspace/,
-    undefined,
-    { timeout: 5000 }
-  );
+  await screen.findByRole("treeitem", { name: "Base Workspace" });
 
   // Navigate to top node (simulating stack push)
   window.history.pushState({}, "", `/w/${topWorkspace!.id}`);
@@ -156,9 +140,7 @@ test("Clicking stacked layer navigates back", async () => {
   const layer2 = findNodeByText(db, "Layer 2");
 
   renderApp({ ...alice(), initialRoute: `/w/${layer1!.id}` });
-  await screen.findByLabelText(/expand Layer 1|collapse Layer 1/, undefined, {
-    timeout: 5000,
-  });
+  await screen.findByRole("treeitem", { name: "Layer 1" });
 
   // Navigate to layer 2
   window.history.pushState({}, "", `/w/${layer2!.id}`);

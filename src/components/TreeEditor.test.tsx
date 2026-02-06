@@ -693,17 +693,39 @@ Parent
     test("Tab on existing node - previous sibling HAS children - goes to END", async () => {
       const [alice] = setup([ALICE]);
       renderTree(alice);
-      await type("Root{Enter}{Tab}Parent With Kids{Enter}Will Move{Escape}");
+      await type("Root{Enter}{Tab}Parent With Kids{Escape}");
+
+      // Create first child by indenting a newly created sibling under Parent With Kids
       await userEvent.click(
-        await screen.findByLabelText("expand Parent With Kids")
+        await screen.findByLabelText("edit Parent With Kids")
+      );
+      await userEvent.keyboard("{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "Child A");
+      const childAEditor = await findNewNodeEditor();
+      const rangeForChildA = document.createRange();
+      rangeForChildA.selectNodeContents(childAEditor);
+      rangeForChildA.collapse(true);
+      window.getSelection()?.removeAllRanges();
+      window.getSelection()?.addRange(rangeForChildA);
+      await userEvent.keyboard("{Tab}");
+      await userEvent.keyboard("{Escape}");
+
+      // Second child as sibling under the same parent
+      await userEvent.click(await screen.findByLabelText("edit Child A"));
+      await userEvent.keyboard("{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "Child B{Escape}");
+
+      // Create root-level "Will Move" sibling by collapsing parent first
+      await userEvent.click(
+        await screen.findByLabelText("collapse Parent With Kids")
       );
       await userEvent.click(
         await screen.findByLabelText("edit Parent With Kids")
       );
       await userEvent.keyboard("{Enter}");
-      await userEvent.type(
-        await findNewNodeEditor(),
-        "Child A{Enter}Child B{Escape}"
+      await userEvent.type(await findNewNodeEditor(), "Will Move{Escape}");
+      await userEvent.click(
+        await screen.findByLabelText("expand Parent With Kids")
       );
 
       await expectTree(`
@@ -855,11 +877,18 @@ Custom Root
       await userEvent.type(await findNewNodeEditor(), "Parent{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
-      await userEvent.click(await screen.findByLabelText("expand Parent"));
+      // First child under Parent is created via Enter + Tab (no expand icon on leaf)
       await userEvent.click(await screen.findByLabelText("edit Parent"));
       await userEvent.keyboard("{Enter}");
-      await userEvent.type(await findNewNodeEditor(), "Existing Child{Enter}");
-      await userEvent.type(await findNewNodeEditor(), "{Escape}");
+      await userEvent.type(await findNewNodeEditor(), "Existing Child");
+      const existingChildEditor = await findNewNodeEditor();
+      const existingChildRange = document.createRange();
+      existingChildRange.selectNodeContents(existingChildEditor);
+      existingChildRange.collapse(true);
+      window.getSelection()?.removeAllRanges();
+      window.getSelection()?.addRange(existingChildRange);
+      await userEvent.keyboard("{Tab}");
+      await userEvent.keyboard("{Escape}");
 
       await expectTree(`
 Custom Root
@@ -1042,19 +1071,31 @@ Custom Root
       await userEvent.type(await findNewNodeEditor(), "L1{Enter}");
       await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
-      // Create L2 under L1
-      await userEvent.click(await screen.findByLabelText("expand L1"));
+      // Create L2 under L1 via Enter + Tab
       await userEvent.click(await screen.findByLabelText("edit L1"));
       await userEvent.keyboard("{Enter}");
-      await userEvent.type(await findNewNodeEditor(), "L2{Enter}");
-      await userEvent.type(await findNewNodeEditor(), "{Escape}");
+      await userEvent.type(await findNewNodeEditor(), "L2");
+      const l2Editor = await findNewNodeEditor();
+      const l2Range = document.createRange();
+      l2Range.selectNodeContents(l2Editor);
+      l2Range.collapse(true);
+      window.getSelection()?.removeAllRanges();
+      window.getSelection()?.addRange(l2Range);
+      await userEvent.keyboard("{Tab}");
+      await userEvent.keyboard("{Escape}");
 
-      // Create L3 under L2
-      await userEvent.click(await screen.findByLabelText("expand L2"));
+      // Create L3 under L2 via Enter + Tab
       await userEvent.click(await screen.findByLabelText("edit L2"));
       await userEvent.keyboard("{Enter}");
-      await userEvent.type(await findNewNodeEditor(), "L3{Enter}");
-      await userEvent.type(await findNewNodeEditor(), "{Escape}");
+      await userEvent.type(await findNewNodeEditor(), "L3");
+      const l3Editor = await findNewNodeEditor();
+      const l3Range = document.createRange();
+      l3Range.selectNodeContents(l3Editor);
+      l3Range.collapse(true);
+      window.getSelection()?.removeAllRanges();
+      window.getSelection()?.addRange(l3Range);
+      await userEvent.keyboard("{Tab}");
+      await userEvent.keyboard("{Escape}");
 
       await expectTree(`
 Custom Root

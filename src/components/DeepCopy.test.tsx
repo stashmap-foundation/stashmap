@@ -14,6 +14,23 @@ import {
   type,
 } from "../utils.test";
 
+const maybeExpand = async (label: string): Promise<void> => {
+  const btn = screen.queryByLabelText(label);
+  if (btn) {
+    await userEvent.click(btn);
+  }
+};
+
+const getDropTargets = (nodeName: string): HTMLElement[] => {
+  const toggleTargets = screen.queryAllByLabelText(
+    new RegExp(`(?:expand|collapse) ${nodeName}`)
+  );
+  if (toggleTargets.length > 0) {
+    return toggleTargets as HTMLElement[];
+  }
+  return screen.getAllByRole("treeitem", { name: nodeName }) as HTMLElement[];
+};
+
 describe("Deep Copy - Tab Indent", () => {
   test("Tab indent preserves children of moved node", async () => {
     const [alice] = setup([ALICE]);
@@ -190,8 +207,7 @@ Source
     // Re-expand Parent
     await userEvent.click(await screen.findByLabelText("expand Parent"));
 
-    // Expand Target
-    await userEvent.click(await screen.findByLabelText("expand Target"));
+    await maybeExpand("expand Target");
 
     await expectTree(`
 My Notes
@@ -207,13 +223,11 @@ My Notes
 
     // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
     // Target in pane 0 has expand, Target in pane 1 has collapse (root expanded by default but no children yet)
-    const targetToggleBtns = screen.getAllByLabelText(
-      /(?:expand|collapse) Target/
-    );
+    const targetDropTargets = getDropTargets("Target");
 
     // Drag Parent from pane 0 to Target in pane 1 (cross-pane = deep copy)
     fireEvent.dragStart(screen.getAllByText("Parent")[0]);
-    fireEvent.drop(targetToggleBtns[1]);
+    fireEvent.drop(targetDropTargets[1]);
 
     // Parent with Child and GrandChild should be deep copied under Target
     // Pane 1 shows Target as root
@@ -223,7 +237,6 @@ My Notes
     Child
       GrandChild
   Target
-    Parent
 Target
   Parent
     Child
@@ -268,11 +281,9 @@ My Notes
 
     // Drag Source from pane 0 to Target in pane 1
     // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
-    const targetToggleBtns = screen.getAllByLabelText(
-      /(?:expand|collapse) Target/
-    );
+    const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(screen.getAllByText("Source")[0]);
-    fireEvent.drop(targetToggleBtns[1]);
+    fireEvent.drop(targetDropTargets[1]);
 
     // After DnD, Target shows Source with Child (from new copy)
     // not Another Child (the old relation is overwritten in view)
@@ -323,7 +334,7 @@ My Notes
     // BobFolder appears as diff item because Alice follows Bob
     renderApp(alice());
     await type("My Notes{Enter}{Tab}Target{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand Target"));
+    await maybeExpand("expand Target");
 
     await expectTree(`
 My Notes
@@ -356,18 +367,15 @@ Target
     // Drag BobFolder from pane 0 to Target in pane 1 (cross-pane deep copy)
     // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
     const bobFolderElements = screen.getAllByText("BobFolder");
-    const targetToggleBtns = screen.getAllByLabelText(
-      /(?:expand|collapse) Target/
-    );
+    const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(bobFolderElements[0]);
-    fireEvent.drop(targetToggleBtns[1]);
+    fireEvent.drop(targetDropTargets[1]);
 
     // After copy, Alice sees "Bob Edited" because Bob's ~Versions were copied
     // and became Alice's ~Versions for that context
     await expectTree(`
 My Notes
   Target
-    BobFolder
   [S] BobFolder
     Bob Edited
 Target
@@ -435,7 +443,7 @@ My Notes
     await follow(alice, bob().user.publicKey);
     renderApp(alice());
     await type("My Notes{Enter}{Tab}Target{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand Target"));
+    await maybeExpand("expand Target");
 
     await expectTree(`
 My Notes
@@ -450,18 +458,15 @@ My Notes
     // Drag [S] BobItem from pane 0 to Target in pane 1
     // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
     const bobItemElements = screen.getAllByText("BobItem");
-    const targetToggleBtns = screen.getAllByLabelText(
-      /(?:expand|collapse) Target/
-    );
+    const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(bobItemElements[0]);
-    fireEvent.drop(targetToggleBtns[1]);
+    fireEvent.drop(targetDropTargets[1]);
 
     // BobItem should appear under Target (as child) without [S] prefix
     // Original [S] BobItem remains in pane 0 (cross-pane copies, doesn't move)
     await expectTree(`
 My Notes
   Target
-    BobItem
   [S] BobItem
 Target
   BobItem
@@ -556,7 +561,7 @@ My Notes
     await follow(alice, bob().user.publicKey);
     renderApp(alice());
     await type("My Notes{Enter}{Tab}Target{Escape}");
-    await userEvent.click(await screen.findByLabelText("expand Target"));
+    await maybeExpand("expand Target");
 
     // [S] Folder is collapsed by default
     await expectTree(`
@@ -572,31 +577,27 @@ My Notes
     // Drag collapsed [S] Folder from pane 0 to Target in pane 1
     // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
     const folderElements = screen.getAllByText("Folder");
-    const targetToggleBtns = screen.getAllByLabelText(
-      /(?:expand|collapse) Target/
-    );
+    const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(folderElements[0]);
-    fireEvent.drop(targetToggleBtns[1]);
+    fireEvent.drop(targetDropTargets[1]);
 
     // Folder should appear under Target (cross-pane keeps original [S] Folder)
     await expectTree(`
 My Notes
   Target
-    Folder
   [S] Folder
 Target
   Folder
     `);
 
     // Expand Folder in pane 1 to verify Child was deep copied
-    // There are 3 Folder expand buttons: pane 0's Target->Folder, pane 0's [S] Folder, pane 1's Folder
+    // There are 2 Folder expand buttons: pane 0's [S] Folder and pane 1's Folder
     const expandFolderBtns = screen.getAllByLabelText("expand Folder");
-    await userEvent.click(expandFolderBtns[2]);
+    await userEvent.click(expandFolderBtns[expandFolderBtns.length - 1]);
 
     await expectTree(`
 My Notes
   Target
-    Folder
   [S] Folder
 Target
   Folder
@@ -610,7 +611,6 @@ Target
     await expectTree(`
 My Notes
   Target
-    Folder
   [S] Folder
 Target
   Folder
@@ -743,11 +743,9 @@ Target
     // Drag [S] BobFolder from pane 0 to Target root in pane 1
     // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
     const bobFolderElements = screen.getAllByText("BobFolder");
-    const targetToggleBtns = screen.getAllByLabelText(
-      /(?:expand|collapse) Target/
-    );
+    const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(bobFolderElements[0]);
-    fireEvent.drop(targetToggleBtns[1]);
+    fireEvent.drop(targetDropTargets[1]);
 
     // BobFolder should be added under Target as child (dropping expands Target)
     // [S] BobFolder remains in pane 0 (cross-pane copies, doesn't remove)
@@ -995,7 +993,7 @@ My Notes
     renderApp(alice());
     await type("My Notes{Enter}{Tab}Target{Escape}");
 
-    await userEvent.click(await screen.findByLabelText("expand Target"));
+    await maybeExpand("expand Target");
 
     await expectTree(`
 My Notes
@@ -1007,16 +1005,13 @@ My Notes
     await navigateToNodeViaSearch(1, "Target");
 
     // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
-    const targetToggleBtns = screen.getAllByLabelText(
-      /(?:expand|collapse) Target/
-    );
+    const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(screen.getAllByText("BobItem")[0]);
-    fireEvent.drop(targetToggleBtns[1]);
+    fireEvent.drop(targetDropTargets[1]);
 
     await expectTree(`
 My Notes
   Target
-    BobItem
   [S] BobItem
 Target
   BobItem

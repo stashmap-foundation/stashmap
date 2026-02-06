@@ -12,6 +12,13 @@ import {
   type,
 } from "../utils.test";
 
+const maybeExpand = async (label: string): Promise<void> => {
+  const btn = screen.queryByLabelText(label);
+  if (btn) {
+    await userEvent.click(btn);
+  }
+};
+
 describe("Suggestion Display", () => {
   test("Suggestion from other user shows without breadcrumbs", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
@@ -220,7 +227,7 @@ My Notes
   Recipes
     `);
 
-    await userEvent.click(await screen.findByLabelText("expand Recipes"));
+    await maybeExpand("expand Recipes");
 
     await expectTree(`
 My Notes

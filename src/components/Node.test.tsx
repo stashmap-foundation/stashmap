@@ -674,6 +674,34 @@ test("getDiffItemsForNode only returns suggestions from matching context", () =>
 
 // Tests for inline node creation via keyboard
 describe("Inline Node Creation", () => {
+  test("leaf nodes keep spacing and become expandable after first child", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("Root{Enter}{Tab}Leaf{Escape}");
+
+    expect(screen.queryByLabelText("expand Leaf")).toBeNull();
+    expect(screen.queryByLabelText("collapse Leaf")).toBeNull();
+
+    const leafEditor = await screen.findByLabelText("edit Leaf");
+    expect(screen.queryByText("•")).toBeNull();
+
+    await userEvent.click(leafEditor);
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Child{Escape}");
+
+    const childEditor = await screen.findByLabelText("edit Child");
+    await userEvent.click(childEditor);
+    const range = document.createRange();
+    range.selectNodeContents(childEditor);
+    range.collapse(true);
+    window.getSelection()?.removeAllRanges();
+    window.getSelection()?.addRange(range);
+    await userEvent.keyboard("{Tab}");
+
+    await screen.findByLabelText(/expand Leaf|collapse Leaf/);
+  });
+
   test("Create new sibling node by pressing Enter on existing node", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);

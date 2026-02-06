@@ -16,6 +16,7 @@ import {
   getRelationForView,
   getRelationIndex,
   getLast,
+  getDiffItemsForNode,
   isReferencedByView,
   getContext,
   useIsViewingOtherUserContent,
@@ -35,9 +36,12 @@ import {
   isConcreteRefId,
   parseConcreteRefId,
   getRelationsNoReferencedBy,
+  getConcreteRefsForAbstract,
+  getRelations,
   isSearchId,
   computeEmptyNodeMetadata,
 } from "../connections";
+import { DEFAULT_TYPE_FILTERS } from "../constants";
 import { IS_MOBILE } from "./responsive";
 import { MiniEditor, preventEditorBlurIfSameNode } from "./AddNode";
 import { useOnToggleExpanded } from "./SelectRelations";
@@ -663,6 +667,8 @@ export function Node({
   const cls =
     className !== undefined ? `${className} hover-light-bg` : defaultCls;
   const clsBody = cardBodyClassName || "ps-0 pt-0 pb-0";
+  const data = useData();
+  const stack = usePaneStack();
 
   const [nodeID] = useNodeID();
 
@@ -690,6 +696,42 @@ export function Node({
     (!isSuggestion && !isConcreteRef && !isInReferencedByView) ||
     isAbstractRef ||
     isSuggestionWithChildren;
+  const childRelations = getRelationForView(data, viewPath, stack);
+  const activeFilters = useCurrentPane().typeFilters || DEFAULT_TYPE_FILTERS;
+  const hasChildren = (() => {
+    if (isAbstractRef) {
+      const concreteRefs = getConcreteRefsForAbstract(
+        data.knowledgeDBs,
+        data.user.publicKey,
+        nodeID as LongID
+      );
+      return Boolean(concreteRefs && concreteRefs.items.size > 0);
+    }
+
+    if (isConcreteRef) {
+      const concreteRefChildren = getRelations(
+        data.knowledgeDBs,
+        nodeID as LongID,
+        data.user.publicKey,
+        nodeID
+      );
+      return Boolean(concreteRefChildren && concreteRefChildren.items.size > 0);
+    }
+
+    const hasDirectChildren = Boolean(
+      childRelations && childRelations.items.size > 0
+    );
+    const hasSuggestionChildren =
+      getDiffItemsForNode(
+        data.knowledgeDBs,
+        data.user.publicKey,
+        nodeID,
+        activeFilters,
+        childRelations?.id,
+        getContext(data, viewPath, stack)
+      ).size > 0;
+    return hasDirectChildren || hasSuggestionChildren;
+  })();
 
   // Content class for styling based on view mode
   const getContentClass = (): string => {
@@ -749,17 +791,10 @@ export function Node({
         {levels > 0 && (
           <Indent levels={levels} colorLevels={referencedByDepth} />
         )}
-        {showExpandCollapse && <ExpandCollapseToggle />}
-        {isConcreteRef && !showExpandCollapse && (
-          <button
-            type="button"
-            disabled
-            className="expand-collapse-toggle toggle-hidden"
-            aria-label="concrete reference"
-            aria-hidden="true"
-          >
-            <span className="triangle collapsed">▶</span>
-          </button>
+        {showExpandCollapse && hasChildren && <ExpandCollapseToggle />}
+        {((showExpandCollapse && !hasChildren) ||
+          (isConcreteRef && !showExpandCollapse)) && (
+          <span className="node-marker" aria-hidden="true" />
         )}
         {isMultiselect && <NodeSelectbox />}
         <div className={`w-100 node-content-wrapper ${contentClass}`}>

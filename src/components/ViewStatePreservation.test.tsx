@@ -24,6 +24,23 @@ async function deleteItem(itemName: string): Promise<void> {
   });
 }
 
+const maybeExpand = async (label: string): Promise<void> => {
+  const btn = screen.queryByLabelText(label);
+  if (btn) {
+    await userEvent.click(btn);
+  }
+};
+
+const getDropTargets = (nodeName: string): HTMLElement[] => {
+  const toggleTargets = screen.queryAllByLabelText(
+    new RegExp(`(?:expand|collapse) ${nodeName}`)
+  );
+  if (toggleTargets.length > 0) {
+    return toggleTargets as HTMLElement[];
+  }
+  return screen.getAllByRole("treeitem", { name: nodeName }) as HTMLElement[];
+};
+
 describe("View State Preservation - Reorder Within Same List", () => {
   test("Move expanded item down - item stays expanded", async () => {
     const [alice] = setup([ALICE]);
@@ -296,7 +313,7 @@ describe("View State Preservation - Cross-Pane DnD (Copy)", () => {
     await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
     await userEvent.click(await screen.findByLabelText("expand Source"));
-    await userEvent.click(await screen.findByLabelText("expand Target"));
+    await maybeExpand("expand Target");
 
     await expectTree(`
 My Notes
@@ -311,11 +328,9 @@ My Notes
     await navigateToNodeViaSearch(1, "Target");
 
     // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
-    const targetToggleBtns = screen.getAllByLabelText(
-      /(?:expand|collapse) Target/
-    );
+    const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(screen.getAllByText("Source")[0]);
-    fireEvent.drop(targetToggleBtns[1]);
+    fireEvent.drop(targetDropTargets[1]);
 
     const collapseButtons = screen.getAllByLabelText("collapse Source");
     expect(collapseButtons.length).toBeGreaterThanOrEqual(2);
@@ -335,7 +350,7 @@ My Notes
     await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
     await userEvent.click(await screen.findByLabelText("expand Parent"));
-    await userEvent.click(await screen.findByLabelText("expand Target"));
+    await maybeExpand("expand Target");
 
     await expectTree(`
 My Notes
@@ -352,11 +367,9 @@ My Notes
     await navigateToNodeViaSearch(1, "Target");
 
     // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
-    const targetToggleBtns = screen.getAllByLabelText(
-      /(?:expand|collapse) Target/
-    );
+    const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(screen.getAllByText("Parent")[0]);
-    fireEvent.drop(targetToggleBtns[1]);
+    fireEvent.drop(targetDropTargets[1]);
 
     const collapseParentButtons = screen.getAllByLabelText("collapse Parent");
     expect(collapseParentButtons.length).toBeGreaterThanOrEqual(2);
@@ -377,7 +390,7 @@ My Notes
     await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
     await userEvent.click(await screen.findByLabelText("expand Source"));
-    await userEvent.click(await screen.findByLabelText("expand Target"));
+    await maybeExpand("expand Target");
 
     await expectTree(`
 My Notes
@@ -392,11 +405,9 @@ My Notes
     await navigateToNodeViaSearch(1, "Target");
 
     // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
-    const targetToggleBtns = screen.getAllByLabelText(
-      /(?:expand|collapse) Target/
-    );
+    const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(screen.getAllByText("Source")[0]);
-    fireEvent.drop(targetToggleBtns[1]);
+    fireEvent.drop(targetDropTargets[1]);
 
     const collapseSourceButtons = screen.getAllByLabelText("collapse Source");
     expect(collapseSourceButtons.length).toBeGreaterThanOrEqual(2);
@@ -612,7 +623,7 @@ describe("View State Preservation - Complex Tree Operations", () => {
       "My Notes{Enter}{Tab}Target{Enter}Source{Enter}{Tab}L1{Enter}{Tab}L2{Enter}{Tab}L3{Escape}"
     );
 
-    await userEvent.click(await screen.findByLabelText("expand Target"));
+    await maybeExpand("expand Target");
 
     await expectTree(`
 My Notes

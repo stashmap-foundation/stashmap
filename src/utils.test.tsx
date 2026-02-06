@@ -846,6 +846,35 @@ function classifyRow(row: Element): RowInfo | null {
     };
   }
 
+  if (noteEditor) {
+    const rawText = noteEditor.textContent?.trim() || "";
+    if (!rawText) {
+      return null;
+    }
+    return {
+      element: noteEditor as HTMLElement,
+      text: rawText,
+      indentLevel: getIndentLevel(noteEditor as HTMLElement),
+    };
+  }
+
+  // Read-only text rows (e.g. other-user content) have no editor and may have
+  // no expand/collapse toggle when they are leaf nodes.
+  /* eslint-disable testing-library/no-node-access */
+  const readOnlyText = innerNode?.querySelector(".break-word");
+  /* eslint-enable testing-library/no-node-access */
+  if (readOnlyText) {
+    const rawText = readOnlyText.textContent?.trim() || "";
+    if (!rawText) {
+      return null;
+    }
+    return {
+      element: readOnlyText as HTMLElement,
+      text: rawText,
+      indentLevel: getIndentLevel(readOnlyText as HTMLElement),
+    };
+  }
+
   return null;
 }
 
@@ -939,13 +968,14 @@ export async function navigateToNodeViaSearch(
     name: new RegExp(`Navigate to.*${nodeName}`, "i"),
   });
   await userEvent.click(navigateButtons[0]);
-  // Wait for navigation to complete - look for expand/collapse button for the node
-  // Use findAllByLabelText since multiple panes may have the same node
+
+  // Navigation can finish before descendants are rendered; wait for the target
+  // row/editor without relying on expand/collapse controls.
   await waitFor(() => {
-    const buttons = screen.queryAllByLabelText(
-      new RegExp(`(expand|collapse) ${nodeName}`)
-    );
-    expect(buttons.length).toBeGreaterThan(0);
+    const hasEditor = screen.queryAllByLabelText(`edit ${nodeName}`).length > 0;
+    const hasTreeRow =
+      screen.queryAllByRole("treeitem", { name: nodeName }).length > 0;
+    expect(hasEditor || hasTreeRow).toBe(true);
   });
 }
 

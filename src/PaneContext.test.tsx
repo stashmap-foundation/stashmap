@@ -28,5 +28,5 @@ test("Navigate to specific node via URL", async () => {
   renderApp({ ...alice(), initialRoute: `/w/${testNode!.id}` });
 
   // The node should now be displayed as root
-  await screen.findByLabelText(/expand Test Node|collapse Test Node/);
+  await screen.findByRole("treeitem", { name: "Test Node" });
 });

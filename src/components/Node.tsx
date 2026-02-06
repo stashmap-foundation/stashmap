@@ -793,8 +793,13 @@ export function Node({
         )}
         {showExpandCollapse && hasChildren && <ExpandCollapseToggle />}
         {((showExpandCollapse && !hasChildren) ||
-          (isConcreteRef && !showExpandCollapse)) && (
-          <span className="node-marker" aria-hidden="true" />
+          (isConcreteRef && !showExpandCollapse) ||
+          (isSuggestion && !showExpandCollapse)) && (
+          <span
+            className="node-marker"
+            aria-hidden="true"
+            data-testid="node-marker"
+          />
         )}
         {isMultiselect && <NodeSelectbox />}
         <div className={`w-100 node-content-wrapper ${contentClass}`}>

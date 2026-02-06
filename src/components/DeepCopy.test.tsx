@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -1125,5 +1125,11 @@ My Notes
     `);
 
     expect(screen.queryByLabelText("edit BobLeafNode")).toBeNull();
+    expect(screen.queryByLabelText("expand BobLeafNode")).toBeNull();
+    expect(screen.queryByLabelText("collapse BobLeafNode")).toBeNull();
+
+    const leafSuggestionRow = screen.getByLabelText("BobLeafNode");
+    // Leaf suggestions reserve toggle width with a spacer so text aligns with expandable suggestions.
+    expect(within(leafSuggestionRow).getByTestId("node-marker")).toBeDefined();
   });
 });

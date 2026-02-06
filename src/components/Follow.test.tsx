@@ -58,7 +58,7 @@ test("find a user by nip-05 identifier", async () => {
 
   const findButton = screen.getByText("Find");
   await waitFor(() => {
-    expect(findButton.ariaDisabled).toBe(undefined);
+    expect(findButton.getAttribute("aria-disabled")).toBeNull();
   });
   fireEvent.click(findButton);
 
@@ -89,7 +89,7 @@ test("cannot find a user by nip-05 identifier", async () => {
 
   const findButton = screen.getByText("Find");
   await waitFor(() => {
-    expect(findButton.ariaDisabled).toBe(undefined);
+    expect(findButton.getAttribute("aria-disabled")).toBeNull();
   });
   fireEvent.click(findButton);
 

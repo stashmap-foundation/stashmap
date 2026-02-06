@@ -16,38 +16,31 @@ export type MockRelayPool = SimplePool & {
   resetPublishedOnRelays: () => void;
 };
 
-function fireEose(sub: Subscription): Promise<void> {
-  return Promise.resolve(sub.oneose?.());
+function fireEose(sub: Subscription): void {
+  sub.oneose?.();
 }
 
-function fireEvent(sub: Subscription, event: Event): Promise<void> {
-  return Promise.resolve(sub.onevent?.(event));
+function fireEvent(sub: Subscription, event: Event): void {
+  sub.onevent?.(event);
 }
 
-async function broadcastEvent(
+function broadcastEvent(
   subs: Map<string, Subscription>,
   event: Event
-): Promise<void> {
+): void {
   const filtered = subs.filter((sub) => matchFilters(sub.filters, event));
-  await Promise.all(
-    filtered.toList().map(async (sub) => {
-      // eslint-disable-next-line testing-library/no-await-sync-events
-      await fireEvent(sub, event);
-      await fireEose(sub);
-    })
-  );
+  filtered.forEach((sub) => {
+    fireEvent(sub, event);
+  });
 }
 
-async function broadcastEvents(
-  subs: Map<string, Subscription>,
-  events: Array<Event>
-): Promise<string> {
-  await Promise.all(
-    events.map(async (event) => {
-      await broadcastEvent(subs, event);
-    })
-  );
-  return "";
+function replayEvents(subscription: Subscription, events: Array<Event>): void {
+  events.forEach((event) => {
+    if (matchFilters(subscription.filters, event)) {
+      fireEvent(subscription, event);
+    }
+  });
+  fireEose(subscription);
 }
 
 export function mockRelayPool(): MockRelayPool {
@@ -70,23 +63,20 @@ export function mockRelayPool(): MockRelayPool {
         ...params,
       } as Subscription;
       subs = subs.set(id, subscription);
-      (async () => {
-        await broadcastEvents(
-          Map<string, Subscription>({ [id]: subscription }),
-          events
-        );
-        fireEose(subscription);
-      })();
+      replayEvents(subscription, events);
 
       return {
-        close: () => subs.remove(id),
+        close: () => {
+          subs = subs.remove(id);
+        },
       };
     },
     publish: (relays: string[], event: Event): Promise<string>[] => {
       // eslint-disable-next-line functional/immutable-data
       events.push({ ...event, relays });
       publishedOnRelays = Set([...publishedOnRelays, ...relays]).toArray();
-      return relays.map(() => broadcastEvents(subs, [event]));
+      broadcastEvent(subs, event);
+      return relays.map(() => Promise.resolve(""));
     },
     getEvents: () => events,
     getPublishedOnRelays: () => publishedOnRelays,

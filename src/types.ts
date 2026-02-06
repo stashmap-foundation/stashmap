@@ -2,6 +2,7 @@ import { Map, OrderedMap, List, OrderedSet, Set } from "immutable";
 import { Event, EventTemplate, UnsignedEvent } from "nostr-tools";
 // eslint-disable-next-line import/no-unresolved
 import { RelayInformation } from "nostr-tools/lib/types/nip11";
+import { QueueStatus } from "./PublishQueue";
 
 declare global {
   type Children = {
@@ -122,6 +123,7 @@ declare global {
     preLoginEvents: List<UnsignedEvent & EventAttachment>;
     temporaryView: TemporaryViewState;
     temporaryEvents: List<TemporaryEvent>;
+    queueStatus?: QueueStatus;
   };
 
   type AllRelays = {

@@ -51,6 +51,54 @@ async function publishEvent(
   };
 }
 
+export type SignedEventWithConf = {
+  readonly event: VerifiedEvent;
+  readonly writeRelayConf?: WriteRelayConf;
+};
+
+export async function signEvents(
+  events: List<EventTemplate & EventAttachment>,
+  user: User,
+  finalizeEvent: FinalizeEvent
+): Promise<List<SignedEventWithConf>> {
+  if (!isUserLoggedIn(user)) {
+    return List();
+  }
+
+  const signEventWithExtension = async (
+    event: EventTemplate
+  ): Promise<Event> => {
+    try {
+      return window.nostr.signEvent(event);
+      // eslint-disable-next-line no-empty
+    } catch {
+      throw new Error("Failed to sign event with extension");
+    }
+  };
+
+  return isUserLoggedInWithExtension(user)
+    ? List<SignedEventWithConf>(
+        await Promise.all(
+          events.map(async (e) => {
+            const { writeRelayConf, ...template } = e;
+            const signedEvent = await signEventWithExtension(template);
+            return {
+              event: signedEvent as VerifiedEvent,
+              writeRelayConf,
+            };
+          })
+        )
+      )
+    : events.map((e) => {
+        const { writeRelayConf, ...template } = e;
+        const event = finalizeEvent(
+          template,
+          (user as KeyPair).privateKey
+        ) as VerifiedEvent;
+        return { event, writeRelayConf };
+      });
+}
+
 export async function execute({
   plan,
   relayPool,
@@ -65,44 +113,16 @@ export async function execute({
     console.warn("Won't execute Noop plan");
     return Map();
   }
-  const { user } = plan;
 
-  if (!isUserLoggedIn(user)) {
+  const finalizedEvents = await signEvents(
+    plan.publishEvents,
+    plan.user,
+    finalizeEvent
+  );
+
+  if (finalizedEvents.size === 0) {
     return Map();
   }
-
-  const signEventWithExtension = async (
-    event: EventTemplate
-  ): Promise<Event> => {
-    try {
-      return window.nostr.signEvent(event);
-      // eslint-disable-next-line no-empty
-    } catch {
-      throw new Error("Failed to sign event with extension");
-    }
-  };
-  const finalizedEvents = isUserLoggedInWithExtension(user)
-    ? List<{ event: VerifiedEvent; writeRelayConf?: WriteRelayConf }>(
-        await Promise.all(
-          plan.publishEvents.map(async (e) => {
-            const { writeRelayConf } = e;
-            // eslint-disable-next-line functional/immutable-data
-            delete e.writeRelayConf;
-            const signedEvent = await signEventWithExtension(e);
-            return { event: signedEvent as VerifiedEvent, writeRelayConf };
-          })
-        )
-      )
-    : plan.publishEvents.map((e) => {
-        const { writeRelayConf } = e;
-        // eslint-disable-next-line functional/immutable-data
-        delete e.writeRelayConf;
-        const event = finalizeEvent(
-          e,
-          (user as KeyPair).privateKey
-        ) as VerifiedEvent;
-        return { event, writeRelayConf };
-      });
 
   const results = await Promise.all(
     finalizedEvents.toArray().map(({ event, writeRelayConf }) => {

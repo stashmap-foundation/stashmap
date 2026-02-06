@@ -69,6 +69,7 @@ import { DND } from "./dnd";
 import { findContacts } from "./contacts";
 import { UserRelayContextProvider } from "./UserRelayContext";
 import { NavigationStackProvider } from "./NavigationStackContext";
+import { StashmapDB } from "./indexedDB";
 import {
   PaneIndexProvider,
   useCurrentPane,
@@ -323,7 +324,22 @@ type RenderApis = Partial<TestApis> & {
   user?: User;
   defaultRelays?: Array<string>;
   initialStack?: (LongID | ID)[];
+  db?: StashmapDB | null;
 };
+
+function TestPublishProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}): JSX.Element {
+  return (
+    <DataContextProvider {...DEFAULT_DATA_CONTEXT_PROPS}>
+      <PlanningContextProvider setPublishEvents={() => {}}>
+        {children}
+      </PlanningContextProvider>
+    </DataContextProvider>
+  );
+}
 
 export function renderApis(
   children: React.ReactElement,
@@ -363,9 +379,7 @@ export function renderApis(
             timeToStorePreLoginEvents: 0,
           }}
         >
-          {/* eslint-disable-next-line react/jsx-props-no-spreading */}
-          <DataContextProvider {...DEFAULT_DATA_CONTEXT_PROPS}>
-            <PlanningContextProvider setPublishEvents={() => {}}>
+          <TestPublishProvider>
               <NostrAuthContextProvider
                 defaultRelayUrls={
                   optionsWithDefaultUser.defaultRelays ||
@@ -393,8 +407,7 @@ export function renderApis(
                   </PaneIndexProvider>
                 </UserRelayContextProvider>
               </NostrAuthContextProvider>
-            </PlanningContextProvider>
-          </DataContextProvider>
+          </TestPublishProvider>
         </ApiProvider>
       </NavigationStackProvider>
     </BrowserRouter>
@@ -459,6 +472,7 @@ export function renderWithTestData(
   children: React.ReactElement,
   options?: Partial<TestAppState> & {
     initialRoute?: string;
+    db?: StashmapDB | null;
   }
 ): TestAppState & RenderResult {
   const props = applyDefaults(options);

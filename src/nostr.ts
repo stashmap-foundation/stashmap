@@ -22,7 +22,6 @@ export const DEFAULT_RELAYS: Relays = [
   { url: "wss://relay.damus.io/", read: true, write: true },
   { url: "wss://relay.primal.net/", read: true, write: true },
   { url: "wss://nos.lol/", read: true, write: true },
-  { url: "wss://relay.nostr.band/", read: true, write: true },
   { url: "wss://nostr.mom/", read: true, write: true },
   { url: "wss://nostr.noones.com/", read: true, write: true },
 ];

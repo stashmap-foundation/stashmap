@@ -15,13 +15,17 @@ const EventCacheContext = React.createContext<EventCacheState | undefined>(
 export function EventCacheProvider({
   children,
   unpublishedEvents,
+  initialCachedEvents,
+  onEventsAdded,
 }: {
   children: React.ReactNode;
   unpublishedEvents: List<UnsignedEvent>;
+  initialCachedEvents?: Map<string, Event | UnsignedEvent>;
+  onEventsAdded?: (events: Map<string, Event | UnsignedEvent>) => void;
 }): JSX.Element {
   const [events, setEvents] = React.useState<
     Map<string, Event | UnsignedEvent>
-  >(Map());
+  >(initialCachedEvents ?? Map());
 
   const addEvents = useCallback(
     (newEvents: Map<string, Event | UnsignedEvent>) => {
@@ -30,10 +34,14 @@ export function EventCacheProvider({
         if (newKeys.isEmpty()) {
           return prev;
         }
-        return prev.merge(newEvents.filter((_, k) => newKeys.includes(k)));
+        const added = newEvents.filter((_, k) => newKeys.includes(k));
+        if (onEventsAdded) {
+          onEventsAdded(added);
+        }
+        return prev.merge(added);
       });
     },
-    []
+    [onEventsAdded]
   );
 
   const knowledgeDBs = React.useMemo(() => {

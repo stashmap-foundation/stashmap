@@ -1719,3 +1719,16 @@ input:focus,
     color: var(--base1);
   }
 }
+
+.publish-pending-info {
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  color: var(--yellow);
+  border-bottom: 1px solid var(--base01);
+}
+
+.publish-relay-backoff {
+  color: var(--yellow);
+  font-size: 0.75rem;
+  width: 100%;
+}

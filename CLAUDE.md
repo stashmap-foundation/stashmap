@@ -5,6 +5,7 @@
 - Reuse code! If you find yourself copying and pasting code, consider refactoring it into a reusable function or component.
 - We program purely functional, don't use let or var, only const.
 - Don't add any comments to the code, except when they are really necessary, which is very rare. Code should be self-explanatory. Don't add any comments where you tell me waht you are doing.
+- Don't use inline imports in type declarations (e.g., `import("./Foo").Bar`). Use regular top-level imports instead.
 
 ## Testing
 

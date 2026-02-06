@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import "./App.css";
 import { List, Map, Set, OrderedSet } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
@@ -26,8 +26,16 @@ import { PlanningContextProvider } from "./planner";
 import { useUserRelayContext } from "./UserRelayContext";
 import { NavigationStackProvider } from "./NavigationStackContext";
 import { flattenRelays, usePreloadRelays, findRelays } from "./relays";
+import { useDefaultRelays } from "./NostrAuthContext";
 import { sortEventsDescending, useEventQuery } from "./commons/useNostrQuery";
 import { useRootFromURL } from "./KnowledgeDataContext";
+import {
+  openDB,
+  StashmapDB,
+  getCachedEvents,
+  getOutboxEvents,
+  putCachedEvents,
+} from "./indexedDB";
 
 const defaultPane = (author: PublicKey, rootNodeID?: LongID | ID): Pane => ({
   id: "pane-0",
@@ -168,8 +176,51 @@ function Data({ user, children }: DataProps): JSX.Element {
       temporaryView: DEFAULT_TEMPORARY_VIEW,
       temporaryEvents: List(),
     });
-  const { isRelaysLoaded } = useUserRelayContext();
+  const { isRelaysLoaded, userRelays } = useUserRelayContext();
+  const defaultRelays = useDefaultRelays();
   const { relayPool } = useApis();
+
+  const [db, setDb] = useState<StashmapDB | null>(null);
+  const [initialCachedEvents, setInitialCachedEvents] = useState<
+    Map<string, Event | UnsignedEvent>
+  >(Map());
+
+  useEffect(() => {
+    openDB().then(async (database) => {
+      if (!database) return;
+      setDb(database);
+      const [cached, outbox] = await Promise.all([
+        getCachedEvents(database),
+        getOutboxEvents(database),
+      ]);
+      const eventsMap = (cached as unknown as ReadonlyArray<Event>).reduce(
+        (rdx: Map<string, Event | UnsignedEvent>, event: Event) =>
+          event.id ? rdx.set(event.id, event) : rdx,
+        Map<string, Event | UnsignedEvent>()
+      );
+      setInitialCachedEvents(eventsMap);
+      if (outbox.length > 0) {
+        setNewEventsAndPublishResults((prev) => ({
+          ...prev,
+          unsignedEvents: prev.unsignedEvents.concat(
+            List(outbox.map((entry) => entry.event))
+          ),
+        }));
+      }
+    });
+  }, []);
+
+  const onEventsAdded = useCallback(
+    (events: Map<string, Event | UnsignedEvent>) => {
+      if (!db) return;
+      const asRecords = events
+        .valueSeq()
+        .toArray()
+        .map((e) => e as unknown as Record<string, unknown>);
+      putCachedEvents(db, asRecords).catch(() => {});
+    },
+    [db]
+  );
 
   const { events: mE, eose: metaEventsEose } = useEventQuery(
     relayPool,
@@ -253,11 +304,19 @@ function Data({ user, children }: DataProps): JSX.Element {
     >
       <EventCacheProvider
         unpublishedEvents={newEventsAndPublishResults.unsignedEvents}
+        initialCachedEvents={initialCachedEvents}
+        onEventsAdded={onEventsAdded}
       >
         <MergeKnowledgeDB>
           <NavigationStackProvider>
             <PlanningContextProvider
               setPublishEvents={setNewEventsAndPublishResults}
+              db={db}
+              getRelays={() => ({
+                defaultRelays,
+                userRelays,
+                contactsRelays: flattenRelays(contactsRelays),
+              })}
             >
               {children}
             </PlanningContextProvider>

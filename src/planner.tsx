@@ -1,4 +1,4 @@
-import React, { Dispatch, SetStateAction } from "react";
+import React, { Dispatch, SetStateAction, useEffect, useRef } from "react";
 import { List, Map } from "immutable";
 import { UnsignedEvent, Event } from "nostr-tools";
 import {
@@ -14,6 +14,8 @@ import {
 import { useData } from "./DataContext";
 import { execute, republishEvents } from "./executor";
 import { useApis } from "./Apis";
+import { createPublishQueue } from "./PublishQueue";
+import type { StashmapDB } from "./indexedDB";
 import { viewDataToJSON } from "./serializer";
 import { newDB } from "./knowledge";
 import {
@@ -1111,19 +1113,69 @@ function filterEmptyNodesFromEvents(
 export function PlanningContextProvider({
   children,
   setPublishEvents,
+  db,
+  getRelays,
 }: {
   children: React.ReactNode;
   setPublishEvents: Dispatch<SetStateAction<EventState>>;
+  db?: StashmapDB | null;
+  getRelays?: () => AllRelays;
 }): JSX.Element {
   const { relayPool, finalizeEvent } = useApis();
+  const { user } = useData();
+
+  const depsRef = useRef({
+    user,
+    relays: getRelays
+      ? getRelays()
+      : { defaultRelays: [] as Relays, userRelays: [] as Relays, contactsRelays: [] as Relays },
+    relayPool,
+    finalizeEvent,
+  });
+  depsRef.current = {
+    user,
+    relays: getRelays
+      ? getRelays()
+      : depsRef.current.relays,
+    relayPool,
+    finalizeEvent,
+  };
+
+  const setPublishEventsRef = useRef(setPublishEvents);
+  setPublishEventsRef.current = setPublishEvents;
+
+  const queueRef = useRef<ReturnType<typeof createPublishQueue> | null>(null);
+
+  useEffect(() => {
+    if (!db) return;
+    const queue = createPublishQueue({
+      db,
+      getDeps: () => depsRef.current,
+      onResults: (results) => {
+        setPublishEventsRef.current((prevStatus) => ({
+          ...prevStatus,
+          results: mergePublishResultsOfEvents(prevStatus.results, results),
+          isLoading: false,
+          queueStatus: queueRef.current?.getStatus(),
+        }));
+      },
+    });
+    queueRef.current = queue;
+    queue.init().then(() => {
+      setPublishEventsRef.current((prev) => ({
+        ...prev,
+        queueStatus: queue.getStatus(),
+      }));
+    });
+    return () => {
+      queueRef.current = null;
+      queue.destroy();
+    };
+  }, [db]);
 
   const executePlan = async (plan: Plan): Promise<void> => {
-    // Filter empty nodes from events before publishing
-    // (empty nodes are injected at read time, so modifications include them)
     const filteredEvents = filterEmptyNodesFromEvents(plan.publishEvents);
 
-    // If no events to publish, just update temporaryView/temporaryEvents in a single call
-    // This avoids rapid isLoading true→false transitions that cause race conditions
     if (filteredEvents.size === 0) {
       setPublishEvents((prevStatus) => {
         const newTemporaryEvents = prevStatus.temporaryEvents.concat(
@@ -1138,7 +1190,6 @@ export function PlanningContextProvider({
       return;
     }
 
-    // Normal flow for when we have events to publish
     setPublishEvents((prevStatus) => {
       const newTemporaryEvents = prevStatus.temporaryEvents.concat(
         plan.temporaryEvents
@@ -1146,14 +1197,22 @@ export function PlanningContextProvider({
       return {
         unsignedEvents: prevStatus.unsignedEvents.merge(filteredEvents),
         results: prevStatus.results,
-        isLoading: true,
+        isLoading: !queueRef.current,
         preLoginEvents: prevStatus.preLoginEvents,
         temporaryView: plan.temporaryView,
         temporaryEvents: newTemporaryEvents,
       };
     });
 
-    // FILTERED events → relay publishing
+    if (queueRef.current) {
+      queueRef.current.enqueue(filteredEvents);
+      setPublishEvents((prev) => ({
+        ...prev,
+        queueStatus: queueRef.current?.getStatus(),
+      }));
+      return;
+    }
+
     const filteredPlan = {
       ...plan,
       publishEvents: filteredEvents,

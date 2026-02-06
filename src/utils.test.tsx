@@ -228,6 +228,7 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
     results: Map<string, PublishResultsOfEvent>(),
     preLoginEvents: List<UnsignedEvent>(),
     temporaryView: {
+      rowFocusIntents: Map<number, RowFocusIntent>(),
       selection: OrderedSet<string>(),
       multiselectBtns: Set<string>(),
       editingViews: Set<string>(),

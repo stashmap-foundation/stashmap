@@ -51,6 +51,7 @@ export function FullscreenButton(): JSX.Element | null {
   return (
     <button
       type="button"
+      data-node-action="open-fullscreen"
       aria-label={ariaLabel}
       className="btn btn-icon"
       onClick={onClick}

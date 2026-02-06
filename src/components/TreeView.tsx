@@ -23,7 +23,7 @@ import {
   useDisplayText,
 } from "../ViewContext";
 import { useData } from "../DataContext";
-import { usePaneStack, useCurrentPane } from "../SplitPanesContext";
+import { usePaneStack, useCurrentPane, usePaneIndex } from "../SplitPanesContext";
 import {
   addNodeToFilters,
   addReferencedByToFilters,
@@ -44,6 +44,14 @@ import {
   getRelationsNoReferencedBy,
 } from "../connections";
 import { useApis } from "../Apis";
+import {
+  ActiveRowState,
+  KeyboardMode,
+  getFocusableRows,
+  getRowIndex,
+  getRowKey,
+  isEditableElement,
+} from "./keyboardNavigation";
 
 function getAncestorPaths(path: string, rootKey: string): string[] {
   const suffix = path.slice(rootKey.length);
@@ -86,6 +94,8 @@ function VirtuosoForColumn({
   onStopScrolling,
   viewPath,
   ariaLabel,
+  activeRowKey,
+  onRowFocus,
 }: {
   nodes: List<ViewPath>;
   startIndexFromStorage: number;
@@ -94,6 +104,8 @@ function VirtuosoForColumn({
   viewPath: ViewPath;
   onStopScrolling: (isScrolling: boolean) => void;
   ariaLabel: string | undefined;
+  activeRowKey: string;
+  onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
 }): JSX.Element {
   const location = useLocation();
   const virtuosoRef = useRef<VirtuosoHandle>(null); // Step 2
@@ -153,13 +165,25 @@ function VirtuosoForColumn({
         itemContent={(index, path) => {
           return (
             <ViewContext.Provider value={path} key={viewPathToString(path)}>
-              <ListItem index={index} treeViewPath={viewPath} />
+              <ListItem
+                index={index}
+                treeViewPath={viewPath}
+                activeRowKey={activeRowKey}
+                onRowFocus={onRowFocus}
+              />
             </ViewContext.Provider>
           );
         }}
       />
     </div>
   );
+}
+
+function useKeyboardMode(): [
+  KeyboardMode,
+  React.Dispatch<React.SetStateAction<KeyboardMode>>
+] {
+  return useState<KeyboardMode>("normal");
 }
 
 export function TreeViewNodeLoader({
@@ -236,6 +260,7 @@ function Tree(): JSX.Element | null {
   const pane = useCurrentPane();
   const { fileStore } = useApis();
   const { getLocalStorage, setLocalStorage } = fileStore;
+  const paneIndex = usePaneIndex();
   const scrollableId = useViewKey();
   const startIndexFromStorage = Number(getLocalStorage(scrollableId)) || 0;
   const [range, setRange] = useState<ListRange>({
@@ -243,6 +268,14 @@ function Tree(): JSX.Element | null {
     endIndex: startIndexFromStorage,
   });
   const viewPath = useViewPath();
+  const [activeRow, setActiveRow] = useState<ActiveRowState>({
+    activeRowKey: "",
+    activeRowIndex: 0,
+  });
+  const didAutoFocusRef = useRef(false);
+  const consumedRowFocusIntentIdRef = useRef<number | null>(null);
+  const treeRootRef = useRef<HTMLDivElement>(null);
+  const [keyboardMode, setKeyboardMode] = useKeyboardMode();
   const viewKey = viewPathToString(viewPath);
   const isRootExpanded = isExpanded(data, viewKey);
   const childNodes = isRootExpanded
@@ -250,8 +283,145 @@ function Tree(): JSX.Element | null {
     : List<ViewPath>();
   // Include ROOT as the first node, followed by its children
   const nodes = List<ViewPath>([viewPath]).concat(childNodes);
+  const nodeKeys = nodes.map((path) => viewPathToString(path)).toArray();
   const displayText = useDisplayText();
   const ariaLabel = displayText ? `related to ${displayText}` : undefined;
+  const rowFocusIntent =
+    data.publishEventsStatus.temporaryView.rowFocusIntents.get(paneIndex);
+
+  useEffect(() => {
+    if (nodeKeys.length === 0) {
+      return;
+    }
+    const existingIndex = nodeKeys.indexOf(activeRow.activeRowKey);
+    if (existingIndex >= 0) {
+      if (existingIndex !== activeRow.activeRowIndex) {
+        setActiveRow((current) => ({
+          activeRowKey: current.activeRowKey,
+          activeRowIndex: existingIndex,
+        }));
+      }
+      return;
+    }
+    const fallbackIndex = Math.min(
+      Math.max(activeRow.activeRowIndex, 0),
+      nodeKeys.length - 1
+    );
+    setActiveRow({
+      activeRowKey: nodeKeys[fallbackIndex],
+      activeRowIndex: fallbackIndex,
+    });
+  }, [nodeKeys, activeRow.activeRowKey, activeRow.activeRowIndex]);
+
+  const onRowFocus = (
+    key: string,
+    index: number,
+    mode: KeyboardMode
+  ): void => {
+    setActiveRow({
+      activeRowKey: key,
+      activeRowIndex: index,
+    });
+    setKeyboardMode(mode);
+  };
+
+  useEffect(() => {
+    const activeElement = document.activeElement;
+    setKeyboardMode(isEditableElement(activeElement) ? "insert" : "normal");
+  }, [activeRow.activeRowKey]);
+
+  useEffect(() => {
+    const treeRoot = treeRootRef.current;
+    if (!treeRoot) {
+      return;
+    }
+    if (!rowFocusIntent) {
+      return;
+    }
+    if (consumedRowFocusIntentIdRef.current === rowFocusIntent.requestId) {
+      return;
+    }
+    const byViewKey = rowFocusIntent.viewKey
+        ? treeRoot.querySelector(
+            `[data-row-focusable="true"][data-view-key="${rowFocusIntent.viewKey}"]`
+          )
+        : null;
+    const byNodeId = rowFocusIntent.nodeId
+        ? treeRoot.querySelector(
+            `[data-row-focusable="true"][data-node-id="${rowFocusIntent.nodeId}"]`
+          )
+        : null;
+    const byRowIndex =
+      rowFocusIntent.rowIndex !== undefined
+        ? treeRoot.querySelector(
+            `[data-row-focusable="true"][data-row-index="${rowFocusIntent.rowIndex}"]`
+          )
+        : null;
+    const target =
+      (byViewKey instanceof HTMLElement && byViewKey) ||
+      (byNodeId instanceof HTMLElement && byNodeId) ||
+      (byRowIndex instanceof HTMLElement && byRowIndex);
+    if (!target) {
+      return;
+    }
+    target.focus();
+    setActiveRow({
+      activeRowKey: getRowKey(target),
+      activeRowIndex: getRowIndex(target),
+    });
+    consumedRowFocusIntentIdRef.current = rowFocusIntent.requestId;
+  }, [
+    paneIndex,
+    rowFocusIntent?.requestId,
+    rowFocusIntent?.viewKey,
+    rowFocusIntent?.nodeId,
+    rowFocusIntent?.rowIndex,
+    nodeKeys,
+    range.startIndex,
+    range.endIndex,
+  ]);
+
+  useEffect(() => {
+    if (!activeRow.activeRowKey || didAutoFocusRef.current) {
+      return;
+    }
+
+    const treeRoot = treeRootRef.current;
+    if (!treeRoot) {
+      return;
+    }
+
+    const activeElement = document.activeElement;
+    const isFocusedInModal =
+      activeElement instanceof HTMLElement &&
+      activeElement.closest(".modal") !== null;
+    const isFocusedInTree =
+      activeElement instanceof HTMLElement && treeRoot.contains(activeElement);
+    const hasUsableFocus =
+      isFocusedInModal ||
+      (isFocusedInTree &&
+        (activeElement.closest('[data-row-focusable="true"]') !== null ||
+          isEditableElement(activeElement)));
+
+    if (hasUsableFocus) {
+      // eslint-disable-next-line functional/immutable-data
+      didAutoFocusRef.current = true;
+      return;
+    }
+
+    const preferredRow = treeRoot.querySelector(
+      `[data-row-focusable="true"][data-view-key="${activeRow.activeRowKey}"]`
+    );
+    const fallbackRow = getFocusableRows(treeRoot)[0];
+    const targetRow =
+      preferredRow instanceof HTMLElement ? preferredRow : fallbackRow;
+
+    if (targetRow) {
+      targetRow.focus();
+      // eslint-disable-next-line functional/immutable-data
+      didAutoFocusRef.current = true;
+    }
+  }, [activeRow.activeRowKey, range.startIndex, range.endIndex]);
 
   const onStopScrolling = (isScrolling: boolean): void => {
     // don't set the storage if the index is 0 since onStopStrolling is called on initial render
@@ -265,17 +435,21 @@ function Tree(): JSX.Element | null {
   };
 
   return (
-    <TreeViewNodeLoader nodes={nodes} range={range}>
-      <VirtuosoForColumn
-        nodes={nodes}
-        range={range}
-        setRange={setRange}
-        startIndexFromStorage={startIndexFromStorage}
-        viewPath={viewPath}
-        onStopScrolling={onStopScrolling}
-        ariaLabel={ariaLabel}
-      />
-    </TreeViewNodeLoader>
+    <div ref={treeRootRef} data-keyboard-mode={keyboardMode}>
+      <TreeViewNodeLoader nodes={nodes} range={range}>
+        <VirtuosoForColumn
+          nodes={nodes}
+          range={range}
+          setRange={setRange}
+          startIndexFromStorage={startIndexFromStorage}
+          viewPath={viewPath}
+          onStopScrolling={onStopScrolling}
+          ariaLabel={ariaLabel}
+          activeRowKey={activeRow.activeRowKey}
+          onRowFocus={onRowFocus}
+        />
+      </TreeViewNodeLoader>
+    </div>
   );
 }
 

@@ -41,11 +41,22 @@ export async function getImageUrlFromText(
 type MiniEditorProps = {
   initialText?: string;
   initialCursorPosition?: number;
-  onSave: (text: string, imageUrl?: string, submitted?: boolean) => void;
+  onSave: (
+    text: string,
+    imageUrl?: string,
+    submitted?: boolean,
+    reason?: "enter" | "escape" | "blur"
+  ) => void;
   onClose?: () => void;
   onTab?: (text: string, cursorPosition: number) => void;
+  onShiftTab?: (text: string, cursorPosition: number) => void;
   autoFocus?: boolean;
   ariaLabel?: string;
+  onRequestRowFocus?: (target: {
+    viewKey?: string;
+    nodeId?: string;
+    rowIndex?: number;
+  }) => void;
 };
 
 export function MiniEditor({
@@ -54,8 +65,10 @@ export function MiniEditor({
   onSave,
   onClose,
   onTab,
+  onShiftTab,
   autoFocus = true,
   ariaLabel,
+  onRequestRowFocus,
 }: MiniEditorProps): JSX.Element {
   const editorRef = React.useRef<HTMLSpanElement>(null);
   // Track last saved text to prevent duplicate saves when blur fires multiple times
@@ -108,7 +121,7 @@ export function MiniEditor({
       // eslint-disable-next-line functional/immutable-data
       lastSavedTextRef.current = text; // Update immediately to prevent duplicate saves
       const imageUrl = await getImageUrlFromText(text);
-      onSave(text, imageUrl);
+      onSave(text, imageUrl, undefined, "blur");
     }
   };
 
@@ -129,26 +142,41 @@ export function MiniEditor({
 
   // Track if we're handling a key event to prevent blur from re-triggering save
   const handlingKeyRef = React.useRef(false);
-
   const handleKeyDown = async (
     e: React.KeyboardEvent<HTMLSpanElement>
   ): Promise<void> => {
     if (e.key === "Escape") {
       e.preventDefault();
+      const currentRow = editorRef.current?.closest(
+        '[data-row-focusable="true"]'
+      );
+      const rowElement = currentRow instanceof HTMLElement ? currentRow : null;
+      const rowKey = rowElement?.getAttribute("data-view-key") || null;
+      const rowIndex = rowElement?.getAttribute("data-row-index") || null;
+      const nodeId = rowElement?.getAttribute("data-node-id") || null;
       // eslint-disable-next-line functional/immutable-data
       handlingKeyRef.current = true;
       const text = getText().trim();
-      if (text && text !== lastSavedTextRef.current) {
+      const hasChanges = Boolean(text && text !== lastSavedTextRef.current);
+      if (hasChanges) {
         // Save changes - onSave will close the editor
         // eslint-disable-next-line functional/immutable-data
         lastSavedTextRef.current = text; // Update immediately to prevent duplicate saves
         const imageUrl = await getImageUrlFromText(text);
-        onSave(text, imageUrl);
+        onSave(text, imageUrl, undefined, "escape");
       } else {
+        onRequestRowFocus?.({
+          viewKey: rowKey || undefined,
+          nodeId: nodeId || undefined,
+          rowIndex: rowIndex !== null ? Number(rowIndex) : undefined,
+        });
         // No changes, just close
         onClose?.();
       }
       editorRef.current?.blur();
+      if (rowElement?.isConnected && !hasChanges) {
+        rowElement.focus();
+      }
       // eslint-disable-next-line functional/immutable-data
       handlingKeyRef.current = false;
     } else if (e.key === "Enter") {
@@ -161,10 +189,13 @@ export function MiniEditor({
       // eslint-disable-next-line functional/immutable-data
       lastSavedTextRef.current = text; // Update immediately to prevent duplicate saves
       const imageUrl = await getImageUrlFromText(text);
-      onSave(text, imageUrl, true);
+      onSave(text, imageUrl, true, "enter");
     } else if (e.key === "Tab" && !e.shiftKey && onTab && isCursorAtStart()) {
       e.preventDefault();
       onTab(getText().trim(), getCursorPosition());
+    } else if (e.key === "Tab" && e.shiftKey && onShiftTab && isCursorAtStart()) {
+      e.preventDefault();
+      onShiftTab(getText().trim(), getCursorPosition());
     }
   };
 

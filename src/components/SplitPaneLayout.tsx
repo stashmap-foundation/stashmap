@@ -81,6 +81,7 @@ export function PaneSearchButton(): JSX.Element {
       type="button"
       className="btn btn-icon"
       onClick={() => setShowInput(true)}
+      data-pane-action="search"
       aria-label={`Search to change pane ${paneIndex} content`}
       title="Search"
     >
@@ -114,6 +115,7 @@ export function ClosePaneButton(): JSX.Element | null {
       type="button"
       className="btn btn-icon"
       onClick={handleRemovePane}
+      data-pane-action="close-pane"
       aria-label="Close pane"
       title="Close pane"
     >

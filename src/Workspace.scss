@@ -577,7 +577,8 @@ body {
     }
   }
 
-  &:hover .on-hover-menu {
+  &:hover .on-hover-menu,
+  &:focus-within .on-hover-menu {
     opacity: 1;
     visibility: visible;
   }
@@ -621,6 +622,13 @@ body {
   visibility: visible;
 }
 
+.visible-on-hover:focus-within .right-menu .relevance-slot > *,
+.visible-on-hover:focus-within .right-menu .evidence-slot > *,
+.visible-on-hover:focus-within .right-menu .ref-count-btn.show-on-row-hover {
+  opacity: 1;
+  visibility: visible;
+}
+
 // Inline action buttons (fullscreen, split pane)
 .inline-node-actions {
   display: inline-flex;
@@ -632,7 +640,8 @@ body {
   transition: opacity 150ms ease;
 }
 
-.visible-on-hover:hover .inline-node-actions {
+.visible-on-hover:hover .inline-node-actions,
+.visible-on-hover:focus-within .inline-node-actions {
   opacity: 1;
   visibility: visible;
 }
@@ -1284,6 +1293,15 @@ input:focus,
   &:hover {
     background: var(--base02);
   }
+}
+
+.pane-wrapper.keyboard-nav-active .hover-light-bg:hover {
+  background: transparent;
+}
+
+.item[data-row-focusable="true"]:focus-visible .inner-node.hover-light-bg,
+.item[data-row-focusable="true"]:focus .inner-node.hover-light-bg {
+  background: var(--base02);
 }
 
 .hover-black-dimmed {

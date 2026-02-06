@@ -14,6 +14,8 @@ import {
   useDisplayText,
   getParentView,
   getRelationForView,
+  getRelationIndex,
+  getLast,
   isReferencedByView,
   getContext,
   useIsViewingOtherUserContent,
@@ -42,6 +44,7 @@ import { useOnToggleExpanded } from "./SelectRelations";
 import { ReferenceIndicators } from "./ReferenceIndicators";
 import { useData } from "../DataContext";
 import {
+  Plan,
   usePlanner,
   planSetEmptyNodePosition,
   planSaveNodeAndEnsureRelations,
@@ -52,6 +55,7 @@ import {
   planCreateVersion,
   planAddToParent,
   planDeepCopyNodeWithView,
+  planSetRowFocusIntent,
 } from "../planner";
 import { planDisconnectFromParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
@@ -199,16 +203,32 @@ function EditableContent(): JSX.Element {
   const shouldAutoFocus =
     isEmptyNode && (isRootEmptyNode || emptyData?.paneIndex === paneIndex);
 
+  const planWithRowFocusIntent = (
+    plan: Plan,
+    targetViewPath: ViewPath
+  ): Plan => {
+    return planSetRowFocusIntent(plan, {
+      paneIndex,
+      viewKey: viewPathToString(targetViewPath),
+      nodeId: getLast(targetViewPath).nodeID,
+    });
+  };
+
   const handleSave = (
     text: string,
     _imageUrl?: string,
-    submitted?: boolean
+    submitted?: boolean,
+    reason?: "enter" | "escape" | "blur"
   ): void => {
     const { plan: basePlan, viewPath: updatedViewPath } =
       planSaveNodeAndEnsureRelations(createPlan(), text, viewPath, stack);
+    const planWithEscFocus =
+      reason === "escape"
+        ? planWithRowFocusIntent(basePlan, updatedViewPath)
+        : basePlan;
 
     if (!submitted || !text.trim()) {
-      executePlan(basePlan);
+      executePlan(planWithEscFocus);
       return;
     }
 
@@ -221,7 +241,7 @@ function EditableContent(): JSX.Element {
     );
 
     if (!nextPosition) {
-      executePlan(basePlan);
+      executePlan(planWithEscFocus);
       return;
     }
 
@@ -339,6 +359,120 @@ function EditableContent(): JSX.Element {
     executePlan(finalPlan);
   };
 
+  const handleShiftTab = (text: string): void => {
+    if (!parentPath) {
+      return;
+    }
+
+    const grandParentPath = getParentView(parentPath);
+    if (!grandParentPath) {
+      return;
+    }
+
+    const basePlan = createPlan();
+    const trimmedText = text.trim();
+    const parentRelationIndex = getRelationIndex(basePlan, parentPath);
+
+    if (parentRelationIndex === undefined) {
+      return;
+    }
+
+    if (isEmptyNode) {
+      const currentParentRelation = getRelationForView(
+        basePlan,
+        parentPath,
+        stack
+      );
+      const planWithoutEmpty = currentParentRelation
+        ? planRemoveEmptyNodePosition(basePlan, currentParentRelation.id)
+        : basePlan;
+
+      if (!trimmedText) {
+        executePlan(
+          planSetEmptyNodePosition(
+            planWithoutEmpty,
+            grandParentPath,
+            stack,
+            parentRelationIndex + 1
+          )
+        );
+        return;
+      }
+
+      const [planWithNode, newNode] = planCreateNode(planWithoutEmpty, trimmedText);
+      executePlan(
+        planAddToParent(
+          planWithNode,
+          newNode.id,
+          grandParentPath,
+          stack,
+          parentRelationIndex + 1
+        )
+      );
+      return;
+    }
+
+    if (!node || node.type !== "text") {
+      return;
+    }
+
+    const context = getContext(basePlan, viewPath, stack);
+    const planWithCopy = planDeepCopyNodeWithView(
+      basePlan,
+      nodeID,
+      context,
+      viewPath,
+      grandParentPath,
+      stack,
+      parentRelationIndex + 1
+    );
+    const planWithDisconnect = planDisconnectFromParent(
+      planWithCopy,
+      viewPath,
+      stack
+    );
+
+    const originalNodeText = node.text ?? "";
+    const hasTextChanges = trimmedText !== originalNodeText;
+
+    if (!hasTextChanges) {
+      executePlan(planWithDisconnect);
+      return;
+    }
+
+    const grandParentContext = getContext(basePlan, grandParentPath, stack);
+    const grandParentNodeID = getLast(grandParentPath).nodeID;
+    const newContext = grandParentContext.push(grandParentNodeID);
+    executePlan(planCreateVersion(planWithDisconnect, nodeID, trimmedText, newContext));
+  };
+
+  const handleRequestRowFocus = ({
+    viewKey,
+    nodeId,
+    rowIndex,
+  }: {
+    viewKey?: string;
+    nodeId?: string;
+    rowIndex?: number;
+  }): void => {
+    const focusTargetNodeId =
+      nodeId && !isEmptyNodeID(nodeId as ID) ? nodeId : undefined;
+    if (
+      viewKey === undefined &&
+      focusTargetNodeId === undefined &&
+      rowIndex === undefined
+    ) {
+      return;
+    }
+    const focusPlan = planSetRowFocusIntent(createPlan(), {
+      paneIndex,
+      viewKey,
+      nodeId: focusTargetNodeId,
+      rowIndex,
+    });
+    executePlan(focusPlan);
+  };
+
   // Handle closing empty node editor (Escape with no text)
   const handleClose = (): void => {
     if (!isEmptyNode || !parentPath) return;
@@ -362,9 +496,11 @@ function EditableContent(): JSX.Element {
       initialText={displayText}
       onSave={handleSave}
       onTab={handleTab}
+      onShiftTab={handleShiftTab}
       onClose={isEmptyNode ? handleClose : undefined}
       autoFocus={shouldAutoFocus}
       ariaLabel={isEmptyNode ? "new node editor" : `edit ${displayText}`}
+      onRequestRowFocus={handleRequestRowFocus}
     />
   );
 }

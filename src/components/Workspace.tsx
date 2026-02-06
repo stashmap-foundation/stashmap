@@ -297,7 +297,6 @@ const FILTER_SYMBOL_TO_KEY = {
 } as const;
 
 type Evidence = "none" | "confirms" | "contra";
-let lastKeyboardPaneRoot: HTMLElement | null = null;
 
 function getActiveRow(root: HTMLElement): HTMLElement | undefined {
   const rows = getFocusableRows(root);
@@ -313,7 +312,9 @@ function focusRowAt(root: HTMLElement, index: number): void {
 
 function focusParentRow(root: HTMLElement, activeRow: HTMLElement): void {
   const rows = getFocusableRows(root);
-  const activeIndex = rows.findIndex((row) => getRowKey(row) === getRowKey(activeRow));
+  const activeIndex = rows.findIndex(
+    (row) => getRowKey(row) === getRowKey(activeRow)
+  );
   if (activeIndex <= 0) {
     return;
   }
@@ -327,12 +328,16 @@ function focusParentRow(root: HTMLElement, activeRow: HTMLElement): void {
 
 function focusFirstChildRow(root: HTMLElement, activeRow: HTMLElement): void {
   const rows = getFocusableRows(root);
-  const activeIndex = rows.findIndex((row) => getRowKey(row) === getRowKey(activeRow));
+  const activeIndex = rows.findIndex(
+    (row) => getRowKey(row) === getRowKey(activeRow)
+  );
   if (activeIndex < 0 || activeIndex >= rows.length - 1) {
     return;
   }
   const activeDepth = getRowDepth(activeRow);
-  const child = rows.slice(activeIndex + 1).find((row) => getRowDepth(row) === activeDepth + 1);
+  const child = rows
+    .slice(activeIndex + 1)
+    .find((row) => getRowDepth(row) === activeDepth + 1);
   focusRow(child);
 }
 
@@ -342,7 +347,42 @@ function focusRowEditor(activeRow: HTMLElement): void {
   );
   if (editor instanceof HTMLElement) {
     editor.focus();
+    if (
+      editor instanceof HTMLInputElement ||
+      editor instanceof HTMLTextAreaElement
+    ) {
+      const end = editor.value.length;
+      editor.setSelectionRange(end, end);
+      return;
+    }
+    if (editor.isContentEditable) {
+      const selection = window.getSelection();
+      if (!selection) {
+        return;
+      }
+      const range = document.createRange();
+      range.selectNodeContents(editor);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
   }
+}
+
+function focusAdjacentRowEditor(
+  root: HTMLElement,
+  currentRow: HTMLElement,
+  delta: -1 | 1
+): void {
+  const currentIndex = Number(currentRow.getAttribute("data-row-index") || "0");
+  const targetIndex = currentIndex + delta;
+  const rows = getFocusableRows(root);
+  const targetRow = rows[targetIndex];
+  if (!targetRow) {
+    return;
+  }
+  focusRow(targetRow);
+  focusRowEditor(targetRow);
 }
 
 function toggleRowOpenInSplitPane(activeRow: HTMLElement): void {
@@ -385,6 +425,21 @@ function getPaneWrappers(): HTMLElement[] {
   return Array.from(document.querySelectorAll(".pane-wrapper")).filter(
     (el): el is HTMLElement => el instanceof HTMLElement
   );
+}
+
+function getSelectedPaneRoot(): HTMLElement | null {
+  return (
+    getPaneWrappers().find(
+      (pane) => pane.getAttribute("data-keyboard-pane-selected") === "true"
+    ) || null
+  );
+}
+
+function setSelectedPane(targetPane: HTMLElement): void {
+  getPaneWrappers().forEach((pane) =>
+    pane.removeAttribute("data-keyboard-pane-selected")
+  );
+  targetPane.setAttribute("data-keyboard-pane-selected", "true");
 }
 
 function triggerRowRelevanceSymbol(
@@ -437,6 +492,21 @@ function setEvidenceSymbol(activeRow: HTMLElement, target: Evidence): void {
   Array.from({ length: steps }).forEach(() => button.click());
 }
 
+function refocusPaneAfterRowMutation(root: HTMLElement): void {
+  window.setTimeout(() => {
+    const { activeElement } = document;
+    if (activeElement instanceof HTMLElement && root.contains(activeElement)) {
+      return;
+    }
+    const activeRow = getActiveRow(root);
+    if (activeRow) {
+      focusRow(activeRow);
+      return;
+    }
+    root.focus();
+  }, 0);
+}
+
 function usePaneKeyboardNavigation(paneIndex: number): {
   wrapperRef: React.RefObject<HTMLDivElement>;
   onKeyDownCapture: (e: React.KeyboardEvent<HTMLDivElement>) => void;
@@ -448,10 +518,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 } {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const lastSequenceRef = useRef<{ key: "g" | "d" | "f" | null; ts: number }>({
-    key: null,
-    ts: 0,
-  });
 
   const setKeyboardNavActive = (active: boolean): void => {
     const root = wrapperRef.current;
@@ -462,12 +528,11 @@ function usePaneKeyboardNavigation(paneIndex: number): {
   };
 
   const activatePaneKeyboardContext = (targetPane: HTMLElement): void => {
+    setSelectedPane(targetPane);
     getPaneWrappers().forEach((pane) =>
       pane.classList.remove("keyboard-nav-active")
     );
     targetPane.classList.add("keyboard-nav-active");
-    // eslint-disable-next-line functional/immutable-data
-    lastKeyboardPaneRoot = targetPane;
   };
 
   const switchPane = (direction: -1 | 1): void => {
@@ -499,20 +564,19 @@ function usePaneKeyboardNavigation(paneIndex: number): {
   useEffect(() => {
     const root = wrapperRef.current;
     if (!root) {
-      return;
+      return () => {};
     }
-    if (paneIndex === 0 && !lastKeyboardPaneRoot) {
-      // eslint-disable-next-line functional/immutable-data
-      lastKeyboardPaneRoot = root;
+    if (paneIndex === 0 && !getSelectedPaneRoot()) {
+      setSelectedPane(root);
     }
-    const activeElement = document.activeElement;
+    const { activeElement } = document;
     const hasFocusInsidePane =
       activeElement instanceof HTMLElement && root.contains(activeElement);
     if (hasFocusInsidePane) {
-      return;
+      return () => {};
     }
     if (activeElement && activeElement !== document.body) {
-      return;
+      return () => {};
     }
     const id = window.setTimeout(() => {
       if (document.activeElement === document.body || !document.activeElement) {
@@ -527,7 +591,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
   useEffect(() => {
     const root = wrapperRef.current;
     if (!root) {
-      return;
+      return () => {};
     }
     const onGlobalKeyDown = (e: KeyboardEvent): void => {
       if (e.defaultPrevented) {
@@ -549,18 +613,19 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       if (isEditableElement(e.target)) {
         return;
       }
-      if (
-        e.target instanceof HTMLElement &&
-        e.target.closest(".modal")
-      ) {
+      if (e.target instanceof HTMLElement && e.target.closest(".modal")) {
         return;
       }
-      const selectedPane = lastKeyboardPaneRoot || (paneIndex === 0 ? root : null);
+      const selectedPane =
+        getSelectedPaneRoot() || (paneIndex === 0 ? root : null);
       if (selectedPane !== root) {
         return;
       }
-      const activeElement = document.activeElement;
-      if (activeElement instanceof HTMLElement && root.contains(activeElement)) {
+      const { activeElement } = document;
+      if (
+        activeElement instanceof HTMLElement &&
+        root.contains(activeElement)
+      ) {
         return;
       }
       const activeRow = getActiveRow(root);
@@ -574,10 +639,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     window.addEventListener("keydown", onGlobalKeyDown, true);
     return () => {
       window.removeEventListener("keydown", onGlobalKeyDown, true);
-      if (lastKeyboardPaneRoot === root) {
-        // eslint-disable-next-line functional/immutable-data
-        lastKeyboardPaneRoot = null;
-      }
     };
   }, [paneIndex, showShortcuts]);
 
@@ -585,9 +646,8 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (!wrapperRef.current) {
       return;
     }
+    setSelectedPane(wrapperRef.current);
     setKeyboardNavActive(false);
-    // eslint-disable-next-line functional/immutable-data
-    lastKeyboardPaneRoot = wrapperRef.current;
   };
 
   const onPaneMouseMove = (): void => {
@@ -598,8 +658,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (!wrapperRef.current) {
       return;
     }
-    // eslint-disable-next-line functional/immutable-data
-    lastKeyboardPaneRoot = wrapperRef.current;
+    setSelectedPane(wrapperRef.current);
   };
 
   const onKeyDownCapture = (e: React.KeyboardEvent<HTMLDivElement>): void => {
@@ -609,10 +668,48 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     }
 
     const now = Date.now();
+    const lastSequenceKey = root.dataset.keyboardSequenceKey as
+      | "g"
+      | "d"
+      | "f"
+      | undefined;
+    const lastSequenceTs = Number(root.dataset.keyboardSequenceTs || "0");
+    const setLastSequence = (key: "g" | "d" | "f" | null, ts: number): void => {
+      if (!key) {
+        root.removeAttribute("data-keyboard-sequence-key");
+        root.removeAttribute("data-keyboard-sequence-ts");
+        return;
+      }
+      root.setAttribute("data-keyboard-sequence-key", key);
+      root.setAttribute("data-keyboard-sequence-ts", String(ts));
+    };
     const editable = isEditableElement(e.target);
     const focusedRow = getRowFromElement(document.activeElement);
 
     if (editable) {
+      const target = e.target instanceof HTMLElement ? e.target : null;
+      const isMiniEditor =
+        target?.classList.contains("mini-editor") ||
+        target?.closest(".mini-editor") !== null;
+      if (
+        isMiniEditor &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey &&
+        (e.key === "ArrowDown" || e.key === "ArrowUp")
+      ) {
+        const currentRow = getRowFromElement(e.target);
+        if (!currentRow) {
+          return;
+        }
+        e.preventDefault();
+        setKeyboardNavActive(true);
+        focusAdjacentRowEditor(
+          root,
+          currentRow,
+          e.key === "ArrowDown" ? 1 : -1
+        );
+      }
       return;
     }
 
@@ -650,44 +747,45 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     }
 
     if (e.key === "g") {
-      if (lastSequenceRef.current.key === "g" && now - lastSequenceRef.current.ts < 600) {
+      if (lastSequenceKey === "g" && now - lastSequenceTs < 600) {
         e.preventDefault();
         focusRowAt(root, 0);
-        lastSequenceRef.current = { key: null, ts: 0 };
+        setLastSequence(null, 0);
         return;
       }
-      lastSequenceRef.current = { key: "g", ts: now };
+      setLastSequence("g", now);
       return;
     }
 
     if (e.key === "d") {
-      if (lastSequenceRef.current.key === "d" && now - lastSequenceRef.current.ts < 600) {
+      if (lastSequenceKey === "d" && now - lastSequenceTs < 600) {
         e.preventDefault();
         triggerRowRelevanceSymbol(activeRow, "x");
-        lastSequenceRef.current = { key: null, ts: 0 };
+        setLastSequence(null, 0);
         return;
       }
-      lastSequenceRef.current = { key: "d", ts: now };
+      setLastSequence("d", now);
       return;
     }
 
     if (e.key === "f") {
-      lastSequenceRef.current = { key: "f", ts: now };
+      setLastSequence("f", now);
       return;
     }
 
-    if (lastSequenceRef.current.key === "f" && now - lastSequenceRef.current.ts < 800) {
-      const key = FILTER_SYMBOL_TO_KEY[e.key as keyof typeof FILTER_SYMBOL_TO_KEY];
+    if (lastSequenceKey === "f" && now - lastSequenceTs < 800) {
+      const key =
+        FILTER_SYMBOL_TO_KEY[e.key as keyof typeof FILTER_SYMBOL_TO_KEY];
       if (key) {
         e.preventDefault();
         setKeyboardNavActive(true);
         togglePaneFilter(root, key);
-        lastSequenceRef.current = { key: null, ts: 0 };
+        setLastSequence(null, 0);
         return;
       }
     }
 
-    lastSequenceRef.current = { key: null, ts: 0 };
+    setLastSequence(null, 0);
 
     if (e.key === "G") {
       e.preventDefault();
@@ -722,7 +820,9 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (e.key === "h" || e.key === "ArrowLeft") {
       e.preventDefault();
       setKeyboardNavActive(true);
-      const collapseButton = activeRow.querySelector("button[aria-label^='collapse ']");
+      const collapseButton = activeRow.querySelector(
+        "button[aria-label^='collapse ']"
+      );
       if (collapseButton instanceof HTMLElement) {
         collapseButton.click();
       } else {
@@ -734,7 +834,9 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (e.key === "l" || e.key === "ArrowRight") {
       e.preventDefault();
       setKeyboardNavActive(true);
-      const expandButton = activeRow.querySelector("button[aria-label^='expand ']");
+      const expandButton = activeRow.querySelector(
+        "button[aria-label^='expand ']"
+      );
       if (expandButton instanceof HTMLElement) {
         expandButton.click();
         window.setTimeout(() => focusFirstChildRow(root, activeRow), 0);
@@ -766,7 +868,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       setKeyboardNavActive(true);
       const newNoteButton = root.querySelector('[data-pane-action="new-note"]');
       if (newNoteButton instanceof HTMLElement) {
-        newNoteButton.click();
+        window.setTimeout(() => newNoteButton.click(), 0);
       }
       return;
     }
@@ -776,7 +878,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       setKeyboardNavActive(true);
       const newPaneButton = root.querySelector('[data-pane-action="new-pane"]');
       if (newPaneButton instanceof HTMLElement) {
-        newPaneButton.click();
+        window.setTimeout(() => newPaneButton.click(), 0);
       }
       return;
     }
@@ -784,7 +886,9 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (e.key === "q") {
       e.preventDefault();
       setKeyboardNavActive(true);
-      const closePaneButton = root.querySelector('[data-pane-action="close-pane"]');
+      const closePaneButton = root.querySelector(
+        '[data-pane-action="close-pane"]'
+      );
       if (closePaneButton instanceof HTMLElement) {
         closePaneButton.click();
       }
@@ -828,6 +932,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       e.preventDefault();
       setKeyboardNavActive(true);
       triggerRowRelevanceSymbol(activeRow, e.key as "x" | "~" | "!" | "?");
+      refocusPaneAfterRowMutation(root);
       return;
     }
 
@@ -835,6 +940,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       e.preventDefault();
       setKeyboardNavActive(true);
       setEvidenceSymbol(activeRow, "confirms");
+      refocusPaneAfterRowMutation(root);
       return;
     }
 
@@ -842,6 +948,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       e.preventDefault();
       setKeyboardNavActive(true);
       setEvidenceSymbol(activeRow, "contra");
+      refocusPaneAfterRowMutation(root);
       return;
     }
 
@@ -849,6 +956,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       e.preventDefault();
       setKeyboardNavActive(true);
       setEvidenceSymbol(activeRow, "none");
+      refocusPaneAfterRowMutation(root);
       return;
     }
 

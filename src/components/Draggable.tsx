@@ -63,9 +63,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     });
 
     drag(ref as ConnectableElement);
-    const handleRowMouseEnter = (
-      e: React.MouseEvent<HTMLDivElement>
-    ): void => {
+    const handleRowMouseEnter = (e: React.MouseEvent<HTMLDivElement>): void => {
       if (isEditableElement(document.activeElement)) {
         return;
       }
@@ -87,6 +85,9 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
         data-node-id={nodeID}
         data-node-text={displayText}
         data-node-mutable={isMutableNode(node) ? "true" : "false"}
+        role="treeitem"
+        aria-label={displayText}
+        aria-selected={isActiveRow}
         tabIndex={isActiveRow ? 0 : -1}
         onMouseMove={handleRowMouseEnter}
         onFocusCapture={(e) =>
@@ -148,9 +149,7 @@ function DraggableSuggestion({
     drag(ref as ConnectableElement);
   }
 
-  const handleRowMouseEnter = (
-    e: React.MouseEvent<HTMLDivElement>
-  ): void => {
+  const handleRowMouseEnter = (e: React.MouseEvent<HTMLDivElement>): void => {
     if (isEditableElement(document.activeElement)) {
       return;
     }
@@ -174,6 +173,9 @@ function DraggableSuggestion({
       data-node-id={nodeID}
       data-node-text={displayText}
       data-node-mutable={isMutableNode(node) ? "true" : "false"}
+      role="treeitem"
+      aria-label={displayText}
+      aria-selected={isActiveRow}
       tabIndex={isActiveRow ? 0 : -1}
       onMouseMove={handleRowMouseEnter}
       onFocusCapture={(e) =>

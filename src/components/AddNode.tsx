@@ -172,7 +172,7 @@ export function MiniEditor({
         onClose?.();
       }
       editorRef.current?.blur();
-      if (rowElement?.isConnected && !hasChanges) {
+      if (rowElement?.isConnected) {
         rowElement.focus();
       }
       // eslint-disable-next-line functional/immutable-data
@@ -191,7 +191,12 @@ export function MiniEditor({
     } else if (e.key === "Tab" && !e.shiftKey && onTab && isCursorAtStart()) {
       e.preventDefault();
       onTab(getText().trim(), getCursorPosition());
-    } else if (e.key === "Tab" && e.shiftKey && onShiftTab && isCursorAtStart()) {
+    } else if (
+      e.key === "Tab" &&
+      e.shiftKey &&
+      onShiftTab &&
+      isCursorAtStart()
+    ) {
       e.preventDefault();
       onShiftTab(getText().trim(), getCursorPosition());
     }

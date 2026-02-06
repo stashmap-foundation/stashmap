@@ -23,7 +23,11 @@ import {
   useDisplayText,
 } from "../ViewContext";
 import { useData } from "../DataContext";
-import { usePaneStack, useCurrentPane, usePaneIndex } from "../SplitPanesContext";
+import {
+  usePaneStack,
+  useCurrentPane,
+  usePaneIndex,
+} from "../SplitPanesContext";
 import {
   addNodeToFilters,
   addReferencedByToFilters,
@@ -273,7 +277,9 @@ function Tree(): JSX.Element | null {
     activeRowIndex: 0,
   });
   const didAutoFocusRef = useRef(false);
-  const consumedRowFocusIntentIdRef = useRef<number | null>(null);
+  const [consumedRowFocusIntentId, setConsumedRowFocusIntentId] = useState<
+    number | null
+  >(null);
   const treeRootRef = useRef<HTMLDivElement>(null);
   const [keyboardMode, setKeyboardMode] = useKeyboardMode();
   const viewKey = viewPathToString(viewPath);
@@ -313,11 +319,7 @@ function Tree(): JSX.Element | null {
     });
   }, [nodeKeys, activeRow.activeRowKey, activeRow.activeRowIndex]);
 
-  const onRowFocus = (
-    key: string,
-    index: number,
-    mode: KeyboardMode
-  ): void => {
+  const onRowFocus = (key: string, index: number, mode: KeyboardMode): void => {
     setActiveRow({
       activeRowKey: key,
       activeRowIndex: index,
@@ -326,7 +328,7 @@ function Tree(): JSX.Element | null {
   };
 
   useEffect(() => {
-    const activeElement = document.activeElement;
+    const { activeElement } = document;
     setKeyboardMode(isEditableElement(activeElement) ? "insert" : "normal");
   }, [activeRow.activeRowKey]);
 
@@ -338,19 +340,19 @@ function Tree(): JSX.Element | null {
     if (!rowFocusIntent) {
       return;
     }
-    if (consumedRowFocusIntentIdRef.current === rowFocusIntent.requestId) {
+    if (consumedRowFocusIntentId === rowFocusIntent.requestId) {
       return;
     }
     const byViewKey = rowFocusIntent.viewKey
-        ? treeRoot.querySelector(
-            `[data-row-focusable="true"][data-view-key="${rowFocusIntent.viewKey}"]`
-          )
-        : null;
+      ? treeRoot.querySelector(
+          `[data-row-focusable="true"][data-view-key="${rowFocusIntent.viewKey}"]`
+        )
+      : null;
     const byNodeId = rowFocusIntent.nodeId
-        ? treeRoot.querySelector(
-            `[data-row-focusable="true"][data-node-id="${rowFocusIntent.nodeId}"]`
-          )
-        : null;
+      ? treeRoot.querySelector(
+          `[data-row-focusable="true"][data-node-id="${rowFocusIntent.nodeId}"]`
+        )
+      : null;
     const byRowIndex =
       rowFocusIntent.rowIndex !== undefined
         ? treeRoot.querySelector(
@@ -369,9 +371,10 @@ function Tree(): JSX.Element | null {
       activeRowKey: getRowKey(target),
       activeRowIndex: getRowIndex(target),
     });
-    consumedRowFocusIntentIdRef.current = rowFocusIntent.requestId;
+    setConsumedRowFocusIntentId(rowFocusIntent.requestId);
   }, [
     paneIndex,
+    consumedRowFocusIntentId,
     rowFocusIntent?.requestId,
     rowFocusIntent?.viewKey,
     rowFocusIntent?.nodeId,
@@ -391,7 +394,7 @@ function Tree(): JSX.Element | null {
       return;
     }
 
-    const activeElement = document.activeElement;
+    const { activeElement } = document;
     const isFocusedInModal =
       activeElement instanceof HTMLElement &&
       activeElement.closest(".modal") !== null;

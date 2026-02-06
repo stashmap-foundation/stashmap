@@ -14,9 +14,7 @@ export function isEditableElement(target: EventTarget | null): boolean {
   if (target.isContentEditable) {
     return true;
   }
-  return (
-    target.closest("input, textarea, [contenteditable='true']") !== null
-  );
+  return target.closest("input, textarea, [contenteditable='true']") !== null;
 }
 
 export function getFocusableRows(root: ParentNode): HTMLElement[] {

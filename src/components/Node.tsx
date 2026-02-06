@@ -222,10 +222,9 @@ function EditableContent(): JSX.Element {
   ): void => {
     const { plan: basePlan, viewPath: updatedViewPath } =
       planSaveNodeAndEnsureRelations(createPlan(), text, viewPath, stack);
-    const planWithEscFocus =
-      escapeFocusPendingRef.current
-        ? planWithRowFocusIntent(basePlan, updatedViewPath)
-        : basePlan;
+    const planWithEscFocus = escapeFocusPendingRef.current
+      ? planWithRowFocusIntent(basePlan, updatedViewPath)
+      : basePlan;
     // eslint-disable-next-line functional/immutable-data
     escapeFocusPendingRef.current = false;
 
@@ -401,7 +400,10 @@ function EditableContent(): JSX.Element {
         return;
       }
 
-      const [planWithNode, newNode] = planCreateNode(planWithoutEmpty, trimmedText);
+      const [planWithNode, newNode] = planCreateNode(
+        planWithoutEmpty,
+        trimmedText
+      );
       executePlan(
         planAddToParent(
           planWithNode,
@@ -445,7 +447,9 @@ function EditableContent(): JSX.Element {
     const grandParentContext = getContext(basePlan, grandParentPath, stack);
     const grandParentNodeID = getLast(grandParentPath).nodeID;
     const newContext = grandParentContext.push(grandParentNodeID);
-    executePlan(planCreateVersion(planWithDisconnect, nodeID, trimmedText, newContext));
+    executePlan(
+      planCreateVersion(planWithDisconnect, nodeID, trimmedText, newContext)
+    );
   };
 
   const handleRequestRowFocus = ({

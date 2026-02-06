@@ -21,7 +21,9 @@ export function KeyboardShortcutsModal({
           <li>g g: first row, G: last row</li>
           <li>Enter or i: edit current row</li>
           <li>/: search in current pane</li>
-          <li>H: go home (~Log), N: new root note, P: open new pane, q: close pane</li>
+          <li>
+            H: go home (~Log), N: new root note, P: open new pane, q: close pane
+          </li>
           <li>[ / ]: switch to previous/next pane</li>
           <li>s: open current row in split pane</li>
           <li>z: open current row in fullscreen</li>

@@ -88,7 +88,18 @@ body {
   padding: 8px 16px;
   min-height: 44px;
   background-color: var(--base03);
+  position: relative;
   flex-shrink: 0;
+
+  &::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 6px;
+    height: 1px;
+    background: var(--base01);
+  }
 }
 
 .pane-header-left {
@@ -111,6 +122,7 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
+  padding-top: 6px;
   padding-left: 16px;
 }
 
@@ -1596,15 +1608,22 @@ input:focus,
 }
 
 .clickable-filter-symbol {
-  background: none;
-  border: none;
-  padding: 0 2px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 1px 3px;
   cursor: pointer;
   font-size: 14px;
   font-weight: bold;
   font-family: monospace;
   line-height: 1;
-  transition: transform 0.1s ease;
+  transition: transform 0.1s ease, background-color 0.1s ease,
+    border-color 0.1s ease;
+
+  &[aria-pressed="true"] {
+    background: var(--base02);
+    border-color: var(--base01);
+  }
 
   &:hover {
     transform: scale(1.2);

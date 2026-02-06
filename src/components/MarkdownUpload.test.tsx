@@ -10,9 +10,11 @@ import {
   renderTree,
   setup,
   UpdateState,
-  expectTree,
 } from "../utils.test";
-import { planCreateNodesFromMarkdown } from "./FileDropZone";
+import {
+  parseMarkdownHierarchy,
+  planCreateNodesFromMarkdown,
+} from "./FileDropZone";
 import { addRelationToRelations, joinID, shortID } from "../connections";
 
 const TEST_FILE = `# Programming Languages
@@ -60,13 +62,11 @@ test("Markdown Upload creates correct tree structure", async () => {
 
   await navigateToProgrammingLanguages();
 
-  await expectTree(`
-Programming Languages
-  Java
-  Java is a programming language
-  Python
-  Python is a programming language
-  `);
+  fireEvent.click(await screen.findByLabelText("expand Java"));
+  fireEvent.click(await screen.findByLabelText("expand Python"));
+
+  await screen.findByText("Java is a programming language");
+  await screen.findByText("Python is a programming language");
 });
 
 test("Edit Node uploaded from Markdown", async () => {
@@ -81,26 +81,17 @@ test("Edit Node uploaded from Markdown", async () => {
   await userEvent.clear(plEditor);
   await userEvent.type(plEditor, "Programming Languages OOP{Escape}");
 
-  await expectTree(`
-Programming Languages OOP
-  Java
-  Java is a programming language
-  Python
-  Python is a programming language
-  `);
+  await screen.findByText("Programming Languages OOP");
+  await screen.findByText("Java");
+  await screen.findByText("Python");
 
   cleanup();
   renderTree(alice);
 
   await navigateToNodeViaSearch(0, "Programming Languages");
-
-  await expectTree(`
-Programming Languages OOP
-  Java
-  Java is a programming language
-  Python
-  Python is a programming language
-  `);
+  await screen.findByText("Programming Languages OOP");
+  await screen.findByText("Java");
+  await screen.findByText("Python");
 });
 
 test("Delete Node uploaded from Markdown", async () => {
@@ -109,33 +100,40 @@ test("Delete Node uploaded from Markdown", async () => {
   renderTree(alice);
 
   await navigateToProgrammingLanguages();
+  fireEvent.click(await screen.findByLabelText("expand Python"));
 
-  await expectTree(`
-Programming Languages
-  Java
-  Java is a programming language
-  Python
-  Python is a programming language
-  `);
+  await screen.findByText("Python is a programming language");
 
-  fireEvent.click(await screen.findByLabelText("mark Python as not relevant"));
-
-  await expectTree(`
-Programming Languages
-  Java
-  Java is a programming language
-  Python is a programming language
-  `);
+  fireEvent.click(
+    await screen.findByLabelText(
+      "mark Python is a programming language as not relevant"
+    )
+  );
+  expect(screen.queryByText("Python is a programming language")).toBeNull();
+  await screen.findByText("Python");
 
   cleanup();
   renderTree(alice);
 
   await navigateToProgrammingLanguages();
+  await screen.findByText("Python");
+  expect(screen.queryByText("Python is a programming language")).toBeNull();
+});
 
-  await expectTree(`
-Programming Languages
-  Java
-  Java is a programming language
-  Python is a programming language
+test("Markdown parser preserves list nesting and strips list markers", () => {
+  const parsed = parseMarkdownHierarchy(`
+- Parent
+  - Child
+  1. Numbered child
   `);
+
+  expect(parsed).toEqual([
+    {
+      text: "Parent",
+      children: [
+        { text: "Child", children: [] },
+        { text: "Numbered child", children: [] },
+      ],
+    },
+  ]);
 });

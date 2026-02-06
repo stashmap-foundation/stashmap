@@ -6,7 +6,7 @@ import { newNode, bulkAddRelations } from "../connections";
 import { newRelations } from "../ViewContext";
 import {
   Plan,
-  planBulkUpsertNodes,
+  planUpsertNode,
   planUpsertRelations,
   usePlanner,
 } from "../planner";
@@ -19,94 +19,292 @@ function convertToPlainText(html: string): string {
 }
 /* eslint-enable functional/immutable-data */
 
-function createRelationsFromParagraphNodes(
-  nodes: KnowNode[],
-  myself: PublicKey,
-  context: List<ID> = List()
-): [relations: Relations, topNodeID: ID] {
-  const topParagraph = nodes[0];
-  const furtherParagraphs = nodes.slice(1);
-  const relations = bulkAddRelations(
-    newRelations(topParagraph.id, context, myself),
-    furtherParagraphs.map((n) => n.id)
-  );
-  return [relations, topParagraph.id];
+const markdown = new MarkdownIt();
+
+function stripLeadingListMarkers(text: string): string {
+  return text
+    .replace(/^[-*+]\s+/, "")
+    .replace(/^\d+\.\s+/, "")
+    .trim();
 }
 
-export function createNodesFromMarkdown(markdown: string): KnowNode[] {
-  const markdownParagraphs = markdown.split("\n\n");
-  const plainTextParagraphs = markdownParagraphs
-    .map((paragraph: string) => {
-      const md = new MarkdownIt();
-      return convertToPlainText(md.render(paragraph)).trim();
-    })
-    .filter((paragraph) => paragraph !== "");
-  return plainTextParagraphs.map((paragraph) => {
-    return newNode(paragraph);
-  });
+function normalizeMarkdownText(markdownText: string): string {
+  const plainText = convertToPlainText(
+    markdown.renderInline(markdownText)
+  ).replace(/\s+/g, " ");
+  return stripLeadingListMarkers(plainText);
 }
 
-const CHUNK_SIZE = 8196;
+export type MarkdownTreeNode = {
+  text: string;
+  children: MarkdownTreeNode[];
+};
 
-function splitMarkdownInChunkSizes(markdown: string): string[] {
-  const paragraphs = markdown.split("\n\n");
-  return paragraphs.reduce((rdx: string[], p: string, i: number): string[] => {
-    const currentChunk = rdx[rdx.length - 1] || "";
+export type MarkdownImportFile = {
+  name: string;
+  markdown: string;
+};
 
-    const paragraph = i === paragraphs.length - 1 ? p : `${p}\n\n`;
-    if (currentChunk.length + paragraph.length > CHUNK_SIZE) {
-      return [...rdx, paragraph];
+function titleFromFileName(fileName: string): string {
+  const baseName = fileName.replace(/\.[^/.]+$/u, "").trim();
+  if (baseName) {
+    return baseName;
+  }
+  return "Imported Markdown";
+}
+
+/* eslint-disable functional/immutable-data, functional/no-let, no-continue */
+function appendNode(
+  roots: MarkdownTreeNode[],
+  parent: MarkdownTreeNode | undefined,
+  node: MarkdownTreeNode
+): void {
+  if (parent) {
+    parent.children.push(node);
+    return;
+  }
+  roots.push(node);
+}
+
+function getLastDefinedListItem(
+  listItemStack: Array<MarkdownTreeNode | undefined>
+): MarkdownTreeNode | undefined {
+  for (let i = listItemStack.length - 1; i >= 0; i -= 1) {
+    const listItem = listItemStack[i];
+    if (listItem) {
+      return listItem;
     }
-    return [...rdx.slice(0, -1), `${currentChunk}${paragraph}`];
+  }
+  return undefined;
+}
+
+export function parseMarkdownHierarchy(
+  markdownText: string
+): MarkdownTreeNode[] {
+  const tokens = markdown.parse(markdownText, {});
+  const roots: MarkdownTreeNode[] = [];
+  const headingStack: Array<{ level: number; node: MarkdownTreeNode }> = [];
+  const listItemStack: Array<MarkdownTreeNode | undefined> = [];
+
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    if (token.type === "heading_open") {
+      const headingLevel = Number(token.tag.replace("h", ""));
+      const inline = tokens[i + 1];
+      if (!inline || inline.type !== "inline") {
+        continue;
+      }
+      const text = normalizeMarkdownText(inline.content);
+      if (!text) {
+        continue;
+      }
+      while (
+        headingStack.length > 0 &&
+        headingStack[headingStack.length - 1].level >= headingLevel
+      ) {
+        headingStack.pop();
+      }
+      const parent =
+        getLastDefinedListItem(listItemStack) ||
+        headingStack[headingStack.length - 1]?.node;
+      const node: MarkdownTreeNode = { text, children: [] };
+      appendNode(roots, parent, node);
+      headingStack.push({ level: headingLevel, node });
+      continue;
+    }
+
+    if (token.type === "list_item_open") {
+      listItemStack.push(undefined);
+      continue;
+    }
+
+    if (token.type === "list_item_close") {
+      listItemStack.pop();
+      continue;
+    }
+
+    if (token.type !== "paragraph_open") {
+      continue;
+    }
+
+    const inline = tokens[i + 1];
+    if (!inline || inline.type !== "inline") {
+      continue;
+    }
+    const text = normalizeMarkdownText(inline.content);
+    if (!text) {
+      continue;
+    }
+
+    if (listItemStack.length > 0) {
+      const currentItemIndex = listItemStack.length - 1;
+      const currentListNode = listItemStack[currentItemIndex];
+      if (!currentListNode) {
+        const parent =
+          getLastDefinedListItem(listItemStack.slice(0, -1)) ||
+          headingStack[headingStack.length - 1]?.node;
+        const node: MarkdownTreeNode = { text, children: [] };
+        appendNode(roots, parent, node);
+        listItemStack[currentItemIndex] = node;
+        continue;
+      }
+      currentListNode.children.push({ text, children: [] });
+      continue;
+    }
+
+    const paragraphNode: MarkdownTreeNode = { text, children: [] };
+    appendNode(
+      roots,
+      headingStack[headingStack.length - 1]?.node,
+      paragraphNode
+    );
+  }
+  return roots;
+}
+/* eslint-enable functional/immutable-data, functional/no-let, no-continue */
+
+function normalizeRootsForSingleFile(
+  roots: MarkdownTreeNode[],
+  fileName: string
+): MarkdownTreeNode[] {
+  if (roots.length <= 1) {
+    return roots;
+  }
+  return [{ text: titleFromFileName(fileName), children: roots }];
+}
+
+export function parseMarkdownImportFiles(
+  files: MarkdownImportFile[]
+): MarkdownTreeNode[] {
+  return files.reduce((acc: MarkdownTreeNode[], file: MarkdownImportFile) => {
+    const roots = parseMarkdownHierarchy(file.markdown);
+    const normalizedRoots = normalizeRootsForSingleFile(roots, file.name);
+    return [...acc, ...normalizedRoots];
   }, []);
+}
+
+export function buildRootTreeForEmptyRootDrop(
+  importedTrees: MarkdownTreeNode[]
+): MarkdownTreeNode | undefined {
+  if (importedTrees.length === 0) {
+    return undefined;
+  }
+  if (importedTrees.length === 1) {
+    return importedTrees[0];
+  }
+  return {
+    text: "Imported Markdown Files",
+    children: importedTrees,
+  };
+}
+
+function materializeTreeNode(
+  plan: Plan,
+  treeNode: MarkdownTreeNode,
+  context: List<ID>
+): [Plan, ID] {
+  const node = newNode(treeNode.text);
+  const withNode = planUpsertNode(plan, node);
+
+  if (treeNode.children.length === 0) {
+    return [withNode, node.id];
+  }
+
+  const childContext = context.push(node.id);
+  const [withChildren, childIDs] = treeNode.children.reduce(
+    ([accPlan, accChildIDs], childNode) => {
+      const [nextPlan, childID] = materializeTreeNode(
+        accPlan,
+        childNode,
+        childContext
+      );
+      return [nextPlan, [...accChildIDs, childID]];
+    },
+    [withNode, [] as ID[]] as [Plan, ID[]]
+  );
+
+  const relation = bulkAddRelations(
+    newRelations(node.id, context, withChildren.user.publicKey),
+    childIDs
+  );
+  return [planUpsertRelations(withChildren, relation), node.id];
+}
+
+export function planCreateNodesFromMarkdownTrees(
+  plan: Plan,
+  trees: MarkdownTreeNode[],
+  context: List<ID> = List()
+): [Plan, topNodeIDs: ID[]] {
+  const materializeTrees = (
+    sourcePlan: Plan,
+    sourceContext: List<ID>
+  ): [Plan, ID[]] =>
+    trees.reduce(
+      ([accPlan, accTopNodeIDs], treeNode) => {
+        const [nextPlan, topNodeID] = materializeTreeNode(
+          accPlan,
+          treeNode,
+          sourceContext
+        );
+        return [nextPlan, [...accTopNodeIDs, topNodeID]];
+      },
+      [sourcePlan, [] as ID[]] as [Plan, ID[]]
+    );
+
+  const [planWithContext, topNodeIDs] = materializeTrees(plan, context);
+  if (context.size === 0) {
+    return [planWithContext, topNodeIDs];
+  }
+
+  const [planWithStandaloneContext] = materializeTrees(
+    planWithContext,
+    List<ID>()
+  );
+  return [planWithStandaloneContext, topNodeIDs];
+}
+
+export function planCreateNodesFromMarkdownFiles(
+  plan: Plan,
+  files: MarkdownImportFile[],
+  context: List<ID> = List()
+): [Plan, topNodeIDs: ID[]] {
+  const trees = parseMarkdownImportFiles(files);
+  return planCreateNodesFromMarkdownTrees(plan, trees, context);
+}
+
+function flattenTreeNodes(treeNodes: MarkdownTreeNode[]): MarkdownTreeNode[] {
+  return treeNodes.reduce((acc: MarkdownTreeNode[], treeNode) => {
+    return [...acc, treeNode, ...flattenTreeNodes(treeNode.children)];
+  }, []);
+}
+
+export function createNodesFromMarkdown(markdownText: string): KnowNode[] {
+  const trees = parseMarkdownHierarchy(markdownText);
+  return flattenTreeNodes(trees).map((treeNode) => newNode(treeNode.text));
 }
 
 export function planCreateNodesFromMarkdown(
   plan: Plan,
-  markdown: string,
+  markdownText: string,
   context: List<ID> = List()
 ): [Plan, topNodeID: ID] {
-  const splittedMarkdown = splitMarkdownInChunkSizes(markdown);
-  const nodes = splittedMarkdown.reduce((rdx: KnowNode[], md: string) => {
-    const mdNodes = createNodesFromMarkdown(md);
-    return [...rdx, ...mdNodes];
-  }, []);
-  // Always create relations with empty context (standalone)
-  const [emptyContextRelations, topNodeID] = createRelationsFromParagraphNodes(
-    nodes,
-    plan.user.publicKey,
-    List()
-  );
-  const planWithNodes = planBulkUpsertNodes(plan, nodes);
-  const planWithEmptyContextRelations = planUpsertRelations(
-    planWithNodes,
-    emptyContextRelations
+  const [nextPlan, topNodeIDs] = planCreateNodesFromMarkdownFiles(
+    plan,
+    [{ name: "Imported Markdown", markdown: markdownText }],
+    context
   );
 
-  // Also create relations with the provided context if non-empty
-  if (context.size > 0) {
-    const [contextRelations] = createRelationsFromParagraphNodes(
-      nodes,
-      plan.user.publicKey,
-      context
-    );
-    return [
-      planUpsertRelations(planWithEmptyContextRelations, contextRelations),
-      topNodeID,
-    ];
+  if (topNodeIDs.length > 0) {
+    return [nextPlan, topNodeIDs[0]];
   }
 
-  return [planWithEmptyContextRelations, topNodeID];
+  const fallbackNode = newNode("Imported Markdown");
+  return [planUpsertNode(nextPlan, fallbackNode), fallbackNode.id];
 }
 
 type FileDropZoneProps = {
   children: React.ReactNode;
   onDrop: (plan: Plan, topNodes: Array<ID>) => void;
-};
-
-type MarkdownReducer = {
-  plan: Plan;
-  topNodeIDs: ID[];
 };
 
 /* eslint-disable react/jsx-props-no-spreading */
@@ -118,39 +316,22 @@ export function FileDropZone({
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     noClick: true,
     noKeyboard: true,
-    accept: ".md",
+    accept: [".md", ".markdown"],
     onDrop: async (acceptedFiles: Array<File>) => {
-      const markdowns = await Promise.all(
-        acceptedFiles.map((file: File): Promise<string> => {
-          return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            /* eslint-disable functional/immutable-data */
-            reader.onload = () => {
-              resolve(reader.result as string);
-            };
-            reader.onerror = reject;
-            reader.readAsText(file);
-            /* eslint-enable functional/immutable-data */
-          });
+      const markdownFiles = await Promise.all(
+        acceptedFiles.map(async (file) => {
+          return {
+            name: file.name,
+            markdown: await file.text(),
+          };
         })
       );
-      const mdNodes = markdowns.reduce<MarkdownReducer>(
-        (rdx, markdown) => {
-          const [plan, topNodeID] = planCreateNodesFromMarkdown(
-            rdx.plan,
-            markdown
-          );
-          return {
-            plan,
-            topNodeIDs: [...rdx.topNodeIDs, topNodeID],
-          };
-        },
-        {
-          plan: createPlan(),
-          topNodeIDs: [] as ID[],
-        }
+
+      const [planWithMarkdown, topNodeIDs] = planCreateNodesFromMarkdownFiles(
+        createPlan(),
+        markdownFiles
       );
-      onDrop(mdNodes.plan, mdNodes.topNodeIDs);
+      onDrop(planWithMarkdown, topNodeIDs);
     },
   });
   const className = isDragActive ? "dimmed flex-col-100" : "flex-col-100";

@@ -236,7 +236,11 @@ function PaneStatusLine(): JSX.Element {
       <div className="status-segment">
         <CurrentNodeName />
       </div>
-      <div className={`status-spacer ${isViewingOtherUserContent ? "status-readonly" : ""}`}>
+      <div
+        className={`status-spacer ${
+          isViewingOtherUserContent ? "status-readonly" : ""
+        }`}
+      >
         {isViewingOtherUserContent && "READONLY"}
       </div>
       {isFirstPane && <PublishingStatusWrapper />}
@@ -257,7 +261,9 @@ export function PaneView(): JSX.Element | null {
   return (
     <TemporaryViewProvider>
       <div
-        className={`pane-wrapper ${isOtherUser ? "pane-other-user pane-readonly-mode" : ""}`}
+        className={`pane-wrapper ${
+          isOtherUser ? "pane-other-user pane-readonly-mode" : ""
+        }`}
       >
         <PaneHeader />
         <div className="pane-content">

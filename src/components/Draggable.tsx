@@ -5,13 +5,17 @@ import {
   useIsSuggestion,
   useIsInReferencedByView,
   useViewPath,
+  useViewKey,
   useNodeID,
+  useNode,
+  useDisplayText,
   useIsViewingOtherUserContent,
 } from "../ViewContext";
 import { isEmptyNodeID, isAbstractRefId } from "../connections";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable } from "./DroppableContainer";
-import { useIsEditingOn } from "./TemporaryViewContext";
+import { isMutableNode, useIsEditingOn } from "./TemporaryViewContext";
+import { isEditableElement, KeyboardMode } from "./keyboardNavigation";
 
 export type DragItemType = {
   path: ViewPath;
@@ -19,13 +23,30 @@ export type DragItemType = {
 
 type DraggableProps = {
   className?: string;
+  rowViewKey?: string;
+  rowIndex?: number;
+  rowDepth?: number;
+  isActiveRow?: boolean;
+  onRowFocus?: (key: string, index: number, mode: KeyboardMode) => void;
 };
 
 const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
-  ({ className }: DraggableProps, ref): JSX.Element => {
+  (
+    {
+      className,
+      rowViewKey = "",
+      rowIndex = 0,
+      rowDepth = 0,
+      isActiveRow = false,
+      onRowFocus = () => {},
+    }: DraggableProps,
+    ref
+  ): JSX.Element => {
     const path = useViewPath();
     const isNodeBeeingEdited = useIsEditingOn();
     const [nodeID] = useNodeID();
+    const [node] = useNode();
+    const displayText = useDisplayText();
     const isEmptyNode = isEmptyNodeID(nodeID);
     const isAbstractRef = isAbstractRefId(nodeID);
     const disableDrag = isNodeBeeingEdited || isEmptyNode || isAbstractRef;
@@ -42,8 +63,40 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     });
 
     drag(ref as ConnectableElement);
+    const handleRowMouseEnter = (
+      e: React.MouseEvent<HTMLDivElement>
+    ): void => {
+      if (isEditableElement(document.activeElement)) {
+        return;
+      }
+      onRowFocus(rowViewKey, rowIndex, "normal");
+      const row = e.currentTarget;
+      if (document.activeElement !== row) {
+        row.focus();
+      }
+    };
+
     return (
-      <div ref={ref} className={`item ${isDragging ? "is-dragging" : ""}`}>
+      <div
+        ref={ref}
+        className={`item ${isDragging ? "is-dragging" : ""}`}
+        data-row-focusable="true"
+        data-view-key={rowViewKey}
+        data-row-index={rowIndex}
+        data-row-depth={rowDepth}
+        data-node-id={nodeID}
+        data-node-text={displayText}
+        data-node-mutable={isMutableNode(node) ? "true" : "false"}
+        tabIndex={isActiveRow ? 0 : -1}
+        onMouseMove={handleRowMouseEnter}
+        onFocusCapture={(e) =>
+          onRowFocus(
+            rowViewKey,
+            rowIndex,
+            isEditableElement(e.target) ? "insert" : "normal"
+          )
+        }
+      >
         <Node className={className} />
       </div>
     );
@@ -61,12 +114,24 @@ export function DraggableNote(): JSX.Element {
 
 function DraggableSuggestion({
   className,
+  rowViewKey,
+  rowIndex,
+  rowDepth,
+  isActiveRow,
+  onRowFocus,
 }: {
   className?: string;
+  rowViewKey: string;
+  rowIndex: number;
+  rowDepth: number;
+  isActiveRow: boolean;
+  onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const path = useViewPath();
   const [nodeID] = useNodeID();
+  const [node] = useNode();
+  const displayText = useDisplayText();
   const isAbstractRef = isAbstractRefId(nodeID);
 
   const [{ isDragging }, drag] = useDrag({
@@ -83,12 +148,41 @@ function DraggableSuggestion({
     drag(ref as ConnectableElement);
   }
 
+  const handleRowMouseEnter = (
+    e: React.MouseEvent<HTMLDivElement>
+  ): void => {
+    if (isEditableElement(document.activeElement)) {
+      return;
+    }
+    onRowFocus(rowViewKey, rowIndex, "normal");
+    const row = e.currentTarget;
+    if (document.activeElement !== row) {
+      row.focus();
+    }
+  };
+
   return (
     <div
       ref={ref}
       className={`item suggestion-item ${isDragging ? "is-dragging" : ""} ${
         className || ""
       }`}
+      data-row-focusable="true"
+      data-view-key={rowViewKey}
+      data-row-index={rowIndex}
+      data-row-depth={rowDepth}
+      data-node-id={nodeID}
+      data-node-text={displayText}
+      data-node-mutable={isMutableNode(node) ? "true" : "false"}
+      tabIndex={isActiveRow ? 0 : -1}
+      onMouseMove={handleRowMouseEnter}
+      onFocusCapture={(e) =>
+        onRowFocus(
+          rowViewKey,
+          rowIndex,
+          isEditableElement(e.target) ? "insert" : "normal"
+        )
+      }
     >
       <Node className={className} isSuggestion />
     </div>
@@ -98,14 +192,22 @@ function DraggableSuggestion({
 export function ListItem({
   index,
   treeViewPath,
+  activeRowKey,
+  onRowFocus,
 }: {
   index: number;
   treeViewPath: ViewPath;
+  activeRowKey: string;
+  onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
+  const viewKey = useViewKey();
+  const viewPath = useViewPath();
   const isSuggestion = useIsSuggestion();
   const isInReferencedByView = useIsInReferencedByView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
+  const rowDepth = viewPath.length - 1;
+  const isActiveRow = activeRowKey === viewKey;
 
   const isReadonly = isInReferencedByView || isViewingOtherUserContent;
 
@@ -123,7 +225,13 @@ export function ListItem({
     // Suggestions: draggable but NOT droppable
     return (
       <div className="visible-on-hover suggestion-item-container">
-        <DraggableSuggestion />
+        <DraggableSuggestion
+          rowViewKey={viewKey}
+          rowIndex={index}
+          rowDepth={rowDepth}
+          isActiveRow={isActiveRow}
+          onRowFocus={onRowFocus}
+        />
       </div>
     );
   }
@@ -138,7 +246,15 @@ export function ListItem({
   }`;
   return (
     <div className="visible-on-hover">
-      <Draggable ref={ref} className={className} />
+      <Draggable
+        ref={ref}
+        className={className}
+        rowViewKey={viewKey}
+        rowIndex={index}
+        rowDepth={rowDepth}
+        isActiveRow={isActiveRow}
+        onRowFocus={onRowFocus}
+      />
     </div>
   );
 }

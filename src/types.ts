@@ -254,6 +254,8 @@ declare global {
 
   // Temporary UI state (not persisted to Nostr)
   type TemporaryViewState = {
+    // Per-pane row focus target for deterministic keyboard focus restoration
+    rowFocusIntents: Map<number, RowFocusIntent>;
     // Multiselect
     selection: OrderedSet<string>;
     multiselectBtns: Set<string>;
@@ -263,5 +265,13 @@ declare global {
     editorOpenViews: Set<string>;
     // Draft texts: draftID → current text being typed
     draftTexts: Map<string, string>;
+  };
+
+  type RowFocusIntent = {
+    requestId: number;
+    paneIndex: number;
+    viewKey?: string;
+    nodeId?: string;
+    rowIndex?: number;
   };
 }

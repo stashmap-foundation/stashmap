@@ -63,6 +63,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
   return (
     <button
       type="button"
+      data-node-action="open-split-pane"
       aria-label="open in split pane"
       className="btn btn-icon"
       onClick={onClick}
@@ -103,6 +104,7 @@ export function OpenInSplitPaneButtonWithStack({
   return (
     <button
       type="button"
+      data-node-action="open-split-pane"
       aria-label="open in split pane"
       className="btn btn-icon"
       onClick={onClick}
@@ -138,6 +140,7 @@ export function NewPaneButton(): JSX.Element | null {
   return (
     <button
       type="button"
+      data-pane-action="new-pane"
       aria-label="Open new pane"
       className="btn btn-icon"
       onClick={onClick}

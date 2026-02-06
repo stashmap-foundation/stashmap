@@ -419,6 +419,27 @@ export function planUpdatePanes(plan: Plan, panes: Pane[]): Plan {
   return planUpdateViewData(plan, plan.views, panes);
 }
 
+let nextRowFocusRequestId = 1;
+
+export function planSetRowFocusIntent(
+  plan: Plan,
+  intent: Omit<RowFocusIntent, "requestId">
+): Plan {
+  const requestId = nextRowFocusRequestId;
+  // eslint-disable-next-line functional/immutable-data
+  nextRowFocusRequestId += 1;
+  return {
+    ...plan,
+    temporaryView: {
+      ...plan.temporaryView,
+      rowFocusIntents: plan.temporaryView.rowFocusIntents.set(intent.paneIndex, {
+        ...intent,
+        requestId,
+      }),
+    },
+  };
+}
+
 export function planRemoveEmptyNodePosition(
   plan: Plan,
   relationsID: LongID

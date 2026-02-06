@@ -24,10 +24,7 @@ function fireEvent(sub: Subscription, event: Event): void {
   sub.onevent?.(event);
 }
 
-function broadcastEvent(
-  subs: Map<string, Subscription>,
-  event: Event
-): void {
+function broadcastEvent(subs: Map<string, Subscription>, event: Event): void {
   const filtered = subs.filter((sub) => matchFilters(sub.filters, event));
   filtered.forEach((sub) => {
     fireEvent(sub, event);

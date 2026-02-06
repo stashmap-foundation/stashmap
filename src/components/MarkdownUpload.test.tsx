@@ -81,15 +81,15 @@ test("Edit Node uploaded from Markdown", async () => {
   await userEvent.clear(plEditor);
   await userEvent.type(plEditor, "Programming Languages OOP{Escape}");
 
-  await screen.findByText("Programming Languages OOP");
+  await screen.findByLabelText("edit Programming Languages OOP");
   await screen.findByText("Java");
   await screen.findByText("Python");
 
   cleanup();
   renderTree(alice);
 
-  await navigateToNodeViaSearch(0, "Programming Languages");
-  await screen.findByText("Programming Languages OOP");
+  await navigateToNodeViaSearch(0, "Programming Languages OOP");
+  await screen.findByLabelText("edit Programming Languages OOP");
   await screen.findByText("Java");
   await screen.findByText("Python");
 });

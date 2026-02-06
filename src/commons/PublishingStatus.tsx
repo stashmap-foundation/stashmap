@@ -63,8 +63,7 @@ function RelayRow({
   const relayName = relayUrl.replace("wss://", "").replace("ws://", "");
   const numberFulfilled = status ? getStatusCount(status, "fulfilled") : 0;
   const numberRejected = status ? getStatusCount(status, "rejected") : 0;
-  const synced = numberFulfilled + numberRejected;
-  const total = synced + pendingCount;
+  const total = numberFulfilled + pendingCount;
   const lastError = status ? getLastRejectedReason(status) : undefined;
 
   return (
@@ -118,6 +117,17 @@ const getBackoffSeconds = (
   return secs > 0 ? secs : undefined;
 };
 
+const getPendingForRelay = (
+  queueStatus: QueueStatus | undefined,
+  relayUrl: string
+): number => {
+  if (!queueStatus || queueStatus.pendingCount === 0) return 0;
+  const entry = queueStatus.succeededPerRelay.find((r) => r.url === relayUrl);
+  return entry
+    ? queueStatus.pendingCount - entry.count
+    : queueStatus.pendingCount;
+};
+
 export function PublishingStatusContent({
   publishEventsStatus,
   writeRelayUrls,
@@ -140,7 +150,7 @@ export function PublishingStatusContent({
           key={relayUrl}
           relayUrl={relayUrl}
           status={publishResultsRelayMap.get(relayUrl)}
-          pendingCount={pendingCount}
+          pendingCount={getPendingForRelay(queueStatus, relayUrl)}
           backoffSeconds={getBackoffSeconds(queueStatus, relayUrl)}
         />
       ))}

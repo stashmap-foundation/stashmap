@@ -6,6 +6,7 @@ import { signEvents, PUBLISH_TIMEOUT } from "./executor";
 import { applyWriteRelayConfig } from "./relays";
 import {
   StashmapDB,
+  OutboxEntry,
   getOutboxEvents,
   putOutboxEvent,
   removeOutboxEvent,
@@ -32,6 +33,10 @@ export type QueueStatus = {
   readonly backedOffRelays: ReadonlyArray<{
     readonly url: string;
     readonly retryAfter: number;
+  }>;
+  readonly succeededPerRelay: ReadonlyArray<{
+    readonly url: string;
+    readonly count: number;
   }>;
 };
 
@@ -110,7 +115,7 @@ export const createPublishQueue = (
   const debounceMs = config.debounceMs ?? DEFAULT_DEBOUNCE_MS;
 
   // eslint-disable-next-line functional/no-let
-  let buffer = Map<string, UnsignedEvent & EventAttachment>();
+  let buffer = Map<string, OutboxEntry>();
   // eslint-disable-next-line functional/no-let
   let relayBackoff = Map<string, RelayBackoffState>();
   // eslint-disable-next-line functional/no-let
@@ -122,23 +127,30 @@ export const createPublishQueue = (
   // eslint-disable-next-line functional/no-let
   let destroyed = false;
 
-  const getStatus = (): QueueStatus => ({
-    pendingCount: buffer.size,
-    flushing,
-    backedOffRelays: relayBackoff
-      .entrySeq()
-      .toArray()
-      .map(([url, state]) => ({ url, retryAfter: state.nextRetryAfter })),
-  });
-
-  const persistToOutbox = (
-    key: string,
-    event: UnsignedEvent & EventAttachment
-  ): void => {
-    if (!config.db) return;
-    putOutboxEvent(config.db, { key, event, createdAt: Date.now() }).catch(
-      () => {}
+  const getStatus = (): QueueStatus => {
+    const counts = new globalThis.Map<string, number>();
+    buffer.forEach((entry) => {
+      (entry.succeededRelays || []).forEach((url) => {
+        counts.set(url, (counts.get(url) || 0) + 1);
+      });
+    });
+    const succeededPerRelay = Array.from(counts.entries()).map(
+      ([url, count]) => ({ url, count })
     );
+    return {
+      pendingCount: buffer.size,
+      flushing,
+      backedOffRelays: relayBackoff
+        .entrySeq()
+        .toArray()
+        .map(([url, state]) => ({ url, retryAfter: state.nextRetryAfter })),
+      succeededPerRelay,
+    };
+  };
+
+  const persistToOutbox = (entry: OutboxEntry): void => {
+    if (!config.db) return;
+    putOutboxEvent(config.db, entry).catch(() => {});
   };
 
   const removeFromOutboxDB = (key: string): void => {
@@ -211,22 +223,27 @@ export const createPublishQueue = (
     try {
       const deps = config.getDeps();
       const entries = buffer.entrySeq().toArray();
-      const events = List(entries.map(([, event]) => event));
+      const events = List(entries.map(([, entry]) => entry.event));
 
       const signed = await signEvents(events, deps.user, deps.finalizeEvent);
       if (signed.size === 0) {
         return;
       }
 
-      const publishedKeys: string[] = [];
       // eslint-disable-next-line functional/no-let
       let allResults = Map<string, PublishResultsOfEvent>();
+      const relayFailures = new Set<string>();
+      const relaySuccesses = new Set<string>();
 
       await Promise.all(
         signed.toArray().map(async ({ event, writeRelayConf }, index) => {
-          const entryKey = entries[index][0];
+          const [entryKey, outboxEntry] = entries[index];
           const relayUrls = resolveWriteRelayUrls(writeRelayConf, deps.relays);
-          const availableUrls = getAvailableRelays(relayUrls);
+          const alreadyDone = outboxEntry.succeededRelays || [];
+          const needsPublish = relayUrls.filter(
+            (url) => !alreadyDone.includes(url)
+          );
+          const availableUrls = getAvailableRelays(needsPublish);
 
           if (availableUrls.length === 0) return;
 
@@ -236,28 +253,44 @@ export const createPublishQueue = (
             availableUrls
           );
 
+          const newSucceeded = [...alreadyDone];
           relayResults.forEach((status, url) => {
-            updateBackoff(url, status.status === "fulfilled");
+            if (status.status === "fulfilled") {
+              // eslint-disable-next-line functional/immutable-data
+              newSucceeded.push(url);
+              relaySuccesses.add(url);
+            } else {
+              relayFailures.add(url);
+            }
           });
 
-          const anySuccess = relayResults.some(
-            (s) => s.status === "fulfilled"
+          const allRelaysDone = relayUrls.every((url) =>
+            newSucceeded.includes(url)
           );
-
-          if (anySuccess) {
-            // eslint-disable-next-line functional/immutable-data
-            publishedKeys.push(entryKey);
-            allResults = allResults.set(event.id, {
-              event,
-              results: relayResults,
-            });
+          if (allRelaysDone) {
+            buffer = buffer.delete(entryKey);
+            removeFromOutboxDB(entryKey);
+          } else {
+            const updated: OutboxEntry = {
+              ...outboxEntry,
+              succeededRelays: newSucceeded,
+            };
+            buffer = buffer.set(entryKey, updated);
+            persistToOutbox(updated);
           }
+
+          allResults = allResults.set(event.id, {
+            event,
+            results: relayResults,
+          });
         })
       );
 
-      publishedKeys.forEach((key) => {
-        buffer = buffer.delete(key);
-        removeFromOutboxDB(key);
+      relayFailures.forEach((url) => updateBackoff(url, false));
+      relaySuccesses.forEach((url) => {
+        if (!relayFailures.has(url)) {
+          updateBackoff(url, true);
+        }
       });
 
       flushing = false;
@@ -338,8 +371,13 @@ export const createPublishQueue = (
       }
 
       const key = getOutboxKey(event);
-      buffer = buffer.set(key, event);
-      persistToOutbox(key, event);
+      const entry: OutboxEntry = {
+        key,
+        event,
+        createdAt: Date.now(),
+      };
+      buffer = buffer.set(key, entry);
+      persistToOutbox(entry);
       buffered = true;
     });
 
@@ -350,8 +388,8 @@ export const createPublishQueue = (
   };
 
   const handleBeforeUnload = (): void => {
-    buffer.forEach((event, key) => {
-      persistToOutbox(key, event);
+    buffer.forEach((entry) => {
+      persistToOutbox(entry);
     });
   };
 
@@ -361,7 +399,7 @@ export const createPublishQueue = (
       const persisted = await getOutboxEvents(config.db);
       persisted.forEach((entry) => {
         if (!buffer.has(entry.key)) {
-          buffer = buffer.set(entry.key, entry.event);
+          buffer = buffer.set(entry.key, entry);
         }
       });
       if (buffer.size > 0) {

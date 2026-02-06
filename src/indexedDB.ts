@@ -9,6 +9,7 @@ export type OutboxEntry = {
   readonly key: string;
   readonly event: UnsignedEvent & EventAttachment;
   readonly createdAt: number;
+  readonly succeededRelays?: ReadonlyArray<string>;
 };
 
 export type StashmapDB = IDBDatabase;

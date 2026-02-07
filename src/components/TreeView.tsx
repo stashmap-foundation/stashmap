@@ -1,13 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { List } from "immutable";
-import {
-  ListRange,
-  ScrollerProps,
-  Virtuoso,
-  VirtuosoHandle,
-} from "react-virtuoso";
-import { useDndScrolling } from "react-dnd-scrolling";
+import { ListRange, Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import { useLocation } from "react-router-dom";
+import { useDragAutoScroll } from "../useDragAutoScroll";
 import { ListItem } from "./Draggable";
 import { getNodesInTree } from "./Node";
 import {
@@ -112,7 +107,21 @@ function VirtuosoForColumn({
   onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
 }): JSX.Element {
   const location = useLocation();
-  const virtuosoRef = useRef<VirtuosoHandle>(null); // Step 2
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scrollParent, setScrollParent] = useState<HTMLElement | undefined>(
+    undefined
+  );
+
+  useEffect(() => {
+    const el = containerRef.current?.closest(".pane-content");
+    if (el instanceof HTMLElement) {
+      setScrollParent(el);
+    }
+  }, []);
+
+  useDragAutoScroll(scrollParent);
+
   useEffect(() => {
     if (virtuosoRef.current) {
       virtuosoRef.current.scrollToIndex({
@@ -123,36 +132,12 @@ function VirtuosoForColumn({
     }
   }, [location]);
 
-  const [totalListHeight, setTotalListHeight] = useState<number | undefined>(
-    undefined
-  );
-  const virtuosoStyle = {
-    height: totalListHeight ? `${totalListHeight}px` : "1px",
-  };
-
-  /* eslint-disable react/jsx-props-no-spreading */
-  const Scroller = React.useCallback(
-    React.forwardRef<HTMLDivElement, ScrollerProps>(
-      ({ style, ...props }, ref) => {
-        useDndScrolling(ref, {});
-        return <div style={style} ref={ref} {...props} />;
-      }
-    ),
-    []
-  );
-  /* eslint-enable react/jsx-props-no-spreading */
   return (
-    <div
-      className="max-height-100 overflow-hidden"
-      aria-label={ariaLabel}
-      style={virtuosoStyle}
-    >
+    <div ref={containerRef} aria-label={ariaLabel}>
       <Virtuoso
         ref={virtuosoRef}
+        customScrollParent={scrollParent}
         data={nodes.toArray()}
-        totalListHeightChanged={(height) => {
-          setTotalListHeight(height);
-        }}
         rangeChanged={(r): void => {
           if (r.startIndex === 0 && r.endIndex === 0) {
             return;
@@ -165,7 +150,6 @@ function VirtuosoForColumn({
           }
         }}
         isScrolling={onStopScrolling}
-        components={{ Scroller }}
         itemContent={(index, path) => {
           return (
             <ViewContext.Provider value={path} key={viewPathToString(path)}>

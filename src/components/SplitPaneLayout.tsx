@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Dropdown } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import {
@@ -19,6 +19,7 @@ import { EMPTY_NODE_ID, createSearchId, LOG_NODE_ID } from "../connections";
 import { planUpdateViews, planUpdatePanes, usePlanner } from "../planner";
 import { useData } from "../DataContext";
 import { isUserLoggedIn, useLogout } from "../NostrAuthContext";
+import { useDragAutoScroll } from "../useDragAutoScroll";
 
 export function PaneSearchButton(): JSX.Element {
   const { setPane } = useSplitPanes();
@@ -244,9 +245,17 @@ function PaneWrapper({ index }: { index: number }): JSX.Element {
 
 export function SplitPaneLayout(): JSX.Element {
   const { panes } = useSplitPanes();
+  const [container, setContainer] = useState<HTMLElement | undefined>(
+    undefined
+  );
+  const containerCallback = useCallback((el: HTMLDivElement | null) => {
+    setContainer(el ?? undefined);
+  }, []);
+
+  useDragAutoScroll(container, "horizontal");
 
   return (
-    <div className="split-pane-container">
+    <div className="split-pane-container" ref={containerCallback}>
       {panes.map((pane, index) => (
         // eslint-disable-next-line react/no-array-index-key
         <PaneWrapper key={`${pane.id}-${index}`} index={index} />

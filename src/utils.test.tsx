@@ -977,16 +977,13 @@ export async function navigateToNodeViaSearch(
     await screen.findByLabelText("search input"),
     `${nodeName}{Enter}`
   );
-  // Wait for search results with references to load
   await waitFor(() => {
-    const navigateButtons = screen.queryAllByRole("button", {
+    const navigateLinks = screen.queryAllByRole("link", {
       name: new RegExp(`Navigate to.*${nodeName}`, "i"),
     });
-    expect(navigateButtons.length).toBeGreaterThan(0);
+    expect(navigateLinks.length).toBeGreaterThan(0);
   });
-  // Click on the first reference to navigate (NodeAutoLink wraps refs in clickable button)
-  // Use findAllByRole since there may be multiple references to the same node
-  const navigateButtons = await screen.findAllByRole("button", {
+  const navigateButtons = await screen.findAllByRole("link", {
     name: new RegExp(`Navigate to.*${nodeName}`, "i"),
   });
   await userEvent.click(navigateButtons[0]);

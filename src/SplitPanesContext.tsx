@@ -2,6 +2,7 @@ import React, { createContext, useContext } from "react";
 import { clearViewsForPane } from "./ViewContext";
 import { planUpdateViews, planUpdatePanes, usePlanner } from "./planner";
 import { useData } from "./DataContext";
+import { pathToStack, parseRelationUrl } from "./navigationUrl";
 
 const PaneIndexContext = createContext<number>(0);
 
@@ -100,4 +101,30 @@ export function useSplitPanes(): PaneOperations {
   };
 
   return { panes, addPaneAt, removePane, setPane };
+}
+
+export function useNavigatePane(): (
+  url: string
+) => void {
+  const { setPane } = useSplitPanes();
+  const pane = useCurrentPane();
+  const { user } = useData();
+
+  return (url: string): void => {
+    const relationID = parseRelationUrl(url);
+    if (relationID) {
+      setPane({
+        id: pane.id,
+        stack: [],
+        author: user.publicKey,
+        rootRelation: relationID,
+      });
+    } else {
+      setPane({
+        id: pane.id,
+        stack: pathToStack(url),
+        author: user.publicKey,
+      });
+    }
+  };
 }

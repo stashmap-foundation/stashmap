@@ -8,10 +8,10 @@ import {
 } from "../ViewContext";
 import { useData } from "../DataContext";
 import {
-  useSplitPanes,
   useCurrentPane,
   usePaneStack,
   usePaneIndex,
+  useNavigatePane,
 } from "../SplitPanesContext";
 import { useNavigationState } from "../NavigationStateContext";
 import { TreeView } from "./TreeView";
@@ -26,6 +26,7 @@ import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 import { SignInMenuBtn } from "../SignIn";
 import { usePlanner, planForkPane } from "../planner";
 import { LOG_NODE_ID } from "../connections";
+import { stackToPath } from "../navigationUrl";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import {
   focusRow,
@@ -38,11 +39,13 @@ import {
 
 function BreadcrumbItem({
   nodeID,
+  href,
   onClick,
   isLast,
 }: {
   nodeID: LongID | ID;
-  onClick: () => void;
+  href: string;
+  onClick: (e: React.MouseEvent) => void;
   isLast: boolean;
 }): JSX.Element {
   const { knowledgeDBs, user } = useData();
@@ -56,38 +59,43 @@ function BreadcrumbItem({
 
   return (
     <>
-      <button
-        type="button"
+      <a
+        href={href}
         className="breadcrumb-link"
         onClick={onClick}
         aria-label={`Navigate to ${node?.text || "parent"}`}
       >
         {node?.text || "Loading..."}
-      </button>
+      </a>
       <span className="breadcrumb-separator">/</span>
     </>
   );
 }
 
 function Breadcrumbs(): JSX.Element {
-  const { setPane } = useSplitPanes();
-  const pane = useCurrentPane();
+  const { knowledgeDBs, user } = useData();
   const stack = usePaneStack();
-
-  const popTo = (index: number): void => {
-    setPane({ ...pane, stack: stack.slice(0, index + 1) });
-  };
+  const navigatePane = useNavigatePane();
 
   return (
     <nav className="breadcrumbs" aria-label="Navigation breadcrumbs">
-      {stack.map((nodeID, index) => (
-        <BreadcrumbItem
-          key={nodeID as string}
-          nodeID={nodeID}
-          onClick={() => popTo(index)}
-          isLast={index === stack.length - 1}
-        />
-      ))}
+      {stack.map((nodeID, index) => {
+        const targetUrl =
+          stackToPath(stack.slice(0, index + 1), knowledgeDBs, user.publicKey) ||
+          "#";
+        return (
+          <BreadcrumbItem
+            key={nodeID as string}
+            nodeID={nodeID}
+            href={targetUrl}
+            onClick={(e) => {
+              e.preventDefault();
+              navigatePane(targetUrl);
+            }}
+            isLast={index === stack.length - 1}
+          />
+        );
+      })}
     </nav>
   );
 }
@@ -120,63 +128,56 @@ function ForkButton(): JSX.Element | null {
 }
 
 function HomeButton(): JSX.Element | null {
-  const { setPane } = useSplitPanes();
-  const pane = useCurrentPane();
   const { knowledgeDBs, user } = useData();
+  const navigatePane = useNavigatePane();
 
   const logNode = getNodeFromID(knowledgeDBs, LOG_NODE_ID, user.publicKey);
   if (!logNode) {
     return null;
   }
 
-  const handleClick = (): void => {
-    setPane({
-      ...pane,
-      author: user.publicKey,
-      stack: [LOG_NODE_ID],
-      rootRelation: undefined,
-    });
-  };
+  const href =
+    stackToPath([LOG_NODE_ID], knowledgeDBs, user.publicKey) || "#";
 
   return (
-    <button
-      type="button"
+    <a
+      href={href}
       className="btn btn-icon"
-      onClick={handleClick}
+      onClick={(e) => {
+        e.preventDefault();
+        navigatePane(href);
+      }}
       data-pane-action="home"
       aria-label="Navigate to Log"
       title="Log"
     >
       <span aria-hidden="true">⌂</span>
-    </button>
+    </a>
   );
 }
 
 function NewNoteButton(): JSX.Element {
-  const { setPane } = useSplitPanes();
-  const pane = useCurrentPane();
-
-  const handleClick = (): void => {
-    setPane({ ...pane, stack: [], rootRelation: undefined });
-  };
+  const navigatePane = useNavigatePane();
 
   return (
-    <button
-      type="button"
+    <a
+      href="/"
       className="btn btn-sm"
-      onClick={handleClick}
+      onClick={(e) => {
+        e.preventDefault();
+        navigatePane("/");
+      }}
       data-pane-action="new-note"
       aria-label="Create new note"
     >
       New
-    </button>
+    </a>
   );
 }
 
 function useHomeShortcut(): void {
-  const { setPane } = useSplitPanes();
-  const pane = useCurrentPane();
   const { knowledgeDBs, user } = useData();
+  const navigatePane = useNavigatePane();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
@@ -188,45 +189,45 @@ function useHomeShortcut(): void {
         );
         if (logNode) {
           e.preventDefault();
-          setPane({
-            ...pane,
-            author: user.publicKey,
-            stack: [LOG_NODE_ID],
-            rootRelation: undefined,
-          });
+          const href =
+            stackToPath([LOG_NODE_ID], knowledgeDBs, user.publicKey) || "/";
+          navigatePane(href);
         }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [setPane, pane, knowledgeDBs, user.publicKey]);
+  }, [navigatePane, knowledgeDBs, user.publicKey]);
 }
 
 function BackButton(): JSX.Element | null {
-  const { setPane } = useSplitPanes();
-  const pane = useCurrentPane();
+  const { knowledgeDBs, user } = useData();
   const stack = usePaneStack();
+  const navigatePane = useNavigatePane();
 
   if (stack.length <= 1) {
     return null;
   }
 
-  const handleBack = (): void => {
-    setPane({ ...pane, stack: stack.slice(0, -1) });
-  };
+  const parentStack = stack.slice(0, -1);
+  const href =
+    stackToPath(parentStack, knowledgeDBs, user.publicKey) || "#";
 
   return (
-    <button
-      type="button"
+    <a
+      href={href}
       className="btn btn-icon"
-      onClick={handleBack}
+      onClick={(e) => {
+        e.preventDefault();
+        navigatePane(href);
+      }}
       data-pane-action="back"
       aria-label="Go back"
       title="Back"
     >
       <span aria-hidden="true">&larr;</span>
-    </button>
+    </a>
   );
 }
 

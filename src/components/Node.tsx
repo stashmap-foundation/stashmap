@@ -67,9 +67,10 @@ import { NodeCard } from "../commons/Ui";
 import {
   usePaneStack,
   usePaneIndex,
-  useSplitPanes,
   useCurrentPane,
+  useNavigatePane,
 } from "../SplitPanesContext";
+import { stackToPath, buildRelationUrl } from "../navigationUrl";
 import { RightMenu } from "./RightMenu";
 import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
@@ -567,32 +568,29 @@ function NodeAutoLink({
 }: {
   children: React.ReactNode;
 }): JSX.Element | null {
-  const { setPane } = useSplitPanes();
-  const pane = useCurrentPane();
   const { knowledgeDBs, user } = useData();
   const [node] = useNode();
   const displayText = useDisplayText();
+  const navigatePane = useNavigatePane();
 
   if (node && isReferenceNode(node)) {
     const refInfo = getRefTargetInfo(node.id, knowledgeDBs, user.publicKey);
     if (refInfo) {
-      const handleClick = (): void => {
-        setPane({
-          ...pane,
-          stack: refInfo.stack,
-          author: refInfo.author,
-          rootRelation: refInfo.rootRelation,
-        });
-      };
+      const href = refInfo.rootRelation
+        ? buildRelationUrl(refInfo.rootRelation)
+        : stackToPath(refInfo.stack, knowledgeDBs, user.publicKey) || "#";
       return (
-        <button
-          type="button"
+        <a
+          href={href}
           className="reference-link-btn"
-          onClick={handleClick}
+          onClick={(e) => {
+            e.preventDefault();
+            navigatePane(href);
+          }}
           aria-label={`Navigate to ${displayText}`}
         >
           {children}
-        </button>
+        </a>
       );
     }
   }

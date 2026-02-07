@@ -216,7 +216,7 @@ test("Referenced By deduplicates paths from multiple users", async () => {
 
   // There should be exactly one reference path (not counting breadcrumb links)
   const referenceButtons = screen
-    .getAllByLabelText(/Navigate to/)
+    .getAllByRole("link", { name: /Navigate to/ })
     .filter((btn) => btn.classList.contains("reference-link-btn"));
   expect(referenceButtons).toHaveLength(1);
 });

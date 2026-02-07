@@ -32,7 +32,9 @@ module.exports = {
       logging: "none",
     },
     static: path.appPublic,
-    historyApiFallback: true,
+    historyApiFallback: {
+      disableDotRule: true,
+    },
   },
   module: {
     rules: [

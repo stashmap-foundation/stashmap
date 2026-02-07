@@ -27,7 +27,7 @@ import { useUserRelayContext } from "./UserRelayContext";
 import { NavigationStackProvider } from "./NavigationStackContext";
 import { flattenRelays, usePreloadRelays, findRelays } from "./relays";
 import { useDefaultRelays } from "./NostrAuthContext";
-import { sortEventsDescending, useEventQuery } from "./commons/useNostrQuery";
+import { useEventQuery } from "./commons/useNostrQuery";
 import { useRootFromURL } from "./KnowledgeDataContext";
 import {
   openDB,
@@ -113,12 +113,9 @@ export function processEvents(
   events: List<UnsignedEvent>
 ): Map<PublicKey, ProcessedEvents> {
   const groupedByAuthor = events.groupBy((e) => e.pubkey as PublicKey);
-  const sorted = groupedByAuthor.map((authorEvents) =>
-    sortEventsDescending(List(authorEvents.valueSeq()))
-  );
   return Map<PublicKey, ProcessedEvents>(
-    sorted.toArray().map(([author, authorEvents]) => {
-      return [author, processEventsByAuthor(authorEvents)];
+    groupedByAuthor.toArray().map(([author, authorEvents]) => {
+      return [author, processEventsByAuthor(List(authorEvents.valueSeq()))];
     })
   );
 }

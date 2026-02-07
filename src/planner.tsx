@@ -29,6 +29,8 @@ import {
   computeEmptyNodeMetadata,
   isConcreteRefId,
   parseConcreteRefId,
+  isAbstractRefId,
+  parseAbstractRefId,
   createAbstractRefId,
   LOG_NODE_ID,
 } from "./connections";
@@ -632,6 +634,15 @@ export function planDeepCopyNode(
             context: sourceRelation.context,
           };
         }
+      }
+    }
+    if (isAbstractRefId(sourceNodeID)) {
+      const parsed = parseAbstractRefId(sourceNodeID);
+      if (parsed) {
+        return {
+          nodeID: parsed.targetNode,
+          context: parsed.targetContext,
+        };
       }
     }
     return { nodeID: sourceNodeID, context: sourceContext };

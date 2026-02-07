@@ -1,4 +1,4 @@
-import React, { RefObject, useRef } from "react";
+import React, { RefObject, useEffect, useRef } from "react";
 import { List } from "immutable";
 import { ConnectDropTarget, DropTargetMonitor, useDrop } from "react-dnd";
 import { NativeTypes } from "react-dnd-html5-backend";
@@ -191,6 +191,7 @@ export function useDroppable({
   const stack = usePaneStack();
   const pane = useCurrentPane();
   const path = useViewPath();
+  const invertCopyModeRef = useRef(false);
 
   const isListItem = index !== undefined;
 
@@ -203,6 +204,35 @@ export function useDroppable({
     }
     return direction;
   };
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      // eslint-disable-next-line functional/immutable-data
+      invertCopyModeRef.current = e.altKey || e.key === "Alt";
+    };
+    const onKeyUp = (e: KeyboardEvent): void => {
+      if (e.key === "Alt" || !e.altKey) {
+        // eslint-disable-next-line functional/immutable-data
+        invertCopyModeRef.current = false;
+      }
+    };
+    const onWindowBlur = (): void => {
+      // eslint-disable-next-line functional/immutable-data
+      invertCopyModeRef.current = false;
+    };
+
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("keyup", onKeyUp, true);
+    window.addEventListener("blur", onWindowBlur);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("keyup", onKeyUp, true);
+      window.removeEventListener("blur", onWindowBlur);
+      // eslint-disable-next-line functional/immutable-data
+      invertCopyModeRef.current = false;
+    };
+  }, []);
 
   return useDrop<
     DropItemType,
@@ -309,7 +339,8 @@ export function useDroppable({
           stack,
           calcIndex(index, direction),
           pane.rootRelation,
-          dragItem.isSuggestion
+          dragItem.isSuggestion,
+          invertCopyModeRef.current
         )
       );
       const parentKey = getParentKey(viewPathToString(dragItem.path));

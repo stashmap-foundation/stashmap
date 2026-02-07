@@ -1017,9 +1017,183 @@ Target
   BobItem
     `);
   });
+
+  test("E3: Alt + cross-pane DnD simple suggestion creates a reference copy", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(bob);
+    await type("My Notes{Enter}{Tab}BobItem{Escape}");
+
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    renderApp(alice());
+    await type("My Notes{Enter}{Tab}Target{Escape}");
+
+    await maybeExpand("expand Target");
+
+    await expectTree(`
+My Notes
+  Target
+  [S] BobItem
+    `);
+
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Target");
+
+    const targetDropTargets = getDropTargets("Target");
+    await userEvent.keyboard("{Alt>}");
+    fireEvent.dragStart(screen.getAllByText("BobItem")[0]);
+    fireEvent.dragOver(targetDropTargets[1], { altKey: true });
+    fireEvent.drop(targetDropTargets[1], { altKey: true });
+    await userEvent.keyboard("{/Alt}");
+
+    await expectTree(`
+My Notes
+  Target
+  [S] BobItem
+Target
+  My Notes → BobItem
+    `);
+  });
+});
+
+describe("Deep Copy - Alt Modifier", () => {
+  test("Alt-dragging a normal node creates a reference instead of deep copy", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("My Notes{Enter}{Tab}Source{Enter}{Tab}Child{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("collapse Source"));
+    await userEvent.click(await screen.findByLabelText("edit Source"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand Source"));
+
+    await expectTree(`
+My Notes
+  Source
+    Child
+  Target
+    `);
+
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Target");
+
+    const targetDropTargets = getDropTargets("Target");
+    await userEvent.keyboard("{Alt>}");
+    fireEvent.dragStart(screen.getByText("Source"));
+    fireEvent.dragOver(targetDropTargets[1], { altKey: true });
+    fireEvent.drop(targetDropTargets[1], { altKey: true });
+    await userEvent.keyboard("{/Alt}");
+
+    await expectTree(`
+My Notes
+  Source
+    Child
+  Target
+Target
+  My Notes → Source
+    `);
+  });
+
+  test("Alt-dragging a reference keeps it as a reference", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("My Notes{Enter}{Tab}Source{Enter}Target{Enter}Target2{Escape}");
+
+    await expectTree(`
+My Notes
+  Source
+  Target
+  Target2
+    `);
+
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Target");
+
+    const targetDropTargets = getDropTargets("Target");
+    await userEvent.keyboard("{Alt>}");
+    fireEvent.dragStart(screen.getByText("Source"));
+    fireEvent.dragOver(targetDropTargets[1], { altKey: true });
+    fireEvent.drop(targetDropTargets[1], { altKey: true });
+    await userEvent.keyboard("{/Alt}");
+
+    await expectTree(`
+My Notes
+  Source
+  Target
+  Target2
+Target
+  My Notes → Source
+    `);
+
+    const target2DropTargets = getDropTargets("Target2");
+    await userEvent.keyboard("{Alt>}");
+    fireEvent.dragStart(screen.getByText("My Notes → Source"));
+    fireEvent.dragOver(target2DropTargets[0], { altKey: true });
+    fireEvent.drop(target2DropTargets[0], { altKey: true });
+    await userEvent.keyboard("{/Alt}");
+
+    await expectTree(`
+My Notes
+  Source
+  Target
+  My Notes → Source
+  Target2
+Target
+  My Notes → Source
+    `);
+  });
 });
 
 describe("Deep Copy - Edit Restrictions", () => {
+  test("Abstract references in Referenced By view are draggable", async () => {
+    const [alice, bob, carol] = setup([ALICE, BOB, CAROL]);
+    await follow(alice, bob().user.publicKey);
+    await follow(alice, carol().user.publicKey);
+
+    renderTree(bob);
+    await type(
+      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Enter}{Tab}Bob Child{Escape}"
+    );
+
+    cleanup();
+
+    renderTree(carol);
+    await type(
+      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Enter}{Tab}Carol Child{Escape}"
+    );
+
+    cleanup();
+
+    renderTree(alice);
+    await type(
+      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Escape}"
+    );
+
+    await userEvent.click(
+      await screen.findByLabelText("show references to Barcelona")
+    );
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    Barcelona
+      My Notes → Holiday Destinations → Barcelona
+    `);
+
+    const abstractRefText = screen.getByText(
+      "My Notes → Holiday Destinations → Barcelona"
+    );
+    // eslint-disable-next-line testing-library/no-node-access
+    const abstractRefItem = abstractRefText.closest(".item");
+    expect(abstractRefItem).not.toBeNull();
+    expect(abstractRefItem?.getAttribute("draggable")).toBe("true");
+  });
+
   test("I: Abstract references cannot be dragged", async () => {
     const [alice, bob, carol] = setup([ALICE, BOB, CAROL]);
 

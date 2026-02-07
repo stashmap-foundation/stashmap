@@ -48,8 +48,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     const [node] = useNode();
     const displayText = useDisplayText();
     const isEmptyNode = isEmptyNodeID(nodeID);
-    const isAbstractRef = isAbstractRefId(nodeID);
-    const disableDrag = isNodeBeeingEdited || isEmptyNode || isAbstractRef;
+    const disableDrag = isNodeBeeingEdited || isEmptyNode;
 
     const [{ isDragging }, drag] = useDrag({
       type: NOTE_TYPE,

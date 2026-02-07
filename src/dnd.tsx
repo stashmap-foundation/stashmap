@@ -3,7 +3,13 @@ import { List, OrderedSet, Set } from "immutable";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { getSelectedInView } from "./components/TemporaryViewContext";
-import { moveRelations, deleteRelations } from "./connections";
+import {
+  moveRelations,
+  deleteRelations,
+  createAbstractRefId,
+  isRefId,
+  shortID,
+} from "./connections";
 import {
   parseViewPath,
   upsertRelations,
@@ -24,6 +30,7 @@ import {
   planUpdateViews,
   planDeepCopyNodeWithView,
   planExpandNode,
+  planAddToParent,
   getPane,
 } from "./planner";
 
@@ -83,7 +90,8 @@ export function dnd(
   stack: ID[],
   indexTo: number | undefined,
   rootRelation: LongID | undefined,
-  isSuggestion?: boolean
+  isSuggestion?: boolean,
+  invertCopyMode = false
 ): Plan {
   const rootView = to;
 
@@ -136,7 +144,11 @@ export function dnd(
     );
     return planUpdateViews(updatedRelationsPlan, updatedViews);
   }
-  // Deep copy each source node to target (copies node + all descendants + views)
+  // Copy each source into target:
+  // - Default: normal nodes deep copy, refs remain refs
+  // - Alt: normal nodes become references
+  // - Non-suggestion references are always copied as references (never deep copied)
+  // - Suggestions default to deep copy; Alt creates a reference copy
   const [, toViewData] = getNodeIDFromView(plan, toView);
 
   // Ensure target is expanded
@@ -144,13 +156,46 @@ export function dnd(
     ? plan
     : planExpandNode(plan, toViewData, toView);
 
-  // Deep copy each source
+  const shouldCreateReference = (sourceNodeID: LongID | ID): boolean => {
+    if (isSuggestion) {
+      return invertCopyMode;
+    }
+    const sourceIsReference = isRefId(sourceNodeID);
+    if (sourceIsReference) {
+      return true;
+    }
+    return invertCopyMode;
+  };
+
+  const toReferenceNodeID = (
+    sourceNodeID: LongID | ID,
+    sourceContext: Context
+  ): LongID | ID => {
+    if (isRefId(sourceNodeID)) {
+      return sourceNodeID;
+    }
+    return createAbstractRefId(
+      sourceContext,
+      shortID(sourceNodeID as ID) as ID
+    );
+  };
+
   return sources.toList().reduce((accPlan: Plan, s: string, idx: number) => {
     const sourcePath = parseViewPath(s);
     const [sourceNodeID] = getNodeIDFromView(accPlan, sourcePath);
     const sourceStack = getPane(accPlan, sourcePath).stack;
     const sourceContext = getContext(accPlan, sourcePath, sourceStack);
     const insertAt = dropIndex !== undefined ? dropIndex + idx : undefined;
+
+    if (shouldCreateReference(sourceNodeID)) {
+      return planAddToParent(
+        accPlan,
+        toReferenceNodeID(sourceNodeID, sourceContext),
+        toView,
+        stack,
+        insertAt
+      );
+    }
 
     return planDeepCopyNodeWithView(
       accPlan,

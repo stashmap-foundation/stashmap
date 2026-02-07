@@ -12,7 +12,13 @@ import {
   type,
 } from "./utils.test";
 import { dnd } from "./dnd";
-import { addRelationToRelations, newNode, shortID } from "./connections";
+import {
+  addRelationToRelations,
+  createAbstractRefId,
+  createConcreteRefId,
+  newNode,
+  shortID,
+} from "./connections";
 import { NodeIndex, newRelations, viewPathToString } from "./ViewContext";
 import {
   createPlan,
@@ -173,4 +179,231 @@ test("Diff items are always added, never moved", () => {
   const nodeIDs = updatedRelations?.items.map((item) => item.nodeID).toArray();
   expect(nodeIDs).toContain(bobChild.id);
   expect(nodeIDs).toContain(aliceChild.id);
+});
+
+test("Dragging a concrete reference keeps it as a reference by default", () => {
+  const [alice] = setup([ALICE]);
+  const { publicKey: alicePK } = alice().user;
+
+  const root = newNode("Root");
+  const target = newNode("Target");
+  const refTarget = newNode("Ref Target");
+  const refChild = newNode("Ref Child");
+
+  const refRelations = addRelationToRelations(
+    newRelations(refTarget.id, List([root.id]), alicePK),
+    refChild.id
+  );
+  const concreteRefId = createConcreteRefId(refRelations.id);
+  const rootRelations = addRelationToRelations(
+    addRelationToRelations(
+      newRelations(root.id, List(), alicePK),
+      concreteRefId
+    ),
+    target.id
+  );
+
+  const rootPath = [
+    0,
+    {
+      nodeID: root.id,
+      nodeIndex: 0 as NodeIndex,
+      relationsID: rootRelations.id,
+    },
+  ] as const;
+  const sourcePath = [
+    ...rootPath,
+    { nodeID: concreteRefId, nodeIndex: 0 as NodeIndex },
+  ] as const;
+
+  const views = Map<string, View>().set(viewPathToString(rootPath), {
+    viewingMode: undefined,
+    expanded: true,
+  });
+  const panes = [{ id: "pane-0", stack: [root.id], author: alicePK }];
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>().set(alicePK, newDB());
+
+  const plan = planUpdateViews(
+    planUpsertRelations(
+      planUpsertRelations(
+        planBulkUpsertNodes(
+          createPlan({ ...alice(), knowledgeDBs, panes, views }),
+          [root, target, refTarget, refChild]
+        ),
+        rootRelations
+      ),
+      refRelations
+    ),
+    views
+  );
+
+  const result = dnd(
+    plan,
+    OrderedSet<string>(),
+    viewPathToString(sourcePath),
+    rootPath,
+    [root.id],
+    undefined,
+    undefined,
+    false
+  );
+
+  const updatedRootRelations = result.knowledgeDBs
+    .get(alicePK)
+    ?.relations.get(shortID(rootRelations.id));
+  const nodeIDs = updatedRootRelations?.items
+    .map((item) => item.nodeID)
+    .toArray();
+
+  expect(nodeIDs).toEqual([concreteRefId, target.id, concreteRefId]);
+});
+
+test("Alt-dragging a concrete reference still copies it as a reference", () => {
+  const [alice] = setup([ALICE]);
+  const { publicKey: alicePK } = alice().user;
+
+  const root = newNode("Root");
+  const target = newNode("Target");
+  const refTarget = newNode("Ref Target");
+  const refChild = newNode("Ref Child");
+
+  const refRelations = addRelationToRelations(
+    newRelations(refTarget.id, List([root.id]), alicePK),
+    refChild.id
+  );
+  const concreteRefId = createConcreteRefId(refRelations.id);
+  const rootRelations = addRelationToRelations(
+    addRelationToRelations(
+      newRelations(root.id, List(), alicePK),
+      concreteRefId
+    ),
+    target.id
+  );
+
+  const rootPath = [
+    0,
+    {
+      nodeID: root.id,
+      nodeIndex: 0 as NodeIndex,
+      relationsID: rootRelations.id,
+    },
+  ] as const;
+  const sourcePath = [
+    ...rootPath,
+    { nodeID: concreteRefId, nodeIndex: 0 as NodeIndex },
+  ] as const;
+
+  const views = Map<string, View>().set(viewPathToString(rootPath), {
+    viewingMode: undefined,
+    expanded: true,
+  });
+  const panes = [{ id: "pane-0", stack: [root.id], author: alicePK }];
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>().set(alicePK, newDB());
+
+  const plan = planUpdateViews(
+    planUpsertRelations(
+      planUpsertRelations(
+        planBulkUpsertNodes(
+          createPlan({ ...alice(), knowledgeDBs, panes, views }),
+          [root, target, refTarget, refChild]
+        ),
+        rootRelations
+      ),
+      refRelations
+    ),
+    views
+  );
+
+  const result = dnd(
+    plan,
+    OrderedSet<string>(),
+    viewPathToString(sourcePath),
+    rootPath,
+    [root.id],
+    undefined,
+    undefined,
+    false,
+    true
+  );
+
+  const updatedRootRelations = result.knowledgeDBs
+    .get(alicePK)
+    ?.relations.get(shortID(rootRelations.id));
+  const nodeIDs = updatedRootRelations?.items
+    .map((item) => item.nodeID)
+    .toArray();
+
+  expect(nodeIDs).toEqual([concreteRefId, target.id, concreteRefId]);
+});
+
+test("Alt-dragging a normal node creates a reference", () => {
+  const [alice] = setup([ALICE]);
+  const { publicKey: alicePK } = alice().user;
+
+  const root = newNode("Root");
+  const sourceNode = newNode("Source");
+  const target = newNode("Target");
+  const rootRelations = addRelationToRelations(
+    addRelationToRelations(
+      newRelations(root.id, List(), alicePK),
+      sourceNode.id
+    ),
+    target.id
+  );
+
+  const rootPath = [
+    0,
+    {
+      nodeID: root.id,
+      nodeIndex: 0 as NodeIndex,
+      relationsID: rootRelations.id,
+    },
+  ] as const;
+  const sourcePath = [
+    ...rootPath,
+    { nodeID: sourceNode.id, nodeIndex: 0 as NodeIndex },
+  ] as const;
+
+  const views = Map<string, View>().set(viewPathToString(rootPath), {
+    viewingMode: undefined,
+    expanded: true,
+  });
+  const panes = [{ id: "pane-0", stack: [root.id], author: alicePK }];
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>().set(alicePK, newDB());
+
+  const plan = planUpdateViews(
+    planUpsertRelations(
+      planBulkUpsertNodes(
+        createPlan({ ...alice(), knowledgeDBs, panes, views }),
+        [root, sourceNode, target]
+      ),
+      rootRelations
+    ),
+    views
+  );
+
+  const result = dnd(
+    plan,
+    OrderedSet<string>(),
+    viewPathToString(sourcePath),
+    rootPath,
+    [root.id],
+    undefined,
+    undefined,
+    false,
+    true
+  );
+
+  const updatedRootRelations = result.knowledgeDBs
+    .get(alicePK)
+    ?.relations.get(shortID(rootRelations.id));
+  const nodeIDs = updatedRootRelations?.items
+    .map((item) => item.nodeID)
+    .toArray();
+
+  expect(nodeIDs).toEqual([
+    sourceNode.id,
+    target.id,
+    createAbstractRefId(List([root.id]), sourceNode.id),
+  ]);
 });

@@ -678,7 +678,7 @@ export function Node({
   const defaultCls = isDesktop ? "hover-light-bg" : "";
   const cls =
     className !== undefined ? `${className} hover-light-bg` : defaultCls;
-  const clsBody = cardBodyClassName || "ps-0 pt-0 pb-0";
+  const clsBody = cardBodyClassName || "ps-0";
   const data = useData();
   const stack = usePaneStack();
 

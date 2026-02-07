@@ -61,7 +61,7 @@ async function setupTest(): Promise<{
 }
 
 test("Write views on user relays", async () => {
-  const { alice, workspace } = await setupTest();
+  const { alice } = await setupTest();
   const aliceData = alice();
   aliceData.relayPool.resetPublishedOnRelays();
 

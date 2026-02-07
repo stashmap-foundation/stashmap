@@ -81,8 +81,11 @@ function Breadcrumbs(): JSX.Element {
     <nav className="breadcrumbs" aria-label="Navigation breadcrumbs">
       {stack.map((nodeID, index) => {
         const targetUrl =
-          stackToPath(stack.slice(0, index + 1), knowledgeDBs, user.publicKey) ||
-          "#";
+          stackToPath(
+            stack.slice(0, index + 1),
+            knowledgeDBs,
+            user.publicKey
+          ) || "#";
         return (
           <BreadcrumbItem
             key={nodeID as string}
@@ -136,8 +139,7 @@ function HomeButton(): JSX.Element | null {
     return null;
   }
 
-  const href =
-    stackToPath([LOG_NODE_ID], knowledgeDBs, user.publicKey) || "#";
+  const href = stackToPath([LOG_NODE_ID], knowledgeDBs, user.publicKey) || "#";
 
   return (
     <a
@@ -211,8 +213,7 @@ function BackButton(): JSX.Element | null {
   }
 
   const parentStack = stack.slice(0, -1);
-  const href =
-    stackToPath(parentStack, knowledgeDBs, user.publicKey) || "#";
+  const href = stackToPath(parentStack, knowledgeDBs, user.publicKey) || "#";
 
   return (
     <a

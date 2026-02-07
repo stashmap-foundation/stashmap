@@ -9,13 +9,18 @@ export function stackToPath(
   if (stack.length === 0) {
     return "/";
   }
-  const segments: string[] = [];
-  for (const nodeID of stack) {
+  const segments = stack.reduce<string[] | undefined>((acc, nodeID) => {
+    if (!acc) {
+      return undefined;
+    }
     const node = getNodeFromID(knowledgeDBs, nodeID, myself);
     if (!node?.text) {
       return undefined;
     }
-    segments.push(encodeURIComponent(node.text));
+    return [...acc, encodeURIComponent(node.text)];
+  }, []);
+  if (!segments) {
+    return undefined;
   }
   return `/n/${segments.join("/")}`;
 }
@@ -54,9 +59,7 @@ export function buildRelationUrl(rootRelation: LongID): string {
   return `/r/${encodeURIComponent(rootRelation)}`;
 }
 
-export function parseRelationUrl(
-  pathname: string
-): LongID | undefined {
+export function parseRelationUrl(pathname: string): LongID | undefined {
   const match = pathname.match(/^\/r\/(.+)$/);
   if (!match) {
     return undefined;

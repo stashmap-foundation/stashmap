@@ -1,4 +1,3 @@
-import React from "react";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { nip19 } from "nostr-tools";

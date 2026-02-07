@@ -1,7 +1,18 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useData } from "./DataContext";
 import { createConcreteRefId, getRefTargetInfo } from "./connections";
-import { stackToPath, pathToStack, buildRelationUrl, parseRelationUrl } from "./navigationUrl";
+import {
+  stackToPath,
+  pathToStack,
+  buildRelationUrl,
+  parseRelationUrl,
+} from "./navigationUrl";
 import { usePlanner } from "./planner";
 import { generatePaneId } from "./SplitPanesContext";
 
@@ -118,7 +129,9 @@ export function NavigationStateProvider({
     }
 
     if (isPopstateRef.current) {
+      // eslint-disable-next-line functional/immutable-data
       isPopstateRef.current = false;
+      // eslint-disable-next-line functional/immutable-data
       prevUrlRef.current = fullUrl;
       return;
     }
@@ -137,11 +150,13 @@ export function NavigationStateProvider({
     } else {
       window.history.pushState(historyState, "", fullUrl);
     }
+    // eslint-disable-next-line functional/immutable-data
     prevUrlRef.current = fullUrl;
   }, [panes, safeActivePaneIndex, knowledgeDBs, user.publicKey]);
 
   useEffect(() => {
     const onPopState = (e: PopStateEvent): void => {
+      // eslint-disable-next-line functional/immutable-data
       isPopstateRef.current = true;
       const state = e.state as HistoryState | null;
       if (state?.panes) {

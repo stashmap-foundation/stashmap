@@ -27,7 +27,10 @@ test("Navigate to specific node via URL using human-readable path", async () => 
   const testNode = findNodeByText(db, "Test Node");
   expect(testNode).toBeDefined();
 
-  renderApp({ ...alice(), initialRoute: `/n/${encodeURIComponent("Test Node")}` });
+  renderApp({
+    ...alice(),
+    initialRoute: `/n/${encodeURIComponent("Test Node")}`,
+  });
 
   await screen.findByRole("treeitem", { name: "Test Node" });
 });
@@ -36,7 +39,9 @@ test("Bob can view Alice's relation via /r/ URL without following her", async ()
   const [alice, bob] = setup([ALICE, BOB]);
 
   renderApp(alice());
-  await type("My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}");
+  await type(
+    "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
+  );
 
   await expectTree(`
 My Notes

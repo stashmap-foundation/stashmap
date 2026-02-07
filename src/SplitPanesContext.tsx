@@ -103,9 +103,7 @@ export function useSplitPanes(): PaneOperations {
   return { panes, addPaneAt, removePane, setPane };
 }
 
-export function useNavigatePane(): (
-  url: string
-) => void {
+export function useNavigatePane(): (url: string) => void {
   const { setPane } = useSplitPanes();
   const pane = useCurrentPane();
   const { user } = useData();

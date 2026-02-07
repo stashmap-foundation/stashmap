@@ -15,11 +15,7 @@ import { DataContextProvider, MergeKnowledgeDB } from "./DataContext";
 import { EventCacheProvider } from "./EventCache";
 import { findContacts, findMembers } from "./contacts";
 import { useApis } from "./Apis";
-import {
-  findNodes,
-  findRelations,
-  findViews,
-} from "./knowledgeEvents";
+import { findNodes, findRelations, findViews } from "./knowledgeEvents";
 import { newDB } from "./knowledge";
 import { PlanningContextProvider, replaceUnauthenticatedUser } from "./planner";
 import { useUserRelayContext } from "./UserRelayContext";
@@ -38,7 +34,10 @@ import { generatePaneId } from "./SplitPanesContext";
 import { jsonToPanes, paneToJSON, Serializable } from "./serializer";
 import { NavigationStateProvider } from "./NavigationStateContext";
 
-export const defaultPane = (author: PublicKey, rootNodeID?: LongID | ID): Pane => ({
+export const defaultPane = (
+  author: PublicKey,
+  rootNodeID?: LongID | ID
+): Pane => ({
   id: generatePaneId(),
   stack: rootNodeID ? [rootNodeID] : [],
   author,
@@ -54,8 +53,8 @@ function loadPanesFromStorage(publicKey: PublicKey): Pane[] | undefined {
     if (!raw) {
       return undefined;
     }
-    const parsed = JSON.parse(raw);
-    const panes = jsonToPanes({ panes: parsed });
+    const panes = jsonToPanes({ panes: JSON.parse(raw) as Serializable });
+
     return panes.length > 0 ? panes : undefined;
   } catch {
     return undefined;
@@ -65,7 +64,10 @@ function loadPanesFromStorage(publicKey: PublicKey): Pane[] | undefined {
 function savePanesToStorage(publicKey: PublicKey, panes: Pane[]): void {
   try {
     const serialized = panes.map((p) => paneToJSON(p));
-    localStorage.setItem(panesStorageKey(publicKey), JSON.stringify(serialized));
+    localStorage.setItem(
+      panesStorageKey(publicKey),
+      JSON.stringify(serialized)
+    );
   } catch {
     // ignore storage errors
   }
@@ -74,7 +76,14 @@ function savePanesToStorage(publicKey: PublicKey, panes: Pane[]): void {
 function getInitialPanes(publicKey: PublicKey): Pane[] {
   const relationID = parseRelationUrl(window.location.pathname);
   if (relationID) {
-    return [{ id: generatePaneId(), stack: [], author: publicKey, rootRelation: relationID }];
+    return [
+      {
+        id: generatePaneId(),
+        stack: [],
+        author: publicKey,
+        rootRelation: relationID,
+      },
+    ];
   }
   const urlStack = pathToStack(window.location.pathname);
   if (urlStack.length > 0) {
@@ -364,9 +373,7 @@ function Data({ user, children }: DataProps): JSX.Element {
               contactsRelays: flattenRelays(contactsRelays),
             })}
           >
-            <NavigationStateProvider>
-              {children}
-            </NavigationStateProvider>
+            <NavigationStateProvider>{children}</NavigationStateProvider>
           </PlanningContextProvider>
         </MergeKnowledgeDB>
       </EventCacheProvider>

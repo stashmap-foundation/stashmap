@@ -1,17 +1,23 @@
 import { Map } from "immutable";
 import { hashText } from "./connections";
 import { newDB } from "./knowledge";
-import { stackToPath, pathToStack, parseRelationUrl, parseAuthorFromSearch } from "./navigationUrl";
+import {
+  stackToPath,
+  pathToStack,
+  parseRelationUrl,
+  parseAuthorFromSearch,
+} from "./navigationUrl";
 
 const ALICE_PK = "alice-pub-key" as PublicKey;
 
-function knowledgeDBWithNodes(
-  nodes: Array<{ text: string }>
-): KnowledgeDBs {
+function knowledgeDBWithNodes(nodes: Array<{ text: string }>): KnowledgeDBs {
   const db: KnowledgeData = {
     ...newDB(),
     nodes: Map(
-      nodes.map((n) => [hashText(n.text), { text: n.text, id: hashText(n.text) }])
+      nodes.map((n) => [
+        hashText(n.text),
+        { text: n.text, id: hashText(n.text) },
+      ])
     ) as KnowledgeData["nodes"],
   };
   return Map<PublicKey, KnowledgeData>({ [ALICE_PK]: db });

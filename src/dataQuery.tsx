@@ -163,7 +163,11 @@ export function addRelationIDToFilters(
 ): Filters {
   return {
     ...addAuthorFromIDToFilters(filters, relationID as ID),
-    knowledgeListbyID: addIDToFilter(filters.knowledgeListbyID, relationID, "#d"),
+    knowledgeListbyID: addIDToFilter(
+      filters.knowledgeListbyID,
+      relationID,
+      "#d"
+    ),
   };
 }
 

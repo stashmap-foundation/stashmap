@@ -2,15 +2,14 @@ import React from "react";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { nip19 } from "nostr-tools";
-import { renderWithTestData, findNewNodeEditor } from "./utils.test";
-import { App } from "./App";
+import { renderApp, findNewNodeEditor } from "./utils.test";
 
 const npub = nip19.npubEncode(
   "17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917"
 );
 
 test("Login and logout with seed phrase", async () => {
-  renderWithTestData(<App />, { user: undefined });
+  renderApp({ user: undefined });
   await userEvent.click(await screen.findByLabelText("sign in"));
   await userEvent.type(
     await screen.findByPlaceholderText(
@@ -34,7 +33,7 @@ test("Login and logout with seed phrase", async () => {
 });
 
 test("Login with nsec", async () => {
-  renderWithTestData(<App />, { user: undefined });
+  renderApp({ user: undefined });
   await userEvent.click(await screen.findByLabelText("sign in"));
   await userEvent.type(
     await screen.findByPlaceholderText(
@@ -48,7 +47,7 @@ test("Login with nsec", async () => {
 });
 
 test("Login with private key", async () => {
-  renderWithTestData(<App />, { user: undefined });
+  renderApp({ user: undefined });
   await userEvent.click(await screen.findByLabelText("sign in"));
   await userEvent.type(
     await screen.findByPlaceholderText(
@@ -62,7 +61,7 @@ test("Login with private key", async () => {
 });
 
 test("Display Error", async () => {
-  renderWithTestData(<App />, { user: undefined });
+  renderApp({ user: undefined });
   await userEvent.click(await screen.findByLabelText("sign in"));
   await userEvent.type(
     await screen.findByPlaceholderText(
@@ -74,7 +73,7 @@ test("Display Error", async () => {
 });
 
 test("Sign in persists created Notes", async () => {
-  const view = renderWithTestData(<App />, {
+  const view = renderApp({
     user: undefined,
     timeToStorePreLoginEvents: 0,
   });
@@ -96,7 +95,7 @@ test("Sign in persists created Notes", async () => {
   fireEvent.click(await screen.findByLabelText("logout"));
   cleanup();
 
-  renderWithTestData(<App />, {
+  renderApp({
     relayPool: view.relayPool,
     fileStore: view.fileStore,
     user: undefined,

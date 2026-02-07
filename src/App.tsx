@@ -12,14 +12,15 @@ export function App(): JSX.Element {
   return (
     <Routes>
       <Route element={<RequireLogin />}>
-        <Route path="/w/:workspaceID" element={<Dashboard />} />
         <Route path="/" element={<Dashboard />}>
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/follow" element={<Follow />} />
-          <Route path="/relays" element={<RelaysWrapper />} />
-          <Route path="/signin" element={<SignInModal />} />
-          <Route path="/signup" element={<SignUp />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="follow" element={<Follow />} />
+          <Route path="relays" element={<RelaysWrapper />} />
+          <Route path="signin" element={<SignInModal />} />
+          <Route path="signup" element={<SignUp />} />
         </Route>
+        <Route path="/n/*" element={<Dashboard />} />
+        <Route path="/r/:relationId" element={<Dashboard />} />
       </Route>
     </Routes>
   );

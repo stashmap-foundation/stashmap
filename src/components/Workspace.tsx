@@ -13,6 +13,7 @@ import {
   usePaneStack,
   usePaneIndex,
 } from "../SplitPanesContext";
+import { useNavigationState } from "../NavigationStateContext";
 import { TreeView } from "./TreeView";
 import {
   PaneSearchButton,
@@ -202,6 +203,33 @@ function useHomeShortcut(): void {
   }, [setPane, pane, knowledgeDBs, user.publicKey]);
 }
 
+function BackButton(): JSX.Element | null {
+  const { setPane } = useSplitPanes();
+  const pane = useCurrentPane();
+  const stack = usePaneStack();
+
+  if (stack.length <= 1) {
+    return null;
+  }
+
+  const handleBack = (): void => {
+    setPane({ ...pane, stack: stack.slice(0, -1) });
+  };
+
+  return (
+    <button
+      type="button"
+      className="btn btn-icon"
+      onClick={handleBack}
+      data-pane-action="back"
+      aria-label="Go back"
+      title="Back"
+    >
+      <span aria-hidden="true">&larr;</span>
+    </button>
+  );
+}
+
 function PaneHeader(): JSX.Element {
   const paneIndex = usePaneIndex();
   const isFirstPane = paneIndex === 0;
@@ -210,6 +238,7 @@ function PaneHeader(): JSX.Element {
   return (
     <header className="pane-header">
       <div className="pane-header-left">
+        <BackButton />
         <Breadcrumbs />
         <ForkButton />
         {isFirstPane && <SignInMenuBtn />}
@@ -518,6 +547,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 } {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const { setActivePaneIndex } = useNavigationState();
 
   const setKeyboardNavActive = (active: boolean): void => {
     const root = wrapperRef.current;
@@ -540,21 +570,22 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (!root) {
       return;
     }
-    const panes = getPaneWrappers();
-    const currentIndex = panes.findIndex((pane) => pane === root);
+    const allPanes = getPaneWrappers();
+    const currentIndex = allPanes.findIndex((pane) => pane === root);
     if (currentIndex < 0) {
       return;
     }
     const targetIndex = Math.max(
       0,
-      Math.min(panes.length - 1, currentIndex + direction)
+      Math.min(allPanes.length - 1, currentIndex + direction)
     );
     if (targetIndex === currentIndex) {
       return;
     }
-    const targetPane = panes[targetIndex];
+    const targetPane = allPanes[targetIndex];
     activatePaneKeyboardContext(targetPane);
     targetPane.focus();
+    setActivePaneIndex(targetIndex);
     const targetRow = getActiveRow(targetPane);
     if (targetRow) {
       focusRow(targetRow);
@@ -648,6 +679,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     }
     setSelectedPane(wrapperRef.current);
     setKeyboardNavActive(false);
+    setActivePaneIndex(paneIndex);
   };
 
   const onPaneMouseMove = (): void => {
@@ -659,6 +691,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       return;
     }
     setSelectedPane(wrapperRef.current);
+    setActivePaneIndex(paneIndex);
   };
 
   const onKeyDownCapture = (e: React.KeyboardEvent<HTMLDivElement>): void => {
@@ -911,6 +944,16 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       e.preventDefault();
       setKeyboardNavActive(true);
       triggerPaneHome(root);
+      return;
+    }
+
+    if (e.key === "Backspace") {
+      e.preventDefault();
+      setKeyboardNavActive(true);
+      const backButton = root.querySelector('[data-pane-action="back"]');
+      if (backButton instanceof HTMLElement) {
+        backButton.click();
+      }
       return;
     }
 

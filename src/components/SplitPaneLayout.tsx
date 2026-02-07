@@ -6,12 +6,13 @@ import {
   PaneIndexProvider,
   usePaneIndex,
   useCurrentPane,
+  generatePaneId,
 } from "../SplitPanesContext";
 import {
   RootViewContextProvider,
   updateViewPathsAfterPaneDelete,
 } from "../ViewContext";
-import { LoadData } from "../dataQuery";
+import { LoadData, LoadRelationData } from "../dataQuery";
 import { LoadSearchData } from "../LoadSearchData";
 import { PaneView } from "./Workspace";
 import { EMPTY_NODE_ID, createSearchId, LOG_NODE_ID } from "../connections";
@@ -90,20 +91,23 @@ export function PaneSearchButton(): JSX.Element {
   );
 }
 
-export function ClosePaneButton(): JSX.Element | null {
+export function ClosePaneButton(): JSX.Element {
   const { panes } = useSplitPanes();
   const paneIndex = usePaneIndex();
   const { createPlan, executePlan } = usePlanner();
-
-  if (paneIndex === 0) {
-    return null;
-  }
+  const { user } = useData();
 
   const handleRemovePane = (): void => {
+    const plan = createPlan();
     if (panes.length <= 1) {
+      const freshPane: Pane = {
+        id: generatePaneId(),
+        stack: [],
+        author: user.publicKey,
+      };
+      executePlan(planUpdatePanes(plan, [freshPane]));
       return;
     }
-    const plan = createPlan();
     const updatedViews = updateViewPathsAfterPaneDelete(plan.views, paneIndex);
     const newPanes = panes.filter((p) => p.id !== panes[paneIndex].id);
     const planWithViews = planUpdateViews(plan, updatedViews);
@@ -201,7 +205,7 @@ function PaneContent(): JSX.Element {
     ? "split-pane other-user-pane"
     : "split-pane";
 
-  return (
+  const content = (
     <div className={paneClassName}>
       <LoadSearchData nodeIDs={pane.stack}>
         <LoadData nodeIDs={pane.stack}>
@@ -219,6 +223,15 @@ function PaneContent(): JSX.Element {
       </LoadSearchData>
     </div>
   );
+
+  if (pane.rootRelation) {
+    return (
+      <LoadRelationData relationID={pane.rootRelation}>
+        {content}
+      </LoadRelationData>
+    );
+  }
+  return content;
 }
 
 function PaneWrapper({ index }: { index: number }): JSX.Element {

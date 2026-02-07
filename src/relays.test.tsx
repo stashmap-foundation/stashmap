@@ -67,7 +67,7 @@ test("Write views on user relays", async () => {
 
   renderApp({
     ...aliceData,
-    initialRoute: `/w/${workspace.id}`,
+    initialRoute: `/n/${encodeURIComponent("Alice Workspace")}`,
   });
 
   const collapseButton = await screen.findByLabelText(

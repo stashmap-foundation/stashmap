@@ -410,7 +410,7 @@ function removeEmptyNodeFromKnowledgeDBs(
   });
 }
 
-function planUpdateViewData(plan: Plan, views: Views, panes: Pane[]): Plan {
+function planPublishViews(plan: Plan, views: Views): Plan {
   const publishEvents = plan.publishEvents.filterNot(
     (event) => event.kind === KIND_VIEWS
   );
@@ -419,12 +419,11 @@ function planUpdateViewData(plan: Plan, views: Views, panes: Pane[]): Plan {
     pubkey: plan.user.publicKey,
     created_at: newTimestamp(),
     tags: [msTag()],
-    content: JSON.stringify(viewDataToJSON(views, panes)),
+    content: JSON.stringify(viewDataToJSON(views, [])),
   };
   return {
     ...plan,
     views,
-    panes,
     publishEvents: publishEvents.push(
       setRelayConf(writeViewEvent, {
         defaultRelays: false,
@@ -436,11 +435,14 @@ function planUpdateViewData(plan: Plan, views: Views, panes: Pane[]): Plan {
 }
 
 export function planUpdateViews(plan: Plan, views: Views): Plan {
-  return planUpdateViewData(plan, views, plan.panes);
+  return planPublishViews(plan, views);
 }
 
 export function planUpdatePanes(plan: Plan, panes: Pane[]): Plan {
-  return planUpdateViewData(plan, plan.views, panes);
+  return {
+    ...plan,
+    panes,
+  };
 }
 
 export function planSetRowFocusIntent(
@@ -1080,12 +1082,15 @@ type Planner = {
   executePlan: ExecutePlan;
   republishEvents: RepublishEvents;
   setPublishEvents: Dispatch<SetStateAction<EventState>>;
+  setPanes: Dispatch<SetStateAction<Pane[]>>;
 };
 
 type PlanningContextValue = Pick<
   Planner,
   "executePlan" | "republishEvents" | "setPublishEvents"
->;
+> & {
+  setPanes: Dispatch<SetStateAction<Pane[]>>;
+};
 
 const PlanningContext = React.createContext<PlanningContextValue | undefined>(
   undefined
@@ -1134,11 +1139,13 @@ function filterEmptyNodesFromEvents(
 export function PlanningContextProvider({
   children,
   setPublishEvents,
+  setPanes,
   db,
   getRelays,
 }: {
   children: React.ReactNode;
   setPublishEvents: Dispatch<SetStateAction<EventState>>;
+  setPanes: Dispatch<SetStateAction<Pane[]>>;
   db?: StashmapDB | null;
   getRelays?: () => AllRelays;
 }): JSX.Element {
@@ -1202,6 +1209,7 @@ export function PlanningContextProvider({
   }, [db]);
 
   const executePlan = async (plan: Plan): Promise<void> => {
+    setPanes(plan.panes);
     const filteredEvents = filterEmptyNodesFromEvents(plan.publishEvents);
 
     if (filteredEvents.size === 0) {
@@ -1285,6 +1293,7 @@ export function PlanningContextProvider({
         executePlan,
         republishEvents: republishEventsOnRelay,
         setPublishEvents,
+        setPanes,
       }}
     >
       {children}
@@ -1326,6 +1335,7 @@ export function usePlanner(): Planner {
     executePlan: planningContext.executePlan,
     republishEvents: planningContext.republishEvents,
     setPublishEvents: planningContext.setPublishEvents,
+    setPanes: planningContext.setPanes,
   };
 }
 

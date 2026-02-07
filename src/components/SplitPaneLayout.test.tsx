@@ -51,14 +51,14 @@ Root
   `);
 });
 
-test("ClosePaneButton returns null for pane index 0", () => {
+test("ClosePaneButton renders for pane index 0", () => {
   renderApis(
     <PaneIndexProvider index={0}>
       <ClosePaneButton />
     </PaneIndexProvider>
   );
 
-  expect(screen.queryByLabelText("Close pane")).toBeNull();
+  expect(screen.getByLabelText("Close pane")).toBeTruthy();
 });
 
 test("ClosePaneButton renders for pane index > 0", () => {

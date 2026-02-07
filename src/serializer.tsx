@@ -160,7 +160,7 @@ export function jsonToViews(s: Serializable): Map<string, View> {
     }) as Map<string, View>;
 }
 
-function paneToJSON(pane: Pane): Serializable {
+export function paneToJSON(pane: Pane): Serializable {
   return {
     i: pane.id,
     s: pane.stack,

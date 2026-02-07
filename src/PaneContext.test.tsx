@@ -1,32 +1,74 @@
-import { screen } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import {
   ALICE,
+  BOB,
   setup,
   renderApp,
   setupTestDB,
   findNodeByText,
+  type,
+  expectTree,
 } from "./utils.test";
 
 test("App defaults to empty pane with new node editor when visiting /", async () => {
   const [alice] = setup([ALICE]);
   renderApp({ ...alice(), initialRoute: "/" });
 
-  // Should show empty pane with new node editor
   await screen.findByLabelText("new node editor", undefined, {
     timeout: 5000,
   });
 });
 
-test("Navigate to specific node via URL", async () => {
+test("Navigate to specific node via URL using human-readable path", async () => {
   const [alice] = setup([ALICE]);
   const db = await setupTestDB(alice(), [["Test Node", []]]);
 
   const testNode = findNodeByText(db, "Test Node");
   expect(testNode).toBeDefined();
 
-  // Navigate directly to the node via URL
-  renderApp({ ...alice(), initialRoute: `/w/${testNode!.id}` });
+  renderApp({ ...alice(), initialRoute: `/n/${encodeURIComponent("Test Node")}` });
 
-  // The node should now be displayed as root
   await screen.findByRole("treeitem", { name: "Test Node" });
+});
+
+test("Bob can view Alice's relation via /r/ URL without following her", async () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+
+  renderApp(alice());
+  await type("My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}");
+
+  await expectTree(`
+My Notes
+  Cities
+    Paris
+    London
+  `);
+
+  await userEvent.click(
+    await screen.findByLabelText("show references to Cities")
+  );
+  await userEvent.click(
+    await screen.findByLabelText("open My Notes → Cities (2) in fullscreen")
+  );
+
+  await expectTree(`
+Cities
+  Paris
+  London
+  `);
+
+  await waitFor(() => {
+    expect(window.location.pathname).toMatch(/^\/r\//);
+  });
+  const relationUrl = window.location.pathname;
+  cleanup();
+
+  renderApp({ ...bob(), initialRoute: relationUrl });
+
+  await expectTree(`
+Cities
+  Paris
+  London
+  `);
 });

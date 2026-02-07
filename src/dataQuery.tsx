@@ -157,6 +157,16 @@ export function addReferencedByToFilters(
   };
 }
 
+export function addRelationIDToFilters(
+  filters: Filters,
+  relationID: LongID
+): Filters {
+  return {
+    ...addAuthorFromIDToFilters(filters, relationID as ID),
+    knowledgeListbyID: addIDToFilter(filters.knowledgeListbyID, relationID, "#d"),
+  };
+}
+
 export function addListToFilters(
   filters: Filters,
   listID: LongID,
@@ -168,8 +178,7 @@ export function addListToFilters(
 
   // Also query for ALL relations with this node as HEAD (for diff items from other users)
   return {
-    ...addAuthorFromIDToFilters(filters, listID),
-    knowledgeListbyID: addIDToFilter(filters.knowledgeListbyID, listID, "#d"),
+    ...addRelationIDToFilters(filters, listID),
     knowledgeListByHead: addIDToFilter(
       filters.knowledgeListByHead,
       nodeID,
@@ -322,6 +331,21 @@ export function LoadData({
       {children}
     </RegisterQuery>
   );
+}
+
+export function LoadRelationData({
+  children,
+  relationID,
+}: {
+  children: React.ReactNode;
+  relationID: LongID;
+}): JSX.Element {
+  const { user, contacts, projectMembers } = useData();
+  const baseFilter = createBaseFilter(contacts, projectMembers, user.publicKey);
+  const filter = addRelationIDToFilters(baseFilter, relationID);
+  const filterArray = filtersToFilterArray(filter);
+  useQueryKnowledgeData(filterArray);
+  return <>{children}</>;
 }
 
 export function LoadMissingVersionNodes({

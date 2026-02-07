@@ -20,7 +20,6 @@ import {
   ALICE,
   setup,
   setupTestDB,
-  findNodeByText,
   expectTree,
   findNewNodeEditor,
   BOB,
@@ -446,18 +445,16 @@ Programming Languages
 test("Disconnect Nodes", async () => {
   const [alice] = setup([ALICE]);
   // Create PL at root level so children have empty context
-  const aliceDB = await setupTestDB(
+  await setupTestDB(
     alice(),
     [["Programming Languages", ["C", "C++", "Java", "Rust"]]],
     {
       root: "Programming Languages",
     }
   );
-  // Navigate directly to Programming Languages (root level, empty context)
-  const pl = findNodeByText(aliceDB, "Programming Languages") as KnowNode;
   renderApp({
     ...alice(),
-    initialRoute: `/w/${pl.id}`,
+    initialRoute: `/n/${encodeURIComponent("Programming Languages")}`,
   });
   // Root is expanded by default
   await expectTree(`

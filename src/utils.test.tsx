@@ -68,8 +68,8 @@ import { PaneView } from "./components/Workspace";
 import { DND } from "./dnd";
 import { findContacts } from "./contacts";
 import { UserRelayContextProvider } from "./UserRelayContext";
-import { NavigationStackProvider } from "./NavigationStackContext";
 import { StashmapDB } from "./indexedDB";
+
 import {
   PaneIndexProvider,
   useCurrentPane,
@@ -344,7 +344,7 @@ function TestPublishProvider({
       projectMembers={DEFAULT_DATA_CONTEXT_PROPS.projectMembers}
       panes={DEFAULT_DATA_CONTEXT_PROPS.panes}
     >
-      <PlanningContextProvider setPublishEvents={() => {}}>
+      <PlanningContextProvider setPublishEvents={() => {}} setPanes={() => {}}>
         {children}
       </PlanningContextProvider>
     </DataContextProvider>
@@ -378,48 +378,46 @@ export function renderApis(
   window.history.pushState({}, "", options?.initialRoute || "/");
   const utils = render(
     <BrowserRouter>
-      <NavigationStackProvider>
-        <ApiProvider
-          apis={{
-            fileStore,
-            relayPool,
-            finalizeEvent,
-            nip11,
-            eventLoadingTimeout: 0,
-            timeToStorePreLoginEvents: 0,
-          }}
-        >
-          <TestPublishProvider>
-            <NostrAuthContextProvider
-              defaultRelayUrls={
-                optionsWithDefaultUser.defaultRelays ||
-                TEST_RELAYS.map((r) => r.url)
-              }
-            >
-              <UserRelayContextProvider>
-                <PaneIndexProvider index={0}>
-                  <VirtuosoMockContext.Provider
-                    value={{ viewportHeight: 10000, itemHeight: 100 }}
-                  >
-                    {options?.includeFocusContext === true ? (
-                      <FocusContextProvider>{children}</FocusContextProvider>
-                    ) : (
-                      <FocusContext.Provider
-                        value={{
-                          isInputElementInFocus: true,
-                          setIsInputElementInFocus: jest.fn(),
-                        }}
-                      >
-                        {children}
-                      </FocusContext.Provider>
-                    )}
-                  </VirtuosoMockContext.Provider>
-                </PaneIndexProvider>
-              </UserRelayContextProvider>
-            </NostrAuthContextProvider>
-          </TestPublishProvider>
-        </ApiProvider>
-      </NavigationStackProvider>
+      <ApiProvider
+        apis={{
+          fileStore,
+          relayPool,
+          finalizeEvent,
+          nip11,
+          eventLoadingTimeout: 0,
+          timeToStorePreLoginEvents: 0,
+        }}
+      >
+        <TestPublishProvider>
+          <NostrAuthContextProvider
+            defaultRelayUrls={
+              optionsWithDefaultUser.defaultRelays ||
+              TEST_RELAYS.map((r) => r.url)
+            }
+          >
+            <UserRelayContextProvider>
+              <PaneIndexProvider index={0}>
+                <VirtuosoMockContext.Provider
+                  value={{ viewportHeight: 10000, itemHeight: 100 }}
+                >
+                  {options?.includeFocusContext === true ? (
+                    <FocusContextProvider>{children}</FocusContextProvider>
+                  ) : (
+                    <FocusContext.Provider
+                      value={{
+                        isInputElementInFocus: true,
+                        setIsInputElementInFocus: jest.fn(),
+                      }}
+                    >
+                      {children}
+                    </FocusContext.Provider>
+                  )}
+                </VirtuosoMockContext.Provider>
+              </PaneIndexProvider>
+            </UserRelayContextProvider>
+          </NostrAuthContextProvider>
+        </TestPublishProvider>
+      </ApiProvider>
     </BrowserRouter>
   );
   return {
@@ -489,7 +487,7 @@ export function renderWithTestData(
   const utils = renderApis(
     <Routes>
       <Route element={<RequireLogin />}>
-        {["*", "w/:workspaceID/*", "d/:openNodeID", "join/:projectID"].map(
+        {["*", "n/*", "r/:relationId", "d/:openNodeID", "join/:projectID"].map(
           (path) => (
             <Route
               key={path}

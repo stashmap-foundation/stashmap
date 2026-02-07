@@ -48,3 +48,8 @@ afterAll(() => {
   console.warn = originalWarn;
 });
 /* eslint-enable no-console */
+
+afterEach(() => {
+  localStorage.clear();
+  window.history.pushState({}, "", "/");
+});

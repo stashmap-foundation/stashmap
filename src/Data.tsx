@@ -19,16 +19,13 @@ import {
   findNodes,
   findRelations,
   findViews,
-  findPanes,
 } from "./knowledgeEvents";
 import { newDB } from "./knowledge";
-import { PlanningContextProvider } from "./planner";
+import { PlanningContextProvider, replaceUnauthenticatedUser } from "./planner";
 import { useUserRelayContext } from "./UserRelayContext";
-import { NavigationStackProvider } from "./NavigationStackContext";
 import { flattenRelays, usePreloadRelays, findRelays } from "./relays";
 import { useDefaultRelays } from "./NostrAuthContext";
 import { useEventQuery } from "./commons/useNostrQuery";
-import { useRootFromURL } from "./KnowledgeDataContext";
 import {
   openDB,
   StashmapDB,
@@ -36,12 +33,59 @@ import {
   getOutboxEvents,
   putCachedEvents,
 } from "./indexedDB";
+import { pathToStack, parseRelationUrl } from "./navigationUrl";
+import { generatePaneId } from "./SplitPanesContext";
+import { jsonToPanes, paneToJSON, Serializable } from "./serializer";
+import { NavigationStateProvider } from "./NavigationStateContext";
 
-const defaultPane = (author: PublicKey, rootNodeID?: LongID | ID): Pane => ({
-  id: "pane-0",
+export const defaultPane = (author: PublicKey, rootNodeID?: LongID | ID): Pane => ({
+  id: generatePaneId(),
   stack: rootNodeID ? [rootNodeID] : [],
   author,
 });
+
+function panesStorageKey(publicKey: PublicKey): string {
+  return `stashmap-panes-${publicKey}`;
+}
+
+function loadPanesFromStorage(publicKey: PublicKey): Pane[] | undefined {
+  try {
+    const raw = localStorage.getItem(panesStorageKey(publicKey));
+    if (!raw) {
+      return undefined;
+    }
+    const parsed = JSON.parse(raw);
+    const panes = jsonToPanes({ panes: parsed });
+    return panes.length > 0 ? panes : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function savePanesToStorage(publicKey: PublicKey, panes: Pane[]): void {
+  try {
+    const serialized = panes.map((p) => paneToJSON(p));
+    localStorage.setItem(panesStorageKey(publicKey), JSON.stringify(serialized));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function getInitialPanes(publicKey: PublicKey): Pane[] {
+  const relationID = parseRelationUrl(window.location.pathname);
+  if (relationID) {
+    return [{ id: generatePaneId(), stack: [], author: publicKey, rootRelation: relationID }];
+  }
+  const urlStack = pathToStack(window.location.pathname);
+  if (urlStack.length > 0) {
+    return [{ id: generatePaneId(), stack: urlStack, author: publicKey }];
+  }
+  const stored = loadPanesFromStorage(publicKey);
+  if (stored) {
+    return stored;
+  }
+  return [defaultPane(publicKey)];
+}
 
 type DataProps = {
   user: User;
@@ -53,7 +97,6 @@ type ProcessedEvents = {
   contacts: Contacts;
   relays: Relays;
   views: Views;
-  panes: Pane[];
   projectMembers: Members;
 };
 
@@ -63,7 +106,6 @@ export function newProcessedEvents(): ProcessedEvents {
     contacts: Map<PublicKey, Contact>(),
     relays: [],
     views: Map<string, View>(),
-    panes: [],
     projectMembers: Map<PublicKey, Member>(),
   };
 }
@@ -76,12 +118,10 @@ function mergeEvents(
   processed: ProcessedEvents,
   events: List<UnsignedEvent | Event>
 ): ProcessedEvents {
-  const mergedPanes = findPanes(events);
   return {
     ...processed,
     contacts: processed.contacts.merge(findContacts(events)),
     views: findViews(events).merge(processed.views),
-    panes: mergedPanes.length > 0 ? mergedPanes : processed.panes,
   };
 }
 
@@ -92,7 +132,6 @@ function processEventsByAuthor(
   const nodes = findNodes(authorEvents);
   const relations = findRelations(authorEvents);
   const views = findViews(authorEvents);
-  const panes = findPanes(authorEvents);
   const projectMembers = findMembers(authorEvents);
   const knowledgeDB = {
     nodes,
@@ -104,7 +143,6 @@ function processEventsByAuthor(
     knowledgeDB,
     relays,
     views,
-    panes,
     projectMembers,
   };
 }
@@ -163,7 +201,9 @@ const DEFAULT_TEMPORARY_VIEW: TemporaryViewState = {
 
 function Data({ user, children }: DataProps): JSX.Element {
   const myPublicKey = user.publicKey;
-  const rootFromURL = useRootFromURL();
+  const [panes, setPanes] = useState<Pane[]>(() =>
+    getInitialPanes(myPublicKey)
+  );
   const [newEventsAndPublishResults, setNewEventsAndPublishResults] =
     useState<EventState>({
       unsignedEvents: List(),
@@ -218,6 +258,19 @@ function Data({ user, children }: DataProps): JSX.Element {
     },
     [db]
   );
+
+  useEffect(() => {
+    setPanes((current) =>
+      current.map((p) => ({
+        ...p,
+        author: replaceUnauthenticatedUser(p.author, myPublicKey),
+      }))
+    );
+  }, [myPublicKey]);
+
+  useEffect(() => {
+    savePanesToStorage(myPublicKey, panes);
+  }, [panes, myPublicKey]);
 
   const { events: mE, eose: metaEventsEose } = useEventQuery(
     relayPool,
@@ -292,11 +345,7 @@ function Data({ user, children }: DataProps): JSX.Element {
       relaysInfos={searchRelaysInfo}
       publishEventsStatus={newEventsAndPublishResults}
       views={processedMetaEvents.views}
-      panes={
-        processedMetaEvents.panes.length > 0
-          ? processedMetaEvents.panes
-          : [defaultPane(user.publicKey, rootFromURL)]
-      }
+      panes={panes}
       projectMembers={projectMembers}
     >
       <EventCacheProvider
@@ -305,19 +354,20 @@ function Data({ user, children }: DataProps): JSX.Element {
         onEventsAdded={onEventsAdded}
       >
         <MergeKnowledgeDB>
-          <NavigationStackProvider>
-            <PlanningContextProvider
-              setPublishEvents={setNewEventsAndPublishResults}
-              db={db}
-              getRelays={() => ({
-                defaultRelays,
-                userRelays,
-                contactsRelays: flattenRelays(contactsRelays),
-              })}
-            >
+          <PlanningContextProvider
+            setPublishEvents={setNewEventsAndPublishResults}
+            setPanes={setPanes}
+            db={db}
+            getRelays={() => ({
+              defaultRelays,
+              userRelays,
+              contactsRelays: flattenRelays(contactsRelays),
+            })}
+          >
+            <NavigationStateProvider>
               {children}
-            </PlanningContextProvider>
-          </NavigationStackProvider>
+            </NavigationStateProvider>
+          </PlanningContextProvider>
         </MergeKnowledgeDB>
       </EventCacheProvider>
     </DataContextProvider>

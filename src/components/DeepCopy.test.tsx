@@ -148,6 +148,61 @@ My Notes
         GrandChild
     `);
   });
+
+  test("Tab indent cleans up old descendant relations (no orphaned references)", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type(
+      "My Notes{Enter}{Tab}Sibling{Enter}Parent{Enter}{Tab}GrandChild{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Sibling
+  Parent
+    GrandChild
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText("show references to GrandChild")
+    );
+
+    await expectTree(`
+My Notes
+  Sibling
+  Parent
+    GrandChild
+      My Notes → Parent (1) → GrandChild
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText("hide references to GrandChild")
+    );
+
+    const parentEditor = await screen.findByLabelText("edit Parent");
+    await userEvent.click(parentEditor);
+    await userEvent.keyboard("{Home}{Tab}");
+
+    await expectTree(`
+My Notes
+  Sibling
+    Parent
+      GrandChild
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText("show references to GrandChild")
+    );
+
+    await expectTree(`
+My Notes
+  Sibling
+    Parent
+      GrandChild
+        My Notes → Sibling → Parent (1) → GrandChild
+    `);
+  });
 });
 
 describe("Deep Copy - Cross-Pane DnD", () => {

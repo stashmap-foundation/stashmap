@@ -60,6 +60,7 @@ import {
   planAddToParent,
   planDeepCopyNodeWithView,
   planSetRowFocusIntent,
+  planDeleteDescendantRelations,
 } from "../planner";
 import { planDisconnectFromParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
@@ -353,14 +354,21 @@ function EditableContent(): JSX.Element {
       stack
     );
 
+    // Step 3b: Delete orphaned descendant relations in old context
+    const planWithCleanup = planDeleteDescendantRelations(
+      planWithDisconnect,
+      nodeID,
+      context
+    );
+
     // Step 4: Save text changes in NEW context (if any)
     // The node's new context is prevSiblingContext + prevSibling's ID
     const newContext = prevSiblingContext.push(prevSibling.nodeID);
     const originalNodeText = node?.text ?? "";
     const hasTextChanges = trimmedText !== originalNodeText;
     const finalPlan = hasTextChanges
-      ? planCreateVersion(planWithDisconnect, nodeID, trimmedText, newContext)
-      : planWithDisconnect;
+      ? planCreateVersion(planWithCleanup, nodeID, trimmedText, newContext)
+      : planWithCleanup;
 
     executePlan(finalPlan);
   };
@@ -441,11 +449,17 @@ function EditableContent(): JSX.Element {
       stack
     );
 
+    const planWithCleanup = planDeleteDescendantRelations(
+      planWithDisconnect,
+      nodeID,
+      context
+    );
+
     const originalNodeText = node.text ?? "";
     const hasTextChanges = trimmedText !== originalNodeText;
 
     if (!hasTextChanges) {
-      executePlan(planWithDisconnect);
+      executePlan(planWithCleanup);
       return;
     }
 
@@ -453,7 +467,7 @@ function EditableContent(): JSX.Element {
     const grandParentNodeID = getLast(grandParentPath).nodeID;
     const newContext = grandParentContext.push(grandParentNodeID);
     executePlan(
-      planCreateVersion(planWithDisconnect, nodeID, trimmedText, newContext)
+      planCreateVersion(planWithCleanup, nodeID, trimmedText, newContext)
     );
   };
 

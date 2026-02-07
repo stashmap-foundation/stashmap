@@ -1002,6 +1002,23 @@ export function planDeleteRelations(plan: Plan, relationsID: LongID): Plan {
   };
 }
 
+export function planDeleteDescendantRelations(
+  plan: Plan,
+  nodeID: LongID | ID,
+  context: Context
+): Plan {
+  const descendants = getDescendantRelations(
+    plan.knowledgeDBs,
+    nodeID,
+    context
+  ).filter((r) => r.author === plan.user.publicKey);
+
+  return descendants.reduce(
+    (accPlan, relation) => planDeleteRelations(accPlan, relation.id),
+    plan
+  );
+}
+
 export function replaceUnauthenticatedUser<T extends string>(
   from: T,
   publicKey: string

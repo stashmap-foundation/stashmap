@@ -14,6 +14,15 @@ import {
 
 const DEFAULT_DEBOUNCE_MS = process.env.NODE_ENV === "test" ? 100 : 5000;
 const MAX_BACKOFF_MS = 60000;
+const DEFAULT_BATCH_SIZE = 10;
+
+const toChunks = <T>(
+  items: ReadonlyArray<T>,
+  size: number
+): ReadonlyArray<ReadonlyArray<T>> =>
+  Array.from({ length: Math.ceil(items.length / size) }, (_, i) =>
+    items.slice(i * size, (i + 1) * size)
+  );
 
 type RelayBackoffState = {
   readonly failures: number;
@@ -43,6 +52,7 @@ export type QueueStatus = {
 export type PublishQueueConfig = {
   readonly db: StashmapDB | null;
   readonly debounceMs?: number;
+  readonly batchSize?: number;
   readonly getDeps: () => FlushDeps;
   readonly onResults: (results: PublishResultsEventMap) => void;
 };
@@ -115,6 +125,7 @@ export const createPublishQueue = (
   config: PublishQueueConfig
 ): PublishQueue => {
   const debounceMs = config.debounceMs ?? DEFAULT_DEBOUNCE_MS;
+  const batchSize = config.batchSize ?? DEFAULT_BATCH_SIZE;
 
   // eslint-disable-next-line functional/no-let
   let buffer = Map<string, OutboxEntry>();
@@ -226,81 +237,97 @@ export const createPublishQueue = (
     try {
       const deps = config.getDeps();
       const entries = buffer.entrySeq().toArray();
-      const events = List(entries.map(([, entry]) => entry.event));
+      const chunks = toChunks(entries, batchSize);
 
-      const signed = await signEvents(events, deps.user, deps.finalizeEvent);
-      if (signed.size === 0) {
-        return;
-      }
-
-      // eslint-disable-next-line functional/no-let
-      let allResults = Map<string, PublishResultsOfEvent>();
-      const relayFailures = new Set<string>();
-      const relaySuccesses = new Set<string>();
-
-      await Promise.all(
-        signed.toArray().map(async ({ event, writeRelayConf }, index) => {
-          const [entryKey, outboxEntry] = entries[index];
-          const relayUrls = resolveWriteRelayUrls(writeRelayConf, deps.relays);
-          const alreadyDone = outboxEntry.succeededRelays || [];
-          const needsPublish = relayUrls.filter(
-            (url) => !alreadyDone.includes(url)
+      for (const chunk of chunks) {
+        if (destroyed) break;
+        try {
+          const chunkEvents = List(chunk.map(([, entry]) => entry.event));
+          const signed = await signEvents(
+            chunkEvents,
+            deps.user,
+            deps.finalizeEvent
           );
-          const availableUrls = getAvailableRelays(needsPublish);
+          if (signed.size === 0) continue;
 
-          if (availableUrls.length === 0) return;
+          // eslint-disable-next-line functional/no-let
+          let batchResults = Map<string, PublishResultsOfEvent>();
+          const relayFailures = new Set<string>();
+          const relaySuccesses = new Set<string>();
 
-          const relayResults = await publishToRelays(
-            deps.relayPool,
-            event,
-            availableUrls
+          await Promise.all(
+            signed.toArray().map(async ({ event, writeRelayConf }, index) => {
+              const [entryKey, outboxEntry] = chunk[index];
+              const relayUrls = resolveWriteRelayUrls(
+                writeRelayConf,
+                deps.relays
+              );
+              const alreadyDone = outboxEntry.succeededRelays || [];
+              const needsPublish = relayUrls.filter(
+                (url) => !alreadyDone.includes(url)
+              );
+              const availableUrls = getAvailableRelays(needsPublish);
+
+              if (availableUrls.length === 0) return;
+
+              const relayResults = await publishToRelays(
+                deps.relayPool,
+                event,
+                availableUrls
+              );
+
+              const newSucceeded = [...alreadyDone];
+              relayResults.forEach((status, url) => {
+                if (status.status === "fulfilled") {
+                  // eslint-disable-next-line functional/immutable-data
+                  newSucceeded.push(url);
+                  relaySuccesses.add(url);
+                } else {
+                  relayFailures.add(url);
+                }
+              });
+
+              const allRelaysDone = relayUrls.every((url) =>
+                newSucceeded.includes(url)
+              );
+              if (allRelaysDone) {
+                buffer = buffer.delete(entryKey);
+                removeFromOutboxDB(entryKey);
+              } else {
+                const updated: OutboxEntry = {
+                  ...outboxEntry,
+                  succeededRelays: newSucceeded,
+                };
+                buffer = buffer.set(entryKey, updated);
+                persistToOutbox(updated);
+              }
+
+              batchResults = batchResults.set(event.id, {
+                event,
+                results: relayResults,
+              });
+            })
           );
 
-          const newSucceeded = [...alreadyDone];
-          relayResults.forEach((status, url) => {
-            if (status.status === "fulfilled") {
-              // eslint-disable-next-line functional/immutable-data
-              newSucceeded.push(url);
-              relaySuccesses.add(url);
-            } else {
-              relayFailures.add(url);
+          relayFailures.forEach((url) => updateBackoff(url, false));
+          relaySuccesses.forEach((url) => {
+            if (!relayFailures.has(url)) {
+              updateBackoff(url, true);
             }
           });
 
-          const allRelaysDone = relayUrls.every((url) =>
-            newSucceeded.includes(url)
-          );
-          if (allRelaysDone) {
-            buffer = buffer.delete(entryKey);
-            removeFromOutboxDB(entryKey);
-          } else {
-            const updated: OutboxEntry = {
-              ...outboxEntry,
-              succeededRelays: newSucceeded,
-            };
-            buffer = buffer.set(entryKey, updated);
-            persistToOutbox(updated);
+          flushing = false;
+          if (batchResults.size > 0) {
+            config.onResults(batchResults);
           }
-
-          allResults = allResults.set(event.id, {
-            event,
-            results: relayResults,
-          });
-        })
-      );
-
-      relayFailures.forEach((url) => updateBackoff(url, false));
-      relaySuccesses.forEach((url) => {
-        if (!relayFailures.has(url)) {
-          updateBackoff(url, true);
+          flushing = true;
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error("Publish queue batch failed, continuing", error);
         }
-      });
+      }
 
       flushing = false;
-
-      if (allResults.size > 0) {
-        config.onResults(allResults);
-      }
 
       scheduleRetry();
     } catch (error) {

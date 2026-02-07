@@ -10,6 +10,8 @@ import {
   KIND_MEMBERLIST,
   KIND_RELAY_METADATA_EVENT,
   newTimestamp,
+  getReplaceableKey,
+  msTag,
 } from "./nostr";
 import { useData } from "./DataContext";
 import { execute, republishEvents } from "./executor";
@@ -96,7 +98,7 @@ function newContactListEvent(contacts: Contacts, user: User): UnsignedEvent {
     kind: KIND_CONTACTLIST,
     pubkey: user.publicKey,
     created_at: newTimestamp(),
-    tags,
+    tags: [...tags, msTag()],
     content: "",
   };
 }
@@ -230,6 +232,7 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
       ...contextTags,
       ...basedOnTag,
       ...itemsAsTags,
+      msTag(),
     ],
     content: "",
   };
@@ -257,7 +260,7 @@ export function planUpsertNode(plan: Plan, node: KnowNode): Plan {
     kind: KIND_KNOWLEDGE_NODE,
     pubkey: plan.user.publicKey,
     created_at: newTimestamp(),
-    tags: [["d", dTag]],
+    tags: [["d", dTag], msTag()],
     content: node.text,
   };
   const deduped = filterOldReplaceableEvent(
@@ -416,7 +419,7 @@ function planUpdateViewData(plan: Plan, views: Views, panes: Pane[]): Plan {
     kind: KIND_VIEWS,
     pubkey: plan.user.publicKey,
     created_at: newTimestamp(),
-    tags: [],
+    tags: [msTag()],
     content: JSON.stringify(viewDataToJSON(views, panes)),
   };
   return {
@@ -955,6 +958,7 @@ function planDelete(plan: Plan, id: LongID | ID, kind: number): Plan {
     tags: [
       ["a", `${kind}:${plan.user.publicKey}:${shortID(id)}`],
       ["k", `${kind}`],
+      msTag(),
     ],
     content: "",
   };
@@ -1055,8 +1059,8 @@ export function planPublishRelayMetadata(plan: Plan, relays: Relays): Plan {
   const publishRelayMetadataEvent = {
     kind: KIND_RELAY_METADATA_EVENT,
     pubkey: plan.user.publicKey,
-    created_at: Math.floor(Date.now() / 1000),
-    tags,
+    created_at: newTimestamp(),
+    tags: [...tags, msTag()],
     content: "",
     writeRelayConf: {
       defaultRelays: true,
@@ -1213,7 +1217,7 @@ export function PlanningContextProvider({
         plan.temporaryEvents
       );
       return {
-        unsignedEvents: prevStatus.unsignedEvents.merge(filteredEvents),
+        unsignedEvents: prevStatus.unsignedEvents.concat(filteredEvents),
         results: prevStatus.results,
         isLoading: !queueRef.current,
         preLoginEvents: prevStatus.preLoginEvents,

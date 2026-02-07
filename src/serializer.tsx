@@ -2,7 +2,7 @@ import { Map, List } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
 import { parseViewPath } from "./ViewContext";
 import { joinID, hashText } from "./connections";
-import { findAllTags, findTag } from "./commons/useNostrQuery";
+import { findAllTags, findTag, getEventMs } from "./commons/useNostrQuery";
 
 export type Serializable =
   | string
@@ -210,7 +210,7 @@ export function viewDataToJSON(
 export function eventToRelations(e: UnsignedEvent): Relations | undefined {
   const id = findTag(e, "d");
   const head = findTag(e, "k") as ID;
-  const updated = e.created_at;
+  const updated = getEventMs(e);
   if (id === undefined || head === undefined) {
     return undefined;
   }

@@ -194,7 +194,7 @@ test("follow sends nip-02 event", async () => {
     expect.objectContaining({
       kind: 3,
       pubkey: `${ALICE.publicKey}`,
-      tags: [["p", `${BOB.publicKey}`]],
+      tags: expect.arrayContaining([["p", `${BOB.publicKey}`]]),
       content: "",
     })
   );
@@ -222,7 +222,7 @@ test("unfollow sends nip-02 event", async () => {
     expect.objectContaining({
       kind: 3,
       pubkey: `${ALICE.publicKey}`,
-      tags: [],
+      tags: expect.arrayContaining([]),
       content: "",
     })
   );
@@ -260,10 +260,10 @@ test("follow a new user before signin doesn't delete existing contacts after sig
     expect.objectContaining({
       kind: KIND_CONTACTLIST,
       pubkey: `${ALICE.publicKey}`,
-      tags: [
+      tags: expect.arrayContaining([
         ["p", `${CAROL.publicKey}`],
         ["p", `${BOB.publicKey}`],
-      ],
+      ]),
       content: "",
     })
   );

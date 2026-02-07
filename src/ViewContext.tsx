@@ -1045,7 +1045,7 @@ export function newRelations(
     items: List<RelationItem>(),
     context,
     id: joinID(myself, v4()),
-    updated: Math.floor(Date.now() / 1000),
+    updated: Date.now(),
     author: myself,
   };
 }

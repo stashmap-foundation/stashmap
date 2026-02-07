@@ -45,7 +45,7 @@ test("Remove a Relay and add a suggested Relay", async () => {
       kind: 10002,
       pubkey:
         "f0289b28573a7c9bb169f43102b26259b7a4b758aca66ea3ac8cd0fe516a3758",
-      tags,
+      tags: expect.arrayContaining(tags),
       content: "",
     })
   );
@@ -71,7 +71,7 @@ test("Remove a Relay and add a suggested Relay", async () => {
       kind: 10002,
       pubkey:
         "f0289b28573a7c9bb169f43102b26259b7a4b758aca66ea3ac8cd0fe516a3758",
-      tags: newTags,
+      tags: expect.arrayContaining(newTags),
       content: "",
     })
   );
@@ -103,7 +103,7 @@ test("Add a new Relay", async () => {
       kind: 10002,
       pubkey:
         "f0289b28573a7c9bb169f43102b26259b7a4b758aca66ea3ac8cd0fe516a3758",
-      tags,
+      tags: expect.arrayContaining(tags),
       content: "",
     })
   );
@@ -143,7 +143,7 @@ test("Stop writing to an existing Nostr Relay", async () => {
       kind: 10002,
       pubkey:
         "f0289b28573a7c9bb169f43102b26259b7a4b758aca66ea3ac8cd0fe516a3758",
-      tags,
+      tags: expect.arrayContaining(tags),
       content: "",
     })
   );

@@ -37,9 +37,14 @@ export function findTag(event: EventTemplate, tag: string): string | undefined {
   return allTags && allTags[0] && allTags[0][0];
 }
 
+export function getEventMs(event: EventTemplate): number {
+  const ms = event.tags?.find((t) => t[0] === "ms")?.[1];
+  return ms ? Number(ms) : event.created_at * 1000;
+}
+
 export function sortEvents<T extends EventTemplate>(events: List<T>): List<T> {
   return events.sortBy(
-    (event, index) => [event.created_at, index] as [number, number],
+    (event, index) => [getEventMs(event), index] as [number, number],
     (a, b) => {
       if (a[0] !== b[0]) {
         return a[0] < b[0] ? -1 : 1;
@@ -53,7 +58,7 @@ export function sortEventsDescending<T extends EventTemplate>(
   events: List<T>
 ): List<T> {
   return events.sortBy(
-    (event, index) => [event.created_at, index],
+    (event, index) => [getEventMs(event), index],
     (a, b) => {
       if (a[0] !== b[0]) {
         return a[0] < b[0] ? 1 : -1;

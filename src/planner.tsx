@@ -10,7 +10,6 @@ import {
   KIND_MEMBERLIST,
   KIND_RELAY_METADATA_EVENT,
   newTimestamp,
-  getReplaceableKey,
   msTag,
 } from "./nostr";
 import { useData } from "./DataContext";
@@ -1150,26 +1149,31 @@ export function PlanningContextProvider({
     user,
     relays: getRelays
       ? getRelays()
-      : { defaultRelays: [] as Relays, userRelays: [] as Relays, contactsRelays: [] as Relays },
+      : {
+          defaultRelays: [] as Relays,
+          userRelays: [] as Relays,
+          contactsRelays: [] as Relays,
+        },
     relayPool,
     finalizeEvent,
   });
+  // eslint-disable-next-line functional/immutable-data
   depsRef.current = {
     user,
-    relays: getRelays
-      ? getRelays()
-      : depsRef.current.relays,
+    relays: getRelays ? getRelays() : depsRef.current.relays,
     relayPool,
     finalizeEvent,
   };
 
   const setPublishEventsRef = useRef(setPublishEvents);
+  // eslint-disable-next-line functional/immutable-data
   setPublishEventsRef.current = setPublishEvents;
 
   const queueRef = useRef<ReturnType<typeof createPublishQueue> | null>(null);
 
   useEffect(() => {
-    if (!db) return;
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    if (!db) return () => {};
     const queue = createPublishQueue({
       db,
       getDeps: () => depsRef.current,
@@ -1182,6 +1186,7 @@ export function PlanningContextProvider({
         }));
       },
     });
+    // eslint-disable-next-line functional/immutable-data
     queueRef.current = queue;
     queue.init().then(() => {
       setPublishEventsRef.current((prev) => ({
@@ -1190,6 +1195,7 @@ export function PlanningContextProvider({
       }));
     });
     return () => {
+      // eslint-disable-next-line functional/immutable-data
       queueRef.current = null;
       queue.destroy();
     };

@@ -97,7 +97,9 @@ const publishToRelays = async (
   const results = await Promise.allSettled(
     relayPool
       .publish([...writeRelayUrls], event)
-      .map((promise) => Promise.race([promise, timeoutPromise(PUBLISH_TIMEOUT)]))
+      .map((promise) =>
+        Promise.race([promise, timeoutPromise(PUBLISH_TIMEOUT)])
+      )
   );
 
   return writeRelayUrls.reduce((rdx, url, index) => {
@@ -177,7 +179,7 @@ export const createPublishQueue = (
       relayBackoff = relayBackoff.set(url, {
         failures,
         nextRetryAfter:
-          Date.now() + Math.min(Math.pow(2, failures) * 1000, MAX_BACKOFF_MS),
+          Date.now() + Math.min(2 ** failures * 1000, MAX_BACKOFF_MS),
       });
     }
   };
@@ -198,6 +200,7 @@ export const createPublishQueue = (
     const delay = Math.max(earliestRetry - now, 100);
     retryTimer = setTimeout(() => {
       if (!destroyed && buffer.size > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-use-before-define
         flush();
       }
     }, delay);
@@ -216,7 +219,7 @@ export const createPublishQueue = (
     return Array.from(new Set(writeRelays.map((r: Relay) => r.url)));
   };
 
-  const flush = async (): Promise<void> => {
+  async function flush(): Promise<void> {
     if (flushing || destroyed || buffer.size === 0) return;
     flushing = true;
 
@@ -307,7 +310,7 @@ export const createPublishQueue = (
     } finally {
       flushing = false;
     }
-  };
+  }
 
   const publishDeleteImmediate = async (
     event: UnsignedEvent & EventAttachment

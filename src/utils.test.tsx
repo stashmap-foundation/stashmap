@@ -333,7 +333,17 @@ function TestPublishProvider({
   children: React.ReactNode;
 }): JSX.Element {
   return (
-    <DataContextProvider {...DEFAULT_DATA_CONTEXT_PROPS}>
+    <DataContextProvider
+      user={DEFAULT_DATA_CONTEXT_PROPS.user}
+      contacts={DEFAULT_DATA_CONTEXT_PROPS.contacts}
+      contactsRelays={DEFAULT_DATA_CONTEXT_PROPS.contactsRelays}
+      knowledgeDBs={DEFAULT_DATA_CONTEXT_PROPS.knowledgeDBs}
+      relaysInfos={DEFAULT_DATA_CONTEXT_PROPS.relaysInfos}
+      publishEventsStatus={DEFAULT_DATA_CONTEXT_PROPS.publishEventsStatus}
+      views={DEFAULT_DATA_CONTEXT_PROPS.views}
+      projectMembers={DEFAULT_DATA_CONTEXT_PROPS.projectMembers}
+      panes={DEFAULT_DATA_CONTEXT_PROPS.panes}
+    >
       <PlanningContextProvider setPublishEvents={() => {}}>
         {children}
       </PlanningContextProvider>
@@ -380,33 +390,33 @@ export function renderApis(
           }}
         >
           <TestPublishProvider>
-              <NostrAuthContextProvider
-                defaultRelayUrls={
-                  optionsWithDefaultUser.defaultRelays ||
-                  TEST_RELAYS.map((r) => r.url)
-                }
-              >
-                <UserRelayContextProvider>
-                  <PaneIndexProvider index={0}>
-                    <VirtuosoMockContext.Provider
-                      value={{ viewportHeight: 10000, itemHeight: 100 }}
-                    >
-                      {options?.includeFocusContext === true ? (
-                        <FocusContextProvider>{children}</FocusContextProvider>
-                      ) : (
-                        <FocusContext.Provider
-                          value={{
-                            isInputElementInFocus: true,
-                            setIsInputElementInFocus: jest.fn(),
-                          }}
-                        >
-                          {children}
-                        </FocusContext.Provider>
-                      )}
-                    </VirtuosoMockContext.Provider>
-                  </PaneIndexProvider>
-                </UserRelayContextProvider>
-              </NostrAuthContextProvider>
+            <NostrAuthContextProvider
+              defaultRelayUrls={
+                optionsWithDefaultUser.defaultRelays ||
+                TEST_RELAYS.map((r) => r.url)
+              }
+            >
+              <UserRelayContextProvider>
+                <PaneIndexProvider index={0}>
+                  <VirtuosoMockContext.Provider
+                    value={{ viewportHeight: 10000, itemHeight: 100 }}
+                  >
+                    {options?.includeFocusContext === true ? (
+                      <FocusContextProvider>{children}</FocusContextProvider>
+                    ) : (
+                      <FocusContext.Provider
+                        value={{
+                          isInputElementInFocus: true,
+                          setIsInputElementInFocus: jest.fn(),
+                        }}
+                      >
+                        {children}
+                      </FocusContext.Provider>
+                    )}
+                  </VirtuosoMockContext.Provider>
+                </PaneIndexProvider>
+              </UserRelayContextProvider>
+            </NostrAuthContextProvider>
           </TestPublishProvider>
         </ApiProvider>
       </NavigationStackProvider>

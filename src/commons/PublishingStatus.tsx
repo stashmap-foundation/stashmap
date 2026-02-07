@@ -49,6 +49,27 @@ function getLastRejectedReason(
   return lastRejected ? lastRejected.reason : undefined;
 }
 
+function StatsDisplay({
+  numberFulfilled,
+  total,
+  numberRejected,
+  pendingCount,
+}: {
+  numberFulfilled: number;
+  total: number;
+  numberRejected: number;
+  pendingCount: number;
+}): JSX.Element {
+  const text = `${numberFulfilled}/${total}`;
+  if (numberRejected > 0) {
+    return <span className="text-danger">{text}</span>;
+  }
+  if (pendingCount > 0) {
+    return <span className="text-warning">{text}</span>;
+  }
+  return <span className="text-success">{text}</span>;
+}
+
 function RelayRow({
   relayUrl,
   status,
@@ -72,19 +93,12 @@ function RelayRow({
         <span className="publish-relay-name">{relayName}</span>
         {total > 0 && (
           <span className="publish-relay-stats">
-            {numberRejected > 0 ? (
-              <span className="text-danger">
-                {`${numberFulfilled}/${total}`}
-              </span>
-            ) : pendingCount > 0 ? (
-              <span className="text-warning">
-                {`${numberFulfilled}/${total}`}
-              </span>
-            ) : (
-              <span className="text-success">
-                {`${numberFulfilled}/${total}`}
-              </span>
-            )}
+            <StatsDisplay
+              numberFulfilled={numberFulfilled}
+              total={total}
+              numberRejected={numberRejected}
+              pendingCount={pendingCount}
+            />
           </span>
         )}
         {lastError && (

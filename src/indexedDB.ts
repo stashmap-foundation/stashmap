@@ -1,3 +1,4 @@
+/* eslint-disable functional/immutable-data */
 import { UnsignedEvent } from "nostr-tools";
 
 const DB_NAME = "stashmap";
@@ -40,7 +41,9 @@ const txStore = (
   mode: IDBTransactionMode
 ): IDBObjectStore => db.transaction(store, mode).objectStore(store);
 
-export const getOutboxEvents = (db: StashmapDB): Promise<ReadonlyArray<OutboxEntry>> =>
+export const getOutboxEvents = (
+  db: StashmapDB
+): Promise<ReadonlyArray<OutboxEntry>> =>
   new Promise((resolve, reject) => {
     const request = txStore(db, OUTBOX_STORE, "readonly").getAll();
     request.onsuccess = () => resolve(request.result);
@@ -57,10 +60,7 @@ export const putOutboxEvent = (
     request.onerror = () => reject(request.error);
   });
 
-export const removeOutboxEvent = (
-  db: StashmapDB,
-  key: string
-): Promise<void> =>
+export const removeOutboxEvent = (db: StashmapDB, key: string): Promise<void> =>
   new Promise((resolve, reject) => {
     const request = txStore(db, OUTBOX_STORE, "readwrite").delete(key);
     request.onsuccess = () => resolve();

@@ -188,6 +188,18 @@ export function planRemoveContact(plan: Plan, publicKey: PublicKey): Plan {
   };
 }
 
+function filterOldReplaceableEvent(
+  publishEvents: List<UnsignedEvent & EventAttachment>,
+  kind: number,
+  dTagValue: string
+): List<UnsignedEvent & EventAttachment> {
+  return publishEvents.filterNot(
+    (event) =>
+      event.kind === kind &&
+      event.tags.some((tag) => tag[0] === "d" && tag[1] === dTagValue)
+  );
+}
+
 export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
   const updatedRelations = userDB.relations.set(
@@ -198,27 +210,22 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
     ...userDB,
     relations: updatedRelations,
   };
-  // Items with relevance and optional argument: ["i", nodeID, relevance, argument?]
-  // relevance undefined is serialized as empty string ""
   const itemsAsTags = relations.items.toArray().map((item) => {
     const relevanceStr = item.relevance ?? "";
     return item.argument
       ? ["i", item.nodeID, relevanceStr, item.argument]
       : ["i", item.nodeID, relevanceStr];
   });
-  // Context tags: ["c", id] for each ancestor (enables relay-level context queries)
   const contextTags = relations.context.toArray().map((id) => ["c", id]);
-  // basedOn tag: ["b", relationID] - tracks what this relation was forked from
   const basedOnTag = relations.basedOn ? [["b", relations.basedOn]] : [];
+  const dTag = shortID(relations.id);
   const updateRelationsEvent = {
     kind: KIND_KNOWLEDGE_LIST,
     pubkey: plan.user.publicKey,
     created_at: newTimestamp(),
     tags: [
-      ["d", shortID(relations.id)],
-      // Cannot use fullID here because we need to query for short IDs
+      ["d", dTag],
       ["k", shortID(relations.head)],
-      // Full ID Head
       ["head", relations.head],
       ...contextTags,
       ...basedOnTag,
@@ -226,10 +233,15 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
     ],
     content: "",
   };
+  const deduped = filterOldReplaceableEvent(
+    plan.publishEvents,
+    KIND_KNOWLEDGE_LIST,
+    dTag
+  );
   return {
     ...plan,
     knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
-    publishEvents: plan.publishEvents.push(updateRelationsEvent),
+    publishEvents: deduped.push(updateRelationsEvent),
   };
 }
 
@@ -240,17 +252,23 @@ export function planUpsertNode(plan: Plan, node: KnowNode): Plan {
     ...userDB,
     nodes: updatedNodes,
   };
+  const dTag = shortID(node.id);
   const updateNodeEvent = {
     kind: KIND_KNOWLEDGE_NODE,
     pubkey: plan.user.publicKey,
     created_at: newTimestamp(),
-    tags: [["d", shortID(node.id)]],
+    tags: [["d", dTag]],
     content: node.text,
   };
+  const deduped = filterOldReplaceableEvent(
+    plan.publishEvents,
+    KIND_KNOWLEDGE_NODE,
+    dTag
+  );
   return {
     ...plan,
     knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
-    publishEvents: plan.publishEvents.push(updateNodeEvent),
+    publishEvents: deduped.push(updateNodeEvent),
   };
 }
 

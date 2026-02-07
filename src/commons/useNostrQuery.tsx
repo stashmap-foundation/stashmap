@@ -38,8 +38,14 @@ export function findTag(event: EventTemplate, tag: string): string | undefined {
 }
 
 export function sortEvents<T extends EventTemplate>(events: List<T>): List<T> {
-  return events.sortBy((event, index) =>
-    parseFloat(`${event.created_at}.${index}`)
+  return events.sortBy(
+    (event, index) => [event.created_at, index] as [number, number],
+    (a, b) => {
+      if (a[0] !== b[0]) {
+        return a[0] < b[0] ? -1 : 1;
+      }
+      return a[1] < b[1] ? -1 : 1;
+    }
   );
 }
 

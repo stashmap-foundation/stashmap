@@ -340,8 +340,6 @@ function EditableContent(): JSX.Element {
     // Must happen BEFORE disconnect so views are still available to copy
     const planWithDeepCopy = planDeepCopyNodeWithView(
       planWithExpand,
-      nodeID,
-      context,
       viewPath,
       prevSibling.viewPath,
       stack
@@ -433,11 +431,8 @@ function EditableContent(): JSX.Element {
       return;
     }
 
-    const context = getContext(basePlan, viewPath, stack);
     const planWithCopy = planDeepCopyNodeWithView(
       basePlan,
-      nodeID,
-      context,
       viewPath,
       grandParentPath,
       stack,

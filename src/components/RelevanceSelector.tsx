@@ -9,10 +9,8 @@ import {
 import {
   useViewPath,
   getParentView,
-  useNodeID,
   useNode,
   useDisplayText,
-  getContext,
 } from "../ViewContext";
 import { usePlanner, planDeepCopyNode } from "../planner";
 import { usePaneStack } from "../SplitPanesContext";
@@ -73,7 +71,6 @@ export function RelevanceSelector({
 
   // Hooks for suggestions (accepting with relevance)
   const viewPath = useViewPath();
-  const [nodeID] = useNodeID();
   const [node] = useNode();
   const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
@@ -84,16 +81,12 @@ export function RelevanceSelector({
   const editorTextContext = useEditorText();
   const editorText = editorTextContext?.text ?? "";
 
-  // For suggestions, accept with the specified relevance level
-  // Uses planDeepCopyNode to resolve crefs and copy children
   const acceptWithLevel = (level: number): void => {
     if (!parentPath) return;
     const relevance = levelToRelevance(level);
-    const sourceContext = getContext(createPlan(), viewPath, stack);
     const [plan] = planDeepCopyNode(
       createPlan(),
-      nodeID,
-      sourceContext,
+      viewPath,
       parentPath,
       stack,
       undefined,

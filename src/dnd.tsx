@@ -204,8 +204,6 @@ export function dnd(
 
         const planWithCopy = planDeepCopyNodeWithView(
           accPlan,
-          sourceNodeID,
-          sourceContext,
           sourcePath,
           toView,
           stack,
@@ -264,8 +262,6 @@ export function dnd(
 
     return planDeepCopyNodeWithView(
       accPlan,
-      sourceNodeID,
-      sourceContext,
       sourcePath,
       toView,
       stack,

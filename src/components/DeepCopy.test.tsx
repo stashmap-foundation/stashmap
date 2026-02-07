@@ -221,18 +221,14 @@ My Notes
     Child B
     `);
 
-    // Open split pane
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-
-    // Navigate pane 1 to Source (Source has no children as root, so no expand/collapse)
     await navigateToNodeViaSearch(1, "Source");
 
-    // Drag Child A from pane 0 to My Notes (use collapse button to target tree node, not breadcrumb)
-    fireEvent.dragStart(screen.getAllByText("Child A")[0]);
+    // Drag Child A from pane 1 to My Notes in pane 0 (cross-pane = copy)
+    const childAs = screen.getAllByText("Child A");
+    fireEvent.dragStart(childAs[childAs.length - 1]);
     fireEvent.drop(screen.getAllByLabelText("collapse My Notes")[0]);
 
-    // Child A should appear under My Notes (deep copied)
-    // Pane 1 shows Source as root with children
     await expectTree(`
 My Notes
   Child A

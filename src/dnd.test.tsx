@@ -1,10 +1,12 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { List, Map, OrderedSet } from "immutable";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   BOB,
   expectTree,
+  findNewNodeEditor,
+  follow,
   navigateToNodeViaSearch,
   renderApp,
   renderTree,
@@ -412,4 +414,135 @@ test("Alt-dragging a normal node creates a reference", () => {
     target.id,
     createAbstractRefId(List([root.id]), sourceNode.id),
   ]);
+});
+
+test("Deep copy preserves all children when forked duplicate relations exist", async () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  await follow(alice, bob().user.publicKey);
+
+  renderTree(bob);
+  await type(
+    "Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Sevilla{Enter}Barcelona{Enter}Madrid{Escape}"
+  );
+  await expectTree(`
+Holiday Destinations
+  Spain
+    Sevilla
+    Barcelona
+    Madrid
+  `);
+  cleanup();
+
+  renderTree(alice);
+  await type(
+    "Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Valencia{Enter}Malaga{Escape}"
+  );
+
+  await userEvent.click(
+    await screen.findByLabelText("show references to Spain")
+  );
+
+  await userEvent.click(
+    await screen.findByLabelText(
+      "expand Holiday Destinations \u2192 Spain"
+    )
+  );
+
+  await expectTree(`
+Holiday Destinations
+  Spain
+    Holiday Destinations \u2192 Spain
+      Holiday Destinations \u2192 Spain (2)
+      [O] Holiday Destinations \u2192 Spain (3)
+  `);
+
+  const fullscreenButtons = await screen.findAllByLabelText(
+    /open Holiday Destinations . Spain \(\d+\) in fullscreen/
+  );
+  await userEvent.click(fullscreenButtons[1]);
+
+  await expectTree(`
+Spain
+  Sevilla
+  Barcelona
+  Madrid
+  `);
+
+  await userEvent.click(
+    await screen.findByLabelText("fork to make your own copy")
+  );
+
+  await expectTree(`
+Spain
+  Sevilla
+  Barcelona
+  Madrid
+  `);
+
+  cleanup();
+
+  renderApp(alice());
+
+  await screen.findByLabelText("Navigate to Holiday Destinations");
+  await userEvent.click(
+    await screen.findByLabelText("Navigate to Holiday Destinations")
+  );
+
+  await userEvent.click(
+    await screen.findByLabelText("edit Holiday Destinations")
+  );
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+
+  await userEvent.click(
+    await screen.findByLabelText("show references to Spain")
+  );
+
+  await userEvent.click(
+    await screen.findByLabelText(
+      "expand Holiday Destinations \u2192 Spain"
+    )
+  );
+
+  await expectTree(`
+Holiday Destinations
+  Target
+  Spain
+    Holiday Destinations \u2192 Spain
+      Holiday Destinations \u2192 Spain (3)
+      Holiday Destinations \u2192 Spain (2)
+      [O] Holiday Destinations \u2192 Spain (3)
+  `);
+
+  const openOldRef = await screen.findAllByLabelText(
+    /open Holiday Destinations . Spain \(\d+\) in fullscreen/
+  );
+  await userEvent.click(openOldRef[1]);
+
+  await expectTree(`
+Spain
+  Valencia
+  Malaga
+  `);
+
+  await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+  await navigateToNodeViaSearch(1, "Target");
+
+  const spainTreeItems = screen.getAllByRole("treeitem", { name: "Spain" });
+  const targetDropTargets = screen.getAllByRole("treeitem", { name: "Target" });
+  fireEvent.dragStart(spainTreeItems[0]);
+  fireEvent.drop(targetDropTargets[targetDropTargets.length - 1]);
+
+  const expandButtons = await screen.findAllByLabelText("expand Spain");
+  await userEvent.click(expandButtons[expandButtons.length - 1]);
+
+  await expectTree(`
+Spain
+  Valencia
+  Malaga
+Target
+  Spain
+    Valencia
+    Malaga
+  `);
 });

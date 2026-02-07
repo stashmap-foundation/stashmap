@@ -556,13 +556,23 @@ function planCopyDescendantRelations(
   sourceNodeID: LongID | ID,
   sourceContext: Context,
   transformContext: (relation: Relations) => Context,
-  filterRelation?: (relation: Relations) => boolean
+  filterRelation?: (relation: Relations) => boolean,
+  sourceRelation?: Relations
 ): [Plan, RelationsIdMapping] {
-  const descendants = getDescendantRelations(
+  const allDescendants = getDescendantRelations(
     plan.knowledgeDBs,
     sourceNodeID,
     sourceContext
   ).filter(filterRelation ?? (() => true));
+  const descendants: List<Relations> = sourceRelation
+    ? allDescendants
+        .filter(
+          (r) =>
+            r.head !== sourceRelation.head ||
+            !contextsMatch(r.context, sourceRelation.context)
+        )
+        .push(sourceRelation)
+    : allDescendants;
 
   return descendants.reduce(
     ([accPlan, accMapping], relation) => {
@@ -634,28 +644,31 @@ export function planForkPane(
 
 export function planDeepCopyNode(
   plan: Plan,
-  sourceNodeID: LongID | ID,
-  sourceContext: Context,
+  sourceViewPath: ViewPath,
   targetParentViewPath: ViewPath,
   stack: ID[],
   insertAtIndex?: number,
   relevance?: Relevance,
   argument?: Argument
 ): [Plan, RelationsIdMapping] {
-  // Resolve crefs to their actual content
+  const [sourceNodeID] = getNodeIDFromView(plan, sourceViewPath);
+  const sourceStack = getPane(plan, sourceViewPath).stack;
+  const sourceContext = getContext(plan, sourceViewPath, sourceStack);
+  const sourceRelation = getRelationForView(plan, sourceViewPath, sourceStack);
+
   const resolveSource = (): { nodeID: LongID | ID; context: Context } => {
     if (isConcreteRefId(sourceNodeID)) {
       const parsed = parseConcreteRefId(sourceNodeID);
       if (parsed) {
-        const sourceRelation = getRelationsNoReferencedBy(
+        const relation = getRelationsNoReferencedBy(
           plan.knowledgeDBs,
           parsed.relationID,
           plan.user.publicKey
         );
-        if (sourceRelation) {
+        if (relation) {
           return {
-            nodeID: sourceRelation.head,
-            context: sourceRelation.context,
+            nodeID: relation.head,
+            context: relation.context,
           };
         }
       }
@@ -701,7 +714,9 @@ export function planDeepCopyNode(
       return isDirectChildrenRelation
         ? nodeNewContext
         : nodeNewContext.concat(relation.context.skip(resolvedContext.size));
-    }
+    },
+    undefined,
+    sourceRelation
   );
 
   return [finalPlan, mapping];
@@ -709,8 +724,6 @@ export function planDeepCopyNode(
 
 export function planDeepCopyNodeWithView(
   plan: Plan,
-  sourceNodeID: LongID | ID,
-  sourceContext: Context,
   sourceViewPath: ViewPath,
   targetParentViewPath: ViewPath,
   stack: ID[],
@@ -718,8 +731,7 @@ export function planDeepCopyNodeWithView(
 ): Plan {
   const [planWithCopy, relationsIdMapping] = planDeepCopyNode(
     plan,
-    sourceNodeID,
-    sourceContext,
+    sourceViewPath,
     targetParentViewPath,
     stack,
     insertAtIndex

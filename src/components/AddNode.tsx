@@ -181,6 +181,10 @@ export function MiniEditor({
       e.preventDefault();
       const text = getText().trim();
       if (!text) {
+        if (onShiftTab) {
+          onShiftTab(text, getCursorPosition());
+          return;
+        }
         onClose?.();
         return;
       }

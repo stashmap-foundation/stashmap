@@ -51,7 +51,7 @@ export function KeyboardShortcutsModal({
 
         <h6>Insert Mode</h6>
         <ul>
-          <li>Enter: save and create next editor</li>
+          <li>Enter: save and create next editor (empty editor: outdent)</li>
           <li>Escape: save/close editor and return to normal mode</li>
           <li>Tab: indent at cursor start, Shift+Tab: outdent</li>
         </ul>

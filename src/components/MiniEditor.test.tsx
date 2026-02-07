@@ -110,6 +110,30 @@ describe("MiniEditor", () => {
       });
     });
 
+    test("Enter on empty editor triggers outdent callback when available", async () => {
+      const onSave = jest.fn();
+      const onClose = jest.fn();
+      const onShiftTab = jest.fn();
+      render(
+        <MiniEditor
+          initialText=""
+          onSave={onSave}
+          onClose={onClose}
+          onShiftTab={onShiftTab}
+          autoFocus={false}
+        />
+      );
+
+      const editor = screen.getByRole("textbox");
+      await userEvent.click(editor);
+      await userEvent.keyboard("{Enter}");
+
+      expect(onShiftTab).toHaveBeenCalledTimes(1);
+      expect(onShiftTab).toHaveBeenCalledWith("", 0);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(onSave).not.toHaveBeenCalled();
+    });
+
     test("initialText prop change resets tracking, allowing new save", async () => {
       const onSave = jest.fn();
       const { rerender } = render(

@@ -85,13 +85,26 @@ My Notes
       `);
     });
 
-    test("Empty Enter closes editor without creating node", async () => {
+    test("Empty Enter on new node follows Shift+Tab behavior when outdent is unavailable", async () => {
       const [alice] = setup([ALICE]);
       renderTree(alice);
       await type("Parent{Enter}{Tab}{Enter}");
 
       await expectTree(`
 Parent
+  [NEW NODE]
+      `);
+    });
+
+    test("Empty Enter on nested new node outdents like Shift+Tab", async () => {
+      const [alice] = setup([ALICE]);
+      renderTree(alice);
+      await type("Root{Enter}{Tab}Parent{Enter}{Tab}{Enter}");
+
+      await expectTree(`
+Root
+  Parent
+  [NEW NODE]
       `);
     });
 

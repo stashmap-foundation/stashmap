@@ -14,6 +14,7 @@ global.ResizeObserver = function ResizeObserver() {};
 global.ResizeObserver.prototype.observe = () => {};
 global.ResizeObserver.prototype.unobserve = () => {};
 global.ResizeObserver.prototype.disconnect = () => {};
+Element.prototype.scrollIntoView = () => {};
 /* eslint-enable functional/immutable-data */
 
 /* eslint-disable no-console */

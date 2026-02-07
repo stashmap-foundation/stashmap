@@ -50,6 +50,8 @@ import {
   getRowIndex,
   getRowKey,
   isEditableElement,
+  registerScrollToRow,
+  unregisterScrollToRow,
 } from "./keyboardNavigation";
 
 function getAncestorPaths(path: string, rootKey: string): string[] {
@@ -123,6 +125,18 @@ function VirtuosoForColumn({
   useDragAutoScroll(scrollParent);
 
   useEffect(() => {
+    const treeRoot = containerRef.current?.closest("[data-keyboard-mode]");
+    if (treeRoot instanceof HTMLElement && virtuosoRef.current) {
+      const ref = virtuosoRef;
+      registerScrollToRow(treeRoot, (index, done) => {
+        ref.current?.scrollIntoView({ index, behavior: "auto", done });
+      });
+      return () => unregisterScrollToRow(treeRoot);
+    }
+    return undefined;
+  }, [scrollParent]);
+
+  useEffect(() => {
     if (virtuosoRef.current) {
       virtuosoRef.current.scrollToIndex({
         align: "start",
@@ -161,6 +175,9 @@ function VirtuosoForColumn({
               />
             </ViewContext.Provider>
           );
+        }}
+        components={{
+          Footer: () => <div style={{ height: "50vh" }} />,
         }}
       />
     </div>
@@ -422,7 +439,11 @@ function Tree(): JSX.Element | null {
   };
 
   return (
-    <div ref={treeRootRef} data-keyboard-mode={keyboardMode}>
+    <div
+      ref={treeRootRef}
+      data-keyboard-mode={keyboardMode}
+      data-total-rows={nodes.size}
+    >
       <TreeViewNodeLoader nodes={nodes} range={range}>
         <VirtuosoForColumn
           nodes={nodes}

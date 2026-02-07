@@ -34,6 +34,7 @@ import {
   getRowDepth,
   getRowFromElement,
   getRowKey,
+  getScrollToRow,
   isEditableElement,
 } from "./keyboardNavigation";
 
@@ -335,10 +336,26 @@ function getActiveRow(root: HTMLElement): HTMLElement | undefined {
   return active || rows[0];
 }
 
-function focusRowAt(root: HTMLElement, index: number): void {
-  const rows = getFocusableRows(root);
-  const target = rows[index];
-  focusRow(target);
+function scrollAndFocusRow(root: HTMLElement, index: number): void {
+  const target = root.querySelector(
+    `[data-row-focusable="true"][data-row-index="${index}"]`
+  );
+  if (target instanceof HTMLElement) {
+    target.scrollIntoView({ block: "nearest" });
+    focusRow(target);
+    return;
+  }
+  const scrollToRow = getScrollToRow(root);
+  if (scrollToRow) {
+    scrollToRow(index, () => {
+      const retryTarget = root.querySelector(
+        `[data-row-focusable="true"][data-row-index="${index}"]`
+      );
+      if (retryTarget instanceof HTMLElement) {
+        focusRow(retryTarget);
+      }
+    });
+  }
 }
 
 function focusParentRow(root: HTMLElement, activeRow: HTMLElement): void {
@@ -407,13 +424,15 @@ function focusAdjacentRowEditor(
 ): void {
   const currentIndex = Number(currentRow.getAttribute("data-row-index") || "0");
   const targetIndex = currentIndex + delta;
-  const rows = getFocusableRows(root);
-  const targetRow = rows[targetIndex];
-  if (!targetRow) {
+  const target = root.querySelector(
+    `[data-row-focusable="true"][data-row-index="${targetIndex}"]`
+  );
+  if (!(target instanceof HTMLElement)) {
     return;
   }
-  focusRow(targetRow);
-  focusRowEditor(targetRow);
+  target.scrollIntoView({ block: "nearest" });
+  focusRow(target);
+  focusRowEditor(target);
 }
 
 function toggleRowOpenInSplitPane(activeRow: HTMLElement): void {
@@ -784,7 +803,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (e.key === "g") {
       if (lastSequenceKey === "g" && now - lastSequenceTs < 600) {
         e.preventDefault();
-        focusRowAt(root, 0);
+        scrollAndFocusRow(root, 0);
         setLastSequence(null, 0);
         return;
       }
@@ -825,8 +844,13 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (e.key === "G") {
       e.preventDefault();
       setKeyboardNavActive(true);
-      const rows = getFocusableRows(root);
-      focusRow(rows[rows.length - 1]);
+      const treeRoot = root.querySelector("[data-total-rows]");
+      const totalRows = Number(
+        treeRoot?.getAttribute("data-total-rows") || "0"
+      );
+      if (totalRows > 0) {
+        scrollAndFocusRow(root, totalRows - 1);
+      }
       return;
     }
 
@@ -837,7 +861,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         focusRow(activeRow);
         return;
       }
-      focusRowAt(root, activeIndex + 1);
+      scrollAndFocusRow(root, activeIndex + 1);
       return;
     }
 
@@ -848,7 +872,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         focusRow(activeRow);
         return;
       }
-      focusRowAt(root, activeIndex - 1);
+      scrollAndFocusRow(root, activeIndex - 1);
       return;
     }
 

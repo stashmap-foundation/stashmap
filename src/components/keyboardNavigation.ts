@@ -56,3 +56,25 @@ export function focusRow(row: HTMLElement | undefined): void {
   }
   row.focus();
 }
+
+export type ScrollToRowFn = (index: number, done?: () => void) => void;
+
+const scrollCallbacks = new Map<HTMLElement, ScrollToRowFn>();
+
+export function registerScrollToRow(el: HTMLElement, fn: ScrollToRowFn): void {
+  scrollCallbacks.set(el, fn);
+}
+
+export function unregisterScrollToRow(el: HTMLElement): void {
+  scrollCallbacks.delete(el);
+}
+
+export function getScrollToRow(
+  paneRoot: HTMLElement
+): ScrollToRowFn | undefined {
+  const treeRoot = paneRoot.querySelector("[data-keyboard-mode]");
+  if (treeRoot instanceof HTMLElement) {
+    return scrollCallbacks.get(treeRoot);
+  }
+  return undefined;
+}

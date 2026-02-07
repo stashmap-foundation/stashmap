@@ -1,10 +1,10 @@
+import { hexToBytes } from "@noble/hashes/utils";
 import { List } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
-import { createPublishQueue, PublishQueueConfig, FlushDeps } from "./PublishQueue";
-import { mockRelayPool, MockRelayPool } from "./nostrMock.test";
-import { mockFinalizeEvent, ALICE_PRIVATE_KEY } from "./utils.test";
 import { KIND_KNOWLEDGE_NODE } from "./nostr";
-import { hexToBytes } from "@noble/hashes/utils";
+import { mockRelayPool, MockRelayPool } from "./nostrMock.test";
+import { createPublishQueue, FlushDeps } from "./PublishQueue";
+import { mockFinalizeEvent, ALICE_PRIVATE_KEY } from "./utils.test";
 
 jest.mock("./indexedDB");
 
@@ -16,9 +16,7 @@ const ALICE_USER: User = {
 
 const TEST_RELAYS: AllRelays = {
   defaultRelays: [],
-  userRelays: [
-    { url: "wss://relay.test/", read: true, write: true },
-  ],
+  userRelays: [{ url: "wss://relay.test/", read: true, write: true }],
   contactsRelays: [],
 };
 
@@ -86,9 +84,7 @@ const makeQueue = (
 test("flushes remaining events via re-scheduled flush after first batch", async () => {
   const { queue, relayPool, onResults } = makeQueue({ batchSize: 2 });
 
-  queue.enqueue(
-    List([makeEvent("a"), makeEvent("b"), makeEvent("c")])
-  );
+  queue.enqueue(List([makeEvent("a"), makeEvent("b"), makeEvent("c")]));
 
   await waitForResults(onResults, 2);
 
@@ -151,7 +147,9 @@ test("events from multiple plans are published in enqueue order", async () => {
     debounceMs: 10,
   });
 
-  queue.enqueue(List([makeEvent("plan1-a"), makeEvent("plan1-b"), makeEvent("plan1-c")]));
+  queue.enqueue(
+    List([makeEvent("plan1-a"), makeEvent("plan1-b"), makeEvent("plan1-c")])
+  );
   queue.enqueue(List([makeEvent("plan2-a"), makeEvent("plan2-b")]));
 
   await waitForResults(onResults, 3);

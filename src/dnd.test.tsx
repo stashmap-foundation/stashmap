@@ -55,7 +55,7 @@ Root
   `);
 });
 
-test("Drag between split panes", async () => {
+test("Same-pane drag to different parent moves node", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
 
@@ -86,8 +86,14 @@ Root
   fireEvent.dragStart(draggableItems[0]);
   fireEvent.drop(rootToggle);
 
-  const allDraggableItems = screen.getAllByText("Draggable Item");
-  expect(allDraggableItems.length).toBeGreaterThanOrEqual(2);
+  await expectTree(`
+Root
+  Draggable Item
+  Parent
+    Child A
+Parent
+  Child A
+  `);
 });
 
 test("Diff items are always added, never moved", () => {

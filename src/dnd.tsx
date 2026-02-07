@@ -23,6 +23,10 @@ import {
   getLast,
   getContext,
   getRelationForView,
+  getPaneIndex,
+  addNodeToPathWithRelations,
+  viewPathToString,
+  copyViewsWithNewPrefix,
 } from "./ViewContext";
 import { getNodesInTree } from "./components/Node";
 import {
@@ -116,15 +120,22 @@ export function dnd(
     : undefined;
   const toRelation = getRelationForView(plan, toView, stack);
 
-  // Suggestions are always added, never moved (they're from other users)
-  const move =
-    !isSuggestion &&
-    dropIndex !== undefined &&
+  const sourcePaneIndex = getPaneIndex(sourceViewPath);
+  const targetPaneIndex = getPaneIndex(rootView);
+  const isSamePane = sourcePaneIndex === targetPaneIndex;
+
+  const sameRelation =
     fromRelation !== undefined &&
     toRelation !== undefined &&
     fromRelation.id === toRelation.id;
 
-  if (move) {
+  const reorder =
+    isSamePane &&
+    !isSuggestion &&
+    sameRelation &&
+    dropIndex !== undefined;
+
+  if (reorder) {
     const sourceIndices = List(
       sources.map((n) => getRelationIndex(plan, parseViewPath(n)))
     ).filter((n) => n !== undefined) as List<number>;
@@ -144,14 +155,68 @@ export function dnd(
     );
     return planUpdateViews(updatedRelationsPlan, updatedViews);
   }
-  // Copy each source into target:
-  // - Default: normal nodes deep copy, refs remain refs
-  // - Alt: normal nodes become references
-  // - Non-suggestion references are always copied as references (never deep copied)
-  // - Suggestions default to deep copy; Alt creates a reference copy
+
+  const samePaneMove =
+    isSamePane &&
+    !isSuggestion &&
+    !invertCopyMode &&
+    !sameRelation &&
+    dropIndex !== undefined;
+
+  if (samePaneMove) {
+    return sources
+      .toList()
+      .reduce((accPlan: Plan, s: string, idx: number) => {
+        const sourcePath = parseViewPath(s);
+        const [sourceNodeID] = getNodeIDFromView(accPlan, sourcePath);
+        const sourceStack = getPane(accPlan, sourcePath).stack;
+        const sourceContext = getContext(accPlan, sourcePath, sourceStack);
+        const insertAt = dropIndex + idx;
+
+        if (isRefId(sourceNodeID)) {
+          const planWithAdd = planAddToParent(
+            accPlan,
+            sourceNodeID,
+            toView,
+            stack,
+            insertAt
+          );
+          const relations = getRelationForView(planWithAdd, toView, stack);
+          if (relations) {
+            const targetIndex = insertAt ?? relations.items.size - 1;
+            const targetViewPath = addNodeToPathWithRelations(
+              toView,
+              relations,
+              targetIndex
+            );
+            const sourceKey = viewPathToString(sourcePath);
+            const targetKey = viewPathToString(targetViewPath);
+            const updatedViews = copyViewsWithNewPrefix(
+              planWithAdd.views,
+              sourceKey,
+              targetKey
+            );
+            const planWithViews = planUpdateViews(planWithAdd, updatedViews);
+            return planDisconnectFromParent(planWithViews, sourcePath, stack);
+          }
+          return planDisconnectFromParent(planWithAdd, sourcePath, stack);
+        }
+
+        const planWithCopy = planDeepCopyNodeWithView(
+          accPlan,
+          sourceNodeID,
+          sourceContext,
+          sourcePath,
+          toView,
+          stack,
+          insertAt
+        );
+        return planDisconnectFromParent(planWithCopy, sourcePath, stack);
+      }, plan);
+  }
+
   const [, toViewData] = getNodeIDFromView(plan, toView);
 
-  // Ensure target is expanded
   const expandedPlan = toViewData.expanded
     ? plan
     : planExpandNode(plan, toViewData, toView);

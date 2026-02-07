@@ -7,21 +7,30 @@ import { PublishingStatusContent } from "../commons/PublishingStatus";
 import { getWriteRelays } from "../relays";
 import { useUserRelayContext } from "../UserRelayContext";
 
-function getStatusInfo(publishEventsStatus: EventState): {
+function getRelayRatio(
+  results: PublishResultsEventMap,
+  writeRelayUrls: string[]
+): { succeeded: number; total: number } | undefined {
+  if (results.isEmpty() || writeRelayUrls.length === 0) {
+    return undefined;
+  }
+  const succeeded = writeRelayUrls.filter(
+    (url) => !results.some((r) => r.results.get(url)?.status === "rejected")
+  ).length;
+  return { succeeded, total: writeRelayUrls.length };
+}
+
+function getStatusInfo(
+  publishEventsStatus: EventState,
+  writeRelayUrls: string[]
+): {
   text: string;
   segmentClass: string;
 } {
   const { isLoading, results, queueStatus } = publishEventsStatus;
   const pendingCount = queueStatus?.pendingCount ?? 0;
   const isFlushing = queueStatus?.flushing ?? false;
-
-  const hasErrors = results.some((r) =>
-    r.results.some((s) => s.status === "rejected")
-  );
-
-  const errorCount = hasErrors
-    ? results.count((r) => r.results.some((s) => s.status === "rejected"))
-    : 0;
+  const ratio = getRelayRatio(results, writeRelayUrls);
 
   if (isFlushing || isLoading) {
     return {
@@ -30,10 +39,10 @@ function getStatusInfo(publishEventsStatus: EventState): {
     };
   }
 
-  if (pendingCount > 0 && hasErrors) {
+  if (pendingCount > 0 && ratio && ratio.succeeded < ratio.total) {
     return {
-      text: `${pendingCount} pending · ${errorCount} error`,
-      segmentClass: "status-segment-error",
+      text: `${pendingCount} pending · ${ratio.succeeded}/${ratio.total} relays`,
+      segmentClass: "status-segment-warning",
     };
   }
 
@@ -44,8 +53,15 @@ function getStatusInfo(publishEventsStatus: EventState): {
     };
   }
 
-  if (hasErrors) {
+  if (ratio && ratio.succeeded === 0) {
     return { text: "error", segmentClass: "status-segment-error" };
+  }
+
+  if (ratio && ratio.succeeded < ratio.total) {
+    return {
+      text: `${ratio.succeeded}/${ratio.total} relays`,
+      segmentClass: "status-segment-warning",
+    };
   }
 
   return { text: "synced", segmentClass: "status-segment-dark" };
@@ -56,7 +72,10 @@ export function PublishingStatusWrapper(): JSX.Element {
   const { publishEventsStatus } = useData();
   const { userRelays } = useUserRelayContext();
   const writeRelayUrls = getWriteRelays(userRelays).map((r) => r.url);
-  const { text, segmentClass } = getStatusInfo(publishEventsStatus);
+  const { text, segmentClass } = getStatusInfo(
+    publishEventsStatus,
+    writeRelayUrls
+  );
 
   return (
     <Dropdown className="status-dropdown">

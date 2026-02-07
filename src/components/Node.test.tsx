@@ -779,7 +779,7 @@ My Notes
     `);
   });
 
-  test("Empty editor closes without creating a node", async () => {
+  test("Empty Enter keeps new editor visible when outdent is unavailable", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -801,13 +801,14 @@ My Notes
   [NEW NODE]
     `);
 
-    // Press Enter without typing anything - should close
+    // Press Enter without typing anything - keeps editor visible
     await userEvent.type(await findNewNodeEditor(), "{Enter}");
 
-    // Editor should be gone, only the original child should exist
+    // Empty editor remains in place
     await expectTree(`
 My Notes
   Existing Child
+  [NEW NODE]
     `);
   });
 

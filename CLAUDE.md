@@ -1,6 +1,7 @@
 # Remember
 
 - To run typescript use: npm run typescript
+- To run lint use: npm run lint
 - Ignore "React is declared but its value is never read" warnings - they are almost always stale
 - Reuse code! If you find yourself copying and pasting code, consider refactoring it into a reusable function or component.
 - We program purely functional, don't use let or var, only const.

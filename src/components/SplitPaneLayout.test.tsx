@@ -1,5 +1,5 @@
 import React from "react";
-import { screen } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PaneIndexProvider } from "../SplitPanesContext";
 import { ClosePaneButton } from "./SplitPaneLayout";
@@ -42,6 +42,56 @@ Root
 
   const closeButtons = screen.getAllByLabelText("Close pane");
   await userEvent.click(closeButtons[0]);
+
+  await expectTree(`
+Root
+  Test Node
+Root
+  Test Node
+  `);
+});
+
+test("Split pane layout survives browser refresh", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp(alice());
+
+  await type("Root{Enter}Test Node{Escape}");
+
+  await expectTree(`
+Root
+  Test Node
+  `);
+
+  await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+  await screen.findAllByLabelText("collapse Root");
+
+  await expectTree(`
+Root
+  Test Node
+Root
+  Test Node
+  `);
+
+  await waitFor(() => {
+    expect(window.history.state?.panes?.length).toBe(2);
+  });
+
+  const savedHistoryState = window.history.state;
+
+  cleanup();
+
+  const origPushState = window.history.pushState.bind(window.history);
+  const pushStateSpy = jest
+    .spyOn(window.history, "pushState")
+    .mockImplementation(
+      (_data: unknown, title: string, url?: string | URL | null) => {
+        origPushState(savedHistoryState, title, url);
+      }
+    );
+
+  renderApp(alice());
+
+  pushStateSpy.mockRestore();
 
   await expectTree(`
 Root

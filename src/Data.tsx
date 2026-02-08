@@ -74,6 +74,12 @@ function savePanesToStorage(publicKey: PublicKey, panes: Pane[]): void {
 }
 
 function getInitialPanes(publicKey: PublicKey): Pane[] {
+  const historyState = window.history.state as {
+    panes?: Pane[];
+  } | null;
+  if (historyState?.panes && historyState.panes.length > 0) {
+    return historyState.panes;
+  }
   const relationID = parseRelationUrl(window.location.pathname);
   if (relationID) {
     return [

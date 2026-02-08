@@ -75,7 +75,11 @@ export function NavigationStateProvider({
 }): JSX.Element {
   const { panes, knowledgeDBs, user } = useData();
   const { setPanes } = usePlanner();
-  const [activePaneIndex, setActivePaneIndexState] = useState(0);
+  const [activePaneIndex, setActivePaneIndexState] = useState(
+    () =>
+      (window.history.state as { activePaneIndex?: number } | null)
+        ?.activePaneIndex ?? 0
+  );
   const isPopstateRef = useRef(false);
   const prevUrlRef = useRef<string>("");
 
@@ -137,6 +141,11 @@ export function NavigationStateProvider({
     }
 
     if (fullUrl === prevUrlRef.current) {
+      const state: HistoryState = {
+        panes,
+        activePaneIndex: safeActivePaneIndex,
+      };
+      window.history.replaceState(state, "", fullUrl);
       return;
     }
 

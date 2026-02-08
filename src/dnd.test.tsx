@@ -921,6 +921,7 @@ test("Bottom-half drop on last child of nested parent stays within that parent",
   expect(dropIndex).toBe(1);
 });
 
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
 function setupDepthClampTree() {
   const [alice] = setup([ALICE]);
   const { publicKey: alicePK } = alice().user;
@@ -1317,6 +1318,48 @@ Holiday Destinations
     Malaga
   Sevilla
     Beach
+  `);
+});
+
+test("Cannot drag a parent into its own child or grandchild", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp(alice());
+
+  await type(
+    "Root{Enter}Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
+  );
+
+  await expectTree(`
+Root
+  Parent
+    Child
+      GrandChild
+  `);
+
+  const parent = screen.getByRole("treeitem", { name: "Parent" });
+  const child = screen.getByRole("treeitem", { name: "Child" });
+  const grandChild = screen.getByRole("treeitem", { name: "GrandChild" });
+
+  expectIndentationLimits("Parent", "Child").toBe(2, 4);
+  fireEvent.dragStart(parent);
+  fireEvent.drop(child);
+
+  await expectTree(`
+Root
+  Parent
+    Child
+      GrandChild
+  `);
+
+  expectIndentationLimits("Parent", "GrandChild").toBe(2, 5);
+  fireEvent.dragStart(parent);
+  fireEvent.drop(grandChild);
+
+  await expectTree(`
+Root
+  Parent
+    Child
+      GrandChild
   `);
 });
 

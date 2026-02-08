@@ -127,26 +127,21 @@ function resolveDropByDepth(
 function findNextNonSource(
   nodes: List<ViewPath>,
   startIndex: number,
-  sourceKeys: Set<string>
+  sourceKeys: Set<string>,
+  skipDepth?: number
 ): ViewPath | undefined {
-  let skipDepth: number | undefined;
-  for (let i = startIndex; i < nodes.size; i++) {
-    const node = nodes.get(i);
-    if (!node) {
-      continue;
-    }
-    const depth = node.length - 1;
-    if (skipDepth !== undefined && depth > skipDepth) {
-      continue;
-    }
-    skipDepth = undefined;
-    if (sourceKeys.has(viewPathToString(node))) {
-      skipDepth = depth;
-      continue;
-    }
-    return node;
+  const node = nodes.get(startIndex);
+  if (!node) {
+    return undefined;
   }
-  return undefined;
+  const depth = node.length - 1;
+  if (skipDepth !== undefined && depth > skipDepth) {
+    return findNextNonSource(nodes, startIndex + 1, sourceKeys, skipDepth);
+  }
+  if (sourceKeys.has(viewPathToString(node))) {
+    return findNextNonSource(nodes, startIndex + 1, sourceKeys, depth);
+  }
+  return node;
 }
 
 export function getDropDestinationFromTreeView(
@@ -339,6 +334,13 @@ export function dnd(
     dropIndex !== undefined;
 
   if (samePaneMove) {
+    const toViewStr = viewPathToString(toView);
+    const isDropIntoOwnDescendant = sources.some(
+      (s) => toViewStr === s || toViewStr.startsWith(`${s}:`)
+    );
+    if (isDropIntoOwnDescendant) {
+      return plan;
+    }
     return sources.toList().reduce((accPlan: Plan, s: string, idx: number) => {
       const sourcePath = parseViewPath(s);
       const [sourceNodeID] = getNodeIDFromView(accPlan, sourcePath);

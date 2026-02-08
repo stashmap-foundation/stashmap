@@ -529,7 +529,8 @@ body {
 }
 
 // Dragging states
-.is-dragging {
+.is-dragging,
+.is-dragging-child {
   opacity: 0.4;
 }
 

@@ -139,8 +139,12 @@ function calcDragDirection(
     return undefined;
   }
   const item = monitor.getItem() as DragItemType | undefined;
-  if (item?.path && viewPathToString(item.path) === viewPathToString(path)) {
-    return undefined;
+  if (item?.path) {
+    const sourceStr = viewPathToString(item.path);
+    const targetStr = viewPathToString(path);
+    if (targetStr === sourceStr || targetStr.startsWith(`${sourceStr}:`)) {
+      return undefined;
+    }
   }
   return -1;
 }

@@ -18,6 +18,22 @@ import { useDroppable, clearDropIndent } from "./DroppableContainer";
 import { isMutableNode, useIsEditingOn } from "./TemporaryViewContext";
 import { isEditableElement, KeyboardMode } from "./keyboardNavigation";
 
+function markDragDescendants(sourceViewKey: string): void {
+  const prefix = `${sourceViewKey}:`;
+  document.querySelectorAll(".item").forEach((el) => {
+    const key = el.getAttribute("data-view-key");
+    if (key && key.startsWith(prefix)) {
+      el.classList.add("is-dragging-child");
+    }
+  });
+}
+
+function clearDragDescendants(): void {
+  document.querySelectorAll(".is-dragging-child").forEach((el) => {
+    el.classList.remove("is-dragging-child");
+  });
+}
+
 export type DragItemType = {
   path: ViewPath;
   text?: string;
@@ -56,12 +72,16 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
       type: NOTE_TYPE,
       item: () => {
         clearDropIndent();
+        markDragDescendants(rowViewKey);
         return { path, text: displayText };
       },
       collect: (monitor) => ({
         isDragging: !!monitor.isDragging(),
       }),
       canDrag: () => !disableDrag,
+      end: () => {
+        clearDragDescendants();
+      },
     });
 
     useEffect(() => {

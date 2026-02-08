@@ -554,13 +554,9 @@ My Notes
   [S] BobItem
     `);
 
-    // Drag [S] BobItem and drop on Target (same pane = sibling reorder)
-    // This should accept the suggestion and place it before Target
     fireEvent.dragStart(screen.getByText("BobItem"));
-    fireEvent.drop(screen.getByText("Target"));
+    fireEvent.drop(screen.getByLabelText("collapse My Notes"));
 
-    // BobItem should be accepted (no [S] prefix) and placed before Target
-    // The original suggestion should be GONE (not duplicated)
     await expectTree(`
 My Notes
   BobItem
@@ -647,11 +643,9 @@ My Notes
   [S] Folder
     `);
 
-    // Drag collapsed [S] Folder and drop on Target (same pane = sibling)
     fireEvent.dragStart(screen.getByText("Folder"));
-    fireEvent.drop(screen.getByText("Target"));
+    fireEvent.drop(screen.getByLabelText("collapse My Notes"));
 
-    // Folder should be accepted (no [S]) and placed before Target
     await expectTree(`
 My Notes
   Folder
@@ -1115,7 +1109,7 @@ My Notes
     `);
 
     fireEvent.dragStart(screen.getByText("BobItem"));
-    fireEvent.drop(screen.getByText("Target"));
+    fireEvent.drop(screen.getByLabelText("collapse My Notes"));
 
     await expectTree(`
 My Notes

@@ -1127,6 +1127,97 @@ test("Depth clamp: Sevilla bottom at depth 4 inserts as child of Sevilla", () =>
   expect(dropIndex).toBe(0);
 });
 
+test("Move expanded node onto sibling keeps it as sibling", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp(alice());
+
+  await type(
+    "My Notes{Enter}A{Enter}{Tab}ChildOfA{Escape}"
+  );
+
+  await userEvent.click(await screen.findByLabelText("collapse A"));
+  await userEvent.click(await screen.findByLabelText("edit A"));
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(await findNewNodeEditor(), "B{Enter}C{Escape}");
+
+  await userEvent.click(await screen.findByLabelText("expand A"));
+
+  await expectTree(`
+My Notes
+  A
+    ChildOfA
+  B
+  C
+  `);
+
+  fireEvent.dragStart(screen.getByText("A"));
+  fireEvent.drop(screen.getByText("C"));
+
+  await expectTree(`
+My Notes
+  B
+  C
+  A
+    ChildOfA
+  `);
+});
+
+test("Move expanded node with children onto previous sibling stays as sibling", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp(alice());
+
+  await type("Root{Enter}First{Enter}Second{Enter}{Tab}Child1{Enter}Child2{Escape}");
+
+  await expectTree(`
+Root
+  First
+  Second
+    Child1
+    Child2
+  `);
+
+  fireEvent.dragStart(screen.getByText("Second"));
+  fireEvent.drop(screen.getByText("First"));
+
+  await expectTree(`
+Root
+  First
+  Second
+    Child1
+    Child2
+  `);
+});
+
+test("Outdent expanded node past its own children to root level", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp(alice());
+
+  await type(
+    "Root{Enter}Parent{Enter}{Tab}Draggable{Enter}{Tab}DeepChild{Escape}"
+  );
+
+  await expectTree(`
+Root
+  Parent
+    Draggable
+      DeepChild
+  `);
+
+  const draggable = screen.getByRole("treeitem", { name: "Draggable" });
+  const parent = screen.getByRole("treeitem", { name: "Parent" });
+
+  fireEvent.dragStart(draggable);
+  setDropIndentDepth(2);
+  fireEvent.drop(parent);
+
+  await expectTree(`
+Root
+  Parent
+  Draggable
+    DeepChild
+  `);
+});
+
 test("Cross-pane drag to same parent copies instead of reordering", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());

@@ -1,5 +1,6 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { ConnectableElement, useDrag } from "react-dnd";
+import { getEmptyImage } from "react-dnd-html5-backend";
 import {
   ViewPath,
   useIsSuggestion,
@@ -12,13 +13,14 @@ import {
   useIsViewingOtherUserContent,
 } from "../ViewContext";
 import { isEmptyNodeID, isAbstractRefId } from "../connections";
-import { NOTE_TYPE, Node, INDENTATION } from "./Node";
-import { useDroppable } from "./DroppableContainer";
+import { NOTE_TYPE, Node } from "./Node";
+import { useDroppable, clearDropIndent } from "./DroppableContainer";
 import { isMutableNode, useIsEditingOn } from "./TemporaryViewContext";
 import { isEditableElement, KeyboardMode } from "./keyboardNavigation";
 
 export type DragItemType = {
   path: ViewPath;
+  text?: string;
 };
 
 type DraggableProps = {
@@ -38,7 +40,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
       rowIndex = 0,
       rowDepth = 0,
       isActiveRow = false,
-      onRowFocus = () => {},
+      onRowFocus = () => { },
     }: DraggableProps,
     ref
   ): JSX.Element => {
@@ -50,16 +52,21 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     const isEmptyNode = isEmptyNodeID(nodeID);
     const disableDrag = isNodeBeeingEdited || isEmptyNode;
 
-    const [{ isDragging }, drag] = useDrag({
+    const [{ isDragging }, drag, preview] = useDrag({
       type: NOTE_TYPE,
       item: () => {
-        return { path };
+        clearDropIndent();
+        return { path, text: displayText };
       },
       collect: (monitor) => ({
         isDragging: !!monitor.isDragging(),
       }),
       canDrag: () => !disableDrag,
     });
+
+    useEffect(() => {
+      preview(getEmptyImage(), { captureDraggingState: true });
+    }, [preview]);
 
     drag(ref as ConnectableElement);
     const handleRowMouseEnter = (e: React.MouseEvent<HTMLDivElement>): void => {
@@ -134,15 +141,20 @@ function DraggableSuggestion({
   const displayText = useDisplayText();
   const isAbstractRef = isAbstractRefId(nodeID);
 
-  const [{ isDragging }, drag] = useDrag({
+  const [{ isDragging }, drag, preview] = useDrag({
     type: NOTE_TYPE,
     item: () => {
-      return { path, isSuggestion: true };
+      clearDropIndent();
+      return { path, text: displayText, isSuggestion: true };
     },
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging(),
     }),
   });
+
+  useEffect(() => {
+    preview(getEmptyImage(), { captureDraggingState: true });
+  }, [preview]);
 
   if (!isAbstractRef) {
     drag(ref as ConnectableElement);
@@ -162,9 +174,8 @@ function DraggableSuggestion({
   return (
     <div
       ref={ref}
-      className={`item suggestion-item ${isDragging ? "is-dragging" : ""} ${
-        className || ""
-      }`}
+      className={`item suggestion-item ${isDragging ? "is-dragging" : ""} ${className || ""
+        }`}
       data-row-focusable="true"
       data-view-key={rowViewKey}
       data-row-index={rowIndex}
@@ -193,14 +204,12 @@ function DraggableSuggestion({
 export function ListItem({
   index,
   treeViewPath,
-  prevDepth,
   nextDepth,
   activeRowKey,
   onRowFocus,
 }: {
   index: number;
   treeViewPath: ViewPath;
-  prevDepth?: number;
   nextDepth?: number;
   activeRowKey: string;
   onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
@@ -216,14 +225,10 @@ export function ListItem({
 
   const isReadonly = isInReferencedByView || isViewingOtherUserContent;
 
-  const isRoot = index === 0;
-
-  const [{ dragDirection, targetDepth }, drop] = useDroppable({
+  const [{ dragDirection }, drop] = useDroppable({
     destination: treeViewPath,
     index,
     ref,
-    isRoot,
-    prevDepth,
     nextDepth,
   });
 
@@ -245,17 +250,9 @@ export function ListItem({
     drop(ref);
   }
 
-  const className = `${dragDirection === 1 ? "dragging-over-top" : ""} ${
-    dragDirection === -1 ? "dragging-over-bottom" : ""
-  }`;
-  const dropIndentLeft =
-    targetDepth !== undefined ? 5 + (targetDepth - 1) * INDENTATION : undefined;
-  const style =
-    dropIndentLeft !== undefined
-      ? ({ "--drop-indent-left": `${dropIndentLeft}px` } as React.CSSProperties)
-      : undefined;
+  const className = dragDirection === -1 ? "dragging-over-bottom" : "";
   return (
-    <div className="visible-on-hover" style={style}>
+    <div className="visible-on-hover">
       <Draggable
         ref={ref}
         className={className}
@@ -268,3 +265,5 @@ export function ListItem({
     </div>
   );
 }
+
+

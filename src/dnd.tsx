@@ -1,6 +1,6 @@
 import React from "react";
 import { List, OrderedSet, Set } from "immutable";
-import { DndProvider } from "react-dnd";
+import { DndProvider, useDragLayer, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { getSelectedInView } from "./components/TemporaryViewContext";
 import {
@@ -441,6 +441,40 @@ export function dnd(
   }, expandedPlan);
 }
 
+function CustomDragLayer(): JSX.Element | null {
+  const { isDragging, item, currentOffset } = useDragLayer((monitor) => ({
+    isDragging: monitor.isDragging(),
+    item: monitor.getItem() as { text?: string } | null,
+    currentOffset: monitor.getClientOffset() as XYCoord | null,
+  }));
+
+  if (!isDragging || !item?.text || !currentOffset) {
+    return null;
+  }
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        pointerEvents: "none",
+        zIndex: 1000,
+        left: currentOffset.x + 12,
+        top: currentOffset.y - 8,
+        opacity: 0.6,
+        fontSize: "14px",
+        maxWidth: "200px",
+      }}
+    >
+      {item.text}
+    </div>
+  );
+}
+
 export function DND({ children }: { children: React.ReactNode }): JSX.Element {
-  return <DndProvider backend={HTML5Backend}>{children}</DndProvider>;
+  return (
+    <DndProvider backend={HTML5Backend}>
+      <CustomDragLayer />
+      {children}
+    </DndProvider>
+  );
 }

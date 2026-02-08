@@ -142,24 +142,7 @@ function calcDragDirection(
   if (item?.path && viewPathToString(item.path) === viewPathToString(path)) {
     return undefined;
   }
-  const hoverBoundingRect = ref.current.getBoundingClientRect();
-  const hoverMiddleY = (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
-  const clientOffset = monitor.getClientOffset();
-  if (!clientOffset || clientOffset.y === undefined) {
-    // This should only happen in test environment, therefore we assume dragging upwards
-    return 1;
-  }
-  const hoverClientY = clientOffset.y - hoverBoundingRect.top;
-
-  // Dragging upwards
-  if (hoverClientY < hoverMiddleY) {
-    return 1;
-  }
-  // Dragging downwards
-  if (hoverClientY > hoverMiddleY) {
-    return -1;
-  }
-  return undefined;
+  return -1;
 }
 
 function calcIndex(
@@ -172,58 +155,57 @@ function calcIndex(
   return direction === 1 ? index : index + 1;
 }
 
+const INDICATOR_GUTTER_WIDTH = 20;
 const INDENT_MARGIN = 5;
 
-function calcTargetDepth(
-  ref: RefObject<HTMLElement>,
-  monitor: DropTargetMonitor<DropItemType>,
-  direction: number | undefined,
-  currentDepth: number,
-  prevDepth: number | undefined,
-  nextDepth: number | undefined
-): number | undefined {
-  if (direction === undefined) {
-    return undefined;
+const DEPTH_STEP = INDENTATION;
+
+/* eslint-disable functional/immutable-data */
+const globalDragIndent = {
+  anchorX: undefined as number | undefined,
+  targetDepth: undefined as number | undefined,
+  lastDirection: undefined as number | undefined,
+  activeElement: undefined as HTMLElement | undefined,
+};
+
+function applyDropIndent(el: HTMLElement, depth: number): void {
+  const TOGGLE_WIDTH = 20;
+  const left = INDICATOR_GUTTER_WIDTH + INDENT_MARGIN + (depth - 1) * INDENTATION + TOGGLE_WIDTH;
+  el.style.setProperty("--drop-indent-left", `${left}px`);
+  const innerNode = el.querySelector(".inner-node");
+  if (innerNode instanceof HTMLElement) {
+    innerNode.style.setProperty("--drop-indent-left", `${left}px`);
   }
-  const clientOffset = monitor.getClientOffset();
-  if (!clientOffset || !ref.current) {
-    return undefined;
-  }
-  const itemLeft = ref.current.getBoundingClientRect().left;
-  const rawDepth = Math.round(
-    (clientOffset.x - itemLeft - INDENT_MARGIN) / INDENTATION + 1
-  );
-  const maxDepth =
-    direction === -1
-      ? currentDepth + 1
-      : prevDepth !== undefined
-      ? prevDepth + 1
-      : currentDepth;
-  const minDepth =
-    direction === -1 ? (nextDepth !== undefined ? nextDepth : 2) : currentDepth;
-  return Math.max(minDepth, Math.min(maxDepth, rawDepth));
 }
+
+export function clearDropIndent(): void {
+  const prev = globalDragIndent.activeElement;
+  if (prev) {
+    prev.style.removeProperty("--drop-indent-left");
+    const innerNode = prev.querySelector(".inner-node");
+    if (innerNode instanceof HTMLElement) {
+      innerNode.style.removeProperty("--drop-indent-left");
+    }
+  }
+  globalDragIndent.anchorX = undefined;
+  globalDragIndent.targetDepth = undefined;
+  globalDragIndent.lastDirection = undefined;
+  globalDragIndent.activeElement = undefined;
+}
+/* eslint-enable functional/immutable-data */
 
 export function useDroppable({
   destination,
   index,
   ref,
-  isRoot,
-  prevDepth,
   nextDepth,
 }: {
   destination: ViewPath;
   index?: number;
   ref: RefObject<HTMLElement>;
-  isRoot?: boolean;
-  prevDepth?: number;
   nextDepth?: number;
 }): [
-  {
-    dragDirection: number | undefined;
-    isOver: boolean;
-    targetDepth: number | undefined;
-  },
+  { dragDirection: number | undefined; isOver: boolean },
   ConnectDropTarget
 ] {
   const { setState, selection, multiselectBtns } = useTemporaryView();
@@ -234,16 +216,6 @@ export function useDroppable({
   const invertCopyModeRef = useRef(false);
 
   const isListItem = index !== undefined;
-
-  // Helper to adjust direction for root node (can't drop above root)
-  const adjustDirectionForRoot = (
-    direction: number | undefined
-  ): number | undefined => {
-    if (isRoot && direction === 1) {
-      return -1; // Treat top drop on root as bottom drop
-    }
-    return direction;
-  };
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
@@ -276,46 +248,123 @@ export function useDroppable({
 
   const currentDepth = path.length - 1;
 
+  const calcDepthLimits = (): { minDepth: number; maxDepth: number } => {
+    const maxDepth = currentDepth + 1;
+    const minDepth = nextDepth !== undefined ? nextDepth : 1;
+    return { minDepth, maxDepth };
+  };
+
+  const updateTargetDepth = (
+    monitor: DropTargetMonitor<DropItemType>
+  ): void => {
+    const direction = calcDragDirection(ref, monitor, path);
+    const clientOffset = monitor.getClientOffset();
+    if (!clientOffset || !ref.current || direction === undefined) {
+      return;
+    }
+
+    const parentEl = ref.current.parentElement;
+    if (!parentEl) {
+      return;
+    }
+
+    /* eslint-disable functional/immutable-data */
+    if (globalDragIndent.activeElement !== parentEl) {
+      const prev = globalDragIndent.activeElement;
+      if (prev) {
+        prev.style.removeProperty("--drop-indent-left");
+        const prevInner = prev.querySelector(".inner-node");
+        if (prevInner instanceof HTMLElement) {
+          prevInner.style.removeProperty("--drop-indent-left");
+        }
+      }
+      globalDragIndent.activeElement = parentEl;
+    }
+
+    const { minDepth, maxDepth } = calcDepthLimits();
+
+    if (globalDragIndent.anchorX === undefined) {
+      globalDragIndent.anchorX = clientOffset.x;
+      globalDragIndent.targetDepth = Math.max(
+        minDepth,
+        Math.min(maxDepth, currentDepth)
+      );
+    }
+    globalDragIndent.lastDirection = direction;
+
+    const clamped = Math.max(
+      minDepth,
+      Math.min(maxDepth, globalDragIndent.targetDepth ?? currentDepth)
+    );
+    if (clamped !== globalDragIndent.targetDepth) {
+      globalDragIndent.anchorX = clientOffset.x;
+    }
+    globalDragIndent.targetDepth = clamped;
+
+    const deltaX = clientOffset.x - globalDragIndent.anchorX;
+
+    if (deltaX > DEPTH_STEP) {
+      if (clamped < maxDepth) {
+        globalDragIndent.targetDepth = clamped + 1;
+      }
+      globalDragIndent.anchorX = clientOffset.x;
+    } else if (deltaX < -DEPTH_STEP) {
+      if (clamped > minDepth) {
+        globalDragIndent.targetDepth = clamped - 1;
+      }
+      globalDragIndent.anchorX = clientOffset.x;
+    }
+    /* eslint-enable functional/immutable-data */
+
+    const depth = globalDragIndent.targetDepth;
+    if (depth !== undefined) {
+      applyDropIndent(parentEl, depth);
+    }
+  };
+
   return useDrop<
     DropItemType,
     DropItemType,
-    {
-      dragDirection: number | undefined;
-      isOver: boolean;
-      targetDepth: number | undefined;
-    }
+    { dragDirection: number | undefined; isOver: boolean }
   >({
     accept: [NOTE_TYPE, NativeTypes.FILE],
     collect(monitor) {
       const rawDirection = calcDragDirection(ref, monitor, path);
-      const direction = adjustDirectionForRoot(rawDirection);
+      const direction = rawDirection;
+      const isOver = monitor.isOver({ shallow: true });
+      if (isOver && direction !== undefined) {
+        const parentEl = ref.current?.parentElement;
+        if (parentEl) {
+          /* eslint-disable functional/immutable-data */
+          if (globalDragIndent.targetDepth === undefined) {
+            const { minDepth, maxDepth } = calcDepthLimits();
+            globalDragIndent.targetDepth = Math.max(
+              minDepth,
+              Math.min(maxDepth, currentDepth)
+            );
+            globalDragIndent.anchorX =
+              monitor.getClientOffset()?.x ?? globalDragIndent.anchorX;
+          }
+          /* eslint-enable functional/immutable-data */
+          applyDropIndent(parentEl, globalDragIndent.targetDepth);
+        }
+      }
       return {
         dragDirection: direction,
-        isOver: monitor.isOver({ shallow: true }),
-        targetDepth: calcTargetDepth(
-          ref,
-          monitor,
-          direction,
-          currentDepth,
-          prevDepth,
-          nextDepth
-        ),
+        isOver,
       };
     },
+    hover(_item: DropItemType, monitor: DropTargetMonitor<DropItemType>) {
+      updateTargetDepth(monitor);
+    },
     drop(item: DropItemType, monitor: DropTargetMonitor<DropItemType>) {
+      const targetDepth = globalDragIndent.targetDepth;
+      clearDropIndent();
       const rawDirection = calcDragDirection(ref, monitor, path);
-      const direction = adjustDirectionForRoot(rawDirection);
+      const direction = rawDirection;
       if (isListItem && direction === undefined) {
         return item;
       }
-      const targetDepth = calcTargetDepth(
-        ref,
-        monitor,
-        direction,
-        currentDepth,
-        prevDepth,
-        nextDepth
-      );
 
       if (monitor.getItemType() === NativeTypes.FILE) {
         const fileDropItem = item as NativeFileDropItem;
@@ -425,7 +474,7 @@ export function DroppableContainer({
   const [{ isOver }, drop] = useDroppable({
     destination: path,
     ref,
-  }) as [{ isOver: boolean }, ConnectDropTarget];
+  });
   const className = isOver ? "dimmed" : "";
   drop(ref);
 

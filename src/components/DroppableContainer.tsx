@@ -170,7 +170,11 @@ const globalDragIndent = {
 
 function applyDropIndent(el: HTMLElement, depth: number): void {
   const TOGGLE_WIDTH = 20;
-  const left = INDICATOR_GUTTER_WIDTH + INDENT_MARGIN + (depth - 1) * INDENTATION + TOGGLE_WIDTH;
+  const left =
+    INDICATOR_GUTTER_WIDTH +
+    INDENT_MARGIN +
+    (depth - 1) * INDENTATION +
+    TOGGLE_WIDTH;
   el.style.setProperty("--drop-indent-left", `${left}px`);
   const innerNode = el.querySelector(".inner-node");
   if (innerNode instanceof HTMLElement) {
@@ -199,16 +203,40 @@ export function clearDropIndent(): void {
 }
 /* eslint-enable functional/immutable-data */
 
+export function computeDepthLimits(
+  currentDepth: number,
+  nextDepth: number | undefined,
+  nextViewPathStr: string | undefined,
+  sourcePathStr: string | undefined,
+  rootDepth: number
+): { minDepth: number; maxDepth: number } {
+  const maxDepth = currentDepth + 1;
+  if (nextDepth === undefined) {
+    return { minDepth: rootDepth + 1, maxDepth };
+  }
+  if (
+    sourcePathStr &&
+    nextViewPathStr &&
+    (nextViewPathStr === sourcePathStr ||
+      nextViewPathStr.startsWith(`${sourcePathStr}:`))
+  ) {
+    return { minDepth: rootDepth + 1, maxDepth };
+  }
+  return { minDepth: nextDepth, maxDepth };
+}
+
 export function useDroppable({
   destination,
   index,
   ref,
   nextDepth,
+  nextViewPathStr,
 }: {
   destination: ViewPath;
   index?: number;
   ref: RefObject<HTMLElement>;
   nextDepth?: number;
+  nextViewPathStr?: string;
 }): [
   { dragDirection: number | undefined; isOver: boolean },
   ConnectDropTarget
@@ -253,11 +281,18 @@ export function useDroppable({
 
   const currentDepth = path.length - 1;
 
-  const calcDepthLimits = (): { minDepth: number; maxDepth: number } => {
-    const maxDepth = currentDepth + 1;
-    const minDepth = nextDepth !== undefined ? nextDepth : 1;
-    return { minDepth, maxDepth };
-  };
+  const rootDepth = destination.length - 1;
+
+  const calcDepthLimits = (
+    sourcePathStr?: string
+  ): { minDepth: number; maxDepth: number } =>
+    computeDepthLimits(
+      currentDepth,
+      nextDepth,
+      nextViewPathStr,
+      sourcePathStr,
+      rootDepth
+    );
 
   const updateTargetDepth = (
     monitor: DropTargetMonitor<DropItemType>
@@ -286,7 +321,11 @@ export function useDroppable({
       globalDragIndent.activeElement = parentEl;
     }
 
-    const { minDepth, maxDepth } = calcDepthLimits();
+    const dragItem = monitor.getItem() as DragItemType | undefined;
+    const sourcePathStr = dragItem?.path
+      ? viewPathToString(dragItem.path)
+      : undefined;
+    const { minDepth, maxDepth } = calcDepthLimits(sourcePathStr);
 
     if (globalDragIndent.anchorX === undefined) {
       globalDragIndent.anchorX = clientOffset.x;
@@ -342,7 +381,13 @@ export function useDroppable({
         if (parentEl) {
           /* eslint-disable functional/immutable-data */
           if (globalDragIndent.targetDepth === undefined) {
-            const { minDepth, maxDepth } = calcDepthLimits();
+            const collectDragItem = monitor.getItem() as
+              | DragItemType
+              | undefined;
+            const collectSourcePath = collectDragItem?.path
+              ? viewPathToString(collectDragItem.path)
+              : undefined;
+            const { minDepth, maxDepth } = calcDepthLimits(collectSourcePath);
             globalDragIndent.targetDepth = Math.max(
               minDepth,
               Math.min(maxDepth, currentDepth)
@@ -363,7 +408,7 @@ export function useDroppable({
       updateTargetDepth(monitor);
     },
     drop(item: DropItemType, monitor: DropTargetMonitor<DropItemType>) {
-      const targetDepth = globalDragIndent.targetDepth;
+      const { targetDepth } = globalDragIndent;
       clearDropIndent();
       const rawDirection = calcDragDirection(ref, monitor, path);
       const direction = rawDirection;

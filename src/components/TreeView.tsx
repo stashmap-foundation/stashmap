@@ -173,6 +173,9 @@ function VirtuosoForColumn({
                 index={index}
                 treeViewPath={viewPath}
                 nextDepth={nextPath ? nextPath.length - 1 : undefined}
+                nextViewPathStr={
+                  nextPath ? viewPathToString(nextPath) : undefined
+                }
                 activeRowKey={activeRowKey}
                 onRowFocus={onRowFocus}
               />

@@ -66,6 +66,10 @@ import { newDB } from "./knowledge";
 import { TemporaryViewProvider } from "./components/TemporaryViewContext";
 import { PaneView } from "./components/Workspace";
 import { DND } from "./dnd";
+import {
+  computeDepthLimits,
+  setDropIndentDepth,
+} from "./components/DroppableContainer";
 import { findContacts } from "./contacts";
 import { UserRelayContextProvider } from "./UserRelayContext";
 import { StashmapDB } from "./indexedDB";
@@ -996,6 +1000,79 @@ export async function navigateToNodeViaSearch(
       screen.queryAllByRole("treeitem", { name: nodeName }).length > 0;
     expect(hasEditor || hasTreeRow).toBe(true);
   });
+}
+
+function getDropDepthLimits(
+  sourceName: string,
+  targetName: string
+): { minDepth: number; maxDepth: number } {
+  /* eslint-disable testing-library/no-node-access */
+  const allRows = Array.from(document.querySelectorAll(".item"));
+  /* eslint-enable testing-library/no-node-access */
+
+  const sourceRow = allRows.find(
+    (r) => r.getAttribute("data-node-text") === sourceName
+  );
+  const targetRow = allRows.find(
+    (r) => r.getAttribute("data-node-text") === targetName
+  );
+  if (!sourceRow || !targetRow) {
+    throw new Error(
+      `Could not find source "${sourceName}" or target "${targetName}" in tree`
+    );
+  }
+
+  const targetIndex = allRows.indexOf(targetRow);
+  const nextRow = allRows[targetIndex + 1];
+
+  const currentDepth = Number(targetRow.getAttribute("data-row-depth"));
+  const nextDepth = nextRow
+    ? Number(nextRow.getAttribute("data-row-depth"))
+    : undefined;
+  const nextViewPathStr = nextRow
+    ? nextRow.getAttribute("data-view-key") ?? undefined
+    : undefined;
+  const sourcePathStr = sourceRow.getAttribute("data-view-key") ?? undefined;
+
+  const rootDepth = Math.min(
+    ...allRows.map((r) => Number(r.getAttribute("data-row-depth")))
+  );
+
+  return computeDepthLimits(
+    currentDepth,
+    nextDepth,
+    nextViewPathStr,
+    sourcePathStr,
+    rootDepth
+  );
+}
+
+export function setDropIndentLevel(
+  sourceName: string,
+  targetName: string,
+  depth: number
+): void {
+  const { minDepth, maxDepth } = getDropDepthLimits(sourceName, targetName);
+  if (depth < minDepth || depth > maxDepth) {
+    throw new Error(
+      `Depth ${depth} is outside allowed range [${minDepth}, ${maxDepth}] ` +
+        `when dragging "${sourceName}" onto "${targetName}"`
+    );
+  }
+  setDropIndentDepth(depth);
+}
+
+export function expectIndentationLimits(
+  sourceName: string,
+  targetName: string
+): { toBe: (min: number, max: number) => void } {
+  const { minDepth, maxDepth } = getDropDepthLimits(sourceName, targetName);
+  return {
+    toBe(min: number, max: number) {
+      expect(minDepth).toBe(min);
+      expect(maxDepth).toBe(max);
+    },
+  };
 }
 
 export {

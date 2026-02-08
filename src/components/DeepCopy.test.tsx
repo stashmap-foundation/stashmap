@@ -1267,7 +1267,9 @@ Target
   My Notes → Source
     `);
 
-    const targetInPane0 = screen.getAllByRole("treeitem", { name: "Target" })[0];
+    const targetInPane0 = screen.getAllByRole("treeitem", {
+      name: "Target",
+    })[0];
     await userEvent.keyboard("{Alt>}");
     fireEvent.dragStart(screen.getByText("My Notes → Source"));
     fireEvent.dragOver(targetInPane0, { altKey: true });

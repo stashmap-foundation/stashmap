@@ -40,7 +40,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
       rowIndex = 0,
       rowDepth = 0,
       isActiveRow = false,
-      onRowFocus = () => { },
+      onRowFocus = () => {},
     }: DraggableProps,
     ref
   ): JSX.Element => {
@@ -174,8 +174,9 @@ function DraggableSuggestion({
   return (
     <div
       ref={ref}
-      className={`item suggestion-item ${isDragging ? "is-dragging" : ""} ${className || ""
-        }`}
+      className={`item suggestion-item ${isDragging ? "is-dragging" : ""} ${
+        className || ""
+      }`}
       data-row-focusable="true"
       data-view-key={rowViewKey}
       data-row-index={rowIndex}
@@ -205,12 +206,14 @@ export function ListItem({
   index,
   treeViewPath,
   nextDepth,
+  nextViewPathStr,
   activeRowKey,
   onRowFocus,
 }: {
   index: number;
   treeViewPath: ViewPath;
   nextDepth?: number;
+  nextViewPathStr?: string;
   activeRowKey: string;
   onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
 }): JSX.Element {
@@ -230,6 +233,7 @@ export function ListItem({
     index,
     ref,
     nextDepth,
+    nextViewPathStr,
   });
 
   if (isSuggestion) {
@@ -265,5 +269,3 @@ export function ListItem({
     </div>
   );
 }
-
-

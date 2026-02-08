@@ -12,9 +12,10 @@ import {
   renderTree,
   setup,
   type,
+  setDropIndentLevel,
+  expectIndentationLimits,
 } from "./utils.test";
 import { dnd, getDropDestinationFromTreeView } from "./dnd";
-import { setDropIndentDepth } from "./components/DroppableContainer";
 import {
   addRelationToRelations,
   createAbstractRefId,
@@ -652,8 +653,9 @@ Root
   const draggable = screen.getByRole("treeitem", { name: "Draggable" });
   const target = screen.getByRole("treeitem", { name: "Target" });
 
+  expectIndentationLimits("Draggable", "Target").toBe(2, 3);
   fireEvent.dragStart(draggable);
-  setDropIndentDepth(3);
+  setDropIndentLevel("Draggable", "Target", 3);
   fireEvent.drop(target);
 
   await expectTree(`
@@ -683,8 +685,9 @@ Holiday Destinations
   const draggable = screen.getByRole("treeitem", { name: "Draggable" });
   const malaga = screen.getByRole("treeitem", { name: "Malaga" });
 
+  expectIndentationLimits("Draggable", "Malaga").toBe(2, 4);
   fireEvent.dragStart(draggable);
-  setDropIndentDepth(2);
+  setDropIndentLevel("Draggable", "Malaga", 2);
   fireEvent.drop(malaga);
 
   await expectTree(`
@@ -715,8 +718,9 @@ Holiday Destinations
   const draggable = screen.getByRole("treeitem", { name: "Draggable" });
   const barcelona = screen.getByRole("treeitem", { name: "Barcelona" });
 
+  expectIndentationLimits("Draggable", "Barcelona").toBe(3, 4);
   fireEvent.dragStart(draggable);
-  setDropIndentDepth(4);
+  setDropIndentLevel("Draggable", "Barcelona", 4);
   fireEvent.drop(barcelona);
 
   await expectTree(`
@@ -732,9 +736,7 @@ test("Depth drop: expanded parent forces child depth", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
 
-  await type(
-    "Root{Enter}Draggable{Enter}Spain{Enter}{Tab}Barcelona{Escape}"
-  );
+  await type("Root{Enter}Draggable{Enter}Spain{Enter}{Tab}Barcelona{Escape}");
 
   await expectTree(`
 Root
@@ -746,8 +748,9 @@ Root
   const draggable = screen.getByRole("treeitem", { name: "Draggable" });
   const spain = screen.getByRole("treeitem", { name: "Spain" });
 
+  expectIndentationLimits("Draggable", "Spain").toBe(3, 3);
   fireEvent.dragStart(draggable);
-  setDropIndentDepth(2);
+  setDropIndentLevel("Draggable", "Spain", 3);
   fireEvent.drop(spain);
 
   await expectTree(`
@@ -776,8 +779,9 @@ Holiday Destinations
   const sevilla = screen.getByRole("treeitem", { name: "Sevilla" });
   const barcelona = screen.getByRole("treeitem", { name: "Barcelona" });
 
+  expectIndentationLimits("Sevilla", "Barcelona").toBe(2, 4);
   fireEvent.dragStart(sevilla);
-  setDropIndentDepth(2);
+  setDropIndentLevel("Sevilla", "Barcelona", 2);
   fireEvent.drop(barcelona);
 
   await expectTree(`
@@ -807,8 +811,9 @@ Root
   const draggable = screen.getByRole("treeitem", { name: "Draggable" });
   const c = screen.getByRole("treeitem", { name: "C" });
 
+  expectIndentationLimits("Draggable", "C").toBe(2, 5);
   fireEvent.dragStart(draggable);
-  setDropIndentDepth(2);
+  setDropIndentLevel("Draggable", "C", 2);
   fireEvent.drop(c);
 
   await expectTree(`
@@ -939,10 +944,7 @@ function setupDepthClampTree() {
   );
 
   const hdRelations = addRelationToRelations(
-    addRelationToRelations(
-      newRelations(hd.id, List(), alicePK),
-      sf.id
-    ),
+    addRelationToRelations(newRelations(hd.id, List(), alicePK), sf.id),
     spain.id
   );
 
@@ -1031,7 +1033,12 @@ function setupDepthClampTree() {
 test("Depth clamp: HD bottom at depth 2 inserts before first child of HD", () => {
   const { plan, rootPath, hd } = setupDepthClampTree();
   const [toView, dropIndex] = getDropDestinationFromTreeView(
-    plan, rootPath, [hd.id], 1, undefined, 2
+    plan,
+    rootPath,
+    [hd.id],
+    1,
+    undefined,
+    2
   );
   expect(viewPathToString(toView)).toBe(viewPathToString(rootPath));
   expect(dropIndex).toBe(0);
@@ -1040,7 +1047,12 @@ test("Depth clamp: HD bottom at depth 2 inserts before first child of HD", () =>
 test("Depth clamp: SF bottom at depth 2 inserts after SF in HD", () => {
   const { plan, rootPath, hd } = setupDepthClampTree();
   const [toView, dropIndex] = getDropDestinationFromTreeView(
-    plan, rootPath, [hd.id], 2, undefined, 2
+    plan,
+    rootPath,
+    [hd.id],
+    2,
+    undefined,
+    2
   );
   expect(viewPathToString(toView)).toBe(viewPathToString(rootPath));
   expect(dropIndex).toBe(1);
@@ -1049,7 +1061,12 @@ test("Depth clamp: SF bottom at depth 2 inserts after SF in HD", () => {
 test("Depth clamp: SF bottom at depth 3 inserts as child of SF", () => {
   const { plan, rootPath, sfPath, hd } = setupDepthClampTree();
   const [toView, dropIndex] = getDropDestinationFromTreeView(
-    plan, rootPath, [hd.id], 2, undefined, 3
+    plan,
+    rootPath,
+    [hd.id],
+    2,
+    undefined,
+    3
   );
   expect(viewPathToString(toView)).toBe(viewPathToString(sfPath));
   expect(dropIndex).toBe(0);
@@ -1058,7 +1075,12 @@ test("Depth clamp: SF bottom at depth 3 inserts as child of SF", () => {
 test("Depth clamp: Spain bottom at depth 3 inserts as first child of Spain", () => {
   const { plan, rootPath, spainPath, hd } = setupDepthClampTree();
   const [toView, dropIndex] = getDropDestinationFromTreeView(
-    plan, rootPath, [hd.id], 3, undefined, 3
+    plan,
+    rootPath,
+    [hd.id],
+    3,
+    undefined,
+    3
   );
   expect(viewPathToString(toView)).toBe(viewPathToString(spainPath));
   expect(dropIndex).toBe(0);
@@ -1067,7 +1089,12 @@ test("Depth clamp: Spain bottom at depth 3 inserts as first child of Spain", () 
 test("Depth clamp: Barcelona bottom at depth 3 inserts after Barcelona in Spain", () => {
   const { plan, rootPath, spainPath, hd } = setupDepthClampTree();
   const [toView, dropIndex] = getDropDestinationFromTreeView(
-    plan, rootPath, [hd.id], 4, undefined, 3
+    plan,
+    rootPath,
+    [hd.id],
+    4,
+    undefined,
+    3
   );
   expect(viewPathToString(toView)).toBe(viewPathToString(spainPath));
   expect(dropIndex).toBe(1);
@@ -1076,7 +1103,12 @@ test("Depth clamp: Barcelona bottom at depth 3 inserts after Barcelona in Spain"
 test("Depth clamp: Barcelona bottom at depth 4 inserts as child of Barcelona", () => {
   const { plan, rootPath, barcelonaPath, hd } = setupDepthClampTree();
   const [toView, dropIndex] = getDropDestinationFromTreeView(
-    plan, rootPath, [hd.id], 4, undefined, 4
+    plan,
+    rootPath,
+    [hd.id],
+    4,
+    undefined,
+    4
   );
   expect(viewPathToString(toView)).toBe(viewPathToString(barcelonaPath));
   expect(dropIndex).toBe(0);
@@ -1085,7 +1117,12 @@ test("Depth clamp: Barcelona bottom at depth 4 inserts as child of Barcelona", (
 test("Depth clamp: Malaga bottom at depth 3 inserts after Malaga in Spain", () => {
   const { plan, rootPath, spainPath, hd } = setupDepthClampTree();
   const [toView, dropIndex] = getDropDestinationFromTreeView(
-    plan, rootPath, [hd.id], 5, undefined, 3
+    plan,
+    rootPath,
+    [hd.id],
+    5,
+    undefined,
+    3
   );
   expect(viewPathToString(toView)).toBe(viewPathToString(spainPath));
   expect(dropIndex).toBe(2);
@@ -1094,7 +1131,12 @@ test("Depth clamp: Malaga bottom at depth 3 inserts after Malaga in Spain", () =
 test("Depth clamp: Malaga bottom at depth 4 inserts as child of Malaga", () => {
   const { plan, rootPath, malagaPath, hd } = setupDepthClampTree();
   const [toView, dropIndex] = getDropDestinationFromTreeView(
-    plan, rootPath, [hd.id], 5, undefined, 4
+    plan,
+    rootPath,
+    [hd.id],
+    5,
+    undefined,
+    4
   );
   expect(viewPathToString(toView)).toBe(viewPathToString(malagaPath));
   expect(dropIndex).toBe(0);
@@ -1103,7 +1145,12 @@ test("Depth clamp: Malaga bottom at depth 4 inserts as child of Malaga", () => {
 test("Depth clamp: Sevilla bottom at depth 2 inserts after Spain in HD", () => {
   const { plan, rootPath, hd } = setupDepthClampTree();
   const [toView, dropIndex] = getDropDestinationFromTreeView(
-    plan, rootPath, [hd.id], 6, undefined, 2
+    plan,
+    rootPath,
+    [hd.id],
+    6,
+    undefined,
+    2
   );
   expect(viewPathToString(toView)).toBe(viewPathToString(rootPath));
   expect(dropIndex).toBe(2);
@@ -1112,7 +1159,12 @@ test("Depth clamp: Sevilla bottom at depth 2 inserts after Spain in HD", () => {
 test("Depth clamp: Sevilla bottom at depth 3 inserts after Sevilla in Spain", () => {
   const { plan, rootPath, spainPath, hd } = setupDepthClampTree();
   const [toView, dropIndex] = getDropDestinationFromTreeView(
-    plan, rootPath, [hd.id], 6, undefined, 3
+    plan,
+    rootPath,
+    [hd.id],
+    6,
+    undefined,
+    3
   );
   expect(viewPathToString(toView)).toBe(viewPathToString(spainPath));
   expect(dropIndex).toBe(3);
@@ -1121,7 +1173,12 @@ test("Depth clamp: Sevilla bottom at depth 3 inserts after Sevilla in Spain", ()
 test("Depth clamp: Sevilla bottom at depth 4 inserts as child of Sevilla", () => {
   const { plan, rootPath, sevillaPath, hd } = setupDepthClampTree();
   const [toView, dropIndex] = getDropDestinationFromTreeView(
-    plan, rootPath, [hd.id], 6, undefined, 4
+    plan,
+    rootPath,
+    [hd.id],
+    6,
+    undefined,
+    4
   );
   expect(viewPathToString(toView)).toBe(viewPathToString(sevillaPath));
   expect(dropIndex).toBe(0);
@@ -1131,9 +1188,7 @@ test("Move expanded node onto sibling keeps it as sibling", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
 
-  await type(
-    "My Notes{Enter}A{Enter}{Tab}ChildOfA{Escape}"
-  );
+  await type("My Notes{Enter}A{Enter}{Tab}ChildOfA{Escape}");
 
   await userEvent.click(await screen.findByLabelText("collapse A"));
   await userEvent.click(await screen.findByLabelText("edit A"));
@@ -1150,6 +1205,7 @@ My Notes
   C
   `);
 
+  expectIndentationLimits("A", "C").toBe(2, 3);
   fireEvent.dragStart(screen.getByText("A"));
   fireEvent.drop(screen.getByText("C"));
 
@@ -1166,7 +1222,9 @@ test("Move expanded node with children onto previous sibling stays as sibling", 
   const [alice] = setup([ALICE]);
   renderApp(alice());
 
-  await type("Root{Enter}First{Enter}Second{Enter}{Tab}Child1{Enter}Child2{Escape}");
+  await type(
+    "Root{Enter}First{Enter}Second{Enter}{Tab}Child1{Enter}Child2{Escape}"
+  );
 
   await expectTree(`
 Root
@@ -1176,6 +1234,7 @@ Root
     Child2
   `);
 
+  expectIndentationLimits("Second", "First").toBe(2, 3);
   fireEvent.dragStart(screen.getByText("Second"));
   fireEvent.drop(screen.getByText("First"));
 
@@ -1206,8 +1265,9 @@ Root
   const draggable = screen.getByRole("treeitem", { name: "Draggable" });
   const parent = screen.getByRole("treeitem", { name: "Parent" });
 
+  expectIndentationLimits("Draggable", "Parent").toBe(2, 3);
   fireEvent.dragStart(draggable);
-  setDropIndentDepth(2);
+  setDropIndentLevel("Draggable", "Parent", 2);
   fireEvent.drop(parent);
 
   await expectTree(`
@@ -1215,6 +1275,48 @@ Root
   Parent
   Draggable
     DeepChild
+  `);
+});
+
+test("Drag last child onto previous sibling outdents past parent", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp(alice());
+
+  await type(
+    "Holiday Destinations{Enter}Barcelona{Enter}{Tab}Sagrada Familia{Escape}"
+  );
+  await userEvent.click(await screen.findByLabelText("collapse Barcelona"));
+  await userEvent.click(await screen.findByLabelText("edit Barcelona"));
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "Spain{Enter}{Tab}Malaga{Enter}Sevilla{Enter}{Tab}Beach{Escape}"
+  );
+
+  await expectTree(`
+Holiday Destinations
+  Barcelona
+  Spain
+    Malaga
+    Sevilla
+      Beach
+  `);
+
+  const sevilla = screen.getByRole("treeitem", { name: "Sevilla" });
+  const malaga = screen.getByRole("treeitem", { name: "Malaga" });
+
+  expectIndentationLimits("Sevilla", "Malaga").toBe(2, 4);
+  fireEvent.dragStart(sevilla);
+  setDropIndentLevel("Sevilla", "Malaga", 2);
+  fireEvent.drop(malaga);
+
+  await expectTree(`
+Holiday Destinations
+  Barcelona
+  Spain
+    Malaga
+  Sevilla
+    Beach
   `);
 });
 

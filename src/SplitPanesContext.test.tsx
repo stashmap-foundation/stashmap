@@ -1,5 +1,5 @@
 import React from "react";
-import { screen, fireEvent } from "@testing-library/react";
+import { act, screen, fireEvent } from "@testing-library/react";
 import {
   useSplitPanes,
   PaneIndexProvider,
@@ -44,10 +44,10 @@ test("addPaneAt adds a new pane to the end", async () => {
   await screen.findByTestId("pane-count");
   expect(screen.getByTestId("pane-count").textContent).toBe("1");
 
-  fireEvent.click(screen.getByText("Add Pane"));
+  await act(async () => fireEvent.click(screen.getByText("Add Pane")));
   expect(screen.getByTestId("pane-count").textContent).toBe("2");
 
-  fireEvent.click(screen.getByText("Add Pane"));
+  await act(async () => fireEvent.click(screen.getByText("Add Pane")));
   expect(screen.getByTestId("pane-count").textContent).toBe("3");
 });
 
@@ -55,12 +55,12 @@ test("addPaneAt inserts pane at specific index with initialStack", async () => {
   renderWithTestData(<TestSplitPanes />);
 
   await screen.findByTestId("pane-count");
-  fireEvent.click(screen.getByText("Add Pane"));
+  await act(async () => fireEvent.click(screen.getByText("Add Pane")));
   expect(screen.getByTestId("pane-count").textContent).toBe("2");
 
   const paneIdsBefore = screen.getByTestId("pane-ids").textContent?.split(",");
 
-  fireEvent.click(screen.getByText("Add Pane At 1"));
+  await act(async () => fireEvent.click(screen.getByText("Add Pane At 1")));
   expect(screen.getByTestId("pane-count").textContent).toBe("3");
 
   const paneIdsAfter = screen.getByTestId("pane-ids").textContent?.split(",");
@@ -74,13 +74,13 @@ test("removePane removes pane by id", async () => {
   renderWithTestData(<TestSplitPanes />);
 
   await screen.findByTestId("pane-count");
-  fireEvent.click(screen.getByText("Add Pane"));
-  fireEvent.click(screen.getByText("Add Pane"));
+  await act(async () => fireEvent.click(screen.getByText("Add Pane")));
+  await act(async () => fireEvent.click(screen.getByText("Add Pane")));
   expect(screen.getByTestId("pane-count").textContent).toBe("3");
 
   const paneIdsBefore = screen.getByTestId("pane-ids").textContent?.split(",");
 
-  fireEvent.click(screen.getByText("Remove Pane 1"));
+  await act(async () => fireEvent.click(screen.getByText("Remove Pane 1")));
   expect(screen.getByTestId("pane-count").textContent).toBe("2");
 
   const paneIdsAfter = screen.getByTestId("pane-ids").textContent?.split(",");
@@ -94,7 +94,7 @@ test("removePane does not remove the last pane", async () => {
   await screen.findByTestId("pane-count");
   expect(screen.getByTestId("pane-count").textContent).toBe("1");
 
-  fireEvent.click(screen.getByText("Remove First Pane"));
+  await act(async () => fireEvent.click(screen.getByText("Remove First Pane")));
   expect(screen.getByTestId("pane-count").textContent).toBe("1");
 });
 
@@ -162,10 +162,10 @@ test("popTo(length-2) removes last item and updates rootNodeID", async () => {
   renderWithTestData(<TestPaneNavigation />);
 
   await screen.findByTestId("stack");
-  fireEvent.click(screen.getByText("Set Stack"));
+  await act(async () => fireEvent.click(screen.getByText("Set Stack")));
   expect(screen.getByTestId("stack").textContent).toBe("new1,new2,new3");
 
-  fireEvent.click(screen.getByText("Pop"));
+  await act(async () => fireEvent.click(screen.getByText("Pop")));
   expect(screen.getByTestId("stack").textContent).toBe("new1,new2");
   expect(screen.getByTestId("root-node-id").textContent).toBe("new2");
 });
@@ -176,7 +176,7 @@ test("popTo with invalid index does not change stack", async () => {
   await screen.findByTestId("stack");
   expect(screen.getByTestId("stack").textContent).toBe("");
 
-  fireEvent.click(screen.getByText("Pop"));
+  await act(async () => fireEvent.click(screen.getByText("Pop")));
   expect(screen.getByTestId("stack").textContent).toBe("");
   expect(screen.getByTestId("root-node-id").textContent).toBe("");
 });
@@ -185,10 +185,10 @@ test("popTo navigates to specific stack index", async () => {
   renderWithTestData(<TestPaneNavigation />);
 
   await screen.findByTestId("stack");
-  fireEvent.click(screen.getByText("Set Stack"));
+  await act(async () => fireEvent.click(screen.getByText("Set Stack")));
   expect(screen.getByTestId("stack").textContent).toBe("new1,new2,new3");
 
-  fireEvent.click(screen.getByText("Pop To 0"));
+  await act(async () => fireEvent.click(screen.getByText("Pop To 0")));
   expect(screen.getByTestId("stack").textContent).toBe("new1");
   expect(screen.getByTestId("root-node-id").textContent).toBe("new1");
 });
@@ -199,7 +199,7 @@ test("setPane replaces entire stack with new path", async () => {
   await screen.findByTestId("stack");
   expect(screen.getByTestId("stack").textContent).toBe("");
 
-  fireEvent.click(screen.getByText("Set Stack"));
+  await act(async () => fireEvent.click(screen.getByText("Set Stack")));
   expect(screen.getByTestId("stack").textContent).toBe("new1,new2,new3");
   expect(screen.getByTestId("root-node-id").textContent).toBe("new3");
 });

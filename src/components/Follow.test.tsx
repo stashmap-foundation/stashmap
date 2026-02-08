@@ -228,7 +228,28 @@ test("unfollow sends nip-02 event", async () => {
   );
 });
 
+// react-virtuoso layout effects (null) and focus-triggered setActiveRow (Tree)
+// fire during React's commit phase — cannot be wrapped in act()
+// eslint-disable-next-line no-console
+const _consoleError = console.error;
+const suppressLayoutEffectActWarnings = (): void => {
+  // eslint-disable-next-line functional/immutable-data, no-console
+  console.error = (...args: unknown[]) => {
+    const isActWarning =
+      typeof args[0] === "string" &&
+      args[0].includes("inside a test was not wrapped in act");
+    const isVirtuosoOrFocus = args[1] === "null" || args[1] === "Tree";
+    if (isActWarning && isVirtuosoOrFocus) return;
+    _consoleError(...args);
+  };
+};
+const restoreConsoleError = (): void => {
+  // eslint-disable-next-line functional/immutable-data, no-console
+  console.error = _consoleError;
+};
+
 test("follow a new user before signin doesn't delete existing contacts after signin", async () => {
+  suppressLayoutEffectActWarnings();
   const [anon, alice] = setup([ANON, ALICE]);
   await follow(alice, CAROL.publicKey);
 
@@ -267,4 +288,5 @@ test("follow a new user before signin doesn't delete existing contacts after sig
       content: "",
     })
   );
+  restoreConsoleError();
 });

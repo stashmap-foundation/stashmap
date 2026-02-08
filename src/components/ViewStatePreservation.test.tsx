@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -330,7 +330,9 @@ My Notes
     // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
     const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(screen.getAllByText("Source")[0]);
-    fireEvent.drop(targetDropTargets[1]);
+    await act(async () => {
+      fireEvent.drop(targetDropTargets[1]);
+    });
 
     const collapseButtons = screen.getAllByLabelText("collapse Source");
     expect(collapseButtons.length).toBeGreaterThanOrEqual(2);
@@ -369,7 +371,9 @@ My Notes
     // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
     const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(screen.getAllByText("Parent")[0]);
-    fireEvent.drop(targetDropTargets[1]);
+    await act(async () => {
+      fireEvent.drop(targetDropTargets[1]);
+    });
 
     const collapseParentButtons = screen.getAllByLabelText("collapse Parent");
     expect(collapseParentButtons.length).toBeGreaterThanOrEqual(2);
@@ -407,7 +411,9 @@ My Notes
     // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
     const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(screen.getAllByText("Source")[0]);
-    fireEvent.drop(targetDropTargets[1]);
+    await act(async () => {
+      fireEvent.drop(targetDropTargets[1]);
+    });
 
     const collapseSourceButtons = screen.getAllByLabelText("collapse Source");
     expect(collapseSourceButtons.length).toBeGreaterThanOrEqual(2);

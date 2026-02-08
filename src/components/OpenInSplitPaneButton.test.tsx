@@ -1,6 +1,6 @@
 import React from "react";
 import { List } from "immutable";
-import { screen, fireEvent } from "@testing-library/react";
+import { act, screen, fireEvent } from "@testing-library/react";
 import { useSplitPanes } from "../SplitPanesContext";
 import { ViewContext, ViewPath, NodeIndex } from "../ViewContext";
 import {
@@ -55,7 +55,9 @@ test("clicking button calls addPaneAt and creates new pane", async () => {
   await screen.findByTestId("pane-count");
   expect(screen.getByTestId("pane-count").textContent).toBe("1");
 
-  fireEvent.click(screen.getByLabelText("open in split pane"));
+  await act(async () =>
+    fireEvent.click(screen.getByLabelText("open in split pane"))
+  );
 
   expect(screen.getByTestId("pane-count").textContent).toBe("2");
 });
@@ -73,7 +75,9 @@ test("OpenInSplitPaneButtonWithStack passes provided stack to addPaneAt", async 
   await screen.findByTestId("pane-count");
   expect(screen.getByTestId("pane-count").textContent).toBe("1");
 
-  fireEvent.click(screen.getByLabelText("open in split pane"));
+  await act(async () =>
+    fireEvent.click(screen.getByLabelText("open in split pane"))
+  );
 
   expect(screen.getByTestId("pane-count").textContent).toBe("2");
 });
@@ -103,7 +107,9 @@ test("Reference node opens with only reference path, not current pane stack", as
   );
 
   await screen.findByTestId("pane-count");
-  fireEvent.click(screen.getByLabelText("open in split pane"));
+  await act(async () =>
+    fireEvent.click(screen.getByLabelText("open in split pane"))
+  );
 
   const newPaneStack = JSON.parse(
     screen.getByTestId("new-pane-stack").textContent || "[]"
@@ -125,7 +131,9 @@ test("OpenInSplitPaneButtonWithStack click does not bubble to parent onClick", a
   );
 
   await screen.findByTestId("pane-count");
-  fireEvent.click(screen.getByLabelText("open in split pane"));
+  await act(async () =>
+    fireEvent.click(screen.getByLabelText("open in split pane"))
+  );
 
   expect(screen.getByTestId("pane-count").textContent).toBe("2");
   expect(parentClickHandler).not.toHaveBeenCalled();

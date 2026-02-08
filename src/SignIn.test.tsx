@@ -3,6 +3,18 @@ import userEvent from "@testing-library/user-event";
 import { nip19 } from "nostr-tools";
 import { renderApp, findNewNodeEditor } from "./utils.test";
 
+const originalConsoleError = console.error;
+beforeAll(() => {
+  jest.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+    const msg = String(args[0]);
+    if (msg.includes("Not implemented: navigation")) return;
+    originalConsoleError(...args);
+  });
+});
+afterAll(() => {
+  jest.restoreAllMocks();
+});
+
 const npub = nip19.npubEncode(
   "17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917"
 );

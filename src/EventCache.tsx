@@ -27,6 +27,20 @@ export function EventCacheProvider({
     Map<string, Event | UnsignedEvent>
   >(initialCachedEvents ?? Map());
 
+  React.useEffect(() => {
+    if (initialCachedEvents && initialCachedEvents.size > 0) {
+      setEvents((prev) => {
+        const newKeys = initialCachedEvents
+          .keySeq()
+          .filter((k) => !prev.has(k));
+        if (newKeys.isEmpty()) return prev;
+        return prev.merge(
+          initialCachedEvents.filter((_, k) => newKeys.includes(k))
+        );
+      });
+    }
+  }, [initialCachedEvents]);
+
   const addEvents = useCallback(
     (newEvents: Map<string, Event | UnsignedEvent>) => {
       setEvents((prev) => {

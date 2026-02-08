@@ -1,3 +1,4 @@
+import { act } from "@testing-library/react";
 import { Map, Set } from "immutable";
 import {
   Event,
@@ -72,7 +73,7 @@ export function mockRelayPool(): MockRelayPool {
       // eslint-disable-next-line functional/immutable-data
       events.push({ ...event, relays });
       publishedOnRelays = Set([...publishedOnRelays, ...relays]).toArray();
-      broadcastEvent(subs, event);
+      act(() => broadcastEvent(subs, event));
       return relays.map(() => Promise.resolve(""));
     },
     getEvents: () => events,

@@ -178,6 +178,11 @@ function applyDropIndent(el: HTMLElement, depth: number): void {
   }
 }
 
+export function setDropIndentDepth(depth: number): void {
+  // eslint-disable-next-line functional/immutable-data
+  globalDragIndent.targetDepth = depth;
+}
+
 export function clearDropIndent(): void {
   const prev = globalDragIndent.activeElement;
   if (prev) {

@@ -19,12 +19,13 @@ import {
   getConcreteRefs,
   groupConcreteRefs,
   isAbstractRefId,
+  itemPassesFilters,
 } from "./connections";
 import { newDB } from "./knowledge";
 import { useData } from "./DataContext";
 import { Plan, planUpsertRelations, getPane } from "./planner";
 import { usePaneStack, useCurrentPane } from "./SplitPanesContext";
-import { REFERENCED_BY } from "./constants";
+import { REFERENCED_BY, DEFAULT_TYPE_FILTERS } from "./constants";
 
 // only exported for tests
 export type NodeIndex = number & { readonly "": unique symbol };
@@ -811,7 +812,6 @@ export function getPreviousSibling(
 ): SiblingInfo | undefined {
   const relationIndex = getRelationIndex(data, viewPath);
   if (relationIndex === undefined || relationIndex === 0) {
-    // No previous sibling (first item or error)
     return undefined;
   }
 
@@ -820,17 +820,28 @@ export function getPreviousSibling(
     return undefined;
   }
 
-  // Get the previous sibling's path
-  // Try-catch handles case where parent relations are not properly set up (e.g., in tests)
-  try {
-    const prevSiblingPath = addNodeToPath(
-      data,
-      parentPath,
-      relationIndex - 1,
-      stack
-    );
-    const [prevNodeID, prevView] = getNodeIDFromView(data, prevSiblingPath);
+  const parentRelation = getParentRelation(data, viewPath);
+  if (!parentRelation) {
+    return undefined;
+  }
 
+  const pane = getPane(data, viewPath);
+  const activeFilters = pane.typeFilters || DEFAULT_TYPE_FILTERS;
+
+  const prevIndex = parentRelation.items
+    .slice(0, relationIndex)
+    .reduce<number>(
+      (found, item, i) => (itemPassesFilters(item, activeFilters) ? i : found),
+      -1
+    );
+
+  if (prevIndex === -1) {
+    return undefined;
+  }
+
+  try {
+    const prevSiblingPath = addNodeToPath(data, parentPath, prevIndex, stack);
+    const [prevNodeID, prevView] = getNodeIDFromView(data, prevSiblingPath);
     return {
       viewPath: prevSiblingPath,
       nodeID: prevNodeID,
@@ -1104,151 +1115,165 @@ export function upsertRelations(
   return planUpsertRelations(plan, updatedRelations);
 }
 
-/*
- * input for example
- * ws:0:2:0
- *
- * returns
- * ws
- * ws:0
- * ws:0:2
- * ws:0:2:0
- * */
-function getAllSubpaths(path: string): ImmutableSet<string> {
-  return path.split(":").reduce((acc, p) => {
-    const lastPath = acc.last(undefined);
-    return acc.add(lastPath ? `${lastPath}:${p}` : `${p}`);
-  }, ImmutableSet<string>());
+function alterPath(
+  viewPathStr: string,
+  calcIndex: (
+    relationsID: LongID,
+    nodeID: ID,
+    nodeIndex: NodeIndex
+  ) => NodeIndex
+): string {
+  const path = parseViewPath(viewPathStr);
+  if (path.length <= 2) {
+    return viewPathStr;
+  }
+  const paneIndex = getPaneIndex(path);
+  const parents = path.slice(1, -1) as SubPathWithRelations[];
+  const last = getLast(path);
+
+  const { segments, prevRelationsID } = parents.reduce(
+    (
+      acc: {
+        segments: SubPathWithRelations[];
+        prevRelationsID: LongID | undefined;
+      },
+      parent
+    ) => ({
+      segments: [
+        ...acc.segments,
+        acc.prevRelationsID === undefined
+          ? parent
+          : {
+              ...parent,
+              nodeIndex: calcIndex(
+                acc.prevRelationsID,
+                parent.nodeID as ID,
+                parent.nodeIndex
+              ),
+            },
+      ],
+      prevRelationsID: parent.relationsID as LongID,
+    }),
+    { segments: [], prevRelationsID: undefined }
+  );
+
+  const alteredLast = {
+    ...last,
+    nodeIndex: calcIndex(
+      prevRelationsID as LongID,
+      last.nodeID as ID,
+      last.nodeIndex
+    ),
+  };
+
+  return convertViewPathToString([
+    paneIndex,
+    ...segments,
+    alteredLast,
+  ] as ViewPath);
 }
 
-function findParentViewPathsForRelation(
-  data: Data,
-  relationsID: LongID
-): ImmutableSet<string> {
-  const paths = data.views.reduce((acc, _, path) => {
-    return acc.merge(getAllSubpaths(path));
-  }, ImmutableSet<string>());
+function alterNodeIndicesInViews(
+  views: Views,
+  relationsID: LongID,
+  calcIndex: (
+    relationsID: LongID,
+    nodeID: ID,
+    nodeIndex: NodeIndex
+  ) => NodeIndex
+): Views {
   const pattern = `:${relationsID}:`;
-  return paths
-    .filter((path) => path.includes(pattern))
-    .map((path) => {
-      const idx = path.indexOf(pattern);
-      return path.substring(0, idx);
-    })
-    .toSet();
-}
-
-function updateRelationViews(
-  views: Views,
-  parentViewPath: string,
-  update: (relations: List<string | undefined>) => List<string | undefined>
-): Views {
-  const childPaths = views
-    .keySeq()
-    .toList()
-    .filter((path) => path.startsWith(`${parentViewPath}:`));
-
-  /*
-   * ws:0:1 => ws:0:2
-   * ws:0:2 => ws:0:3
-   * ws:0:2:0 => ws:0:3:0
-   * ws:0:2:1 => ws:0:3:1
-   */
-
-  const toReplace = childPaths.reduce((acc, path) => {
-    // Figure out the which index position this relationship has to the parent
-    const subpath = path.substring(parentViewPath.length + 1);
-    const index = parseInt(subpath.split(":")[0], 10);
-    return acc.set(index, `${parentViewPath}:${index}`);
-  }, List<string | undefined>([]));
-  const updatedPositions = update(toReplace);
-  const replaceWith = updatedPositions.reduce((acc, replaceString, newPos) => {
-    if (replaceString === undefined) {
-      return acc;
+  return views.mapKeys((key) => {
+    if (!key.includes(pattern)) {
+      return key;
     }
-    const replaceW = `${parentViewPath}:${newPos}`;
-    return acc.set(replaceString, replaceW);
-  }, Map<string, string>());
-
-  return views.mapEntries(([path, view]) => {
-    if (path.length <= parentViewPath.length) {
-      return [path, view];
-    }
-    const subpath = path.substring(parentViewPath.length + 1);
-    const index = parseInt(subpath.split(":")[0], 10);
-    const replace = `${parentViewPath}:${index}`;
-    const w = replaceWith.get(replace);
-    if (w === undefined) {
-      return [path, view];
-    }
-    return [path.replace(replace, w), view];
-  });
-}
-
-function moveChildViews(
-  views: Views,
-  parentViewPath: string,
-  indices: Array<number>,
-  startPosition: number
-): Views {
-  return updateRelationViews(views, parentViewPath, (relations) => {
-    const viewsToMove = List<string | undefined>(
-      indices.map((i) => relations.get(i))
-    );
-    return relations
-      .filterNot((_, i) => indices.includes(i))
-      .splice(startPosition, 0, ...viewsToMove.toArray());
+    return alterPath(key, calcIndex);
   });
 }
 
 export function updateViewPathsAfterMoveRelations(
   data: Data,
   relationsID: LongID,
+  oldItems: List<RelationItem>,
   indices: Array<number>,
   startPosition?: number
 ): Views {
   if (startPosition === undefined) {
     return data.views;
   }
-  const viewKeys = findParentViewPathsForRelation(data, relationsID);
-  const sortedViewKeys = viewKeys.sort(
-    (a, b) => b.split(":").length - a.split(":").length
+  const itemsBeforeStartPos = indices.filter((i) => i < startPosition).length;
+  const insertPos = startPosition - itemsBeforeStartPos;
+  const remaining = Array.from({ length: oldItems.size }, (_, i) => i).filter(
+    (i) => !indices.includes(i)
   );
-  return sortedViewKeys.reduce((accViews, parentViewPath) => {
-    return moveChildViews(accViews, parentViewPath, indices, startPosition);
-  }, data.views);
+  const newOrder = [
+    ...remaining.slice(0, insertPos),
+    ...indices,
+    ...remaining.slice(insertPos),
+  ];
+
+  const renames = newOrder.reduce<
+    Array<{ nodeID: LongID | ID; oldIdx: NodeIndex; newIdx: NodeIndex }>
+  >((acc, oldPos, newPos) => {
+    const item = oldItems.get(oldPos);
+    if (!item) {
+      return acc;
+    }
+    const oldNodeIndex = oldItems
+      .slice(0, oldPos)
+      .filter((it) => it.nodeID === item.nodeID).size as NodeIndex;
+    const newNodeIndex = newOrder
+      .slice(0, newPos)
+      .filter((p) => oldItems.get(p)?.nodeID === item.nodeID)
+      .length as unknown as NodeIndex;
+    if (oldNodeIndex !== newNodeIndex) {
+      return [
+        ...acc,
+        { nodeID: item.nodeID, oldIdx: oldNodeIndex, newIdx: newNodeIndex },
+      ];
+    }
+    return acc;
+  }, []);
+
+  if (renames.length === 0) {
+    return data.views;
+  }
+
+  return alterNodeIndicesInViews(
+    data.views,
+    relationsID,
+    (relation, node, index) => {
+      if (relation !== relationsID) {
+        return index;
+      }
+      const rename = renames.find(
+        (r) => r.nodeID === node && r.oldIdx === index
+      );
+      return rename ? rename.newIdx : index;
+    }
+  );
 }
 
 export function updateViewPathsAfterAddRelation(
   data: Data,
   relationsID: LongID,
-  ord?: number
+  addedNodeID: LongID | ID,
+  addedNodeIndex: NodeIndex
 ): Views {
-  if (ord === undefined) {
-    return data.views;
-  }
-  const viewKeys = findParentViewPathsForRelation(data, relationsID);
-
-  const sortedViewKeys = viewKeys.sort(
-    (a, b) => b.split(":").length - a.split(":").length
+  return alterNodeIndicesInViews(
+    data.views,
+    relationsID,
+    (relation, node, index) => {
+      if (
+        relation === relationsID &&
+        node === addedNodeID &&
+        index >= addedNodeIndex
+      ) {
+        return (index + 1) as NodeIndex;
+      }
+      return index;
+    }
   );
-
-  return sortedViewKeys.reduce((accViews, parentViewPath) => {
-    const childPaths = accViews
-      .keySeq()
-      .toList()
-      .filter((path) => path.startsWith(parentViewPath));
-
-    const lastChildIndex =
-      (childPaths
-        // eslint-disable-next-line functional/immutable-data
-        .map((path) => parseInt(path.split(":").pop() as string, 10))
-        .max() as number) + 1;
-
-    const indices = [lastChildIndex];
-    const startPosition = ord;
-    return moveChildViews(accViews, parentViewPath, indices, startPosition);
-  }, data.views);
 }
 
 export function updateViewPathsAfterDeleteNode(
@@ -1256,34 +1281,6 @@ export function updateViewPathsAfterDeleteNode(
   nodeID: LongID | ID
 ): Views {
   return views.filterNot((_, k) => k.includes(nodeID));
-}
-
-/*
- * A:R:2:B:R2:2 -> A:R:1:B:R2:2
- * A:R2:1:B:R:2 -> A:R2:1:B:R:1
- * C:R:0 -> C:R:0
- * A:R:2:B:R:2 -> A:R:1:B:R:1
- * R:1:R:2 -> deleted
- * A:R2:1:B:R:1 -> deleted
- */
-
-function alterPath(
-  viewPath: string,
-  calcIndex: (relation: LongID, node: LongID, index: NodeIndex) => NodeIndex
-): string {
-  const paths = viewPath.split(":");
-  return paths
-    .map((path, idx) => {
-      // The first two values are root:0
-      if (idx >= 4 && (idx - 1) % 3 === 0) {
-        const relation = paths[idx - 2] as LongID;
-        const node = paths[idx - 1] as LongID;
-        const index = parseInt(paths[idx], 10) as NodeIndex;
-        return calcIndex(relation, node, index);
-      }
-      return path;
-    })
-    .join(":");
 }
 
 export function updateViewPathsAfterDisconnect(
@@ -1298,13 +1295,10 @@ export function updateViewPathsAfterDisconnect(
     (_, k) => k.includes(`${toDelete}:`) || k.endsWith(toDelete)
   );
 
-  const lookForPrefix = `${fromRelation}:${disconnectNode}:`;
-
-  return withDeleted.mapKeys((key) => {
-    if (!key.includes(lookForPrefix)) {
-      return key;
-    }
-    return alterPath(key, (relation, node, index) => {
+  return alterNodeIndicesInViews(
+    withDeleted,
+    fromRelation,
+    (relation, node, index) => {
       if (
         relation === fromRelation &&
         node === disconnectNode &&
@@ -1313,8 +1307,8 @@ export function updateViewPathsAfterDisconnect(
         return (index - 1) as NodeIndex;
       }
       return index;
-    });
-  });
+    }
+  );
 }
 
 export function updateViewPathsAfterPaneDelete(
@@ -1362,16 +1356,26 @@ export function bulkUpdateViewPathsAfterAddRelation(
   startPos?: number
 ): Views {
   const relation = getRelationForView(data, repoPath, stack);
-  if (!relation) {
+  if (!relation || startPos === undefined) {
     return data.views;
   }
-  return List<undefined>([])
-    .set(nAdds - 1, undefined)
-    .reduce((rdx, _, currentIndex) => {
+  return Array.from({ length: nAdds }, (_, i) => i).reduce(
+    (rdx, currentIndex) => {
+      const pos = startPos + currentIndex;
+      const item = relation.items.get(pos);
+      if (!item) {
+        return rdx;
+      }
+      const addedNodeIndex = relation.items
+        .slice(0, pos)
+        .filter((it) => it.nodeID === item.nodeID).size as NodeIndex;
       return updateViewPathsAfterAddRelation(
         { ...data, views: rdx },
         relation.id,
-        startPos !== undefined ? startPos + currentIndex : undefined
+        item.nodeID,
+        addedNodeIndex
       );
-    }, data.views);
+    },
+    data.views
+  );
 }

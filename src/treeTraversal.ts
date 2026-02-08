@@ -19,8 +19,8 @@ import {
   isAbstractRefId,
   isConcreteRefId,
   isSearchId,
-  isEmptyNodeID,
   getRelations,
+  itemPassesFilters,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
 import { getPane } from "./planner";
@@ -83,31 +83,6 @@ function getChildrenForReferencedBy(
   return relations.items
     .map((_, i) => addNodeToPathWithRelations(refParentPath, relations, i))
     .toList();
-}
-
-function itemPassesFilters(
-  item: RelationItem,
-  activeFilters: (Relevance | Argument | "suggestions" | "contains")[]
-): boolean {
-  if (isEmptyNodeID(item.nodeID)) {
-    return true;
-  }
-
-  const relevanceFilter =
-    item.relevance === undefined ? "contains" : item.relevance;
-  if (!activeFilters.includes(relevanceFilter)) {
-    return false;
-  }
-
-  const hasArgumentFilter =
-    activeFilters.includes("confirms") || activeFilters.includes("contra");
-  if (hasArgumentFilter) {
-    if (!item.argument || !activeFilters.includes(item.argument)) {
-      return false;
-    }
-  }
-
-  return true;
 }
 
 function getChildrenForRegularNode(

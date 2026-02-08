@@ -619,9 +619,9 @@ Child
 
     fireEvent.click(screen.getAllByLabelText("mark Child as not relevant")[0]);
     await waitFor(() => {
-      expect(
-        screen.queryAllByRole("treeitem", { name: "Child" })
-      ).toHaveLength(1);
+      expect(screen.queryAllByRole("treeitem", { name: "Child" })).toHaveLength(
+        1
+      );
     });
 
     const notRelevantFilters = screen.getAllByLabelText(

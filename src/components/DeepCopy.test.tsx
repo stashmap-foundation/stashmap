@@ -32,6 +32,43 @@ const getDropTargets = (nodeName: string): HTMLElement[] => {
 };
 
 describe("Deep Copy - Tab Indent", () => {
+  test("Tab indent skips hidden not_relevant sibling", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("My Notes{Enter}{Tab}NodeA{Enter}Hidden{Enter}Sibling{Escape}");
+
+    await expectTree(`
+My Notes
+  NodeA
+  Hidden
+  Sibling
+    `);
+
+    // Mark Hidden as not relevant - it disappears from view
+    fireEvent.click(screen.getByLabelText("mark Hidden as not relevant"));
+    await screen.findByText("Sibling");
+    expect(screen.queryByText("Hidden")).toBeNull();
+
+    await expectTree(`
+My Notes
+  NodeA
+  Sibling
+    `);
+
+    // Tab on Sibling should indent under NodeA (the visible previous sibling),
+    // NOT under the hidden "Hidden" node
+    const siblingEditor = await screen.findByLabelText("edit Sibling");
+    await userEvent.click(siblingEditor);
+    await userEvent.keyboard("{Home}{Tab}");
+
+    await expectTree(`
+My Notes
+  NodeA
+    Sibling
+    `);
+  });
+
   test("Tab indent preserves children of moved node", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);

@@ -740,6 +740,35 @@ export function itemMatchesType(
   return item.relevance === filterType;
 }
 
+export function isEmptyNodeID(id: LongID | ID): boolean {
+  return id === EMPTY_NODE_ID;
+}
+
+export function itemPassesFilters(
+  item: RelationItem,
+  activeFilters: (Relevance | Argument | "suggestions" | "contains")[]
+): boolean {
+  if (isEmptyNodeID(item.nodeID)) {
+    return true;
+  }
+
+  const relevanceFilter =
+    item.relevance === undefined ? "contains" : item.relevance;
+  if (!activeFilters.includes(relevanceFilter)) {
+    return false;
+  }
+
+  const hasArgumentFilter =
+    activeFilters.includes("confirms") || activeFilters.includes("contra");
+  if (hasArgumentFilter) {
+    if (!item.argument || !activeFilters.includes(item.argument)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export function aggregateWeightedVotes(
   listsOfVotes: List<{ items: List<RelationItem>; weight: number }>,
   filterType: Relevance | Argument | "contains"
@@ -871,11 +900,6 @@ export function newNode(text: string): KnowNode {
     id: hashText(text), // Content-addressed: ID = hash(text)
     type: "text",
   };
-}
-
-// Check if a node ID is the empty placeholder node
-export function isEmptyNodeID(id: LongID | ID): boolean {
-  return id === EMPTY_NODE_ID;
 }
 
 export type EmptyNodeData = {

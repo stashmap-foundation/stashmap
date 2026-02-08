@@ -443,9 +443,7 @@ Holiday Destinations
   );
 
   await userEvent.click(
-    await screen.findByLabelText(
-      "expand Holiday Destinations \u2192 Spain"
-    )
+    await screen.findByLabelText("expand Holiday Destinations \u2192 Spain")
   );
 
   await expectTree(`
@@ -499,9 +497,7 @@ Spain
   );
 
   await userEvent.click(
-    await screen.findByLabelText(
-      "expand Holiday Destinations \u2192 Spain"
-    )
+    await screen.findByLabelText("expand Holiday Destinations \u2192 Spain")
   );
 
   await expectTree(`

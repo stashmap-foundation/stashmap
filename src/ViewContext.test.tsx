@@ -38,6 +38,7 @@ import {
   updateViewPathsAfterDisconnect,
   updateViewPathsAfterPaneDelete,
   updateViewPathsAfterPaneInsert,
+  updateViewPathsAfterMoveRelations,
   NodeIndex,
   ViewPath,
 } from "./ViewContext";
@@ -246,16 +247,43 @@ My Notes
 });
 
 test("Alter View paths after disconnect", () => {
-  // Assume I'm deleting r:n:1 (first occurance of n in r)
   const views = Map<string, { e: string }>({
-    "root:0:r:n:1": { e: "delete" },
-    "root:0:r:n:3": { e: "root:0:r:n:2" },
-    "root:0:r:n:12": { e: "root:0:r:n:11" },
-    "root2:0:r:n:2:r:n:3": { e: "root2:0:r:n:1:r:n:2" },
-    "root2:0:r:n:2:r:n:1": { e: "delete" },
-    "root2:0:r:n:1:r:n:2": { e: "delete" },
-    "root:0:r:n:0": { e: "root:0:r:n:0" },
-    "root:0:r:n:2:r2:a:0:r:n:45": { e: "root:0:r:n:1:r2:a:0:r:n:44" },
+    "p0:root:0:r:n:1": { e: "delete" },
+    "p0:root:0:r:n:3": { e: "p0:root:0:r:n:2" },
+    "p0:root:0:r:n:12": { e: "p0:root:0:r:n:11" },
+    "p0:root2:0:r:n:2:r:n:3": { e: "p0:root2:0:r:n:1:r:n:2" },
+    "p0:root2:0:r:n:2:r:n:1": { e: "delete" },
+    "p0:root2:0:r:n:1:r:n:2": { e: "delete" },
+    "p0:root:0:r:n:0": { e: "p0:root:0:r:n:0" },
+    "p0:root:0:r:n:2:r2:a:0:r:n:45": {
+      e: "p0:root:0:r:n:1:r2:a:0:r:n:44",
+    },
+  });
+  const updatedViews = updateViewPathsAfterDisconnect(
+    views as unknown as Views,
+    "n" as LongID,
+    "r" as LongID,
+    1 as NodeIndex
+  );
+
+  const expectedResult = views
+    .filter((v) => v.e !== "delete")
+    .mapEntries((e) => [e[1].e, e[1]]);
+  expect(updatedViews.keySeq().toJS()).toEqual(expectedResult.keySeq().toJS());
+});
+
+test("Alter View paths after disconnect with pane-prefixed paths", () => {
+  const views = Map<string, { e: string }>({
+    "p0:root:0:r:n:1": { e: "delete" },
+    "p0:root:0:r:n:3": { e: "p0:root:0:r:n:2" },
+    "p0:root:0:r:n:12": { e: "p0:root:0:r:n:11" },
+    "p0:root2:0:r:n:2:r:n:3": { e: "p0:root2:0:r:n:1:r:n:2" },
+    "p0:root2:0:r:n:2:r:n:1": { e: "delete" },
+    "p0:root2:0:r:n:1:r:n:2": { e: "delete" },
+    "p0:root:0:r:n:0": { e: "p0:root:0:r:n:0" },
+    "p0:root:0:r:n:2:r2:a:0:r:n:45": {
+      e: "p0:root:0:r:n:1:r2:a:0:r:n:44",
+    },
   });
   const updatedViews = updateViewPathsAfterDisconnect(
     views as unknown as Views,
@@ -532,4 +560,41 @@ test("updateViewPathsAfterPaneInsert shifts pane indices at and after insertion 
   // Old pane 2 is now pane 3
   expect(updatedViews.has("p3:root:0")).toBe(true);
   expect(updatedViews.get("p3:root:0")?.expanded).toBe(true);
+});
+
+test("updateViewPathsAfterMoveRelations preserves paths when relationsID starts with digit", () => {
+  const relID = "3abc_uuid" as LongID;
+  const childAPath = `p0:root:0:${relID}:childA:0`;
+  const childADeepPath = `p0:root:0:${relID}:childA:0:innerRel:grand:0`;
+  const childBPath = `p0:root:0:${relID}:childB:0`;
+
+  const views = Map<string, View>({
+    "p0:root:0": { viewingMode: undefined, expanded: true },
+    [childAPath]: { viewingMode: undefined, expanded: true },
+    [childADeepPath]: { viewingMode: undefined, expanded: true },
+    [childBPath]: { viewingMode: undefined, expanded: false },
+  });
+
+  const data = { views } as unknown as Data;
+
+  const oldItems = List([
+    { nodeID: "childA" as LongID, relevance: undefined },
+    { nodeID: "childB" as LongID, relevance: undefined },
+  ] as RelationItem[]);
+
+  const updatedViews = updateViewPathsAfterMoveRelations(
+    data,
+    relID,
+    oldItems,
+    [0],
+    4
+  );
+
+  expect(updatedViews.has(childAPath)).toBe(true);
+  expect(updatedViews.get(childAPath)?.expanded).toBe(true);
+  expect(updatedViews.has(childADeepPath)).toBe(true);
+  expect(updatedViews.get(childADeepPath)?.expanded).toBe(true);
+  expect(updatedViews.has(childBPath)).toBe(true);
+
+  expect(updatedViews.has("p0:root:0:2abc_uuid:childA:0")).toBe(false);
 });

@@ -1,3 +1,4 @@
+/* eslint-disable testing-library/no-unnecessary-act, @typescript-eslint/require-await */
 import React from "react";
 import { act, screen, fireEvent } from "@testing-library/react";
 import {

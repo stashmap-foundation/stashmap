@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { nip19 } from "nostr-tools";
 import { renderApp, findNewNodeEditor } from "./utils.test";
 
+// eslint-disable-next-line no-console
 const originalConsoleError = console.error;
 beforeAll(() => {
   jest.spyOn(console, "error").mockImplementation((...args: unknown[]) => {

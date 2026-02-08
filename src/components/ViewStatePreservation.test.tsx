@@ -1,4 +1,11 @@
-import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+/* eslint-disable testing-library/no-unnecessary-act, @typescript-eslint/require-await */
+import {
+  act,
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,

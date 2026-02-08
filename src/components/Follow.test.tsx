@@ -231,7 +231,7 @@ test("unfollow sends nip-02 event", async () => {
 // react-virtuoso layout effects (null) and focus-triggered setActiveRow (Tree)
 // fire during React's commit phase — cannot be wrapped in act()
 // eslint-disable-next-line no-console
-const _consoleError = console.error;
+const originalConsoleError = console.error;
 const suppressLayoutEffectActWarnings = (): void => {
   // eslint-disable-next-line functional/immutable-data, no-console
   console.error = (...args: unknown[]) => {
@@ -240,12 +240,12 @@ const suppressLayoutEffectActWarnings = (): void => {
       args[0].includes("inside a test was not wrapped in act");
     const isVirtuosoOrFocus = args[1] === "null" || args[1] === "Tree";
     if (isActWarning && isVirtuosoOrFocus) return;
-    _consoleError(...args);
+    originalConsoleError(...args);
   };
 };
 const restoreConsoleError = (): void => {
   // eslint-disable-next-line functional/immutable-data, no-console
-  console.error = _consoleError;
+  console.error = originalConsoleError;
 };
 
 test("follow a new user before signin doesn't delete existing contacts after signin", async () => {

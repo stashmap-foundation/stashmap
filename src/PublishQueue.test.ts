@@ -1,6 +1,6 @@
 import { hexToBytes } from "@noble/hashes/utils";
 import { List } from "immutable";
-import { UnsignedEvent } from "nostr-tools";
+import { Event, UnsignedEvent } from "nostr-tools";
 import { KIND_KNOWLEDGE_NODE } from "./nostr";
 import { mockRelayPool, MockRelayPool } from "./nostrMock.test";
 import { createPublishQueue, FlushDeps } from "./PublishQueue";
@@ -161,6 +161,150 @@ test("events from multiple plans are published in enqueue order", async () => {
     "plan2-a",
     "plan2-b",
   ]);
+  expect(queue.getStatus().pendingCount).toBe(0);
+}, 10000);
+
+test("clears events from buffer when their target relay is removed from config", async () => {
+  const RELAY_A = "wss://relay-a.test/";
+  const RELAY_B = "wss://relay-b.test/";
+
+  const pool = mockRelayPool();
+  const origPublish = pool.publish.bind(pool);
+  const failPool: MockRelayPool = {
+    ...pool,
+    publish: (relays: string[], event: Event): Promise<string>[] => {
+      const working = relays.filter((r) => r !== RELAY_B);
+      if (working.length > 0) {
+        origPublish(working, event);
+      }
+      return relays.map((relay) =>
+        relay === RELAY_B
+          ? Promise.reject(new Error("connection refused"))
+          : Promise.resolve("")
+      );
+    },
+  } as MockRelayPool;
+
+  const relayConfig: { current: AllRelays } = {
+    current: {
+      defaultRelays: [],
+      userRelays: [
+        { url: RELAY_A, read: true, write: true },
+        { url: RELAY_B, read: true, write: true },
+      ],
+      contactsRelays: [],
+    },
+  };
+
+  const onResults = jest.fn();
+  const queue = createPublishQueue({
+    db: null,
+    debounceMs: 10,
+    batchSize: 10,
+    getDeps: (): FlushDeps => ({
+      user: ALICE_USER,
+      relays: relayConfig.current,
+      relayPool: failPool as never,
+      finalizeEvent: mockFinalizeEvent(),
+    }),
+    onResults,
+  });
+
+  queue.enqueue(List([makeEvent("a"), makeEvent("b")]));
+  await waitForResults(onResults, 1);
+
+  expect(queue.getStatus().pendingCount).toBe(2);
+
+  // eslint-disable-next-line functional/immutable-data
+  relayConfig.current = {
+    defaultRelays: [],
+    userRelays: [{ url: RELAY_A, read: true, write: true }],
+    contactsRelays: [],
+  };
+
+  queue.enqueue(List([makeEvent("c")]));
+  await waitForResults(onResults, 2);
+
+  expect(queue.getStatus().pendingCount).toBe(0);
+}, 10000);
+
+test("publishes events enqueued during an in-progress flush", async () => {
+  const pool = mockRelayPool();
+  const origPublish = pool.publish.bind(pool);
+  const publishedTags: string[] = [];
+  const resolvers: Array<(v: string) => void> = [];
+
+  const controlledPool: MockRelayPool = {
+    ...pool,
+    publish: (relays: string[], event: Event): Promise<string>[] => {
+      const dTag = event.tags.find((t: string[]) => t[0] === "d")?.[1] ?? "";
+      // eslint-disable-next-line functional/immutable-data
+      publishedTags.push(dTag);
+      origPublish(relays, event);
+      if (resolvers.length === 0) {
+        return relays.map(
+          () =>
+            new Promise<string>((resolve) => {
+              // eslint-disable-next-line functional/immutable-data
+              resolvers.push(resolve);
+            })
+        );
+      }
+      return relays.map(() => Promise.resolve(""));
+    },
+  } as MockRelayPool;
+
+  const onResults = jest.fn();
+  const queue = createPublishQueue({
+    db: null,
+    debounceMs: 5,
+    batchSize: 10,
+    getDeps: (): FlushDeps => ({
+      user: ALICE_USER,
+      relays: TEST_RELAYS,
+      relayPool: controlledPool as never,
+      finalizeEvent: mockFinalizeEvent(),
+    }),
+    onResults,
+  });
+
+  queue.enqueue(List([makeEvent("a")]));
+
+  const waitUntil = (
+    predicate: () => boolean,
+    timeoutMs = 3000
+  ): Promise<void> =>
+    new Promise((resolve, reject) => {
+      const start = Date.now();
+      const check = (): void => {
+        if (predicate()) {
+          resolve();
+          return;
+        }
+        if (Date.now() - start > timeoutMs) {
+          reject(new Error("waitUntil timed out"));
+          return;
+        }
+        setTimeout(check, 5);
+      };
+      check();
+    });
+
+  await waitUntil(() => resolvers.length === 1);
+
+  queue.enqueue(List([makeEvent("b")]));
+  await new Promise<void>((r) => {
+    setTimeout(r, 20);
+  });
+
+  resolvers.forEach((r) => r(""));
+
+  await waitForResults(onResults, 1);
+  await new Promise<void>((r) => {
+    setTimeout(r, 300);
+  });
+
+  expect(publishedTags).toContain("b");
   expect(queue.getStatus().pendingCount).toBe(0);
 }, 10000);
 

@@ -253,7 +253,13 @@ export const createPublishQueue = (
         );
         const availableUrls = getAvailableRelays(needsPublish);
 
-        if (availableUrls.length === 0) return;
+        if (availableUrls.length === 0) {
+          if (needsPublish.length === 0) {
+            buffer = buffer.delete(entryKey);
+            removeFromOutboxDB(entryKey);
+          }
+          return;
+        }
 
         const relayResults = await publishToRelays(
           deps.relayPool,
@@ -315,6 +321,7 @@ export const createPublishQueue = (
     try {
       const deps = config.getDeps();
       const entries = buffer.entrySeq().toArray();
+      const processedKeys = new globalThis.Set(entries.map(([key]) => key));
       const chunks = toChunks(entries, batchSize);
 
       await chunks.reduce(
@@ -334,6 +341,14 @@ export const createPublishQueue = (
       flushing = false;
 
       scheduleRetry();
+
+      if (
+        !destroyed &&
+        buffer.keySeq().some((key) => !processedKeys.has(key))
+      ) {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => flush(), 0);
+      }
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Publish queue flush failed", error);

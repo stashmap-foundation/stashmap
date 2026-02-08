@@ -12,7 +12,7 @@ import {
   useIsViewingOtherUserContent,
 } from "../ViewContext";
 import { isEmptyNodeID, isAbstractRefId } from "../connections";
-import { NOTE_TYPE, Node } from "./Node";
+import { NOTE_TYPE, Node, INDENTATION } from "./Node";
 import { useDroppable } from "./DroppableContainer";
 import { isMutableNode, useIsEditingOn } from "./TemporaryViewContext";
 import { isEditableElement, KeyboardMode } from "./keyboardNavigation";
@@ -193,11 +193,15 @@ function DraggableSuggestion({
 export function ListItem({
   index,
   treeViewPath,
+  prevDepth,
+  nextDepth,
   activeRowKey,
   onRowFocus,
 }: {
   index: number;
   treeViewPath: ViewPath;
+  prevDepth?: number;
+  nextDepth?: number;
   activeRowKey: string;
   onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
 }): JSX.Element {
@@ -212,18 +216,18 @@ export function ListItem({
 
   const isReadonly = isInReferencedByView || isViewingOtherUserContent;
 
-  // Root node (index 0) can't have siblings above it
   const isRoot = index === 0;
 
-  const [{ dragDirection }, drop] = useDroppable({
+  const [{ dragDirection, targetDepth }, drop] = useDroppable({
     destination: treeViewPath,
     index,
     ref,
     isRoot,
+    prevDepth,
+    nextDepth,
   });
 
   if (isSuggestion) {
-    // Suggestions: draggable but NOT droppable
     return (
       <div className="visible-on-hover suggestion-item-container">
         <DraggableSuggestion
@@ -237,7 +241,6 @@ export function ListItem({
     );
   }
 
-  // Readonly views: items are draggable but NOT droppable (don't register drop)
   if (!isReadonly) {
     drop(ref);
   }
@@ -245,8 +248,14 @@ export function ListItem({
   const className = `${dragDirection === 1 ? "dragging-over-top" : ""} ${
     dragDirection === -1 ? "dragging-over-bottom" : ""
   }`;
+  const dropIndentLeft =
+    targetDepth !== undefined ? 5 + (targetDepth - 1) * INDENTATION : undefined;
+  const style =
+    dropIndentLeft !== undefined
+      ? ({ "--drop-indent-left": `${dropIndentLeft}px` } as React.CSSProperties)
+      : undefined;
   return (
-    <div className="visible-on-hover">
+    <div className="visible-on-hover" style={style}>
       <Draggable
         ref={ref}
         className={className}

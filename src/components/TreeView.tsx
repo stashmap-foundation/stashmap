@@ -165,11 +165,16 @@ function VirtuosoForColumn({
         }}
         isScrolling={onStopScrolling}
         itemContent={(index, path) => {
+          const prevPath = index > 0 ? nodes.get(index - 1) : undefined;
+          const nextPath =
+            index < nodes.size - 1 ? nodes.get(index + 1) : undefined;
           return (
             <ViewContext.Provider value={path} key={viewPathToString(path)}>
               <ListItem
                 index={index}
                 treeViewPath={viewPath}
+                prevDepth={prevPath ? prevPath.length - 1 : undefined}
+                nextDepth={nextPath ? nextPath.length - 1 : undefined}
                 activeRowKey={activeRowKey}
                 onRowFocus={onRowFocus}
               />

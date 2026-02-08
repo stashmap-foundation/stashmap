@@ -724,7 +724,7 @@ test("Bottom-half drop on last child of nested parent stays within that parent",
     [root.id],
     4,
     undefined,
-    true
+    3
   );
 
   expect(viewPathToString(toView)).toBe(viewPathToString(spainPath));

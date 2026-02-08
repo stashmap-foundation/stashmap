@@ -29,7 +29,7 @@ import {
   useViewPath,
   viewPathToString,
 } from "../ViewContext";
-import { NOTE_TYPE } from "./Node";
+import { NOTE_TYPE, INDENTATION } from "./Node";
 import { usePaneStack, useCurrentPane } from "../SplitPanesContext";
 import {
   buildRootTreeForEmptyRootDrop,
@@ -172,18 +172,58 @@ function calcIndex(
   return direction === 1 ? index : index + 1;
 }
 
+const INDENT_MARGIN = 5;
+
+function calcTargetDepth(
+  ref: RefObject<HTMLElement>,
+  monitor: DropTargetMonitor<DropItemType>,
+  direction: number | undefined,
+  currentDepth: number,
+  prevDepth: number | undefined,
+  nextDepth: number | undefined
+): number | undefined {
+  if (direction === undefined) {
+    return undefined;
+  }
+  const clientOffset = monitor.getClientOffset();
+  if (!clientOffset || !ref.current) {
+    return undefined;
+  }
+  const itemLeft = ref.current.getBoundingClientRect().left;
+  const rawDepth = Math.round(
+    (clientOffset.x - itemLeft - INDENT_MARGIN) / INDENTATION + 1
+  );
+  const maxDepth =
+    direction === -1
+      ? currentDepth + 1
+      : prevDepth !== undefined
+      ? prevDepth + 1
+      : currentDepth;
+  const minDepth =
+    direction === -1 ? (nextDepth !== undefined ? nextDepth : 2) : currentDepth;
+  return Math.max(minDepth, Math.min(maxDepth, rawDepth));
+}
+
 export function useDroppable({
   destination,
   index,
   ref,
   isRoot,
+  prevDepth,
+  nextDepth,
 }: {
   destination: ViewPath;
   index?: number;
   ref: RefObject<HTMLElement>;
   isRoot?: boolean;
+  prevDepth?: number;
+  nextDepth?: number;
 }): [
-  { dragDirection: number | undefined; isOver: boolean },
+  {
+    dragDirection: number | undefined;
+    isOver: boolean;
+    targetDepth: number | undefined;
+  },
   ConnectDropTarget
 ] {
   const { setState, selection, multiselectBtns } = useTemporaryView();
@@ -234,17 +274,32 @@ export function useDroppable({
     };
   }, []);
 
+  const currentDepth = path.length - 1;
+
   return useDrop<
     DropItemType,
     DropItemType,
-    { dragDirection: number | undefined; isOver: boolean }
+    {
+      dragDirection: number | undefined;
+      isOver: boolean;
+      targetDepth: number | undefined;
+    }
   >({
     accept: [NOTE_TYPE, NativeTypes.FILE],
     collect(monitor) {
       const rawDirection = calcDragDirection(ref, monitor, path);
+      const direction = adjustDirectionForRoot(rawDirection);
       return {
-        dragDirection: adjustDirectionForRoot(rawDirection),
+        dragDirection: direction,
         isOver: monitor.isOver({ shallow: true }),
+        targetDepth: calcTargetDepth(
+          ref,
+          monitor,
+          direction,
+          currentDepth,
+          prevDepth,
+          nextDepth
+        ),
       };
     },
     drop(item: DropItemType, monitor: DropTargetMonitor<DropItemType>) {
@@ -253,6 +308,14 @@ export function useDroppable({
       if (isListItem && direction === undefined) {
         return item;
       }
+      const targetDepth = calcTargetDepth(
+        ref,
+        monitor,
+        direction,
+        currentDepth,
+        prevDepth,
+        nextDepth
+      );
 
       if (monitor.getItemType() === NativeTypes.FILE) {
         const fileDropItem = item as NativeFileDropItem;
@@ -282,8 +345,7 @@ export function useDroppable({
                   destination,
                   stack,
                   destinationIndex,
-                  pane.rootRelation,
-                  direction === -1
+                  pane.rootRelation
                 );
           const [dropParentNodeID] = getNodeIDFromView(plan, dropParentPath);
 
@@ -342,7 +404,7 @@ export function useDroppable({
           pane.rootRelation,
           dragItem.isSuggestion,
           invertCopyModeRef.current,
-          direction === -1
+          targetDepth
         )
       );
       const parentKey = getParentKey(viewPathToString(dragItem.path));
@@ -363,7 +425,7 @@ export function DroppableContainer({
   const [{ isOver }, drop] = useDroppable({
     destination: path,
     ref,
-  });
+  }) as [{ isOver: boolean }, ConnectDropTarget];
   const className = isOver ? "dimmed" : "";
   drop(ref);
 

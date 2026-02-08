@@ -589,7 +589,7 @@ function NodeAutoLink({
   return <>{children}</>;
 }
 
-const INDENTATION = 25;
+export const INDENTATION = 25;
 const ARROW_WIDTH = 0;
 
 export function Indent({

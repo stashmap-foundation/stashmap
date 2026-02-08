@@ -64,13 +64,99 @@ function getInsertAfterNode(
   return [parentView, index + 1];
 }
 
+function getAncestorAtDepth(
+  path: ViewPath,
+  depth: number
+): ViewPath | undefined {
+  if (path.length - 1 <= depth) {
+    return path;
+  }
+  const parent = getParentView(path);
+  if (!parent) {
+    return undefined;
+  }
+  return getAncestorAtDepth(parent, depth);
+}
+
+function resolveDropByDepth(
+  data: Data,
+  root: ViewPath,
+  stack: ID[],
+  prevNode: ViewPath | undefined,
+  dropBefore: ViewPath | undefined,
+  targetDepth: number
+): [ViewPath, number] {
+  const rootDepth = root.length - 1;
+  const maxDepth = prevNode ? prevNode.length - 1 + 1 : rootDepth + 1;
+  const minDepth = dropBefore ? dropBefore.length - 1 : rootDepth + 1;
+  const clampedDepth = Math.max(minDepth, Math.min(maxDepth, targetDepth));
+
+  if (!prevNode) {
+    if (!dropBefore) {
+      return getDropDestinationEndOfRoot(data, root, stack);
+    }
+    const parentView = getParentView(dropBefore);
+    if (!parentView) {
+      return getDropDestinationEndOfRoot(data, root, stack);
+    }
+    const idx = getRelationIndex(data, dropBefore);
+    return [parentView, idx || 0];
+  }
+
+  const prevDepth = prevNode.length - 1;
+  if (clampedDepth === prevDepth + 1) {
+    if (dropBefore && dropBefore.length - 1 === clampedDepth) {
+      const idx = getRelationIndex(data, dropBefore);
+      return [prevNode, idx ?? 0];
+    }
+    const relation = getRelationForView(data, prevNode, stack);
+    return [prevNode, relation?.items.size || 0];
+  }
+
+  const ancestor = getAncestorAtDepth(prevNode, clampedDepth);
+  if (ancestor) {
+    const afterAncestor = getInsertAfterNode(data, ancestor);
+    if (afterAncestor) {
+      return afterAncestor;
+    }
+  }
+
+  return getDropDestinationEndOfRoot(data, root, stack);
+}
+
+function findNextNonSource(
+  nodes: List<ViewPath>,
+  startIndex: number,
+  sourceKeys: Set<string>
+): ViewPath | undefined {
+  let skipDepth: number | undefined;
+  for (let i = startIndex; i < nodes.size; i++) {
+    const node = nodes.get(i);
+    if (!node) {
+      continue;
+    }
+    const depth = node.length - 1;
+    if (skipDepth !== undefined && depth > skipDepth) {
+      continue;
+    }
+    skipDepth = undefined;
+    if (sourceKeys.has(viewPathToString(node))) {
+      skipDepth = depth;
+      continue;
+    }
+    return node;
+  }
+  return undefined;
+}
+
 export function getDropDestinationFromTreeView(
   data: Data,
   root: ViewPath,
   stack: ID[],
   destinationIndex: number,
   rootRelation: LongID | undefined,
-  isBottomHalf?: boolean
+  targetDepth?: number,
+  sourceKeys?: Set<string>
 ): [ViewPath, number] {
   const nodes = getNodesInTree(
     data,
@@ -79,10 +165,24 @@ export function getDropDestinationFromTreeView(
     List<ViewPath>(),
     rootRelation
   );
-  // Subtract 1 because the visual list includes root at index 0,
-  // but getNodesInTree doesn't include the root
   const adjustedIndex = destinationIndex - 1;
   const dropBefore = nodes.get(adjustedIndex);
+  const prevNode = adjustedIndex > 0 ? nodes.get(adjustedIndex - 1) : undefined;
+
+  if (targetDepth !== undefined) {
+    const realDropBefore = sourceKeys
+      ? findNextNonSource(nodes, adjustedIndex, sourceKeys)
+      : dropBefore;
+    return resolveDropByDepth(
+      data,
+      root,
+      stack,
+      prevNode,
+      realDropBefore,
+      targetDepth
+    );
+  }
+
   if (!dropBefore) {
     const lastNode = nodes.last();
     if (lastNode) {
@@ -93,8 +193,7 @@ export function getDropDestinationFromTreeView(
     }
     return getDropDestinationEndOfRoot(data, root, stack);
   }
-  const prevNode = adjustedIndex > 0 ? nodes.get(adjustedIndex - 1) : undefined;
-  if (isBottomHalf && prevNode && prevNode.length > dropBefore.length) {
+  if (prevNode && prevNode.length > dropBefore.length) {
     const afterPrev = getInsertAfterNode(data, prevNode);
     if (afterPrev) {
       return afterPrev;
@@ -170,7 +269,7 @@ export function dnd(
   rootRelation: LongID | undefined,
   isSuggestion?: boolean,
   invertCopyMode?: boolean,
-  isBottomHalf?: boolean
+  targetDepth?: number
 ): Plan {
   const rootView = to;
 
@@ -179,6 +278,7 @@ export function dnd(
   const sources = selection.contains(source) ? selectedSources : List([source]);
 
   const sourceParentPath = getParentView(sourceViewPath);
+  const sourceKeys = Set(sources.map((s) => s));
   const [toView, dropIndex] =
     indexTo === undefined
       ? [rootView, undefined]
@@ -188,7 +288,8 @@ export function dnd(
           stack,
           indexTo,
           rootRelation,
-          isBottomHalf
+          targetDepth,
+          sourceKeys
         );
 
   const fromRelation = sourceParentPath

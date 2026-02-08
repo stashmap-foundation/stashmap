@@ -65,7 +65,7 @@ My Notes
     await screen.findByLabelText("collapse A");
 
     fireEvent.dragStart(screen.getByText("A"));
-    fireEvent.drop(screen.getByText("C"));
+    fireEvent.drop(screen.getByText("B"));
 
     await expectTree(`
 My Notes
@@ -97,7 +97,7 @@ My Notes
     await screen.findByLabelText("collapse C");
 
     fireEvent.dragStart(screen.getByText("C"));
-    fireEvent.drop(screen.getByText("A"));
+    fireEvent.drop(screen.getByLabelText("My Notes"));
 
     await expectTree(`
 My Notes
@@ -138,7 +138,7 @@ My Notes
     await screen.findByLabelText("collapse C");
 
     fireEvent.dragStart(screen.getByText("B"));
-    fireEvent.drop(screen.getByText("A"));
+    fireEvent.drop(screen.getByLabelText("My Notes"));
 
     await expectTree(`
 My Notes
@@ -173,7 +173,7 @@ My Notes
     await screen.findByLabelText("collapse Child");
 
     fireEvent.dragStart(screen.getByText("B"));
-    fireEvent.drop(screen.getByText("A"));
+    fireEvent.drop(screen.getByLabelText("My Notes"));
 
     await expectTree(`
 My Notes
@@ -434,7 +434,7 @@ My Notes
     await userEvent.type(await findNewNodeEditor(), "Inserted{Escape}");
 
     fireEvent.dragStart(screen.getByText("Inserted"));
-    fireEvent.drop(screen.getByText("A"));
+    fireEvent.drop(screen.getByLabelText("My Notes"));
 
     await expectTree(`
 My Notes
@@ -690,7 +690,7 @@ My Notes
     await screen.findByLabelText("collapse B");
 
     fireEvent.dragStart(screen.getByText("C"));
-    fireEvent.drop(screen.getByText("A"));
+    fireEvent.drop(screen.getByLabelText("My Notes"));
 
     await screen.findByLabelText("collapse A");
     await screen.findByLabelText("collapse B");
@@ -703,7 +703,7 @@ My Notes
     await screen.findByLabelText("collapse B");
 
     fireEvent.dragStart(screen.getByText("A"));
-    fireEvent.drop(screen.getByText("B"));
+    fireEvent.drop(screen.getByText("C"));
 
     await expectTree(`
 My Notes
@@ -762,7 +762,7 @@ My Notes
     await screen.findByLabelText("collapse C");
 
     fireEvent.dragStart(screen.getByText("B"));
-    fireEvent.drop(screen.getByText("A"));
+    fireEvent.drop(screen.getByLabelText("My Notes"));
 
     await expectTree(`
 My Notes

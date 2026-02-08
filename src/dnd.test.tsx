@@ -44,10 +44,10 @@ Root
   `);
 
   const itemC = screen.getByText("Item C");
-  const itemA = screen.getByText("Item A");
+  const root = screen.getByLabelText("Root");
 
   fireEvent.dragStart(itemC);
-  fireEvent.drop(itemA);
+  fireEvent.drop(root);
 
   await expectTree(`
 Root
@@ -622,10 +622,10 @@ Holiday Destinations
   `);
 
   const barcelona = screen.getByText("Barcelona");
-  const sevilla = screen.getByText("Sevilla");
+  const spain = screen.getByText("Spain");
 
   fireEvent.dragStart(barcelona);
-  fireEvent.drop(sevilla);
+  fireEvent.drop(spain);
 
   await expectTree(`
 Holiday Destinations

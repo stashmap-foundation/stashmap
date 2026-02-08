@@ -801,9 +801,9 @@ My Notes
   [S] BobFolder
     `);
 
-    // Drag [S] BobFolder and drop on AliceChild (inserts before AliceChild as sibling under Target)
+    // Drag [S] BobFolder and drop on Target (inserts after Target, i.e. as first child of Target)
     fireEvent.dragStart(screen.getByText("BobFolder"));
-    fireEvent.drop(screen.getByText("AliceChild"));
+    fireEvent.drop(screen.getByLabelText("collapse Target"));
 
     // BobFolder should be added under Target, AliceChild preserved
     // [S] BobFolder remains because it's at a different parent (My Notes vs Target)
@@ -1273,11 +1273,11 @@ Target
   My Notes → Source
     `);
 
-    const target2DropTargets = getDropTargets("Target2");
+    const targetInPane0 = screen.getAllByRole("treeitem", { name: "Target" })[0];
     await userEvent.keyboard("{Alt>}");
     fireEvent.dragStart(screen.getByText("My Notes → Source"));
-    fireEvent.dragOver(target2DropTargets[0], { altKey: true });
-    fireEvent.drop(target2DropTargets[0], { altKey: true });
+    fireEvent.dragOver(targetInPane0, { altKey: true });
+    fireEvent.drop(targetInPane0, { altKey: true });
     await userEvent.keyboard("{/Alt}");
 
     await expectTree(`

@@ -452,14 +452,17 @@ function CustomDragLayer(): JSX.Element | null {
     return null;
   }
 
+  const x = currentOffset.x || 0;
+  const y = currentOffset.y || 0;
+
   return (
     <div
       style={{
         position: "fixed",
         pointerEvents: "none",
         zIndex: 1000,
-        left: currentOffset.x + 12,
-        top: currentOffset.y - 8,
+        left: x + 12,
+        top: y - 8,
         opacity: 0.6,
         fontSize: "14px",
         maxWidth: "200px",

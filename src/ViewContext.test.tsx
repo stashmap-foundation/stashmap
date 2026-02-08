@@ -137,10 +137,10 @@ My Notes
   `);
 
   const oop = screen.getByText("OOP");
-  const fpl = screen.getByText("FPL");
+  const pl = screen.getByLabelText("Programming Languages");
 
   fireEvent.dragStart(oop);
-  fireEvent.drop(fpl);
+  fireEvent.drop(pl);
   await expectTree(`
 My Notes
   Programming Languages

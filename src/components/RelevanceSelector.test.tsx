@@ -5,8 +5,10 @@ import {
   ALICE,
   BOB,
   expectTree,
+  findNewNodeEditor,
   follow,
   navigateToNodeViaSearch,
+  renderApp,
   renderTree,
   setup,
   type,
@@ -576,6 +578,146 @@ describe("Remove from list", () => {
 
     // Even with not_relevant filter enabled, Child should not reappear
     expect(screen.queryByText("Child")).toBeNull();
+  });
+
+  test("remove from list cleans up orphaned descendant relations", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type(
+      "Root{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
+    );
+
+    await userEvent.click(
+      await screen.findByLabelText("show references to GrandChild")
+    );
+
+    await expectTree(`
+Root
+  Parent
+    Child
+      GrandChild
+        Root \u2192 Parent \u2192 Child (1) \u2192 GrandChild
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText("hide references to GrandChild")
+    );
+
+    const splitPaneButtons = screen.getAllByLabelText("open in split pane");
+    await userEvent.click(splitPaneButtons[0]);
+    await navigateToNodeViaSearch(1, "Child");
+
+    await expectTree(`
+Root
+  Parent
+    Child
+      GrandChild
+Child
+  GrandChild
+    `);
+
+    fireEvent.click(screen.getAllByLabelText("mark Child as not relevant")[0]);
+    await waitFor(() => {
+      expect(
+        screen.queryAllByRole("treeitem", { name: "Child" })
+      ).toHaveLength(1);
+    });
+
+    const notRelevantFilters = screen.getAllByLabelText(
+      "toggle Not Relevant filter"
+    );
+    await userEvent.click(notRelevantFilters[0]);
+    await screen.findByLabelText("remove Child from list");
+
+    fireEvent.click(screen.getByLabelText("remove Child from list"));
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText("remove Child from list")).toBeNull();
+    });
+
+    await userEvent.click(
+      screen.getAllByLabelText("toggle Not Relevant filter")[0]
+    );
+
+    await expectTree(`
+Root
+  Parent
+Child
+    `);
+  });
+
+  test("removing ~Versions from list does not delete orphaned descendant relations", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("My Notes{Enter}{Tab}Barcelona{Escape}");
+
+    const barcelonaEditor = await screen.findByLabelText("edit Barcelona");
+    await userEvent.click(barcelonaEditor);
+    await userEvent.clear(barcelonaEditor);
+    await userEvent.type(barcelonaEditor, "BCN");
+    fireEvent.blur(barcelonaEditor);
+
+    await expectTree(`
+My Notes
+  BCN
+    `);
+
+    await userEvent.click(await screen.findByLabelText("edit BCN"));
+    await userEvent.keyboard("{Enter}");
+    const newEditor = await findNewNodeEditor();
+    await userEvent.type(newEditor, "~Versions");
+    await userEvent.click(newEditor);
+    await userEvent.keyboard("{Home}{Tab}");
+
+    await expectTree(`
+My Notes
+  BCN
+    ~Versions
+    `);
+
+    await userEvent.click(await screen.findByLabelText("expand ~Versions"));
+
+    await expectTree(`
+My Notes
+  BCN
+    ~Versions
+      BCN
+      Barcelona
+    `);
+
+    fireEvent.click(screen.getByLabelText("mark ~Versions as not relevant"));
+    await waitFor(() => {
+      expect(screen.queryByText("~Versions")).toBeNull();
+    });
+
+    await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
+    await screen.findByText("~Versions");
+
+    fireEvent.click(screen.getByLabelText("remove ~Versions from list"));
+
+    await waitFor(() => {
+      expect(screen.queryByText("~Versions")).toBeNull();
+    });
+
+    await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
+
+    await expectTree(`
+My Notes
+  BCN
+    `);
+
+    const bcnEditor = await screen.findByLabelText("edit BCN");
+    await userEvent.click(bcnEditor);
+    await userEvent.clear(bcnEditor);
+    await userEvent.type(bcnEditor, "Barcelona");
+    fireEvent.blur(bcnEditor);
+
+    await expectTree(`
+My Notes
+  Barcelona
+    `);
   });
 });
 

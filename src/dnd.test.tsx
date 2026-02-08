@@ -13,7 +13,7 @@ import {
   setup,
   type,
 } from "./utils.test";
-import { dnd } from "./dnd";
+import { dnd, getDropDestinationFromTreeView } from "./dnd";
 import {
   addRelationToRelations,
   createAbstractRefId,
@@ -545,4 +545,192 @@ Target
     Valencia
     Malaga
   `);
+});
+
+test("Same-pane move cleans up old descendant relations (no orphaned references)", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp(alice());
+
+  await type(
+    "Root{Enter}{Tab}Source{Enter}{Tab}Parent{Enter}{Tab}GrandChild{Escape}"
+  );
+
+  await expectTree(`
+Root
+  Source
+    Parent
+      GrandChild
+  `);
+
+  await userEvent.click(
+    await screen.findByLabelText("show references to GrandChild")
+  );
+
+  await expectTree(`
+Root
+  Source
+    Parent
+      GrandChild
+        Root \u2192 Source \u2192 Parent (1) \u2192 GrandChild
+  `);
+
+  await userEvent.click(
+    await screen.findByLabelText("hide references to GrandChild")
+  );
+
+  const splitPaneButtons = screen.getAllByLabelText("open in split pane");
+  await userEvent.click(splitPaneButtons[0]);
+  await navigateToNodeViaSearch(1, "Source");
+
+  const parentItems = screen.getAllByRole("treeitem", { name: "Parent" });
+  const rootToggle = screen.getAllByLabelText("collapse Root")[0];
+
+  fireEvent.dragStart(parentItems[0]);
+  fireEvent.drop(rootToggle);
+
+  await expectTree(`
+Root
+  Parent
+    GrandChild
+  Source
+Source
+  `);
+
+  await userEvent.click(
+    screen.getAllByLabelText("show references to GrandChild")[0]
+  );
+
+  await expectTree(`
+Root
+  Parent
+    GrandChild
+      Root \u2192 Parent (1) \u2192 GrandChild
+  Source
+Source
+  `);
+});
+
+test("Drag node onto expanded sibling's child moves it", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp(alice());
+
+  await type(
+    "Holiday Destinations{Enter}Barcelona{Enter}Spain{Enter}{Tab}Sevilla{Escape}"
+  );
+
+  await expectTree(`
+Holiday Destinations
+  Barcelona
+  Spain
+    Sevilla
+  `);
+
+  const barcelona = screen.getByText("Barcelona");
+  const sevilla = screen.getByText("Sevilla");
+
+  fireEvent.dragStart(barcelona);
+  fireEvent.drop(sevilla);
+
+  await expectTree(`
+Holiday Destinations
+  Spain
+    Barcelona
+    Sevilla
+  `);
+});
+
+test("Bottom-half drop on last child of nested parent stays within that parent", () => {
+  const [alice] = setup([ALICE]);
+  const { publicKey: alicePK } = alice().user;
+
+  const root = newNode("Holiday Destinations");
+  const barcelona = newNode("Barcelona");
+  const spain = newNode("Spain");
+  const sevilla = newNode("Sevilla");
+  const otherItem = newNode("Other Item");
+
+  const spainRelations = addRelationToRelations(
+    newRelations(spain.id, List([root.id]), alicePK),
+    sevilla.id
+  );
+  const rootRelations = addRelationToRelations(
+    addRelationToRelations(
+      addRelationToRelations(
+        newRelations(root.id, List(), alicePK),
+        barcelona.id
+      ),
+      spain.id
+    ),
+    otherItem.id
+  );
+
+  const rootPath = [
+    0,
+    {
+      nodeID: root.id,
+      nodeIndex: 0 as NodeIndex,
+      relationsID: rootRelations.id,
+    },
+  ] as const;
+
+  const spainPath = [
+    ...rootPath,
+    {
+      nodeID: spain.id,
+      nodeIndex: 0 as NodeIndex,
+      relationsID: spainRelations.id,
+    },
+  ] as const;
+
+  const views = Map<string, View>()
+    .set(viewPathToString(rootPath), {
+      viewingMode: undefined,
+      expanded: true,
+    })
+    .set(viewPathToString(spainPath), {
+      viewingMode: undefined,
+      expanded: true,
+    });
+
+  const panes = [{ id: "pane-0", stack: [root.id], author: alicePK }];
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>().set(alicePK, newDB());
+
+  const plan = planUpdateViews(
+    planUpsertRelations(
+      planUpsertRelations(
+        planBulkUpsertNodes(
+          createPlan({ ...alice(), knowledgeDBs, panes, views }),
+          [root, barcelona, spain, sevilla, otherItem]
+        ),
+        rootRelations
+      ),
+      spainRelations
+    ),
+    views
+  );
+
+  // Flat tree (excluding root):
+  //   0: Barcelona
+  //   1: Spain
+  //   2: Sevilla (child of Spain)
+  //   3: Other Item
+  //
+  // Bottom-half drop on Sevilla: destinationIndex = 3 (calcIndex(sevillaVisualIndex, -1))
+  // Visual index 3 = Sevilla at flat index 2, so calcIndex(3, -1) = 4
+  // In getDropDestinationFromTreeView, adjustedIndex = 4 - 1 = 3 = Other Item
+  //
+  // BUG: resolves to [rootPath, 2] (before Other Item in root),
+  // should resolve to [spainPath, 1] (after Sevilla in Spain)
+
+  const [toView, dropIndex] = getDropDestinationFromTreeView(
+    plan,
+    rootPath,
+    [root.id],
+    4,
+    undefined,
+    true
+  );
+
+  expect(viewPathToString(toView)).toBe(viewPathToString(spainPath));
+  expect(dropIndex).toBe(1);
 });

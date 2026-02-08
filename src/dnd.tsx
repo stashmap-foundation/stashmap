@@ -9,6 +9,7 @@ import {
   createAbstractRefId,
   isRefId,
   shortID,
+  VERSIONS_NODE_ID,
 } from "./connections";
 import {
   parseViewPath,
@@ -35,6 +36,7 @@ import {
   planDeepCopyNodeWithView,
   planExpandNode,
   planAddToParent,
+  planDeleteDescendantRelations,
   getPane,
 } from "./planner";
 
@@ -47,12 +49,28 @@ function getDropDestinationEndOfRoot(
   return [root, relations?.items.size || 0];
 }
 
+function getInsertAfterNode(
+  data: Data,
+  node: ViewPath
+): [ViewPath, number] | undefined {
+  const parentView = getParentView(node);
+  if (!parentView) {
+    return undefined;
+  }
+  const index = getRelationIndex(data, node);
+  if (index === undefined) {
+    return undefined;
+  }
+  return [parentView, index + 1];
+}
+
 export function getDropDestinationFromTreeView(
   data: Data,
   root: ViewPath,
   stack: ID[],
   destinationIndex: number,
-  rootRelation: LongID | undefined
+  rootRelation: LongID | undefined,
+  isBottomHalf?: boolean
 ): [ViewPath, number] {
   const nodes = getNodesInTree(
     data,
@@ -66,13 +84,26 @@ export function getDropDestinationFromTreeView(
   const adjustedIndex = destinationIndex - 1;
   const dropBefore = nodes.get(adjustedIndex);
   if (!dropBefore) {
+    const lastNode = nodes.last();
+    if (lastNode) {
+      const afterLast = getInsertAfterNode(data, lastNode);
+      if (afterLast) {
+        return afterLast;
+      }
+    }
     return getDropDestinationEndOfRoot(data, root, stack);
+  }
+  const prevNode = adjustedIndex > 0 ? nodes.get(adjustedIndex - 1) : undefined;
+  if (isBottomHalf && prevNode && prevNode.length > dropBefore.length) {
+    const afterPrev = getInsertAfterNode(data, prevNode);
+    if (afterPrev) {
+      return afterPrev;
+    }
   }
   const parentView = getParentView(dropBefore);
   if (!parentView) {
     return getDropDestinationEndOfRoot(data, root, stack);
   }
-  // new index is the current index of the sibling
   const index = getRelationIndex(data, dropBefore);
   return [parentView, index || 0];
 }
@@ -95,7 +126,8 @@ export function dnd(
   indexTo: number | undefined,
   rootRelation: LongID | undefined,
   isSuggestion?: boolean,
-  invertCopyMode = false
+  invertCopyMode = false,
+  isBottomHalf?: boolean
 ): Plan {
   const rootView = to;
 
@@ -112,7 +144,8 @@ export function dnd(
           rootView,
           stack,
           indexTo,
-          rootRelation
+          rootRelation,
+          isBottomHalf
         );
 
   const fromRelation = sourceParentPath
@@ -169,8 +202,6 @@ export function dnd(
       .reduce((accPlan: Plan, s: string, idx: number) => {
         const sourcePath = parseViewPath(s);
         const [sourceNodeID] = getNodeIDFromView(accPlan, sourcePath);
-        const sourceStack = getPane(accPlan, sourcePath).stack;
-        const sourceContext = getContext(accPlan, sourcePath, sourceStack);
         const insertAt = dropIndex + idx;
 
         if (isRefId(sourceNodeID)) {
@@ -272,7 +303,9 @@ export function dnd(
 
 /**
  * Disconnect a node from its current parent.
- * Returns the updated plan with the node removed from its parent's relations and views updated.
+ * Also cleans up orphaned descendant relations, unless the node is a
+ * reference (refs don't own descendants) or ~Versions (version history
+ * should survive temporary removal).
  */
 export function planDisconnectFromParent(
   plan: Plan,
@@ -295,7 +328,6 @@ export function planDisconnectFromParent(
     return plan;
   }
 
-  // Remove from parent's relations
   const updatedRelationsPlan = upsertRelations(
     plan,
     parentPath,
@@ -303,7 +335,6 @@ export function planDisconnectFromParent(
     (relations) => deleteRelations(relations, Set([relationIndex]))
   );
 
-  // Update view paths
   const updatedViews = updateViewPathsAfterDisconnect(
     updatedRelationsPlan.views,
     nodeID,
@@ -311,7 +342,16 @@ export function planDisconnectFromParent(
     nodeIndex
   );
 
-  return planUpdateViews(updatedRelationsPlan, updatedViews);
+  const planWithViews = planUpdateViews(updatedRelationsPlan, updatedViews);
+
+  const skipCleanup =
+    isRefId(nodeID) || shortID(nodeID) === VERSIONS_NODE_ID;
+  if (skipCleanup) {
+    return planWithViews;
+  }
+
+  const context = getContext(plan, viewPath, stack);
+  return planDeleteDescendantRelations(planWithViews, nodeID, context);
 }
 
 export function DND({ children }: { children: React.ReactNode }): JSX.Element {

@@ -60,7 +60,6 @@ import {
   planAddToParent,
   planDeepCopyNodeWithView,
   planSetRowFocusIntent,
-  planDeleteDescendantRelations,
 } from "../planner";
 import { planDisconnectFromParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
@@ -273,7 +272,6 @@ function EditableContent(): JSX.Element {
     }
 
     const basePlan = createPlan();
-    const context = getContext(basePlan, viewPath, stack);
     const trimmedText = text.trim();
 
     // Handle empty nodes: materialize with text, or move empty position if no text
@@ -345,28 +343,18 @@ function EditableContent(): JSX.Element {
       stack
     );
 
-    // Step 3: Disconnect current node from current parent
     const planWithDisconnect = planDisconnectFromParent(
       planWithDeepCopy,
       viewPath,
       stack
     );
 
-    // Step 3b: Delete orphaned descendant relations in old context
-    const planWithCleanup = planDeleteDescendantRelations(
-      planWithDisconnect,
-      nodeID,
-      context
-    );
-
-    // Step 4: Save text changes in NEW context (if any)
-    // The node's new context is prevSiblingContext + prevSibling's ID
     const newContext = prevSiblingContext.push(prevSibling.nodeID);
     const originalNodeText = node?.text ?? "";
     const hasTextChanges = trimmedText !== originalNodeText;
     const finalPlan = hasTextChanges
-      ? planCreateVersion(planWithCleanup, nodeID, trimmedText, newContext)
-      : planWithCleanup;
+      ? planCreateVersion(planWithDisconnect, nodeID, trimmedText, newContext)
+      : planWithDisconnect;
 
     executePlan(finalPlan);
   };
@@ -444,17 +432,11 @@ function EditableContent(): JSX.Element {
       stack
     );
 
-    const planWithCleanup = planDeleteDescendantRelations(
-      planWithDisconnect,
-      nodeID,
-      context
-    );
-
     const originalNodeText = node.text ?? "";
     const hasTextChanges = trimmedText !== originalNodeText;
 
     if (!hasTextChanges) {
-      executePlan(planWithCleanup);
+      executePlan(planWithDisconnect);
       return;
     }
 
@@ -462,7 +444,7 @@ function EditableContent(): JSX.Element {
     const grandParentNodeID = getLast(grandParentPath).nodeID;
     const newContext = grandParentContext.push(grandParentNodeID);
     executePlan(
-      planCreateVersion(planWithCleanup, nodeID, trimmedText, newContext)
+      planCreateVersion(planWithDisconnect, nodeID, trimmedText, newContext)
     );
   };
 

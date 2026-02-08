@@ -282,7 +282,8 @@ export function useDroppable({
                   destination,
                   stack,
                   destinationIndex,
-                  pane.rootRelation
+                  pane.rootRelation,
+                  direction === -1
                 );
           const [dropParentNodeID] = getNodeIDFromView(plan, dropParentPath);
 
@@ -340,7 +341,8 @@ export function useDroppable({
           calcIndex(index, direction),
           pane.rootRelation,
           dragItem.isSuggestion,
-          invertCopyModeRef.current
+          invertCopyModeRef.current,
+          direction === -1
         )
       );
       const parentKey = getParentKey(viewPathToString(dragItem.path));

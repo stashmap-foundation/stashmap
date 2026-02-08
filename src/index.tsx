@@ -6,7 +6,6 @@ import * as serviceWorker from "./serviceWorker";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./theme/solarized.scss";
 import "./assets/fonts/nostr/css/nostr.css";
-import "./editor.css";
 import "./Workspace.scss";
 import "./App.css";
 import { App } from "./App";

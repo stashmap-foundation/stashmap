@@ -59,10 +59,9 @@ import {
   planCreateNode,
   planCreateVersion,
   planAddToParent,
-  planDeepCopyNodeWithView,
   planSetRowFocusIntent,
 } from "../planner";
-import { planDisconnectFromParent } from "../dnd";
+import { planMoveNodeWithView } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeCard } from "../commons/Ui";
 import {
@@ -322,8 +321,6 @@ function EditableContent(): JSX.Element {
       return;
     }
 
-    // Handle regular nodes
-    // Step 1: Expand the previous sibling
     const prevSiblingContext = getContext(
       basePlan,
       prevSibling.viewPath,
@@ -335,18 +332,10 @@ function EditableContent(): JSX.Element {
       prevSibling.viewPath
     );
 
-    // Step 2: Deep copy node to previous sibling (copies node + all descendants + views)
-    // Must happen BEFORE disconnect so views are still available to copy
-    const planWithDeepCopy = planDeepCopyNodeWithView(
+    const planWithMove = planMoveNodeWithView(
       planWithExpand,
       viewPath,
       prevSibling.viewPath,
-      stack
-    );
-
-    const planWithDisconnect = planDisconnectFromParent(
-      planWithDeepCopy,
-      viewPath,
       stack
     );
 
@@ -354,8 +343,8 @@ function EditableContent(): JSX.Element {
     const originalNodeText = node?.text ?? "";
     const hasTextChanges = trimmedText !== originalNodeText;
     const finalPlan = hasTextChanges
-      ? planCreateVersion(planWithDisconnect, nodeID, trimmedText, newContext)
-      : planWithDisconnect;
+      ? planCreateVersion(planWithMove, nodeID, trimmedText, newContext)
+      : planWithMove;
 
     executePlan(finalPlan);
   };
@@ -420,24 +409,19 @@ function EditableContent(): JSX.Element {
       return;
     }
 
-    const planWithCopy = planDeepCopyNodeWithView(
+    const planWithMove = planMoveNodeWithView(
       basePlan,
       viewPath,
       grandParentPath,
       stack,
       parentRelationIndex + 1
     );
-    const planWithDisconnect = planDisconnectFromParent(
-      planWithCopy,
-      viewPath,
-      stack
-    );
 
     const originalNodeText = node.text ?? "";
     const hasTextChanges = trimmedText !== originalNodeText;
 
     if (!hasTextChanges) {
-      executePlan(planWithDisconnect);
+      executePlan(planWithMove);
       return;
     }
 
@@ -445,7 +429,7 @@ function EditableContent(): JSX.Element {
     const grandParentNodeID = getLast(grandParentPath).nodeID;
     const newContext = grandParentContext.push(grandParentNodeID);
     executePlan(
-      planCreateVersion(planWithDisconnect, nodeID, trimmedText, newContext)
+      planCreateVersion(planWithMove, nodeID, trimmedText, newContext)
     );
   };
 

@@ -295,6 +295,110 @@ My Notes
       My Notes → Child (1) → GrandChild
     `);
   });
+
+  test("Tab indent preserves relation URL for deeply nested descendants", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type(
+      "My Notes{Enter}{Tab}Sibling{Enter}Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Sibling
+  Parent
+    Child
+      GrandChild
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText("show references to Child")
+    );
+
+    const fullscreenLink = await screen.findByLabelText(
+      "open My Notes → Parent → Child (1) in fullscreen"
+    );
+    const relationUrl = fullscreenLink.getAttribute("href");
+    expect(relationUrl).toMatch(/^\/r\//);
+
+    await userEvent.click(
+      await screen.findByLabelText("hide references to Child")
+    );
+
+    const parentEditor = await screen.findByLabelText("edit Parent");
+    await userEvent.click(parentEditor);
+    await userEvent.keyboard("{Home}{Tab}");
+
+    await expectTree(`
+My Notes
+  Sibling
+    Parent
+      Child
+        GrandChild
+    `);
+
+    cleanup();
+
+    renderApp({ ...alice(), initialRoute: relationUrl as string });
+
+    await expectTree(`
+Child
+  GrandChild
+    `);
+  });
+
+  test("Shift-Tab outdent preserves relation URL for deeply nested descendants", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type(
+      "My Notes{Enter}{Tab}Outer{Enter}{Tab}Inner{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Outer
+    Inner
+      Child
+        GrandChild
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText("show references to Child")
+    );
+
+    const fullscreenLink = await screen.findByLabelText(
+      "open My Notes → Outer → Inner → Child (1) in fullscreen"
+    );
+    const relationUrl = fullscreenLink.getAttribute("href");
+    expect(relationUrl).toMatch(/^\/r\//);
+
+    await userEvent.click(
+      await screen.findByLabelText("hide references to Child")
+    );
+
+    const innerEditor = await screen.findByLabelText("edit Inner");
+    await userEvent.click(innerEditor);
+    await userEvent.keyboard("{Home}{Shift>}{Tab}{/Shift}");
+
+    await expectTree(`
+My Notes
+  Outer
+  Inner
+    Child
+      GrandChild
+    `);
+
+    cleanup();
+
+    renderApp({ ...alice(), initialRoute: relationUrl as string });
+
+    await expectTree(`
+Child
+  GrandChild
+    `);
+  });
 });
 
 describe("Deep Copy - Cross-Pane DnD", () => {

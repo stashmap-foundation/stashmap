@@ -597,6 +597,47 @@ function planCopyDescendantRelations(
   );
 }
 
+export function planMoveDescendantRelations(
+  plan: Plan,
+  sourceNodeID: LongID | ID,
+  sourceContext: Context,
+  targetContext: Context,
+  sourceRelation?: Relations
+): Plan {
+  const allDescendants = getDescendantRelations(
+    plan.knowledgeDBs,
+    sourceNodeID,
+    sourceContext
+  );
+  const descendants: List<Relations> = sourceRelation
+    ? allDescendants
+        .filter(
+          (r) =>
+            r.head !== sourceRelation.head ||
+            !contextsMatch(r.context, sourceRelation.context)
+        )
+        .push(sourceRelation)
+    : allDescendants;
+
+  const sourceChildContext = sourceContext.push(shortID(sourceNodeID));
+  const targetChildContext = targetContext.push(shortID(sourceNodeID));
+
+  return descendants.reduce((accPlan, relation) => {
+    const isDirectChildrenRelation =
+      relation.head === shortID(sourceNodeID) &&
+      contextsMatch(relation.context, sourceContext);
+    const newContext = isDirectChildrenRelation
+      ? targetContext
+      : targetChildContext.concat(
+          relation.context.skip(sourceChildContext.size)
+        );
+    return planUpsertRelations(accPlan, {
+      ...relation,
+      context: newContext,
+    });
+  }, plan);
+}
+
 function updateViewsWithRelationsMapping(
   views: Views,
   relationsIdMapping: Map<LongID, LongID>

@@ -37,6 +37,7 @@ import {
   planExpandNode,
   planAddToParent,
   planDeleteDescendantRelations,
+  planMoveDescendantRelations,
   getPane,
 } from "./planner";
 
@@ -211,7 +212,8 @@ export function getDropDestinationFromTreeView(
 export function planDisconnectFromParent(
   plan: Plan,
   viewPath: ViewPath,
-  stack: ID[]
+  stack: ID[],
+  preserveDescendants?: boolean
 ): Plan {
   const parentPath = getParentView(viewPath);
   if (!parentPath) {
@@ -245,13 +247,88 @@ export function planDisconnectFromParent(
 
   const planWithViews = planUpdateViews(updatedRelationsPlan, updatedViews);
 
-  const skipCleanup = isRefId(nodeID) || shortID(nodeID) === VERSIONS_NODE_ID;
+  const skipCleanup =
+    preserveDescendants ||
+    isRefId(nodeID) ||
+    shortID(nodeID) === VERSIONS_NODE_ID;
   if (skipCleanup) {
     return planWithViews;
   }
 
   const context = getContext(plan, viewPath, stack);
   return planDeleteDescendantRelations(planWithViews, nodeID, context);
+}
+
+export function planMoveNodeWithView(
+  plan: Plan,
+  sourceViewPath: ViewPath,
+  targetParentViewPath: ViewPath,
+  stack: ID[],
+  insertAtIndex?: number
+): Plan {
+  const [sourceNodeID] = getNodeIDFromView(plan, sourceViewPath);
+  const sourceStack = getPane(plan, sourceViewPath).stack;
+  const sourceContext = getContext(plan, sourceViewPath, sourceStack);
+  const sourceRelation = getRelationForView(plan, sourceViewPath, sourceStack);
+
+  const planWithAdd = planAddToParent(
+    plan,
+    sourceNodeID,
+    targetParentViewPath,
+    stack,
+    insertAtIndex
+  );
+
+  const targetParentContext = getContext(
+    planWithAdd,
+    targetParentViewPath,
+    stack
+  );
+  const [targetParentNodeID] = getNodeIDFromView(
+    planWithAdd,
+    targetParentViewPath
+  );
+  const targetContext = targetParentContext.push(shortID(targetParentNodeID));
+
+  const relations = getRelationForView(
+    planWithAdd,
+    targetParentViewPath,
+    stack
+  );
+  if (!relations || relations.items.size === 0) {
+    return planDisconnectFromParent(planWithAdd, sourceViewPath, stack, true);
+  }
+
+  const targetIndex = insertAtIndex ?? relations.items.size - 1;
+  const targetViewPath = addNodeToPathWithRelations(
+    targetParentViewPath,
+    relations,
+    targetIndex
+  );
+
+  const sourceKey = viewPathToString(sourceViewPath);
+  const targetKey = viewPathToString(targetViewPath);
+  const updatedViews = copyViewsWithNewPrefix(
+    planWithAdd.views,
+    sourceKey,
+    targetKey
+  );
+  const planWithViews = planUpdateViews(planWithAdd, updatedViews);
+
+  const planWithDisconnect = planDisconnectFromParent(
+    planWithViews,
+    sourceViewPath,
+    stack,
+    true
+  );
+
+  return planMoveDescendantRelations(
+    planWithDisconnect,
+    sourceNodeID,
+    sourceContext,
+    targetContext,
+    sourceRelation
+  );
 }
 
 export function dnd(
@@ -375,14 +452,7 @@ export function dnd(
         return planDisconnectFromParent(planWithAdd, sourcePath, stack);
       }
 
-      const planWithCopy = planDeepCopyNodeWithView(
-        accPlan,
-        sourcePath,
-        toView,
-        stack,
-        insertAt
-      );
-      return planDisconnectFromParent(planWithCopy, sourcePath, stack);
+      return planMoveNodeWithView(accPlan, sourcePath, toView, stack, insertAt);
     }, plan);
   }
 

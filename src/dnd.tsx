@@ -6,7 +6,7 @@ import { getSelectedInView } from "./components/TemporaryViewContext";
 import {
   moveRelations,
   deleteRelations,
-  createAbstractRefId,
+  createConcreteRefId,
   isRefId,
   shortID,
   VERSIONS_NODE_ID,
@@ -475,28 +475,35 @@ export function dnd(
 
   const toReferenceNodeID = (
     sourceNodeID: LongID | ID,
-    sourceContext: Context
+    sourceRelation: Relations
   ): LongID | ID => {
     if (isRefId(sourceNodeID)) {
       return sourceNodeID;
     }
-    return createAbstractRefId(
-      sourceContext,
-      shortID(sourceNodeID as ID) as ID
-    );
+    return createConcreteRefId(sourceRelation.id);
   };
 
   return sources.toList().reduce((accPlan: Plan, s: string, idx: number) => {
     const sourcePath = parseViewPath(s);
     const [sourceNodeID] = getNodeIDFromView(accPlan, sourcePath);
     const sourceStack = getPane(accPlan, sourcePath).stack;
-    const sourceContext = getContext(accPlan, sourcePath, sourceStack);
     const insertAt = dropIndex !== undefined ? dropIndex + idx : undefined;
 
     if (shouldCreateReference(sourceNodeID)) {
-      return planAddToParent(
+      const planWithRelation = upsertRelations(
         accPlan,
-        toReferenceNodeID(sourceNodeID, sourceContext),
+        sourcePath,
+        sourceStack,
+        (r) => r
+      );
+      const sourceRelation = getRelationForView(
+        planWithRelation,
+        sourcePath,
+        sourceStack
+      )!;
+      return planAddToParent(
+        planWithRelation,
+        toReferenceNodeID(sourceNodeID, sourceRelation),
         toView,
         stack,
         insertAt

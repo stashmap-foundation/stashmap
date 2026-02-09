@@ -4,6 +4,7 @@ import {
   useViewPath,
   useDisplayText,
   useEffectiveAuthor,
+  useRelation,
 } from "../ViewContext";
 import {
   usePaneStack,
@@ -23,6 +24,7 @@ export function FullscreenButton(): JSX.Element | null {
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();
   const effectiveAuthor = useEffectiveAuthor();
+  const relation = useRelation();
   const isFullscreenNode = viewPath.length === 2;
   if (isFullscreenNode) {
     return null;
@@ -33,6 +35,9 @@ export function FullscreenButton(): JSX.Element | null {
   const getTargetUrl = (): string => {
     if (refInfo?.rootRelation) {
       return buildRelationUrl(refInfo.rootRelation);
+    }
+    if (relation) {
+      return buildRelationUrl(relation.id);
     }
     const targetStack = refInfo
       ? refInfo.stack

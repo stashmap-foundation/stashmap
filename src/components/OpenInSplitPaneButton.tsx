@@ -5,6 +5,7 @@ import {
   useViewPath,
   updateViewPathsAfterPaneInsert,
   getEffectiveAuthor,
+  useRelation,
 } from "../ViewContext";
 import {
   useSplitPanes,
@@ -26,6 +27,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
   const isMobile = useMediaQuery(IS_MOBILE);
   const { createPlan, executePlan } = usePlanner();
   const { knowledgeDBs } = data;
+  const relation = useRelation();
 
   if (isMobile) {
     return null;
@@ -58,7 +60,12 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
       .slice(1)
       .map((subPath) => (subPath as { nodeID: LongID | ID }).nodeID);
     const fullStack = [...paneStackWithoutRoot, ...viewPathNodeIDs];
-    addPaneAt(insertIndex, fullStack, getEffectiveAuthor(data, viewPath));
+    addPaneAt(
+      insertIndex,
+      fullStack,
+      getEffectiveAuthor(data, viewPath),
+      relation?.id
+    );
   };
 
   return (

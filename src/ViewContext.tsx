@@ -737,6 +737,13 @@ export function useEffectiveAuthor(): PublicKey {
   return getEffectiveAuthor(data, viewPath);
 }
 
+export function useRelation(): Relations | undefined {
+  const data = useData();
+  const viewPath = useViewPath();
+  const stack = usePaneStack();
+  return getRelationForView(data, viewPath, stack);
+}
+
 export function useIsViewingOtherUserContent(): boolean {
   const { user } = useData();
   const effectiveAuthor = useEffectiveAuthor();

@@ -18,7 +18,6 @@ import {
 import { dnd, getDropDestinationFromTreeView } from "./dnd";
 import {
   addRelationToRelations,
-  createAbstractRefId,
   createConcreteRefId,
   newNode,
   shortID,
@@ -346,7 +345,7 @@ test("Alt-dragging a concrete reference still copies it as a reference", () => {
   expect(nodeIDs).toEqual([concreteRefId, target.id, concreteRefId]);
 });
 
-test("Alt-dragging a normal node creates a reference", () => {
+test("Alt-dragging a normal node creates a concrete reference", () => {
   const [alice] = setup([ALICE]);
   const { publicKey: alicePK } = alice().user;
 
@@ -411,11 +410,112 @@ test("Alt-dragging a normal node creates a reference", () => {
     .map((item) => item.nodeID)
     .toArray();
 
-  expect(nodeIDs).toEqual([
-    sourceNode.id,
-    target.id,
-    createAbstractRefId(List([root.id]), sourceNode.id),
-  ]);
+  expect(nodeIDs?.length).toBe(3);
+  expect(nodeIDs?.[0]).toBe(sourceNode.id);
+  expect(nodeIDs?.[1]).toBe(target.id);
+  const refId = nodeIDs?.[2] as string;
+  expect(refId.startsWith("cref:")).toBe(true);
+});
+
+test("Alt-dragged concrete ref survives move and shows children", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp(alice());
+
+  await type("Root{Enter}Source{Enter}Target{Enter}OtherParent{Escape}");
+
+  await expectTree(`
+Root
+  Source
+  Target
+  OtherParent
+  `);
+
+  await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+  await navigateToNodeViaSearch(1, "Target");
+
+  const targetTreeItems = screen.getAllByRole("treeitem", { name: "Target" });
+  const targetInPane1 = targetTreeItems[targetTreeItems.length - 1];
+
+  await userEvent.keyboard("{Alt>}");
+  fireEvent.dragStart(screen.getAllByText("Source")[0]);
+  fireEvent.dragOver(targetInPane1, { altKey: true });
+  fireEvent.drop(targetInPane1, { altKey: true });
+  await userEvent.keyboard("{/Alt}");
+
+  await expectTree(`
+Root
+  Source
+  Target
+  OtherParent
+Target
+  Root → Source (0)
+  `);
+
+  cleanup();
+  renderApp(alice());
+
+  await expectTree(`
+Root
+  Source
+  Target
+  OtherParent
+Target
+  Root → Source (0)
+  `);
+
+  const source = screen.getAllByRole("treeitem", { name: "Source" })[0];
+  const otherParent = screen.getAllByRole("treeitem", {
+    name: "OtherParent",
+  })[0];
+  fireEvent.dragStart(source);
+  setDropIndentLevel("Source", "OtherParent", 3);
+  fireEvent.dragOver(otherParent);
+  fireEvent.drop(otherParent);
+
+  await expectTree(`
+Root
+  Target
+  OtherParent
+    Source
+Target
+  Root → OtherParent → Source (0)
+  `);
+
+  await userEvent.click(await screen.findByLabelText("edit Source"));
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "{Tab}Child1{Enter}Child2{Escape}"
+  );
+
+  await expectTree(`
+Root
+  Target
+  OtherParent
+    Source
+      Child1
+      Child2
+Target
+  Root → OtherParent → Source (2)
+  `);
+
+  await userEvent.click(
+    await screen.findByLabelText(
+      "open Root \u2192 OtherParent \u2192 Source (2) in fullscreen"
+    )
+  );
+
+  await expectTree(`
+Root
+  Target
+  OtherParent
+    Source
+      Child1
+      Child2
+Source
+  Child1
+  Child2
+  `);
 });
 
 test("Deep copy preserves all children when forked duplicate relations exist", async () => {

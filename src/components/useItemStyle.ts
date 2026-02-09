@@ -4,6 +4,7 @@ import {
   useViewPath,
   useIsInReferencedByView,
   useIsSuggestion,
+  useIsViewingOtherUserContent,
   getParentRelation,
 } from "../ViewContext";
 import { useData } from "../DataContext";
@@ -52,7 +53,7 @@ function getArgumentTextStyle(argument: Argument | undefined): CSSProperties {
  * Hook that returns styling based on item's relevance, argument, and suggestion status.
  *
  * Styling rules:
- * - Suggestions: gray text (non-editable content)
+ * - Suggestions and other users' content: gray text (non-editable content)
  * - Not relevant: line-through + gray text
  * - Contra: red text
  * - Confirms: green text
@@ -64,13 +65,13 @@ export function useItemStyle(): ItemStyle {
   const relationIndex = useRelationIndex();
   const isInReferencedByView = useIsInReferencedByView();
   const isSuggestion = useIsSuggestion();
+  const isViewingOtherUserContent = useIsViewingOtherUserContent();
 
   if (isInReferencedByView) {
     return DEFAULT_STYLE;
   }
 
-  // Suggestions: gray text for non-editable content
-  if (isSuggestion) {
+  if (isSuggestion || isViewingOtherUserContent) {
     return {
       cardStyle: {},
       textStyle: { color: "var(--base01)" },

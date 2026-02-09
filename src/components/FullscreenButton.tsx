@@ -1,23 +1,34 @@
 import React from "react";
-import { useNodeID, useViewPath, useDisplayText } from "../ViewContext";
-import { usePaneStack, useNavigatePane } from "../SplitPanesContext";
+import {
+  useNodeID,
+  useViewPath,
+  useDisplayText,
+  useEffectiveAuthor,
+} from "../ViewContext";
+import {
+  usePaneStack,
+  useCurrentPane,
+  useNavigatePane,
+} from "../SplitPanesContext";
 import { getRefTargetInfo } from "../connections";
 import { useData } from "../DataContext";
-import { stackToPath, buildRelationUrl } from "../navigationUrl";
+import { buildNodeUrl, buildRelationUrl } from "../navigationUrl";
 
 export function FullscreenButton(): JSX.Element | null {
   const stack = usePaneStack();
+  const pane = useCurrentPane();
   const viewPath = useViewPath();
   const [nodeID] = useNodeID();
   const { knowledgeDBs, user } = useData();
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();
+  const effectiveAuthor = useEffectiveAuthor();
   const isFullscreenNode = viewPath.length === 2;
   if (isFullscreenNode) {
     return null;
   }
 
-  const refInfo = getRefTargetInfo(nodeID, knowledgeDBs, user.publicKey);
+  const refInfo = getRefTargetInfo(nodeID, knowledgeDBs, effectiveAuthor);
 
   const getTargetUrl = (): string => {
     if (refInfo?.rootRelation) {
@@ -31,7 +42,10 @@ export function FullscreenButton(): JSX.Element | null {
             .slice(1)
             .map((subPath) => (subPath as { nodeID: LongID | ID }).nodeID),
         ];
-    return stackToPath(targetStack, knowledgeDBs, user.publicKey) || "#";
+    return (
+      buildNodeUrl(targetStack, knowledgeDBs, user.publicKey, pane.author) ||
+      "#"
+    );
   };
 
   const href = getTargetUrl();

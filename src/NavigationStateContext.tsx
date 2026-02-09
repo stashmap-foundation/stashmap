@@ -8,10 +8,11 @@ import React, {
 import { useData } from "./DataContext";
 import { createConcreteRefId, getRefTargetInfo } from "./connections";
 import {
-  stackToPath,
   pathToStack,
+  buildNodeUrl,
   buildRelationUrl,
   parseRelationUrl,
+  parseAuthorFromSearch,
 } from "./navigationUrl";
 import { usePlanner } from "./planner";
 import { generatePaneId } from "./SplitPanesContext";
@@ -48,10 +49,20 @@ function paneToUrl(
   if (activePane.rootRelation) {
     return buildRelationUrl(activePane.rootRelation);
   }
-  return stackToPath(activePane.stack, knowledgeDBs, myself);
+  return buildNodeUrl(
+    activePane.stack,
+    knowledgeDBs,
+    myself,
+    activePane.author
+  );
 }
 
-function urlToPane(pathname: string, fallbackAuthor: PublicKey): Pane {
+function urlToPane(
+  pathname: string,
+  search: string,
+  fallbackAuthor: PublicKey
+): Pane {
+  const author = parseAuthorFromSearch(search) || fallbackAuthor;
   const relationID = parseRelationUrl(pathname);
   if (relationID) {
     return {
@@ -64,7 +75,7 @@ function urlToPane(pathname: string, fallbackAuthor: PublicKey): Pane {
   return {
     id: generatePaneId(),
     stack: pathToStack(pathname),
-    author: fallbackAuthor,
+    author,
   };
 }
 
@@ -105,7 +116,7 @@ export function NavigationStateProvider({
         return p;
       }
       const crefId = createConcreteRefId(p.rootRelation);
-      const refInfo = getRefTargetInfo(crefId, knowledgeDBs, user.publicKey);
+      const refInfo = getRefTargetInfo(crefId, knowledgeDBs, p.author);
       if (!refInfo) {
         return p;
       }
@@ -172,7 +183,13 @@ export function NavigationStateProvider({
         setPanes(state.panes);
         setActivePaneIndexState(state.activePaneIndex ?? 0);
       } else {
-        setPanes([urlToPane(window.location.pathname, user.publicKey)]);
+        setPanes([
+          urlToPane(
+            window.location.pathname,
+            window.location.search,
+            user.publicKey
+          ),
+        ]);
         setActivePaneIndexState(0);
       }
     };

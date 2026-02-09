@@ -29,7 +29,11 @@ import {
   getOutboxEvents,
   putCachedEvents,
 } from "./indexedDB";
-import { pathToStack, parseRelationUrl } from "./navigationUrl";
+import {
+  pathToStack,
+  parseRelationUrl,
+  parseAuthorFromSearch,
+} from "./navigationUrl";
 import { generatePaneId } from "./SplitPanesContext";
 import { jsonToPanes, paneToJSON, Serializable } from "./serializer";
 import { NavigationStateProvider } from "./NavigationStateContext";
@@ -93,7 +97,9 @@ function getInitialPanes(publicKey: PublicKey): Pane[] {
   }
   const urlStack = pathToStack(window.location.pathname);
   if (urlStack.length > 0) {
-    return [{ id: generatePaneId(), stack: urlStack, author: publicKey }];
+    const urlAuthor =
+      parseAuthorFromSearch(window.location.search) || publicKey;
+    return [{ id: generatePaneId(), stack: urlStack, author: urlAuthor }];
   }
   const stored = loadPanesFromStorage(publicKey);
   if (stored) {

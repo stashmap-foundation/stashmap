@@ -320,18 +320,22 @@ type RefTargetInfo = {
 export function getRefTargetInfo(
   refId: ID | LongID,
   knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey
+  effectiveAuthor: PublicKey
 ): RefTargetInfo | undefined {
   if (isConcreteRefId(refId)) {
     const parsed = parseConcreteRefId(refId);
-    if (!parsed) return undefined;
+    if (!parsed) {
+      return undefined;
+    }
     const { relationID, targetNode } = parsed;
     const relation = getRelationsNoReferencedBy(
       knowledgeDBs,
       relationID,
-      myself
+      effectiveAuthor
     );
-    if (!relation) return undefined;
+    if (!relation) {
+      return undefined;
+    }
     const stack = targetNode
       ? [...relation.context.toArray(), relation.head, targetNode]
       : [...relation.context.toArray(), relation.head];
@@ -348,7 +352,7 @@ export function getRefTargetInfo(
   if (!parsed) return undefined;
   return {
     stack: [...parsed.targetContext.toArray(), parsed.targetNode],
-    author: myself,
+    author: effectiveAuthor,
   };
 }
 

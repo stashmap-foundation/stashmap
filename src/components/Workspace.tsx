@@ -26,7 +26,7 @@ import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 import { SignInMenuBtn } from "../SignIn";
 import { usePlanner, planForkPane } from "../planner";
 import { LOG_NODE_ID } from "../connections";
-import { stackToPath } from "../navigationUrl";
+import { buildNodeUrl } from "../navigationUrl";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import {
   focusRow,
@@ -76,16 +76,18 @@ function BreadcrumbItem({
 function Breadcrumbs(): JSX.Element {
   const { knowledgeDBs, user } = useData();
   const stack = usePaneStack();
+  const pane = useCurrentPane();
   const navigatePane = useNavigatePane();
 
   return (
     <nav className="breadcrumbs" aria-label="Navigation breadcrumbs">
       {stack.map((nodeID, index) => {
         const targetUrl =
-          stackToPath(
+          buildNodeUrl(
             stack.slice(0, index + 1),
             knowledgeDBs,
-            user.publicKey
+            user.publicKey,
+            pane.author
           ) || "#";
         return (
           <BreadcrumbItem
@@ -140,7 +142,7 @@ function HomeButton(): JSX.Element | null {
     return null;
   }
 
-  const href = stackToPath([LOG_NODE_ID], knowledgeDBs, user.publicKey) || "#";
+  const href = buildNodeUrl([LOG_NODE_ID], knowledgeDBs, user.publicKey) || "#";
 
   return (
     <a
@@ -193,7 +195,7 @@ function useHomeShortcut(): void {
         if (logNode) {
           e.preventDefault();
           const href =
-            stackToPath([LOG_NODE_ID], knowledgeDBs, user.publicKey) || "/";
+            buildNodeUrl([LOG_NODE_ID], knowledgeDBs, user.publicKey) || "/";
           navigatePane(href);
         }
       }
@@ -207,6 +209,7 @@ function useHomeShortcut(): void {
 function BackButton(): JSX.Element | null {
   const { knowledgeDBs, user } = useData();
   const stack = usePaneStack();
+  const pane = useCurrentPane();
   const navigatePane = useNavigatePane();
 
   if (stack.length <= 1) {
@@ -214,7 +217,8 @@ function BackButton(): JSX.Element | null {
   }
 
   const parentStack = stack.slice(0, -1);
-  const href = stackToPath(parentStack, knowledgeDBs, user.publicKey) || "#";
+  const href =
+    buildNodeUrl(parentStack, knowledgeDBs, user.publicKey, pane.author) || "#";
 
   return (
     <a

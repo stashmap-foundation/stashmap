@@ -1,7 +1,7 @@
 import { hashText } from "./connections";
 import { getNodeFromID } from "./ViewContext";
 
-export function stackToPath(
+function stackToPath(
   stack: ID[],
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey

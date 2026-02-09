@@ -176,3 +176,141 @@ Cities
   London
   `);
 });
+
+test("Clicking breadcrumb while viewing other user's content preserves READONLY", async () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+
+  renderApp(alice());
+  await type(
+    "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
+  );
+
+  await userEvent.click(
+    await screen.findByLabelText("show references to Cities")
+  );
+  await userEvent.click(
+    await screen.findByLabelText("open My Notes → Cities (2) in fullscreen")
+  );
+
+  await waitFor(() => {
+    expect(window.location.pathname).toMatch(/^\/r\//);
+  });
+  const relationUrl = window.location.pathname;
+  cleanup();
+
+  renderApp({ ...bob(), initialRoute: relationUrl });
+
+  await screen.findByText("READONLY");
+  await expectTree(`
+Cities
+  Paris
+  London
+  `);
+
+  await userEvent.click(await screen.findByLabelText("Navigate to My Notes"));
+
+  await screen.findByText("READONLY");
+  await userEvent.click(await screen.findByLabelText("expand Cities"));
+  await expectTree(`
+My Notes
+  Cities
+    Paris
+    London
+  `);
+});
+
+test("Opening /n/ URL with author param shows READONLY", async () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+
+  renderApp(alice());
+  await type(
+    "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
+  );
+  cleanup();
+
+  renderApp({
+    ...bob(),
+    initialRoute: `/n/${encodeURIComponent("My Notes")}/${encodeURIComponent(
+      "Cities"
+    )}?author=${alice().user.publicKey}`,
+  });
+
+  await screen.findByText("READONLY");
+  await expectTree(`
+Cities
+  Paris
+  London
+  `);
+});
+
+test("URL includes author param when viewing other user's content via breadcrumb", async () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+
+  renderApp(alice());
+  await type(
+    "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
+  );
+
+  await userEvent.click(
+    await screen.findByLabelText("show references to Cities")
+  );
+  await userEvent.click(
+    await screen.findByLabelText("open My Notes → Cities (2) in fullscreen")
+  );
+
+  await waitFor(() => {
+    expect(window.location.pathname).toMatch(/^\/r\//);
+  });
+  const relationUrl = window.location.pathname;
+  cleanup();
+
+  renderApp({ ...bob(), initialRoute: relationUrl });
+
+  await screen.findByText("READONLY");
+
+  await userEvent.click(await screen.findByLabelText("Navigate to My Notes"));
+
+  await waitFor(() => {
+    expect(window.location.search).toContain("author=");
+  });
+});
+
+test("Clicking fullscreen while viewing other user's content preserves READONLY", async () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+
+  renderApp(alice());
+  await type(
+    "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
+  );
+
+  await userEvent.click(
+    await screen.findByLabelText("show references to Cities")
+  );
+  await userEvent.click(
+    await screen.findByLabelText("open My Notes → Cities (2) in fullscreen")
+  );
+
+  await waitFor(() => {
+    expect(window.location.pathname).toMatch(/^\/r\//);
+  });
+  const relationUrl = window.location.pathname;
+  cleanup();
+
+  renderApp({ ...bob(), initialRoute: relationUrl });
+
+  await screen.findByText("READONLY");
+  await expectTree(`
+Cities
+  Paris
+  London
+  `);
+
+  await userEvent.click(
+    await screen.findByLabelText("open Paris in fullscreen")
+  );
+
+  await screen.findByText("READONLY");
+  await expectTree(`
+Paris
+  `);
+});

@@ -25,7 +25,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
   const [nodeID] = useNodeID();
   const isMobile = useMediaQuery(IS_MOBILE);
   const { createPlan, executePlan } = usePlanner();
-  const { knowledgeDBs, user } = data;
+  const { knowledgeDBs } = data;
 
   if (isMobile) {
     return null;
@@ -42,7 +42,8 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
 
     const paneStackWithoutRoot = stack.slice(0, -1);
 
-    const refInfo = getRefTargetInfo(nodeID, knowledgeDBs, user.publicKey);
+    const effectiveAuthor = getEffectiveAuthor(data, viewPath);
+    const refInfo = getRefTargetInfo(nodeID, knowledgeDBs, effectiveAuthor);
     if (refInfo) {
       addPaneAt(
         insertIndex,

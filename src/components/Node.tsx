@@ -22,6 +22,7 @@ import {
   useIsViewingOtherUserContent,
   useIsSuggestion,
   viewPathToString,
+  useEffectiveAuthor,
 } from "../ViewContext";
 import {
   NodeSelectbox,
@@ -70,7 +71,7 @@ import {
   useCurrentPane,
   useNavigatePane,
 } from "../SplitPanesContext";
-import { stackToPath, buildRelationUrl } from "../navigationUrl";
+import { buildNodeUrl, buildRelationUrl } from "../navigationUrl";
 import { RightMenu } from "./RightMenu";
 import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
@@ -563,13 +564,19 @@ function NodeAutoLink({
   const [node] = useNode();
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();
+  const effectiveAuthor = useEffectiveAuthor();
 
   if (node && isReferenceNode(node)) {
-    const refInfo = getRefTargetInfo(node.id, knowledgeDBs, user.publicKey);
+    const refInfo = getRefTargetInfo(node.id, knowledgeDBs, effectiveAuthor);
     if (refInfo) {
       const href = refInfo.rootRelation
         ? buildRelationUrl(refInfo.rootRelation)
-        : stackToPath(refInfo.stack, knowledgeDBs, user.publicKey) || "#";
+        : buildNodeUrl(
+            refInfo.stack,
+            knowledgeDBs,
+            user.publicKey,
+            refInfo.author
+          ) || "#";
       return (
         <a
           href={href}

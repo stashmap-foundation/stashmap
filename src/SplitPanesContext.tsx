@@ -2,7 +2,11 @@ import React, { createContext, useContext } from "react";
 import { clearViewsForPane } from "./ViewContext";
 import { planUpdateViews, planUpdatePanes, usePlanner } from "./planner";
 import { useData } from "./DataContext";
-import { pathToStack, parseRelationUrl } from "./navigationUrl";
+import {
+  pathToStack,
+  parseRelationUrl,
+  parseAuthorFromSearch,
+} from "./navigationUrl";
 
 const PaneIndexContext = createContext<number>(0);
 
@@ -105,19 +109,24 @@ export function useNavigatePane(): (url: string) => void {
   const { user } = useData();
 
   return (url: string): void => {
-    const relationID = parseRelationUrl(url);
+    const questionMarkIndex = url.indexOf("?");
+    const pathname =
+      questionMarkIndex >= 0 ? url.slice(0, questionMarkIndex) : url;
+    const search = questionMarkIndex >= 0 ? url.slice(questionMarkIndex) : "";
+    const author = parseAuthorFromSearch(search) || user.publicKey;
+    const relationID = parseRelationUrl(pathname);
     if (relationID) {
       setPane({
         id: pane.id,
         stack: [],
-        author: user.publicKey,
+        author,
         rootRelation: relationID,
       });
     } else {
       setPane({
         id: pane.id,
-        stack: pathToStack(url),
-        author: user.publicKey,
+        stack: pathToStack(pathname),
+        author,
       });
     }
   };

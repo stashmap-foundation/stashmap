@@ -38,10 +38,6 @@ export function usePaneStack(): ID[] {
   return useCurrentPane().stack;
 }
 
-export function usePaneAuthor(): PublicKey {
-  return useCurrentPane().author;
-}
-
 export function useRoot(): ID {
   const pane = useCurrentPane();
   return pane.stack[pane.stack.length - 1] as ID;

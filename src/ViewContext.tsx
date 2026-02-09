@@ -24,7 +24,7 @@ import {
 import { newDB } from "./knowledge";
 import { useData } from "./DataContext";
 import { Plan, planUpsertRelations, getPane } from "./planner";
-import { usePaneStack, useCurrentPane } from "./SplitPanesContext";
+import { usePaneStack } from "./SplitPanesContext";
 import { REFERENCED_BY, DEFAULT_TYPE_FILTERS } from "./constants";
 
 // only exported for tests
@@ -365,6 +365,33 @@ export function getRelationsForContext(
   return getNewestRelationFromAuthor(knowledgeDBs, paneAuthor, nodeID, context);
 }
 
+export function getParentRelation(
+  data: Data,
+  viewPath: ViewPath
+): Relations | undefined {
+  if (isRoot(viewPath)) {
+    return undefined;
+  }
+
+  const parentElement = viewPath[viewPath.length - 2] as SubPathWithRelations;
+  if (!parentElement.relationsID) {
+    return undefined;
+  }
+
+  return getRelations(
+    data.knowledgeDBs,
+    parentElement.relationsID,
+    data.user.publicKey,
+    parentElement.nodeID
+  );
+}
+
+export function getEffectiveAuthor(data: Data, viewPath: ViewPath): PublicKey {
+  const pane = getPane(data, viewPath);
+  const parentRelation = getParentRelation(data, viewPath);
+  return parentRelation?.author || pane.author;
+}
+
 export function getRelationForView(
   data: Data,
   viewPath: ViewPath,
@@ -373,23 +400,19 @@ export function getRelationForView(
   const [nodeID, view] = getNodeIDFromView(data, viewPath);
   const context = getContext(data, viewPath, stack);
   const pane = getPane(data, viewPath);
+  const author = getEffectiveAuthor(data, viewPath);
 
   if (view.viewingMode === "REFERENCED_BY") {
-    return getRelations(data.knowledgeDBs, REFERENCED_BY, pane.author, nodeID);
+    return getRelations(data.knowledgeDBs, REFERENCED_BY, author, nodeID);
   }
 
   if (isAbstractRefId(nodeID) || isConcreteRefId(nodeID)) {
-    return getRelations(
-      data.knowledgeDBs,
-      nodeID as LongID,
-      pane.author,
-      nodeID
-    );
+    return getRelations(data.knowledgeDBs, nodeID as LongID, author, nodeID);
   }
 
   return getRelationsForContext(
     data.knowledgeDBs,
-    pane.author,
+    author,
     nodeID,
     context,
     pane.rootRelation,
@@ -708,36 +731,6 @@ export function addNodeToPath(
   return addNodeToPathWithRelations(path, relations, index);
 }
 
-export function getParentRelation(
-  data: Data,
-  viewPath: ViewPath
-): Relations | undefined {
-  if (isRoot(viewPath)) {
-    return undefined;
-  }
-
-  // viewPath structure: [paneIndex, ...SubPathWithRelations[], SubPath]
-  // The second-to-last element has relationsID pointing to the relation
-  // that contains the current node.
-  const parentElement = viewPath[viewPath.length - 2] as SubPathWithRelations;
-  if (!parentElement.relationsID) {
-    return undefined;
-  }
-
-  return getRelations(
-    data.knowledgeDBs,
-    parentElement.relationsID,
-    data.user.publicKey,
-    parentElement.nodeID
-  );
-}
-
-export function getEffectiveAuthor(data: Data, viewPath: ViewPath): PublicKey {
-  const pane = getPane(data, viewPath);
-  const parentRelation = getParentRelation(data, viewPath);
-  return parentRelation?.author || pane.author;
-}
-
 export function useEffectiveAuthor(): PublicKey {
   const data = useData();
   const viewPath = useViewPath();
@@ -763,12 +756,6 @@ export function useIsViewingOtherUserContent(): boolean {
  */
 export function useIsInReferencedByView(): boolean {
   return useReferencedByDepth() !== undefined;
-}
-
-export function useIsOtherUserContent(): boolean {
-  const { user } = useData();
-  const pane = useCurrentPane();
-  return pane.author !== user.publicKey;
 }
 
 export function popViewPath(
@@ -1085,11 +1072,11 @@ export function upsertRelations(
   const pane = getPane(plan, viewPath);
   const [nodeID] = getNodeIDFromView(plan, viewPath);
   const context = getContext(plan, viewPath, stack);
+  const author = getEffectiveAuthor(plan, viewPath);
 
-  // Get current relation from context
   const currentRelation = getRelationsForContext(
     plan.knowledgeDBs,
-    pane.author,
+    author,
     nodeID,
     context,
     pane.rootRelation,

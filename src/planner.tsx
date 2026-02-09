@@ -58,6 +58,7 @@ import {
   getRelationForView,
   addNodeToPathWithRelations,
   getRelationsForContext,
+  getEffectiveAuthor,
   isRoot,
   getPaneIndex,
 } from "./ViewContext";
@@ -1396,11 +1397,11 @@ export function planSetEmptyNodePosition(
     parentPath
   );
 
-  // 3. Get relations from context using pane author (handles forked relations correctly)
   const pane = getPane(planWithExpanded, parentPath);
+  const author = getEffectiveAuthor(planWithExpanded, parentPath);
   const relations = getRelationsForContext(
     planWithExpanded.knowledgeDBs,
-    pane.author,
+    author,
     parentNodeID,
     context,
     pane.rootRelation,

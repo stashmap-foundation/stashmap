@@ -19,7 +19,7 @@ import {
   useViewPath,
   ViewPath,
 } from "./ViewContext";
-import { usePaneStack } from "./SplitPanesContext";
+import { usePaneStack, useCurrentPane } from "./SplitPanesContext";
 import { useData } from "./DataContext";
 import { useApis } from "./Apis";
 import { RegisterQuery, extractNodesFromQueries } from "./LoadingStatus";
@@ -213,12 +213,16 @@ export function addDescendantsToFilters(
 export function createBaseFilter(
   contacts: Contacts,
   projectMembers: Members,
-  myself: PublicKey
+  myself: PublicKey,
+  paneAuthor?: PublicKey
 ): Filters {
   const authors = [
     ...contacts.keySeq().toArray(),
     ...projectMembers.keySeq().toArray(),
     myself,
+    ...(paneAuthor && paneAuthor !== myself && !contacts.has(paneAuthor)
+      ? [paneAuthor]
+      : []),
   ];
   return {
     knowledgeListbyID: {
@@ -310,8 +314,14 @@ export function LoadData({
   lists?: boolean;
 }): JSX.Element {
   const { user, contacts, projectMembers } = useData();
+  const effectiveAuthor = useCurrentPane().author;
 
-  const baseFilter = createBaseFilter(contacts, projectMembers, user.publicKey);
+  const baseFilter = createBaseFilter(
+    contacts,
+    projectMembers,
+    user.publicKey,
+    effectiveAuthor
+  );
 
   const filter = nodeIDs.reduce((acc, nodeID) => {
     const withNode = addNodeToFilters(acc, nodeID, lists);
@@ -345,7 +355,13 @@ export function LoadRelationData({
   relationID: LongID;
 }): JSX.Element {
   const { user, contacts, projectMembers } = useData();
-  const baseFilter = createBaseFilter(contacts, projectMembers, user.publicKey);
+  const effectiveAuthor = useCurrentPane().author;
+  const baseFilter = createBaseFilter(
+    contacts,
+    projectMembers,
+    user.publicKey,
+    effectiveAuthor
+  );
   const filter = addRelationIDToFilters(baseFilter, relationID);
   const filterArray = filtersToFilterArray(filter);
   useQueryKnowledgeData(filterArray);

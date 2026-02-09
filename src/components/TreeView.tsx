@@ -16,6 +16,7 @@ import {
   parseViewPath,
   isExpanded,
   useDisplayText,
+  getEffectiveAuthor,
 } from "../ViewContext";
 import { useData } from "../DataContext";
 import {
@@ -207,10 +208,13 @@ export function TreeViewNodeLoader({
   nodes: List<ViewPath>;
 }): JSX.Element {
   const data = useData();
+  const viewPath = useViewPath();
+  const effectiveAuthor = getEffectiveAuthor(data, viewPath);
   const baseFilter = createBaseFilter(
     data.contacts,
     data.projectMembers,
-    data.user.publicKey
+    data.user.publicKey,
+    effectiveAuthor
   );
 
   const nodeIDs = nodes.map((path) => getNodeIDFromView(data, path)[0]);
@@ -471,11 +475,13 @@ export function TreeView(): JSX.Element {
   const data = useData();
   const key = useViewKey();
   const viewPath = useViewPath();
+  const effectiveAuthor = getEffectiveAuthor(data, viewPath);
   const rootNodeID = getLast(viewPath).nodeID;
   const baseFilter = createBaseFilter(
     data.contacts,
     data.projectMembers,
-    data.user.publicKey
+    data.user.publicKey,
+    effectiveAuthor
   );
 
   // Add REFERENCED_BY filters for views in referenced-by mode

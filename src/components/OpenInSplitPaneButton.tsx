@@ -4,12 +4,12 @@ import {
   useNodeID,
   useViewPath,
   updateViewPathsAfterPaneInsert,
+  getEffectiveAuthor,
 } from "../ViewContext";
 import {
   useSplitPanes,
   usePaneIndex,
   usePaneStack,
-  usePaneAuthor,
 } from "../SplitPanesContext";
 import { IS_MOBILE } from "./responsive";
 import { getRefTargetInfo } from "../connections";
@@ -20,12 +20,12 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
   const { addPaneAt } = useSplitPanes();
   const paneIndex = usePaneIndex();
   const stack = usePaneStack();
-  const currentAuthor = usePaneAuthor();
   const viewPath = useViewPath();
+  const data = useData();
   const [nodeID] = useNodeID();
   const isMobile = useMediaQuery(IS_MOBILE);
   const { createPlan, executePlan } = usePlanner();
-  const { knowledgeDBs, user } = useData();
+  const { knowledgeDBs, user } = data;
 
   if (isMobile) {
     return null;
@@ -57,48 +57,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
       .slice(1)
       .map((subPath) => (subPath as { nodeID: LongID | ID }).nodeID);
     const fullStack = [...paneStackWithoutRoot, ...viewPathNodeIDs];
-    addPaneAt(insertIndex, fullStack, currentAuthor);
-  };
-
-  return (
-    <button
-      type="button"
-      data-node-action="open-split-pane"
-      aria-label="open in split pane"
-      className="btn btn-icon"
-      onClick={onClick}
-      title="Open in new split pane"
-    >
-      <span aria-hidden="true">»</span>
-    </button>
-  );
-}
-
-export function OpenInSplitPaneButtonWithStack({
-  stack,
-}: {
-  stack: ID[];
-}): JSX.Element | null {
-  const { addPaneAt } = useSplitPanes();
-  const paneIndex = usePaneIndex();
-  const author = usePaneAuthor();
-  const isMobile = useMediaQuery(IS_MOBILE);
-  const { createPlan, executePlan } = usePlanner();
-
-  if (isMobile) {
-    return null;
-  }
-
-  const onClick = (): void => {
-    const insertIndex = paneIndex + 1;
-    const plan = createPlan();
-    const shiftedViews = updateViewPathsAfterPaneInsert(
-      plan.views,
-      insertIndex
-    );
-    executePlan(planUpdateViews(plan, shiftedViews));
-
-    addPaneAt(insertIndex, stack, author);
+    addPaneAt(insertIndex, fullStack, getEffectiveAuthor(data, viewPath));
   };
 
   return (

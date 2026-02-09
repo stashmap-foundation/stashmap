@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   BOB,
+  ANON,
   setup,
   renderApp,
   setupTestDB,
@@ -74,6 +75,104 @@ Cities
   await expectTree(`
 Cities
   Paris
+  London
+  `);
+});
+
+test("Anonymous user can view relation via /r/ URL", async () => {
+  const [alice, anon] = setup([ALICE, ANON]);
+
+  renderApp(alice());
+  await type(
+    "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
+  );
+
+  await expectTree(`
+My Notes
+  Cities
+    Paris
+    London
+  `);
+
+  await userEvent.click(
+    await screen.findByLabelText("show references to Cities")
+  );
+  await userEvent.click(
+    await screen.findByLabelText("open My Notes → Cities (2) in fullscreen")
+  );
+
+  await expectTree(`
+Cities
+  Paris
+  London
+  `);
+
+  await waitFor(() => {
+    expect(window.location.pathname).toMatch(/^\/r\//);
+  });
+  const relationUrl = window.location.pathname;
+  cleanup();
+
+  renderApp({ ...anon(), initialRoute: relationUrl });
+
+  await expectTree(`
+Cities
+  Paris
+  London
+  `);
+});
+
+test("Anonymous user sees versioned node text via /r/ URL", async () => {
+  const [alice, anon] = setup([ALICE, ANON]);
+
+  renderApp(alice());
+  await type(
+    "My Notes{Enter}{Tab}Cities{Enter}{Tab}Barcelona{Enter}London{Escape}"
+  );
+
+  await expectTree(`
+My Notes
+  Cities
+    Barcelona
+    London
+  `);
+
+  const barcelonaEditor = await screen.findByLabelText("edit Barcelona");
+  await userEvent.click(barcelonaEditor);
+  await userEvent.clear(barcelonaEditor);
+  await userEvent.type(barcelonaEditor, "BCN{Escape}");
+
+  await expectTree(`
+My Notes
+  Cities
+    BCN
+    London
+  `);
+
+  await userEvent.click(
+    await screen.findByLabelText("show references to Cities")
+  );
+  await userEvent.click(
+    await screen.findByLabelText("open My Notes → Cities (2) in fullscreen")
+  );
+
+  await expectTree(`
+Cities
+  BCN
+  London
+  `);
+
+  await waitFor(() => {
+    expect(window.location.pathname).toMatch(/^\/r\//);
+  });
+  const relationUrl = window.location.pathname;
+  cleanup();
+
+  renderApp({ ...anon(), initialRoute: relationUrl });
+
+  await expectTree(`
+Cities
+  BCN
   London
   `);
 });

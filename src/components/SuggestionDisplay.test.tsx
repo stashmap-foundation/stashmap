@@ -205,6 +205,95 @@ My Notes
     `);
   });
 
+  test("Expanding a suggestion shows the other user's grandchildren", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    await follow(alice, bob().user.publicKey);
+
+    renderTree(bob);
+    await type(
+      "My Notes{Enter}{Tab}Recipes{Enter}{Tab}Pasta{Enter}{Tab}Carbonara{Enter}Bolognese{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Recipes
+    Pasta
+      Carbonara
+      Bolognese
+    `);
+    cleanup();
+
+    renderTree(alice);
+    await type("My Notes{Enter}{Tab}Recipes{Escape}");
+
+    await maybeExpand("expand Recipes");
+
+    await expectTree(`
+My Notes
+  Recipes
+    [S] Pasta
+    `);
+
+    await userEvent.click(await screen.findByLabelText("expand Pasta"));
+
+    await expectTree(`
+My Notes
+  Recipes
+    [S] Pasta
+      Carbonara
+      Bolognese
+    `);
+  });
+
+  test("Deep suggestion tree is fully expandable", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    await follow(alice, bob().user.publicKey);
+
+    renderTree(bob);
+    await type(
+      "My Notes{Enter}{Tab}Recipes{Enter}{Tab}Pasta{Enter}{Tab}Carbonara{Enter}{Tab}Ingredients{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Recipes
+    Pasta
+      Carbonara
+        Ingredients
+    `);
+    cleanup();
+
+    renderTree(alice);
+    await type("My Notes{Enter}{Tab}Recipes{Escape}");
+
+    await maybeExpand("expand Recipes");
+
+    await expectTree(`
+My Notes
+  Recipes
+    [S] Pasta
+    `);
+
+    await userEvent.click(await screen.findByLabelText("expand Pasta"));
+
+    await expectTree(`
+My Notes
+  Recipes
+    [S] Pasta
+      Carbonara
+    `);
+
+    await userEvent.click(await screen.findByLabelText("expand Carbonara"));
+
+    await expectTree(`
+My Notes
+  Recipes
+    [S] Pasta
+      Carbonara
+        Ingredients
+    `);
+  });
+
   test("Copied suggestion becomes regular item without [S] marker", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);

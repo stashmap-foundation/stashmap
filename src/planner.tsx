@@ -586,6 +586,7 @@ function planCopyDescendantRelations(
       const newRelation: Relations = {
         ...baseRelation,
         items: relation.items,
+        basedOn: relation.id,
       };
 
       return [

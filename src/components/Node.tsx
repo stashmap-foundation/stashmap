@@ -79,6 +79,48 @@ import { EditorTextProvider } from "./EditorTextContext";
 
 export { getNodesInTree } from "../treeTraversal";
 
+function useNodeHasChildren(): boolean {
+  const data = useData();
+  const viewPath = useViewPath();
+  const stack = usePaneStack();
+  const [nodeID] = useNodeID();
+  const activeFilters = useCurrentPane().typeFilters || DEFAULT_TYPE_FILTERS;
+
+  if (isAbstractRefId(nodeID)) {
+    const concreteRefs = getConcreteRefsForAbstract(
+      data.knowledgeDBs,
+      data.user.publicKey,
+      nodeID as LongID
+    );
+    return Boolean(concreteRefs && concreteRefs.items.size > 0);
+  }
+
+  if (isConcreteRefId(nodeID)) {
+    const concreteRefChildren = getRelations(
+      data.knowledgeDBs,
+      nodeID as LongID,
+      data.user.publicKey,
+      nodeID
+    );
+    return Boolean(concreteRefChildren && concreteRefChildren.items.size > 0);
+  }
+
+  const childRelations = getRelationForView(data, viewPath, stack);
+  const hasDirectChildren = Boolean(
+    childRelations && childRelations.items.size > 0
+  );
+  const hasSuggestionChildren =
+    getDiffItemsForNode(
+      data.knowledgeDBs,
+      data.user.publicKey,
+      nodeID,
+      activeFilters,
+      childRelations?.id,
+      getContext(data, viewPath, stack)
+    ).size > 0;
+  return hasDirectChildren || hasSuggestionChildren;
+}
+
 function getLevels(viewPath: ViewPath): number {
   // Subtract 1: for pane index at position 0
   // This gives: root = 1, first children = 2, nested = 3, etc.
@@ -190,10 +232,11 @@ function EditableContent(): JSX.Element {
   const displayText = useDisplayText();
   const prevSibling = usePreviousSibling();
   const parentPath = getParentView(viewPath);
-  const nodeIsExpanded = useIsExpanded();
+  const viewIsExpanded = useIsExpanded();
   const nodeIsRoot = useIsRoot();
   const relationIndex = useRelationIndex();
   const isEmptyNode = isEmptyNodeID(nodeID);
+  const nodeIsExpanded = viewIsExpanded && useNodeHasChildren();
 
   const emptyNodeMetadata = computeEmptyNodeMetadata(
     data.publishEventsStatus.temporaryEvents
@@ -647,8 +690,6 @@ export function Node({
   const cls =
     className !== undefined ? `${className} hover-light-bg` : defaultCls;
   const clsBody = cardBodyClassName || "ps-0";
-  const data = useData();
-  const stack = usePaneStack();
 
   const [nodeID] = useNodeID();
 
@@ -676,42 +717,7 @@ export function Node({
     (!isSuggestion && !isConcreteRef && !isInReferencedByView) ||
     isAbstractRef ||
     isSuggestionWithChildren;
-  const childRelations = getRelationForView(data, viewPath, stack);
-  const activeFilters = useCurrentPane().typeFilters || DEFAULT_TYPE_FILTERS;
-  const hasChildren = (() => {
-    if (isAbstractRef) {
-      const concreteRefs = getConcreteRefsForAbstract(
-        data.knowledgeDBs,
-        data.user.publicKey,
-        nodeID as LongID
-      );
-      return Boolean(concreteRefs && concreteRefs.items.size > 0);
-    }
-
-    if (isConcreteRef) {
-      const concreteRefChildren = getRelations(
-        data.knowledgeDBs,
-        nodeID as LongID,
-        data.user.publicKey,
-        nodeID
-      );
-      return Boolean(concreteRefChildren && concreteRefChildren.items.size > 0);
-    }
-
-    const hasDirectChildren = Boolean(
-      childRelations && childRelations.items.size > 0
-    );
-    const hasSuggestionChildren =
-      getDiffItemsForNode(
-        data.knowledgeDBs,
-        data.user.publicKey,
-        nodeID,
-        activeFilters,
-        childRelations?.id,
-        getContext(data, viewPath, stack)
-      ).size > 0;
-    return hasDirectChildren || hasSuggestionChildren;
-  })();
+  const hasChildren = useNodeHasChildren();
 
   // Content class for styling based on view mode
   const getContentClass = (): string => {

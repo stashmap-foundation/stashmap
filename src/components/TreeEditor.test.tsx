@@ -1244,4 +1244,29 @@ Root
       `);
     });
   });
+
+  test("Enter on expanded-but-childless node creates sibling, not child", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("Root{Enter}{Tab}Foo{Enter}{Tab}{Escape}");
+
+    await expectTree(`
+Root
+  Foo
+    `);
+
+    const fooEditor = await screen.findByLabelText("edit Foo");
+    await userEvent.click(fooEditor);
+    await userEvent.keyboard("{Enter}");
+
+    const newEditor = await findNewNodeEditor();
+    await userEvent.type(newEditor, "Bar{Escape}");
+
+    await expectTree(`
+Root
+  Foo
+  Bar
+    `);
+  });
 });

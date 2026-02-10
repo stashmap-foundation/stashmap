@@ -974,24 +974,6 @@ export function useIsRoot(): boolean {
   return isRoot(useViewPath());
 }
 
-/**
- * Get the target path and insert index for adding a new node after this one.
- * Same logic as DND: if root or expanded → insert as first child, else → insert as sibling.
- */
-export function useNextInsertPosition(): [ViewPath, number] | null {
-  const viewPath = useViewPath();
-  const parentPath = getParentView(viewPath);
-  const nodeIsExpanded = useIsExpanded();
-  const nodeIsRoot = useIsRoot();
-  const relationIndex = useRelationIndex();
-
-  if (!parentPath && !nodeIsRoot) return null;
-
-  const targetPath = nodeIsRoot || nodeIsExpanded ? viewPath : parentPath!;
-  const insertIndex =
-    nodeIsRoot || nodeIsExpanded ? 0 : (relationIndex ?? 0) + 1;
-  return [targetPath, insertIndex];
-}
 
 export function getParentKey(viewKey: string): string {
   return viewKey.split(":").slice(0, -3).join(":");

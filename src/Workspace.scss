@@ -85,21 +85,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 16px;
+  padding: 8px 16px 2px;
   min-height: 44px;
   background-color: var(--base03);
-  position: relative;
   flex-shrink: 0;
-
-  &::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 6px;
-    height: 1px;
-    background: var(--base01);
-  }
+  border-bottom: 1px solid var(--base01);
 }
 
 .pane-header-left {
@@ -124,6 +114,7 @@ body {
   position: relative;
   padding-top: 6px;
   padding-left: 16px;
+
 }
 
 // Split pane layout

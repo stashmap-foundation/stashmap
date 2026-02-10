@@ -217,11 +217,13 @@ export function ListItem({
   const ref = useRef<HTMLDivElement>(null);
   const viewKey = useViewKey();
   const viewPath = useViewPath();
+  const [nodeID] = useNodeID();
   const isSuggestion = useIsSuggestion();
   const isInReferencedByView = useIsInReferencedByView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const rowDepth = viewPath.length - 1;
   const isActiveRow = activeRowKey === viewKey;
+  const isEmptyNode = isEmptyNodeID(nodeID);
 
   const isReadonly = isInReferencedByView || isViewingOtherUserContent;
 
@@ -251,7 +253,8 @@ export function ListItem({
     drop(ref);
   }
 
-  const className = dragDirection === -1 ? "dragging-over-bottom" : "";
+  const className =
+    dragDirection === -1 && !isEmptyNode ? "dragging-over-bottom" : "";
   return (
     <div className="visible-on-hover">
       <Draggable

@@ -15,6 +15,7 @@ import {
 } from "../SplitPanesContext";
 import { useNavigationState } from "../NavigationStateContext";
 import { TreeView } from "./TreeView";
+import { DroppableContainer } from "./DroppableContainer";
 import {
   PaneSearchButton,
   PaneSettingsMenu,
@@ -1036,9 +1037,12 @@ export function PaneView(): JSX.Element | null {
           onHide={() => setShowShortcuts(false)}
         />
         <PaneHeader />
-        <div className="pane-content">
+        <DroppableContainer
+          className={`pane-content${!pane.stack.length ? " empty-pane-drop-zone" : ""}`}
+          disabled={!!pane.stack.length}
+        >
           <TreeView />
-        </div>
+        </DroppableContainer>
         <PaneStatusLine />
       </div>
     </TemporaryViewProvider>

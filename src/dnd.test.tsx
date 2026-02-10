@@ -1502,3 +1502,32 @@ Root
   Item C
   `);
 });
+
+test("Drag node into empty split pane navigates that pane to the node", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp(alice());
+
+  await type("Root{Enter}Spain{Enter}France{Escape}");
+
+  await expectTree(`
+Root
+  Spain
+  France
+  `);
+
+  await userEvent.click(screen.getByLabelText("Open new pane"));
+
+  const newNodeEditors = await screen.findAllByLabelText("new node editor");
+  const emptyPaneEditor = newNodeEditors[newNodeEditors.length - 1];
+  const dropTarget = emptyPaneEditor.closest('[role="treeitem"]')!;
+
+  fireEvent.dragStart(screen.getByText("Spain"));
+  fireEvent.drop(dropTarget);
+
+  await expectTree(`
+Root
+  Spain
+  France
+Spain
+  `);
+});

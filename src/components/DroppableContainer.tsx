@@ -51,6 +51,8 @@ type DropItemType = DragItemType | NativeFileDropItem;
 
 type DroppableContainerProps = {
   children: React.ReactNode;
+  className?: string;
+  disabled?: boolean;
 };
 
 function isMarkdownFile(file: File): boolean {
@@ -496,9 +498,27 @@ export function useDroppable({
       }
 
       const dragItem = item as DragItemType;
+      const plan = createPlan();
+      const [destinationRootNodeID] = getNodeIDFromView(plan, destination);
+
+      if (isEmptyNodeID(destinationRootNodeID)) {
+        const [sourceNodeID] = getNodeIDFromView(plan, dragItem.path);
+        const targetPaneIndex = destination[0] as number;
+        const updatedPanes = plan.panes.map((p, idx) => {
+          if (idx !== targetPaneIndex) return p;
+          return {
+            ...p,
+            stack: [shortID(sourceNodeID) as ID],
+            rootRelation: undefined,
+          };
+        });
+        executePlan(planUpdatePanes(plan, updatedPanes));
+        return dragItem;
+      }
+
       executePlan(
         dnd(
-          createPlan(),
+          plan,
           selection,
           viewPathToString(dragItem.path), // TODO: change parameter to path instead of string
           destination,
@@ -522,6 +542,8 @@ export function useDroppable({
 
 export function DroppableContainer({
   children,
+  className: extraClassName,
+  disabled,
 }: DroppableContainerProps): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const path = useViewPath();
@@ -529,8 +551,10 @@ export function DroppableContainer({
     destination: path,
     ref,
   });
-  const className = isOver ? "dimmed" : "";
-  drop(ref);
+  const className = [!disabled && isOver ? "dimmed" : "", extraClassName]
+    .filter(Boolean)
+    .join(" ");
+  drop(disabled ? null : ref);
 
   return (
     <div ref={ref} className={className}>

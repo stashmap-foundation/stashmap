@@ -8,6 +8,7 @@ import {
   useNode,
 } from "../ViewContext";
 import { useData } from "../DataContext";
+import { usePlanner } from "../planner";
 
 export type MultiSelectionState = {
   baseSelection: OrderedSet<string>;
@@ -132,10 +133,14 @@ export function toggleSelect(
   viewKey: string
 ): MultiSelectionState {
   const committed = state.baseSelection.union(state.shiftSelection);
+  const withAnchor =
+    committed.size === 0 && state.anchor && state.anchor !== viewKey
+      ? committed.add(state.anchor)
+      : committed;
   return {
-    baseSelection: committed.contains(viewKey)
-      ? committed.remove(viewKey)
-      : committed.add(viewKey),
+    baseSelection: withAnchor.contains(viewKey)
+      ? withAnchor.remove(viewKey)
+      : withAnchor.add(viewKey),
     shiftSelection: OrderedSet<string>(),
     anchor: viewKey,
   };
@@ -257,13 +262,24 @@ export function TemporaryViewProvider({
 }: {
   children: React.ReactNode;
 }): JSX.Element {
-  const [multiselectState, setMultiselectState] = useState<MultiSelectionState>(
-    {
-      baseSelection: OrderedSet<string>(),
-      shiftSelection: OrderedSet<string>(),
-      anchor: "",
-    }
-  );
+  const { publishEventsStatus } = useData();
+  const { setPublishEvents } = usePlanner();
+
+  const { baseSelection, shiftSelection, anchor } =
+    publishEventsStatus.temporaryView;
+
+  const setMultiselectState = (state: MultiSelectionState): void => {
+    setPublishEvents((prev) => ({
+      ...prev,
+      temporaryView: {
+        ...prev.temporaryView,
+        baseSelection: state.baseSelection,
+        shiftSelection: state.shiftSelection,
+        anchor: state.anchor,
+      },
+    }));
+  };
+
   const [isEditingState, setEditingState] = useState<EditingState>({
     editingViews: Set<string>(),
   });
@@ -274,12 +290,10 @@ export function TemporaryViewProvider({
   return (
     <TemporaryViewContext.Provider
       value={{
-        selection: multiselectState.baseSelection.union(
-          multiselectState.shiftSelection
-        ),
-        baseSelection: multiselectState.baseSelection,
-        shiftSelection: multiselectState.shiftSelection,
-        anchor: multiselectState.anchor,
+        selection: baseSelection.union(shiftSelection),
+        baseSelection,
+        shiftSelection,
+        anchor,
         setState: setMultiselectState,
         editingViews: isEditingState.editingViews,
         setEditingState,

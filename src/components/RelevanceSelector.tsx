@@ -7,15 +7,20 @@ import {
   RELEVANCE_LABELS,
 } from "./useUpdateRelevance";
 import {
+  ViewPath,
   useViewPath,
+  parseViewPath,
   getParentView,
   useNode,
   useDisplayText,
+  useViewKey,
 } from "../ViewContext";
 import { usePlanner, planDeepCopyNode } from "../planner";
 import { usePaneStack } from "../SplitPanesContext";
 import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
+import { useTemporaryView } from "./TemporaryViewContext";
+import { planBatchRelevance, EditorInfo } from "./batchOperations";
 
 type RelevanceSelectorProps = {
   isSuggestion?: boolean;
@@ -65,16 +70,15 @@ export function RelevanceSelector({
 }: RelevanceSelectorProps): JSX.Element | null {
   const [hoverLevel, setHoverLevel] = useState<number | null>(null);
 
-  // Hooks for normal items (updating existing relevance)
-  const { currentRelevance, setLevel, removeFromList, isVisible } =
-    useUpdateRelevance();
+  const { currentRelevance, removeFromList, isVisible } = useUpdateRelevance();
 
-  // Hooks for suggestions (accepting with relevance)
   const viewPath = useViewPath();
+  const viewKey = useViewKey();
   const [node] = useNode();
   const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
   const parentPath = getParentView(viewPath);
+  const { selection } = useTemporaryView();
 
   const suggestionNodeText = node?.text || "";
   const versionedDisplayText = useDisplayText();
@@ -110,29 +114,51 @@ export function RelevanceSelector({
     ? suggestionNodeText
     : editorText.trim() || versionedDisplayText;
 
-  // Handler that works for both modes
+  const isInSelection = selection.has(viewKey) && selection.size > 1;
+
+  const getActionPaths = (): ViewPath[] =>
+    isInSelection ? selection.toArray().map(parseViewPath) : [viewPath];
+
+  const getEditorInfo = (): EditorInfo | undefined =>
+    editorText ? { text: editorText, viewPath } : undefined;
+
   const handleSetLevel = (level: number): void => {
     if (isSuggestion) {
       acceptWithLevel(level);
-    } else if (level === currentLevel) {
-      setLevel(-1);
-    } else {
-      setLevel(level);
+      return;
     }
+    const relevance = levelToRelevance(level === currentLevel ? -1 : level);
+    executePlan(
+      planBatchRelevance(
+        createPlan(),
+        getActionPaths(),
+        stack,
+        relevance,
+        getEditorInfo()
+      )
+    );
   };
 
-  // Check if item is already marked as not relevant (for showing remove option)
   const isCurrentlyNotRelevant = !isSuggestion && currentLevel === 0;
 
-  // Handler for X button - marks as not relevant, or removes if already not relevant
   const handleXClick = (): void => {
     if (isSuggestion) {
-      acceptWithLevel(0); // Decline suggestion
-    } else if (isCurrentlyNotRelevant) {
-      removeFromList(); // Completely remove from list
-    } else {
-      setLevel(0); // Mark as not relevant
+      acceptWithLevel(0);
+      return;
     }
+    if (!isInSelection && isCurrentlyNotRelevant) {
+      removeFromList();
+      return;
+    }
+    executePlan(
+      planBatchRelevance(
+        createPlan(),
+        getActionPaths(),
+        stack,
+        "not_relevant",
+        getEditorInfo()
+      )
+    );
   };
 
   // For suggestions with no hover, show all as inactive

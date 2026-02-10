@@ -382,7 +382,9 @@ function Tree(): JSX.Element | null {
       return;
     }
 
-    setSelectionState(clearSelection({ ...currentState, anchor: clickedViewKey }));
+    setSelectionState(
+      clearSelection({ ...currentState, anchor: clickedViewKey })
+    );
   };
 
   useEffect(() => {

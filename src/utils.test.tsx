@@ -45,7 +45,12 @@ import {
 import { execute } from "./executor";
 import { ApiProvider, Apis, FinalizeEvent } from "./Apis";
 import { App } from "./App";
-import { DataContextProps, DataContextProvider } from "./DataContext";
+import {
+  DataContextProps,
+  DataContextProvider,
+  MergeKnowledgeDB,
+} from "./DataContext";
+import { EventCacheProvider } from "./EventCache";
 import { MockRelayPool, mockRelayPool } from "./nostrMock.test";
 import {
   NostrAuthContextProvider,
@@ -337,6 +342,9 @@ function TestPublishProvider({
 }: {
   children: React.ReactNode;
 }): JSX.Element {
+  const [publishEventsStatus, setPublishEventsStatus] = React.useState(
+    DEFAULT_DATA_CONTEXT_PROPS.publishEventsStatus
+  );
   return (
     <DataContextProvider
       user={DEFAULT_DATA_CONTEXT_PROPS.user}
@@ -344,14 +352,23 @@ function TestPublishProvider({
       contactsRelays={DEFAULT_DATA_CONTEXT_PROPS.contactsRelays}
       knowledgeDBs={DEFAULT_DATA_CONTEXT_PROPS.knowledgeDBs}
       relaysInfos={DEFAULT_DATA_CONTEXT_PROPS.relaysInfos}
-      publishEventsStatus={DEFAULT_DATA_CONTEXT_PROPS.publishEventsStatus}
+      publishEventsStatus={publishEventsStatus}
       views={DEFAULT_DATA_CONTEXT_PROPS.views}
       projectMembers={DEFAULT_DATA_CONTEXT_PROPS.projectMembers}
       panes={DEFAULT_DATA_CONTEXT_PROPS.panes}
     >
-      <PlanningContextProvider setPublishEvents={() => {}} setPanes={() => {}}>
-        {children}
-      </PlanningContextProvider>
+      <EventCacheProvider
+        unpublishedEvents={publishEventsStatus.unsignedEvents}
+      >
+        <MergeKnowledgeDB>
+          <PlanningContextProvider
+            setPublishEvents={setPublishEventsStatus}
+            setPanes={() => {}}
+          >
+            {children}
+          </PlanningContextProvider>
+        </MergeKnowledgeDB>
+      </EventCacheProvider>
     </DataContextProvider>
   );
 }

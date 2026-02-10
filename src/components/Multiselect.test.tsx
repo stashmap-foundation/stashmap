@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ALICE, renderApp, setup, type } from "../utils.test";
+import { ALICE, expectTree, renderApp, setup, type } from "../utils.test";
 
 function getSelectedNodes(): string[] {
   return Array.from(
@@ -13,6 +13,7 @@ function getActionTargets(): string[] {
   if (selected.length > 0) {
     return selected;
   }
+  /* eslint-disable testing-library/no-node-access */
   const active = document.activeElement;
   if (active instanceof HTMLElement) {
     const item = active.closest('.item[data-row-focusable="true"]');
@@ -20,6 +21,7 @@ function getActionTargets(): string[] {
       return [item.getAttribute("data-node-text") || ""];
     }
   }
+  /* eslint-enable testing-library/no-node-access */
   return [];
 }
 
@@ -179,7 +181,9 @@ describe("Selection via keyboard", () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
-    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Enter}D{Enter}E{Enter}F{Escape}");
+    await type(
+      "Root{Enter}{Tab}A{Enter}B{Enter}C{Enter}D{Enter}E{Enter}F{Escape}"
+    );
     await clickRow("A");
     await userEvent.keyboard("{Shift>}jjjjj{/Shift}");
     await expectTargets("A", "B", "C", "D", "E", "F");
@@ -367,5 +371,271 @@ describe("Selection via mouse", () => {
 
     modClick(await screen.findByLabelText("D"), { metaKey: true });
     await expectTargets("A", "B", "D");
+  });
+});
+
+async function expectRelevance(
+  nodeText: string,
+  expected: string
+): Promise<void> {
+  await waitFor(() => {
+    /* eslint-disable testing-library/no-node-access */
+    const item = document.querySelector(`.item[data-node-text="${nodeText}"]`);
+    const selector = item?.querySelector(".relevance-selector");
+    /* eslint-enable testing-library/no-node-access */
+    expect(selector?.getAttribute("title")).toBe(expected);
+  });
+}
+
+describe("Cmd+click includes focused row", () => {
+  test("click row then Cmd+click another includes both", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("A");
+    modClick(await screen.findByLabelText("B"), { metaKey: true });
+    await expectTargets("A", "B");
+  });
+
+  test("click row then Cmd+click two others includes all three", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("A");
+    modClick(await screen.findByLabelText("B"), { metaKey: true });
+    modClick(await screen.findByLabelText("C"), { metaKey: true });
+    await expectTargets("A", "B", "C");
+  });
+});
+
+describe("Batch relevance via keyboard", () => {
+  test("x on selection hides all selected rows", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("A", "B");
+    await userEvent.keyboard("x");
+    await expectTree(`
+Root
+  C
+    `);
+  });
+
+  test("! on selection sets relevant on all selected", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await userEvent.keyboard("!");
+    await expectRelevance("A", "Relevant");
+    await expectRelevance("B", "Relevant");
+    await expectRelevance("C", "Contains");
+  });
+
+  test("? on selection sets maybe relevant on all selected", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await userEvent.keyboard("?");
+    await expectRelevance("A", "Maybe Relevant");
+    await expectRelevance("B", "Maybe Relevant");
+  });
+
+  test("~ on selection hides all selected (filtered by default)", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await userEvent.keyboard("~");
+    await expectTree(`
+Root
+  C
+    `);
+  });
+
+  test("selection clears after relevance operation", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("A", "B");
+    await userEvent.keyboard("!");
+    await waitFor(() => {
+      expect(getSelectedNodes()).toEqual([]);
+    });
+  });
+
+  test("single focused row still works without selection", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("x");
+    await expectTree(`
+Root
+  B
+    `);
+  });
+
+  test("toggle: ! twice returns to contains", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("!");
+    await expectRelevance("A", "Relevant");
+    await clickRow("A");
+    await userEvent.keyboard("!");
+    await expectRelevance("A", "Contains");
+  });
+
+  test("x on cross-depth selection hides all", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}{Tab}A1{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("A", "A1");
+    await userEvent.keyboard("x");
+    await expectTree(`
+Root
+    `);
+  });
+});
+
+describe("Batch relevance via button click", () => {
+  test("clicking ! button on selected row applies to all selected", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("A", "B");
+    fireEvent.click(screen.getByLabelText("set A to relevant"));
+    await expectRelevance("A", "Relevant");
+    await expectRelevance("B", "Relevant");
+    await expectRelevance("C", "Contains");
+  });
+
+  test("clicking x button on selected row applies to all selected", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    fireEvent.click(screen.getByLabelText("mark A as not relevant"));
+    await expectTree(`
+Root
+  C
+    `);
+  });
+
+  test("toggle: clicking same level twice returns to contains", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Escape}");
+    await clickRow("A");
+    fireEvent.click(screen.getByLabelText("set A to relevant"));
+    await expectRelevance("A", "Relevant");
+    fireEvent.click(screen.getByLabelText("set A to relevant"));
+    await expectRelevance("A", "Contains");
+  });
+});
+
+describe("Batch evidence via keyboard", () => {
+  test("+ on selection sets confirms on all selected", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await userEvent.keyboard("+");
+    await screen.findByLabelText(/Evidence for A: Confirms/);
+    await screen.findByLabelText(/Evidence for B: Confirms/);
+    await screen.findByLabelText(/Evidence for C: No evidence type/);
+  });
+
+  test("- on selection sets contradicts on all selected", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await userEvent.keyboard("-");
+    await screen.findByLabelText(/Evidence for A: Contradicts/);
+    await screen.findByLabelText(/Evidence for B: Contradicts/);
+  });
+
+  test("o on selection clears evidence on all selected", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await userEvent.keyboard("+");
+    await screen.findByLabelText(/Evidence for A: Confirms/);
+    await screen.findByLabelText(/Evidence for B: Confirms/);
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await userEvent.keyboard("o");
+    await screen.findByLabelText(/Evidence for A: No evidence type/);
+    await screen.findByLabelText(/Evidence for B: No evidence type/);
+  });
+
+  test("toggle: + twice clears evidence", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("+");
+    await screen.findByLabelText(/Evidence for A: Confirms/);
+    await clickRow("A");
+    await userEvent.keyboard("+");
+    await screen.findByLabelText(/Evidence for A: No evidence type/);
+  });
+
+  test("selection clears after evidence operation", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("A", "B");
+    await userEvent.keyboard("+");
+    await waitFor(() => {
+      expect(getSelectedNodes()).toEqual([]);
+    });
+  });
+
+  test("single focused row still works without selection", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("+");
+    await screen.findByLabelText(/Evidence for A: Confirms/);
+    await screen.findByLabelText(/Evidence for B: No evidence type/);
+  });
+});
+
+describe("Batch evidence via button click", () => {
+  test("clicking evidence button on selected row cycles for all selected", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("A", "B");
+    fireEvent.click(screen.getByLabelText(/Evidence for A: No evidence type/));
+    await screen.findByLabelText(/Evidence for A: Confirms/);
+    await screen.findByLabelText(/Evidence for B: Confirms/);
+    await screen.findByLabelText(/Evidence for C: No evidence type/);
   });
 });

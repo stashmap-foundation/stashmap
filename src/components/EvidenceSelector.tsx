@@ -1,9 +1,20 @@
 import React, { useState } from "react";
 import { TYPE_COLORS } from "../constants";
 import { useUpdateArgument } from "./useUpdateArgument";
-import { useNode, useDisplayText } from "../ViewContext";
+import {
+  ViewPath,
+  useViewPath,
+  parseViewPath,
+  useNode,
+  useDisplayText,
+  useViewKey,
+} from "../ViewContext";
+import { usePlanner } from "../planner";
+import { usePaneStack } from "../SplitPanesContext";
 import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
+import { useTemporaryView } from "./TemporaryViewContext";
+import { planBatchArgument, EditorInfo } from "./batchOperations";
 
 function getArgumentColor(argument: Argument, isHovered: boolean): string {
   if (argument === "confirms") {
@@ -36,19 +47,41 @@ function getArgumentLabel(argument: Argument): string {
 
 export function EvidenceSelector(): JSX.Element | null {
   const [isHovered, setIsHovered] = useState(false);
-  const { currentArgument, setArgument, isVisible } = useUpdateArgument();
+  const { currentArgument, isVisible } = useUpdateArgument();
+  const viewPath = useViewPath();
+  const viewKey = useViewKey();
   const [node] = useNode();
   const versionedDisplayText = useDisplayText();
   const editorTextContext = useEditorText();
   const editorText = editorTextContext?.text ?? "";
+  const stack = usePaneStack();
+  const { createPlan, executePlan } = usePlanner();
+  const { selection } = useTemporaryView();
 
   if (!isVisible) return null;
 
   const nodeName =
     editorText.trim() || versionedDisplayText || node?.text || "item";
 
+  const isInSelection = selection.has(viewKey) && selection.size > 1;
+
+  const getActionPaths = (): ViewPath[] =>
+    isInSelection ? selection.toArray().map(parseViewPath) : [viewPath];
+
+  const getEditorInfo = (): EditorInfo | undefined =>
+    editorText ? { text: editorText, viewPath } : undefined;
+
   const handleClick = (): void => {
-    setArgument(getNextArgument(currentArgument));
+    const nextArgument = getNextArgument(currentArgument);
+    executePlan(
+      planBatchArgument(
+        createPlan(),
+        getActionPaths(),
+        stack,
+        nextArgument,
+        getEditorInfo()
+      )
+    );
   };
 
   const hasArgument = currentArgument !== undefined;

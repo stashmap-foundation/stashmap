@@ -1326,12 +1326,22 @@ input:focus,
   .text-readonly {
     color: inherit;
   }
+
+  .relevance-symbol,
+  .evidence-selector {
+    color: var(--base02) !important;
+  }
 }
 
 .item[data-selected="true"]:focus .inner-node.hover-light-bg,
 .item[data-selected="true"]:focus-visible .inner-node.hover-light-bg {
   background: var(--base1);
   color: var(--base03);
+
+  .relevance-symbol,
+  .evidence-selector {
+    color: var(--base02) !important;
+  }
 }
 
 

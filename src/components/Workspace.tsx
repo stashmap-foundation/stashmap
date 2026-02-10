@@ -9,6 +9,7 @@ import {
 
 import {
   getNodeFromID,
+  parseViewPath,
   useViewPath,
   useIsViewingOtherUserContent,
 } from "../ViewContext";
@@ -44,6 +45,11 @@ import {
   getScrollToRow,
   isEditableElement,
 } from "./keyboardNavigation";
+import {
+  planBatchRelevance,
+  planBatchArgument,
+  getCurrentItem,
+} from "./batchOperations";
 
 function BreadcrumbItem({
   nodeID,
@@ -343,8 +349,6 @@ const FILTER_SYMBOL_TO_KEY = {
   "@": "8",
 } as const;
 
-type Evidence = "none" | "confirms" | "contra";
-
 function getActiveRow(root: HTMLElement): HTMLElement | undefined {
   const rows = getFocusableRows(root);
   const active = rows.find((row) => row.tabIndex === 0);
@@ -507,55 +511,12 @@ function setSelectedPane(targetPane: HTMLElement): void {
   targetPane.setAttribute("data-keyboard-pane-selected", "true");
 }
 
-function triggerRowRelevanceSymbol(
-  activeRow: HTMLElement,
-  symbol: "x" | "~" | "?" | "!"
-): void {
-  const buttons = Array.from(
-    activeRow.querySelectorAll(".relevance-selector [role='button']")
-  ).filter((el): el is HTMLElement => el instanceof HTMLElement);
-  const target = buttons.find(
-    (button) => button.textContent?.trim().toLowerCase() === symbol
-  );
-  if (target) {
-    target.click();
-  }
-}
-
-function getCurrentEvidence(activeRow: HTMLElement): Evidence {
-  const button = activeRow.querySelector(".evidence-selector[role='button']");
-  if (!(button instanceof HTMLElement)) {
-    return "none";
-  }
-  const ariaLabel = (button.getAttribute("aria-label") || "").toLowerCase();
-  if (ariaLabel.includes("confirms")) {
-    return "confirms";
-  }
-  if (ariaLabel.includes("contradicts")) {
-    return "contra";
-  }
-  return "none";
-}
-
-function getEvidenceSteps(from: Evidence, to: Evidence): number {
-  if (from === to) return 0;
-  if (from === "none" && to === "confirms") return 1;
-  if (from === "none" && to === "contra") return 2;
-  if (from === "confirms" && to === "contra") return 1;
-  if (from === "confirms" && to === "none") return 2;
-  if (from === "contra" && to === "none") return 1;
-  return 2;
-}
-
-function setEvidenceSymbol(activeRow: HTMLElement, target: Evidence): void {
-  const button = activeRow.querySelector(".evidence-selector[role='button']");
-  if (!(button instanceof HTMLElement)) {
-    return;
-  }
-  const current = getCurrentEvidence(activeRow);
-  const steps = getEvidenceSteps(current, target);
-  Array.from({ length: steps }).forEach(() => button.click());
-}
+const SYMBOL_TO_RELEVANCE: Record<string, Relevance> = {
+  x: "not_relevant",
+  "~": "little_relevant",
+  "?": "maybe_relevant",
+  "!": "relevant",
+};
 
 function refocusPaneAfterRowMutation(root: HTMLElement): void {
   window.setTimeout(() => {
@@ -576,12 +537,6 @@ function getVisibleRowKeys(root: HTMLElement): string[] {
   return getFocusableRows(root).map((row) => getRowKey(row));
 }
 
-function getSelectedRowElements(root: HTMLElement): HTMLElement[] {
-  return Array.from(
-    root.querySelectorAll('.item[data-selected="true"]')
-  ).filter((el): el is HTMLElement => el instanceof HTMLElement);
-}
-
 function usePaneKeyboardNavigation(paneIndex: number): {
   wrapperRef: React.RefObject<HTMLDivElement>;
   onKeyDownCapture: (e: React.KeyboardEvent<HTMLDivElement>) => void;
@@ -600,6 +555,8 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     anchor,
     setState: setSelectionState,
   } = useTemporaryView();
+  const stack = usePaneStack();
+  const { createPlan, executePlan } = usePlanner();
 
   const switchPane = (direction: -1 | 1): void => {
     const root = wrapperRef.current;
@@ -787,7 +744,15 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       return;
     }
 
-    if (e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    const isShiftOnly = e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey;
+    if (
+      isShiftOnly &&
+      e.key !== "!" &&
+      e.key !== "?" &&
+      e.key !== "~" &&
+      e.key !== "+" &&
+      e.key !== "-"
+    ) {
       const activeRow = getActiveRow(root);
       if (!activeRow) {
         return;
@@ -810,7 +775,11 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         const targetIndex = isDown ? activeIndex + 1 : activeIndex - 1;
         const allKeys = getVisibleRowKeys(root);
         const currentAnchor = anchor || activeRowKey;
-        const currentState = { baseSelection, shiftSelection, anchor: currentAnchor };
+        const currentState = {
+          baseSelection,
+          shiftSelection,
+          anchor: currentAnchor,
+        };
         const rows = getFocusableRows(root);
         const targetRow = rows.find(
           (row) =>
@@ -841,7 +810,9 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (e.key === "Escape") {
       e.preventDefault();
       if (selection.size > 0) {
-        setSelectionState(clearSelection({ baseSelection, shiftSelection, anchor }));
+        setSelectionState(
+          clearSelection({ baseSelection, shiftSelection, anchor })
+        );
       }
       (document.activeElement as HTMLElement)?.blur();
       return;
@@ -855,17 +826,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         return;
       }
       setLastSequence("g", now);
-      return;
-    }
-
-    if (e.key === "d") {
-      if (lastSequenceKey === "d" && now - lastSequenceTs < 600) {
-        e.preventDefault();
-        triggerRowRelevanceSymbol(activeRow, "x");
-        setLastSequence(null, 0);
-        return;
-      }
-      setLastSequence("d", now);
       return;
     }
 
@@ -1040,28 +1000,40 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "x" || e.key === "~" || e.key === "!" || e.key === "?") {
       e.preventDefault();
-      triggerRowRelevanceSymbol(activeRow, e.key as "x" | "~" | "!" | "?");
+      const plan = createPlan();
+      const activeViewPath = parseViewPath(getRowKey(activeRow));
+      const paths =
+        selection.size > 0
+          ? selection.toArray().map(parseViewPath)
+          : [activeViewPath];
+      const targetRelevance = SYMBOL_TO_RELEVANCE[e.key];
+      const currentItem = getCurrentItem(plan, activeViewPath);
+      const relevance =
+        currentItem?.relevance === targetRelevance
+          ? undefined
+          : targetRelevance;
+      executePlan(planBatchRelevance(plan, paths, stack, relevance));
       refocusPaneAfterRowMutation(root);
       return;
     }
 
-    if (e.key === "+") {
+    if (e.key === "+" || e.key === "-" || e.key === "o") {
       e.preventDefault();
-      setEvidenceSymbol(activeRow, "confirms");
-      refocusPaneAfterRowMutation(root);
-      return;
-    }
-
-    if (e.key === "-") {
-      e.preventDefault();
-      setEvidenceSymbol(activeRow, "contra");
-      refocusPaneAfterRowMutation(root);
-      return;
-    }
-
-    if (e.key === "o") {
-      e.preventDefault();
-      setEvidenceSymbol(activeRow, "none");
+      const plan = createPlan();
+      const activeViewPath = parseViewPath(getRowKey(activeRow));
+      const paths =
+        selection.size > 0
+          ? selection.toArray().map(parseViewPath)
+          : [activeViewPath];
+      const targetArgument: Argument = (() => {
+        if (e.key === "+") return "confirms" as const;
+        if (e.key === "-") return "contra" as const;
+        return undefined;
+      })();
+      const currentItem = getCurrentItem(plan, activeViewPath);
+      const argument: Argument =
+        currentItem?.argument === targetArgument ? undefined : targetArgument;
+      executePlan(planBatchArgument(plan, paths, stack, argument));
       refocusPaneAfterRowMutation(root);
       return;
     }

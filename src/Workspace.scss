@@ -1322,6 +1322,28 @@ input:focus,
   background: var(--base02);
 }
 
+.item[data-selected="true"] .inner-node.hover-light-bg {
+  background: var(--base02);
+}
+
+.item[data-selected="true"] ~ .visible-on-hover .right-menu .relevance-slot > *,
+.item[data-selected="true"] ~ .visible-on-hover .right-menu .evidence-slot > * {
+  opacity: 1;
+  visibility: visible;
+}
+
+.visible-on-hover:has(.item[data-selected="true"]) .right-menu .relevance-slot > *,
+.visible-on-hover:has(.item[data-selected="true"]) .right-menu .evidence-slot > *,
+.visible-on-hover:has(.item[data-selected="true"]) .right-menu .ref-count-btn.show-on-row-hover {
+  opacity: 1;
+  visibility: visible;
+}
+
+.visible-on-hover:has(.item[data-selected="true"]) .inline-node-actions {
+  opacity: 1;
+  visibility: visible;
+}
+
 .hover-black-dimmed {
   background: transparent;
   transition: none !important;

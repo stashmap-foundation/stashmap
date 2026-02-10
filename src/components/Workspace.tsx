@@ -1,5 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import { TemporaryViewProvider } from "./TemporaryViewContext";
+import {
+  TemporaryViewProvider,
+  useTemporaryView,
+  clearSelection,
+  extendSelection,
+  shrinkSelection,
+  toggleSelect,
+} from "./TemporaryViewContext";
 
 import {
   getNodeFromID,
@@ -562,6 +569,16 @@ function refocusPaneAfterRowMutation(root: HTMLElement): void {
   }, 0);
 }
 
+function getVisibleRowKeys(root: HTMLElement): string[] {
+  return getFocusableRows(root).map((row) => getRowKey(row));
+}
+
+function getSelectedRowElements(root: HTMLElement): HTMLElement[] {
+  return Array.from(
+    root.querySelectorAll('.item[data-selected="true"]')
+  ).filter((el): el is HTMLElement => el instanceof HTMLElement);
+}
+
 function usePaneKeyboardNavigation(paneIndex: number): {
   wrapperRef: React.RefObject<HTMLDivElement>;
   onKeyDownCapture: (e: React.KeyboardEvent<HTMLDivElement>) => void;
@@ -573,6 +590,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const { setActivePaneIndex } = useNavigationState();
+  const { selection, anchor, setState: setSelectionState } = useTemporaryView();
 
   const switchPane = (direction: -1 | 1): void => {
     const root = wrapperRef.current;
@@ -764,6 +782,54 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       return;
     }
 
+    if (e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      const activeRow = getActiveRow(root);
+      if (!activeRow) {
+        return;
+      }
+      const activeRowKey = getRowKey(activeRow);
+      const activeIndex = Number(
+        activeRow.getAttribute("data-row-index") || "0"
+      );
+
+      if (
+        e.key === "J" ||
+        e.key === "j" ||
+        e.key === "ArrowDown" ||
+        e.key === "K" ||
+        e.key === "k" ||
+        e.key === "ArrowUp"
+      ) {
+        e.preventDefault();
+        const isDown = e.key === "J" || e.key === "j" || e.key === "ArrowDown";
+        const targetIndex = isDown ? activeIndex + 1 : activeIndex - 1;
+        const rows = getFocusableRows(root);
+        const targetRow = rows.find(
+          (row) =>
+            Number(row.getAttribute("data-row-index") || "0") === targetIndex
+        );
+        if (!targetRow) {
+          const currentState = { selection, anchor };
+          setSelectionState(extendSelection(currentState, activeRowKey));
+          return;
+        }
+        const targetKey = getRowKey(targetRow);
+        const currentState = { selection, anchor };
+        const isTargetSelected = selection.contains(targetKey);
+        const isCurrentSelected = selection.contains(activeRowKey);
+
+        if (isTargetSelected && isCurrentSelected) {
+          setSelectionState(shrinkSelection(currentState, activeRowKey));
+        } else {
+          const withCurrent = extendSelection(currentState, activeRowKey);
+          setSelectionState(extendSelection(withCurrent, targetKey));
+        }
+        scrollAndFocusRow(root, targetIndex);
+        return;
+      }
+      return;
+    }
+
     if (e.metaKey || e.ctrlKey || e.altKey) {
       return;
     }
@@ -776,7 +842,10 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "Escape") {
       e.preventDefault();
-      focusRow(activeRow);
+      if (selection.size > 0) {
+        setSelectionState(clearSelection({ selection, anchor }));
+      }
+      (document.activeElement as HTMLElement)?.blur();
       return;
     }
 
@@ -829,6 +898,15 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       if (totalRows > 0) {
         scrollAndFocusRow(root, totalRows - 1);
       }
+      return;
+    }
+
+    if (e.key === " ") {
+      e.preventDefault();
+      const activeRowKey = getRowKey(activeRow);
+      setSelectionState(
+        toggleSelect({ selection, anchor }, activeRowKey)
+      );
       return;
     }
 
@@ -1006,7 +1084,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
   };
 }
 
-export function PaneView(): JSX.Element | null {
+function PaneViewInner(): JSX.Element {
   const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
   const { user } = useData();
@@ -1021,32 +1099,36 @@ export function PaneView(): JSX.Element | null {
   } = usePaneKeyboardNavigation(paneIndex);
 
   return (
-    <TemporaryViewProvider>
-      <div
-        ref={wrapperRef}
-        className={`pane-wrapper ${
-          isOtherUser ? "pane-other-user pane-readonly-mode" : ""
-        }`}
-        tabIndex={-1}
-        onMouseEnter={onPaneMouseEnter}
-        onFocusCapture={onPaneFocusCapture}
-        onKeyDownCapture={onKeyDownCapture}
+    <div
+      ref={wrapperRef}
+      className={`pane-wrapper ${
+        isOtherUser ? "pane-other-user pane-readonly-mode" : ""
+      }`}
+      tabIndex={-1}
+      onMouseEnter={onPaneMouseEnter}
+      onFocusCapture={onPaneFocusCapture}
+      onKeyDownCapture={onKeyDownCapture}
+    >
+      <KeyboardShortcutsModal
+        show={showShortcuts}
+        onHide={() => setShowShortcuts(false)}
+      />
+      <PaneHeader />
+      <DroppableContainer
+        className={`pane-content${!pane.stack.length ? " empty-pane-drop-zone" : ""}`}
+        disabled={!!pane.stack.length}
       >
-        <KeyboardShortcutsModal
-          show={showShortcuts}
-          onHide={() => setShowShortcuts(false)}
-        />
-        <PaneHeader />
-        <DroppableContainer
-          className={`pane-content${
-            !pane.stack.length ? " empty-pane-drop-zone" : ""
-          }`}
-          disabled={!!pane.stack.length}
-        >
-          <TreeView />
-        </DroppableContainer>
-        <PaneStatusLine />
-      </div>
+        <TreeView />
+      </DroppableContainer>
+      <PaneStatusLine />
+    </div>
+  );
+}
+
+export function PaneView(): JSX.Element | null {
+  return (
+    <TemporaryViewProvider>
+      <PaneViewInner />
     </TemporaryViewProvider>
   );
 }

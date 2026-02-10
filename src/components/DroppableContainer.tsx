@@ -247,7 +247,7 @@ export function useDroppable({
   { dragDirection: number | undefined; isOver: boolean },
   ConnectDropTarget
 ] {
-  const { setState, selection, multiselectBtns } = useTemporaryView();
+  const { setState, selection, anchor } = useTemporaryView();
   const { createPlan, executePlan } = usePlanner();
   const stack = usePaneStack();
   const pane = useCurrentPane();
@@ -533,7 +533,7 @@ export function useDroppable({
       const parentKey = getParentKey(viewPathToString(dragItem.path));
       setState({
         selection: deselectAllChildren(selection, parentKey),
-        multiselectBtns: multiselectBtns.remove(parentKey),
+        anchor,
       });
       return dragItem;
     },

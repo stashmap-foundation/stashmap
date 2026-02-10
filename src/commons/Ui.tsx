@@ -78,37 +78,6 @@ export function UIColumn({
   );
 }
 
-type SelectboxProps = {
-  checked: boolean;
-  setSelected: (checked: boolean) => void;
-  ariaLabel?: string;
-};
-
-/* eslint-disable jsx-a11y/label-has-associated-control */
-export function Selectbox({
-  checked,
-  setSelected,
-  ariaLabel,
-}: SelectboxProps): JSX.Element {
-  return (
-    <div className="checkbox">
-      <div className="pretty p-default p-round font-size-select">
-        <input
-          type="checkbox"
-          aria-label={ariaLabel}
-          checked={checked}
-          onChange={(e) => {
-            setSelected(e.target.checked);
-          }}
-        />
-        <div className="state p-info p-info-o">
-          <label />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 type KnowledgeNodeCardProps = {
   badgeValue?: number;
   style?: CSSProperties | undefined;

@@ -1,25 +1,17 @@
 import React, { useState } from "react";
 import { OrderedSet, Set } from "immutable";
-import { Selectbox } from "../commons/Ui";
 import {
   parseViewPath,
   useViewKey,
-  getParentKey,
-  useNode,
-  useParentNode,
-  useRelationIndex,
   getRelationIndex,
   useDisplayText,
-  useViewPath,
-  getParentView,
-  getRelationForView,
+  useNode,
 } from "../ViewContext";
 import { useData } from "../DataContext";
-import { usePaneStack } from "../SplitPanesContext";
 
 type MultiSelectionState = {
   selection: OrderedSet<string>;
-  multiselectBtns: Set<string>;
+  anchor: string;
 };
 
 type MultiSelection = MultiSelectionState & {
@@ -44,7 +36,6 @@ type EditorOpen = EditorOpenState & {
 
 type TemporaryView = MultiSelection & Editing & EditorOpen;
 
-type SetSelected = (selected: boolean) => void;
 type FindSelectedByPostfix = (postfix: string) => Set<string>;
 type DeselectByPostfix = (postfix: string) => void;
 
@@ -62,18 +53,6 @@ function getTemporaryViewContextOrThrow(): TemporaryView {
 
 export function useTemporaryView(): TemporaryView {
   return getTemporaryViewContextOrThrow();
-}
-
-function useSetSelected(): SetSelected {
-  const { selection, setState, multiselectBtns } = useTemporaryView();
-  const viewKey = useViewKey();
-  return (selected: boolean): void => {
-    if (!selected) {
-      setState({ selection: selection.remove(viewKey), multiselectBtns });
-    } else {
-      setState({ selection: selection.add(viewKey), multiselectBtns });
-    }
-  };
 }
 
 export function useIsSelected(): boolean {
@@ -122,71 +101,83 @@ export function deselectAllChildren(
 }
 
 export function useDeselectAllInView(): DeselectByPostfix {
-  const { selection, setState, multiselectBtns } = useTemporaryView();
+  const { selection, anchor, setState } = useTemporaryView();
   return (viewKey) =>
     setState({
       selection: deselectAllChildren(selection, viewKey),
-      multiselectBtns,
+      anchor,
     });
 }
 
-function isMultiselectBtnOn(
-  multiselectBtns: Set<string>,
-  viewKey: string
-): boolean {
-  return multiselectBtns.has(viewKey);
-}
-
-export function useIsParentMultiselectBtnOn(): boolean {
-  const { multiselectBtns } = useTemporaryView();
-  const viewKey = useViewKey();
-  return isMultiselectBtnOn(multiselectBtns, getParentKey(viewKey));
-}
-
-export function switchOffMultiselect(
-  multiselectBtns: Set<string>,
-  selection: OrderedSet<string>,
+export function selectSingle(
+  _state: MultiSelectionState,
   viewKey: string
 ): MultiSelectionState {
   return {
-    selection: deselectAllChildren(selection, viewKey),
-    multiselectBtns: multiselectBtns.remove(viewKey),
+    selection: OrderedSet<string>([viewKey]),
+    anchor: viewKey,
   };
 }
 
-function toggleMultiselect(
-  multiselectBtns: Set<string>,
-  selection: OrderedSet<string>,
+export function toggleSelect(
+  state: MultiSelectionState,
   viewKey: string
 ): MultiSelectionState {
   return {
-    selection: deselectAllChildren(selection, viewKey),
-    multiselectBtns: isMultiselectBtnOn(multiselectBtns, viewKey)
-      ? multiselectBtns.remove(viewKey)
-      : multiselectBtns.add(viewKey),
+    selection: state.selection.contains(viewKey)
+      ? state.selection.remove(viewKey)
+      : state.selection.add(viewKey),
+    anchor: viewKey,
   };
 }
 
-export function ToggleMultiselect(): JSX.Element {
-  const displayText = useDisplayText();
-  const ariaLabel = displayText
-    ? `toggle multiselect ${displayText}`
-    : undefined;
-  const { selection, setState, multiselectBtns } = useTemporaryView();
-  const viewKey = useViewKey();
-  const onClick = (): void =>
-    setState(toggleMultiselect(multiselectBtns, selection, viewKey));
+export function selectRange(
+  state: MultiSelectionState,
+  orderedKeys: string[],
+  anchor: string,
+  target: string
+): MultiSelectionState {
+  const anchorIdx = orderedKeys.indexOf(anchor);
+  const targetIdx = orderedKeys.indexOf(target);
+  if (anchorIdx === -1 || targetIdx === -1) {
+    return { selection: state.selection, anchor };
+  }
+  const start = Math.min(anchorIdx, targetIdx);
+  const end = Math.max(anchorIdx, targetIdx);
+  const rangeKeys = orderedKeys.slice(start, end + 1);
+  return {
+    selection: state.selection.union(OrderedSet<string>(rangeKeys)),
+    anchor,
+  };
+}
 
-  return (
-    <button
-      type="button"
-      className="btn"
-      onClick={onClick}
-      aria-label={ariaLabel}
-    >
-      <span aria-hidden="true">✓</span>
-    </button>
-  );
+export function extendSelection(
+  state: MultiSelectionState,
+  viewKey: string
+): MultiSelectionState {
+  return {
+    selection: state.selection.add(viewKey),
+    anchor: state.anchor,
+  };
+}
+
+export function shrinkSelection(
+  state: MultiSelectionState,
+  viewKey: string
+): MultiSelectionState {
+  return {
+    selection: state.selection.remove(viewKey),
+    anchor: state.anchor,
+  };
+}
+
+export function clearSelection(
+  state: MultiSelectionState
+): MultiSelectionState {
+  return {
+    selection: OrderedSet<string>(),
+    anchor: state.anchor,
+  };
 }
 
 function isEditingOn(editingViews: Set<string>, viewKey: string): boolean {
@@ -210,7 +201,6 @@ export function toggleEditing(
   };
 }
 
-// With content-addressed IDs (hash of text), any text node is mutable
 export function isMutableNode(node: KnowNode | undefined): boolean {
   return !!node && node.type === "text";
 }
@@ -278,8 +268,8 @@ export function TemporaryViewProvider({
 }): JSX.Element {
   const [multiselectState, setMultiselectState] = useState<MultiSelectionState>(
     {
-      multiselectBtns: Set<string>(),
       selection: OrderedSet<string>(),
+      anchor: "",
     }
   );
   const [isEditingState, setEditingState] = useState<EditingState>({
@@ -292,8 +282,8 @@ export function TemporaryViewProvider({
   return (
     <TemporaryViewContext.Provider
       value={{
-        multiselectBtns: multiselectState.multiselectBtns,
         selection: multiselectState.selection,
+        anchor: multiselectState.anchor,
         setState: setMultiselectState,
         editingViews: isEditingState.editingViews,
         setEditingState,
@@ -303,47 +293,5 @@ export function TemporaryViewProvider({
     >
       {children}
     </TemporaryViewContext.Provider>
-  );
-}
-
-export function NodeSelectbox(): JSX.Element | null {
-  const displayText = useDisplayText();
-  const data = useData();
-  const [parentNode, parentView] = useParentNode();
-  const viewPath = useViewPath();
-  const stack = usePaneStack();
-  const relationIndex = useRelationIndex();
-  const checked = useIsSelected();
-  const setSelected = useSetSelected();
-  if (!parentView) {
-    return null;
-  }
-
-  const parentPath = getParentView(viewPath);
-  const relations = parentPath
-    ? getRelationForView(data, parentPath, stack as ID[])
-    : undefined;
-  if (!relations) {
-    return null;
-  }
-
-  const isSubjectNode =
-    parentNode &&
-    relationIndex !== undefined &&
-    relationIndex >= relations.items.size;
-
-  const ariaLabel = displayText
-    ? `${checked ? "deselect" : "select"} ${displayText}`
-    : undefined;
-
-  if (isSubjectNode) {
-    return null;
-  }
-  return (
-    <Selectbox
-      checked={checked}
-      setSelected={setSelected}
-      ariaLabel={ariaLabel}
-    />
   );
 }

@@ -15,7 +15,11 @@ import {
 import { isEmptyNodeID, isAbstractRefId } from "../connections";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
-import { isMutableNode, useIsEditingOn } from "./TemporaryViewContext";
+import {
+  isMutableNode,
+  useIsEditingOn,
+  useIsSelected,
+} from "./TemporaryViewContext";
 import { isEditableElement, KeyboardMode } from "./keyboardNavigation";
 
 function markDragDescendants(sourceViewKey: string): void {
@@ -45,7 +49,13 @@ type DraggableProps = {
   rowIndex?: number;
   rowDepth?: number;
   isActiveRow?: boolean;
+  isSelected?: boolean;
   onRowFocus?: (key: string, index: number, mode: KeyboardMode) => void;
+  onRowClick?: (
+    e: React.MouseEvent,
+    viewKey: string,
+    rowEl: HTMLElement
+  ) => void;
 };
 
 const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
@@ -56,7 +66,9 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
       rowIndex = 0,
       rowDepth = 0,
       isActiveRow = false,
+      isSelected = false,
       onRowFocus = () => {},
+      onRowClick,
     }: DraggableProps,
     ref
   ): JSX.Element => {
@@ -90,6 +102,20 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
 
     drag(ref as ConnectableElement);
 
+    const handleClick = (e: React.MouseEvent): void => {
+      if (!onRowClick) {
+        return;
+      }
+      const el = (ref as React.RefObject<HTMLDivElement>)?.current;
+      if (!el) {
+        return;
+      }
+      if (isEditableElement(e.target as HTMLElement)) {
+        return;
+      }
+      onRowClick(e, rowViewKey, el);
+    };
+
     return (
       <div
         ref={ref}
@@ -101,6 +127,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
         data-node-id={nodeID}
         data-node-text={displayText}
         data-node-mutable={isMutableNode(node) ? "true" : "false"}
+        data-selected={isSelected ? "true" : undefined}
         role="treeitem"
         aria-label={displayText}
         aria-selected={isActiveRow}
@@ -112,6 +139,8 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
             isEditableElement(e.target) ? "insert" : "normal"
           )
         }
+        onClick={handleClick}
+        onKeyDown={() => {}}
       >
         <Node className={className} />
       </div>
@@ -206,6 +235,7 @@ export function ListItem({
   nextViewPathStr,
   activeRowKey,
   onRowFocus,
+  onRowClick,
 }: {
   index: number;
   treeViewPath: ViewPath;
@@ -213,6 +243,11 @@ export function ListItem({
   nextViewPathStr?: string;
   activeRowKey: string;
   onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
+  onRowClick?: (
+    e: React.MouseEvent,
+    viewKey: string,
+    rowEl: HTMLElement
+  ) => void;
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const viewKey = useViewKey();
@@ -221,6 +256,7 @@ export function ListItem({
   const isSuggestion = useIsSuggestion();
   const isInReferencedByView = useIsInReferencedByView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
+  const selected = useIsSelected();
   const rowDepth = viewPath.length - 1;
   const isActiveRow = activeRowKey === viewKey;
   const isEmptyNode = isEmptyNodeID(nodeID);
@@ -264,7 +300,9 @@ export function ListItem({
         rowIndex={index}
         rowDepth={rowDepth}
         isActiveRow={isActiveRow}
+        isSelected={selected}
         onRowFocus={onRowFocus}
+        onRowClick={onRowClick}
       />
     </div>
   );

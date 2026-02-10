@@ -235,7 +235,7 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
     temporaryView: {
       rowFocusIntents: Map<number, RowFocusIntent>(),
       selection: OrderedSet<string>(),
-      multiselectBtns: Set<string>(),
+      anchor: "",
       editingViews: Set<string>(),
       editorOpenViews: Set<string>(),
       draftTexts: Map<string, string>(),

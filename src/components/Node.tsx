@@ -24,11 +24,7 @@ import {
   viewPathToString,
   useEffectiveAuthor,
 } from "../ViewContext";
-import {
-  NodeSelectbox,
-  useIsParentMultiselectBtnOn,
-  isMutableNode,
-} from "./TemporaryViewContext";
+import { isMutableNode } from "./TemporaryViewContext";
 import {
   isReferenceNode,
   getRefTargetInfo,
@@ -688,7 +684,6 @@ export function Node({
   const isDesktop = !useMediaQuery(IS_MOBILE);
   const viewPath = useViewPath();
   const levels = getLevels(viewPath);
-  const isMultiselect = useIsParentMultiselectBtnOn();
   const referencedByDepth = useReferencedByDepth();
   const isInReferencedByView = referencedByDepth !== undefined;
   const [, view] = useNodeID();
@@ -794,7 +789,6 @@ export function Node({
             data-testid="node-marker"
           />
         )}
-        {isMultiselect && <NodeSelectbox />}
         <div className={`w-100 node-content-wrapper ${contentClass}`}>
           <span style={textStyle}>
             <NodeAutoLink>

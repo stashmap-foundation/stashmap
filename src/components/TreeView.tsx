@@ -54,6 +54,12 @@ import {
   registerScrollToRow,
   unregisterScrollToRow,
 } from "./keyboardNavigation";
+import {
+  useTemporaryView,
+  selectSingle,
+  toggleSelect,
+  selectRange,
+} from "./TemporaryViewContext";
 
 function getAncestorPaths(path: string, rootKey: string): string[] {
   const suffix = path.slice(rootKey.length);
@@ -98,6 +104,7 @@ function VirtuosoForColumn({
   ariaLabel,
   activeRowKey,
   onRowFocus,
+  onRowClick,
 }: {
   nodes: List<ViewPath>;
   startIndexFromStorage: number;
@@ -108,6 +115,11 @@ function VirtuosoForColumn({
   ariaLabel: string | undefined;
   activeRowKey: string;
   onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
+  onRowClick?: (
+    e: React.MouseEvent,
+    viewKey: string,
+    rowEl: HTMLElement
+  ) => void;
 }): JSX.Element {
   const location = useLocation();
   const virtuosoRef = useRef<VirtuosoHandle>(null);
@@ -179,6 +191,7 @@ function VirtuosoForColumn({
                 }
                 activeRowKey={activeRowKey}
                 onRowFocus={onRowFocus}
+                onRowClick={onRowClick}
               />
             </ViewContext.Provider>
           );
@@ -330,12 +343,43 @@ function Tree(): JSX.Element | null {
     });
   }, [nodeKeys, activeRow.activeRowKey, activeRow.activeRowIndex]);
 
+  const { selection, anchor, setState: setSelectionState } = useTemporaryView();
+
   const onRowFocus = (key: string, index: number, mode: KeyboardMode): void => {
     setActiveRow({
       activeRowKey: key,
       activeRowIndex: index,
     });
     setKeyboardMode(mode);
+  };
+
+  const onRowClick = (
+    e: React.MouseEvent,
+    clickedViewKey: string,
+    rowEl: HTMLElement
+  ): void => {
+    const isMeta = e.metaKey || e.ctrlKey;
+    const isShift = e.shiftKey;
+    const currentState = { selection, anchor };
+
+    if (isMeta) {
+      setSelectionState(toggleSelect(currentState, clickedViewKey));
+      return;
+    }
+
+    if (isShift && anchor) {
+      const paneRoot = rowEl.closest(".pane-wrapper");
+      if (!paneRoot) {
+        return;
+      }
+      const allKeys = getFocusableRows(paneRoot).map((row) => getRowKey(row));
+      setSelectionState(
+        selectRange(currentState, allKeys, anchor, clickedViewKey)
+      );
+      return;
+    }
+
+    setSelectionState(selectSingle(currentState, clickedViewKey));
   };
 
   useEffect(() => {
@@ -465,6 +509,7 @@ function Tree(): JSX.Element | null {
           ariaLabel={ariaLabel}
           activeRowKey={activeRow.activeRowKey}
           onRowFocus={onRowFocus}
+          onRowClick={onRowClick}
         />
       </TreeViewNodeLoader>
     </div>

@@ -260,7 +260,7 @@ declare global {
     rowFocusIntents: Map<number, RowFocusIntent>;
     // Multiselect
     selection: OrderedSet<string>;
-    multiselectBtns: Set<string>;
+    anchor: string;
     // Editing state
     editingViews: Set<string>;
     // AddToNode editor open state

@@ -1662,8 +1662,7 @@ My Notes
       .slice(eventsBeforeAccept)
       .filter(
         (e) =>
-          e.kind === KIND_KNOWLEDGE_LIST &&
-          e.tags.some((t) => t[0] === "b")
+          e.kind === KIND_KNOWLEDGE_LIST && e.tags.some((t) => t[0] === "b")
       );
 
     expect(newEvents.length).toBeGreaterThan(0);

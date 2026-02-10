@@ -280,6 +280,12 @@ export function useQueryKnowledgeData(filters: Filter[]): {
     }
   }, [eventCache, events]);
 
+  const serializedFilters = JSON.stringify(filters);
+
+  useEffect(() => {
+    setAllEventsProcessed(false);
+  }, [serializedFilters]);
+
   useEffect(() => {
     if (!eose || disabled) {
       return;
@@ -289,13 +295,7 @@ export function useQueryKnowledgeData(filters: Filter[]): {
     setAllEventsProcessedTimeout.current = setTimeout(() => {
       setAllEventsProcessed(true);
     }, eventLoadingTimeout) as unknown as number;
-  }, [
-    events.size,
-    eose,
-    JSON.stringify(filters),
-    disabled,
-    eventLoadingTimeout,
-  ]);
+  }, [events.size, eose, serializedFilters, disabled, eventLoadingTimeout]);
 
   return { allEventsProcessed };
 }

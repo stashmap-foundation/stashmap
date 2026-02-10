@@ -657,7 +657,7 @@ Child
     await userEvent.click(barcelonaEditor);
     await userEvent.clear(barcelonaEditor);
     await userEvent.type(barcelonaEditor, "BCN");
-    fireEvent.blur(barcelonaEditor);
+    fireEvent.blur(barcelonaEditor, { relatedTarget: document.body });
 
     await expectTree(`
 My Notes
@@ -712,7 +712,7 @@ My Notes
     await userEvent.click(bcnEditor);
     await userEvent.clear(bcnEditor);
     await userEvent.type(bcnEditor, "Barcelona");
-    fireEvent.blur(bcnEditor);
+    fireEvent.blur(bcnEditor, { relatedTarget: document.body });
 
     await expectTree(`
 My Notes

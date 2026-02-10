@@ -14,7 +14,7 @@ import {
 } from "../ViewContext";
 import { usePlanner, planDeepCopyNode } from "../planner";
 import { usePaneStack } from "../SplitPanesContext";
-import { preventEditorBlurIfSameNode } from "./AddNode";
+import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
 
 type RelevanceSelectorProps = {
@@ -154,7 +154,7 @@ export function RelevanceSelector({
       <span
         className="relevance-symbol"
         onClick={handleXClick}
-        onMouseDown={preventEditorBlurIfSameNode}
+        onMouseDown={preventEditorBlur}
         onMouseEnter={() => setHoverLevel(0)}
         role="button"
         tabIndex={0}
@@ -189,7 +189,7 @@ export function RelevanceSelector({
           key={level}
           className="relevance-symbol"
           onClick={() => handleSetLevel(level)}
-          onMouseDown={preventEditorBlurIfSameNode}
+          onMouseDown={preventEditorBlur}
           onMouseEnter={() => setHoverLevel(level)}
           role="button"
           tabIndex={0}

@@ -119,7 +119,7 @@ test("Edit node inline", async () => {
   await userEvent.clear(textElement);
   await userEvent.type(textElement, "My edited Note");
   // Blur to save (inline editing saves on blur)
-  fireEvent.blur(textElement);
+  fireEvent.blur(textElement, { relatedTarget: document.body });
   const editedElements = await screen.findAllByText("My edited Note");
   expect(editedElements.length).toBeGreaterThan(0);
 });

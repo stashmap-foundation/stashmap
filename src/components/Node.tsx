@@ -44,7 +44,7 @@ import {
 } from "../connections";
 import { DEFAULT_TYPE_FILTERS } from "../constants";
 import { IS_MOBILE } from "./responsive";
-import { MiniEditor, preventEditorBlurIfSameNode } from "./AddNode";
+import { MiniEditor, preventEditorBlur } from "./AddNode";
 import { useOnToggleExpanded } from "./SelectRelations";
 import { ReferenceIndicators } from "./ReferenceIndicators";
 import { useData } from "../DataContext";
@@ -115,7 +115,7 @@ function ExpandCollapseToggle(): JSX.Element | null {
     <button
       type="button"
       onClick={onToggle}
-      onMouseDown={preventEditorBlurIfSameNode}
+      onMouseDown={preventEditorBlur}
       disabled={isEmptyNode}
       className={toggleClass}
       aria-label={

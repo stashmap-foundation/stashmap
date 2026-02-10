@@ -1,16 +1,9 @@
 import React, { useEffect } from "react";
 import { useEditorText } from "./EditorTextContext";
+import { isEditableElement } from "./keyboardNavigation";
 
-/**
- * Prevents a button from stealing focus from an editor in the same node row.
- * Use as onMouseDown handler on buttons that should not blur the editor.
- *
- * - If the active element (editor) is in the same .inner-node container, prevents default
- * - If the active element is in a different row, allows normal focus behavior
- */
-export function preventEditorBlurIfSameNode(e: React.MouseEvent): void {
-  const nodeContainer = (e.currentTarget as HTMLElement).closest(".inner-node");
-  if (nodeContainer?.contains(document.activeElement)) {
+export function preventEditorBlur(e: React.MouseEvent): void {
+  if (isEditableElement(document.activeElement)) {
     e.preventDefault();
   }
 }
@@ -207,13 +200,14 @@ export function MiniEditor({
   };
 
   const handleBlur = (e: React.FocusEvent): void => {
-    // Skip if we're handling a key event (ESC/Enter already handled save/close)
     if (handlingKeyRef.current) {
       return;
     }
 
-    // Skip if focus moved to a modal (e.g., search modal opened from same row)
     const { relatedTarget } = e;
+    if (!relatedTarget) {
+      return;
+    }
     if (
       relatedTarget instanceof HTMLElement &&
       relatedTarget.closest(".modal")

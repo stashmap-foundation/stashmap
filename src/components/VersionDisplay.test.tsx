@@ -35,7 +35,7 @@ describe("Version Display", () => {
     await userEvent.click(barcelonaEditor);
     await userEvent.clear(barcelonaEditor);
     await userEvent.type(barcelonaEditor, "BCN");
-    fireEvent.blur(barcelonaEditor);
+    fireEvent.blur(barcelonaEditor, { relatedTarget: document.body });
 
     // Verify BCN is displayed
     await screen.findByLabelText("edit BCN");
@@ -82,7 +82,7 @@ My Notes
     await userEvent.click(barcelonaEditor);
     await userEvent.clear(barcelonaEditor);
     await userEvent.type(barcelonaEditor, "BCN");
-    fireEvent.blur(barcelonaEditor);
+    fireEvent.blur(barcelonaEditor, { relatedTarget: document.body });
 
     // The tree should now show "BCN" instead of "Barcelona"
     await expectTree(`
@@ -118,7 +118,7 @@ My Notes
     await userEvent.click(editor1);
     await userEvent.clear(editor1);
     await userEvent.type(editor1, "Version 2");
-    fireEvent.blur(editor1);
+    fireEvent.blur(editor1, { relatedTarget: document.body });
 
     await expectTree(`
 My Notes
@@ -130,7 +130,7 @@ My Notes
     await userEvent.click(editor2);
     await userEvent.clear(editor2);
     await userEvent.type(editor2, "Version 3");
-    fireEvent.blur(editor2);
+    fireEvent.blur(editor2, { relatedTarget: document.body });
 
     await expectTree(`
 My Notes
@@ -166,7 +166,7 @@ My Notes
     await userEvent.click(barcelonaEditor);
     await userEvent.clear(barcelonaEditor);
     await userEvent.type(barcelonaEditor, "BCN");
-    fireEvent.blur(barcelonaEditor);
+    fireEvent.blur(barcelonaEditor, { relatedTarget: document.body });
 
     await expectTree(`
 My Notes
@@ -222,7 +222,7 @@ My Notes
     await userEvent.click(barcelonaEditor);
     await userEvent.clear(barcelonaEditor);
     await userEvent.type(barcelonaEditor, "BCN");
-    fireEvent.blur(barcelonaEditor);
+    fireEvent.blur(barcelonaEditor, { relatedTarget: document.body });
 
     await expectTree(`
 My Notes
@@ -279,14 +279,14 @@ My Notes
     await userEvent.click(barcelonaEditor);
     await userEvent.clear(barcelonaEditor);
     await userEvent.type(barcelonaEditor, "BCN");
-    fireEvent.blur(barcelonaEditor);
+    fireEvent.blur(barcelonaEditor, { relatedTarget: document.body });
 
     // Edit BCN to V3 (second edit)
     const bcnEditor = await screen.findByLabelText("edit BCN");
     await userEvent.click(bcnEditor);
     await userEvent.clear(bcnEditor);
     await userEvent.type(bcnEditor, "V3");
-    fireEvent.blur(bcnEditor);
+    fireEvent.blur(bcnEditor, { relatedTarget: document.body });
 
     // Now we have ~Versions: [V3, BCN, Barcelona]
     await addChildViaTab("V3", "~Versions");
@@ -308,7 +308,7 @@ My Notes
     await userEvent.click(bcnInsideVersions);
     await userEvent.clear(bcnInsideVersions);
     await userEvent.type(bcnInsideVersions, "BCN-updated");
-    fireEvent.blur(bcnInsideVersions);
+    fireEvent.blur(bcnInsideVersions, { relatedTarget: document.body });
 
     // The new version should be inserted at the same position (1),
     // and BCN should shift down to position 2
@@ -352,14 +352,14 @@ My Notes
     await userEvent.click(barcelonaEditor);
     await userEvent.clear(barcelonaEditor);
     await userEvent.type(barcelonaEditor, "BCN");
-    fireEvent.blur(barcelonaEditor);
+    fireEvent.blur(barcelonaEditor, { relatedTarget: document.body });
 
     // Edit BCN to V3 (second edit)
     const bcnEditor = await screen.findByLabelText("edit BCN");
     await userEvent.click(bcnEditor);
     await userEvent.clear(bcnEditor);
     await userEvent.type(bcnEditor, "V3");
-    fireEvent.blur(bcnEditor);
+    fireEvent.blur(bcnEditor, { relatedTarget: document.body });
 
     // Now we have ~Versions: [V3, BCN, Barcelona]
     await addChildViaTab("V3", "~Versions");
@@ -428,7 +428,7 @@ My Notes
     await userEvent.click(barcelonaEditor);
     await userEvent.clear(barcelonaEditor);
     await userEvent.type(barcelonaEditor, "BCN");
-    fireEvent.blur(barcelonaEditor);
+    fireEvent.blur(barcelonaEditor, { relatedTarget: document.body });
 
     await expectTree(`
 My Notes
@@ -510,7 +510,7 @@ My Notes
     await userEvent.click(barcelonaEditors[0]);
     await userEvent.clear(barcelonaEditors[0]);
     await userEvent.type(barcelonaEditors[0], "BCN");
-    fireEvent.blur(barcelonaEditors[0]);
+    fireEvent.blur(barcelonaEditors[0], { relatedTarget: document.body });
 
     // Holiday Destinations still shows Barcelona, Cities in Spain shows BCN
     await expectTree(`
@@ -587,7 +587,7 @@ My Notes
     await userEvent.click(myNotesEditor);
     await userEvent.clear(myNotesEditor);
     await userEvent.type(myNotesEditor, "My Dashboard");
-    fireEvent.blur(myNotesEditor);
+    fireEvent.blur(myNotesEditor, { relatedTarget: document.body });
 
     await expectTree(`
 My Dashboard

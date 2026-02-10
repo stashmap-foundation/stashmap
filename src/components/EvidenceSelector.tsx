@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { TYPE_COLORS } from "../constants";
 import { useUpdateArgument } from "./useUpdateArgument";
 import { useNode, useDisplayText } from "../ViewContext";
-import { preventEditorBlurIfSameNode } from "./AddNode";
+import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
 
 function getArgumentColor(argument: Argument, isHovered: boolean): string {
@@ -58,7 +58,7 @@ export function EvidenceSelector(): JSX.Element | null {
       className="pill evidence-selector"
       data-has-argument={hasArgument ? "true" : undefined}
       onClick={handleClick}
-      onMouseDown={preventEditorBlurIfSameNode}
+      onMouseDown={preventEditorBlur}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       role="button"

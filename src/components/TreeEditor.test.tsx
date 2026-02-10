@@ -1236,7 +1236,7 @@ Root
 
       const editor = await findNewNodeEditor();
       await userEvent.type(editor, "Saved by Blur");
-      fireEvent.blur(editor);
+      fireEvent.blur(editor, { relatedTarget: document.body });
 
       await expectTree(`
 Root

@@ -27,9 +27,9 @@ describe("MiniEditor", () => {
       await userEvent.type(editor, "Changed");
 
       // Trigger blur multiple times (simulating the race condition)
-      fireEvent.blur(editor);
-      fireEvent.blur(editor);
-      fireEvent.blur(editor);
+      fireEvent.blur(editor, { relatedTarget: document.body });
+      fireEvent.blur(editor, { relatedTarget: document.body });
+      fireEvent.blur(editor, { relatedTarget: document.body });
 
       // Wait for async operations
       await waitFor(() => {
@@ -45,7 +45,7 @@ describe("MiniEditor", () => {
       );
 
       const editor = screen.getByRole("textbox");
-      fireEvent.blur(editor);
+      fireEvent.blur(editor, { relatedTarget: document.body });
 
       // Give time for any async operations
       await waitFor(() => {
@@ -103,7 +103,7 @@ describe("MiniEditor", () => {
 
       // Press Enter then blur (simulating focus moving away after Enter)
       await userEvent.keyboard("{Enter}");
-      fireEvent.blur(editor);
+      fireEvent.blur(editor, { relatedTarget: document.body });
 
       await waitFor(() => {
         expect(onSave).toHaveBeenCalledTimes(1);
@@ -145,7 +145,7 @@ describe("MiniEditor", () => {
       // Edit and save
       await userEvent.clear(editor);
       await userEvent.type(editor, "Changed");
-      fireEvent.blur(editor);
+      fireEvent.blur(editor, { relatedTarget: document.body });
 
       await waitFor(() => {
         expect(onSave).toHaveBeenCalledTimes(1);
@@ -159,7 +159,7 @@ describe("MiniEditor", () => {
       // Now edit again
       await userEvent.clear(editor);
       await userEvent.type(editor, "Changed Again");
-      fireEvent.blur(editor);
+      fireEvent.blur(editor, { relatedTarget: document.body });
 
       await waitFor(() => {
         expect(onSave).toHaveBeenCalledTimes(2);
@@ -182,7 +182,7 @@ describe("MiniEditor", () => {
       // Type the same text as initialText
       await userEvent.clear(editor);
       await userEvent.type(editor, "Updated");
-      fireEvent.blur(editor);
+      fireEvent.blur(editor, { relatedTarget: document.body });
 
       // Should not call onSave since text matches initialText
       await waitFor(() => {

@@ -561,7 +561,7 @@ describe("Deep Copy - ~Versions Handling", () => {
     await userEvent.click(sourceEditor);
     await userEvent.clear(sourceEditor);
     await userEvent.type(sourceEditor, "Bob Edited");
-    fireEvent.blur(sourceEditor);
+    fireEvent.blur(sourceEditor, { relatedTarget: document.body });
 
     // Wait for the edit to be reflected
     await screen.findByLabelText("edit Bob Edited");

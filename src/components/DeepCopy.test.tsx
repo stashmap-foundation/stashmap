@@ -13,6 +13,7 @@ import {
   setup,
   type,
 } from "../utils.test";
+import { KIND_KNOWLEDGE_LIST } from "../nostr";
 
 const maybeExpand = async (label: string): Promise<void> => {
   const btn = screen.queryByLabelText(label);
@@ -1548,5 +1549,123 @@ My Notes
     const leafSuggestionRow = screen.getByLabelText("BobLeafNode");
     // Leaf suggestions reserve toggle width with a spacer so text aligns with expandable suggestions.
     expect(within(leafSuggestionRow).getByTestId("node-marker")).toBeDefined();
+  });
+});
+
+describe("Deep Copy - basedOn Tracking", () => {
+  test("Cross-pane deep copy sets basedOn on all copied relations", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(bob);
+    await type(
+      "My Notes{Enter}{Tab}BobFolder{Enter}{Tab}BobChild{Enter}{Tab}BobGrandChild{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  BobFolder
+    BobChild
+      BobGrandChild
+    `);
+
+    const bobRelationEvents = bob()
+      .relayPool.getEvents()
+      .filter(
+        (e) => e.kind === KIND_KNOWLEDGE_LIST && e.pubkey === BOB.publicKey
+      );
+    const bobRelationDTags = bobRelationEvents.map(
+      (e) => e.tags.find((t) => t[0] === "d")![1]
+    );
+
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    const utils = renderApp(alice());
+    await type("My Notes{Enter}{Tab}Target{Escape}");
+    await maybeExpand("expand Target");
+
+    await expectTree(`
+My Notes
+  Target
+  [S] BobFolder
+    `);
+
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Target");
+
+    const targetDropTargets = getDropTargets("Target");
+    const bobFolderElements = screen.getAllByText("BobFolder");
+    fireEvent.dragStart(bobFolderElements[0]);
+    fireEvent.drop(targetDropTargets[1]);
+
+    await expectTree(`
+My Notes
+  Target
+  [S] BobFolder
+Target
+  BobFolder
+    `);
+
+    const aliceCopyEvents = utils.relayPool
+      .getEvents()
+      .filter(
+        (e) =>
+          e.kind === KIND_KNOWLEDGE_LIST &&
+          e.pubkey === ALICE.publicKey &&
+          e.tags.some((t) => t[0] === "b")
+      );
+
+    expect(aliceCopyEvents.length).toBeGreaterThan(0);
+
+    aliceCopyEvents.forEach((e) => {
+      const basedOnValue = e.tags.find((t) => t[0] === "b")![1];
+      const sourceDTag = basedOnValue.split("_").slice(1).join("_");
+      expect(bobRelationDTags).toContain(sourceDTag);
+    });
+  });
+
+  test("Accepting suggestion via relevance selector sets basedOn", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(bob);
+    await type("My Notes{Enter}{Tab}BobFolder{Enter}{Tab}BobChild{Escape}");
+
+    await expectTree(`
+My Notes
+  BobFolder
+    BobChild
+    `);
+
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    const utils = renderTree(alice);
+    await type("My Notes{Escape}");
+
+    await expectTree(`
+My Notes
+  [S] BobFolder
+    `);
+
+    const eventsBeforeAccept = utils.relayPool.getEvents().length;
+
+    const acceptBtn = screen.getByLabelText("accept BobFolder as relevant");
+    fireEvent.click(acceptBtn);
+
+    await expectTree(`
+My Notes
+  BobFolder
+    `);
+
+    const newEvents = utils.relayPool
+      .getEvents()
+      .slice(eventsBeforeAccept)
+      .filter(
+        (e) =>
+          e.kind === KIND_KNOWLEDGE_LIST &&
+          e.tags.some((t) => t[0] === "b")
+      );
+
+    expect(newEvents.length).toBeGreaterThan(0);
   });
 });

@@ -1,6 +1,9 @@
+import { List } from "immutable";
 import { KIND_KNOWLEDGE_LIST } from "./nostr";
 import { eventToRelations, jsonToViews } from "./serializer";
-import { ALICE } from "./utils.test";
+import { createPlan, planUpsertRelations } from "./planner";
+import { ALICE, setup } from "./utils.test";
+import { newRelations } from "./ViewContext";
 
 describe("eventToRelations validation", () => {
   test("filters invalid relevance values to undefined (contains)", () => {
@@ -178,5 +181,48 @@ describe("jsonToViews validation", () => {
     const view = views.get("p0:node3:0");
     expect(view).toBeDefined();
     expect(view!.typeFilters).toBeUndefined();
+  });
+});
+
+describe("basedOn serialization round-trip", () => {
+  test("relation with basedOn serializes to b tag and parses back", () => {
+    const [alice] = setup([ALICE]);
+    const plan = createPlan(alice());
+    const sourceRelationID = "bob_source-relation-123" as LongID;
+    const relations = {
+      ...newRelations("head-node" as ID, List<ID>(), plan.user.publicKey),
+      basedOn: sourceRelationID,
+    };
+    const planWithRelation = planUpsertRelations(plan, relations);
+
+    const event = planWithRelation.publishEvents.last()!;
+    expect(event.kind).toBe(KIND_KNOWLEDGE_LIST);
+
+    const bTag = event.tags.find((t: string[]) => t[0] === "b");
+    expect(bTag).toBeDefined();
+    expect(bTag![1]).toBe(sourceRelationID);
+
+    const parsed = eventToRelations(event);
+    expect(parsed).toBeDefined();
+    expect(parsed!.basedOn).toBe(sourceRelationID);
+  });
+
+  test("relation without basedOn does not produce b tag", () => {
+    const [alice] = setup([ALICE]);
+    const plan = createPlan(alice());
+    const relations = newRelations(
+      "head-node" as ID,
+      List<ID>(),
+      plan.user.publicKey
+    );
+    const planWithRelation = planUpsertRelations(plan, relations);
+
+    const event = planWithRelation.publishEvents.last()!;
+    const bTag = event.tags.find((t: string[]) => t[0] === "b");
+    expect(bTag).toBeUndefined();
+
+    const parsed = eventToRelations(event);
+    expect(parsed).toBeDefined();
+    expect(parsed!.basedOn).toBeUndefined();
   });
 });

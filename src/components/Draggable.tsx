@@ -89,16 +89,6 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     }, [preview]);
 
     drag(ref as ConnectableElement);
-    const handleRowMouseEnter = (e: React.MouseEvent<HTMLDivElement>): void => {
-      if (isEditableElement(document.activeElement)) {
-        return;
-      }
-      onRowFocus(rowViewKey, rowIndex, "normal");
-      const row = e.currentTarget;
-      if (document.activeElement !== row) {
-        row.focus();
-      }
-    };
 
     return (
       <div
@@ -115,7 +105,6 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
         aria-label={displayText}
         aria-selected={isActiveRow}
         tabIndex={isActiveRow ? 0 : -1}
-        onMouseMove={handleRowMouseEnter}
         onFocusCapture={(e) =>
           onRowFocus(
             rowViewKey,
@@ -180,17 +169,6 @@ function DraggableSuggestion({
     drag(ref as ConnectableElement);
   }
 
-  const handleRowMouseEnter = (e: React.MouseEvent<HTMLDivElement>): void => {
-    if (isEditableElement(document.activeElement)) {
-      return;
-    }
-    onRowFocus(rowViewKey, rowIndex, "normal");
-    const row = e.currentTarget;
-    if (document.activeElement !== row) {
-      row.focus();
-    }
-  };
-
   return (
     <div
       ref={ref}
@@ -208,7 +186,6 @@ function DraggableSuggestion({
       aria-label={displayText}
       aria-selected={isActiveRow}
       tabIndex={isActiveRow ? 0 : -1}
-      onMouseMove={handleRowMouseEnter}
       onFocusCapture={(e) =>
         onRowFocus(
           rowViewKey,

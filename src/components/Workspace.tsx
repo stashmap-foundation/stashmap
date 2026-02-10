@@ -565,7 +565,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
   wrapperRef: React.RefObject<HTMLDivElement>;
   onKeyDownCapture: (e: React.KeyboardEvent<HTMLDivElement>) => void;
   onPaneMouseEnter: () => void;
-  onPaneMouseMove: () => void;
   onPaneFocusCapture: () => void;
   showShortcuts: boolean;
   setShowShortcuts: React.Dispatch<React.SetStateAction<boolean>>;
@@ -573,22 +572,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const { setActivePaneIndex } = useNavigationState();
-
-  const setKeyboardNavActive = (active: boolean): void => {
-    const root = wrapperRef.current;
-    if (!root) {
-      return;
-    }
-    root.classList.toggle("keyboard-nav-active", active);
-  };
-
-  const activatePaneKeyboardContext = (targetPane: HTMLElement): void => {
-    setSelectedPane(targetPane);
-    getPaneWrappers().forEach((pane) =>
-      pane.classList.remove("keyboard-nav-active")
-    );
-    targetPane.classList.add("keyboard-nav-active");
-  };
 
   const switchPane = (direction: -1 | 1): void => {
     const root = wrapperRef.current;
@@ -608,7 +591,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       return;
     }
     const targetPane = allPanes[targetIndex];
-    activatePaneKeyboardContext(targetPane);
+    setSelectedPane(targetPane);
     targetPane.focus();
     setActivePaneIndex(targetIndex);
     const targetRow = getActiveRow(targetPane);
@@ -689,7 +672,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         return;
       }
       e.preventDefault();
-      setKeyboardNavActive(true);
       focusRow(activeRow);
     };
     window.addEventListener("keydown", onGlobalKeyDown, true);
@@ -703,12 +685,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       return;
     }
     setSelectedPane(wrapperRef.current);
-    setKeyboardNavActive(false);
     setActivePaneIndex(paneIndex);
-  };
-
-  const onPaneMouseMove = (): void => {
-    setKeyboardNavActive(false);
   };
 
   const onPaneFocusCapture = (): void => {
@@ -761,7 +738,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
           return;
         }
         e.preventDefault();
-        setKeyboardNavActive(true);
         focusAdjacentRowEditor(
           root,
           currentRow,
@@ -799,7 +775,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "Escape") {
       e.preventDefault();
-      setKeyboardNavActive(true);
       focusRow(activeRow);
       return;
     }
@@ -836,7 +811,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         FILTER_SYMBOL_TO_KEY[e.key as keyof typeof FILTER_SYMBOL_TO_KEY];
       if (key) {
         e.preventDefault();
-        setKeyboardNavActive(true);
         togglePaneFilter(root, key);
         setLastSequence(null, 0);
         return;
@@ -847,7 +821,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "G") {
       e.preventDefault();
-      setKeyboardNavActive(true);
       const treeRoot = root.querySelector("[data-total-rows]");
       const totalRows = Number(
         treeRoot?.getAttribute("data-total-rows") || "0"
@@ -860,7 +833,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "j" || e.key === "ArrowDown") {
       e.preventDefault();
-      setKeyboardNavActive(true);
       if (!focusedRow) {
         focusRow(activeRow);
         return;
@@ -871,7 +843,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "k" || e.key === "ArrowUp") {
       e.preventDefault();
-      setKeyboardNavActive(true);
       if (!focusedRow) {
         focusRow(activeRow);
         return;
@@ -882,7 +853,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "h" || e.key === "ArrowLeft") {
       e.preventDefault();
-      setKeyboardNavActive(true);
       const collapseButton = activeRow.querySelector(
         "button[aria-label^='collapse ']"
       );
@@ -896,7 +866,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "l" || e.key === "ArrowRight") {
       e.preventDefault();
-      setKeyboardNavActive(true);
       const expandButton = activeRow.querySelector(
         "button[aria-label^='expand ']"
       );
@@ -911,14 +880,12 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "Enter" || e.key === "i") {
       e.preventDefault();
-      setKeyboardNavActive(true);
       focusRowEditor(activeRow);
       return;
     }
 
     if (e.key === "/") {
       e.preventDefault();
-      setKeyboardNavActive(true);
       const searchButton = root.querySelector('[data-pane-action="search"]');
       if (searchButton instanceof HTMLElement) {
         searchButton.click();
@@ -928,7 +895,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "N") {
       e.preventDefault();
-      setKeyboardNavActive(true);
       const newNoteButton = root.querySelector('[data-pane-action="new-note"]');
       if (newNoteButton instanceof HTMLElement) {
         window.setTimeout(() => newNoteButton.click(), 0);
@@ -938,7 +904,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "P") {
       e.preventDefault();
-      setKeyboardNavActive(true);
       const newPaneButton = root.querySelector('[data-pane-action="new-pane"]');
       if (newPaneButton instanceof HTMLElement) {
         window.setTimeout(() => newPaneButton.click(), 0);
@@ -948,7 +913,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "q") {
       e.preventDefault();
-      setKeyboardNavActive(true);
       const closePaneButton = root.querySelector(
         '[data-pane-action="close-pane"]'
       );
@@ -972,14 +936,12 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "H") {
       e.preventDefault();
-      setKeyboardNavActive(true);
       triggerPaneHome(root);
       return;
     }
 
     if (e.key === "Backspace") {
       e.preventDefault();
-      setKeyboardNavActive(true);
       const backButton = root.querySelector('[data-pane-action="back"]');
       if (backButton instanceof HTMLElement) {
         backButton.click();
@@ -989,21 +951,18 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "s") {
       e.preventDefault();
-      setKeyboardNavActive(true);
       toggleRowOpenInSplitPane(activeRow);
       return;
     }
 
     if (e.key === "z") {
       e.preventDefault();
-      setKeyboardNavActive(true);
       toggleRowOpenFullscreen(activeRow);
       return;
     }
 
     if (e.key === "x" || e.key === "~" || e.key === "!" || e.key === "?") {
       e.preventDefault();
-      setKeyboardNavActive(true);
       triggerRowRelevanceSymbol(activeRow, e.key as "x" | "~" | "!" | "?");
       refocusPaneAfterRowMutation(root);
       return;
@@ -1011,7 +970,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "+") {
       e.preventDefault();
-      setKeyboardNavActive(true);
       setEvidenceSymbol(activeRow, "confirms");
       refocusPaneAfterRowMutation(root);
       return;
@@ -1019,7 +977,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "-") {
       e.preventDefault();
-      setKeyboardNavActive(true);
       setEvidenceSymbol(activeRow, "contra");
       refocusPaneAfterRowMutation(root);
       return;
@@ -1027,7 +984,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "o") {
       e.preventDefault();
-      setKeyboardNavActive(true);
       setEvidenceSymbol(activeRow, "none");
       refocusPaneAfterRowMutation(root);
       return;
@@ -1035,7 +991,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (/^[1-8]$/.test(e.key)) {
       e.preventDefault();
-      setKeyboardNavActive(true);
       togglePaneFilter(root, e.key);
     }
   };
@@ -1044,7 +999,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     wrapperRef,
     onKeyDownCapture,
     onPaneMouseEnter,
-    onPaneMouseMove,
     onPaneFocusCapture,
     showShortcuts,
     setShowShortcuts,
@@ -1060,7 +1014,6 @@ export function PaneView(): JSX.Element | null {
     wrapperRef,
     onKeyDownCapture,
     onPaneMouseEnter,
-    onPaneMouseMove,
     onPaneFocusCapture,
     showShortcuts,
     setShowShortcuts,
@@ -1075,7 +1028,6 @@ export function PaneView(): JSX.Element | null {
         }`}
         tabIndex={-1}
         onMouseEnter={onPaneMouseEnter}
-        onMouseMove={onPaneMouseMove}
         onFocusCapture={onPaneFocusCapture}
         onKeyDownCapture={onKeyDownCapture}
       >

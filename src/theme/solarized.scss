@@ -18,6 +18,8 @@
   // Readonly mode colors (viewing other user's content)
   --readonly-text-opacity: 0.6;
 
+  --hover-bg: rgba(0, 0, 0, 0.04);
+
   // Accent colors (same in both themes)
   --red: #dc322f;     // Contra, errors, remove
   --green: #859900;   // Confirms, success
@@ -38,6 +40,8 @@
   --base1: #93a1a1;  // Primary/emphasized text
   --base2: #eee8d5;  // Light text on dark
   --base3: #fdf6e3;  // Lightest text on dark
+
+  --hover-bg: rgba(255, 255, 255, 0.04);
 
   // Semantic colors
   --non-editable: var(--base01);

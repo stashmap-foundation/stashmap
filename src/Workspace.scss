@@ -1322,12 +1322,8 @@ input:focus,
 
 .hover-light-bg {
   &:hover {
-    background: var(--base02);
+    background: var(--hover-bg);
   }
-}
-
-.pane-wrapper.keyboard-nav-active .hover-light-bg:hover {
-  background: transparent;
 }
 
 .item[data-row-focusable="true"]:focus-visible .inner-node.hover-light-bg,

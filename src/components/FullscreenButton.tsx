@@ -48,8 +48,12 @@ export function FullscreenButton(): JSX.Element | null {
             .map((subPath) => (subPath as { nodeID: LongID | ID }).nodeID),
         ];
     return (
-      buildNodeUrl(targetStack, knowledgeDBs, user.publicKey, pane.author) ||
-      "#"
+      buildNodeUrl(
+        targetStack,
+        knowledgeDBs,
+        user.publicKey,
+        refInfo?.author || pane.author
+      ) || "#"
     );
   };
 

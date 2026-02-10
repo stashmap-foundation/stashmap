@@ -687,7 +687,7 @@ export function Node({
   const referencedByDepth = useReferencedByDepth();
   const isInReferencedByView = referencedByDepth !== undefined;
   const [, view] = useNodeID();
-  const { cardStyle, textStyle, relevance } = useItemStyle();
+  const { cardStyle, textStyle, textClassName, relevance } = useItemStyle();
   const defaultCls = isDesktop ? "hover-light-bg" : "";
   const cls =
     className !== undefined ? `${className} hover-light-bg` : defaultCls;
@@ -790,7 +790,7 @@ export function Node({
           />
         )}
         <div className={`w-100 node-content-wrapper ${contentClass}`}>
-          <span style={textStyle}>
+          <span className={textClassName} style={textStyle}>
             <NodeAutoLink>
               <InteractiveNodeContent />
             </NodeAutoLink>

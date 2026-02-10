@@ -163,14 +163,22 @@ function DraggableSuggestion({
   rowIndex,
   rowDepth,
   isActiveRow,
+  isSelected = false,
   onRowFocus,
+  onRowClick,
 }: {
   className?: string;
   rowViewKey: string;
   rowIndex: number;
   rowDepth: number;
   isActiveRow: boolean;
+  isSelected?: boolean;
   onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
+  onRowClick?: (
+    e: React.MouseEvent,
+    viewKey: string,
+    rowEl: HTMLElement
+  ) => void;
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const path = useViewPath();
@@ -198,6 +206,16 @@ function DraggableSuggestion({
     drag(ref as ConnectableElement);
   }
 
+  const handleClick = (e: React.MouseEvent): void => {
+    if (!onRowClick) {
+      return;
+    }
+    if (isEditableElement(e.target as HTMLElement)) {
+      return;
+    }
+    onRowClick(e, rowViewKey, ref.current as HTMLElement);
+  };
+
   return (
     <div
       ref={ref}
@@ -211,6 +229,7 @@ function DraggableSuggestion({
       data-node-id={nodeID}
       data-node-text={displayText}
       data-node-mutable={isMutableNode(node) ? "true" : "false"}
+      data-selected={isSelected ? "true" : undefined}
       role="treeitem"
       aria-label={displayText}
       aria-selected={isActiveRow}
@@ -222,6 +241,8 @@ function DraggableSuggestion({
           isEditableElement(e.target) ? "insert" : "normal"
         )
       }
+      onClick={handleClick}
+      onKeyDown={() => {}}
     >
       <Node className={className} isSuggestion />
     </div>
@@ -279,7 +300,9 @@ export function ListItem({
           rowIndex={index}
           rowDepth={rowDepth}
           isActiveRow={isActiveRow}
+          isSelected={selected}
           onRowFocus={onRowFocus}
+          onRowClick={onRowClick}
         />
       </div>
     );

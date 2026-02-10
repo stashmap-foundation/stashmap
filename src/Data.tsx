@@ -217,7 +217,8 @@ export function useRelaysInfo(
 
 const DEFAULT_TEMPORARY_VIEW: TemporaryViewState = {
   rowFocusIntents: Map<number, RowFocusIntent>(),
-  selection: OrderedSet<string>(),
+  baseSelection: OrderedSet<string>(),
+  shiftSelection: OrderedSet<string>(),
   anchor: "",
   editingViews: Set<string>(),
   editorOpenViews: Set<string>(),

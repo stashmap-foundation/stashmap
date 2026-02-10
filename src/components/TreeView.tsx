@@ -56,9 +56,9 @@ import {
 } from "./keyboardNavigation";
 import {
   useTemporaryView,
-  selectSingle,
+  clearSelection,
   toggleSelect,
-  selectRange,
+  shiftSelect,
 } from "./TemporaryViewContext";
 
 function getAncestorPaths(path: string, rootKey: string): string[] {
@@ -343,7 +343,12 @@ function Tree(): JSX.Element | null {
     });
   }, [nodeKeys, activeRow.activeRowKey, activeRow.activeRowIndex]);
 
-  const { selection, anchor, setState: setSelectionState } = useTemporaryView();
+  const {
+    baseSelection,
+    shiftSelection,
+    anchor,
+    setState: setSelectionState,
+  } = useTemporaryView();
 
   const onRowFocus = (key: string, index: number, mode: KeyboardMode): void => {
     setActiveRow({
@@ -360,7 +365,7 @@ function Tree(): JSX.Element | null {
   ): void => {
     const isMeta = e.metaKey || e.ctrlKey;
     const isShift = e.shiftKey;
-    const currentState = { selection, anchor };
+    const currentState = { baseSelection, shiftSelection, anchor };
 
     if (isMeta) {
       setSelectionState(toggleSelect(currentState, clickedViewKey));
@@ -373,13 +378,11 @@ function Tree(): JSX.Element | null {
         return;
       }
       const allKeys = getFocusableRows(paneRoot).map((row) => getRowKey(row));
-      setSelectionState(
-        selectRange(currentState, allKeys, anchor, clickedViewKey)
-      );
+      setSelectionState(shiftSelect(currentState, allKeys, clickedViewKey));
       return;
     }
 
-    setSelectionState(selectSingle(currentState, clickedViewKey));
+    setSelectionState(clearSelection({ ...currentState, anchor: clickedViewKey }));
   };
 
   useEffect(() => {

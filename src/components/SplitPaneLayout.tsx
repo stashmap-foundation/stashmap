@@ -129,7 +129,11 @@ export function ClosePaneButton(): JSX.Element {
   );
 }
 
-export function PaneSettingsMenu(): JSX.Element {
+export function PaneSettingsMenu({
+  onShowShortcuts,
+}: {
+  onShowShortcuts?: () => void;
+}): JSX.Element {
   const navigate = useNavigate();
   const logout = useLogout();
   const { user } = useData();
@@ -177,6 +181,19 @@ export function PaneSettingsMenu(): JSX.Element {
           <span className="icon-nostr-logo d-block dropdown-item-icon" />
           <div className="menu-item-text">Relays</div>
         </Dropdown.Item>
+        {onShowShortcuts && (
+          <Dropdown.Item
+            className="d-flex menu-item"
+            onClick={onShowShortcuts}
+            aria-label="keyboard shortcuts"
+            tabIndex={0}
+          >
+            <span className="d-block dropdown-item-icon" aria-hidden="true">
+              ⌨
+            </span>
+            <div className="menu-item-text">Keyboard Shortcuts</div>
+          </Dropdown.Item>
+        )}
         {isLoggedIn && (
           <Dropdown.Item
             className="d-flex menu-item"

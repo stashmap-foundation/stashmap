@@ -259,7 +259,8 @@ declare global {
     // Per-pane row focus target for deterministic keyboard focus restoration
     rowFocusIntents: Map<number, RowFocusIntent>;
     // Multiselect
-    selection: OrderedSet<string>;
+    baseSelection: OrderedSet<string>;
+    shiftSelection: OrderedSet<string>;
     anchor: string;
     // Editing state
     editingViews: Set<string>;

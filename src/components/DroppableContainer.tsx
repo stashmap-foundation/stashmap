@@ -1,5 +1,5 @@
 import React, { RefObject, useEffect, useRef } from "react";
-import { List } from "immutable";
+import { List, OrderedSet } from "immutable";
 import { ConnectDropTarget, DropTargetMonitor, useDrop } from "react-dnd";
 import { NativeTypes } from "react-dnd-html5-backend";
 import { dnd, getDropDestinationFromTreeView } from "../dnd";
@@ -532,7 +532,8 @@ export function useDroppable({
       );
       const parentKey = getParentKey(viewPathToString(dragItem.path));
       setState({
-        selection: deselectAllChildren(selection, parentKey),
+        baseSelection: deselectAllChildren(selection, parentKey),
+        shiftSelection: OrderedSet<string>(),
         anchor,
       });
       return dragItem;

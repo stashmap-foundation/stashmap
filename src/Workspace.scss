@@ -644,13 +644,6 @@ body {
   visibility: visible;
 }
 
-.visible-on-hover:focus-within .right-menu .relevance-slot > *,
-.visible-on-hover:focus-within .right-menu .evidence-slot > *,
-.visible-on-hover:focus-within .right-menu .ref-count-btn.show-on-row-hover {
-  opacity: 1;
-  visibility: visible;
-}
-
 // Inline action buttons (fullscreen, split pane)
 .inline-node-actions {
   display: inline-flex;
@@ -662,8 +655,7 @@ body {
   transition: opacity 150ms ease;
 }
 
-.visible-on-hover:hover .inline-node-actions,
-.visible-on-hover:focus-within .inline-node-actions {
+.visible-on-hover:hover .inline-node-actions {
   opacity: 1;
   visibility: visible;
 }
@@ -909,6 +901,7 @@ input:focus,
   background-color: var(--base03);
   color: var(--base0);
   border: none;
+  border-radius: 0;
 }
 
 .card-body {
@@ -1322,27 +1315,25 @@ input:focus,
   background: var(--base02);
 }
 
+.text-readonly {
+  color: var(--base01);
+}
+
 .item[data-selected="true"] .inner-node.hover-light-bg {
-  background: var(--base02);
+  background: var(--base01);
+  color: var(--base03);
+
+  .text-readonly {
+    color: inherit;
+  }
 }
 
-.item[data-selected="true"] ~ .visible-on-hover .right-menu .relevance-slot > *,
-.item[data-selected="true"] ~ .visible-on-hover .right-menu .evidence-slot > * {
-  opacity: 1;
-  visibility: visible;
+.item[data-selected="true"]:focus .inner-node.hover-light-bg,
+.item[data-selected="true"]:focus-visible .inner-node.hover-light-bg {
+  background: var(--base1);
+  color: var(--base03);
 }
 
-.visible-on-hover:has(.item[data-selected="true"]) .right-menu .relevance-slot > *,
-.visible-on-hover:has(.item[data-selected="true"]) .right-menu .evidence-slot > *,
-.visible-on-hover:has(.item[data-selected="true"]) .right-menu .ref-count-btn.show-on-row-hover {
-  opacity: 1;
-  visibility: visible;
-}
-
-.visible-on-hover:has(.item[data-selected="true"]) .inline-node-actions {
-  opacity: 1;
-  visibility: visible;
-}
 
 .hover-black-dimmed {
   background: transparent;

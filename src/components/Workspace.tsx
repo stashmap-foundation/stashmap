@@ -3,8 +3,7 @@ import {
   TemporaryViewProvider,
   useTemporaryView,
   clearSelection,
-  extendSelection,
-  shrinkSelection,
+  shiftSelect,
   toggleSelect,
 } from "./TemporaryViewContext";
 
@@ -291,7 +290,11 @@ function CurrentNodeName(): JSX.Element {
   return <span>{truncated}</span>;
 }
 
-function PaneStatusLine(): JSX.Element {
+function PaneStatusLine({
+  onShowShortcuts,
+}: {
+  onShowShortcuts?: () => void;
+}): JSX.Element {
   const paneIndex = usePaneIndex();
   const isFirstPane = paneIndex === 0;
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
@@ -311,7 +314,7 @@ function PaneStatusLine(): JSX.Element {
       {isFirstPane && <PublishingStatusWrapper />}
       {isFirstPane && (
         <div className="status-segment">
-          <PaneSettingsMenu />
+          <PaneSettingsMenu onShowShortcuts={onShowShortcuts} />
         </div>
       )}
     </footer>
@@ -590,7 +593,13 @@ function usePaneKeyboardNavigation(paneIndex: number): {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const { setActivePaneIndex } = useNavigationState();
-  const { selection, anchor, setState: setSelectionState } = useTemporaryView();
+  const {
+    selection,
+    baseSelection,
+    shiftSelection,
+    anchor,
+    setState: setSelectionState,
+  } = useTemporaryView();
 
   const switchPane = (direction: -1 | 1): void => {
     const root = wrapperRef.current;
@@ -772,11 +781,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       return;
     }
 
-    if (
-      e.key === "F1" ||
-      ((e.metaKey || e.ctrlKey) && e.key === "/") ||
-      e.key === "K"
-    ) {
+    if (e.key === "F1" || ((e.metaKey || e.ctrlKey) && e.key === "/")) {
       e.preventDefault();
       setShowShortcuts(true);
       return;
@@ -803,27 +808,20 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         e.preventDefault();
         const isDown = e.key === "J" || e.key === "j" || e.key === "ArrowDown";
         const targetIndex = isDown ? activeIndex + 1 : activeIndex - 1;
+        const allKeys = getVisibleRowKeys(root);
+        const currentAnchor = anchor || activeRowKey;
+        const currentState = { baseSelection, shiftSelection, anchor: currentAnchor };
         const rows = getFocusableRows(root);
         const targetRow = rows.find(
           (row) =>
             Number(row.getAttribute("data-row-index") || "0") === targetIndex
         );
         if (!targetRow) {
-          const currentState = { selection, anchor };
-          setSelectionState(extendSelection(currentState, activeRowKey));
+          setSelectionState(shiftSelect(currentState, allKeys, activeRowKey));
           return;
         }
         const targetKey = getRowKey(targetRow);
-        const currentState = { selection, anchor };
-        const isTargetSelected = selection.contains(targetKey);
-        const isCurrentSelected = selection.contains(activeRowKey);
-
-        if (isTargetSelected && isCurrentSelected) {
-          setSelectionState(shrinkSelection(currentState, activeRowKey));
-        } else {
-          const withCurrent = extendSelection(currentState, activeRowKey);
-          setSelectionState(extendSelection(withCurrent, targetKey));
-        }
+        setSelectionState(shiftSelect(currentState, allKeys, targetKey));
         scrollAndFocusRow(root, targetIndex);
         return;
       }
@@ -843,7 +841,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (e.key === "Escape") {
       e.preventDefault();
       if (selection.size > 0) {
-        setSelectionState(clearSelection({ selection, anchor }));
+        setSelectionState(clearSelection({ baseSelection, shiftSelection, anchor }));
       }
       (document.activeElement as HTMLElement)?.blur();
       return;
@@ -905,7 +903,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       e.preventDefault();
       const activeRowKey = getRowKey(activeRow);
       setSelectionState(
-        toggleSelect({ selection, anchor }, activeRowKey)
+        toggleSelect({ baseSelection, shiftSelection, anchor }, activeRowKey)
       );
       return;
     }
@@ -1120,7 +1118,7 @@ function PaneViewInner(): JSX.Element {
       >
         <TreeView />
       </DroppableContainer>
-      <PaneStatusLine />
+      <PaneStatusLine onShowShortcuts={() => setShowShortcuts(true)} />
     </div>
   );
 }

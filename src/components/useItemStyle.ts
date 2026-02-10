@@ -13,12 +13,14 @@ import { TYPE_COLORS } from "../constants";
 type ItemStyle = {
   cardStyle: CSSProperties;
   textStyle: CSSProperties;
+  textClassName: string;
   relevance: Relevance;
 };
 
 const DEFAULT_STYLE: ItemStyle = {
   cardStyle: {},
   textStyle: {},
+  textClassName: "",
   relevance: undefined,
 };
 
@@ -74,7 +76,8 @@ export function useItemStyle(): ItemStyle {
   if (isSuggestion || isViewingOtherUserContent) {
     return {
       cardStyle: {},
-      textStyle: { color: "var(--base01)" },
+      textStyle: {},
+      textClassName: "text-readonly",
       relevance: undefined,
     };
   }
@@ -94,6 +97,7 @@ export function useItemStyle(): ItemStyle {
       ...getRelevanceTextStyle(normalizedRelevance),
       ...getArgumentTextStyle(argument),
     },
+    textClassName: "",
     relevance: normalizedRelevance,
   };
 }

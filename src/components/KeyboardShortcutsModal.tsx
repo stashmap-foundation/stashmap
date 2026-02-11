@@ -53,7 +53,7 @@ export function KeyboardShortcutsModal({
         <ul>
           <li>Enter: save and create next editor (empty editor: outdent)</li>
           <li>Escape: save/close editor and return to normal mode</li>
-          <li>Tab: indent at cursor start, Shift+Tab: outdent</li>
+          <li>Tab: indent, Shift+Tab: outdent</li>
         </ul>
       </Modal.Body>
     </Modal>

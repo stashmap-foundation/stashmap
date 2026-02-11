@@ -122,14 +122,6 @@ export function MiniEditor({
     return range.startOffset;
   };
 
-  const isCursorAtStart = (): boolean => {
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return false;
-    const range = sel.getRangeAt(0);
-    // Check if cursor is at the very beginning (offset 0, collapsed)
-    return range.collapsed && range.startOffset === 0;
-  };
-
   // Track if we're handling a key event to prevent blur from re-triggering save
   const handlingKeyRef = React.useRef(false);
   const handleKeyDown = async (
@@ -185,15 +177,10 @@ export function MiniEditor({
       lastSavedTextRef.current = text; // Update immediately to prevent duplicate saves
       const imageUrl = await getImageUrlFromText(text);
       onSave(text, imageUrl, true);
-    } else if (e.key === "Tab" && !e.shiftKey && onTab && isCursorAtStart()) {
+    } else if (e.key === "Tab" && !e.shiftKey && onTab) {
       e.preventDefault();
       onTab(getText().trim(), getCursorPosition());
-    } else if (
-      e.key === "Tab" &&
-      e.shiftKey &&
-      onShiftTab &&
-      isCursorAtStart()
-    ) {
+    } else if (e.key === "Tab" && e.shiftKey && onShiftTab) {
       e.preventDefault();
       onShiftTab(getText().trim(), getCursorPosition());
     }

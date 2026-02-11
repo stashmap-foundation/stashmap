@@ -618,7 +618,7 @@ My Notes
   });
 
   describe("Tab on Edit - Detailed Behavior", () => {
-    test("Tab on existing node with cursor NOT at start does nothing", async () => {
+    test("Tab indents node even when cursor is NOT at start", async () => {
       const [alice] = setup([ALICE]);
       renderTree(alice);
       await type("Parent{Enter}{Tab}First{Enter}Second{Escape}");
@@ -643,7 +643,7 @@ Parent
       await expectTree(`
 Parent
   First
-  Second
+    Second
       `);
     });
 

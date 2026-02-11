@@ -18,7 +18,7 @@ function getArgumentColor(argument: Argument, isHovered: boolean): string {
 function getArgumentSymbol(argument: Argument): string {
   if (argument === "confirms") return "+";
   if (argument === "contra") return "−";
-  return "○";
+  return "±";
 }
 
 function getNextArgument(current: Argument): Argument {

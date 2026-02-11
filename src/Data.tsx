@@ -296,10 +296,9 @@ function Data({ user, children }: DataProps): JSX.Element {
   const { events: mE, eose: metaEventsEose } = useEventQuery(
     relayPool,
     [
-      {
-        authors: [myPublicKey],
-        kinds: [KIND_SETTINGS, KIND_CONTACTLIST, KIND_VIEWS],
-      },
+      { authors: [myPublicKey], kinds: [KIND_SETTINGS], limit: 1 },
+      { authors: [myPublicKey], kinds: [KIND_CONTACTLIST], limit: 1 },
+      { authors: [myPublicKey], kinds: [KIND_VIEWS], limit: 1 },
     ],
     {
       readFromRelays: usePreloadRelays({

@@ -11,10 +11,16 @@ import {
 } from "nostr-tools";
 import { v4 } from "uuid";
 
+type SubscriptionRecord = {
+  filters: Filter[];
+  relays: string[];
+};
+
 export type MockRelayPool = SimplePool & {
   getEvents: () => Array<Event & { relays?: string[] }>;
   getPublishedOnRelays: () => Array<string>;
   resetPublishedOnRelays: () => void;
+  getSubscriptions: () => Array<SubscriptionRecord>;
 };
 
 function fireEose(sub: Subscription): void {
@@ -45,6 +51,8 @@ export function mockRelayPool(): MockRelayPool {
   // eslint-disable-next-line functional/no-let
   let subs = Map<string, Subscription>();
   // eslint-disable-next-line functional/no-let
+  let subscriptionRecords = Map<string, SubscriptionRecord>();
+  // eslint-disable-next-line functional/no-let
   let publishedOnRelays: Array<string> = [];
   const events: Array<Event & { relays?: string[] }> = [];
 
@@ -61,11 +69,13 @@ export function mockRelayPool(): MockRelayPool {
         ...params,
       } as Subscription;
       subs = subs.set(id, subscription);
+      subscriptionRecords = subscriptionRecords.set(id, { filters, relays });
       replayEvents(subscription, events);
 
       return {
         close: () => {
           subs = subs.remove(id);
+          subscriptionRecords = subscriptionRecords.remove(id);
         },
       };
     },
@@ -81,6 +91,7 @@ export function mockRelayPool(): MockRelayPool {
     resetPublishedOnRelays: () => {
       publishedOnRelays = [];
     },
+    getSubscriptions: () => subscriptionRecords.valueSeq().toArray(),
   } as unknown as MockRelayPool;
 }
 

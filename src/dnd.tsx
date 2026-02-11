@@ -2,7 +2,6 @@ import React from "react";
 import { List, OrderedSet, Set } from "immutable";
 import { DndProvider, useDragLayer, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { getSelectedInView } from "./components/TemporaryViewContext";
 import {
   moveRelations,
   deleteRelations,
@@ -346,8 +345,11 @@ export function dnd(
   const rootView = to;
 
   const sourceViewPath = parseViewPath(source);
-  const selectedSources = getSelectedInView(selection, getParentKey(source));
-  const sources = selection.contains(source) ? selectedSources : List([source]);
+  const sources = selection.contains(source) ? selection : OrderedSet([source]);
+
+  const independentSources = sources.filterNot((s) =>
+    sources.some((other) => s !== other && s.startsWith(`${other}:`))
+  );
 
   const sourceParentPath = getParentView(sourceViewPath);
   const sourceKeys = Set(sources.map((s) => s));
@@ -373,7 +375,12 @@ export function dnd(
   const targetPaneIndex = getPaneIndex(rootView);
   const isSamePane = sourcePaneIndex === targetPaneIndex;
 
+  const sourceParentKey = getParentKey(source);
+  const allSourcesSameParent =
+    !selection.contains(source) ||
+    independentSources.every((s) => getParentKey(s) === sourceParentKey);
   const sameRelation =
+    allSourcesSameParent &&
     fromRelation !== undefined &&
     toRelation !== undefined &&
     fromRelation.id === toRelation.id;
@@ -383,7 +390,7 @@ export function dnd(
 
   if (reorder) {
     const sourceIndices = List(
-      sources.map((n) => getRelationIndex(plan, parseViewPath(n)))
+      independentSources.map((n) => getRelationIndex(plan, parseViewPath(n)))
     ).filter((n) => n !== undefined) as List<number>;
     const updatedRelationsPlan = upsertRelations(
       plan,
@@ -412,48 +419,56 @@ export function dnd(
 
   if (samePaneMove) {
     const toViewStr = viewPathToString(toView);
-    const isDropIntoOwnDescendant = sources.some(
+    const isDropIntoOwnDescendant = independentSources.some(
       (s) => toViewStr === s || toViewStr.startsWith(`${s}:`)
     );
     if (isDropIntoOwnDescendant) {
       return plan;
     }
-    return sources.toList().reduce((accPlan: Plan, s: string, idx: number) => {
-      const sourcePath = parseViewPath(s);
-      const [sourceNodeID] = getNodeIDFromView(accPlan, sourcePath);
-      const insertAt = dropIndex + idx;
+    return independentSources
+      .toList()
+      .reduce((accPlan: Plan, s: string, idx: number) => {
+        const sourcePath = parseViewPath(s);
+        const [sourceNodeID] = getNodeIDFromView(accPlan, sourcePath);
+        const insertAt = dropIndex + idx;
 
-      if (isRefId(sourceNodeID)) {
-        const planWithAdd = planAddToParent(
+        if (isRefId(sourceNodeID)) {
+          const planWithAdd = planAddToParent(
+            accPlan,
+            sourceNodeID,
+            toView,
+            stack,
+            insertAt
+          );
+          const relations = getRelationForView(planWithAdd, toView, stack);
+          if (relations) {
+            const targetIndex = insertAt ?? relations.items.size - 1;
+            const targetViewPath = addNodeToPathWithRelations(
+              toView,
+              relations,
+              targetIndex
+            );
+            const sourceKey = viewPathToString(sourcePath);
+            const targetKey = viewPathToString(targetViewPath);
+            const updatedViews = copyViewsWithNewPrefix(
+              planWithAdd.views,
+              sourceKey,
+              targetKey
+            );
+            const planWithViews = planUpdateViews(planWithAdd, updatedViews);
+            return planDisconnectFromParent(planWithViews, sourcePath, stack);
+          }
+          return planDisconnectFromParent(planWithAdd, sourcePath, stack);
+        }
+
+        return planMoveNodeWithView(
           accPlan,
-          sourceNodeID,
+          sourcePath,
           toView,
           stack,
           insertAt
         );
-        const relations = getRelationForView(planWithAdd, toView, stack);
-        if (relations) {
-          const targetIndex = insertAt ?? relations.items.size - 1;
-          const targetViewPath = addNodeToPathWithRelations(
-            toView,
-            relations,
-            targetIndex
-          );
-          const sourceKey = viewPathToString(sourcePath);
-          const targetKey = viewPathToString(targetViewPath);
-          const updatedViews = copyViewsWithNewPrefix(
-            planWithAdd.views,
-            sourceKey,
-            targetKey
-          );
-          const planWithViews = planUpdateViews(planWithAdd, updatedViews);
-          return planDisconnectFromParent(planWithViews, sourcePath, stack);
-        }
-        return planDisconnectFromParent(planWithAdd, sourcePath, stack);
-      }
-
-      return planMoveNodeWithView(accPlan, sourcePath, toView, stack, insertAt);
-    }, plan);
+      }, plan);
   }
 
   const [, toViewData] = getNodeIDFromView(plan, toView);
@@ -483,41 +498,43 @@ export function dnd(
     return createConcreteRefId(sourceRelation.id);
   };
 
-  return sources.toList().reduce((accPlan: Plan, s: string, idx: number) => {
-    const sourcePath = parseViewPath(s);
-    const [sourceNodeID] = getNodeIDFromView(accPlan, sourcePath);
-    const sourceStack = getPane(accPlan, sourcePath).stack;
-    const insertAt = dropIndex !== undefined ? dropIndex + idx : undefined;
+  return independentSources
+    .toList()
+    .reduce((accPlan: Plan, s: string, idx: number) => {
+      const sourcePath = parseViewPath(s);
+      const [sourceNodeID] = getNodeIDFromView(accPlan, sourcePath);
+      const sourceStack = getPane(accPlan, sourcePath).stack;
+      const insertAt = dropIndex !== undefined ? dropIndex + idx : undefined;
 
-    if (shouldCreateReference(sourceNodeID)) {
-      const planWithRelation = upsertRelations(
+      if (shouldCreateReference(sourceNodeID)) {
+        const planWithRelation = upsertRelations(
+          accPlan,
+          sourcePath,
+          sourceStack,
+          (r) => r
+        );
+        const sourceRelation = getRelationForView(
+          planWithRelation,
+          sourcePath,
+          sourceStack
+        )!;
+        return planAddToParent(
+          planWithRelation,
+          toReferenceNodeID(sourceNodeID, sourceRelation),
+          toView,
+          stack,
+          insertAt
+        );
+      }
+
+      return planDeepCopyNodeWithView(
         accPlan,
         sourcePath,
-        sourceStack,
-        (r) => r
-      );
-      const sourceRelation = getRelationForView(
-        planWithRelation,
-        sourcePath,
-        sourceStack
-      )!;
-      return planAddToParent(
-        planWithRelation,
-        toReferenceNodeID(sourceNodeID, sourceRelation),
         toView,
         stack,
         insertAt
       );
-    }
-
-    return planDeepCopyNodeWithView(
-      accPlan,
-      sourcePath,
-      toView,
-      stack,
-      insertAt
-    );
-  }, expandedPlan);
+    }, expandedPlan);
 }
 
 function CustomDragLayer(): JSX.Element | null {

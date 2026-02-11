@@ -1517,9 +1517,8 @@ Root
 
   await userEvent.click(screen.getByLabelText("Open new pane"));
 
-  const newNodeEditors = await screen.findAllByLabelText("new node editor");
-  const emptyPaneEditor = newNodeEditors[newNodeEditors.length - 1];
-  const dropTarget = emptyPaneEditor.closest('[role="treeitem"]')!;
+  const emptyTreeItems = await screen.findAllByRole("treeitem", { name: "" });
+  const dropTarget = emptyTreeItems[emptyTreeItems.length - 1];
 
   fireEvent.dragStart(screen.getByText("Spain"));
   fireEvent.drop(dropTarget);

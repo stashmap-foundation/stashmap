@@ -1269,4 +1269,18 @@ Root
   Bar
     `);
   });
+
+  test("Empty node does not show fullscreen or split pane buttons", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
+
+    await screen.findByLabelText("open Child in fullscreen");
+
+    await userEvent.click(await screen.findByLabelText("edit Child"));
+    await userEvent.keyboard("{Enter}");
+
+    await findNewNodeEditor();
+    expect(screen.queryByLabelText("open in fullscreen")).toBeNull();
+  });
 });

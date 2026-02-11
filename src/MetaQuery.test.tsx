@@ -7,9 +7,7 @@ test("meta query uses separate filters with limit 1 for each replaceable kind", 
   const { relayPool } = renderTree(alice);
 
   await waitFor(() => {
-    const allFilters = relayPool
-      .getSubscriptions()
-      .flatMap((s) => s.filters);
+    const allFilters = relayPool.getSubscriptions().flatMap((s) => s.filters);
 
     const metaKinds = [KIND_SETTINGS, KIND_CONTACTLIST, KIND_VIEWS];
     metaKinds.forEach((kind) => {

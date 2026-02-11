@@ -974,7 +974,6 @@ export function useIsRoot(): boolean {
   return isRoot(useViewPath());
 }
 
-
 export function getParentKey(viewKey: string): string {
   return viewKey.split(":").slice(0, -3).join(":");
 }

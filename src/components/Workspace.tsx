@@ -1038,7 +1038,9 @@ export function PaneView(): JSX.Element | null {
         />
         <PaneHeader />
         <DroppableContainer
-          className={`pane-content${!pane.stack.length ? " empty-pane-drop-zone" : ""}`}
+          className={`pane-content${
+            !pane.stack.length ? " empty-pane-drop-zone" : ""
+          }`}
           disabled={!!pane.stack.length}
         >
           <TreeView />

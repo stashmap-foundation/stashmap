@@ -794,10 +794,12 @@ export function Node({
               <InteractiveNodeContent />
             </NodeAutoLink>
           </span>
-          <span className="inline-node-actions">
-            <FullscreenButton />
-            <OpenInSplitPaneButton />
-          </span>
+          {!isEmptyNodeID(nodeID) && (
+            <span className="inline-node-actions">
+              <FullscreenButton />
+              <OpenInSplitPaneButton />
+            </span>
+          )}
         </div>
         <RightMenu />
       </NodeCard>

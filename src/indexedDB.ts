@@ -87,3 +87,15 @@ export const putCachedEvents = (
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+
+export const clearDatabase = (): Promise<void> =>
+  new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      resolve();
+      return;
+    }
+    const request = indexedDB.deleteDatabase(DB_NAME);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => resolve();
+  });

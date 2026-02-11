@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import "./App.css";
 import { List, Map, Set, OrderedSet } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
@@ -34,6 +34,7 @@ import {
   parseRelationUrl,
   parseAuthorFromSearch,
 } from "./navigationUrl";
+import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { generatePaneId } from "./SplitPanesContext";
 import { jsonToPanes, paneToJSON, Serializable } from "./serializer";
 import { NavigationStateProvider } from "./NavigationStateContext";
@@ -66,6 +67,9 @@ function loadPanesFromStorage(publicKey: PublicKey): Pane[] | undefined {
 }
 
 function savePanesToStorage(publicKey: PublicKey, panes: Pane[]): void {
+  if (publicKey === UNAUTHENTICATED_USER_PK) {
+    return;
+  }
   try {
     const serialized = panes.map((p) => paneToJSON(p));
     localStorage.setItem(
@@ -280,7 +284,16 @@ function Data({ user, children }: DataProps): JSX.Element {
     [db]
   );
 
+  const initialPublicKeyRef = useRef(myPublicKey);
   useEffect(() => {
+    if (myPublicKey === initialPublicKeyRef.current) {
+      return;
+    }
+    const savedPanes = loadPanesFromStorage(myPublicKey);
+    if (savedPanes) {
+      setPanes(savedPanes);
+      return;
+    }
     setPanes((current) =>
       current.map((p) => ({
         ...p,

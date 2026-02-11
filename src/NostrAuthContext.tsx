@@ -5,6 +5,7 @@ import { DEFAULT_RELAYS } from "./nostr";
 import { useApis } from "./Apis";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { sanitizeRelays } from "./relays";
+import { clearDatabase } from "./indexedDB";
 
 type Context = {
   user: User | undefined;
@@ -114,14 +115,16 @@ export function useLogout(): () => void {
     throw new Error("NostrAuthContext missing");
   }
 
-  return () => {
-    context.setUser(undefined);
+  return async () => {
     const publicKey = getPublicKeyFromContext(context);
     if (publicKey) {
       deleteLocalStorage(publicKey);
     }
     deleteLocalStorage("privateKey");
     deleteLocalStorage("publicKey");
+    context.setUser(undefined);
+    await clearDatabase();
+    window.history.replaceState(null, "", "/");
     window.location.reload();
   };
 }

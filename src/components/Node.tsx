@@ -236,7 +236,8 @@ function EditableContent(): JSX.Element {
   const nodeIsRoot = useIsRoot();
   const relationIndex = useRelationIndex();
   const isEmptyNode = isEmptyNodeID(nodeID);
-  const nodeIsExpanded = viewIsExpanded && useNodeHasChildren();
+  const nodeHasChildren = useNodeHasChildren();
+  const nodeIsExpanded = viewIsExpanded && nodeHasChildren;
 
   const emptyNodeMetadata = computeEmptyNodeMetadata(
     data.publishEventsStatus.temporaryEvents

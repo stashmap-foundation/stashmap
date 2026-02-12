@@ -850,9 +850,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       const rows = getFocusableRows(root);
       const selectedRows =
         selection.size > 0
-          ? rows.filter(
-              (row) => row.getAttribute("data-selected") === "true"
-            )
+          ? rows.filter((row) => row.getAttribute("data-selected") === "true")
           : getSubtreeRows(rows, activeRow);
       const depths = selectedRows.map((row) =>
         Number(row.getAttribute("data-row-depth") || "0")

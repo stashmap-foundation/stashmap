@@ -57,7 +57,7 @@ import {
   planAddToParent,
   planSetRowFocusIntent,
 } from "../planner";
-import { planMoveNodeWithView, planDisconnectFromParent } from "../dnd";
+import { planDisconnectFromParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeCard } from "../commons/Ui";
 import {
@@ -541,11 +541,11 @@ function NodeAutoLink({
       const href = refInfo.rootRelation
         ? buildRelationUrl(refInfo.rootRelation)
         : buildNodeUrl(
-            refInfo.stack,
-            knowledgeDBs,
-            user.publicKey,
-            refInfo.author
-          ) || "#";
+          refInfo.stack,
+          knowledgeDBs,
+          user.publicKey,
+          refInfo.author
+        ) || "#";
       return (
         <a
           href={href}
@@ -722,12 +722,12 @@ export function Node({
         {((showExpandCollapse && !hasChildren) ||
           (isConcreteRef && !showExpandCollapse) ||
           (isSuggestion && !showExpandCollapse)) && (
-          <span
-            className="node-marker"
-            aria-hidden="true"
-            data-testid="node-marker"
-          />
-        )}
+            <span
+              className="node-marker"
+              aria-hidden="true"
+              data-testid="node-marker"
+            />
+          )}
         <div className={`w-100 node-content-wrapper ${contentClass}`}>
           <span className={textClassName} style={textStyle}>
             <NodeAutoLink>

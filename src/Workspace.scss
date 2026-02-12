@@ -600,7 +600,8 @@ body {
   }
 
   &:hover .on-hover-menu,
-  &:focus-within .on-hover-menu {
+  &:focus-within .on-hover-menu,
+  .item[data-selected="true"] & .on-hover-menu {
     opacity: 1;
     visibility: visible;
   }

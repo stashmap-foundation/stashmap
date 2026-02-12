@@ -2240,6 +2240,7 @@ describe("Copy to clipboard", () => {
   const mockWriteText = jest.fn().mockResolvedValue(undefined);
 
   beforeEach(() => {
+    // eslint-disable-next-line functional/immutable-data
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText: mockWriteText },
       writable: true,
@@ -2262,12 +2263,12 @@ describe("Copy to clipboard", () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
-    await type("Root{Enter}{Tab}Parent{Enter}{Tab}Child A{Enter}Child B{Escape}");
+    await type(
+      "Root{Enter}{Tab}Parent{Enter}{Tab}Child A{Enter}Child B{Escape}"
+    );
     await clickRow("Parent");
     await userEvent.keyboard("{Meta>}c{/Meta}");
-    expect(mockWriteText).toHaveBeenCalledWith(
-      "Parent\n\tChild A\n\tChild B"
-    );
+    expect(mockWriteText).toHaveBeenCalledWith("Parent\n\tChild A\n\tChild B");
   });
 
   test("Cmd+C on focused row with collapsed children copies only the row", async () => {
@@ -2345,9 +2346,7 @@ describe("Copy to clipboard", () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
-    await type(
-      "Root{Enter}{Tab}A{Enter}{Tab}A1{Enter}{Tab}A1a{Escape}"
-    );
+    await type("Root{Enter}{Tab}A{Enter}{Tab}A1{Enter}{Tab}A1a{Escape}");
     await userEvent.click(await screen.findByLabelText("collapse A1"));
     await userEvent.click(await screen.findByLabelText("collapse A"));
     await userEvent.click(await screen.findByLabelText("edit A"));

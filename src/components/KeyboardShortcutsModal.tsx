@@ -30,10 +30,19 @@ export function KeyboardShortcutsModal({
           <li>d d or x: same action as row x button</li>
         </ul>
 
+        <h6>Selection</h6>
+        <ul>
+          <li>Space: toggle current row selection</li>
+          <li>Shift+j/k or Shift+arrows: extend/shrink selection</li>
+          <li>Cmd/Ctrl+click: toggle row, Shift+click: range select</li>
+          <li>Escape: clear selection</li>
+          <li>Cmd/Ctrl+C: copy row(s) as tab-indented text</li>
+        </ul>
+
         <h6>Relevance And Evidence</h6>
         <ul>
-          <li>x, ~, ?, !: set current row relevance</li>
-          <li>o, +, -: clear/set current row evidence</li>
+          <li>x, ~, ?, !: set relevance (all selected rows if selection)</li>
+          <li>o, +, -: clear/set evidence (all selected rows if selection)</li>
         </ul>
 
         <h6>Pane Filters</h6>

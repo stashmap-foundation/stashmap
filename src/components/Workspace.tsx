@@ -852,6 +852,18 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       return;
     }
 
+    if ((e.metaKey || e.ctrlKey) && e.key === "a") {
+      e.preventDefault();
+      const rows = getFocusableRows(root);
+      const allViewKeys = rows.map((row) => getRowKey(row));
+      setSelectionState({
+        baseSelection: OrderedSet<string>(allViewKeys),
+        shiftSelection: OrderedSet<string>(),
+        anchor,
+      });
+      return;
+    }
+
     if ((e.metaKey || e.ctrlKey) && e.key === "c") {
       const activeRow = getActiveRow(root);
       if (!activeRow) {

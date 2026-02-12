@@ -35,8 +35,10 @@ export function KeyboardShortcutsModal({
           <li>Space: toggle current row selection</li>
           <li>Shift+j/k or Shift+arrows: extend/shrink selection</li>
           <li>Cmd/Ctrl+click: toggle row, Shift+click: range select</li>
+          <li>Cmd/Ctrl+A: select all visible rows</li>
           <li>Escape: clear selection</li>
           <li>Cmd/Ctrl+C: copy row(s) as tab-indented text</li>
+          <li>Cmd/Ctrl+V: paste tab-indented text as child nodes</li>
         </ul>
 
         <h6>Relevance And Evidence</h6>

@@ -284,6 +284,28 @@ describe("Selection via keyboard", () => {
     await expectTargets("A", "B");
   });
 
+  test("Cmd+A selects all visible rows", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("{Meta>}a{/Meta}");
+    await expectTargets("Root", "A", "B", "C");
+  });
+
+  test("Cmd+A selects across indent levels", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type(
+      "Root{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}{Enter}Sibling{Escape}"
+    );
+    await clickRow("Root");
+    await userEvent.keyboard("{Meta>}a{/Meta}");
+    await expectTargets("Root", "Parent", "Child", "Sibling");
+  });
+
   test("selection works across different indent levels", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());

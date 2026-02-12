@@ -2235,3 +2235,133 @@ describe("Escape clears selection completely", () => {
     });
   });
 });
+
+describe("Copy to clipboard", () => {
+  const mockWriteText = jest.fn().mockResolvedValue(undefined);
+
+  beforeEach(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: mockWriteText },
+      writable: true,
+      configurable: true,
+    });
+    mockWriteText.mockClear();
+  });
+
+  test("Cmd+C on focused row copies its text", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}Hello{Escape}");
+    await clickRow("Hello");
+    await userEvent.keyboard("{Meta>}c{/Meta}");
+    expect(mockWriteText).toHaveBeenCalledWith("Hello");
+  });
+
+  test("Cmd+C on focused row with expanded children copies subtree", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}Parent{Enter}{Tab}Child A{Enter}Child B{Escape}");
+    await clickRow("Parent");
+    await userEvent.keyboard("{Meta>}c{/Meta}");
+    expect(mockWriteText).toHaveBeenCalledWith(
+      "Parent\n\tChild A\n\tChild B"
+    );
+  });
+
+  test("Cmd+C on focused row with collapsed children copies only the row", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
+    await userEvent.click(await screen.findByLabelText("collapse Parent"));
+    await clickRow("Parent");
+    await userEvent.keyboard("{Meta>}c{/Meta}");
+    expect(mockWriteText).toHaveBeenCalledWith("Parent");
+  });
+
+  test("Cmd+C with selection copies only selected rows", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("A", "B");
+    await userEvent.keyboard("{Meta>}c{/Meta}");
+    expect(mockWriteText).toHaveBeenCalledWith("A\nB");
+  });
+
+  test("Cmd+C with selection preserves relative indentation", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}{Tab}A1{Enter}A2{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("A", "A1", "A2");
+    await userEvent.keyboard("{Meta>}c{/Meta}");
+    expect(mockWriteText).toHaveBeenCalledWith("A\n\tA1\n\tA2");
+  });
+
+  test("Cmd+C with deep subtree preserves all indent levels", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type(
+      "Root{Enter}{Tab}A{Enter}{Tab}B{Enter}{Tab}C{Enter}{Tab}D{Escape}"
+    );
+    await clickRow("A");
+    await userEvent.keyboard("{Meta>}c{/Meta}");
+    expect(mockWriteText).toHaveBeenCalledWith("A\n\tB\n\t\tC\n\t\t\tD");
+  });
+
+  test("Cmd+C copies selected rows in DOM order regardless of selection order", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("B");
+    modClick(await screen.findByLabelText("C"), { metaKey: true });
+    modClick(await screen.findByLabelText("A"), { metaKey: true });
+    await expectTargets("A", "B", "C");
+    await userEvent.keyboard("{Meta>}c{/Meta}");
+    expect(mockWriteText).toHaveBeenCalledWith("A\nB\nC");
+  });
+
+  test("Cmd+C does nothing when editing a node", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}Hello{Escape}");
+    await userEvent.click(await screen.findByLabelText("edit Hello"));
+    await userEvent.keyboard("{Meta>}c{/Meta}");
+    expect(mockWriteText).not.toHaveBeenCalled();
+  });
+
+  test("Cmd+C with cross-depth selection normalizes to shallowest", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type(
+      "Root{Enter}{Tab}A{Enter}{Tab}A1{Enter}{Tab}A1a{Escape}"
+    );
+    await userEvent.click(await screen.findByLabelText("collapse A1"));
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
+    await type("B{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand A"));
+    await userEvent.click(await screen.findByLabelText("expand A1"));
+
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("A", "A1", "A1a", "B");
+    await userEvent.keyboard("{Meta>}c{/Meta}");
+    expect(mockWriteText).toHaveBeenCalledWith("A\n\tA1\n\t\tA1a\nB");
+  });
+});

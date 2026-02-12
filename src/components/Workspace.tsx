@@ -540,6 +540,25 @@ function getVisibleRowKeys(root: HTMLElement): string[] {
   return getFocusableRows(root).map((row) => getRowKey(row));
 }
 
+function getSubtreeRows(
+  allRows: HTMLElement[],
+  activeRow: HTMLElement
+): HTMLElement[] {
+  const activeIndex = allRows.indexOf(activeRow);
+  if (activeIndex === -1) {
+    return [activeRow];
+  }
+  const activeDepth = Number(activeRow.getAttribute("data-row-depth") || "0");
+  const descendants = allRows
+    .slice(activeIndex + 1)
+    .findIndex(
+      (row) => Number(row.getAttribute("data-row-depth") || "0") <= activeDepth
+    );
+  const endIndex =
+    descendants === -1 ? allRows.length : activeIndex + 1 + descendants;
+  return allRows.slice(activeIndex, endIndex);
+}
+
 function getActionTargetKeys(
   selection: OrderedSet<string>,
   activeRow: HTMLElement
@@ -819,6 +838,33 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         scrollAndFocusRow(root, targetIndex);
         return;
       }
+      return;
+    }
+
+    if ((e.metaKey || e.ctrlKey) && e.key === "c") {
+      const activeRow = getActiveRow(root);
+      if (!activeRow) {
+        return;
+      }
+      e.preventDefault();
+      const rows = getFocusableRows(root);
+      const selectedRows =
+        selection.size > 0
+          ? rows.filter(
+              (row) => row.getAttribute("data-selected") === "true"
+            )
+          : getSubtreeRows(rows, activeRow);
+      const depths = selectedRows.map((row) =>
+        Number(row.getAttribute("data-row-depth") || "0")
+      );
+      const minDepth = Math.min(...depths);
+      const lines = selectedRows.map((row) => {
+        const depth =
+          Number(row.getAttribute("data-row-depth") || "0") - minDepth;
+        const text = row.getAttribute("data-node-text") || "";
+        return "\t".repeat(depth) + text;
+      });
+      navigator.clipboard.writeText(lines.join("\n"));
       return;
     }
 

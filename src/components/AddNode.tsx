@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { useEditorText } from "./EditorTextContext";
 import { isEditableElement } from "./keyboardNavigation";
+import { ParsedLine, parseClipboardText } from "../planner";
 
 export function preventEditorBlur(e: React.MouseEvent): void {
   if (isEditableElement(document.activeElement)) {
@@ -47,6 +48,7 @@ type MiniEditorProps = {
     rowIndex?: number;
   }) => void;
   onDelete?: () => void;
+  onPasteMultiLine?: (items: ParsedLine[], currentText: string) => void;
 };
 
 export function MiniEditor({
@@ -61,6 +63,7 @@ export function MiniEditor({
   onEscape,
   onRequestRowFocus,
   onDelete,
+  onPasteMultiLine,
 }: MiniEditorProps): JSX.Element {
   const editorRef = React.useRef<HTMLSpanElement>(null);
   // Track last saved text to prevent duplicate saves when blur fires multiple times
@@ -224,7 +227,14 @@ export function MiniEditor({
   const handlePaste = (e: React.ClipboardEvent): void => {
     e.preventDefault();
     const text = e.clipboardData.getData("text/plain");
-    document.execCommand("insertText", false, text);
+    const items = parseClipboardText(text);
+    if (items.length <= 1 || !onPasteMultiLine) {
+      document.execCommand("insertText", false, text);
+      return;
+    }
+    document.execCommand("insertText", false, items[0].text);
+    const currentText = editorRef.current?.textContent || "";
+    onPasteMultiLine(items.slice(1), currentText);
   };
 
   const moveCursorToEnd = (): void => {

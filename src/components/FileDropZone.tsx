@@ -6,6 +6,7 @@ import { newNode, bulkAddRelations } from "../connections";
 import { newRelations } from "../ViewContext";
 import {
   Plan,
+  ParsedLine,
   planUpsertNode,
   planUpsertRelations,
   usePlanner,
@@ -162,6 +163,27 @@ export function parseMarkdownHierarchy(
   return roots;
 }
 /* eslint-enable functional/immutable-data, functional/no-let, no-continue */
+
+/* eslint-disable functional/immutable-data */
+export function parsedLinesToTrees(items: ParsedLine[]): MarkdownTreeNode[] {
+  if (items.length === 0) return [];
+  const minDepth = Math.min(...items.map((i) => i.depth));
+  const roots: MarkdownTreeNode[] = [];
+  const stack: MarkdownTreeNode[] = [];
+  items.forEach((item) => {
+    const depth = item.depth - minDepth;
+    const node: MarkdownTreeNode = { text: item.text, children: [] };
+    stack.length = Math.min(depth, stack.length);
+    if (stack.length === 0) {
+      roots.push(node);
+    } else {
+      stack[stack.length - 1].children.push(node);
+    }
+    stack.push(node);
+  });
+  return roots;
+}
+/* eslint-enable functional/immutable-data */
 
 function normalizeRootsForSingleFile(
   roots: MarkdownTreeNode[],

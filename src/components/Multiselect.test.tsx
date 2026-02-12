@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   expectTree,
+  findNewNodeEditor,
   navigateToNodeViaSearch,
   renderApp,
   setDropIndentLevel,
@@ -2362,5 +2363,250 @@ describe("Copy to clipboard", () => {
     await expectTargets("A", "A1", "A1a", "B");
     await userEvent.keyboard("{Meta>}c{/Meta}");
     expect(mockWriteText).toHaveBeenCalledWith("A\n\tA1\n\t\tA1a\nB");
+  });
+});
+
+function firePaste(element: HTMLElement, text: string): void {
+  const clipboardData = {
+    getData: () => text,
+  };
+  // eslint-disable-next-line testing-library/prefer-user-event
+  fireEvent.paste(element, { clipboardData });
+}
+
+describe("Paste in normal mode (Cmd+V)", () => {
+  const mockReadText = jest.fn();
+
+  beforeEach(() => {
+    // eslint-disable-next-line functional/immutable-data
+    Object.defineProperty(navigator, "clipboard", {
+      value: { readText: mockReadText },
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  test("Cmd+V pastes flat items as children of focused row", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}Existing{Escape}");
+    await clickRow("Root");
+    mockReadText.mockResolvedValueOnce("Pasted A\nPasted B");
+    await userEvent.keyboard("{Meta>}v{/Meta}");
+    await screen.findByLabelText("Pasted A");
+    await expectTree(`
+Root
+  Pasted A
+  Pasted B
+  Existing
+    `);
+  });
+
+  test("Cmd+V pastes nested items preserving hierarchy", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Escape}");
+    await clickRow("Root");
+    mockReadText.mockResolvedValueOnce("Parent\n\tChild 1\n\tChild 2");
+    await userEvent.keyboard("{Meta>}v{/Meta}");
+    await screen.findByLabelText("Parent");
+    await userEvent.click(await screen.findByLabelText("expand Parent"));
+    await expectTree(`
+Root
+  Parent
+    Child 1
+    Child 2
+    `);
+  });
+
+  test("Cmd+V strips markdown bullet markers", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Escape}");
+    await clickRow("Root");
+    mockReadText.mockResolvedValueOnce("- Item A\n- Item B\n- Item C");
+    await userEvent.keyboard("{Meta>}v{/Meta}");
+    await screen.findByLabelText("Item A");
+    await expectTree(`
+Root
+  Item A
+  Item B
+  Item C
+    `);
+  });
+
+  test("Cmd+V strips numbered list markers", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Escape}");
+    await clickRow("Root");
+    mockReadText.mockResolvedValueOnce("1. First\n2. Second\n3. Third");
+    await userEvent.keyboard("{Meta>}v{/Meta}");
+    await screen.findByLabelText("First");
+    await expectTree(`
+Root
+  First
+  Second
+  Third
+    `);
+  });
+
+  test("Cmd+V pastes siblings as children of root", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Escape}");
+    await clickRow("Root");
+    mockReadText.mockResolvedValueOnce("A\nB\nC");
+    await userEvent.keyboard("{Meta>}v{/Meta}");
+    await screen.findByLabelText("A");
+    await expectTree(`
+Root
+  A
+  B
+  C
+    `);
+  });
+
+  test("Cmd+V does nothing with empty clipboard", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}Existing{Escape}");
+    await clickRow("Root");
+    mockReadText.mockResolvedValueOnce("");
+    await userEvent.keyboard("{Meta>}v{/Meta}");
+    await expectTree(`
+Root
+  Existing
+    `);
+  });
+});
+
+describe("Paste in edit mode (multi-line)", () => {
+  beforeEach(() => {
+    // eslint-disable-next-line functional/immutable-data
+    document.execCommand = jest.fn(() => true);
+  });
+  test("pasting multi-line text creates siblings after current node", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}First{Escape}");
+    const editor = await screen.findByLabelText("edit First");
+    await userEvent.click(editor);
+    const editBox = await screen.findByRole("textbox", {
+      name: "edit First",
+    });
+    firePaste(editBox, "First\nSecond\nThird");
+    await screen.findByLabelText("Second");
+    await expectTree(`
+Root
+  First
+  Second
+  Third
+    `);
+  });
+
+  test("pasting multi-line text with indentation creates hierarchy", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}Existing{Escape}");
+    const editor = await screen.findByLabelText("edit Existing");
+    await userEvent.click(editor);
+    const editBox = await screen.findByRole("textbox", {
+      name: "edit Existing",
+    });
+    firePaste(editBox, "Existing\n\tChild A\n\tChild B");
+    await screen.findByLabelText("Child A");
+    await expectTree(`
+Root
+  Existing
+  Child A
+  Child B
+    `);
+  });
+
+  test("pasting multi-line in new node editor creates nodes", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}Alpha");
+    const editor = await findNewNodeEditor();
+    firePaste(editor, "Alpha\nBeta\nGamma");
+    await screen.findByLabelText("Beta");
+    await screen.findByLabelText("Gamma");
+    await screen.findByLabelText("Alpha");
+  });
+});
+
+describe("Copy and paste across panes", () => {
+  test("Cmd+C a nested subtree in pane 0 then Cmd+V into pane 1", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type(
+      "Source{Enter}{Tab}Alpha{Enter}{Tab}Beta{Enter}Gamma{Enter}{Tab}Delta{Escape}"
+    );
+
+    // eslint-disable-next-line functional/immutable-data
+    const clipboard = { text: "" };
+    // eslint-disable-next-line functional/immutable-data
+    Object.defineProperty(navigator, "clipboard", {
+      value: {
+        writeText: jest.fn((text: string) => {
+          // eslint-disable-next-line functional/immutable-data
+          clipboard.text = text;
+          return Promise.resolve();
+        }),
+        readText: jest.fn(() => Promise.resolve(clipboard.text)),
+      },
+      writable: true,
+      configurable: true,
+    });
+
+    await clickRow("Alpha");
+    await userEvent.keyboard("{Meta>}c{/Meta}");
+    expect(clipboard.text).toBe("Alpha\n\tBeta\n\tGamma\n\t\tDelta");
+
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Source");
+
+    const sourceLabels = screen.getAllByLabelText("Source");
+    const sourceInPane1 = sourceLabels[sourceLabels.length - 1];
+    await userEvent.click(sourceInPane1);
+
+    await userEvent.keyboard("{Meta>}v{/Meta}");
+    await waitFor(() => {
+      expect(navigator.clipboard.readText).toHaveBeenCalled();
+    });
+
+    await waitFor(() => {
+      const alphaNodes = screen.getAllByLabelText("Alpha");
+      expect(alphaNodes.length).toBeGreaterThanOrEqual(3);
+    });
+
+    const expandAlphas = screen.getAllByLabelText("expand Alpha");
+    await userEvent.click(expandAlphas[expandAlphas.length - 1]);
+    const expandGammas = screen.getAllByLabelText("expand Gamma");
+    await userEvent.click(expandGammas[expandGammas.length - 1]);
+
+    const betas = screen.getAllByLabelText("Beta");
+    expect(betas.length).toBeGreaterThanOrEqual(2);
+    const gammas = screen.getAllByLabelText("Gamma");
+    expect(gammas.length).toBeGreaterThanOrEqual(2);
+
+    const expandGammas2 = screen.queryAllByLabelText("expand Gamma");
+    if (expandGammas2.length > 0) {
+      await userEvent.click(expandGammas2[expandGammas2.length - 1]);
+    }
+
+    const deltas = screen.getAllByLabelText("Delta");
+    expect(deltas.length).toBeGreaterThanOrEqual(2);
   });
 });

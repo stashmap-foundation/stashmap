@@ -825,6 +825,27 @@ export function planCreateNode(plan: Plan, text: string): [Plan, KnowNode] {
   return [planWithNode, node];
 }
 
+export type ParsedLine = { text: string; depth: number };
+
+export function parseClipboardText(text: string): ParsedLine[] {
+  return text
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
+    .map((line) => {
+      const tabMatch = line.match(/^(\t*)/);
+      const tabDepth = tabMatch ? tabMatch[1].length : 0;
+      const spaceMatch = line.match(/^( +)/);
+      const spaceDepth = spaceMatch ? Math.floor(spaceMatch[1].length / 2) : 0;
+      const depth = tabDepth > 0 ? tabDepth : spaceDepth;
+      const content = line
+        .trim()
+        .replace(/^[-*•]\s+/, "")
+        .replace(/^\d+[.)]\s+/, "");
+      return { text: content, depth };
+    })
+    .filter((item) => item.text.length > 0);
+}
+
 function ensureLogNode(plan: Plan): Plan {
   const existingLog = getNodeFromID(
     plan.knowledgeDBs,

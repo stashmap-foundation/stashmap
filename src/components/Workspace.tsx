@@ -10,6 +10,8 @@ import {
 
 import {
   getNodeFromID,
+  getNodeIDFromView,
+  getContext,
   parseViewPath,
   useViewPath,
   useIsViewingOtherUserContent,
@@ -33,8 +35,17 @@ import { InlineFilterDots } from "./TypeFilterButton";
 import { NewPaneButton } from "./OpenInSplitPaneButton";
 import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 import { SignInMenuBtn } from "../SignIn";
-import { usePlanner, planForkPane } from "../planner";
-import { LOG_NODE_ID } from "../connections";
+import {
+  usePlanner,
+  planForkPane,
+  planAddToParent,
+  parseClipboardText,
+} from "../planner";
+import {
+  parsedLinesToTrees,
+  planCreateNodesFromMarkdownTrees,
+} from "./FileDropZone";
+import { LOG_NODE_ID, shortID } from "../connections";
 import { buildNodeUrl } from "../navigationUrl";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import {
@@ -863,6 +874,36 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         return "\t".repeat(depth) + text;
       });
       navigator.clipboard.writeText(lines.join("\n"));
+      return;
+    }
+
+    if ((e.metaKey || e.ctrlKey) && e.key === "v") {
+      const activeRow = getActiveRow(root);
+      if (!activeRow) {
+        return;
+      }
+      e.preventDefault();
+      const activeRowKey = getRowKey(activeRow);
+      const parentPath = parseViewPath(activeRowKey);
+      navigator.clipboard.readText().then((text) => {
+        const items = parseClipboardText(text);
+        if (items.length === 0) {
+          return;
+        }
+        const trees = parsedLinesToTrees(items);
+        const plan = createPlan();
+        const parentContext = getContext(plan, parentPath, stack);
+        const [parentNodeID] = getNodeIDFromView(plan, parentPath);
+        const pasteContext = parentContext.push(shortID(parentNodeID) as ID);
+        const [planWithNodes, topNodeIDs] = planCreateNodesFromMarkdownTrees(
+          plan,
+          trees,
+          pasteContext
+        );
+        executePlan(
+          planAddToParent(planWithNodes, topNodeIDs, parentPath, stack, 0)
+        );
+      });
       return;
     }
 

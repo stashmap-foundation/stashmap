@@ -19,6 +19,7 @@ import {
   getDiffItemsForNode,
   isReferencedByView,
   getContext,
+  getNodeIDFromView,
   useIsViewingOtherUserContent,
   useIsSuggestion,
   viewPathToString,
@@ -38,6 +39,7 @@ import {
   getRelations,
   isSearchId,
   computeEmptyNodeMetadata,
+  shortID,
 } from "../connections";
 import { DEFAULT_TYPE_FILTERS } from "../constants";
 import { IS_MOBILE } from "./responsive";
@@ -56,7 +58,12 @@ import {
   planCreateNode,
   planAddToParent,
   planSetRowFocusIntent,
+  ParsedLine,
 } from "../planner";
+import {
+  parsedLinesToTrees,
+  planCreateNodesFromMarkdownTrees,
+} from "./FileDropZone";
 import { planDisconnectFromParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeCard } from "../commons/Ui";
@@ -439,6 +446,48 @@ function EditableContent(): JSX.Element {
     executePlan(focusPlan);
   };
 
+  const handlePasteMultiLine = (
+    items: ParsedLine[],
+    currentText: string
+  ): void => {
+    const { plan: basePlan, viewPath: updatedViewPath } =
+      planSaveNodeAndEnsureRelations(
+        createPlan(),
+        currentText,
+        viewPath,
+        stack
+      );
+    const trees = parsedLinesToTrees(items);
+    const parentOfSaved = getParentView(updatedViewPath);
+    if (!parentOfSaved) {
+      const pasteContext = getContext(basePlan, updatedViewPath, stack).push(
+        shortID(getNodeIDFromView(basePlan, updatedViewPath)[0]) as ID
+      );
+      const [planWithNodes, topNodeIDs] = planCreateNodesFromMarkdownTrees(
+        basePlan,
+        trees,
+        pasteContext
+      );
+      executePlan(
+        planAddToParent(planWithNodes, topNodeIDs, updatedViewPath, stack, 0)
+      );
+      return;
+    }
+    const savedIndex = getRelationIndex(basePlan, updatedViewPath);
+    const insertAt = savedIndex !== undefined ? savedIndex + 1 : 0;
+    const pasteContext = getContext(basePlan, parentOfSaved, stack).push(
+      shortID(getNodeIDFromView(basePlan, parentOfSaved)[0]) as ID
+    );
+    const [planWithNodes, topNodeIDs] = planCreateNodesFromMarkdownTrees(
+      basePlan,
+      trees,
+      pasteContext
+    );
+    executePlan(
+      planAddToParent(planWithNodes, topNodeIDs, parentOfSaved, stack, insertAt)
+    );
+  };
+
   const handleDelete = (): void => {
     const plan = planDisconnectFromParent(createPlan(), viewPath, stack);
     executePlan(plan);
@@ -479,6 +528,7 @@ function EditableContent(): JSX.Element {
       onEscape={handleEscapeRequest}
       onRequestRowFocus={handleRequestRowFocus}
       onDelete={isEmptyNode ? undefined : handleDelete}
+      onPasteMultiLine={handlePasteMultiLine}
     />
   );
 }
@@ -541,11 +591,11 @@ function NodeAutoLink({
       const href = refInfo.rootRelation
         ? buildRelationUrl(refInfo.rootRelation)
         : buildNodeUrl(
-          refInfo.stack,
-          knowledgeDBs,
-          user.publicKey,
-          refInfo.author
-        ) || "#";
+            refInfo.stack,
+            knowledgeDBs,
+            user.publicKey,
+            refInfo.author
+          ) || "#";
       return (
         <a
           href={href}
@@ -722,12 +772,12 @@ export function Node({
         {((showExpandCollapse && !hasChildren) ||
           (isConcreteRef && !showExpandCollapse) ||
           (isSuggestion && !showExpandCollapse)) && (
-            <span
-              className="node-marker"
-              aria-hidden="true"
-              data-testid="node-marker"
-            />
-          )}
+          <span
+            className="node-marker"
+            aria-hidden="true"
+            data-testid="node-marker"
+          />
+        )}
         <div className={`w-100 node-content-wrapper ${contentClass}`}>
           <span className={textClassName} style={textStyle}>
             <NodeAutoLink>

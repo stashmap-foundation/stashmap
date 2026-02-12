@@ -61,7 +61,7 @@ import {
   planAddToParent,
   planSetRowFocusIntent,
 } from "../planner";
-import { planMoveNodeWithView } from "../dnd";
+import { planMoveNodeWithView, planDisconnectFromParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeCard } from "../commons/Ui";
 import {
@@ -504,6 +504,11 @@ function EditableContent(): JSX.Element {
     executePlan(focusPlan);
   };
 
+  const handleDelete = (): void => {
+    const plan = planDisconnectFromParent(createPlan(), viewPath, stack);
+    executePlan(plan);
+  };
+
   const handleEscapeRequest = (): void => {
     // eslint-disable-next-line functional/immutable-data
     escapeFocusPendingRef.current = true;
@@ -538,6 +543,7 @@ function EditableContent(): JSX.Element {
       ariaLabel={isEmptyNode ? "new node editor" : `edit ${displayText}`}
       onEscape={handleEscapeRequest}
       onRequestRowFocus={handleRequestRowFocus}
+      onDelete={isEmptyNode ? undefined : handleDelete}
     />
   );
 }

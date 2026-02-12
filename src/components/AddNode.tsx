@@ -46,6 +46,7 @@ type MiniEditorProps = {
     nodeId?: string;
     rowIndex?: number;
   }) => void;
+  onDelete?: () => void;
 };
 
 export function MiniEditor({
@@ -59,6 +60,7 @@ export function MiniEditor({
   ariaLabel,
   onEscape,
   onRequestRowFocus,
+  onDelete,
 }: MiniEditorProps): JSX.Element {
   const editorRef = React.useRef<HTMLSpanElement>(null);
   // Track last saved text to prevent duplicate saves when blur fires multiple times
@@ -142,11 +144,12 @@ export function MiniEditor({
       const text = getText().trim();
       const hasChanges = Boolean(text && text !== lastSavedTextRef.current);
       if (hasChanges) {
-        // Save changes - onSave will close the editor
         // eslint-disable-next-line functional/immutable-data
-        lastSavedTextRef.current = text; // Update immediately to prevent duplicate saves
+        lastSavedTextRef.current = text;
         const imageUrl = await getImageUrlFromText(text);
         onSave(text, imageUrl);
+      } else if (!text && lastSavedTextRef.current && onDelete) {
+        onDelete();
       } else {
         onRequestRowFocus?.({
           viewKey: rowKey || undefined,
@@ -166,6 +169,10 @@ export function MiniEditor({
       e.preventDefault();
       const text = getText().trim();
       if (!text) {
+        if (lastSavedTextRef.current && onDelete) {
+          onDelete();
+          return;
+        }
         if (onShiftTab) {
           onShiftTab(text, getCursorPosition());
           return;
@@ -204,7 +211,11 @@ export function MiniEditor({
 
     const text = getText().trim();
     if (!text) {
-      onClose?.();
+      if (lastSavedTextRef.current && onDelete) {
+        onDelete();
+      } else {
+        onClose?.();
+      }
       return;
     }
     saveIfChanged();

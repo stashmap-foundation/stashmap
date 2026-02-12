@@ -8,6 +8,7 @@ import {
   renderTree,
   renderApp,
   createAndSetAsRoot,
+  navigateToNodeViaSearch,
   type,
 } from "../utils.test";
 
@@ -1268,6 +1269,173 @@ Root
   Foo
   Bar
     `);
+  });
+
+  describe("Delete node when edited to empty", () => {
+    test("Blur on cleared leaf node removes it", async () => {
+      const [alice] = setup([ALICE]);
+      renderTree(alice);
+      await type("Root{Enter}{Tab}Child{Escape}");
+
+      await expectTree(`
+Root
+  Child
+      `);
+
+      const editor = await screen.findByLabelText("edit Child");
+      await userEvent.click(editor);
+      await userEvent.clear(editor);
+      fireEvent.blur(editor, { relatedTarget: document.body });
+
+      await expectTree(`
+Root
+      `);
+    });
+
+    test("Enter on cleared leaf node removes it", async () => {
+      const [alice] = setup([ALICE]);
+      renderTree(alice);
+      await type("Root{Enter}{Tab}Child{Escape}");
+
+      await expectTree(`
+Root
+  Child
+      `);
+
+      const editor = await screen.findByLabelText("edit Child");
+      await userEvent.click(editor);
+      await userEvent.clear(editor);
+      await userEvent.keyboard("{Enter}");
+
+      await expectTree(`
+Root
+      `);
+    });
+
+    test("Escape on cleared leaf node removes it", async () => {
+      const [alice] = setup([ALICE]);
+      renderTree(alice);
+      await type("Root{Enter}{Tab}Child{Escape}");
+
+      await expectTree(`
+Root
+  Child
+      `);
+
+      const editor = await screen.findByLabelText("edit Child");
+      await userEvent.click(editor);
+      await userEvent.clear(editor);
+      await userEvent.keyboard("{Escape}");
+
+      await expectTree(`
+Root
+      `);
+    });
+
+    test("Clear parent with children removes parent and children", async () => {
+      const [alice] = setup([ALICE]);
+      renderTree(alice);
+      await type("Root{Enter}{Tab}Parent{Enter}{Tab}Grandchild{Escape}");
+
+      await expectTree(`
+Root
+  Parent
+    Grandchild
+      `);
+
+      const editor = await screen.findByLabelText("edit Parent");
+      await userEvent.click(editor);
+      await userEvent.clear(editor);
+      fireEvent.blur(editor, { relatedTarget: document.body });
+
+      await expectTree(`
+Root
+      `);
+
+      cleanup();
+      renderTree(alice);
+
+      await expectTree(`
+Root
+      `);
+    });
+
+    test("Clear one sibling removes only that sibling", async () => {
+      const [alice] = setup([ALICE]);
+      renderTree(alice);
+      await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+
+      await expectTree(`
+Root
+  A
+  B
+  C
+      `);
+
+      const editor = await screen.findByLabelText("edit B");
+      await userEvent.click(editor);
+      await userEvent.clear(editor);
+      fireEvent.blur(editor, { relatedTarget: document.body });
+
+      await expectTree(`
+Root
+  A
+  C
+      `);
+    });
+
+    test("Clearing parent also deletes descendant relations", async () => {
+      const [alice] = setup([ALICE]);
+      renderApp(alice());
+
+      await type(
+        "Root{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
+      );
+
+      const splitPaneButtons = screen.getAllByLabelText("open in split pane");
+      await userEvent.click(splitPaneButtons[0]);
+      await navigateToNodeViaSearch(1, "Child");
+
+      await expectTree(`
+Root
+  Parent
+    Child
+      GrandChild
+Child
+  GrandChild
+      `);
+
+      const editor = screen.getAllByLabelText("edit Parent")[0];
+      await userEvent.click(editor);
+      await userEvent.clear(editor);
+      fireEvent.blur(editor, { relatedTarget: document.body });
+
+      await expectTree(`
+Root
+Child
+      `);
+    });
+
+    test("Clear root node text does not remove root", async () => {
+      const [alice] = setup([ALICE]);
+      renderTree(alice);
+      await type("Root{Enter}{Tab}Child{Escape}");
+
+      await expectTree(`
+Root
+  Child
+      `);
+
+      const editor = await screen.findByLabelText("edit Root");
+      await userEvent.click(editor);
+      await userEvent.clear(editor);
+      fireEvent.blur(editor, { relatedTarget: document.body });
+
+      await expectTree(`
+Root
+  Child
+      `);
+    });
   });
 
   test("Empty node does not show fullscreen or split pane buttons", async () => {

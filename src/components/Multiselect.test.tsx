@@ -219,7 +219,7 @@ describe("Selection via keyboard", () => {
     await expectTargets("B", "D", "E", "F", "G");
   });
 
-  test("Escape clears multi-selection", async () => {
+  test("Escape clears multi-selection but keeps focus", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
@@ -228,16 +228,36 @@ describe("Selection via keyboard", () => {
     await userEvent.keyboard("{Shift>}j{/Shift}");
     await expectTargets("A", "B");
     await userEvent.keyboard("{Escape}");
-    await expectNoTargets();
+    await expectTargets("B");
+    await waitFor(() => {
+      expect(getSelectedNodes()).toEqual([]);
+    });
   });
 
-  test("Escape clears single-row selection", async () => {
+  test("Escape clears single-row selection but keeps focus", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
     await type("Root{Enter}{Tab}A{Enter}B{Escape}");
     await clickRow("A");
     await userEvent.keyboard(" ");
+    await expectTargets("A");
+    await userEvent.keyboard("{Escape}");
+    await expectTargets("A");
+    await waitFor(() => {
+      expect(getSelectedNodes()).toEqual([]);
+    });
+  });
+
+  test("second Escape blurs focused row", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}B{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard(" ");
+    await expectTargets("A");
+    await userEvent.keyboard("{Escape}");
     await expectTargets("A");
     await userEvent.keyboard("{Escape}");
     await expectNoTargets();
@@ -1558,5 +1578,660 @@ Root
     A1
     B
     `);
+  });
+});
+
+describe("Batch indent (Tab) with selection", () => {
+  test("Tab indents all selected siblings into previous sibling", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Enter}D{Escape}");
+    await clickRow("B");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("B", "C");
+    await userEvent.keyboard("{Tab}");
+    await expectTree(`
+Root
+  A
+    B
+    C
+  D
+    `);
+  });
+
+  test("Tab preserves order of selected items", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Enter}D{Escape}");
+    await clickRow("C");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("C", "D");
+    await userEvent.keyboard("{Tab}");
+    await expectTree(`
+Root
+  A
+  B
+    C
+    D
+    `);
+  });
+
+  test("Tab does nothing when first selected is first child", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("A", "B");
+    await userEvent.keyboard("{Tab}");
+    await expectTree(`
+Root
+  A
+  B
+  C
+    `);
+  });
+
+  test("Tab does nothing when selection spans different parents", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}A1{Enter}B{Escape}");
+    await clickRow("A1");
+    await userEvent.keyboard("{Tab}");
+    await expectTree(`
+Root
+  A
+    A1
+  B
+    `);
+    await clickRow("A1");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("A1", "B");
+    await userEvent.keyboard("{Tab}");
+    await expectTree(`
+Root
+  A
+    A1
+  B
+    `);
+  });
+
+  test("Tab clears selection after indent", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("B");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("B", "C");
+    await userEvent.keyboard("{Tab}");
+    await expectNoTargets();
+  });
+
+  test("Tab indents single selected row", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}B{Escape}");
+    await clickRow("B");
+    await expectTargets("B");
+    await userEvent.keyboard("{Tab}");
+    await expectTree(`
+Root
+  A
+    B
+    `);
+  });
+
+  test("Tab expands collapsed previous sibling", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}A1{Enter}B{Escape}");
+    await clickRow("A1");
+    await userEvent.keyboard("{Tab}");
+    await expectTree(`
+Root
+  A
+    A1
+  B
+    `);
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await expectTree(`
+Root
+  A
+  B
+    `);
+    await clickRow("B");
+    await userEvent.keyboard("{Tab}");
+    await expectTree(`
+Root
+  A
+    A1
+    B
+    `);
+  });
+});
+
+describe("Batch outdent (Shift+Tab) with selection", () => {
+  test("Shift+Tab outdents all selected siblings to grandparent", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}{Tab}B{Enter}C{Enter}D{Escape}");
+    await clickRow("B");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("B", "C");
+    await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
+    await expectTree(`
+Root
+  A
+    D
+  B
+  C
+    `);
+  });
+
+  test("Shift+Tab preserves order of selected items", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}{Tab}B{Enter}C{Enter}D{Escape}");
+    await clickRow("C");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("C", "D");
+    await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
+    await expectTree(`
+Root
+  A
+    B
+  C
+  D
+    `);
+  });
+
+  test("Shift+Tab does nothing when parent is root-level", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("A", "B");
+    await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
+    await expectTree(`
+Root
+  A
+  B
+  C
+    `);
+  });
+
+  test("Shift+Tab clears selection after outdent", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}{Tab}B{Enter}C{Escape}");
+    await clickRow("B");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("B", "C");
+    await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
+    await expectNoTargets();
+  });
+
+  test("Shift+Tab outdents single selected row", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}{Tab}B{Escape}");
+    await clickRow("B");
+    await expectTargets("B");
+    await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
+    await expectTree(`
+Root
+  A
+  B
+    `);
+  });
+
+  test("Shift+Tab inserts after parent in grandparent", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}{Tab}X{Enter}Y{Escape}");
+    await userEvent.keyboard("{Escape}");
+    await clickRow("X");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("X", "Y");
+    await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
+    await expectTree(`
+Root
+  A
+  X
+  Y
+    `);
+  });
+
+  test("Shift+Tab does nothing when selection spans different parents", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}{Tab}A1{Enter}{Escape}");
+    await userEvent.keyboard("{Escape}");
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("A", "A1");
+    await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
+    await expectTree(`
+Root
+  A
+    A1
+    `);
+  });
+});
+
+describe("View state preservation - multiselect DnD", () => {
+  test("move expanded items - both stay expanded", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}{Tab}A1{Escape}");
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
+    await type("B{Enter}{Tab}B1{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand A"));
+    await userEvent.click(await screen.findByLabelText("collapse B"));
+    await userEvent.click(await screen.findByLabelText("edit B"));
+    await userEvent.keyboard("{Enter}");
+    await type("Target{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand B"));
+
+    await expectTree(`
+Root
+  A
+    A1
+  B
+    B1
+  Target
+    `);
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse B");
+
+    await clickRow("A");
+    modClick(await screen.findByLabelText("B"), { metaKey: true });
+    await expectTargets("A", "B");
+
+    fireEvent.dragStart(screen.getByText("A"));
+    fireEvent.drop(screen.getByRole("treeitem", { name: "Target" }));
+
+    await expectTree(`
+Root
+  Target
+  A
+    A1
+  B
+    B1
+    `);
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse B");
+  });
+
+  test("non-selected sibling expanded state preserved after multi-move", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}{Tab}B1{Escape}");
+    await userEvent.click(await screen.findByLabelText("collapse B"));
+    await userEvent.click(await screen.findByLabelText("edit B"));
+    await userEvent.keyboard("{Enter}");
+    await type("C{Enter}Target{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand B"));
+
+    await expectTree(`
+Root
+  A
+  B
+    B1
+  C
+  Target
+    `);
+    await screen.findByLabelText("collapse B");
+
+    await clickRow("A");
+    modClick(await screen.findByLabelText("C"), { metaKey: true });
+    await expectTargets("A", "C");
+
+    fireEvent.dragStart(screen.getByText("A"));
+    fireEvent.drop(screen.getByRole("treeitem", { name: "Target" }));
+
+    await expectTree(`
+Root
+  B
+    B1
+  Target
+  A
+  C
+    `);
+    await screen.findByLabelText("collapse B");
+  });
+
+  test("move expanded item with deep descendants preserves all levels", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}{Tab}A1{Enter}{Tab}A1a{Escape}");
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
+    await type("B{Enter}Target{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand A"));
+
+    await expectTree(`
+Root
+  A
+    A1
+      A1a
+  B
+  Target
+    `);
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse A1");
+
+    await clickRow("A");
+    modClick(await screen.findByLabelText("B"), { metaKey: true });
+    await expectTargets("A", "B");
+
+    fireEvent.dragStart(screen.getByText("A"));
+    fireEvent.drop(screen.getByRole("treeitem", { name: "Target" }));
+
+    await expectTree(`
+Root
+  Target
+  A
+    A1
+      A1a
+  B
+    `);
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse A1");
+  });
+
+  test("cross-pane copy of multi-selection preserves expanded state", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}A{Enter}{Tab}A1{Escape}");
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
+    await type("B{Enter}{Tab}B1{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand A"));
+    await userEvent.click(await screen.findByLabelText("collapse B"));
+    await userEvent.click(await screen.findByLabelText("edit B"));
+    await userEvent.keyboard("{Enter}");
+    await type("Target{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand B"));
+
+    await expectTree(`
+Root
+  A
+    A1
+  B
+    B1
+  Target
+    `);
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse B");
+
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Target");
+
+    const pane0Items = screen.getAllByLabelText("A");
+    await userEvent.click(pane0Items[0]);
+    modClick(screen.getAllByLabelText("B")[0], { metaKey: true });
+
+    const targetItems = screen.getAllByRole("treeitem", { name: "Target" });
+    const targetInPane1 = targetItems[targetItems.length - 1];
+
+    fireEvent.dragStart(screen.getAllByText("A")[0]);
+    fireEvent.drop(targetInPane1);
+
+    const collapseA = screen.getAllByLabelText("collapse A");
+    expect(collapseA.length).toBeGreaterThanOrEqual(2);
+    const collapseB = screen.getAllByLabelText("collapse B");
+    expect(collapseB.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("View state preservation - multiselect Tab indent", () => {
+  test("Tab indent expanded items - both stay expanded", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}Prev{Enter}A{Enter}{Tab}A1{Escape}");
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
+    await type("B{Enter}{Tab}B1{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand A"));
+
+    await expectTree(`
+Root
+  Prev
+  A
+    A1
+  B
+    B1
+    `);
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse B");
+
+    await clickRow("A");
+    modClick(await screen.findByLabelText("B"), { metaKey: true });
+    await expectTargets("A", "B");
+    await userEvent.keyboard("{Tab}");
+
+    await expectTree(`
+Root
+  Prev
+    A
+      A1
+    B
+      B1
+    `);
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse B");
+  });
+
+  test("Tab indent preserves non-selected sibling expanded state", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}Prev{Enter}{Tab}P1{Escape}");
+    await userEvent.click(await screen.findByLabelText("collapse Prev"));
+    await userEvent.click(await screen.findByLabelText("edit Prev"));
+    await userEvent.keyboard("{Enter}");
+    await type("A{Enter}B{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand Prev"));
+
+    await expectTree(`
+Root
+  Prev
+    P1
+  A
+  B
+    `);
+    await screen.findByLabelText("collapse Prev");
+
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("A", "B");
+    await userEvent.keyboard("{Tab}");
+
+    await expectTree(`
+Root
+  Prev
+    P1
+    A
+    B
+    `);
+    await screen.findByLabelText("collapse Prev");
+  });
+
+  test("Tab indent item with deep descendants preserves all levels", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type(
+      "Root{Enter}{Tab}Prev{Enter}A{Enter}{Tab}A1{Enter}{Tab}A1a{Escape}"
+    );
+
+    await expectTree(`
+Root
+  Prev
+  A
+    A1
+      A1a
+    `);
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse A1");
+
+    await clickRow("A");
+    await userEvent.keyboard("{Tab}");
+
+    await expectTree(`
+Root
+  Prev
+    A
+      A1
+        A1a
+    `);
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse A1");
+  });
+});
+
+describe("View state preservation - multiselect Shift+Tab outdent", () => {
+  test("Shift+Tab outdent expanded items - both stay expanded", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}Parent{Enter}{Tab}A{Enter}{Tab}A1{Escape}");
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
+    await type("B{Enter}{Tab}B1{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand A"));
+
+    await expectTree(`
+Root
+  Parent
+    A
+      A1
+    B
+      B1
+    `);
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse B");
+
+    await clickRow("A");
+    modClick(await screen.findByLabelText("B"), { metaKey: true });
+    await expectTargets("A", "B");
+    await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
+
+    await expectTree(`
+Root
+  Parent
+  A
+    A1
+  B
+    B1
+    `);
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse B");
+  });
+
+  test("Shift+Tab outdent preserves remaining sibling expanded state", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await type("Root{Enter}{Tab}Parent{Enter}{Tab}Stay{Enter}{Tab}S1{Escape}");
+    await userEvent.click(await screen.findByLabelText("collapse Stay"));
+    await userEvent.click(await screen.findByLabelText("edit Stay"));
+    await userEvent.keyboard("{Enter}");
+    await type("A{Enter}B{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand Stay"));
+
+    await expectTree(`
+Root
+  Parent
+    Stay
+      S1
+    A
+    B
+    `);
+    await screen.findByLabelText("collapse Stay");
+
+    await clickRow("A");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("A", "B");
+    await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
+
+    await expectTree(`
+Root
+  Parent
+    Stay
+      S1
+  A
+  B
+    `);
+    await screen.findByLabelText("collapse Stay");
+  });
+});
+
+describe("Escape clears selection completely", () => {
+  test("Space after Escape does not include previously selected row", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}Child 1{Enter}Child 2{Enter}Child 3{Escape}");
+    await clickRow("Child 3");
+    await userEvent.keyboard(" ");
+    await expectTargets("Child 3");
+    await userEvent.keyboard("{Escape}");
+    await expectTargets("Child 3");
+
+    await userEvent.keyboard("gg");
+    await userEvent.keyboard(" ");
+    await expectTargets("Root");
+  });
+
+  test("Shift+j after Escape does not include previously selected row", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}Child 1{Enter}Child 2{Enter}Child 3{Escape}");
+    await clickRow("Child 3");
+    await userEvent.keyboard(" ");
+    await expectTargets("Child 3");
+    await userEvent.keyboard("{Escape}");
+    await expectTargets("Child 3");
+
+    await userEvent.keyboard("gg");
+    await userEvent.keyboard("j");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("Child 1", "Child 2");
+  });
+
+  test("Shift+click after Escape does not include previously selected row", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}Child 1{Enter}Child 2{Enter}Child 3{Escape}");
+    await clickRow("Child 3");
+    await userEvent.keyboard(" ");
+    await expectTargets("Child 3");
+    await userEvent.keyboard("{Escape}");
+
+    modClick(await screen.findByLabelText("Root"), { shiftKey: true });
+    await waitFor(() => {
+      expect(getSelectedNodes()).toEqual([]);
+    });
   });
 });

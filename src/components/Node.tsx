@@ -25,6 +25,7 @@ import {
   useEffectiveAuthor,
 } from "../ViewContext";
 import { isMutableNode } from "./TemporaryViewContext";
+import { planBatchIndent, planBatchOutdent } from "./batchOperations";
 import {
   isReferenceNode,
   getRefTargetInfo,
@@ -53,7 +54,6 @@ import {
   planExpandNode,
   planRemoveEmptyNodePosition,
   planCreateNode,
-  planCreateVersion,
   planAddToParent,
   planSetRowFocusIntent,
 } from "../planner";
@@ -302,11 +302,6 @@ function EditableContent(): JSX.Element {
   };
 
   const handleTab = (text: string): void => {
-    if (!prevSibling) {
-      return;
-    }
-
-    // For regular nodes, check node type
     if (!isEmptyNode && (!node || node.type !== "text")) {
       return;
     }
@@ -314,21 +309,16 @@ function EditableContent(): JSX.Element {
     const basePlan = createPlan();
     const trimmedText = text.trim();
 
-    // Handle empty nodes: materialize with text, or move empty position if no text
     if (isEmptyNode) {
-      if (!parentPath) return;
+      if (!prevSibling || !parentPath) return;
       const currentParentRelation = getRelationForView(
         basePlan,
         parentPath,
         stack
       );
-
-      // Remove empty node position from old parent
       const planWithoutEmpty = currentParentRelation
         ? planRemoveEmptyNodePosition(basePlan, currentParentRelation.id)
         : basePlan;
-
-      // Expand previous sibling
       const planWithExpand = planExpandNode(
         planWithoutEmpty,
         prevSibling.view,
@@ -336,78 +326,45 @@ function EditableContent(): JSX.Element {
       );
 
       if (trimmedText) {
-        // Has text - create real node and add to previous sibling
         const [planWithNode, newNode] = planCreateNode(
           planWithExpand,
           trimmedText
         );
-        const finalPlan = planAddToParent(
-          planWithNode,
-          newNode.id,
-          prevSibling.viewPath,
-          stack
+        executePlan(
+          planAddToParent(planWithNode, newNode.id, prevSibling.viewPath, stack)
         );
-        executePlan(finalPlan);
       } else {
-        // No text - just move empty position to previous sibling (at end)
-        const finalPlan = planSetEmptyNodePosition(
-          planWithExpand,
-          prevSibling.viewPath,
-          stack,
-          0 // Insert at end (will be only child or after existing children)
+        executePlan(
+          planSetEmptyNodePosition(
+            planWithExpand,
+            prevSibling.viewPath,
+            stack,
+            0
+          )
         );
-        executePlan(finalPlan);
       }
       return;
     }
 
-    const prevSiblingContext = getContext(
-      basePlan,
-      prevSibling.viewPath,
-      stack
-    );
-    const planWithExpand = planExpandNode(
-      basePlan,
-      prevSibling.view,
-      prevSibling.viewPath
-    );
-
-    const planWithMove = planMoveNodeWithView(
-      planWithExpand,
+    const viewKey = viewPathToString(viewPath);
+    const result = planBatchIndent(basePlan, [viewKey], stack, {
+      text: trimmedText,
       viewPath,
-      prevSibling.viewPath,
-      stack
-    );
-
-    const newContext = prevSiblingContext.push(prevSibling.nodeID);
-    const originalNodeText = node?.text ?? "";
-    const hasTextChanges = trimmedText !== originalNodeText;
-    const finalPlan = hasTextChanges
-      ? planCreateVersion(planWithMove, nodeID, trimmedText, newContext)
-      : planWithMove;
-
-    executePlan(finalPlan);
+    });
+    if (result) executePlan(result);
   };
 
   const handleShiftTab = (text: string): void => {
-    if (!parentPath) {
-      return;
-    }
-
-    const grandParentPath = getParentView(parentPath);
-    if (!grandParentPath) {
-      return;
-    }
-
     const basePlan = createPlan();
     const trimmedText = text.trim();
-    const parentRelationIndex = getRelationIndex(basePlan, parentPath);
-
-    if (parentRelationIndex === undefined) {
-      return;
-    }
 
     if (isEmptyNode) {
+      if (!parentPath) return;
+      const grandParentPath = getParentView(parentPath);
+      if (!grandParentPath) return;
+      const parentRelationIndex = getRelationIndex(basePlan, parentPath);
+      if (parentRelationIndex === undefined) return;
+
       const currentParentRelation = getRelationForView(
         basePlan,
         parentPath,
@@ -445,32 +402,14 @@ function EditableContent(): JSX.Element {
       return;
     }
 
-    if (!node || node.type !== "text") {
-      return;
-    }
+    if (!node || node.type !== "text") return;
 
-    const planWithMove = planMoveNodeWithView(
-      basePlan,
+    const viewKey = viewPathToString(viewPath);
+    const result = planBatchOutdent(basePlan, [viewKey], stack, {
+      text: trimmedText,
       viewPath,
-      grandParentPath,
-      stack,
-      parentRelationIndex + 1
-    );
-
-    const originalNodeText = node.text ?? "";
-    const hasTextChanges = trimmedText !== originalNodeText;
-
-    if (!hasTextChanges) {
-      executePlan(planWithMove);
-      return;
-    }
-
-    const grandParentContext = getContext(basePlan, grandParentPath, stack);
-    const grandParentNodeID = getLast(grandParentPath).nodeID;
-    const newContext = grandParentContext.push(grandParentNodeID);
-    executePlan(
-      planCreateVersion(planWithMove, nodeID, trimmedText, newContext)
-    );
+    });
+    if (result) executePlan(result);
   };
 
   const handleRequestRowFocus = ({

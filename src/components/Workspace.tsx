@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { OrderedSet } from "immutable";
 import {
   TemporaryViewProvider,
   useTemporaryView,
@@ -48,6 +49,8 @@ import {
 import {
   planBatchRelevance,
   planBatchArgument,
+  planBatchIndent,
+  planBatchOutdent,
   getCurrentItem,
 } from "./batchOperations";
 
@@ -537,6 +540,13 @@ function getVisibleRowKeys(root: HTMLElement): string[] {
   return getFocusableRows(root).map((row) => getRowKey(row));
 }
 
+function getActionTargetKeys(
+  selection: OrderedSet<string>,
+  activeRow: HTMLElement
+): string[] {
+  return selection.size > 0 ? selection.toArray() : [getRowKey(activeRow)];
+}
+
 function usePaneKeyboardNavigation(paneIndex: number): {
   wrapperRef: React.RefObject<HTMLDivElement>;
   onKeyDownCapture: (e: React.KeyboardEvent<HTMLDivElement>) => void;
@@ -744,6 +754,21 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       return;
     }
 
+    if (e.key === "Tab" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      const activeRow = getActiveRow(root);
+      if (!activeRow) return;
+      e.preventDefault();
+      const keys = getActionTargetKeys(selection, activeRow);
+      const plan = createPlan();
+      const result = e.shiftKey
+        ? planBatchOutdent(plan, keys, stack)
+        : planBatchIndent(plan, keys, stack);
+      if (result) {
+        executePlan(result);
+      }
+      return;
+    }
+
     const isShiftOnly = e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey;
     if (
       isShiftOnly &&
@@ -811,8 +836,9 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       e.preventDefault();
       if (selection.size > 0) {
         setSelectionState(
-          clearSelection({ baseSelection, shiftSelection, anchor })
+          clearSelection({ baseSelection, shiftSelection, anchor: "" })
         );
+        return;
       }
       (document.activeElement as HTMLElement)?.blur();
       return;
@@ -1001,11 +1027,9 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (e.key === "x" || e.key === "~" || e.key === "!" || e.key === "?") {
       e.preventDefault();
       const plan = createPlan();
+      const keys = getActionTargetKeys(selection, activeRow);
+      const paths = keys.map(parseViewPath);
       const activeViewPath = parseViewPath(getRowKey(activeRow));
-      const paths =
-        selection.size > 0
-          ? selection.toArray().map(parseViewPath)
-          : [activeViewPath];
       const targetRelevance = SYMBOL_TO_RELEVANCE[e.key];
       const currentItem = getCurrentItem(plan, activeViewPath);
       const relevance =
@@ -1020,11 +1044,9 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (e.key === "+" || e.key === "-" || e.key === "o") {
       e.preventDefault();
       const plan = createPlan();
+      const keys = getActionTargetKeys(selection, activeRow);
+      const paths = keys.map(parseViewPath);
       const activeViewPath = parseViewPath(getRowKey(activeRow));
-      const paths =
-        selection.size > 0
-          ? selection.toArray().map(parseViewPath)
-          : [activeViewPath];
       const targetArgument: Argument = (() => {
         if (e.key === "+") return "confirms" as const;
         if (e.key === "-") return "contra" as const;
@@ -1085,7 +1107,9 @@ function PaneViewInner(): JSX.Element {
       />
       <PaneHeader />
       <DroppableContainer
-        className={`pane-content${!pane.stack.length ? " empty-pane-drop-zone" : ""}`}
+        className={`pane-content${
+          !pane.stack.length ? " empty-pane-drop-zone" : ""
+        }`}
         disabled={!!pane.stack.length}
       >
         <TreeView />

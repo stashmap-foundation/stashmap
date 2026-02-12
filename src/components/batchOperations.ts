@@ -3,6 +3,7 @@ import {
   updateItemRelevance,
   updateItemArgument,
   isEmptyNodeID,
+  shortID,
 } from "../connections";
 import {
   ViewPath,
@@ -13,12 +14,19 @@ import {
   getLast,
   getRelationForView,
   viewPathToString,
+  getParentKey,
+  parseViewPath,
+  getPreviousSibling,
+  getContext,
 } from "../ViewContext";
 import {
   Plan,
+  planExpandNode,
+  planCreateVersion,
   planSaveNodeAndEnsureRelations,
   planUpdateEmptyNodeMetadata,
 } from "../planner";
+import { planMoveNodeWithView } from "../dnd";
 
 export type EditorInfo = {
   text: string;
@@ -187,5 +195,102 @@ export function planBatchArgument(
       ),
     plan
   );
+  return planClearSelection(updated);
+}
+
+function allSameParent(viewKeys: string[]): boolean {
+  if (viewKeys.length === 0) return false;
+  const firstParent = getParentKey(viewKeys[0]);
+  return viewKeys.every((k) => getParentKey(k) === firstParent);
+}
+
+function sortByRelationIndex(plan: Plan, viewPaths: ViewPath[]): ViewPath[] {
+  return [...viewPaths].sort((a, b) => {
+    const idxA = getRelationIndex(plan, a) ?? 0;
+    const idxB = getRelationIndex(plan, b) ?? 0;
+    return idxA - idxB;
+  });
+}
+
+export function planBatchIndent(
+  plan: Plan,
+  viewKeys: string[],
+  stack: ID[],
+  editorInfo?: EditorInfo
+): Plan | undefined {
+  if (!allSameParent(viewKeys)) return undefined;
+
+  const viewPaths = sortByRelationIndex(plan, viewKeys.map(parseViewPath));
+  const firstPath = viewPaths[0];
+
+  const prevSibling = getPreviousSibling(plan, firstPath, stack);
+  if (!prevSibling) return undefined;
+
+  const planWithExpand = planExpandNode(
+    plan,
+    prevSibling.view,
+    prevSibling.viewPath
+  );
+
+  const prevSiblingContext = getContext(plan, prevSibling.viewPath, stack);
+  const newContext = prevSiblingContext.push(shortID(prevSibling.nodeID));
+
+  const updated = viewPaths.reduce((acc, viewPath) => {
+    const moved = planMoveNodeWithView(
+      acc,
+      viewPath,
+      prevSibling.viewPath,
+      stack
+    );
+    const editorText = getEditorTextForPath(editorInfo, viewPath);
+    if (!editorText) return moved;
+    const { nodeID } = getLast(viewPath);
+    const nodeText = getNodeText(acc, nodeID);
+    if (editorText === nodeText) return moved;
+    return planCreateVersion(moved, nodeID, editorText, newContext);
+  }, planWithExpand);
+
+  return planClearSelection(updated);
+}
+
+export function planBatchOutdent(
+  plan: Plan,
+  viewKeys: string[],
+  stack: ID[],
+  editorInfo?: EditorInfo
+): Plan | undefined {
+  if (!allSameParent(viewKeys)) return undefined;
+
+  const viewPaths = sortByRelationIndex(plan, viewKeys.map(parseViewPath));
+  const firstPath = viewPaths[0];
+  const parentPath = getParentView(firstPath);
+  if (!parentPath) return undefined;
+
+  const grandParentPath = getParentView(parentPath);
+  if (!grandParentPath) return undefined;
+
+  const parentRelationIndex = getRelationIndex(plan, parentPath);
+  if (parentRelationIndex === undefined) return undefined;
+
+  const grandParentContext = getContext(plan, grandParentPath, stack);
+  const grandParentNodeID = getLast(grandParentPath).nodeID;
+  const newContext = grandParentContext.push(shortID(grandParentNodeID));
+
+  const updated = viewPaths.reduce((acc, viewPath, idx) => {
+    const moved = planMoveNodeWithView(
+      acc,
+      viewPath,
+      grandParentPath,
+      stack,
+      parentRelationIndex + 1 + idx
+    );
+    const editorText = getEditorTextForPath(editorInfo, viewPath);
+    if (!editorText) return moved;
+    const { nodeID } = getLast(viewPath);
+    const nodeText = getNodeText(acc, nodeID);
+    if (editorText === nodeText) return moved;
+    return planCreateVersion(moved, nodeID, editorText, newContext);
+  }, plan);
+
   return planClearSelection(updated);
 }

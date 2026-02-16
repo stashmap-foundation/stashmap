@@ -8,6 +8,7 @@ import {
   shortID,
   isConcreteRefId,
   parseConcreteRefId,
+  createConcreteRefId,
 } from "../connections";
 import { DND } from "../dnd";
 import {
@@ -285,11 +286,9 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
 
   const views = Map<string, View>()
     .set(viewPathToString(parentPath), {
-      viewingMode: undefined,
       expanded: true,
     })
     .set(viewPathToString(childPath), {
-      viewingMode: undefined,
       expanded: true,
     });
 
@@ -300,7 +299,7 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
     panes: [{ id: "pane-0", stack: [parent.id], author: alicePK }],
   };
 
-  const nodes = getNodesInTree(
+  const { paths: nodes } = getNodesInTree(
     data,
     parentPath,
     [parent.id],
@@ -458,11 +457,9 @@ test("Diff item paths are correctly identified as diff items", () => {
 
   const views = Map<string, View>()
     .set(viewPathToString(rootPath), {
-      viewingMode: undefined,
       expanded: true,
     })
     .set(viewPathToString(parentPath), {
-      viewingMode: undefined,
       expanded: true,
     });
 
@@ -473,7 +470,13 @@ test("Diff item paths are correctly identified as diff items", () => {
     panes: [{ id: "pane-0", stack: [root.id], author: alicePK }],
   };
 
-  const nodes = getNodesInTree(data, rootPath, [root.id], List(), undefined);
+  const { paths: nodes } = getNodesInTree(
+    data,
+    rootPath,
+    [root.id],
+    List(),
+    undefined
+  );
   expect(nodes.size).toBeGreaterThanOrEqual(3);
 
   const diffItemPath = nodes.find(
@@ -618,6 +621,58 @@ test("getDiffItemsForNode returns concrete ref for expandable suggestions (has c
   const parsed = parseConcreteRefId(suggestion as LongID);
   expect(parsed).toBeDefined();
   expect(parsed?.relationID).toBe(bobFolderRelations.id);
+});
+
+test("getDiffItemsForNode preserves concrete-ref suggestion IDs", () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  const { publicKey: alicePK } = alice().user;
+  const { publicKey: bobPK } = bob().user;
+
+  const parent = newNode("Parent");
+  const bobLinkedRoot = newNode("Bob Linked Root");
+  const bobLinkedChild = newNode("Bob Linked Child");
+
+  const aliceRelations = newRelations(parent.id, List(), alicePK);
+  const bobLinkedRelations = addRelationToRelations(
+    newRelations(bobLinkedRoot.id, List(), bobPK),
+    bobLinkedChild.id
+  );
+  const bobLinkRef = createConcreteRefId(bobLinkedRelations.id);
+  const bobParentRelations = addRelationToRelations(
+    newRelations(parent.id, List(), bobPK),
+    bobLinkRef
+  );
+
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>()
+    .set(alicePK, {
+      nodes: newDB().nodes.set(shortID(parent.id), parent),
+      relations: newDB().relations.set(
+        shortID(aliceRelations.id),
+        aliceRelations
+      ),
+    })
+    .set(bobPK, {
+      nodes: newDB()
+        .nodes.set(shortID(bobLinkedRoot.id), bobLinkedRoot)
+        .set(shortID(bobLinkedChild.id), bobLinkedChild),
+      relations: newDB()
+        .relations.set(shortID(bobLinkedRelations.id), bobLinkedRelations)
+        .set(shortID(bobParentRelations.id), bobParentRelations),
+    });
+
+  const diffItems = getDiffItemsForNode(
+    knowledgeDBs,
+    alicePK,
+    parent.id,
+    ["contains", "suggestions"],
+    aliceRelations.id,
+    List()
+  );
+
+  expect(diffItems.size).toBe(1);
+  const suggestion = diffItems.get(0) as LongID;
+  expect(suggestion).toBe(bobLinkRef);
+  expect(isConcreteRefId(suggestion)).toBe(true);
 });
 
 test("getDiffItemsForNode only returns suggestions from matching context", () => {

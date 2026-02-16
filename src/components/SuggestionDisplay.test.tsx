@@ -42,10 +42,11 @@ My Notes
     await expectTree(`
 My Notes
   [S] Holiday Destinations
+  [VO] +1
     `);
   });
 
-  test("Concrete ref in Referenced By view shows breadcrumbs", async () => {
+  test("Other user's children show as suggestions with version", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
 
@@ -64,24 +65,18 @@ My Notes
 
     renderTree(alice);
     await type("My Notes{Enter}{Tab}Topic{Escape}");
+    await maybeExpand("expand Topic");
 
     await expectTree(`
 My Notes
   Topic
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText("show references to Topic")
-    );
-
-    await expectTree(`
-My Notes
-  Topic
-    [O] My Notes → Topic (2)
+    [S] Child1
+    [S] Child2
+    [VO] +2
     `);
   });
 
-  test("Abstract ref expands to concrete refs with breadcrumbs", async () => {
+  test("Suggestion and version appear when both users have same topic", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
 
@@ -103,28 +98,7 @@ My Notes
   Topic
     AliceChild
     [S] BobChild
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText("show references to Topic")
-    );
-
-    await expectTree(`
-My Notes
-  Topic
-    My Notes → Topic
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText("expand My Notes → Topic")
-    );
-
-    await expectTree(`
-My Notes
-  Topic
-    My Notes → Topic
-      My Notes → Topic (1)
-      [O] My Notes → Topic (1)
+    [VO] +1 -1
     `);
   });
 
@@ -153,11 +127,11 @@ My Notes
 
     await expectTree(`
 Search: Barcelona
-  My Notes → Holiday Destinations → Spain (1) → Barcelona
+  [R] My Notes / Holiday Destinations / Spain >>> Barcelona
     `);
   });
 
-  test("All concrete refs inside abstract ref show breadcrumbs", async () => {
+  test("Suggestion and version appear when both users share a topic", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
     await follow(bob, alice().user.publicKey);
@@ -180,28 +154,7 @@ My Notes
   Shared
     AliceChild
     [S] BobChild
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText("show references to Shared")
-    );
-
-    await expectTree(`
-My Notes
-  Shared
-    My Notes → Shared
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText("expand My Notes → Shared")
-    );
-
-    await expectTree(`
-My Notes
-  Shared
-    My Notes → Shared
-      My Notes → Shared (1)
-      [O] My Notes → Shared (1)
+    [VO] +1 -1
     `);
   });
 
@@ -232,6 +185,7 @@ My Notes
 My Notes
   Recipes
     [S] Pasta
+    [VO] +1
     `);
 
     await userEvent.click(await screen.findByLabelText("expand Pasta"));
@@ -240,8 +194,9 @@ My Notes
 My Notes
   Recipes
     [S] Pasta
-      Carbonara
-      Bolognese
+      [O] Carbonara
+      [O] Bolognese
+    [VO] +1
     `);
   });
 
@@ -272,6 +227,7 @@ My Notes
 My Notes
   Recipes
     [S] Pasta
+    [VO] +1
     `);
 
     await userEvent.click(await screen.findByLabelText("expand Pasta"));
@@ -280,7 +236,8 @@ My Notes
 My Notes
   Recipes
     [S] Pasta
-      Carbonara
+      [O] Carbonara
+    [VO] +1
     `);
 
     await userEvent.click(await screen.findByLabelText("expand Carbonara"));
@@ -289,8 +246,9 @@ My Notes
 My Notes
   Recipes
     [S] Pasta
-      Carbonara
-        Ingredients
+      [O] Carbonara
+        [O] Ingredients
+    [VO] +1
     `);
   });
 
@@ -322,6 +280,7 @@ My Notes
 My Notes
   Recipes
     [S] Pasta
+    [VO] +1
     `);
 
     await userEvent.click(await screen.findByLabelText("edit Recipes"));
@@ -333,5 +292,40 @@ My Notes
   Recipes
     Pasta
     `);
+  });
+
+  test("Other user's ~Log cref suggestions resolve to linked note text", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    await follow(alice, bob().user.publicKey);
+
+    renderTree(bob);
+    await type("Bob Root{Enter}{Tab}Bob Child{Escape}");
+    cleanup();
+
+    renderTree(alice);
+    await type("Alice Root{Escape}");
+    await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+    await expectTree(`
+~Log
+  [R] Alice Root
+  [S] Bob Root
+  [VO] +1 -1
+    `);
+
+    expect(screen.queryByText("Error: Node not found")).toBeNull();
+
+    cleanup();
+    renderTree(alice);
+    await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+    await expectTree(`
+~Log
+  [R] Alice Root
+  [S] Bob Root
+  [VO] +1 -1
+    `);
+
+    expect(screen.queryByText("Error: Node not found")).toBeNull();
   });
 });

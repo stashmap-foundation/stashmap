@@ -3,16 +3,16 @@ import { ConnectableElement, useDrag } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
 import {
   ViewPath,
-  useIsSuggestion,
-  useIsInReferencedByView,
+  useIsInSearchView,
   useViewPath,
   useViewKey,
   useNodeID,
   useNode,
   useDisplayText,
   useIsViewingOtherUserContent,
+  useRelationItem,
 } from "../ViewContext";
-import { isEmptyNodeID, isAbstractRefId } from "../connections";
+import { isEmptyNodeID } from "../connections";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
 import {
@@ -181,7 +181,6 @@ function DraggableSuggestion({
   const [nodeID] = useNodeID();
   const [node] = useNode();
   const displayText = useDisplayText();
-  const isAbstractRef = isAbstractRefId(nodeID);
 
   const [{ isDragging }, drag, preview] = useDrag({
     type: NOTE_TYPE,
@@ -198,9 +197,7 @@ function DraggableSuggestion({
     preview(getEmptyImage(), { captureDraggingState: true });
   }, [preview]);
 
-  if (!isAbstractRef) {
-    drag(ref as ConnectableElement);
-  }
+  drag(ref as ConnectableElement);
 
   const handleClick = (e: React.MouseEvent): void => {
     if (!onRowClick) {
@@ -274,15 +271,18 @@ export function ListItem({
   const viewKey = useViewKey();
   const viewPath = useViewPath();
   const [nodeID] = useNodeID();
-  const isSuggestion = useIsSuggestion();
-  const isInReferencedByView = useIsInReferencedByView();
+  const virtualType = useRelationItem()?.virtualType;
+  const isSuggestion = virtualType === "suggestion";
+  const isVersion = virtualType === "version";
+  const displayText = useDisplayText();
+  const isInSearchView = useIsInSearchView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const selected = useIsSelected();
   const rowDepth = viewPath.length - 1;
   const isActiveRow = activeRowKey === viewKey;
   const isEmptyNode = isEmptyNodeID(nodeID);
 
-  const isReadonly = isInReferencedByView || isViewingOtherUserContent;
+  const isReadonly = isInSearchView || isViewingOtherUserContent;
 
   const [{ dragDirection }, drop] = useDroppable({
     destination: treeViewPath,
@@ -291,6 +291,35 @@ export function ListItem({
     nextDepth,
     nextViewPathStr,
   });
+
+  if (isVersion) {
+    return (
+      <div className="visible-on-hover">
+        <div
+          ref={ref}
+          className="item"
+          data-row-focusable="true"
+          data-view-key={viewKey}
+          data-row-index={index}
+          data-row-depth={rowDepth}
+          data-node-id={nodeID}
+          role="treeitem"
+          aria-label={displayText}
+          aria-selected={isActiveRow}
+          tabIndex={isActiveRow ? 0 : -1}
+          onFocusCapture={(e) =>
+            onRowFocus(
+              viewKey,
+              index,
+              isEditableElement(e.target) ? "insert" : "normal"
+            )
+          }
+        >
+          <Node />
+        </div>
+      </div>
+    );
+  }
 
   if (isSuggestion) {
     return (

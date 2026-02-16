@@ -92,6 +92,7 @@ Root
 Root
   Parent Node
     [S] Bob Child
+    [VO] +1
   `);
 });
 

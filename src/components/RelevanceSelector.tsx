@@ -11,11 +11,12 @@ import {
   useViewPath,
   parseViewPath,
   getParentView,
+  getLast,
   useNode,
   useDisplayText,
   useViewKey,
 } from "../ViewContext";
-import { usePlanner, planDeepCopyNode } from "../planner";
+import { usePlanner, planDeepCopyNode, planAddToParent } from "../planner";
 import { usePaneStack } from "../SplitPanesContext";
 import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
@@ -23,7 +24,7 @@ import { useTemporaryView } from "./TemporaryViewContext";
 import { planBatchRelevance, EditorInfo } from "./batchOperations";
 
 type RelevanceSelectorProps = {
-  isSuggestion?: boolean;
+  virtualType?: VirtualType;
 };
 
 const LEVEL_SYMBOLS: Record<number, string> = {
@@ -52,11 +53,11 @@ function getLevelColor(
 }
 
 function getXButtonAriaLabel(
-  isSuggestion: boolean,
+  isVirtual: boolean,
   isCurrentlyNotRelevant: boolean,
   displayText: string
 ): string {
-  if (isSuggestion) {
+  if (isVirtual) {
     return `decline ${displayText}`;
   }
   if (isCurrentlyNotRelevant) {
@@ -66,7 +67,7 @@ function getXButtonAriaLabel(
 }
 
 export function RelevanceSelector({
-  isSuggestion = false,
+  virtualType,
 }: RelevanceSelectorProps): JSX.Element | null {
   const [hoverLevel, setHoverLevel] = useState<number | null>(null);
 
@@ -80,6 +81,7 @@ export function RelevanceSelector({
   const parentPath = getParentView(viewPath);
   const { selection } = useTemporaryView();
 
+  const isVirtual = virtualType !== undefined;
   const suggestionNodeText = node?.text || "";
   const versionedDisplayText = useDisplayText();
   const editorTextContext = useEditorText();
@@ -88,29 +90,39 @@ export function RelevanceSelector({
   const acceptWithLevel = (level: number): void => {
     if (!parentPath) return;
     const relevance = levelToRelevance(level);
-    const [plan] = planDeepCopyNode(
-      createPlan(),
-      viewPath,
-      parentPath,
-      stack,
-      undefined,
-      relevance
-    );
-    executePlan(plan);
+    if (virtualType === "suggestion") {
+      const [plan] = planDeepCopyNode(
+        createPlan(),
+        viewPath,
+        parentPath,
+        stack,
+        undefined,
+        relevance
+      );
+      executePlan(plan);
+    } else {
+      const { nodeID } = getLast(viewPath);
+      const plan = planAddToParent(
+        createPlan(),
+        nodeID,
+        parentPath,
+        stack,
+        undefined,
+        relevance
+      );
+      executePlan(plan);
+    }
   };
 
-  // Determine visibility
-  if (isSuggestion) {
+  if (isVirtual) {
     if (!parentPath) return null;
   } else if (!isVisible) return null;
 
-  // For suggestions: no selection initially (-1 means nothing selected)
-  // For normal items: use current relevance
-  const currentLevel = isSuggestion ? -1 : relevanceToLevel(currentRelevance);
+  const currentLevel = isVirtual ? -1 : relevanceToLevel(currentRelevance);
   const displayLevel = hoverLevel !== null ? hoverLevel : currentLevel;
   const isNotRelevant = displayLevel === 0;
   const isContains = displayLevel === -1;
-  const displayText = isSuggestion
+  const displayText = isVirtual
     ? suggestionNodeText
     : editorText.trim() || versionedDisplayText;
 
@@ -123,7 +135,7 @@ export function RelevanceSelector({
     editorText ? { text: editorText, viewPath } : undefined;
 
   const handleSetLevel = (level: number): void => {
-    if (isSuggestion) {
+    if (isVirtual) {
       acceptWithLevel(level);
       return;
     }
@@ -139,10 +151,10 @@ export function RelevanceSelector({
     );
   };
 
-  const isCurrentlyNotRelevant = !isSuggestion && currentLevel === 0;
+  const isCurrentlyNotRelevant = !isVirtual && currentLevel === 0;
 
   const handleXClick = (): void => {
-    if (isSuggestion) {
+    if (isVirtual) {
       acceptWithLevel(0);
       return;
     }
@@ -161,14 +173,13 @@ export function RelevanceSelector({
     );
   };
 
-  // For suggestions with no hover, show all as inactive
   const effectiveDisplayLevel = displayLevel === -1 ? -1 : displayLevel;
 
   const getTitle = (): string => {
     if (effectiveDisplayLevel >= 0) {
       return RELEVANCE_LABELS[effectiveDisplayLevel];
     }
-    return isSuggestion ? "Set relevance" : RELEVANCE_LABELS[-1];
+    return isVirtual ? "Set relevance" : RELEVANCE_LABELS[-1];
   };
 
   return (
@@ -176,6 +187,7 @@ export function RelevanceSelector({
       className="pill relevance-selector"
       onMouseLeave={() => setHoverLevel(null)}
       title={getTitle()}
+      aria-label={`${getTitle()} for ${displayText}`}
     >
       <span
         className="relevance-symbol"
@@ -185,7 +197,7 @@ export function RelevanceSelector({
         role="button"
         tabIndex={0}
         aria-label={getXButtonAriaLabel(
-          isSuggestion,
+          isVirtual,
           isCurrentlyNotRelevant,
           displayText
         )}
@@ -220,7 +232,7 @@ export function RelevanceSelector({
           role="button"
           tabIndex={0}
           aria-label={
-            isSuggestion
+            isVirtual
               ? `accept ${displayText} as ${RELEVANCE_LABELS[
                   level
                 ].toLowerCase()}`

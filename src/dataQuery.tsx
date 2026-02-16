@@ -4,10 +4,12 @@ import { List, Set } from "immutable";
 import { KIND_DELETE, KIND_KNOWLEDGE_LIST, KIND_KNOWLEDGE_NODE } from "./nostr";
 import {
   splitID,
-  isRefId,
-  extractNodeIdsFromRefId,
+  isConcreteRefId,
+  parseConcreteRefId,
+  getRelationsNoReferencedBy,
   VERSIONS_NODE_ID,
 } from "./connections";
+import { parseRef } from "./buildReferenceNode";
 import { REFERENCED_BY } from "./constants";
 import {
   getNodeFromID,
@@ -107,17 +109,33 @@ function addAuthorFromIDToFilters(filters: Filters, id: LongID | ID): Filters {
   };
 }
 
+export function addRelationIDToFilters(
+  filters: Filters,
+  relationID: LongID
+): Filters {
+  return {
+    ...addAuthorFromIDToFilters(filters, relationID as ID),
+    knowledgeListbyID: addIDToFilter(
+      filters.knowledgeListbyID,
+      relationID,
+      "#d"
+    ),
+  };
+}
+
 export function addNodeToFilters(
   filters: Filters,
   id: LongID | ID,
   includeListQuery: boolean = false
 ): Filters {
-  if (isRefId(id)) {
-    const nodeIds = extractNodeIdsFromRefId(id);
-    return nodeIds.reduce(
-      (acc, nodeId) => addNodeToFilters(acc, nodeId, includeListQuery),
-      filters
-    );
+  if (isConcreteRefId(id)) {
+    const parsed = parseConcreteRefId(id);
+    if (parsed) {
+      const withRelation = addRelationIDToFilters(filters, parsed.relationID);
+      return parsed.targetNode
+        ? addNodeToFilters(withRelation, parsed.targetNode, includeListQuery)
+        : withRelation;
+    }
   }
 
   const baseFilters = {
@@ -154,20 +172,6 @@ export function addReferencedByToFilters(
     referencedBy: updatedFilter,
     // Also query for relations where this node is the head (has direct children)
     knowledgeListByHead: addIDToFilter(filters.knowledgeListByHead, id, "#k"),
-  };
-}
-
-export function addRelationIDToFilters(
-  filters: Filters,
-  relationID: LongID
-): Filters {
-  return {
-    ...addAuthorFromIDToFilters(filters, relationID as ID),
-    knowledgeListbyID: addIDToFilter(
-      filters.knowledgeListbyID,
-      relationID,
-      "#d"
-    ),
   };
 }
 
@@ -354,7 +358,7 @@ export function LoadRelationData({
   children: React.ReactNode;
   relationID: LongID;
 }): JSX.Element {
-  const { user, contacts, projectMembers } = useData();
+  const { knowledgeDBs, user, contacts, projectMembers } = useData();
   const effectiveAuthor = useCurrentPane().author;
   const baseFilter = createBaseFilter(
     contacts,
@@ -362,7 +366,18 @@ export function LoadRelationData({
     user.publicKey,
     effectiveAuthor
   );
-  const filter = addRelationIDToFilters(baseFilter, relationID);
+  const withRelation = addRelationIDToFilters(baseFilter, relationID);
+  const relation = getRelationsNoReferencedBy(
+    knowledgeDBs,
+    relationID,
+    effectiveAuthor
+  );
+  const filter = relation
+    ? [...relation.context.toArray(), relation.head].reduce(
+        (acc, nodeID) => addNodeToFilters(acc, nodeID),
+        withRelation
+      )
+    : withRelation;
   const filterArray = filtersToFilterArray(filter);
   useQueryKnowledgeData(filterArray);
   return <>{children}</>;
@@ -389,24 +404,38 @@ export function LoadMissingVersionNodes({
         : [contextNodeID];
       const context = getContext(data, viewPath, stack);
       const effectiveAuthor = getEffectiveAuthor(data, viewPath);
+
+      const ref = isConcreteRefId(nodeID)
+        ? parseRef(nodeID as LongID, data.knowledgeDBs, data.user.publicKey)
+        : undefined;
+
+      const author = ref?.relation.author ?? effectiveAuthor;
+      const targetNodeID = ref
+        ? ref.targetNode || (ref.relation.head as ID)
+        : (nodeID as ID);
+      const refContext = ref?.targetNode
+        ? ref.relationContext.push(ref.relation.head as ID)
+        : ref?.relationContext;
+      const targetContext = refContext ?? context;
+
       const versionsRel = getVersionsRelations(
         data.knowledgeDBs,
-        effectiveAuthor,
-        nodeID,
-        context
+        author,
+        targetNodeID,
+        targetContext
       );
-      if (versionsRel) {
-        const firstVersionID = versionsRel.items.first()?.nodeID;
-        if (firstVersionID) {
-          const firstVersionNode = getNodeFromID(
-            data.knowledgeDBs,
-            firstVersionID,
-            effectiveAuthor
-          );
-          if (!firstVersionNode && !acc.includes(firstVersionID)) {
-            return [...acc, firstVersionID];
-          }
-        }
+      if (!versionsRel) return acc;
+
+      const firstVersionID = versionsRel.items.first()?.nodeID;
+      if (!firstVersionID) return acc;
+
+      const firstVersionNode = getNodeFromID(
+        data.knowledgeDBs,
+        firstVersionID,
+        author
+      );
+      if (!firstVersionNode && !acc.includes(firstVersionID)) {
+        return [...acc, firstVersionID];
       }
       return acc;
     },

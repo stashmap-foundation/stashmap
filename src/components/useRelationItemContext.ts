@@ -3,7 +3,7 @@ import {
   useViewPath,
   getParentView,
   upsertRelations,
-  useIsInReferencedByView,
+  useIsInSearchView,
   useNode,
   useNodeID,
   getRelationForView,
@@ -52,7 +52,7 @@ export function useRelationItemContext(): RelationItemContext {
   const relationIndex = useRelationIndex();
   const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
-  const isInReferencedByView = useIsInReferencedByView();
+  const isInSearchView = useIsInSearchView();
   const [node] = useNode();
   const parentView = getParentView(viewPath);
 
@@ -65,9 +65,7 @@ export function useRelationItemContext(): RelationItemContext {
   const nodeText = node?.text || "";
 
   const isVisible =
-    !isInReferencedByView &&
-    relationIndex !== undefined &&
-    parentView !== undefined;
+    !isInSearchView && relationIndex !== undefined && parentView !== undefined;
 
   // Get current item using context-aware lookup
   const currentItem =

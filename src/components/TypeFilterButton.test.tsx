@@ -156,13 +156,8 @@ My Notes
 
     // Inline filter dots should exist in pane header
     expect(screen.getByLabelText("toggle Relevant filter")).toBeDefined();
-
-    // Switch to Referenced By view
-    fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
-    await screen.findByLabelText("hide references to Bitcoin");
-
-    // Inline filter dots should still be visible (they're in pane header)
-    expect(screen.getByLabelText("toggle Relevant filter")).toBeDefined();
+    expect(screen.getByLabelText("toggle Contains filter")).toBeDefined();
+    expect(screen.getByLabelText("toggle Suggestions filter")).toBeDefined();
   });
 
   test("filter state persists across interactions", async () => {

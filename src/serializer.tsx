@@ -85,7 +85,7 @@ function parseArgument(value: string | undefined): Argument {
 
 function parseTypeFilter(
   value: string
-): Relevance | Argument | "suggestions" | "contains" | null {
+): Relevance | Argument | "suggestions" | "versions" | "contains" | null {
   if (value === "contains") {
     return "contains";
   }
@@ -106,23 +106,31 @@ function parseTypeFilter(
   if (value === "suggestions") {
     return "suggestions";
   }
+  if (value === "versions") {
+    return "versions";
+  }
   return null;
 }
 
 function parseTypeFilters(
   arr: Array<Serializable>
-): Array<Relevance | Argument | "suggestions" | "contains"> {
+): Array<Relevance | Argument | "suggestions" | "versions" | "contains"> {
   return arr
     .map((item) => parseTypeFilter(asString(item)))
     .filter(
-      (parsed): parsed is Relevance | Argument | "suggestions" | "contains" =>
-        parsed !== null
+      (
+        parsed
+      ): parsed is
+        | Relevance
+        | Argument
+        | "suggestions"
+        | "versions"
+        | "contains" => parsed !== null
     );
 }
 
 function viewToJSON(attributes: View): Serializable {
   return {
-    m: attributes.viewingMode,
     e: attributes.expanded !== undefined ? attributes.expanded : undefined,
     f: attributes.typeFilters,
   };
@@ -134,7 +142,6 @@ function jsonToView(view: Serializable): View | undefined {
   }
   const a = asObject(view);
   return {
-    viewingMode: a.m === "REFERENCED_BY" ? "REFERENCED_BY" : undefined,
     expanded: a.e !== undefined ? asBoolean(a.e) : undefined,
     typeFilters: a.f !== undefined ? parseTypeFilters(asArray(a.f)) : undefined,
   };

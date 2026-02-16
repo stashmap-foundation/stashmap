@@ -6,6 +6,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
   MatcherFunction,
   RenderResult,
 } from "@testing-library/react";
@@ -799,6 +800,22 @@ type RowInfo = {
   indentLevel: number;
 };
 
+function getItemPrefix(innerNode: Element | null, isRef: boolean): string {
+  const virtualType = innerNode?.getAttribute("data-virtual-type");
+  const isOtherUser = innerNode?.getAttribute("data-other-user") === "true";
+  if (virtualType === "suggestion") return "[S] ";
+  if (virtualType === "version") return isOtherUser ? "[VO] " : "[V] ";
+  const typeCharMap: Record<string, string> = {
+    incoming: "I",
+    occurrence: "C",
+  };
+  const typeChar = typeCharMap[virtualType ?? ""] ?? (isRef ? "R" : "");
+  if (isOtherUser && typeChar) return `[O${typeChar}] `;
+  if (isOtherUser) return "[O] ";
+  if (typeChar) return `[${typeChar}] `;
+  return "";
+}
+
 function classifyRow(row: Element): RowInfo | null {
   /* eslint-disable testing-library/no-node-access */
   const toggleButton = row.querySelector(
@@ -808,13 +825,13 @@ function classifyRow(row: Element): RowInfo | null {
     '[role="textbox"][aria-label="new node editor"]'
   );
   const innerNode = row.querySelector(".inner-node");
-  const isSuggestion = innerNode?.getAttribute("data-suggestion") === "true";
   const referenceNode = row.querySelector('[data-testid="reference-node"]');
-  const isOtherUser = referenceNode?.getAttribute("data-other-user") === "true";
   const noteEditor = innerNode?.querySelector(
     '[role="textbox"][aria-label^="edit "]'
   );
   /* eslint-enable testing-library/no-node-access */
+
+  const prefix = getItemPrefix(innerNode, !!referenceNode);
 
   if (newNodeEditor) {
     const content = newNodeEditor.textContent?.trim();
@@ -846,14 +863,9 @@ function classifyRow(row: Element): RowInfo | null {
     if (!rawText) {
       return null;
     }
-    const getPrefix = (): string => {
-      if (isSuggestion) return "[S] ";
-      if (isOtherUser) return "[O] ";
-      return "";
-    };
     return {
       element: toggleButton as HTMLElement,
-      text: `${getPrefix()}${rawText}`,
+      text: `${prefix}${rawText}`,
       indentLevel: getIndentLevel(toggleButton as HTMLElement),
     };
   }
@@ -865,19 +877,17 @@ function classifyRow(row: Element): RowInfo | null {
       .replace(/^\[\[/, "")
       .replace(/\]\]$/, "")
       .trim();
-    const getPrefix = (): string => {
-      if (isSuggestion) return "[S] ";
-      if (isOtherUser) return "[O] ";
-      return "";
-    };
+    const displayText = prefix.startsWith("[V")
+      ? (cleanText.match(/[+-]\d+/g) || []).join(" ")
+      : cleanText;
     return {
       element: referenceNode as HTMLElement,
-      text: `${getPrefix()}${cleanText}`,
+      text: `${prefix}${displayText}`,
       indentLevel: getIndentLevel(referenceNode as HTMLElement),
     };
   }
 
-  if (isSuggestion && innerNode) {
+  if (prefix && innerNode) {
     /* eslint-disable testing-library/no-node-access */
     const textSpan = innerNode.querySelector(".break-word");
     /* eslint-enable testing-library/no-node-access */
@@ -885,7 +895,7 @@ function classifyRow(row: Element): RowInfo | null {
       textSpan?.textContent?.trim() || noteEditor?.textContent?.trim() || "";
     return {
       element: innerNode as HTMLElement,
-      text: `[S] ${rawText}`,
+      text: `${prefix}${rawText}`,
       indentLevel: getIndentLevel(innerNode as HTMLElement),
     };
   }
@@ -902,8 +912,6 @@ function classifyRow(row: Element): RowInfo | null {
     };
   }
 
-  // Read-only text rows (e.g. other-user content) have no editor and may have
-  // no expand/collapse toggle when they are leaf nodes.
   /* eslint-disable testing-library/no-node-access */
   const readOnlyText = innerNode?.querySelector(".break-word");
   /* eslint-enable testing-library/no-node-access */
@@ -988,6 +996,21 @@ export async function createAndSetAsRoot(nodeName: string): Promise<void> {
   await type(`${nodeName}{Escape}`);
 }
 
+export const textContent =
+  (text: string): MatcherFunction =>
+  (_, el) =>
+    el?.textContent === text &&
+    // eslint-disable-next-line testing-library/no-node-access
+    Array.from(el?.children || []).every((child) => child.textContent !== text);
+
+export function getPane(paneIndex: number): ReturnType<typeof within> {
+  // eslint-disable-next-line testing-library/no-node-access
+  const el = document.querySelector(
+    `[data-pane-index="${paneIndex}"]`
+  ) as HTMLElement;
+  return within(el);
+}
+
 export async function navigateToNodeViaSearch(
   paneIndex: number,
   nodeName: string
@@ -999,13 +1022,21 @@ export async function navigateToNodeViaSearch(
     await screen.findByLabelText("search input"),
     `${nodeName}{Enter}`
   );
+  // eslint-disable-next-line testing-library/no-node-access
+  const paneContainer = document.querySelector(
+    `[data-pane-index="${paneIndex}"]`
+  ) as HTMLElement;
+  const paneScope = paneContainer ? within(paneContainer) : screen;
+
   await waitFor(() => {
-    const navigateLinks = screen.queryAllByRole("link", {
+    // eslint-disable-next-line testing-library/prefer-screen-queries
+    const navigateLinks = paneScope.queryAllByRole("link", {
       name: new RegExp(`Navigate to.*${nodeName}`, "i"),
     });
     expect(navigateLinks.length).toBeGreaterThan(0);
   });
-  const navigateButtons = await screen.findAllByRole("link", {
+  // eslint-disable-next-line testing-library/prefer-screen-queries
+  const navigateButtons = paneScope.getAllByRole("link", {
     name: new RegExp(`Navigate to.*${nodeName}`, "i"),
   });
   await userEvent.click(navigateButtons[0]);
@@ -1018,6 +1049,22 @@ export async function navigateToNodeViaSearch(
       screen.queryAllByRole("treeitem", { name: nodeName }).length > 0;
     expect(hasEditor || hasTreeRow).toBe(true);
   });
+
+  // Search results are crefs, so navigation lands on the parent context.
+  // Click the fullscreen button to make the target node the pane root.
+  const fullscreenButtons = screen.queryAllByLabelText(
+    `open ${nodeName} in fullscreen`
+  );
+  if (fullscreenButtons.length > 0) {
+    await userEvent.click(fullscreenButtons[fullscreenButtons.length - 1]);
+    await waitFor(() => {
+      const hasEditor =
+        screen.queryAllByLabelText(`edit ${nodeName}`).length > 0;
+      const hasTreeRow =
+        screen.queryAllByRole("treeitem", { name: nodeName }).length > 0;
+      expect(hasEditor || hasTreeRow).toBe(true);
+    });
+  }
 }
 
 function getDropDepthLimits(

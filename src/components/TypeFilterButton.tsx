@@ -69,7 +69,19 @@ const SUGGESTIONS_FILTER = {
   symbol: "@",
 };
 
-export type FilterId = Relevance | Argument | "suggestions" | "contains";
+const VERSIONS_FILTER = {
+  id: "versions" as const,
+  label: "Versions",
+  color: TYPE_COLORS.other_user,
+  symbol: "\u2225",
+};
+
+export type FilterId =
+  | Relevance
+  | Argument
+  | "suggestions"
+  | "versions"
+  | "contains";
 
 function ClickableFilterSymbol({
   id,
@@ -150,6 +162,11 @@ export function FilterSymbolsDisplay({
         symbol={SUGGESTIONS_FILTER.symbol}
         isActive={isActive("suggestions")}
       />
+      <FilterSymbol
+        color={VERSIONS_FILTER.color}
+        symbol={VERSIONS_FILTER.symbol}
+        isActive={isActive("versions")}
+      />
     </span>
   );
 }
@@ -220,6 +237,14 @@ export function InlineFilterDots(): JSX.Element {
         color={SUGGESTIONS_FILTER.color}
         symbol={SUGGESTIONS_FILTER.symbol}
         isActive={isFilterActive(SUGGESTIONS_FILTER.id)}
+        onClick={handleFilterToggle}
+      />
+      <ClickableFilterSymbol
+        id={VERSIONS_FILTER.id}
+        label={VERSIONS_FILTER.label}
+        color={VERSIONS_FILTER.color}
+        symbol={VERSIONS_FILTER.symbol}
+        isActive={isFilterActive(VERSIONS_FILTER.id)}
         onClick={handleFilterToggle}
       />
     </div>

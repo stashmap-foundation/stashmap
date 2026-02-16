@@ -35,6 +35,7 @@ My Notes
   await expectTree(`
 My Notes
   [S] Holiday Destinations
+  [VO] +1
   `);
 
   await userEvent.click(
@@ -42,8 +43,8 @@ My Notes
   );
 
   await expectTree(`
-Holiday Destinations
-  Spain
+[O] Holiday Destinations
+  [O] Spain
   `);
 
   await screen.findByLabelText("Navigate to My Notes");

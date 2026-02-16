@@ -153,7 +153,7 @@ export function getDropDestinationFromTreeView(
   targetDepth?: number,
   sourceKeys?: Set<string>
 ): [ViewPath, number] {
-  const nodes = getNodesInTree(
+  const { paths: nodes } = getNodesInTree(
     data,
     root,
     stack,

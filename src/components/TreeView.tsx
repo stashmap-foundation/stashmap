@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { List } from "immutable";
+import { List, Map } from "immutable";
 import { ListRange, Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import { useLocation } from "react-router-dom";
 import { useDragAutoScroll } from "../useDragAutoScroll";
@@ -13,10 +13,10 @@ import {
   useViewKey,
   getNodeIDFromView,
   getLast,
-  parseViewPath,
   isExpanded,
   useDisplayText,
   getEffectiveAuthor,
+  VirtualItemsProvider,
 } from "../ViewContext";
 import { useData } from "../DataContext";
 import {
@@ -61,37 +61,6 @@ import {
   usePlanner,
 } from "../planner";
 
-function getAncestorPaths(path: string, rootKey: string): string[] {
-  const suffix = path.slice(rootKey.length);
-  const parts = suffix.split(":");
-
-  const numTriplets = Math.floor((parts.length - 4) / 3);
-  const triplets = Array.from({ length: numTriplets }, (_, idx) => {
-    const i = 1 + idx * 3;
-    return [parts[i], parts[i + 1], parts[i + 2]] as const;
-  });
-
-  return triplets.reduce<{ current: string; ancestors: string[] }>(
-    (acc, [a, b, c]) => {
-      const next = `${acc.current}:${a}:${b}:${c}`;
-      return { current: next, ancestors: [...acc.ancestors, next] };
-    },
-    { current: rootKey, ancestors: [] }
-  ).ancestors;
-}
-
-export function areAllAncestorsExpanded(
-  views: Views,
-  path: string,
-  rootKey: string
-): boolean {
-  const ancestorPaths = getAncestorPaths(path, rootKey);
-  return ancestorPaths.every((ancestorPath) => {
-    const view = views.get(ancestorPath);
-    return view?.expanded === true;
-  });
-}
-
 const LOAD_EXTRA = 10;
 
 function VirtuosoForColumn({
@@ -105,6 +74,7 @@ function VirtuosoForColumn({
   activeRowKey,
   onRowFocus,
   onRowClick,
+  scrollToNodeId,
 }: {
   nodes: List<ViewPath>;
   startIndexFromStorage: number;
@@ -116,6 +86,7 @@ function VirtuosoForColumn({
   activeRowKey: string;
   onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
   onRowClick?: (e: React.MouseEvent, viewKey: string) => void;
+  scrollToNodeId?: string;
 }): JSX.Element {
   const location = useLocation();
   const virtuosoRef = useRef<VirtuosoHandle>(null);
@@ -154,6 +125,22 @@ function VirtuosoForColumn({
       });
     }
   }, [location]);
+
+  useEffect(() => {
+    if (!scrollToNodeId || !virtuosoRef.current) {
+      return;
+    }
+    const index = nodes.findIndex(
+      (path) => getLast(path).nodeID === scrollToNodeId
+    );
+    if (index >= 0) {
+      virtuosoRef.current.scrollToIndex({
+        index,
+        align: "center",
+        behavior: "auto",
+      });
+    }
+  }, [scrollToNodeId, nodes.size]);
 
   return (
     <div ref={containerRef} aria-label={ariaLabel}>
@@ -236,7 +223,7 @@ export function TreeViewNodeLoader({
     const withNode = addNodeToFilters(rdx, nodeID);
 
     if (!isConcreteRefId(nodeID)) {
-      return withNode;
+      return addReferencedByToFilters(withNode, nodeID);
     }
 
     const parsed = parseConcreteRefId(nodeID);
@@ -255,10 +242,14 @@ export function TreeViewNodeLoader({
       return withRelation;
     }
 
+    const withTargetRefs = parsed.targetNode
+      ? addReferencedByToFilters(withRelation, parsed.targetNode)
+      : withRelation;
+
     const contextNodes = [...relation.context.toArray(), relation.head] as ID[];
     const withContextNodes = contextNodes.reduce(
       (acc, contextNodeID) => addNodeToFilters(acc, contextNodeID),
-      withRelation
+      withTargetRefs
     );
     return addDescendantsToFilters(withContextNodes, relation.head);
   }, baseFilter);
@@ -303,9 +294,11 @@ function Tree(): JSX.Element | null {
   const [keyboardMode, setKeyboardMode] = useKeyboardMode();
   const viewKey = viewPathToString(viewPath);
   const isRootExpanded = isExpanded(data, viewKey);
-  const childNodes = isRootExpanded
+  const treeResult = isRootExpanded
     ? getNodesInTree(data, viewPath, stack, List<ViewPath>(), pane.rootRelation)
-    : List<ViewPath>();
+    : undefined;
+  const childNodes = treeResult?.paths || List<ViewPath>();
+  const virtualItems = treeResult?.virtualItems || Map<string, RelationItem>();
   // Include ROOT as the first node, followed by its children
   const nodes = List<ViewPath>([viewPath]).concat(childNodes);
   const nodeKeys = nodes.map((path) => viewPathToString(path)).toArray();
@@ -437,32 +430,34 @@ function Tree(): JSX.Element | null {
   };
 
   return (
-    <div
-      ref={treeRootRef}
-      data-keyboard-mode={keyboardMode}
-      data-total-rows={nodes.size}
-    >
-      <TreeViewNodeLoader nodes={nodes} range={range}>
-        <VirtuosoForColumn
-          nodes={nodes}
-          range={range}
-          setRange={setRange}
-          startIndexFromStorage={startIndexFromStorage}
-          viewPath={viewPath}
-          onStopScrolling={onStopScrolling}
-          ariaLabel={ariaLabel}
-          activeRowKey={activeRow.activeRowKey}
-          onRowFocus={onRowFocus}
-          onRowClick={onRowClick}
-        />
-      </TreeViewNodeLoader>
-    </div>
+    <VirtualItemsProvider value={virtualItems}>
+      <div
+        ref={treeRootRef}
+        data-keyboard-mode={keyboardMode}
+        data-total-rows={nodes.size}
+      >
+        <TreeViewNodeLoader nodes={nodes} range={range}>
+          <VirtuosoForColumn
+            nodes={nodes}
+            range={range}
+            setRange={setRange}
+            startIndexFromStorage={startIndexFromStorage}
+            viewPath={viewPath}
+            onStopScrolling={onStopScrolling}
+            ariaLabel={ariaLabel}
+            activeRowKey={activeRow.activeRowKey}
+            onRowFocus={onRowFocus}
+            onRowClick={onRowClick}
+            scrollToNodeId={pane.scrollToNodeId}
+          />
+        </TreeViewNodeLoader>
+      </div>
+    </VirtualItemsProvider>
   );
 }
 
 export function TreeView(): JSX.Element {
   const data = useData();
-  const key = useViewKey();
   const viewPath = useViewPath();
   const effectiveAuthor = getEffectiveAuthor(data, viewPath);
   const rootNodeID = getLast(viewPath).nodeID;
@@ -473,39 +468,21 @@ export function TreeView(): JSX.Element {
     effectiveAuthor
   );
 
-  // Add REFERENCED_BY filters for views in referenced-by mode
-  const referencedByNodeIDs = data.views
-    .filter(
-      (view, path) =>
-        path.startsWith(key) &&
-        view.viewingMode === "REFERENCED_BY" &&
-        areAllAncestorsExpanded(data.views, path, key)
-    )
-    .map((_, path) => getLast(parseViewPath(path)).nodeID)
-    .valueSeq()
-    .toArray();
-  const referencedByFilter = referencedByNodeIDs.reduce(
-    (rdx, nodeID) => addReferencedByToFilters(rdx, nodeID),
-    baseFilter
-  );
-
-  // For search nodes, add REFERENCED_BY queries for each search result
   const searchFilter = (() => {
     if (!isSearchId(rootNodeID as ID)) {
-      return referencedByFilter;
+      return baseFilter;
     }
     const searchRelation = getRelations(
       data.knowledgeDBs,
       rootNodeID as ID,
-      data.user.publicKey,
-      rootNodeID
+      data.user.publicKey
     );
     if (!searchRelation) {
-      return referencedByFilter;
+      return baseFilter;
     }
     return searchRelation.items.reduce(
       (rdx, item) => addReferencedByToFilters(rdx, item.nodeID),
-      referencedByFilter
+      baseFilter
     );
   })();
 

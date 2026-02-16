@@ -138,7 +138,14 @@ declare global {
     author: PublicKey;
     rootRelation?: LongID;
     searchQuery?: string;
-    typeFilters?: (Relevance | Argument | "suggestions" | "contains")[];
+    typeFilters?: (
+      | Relevance
+      | Argument
+      | "suggestions"
+      | "versions"
+      | "contains"
+    )[];
+    scrollToNodeId?: string;
   };
 
   type Data = {
@@ -175,11 +182,10 @@ declare global {
   type LongID = string & { readonly "": unique symbol };
 
   type View = {
-    viewingMode: "REFERENCED_BY" | undefined;
-    // Show children, only relevant for inner nodes
     expanded?: boolean;
-    // Type filters for children view (empty/undefined = defaults: relevant, maybe_relevant, contains, suggestions)
-    typeFilters?: Array<Relevance | Argument | "suggestions" | "contains">;
+    typeFilters?: Array<
+      Relevance | Argument | "suggestions" | "versions" | "contains"
+    >;
   };
 
   // Context is the path of ancestor node IDs leading to the head node
@@ -199,10 +205,24 @@ declare global {
   type Argument = "confirms" | "contra" | undefined;
 
   // Each item in a relation has relevance and optional argument
+  type VirtualType =
+    | "suggestion"
+    | "search"
+    | "incoming"
+    | "occurrence"
+    | "version";
+
+  type VersionMeta = {
+    updated: number;
+    addCount: number;
+    removeCount: number;
+  };
+
   type RelationItem = {
     nodeID: LongID | ID;
     relevance: Relevance; // undefined = contains (default), "relevant", "maybe_relevant", "little_relevant", "not_relevant"
     argument?: Argument; // "confirms", "contra", or undefined (neutral)
+    virtualType?: VirtualType;
   };
 
   type Relations = {
@@ -225,15 +245,19 @@ declare global {
     type: "text";
   };
 
-  // A virtual node representing a path to another node
-  // ID format: "ref:targetId:context0:context1:..."
-  // Not stored on server - reconstructed from ID
   type ReferenceNode = {
     id: LongID;
     type: "reference";
-    text: string; // Computed: "My Notes → Scholarium → Madeira"
-    targetNode: ID; // The node being referenced
-    targetContext: Context; // The path to reach it
+    text: string;
+    targetNode: ID;
+    targetContext: Context;
+    contextLabels: string[];
+    targetLabel: string;
+    author: PublicKey;
+    incomingRelevance?: Relevance;
+    incomingArgument?: Argument;
+    isBidirectional?: boolean;
+    versionMeta?: VersionMeta;
   };
 
   type KnowNode = TextNode | ReferenceNode;

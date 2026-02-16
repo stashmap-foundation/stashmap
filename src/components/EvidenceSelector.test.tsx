@@ -1,13 +1,6 @@
 import { List } from "immutable";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import {
-  ALICE,
-  expectTree,
-  navigateToNodeViaSearch,
-  renderTree,
-  setup,
-  type,
-} from "../utils.test";
+import { ALICE, expectTree, renderTree, setup, type } from "../utils.test";
 import { updateItemArgument } from "../connections";
 
 describe("EvidenceSelector", () => {
@@ -96,22 +89,25 @@ Root
     await screen.findByLabelText(/Evidence for Child: Contradicts/);
   });
 
-  test("does not show evidence selector for Referenced By items", async () => {
+  test("incoming refs show relevance selector but not evidence selector", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    await type("Root{Enter}Money{Enter}{Tab}Bitcoin{Escape}");
+    await type("Crypto{Enter}{Tab}Bitcoin{Escape}");
+    fireEvent.click(screen.getByLabelText("Create new note"));
+    await type("Money{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
 
-    await navigateToNodeViaSearch(0, "Bitcoin");
-    await screen.findByRole("treeitem", { name: "Bitcoin" });
+    await expectTree(`
+Money
+  Bitcoin
+    Details
+    [I] Bitcoin  <<< Crypto
+    `);
 
-    fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
-    await screen.findByLabelText("hide references to Bitcoin");
-
-    const moneyMatches = await screen.findAllByText(/Money/);
-    expect(moneyMatches.length).toBeGreaterThanOrEqual(1);
-
-    const evidenceButtons = screen.queryAllByLabelText(/Evidence for Money:/);
+    await screen.findByLabelText(/decline Bitcoin/);
+    const evidenceButtons = screen.queryAllByLabelText(
+      /Evidence for Bitcoin {2}<<</
+    );
     expect(evidenceButtons.length).toBe(0);
   });
 

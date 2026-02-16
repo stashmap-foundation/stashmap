@@ -10,7 +10,6 @@ import {
   getNodeFromView,
   getNodeFromID,
   getNodeIDFromView,
-  getParentRelation,
   getVersionedDisplayText,
   getContext,
   isExpanded,
@@ -53,7 +52,7 @@ import {
   parsedLinesToTrees,
   planCreateNodesFromMarkdownTrees,
 } from "./FileDropZone";
-import { LOG_NODE_ID, shortID } from "../connections";
+import { LOG_NODE_ID, VERSIONS_NODE_ID, shortID } from "../connections";
 import { buildNodeUrl } from "../navigationUrl";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import {
@@ -87,11 +86,12 @@ function BreadcrumbItem({
 }): JSX.Element {
   const { knowledgeDBs, user } = useData();
   const node = getNodeFromID(knowledgeDBs, nodeID as string, user.publicKey);
+  const label =
+    node?.text ||
+    (shortID(nodeID) === VERSIONS_NODE_ID ? "~Versions" : "Loading...");
 
   if (isLast) {
-    return (
-      <span className="breadcrumb-current">{node?.text || "Loading..."}</span>
-    );
+    return <span className="breadcrumb-current">{label}</span>;
   }
 
   return (
@@ -100,9 +100,9 @@ function BreadcrumbItem({
         href={href}
         className="breadcrumb-link"
         onClick={onClick}
-        aria-label={`Navigate to ${node?.text || "parent"}`}
+        aria-label={`Navigate to ${label}`}
       >
-        {node?.text || "Loading..."}
+        {label}
       </a>
       <span className="breadcrumb-separator">/</span>
     </>
@@ -582,8 +582,7 @@ function getDisplayTextForViewKey(
   viewKey: string
 ): string {
   const viewPath = parseViewPath(viewKey);
-  const parentRelation = getParentRelation(data, viewPath);
-  const [node] = getNodeFromView(data, viewPath, parentRelation);
+  const [node] = getNodeFromView(data, viewPath);
   const [nodeID] = getNodeIDFromView(data, viewPath);
   const context = getContext(data, viewPath, stack);
   const effectiveAuthor = getEffectiveAuthor(data, viewPath);
@@ -633,7 +632,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
           stack,
           List<ViewPath>(),
           pane.rootRelation
-        )
+        ).paths
       : List<ViewPath>();
     return List<ViewPath>([viewPath])
       .concat(childNodes)

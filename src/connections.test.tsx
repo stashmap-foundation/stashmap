@@ -4,14 +4,14 @@ import {
   addRelationToRelations,
   bulkAddRelations,
   newNode,
-  getReferencedByRelations,
+  findRefsToNode,
+  getRelationsNoReferencedBy,
   shortID,
+  parseConcreteRefId,
   countRelationVotes,
   aggregateWeightedVotes,
   aggregateNegativeWeightedVotes,
   countRelevanceVoting,
-  parseConcreteRefId,
-  getRelationsNoReferencedBy,
 } from "./connections";
 import { ALICE, BOB, CAROL } from "./utils.test";
 import { newRelations } from "./ViewContext";
@@ -78,7 +78,7 @@ test("Reorder existing connections", () => {
   );
 });
 
-test("get referenced by relations", () => {
+test("findRefsToNode finds refs from multiple users", () => {
   const aliceDB = newDB();
   const bobsDB = newDB();
   const btc = newNode("Bitcoin");
@@ -93,45 +93,70 @@ test("get referenced by relations", () => {
     newRelations(crypto.id, List(), BOB.publicKey),
     btc.id
   );
-  const aliceDBWithRelations = {
-    ...aliceDB,
-    relations: Map({ [shortID(moneyRelations.id)]: moneyRelations }),
-    nodes: Map({ [btc.id]: btc, [money.id]: money }),
-  };
-  const bobDBWithRelations = {
-    ...bobsDB,
-    relations: Map({ [shortID(cryptoRelations.id)]: cryptoRelations }),
-    nodes: Map({ [crypto.id]: crypto }),
-  };
   const dbs = Map({
-    [ALICE.publicKey]: aliceDBWithRelations,
-    [BOB.publicKey]: bobDBWithRelations,
-  });
+    [ALICE.publicKey]: {
+      ...aliceDB,
+      relations: Map({ [shortID(moneyRelations.id)]: moneyRelations }),
+      nodes: Map({ [btc.id]: btc, [money.id]: money }),
+    },
+    [BOB.publicKey]: {
+      ...bobsDB,
+      relations: Map({ [shortID(cryptoRelations.id)]: cryptoRelations }),
+      nodes: Map({ [crypto.id]: crypto }),
+    },
+  }) as KnowledgeDBs;
 
-  const referencedBy = getReferencedByRelations(
-    dbs as KnowledgeDBs,
-    ALICE.publicKey,
-    btc.id
+  const refs = findRefsToNode(dbs, btc.id);
+  expect(refs.size).toBe(2);
+  expect(refs.every((r) => r.targetNode === shortID(btc.id))).toBe(true);
+  const relationIDs = refs.map((r) => r.relationID).toSet();
+  expect(relationIDs.has(moneyRelations.id)).toBe(true);
+  expect(relationIDs.has(cryptoRelations.id)).toBe(true);
+});
+
+test("getRelationsNoReferencedBy resolves unscoped relation IDs across DBs", () => {
+  const root = newNode("Root");
+  const child = newNode("Child");
+  const bobRelations = addRelationToRelations(
+    newRelations(root.id, List(), BOB.publicKey),
+    child.id
   );
-  const refIds = getNodeIDs(referencedBy?.items || List());
-  // With single refs per context, we now get concrete refs
-  const parsed = refIds.map((refId) => parseConcreteRefId(refId));
-  // All refs should have a targetNode (btc is IN items, not HEAD)
-  expect(parsed.every((p) => p?.targetNode === shortID(btc.id))).toBe(true);
-  // Get the parent heads from the relations
-  const relationHeads = parsed
-    .map((p) => {
-      const rel = getRelationsNoReferencedBy(
-        dbs as KnowledgeDBs,
-        p?.relationID,
-        ALICE.publicKey
-      );
-      return rel?.head;
-    })
-    .toSet();
-  expect(relationHeads).toEqual(
-    List([shortID(money.id), shortID(crypto.id)] as ID[]).toSet()
+
+  const dbs = Map({
+    [ALICE.publicKey]: {
+      ...newDB(),
+      nodes: Map({ [root.id]: root }),
+      relations: Map<string, Relations>(),
+    },
+    [BOB.publicKey]: {
+      ...newDB(),
+      nodes: Map({ [root.id]: root, [child.id]: child }),
+      relations: Map({ [shortID(bobRelations.id)]: bobRelations }),
+    },
+  }) as KnowledgeDBs;
+
+  const unscopedRelationID = shortID(bobRelations.id) as ID;
+  const resolved = getRelationsNoReferencedBy(
+    dbs,
+    unscopedRelationID,
+    ALICE.publicKey
   );
+
+  expect(resolved?.id).toBe(bobRelations.id);
+  expect(resolved?.author).toBe(BOB.publicKey);
+});
+
+test("parseConcreteRefId handles relation IDs containing colons", () => {
+  const refWithoutTarget = "cref:pubkey_rel:legacy" as LongID;
+  const parsedWithoutTarget = parseConcreteRefId(refWithoutTarget);
+  expect(parsedWithoutTarget?.relationID).toBe("pubkey_rel:legacy");
+  expect(parsedWithoutTarget?.targetNode).toBeUndefined();
+
+  const targetNode = "0123456789abcdef0123456789abcdef" as ID;
+  const refWithTarget = `cref:pubkey_rel:legacy:${targetNode}` as LongID;
+  const parsedWithTarget = parseConcreteRefId(refWithTarget);
+  expect(parsedWithTarget?.relationID).toBe("pubkey_rel:legacy");
+  expect(parsedWithTarget?.targetNode).toBe(targetNode);
 });
 
 test("count relation votes", () => {

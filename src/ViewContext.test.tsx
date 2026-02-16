@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { List, Map } from "immutable";
 import {
@@ -7,7 +7,7 @@ import {
   addRelationToRelations,
   bulkAddRelations,
   shortID,
-  createAbstractRefId,
+  createConcreteRefId,
 } from "./connections";
 import { execute } from "./executor";
 import {
@@ -163,11 +163,10 @@ My Notes
   `);
 });
 
-test("Contact views list via concrete reference", async () => {
+test("Contact views list via version and list remains unchanged", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
   await follow(bob, alice().user.publicKey);
 
-  // Alice creates Cities with Paris and London
   renderTree(alice);
   await type(
     "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
@@ -181,63 +180,20 @@ My Notes
   `);
   cleanup();
 
-  // Bob creates same structure: Cities → Paris (same context as Alice)
   renderTree(bob);
-  // Bob creates My Notes, then sees Alice's Cities as a suggestion
-  await type("My Notes{Escape}");
-  await expectTree(`
-My Notes
-  [S] Cities
-  `);
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(
-    await findNewNodeEditor(),
-    "Cities{Enter}{Tab}Paris{Escape}"
-  );
+  await type("My Notes{Enter}{Tab}Cities{Enter}{Tab}Madrid{Escape}");
 
   await expectTree(`
 My Notes
   Cities
-    Paris
+    Madrid
+    [S] Paris
     [S] London
-  `);
-
-  // Show Referenced By for Cities to find Alice's reference
-  // Cities is already expanded from typing Tab above
-  await userEvent.click(
-    await screen.findByLabelText("show references to Cities")
-  );
-
-  // Both Alice and Bob have Cities in same context, so abstract ref groups them
-  await userEvent.click(
-    await screen.findByLabelText("expand My Notes → Cities")
-  );
-
-  await expectTree(`
-My Notes
-  Cities
-    My Notes → Cities
-      My Notes → Cities (1)
-      [O] My Notes → Cities (2)
-  `);
-
-  // Click on Alice's concrete reference (marked with [O]) to open her list
-  await userEvent.click(
-    await screen.findByLabelText("open My Notes → Cities (2) in fullscreen")
-  );
-
-  // Now Bob is viewing Alice's Cities - root is expanded by default
-  await expectTree(`
-Cities
-  Paris
-  London
+    [VO] +2 -1
   `);
   cleanup();
 
-  // Alice's list remains unchanged
   renderTree(alice);
-  // Cities might be expanded or collapsed - just check the content
   await expectTree(`
 My Notes
   Cities
@@ -355,15 +311,10 @@ test("Parse View path", () => {
   ]);
 });
 
-test("View path roundtrip preserves ref IDs with colons", () => {
-  // Create a ref ID that contains colons: ref:context1:context2:target
-  const refId = createAbstractRefId(
-    List(["ctx1" as ID, "ctx2" as ID]),
-    "target" as ID
-  );
-  expect(refId).toBe("ref:ctx1:ctx2:target");
+test("View path roundtrip preserves concrete ref IDs with colons", () => {
+  const refId = createConcreteRefId("rel1" as LongID, "target" as ID);
+  expect(refId).toBe("cref:rel1:target");
 
-  // Create a view path with the ref ID as the last node
   const viewPath: ViewPath = [
     0,
     {
@@ -374,18 +325,15 @@ test("View path roundtrip preserves ref IDs with colons", () => {
     { nodeID: refId, nodeIndex: 0 as NodeIndex },
   ];
 
-  // Serialize to string and parse back
   const serialized = viewPathToString(viewPath);
   const parsed = parseViewPath(serialized);
 
-  // The ref ID should be preserved exactly
   expect(parsed).toEqual(viewPath);
-  expect((parsed[2] as { nodeID: string }).nodeID).toBe("ref:ctx1:ctx2:target");
+  expect((parsed[2] as { nodeID: string }).nodeID).toBe("cref:rel1:target");
 });
 
-test("View path roundtrip preserves ref IDs in middle of path", () => {
-  // Ref ID in the middle of the path (with relationsID)
-  const refId = createAbstractRefId(List(["money" as ID]), "bitcoin" as ID);
+test("View path roundtrip preserves concrete ref IDs in middle of path", () => {
+  const refId = createConcreteRefId("someRelation" as LongID);
 
   const viewPath: ViewPath = [
     1,
@@ -397,7 +345,7 @@ test("View path roundtrip preserves ref IDs in middle of path", () => {
   const parsed = parseViewPath(serialized);
 
   expect(parsed).toEqual(viewPath);
-  expect((parsed[1] as { nodeID: string }).nodeID).toBe("ref:money:bitcoin");
+  expect((parsed[1] as { nodeID: string }).nodeID).toBe("cref:someRelation");
 });
 
 test("View doesn't change if list is forked from contact", async () => {
@@ -419,35 +367,34 @@ My Notes
 
   renderTree(alice);
   await type("My Notes{Enter}{Tab}Programming Languages{Escape}");
-  await expectTree(`
-My Notes
-  Programming Languages
-  `);
   await userEvent.click(
-    await screen.findByLabelText("show references to Programming Languages")
+    await screen.findByLabelText("expand Programming Languages")
   );
   await expectTree(`
 My Notes
   Programming Languages
-    [O] My Notes → Programming Languages (1)
+    [S] OOP
+    [VO] +1
   `);
 
   await userEvent.click(
-    await screen.findByLabelText(
-      "open My Notes → Programming Languages (1) in fullscreen"
-    )
+    await screen.findByLabelText(/open .* \+1 in fullscreen/)
   );
 
-  // Root is expanded by default
+  await waitFor(() => {
+    expect(window.location.pathname).toMatch(/^\/r\//);
+  });
+
+  await screen.findByText("READONLY");
+
   await userEvent.click(await screen.findByLabelText("expand OOP"));
   await expectTree(`
-Programming Languages
-  OOP
-    C++
-    Java
+[O] Programming Languages
+  [O] OOP
+    [O] C++
+    [O] Java
   `);
 
-  // Fork to make it Alice's own copy (can't edit other user's content directly)
   await userEvent.click(
     await screen.findByLabelText("fork to make your own copy")
   );
@@ -466,6 +413,7 @@ Programming Languages
   OOP
     C++
     Java
+  [VO] -1
   `);
   cleanup();
 });
@@ -514,13 +462,13 @@ Programming Languages
 
 test("updateViewPathsAfterPaneDelete removes views for deleted pane and shifts indices", () => {
   const views = Map<string, View>({
-    "p0:root:0": { viewingMode: undefined, expanded: false },
-    "p0:root:0:r:node1:0": { viewingMode: undefined, expanded: true },
-    "p1:root:0": { viewingMode: undefined, expanded: false },
-    "p1:root:0:r:node2:0": { viewingMode: undefined, expanded: true },
-    "p2:root:0": { viewingMode: "REFERENCED_BY", expanded: false },
-    "p2:root:0:r:node3:0": { viewingMode: undefined, expanded: true },
-    "p3:root:0": { viewingMode: undefined, expanded: true },
+    "p0:root:0": { expanded: false },
+    "p0:root:0:r:node1:0": { expanded: true },
+    "p1:root:0": { expanded: false },
+    "p1:root:0:r:node2:0": { expanded: true },
+    "p2:root:0": { expanded: true },
+    "p2:root:0:r:node3:0": { expanded: true },
+    "p3:root:0": { expanded: true },
   });
 
   const updatedViews = updateViewPathsAfterPaneDelete(views, 1);
@@ -528,7 +476,7 @@ test("updateViewPathsAfterPaneDelete removes views for deleted pane and shifts i
   expect(updatedViews.has("p0:root:0")).toBe(true);
   expect(updatedViews.has("p0:root:0:r:node1:0")).toBe(true);
   expect(updatedViews.has("p1:root:0:r:node2:0")).toBe(false);
-  expect(updatedViews.get("p1:root:0")?.viewingMode).toBe("REFERENCED_BY");
+  expect(updatedViews.get("p1:root:0")?.expanded).toBe(true);
   expect(updatedViews.get("p1:root:0:r:node3:0")?.expanded).toBe(true);
   expect(updatedViews.get("p2:root:0")?.expanded).toBe(true);
   expect(updatedViews.has("p3:root:0")).toBe(false);
@@ -536,28 +484,24 @@ test("updateViewPathsAfterPaneDelete removes views for deleted pane and shifts i
 
 test("updateViewPathsAfterPaneInsert shifts pane indices at and after insertion point", () => {
   const views = Map<string, View>({
-    "p0:root:0": { viewingMode: undefined, expanded: false },
-    "p0:root:0:r:node1:0": { viewingMode: undefined, expanded: true },
-    "p1:root:0": { viewingMode: "REFERENCED_BY", expanded: false },
-    "p1:root:0:r:node2:0": { viewingMode: undefined, expanded: true },
-    "p2:root:0": { viewingMode: undefined, expanded: true },
+    "p0:root:0": { expanded: false },
+    "p0:root:0:r:node1:0": { expanded: true },
+    "p1:root:0": { expanded: true },
+    "p1:root:0:r:node2:0": { expanded: true },
+    "p2:root:0": { expanded: true },
   });
 
-  // Insert a pane at index 1, so pane 1 becomes pane 2, pane 2 becomes pane 3
   const updatedViews = updateViewPathsAfterPaneInsert(views, 1);
 
-  // Pane 0 stays the same
   expect(updatedViews.has("p0:root:0")).toBe(true);
   expect(updatedViews.get("p0:root:0")?.expanded).toBe(false);
   expect(updatedViews.has("p0:root:0:r:node1:0")).toBe(true);
 
-  // Old pane 1 is now pane 2
   expect(updatedViews.has("p1:root:0")).toBe(false);
   expect(updatedViews.has("p2:root:0")).toBe(true);
-  expect(updatedViews.get("p2:root:0")?.viewingMode).toBe("REFERENCED_BY");
+  expect(updatedViews.get("p2:root:0")?.expanded).toBe(true);
   expect(updatedViews.has("p2:root:0:r:node2:0")).toBe(true);
 
-  // Old pane 2 is now pane 3
   expect(updatedViews.has("p3:root:0")).toBe(true);
   expect(updatedViews.get("p3:root:0")?.expanded).toBe(true);
 });
@@ -569,10 +513,10 @@ test("updateViewPathsAfterMoveRelations preserves paths when relationsID starts 
   const childBPath = `p0:root:0:${relID}:childB:0`;
 
   const views = Map<string, View>({
-    "p0:root:0": { viewingMode: undefined, expanded: true },
-    [childAPath]: { viewingMode: undefined, expanded: true },
-    [childADeepPath]: { viewingMode: undefined, expanded: true },
-    [childBPath]: { viewingMode: undefined, expanded: false },
+    "p0:root:0": { expanded: true },
+    [childAPath]: { expanded: true },
+    [childADeepPath]: { expanded: true },
+    [childBPath]: { expanded: false },
   });
 
   const data = { views } as unknown as Data;

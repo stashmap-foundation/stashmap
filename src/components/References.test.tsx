@@ -10,11 +10,13 @@ import {
   type,
 } from "../utils.test";
 
-describe("References in Referenced By", () => {
-  test("Single concrete reference shows directly (no abstract wrapper)", async () => {
+describe("Incoming references and occurrences", () => {
+  test("Occurrence shows when same node is head of a root-level relation", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
+    await type("Barcelona{Enter}{Tab}Best Tapas{Escape}");
+    await userEvent.click(await screen.findByLabelText("Create new note"));
     await type(
       "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Sagrada Familia{Escape}"
     );
@@ -24,21 +26,11 @@ Notes
   Cities
     Barcelona
       Sagrada Familia
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText("show references to Barcelona")
-    );
-
-    await expectTree(`
-Notes
-  Cities
-    Barcelona
-      Notes → Cities → Barcelona (1)
+      [C] Barcelona
     `);
   });
 
-  test("Multiple concrete references from same context show under abstract", async () => {
+  test("Other user's version shows as suggestion and version entry", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
 
@@ -46,57 +38,26 @@ Notes
     await type(
       "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Alice child{Escape}"
     );
+    cleanup();
 
+    renderTree(bob);
+    await type(
+      "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Bob child{Escape}"
+    );
+    cleanup();
+
+    renderTree(alice);
     await expectTree(`
 Notes
   Cities
     Barcelona
       Alice child
-    `);
-
-    cleanup();
-
-    renderTree(bob);
-    await type(
-      "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Bob child{Escape}"
-    );
-
-    await expectTree(`
-Notes
-  Cities
-    Barcelona
-      Bob child
-    `);
-
-    cleanup();
-
-    renderTree(alice);
-    await userEvent.click(
-      await screen.findByLabelText("show references to Barcelona")
-    );
-
-    await expectTree(`
-Notes
-  Cities
-    Barcelona
-      Notes → Cities → Barcelona
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText("expand Notes → Cities → Barcelona")
-    );
-
-    await expectTree(`
-Notes
-  Cities
-    Barcelona
-      Notes → Cities → Barcelona
-        [O] Notes → Cities → Barcelona (1)
-        Notes → Cities → Barcelona (1)
+      [S] Bob child
+      [VO] +1 -1
     `);
   });
 
-  test("Clicking concrete reference opens with that author's content", async () => {
+  test("Clicking version fullscreen opens with that author's content", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
 
@@ -104,69 +65,50 @@ Notes
     await type(
       "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Alice child{Escape}"
     );
-
     cleanup();
 
     renderTree(bob);
     await type(
       "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Bob child{Escape}"
     );
-
     cleanup();
 
     renderTree(alice);
     await userEvent.click(
-      await screen.findByLabelText("show references to Barcelona")
-    );
-    await userEvent.click(
-      await screen.findByLabelText("expand Notes → Cities → Barcelona")
+      await screen.findByLabelText(/open .* \+1 -1 in fullscreen/)
     );
 
     await expectTree(`
-Notes
-  Cities
-    Barcelona
-      Notes → Cities → Barcelona
-        [O] Notes → Cities → Barcelona (1)
-        Notes → Cities → Barcelona (1)
-    `);
-
-    const fullscreenButtons = await screen.findAllByLabelText(
-      "open Notes → Cities → Barcelona (1) in fullscreen"
-    );
-    await userEvent.click(fullscreenButtons[0]);
-
-    await expectTree(`
-Barcelona
-  Bob child
+[O] Barcelona
+  [O] Bob child
+  [VO] +1 -1
     `);
   });
 
-  test("Edited node with ~Versions shows only one reference (deduplication)", async () => {
+  test("Edited node with ~Versions shows only one incoming reference (deduplication)", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
     await type(
       "Notes{Enter}Test A{Enter}{Tab}~Versions{Enter}{Tab}Test B{Escape}"
     );
+    await userEvent.click(await screen.findByLabelText("Create new note"));
+    await type("Other{Enter}{Tab}Test B{Enter}{Tab}Child{Escape}");
 
     await expectTree(`
-Notes
+Other
   Test B
-    ~Versions
-      Test B
-      Test A
+    Child
+    [I] Test B  <<< Notes
     `);
 
-    const showRefsButtons = await screen.findAllByLabelText(
-      "show references to Test B"
+    await userEvent.click(
+      await screen.findByLabelText(/open .* <<< Notes in fullscreen/)
     );
-    await userEvent.click(showRefsButtons[0]);
 
     await expectTree(`
 Notes
   Test B
-    Notes → Test B (1)
     `);
   });
 
@@ -177,26 +119,14 @@ Notes
     await type(
       "Notes{Enter}Level1{Enter}{Tab}Level2{Enter}{Tab}Level3{Enter}{Tab}Target{Escape}"
     );
+    await userEvent.click(await screen.findByLabelText("Create new note"));
+    await type("Other{Enter}{Tab}Target{Enter}{Tab}Child{Escape}");
 
     await expectTree(`
-Notes
-  Level1
-    Level2
-      Level3
-        Target
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText("show references to Target")
-    );
-
-    await expectTree(`
-Notes
-  Level1
-    Level2
-      Level3
-        Target
-          Notes → Level1 → Level2 → Level3 (1) → Target
+Other
+  Target
+    Child
+    [I] Target  <<< Level3 / Level2 / Level1 / Notes
     `);
 
     expect(screen.queryByText(/Loading/)).toBeNull();

@@ -1,5 +1,5 @@
 import { Map } from "immutable";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -8,247 +8,100 @@ import {
   follow,
   renderTree,
   setup,
-  findNewNodeEditor,
-  navigateToNodeViaSearch,
-  getTreeStructure,
   type,
 } from "../utils.test";
-import { areAllAncestorsExpanded } from "./TreeView";
 
-test("Load Referenced By Nodes", async () => {
-  const [alice] = setup([ALICE]);
-  renderTree(alice);
+function getAncestorPaths(path: string, rootKey: string): string[] {
+  const suffix = path.slice(rootKey.length);
+  const parts = suffix.split(":");
 
-  await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(
-    await findNewNodeEditor(),
-    "Cryptocurrencies{Enter}{Tab}Bitcoin{Escape}"
-  );
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(
-    await findNewNodeEditor(),
-    "P2P Apps{Enter}{Tab}Bitcoin{Escape}"
-  );
-
-  await expectTree(`
-My Notes
-  P2P Apps
-    Bitcoin
-  Cryptocurrencies
-    Bitcoin
-  Money
-    Bitcoin
-  `);
-
-  // Click show references on Bitcoin (pick first one)
-  const showRefBtns = screen.getAllByLabelText("show references to Bitcoin");
-  fireEvent.click(showRefBtns[0]);
-
-  // After clicking, should be in Referenced By mode - button now says "hide"
-  await screen.findByLabelText("hide references to Bitcoin");
-
-  // Reference nodes display the paths containing Money, Cryptocurrencies, P2P Apps
-  const moneyMatches = await screen.findAllByText(/Money/);
-  expect(moneyMatches.length).toBeGreaterThanOrEqual(1);
-  const cryptoMatches = await screen.findAllByText(/Cryptocurrencies/);
-  expect(cryptoMatches.length).toBeGreaterThanOrEqual(1);
-  const p2pMatches = await screen.findAllByText(/P2P Apps/);
-  expect(p2pMatches.length).toBeGreaterThanOrEqual(1);
-});
-
-test("Show Referenced By with content details", async () => {
-  const [alice] = setup([ALICE]);
-  renderTree(alice);
-
-  await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
-  await userEvent.keyboard("{Enter}");
-  await userEvent.type(
-    await findNewNodeEditor(),
-    "P2P Apps{Enter}{Tab}Bitcoin{Escape}"
-  );
-
-  await expectTree(`
-My Notes
-  P2P Apps
-    Bitcoin
-  Money
-    Bitcoin
-  `);
-
-  // Click on Bitcoin's "show references" button to see its references
-  const bitcoinLabels = screen.getAllByLabelText("show references to Bitcoin");
-  fireEvent.click(bitcoinLabels[0]);
-
-  // Button should change to "hide references"
-  await screen.findByLabelText("hide references to Bitcoin");
-
-  // The references should show as paths containing Money and P2P Apps
-  const moneyMatches = await screen.findAllByText(/Money/);
-  expect(moneyMatches.length).toBeGreaterThanOrEqual(1);
-  const p2pMatches = await screen.findAllByText(/P2P Apps/);
-  expect(p2pMatches.length).toBeGreaterThanOrEqual(1);
-});
-
-test("Root node shows references when there are more than 0", async () => {
-  const [alice] = setup([ALICE]);
-  renderTree(alice);
-
-  await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
-
-  await screen.findByText("Bitcoin");
-
-  // Navigate to Bitcoin as root using pane search
-  await navigateToNodeViaSearch(0, "Bitcoin");
-
-  // Now Bitcoin is the root - wait for it to appear as root
-  await screen.findByRole("treeitem", { name: "Bitcoin" });
-
-  // Show references to Bitcoin
-  fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
-  await screen.findByLabelText("hide references to Bitcoin");
-
-  // The reference should show Money as the parent
-  const content = (await screen.findByLabelText("related to Bitcoin"))
-    .textContent;
-  expect(content).toMatch(/Money/);
-});
-
-test("Referenced By items do not show relation selector", async () => {
-  const [alice] = setup([ALICE]);
-  renderTree(alice);
-
-  await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
-
-  // Navigate to Bitcoin as root
-  await navigateToNodeViaSearch(0, "Bitcoin");
-  await screen.findByRole("treeitem", { name: "Bitcoin" });
-
-  // The root node (Bitcoin) should have a relation selector
-  expect(screen.getByLabelText("show references to Bitcoin")).toBeDefined();
-
-  // Open Referenced By view
-  fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
-  await screen.findByLabelText("hide references to Bitcoin");
-
-  // Wait for the reference item to appear
-  const moneyMatches = await screen.findAllByText(/Money/);
-  expect(moneyMatches.length).toBeGreaterThanOrEqual(1);
-
-  // The Referenced By items should NOT have relation selectors
-  // Only the root node (Bitcoin) should have one
-  const allRelationSelectors = screen.getAllByRole("button", {
-    name: /show references|hide references/,
+  const numTriplets = Math.floor((parts.length - 4) / 3);
+  const triplets = Array.from({ length: numTriplets }, (_, idx) => {
+    const i = 1 + idx * 3;
+    return [parts[i], parts[i + 1], parts[i + 2]] as const;
   });
-  // Should only find one - for the root Bitcoin node
-  expect(allRelationSelectors).toHaveLength(1);
-});
 
-test("Referenced By items still show navigation buttons", async () => {
+  return triplets.reduce<{ current: string; ancestors: string[] }>(
+    (acc, [a, b, c]) => {
+      const next = `${acc.current}:${a}:${b}:${c}`;
+      return { current: next, ancestors: [...acc.ancestors, next] };
+    },
+    { current: rootKey, ancestors: [] }
+  ).ancestors;
+}
+
+function areAllAncestorsExpanded(
+  views: Views,
+  path: string,
+  rootKey: string
+): boolean {
+  const ancestorPaths = getAncestorPaths(path, rootKey);
+  return ancestorPaths.every((ancestorPath) => {
+    const view = views.get(ancestorPath);
+    return view?.expanded === true;
+  });
+}
+
+test("Node referenced from different roots shows incoming refs", async () => {
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
-  await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
+  await type("Crypto{Enter}{Tab}Bitcoin{Escape}");
+  await userEvent.click(await screen.findByLabelText("Create new note"));
+  await type("P2P{Enter}{Tab}Bitcoin{Escape}");
+  await userEvent.click(await screen.findByLabelText("Create new note"));
+  await type("Money{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
 
-  // Navigate to Bitcoin as root
-  await navigateToNodeViaSearch(0, "Bitcoin");
-  await screen.findByRole("treeitem", { name: "Bitcoin" });
-
-  // Open Referenced By view
-  fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
-  await screen.findByLabelText("hide references to Bitcoin");
-
-  // Wait for the reference item to appear
-  const moneyMatches = await screen.findAllByText(/Money/);
-  expect(moneyMatches.length).toBeGreaterThanOrEqual(1);
-
-  // Navigation buttons should still be available for Referenced By items
-  // The fullscreen button should be present (aria-label includes display text)
-  const fullscreenButtons = screen.getAllByLabelText(/open.*in fullscreen/);
-  expect(fullscreenButtons.length).toBeGreaterThanOrEqual(1);
+  await expectTree(`
+Money
+  Bitcoin
+    Details
+    [I] Bitcoin  <<< P2P
+    [I] Bitcoin  <<< Crypto
+  `);
 });
 
-test("Referenced By shows node with list and empty context", async () => {
+test("Multiple incoming refs each show correct source path", async () => {
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
-  await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
+  await type(
+    "Notes{Enter}{Tab}Level1{Enter}{Tab}Level2{Enter}{Tab}Target{Escape}"
+  );
+  await userEvent.click(await screen.findByLabelText("Create new note"));
+  await type(
+    "Work{Enter}{Tab}Projects{Enter}{Tab}Target{Enter}{Tab}Child{Escape}"
+  );
 
-  // Navigate to Money as root
-  await navigateToNodeViaSearch(0, "Money");
-
-  // Money is now root - wait for it to appear (could be expanded or collapsed)
-  await screen.findByLabelText(/expand Money|collapse Money/);
-
-  // Open Referenced By view
-  fireEvent.click(screen.getByLabelText("show references to Money"));
-  await screen.findByLabelText("hide references to Money");
-
-  // The node with a list should appear in its own Referenced By
-  // It should display just "Money" (the node name), not "Loading..."
-  const content = (await screen.findByLabelText("related to Money"))
-    .textContent;
-  expect(content).toMatch(/Money/);
-  expect(content).not.toMatch(/Loading/);
+  await expectTree(`
+Work
+  Projects
+    Target
+      Child
+      [I] Target  <<< Level2 / Level1 / Notes
+  `);
 });
 
-test("Referenced By deduplicates paths from multiple users", async () => {
-  // Test that when the same node is referenced from the same parent path,
-  // the references are deduplicated in the UI
-  const [alice] = setup([ALICE]);
-  renderTree(alice);
-
-  await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
-
-  // Navigate to Bitcoin as root
-  await navigateToNodeViaSearch(0, "Bitcoin");
-  await screen.findByRole("treeitem", { name: "Bitcoin" });
-
-  // Open references view
-  fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
-  await screen.findByLabelText("hide references to Bitcoin");
-
-  // Wait for Referenced By to load - the path My Notes -> Money -> Bitcoin should show
-  await screen.findByLabelText("related to Bitcoin");
-
-  // There should be exactly one reference path (not counting breadcrumb links)
-  const referenceButtons = screen
-    .getAllByRole("link", { name: /Navigate to/ })
-    .filter((btn) => btn.classList.contains("reference-link-btn"));
-  expect(referenceButtons).toHaveLength(1);
-});
-
-test("Reference indicators show other users icon", async () => {
+test("Other user's incoming ref shows other-user indicator", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
   await follow(alice, bob().user.publicKey);
 
-  // Bob creates: My Notes -> Parent -> Child
   renderTree(bob);
-  await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
+  await type("Bob Root{Enter}{Tab}Shared{Escape}");
   cleanup();
 
-  // Alice creates: My Notes -> Parent -> Child (same structure)
   renderTree(alice);
-  await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
+  await type("Alice Root{Enter}{Tab}Shared{Enter}{Tab}Detail{Escape}");
 
-  // Navigate to Child and show references
-  await navigateToNodeViaSearch(0, "Child");
-
-  fireEvent.click(await screen.findByLabelText("show references to Child"));
-
-  // Expand abstract reference to see concrete references
-  await userEvent.click(await screen.findByLabelText(/expand.*Parent.*Child/));
-
-  // Bob's concrete reference should show the other user icon
-  const otherUserIcon = await screen.findByTitle("Content from another user");
-  expect(otherUserIcon).toBeDefined();
+  await expectTree(`
+Alice Root
+  Shared
+    Detail
+    [OI] Shared  <<< Bob Root
+  `);
 });
 
 test("Relevance selector shows when node is expanded", async () => {
-  // This tests that child nodes show relevance selectors when visible
   const [alice] = setup([ALICE]);
   renderTree(alice);
 
@@ -256,51 +109,11 @@ test("Relevance selector shows when node is expanded", async () => {
     "My Notes{Enter}{Tab}Parent{Enter}{Tab}Child1{Enter}Child2{Escape}"
   );
 
-  // Verify children are visible under Parent
   await screen.findByText("Child1");
   await screen.findByText("Child2");
 
-  // The relevance selectors should appear for the children
-  // (Child1 and Child2 each have their own relevance button)
   expect(screen.getByLabelText("mark Child1 as not relevant")).toBeDefined();
   expect(screen.getByLabelText("mark Child2 as not relevant")).toBeDefined();
-});
-
-test("Can exit Referenced By mode even when node has no relations", async () => {
-  // This tests the fix for when a node has references TO it
-  // but no children/relations of its own - you should still be able
-  // to exit Referenced By mode
-  const [alice] = setup([ALICE]);
-  renderTree(alice);
-
-  await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
-
-  // Navigate to Bitcoin as root using pane search
-  await navigateToNodeViaSearch(0, "Bitcoin");
-
-  // Bitcoin is now root - it has no children
-  await screen.findByRole("treeitem", { name: "Bitcoin" });
-
-  // Filter dots should be visible initially (not in Referenced By mode)
-  expect(screen.getByLabelText("toggle Relevant filter")).toBeDefined();
-
-  // Enter Referenced By mode
-  fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
-  await screen.findByLabelText("hide references to Bitcoin");
-
-  // Reference should be visible (Money is Bitcoin's parent)
-  // Wait for references to load - look for the reference path containing Money
-  await waitFor(async () => {
-    const tree = await getTreeStructure();
-    expect(tree).toMatch(/Money/);
-  });
-
-  // Exit Referenced By mode - this should work even though Bitcoin has no relations
-  fireEvent.click(screen.getByLabelText("hide references to Bitcoin"));
-
-  // Should be back to normal mode - filter dots should be visible again
-  await screen.findByLabelText("toggle Relevant filter");
-  expect(screen.getByLabelText("show references to Bitcoin")).toBeDefined();
 });
 
 describe("areAllAncestorsExpanded", () => {
@@ -310,9 +123,9 @@ describe("areAllAncestorsExpanded", () => {
     const childKey = "p0:rootNode:0:rootRel:parentNode:0:parentRel:childNode:0";
 
     const views: Views = Map({
-      [rootKey]: { viewingMode: undefined, expanded: true },
-      [parentKey]: { viewingMode: undefined, expanded: false },
-      [childKey]: { viewingMode: undefined, expanded: true },
+      [rootKey]: { expanded: true },
+      [parentKey]: { expanded: false },
+      [childKey]: { expanded: true },
     });
 
     expect(areAllAncestorsExpanded(views, childKey, rootKey)).toBe(false);
@@ -325,9 +138,9 @@ describe("areAllAncestorsExpanded", () => {
     const childKey = "p0:rootNode:0:rootRel:parentNode:0:parentRel:childNode:0";
 
     const views: Views = Map({
-      [rootKey]: { viewingMode: undefined, expanded: true },
-      [parentKey]: { viewingMode: undefined, expanded: true },
-      [childKey]: { viewingMode: undefined, expanded: true },
+      [rootKey]: { expanded: true },
+      [parentKey]: { expanded: true },
+      [childKey]: { expanded: true },
     });
 
     expect(areAllAncestorsExpanded(views, childKey, rootKey)).toBe(true);

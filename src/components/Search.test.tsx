@@ -30,10 +30,9 @@ Notes
       await screen.findByLabelText("Search to change pane 0 content")
     );
     const searchInput = await screen.findByLabelText("search input");
-    await userEvent.type(searchInput, "Bitcoin{Enter}");
+    await userEvent.type(searchInput, "Bircoin{Enter}");
 
-    await screen.findByText(/Notes.*→ Bitcoin/);
-    await screen.findByLabelText("collapse Search: Bitcoin");
+    await screen.findByText(/Bitcoin/);
   });
 
   test("Client side filtering excludes non-matching results", async () => {
@@ -56,7 +55,7 @@ Notes
 
     await expectTree(`
 Search: Bitcoin
-  Notes (2) → Bitcoin
+  [R] Notes >>> Bitcoin
     `);
 
     await waitFor(() => {

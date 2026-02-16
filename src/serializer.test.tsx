@@ -195,7 +195,7 @@ describe("basedOn serialization round-trip", () => {
     };
     const planWithRelation = planUpsertRelations(plan, relations);
 
-    const event = planWithRelation.publishEvents.last()!;
+    const event = planWithRelation.publishEvents.first()!;
     expect(event.kind).toBe(KIND_KNOWLEDGE_LIST);
 
     const bTag = event.tags.find((t: string[]) => t[0] === "b");

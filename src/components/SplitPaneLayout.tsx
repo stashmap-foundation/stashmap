@@ -217,6 +217,7 @@ function PaneContent(): JSX.Element {
   const paneIndex = usePaneIndex();
   const { user } = useData();
   const rootNodeID = pane.stack[pane.stack.length - 1] || EMPTY_NODE_ID;
+
   const isOtherUserContent = pane.author !== user.publicKey;
 
   const paneClassName = isOtherUserContent
@@ -224,7 +225,7 @@ function PaneContent(): JSX.Element {
     : "split-pane";
 
   const content = (
-    <div className={paneClassName}>
+    <div className={paneClassName} data-pane-index={paneIndex}>
       <LoadSearchData nodeIDs={pane.stack}>
         <LoadData nodeIDs={pane.stack}>
           <LoadData nodeIDs={[LOG_NODE_ID]} lists>

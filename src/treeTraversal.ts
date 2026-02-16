@@ -1,88 +1,57 @@
-import { List } from "immutable";
+import { List, Map } from "immutable";
 import {
   ViewPath,
   NodeIndex,
+  VirtualItemsMap,
   addNodeToPathWithRelations,
   addRelationsToLastElement,
   getDiffItemsForNode,
+  getVersionsForRelation,
   getNodeIDFromView,
   getContext,
   getRelationsForContext,
-  getParentView,
   isRoot,
-  isReferencedByView,
   getEffectiveAuthor,
+  viewPathToString,
 } from "./ViewContext";
 import {
-  getReferencedByRelations,
-  getConcreteRefsForAbstract,
-  isAbstractRefId,
   isConcreteRefId,
   isSearchId,
   getRelations,
   itemPassesFilters,
+  getIncomingRefsForNode,
+  getOccurrencesForNode,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
 import { getPane } from "./planner";
 
-function getChildrenForAbstractRef(
-  data: Data,
-  parentPath: ViewPath,
-  parentNodeID: LongID | ID
-): List<ViewPath> {
-  const relations = getConcreteRefsForAbstract(
-    data.knowledgeDBs,
-    data.user.publicKey,
-    parentNodeID as LongID
-  );
-  if (!relations || relations.items.size === 0) {
-    return List();
-  }
-  return relations.items
-    .map((_, i) => addNodeToPathWithRelations(parentPath, relations, i))
-    .toList();
-}
+type TreeResult = {
+  paths: List<ViewPath>;
+  virtualItems: VirtualItemsMap;
+};
+
+const EMPTY_VIRTUAL_ITEMS: VirtualItemsMap = Map<string, RelationItem>();
 
 function getChildrenForConcreteRef(
   data: Data,
   parentPath: ViewPath,
   parentNodeID: LongID | ID
-): List<ViewPath> {
+): TreeResult {
   const sourceRelation = getRelations(
     data.knowledgeDBs,
     parentNodeID,
-    data.user.publicKey,
-    parentNodeID
+    data.user.publicKey
   );
   if (!sourceRelation || sourceRelation.items.size === 0) {
-    return List();
+    return { paths: List(), virtualItems: EMPTY_VIRTUAL_ITEMS };
   }
 
-  return sourceRelation.items
-    .map((_, i) => addNodeToPathWithRelations(parentPath, sourceRelation, i))
-    .toList();
-}
-
-function getChildrenForReferencedBy(
-  data: Data,
-  parentPath: ViewPath,
-  parentNodeID: LongID | ID,
-  grandparentPath: ViewPath | undefined,
-  isGrandchildOfSearch: boolean
-): List<ViewPath> {
-  const relations = getReferencedByRelations(
-    data.knowledgeDBs,
-    data.user.publicKey,
-    parentNodeID
-  );
-  if (!relations || relations.items.size === 0) {
-    return List();
-  }
-  const refParentPath =
-    isGrandchildOfSearch && grandparentPath ? grandparentPath : parentPath;
-  return relations.items
-    .map((_, i) => addNodeToPathWithRelations(refParentPath, relations, i))
-    .toList();
+  return {
+    paths: sourceRelation.items
+      .map((_, i) => addNodeToPathWithRelations(parentPath, sourceRelation, i))
+      .toList(),
+    virtualItems: EMPTY_VIRTUAL_ITEMS,
+  };
 }
 
 function getChildrenForRegularNode(
@@ -91,19 +60,14 @@ function getChildrenForRegularNode(
   parentNodeID: LongID | ID,
   stack: ID[],
   rootRelation: LongID | undefined
-): List<ViewPath> {
+): TreeResult {
   const author = getEffectiveAuthor(data, parentPath);
   const context = getContext(data, parentPath, stack);
   const pane = getPane(data, parentPath);
   const activeFilters = pane.typeFilters || DEFAULT_TYPE_FILTERS;
 
   const relations = isSearchId(parentNodeID as ID)
-    ? getRelations(
-        data.knowledgeDBs,
-        parentNodeID as ID,
-        data.user.publicKey,
-        parentNodeID
-      )
+    ? getRelations(data.knowledgeDBs, parentNodeID as ID, data.user.publicKey)
     : getRelationsForContext(
         data.knowledgeDBs,
         author,
@@ -123,6 +87,26 @@ function getChildrenForRegularNode(
         .toList()
     : List<ViewPath>();
 
+  const relationId = relations?.id || ("" as LongID);
+
+  const incomingRefs = getIncomingRefsForNode(
+    data.knowledgeDBs,
+    parentNodeID,
+    relations?.id,
+    context,
+    author,
+    relations?.items
+  );
+
+  const occurrences = getOccurrencesForNode(
+    data.knowledgeDBs,
+    parentNodeID,
+    relations?.id,
+    author,
+    context,
+    relations?.items
+  );
+
   const diffItems = getDiffItemsForNode(
     data.knowledgeDBs,
     data.user.publicKey,
@@ -132,51 +116,71 @@ function getChildrenForRegularNode(
     context
   );
 
-  const diffPaths = diffItems.map((suggestionId, idx) => {
-    const pathWithRelations = addRelationsToLastElement(
-      parentPath,
-      relations?.id || ("" as LongID)
-    );
-    return [
-      ...pathWithRelations,
-      { nodeID: suggestionId, nodeIndex: idx as NodeIndex },
-    ] as ViewPath;
-  });
+  const addVirtualItems = (
+    acc: { paths: List<ViewPath>; virtualItems: VirtualItemsMap },
+    items: List<LongID | ID>,
+    virtualType: VirtualType
+  ): { paths: List<ViewPath>; virtualItems: VirtualItemsMap } =>
+    items.reduce((result, nodeID, idx) => {
+      const pathWithRelations = addRelationsToLastElement(
+        parentPath,
+        relationId
+      );
+      const path = [
+        ...pathWithRelations,
+        { nodeID, nodeIndex: (acc.paths.size + idx) as NodeIndex },
+      ] as ViewPath;
+      return {
+        paths: result.paths.push(path),
+        virtualItems: result.virtualItems.set(viewPathToString(path), {
+          nodeID,
+          relevance: undefined as Relevance,
+          virtualType,
+        }),
+      };
+    }, acc);
 
-  return relationPaths.concat(diffPaths);
+  const initial = {
+    paths: List<ViewPath>(),
+    virtualItems: EMPTY_VIRTUAL_ITEMS,
+  };
+  const versions = getVersionsForRelation(
+    data.knowledgeDBs,
+    parentNodeID,
+    activeFilters,
+    relations,
+    context
+  );
+
+  const withIncoming = addVirtualItems(initial, incomingRefs, "incoming");
+  const withOccurrences = addVirtualItems(
+    withIncoming,
+    occurrences,
+    "occurrence"
+  );
+  const withSuggestions = addVirtualItems(
+    withOccurrences,
+    diffItems,
+    "suggestion"
+  );
+  const withVersions = addVirtualItems(withSuggestions, versions, "version");
+
+  return {
+    paths: relationPaths.concat(withVersions.paths),
+    virtualItems: withVersions.virtualItems,
+  };
 }
 
-function getChildNodes(
+export function getChildNodes(
   data: Data,
   parentPath: ViewPath,
   stack: ID[],
   rootRelation: LongID | undefined
-): List<ViewPath> {
-  const [parentNodeID, parentView] = getNodeIDFromView(data, parentPath);
-
-  if (isAbstractRefId(parentNodeID)) {
-    return getChildrenForAbstractRef(data, parentPath, parentNodeID);
-  }
+): TreeResult {
+  const [parentNodeID] = getNodeIDFromView(data, parentPath);
 
   if (isConcreteRefId(parentNodeID)) {
     return getChildrenForConcreteRef(data, parentPath, parentNodeID);
-  }
-
-  const grandparentPath = getParentView(parentPath);
-  const [grandparentNodeID] = grandparentPath
-    ? getNodeIDFromView(data, grandparentPath)
-    : [undefined];
-  const isGrandchildOfSearch =
-    grandparentNodeID && isSearchId(grandparentNodeID as ID);
-
-  if (isReferencedByView(parentView) || isGrandchildOfSearch) {
-    return getChildrenForReferencedBy(
-      data,
-      parentPath,
-      parentNodeID,
-      grandparentPath,
-      !!isGrandchildOfSearch
-    );
   }
 
   return getChildrenForRegularNode(
@@ -194,19 +198,32 @@ export function getNodesInTree(
   stack: ID[],
   ctx: List<ViewPath>,
   rootRelation: LongID | undefined
-): List<ViewPath> {
-  const [parentNodeID] = getNodeIDFromView(data, parentPath);
-  const isSearch = isSearchId(parentNodeID as ID);
-  const children = getChildNodes(data, parentPath, stack, rootRelation);
+): TreeResult {
+  const childResult = getChildNodes(data, parentPath, stack, rootRelation);
 
-  return children.reduce((result, childPath) => {
-    const [, childView] = getNodeIDFromView(data, childPath);
-    const skipAddingChild = isSearch;
-    const withChild = skipAddingChild ? result : result.push(childPath);
+  return childResult.paths.reduce(
+    (result, childPath) => {
+      const [, childView] = getNodeIDFromView(data, childPath);
+      const withChild = result.paths.push(childPath);
 
-    if (childView.expanded || isSearch) {
-      return getNodesInTree(data, childPath, stack, withChild, rootRelation);
+      if (childView.expanded) {
+        const sub = getNodesInTree(
+          data,
+          childPath,
+          stack,
+          withChild,
+          rootRelation
+        );
+        return {
+          paths: sub.paths,
+          virtualItems: result.virtualItems.merge(sub.virtualItems),
+        };
+      }
+      return { ...result, paths: withChild };
+    },
+    {
+      paths: ctx,
+      virtualItems: childResult.virtualItems,
     }
-    return withChild;
-  }, ctx);
+  );
 }

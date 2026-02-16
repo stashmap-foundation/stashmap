@@ -377,6 +377,17 @@ body {
   font-family: monospace;
 }
 
+.version-indicator-other {
+  color: var(--violet);
+  font-weight: bold;
+  font-family: monospace;
+}
+
+.version-indicator-own {
+  font-weight: bold;
+  font-family: monospace;
+}
+
 // Reference indicator in gutter
 .reference-indicator {
   color: var(--cyan);
@@ -613,7 +624,7 @@ body {
 // Right menu - controls after the text
 .right-menu {
   display: grid;
-  grid-template-columns: 40px 110px 42px;
+  grid-template-columns: 90px 42px;
   align-items: center;
   gap: 4px;
   padding-left: 8px;

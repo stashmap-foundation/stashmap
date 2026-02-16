@@ -16,6 +16,8 @@
 - Don't do html access in tests, use aria-labels
 - When writing tests, we prefer to use await findBy instead of queryBy. We prefer to test for one element with full aria label then multiple elements. We prefer to find concrete elements over expect(foo.length).toBe(2)
 - prefer expectTree over extractNodes in tests
+- Use `textContent("My Notes >>> Source")` helper to find elements whose text spans multiple DOM nodes (e.g. `>>>` in a bold span). Use `getPane(0).getByText(...)` to scope queries to a specific pane. If you encounter tests doing `screen.getByText("some text")` with pane-specific content or multi-span text, update them to use these helpers.
+- Use `getPane(paneIndex)` helper instead of manual `within(document.querySelector(...))` to scope test queries to a specific split pane
 
 ### Write Integration Tests, Not Unit Tests with Mocked Contexts
 

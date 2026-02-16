@@ -55,8 +55,9 @@ export function buildNodeUrl(
   return path;
 }
 
-export function buildRelationUrl(rootRelation: LongID): string {
-  return `/r/${encodeURIComponent(rootRelation)}`;
+export function buildRelationUrl(rootRelation: LongID, scrollTo?: ID): string {
+  const base = `/r/${encodeURIComponent(rootRelation)}`;
+  return scrollTo ? `${base}#${encodeURIComponent(scrollTo)}` : base;
 }
 
 export function parseRelationUrl(pathname: string): LongID | undefined {

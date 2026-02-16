@@ -7,6 +7,7 @@ import {
 } from "../connections";
 import {
   ViewPath,
+  VirtualItemsMap,
   addNodeToPathWithRelations,
   getParentView,
   getParentRelation,
@@ -26,6 +27,8 @@ import {
   planCreateVersion,
   planSaveNodeAndEnsureRelations,
   planUpdateEmptyNodeMetadata,
+  planDeepCopyNode,
+  planAddToParent,
 } from "../planner";
 import { planMoveNodeWithView } from "../dnd";
 
@@ -36,13 +39,16 @@ export type EditorInfo = {
 
 export function getCurrentItem(
   data: Data,
-  viewPath: ViewPath
+  viewPath: ViewPath,
+  virtualItemsMap: VirtualItemsMap
 ): RelationItem | undefined {
   const parentView = getParentView(viewPath);
   if (!parentView) return undefined;
   const relations = getParentRelation(data, viewPath);
   const relationIndex = getRelationIndex(data, viewPath);
-  if (!relations || relationIndex === undefined) return undefined;
+  if (!relations || relationIndex === undefined) {
+    return virtualItemsMap.get(viewPathToString(viewPath));
+  }
   return relations.items.get(relationIndex);
 }
 
@@ -79,7 +85,8 @@ function planUpdateOneRelevance(
   viewPath: ViewPath,
   stack: ID[],
   relevance: Relevance,
-  editorText: string
+  editorText: string,
+  virtualItemsMap: VirtualItemsMap
 ): Plan {
   const { nodeID } = getLast(viewPath);
   const parentView = getParentView(viewPath);
@@ -103,7 +110,31 @@ function planUpdateOneRelevance(
   }
 
   const relationIndex = getRelationIndex(acc, viewPath);
-  if (relationIndex === undefined) return acc;
+  if (relationIndex === undefined) {
+    const virtualItem = virtualItemsMap.get(viewPathToString(viewPath));
+    if (virtualItem) {
+      if (virtualItem.virtualType === "suggestion") {
+        const [plan] = planDeepCopyNode(
+          acc,
+          viewPath,
+          parentView,
+          stack,
+          undefined,
+          relevance
+        );
+        return plan;
+      }
+      return planAddToParent(
+        acc,
+        nodeID,
+        parentView,
+        stack,
+        undefined,
+        relevance
+      );
+    }
+    return acc;
+  }
 
   const basePlan =
     editorText.trim() && editorText !== getNodeText(acc, nodeID)
@@ -120,7 +151,8 @@ function planUpdateOneArgument(
   viewPath: ViewPath,
   stack: ID[],
   argument: Argument,
-  editorText: string
+  editorText: string,
+  virtualItemsMap: VirtualItemsMap
 ): Plan {
   const { nodeID } = getLast(viewPath);
   const parentView = getParentView(viewPath);
@@ -145,7 +177,33 @@ function planUpdateOneArgument(
   }
 
   const relationIndex = getRelationIndex(acc, viewPath);
-  if (relationIndex === undefined) return acc;
+  if (relationIndex === undefined) {
+    const virtualItem = virtualItemsMap.get(viewPathToString(viewPath));
+    if (virtualItem) {
+      const acceptedPlan =
+        virtualItem.virtualType === "suggestion"
+          ? planDeepCopyNode(
+              acc,
+              viewPath,
+              parentView,
+              stack,
+              undefined,
+              undefined,
+              argument
+            )[0]
+          : planAddToParent(
+              acc,
+              nodeID,
+              parentView,
+              stack,
+              undefined,
+              undefined,
+              argument
+            );
+      return acceptedPlan;
+    }
+    return acc;
+  }
 
   const basePlan =
     editorText.trim() && editorText !== getNodeText(acc, nodeID)
@@ -162,6 +220,7 @@ export function planBatchRelevance(
   viewPaths: ViewPath[],
   stack: ID[],
   relevance: Relevance,
+  virtualItemsMap: VirtualItemsMap,
   editorInfo?: EditorInfo
 ): Plan {
   const updated = viewPaths.reduce(
@@ -171,7 +230,8 @@ export function planBatchRelevance(
         viewPath,
         stack,
         relevance,
-        getEditorTextForPath(editorInfo, viewPath)
+        getEditorTextForPath(editorInfo, viewPath),
+        virtualItemsMap
       ),
     plan
   );
@@ -183,6 +243,7 @@ export function planBatchArgument(
   viewPaths: ViewPath[],
   stack: ID[],
   argument: Argument,
+  virtualItemsMap: VirtualItemsMap,
   editorInfo?: EditorInfo
 ): Plan {
   const updated = viewPaths.reduce(
@@ -192,7 +253,8 @@ export function planBatchArgument(
         viewPath,
         stack,
         argument,
-        getEditorTextForPath(editorInfo, viewPath)
+        getEditorTextForPath(editorInfo, viewPath),
+        virtualItemsMap
       ),
     plan
   );

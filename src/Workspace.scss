@@ -320,6 +320,7 @@ body {
   flex: 1;
   min-width: 0;
   min-height: var(--row-height, 1.4em);
+  position: relative;
 }
 
 // Reference count - on the right side
@@ -373,6 +374,17 @@ body {
 // Suggestion indicator (suggestions from other users)
 .suggestion-indicator {
   color: var(--violet);
+  font-weight: bold;
+  font-family: monospace;
+}
+
+.version-indicator-other {
+  color: var(--violet);
+  font-weight: bold;
+  font-family: monospace;
+}
+
+.version-indicator-own {
   font-weight: bold;
   font-family: monospace;
 }
@@ -613,7 +625,7 @@ body {
 // Right menu - controls after the text
 .right-menu {
   display: grid;
-  grid-template-columns: 40px 110px 42px;
+  grid-template-columns: 90px 42px;
   align-items: center;
   gap: 4px;
   padding-left: 8px;
@@ -1318,12 +1330,36 @@ body:not(.keyboard-input-mode) .hover-light-bg:hover {
   color: var(--base01);
 }
 
+.ref-separator {
+  color: var(--base01);
+  font-weight: bold;
+}
+
+.first-virtual {
+  padding-top: 0px;
+
+  .node-content-wrapper::before {
+    content: "";
+    position: absolute;
+    top: -5px;
+    left: 0;
+    width: 60px;
+    border-top: 1px dotted var(--base01);
+  }
+}
+
 .item[data-selected="true"] .inner-node.hover-light-bg {
   background: var(--base01);
   color: var(--base03);
 
   .text-readonly {
     color: inherit;
+    opacity: 0.5;
+  }
+
+  .ref-separator {
+    color: inherit;
+    opacity: 0.5;
   }
 
   .expand-collapse-toggle:not(.toggle-hidden),
@@ -1339,6 +1375,7 @@ body:not(.keyboard-input-mode) .hover-light-bg:hover {
   .evidence-selector {
     color: var(--base02) !important;
   }
+
 }
 
 .item[data-selected="true"]:focus .inner-node.hover-light-bg,
@@ -1346,6 +1383,16 @@ body:not(.keyboard-input-mode) .hover-light-bg:hover {
   background: var(--base1);
   color: var(--base03);
 
+  .text-readonly {
+    color: inherit;
+    opacity: 0.5;
+  }
+
+  .ref-separator {
+    color: inherit;
+    opacity: 0.5;
+  }
+
   .expand-collapse-toggle:not(.toggle-hidden),
   .expand-collapse-toggle:not(.toggle-hidden):hover,
   .expand-collapse-toggle:not(.toggle-hidden):focus,
@@ -1359,6 +1406,7 @@ body:not(.keyboard-input-mode) .hover-light-bg:hover {
   .evidence-selector {
     color: var(--base02) !important;
   }
+
 }
 
 

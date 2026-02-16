@@ -34,7 +34,7 @@ export function FullscreenButton(): JSX.Element | null {
 
   const getTargetUrl = (): string => {
     if (refInfo?.rootRelation) {
-      return buildRelationUrl(refInfo.rootRelation);
+      return buildRelationUrl(refInfo.rootRelation, refInfo.scrollTo);
     }
     if (relation) {
       return buildRelationUrl(relation.id);

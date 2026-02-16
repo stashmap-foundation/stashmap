@@ -32,10 +32,8 @@ import {
   computeEmptyNodeMetadata,
   isConcreteRefId,
   parseConcreteRefId,
-  isAbstractRefId,
-  parseAbstractRefId,
-  createAbstractRefId,
   LOG_NODE_ID,
+  createConcreteRefId,
 } from "./connections";
 import {
   newRelations,
@@ -209,7 +207,51 @@ function filterOldReplaceableEvent(
   );
 }
 
-export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
+export function planUpsertNode(plan: Plan, node: KnowNode): Plan {
+  const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
+  const updatedNodes = userDB.nodes.set(shortID(node.id), node);
+  const updatedDB = {
+    ...userDB,
+    nodes: updatedNodes,
+  };
+  const dTag = shortID(node.id);
+  const updateNodeEvent = {
+    kind: KIND_KNOWLEDGE_NODE,
+    pubkey: plan.user.publicKey,
+    created_at: newTimestamp(),
+    tags: [["d", dTag], msTag()],
+    content: node.text,
+  };
+  const deduped = filterOldReplaceableEvent(
+    plan.publishEvents,
+    KIND_KNOWLEDGE_NODE,
+    dTag
+  );
+  return {
+    ...plan,
+    knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
+    publishEvents: deduped.push(updateNodeEvent),
+  };
+}
+
+function ensureLogNode(plan: Plan): Plan {
+  const existingLog = getNodeFromID(
+    plan.knowledgeDBs,
+    LOG_NODE_ID,
+    plan.user.publicKey
+  );
+  if (existingLog) {
+    return plan;
+  }
+  const logNode: KnowNode = {
+    id: LOG_NODE_ID,
+    text: "~Log",
+    type: "text",
+  };
+  return planUpsertNode(plan, logNode);
+}
+
+function upsertRelationsCore(plan: Plan, relations: Relations): Plan {
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
   const updatedRelations = userDB.relations.set(
     shortID(relations.id),
@@ -219,12 +261,15 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
     ...userDB,
     relations: updatedRelations,
   };
-  const itemsAsTags = relations.items.toArray().map((item) => {
-    const relevanceStr = item.relevance ?? "";
-    return item.argument
-      ? ["i", item.nodeID, relevanceStr, item.argument]
-      : ["i", item.nodeID, relevanceStr];
-  });
+  const itemsAsTags = relations.items
+    .filter((item) => !item.nodeID.startsWith("ref:"))
+    .toArray()
+    .map((item) => {
+      const relevanceStr = item.relevance ?? "";
+      return item.argument
+        ? ["i", item.nodeID, relevanceStr, item.argument]
+        : ["i", item.nodeID, relevanceStr];
+    });
   const contextTags = relations.context.toArray().map((id) => ["c", id]);
   const basedOnTag = relations.basedOn ? [["b", relations.basedOn]] : [];
   const dTag = shortID(relations.id);
@@ -255,31 +300,42 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
   };
 }
 
-export function planUpsertNode(plan: Plan, node: KnowNode): Plan {
-  const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
-  const updatedNodes = userDB.nodes.set(shortID(node.id), node);
-  const updatedDB = {
-    ...userDB,
-    nodes: updatedNodes,
-  };
-  const dTag = shortID(node.id);
-  const updateNodeEvent = {
-    kind: KIND_KNOWLEDGE_NODE,
-    pubkey: plan.user.publicKey,
-    created_at: newTimestamp(),
-    tags: [["d", dTag], msTag()],
-    content: node.text,
-  };
-  const deduped = filterOldReplaceableEvent(
-    plan.publishEvents,
-    KIND_KNOWLEDGE_NODE,
-    dTag
+function addCrefToLog(plan: Plan, relationID: LongID): Plan {
+  const planWithLog = ensureLogNode(plan);
+  const logRelations = getRelationsForContext(
+    planWithLog.knowledgeDBs,
+    planWithLog.user.publicKey,
+    LOG_NODE_ID,
+    List<ID>(),
+    undefined,
+    false
   );
-  return {
-    ...plan,
-    knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
-    publishEvents: deduped.push(updateNodeEvent),
-  };
+  const relations =
+    logRelations || newRelations(LOG_NODE_ID, List<ID>(), plan.user.publicKey);
+  const crefId = createConcreteRefId(relationID);
+  const updatedRelations = addRelationToRelations(
+    relations,
+    crefId,
+    undefined,
+    undefined,
+    0
+  );
+  return upsertRelationsCore(planWithLog, updatedRelations);
+}
+
+export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
+  const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
+  const isNewRelation = !userDB.relations.has(shortID(relations.id));
+  const basePlan = upsertRelationsCore(plan, relations);
+
+  const isRootRelation =
+    isNewRelation &&
+    relations.context.size === 0 &&
+    shortID(relations.head) !== LOG_NODE_ID;
+  if (!isRootRelation) {
+    return basePlan;
+  }
+  return addCrefToLog(basePlan, relations.id);
 }
 
 export function planBulkUpsertNodes(plan: Plan, nodes: KnowNode[]): Plan {
@@ -756,18 +812,30 @@ export function planForkPane(
   stack: ID[]
 ): Plan {
   const pane = getPane(plan, viewPath);
+
+  const rootRelationData = pane.rootRelation
+    ? getRelationsNoReferencedBy(
+        plan.knowledgeDBs,
+        pane.rootRelation,
+        pane.author || plan.user.publicKey
+      )
+    : undefined;
+
   const context = getContext(plan, viewPath, stack);
-  const entryNodeID = context.first();
+  const entryNodeID = rootRelationData
+    ? (rootRelationData.head as ID)
+    : context.first() || (stack[stack.length - 1] as ID);
   if (!entryNodeID) {
     return plan;
   }
-  const entryContext = List<ID>();
+  const entryContext = rootRelationData ? rootRelationData.context : List<ID>();
   const [planWithRelations, relationsIdMapping] = planCopyDescendantRelations(
     plan,
     entryNodeID,
     entryContext,
     (relation) => relation.context,
-    (relation) => relation.author === pane.author
+    (relation) => relation.author === pane.author,
+    rootRelationData
   );
   const updatedViews = updateViewsWithRelationsMapping(
     planWithRelations.views,
@@ -775,9 +843,16 @@ export function planForkPane(
   );
   const planWithUpdatedViews = planUpdateViews(planWithRelations, updatedViews);
   const paneIndex = viewPath[0];
+  const newRootRelation = pane.rootRelation
+    ? relationsIdMapping.get(pane.rootRelation)
+    : undefined;
   const newPanes = planWithUpdatedViews.panes.map((p, i) =>
     i === paneIndex
-      ? { ...p, author: plan.user.publicKey, rootRelation: undefined }
+      ? {
+          ...p,
+          author: plan.user.publicKey,
+          rootRelation: newRootRelation,
+        }
       : p
   );
   return planUpdatePanes(planWithUpdatedViews, newPanes);
@@ -812,15 +887,6 @@ export function planDeepCopyNode(
             context: relation.context,
           };
         }
-      }
-    }
-    if (isAbstractRefId(sourceNodeID)) {
-      const parsed = parseAbstractRefId(sourceNodeID);
-      if (parsed) {
-        return {
-          nodeID: parsed.targetNode,
-          context: parsed.targetContext,
-        };
       }
     }
     return { nodeID: sourceNodeID, context: sourceContext };
@@ -944,23 +1010,6 @@ export function parseClipboardText(text: string): ParsedLine[] {
     .filter((item) => item.text.length > 0);
 }
 
-function ensureLogNode(plan: Plan): Plan {
-  const existingLog = getNodeFromID(
-    plan.knowledgeDBs,
-    LOG_NODE_ID,
-    plan.user.publicKey
-  );
-  if (existingLog) {
-    return plan;
-  }
-  const logNode: KnowNode = {
-    id: LOG_NODE_ID,
-    text: "~Log",
-    type: "text",
-  };
-  return planUpsertNode(plan, logNode);
-}
-
 export type SaveNodeResult = {
   plan: Plan;
   viewPath: ViewPath;
@@ -972,35 +1021,17 @@ function planCreateNoteAtRoot(
   viewPath: ViewPath
 ): SaveNodeResult {
   const [planWithNode, createdNode] = planCreateNode(plan, text);
-  const planWithLog = ensureLogNode(planWithNode);
-
-  const logRelations = getRelationsForContext(
-    planWithLog.knowledgeDBs,
-    planWithLog.user.publicKey,
-    LOG_NODE_ID,
-    List<ID>(),
-    undefined,
-    false
+  const planWithRelation = planUpsertRelations(
+    planWithNode,
+    newRelations(createdNode.id, List<ID>(), plan.user.publicKey)
   );
-
-  const relations =
-    logRelations || newRelations(LOG_NODE_ID, List<ID>(), plan.user.publicKey);
-  const refId = createAbstractRefId(List<ID>(), createdNode.id);
-  const updatedRelations = addRelationToRelations(
-    relations,
-    refId,
-    undefined,
-    undefined,
-    0
-  );
-  const planWithRelations = planUpsertRelations(planWithLog, updatedRelations);
 
   const paneIndex = getPaneIndex(viewPath);
-  const newPanes = planWithRelations.panes.map((p, i) =>
+  const newPanes = planWithRelation.panes.map((p, i) =>
     i === paneIndex ? { ...p, stack: [createdNode.id] } : p
   );
 
-  const resultPlan = planUpdatePanes(planWithRelations, newPanes);
+  const resultPlan = planUpdatePanes(planWithRelation, newPanes);
   const newViewPath: ViewPath = [
     paneIndex,
     { nodeID: createdNode.id, nodeIndex: 0 as NodeIndex },

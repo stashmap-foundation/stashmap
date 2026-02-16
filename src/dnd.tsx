@@ -153,7 +153,7 @@ export function getDropDestinationFromTreeView(
   targetDepth?: number,
   sourceKeys?: Set<string>
 ): [ViewPath, number] {
-  const nodes = getNodesInTree(
+  const { paths: nodes } = getNodesInTree(
     data,
     root,
     stack,
@@ -340,7 +340,8 @@ export function dnd(
   rootRelation: LongID | undefined,
   isSuggestion?: boolean,
   invertCopyMode?: boolean,
-  targetDepth?: number
+  targetDepth?: number,
+  isCopyDrag?: boolean
 ): Plan {
   const rootView = to;
 
@@ -385,12 +386,19 @@ export function dnd(
     toRelation !== undefined &&
     fromRelation.id === toRelation.id;
 
+  const skipMoveLogic = isSuggestion || isCopyDrag;
   const reorder =
-    isSamePane && !isSuggestion && sameRelation && dropIndex !== undefined;
+    isSamePane && !skipMoveLogic && sameRelation && dropIndex !== undefined;
 
   if (reorder) {
+    const realSources = independentSources.filter(
+      (n) => getRelationIndex(plan, parseViewPath(n)) !== undefined
+    );
+    const virtualSources = independentSources.filter(
+      (n) => getRelationIndex(plan, parseViewPath(n)) === undefined
+    );
     const sourceIndices = List(
-      independentSources.map((n) => getRelationIndex(plan, parseViewPath(n)))
+      realSources.map((n) => getRelationIndex(plan, parseViewPath(n)))
     ).filter((n) => n !== undefined) as List<number>;
     const updatedRelationsPlan = upsertRelations(
       plan,
@@ -407,12 +415,20 @@ export function dnd(
       sourceIndices.toArray(),
       dropIndex
     );
-    return planUpdateViews(updatedRelationsPlan, updatedViews);
+    const reorderedPlan = planUpdateViews(updatedRelationsPlan, updatedViews);
+    return virtualSources
+      .toList()
+      .reduce((accPlan: Plan, s: string, idx: number) => {
+        const sourcePath = parseViewPath(s);
+        const [sourceNodeID] = getNodeIDFromView(accPlan, sourcePath);
+        const insertAt = dropIndex + sourceIndices.size + idx;
+        return planAddToParent(accPlan, sourceNodeID, toView, stack, insertAt);
+      }, reorderedPlan);
   }
 
   const samePaneMove =
     isSamePane &&
-    !isSuggestion &&
+    !skipMoveLogic &&
     !invertCopyMode &&
     !sameRelation &&
     dropIndex !== undefined;
@@ -507,6 +523,15 @@ export function dnd(
       const insertAt = dropIndex !== undefined ? dropIndex + idx : undefined;
 
       if (shouldCreateReference(sourceNodeID)) {
+        if (isRefId(sourceNodeID)) {
+          return planAddToParent(
+            accPlan,
+            sourceNodeID,
+            toView,
+            stack,
+            insertAt
+          );
+        }
         const planWithRelation = upsertRelations(
           accPlan,
           sourcePath,

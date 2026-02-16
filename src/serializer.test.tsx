@@ -125,6 +125,29 @@ describe("eventToRelations basedOn parsing", () => {
   });
 });
 
+test("filters out old abstract ref IDs (ref:) from items", () => {
+  const event = {
+    kind: KIND_KNOWLEDGE_LIST,
+    tags: [
+      ["d", "rel-200"],
+      ["k", "head-node"],
+      ["i", "node1", "relevant"],
+      ["i", "ref:ctx1:ctx2:target1", "relevant"],
+      ["i", "cref:alice_list123:node2", ""],
+      ["i", "ref:ctx3:target2", ""],
+    ],
+    pubkey: ALICE.publicKey,
+    content: "",
+    created_at: 1234567890,
+  };
+
+  const relations = eventToRelations(event);
+  expect(relations).toBeDefined();
+  expect(relations!.items.size).toBe(2);
+  expect(relations!.items.get(0)?.nodeID).toBe("node1");
+  expect(relations!.items.get(1)?.nodeID).toBe("cref:alice_list123:node2");
+});
+
 describe("jsonToViews validation", () => {
   test("filters invalid typeFilter values", () => {
     const json = {
@@ -195,7 +218,7 @@ describe("basedOn serialization round-trip", () => {
     };
     const planWithRelation = planUpsertRelations(plan, relations);
 
-    const event = planWithRelation.publishEvents.last()!;
+    const event = planWithRelation.publishEvents.first()!;
     expect(event.kind).toBe(KIND_KNOWLEDGE_LIST);
 
     const bTag = event.tags.find((t: string[]) => t[0] === "b");

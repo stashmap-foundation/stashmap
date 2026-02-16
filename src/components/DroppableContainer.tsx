@@ -3,30 +3,20 @@ import { List, OrderedSet } from "immutable";
 import { ConnectDropTarget, DropTargetMonitor, useDrop } from "react-dnd";
 import { NativeTypes } from "react-dnd-html5-backend";
 import { dnd, getDropDestinationFromTreeView } from "../dnd";
-import {
-  addRelationToRelations,
-  createAbstractRefId,
-  isEmptyNodeID,
-  LOG_NODE_ID,
-  shortID,
-} from "../connections";
+import { isEmptyNodeID, shortID } from "../connections";
 import { deselectAllChildren, useTemporaryView } from "./TemporaryViewContext";
 import {
   Plan,
   planAddToParent,
   planSetTemporarySelectionState,
   planUpdatePanes,
-  planUpsertNode,
-  planUpsertRelations,
   usePlanner,
 } from "../planner";
 import {
   ViewPath,
   getContext,
   getNodeIDFromView,
-  getRelationsForContext,
   getParentKey,
-  newRelations,
   useViewPath,
   viewPathToString,
 } from "../ViewContext";
@@ -42,6 +32,7 @@ import {
 export type DragItemType = {
   path: ViewPath;
   isSuggestion?: boolean;
+  isCopyDrag?: boolean;
 };
 
 type NativeFileDropItem = {
@@ -90,34 +81,7 @@ function planMaterializeImportedRoot(
   paneIndex: number,
   rootNodeID: ID
 ): Plan {
-  const logNode: KnowNode = {
-    id: LOG_NODE_ID,
-    text: "~Log",
-    type: "text",
-  };
-  const withLogNode = planUpsertNode(plan, logNode);
-  const existingLogRelations = getRelationsForContext(
-    withLogNode.knowledgeDBs,
-    withLogNode.user.publicKey,
-    LOG_NODE_ID,
-    List<ID>(),
-    undefined,
-    false
-  );
-  const logRelations =
-    existingLogRelations ||
-    newRelations(LOG_NODE_ID, List<ID>(), withLogNode.user.publicKey);
-  const withUpdatedLogRelations = planUpsertRelations(
-    withLogNode,
-    addRelationToRelations(
-      logRelations,
-      createAbstractRefId(List<ID>(), rootNodeID),
-      undefined,
-      undefined,
-      0
-    )
-  );
-  const updatedPanes = withUpdatedLogRelations.panes.map((paneState, idx) => {
+  const updatedPanes = plan.panes.map((paneState, idx) => {
     if (idx !== paneIndex) {
       return paneState;
     }
@@ -127,7 +91,7 @@ function planMaterializeImportedRoot(
       rootRelation: undefined,
     };
   });
-  return planUpdatePanes(withUpdatedLogRelations, updatedPanes);
+  return planUpdatePanes(plan, updatedPanes);
 }
 
 function calcDragDirection(
@@ -520,14 +484,15 @@ export function useDroppable({
       const dropped = dnd(
         plan,
         selection,
-        viewPathToString(dragItem.path), // TODO: change parameter to path instead of string
+        viewPathToString(dragItem.path),
         destination,
         stack,
         calcIndex(index, direction),
         pane.rootRelation,
         dragItem.isSuggestion,
         invertCopyModeRef.current,
-        targetDepth
+        targetDepth,
+        dragItem.isCopyDrag
       );
       const parentKey = getParentKey(viewPathToString(dragItem.path));
       executePlan(

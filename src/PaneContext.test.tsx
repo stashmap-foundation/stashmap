@@ -8,6 +8,8 @@ import {
   renderApp,
   setupTestDB,
   findNodeByText,
+  findNewNodeEditor,
+  follow,
   type,
   expectTree,
 } from "./utils.test";
@@ -38,6 +40,50 @@ test("Navigate to specific node via URL using human-readable path", async () => 
   await screen.findByRole("treeitem", { name: "Test Node" });
 });
 
+test("Fork works when navigating to a version entry", async () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  await follow(bob, alice().user.publicKey);
+
+  renderApp(alice());
+  await type(
+    "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Enter}Rome{Enter}Vienna{Escape}"
+  );
+  cleanup();
+
+  renderApp(bob());
+  await type(
+    "My Notes{Enter}{Tab}Cities{Enter}{Tab}Barcelona{Enter}Madrid{Escape}"
+  );
+
+  await userEvent.click(
+    await screen.findByLabelText(/open .* \+4 -2 in fullscreen/)
+  );
+
+  await waitFor(() => {
+    expect(window.location.pathname).toMatch(/^\/r\//);
+  });
+
+  await screen.findByText("READONLY");
+
+  await userEvent.click(
+    await screen.findByLabelText("fork to make your own copy")
+  );
+
+  await userEvent.click(await screen.findByLabelText("edit Cities"));
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(await findNewNodeEditor(), "Berlin{Escape}");
+
+  await expectTree(`
+Cities
+  Berlin
+  Paris
+  London
+  Rome
+  Vienna
+  [V] +2 -5
+  `);
+});
+
 test("Bob can view Alice's relation via /r/ URL without following her", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
 
@@ -46,25 +92,9 @@ test("Bob can view Alice's relation via /r/ URL without following her", async ()
     "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
   );
 
-  await expectTree(`
-My Notes
-  Cities
-    Paris
-    London
-  `);
-
   await userEvent.click(
-    await screen.findByLabelText("show references to Cities")
+    await screen.findByLabelText("open Cities in fullscreen")
   );
-  await userEvent.click(
-    await screen.findByLabelText("open My Notes → Cities (2) in fullscreen")
-  );
-
-  await expectTree(`
-Cities
-  Paris
-  London
-  `);
 
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/r\//);
@@ -75,9 +105,9 @@ Cities
   renderApp({ ...bob(), initialRoute: relationUrl });
 
   await expectTree(`
-Cities
-  Paris
-  London
+[O] Cities
+  [O] Paris
+  [O] London
   `);
 });
 
@@ -89,25 +119,9 @@ test("Anonymous user can view relation via /r/ URL", async () => {
     "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
   );
 
-  await expectTree(`
-My Notes
-  Cities
-    Paris
-    London
-  `);
-
   await userEvent.click(
-    await screen.findByLabelText("show references to Cities")
+    await screen.findByLabelText("open Cities in fullscreen")
   );
-  await userEvent.click(
-    await screen.findByLabelText("open My Notes → Cities (2) in fullscreen")
-  );
-
-  await expectTree(`
-Cities
-  Paris
-  London
-  `);
 
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/r\//);
@@ -132,37 +146,14 @@ test("Anonymous user sees versioned node text via /r/ URL", async () => {
     "My Notes{Enter}{Tab}Cities{Enter}{Tab}Barcelona{Enter}London{Escape}"
   );
 
-  await expectTree(`
-My Notes
-  Cities
-    Barcelona
-    London
-  `);
-
   const barcelonaEditor = await screen.findByLabelText("edit Barcelona");
   await userEvent.click(barcelonaEditor);
   await userEvent.clear(barcelonaEditor);
   await userEvent.type(barcelonaEditor, "BCN{Escape}");
 
-  await expectTree(`
-My Notes
-  Cities
-    BCN
-    London
-  `);
-
   await userEvent.click(
-    await screen.findByLabelText("show references to Cities")
+    await screen.findByLabelText("open Cities in fullscreen")
   );
-  await userEvent.click(
-    await screen.findByLabelText("open My Notes → Cities (2) in fullscreen")
-  );
-
-  await expectTree(`
-Cities
-  BCN
-  London
-  `);
 
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/r\//);
@@ -188,10 +179,7 @@ test("Clicking breadcrumb while viewing other user's content preserves READONLY"
   );
 
   await userEvent.click(
-    await screen.findByLabelText("show references to Cities")
-  );
-  await userEvent.click(
-    await screen.findByLabelText("open My Notes → Cities (2) in fullscreen")
+    await screen.findByLabelText("open Cities in fullscreen")
   );
 
   await waitFor(() => {
@@ -204,9 +192,9 @@ test("Clicking breadcrumb while viewing other user's content preserves READONLY"
 
   await screen.findByText("READONLY");
   await expectTree(`
-Cities
-  Paris
-  London
+[O] Cities
+  [O] Paris
+  [O] London
   `);
 
   await userEvent.click(await screen.findByLabelText("Navigate to My Notes"));
@@ -214,10 +202,10 @@ Cities
   await screen.findByText("READONLY");
   await userEvent.click(await screen.findByLabelText("expand Cities"));
   await expectTree(`
-My Notes
-  Cities
-    Paris
-    London
+[O] My Notes
+  [O] Cities
+    [O] Paris
+    [O] London
   `);
 });
 
@@ -239,9 +227,9 @@ test("Opening /n/ URL with author param shows READONLY", async () => {
 
   await screen.findByText("READONLY");
   await expectTree(`
-Cities
-  Paris
-  London
+[O] Cities
+  [O] Paris
+  [O] London
   `);
 });
 
@@ -254,10 +242,7 @@ test("URL includes author param when viewing other user's content via breadcrumb
   );
 
   await userEvent.click(
-    await screen.findByLabelText("show references to Cities")
-  );
-  await userEvent.click(
-    await screen.findByLabelText("open My Notes → Cities (2) in fullscreen")
+    await screen.findByLabelText("open Cities in fullscreen")
   );
 
   await waitFor(() => {
@@ -286,10 +271,7 @@ test("Clicking fullscreen while viewing other user's content preserves READONLY"
   );
 
   await userEvent.click(
-    await screen.findByLabelText("show references to Cities")
-  );
-  await userEvent.click(
-    await screen.findByLabelText("open My Notes → Cities (2) in fullscreen")
+    await screen.findByLabelText("open Cities in fullscreen")
   );
 
   await waitFor(() => {
@@ -302,9 +284,9 @@ test("Clicking fullscreen while viewing other user's content preserves READONLY"
 
   await screen.findByText("READONLY");
   await expectTree(`
-Cities
-  Paris
-  London
+[O] Cities
+  [O] Paris
+  [O] London
   `);
 
   await userEvent.click(
@@ -313,7 +295,7 @@ Cities
 
   await screen.findByText("READONLY");
   await expectTree(`
-Paris
+[O] Paris
   `);
 });
 
@@ -326,10 +308,7 @@ test("Relay filters never contain invalid pubkeys when anonymous user views /r/ 
   );
 
   await userEvent.click(
-    await screen.findByLabelText("show references to Cities")
-  );
-  await userEvent.click(
-    await screen.findByLabelText("open My Notes → Cities (2) in fullscreen")
+    await screen.findByLabelText("open Cities in fullscreen")
   );
 
   await waitFor(() => {
@@ -360,10 +339,7 @@ test("/r/ URL takes priority over stale history state", async () => {
   );
 
   await userEvent.click(
-    await screen.findByLabelText("show references to Cities")
-  );
-  await userEvent.click(
-    await screen.findByLabelText("open My Notes → Cities (2) in fullscreen")
+    await screen.findByLabelText("open Cities in fullscreen")
   );
 
   await waitFor(() => {
@@ -374,19 +350,21 @@ test("/r/ URL takes priority over stale history state", async () => {
 
   const stalePanes = [defaultPane(bob().user.publicKey)];
   const origPushState = window.history.pushState.bind(window.history);
-  jest.spyOn(window.history, "pushState").mockImplementation(
-    (_data: unknown, title: string, url?: string | URL | null) => {
-      origPushState({ panes: stalePanes }, title, url);
-    }
-  );
+  jest
+    .spyOn(window.history, "pushState")
+    .mockImplementation(
+      (_data: unknown, title: string, url?: string | URL | null) => {
+        origPushState({ panes: stalePanes }, title, url);
+      }
+    );
 
   renderApp({ ...bob(), initialRoute: relationUrl });
 
   jest.restoreAllMocks();
 
   await expectTree(`
-Cities
-  Paris
-  London
+[O] Cities
+  [O] Paris
+  [O] London
   `);
 });

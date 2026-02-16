@@ -1,5 +1,5 @@
 import React from "react";
-import { List, Set as ImmutableSet, Map } from "immutable";
+import { List, Set as ImmutableSet, OrderedSet, Map } from "immutable";
 import { v4 } from "uuid";
 import {
   getRelations,
@@ -10,22 +10,25 @@ import {
   isRefId,
   isSearchId,
   parseSearchId,
-  buildReferenceNode,
   itemMatchesType,
   VERSIONS_NODE_ID,
   EMPTY_NODE_ID,
   addRelationToRelations,
   isConcreteRefId,
-  getConcreteRefs,
-  groupConcreteRefs,
-  isAbstractRefId,
+  createConcreteRefId,
+  findRefsToNode,
   itemPassesFilters,
 } from "./connections";
+import {
+  buildOutgoingReference,
+  buildReferenceItem,
+  computeRelationDiff,
+} from "./buildReferenceNode";
 import { newDB } from "./knowledge";
 import { useData } from "./DataContext";
 import { Plan, planUpsertRelations, getPane } from "./planner";
 import { usePaneStack } from "./SplitPanesContext";
-import { REFERENCED_BY, DEFAULT_TYPE_FILTERS } from "./constants";
+import { DEFAULT_TYPE_FILTERS, suggestionSettings } from "./constants";
 
 // only exported for tests
 export type NodeIndex = number & { readonly "": unique symbol };
@@ -42,38 +45,38 @@ export function contextsMatch(a: Context, b: Context): boolean {
  * - Plain nodeID for leaf suggestions (no children in any user's context)
  * - Abstract/concrete ref ID for expandable suggestions (grouped by context)
  */
-export function getDiffItemsForNode(
+type SuggestionsResult = {
+  suggestions: List<LongID | ID>;
+  coveredCandidateIDs: ImmutableSet<string>;
+};
+
+const EMPTY_SUGGESTIONS_RESULT: SuggestionsResult = {
+  suggestions: List<LongID | ID>(),
+  coveredCandidateIDs: ImmutableSet<string>(),
+};
+
+export function getSuggestionsForNode(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
   nodeID: LongID | ID,
-  filterTypes: (Relevance | Argument | "suggestions" | "contains")[],
+  filterTypes: TypeFilters,
   currentRelationId?: LongID,
   parentContext?: Context
-): List<LongID | ID> {
+): SuggestionsResult {
   if (!filterTypes || filterTypes.length === 0) {
-    return List<LongID | ID>();
+    return EMPTY_SUGGESTIONS_RESULT;
   }
 
   if (!filterTypes.includes("suggestions")) {
-    return List<LongID | ID>();
+    return EMPTY_SUGGESTIONS_RESULT;
   }
 
   const itemFilters = filterTypes.filter(
     (t): t is Relevance | Argument | "contains" =>
-      t !== "suggestions" && t !== undefined
+      t !== "suggestions" && t !== "versions" && t !== undefined
   );
 
   const [, localID] = splitID(nodeID);
-
-  const myDB = knowledgeDBs.get(myself);
-  const myRelations = myDB?.relations
-    .filter((r) => r.head === localID)
-    .toList();
-  const myAllItems: ImmutableSet<LongID | ID> = (
-    myRelations || List<Relations>()
-  )
-    .flatMap((r) => r.items.map((item) => item.nodeID))
-    .toSet();
 
   const currentRelation = currentRelationId
     ? getRelationsNoReferencedBy(knowledgeDBs, currentRelationId, myself)
@@ -95,43 +98,143 @@ export function getDiffItemsForNode(
             contextsMatch(r.context, contextToMatch)
         )
         .toList()
-    );
+    )
+    .sortBy((r) => -r.updated);
 
   const candidateNodeIDs = otherRelations.reduce(
-    (acc: ImmutableSet<ID>, relations: Relations) => {
+    (acc: OrderedSet<ID>, relations: Relations) => {
       const newItems = relations.items
         .filter(
           (item: RelationItem) =>
             itemFilters.some((t) => itemMatchesType(item, t)) &&
             item.relevance !== "not_relevant" &&
-            !myAllItems.has(item.nodeID) &&
             !currentRelationItems.has(item.nodeID)
         )
         .map((item: RelationItem) => shortID(item.nodeID) as ID);
       return acc.union(newItems);
     },
-    ImmutableSet<ID>()
+    OrderedSet<ID>()
   );
 
   if (candidateNodeIDs.size === 0) {
-    return List<LongID | ID>();
+    return EMPTY_SUGGESTIONS_RESULT;
   }
+
+  const cappedCandidates = candidateNodeIDs.take(
+    suggestionSettings.maxSuggestions
+  );
 
   const itemContext = parentContext
     ? parentContext.push(localID as ID)
     : List<ID>([localID as ID]);
 
-  return candidateNodeIDs.reduce((acc, candidateID) => {
-    const refs = getConcreteRefs(knowledgeDBs, candidateID, itemContext);
+  const suggestions = cappedCandidates.reduce((acc, candidateID) => {
+    const refs = findRefsToNode(knowledgeDBs, candidateID, itemContext);
     const headRefs = refs.filter(
-      (ref) => !ref.isInItems && splitID(ref.relationID)[0] !== myself
+      (ref) => !ref.targetNode && splitID(ref.relationID)[0] !== myself
     );
     if (headRefs.size > 0) {
-      const grouped = groupConcreteRefs(headRefs, candidateID);
-      return acc.concat(grouped.map((item) => item.nodeID));
+      const first = headRefs.sortBy((r) => -r.updated).first()!;
+      return acc.push(createConcreteRefId(first.relationID));
     }
     return acc.push(candidateID as LongID | ID);
   }, List<LongID | ID>());
+
+  return {
+    suggestions,
+    coveredCandidateIDs: cappedCandidates.toSet() as ImmutableSet<string>,
+  };
+}
+
+export function getAlternativeRelations(
+  knowledgeDBs: KnowledgeDBs,
+  nodeID: LongID | ID,
+  context: Context,
+  excludeRelationId?: LongID
+): List<Relations> {
+  const localID = shortID(nodeID);
+  return knowledgeDBs
+    .toList()
+    .flatMap((db) =>
+      db.relations
+        .filter(
+          (r) =>
+            r.head === localID &&
+            r.id !== excludeRelationId &&
+            contextsMatch(r.context, context)
+        )
+        .toList()
+    );
+}
+
+export function getVersionsForRelation(
+  knowledgeDBs: KnowledgeDBs,
+  nodeID: LongID | ID,
+  filterTypes: TypeFilters,
+  currentRelation?: Relations,
+  parentContext?: Context,
+  coveredSuggestionIDs?: ImmutableSet<string>
+): List<LongID> {
+  if (!filterTypes || !filterTypes.includes("versions")) {
+    return List<LongID>();
+  }
+
+  const contextToMatch = parentContext || List<ID>();
+  const alternatives = getAlternativeRelations(
+    knowledgeDBs,
+    nodeID,
+    contextToMatch,
+    currentRelation?.id
+  );
+
+  const existingCrefIDs = currentRelation
+    ? currentRelation.items
+        .map((item) => item.nodeID)
+        .filter((id) => isConcreteRefId(id))
+        .toSet()
+    : ImmutableSet<LongID | ID>();
+
+  const currentItemIDs = currentRelation
+    ? currentRelation.items
+        .filter(
+          (item) =>
+            itemPassesFilters(item, filterTypes) &&
+            item.relevance !== "not_relevant"
+        )
+        .map((item) => shortID(item.nodeID))
+        .toSet()
+    : ImmutableSet<string>();
+
+  return alternatives
+    .filter((r) => {
+      if (existingCrefIDs.has(createConcreteRefId(r.id))) {
+        return false;
+      }
+      const { addCount, removeCount } = computeRelationDiff(
+        r,
+        currentRelation,
+        filterTypes
+      );
+      if (addCount === 0 && removeCount === 0) {
+        return false;
+      }
+      const coveredIDs = coveredSuggestionIDs || ImmutableSet<string>();
+      const addIDs = r.items
+        .filter(
+          (item) =>
+            itemPassesFilters(item, filterTypes) &&
+            item.relevance !== "not_relevant"
+        )
+        .map((item) => shortID(item.nodeID))
+        .filter((id) => !currentItemIDs.has(id));
+      const hasUncoveredAdds = addIDs.some((id) => !coveredIDs.has(id));
+      return (
+        hasUncoveredAdds || removeCount > suggestionSettings.maxSuggestions
+      );
+    })
+    .sortBy((r) => -r.updated)
+    .map((r) => createConcreteRefId(r.id))
+    .toList();
 }
 
 type SubPath = {
@@ -155,6 +258,18 @@ export function useViewPath(): ViewPath {
     throw new Error("ViewContext not provided");
   }
   return context;
+}
+
+export type VirtualItemsMap = Map<string, RelationItem>;
+
+const VirtualItemsContext = React.createContext<VirtualItemsMap>(
+  Map<string, RelationItem>()
+);
+
+export const VirtualItemsProvider = VirtualItemsContext.Provider;
+
+export function useVirtualItemsMap(): VirtualItemsMap {
+  return React.useContext(VirtualItemsContext);
 }
 
 // Encode nodeID to handle colons in ref IDs (ref:ctx:target format)
@@ -280,8 +395,7 @@ export function getContext(
     const parentRelation = getRelations(
       data.knowledgeDBs,
       parentElement.relationsID,
-      data.user.publicKey,
-      parentElement.nodeID
+      data.user.publicKey
     );
     if (parentRelation) {
       return parentRelation.context.push(parentRelation.head);
@@ -314,7 +428,6 @@ export function getLast(viewContext: ViewPath): SubPath {
 
 function getDefaultView(id: ID, isRootNode: boolean): View {
   return {
-    viewingMode: undefined,
     expanded: isRootNode || isSearchId(id),
   };
 }
@@ -360,7 +473,14 @@ export function getRelationsForContext(
   isRootNode: boolean
 ): Relations | undefined {
   if (isRootNode && rootRelation) {
-    return getRelationsNoReferencedBy(knowledgeDBs, rootRelation, paneAuthor);
+    const relation = getRelationsNoReferencedBy(
+      knowledgeDBs,
+      rootRelation,
+      paneAuthor
+    );
+    if (relation) {
+      return relation;
+    }
   }
   return getNewestRelationFromAuthor(knowledgeDBs, paneAuthor, nodeID, context);
 }
@@ -381,8 +501,7 @@ export function getParentRelation(
   return getRelations(
     data.knowledgeDBs,
     parentElement.relationsID,
-    data.user.publicKey,
-    parentElement.nodeID
+    data.user.publicKey
   );
 }
 
@@ -397,17 +516,13 @@ export function getRelationForView(
   viewPath: ViewPath,
   stack: ID[]
 ): Relations | undefined {
-  const [nodeID, view] = getNodeIDFromView(data, viewPath);
+  const [nodeID] = getNodeIDFromView(data, viewPath);
   const context = getContext(data, viewPath, stack);
   const pane = getPane(data, viewPath);
   const author = getEffectiveAuthor(data, viewPath);
 
-  if (view.viewingMode === "REFERENCED_BY") {
-    return getRelations(data.knowledgeDBs, REFERENCED_BY, author, nodeID);
-  }
-
-  if (isAbstractRefId(nodeID) || isConcreteRefId(nodeID)) {
-    return getRelations(data.knowledgeDBs, nodeID as LongID, author, nodeID);
+  if (isConcreteRefId(nodeID)) {
+    return getRelations(data.knowledgeDBs, nodeID, author);
   }
 
   return getRelationsForContext(
@@ -420,7 +535,7 @@ export function getRelationForView(
   );
 }
 
-export function useReferencedByDepth(): number | undefined {
+export function useSearchDepth(): number | undefined {
   const data = useData();
   const viewPath = useViewPath();
 
@@ -429,8 +544,8 @@ export function useReferencedByDepth(): number | undefined {
     depth: number
   ): number | undefined => {
     if (!currentPath) return undefined;
-    const [nodeID, view] = getNodeIDFromView(data, currentPath);
-    if (view?.viewingMode === "REFERENCED_BY" || isSearchId(nodeID as ID)) {
+    const [nodeID] = getNodeIDFromView(data, currentPath);
+    if (isSearchId(nodeID as ID)) {
       return depth;
     }
     return loop(getParentView(currentPath), depth + 1);
@@ -439,36 +554,8 @@ export function useReferencedByDepth(): number | undefined {
   return loop(getParentView(viewPath), 1);
 }
 
-export function isSuggestion(
-  nodeID: LongID | ID,
-  parentRelation: Relations | undefined
-): boolean {
-  if (!parentRelation) {
-    return true;
-  }
-  if (
-    parentRelation.id === REFERENCED_BY ||
-    isSearchId(parentRelation.head as ID)
-  ) {
-    return false;
-  }
-  return !parentRelation.items.some((item) => item.nodeID === nodeID);
-}
-
-export function useIsSuggestion(): boolean {
-  const data = useData();
-  const viewPath = useViewPath();
-  const stack = usePaneStack();
-  const parentPath = getParentView(viewPath);
-
-  if (!parentPath) {
-    return false;
-  }
-
-  const [nodeID] = getNodeIDFromView(data, viewPath);
-  const parentRel = getRelationForView(data, parentPath, stack);
-
-  return isSuggestion(nodeID, parentRel);
+export function useIsInSearchView(): boolean {
+  return useSearchDepth() !== undefined;
 }
 
 export function contextStartsWith(context: Context, prefix: Context): boolean {
@@ -497,10 +584,6 @@ export function getDescendantRelations(
   );
 }
 
-export function isReferencedByView(view: View): boolean {
-  return view.viewingMode === "REFERENCED_BY";
-}
-
 function getNodeFromAnyDB(
   knowledgeDBs: KnowledgeDBs,
   id: string
@@ -514,17 +597,10 @@ function getNodeFromAnyDB(
 export function getNodeFromID(
   knowledgeDBs: KnowledgeDBs,
   id: ID | LongID,
-  myself: PublicKey,
-  parentRelation?: Relations
+  myself: PublicKey
 ): KnowNode | undefined {
-  // Handle ref IDs - build a virtual ReferenceNode
   if (isRefId(id)) {
-    return buildReferenceNode(
-      id as LongID,
-      knowledgeDBs,
-      myself,
-      parentRelation
-    );
+    return buildOutgoingReference(id as LongID, knowledgeDBs, myself);
   }
 
   // Handle search IDs - build virtual node from ID
@@ -551,7 +627,14 @@ export function getNodeFromID(
   return node;
 }
 
-export type TypeFilters = (Relevance | Argument | "suggestions" | "contains")[];
+export type TypeFilters = (
+  | Relevance
+  | Argument
+  | "suggestions"
+  | "versions"
+  | "incoming"
+  | "contains"
+)[];
 
 export const VERSION_FILTERS: TypeFilters = [
   "relevant",
@@ -595,7 +678,7 @@ export function getVersionsRelations(
   context: Context
 ): Relations | undefined {
   const versionsContext = getVersionsContext(nodeID, context);
-  return getRelationsForContext(
+  const result = getRelationsForContext(
     knowledgeDBs,
     author,
     VERSIONS_NODE_ID,
@@ -603,6 +686,7 @@ export function getVersionsRelations(
     undefined,
     false
   );
+  return result;
 }
 
 /**
@@ -635,16 +719,10 @@ export function getVersionedDisplayText(
 
 export function getNodeFromView(
   data: Data,
-  viewPath: ViewPath,
-  parentRelation: Relations | undefined
+  viewPath: ViewPath
 ): [KnowNode, View] | [undefined, undefined] {
   const [nodeID, view] = getNodeIDFromView(data, viewPath);
-  const node = getNodeFromID(
-    data.knowledgeDBs,
-    nodeID,
-    data.user.publicKey,
-    parentRelation
-  );
+  const node = getNodeFromID(data.knowledgeDBs, nodeID, data.user.publicKey);
   if (!node) {
     return [undefined, undefined];
   }
@@ -750,21 +828,6 @@ export function useIsViewingOtherUserContent(): boolean {
   return effectiveAuthor !== user.publicKey;
 }
 
-/**
- * Check if the current node is a suggestion (from another user).
- * A node is a suggestion if:
- * 1. It's a concrete ref from another user with matching context (expandable suggestion), OR
- * 2. It's a plain nodeID not in the current user's parent relation (leaf suggestion)
- */
-/**
- * Check if we're anywhere within a Referenced By view.
- * Items in Referenced By view are readonly - no editing, no dropping onto them.
- * Walks up all ancestors to check if any has relations === REFERENCED_BY.
- */
-export function useIsInReferencedByView(): boolean {
-  return useReferencedByDepth() !== undefined;
-}
-
 export function popViewPath(
   viewContext: ViewPath,
   times: number
@@ -791,6 +854,23 @@ export function useRelationIndex(): number | undefined {
   const path = useViewPath();
   const data = useData();
   return getRelationIndex(data, path);
+}
+
+export function useRelationItem(): RelationItem | undefined {
+  const virtualItems = React.useContext(VirtualItemsContext);
+  const data = useData();
+  const viewPath = useViewPath();
+  const viewKey = viewPathToString(viewPath);
+  const virtualItem = virtualItems.get(viewKey);
+  if (virtualItem) {
+    return virtualItem;
+  }
+  const relation = getParentRelation(data, viewPath);
+  if (!relation) {
+    return undefined;
+  }
+  const index = getRelationIndex(data, viewPath);
+  return index !== undefined ? relation.items.get(index) : undefined;
 }
 
 export type SiblingInfo = {
@@ -904,8 +984,29 @@ export function useNodeID(): [LongID | ID, View] {
 export function useNode(): [KnowNode, View] | [undefined, undefined] {
   const data = useData();
   const viewPath = useViewPath();
-  const parentRelation = getParentRelation(data, viewPath);
-  return getNodeFromView(data, viewPath, parentRelation);
+  const stack = usePaneStack();
+  const [nodeID, view] = getNodeIDFromView(data, viewPath);
+  const virtualItem = useRelationItem();
+
+  if (isRefId(nodeID)) {
+    const node = buildReferenceItem(
+      nodeID as LongID,
+      data,
+      viewPath,
+      stack,
+      virtualItem?.virtualType
+    );
+    if (!node) {
+      return [undefined, undefined];
+    }
+    return [node, view];
+  }
+
+  const node = getNodeFromID(data.knowledgeDBs, nodeID, data.user.publicKey);
+  if (!node) {
+    return [undefined, undefined];
+  }
+  return [node, view];
 }
 
 export function useDisplayText(): string {
@@ -933,8 +1034,7 @@ export function getParentNode(
   if (!parentPath) {
     return [undefined, undefined];
   }
-  const grandparentRelation = getParentRelation(data, parentPath);
-  return getNodeFromView(data, parentPath, grandparentRelation);
+  return getNodeFromView(data, parentPath);
 }
 
 export function getParentNodeID(

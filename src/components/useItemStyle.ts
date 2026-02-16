@@ -1,13 +1,10 @@
 import { CSSProperties } from "react";
 import {
-  useRelationIndex,
-  useViewPath,
-  useIsInReferencedByView,
-  useIsSuggestion,
   useIsViewingOtherUserContent,
-  getParentRelation,
+  useRelationItem,
+  useNodeID,
 } from "../ViewContext";
-import { useData } from "../DataContext";
+import { isConcreteRefId } from "../connections";
 import { TYPE_COLORS } from "../constants";
 
 type ItemStyle = {
@@ -15,13 +12,6 @@ type ItemStyle = {
   textStyle: CSSProperties;
   textClassName: string;
   relevance: Relevance;
-};
-
-const DEFAULT_STYLE: ItemStyle = {
-  cardStyle: {},
-  textStyle: {},
-  textClassName: "",
-  relevance: undefined,
 };
 
 function getRelevanceTextStyle(relevance: Relevance): CSSProperties {
@@ -35,7 +25,7 @@ function getRelevanceTextStyle(relevance: Relevance): CSSProperties {
     case "little_relevant":
       return {};
     case "not_relevant":
-      return { textDecoration: "line-through", color: "var(--base01)" };
+      return { textDecoration: "line-through" };
     default:
       return {};
   }
@@ -51,29 +41,21 @@ function getArgumentTextStyle(argument: Argument | undefined): CSSProperties {
   return {};
 }
 
-/**
- * Hook that returns styling based on item's relevance, argument, and suggestion status.
- *
- * Styling rules:
- * - Suggestions and other users' content: gray text (non-editable content)
- * - Not relevant: line-through + gray text
- * - Contra: red text
- * - Confirms: green text
- * - Relevance indicators (! ? ~) are shown in gutter, not as text styling
- */
+function isReferenceVirtualType(virtualType: VirtualType | undefined): boolean {
+  return (
+    virtualType === "incoming" ||
+    virtualType === "occurrence" ||
+    virtualType === "version"
+  );
+}
+
 export function useItemStyle(): ItemStyle {
-  const data = useData();
-  const viewPath = useViewPath();
-  const relationIndex = useRelationIndex();
-  const isInReferencedByView = useIsInReferencedByView();
-  const isSuggestion = useIsSuggestion();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
+  const currentItem = useRelationItem();
+  const [nodeID] = useNodeID();
+  const virtualType = currentItem?.virtualType;
 
-  if (isInReferencedByView) {
-    return DEFAULT_STYLE;
-  }
-
-  if (isSuggestion || isViewingOtherUserContent) {
+  if (virtualType === "suggestion" || isViewingOtherUserContent) {
     return {
       cardStyle: {},
       textStyle: {},
@@ -82,20 +64,27 @@ export function useItemStyle(): ItemStyle {
     };
   }
 
-  // Get current item's relevance and argument
-  const relations = getParentRelation(data, viewPath);
-  const currentItem = relations?.items.get(relationIndex ?? -1);
+  if (isReferenceVirtualType(virtualType)) {
+    return {
+      cardStyle: {},
+      textStyle: { fontStyle: "italic" },
+      textClassName: "text-readonly",
+      relevance: undefined,
+    };
+  }
+
   const relevance = currentItem?.relevance;
   const argument = currentItem?.argument;
-
   const normalizedRelevance =
     relevance === ("" as string) ? undefined : relevance;
+  const isOutgoingRef = isConcreteRefId(nodeID);
 
   return {
     cardStyle: {},
     textStyle: {
       ...getRelevanceTextStyle(normalizedRelevance),
       ...getArgumentTextStyle(argument),
+      ...(isOutgoingRef ? { fontStyle: "italic" as const } : {}),
     },
     textClassName: "",
     relevance: normalizedRelevance,

@@ -4,8 +4,8 @@ import {
   useNode,
   useViewPath,
   ViewPath,
-  useIsInReferencedByView,
-  useReferencedByDepth,
+  useSearchDepth,
+  useIsInSearchView,
   useIsExpanded,
   useIsRoot,
   useRelationIndex,
@@ -16,12 +16,10 @@ import {
   getRelationForView,
   getRelationIndex,
   getLast,
-  getDiffItemsForNode,
-  isReferencedByView,
   getContext,
   getNodeIDFromView,
   useIsViewingOtherUserContent,
-  useIsSuggestion,
+  useRelationItem,
   viewPathToString,
   useEffectiveAuthor,
 } from "../ViewContext";
@@ -31,21 +29,14 @@ import {
   isReferenceNode,
   getRefTargetInfo,
   isEmptyNodeID,
-  isAbstractRefId,
   isConcreteRefId,
-  parseConcreteRefId,
-  getRelationsNoReferencedBy,
-  getConcreteRefsForAbstract,
-  getRelations,
-  isSearchId,
   computeEmptyNodeMetadata,
   shortID,
 } from "../connections";
-import { DEFAULT_TYPE_FILTERS } from "../constants";
+import { TYPE_COLORS } from "../constants";
 import { IS_MOBILE } from "./responsive";
 import { MiniEditor, preventEditorBlur } from "./AddNode";
 import { useOnToggleExpanded } from "./SelectRelations";
-import { ReferenceIndicators } from "./ReferenceIndicators";
 import { useData } from "../DataContext";
 import {
   Plan,
@@ -79,6 +70,7 @@ import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 import { useItemStyle } from "./useItemStyle";
 import { EditorTextProvider } from "./EditorTextContext";
+import { getChildNodes } from "../treeTraversal";
 
 export { getNodesInTree } from "../treeTraversal";
 
@@ -86,42 +78,9 @@ function useNodeHasChildren(): boolean {
   const data = useData();
   const viewPath = useViewPath();
   const stack = usePaneStack();
-  const [nodeID] = useNodeID();
-  const activeFilters = useCurrentPane().typeFilters || DEFAULT_TYPE_FILTERS;
-
-  if (isAbstractRefId(nodeID)) {
-    const concreteRefs = getConcreteRefsForAbstract(
-      data.knowledgeDBs,
-      data.user.publicKey,
-      nodeID as LongID
-    );
-    return Boolean(concreteRefs && concreteRefs.items.size > 0);
-  }
-
-  if (isConcreteRefId(nodeID)) {
-    const concreteRefChildren = getRelations(
-      data.knowledgeDBs,
-      nodeID as LongID,
-      data.user.publicKey,
-      nodeID
-    );
-    return Boolean(concreteRefChildren && concreteRefChildren.items.size > 0);
-  }
-
-  const childRelations = getRelationForView(data, viewPath, stack);
-  const hasDirectChildren = Boolean(
-    childRelations && childRelations.items.size > 0
-  );
-  const hasSuggestionChildren =
-    getDiffItemsForNode(
-      data.knowledgeDBs,
-      data.user.publicKey,
-      nodeID,
-      activeFilters,
-      childRelations?.id,
-      getContext(data, viewPath, stack)
-    ).size > 0;
-  return hasDirectChildren || hasSuggestionChildren;
+  const pane = useCurrentPane();
+  const result = getChildNodes(data, viewPath, stack, pane.rootRelation);
+  return result.paths.size > 0;
 }
 
 function getLevels(viewPath: ViewPath): number {
@@ -131,18 +90,11 @@ function getLevels(viewPath: ViewPath): number {
 }
 
 function ExpandCollapseToggle(): JSX.Element | null {
-  const [nodeID, view] = useNodeID();
+  const [nodeID] = useNodeID();
   const displayText = useDisplayText();
   const onToggleExpanded = useOnToggleExpanded();
-  const isReferencedByRoot = isReferencedByView(view);
-  const isInReferencedByView = useIsInReferencedByView();
-  const isSearchNode = isSearchId(nodeID as ID);
-  const showReferencedByStyle =
-    isReferencedByRoot || isInReferencedByView || isSearchNode;
-
   const isExpanded = useIsExpanded();
   const isEmptyNode = isEmptyNodeID(nodeID);
-
   const onToggle = (): void => {
     if (isEmptyNode) return;
     onToggleExpanded(!isExpanded);
@@ -150,7 +102,6 @@ function ExpandCollapseToggle(): JSX.Element | null {
 
   const toggleClass = [
     "expand-collapse-toggle",
-    showReferencedByStyle ? "toggle-referenced-by" : "",
     isEmptyNode ? "toggle-disabled" : "",
   ]
     .filter(Boolean)
@@ -183,45 +134,164 @@ function ErrorContent(): JSX.Element {
   return <span className="text-danger">Error: Node not found</span>;
 }
 
-function NodeContent({
-  nodeType,
-  nodeId,
-  text,
+function relevanceColor(relevance: Relevance): string | undefined {
+  if (relevance === "relevant") return TYPE_COLORS.relevant;
+  if (relevance === "maybe_relevant") return TYPE_COLORS.maybe_relevant;
+  if (relevance === "little_relevant") return TYPE_COLORS.little_relevant;
+  return undefined;
+}
+
+function relevanceChar(relevance: Relevance): string {
+  if (relevance === "relevant") return "!";
+  if (relevance === "maybe_relevant") return "?";
+  if (relevance === "little_relevant") return "~";
+  return "";
+}
+
+function argumentChar(argument: Argument | undefined): string {
+  if (argument === "confirms") return "+";
+  if (argument === "contra") return "-";
+  return "";
+}
+
+function argumentColor(argument: Argument | undefined): string | undefined {
+  if (argument === "confirms") return TYPE_COLORS.confirms;
+  if (argument === "contra") return TYPE_COLORS.contra;
+  return undefined;
+}
+
+function IncomingIndicator({
+  relevance,
+  argument,
 }: {
-  nodeType: KnowNode["type"];
-  nodeId: LongID | ID;
-  text: string;
-}): JSX.Element {
-  const { knowledgeDBs, user } = useData();
-  const isSuggestion = useIsSuggestion();
-  const isReference = nodeType === "reference";
-  const isConcreteRef = isConcreteRefId(nodeId);
-  const showBrackets = isReference && !isSuggestion;
-
-  const isOtherUser = (() => {
-    if (!isConcreteRef) return false;
-    const parsed = parseConcreteRefId(nodeId);
-    if (!parsed) return false;
-    const relation = getRelationsNoReferencedBy(
-      knowledgeDBs,
-      parsed.relationID,
-      user.publicKey
-    );
-    return relation ? relation.author !== user.publicKey : false;
-  })();
-
+  relevance?: Relevance;
+  argument?: Argument;
+}): JSX.Element | null {
+  const relChar = relevanceChar(relevance);
+  const argChar = argumentChar(argument);
+  if (!relChar && !argChar) {
+    return null;
+  }
   return (
-    <span
-      className={`break-word ${showBrackets ? "reference-node" : ""}`}
-      data-testid={isReference ? "reference-node" : undefined}
-      data-other-user={isOtherUser ? "true" : undefined}
-    >
-      {showBrackets && <ReferenceIndicators refId={nodeId} />}
-      {showBrackets && <span className="reference-bracket">[[</span>}
-      <span className={showBrackets ? "reference-text" : ""}>{text}</span>
-      {showBrackets && <span className="reference-bracket">]]</span>}
+    <>
+      {relChar && (
+        <span style={{ color: relevanceColor(relevance) }}>{relChar}</span>
+      )}
+      {argChar && (
+        <span style={{ color: argumentColor(argument) }}>{argChar}</span>
+      )}
+    </>
+  );
+}
+
+function VersionContent({ node }: { node: ReferenceNode }): JSX.Element {
+  const { user } = useData();
+  const meta = node.versionMeta;
+  const isOtherUser = node.author !== user.publicKey;
+  const dateStr = meta ? new Date(meta.updated).toLocaleString() : "";
+  return (
+    <span className="break-word" data-testid="reference-node">
+      {dateStr}
+      <span style={{ fontStyle: "normal" }}>
+        {isOtherUser && " \u{1F464}"}
+        {meta && meta.addCount > 0 && (
+          <>
+            {" "}
+            <span style={{ color: "var(--green)" }}>+{meta.addCount}</span>
+          </>
+        )}
+        {meta && meta.removeCount > 0 && (
+          <>
+            {" "}
+            <span style={{ color: "var(--red)" }}>-{meta.removeCount}</span>
+          </>
+        )}
+      </span>
     </span>
   );
+}
+
+function OtherUserIcon({ node }: { node: ReferenceNode }): JSX.Element | null {
+  const { user } = useData();
+  if (node.author === user.publicKey) {
+    return null;
+  }
+  return <span style={{ fontStyle: "normal" }}>{" \u{1F464}"}</span>;
+}
+
+function ReferenceContent({ node }: { node: ReferenceNode }): JSX.Element {
+  const virtualType = useRelationItem()?.virtualType;
+
+  if (virtualType === "version" || node.versionMeta) {
+    return <VersionContent node={node} />;
+  }
+
+  if (virtualType === "suggestion") {
+    return (
+      <span className="break-word" data-testid="reference-node">
+        {node.targetLabel}
+      </span>
+    );
+  }
+
+  if (virtualType === "incoming") {
+    const reversed = [...node.contextLabels].reverse().join(" / ");
+    return (
+      <span className="break-word" data-testid="reference-node">
+        {node.targetLabel}{" "}
+        <IncomingIndicator
+          relevance={node.incomingRelevance}
+          argument={node.incomingArgument}
+        />
+        {reversed && (
+          <>
+            {" "}
+            <span className="ref-separator">&lt;&lt;&lt;</span> {reversed}
+          </>
+        )}
+        <OtherUserIcon node={node} />
+      </span>
+    );
+  }
+
+  const contextPath = node.contextLabels.join(" / ");
+  return (
+    <span className="break-word" data-testid="reference-node">
+      {contextPath && (
+        <>
+          {contextPath}{" "}
+          {node.isBidirectional && (
+            <>
+              <span className="ref-separator">&lt;&lt;&lt;</span>{" "}
+            </>
+          )}
+          <span className="ref-separator">&gt;&gt;&gt;</span>
+          {node.incomingRelevance || node.incomingArgument ? (
+            <>
+              {" "}
+              <IncomingIndicator
+                relevance={node.incomingRelevance}
+                argument={node.incomingArgument}
+              />
+            </>
+          ) : null}{" "}
+        </>
+      )}
+      {node.targetLabel}
+      <OtherUserIcon node={node} />
+    </span>
+  );
+}
+
+function NodeContent(): JSX.Element {
+  const [node] = useNode();
+  const displayText = useDisplayText();
+
+  if (node && node.type === "reference") {
+    return <ReferenceContent node={node} />;
+  }
+
+  return <span className="break-word">{displayText}</span>;
 }
 
 function EditableContent(): JSX.Element {
@@ -510,9 +580,7 @@ function EditableContent(): JSX.Element {
 
   // For non-text nodes (and non-empty nodes), show read-only content
   if (!isEmptyNode && (!node || node.type !== "text")) {
-    return (
-      <NodeContent nodeType={node!.type} nodeId={nodeID} text={displayText} />
-    );
+    return <NodeContent />;
   }
 
   return (
@@ -535,20 +603,15 @@ function EditableContent(): JSX.Element {
 
 function InteractiveNodeContent(): JSX.Element {
   const [node] = useNode();
-  const [nodeID, view] = useNodeID();
-  const displayText = useDisplayText();
+  const [nodeID] = useNodeID();
   const isLoading = useNodeIsLoading();
-  const isInReferencedByView = useIsInReferencedByView();
+  const isInSearchView = useIsInSearchView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
-  const isSuggestionNode = useIsSuggestion();
-  const isReferencedByRoot = isReferencedByView(view);
+  const virtualType = useRelationItem()?.virtualType;
   const isEmptyNode = isEmptyNodeID(nodeID);
 
   const isReadonly =
-    isInReferencedByView ||
-    isReferencedByRoot ||
-    isViewingOtherUserContent ||
-    isSuggestionNode;
+    isInSearchView || isViewingOtherUserContent || virtualType !== undefined;
 
   if (isLoading) {
     return <LoadingNode />;
@@ -569,9 +632,7 @@ function InteractiveNodeContent(): JSX.Element {
   }
 
   // Read-only content
-  return (
-    <NodeContent nodeType={node.type} nodeId={nodeID} text={displayText} />
-  );
+  return <NodeContent />;
 }
 
 function NodeAutoLink({
@@ -589,7 +650,7 @@ function NodeAutoLink({
     const refInfo = getRefTargetInfo(node.id, knowledgeDBs, effectiveAuthor);
     if (refInfo) {
       const href = refInfo.rootRelation
-        ? buildRelationUrl(refInfo.rootRelation)
+        ? buildRelationUrl(refInfo.rootRelation, refInfo.scrollTo)
         : buildNodeUrl(
             refInfo.stack,
             knowledgeDBs,
@@ -661,6 +722,36 @@ function SuggestionIndicator(): JSX.Element {
   );
 }
 
+function ReferenceGutterIndicator(): JSX.Element {
+  return (
+    <span
+      className="reference-indicator"
+      title="Incoming reference"
+      aria-hidden="true"
+    >
+      R
+    </span>
+  );
+}
+
+function VersionIndicator({
+  isOtherUser,
+}: {
+  isOtherUser: boolean;
+}): JSX.Element {
+  return (
+    <span
+      className={
+        isOtherUser ? "version-indicator-other" : "version-indicator-own"
+      }
+      title="Alternative version of this list"
+      aria-hidden="true"
+    >
+      ∥
+    </span>
+  );
+}
+
 export function Node({
   className,
   cardBodyClassName,
@@ -673,54 +764,32 @@ export function Node({
   const isDesktop = !useMediaQuery(IS_MOBILE);
   const viewPath = useViewPath();
   const levels = getLevels(viewPath);
-  const referencedByDepth = useReferencedByDepth();
-  const isInReferencedByView = referencedByDepth !== undefined;
-  const [, view] = useNodeID();
+  const searchDepth = useSearchDepth();
   const { cardStyle, textStyle, textClassName, relevance } = useItemStyle();
   const defaultCls = isDesktop ? "hover-light-bg" : "";
   const cls =
     className !== undefined ? `${className} hover-light-bg` : defaultCls;
   const clsBody = cardBodyClassName || "ps-0";
 
+  const { user } = useData();
   const [nodeID] = useNodeID();
-
-  // Check if this node is the root of a Referenced By view
-  const isReferencedByRoot = isReferencedByView(view);
-  // Check if this is a search node
-  const isSearchNode = isSearchId(nodeID as ID);
-  // Show background for Referenced By views and search results
-  const showReferencedByBackground =
-    isReferencedByRoot || isInReferencedByView || isSearchNode;
-
-  // Abstract refs can be expanded to show concrete refs
-  const isAbstractRef = isAbstractRefId(nodeID);
-  // Concrete refs are terminal - no children, no toggle
+  const [node] = useNode();
   const isConcreteRef = isConcreteRefId(nodeID);
-  // Check if this is any kind of reference node
-  const isReference = isAbstractRef || isConcreteRef;
+  const virtualType = useRelationItem()?.virtualType;
+  const isViewingOtherUser = useIsViewingOtherUserContent();
+  const isOtherUser =
+    (node && isReferenceNode(node) && node.author !== user.publicKey) ||
+    isViewingOtherUser;
 
-  // Show expand/collapse for:
-  // - Regular nodes (not in Referenced By view)
-  // - Abstract refs (to show concrete refs)
-  // - Suggestions that are concrete refs (to show source author's children)
+  const isVersion =
+    virtualType === "version" ||
+    (!virtualType && !!node && isReferenceNode(node) && !!node.versionMeta);
   const isSuggestionWithChildren = isSuggestion && isConcreteRef;
   const showExpandCollapse =
-    (!isSuggestion && !isConcreteRef && !isInReferencedByView) ||
-    isAbstractRef ||
-    isSuggestionWithChildren;
+    (!isSuggestion && !isVersion && !isConcreteRef) || isSuggestionWithChildren;
   const hasChildren = useNodeHasChildren();
 
-  // Content class for styling based on view mode
-  const getContentClass = (): string => {
-    if (isSuggestion) {
-      return "content-suggestion";
-    }
-    if (showReferencedByBackground) {
-      return "content-referenced-by";
-    }
-    return "";
-  };
-  const contentClass = getContentClass();
+  const contentClass = isSuggestion ? "content-suggestion" : "";
 
   return (
     <EditorTextProvider>
@@ -729,9 +798,15 @@ export function Node({
         cardBodyClassName={clsBody}
         style={cardStyle}
         data-suggestion={isSuggestion ? "true" : undefined}
+        data-virtual-type={virtualType || (isVersion ? "version" : undefined)}
+        data-other-user={isOtherUser ? "true" : undefined}
       >
         <div className="indicator-gutter">
           {isSuggestion && <SuggestionIndicator />}
+          {isVersion && <VersionIndicator isOtherUser={!!isOtherUser} />}
+          {(virtualType === "incoming" || virtualType === "occurrence") && (
+            <ReferenceGutterIndicator />
+          )}
           {relevance === "relevant" && !isSuggestion && (
             <span
               className="relevant-indicator"
@@ -759,15 +834,8 @@ export function Node({
               ~
             </span>
           )}
-          {(showReferencedByBackground || isReference) && !isSuggestion && (
-            <span className="reference-indicator" aria-label="reference">
-              ⤶
-            </span>
-          )}
         </div>
-        {levels > 0 && (
-          <Indent levels={levels} colorLevels={referencedByDepth} />
-        )}
+        {levels > 0 && <Indent levels={levels} colorLevels={searchDepth} />}
         {showExpandCollapse && hasChildren && <ExpandCollapseToggle />}
         {((showExpandCollapse && !hasChildren) ||
           (isConcreteRef && !showExpandCollapse) ||

@@ -53,7 +53,8 @@ type PaneOperations = {
     index: number,
     stack: ID[],
     author: PublicKey,
-    rootRelation?: LongID
+    rootRelation?: LongID,
+    scrollToNodeId?: string
   ) => void;
   removePane: (paneId: string) => void;
   setPane: (pane: Pane) => void;
@@ -67,13 +68,15 @@ export function useSplitPanes(): PaneOperations {
     index: number,
     stack: ID[],
     author: PublicKey,
-    rootRelation?: LongID
+    rootRelation?: LongID,
+    scrollToNodeId?: string
   ): void => {
     const newPane: Pane = {
       id: generatePaneId(),
       stack,
       author,
       rootRelation,
+      scrollToNodeId,
     };
     const newPanes = [...panes.slice(0, index), newPane, ...panes.slice(index)];
     const plan = createPlan();
@@ -109,10 +112,17 @@ export function useNavigatePane(): (url: string) => void {
   const { user } = useData();
 
   return (url: string): void => {
-    const questionMarkIndex = url.indexOf("?");
+    const hashIndex = url.indexOf("#");
+    const urlWithoutHash = hashIndex >= 0 ? url.slice(0, hashIndex) : url;
+    const scrollToNodeId =
+      hashIndex >= 0 ? decodeURIComponent(url.slice(hashIndex + 1)) : undefined;
+    const questionMarkIndex = urlWithoutHash.indexOf("?");
     const pathname =
-      questionMarkIndex >= 0 ? url.slice(0, questionMarkIndex) : url;
-    const search = questionMarkIndex >= 0 ? url.slice(questionMarkIndex) : "";
+      questionMarkIndex >= 0
+        ? urlWithoutHash.slice(0, questionMarkIndex)
+        : urlWithoutHash;
+    const search =
+      questionMarkIndex >= 0 ? urlWithoutHash.slice(questionMarkIndex) : "";
     const author = parseAuthorFromSearch(search) || user.publicKey;
     const relationID = parseRelationUrl(pathname);
     if (relationID) {
@@ -121,6 +131,7 @@ export function useNavigatePane(): (url: string) => void {
         stack: [],
         author,
         rootRelation: relationID,
+        scrollToNodeId,
       });
     } else {
       setPane({

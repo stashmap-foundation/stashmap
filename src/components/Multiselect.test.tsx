@@ -794,8 +794,8 @@ Root
   B
   Target
 Target
-  Root → A (0)
-  Root → B (0)
+  [R] Root >>> A
+  [R] Root >>> B
     `);
   });
 
@@ -1191,8 +1191,8 @@ Root
   Shallow
   Target
 Target
-  Root → Parent → Deep (0)
-  Root → Shallow (0)
+  [R] Root / Parent >>> Deep
+  [R] Root >>> Shallow
     `);
   });
 
@@ -2464,6 +2464,7 @@ Root
   Parent
     Child 1
     Child 2
+    [C] Parent
     `);
   });
 

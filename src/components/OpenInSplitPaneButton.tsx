@@ -51,7 +51,8 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
         insertIndex,
         refInfo.stack,
         refInfo.author,
-        refInfo.rootRelation
+        refInfo.rootRelation,
+        refInfo.scrollTo
       );
       return;
     }

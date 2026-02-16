@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { List, OrderedSet } from "immutable";
+import { List, Map, OrderedSet } from "immutable";
 import {
   TemporaryViewProvider,
   useTemporaryView,
@@ -10,12 +10,12 @@ import {
   getNodeFromView,
   getNodeFromID,
   getNodeIDFromView,
-  getParentRelation,
   getVersionedDisplayText,
   getContext,
   isExpanded,
   parseViewPath,
   ViewPath,
+  VirtualItemsMap,
   viewPathToString,
   useViewPath,
   useIsViewingOtherUserContent,
@@ -35,7 +35,11 @@ import {
   PaneSettingsMenu,
   ClosePaneButton,
 } from "./SplitPaneLayout";
-import { InlineFilterDots } from "./TypeFilterButton";
+import {
+  InlineFilterDots,
+  FilterId,
+  useToggleFilter,
+} from "./TypeFilterButton";
 import { NewPaneButton } from "./OpenInSplitPaneButton";
 import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 import { SignInMenuBtn } from "../SignIn";
@@ -53,7 +57,7 @@ import {
   parsedLinesToTrees,
   planCreateNodesFromMarkdownTrees,
 } from "./FileDropZone";
-import { LOG_NODE_ID, shortID } from "../connections";
+import { LOG_NODE_ID, VERSIONS_NODE_ID, shortID } from "../connections";
 import { buildNodeUrl } from "../navigationUrl";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import {
@@ -87,11 +91,12 @@ function BreadcrumbItem({
 }): JSX.Element {
   const { knowledgeDBs, user } = useData();
   const node = getNodeFromID(knowledgeDBs, nodeID as string, user.publicKey);
+  const label =
+    node?.text ||
+    (shortID(nodeID) === VERSIONS_NODE_ID ? "~Versions" : "Loading...");
 
   if (isLast) {
-    return (
-      <span className="breadcrumb-current">{node?.text || "Loading..."}</span>
-    );
+    return <span className="breadcrumb-current">{label}</span>;
   }
 
   return (
@@ -100,9 +105,9 @@ function BreadcrumbItem({
         href={href}
         className="breadcrumb-link"
         onClick={onClick}
-        aria-label={`Navigate to ${node?.text || "parent"}`}
+        aria-label={`Navigate to ${label}`}
       >
-        {node?.text || "Loading..."}
+        {label}
       </a>
       <span className="breadcrumb-separator">/</span>
     </>
@@ -350,27 +355,27 @@ function PaneStatusLine({
   );
 }
 
-const FILTER_ARIA_LABELS = {
-  "1": "toggle Relevant filter",
-  "2": "toggle Maybe Relevant filter",
-  "3": "toggle Little Relevant filter",
-  "4": "toggle Not Relevant filter",
-  "5": "toggle Contains filter",
-  "6": "toggle Confirms filter",
-  "7": "toggle Contradicts filter",
-  "8": "toggle Suggestions filter",
-} as const;
-
-const FILTER_SYMBOL_TO_KEY = {
-  "!": "1",
-  "?": "2",
-  "~": "3",
-  x: "4",
-  o: "5",
-  "+": "6",
-  "-": "7",
-  "@": "8",
-} as const;
+const KEY_TO_FILTER: Record<string, FilterId> = {
+  "1": "relevant",
+  "!": "relevant",
+  "2": "maybe_relevant",
+  "?": "maybe_relevant",
+  "3": "little_relevant",
+  "~": "little_relevant",
+  "4": "not_relevant",
+  x: "not_relevant",
+  "5": "contains",
+  o: "contains",
+  "6": "confirms",
+  "+": "confirms",
+  "7": "contra",
+  "-": "contra",
+  "8": "suggestions",
+  "@": "suggestions",
+  "9": "versions",
+  "0": "incoming",
+  R: "incoming",
+};
 
 function getActiveRow(root: HTMLElement): HTMLElement | undefined {
   const rows = getFocusableRows(root);
@@ -494,17 +499,6 @@ function toggleRowOpenFullscreen(activeRow: HTMLElement): void {
   }
 }
 
-function togglePaneFilter(root: HTMLElement, key: string): void {
-  const ariaLabel = FILTER_ARIA_LABELS[key as keyof typeof FILTER_ARIA_LABELS];
-  if (!ariaLabel) {
-    return;
-  }
-  const button = root.querySelector(`button[aria-label="${ariaLabel}"]`);
-  if (button instanceof HTMLElement) {
-    button.click();
-  }
-}
-
 function triggerPaneHome(root: HTMLElement): void {
   const homeButton = root.querySelector('[data-pane-action="home"]');
   if (homeButton instanceof HTMLElement) {
@@ -582,8 +576,7 @@ function getDisplayTextForViewKey(
   viewKey: string
 ): string {
   const viewPath = parseViewPath(viewKey);
-  const parentRelation = getParentRelation(data, viewPath);
-  const [node] = getNodeFromView(data, viewPath, parentRelation);
+  const [node] = getNodeFromView(data, viewPath);
   const [nodeID] = getNodeIDFromView(data, viewPath);
   const context = getContext(data, viewPath, stack);
   const effectiveAuthor = getEffectiveAuthor(data, viewPath);
@@ -622,11 +615,12 @@ function usePaneKeyboardNavigation(paneIndex: number): {
   const data = useData();
   const stack = usePaneStack();
   const pane = useCurrentPane();
+  const toggleFilter = useToggleFilter();
   const viewPath = useViewPath();
   const { createPlan, executePlan } = usePlanner();
-  const orderedViewKeys = useMemo(() => {
+  const treeResult = useMemo(() => {
     const rootKey = viewPathToString(viewPath);
-    const childNodes = isExpanded(data, rootKey)
+    return isExpanded(data, rootKey)
       ? getNodesInTree(
           data,
           viewPath,
@@ -634,12 +628,18 @@ function usePaneKeyboardNavigation(paneIndex: number): {
           List<ViewPath>(),
           pane.rootRelation
         )
-      : List<ViewPath>();
-    return List<ViewPath>([viewPath])
-      .concat(childNodes)
-      .map((path) => viewPathToString(path))
-      .toArray();
+      : undefined;
   }, [data, viewPath, stack, pane.rootRelation]);
+  const orderedViewKeys = useMemo(
+    () =>
+      List<ViewPath>([viewPath])
+        .concat(treeResult?.paths || List<ViewPath>())
+        .map((path) => viewPathToString(path))
+        .toArray(),
+    [viewPath, treeResult]
+  );
+  const virtualItemsMap: VirtualItemsMap =
+    treeResult?.virtualItems || Map<string, RelationItem>();
 
   const switchPane = (direction: -1 | 1): void => {
     const root = wrapperRef.current;
@@ -1007,11 +1007,10 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     }
 
     if (lastSequenceKey === "f" && now - lastSequenceTs < 800) {
-      const key =
-        FILTER_SYMBOL_TO_KEY[e.key as keyof typeof FILTER_SYMBOL_TO_KEY];
-      if (key) {
+      const filterId = KEY_TO_FILTER[e.key];
+      if (filterId) {
         e.preventDefault();
-        togglePaneFilter(root, key);
+        toggleFilter(filterId);
         setLastSequence(null, 0);
         return;
       }
@@ -1175,12 +1174,14 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       const paths = keys.map(parseViewPath);
       const activeViewPath = parseViewPath(getRowKey(activeRow));
       const targetRelevance = SYMBOL_TO_RELEVANCE[e.key];
-      const currentItem = getCurrentItem(plan, activeViewPath);
+      const currentItem = getCurrentItem(plan, activeViewPath, virtualItemsMap);
       const relevance =
         currentItem?.relevance === targetRelevance
           ? undefined
           : targetRelevance;
-      executePlan(planBatchRelevance(plan, paths, stack, relevance));
+      executePlan(
+        planBatchRelevance(plan, paths, stack, relevance, virtualItemsMap)
+      );
       refocusPaneAfterRowMutation(root);
       return;
     }
@@ -1196,17 +1197,28 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         if (e.key === "-") return "contra" as const;
         return undefined;
       })();
-      const currentItem = getCurrentItem(plan, activeViewPath);
+      const currentItem = getCurrentItem(plan, activeViewPath, virtualItemsMap);
       const argument: Argument =
         currentItem?.argument === targetArgument ? undefined : targetArgument;
-      executePlan(planBatchArgument(plan, paths, stack, argument));
+      executePlan(
+        planBatchArgument(plan, paths, stack, argument, virtualItemsMap)
+      );
       refocusPaneAfterRowMutation(root);
       return;
     }
 
-    if (/^[1-8]$/.test(e.key)) {
+    const filterId = KEY_TO_FILTER[e.key];
+    if (filterId) {
       e.preventDefault();
-      togglePaneFilter(root, e.key);
+      toggleFilter(filterId);
+      // If the focused row was removed by the filter change, focus falls to
+      // <body> and subsequent keypresses won't reach this handler. Recapture
+      // focus on the pane wrapper so keyboard shortcuts keep working.
+      window.setTimeout(() => {
+        if (document.activeElement === document.body) {
+          root.focus();
+        }
+      }, 0);
     }
   };
 

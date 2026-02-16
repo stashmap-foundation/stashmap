@@ -8,6 +8,8 @@ import {
   useNode,
   useDisplayText,
   useViewKey,
+  useRelationItem,
+  useVirtualItemsMap,
 } from "../ViewContext";
 import { usePlanner } from "../planner";
 import { usePaneStack } from "../SplitPanesContext";
@@ -48,6 +50,12 @@ function getArgumentLabel(argument: Argument): string {
 export function EvidenceSelector(): JSX.Element | null {
   const [isHovered, setIsHovered] = useState(false);
   const { currentArgument, isVisible } = useUpdateArgument();
+  const relationItem = useRelationItem();
+  const virtualType = relationItem?.virtualType;
+  const isAcceptableVirtual =
+    virtualType === "incoming" ||
+    virtualType === "occurrence" ||
+    virtualType === "version";
   const viewPath = useViewPath();
   const viewKey = useViewKey();
   const [node] = useNode();
@@ -57,8 +65,9 @@ export function EvidenceSelector(): JSX.Element | null {
   const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
   const { selection } = useTemporaryView();
+  const virtualItemsMap = useVirtualItemsMap();
 
-  if (!isVisible) return null;
+  if (!isVisible && !isAcceptableVirtual) return null;
 
   const nodeName =
     editorText.trim() || versionedDisplayText || node?.text || "item";
@@ -79,6 +88,7 @@ export function EvidenceSelector(): JSX.Element | null {
         getActionPaths(),
         stack,
         nextArgument,
+        virtualItemsMap,
         getEditorInfo()
       )
     );

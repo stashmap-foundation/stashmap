@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   BOB,
+  CAROL,
   expectTree,
   findNewNodeEditor,
   follow,
@@ -186,28 +187,385 @@ My Notes
     expect(relevanceButtons.length).toBeGreaterThanOrEqual(2);
   });
 
-  test("does not show relevance selector for Referenced By items", async () => {
+  test("accepting incoming ref as relevant makes it bidirectional, filter toggle preserves it", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    await type("My Notes{Enter}{Tab}Money{Enter}{Tab}Bitcoin{Escape}");
+    await type("Money{Enter}{Tab}Bitcoin{Escape}");
+    await userEvent.click(await screen.findByLabelText("Create new note"));
+    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
 
-    await navigateToNodeViaSearch(0, "Bitcoin");
-    await screen.findByRole("treeitem", { name: "Bitcoin" });
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [I] Bitcoin  <<< Money
+    `);
 
-    // Switch to Referenced By view
-    fireEvent.click(screen.getByLabelText("show references to Bitcoin"));
-    await screen.findByLabelText("hide references to Bitcoin");
-
-    // Wait for Referenced By content
-    const moneyMatches = await screen.findAllByText(/Money/);
-    expect(moneyMatches.length).toBeGreaterThanOrEqual(1);
-
-    // Referenced By items should NOT have relevance selectors
-    const relevanceButtons = screen.queryAllByLabelText(
-      /mark Money as not relevant/
+    await userEvent.click(
+      await screen.findByLabelText(/accept .* <<< Money as relevant/)
     );
-    expect(relevanceButtons.length).toBe(0);
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money <<< >>> Bitcoin
+    `);
+
+    await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    `);
+
+    await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money <<< >>> Bitcoin
+    `);
+  });
+
+  test("accepting incoming ref as maybe relevant makes it bidirectional, filter toggle preserves it", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("Money{Enter}{Tab}Bitcoin{Escape}");
+    await userEvent.click(await screen.findByLabelText("Create new note"));
+    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [I] Bitcoin  <<< Money
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText(/accept .* <<< Money as maybe relevant/)
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money <<< >>> Bitcoin
+    `);
+
+    await userEvent.click(
+      screen.getByLabelText("toggle Maybe Relevant filter")
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    `);
+
+    await userEvent.click(
+      screen.getByLabelText("toggle Maybe Relevant filter")
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money <<< >>> Bitcoin
+    `);
+  });
+
+  test("accepting incoming ref as little relevant makes it bidirectional, filter toggle preserves it", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("Money{Enter}{Tab}Bitcoin{Escape}");
+    await userEvent.click(await screen.findByLabelText("Create new note"));
+    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+
+    await userEvent.click(
+      screen.getByLabelText("toggle Little Relevant filter")
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [I] Bitcoin  <<< Money
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText(/accept .* <<< Money as little relevant/)
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money <<< >>> Bitcoin
+    `);
+
+    await userEvent.click(
+      screen.getByLabelText("toggle Little Relevant filter")
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    `);
+
+    await userEvent.click(
+      screen.getByLabelText("toggle Little Relevant filter")
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money <<< >>> Bitcoin
+    `);
+  });
+
+  test("declining incoming ref hides it, not relevant filter shows it struck through", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("Money{Enter}{Tab}Bitcoin{Escape}");
+    await userEvent.click(await screen.findByLabelText("Create new note"));
+    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [I] Bitcoin  <<< Money
+    `);
+
+    fireEvent.click(screen.getByLabelText(/decline .* <<< Money/));
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    `);
+
+    await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money <<< >>> Bitcoin
+    `);
+
+    const refNode = screen.getByText(
+      (content, element) =>
+        // eslint-disable-next-line testing-library/no-node-access
+        element?.closest('[data-testid="reference-node"]') !== null &&
+        content.includes("Money")
+    );
+    // eslint-disable-next-line testing-library/no-node-access
+    const styledSpan = refNode.closest(
+      "span[style*='text-decoration']"
+    ) as HTMLElement;
+    expect(styledSpan?.style.textDecoration).toBe("line-through");
+
+    await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    `);
+  });
+
+  test("accepting incoming ref with confirms argument shows indicator, filter toggle preserves it", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("Money{Enter}{Tab}Bitcoin{Escape}");
+
+    await userEvent.click(
+      screen.getByLabelText("Evidence for Bitcoin: No evidence type")
+    );
+
+    await userEvent.click(await screen.findByLabelText("Create new note"));
+    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [I] Bitcoin + <<< Money
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText(/accept .* <<< Money as relevant/)
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money <<< >>> + Bitcoin
+    `);
+
+    await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    `);
+
+    await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money <<< >>> + Bitcoin
+    `);
+  });
+
+  test("accepting incoming ref with contra argument shows indicator, filter toggle preserves it", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("Money{Enter}{Tab}Bitcoin{Escape}");
+
+    const evidenceBtn = screen.getByLabelText(
+      "Evidence for Bitcoin: No evidence type"
+    );
+    await userEvent.click(evidenceBtn);
+    await userEvent.click(
+      screen.getByLabelText("Evidence for Bitcoin: Confirms")
+    );
+
+    await userEvent.click(await screen.findByLabelText("Create new note"));
+    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [I] Bitcoin - <<< Money
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText(/accept .* <<< Money as relevant/)
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money <<< >>> - Bitcoin
+    `);
+
+    await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    `);
+
+    await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money <<< >>> - Bitcoin
+    `);
+  });
+
+  test("accepting incoming ref from other user as relevant makes it bidirectional", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(bob);
+    await type("Money{Enter}{Tab}Bitcoin{Escape}");
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [OI] Bitcoin  <<< Money
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText(/accept .* <<< Money as relevant/)
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [OR] Money <<< >>> Bitcoin
+    `);
+
+    await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    `);
+
+    await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [OR] Money <<< >>> Bitcoin
+    `);
+  });
+
+  test("accepting incoming ref suppresses duplicates from other users with same context", async () => {
+    const [alice, bob, carol] = setup([ALICE, BOB, CAROL]);
+
+    renderTree(bob);
+    await type("Money{Enter}{Tab}Bitcoin{Escape}");
+    cleanup();
+
+    renderTree(carol);
+    await type("Money{Enter}{Tab}Bitcoin{Escape}");
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    await follow(alice, carol().user.publicKey);
+    renderTree(alice);
+    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [OI] Bitcoin  <<< Money
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText(/accept .* <<< Money as relevant/)
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [OR] Money <<< >>> Bitcoin
+    `);
   });
 
   test("clicking X marks item as not relevant and hides it", async () => {
@@ -373,10 +731,7 @@ describe("Diff item relevance selection", () => {
     // Bob's child should appear as a diff item
     await screen.findByText("Bob Child");
 
-    // Diff item should have a relevance selector with "Set relevance" title
-    // (indicating no dots selected)
-    const diffSelector = screen.getByTitle("Set relevance");
-    expect(diffSelector).toBeDefined();
+    await screen.findByLabelText("Set relevance for Bob Child");
   });
 
   test("clicking dot on diff item accepts it with that relevance", async () => {
@@ -588,21 +943,12 @@ describe("Remove from list", () => {
       "Root{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
     );
 
-    await userEvent.click(
-      await screen.findByLabelText("show references to GrandChild")
-    );
-
     await expectTree(`
 Root
   Parent
     Child
       GrandChild
-        Root \u2192 Parent \u2192 Child (1) \u2192 GrandChild
     `);
-
-    await userEvent.click(
-      await screen.findByLabelText("hide references to GrandChild")
-    );
 
     const splitPaneButtons = screen.getAllByLabelText("open in split pane");
     await userEvent.click(splitPaneButtons[0]);
@@ -949,6 +1295,7 @@ My Notes
 
     await expectTree(`
 My Notes
+  [VO] +1
     `);
 
     await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
@@ -956,6 +1303,7 @@ My Notes
     await expectTree(`
 My Notes
   BobItem
+  [VO] +1
     `);
 
     await screen.findByLabelText("remove BobItem from list");
@@ -1029,5 +1377,239 @@ My Notes
     `);
 
     expect(screen.getByText("BobFolder").textContent).toBe("BobFolder");
+  });
+});
+
+describe("Occurrence relevance", () => {
+  test("accepting occurrence as relevant, filter toggle preserves it", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(bob);
+    await type("Bitcoin{Enter}{Tab}Price History{Escape}");
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [OC] Bitcoin
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText(/accept Bitcoin as relevant/)
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [OR] Bitcoin
+    `);
+
+    await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    `);
+
+    await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [OR] Bitcoin
+    `);
+  });
+
+  test("accepting occurrence as maybe relevant, filter toggle preserves it", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(bob);
+    await type("Bitcoin{Enter}{Tab}Price History{Escape}");
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [OC] Bitcoin
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText(/accept Bitcoin as maybe relevant/)
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [OR] Bitcoin
+    `);
+
+    await userEvent.click(
+      screen.getByLabelText("toggle Maybe Relevant filter")
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    `);
+
+    await userEvent.click(
+      screen.getByLabelText("toggle Maybe Relevant filter")
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [OR] Bitcoin
+    `);
+  });
+
+  test("accepting occurrence as little relevant, filter toggle preserves it", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(bob);
+    await type("Bitcoin{Enter}{Tab}Price History{Escape}");
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+
+    await userEvent.click(
+      screen.getByLabelText("toggle Little Relevant filter")
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [OC] Bitcoin
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText(/accept Bitcoin as little relevant/)
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [OR] Bitcoin
+    `);
+
+    await userEvent.click(
+      screen.getByLabelText("toggle Little Relevant filter")
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    `);
+
+    await userEvent.click(
+      screen.getByLabelText("toggle Little Relevant filter")
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [OR] Bitcoin
+    `);
+  });
+
+  test("declining occurrence hides it, not relevant filter shows it struck through", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(bob);
+    await type("Bitcoin{Enter}{Tab}Price History{Escape}");
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    renderTree(alice);
+    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [OC] Bitcoin
+    `);
+
+    fireEvent.click(screen.getByLabelText(/decline Bitcoin/));
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    `);
+
+    await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [OR] Bitcoin
+    `);
+
+    await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    `);
+  });
+
+  test("accepting occurrence suppresses duplicates from other users", async () => {
+    const [alice, bob, carol] = setup([ALICE, BOB, CAROL]);
+
+    renderTree(bob);
+    await type("Bitcoin{Enter}{Tab}Price History{Escape}");
+    cleanup();
+
+    renderTree(carol);
+    await type("Bitcoin{Enter}{Tab}Mining{Escape}");
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    await follow(alice, carol().user.publicKey);
+    renderTree(alice);
+    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [OC] Bitcoin
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText(/accept Bitcoin as relevant/)
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [OR] Bitcoin
+    `);
   });
 });

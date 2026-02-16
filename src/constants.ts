@@ -1,6 +1,5 @@
 // Core constants with no dependencies to avoid circular imports
 export const REFERENCED_BY = "referencedby" as LongID;
-export const REF_PREFIX = "ref:";
 export const SEARCH_PREFIX = "~Search:";
 
 // Default type filters for children view
@@ -12,8 +11,19 @@ export const DEFAULT_TYPE_FILTERS: (
   | Relevance
   | Argument
   | "suggestions"
+  | "versions"
+  | "incoming"
   | "contains"
-)[] = ["relevant", "maybe_relevant", "contains", "suggestions"];
+)[] = [
+  "relevant",
+  "maybe_relevant",
+  "contains",
+  "suggestions",
+  "versions",
+  "incoming",
+];
+
+export const suggestionSettings = { maxSuggestions: 5 };
 
 // Solarized accent colors for relevance and argument types
 export const TYPE_COLORS = {

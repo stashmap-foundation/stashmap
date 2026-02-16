@@ -17,7 +17,7 @@ import {
 import {
   RootViewContextProvider,
   newRelations,
-  getDiffItemsForNode,
+  getSuggestionsForNode,
 } from "../ViewContext";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
 import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
@@ -95,7 +95,7 @@ Root
   `);
 });
 
-test("getDiffItemsForNode returns items from other users", () => {
+test("getSuggestionsForNode returns items from other users", () => {
   const [alice, bob] = setup([ALICE, BOB]);
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
@@ -130,7 +130,7 @@ test("getDiffItemsForNode returns items from other users", () => {
       relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
     });
 
-  const diffItems = getDiffItemsForNode(
+  const { suggestions: diffItems } = getSuggestionsForNode(
     knowledgeDBs,
     alicePK,
     parentNode.id,
@@ -188,7 +188,7 @@ test("Diff items are not included when saving a relation", () => {
   ).toBe(false);
 });
 
-test("getDiffItemsForNode deduplicates items from multiple other users", () => {
+test("getSuggestionsForNode deduplicates items from multiple other users", () => {
   const [alice, bob] = setup([ALICE, BOB]);
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
@@ -236,7 +236,7 @@ test("getDiffItemsForNode deduplicates items from multiple other users", () => {
       ),
     });
 
-  const diffItems = getDiffItemsForNode(
+  const { suggestions: diffItems } = getSuggestionsForNode(
     knowledgeDBs,
     alicePK,
     parentNode.id,

@@ -3,16 +3,16 @@ import { ConnectableElement, useDrag } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
 import {
   ViewPath,
-  useIsSuggestion,
-  useIsInReferencedByView,
+  useIsInSearchView,
   useViewPath,
   useViewKey,
   useNodeID,
   useNode,
   useDisplayText,
   useIsViewingOtherUserContent,
+  useRelationItem,
 } from "../ViewContext";
-import { isEmptyNodeID, isAbstractRefId } from "../connections";
+import { isEmptyNodeID } from "../connections";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
 import {
@@ -41,10 +41,12 @@ function clearDragDescendants(): void {
 export type DragItemType = {
   path: ViewPath;
   text?: string;
+  isCopyDrag?: boolean;
 };
 
 type DraggableProps = {
   className?: string;
+  copyDrag?: boolean;
   rowViewKey?: string;
   rowIndex?: number;
   rowDepth?: number;
@@ -58,6 +60,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
   (
     {
       className,
+      copyDrag = false,
       rowViewKey = "",
       rowIndex = 0,
       rowDepth = 0,
@@ -81,7 +84,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
       item: () => {
         clearDropIndent();
         markDragDescendants(rowViewKey);
-        return { path, text: displayText };
+        return { path, text: displayText, isCopyDrag: copyDrag || undefined };
       },
       collect: (monitor) => ({
         isDragging: !!monitor.isDragging(),
@@ -181,7 +184,6 @@ function DraggableSuggestion({
   const [nodeID] = useNodeID();
   const [node] = useNode();
   const displayText = useDisplayText();
-  const isAbstractRef = isAbstractRefId(nodeID);
 
   const [{ isDragging }, drag, preview] = useDrag({
     type: NOTE_TYPE,
@@ -198,9 +200,7 @@ function DraggableSuggestion({
     preview(getEmptyImage(), { captureDraggingState: true });
   }, [preview]);
 
-  if (!isAbstractRef) {
-    drag(ref as ConnectableElement);
-  }
+  drag(ref as ConnectableElement);
 
   const handleClick = (e: React.MouseEvent): void => {
     if (!onRowClick) {
@@ -261,6 +261,7 @@ export function ListItem({
   activeRowKey,
   onRowFocus,
   onRowClick,
+  isFirstVirtual,
 }: {
   index: number;
   treeViewPath: ViewPath;
@@ -269,20 +270,26 @@ export function ListItem({
   activeRowKey: string;
   onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
   onRowClick?: (e: React.MouseEvent, viewKey: string) => void;
+  isFirstVirtual?: boolean;
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const viewKey = useViewKey();
   const viewPath = useViewPath();
   const [nodeID] = useNodeID();
-  const isSuggestion = useIsSuggestion();
-  const isInReferencedByView = useIsInReferencedByView();
+  const virtualType = useRelationItem()?.virtualType;
+  const isSuggestion = virtualType === "suggestion";
+  const isCopyDrag =
+    virtualType === "incoming" ||
+    virtualType === "occurrence" ||
+    virtualType === "version";
+  const isInSearchView = useIsInSearchView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const selected = useIsSelected();
   const rowDepth = viewPath.length - 1;
   const isActiveRow = activeRowKey === viewKey;
   const isEmptyNode = isEmptyNodeID(nodeID);
 
-  const isReadonly = isInReferencedByView || isViewingOtherUserContent;
+  const isReadonly = isInSearchView || isViewingOtherUserContent;
 
   const [{ dragDirection }, drop] = useDroppable({
     destination: treeViewPath,
@@ -294,7 +301,11 @@ export function ListItem({
 
   if (isSuggestion) {
     return (
-      <div className="visible-on-hover suggestion-item-container">
+      <div
+        className={`visible-on-hover suggestion-item-container${
+          isFirstVirtual ? " first-virtual" : ""
+        }`}
+      >
         <DraggableSuggestion
           rowViewKey={viewKey}
           rowIndex={index}
@@ -308,17 +319,20 @@ export function ListItem({
     );
   }
 
-  if (!isReadonly) {
+  if (!isReadonly && !isCopyDrag) {
     drop(ref);
   }
 
   const className =
     dragDirection === -1 && !isEmptyNode ? "dragging-over-bottom" : "";
   return (
-    <div className="visible-on-hover">
+    <div
+      className={`visible-on-hover${isFirstVirtual ? " first-virtual" : ""}`}
+    >
       <Draggable
         ref={ref}
         className={className}
+        copyDrag={isCopyDrag}
         rowViewKey={viewKey}
         rowIndex={index}
         rowDepth={rowDepth}

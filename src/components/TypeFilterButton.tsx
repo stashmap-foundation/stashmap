@@ -69,7 +69,45 @@ const SUGGESTIONS_FILTER = {
   symbol: "@",
 };
 
-export type FilterId = Relevance | Argument | "suggestions" | "contains";
+const VERSIONS_FILTER = {
+  id: "versions" as const,
+  label: "Versions",
+  color: TYPE_COLORS.other_user,
+  symbol: "\u2225",
+};
+
+const INCOMING_FILTER = {
+  id: "incoming" as const,
+  label: "Incoming References",
+  color: TYPE_COLORS.referenced_by,
+  symbol: "R",
+};
+
+export type FilterId =
+  | Relevance
+  | Argument
+  | "suggestions"
+  | "versions"
+  | "incoming"
+  | "contains";
+
+export function useToggleFilter(): (id: FilterId) => void {
+  const pane = useCurrentPane();
+  const { panes } = useData();
+  const { createPlan, executePlan } = usePlanner();
+
+  return (id: FilterId): void => {
+    const currentFilters = pane.typeFilters || DEFAULT_TYPE_FILTERS;
+    const isActive = currentFilters.includes(id);
+    const newFilters: FilterId[] = isActive
+      ? currentFilters.filter((f) => f !== id)
+      : [...currentFilters, id];
+    const updatedPane = { ...pane, typeFilters: newFilters };
+    const newPanes = panes.map((p) => (p.id === pane.id ? updatedPane : p));
+    const plan = createPlan();
+    executePlan(planUpdatePanes(plan, newPanes));
+  };
+}
 
 function ClickableFilterSymbol({
   id,
@@ -150,6 +188,16 @@ export function FilterSymbolsDisplay({
         symbol={SUGGESTIONS_FILTER.symbol}
         isActive={isActive("suggestions")}
       />
+      <FilterSymbol
+        color={VERSIONS_FILTER.color}
+        symbol={VERSIONS_FILTER.symbol}
+        isActive={isActive("versions")}
+      />
+      <FilterSymbol
+        color={INCOMING_FILTER.color}
+        symbol={INCOMING_FILTER.symbol}
+        isActive={isActive("incoming")}
+      />
     </span>
   );
 }
@@ -167,24 +215,9 @@ export function TypeFilterButton(): JSX.Element {
 
 export function InlineFilterDots(): JSX.Element {
   const pane = useCurrentPane();
-  const { panes } = useData();
-  const { createPlan, executePlan } = usePlanner();
-
   const currentFilters = pane.typeFilters || DEFAULT_TYPE_FILTERS;
-
   const isFilterActive = (id: FilterId): boolean => currentFilters.includes(id);
-
-  const handleFilterToggle = (id: FilterId): void => {
-    const isActive = currentFilters.includes(id);
-    const newFilters: FilterId[] = isActive
-      ? currentFilters.filter((f) => f !== id)
-      : [...currentFilters, id];
-
-    const updatedPane = { ...pane, typeFilters: newFilters };
-    const newPanes = panes.map((p) => (p.id === pane.id ? updatedPane : p));
-    const plan = createPlan();
-    executePlan(planUpdatePanes(plan, newPanes));
-  };
+  const handleFilterToggle = useToggleFilter();
 
   return (
     <div className="inline-filter-symbols">
@@ -220,6 +253,22 @@ export function InlineFilterDots(): JSX.Element {
         color={SUGGESTIONS_FILTER.color}
         symbol={SUGGESTIONS_FILTER.symbol}
         isActive={isFilterActive(SUGGESTIONS_FILTER.id)}
+        onClick={handleFilterToggle}
+      />
+      <ClickableFilterSymbol
+        id={VERSIONS_FILTER.id}
+        label={VERSIONS_FILTER.label}
+        color={VERSIONS_FILTER.color}
+        symbol={VERSIONS_FILTER.symbol}
+        isActive={isFilterActive(VERSIONS_FILTER.id)}
+        onClick={handleFilterToggle}
+      />
+      <ClickableFilterSymbol
+        id={INCOMING_FILTER.id}
+        label={INCOMING_FILTER.label}
+        color={INCOMING_FILTER.color}
+        symbol={INCOMING_FILTER.symbol}
+        isActive={isFilterActive(INCOMING_FILTER.id)}
         onClick={handleFilterToggle}
       />
     </div>

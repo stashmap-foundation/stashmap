@@ -26,9 +26,7 @@ describe("Version Display", () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
-    await type(
-      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Escape}"
-    );
+    await type("Root1{Enter}{Tab}Barcelona{Enter}{Tab}Detail{Escape}");
 
     // Edit Barcelona to BCN
     const barcelonaEditor = await screen.findByLabelText("edit Barcelona");
@@ -37,29 +35,28 @@ describe("Version Display", () => {
     await userEvent.type(barcelonaEditor, "BCN");
     fireEvent.blur(barcelonaEditor, { relatedTarget: document.body });
 
-    // Verify BCN is displayed
     await screen.findByLabelText("edit BCN");
 
-    // Show "Referenced By" for BCN
-    fireEvent.click(await screen.findByLabelText("show references to BCN"));
-    await screen.findByLabelText("hide references to BCN");
+    // Create second root referencing the same node (hashText("Barcelona"))
+    await userEvent.click(await screen.findByLabelText("Create new note"));
+    await type("Root2{Enter}{Tab}Barcelona{Enter}{Tab}Info{Escape}");
 
+    // Incoming ref shows versioned text BCN from the source context
     await expectTree(`
-My Notes
-  Holiday Destinations
-    BCN
-      My Notes → Holiday Destinations (1) → BCN
+Root2
+  Barcelona
+    Info
+    [I] BCN  <<< Root1
     `);
 
     cleanup();
     renderTree(alice);
 
-    await screen.findByLabelText("hide references to BCN");
     await expectTree(`
-My Notes
-  Holiday Destinations
-    BCN
-      My Notes → Holiday Destinations (1) → BCN
+Root2
+  Barcelona
+    Info
+    [I] BCN  <<< Root1
     `);
   });
 
@@ -485,72 +482,45 @@ My Notes
     renderTree(alice);
 
     await type(
-      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Escape}"
+      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Enter}{Tab}Child1{Escape}"
     );
     await userEvent.click(await screen.findByLabelText("edit My Notes"));
     await userEvent.keyboard("{Enter}");
     await userEvent.type(
       await findNewNodeEditor(),
-      "Cities in Spain{Enter}{Tab}Barcelona{Escape}"
+      "Cities{Enter}{Tab}Barcelona{Enter}{Tab}Child2{Escape}"
     );
 
-    await expectTree(`
-My Notes
-  Cities in Spain
-    Barcelona
-  Holiday Destinations
-    Barcelona
-    `);
-
-    // Edit Barcelona under Cities in Spain to BCN
-    // This creates ~Versions with [BCN, Barcelona] only for that context
-    // Holiday Destinations → Barcelona is unaffected (different context)
+    // Edit Barcelona under Cities to BCN
     const barcelonaEditors = await screen.findAllByLabelText("edit Barcelona");
-    // The first one is under Cities in Spain (it was added last, so appears first)
     await userEvent.click(barcelonaEditors[0]);
     await userEvent.clear(barcelonaEditors[0]);
     await userEvent.type(barcelonaEditors[0], "BCN");
     fireEvent.blur(barcelonaEditors[0], { relatedTarget: document.body });
 
-    // Holiday Destinations still shows Barcelona, Cities in Spain shows BCN
-    await expectTree(`
-My Notes
-  Cities in Spain
-    BCN
-  Holiday Destinations
-    Barcelona
-    `);
+    await screen.findByLabelText("edit BCN");
 
-    // Show "Referenced By" for Barcelona (under Holiday Destinations)
-    fireEvent.click(
-      await screen.findByLabelText("show references to Barcelona")
-    );
-    await screen.findByLabelText("hide references to Barcelona");
+    // Create another root to see incoming refs from both contexts
+    await userEvent.click(await screen.findByLabelText("Create new note"));
+    await type("Other{Enter}{Tab}Barcelona{Enter}{Tab}Detail{Escape}");
 
-    // Should show two references:
-    // - "My Notes → Holiday Destinations (1) → Barcelona" (direct, concrete ref)
-    // - "My Notes → Cities in Spain (1) → BCN" (filtered from "...BCN → ~Versions → Barcelona")
     await expectTree(`
-My Notes
-  Cities in Spain
-    BCN
-  Holiday Destinations
-    Barcelona
-      My Notes → Holiday Destinations (1) → Barcelona
-      My Notes → Cities in Spain (1) → BCN
+Other
+  Barcelona
+    Detail
+    [I] BCN  <<< Cities / My Notes
+    [I] Barcelona  <<< Holiday Destinations / My Notes
     `);
 
     cleanup();
     renderTree(alice);
 
     await expectTree(`
-My Notes
-  Cities in Spain
-    BCN
-  Holiday Destinations
-    Barcelona
-      My Notes → Holiday Destinations (1) → Barcelona
-      My Notes → Cities in Spain (1) → BCN
+Other
+  Barcelona
+    Detail
+    [I] BCN  <<< Cities / My Notes
+    [I] Barcelona  <<< Holiday Destinations / My Notes
     `);
   });
 

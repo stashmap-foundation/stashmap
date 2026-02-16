@@ -43,23 +43,23 @@ test("open reference node in split pane uses reference path", async () => {
   await type(
     "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Escape}"
   );
+  await userEvent.click(await screen.findByLabelText("Create new note"));
+  await type("Countries in Europe{Enter}{Tab}Spain{Escape}");
 
+  await userEvent.click(await screen.findByLabelText("expand Spain"));
   await expectTree(`
-My Notes
-  Holiday Destinations
-    Spain
+Countries in Europe
+  Spain
+    [I] Spain  <<< Holiday Destinations / My Notes
   `);
 
-  await userEvent.click(
-    await screen.findByLabelText("show references to Holiday Destinations")
-  );
-  await userEvent.click(
-    await screen.findByLabelText(
-      "open My Notes → Holiday Destinations (1) in fullscreen"
-    )
-  );
+  const splitButtons = await screen.findAllByLabelText("open in split pane");
+  await userEvent.click(splitButtons[splitButtons.length - 1]);
 
   await expectTree(`
+Countries in Europe
+  Spain
+    [I] Spain  <<< Holiday Destinations / My Notes
 Holiday Destinations
   Spain
   `);

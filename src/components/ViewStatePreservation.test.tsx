@@ -373,7 +373,28 @@ My Notes
     await screen.findByLabelText("collapse Child");
 
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+
+    await expectTree(`
+My Notes
+  Parent
+    Child
+      GrandChild
+  Target
+My Notes
+  Parent
+  Target
+    `);
+
     await navigateToNodeViaSearch(1, "Target");
+
+    await expectTree(`
+My Notes
+  Parent
+    Child
+      GrandChild
+  Target
+Target
+    `);
 
     // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
     const targetDropTargets = getDropTargets("Target");
@@ -381,6 +402,18 @@ My Notes
     await act(async () => {
       fireEvent.drop(targetDropTargets[1]);
     });
+
+    await expectTree(`
+My Notes
+  Parent
+    Child
+      GrandChild
+  Target
+Target
+  Parent
+    Child
+      GrandChild
+    `);
 
     const collapseParentButtons = screen.getAllByLabelText("collapse Parent");
     expect(collapseParentButtons.length).toBeGreaterThanOrEqual(2);

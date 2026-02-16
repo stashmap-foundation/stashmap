@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   BOB,
+  CAROL,
   setup,
   follow,
   renderTree,
@@ -45,7 +46,7 @@ My Notes
     `);
   });
 
-  test("Concrete ref in Referenced By view shows breadcrumbs", async () => {
+  test("Other user's children show as suggestions with version", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
 
@@ -64,24 +65,17 @@ My Notes
 
     renderTree(alice);
     await type("My Notes{Enter}{Tab}Topic{Escape}");
+    await maybeExpand("expand Topic");
 
     await expectTree(`
 My Notes
   Topic
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText("show references to Topic")
-    );
-
-    await expectTree(`
-My Notes
-  Topic
-    [O] My Notes → Topic (2)
+    [S] Child1
+    [S] Child2
     `);
   });
 
-  test("Abstract ref expands to concrete refs with breadcrumbs", async () => {
+  test("Suggestion and version appear when both users have same topic", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
 
@@ -103,28 +97,6 @@ My Notes
   Topic
     AliceChild
     [S] BobChild
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText("show references to Topic")
-    );
-
-    await expectTree(`
-My Notes
-  Topic
-    My Notes → Topic
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText("expand My Notes → Topic")
-    );
-
-    await expectTree(`
-My Notes
-  Topic
-    My Notes → Topic
-      My Notes → Topic (1)
-      [O] My Notes → Topic (1)
     `);
   });
 
@@ -153,11 +125,11 @@ My Notes
 
     await expectTree(`
 Search: Barcelona
-  My Notes → Holiday Destinations → Spain (1) → Barcelona
+  [R] My Notes / Holiday Destinations / Spain >>> Barcelona
     `);
   });
 
-  test("All concrete refs inside abstract ref show breadcrumbs", async () => {
+  test("Suggestion and version appear when both users share a topic", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
     await follow(bob, alice().user.publicKey);
@@ -180,28 +152,6 @@ My Notes
   Shared
     AliceChild
     [S] BobChild
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText("show references to Shared")
-    );
-
-    await expectTree(`
-My Notes
-  Shared
-    My Notes → Shared
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText("expand My Notes → Shared")
-    );
-
-    await expectTree(`
-My Notes
-  Shared
-    My Notes → Shared
-      My Notes → Shared (1)
-      [O] My Notes → Shared (1)
     `);
   });
 
@@ -240,9 +190,36 @@ My Notes
 My Notes
   Recipes
     [S] Pasta
-      Carbonara
-      Bolognese
+      [O] Carbonara
+      [O] Bolognese
     `);
+  });
+
+  test("only one divider line when suggestion is expanded", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    await follow(alice, bob().user.publicKey);
+
+    renderTree(bob);
+    await type(
+      "My Notes{Enter}{Tab}Recipes{Enter}{Tab}Pasta{Enter}{Tab}Carbonara{Escape}"
+    );
+    cleanup();
+
+    renderTree(alice);
+    await type("My Notes{Enter}{Tab}Recipes{Escape}");
+    await maybeExpand("expand Recipes");
+    await userEvent.click(await screen.findByLabelText("expand Pasta"));
+
+    await expectTree(`
+My Notes
+  Recipes
+    [S] Pasta
+      [O] Carbonara
+    `);
+
+    // eslint-disable-next-line testing-library/no-node-access
+    const dividers = document.querySelectorAll(".first-virtual");
+    expect(dividers).toHaveLength(1);
   });
 
   test("Deep suggestion tree is fully expandable", async () => {
@@ -280,7 +257,7 @@ My Notes
 My Notes
   Recipes
     [S] Pasta
-      Carbonara
+      [O] Carbonara
     `);
 
     await userEvent.click(await screen.findByLabelText("expand Carbonara"));
@@ -289,8 +266,8 @@ My Notes
 My Notes
   Recipes
     [S] Pasta
-      Carbonara
-        Ingredients
+      [O] Carbonara
+        [O] Ingredients
     `);
   });
 
@@ -332,6 +309,307 @@ My Notes
 My Notes
   Recipes
     Pasta
+    `);
+  });
+
+  test("Other user's ~Log cref suggestions resolve to linked note text", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    await follow(alice, bob().user.publicKey);
+
+    renderTree(bob);
+    await type("Bob Root{Enter}{Tab}Bob Child{Escape}");
+    cleanup();
+
+    renderTree(alice);
+    await type("Alice Root{Escape}");
+    await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+    await expectTree(`
+~Log
+  [R] Alice Root
+  [S] Bob Root
+    `);
+
+    expect(screen.queryByText("Error: Node not found")).toBeNull();
+
+    cleanup();
+    renderTree(alice);
+    await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+    await expectTree(`
+~Log
+  [R] Alice Root
+  [S] Bob Root
+    `);
+
+    expect(screen.queryByText("Error: Node not found")).toBeNull();
+  });
+
+  test("suggestion not swallowed by items in other own relation", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    await follow(alice, bob().user.publicKey);
+
+    renderTree(bob);
+    await type(
+      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Enter}Austria{Escape}"
+    );
+    cleanup();
+
+    renderTree(alice);
+    await type(
+      "Travel{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Enter}Austria{Escape}"
+    );
+
+    await userEvent.click(await screen.findByLabelText("Create new note"));
+    await type(
+      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    Spain
+    [I] Holiday Destinations  <<< Travel
+    [S] Austria
+    `);
+  });
+
+  test("shows suggestions from all forks of the same list", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    await follow(alice, bob().user.publicKey);
+    await follow(bob, alice().user.publicKey);
+
+    renderTree(alice);
+    await type(
+      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Enter}France{Enter}Italy{Enter}Portugal{Escape}"
+    );
+    cleanup();
+
+    renderTree(bob);
+    await type("My Notes{Enter}{Tab}Holiday Destinations{Escape}");
+    await maybeExpand("expand Holiday Destinations");
+
+    await userEvent.click(
+      await screen.findByLabelText(/open .* \+4 in fullscreen/)
+    );
+    await screen.findByText("READONLY");
+    await userEvent.click(
+      await screen.findByLabelText("fork to make your own copy")
+    );
+    await userEvent.click(
+      await screen.findByLabelText("edit Holiday Destinations")
+    );
+    await userEvent.keyboard("{Enter}");
+    await type("Austria{Enter}Berlin{Enter}Rome{Enter}Vienna{Escape}");
+
+    await userEvent.click(
+      await screen.findByLabelText(/open .* -4 in fullscreen/)
+    );
+    await screen.findByText("READONLY");
+    await userEvent.click(
+      await screen.findByLabelText("fork to make your own copy")
+    );
+    await userEvent.click(
+      await screen.findByLabelText("edit Holiday Destinations")
+    );
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Munich{Escape}");
+    cleanup();
+
+    window.history.pushState({}, "", "/");
+    renderTree(alice);
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    Spain
+    France
+    Italy
+    Portugal
+    [S] Munich
+    [S] Austria
+    [S] Berlin
+    [VO] +4
+    `);
+  });
+
+  test("no suggestions shown when viewing other user's READONLY content", async () => {
+    const [alice, bob, carol] = setup([ALICE, BOB, CAROL]);
+    await follow(alice, bob().user.publicKey);
+    await follow(alice, carol().user.publicKey);
+
+    renderTree(bob);
+    await type(
+      "Topic{Enter}{Tab}BobChild1{Enter}BobChild2{Enter}BobChild3{Enter}BobChild4{Escape}"
+    );
+    cleanup();
+
+    renderTree(carol);
+    await type("Topic{Enter}{Tab}CarolChild{Escape}");
+    cleanup();
+
+    renderTree(alice);
+    await type("Topic{Escape}");
+
+    await expectTree(`
+Topic
+  [S] CarolChild
+  [S] BobChild1
+  [S] BobChild2
+  [VO] +4
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText(/open .* \+4 in fullscreen/)
+    );
+    await screen.findByText("READONLY");
+
+    await expectTree(`
+[O] Topic
+  [O] BobChild1
+  [O] BobChild2
+  [O] BobChild3
+  [O] BobChild4
+  [VO] -4
+  [VO] +1 -4
+    `);
+  });
+
+  test("no version shown when all suggestions fit within cap", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    await follow(alice, bob().user.publicKey);
+
+    renderTree(bob);
+    await type("Recipes{Enter}{Tab}Pasta{Enter}Risotto{Enter}Curry{Escape}");
+    cleanup();
+
+    renderTree(alice);
+    await type("Recipes{Escape}");
+
+    await expectTree(`
+Recipes
+  [S] Pasta
+  [S] Risotto
+  [S] Curry
+    `);
+  });
+
+  test("suggestions capped, version shows full diff, accepting surfaces next until version disappears", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    await follow(alice, bob().user.publicKey);
+
+    renderTree(bob);
+    await type(
+      "Holiday Destinations{Enter}{Tab}Spain{Enter}France{Enter}Italy{Enter}Portugal{Enter}Greece{Escape}"
+    );
+    cleanup();
+
+    renderTree(alice);
+    await type("Holiday Destinations{Escape}");
+
+    await expectTree(`
+Holiday Destinations
+  [S] Spain
+  [S] France
+  [S] Italy
+  [VO] +5
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText("accept Spain as relevant")
+    );
+
+    await expectTree(`
+Holiday Destinations
+  Spain
+  [S] France
+  [S] Italy
+  [S] Portugal
+  [VO] +4
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText("accept France as relevant")
+    );
+
+    await expectTree(`
+Holiday Destinations
+  Spain
+  France
+  [S] Italy
+  [S] Portugal
+  [S] Greece
+    `);
+  });
+
+  test("multiple users suggestions pooled newest first, version per user when exceeding cap", async () => {
+    const [alice, bob, carol] = setup([ALICE, BOB, CAROL]);
+    await follow(alice, bob().user.publicKey);
+    await follow(alice, carol().user.publicKey);
+
+    renderTree(bob);
+    await type("Cooking{Enter}{Tab}Pasta{Enter}Risotto{Escape}");
+    cleanup();
+
+    renderTree(carol);
+    await type("Cooking{Enter}{Tab}Sushi{Enter}Tacos{Enter}Curry{Escape}");
+    cleanup();
+
+    renderTree(alice);
+    await type("Cooking{Escape}");
+
+    await expectTree(`
+Cooking
+  [S] Sushi
+  [S] Tacos
+  [S] Curry
+  [VO] +2
+    `);
+  });
+
+  test("fork of other user's list shows as own version entry", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    await follow(alice, bob().user.publicKey);
+    await follow(bob, alice().user.publicKey);
+
+    renderTree(alice);
+    await type(
+      "Recipes{Enter}{Tab}Pasta{Enter}Salad{Enter}Soup{Enter}Stew{Escape}"
+    );
+    cleanup();
+
+    renderTree(bob);
+    await type("Recipes{Escape}");
+
+    await expectTree(`
+Recipes
+  [S] Pasta
+  [S] Salad
+  [S] Soup
+  [VO] +4
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText(/open .* \+4 in fullscreen/)
+    );
+    await screen.findByText("READONLY");
+    await userEvent.click(
+      await screen.findByLabelText("fork to make your own copy")
+    );
+    await userEvent.click(await screen.findByLabelText("edit Recipes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Curry{Escape}");
+    cleanup();
+
+    window.history.pushState({}, "", "/");
+    renderTree(bob);
+    await expectTree(`
+Recipes
+  Curry
+  Pasta
+  Salad
+  Soup
+  Stew
+  [V] -5
     `);
   });
 });

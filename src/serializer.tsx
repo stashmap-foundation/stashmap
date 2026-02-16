@@ -85,7 +85,14 @@ function parseArgument(value: string | undefined): Argument {
 
 function parseTypeFilter(
   value: string
-): Relevance | Argument | "suggestions" | "contains" | null {
+):
+  | Relevance
+  | Argument
+  | "suggestions"
+  | "versions"
+  | "incoming"
+  | "contains"
+  | null {
   if (value === "contains") {
     return "contains";
   }
@@ -106,23 +113,37 @@ function parseTypeFilter(
   if (value === "suggestions") {
     return "suggestions";
   }
+  if (value === "versions") {
+    return "versions";
+  }
+  if (value === "incoming") {
+    return "incoming";
+  }
   return null;
 }
 
 function parseTypeFilters(
   arr: Array<Serializable>
-): Array<Relevance | Argument | "suggestions" | "contains"> {
+): Array<
+  Relevance | Argument | "suggestions" | "versions" | "incoming" | "contains"
+> {
   return arr
     .map((item) => parseTypeFilter(asString(item)))
     .filter(
-      (parsed): parsed is Relevance | Argument | "suggestions" | "contains" =>
-        parsed !== null
+      (
+        parsed
+      ): parsed is
+        | Relevance
+        | Argument
+        | "suggestions"
+        | "versions"
+        | "incoming"
+        | "contains" => parsed !== null
     );
 }
 
 function viewToJSON(attributes: View): Serializable {
   return {
-    m: attributes.viewingMode,
     e: attributes.expanded !== undefined ? attributes.expanded : undefined,
     f: attributes.typeFilters,
   };
@@ -134,7 +155,6 @@ function jsonToView(view: Serializable): View | undefined {
   }
   const a = asObject(view);
   return {
-    viewingMode: a.m === "REFERENCED_BY" ? "REFERENCED_BY" : undefined,
     expanded: a.e !== undefined ? asBoolean(a.e) : undefined,
     typeFilters: a.f !== undefined ? parseTypeFilters(asArray(a.f)) : undefined,
   };
@@ -226,11 +246,13 @@ export function eventToRelations(e: UnsignedEvent): Relations | undefined {
   // Invalid relevance/argument values are filtered to defaults
   const itemsAsTags = findAllTags(e, "i") || [];
   const items = List(
-    itemsAsTags.map((tagValues) => ({
-      nodeID: tagValues[0] as LongID,
-      relevance: parseRelevance(tagValues[1]),
-      argument: parseArgument(tagValues[2]),
-    }))
+    itemsAsTags
+      .filter((tagValues) => !tagValues[0].startsWith("ref:"))
+      .map((tagValues) => ({
+        nodeID: tagValues[0] as LongID,
+        relevance: parseRelevance(tagValues[1]),
+        argument: parseArgument(tagValues[2]),
+      }))
   );
 
   return {

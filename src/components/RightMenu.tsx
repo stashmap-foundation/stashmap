@@ -1,31 +1,34 @@
 import React from "react";
 import {
-  useIsSuggestion,
+  useRelationItem,
   useIsRoot,
-  useIsInReferencedByView,
+  useIsInSearchView,
   useIsViewingOtherUserContent,
 } from "../ViewContext";
 import { RelevanceSelector } from "./RelevanceSelector";
 import { EvidenceSelector } from "./EvidenceSelector";
-import { ReferenceCount } from "./ReferenceCount";
 
 export function RightMenu(): JSX.Element {
-  const isSuggestion = useIsSuggestion();
+  const virtualType = useRelationItem()?.virtualType;
+  const isVirtualItem =
+    virtualType === "suggestion" ||
+    virtualType === "incoming" ||
+    virtualType === "occurrence" ||
+    virtualType === "version";
   const isRoot = useIsRoot();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
-  const isInReferencedByView = useIsInReferencedByView();
+  const isInSearchView = useIsInSearchView();
 
   const isReadonly =
-    isRoot || isViewingOtherUserContent || isInReferencedByView;
+    isRoot || isInSearchView || (isViewingOtherUserContent && !isVirtualItem);
 
   return (
     <div className="right-menu">
-      <ReferenceCount />
       <div className="relevance-slot">
-        {!isReadonly && <RelevanceSelector isSuggestion={isSuggestion} />}
+        {!isReadonly && <RelevanceSelector virtualType={virtualType} />}
       </div>
       <div className="evidence-slot">
-        {!isReadonly && !isSuggestion && <EvidenceSelector />}
+        {!isReadonly && virtualType !== "suggestion" && <EvidenceSelector />}
       </div>
     </div>
   );

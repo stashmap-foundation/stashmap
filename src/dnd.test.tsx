@@ -142,7 +142,6 @@ test("Diff items are always added, never moved", () => {
   ] as const;
 
   const views = Map<string, View>().set(viewPathToString(parentPath), {
-    viewingMode: undefined,
     expanded: true,
   });
 
@@ -226,7 +225,6 @@ test("Dragging a concrete reference keeps it as a reference by default", () => {
   ] as const;
 
   const views = Map<string, View>().set(viewPathToString(rootPath), {
-    viewingMode: undefined,
     expanded: true,
   });
   const panes = [{ id: "pane-0", stack: [root.id], author: alicePK }];
@@ -303,7 +301,6 @@ test("Alt-dragging a concrete reference still copies it as a reference", () => {
   ] as const;
 
   const views = Map<string, View>().set(viewPathToString(rootPath), {
-    viewingMode: undefined,
     expanded: true,
   });
   const panes = [{ id: "pane-0", stack: [root.id], author: alicePK }];
@@ -374,7 +371,6 @@ test("Alt-dragging a normal node creates a concrete reference", () => {
   ] as const;
 
   const views = Map<string, View>().set(viewPathToString(rootPath), {
-    viewingMode: undefined,
     expanded: true,
   });
   const panes = [{ id: "pane-0", stack: [root.id], author: alicePK }];
@@ -448,7 +444,7 @@ Root
   Target
   OtherParent
 Target
-  Root → Source (0)
+  [R] Root >>> Source
   `);
 
   cleanup();
@@ -460,7 +456,7 @@ Root
   Target
   OtherParent
 Target
-  Root → Source (0)
+  [R] Root >>> Source
   `);
 
   const source = screen.getAllByRole("treeitem", { name: "Source" })[0];
@@ -478,7 +474,7 @@ Root
   OtherParent
     Source
 Target
-  Root → OtherParent → Source (0)
+  [R] Root / OtherParent >>> Source
   `);
 
   await userEvent.click(await screen.findByLabelText("edit Source"));
@@ -496,12 +492,12 @@ Root
       Child1
       Child2
 Target
-  Root → OtherParent → Source (2)
+  [R] Root / OtherParent >>> Source
   `);
 
   await userEvent.click(
     await screen.findByLabelText(
-      "open Root \u2192 OtherParent \u2192 Source (2) in fullscreen"
+      "open Root / OtherParent >>> Source in fullscreen"
     )
   );
 
@@ -524,7 +520,7 @@ test("Deep copy preserves all children when forked duplicate relations exist", a
 
   renderTree(bob);
   await type(
-    "Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Sevilla{Enter}Barcelona{Enter}Madrid{Escape}"
+    "Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Sevilla{Enter}Barcelona{Enter}Madrid{Enter}Granada{Escape}"
   );
   await expectTree(`
 Holiday Destinations
@@ -532,6 +528,7 @@ Holiday Destinations
     Sevilla
     Barcelona
     Madrid
+    Granada
   `);
   cleanup();
 
@@ -540,32 +537,17 @@ Holiday Destinations
     "Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Valencia{Enter}Malaga{Escape}"
   );
 
-  await userEvent.click(
-    await screen.findByLabelText("show references to Spain")
-  );
-
-  await userEvent.click(
-    await screen.findByLabelText("expand Holiday Destinations \u2192 Spain")
-  );
+  const versionEntries = await screen.findAllByLabelText(/in fullscreen/);
+  const versionFullscreen = versionEntries[versionEntries.length - 1];
+  await userEvent.click(versionFullscreen);
 
   await expectTree(`
-Holiday Destinations
-  Spain
-    Holiday Destinations \u2192 Spain
-      Holiday Destinations \u2192 Spain (2)
-      [O] Holiday Destinations \u2192 Spain (3)
-  `);
-
-  const fullscreenButtons = await screen.findAllByLabelText(
-    /open Holiday Destinations . Spain \(\d+\) in fullscreen/
-  );
-  await userEvent.click(fullscreenButtons[1]);
-
-  await expectTree(`
-Spain
-  Sevilla
-  Barcelona
-  Madrid
+[O] Spain
+  [O] Sevilla
+  [O] Barcelona
+  [O] Madrid
+  [O] Granada
+  [VO] +2 -4
   `);
 
   await userEvent.click(
@@ -577,6 +559,8 @@ Spain
   Sevilla
   Barcelona
   Madrid
+  Granada
+  [V] +2 -4
   `);
 
   cleanup();
@@ -595,32 +579,34 @@ Spain
   await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
 
   await userEvent.click(
-    await screen.findByLabelText("show references to Spain")
-  );
-
-  await userEvent.click(
-    await screen.findByLabelText("expand Holiday Destinations \u2192 Spain")
+    await screen.findByLabelText("open Spain in fullscreen")
   );
 
   await expectTree(`
-Holiday Destinations
-  Target
-  Spain
-    Holiday Destinations \u2192 Spain
-      Holiday Destinations \u2192 Spain (3)
-      Holiday Destinations \u2192 Spain (2)
-      [O] Holiday Destinations \u2192 Spain (3)
+Spain
+  Sevilla
+  Barcelona
+  Madrid
+  Granada
+  [V] +2 -4
   `);
 
-  const openOldRef = await screen.findAllByLabelText(
-    /open Holiday Destinations . Spain \(\d+\) in fullscreen/
+  const versionFullscreenBtns = await screen.findAllByLabelText(
+    /open .* in fullscreen/
   );
-  await userEvent.click(openOldRef[1]);
+  await userEvent.click(
+    versionFullscreenBtns[versionFullscreenBtns.length - 1]
+  );
 
   await expectTree(`
 Spain
   Valencia
   Malaga
+  [S] Sevilla
+  [S] Barcelona
+  [S] Madrid
+  [V] +4 -2
+  [VO] +4 -2
   `);
 
   await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
@@ -638,6 +624,11 @@ Spain
 Spain
   Valencia
   Malaga
+  [S] Sevilla
+  [S] Barcelona
+  [S] Madrid
+  [V] +4 -2
+  [VO] +4 -2
 Target
   Spain
     Valencia
@@ -645,66 +636,46 @@ Target
   `);
 });
 
-test("Same-pane move cleans up old descendant relations (no orphaned references)", async () => {
+test("Incoming reference updates when source is moved (deep cleanup)", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
 
   await type(
-    "Root{Enter}{Tab}Source{Enter}{Tab}Parent{Enter}{Tab}GrandChild{Escape}"
+    "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Barcelona{Enter}{Tab}Sagrada Familia{Escape}"
   );
 
+  await userEvent.click(screen.getByLabelText("Open new pane"));
+  await type("Cities in Spain{Enter}{Tab}Barcelona{Escape}");
+
+  await userEvent.click(await screen.findByLabelText("expand Barcelona"));
+
   await expectTree(`
-Root
-  Source
-    Parent
-      GrandChild
+My Notes
+  Holiday Destinations
+    Spain
+      Barcelona
+        Sagrada Familia
+        [I] Barcelona  <<< Cities in Spain
+Cities in Spain
+  Barcelona
+    [I] Barcelona  <<< Spain / Holiday Destinations / My Notes
   `);
 
-  await userEvent.click(
-    await screen.findByLabelText("show references to GrandChild")
-  );
+  const spain = screen.getByRole("treeitem", { name: "Spain" });
+  const hdToggle = screen.getByLabelText("collapse Holiday Destinations");
+  fireEvent.dragStart(spain);
+  fireEvent.drop(hdToggle);
 
   await expectTree(`
-Root
-  Source
-    Parent
-      GrandChild
-        Root \u2192 Source \u2192 Parent (1) \u2192 GrandChild
-  `);
-
-  await userEvent.click(
-    await screen.findByLabelText("hide references to GrandChild")
-  );
-
-  const splitPaneButtons = screen.getAllByLabelText("open in split pane");
-  await userEvent.click(splitPaneButtons[0]);
-  await navigateToNodeViaSearch(1, "Source");
-
-  const parentItems = screen.getAllByRole("treeitem", { name: "Parent" });
-  const rootToggle = screen.getAllByLabelText("collapse Root")[0];
-
-  fireEvent.dragStart(parentItems[0]);
-  fireEvent.drop(rootToggle);
-
-  await expectTree(`
-Root
-  Parent
-    GrandChild
-  Source
-Source
-  `);
-
-  await userEvent.click(
-    screen.getAllByLabelText("show references to GrandChild")[0]
-  );
-
-  await expectTree(`
-Root
-  Parent
-    GrandChild
-      Root \u2192 Parent (1) \u2192 GrandChild
-  Source
-Source
+My Notes
+  Holiday Destinations
+  Spain
+    Barcelona
+      Sagrada Familia
+      [I] Barcelona  <<< Cities in Spain
+Cities in Spain
+  Barcelona
+    [I] Barcelona  <<< Spain / My Notes
   `);
 });
 
@@ -970,11 +941,9 @@ test("Bottom-half drop on last child of nested parent stays within that parent",
 
   const views = Map<string, View>()
     .set(viewPathToString(rootPath), {
-      viewingMode: undefined,
       expanded: true,
     })
     .set(viewPathToString(spainPath), {
-      viewingMode: undefined,
       expanded: true,
     });
 
@@ -1094,11 +1063,9 @@ function setupDepthClampTree() {
 
   const views = Map<string, View>()
     .set(viewPathToString(rootPath), {
-      viewingMode: undefined,
       expanded: true,
     })
     .set(viewPathToString(spainPath), {
-      viewingMode: undefined,
       expanded: true,
     });
 
@@ -1528,5 +1495,6 @@ Root
   Spain
   France
 Spain
+  [I] Spain  <<< Root
   `);
 });

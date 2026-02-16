@@ -8,6 +8,7 @@ import {
   shortID,
   isConcreteRefId,
   parseConcreteRefId,
+  createConcreteRefId,
 } from "../connections";
 import { DND } from "../dnd";
 import {
@@ -26,7 +27,7 @@ import {
   RootViewContextProvider,
   newRelations,
   viewPathToString,
-  getDiffItemsForNode,
+  getSuggestionsForNode,
   getLast,
 } from "../ViewContext";
 import { TreeView } from "./TreeView";
@@ -285,11 +286,9 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
 
   const views = Map<string, View>()
     .set(viewPathToString(parentPath), {
-      viewingMode: undefined,
       expanded: true,
     })
     .set(viewPathToString(childPath), {
-      viewingMode: undefined,
       expanded: true,
     });
 
@@ -300,7 +299,7 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
     panes: [{ id: "pane-0", stack: [parent.id], author: alicePK }],
   };
 
-  const nodes = getNodesInTree(
+  const { paths: nodes } = getNodesInTree(
     data,
     parentPath,
     [parent.id],
@@ -314,7 +313,7 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
   expect(nodeIDs).toContain(bobGrandchild.id);
 });
 
-test("getDiffItemsForNode returns items from other users not in current user's list", () => {
+test("getSuggestionsForNode returns items from other users not in current user's list", () => {
   const [alice, bob] = setup([ALICE, BOB]);
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
@@ -347,7 +346,7 @@ test("getDiffItemsForNode returns items from other users not in current user's l
       relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
     });
 
-  const diffItems = getDiffItemsForNode(
+  const { suggestions: diffItems } = getSuggestionsForNode(
     knowledgeDBs,
     alicePK,
     parent.id,
@@ -359,7 +358,7 @@ test("getDiffItemsForNode returns items from other users not in current user's l
   expect(diffItems.get(0)).toBe(bobChild.id);
 });
 
-test("getDiffItemsForNode excludes items already in user's list", () => {
+test("getSuggestionsForNode excludes items already in user's list", () => {
   const [alice, bob] = setup([ALICE, BOB]);
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
@@ -391,7 +390,7 @@ test("getDiffItemsForNode excludes items already in user's list", () => {
       relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
     });
 
-  const diffItems = getDiffItemsForNode(
+  const { suggestions: diffItems } = getSuggestionsForNode(
     knowledgeDBs,
     alicePK,
     parent.id,
@@ -458,11 +457,9 @@ test("Diff item paths are correctly identified as diff items", () => {
 
   const views = Map<string, View>()
     .set(viewPathToString(rootPath), {
-      viewingMode: undefined,
       expanded: true,
     })
     .set(viewPathToString(parentPath), {
-      viewingMode: undefined,
       expanded: true,
     });
 
@@ -473,7 +470,13 @@ test("Diff item paths are correctly identified as diff items", () => {
     panes: [{ id: "pane-0", stack: [root.id], author: alicePK }],
   };
 
-  const nodes = getNodesInTree(data, rootPath, [root.id], List(), undefined);
+  const { paths: nodes } = getNodesInTree(
+    data,
+    rootPath,
+    [root.id],
+    List(),
+    undefined
+  );
   expect(nodes.size).toBeGreaterThanOrEqual(3);
 
   const diffItemPath = nodes.find(
@@ -487,7 +490,7 @@ test("Diff item paths are correctly identified as diff items", () => {
   expect(aliceChildPath).toBeDefined();
 });
 
-test("getDiffItemsForNode should return no diff items for not_relevant relation type", () => {
+test("getSuggestionsForNode should return no diff items for not_relevant relation type", () => {
   const [alice, bob] = setup([ALICE, BOB]);
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
@@ -515,7 +518,7 @@ test("getDiffItemsForNode should return no diff items for not_relevant relation 
       relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
     });
 
-  const diffItems = getDiffItemsForNode(
+  const { suggestions: diffItems } = getSuggestionsForNode(
     knowledgeDBs,
     alicePK,
     parent.id,
@@ -525,7 +528,7 @@ test("getDiffItemsForNode should return no diff items for not_relevant relation 
   expect(diffItems.size).toBe(0);
 });
 
-test("getDiffItemsForNode returns plain nodeID for leaf suggestions (no children)", () => {
+test("getSuggestionsForNode returns plain nodeID for leaf suggestions (no children)", () => {
   const [alice, bob] = setup([ALICE, BOB]);
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
@@ -552,7 +555,7 @@ test("getDiffItemsForNode returns plain nodeID for leaf suggestions (no children
       relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
     });
 
-  const diffItems = getDiffItemsForNode(
+  const { suggestions: diffItems } = getSuggestionsForNode(
     knowledgeDBs,
     alicePK,
     parent.id,
@@ -567,7 +570,7 @@ test("getDiffItemsForNode returns plain nodeID for leaf suggestions (no children
   expect(suggestion).toBe(bobLeafChild.id);
 });
 
-test("getDiffItemsForNode returns concrete ref for expandable suggestions (has children)", () => {
+test("getSuggestionsForNode returns concrete ref for expandable suggestions (has children)", () => {
   const [alice, bob] = setup([ALICE, BOB]);
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
@@ -603,7 +606,7 @@ test("getDiffItemsForNode returns concrete ref for expandable suggestions (has c
         .set(shortID(bobFolderRelations.id), bobFolderRelations),
     });
 
-  const diffItems = getDiffItemsForNode(
+  const { suggestions: diffItems } = getSuggestionsForNode(
     knowledgeDBs,
     alicePK,
     parent.id,
@@ -620,7 +623,59 @@ test("getDiffItemsForNode returns concrete ref for expandable suggestions (has c
   expect(parsed?.relationID).toBe(bobFolderRelations.id);
 });
 
-test("getDiffItemsForNode only returns suggestions from matching context", () => {
+test("getSuggestionsForNode preserves concrete-ref suggestion IDs", () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  const { publicKey: alicePK } = alice().user;
+  const { publicKey: bobPK } = bob().user;
+
+  const parent = newNode("Parent");
+  const bobLinkedRoot = newNode("Bob Linked Root");
+  const bobLinkedChild = newNode("Bob Linked Child");
+
+  const aliceRelations = newRelations(parent.id, List(), alicePK);
+  const bobLinkedRelations = addRelationToRelations(
+    newRelations(bobLinkedRoot.id, List(), bobPK),
+    bobLinkedChild.id
+  );
+  const bobLinkRef = createConcreteRefId(bobLinkedRelations.id);
+  const bobParentRelations = addRelationToRelations(
+    newRelations(parent.id, List(), bobPK),
+    bobLinkRef
+  );
+
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>()
+    .set(alicePK, {
+      nodes: newDB().nodes.set(shortID(parent.id), parent),
+      relations: newDB().relations.set(
+        shortID(aliceRelations.id),
+        aliceRelations
+      ),
+    })
+    .set(bobPK, {
+      nodes: newDB()
+        .nodes.set(shortID(bobLinkedRoot.id), bobLinkedRoot)
+        .set(shortID(bobLinkedChild.id), bobLinkedChild),
+      relations: newDB()
+        .relations.set(shortID(bobLinkedRelations.id), bobLinkedRelations)
+        .set(shortID(bobParentRelations.id), bobParentRelations),
+    });
+
+  const { suggestions: diffItems } = getSuggestionsForNode(
+    knowledgeDBs,
+    alicePK,
+    parent.id,
+    ["contains", "suggestions"],
+    aliceRelations.id,
+    List()
+  );
+
+  expect(diffItems.size).toBe(1);
+  const suggestion = diffItems.get(0) as LongID;
+  expect(suggestion).toBe(bobLinkRef);
+  expect(isConcreteRefId(suggestion)).toBe(true);
+});
+
+test("getSuggestionsForNode only returns suggestions from matching context", () => {
   const [alice, bob] = setup([ALICE, BOB]);
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
@@ -659,7 +714,7 @@ test("getDiffItemsForNode only returns suggestions from matching context", () =>
         .set(shortID(bobRelationsDiffContext.id), bobRelationsDiffContext),
     });
 
-  const diffItems = getDiffItemsForNode(
+  const { suggestions: diffItems } = getSuggestionsForNode(
     knowledgeDBs,
     alicePK,
     parent.id,

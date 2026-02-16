@@ -42,8 +42,8 @@ My Notes
   );
 
   await expectTree(`
-Holiday Destinations
-  Spain
+[O] Holiday Destinations
+  [O] Spain
   `);
 
   await screen.findByLabelText("Navigate to My Notes");

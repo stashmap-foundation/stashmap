@@ -4,7 +4,6 @@ import {
   ALICE,
   BOB,
   expectTree,
-  findNewNodeEditor,
   follow,
   renderApp,
   setup,
@@ -37,8 +36,8 @@ Notes
 
     await expectTree(`
 Search: Apple
-  Notes (3) → Apple pie recipe
-  Notes (3) → Apple cider
+  [R] Notes >>> Apple pie recipe
+  [R] Notes >>> Apple cider
     `);
 
     cleanup();
@@ -46,42 +45,23 @@ Search: Apple
 
     await expectTree(`
 Search: Apple
-  Notes (3) → Apple pie recipe
-  Notes (3) → Apple cider
+  [R] Notes >>> Apple pie recipe
+  [R] Notes >>> Apple cider
     `);
   });
 
-  test("Search abstract reference can be expanded to show concrete refs", async () => {
+  test("Search results deduplicate by context across users", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
 
     renderApp(bob());
     await type("Notes{Enter}Shared Topic{Escape}");
-
-    await expectTree(`
-Notes
-  Shared Topic
-    `);
 
     cleanup();
 
     await follow(alice, bob().user.publicKey);
     renderApp(alice());
 
-    await type("Notes{Escape}");
-
-    await expectTree(`
-Notes
-  [S] Shared Topic
-    `);
-
-    await userEvent.click(await screen.findByLabelText("edit Notes"));
-    await userEvent.keyboard("{Enter}");
-    await userEvent.type(await findNewNodeEditor(), "Shared Topic{Escape}");
-
-    await expectTree(`
-Notes
-  Shared Topic
-    `);
+    await type("Notes{Enter}Shared Topic{Escape}");
 
     await userEvent.click(
       await screen.findByLabelText("Search to change pane 0 content")
@@ -93,18 +73,36 @@ Notes
 
     await expectTree(`
 Search: Shared Topic
-  Notes → Shared Topic
+  [R] Notes >>> Shared Topic
     `);
+  });
+
+  test("Search deduplication prefers effective author even with older timestamp", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderApp(alice());
+    await type("Notes{Enter}Shared Topic{Escape}");
+
+    cleanup();
+
+    await follow(alice, bob().user.publicKey);
+    renderApp(bob());
+    await type("Notes{Enter}Shared Topic{Escape}");
+
+    cleanup();
+    renderApp(alice());
 
     await userEvent.click(
-      await screen.findByLabelText("expand Notes → Shared Topic")
+      await screen.findByLabelText("Search to change pane 0 content")
+    );
+    await userEvent.type(
+      await screen.findByLabelText("search input"),
+      "Shared Topic{Enter}"
     );
 
     await expectTree(`
 Search: Shared Topic
-  Notes → Shared Topic
-    Notes (1) → Shared Topic
-    [O] Notes (1) → Shared Topic
+  [R] Notes >>> Shared Topic
     `);
   });
 
@@ -133,7 +131,7 @@ Notes
 
     await expectTree(`
 Search: Barcelona
-  Notes → Holiday Destinations → Spain (1) → Barcelona
+  [R] Notes / Holiday Destinations / Spain >>> Barcelona
     `);
 
     expect(screen.queryByText(/Loading/)).toBeNull();
@@ -169,7 +167,7 @@ Notes
 
     await expectTree(`
 Search: Barcelona
-  [O] Notes → Holiday Destinations → Spain (1) → Barcelona
+  [OR] Notes / Holiday Destinations / Spain >>> Barcelona
     `);
 
     expect(screen.queryByText(/Loading/)).toBeNull();

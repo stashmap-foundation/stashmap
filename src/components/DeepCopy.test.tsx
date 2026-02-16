@@ -3,14 +3,15 @@ import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   BOB,
-  CAROL,
   expectTree,
   findNewNodeEditor,
   follow,
+  getPane,
   navigateToNodeViaSearch,
   renderApp,
   renderTree,
   setup,
+  textContent,
   type,
 } from "../utils.test";
 import { KIND_KNOWLEDGE_LIST } from "../nostr";
@@ -192,53 +193,77 @@ My Notes
     renderTree(alice);
 
     await type(
-      "My Notes{Enter}{Tab}Sibling{Enter}Parent{Enter}{Tab}GrandChild{Escape}"
+      "Notes{Enter}{Tab}Sibling{Enter}Cities{Enter}{Tab}Barcelona{Escape}"
     );
+    await userEvent.click(await screen.findByLabelText("Create new note"));
+    await type("Travel{Enter}{Tab}Barcelona{Escape}");
+    await maybeExpand("expand Barcelona");
 
     await expectTree(`
-My Notes
-  Sibling
-  Parent
-    GrandChild
+Travel
+  Barcelona
+    [I] Barcelona  <<< Cities / Notes
     `);
 
-    await userEvent.click(
-      await screen.findByLabelText("show references to GrandChild")
-    );
+    cleanup();
+    renderApp(alice());
 
     await expectTree(`
-My Notes
-  Sibling
-  Parent
-    GrandChild
-      My Notes → Parent (1) → GrandChild
+Travel
+  Barcelona
+    [I] Barcelona  <<< Cities / Notes
     `);
 
-    await userEvent.click(
-      await screen.findByLabelText("hide references to GrandChild")
-    );
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await userEvent.click(await screen.findByLabelText("expand Barcelona"));
 
-    const parentEditor = await screen.findByLabelText("edit Parent");
-    await userEvent.click(parentEditor);
+    await expectTree(`
+Travel
+  Barcelona
+    [I] Barcelona  <<< Cities / Notes
+Travel
+  Barcelona
+    [I] Barcelona  <<< Cities / Notes
+    `);
+
+    await navigateToNodeViaSearch(1, "Notes");
+    await userEvent.click(screen.getAllByLabelText("expand Cities")[0]);
+
+    await expectTree(`
+Travel
+  Barcelona
+    [I] Barcelona  <<< Cities / Notes
+Notes
+  Sibling
+  Cities
+    Barcelona
+    `);
+
+    const citiesEditors = screen.getAllByLabelText("edit Cities");
+    await userEvent.click(citiesEditors[citiesEditors.length - 1]);
     await userEvent.keyboard("{Home}{Tab}");
 
     await expectTree(`
-My Notes
+Travel
+  Barcelona
+    [I] Barcelona  <<< Cities / Sibling / Notes
+Notes
   Sibling
-    Parent
-      GrandChild
+    Cities
+      Barcelona
     `);
 
-    await userEvent.click(
-      await screen.findByLabelText("show references to GrandChild")
-    );
+    cleanup();
+    renderApp(alice());
 
     await expectTree(`
-My Notes
+Travel
+  Barcelona
+    [I] Barcelona  <<< Cities / Sibling / Notes
+Notes
   Sibling
-    Parent
-      GrandChild
-        My Notes → Sibling → Parent (1) → GrandChild
+    Cities
+      Barcelona
     `);
   });
 
@@ -247,53 +272,67 @@ My Notes
     renderTree(alice);
 
     await type(
-      "My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
+      "Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}{Tab}Barcelona{Escape}"
     );
+    await userEvent.click(await screen.findByLabelText("Create new note"));
+    await type("Travel{Enter}{Tab}Barcelona{Escape}");
+    await maybeExpand("expand Barcelona");
 
     await expectTree(`
-My Notes
-  Parent
-    Child
-      GrandChild
+Travel
+  Barcelona
+    [I] Barcelona  <<< Child / Parent / Notes
     `);
 
-    await userEvent.click(
-      await screen.findByLabelText("show references to GrandChild")
-    );
+    cleanup();
+    renderApp(alice());
 
     await expectTree(`
-My Notes
-  Parent
-    Child
-      GrandChild
-        My Notes → Parent → Child (1) → GrandChild
+Travel
+  Barcelona
+    [I] Barcelona  <<< Child / Parent / Notes
     `);
 
-    await userEvent.click(
-      await screen.findByLabelText("hide references to GrandChild")
-    );
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Notes");
+    await userEvent.click(screen.getAllByLabelText("expand Parent")[0]);
+    await userEvent.click(screen.getAllByLabelText("expand Child")[0]);
 
-    const childEditor = await screen.findByLabelText("edit Child");
+    await expectTree(`
+Travel
+  Barcelona
+    [I] Barcelona  <<< Child / Parent / Notes
+Notes
+  Parent
+    Child
+      Barcelona
+    `);
+
+    const childEditor = screen.getAllByLabelText("edit Child")[0];
     await userEvent.click(childEditor);
     await userEvent.keyboard("{Home}{Shift>}{Tab}{/Shift}");
 
     await expectTree(`
-My Notes
+Travel
+  Barcelona
+    [I] Barcelona  <<< Child / Notes
+Notes
   Parent
   Child
-    GrandChild
+    Barcelona
     `);
 
-    await userEvent.click(
-      await screen.findByLabelText("show references to GrandChild")
-    );
+    cleanup();
+    renderApp(alice());
 
     await expectTree(`
-My Notes
+Travel
+  Barcelona
+    [I] Barcelona  <<< Child / Notes
+Notes
   Parent
   Child
-    GrandChild
-      My Notes → Child (1) → GrandChild
+    Barcelona
     `);
   });
 
@@ -313,19 +352,11 @@ My Notes
       GrandChild
     `);
 
-    await userEvent.click(
-      await screen.findByLabelText("show references to Child")
-    );
-
     const fullscreenLink = await screen.findByLabelText(
-      "open My Notes → Parent → Child (1) in fullscreen"
+      "open Child in fullscreen"
     );
     const relationUrl = fullscreenLink.getAttribute("href");
     expect(relationUrl).toMatch(/^\/r\//);
-
-    await userEvent.click(
-      await screen.findByLabelText("hide references to Child")
-    );
 
     const parentEditor = await screen.findByLabelText("edit Parent");
     await userEvent.click(parentEditor);
@@ -365,19 +396,11 @@ My Notes
         GrandChild
     `);
 
-    await userEvent.click(
-      await screen.findByLabelText("show references to Child")
-    );
-
     const fullscreenLink = await screen.findByLabelText(
-      "open My Notes → Outer → Inner → Child (1) in fullscreen"
+      "open Child in fullscreen"
     );
     const relationUrl = fullscreenLink.getAttribute("href");
     expect(relationUrl).toMatch(/^\/r\//);
-
-    await userEvent.click(
-      await screen.findByLabelText("hide references to Child")
-    );
 
     const innerEditor = await screen.findByLabelText("edit Inner");
     await userEvent.click(innerEditor);
@@ -597,7 +620,7 @@ My Notes
 My Notes
   Target
   [S] BobFolder
-    Bob Edited
+    [O] Bob Edited
     `);
 
     // Open split pane and navigate pane 1 to Target
@@ -608,7 +631,7 @@ My Notes
 My Notes
   Target
   [S] BobFolder
-    Bob Edited
+    [O] Bob Edited
 Target
     `);
 
@@ -625,7 +648,7 @@ Target
 My Notes
   Target
   [S] BobFolder
-    Bob Edited
+    [O] Bob Edited
 Target
   BobFolder
     Bob Edited
@@ -1295,7 +1318,7 @@ My Notes
   Target
   [S] BobItem
 Target
-  My Notes → BobItem (0)
+  [R] My Notes >>> BobItem
     `);
   });
 });
@@ -1336,7 +1359,7 @@ My Notes
     Child
   Target
 Target
-  My Notes → Source (1)
+  [R] My Notes >>> Source
     `);
   });
 
@@ -1369,14 +1392,16 @@ My Notes
   Target
   Target2
 Target
-  My Notes → Source (0)
+  [R] My Notes >>> Source
     `);
 
     const targetInPane0 = screen.getAllByRole("treeitem", {
       name: "Target",
     })[0];
     await userEvent.keyboard("{Alt>}");
-    fireEvent.dragStart(screen.getByText("My Notes → Source (0)"));
+    fireEvent.dragStart(
+      getPane(1).getByText(textContent("My Notes >>> Source"))
+    );
     fireEvent.dragOver(targetInPane0, { altKey: true });
     fireEvent.drop(targetInPane0, { altKey: true });
     await userEvent.keyboard("{/Alt}");
@@ -1385,104 +1410,70 @@ Target
 My Notes
   Source
   Target
-  My Notes → Source (0)
+  [R] My Notes >>> Source
   Target2
 Target
-  My Notes → Source (0)
+  [R] My Notes >>> Source
     `);
   });
 });
 
 describe("Deep Copy - Edit Restrictions", () => {
-  test("Abstract references in Referenced By view are draggable", async () => {
-    const [alice, bob, carol] = setup([ALICE, BOB, CAROL]);
+  test("Suggestions are draggable", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
-    await follow(alice, carol().user.publicKey);
-
-    renderTree(bob);
-    await type(
-      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Enter}{Tab}Bob Child{Escape}"
-    );
-
-    cleanup();
-
-    renderTree(carol);
-    await type(
-      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Enter}{Tab}Carol Child{Escape}"
-    );
-
-    cleanup();
-
-    renderTree(alice);
-    await type(
-      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Escape}"
-    );
-
-    await userEvent.click(
-      await screen.findByLabelText("show references to Barcelona")
-    );
-
-    await expectTree(`
-My Notes
-  Holiday Destinations
-    Barcelona
-      My Notes → Holiday Destinations → Barcelona
-    `);
-
-    const abstractRefText = screen.getByText(
-      "My Notes → Holiday Destinations → Barcelona"
-    );
-    // eslint-disable-next-line testing-library/no-node-access
-    const abstractRefItem = abstractRefText.closest(".item");
-    expect(abstractRefItem).not.toBeNull();
-    expect(abstractRefItem?.getAttribute("draggable")).toBe("true");
-  });
-
-  test("I: Abstract references cannot be dragged", async () => {
-    const [alice, bob, carol] = setup([ALICE, BOB, CAROL]);
 
     renderTree(bob);
     await type(
       "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Escape}"
     );
 
-    await expectTree(`
-My Notes
-  Holiday Destinations
-    Barcelona
-    `);
-
     cleanup();
 
-    renderTree(carol);
-    await type(
-      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Malaga{Escape}"
-    );
-
-    await expectTree(`
-My Notes
-  Holiday Destinations
-    Malaga
-    `);
-
-    cleanup();
-
-    await follow(alice, bob().user.publicKey);
-    await follow(alice, carol().user.publicKey);
     renderTree(alice);
     await type("My Notes{Escape}");
 
     await expectTree(`
 My Notes
-  [S] My Notes → Holiday Destinations
+  [S] Holiday Destinations
     `);
 
-    // Verify abstract references are not draggable by checking the draggable attribute
-    const holidayText = screen.getByText("My Notes → Holiday Destinations");
+    const suggestionText = await screen.findByText("Holiday Destinations");
     // eslint-disable-next-line testing-library/no-node-access
-    const holidayItem = holidayText.closest(".item");
-    expect(holidayItem).not.toBeNull();
-    expect(holidayItem?.getAttribute("draggable")).not.toBe("true");
+    const suggestionItem = suggestionText.closest(".item");
+    expect(suggestionItem).not.toBeNull();
+    expect(suggestionItem?.getAttribute("draggable")).toBe("true");
+  });
+
+  test("Version items can be dragged", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    await follow(alice, bob().user.publicKey);
+
+    renderTree(bob);
+    await type(
+      "My Notes{Enter}{Tab}BobItem1{Enter}BobItem2{Enter}BobItem3{Enter}BobItem4{Escape}"
+    );
+
+    cleanup();
+
+    renderTree(alice);
+    await type("My Notes{Escape}");
+
+    await expectTree(`
+My Notes
+  [S] BobItem1
+  [S] BobItem2
+  [S] BobItem3
+  [VO] +4
+    `);
+
+    // eslint-disable-next-line testing-library/no-node-access
+    const versionCard = document.querySelector('[data-virtual-type="version"]');
+    expect(versionCard).not.toBeNull();
+    // eslint-disable-next-line testing-library/no-node-access
+    const versionItem = versionCard?.closest(".item");
+    expect(versionItem).not.toBeNull();
+    expect(versionItem?.getAttribute("draggable")).toBe("true");
   });
 
   test("H: Children of suggestions cannot be edited", async () => {
@@ -1513,7 +1504,7 @@ My Notes
     await expectTree(`
 My Notes
   [S] BobFolder
-    BobChild
+    [O] BobChild
     `);
 
     // Children of suggestions should not have edit buttons
@@ -1666,5 +1657,91 @@ My Notes
       );
 
     expect(newEvents.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Deep Copy - Version DnD", () => {
+  test("Cross-pane DnD version creates cref displayed as VO and deduplicates virtual", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    await follow(alice, bob().user.publicKey);
+
+    renderTree(bob);
+    await type("My Notes{Enter}{Tab}B1{Enter}B2{Enter}B3{Enter}B4{Escape}");
+    cleanup();
+
+    renderApp(alice());
+    await type("My Notes{Enter}{Tab}A1{Escape}");
+
+    await expectTree(`
+My Notes
+  A1
+  [S] B1
+  [S] B2
+  [S] B3
+  [VO] +4 -1
+    `);
+
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "My Notes");
+
+    // eslint-disable-next-line testing-library/no-node-access
+    const versionElement = document.querySelector(
+      '[data-virtual-type="version"]'
+    )!;
+    const dropTarget = getPane(1).getByLabelText("collapse My Notes");
+    fireEvent.dragStart(versionElement);
+    fireEvent.drop(dropTarget);
+
+    await expectTree(`
+My Notes
+  [VO] +4 -2
+  A1
+  [S] B1
+  [S] B2
+  [S] B3
+My Notes
+  [VO] +4 -2
+  A1
+  [S] B1
+  [S] B2
+  [S] B3
+    `);
+  });
+
+  test("Same-pane DnD version creates cref displayed as VO and deduplicates virtual", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    await follow(alice, bob().user.publicKey);
+
+    renderTree(bob);
+    await type("My Notes{Enter}{Tab}B1{Enter}B2{Enter}B3{Enter}B4{Escape}");
+    cleanup();
+
+    renderTree(alice);
+    await type("My Notes{Enter}{Tab}A1{Escape}");
+
+    await expectTree(`
+My Notes
+  A1
+  [S] B1
+  [S] B2
+  [S] B3
+  [VO] +4 -1
+    `);
+
+    // eslint-disable-next-line testing-library/no-node-access
+    const versionElement = document.querySelector(
+      '[data-virtual-type="version"]'
+    )!;
+    fireEvent.dragStart(versionElement);
+    fireEvent.drop(screen.getByLabelText("collapse My Notes"));
+
+    await expectTree(`
+My Notes
+  [VO] +4 -2
+  A1
+  [S] B1
+  [S] B2
+  [S] B3
+    `);
   });
 });

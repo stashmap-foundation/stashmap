@@ -49,7 +49,7 @@ describe("Home Navigation", () => {
 
       renderTree(bob);
       await type(
-        "My Notes{Enter}{Tab}Programming Languages{Enter}{Tab}Rust{Escape}"
+        "My Notes{Enter}{Tab}Programming Languages{Enter}{Tab}Rust{Enter}{Tab}Memory Safety{Escape}"
       );
       cleanup();
 
@@ -59,21 +59,16 @@ describe("Home Navigation", () => {
       await type("My Notes{Enter}{Tab}Programming Languages{Escape}");
 
       await userEvent.click(
-        await screen.findByLabelText("show references to Programming Languages")
+        await screen.findByLabelText("expand Programming Languages")
       );
       await userEvent.click(
-        await screen.findByLabelText(
-          "open My Notes → Programming Languages (1) in fullscreen"
-        )
+        await screen.findByLabelText("open Rust in fullscreen")
       );
       await screen.findByText("READONLY");
 
       await userEvent.click(await screen.findByLabelText("Navigate to Log"));
 
       await screen.findByLabelText("collapse ~Log");
-      await waitFor(() => {
-        expect(screen.queryByText("READONLY")).toBeNull();
-      });
       await screen.findByText("Alice Home Note");
     });
   });
@@ -143,7 +138,7 @@ My Notes
 
       await expectTree(`
 ~Log
-  First Note
+  [R] First Note
       `);
     });
 
@@ -159,8 +154,8 @@ My Notes
 
       await expectTree(`
 ~Log
-  Second Note
-  First Note
+  [R] Second Note
+  [R] First Note
       `);
     });
 
@@ -202,9 +197,9 @@ My Notes
 
       await expectTree(`
 ~Log
-  Third Note
-  Second Note
-  First Note
+  [R] Third Note
+  [R] Second Note
+  [R] First Note
       `);
 
       cleanup();
@@ -216,9 +211,9 @@ My Notes
 
       await expectTree(`
 ~Log
-  Third Note
-  Second Note
-  First Note
+  [R] Third Note
+  [R] Second Note
+  [R] First Note
       `);
     });
 
@@ -238,7 +233,7 @@ My Notes
 
       await expectTree(`
 ~Log
-  My Notes
+  [R] My Notes
       `);
 
       await userEvent.click(await screen.findByText("My Notes"));

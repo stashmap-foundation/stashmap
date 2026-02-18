@@ -8,20 +8,21 @@ import {
   useNode,
 } from "../ViewContext";
 import { useData } from "../DataContext";
-import { usePlanner } from "../planner";
+import { planDeselectTemporarySelectionInView, usePlanner } from "../planner";
 
-export type MultiSelectionState = {
-  baseSelection: OrderedSet<string>;
-  shiftSelection: OrderedSet<string>;
-  anchor: string;
-};
+export {
+  clearSelection,
+  deselectAllChildren,
+  selectSingle,
+  shiftSelect,
+  toggleSelect,
+} from "../selection";
 
 type MultiSelection = {
   selection: OrderedSet<string>;
   baseSelection: OrderedSet<string>;
   shiftSelection: OrderedSet<string>;
   anchor: string;
-  setState: (multiselectionState: MultiSelectionState) => void;
 };
 
 type EditingState = {
@@ -99,81 +100,10 @@ export function useGetSelectedInView(): FindSelectedByPostfix {
   return (postfix) => getSelectedInView(selection, postfix);
 }
 
-export function deselectAllChildren(
-  selection: OrderedSet<string>,
-  viewKey: string
-): OrderedSet<string> {
-  return selection.filterNot((sel) => sel.startsWith(viewKey));
-}
-
 export function useDeselectAllInView(): DeselectByPostfix {
-  const { baseSelection, shiftSelection, anchor, setState } =
-    useTemporaryView();
+  const { createPlan, executePlan } = usePlanner();
   return (viewKey) =>
-    setState({
-      baseSelection: deselectAllChildren(baseSelection, viewKey),
-      shiftSelection: deselectAllChildren(shiftSelection, viewKey),
-      anchor,
-    });
-}
-
-export function selectSingle(
-  _state: MultiSelectionState,
-  viewKey: string
-): MultiSelectionState {
-  return {
-    baseSelection: OrderedSet<string>([viewKey]),
-    shiftSelection: OrderedSet<string>(),
-    anchor: viewKey,
-  };
-}
-
-export function toggleSelect(
-  state: MultiSelectionState,
-  viewKey: string
-): MultiSelectionState {
-  const committed = state.baseSelection.union(state.shiftSelection);
-  const withAnchor =
-    committed.size === 0 && state.anchor && state.anchor !== viewKey
-      ? committed.add(state.anchor)
-      : committed;
-  return {
-    baseSelection: withAnchor.contains(viewKey)
-      ? withAnchor.remove(viewKey)
-      : withAnchor.add(viewKey),
-    shiftSelection: OrderedSet<string>(),
-    anchor: viewKey,
-  };
-}
-
-export function shiftSelect(
-  state: MultiSelectionState,
-  orderedKeys: string[],
-  target: string
-): MultiSelectionState {
-  const anchorIdx = orderedKeys.indexOf(state.anchor);
-  const targetIdx = orderedKeys.indexOf(target);
-  if (anchorIdx === -1 || targetIdx === -1) {
-    return state;
-  }
-  const start = Math.min(anchorIdx, targetIdx);
-  const end = Math.max(anchorIdx, targetIdx);
-  const rangeKeys = orderedKeys.slice(start, end + 1);
-  return {
-    baseSelection: state.baseSelection,
-    shiftSelection: OrderedSet<string>(rangeKeys),
-    anchor: state.anchor,
-  };
-}
-
-export function clearSelection(
-  state: MultiSelectionState
-): MultiSelectionState {
-  return {
-    baseSelection: OrderedSet<string>(),
-    shiftSelection: OrderedSet<string>(),
-    anchor: state.anchor,
-  };
+    executePlan(planDeselectTemporarySelectionInView(createPlan(), viewKey));
 }
 
 function isEditingOn(editingViews: Set<string>, viewKey: string): boolean {
@@ -263,22 +193,9 @@ export function TemporaryViewProvider({
   children: React.ReactNode;
 }): JSX.Element {
   const { publishEventsStatus } = useData();
-  const { setPublishEvents } = usePlanner();
 
   const { baseSelection, shiftSelection, anchor } =
     publishEventsStatus.temporaryView;
-
-  const setMultiselectState = (state: MultiSelectionState): void => {
-    setPublishEvents((prev) => ({
-      ...prev,
-      temporaryView: {
-        ...prev.temporaryView,
-        baseSelection: state.baseSelection,
-        shiftSelection: state.shiftSelection,
-        anchor: state.anchor,
-      },
-    }));
-  };
 
   const [isEditingState, setEditingState] = useState<EditingState>({
     editingViews: Set<string>(),
@@ -294,7 +211,6 @@ export function TemporaryViewProvider({
         baseSelection,
         shiftSelection,
         anchor,
-        setState: setMultiselectState,
         editingViews: isEditingState.editingViews,
         setEditingState,
         editorOpenViews: isEditorOpenState.editorOpenViews,

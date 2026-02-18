@@ -47,19 +47,19 @@ import { useApis } from "../Apis";
 import {
   ActiveRowState,
   KeyboardMode,
-  getFocusableRows,
   getRowIndex,
   getRowKey,
   isEditableElement,
   registerScrollToRow,
   unregisterScrollToRow,
 } from "./keyboardNavigation";
+import { useTemporaryView } from "./TemporaryViewContext";
 import {
-  useTemporaryView,
-  clearSelection,
-  toggleSelect,
-  shiftSelect,
-} from "./TemporaryViewContext";
+  planClearTemporarySelection,
+  planShiftTemporarySelection,
+  planToggleTemporarySelection,
+  usePlanner,
+} from "../planner";
 
 function getAncestorPaths(path: string, rootKey: string): string[] {
   const suffix = path.slice(rootKey.length);
@@ -115,11 +115,7 @@ function VirtuosoForColumn({
   ariaLabel: string | undefined;
   activeRowKey: string;
   onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
-  onRowClick?: (
-    e: React.MouseEvent,
-    viewKey: string,
-    rowEl: HTMLElement
-  ) => void;
+  onRowClick?: (e: React.MouseEvent, viewKey: string) => void;
 }): JSX.Element {
   const location = useLocation();
   const virtuosoRef = useRef<VirtuosoHandle>(null);
@@ -300,7 +296,6 @@ function Tree(): JSX.Element | null {
     activeRowKey: "",
     activeRowIndex: 0,
   });
-  const didAutoFocusRef = useRef(false);
   const [consumedRowFocusIntentId, setConsumedRowFocusIntentId] = useState<
     number | null
   >(null);
@@ -343,12 +338,8 @@ function Tree(): JSX.Element | null {
     });
   }, [nodeKeys, activeRow.activeRowKey, activeRow.activeRowIndex]);
 
-  const {
-    baseSelection,
-    shiftSelection,
-    anchor,
-    setState: setSelectionState,
-  } = useTemporaryView();
+  const { anchor } = useTemporaryView();
+  const { createPlan, executePlan } = usePlanner();
 
   const onRowFocus = (key: string, index: number, mode: KeyboardMode): void => {
     setActiveRow({
@@ -358,33 +349,23 @@ function Tree(): JSX.Element | null {
     setKeyboardMode(mode);
   };
 
-  const onRowClick = (
-    e: React.MouseEvent,
-    clickedViewKey: string,
-    rowEl: HTMLElement
-  ): void => {
+  const onRowClick = (e: React.MouseEvent, clickedViewKey: string): void => {
     const isMeta = e.metaKey || e.ctrlKey;
     const isShift = e.shiftKey;
-    const currentState = { baseSelection, shiftSelection, anchor };
 
     if (isMeta) {
-      setSelectionState(toggleSelect(currentState, clickedViewKey));
+      executePlan(planToggleTemporarySelection(createPlan(), clickedViewKey));
       return;
     }
 
     if (isShift && anchor) {
-      const paneRoot = rowEl.closest(".pane-wrapper");
-      if (!paneRoot) {
-        return;
-      }
-      const allKeys = getFocusableRows(paneRoot).map((row) => getRowKey(row));
-      setSelectionState(shiftSelect(currentState, allKeys, clickedViewKey));
+      executePlan(
+        planShiftTemporarySelection(createPlan(), nodeKeys, clickedViewKey)
+      );
       return;
     }
 
-    setSelectionState(
-      clearSelection({ ...currentState, anchor: clickedViewKey })
-    );
+    executePlan(planClearTemporarySelection(createPlan(), clickedViewKey));
   };
 
   useEffect(() => {
@@ -443,48 +424,6 @@ function Tree(): JSX.Element | null {
     range.startIndex,
     range.endIndex,
   ]);
-
-  useEffect(() => {
-    if (!activeRow.activeRowKey || didAutoFocusRef.current) {
-      return;
-    }
-
-    const treeRoot = treeRootRef.current;
-    if (!treeRoot) {
-      return;
-    }
-
-    const { activeElement } = document;
-    const isFocusedInModal =
-      activeElement instanceof HTMLElement &&
-      activeElement.closest(".modal") !== null;
-    const isFocusedInTree =
-      activeElement instanceof HTMLElement && treeRoot.contains(activeElement);
-    const hasUsableFocus =
-      isFocusedInModal ||
-      (isFocusedInTree &&
-        (activeElement.closest('[data-row-focusable="true"]') !== null ||
-          isEditableElement(activeElement)));
-
-    if (hasUsableFocus) {
-      // eslint-disable-next-line functional/immutable-data
-      didAutoFocusRef.current = true;
-      return;
-    }
-
-    const preferredRow = treeRoot.querySelector(
-      `[data-row-focusable="true"][data-view-key="${activeRow.activeRowKey}"]`
-    );
-    const fallbackRow = getFocusableRows(treeRoot)[0];
-    const targetRow =
-      preferredRow instanceof HTMLElement ? preferredRow : fallbackRow;
-
-    if (targetRow) {
-      targetRow.focus();
-      // eslint-disable-next-line functional/immutable-data
-      didAutoFocusRef.current = true;
-    }
-  }, [activeRow.activeRowKey, range.startIndex, range.endIndex]);
 
   const onStopScrolling = (isScrolling: boolean): void => {
     // don't set the storage if the index is 0 since onStopStrolling is called on initial render

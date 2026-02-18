@@ -1328,6 +1328,15 @@ input:focus,
     color: inherit;
   }
 
+  .expand-collapse-toggle:not(.toggle-hidden),
+  .expand-collapse-toggle:not(.toggle-hidden):hover,
+  .expand-collapse-toggle:not(.toggle-hidden):focus,
+  .expand-collapse-toggle:not(.toggle-hidden):focus-visible,
+  .expand-collapse-toggle:not(.toggle-hidden):active,
+  .expand-collapse-toggle:not(.toggle-hidden):disabled {
+    color: inherit;
+  }
+
   .relevance-symbol,
   .evidence-selector {
     color: var(--base02) !important;
@@ -1338,6 +1347,15 @@ input:focus,
 .item[data-selected="true"]:focus-visible .inner-node.hover-light-bg {
   background: var(--base1);
   color: var(--base03);
+
+  .expand-collapse-toggle:not(.toggle-hidden),
+  .expand-collapse-toggle:not(.toggle-hidden):hover,
+  .expand-collapse-toggle:not(.toggle-hidden):focus,
+  .expand-collapse-toggle:not(.toggle-hidden):focus-visible,
+  .expand-collapse-toggle:not(.toggle-hidden):active,
+  .expand-collapse-toggle:not(.toggle-hidden):disabled {
+    color: inherit;
+  }
 
   .relevance-symbol,
   .evidence-selector {

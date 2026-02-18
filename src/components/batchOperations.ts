@@ -7,6 +7,7 @@ import {
 } from "../connections";
 import {
   ViewPath,
+  addNodeToPathWithRelations,
   getParentView,
   getParentRelation,
   getRelationIndex,
@@ -204,6 +205,47 @@ function allSameParent(viewKeys: string[]): boolean {
   return viewKeys.every((k) => getParentKey(k) === firstParent);
 }
 
+type SelectionRemap = {
+  fromKey: string;
+  toKey: string;
+};
+
+function remapSelectionForMovedKeys(
+  originalPlan: Plan,
+  updatedPlan: Plan,
+  keyRemap: SelectionRemap[]
+): Plan {
+  if (keyRemap.length === 0) {
+    return updatedPlan;
+  }
+  const keyMap = keyRemap.reduce(
+    (acc, { fromKey, toKey }) => acc.set(fromKey, toKey),
+    new Map<string, string>()
+  );
+  const remapSelectionSet = (
+    selection: OrderedSet<string>
+  ): OrderedSet<string> =>
+    OrderedSet<string>(
+      selection.toArray().map((key) => keyMap.get(key) || key)
+    );
+  const remappedAnchor =
+    keyMap.get(originalPlan.temporaryView.anchor) ||
+    originalPlan.temporaryView.anchor;
+  return {
+    ...updatedPlan,
+    temporaryView: {
+      ...updatedPlan.temporaryView,
+      baseSelection: remapSelectionSet(
+        originalPlan.temporaryView.baseSelection
+      ),
+      shiftSelection: remapSelectionSet(
+        originalPlan.temporaryView.shiftSelection
+      ),
+      anchor: remappedAnchor,
+    },
+  };
+}
+
 function sortByRelationIndex(plan: Plan, viewPaths: ViewPath[]): ViewPath[] {
   return [...viewPaths].sort((a, b) => {
     const idxA = getRelationIndex(plan, a) ?? 0;
@@ -234,23 +276,61 @@ export function planBatchIndent(
 
   const prevSiblingContext = getContext(plan, prevSibling.viewPath, stack);
   const newContext = prevSiblingContext.push(shortID(prevSibling.nodeID));
+  const { plan: updated, remappedKeys } = viewPaths.reduce(
+    (state, viewPath) => {
+      const fromKey = viewPathToString(viewPath);
+      const targetRelationBefore = getRelationForView(
+        state.plan,
+        prevSibling.viewPath,
+        stack
+      );
+      const insertAt = targetRelationBefore?.items.size ?? 0;
+      const moved = planMoveNodeWithView(
+        state.plan,
+        viewPath,
+        prevSibling.viewPath,
+        stack,
+        insertAt
+      );
+      const targetRelationAfter = getRelationForView(
+        moved,
+        prevSibling.viewPath,
+        stack
+      );
+      const nextRemappedKeys =
+        targetRelationAfter && insertAt < targetRelationAfter.items.size
+          ? [
+              ...state.remappedKeys,
+              {
+                fromKey,
+                toKey: viewPathToString(
+                  addNodeToPathWithRelations(
+                    prevSibling.viewPath,
+                    targetRelationAfter,
+                    insertAt
+                  )
+                ),
+              },
+            ]
+          : state.remappedKeys;
+      const editorText = getEditorTextForPath(editorInfo, viewPath);
+      if (!editorText) {
+        return { plan: moved, remappedKeys: nextRemappedKeys };
+      }
+      const { nodeID } = getLast(viewPath);
+      const nodeText = getNodeText(state.plan, nodeID);
+      if (editorText === nodeText) {
+        return { plan: moved, remappedKeys: nextRemappedKeys };
+      }
+      return {
+        plan: planCreateVersion(moved, nodeID, editorText, newContext),
+        remappedKeys: nextRemappedKeys,
+      };
+    },
+    { plan: planWithExpand, remappedKeys: [] as SelectionRemap[] }
+  );
 
-  const updated = viewPaths.reduce((acc, viewPath) => {
-    const moved = planMoveNodeWithView(
-      acc,
-      viewPath,
-      prevSibling.viewPath,
-      stack
-    );
-    const editorText = getEditorTextForPath(editorInfo, viewPath);
-    if (!editorText) return moved;
-    const { nodeID } = getLast(viewPath);
-    const nodeText = getNodeText(acc, nodeID);
-    if (editorText === nodeText) return moved;
-    return planCreateVersion(moved, nodeID, editorText, newContext);
-  }, planWithExpand);
-
-  return planClearSelection(updated);
+  return remapSelectionForMovedKeys(plan, updated, remappedKeys);
 }
 
 export function planBatchOutdent(
@@ -275,22 +355,54 @@ export function planBatchOutdent(
   const grandParentContext = getContext(plan, grandParentPath, stack);
   const grandParentNodeID = getLast(grandParentPath).nodeID;
   const newContext = grandParentContext.push(shortID(grandParentNodeID));
+  const { plan: updated, remappedKeys } = viewPaths.reduce(
+    (state, viewPath, idx) => {
+      const fromKey = viewPathToString(viewPath);
+      const insertAt = parentRelationIndex + 1 + idx;
+      const moved = planMoveNodeWithView(
+        state.plan,
+        viewPath,
+        grandParentPath,
+        stack,
+        insertAt
+      );
+      const targetRelationAfter = getRelationForView(
+        moved,
+        grandParentPath,
+        stack
+      );
+      const nextRemappedKeys =
+        targetRelationAfter && insertAt < targetRelationAfter.items.size
+          ? [
+              ...state.remappedKeys,
+              {
+                fromKey,
+                toKey: viewPathToString(
+                  addNodeToPathWithRelations(
+                    grandParentPath,
+                    targetRelationAfter,
+                    insertAt
+                  )
+                ),
+              },
+            ]
+          : state.remappedKeys;
+      const editorText = getEditorTextForPath(editorInfo, viewPath);
+      if (!editorText) {
+        return { plan: moved, remappedKeys: nextRemappedKeys };
+      }
+      const { nodeID } = getLast(viewPath);
+      const nodeText = getNodeText(state.plan, nodeID);
+      if (editorText === nodeText) {
+        return { plan: moved, remappedKeys: nextRemappedKeys };
+      }
+      return {
+        plan: planCreateVersion(moved, nodeID, editorText, newContext),
+        remappedKeys: nextRemappedKeys,
+      };
+    },
+    { plan, remappedKeys: [] as SelectionRemap[] }
+  );
 
-  const updated = viewPaths.reduce((acc, viewPath, idx) => {
-    const moved = planMoveNodeWithView(
-      acc,
-      viewPath,
-      grandParentPath,
-      stack,
-      parentRelationIndex + 1 + idx
-    );
-    const editorText = getEditorTextForPath(editorInfo, viewPath);
-    if (!editorText) return moved;
-    const { nodeID } = getLast(viewPath);
-    const nodeText = getNodeText(acc, nodeID);
-    if (editorText === nodeText) return moved;
-    return planCreateVersion(moved, nodeID, editorText, newContext);
-  }, plan);
-
-  return planClearSelection(updated);
+  return remapSelectionForMovedKeys(plan, updated, remappedKeys);
 }

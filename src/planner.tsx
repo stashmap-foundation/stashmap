@@ -1,5 +1,5 @@
 import React, { Dispatch, SetStateAction, useEffect, useRef } from "react";
-import { List, Map } from "immutable";
+import { List, Map, OrderedSet } from "immutable";
 import { UnsignedEvent, Event } from "nostr-tools";
 import {
   KIND_DELETE,
@@ -65,6 +65,13 @@ import {
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useRelaysToCreatePlan } from "./relays";
 import { mergePublishResultsOfEvents } from "./commons/PublishingStatus";
+import {
+  MultiSelectionState,
+  clearSelection,
+  deselectAllChildren,
+  shiftSelect,
+  toggleSelect,
+} from "./selection";
 
 export function getPane(plan: Plan | Data, viewPath: ViewPath): Pane {
   const paneIndex = viewPath[0];
@@ -471,6 +478,97 @@ export function planSetRowFocusIntent(
       ),
     },
   };
+}
+
+function getTemporarySelectionState(plan: Plan): MultiSelectionState {
+  return {
+    baseSelection: plan.temporaryView.baseSelection,
+    shiftSelection: plan.temporaryView.shiftSelection,
+    anchor: plan.temporaryView.anchor,
+  };
+}
+
+export function planSetTemporarySelectionState(
+  plan: Plan,
+  state: MultiSelectionState
+): Plan {
+  return {
+    ...plan,
+    temporaryView: {
+      ...plan.temporaryView,
+      baseSelection: state.baseSelection,
+      shiftSelection: state.shiftSelection,
+      anchor: state.anchor,
+    },
+  };
+}
+
+export function planToggleTemporarySelection(
+  plan: Plan,
+  viewKey: string
+): Plan {
+  return planSetTemporarySelectionState(
+    plan,
+    toggleSelect(getTemporarySelectionState(plan), viewKey)
+  );
+}
+
+export function planShiftTemporarySelection(
+  plan: Plan,
+  orderedKeys: string[],
+  targetViewKey: string,
+  fallbackAnchor?: string
+): Plan {
+  const current = getTemporarySelectionState(plan);
+  const effectiveAnchor = current.anchor || fallbackAnchor;
+  if (!effectiveAnchor) {
+    return plan;
+  }
+  return planSetTemporarySelectionState(
+    plan,
+    shiftSelect(
+      {
+        ...current,
+        anchor: effectiveAnchor,
+      },
+      orderedKeys,
+      targetViewKey
+    )
+  );
+}
+
+export function planClearTemporarySelection(plan: Plan, anchor?: string): Plan {
+  return planSetTemporarySelectionState(
+    plan,
+    clearSelection({
+      ...getTemporarySelectionState(plan),
+      anchor: anchor ?? plan.temporaryView.anchor,
+    })
+  );
+}
+
+export function planSelectAllTemporaryRows(
+  plan: Plan,
+  orderedKeys: string[],
+  anchor?: string
+): Plan {
+  return planSetTemporarySelectionState(plan, {
+    baseSelection: OrderedSet<string>(orderedKeys),
+    shiftSelection: OrderedSet<string>(),
+    anchor: anchor ?? plan.temporaryView.anchor,
+  });
+}
+
+export function planDeselectTemporarySelectionInView(
+  plan: Plan,
+  viewKey: string
+): Plan {
+  const current = getTemporarySelectionState(plan);
+  return planSetTemporarySelectionState(plan, {
+    baseSelection: deselectAllChildren(current.baseSelection, viewKey),
+    shiftSelection: deselectAllChildren(current.shiftSelection, viewKey),
+    anchor: current.anchor,
+  });
 }
 
 export function planRemoveEmptyNodePosition(

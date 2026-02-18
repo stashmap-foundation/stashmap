@@ -14,6 +14,7 @@ import { deselectAllChildren, useTemporaryView } from "./TemporaryViewContext";
 import {
   Plan,
   planAddToParent,
+  planSetTemporarySelectionState,
   planUpdatePanes,
   planUpsertNode,
   planUpsertRelations,
@@ -247,7 +248,7 @@ export function useDroppable({
   { dragDirection: number | undefined; isOver: boolean },
   ConnectDropTarget
 ] {
-  const { setState, selection, anchor } = useTemporaryView();
+  const { selection, anchor } = useTemporaryView();
   const { createPlan, executePlan } = usePlanner();
   const stack = usePaneStack();
   const pane = useCurrentPane();
@@ -516,26 +517,26 @@ export function useDroppable({
         return dragItem;
       }
 
-      executePlan(
-        dnd(
-          plan,
-          selection,
-          viewPathToString(dragItem.path), // TODO: change parameter to path instead of string
-          destination,
-          stack,
-          calcIndex(index, direction),
-          pane.rootRelation,
-          dragItem.isSuggestion,
-          invertCopyModeRef.current,
-          targetDepth
-        )
+      const dropped = dnd(
+        plan,
+        selection,
+        viewPathToString(dragItem.path), // TODO: change parameter to path instead of string
+        destination,
+        stack,
+        calcIndex(index, direction),
+        pane.rootRelation,
+        dragItem.isSuggestion,
+        invertCopyModeRef.current,
+        targetDepth
       );
       const parentKey = getParentKey(viewPathToString(dragItem.path));
-      setState({
-        baseSelection: deselectAllChildren(selection, parentKey),
-        shiftSelection: OrderedSet<string>(),
-        anchor,
-      });
+      executePlan(
+        planSetTemporarySelectionState(dropped, {
+          baseSelection: deselectAllChildren(selection, parentKey),
+          shiftSelection: OrderedSet<string>(),
+          anchor,
+        })
+      );
       return dragItem;
     },
   });

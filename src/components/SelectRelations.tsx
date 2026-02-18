@@ -8,11 +8,14 @@ import {
   useDisplayText,
   isReferencedByView,
 } from "../ViewContext";
-import { useDeselectAllInView } from "./TemporaryViewContext";
 import { getRelations, isReferenceNode } from "../connections";
 import { REFERENCED_BY } from "../constants";
 import { useData } from "../DataContext";
-import { planUpdateViews, usePlanner } from "../planner";
+import {
+  planDeselectTemporarySelectionInView,
+  planUpdateViews,
+  usePlanner,
+} from "../planner";
 
 type ChangeViewingMode = (
   viewingMode: "REFERENCED_BY" | undefined,
@@ -25,10 +28,9 @@ export function useOnChangeViewingMode(): ChangeViewingMode {
   const { createPlan, executePlan } = usePlanner();
   const view = useNodeID()[1];
   const viewKey = useViewKey();
-  const deselectAllInView = useDeselectAllInView();
 
   return (viewingMode: "REFERENCED_BY" | undefined, expand: boolean): void => {
-    const plan = planUpdateViews(
+    const planWithViews = planUpdateViews(
       createPlan(),
       updateView(data.views, viewPath, {
         ...view,
@@ -36,8 +38,7 @@ export function useOnChangeViewingMode(): ChangeViewingMode {
         expanded: expand,
       })
     );
-    executePlan(plan);
-    deselectAllInView(viewKey);
+    executePlan(planDeselectTemporarySelectionInView(planWithViews, viewKey));
   };
 }
 

@@ -1156,7 +1156,6 @@ Root
     Deep
   Shallow
 Shallow
-  Root (2) → Shallow
   Deep
   Shallow
     `);
@@ -1375,7 +1374,6 @@ Root
   C
     C1
 C1
-  Root → C (1) → C1
   A1
   B1
   C1
@@ -1495,7 +1493,6 @@ Root
     Deep
   Target
 Target
-  Root (2) → Target
   Parent
     Deep
     `);
@@ -1530,7 +1527,6 @@ Root
   B
     B1
 B1
-  Root → B (1) → B1
   A
     A1
   B1
@@ -1683,7 +1679,7 @@ Root
     `);
   });
 
-  test("Tab clears selection after indent", async () => {
+  test("Tab preserves selection after indent", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
@@ -1692,7 +1688,35 @@ Root
     await userEvent.keyboard("{Shift>}j{/Shift}");
     await expectTargets("B", "C");
     await userEvent.keyboard("{Tab}");
-    await expectNoTargets();
+    await expectTargets("B", "C");
+  });
+
+  test("Shift+Tab right after Tab outdents on first press", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+    await clickRow("B");
+    await userEvent.keyboard("{Shift>}j{/Shift}");
+    await expectTargets("B", "C");
+
+    await userEvent.keyboard("{Tab}");
+    await expectTree(`
+Root
+  A
+    B
+    C
+    `);
+    await expectTargets("B", "C");
+
+    await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
+    await expectTree(`
+Root
+  A
+  B
+  C
+    `);
+    await expectTargets("B", "C");
   });
 
   test("Tab indents single selected row", async () => {
@@ -1794,7 +1818,7 @@ Root
     `);
   });
 
-  test("Shift+Tab clears selection after outdent", async () => {
+  test("Shift+Tab preserves selection after outdent", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
@@ -1803,7 +1827,7 @@ Root
     await userEvent.keyboard("{Shift>}j{/Shift}");
     await expectTargets("B", "C");
     await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
-    await expectNoTargets();
+    await expectTargets("B", "C");
   });
 
   test("Shift+Tab outdents single selected row", async () => {

@@ -51,11 +51,7 @@ type DraggableProps = {
   isActiveRow?: boolean;
   isSelected?: boolean;
   onRowFocus?: (key: string, index: number, mode: KeyboardMode) => void;
-  onRowClick?: (
-    e: React.MouseEvent,
-    viewKey: string,
-    rowEl: HTMLElement
-  ) => void;
+  onRowClick?: (e: React.MouseEvent, viewKey: string) => void;
 };
 
 const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
@@ -106,14 +102,18 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
       if (!onRowClick) {
         return;
       }
-      const el = (ref as React.RefObject<HTMLDivElement>)?.current;
-      if (!el) {
+      const target = e.target as HTMLElement;
+      if (isEditableElement(target)) {
         return;
       }
-      if (isEditableElement(e.target as HTMLElement)) {
+      if (
+        target.closest(
+          "button, a, input, textarea, select, [role='button'], [data-node-action], [data-pane-action]"
+        )
+      ) {
         return;
       }
-      onRowClick(e, rowViewKey, el);
+      onRowClick(e, rowViewKey);
     };
 
     return (
@@ -174,11 +174,7 @@ function DraggableSuggestion({
   isActiveRow: boolean;
   isSelected?: boolean;
   onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
-  onRowClick?: (
-    e: React.MouseEvent,
-    viewKey: string,
-    rowEl: HTMLElement
-  ) => void;
+  onRowClick?: (e: React.MouseEvent, viewKey: string) => void;
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const path = useViewPath();
@@ -210,10 +206,18 @@ function DraggableSuggestion({
     if (!onRowClick) {
       return;
     }
-    if (isEditableElement(e.target as HTMLElement)) {
+    const target = e.target as HTMLElement;
+    if (isEditableElement(target)) {
       return;
     }
-    onRowClick(e, rowViewKey, ref.current as HTMLElement);
+    if (
+      target.closest(
+        "button, a, input, textarea, select, [role='button'], [data-node-action], [data-pane-action]"
+      )
+    ) {
+      return;
+    }
+    onRowClick(e, rowViewKey);
   };
 
   return (
@@ -264,11 +268,7 @@ export function ListItem({
   nextViewPathStr?: string;
   activeRowKey: string;
   onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
-  onRowClick?: (
-    e: React.MouseEvent,
-    viewKey: string,
-    rowEl: HTMLElement
-  ) => void;
+  onRowClick?: (e: React.MouseEvent, viewKey: string) => void;
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const viewKey = useViewKey();

@@ -1,18 +1,22 @@
-import React, { useEffect, useRef, useState } from "react";
-import { OrderedSet } from "immutable";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { List, OrderedSet } from "immutable";
 import {
   TemporaryViewProvider,
   useTemporaryView,
-  clearSelection,
-  shiftSelect,
-  toggleSelect,
 } from "./TemporaryViewContext";
 
 import {
+  getEffectiveAuthor,
+  getNodeFromView,
   getNodeFromID,
   getNodeIDFromView,
+  getParentRelation,
+  getVersionedDisplayText,
   getContext,
+  isExpanded,
   parseViewPath,
+  ViewPath,
+  viewPathToString,
   useViewPath,
   useIsViewingOtherUserContent,
 } from "../ViewContext";
@@ -39,6 +43,10 @@ import {
   usePlanner,
   planForkPane,
   planAddToParent,
+  planClearTemporarySelection,
+  planSelectAllTemporaryRows,
+  planShiftTemporarySelection,
+  planToggleTemporarySelection,
   parseClipboardText,
 } from "../planner";
 import {
@@ -64,6 +72,7 @@ import {
   planBatchOutdent,
   getCurrentItem,
 } from "./batchOperations";
+import { getNodesInTree } from "./Node";
 
 function BreadcrumbItem({
   nodeID,
@@ -365,8 +374,7 @@ const FILTER_SYMBOL_TO_KEY = {
 
 function getActiveRow(root: HTMLElement): HTMLElement | undefined {
   const rows = getFocusableRows(root);
-  const active = rows.find((row) => row.tabIndex === 0);
-  return active || rows[0];
+  return rows.find((row) => row.tabIndex === 0);
 }
 
 function scrollAndFocusRow(root: HTMLElement, index: number): void {
@@ -547,34 +555,56 @@ function refocusPaneAfterRowMutation(root: HTMLElement): void {
   }, 0);
 }
 
-function getVisibleRowKeys(root: HTMLElement): string[] {
-  return getFocusableRows(root).map((row) => getRowKey(row));
+function getRowDepthFromViewKey(viewKey: string): number {
+  return parseViewPath(viewKey).length - 1;
 }
 
-function getSubtreeRows(
-  allRows: HTMLElement[],
-  activeRow: HTMLElement
-): HTMLElement[] {
-  const activeIndex = allRows.indexOf(activeRow);
+function getSubtreeKeysFromOrderedKeys(
+  orderedKeys: string[],
+  activeRowKey: string
+): string[] {
+  const activeIndex = orderedKeys.indexOf(activeRowKey);
   if (activeIndex === -1) {
-    return [activeRow];
+    return [activeRowKey];
   }
-  const activeDepth = Number(activeRow.getAttribute("data-row-depth") || "0");
-  const descendants = allRows
+  const activeDepth = getRowDepthFromViewKey(activeRowKey);
+  const endIndex = orderedKeys
     .slice(activeIndex + 1)
-    .findIndex(
-      (row) => Number(row.getAttribute("data-row-depth") || "0") <= activeDepth
-    );
-  const endIndex =
-    descendants === -1 ? allRows.length : activeIndex + 1 + descendants;
-  return allRows.slice(activeIndex, endIndex);
+    .findIndex((viewKey) => getRowDepthFromViewKey(viewKey) <= activeDepth);
+  const finalIndex =
+    endIndex === -1 ? orderedKeys.length : activeIndex + 1 + endIndex;
+  return orderedKeys.slice(activeIndex, finalIndex);
+}
+
+function getDisplayTextForViewKey(
+  data: Data,
+  stack: ID[],
+  viewKey: string
+): string {
+  const viewPath = parseViewPath(viewKey);
+  const parentRelation = getParentRelation(data, viewPath);
+  const [node] = getNodeFromView(data, viewPath, parentRelation);
+  const [nodeID] = getNodeIDFromView(data, viewPath);
+  const context = getContext(data, viewPath, stack);
+  const effectiveAuthor = getEffectiveAuthor(data, viewPath);
+  const versionedText = getVersionedDisplayText(
+    data.knowledgeDBs,
+    effectiveAuthor,
+    nodeID as ID,
+    context
+  );
+  return versionedText ?? node?.text ?? "";
 }
 
 function getActionTargetKeys(
   selection: OrderedSet<string>,
-  activeRow: HTMLElement
+  activeRow: HTMLElement,
+  orderedViewKeys: string[]
 ): string[] {
-  return selection.size > 0 ? selection.toArray() : [getRowKey(activeRow)];
+  if (selection.size === 0) {
+    return [getRowKey(activeRow)];
+  }
+  return orderedViewKeys.filter((viewKey) => selection.contains(viewKey));
 }
 
 function usePaneKeyboardNavigation(paneIndex: number): {
@@ -588,15 +618,28 @@ function usePaneKeyboardNavigation(paneIndex: number): {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const { setActivePaneIndex } = useNavigationState();
-  const {
-    selection,
-    baseSelection,
-    shiftSelection,
-    anchor,
-    setState: setSelectionState,
-  } = useTemporaryView();
+  const { selection, anchor } = useTemporaryView();
+  const data = useData();
   const stack = usePaneStack();
+  const pane = useCurrentPane();
+  const viewPath = useViewPath();
   const { createPlan, executePlan } = usePlanner();
+  const orderedViewKeys = useMemo(() => {
+    const rootKey = viewPathToString(viewPath);
+    const childNodes = isExpanded(data, rootKey)
+      ? getNodesInTree(
+          data,
+          viewPath,
+          stack,
+          List<ViewPath>(),
+          pane.rootRelation
+        )
+      : List<ViewPath>();
+    return List<ViewPath>([viewPath])
+      .concat(childNodes)
+      .map((path) => viewPathToString(path))
+      .toArray();
+  }, [data, viewPath, stack, pane.rootRelation]);
 
   const switchPane = (direction: -1 | 1): void => {
     const root = wrapperRef.current;
@@ -604,7 +647,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       return;
     }
     const allPanes = getPaneWrappers();
-    const currentIndex = allPanes.findIndex((pane) => pane === root);
+    const currentIndex = allPanes.findIndex((paneEl) => paneEl === root);
     if (currentIndex < 0) {
       return;
     }
@@ -630,26 +673,24 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (!root) {
       return () => {};
     }
-    if (paneIndex === 0 && !getSelectedPaneRoot()) {
+    if (paneIndex !== 0) {
+      return () => {};
+    }
+
+    const selectedPane = getSelectedPaneRoot();
+    if (!selectedPane) {
       setSelectedPane(root);
     }
+
     const { activeElement } = document;
-    const hasFocusInsidePane =
-      activeElement instanceof HTMLElement && root.contains(activeElement);
-    if (hasFocusInsidePane) {
-      return () => {};
+    if (
+      !activeElement ||
+      activeElement === document.body ||
+      activeElement === document.documentElement
+    ) {
+      root.focus();
     }
-    if (activeElement && activeElement !== document.body) {
-      return () => {};
-    }
-    const id = window.setTimeout(() => {
-      if (document.activeElement === document.body || !document.activeElement) {
-        root.focus();
-      }
-    }, 0);
-    return () => {
-      window.clearTimeout(id);
-    };
+    return () => {};
   }, [paneIndex]);
 
   useEffect(() => {
@@ -694,6 +735,13 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       }
       const activeRow = getActiveRow(root);
       if (!activeRow) {
+        if (e.key === "ArrowDown" || e.key === "j") {
+          const [firstRow] = getFocusableRows(root);
+          if (firstRow) {
+            e.preventDefault();
+            focusRow(firstRow);
+          }
+        }
         return;
       }
       e.preventDefault();
@@ -785,16 +833,20 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     }
 
     if (e.key === "Tab" && !e.metaKey && !e.ctrlKey && !e.altKey) {
-      const activeRow = getActiveRow(root);
-      if (!activeRow) return;
       e.preventDefault();
-      const keys = getActionTargetKeys(selection, activeRow);
+      const activeRow = getActiveRow(root);
+      if (!activeRow) {
+        root.focus();
+        return;
+      }
+      const keys = getActionTargetKeys(selection, activeRow, orderedViewKeys);
       const plan = createPlan();
       const result = e.shiftKey
         ? planBatchOutdent(plan, keys, stack)
         : planBatchIndent(plan, keys, stack);
       if (result) {
         executePlan(result);
+        refocusPaneAfterRowMutation(root);
       }
       return;
     }
@@ -813,9 +865,10 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         return;
       }
       const activeRowKey = getRowKey(activeRow);
-      const activeIndex = Number(
-        activeRow.getAttribute("data-row-index") || "0"
-      );
+      const activeIndex = orderedViewKeys.indexOf(activeRowKey);
+      if (activeIndex < 0) {
+        return;
+      }
 
       if (
         e.key === "J" ||
@@ -828,25 +881,25 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         e.preventDefault();
         const isDown = e.key === "J" || e.key === "j" || e.key === "ArrowDown";
         const targetIndex = isDown ? activeIndex + 1 : activeIndex - 1;
-        const allKeys = getVisibleRowKeys(root);
-        const currentAnchor = anchor || activeRowKey;
-        const currentState = {
-          baseSelection,
-          shiftSelection,
-          anchor: currentAnchor,
-        };
-        const rows = getFocusableRows(root);
-        const targetRow = rows.find(
-          (row) =>
-            Number(row.getAttribute("data-row-index") || "0") === targetIndex
+        const boundedTarget = Math.max(
+          0,
+          Math.min(orderedViewKeys.length - 1, targetIndex)
         );
-        if (!targetRow) {
-          setSelectionState(shiftSelect(currentState, allKeys, activeRowKey));
+        const targetKey = orderedViewKeys[boundedTarget];
+        if (!targetKey) {
           return;
         }
-        const targetKey = getRowKey(targetRow);
-        setSelectionState(shiftSelect(currentState, allKeys, targetKey));
-        scrollAndFocusRow(root, targetIndex);
+        executePlan(
+          planShiftTemporarySelection(
+            createPlan(),
+            orderedViewKeys,
+            targetKey,
+            activeRowKey
+          )
+        );
+        if (boundedTarget !== activeIndex) {
+          scrollAndFocusRow(root, boundedTarget);
+        }
         return;
       }
       return;
@@ -854,13 +907,9 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if ((e.metaKey || e.ctrlKey) && e.key === "a") {
       e.preventDefault();
-      const rows = getFocusableRows(root);
-      const allViewKeys = rows.map((row) => getRowKey(row));
-      setSelectionState({
-        baseSelection: OrderedSet<string>(allViewKeys),
-        shiftSelection: OrderedSet<string>(),
-        anchor,
-      });
+      executePlan(
+        planSelectAllTemporaryRows(createPlan(), orderedViewKeys, anchor)
+      );
       return;
     }
 
@@ -870,19 +919,21 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         return;
       }
       e.preventDefault();
-      const rows = getFocusableRows(root);
-      const selectedRows =
+      const activeRowKey = getRowKey(activeRow);
+      const selectedKeys =
         selection.size > 0
-          ? rows.filter((row) => row.getAttribute("data-selected") === "true")
-          : getSubtreeRows(rows, activeRow);
-      const depths = selectedRows.map((row) =>
-        Number(row.getAttribute("data-row-depth") || "0")
+          ? orderedViewKeys.filter((viewKey) => selection.contains(viewKey))
+          : getSubtreeKeysFromOrderedKeys(orderedViewKeys, activeRowKey);
+      if (selectedKeys.length === 0) {
+        return;
+      }
+      const depths = selectedKeys.map((viewKey) =>
+        getRowDepthFromViewKey(viewKey)
       );
       const minDepth = Math.min(...depths);
-      const lines = selectedRows.map((row) => {
-        const depth =
-          Number(row.getAttribute("data-row-depth") || "0") - minDepth;
-        const text = row.getAttribute("data-node-text") || "";
+      const lines = selectedKeys.map((viewKey) => {
+        const depth = getRowDepthFromViewKey(viewKey) - minDepth;
+        const text = getDisplayTextForViewKey(data, stack, viewKey);
         return "\t".repeat(depth) + text;
       });
       navigator.clipboard.writeText(lines.join("\n"));
@@ -932,9 +983,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (e.key === "Escape") {
       e.preventDefault();
       if (selection.size > 0) {
-        setSelectionState(
-          clearSelection({ baseSelection, shiftSelection, anchor: "" })
-        );
+        executePlan(planClearTemporarySelection(createPlan(), ""));
         return;
       }
       (document.activeElement as HTMLElement)?.blur();
@@ -985,9 +1034,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (e.key === " ") {
       e.preventDefault();
       const activeRowKey = getRowKey(activeRow);
-      setSelectionState(
-        toggleSelect({ baseSelection, shiftSelection, anchor }, activeRowKey)
-      );
+      executePlan(planToggleTemporarySelection(createPlan(), activeRowKey));
       return;
     }
 
@@ -1124,7 +1171,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (e.key === "x" || e.key === "~" || e.key === "!" || e.key === "?") {
       e.preventDefault();
       const plan = createPlan();
-      const keys = getActionTargetKeys(selection, activeRow);
+      const keys = getActionTargetKeys(selection, activeRow, orderedViewKeys);
       const paths = keys.map(parseViewPath);
       const activeViewPath = parseViewPath(getRowKey(activeRow));
       const targetRelevance = SYMBOL_TO_RELEVANCE[e.key];
@@ -1141,7 +1188,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (e.key === "+" || e.key === "-" || e.key === "o") {
       e.preventDefault();
       const plan = createPlan();
-      const keys = getActionTargetKeys(selection, activeRow);
+      const keys = getActionTargetKeys(selection, activeRow, orderedViewKeys);
       const paths = keys.map(parseViewPath);
       const activeViewPath = parseViewPath(getRowKey(activeRow));
       const targetArgument: Argument = (() => {

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Route, Routes } from "react-router-dom";
 import Dashboard from "./components/Dashboard";
 import { Follow } from "./components/Follow";
@@ -9,6 +9,36 @@ import { SignInModal } from "./SignIn";
 import { Profile } from "./components/Profile";
 
 export function App(): JSX.Element {
+  useEffect(() => {
+    const root = document.body;
+
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (
+        event.key === "Shift" ||
+        event.key === "Control" ||
+        event.key === "Alt" ||
+        event.key === "Meta" ||
+        event.key === "CapsLock"
+      ) {
+        return;
+      }
+      root.classList.add("keyboard-input-mode");
+    };
+
+    const onMouseMove = (): void => {
+      root.classList.remove("keyboard-input-mode");
+    };
+
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("mousemove", onMouseMove, true);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("mousemove", onMouseMove, true);
+      root.classList.remove("keyboard-input-mode");
+    };
+  }, []);
+
   return (
     <Routes>
       <Route element={<RequireLogin />}>

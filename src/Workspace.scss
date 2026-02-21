@@ -1305,10 +1305,8 @@ input:focus,
   height: 100%;
 }
 
-.hover-light-bg {
-  &:hover {
-    background: var(--hover-bg);
-  }
+body:not(.keyboard-input-mode) .hover-light-bg:hover {
+  background: var(--hover-bg);
 }
 
 .item[data-row-focusable="true"]:focus-visible .inner-node.hover-light-bg,

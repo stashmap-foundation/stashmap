@@ -1608,11 +1608,10 @@ body:not(.keyboard-input-mode) .hover-light-bg:hover {
 }
 
 .header-action-btn-danger {
-  background: var(--red);
-  color: var(--base3);
+  color: var(--red);
 
   &:hover {
-    background: var(--red);
+    color: var(--red);
     filter: brightness(1.1);
   }
 }

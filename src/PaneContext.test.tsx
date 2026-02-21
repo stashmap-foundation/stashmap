@@ -12,6 +12,7 @@ import {
   expectTree,
 } from "./utils.test";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
+import { defaultPane } from "./Data";
 
 test("App defaults to empty pane with new node editor when visiting /", async () => {
   const [alice] = setup([ALICE]);
@@ -348,4 +349,44 @@ Cities
   const allFilters = relayPool.getSubscriptions().flatMap((s) => s.filters);
   const allAuthors = allFilters.flatMap((f) => f.authors ?? []);
   expect(allAuthors).not.toContain(UNAUTHENTICATED_USER_PK);
+});
+
+test("/r/ URL takes priority over stale history state", async () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+
+  renderApp(alice());
+  await type(
+    "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
+  );
+
+  await userEvent.click(
+    await screen.findByLabelText("show references to Cities")
+  );
+  await userEvent.click(
+    await screen.findByLabelText("open My Notes → Cities (2) in fullscreen")
+  );
+
+  await waitFor(() => {
+    expect(window.location.pathname).toMatch(/^\/r\//);
+  });
+  const relationUrl = window.location.pathname;
+  cleanup();
+
+  const stalePanes = [defaultPane(bob().user.publicKey)];
+  const origPushState = window.history.pushState.bind(window.history);
+  jest.spyOn(window.history, "pushState").mockImplementation(
+    (_data: unknown, title: string, url?: string | URL | null) => {
+      origPushState({ panes: stalePanes }, title, url);
+    }
+  );
+
+  renderApp({ ...bob(), initialRoute: relationUrl });
+
+  jest.restoreAllMocks();
+
+  await expectTree(`
+Cities
+  Paris
+  London
+  `);
 });

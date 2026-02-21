@@ -11,6 +11,7 @@ import {
   type,
   expectTree,
 } from "./utils.test";
+import { UNAUTHENTICATED_USER_PK } from "./AppState";
 
 test("App defaults to empty pane with new node editor when visiting /", async () => {
   const [alice] = setup([ALICE]);
@@ -313,4 +314,38 @@ Cities
   await expectTree(`
 Paris
   `);
+});
+
+test("Relay filters never contain invalid pubkeys when anonymous user views /r/ URL", async () => {
+  const [alice, anon] = setup([ALICE, ANON]);
+
+  renderApp(alice());
+  await type(
+    "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
+  );
+
+  await userEvent.click(
+    await screen.findByLabelText("show references to Cities")
+  );
+  await userEvent.click(
+    await screen.findByLabelText("open My Notes → Cities (2) in fullscreen")
+  );
+
+  await waitFor(() => {
+    expect(window.location.pathname).toMatch(/^\/r\//);
+  });
+  const relationUrl = window.location.pathname;
+  cleanup();
+
+  const { relayPool } = renderApp({ ...anon(), initialRoute: relationUrl });
+
+  await expectTree(`
+Cities
+  Paris
+  London
+  `);
+
+  const allFilters = relayPool.getSubscriptions().flatMap((s) => s.filters);
+  const allAuthors = allFilters.flatMap((f) => f.authors ?? []);
+  expect(allAuthors).not.toContain(UNAUTHENTICATED_USER_PK);
 });

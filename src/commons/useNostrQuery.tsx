@@ -122,12 +122,17 @@ export function useEventQuery(
     ),
   ];
 
+  const isValidHexPubkey = (s: string): boolean => /^[0-9a-f]{64}$/.test(s);
+  const sanitizedFilters = filters.map((f) =>
+    f.authors ? { ...f, authors: f.authors.filter(isValidHexPubkey) } : f
+  );
+
   useEffect(() => {
     if (!enabled) {
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       return () => {};
     }
-    const sub = relayPool.subscribeMany(relayUrls, filters, {
+    const sub = relayPool.subscribeMany(relayUrls, sanitizedFilters, {
       onevent(event: Event): void {
         if (!componentIsMounted.current) {
           return;
@@ -158,7 +163,7 @@ export function useEventQuery(
   }, [
     enabled,
     JSON.stringify(relayUrls),
-    JSON.stringify(filters),
+    JSON.stringify(sanitizedFilters),
     componentIsMounted.current,
   ]);
   return {

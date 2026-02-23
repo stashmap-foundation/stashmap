@@ -358,7 +358,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> Bitcoin
+    [R] Money <<< Bitcoin
     `);
 
     const refNode = screen.getByText(

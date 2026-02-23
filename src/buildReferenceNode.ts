@@ -379,21 +379,19 @@ export function buildReferenceItem(
 
   const parentNodeID = getLast(parentPath).nodeID;
   const parentShortID = shortID(parentNodeID);
-  const targetRelationHasParent = ref.relation.items.some(
-    (item) => shortID(item.nodeID) === parentShortID
-  );
-
-  if (!targetRelationHasParent) return outgoing;
-
   const incomingItem = ref.relation.items.find(
     (item) => shortID(item.nodeID) === parentShortID
   );
+
+  if (!incomingItem || incomingItem.relevance === "not_relevant")
+    return outgoing;
+
   const indicator =
-    relevanceIndicator(incomingItem?.relevance) +
-    argumentIndicator(incomingItem?.argument);
+    relevanceIndicator(incomingItem.relevance) +
+    argumentIndicator(incomingItem.argument);
   const suffix = indicator ? ` ${indicator}` : "";
-  const contextPath = outgoing.contextLabels.join(" / ");
   const arrows = suffix ? `<<< >>>${suffix}` : "<<< >>>";
+  const contextPath = outgoing.contextLabels.join(" / ");
   const text = contextPath
     ? `${contextPath} ${arrows} ${outgoing.targetLabel}`
     : outgoing.targetLabel;
@@ -402,7 +400,7 @@ export function buildReferenceItem(
     ...outgoing,
     text,
     isBidirectional: true,
-    incomingRelevance: incomingItem?.relevance,
-    incomingArgument: incomingItem?.argument,
+    incomingRelevance: incomingItem.relevance,
+    incomingArgument: incomingItem.argument,
   };
 }

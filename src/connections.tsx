@@ -212,7 +212,9 @@ function findNodeAppearances(
       ) {
         return rdx;
       }
-      const isInItems = relation.items.some((item) => item.nodeID === nodeID);
+      const isInItems = relation.items.some(
+        (item) => item.nodeID === nodeID && item.relevance !== "not_relevant"
+      );
       const isHeadWithChildren =
         relation.head === targetShortID && relation.items.size > 0;
       if (isHeadWithChildren || isInItems) {

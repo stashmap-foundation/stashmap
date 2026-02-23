@@ -218,7 +218,8 @@ function OtherUserIcon({ node }: { node: ReferenceNode }): JSX.Element | null {
 }
 
 function ReferenceContent({ node }: { node: ReferenceNode }): JSX.Element {
-  const virtualType = useRelationItem()?.virtualType;
+  const relationItem = useRelationItem();
+  const virtualType = relationItem?.virtualType;
 
   if (node.deleted) {
     const contextPath = node.contextLabels.join(" / ");
@@ -271,17 +272,16 @@ function ReferenceContent({ node }: { node: ReferenceNode }): JSX.Element {
   }
 
   const contextPath = node.contextLabels.join(" / ");
+  const showOutgoing = relationItem?.relevance !== "not_relevant";
+  const showIncoming = node.isBidirectional || (contextPath && !showOutgoing);
   return (
     <span className="break-word" data-testid="reference-node">
       {contextPath && (
         <>
           {contextPath}{" "}
-          {node.isBidirectional && (
-            <>
-              <span className="ref-separator">&lt;&lt;&lt;</span>{" "}
-            </>
-          )}
-          <span className="ref-separator">&gt;&gt;&gt;</span>
+          {showIncoming && <span className="ref-separator">&lt;&lt;&lt;</span>}
+          {showIncoming && showOutgoing && " "}
+          {showOutgoing && <span className="ref-separator">&gt;&gt;&gt;</span>}
           {node.incomingRelevance || node.incomingArgument ? (
             <>
               {" "}

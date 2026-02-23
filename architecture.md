@@ -99,6 +99,30 @@ Changes are never applied directly. They're accumulated in a `Plan` (extends `Da
 
 Built via `getSuggestionsForNode`, `getVersionsForRelation`, `buildReferenceNode`.
 
+### Link Direction & Relevance Model
+
+A **concrete ref** (cref) stored in a relation creates an outgoing link (`>>>`). When the target relation also contains the parent node as an item, the link is **bidirectional** (`<<< >>>`). The `<<<` arrow means "the target relation links back to us" (incoming direction).
+
+**Two independent relevance values** control what arrows are shown:
+- **sourceRelevance**: relevance of the cref item in the local relation (the outgoing side)
+- **incomingItem.relevance**: relevance of our parent node in the target relation (the incoming side)
+
+**Direction display matrix:**
+
+| sourceRelevance | incomingItem.relevance | Display | Meaning |
+|---|---|---|---|
+| normal | normal | `<<< >>>` | Bidirectional, both sides active |
+| not_relevant | normal | `<<<` | User declined outgoing, but source still links to us |
+| normal | not_relevant | `>>>` | User's outgoing link active, source marked us not_relevant |
+| not_relevant | not_relevant | `>>>` | Both sides not_relevant, shown as plain outgoing ref |
+
+Key rules:
+- `<<<` only appears when `incomingItem.relevance !== "not_relevant"` AND `sourceRelevance === "not_relevant"`
+- Items marked `not_relevant` in a source relation do NOT generate incoming refs in `findNodeAppearances` (`connections.tsx`)
+- Accepting an incoming ref with `x` (not_relevant) creates a cref but does NOT create a meaningful outgoing link — it just records the user's decision about the incoming link
+
+**Implementation**: `buildReferenceItem` in `buildReferenceNode.ts` receives `sourceRelevance` from the call site (`ViewContext.tsx`), which gets it from the relation item. The bidirectional check in `buildReferenceItem` uses both values to determine arrow display.
+
 ## Key Patterns
 
 - **Immutable.js** everywhere (Map, List, Set, OrderedSet)

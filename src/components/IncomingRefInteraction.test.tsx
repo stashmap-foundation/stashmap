@@ -119,6 +119,65 @@ Crypto
     Details
     `);
   });
+
+  test("not_relevant incoming ref stays incoming when filter toggled to show", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await setupIncomingRef();
+
+    await clickRow("Bitcoin <<< Money");
+    await userEvent.keyboard("x");
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText("toggle Not Relevant filter")
+    );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money <<< Bitcoin
+    `);
+  });
+
+  test("not_relevant item in source relation does not trigger bidirectional indicator", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+    await setupIncomingRef();
+
+    await clickRow("Bitcoin <<< Money");
+    await userEvent.keyboard("!");
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money <<< >>> Bitcoin
+    `);
+
+    await navigateToNodeViaSearch(0, "Money");
+    await clickRow("Bitcoin");
+    await userEvent.keyboard("x");
+
+    await expectTree(`
+Money
+    `);
+
+    await navigateToNodeViaSearch(0, "Crypto");
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money >>> Bitcoin
+    `);
+  });
 });
 
 describe("Incoming ref keyboard argument", () => {

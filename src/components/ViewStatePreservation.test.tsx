@@ -829,9 +829,7 @@ describe("View State Preservation - Pane Content Switching", () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
-    await type(
-      "My Notes{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}"
-    );
+    await type("My Notes{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}");
 
     await userEvent.click(await screen.findByLabelText("collapse A"));
     await userEvent.click(await screen.findByLabelText("edit A"));
@@ -848,14 +846,10 @@ My Notes
 
     await screen.findByLabelText("collapse A");
 
-    await userEvent.click(
-      await screen.findByLabelText("open A in fullscreen")
-    );
+    await userEvent.click(await screen.findByLabelText("open A in fullscreen"));
     await screen.findByRole("treeitem", { name: "A" });
 
-    await userEvent.click(
-      await screen.findByLabelText("Navigate to My Notes")
-    );
+    await userEvent.click(await screen.findByLabelText("Navigate to My Notes"));
 
     await expectTree(`
 My Notes
@@ -885,18 +879,14 @@ My Notes
     await screen.findByLabelText("collapse A");
     await screen.findByLabelText("collapse Child");
 
-    await userEvent.click(
-      await screen.findByLabelText("open A in fullscreen")
-    );
+    await userEvent.click(await screen.findByLabelText("open A in fullscreen"));
 
     await expectTree(`
 A
   Child
     `);
 
-    await userEvent.click(
-      await screen.findByLabelText("Navigate to My Notes")
-    );
+    await userEvent.click(await screen.findByLabelText("Navigate to My Notes"));
 
     await expectTree(`
 My Notes

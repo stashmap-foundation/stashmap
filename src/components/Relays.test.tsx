@@ -175,14 +175,12 @@ test("Suggest Relays of a contact", async () => {
     screen.getByLabelText("suggested relay wss://relay.test.contact/")
       .textContent
   ).toBe(
-    `Suggestedwss://relay.test.contact/2 of your contacts write to this relay${addRelayWarningText}+`
+    `wss://relay.test.contact/2 of your contacts write to this relay${addRelayWarningText}+`
   );
   expect(
     screen.getByLabelText("suggested relay wss://relay.test.contact.second/")
       .textContent
-  ).toBe(
-    "Suggestedwss://relay.test.contact.second/One contact writes to this relay+"
-  );
+  ).toBe("wss://relay.test.contact.second/One contact writes to this relay+");
   expect(
     screen.queryByLabelText("suggested relay wss://relay.test.contact.third/")
   ).toBeNull();

@@ -1080,8 +1080,7 @@ export function updateView(views: Views, path: ViewPath, view: View): Views {
   const key = viewPathToString(path);
   const { nodeID } = getLast(path);
   const defaultView = getDefaultView(nodeID, isRoot(path));
-  const isDefault =
-    view.expanded === defaultView.expanded && !view.typeFilters;
+  const isDefault = view.expanded === defaultView.expanded && !view.typeFilters;
   if (isDefault) {
     return views.delete(key);
   }

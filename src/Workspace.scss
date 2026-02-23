@@ -1472,25 +1472,7 @@ body:not(.keyboard-input-mode) .hover-light-bg:hover {
 }
 
 // ============================================
-// 20. INPUT WITH OVERLAY BUTTON
-// ============================================
-
-.input-with-overlay {
-  position: relative;
-  flex-grow: 1;
-}
-
-.input-overlay-buttons {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  gap: 4px;
-}
-
-// ============================================
-// 21. FILTER DOTS
+// 20. FILTER DOTS
 // ============================================
 
 .filter-dot {
@@ -1808,3 +1790,72 @@ body:not(.keyboard-input-mode) .hover-light-bg:hover {
   font-size: 0.75rem;
   width: 100%;
 }
+
+// ============================================
+// 26. COMMAND BAR (floating dialog for Follow)
+// ============================================
+
+.command-bar .modal-dialog {
+  max-width: 500px;
+  margin-top: 15vh;
+}
+
+.command-bar .modal-body {
+  padding: 12px 16px;
+}
+
+// ============================================
+// 27. RELAY ROWS (flat relay list)
+// ============================================
+
+.relay-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--base02);
+  gap: 8px;
+}
+
+.relay-row-url {
+  font-family: monospace;
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.relay-row-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.relay-section-header {
+  color: var(--base00);
+  font-size: 0.8rem;
+  padding: 12px 0 4px;
+  border-bottom: 1px solid var(--base02);
+  font-family: monospace;
+}
+
+.relay-info-text {
+  font-size: 0.8rem;
+  color: var(--base00);
+  white-space: nowrap;
+}
+
+// ============================================
+// 28. ERROR INLINE (terminal-style error)
+// ============================================
+
+.error-inline {
+  color: var(--red);
+  border-left: 2px solid var(--red);
+  padding: 4px 8px;
+  font-size: 0.85rem;
+}
+

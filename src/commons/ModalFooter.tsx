@@ -1,6 +1,5 @@
 import React from "react";
 import Modal from "react-bootstrap/Modal";
-import Button from "react-bootstrap/Button";
 
 type ModalFooterProps = {
   onHide: () => void;
@@ -16,16 +15,20 @@ export function ModalFooter({
   const Submit =
     SubmitButton ||
     ((): JSX.Element => (
-      <Button variant="primary" type="submit">
+      <button type="submit" className="btn btn-outline-dark">
         Save
-      </Button>
+      </button>
     ));
 
   return (
     <Modal.Footer>
-      <Button variant="outline-dark" className="me-auto" onClick={onHide}>
+      <button
+        type="button"
+        className="btn btn-outline-dark me-auto"
+        onClick={onHide}
+      >
         Cancel
-      </Button>
+      </button>
       {loading ? (
         <div
           aria-label="loading"

@@ -1,6 +1,5 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { nip19 } from "nostr-tools";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { renderApp, findNewNodeEditor } from "./utils.test";
 
@@ -17,10 +16,6 @@ afterAll(() => {
   jest.restoreAllMocks();
 });
 
-const npub = nip19.npubEncode(
-  "17162c921dc4d2518f9a101db33695df1afb56ab82f5ff3e5da6eec3ca5cd917"
-);
-
 test("Login and logout with seed phrase", async () => {
   renderApp({ user: undefined });
   await userEvent.click(await screen.findByLabelText("sign in"));
@@ -36,10 +31,8 @@ test("Login and logout with seed phrase", async () => {
   });
 
   fireEvent.click(screen.getByLabelText("open menu"));
-  fireEvent.click(screen.getByLabelText("show profile"));
-  await screen.findByDisplayValue(npub);
+  await screen.findByLabelText("copy npub");
 
-  fireEvent.click(await screen.findByLabelText("open menu"));
   const logoutButton = await screen.findByLabelText("logout");
   fireEvent.click(logoutButton);
   await screen.findByLabelText("sign in");
@@ -55,8 +48,7 @@ test("Login with nsec", async () => {
     "nsec10allq0gjx7fddtzef0ax00mdps9t2kmtrldkyjfs8l5xruwvh2dq0lhhkp{enter}"
   );
   fireEvent.click(await screen.findByLabelText("open menu"));
-  fireEvent.click(screen.getByLabelText("show profile"));
-  await screen.findByDisplayValue(npub);
+  await screen.findByLabelText("copy npub");
 });
 
 test("Login with private key", async () => {
@@ -69,8 +61,7 @@ test("Login with private key", async () => {
     "7f7ff03d123792d6ac594bfa67bf6d0c0ab55b6b1fdb6249303fe861f1ccba9a{enter}"
   );
   fireEvent.click(await screen.findByLabelText("open menu"));
-  fireEvent.click(screen.getByLabelText("show profile"));
-  await screen.findByDisplayValue(npub);
+  await screen.findByLabelText("copy npub");
 });
 
 test("Display Error", async () => {

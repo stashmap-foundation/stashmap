@@ -64,7 +64,7 @@ test("find a user by nip-05 identifier", async () => {
 
   await screen.findByLabelText("follow user");
   const npub = nip19.npubEncode(BOB_PUBLIC_KEY);
-  screen.getByDisplayValue(npub);
+  screen.getByText(npub);
 });
 
 test("find a user by nprofile", async () => {
@@ -78,7 +78,7 @@ test("find a user by nprofile", async () => {
   fireEvent.click(screen.getByText("Find"));
 
   await screen.findByLabelText("follow user");
-  screen.getByDisplayValue(npub);
+  screen.getByText(npub);
 });
 
 test("cannot find a user by nip-05 identifier", async () => {
@@ -105,7 +105,7 @@ test("find a user x", async () => {
   fireEvent.click(screen.getByText("Find"));
 
   await screen.findByLabelText("follow user");
-  screen.getByDisplayValue(nip19.npubEncode(BOB_PUBLIC_KEY));
+  screen.getByText(nip19.npubEncode(BOB_PUBLIC_KEY));
 });
 
 test("search for an invalid user", async () => {
@@ -121,7 +121,7 @@ test("search for an invalid user", async () => {
   );
 });
 
-test("search for myself leads to profile", async () => {
+test("search for myself shows own npub", async () => {
   const [alice] = setup([ALICE]);
 
   renderApp(alice());
@@ -132,7 +132,8 @@ test("search for myself leads to profile", async () => {
   const input = await screen.findByLabelText("find user");
   await userEvent.type(input, ALICE.publicKey);
   fireEvent.click(screen.getByText("Find"));
-  await screen.findByText("Your nostr npub:");
+  const npub = nip19.npubEncode(ALICE.publicKey);
+  await screen.findByText(npub);
 });
 
 test("find a user by npub", async () => {
@@ -145,7 +146,7 @@ test("find a user by npub", async () => {
   fireEvent.click(screen.getByText("Find"));
 
   await screen.findByLabelText("follow user");
-  screen.getByDisplayValue(npub);
+  screen.getByText(npub);
 });
 
 test("follow a new user", async () => {

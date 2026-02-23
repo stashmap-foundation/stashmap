@@ -20,15 +20,14 @@ test("Renders message", () => {
   screen.getByText("my error");
 });
 
-test("Sets error to null on close", () => {
+test("Sets error to null on click", () => {
   const setError = jest.fn();
   render(
     <div>
       <ErrorMessage error="my error" setError={setError} />
     </div>
   );
-  const closeButton = screen.getByLabelText("Close alert");
-  fireEvent.click(closeButton);
+  fireEvent.click(screen.getByText("my error"));
   expect(setError).toHaveBeenCalledTimes(1);
   expect(setError).toHaveBeenCalledWith(null);
 });

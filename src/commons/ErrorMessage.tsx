@@ -1,5 +1,4 @@
 import React from "react";
-import { Alert } from "react-bootstrap";
 
 type ErrorMessageProps = {
   error: string | null;
@@ -13,13 +12,17 @@ export function ErrorMessage({
   return (
     <>
       {error !== null && (
-        <Alert
-          variant="danger"
-          dismissible
-          onClose={(): void => setError(null)}
+        <div
+          className="error-inline"
+          onClick={(): void => setError(null)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e): void => {
+            if (e.key === "Enter" || e.key === " ") setError(null);
+          }}
         >
           {error}
-        </Alert>
+        </div>
       )}
     </>
   );

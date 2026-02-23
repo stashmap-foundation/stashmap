@@ -1,13 +1,8 @@
 import React, { useState } from "react";
-import { Card, InputGroup } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { Map } from "immutable";
 import { Button } from "../commons/Ui";
 import { ModalForm } from "../commons/ModalForm";
-import {
-  InputElementWrapper,
-  pasteFromClipboard,
-} from "../commons/InputElementUtils";
 import { ErrorMessage } from "../commons/ErrorMessage";
 import {
   mergeRelays,
@@ -20,201 +15,138 @@ import { useData } from "../DataContext";
 import { useDefaultRelays } from "../NostrAuthContext";
 import { planPublishRelayMetadata, usePlanner } from "../planner";
 
-type ReadWriteButtonProps = {
-  isPressed: boolean;
-  onClick: () => void;
-  ariaLabel: string;
-  children: React.ReactNode;
-};
-
 function ReadWriteButton({
   isPressed,
   onClick,
   ariaLabel,
   children,
-}: ReadWriteButtonProps): JSX.Element {
-  return (
-    <Button
-      onClick={onClick}
-      className={`btn font-size-small ${
-        isPressed ? "pressed" : ""
-      } m-1 mt-0 mb-2`}
-      ariaLabel={ariaLabel}
-    >
-      {children}
-    </Button>
-  );
-}
-
-type DeleteRelayButtonProps = {
+}: {
+  isPressed: boolean;
   onClick: () => void;
   ariaLabel: string;
-};
-
-function DeleteRelayButton({
-  onClick,
-  ariaLabel,
-}: DeleteRelayButtonProps): JSX.Element {
-  return (
-    <Button
-      onClick={onClick}
-      className="btn font-size-small"
-      ariaLabel={ariaLabel}
-    >
-      <span aria-hidden="true">×</span>
-    </Button>
-  );
-}
-
-function AddRelayButton({
-  onClick,
-  ariaLabel,
-}: DeleteRelayButtonProps): JSX.Element {
-  return (
-    <Button
-      onClick={onClick}
-      className="btn font-size-small"
-      ariaLabel={ariaLabel}
-    >
-      <span aria-hidden="true">+</span>
-    </Button>
-  );
-}
-
-type RelayCardProps = {
-  className?: string;
-  ariaLabel?: string;
   children: React.ReactNode;
-};
-
-function RelayCard({
-  className,
-  ariaLabel,
-  children,
-}: RelayCardProps): JSX.Element {
+}): JSX.Element {
   return (
-    <Card
-      className={`flex-row-space-between p-3 m-2 mt-3 mb-3 border-strong ${
-        className || ""
-      }`}
-      aria-label={ariaLabel || "relay card"}
+    <Button
+      onClick={onClick}
+      className={`btn font-size-small ${isPressed ? "pressed" : ""}`}
+      ariaLabel={ariaLabel}
     >
       {children}
-    </Card>
+    </Button>
   );
 }
 
 export const addRelayWarningText =
   "If you don't read from one of these relays, you will miss notes from your contacts!";
 
-type RelayDetailsProps = {
-  relay: Relay | SuggestedRelay;
-  onUpdate: (newRelay: Relay) => void;
-  onDelete: () => void;
-  isNecessaryReadRelay: boolean;
-  readonly: boolean;
-};
-
-function RelayDetails({
+function RelayRow({
   relay,
   onUpdate,
   onDelete,
   isNecessaryReadRelay,
   readonly,
-}: RelayDetailsProps): JSX.Element {
+}: {
+  relay: Relay | SuggestedRelay;
+  onUpdate: (newRelay: Relay) => void;
+  onDelete: () => void;
+  isNecessaryReadRelay: boolean;
+  readonly: boolean;
+}): JSX.Element {
   const isNecessary = !relay.read && isNecessaryReadRelay;
   return (
-    <RelayCard ariaLabel={`relay details ${relay.url}`}>
-      <div>
-        <div className="flex-row-start m-1 mt-2">{relay.url}</div>
-        <div className="flex-row-start">
-          {!readonly && (
-            <>
-              <ReadWriteButton
-                isPressed={relay.read}
-                ariaLabel={
-                  relay.read
-                    ? `stop reading from relay ${relay.url}`
-                    : `start reading from relay ${relay.url}`
-                }
-                onClick={() => {
-                  onUpdate({ ...relay, read: !relay.read });
-                }}
-              >
-                Read
-              </ReadWriteButton>
-              <ReadWriteButton
-                isPressed={relay.write}
-                ariaLabel={
-                  relay.write
-                    ? `stop writing to relay ${relay.url}`
-                    : `start writing to relay ${relay.url}`
-                }
-                onClick={() => {
-                  onUpdate({ ...relay, write: !relay.write });
-                }}
-              >
-                Write
-              </ReadWriteButton>
-            </>
-          )}
-        </div>
+    <div className="relay-row" aria-label={`relay details ${relay.url}`}>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div className="relay-row-url">{relay.url}</div>
         {isNecessary && (
-          <div className="flex-row-start m-1 danger">{addRelayWarningText}</div>
+          <div className="danger font-size-small">{addRelayWarningText}</div>
         )}
       </div>
-      {!readonly && (
-        <div className="flex-col-center">
-          <DeleteRelayButton
+      <div className="relay-row-controls">
+        {!readonly && (
+          <>
+            <ReadWriteButton
+              isPressed={relay.read}
+              ariaLabel={
+                relay.read
+                  ? `stop reading from relay ${relay.url}`
+                  : `start reading from relay ${relay.url}`
+              }
+              onClick={() => onUpdate({ ...relay, read: !relay.read })}
+            >
+              R
+            </ReadWriteButton>
+            <ReadWriteButton
+              isPressed={relay.write}
+              ariaLabel={
+                relay.write
+                  ? `stop writing to relay ${relay.url}`
+                  : `start writing to relay ${relay.url}`
+              }
+              onClick={() => onUpdate({ ...relay, write: !relay.write })}
+            >
+              W
+            </ReadWriteButton>
+          </>
+        )}
+        {!readonly && (
+          <Button
             onClick={onDelete}
+            className="btn font-size-small"
             ariaLabel={`delete relay ${relay.url}`}
-          />
-        </div>
-      )}
-    </RelayCard>
+          >
+            <span aria-hidden="true">×</span>
+          </Button>
+        )}
+      </div>
+    </div>
   );
 }
 
-function SuggestedRelayDetails({
+function SuggestedRelayRow({
   relay,
   onUpdate,
   isNecessaryReadRelay,
-}: Omit<RelayDetailsProps, "onDelete" | "readonly">): JSX.Element {
-  const number = (relay as SuggestedRelay).numberOfContacts;
+}: {
+  relay: SuggestedRelay;
+  onUpdate: (newRelay: Relay) => void;
+  isNecessaryReadRelay: boolean;
+}): JSX.Element {
+  const number = relay.numberOfContacts;
   const infoText =
     number > 1
       ? `${number} of your contacts write to this relay`
       : "One contact writes to this relay";
   return (
-    <RelayCard
-      className="black-dimmed"
-      ariaLabel={`suggested relay ${relay.url}`}
+    <div
+      className="relay-row black-dimmed"
+      aria-label={`suggested relay ${relay.url}`}
     >
-      <div>
-        <div className="flex-row-start m-1 mt-2 bold">Suggested</div>
-        <div className="flex-row-start m-1">{relay.url}</div>
-        {number > 0 && (
-          <div className="flex-row-start m-1 bold">{infoText}</div>
-        )}
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div className="relay-row-url">{relay.url}</div>
+        {number > 0 && <div className="relay-info-text">{infoText}</div>}
         {isNecessaryReadRelay && (
-          <div className="flex-row-start m-1 danger">{addRelayWarningText}</div>
+          <div className="danger font-size-small">{addRelayWarningText}</div>
         )}
       </div>
-      <div className="flex-col-center">
-        <AddRelayButton
+      <div className="relay-row-controls">
+        <Button
           onClick={() => onUpdate(relay)}
+          className="btn font-size-small"
           ariaLabel={`add relay ${relay.url}`}
-        />
+        >
+          <span aria-hidden="true">+</span>
+        </Button>
       </div>
-    </RelayCard>
+    </div>
   );
 }
 
-type NewRelayProps = {
+function NewRelay({
+  onSave,
+}: {
   onSave: (newRelay: Relay) => void;
-};
-
-function NewRelay({ onSave }: NewRelayProps): JSX.Element {
+}): JSX.Element {
   const [input, setInput] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
@@ -247,44 +179,34 @@ function NewRelay({ onSave }: NewRelayProps): JSX.Element {
     setInput(undefined);
   };
 
-  const inputElementAriaLabel = "add new relay";
-
   return (
-    <RelayCard className="black-dimmed" ariaLabel="new relay card">
-      <div className="m-1 mt-2 w-90">
-        <InputGroup>
-          <div className="input-with-overlay">
-            <InputElementWrapper
-              aria-label={inputElementAriaLabel}
-              onChange={onChange}
-              placeholder="wss://"
-              className="form-control w-100"
-            />
-            <div className="input-overlay-buttons">
-              <Button
-                className="btn btn-icon"
-                onClick={() =>
-                  pasteFromClipboard(inputElementAriaLabel, setInput)
-                }
-              >
-                <span aria-hidden="true">⎘</span>
-              </Button>
-            </div>
+    <div className="relay-row black-dimmed" aria-label="new relay card">
+      <div style={{ flex: 1 }}>
+        <input
+          type="text"
+          aria-label="add new relay"
+          onChange={onChange}
+          placeholder="wss://"
+          className="form-control w-100"
+        />
+        {error && (
+          <div className="mt-1">
+            <ErrorMessage error={error} setError={setError} />
           </div>
-        </InputGroup>
-        <div className="m-2">
-          <ErrorMessage error={error} setError={setError} />
-        </div>
+        )}
       </div>
       {input !== undefined && (
-        <div className="flex-col-center">
-          <AddRelayButton
+        <div className="relay-row-controls">
+          <Button
             onClick={onSubmit}
+            className="btn font-size-small"
             ariaLabel={`add new relay ${input}`}
-          />
+          >
+            <span aria-hidden="true">+</span>
+          </Button>
         </div>
       )}
-    </RelayCard>
+    </div>
   );
 }
 
@@ -364,42 +286,37 @@ export function Relays({
       hideFooter={!!readonly}
     >
       <div className="scroll">
-        {relayState.myRelays.map((relay: Relay, index: number) => {
-          const key = `relay ${relay.url}`;
-          return (
-            <div key={key}>
-              <RelayDetails
-                readonly={!!readonly}
-                relay={relay}
-                onDelete={() => deleteRelay(index)}
-                onUpdate={(newRelay) => {
-                  if (newRelay !== relay) {
-                    updateRelay(newRelay, index);
-                  }
-                }}
-                isNecessaryReadRelay={necessaryReadRelays.some(
-                  (r) => r.url === relay.url
-                )}
-              />
-            </div>
-          );
-        })}
+        {relayState.myRelays.map((relay: Relay, index: number) => (
+          <RelayRow
+            key={`relay ${relay.url}`}
+            readonly={!!readonly}
+            relay={relay}
+            onDelete={() => deleteRelay(index)}
+            onUpdate={(newRelay) => {
+              if (newRelay !== relay) {
+                updateRelay(newRelay, index);
+              }
+            }}
+            isNecessaryReadRelay={necessaryReadRelays.some(
+              (r) => r.url === relay.url
+            )}
+          />
+        ))}
         {!readonly && (
           <>
-            {relayState.suggested.map((suggestedRelay: SuggestedRelay) => {
-              const key = `suggested relay ${suggestedRelay.url}`;
-              return (
-                <div key={key}>
-                  <SuggestedRelayDetails
-                    relay={suggestedRelay}
-                    onUpdate={(newRelay) => addRelay(newRelay)}
-                    isNecessaryReadRelay={necessaryReadRelays.some(
-                      (r) => r.url === suggestedRelay.url
-                    )}
-                  />
-                </div>
-              );
-            })}
+            {relayState.suggested.length > 0 && (
+              <div className="relay-section-header">suggested</div>
+            )}
+            {relayState.suggested.map((suggestedRelay: SuggestedRelay) => (
+              <SuggestedRelayRow
+                key={`suggested relay ${suggestedRelay.url}`}
+                relay={suggestedRelay}
+                onUpdate={(newRelay) => addRelay(newRelay)}
+                isNecessaryReadRelay={necessaryReadRelays.some(
+                  (r) => r.url === suggestedRelay.url
+                )}
+              />
+            ))}
             <NewRelay onSave={(newRelay) => addRelay(newRelay)} />
           </>
         )}

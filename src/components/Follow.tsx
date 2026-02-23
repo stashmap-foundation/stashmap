@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Form, InputGroup, Modal } from "react-bootstrap";
+import { Form, Modal } from "react-bootstrap";
 import { Map } from "immutable";
 import { nip19, nip05, Event } from "nostr-tools";
 import { useDebounce } from "use-debounce";
@@ -14,10 +14,6 @@ import {
 import { useData } from "../DataContext";
 import { useApis } from "../Apis";
 import { useNip05Query } from "./useNip05Query";
-import {
-  FormControlWrapper,
-  pasteFromClipboard,
-} from "../commons/InputElementUtils";
 import { Button } from "../commons/Ui";
 
 type Nip05EventContent = {
@@ -81,7 +77,7 @@ async function decodeInput(
 export function Follow(): JSX.Element {
   const navigate = useNavigate();
   const { relayPool } = useApis();
-  const { user, contacts } = useData();
+  const { contacts } = useData();
   const { createPlan, executePlan } = usePlanner();
   const { search } = useLocation();
   const params = new URLSearchParams(search);
@@ -105,11 +101,7 @@ export function Follow(): JSX.Element {
         setError("Lookup of nip-05 identifier failed");
         setLookupPublicKey(undefined);
       } else {
-        navigate(
-          lookupPublicKey === user.publicKey
-            ? "/profile"
-            : `/follow?publicKey=${lookupPublicKey}`
-        );
+        navigate(`/follow?publicKey=${lookupPublicKey}`);
       }
     } else if (lookupPublicKey !== undefined && nip05Events.size === 0) {
       setError("No Nip05 Events found");
@@ -138,11 +130,7 @@ export function Follow(): JSX.Element {
     } else if (decodedInput && decodedInput.isNip05) {
       setLookupPublicKey(decodedInput.publicKey);
     } else {
-      navigate(
-        decodedInput.publicKey === user.publicKey
-          ? "/profile"
-          : `/follow?publicKey=${decodedInput.publicKey}`
-      );
+      navigate(`/follow?publicKey=${decodedInput.publicKey}`);
     }
   };
 
@@ -150,48 +138,31 @@ export function Follow(): JSX.Element {
 
   if (!publicKey) {
     return (
-      <Modal show onHide={onHide} size="xl">
-        <Modal.Header closeButton>
-          <Modal.Title>Find User</Modal.Title>
-        </Modal.Header>
+      <Modal show onHide={onHide} className="command-bar">
         <Modal.Body>
           <Form onSubmit={onSubmit}>
-            <div className="d-flex m-2 align-items-center">
-              <InputGroup>
-                <div className="input-with-overlay">
-                  <FormControlWrapper
-                    aria-label={inputElementAriaLabel}
-                    defaultValue=""
-                    onChange={onChange}
-                    placeholder="Enter npub, nprofile or nostr address"
-                    className="form-control w-100"
-                  />
-                  <div className="input-overlay-buttons">
-                    <Button
-                      className="btn btn-icon"
-                      onClick={() =>
-                        pasteFromClipboard(inputElementAriaLabel, setInput)
-                      }
-                    >
-                      <span aria-hidden="true">⎘</span>
-                    </Button>
-                  </div>
-                </div>
-              </InputGroup>
-              <div className="ms-4">
-                <Button
-                  type="submit"
-                  className="btn btn-primary"
-                  ariaLabel="start search"
-                  disabled={!input}
-                >
-                  Find
-                </Button>
+            <div className="d-flex align-items-center gap-2">
+              <input
+                type="text"
+                aria-label={inputElementAriaLabel}
+                onChange={onChange}
+                placeholder="npub, nprofile or nostr address"
+                className="form-control flex-grow-1"
+              />
+              <Button
+                type="submit"
+                className="btn btn-outline-dark"
+                ariaLabel="start search"
+                disabled={!input}
+              >
+                Find
+              </Button>
+            </div>
+            {error && (
+              <div className="mt-2">
+                <ErrorMessage error={error} setError={setError} />
               </div>
-            </div>
-            <div className="m-2">
-              <ErrorMessage error={error} setError={setError} />
-            </div>
+            )}
           </Form>
         </Modal.Body>
       </Modal>
@@ -227,49 +198,37 @@ export function Follow(): JSX.Element {
   };
 
   return (
-    <Modal show onHide={onHide} size="xl">
+    <Modal show onHide={onHide} className="command-bar">
       <Modal.Header closeButton>
         <Modal.Title>
           {isFollowing ? "You follow this User" : "Follow User"}
         </Modal.Title>
       </Modal.Header>
       <Modal.Body>
-        <div className="d-flex m-2 align-items-center">
-          <FormControlWrapper
-            aria-label="user npub"
-            value={npub}
-            readOnly
-            disabled
-            className="form-control flex-grow-1"
-          />
-          <div className="ms-4">
+        <div
+          className="d-block mb-3 break-word font-size-small"
+          aria-label="user npub"
+        >
+          {npub}
+        </div>
+        <div className="d-flex align-items-center gap-2">
+          {isFollowing ? (
             <Button
-              className="btn btn-primary"
+              className="btn btn-outline-dark"
               ariaLabel="unfollow user"
               onClick={unfollowContact}
-              disabled={!isFollowing}
-              type="button"
             >
-              <span className="d-block" aria-hidden="true">
-                👤−
-              </span>
+              Unfollow
             </Button>
-          </div>
-          <div className="ms-2">
+          ) : (
             <Button
-              className="btn btn-primary"
+              className="btn btn-outline-dark"
               ariaLabel="follow user"
               onClick={followContact}
-              disabled={isFollowing}
-              type="button"
             >
-              <span className="d-block" aria-hidden="true">
-                👤+
-              </span>
+              Follow
             </Button>
-          </div>
-        </div>
-        <div className="p-2">
+          )}
           <Button
             onClick={() => {
               setInput(undefined);
@@ -277,9 +236,9 @@ export function Follow(): JSX.Element {
               setError(null);
               navigate("/follow");
             }}
-            className="btn"
+            className="btn btn-outline-dark"
           >
-            Back
+            ← Back
           </Button>
         </div>
       </Modal.Body>

@@ -6,7 +6,6 @@ import { RelaysWrapper } from "./components/Relays";
 import { RequireLogin } from "./AppState";
 import { SignUp } from "./SignUp";
 import { SignInModal } from "./SignIn";
-import { Profile } from "./components/Profile";
 
 export function App(): JSX.Element {
   useEffect(() => {
@@ -43,7 +42,6 @@ export function App(): JSX.Element {
     <Routes>
       <Route element={<RequireLogin />}>
         <Route path="/" element={<Dashboard />}>
-          <Route path="profile" element={<Profile />} />
           <Route path="follow" element={<Follow />} />
           <Route path="relays" element={<RelaysWrapper />} />
           <Route path="signin" element={<SignInModal />} />

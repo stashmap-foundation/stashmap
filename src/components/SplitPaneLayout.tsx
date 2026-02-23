@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Dropdown } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
+import { nip19 } from "nostr-tools";
 import {
   useSplitPanes,
   PaneIndexProvider,
@@ -87,7 +88,7 @@ export function PaneSearchButton(): JSX.Element {
       aria-label={`Search to change pane ${paneIndex} content`}
       title="Search"
     >
-      <span aria-hidden="true">🔍</span>
+      <span aria-hidden="true">/</span>
     </button>
   );
 }
@@ -129,6 +130,8 @@ export function ClosePaneButton(): JSX.Element {
   );
 }
 
+type CopiedField = "none" | "npub" | "nprofile" | "invite";
+
 export function PaneSettingsMenu({
   onShowShortcuts,
 }: {
@@ -138,6 +141,21 @@ export function PaneSettingsMenu({
   const logout = useLogout();
   const { user } = useData();
   const isLoggedIn = isUserLoggedIn(user);
+  const [copied, setCopied] = useState<CopiedField>("none");
+
+  const copyToClipboard = (text: string, field: CopiedField): void => {
+    navigator.clipboard.writeText(text);
+    setCopied(field);
+    setTimeout(() => setCopied("none"), 1500);
+  };
+
+  const npub = isLoggedIn ? nip19.npubEncode(user.publicKey) : "";
+  const nprofile = isLoggedIn
+    ? nip19.nprofileEncode({ pubkey: user.publicKey })
+    : "";
+  const inviteLink = isLoggedIn
+    ? `${window.location.origin}/follow?publicKey=${user.publicKey}`
+    : "";
 
   return (
     <Dropdown className="options-dropdown status-dropdown">
@@ -150,17 +168,50 @@ export function PaneSettingsMenu({
         ≡
       </Dropdown.Toggle>
       <Dropdown.Menu>
-        <Dropdown.Item
-          className="d-flex menu-item"
-          onClick={() => navigate("/profile")}
-          aria-label="show profile"
-          tabIndex={0}
-        >
-          <span className="d-block dropdown-item-icon" aria-hidden="true">
-            👤
-          </span>
-          <div className="menu-item-text">Profile</div>
-        </Dropdown.Item>
+        {isLoggedIn && (
+          <>
+            <Dropdown.Item
+              className="d-flex menu-item"
+              onClick={() => copyToClipboard(npub, "npub")}
+              aria-label="copy npub"
+              tabIndex={0}
+            >
+              <span className="d-block dropdown-item-icon" aria-hidden="true">
+                @
+              </span>
+              <div className="menu-item-text">
+                {copied === "npub" ? "Copied!" : "Copy npub"}
+              </div>
+            </Dropdown.Item>
+            <Dropdown.Item
+              className="d-flex menu-item"
+              onClick={() => copyToClipboard(nprofile, "nprofile")}
+              aria-label="copy nprofile"
+              tabIndex={0}
+            >
+              <span className="d-block dropdown-item-icon" aria-hidden="true">
+                @
+              </span>
+              <div className="menu-item-text">
+                {copied === "nprofile" ? "Copied!" : "Copy nprofile"}
+              </div>
+            </Dropdown.Item>
+            <Dropdown.Item
+              className="d-flex menu-item"
+              onClick={() => copyToClipboard(inviteLink, "invite")}
+              aria-label="copy invite link"
+              tabIndex={0}
+            >
+              <span className="d-block dropdown-item-icon" aria-hidden="true">
+                @
+              </span>
+              <div className="menu-item-text">
+                {copied === "invite" ? "Copied!" : "Copy invite link"}
+              </div>
+            </Dropdown.Item>
+            <Dropdown.Divider />
+          </>
+        )}
         <Dropdown.Item
           className="d-flex menu-item"
           onClick={() => navigate("/follow")}
@@ -168,7 +219,7 @@ export function PaneSettingsMenu({
           tabIndex={0}
         >
           <span className="d-block dropdown-item-icon" aria-hidden="true">
-            👥
+            +@
           </span>
           <div className="menu-item-text">Follow User</div>
         </Dropdown.Item>
@@ -178,7 +229,9 @@ export function PaneSettingsMenu({
           aria-label="edit relays"
           tabIndex={0}
         >
-          <span className="icon-nostr-logo d-block dropdown-item-icon" />
+          <span className="d-block dropdown-item-icon" aria-hidden="true">
+            ~
+          </span>
           <div className="menu-item-text">Relays</div>
         </Dropdown.Item>
         {onShowShortcuts && (
@@ -189,9 +242,9 @@ export function PaneSettingsMenu({
             tabIndex={0}
           >
             <span className="d-block dropdown-item-icon" aria-hidden="true">
-              ⌨
+              ?
             </span>
-            <div className="menu-item-text">Keyboard Shortcuts</div>
+            <div className="menu-item-text">Shortcuts</div>
           </Dropdown.Item>
         )}
         {isLoggedIn && (
@@ -202,7 +255,7 @@ export function PaneSettingsMenu({
             tabIndex={0}
           >
             <span className="d-block dropdown-item-icon" aria-hidden="true">
-              ↪
+              q
             </span>
             <div className="menu-item-text">Log Out</div>
           </Dropdown.Item>

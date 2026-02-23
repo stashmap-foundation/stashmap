@@ -13,6 +13,19 @@ import {
   type,
 } from "../utils.test";
 
+/* eslint-disable testing-library/no-node-access */
+async function expectFocusedNode(name: string): Promise<void> {
+  await waitFor(() => {
+    const active = document.activeElement;
+    expect(active).toBeInstanceOf(HTMLElement);
+    const item = (active as HTMLElement).closest(
+      '.item[data-row-focusable="true"]'
+    );
+    expect(item?.getAttribute("data-node-text")).toBe(name);
+  });
+}
+/* eslint-enable testing-library/no-node-access */
+
 describe("Delete key", () => {
   test("Delete key removes focused node from tree", async () => {
     const [alice] = setup([ALICE]);
@@ -337,5 +350,73 @@ Root
     });
 
     await findNewNodeEditor();
+  });
+
+  test("delete middle node focuses next node", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("edit B"));
+    await userEvent.keyboard("{Escape}{Delete}");
+
+    await expectTree(`
+Root
+  A
+  C
+    `);
+    await expectFocusedNode("C");
+  });
+
+  test("delete last node focuses previous node", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("edit C"));
+    await userEvent.keyboard("{Escape}{Delete}");
+
+    await expectTree(`
+Root
+  A
+  B
+    `);
+    await expectFocusedNode("B");
+  });
+
+  test("batch delete focuses first node after last deleted", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Enter}D{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Escape} jj {Delete}");
+
+    await expectTree(`
+Root
+  B
+  D
+    `);
+    await expectFocusedNode("D");
+  });
+
+  test("batch delete at end focuses last surviving node", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Enter}D{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("edit C"));
+    await userEvent.keyboard("{Escape} j {Delete}");
+
+    await expectTree(`
+Root
+  A
+  B
+    `);
+    await expectFocusedNode("B");
   });
 });

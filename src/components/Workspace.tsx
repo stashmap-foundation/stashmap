@@ -571,6 +571,30 @@ function getSubtreeKeysFromOrderedKeys(
   return orderedKeys.slice(activeIndex, finalIndex);
 }
 
+function computeFocusIndexAfterDeletion(
+  keys: string[],
+  orderedViewKeys: string[]
+): number | undefined {
+  const removedSet = new Set(
+    keys.flatMap((key) => getSubtreeKeysFromOrderedKeys(orderedViewKeys, key))
+  );
+  if (removedSet.size >= orderedViewKeys.length) {
+    return undefined;
+  }
+  const survivors = orderedViewKeys.filter((key) => !removedSet.has(key));
+  const maxRemovedIndex = orderedViewKeys.reduce(
+    (max, key, i) => (removedSet.has(key) ? Math.max(max, i) : max),
+    -1
+  );
+  const firstSurvivorAfter = orderedViewKeys.findIndex(
+    (key, i) => i > maxRemovedIndex && !removedSet.has(key)
+  );
+  if (firstSurvivorAfter !== -1) {
+    return survivors.indexOf(orderedViewKeys[firstSurvivorAfter]);
+  }
+  return survivors.length - 1;
+}
+
 function getDisplayTextForViewKey(
   data: Data,
   stack: ID[],
@@ -1150,13 +1174,20 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (e.key === "Backspace" || e.key === "Delete") {
       e.preventDefault();
       const keys = getActionTargetKeys(selection, activeRow, orderedViewKeys);
+      const focusIndex = computeFocusIndexAfterDeletion(keys, orderedViewKeys);
       const paths = keys.map(parseViewPath);
-      const result = paths.reduce(
-        (acc, path) => planDeleteNodeFromView(acc, path, stack),
-        createPlan()
+      const result = planClearTemporarySelection(
+        paths.reduce(
+          (acc, path) => planDeleteNodeFromView(acc, path, stack),
+          createPlan()
+        )
       );
       executePlan(result);
-      refocusPaneAfterRowMutation(root);
+      window.setTimeout(() => {
+        if (focusIndex !== undefined) {
+          scrollAndFocusRow(root, focusIndex);
+        }
+      }, 0);
       return;
     }
 

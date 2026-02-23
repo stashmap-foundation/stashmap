@@ -624,23 +624,27 @@ body {
 
 // Right menu - controls after the text
 .right-menu {
-  display: grid;
-  grid-template-columns: 90px 42px;
+  display: flex;
   align-items: center;
-  gap: 4px;
   padding-left: 8px;
   margin-left: auto;
   flex-shrink: 0;
   height: var(--row-height, 1.4em);
 
-  // Relevance and evidence slots - content on hover only
+  // All slots - content on hover only
   .relevance-slot,
-  .evidence-slot {
+  .evidence-slot,
+  .action-slot {
     > * {
       opacity: 0;
       visibility: hidden;
       transition: opacity 150ms ease;
     }
+  }
+
+  .action-slot {
+    display: flex;
+    align-items: center;
   }
 
   // Ref count always visible (when > 1)
@@ -652,23 +656,8 @@ body {
 
 .visible-on-hover:hover .right-menu .relevance-slot > *,
 .visible-on-hover:hover .right-menu .evidence-slot > *,
+.visible-on-hover:hover .right-menu .action-slot > *,
 .visible-on-hover:hover .right-menu .ref-count-btn.show-on-row-hover {
-  opacity: 1;
-  visibility: visible;
-}
-
-// Inline action buttons (fullscreen, split pane)
-.inline-node-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: var(--row-height, 1.4em);
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 150ms ease;
-}
-
-.visible-on-hover:hover .inline-node-actions {
   opacity: 1;
   visibility: visible;
 }
@@ -1119,10 +1108,21 @@ input:focus,
 }
 
 // Evidence selector (confirms/contra)
+.evidence-slot {
+  min-width: 18px;
+}
+
 .evidence-selector {
-  min-width: 32px;
-  font-size: 1.2rem;
-  font-weight: 600;
+  width: 18px;
+  height: 18px;
+  font-size: 14px;
+  font-weight: bold;
+  font-family: monospace;
+  line-height: 1;
+
+  &:hover {
+    transform: scale(1.2);
+  }
 }
 
 // ============================================

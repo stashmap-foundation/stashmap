@@ -66,8 +66,6 @@ import {
 } from "../SplitPanesContext";
 import { buildNodeUrl, buildRelationUrl } from "../navigationUrl";
 import { RightMenu } from "./RightMenu";
-import { FullscreenButton } from "./FullscreenButton";
-import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 import { useItemStyle } from "./useItemStyle";
 import { EditorTextProvider } from "./EditorTextContext";
 import { getChildNodes } from "../treeTraversal";
@@ -852,12 +850,6 @@ export function Node({
               <InteractiveNodeContent />
             </NodeAutoLink>
           </span>
-          {!isEmptyNodeID(nodeID) && (
-            <span className="inline-node-actions">
-              <FullscreenButton />
-              <OpenInSplitPaneButton />
-            </span>
-          )}
         </div>
         <RightMenu />
       </NodeCard>

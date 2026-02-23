@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { TYPE_COLORS } from "../constants";
 import { useUpdateArgument } from "./useUpdateArgument";
 import {
@@ -18,14 +18,14 @@ import { useEditorText } from "./EditorTextContext";
 import { useTemporaryView } from "./TemporaryViewContext";
 import { planBatchArgument, EditorInfo } from "./batchOperations";
 
-function getArgumentColor(argument: Argument, isHovered: boolean): string {
+function getArgumentColor(argument: Argument): string {
   if (argument === "confirms") {
     return TYPE_COLORS.confirms;
   }
   if (argument === "contra") {
     return TYPE_COLORS.contra;
   }
-  return isHovered ? "var(--base00)" : "var(--base01)";
+  return TYPE_COLORS.inactive;
 }
 
 function getArgumentSymbol(argument: Argument): string {
@@ -48,7 +48,6 @@ function getArgumentLabel(argument: Argument): string {
 }
 
 export function EvidenceSelector(): JSX.Element | null {
-  const [isHovered, setIsHovered] = useState(false);
   const { currentArgument, isVisible } = useUpdateArgument();
   const relationItem = useRelationItem();
   const virtualType = relationItem?.virtualType;
@@ -102,8 +101,6 @@ export function EvidenceSelector(): JSX.Element | null {
       data-has-argument={hasArgument ? "true" : undefined}
       onClick={handleClick}
       onMouseDown={preventEditorBlur}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       role="button"
       tabIndex={0}
       aria-label={`Evidence for ${nodeName}: ${getArgumentLabel(
@@ -116,7 +113,7 @@ export function EvidenceSelector(): JSX.Element | null {
           handleClick();
         }
       }}
-      style={{ color: getArgumentColor(currentArgument, isHovered) }}
+      style={{ color: getArgumentColor(currentArgument) }}
     >
       {getArgumentSymbol(currentArgument)}
     </span>

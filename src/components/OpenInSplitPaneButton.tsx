@@ -78,7 +78,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
       onClick={onClick}
       title="Open in new split pane"
     >
-      <span aria-hidden="true">◫</span>
+      <span aria-hidden="true">⍈</span>
     </button>
   );
 }

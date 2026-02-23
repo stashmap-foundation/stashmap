@@ -197,7 +197,7 @@ function HomeButton(): JSX.Element | null {
       aria-label="Navigate to Log"
       title="Log"
     >
-      <span aria-hidden="true">⌂</span>
+      <span aria-hidden="true">✽</span>
     </a>
   );
 }

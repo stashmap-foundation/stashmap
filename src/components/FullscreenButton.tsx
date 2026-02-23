@@ -75,7 +75,7 @@ export function FullscreenButton(): JSX.Element | null {
       }}
       title="Open in fullscreen"
     >
-      <span aria-hidden="true">↗</span>
+      <span aria-hidden="true">↖</span>
     </a>
   );
 }

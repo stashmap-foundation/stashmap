@@ -61,7 +61,7 @@ function getXButtonAriaLabel(
     return `decline ${displayText}`;
   }
   if (isCurrentlyNotRelevant) {
-    return `remove ${displayText} from list`;
+    return `mark ${displayText} as contains`;
   }
   return `mark ${displayText} as not relevant`;
 }
@@ -71,7 +71,7 @@ export function RelevanceSelector({
 }: RelevanceSelectorProps): JSX.Element | null {
   const [hoverLevel, setHoverLevel] = useState<number | null>(null);
 
-  const { currentRelevance, removeFromList, isVisible } = useUpdateRelevance();
+  const { currentRelevance, isVisible } = useUpdateRelevance();
 
   const viewPath = useViewPath();
   const viewKey = useViewKey();
@@ -125,16 +125,13 @@ export function RelevanceSelector({
   const isCurrentlyNotRelevant = !isVirtual && currentLevel === 0;
 
   const handleXClick = (): void => {
-    if (!isInSelection && isCurrentlyNotRelevant) {
-      removeFromList();
-      return;
-    }
+    const relevance = isCurrentlyNotRelevant ? undefined : "not_relevant";
     executePlan(
       planBatchRelevance(
         createPlan(),
         getActionPaths(),
         stack,
-        "not_relevant",
+        relevance,
         virtualItemsMap,
         getEditorInfo()
       )
@@ -180,12 +177,10 @@ export function RelevanceSelector({
             if (!isNotRelevant) {
               return TYPE_COLORS.inactive;
             }
-            return isCurrentlyNotRelevant
-              ? "var(--red)"
-              : TYPE_COLORS.not_relevant;
+            return TYPE_COLORS.not_relevant;
           })(),
         }}
-        title={isCurrentlyNotRelevant ? "Remove from list" : undefined}
+        title={undefined}
       >
         x
       </span>

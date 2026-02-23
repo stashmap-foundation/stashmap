@@ -1156,7 +1156,12 @@ export function getNextInsertPosition(
   return [parentPath, stack, (relationIndex ?? 0) + 1];
 }
 
-function planDelete(plan: Plan, id: LongID | ID, kind: number): Plan {
+function planDelete(
+  plan: Plan,
+  id: LongID | ID,
+  kind: number,
+  extraTags?: string[][]
+): Plan {
   const deleteEvent = {
     kind: KIND_DELETE,
     pubkey: plan.user.publicKey,
@@ -1164,6 +1169,7 @@ function planDelete(plan: Plan, id: LongID | ID, kind: number): Plan {
     tags: [
       ["a", `${kind}:${plan.user.publicKey}:${shortID(id)}`],
       ["k", `${kind}`],
+      ...(extraTags || []),
       msTag(),
     ],
     content: "",
@@ -1194,8 +1200,15 @@ export function planDeleteNode(plan: Plan, nodeID: LongID | ID): Plan {
 }
 
 export function planDeleteRelations(plan: Plan, relationsID: LongID): Plan {
-  const deletePlan = planDelete(plan, relationsID, KIND_KNOWLEDGE_LIST);
-  const userDB = plan.knowledgeDBs.get(deletePlan.user.publicKey, newDB());
+  const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
+  const relation = userDB.relations.get(shortID(relationsID));
+  const headTag = relation ? [["head", relation.head]] : [];
+  const deletePlan = planDelete(
+    plan,
+    relationsID,
+    KIND_KNOWLEDGE_LIST,
+    headTag
+  );
   const updatedRelations = userDB.relations.remove(shortID(relationsID));
   const updatedDB = {
     ...userDB,

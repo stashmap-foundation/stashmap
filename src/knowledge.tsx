@@ -11,5 +11,6 @@ export function newDB(): KnowledgeData {
   return {
     nodes: Map<ID, KnowNode>([[EMPTY_NODE_ID, emptyNode]]),
     relations: Map<ID, Relations>(),
+    tombstones: Map<ID, ID>(),
   };
 }

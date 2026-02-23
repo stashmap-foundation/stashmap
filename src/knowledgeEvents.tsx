@@ -98,6 +98,19 @@ export function findRelations(
   }, Map<string, Relations>());
 }
 
+export function findTombstones(events: List<UnsignedEvent>): Map<ID, ID> {
+  const deleteEvents = events.filter((event) => event.kind === KIND_DELETE);
+  return deleteEvents.reduce((rdx, event) => {
+    const aTag = findTag(event, "a");
+    if (!aTag) return rdx;
+    const [deleteKind, , eventToDeleteId] = aTag.split(":");
+    if (deleteKind !== `${KIND_KNOWLEDGE_LIST}` || !eventToDeleteId) return rdx;
+    const headTag = findTag(event, "head");
+    if (!headTag) return rdx;
+    return rdx.set(eventToDeleteId as ID, headTag as ID);
+  }, Map<ID, ID>());
+}
+
 export function findViews(events: List<UnsignedEvent>): Views {
   const viewEvent = getMostRecentReplacableEvent(
     events.filter((event) => event.kind === KIND_VIEWS)

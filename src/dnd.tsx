@@ -7,6 +7,7 @@ import {
   deleteRelations,
   createConcreteRefId,
   isRefId,
+  isSearchId,
   shortID,
   VERSIONS_NODE_ID,
 } from "./connections";
@@ -15,6 +16,7 @@ import {
   upsertRelations,
   getParentKey,
   ViewPath,
+  NodeIndex,
   getParentView,
   updateViewPathsAfterMoveRelations,
   updateViewPathsAfterDisconnect,
@@ -23,7 +25,9 @@ import {
   getLast,
   getContext,
   getRelationForView,
+  getDescendantRelations,
   getPaneIndex,
+  isRoot,
   addNodeToPathWithRelations,
   viewPathToString,
   copyViewsWithNewPrefix,
@@ -32,9 +36,11 @@ import { getNodesInTree } from "./components/Node";
 import {
   Plan,
   planUpdateViews,
+  planUpdatePanes,
   planDeepCopyNodeWithView,
   planExpandNode,
   planAddToParent,
+  planDeleteRelations,
   planDeleteDescendantRelations,
   planMoveDescendantRelations,
   getPane,
@@ -256,6 +262,75 @@ export function planDisconnectFromParent(
 
   const context = getContext(plan, viewPath, stack);
   return planDeleteDescendantRelations(planWithViews, nodeID, context);
+}
+
+export function planDeleteNodeFromView(
+  plan: Plan,
+  viewPath: ViewPath,
+  stack: ID[]
+): Plan {
+  if (!isRoot(viewPath)) {
+    return planDisconnectFromParent(plan, viewPath, stack);
+  }
+
+  const [nodeID] = getNodeIDFromView(plan, viewPath);
+  if (isSearchId(nodeID as ID)) {
+    return plan;
+  }
+
+  const relation = getRelationForView(plan, viewPath, stack);
+  if (!relation || relation.author !== plan.user.publicKey) {
+    return plan;
+  }
+
+  const context = getContext(plan, viewPath, stack);
+
+  const descendantRelationIds = getDescendantRelations(
+    plan.knowledgeDBs,
+    nodeID,
+    context
+  )
+    .filter((r) => r.author === plan.user.publicKey)
+    .map((r) => r.id)
+    .toSet()
+    .add(relation.id);
+
+  const planAfterDescendants = planDeleteDescendantRelations(
+    plan,
+    nodeID,
+    context
+  );
+  const planAfterDelete = planDeleteRelations(
+    planAfterDescendants,
+    relation.id
+  );
+
+  const paneIndex = getPaneIndex(viewPath);
+  const shouldResetPane = (p: Pane, i: number): boolean => {
+    if (i === paneIndex) {
+      return true;
+    }
+    if (p.rootRelation !== undefined) {
+      return descendantRelationIds.has(p.rootRelation);
+    }
+    if (p.stack.length === 0) {
+      return false;
+    }
+    const rootViewPath: ViewPath = [
+      i,
+      { nodeID: p.stack[p.stack.length - 1], nodeIndex: 0 as NodeIndex },
+    ];
+    const paneRelation = getRelationForView(
+      planAfterDelete,
+      rootViewPath,
+      p.stack
+    );
+    return paneRelation === undefined;
+  };
+  const newPanes = planAfterDelete.panes.map((p, i) =>
+    shouldResetPane(p, i) ? { ...p, stack: [], rootRelation: undefined } : p
+  );
+  return planUpdatePanes(planAfterDelete, newPanes);
 }
 
 export function planMoveNodeWithView(

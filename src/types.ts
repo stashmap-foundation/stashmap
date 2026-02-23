@@ -264,6 +264,7 @@ declare global {
     incomingArgument?: Argument;
     isBidirectional?: boolean;
     versionMeta?: VersionMeta;
+    deleted?: boolean;
   };
 
   type KnowNode = TextNode | ReferenceNode;
@@ -282,6 +283,7 @@ declare global {
   type KnowledgeData = {
     nodes: Map<ID, KnowNode>;
     relations: Map<ID, Relations>;
+    tombstones?: Map<ID, ID>;
   };
 
   // Temporary UI state (not persisted to Nostr)

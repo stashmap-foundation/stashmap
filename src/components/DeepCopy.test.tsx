@@ -1136,22 +1136,9 @@ My Notes
   BobItem
     `);
 
-    // Now mark it as not relevant (delete it)
-    const markNotRelevant = screen.getByLabelText(
-      "mark BobItem as not relevant"
-    );
-    fireEvent.click(markNotRelevant);
-
-    // Enable not_relevant filter to see it again
-    await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
-
-    // Should see exactly ONE BobItem (not multiplied)
-    const bobItems = screen.getAllByText("BobItem");
-    expect(bobItems.length).toBe(1);
-
-    // Remove from list completely
-    const removeBtn = screen.getByLabelText("remove BobItem from list");
-    fireEvent.click(removeBtn);
+    // Delete BobItem via Delete key
+    await userEvent.click(screen.getByLabelText("edit BobItem"));
+    await userEvent.keyboard("{Escape}{Delete}");
 
     // The suggestion should reappear (since we removed Alice's copy)
     // but there should only be ONE [S] BobItem, not multiple

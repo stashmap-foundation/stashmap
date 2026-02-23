@@ -1,9 +1,10 @@
-import { List } from "immutable";
+import { List, Map } from "immutable";
 import {
   isConcreteRefId,
   parseConcreteRefId,
   getRelationsNoReferencedBy,
   shortID,
+  splitID,
   itemPassesFilters,
 } from "./connections";
 import {
@@ -122,13 +123,43 @@ function resolveLabels(
   return { contextLabels, targetLabel, fullContext };
 }
 
+function buildDeletedReference(
+  refId: LongID,
+  knowledgeDBs: KnowledgeDBs,
+  myself: PublicKey
+): ReferenceNode | undefined {
+  const parsed = parseConcreteRefId(refId);
+  if (!parsed) return undefined;
+  const { relationID } = parsed;
+  const [remote] = splitID(relationID);
+  const author = remote || myself;
+  const db = knowledgeDBs.get(author);
+  const tombstones = db?.tombstones || Map<ID, ID>();
+  const shortRelID = splitID(relationID)[1];
+  const headNodeID = tombstones.get(shortRelID as ID);
+  if (!headNodeID) return undefined;
+  const headNode = getNodeFromID(knowledgeDBs, headNodeID, myself);
+  const targetLabel = headNode?.text || "(deleted)";
+  return {
+    id: refId,
+    type: "reference",
+    text: `(deleted) ${targetLabel}`,
+    targetNode: headNodeID,
+    targetContext: List<ID>(),
+    contextLabels: [],
+    targetLabel,
+    author,
+    deleted: true,
+  };
+}
+
 export function buildOutgoingReference(
   refId: LongID,
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey
 ): ReferenceNode | undefined {
   const ref = parseRef(refId, knowledgeDBs, myself);
-  if (!ref) return undefined;
+  if (!ref) return buildDeletedReference(refId, knowledgeDBs, myself);
 
   const target = ref.targetNode || (ref.relation.head as ID);
   const { contextLabels, targetLabel, fullContext } = resolveLabels(
@@ -236,7 +267,9 @@ export function buildReferenceItem(
   virtualType?: VirtualType
 ): ReferenceNode | undefined {
   const ref = parseRef(refId, data.knowledgeDBs, data.user.publicKey);
-  if (!ref) return undefined;
+  if (!ref) {
+    return buildDeletedReference(refId, data.knowledgeDBs, data.user.publicKey);
+  }
 
   if (virtualType === "suggestion") {
     const outgoing = buildOutgoingReference(

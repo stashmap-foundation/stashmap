@@ -77,6 +77,7 @@ import {
   getCurrentItem,
 } from "./batchOperations";
 import { getNodesInTree } from "./Node";
+import { planDeleteNodeFromView } from "../dnd";
 
 function BreadcrumbItem({
   nodeID,
@@ -1146,12 +1147,16 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       return;
     }
 
-    if (e.key === "Backspace") {
+    if (e.key === "Backspace" || e.key === "Delete") {
       e.preventDefault();
-      const backButton = root.querySelector('[data-pane-action="back"]');
-      if (backButton instanceof HTMLElement) {
-        backButton.click();
-      }
+      const keys = getActionTargetKeys(selection, activeRow, orderedViewKeys);
+      const paths = keys.map(parseViewPath);
+      const result = paths.reduce(
+        (acc, path) => planDeleteNodeFromView(acc, path, stack),
+        createPlan()
+      );
+      executePlan(result);
+      refocusPaneAfterRowMutation(root);
       return;
     }
 

@@ -41,7 +41,7 @@ function SearchCrefBuilder({
     const refs = findRefsToNode(knowledgeDBs, nodeID);
     const deduped = deduplicateRefsByContext(refs, effectiveAuthor);
     if (deduped.size === 0) {
-      return List<ID | LongID>([nodeID]);
+      return List<ID | LongID>();
     }
     return deduped.map((ref) =>
       createConcreteRefId(ref.relationID, ref.targetNode)
@@ -57,6 +57,7 @@ function SearchCrefBuilder({
   const syntheticDB: KnowledgeData = {
     nodes: searchNodes as Map<ID, KnowNode>,
     relations: Map<ID, Relations>([[searchId, searchRelations]]),
+    tombstones: Map<ID, ID>(),
   };
 
   const syntheticDBs: KnowledgeDBs = Map<PublicKey, KnowledgeData>([

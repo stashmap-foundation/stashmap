@@ -15,7 +15,12 @@ import { DataContextProvider, MergeKnowledgeDB } from "./DataContext";
 import { EventCacheProvider } from "./EventCache";
 import { findContacts, findMembers } from "./contacts";
 import { useApis } from "./Apis";
-import { findNodes, findRelations, findViews } from "./knowledgeEvents";
+import {
+  findNodes,
+  findRelations,
+  findTombstones,
+  findViews,
+} from "./knowledgeEvents";
 import { newDB } from "./knowledge";
 import { PlanningContextProvider, replaceUnauthenticatedUser } from "./planner";
 import { useUserRelayContext } from "./UserRelayContext";
@@ -156,11 +161,13 @@ function processEventsByAuthor(
   const contacts = findContacts(authorEvents);
   const nodes = findNodes(authorEvents);
   const relations = findRelations(authorEvents);
+  const tombstones = findTombstones(authorEvents);
   const views = findViews(authorEvents);
   const projectMembers = findMembers(authorEvents);
   const knowledgeDB = {
     nodes,
     relations,
+    tombstones,
   };
   const relays = findRelays(authorEvents);
   return {

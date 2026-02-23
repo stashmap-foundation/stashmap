@@ -35,9 +35,12 @@ function mergeDBNodesAndRelations(
   if (b === undefined) {
     return existing;
   }
+  const aTombstones = existing.tombstones || Map<ID, ID>();
+  const bTombstones = b.tombstones || Map<ID, ID>();
   return {
     nodes: existing.nodes.merge(b.nodes),
     relations: existing.relations.merge(b.relations),
+    tombstones: aTombstones.merge(bTombstones),
   };
 }
 

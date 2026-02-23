@@ -6,10 +6,8 @@ import {
   BOB,
   CAROL,
   expectTree,
-  findNewNodeEditor,
   follow,
   navigateToNodeViaSearch,
-  renderApp,
   renderTree,
   setup,
   type,
@@ -841,9 +839,8 @@ describe("Diff item relevance selection", () => {
   });
 });
 
-// Tests for removing items from list
-describe("Remove from list", () => {
-  test("not relevant item shows 'remove from list' aria-label", async () => {
+describe("X toggle (not_relevant)", () => {
+  test("not relevant item shows 'mark as contains' aria-label", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -851,24 +848,20 @@ describe("Remove from list", () => {
 
     await screen.findByText("Child");
 
-    // Mark as not relevant - child gets hidden
     fireEvent.click(screen.getByLabelText("mark Child as not relevant"));
     await waitFor(() => {
       expect(screen.queryByText("Child")).toBeNull();
     });
 
-    // Enable not_relevant filter to see the child
     await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
 
-    // Child should now be visible
     await screen.findByText("Child");
 
-    // The X button should now say "remove from list" instead of "mark as not relevant"
-    const removeBtn = screen.getByLabelText("remove Child from list");
-    expect(removeBtn).toBeDefined();
+    const toggleBtn = screen.getByLabelText("mark Child as contains");
+    expect(toggleBtn).toBeDefined();
   });
 
-  test("clicking X on not relevant item removes it completely from list", async () => {
+  test("clicking X on not relevant item toggles it back to contains", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -877,193 +870,22 @@ describe("Remove from list", () => {
     );
 
     await screen.findByText("Child1");
-    await screen.findByText("Child2");
 
-    // Mark Child1 as not relevant - it gets hidden
     fireEvent.click(screen.getByLabelText("mark Child1 as not relevant"));
     await waitFor(() => {
       expect(screen.queryByText("Child1")).toBeNull();
     });
 
-    // Enable not_relevant filter to see Child1
     await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
     await screen.findByText("Child1");
 
-    // Click the remove button to completely remove Child1
-    fireEvent.click(screen.getByLabelText("remove Child1 from list"));
-
-    // Child1 should disappear completely
-    await waitFor(() => {
-      expect(screen.queryByText("Child1")).toBeNull();
-    });
-
-    // Child2 should still be visible
-    expect(screen.getByText("Child2")).toBeDefined();
-  });
-
-  test("two-step deletion: first mark as not relevant, then remove", async () => {
-    const [alice] = setup([ALICE]);
-    renderTree(alice);
-
-    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
-
-    await screen.findByText("Child");
-
-    // Step 1: Mark as not relevant - child gets hidden
-    fireEvent.click(screen.getByLabelText("mark Child as not relevant"));
-    await waitFor(() => {
-      expect(screen.queryByText("Child")).toBeNull();
-    });
-
-    // Enable not_relevant filter to see the child again
-    await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
-    await screen.findByText("Child");
-
-    // Now the X button should say "remove from list"
-    const removeBtn = await screen.findByLabelText("remove Child from list");
-    expect(removeBtn).toBeDefined();
-
-    // Step 2: Remove from list completely
-    fireEvent.click(removeBtn);
-
-    // Child should be completely gone
-    await waitFor(() => {
-      expect(screen.queryByText("Child")).toBeNull();
-    });
-
-    // Even with not_relevant filter enabled, Child should not reappear
-    expect(screen.queryByText("Child")).toBeNull();
-  });
-
-  test("remove from list cleans up orphaned descendant relations", async () => {
-    const [alice] = setup([ALICE]);
-    renderApp(alice());
-
-    await type(
-      "Root{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
-    );
-
-    await expectTree(`
-Root
-  Parent
-    Child
-      GrandChild
-    `);
-
-    const splitPaneButtons = screen.getAllByLabelText("open in split pane");
-    await userEvent.click(splitPaneButtons[0]);
-    await navigateToNodeViaSearch(1, "Child");
-
-    await expectTree(`
-Root
-  Parent
-    Child
-      GrandChild
-Child
-  GrandChild
-    `);
-
-    fireEvent.click(screen.getAllByLabelText("mark Child as not relevant")[0]);
-    await waitFor(() => {
-      expect(screen.queryAllByRole("treeitem", { name: "Child" })).toHaveLength(
-        1
-      );
-    });
-
-    const notRelevantFilters = screen.getAllByLabelText(
-      "toggle Not Relevant filter"
-    );
-    await userEvent.click(notRelevantFilters[0]);
-    await screen.findByLabelText("remove Child from list");
-
-    fireEvent.click(screen.getByLabelText("remove Child from list"));
+    fireEvent.click(screen.getByLabelText("mark Child1 as contains"));
 
     await waitFor(() => {
-      expect(screen.queryByLabelText("remove Child from list")).toBeNull();
+      expect(screen.queryByLabelText("mark Child1 as contains")).toBeNull();
     });
 
-    await userEvent.click(
-      screen.getAllByLabelText("toggle Not Relevant filter")[0]
-    );
-
-    await expectTree(`
-Root
-  Parent
-Child
-    `);
-  });
-
-  test("removing ~Versions from list does not delete orphaned descendant relations", async () => {
-    const [alice] = setup([ALICE]);
-    renderTree(alice);
-
-    await type("My Notes{Enter}{Tab}Barcelona{Escape}");
-
-    const barcelonaEditor = await screen.findByLabelText("edit Barcelona");
-    await userEvent.click(barcelonaEditor);
-    await userEvent.clear(barcelonaEditor);
-    await userEvent.type(barcelonaEditor, "BCN");
-    fireEvent.blur(barcelonaEditor, { relatedTarget: document.body });
-
-    await expectTree(`
-My Notes
-  BCN
-    `);
-
-    await userEvent.click(await screen.findByLabelText("edit BCN"));
-    await userEvent.keyboard("{Enter}");
-    const newEditor = await findNewNodeEditor();
-    await userEvent.type(newEditor, "~Versions");
-    await userEvent.click(newEditor);
-    await userEvent.keyboard("{Home}{Tab}");
-
-    await expectTree(`
-My Notes
-  BCN
-    ~Versions
-    `);
-
-    await userEvent.click(await screen.findByLabelText("expand ~Versions"));
-
-    await expectTree(`
-My Notes
-  BCN
-    ~Versions
-      BCN
-      Barcelona
-    `);
-
-    fireEvent.click(screen.getByLabelText("mark ~Versions as not relevant"));
-    await waitFor(() => {
-      expect(screen.queryByText("~Versions")).toBeNull();
-    });
-
-    await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
-    await screen.findByText("~Versions");
-
-    fireEvent.click(screen.getByLabelText("remove ~Versions from list"));
-
-    await waitFor(() => {
-      expect(screen.queryByText("~Versions")).toBeNull();
-    });
-
-    await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
-
-    await expectTree(`
-My Notes
-  BCN
-    `);
-
-    const bcnEditor = await screen.findByLabelText("edit BCN");
-    await userEvent.click(bcnEditor);
-    await userEvent.clear(bcnEditor);
-    await userEvent.type(bcnEditor, "Barcelona");
-    fireEvent.blur(bcnEditor, { relatedTarget: document.body });
-
-    await expectTree(`
-My Notes
-  Barcelona
-    `);
+    await screen.findByLabelText("mark Child1 as not relevant");
   });
 });
 
@@ -1306,7 +1128,7 @@ My Notes
   [VO] +1
     `);
 
-    await screen.findByLabelText("remove BobItem from list");
+    await screen.findByLabelText("mark BobItem as contains");
   });
 
   test("accepted item is no longer a suggestion", async () => {

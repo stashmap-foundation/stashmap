@@ -19,13 +19,8 @@ import {
 } from "../utils.test";
 
 async function deleteItem(itemName: string): Promise<void> {
-  fireEvent.click(screen.getByLabelText(`mark ${itemName} as not relevant`));
-  await waitFor(() => {
-    expect(screen.queryByText(itemName)).toBeNull();
-  });
-  await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
-  await screen.findByText(itemName);
-  fireEvent.click(screen.getByLabelText(`remove ${itemName} from list`));
+  await userEvent.click(screen.getByLabelText(`edit ${itemName}`));
+  await userEvent.keyboard("{Escape}{Delete}");
   await waitFor(() => {
     expect(screen.queryByText(itemName)).toBeNull();
   });

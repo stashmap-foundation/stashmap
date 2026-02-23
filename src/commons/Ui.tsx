@@ -86,6 +86,7 @@ type KnowledgeNodeCardProps = {
   "data-suggestion"?: string;
   "data-virtual-type"?: string;
   "data-other-user"?: string;
+  "data-deleted"?: string;
 };
 
 export function NodeCard({
@@ -97,6 +98,7 @@ export function NodeCard({
   "data-suggestion": dataSuggestion,
   "data-virtual-type": dataVirtualType,
   "data-other-user": dataOtherUser,
+  "data-deleted": dataDeleted,
 }: Partial<Children> & KnowledgeNodeCardProps): JSX.Element {
   return (
     <Card
@@ -105,6 +107,7 @@ export function NodeCard({
       data-suggestion={dataSuggestion}
       data-virtual-type={dataVirtualType}
       data-other-user={dataOtherUser}
+      data-deleted={dataDeleted}
     >
       <Badge value={badgeValue} isLeft size={80} />
       <Card.Body className={cardBodyClassName || "ps-0 pb-2 pt-2"}>

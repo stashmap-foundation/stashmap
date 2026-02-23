@@ -280,10 +280,12 @@ declare global {
   };
   type RelationTypes = OrderedMap<ID, RelationType>;
 
+  type Tombstone = { head: ID; context: List<ID> };
+
   type KnowledgeData = {
     nodes: Map<ID, KnowNode>;
     relations: Map<ID, Relations>;
-    tombstones?: Map<ID, ID>;
+    tombstones?: Map<ID, Tombstone>;
   };
 
   // Temporary UI state (not persisted to Nostr)

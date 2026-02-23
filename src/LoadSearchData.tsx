@@ -57,7 +57,7 @@ function SearchCrefBuilder({
   const syntheticDB: KnowledgeData = {
     nodes: searchNodes as Map<ID, KnowNode>,
     relations: Map<ID, Relations>([[searchId, searchRelations]]),
-    tombstones: Map<ID, ID>(),
+    tombstones: Map<ID, Tombstone>(),
   };
 
   const syntheticDBs: KnowledgeDBs = Map<PublicKey, KnowledgeData>([

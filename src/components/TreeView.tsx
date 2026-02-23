@@ -43,6 +43,7 @@ import {
   parseConcreteRefId,
   getRelationsNoReferencedBy,
 } from "../connections";
+import { getTombstone } from "../buildReferenceNode";
 import { useApis } from "../Apis";
 import {
   ActiveRowState,
@@ -244,7 +245,23 @@ export function TreeViewNodeLoader({
       data.user.publicKey
     );
     if (!relation) {
-      return withRelation;
+      const tombstone = getTombstone(
+        data.knowledgeDBs,
+        parsed.relationID,
+        data.user.publicKey
+      );
+      if (!tombstone) {
+        return withRelation;
+      }
+      const tombstoneNodes = [
+        ...tombstone.context.toArray(),
+        tombstone.head,
+        ...(parsed.targetNode ? [parsed.targetNode] : []),
+      ] as ID[];
+      return tombstoneNodes.reduce(
+        (acc, nid) => addNodeToFilters(acc, nid),
+        withRelation
+      );
     }
 
     const withTargetRefs = parsed.targetNode

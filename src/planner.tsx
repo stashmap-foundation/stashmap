@@ -1203,12 +1203,13 @@ export function planDeleteRelations(plan: Plan, relationsID: LongID): Plan {
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
   const relation = userDB.relations.get(shortID(relationsID));
   const headTag = relation ? [["head", relation.head]] : [];
-  const deletePlan = planDelete(
-    plan,
-    relationsID,
-    KIND_KNOWLEDGE_LIST,
-    headTag
-  );
+  const contextTags = relation
+    ? relation.context.toArray().map((id) => ["c", id])
+    : [];
+  const deletePlan = planDelete(plan, relationsID, KIND_KNOWLEDGE_LIST, [
+    ...headTag,
+    ...contextTags,
+  ]);
   const updatedRelations = userDB.relations.remove(shortID(relationsID));
   const updatedDB = {
     ...userDB,

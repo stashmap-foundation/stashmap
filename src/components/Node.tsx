@@ -220,6 +220,24 @@ function OtherUserIcon({ node }: { node: ReferenceNode }): JSX.Element | null {
 function ReferenceContent({ node }: { node: ReferenceNode }): JSX.Element {
   const virtualType = useRelationItem()?.virtualType;
 
+  if (node.deleted) {
+    const contextPath = node.contextLabels.join(" / ");
+    return (
+      <span
+        className="break-word deleted-reference"
+        data-testid="reference-node"
+      >
+        (deleted){" "}
+        {contextPath && (
+          <>
+            {contextPath} <span className="ref-separator">&gt;&gt;&gt;</span>{" "}
+          </>
+        )}
+        {node.targetLabel}
+      </span>
+    );
+  }
+
   if (virtualType === "version" || node.versionMeta) {
     return <VersionContent node={node} />;
   }
@@ -798,6 +816,9 @@ export function Node({
         data-suggestion={isSuggestion ? "true" : undefined}
         data-virtual-type={virtualType || (isVersion ? "version" : undefined)}
         data-other-user={isOtherUser ? "true" : undefined}
+        data-deleted={
+          node && isReferenceNode(node) && node.deleted ? "true" : undefined
+        }
       >
         <div className="indicator-gutter">
           {isSuggestion && <SuggestionIndicator />}

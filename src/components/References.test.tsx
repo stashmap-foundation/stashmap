@@ -5,6 +5,7 @@ import {
   BOB,
   expectTree,
   follow,
+  renderApp,
   renderTree,
   setup,
   type,
@@ -135,5 +136,88 @@ Other
     `);
 
     expect(screen.queryByText(/Loading/)).toBeNull();
+  });
+
+  test("Deleted relation shows (deleted) indicator in ~Log", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("My Notes{Enter}{Tab}Child{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+    await expectTree(`
+~Log
+  [R] My Notes
+    `);
+
+    await userEvent.click(await screen.findByText("My Notes"));
+
+    await expectTree(`
+My Notes
+  Child
+    `);
+
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Escape}{Delete}");
+
+    await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+    await expectTree(`
+~Log
+  [D] (deleted) My Notes
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+    await expectTree(`
+~Log
+  [D] (deleted) My Notes
+    `);
+  });
+
+  test("Deleted nested relation shows context path in ~Log", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Investment{Enter}{Tab}Alternative{Enter}{Tab}Bitcoin{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+    await expectTree(`
+~Log
+  [R] Investment
+    `);
+
+    await userEvent.click(await screen.findByText("Investment"));
+
+    await expectTree(`
+Investment
+  Alternative
+    Bitcoin
+    `);
+
+    await userEvent.click(await screen.findByLabelText("edit Investment"));
+    await userEvent.keyboard("{Escape}{Delete}");
+
+    await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+    await expectTree(`
+~Log
+  [D] (deleted) Investment
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+    await expectTree(`
+~Log
+  [D] (deleted) Investment
+    `);
   });
 });

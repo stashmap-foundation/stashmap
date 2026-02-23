@@ -123,6 +123,19 @@ function resolveLabels(
   return { contextLabels, targetLabel, fullContext };
 }
 
+export function getTombstone(
+  knowledgeDBs: KnowledgeDBs,
+  relationID: LongID,
+  myself: PublicKey
+): Tombstone | undefined {
+  const [remote] = splitID(relationID);
+  const author = remote || myself;
+  const db = knowledgeDBs.get(author);
+  const tombstones = db?.tombstones || Map<ID, Tombstone>();
+  const shortRelID = splitID(relationID)[1];
+  return tombstones.get(shortRelID as ID);
+}
+
 function buildDeletedReference(
   refId: LongID,
   knowledgeDBs: KnowledgeDBs,
@@ -130,23 +143,35 @@ function buildDeletedReference(
 ): ReferenceNode | undefined {
   const parsed = parseConcreteRefId(refId);
   if (!parsed) return undefined;
-  const { relationID } = parsed;
+  const { relationID, targetNode } = parsed;
   const [remote] = splitID(relationID);
   const author = remote || myself;
-  const db = knowledgeDBs.get(author);
-  const tombstones = db?.tombstones || Map<ID, ID>();
-  const shortRelID = splitID(relationID)[1];
-  const headNodeID = tombstones.get(shortRelID as ID);
-  if (!headNodeID) return undefined;
-  const headNode = getNodeFromID(knowledgeDBs, headNodeID, myself);
-  const targetLabel = headNode?.text || "(deleted)";
+  const tombstone = getTombstone(knowledgeDBs, relationID, myself);
+  if (!tombstone) return undefined;
+  const { head, context } = tombstone;
+
+  const contextLabels = targetNode
+    ? resolveContextLabels(knowledgeDBs, myself, context.push(head))
+    : resolveContextLabels(knowledgeDBs, myself, context);
+  const targetLabel = resolveNodeLabel(
+    knowledgeDBs,
+    myself,
+    targetNode || head,
+    targetNode ? context.push(head) : context
+  );
+  const fullContext = targetNode ? context.push(head) : context;
+  const contextPath = contextLabels.join(" / ");
+  const text = contextPath
+    ? `(deleted) ${contextPath} >>> ${targetLabel}`
+    : `(deleted) ${targetLabel}`;
+
   return {
     id: refId,
     type: "reference",
-    text: `(deleted) ${targetLabel}`,
-    targetNode: headNodeID,
-    targetContext: List<ID>(),
-    contextLabels: [],
+    text,
+    targetNode: targetNode || head,
+    targetContext: fullContext,
+    contextLabels,
     targetLabel,
     author,
     deleted: true,

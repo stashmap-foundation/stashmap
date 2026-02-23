@@ -75,7 +75,7 @@ Key principles:
 - One tack per subagent for focused execution
 
 ## Self-Improvement Loop
-- After ANY correction from the user: update `tasks/lessons.md` with the pattern
+- After ANY correction from the user: update `tasks/lessons.md` with the pattern. NEVER put project lessons into MEMORY.md — that file is only for codebase architecture notes and code style reminders, not correction-driven lessons.
 - Write rules for yourself that prevent the same mistake
 - Ruthlessly iterate on these lessons until mistake rate drops
 - Review lessons at session start for relevant project

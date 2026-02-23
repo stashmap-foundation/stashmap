@@ -13,7 +13,7 @@ Stashmap is a decentralized knowledge management tool built on Nostr. Users crea
 - Concrete ref IDs: `cref:relationID` or `cref:relationID:targetNode`
 - Search IDs: `search:query`
 
-**KnowledgeData** (`Map<PublicKey, { nodes, relations }>`): Each user has their own set of nodes and relations. Multiple users' data is merged for display.
+**KnowledgeData** (`Map<PublicKey, { nodes, relations, tombstones }>`): Each user has their own set of nodes, relations, and tombstones. Multiple users' data is merged for display.
 
 **Relations** represent parent→children links with context:
 - `head`: parent node ID
@@ -81,6 +81,8 @@ Changes are never applied directly. They're accumulated in a `Plan` (extends `Da
 3. `executePlan(plan)` — sign events and publish
 
 ## Publishing & Sync
+
+**Deletion & Tombstones**: When a relation is deleted, a `KIND_DELETE` event is published with `["head", headNodeID]` and `["c", contextNodeID]` tags preserving the relation's context path. `findTombstones()` parses these into `Tombstone = { head: ID, context: List<ID> }`, keyed by short relation ID. This allows deleted crefs in `~Log` to render their full context path (e.g. `(deleted) Investment / Alternative >>> Bitcoin`) instead of just the head label. `TreeViewNodeLoader` queries tombstone node IDs so labels resolve correctly.
 
 **Nostr events**: Nodes are `KIND_KNOWLEDGE_NODE` (34751), relations are `KIND_KNOWLEDGE_LIST` (34760). Events are replaceable (d-tag keyed).
 

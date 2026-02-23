@@ -2,6 +2,7 @@ import { List, Map } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
 import {
   findTag,
+  findAllTags,
   getMostRecentReplacableEvent,
   sortEvents,
 } from "./commons/useNostrQuery";
@@ -98,7 +99,9 @@ export function findRelations(
   }, Map<string, Relations>());
 }
 
-export function findTombstones(events: List<UnsignedEvent>): Map<ID, ID> {
+export function findTombstones(
+  events: List<UnsignedEvent>
+): Map<ID, Tombstone> {
   const deleteEvents = events.filter((event) => event.kind === KIND_DELETE);
   return deleteEvents.reduce((rdx, event) => {
     const aTag = findTag(event, "a");
@@ -107,8 +110,14 @@ export function findTombstones(events: List<UnsignedEvent>): Map<ID, ID> {
     if (deleteKind !== `${KIND_KNOWLEDGE_LIST}` || !eventToDeleteId) return rdx;
     const headTag = findTag(event, "head");
     if (!headTag) return rdx;
-    return rdx.set(eventToDeleteId as ID, headTag as ID);
-  }, Map<ID, ID>());
+    const contextValues = (findAllTags(event, "c") || []).map(
+      (t) => t[0] as ID
+    );
+    return rdx.set(eventToDeleteId as ID, {
+      head: headTag as ID,
+      context: List(contextValues),
+    });
+  }, Map<ID, Tombstone>());
 }
 
 export function findViews(events: List<UnsignedEvent>): Views {

@@ -801,6 +801,8 @@ type RowInfo = {
 };
 
 function getItemPrefix(innerNode: Element | null, isRef: boolean): string {
+  const isDeleted = innerNode?.getAttribute("data-deleted") === "true";
+  if (isDeleted) return "[D] ";
   const virtualType = innerNode?.getAttribute("data-virtual-type");
   const isOtherUser = innerNode?.getAttribute("data-other-user") === "true";
   if (virtualType === "suggestion") return "[S] ";

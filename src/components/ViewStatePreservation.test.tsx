@@ -823,3 +823,89 @@ My Notes
     await screen.findByLabelText("collapse C");
   });
 });
+
+describe("View State Preservation - Pane Content Switching", () => {
+  test("Expanded nodes survive navigation to different root and back", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type(
+      "My Notes{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}"
+    );
+
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "B{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand A"));
+
+    await expectTree(`
+My Notes
+  A
+    ChildOfA
+  B
+    `);
+
+    await screen.findByLabelText("collapse A");
+
+    await userEvent.click(
+      await screen.findByLabelText("open A in fullscreen")
+    );
+    await screen.findByRole("treeitem", { name: "A" });
+
+    await userEvent.click(
+      await screen.findByLabelText("Navigate to My Notes")
+    );
+
+    await expectTree(`
+My Notes
+  A
+    ChildOfA
+  B
+    `);
+
+    await screen.findByLabelText("collapse A");
+  });
+
+  test("Deeply nested expanded states survive navigation", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type(
+      "My Notes{Enter}{Tab}A{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  A
+    Child
+      GrandChild
+    `);
+
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse Child");
+
+    await userEvent.click(
+      await screen.findByLabelText("open A in fullscreen")
+    );
+
+    await expectTree(`
+A
+  Child
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText("Navigate to My Notes")
+    );
+
+    await expectTree(`
+My Notes
+  A
+    Child
+      GrandChild
+    `);
+
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse Child");
+  });
+});

@@ -111,6 +111,9 @@ Other
     await expectTree(`
 Notes
   Test B
+    ~Versions
+      Test B
+      Test A
     `);
   });
 

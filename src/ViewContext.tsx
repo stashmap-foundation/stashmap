@@ -787,8 +787,6 @@ export function addNodeToPathWithRelations(
 ): ViewPath {
   const item = relations.items.get(index);
   if (!item) {
-    // eslint-disable-next-line no-console
-    console.error("No node found in relations", relations, " at index", index);
     throw new Error("No node found in relation at index");
   }
   const nodeIndex = calculateNodeIndex(relations, index);
@@ -1079,7 +1077,15 @@ export function getParentKey(viewKey: string): string {
 }
 
 export function updateView(views: Views, path: ViewPath, view: View): Views {
-  return views.set(viewPathToString(path), view);
+  const key = viewPathToString(path);
+  const { nodeID } = getLast(path);
+  const defaultView = getDefaultView(nodeID, isRoot(path));
+  const isDefault =
+    view.expanded === defaultView.expanded && !view.typeFilters;
+  if (isDefault) {
+    return views.delete(key);
+  }
+  return views.set(key, view);
 }
 
 export function deleteChildViews(views: Views, path: ViewPath): Views {
@@ -1401,10 +1407,6 @@ export function updateViewPathsAfterPaneDelete(
       }
       return key;
     });
-}
-
-export function clearViewsForPane(views: Views, paneIndex: number): Views {
-  return views.filterNot((_, key) => key.startsWith(`p${paneIndex}:`));
 }
 
 export function updateViewPathsAfterPaneInsert(

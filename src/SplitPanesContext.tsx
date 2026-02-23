@@ -1,6 +1,5 @@
 import React, { createContext, useContext } from "react";
-import { clearViewsForPane } from "./ViewContext";
-import { planUpdateViews, planUpdatePanes, usePlanner } from "./planner";
+import { planUpdatePanes, usePlanner } from "./planner";
 import { useData } from "./DataContext";
 import {
   pathToStack,
@@ -96,10 +95,8 @@ export function useSplitPanes(): PaneOperations {
     const paneIndex = panes.findIndex((p) => p.id === pane.id);
     if (paneIndex >= 0) {
       const plan = createPlan();
-      const clearedViews = clearViewsForPane(plan.views, paneIndex);
-      const planWithViews = planUpdateViews(plan, clearedViews);
       const newPanes = panes.map((p) => (p.id === pane.id ? pane : p));
-      executePlan(planUpdatePanes(planWithViews, newPanes));
+      executePlan(planUpdatePanes(plan, newPanes));
     }
   };
 

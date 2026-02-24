@@ -419,4 +419,140 @@ Root
     `);
     await expectFocusedNode("B");
   });
+
+  test("alt-dragged cref shows deleted after ancestor deletion", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("A{Enter}{Tab}B{Enter}{Tab}C{Enter}{Tab}D{Enter}{Tab}E{Escape}");
+
+    await expectTree(`
+A
+  B
+    C
+      D
+        E
+    `);
+
+    await userEvent.click(await screen.findByLabelText("Open new pane"));
+
+    const newEditor = await findNewNodeEditor();
+    await userEvent.type(newEditor, "My links{Escape}");
+
+    await expectTree(`
+A
+  B
+    C
+      D
+        E
+My links
+    `);
+
+    const myLinksItem = screen.getAllByRole("treeitem", {
+      name: "My links",
+    });
+    const myLinksInPane1 = myLinksItem[myLinksItem.length - 1];
+
+    await userEvent.keyboard("{Alt>}");
+    fireEvent.dragStart(screen.getAllByText("E")[0]);
+    fireEvent.dragOver(myLinksInPane1, { altKey: true });
+    fireEvent.drop(myLinksInPane1, { altKey: true });
+    await userEvent.keyboard("{/Alt}");
+
+    await expectTree(`
+A
+  B
+    C
+      D
+        E
+My links
+  [R] A / B / C / D >>> E
+    `);
+
+    await userEvent.click(screen.getAllByLabelText("edit C")[0]);
+    await userEvent.keyboard("{Escape}{Delete}");
+
+    await expectTree(`
+A
+  B
+My links
+  [D] (deleted) A / B / C / D >>> E
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+A
+  B
+My links
+  [D] (deleted) A / B / C / D >>> E
+    `);
+  });
+
+  test("alt-dragged cref deleted after refresh then ancestor deletion", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("A{Enter}{Tab}B{Enter}{Tab}C{Enter}{Tab}D{Enter}{Tab}E{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("Open new pane"));
+
+    const newEditor = await findNewNodeEditor();
+    await userEvent.type(newEditor, "My links{Escape}");
+
+    const myLinksItems = screen.getAllByRole("treeitem", {
+      name: "My links",
+    });
+    const myLinksInPane1 = myLinksItems[myLinksItems.length - 1];
+
+    await userEvent.keyboard("{Alt>}");
+    fireEvent.dragStart(screen.getAllByText("E")[0]);
+    fireEvent.dragOver(myLinksInPane1, { altKey: true });
+    fireEvent.drop(myLinksInPane1, { altKey: true });
+    await userEvent.keyboard("{/Alt}");
+
+    await expectTree(`
+A
+  B
+    C
+      D
+        E
+My links
+  [R] A / B / C / D >>> E
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+A
+  B
+    C
+      D
+        E
+My links
+  [R] A / B / C / D >>> E
+    `);
+
+    await userEvent.click(screen.getAllByLabelText("edit C")[0]);
+    await userEvent.keyboard("{Escape}{Delete}");
+
+    await expectTree(`
+A
+  B
+My links
+  [D] (deleted) A / B / C / D >>> E
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+A
+  B
+My links
+  [D] (deleted) A / B / C / D >>> E
+    `);
+  });
 });

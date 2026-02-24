@@ -412,7 +412,6 @@ export const createPublishQueue = (
           if (targetKey && buffer.has(targetKey)) {
             buffer = buffer.delete(targetKey);
             removeFromOutboxDB(targetKey);
-            return;
           }
         }
         publishDeleteImmediate(event);

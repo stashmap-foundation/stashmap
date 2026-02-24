@@ -81,23 +81,27 @@ function SignInWithSeed({
 
   return (
     <Form onSubmit={onSubmit}>
-      <div className="flex-row-space-between align-center mb-3 gap-2">
+      <div className="d-flex align-items-center gap-2">
         <Form.Group controlId="inputSeed" className="flex-grow-1">
-          <ErrorMessage error={error} setError={setError} />
           <Form.Control
             type="password"
             placeholder="nsec, private key or mnemonic (12 words)"
             required
           />
         </Form.Group>
-        <div>
-          {loading ? (
-            <div aria-label="loading" className="spinner-border" />
-          ) : (
-            <Button type="submit">Continue</Button>
-          )}
-        </div>
+        {loading ? (
+          <div aria-label="loading" className="spinner-border" />
+        ) : (
+          <Button type="submit" className="btn btn-outline-dark">
+            Continue
+          </Button>
+        )}
       </div>
+      {error && (
+        <div className="mt-2">
+          <ErrorMessage error={error} setError={setError} />
+        </div>
+      )}
     </Form>
   );
 }
@@ -150,32 +154,30 @@ function SignInWithExtension({
 
   return (
     <Form onSubmit={onSubmit}>
-      <div className="d-flex flex-column align-center">
-        <div className="black-muted m-3">- OR -</div>
-        <Form.Group controlId="signInWithExtension">
-          <ErrorMessage error={error} setError={setError} />
-          <div className="w-100">
-            {loading ? (
-              <div aria-label="loading" className="spinner-border" />
-            ) : (
-              <Button type="submit">Continue with Extension</Button>
-            )}
-          </div>
-        </Form.Group>
-        <div className="black-muted m-3">- OR -</div>
-        <div>
-          <Button
-            className="btn underline mb-3"
-            onClick={() => {
-              navigate("/signup", {
-                state: { referrer: pathname + search + hash },
-              });
-            }}
-          >
-            Create new Account
+      <div className="d-flex align-items-center gap-2 mt-3">
+        {loading ? (
+          <div aria-label="loading" className="spinner-border" />
+        ) : (
+          <Button type="submit" className="btn btn-outline-dark">
+            Continue with Extension
           </Button>
-        </div>
+        )}
+        <Button
+          className="btn btn-outline-dark"
+          onClick={() => {
+            navigate("/signup", {
+              state: { referrer: pathname + search + hash },
+            });
+          }}
+        >
+          Create new Account
+        </Button>
       </div>
+      {error && (
+        <div className="mt-2">
+          <ErrorMessage error={error} setError={setError} />
+        </div>
+      )}
     </Form>
   );
 }
@@ -266,7 +268,7 @@ export function SignInModal(): JSX.Element {
     setTimeout(() => navigate(referrer || "/"), 0);
   };
   return (
-    <Modal show onHide={onHide}>
+    <Modal show onHide={onHide} className="command-bar">
       <Modal.Header closeButton>
         <Modal.Title>Login</Modal.Title>
       </Modal.Header>

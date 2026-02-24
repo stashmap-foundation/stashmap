@@ -5,6 +5,7 @@ import { NavbarControls } from "./NavbarControls";
 import { SplitPaneLayout } from "./SplitPaneLayout";
 import { StorePreLoginContext } from "../StorePreLoginContext";
 import { DND } from "../dnd";
+import { PaneHistoryProvider } from "../PaneHistoryContext";
 
 export function AppLayout({
   children,
@@ -32,7 +33,9 @@ function Dashboard(): JSX.Element {
       <AppLayout>
         <Outlet />
         <DND>
-          <SplitPaneLayout />
+          <PaneHistoryProvider>
+            <SplitPaneLayout />
+          </PaneHistoryProvider>
         </DND>
       </AppLayout>
     </StorePreLoginContext>

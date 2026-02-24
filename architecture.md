@@ -50,6 +50,8 @@ Operations: `addPaneAt`, `removePane`, `setPane`. Panes persisted to localStorag
 
 Root node for a pane: `stack[stack.length - 1]` or `EMPTY_NODE_ID` if stack is empty.
 
+**Per-pane navigation history** (`PaneHistoryContext.tsx`): Stores previous `Pane` states per pane ID (max 50). `useNavigatePane()` pushes current pane state to history before navigating. The back button pops from this history and uses `replaceNextNavigation()` from `NavigationStateContext` to avoid polluting browser history. History is cleaned up when a pane is removed.
+
 ## View System (`ViewContext.tsx`)
 
 Views track UI state (expansion) per node per position in the tree.

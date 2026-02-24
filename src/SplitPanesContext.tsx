@@ -6,6 +6,7 @@ import {
   parseRelationUrl,
   parseAuthorFromSearch,
 } from "./navigationUrl";
+import { usePaneHistory } from "./PaneHistoryContext";
 
 const PaneIndexContext = createContext<number>(0);
 
@@ -62,6 +63,7 @@ type PaneOperations = {
 export function useSplitPanes(): PaneOperations {
   const { panes } = useData();
   const { createPlan, executePlan } = usePlanner();
+  const paneHistory = usePaneHistory();
 
   const addPaneAt = (
     index: number,
@@ -86,6 +88,7 @@ export function useSplitPanes(): PaneOperations {
     if (panes.length <= 1) {
       return;
     }
+    paneHistory?.cleanup(paneId);
     const newPanes = panes.filter((p) => p.id !== paneId);
     const plan = createPlan();
     executePlan(planUpdatePanes(plan, newPanes));
@@ -107,8 +110,10 @@ export function useNavigatePane(): (url: string) => void {
   const { setPane } = useSplitPanes();
   const pane = useCurrentPane();
   const { user } = useData();
+  const paneHistory = usePaneHistory();
 
   return (url: string): void => {
+    paneHistory?.push(pane.id, pane);
     const hashIndex = url.indexOf("#");
     const urlWithoutHash = hashIndex >= 0 ? url.slice(0, hashIndex) : url;
     const scrollToNodeId =

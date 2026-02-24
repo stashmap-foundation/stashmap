@@ -67,6 +67,7 @@ Key principles:
 ## Plan Mode Default
 - Use plan mode for verification steps, not just building
 - Write detailed specs upfront to reduce ambiguity
+- **Tests are a fundamental part of every plan.** Plans MUST include a concrete test section describing which test cases to write, BEFORE the implementation section. Tests should generally be written first (TDD). Never treat tests as an afterthought or "verification step" — they are the primary deliverable alongside the code.
 
 ## Subagent Strategy
 - Use subagents liberally to keep main context window clean

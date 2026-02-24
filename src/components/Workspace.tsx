@@ -26,8 +26,10 @@ import {
   usePaneStack,
   usePaneIndex,
   useNavigatePane,
+  useSplitPanes,
 } from "../SplitPanesContext";
 import { useNavigationState } from "../NavigationStateContext";
+import { usePaneHistory } from "../PaneHistoryContext";
 import { TreeView } from "./TreeView";
 import { DroppableContainer } from "./DroppableContainer";
 import {
@@ -249,33 +251,34 @@ function useHomeShortcut(): void {
 }
 
 function BackButton(): JSX.Element | null {
-  const { knowledgeDBs, user } = useData();
-  const stack = usePaneStack();
   const pane = useCurrentPane();
-  const navigatePane = useNavigatePane();
+  const { setPane } = useSplitPanes();
+  const paneHistory = usePaneHistory();
+  const { replaceNextNavigation } = useNavigationState();
 
-  if (stack.length <= 1) {
+  if (!paneHistory?.canGoBack(pane.id)) {
     return null;
   }
 
-  const parentStack = stack.slice(0, -1);
-  const href =
-    buildNodeUrl(parentStack, knowledgeDBs, user.publicKey, pane.author) || "#";
+  const handleBack = (): void => {
+    const previous = paneHistory?.pop(pane.id);
+    if (previous) {
+      replaceNextNavigation();
+      setPane(previous);
+    }
+  };
 
   return (
-    <a
-      href={href}
+    <button
+      type="button"
       className="btn btn-icon"
-      onClick={(e) => {
-        e.preventDefault();
-        navigatePane(href);
-      }}
+      onClick={handleBack}
       data-pane-action="back"
       aria-label="Go back"
       title="Back"
     >
       <span aria-hidden="true">&larr;</span>
-    </a>
+    </button>
   );
 }
 

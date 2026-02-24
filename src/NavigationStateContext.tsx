@@ -20,6 +20,7 @@ import { generatePaneId } from "./SplitPanesContext";
 type NavigationStateContextType = {
   activePaneIndex: number;
   setActivePaneIndex: (index: number) => void;
+  replaceNextNavigation: () => void;
 };
 
 const NavigationStateContext = createContext<
@@ -93,6 +94,12 @@ export function NavigationStateProvider({
   );
   const isPopstateRef = useRef(false);
   const prevUrlRef = useRef<string>("");
+  const replaceNextRef = useRef(false);
+
+  const replaceNextNavigation = (): void => {
+    // eslint-disable-next-line functional/immutable-data
+    replaceNextRef.current = true;
+  };
 
   const safeActivePaneIndex = Math.min(activePaneIndex, panes.length - 1);
 
@@ -165,8 +172,10 @@ export function NavigationStateProvider({
       activePaneIndex: safeActivePaneIndex,
     };
 
-    if (prevUrlRef.current === "") {
+    if (prevUrlRef.current === "" || replaceNextRef.current) {
       window.history.replaceState(historyState, "", fullUrl);
+      // eslint-disable-next-line functional/immutable-data
+      replaceNextRef.current = false;
     } else {
       window.history.pushState(historyState, "", fullUrl);
     }
@@ -202,6 +211,7 @@ export function NavigationStateProvider({
       value={{
         activePaneIndex: safeActivePaneIndex,
         setActivePaneIndex,
+        replaceNextNavigation,
       }}
     >
       {children}

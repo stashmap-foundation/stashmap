@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -70,7 +70,17 @@ describe("Occurrence keyboard relevance", () => {
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> Bitcoin
+    [R] Money / Bitcoin
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money / Bitcoin
     `);
   });
 
@@ -81,6 +91,15 @@ Crypto
 
     await clickRow("Money / Bitcoin");
     await userEvent.keyboard("~");
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    `);
+
+    cleanup();
+    renderApp(alice());
 
     await expectTree(`
 Crypto
@@ -101,7 +120,17 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> Bitcoin
+    [R] Money / Bitcoin
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money / Bitcoin
     `);
   });
 
@@ -112,6 +141,15 @@ Crypto
 
     await clickRow("Money / Bitcoin");
     await userEvent.keyboard("x");
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    `);
+
+    cleanup();
+    renderApp(alice());
 
     await expectTree(`
 Crypto
@@ -142,7 +180,17 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money <<< Bitcoin
+    [R] Money / Bitcoin
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money / Bitcoin
     `);
   });
 
@@ -158,7 +206,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> Bitcoin
+    [R] Money / Bitcoin
     `);
 
     await navigateToNodeViaSearch(0, "Money");
@@ -175,7 +223,19 @@ Money
 Crypto
   Bitcoin
     Details
-    [R] Money >>> Bitcoin
+    [R] Money / Bitcoin
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await navigateToNodeViaSearch(0, "Crypto");
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money / Bitcoin
     `);
   });
 });
@@ -193,7 +253,18 @@ describe("Occurrence keyboard argument", () => {
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> Bitcoin
+    [R] Money / Bitcoin
+    `);
+    await screen.findByLabelText(/Evidence for.*Money.*Confirms/);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money / Bitcoin
     `);
     await screen.findByLabelText(/Evidence for.*Money.*Confirms/);
   });
@@ -210,7 +281,18 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> Bitcoin
+    [R] Money / Bitcoin
+    `);
+    await screen.findByLabelText(/Evidence for.*Money.*Contradicts/);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money / Bitcoin
     `);
     await screen.findByLabelText(/Evidence for.*Money.*Contradicts/);
   });
@@ -227,11 +309,16 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> Bitcoin
+    [R] Money / Bitcoin
     `);
     await screen.findByLabelText(/Evidence for.*Money.*Confirms/);
 
     await userEvent.keyboard("o");
+    await screen.findByLabelText(/Evidence for.*Money.*No evidence type/);
+
+    cleanup();
+    renderApp(alice());
+
     await screen.findByLabelText(/Evidence for.*Money.*No evidence type/);
   });
 });
@@ -251,7 +338,17 @@ describe("Occurrence multiselect keyboard", () => {
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> Bitcoin
+    [R] Money / Bitcoin
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money / Bitcoin
     `);
   });
 
@@ -268,8 +365,19 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Tech <<< >>> Bitcoin
-    [R] Money <<< >>> Bitcoin
+    [R] Tech / Bitcoin
+    [R] Money / Bitcoin
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Tech / Bitcoin
+    [R] Money / Bitcoin
     `);
   });
 
@@ -306,8 +414,20 @@ Crypto
   Bitcoin
     A
     B
-    [R] Tech <<< >>> Bitcoin
-    [R] Money <<< >>> Bitcoin
+    [R] Tech / Bitcoin
+    [R] Money / Bitcoin
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    A
+    B
+    [R] Tech / Bitcoin
+    [R] Money / Bitcoin
     `);
   });
 
@@ -324,10 +444,20 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> Bitcoin
+    [R] Money / Bitcoin
     `);
     await screen.findByLabelText(/Evidence for.*Details.*Confirms/);
     await screen.findByLabelText(/Evidence for.*Money.*Confirms/);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money / Bitcoin
+    `);
   });
 });
 
@@ -345,7 +475,17 @@ describe("Occurrence button clicks", () => {
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> Bitcoin
+    [R] Money / Bitcoin
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money / Bitcoin
     `);
   });
 
@@ -357,6 +497,15 @@ Crypto
     await userEvent.click(
       await screen.findByLabelText(/decline Money \/ Bitcoin/)
     );
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    `);
+
+    cleanup();
+    renderApp(alice());
 
     await expectTree(`
 Crypto
@@ -381,8 +530,19 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Tech <<< >>> Bitcoin
-    [R] Money <<< >>> Bitcoin
+    [R] Tech / Bitcoin
+    [R] Money / Bitcoin
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Tech / Bitcoin
+    [R] Money / Bitcoin
     `);
   });
 
@@ -403,7 +563,17 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> Bitcoin
+    [R] Money / Bitcoin
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money / Bitcoin
     `);
   });
 });
@@ -430,7 +600,18 @@ describe("Occurrence evidence selector", () => {
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> Bitcoin
+    [R] Money / Bitcoin
+    `);
+    await screen.findByLabelText(/Evidence for.*Money.*Confirms/);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money / Bitcoin
     `);
     await screen.findByLabelText(/Evidence for.*Money.*Confirms/);
   });
@@ -479,7 +660,17 @@ describe("Occurrence drag and drop", () => {
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> Bitcoin
+    [R] Money / Bitcoin
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Money / Bitcoin
     `);
   });
 
@@ -501,8 +692,19 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Tech <<< >>> Bitcoin
-    [R] Money <<< >>> Bitcoin
+    [R] Tech / Bitcoin
+    [R] Money / Bitcoin
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    [R] Tech / Bitcoin
+    [R] Money / Bitcoin
     `);
   });
 
@@ -540,7 +742,19 @@ Crypto
   Bitcoin
     A
     C
-    [R] Money <<< >>> Bitcoin
+    [R] Money / Bitcoin
+    B
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    A
+    C
+    [R] Money / Bitcoin
     B
     `);
   });
@@ -572,13 +786,13 @@ Money
 });
 
 describe("Occurrence filter toggle", () => {
-  test("pressing 0 on focused occurrence hides it and pressing 0 again brings it back", async () => {
+  test("pressing = on focused occurrence hides it and pressing = again brings it back", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
     await setupOccurrence();
 
     await clickRow("Money / Bitcoin");
-    await userEvent.keyboard("0");
+    await userEvent.keyboard("=");
 
     await expectTree(`
 Crypto
@@ -586,7 +800,7 @@ Crypto
     Details
     `);
 
-    await userEvent.keyboard("0");
+    await userEvent.keyboard("=");
 
     await expectTree(`
 Crypto

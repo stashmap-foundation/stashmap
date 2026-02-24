@@ -444,7 +444,7 @@ Root
   Target
   OtherParent
 Target
-  [R] Root >>> Source
+  [R] Root / Source
   `);
 
   cleanup();
@@ -456,7 +456,7 @@ Root
   Target
   OtherParent
 Target
-  [R] Root >>> Source
+  [R] Root / Source
   `);
 
   const source = screen.getAllByRole("treeitem", { name: "Source" })[0];
@@ -474,7 +474,7 @@ Root
   OtherParent
     Source
 Target
-  [R] Root / OtherParent >>> Source
+  [R] Root / OtherParent / Source
   `);
 
   await userEvent.click(await screen.findByLabelText("edit Source"));
@@ -491,13 +491,14 @@ Root
     Source
       Child1
       Child2
+      [I] Target <<< Root
 Target
-  [R] Root / OtherParent >>> Source
+  [R] Root / OtherParent / Source
   `);
 
   await userEvent.click(
     await screen.findByLabelText(
-      "open Root / OtherParent >>> Source in fullscreen"
+      "open Root / OtherParent / Source in fullscreen"
     )
   );
 
@@ -508,9 +509,11 @@ Root
     Source
       Child1
       Child2
+      [I] Target <<< Root
 Source
   Child1
   Child2
+  [I] Target <<< Root
   `);
 });
 

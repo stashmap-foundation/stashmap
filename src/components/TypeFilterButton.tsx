@@ -76,11 +76,18 @@ const VERSIONS_FILTER = {
   symbol: "\u2225",
 };
 
-const INCOMING_FILTER = {
-  id: "incoming" as const,
+const OCCURRENCE_FILTER = {
+  id: "occurrence" as const,
   label: "Occurrences",
   color: TYPE_COLORS.referenced_by,
   symbol: "=",
+};
+
+const INCOMING_FILTER = {
+  id: "incoming" as const,
+  label: "Incoming",
+  color: TYPE_COLORS.referenced_by,
+  symbol: "R",
 };
 
 export type FilterId =
@@ -89,6 +96,7 @@ export type FilterId =
   | "suggestions"
   | "versions"
   | "incoming"
+  | "occurrence"
   | "contains";
 
 export function useToggleFilter(): (id: FilterId) => void {
@@ -194,6 +202,11 @@ export function FilterSymbolsDisplay({
         isActive={isActive("versions")}
       />
       <FilterSymbol
+        color={OCCURRENCE_FILTER.color}
+        symbol={OCCURRENCE_FILTER.symbol}
+        isActive={isActive("occurrence")}
+      />
+      <FilterSymbol
         color={INCOMING_FILTER.color}
         symbol={INCOMING_FILTER.symbol}
         isActive={isActive("incoming")}
@@ -261,6 +274,14 @@ export function InlineFilterDots(): JSX.Element {
         color={VERSIONS_FILTER.color}
         symbol={VERSIONS_FILTER.symbol}
         isActive={isFilterActive(VERSIONS_FILTER.id)}
+        onClick={handleFilterToggle}
+      />
+      <ClickableFilterSymbol
+        id={OCCURRENCE_FILTER.id}
+        label={OCCURRENCE_FILTER.label}
+        color={OCCURRENCE_FILTER.color}
+        symbol={OCCURRENCE_FILTER.symbol}
+        isActive={isFilterActive(OCCURRENCE_FILTER.id)}
         onClick={handleFilterToggle}
       />
       <ClickableFilterSymbol

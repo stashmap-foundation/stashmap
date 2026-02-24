@@ -29,6 +29,20 @@
 
 **Rule**: Tests for features that persist data via Nostr events (tombstones, crefs, etc.) MUST include a `cleanup()` + re-render phase to verify the event round-trip. Data in local state doesn't prove events are serialized correctly — only a full reload proves that.
 
+## REUSE existing functions — never duplicate logic
+
+**Date**: 2026-02-24
+**Context**: Writing `getIncomingCrefsForNode`, I duplicated deduplication/sorting logic instead of reusing `deduplicateRefsByContext` which already handles effectiveAuthor-first + most-recent sorting.
+
+**Mistake**: Built inline dedup (groupBy + sortBy + first) and inline outgoing-cref-set-building instead of calling existing helpers. This has happened multiple times.
+
+**Rule**: Before writing ANY logic:
+1. Search the codebase for existing functions that do the same thing
+2. If a function exists, call it — even if the types need minor adapting
+3. If you need a subset of existing logic, extract a helper and share it
+4. CLAUDE.md says "Reuse code!" — this is a hard requirement, not a suggestion
+5. Common patterns to watch for: deduplication, sorting, ID parsing, context key building, covered-context checks
+
 ## Project lessons go in tasks/lessons.md, NOT MEMORY.md
 
 **Date**: 2026-02-23

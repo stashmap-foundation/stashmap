@@ -96,34 +96,34 @@ Changes are never applied directly. They're accumulated in a `Plan` (extends `Da
 
 - **Suggestions**: Items other users added to the same node (virtualType: "suggestion")
 - **Versions**: Alternative relations for the same head node with diffs (virtualType: "version")
-- **Occurrences**: This node appears in another relation — same node, different context (virtualType: "occurrence"). Display: `Context / Target` with `=` gutter indicator. Includes both item-level (node is a child in another tree) and head-level (node is head of a root-level relation) appearances.
+- **Occurrences**: This node appears in another relation — same node, different context (virtualType: "occurrence"). Display: `Context / Target` with `[C]` tree prefix. Includes both item-level (node is a child in another tree) and head-level (node is head of a root-level relation) appearances.
 - **Outgoing references**: Stored cref items linking to another relation (display: `Context >>> Target`)
+- **Incoming references**: Another relation has a cref item pointing TO our relation (virtualType: "incoming"). Display: `Target <<< Context` with `[I]` tree prefix. Found via `getIncomingCrefsForNode` reverse lookup.
 
-Built via `getSuggestionsForNode`, `getVersionsForRelation`, `getOccurrencesForNode`, `buildReferenceNode`.
+Built via `getSuggestionsForNode`, `getVersionsForRelation`, `getOccurrencesForNode`, `getIncomingCrefsForNode`, `buildReferenceNode`.
 
 ### Link Direction & Relevance Model
 
-A **concrete ref** (cref) stored in a relation creates an outgoing link (`>>>`). When the target relation also contains the parent node as an item, the link is **bidirectional** (`<<< >>>`). The `<<<` arrow means "the target relation links back to us" (incoming direction).
+A **concrete ref** (cref) stored in a relation creates an outgoing link (`>>>`). When the target relation also has a cref pointing back to our relation, the link is **bidirectional** (`<<< >>>`). The `<<<` arrow means "they have a cref to us" (incoming direction).
 
-**Two independent relevance values** control what arrows are shown:
-- **sourceRelevance**: relevance of the cref item in the local relation (the outgoing side)
-- **incomingItem.relevance**: relevance of our parent node in the target relation (the incoming side)
+**displayAs discriminant on ReferenceNode**: For stored cref items, `buildReferenceItem` sets `displayAs` to classify how the ref should be rendered:
+- `"bidirectional"`: target has a cref back to our relation, and our cref is not `not_relevant`
+- `"incoming"`: target has a cref back to us, but our stored cref IS `not_relevant`
+- `"occurrence"`: no cref back, but this is an occurrence origin (`targetNode` + `sourceItem` exist)
+- `undefined`: plain outgoing reference
 
-**Direction display matrix:**
+**Display matrix:**
 
-| sourceRelevance | incomingItem.relevance | Display | Meaning |
-|---|---|---|---|
-| normal | normal | `<<< >>>` | Bidirectional, both sides active |
-| not_relevant | normal | `<<<` | User declined outgoing, but source still links to us |
-| normal | not_relevant | `>>>` | User's outgoing link active, source marked us not_relevant |
-| not_relevant | not_relevant | `>>>` | Both sides not_relevant, shown as plain outgoing ref |
+| displayAs | Display | Meaning |
+|---|---|---|
+| undefined | `Context >>> Target` | Plain outgoing reference |
+| "bidirectional" | `Context <<< >>> Target` | Mutual crefs between relations |
+| "incoming" | `Target <<< Context` | Stored cref is not_relevant, but they link to us |
+| "occurrence" | `Context / Target` (not_relevant) or `Context >>> Target` (relevant) | Node appears in target via sourceItem |
 
-Key rules:
-- `<<<` only appears when `incomingItem.relevance !== "not_relevant"` AND `sourceRelevance === "not_relevant"`
-- Items marked `not_relevant` in a source relation do NOT generate incoming refs in `findNodeAppearances` (`connections.tsx`)
-- Accepting an incoming ref with `x` (not_relevant) creates a cref but does NOT create a meaningful outgoing link — it just records the user's decision about the incoming link
+**Occurrence suppression**: Occurrences are suppressed when a stored outgoing cref OR an incoming cref already covers that context. Uses `coveredContextKeys` with merged outgoing + incoming cref IDs.
 
-**Implementation**: `buildReferenceItem` in `buildReferenceNode.ts` receives `sourceRelevance` from the call site (`ViewContext.tsx`), which gets it from the relation item. The bidirectional check in `buildReferenceItem` uses both values to determine arrow display.
+**Implementation**: `buildReferenceItem` in `buildReferenceNode.ts` checks for a reverse cref in the target relation's items (`incomingCref`). The `resolveDisplayAs` function determines the display mode based on whether the reverse cref exists, its relevance, and whether this is an occurrence origin.
 
 ## Key Patterns
 
@@ -143,7 +143,9 @@ Key rules:
 | `ViewContext.tsx` | View expansion state, view path logic |
 | `SplitPanesContext.tsx` | Pane management |
 | `planner.tsx` | Plan/execute, all plan operations |
-| `connections.tsx` | Node/relation utilities, hashText, ID parsing |
+| `connections.tsx` | Node/relation utilities, hashText, ID parsing, occurrence/incoming ref lookup |
+| `treeTraversal.ts` | Computes children for tree nodes, wires virtual items |
+| `buildReferenceNode.ts` | Builds ReferenceNode display data from crefs |
 | `navigationUrl.ts` | URL ↔ navigation state |
 | `knowledgeEvents.tsx` | Nostr event parsing |
 | `executor.tsx` | Event signing and relay publishing |

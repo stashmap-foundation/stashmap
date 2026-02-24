@@ -36,8 +36,8 @@ Notes
 
     await expectTree(`
 Search: Apple
-  [R] Notes >>> Apple pie recipe
-  [R] Notes >>> Apple cider
+  [R] Notes / Apple pie recipe
+  [R] Notes / Apple cider
     `);
 
     cleanup();
@@ -45,8 +45,8 @@ Search: Apple
 
     await expectTree(`
 Search: Apple
-  [R] Notes >>> Apple pie recipe
-  [R] Notes >>> Apple cider
+  [R] Notes / Apple pie recipe
+  [R] Notes / Apple cider
     `);
   });
 
@@ -73,7 +73,7 @@ Search: Apple
 
     await expectTree(`
 Search: Shared Topic
-  [R] Notes >>> Shared Topic
+  [R] Notes / Shared Topic
     `);
   });
 
@@ -102,7 +102,7 @@ Search: Shared Topic
 
     await expectTree(`
 Search: Shared Topic
-  [R] Notes >>> Shared Topic
+  [R] Notes / Shared Topic
     `);
   });
 
@@ -131,7 +131,7 @@ Notes
 
     await expectTree(`
 Search: Barcelona
-  [R] Notes / Holiday Destinations / Spain >>> Barcelona
+  [R] Notes / Holiday Destinations / Spain / Barcelona
     `);
 
     expect(screen.queryByText(/Loading/)).toBeNull();
@@ -167,7 +167,7 @@ Notes
 
     await expectTree(`
 Search: Barcelona
-  [OR] Notes / Holiday Destinations / Spain >>> Barcelona
+  [OR] Notes / Holiday Destinations / Spain / Barcelona
     `);
 
     expect(screen.queryByText(/Loading/)).toBeNull();

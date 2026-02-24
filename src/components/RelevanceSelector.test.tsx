@@ -208,7 +208,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> Bitcoin
+    [R] Money / Bitcoin
     `);
 
     await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
@@ -225,7 +225,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> Bitcoin
+    [R] Money / Bitcoin
     `);
   });
 
@@ -252,7 +252,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> Bitcoin
+    [R] Money / Bitcoin
     `);
 
     await userEvent.click(
@@ -273,7 +273,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> Bitcoin
+    [R] Money / Bitcoin
     `);
   });
 
@@ -304,7 +304,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> Bitcoin
+    [R] Money / Bitcoin
     `);
 
     await userEvent.click(
@@ -325,7 +325,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> Bitcoin
+    [R] Money / Bitcoin
     `);
   });
 
@@ -358,7 +358,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money <<< Bitcoin
+    [R] Money / Bitcoin
     `);
 
     const refNode = screen.getByText(
@@ -410,7 +410,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> + Bitcoin
+    [R] Money / + Bitcoin
     `);
 
     await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
@@ -427,7 +427,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> + Bitcoin
+    [R] Money / + Bitcoin
     `);
   });
 
@@ -463,7 +463,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> - Bitcoin
+    [R] Money / - Bitcoin
     `);
 
     await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
@@ -480,7 +480,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money <<< >>> - Bitcoin
+    [R] Money / - Bitcoin
     `);
   });
 
@@ -510,7 +510,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [OR] Money <<< >>> Bitcoin
+    [OR] Money / Bitcoin
     `);
 
     await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
@@ -527,7 +527,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [OR] Money <<< >>> Bitcoin
+    [OR] Money / Bitcoin
     `);
   });
 
@@ -562,7 +562,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [OR] Money <<< >>> Bitcoin
+    [OR] Money / Bitcoin
     `);
   });
 

@@ -20,6 +20,7 @@ import {
   getRelations,
   itemPassesFilters,
   getOccurrencesForNode,
+  getIncomingCrefsForNode,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
 import { getPane } from "./planner";
@@ -95,14 +96,34 @@ function getChildrenForRegularNode(
 
   const relationId = relations?.id || ("" as LongID);
 
-  const occurrences = activeFilters.includes("incoming")
+  const containingRelationID: LongID | undefined =
+    parentPath.length > 2
+      ? ((parentPath[parentPath.length - 2] as { relationsID?: ID })
+          .relationsID as LongID)
+      : undefined;
+
+  const incomingCrefs = getIncomingCrefsForNode(
+    data.knowledgeDBs,
+    parentNodeID,
+    containingRelationID,
+    relations?.id,
+    author,
+    relations?.items
+  );
+
+  const visibleIncomingCrefs = activeFilters.includes("incoming")
+    ? incomingCrefs
+    : List<LongID>();
+
+  const occurrences = activeFilters.includes("occurrence")
     ? getOccurrencesForNode(
         data.knowledgeDBs,
         parentNodeID,
         relations?.id,
         author,
         context,
-        relations?.items
+        relations?.items,
+        incomingCrefs
       )
     : List<LongID | ID>();
 
@@ -159,13 +180,22 @@ function getChildrenForRegularNode(
     coveredCandidateIDs
   );
 
-  const withOccurrences = addVirtualItems(initial, occurrences, "occurrence");
+  const withIncoming = addVirtualItems(
+    initial,
+    visibleIncomingCrefs,
+    "incoming"
+  );
   const withSuggestions = addVirtualItems(
-    withOccurrences,
+    withIncoming,
     diffItems,
     "suggestion"
   );
-  const withVersions = addVirtualItems(withSuggestions, versions, "version");
+  const withOccurrences = addVirtualItems(
+    withSuggestions,
+    occurrences,
+    "occurrence"
+  );
+  const withVersions = addVirtualItems(withOccurrences, versions, "version");
 
   const firstVirtualPath = withVersions.paths.first();
   const firstVirtualKeys = firstVirtualPath

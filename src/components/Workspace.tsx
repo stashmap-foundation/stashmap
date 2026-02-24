@@ -380,7 +380,7 @@ const KEY_TO_FILTER: Record<string, FilterId> = {
   "@": "suggestions",
   "9": "versions",
   "0": "incoming",
-  R: "incoming",
+  "=": "occurrence",
 };
 
 function getActiveRow(root: HTMLElement): HTMLElement | undefined {

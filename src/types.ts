@@ -144,6 +144,7 @@ declare global {
       | "suggestions"
       | "versions"
       | "incoming"
+      | "occurrence"
       | "contains"
     )[];
     scrollToNodeId?: string;
@@ -190,6 +191,7 @@ declare global {
       | "suggestions"
       | "versions"
       | "incoming"
+      | "occurrence"
       | "contains"
     >;
   };
@@ -262,7 +264,7 @@ declare global {
     author: PublicKey;
     incomingRelevance?: Relevance;
     incomingArgument?: Argument;
-    isBidirectional?: boolean;
+    displayAs?: "bidirectional" | "incoming" | "occurrence";
     versionMeta?: VersionMeta;
     deleted?: boolean;
   };

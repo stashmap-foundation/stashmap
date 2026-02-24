@@ -14,9 +14,11 @@ import {
   getParentView,
   getLast,
   getRelationForView,
+  getRelationsForContext,
 } from "./ViewContext";
 import { getPane } from "./planner";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
+import { referenceToText } from "./components/referenceDisplay";
 
 function resolveNodeLabel(
   knowledgeDBs: KnowledgeDBs,
@@ -47,19 +49,6 @@ function resolveContextLabels(
       resolveNodeLabel(knowledgeDBs, myself, nodeId, context.slice(0, index))
     )
     .toArray();
-}
-
-function relevanceIndicator(relevance: Relevance): string {
-  if (relevance === "relevant") return "!";
-  if (relevance === "maybe_relevant") return "?";
-  if (relevance === "little_relevant") return "~";
-  return "";
-}
-
-function argumentIndicator(argument: Argument | undefined): string {
-  if (argument === "confirms") return "+";
-  if (argument === "contra") return "-";
-  return "";
 }
 
 export type ParsedRef = {
@@ -162,7 +151,7 @@ function buildDeletedReference(
   const fullContext = targetNode ? context.push(head) : context;
   const contextPath = contextLabels.join(" / ");
   const text = contextPath
-    ? `(deleted) ${contextPath} >>> ${targetLabel}`
+    ? `(deleted) ${contextPath} / ${targetLabel}`
     : `(deleted) ${targetLabel}`;
 
   return {
@@ -195,7 +184,7 @@ export function buildOutgoingReference(
     ref.targetNode
   );
   const contextPath = contextLabels.join(" / ");
-  const text = contextPath ? `${contextPath} >>> ${targetLabel}` : targetLabel;
+  const text = contextPath ? `${contextPath} / ${targetLabel}` : targetLabel;
 
   return {
     id: refId,
@@ -217,6 +206,7 @@ function effectiveIDs(
     | "suggestions"
     | "versions"
     | "incoming"
+    | "occurrence"
     | "contains"
   )[]
 ): List<string> {
@@ -239,6 +229,7 @@ export function computeRelationDiff(
     | "suggestions"
     | "versions"
     | "incoming"
+    | "occurrence"
     | "contains"
   )[]
 ): { addCount: number; removeCount: number } {
@@ -284,6 +275,63 @@ function computeVersionMeta(
   return { updated: relation.updated, addCount, removeCount };
 }
 
+function findCrefToNode(
+  items: List<RelationItem>,
+  targetRelation: Relations,
+  containingRelation: Relations | undefined
+): RelationItem | undefined {
+  return items.find((item) => {
+    if (!isConcreteRefId(item.nodeID)) return false;
+    const parsed = parseConcreteRefId(item.nodeID);
+    if (!parsed) return false;
+    const matchesHead = parsed.relationID === targetRelation.id;
+    const matchesItem =
+      !!containingRelation &&
+      parsed.targetNode === shortID(targetRelation.head) &&
+      parsed.relationID === containingRelation.id;
+    return matchesHead || matchesItem;
+  });
+}
+
+function findIncomingCrefItem(
+  ref: ParsedRef,
+  data: Data,
+  viewPath: ViewPath,
+  stack: ID[]
+): RelationItem | undefined {
+  const parentPath = getParentView(viewPath);
+  if (!parentPath) return undefined;
+  const parentRelation = getRelationForView(data, parentPath, stack);
+  if (!parentRelation) return undefined;
+  const grandParentPath = getParentView(parentPath);
+  const containingRelation = grandParentPath
+    ? getRelationForView(data, grandParentPath, stack)
+    : undefined;
+  const fromSource = findCrefToNode(
+    ref.relation.items,
+    parentRelation,
+    containingRelation
+  );
+  if (fromSource) return fromSource;
+  const targetNodeRelation = ref.targetNode
+    ? getRelationsForContext(
+        data.knowledgeDBs,
+        data.user.publicKey,
+        ref.targetNode,
+        ref.relationContext.push(shortID(ref.relation.head) as ID),
+        undefined,
+        false
+      )
+    : undefined;
+  return targetNodeRelation
+    ? findCrefToNode(
+        targetNodeRelation.items,
+        parentRelation,
+        containingRelation
+      )
+    : undefined;
+}
+
 export function buildReferenceItem(
   refId: LongID,
   data: Data,
@@ -306,34 +354,33 @@ export function buildReferenceItem(
     return { ...outgoing, text: outgoing.targetLabel };
   }
 
-  if (virtualType === "occurrence") {
-    const target = ref.targetNode || (ref.relation.head as ID);
-    const { contextLabels, targetLabel, fullContext } = resolveLabels(
+  if (virtualType === "incoming" || virtualType === "occurrence") {
+    const outgoing = buildOutgoingReference(
+      refId,
       data.knowledgeDBs,
-      data.user.publicKey,
-      ref.relation,
-      ref.relationContext,
-      ref.targetNode
+      data.user.publicKey
     );
-    const indicator =
-      relevanceIndicator(ref.sourceItem?.relevance) +
-      argumentIndicator(ref.sourceItem?.argument);
-    const prefix = indicator ? `${indicator} ` : "";
-    const contextPath = contextLabels.join(" / ");
-    const text = contextPath
-      ? `${contextPath} / ${prefix}${targetLabel}`
-      : `${prefix}${targetLabel}`;
+    if (!outgoing) return undefined;
+    const displayAs = virtualType as "incoming" | "occurrence";
+    const crefItem =
+      virtualType === "incoming"
+        ? findIncomingCrefItem(ref, data, viewPath, stack)
+        : undefined;
+    const incomingRelevance = crefItem?.relevance ?? ref.sourceItem?.relevance;
+    const incomingArgument = crefItem?.argument ?? ref.sourceItem?.argument;
+    const text = referenceToText({
+      displayAs,
+      contextLabels: outgoing.contextLabels,
+      targetLabel: outgoing.targetLabel,
+      incomingRelevance,
+      incomingArgument,
+    });
     return {
-      id: refId,
-      type: "reference",
+      ...outgoing,
       text,
-      targetNode: target,
-      targetContext: fullContext,
-      contextLabels,
-      targetLabel,
-      author: ref.relation.author,
-      incomingRelevance: ref.sourceItem?.relevance,
-      incomingArgument: ref.sourceItem?.argument,
+      displayAs,
+      incomingRelevance,
+      incomingArgument,
     };
   }
 
@@ -377,30 +424,74 @@ export function buildReferenceItem(
     return { ...outgoing, text: outgoing.text, versionMeta };
   }
 
-  const parentNodeID = getLast(parentPath).nodeID;
-  const parentShortID = shortID(parentNodeID);
-  const incomingItem = ref.relation.items.find(
-    (item) => shortID(item.nodeID) === parentShortID
-  );
+  if (!parentRelation) return outgoing;
 
-  if (!incomingItem || incomingItem.relevance === "not_relevant")
-    return outgoing;
+  const storedItem = parentRelation.items.find((item) => item.nodeID === refId);
+  const isNotRelevant = storedItem?.relevance === "not_relevant";
 
-  const indicator =
-    relevanceIndicator(incomingItem.relevance) +
-    argumentIndicator(incomingItem.argument);
-  const suffix = indicator ? ` ${indicator}` : "";
-  const arrows = suffix ? `<<< >>>${suffix}` : "<<< >>>";
-  const contextPath = outgoing.contextLabels.join(" / ");
-  const text = contextPath
-    ? `${contextPath} ${arrows} ${outgoing.targetLabel}`
-    : outgoing.targetLabel;
+  const grandParentPath = getParentView(parentPath);
+  const containingRelation = grandParentPath
+    ? getRelationForView(data, grandParentPath, stack)
+    : undefined;
 
+  const targetNodeRelation = ref.targetNode
+    ? getRelationsForContext(
+        data.knowledgeDBs,
+        data.user.publicKey,
+        ref.targetNode,
+        ref.relationContext.push(shortID(ref.relation.head) as ID),
+        undefined,
+        false
+      )
+    : undefined;
+
+  const findReverseCref = (
+    items: List<RelationItem>
+  ): RelationItem | undefined =>
+    findCrefToNode(items, parentRelation, containingRelation);
+
+  const incomingCref =
+    findReverseCref(ref.relation.items) ||
+    (targetNodeRelation
+      ? findReverseCref(targetNodeRelation.items)
+      : undefined);
+  const hasActiveIncoming =
+    !!incomingCref && incomingCref.relevance !== "not_relevant";
+
+  const isOccurrenceOrigin = !!ref.targetNode && !!ref.sourceItem;
+  const resolveDisplayAs = ():
+    | "bidirectional"
+    | "incoming"
+    | "occurrence"
+    | undefined => {
+    if (hasActiveIncoming) return isNotRelevant ? "incoming" : "bidirectional";
+    if (isOccurrenceOrigin) return "occurrence";
+    return undefined;
+  };
+  const displayAs = resolveDisplayAs();
+
+  if (!displayAs) return outgoing;
+
+  const incomingRel =
+    displayAs === "occurrence"
+      ? ref.sourceItem!.relevance
+      : incomingCref!.relevance;
+  const incomingArg =
+    displayAs === "occurrence"
+      ? ref.sourceItem!.argument
+      : incomingCref!.argument;
+  const text = referenceToText({
+    displayAs,
+    contextLabels: outgoing.contextLabels,
+    targetLabel: outgoing.targetLabel,
+    incomingRelevance: incomingRel,
+    incomingArgument: incomingArg,
+  });
   return {
     ...outgoing,
     text,
-    isBidirectional: true,
-    incomingRelevance: incomingItem.relevance,
-    incomingArgument: incomingItem.argument,
+    displayAs,
+    incomingRelevance: incomingRel,
+    incomingArgument: incomingArg,
   };
 }

@@ -30,7 +30,7 @@ import {
   isConcreteRefId,
   computeEmptyNodeMetadata,
 } from "../connections";
-import { TYPE_COLORS } from "../constants";
+import { ReferenceDisplay } from "./referenceDisplay";
 import { IS_MOBILE } from "./responsive";
 import { MiniEditor, preventEditorBlur } from "./AddNode";
 import { useOnToggleExpanded } from "./SelectRelations";
@@ -126,56 +126,6 @@ function ErrorContent(): JSX.Element {
   return <span className="text-danger">Error: Node not found</span>;
 }
 
-function relevanceColor(relevance: Relevance): string | undefined {
-  if (relevance === "relevant") return TYPE_COLORS.relevant;
-  if (relevance === "maybe_relevant") return TYPE_COLORS.maybe_relevant;
-  if (relevance === "little_relevant") return TYPE_COLORS.little_relevant;
-  return undefined;
-}
-
-function relevanceChar(relevance: Relevance): string {
-  if (relevance === "relevant") return "!";
-  if (relevance === "maybe_relevant") return "?";
-  if (relevance === "little_relevant") return "~";
-  return "";
-}
-
-function argumentChar(argument: Argument | undefined): string {
-  if (argument === "confirms") return "+";
-  if (argument === "contra") return "-";
-  return "";
-}
-
-function argumentColor(argument: Argument | undefined): string | undefined {
-  if (argument === "confirms") return TYPE_COLORS.confirms;
-  if (argument === "contra") return TYPE_COLORS.contra;
-  return undefined;
-}
-
-function IncomingIndicator({
-  relevance,
-  argument,
-}: {
-  relevance?: Relevance;
-  argument?: Argument;
-}): JSX.Element | null {
-  const relChar = relevanceChar(relevance);
-  const argChar = argumentChar(argument);
-  if (!relChar && !argChar) {
-    return null;
-  }
-  return (
-    <>
-      {relChar && (
-        <span style={{ color: relevanceColor(relevance) }}>{relChar}</span>
-      )}
-      {argChar && (
-        <span style={{ color: argumentColor(argument) }}>{argChar}</span>
-      )}
-    </>
-  );
-}
-
 function VersionContent({ node }: { node: ReferenceNode }): JSX.Element {
   const { user } = useData();
   const meta = node.versionMeta;
@@ -203,35 +153,9 @@ function VersionContent({ node }: { node: ReferenceNode }): JSX.Element {
   );
 }
 
-function OtherUserIcon({ node }: { node: ReferenceNode }): JSX.Element | null {
-  const { user } = useData();
-  if (node.author === user.publicKey) {
-    return null;
-  }
-  return <span style={{ fontStyle: "normal" }}>{" \u{1F464}"}</span>;
-}
-
 function ReferenceContent({ node }: { node: ReferenceNode }): JSX.Element {
   const relationItem = useRelationItem();
   const virtualType = relationItem?.virtualType;
-
-  if (node.deleted) {
-    const contextPath = node.contextLabels.join(" / ");
-    return (
-      <span
-        className="break-word deleted-reference"
-        data-testid="reference-node"
-      >
-        (deleted){" "}
-        {contextPath && (
-          <>
-            {contextPath} <span className="ref-separator">&gt;&gt;&gt;</span>{" "}
-          </>
-        )}
-        {node.targetLabel}
-      </span>
-    );
-  }
 
   if (virtualType === "version" || node.versionMeta) {
     return <VersionContent node={node} />;
@@ -245,51 +169,7 @@ function ReferenceContent({ node }: { node: ReferenceNode }): JSX.Element {
     );
   }
 
-  if (virtualType === "occurrence") {
-    const contextPath = node.contextLabels.join(" / ");
-    const hasIndicator =
-      relevanceChar(node.incomingRelevance) ||
-      argumentChar(node.incomingArgument);
-    return (
-      <span className="break-word" data-testid="reference-node">
-        {contextPath && <>{contextPath} / </>}
-        <IncomingIndicator
-          relevance={node.incomingRelevance}
-          argument={node.incomingArgument}
-        />
-        {hasIndicator && " "}
-        {node.targetLabel}
-        <OtherUserIcon node={node} />
-      </span>
-    );
-  }
-
-  const contextPath = node.contextLabels.join(" / ");
-  const showOutgoing = relationItem?.relevance !== "not_relevant";
-  const showIncoming = node.isBidirectional || (contextPath && !showOutgoing);
-  return (
-    <span className="break-word" data-testid="reference-node">
-      {contextPath && (
-        <>
-          {contextPath}{" "}
-          {showIncoming && <span className="ref-separator">&lt;&lt;&lt;</span>}
-          {showIncoming && showOutgoing && " "}
-          {showOutgoing && <span className="ref-separator">&gt;&gt;&gt;</span>}
-          {node.incomingRelevance || node.incomingArgument ? (
-            <>
-              {" "}
-              <IncomingIndicator
-                relevance={node.incomingRelevance}
-                argument={node.incomingArgument}
-              />
-            </>
-          ) : null}{" "}
-        </>
-      )}
-      {node.targetLabel}
-      <OtherUserIcon node={node} />
-    </span>
-  );
+  return <ReferenceDisplay node={node} />;
 }
 
 function NodeContent(): JSX.Element {
@@ -728,6 +608,18 @@ function OccurrenceGutterIndicator(): JSX.Element {
   );
 }
 
+function IncomingRefGutterIndicator(): JSX.Element {
+  return (
+    <span
+      className="reference-indicator"
+      title="Incoming Reference"
+      aria-hidden="true"
+    >
+      R
+    </span>
+  );
+}
+
 function VersionIndicator({
   isOtherUser,
 }: {
@@ -802,6 +694,7 @@ export function Node({
           {isSuggestion && <SuggestionIndicator />}
           {isVersion && <VersionIndicator isOtherUser={!!isOtherUser} />}
           {virtualType === "occurrence" && <OccurrenceGutterIndicator />}
+          {virtualType === "incoming" && <IncomingRefGutterIndicator />}
           {relevance === "relevant" && !isSuggestion && (
             <span
               className="relevant-indicator"

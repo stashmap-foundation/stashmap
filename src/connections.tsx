@@ -341,24 +341,32 @@ export function findRefsToNode(
     .toList();
 }
 
+function contextKeyForCref(
+  knowledgeDBs: KnowledgeDBs,
+  crefID: LongID | ID,
+  effectiveAuthor: PublicKey
+): string | undefined {
+  const parsed = parseConcreteRefId(crefID);
+  if (!parsed) return undefined;
+  const rel = getRelationsNoReferencedBy(
+    knowledgeDBs,
+    parsed.relationID,
+    effectiveAuthor
+  );
+  if (!rel) return undefined;
+  return parsed.targetNode
+    ? rel.context.push(rel.head as ID).join(":")
+    : rel.context.join(":");
+}
+
 function coveredContextKeys(
   knowledgeDBs: KnowledgeDBs,
-  currentItems: List<RelationItem>,
+  crefIDs: List<LongID | ID>,
   effectiveAuthor: PublicKey
 ): Set<string> {
-  return currentItems.reduce((acc, item) => {
-    const parsed = parseConcreteRefId(item.nodeID);
-    if (!parsed) return acc;
-    const rel = getRelationsNoReferencedBy(
-      knowledgeDBs,
-      parsed.relationID,
-      effectiveAuthor
-    );
-    if (!rel) return acc;
-    const key = parsed.targetNode
-      ? rel.context.push(rel.head as ID).join(":")
-      : rel.context.join(":");
-    return acc.add(key);
+  return crefIDs.reduce((acc, crefID) => {
+    const key = contextKeyForCref(knowledgeDBs, crefID, effectiveAuthor);
+    return key !== undefined ? acc.add(key) : acc;
   }, List<string>().toSet());
 }
 
@@ -368,13 +376,22 @@ export function getOccurrencesForNode(
   currentRelationID: LongID | undefined,
   effectiveAuthor: PublicKey,
   currentContext: Context,
-  currentItems?: List<RelationItem>
+  currentItems?: List<RelationItem>,
+  incomingCrefIDs?: List<LongID>
 ): List<LongID> {
   const allRefs = findRefsToNode(knowledgeDBs, nodeID);
   const contextRoot = currentContext.first();
-  const covered = currentItems
-    ? coveredContextKeys(knowledgeDBs, currentItems, effectiveAuthor)
-    : undefined;
+  const outgoingCrefIDs = currentItems
+    ? currentItems
+        .map((item) => item.nodeID)
+        .filter(isConcreteRefId)
+        .toList()
+    : List<LongID | ID>();
+  const covered = coveredContextKeys(
+    knowledgeDBs,
+    outgoingCrefIDs.concat(incomingCrefIDs || List<LongID>()),
+    effectiveAuthor
+  );
   const filtered = allRefs
     .filter((ref) => ref.relationID !== currentRelationID)
     .filter((ref) =>
@@ -382,11 +399,86 @@ export function getOccurrencesForNode(
         ? !contextRoot || ref.context.first() !== contextRoot
         : currentContext.size > 0 && ref.context.size === 0
     )
-    .filter((ref) => !covered || !covered.has(ref.context.join(":")));
+    .filter((ref) => !covered.has(ref.context.join(":")));
   const deduped = deduplicateRefsByContext(filtered, effectiveAuthor);
   return deduped
     .sortBy((ref) => -ref.updated)
     .map((ref) => createConcreteRefId(ref.relationID, ref.targetNode))
+    .toList();
+}
+
+export function getIncomingCrefsForNode(
+  knowledgeDBs: KnowledgeDBs,
+  currentNodeID: LongID | ID,
+  parentRelationID: LongID | undefined,
+  currentRelationID: LongID | undefined,
+  effectiveAuthor: PublicKey,
+  currentItems?: List<RelationItem>
+): List<LongID> {
+  const currentShortNodeID = shortID(currentNodeID);
+  const outgoingTargetRelIDs = (currentItems || List<RelationItem>()).reduce(
+    (acc, item) => {
+      const parsed = parseConcreteRefId(item.nodeID);
+      if (!parsed) return acc;
+      const withTarget = acc.add(parsed.relationID);
+      if (!parsed.targetNode) return withTarget;
+      const targetRelation = getRelationsNoReferencedBy(
+        knowledgeDBs,
+        parsed.relationID,
+        effectiveAuthor
+      );
+      if (!targetRelation) return withTarget;
+      const childContext = targetRelation.context.push(
+        targetRelation.head as ID
+      );
+      const childRelation = knowledgeDBs
+        .valueSeq()
+        .flatMap((db) => db.relations.valueSeq())
+        .find(
+          (r) => r.head === parsed.targetNode && r.context.equals(childContext)
+        );
+      return childRelation ? withTarget.add(childRelation.id) : withTarget;
+    },
+    Set<LongID>()
+  );
+
+  const refs = knowledgeDBs.reduce((acc, knowledgeDB) => {
+    return knowledgeDB.relations.reduce((rdx, relation) => {
+      if (relation.id === parentRelationID) return rdx;
+      if (relation.id === currentRelationID) return rdx;
+      if (relation.head === LOG_NODE_ID) return rdx;
+      if (outgoingTargetRelIDs.has(relation.id)) return rdx;
+
+      const hasCrefToUs = relation.items.some((item) => {
+        if (!isConcreteRefId(item.nodeID)) return false;
+        if (item.relevance === "not_relevant") return false;
+        const parsed = parseConcreteRefId(item.nodeID);
+        if (!parsed) return false;
+        const matchesItem =
+          !!parentRelationID &&
+          parsed.targetNode === currentShortNodeID &&
+          parsed.relationID === parentRelationID;
+        const matchesHead =
+          !!currentRelationID &&
+          !parsed.targetNode &&
+          parsed.relationID === currentRelationID;
+        return matchesItem || matchesHead;
+      });
+
+      if (!hasCrefToUs) return rdx;
+
+      return rdx.push({
+        relationID: relation.id,
+        context: relation.context,
+        updated: relation.updated,
+      });
+    }, acc);
+  }, List<ReferencedByRef>());
+
+  const deduped = deduplicateRefsByContext(refs, effectiveAuthor);
+  return deduped
+    .sortBy((ref) => -ref.updated)
+    .map((ref) => createConcreteRefId(ref.relationID))
     .toList();
 }
 
@@ -588,6 +680,7 @@ export function itemPassesFilters(
     | "suggestions"
     | "versions"
     | "incoming"
+    | "occurrence"
     | "contains"
   )[]
 ): boolean {

@@ -798,6 +798,7 @@ type RowInfo = {
   element: HTMLElement;
   text: string;
   indentLevel: number;
+  gutter?: string;
 };
 
 function getItemPrefix(innerNode: Element | null, isRef: boolean): string {
@@ -818,6 +819,21 @@ function getItemPrefix(innerNode: Element | null, isRef: boolean): string {
   return "";
 }
 
+function getGutter(row: Element): string | undefined {
+  /* eslint-disable testing-library/no-node-access */
+  const selector = row.querySelector(".relevance-selector");
+  /* eslint-enable testing-library/no-node-access */
+  const title = selector?.getAttribute("title");
+  if (!title) return undefined;
+  const gutterMap: Record<string, string> = {
+    Relevant: "!",
+    "Maybe Relevant": "?",
+    "Little Relevant": "~",
+    "Not Relevant": "x",
+  };
+  return gutterMap[title];
+}
+
 function classifyRow(row: Element): RowInfo | null {
   /* eslint-disable testing-library/no-node-access */
   const toggleButton = row.querySelector(
@@ -832,17 +848,20 @@ function classifyRow(row: Element): RowInfo | null {
     '[role="textbox"][aria-label^="edit "]'
   );
   /* eslint-enable testing-library/no-node-access */
+  const gutter = getGutter(row);
 
   const prefix = getItemPrefix(innerNode, !!referenceNode);
+
+  const withGutter = (info: RowInfo): RowInfo => ({ ...info, gutter });
 
   if (newNodeEditor) {
     const content = newNodeEditor.textContent?.trim();
     const text = content ? `[NEW NODE: ${content}]` : "[NEW NODE]";
-    return {
+    return withGutter({
       element: newNodeEditor as HTMLElement,
       text,
       indentLevel: getIndentLevel(newNodeEditor as HTMLElement),
-    };
+    });
   }
 
   if (toggleButton) {
@@ -865,11 +884,11 @@ function classifyRow(row: Element): RowInfo | null {
     if (!rawText) {
       return null;
     }
-    return {
+    return withGutter({
       element: toggleButton as HTMLElement,
       text: `${prefix}${rawText}`,
       indentLevel: getIndentLevel(toggleButton as HTMLElement),
-    };
+    });
   }
 
   if (referenceNode) {
@@ -882,11 +901,11 @@ function classifyRow(row: Element): RowInfo | null {
     const displayText = prefix.startsWith("[V")
       ? (cleanText.match(/[+-]\d+/g) || []).join(" ")
       : cleanText;
-    return {
+    return withGutter({
       element: referenceNode as HTMLElement,
       text: `${prefix}${displayText}`.trimEnd(),
       indentLevel: getIndentLevel(referenceNode as HTMLElement),
-    };
+    });
   }
 
   if (prefix && innerNode) {
@@ -895,11 +914,11 @@ function classifyRow(row: Element): RowInfo | null {
     /* eslint-enable testing-library/no-node-access */
     const rawText =
       textSpan?.textContent?.trim() || noteEditor?.textContent?.trim() || "";
-    return {
+    return withGutter({
       element: innerNode as HTMLElement,
       text: `${prefix}${rawText}`,
       indentLevel: getIndentLevel(innerNode as HTMLElement),
-    };
+    });
   }
 
   if (noteEditor) {
@@ -907,11 +926,11 @@ function classifyRow(row: Element): RowInfo | null {
     if (!rawText) {
       return null;
     }
-    return {
+    return withGutter({
       element: noteEditor as HTMLElement,
       text: rawText,
       indentLevel: getIndentLevel(noteEditor as HTMLElement),
-    };
+    });
   }
 
   /* eslint-disable testing-library/no-node-access */
@@ -922,17 +941,21 @@ function classifyRow(row: Element): RowInfo | null {
     if (!rawText) {
       return null;
     }
-    return {
+    return withGutter({
       element: readOnlyText as HTMLElement,
       text: rawText,
       indentLevel: getIndentLevel(readOnlyText as HTMLElement),
-    };
+    });
   }
 
   return null;
 }
 
-export async function getTreeStructure(): Promise<string> {
+type TreeOptions = {
+  showGutter?: boolean;
+};
+
+export async function getTreeStructure(options?: TreeOptions): Promise<string> {
   await waitFor(() => {
     expect(screen.queryByText("Loading...")).toBeNull();
   });
@@ -945,9 +968,10 @@ export async function getTreeStructure(): Promise<string> {
     .map((row) => classifyRow(row))
     .filter((info): info is RowInfo => info !== null);
 
-  const lines = rowInfos.map(({ text, indentLevel }) => {
+  const lines = rowInfos.map(({ text, indentLevel, gutter }) => {
     const indent = "  ".repeat(indentLevel);
-    return `${indent}${text}`;
+    const gutterPrefix = options?.showGutter && gutter ? `{${gutter}} ` : "";
+    return `${indent}${gutterPrefix}${text}`;
   });
 
   return lines.join("\n");
@@ -956,8 +980,12 @@ export async function getTreeStructure(): Promise<string> {
 /**
  * Asserts the tree matches the expected structure.
  * Pass a template string with 2-space indentation per level.
+ * Options: { showGutter: true } appends relevance symbols as {!} {?} etc.
  */
-export async function expectTree(expected: string): Promise<void> {
+export async function expectTree(
+  expected: string,
+  options?: TreeOptions
+): Promise<void> {
   const expectedNormalized = expected
     .split("\n")
     .map((line) => line.trimEnd())
@@ -966,11 +994,11 @@ export async function expectTree(expected: string): Promise<void> {
 
   try {
     await waitFor(async () => {
-      const actual = await getTreeStructure();
+      const actual = await getTreeStructure(options);
       expect(actual).toEqual(expectedNormalized);
     });
   } catch (error) {
-    const actual = await getTreeStructure();
+    const actual = await getTreeStructure(options);
     // eslint-disable-next-line no-console
     console.log(`ACTUAL TREE:\n${actual}`);
     // eslint-disable-next-line no-console

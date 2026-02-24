@@ -1305,7 +1305,7 @@ My Notes
   Target
   [S] BobItem
 Target
-  [R] My Notes >>> BobItem
+  [R] My Notes / BobItem
     `);
   });
 });
@@ -1344,9 +1344,10 @@ My Notes
 My Notes
   Source
     Child
+    [I] Target <<< My Notes
   Target
 Target
-  [R] My Notes >>> Source
+  [R] My Notes / Source
     `);
   });
 
@@ -1379,16 +1380,14 @@ My Notes
   Target
   Target2
 Target
-  [R] My Notes >>> Source
+  [R] My Notes / Source
     `);
 
     const targetInPane0 = screen.getAllByRole("treeitem", {
       name: "Target",
     })[0];
     await userEvent.keyboard("{Alt>}");
-    fireEvent.dragStart(
-      getPane(1).getByText(textContent("My Notes >>> Source"))
-    );
+    fireEvent.dragStart(getPane(1).getByText(textContent("My Notes / Source")));
     fireEvent.dragOver(targetInPane0, { altKey: true });
     fireEvent.drop(targetInPane0, { altKey: true });
     await userEvent.keyboard("{/Alt}");
@@ -1397,10 +1396,10 @@ Target
 My Notes
   Source
   Target
-  [R] My Notes >>> Source
+  [R] My Notes / Source
   Target2
 Target
-  [R] My Notes >>> Source
+  [R] My Notes / Source
     `);
   });
 });

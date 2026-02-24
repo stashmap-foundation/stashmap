@@ -125,7 +125,7 @@ My Notes
 
     await expectTree(`
 Search: Barcelona
-  [R] My Notes / Holiday Destinations / Spain >>> Barcelona
+  [R] My Notes / Holiday Destinations / Spain / Barcelona
     `);
   });
 
@@ -369,8 +369,8 @@ My Notes
 My Notes
   Holiday Destinations
     Spain
-    [C] Travel / Holiday Destinations
     [S] Austria
+    [C] Travel / Holiday Destinations
     `);
   });
 

@@ -102,11 +102,11 @@ Notes
 Other
   Test B
     Child
-    [I] Test B  <<< Notes
+    [C] Notes / Test B
     `);
 
     await userEvent.click(
-      await screen.findByLabelText(/open .* <<< Notes in fullscreen/)
+      await screen.findByLabelText(/open Notes \/ Test B in fullscreen/)
     );
 
     await expectTree(`
@@ -132,7 +132,7 @@ Notes
 Other
   Target
     Child
-    [I] Target  <<< Level3 / Level2 / Level1 / Notes
+    [C] Notes / Level1 / Level2 / Level3 / Target
     `);
 
     expect(screen.queryByText(/Loading/)).toBeNull();

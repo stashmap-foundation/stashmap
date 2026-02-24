@@ -19,7 +19,6 @@ import {
   isSearchId,
   getRelations,
   itemPassesFilters,
-  getIncomingRefsForNode,
   getOccurrencesForNode,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
@@ -96,17 +95,6 @@ function getChildrenForRegularNode(
 
   const relationId = relations?.id || ("" as LongID);
 
-  const incomingRefs = activeFilters.includes("incoming")
-    ? getIncomingRefsForNode(
-        data.knowledgeDBs,
-        parentNodeID,
-        relations?.id,
-        context,
-        author,
-        relations?.items
-      )
-    : List<LongID | ID>();
-
   const occurrences = activeFilters.includes("incoming")
     ? getOccurrencesForNode(
         data.knowledgeDBs,
@@ -171,12 +159,7 @@ function getChildrenForRegularNode(
     coveredCandidateIDs
   );
 
-  const withIncoming = addVirtualItems(initial, incomingRefs, "incoming");
-  const withOccurrences = addVirtualItems(
-    withIncoming,
-    occurrences,
-    "occurrence"
-  );
+  const withOccurrences = addVirtualItems(initial, occurrences, "occurrence");
   const withSuggestions = addVirtualItems(
     withOccurrences,
     diffItems,

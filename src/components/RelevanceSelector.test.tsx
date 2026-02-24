@@ -197,11 +197,11 @@ My Notes
 Crypto
   Bitcoin
     Details
-    [I] Bitcoin  <<< Money
+    [C] Money / Bitcoin
     `);
 
     await userEvent.click(
-      await screen.findByLabelText(/accept .* <<< Money as relevant/)
+      await screen.findByLabelText(/accept Money \/ Bitcoin as relevant/)
     );
 
     await expectTree(`
@@ -241,11 +241,11 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [I] Bitcoin  <<< Money
+    [C] Money / Bitcoin
     `);
 
     await userEvent.click(
-      await screen.findByLabelText(/accept .* <<< Money as maybe relevant/)
+      await screen.findByLabelText(/accept Money \/ Bitcoin as maybe relevant/)
     );
 
     await expectTree(`
@@ -293,11 +293,11 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [I] Bitcoin  <<< Money
+    [C] Money / Bitcoin
     `);
 
     await userEvent.click(
-      await screen.findByLabelText(/accept .* <<< Money as little relevant/)
+      await screen.findByLabelText(/accept Money \/ Bitcoin as little relevant/)
     );
 
     await expectTree(`
@@ -341,10 +341,10 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [I] Bitcoin  <<< Money
+    [C] Money / Bitcoin
     `);
 
-    fireEvent.click(screen.getByLabelText(/decline .* <<< Money/));
+    fireEvent.click(screen.getByLabelText(/decline Money \/ Bitcoin/));
 
     await expectTree(`
 Crypto
@@ -399,11 +399,11 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [I] Bitcoin + <<< Money
+    [C] Money / + Bitcoin
     `);
 
     await userEvent.click(
-      await screen.findByLabelText(/accept .* <<< Money as relevant/)
+      await screen.findByLabelText(/accept Money \/ \+ Bitcoin as relevant/)
     );
 
     await expectTree(`
@@ -431,7 +431,7 @@ Crypto
     `);
   });
 
-  test("accepting incoming ref with contra argument shows indicator, filter toggle preserves it", async () => {
+  test("accepting occurrence with contra argument shows indicator, filter toggle preserves it", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -452,11 +452,11 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [I] Bitcoin - <<< Money
+    [C] Money / - Bitcoin
     `);
 
     await userEvent.click(
-      await screen.findByLabelText(/accept .* <<< Money as relevant/)
+      await screen.findByLabelText(/accept Money \/ - Bitcoin as relevant/)
     );
 
     await expectTree(`
@@ -499,11 +499,11 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [OI] Bitcoin  <<< Money
+    [OC] Money / Bitcoin
     `);
 
     await userEvent.click(
-      await screen.findByLabelText(/accept .* <<< Money as relevant/)
+      await screen.findByLabelText(/accept Money \/ Bitcoin as relevant/)
     );
 
     await expectTree(`
@@ -551,11 +551,11 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [OI] Bitcoin  <<< Money
+    [OC] Money / Bitcoin
     `);
 
     await userEvent.click(
-      await screen.findByLabelText(/accept .* <<< Money as relevant/)
+      await screen.findByLabelText(/accept Money \/ Bitcoin as relevant/)
     );
 
     await expectTree(`

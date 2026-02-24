@@ -655,10 +655,10 @@ My Notes
     Spain
       Barcelona
         Sagrada Familia
-        [I] Barcelona  <<< Cities in Spain
+        [C] Cities in Spain / Barcelona
 Cities in Spain
   Barcelona
-    [I] Barcelona  <<< Spain / Holiday Destinations / My Notes
+    [C] My Notes / Holiday Destinations / Spain / Barcelona
   `);
 
   const spain = screen.getByRole("treeitem", { name: "Spain" });
@@ -672,10 +672,10 @@ My Notes
   Spain
     Barcelona
       Sagrada Familia
-      [I] Barcelona  <<< Cities in Spain
+      [C] Cities in Spain / Barcelona
 Cities in Spain
   Barcelona
-    [I] Barcelona  <<< Spain / My Notes
+    [C] My Notes / Spain / Barcelona
   `);
 });
 
@@ -1495,6 +1495,6 @@ Root
   Spain
   France
 Spain
-  [I] Spain  <<< Root
+  [C] Root / Spain
   `);
 });

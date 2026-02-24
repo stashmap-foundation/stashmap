@@ -202,7 +202,7 @@ My Notes
     await expectTree(`
 Travel
   Barcelona
-    [I] Barcelona  <<< Cities / Notes
+    [C] Notes / Cities / Barcelona
     `);
 
     cleanup();
@@ -211,7 +211,7 @@ Travel
     await expectTree(`
 Travel
   Barcelona
-    [I] Barcelona  <<< Cities / Notes
+    [C] Notes / Cities / Barcelona
     `);
 
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
@@ -220,10 +220,10 @@ Travel
     await expectTree(`
 Travel
   Barcelona
-    [I] Barcelona  <<< Cities / Notes
+    [C] Notes / Cities / Barcelona
 Travel
   Barcelona
-    [I] Barcelona  <<< Cities / Notes
+    [C] Notes / Cities / Barcelona
     `);
 
     await navigateToNodeViaSearch(1, "Notes");
@@ -232,7 +232,7 @@ Travel
     await expectTree(`
 Travel
   Barcelona
-    [I] Barcelona  <<< Cities / Notes
+    [C] Notes / Cities / Barcelona
 Notes
   Sibling
   Cities
@@ -246,7 +246,7 @@ Notes
     await expectTree(`
 Travel
   Barcelona
-    [I] Barcelona  <<< Cities / Sibling / Notes
+    [C] Notes / Sibling / Cities / Barcelona
 Notes
   Sibling
     Cities
@@ -259,7 +259,7 @@ Notes
     await expectTree(`
 Travel
   Barcelona
-    [I] Barcelona  <<< Cities / Sibling / Notes
+    [C] Notes / Sibling / Cities / Barcelona
 Notes
   Sibling
     Cities
@@ -281,7 +281,7 @@ Notes
     await expectTree(`
 Travel
   Barcelona
-    [I] Barcelona  <<< Child / Parent / Notes
+    [C] Notes / Parent / Child / Barcelona
     `);
 
     cleanup();
@@ -290,7 +290,7 @@ Travel
     await expectTree(`
 Travel
   Barcelona
-    [I] Barcelona  <<< Child / Parent / Notes
+    [C] Notes / Parent / Child / Barcelona
     `);
 
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
@@ -301,7 +301,7 @@ Travel
     await expectTree(`
 Travel
   Barcelona
-    [I] Barcelona  <<< Child / Parent / Notes
+    [C] Notes / Parent / Child / Barcelona
 Notes
   Parent
     Child
@@ -315,7 +315,7 @@ Notes
     await expectTree(`
 Travel
   Barcelona
-    [I] Barcelona  <<< Child / Notes
+    [C] Notes / Child / Barcelona
 Notes
   Parent
   Child
@@ -328,7 +328,7 @@ Notes
     await expectTree(`
 Travel
   Barcelona
-    [I] Barcelona  <<< Child / Notes
+    [C] Notes / Child / Barcelona
 Notes
   Parent
   Child

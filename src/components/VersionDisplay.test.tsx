@@ -47,7 +47,7 @@ describe("Version Display", () => {
 Root2
   Barcelona
     Info
-    [I] BCN  <<< Root1
+    [C] Root1 / BCN
     `);
 
     cleanup();
@@ -57,7 +57,7 @@ Root2
 Root2
   Barcelona
     Info
-    [I] BCN  <<< Root1
+    [C] Root1 / BCN
     `);
   });
 
@@ -505,8 +505,8 @@ My Notes
 Other
   Barcelona
     Detail
-    [I] BCN  <<< Cities / My Notes
-    [I] Barcelona  <<< Holiday Destinations / My Notes
+    [C] My Notes / Cities / BCN
+    [C] My Notes / Holiday Destinations / Barcelona
     `);
 
     cleanup();
@@ -516,8 +516,8 @@ Other
 Other
   Barcelona
     Detail
-    [I] BCN  <<< Cities / My Notes
-    [I] Barcelona  <<< Holiday Destinations / My Notes
+    [C] My Notes / Cities / BCN
+    [C] My Notes / Holiday Destinations / Barcelona
     `);
   });
 

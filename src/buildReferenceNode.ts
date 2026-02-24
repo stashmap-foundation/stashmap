@@ -306,7 +306,7 @@ export function buildReferenceItem(
     return { ...outgoing, text: outgoing.targetLabel };
   }
 
-  if (virtualType === "incoming") {
+  if (virtualType === "occurrence") {
     const target = ref.targetNode || (ref.relation.head as ID);
     const { contextLabels, targetLabel, fullContext } = resolveLabels(
       data.knowledgeDBs,
@@ -318,11 +318,11 @@ export function buildReferenceItem(
     const indicator =
       relevanceIndicator(ref.sourceItem?.relevance) +
       argumentIndicator(ref.sourceItem?.argument);
-    const suffix = indicator ? ` ${indicator}` : "";
-    const reversed = [...contextLabels].reverse().join(" / ");
-    const text = reversed
-      ? `${targetLabel}${suffix} <<< ${reversed}`
-      : targetLabel;
+    const prefix = indicator ? `${indicator} ` : "";
+    const contextPath = contextLabels.join(" / ");
+    const text = contextPath
+      ? `${contextPath} / ${prefix}${targetLabel}`
+      : `${prefix}${targetLabel}`;
     return {
       id: refId,
       type: "reference",

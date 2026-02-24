@@ -28,7 +28,7 @@ async function expectRelevance(
   });
 }
 
-async function setupIncomingRef(): Promise<void> {
+async function setupOccurrence(): Promise<void> {
   await type("Money{Enter}{Tab}Bitcoin{Escape}");
   await userEvent.click(await screen.findByLabelText("Create new note"));
   await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
@@ -37,11 +37,11 @@ async function setupIncomingRef(): Promise<void> {
 Crypto
   Bitcoin
     Details
-    [I] Bitcoin  <<< Money
+    [C] Money / Bitcoin
     `);
 }
 
-async function setupTwoIncomingRefs(): Promise<void> {
+async function setupTwoOccurrences(): Promise<void> {
   await type("Money{Enter}{Tab}Bitcoin{Escape}");
   await userEvent.click(await screen.findByLabelText("Create new note"));
   await type("Tech{Enter}{Tab}Bitcoin{Escape}");
@@ -52,18 +52,18 @@ async function setupTwoIncomingRefs(): Promise<void> {
 Crypto
   Bitcoin
     Details
-    [I] Bitcoin  <<< Tech
-    [I] Bitcoin  <<< Money
+    [C] Tech / Bitcoin
+    [C] Money / Bitcoin
     `);
 }
 
-describe("Incoming ref keyboard relevance", () => {
-  test("! accepts incoming ref as relevant", async () => {
+describe("Occurrence keyboard relevance", () => {
+  test("! accepts occurrence as relevant", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
-    await clickRow("Bitcoin <<< Money");
+    await clickRow("Money / Bitcoin");
     await userEvent.keyboard("!");
 
     await expectTree(`
@@ -74,12 +74,12 @@ Crypto
     `);
   });
 
-  test("~ accepts incoming ref as little_relevant (filtered by default)", async () => {
+  test("~ accepts occurrence as little_relevant (filtered by default)", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
-    await clickRow("Bitcoin <<< Money");
+    await clickRow("Money / Bitcoin");
     await userEvent.keyboard("~");
 
     await expectTree(`
@@ -89,12 +89,12 @@ Crypto
     `);
   });
 
-  test("? accepts incoming ref as maybe_relevant", async () => {
+  test("? accepts occurrence as maybe_relevant", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
-    await clickRow("Bitcoin <<< Money");
+    await clickRow("Money / Bitcoin");
     await userEvent.keyboard("?");
 
     await expectTree(`
@@ -105,12 +105,12 @@ Crypto
     `);
   });
 
-  test("x accepts incoming ref as not_relevant (filtered by default)", async () => {
+  test("x accepts occurrence as not_relevant (filtered by default)", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
-    await clickRow("Bitcoin <<< Money");
+    await clickRow("Money / Bitcoin");
     await userEvent.keyboard("x");
 
     await expectTree(`
@@ -120,12 +120,12 @@ Crypto
     `);
   });
 
-  test("not_relevant incoming ref stays incoming when filter toggled to show", async () => {
+  test("not_relevant occurrence stays when filter toggled to show", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
-    await clickRow("Bitcoin <<< Money");
+    await clickRow("Money / Bitcoin");
     await userEvent.keyboard("x");
 
     await expectTree(`
@@ -149,9 +149,9 @@ Crypto
   test("not_relevant item in source relation does not trigger bidirectional indicator", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
-    await clickRow("Bitcoin <<< Money");
+    await clickRow("Money / Bitcoin");
     await userEvent.keyboard("!");
 
     await expectTree(`
@@ -180,13 +180,13 @@ Crypto
   });
 });
 
-describe("Incoming ref keyboard argument", () => {
-  test("+ accepts incoming ref and sets argument confirms", async () => {
+describe("Occurrence keyboard argument", () => {
+  test("+ accepts occurrence and sets argument confirms", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
-    await clickRow("Bitcoin <<< Money");
+    await clickRow("Money / Bitcoin");
     await userEvent.keyboard("+");
 
     await expectTree(`
@@ -198,12 +198,12 @@ Crypto
     await screen.findByLabelText(/Evidence for.*Money.*Confirms/);
   });
 
-  test("- accepts incoming ref and sets argument contra", async () => {
+  test("- accepts occurrence and sets argument contra", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
-    await clickRow("Bitcoin <<< Money");
+    await clickRow("Money / Bitcoin");
     await userEvent.keyboard("-");
 
     await expectTree(`
@@ -215,12 +215,12 @@ Crypto
     await screen.findByLabelText(/Evidence for.*Money.*Contradicts/);
   });
 
-  test("o clears argument on accepted incoming ref", async () => {
+  test("o clears argument on accepted occurrence", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
-    await clickRow("Bitcoin <<< Money");
+    await clickRow("Money / Bitcoin");
     await userEvent.keyboard("+");
 
     await expectTree(`
@@ -236,11 +236,11 @@ Crypto
   });
 });
 
-describe("Incoming ref multiselect keyboard", () => {
-  test("mixed selection: regular + incoming, ! sets relevance on both", async () => {
+describe("Occurrence multiselect keyboard", () => {
+  test("mixed selection: regular + occurrence, ! sets relevance on both", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
     await clickRow("Details");
     await userEvent.keyboard("{Shift>}j{/Shift}");
@@ -255,12 +255,12 @@ Crypto
     `);
   });
 
-  test("multiple incoming refs selected, ! accepts all", async () => {
+  test("multiple occurrences selected, ! accepts all", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupTwoIncomingRefs();
+    await setupTwoOccurrences();
 
-    await clickRow("Bitcoin <<< Tech");
+    await clickRow("Tech / Bitcoin");
     await userEvent.keyboard("{Shift>}j{/Shift}");
     await userEvent.keyboard("!");
 
@@ -273,7 +273,7 @@ Crypto
     `);
   });
 
-  test("multiple regular items + multiple incoming refs, ! sets relevance on all", async () => {
+  test("multiple regular items + multiple occurrences, ! sets relevance on all", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
@@ -288,11 +288,11 @@ Crypto
   Bitcoin
     A
     B
-    [I] Bitcoin  <<< Tech
-    [I] Bitcoin  <<< Money
+    [C] Tech / Bitcoin
+    [C] Money / Bitcoin
     `);
 
-    // Select all 4: A, B, Tech incoming, Money incoming
+    // Select all 4: A, B, Tech occurrence, Money occurrence
     await clickRow("A");
     await userEvent.keyboard("{Shift>}j{/Shift}");
     await userEvent.keyboard("{Shift>}j{/Shift}");
@@ -311,10 +311,10 @@ Crypto
     `);
   });
 
-  test("mixed selection with + accepts incoming and sets argument on both", async () => {
+  test("mixed selection with + accepts occurrence and sets argument on both", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
     await clickRow("Details");
     await userEvent.keyboard("{Shift>}j{/Shift}");
@@ -331,14 +331,14 @@ Crypto
   });
 });
 
-describe("Incoming ref button clicks", () => {
-  test("clicking ! button accepts incoming ref", async () => {
+describe("Occurrence button clicks", () => {
+  test("clicking ! button accepts occurrence", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
     await userEvent.click(
-      await screen.findByLabelText(/accept .* <<< Money as relevant/)
+      await screen.findByLabelText(/accept Money \/ Bitcoin as relevant/)
     );
 
     await expectTree(`
@@ -349,12 +349,14 @@ Crypto
     `);
   });
 
-  test("clicking x button declines incoming ref (filtered)", async () => {
+  test("clicking x button declines occurrence (filtered)", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
-    await userEvent.click(await screen.findByLabelText(/decline .* <<< Money/));
+    await userEvent.click(
+      await screen.findByLabelText(/decline Money \/ Bitcoin/)
+    );
 
     await expectTree(`
 Crypto
@@ -363,16 +365,16 @@ Crypto
     `);
   });
 
-  test("clicking ! button with multiselect accepts all selected incoming refs", async () => {
+  test("clicking ! button with multiselect accepts all selected occurrences", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupTwoIncomingRefs();
+    await setupTwoOccurrences();
 
-    await clickRow("Bitcoin <<< Tech");
+    await clickRow("Tech / Bitcoin");
     await userEvent.keyboard("{Shift>}j{/Shift}");
 
     await userEvent.click(
-      await screen.findByLabelText(/accept .* <<< Money as relevant/)
+      await screen.findByLabelText(/accept Money \/ Bitcoin as relevant/)
     );
 
     await expectTree(`
@@ -384,16 +386,16 @@ Crypto
     `);
   });
 
-  test("clicking ! button with mixed selection sets relevance on regular and accepts incoming", async () => {
+  test("clicking ! button with mixed selection sets relevance on regular and accepts occurrence", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
     await clickRow("Details");
     await userEvent.keyboard("{Shift>}j{/Shift}");
 
     await userEvent.click(
-      await screen.findByLabelText(/accept .* <<< Money as relevant/)
+      await screen.findByLabelText(/accept Money \/ Bitcoin as relevant/)
     );
 
     await expectRelevance("Details", "Relevant");
@@ -406,22 +408,22 @@ Crypto
   });
 });
 
-describe("Incoming ref evidence selector", () => {
-  test("evidence selector is visible on incoming ref", async () => {
+describe("Occurrence evidence selector", () => {
+  test("evidence selector is visible on occurrence", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
-    await screen.findByLabelText(/Evidence for Bitcoin <<< Money/);
+    await screen.findByLabelText(/Evidence for Money \/ Bitcoin/);
   });
 
-  test("clicking evidence selector accepts incoming ref and sets argument", async () => {
+  test("clicking evidence selector accepts occurrence and sets argument", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
     await userEvent.click(
-      await screen.findByLabelText(/Evidence for Bitcoin <<< Money/)
+      await screen.findByLabelText(/Evidence for Money \/ Bitcoin/)
     );
 
     await expectTree(`
@@ -434,7 +436,7 @@ Crypto
   });
 });
 
-test("Enter on root node with incoming refs but no children creates new child", async () => {
+test("Enter on root node with occurrences but no children creates new child", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
 
@@ -447,7 +449,7 @@ test("Enter on root node with incoming refs but no children creates new child", 
   );
   await expectTree(`
 Barcelona
-  [I] Barcelona  <<< Money
+  [C] Money / Barcelona
   `);
 
   const editor = await screen.findByLabelText("edit Barcelona");
@@ -457,20 +459,20 @@ Barcelona
   await expectTree(`
 Barcelona
   [NEW NODE]
-  [I] Barcelona  <<< Money
+  [C] Money / Barcelona
   `);
 });
 
-describe("Incoming ref drag and drop", () => {
-  test("dragging incoming ref onto a sibling accepts it", async () => {
+describe("Occurrence drag and drop", () => {
+  test("dragging occurrence onto a sibling accepts it", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
-    const incomingRef = await screen.findByLabelText("Bitcoin <<< Money");
+    const occurrence = await screen.findByLabelText("Money / Bitcoin");
     const details = await screen.findByLabelText("Details");
 
-    fireEvent.dragStart(incomingRef);
+    fireEvent.dragStart(occurrence);
     fireEvent.drop(details);
 
     await expectTree(`
@@ -481,18 +483,18 @@ Crypto
     `);
   });
 
-  test("dragging multiple selected incoming refs onto a sibling accepts all", async () => {
+  test("dragging multiple selected occurrences onto a sibling accepts all", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupTwoIncomingRefs();
+    await setupTwoOccurrences();
 
-    await clickRow("Bitcoin <<< Tech");
+    await clickRow("Tech / Bitcoin");
     await userEvent.keyboard("{Shift>}j{/Shift}");
 
-    const incomingRef = await screen.findByLabelText("Bitcoin <<< Tech");
+    const occurrence = await screen.findByLabelText("Tech / Bitcoin");
     const details = await screen.findByLabelText("Details");
 
-    fireEvent.dragStart(incomingRef);
+    fireEvent.dragStart(occurrence);
     fireEvent.drop(details);
 
     await expectTree(`
@@ -504,7 +506,7 @@ Crypto
     `);
   });
 
-  test("mixed selection drag: regular item + incoming ref to top of list", async () => {
+  test("mixed selection drag: regular item + occurrence to top of list", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
@@ -520,10 +522,10 @@ Crypto
     A
     B
     C
-    [I] Bitcoin  <<< Money
+    [C] Money / Bitcoin
     `);
 
-    // Select C + incoming ref
+    // Select C + occurrence
     await clickRow("C");
     await userEvent.keyboard("{Shift>}j{/Shift}");
 
@@ -543,25 +545,25 @@ Crypto
     `);
   });
 
-  test("dragging incoming ref into another pane accepts it", async () => {
+  test("dragging occurrence into another pane accepts it", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
     await userEvent.click(screen.getByLabelText("Open new pane"));
     await navigateToNodeViaSearch(1, "Money");
 
-    const incomingRef = await screen.findByLabelText("Bitcoin <<< Money");
+    const occurrence = await screen.findByLabelText("Money / Bitcoin");
     const moneyCollapse = getPane(1).getByLabelText("collapse Money");
 
-    fireEvent.dragStart(incomingRef);
+    fireEvent.dragStart(occurrence);
     fireEvent.drop(moneyCollapse);
 
     await expectTree(`
 Crypto
   Bitcoin
     Details
-    [I] Bitcoin  <<< Money
+    [C] Money / Bitcoin
 Money
   [V]
   Bitcoin
@@ -569,13 +571,13 @@ Money
   });
 });
 
-describe("Incoming ref filter toggle", () => {
-  test("pressing 0 on focused incoming ref hides it and pressing 0 again brings it back", async () => {
+describe("Occurrence filter toggle", () => {
+  test("pressing 0 on focused occurrence hides it and pressing 0 again brings it back", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
-    await clickRow("Bitcoin <<< Money");
+    await clickRow("Money / Bitcoin");
     await userEvent.keyboard("0");
 
     await expectTree(`
@@ -590,11 +592,11 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [I] Bitcoin  <<< Money
+    [C] Money / Bitcoin
     `);
   });
 
-  test("toggling off incoming filter also hides occurrences", async () => {
+  test("toggling off occurrences filter hides occurrences", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
@@ -612,7 +614,7 @@ Cities
     `);
 
     await userEvent.click(
-      await screen.findByLabelText("toggle Incoming References filter")
+      await screen.findByLabelText("toggle Occurrences filter")
     );
 
     await expectTree(`
@@ -622,14 +624,12 @@ Cities
     `);
   });
 
-  test("toggling incoming filter back on shows them again", async () => {
+  test("toggling occurrences filter back on shows them again", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
-    await setupIncomingRef();
+    await setupOccurrence();
 
-    const btn = await screen.findByLabelText(
-      "toggle Incoming References filter"
-    );
+    const btn = await screen.findByLabelText("toggle Occurrences filter");
     await userEvent.click(btn);
 
     await expectTree(`
@@ -644,7 +644,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [I] Bitcoin  <<< Money
+    [C] Money / Bitcoin
     `);
   });
 });

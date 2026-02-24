@@ -369,7 +369,7 @@ My Notes
 My Notes
   Holiday Destinations
     Spain
-    [I] Holiday Destinations  <<< Travel
+    [C] Travel / Holiday Destinations
     [S] Austria
     `);
   });

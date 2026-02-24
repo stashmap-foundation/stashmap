@@ -56,8 +56,8 @@ test("Node referenced from different roots shows incoming refs", async () => {
 Money
   Bitcoin
     Details
-    [I] Bitcoin  <<< P2P
-    [I] Bitcoin  <<< Crypto
+    [C] P2P / Bitcoin
+    [C] Crypto / Bitcoin
   `);
 });
 
@@ -78,7 +78,7 @@ Work
   Projects
     Target
       Child
-      [I] Target  <<< Level2 / Level1 / Notes
+      [C] Notes / Level1 / Level2 / Target
   `);
 });
 
@@ -97,7 +97,7 @@ test("Other user's incoming ref shows other-user indicator", async () => {
 Alice Root
   Shared
     Detail
-    [OI] Shared  <<< Bob Root
+    [OC] Bob Root / Shared
   `);
 });
 

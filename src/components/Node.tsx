@@ -245,21 +245,20 @@ function ReferenceContent({ node }: { node: ReferenceNode }): JSX.Element {
     );
   }
 
-  if (virtualType === "incoming") {
-    const reversed = [...node.contextLabels].reverse().join(" / ");
+  if (virtualType === "occurrence") {
+    const contextPath = node.contextLabels.join(" / ");
+    const hasIndicator =
+      relevanceChar(node.incomingRelevance) ||
+      argumentChar(node.incomingArgument);
     return (
       <span className="break-word" data-testid="reference-node">
-        {node.targetLabel}{" "}
+        {contextPath && <>{contextPath} / </>}
         <IncomingIndicator
           relevance={node.incomingRelevance}
           argument={node.incomingArgument}
         />
-        {reversed && (
-          <>
-            {" "}
-            <span className="ref-separator">&lt;&lt;&lt;</span> {reversed}
-          </>
-        )}
+        {hasIndicator && " "}
+        {node.targetLabel}
         <OtherUserIcon node={node} />
       </span>
     );
@@ -721,14 +720,10 @@ function SuggestionIndicator(): JSX.Element {
   );
 }
 
-function ReferenceGutterIndicator(): JSX.Element {
+function OccurrenceGutterIndicator(): JSX.Element {
   return (
-    <span
-      className="reference-indicator"
-      title="Incoming reference"
-      aria-hidden="true"
-    >
-      R
+    <span className="reference-indicator" title="Occurrence" aria-hidden="true">
+      =
     </span>
   );
 }
@@ -806,9 +801,7 @@ export function Node({
         <div className="indicator-gutter">
           {isSuggestion && <SuggestionIndicator />}
           {isVersion && <VersionIndicator isOtherUser={!!isOtherUser} />}
-          {(virtualType === "incoming" || virtualType === "occurrence") && (
-            <ReferenceGutterIndicator />
-          )}
+          {virtualType === "occurrence" && <OccurrenceGutterIndicator />}
           {relevance === "relevant" && !isSuggestion && (
             <span
               className="relevant-indicator"

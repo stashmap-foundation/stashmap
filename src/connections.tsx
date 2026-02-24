@@ -362,12 +362,12 @@ function coveredContextKeys(
   }, List<string>().toSet());
 }
 
-export function getIncomingRefsForNode(
+export function getOccurrencesForNode(
   knowledgeDBs: KnowledgeDBs,
   nodeID: LongID | ID,
   currentRelationID: LongID | undefined,
-  currentContext: Context,
   effectiveAuthor: PublicKey,
+  currentContext: Context,
   currentItems?: List<RelationItem>
 ): List<LongID> {
   const allRefs = findRefsToNode(knowledgeDBs, nodeID);
@@ -380,34 +380,8 @@ export function getIncomingRefsForNode(
     .filter((ref) =>
       ref.targetNode
         ? !contextRoot || ref.context.first() !== contextRoot
-        : false
+        : currentContext.size > 0 && ref.context.size === 0
     )
-    .filter((ref) => !covered || !covered.has(ref.context.join(":")));
-  const deduped = deduplicateRefsByContext(filtered, effectiveAuthor);
-  return deduped
-    .sortBy((ref) => -ref.updated)
-    .map((ref) => createConcreteRefId(ref.relationID, ref.targetNode))
-    .toList();
-}
-
-export function getOccurrencesForNode(
-  knowledgeDBs: KnowledgeDBs,
-  nodeID: LongID | ID,
-  currentRelationID: LongID | undefined,
-  effectiveAuthor: PublicKey,
-  currentContext: Context,
-  currentItems?: List<RelationItem>
-): List<LongID> {
-  if (currentContext.size === 0) {
-    return List<LongID>();
-  }
-  const allRefs = findRefsToNode(knowledgeDBs, nodeID);
-  const covered = currentItems
-    ? coveredContextKeys(knowledgeDBs, currentItems, effectiveAuthor)
-    : undefined;
-  const filtered = allRefs
-    .filter((ref) => ref.relationID !== currentRelationID)
-    .filter((ref) => !ref.targetNode && ref.context.size === 0)
     .filter((ref) => !covered || !covered.has(ref.context.join(":")));
   const deduped = deduplicateRefsByContext(filtered, effectiveAuthor);
   return deduped

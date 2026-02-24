@@ -92,14 +92,14 @@ Changes are never applied directly. They're accumulated in a `Plan` (extends `Da
 
 **Data flow**: User input → Plan → executePlan → sign → PublishQueue → Nostr relays → remote users receive via subscription → EventCache → KnowledgeDBs → re-render.
 
-## References & Suggestions
+## References, Occurrences & Suggestions
 
 - **Suggestions**: Items other users added to the same node (virtualType: "suggestion")
 - **Versions**: Alternative relations for the same head node with diffs (virtualType: "version")
-- **Incoming references**: This node referenced from another relation (virtualType: "incoming")
-- **Occurrences**: This node appears in another of your own relations (virtualType: "occurrence")
+- **Occurrences**: This node appears in another relation — same node, different context (virtualType: "occurrence"). Display: `Context / Target` with `=` gutter indicator. Includes both item-level (node is a child in another tree) and head-level (node is head of a root-level relation) appearances.
+- **Outgoing references**: Stored cref items linking to another relation (display: `Context >>> Target`)
 
-Built via `getSuggestionsForNode`, `getVersionsForRelation`, `buildReferenceNode`.
+Built via `getSuggestionsForNode`, `getVersionsForRelation`, `getOccurrencesForNode`, `buildReferenceNode`.
 
 ### Link Direction & Relevance Model
 

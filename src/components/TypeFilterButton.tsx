@@ -78,9 +78,9 @@ const VERSIONS_FILTER = {
 
 const INCOMING_FILTER = {
   id: "incoming" as const,
-  label: "Incoming References",
+  label: "Occurrences",
   color: TYPE_COLORS.referenced_by,
-  symbol: "R",
+  symbol: "=",
 };
 
 export type FilterId =

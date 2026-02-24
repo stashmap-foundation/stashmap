@@ -101,11 +101,11 @@ Root
 Money
   Bitcoin
     Details
-    [I] Bitcoin  <<< Crypto
+    [C] Crypto / Bitcoin
     `);
 
-    await screen.findByLabelText(/decline Bitcoin/);
-    await screen.findByLabelText(/Evidence for Bitcoin <<< Crypto/);
+    await screen.findByLabelText(/decline Crypto \/ Bitcoin/);
+    await screen.findByLabelText(/Evidence for Crypto \/ Bitcoin/);
   });
 
   test("evidence selector persists after setting", async () => {

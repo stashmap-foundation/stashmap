@@ -50,7 +50,7 @@ test("open reference node in split pane uses reference path", async () => {
   await expectTree(`
 Countries in Europe
   Spain
-    [I] Spain  <<< Holiday Destinations / My Notes
+    [C] My Notes / Holiday Destinations / Spain
   `);
 
   const splitButtons = await screen.findAllByLabelText("open in split pane");
@@ -59,7 +59,7 @@ Countries in Europe
   await expectTree(`
 Countries in Europe
   Spain
-    [I] Spain  <<< Holiday Destinations / My Notes
+    [C] My Notes / Holiday Destinations / Spain
 Holiday Destinations
   Spain
   `);

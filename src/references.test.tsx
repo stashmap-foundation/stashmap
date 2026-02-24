@@ -156,7 +156,7 @@ describe("findRefsToNode", () => {
     expect(refs.size).toBe(1);
     expect(refs.first()!.relationID).toBe(myNotesRelation.id);
     expect(refs.first()!.targetNode).toBe(shortID(stuff.id));
-    expect(refs.first()!.context.toArray()).toEqual([]);
+    expect(refs.first()!.context.toArray()).toEqual([shortID(myNotes.id)]);
   });
 
   test("~Versions IN case: child of version resolves to grandparent with targetNode", () => {
@@ -213,7 +213,7 @@ describe("findRefsToNode", () => {
     expect(refs.size).toBe(1);
     expect(refs.first()!.relationID).toBe(myNotesRelation.id);
     expect(refs.first()!.targetNode).toBe(shortID(stuff.id));
-    expect(refs.first()!.context.toArray()).toEqual([]);
+    expect(refs.first()!.context.toArray()).toEqual([shortID(myNotes.id)]);
   });
 
   test("~Versions at root level: version resolves to HEAD ref (occurrence)", () => {

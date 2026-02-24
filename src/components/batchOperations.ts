@@ -131,7 +131,7 @@ function planUpdateOneRelevance(
         stack,
         undefined,
         relevance
-      );
+      )[0];
     }
     return acc;
   }
@@ -199,7 +199,7 @@ function planUpdateOneArgument(
               undefined,
               undefined,
               argument
-            );
+            )[0];
       return acceptedPlan;
     }
     return acc;

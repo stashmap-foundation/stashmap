@@ -345,13 +345,32 @@ export function planMoveNodeWithView(
   const sourceContext = getContext(plan, sourceViewPath, sourceStack);
   const sourceRelation = getRelationForView(plan, sourceViewPath, sourceStack);
 
-  const planWithAdd = planAddToParent(
+  const sourceParentPath = getParentView(sourceViewPath);
+  const sourceParentRelation = sourceParentPath
+    ? getRelationForView(plan, sourceParentPath, stack)
+    : undefined;
+  const targetParentRelation = getRelationForView(
+    plan,
+    targetParentViewPath,
+    stack
+  );
+  const isSameParentRelation =
+    sourceParentRelation !== undefined &&
+    targetParentRelation !== undefined &&
+    sourceParentRelation.id === targetParentRelation.id;
+
+  const [planWithAdd, [actualNodeID]] = planAddToParent(
     plan,
     sourceNodeID,
     targetParentViewPath,
     stack,
-    insertAtIndex
+    insertAtIndex,
+    undefined,
+    undefined,
+    isSameParentRelation ? [shortID(sourceNodeID)] : undefined
   );
+
+  const moveNodeID = actualNodeID ?? sourceNodeID;
 
   const targetParentContext = getContext(
     planWithAdd,
@@ -401,7 +420,8 @@ export function planMoveNodeWithView(
     sourceNodeID,
     sourceContext,
     targetContext,
-    sourceRelation
+    sourceRelation,
+    moveNodeID !== sourceNodeID ? moveNodeID : undefined
   );
 }
 
@@ -497,7 +517,13 @@ export function dnd(
         const sourcePath = parseViewPath(s);
         const [sourceNodeID] = getNodeIDFromView(accPlan, sourcePath);
         const insertAt = dropIndex + sourceIndices.size + idx;
-        return planAddToParent(accPlan, sourceNodeID, toView, stack, insertAt);
+        return planAddToParent(
+          accPlan,
+          sourceNodeID,
+          toView,
+          stack,
+          insertAt
+        )[0];
       }, reorderedPlan);
   }
 
@@ -524,7 +550,7 @@ export function dnd(
         const insertAt = dropIndex + idx;
 
         if (isRefId(sourceNodeID)) {
-          const planWithAdd = planAddToParent(
+          const [planWithAdd] = planAddToParent(
             accPlan,
             sourceNodeID,
             toView,
@@ -605,7 +631,7 @@ export function dnd(
             toView,
             stack,
             insertAt
-          );
+          )[0];
         }
         const planWithRelation = upsertRelations(
           accPlan,
@@ -624,7 +650,7 @@ export function dnd(
           toView,
           stack,
           insertAt
-        );
+        )[0];
       }
 
       return planDeepCopyNodeWithView(

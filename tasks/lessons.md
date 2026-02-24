@@ -37,3 +37,43 @@
 **Mistake**: CLAUDE.md explicitly says "After ANY correction from the user: update `tasks/lessons.md`". MEMORY.md is for codebase architecture notes and code style reminders, not correction-driven lessons.
 
 **Rule**: Always put lessons from corrections in `tasks/lessons.md`. MEMORY.md is only for persistent architecture/style notes that help across sessions.
+
+## Test Writing: Build Incrementally
+
+**Mistake**: Wrote an entire DnD test in one shot with assumed typing sequence, then spent hours debugging why the tree structure was wrong and the drop target was wrong.
+
+**Rule**: Always build tests step by step. After EVERY statement, add `await expectTree(...)` to verify the current state. Only proceed to the next step once the current one produces the expected tree. Never write a full test and then debug it.
+
+## Typing Sequences: How Tree Structure Works
+
+**Mistake**: Assumed `Apple{Enter}Basket` creates Apple and Basket as siblings. It doesn't — `{Enter}` from an expanded node creates a child inside it.
+
+**Rules**:
+- `{Enter}` creates a new node AFTER the current one at the same depth — but if the current node has expanded children, the new node appears inside it
+- To add a sibling of a node that has children, click the PARENT's editor and press `{Enter}`
+- `{Tab}` indents (makes child), works on new empty nodes
+- When in doubt: type a small sequence, check with `expectTree`, then continue
+
+## DOM Order with Duplicate Names
+
+**Mistake**: Assumed `getAllByRole("treeitem", { name: "Apple" })[1]` would return the "inner" Apple. Got confused about which index maps to which element.
+
+**Rule**: `getAllBy*` returns elements in DOM order (top to bottom in the rendered tree). With a tree like:
+```
+Root
+  Basket
+    Apple    ← [0] (rendered first in Virtuoso)
+  Apple      ← [1] (rendered second)
+```
+The Apple under Basket is `[0]` because it appears earlier in the visual tree.
+
+## DnD Tests: Use Existing Patterns
+
+Working DnD tests use simple patterns:
+```ts
+fireEvent.dragStart(screen.getByText("Item C"));
+fireEvent.drop(screen.getByLabelText("Root"));
+```
+- Dropping on Root moves item to position 0 (beginning of children)
+- No need for `setDropIndentDepth` for simple moves
+- `fireEvent.dragStart` + `fireEvent.drop` is sufficient (no dragEnter/dragOver needed)

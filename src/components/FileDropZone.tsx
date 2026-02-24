@@ -2,13 +2,18 @@ import React from "react";
 import { List } from "immutable";
 import { useDropzone } from "react-dropzone";
 import MarkdownIt from "markdown-it";
-import { newNode, bulkAddRelations } from "../connections";
-import { newRelations } from "../ViewContext";
+import { newNode, bulkAddRelations, hashText } from "../connections";
+import { newRelations, ViewPath } from "../ViewContext";
 import {
   Plan,
   ParsedLine,
   planUpsertNode,
   planUpsertRelations,
+  planAddToParent,
+  planMoveTreeDescendantsToContext,
+  planCreateVersion,
+  findUniqueText,
+  parseClipboardText,
   usePlanner,
 } from "../planner";
 
@@ -185,6 +190,14 @@ export function parsedLinesToTrees(items: ParsedLine[]): MarkdownTreeNode[] {
 }
 /* eslint-enable functional/immutable-data */
 
+export function parseTextToTrees(text: string): MarkdownTreeNode[] {
+  const hasHeaders = text.split("\n").some((line) => /^#{1,6}\s/.test(line));
+  if (hasHeaders) {
+    return parseMarkdownHierarchy(text);
+  }
+  return parsedLinesToTrees(parseClipboardText(text));
+}
+
 function normalizeRootsForSingleFile(
   roots: MarkdownTreeNode[],
   fileName: string
@@ -235,12 +248,28 @@ function materializeTreeNode(
   const childContext = context.push(node.id);
   const [withChildren, childIDs] = treeNode.children.reduce(
     ([accPlan, accChildIDs], childNode) => {
-      const [nextPlan, childID] = materializeTreeNode(
+      const childID = hashText(childNode.text);
+      const isDuplicate = accChildIDs.includes(childID);
+      const effectiveChild = isDuplicate
+        ? {
+            ...childNode,
+            text: findUniqueText(childNode.text, accChildIDs),
+          }
+        : childNode;
+      const [afterChild, materializedID] = materializeTreeNode(
         accPlan,
-        childNode,
+        effectiveChild,
         childContext
       );
-      return [nextPlan, [...accChildIDs, childID]];
+      const afterVersion = isDuplicate
+        ? planCreateVersion(
+            afterChild,
+            materializedID,
+            childNode.text,
+            childContext
+          )
+        : afterChild;
+      return [afterVersion, [...accChildIDs, materializedID]];
     },
     [withNode, [] as ID[]] as [Plan, ID[]]
   );
@@ -255,40 +284,25 @@ function materializeTreeNode(
 export function planCreateNodesFromMarkdownTrees(
   plan: Plan,
   trees: MarkdownTreeNode[],
-  context: List<ID> = List()
+  context: List<ID> = List<ID>()
 ): [Plan, topNodeIDs: ID[]] {
-  const materializeTrees = (
-    sourcePlan: Plan,
-    sourceContext: List<ID>
-  ): [Plan, ID[]] =>
-    trees.reduce(
-      ([accPlan, accTopNodeIDs], treeNode) => {
-        const [nextPlan, topNodeID] = materializeTreeNode(
-          accPlan,
-          treeNode,
-          sourceContext
-        );
-        return [nextPlan, [...accTopNodeIDs, topNodeID]];
-      },
-      [sourcePlan, [] as ID[]] as [Plan, ID[]]
-    );
-
-  const [planWithContext, topNodeIDs] = materializeTrees(plan, context);
-  if (context.size === 0) {
-    return [planWithContext, topNodeIDs];
-  }
-
-  const [planWithStandaloneContext] = materializeTrees(
-    planWithContext,
-    List<ID>()
+  return trees.reduce(
+    ([accPlan, accTopNodeIDs], treeNode) => {
+      const [nextPlan, topNodeID] = materializeTreeNode(
+        accPlan,
+        treeNode,
+        context
+      );
+      return [nextPlan, [...accTopNodeIDs, topNodeID]];
+    },
+    [plan, [] as ID[]] as [Plan, ID[]]
   );
-  return [planWithStandaloneContext, topNodeIDs];
 }
 
 export function planCreateNodesFromMarkdownFiles(
   plan: Plan,
   files: MarkdownImportFile[],
-  context: List<ID> = List()
+  context: List<ID> = List<ID>()
 ): [Plan, topNodeIDs: ID[]] {
   const trees = parseMarkdownImportFiles(files);
   return planCreateNodesFromMarkdownTrees(plan, trees, context);
@@ -308,7 +322,7 @@ export function createNodesFromMarkdown(markdownText: string): KnowNode[] {
 export function planCreateNodesFromMarkdown(
   plan: Plan,
   markdownText: string,
-  context: List<ID> = List()
+  context: List<ID> = List<ID>()
 ): [Plan, topNodeID: ID] {
   const [nextPlan, topNodeIDs] = planCreateNodesFromMarkdownFiles(
     plan,
@@ -322,6 +336,37 @@ export function planCreateNodesFromMarkdown(
 
   const fallbackNode = newNode("Imported Markdown");
   return [planUpsertNode(nextPlan, fallbackNode), fallbackNode.id];
+}
+
+export function planPasteMarkdownTrees(
+  plan: Plan,
+  trees: MarkdownTreeNode[],
+  parentViewPath: ViewPath,
+  stack: ID[],
+  insertAtIndex?: number
+): Plan {
+  return trees.reduce((accPlan, tree, idx) => {
+    const insertAt =
+      insertAtIndex !== undefined ? insertAtIndex + idx : undefined;
+    const [planWithNode, topNodeIDs] = planCreateNodesFromMarkdownTrees(
+      accPlan,
+      [tree]
+    );
+    const [planWithAdded, actualIDs] = planAddToParent(
+      planWithNode,
+      topNodeIDs,
+      parentViewPath,
+      stack,
+      insertAt
+    );
+    return planMoveTreeDescendantsToContext(
+      planWithAdded,
+      topNodeIDs,
+      actualIDs,
+      parentViewPath,
+      stack
+    );
+  }, plan);
 }
 
 type FileDropZoneProps = {

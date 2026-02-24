@@ -34,6 +34,8 @@ import {
   parseConcreteRefId,
   LOG_NODE_ID,
   createConcreteRefId,
+  hashText,
+  isRefId,
 } from "./connections";
 import {
   newRelations,
@@ -662,6 +664,76 @@ export function planExpandNode(
   );
 }
 
+export function findUniqueText(
+  text: string,
+  existingIDs: ID[],
+  n: number = 1
+): string {
+  const candidate = `${text} (${n})`;
+  return existingIDs.includes(hashText(candidate))
+    ? findUniqueText(text, existingIDs, n + 1)
+    : candidate;
+}
+
+function resolveCollisions(
+  plan: Plan,
+  nodeIDsArray: (LongID | ID)[],
+  parentViewPath: ViewPath,
+  stack: ID[],
+  excludeNodeIDs?: readonly ID[]
+): [Plan, (LongID | ID)[]] {
+  const relation = getRelationForView(plan, parentViewPath, stack);
+  if (!relation) {
+    return [plan, nodeIDsArray];
+  }
+
+  const [parentNodeID] = getNodeIDFromView(plan, parentViewPath);
+  const parentContext = getContext(plan, parentViewPath, stack);
+  const nodeContext = parentContext.push(parentNodeID);
+
+  return nodeIDsArray.reduce<[Plan, (LongID | ID)[]]>(
+    ([accPlan, accIDs], nodeID) => {
+      if (isRefId(nodeID)) {
+        return [accPlan, [...accIDs, nodeID]];
+      }
+
+      const alreadyExists = relation.items.some(
+        (item) =>
+          item.nodeID === nodeID &&
+          (!excludeNodeIDs || !excludeNodeIDs.includes(item.nodeID))
+      );
+      const alreadyAdded = accIDs.some((id) => id === nodeID);
+      if (!alreadyExists && !alreadyAdded) {
+        return [accPlan, [...accIDs, nodeID]];
+      }
+
+      const node = getNodeFromID(
+        accPlan.knowledgeDBs,
+        nodeID,
+        accPlan.user.publicKey
+      );
+      if (!node || node.type !== "text") {
+        return [accPlan, [...accIDs, nodeID]];
+      }
+
+      const relationIDs = relation.items.map((item) => item.nodeID).toArray();
+      const uniqueText = findUniqueText(node.text, relationIDs);
+      const variantNode = newNode(uniqueText);
+      const planWithVariant = planUpsertNode(accPlan, variantNode);
+      const planWithVersion = planCreateVersion(
+        planWithVariant,
+        variantNode.id,
+        node.text,
+        nodeContext
+      );
+      return [planWithVersion, [...accIDs, variantNode.id]];
+    },
+    [plan, []]
+  );
+}
+
+// excludeFromCollisions: node IDs about to be disconnected (e.g. during move),
+// so they shouldn't count as existing siblings when detecting collisions.
 export function planAddToParent(
   plan: Plan,
   nodeIDs: LongID | ID | (LongID | ID)[],
@@ -669,24 +741,33 @@ export function planAddToParent(
   stack: ID[],
   insertAtIndex?: number,
   relevance?: Relevance,
-  argument?: Argument
-): Plan {
+  argument?: Argument,
+  excludeFromCollisions?: readonly ID[]
+): [Plan, (LongID | ID)[]] {
   const nodeIDsArray = Array.isArray(nodeIDs) ? nodeIDs : [nodeIDs];
   if (nodeIDsArray.length === 0) {
-    return plan;
+    return [plan, []];
   }
 
   const [, parentView] = getNodeIDFromView(plan, parentViewPath);
   const planWithExpand = planExpandNode(plan, parentView, parentViewPath);
 
-  const updatedRelationsPlan = upsertRelations(
+  const [planWithCollisions, resolvedIDs] = resolveCollisions(
     planWithExpand,
+    nodeIDsArray,
+    parentViewPath,
+    stack,
+    excludeFromCollisions
+  );
+
+  const updatedRelationsPlan = upsertRelations(
+    planWithCollisions,
     parentViewPath,
     stack,
     (relations) =>
       bulkAddRelations(
         relations,
-        nodeIDsArray,
+        resolvedIDs,
         relevance,
         argument,
         insertAtIndex
@@ -697,11 +778,11 @@ export function planAddToParent(
     updatedRelationsPlan,
     parentViewPath,
     stack as ID[],
-    nodeIDsArray.length,
+    resolvedIDs.length,
     insertAtIndex
   );
 
-  return planUpdateViews(updatedRelationsPlan, updatedViews);
+  return [planUpdateViews(updatedRelationsPlan, updatedViews), resolvedIDs];
 }
 
 type RelationsIdMapping = Map<LongID, LongID>;
@@ -712,7 +793,8 @@ function planCopyDescendantRelations(
   sourceContext: Context,
   transformContext: (relation: Relations) => Context,
   filterRelation?: (relation: Relations) => boolean,
-  sourceRelation?: Relations
+  sourceRelation?: Relations,
+  targetNodeID?: LongID | ID
 ): [Plan, RelationsIdMapping] {
   const allDescendants = getDescendantRelations(
     plan.knowledgeDBs,
@@ -732,8 +814,14 @@ function planCopyDescendantRelations(
   return descendants.reduce(
     ([accPlan, accMapping], relation) => {
       const newContext = transformContext(relation);
+      const head =
+        targetNodeID &&
+        relation.head === shortID(sourceNodeID) &&
+        contextsMatch(relation.context, sourceContext)
+          ? targetNodeID
+          : relation.head;
       const baseRelation = newRelations(
-        relation.head,
+        head,
         newContext,
         accPlan.user.publicKey
       );
@@ -757,7 +845,8 @@ export function planMoveDescendantRelations(
   sourceNodeID: LongID | ID,
   sourceContext: Context,
   targetContext: Context,
-  sourceRelation?: Relations
+  sourceRelation?: Relations,
+  targetNodeID?: LongID | ID
 ): Plan {
   const allDescendants = getDescendantRelations(
     plan.knowledgeDBs,
@@ -774,8 +863,9 @@ export function planMoveDescendantRelations(
         .push(sourceRelation)
     : allDescendants;
 
+  const effectiveTargetNodeID = targetNodeID ?? sourceNodeID;
   const sourceChildContext = sourceContext.push(shortID(sourceNodeID));
-  const targetChildContext = targetContext.push(shortID(sourceNodeID));
+  const targetChildContext = targetContext.push(shortID(effectiveTargetNodeID));
 
   return descendants.reduce((accPlan, relation) => {
     const isDirectChildrenRelation =
@@ -786,10 +876,38 @@ export function planMoveDescendantRelations(
       : targetChildContext.concat(
           relation.context.skip(sourceChildContext.size)
         );
+    const head = isDirectChildrenRelation
+      ? shortID(effectiveTargetNodeID)
+      : relation.head;
     return planUpsertRelations(accPlan, {
       ...relation,
+      head,
       context: newContext,
     });
+  }, plan);
+}
+
+export function planMoveTreeDescendantsToContext(
+  plan: Plan,
+  originalTopNodeIDs: ID[],
+  actualNodeIDs: (LongID | ID)[],
+  parentViewPath: ViewPath,
+  stack: ID[]
+): Plan {
+  const parentContext = getContext(plan, parentViewPath, stack);
+  const [parentNodeID] = getNodeIDFromView(plan, parentViewPath);
+  const targetContext = parentContext.push(shortID(parentNodeID));
+
+  return originalTopNodeIDs.reduce((accPlan, originalID, index) => {
+    const actualID = actualNodeIDs[index];
+    return planMoveDescendantRelations(
+      accPlan,
+      originalID,
+      List<ID>(),
+      targetContext,
+      undefined,
+      actualID !== originalID ? actualID : undefined
+    );
   }, plan);
 }
 
@@ -900,7 +1018,7 @@ export function planDeepCopyNode(
   const [targetParentNodeID] = getNodeIDFromView(plan, targetParentViewPath);
   const nodeNewContext = targetParentContext.push(shortID(targetParentNodeID));
 
-  const planWithNode = planAddToParent(
+  const [planWithNode, [actualNodeID]] = planAddToParent(
     plan,
     resolvedNodeID,
     targetParentViewPath,
@@ -910,20 +1028,27 @@ export function planDeepCopyNode(
     argument
   );
 
+  const copyNodeID = actualNodeID ?? resolvedNodeID;
+  const sourceChildContext = resolvedContext.push(shortID(resolvedNodeID));
+  const targetChildContext = nodeNewContext.push(shortID(copyNodeID));
+
   const [finalPlan, mapping] = planCopyDescendantRelations(
     planWithNode,
     resolvedNodeID,
     resolvedContext,
     (relation) => {
       const isDirectChildrenRelation =
-        relation.head === resolvedNodeID &&
+        relation.head === shortID(resolvedNodeID) &&
         contextsMatch(relation.context, resolvedContext);
       return isDirectChildrenRelation
         ? nodeNewContext
-        : nodeNewContext.concat(relation.context.skip(resolvedContext.size));
+        : targetChildContext.concat(
+            relation.context.skip(sourceChildContext.size)
+          );
     },
     undefined,
-    sourceRelation
+    sourceRelation,
+    copyNodeID !== resolvedNodeID ? copyNodeID : undefined
   );
 
   return [finalPlan, mapping];
@@ -1061,7 +1186,6 @@ export function planSaveNodeAndEnsureRelations(
       if (!trimmedText) return { plan, viewPath };
       return planCreateNoteAtRoot(plan, trimmedText, viewPath);
     }
-    const [parentNodeID] = getNodeIDFromView(plan, parentPath);
     const relations = getRelationForView(plan, parentPath, stack);
 
     if (!trimmedText) {
@@ -1073,23 +1197,6 @@ export function planSaveNodeAndEnsureRelations(
 
     const [planWithNode, createdNode] = planCreateNode(plan, trimmedText);
 
-    const parentContext = getContext(plan, parentPath, stack);
-    const nodeContext = parentContext.push(parentNodeID);
-    const existingVersions = getVersionsRelations(
-      planWithNode.knowledgeDBs,
-      planWithNode.user.publicKey,
-      createdNode.id,
-      nodeContext
-    );
-    const planWithVersion = existingVersions
-      ? planCreateVersion(
-          planWithNode,
-          createdNode.id,
-          trimmedText,
-          nodeContext
-        )
-      : planWithNode;
-
     const emptyNodeMetadata = computeEmptyNodeMetadata(
       plan.publishEventsStatus.temporaryEvents
     );
@@ -1099,10 +1206,10 @@ export function planSaveNodeAndEnsureRelations(
     const emptyNodeIndex = metadata?.index ?? 0;
 
     const planWithoutEmpty = relations
-      ? planRemoveEmptyNodePosition(planWithVersion, relations.id)
-      : planWithVersion;
+      ? planRemoveEmptyNodePosition(planWithNode, relations.id)
+      : planWithNode;
 
-    const resultPlan = planAddToParent(
+    const [resultPlan] = planAddToParent(
       planWithoutEmpty,
       createdNode.id,
       parentPath,

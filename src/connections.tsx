@@ -267,7 +267,7 @@ function findAncestorRef(
     if (grandparentRelation) {
       return {
         relationID: grandparentRelation.id,
-        context: grandparentContext,
+        context: parentContext,
         updated,
         targetNode: parentNodeID,
       };

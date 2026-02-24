@@ -48,18 +48,18 @@ import { SignInMenuBtn } from "../SignIn";
 import {
   usePlanner,
   planForkPane,
-  planAddToParent,
   planClearTemporarySelection,
   planSelectAllTemporaryRows,
   planShiftTemporarySelection,
   planToggleTemporarySelection,
-  parseClipboardText,
 } from "../planner";
+import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import {
-  parsedLinesToTrees,
-  planCreateNodesFromMarkdownTrees,
-} from "./FileDropZone";
-import { LOG_NODE_ID, VERSIONS_NODE_ID, shortID } from "../connections";
+  LOG_NODE_ID,
+  VERSIONS_NODE_ID,
+  isSearchId,
+  shortID,
+} from "../connections";
 import { buildNodeUrl } from "../navigationUrl";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import {
@@ -125,27 +125,29 @@ function Breadcrumbs(): JSX.Element {
 
   return (
     <nav className="breadcrumbs" aria-label="Navigation breadcrumbs">
-      {stack.map((nodeID, index) => {
-        const targetUrl =
-          buildNodeUrl(
-            stack.slice(0, index + 1),
-            knowledgeDBs,
-            user.publicKey,
-            pane.author
-          ) || "#";
-        return (
-          <BreadcrumbItem
-            key={nodeID as string}
-            nodeID={nodeID}
-            href={targetUrl}
-            onClick={(e) => {
-              e.preventDefault();
-              navigatePane(targetUrl);
-            }}
-            isLast={index === stack.length - 1}
-          />
-        );
-      })}
+      {stack
+        .filter((id) => !isSearchId(id as ID))
+        .map((nodeID, index) => {
+          const targetUrl =
+            buildNodeUrl(
+              stack.slice(0, index + 1),
+              knowledgeDBs,
+              user.publicKey,
+              pane.author
+            ) || "#";
+          return (
+            <BreadcrumbItem
+              key={nodeID as string}
+              nodeID={nodeID}
+              href={targetUrl}
+              onClick={(e) => {
+                e.preventDefault();
+                navigatePane(targetUrl);
+              }}
+              isLast={index === stack.length - 1}
+            />
+          );
+        })}
     </nav>
   );
 }
@@ -977,22 +979,12 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       const activeRowKey = getRowKey(activeRow);
       const parentPath = parseViewPath(activeRowKey);
       navigator.clipboard.readText().then((text) => {
-        const items = parseClipboardText(text);
-        if (items.length === 0) {
+        const trees = parseTextToTrees(text);
+        if (trees.length === 0) {
           return;
         }
-        const trees = parsedLinesToTrees(items);
-        const plan = createPlan();
-        const parentContext = getContext(plan, parentPath, stack);
-        const [parentNodeID] = getNodeIDFromView(plan, parentPath);
-        const pasteContext = parentContext.push(shortID(parentNodeID) as ID);
-        const [planWithNodes, topNodeIDs] = planCreateNodesFromMarkdownTrees(
-          plan,
-          trees,
-          pasteContext
-        );
         executePlan(
-          planAddToParent(planWithNodes, topNodeIDs, parentPath, stack, 0)
+          planPasteMarkdownTrees(createPlan(), trees, parentPath, stack, 0)
         );
       });
       return;

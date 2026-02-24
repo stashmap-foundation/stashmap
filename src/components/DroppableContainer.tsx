@@ -1,5 +1,5 @@
 import React, { RefObject, useEffect, useRef } from "react";
-import { List, OrderedSet } from "immutable";
+import { OrderedSet } from "immutable";
 import { ConnectDropTarget, DropTargetMonitor, useDrop } from "react-dnd";
 import { NativeTypes } from "react-dnd-html5-backend";
 import { dnd, getDropDestinationFromTreeView } from "../dnd";
@@ -7,14 +7,12 @@ import { isEmptyNodeID, shortID } from "../connections";
 import { deselectAllChildren, useTemporaryView } from "./TemporaryViewContext";
 import {
   Plan,
-  planAddToParent,
   planSetTemporarySelectionState,
   planUpdatePanes,
   usePlanner,
 } from "../planner";
 import {
   ViewPath,
-  getContext,
   getNodeIDFromView,
   getParentKey,
   useViewPath,
@@ -27,6 +25,7 @@ import {
   MarkdownImportFile,
   parseMarkdownImportFiles,
   planCreateNodesFromMarkdownTrees,
+  planPasteMarkdownTrees,
 } from "./FileDropZone";
 
 export type DragItemType = {
@@ -425,7 +424,7 @@ export function useDroppable({
               return;
             }
             const [planWithMarkdown, topNodeIDs] =
-              planCreateNodesFromMarkdownTrees(plan, [rootTree], List<ID>());
+              planCreateNodesFromMarkdownTrees(plan, [rootTree]);
             const rootNodeID = topNodeIDs[0];
             if (!rootNodeID) {
               return;
@@ -436,23 +435,10 @@ export function useDroppable({
             return;
           }
 
-          const parentContext = getContext(plan, dropParentPath, stack);
-          const markdownContext = parentContext.push(
-            shortID(dropParentNodeID) as ID
-          );
-          const [planWithMarkdown, topNodeIDs] =
-            planCreateNodesFromMarkdownTrees(
+          await executePlan(
+            planPasteMarkdownTrees(
               plan,
               importedTrees,
-              markdownContext
-            );
-          if (topNodeIDs.length === 0) {
-            return;
-          }
-          await executePlan(
-            planAddToParent(
-              planWithMarkdown,
-              topNodeIDs,
               dropParentPath,
               stack,
               insertAtIndex

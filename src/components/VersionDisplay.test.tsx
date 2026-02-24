@@ -5,6 +5,7 @@ import {
   setup,
   expectTree,
   findNewNodeEditor,
+  renderApp,
   renderTree,
   type,
 } from "../utils.test";
@@ -144,7 +145,7 @@ My Notes
     `);
   });
 
-  test("Creating a node with same text as previously versioned node shows the typed text", async () => {
+  test("Creating a node with same text as existing sibling creates independent node", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -171,9 +172,6 @@ My Notes
     BCN
     `);
 
-    // Now create another node with text "Barcelona" (same content-addressed ID)
-    // This adds "Barcelona" to top of ~Versions, so BOTH nodes show "Barcelona"
-    // (they're the same node with the same ~Versions)
     await userEvent.click(
       await screen.findByLabelText("edit Holiday Destinations")
     );
@@ -181,12 +179,11 @@ My Notes
     await userEvent.type(await findNewNodeEditor(), "Barcelona{Enter}");
     await userEvent.type(await findNewNodeEditor(), "{Escape}");
 
-    // Both references to the same node show the same versioned text
     await expectTree(`
 My Notes
   Holiday Destinations
     Barcelona
-    Barcelona
+    BCN
     `);
 
     cleanup();
@@ -196,7 +193,7 @@ My Notes
 My Notes
   Holiday Destinations
     Barcelona
-    Barcelona
+    BCN
     `);
   });
 
@@ -568,6 +565,349 @@ My Dashboard
 
     await expectTree(`
 My Dashboard
+    `);
+  });
+});
+
+describe("Duplicate node collision resolution", () => {
+  test("Typing same text twice creates independent siblings", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("Root{Enter}{Tab}Apple{Enter}{Tab}child of first{Escape}");
+
+    await expectTree(`
+Root
+  Apple
+    child of first
+    `);
+
+    await userEvent.click(await screen.findByLabelText("edit Root"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Apple{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "{Escape}");
+
+    await expectTree(`
+Root
+  Apple
+  Apple
+    child of first
+    `);
+
+    cleanup();
+    renderTree(alice);
+
+    await expectTree(`
+Root
+  Apple
+  Apple
+    child of first
+    `);
+  });
+
+  test("Data loss scenario: rename sibling then create same text", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("Root{Enter}{Tab}Bugs:{Enter}{Tab}Login crash{Escape}");
+
+    await expectTree(`
+Root
+  Bugs:
+    Login crash
+    `);
+
+    const bugsEditor = await screen.findByLabelText("edit Bugs:");
+    await userEvent.click(bugsEditor);
+    await userEvent.clear(bugsEditor);
+    await userEvent.type(bugsEditor, "Bugs (MVP)");
+    fireEvent.blur(bugsEditor, { relatedTarget: document.body });
+
+    await expectTree(`
+Root
+  Bugs (MVP)
+    Login crash
+    `);
+
+    await userEvent.click(await screen.findByLabelText("edit Root"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Bugs:{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "{Tab}Signup error{Escape}"
+    );
+
+    await expectTree(`
+Root
+  Bugs:
+    Signup error
+  Bugs (MVP)
+    Login crash
+    `);
+
+    cleanup();
+    renderTree(alice);
+
+    await expectTree(`
+Root
+  Bugs:
+    Signup error
+  Bugs (MVP)
+    Login crash
+    `);
+  });
+
+  test("DnD copy into parent with same-text sibling creates independent node", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}Apple{Enter}{Tab}child A{Escape}");
+
+    await expectTree(`
+Root
+  Apple
+    child A
+    `);
+
+    await userEvent.click(await screen.findByLabelText("edit Root"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Basket{Escape}");
+
+    await expectTree(`
+Root
+  Basket
+  Apple
+    child A
+    `);
+
+    await userEvent.click(await screen.findByLabelText("edit Basket"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "{Tab}Apple{Enter}{Tab}child B{Escape}"
+    );
+
+    await expectTree(`
+Root
+  Basket
+    Apple
+      child B
+  Apple
+    child A
+    `);
+
+    const innerApple = screen.getAllByRole("treeitem", { name: "Apple" })[0];
+    const root = screen.getByRole("treeitem", { name: "Root" });
+
+    fireEvent.dragStart(innerApple);
+    fireEvent.drop(root);
+
+    await expectTree(`
+Root
+  Apple
+    child B
+  Basket
+  Apple
+    child A
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+Root
+  Apple
+    child B
+  Basket
+  Apple
+    child A
+    `);
+  });
+
+  test("Paste collision: paste text matching existing sibling creates independent node", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}Item A{Enter}Item B{Escape}");
+
+    await expectTree(`
+Root
+  Item A
+  Item B
+    `);
+
+    const mockReadText = jest.fn();
+    // eslint-disable-next-line functional/immutable-data
+    Object.defineProperty(navigator, "clipboard", {
+      value: { readText: mockReadText },
+      writable: true,
+      configurable: true,
+    });
+
+    await userEvent.click(await screen.findByLabelText("Root"));
+    mockReadText.mockResolvedValueOnce("Item A");
+    await userEvent.keyboard("{Meta>}v{/Meta}");
+    await screen.findAllByLabelText("Item A");
+
+    await expectTree(`
+Root
+  Item A
+  Item A
+  Item B
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await expectTree(`
+Root
+  Item A
+  Item A
+  Item B
+    `);
+  });
+
+  test("Cmd+V paste collision: paste duplicates with different children next to existing", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}City{Enter}{Tab}Vienna{Escape}");
+
+    await expectTree(`
+Root
+  City
+    Vienna
+    `);
+
+    const mockReadText = jest.fn();
+    // eslint-disable-next-line functional/immutable-data
+    Object.defineProperty(navigator, "clipboard", {
+      value: { readText: mockReadText },
+      writable: true,
+      configurable: true,
+    });
+
+    await userEvent.click(await screen.findByLabelText("Root"));
+    mockReadText.mockResolvedValueOnce("City\n\tParis");
+    await userEvent.keyboard("{Meta>}v{/Meta}");
+
+    await expectTree(`
+Root
+  City
+  City
+    Vienna
+    `);
+
+    await userEvent.click(await screen.findByLabelText("expand City"));
+
+    await expectTree(`
+Root
+  City
+    Paris
+  City
+    Vienna
+    `);
+  });
+
+  test("Cmd+V paste: two same-name nodes with different children stay independent", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("Root{Enter}{Tab}Bitcoin{Enter}{Tab}Is Orange{Escape}");
+
+    await expectTree(`
+Root
+  Bitcoin
+    Is Orange
+    `);
+
+    await userEvent.click(await screen.findByLabelText("edit Root"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "{Tab}Bitcoin{Enter}{Tab}Is Awesome{Escape}"
+    );
+
+    await expectTree(`
+Root
+  Bitcoin
+    Is Awesome
+  Bitcoin
+    Is Orange
+    `);
+
+    const mockReadText = jest.fn();
+    // eslint-disable-next-line functional/immutable-data
+    Object.defineProperty(navigator, "clipboard", {
+      value: { readText: mockReadText },
+      writable: true,
+      configurable: true,
+    });
+
+    await userEvent.click(await screen.findByLabelText("Root"));
+    mockReadText.mockResolvedValueOnce(
+      "Bitcoin\n\thas only 21 Million\nBitcoin\n\tIs P2P"
+    );
+    await userEvent.keyboard("{Meta>}v{/Meta}");
+
+    await screen.findAllByLabelText(/expand Bitcoin|collapse Bitcoin/);
+
+    while (screen.queryAllByLabelText("expand Bitcoin").length > 0) {
+      fireEvent.click(screen.getAllByLabelText("expand Bitcoin")[0]);
+    }
+
+    await expectTree(`
+Root
+  Bitcoin
+    has only 21 Million
+  Bitcoin
+    Is P2P
+  Bitcoin
+    Is Awesome
+  Bitcoin
+    Is Orange
+    `);
+  });
+
+  test("Tab indent creates independent child when sibling with same text exists", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type(
+      "Root{Enter}{Tab}Parent{Enter}{Tab}Apple{Enter}{Tab}from first{Escape}"
+    );
+
+    await expectTree(`
+Root
+  Parent
+    Apple
+      from first
+    `);
+
+    await userEvent.click(await screen.findByLabelText("edit Parent"));
+    await userEvent.keyboard("{Enter}");
+    const newEditor = await findNewNodeEditor();
+    await userEvent.type(newEditor, "Apple");
+    await userEvent.click(newEditor);
+    await userEvent.keyboard("{Escape}{Home}{Tab}");
+
+    await expectTree(`
+Root
+  Parent
+    Apple
+    Apple
+      from first
+    `);
+
+    cleanup();
+    renderTree(alice);
+
+    await expectTree(`
+Root
+  Parent
+    Apple
+    Apple
+      from first
     `);
   });
 });

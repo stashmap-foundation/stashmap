@@ -16,8 +16,6 @@ import {
   getRelationForView,
   getRelationIndex,
   getLast,
-  getContext,
-  getNodeIDFromView,
   useIsViewingOtherUserContent,
   useRelationItem,
   viewPathToString,
@@ -31,7 +29,6 @@ import {
   isEmptyNodeID,
   isConcreteRefId,
   computeEmptyNodeMetadata,
-  shortID,
 } from "../connections";
 import { TYPE_COLORS } from "../constants";
 import { IS_MOBILE } from "./responsive";
@@ -51,10 +48,7 @@ import {
   planSetRowFocusIntent,
   ParsedLine,
 } from "../planner";
-import {
-  parsedLinesToTrees,
-  planCreateNodesFromMarkdownTrees,
-} from "./FileDropZone";
+import { parsedLinesToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import { planDisconnectFromParent } from "../dnd";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeCard } from "../commons/Ui";
@@ -424,7 +418,12 @@ function EditableContent(): JSX.Element {
           trimmedText
         );
         executePlan(
-          planAddToParent(planWithNode, newNode.id, prevSibling.viewPath, stack)
+          planAddToParent(
+            planWithNode,
+            newNode.id,
+            prevSibling.viewPath,
+            stack
+          )[0]
         );
       } else {
         executePlan(
@@ -490,7 +489,7 @@ function EditableContent(): JSX.Element {
           grandParentPath,
           stack,
           parentRelationIndex + 1
-        )
+        )[0]
       );
       return;
     }
@@ -546,31 +545,15 @@ function EditableContent(): JSX.Element {
     const trees = parsedLinesToTrees(items);
     const parentOfSaved = getParentView(updatedViewPath);
     if (!parentOfSaved) {
-      const pasteContext = getContext(basePlan, updatedViewPath, stack).push(
-        shortID(getNodeIDFromView(basePlan, updatedViewPath)[0]) as ID
-      );
-      const [planWithNodes, topNodeIDs] = planCreateNodesFromMarkdownTrees(
-        basePlan,
-        trees,
-        pasteContext
-      );
       executePlan(
-        planAddToParent(planWithNodes, topNodeIDs, updatedViewPath, stack, 0)
+        planPasteMarkdownTrees(basePlan, trees, updatedViewPath, stack, 0)
       );
       return;
     }
     const savedIndex = getRelationIndex(basePlan, updatedViewPath);
     const insertAt = savedIndex !== undefined ? savedIndex + 1 : 0;
-    const pasteContext = getContext(basePlan, parentOfSaved, stack).push(
-      shortID(getNodeIDFromView(basePlan, parentOfSaved)[0]) as ID
-    );
-    const [planWithNodes, topNodeIDs] = planCreateNodesFromMarkdownTrees(
-      basePlan,
-      trees,
-      pasteContext
-    );
     executePlan(
-      planAddToParent(planWithNodes, topNodeIDs, parentOfSaved, stack, insertAt)
+      planPasteMarkdownTrees(basePlan, trees, parentOfSaved, stack, insertAt)
     );
   };
 

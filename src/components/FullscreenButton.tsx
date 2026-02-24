@@ -11,7 +11,7 @@ import {
   useCurrentPane,
   useNavigatePane,
 } from "../SplitPanesContext";
-import { getRefTargetInfo } from "../connections";
+import { getRefTargetInfo, isSearchId } from "../connections";
 import { useData } from "../DataContext";
 import { buildNodeUrl, buildRelationUrl } from "../navigationUrl";
 
@@ -39,14 +39,16 @@ export function FullscreenButton(): JSX.Element | null {
     if (relation) {
       return buildRelationUrl(relation.id);
     }
-    const targetStack = refInfo
-      ? refInfo.stack
-      : [
-          ...stack.slice(0, -1),
-          ...viewPath
-            .slice(1)
-            .map((subPath) => (subPath as { nodeID: LongID | ID }).nodeID),
-        ];
+    const targetStack = (
+      refInfo
+        ? refInfo.stack
+        : [
+            ...stack.slice(0, -1),
+            ...viewPath
+              .slice(1)
+              .map((subPath) => (subPath as { nodeID: LongID | ID }).nodeID),
+          ]
+    ).filter((id) => !isSearchId(id as ID));
     return (
       buildNodeUrl(
         targetStack,

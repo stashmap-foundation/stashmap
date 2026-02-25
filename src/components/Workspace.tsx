@@ -1280,9 +1280,7 @@ function PaneViewInner(): JSX.Element {
   return (
     <div
       ref={wrapperRef}
-      className={`pane-wrapper ${
-        isOtherUser ? "pane-other-user pane-readonly-mode" : ""
-      }`}
+      className={`pane-wrapper ${isOtherUser ? "pane-other-user" : ""}`}
       tabIndex={-1}
       onMouseEnter={onPaneMouseEnter}
       onFocusCapture={onPaneFocusCapture}

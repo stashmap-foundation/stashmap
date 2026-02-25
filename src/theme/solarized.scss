@@ -15,9 +15,6 @@
   // Semantic colors
   --non-editable: var(--base01); // Read-only content
 
-  // Readonly mode colors (viewing other user's content)
-  --readonly-text-opacity: 0.6;
-
   --hover-bg: rgba(0, 0, 0, 0.04);
 
   // Accent colors (same in both themes)
@@ -46,8 +43,6 @@
   // Semantic colors
   --non-editable: var(--base01);
 
-  // Readonly mode colors (viewing other user's content)
-  --readonly-text-opacity: 0.55;
 }
 
 // Base layout - critical for content to render

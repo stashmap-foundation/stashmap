@@ -71,15 +71,6 @@ body {
   }
 }
 
-// ============================================
-// READONLY MODE (viewing other user's content)
-// ============================================
-
-.pane-readonly-mode {
-  .pane-content {
-    opacity: var(--readonly-text-opacity);
-  }
-}
 
 .pane-header {
   display: flex;

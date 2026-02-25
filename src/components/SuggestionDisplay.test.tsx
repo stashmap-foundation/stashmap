@@ -474,6 +474,43 @@ Topic
     `);
   });
 
+  test("declining version entry hides all suggestions from that list", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    await follow(alice, bob().user.publicKey);
+
+    renderTree(bob);
+    await type(
+      "Holiday Destinations{Enter}{Tab}Spain{Enter}France{Enter}Italy{Enter}Portugal{Enter}Greece{Escape}"
+    );
+
+    await expectTree(`
+Holiday Destinations
+  Spain
+  France
+  Italy
+  Portugal
+  Greece
+    `);
+    cleanup();
+
+    renderTree(alice);
+    await type("Holiday Destinations{Escape}");
+
+    await expectTree(`
+Holiday Destinations
+  [S] Spain
+  [S] France
+  [S] Italy
+  [VO] +5
+    `);
+
+    await userEvent.click(await screen.findByLabelText(/decline.*\+5/));
+
+    await expectTree(`
+Holiday Destinations
+    `);
+  });
+
   test("no version shown when all suggestions fit within cap", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);

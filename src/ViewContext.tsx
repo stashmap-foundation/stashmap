@@ -85,6 +85,16 @@ export function getSuggestionsForNode(
     ? currentRelation.items.map((item) => item.nodeID).toSet()
     : ImmutableSet<LongID | ID>();
 
+  const declinedRelationCrefIDs: ImmutableSet<LongID | ID> = currentRelation
+    ? currentRelation.items
+        .filter(
+          (item) =>
+            isConcreteRefId(item.nodeID) && item.relevance === "not_relevant"
+        )
+        .map((item) => item.nodeID)
+        .toSet()
+    : ImmutableSet<LongID | ID>();
+
   const contextToMatch = parentContext || List<ID>();
   const otherRelations: List<Relations> = knowledgeDBs
     .filter((_, pk) => pk !== myself)
@@ -95,6 +105,7 @@ export function getSuggestionsForNode(
           (r) =>
             r.head === localID &&
             r.id !== currentRelationId &&
+            !declinedRelationCrefIDs.has(createConcreteRefId(r.id)) &&
             contextsMatch(r.context, contextToMatch)
         )
         .toList()

@@ -794,7 +794,8 @@ function planCopyDescendantRelations(
   transformContext: (relation: Relations) => Context,
   filterRelation?: (relation: Relations) => boolean,
   sourceRelation?: Relations,
-  targetNodeID?: LongID | ID
+  targetNodeID?: LongID | ID,
+  root?: ID
 ): [Plan, RelationsIdMapping] {
   const allDescendants = getDescendantRelations(
     plan.knowledgeDBs,
@@ -823,7 +824,8 @@ function planCopyDescendantRelations(
       const baseRelation = newRelations(
         head,
         newContext,
-        accPlan.user.publicKey
+        accPlan.user.publicKey,
+        root
       );
       const newRelation: Relations = {
         ...baseRelation,
@@ -846,7 +848,8 @@ export function planMoveDescendantRelations(
   sourceContext: Context,
   targetContext: Context,
   sourceRelation?: Relations,
-  targetNodeID?: LongID | ID
+  targetNodeID?: LongID | ID,
+  root?: ID
 ): Plan {
   const allDescendants = getDescendantRelations(
     plan.knowledgeDBs,
@@ -883,6 +886,7 @@ export function planMoveDescendantRelations(
       ...relation,
       head,
       context: newContext,
+      root: root ?? relation.root,
     });
   }, plan);
 }
@@ -892,7 +896,8 @@ export function planMoveTreeDescendantsToContext(
   originalTopNodeIDs: ID[],
   actualNodeIDs: (LongID | ID)[],
   parentViewPath: ViewPath,
-  stack: ID[]
+  stack: ID[],
+  root?: ID
 ): Plan {
   const parentContext = getContext(plan, parentViewPath, stack);
   const [parentNodeID] = getNodeIDFromView(plan, parentViewPath);
@@ -906,7 +911,8 @@ export function planMoveTreeDescendantsToContext(
       List<ID>(),
       targetContext,
       undefined,
-      actualID !== originalID ? actualID : undefined
+      actualID !== originalID ? actualID : undefined,
+      root
     );
   }, plan);
 }
@@ -1032,6 +1038,12 @@ export function planDeepCopyNode(
   const sourceChildContext = resolvedContext.push(shortID(resolvedNodeID));
   const targetChildContext = nodeNewContext.push(shortID(copyNodeID));
 
+  const targetParentRelation = getRelationForView(
+    planWithNode,
+    targetParentViewPath,
+    stack
+  );
+
   const [finalPlan, mapping] = planCopyDescendantRelations(
     planWithNode,
     resolvedNodeID,
@@ -1048,7 +1060,8 @@ export function planDeepCopyNode(
     },
     undefined,
     sourceRelation,
-    copyNodeID !== resolvedNodeID ? copyNodeID : undefined
+    copyNodeID !== resolvedNodeID ? copyNodeID : undefined,
+    targetParentRelation?.root
   );
 
   return [finalPlan, mapping];

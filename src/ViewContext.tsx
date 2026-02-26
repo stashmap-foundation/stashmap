@@ -1160,7 +1160,8 @@ export function copyViewsWithRelationsMapping(
 export function newRelations(
   head: LongID | ID,
   context: Context,
-  myself: PublicKey
+  myself: PublicKey,
+  root?: ID
 ): Relations {
   return {
     head: shortID(head),
@@ -1169,6 +1170,7 @@ export function newRelations(
     id: joinID(myself, v4()),
     updated: Date.now(),
     author: myself,
+    root,
   };
 }
 

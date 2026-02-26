@@ -421,7 +421,8 @@ export function planMoveNodeWithView(
     sourceContext,
     targetContext,
     sourceRelation,
-    moveNodeID !== sourceNodeID ? moveNodeID : undefined
+    moveNodeID !== sourceNodeID ? moveNodeID : undefined,
+    targetParentRelation?.root
   );
 }
 

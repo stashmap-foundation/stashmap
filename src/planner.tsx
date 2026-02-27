@@ -3,6 +3,7 @@ import { List, Map, OrderedSet, Set as ImmutableSet } from "immutable";
 import { UnsignedEvent, Event } from "nostr-tools";
 import {
   KIND_DELETE,
+  KIND_KNOWLEDGE_DOCUMENT,
   KIND_KNOWLEDGE_LIST,
   KIND_KNOWLEDGE_NODE,
   KIND_CONTACTLIST,
@@ -1331,7 +1332,21 @@ function buildDocumentEvents(
       const rootRelation = userDB.relations.find(
         (r) => shortID(r.id) === rootId
       );
-      if (!rootRelation || rootRelation.head === VERSIONS_NODE_ID || rootRelation.context.size > 0) {
+      if (!rootRelation) {
+        const deleteEvent = {
+          kind: KIND_DELETE,
+          pubkey: author,
+          created_at: newTimestamp(),
+          tags: [
+            ["a", `${KIND_KNOWLEDGE_DOCUMENT}:${author}:${rootId}`],
+            ["k", `${KIND_KNOWLEDGE_DOCUMENT}`],
+            msTag(),
+          ],
+          content: "",
+        };
+        return events.push(deleteEvent as UnsignedEvent & EventAttachment);
+      }
+      if (rootRelation.head === VERSIONS_NODE_ID || rootRelation.context.size > 0) {
         return events;
       }
       const event = buildDocumentEvent(

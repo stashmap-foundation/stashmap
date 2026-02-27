@@ -1,4 +1,4 @@
-import { List, Map } from "immutable";
+import { List } from "immutable";
 import {
   isConcreteRefId,
   parseConcreteRefId,
@@ -112,54 +112,29 @@ function resolveLabels(
   return { contextLabels, targetLabel, fullContext };
 }
 
-export function getTombstone(
-  knowledgeDBs: KnowledgeDBs,
-  relationID: LongID,
-  myself: PublicKey
-): Tombstone | undefined {
-  const [remote] = splitID(relationID);
-  const author = remote || myself;
-  const db = knowledgeDBs.get(author);
-  const tombstones = db?.tombstones || Map<ID, Tombstone>();
-  const shortRelID = splitID(relationID)[1];
-  return tombstones.get(shortRelID as ID);
-}
 
 function buildDeletedReference(
   refId: LongID,
-  knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey
+  myself: PublicKey,
+  linkText?: string
 ): ReferenceNode | undefined {
   const parsed = parseConcreteRefId(refId);
   if (!parsed) return undefined;
   const { relationID, targetNode } = parsed;
   const [remote] = splitID(relationID);
   const author = remote || myself;
-  const tombstone = getTombstone(knowledgeDBs, relationID, myself);
-  if (!tombstone) return undefined;
-  const { head, context } = tombstone;
 
-  const contextLabels = targetNode
-    ? resolveContextLabels(knowledgeDBs, myself, context.push(head))
-    : resolveContextLabels(knowledgeDBs, myself, context);
-  const targetLabel = resolveNodeLabel(
-    knowledgeDBs,
-    myself,
-    targetNode || head,
-    targetNode ? context.push(head) : context
-  );
-  const fullContext = targetNode ? context.push(head) : context;
-  const contextPath = contextLabels.join(" / ");
-  const text = contextPath
-    ? `(deleted) ${contextPath} / ${targetLabel}`
-    : `(deleted) ${targetLabel}`;
+  if (!linkText) return undefined;
 
+  const parts = linkText.split(" / ");
+  const targetLabel = parts[parts.length - 1];
+  const contextLabels = parts.slice(0, -1);
   return {
     id: refId,
     type: "reference",
-    text,
-    targetNode: targetNode || head,
-    targetContext: fullContext,
+    text: `(deleted) ${linkText}`,
+    targetNode: targetNode || ("" as ID),
+    targetContext: List<ID>(),
     contextLabels,
     targetLabel,
     author,
@@ -173,7 +148,7 @@ export function buildOutgoingReference(
   myself: PublicKey
 ): ReferenceNode | undefined {
   const ref = parseRef(refId, knowledgeDBs, myself);
-  if (!ref) return buildDeletedReference(refId, knowledgeDBs, myself);
+  if (!ref) return buildDeletedReference(refId, myself);
 
   const target = ref.targetNode || (ref.relation.head as ID);
   const { contextLabels, targetLabel, fullContext } = resolveLabels(
@@ -341,7 +316,18 @@ export function buildReferenceItem(
 ): ReferenceNode | undefined {
   const ref = parseRef(refId, data.knowledgeDBs, data.user.publicKey);
   if (!ref) {
-    return buildDeletedReference(refId, data.knowledgeDBs, data.user.publicKey);
+    const parentPath = getParentView(viewPath);
+    const parentRelation = parentPath
+      ? getRelationForView(data, parentPath, stack)
+      : undefined;
+    const parentItem = parentRelation?.items.find(
+      (item) => item.nodeID === refId
+    );
+    return buildDeletedReference(
+      refId,
+      data.user.publicKey,
+      parentItem?.linkText
+    );
   }
 
   if (virtualType === "suggestion") {

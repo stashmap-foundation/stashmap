@@ -232,6 +232,7 @@ declare global {
     argument?: Argument; // "confirms", "contra", or undefined (neutral)
     virtualType?: VirtualType;
     isCref?: boolean;
+    linkText?: string;
   };
 
   type Relations = {
@@ -284,12 +285,9 @@ declare global {
   };
   type RelationTypes = OrderedMap<ID, RelationType>;
 
-  type Tombstone = { head: ID; context: List<ID> };
-
   type KnowledgeData = {
     nodes: Map<ID, KnowNode>;
     relations: Map<ID, Relations>;
-    tombstones?: Map<ID, Tombstone>;
   };
 
   // Temporary UI state (not persisted to Nostr)

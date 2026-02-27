@@ -44,6 +44,8 @@ markdown.use(attrs);
 function extractInlineContent(inline: Token): {
   text: string;
   linkHref?: string;
+  linkRelevance?: Relevance;
+  linkArgument?: Argument;
 } {
   if (!inline.children) {
     return { text: inline.content.trim() };
@@ -57,7 +59,15 @@ function extractInlineContent(inline: Token): {
   const href = linkOpen?.attrGet("href");
   const linkHref =
     href && href.startsWith("#") ? href.slice(1) : undefined;
-  return { text, linkHref };
+  const linkClass = linkOpen?.attrGet("class") || "";
+  const linkClasses = linkClass.split(" ").filter(Boolean);
+  const linkRelevance = (
+    ["relevant", "maybe_relevant", "little_relevant", "not_relevant"] as const
+  ).find((r) => linkClasses.includes(r));
+  const linkArgument = (["confirms", "contra"] as const).find((a) =>
+    linkClasses.includes(a)
+  );
+  return { text, linkHref, linkRelevance, linkArgument };
 }
 
 function extractAttrs(token: Token): {
@@ -204,7 +214,8 @@ export function parseMarkdownHierarchy(
     if (!inline || inline.type !== "inline") {
       continue;
     }
-    const { text, linkHref } = extractInlineContent(inline);
+    const { text, linkHref, linkRelevance, linkArgument } =
+      extractInlineContent(inline);
     if (!text) {
       continue;
     }
@@ -221,8 +232,8 @@ export function parseMarkdownHierarchy(
           text,
           children: [],
           uuid,
-          relevance,
-          argument,
+          relevance: linkHref ? linkRelevance : relevance,
+          argument: linkHref ? linkArgument : argument,
           linkHref,
           hidden,
           basedOn,
@@ -231,7 +242,13 @@ export function parseMarkdownHierarchy(
         listItemStack[currentItemIndex] = node;
         continue;
       }
-      currentListNode.children.push({ text, children: [], linkHref });
+      currentListNode.children.push({
+        text,
+        children: [],
+        linkHref,
+        relevance: linkRelevance,
+        argument: linkArgument,
+      });
       continue;
     }
 
@@ -557,6 +574,7 @@ function materializeTreeNode(
           nodeID: createConcreteRefId(relationID, targetNode),
           relevance: childNode.relevance,
           argument: childNode.argument,
+          linkText: childNode.text,
         };
         return [accCtx, [...accItems, item]] as [WalkContext, RelationItem[]];
       }

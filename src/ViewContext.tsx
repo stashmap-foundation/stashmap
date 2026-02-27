@@ -1056,9 +1056,10 @@ export function useNode(): [KnowNode, View] | [undefined, undefined] {
 export function getDisplayTextForView(
   data: Data,
   viewPath: ViewPath,
-  stack: ID[]
+  stack: ID[],
+  virtualType?: VirtualType
 ): string {
-  const [node] = getNodeForView(data, viewPath, stack);
+  const [node] = getNodeForView(data, viewPath, stack, virtualType);
   const [nodeID] = getNodeIDFromView(data, viewPath);
   const context = getContext(data, viewPath, stack);
   const effectiveAuthor = getEffectiveAuthor(data, viewPath);
@@ -1075,7 +1076,8 @@ export function useDisplayText(): string {
   const data = useData();
   const viewPath = useViewPath();
   const stack = usePaneStack();
-  return getDisplayTextForView(data, viewPath, stack);
+  const virtualType = useRelationItem()?.virtualType;
+  return getDisplayTextForView(data, viewPath, stack, virtualType);
 }
 
 export function getParentNode(

@@ -402,7 +402,7 @@ export function getOccurrencesForNode(
     .filter((ref) => !covered.has(ref.context.join(":")));
   const deduped = deduplicateRefsByContext(filtered, effectiveAuthor);
   return deduped
-    .sortBy((ref) => -ref.updated)
+    .sortBy((ref) => `${-ref.updated}:${ref.context.join(":")}`)
     .map((ref) => createConcreteRefId(ref.relationID, ref.targetNode))
     .toList();
 }
@@ -477,7 +477,7 @@ export function getIncomingCrefsForNode(
 
   const deduped = deduplicateRefsByContext(refs, effectiveAuthor);
   return deduped
-    .sortBy((ref) => -ref.updated)
+    .sortBy((ref) => `${-ref.updated}:${ref.context.join(":")}`)
     .map((ref) => createConcreteRefId(ref.relationID))
     .toList();
 }

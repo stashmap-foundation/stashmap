@@ -18,7 +18,6 @@ import { useApis } from "./Apis";
 import {
   findNodes,
   findRelations,
-  findTombstones,
   findDocumentNodesAndRelations,
   findViews,
 } from "./knowledgeEvents";
@@ -163,13 +162,11 @@ function processEventsByAuthor(
   const docResult = findDocumentNodesAndRelations(authorEvents);
   const nodes = findNodes(authorEvents).merge(docResult.nodes);
   const relations = findRelations(authorEvents).merge(docResult.relations);
-  const tombstones = findTombstones(authorEvents);
   const views = findViews(authorEvents);
   const projectMembers = findMembers(authorEvents);
   const knowledgeDB = {
     nodes,
     relations,
-    tombstones,
   };
   const relays = findRelays(authorEvents);
   return {

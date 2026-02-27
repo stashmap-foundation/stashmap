@@ -323,7 +323,8 @@ export function getNodesInTree(
       const [, childView] = getNodeIDFromView(data, childPath);
       const withChild = result.paths.push(childPath);
 
-      if (options?.isMarkdownExport || childView.expanded) {
+      const [childNodeID] = getNodeIDFromView(data, childPath);
+      if (!isConcreteRefId(childNodeID) && (options?.isMarkdownExport || childView.expanded)) {
         const sub = getNodesInTree(
           data,
           childPath,

@@ -2,7 +2,6 @@ import { List, Map } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
 import {
   findTag,
-  findAllTags,
   getMostRecentReplacableEvent,
   sortEvents,
 } from "./commons/useNostrQuery";
@@ -102,26 +101,6 @@ export function findRelations(
   }, Map<string, Relations>());
 }
 
-export function findTombstones(
-  events: List<UnsignedEvent>
-): Map<ID, Tombstone> {
-  const deleteEvents = events.filter((event) => event.kind === KIND_DELETE);
-  return deleteEvents.reduce((rdx, event) => {
-    const aTag = findTag(event, "a");
-    if (!aTag) return rdx;
-    const [deleteKind, , eventToDeleteId] = aTag.split(":");
-    if (deleteKind !== `${KIND_KNOWLEDGE_LIST}` || !eventToDeleteId) return rdx;
-    const headTag = findTag(event, "head");
-    if (!headTag) return rdx;
-    const contextValues = (findAllTags(event, "c") || []).map(
-      (t) => t[0] as ID
-    );
-    return rdx.set(eventToDeleteId as ID, {
-      head: headTag as ID,
-      context: List(contextValues),
-    });
-  }, Map<ID, Tombstone>());
-}
 
 export function findViews(events: List<UnsignedEvent>): Views {
   const viewEvent = getMostRecentReplacableEvent(
@@ -146,8 +125,21 @@ export function findPanes(events: List<UnsignedEvent>): Pane[] {
 export function findDocumentNodesAndRelations(
   events: List<UnsignedEvent>
 ): { nodes: Map<string, KnowNode>; relations: Map<string, Relations> } {
+  const deletedKeys = events
+    .filter(
+      (event) =>
+        event.kind === KIND_DELETE &&
+        findTag(event, "k") === `${KIND_KNOWLEDGE_DOCUMENT}`
+    )
+    .map((event) => findTag(event, "a"))
+    .filter((a): a is string => !!a)
+    .toSet();
   const docEvents = sortEvents(
-    events.filter((event) => event.kind === KIND_KNOWLEDGE_DOCUMENT)
+    events.filter(
+      (event) =>
+        event.kind === KIND_KNOWLEDGE_DOCUMENT &&
+        !deletedKeys.has(getReplaceableKey(event) ?? "")
+    )
   );
   const allNodes = docEvents.reduce(
     (acc, event) => acc.merge(parseDocumentEvent(event).nodes),

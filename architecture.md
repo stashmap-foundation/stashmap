@@ -86,11 +86,21 @@ Changes are never applied directly. They're accumulated in a `Plan` (extends `Da
 
 **Deletion & Tombstones**: When a relation is deleted, a `KIND_DELETE` event is published with `["head", headNodeID]` and `["c", contextNodeID]` tags preserving the relation's context path. `findTombstones()` parses these into `Tombstone = { head: ID, context: List<ID> }`, keyed by short relation ID. This allows deleted crefs in `~Log` to render their full context path (e.g. `(deleted) Investment / Alternative >>> Bitcoin`) instead of just the head label. `TreeViewNodeLoader` queries tombstone node IDs so labels resolve correctly.
 
-**Nostr events**: Nodes are `KIND_KNOWLEDGE_NODE` (34751), relations are `KIND_KNOWLEDGE_LIST` (34760). Events are replaceable (d-tag keyed).
+**Nostr events**: Documents are `KIND_KNOWLEDGE_DOCUMENT` (34770) — a single markdown event containing an entire subtree. Legacy: nodes were `KIND_KNOWLEDGE_NODE` (34751), relations were `KIND_KNOWLEDGE_LIST` (34760). All events are replaceable (d-tag keyed).
+
+**Document format**: Each document is a markdown list with `{uuid .relevance .argument}` extensions per item. Root is an H1. `#n` tags contain `hashText(nodeText)` for each node; `#c` tags contain context hashes; `#d` tag = root UUID.
+
+**Relations.root**: Every relation has a `root: ID` field pointing to the short ID of its document's root relation UUID. Root relations self-reference. This groups relations into documents for serialization.
+
+**Write path**: `executePlan` → `buildDocumentEvents(plan)` groups changed relations by `root` field, re-serializes each affected root's full tree as a `KIND_KNOWLEDGE_DOCUMENT` event.
+
+**Read path**: `findDocumentNodesAndRelations` deduplicates document events by replaceable key (keeping newest), parses markdown → nodes + relations. Nodes are collected from ALL document versions (content-addressed, immutable); relations only from latest version.
+
+**Query filters** (`dataQuery.tsx`): `documentByID` (`#d`), `documentByNode` (`#n`), `documentByContext` (`#c`) — all using `KIND_KNOWLEDGE_DOCUMENT`.
 
 **PublishQueue**: Debounces (5s prod, 100ms test), batches by kind, retries with backoff, persists to IndexedDB outbox.
 
-**Data flow**: User input → Plan → executePlan → sign → PublishQueue → Nostr relays → remote users receive via subscription → EventCache → KnowledgeDBs → re-render.
+**Data flow**: User input → Plan → executePlan → buildDocumentEvents → sign → PublishQueue → Nostr relays → remote users receive via subscription → EventCache → KnowledgeDBs → re-render.
 
 ## References, Occurrences & Suggestions
 
@@ -147,7 +157,9 @@ A **concrete ref** (cref) stored in a relation creates an outgoing link (`>>>`).
 | `treeTraversal.ts` | Computes children for tree nodes, wires virtual items |
 | `buildReferenceNode.ts` | Builds ReferenceNode display data from crefs |
 | `navigationUrl.ts` | URL ↔ navigation state |
+| `markdownDocument.tsx` | Markdown document serializer + parser |
 | `knowledgeEvents.tsx` | Nostr event parsing |
+| `dataQuery.tsx` | Relay query filter construction |
 | `executor.tsx` | Event signing and relay publishing |
 | `PublishQueue.ts` | Debounced publish queue |
 | `SplitPaneLayout.tsx` | Multi-pane layout component |

@@ -134,7 +134,7 @@ Child
     `);
   });
 
-  test("deleting ~Versions does not delete orphaned descendant relations", async () => {
+  test("deleting ~versions does not delete orphaned descendant relations", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -154,31 +154,31 @@ My Notes
     await userEvent.click(await screen.findByLabelText("edit BCN"));
     await userEvent.keyboard("{Enter}");
     const newEditor = await findNewNodeEditor();
-    await userEvent.type(newEditor, "~Versions");
+    await userEvent.type(newEditor, "~versions");
     await userEvent.click(newEditor);
     await userEvent.keyboard("{Home}{Tab}");
 
     await expectTree(`
 My Notes
   BCN
-    ~Versions
+    ~versions
     `);
 
-    await userEvent.click(await screen.findByLabelText("expand ~Versions"));
+    await userEvent.click(await screen.findByLabelText("expand ~versions"));
 
     await expectTree(`
 My Notes
   BCN
-    ~Versions
+    ~versions
       BCN
       Barcelona
     `);
 
-    await userEvent.click(await screen.findByLabelText("edit ~Versions"));
+    await userEvent.click(await screen.findByLabelText("edit ~versions"));
     await userEvent.keyboard("{Escape}{Delete}");
 
     await waitFor(() => {
-      expect(screen.queryByText("~Versions")).toBeNull();
+      expect(screen.queryByText("~versions")).toBeNull();
     });
 
     await expectTree(`

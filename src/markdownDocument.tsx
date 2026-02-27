@@ -1,4 +1,5 @@
 import { List, Map, Set as ImmutableSet } from "immutable";
+import { v4 } from "uuid";
 import { UnsignedEvent } from "nostr-tools";
 import MarkdownIt from "markdown-it";
 import attrs from "markdown-it-attrs";
@@ -21,6 +22,7 @@ import {
   getDisplayTextForView,
   getRelationItemForView,
   getContext,
+  viewPathToString,
 } from "./ViewContext";
 import { buildOutgoingReference } from "./buildReferenceNode";
 import { KIND_KNOWLEDGE_DOCUMENT, newTimestamp, msTag } from "./nostr";
@@ -53,9 +55,17 @@ function extractAttrs(token: Token): {
   uuid: string | undefined;
   relevance: Relevance;
   argument: Argument;
+  hidden: boolean;
+  basedOn: string | undefined;
 } {
   if (!token.attrs) {
-    return { uuid: undefined, relevance: undefined, argument: undefined };
+    return {
+      uuid: undefined,
+      relevance: undefined,
+      argument: undefined,
+      hidden: false,
+      basedOn: undefined,
+    };
   }
   const uuid = token.attrs.find(([, value]) => value === "")?.[0];
   const classAttr = token.attrGet("class") || "";
@@ -66,7 +76,9 @@ function extractAttrs(token: Token): {
   const argument = (["confirms", "contra"] as const).find((a) =>
     classes.includes(a)
   );
-  return { uuid, relevance, argument };
+  const hidden = classes.includes("hidden");
+  const basedOn = token.attrGet("basedOn") || undefined;
+  return { uuid, relevance, argument, hidden, basedOn };
 }
 
 export type MarkdownTreeNode = {
@@ -76,6 +88,8 @@ export type MarkdownTreeNode = {
   relevance?: Relevance;
   argument?: Argument;
   linkHref?: string;
+  hidden?: boolean;
+  basedOn?: string;
 };
 
 /* eslint-disable functional/immutable-data, functional/no-let, no-continue */
@@ -115,7 +129,15 @@ export function parseMarkdownHierarchy(
     uuid: string | undefined;
     relevance: Relevance;
     argument: Argument;
-  } = { uuid: undefined, relevance: undefined, argument: undefined };
+    hidden: boolean;
+    basedOn: string | undefined;
+  } = {
+    uuid: undefined,
+    relevance: undefined,
+    argument: undefined,
+    hidden: false,
+    basedOn: undefined,
+  };
 
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i];
@@ -129,7 +151,8 @@ export function parseMarkdownHierarchy(
       if (!text) {
         continue;
       }
-      const { uuid, relevance, argument } = extractAttrs(token);
+      const { uuid, relevance, argument, hidden, basedOn } =
+        extractAttrs(token);
       while (
         headingStack.length > 0 &&
         headingStack[headingStack.length - 1].level >= headingLevel
@@ -145,6 +168,8 @@ export function parseMarkdownHierarchy(
         uuid,
         relevance,
         argument,
+        hidden,
+        basedOn,
       };
       appendNode(roots, parent, node);
       headingStack.push({ level: headingLevel, node });
@@ -182,7 +207,7 @@ export function parseMarkdownHierarchy(
         const parent =
           getLastDefinedListItem(listItemStack.slice(0, -1)) ||
           headingStack[headingStack.length - 1]?.node;
-        const { uuid, relevance, argument } = pendingAttrs;
+        const { uuid, relevance, argument, hidden, basedOn } = pendingAttrs;
         const node: MarkdownTreeNode = {
           text,
           children: [],
@@ -190,6 +215,8 @@ export function parseMarkdownHierarchy(
           relevance,
           argument,
           linkHref,
+          hidden,
+          basedOn,
         };
         appendNode(roots, parent, node);
         listItemStack[currentItemIndex] = node;
@@ -213,7 +240,8 @@ export function parseMarkdownHierarchy(
 function formatAttrs(
   uuid: string,
   relevance: Relevance,
-  argument: Argument
+  argument: Argument,
+  options?: { hidden?: boolean; basedOn?: LongID }
 ): string {
   const parts: string[] = uuid ? [uuid] : [];
   if (relevance) {
@@ -221,6 +249,12 @@ function formatAttrs(
   }
   if (argument) {
     parts.push(`.${argument}`);
+  }
+  if (options?.hidden) {
+    parts.push(`.hidden`);
+  }
+  if (options?.basedOn) {
+    parts.push(`basedOn="${options.basedOn}"`);
   }
   if (parts.length === 0) {
     return "";
@@ -276,7 +310,7 @@ function serializeTree(
   const author = data.user.publicKey;
   const rootPath = buildRootPath(rootRelation);
   const stack = [rootRelation.head];
-  const { paths } = getNodesInTree(
+  const { paths, virtualItems } = getNodesInTree(
     data, rootPath, stack, List<ViewPath>(), rootRelation.id,
     author, undefined, { isMarkdownExport: true }
   );
@@ -290,6 +324,7 @@ function serializeTree(
         ? hashText(context.join(":"))
         : undefined;
       const item = getRelationItemForView(data, path);
+      const isVirtual = virtualItems.has(viewPathToString(path));
 
       if (isConcreteRefId(nodeID)) {
         const crefText = formatCrefText(
@@ -305,12 +340,12 @@ function serializeTree(
         };
       }
 
-      const text = getDisplayTextForView(data, path, stack);
-      // Leaf nodes have no relation, so no uuid
+      const nodeText = getNodeFromID(data.knowledgeDBs, nodeID, author)?.text;
+      const text = nodeText ?? getDisplayTextForView(data, path, stack);
       const ownRelation = getRelationForView(data, path, stack);
-      const uuid = ownRelation ? shortID(ownRelation.id) : "";
+      const uuid = ownRelation ? shortID(ownRelation.id) : v4();
 
-      const line = `${indent}- ${text}${formatAttrs(uuid, item?.relevance, item?.argument)}`;
+      const line = `${indent}- ${text}${formatAttrs(uuid, item?.relevance, item?.argument, { hidden: isVirtual, basedOn: ownRelation?.basedOn })}`;
       return {
         lines: [...acc.lines, line],
         nodeHashes: acc.nodeHashes.add(hashText(text)),
@@ -358,7 +393,6 @@ export function buildDocumentEvent(
   const rootLine = `# ${rootText} {${rootUuid}}`;
   const result = serializeTree(data, rootRelation);
   const content = `${[rootLine, ...result.lines].join("\n")}\n`;
-
   const nTags = result.nodeHashes.add(hashText(rootText)).toArray().map((h) => ["n", h]);
   const cTags = result.contextHashes.toArray().map((h) => ["c", h]);
 
@@ -386,8 +420,9 @@ function walkDocumentTree(
     return { nodes: nodesWithThis, relations: acc.relations };
   }
 
+  const visibleChildren = treeNode.children.filter((child) => !child.hidden);
   const childItems = List(
-    treeNode.children.map((child) => {
+    visibleChildren.map((child) => {
       if (child.linkHref) {
         const parts = child.linkHref.split(":");
         const relationID = joinID(author, parts[0]);

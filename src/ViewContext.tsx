@@ -1199,7 +1199,7 @@ export function newRelations(
   };
 }
 
-// Creates new relations, prepopulating ~Versions with the original node
+// Creates new relations, prepopulating ~versions with the original node
 // The versionsContext is [...path, originalNodeID], so originalNodeID is context.last()
 export function newRelationsForNode(
   nodeID: LongID | ID,

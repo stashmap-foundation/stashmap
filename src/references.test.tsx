@@ -108,8 +108,8 @@ describe("findRefsToNode", () => {
     expect(inRef!.relationID).toBe(myNotesRelations.id);
   });
 
-  test("~Versions HEAD case: version resolves to grandparent with targetNode", () => {
-    // My Notes → Stuff → ~Versions → [Stuff v2]
+  test("~versions HEAD case: version resolves to grandparent with targetNode", () => {
+    // My Notes → Stuff → ~versions → [Stuff v2]
     // StuffV2 is a version of Stuff → resolves to cref:myNotesRel:Stuff
     const myNotes = newNode("My Notes");
     const stuff = newNode("Stuff");
@@ -159,8 +159,8 @@ describe("findRefsToNode", () => {
     expect(refs.first()!.context.toArray()).toEqual([shortID(myNotes.id)]);
   });
 
-  test("~Versions IN case: child of version resolves to grandparent with targetNode", () => {
-    // My Notes → Stuff → ~Versions → SomeVersion → [SomeChild]
+  test("~versions IN case: child of version resolves to grandparent with targetNode", () => {
+    // My Notes → Stuff → ~versions → SomeVersion → [SomeChild]
     // SomeChild is in a version relation → resolves to cref:myNotesRel:Stuff
     const myNotes = newNode("My Notes");
     const stuff = newNode("Stuff");
@@ -216,8 +216,8 @@ describe("findRefsToNode", () => {
     expect(refs.first()!.context.toArray()).toEqual([shortID(myNotes.id)]);
   });
 
-  test("~Versions at root level: version resolves to HEAD ref (occurrence)", () => {
-    // Stuff → ~Versions → [StuffV2]
+  test("~versions at root level: version resolves to HEAD ref (occurrence)", () => {
+    // Stuff → ~versions → [StuffV2]
     // Stuff is root-level, no grandparent → HEAD ref
     const stuff = newNode("Stuff");
     const stuffV2 = newNode("Stuff v2");
@@ -256,7 +256,7 @@ describe("findRefsToNode", () => {
     expect(refs.first()!.context.toArray()).toEqual([]);
   });
 
-  test("dedup: same relation via direct and ~Versions path", () => {
+  test("dedup: same relation via direct and ~versions path", () => {
     const myNotes = newNode("My Notes");
     const stuff = newNode("Stuff");
     const stuffV2 = newNode("Stuff v2");
@@ -339,7 +339,7 @@ describe("findRefsToNode", () => {
     expect(refs.every((r) => r.targetNode === stuff.id)).toBe(true);
   });
 
-  test("~Versions with multiple version nodes resolve to same grandparent", () => {
+  test("~versions with multiple version nodes resolve to same grandparent", () => {
     const myNotes = newNode("My Notes");
     const stuff = newNode("Stuff");
     const stuffV1 = newNode("Stuff version 1");

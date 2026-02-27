@@ -572,15 +572,15 @@ Target
   });
 });
 
-describe("Deep Copy - ~Versions Handling", () => {
-  test("Copied ~Versions from another user are taken over", async () => {
+describe("Deep Copy - ~versions Handling", () => {
+  test("Copied ~versions from another user are taken over", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
 
     // Bob creates BobFolder → Original and edits Original
     renderTree(bob);
     await type("My Notes{Enter}{Tab}BobFolder{Enter}{Tab}Original{Escape}");
 
-    // Bob edits "Original" to "Bob Edited" - this creates a ~Versions entry
+    // Bob edits "Original" to "Bob Edited" - this creates a ~versions entry
     const sourceEditor = await screen.findByLabelText("edit Original");
     await userEvent.click(sourceEditor);
     await userEvent.clear(sourceEditor);
@@ -642,8 +642,8 @@ Target
     fireEvent.dragStart(bobFolderElements[0]);
     fireEvent.drop(targetDropTargets[1]);
 
-    // After copy, Alice sees "Bob Edited" because Bob's ~Versions were copied
-    // and became Alice's ~Versions for that context
+    // After copy, Alice sees "Bob Edited" because Bob's ~versions were copied
+    // and became Alice's ~versions for that context
     await expectTree(`
 My Notes
   Target

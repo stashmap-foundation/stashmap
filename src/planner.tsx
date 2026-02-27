@@ -303,19 +303,19 @@ export function planBulkUpsertNodes(plan: Plan, nodes: KnowNode[]): Plan {
 
 /**
  * Create a version for a node instead of modifying it directly.
- * Adds the new version to ~Versions in context [...context, originalNodeID].
- * If the version already exists in ~Versions, moves it to the top instead of adding a duplicate.
- * Also ensures the original node ID is in ~Versions (for complete version history).
+ * Adds the new version to ~versions in context [...context, originalNodeID].
+ * If the version already exists in ~versions, moves it to the top instead of adding a duplicate.
+ * Also ensures the original node ID is in ~versions (for complete version history).
  *
- * Nested version handling: If editing a node that's inside a ~Versions list,
- * adds the new version as a sibling instead of creating recursive ~Versions.
+ * Nested version handling: If editing a node that's inside a ~versions list,
+ * adds the new version as a sibling instead of creating recursive ~versions.
  *
- * Example: Editing BCN inside Barcelona's ~Versions:
- *   Tree: ROOT → Barcelona → ~Versions → BCN
+ * Example: Editing BCN inside Barcelona's ~versions:
+ *   Tree: ROOT → Barcelona → ~versions → BCN
  *   editContext = [ROOT, Barcelona, VERSIONS_NODE_ID]
- *   - originalNodeID = Barcelona (context.get(-2), the node that owns ~Versions)
- *   - context = [ROOT] (slice(0, -2), Barcelona's context without Barcelona or ~Versions)
- *   - versionsContext = [ROOT, Barcelona] (used to look up the ~Versions relation)
+ *   - originalNodeID = Barcelona (context.get(-2), the node that owns ~versions)
+ *   - context = [ROOT] (slice(0, -2), Barcelona's context without Barcelona or ~versions)
+ *   - versionsContext = [ROOT, Barcelona] (used to look up the ~versions relation)
  */
 export function planCreateVersion(
   plan: Plan,
@@ -323,14 +323,14 @@ export function planCreateVersion(
   newText: string,
   editContext: List<ID>
 ): Plan {
-  // Handle nested versions: if editing a node inside ~Versions list,
-  // add the new version as a sibling instead of creating recursive ~Versions
+  // Handle nested versions: if editing a node inside ~versions list,
+  // add the new version as a sibling instead of creating recursive ~versions
   const isInsideVersions = editContext.last() === VERSIONS_NODE_ID;
 
   const [originalNodeID, context]: [ID, List<ID>] =
     isInsideVersions && editContext.size >= 2
       ? [
-          editContext.get(editContext.size - 2) as ID, // The node that owns ~Versions
+          editContext.get(editContext.size - 2) as ID, // The node that owns ~versions
           editContext.slice(0, -2).toList(), // Context to that node
         ]
       : [editedNodeID, editContext];
@@ -339,12 +339,22 @@ export function planCreateVersion(
   const versionNode = newNode(newText);
   const planWithVersionNode = planUpsertNode(plan, versionNode);
 
-  // 2. Ensure ~Versions node exists
-  const versionsNode = newNode("~Versions");
+  // 2. Ensure ~versions node exists
+  const versionsNode = newNode("~versions");
   const updatedPlan = planUpsertNode(planWithVersionNode, versionsNode);
 
-  // 3. Get or create ~Versions relations
+  // 3. Get or create ~versions relations
   const versionsContext = getVersionsContext(originalNodeID, context);
+  const containingRelation = context.size > 0
+    ? getRelationsForContext(
+        updatedPlan.knowledgeDBs,
+        updatedPlan.user.publicKey,
+        context.last() as ID,
+        context.butLast().toList(),
+        undefined,
+        context.size === 1
+      )
+    : undefined;
   const baseVersionsRelations =
     getVersionsRelations(
       updatedPlan.knowledgeDBs,
@@ -352,9 +362,9 @@ export function planCreateVersion(
       originalNodeID,
       context
     ) ||
-    newRelations(VERSIONS_NODE_ID, versionsContext, updatedPlan.user.publicKey);
+    newRelations(VERSIONS_NODE_ID, versionsContext, updatedPlan.user.publicKey, containingRelation?.root);
 
-  // 4. Ensure original node ID is in ~Versions (add at end if not present)
+  // 4. Ensure original node ID is in ~versions (add at end if not present)
   const originalIndex = baseVersionsRelations.items.findIndex(
     (item) => item.nodeID === originalNodeID
   );
@@ -370,7 +380,7 @@ export function planCreateVersion(
       : baseVersionsRelations;
 
   // 5. Determine insert position
-  // If editing inside ~Versions, insert at the same position as the edited node
+  // If editing inside ~versions, insert at the same position as the edited node
   // Otherwise, insert at position 0 (top)
   const editedNodePosition = isInsideVersions
     ? versionsWithOriginal.items.findIndex(
@@ -379,7 +389,7 @@ export function planCreateVersion(
     : -1;
   const insertPosition = editedNodePosition >= 0 ? editedNodePosition : 0;
 
-  // 6. Check if new version already exists in ~Versions
+  // 6. Check if new version already exists in ~versions
   const existingIndex = versionsWithOriginal.items.findIndex(
     (item) => item.nodeID === versionNode.id
   );
@@ -1070,7 +1080,7 @@ export function planDeepCopyNodeWithView(
 
 /**
  * Create a new node and add it to the plan, handling version awareness.
- * If the node (by content-addressed ID) already has ~Versions in this context,
+ * If the node (by content-addressed ID) already has ~versions in this context,
  * ensures the typed text becomes the active version.
  *
  * @param plan - The current plan

@@ -96,7 +96,7 @@ function BreadcrumbItem({
   const node = getNodeFromID(knowledgeDBs, nodeID as string, user.publicKey);
   const label =
     node?.text ||
-    (shortID(nodeID) === VERSIONS_NODE_ID ? "~Versions" : "Loading...");
+    (shortID(nodeID) === VERSIONS_NODE_ID ? "~versions" : "Loading...");
 
   if (isLast) {
     return <span className="breadcrumb-current">{label}</span>;

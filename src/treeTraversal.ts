@@ -7,6 +7,7 @@ import {
   addRelationsToLastElement,
   getSuggestionsForNode,
   getVersionsForRelation,
+  getVersionsRelations,
   getNodeIDFromView,
   getContext,
   getRelationsForContext,
@@ -20,6 +21,7 @@ import {
   itemPassesFilters,
   getOccurrencesForNode,
   getIncomingCrefsForNode,
+  VERSIONS_NODE_ID,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
 
@@ -101,6 +103,43 @@ function getChildrenForRegularNode(
     : List<ViewPath>();
 
   if (options?.isMarkdownExport) {
+    const hasVersionsChild = relations?.items.some(
+      (item) => item.nodeID === (VERSIONS_NODE_ID as LongID | ID)
+    );
+    const versionsRel = !hasVersionsChild
+      ? getVersionsRelations(
+          data.knowledgeDBs,
+          author,
+          parentNodeID as ID,
+          context
+        )
+      : undefined;
+    if (versionsRel) {
+      const relationId = relations?.id || ("" as LongID);
+      const pathWithRelations = addRelationsToLastElement(
+        parentPath,
+        relationId
+      );
+      const versionsPath = [
+        ...pathWithRelations,
+        {
+          nodeID: VERSIONS_NODE_ID as LongID | ID,
+          nodeIndex: relationPaths.size as NodeIndex,
+        },
+      ] as ViewPath;
+      return {
+        paths: relationPaths.push(versionsPath),
+        virtualItems: Map<string, RelationItem>().set(
+          viewPathToString(versionsPath),
+          {
+            nodeID: VERSIONS_NODE_ID as LongID | ID,
+            relevance: undefined as Relevance,
+            virtualType: "version" as VirtualType,
+          }
+        ),
+        firstVirtualKeys: EMPTY_FIRST_VIRTUAL_KEYS,
+      };
+    }
     return {
       paths: relationPaths,
       virtualItems: EMPTY_VIRTUAL_ITEMS,

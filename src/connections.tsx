@@ -9,8 +9,8 @@ export function hashText(text: string): ID {
   return crypto.createHash("sha256").update(text).digest("hex").slice(0, 32);
 }
 
-// Pre-computed hash for the ~Versions node
-export const VERSIONS_NODE_ID = hashText("~Versions");
+// Pre-computed hash for the ~versions node
+export const VERSIONS_NODE_ID = hashText("~versions");
 
 // Pre-computed hash for the ~Log node (home page, linked to root-level notes)
 export const LOG_NODE_ID = hashText("~Log");

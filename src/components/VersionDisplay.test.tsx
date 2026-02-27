@@ -197,7 +197,7 @@ My Notes
     `);
   });
 
-  test("~Versions list contains both original text and new version after first edit", async () => {
+  test("~versions list contains both original text and new version after first edit", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -224,25 +224,25 @@ My Notes
     BCN
     `);
 
-    // Add ~Versions as a child via Tab indentation.
-    await addChildViaTab("BCN", "~Versions");
+    // Add ~versions as a child via Tab indentation.
+    await addChildViaTab("BCN", "~versions");
 
     await expectTree(`
 My Notes
   Holiday Destinations
     BCN
-      ~Versions
+      ~versions
     `);
 
-    // Expand ~Versions to see all versions
-    await userEvent.click(await screen.findByLabelText("expand ~Versions"));
+    // Expand ~versions to see all versions
+    await userEvent.click(await screen.findByLabelText("expand ~versions"));
 
-    // ~Versions should contain both BCN (current/top) and Barcelona (original)
+    // ~versions should contain both BCN (current/top) and Barcelona (original)
     await expectTree(`
 My Notes
   Holiday Destinations
     BCN
-      ~Versions
+      ~versions
         BCN
         Barcelona
     `);
@@ -254,13 +254,13 @@ My Notes
 My Notes
   Holiday Destinations
     BCN
-      ~Versions
+      ~versions
         BCN
         Barcelona
     `);
   });
 
-  test("Editing a version inside ~Versions inserts new version at same position", async () => {
+  test("Editing a version inside ~versions inserts new version at same position", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -282,22 +282,22 @@ My Notes
     await userEvent.type(bcnEditor, "V3");
     fireEvent.blur(bcnEditor, { relatedTarget: document.body });
 
-    // Now we have ~Versions: [V3, BCN, Barcelona]
-    await addChildViaTab("V3", "~Versions");
-    await userEvent.click(await screen.findByLabelText("expand ~Versions"));
+    // Now we have ~versions: [V3, BCN, Barcelona]
+    await addChildViaTab("V3", "~versions");
+    await userEvent.click(await screen.findByLabelText("expand ~versions"));
 
     await expectTree(`
 My Notes
   Holiday Destinations
     V3
-      ~Versions
+      ~versions
         V3
         BCN
         Barcelona
     `);
 
-    // Now edit BCN (at position 1 inside ~Versions) to "BCN-updated"
-    // BCN only appears inside ~Versions (parent shows "V3")
+    // Now edit BCN (at position 1 inside ~versions) to "BCN-updated"
+    // BCN only appears inside ~versions (parent shows "V3")
     const bcnInsideVersions = await screen.findByLabelText("edit BCN");
     await userEvent.click(bcnInsideVersions);
     await userEvent.clear(bcnInsideVersions);
@@ -311,7 +311,7 @@ My Notes
 My Notes
   Holiday Destinations
     V3
-      ~Versions
+      ~versions
         V3
         BCN-updated
         BCN
@@ -325,7 +325,7 @@ My Notes
 My Notes
   Holiday Destinations
     V3
-      ~Versions
+      ~versions
         V3
         BCN-updated
         BCN
@@ -333,7 +333,7 @@ My Notes
     `);
   });
 
-  test("Pressing Enter while editing inside ~Versions opens editor at correct position", async () => {
+  test("Pressing Enter while editing inside ~versions opens editor at correct position", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -355,22 +355,22 @@ My Notes
     await userEvent.type(bcnEditor, "V3");
     fireEvent.blur(bcnEditor, { relatedTarget: document.body });
 
-    // Now we have ~Versions: [V3, BCN, Barcelona]
-    await addChildViaTab("V3", "~Versions");
-    await userEvent.click(await screen.findByLabelText("expand ~Versions"));
+    // Now we have ~versions: [V3, BCN, Barcelona]
+    await addChildViaTab("V3", "~versions");
+    await userEvent.click(await screen.findByLabelText("expand ~versions"));
 
     await expectTree(`
 My Notes
   Holiday Destinations
     V3
-      ~Versions
+      ~versions
         V3
         BCN
         Barcelona
     `);
 
-    // Now edit BCN (at position 1 inside ~Versions) and press Enter
-    // BCN only appears inside ~Versions (parent shows "V3")
+    // Now edit BCN (at position 1 inside ~versions) and press Enter
+    // BCN only appears inside ~versions (parent shows "V3")
     const bcnInsideVersions = await screen.findByLabelText("edit BCN");
     await userEvent.click(bcnInsideVersions);
     await userEvent.clear(bcnInsideVersions);
@@ -380,7 +380,7 @@ My Notes
 My Notes
   Holiday Destinations
     V3
-      ~Versions
+      ~versions
         V3
         BCN-updated
         [NEW NODE]
@@ -395,7 +395,7 @@ My Notes
 My Notes
   Holiday Destinations
     V3
-      ~Versions
+      ~versions
         V3
         BCN-updated
         BCN
@@ -430,27 +430,27 @@ My Notes
     BCN
     `);
 
-    // Add ~Versions as a child via Tab indentation.
-    await addChildViaTab("BCN", "~Versions");
+    // Add ~versions as a child via Tab indentation.
+    await addChildViaTab("BCN", "~versions");
 
-    // Expand ~Versions to see all versions
-    await userEvent.click(await screen.findByLabelText("expand ~Versions"));
+    // Expand ~versions to see all versions
+    await userEvent.click(await screen.findByLabelText("expand ~versions"));
 
     await expectTree(`
 My Notes
   Holiday Destinations
     BCN
-      ~Versions
+      ~versions
         BCN
         Barcelona
     `);
 
-    // Mark the top version (BCN inside ~Versions) as not relevant
-    // There are two "mark BCN as not relevant" buttons - parent and inside ~Versions
+    // Mark the top version (BCN inside ~versions) as not relevant
+    // There are two "mark BCN as not relevant" buttons - parent and inside ~versions
     const notRelevantButtons = await screen.findAllByLabelText(
       "mark BCN as not relevant"
     );
-    // The second one is inside ~Versions
+    // The second one is inside ~versions
     fireEvent.click(notRelevantButtons[1]);
 
     // Now the display should fall back to showing Barcelona (the previous version)
@@ -458,7 +458,7 @@ My Notes
 My Notes
   Holiday Destinations
     Barcelona
-      ~Versions
+      ~versions
         Barcelona
     `);
 
@@ -469,12 +469,12 @@ My Notes
 My Notes
   Holiday Destinations
     Barcelona
-      ~Versions
+      ~versions
         Barcelona
     `);
   });
 
-  test("Reference path filters out ~Versions and deduplicates", async () => {
+  test("Reference path filters out ~versions and deduplicates", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -521,20 +521,20 @@ Other
     `);
   });
 
-  test("Manually adding ~Versions to a node without versions prepopulates with original", async () => {
+  test("Manually adding ~versions to a node without versions prepopulates with original", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
     await type(
-      "My Notes{Enter}{Tab}Original Text{Enter}{Tab}~Versions{Enter}{Tab}"
+      "My Notes{Enter}{Tab}Original Text{Enter}{Tab}~versions{Enter}{Tab}"
     );
 
-    // ~Versions should be expanded and contain "Original Text" as the original version
+    // ~versions should be expanded and contain "Original Text" as the original version
     // Plus there should be an empty editor for the new node
     await expectTree(`
 My Notes
 
-    ~Versions
+    ~versions
       [NEW NODE]
       Original Text
     `);

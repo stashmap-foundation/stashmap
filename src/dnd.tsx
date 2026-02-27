@@ -214,7 +214,7 @@ export function getDropDestinationFromTreeView(
 /**
  * Disconnect a node from its current parent.
  * Also cleans up orphaned descendant relations, unless the node is a
- * reference (refs don't own descendants) or ~Versions (version history
+ * reference (refs don't own descendants) or ~versions (version history
  * should survive temporary removal).
  */
 export function planDisconnectFromParent(

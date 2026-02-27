@@ -88,12 +88,12 @@ Notes
     `);
   });
 
-  test("Edited node with ~Versions shows only one incoming reference (deduplication)", async () => {
+  test("Edited node with ~versions shows only one incoming reference (deduplication)", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
     await type(
-      "Notes{Enter}Test A{Enter}{Tab}~Versions{Enter}{Tab}Test B{Escape}"
+      "Notes{Enter}Test A{Enter}{Tab}~versions{Enter}{Tab}Test B{Escape}"
     );
     await userEvent.click(await screen.findByLabelText("Create new note"));
     await type("Other{Enter}{Tab}Test B{Enter}{Tab}Child{Escape}");
@@ -112,7 +112,7 @@ Other
     await expectTree(`
 Notes
   Test B
-    ~Versions
+    ~versions
       Test B
       Test A
     `);

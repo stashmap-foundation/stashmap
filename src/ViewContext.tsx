@@ -48,11 +48,13 @@ export function contextsMatch(a: Context, b: Context): boolean {
 type SuggestionsResult = {
   suggestions: List<LongID | ID>;
   coveredCandidateIDs: ImmutableSet<string>;
+  crefSuggestionIDs: ImmutableSet<string>;
 };
 
 const EMPTY_SUGGESTIONS_RESULT: SuggestionsResult = {
   suggestions: List<LongID | ID>(),
   coveredCandidateIDs: ImmutableSet<string>(),
+  crefSuggestionIDs: ImmutableSet<string>(),
 };
 
 export function getSuggestionsForNode(
@@ -139,21 +141,38 @@ export function getSuggestionsForNode(
     ? parentContext.push(localID as ID)
     : List<ID>([localID as ID]);
 
-  const suggestions = cappedCandidates.reduce((acc, candidateID) => {
-    const refs = findRefsToNode(knowledgeDBs, candidateID, itemContext);
-    const headRefs = refs.filter(
-      (ref) => !ref.targetNode && splitID(ref.relationID)[0] !== myself
-    );
-    if (headRefs.size > 0) {
-      const first = headRefs.sortBy((r) => -r.updated).first()!;
-      return acc.push(createConcreteRefId(first.relationID));
+  const reduced = cappedCandidates.reduce(
+    (acc, candidateID) => {
+      const refs = findRefsToNode(knowledgeDBs, candidateID, itemContext);
+      const headRefs = refs.filter(
+        (ref) => !ref.targetNode && splitID(ref.relationID)[0] !== myself
+      );
+      if (headRefs.size > 0) {
+        const first = headRefs.sortBy((r) => -r.updated).first()!;
+        return {
+          ...acc,
+          suggestions: acc.suggestions.push(
+            createConcreteRefId(first.relationID)
+          ),
+        };
+      }
+      return {
+        suggestions: acc.suggestions.push(candidateID as LongID | ID),
+        crefSuggestionIDs: isConcreteRefId(candidateID as LongID)
+          ? acc.crefSuggestionIDs.add(candidateID)
+          : acc.crefSuggestionIDs,
+      };
+    },
+    {
+      suggestions: List<LongID | ID>(),
+      crefSuggestionIDs: ImmutableSet<string>(),
     }
-    return acc.push(candidateID as LongID | ID);
-  }, List<LongID | ID>());
+  );
 
   return {
-    suggestions,
+    suggestions: reduced.suggestions,
     coveredCandidateIDs: cappedCandidates.toSet() as ImmutableSet<string>,
+    crefSuggestionIDs: reduced.crefSuggestionIDs,
   };
 }
 

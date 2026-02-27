@@ -466,7 +466,7 @@ A
       D
         E
 My links
-  [R] A / B / C / D >>> E
+  [R] A / B / C / D / E
     `);
 
     await userEvent.click(screen.getAllByLabelText("edit C")[0]);
@@ -476,7 +476,7 @@ My links
 A
   B
 My links
-  [D] (deleted) A / B / C / D >>> E
+  [D] (deleted) A / B / C / D / E
     `);
 
     cleanup();
@@ -486,7 +486,7 @@ My links
 A
   B
 My links
-  [D] (deleted) A / B / C / D >>> E
+  [D] (deleted) A / B / C / D / E
     `);
   });
 
@@ -519,7 +519,7 @@ A
       D
         E
 My links
-  [R] A / B / C / D >>> E
+  [R] A / B / C / D / E
     `);
 
     cleanup();
@@ -532,7 +532,7 @@ A
       D
         E
 My links
-  [R] A / B / C / D >>> E
+  [R] A / B / C / D / E
     `);
 
     await userEvent.click(screen.getAllByLabelText("edit C")[0]);
@@ -542,7 +542,7 @@ My links
 A
   B
 My links
-  [D] (deleted) A / B / C / D >>> E
+  [D] (deleted) A / B / C / D / E
     `);
 
     cleanup();
@@ -552,7 +552,7 @@ My links
 A
   B
 My links
-  [D] (deleted) A / B / C / D >>> E
+  [D] (deleted) A / B / C / D / E
     `);
   });
 });

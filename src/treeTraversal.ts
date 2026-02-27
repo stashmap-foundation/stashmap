@@ -129,7 +129,11 @@ function getChildrenForRegularNode(
 
   const isOwnContent = author === data.user.publicKey;
 
-  const { suggestions: diffItems, coveredCandidateIDs } = isOwnContent
+  const {
+    suggestions: diffItems,
+    coveredCandidateIDs,
+    crefSuggestionIDs,
+  } = isOwnContent
     ? getSuggestionsForNode(
         data.knowledgeDBs,
         data.user.publicKey,
@@ -141,12 +145,14 @@ function getChildrenForRegularNode(
     : {
         suggestions: List<LongID | ID>(),
         coveredCandidateIDs: ImmutableSet<string>(),
+        crefSuggestionIDs: ImmutableSet<string>(),
       };
 
   const addVirtualItems = (
     acc: { paths: List<ViewPath>; virtualItems: VirtualItemsMap },
     items: List<LongID | ID>,
-    virtualType: VirtualType
+    virtualType: VirtualType,
+    crefIDs?: ImmutableSet<string>
   ): { paths: List<ViewPath>; virtualItems: VirtualItemsMap } =>
     items.reduce((result, nodeID, idx) => {
       const pathWithRelations = addRelationsToLastElement(
@@ -157,12 +163,14 @@ function getChildrenForRegularNode(
         ...pathWithRelations,
         { nodeID, nodeIndex: (acc.paths.size + idx) as NodeIndex },
       ] as ViewPath;
+      const isCref = crefIDs?.has(nodeID as string);
       return {
         paths: result.paths.push(path),
         virtualItems: result.virtualItems.set(viewPathToString(path), {
           nodeID,
           relevance: undefined as Relevance,
           virtualType,
+          ...(isCref ? { isCref: true } : {}),
         }),
       };
     }, acc);
@@ -188,7 +196,8 @@ function getChildrenForRegularNode(
   const withSuggestions = addVirtualItems(
     withIncoming,
     diffItems,
-    "suggestion"
+    "suggestion",
+    crefSuggestionIDs
   );
   const withOccurrences = addVirtualItems(
     withSuggestions,

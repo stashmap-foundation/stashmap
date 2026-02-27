@@ -114,6 +114,16 @@ function planUpdateOneRelevance(
     const virtualItem = virtualItemsMap.get(viewPathToString(viewPath));
     if (virtualItem) {
       if (virtualItem.virtualType === "suggestion") {
+        if (virtualItem.isCref) {
+          return planAddToParent(
+            acc,
+            nodeID,
+            parentView,
+            stack,
+            undefined,
+            relevance
+          )[0];
+        }
         const [plan] = planDeepCopyNode(
           acc,
           viewPath,
@@ -181,7 +191,7 @@ function planUpdateOneArgument(
     const virtualItem = virtualItemsMap.get(viewPathToString(viewPath));
     if (virtualItem) {
       const acceptedPlan =
-        virtualItem.virtualType === "suggestion"
+        virtualItem.virtualType === "suggestion" && !virtualItem.isCref
           ? planDeepCopyNode(
               acc,
               viewPath,

@@ -1,4 +1,4 @@
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -11,6 +11,7 @@ import {
   findNewNodeEditor,
   expectTree,
   type,
+  navigateToNodeViaSearch,
 } from "../utils.test";
 
 const maybeExpand = async (label: string): Promise<void> => {
@@ -647,6 +648,63 @@ Recipes
   Soup
   Stew
   [V] -5
+    `);
+  });
+});
+
+describe("Cref suggestions", () => {
+  test("declining cref suggestion hides it permanently", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    await follow(alice, bob().user.publicKey);
+
+    // Bob creates Source (with child) and Target, then alt-drags Source into Target
+    renderApp(bob());
+    await type("Source{Enter}{Tab}Child{Escape}");
+    await userEvent.click(await screen.findByLabelText("Create new note"));
+    await type("Target{Enter}{Tab}Items{Escape}");
+
+    await expectTree(`
+Target
+  Items
+    `);
+
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Source");
+
+    await userEvent.keyboard("{Alt>}");
+    const sourceItems = screen.getAllByRole("treeitem", { name: "Source" });
+    fireEvent.dragStart(sourceItems[sourceItems.length - 1]);
+    const targetItems = screen.getAllByRole("treeitem", { name: "Target" });
+    fireEvent.dragOver(targetItems[0], { altKey: true });
+    fireEvent.drop(targetItems[0], { altKey: true });
+    await userEvent.keyboard("{/Alt}");
+
+    await userEvent.click(screen.getAllByLabelText("Close pane")[0]);
+    await navigateToNodeViaSearch(0, "Target");
+
+    await expectTree(`
+Target
+  [R] Source
+  Items
+    `);
+    cleanup();
+
+    // Alice creates Target and sees Bob's items as suggestions
+    renderTree(alice);
+    await type("Target{Escape}");
+
+    await expectTree(`
+Target
+  [S] Source
+  [S] Items
+    `);
+
+    await userEvent.click(await screen.findByLabelText("decline Source"));
+
+    await expectTree(`
+Target
+  [S] Items
+  [VO] +2
     `);
   });
 });

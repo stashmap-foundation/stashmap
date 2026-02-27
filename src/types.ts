@@ -231,6 +231,7 @@ declare global {
     relevance: Relevance; // undefined = contains (default), "relevant", "maybe_relevant", "little_relevant", "not_relevant"
     argument?: Argument; // "confirms", "contra", or undefined (neutral)
     virtualType?: VirtualType;
+    isCref?: boolean;
   };
 
   type Relations = {

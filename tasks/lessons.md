@@ -91,3 +91,36 @@ fireEvent.drop(screen.getByLabelText("Root"));
 - Dropping on Root moves item to position 0 (beginning of children)
 - No need for `setDropIndentDepth` for simple moves
 - `fireEvent.dragStart` + `fireEvent.drop` is sufficient (no dragEnter/dragOver needed)
+
+## Cref vs Regular Node Suggestions: Don't Use `isConcreteRefId` Alone
+
+**Date**: 2026-02-27
+**Context**: When another user has a cref in their relation, the suggestion should add the cref link (planAddToParent), not deep copy the tree (planDeepCopyNode). Needed to distinguish cref pass-throughs from regular nodes wrapped as crefs.
+
+**Mistake**: First attempted `isConcreteRefId(virtualItem.nodeID)` check in batchOperations.ts. This broke existing tests because `getSuggestionsForNode` wraps ALL suggestions with headRefs as cref IDs (via `createConcreteRefId`), even for regular nodes.
+
+**Rule**: In `getSuggestionsForNode`, both regular nodes AND crefs end up as cref IDs in the suggestions list — but for different reasons:
+1. Regular node candidates: wrapped via `createConcreteRefId(first.relationID)` on line 149
+2. Cref candidates: `shortID()` preserves the cref prefix, pushed as-is on line 151
+
+To distinguish them, propagate the information from the source:
+- `getSuggestionsForNode` → tracks `crefSuggestionIDs` (candidates where `isConcreteRefId(candidateID)` was already true)
+- `treeTraversal.ts` → sets `isCref: true` on virtual items from that set
+- `batchOperations.ts` → checks `virtualItem.isCref` to choose `planAddToParent` vs `planDeepCopyNode`
+
+**General principle**: When all items look the same structurally (all cref IDs), the distinction must be propagated from where it originates, not inferred at the consumption site.
+
+## Creating Crefs in Tests: Use Alt-Drag, Not Typing
+
+**Date**: 2026-02-27
+**Context**: Needed a test with a cref suggestion. Tried creating nodes by typing, which only creates ordinary nodes.
+
+**Rule**: To create a cref in a test, use the alt-drag pattern:
+```ts
+await userEvent.keyboard("{Alt>}");
+fireEvent.dragStart(sourceElement);
+fireEvent.dragOver(targetElement, { altKey: true });
+fireEvent.drop(targetElement, { altKey: true });
+await userEvent.keyboard("{/Alt}");
+```
+Typing `Source{Enter}{Tab}Child` creates ordinary nodes. Only alt-drag creates crefs.

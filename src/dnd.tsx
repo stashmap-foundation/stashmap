@@ -159,12 +159,15 @@ export function getDropDestinationFromTreeView(
   targetDepth?: number,
   sourceKeys?: Set<string>
 ): [ViewPath, number] {
+  const pane = getPane(data, root);
   const { paths: nodes } = getNodesInTree(
     data,
     root,
     stack,
     List<ViewPath>(),
-    rootRelation
+    rootRelation,
+    pane.author,
+    pane.typeFilters
   );
   const adjustedIndex = destinationIndex - 1;
   const dropBefore = nodes.get(adjustedIndex);

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Filter } from "nostr-tools";
 import { List, Set } from "immutable";
-import { KIND_DELETE, KIND_KNOWLEDGE_LIST, KIND_KNOWLEDGE_NODE } from "./nostr";
+import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
 import {
   splitID,
   isConcreteRefId,
@@ -48,25 +48,10 @@ function addIDToFilter(
   };
 }
 
-// {
-//    KIND: [KIND_KNOWLEDGE_LIST],
-//    #d: [relationID]
-// }
-// {
-//    KIND: [KIND_KNOWLEDGE_NODE],
-//    #d: [nodeID]
-// }
-// {
-//    KIND: [KIND_KNOWLEDGE_LIST],
-//    #k: [nodeID]
-// }
-//
 type Filters = {
-  knowledgeListbyID: Filter;
-  knowledgeNodesByID: Filter;
-  knowledgeListByHead: Filter;
-  knowledgeListByContext: Filter;
-  referencedBy: Filter;
+  documentByID: Filter;
+  documentByNode: Filter;
+  documentByContext: Filter;
   deleteFilter: Filter;
   authors: PublicKey[];
 };
@@ -88,12 +73,9 @@ export function sanitizeFilter(
 export function filtersToFilterArray(filters: Filters): Filter[] {
   const { authors } = filters;
   return [
-    sanitizeFilter({ ...filters.knowledgeListbyID, authors }, "#d"),
-    // Content-addressed nodes can be found by ID regardless of author
-    sanitizeFilter({ ...filters.knowledgeNodesByID }, "#d"),
-    sanitizeFilter({ ...filters.knowledgeListByHead, authors }, "#k"),
-    sanitizeFilter({ ...filters.knowledgeListByContext, authors }, "#c"),
-    sanitizeFilter({ ...filters.referencedBy, authors }, "#i"),
+    sanitizeFilter({ ...filters.documentByID, authors }, "#d"),
+    sanitizeFilter({ ...filters.documentByNode, authors }, "#n"),
+    sanitizeFilter({ ...filters.documentByContext, authors }, "#c"),
     sanitizeFilter({ ...filters.deleteFilter, authors }, "#k"),
   ].filter((f) => f !== undefined) as Filter[];
 }
@@ -115,11 +97,7 @@ export function addRelationIDToFilters(
 ): Filters {
   return {
     ...addAuthorFromIDToFilters(filters, relationID as ID),
-    knowledgeListbyID: addIDToFilter(
-      filters.knowledgeListbyID,
-      relationID,
-      "#d"
-    ),
+    documentByID: addIDToFilter(filters.documentByID, relationID, "#d"),
   };
 }
 
@@ -140,7 +118,7 @@ export function addNodeToFilters(
 
   const baseFilters = {
     ...addAuthorFromIDToFilters(filters, id),
-    knowledgeNodesByID: addIDToFilter(filters.knowledgeNodesByID, id, "#d"),
+    documentByNode: addIDToFilter(filters.documentByNode, id, "#n"),
   };
 
   if (!includeListQuery) {
@@ -149,10 +127,10 @@ export function addNodeToFilters(
 
   return {
     ...baseFilters,
-    knowledgeListByHead: addIDToFilter(
-      addIDToFilter(filters.knowledgeListByHead, id, "#k"),
+    documentByNode: addIDToFilter(
+      addIDToFilter(baseFilters.documentByNode, id, "#n"),
       VERSIONS_NODE_ID,
-      "#k"
+      "#n"
     ),
   };
 }
@@ -161,17 +139,9 @@ export function addReferencedByToFilters(
   filters: Filters,
   id: LongID | ID
 ): Filters {
-  const filter = filters.referencedBy;
-  const d = filter["#i"] || [];
-  const updatedFilter = {
-    ...filter,
-    "#i": [...d, id],
-  };
   return {
     ...addAuthorFromIDToFilters(filters, id),
-    referencedBy: updatedFilter,
-    // Also query for relations where this node is the head (has direct children)
-    knowledgeListByHead: addIDToFilter(filters.knowledgeListByHead, id, "#k"),
+    documentByNode: addIDToFilter(filters.documentByNode, id, "#n"),
   };
 }
 
@@ -184,14 +154,9 @@ export function addListToFilters(
     return addReferencedByToFilters(filters, nodeID);
   }
 
-  // Also query for ALL relations with this node as HEAD (for diff items from other users)
   return {
     ...addRelationIDToFilters(filters, listID),
-    knowledgeListByHead: addIDToFilter(
-      filters.knowledgeListByHead,
-      nodeID,
-      "#k"
-    ),
+    documentByNode: addIDToFilter(filters.documentByNode, nodeID, "#n"),
   };
 }
 
@@ -201,16 +166,8 @@ export function addDescendantsToFilters(
 ): Filters {
   return {
     ...filters,
-    knowledgeListByContext: addIDToFilter(
-      filters.knowledgeListByContext,
-      nodeID,
-      "#c"
-    ),
-    knowledgeListByHead: addIDToFilter(
-      filters.knowledgeListByHead,
-      nodeID,
-      "#k"
-    ),
+    documentByContext: addIDToFilter(filters.documentByContext, nodeID, "#c"),
+    documentByNode: addIDToFilter(filters.documentByNode, nodeID, "#n"),
   };
 }
 
@@ -229,24 +186,18 @@ export function createBaseFilter(
       : []),
   ];
   return {
-    knowledgeListbyID: {
-      kinds: [KIND_KNOWLEDGE_LIST],
+    documentByID: {
+      kinds: [KIND_KNOWLEDGE_DOCUMENT],
     },
-    knowledgeNodesByID: {
-      kinds: [KIND_KNOWLEDGE_NODE],
+    documentByNode: {
+      kinds: [KIND_KNOWLEDGE_DOCUMENT],
     },
-    knowledgeListByHead: {
-      kinds: [KIND_KNOWLEDGE_LIST],
-    },
-    knowledgeListByContext: {
-      kinds: [KIND_KNOWLEDGE_LIST],
-    },
-    referencedBy: {
-      kinds: [KIND_KNOWLEDGE_LIST],
+    documentByContext: {
+      kinds: [KIND_KNOWLEDGE_DOCUMENT],
     },
     deleteFilter: {
       kinds: [KIND_DELETE],
-      "#k": [`${KIND_KNOWLEDGE_LIST}`, `${KIND_KNOWLEDGE_NODE}`],
+      "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`],
     },
     authors,
   };

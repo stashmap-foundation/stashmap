@@ -268,6 +268,7 @@ test("Calculate index from node index", () => {
     id: "test" as LongID,
     updated: 0,
     author: ALICE.publicKey,
+    root: "test" as ID,
   };
   expect(calculateNodeIndex(relations, 0)).toBe(0);
   expect(calculateNodeIndex(relations, 1)).toBe(0);

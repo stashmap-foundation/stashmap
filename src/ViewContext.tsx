@@ -885,6 +885,18 @@ export function useRelationIndex(): number | undefined {
   return getRelationIndex(data, path);
 }
 
+export function getRelationItemForView(
+  data: Data,
+  viewPath: ViewPath
+): RelationItem | undefined {
+  const relation = getParentRelation(data, viewPath);
+  if (!relation) {
+    return undefined;
+  }
+  const index = getRelationIndex(data, viewPath);
+  return index !== undefined ? relation.items.get(index) : undefined;
+}
+
 export function useRelationItem(): RelationItem | undefined {
   const virtualItems = React.useContext(VirtualItemsContext);
   const data = useData();
@@ -894,12 +906,7 @@ export function useRelationItem(): RelationItem | undefined {
   if (virtualItem) {
     return virtualItem;
   }
-  const relation = getParentRelation(data, viewPath);
-  if (!relation) {
-    return undefined;
-  }
-  const index = getRelationIndex(data, viewPath);
-  return index !== undefined ? relation.items.get(index) : undefined;
+  return getRelationItemForView(data, viewPath);
 }
 
 export type SiblingInfo = {
@@ -1010,12 +1017,13 @@ export function useNodeID(): [LongID | ID, View] {
   return getNodeIDFromView(data, viewPath);
 }
 
-export function useNode(): [KnowNode, View] | [undefined, undefined] {
-  const data = useData();
-  const viewPath = useViewPath();
-  const stack = usePaneStack();
+export function getNodeForView(
+  data: Data,
+  viewPath: ViewPath,
+  stack: ID[],
+  virtualType?: VirtualType
+): [KnowNode, View] | [undefined, undefined] {
   const [nodeID, view] = getNodeIDFromView(data, viewPath);
-  const virtualItem = useRelationItem();
 
   if (isRefId(nodeID)) {
     const node = buildReferenceItem(
@@ -1023,7 +1031,7 @@ export function useNode(): [KnowNode, View] | [undefined, undefined] {
       data,
       viewPath,
       stack,
-      virtualItem?.virtualType
+      virtualType
     );
     if (!node) {
       return [undefined, undefined];
@@ -1038,12 +1046,21 @@ export function useNode(): [KnowNode, View] | [undefined, undefined] {
   return [node, view];
 }
 
-export function useDisplayText(): string {
+export function useNode(): [KnowNode, View] | [undefined, undefined] {
   const data = useData();
   const viewPath = useViewPath();
   const stack = usePaneStack();
-  const [node] = useNode();
-  const [nodeID] = useNodeID();
+  const virtualItem = useRelationItem();
+  return getNodeForView(data, viewPath, stack, virtualItem?.virtualType);
+}
+
+export function getDisplayTextForView(
+  data: Data,
+  viewPath: ViewPath,
+  stack: ID[]
+): string {
+  const [node] = getNodeForView(data, viewPath, stack);
+  const [nodeID] = getNodeIDFromView(data, viewPath);
   const context = getContext(data, viewPath, stack);
   const effectiveAuthor = getEffectiveAuthor(data, viewPath);
   const versionedText = getVersionedDisplayText(
@@ -1053,6 +1070,13 @@ export function useDisplayText(): string {
     context
   );
   return versionedText ?? node?.text ?? "";
+}
+
+export function useDisplayText(): string {
+  const data = useData();
+  const viewPath = useViewPath();
+  const stack = usePaneStack();
+  return getDisplayTextForView(data, viewPath, stack);
 }
 
 export function getParentNode(
@@ -1163,14 +1187,15 @@ export function newRelations(
   myself: PublicKey,
   root?: ID
 ): Relations {
+  const id = joinID(myself, v4());
   return {
     head: shortID(head),
     items: List<RelationItem>(),
     context,
-    id: joinID(myself, v4()),
+    id,
     updated: Date.now(),
     author: myself,
-    root,
+    root: root ?? shortID(id),
   };
 }
 
@@ -1179,9 +1204,10 @@ export function newRelations(
 export function newRelationsForNode(
   nodeID: LongID | ID,
   context: Context,
-  myself: PublicKey
+  myself: PublicKey,
+  root?: ID
 ): Relations {
-  const relations = newRelations(nodeID, context, myself);
+  const relations = newRelations(nodeID, context, myself, root);
   if (shortID(nodeID) === VERSIONS_NODE_ID && context.size > 0) {
     const originalNodeID = context.last() as ID;
     return addRelationToRelations(relations, originalNodeID);
@@ -1213,9 +1239,10 @@ export function upsertRelations(
     throw new Error("Cannot edit another user's relations");
   }
 
+  const parentRoot = getParentRelation(plan, viewPath)?.root;
   const relations =
     currentRelation ||
-    newRelationsForNode(nodeID, context, plan.user.publicKey);
+    newRelationsForNode(nodeID, context, plan.user.publicKey, parentRoot);
 
   // Apply modification
   const updatedRelations = modify(relations);

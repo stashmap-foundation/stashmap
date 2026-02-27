@@ -11,7 +11,6 @@ import {
   getContext,
   getRelationsForContext,
   isRoot,
-  getEffectiveAuthor,
   viewPathToString,
 } from "./ViewContext";
 import {
@@ -23,12 +22,15 @@ import {
   getIncomingCrefsForNode,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
-import { getPane } from "./planner";
 
 type TreeResult = {
   paths: List<ViewPath>;
   virtualItems: VirtualItemsMap;
   firstVirtualKeys: ImmutableSet<string>;
+};
+
+export type TreeTraversalOptions = {
+  isMarkdownExport?: boolean;
 };
 
 const EMPTY_VIRTUAL_ITEMS: VirtualItemsMap = Map<string, RelationItem>();
@@ -66,12 +68,13 @@ function getChildrenForRegularNode(
   parentPath: ViewPath,
   parentNodeID: LongID | ID,
   stack: ID[],
-  rootRelation: LongID | undefined
+  rootRelation: LongID | undefined,
+  author: PublicKey,
+  typeFilters: Pane["typeFilters"],
+  options?: TreeTraversalOptions
 ): TreeResult {
-  const author = getEffectiveAuthor(data, parentPath);
   const context = getContext(data, parentPath, stack);
-  const pane = getPane(data, parentPath);
-  const activeFilters = pane.typeFilters || DEFAULT_TYPE_FILTERS;
+  const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
 
   const relations = isSearchId(parentNodeID as ID)
     ? getRelations(data.knowledgeDBs, parentNodeID as ID, data.user.publicKey)
@@ -87,12 +90,23 @@ function getChildrenForRegularNode(
   const relationPaths = relations
     ? relations.items
         .map((item, i) => ({ item, index: i }))
-        .filter(({ item }) => itemPassesFilters(item, activeFilters))
+        .filter(
+          ({ item }) =>
+            options?.isMarkdownExport || itemPassesFilters(item, activeFilters)
+        )
         .map(({ index }) =>
           addNodeToPathWithRelations(parentPath, relations, index)
         )
         .toList()
     : List<ViewPath>();
+
+  if (options?.isMarkdownExport) {
+    return {
+      paths: relationPaths,
+      virtualItems: EMPTY_VIRTUAL_ITEMS,
+      firstVirtualKeys: EMPTY_FIRST_VIRTUAL_KEYS,
+    };
+  }
 
   const relationId = relations?.id || ("" as LongID);
 
@@ -222,7 +236,10 @@ export function getChildNodes(
   data: Data,
   parentPath: ViewPath,
   stack: ID[],
-  rootRelation: LongID | undefined
+  rootRelation: LongID | undefined,
+  author: PublicKey,
+  typeFilters: Pane["typeFilters"],
+  options?: TreeTraversalOptions
 ): TreeResult {
   const [parentNodeID] = getNodeIDFromView(data, parentPath);
 
@@ -235,7 +252,10 @@ export function getChildNodes(
     parentPath,
     parentNodeID,
     stack,
-    rootRelation
+    rootRelation,
+    author,
+    typeFilters,
+    options
   );
 }
 
@@ -244,22 +264,36 @@ export function getNodesInTree(
   parentPath: ViewPath,
   stack: ID[],
   ctx: List<ViewPath>,
-  rootRelation: LongID | undefined
+  rootRelation: LongID | undefined,
+  author: PublicKey,
+  typeFilters: Pane["typeFilters"],
+  options?: TreeTraversalOptions
 ): TreeResult {
-  const childResult = getChildNodes(data, parentPath, stack, rootRelation);
+  const childResult = getChildNodes(
+    data,
+    parentPath,
+    stack,
+    rootRelation,
+    author,
+    typeFilters,
+    options
+  );
 
   return childResult.paths.reduce(
     (result, childPath) => {
       const [, childView] = getNodeIDFromView(data, childPath);
       const withChild = result.paths.push(childPath);
 
-      if (childView.expanded) {
+      if (options?.isMarkdownExport || childView.expanded) {
         const sub = getNodesInTree(
           data,
           childPath,
           stack,
           withChild,
-          rootRelation
+          rootRelation,
+          author,
+          typeFilters,
+          options
         );
         return {
           paths: sub.paths,

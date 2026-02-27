@@ -251,7 +251,7 @@ function upsertRelationsCore(plan: Plan, relations: Relations): Plan {
     ...userDB,
     relations: updatedRelations,
   };
-  const affectedRoot = relations.root ?? shortID(relations.id);
+  const affectedRoot = relations.root;
   return {
     ...plan,
     knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
@@ -1292,9 +1292,13 @@ export function planDeleteRelations(plan: Plan, relationsID: LongID): Plan {
     ...userDB,
     relations: updatedRelations,
   };
+  const affectedRoot = relation?.root;
   return {
     ...deletePlan,
     knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
+    affectedRoots: affectedRoot
+      ? deletePlan.affectedRoots.add(affectedRoot)
+      : deletePlan.affectedRoots,
   };
 }
 
@@ -1426,9 +1430,8 @@ function buildDocumentEvents(
         return events;
       }
       const event = buildDocumentEvent(
-        plan.knowledgeDBs,
-        rootRelation,
-        author
+        plan,
+        rootRelation
       );
       return events.push(event as UnsignedEvent & EventAttachment);
     },

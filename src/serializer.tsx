@@ -274,6 +274,7 @@ export function eventToRelations(e: UnsignedEvent): Relations | undefined {
     items,
     author: e.pubkey as PublicKey,
     basedOn,
+    root: id as ID,
   };
 }
 

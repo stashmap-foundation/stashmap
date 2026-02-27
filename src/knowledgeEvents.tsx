@@ -12,6 +12,7 @@ import {
   KIND_KNOWLEDGE_NODE,
   KIND_KNOWLEDGE_DOCUMENT,
   KIND_VIEWS,
+  getReplaceableKey,
 } from "./nostr";
 import {
   Serializable,
@@ -148,17 +149,19 @@ export function findDocumentNodesAndRelations(
   const docEvents = sortEvents(
     events.filter((event) => event.kind === KIND_KNOWLEDGE_DOCUMENT)
   );
-  return docEvents.reduce(
-    (acc, event) => {
-      const result = parseDocumentEvent(event);
-      return {
-        nodes: acc.nodes.merge(result.nodes),
-        relations: acc.relations.merge(result.relations),
-      };
-    },
-    {
-      nodes: Map<string, KnowNode>(),
-      relations: Map<string, Relations>(),
-    }
+  const allNodes = docEvents.reduce(
+    (acc, event) => acc.merge(parseDocumentEvent(event).nodes),
+    Map<string, KnowNode>()
   );
+  const deduped = docEvents
+    .groupBy((event) => getReplaceableKey(event) ?? "")
+    .map((group) => group.last())
+    .valueSeq()
+    .filter((event): event is UnsignedEvent => event !== undefined)
+    .toList();
+  const relations = deduped.reduce(
+    (acc, event) => acc.merge(parseDocumentEvent(event).relations),
+    Map<string, Relations>()
+  );
+  return { nodes: allNodes, relations };
 }

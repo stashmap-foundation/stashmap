@@ -656,7 +656,9 @@ function usePaneKeyboardNavigation(paneIndex: number): {
           viewPath,
           stack,
           List<ViewPath>(),
-          pane.rootRelation
+          pane.rootRelation,
+          pane.author,
+          pane.typeFilters
         )
       : undefined;
   }, [data, viewPath, stack, pane.rootRelation]);

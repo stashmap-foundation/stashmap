@@ -71,7 +71,7 @@ function useNodeHasChildren(): boolean {
   const viewPath = useViewPath();
   const stack = usePaneStack();
   const pane = useCurrentPane();
-  const result = getChildNodes(data, viewPath, stack, pane.rootRelation);
+  const result = getChildNodes(data, viewPath, stack, pane.rootRelation, pane.author, pane.typeFilters);
   return result.paths.size > 0;
 }
 

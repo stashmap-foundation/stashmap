@@ -149,6 +149,7 @@ describe("updateItemArgument", () => {
       id: "rel1" as LongID,
       updated: Date.now(),
       author: "author" as PublicKey,
+      root: "rel1" as ID,
     };
 
     const updated = updateItemArgument(relations, 0, "confirms");
@@ -170,6 +171,7 @@ describe("updateItemArgument", () => {
       id: "rel1" as LongID,
       updated: Date.now(),
       author: "author" as PublicKey,
+      root: "rel1" as ID,
     };
 
     const updated = updateItemArgument(relations, 0, undefined);
@@ -186,6 +188,7 @@ describe("updateItemArgument", () => {
       id: "rel1" as LongID,
       updated: Date.now(),
       author: "author" as PublicKey,
+      root: "rel1" as ID,
     };
 
     const updated = updateItemArgument(relations, 5, "confirms");

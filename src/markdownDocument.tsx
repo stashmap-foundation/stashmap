@@ -12,11 +12,20 @@ import {
   parseConcreteRefId,
   createConcreteRefId,
 } from "./connections";
-import { getNodeFromID, contextsMatch } from "./ViewContext";
+import {
+  getNodeFromID,
+  ViewPath,
+  NodeIndex,
+  getNodeIDFromView,
+  getRelationForView,
+  getDisplayTextForView,
+  getRelationItemForView,
+  getContext,
+} from "./ViewContext";
 import { buildOutgoingReference } from "./buildReferenceNode";
 import { KIND_KNOWLEDGE_DOCUMENT, newTimestamp, msTag } from "./nostr";
-import { newDB } from "./knowledge";
 import { findTag, getEventMs } from "./commons/useNostrQuery";
+import { getNodesInTree } from "./treeTraversal";
 
 const markdown = new MarkdownIt();
 markdown.use(attrs);
@@ -201,18 +210,6 @@ export function parseMarkdownHierarchy(
 }
 /* eslint-enable functional/immutable-data, functional/no-let, no-continue */
 
-function findChildRelation(
-  knowledgeDBs: KnowledgeDBs,
-  author: PublicKey,
-  nodeID: ID,
-  context: Context
-): Relations | undefined {
-  const authorDB = knowledgeDBs.get(author, newDB());
-  return authorDB.relations.find(
-    (r) => r.head === nodeID && contextsMatch(r.context, context)
-  );
-}
-
 function formatAttrs(
   uuid: string,
   relevance: Relevance,
@@ -272,88 +269,94 @@ type SerializeResult = {
   contextHashes: ImmutableSet<string>;
 };
 
-function serializeItems(
-  knowledgeDBs: KnowledgeDBs,
-  author: PublicKey,
-  relation: Relations,
-  depth: number
+function serializeTree(
+  data: Data,
+  rootRelation: Relations
 ): SerializeResult {
-  const childContext = relation.context.push(relation.head);
-  const contextHash = hashText(childContext.join(":"));
-
-  return relation.items.reduce(
-    (acc, item) => {
+  const author = data.user.publicKey;
+  const rootPath = buildRootPath(rootRelation);
+  const stack = [rootRelation.head];
+  const { paths } = getNodesInTree(
+    data, rootPath, stack, List<ViewPath>(), rootRelation.id,
+    author, undefined, { isMarkdownExport: true }
+  );
+  return paths.reduce<SerializeResult>(
+    (acc, path) => {
+      const depth = path.length - 3;
+      const [nodeID] = getNodeIDFromView(data, path);
       const indent = "  ".repeat(depth);
+      const context = getContext(data, path, stack);
+      const contextHash = context.size > 0
+        ? hashText(context.join(":"))
+        : undefined;
+      const item = getRelationItemForView(data, path);
 
-      if (isConcreteRefId(item.nodeID)) {
+      if (isConcreteRefId(nodeID)) {
         const crefText = formatCrefText(
-          knowledgeDBs,
-          author,
-          item.nodeID,
-          item.relevance,
-          item.argument
+          data.knowledgeDBs, author, nodeID, item?.relevance, item?.argument
         );
-        if (crefText) {
-          return {
-            lines: [...acc.lines, `${indent}- ${crefText}`],
-            nodeHashes: acc.nodeHashes,
-            contextHashes: acc.contextHashes.add(contextHash),
-          };
-        }
+        if (!crefText) return acc;
+        return {
+          ...acc,
+          lines: [...acc.lines, `${indent}- ${crefText}`],
+          contextHashes: contextHash
+            ? acc.contextHashes.add(contextHash)
+            : acc.contextHashes,
+        };
       }
 
-      const sid = shortID(item.nodeID);
-      const node = getNodeFromID(knowledgeDBs, sid as ID, author);
-      const text = node?.text ?? sid;
-      const childRelation = findChildRelation(
-        knowledgeDBs,
-        author,
-        sid,
-        childContext
-      );
-      const uuid = childRelation ? shortID(childRelation.id) : "";
-      const line = `${indent}- ${text}${formatAttrs(uuid, item.relevance, item.argument)}`;
-      const childResult = childRelation
-        ? serializeItems(knowledgeDBs, author, childRelation, depth + 1)
-        : { lines: [], nodeHashes: ImmutableSet<string>(), contextHashes: ImmutableSet<string>() };
+      const text = getDisplayTextForView(data, path, stack);
+      // Leaf nodes have no relation, so no uuid
+      const ownRelation = getRelationForView(data, path, stack);
+      const uuid = ownRelation ? shortID(ownRelation.id) : "";
 
+      const line = `${indent}- ${text}${formatAttrs(uuid, item?.relevance, item?.argument)}`;
       return {
-        lines: [...acc.lines, line, ...childResult.lines],
-        nodeHashes: acc.nodeHashes.add(hashText(text)).union(childResult.nodeHashes),
-        contextHashes: acc.contextHashes.add(contextHash).union(childResult.contextHashes),
+        lines: [...acc.lines, line],
+        nodeHashes: acc.nodeHashes.add(hashText(text)),
+        contextHashes: contextHash
+          ? acc.contextHashes.add(contextHash)
+          : acc.contextHashes,
       };
     },
     {
-      lines: [] as string[],
+      lines: [],
       nodeHashes: ImmutableSet<string>(),
       contextHashes: ImmutableSet<string>(),
     }
   );
 }
 
+function buildRootPath(rootRelation: Relations): ViewPath {
+  return [
+    0,
+    { nodeID: rootRelation.head as LongID | ID, nodeIndex: 0 as NodeIndex },
+  ] as ViewPath;
+}
+
 export function treeToMarkdown(
-  knowledgeDBs: KnowledgeDBs,
-  rootRelation: Relations,
-  author: PublicKey
+  data: Data,
+  rootRelation: Relations
 ): string {
-  const rootNode = getNodeFromID(knowledgeDBs, rootRelation.head, author);
+  const author = data.user.publicKey;
+  const rootNode = getNodeFromID(data.knowledgeDBs, rootRelation.head, author);
   const rootText = rootNode?.text ?? rootRelation.head;
   const rootUuid = shortID(rootRelation.id);
   const rootLine = `# ${rootText} {${rootUuid}}`;
-  const { lines } = serializeItems(knowledgeDBs, author, rootRelation, 0);
+  const { lines } = serializeTree(data, rootRelation);
   return `${[rootLine, ...lines].join("\n")}\n`;
 }
 
 export function buildDocumentEvent(
-  knowledgeDBs: KnowledgeDBs,
-  rootRelation: Relations,
-  author: PublicKey
+  data: Data,
+  rootRelation: Relations
 ): UnsignedEvent {
-  const rootNode = getNodeFromID(knowledgeDBs, rootRelation.head, author);
+  const author = data.user.publicKey;
+  const rootNode = getNodeFromID(data.knowledgeDBs, rootRelation.head, author);
   const rootText = rootNode?.text ?? rootRelation.head;
   const rootUuid = shortID(rootRelation.id);
   const rootLine = `# ${rootText} {${rootUuid}}`;
-  const result = serializeItems(knowledgeDBs, author, rootRelation, 0);
+  const result = serializeTree(data, rootRelation);
   const content = `${[rootLine, ...result.lines].join("\n")}\n`;
 
   const nTags = result.nodeHashes.add(hashText(rootText)).toArray().map((h) => ["n", h]);

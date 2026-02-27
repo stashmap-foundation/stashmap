@@ -10,6 +10,7 @@ import {
   KIND_DELETE,
   KIND_KNOWLEDGE_LIST,
   KIND_KNOWLEDGE_NODE,
+  KIND_KNOWLEDGE_DOCUMENT,
   KIND_VIEWS,
 } from "./nostr";
 import {
@@ -20,6 +21,7 @@ import {
   eventToTextNode,
 } from "./serializer";
 import { splitID, isSearchId } from "./connections";
+import { parseDocumentEvent } from "./markdownDocument";
 
 function isTextNode(kind: number | string): boolean {
   const kindAsNumber = typeof kind === "string" ? parseInt(kind, 10) : kind;
@@ -138,4 +140,25 @@ export function findPanes(events: List<UnsignedEvent>): Pane[] {
     return [];
   }
   return jsonToPanes(JSON.parse(viewEvent.content) as Serializable);
+}
+
+export function findDocumentNodesAndRelations(
+  events: List<UnsignedEvent>
+): { nodes: Map<string, KnowNode>; relations: Map<string, Relations> } {
+  const docEvents = sortEvents(
+    events.filter((event) => event.kind === KIND_KNOWLEDGE_DOCUMENT)
+  );
+  return docEvents.reduce(
+    (acc, event) => {
+      const result = parseDocumentEvent(event);
+      return {
+        nodes: acc.nodes.merge(result.nodes),
+        relations: acc.relations.merge(result.relations),
+      };
+    },
+    {
+      nodes: Map<string, KnowNode>(),
+      relations: Map<string, Relations>(),
+    }
+  );
 }

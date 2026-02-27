@@ -1,9 +1,6 @@
 import React from "react";
 import { List } from "immutable";
 import { useDropzone } from "react-dropzone";
-import MarkdownIt from "markdown-it";
-import attrs from "markdown-it-attrs";
-import Token from "markdown-it/lib/token";
 import { v4 } from "uuid";
 import { newNode, hashText, joinID } from "../connections";
 import { newRelations, ViewPath } from "../ViewContext";
@@ -19,48 +16,13 @@ import {
   parseClipboardText,
   usePlanner,
 } from "../planner";
+import {
+  MarkdownTreeNode,
+  parseMarkdownHierarchy,
+} from "../markdownDocument";
 
-const markdown = new MarkdownIt();
-markdown.use(attrs);
-
-function textFromInlineChildren(inline: Token): string {
-  if (!inline.children) {
-    return inline.content.trim();
-  }
-  return inline.children
-    .filter((c) => c.type === "text")
-    .map((c) => c.content)
-    .join("")
-    .trim();
-}
-
-function extractAttrs(token: Token): {
-  uuid: string | undefined;
-  relevance: Relevance;
-  argument: Argument;
-} {
-  if (!token.attrs) {
-    return { uuid: undefined, relevance: undefined, argument: undefined };
-  }
-  const uuid = token.attrs.find(([, value]) => value === "")?.[0];
-  const classAttr = token.attrGet("class") || "";
-  const classes = classAttr.split(" ").filter(Boolean);
-  const relevance = (
-    ["relevant", "maybe_relevant", "little_relevant", "not_relevant"] as const
-  ).find((r) => classes.includes(r));
-  const argument = (["confirms", "contra"] as const).find((a) =>
-    classes.includes(a)
-  );
-  return { uuid, relevance, argument };
-}
-
-export type MarkdownTreeNode = {
-  text: string;
-  children: MarkdownTreeNode[];
-  uuid?: string;
-  relevance?: Relevance;
-  argument?: Argument;
-};
+export type { MarkdownTreeNode } from "../markdownDocument";
+export { parseMarkdownHierarchy } from "../markdownDocument";
 
 export type MarkdownImportFile = {
   name: string;
@@ -74,137 +36,6 @@ function titleFromFileName(fileName: string): string {
   }
   return "Imported Markdown";
 }
-
-/* eslint-disable functional/immutable-data, functional/no-let, no-continue */
-function appendNode(
-  roots: MarkdownTreeNode[],
-  parent: MarkdownTreeNode | undefined,
-  node: MarkdownTreeNode
-): void {
-  if (parent) {
-    parent.children.push(node);
-    return;
-  }
-  roots.push(node);
-}
-
-function getLastDefinedListItem(
-  listItemStack: Array<MarkdownTreeNode | undefined>
-): MarkdownTreeNode | undefined {
-  for (let i = listItemStack.length - 1; i >= 0; i -= 1) {
-    const listItem = listItemStack[i];
-    if (listItem) {
-      return listItem;
-    }
-  }
-  return undefined;
-}
-
-export function parseMarkdownHierarchy(
-  markdownText: string
-): MarkdownTreeNode[] {
-  const tokens = markdown.parse(markdownText, {});
-  const roots: MarkdownTreeNode[] = [];
-  const headingStack: Array<{ level: number; node: MarkdownTreeNode }> = [];
-  const listItemStack: Array<MarkdownTreeNode | undefined> = [];
-
-  let pendingAttrs: {
-    uuid: string | undefined;
-    relevance: Relevance;
-    argument: Argument;
-  } = { uuid: undefined, relevance: undefined, argument: undefined };
-
-  for (let i = 0; i < tokens.length; i += 1) {
-    const token = tokens[i];
-    if (token.type === "heading_open") {
-      const headingLevel = Number(token.tag.replace("h", ""));
-      const inline = tokens[i + 1];
-      if (!inline || inline.type !== "inline") {
-        continue;
-      }
-      const text = textFromInlineChildren(inline);
-      if (!text) {
-        continue;
-      }
-      const { uuid, relevance, argument } = extractAttrs(token);
-      while (
-        headingStack.length > 0 &&
-        headingStack[headingStack.length - 1].level >= headingLevel
-      ) {
-        headingStack.pop();
-      }
-      const parent =
-        getLastDefinedListItem(listItemStack) ||
-        headingStack[headingStack.length - 1]?.node;
-      const node: MarkdownTreeNode = {
-        text,
-        children: [],
-        uuid,
-        relevance,
-        argument,
-      };
-      appendNode(roots, parent, node);
-      headingStack.push({ level: headingLevel, node });
-      continue;
-    }
-
-    if (token.type === "list_item_open") {
-      pendingAttrs = extractAttrs(token);
-      listItemStack.push(undefined);
-      continue;
-    }
-
-    if (token.type === "list_item_close") {
-      listItemStack.pop();
-      continue;
-    }
-
-    if (token.type !== "paragraph_open") {
-      continue;
-    }
-
-    const inline = tokens[i + 1];
-    if (!inline || inline.type !== "inline") {
-      continue;
-    }
-    const text = textFromInlineChildren(inline);
-    if (!text) {
-      continue;
-    }
-
-    if (listItemStack.length > 0) {
-      const currentItemIndex = listItemStack.length - 1;
-      const currentListNode = listItemStack[currentItemIndex];
-      if (!currentListNode) {
-        const parent =
-          getLastDefinedListItem(listItemStack.slice(0, -1)) ||
-          headingStack[headingStack.length - 1]?.node;
-        const { uuid, relevance, argument } = pendingAttrs;
-        const node: MarkdownTreeNode = {
-          text,
-          children: [],
-          uuid,
-          relevance,
-          argument,
-        };
-        appendNode(roots, parent, node);
-        listItemStack[currentItemIndex] = node;
-        continue;
-      }
-      currentListNode.children.push({ text, children: [] });
-      continue;
-    }
-
-    const paragraphNode: MarkdownTreeNode = { text, children: [] };
-    appendNode(
-      roots,
-      headingStack[headingStack.length - 1]?.node,
-      paragraphNode
-    );
-  }
-  return roots;
-}
-/* eslint-enable functional/immutable-data, functional/no-let, no-continue */
 
 /* eslint-disable functional/immutable-data */
 export function parsedLinesToTrees(items: ParsedLine[]): MarkdownTreeNode[] {

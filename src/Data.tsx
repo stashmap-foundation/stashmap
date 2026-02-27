@@ -19,6 +19,7 @@ import {
   findNodes,
   findRelations,
   findTombstones,
+  findDocumentNodesAndRelations,
   findViews,
 } from "./knowledgeEvents";
 import { newDB } from "./knowledge";
@@ -159,8 +160,9 @@ function processEventsByAuthor(
   authorEvents: List<UnsignedEvent | Event>
 ): ProcessedEvents {
   const contacts = findContacts(authorEvents);
-  const nodes = findNodes(authorEvents);
-  const relations = findRelations(authorEvents);
+  const docResult = findDocumentNodesAndRelations(authorEvents);
+  const nodes = findNodes(authorEvents).merge(docResult.nodes);
+  const relations = findRelations(authorEvents).merge(docResult.relations);
   const tombstones = findTombstones(authorEvents);
   const views = findViews(authorEvents);
   const projectMembers = findMembers(authorEvents);

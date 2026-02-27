@@ -1,5 +1,5 @@
 import React, { Dispatch, SetStateAction, useEffect, useRef } from "react";
-import { List, Map, OrderedSet } from "immutable";
+import { List, Map, OrderedSet, Set as ImmutableSet } from "immutable";
 import { UnsignedEvent, Event } from "nostr-tools";
 import {
   KIND_DELETE,
@@ -19,6 +19,7 @@ import { createPublishQueue } from "./PublishQueue";
 import type { StashmapDB } from "./indexedDB";
 import { viewDataToJSON } from "./serializer";
 import { newDB } from "./knowledge";
+import { buildDocumentEvent } from "./markdownDocument";
 import {
   shortID,
   newNode,
@@ -80,6 +81,7 @@ export function getPane(plan: Plan | Data, viewPath: ViewPath): Pane {
 
 export type Plan = Data & {
   publishEvents: List<UnsignedEvent & EventAttachment>;
+  affectedRoots: ImmutableSet<ID>;
   relays: AllRelays;
   temporaryView: TemporaryViewState;
   temporaryEvents: List<TemporaryEvent>;
@@ -216,23 +218,9 @@ export function planUpsertNode(plan: Plan, node: KnowNode): Plan {
     ...userDB,
     nodes: updatedNodes,
   };
-  const dTag = shortID(node.id);
-  const updateNodeEvent = {
-    kind: KIND_KNOWLEDGE_NODE,
-    pubkey: plan.user.publicKey,
-    created_at: newTimestamp(),
-    tags: [["d", dTag], msTag()],
-    content: node.text,
-  };
-  const deduped = filterOldReplaceableEvent(
-    plan.publishEvents,
-    KIND_KNOWLEDGE_NODE,
-    dTag
-  );
   return {
     ...plan,
     knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
-    publishEvents: deduped.push(updateNodeEvent),
   };
 }
 
@@ -263,42 +251,11 @@ function upsertRelationsCore(plan: Plan, relations: Relations): Plan {
     ...userDB,
     relations: updatedRelations,
   };
-  const itemsAsTags = relations.items
-    .filter((item) => !item.nodeID.startsWith("ref:"))
-    .toArray()
-    .map((item) => {
-      const relevanceStr = item.relevance ?? "";
-      return item.argument
-        ? ["i", item.nodeID, relevanceStr, item.argument]
-        : ["i", item.nodeID, relevanceStr];
-    });
-  const contextTags = relations.context.toArray().map((id) => ["c", id]);
-  const basedOnTag = relations.basedOn ? [["b", relations.basedOn]] : [];
-  const dTag = shortID(relations.id);
-  const updateRelationsEvent = {
-    kind: KIND_KNOWLEDGE_LIST,
-    pubkey: plan.user.publicKey,
-    created_at: newTimestamp(),
-    tags: [
-      ["d", dTag],
-      ["k", shortID(relations.head)],
-      ["head", relations.head],
-      ...contextTags,
-      ...basedOnTag,
-      ...itemsAsTags,
-      msTag(),
-    ],
-    content: "",
-  };
-  const deduped = filterOldReplaceableEvent(
-    plan.publishEvents,
-    KIND_KNOWLEDGE_LIST,
-    dTag
-  );
+  const affectedRoot = relations.root ?? shortID(relations.id);
   return {
     ...plan,
     knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
-    publishEvents: deduped.push(updateRelationsEvent),
+    affectedRoots: plan.affectedRoots.add(affectedRoot),
   };
 }
 
@@ -1455,41 +1412,28 @@ const PlanningContext = React.createContext<PlanningContextValue | undefined>(
 // Filter out empty placeholder nodes from events before publishing
 // Empty nodes are injected at read time via injectEmptyNodesIntoKnowledgeDBs,
 // so any relations modification will include them - we need to filter before publishing
-function filterEmptyNodesFromEvents(
-  events: List<UnsignedEvent & EventAttachment>
+function buildDocumentEvents(
+  plan: Plan
 ): List<UnsignedEvent & EventAttachment> {
-  return events
-    .map((event) => {
-      if (event.kind === KIND_KNOWLEDGE_LIST) {
-        // Check if head is empty node - skip entire event (shouldn't happen)
-        const headTag = event.tags.find((t) => t[0] === "head");
-        if (headTag && isEmptyNodeID(headTag[1])) {
-          return null;
-        }
-
-        // Filter empty node items from relations
-        const filteredTags = event.tags.filter((tag) => {
-          if (tag[0] === "i") {
-            return !isEmptyNodeID(tag[1]);
-          }
-          return true;
-        });
-
-        return { ...event, tags: filteredTags };
+  const author = plan.user.publicKey;
+  const userDB = plan.knowledgeDBs.get(author, newDB());
+  return plan.affectedRoots.reduce(
+    (events, rootId) => {
+      const rootRelation = userDB.relations.find(
+        (r) => shortID(r.id) === rootId
+      );
+      if (!rootRelation) {
+        return events;
       }
-
-      if (event.kind === KIND_KNOWLEDGE_NODE) {
-        // Skip empty node events (shouldn't happen)
-        if (event.content === "") {
-          return null;
-        }
-      }
-
-      return event;
-    })
-    .filter(
-      (event): event is UnsignedEvent & EventAttachment => event !== null
-    );
+      const event = buildDocumentEvent(
+        plan.knowledgeDBs,
+        rootRelation,
+        author
+      );
+      return events.push(event as UnsignedEvent & EventAttachment);
+    },
+    plan.publishEvents
+  );
 }
 
 export function PlanningContextProvider({
@@ -1566,7 +1510,7 @@ export function PlanningContextProvider({
 
   const executePlan = async (plan: Plan): Promise<void> => {
     setPanes(plan.panes);
-    const filteredEvents = filterEmptyNodesFromEvents(plan.publishEvents);
+    const filteredEvents = buildDocumentEvents(plan);
 
     if (filteredEvents.size === 0) {
       setPublishEvents((prevStatus) => {
@@ -1667,6 +1611,7 @@ export function createPlan(
     ...props,
     publishEvents:
       props.publishEvents || List<UnsignedEvent & EventAttachment>([]),
+    affectedRoots: ImmutableSet<ID>(),
     temporaryView: props.publishEventsStatus.temporaryView,
     temporaryEvents: List<TemporaryEvent>(),
   };

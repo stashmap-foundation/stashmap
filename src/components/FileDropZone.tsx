@@ -2,7 +2,10 @@ import React from "react";
 import { List } from "immutable";
 import { useDropzone } from "react-dropzone";
 import MarkdownIt from "markdown-it";
-import { newNode, bulkAddRelations, hashText } from "../connections";
+import attrs from "markdown-it-attrs";
+import Token from "markdown-it/lib/token";
+import { v4 } from "uuid";
+import { newNode, hashText, joinID } from "../connections";
 import { newRelations, ViewPath } from "../ViewContext";
 import {
   Plan,
@@ -17,33 +20,46 @@ import {
   usePlanner,
 } from "../planner";
 
-/* eslint-disable functional/immutable-data */
-function convertToPlainText(html: string): string {
-  const div = document.createElement("div");
-  div.innerHTML = html;
-  return div.textContent as string;
-}
-/* eslint-enable functional/immutable-data */
-
 const markdown = new MarkdownIt();
+markdown.use(attrs);
 
-function stripLeadingListMarkers(text: string): string {
-  return text
-    .replace(/^[-*+]\s+/, "")
-    .replace(/^\d+\.\s+/, "")
+function textFromInlineChildren(inline: Token): string {
+  if (!inline.children) {
+    return inline.content.trim();
+  }
+  return inline.children
+    .filter((c) => c.type === "text")
+    .map((c) => c.content)
+    .join("")
     .trim();
 }
 
-function normalizeMarkdownText(markdownText: string): string {
-  const plainText = convertToPlainText(
-    markdown.renderInline(markdownText)
-  ).replace(/\s+/g, " ");
-  return stripLeadingListMarkers(plainText);
+function extractAttrs(token: Token): {
+  uuid: string | undefined;
+  relevance: Relevance;
+  argument: Argument;
+} {
+  if (!token.attrs) {
+    return { uuid: undefined, relevance: undefined, argument: undefined };
+  }
+  const uuid = token.attrs.find(([, value]) => value === "")?.[0];
+  const classAttr = token.attrGet("class") || "";
+  const classes = classAttr.split(" ").filter(Boolean);
+  const relevance = (
+    ["relevant", "maybe_relevant", "little_relevant", "not_relevant"] as const
+  ).find((r) => classes.includes(r));
+  const argument = (["confirms", "contra"] as const).find((a) =>
+    classes.includes(a)
+  );
+  return { uuid, relevance, argument };
 }
 
 export type MarkdownTreeNode = {
   text: string;
   children: MarkdownTreeNode[];
+  uuid?: string;
+  relevance?: Relevance;
+  argument?: Argument;
 };
 
 export type MarkdownImportFile = {
@@ -92,6 +108,12 @@ export function parseMarkdownHierarchy(
   const headingStack: Array<{ level: number; node: MarkdownTreeNode }> = [];
   const listItemStack: Array<MarkdownTreeNode | undefined> = [];
 
+  let pendingAttrs: {
+    uuid: string | undefined;
+    relevance: Relevance;
+    argument: Argument;
+  } = { uuid: undefined, relevance: undefined, argument: undefined };
+
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i];
     if (token.type === "heading_open") {
@@ -100,10 +122,11 @@ export function parseMarkdownHierarchy(
       if (!inline || inline.type !== "inline") {
         continue;
       }
-      const text = normalizeMarkdownText(inline.content);
+      const text = textFromInlineChildren(inline);
       if (!text) {
         continue;
       }
+      const { uuid, relevance, argument } = extractAttrs(token);
       while (
         headingStack.length > 0 &&
         headingStack[headingStack.length - 1].level >= headingLevel
@@ -113,13 +136,20 @@ export function parseMarkdownHierarchy(
       const parent =
         getLastDefinedListItem(listItemStack) ||
         headingStack[headingStack.length - 1]?.node;
-      const node: MarkdownTreeNode = { text, children: [] };
+      const node: MarkdownTreeNode = {
+        text,
+        children: [],
+        uuid,
+        relevance,
+        argument,
+      };
       appendNode(roots, parent, node);
       headingStack.push({ level: headingLevel, node });
       continue;
     }
 
     if (token.type === "list_item_open") {
+      pendingAttrs = extractAttrs(token);
       listItemStack.push(undefined);
       continue;
     }
@@ -137,7 +167,7 @@ export function parseMarkdownHierarchy(
     if (!inline || inline.type !== "inline") {
       continue;
     }
-    const text = normalizeMarkdownText(inline.content);
+    const text = textFromInlineChildren(inline);
     if (!text) {
       continue;
     }
@@ -149,7 +179,14 @@ export function parseMarkdownHierarchy(
         const parent =
           getLastDefinedListItem(listItemStack.slice(0, -1)) ||
           headingStack[headingStack.length - 1]?.node;
-        const node: MarkdownTreeNode = { text, children: [] };
+        const { uuid, relevance, argument } = pendingAttrs;
+        const node: MarkdownTreeNode = {
+          text,
+          children: [],
+          uuid,
+          relevance,
+          argument,
+        };
         appendNode(roots, parent, node);
         listItemStack[currentItemIndex] = node;
         continue;
@@ -236,30 +273,31 @@ export function buildRootTreeForEmptyRootDrop(
 function materializeTreeNode(
   plan: Plan,
   treeNode: MarkdownTreeNode,
-  context: List<ID>
+  context: List<ID>,
+  root: ID
 ): [Plan, ID] {
   const node = newNode(treeNode.text);
   const withNode = planUpsertNode(plan, node);
 
-  if (treeNode.children.length === 0) {
-    return [withNode, node.id];
-  }
-
   const childContext = context.push(node.id);
-  const [withChildren, childIDs] = treeNode.children.reduce(
-    ([accPlan, accChildIDs], childNode) => {
+  const [withChildren, childItems] = treeNode.children.reduce(
+    ([accPlan, accItems], childNode) => {
       const childID = hashText(childNode.text);
-      const isDuplicate = accChildIDs.includes(childID);
+      const isDuplicate = accItems.some((item) => item.nodeID === childID);
       const effectiveChild = isDuplicate
         ? {
             ...childNode,
-            text: findUniqueText(childNode.text, accChildIDs),
+            text: findUniqueText(
+              childNode.text,
+              accItems.map((item) => item.nodeID)
+            ),
           }
         : childNode;
       const [afterChild, materializedID] = materializeTreeNode(
         accPlan,
         effectiveChild,
-        childContext
+        childContext,
+        root
       );
       const afterVersion = isDuplicate
         ? planCreateVersion(
@@ -269,15 +307,26 @@ function materializeTreeNode(
             childContext
           )
         : afterChild;
-      return [afterVersion, [...accChildIDs, materializedID]];
+      const item: RelationItem = {
+        nodeID: materializedID,
+        relevance: childNode.relevance,
+        argument: childNode.argument,
+      };
+      return [afterVersion, [...accItems, item]];
     },
-    [withNode, [] as ID[]] as [Plan, ID[]]
+    [withNode, [] as RelationItem[]] as [Plan, RelationItem[]]
   );
 
-  const relation = bulkAddRelations(
-    newRelations(node.id, context, withChildren.user.publicKey),
-    childIDs
-  );
+  const baseRelation = treeNode.uuid
+    ? {
+        ...newRelations(node.id, context, withChildren.user.publicKey, root),
+        id: joinID(withChildren.user.publicKey, treeNode.uuid),
+      }
+    : newRelations(node.id, context, withChildren.user.publicKey, root);
+  const relation: Relations = {
+    ...baseRelation,
+    items: List(childItems),
+  };
   return [planUpsertRelations(withChildren, relation), node.id];
 }
 
@@ -288,10 +337,15 @@ export function planCreateNodesFromMarkdownTrees(
 ): [Plan, topNodeIDs: ID[]] {
   return trees.reduce(
     ([accPlan, accTopNodeIDs], treeNode) => {
+      const rootUuid = treeNode.uuid ?? v4();
+      const treeWithUuid = treeNode.uuid
+        ? treeNode
+        : { ...treeNode, uuid: rootUuid };
       const [nextPlan, topNodeID] = materializeTreeNode(
         accPlan,
-        treeNode,
-        context
+        treeWithUuid,
+        context,
+        rootUuid as ID
       );
       return [nextPlan, [...accTopNodeIDs, topNodeID]];
     },

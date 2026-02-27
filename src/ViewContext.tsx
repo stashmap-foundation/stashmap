@@ -89,12 +89,12 @@ export function getSuggestionsForNode(
 
   const declinedRelationCrefIDs: ImmutableSet<LongID | ID> = currentRelation
     ? currentRelation.items
-        .filter(
-          (item) =>
-            isConcreteRefId(item.nodeID) && item.relevance === "not_relevant"
-        )
-        .map((item) => item.nodeID)
-        .toSet()
+      .filter(
+        (item) =>
+          isConcreteRefId(item.nodeID) && item.relevance === "not_relevant"
+      )
+      .map((item) => item.nodeID)
+      .toSet()
     : ImmutableSet<LongID | ID>();
 
   const contextToMatch = parentContext || List<ID>();
@@ -219,20 +219,20 @@ export function getVersionsForRelation(
 
   const existingCrefIDs = currentRelation
     ? currentRelation.items
-        .map((item) => item.nodeID)
-        .filter((id) => isConcreteRefId(id))
-        .toSet()
+      .map((item) => item.nodeID)
+      .filter((id) => isConcreteRefId(id))
+      .toSet()
     : ImmutableSet<LongID | ID>();
 
   const currentItemIDs = currentRelation
     ? currentRelation.items
-        .filter(
-          (item) =>
-            itemPassesFilters(item, filterTypes) &&
-            item.relevance !== "not_relevant"
-        )
-        .map((item) => shortID(item.nodeID))
-        .toSet()
+      .filter(
+        (item) =>
+          itemPassesFilters(item, filterTypes) &&
+          item.relevance !== "not_relevant"
+      )
+      .map((item) => shortID(item.nodeID))
+      .toSet()
     : ImmutableSet<string>();
 
   return alternatives
@@ -365,9 +365,8 @@ function convertViewPathToString(viewContext: ViewPath): string {
   ) as SubPathWithRelations[];
   const beginning = withoutLastElement.reduce(
     (acc: string, subPath: SubPathWithRelations): string => {
-      const postfix = `${encodeNodeID(subPath.nodeID)}:${
-        subPath.nodeIndex
-      }:${encodeNodeID(subPath.relationsID)}`;
+      const postfix = `${encodeNodeID(subPath.nodeID)}:${subPath.nodeIndex
+        }:${encodeNodeID(subPath.relationsID)}`;
       return acc !== "" ? `${acc}:${postfix}` : postfix;
     },
     ""
@@ -1240,9 +1239,15 @@ export function upsertRelations(
   }
 
   const parentRoot = getParentRelation(plan, viewPath)?.root;
-  const relations =
+  const base =
     currentRelation ||
     newRelationsForNode(nodeID, context, plan.user.publicKey, parentRoot);
+  const relations =
+    shortID(nodeID) === VERSIONS_NODE_ID &&
+      base.items.size === 0 &&
+      context.size > 0
+      ? addRelationToRelations(base, context.last() as ID)
+      : base;
 
   // Apply modification
   const updatedRelations = modify(relations);
@@ -1284,13 +1289,13 @@ function alterPath(
         acc.prevRelationsID === undefined
           ? parent
           : {
-              ...parent,
-              nodeIndex: calcIndex(
-                acc.prevRelationsID,
-                parent.nodeID as ID,
-                parent.nodeIndex
-              ),
-            },
+            ...parent,
+            nodeIndex: calcIndex(
+              acc.prevRelationsID,
+              parent.nodeID as ID,
+              parent.nodeIndex
+            ),
+          },
       ],
       prevRelationsID: parent.relationsID as LongID,
     }),

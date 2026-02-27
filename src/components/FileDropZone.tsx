@@ -1,24 +1,22 @@
 import React from "react";
 import { List } from "immutable";
 import { useDropzone } from "react-dropzone";
-import { v4 } from "uuid";
-import { newNode, hashText, joinID } from "../connections";
-import { newRelations, ViewPath } from "../ViewContext";
+import { newNode } from "../connections";
+import { ViewPath, getRelationForView } from "../ViewContext";
 import {
   Plan,
   ParsedLine,
   planUpsertNode,
-  planUpsertRelations,
   planAddToParent,
   planMoveTreeDescendantsToContext,
-  planCreateVersion,
-  findUniqueText,
   parseClipboardText,
   usePlanner,
 } from "../planner";
 import {
   MarkdownTreeNode,
   parseMarkdownHierarchy,
+  WalkContext,
+  createNodesFromMarkdownTrees,
 } from "../markdownDocument";
 
 export type { MarkdownTreeNode } from "../markdownDocument";
@@ -101,87 +99,22 @@ export function buildRootTreeForEmptyRootDrop(
   };
 }
 
-function materializeTreeNode(
-  plan: Plan,
-  treeNode: MarkdownTreeNode,
-  context: List<ID>,
-  root: ID
-): [Plan, ID] {
-  const node = newNode(treeNode.text);
-  const withNode = planUpsertNode(plan, node);
-
-  const childContext = context.push(node.id);
-  const [withChildren, childItems] = treeNode.children.reduce(
-    ([accPlan, accItems], childNode) => {
-      const childID = hashText(childNode.text);
-      const isDuplicate = accItems.some((item) => item.nodeID === childID);
-      const effectiveChild = isDuplicate
-        ? {
-            ...childNode,
-            text: findUniqueText(
-              childNode.text,
-              accItems.map((item) => item.nodeID)
-            ),
-          }
-        : childNode;
-      const [afterChild, materializedID] = materializeTreeNode(
-        accPlan,
-        effectiveChild,
-        childContext,
-        root
-      );
-      const afterVersion = isDuplicate
-        ? planCreateVersion(
-            afterChild,
-            materializedID,
-            childNode.text,
-            childContext
-          )
-        : afterChild;
-      const item: RelationItem = {
-        nodeID: materializedID,
-        relevance: childNode.relevance,
-        argument: childNode.argument,
-      };
-      return [afterVersion, [...accItems, item]];
-    },
-    [withNode, [] as RelationItem[]] as [Plan, RelationItem[]]
-  );
-
-  const baseRelation = treeNode.uuid
-    ? {
-        ...newRelations(node.id, context, withChildren.user.publicKey, root),
-        id: joinID(withChildren.user.publicKey, treeNode.uuid),
-      }
-    : newRelations(node.id, context, withChildren.user.publicKey, root);
-  const relation: Relations = {
-    ...baseRelation,
-    items: List(childItems),
-  };
-  return [planUpsertRelations(withChildren, relation), node.id];
-}
-
 export function planCreateNodesFromMarkdownTrees(
   plan: Plan,
   trees: MarkdownTreeNode[],
   context: List<ID> = List<ID>()
 ): [Plan, topNodeIDs: ID[]] {
-  return trees.reduce(
-    ([accPlan, accTopNodeIDs], treeNode) => {
-      const rootUuid = treeNode.uuid ?? v4();
-      const treeWithUuid = treeNode.uuid
-        ? treeNode
-        : { ...treeNode, uuid: rootUuid };
-      const [nextPlan, topNodeID] = materializeTreeNode(
-        accPlan,
-        treeWithUuid,
-        context,
-        rootUuid as ID
-      );
-      return [nextPlan, [...accTopNodeIDs, topNodeID]];
-    },
-    [plan, [] as ID[]] as [Plan, ID[]]
+  const ctx: WalkContext = {
+    knowledgeDBs: plan.knowledgeDBs,
+    publicKey: plan.user.publicKey,
+    affectedRoots: plan.affectedRoots,
+  };
+  const [resultCtx, topNodeIDs] = createNodesFromMarkdownTrees(
+    ctx,
+    trees,
+    context
   );
+  return [{ ...plan, knowledgeDBs: resultCtx.knowledgeDBs, affectedRoots: resultCtx.affectedRoots }, topNodeIDs];
 }
 
 export function planCreateNodesFromMarkdownFiles(
@@ -230,6 +163,8 @@ export function planPasteMarkdownTrees(
   stack: ID[],
   insertAtIndex?: number
 ): Plan {
+  const parentRelation = getRelationForView(plan, parentViewPath, stack);
+  const parentRoot = parentRelation?.root;
   return trees.reduce((accPlan, tree, idx) => {
     const insertAt =
       insertAtIndex !== undefined ? insertAtIndex + idx : undefined;
@@ -249,7 +184,8 @@ export function planPasteMarkdownTrees(
       topNodeIDs,
       actualIDs,
       parentViewPath,
-      stack
+      stack,
+      parentRoot
     );
   }, plan);
 }

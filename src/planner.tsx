@@ -19,14 +19,12 @@ import { createPublishQueue } from "./PublishQueue";
 import type { StashmapDB } from "./indexedDB";
 import { viewDataToJSON } from "./serializer";
 import { newDB } from "./knowledge";
-import { buildDocumentEvent } from "./markdownDocument";
+import { buildDocumentEvent, WalkContext, createVersion } from "./markdownDocument";
 import {
   shortID,
   newNode,
   addRelationToRelations,
-  moveRelations,
   bulkAddRelations,
-  VERSIONS_NODE_ID,
   EMPTY_NODE_ID,
   isEmptyNodeID,
   getRelationsNoReferencedBy,
@@ -35,13 +33,12 @@ import {
   parseConcreteRefId,
   LOG_NODE_ID,
   createConcreteRefId,
-  hashText,
   isRefId,
+  findUniqueText,
+  VERSIONS_NODE_ID,
 } from "./connections";
 import {
   newRelations,
-  getVersionsContext,
-  getVersionsRelations,
   upsertRelations,
   ViewPath,
   NodeIndex,
@@ -301,111 +298,19 @@ export function planBulkUpsertNodes(plan: Plan, nodes: KnowNode[]): Plan {
   return nodes.reduce((p, node) => planUpsertNode(p, node), plan);
 }
 
-/**
- * Create a version for a node instead of modifying it directly.
- * Adds the new version to ~versions in context [...context, originalNodeID].
- * If the version already exists in ~versions, moves it to the top instead of adding a duplicate.
- * Also ensures the original node ID is in ~versions (for complete version history).
- *
- * Nested version handling: If editing a node that's inside a ~versions list,
- * adds the new version as a sibling instead of creating recursive ~versions.
- *
- * Example: Editing BCN inside Barcelona's ~versions:
- *   Tree: ROOT → Barcelona → ~versions → BCN
- *   editContext = [ROOT, Barcelona, VERSIONS_NODE_ID]
- *   - originalNodeID = Barcelona (context.get(-2), the node that owns ~versions)
- *   - context = [ROOT] (slice(0, -2), Barcelona's context without Barcelona or ~versions)
- *   - versionsContext = [ROOT, Barcelona] (used to look up the ~versions relation)
- */
 export function planCreateVersion(
   plan: Plan,
   editedNodeID: ID,
   newText: string,
   editContext: List<ID>
 ): Plan {
-  // Handle nested versions: if editing a node inside ~versions list,
-  // add the new version as a sibling instead of creating recursive ~versions
-  const isInsideVersions = editContext.last() === VERSIONS_NODE_ID;
-
-  const [originalNodeID, context]: [ID, List<ID>] =
-    isInsideVersions && editContext.size >= 2
-      ? [
-          editContext.get(editContext.size - 2) as ID, // The node that owns ~versions
-          editContext.slice(0, -2).toList(), // Context to that node
-        ]
-      : [editedNodeID, editContext];
-
-  // 1. Create new version node
-  const versionNode = newNode(newText);
-  const planWithVersionNode = planUpsertNode(plan, versionNode);
-
-  // 2. Ensure ~versions node exists
-  const versionsNode = newNode("~versions");
-  const updatedPlan = planUpsertNode(planWithVersionNode, versionsNode);
-
-  // 3. Get or create ~versions relations
-  const versionsContext = getVersionsContext(originalNodeID, context);
-  const containingRelation = context.size > 0
-    ? getRelationsForContext(
-        updatedPlan.knowledgeDBs,
-        updatedPlan.user.publicKey,
-        context.last() as ID,
-        context.butLast().toList(),
-        undefined,
-        context.size === 1
-      )
-    : undefined;
-  const baseVersionsRelations =
-    getVersionsRelations(
-      updatedPlan.knowledgeDBs,
-      updatedPlan.user.publicKey,
-      originalNodeID,
-      context
-    ) ||
-    newRelations(VERSIONS_NODE_ID, versionsContext, updatedPlan.user.publicKey, containingRelation?.root);
-
-  // 4. Ensure original node ID is in ~versions (add at end if not present)
-  const originalIndex = baseVersionsRelations.items.findIndex(
-    (item) => item.nodeID === originalNodeID
-  );
-  const versionsWithOriginal =
-    originalIndex < 0
-      ? addRelationToRelations(
-          baseVersionsRelations,
-          originalNodeID,
-          undefined,
-          undefined,
-          baseVersionsRelations.items.size
-        )
-      : baseVersionsRelations;
-
-  // 5. Determine insert position
-  // If editing inside ~versions, insert at the same position as the edited node
-  // Otherwise, insert at position 0 (top)
-  const editedNodePosition = isInsideVersions
-    ? versionsWithOriginal.items.findIndex(
-        (item) => item.nodeID === editedNodeID
-      )
-    : -1;
-  const insertPosition = editedNodePosition >= 0 ? editedNodePosition : 0;
-
-  // 6. Check if new version already exists in ~versions
-  const existingIndex = versionsWithOriginal.items.findIndex(
-    (item) => item.nodeID === versionNode.id
-  );
-
-  const withVersion =
-    existingIndex >= 0
-      ? moveRelations(versionsWithOriginal, [existingIndex], insertPosition)
-      : addRelationToRelations(
-          versionsWithOriginal,
-          versionNode.id,
-          undefined,
-          undefined,
-          insertPosition
-        );
-
-  return planUpsertRelations(updatedPlan, withVersion);
+  const ctx: WalkContext = {
+    knowledgeDBs: plan.knowledgeDBs,
+    publicKey: plan.user.publicKey,
+    affectedRoots: plan.affectedRoots,
+  };
+  const result = createVersion(ctx, editedNodeID, newText, editContext);
+  return { ...plan, knowledgeDBs: result.knowledgeDBs, affectedRoots: result.affectedRoots };
 }
 
 function removeEmptyNodeFromKnowledgeDBs(
@@ -631,16 +536,6 @@ export function planExpandNode(
   );
 }
 
-export function findUniqueText(
-  text: string,
-  existingIDs: ID[],
-  n: number = 1
-): string {
-  const candidate = `${text} (${n})`;
-  return existingIDs.includes(hashText(candidate))
-    ? findUniqueText(text, existingIDs, n + 1)
-    : candidate;
-}
 
 function resolveCollisions(
   plan: Plan,
@@ -1436,7 +1331,7 @@ function buildDocumentEvents(
       const rootRelation = userDB.relations.find(
         (r) => shortID(r.id) === rootId
       );
-      if (!rootRelation) {
+      if (!rootRelation || rootRelation.head === VERSIONS_NODE_ID || rootRelation.context.size > 0) {
         return events;
       }
       const event = buildDocumentEvent(

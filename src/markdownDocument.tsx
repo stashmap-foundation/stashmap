@@ -12,6 +12,10 @@ import {
   isConcreteRefId,
   parseConcreteRefId,
   createConcreteRefId,
+  findUniqueText,
+  VERSIONS_NODE_ID,
+  addRelationToRelations,
+  moveRelations,
 } from "./connections";
 import {
   getNodeFromID,
@@ -23,11 +27,16 @@ import {
   getRelationItemForView,
   getContext,
   viewPathToString,
+  newRelations,
+  getVersionsContext,
+  getVersionsRelations,
+  getRelationsForContext,
 } from "./ViewContext";
 import { buildOutgoingReference } from "./buildReferenceNode";
 import { KIND_KNOWLEDGE_DOCUMENT, newTimestamp, msTag } from "./nostr";
-import { findTag, getEventMs } from "./commons/useNostrQuery";
+import { findTag } from "./commons/useNostrQuery";
 import { getNodesInTree } from "./treeTraversal";
+import { newDB } from "./knowledge";
 
 const markdown = new MarkdownIt();
 markdown.use(attrs);
@@ -405,60 +414,225 @@ export function buildDocumentEvent(
   };
 }
 
-function walkDocumentTree(
-  treeNode: MarkdownTreeNode,
-  context: List<ID>,
-  author: PublicKey,
-  root: ID,
-  updated: number,
-  acc: { nodes: Map<string, KnowNode>; relations: Map<string, Relations> }
-): { nodes: Map<string, KnowNode>; relations: Map<string, Relations> } {
-  const node = newNode(treeNode.text);
-  const nodesWithThis = acc.nodes.set(node.id, node);
+export type WalkContext = {
+  knowledgeDBs: KnowledgeDBs;
+  publicKey: PublicKey;
+  affectedRoots: ImmutableSet<ID>;
+  updated?: number;
+};
 
-  if (!treeNode.uuid) {
-    return { nodes: nodesWithThis, relations: acc.relations };
-  }
+function walkUpsertNode(ctx: WalkContext, node: KnowNode): WalkContext {
+  const db = ctx.knowledgeDBs.get(ctx.publicKey, newDB());
+  return {
+    ...ctx,
+    knowledgeDBs: ctx.knowledgeDBs.set(ctx.publicKey, {
+      ...db,
+      nodes: db.nodes.set(shortID(node.id), node),
+    }),
+  };
+}
 
-  const visibleChildren = treeNode.children.filter((child) => !child.hidden);
-  const childItems = List(
-    visibleChildren.map((child) => {
-      if (child.linkHref) {
-        const parts = child.linkHref.split(":");
-        const relationID = joinID(author, parts[0]);
-        const targetNode = parts.length > 1 ? (parts.slice(1).join(":") as ID) : undefined;
-        return {
-          nodeID: createConcreteRefId(relationID, targetNode),
-          relevance: child.relevance,
-          argument: child.argument,
-        };
-      }
-      return {
-        nodeID: hashText(child.text) as LongID,
-        relevance: child.relevance,
-        argument: child.argument,
-      };
-    })
+function walkUpsertRelation(ctx: WalkContext, relation: Relations): WalkContext {
+  const db = ctx.knowledgeDBs.get(ctx.publicKey, newDB());
+  return {
+    ...ctx,
+    knowledgeDBs: ctx.knowledgeDBs.set(ctx.publicKey, {
+      ...db,
+      relations: db.relations.set(shortID(relation.id), relation),
+    }),
+    affectedRoots: ctx.affectedRoots.add(relation.root),
+  };
+}
+
+export function createVersion(
+  ctx: WalkContext,
+  editedNodeID: ID,
+  newText: string,
+  editContext: List<ID>,
+  root?: ID
+): WalkContext {
+  const isInsideVersions = editContext.last() === VERSIONS_NODE_ID;
+
+  const [originalNodeID, context]: [ID, List<ID>] =
+    isInsideVersions && editContext.size >= 2
+      ? [
+          editContext.get(editContext.size - 2) as ID,
+          editContext.slice(0, -2).toList(),
+        ]
+      : [editedNodeID, editContext];
+
+  const versionNode = newNode(newText);
+  const withVersionNode = walkUpsertNode(ctx, versionNode);
+
+  const versionsNode = newNode("~versions");
+  const withVersionsNode = walkUpsertNode(withVersionNode, versionsNode);
+
+  const versionsContext = getVersionsContext(originalNodeID, context);
+  const containingRelation = root
+    ? undefined
+    : context.size > 0
+      ? getRelationsForContext(
+          withVersionsNode.knowledgeDBs,
+          withVersionsNode.publicKey,
+          context.last() as ID,
+          context.butLast().toList(),
+          undefined,
+          context.size === 1
+        )
+      : getRelationsForContext(
+          withVersionsNode.knowledgeDBs,
+          withVersionsNode.publicKey,
+          originalNodeID,
+          context,
+          undefined,
+          true
+        );
+  const effectiveRoot = root ?? containingRelation?.root;
+  const baseVersionsRelations =
+    getVersionsRelations(
+      withVersionsNode.knowledgeDBs,
+      withVersionsNode.publicKey,
+      originalNodeID,
+      context
+    ) ||
+    newRelations(VERSIONS_NODE_ID, versionsContext, withVersionsNode.publicKey, effectiveRoot);
+
+  const originalIndex = baseVersionsRelations.items.findIndex(
+    (item) => item.nodeID === originalNodeID
+  );
+  const versionsWithOriginal =
+    originalIndex < 0
+      ? addRelationToRelations(
+          baseVersionsRelations,
+          originalNodeID,
+          undefined,
+          undefined,
+          baseVersionsRelations.items.size
+        )
+      : baseVersionsRelations;
+
+  const editedNodePosition = isInsideVersions
+    ? versionsWithOriginal.items.findIndex(
+        (item) => item.nodeID === editedNodeID
+      )
+    : -1;
+  const insertPosition = editedNodePosition >= 0 ? editedNodePosition : 0;
+
+  const existingIndex = versionsWithOriginal.items.findIndex(
+    (item) => item.nodeID === versionNode.id
   );
 
-  const relationID = joinID(author, treeNode.uuid);
-  const relation: Relations = {
-    id: relationID,
-    head: node.id,
-    context,
-    items: childItems,
-    author,
-    root,
-    updated,
-  };
+  const withVersion =
+    existingIndex >= 0
+      ? moveRelations(versionsWithOriginal, [existingIndex], insertPosition)
+      : addRelationToRelations(
+          versionsWithOriginal,
+          versionNode.id,
+          undefined,
+          undefined,
+          insertPosition
+        );
 
-  const relationsWithThis = acc.relations.set(treeNode.uuid, relation);
+  return walkUpsertRelation(withVersionsNode, withVersion);
+}
+
+function materializeTreeNode(
+  ctx: WalkContext,
+  treeNode: MarkdownTreeNode,
+  context: List<ID>,
+  root: ID
+): [WalkContext, ID] {
+  const node = newNode(treeNode.text);
+  const withNode = walkUpsertNode(ctx, node);
+
   const childContext = context.push(node.id);
+  const visibleChildren = treeNode.children.filter((child) => !child.hidden);
+  const [withVisible, childItems] = visibleChildren.reduce(
+    ([accCtx, accItems], childNode) => {
+      if (childNode.linkHref) {
+        const parts = childNode.linkHref.split(":");
+        const relationID = joinID(accCtx.publicKey, parts[0]);
+        const targetNode = parts.length > 1 ? (parts.slice(1).join(":") as ID) : undefined;
+        const item: RelationItem = {
+          nodeID: createConcreteRefId(relationID, targetNode),
+          relevance: childNode.relevance,
+          argument: childNode.argument,
+        };
+        return [accCtx, [...accItems, item]] as [WalkContext, RelationItem[]];
+      }
+      const childID = hashText(childNode.text);
+      const isDuplicate = accItems.some((item) => item.nodeID === childID);
+      const effectiveChild = isDuplicate
+        ? {
+            ...childNode,
+            text: findUniqueText(
+              childNode.text,
+              accItems.map((item) => item.nodeID)
+            ),
+          }
+        : childNode;
+      const [afterChild, materializedID] = materializeTreeNode(
+        accCtx,
+        effectiveChild,
+        childContext,
+        root
+      );
+      const afterVersion = isDuplicate
+        ? createVersion(afterChild, materializedID, childNode.text, childContext, root)
+        : afterChild;
+      const item: RelationItem = {
+        nodeID: materializedID,
+        relevance: childNode.relevance,
+        argument: childNode.argument,
+      };
+      return [afterVersion, [...accItems, item]];
+    },
+    [withNode, [] as RelationItem[]] as [WalkContext, RelationItem[]]
+  );
 
-  return treeNode.children.reduce(
-    (childAcc, child) =>
-      walkDocumentTree(child, childContext, author, root, updated, childAcc),
-    { nodes: nodesWithThis, relations: relationsWithThis }
+  const hiddenChildren = treeNode.children.filter((child) => child.hidden);
+  const withHidden = hiddenChildren.reduce(
+    (accCtx, child) => materializeTreeNode(accCtx, child, childContext, root)[0],
+    withVisible
+  );
+
+  const baseRelation = treeNode.uuid
+    ? {
+        ...newRelations(node.id, context, withHidden.publicKey, root),
+        id: joinID(withHidden.publicKey, treeNode.uuid),
+      }
+    : newRelations(node.id, context, withHidden.publicKey, root);
+  const relation: Relations = {
+    ...baseRelation,
+    items: List(childItems),
+    ...(treeNode.basedOn
+      ? { basedOn: joinID(withHidden.publicKey, treeNode.basedOn) as LongID }
+      : {}),
+    ...(withHidden.updated !== undefined ? { updated: withHidden.updated } : {}),
+  };
+  return [walkUpsertRelation(withHidden, relation), node.id];
+}
+
+export function createNodesFromMarkdownTrees(
+  ctx: WalkContext,
+  trees: MarkdownTreeNode[],
+  context: List<ID> = List<ID>()
+): [WalkContext, topNodeIDs: ID[]] {
+  return trees.reduce(
+    ([accCtx, accTopNodeIDs], treeNode) => {
+      const rootUuid = treeNode.uuid ?? v4();
+      const treeWithUuid = treeNode.uuid
+        ? treeNode
+        : { ...treeNode, uuid: rootUuid };
+      const [nextCtx, topNodeID] = materializeTreeNode(
+        accCtx,
+        treeWithUuid,
+        context,
+        rootUuid as ID
+      );
+      return [nextCtx, [...accTopNodeIDs, topNodeID]];
+    },
+    [ctx, [] as ID[]] as [WalkContext, ID[]]
   );
 }
 
@@ -472,16 +646,17 @@ export function parseDocumentEvent(event: UnsignedEvent): {
   }
 
   const author = event.pubkey as PublicKey;
-  const root = dTagValue as ID;
-  const updated = getEventMs(event);
   const trees = parseMarkdownHierarchy(event.content);
-
-  return trees.reduce(
-    (acc, tree) =>
-      walkDocumentTree(tree, List<ID>(), author, root, updated, acc),
-    {
-      nodes: Map<string, KnowNode>(),
-      relations: Map<string, Relations>(),
-    }
-  );
+  const ctx: WalkContext = {
+    knowledgeDBs: Map<PublicKey, KnowledgeData>(),
+    publicKey: author,
+    affectedRoots: ImmutableSet<ID>(),
+    updated: event.created_at * 1000,
+  };
+  const [result] = createNodesFromMarkdownTrees(ctx, trees);
+  const db = result.knowledgeDBs.get(author);
+  return {
+    nodes: db?.nodes ?? Map<string, KnowNode>(),
+    relations: db?.relations ?? Map<string, Relations>(),
+  };
 }

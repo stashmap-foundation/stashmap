@@ -930,3 +930,14 @@ export function injectEmptyNodesIntoKnowledgeDBs(
     relations: updatedRelations,
   });
 }
+
+export function findUniqueText(
+  text: string,
+  existingIDs: ID[],
+  n: number = 1
+): string {
+  const candidate = `${text} (${n})`;
+  return existingIDs.includes(hashText(candidate))
+    ? findUniqueText(text, existingIDs, n + 1)
+    : candidate;
+}

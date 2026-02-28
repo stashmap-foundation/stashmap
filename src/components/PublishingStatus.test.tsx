@@ -42,15 +42,11 @@ test("Details of Publishing Status", async () => {
       ...utils,
       relayPool: {
         ...utils.relayPool,
-        publish: (relays: Array<string>, event: Event): Promise<string>[] => {
+        publish: (relays: Array<string>, _event: Event): Promise<string>[] => {
           const results = relays.map((_, i) => {
-            if (event.kind === 34751) {
-              if (i === 0 || i === 3) return Promise.resolve("fulfilled");
-              if (i === 1) return Promise.reject(new Error("paid relay"));
-              return Promise.reject(new Error("too many requests"));
-            }
+            if (i === 0 || i === 3) return Promise.resolve("fulfilled");
             if (i === 1) return Promise.reject(new Error("paid relay"));
-            return Promise.resolve("fulfilled");
+            return Promise.reject(new Error("too many requests"));
           });
           return results;
         },

@@ -685,41 +685,14 @@ describe("Relevance filtering", () => {
 describe("Diff item relevance selection", () => {
   test("diff item shows RelevanceSelector with no dots selected", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
-    const { publicKey: alicePK } = alice().user;
-    const { publicKey: bobPK } = bob().user;
+    await follow(alice, bob().user.publicKey);
 
-    // Alice creates Parent
-    const parent = newNode("Parent");
-    const aliceChild = newNode("Alice Child");
-
-    const aliceRelations = addRelationToRelations(
-      newRelations(parent.id, List(), alicePK),
-      aliceChild.id
-    );
-
-    const alicePlan = planUpsertRelations(
-      planUpsertNode(planUpsertNode(createPlan(alice()), parent), aliceChild),
-      aliceRelations
-    );
-    await execute({ ...alice(), plan: alicePlan });
-
-    // Bob adds a different child to the same parent
-    const bobChild = newNode("Bob Child");
-    const bobRelations = addRelationToRelations(
-      newRelations(parent.id, List(), bobPK),
-      bobChild.id
-    );
-
-    const bobPlan = planUpsertRelations(
-      planUpsertNode(createPlan(bob()), bobChild),
-      bobRelations
-    );
-    await execute({ ...bob(), plan: bobPlan });
-
-    // Alice follows Bob
-    await follow(alice, bobPK);
+    renderTree(bob);
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Bob Child{Escape}");
+    cleanup();
 
     renderTree(alice);
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Alice Child{Escape}");
 
     // Navigate to Parent
     await navigateToNodeViaSearch(0, "Parent");
@@ -734,40 +707,14 @@ describe("Diff item relevance selection", () => {
 
   test("clicking dot on diff item accepts it with that relevance", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
-    const { publicKey: alicePK } = alice().user;
-    const { publicKey: bobPK } = bob().user;
+    await follow(alice, bob().user.publicKey);
 
-    // Alice creates Parent with a child (needed for search to find it as a reference)
-    const parent = newNode("Parent");
-    const aliceChild = newNode("Alice Child");
-    const aliceRelations = addRelationToRelations(
-      newRelations(parent.id, List(), alicePK),
-      aliceChild.id
-    );
-
-    const alicePlan = planUpsertRelations(
-      planUpsertNode(planUpsertNode(createPlan(alice()), parent), aliceChild),
-      aliceRelations
-    );
-    await execute({ ...alice(), plan: alicePlan });
-
-    // Bob adds a child to the same parent
-    const bobChild = newNode("Bob Child");
-    const bobRelations = addRelationToRelations(
-      newRelations(parent.id, List(), bobPK),
-      bobChild.id
-    );
-
-    const bobPlan = planUpsertRelations(
-      planUpsertNode(createPlan(bob()), bobChild),
-      bobRelations
-    );
-    await execute({ ...bob(), plan: bobPlan });
-
-    // Alice follows Bob
-    await follow(alice, bobPK);
+    renderTree(bob);
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Bob Child{Escape}");
+    cleanup();
 
     renderTree(alice);
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Alice Child{Escape}");
 
     // Navigate to Parent
     await navigateToNodeViaSearch(0, "Parent");
@@ -788,40 +735,14 @@ describe("Diff item relevance selection", () => {
 
   test("clicking X on diff item declines it as not relevant", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
-    const { publicKey: alicePK } = alice().user;
-    const { publicKey: bobPK } = bob().user;
+    await follow(alice, bob().user.publicKey);
 
-    // Alice creates Parent with a child (needed for search to find it as a reference)
-    const parent = newNode("Parent");
-    const aliceChild = newNode("Alice Child");
-    const aliceRelations = addRelationToRelations(
-      newRelations(parent.id, List(), alicePK),
-      aliceChild.id
-    );
-
-    const alicePlan = planUpsertRelations(
-      planUpsertNode(planUpsertNode(createPlan(alice()), parent), aliceChild),
-      aliceRelations
-    );
-    await execute({ ...alice(), plan: alicePlan });
-
-    // Bob adds a child
-    const bobChild = newNode("Bob Child");
-    const bobRelations = addRelationToRelations(
-      newRelations(parent.id, List(), bobPK),
-      bobChild.id
-    );
-
-    const bobPlan = planUpsertRelations(
-      planUpsertNode(createPlan(bob()), bobChild),
-      bobRelations
-    );
-    await execute({ ...bob(), plan: bobPlan });
-
-    // Alice follows Bob
-    await follow(alice, bobPK);
+    renderTree(bob);
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Bob Child{Escape}");
+    cleanup();
 
     renderTree(alice);
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Alice Child{Escape}");
 
     // Navigate to Parent
     await navigateToNodeViaSearch(0, "Parent");

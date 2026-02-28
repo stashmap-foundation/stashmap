@@ -5,7 +5,6 @@ import { Event, UnsignedEvent } from "nostr-tools";
 // eslint-disable-next-line import/no-unresolved
 import { RelayInformation } from "nostr-tools/lib/types/nip11";
 import {
-  KIND_KNOWLEDGE_NODE,
   KIND_KNOWLEDGE_DOCUMENT,
   KIND_CONTACTLIST,
   KIND_VIEWS,
@@ -141,7 +140,7 @@ export function newProcessedEvents(): ProcessedEvents {
   };
 }
 
-export const KIND_SEARCH = [KIND_KNOWLEDGE_NODE, KIND_KNOWLEDGE_DOCUMENT];
+export const KIND_SEARCH = [KIND_KNOWLEDGE_DOCUMENT];
 
 export const KINDS_META = [KIND_SETTINGS, KIND_CONTACTLIST, KIND_VIEWS];
 

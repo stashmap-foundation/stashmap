@@ -4,12 +4,14 @@ import { List, Map } from "immutable";
 import userEvent from "@testing-library/user-event";
 import {
   addRelationToRelations,
+  joinID,
   newNode,
   shortID,
   isConcreteRefId,
   parseConcreteRefId,
   createConcreteRefId,
 } from "../connections";
+import { KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
 import { DND } from "../dnd";
 import {
   ALICE,
@@ -69,8 +71,8 @@ test("Render non existing Node", async () => {
   );
   await screen.findByText("Programming Languages");
 
-  // Root node is expanded by default, so the child that points to non-existent node is visible
-  await screen.findByText("Error: Node not found");
+  // Document serialization ignores dangling child IDs, so no error row is rendered.
+  expect(screen.queryByText("Error: Node not found")).toBeNull();
 });
 
 async function expectNode(text: string, editable: boolean): Promise<void> {
@@ -92,9 +94,13 @@ async function expectNode(text: string, editable: boolean): Promise<void> {
 test("Edit node inline", async () => {
   const [alice] = setup([ALICE]);
   const note = newNode("My Note");
+  const noteRelations = newRelations(note.id, List(), alice().user.publicKey);
   await execute({
     ...alice(),
-    plan: planUpsertNode(createPlan(alice()), note),
+    plan: planUpsertRelations(
+      planUpsertNode(createPlan(alice()), note),
+      noteRelations
+    ),
   });
   renderWithTestData(
     <LoadData nodeIDs={[note.id]} descendants referencedBy lists>
@@ -129,14 +135,24 @@ test("Load Note from other User which is not a contact", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
   // Create Bob's note directly without setupTestDB
   const bobsNote = newNode("Bobs Note");
+  const bobsRelations = newRelations(
+    bobsNote.id,
+    List(),
+    bob().user.publicKey
+  );
   await execute({
     ...bob(),
-    plan: planUpsertNode(createPlan(bob()), bobsNote),
+    plan: planUpsertRelations(
+      planUpsertNode(createPlan(bob()), bobsNote),
+      bobsRelations
+    ),
   });
 
+  const remoteBobsNoteID = joinID(bob().user.publicKey, bobsNote.id);
+
   renderWithTestData(
-    <LoadData nodeIDs={[bobsNote.id]} descendants referencedBy lists>
-      <RootViewContextProvider root={bobsNote.id}>
+    <LoadData nodeIDs={[remoteBobsNoteID]} descendants referencedBy lists>
+      <RootViewContextProvider root={remoteBobsNoteID}>
         <TemporaryViewProvider>
           <DND>
             <>
@@ -896,17 +912,16 @@ My Notes
     // Wait for the new node to appear
     await screen.findByLabelText("edit New Sibling");
 
-    // Verify a knowledge node event was sent
+    // Verify a document event was sent with the newly created sibling.
     const events = utils.relayPool.getEvents();
-    const nodeEvents = events.filter((e) => e.kind === 34751); // KIND_KNOWLEDGE_NODE
-    const newNodeEvent = nodeEvents.find((e) =>
+    const documentEvents = events.filter(
+      (e) => e.kind === KIND_KNOWLEDGE_DOCUMENT
+    );
+    const eventWithSibling = documentEvents.find((e) =>
       e.content.includes("New Sibling")
     );
-    expect(newNodeEvent).toBeTruthy();
-
-    // Verify a relations event was sent (kind 34760 = KIND_KNOWLEDGE_LIST)
-    const relationsEvents = events.filter((e) => e.kind === 34760);
-    expect(relationsEvents.length).toBeGreaterThan(0);
+    expect(documentEvents.length).toBeGreaterThan(0);
+    expect(eventWithSibling).toBeTruthy();
   });
 
   test("Enter on expanded parent inserts new child at BEGINNING of list", async () => {

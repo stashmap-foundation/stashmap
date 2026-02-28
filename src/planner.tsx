@@ -197,18 +197,6 @@ export function planRemoveContact(plan: Plan, publicKey: PublicKey): Plan {
   };
 }
 
-function filterOldReplaceableEvent(
-  publishEvents: List<UnsignedEvent & EventAttachment>,
-  kind: number,
-  dTagValue: string
-): List<UnsignedEvent & EventAttachment> {
-  return publishEvents.filterNot(
-    (event) =>
-      event.kind === kind &&
-      event.tags.some((tag) => tag[0] === "d" && tag[1] === dTagValue)
-  );
-}
-
 export function planUpsertNode(plan: Plan, node: KnowNode): Plan {
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
   const updatedNodes = userDB.nodes.set(shortID(node.id), node);

@@ -21,8 +21,8 @@ import {
   getNodeFromID,
   ViewPath,
   NodeIndex,
+  isRoot,
   getNodeIDFromView,
-  getRelationForView,
   getDisplayTextForView,
   getRelationItemForView,
   getContext,
@@ -374,7 +374,14 @@ function serializeTree(
 
       const nodeText = getNodeFromID(data.knowledgeDBs, nodeID, author)?.text;
       const text = nodeText ?? getDisplayTextForView(data, path, stack);
-      const ownRelation = getRelationForView(data, path, stack);
+      const ownRelation = getRelationsForContext(
+        data.knowledgeDBs,
+        author,
+        nodeID,
+        context,
+        rootRelation.id,
+        isRoot(path)
+      );
       const uuid = ownRelation ? shortID(ownRelation.id) : v4();
 
       const line = `${indent}- ${text}${formatAttrs(uuid, item?.relevance, item?.argument, { hidden: isVirtual, basedOn: ownRelation?.basedOn })}`;
@@ -646,7 +653,13 @@ function materializeTreeNode(
     ...baseRelation,
     items: List(childItems),
     ...(treeNode.basedOn
-      ? { basedOn: joinID(withHidden.publicKey, treeNode.basedOn) as LongID }
+      ? {
+          basedOn: (
+            treeNode.basedOn.includes("_")
+              ? treeNode.basedOn
+              : joinID(withHidden.publicKey, treeNode.basedOn)
+          ) as LongID,
+        }
       : {}),
     ...(withHidden.updated !== undefined ? { updated: withHidden.updated } : {}),
   };

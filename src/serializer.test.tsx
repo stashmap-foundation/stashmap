@@ -1,9 +1,16 @@
 import { List } from "immutable";
-import { KIND_KNOWLEDGE_LIST } from "./nostr";
+import { KIND_KNOWLEDGE_DOCUMENT, KIND_KNOWLEDGE_LIST } from "./nostr";
 import { eventToRelations, jsonToViews } from "./serializer";
-import { createPlan, planUpsertRelations } from "./planner";
+import {
+  buildDocumentEvents,
+  createPlan,
+  planUpsertNode,
+  planUpsertRelations,
+} from "./planner";
 import { ALICE, setup } from "./utils.test";
 import { newRelations } from "./ViewContext";
+import { addRelationToRelations, newNode, shortID } from "./connections";
+import { parseDocumentEvent } from "./markdownDocument";
 
 describe("eventToRelations validation", () => {
   test("filters invalid relevance values to undefined (contains)", () => {
@@ -208,44 +215,74 @@ describe("jsonToViews validation", () => {
 });
 
 describe("basedOn serialization round-trip", () => {
-  test("relation with basedOn serializes to b tag and parses back", () => {
+  test("relation with basedOn serializes in document and parses back", () => {
     const [alice] = setup([ALICE]);
-    const plan = createPlan(alice());
+    const rootNode = newNode("Root");
+    const childNode = newNode("Child");
     const sourceRelationID = "bob_source-relation-123" as LongID;
-    const relations = {
-      ...newRelations("head-node" as ID, List<ID>(), plan.user.publicKey),
+    const plan = createPlan(alice());
+    const rootRelations = addRelationToRelations(
+      newRelations(rootNode.id, List<ID>(), plan.user.publicKey),
+      childNode.id
+    );
+    const childRelations = {
+      ...newRelations(
+        childNode.id,
+        List<ID>([shortID(rootNode.id) as ID]),
+        plan.user.publicKey
+      ),
       basedOn: sourceRelationID,
     };
-    const planWithRelation = planUpsertRelations(plan, relations);
+    const planWithRelation = planUpsertRelations(
+      planUpsertRelations(
+        planUpsertNode(planUpsertNode(plan, rootNode), childNode),
+        rootRelations
+      ),
+      childRelations
+    );
+    const events = buildDocumentEvents(planWithRelation);
+    const event = events.find((e) => e.kind === KIND_KNOWLEDGE_DOCUMENT);
 
-    const event = planWithRelation.publishEvents.first()!;
-    expect(event.kind).toBe(KIND_KNOWLEDGE_LIST);
+    expect(event).toBeDefined();
 
-    const bTag = event.tags.find((t: string[]) => t[0] === "b");
-    expect(bTag).toBeDefined();
-    expect(bTag![1]).toBe(sourceRelationID);
-
-    const parsed = eventToRelations(event);
-    expect(parsed).toBeDefined();
-    expect(parsed!.basedOn).toBe(sourceRelationID);
+    const parsed = parseDocumentEvent(event!);
+    const relationWithBasedOn = parsed.relations.find(
+      (relation) => relation.basedOn !== undefined
+    );
+    expect(relationWithBasedOn).toBeDefined();
+    expect(relationWithBasedOn!.basedOn).toContain(sourceRelationID);
   });
 
-  test("relation without basedOn does not produce b tag", () => {
+  test("relation without basedOn does not produce basedOn in parsed document", () => {
     const [alice] = setup([ALICE]);
+    const rootNode = newNode("Root");
+    const childNode = newNode("Child");
     const plan = createPlan(alice());
-    const relations = newRelations(
-      "head-node" as ID,
-      List<ID>(),
+    const rootRelations = addRelationToRelations(
+      newRelations(rootNode.id, List<ID>(), plan.user.publicKey),
+      childNode.id
+    );
+    const childRelations = newRelations(
+      childNode.id,
+      List<ID>([shortID(rootNode.id) as ID]),
       plan.user.publicKey
     );
-    const planWithRelation = planUpsertRelations(plan, relations);
+    const planWithRelation = planUpsertRelations(
+      planUpsertRelations(
+        planUpsertNode(planUpsertNode(plan, rootNode), childNode),
+        rootRelations
+      ),
+      childRelations
+    );
+    const events = buildDocumentEvents(planWithRelation);
+    const event = events.find((e) => e.kind === KIND_KNOWLEDGE_DOCUMENT);
 
-    const event = planWithRelation.publishEvents.last()!;
-    const bTag = event.tags.find((t: string[]) => t[0] === "b");
-    expect(bTag).toBeUndefined();
+    expect(event).toBeDefined();
 
-    const parsed = eventToRelations(event);
-    expect(parsed).toBeDefined();
-    expect(parsed!.basedOn).toBeUndefined();
+    const parsed = parseDocumentEvent(event!);
+    const relationWithBasedOn = parsed.relations.find(
+      (relation) => relation.basedOn !== undefined
+    );
+    expect(relationWithBasedOn).toBeUndefined();
   });
 });

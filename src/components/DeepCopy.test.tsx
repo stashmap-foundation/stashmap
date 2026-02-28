@@ -14,7 +14,8 @@ import {
   textContent,
   type,
 } from "../utils.test";
-import { KIND_KNOWLEDGE_LIST } from "../nostr";
+import { KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
+import { parseMarkdownHierarchy } from "../markdownDocument";
 
 const maybeExpand = async (label: string): Promise<void> => {
   const btn = screen.queryByLabelText(label);
@@ -1530,6 +1531,47 @@ My Notes
 });
 
 describe("Deep Copy - basedOn Tracking", () => {
+  const collectTreeValues = (
+    trees: Array<{
+      uuid?: string;
+      basedOn?: string;
+      children: Array<{
+        uuid?: string;
+        basedOn?: string;
+        children: unknown[];
+      }>;
+    }>
+  ): { uuids: string[]; basedOn: string[] } => {
+    const values = { uuids: [] as string[], basedOn: [] as string[] };
+    const walk = (
+      nodes: Array<{
+        uuid?: string;
+        basedOn?: string;
+        children: unknown[];
+      }>
+    ): void => {
+      nodes.forEach((node) => {
+        if (node.uuid) values.uuids.push(node.uuid);
+        if (node.basedOn) values.basedOn.push(node.basedOn);
+        walk(
+          node.children as Array<{
+            uuid?: string;
+            basedOn?: string;
+            children: unknown[];
+          }>
+        );
+      });
+    };
+    walk(
+      trees as Array<{
+        uuid?: string;
+        basedOn?: string;
+        children: unknown[];
+      }>
+    );
+    return values;
+  };
+
   test("Cross-pane deep copy sets basedOn on all copied relations", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
 
@@ -1548,11 +1590,18 @@ My Notes
     const bobRelationEvents = bob()
       .relayPool.getEvents()
       .filter(
-        (e) => e.kind === KIND_KNOWLEDGE_LIST && e.pubkey === BOB.publicKey
+        (e) => e.kind === KIND_KNOWLEDGE_DOCUMENT && e.pubkey === BOB.publicKey
       );
-    const bobRelationDTags = bobRelationEvents.map(
-      (e) => e.tags.find((t) => t[0] === "d")![1]
-    );
+    const bobRelationDTags = bobRelationEvents.flatMap((event) => {
+      const trees = parseMarkdownHierarchy(event.content);
+      return collectTreeValues(
+        trees as Array<{
+          uuid?: string;
+          basedOn?: string;
+          children: unknown[];
+        }>
+      ).uuids;
+    });
 
     cleanup();
 
@@ -1587,17 +1636,26 @@ Target
       .getEvents()
       .filter(
         (e) =>
-          e.kind === KIND_KNOWLEDGE_LIST &&
+          e.kind === KIND_KNOWLEDGE_DOCUMENT &&
           e.pubkey === ALICE.publicKey &&
-          e.tags.some((t) => t[0] === "b")
+          e.content.includes('basedOn="')
       );
 
     expect(aliceCopyEvents.length).toBeGreaterThan(0);
 
     aliceCopyEvents.forEach((e) => {
-      const basedOnValue = e.tags.find((t) => t[0] === "b")![1];
-      const sourceDTag = basedOnValue.split("_").slice(1).join("_");
-      expect(bobRelationDTags).toContain(sourceDTag);
+      const trees = parseMarkdownHierarchy(e.content);
+      const basedOnValues = collectTreeValues(
+        trees as Array<{
+          uuid?: string;
+          basedOn?: string;
+          children: unknown[];
+        }>
+      ).basedOn;
+      basedOnValues.forEach((basedOnValue) => {
+        const sourceDTag = basedOnValue.split("_").slice(1).join("_");
+        expect(bobRelationDTags).toContain(sourceDTag);
+      });
     });
   });
 
@@ -1638,8 +1696,7 @@ My Notes
       .getEvents()
       .slice(eventsBeforeAccept)
       .filter(
-        (e) =>
-          e.kind === KIND_KNOWLEDGE_LIST && e.tags.some((t) => t[0] === "b")
+        (e) => e.kind === KIND_KNOWLEDGE_DOCUMENT && e.content.includes('basedOn="')
       );
 
     expect(newEvents.length).toBeGreaterThan(0);

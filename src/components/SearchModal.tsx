@@ -1,14 +1,10 @@
 import { Map } from "immutable";
 import { useEventQuery } from "../commons/useNostrQuery";
-import {
-  KIND_DELETE,
-  KIND_KNOWLEDGE_DOCUMENT,
-  KIND_KNOWLEDGE_NODE,
-} from "../nostr";
+import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
 import { useData } from "../DataContext";
 import { useApis } from "../Apis";
 import { KIND_SEARCH } from "../Data";
-import { findDocumentNodesAndRelations, findNodes } from "../knowledgeEvents";
+import { findDocumentNodesAndRelations } from "../knowledgeEvents";
 import { useReadRelays } from "../relays";
 
 function isMatch(input: string, test: string): boolean {
@@ -63,7 +59,7 @@ export function useSearchQuery(
     {
       authors,
       kinds: [KIND_DELETE],
-      "#k": [`${KIND_KNOWLEDGE_NODE}`, `${KIND_KNOWLEDGE_DOCUMENT}`],
+      "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`],
     },
   ];
 
@@ -87,14 +83,12 @@ export function useSearchQuery(
       );
 
   const eventsAsList = events.toList();
-  const nodesFromNodeEvents = findNodes(eventsAsList);
   const nodesFromDocumentEvents = findDocumentNodesAndRelations(
     eventsAsList
   ).nodes;
-  const nodesFromKnowledgeEvents = filterForKeyword(
-    nodesFromNodeEvents.merge(nodesFromDocumentEvents),
-    query
-  );
+  const nodesFromKnowledgeEvents = nip50
+    ? nodesFromDocumentEvents.slice(0, 25)
+    : filterForKeyword(nodesFromDocumentEvents, query);
 
   const isQueryFinished = eose;
   const isEose = isQueryFinished || relays.length === 0;

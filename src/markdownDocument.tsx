@@ -233,8 +233,8 @@ export function parseMarkdownHierarchy(
           getLastDefinedListItem(listItemStack.slice(0, -1)) ||
           headingStack[headingStack.length - 1]?.node;
         const { uuid, relevance, argument, hidden, basedOn } = pendingAttrs;
-        const effectiveRelevance = linkHref ? linkRelevance : relevance;
-        const effectiveArgument = linkHref ? linkArgument : argument;
+        const effectiveRelevance = linkRelevance ?? relevance;
+        const effectiveArgument = linkArgument ?? argument;
         const node: MarkdownTreeNode = {
           text,
           children: [],
@@ -298,9 +298,7 @@ function formatAttrs(
 function formatCrefText(
   knowledgeDBs: KnowledgeDBs,
   author: PublicKey,
-  nodeID: LongID | ID,
-  relevance: Relevance,
-  argument: Argument
+  nodeID: LongID | ID
 ): string | undefined {
   const parsed = parseConcreteRefId(nodeID);
   if (!parsed) {
@@ -314,20 +312,10 @@ function formatCrefText(
   if (!ref) {
     return undefined;
   }
-  const relationUuid = shortID(parsed.relationID);
   const href = parsed.targetNode
-    ? `${relationUuid}:${parsed.targetNode}`
-    : relationUuid;
-  const crefParts: string[] = [];
-  if (relevance) {
-    crefParts.push(`.${relevance}`);
-  }
-  if (argument) {
-    crefParts.push(`.${argument}`);
-  }
-  const attrsStr =
-    crefParts.length > 0 ? `{${crefParts.join(" ")}}` : "";
-  return `[${ref.text}](#${href})${attrsStr}`;
+    ? `${parsed.relationID}:${parsed.targetNode}`
+    : `${parsed.relationID}`;
+  return `[${ref.text}](#${href})`;
 }
 
 type SerializeResult = {
@@ -363,7 +351,7 @@ function serializeTree(
       if (isConcreteRefId(nodeID)) {
         const parsed = parseConcreteRefId(nodeID);
         const crefText = formatCrefText(
-          data.knowledgeDBs, author, nodeID, item?.relevance, item?.argument
+          data.knowledgeDBs, author, nodeID
         );
         if (!crefText || !parsed) return acc;
         const crefRelationUUID = shortID(parsed.relationID);
@@ -372,9 +360,10 @@ function serializeTree(
               getNodeFromID(data.knowledgeDBs, parsed.targetNode, author)?.text ?? parsed.targetNode
             ))
           : acc.nodeHashes;
+        const crefAttrs = formatAttrs("", item?.relevance, item?.argument, { hidden: isVirtual });
         return {
           ...acc,
-          lines: [...acc.lines, `${indent}- ${crefText}`],
+          lines: [...acc.lines, `${indent}- ${crefText}${crefAttrs}`],
           nodeHashes: crefNodeHashes,
           contextHashes: contextHash
             ? acc.contextHashes.add(contextHash)
@@ -601,7 +590,7 @@ function materializeTreeNode(
     ([accCtx, accItems], childNode) => {
       if (childNode.linkHref) {
         const parts = childNode.linkHref.split(":");
-        const relationID = joinID(accCtx.publicKey, parts[0]);
+        const relationID = parts[0] as LongID;
         const targetNode = parts.length > 1 ? (parts.slice(1).join(":") as ID) : undefined;
         const item: RelationItem = {
           nodeID: createConcreteRefId(relationID, targetNode),
@@ -705,7 +694,7 @@ export function parseDocumentEvent(event: UnsignedEvent): {
     knowledgeDBs: Map<PublicKey, KnowledgeData>(),
     publicKey: author,
     affectedRoots: ImmutableSet<ID>(),
-    updated: event.created_at * 1000,
+    updated: Number(findTag(event, "ms")) || event.created_at * 1000,
   };
   const [result] = createNodesFromMarkdownTrees(ctx, trees);
   const db = result.knowledgeDBs.get(author);

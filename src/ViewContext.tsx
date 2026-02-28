@@ -191,7 +191,8 @@ export function getAlternativeRelations(
           (r) =>
             r.head === localID &&
             r.id !== excludeRelationId &&
-            contextsMatch(r.context, context)
+            contextsMatch(r.context, context) &&
+            (r.items.size > 0 || r.root === shortID(r.id))
         )
         .toList()
     );

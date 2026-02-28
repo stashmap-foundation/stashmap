@@ -76,6 +76,7 @@ function extractAttrs(token: Token): {
   argument: Argument;
   hidden: boolean;
   basedOn: string | undefined;
+  context: string | undefined;
 } {
   if (!token.attrs) {
     return {
@@ -84,6 +85,7 @@ function extractAttrs(token: Token): {
       argument: undefined,
       hidden: false,
       basedOn: undefined,
+      context: undefined,
     };
   }
   const uuid = token.attrs.find(([, value]) => value === "")?.[0];
@@ -97,7 +99,8 @@ function extractAttrs(token: Token): {
   );
   const hidden = classes.includes("hidden");
   const basedOn = token.attrGet("basedOn") || undefined;
-  return { uuid, relevance, argument, hidden, basedOn };
+  const context = token.attrGet("context") || undefined;
+  return { uuid, relevance, argument, hidden, basedOn, context };
 }
 
 export type MarkdownTreeNode = {
@@ -109,6 +112,7 @@ export type MarkdownTreeNode = {
   linkHref?: string;
   hidden?: boolean;
   basedOn?: string;
+  context?: string;
 };
 
 /* eslint-disable functional/immutable-data, functional/no-let, no-continue */
@@ -170,7 +174,7 @@ export function parseMarkdownHierarchy(
       if (!text) {
         continue;
       }
-      const { uuid, relevance, argument, hidden, basedOn } =
+      const { uuid, relevance, argument, hidden, basedOn, context } =
         extractAttrs(token);
       while (
         headingStack.length > 0 &&
@@ -189,6 +193,7 @@ export function parseMarkdownHierarchy(
         ...(argument !== undefined && { argument }),
         ...(hidden && { hidden }),
         ...(basedOn !== undefined && { basedOn }),
+        ...(context !== undefined && { context }),
       };
       appendNode(roots, parent, node);
       headingStack.push({ level: headingLevel, node });
@@ -409,6 +414,13 @@ function buildRootPath(rootRelation: Relations): ViewPath {
   ] as ViewPath;
 }
 
+function formatRootHeading(rootText: string, rootUuid: string, context: List<ID>): string {
+  const contextAttr = context.size > 0
+    ? ` context="${context.join(":")}"`
+    : "";
+  return `# ${rootText} {${rootUuid}${contextAttr}}`;
+}
+
 export function treeToMarkdown(
   data: Data,
   rootRelation: Relations
@@ -417,7 +429,7 @@ export function treeToMarkdown(
   const rootNode = getNodeFromID(data.knowledgeDBs, rootRelation.head, author);
   const rootText = rootNode?.text ?? rootRelation.head;
   const rootUuid = shortID(rootRelation.id);
-  const rootLine = `# ${rootText} {${rootUuid}}`;
+  const rootLine = formatRootHeading(rootText, rootUuid, rootRelation.context);
   const { lines } = serializeTree(data, rootRelation);
   return `${[rootLine, ...lines].join("\n")}\n`;
 }
@@ -430,11 +442,17 @@ export function buildDocumentEvent(
   const rootNode = getNodeFromID(data.knowledgeDBs, rootRelation.head, author);
   const rootText = rootNode?.text ?? rootRelation.head;
   const rootUuid = shortID(rootRelation.id);
-  const rootLine = `# ${rootText} {${rootUuid}}`;
+  const rootLine = formatRootHeading(rootText, rootUuid, rootRelation.context);
   const result = serializeTree(data, rootRelation);
   const content = `${[rootLine, ...result.lines].join("\n")}\n`;
   const nTags = result.nodeHashes.add(hashText(rootText)).toArray().map((h) => ["n", h]);
-  const cTags = result.contextHashes.toArray().map((h) => ["c", h]);
+  const rootContextHash = rootRelation.context.size > 0
+    ? hashText(rootRelation.context.join(":"))
+    : undefined;
+  const allContextHashes = rootContextHash
+    ? result.contextHashes.add(rootContextHash)
+    : result.contextHashes;
+  const cTags = allContextHashes.toArray().map((h) => ["c", h]);
   const rTags = result.relationUUIDs.add(rootUuid).toArray().map((u) => ["r", u]);
 
   return {
@@ -657,10 +675,13 @@ export function createNodesFromMarkdownTrees(
       const treeWithUuid = treeNode.uuid
         ? treeNode
         : { ...treeNode, uuid: rootUuid };
+      const treeContext = treeNode.context
+        ? List(treeNode.context.split(":") as ID[])
+        : context;
       const [nextCtx, topNodeID] = materializeTreeNode(
         accCtx,
         treeWithUuid,
-        context,
+        treeContext,
         rootUuid as ID
       );
       return [nextCtx, [...accTopNodeIDs, topNodeID]];

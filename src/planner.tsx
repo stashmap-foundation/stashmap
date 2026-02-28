@@ -827,7 +827,7 @@ export function planForkPane(
     plan,
     entryNodeID,
     entryContext,
-    (relation) => relation.context.slice(entryContext.size).toList(),
+    (relation) => relation.context,
     (relation) => relation.author === pane.author,
     rootRelationData
   );
@@ -1353,7 +1353,7 @@ export function buildDocumentEvents(
         };
         return events.push(deleteEvent as UnsignedEvent & EventAttachment);
       }
-      if (rootRelation.head === VERSIONS_NODE_ID || rootRelation.context.size > 0) {
+      if (rootRelation.head === VERSIONS_NODE_ID) {
         return events;
       }
       const event = buildDocumentEvent(

@@ -1,10 +1,14 @@
-import { List, Map } from "immutable";
+import { Map } from "immutable";
 import { useEventQuery } from "../commons/useNostrQuery";
-import { KIND_DELETE, KIND_KNOWLEDGE_NODE } from "../nostr";
+import {
+  KIND_DELETE,
+  KIND_KNOWLEDGE_DOCUMENT,
+  KIND_KNOWLEDGE_NODE,
+} from "../nostr";
 import { useData } from "../DataContext";
 import { useApis } from "../Apis";
 import { KIND_SEARCH } from "../Data";
-import { findNodes } from "../knowledgeEvents";
+import { findDocumentNodesAndRelations, findNodes } from "../knowledgeEvents";
 import { useReadRelays } from "../relays";
 
 function isMatch(input: string, test: string): boolean {
@@ -59,7 +63,7 @@ export function useSearchQuery(
     {
       authors,
       kinds: [KIND_DELETE],
-      "#k": [`${KIND_KNOWLEDGE_NODE}`],
+      "#k": [`${KIND_KNOWLEDGE_NODE}`, `${KIND_KNOWLEDGE_DOCUMENT}`],
     },
   ];
 
@@ -82,14 +86,14 @@ export function useSearchQuery(
         (event) => event.kind === KIND_DELETE || isMatch(query, event.content)
       );
 
-  const groupByKind = events.groupBy((event) => event.kind);
-  const knowledgeEvents = groupByKind.get(KIND_KNOWLEDGE_NODE);
-  const deleteEvents = groupByKind.get(KIND_DELETE);
-
-  const nodesFromKnowledgeEvents = findNodes(
-    (knowledgeEvents?.toList() || List()).merge(
-      deleteEvents?.toList() || List()
-    )
+  const eventsAsList = events.toList();
+  const nodesFromNodeEvents = findNodes(eventsAsList);
+  const nodesFromDocumentEvents = findDocumentNodesAndRelations(
+    eventsAsList
+  ).nodes;
+  const nodesFromKnowledgeEvents = filterForKeyword(
+    nodesFromNodeEvents.merge(nodesFromDocumentEvents),
+    query
   );
 
   const isQueryFinished = eose;

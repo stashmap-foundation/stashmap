@@ -52,8 +52,8 @@ async function setupTwoOccurrences(): Promise<void> {
 Crypto
   Bitcoin
     Details
-    [C] Tech / Bitcoin
     [C] Money / Bitcoin
+    [C] Tech / Bitcoin
     `);
 }
 
@@ -357,7 +357,7 @@ Crypto
     renderApp(alice());
     await setupTwoOccurrences();
 
-    await clickRow("Tech / Bitcoin");
+    await clickRow("Money / Bitcoin");
     await userEvent.keyboard("{Shift>}j{/Shift}");
     await userEvent.keyboard("!");
 
@@ -365,8 +365,8 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Tech / Bitcoin
     [R] Money / Bitcoin
+    [R] Tech / Bitcoin
     `);
 
     cleanup();
@@ -376,8 +376,8 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Tech / Bitcoin
     [R] Money / Bitcoin
+    [R] Tech / Bitcoin
     `);
   });
 
@@ -396,11 +396,11 @@ Crypto
   Bitcoin
     A
     B
-    [C] Tech / Bitcoin
     [C] Money / Bitcoin
+    [C] Tech / Bitcoin
     `);
 
-    // Select all 4: A, B, Tech occurrence, Money occurrence
+    // Select all 4: A, B, Money occurrence, Tech occurrence
     await clickRow("A");
     await userEvent.keyboard("{Shift>}j{/Shift}");
     await userEvent.keyboard("{Shift>}j{/Shift}");
@@ -414,8 +414,8 @@ Crypto
   Bitcoin
     A
     B
-    [R] Tech / Bitcoin
     [R] Money / Bitcoin
+    [R] Tech / Bitcoin
     `);
 
     cleanup();
@@ -426,8 +426,8 @@ Crypto
   Bitcoin
     A
     B
-    [R] Tech / Bitcoin
     [R] Money / Bitcoin
+    [R] Tech / Bitcoin
     `);
   });
 
@@ -519,19 +519,19 @@ Crypto
     renderApp(alice());
     await setupTwoOccurrences();
 
-    await clickRow("Tech / Bitcoin");
+    await clickRow("Money / Bitcoin");
     await userEvent.keyboard("{Shift>}j{/Shift}");
 
     await userEvent.click(
-      await screen.findByLabelText(/accept Money \/ Bitcoin as relevant/)
+      await screen.findByLabelText(/accept Tech \/ Bitcoin as relevant/)
     );
 
     await expectTree(`
 Crypto
   Bitcoin
     Details
-    [R] Tech / Bitcoin
     [R] Money / Bitcoin
+    [R] Tech / Bitcoin
     `);
 
     cleanup();
@@ -541,8 +541,8 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Tech / Bitcoin
     [R] Money / Bitcoin
+    [R] Tech / Bitcoin
     `);
   });
 
@@ -679,10 +679,10 @@ Crypto
     renderApp(alice());
     await setupTwoOccurrences();
 
-    await clickRow("Tech / Bitcoin");
+    await clickRow("Money / Bitcoin");
     await userEvent.keyboard("{Shift>}j{/Shift}");
 
-    const occurrence = await screen.findByLabelText("Tech / Bitcoin");
+    const occurrence = await screen.findByLabelText("Money / Bitcoin");
     const details = await screen.findByLabelText("Details");
 
     fireEvent.dragStart(occurrence);
@@ -692,8 +692,8 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Tech / Bitcoin
     [R] Money / Bitcoin
+    [R] Tech / Bitcoin
     `);
 
     cleanup();
@@ -703,8 +703,8 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Tech / Bitcoin
     [R] Money / Bitcoin
+    [R] Tech / Bitcoin
     `);
   });
 

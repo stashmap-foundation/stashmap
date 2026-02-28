@@ -56,8 +56,8 @@ test("Node referenced from different roots shows incoming refs", async () => {
 Money
   Bitcoin
     Details
-    [C] P2P / Bitcoin
     [C] Crypto / Bitcoin
+    [C] P2P / Bitcoin
   `);
 });
 

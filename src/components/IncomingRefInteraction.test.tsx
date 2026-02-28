@@ -63,8 +63,8 @@ async function setupTwoIncomingRefs(): Promise<void> {
 Money
   Bitcoin
     Details
-    [I] Bitcoin ! <<< Tech
     [I] Bitcoin ! <<< Crypto
+    [I] Bitcoin ! <<< Tech
     `);
 }
 
@@ -331,7 +331,7 @@ describe("Multiselect keyboard", () => {
     renderApp(alice());
     await setupTwoIncomingRefs();
 
-    await clickRow("Bitcoin ! <<< Tech");
+    await clickRow("Bitcoin ! <<< Crypto");
     await userEvent.keyboard("{Shift>}j{/Shift}");
     await userEvent.keyboard("!");
 
@@ -339,8 +339,8 @@ describe("Multiselect keyboard", () => {
 Money
   Bitcoin
     Details
-    [R] Tech <<< >>> ! Bitcoin
     [R] Crypto <<< >>> ! Bitcoin
+    [R] Tech <<< >>> ! Bitcoin
     `);
 
     cleanup();
@@ -350,8 +350,8 @@ Money
 Money
   Bitcoin
     Details
-    [R] Tech <<< >>> ! Bitcoin
     [R] Crypto <<< >>> ! Bitcoin
+    [R] Tech <<< >>> ! Bitcoin
     `);
   });
 
@@ -774,11 +774,11 @@ Money
     renderApp(alice());
     await setupTwoIncomingRefs();
 
-    await clickRow("Bitcoin ! <<< Tech");
+    await clickRow("Bitcoin ! <<< Crypto");
     await userEvent.keyboard("{Shift>}j{/Shift}");
 
     const source = screen.getByRole("treeitem", {
-      name: "Bitcoin ! <<< Tech",
+      name: "Bitcoin ! <<< Crypto",
     });
     const target = screen.getByRole("treeitem", { name: "Details" });
 
@@ -789,8 +789,8 @@ Money
 Money
   Bitcoin
     Details
-    [R] Tech <<< >>> ! Bitcoin
     [R] Crypto <<< >>> ! Bitcoin
+    [R] Tech <<< >>> ! Bitcoin
     `);
 
     cleanup();
@@ -800,8 +800,8 @@ Money
 Money
   Bitcoin
     Details
-    [R] Tech <<< >>> ! Bitcoin
     [R] Crypto <<< >>> ! Bitcoin
+    [R] Tech <<< >>> ! Bitcoin
     `);
   });
 

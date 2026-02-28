@@ -1531,23 +1531,15 @@ My Notes
 });
 
 describe("Deep Copy - basedOn Tracking", () => {
-  const collectTreeValues = (
-    trees: Array<{
-      uuid?: string;
-      basedOn?: string;
-      children: Array<{
-        uuid?: string;
-        basedOn?: string;
-        children: unknown[];
-      }>;
-    }>
-  ): { uuids: string[]; basedOn: string[] } => {
-    type TreeNode = {
-      uuid?: string;
-      basedOn?: string;
-      children: TreeNode[];
-    };
+  type TreeNode = {
+    uuid?: string;
+    basedOn?: string;
+    children: TreeNode[];
+  };
 
+  const collectTreeValues = (
+    trees: TreeNode[]
+  ): { uuids: string[]; basedOn: string[] } => {
     const walk = (nodes: TreeNode[]): { uuids: string[]; basedOn: string[] } =>
       nodes.reduce(
         (acc, node) => {
@@ -1569,7 +1561,7 @@ describe("Deep Copy - basedOn Tracking", () => {
         { uuids: [] as string[], basedOn: [] as string[] }
       );
 
-    return walk(trees as TreeNode[]);
+    return walk(trees);
   };
 
   test("Cross-pane deep copy sets basedOn on all copied relations", async () => {
@@ -1594,13 +1586,7 @@ My Notes
       );
     const bobRelationDTags = bobRelationEvents.flatMap((event) => {
       const trees = parseMarkdownHierarchy(event.content);
-      return collectTreeValues(
-        trees as Array<{
-          uuid?: string;
-          basedOn?: string;
-          children: unknown[];
-        }>
-      ).uuids;
+      return collectTreeValues(trees).uuids;
     });
 
     cleanup();
@@ -1645,13 +1631,7 @@ Target
 
     aliceCopyEvents.forEach((e) => {
       const trees = parseMarkdownHierarchy(e.content);
-      const basedOnValues = collectTreeValues(
-        trees as Array<{
-          uuid?: string;
-          basedOn?: string;
-          children: unknown[];
-        }>
-      ).basedOn;
+      const basedOnValues = collectTreeValues(trees).basedOn;
       basedOnValues.forEach((basedOnValue) => {
         const sourceDTag = basedOnValue.split("_").slice(1).join("_");
         expect(bobRelationDTags).toContain(sourceDTag);

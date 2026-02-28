@@ -19,9 +19,11 @@ import {
   isConcreteRefId,
   isSearchId,
   getRelations,
+  getRelationsNoReferencedBy,
   itemPassesFilters,
   getOccurrencesForNode,
   getIncomingCrefsForNode,
+  shortID,
   VERSIONS_NODE_ID,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
@@ -38,6 +40,56 @@ export type TreeTraversalOptions = {
 
 const EMPTY_VIRTUAL_ITEMS: VirtualItemsMap = Map<string, RelationItem>();
 const EMPTY_FIRST_VIRTUAL_KEYS: ImmutableSet<string> = ImmutableSet<string>();
+
+function getRelationsForMarkdownExport(
+  data: Data,
+  effectiveAuthor: PublicKey,
+  parentNodeID: LongID | ID,
+  context: List<ID>,
+  rootRelation: LongID | undefined,
+  isRootNode: boolean
+): Relations | undefined {
+  const current = getRelationsForContext(
+    data.knowledgeDBs,
+    effectiveAuthor,
+    parentNodeID,
+    context,
+    rootRelation,
+    isRootNode
+  );
+
+  if (!rootRelation || isRootNode) {
+    return current;
+  }
+
+  const rootRelationData = getRelationsNoReferencedBy(
+    data.knowledgeDBs,
+    rootRelation,
+    effectiveAuthor
+  );
+  if (!rootRelationData) {
+    return current;
+  }
+
+  const authorDB = data.knowledgeDBs.get(effectiveAuthor);
+  if (!authorDB) {
+    return current;
+  }
+
+  const localID = shortID(parentNodeID);
+  const sameRootRelation = authorDB.relations
+    .filter(
+      (relation) =>
+        relation.head === localID &&
+        relation.root === rootRelationData.root &&
+        relation.context.equals(context)
+    )
+    .toList()
+    .sort((a, b) => b.updated - a.updated)
+    .first();
+
+  return sameRootRelation ?? current;
+}
 
 function getChildrenForConcreteRef(
   data: Data,
@@ -79,17 +131,27 @@ function getChildrenForRegularNode(
   const effectiveAuthor = getEffectiveAuthor(data, parentPath);
   const context = getContext(data, parentPath, stack);
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
+  const isRootNode = isRoot(parentPath);
 
   const relations = isSearchId(parentNodeID as ID)
     ? getRelations(data.knowledgeDBs, parentNodeID as ID, data.user.publicKey)
-    : getRelationsForContext(
-        data.knowledgeDBs,
-        effectiveAuthor,
-        parentNodeID,
-        context,
-        rootRelation,
-        isRoot(parentPath)
-      );
+    : options?.isMarkdownExport
+      ? getRelationsForMarkdownExport(
+          data,
+          effectiveAuthor,
+          parentNodeID,
+          context,
+          rootRelation,
+          isRootNode
+        )
+      : getRelationsForContext(
+          data.knowledgeDBs,
+          effectiveAuthor,
+          parentNodeID,
+          context,
+          rootRelation,
+          isRootNode
+        );
 
   const relationPaths = relations
     ? relations.items

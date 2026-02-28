@@ -37,6 +37,17 @@ export function contextsMatch(a: Context, b: Context): boolean {
   return a.equals(b);
 }
 
+function debugVersions(
+  message: string,
+  payload: Record<string, unknown>
+): void {
+  if (process.env.DEBUG_VERSIONS !== "1") {
+    return;
+  }
+  // eslint-disable-next-line no-console
+  console.log(`[versions] ${message}`, payload);
+}
+
 /**
  * Calculate items that other users have in their relation lists
  * that the current user doesn't have.
@@ -191,8 +202,7 @@ export function getAlternativeRelations(
           (r) =>
             r.head === localID &&
             r.id !== excludeRelationId &&
-            contextsMatch(r.context, context) &&
-            (r.items.size > 0 || r.root === shortID(r.id))
+            contextsMatch(r.context, context)
         )
         .toList()
     );
@@ -217,6 +227,12 @@ export function getVersionsForRelation(
     contextToMatch,
     currentRelation?.id
   );
+  debugVersions("start", {
+    nodeID: shortID(nodeID),
+    context: contextToMatch.toArray(),
+    currentRelationID: currentRelation?.id,
+    alternatives: alternatives.map((r) => r.id).toArray(),
+  });
 
   const existingCrefIDs = currentRelation
     ? currentRelation.items
@@ -239,6 +255,11 @@ export function getVersionsForRelation(
   return alternatives
     .filter((r) => {
       if (existingCrefIDs.has(createConcreteRefId(r.id))) {
+        debugVersions("filtered-existing-cref", {
+          nodeID: shortID(nodeID),
+          candidateRelationID: r.id,
+          currentRelationID: currentRelation?.id,
+        });
         return false;
       }
       const { addCount, removeCount } = computeRelationDiff(
@@ -247,6 +268,10 @@ export function getVersionsForRelation(
         filterTypes
       );
       if (addCount === 0 && removeCount === 0) {
+        debugVersions("filtered-no-diff", {
+          nodeID: shortID(nodeID),
+          candidateRelationID: r.id,
+        });
         return false;
       }
       const coveredIDs = coveredSuggestionIDs || ImmutableSet<string>();
@@ -259,9 +284,23 @@ export function getVersionsForRelation(
         .map((item) => shortID(item.nodeID))
         .filter((id) => !currentItemIDs.has(id));
       const hasUncoveredAdds = addIDs.some((id) => !coveredIDs.has(id));
-      return (
+      const keep =
         hasUncoveredAdds || removeCount > suggestionSettings.maxSuggestions
-      );
+      ;
+      debugVersions("candidate", {
+        nodeID: shortID(nodeID),
+        context: contextToMatch.toArray(),
+        currentRelationID: currentRelation?.id,
+        candidateRelationID: r.id,
+        addCount,
+        removeCount,
+        addIDs: addIDs.toArray(),
+        coveredIDs: coveredIDs.toArray(),
+        hasUncoveredAdds,
+        threshold: suggestionSettings.maxSuggestions,
+        keep,
+      });
+      return keep;
     })
     .sortBy((r) => -r.updated)
     .map((r) => createConcreteRefId(r.id))

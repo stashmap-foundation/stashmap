@@ -325,6 +325,42 @@ type SerializeResult = {
   relationUUIDs: ImmutableSet<string>;
 };
 
+function getOwnRelationForDocumentSerialization(
+  data: Data,
+  author: PublicKey,
+  nodeID: LongID | ID,
+  context: List<ID>,
+  rootRelation: Relations,
+  isRootNode: boolean
+): Relations | undefined {
+  const current = getRelationsForContext(
+    data.knowledgeDBs,
+    author,
+    nodeID,
+    context,
+    rootRelation.id,
+    isRootNode
+  );
+  if (isRootNode) {
+    return current;
+  }
+
+  const localID = shortID(nodeID);
+  const userDB = data.knowledgeDBs.get(author, newDB());
+  const sameRootRelation = userDB.relations
+    .filter(
+      (relation) =>
+        relation.head === localID &&
+        relation.root === rootRelation.root &&
+        relation.context.equals(context)
+    )
+    .toList()
+    .sort((a, b) => b.updated - a.updated)
+    .first();
+
+  return sameRootRelation ?? current;
+}
+
 function serializeTree(
   data: Data,
   rootRelation: Relations
@@ -374,12 +410,12 @@ function serializeTree(
 
       const nodeText = getNodeFromID(data.knowledgeDBs, nodeID, author)?.text;
       const text = nodeText ?? getDisplayTextForView(data, path, stack);
-      const ownRelation = getRelationsForContext(
-        data.knowledgeDBs,
+      const ownRelation = getOwnRelationForDocumentSerialization(
+        data,
         author,
         nodeID,
         context,
-        rootRelation.id,
+        rootRelation,
         isRoot(path)
       );
       const uuid = ownRelation ? shortID(ownRelation.id) : v4();

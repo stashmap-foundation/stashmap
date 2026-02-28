@@ -585,6 +585,7 @@ Spain
     await screen.findByLabelText("open Spain in fullscreen")
   );
 
+  console.log(">>> HERE");
   await expectTree(`
 Spain
   Sevilla

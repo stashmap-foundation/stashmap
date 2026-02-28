@@ -184,11 +184,11 @@ export function parseMarkdownHierarchy(
       const node: MarkdownTreeNode = {
         text,
         children: [],
-        uuid,
-        relevance,
-        argument,
-        hidden,
-        basedOn,
+        ...(uuid !== undefined && { uuid }),
+        ...(relevance !== undefined && { relevance }),
+        ...(argument !== undefined && { argument }),
+        ...(hidden && { hidden }),
+        ...(basedOn !== undefined && { basedOn }),
       };
       appendNode(roots, parent, node);
       headingStack.push({ level: headingLevel, node });
@@ -228,15 +228,17 @@ export function parseMarkdownHierarchy(
           getLastDefinedListItem(listItemStack.slice(0, -1)) ||
           headingStack[headingStack.length - 1]?.node;
         const { uuid, relevance, argument, hidden, basedOn } = pendingAttrs;
+        const effectiveRelevance = linkHref ? linkRelevance : relevance;
+        const effectiveArgument = linkHref ? linkArgument : argument;
         const node: MarkdownTreeNode = {
           text,
           children: [],
-          uuid,
-          relevance: linkHref ? linkRelevance : relevance,
-          argument: linkHref ? linkArgument : argument,
-          linkHref,
-          hidden,
-          basedOn,
+          ...(uuid !== undefined && { uuid }),
+          ...(effectiveRelevance !== undefined && { relevance: effectiveRelevance }),
+          ...(effectiveArgument !== undefined && { argument: effectiveArgument }),
+          ...(linkHref !== undefined && { linkHref }),
+          ...(hidden && { hidden }),
+          ...(basedOn !== undefined && { basedOn }),
         };
         appendNode(roots, parent, node);
         listItemStack[currentItemIndex] = node;
@@ -245,9 +247,9 @@ export function parseMarkdownHierarchy(
       currentListNode.children.push({
         text,
         children: [],
-        linkHref,
-        relevance: linkRelevance,
-        argument: linkArgument,
+        ...(linkHref !== undefined && { linkHref }),
+        ...(linkRelevance !== undefined && { relevance: linkRelevance }),
+        ...(linkArgument !== undefined && { argument: linkArgument }),
       });
       continue;
     }

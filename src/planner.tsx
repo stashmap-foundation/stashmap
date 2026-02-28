@@ -1322,7 +1322,7 @@ const PlanningContext = React.createContext<PlanningContextValue | undefined>(
 // Filter out empty placeholder nodes from events before publishing
 // Empty nodes are injected at read time via injectEmptyNodesIntoKnowledgeDBs,
 // so any relations modification will include them - we need to filter before publishing
-function buildDocumentEvents(
+export function buildDocumentEvents(
   plan: Plan
 ): List<UnsignedEvent & EventAttachment> {
   const author = plan.user.publicKey;
@@ -1475,6 +1475,7 @@ export function PlanningContextProvider({
     const filteredPlan = {
       ...plan,
       publishEvents: filteredEvents,
+      affectedRoots: ImmutableSet<ID>(),
     };
 
     const results = await execute({

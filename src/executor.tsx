@@ -1,6 +1,6 @@
 import { Event, EventTemplate, SimplePool, VerifiedEvent } from "nostr-tools";
 import { List, Map } from "immutable";
-import { Plan } from "./planner";
+import { Plan, buildDocumentEvents } from "./planner";
 import { FinalizeEvent } from "./Apis";
 import {
   isUserLoggedIn,
@@ -108,14 +108,20 @@ export async function execute({
   relayPool: SimplePool;
   finalizeEvent: FinalizeEvent;
 }): Promise<PublishResultsEventMap> {
-  if (plan.publishEvents.size === 0) {
+  // buildDocumentEvents returns plan.publishEvents + generated document events.
+  // In production executePlan pre-builds documents for the publish queue, so
+  // affectedRoots is cleared before calling execute() making this a passthrough.
+  // In tests execute() is called directly and this generates the document events.
+  const allEvents = buildDocumentEvents(plan);
+
+  if (allEvents.size === 0) {
     // eslint-disable-next-line no-console
     console.warn("Won't execute Noop plan");
     return Map();
   }
 
   const finalizedEvents = await signEvents(
-    plan.publishEvents,
+    allEvents,
     plan.user,
     finalizeEvent
   );

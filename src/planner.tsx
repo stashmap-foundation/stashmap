@@ -23,6 +23,7 @@ import { newDB } from "./knowledge";
 import { buildDocumentEvent, WalkContext, createVersion } from "./markdownDocument";
 import {
   shortID,
+  joinID,
   newNode,
   addRelationToRelations,
   bulkAddRelations,
@@ -638,6 +639,36 @@ export function planAddToParent(
 
 type RelationsIdMapping = Map<LongID, LongID>;
 
+function getDocumentRootRelationForFork(
+  plan: Plan,
+  sourceRelation: Relations
+): Relations {
+  const relationID = joinID(sourceRelation.author, sourceRelation.root);
+  const byRootId = getRelationsNoReferencedBy(
+    plan.knowledgeDBs,
+    relationID,
+    plan.user.publicKey
+  );
+  if (byRootId && byRootId.author === sourceRelation.author) {
+    return byRootId;
+  }
+
+  const authorDB = plan.knowledgeDBs.get(sourceRelation.author);
+  const fallbackRoot = authorDB?.relations
+    .filter(
+      (relation) =>
+        relation.root === sourceRelation.root && relation.context.size === 0
+    )
+    .toList()
+    .sort((a, b) => b.updated - a.updated)
+    .first();
+  if (fallbackRoot) {
+    return fallbackRoot;
+  }
+
+  return sourceRelation;
+}
+
 function planCopyDescendantRelations(
   plan: Plan,
   sourceNodeID: LongID | ID,
@@ -795,28 +826,30 @@ export function planForkPane(
 ): Plan {
   const pane = getPane(plan, viewPath);
 
-  const rootRelationData = pane.rootRelation
+  const relationAtView = pane.rootRelation
     ? getRelationsNoReferencedBy(
         plan.knowledgeDBs,
         pane.rootRelation,
         pane.author || plan.user.publicKey
       )
-    : undefined;
-
-  const context = getContext(plan, viewPath, stack);
-  const entryNodeID = rootRelationData
-    ? (rootRelationData.head as ID)
-    : context.first() || (stack[stack.length - 1] as ID);
-  if (!entryNodeID) {
+    : getRelationForView(plan, viewPath, stack);
+  if (!relationAtView) {
     return plan;
   }
-  const entryContext = rootRelationData ? rootRelationData.context : List<ID>();
+
+  const rootRelationData = getDocumentRootRelationForFork(
+    plan,
+    relationAtView
+  );
+
   const [planWithRelations, relationsIdMapping] = planCopyDescendantRelations(
     plan,
-    entryNodeID,
-    entryContext,
+    rootRelationData.head,
+    rootRelationData.context,
     (relation) => relation.context,
-    (relation) => relation.author === pane.author,
+    (relation) =>
+      relation.author === rootRelationData.author &&
+      relation.root === rootRelationData.root,
     rootRelationData
   );
   const updatedViews = updateViewsWithRelationsMapping(
@@ -825,9 +858,7 @@ export function planForkPane(
   );
   const planWithUpdatedViews = planUpdateViews(planWithRelations, updatedViews);
   const paneIndex = viewPath[0];
-  const newRootRelation = pane.rootRelation
-    ? relationsIdMapping.get(pane.rootRelation)
-    : undefined;
+  const newRootRelation = relationsIdMapping.get(relationAtView.id);
   const newPanes = planWithUpdatedViews.panes.map((p, i) =>
     i === paneIndex
       ? {

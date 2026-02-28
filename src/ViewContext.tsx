@@ -274,15 +274,23 @@ export function getVersionsForRelation(
         });
         return false;
       }
-      const coveredIDs = coveredSuggestionIDs || ImmutableSet<string>();
-      const addIDs = r.items
+      const candidateItemIDs = r.items
         .filter(
           (item) =>
             itemPassesFilters(item, filterTypes) &&
             item.relevance !== "not_relevant"
         )
         .map((item) => shortID(item.nodeID))
-        .filter((id) => !currentItemIDs.has(id));
+        .toSet();
+      if (candidateItemIDs.size === 0) {
+        debugVersions("filtered-empty-candidate", {
+          nodeID: shortID(nodeID),
+          candidateRelationID: r.id,
+        });
+        return false;
+      }
+      const coveredIDs = coveredSuggestionIDs || ImmutableSet<string>();
+      const addIDs = candidateItemIDs.filter((id) => !currentItemIDs.has(id));
       const hasUncoveredAdds = addIDs.some((id) => !coveredIDs.has(id));
       const keep =
         hasUncoveredAdds || removeCount > suggestionSettings.maxSuggestions

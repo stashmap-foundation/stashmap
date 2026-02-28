@@ -87,7 +87,7 @@ import {
 } from "./SplitPanesContext";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
-test.skip("skip", () => {});
+test.skip("skip", () => { });
 
 export const ALICE_PRIVATE_KEY =
   "04d22f1cf58c28647c7b7dc198dcbc4de860948933e56001ab9fc17e1b8d072e";
@@ -364,7 +364,7 @@ function TestPublishProvider({
         <MergeKnowledgeDB>
           <PlanningContextProvider
             setPublishEvents={setPublishEventsStatus}
-            setPanes={() => {}}
+            setPanes={() => { }}
           >
             {children}
           </PlanningContextProvider>
@@ -387,11 +387,11 @@ export function renderApis(
   };
   const user =
     optionsWithDefaultUser.user &&
-    isUserLoggedInWithSeed(optionsWithDefaultUser.user)
+      isUserLoggedInWithSeed(optionsWithDefaultUser.user)
       ? {
-          privateKey: optionsWithDefaultUser.user.privateKey,
-          publicKey: optionsWithDefaultUser.user.publicKey,
-        }
+        privateKey: optionsWithDefaultUser.user.privateKey,
+        publicKey: optionsWithDefaultUser.user.publicKey,
+      }
       : undefined;
   if (user && user.publicKey && !user.privateKey) {
     fileStore.setLocalStorage("publicKey", user.publicKey);
@@ -464,17 +464,6 @@ function renderApp(props: RenderApis): RenderViewResult {
   });
 }
 
-export function waitForLoadingToBeNull(): Promise<void> {
-  return waitFor(
-    () => {
-      expect(screen.queryByLabelText("loading")).toBeNull();
-    },
-    {
-      // it tests which use real encryption can be slow
-      timeout: 10000,
-    }
-  );
-}
 export async function follow(
   cU: UpdateState,
   publicKey: PublicKey
@@ -612,10 +601,10 @@ function createNodesAndRelations(
   return List(nodes).reduce((rdx: Plan, nodeDescription: NodeDescription) => {
     const currentRelations = currentRelationsID
       ? getRelationsNoReferencedBy(
-          rdx.knowledgeDBs,
-          currentRelationsID,
-          rdx.user.publicKey
-        )
+        rdx.knowledgeDBs,
+        currentRelationsID,
+        rdx.user.publicKey
+      )
       : undefined;
     const textOrNode = Array.isArray(nodeDescription)
       ? nodeDescription[0]
@@ -631,9 +620,9 @@ function createNodesAndRelations(
     // Add Node to current relation
     const planWithUpdatedRelation = currentRelations
       ? planUpsertRelations(
-          planWithNode,
-          addRelationToRelations(currentRelations, node.id)
-        )
+        planWithNode,
+        addRelationToRelations(currentRelations, node.id)
+      )
       : planWithNode;
     if (children) {
       // Create relations with current context (path to this node)
@@ -1028,10 +1017,10 @@ export async function createAndSetAsRoot(nodeName: string): Promise<void> {
 
 export const textContent =
   (text: string): MatcherFunction =>
-  (_, el) =>
-    el?.textContent === text &&
-    // eslint-disable-next-line testing-library/no-node-access
-    Array.from(el?.children || []).every((child) => child.textContent !== text);
+    (_, el) =>
+      el?.textContent === text &&
+      // eslint-disable-next-line testing-library/no-node-access
+      Array.from(el?.children || []).every((child) => child.textContent !== text);
 
 export function getPane(paneIndex: number): ReturnType<typeof within> {
   // eslint-disable-next-line testing-library/no-node-access
@@ -1151,7 +1140,7 @@ export function setDropIndentLevel(
   if (depth < minDepth || depth > maxDepth) {
     throw new Error(
       `Depth ${depth} is outside allowed range [${minDepth}, ${maxDepth}] ` +
-        `when dragging "${sourceName}" onto "${targetName}"`
+      `when dragging "${sourceName}" onto "${targetName}"`
     );
   }
   setDropIndentDepth(depth);

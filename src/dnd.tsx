@@ -638,9 +638,13 @@ export function dnd(
           )[0];
         }
         if (isSuggestion) {
-          const sourceParentPath = getParentView(sourcePath);
-          const sourceParentRelation = sourceParentPath
-            ? getRelationForView(accPlan, sourceParentPath, sourceStack)
+          const suggestionSourceParentPath = getParentView(sourcePath);
+          const sourceParentRelation = suggestionSourceParentPath
+            ? getRelationForView(
+                accPlan,
+                suggestionSourceParentPath,
+                sourceStack
+              )
             : undefined;
           if (sourceParentRelation) {
             return planAddToParent(

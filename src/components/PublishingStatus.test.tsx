@@ -42,7 +42,11 @@ test("Details of Publishing Status", async () => {
       ...utils,
       relayPool: {
         ...utils.relayPool,
-        publish: (relays: Array<string>, _event: Event): Promise<string>[] => {
+        publish: (
+          relays: Array<string>,
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          _event: Event
+        ): Promise<string>[] => {
           const results = relays.map((_, i) => {
             if (i === 0 || i === 3) return Promise.resolve("fulfilled");
             if (i === 1) return Promise.reject(new Error("paid relay"));

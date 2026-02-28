@@ -1542,34 +1542,34 @@ describe("Deep Copy - basedOn Tracking", () => {
       }>;
     }>
   ): { uuids: string[]; basedOn: string[] } => {
-    const values = { uuids: [] as string[], basedOn: [] as string[] };
-    const walk = (
-      nodes: Array<{
-        uuid?: string;
-        basedOn?: string;
-        children: unknown[];
-      }>
-    ): void => {
-      nodes.forEach((node) => {
-        if (node.uuid) values.uuids.push(node.uuid);
-        if (node.basedOn) values.basedOn.push(node.basedOn);
-        walk(
-          node.children as Array<{
-            uuid?: string;
-            basedOn?: string;
-            children: unknown[];
-          }>
-        );
-      });
+    type TreeNode = {
+      uuid?: string;
+      basedOn?: string;
+      children: TreeNode[];
     };
-    walk(
-      trees as Array<{
-        uuid?: string;
-        basedOn?: string;
-        children: unknown[];
-      }>
-    );
-    return values;
+
+    const walk = (nodes: TreeNode[]): { uuids: string[]; basedOn: string[] } =>
+      nodes.reduce(
+        (acc, node) => {
+          const { uuid, basedOn, children: childNodes } = node;
+          const childValues = walk(childNodes);
+          return {
+            uuids: [
+              ...acc.uuids,
+              ...(uuid ? [uuid] : []),
+              ...childValues.uuids,
+            ],
+            basedOn: [
+              ...acc.basedOn,
+              ...(basedOn ? [basedOn] : []),
+              ...childValues.basedOn,
+            ],
+          };
+        },
+        { uuids: [] as string[], basedOn: [] as string[] }
+      );
+
+    return walk(trees as TreeNode[]);
   };
 
   test("Cross-pane deep copy sets basedOn on all copied relations", async () => {
@@ -1696,7 +1696,8 @@ My Notes
       .getEvents()
       .slice(eventsBeforeAccept)
       .filter(
-        (e) => e.kind === KIND_KNOWLEDGE_DOCUMENT && e.content.includes('basedOn="')
+        (e) =>
+          e.kind === KIND_KNOWLEDGE_DOCUMENT && e.content.includes('basedOn="')
       );
 
     expect(newEvents.length).toBeGreaterThan(0);

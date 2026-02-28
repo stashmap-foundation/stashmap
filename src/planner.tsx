@@ -20,7 +20,11 @@ import { createPublishQueue } from "./PublishQueue";
 import type { StashmapDB } from "./indexedDB";
 import { viewDataToJSON } from "./serializer";
 import { newDB } from "./knowledge";
-import { buildDocumentEvent, WalkContext, createVersion } from "./markdownDocument";
+import {
+  buildDocumentEvent,
+  WalkContext,
+  createVersion,
+} from "./markdownDocument";
 import {
   shortID,
   joinID,
@@ -300,7 +304,11 @@ export function planCreateVersion(
     affectedRoots: plan.affectedRoots,
   };
   const result = createVersion(ctx, editedNodeID, newText, editContext);
-  return { ...plan, knowledgeDBs: result.knowledgeDBs, affectedRoots: result.affectedRoots };
+  return {
+    ...plan,
+    knowledgeDBs: result.knowledgeDBs,
+    affectedRoots: result.affectedRoots,
+  };
 }
 
 function removeEmptyNodeFromKnowledgeDBs(
@@ -526,7 +534,6 @@ export function planExpandNode(
   );
 }
 
-
 function resolveCollisions(
   plan: Plan,
   nodeIDsArray: (LongID | ID)[],
@@ -725,7 +732,7 @@ function planCopyDescendantRelations(
     [plan, Map<LongID, LongID>(), root] as [
       Plan,
       RelationsIdMapping,
-      ID | undefined,
+      ID | undefined
     ]
   );
   return [resultPlan, resultMapping];
@@ -837,10 +844,7 @@ export function planForkPane(
     return plan;
   }
 
-  const rootRelationData = getDocumentRootRelationForFork(
-    plan,
-    relationAtView
-  );
+  const rootRelationData = getDocumentRootRelationForFork(plan, relationAtView);
 
   const [planWithRelations, relationsIdMapping] = planCopyDescendantRelations(
     plan,
@@ -1353,36 +1357,28 @@ export function buildDocumentEvents(
 ): List<UnsignedEvent & EventAttachment> {
   const author = plan.user.publicKey;
   const userDB = plan.knowledgeDBs.get(author, newDB());
-  return plan.affectedRoots.reduce(
-    (events, rootId) => {
-      const rootRelation = userDB.relations.find(
-        (r) => shortID(r.id) === rootId
-      );
-      if (!rootRelation) {
-        const deleteEvent = {
-          kind: KIND_DELETE,
-          pubkey: author,
-          created_at: newTimestamp(),
-          tags: [
-            ["a", `${KIND_KNOWLEDGE_DOCUMENT}:${author}:${rootId}`],
-            ["k", `${KIND_KNOWLEDGE_DOCUMENT}`],
-            msTag(),
-          ],
-          content: "",
-        };
-        return events.push(deleteEvent as UnsignedEvent & EventAttachment);
-      }
-      if (rootRelation.head === VERSIONS_NODE_ID) {
-        return events;
-      }
-      const event = buildDocumentEvent(
-        plan,
-        rootRelation
-      );
-      return events.push(event as UnsignedEvent & EventAttachment);
-    },
-    plan.publishEvents
-  );
+  return plan.affectedRoots.reduce((events, rootId) => {
+    const rootRelation = userDB.relations.find((r) => shortID(r.id) === rootId);
+    if (!rootRelation) {
+      const deleteEvent = {
+        kind: KIND_DELETE,
+        pubkey: author,
+        created_at: newTimestamp(),
+        tags: [
+          ["a", `${KIND_KNOWLEDGE_DOCUMENT}:${author}:${rootId}`],
+          ["k", `${KIND_KNOWLEDGE_DOCUMENT}`],
+          msTag(),
+        ],
+        content: "",
+      };
+      return events.push(deleteEvent as UnsignedEvent & EventAttachment);
+    }
+    if (rootRelation.head === VERSIONS_NODE_ID) {
+      return events;
+    }
+    const event = buildDocumentEvent(plan, rootRelation);
+    return events.push(event as UnsignedEvent & EventAttachment);
+  }, plan.publishEvents);
 }
 
 export function PlanningContextProvider({

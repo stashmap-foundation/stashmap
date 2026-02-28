@@ -135,11 +135,7 @@ test("Load Note from other User which is not a contact", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
   // Create Bob's note directly without setupTestDB
   const bobsNote = newNode("Bobs Note");
-  const bobsRelations = newRelations(
-    bobsNote.id,
-    List(),
-    bob().user.publicKey
-  );
+  const bobsRelations = newRelations(bobsNote.id, List(), bob().user.publicKey);
   await execute({
     ...bob(),
     plan: planUpsertRelations(

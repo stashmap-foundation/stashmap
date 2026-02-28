@@ -300,7 +300,15 @@ function Tree(): JSX.Element | null {
   const viewKey = viewPathToString(viewPath);
   const isRootExpanded = isExpanded(data, viewKey);
   const treeResult = isRootExpanded
-    ? getNodesInTree(data, viewPath, stack, List<ViewPath>(), pane.rootRelation, pane.author, pane.typeFilters)
+    ? getNodesInTree(
+        data,
+        viewPath,
+        stack,
+        List<ViewPath>(),
+        pane.rootRelation,
+        pane.author,
+        pane.typeFilters
+      )
     : undefined;
   const childNodes = treeResult?.paths || List<ViewPath>();
   const virtualItems = treeResult?.virtualItems || Map<string, RelationItem>();

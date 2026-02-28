@@ -112,7 +112,6 @@ function resolveLabels(
   return { contextLabels, targetLabel, fullContext };
 }
 
-
 function buildDeletedReference(
   refId: LongID,
   myself: PublicKey,

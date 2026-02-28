@@ -97,7 +97,11 @@ export function addRelationIDToFilters(
 ): Filters {
   return {
     ...addAuthorFromIDToFilters(filters, relationID as ID),
-    documentByRelation: addIDToFilter(filters.documentByRelation, relationID, "#r"),
+    documentByRelation: addIDToFilter(
+      filters.documentByRelation,
+      relationID,
+      "#r"
+    ),
   };
 }
 

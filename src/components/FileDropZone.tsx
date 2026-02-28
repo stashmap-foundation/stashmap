@@ -114,7 +114,14 @@ export function planCreateNodesFromMarkdownTrees(
     trees,
     context
   );
-  return [{ ...plan, knowledgeDBs: resultCtx.knowledgeDBs, affectedRoots: resultCtx.affectedRoots }, topNodeIDs];
+  return [
+    {
+      ...plan,
+      knowledgeDBs: resultCtx.knowledgeDBs,
+      affectedRoots: resultCtx.affectedRoots,
+    },
+    topNodeIDs,
+  ];
 }
 
 export function planCreateNodesFromMarkdownFiles(

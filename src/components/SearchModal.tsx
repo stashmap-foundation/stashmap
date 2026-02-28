@@ -83,9 +83,8 @@ export function useSearchQuery(
       );
 
   const eventsAsList = events.toList();
-  const nodesFromDocumentEvents = findDocumentNodesAndRelations(
-    eventsAsList
-  ).nodes;
+  const nodesFromDocumentEvents =
+    findDocumentNodesAndRelations(eventsAsList).nodes;
   const nodesFromKnowledgeEvents = nip50
     ? nodesFromDocumentEvents.slice(0, 25)
     : filterForKeyword(nodesFromDocumentEvents, query);

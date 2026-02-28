@@ -133,25 +133,33 @@ function getChildrenForRegularNode(
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
   const isRootNode = isRoot(parentPath);
 
-  const relations = isSearchId(parentNodeID as ID)
-    ? getRelations(data.knowledgeDBs, parentNodeID as ID, data.user.publicKey)
-    : options?.isMarkdownExport
-      ? getRelationsForMarkdownExport(
-          data,
-          effectiveAuthor,
-          parentNodeID,
-          context,
-          rootRelation,
-          isRootNode
-        )
-      : getRelationsForContext(
-          data.knowledgeDBs,
-          effectiveAuthor,
-          parentNodeID,
-          context,
-          rootRelation,
-          isRootNode
-        );
+  const relations: Relations | undefined = (() => {
+    if (isSearchId(parentNodeID as ID)) {
+      return getRelations(
+        data.knowledgeDBs,
+        parentNodeID as ID,
+        data.user.publicKey
+      );
+    }
+    if (options?.isMarkdownExport) {
+      return getRelationsForMarkdownExport(
+        data,
+        effectiveAuthor,
+        parentNodeID,
+        context,
+        rootRelation,
+        isRootNode
+      );
+    }
+    return getRelationsForContext(
+      data.knowledgeDBs,
+      effectiveAuthor,
+      parentNodeID,
+      context,
+      rootRelation,
+      isRootNode
+    );
+  })();
 
   const relationPaths = relations
     ? relations.items

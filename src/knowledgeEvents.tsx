@@ -101,7 +101,6 @@ export function findRelations(
   }, Map<string, Relations>());
 }
 
-
 export function findViews(events: List<UnsignedEvent>): Views {
   const viewEvent = getMostRecentReplacableEvent(
     events.filter((event) => event.kind === KIND_VIEWS)
@@ -122,9 +121,10 @@ export function findPanes(events: List<UnsignedEvent>): Pane[] {
   return jsonToPanes(JSON.parse(viewEvent.content) as Serializable);
 }
 
-export function findDocumentNodesAndRelations(
-  events: List<UnsignedEvent>
-): { nodes: Map<string, KnowNode>; relations: Map<string, Relations> } {
+export function findDocumentNodesAndRelations(events: List<UnsignedEvent>): {
+  nodes: Map<string, KnowNode>;
+  relations: Map<string, Relations>;
+} {
   const deletedKeys = events
     .filter(
       (event) =>

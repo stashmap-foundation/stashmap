@@ -11,6 +11,7 @@ import {
   getNodeIDFromView,
   getContext,
   getRelationsForContext,
+  getEffectiveAuthor,
   isRoot,
   viewPathToString,
 } from "./ViewContext";
@@ -75,6 +76,7 @@ function getChildrenForRegularNode(
   typeFilters: Pane["typeFilters"],
   options?: TreeTraversalOptions
 ): TreeResult {
+  const effectiveAuthor = getEffectiveAuthor(data, parentPath);
   const context = getContext(data, parentPath, stack);
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
 
@@ -82,7 +84,7 @@ function getChildrenForRegularNode(
     ? getRelations(data.knowledgeDBs, parentNodeID as ID, data.user.publicKey)
     : getRelationsForContext(
         data.knowledgeDBs,
-        author,
+        effectiveAuthor,
         parentNodeID,
         context,
         rootRelation,
@@ -180,7 +182,7 @@ function getChildrenForRegularNode(
       )
     : List<LongID | ID>();
 
-  const isOwnContent = author === data.user.publicKey;
+  const isOwnContent = effectiveAuthor === data.user.publicKey;
 
   const {
     suggestions: diffItems,

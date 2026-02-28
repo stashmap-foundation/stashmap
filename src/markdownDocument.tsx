@@ -329,6 +329,7 @@ type SerializeResult = {
   lines: string[];
   nodeHashes: ImmutableSet<string>;
   contextHashes: ImmutableSet<string>;
+  relationUUIDs: ImmutableSet<string>;
 };
 
 function serializeTree(
@@ -355,16 +356,25 @@ function serializeTree(
       const isVirtual = virtualItems.has(viewPathToString(path));
 
       if (isConcreteRefId(nodeID)) {
+        const parsed = parseConcreteRefId(nodeID);
         const crefText = formatCrefText(
           data.knowledgeDBs, author, nodeID, item?.relevance, item?.argument
         );
-        if (!crefText) return acc;
+        if (!crefText || !parsed) return acc;
+        const crefRelationUUID = shortID(parsed.relationID);
+        const crefNodeHashes = parsed.targetNode
+          ? acc.nodeHashes.add(hashText(
+              getNodeFromID(data.knowledgeDBs, parsed.targetNode, author)?.text ?? parsed.targetNode
+            ))
+          : acc.nodeHashes;
         return {
           ...acc,
           lines: [...acc.lines, `${indent}- ${crefText}`],
+          nodeHashes: crefNodeHashes,
           contextHashes: contextHash
             ? acc.contextHashes.add(contextHash)
             : acc.contextHashes,
+          relationUUIDs: acc.relationUUIDs.add(crefRelationUUID),
         };
       }
 
@@ -380,12 +390,14 @@ function serializeTree(
         contextHashes: contextHash
           ? acc.contextHashes.add(contextHash)
           : acc.contextHashes,
+        relationUUIDs: acc.relationUUIDs.add(uuid),
       };
     },
     {
       lines: [],
       nodeHashes: ImmutableSet<string>(),
       contextHashes: ImmutableSet<string>(),
+      relationUUIDs: ImmutableSet<string>(),
     }
   );
 }
@@ -423,12 +435,13 @@ export function buildDocumentEvent(
   const content = `${[rootLine, ...result.lines].join("\n")}\n`;
   const nTags = result.nodeHashes.add(hashText(rootText)).toArray().map((h) => ["n", h]);
   const cTags = result.contextHashes.toArray().map((h) => ["c", h]);
+  const rTags = result.relationUUIDs.add(rootUuid).toArray().map((u) => ["r", u]);
 
   return {
     kind: KIND_KNOWLEDGE_DOCUMENT,
     pubkey: author,
     created_at: newTimestamp(),
-    tags: [["d", rootUuid], ...nTags, ...cTags, msTag()],
+    tags: [["d", rootUuid], ...nTags, ...cTags, ...rTags, msTag()],
     content,
   };
 }

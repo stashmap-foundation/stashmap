@@ -665,18 +665,19 @@ function planCopyDescendantRelations(
     sourceNodeID,
     sourceContext
   ).filter(filterRelation ?? (() => true));
-  const descendants: List<Relations> = sourceRelation
-    ? allDescendants
-        .filter(
-          (r) =>
-            r.head !== sourceRelation.head ||
-            !contextsMatch(r.context, sourceRelation.context)
-        )
-        .push(sourceRelation)
+  const filteredDescendants = sourceRelation
+    ? allDescendants.filter(
+        (r) =>
+          r.head !== sourceRelation.head ||
+          !contextsMatch(r.context, sourceRelation.context)
+      )
     : allDescendants;
+  const descendants: List<Relations> = sourceRelation
+    ? List<Relations>([sourceRelation]).concat(filteredDescendants)
+    : filteredDescendants;
 
-  return descendants.reduce(
-    ([accPlan, accMapping], relation) => {
+  const [resultPlan, resultMapping] = descendants.reduce(
+    ([accPlan, accMapping, accRoot], relation) => {
       const newContext = transformContext(relation);
       const head =
         targetNodeID &&
@@ -688,7 +689,7 @@ function planCopyDescendantRelations(
         head,
         newContext,
         accPlan.user.publicKey,
-        root
+        accRoot
       );
       const newRelation: Relations = {
         ...baseRelation,
@@ -699,10 +700,16 @@ function planCopyDescendantRelations(
       return [
         planUpsertRelations(accPlan, newRelation),
         accMapping.set(relation.id, newRelation.id),
-      ] as [Plan, RelationsIdMapping];
+        accRoot ?? newRelation.root,
+      ] as [Plan, RelationsIdMapping, ID | undefined];
     },
-    [plan, Map<LongID, LongID>()] as [Plan, RelationsIdMapping]
+    [plan, Map<LongID, LongID>(), root] as [
+      Plan,
+      RelationsIdMapping,
+      ID | undefined,
+    ]
   );
+  return [resultPlan, resultMapping];
 }
 
 export function planMoveDescendantRelations(
@@ -820,7 +827,7 @@ export function planForkPane(
     plan,
     entryNodeID,
     entryContext,
-    (relation) => relation.context,
+    (relation) => relation.context.slice(entryContext.size).toList(),
     (relation) => relation.author === pane.author,
     rootRelationData
   );

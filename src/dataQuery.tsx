@@ -49,7 +49,7 @@ function addIDToFilter(
 }
 
 type Filters = {
-  documentByID: Filter;
+  documentByRelation: Filter;
   documentByNode: Filter;
   documentByContext: Filter;
   deleteFilter: Filter;
@@ -73,7 +73,7 @@ export function sanitizeFilter(
 export function filtersToFilterArray(filters: Filters): Filter[] {
   const { authors } = filters;
   return [
-    sanitizeFilter({ ...filters.documentByID, authors }, "#d"),
+    sanitizeFilter({ ...filters.documentByRelation, authors }, "#r"),
     sanitizeFilter({ ...filters.documentByNode, authors }, "#n"),
     sanitizeFilter({ ...filters.documentByContext, authors }, "#c"),
     sanitizeFilter({ ...filters.deleteFilter, authors }, "#k"),
@@ -97,7 +97,7 @@ export function addRelationIDToFilters(
 ): Filters {
   return {
     ...addAuthorFromIDToFilters(filters, relationID as ID),
-    documentByID: addIDToFilter(filters.documentByID, relationID, "#d"),
+    documentByRelation: addIDToFilter(filters.documentByRelation, relationID, "#r"),
   };
 }
 
@@ -186,7 +186,7 @@ export function createBaseFilter(
       : []),
   ];
   return {
-    documentByID: {
+    documentByRelation: {
       kinds: [KIND_KNOWLEDGE_DOCUMENT],
     },
     documentByNode: {

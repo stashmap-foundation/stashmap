@@ -637,6 +637,24 @@ export function dnd(
             insertAt
           )[0];
         }
+        if (isSuggestion) {
+          const sourceParentPath = getParentView(sourcePath);
+          const sourceParentRelation = sourceParentPath
+            ? getRelationForView(accPlan, sourceParentPath, sourceStack)
+            : undefined;
+          if (sourceParentRelation) {
+            return planAddToParent(
+              accPlan,
+              createConcreteRefId(
+                sourceParentRelation.id,
+                shortID(sourceNodeID) as ID
+              ),
+              toView,
+              stack,
+              insertAt
+            )[0];
+          }
+        }
         const planWithRelation = upsertRelations(
           accPlan,
           sourcePath,

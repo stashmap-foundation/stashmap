@@ -81,6 +81,15 @@ Root
 ```
 The Apple under Basket is `[0]` because it appears earlier in the visual tree.
 
+## NEVER check if tests pass on master
+
+**Date**: 2026-02-28
+**Context**: Debugging a failing C2 test. Started checking out master to see if the test passes there.
+
+**Mistake**: Tests on master always pass. The whole point is that THIS branch broke them. Checking out master wastes time and risks losing state (stash, working directory).
+
+**Rule**: NEVER checkout master or another branch to check if a test passes there. It always does. Focus on understanding what changed on the current branch that broke the test.
+
 ## DnD Tests: Use Existing Patterns
 
 Working DnD tests use simple patterns:

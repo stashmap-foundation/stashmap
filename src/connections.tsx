@@ -185,7 +185,10 @@ export function deduplicateRefsByContext(
               preferAuthor && author !== undefined && author !== preferAuthor
                 ? 1
                 : 0;
-            return [isOther, -r.updated];
+            // Prefer item-level refs (relation + target node) over head-level refs
+            // for the same context so navigation lands in parent context first.
+            const targetPreference = r.targetNode ? 0 : 1;
+            return [isOther, targetPreference, -r.updated];
           })
           .first()!
     )

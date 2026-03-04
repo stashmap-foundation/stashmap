@@ -52,8 +52,8 @@ function extractInlineContent(inline: MarkdownToken): {
     return { text: inline.content.trim() };
   }
   const text = inline.children
-    .filter((c) => c.type === "text")
-    .map((c) => c.content)
+    .filter((c) => c.type === "text" || c.type === "softbreak")
+    .map((c) => (c.type === "softbreak" ? " " : c.content))
     .join("")
     .trim();
   const linkOpen = inline.children.find((c) => c.type === "link_open");

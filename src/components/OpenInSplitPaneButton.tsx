@@ -1,11 +1,9 @@
 import React from "react";
 import { useMediaQuery } from "react-responsive";
 import {
-  useNodeID,
   useViewPath,
   updateViewPathsAfterPaneInsert,
-  getEffectiveAuthor,
-  useRelation,
+  buildPaneTarget,
 } from "../ViewContext";
 import {
   useSplitPanes,
@@ -13,7 +11,6 @@ import {
   usePaneStack,
 } from "../SplitPanesContext";
 import { IS_MOBILE } from "./responsive";
-import { getRefTargetInfo } from "../connections";
 import { planUpdateViews, usePlanner } from "../planner";
 import { useData } from "../DataContext";
 
@@ -23,11 +20,8 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
   const stack = usePaneStack();
   const viewPath = useViewPath();
   const data = useData();
-  const [nodeID] = useNodeID();
   const isMobile = useMediaQuery(IS_MOBILE);
   const { createPlan, executePlan } = usePlanner();
-  const { knowledgeDBs } = data;
-  const relation = useRelation();
 
   if (isMobile) {
     return null;
@@ -42,30 +36,13 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
     );
     executePlan(planUpdateViews(plan, shiftedViews));
 
-    const paneStackWithoutRoot = stack.slice(0, -1);
-
-    const effectiveAuthor = getEffectiveAuthor(data, viewPath);
-    const refInfo = getRefTargetInfo(nodeID, knowledgeDBs, effectiveAuthor);
-    if (refInfo) {
-      addPaneAt(
-        insertIndex,
-        refInfo.stack,
-        refInfo.author,
-        refInfo.rootRelation,
-        refInfo.scrollTo
-      );
-      return;
-    }
-
-    const viewPathNodeIDs = viewPath
-      .slice(1)
-      .map((subPath) => (subPath as { nodeID: LongID | ID }).nodeID);
-    const fullStack = [...paneStackWithoutRoot, ...viewPathNodeIDs];
+    const target = buildPaneTarget(data, viewPath, stack);
     addPaneAt(
       insertIndex,
-      fullStack,
-      getEffectiveAuthor(data, viewPath),
-      relation?.id
+      target.stack,
+      target.author,
+      target.rootRelation,
+      target.scrollToNodeId
     );
   };
 

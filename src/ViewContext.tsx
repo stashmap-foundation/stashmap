@@ -18,6 +18,7 @@ import {
   createConcreteRefId,
   findRefsToNode,
   itemPassesFilters,
+  getRefTargetInfo,
 } from "./connections";
 import {
   buildOutgoingReference,
@@ -610,6 +611,40 @@ export function getRelationForView(
     pane.rootRelation,
     isRoot(viewPath)
   );
+}
+
+export function buildPaneTarget(
+  data: Data,
+  viewPath: ViewPath,
+  paneStack: ID[]
+): {
+  stack: ID[];
+  author: PublicKey;
+  rootRelation?: LongID;
+  scrollToNodeId?: string;
+} {
+  const [nodeID] = getNodeIDFromView(data, viewPath);
+  const effectiveAuthor = getEffectiveAuthor(data, viewPath);
+  const refInfo = getRefTargetInfo(nodeID, data.knowledgeDBs, effectiveAuthor);
+  if (refInfo) {
+    return {
+      stack: refInfo.stack as ID[],
+      author: refInfo.author,
+      rootRelation: refInfo.rootRelation,
+      scrollToNodeId: refInfo.scrollTo,
+    };
+  }
+  const paneStackWithoutRoot = paneStack.slice(0, -1);
+  const viewPathNodeIDs = viewPath
+    .slice(1)
+    .map((subPath) => (subPath as { nodeID: LongID | ID }).nodeID);
+  const fullStack = [...paneStackWithoutRoot, ...viewPathNodeIDs] as ID[];
+  const relation = getRelationForView(data, viewPath, paneStack);
+  return {
+    stack: fullStack,
+    author: effectiveAuthor,
+    rootRelation: relation?.id,
+  };
 }
 
 export function useSearchDepth(): number | undefined {

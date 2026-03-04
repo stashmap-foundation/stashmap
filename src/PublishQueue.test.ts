@@ -308,5 +308,50 @@ test("publishes events enqueued during an in-progress flush", async () => {
   expect(queue.getStatus().pendingCount).toBe(0);
 }, 10000);
 
+test("does not retry events rejected with 'event too large'", async () => {
+  const RELAY_URL = "wss://relay.test/";
+  const pool = mockRelayPool();
+  const publishCount = { current: 0 };
+
+  const rejectPool: MockRelayPool = {
+    ...pool,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    publish: (relays: string[], _event: Event): Promise<string>[] => {
+      // eslint-disable-next-line functional/immutable-data
+      publishCount.current += 1;
+      return relays.map(() =>
+        Promise.reject(
+          new Error("invalid: event too large: 128123 bytes > 65536 bytes")
+        )
+      );
+    },
+  } as MockRelayPool;
+
+  const onResults = jest.fn();
+  const queue = createPublishQueue({
+    db: null,
+    debounceMs: 10,
+    batchSize: 10,
+    getDeps: (): FlushDeps => ({
+      user: ALICE_USER,
+      relays: {
+        defaultRelays: [],
+        userRelays: [{ url: RELAY_URL, read: true, write: true }],
+        contactsRelays: [],
+      },
+      relayPool: rejectPool as never,
+      finalizeEvent: mockFinalizeEvent(),
+    }),
+    onResults,
+  });
+
+  queue.enqueue(List([makeEvent("big-event")]));
+  await waitForResults(onResults, 1);
+
+  expect(publishCount.current).toBe(1);
+  expect(queue.getStatus().pendingCount).toBe(0);
+  expect(queue.getStatus().backedOffRelays).toHaveLength(0);
+}, 10000);
+
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 test.skip("skip", () => {});

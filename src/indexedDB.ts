@@ -11,6 +11,7 @@ export type OutboxEntry = {
   readonly event: UnsignedEvent & EventAttachment;
   readonly createdAt: number;
   readonly succeededRelays?: ReadonlyArray<string>;
+  readonly failedPermanentlyRelays?: ReadonlyArray<string>;
 };
 
 export type StashmapDB = IDBDatabase;

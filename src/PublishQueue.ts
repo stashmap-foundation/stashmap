@@ -16,6 +16,12 @@ const DEFAULT_DEBOUNCE_MS = process.env.NODE_ENV === "test" ? 100 : 5000;
 const MAX_BACKOFF_MS = 60000;
 const DEFAULT_BATCH_SIZE = 10;
 
+const isPermanentFailure = (reason: string | undefined): boolean => {
+  if (!reason) return false;
+  const msg = String(reason).toLowerCase();
+  return msg.includes("event too large") || msg.includes("too large");
+};
+
 const toChunks = <T>(
   items: ReadonlyArray<T>,
   size: number
@@ -248,8 +254,9 @@ export const createPublishQueue = (
         const [entryKey, outboxEntry] = chunk[index];
         const relayUrls = resolveWriteRelayUrls(writeRelayConf, deps.relays);
         const alreadyDone = outboxEntry.succeededRelays || [];
+        const permFailed = outboxEntry.failedPermanentlyRelays || [];
         const needsPublish = relayUrls.filter(
-          (url) => !alreadyDone.includes(url)
+          (url) => !alreadyDone.includes(url) && !permFailed.includes(url)
         );
         const availableUrls = getAvailableRelays(needsPublish);
 
@@ -268,19 +275,25 @@ export const createPublishQueue = (
         );
 
         const newSucceeded = [...alreadyDone];
+        const newPermFailed = [...(outboxEntry.failedPermanentlyRelays || [])];
         relayResults.forEach((status, url) => {
           if (status.status === "fulfilled") {
             // eslint-disable-next-line functional/immutable-data
             newSucceeded.push(url);
             relaySuccesses.add(url);
+          } else if (isPermanentFailure(status.reason)) {
+            if (!newPermFailed.includes(url)) {
+              // eslint-disable-next-line functional/immutable-data
+              newPermFailed.push(url);
+            }
           } else {
             relayFailures.add(url);
           }
         });
 
-        const allRelaysDone = relayUrls.every((url) =>
-          newSucceeded.includes(url)
-        );
+        const relayDone = (url: string): boolean =>
+          newSucceeded.includes(url) || newPermFailed.includes(url);
+        const allRelaysDone = relayUrls.every(relayDone);
         if (allRelaysDone) {
           buffer = buffer.delete(entryKey);
           removeFromOutboxDB(entryKey);
@@ -288,6 +301,8 @@ export const createPublishQueue = (
           const updated: OutboxEntry = {
             ...outboxEntry,
             succeededRelays: newSucceeded,
+            failedPermanentlyRelays:
+              newPermFailed.length > 0 ? newPermFailed : undefined,
           };
           buffer = buffer.set(entryKey, updated);
           persistToOutbox(updated);

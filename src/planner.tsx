@@ -57,6 +57,7 @@ import {
   getRelationForView,
   addNodeToPathWithRelations,
   getRelationsForContext,
+  getRelationsForCurrentTree,
   getEffectiveAuthor,
   isRoot,
   getPaneIndex,
@@ -1589,13 +1590,15 @@ export function planSetEmptyNodePosition(
 
   const pane = getPane(planWithExpanded, parentPath);
   const author = getEffectiveAuthor(planWithExpanded, parentPath);
-  const relations = getRelationsForContext(
+  const parentRoot = getRelationForView(planWithExpanded, parentPath, stack)?.root;
+  const relations = getRelationsForCurrentTree(
     planWithExpanded.knowledgeDBs,
     author,
     parentNodeID,
     context,
     pane.rootRelation,
-    isRoot(parentPath)
+    isRoot(parentPath),
+    parentRoot
   );
   if (!relations) {
     return plan;

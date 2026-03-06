@@ -10,8 +10,9 @@ import {
   getVersionsRelations,
   getNodeIDFromView,
   getContext,
-  getRelationsForContext,
+  getRelationsForCurrentTree,
   getEffectiveAuthor,
+  getParentRelation,
   isRoot,
   viewPathToString,
 } from "./ViewContext";
@@ -47,48 +48,18 @@ function getRelationsForMarkdownExport(
   parentNodeID: LongID | ID,
   context: List<ID>,
   rootRelation: LongID | undefined,
-  isRootNode: boolean
+  isRootNode: boolean,
+  currentRoot?: ID
 ): Relations | undefined {
-  const current = getRelationsForContext(
+  return getRelationsForCurrentTree(
     data.knowledgeDBs,
     effectiveAuthor,
     parentNodeID,
     context,
     rootRelation,
-    isRootNode
+    isRootNode,
+    currentRoot
   );
-
-  if (!rootRelation || isRootNode) {
-    return current;
-  }
-
-  const rootRelationData = getRelationsNoReferencedBy(
-    data.knowledgeDBs,
-    rootRelation,
-    effectiveAuthor
-  );
-  if (!rootRelationData) {
-    return current;
-  }
-
-  const authorDB = data.knowledgeDBs.get(effectiveAuthor);
-  if (!authorDB) {
-    return current;
-  }
-
-  const localID = shortID(parentNodeID);
-  const sameRootRelation = authorDB.relations
-    .filter(
-      (relation) =>
-        relation.head === localID &&
-        relation.root === rootRelationData.root &&
-        relation.context.equals(context)
-    )
-    .toList()
-    .sort((a, b) => b.updated - a.updated)
-    .first();
-
-  return sameRootRelation ?? current;
 }
 
 function getChildrenForConcreteRef(
@@ -130,6 +101,7 @@ function getChildrenForRegularNode(
 ): TreeResult {
   const effectiveAuthor = getEffectiveAuthor(data, parentPath);
   const context = getContext(data, parentPath, stack);
+  const currentRoot = getParentRelation(data, parentPath)?.root;
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
   const isRootNode = isRoot(parentPath);
 
@@ -142,15 +114,17 @@ function getChildrenForRegularNode(
           parentNodeID,
           context,
           rootRelation,
-          isRootNode
+          isRootNode,
+          currentRoot
         )
-      : getRelationsForContext(
+      : getRelationsForCurrentTree(
           data.knowledgeDBs,
           effectiveAuthor,
           parentNodeID,
           context,
           rootRelation,
-          isRootNode
+          isRootNode,
+          currentRoot
         );
   if (process.env.DEBUG_TREE === "1" && isRootNode) {
     // eslint-disable-next-line no-console

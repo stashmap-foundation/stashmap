@@ -536,6 +536,27 @@ function getNewestRelationFromAuthor(
   return relations.first();
 }
 
+function getNewestRelationFromRoot(
+  knowledgeDBs: KnowledgeDBs,
+  author: PublicKey,
+  nodeID: LongID | ID,
+  context: Context,
+  root: ID
+): Relations | undefined {
+  const localID = shortID(nodeID);
+  const authorDB = knowledgeDBs.get(author, newDB());
+  return sortRelationsByDate(
+    authorDB.relations
+      .filter(
+        (r) =>
+          r.head === localID &&
+          r.root === root &&
+          contextsMatch(r.context, context)
+      )
+      .toList()
+  ).first();
+}
+
 export function getNodeIDFromView(
   data: Data,
   viewPath: ViewPath
@@ -574,6 +595,55 @@ export function getRelationsForContext(
   return fallbackResult;
 }
 
+export function getRelationsForCurrentTree(
+  knowledgeDBs: KnowledgeDBs,
+  paneAuthor: PublicKey,
+  nodeID: LongID | ID,
+  context: Context,
+  rootRelation: LongID | undefined,
+  isRootNode: boolean,
+  currentRoot?: ID
+): Relations | undefined {
+  if (isRootNode && rootRelation) {
+    const relation = getRelationsNoReferencedBy(
+      knowledgeDBs,
+      rootRelation,
+      paneAuthor
+    );
+    if (relation) {
+      return relation;
+    }
+  }
+
+  const preferredRoot =
+    currentRoot ||
+    (rootRelation
+      ? getRelationsNoReferencedBy(knowledgeDBs, rootRelation, paneAuthor)?.root
+      : undefined);
+
+  if (preferredRoot) {
+    const sameRootRelation = getNewestRelationFromRoot(
+      knowledgeDBs,
+      paneAuthor,
+      nodeID,
+      context,
+      preferredRoot
+    );
+    if (sameRootRelation) {
+      return sameRootRelation;
+    }
+  }
+
+  return getRelationsForContext(
+    knowledgeDBs,
+    paneAuthor,
+    nodeID,
+    context,
+    rootRelation,
+    isRootNode
+  );
+}
+
 export function getParentRelation(
   data: Data,
   viewPath: ViewPath
@@ -608,19 +678,21 @@ export function getRelationForView(
   const [nodeID] = getNodeIDFromView(data, viewPath);
   const context = getContext(data, viewPath, stack);
   const pane = getPane(data, viewPath);
+  const parentRoot = getParentRelation(data, viewPath)?.root;
   const author = getEffectiveAuthor(data, viewPath);
 
   if (isConcreteRefId(nodeID)) {
     return getRelations(data.knowledgeDBs, nodeID, author);
   }
 
-  return getRelationsForContext(
+  return getRelationsForCurrentTree(
     data.knowledgeDBs,
     author,
     nodeID,
     context,
     pane.rootRelation,
-    isRoot(viewPath)
+    isRoot(viewPath),
+    parentRoot
   );
 }
 
@@ -1285,22 +1357,23 @@ export function upsertRelations(
   const pane = getPane(plan, viewPath);
   const [nodeID] = getNodeIDFromView(plan, viewPath);
   const context = getContext(plan, viewPath, stack);
+  const parentRoot = getParentRelation(plan, viewPath)?.root;
   const author = getEffectiveAuthor(plan, viewPath);
 
-  const currentRelation = getRelationsForContext(
+  const currentRelation = getRelationsForCurrentTree(
     plan.knowledgeDBs,
     author,
     nodeID,
     context,
     pane.rootRelation,
-    isRoot(viewPath)
+    isRoot(viewPath),
+    parentRoot
   );
 
   if (currentRelation && currentRelation.author !== plan.user.publicKey) {
     throw new Error("Cannot edit another user's relations");
   }
 
-  const parentRoot = getParentRelation(plan, viewPath)?.root;
   const base =
     currentRelation ||
     newRelationsForNode(nodeID, context, plan.user.publicKey, parentRoot);

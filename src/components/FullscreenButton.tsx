@@ -5,13 +5,15 @@ import {
   useDisplayText,
   useEffectiveAuthor,
   useRelation,
+  getAlternativeRelations,
+  getContext,
 } from "../ViewContext";
 import {
   usePaneStack,
   useCurrentPane,
   useNavigatePane,
 } from "../SplitPanesContext";
-import { getRefTargetInfo, isSearchId } from "../connections";
+import { getRefTargetInfo, isSearchId, shortID } from "../connections";
 import { useData } from "../DataContext";
 import { buildNodeUrl, buildRelationUrl } from "../navigationUrl";
 
@@ -20,24 +22,40 @@ export function FullscreenButton(): JSX.Element | null {
   const pane = useCurrentPane();
   const viewPath = useViewPath();
   const [nodeID] = useNodeID();
-  const { knowledgeDBs, user } = useData();
+  const data = useData();
+  const { knowledgeDBs, user } = data;
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();
   const effectiveAuthor = useEffectiveAuthor();
   const relation = useRelation();
+  const context = getContext(data, viewPath, stack);
   const isFullscreenNode = viewPath.length === 2;
   if (isFullscreenNode) {
     return null;
   }
 
   const refInfo = getRefTargetInfo(nodeID, knowledgeDBs, effectiveAuthor);
+  const standaloneRelation = getAlternativeRelations(
+    knowledgeDBs,
+    nodeID,
+    context,
+    relation?.id
+  )
+    .filter(
+      (candidate) =>
+        candidate.author === effectiveAuthor &&
+        candidate.root === shortID(candidate.id)
+    )
+    .sortBy((candidate) => -candidate.updated)
+    .first();
+  const fullscreenRelation = standaloneRelation || relation;
 
   const getTargetUrl = (): string => {
     if (refInfo?.rootRelation) {
       return buildRelationUrl(refInfo.rootRelation, refInfo.scrollTo);
     }
-    if (relation) {
-      return buildRelationUrl(relation.id);
+    if (fullscreenRelation) {
+      return buildRelationUrl(fullscreenRelation.id);
     }
     const targetStack = (
       refInfo
@@ -62,7 +80,7 @@ export function FullscreenButton(): JSX.Element | null {
   const href = getTargetUrl();
   if (process.env.DEBUG_FULLSCREEN === "1" && displayText === "Spain") {
     // eslint-disable-next-line no-console
-    console.log(`[fullscreen] Spain href=${href} relation=${relation?.id} items=${relation?.items.size}`);
+    console.log(`[fullscreen] Spain href=${href} relation=${relation?.id} items=${relation?.items.size} fullscreenRelation=${fullscreenRelation?.id}`);
   }
 
   const ariaLabel = displayText

@@ -401,15 +401,6 @@ export function buildReferenceItem(
   if (!parentPath) return outgoing;
 
   const parentRelation = getRelationForView(data, parentPath, stack);
-  if (
-    parentRelation &&
-    ref.relation.head === parentRelation.head &&
-    ref.relation.context.equals(parentRelation.context)
-  ) {
-    const versionMeta = computeVersionMeta(data, viewPath, stack);
-    return { ...outgoing, text: outgoing.text, versionMeta };
-  }
-
   if (!parentRelation) return outgoing;
 
   const storedItem = parentRelation.items.find((item) => item.nodeID === refId);

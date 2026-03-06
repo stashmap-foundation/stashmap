@@ -60,6 +60,10 @@ export function FullscreenButton(): JSX.Element | null {
   };
 
   const href = getTargetUrl();
+  if (process.env.DEBUG_FULLSCREEN === "1" && displayText === "Spain") {
+    // eslint-disable-next-line no-console
+    console.log(`[fullscreen] Spain href=${href} relation=${relation?.id} items=${relation?.items.size}`);
+  }
 
   const ariaLabel = displayText
     ? `open ${displayText} in fullscreen`

@@ -45,7 +45,7 @@ function debugVersions(
     return;
   }
   // eslint-disable-next-line no-console
-  console.log(`[versions] ${message}`, payload);
+  console.log(`[versions] ${message} ${JSON.stringify(payload)}`);
 }
 
 /**
@@ -202,7 +202,8 @@ export function getAlternativeRelations(
           (r) =>
             r.head === localID &&
             r.id !== excludeRelationId &&
-            contextsMatch(r.context, context)
+            contextsMatch(r.context, context) &&
+            (r.items.size > 0 || r.root === shortID(r.id))
         )
         .toList()
     );
@@ -231,7 +232,14 @@ export function getVersionsForRelation(
     nodeID: shortID(nodeID),
     context: contextToMatch.toArray(),
     currentRelationID: currentRelation?.id,
-    alternatives: alternatives.map((r) => r.id).toArray(),
+    currentItemCount: currentRelation?.items.size,
+    alternatives: alternatives.map((r) => ({
+      id: r.id,
+      context: r.context.toArray(),
+      itemCount: r.items.size,
+      author: r.author,
+      root: r.root,
+    })).toArray(),
   });
 
   const existingCrefIDs = currentRelation
@@ -521,6 +529,10 @@ function getNewestRelationFromAuthor(
       .filter((r) => r.head === localID && contextsMatch(r.context, context))
       .toList()
   );
+  if (process.env.DEBUG_RELATIONS === "1" && relations.size > 1) {
+    // eslint-disable-next-line no-console
+    console.log(`[relations] AMBIGUOUS ${localID} ctx=${JSON.stringify(context.toArray())} matches=${relations.size} picked=${JSON.stringify({id: relations.first()?.id, items: relations.first()?.items.size, updated: relations.first()?.updated})} all=${JSON.stringify(relations.map((r) => ({ id: r.id, items: r.items.size, updated: r.updated })).toArray())}`);
+  }
   return relations.first();
 }
 
@@ -551,7 +563,15 @@ export function getRelationsForContext(
       return relation;
     }
   }
-  return getNewestRelationFromAuthor(knowledgeDBs, paneAuthor, nodeID, context);
+  const fallbackResult = getNewestRelationFromAuthor(knowledgeDBs, paneAuthor, nodeID, context);
+  if (process.env.DEBUG_RELATIONS === "1" && isRootNode && rootRelation) {
+    const [remote, localId] = splitID(rootRelation as ID);
+    const db = remote ? knowledgeDBs.get(remote) : knowledgeDBs.get(paneAuthor);
+    const hasKey = db?.relations.has(localId);
+    // eslint-disable-next-line no-console
+    console.log(`[relations] MISSED-ROOT rootRelation=${rootRelation} remote=${remote} localId=${localId} paneAuthor=${paneAuthor} dbExists=${!!db} hasKey=${hasKey} fallback=${fallbackResult?.id} fallbackItems=${fallbackResult?.items.size}`);
+  }
+  return fallbackResult;
 }
 
 export function getParentRelation(

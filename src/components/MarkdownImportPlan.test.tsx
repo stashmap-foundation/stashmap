@@ -10,9 +10,15 @@ import {
   planUpsertRelations,
   planUpdateViews,
 } from "../planner";
-import { addRelationToRelations, hashText, newNode, shortID } from "../connections";
 import {
-  getRelationsForContext,
+  addRelationToRelations,
+  getRelationsNoReferencedBy,
+  hashText,
+  newNode,
+  shortID,
+} from "../connections";
+import {
+  getRelationsForCurrentTree,
   getRelationForView,
   newRelations,
   NodeIndex,
@@ -122,28 +128,31 @@ test("planCreateNodesFromMarkdownTrees creates only standalone relations", () =>
       markdown: "# Parent\n\n## Child\n\n### Grandchild",
     },
   ]);
-  const [plan, topNodeIDs] = planCreateNodesFromMarkdownTrees(basePlan, trees);
+  const [plan, topNodeIDs, topRelationIDs] = planCreateNodesFromMarkdownTrees(
+    basePlan,
+    trees
+  );
   const parentID = topNodeIDs[0];
   const childID = hashText("Child") as ID;
-
-  const standaloneParentRelation = getRelationsForContext(
+  const parentRelation = getRelationsNoReferencedBy(
     plan.knowledgeDBs,
-    plan.user.publicKey,
-    parentID,
-    List<ID>(),
-    undefined,
-    false
+    topRelationIDs[0],
+    plan.user.publicKey
   );
-  const standaloneChildRelation = getRelationsForContext(
+
+  expect(parentRelation).toBeDefined();
+
+  const standaloneChildRelation = getRelationsForCurrentTree(
     plan.knowledgeDBs,
     plan.user.publicKey,
     childID,
     List<ID>([parentID]),
     undefined,
-    false
+    false,
+    parentRelation?.root
   );
 
-  expect(standaloneParentRelation?.items.first()?.nodeID).toEqual(childID);
+  expect(parentRelation?.items.first()?.nodeID).toEqual(childID);
   expect(standaloneChildRelation?.items.first()?.nodeID).toEqual(
     hashText("Grandchild")
   );
@@ -188,15 +197,16 @@ test("planPasteMarkdownTrees moves children to parent context", () => {
   const plan = planPasteMarkdownTrees(basePlan, trees, parentPath, stack, 0);
 
   const cityID = hashText("City") as ID;
-  const rootID = hashText("Root") as ID;
+  const rootRelation = getRelationForView(plan, parentPath, stack);
 
-  const cityRelation = getRelationsForContext(
+  const cityRelation = getRelationsForCurrentTree(
     plan.knowledgeDBs,
     plan.user.publicKey,
     cityID,
-    List<ID>([rootID]),
+    List<ID>([hashText("Root") as ID]),
     undefined,
-    false
+    false,
+    rootRelation?.root
   );
   expect(cityRelation?.items.first()?.nodeID).toEqual(hashText("Vienna"));
 });
@@ -208,8 +218,14 @@ test("planPasteMarkdownTrees: collision does not shadow existing children", () =
   const existingCity = newNode("City");
   const existingVienna = newNode("Vienna");
   const rootID = hashText("Root") as ID;
+  const rootRelation = getRelationForView(basePlan, parentPath, stack);
   const cityRelations = addRelationToRelations(
-    newRelations(existingCity.id, List<ID>([rootID]), basePlan.user.publicKey),
+    newRelations(
+      existingCity.id,
+      List<ID>([rootID]),
+      basePlan.user.publicKey,
+      rootRelation?.root
+    ),
     existingVienna.id
   );
   const withExisting = planUpsertRelations(
@@ -235,13 +251,14 @@ test("planPasteMarkdownTrees: collision does not shadow existing children", () =
     0
   );
 
-  const existingCityRel = getRelationsForContext(
+  const existingCityRel = getRelationsForCurrentTree(
     plan.knowledgeDBs,
     plan.user.publicKey,
     hashText("City") as ID,
     List<ID>([rootID]),
     undefined,
-    false
+    false,
+    getRelationForView(plan, parentPath, stack)?.root
   );
   expect(
     existingCityRel?.items.some((i) => i.nodeID === hashText("Vienna"))

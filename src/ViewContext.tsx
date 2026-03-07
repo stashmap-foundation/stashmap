@@ -536,6 +536,26 @@ function getNewestRelationFromAuthor(
   return relations.first();
 }
 
+function getNewestStandaloneRelationFromAuthor(
+  knowledgeDBs: KnowledgeDBs,
+  author: PublicKey,
+  nodeID: LongID | ID,
+  context: Context
+): Relations | undefined {
+  const localID = shortID(nodeID);
+  const authorDB = knowledgeDBs.get(author, newDB());
+  return sortRelationsByDate(
+    authorDB.relations
+      .filter(
+        (r) =>
+          r.head === localID &&
+          r.root === shortID(r.id) &&
+          contextsMatch(r.context, context)
+      )
+      .toList()
+  ).first();
+}
+
 function getNewestRelationFromRoot(
   knowledgeDBs: KnowledgeDBs,
   author: PublicKey,
@@ -555,6 +575,48 @@ function getNewestRelationFromRoot(
       )
       .toList()
   ).first();
+}
+
+function getRelationFromContextPath(
+  knowledgeDBs: KnowledgeDBs,
+  author: PublicKey,
+  nodeID: LongID | ID,
+  context: Context
+): Relations | undefined {
+  if (context.size === 0) {
+    return getNewestStandaloneRelationFromAuthor(
+      knowledgeDBs,
+      author,
+      nodeID,
+      context
+    );
+  }
+
+  const stack = [...context.toArray(), shortID(nodeID) as ID];
+  let currentRelation = getNewestStandaloneRelationFromAuthor(
+    knowledgeDBs,
+    author,
+    stack[0],
+    List<ID>()
+  );
+  if (!currentRelation) {
+    return undefined;
+  }
+
+  for (let index = 1; index < stack.length; index += 1) {
+    currentRelation = getNewestRelationFromRoot(
+      knowledgeDBs,
+      author,
+      stack[index],
+      List<ID>(stack.slice(0, index)),
+      currentRelation.root
+    );
+    if (!currentRelation) {
+      return undefined;
+    }
+  }
+
+  return currentRelation;
 }
 
 export function getNodeIDFromView(
@@ -631,13 +693,15 @@ export function getRelationsForCurrentTree(
     );
   }
 
-  return getRelationsForContext(
+  if (!isRootNode) {
+    return undefined;
+  }
+
+  return getRelationFromContextPath(
     knowledgeDBs,
     paneAuthor,
     nodeID,
-    context,
-    rootRelation,
-    isRootNode
+    context
   );
 }
 

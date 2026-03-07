@@ -184,10 +184,7 @@ function setupRootPlan(aliceState: () => Parameters<typeof createPlan>[0]): {
     planUpsertNode(createPlan(aliceState()), root),
     rootRelations
   );
-  const parentPath: ViewPath = [
-    0,
-    { nodeID: root.id, nodeIndex: 0 as NodeIndex },
-  ];
+  const parentPath: ViewPath = [0, rootRelations.id];
   const views = Map<string, View>().set(viewPathToString(parentPath), {
     expanded: true,
   });

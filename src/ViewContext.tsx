@@ -550,18 +550,9 @@ export function getVersionsForRelation(
     .toList();
 }
 
-type SubPath = {
-  nodeID: LongID | ID;
-  nodeIndex: NodeIndex;
-};
+type ViewPathSegment = LongID | ID;
 
-type SubPathWithRelations = SubPath & {
-  relationsID: ID;
-};
-
-export type ViewPath =
-  | readonly [number, SubPath]
-  | readonly [number, ...SubPathWithRelations[], SubPath];
+export type ViewPath = readonly [number, ...ViewPathSegment[]];
 
 export const ViewContext = React.createContext<ViewPath | undefined>(undefined);
 
@@ -585,79 +576,46 @@ export function useVirtualItemsMap(): VirtualItemsMap {
   return React.useContext(VirtualItemsContext);
 }
 
-// Encode nodeID to handle colons in ref IDs (ref:ctx:target format)
-function encodeNodeID(nodeID: string): string {
-  return nodeID.replace(/:/g, "%3A");
+// Encode path IDs to handle colons in ref IDs (ref:ctx:target format)
+function encodePathID(id: string): string {
+  return id.replace(/:/g, "%3A");
 }
 
-function decodeNodeID(encoded: string): string {
+function decodePathID(encoded: string): string {
   return encoded.replace(/%3A/g, ":");
 }
 
 export function parseViewPath(path: string): ViewPath {
   const pieces = path.split(":");
-  if (pieces.length < 3) {
+  if (pieces.length < 2) {
     throw new Error("Invalid view path");
   }
 
-  // First piece is pane index (e.g., "p0")
-  const paneIndex = parseInt(pieces[0].substring(1), 10);
-  const pathPieces = pieces.slice(1);
+  const panePart = pieces[0];
+  if (!panePart.startsWith("p")) {
+    throw new Error("Invalid view path");
+  }
 
-  const nodeIndexEnd = parseInt(
-    pathPieces[pathPieces.length - 1],
-    10
-  ) as NodeIndex;
-  const nodeIdEnd = decodeNodeID(pathPieces[pathPieces.length - 2]) as LongID;
+  const paneIndex = parseInt(panePart.substring(1), 10);
+  if (Number.isNaN(paneIndex)) {
+    throw new Error("Invalid view path");
+  }
 
-  const beginning = pathPieces
-    .slice(0, -2)
-    .reduce(
-      (
-        acc: SubPathWithRelations[],
-        piece,
-        index,
-        subPaths
-      ): SubPathWithRelations[] => {
-        if (index % 3 === 0) {
-          const nodeID = decodeNodeID(piece) as LongID;
-          const indexValue = parseInt(subPaths[index + 1], 10) as NodeIndex;
-          const relationID = decodeNodeID(subPaths[index + 2]);
-          return [
-            ...acc,
-            { nodeID, nodeIndex: indexValue, relationsID: relationID },
-          ];
-        }
-        return acc;
-      },
-      []
-    );
-  return [
-    paneIndex,
-    ...beginning,
-    { nodeID: nodeIdEnd, nodeIndex: nodeIndexEnd },
-  ];
+  const pathPieces = pieces
+    .slice(1)
+    .map((piece) => decodePathID(piece) as ViewPathSegment);
+  if (pathPieces.length === 0) {
+    throw new Error("Invalid view path");
+  }
+
+  return [paneIndex, ...pathPieces];
 }
 
 function convertViewPathToString(viewContext: ViewPath): string {
   const paneIndex = viewContext[0] as number;
-  const pathWithoutPane = viewContext.slice(1) as readonly SubPath[];
-  const withoutLastElement = pathWithoutPane.slice(
-    0,
-    -1
-  ) as SubPathWithRelations[];
-  const beginning = withoutLastElement.reduce(
-    (acc: string, subPath: SubPathWithRelations): string => {
-      const postfix = `${encodeNodeID(subPath.nodeID)}:${
-        subPath.nodeIndex
-      }:${encodeNodeID(subPath.relationsID)}`;
-      return acc !== "" ? `${acc}:${postfix}` : postfix;
-    },
-    ""
-  );
-  const lastPath = pathWithoutPane[pathWithoutPane.length - 1];
-  const end = `${encodeNodeID(lastPath.nodeID)}:${lastPath.nodeIndex}`;
-  const pathPart = beginning !== "" ? `${beginning}:${end}` : end;
+  const pathPart = (viewContext.slice(1) as readonly ViewPathSegment[])
+    .map((segment) => encodePathID(segment))
+    .join(":");
   return `p${paneIndex}:${pathPart}`;
 }
 
@@ -677,17 +635,10 @@ export function getPaneIndex(viewContext: ViewPath): number {
 }
 
 export function getParentView(viewContext: ViewPath): ViewPath | undefined {
-  const paneIndex = getPaneIndex(viewContext);
-  const pathWithoutLast = viewContext.slice(1, -1) as SubPathWithRelations[];
-  const parent = pathWithoutLast[pathWithoutLast.length - 1];
-  if (!parent) {
+  if (isRoot(viewContext)) {
     return undefined;
   }
-  return [
-    paneIndex,
-    ...pathWithoutLast.slice(0, -1),
-    { nodeID: parent.nodeID, nodeIndex: parent.nodeIndex },
-  ];
+  return viewContext.slice(0, -1) as unknown as ViewPath;
 }
 
 export function getContext(
@@ -698,31 +649,17 @@ export function getContext(
   if (isRoot(viewPath)) {
     return getContextFromStack(stack);
   }
-
-  // viewPath structure: [paneIndex, ...SubPathWithRelations[], SubPath]
-  // The second-to-last element has relationsID pointing to the relation
-  // that contains the current node. We look it up and derive context from it.
-  const parentElement = viewPath[viewPath.length - 2] as SubPathWithRelations;
-
-  if (parentElement.relationsID) {
-    const parentRelation = getRelations(
-      data.knowledgeDBs,
-      parentElement.relationsID,
-      data.user.publicKey
-    );
-    if (parentRelation) {
-      return parentRelation.context.push(parentRelation.head);
-    }
-  }
-
-  // Parent relation not found (e.g., diff items where parent has no relation yet).
-  // Traverse back to grandparent and derive context from there.
   const parentPath = getParentView(viewPath);
   if (!parentPath) {
     throw new Error("Cannot determine context: no parent path found");
   }
+  const parentRelation = getRelationForView(data, parentPath, stack);
+  if (parentRelation) {
+    return parentRelation.context.push(parentRelation.head);
+  }
   const parentContext = getContext(data, parentPath, stack);
-  return parentContext.push(parentElement.nodeID);
+  const [parentNodeID] = getNodeIDFromView(data, parentPath);
+  return parentContext.push(shortID(parentNodeID as ID) as ID);
 }
 
 function getViewExactMatch(views: Views, path: ViewPath): View | undefined {
@@ -735,8 +672,8 @@ function sortRelationsByDate(relations: List<Relations>): List<Relations> {
   return relations.sort((a, b) => b.updated - a.updated);
 }
 
-export function getLast(viewContext: ViewPath): SubPath {
-  return viewContext[viewContext.length - 1] as SubPath;
+export function getLast(viewContext: ViewPath): ViewPathSegment {
+  return viewContext[viewContext.length - 1] as ViewPathSegment;
 }
 
 function getDefaultView(id: ID, isRootNode: boolean): View {
@@ -745,18 +682,8 @@ function getDefaultView(id: ID, isRootNode: boolean): View {
   };
 }
 
-function getRelationItemViewNodeID(
-  knowledgeDBs: KnowledgeDBs | undefined,
-  relations: Relations,
-  item: RelationItem
-): LongID | ID {
-  return knowledgeDBs
-    ? getRelationItemNodeID(knowledgeDBs, item, relations.author)
-    : item.id;
-}
-
 export function getViewFromPath(data: Data, path: ViewPath): View {
-  const { nodeID } = getLast(path);
+  const nodeID = getNodeIDFromPath(data, path);
   return (
     getViewExactMatch(data.views, path) || getDefaultView(nodeID, isRoot(path))
   );
@@ -810,6 +737,25 @@ function getNewestRelationFromRoot(
         (r) =>
           relationHeadMatchesNode(knowledgeDBs, author, r.head, localID) &&
           r.root === root &&
+          contextsMatch(r.context, context)
+      )
+      .toList()
+  ).first();
+}
+
+function getNewestRelationByContext(
+  knowledgeDBs: KnowledgeDBs,
+  author: PublicKey,
+  nodeID: LongID | ID,
+  context: Context
+): Relations | undefined {
+  const localID = shortID(nodeID);
+  const authorDB = knowledgeDBs.get(author, newDB());
+  return sortRelationsByDate(
+    authorDB.relations
+      .filter(
+        (r) =>
+          relationHeadMatchesNode(knowledgeDBs, author, r.head, localID) &&
           contextsMatch(r.context, context)
       )
       .toList()
@@ -893,13 +839,41 @@ function getRelationFromContextPath(
   return resolved?.relation;
 }
 
+function getViewRelationByID(
+  knowledgeDBs: KnowledgeDBs,
+  id: LongID | ID,
+  myself: PublicKey
+): Relations | undefined {
+  return getRelations(knowledgeDBs, id, myself);
+}
+
+function getNodeIDFromPath(data: Data, viewPath: ViewPath): LongID | ID {
+  const currentID = getLast(viewPath);
+  if (isConcreteRefId(currentID)) {
+    return currentID;
+  }
+  return (
+    getRelationsNoReferencedBy(data.knowledgeDBs, currentID, data.user.publicKey)
+      ?.head || currentID
+  );
+}
+
 export function getNodeIDFromView(
   data: Data,
   viewPath: ViewPath
 ): [LongID | ID, View] {
   const view = getViewFromPath(data, viewPath);
-  const { nodeID } = getLast(viewPath);
-  return [nodeID, view];
+  return [getNodeIDFromPath(data, viewPath), view];
+}
+
+export function getNodeIDsForViewPath(
+  data: Data,
+  viewPath: ViewPath
+): Array<LongID | ID> {
+  const paneIndex = getPaneIndex(viewPath);
+  return (viewPath.slice(1) as ViewPathSegment[]).map((_, index, segments) =>
+    getNodeIDFromPath(data, [paneIndex, ...segments.slice(0, index + 1)])
+  );
 }
 
 export function getRelationsForCurrentTree(
@@ -942,7 +916,10 @@ export function getRelationsForCurrentTree(
     return undefined;
   }
 
-  return getRelationFromContextPath(knowledgeDBs, paneAuthor, nodeID, context);
+  return (
+    getRelationFromContextPath(knowledgeDBs, paneAuthor, nodeID, context) ||
+    getNewestRelationByContext(knowledgeDBs, paneAuthor, nodeID, context)
+  );
 }
 
 export function getParentRelation(
@@ -952,17 +929,8 @@ export function getParentRelation(
   if (isRoot(viewPath)) {
     return undefined;
   }
-
-  const parentElement = viewPath[viewPath.length - 2] as SubPathWithRelations;
-  if (!parentElement.relationsID) {
-    return undefined;
-  }
-
-  return getRelations(
-    data.knowledgeDBs,
-    parentElement.relationsID,
-    data.user.publicKey
-  );
+  const parentID = viewPath[viewPath.length - 2] as ViewPathSegment;
+  return getViewRelationByID(data.knowledgeDBs, parentID, data.user.publicKey);
 }
 
 export function getEffectiveAuthor(data: Data, viewPath: ViewPath): PublicKey {
@@ -976,23 +944,21 @@ export function getRelationForView(
   viewPath: ViewPath,
   stack: ID[]
 ): Relations | undefined {
+  const currentID = getLast(viewPath);
+  const directRelation = getViewRelationByID(
+    data.knowledgeDBs,
+    currentID,
+    data.user.publicKey
+  );
+  if (directRelation) {
+    return directRelation;
+  }
+
   const [nodeID] = getNodeIDFromView(data, viewPath);
   const context = getContext(data, viewPath, stack);
   const pane = getPane(data, viewPath);
   const parentRoot = getParentRelation(data, viewPath)?.root;
   const author = getEffectiveAuthor(data, viewPath);
-
-  if (isConcreteRefId(nodeID)) {
-    return getRelations(data.knowledgeDBs, nodeID, author);
-  }
-
-  const currentItem = getRelationItemForView(data, viewPath);
-  const currentItemRelation = currentItem
-    ? getRelationItemRelation(data.knowledgeDBs, currentItem, author)
-    : undefined;
-  if (currentItemRelation) {
-    return currentItemRelation;
-  }
 
   return getRelationsForCurrentTree(
     data.knowledgeDBs,
@@ -1220,65 +1186,22 @@ export function getNodeFromView(
   return [node, view];
 }
 
-export function calculateNodeIndex(
-  relations: Relations,
-  index: number,
-  knowledgeDBs?: KnowledgeDBs
-): NodeIndex {
-  const item = relations.items.get(index);
-  if (!item) {
-    throw new Error(`No item found at index ${index}`);
-  }
-  const itemNodeID = getRelationItemViewNodeID(knowledgeDBs, relations, item);
-  return relations.items
-    .slice(0, index)
-    .filter(
-      (candidate) =>
-        getRelationItemViewNodeID(knowledgeDBs, relations, candidate) ===
-        itemNodeID
-    ).size as NodeIndex;
-}
-
-export function calculateIndexFromNodeIndex(
-  relations: Relations,
-  node: LongID | ID,
-  nodeIndex: NodeIndex,
-  knowledgeDBs?: KnowledgeDBs
-): number | undefined {
-  const { items } = relations;
-  const res = items.reduce(
-    ([acc, found]: [number, boolean], item, idx): [number, boolean] => {
-      if (found) {
-        return [acc, true];
-      }
-      if (getRelationItemViewNodeID(knowledgeDBs, relations, item) === node) {
-        if (acc === nodeIndex) {
-          return [idx, true];
-        }
-        return [acc + 1, false];
-      }
-      return [acc, false];
-    },
-    [0, false]
-  );
-  if (res[1] === false) {
-    return undefined;
-  }
-  return res[0];
-}
-
 export function addRelationsToLastElement(
   path: ViewPath,
   relationsID: LongID
-): [number, ...SubPathWithRelations[]] {
-  const paneIndex = getPaneIndex(path);
-  // Skip pane index (position 0) and last element
-  const middleElements = path.slice(1, -1) as SubPathWithRelations[];
-  return [paneIndex, ...middleElements, { ...getLast(path), relationsID }];
+): ViewPath {
+  const last = getLast(path);
+  if (last === relationsID || isConcreteRefId(last)) {
+    return path;
+  }
+  return [
+    getPaneIndex(path),
+    ...(path.slice(1, -1) as ViewPathSegment[]),
+    relationsID,
+  ] as ViewPath;
 }
 
 export function addNodeToPathWithRelations(
-  data: Pick<Data, "knowledgeDBs">,
   path: ViewPath,
   relations: Relations,
   index: number
@@ -1287,10 +1210,8 @@ export function addNodeToPathWithRelations(
   if (!item) {
     throw new Error("No node found in relation at index");
   }
-  const nodeID = getRelationItemViewNodeID(data.knowledgeDBs, relations, item);
-  const nodeIndex = calculateNodeIndex(relations, index, data.knowledgeDBs);
   const pathWithRelations = addRelationsToLastElement(path, relations.id);
-  return [...pathWithRelations, { nodeID, nodeIndex }];
+  return [...pathWithRelations, item.id] as ViewPath;
 }
 
 export function addNodeToPath(
@@ -1303,7 +1224,7 @@ export function addNodeToPath(
   if (!relations) {
     throw new Error("Parent doesn't have relations, cannot add to path");
   }
-  return addNodeToPathWithRelations(data, path, relations, index);
+  return addNodeToPathWithRelations(path, relations, index);
 }
 
 export function useEffectiveAuthor(): PublicKey {
@@ -1339,17 +1260,13 @@ export function getRelationIndex(
   data: Data,
   viewPath: ViewPath
 ): number | undefined {
-  const { nodeIndex, nodeID } = getLast(viewPath);
   const relations = getParentRelation(data, viewPath);
   if (!relations) {
     return undefined;
   }
-  return calculateIndexFromNodeIndex(
-    relations,
-    nodeID,
-    nodeIndex,
-    data.knowledgeDBs
-  );
+  const itemID = getLast(viewPath);
+  const index = relations.items.findIndex((item) => item.id === itemID);
+  return index >= 0 ? index : undefined;
 }
 
 export function useRelationIndex(): number | undefined {
@@ -1448,7 +1365,7 @@ export function getLastChild(
     return undefined;
   }
   const lastIndex = relations.items.size - 1;
-  return addNodeToPathWithRelations(data, viewPath, relations, lastIndex);
+  return addNodeToPathWithRelations(viewPath, relations, lastIndex);
 }
 
 export function usePreviousSibling(): SiblingInfo | undefined {
@@ -1471,9 +1388,22 @@ export function RootViewContextProvider({
 }): JSX.Element {
   const data = useData();
   const stack = usePaneStack();
+  const pane = data.panes[paneIndex];
+  const rootContext = getContextFromStack(stack);
+  const resolvedRootRelation =
+    pane?.rootRelation
+      ? getRelations(data.knowledgeDBs, pane.rootRelation, data.user.publicKey)
+      : getRelationsForCurrentTree(
+          data.knowledgeDBs,
+          pane?.author || data.user.publicKey,
+          root,
+          rootContext,
+          undefined,
+          true
+        );
   const startPath: ViewPath = [
     paneIndex,
-    { nodeID: root, nodeIndex: 0 as NodeIndex },
+    resolvedRootRelation?.id || root,
   ];
   const finalPath = (indices || List<number>()).reduce(
     (acc, index) => addNodeToPath(data, acc, index, stack),
@@ -1605,12 +1535,12 @@ export function useIsRoot(): boolean {
 }
 
 export function getParentKey(viewKey: string): string {
-  return viewKey.split(":").slice(0, -3).join(":");
+  return viewKey.split(":").slice(0, -1).join(":");
 }
 
 export function updateView(views: Views, path: ViewPath, view: View): Views {
   const key = viewPathToString(path);
-  const { nodeID } = getLast(path);
+  const nodeID = getLast(path);
   const defaultView = getDefaultView(nodeID, isRoot(path));
   const isDefault = view.expanded === defaultView.expanded && !view.typeFilters;
   if (isDefault) {
@@ -1753,187 +1683,33 @@ export function upsertRelations(
   return planUpsertRelations(plan, updatedRelations);
 }
 
-function alterPath(
-  viewPathStr: string,
-  calcIndex: (
-    relationsID: LongID,
-    nodeID: ID,
-    nodeIndex: NodeIndex
-  ) => NodeIndex
-): string {
-  const path = parseViewPath(viewPathStr);
-  if (path.length <= 2) {
-    return viewPathStr;
+function pathContainsSubpath(path: ViewPath, subpath: ViewPathSegment[]): boolean {
+  if (subpath.length === 0 || path.length - 1 < subpath.length) {
+    return false;
   }
-  const paneIndex = getPaneIndex(path);
-  const parents = path.slice(1, -1) as SubPathWithRelations[];
-  const last = getLast(path);
-
-  const { segments, prevRelationsID } = parents.reduce(
-    (
-      acc: {
-        segments: SubPathWithRelations[];
-        prevRelationsID: LongID | undefined;
-      },
-      parent
-    ) => ({
-      segments: [
-        ...acc.segments,
-        acc.prevRelationsID === undefined
-          ? parent
-          : {
-              ...parent,
-              nodeIndex: calcIndex(
-                acc.prevRelationsID,
-                parent.nodeID as ID,
-                parent.nodeIndex
-              ),
-            },
-      ],
-      prevRelationsID: parent.relationsID as LongID,
-    }),
-    { segments: [], prevRelationsID: undefined }
+  const segments = path.slice(1) as ViewPathSegment[];
+  return segments.some((_, index) =>
+    subpath.every((segment, offset) => segments[index + offset] === segment)
   );
-
-  const alteredLast = {
-    ...last,
-    nodeIndex: calcIndex(
-      prevRelationsID as LongID,
-      last.nodeID as ID,
-      last.nodeIndex
-    ),
-  };
-
-  return convertViewPathToString([
-    paneIndex,
-    ...segments,
-    alteredLast,
-  ] as ViewPath);
-}
-
-function alterNodeIndicesInViews(
-  views: Views,
-  relationsID: LongID,
-  calcIndex: (
-    relationsID: LongID,
-    nodeID: ID,
-    nodeIndex: NodeIndex
-  ) => NodeIndex
-): Views {
-  const pattern = `:${relationsID}:`;
-  return views.mapKeys((key) => {
-    if (!key.includes(pattern)) {
-      return key;
-    }
-    return alterPath(key, calcIndex);
-  });
 }
 
 export function updateViewPathsAfterMoveRelations(
   data: Data,
-  relationsID: LongID,
-  oldItems: List<RelationItem>,
-  indices: Array<number>,
-  startPosition?: number
+  _relationsID: LongID,
+  _oldItems: List<RelationItem>,
+  _indices: Array<number>,
+  _startPosition?: number
 ): Views {
-  if (startPosition === undefined) {
-    return data.views;
-  }
-  const itemsBeforeStartPos = indices.filter((i) => i < startPosition).length;
-  const insertPos = startPosition - itemsBeforeStartPos;
-  const remaining = Array.from({ length: oldItems.size }, (_, i) => i).filter(
-    (i) => !indices.includes(i)
-  );
-  const newOrder = [
-    ...remaining.slice(0, insertPos),
-    ...indices,
-    ...remaining.slice(insertPos),
-  ];
-  const knowledgeDBs = data.knowledgeDBs || Map<PublicKey, KnowledgeData>();
-  const currentUser = data.user?.publicKey || ("" as PublicKey);
-
-  const renames = newOrder.reduce<
-    Array<{ nodeID: LongID | ID; oldIdx: NodeIndex; newIdx: NodeIndex }>
-  >((acc, oldPos, newPos) => {
-    const item = oldItems.get(oldPos);
-    const relation = getRelations(
-      knowledgeDBs,
-      relationsID,
-      currentUser
-    );
-    if (!item) {
-      return acc;
-    }
-    if (!relation) {
-      return acc;
-    }
-    const itemNodeID = getRelationItemViewNodeID(knowledgeDBs, relation, item);
-    const oldNodeIndex = oldItems
-      .slice(0, oldPos)
-      .filter(
-        (candidate) =>
-          getRelationItemViewNodeID(knowledgeDBs, relation, candidate) ===
-          itemNodeID
-      ).size as NodeIndex;
-    const newNodeIndex = newOrder
-      .slice(0, newPos)
-      .filter(
-        (position) =>
-          getRelationItemViewNodeID(
-            knowledgeDBs,
-            relation,
-            oldItems.get(position) as RelationItem
-          ) === itemNodeID
-      )
-      .length as unknown as NodeIndex;
-    if (oldNodeIndex !== newNodeIndex) {
-      return [
-        ...acc,
-        { nodeID: itemNodeID, oldIdx: oldNodeIndex, newIdx: newNodeIndex },
-      ];
-    }
-    return acc;
-  }, []);
-
-  if (renames.length === 0) {
-    return data.views;
-  }
-
-  return alterNodeIndicesInViews(
-    data.views,
-    relationsID,
-    (relation, node, index) => {
-      if (relation !== relationsID) {
-        return index;
-      }
-      const rename = renames.find(
-        (r) => r.nodeID === node && r.oldIdx === index
-      );
-      return rename ? rename.newIdx : index;
-    }
-  );
+  return data.views;
 }
 
 export function updateViewPathsAfterAddRelation(
   data: Data,
-  relationsID: LongID,
-  addedNodeID: LongID | ID,
-  addedNodeIndex: NodeIndex
+  _relationsID: LongID,
+  _addedNodeID: LongID | ID,
+  _addedNodeIndex: NodeIndex
 ): Views {
-  return alterNodeIndicesInViews(
-    data.views,
-    relationsID,
-    (relation, node, index) => {
-      if (
-        relation === relationsID &&
-        node === addedNodeID &&
-        index >= addedNodeIndex
-      ) {
-        return (index + 1) as NodeIndex;
-      }
-      return index;
-    }
-  );
+  return data.views;
 }
 
 export function updateViewPathsAfterDeleteNode(
@@ -1947,28 +1723,15 @@ export function updateViewPathsAfterDisconnect(
   views: Views,
   disconnectNode: LongID | ID,
   fromRelation: LongID,
-  nodeIndex: NodeIndex
+  _nodeIndex: NodeIndex
 ): Views {
-  // If I delete A:0, A:1 will be A:0, A:2 will be A:1 ...
-  const toDelete = `${fromRelation}:${disconnectNode}:${nodeIndex}`;
-  const withDeleted = views.filterNot(
-    (_, k) => k.includes(`${toDelete}:`) || k.endsWith(toDelete)
-  );
-
-  return alterNodeIndicesInViews(
-    withDeleted,
-    fromRelation,
-    (relation, node, index) => {
-      if (
-        relation === fromRelation &&
-        node === disconnectNode &&
-        index > nodeIndex
-      ) {
-        return (index - 1) as NodeIndex;
-      }
-      return index;
+  return views.filterNot((_, key) => {
+    try {
+      return pathContainsSubpath(parseViewPath(key), [fromRelation, disconnectNode]);
+    } catch {
+      return false;
     }
-  );
+  });
 }
 
 export function updateViewPathsAfterPaneDelete(
@@ -2006,44 +1769,10 @@ export function updateViewPathsAfterPaneInsert(
 
 export function bulkUpdateViewPathsAfterAddRelation(
   data: Data,
-  repoPath: ViewPath,
-  stack: ID[],
-  nAdds: number,
-  startPos?: number
+  _repoPath: ViewPath,
+  _stack: ID[],
+  _nAdds: number,
+  _startPos?: number
 ): Views {
-  const relation = getRelationForView(data, repoPath, stack);
-  if (!relation || startPos === undefined) {
-    return data.views;
-  }
-  return Array.from({ length: nAdds }, (_, i) => i).reduce(
-    (rdx, currentIndex) => {
-      const pos = startPos + currentIndex;
-      const item = relation.items.get(pos);
-      if (!item) {
-        return rdx;
-      }
-      const itemNodeID = getRelationItemViewNodeID(
-        data.knowledgeDBs,
-        relation,
-        item
-      );
-      const addedNodeIndex = relation.items
-        .slice(0, pos)
-        .filter(
-          (candidate) =>
-            getRelationItemViewNodeID(
-              data.knowledgeDBs,
-              relation,
-              candidate
-            ) === itemNodeID
-        ).size as NodeIndex;
-      return updateViewPathsAfterAddRelation(
-        { ...data, views: rdx },
-        relation.id,
-        itemNodeID,
-        addedNodeIndex
-      );
-    },
-    data.views
-  );
+  return data.views;
 }

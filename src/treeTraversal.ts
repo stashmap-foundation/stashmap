@@ -84,7 +84,7 @@ function getChildrenForConcreteRef(
   return {
     paths: sourceRelation.items
       .map((_, i) =>
-        addNodeToPathWithRelations(data, parentPath, sourceRelation, i)
+        addNodeToPathWithRelations(parentPath, sourceRelation, i)
       )
       .toList(),
     virtualItems: EMPTY_VIRTUAL_ITEMS,
@@ -138,7 +138,7 @@ function getChildrenForRegularNode(
             options?.isMarkdownExport || itemPassesFilters(item, activeFilters)
         )
         .map(({ index }) =>
-          addNodeToPathWithRelations(data, parentPath, relations, index)
+          addNodeToPathWithRelations(parentPath, relations, index)
         )
         .toList()
     : List<ViewPath>();
@@ -166,10 +166,7 @@ function getChildrenForRegularNode(
       );
       const versionsPath = [
         ...pathWithRelations,
-        {
-          nodeID: VERSIONS_NODE_ID as LongID | ID,
-          nodeIndex: relationPaths.size as NodeIndex,
-        },
+        VERSIONS_NODE_ID as LongID | ID,
       ] as ViewPath;
       return {
         paths: relationPaths.push(versionsPath),
@@ -195,8 +192,7 @@ function getChildrenForRegularNode(
 
   const containingRelationID: LongID | undefined =
     parentPath.length > 2
-      ? ((parentPath[parentPath.length - 2] as { relationsID?: ID })
-          .relationsID as LongID)
+      ? (parentPath[parentPath.length - 2] as LongID)
       : undefined;
 
   const incomingCrefs = getIncomingCrefsForNode(
@@ -265,10 +261,7 @@ function getChildrenForRegularNode(
         parentPath,
         relationId
       );
-      const path = [
-        ...pathWithRelations,
-        { nodeID, nodeIndex: (acc.paths.size + idx) as NodeIndex },
-      ] as ViewPath;
+      const path = [...pathWithRelations, nodeID] as ViewPath;
       const isCref = crefIDs?.has(nodeID as string);
       return {
         paths: result.paths.push(path),

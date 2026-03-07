@@ -20,6 +20,7 @@ import {
   parseViewPath,
   getPreviousSibling,
   getContext,
+  getNodeIDFromView,
 } from "../ViewContext";
 import {
   Plan,
@@ -88,7 +89,7 @@ function planUpdateOneRelevance(
   editorText: string,
   virtualItemsMap: VirtualItemsMap
 ): Plan {
-  const { nodeID } = getLast(viewPath);
+  const [nodeID] = getNodeIDFromView(acc, viewPath);
   const parentView = getParentView(viewPath);
   if (!parentView) return acc;
 
@@ -164,7 +165,7 @@ function planUpdateOneArgument(
   editorText: string,
   virtualItemsMap: VirtualItemsMap
 ): Plan {
-  const { nodeID } = getLast(viewPath);
+  const [nodeID] = getNodeIDFromView(acc, viewPath);
   const parentView = getParentView(viewPath);
   if (!parentView) return acc;
 
@@ -377,7 +378,6 @@ export function planBatchIndent(
                 fromKey,
                 toKey: viewPathToString(
                   addNodeToPathWithRelations(
-                    moved,
                     prevSibling.viewPath,
                     targetRelationAfter,
                     insertAt
@@ -390,7 +390,7 @@ export function planBatchIndent(
       if (!editorText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
-      const { nodeID } = getLast(viewPath);
+      const [nodeID] = getNodeIDFromView(state.plan, viewPath);
       const nodeText = getNodeText(state.plan, nodeID);
       if (editorText === nodeText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
@@ -434,7 +434,7 @@ export function planBatchOutdent(
   if (parentRelationIndex === undefined) return undefined;
 
   const grandParentContext = getContext(plan, grandParentPath, stack);
-  const grandParentNodeID = getLast(grandParentPath).nodeID;
+  const [grandParentNodeID] = getNodeIDFromView(plan, grandParentPath);
   const newContext = grandParentContext.push(shortID(grandParentNodeID));
   const { plan: updated, remappedKeys } = viewPaths.reduce(
     (state, viewPath, idx) => {
@@ -460,7 +460,6 @@ export function planBatchOutdent(
                 fromKey,
                 toKey: viewPathToString(
                   addNodeToPathWithRelations(
-                    moved,
                     grandParentPath,
                     targetRelationAfter,
                     insertAt
@@ -473,7 +472,7 @@ export function planBatchOutdent(
       if (!editorText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
-      const { nodeID } = getLast(viewPath);
+      const [nodeID] = getNodeIDFromView(state.plan, viewPath);
       const nodeText = getNodeText(state.plan, nodeID);
       if (editorText === nodeText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };

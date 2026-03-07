@@ -398,10 +398,7 @@ function getSerializedRelationText(
 }
 
 function buildRootPath(rootRelation: Relations): ViewPath {
-  return [
-    0,
-    { nodeID: rootRelation.head as LongID | ID, nodeIndex: 0 as NodeIndex },
-  ] as ViewPath;
+  return [0, rootRelation.id];
 }
 
 function serializeTree(data: Data, rootRelation: Relations): SerializeResult {

@@ -233,9 +233,13 @@ export function planDisconnectFromParent(
     return plan;
   }
 
-  const { nodeID, nodeIndex } = getLast(viewPath);
+  const disconnectID = getLast(viewPath);
+  const [nodeID] = getNodeIDFromView(plan, viewPath);
   const parentRelation = getRelationForView(plan, parentPath, stack);
   if (!parentRelation) {
+    return plan;
+  }
+  if (parentRelation.author !== plan.user.publicKey) {
     return plan;
   }
 
@@ -248,9 +252,9 @@ export function planDisconnectFromParent(
 
   const updatedViews = updateViewPathsAfterDisconnect(
     updatedRelationsPlan.views,
-    nodeID,
+    disconnectID,
     parentRelation.id,
-    nodeIndex
+    relationIndex as NodeIndex
   );
 
   const planWithViews = planUpdateViews(updatedRelationsPlan, updatedViews);
@@ -319,10 +323,7 @@ export function planDeleteNodeFromView(
     if (p.stack.length === 0) {
       return false;
     }
-    const rootViewPath: ViewPath = [
-      i,
-      { nodeID: p.stack[p.stack.length - 1], nodeIndex: 0 as NodeIndex },
-    ];
+    const rootViewPath: ViewPath = [i, p.rootRelation || p.stack[p.stack.length - 1]];
     const paneRelation = getRelationForView(
       planAfterDelete,
       rootViewPath,
@@ -398,7 +399,6 @@ export function planMoveNodeWithView(
 
   const targetIndex = insertAtIndex ?? relations.items.size - 1;
   const targetViewPath = addNodeToPathWithRelations(
-    planWithAdd,
     targetParentViewPath,
     relations,
     targetIndex
@@ -406,6 +406,12 @@ export function planMoveNodeWithView(
 
   const sourceKey = viewPathToString(sourceViewPath);
   const targetKey = viewPathToString(targetViewPath);
+  const preservedSourceViews =
+    sourceKey === targetKey
+      ? planWithAdd.views.filter(
+          (_view, key) => key === sourceKey || key.startsWith(`${sourceKey}:`)
+        )
+      : undefined;
   const updatedViews = copyViewsWithNewPrefix(
     planWithAdd.views,
     sourceKey,
@@ -413,12 +419,19 @@ export function planMoveNodeWithView(
   );
   const planWithViews = planUpdateViews(planWithAdd, updatedViews);
 
-  const planWithDisconnect = planDisconnectFromParent(
+  const disconnectedPlan = planDisconnectFromParent(
     planWithViews,
     sourceViewPath,
     stack,
     true
   );
+  const planWithDisconnect =
+    preservedSourceViews && preservedSourceViews.size > 0
+      ? planUpdateViews(
+          disconnectedPlan,
+          disconnectedPlan.views.merge(preservedSourceViews)
+        )
+      : disconnectedPlan;
 
   return planMoveDescendantRelations(
     planWithDisconnect,
@@ -567,7 +580,6 @@ export function dnd(
           if (relations) {
             const targetIndex = insertAt ?? relations.items.size - 1;
             const targetViewPath = addNodeToPathWithRelations(
-              planWithAdd,
               toView,
               relations,
               targetIndex

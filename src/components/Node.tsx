@@ -15,7 +15,7 @@ import {
   getParentView,
   getRelationForView,
   getRelationIndex,
-  getLast,
+  getNodeIDFromView,
   useIsViewingOtherUserContent,
   useRelationItem,
   viewPathToString,
@@ -226,10 +226,11 @@ function EditableContent(): JSX.Element {
     plan: Plan,
     targetViewPath: ViewPath
   ): Plan => {
+    const [targetNodeID] = getNodeIDFromView(plan, targetViewPath);
     return planSetRowFocusIntent(plan, {
       paneIndex,
       viewKey: viewPathToString(targetViewPath),
-      nodeId: getLast(targetViewPath).nodeID,
+      nodeId: targetNodeID,
     });
   };
 

@@ -1076,7 +1076,6 @@ export function planDeepCopyNodeWithView(
 
   const targetIndex = insertAtIndex ?? relations.items.size - 1;
   const targetViewPath = addNodeToPathWithRelations(
-    planWithCopy,
     targetParentViewPath,
     relations,
     targetIndex
@@ -1143,9 +1142,14 @@ function planCreateNoteAtRoot(
   viewPath: ViewPath
 ): SaveNodeResult {
   const [planWithNode, createdNode] = planCreateNode(plan, text);
+  const createdRelation = newRelations(
+    createdNode.id,
+    List<ID>(),
+    plan.user.publicKey
+  );
   const planWithRelation = planUpsertRelations(
     planWithNode,
-    newRelations(createdNode.id, List<ID>(), plan.user.publicKey)
+    createdRelation
   );
 
   const paneIndex = getPaneIndex(viewPath);
@@ -1154,10 +1158,7 @@ function planCreateNoteAtRoot(
   );
 
   const resultPlan = planUpdatePanes(planWithRelation, newPanes);
-  const newViewPath: ViewPath = [
-    paneIndex,
-    { nodeID: createdNode.id, nodeIndex: 0 as NodeIndex },
-  ];
+  const newViewPath: ViewPath = [paneIndex, createdRelation.id];
 
   return { plan: resultPlan, viewPath: newViewPath };
 }

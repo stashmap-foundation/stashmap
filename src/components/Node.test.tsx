@@ -25,12 +25,12 @@ import {
   type,
 } from "../utils.test";
 import {
-  NodeIndex,
   RootViewContextProvider,
   newRelations,
   viewPathToString,
   getSuggestionsForNode,
-  getLast,
+  getNodeIDFromView,
+  ViewPath,
 } from "../ViewContext";
 import { TreeView } from "./TreeView";
 import { DraggableNote } from "./Draggable";
@@ -38,6 +38,16 @@ import { TemporaryViewProvider } from "./TemporaryViewContext";
 import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
 import { execute } from "../executor";
 import { getNodesInTree } from "./Node";
+
+function vp(
+  paneIndex: number,
+  ...segments: Array<{ nodeID: LongID | ID; relationsID?: LongID | ID }>
+): ViewPath {
+  return [
+    paneIndex,
+    ...segments.map((segment) => (segment.relationsID || segment.nodeID) as LongID | ID),
+  ];
+}
 import { LoadData } from "../dataQuery";
 import { newDB } from "../knowledge";
 
@@ -249,19 +259,35 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
   const child = newNode("Child");
   const aliceGrandchild = newNode("Alice's Grandchild");
   const bobGrandchild = newNode("Bob's Grandchild");
-  const parentRelations = addRelationToRelations(
-    newRelations(parent.id, List(), alicePK),
-    child.id
-  );
   // child's relations have context=[parent] since child is under parent
-  const childContext = List([shortID(parent.id)]);
+  const parentRelations = newRelations(parent.id, List(), alicePK);
+  const childContext = List([shortID(parent.id) as ID]);
+  const grandchildContext = List([
+    shortID(parent.id) as ID,
+    shortID(child.id) as ID,
+  ]);
+  const aliceGrandchildRelations = newRelations(
+    aliceGrandchild.id,
+    grandchildContext,
+    alicePK,
+    parentRelations.root
+  );
   const childRelations = addRelationToRelations(
     newRelations(child.id, childContext, alicePK, parentRelations.root),
-    aliceGrandchild.id
+    aliceGrandchildRelations.id
+  );
+  const rootedParentRelations = addRelationToRelations(
+    parentRelations,
+    childRelations.id
+  );
+  const bobGrandchildRelations = newRelations(
+    bobGrandchild.id,
+    grandchildContext,
+    bobPK
   );
   const bobChildRelations = addRelationToRelations(
     newRelations(child.id, childContext, bobPK),
-    bobGrandchild.id
+    bobGrandchildRelations.id
   );
 
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
@@ -271,30 +297,32 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
         .set(shortID(child.id), child)
         .set(shortID(aliceGrandchild.id), aliceGrandchild),
       relations: newDB()
-        .relations.set(shortID(parentRelations.id), parentRelations)
-        .set(shortID(childRelations.id), childRelations),
+        .relations.set(shortID(rootedParentRelations.id), rootedParentRelations)
+        .set(shortID(childRelations.id), childRelations)
+        .set(shortID(aliceGrandchildRelations.id), aliceGrandchildRelations),
     })
     .set(bobPK, {
       nodes: newDB().nodes.set(shortID(bobGrandchild.id), bobGrandchild),
-      relations: newDB().relations.set(
-        shortID(bobChildRelations.id),
-        bobChildRelations
-      ),
+      relations: newDB()
+        .relations.set(shortID(bobChildRelations.id), bobChildRelations)
+        .set(shortID(bobGrandchildRelations.id), bobGrandchildRelations),
     });
 
-  const parentPath = [
-    0,
-    { nodeID: parent.id, nodeIndex: 0 as NodeIndex },
-  ] as const;
-  const childPath = [
+  const parentPath = vp(0, {
+    nodeID: parent.id,
+    relationsID: rootedParentRelations.id,
+  });
+  const childPath = vp(
     0,
     {
       nodeID: parent.id,
-      nodeIndex: 0 as NodeIndex,
-      relationsID: parentRelations.id,
+      relationsID: rootedParentRelations.id,
     },
-    { nodeID: child.id, nodeIndex: 0 as NodeIndex },
-  ] as const;
+    {
+      nodeID: child.id,
+      relationsID: childRelations.id,
+    }
+  );
 
   const views = Map<string, View>()
     .set(viewPathToString(parentPath), {
@@ -320,7 +348,7 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
     data.panes[0].author,
     data.panes[0].typeFilters
   );
-  const nodeIDs = nodes.map((path) => getLast(path).nodeID).toArray();
+  const nodeIDs = nodes.map((path) => getNodeIDFromView(data, path)[0]).toArray();
 
   expect(nodeIDs).toContain(child.id);
   expect(nodeIDs).toContain(aliceGrandchild.id);
@@ -425,19 +453,31 @@ test("Diff item paths are correctly identified as diff items", () => {
   const aliceChild = newNode("Alice's Child");
   const bobChild = newNode("Bob's Child");
 
-  const rootRelations = addRelationToRelations(
-    newRelations(root.id, List(), alicePK),
-    parent.id
-  );
   // parent's relations have context=[root] since parent is under root
-  const parentContext = List([shortID(root.id)]);
+  const rootRelations = newRelations(root.id, List(), alicePK);
+  const parentContext = List([shortID(root.id) as ID]);
+  const childContext = List([
+    shortID(root.id) as ID,
+    shortID(parent.id) as ID,
+  ]);
+  const aliceChildRelations = newRelations(
+    aliceChild.id,
+    childContext,
+    alicePK,
+    rootRelations.root
+  );
   const parentRelations = addRelationToRelations(
     newRelations(parent.id, parentContext, alicePK, rootRelations.root),
-    aliceChild.id
+    aliceChildRelations.id
   );
+  const rootedRootRelations = addRelationToRelations(
+    rootRelations,
+    parentRelations.id
+  );
+  const bobChildRelations = newRelations(bobChild.id, childContext, bobPK);
   const bobParentRelations = addRelationToRelations(
     newRelations(parent.id, parentContext, bobPK),
-    bobChild.id
+    bobChildRelations.id
   );
 
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
@@ -447,27 +487,32 @@ test("Diff item paths are correctly identified as diff items", () => {
         .set(shortID(parent.id), parent)
         .set(shortID(aliceChild.id), aliceChild),
       relations: newDB()
-        .relations.set(shortID(rootRelations.id), rootRelations)
-        .set(shortID(parentRelations.id), parentRelations),
+        .relations.set(shortID(rootedRootRelations.id), rootedRootRelations)
+        .set(shortID(parentRelations.id), parentRelations)
+        .set(shortID(aliceChildRelations.id), aliceChildRelations),
     })
     .set(bobPK, {
       nodes: newDB().nodes.set(shortID(bobChild.id), bobChild),
-      relations: newDB().relations.set(
-        shortID(bobParentRelations.id),
-        bobParentRelations
-      ),
+      relations: newDB()
+        .relations.set(shortID(bobParentRelations.id), bobParentRelations)
+        .set(shortID(bobChildRelations.id), bobChildRelations),
     });
 
-  const rootPath = [0, { nodeID: root.id, nodeIndex: 0 as NodeIndex }] as const;
-  const parentPath = [
+  const rootPath = vp(0, {
+    nodeID: root.id,
+    relationsID: rootedRootRelations.id,
+  });
+  const parentPath = vp(
     0,
     {
       nodeID: root.id,
-      nodeIndex: 0 as NodeIndex,
-      relationsID: rootRelations.id,
+      relationsID: rootedRootRelations.id,
     },
-    { nodeID: parent.id, nodeIndex: 0 as NodeIndex },
-  ] as const;
+    {
+      nodeID: parent.id,
+      relationsID: parentRelations.id,
+    }
+  );
 
   const views = Map<string, View>()
     .set(viewPathToString(rootPath), {
@@ -496,12 +541,12 @@ test("Diff item paths are correctly identified as diff items", () => {
   expect(nodes.size).toBeGreaterThanOrEqual(3);
 
   const diffItemPath = nodes.find(
-    (path) => getLast(path).nodeID === bobChild.id
+    (path) => getNodeIDFromView(data, path)[0] === bobChild.id
   );
   expect(diffItemPath).toBeDefined();
 
   const aliceChildPath = nodes.find(
-    (path) => getLast(path).nodeID === aliceChild.id
+    (path) => getNodeIDFromView(data, path)[0] === aliceChild.id
   );
   expect(aliceChildPath).toBeDefined();
 });

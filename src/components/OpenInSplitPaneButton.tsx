@@ -6,6 +6,7 @@ import {
   updateViewPathsAfterPaneInsert,
   getEffectiveAuthor,
   useRelation,
+  getNodeIDsForViewPath,
 } from "../ViewContext";
 import {
   useSplitPanes,
@@ -57,9 +58,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
       return;
     }
 
-    const viewPathNodeIDs = viewPath
-      .slice(1)
-      .map((subPath) => (subPath as { nodeID: LongID | ID }).nodeID);
+    const viewPathNodeIDs = getNodeIDsForViewPath(data, viewPath);
     const fullStack = [...paneStackWithoutRoot, ...viewPathNodeIDs];
     addPaneAt(
       insertIndex,

@@ -323,7 +323,7 @@ function computeVersionMeta(
   viewPath: ViewPath,
   stack: ID[]
 ): VersionMeta {
-  const refId = getLast(viewPath).nodeID;
+  const refId = getLast(viewPath);
   const parsed = parseConcreteRefId(refId);
   if (!parsed) return { updated: 0, addCount: 0, removeCount: 0 };
 

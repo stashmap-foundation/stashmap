@@ -12,7 +12,6 @@ import {
   ViewContext,
   useViewKey,
   getNodeIDFromView,
-  getLast,
   isExpanded,
   useDisplayText,
   getEffectiveAuthor,
@@ -91,6 +90,7 @@ function VirtuosoForColumn({
   scrollToNodeId?: string;
   firstVirtualKeys: ImmutableSet<string>;
 }): JSX.Element {
+  const data = useData();
   const location = useLocation();
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -134,7 +134,7 @@ function VirtuosoForColumn({
       return;
     }
     const index = nodes.findIndex(
-      (path) => getLast(path).nodeID === scrollToNodeId
+      (path) => getNodeIDFromView(data, path)[0] === scrollToNodeId
     );
     if (index >= 0) {
       virtuosoRef.current.scrollToIndex({
@@ -504,7 +504,7 @@ export function TreeView(): JSX.Element {
   const data = useData();
   const viewPath = useViewPath();
   const effectiveAuthor = getEffectiveAuthor(data, viewPath);
-  const rootNodeID = getLast(viewPath).nodeID;
+  const [rootNodeID] = getNodeIDFromView(data, viewPath);
   const baseFilter = createBaseFilter(
     data.contacts,
     data.projectMembers,

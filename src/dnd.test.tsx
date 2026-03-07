@@ -23,7 +23,7 @@ import {
   newNode,
   shortID,
 } from "./connections";
-import { NodeIndex, newRelations, viewPathToString } from "./ViewContext";
+import { ViewPath, newRelations, viewPathToString } from "./ViewContext";
 import {
   createPlan,
   planBulkUpsertNodes,
@@ -31,6 +31,16 @@ import {
   planUpsertRelations,
 } from "./planner";
 import { newDB } from "./knowledge";
+
+function vp(
+  paneIndex: number,
+  ...segments: Array<{ nodeID: LongID | ID; relationsID?: LongID | ID }>
+): ViewPath {
+  return [
+    paneIndex,
+    ...segments.map((segment) => (segment.relationsID || segment.nodeID) as LongID | ID),
+  ];
+}
 
 test("Drag node within tree view", async () => {
   const [alice] = setup([ALICE]);
@@ -108,14 +118,17 @@ test("Diff items are always added, never moved", () => {
   const parent = newNode("Parent");
   const aliceChild = newNode("Alice's Child");
   const bobChild = newNode("Bob's Child");
+  const childContext = List([parent.id as ID]);
+  const aliceChildRelations = newRelations(aliceChild.id, childContext, alicePK);
+  const bobChildRelations = newRelations(bobChild.id, childContext, bobPK);
 
   const aliceRelations = addRelationToRelations(
     newRelations(parent.id, List(), alicePK),
-    aliceChild.id
+    aliceChildRelations.id
   );
   const bobRelations = addRelationToRelations(
     newRelations(parent.id, List(), bobPK),
-    bobChild.id
+    bobChildRelations.id
   );
 
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
@@ -123,24 +136,21 @@ test("Diff items are always added, never moved", () => {
       nodes: newDB()
         .nodes.set(shortID(parent.id), parent)
         .set(shortID(aliceChild.id), aliceChild),
-      relations: newDB().relations.set(
-        shortID(aliceRelations.id),
-        aliceRelations
-      ),
+      relations: newDB()
+        .relations.set(shortID(aliceRelations.id), aliceRelations)
+        .set(shortID(aliceChildRelations.id), aliceChildRelations),
     })
     .set(bobPK, {
       nodes: newDB().nodes.set(shortID(bobChild.id), bobChild),
-      relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
+      relations: newDB()
+        .relations.set(shortID(bobRelations.id), bobRelations)
+        .set(shortID(bobChildRelations.id), bobChildRelations),
     });
 
-  const parentPath = [
-    0,
-    {
-      nodeID: parent.id,
-      nodeIndex: 0 as NodeIndex,
-      relationsID: aliceRelations.id,
-    },
-  ] as const;
+  const parentPath = vp(0, {
+    nodeID: parent.id,
+    relationsID: aliceRelations.id,
+  });
 
   const views = Map<string, View>().set(viewPathToString(parentPath), {
     expanded: true,
@@ -159,15 +169,14 @@ test("Diff items are always added, never moved", () => {
     views
   );
 
-  const diffItemPath = [
+  const diffItemPath = vp(
     0,
     {
       nodeID: parent.id,
-      nodeIndex: 0 as NodeIndex,
       relationsID: aliceRelations.id,
     },
-    { nodeID: bobChild.id, nodeIndex: 0 as NodeIndex, isDiffItem: true },
-  ] as const;
+    { nodeID: bobChild.id }
+  );
 
   const result = dnd(
     plan,
@@ -202,32 +211,31 @@ test("Dragging a concrete reference keeps it as a reference by default", () => {
   const target = newNode("Target");
   const refTarget = newNode("Ref Target");
   const refChild = newNode("Ref Child");
+  const refChildRelations = newRelations(
+    refChild.id,
+    List([root.id as ID, refTarget.id as ID]),
+    alicePK
+  );
 
   const refRelations = addRelationToRelations(
     newRelations(refTarget.id, List([root.id]), alicePK),
-    refChild.id
+    refChildRelations.id
   );
   const concreteRefId = createConcreteRefId(refRelations.id);
+  const targetRelations = newRelations(target.id, List([root.id as ID]), alicePK);
   const rootRelations = addRelationToRelations(
     addRelationToRelations(
       newRelations(root.id, List(), alicePK),
       concreteRefId
     ),
-    target.id
+    targetRelations.id
   );
 
-  const rootPath = [
-    0,
-    {
-      nodeID: root.id,
-      nodeIndex: 0 as NodeIndex,
-      relationsID: rootRelations.id,
-    },
-  ] as const;
-  const sourcePath = [
-    ...rootPath,
-    { nodeID: concreteRefId, nodeIndex: 0 as NodeIndex },
-  ] as const;
+  const rootPath = vp(0, {
+    nodeID: root.id,
+    relationsID: rootRelations.id,
+  });
+  const sourcePath = [...rootPath, concreteRefId] as ViewPath;
 
   const views = Map<string, View>().set(viewPathToString(rootPath), {
     expanded: true,
@@ -248,9 +256,11 @@ test("Dragging a concrete reference keeps it as a reference by default", () => {
     ),
     views
   );
+  const withChildren = planUpsertRelations(plan, refChildRelations);
+  const fullPlan = planUpsertRelations(withChildren, targetRelations);
 
   const result = dnd(
-    plan,
+    fullPlan,
     OrderedSet<string>(),
     viewPathToString(sourcePath),
     rootPath,
@@ -263,11 +273,11 @@ test("Dragging a concrete reference keeps it as a reference by default", () => {
   const updatedRootRelations = result.knowledgeDBs
     .get(alicePK)
     ?.relations.get(shortID(rootRelations.id));
-  const nodeIDs = updatedRootRelations?.items
+  const itemIDs = updatedRootRelations?.items
     .map((item) => item.id)
     .toArray();
 
-  expect(nodeIDs).toEqual([concreteRefId, target.id, concreteRefId]);
+  expect(itemIDs).toEqual([concreteRefId, targetRelations.id, concreteRefId]);
 });
 
 test("Alt-dragging a concrete reference still copies it as a reference", () => {
@@ -278,32 +288,31 @@ test("Alt-dragging a concrete reference still copies it as a reference", () => {
   const target = newNode("Target");
   const refTarget = newNode("Ref Target");
   const refChild = newNode("Ref Child");
+  const refChildRelations = newRelations(
+    refChild.id,
+    List([root.id as ID, refTarget.id as ID]),
+    alicePK
+  );
 
   const refRelations = addRelationToRelations(
     newRelations(refTarget.id, List([root.id]), alicePK),
-    refChild.id
+    refChildRelations.id
   );
   const concreteRefId = createConcreteRefId(refRelations.id);
+  const targetRelations = newRelations(target.id, List([root.id as ID]), alicePK);
   const rootRelations = addRelationToRelations(
     addRelationToRelations(
       newRelations(root.id, List(), alicePK),
       concreteRefId
     ),
-    target.id
+    targetRelations.id
   );
 
-  const rootPath = [
-    0,
-    {
-      nodeID: root.id,
-      nodeIndex: 0 as NodeIndex,
-      relationsID: rootRelations.id,
-    },
-  ] as const;
-  const sourcePath = [
-    ...rootPath,
-    { nodeID: concreteRefId, nodeIndex: 0 as NodeIndex },
-  ] as const;
+  const rootPath = vp(0, {
+    nodeID: root.id,
+    relationsID: rootRelations.id,
+  });
+  const sourcePath = [...rootPath, concreteRefId] as ViewPath;
 
   const views = Map<string, View>().set(viewPathToString(rootPath), {
     expanded: true,
@@ -324,9 +333,11 @@ test("Alt-dragging a concrete reference still copies it as a reference", () => {
     ),
     views
   );
+  const withChildren = planUpsertRelations(plan, refChildRelations);
+  const fullPlan = planUpsertRelations(withChildren, targetRelations);
 
   const result = dnd(
-    plan,
+    fullPlan,
     OrderedSet<string>(),
     viewPathToString(sourcePath),
     rootPath,
@@ -340,11 +351,11 @@ test("Alt-dragging a concrete reference still copies it as a reference", () => {
   const updatedRootRelations = result.knowledgeDBs
     .get(alicePK)
     ?.relations.get(shortID(rootRelations.id));
-  const nodeIDs = updatedRootRelations?.items
+  const itemIDs = updatedRootRelations?.items
     .map((item) => item.id)
     .toArray();
 
-  expect(nodeIDs).toEqual([concreteRefId, target.id, concreteRefId]);
+  expect(itemIDs).toEqual([concreteRefId, targetRelations.id, concreteRefId]);
 });
 
 test("Alt-dragging a normal node creates a concrete reference", () => {
@@ -354,26 +365,25 @@ test("Alt-dragging a normal node creates a concrete reference", () => {
   const root = newNode("Root");
   const sourceNode = newNode("Source");
   const target = newNode("Target");
+  const sourceRelations = newRelations(
+    sourceNode.id,
+    List([root.id as ID]),
+    alicePK
+  );
+  const targetRelations = newRelations(target.id, List([root.id as ID]), alicePK);
   const rootRelations = addRelationToRelations(
     addRelationToRelations(
       newRelations(root.id, List(), alicePK),
-      sourceNode.id
+      sourceRelations.id
     ),
-    target.id
+    targetRelations.id
   );
 
-  const rootPath = [
-    0,
-    {
-      nodeID: root.id,
-      nodeIndex: 0 as NodeIndex,
-      relationsID: rootRelations.id,
-    },
-  ] as const;
-  const sourcePath = [
-    ...rootPath,
-    { nodeID: sourceNode.id, nodeIndex: 0 as NodeIndex },
-  ] as const;
+  const rootPath = vp(0, {
+    nodeID: root.id,
+    relationsID: rootRelations.id,
+  });
+  const sourcePath = [...rootPath, sourceRelations.id] as ViewPath;
 
   const views = Map<string, View>().set(viewPathToString(rootPath), {
     expanded: true,
@@ -391,9 +401,13 @@ test("Alt-dragging a normal node creates a concrete reference", () => {
     ),
     views
   );
+  const fullPlan = planUpsertRelations(
+    planUpsertRelations(plan, sourceRelations),
+    targetRelations
+  );
 
   const result = dnd(
-    plan,
+    fullPlan,
     OrderedSet<string>(),
     viewPathToString(sourcePath),
     rootPath,
@@ -407,14 +421,19 @@ test("Alt-dragging a normal node creates a concrete reference", () => {
   const updatedRootRelations = result.knowledgeDBs
     .get(alicePK)
     ?.relations.get(shortID(rootRelations.id));
-  const nodeIDs = updatedRootRelations?.items
+  const itemIDs = updatedRootRelations?.items
     .map((item) => item.id)
     .toArray();
+  const nodeIDs = updatedRootRelations?.items
+    .map((item) =>
+      getRelationItemNodeID(result.knowledgeDBs, item, updatedRootRelations.author)
+    )
+    .toArray();
 
-  expect(nodeIDs?.length).toBe(3);
+  expect(itemIDs?.length).toBe(3);
   expect(nodeIDs?.[0]).toBe(sourceNode.id);
   expect(nodeIDs?.[1]).toBe(target.id);
-  const refId = nodeIDs?.[2] as string;
+  const refId = itemIDs?.[2] as string;
   expect(refId.startsWith("cref:")).toBe(true);
 });
 
@@ -913,39 +932,59 @@ test("Bottom-half drop on last child of nested parent stays within that parent",
   const spain = newNode("Spain");
   const sevilla = newNode("Sevilla");
   const otherItem = newNode("Other Item");
-
-  const rootRelations = addRelationToRelations(
-    addRelationToRelations(
-      addRelationToRelations(
-        newRelations(root.id, List(), alicePK),
-        barcelona.id
-      ),
-      spain.id
-    ),
-    otherItem.id
+  const rootRelations = newRelations(root.id, List(), alicePK);
+  const childContext = List([root.id as ID]);
+  const spainChildContext = List([root.id as ID, spain.id as ID]);
+  const barcelonaRelations = newRelations(
+    barcelona.id,
+    childContext,
+    alicePK,
+    rootRelations.root
+  );
+  const sevillaRelations = newRelations(
+    sevilla.id,
+    spainChildContext,
+    alicePK,
+    rootRelations.root
+  );
+  const otherItemRelations = newRelations(
+    otherItem.id,
+    childContext,
+    alicePK,
+    rootRelations.root
   );
   const spainRelations = addRelationToRelations(
-    newRelations(spain.id, List([root.id]), alicePK, rootRelations.root),
-    sevilla.id
+    newRelations(spain.id, childContext, alicePK, rootRelations.root),
+    sevillaRelations.id
   );
 
-  const rootPath = [
+  const rootedRootRelations = addRelationToRelations(
+    addRelationToRelations(
+      addRelationToRelations(
+        rootRelations,
+        barcelonaRelations.id
+      ),
+      spainRelations.id
+    ),
+    otherItemRelations.id
+  );
+
+  const rootPath = vp(0, {
+    nodeID: root.id,
+    relationsID: rootedRootRelations.id,
+  });
+
+  const spainPath = vp(
     0,
     {
       nodeID: root.id,
-      nodeIndex: 0 as NodeIndex,
-      relationsID: rootRelations.id,
+      relationsID: rootedRootRelations.id,
     },
-  ] as const;
-
-  const spainPath = [
-    ...rootPath,
     {
       nodeID: spain.id,
-      nodeIndex: 0 as NodeIndex,
       relationsID: spainRelations.id,
-    },
-  ] as const;
+    }
+  );
 
   const views = Map<string, View>()
     .set(viewPathToString(rootPath), {
@@ -965,11 +1004,18 @@ test("Bottom-half drop on last child of nested parent stays within that parent",
           createPlan({ ...alice(), knowledgeDBs, panes, views }),
           [root, barcelona, spain, sevilla, otherItem]
         ),
-        rootRelations
+        rootedRootRelations
       ),
       spainRelations
     ),
     views
+  );
+  const fullPlan = planUpsertRelations(
+    planUpsertRelations(
+      planUpsertRelations(plan, barcelonaRelations),
+      sevillaRelations
+    ),
+    otherItemRelations
   );
 
   // Flat tree (excluding root):
@@ -986,7 +1032,7 @@ test("Bottom-half drop on last child of nested parent stays within that parent",
   // should resolve to [spainPath, 1] (after Sevilla in Spain)
 
   const [toView, dropIndex] = getDropDestinationFromTreeView(
-    plan,
+    fullPlan,
     rootPath,
     [root.id],
     4,
@@ -1009,64 +1055,68 @@ function setupDepthClampTree() {
   const barcelona = newNode("Barcelona");
   const malaga = newNode("Malaga");
   const sevilla = newNode("Sevilla");
-
-  const hdRelations = addRelationToRelations(
-    addRelationToRelations(newRelations(hd.id, List(), alicePK), sf.id),
-    spain.id
+  const hdRelations = newRelations(hd.id, List(), alicePK);
+  const childContext = List([hd.id as ID]);
+  const spainChildContext = List([hd.id as ID, spain.id as ID]);
+  const sfRelations = newRelations(sf.id, childContext, alicePK, hdRelations.root);
+  const barcelonaRelations = newRelations(
+    barcelona.id,
+    spainChildContext,
+    alicePK,
+    hdRelations.root
   );
+  const malagaRelations = newRelations(
+    malaga.id,
+    spainChildContext,
+    alicePK,
+    hdRelations.root
+  );
+  const sevillaRelations = newRelations(
+    sevilla.id,
+    spainChildContext,
+    alicePK,
+    hdRelations.root
+  );
+
   const spainRelations = addRelationToRelations(
     addRelationToRelations(
       addRelationToRelations(
-        newRelations(spain.id, List([hd.id]), alicePK, hdRelations.root),
-        barcelona.id
+        newRelations(spain.id, childContext, alicePK, hdRelations.root),
+        barcelonaRelations.id
       ),
-      malaga.id
+      malagaRelations.id
     ),
-    sevilla.id
+    sevillaRelations.id
+  );
+  const rootedHdRelations = addRelationToRelations(
+    addRelationToRelations(hdRelations, sfRelations.id),
+    spainRelations.id
   );
 
-  const rootPath = [
+  const rootPath = vp(0, {
+    nodeID: hd.id,
+    relationsID: rootedHdRelations.id,
+  });
+
+  const sfPath = [...rootPath, sfRelations.id] as ViewPath;
+
+  const spainPath = vp(
     0,
     {
       nodeID: hd.id,
-      nodeIndex: 0 as NodeIndex,
-      relationsID: hdRelations.id,
+      relationsID: rootedHdRelations.id,
     },
-  ] as const;
-
-  const sfPath = [
-    ...rootPath,
-    { nodeID: sf.id, nodeIndex: 0 as NodeIndex },
-  ] as const;
-
-  const spainPath = [
-    ...rootPath,
-    { nodeID: spain.id, nodeIndex: 0 as NodeIndex },
-  ] as const;
-
-  const spainPathWithRel = [
-    ...rootPath,
     {
       nodeID: spain.id,
-      nodeIndex: 0 as NodeIndex,
       relationsID: spainRelations.id,
-    },
-  ] as const;
+    }
+  );
 
-  const barcelonaPath = [
-    ...spainPathWithRel,
-    { nodeID: barcelona.id, nodeIndex: 0 as NodeIndex },
-  ] as const;
+  const barcelonaPath = [...spainPath, barcelonaRelations.id] as ViewPath;
 
-  const malagaPath = [
-    ...spainPathWithRel,
-    { nodeID: malaga.id, nodeIndex: 0 as NodeIndex },
-  ] as const;
+  const malagaPath = [...spainPath, malagaRelations.id] as ViewPath;
 
-  const sevillaPath = [
-    ...spainPathWithRel,
-    { nodeID: sevilla.id, nodeIndex: 0 as NodeIndex },
-  ] as const;
+  const sevillaPath = [...spainPath, sevillaRelations.id] as ViewPath;
 
   const views = Map<string, View>()
     .set(viewPathToString(rootPath), {
@@ -1086,15 +1136,25 @@ function setupDepthClampTree() {
           createPlan({ ...alice(), knowledgeDBs, panes, views }),
           [hd, sf, spain, barcelona, malaga, sevilla]
         ),
-        hdRelations
+        rootedHdRelations
       ),
       spainRelations
     ),
     views
   );
+  const fullPlan = planUpsertRelations(
+    planUpsertRelations(
+      planUpsertRelations(
+        planUpsertRelations(plan, sfRelations),
+        barcelonaRelations
+      ),
+      malagaRelations
+    ),
+    sevillaRelations
+  );
 
   return {
-    plan,
+    plan: fullPlan,
     rootPath,
     sfPath,
     spainPath,

@@ -205,6 +205,14 @@ export function MiniEditor({
     if (!relatedTarget) {
       return;
     }
+    const currentRow = editorRef.current?.closest('[data-row-focusable="true"]');
+    const sameRowTreeItem =
+      relatedTarget instanceof HTMLElement &&
+      relatedTarget.getAttribute("role") === "treeitem" &&
+      relatedTarget.closest('[data-row-focusable="true"]') === currentRow;
+    if (sameRowTreeItem) {
+      return;
+    }
     if (
       relatedTarget instanceof HTMLElement &&
       relatedTarget.closest(".modal")

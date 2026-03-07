@@ -7,6 +7,7 @@ import {
   useRelation,
   getAlternativeRelations,
   getContext,
+  getNodeIDsForViewPath,
 } from "../ViewContext";
 import {
   usePaneStack,
@@ -62,12 +63,7 @@ export function FullscreenButton(): JSX.Element | null {
     const targetStack = (
       refInfo
         ? refInfo.stack
-        : [
-            ...stack.slice(0, -1),
-            ...viewPath
-              .slice(1)
-              .map((subPath) => (subPath as { nodeID: LongID | ID }).nodeID),
-          ]
+        : [...stack.slice(0, -1), ...getNodeIDsForViewPath(data, viewPath)]
     ).filter((id) => !isSearchId(id as ID));
     return (
       buildNodeUrl(

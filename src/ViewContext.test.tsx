@@ -8,7 +8,6 @@ import {
   bulkAddRelations,
   shortID,
   createConcreteRefId,
-  hashText,
 } from "./connections";
 import { execute } from "./executor";
 import {
@@ -31,8 +30,6 @@ import {
 } from "./utils.test";
 import {
   RootViewContextProvider,
-  calculateIndexFromNodeIndex,
-  calculateNodeIndex,
   newRelations,
   parseViewPath,
   viewPathToString,
@@ -40,7 +37,6 @@ import {
   updateViewPathsAfterPaneDelete,
   updateViewPathsAfterPaneInsert,
   updateViewPathsAfterMoveRelations,
-  NodeIndex,
   ViewPath,
 } from "./ViewContext";
 import { TreeView } from "./components/TreeView";
@@ -202,22 +198,17 @@ My Notes
 
 test("Alter View paths after disconnect", () => {
   const views = Map<string, { e: string }>({
-    "p0:root:0:r:n:1": { e: "delete" },
-    "p0:root:0:r:n:3": { e: "p0:root:0:r:n:2" },
-    "p0:root:0:r:n:12": { e: "p0:root:0:r:n:11" },
-    "p0:root2:0:r:n:2:r:n:3": { e: "p0:root2:0:r:n:1:r:n:2" },
-    "p0:root2:0:r:n:2:r:n:1": { e: "delete" },
-    "p0:root2:0:r:n:1:r:n:2": { e: "delete" },
-    "p0:root:0:r:n:0": { e: "p0:root:0:r:n:0" },
-    "p0:root:0:r:n:2:r2:a:0:r:n:45": {
-      e: "p0:root:0:r:n:1:r2:a:0:r:n:44",
-    },
+    "p0:root:r:n": { e: "delete" },
+    "p0:root:r:n:child": { e: "delete" },
+    "p0:root:r:keep": { e: "p0:root:r:keep" },
+    "p0:root2:r:nested:r:n": { e: "delete" },
+    "p0:root2:r:other": { e: "p0:root2:r:other" },
   });
   const updatedViews = updateViewPathsAfterDisconnect(
     views as unknown as Views,
     "n" as LongID,
     "r" as LongID,
-    1 as NodeIndex
+    1 as never
   );
 
   const expectedResult = views
@@ -228,22 +219,17 @@ test("Alter View paths after disconnect", () => {
 
 test("Alter View paths after disconnect with pane-prefixed paths", () => {
   const views = Map<string, { e: string }>({
-    "p0:root:0:r:n:1": { e: "delete" },
-    "p0:root:0:r:n:3": { e: "p0:root:0:r:n:2" },
-    "p0:root:0:r:n:12": { e: "p0:root:0:r:n:11" },
-    "p0:root2:0:r:n:2:r:n:3": { e: "p0:root2:0:r:n:1:r:n:2" },
-    "p0:root2:0:r:n:2:r:n:1": { e: "delete" },
-    "p0:root2:0:r:n:1:r:n:2": { e: "delete" },
-    "p0:root:0:r:n:0": { e: "p0:root:0:r:n:0" },
-    "p0:root:0:r:n:2:r2:a:0:r:n:45": {
-      e: "p0:root:0:r:n:1:r2:a:0:r:n:44",
-    },
+    "p0:root:r:n": { e: "delete" },
+    "p0:root:r:n:child": { e: "delete" },
+    "p0:root:r:keep": { e: "p0:root:r:keep" },
+    "p1:root:r:n": { e: "delete" },
+    "p1:root:r:other": { e: "p1:root:r:other" },
   });
   const updatedViews = updateViewPathsAfterDisconnect(
     views as unknown as Views,
     "n" as LongID,
     "r" as LongID,
-    1 as NodeIndex
+    1 as never
   );
 
   const expectedResult = views
@@ -252,64 +238,14 @@ test("Alter View paths after disconnect with pane-prefixed paths", () => {
   expect(updatedViews.keySeq().toJS()).toEqual(expectedResult.keySeq().toJS());
 });
 
-test("Calculate index from node index", () => {
-  // Items are now RelationItem objects with id, relevance, and optional argument
-  const relations: Relations = {
-    items: List([
-      { id: "pl" as LongID, relevance: undefined as Relevance },
-      { id: "oop" as LongID, relevance: undefined as Relevance },
-      { id: "pl" as LongID, relevance: undefined as Relevance },
-      { id: "pl" as LongID, relevance: undefined as Relevance },
-      { id: "java" as LongID, relevance: undefined as Relevance },
-    ]),
-    head: "test" as ID,
-    context: List<ID>(),
-    id: "test" as LongID,
-    text: "test",
-    textHash: hashText("test"),
-    parent: undefined,
-    updated: 0,
-    author: ALICE.publicKey,
-    root: "test" as ID,
-  };
-  expect(calculateNodeIndex(relations, 0)).toBe(0);
-  expect(calculateNodeIndex(relations, 1)).toBe(0);
-  expect(calculateNodeIndex(relations, 2)).toBe(1);
-  expect(calculateNodeIndex(relations, 3)).toBe(2);
-  expect(calculateNodeIndex(relations, 4)).toBe(0);
-
-  expect(
-    calculateIndexFromNodeIndex(relations, "pl" as LongID, 0 as NodeIndex)
-  ).toBe(0);
-  expect(
-    calculateIndexFromNodeIndex(relations, "oop" as LongID, 0 as NodeIndex)
-  ).toBe(1);
-  expect(
-    calculateIndexFromNodeIndex(relations, "pl" as LongID, 1 as NodeIndex)
-  ).toBe(2);
-  expect(
-    calculateIndexFromNodeIndex(relations, "pl" as LongID, 2 as NodeIndex)
-  ).toBe(3);
-  expect(
-    calculateIndexFromNodeIndex(relations, "java" as LongID, 0 as NodeIndex)
-  ).toBe(4);
-});
-
 test("Parse View path", () => {
-  expect(parseViewPath("p0:root:1")).toEqual([
-    0,
-    { nodeID: "root", nodeIndex: 1 },
-  ]);
-  expect(parseViewPath("p0:root:0:rl:pl:0")).toEqual([
-    0,
-    { nodeID: "root", nodeIndex: 0, relationsID: "rl" },
-    { nodeID: "pl", nodeIndex: 0 },
-  ]);
-  expect(parseViewPath("p1:root:0:rl:pl:0:rl:oop:1")).toEqual([
+  expect(parseViewPath("p0:root")).toEqual([0, "root"]);
+  expect(parseViewPath("p0:root:pl")).toEqual([0, "root", "pl"]);
+  expect(parseViewPath("p1:root:pl:oop")).toEqual([
     1,
-    { nodeID: "root", nodeIndex: 0, relationsID: "rl" },
-    { nodeID: "pl", nodeIndex: 0, relationsID: "rl" },
-    { nodeID: "oop", nodeIndex: 1 },
+    "root",
+    "pl",
+    "oop",
   ]);
 });
 
@@ -317,37 +253,25 @@ test("View path roundtrip preserves concrete ref IDs with colons", () => {
   const refId = createConcreteRefId("rel1" as LongID, "target" as ID);
   expect(refId).toBe("cref:rel1:target");
 
-  const viewPath: ViewPath = [
-    0,
-    {
-      nodeID: "parent" as LongID,
-      nodeIndex: 0 as NodeIndex,
-      relationsID: "rel1",
-    },
-    { nodeID: refId, nodeIndex: 0 as NodeIndex },
-  ];
+  const viewPath: ViewPath = [0, "rel1" as LongID, refId];
 
   const serialized = viewPathToString(viewPath);
   const parsed = parseViewPath(serialized);
 
   expect(parsed).toEqual(viewPath);
-  expect((parsed[2] as { nodeID: string }).nodeID).toBe("cref:rel1:target");
+  expect(parsed[2]).toBe("cref:rel1:target");
 });
 
 test("View path roundtrip preserves concrete ref IDs in middle of path", () => {
   const refId = createConcreteRefId("someRelation" as LongID);
 
-  const viewPath: ViewPath = [
-    1,
-    { nodeID: refId, nodeIndex: 2 as NodeIndex, relationsID: "someRelation" },
-    { nodeID: "child" as LongID, nodeIndex: 0 as NodeIndex },
-  ];
+  const viewPath: ViewPath = [1, refId, "child" as LongID];
 
   const serialized = viewPathToString(viewPath);
   const parsed = parseViewPath(serialized);
 
   expect(parsed).toEqual(viewPath);
-  expect((parsed[1] as { nodeID: string }).nodeID).toBe("cref:someRelation");
+  expect(parsed[1]).toBe("cref:someRelation");
 });
 
 test("View doesn't change if list is forked from contact", async () => {
@@ -474,55 +398,55 @@ Programming Languages
 
 test("updateViewPathsAfterPaneDelete removes views for deleted pane and shifts indices", () => {
   const views = Map<string, View>({
-    "p0:root:0": { expanded: false },
-    "p0:root:0:r:node1:0": { expanded: true },
-    "p1:root:0": { expanded: false },
-    "p1:root:0:r:node2:0": { expanded: true },
-    "p2:root:0": { expanded: true },
-    "p2:root:0:r:node3:0": { expanded: true },
-    "p3:root:0": { expanded: true },
+    "p0:root": { expanded: false },
+    "p0:root:node1": { expanded: true },
+    "p1:root": { expanded: false },
+    "p1:root:node2": { expanded: true },
+    "p2:root": { expanded: true },
+    "p2:root:node3": { expanded: true },
+    "p3:root": { expanded: true },
   });
 
   const updatedViews = updateViewPathsAfterPaneDelete(views, 1);
 
-  expect(updatedViews.has("p0:root:0")).toBe(true);
-  expect(updatedViews.has("p0:root:0:r:node1:0")).toBe(true);
-  expect(updatedViews.has("p1:root:0:r:node2:0")).toBe(false);
-  expect(updatedViews.get("p1:root:0")?.expanded).toBe(true);
-  expect(updatedViews.get("p1:root:0:r:node3:0")?.expanded).toBe(true);
-  expect(updatedViews.get("p2:root:0")?.expanded).toBe(true);
-  expect(updatedViews.has("p3:root:0")).toBe(false);
+  expect(updatedViews.has("p0:root")).toBe(true);
+  expect(updatedViews.has("p0:root:node1")).toBe(true);
+  expect(updatedViews.has("p1:root:node2")).toBe(false);
+  expect(updatedViews.get("p1:root")?.expanded).toBe(true);
+  expect(updatedViews.get("p1:root:node3")?.expanded).toBe(true);
+  expect(updatedViews.get("p2:root")?.expanded).toBe(true);
+  expect(updatedViews.has("p3:root")).toBe(false);
 });
 
 test("updateViewPathsAfterPaneInsert shifts pane indices at and after insertion point", () => {
   const views = Map<string, View>({
-    "p0:root:0": { expanded: false },
-    "p0:root:0:r:node1:0": { expanded: true },
-    "p1:root:0": { expanded: true },
-    "p1:root:0:r:node2:0": { expanded: true },
-    "p2:root:0": { expanded: true },
+    "p0:root": { expanded: false },
+    "p0:root:node1": { expanded: true },
+    "p1:root": { expanded: true },
+    "p1:root:node2": { expanded: true },
+    "p2:root": { expanded: true },
   });
 
   const updatedViews = updateViewPathsAfterPaneInsert(views, 1);
 
-  expect(updatedViews.has("p0:root:0")).toBe(true);
-  expect(updatedViews.get("p0:root:0")?.expanded).toBe(false);
-  expect(updatedViews.has("p0:root:0:r:node1:0")).toBe(true);
+  expect(updatedViews.has("p0:root")).toBe(true);
+  expect(updatedViews.get("p0:root")?.expanded).toBe(false);
+  expect(updatedViews.has("p0:root:node1")).toBe(true);
 
-  expect(updatedViews.has("p1:root:0")).toBe(false);
-  expect(updatedViews.has("p2:root:0")).toBe(true);
-  expect(updatedViews.get("p2:root:0")?.expanded).toBe(true);
-  expect(updatedViews.has("p2:root:0:r:node2:0")).toBe(true);
+  expect(updatedViews.has("p1:root")).toBe(false);
+  expect(updatedViews.has("p2:root")).toBe(true);
+  expect(updatedViews.get("p2:root")?.expanded).toBe(true);
+  expect(updatedViews.has("p2:root:node2")).toBe(true);
 
-  expect(updatedViews.has("p3:root:0")).toBe(true);
-  expect(updatedViews.get("p3:root:0")?.expanded).toBe(true);
+  expect(updatedViews.has("p3:root")).toBe(true);
+  expect(updatedViews.get("p3:root")?.expanded).toBe(true);
 });
 
 test("updateViewPathsAfterMoveRelations preserves paths when relationsID starts with digit", () => {
   const relID = "3abc_uuid" as LongID;
-  const childAPath = `p0:root:0:${relID}:childA:0`;
-  const childADeepPath = `p0:root:0:${relID}:childA:0:innerRel:grand:0`;
-  const childBPath = `p0:root:0:${relID}:childB:0`;
+  const childAPath = `p0:root:${relID}:childA`;
+  const childADeepPath = `p0:root:${relID}:childA:innerRel:grand`;
+  const childBPath = `p0:root:${relID}:childB`;
 
   const views = Map<string, View>({
     "p0:root:0": { expanded: true },
@@ -552,5 +476,5 @@ test("updateViewPathsAfterMoveRelations preserves paths when relationsID starts 
   expect(updatedViews.get(childADeepPath)?.expanded).toBe(true);
   expect(updatedViews.has(childBPath)).toBe(true);
 
-  expect(updatedViews.has("p0:root:0:2abc_uuid:childA:0")).toBe(false);
+  expect(updatedViews).toEqual(views);
 });

@@ -31,10 +31,7 @@ async function uploadMarkdown(alice: UpdateState): Promise<void> {
     createPlan(alice()),
     newRelations(wsID, List(), alice().user.publicKey)
   );
-  const workspacePath: ViewPath = [
-    0,
-    { nodeID: wsID, nodeIndex: 0 as NodeIndex },
-  ];
+  const workspacePath: ViewPath = [0, wsID];
   const plan = planPasteMarkdownTrees(
     basePlan,
     parseMarkdownHierarchy(TEST_FILE),

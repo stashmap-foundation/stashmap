@@ -14,6 +14,7 @@ import {
   parseRelationUrl,
   parseAuthorFromSearch,
 } from "./navigationUrl";
+import { resolveNodeStackToActualIDs } from "./ViewContext";
 import { usePlanner } from "./planner";
 import { generatePaneId } from "./SplitPanesContext";
 
@@ -113,26 +114,39 @@ export function NavigationStateProvider({
 
   useEffect(() => {
     const needsResolution = panes.some(
-      (p) => p.rootRelation && p.stack.length === 0
+      (p) => (p.rootRelation && p.stack.length === 0) || p.stack.length > 0
     );
     if (!needsResolution) {
       return;
     }
     const resolved = panes.map((p) => {
-      if (!p.rootRelation || p.stack.length > 0) {
+      if (p.rootRelation && p.stack.length === 0) {
+        const crefId = createConcreteRefId(p.rootRelation);
+        const refInfo = getRefTargetInfo(crefId, knowledgeDBs, p.author);
+        if (!refInfo) {
+          return p;
+        }
+        return {
+          ...p,
+          stack: refInfo.stack,
+          author: refInfo.author,
+          rootRelation: refInfo.rootRelation,
+        };
+      }
+
+      if (p.stack.length === 0) {
         return p;
       }
-      const crefId = createConcreteRefId(p.rootRelation);
-      const refInfo = getRefTargetInfo(crefId, knowledgeDBs, p.author);
-      if (!refInfo) {
+      const resolvedStack = resolveNodeStackToActualIDs(
+        knowledgeDBs,
+        p.author,
+        p.stack as ID[]
+      )?.actualStack;
+      if (!resolvedStack) {
         return p;
       }
-      return {
-        ...p,
-        stack: refInfo.stack,
-        author: refInfo.author,
-        rootRelation: refInfo.rootRelation,
-      };
+      const stackChanged = resolvedStack.some((id, index) => id !== p.stack[index]);
+      return stackChanged ? { ...p, stack: resolvedStack } : p;
     });
     if (resolved.some((p, i) => p !== panes[i])) {
       setPanes(resolved);

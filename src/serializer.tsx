@@ -298,6 +298,7 @@ export function eventToTextNode(
   const textNode: TextNode = {
     id: id as ID,
     text,
+    textHash: expectedHash,
     type: "text",
   };
   return [id, textNode];

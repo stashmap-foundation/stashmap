@@ -27,6 +27,7 @@ import {
   VERSIONS_NODE_ID,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
+import { buildOutgoingReference } from "./buildReferenceNode";
 
 type TreeResult = {
   paths: List<ViewPath>;
@@ -211,12 +212,21 @@ function getChildrenForRegularNode(
         data.knowledgeDBs,
         parentNodeID,
         relations?.id,
-        author,
+        effectiveAuthor,
         context,
+        relations?.root ?? currentRoot,
         relations?.items,
         incomingCrefs
       )
     : List<LongID | ID>();
+  const sortedOccurrences = occurrences.sortBy((refID) => {
+    const reference = buildOutgoingReference(
+      refID as LongID,
+      data.knowledgeDBs,
+      data.user.publicKey
+    );
+    return reference?.text || String(refID);
+  });
 
   const isOwnContent = effectiveAuthor === data.user.publicKey;
 
@@ -292,7 +302,7 @@ function getChildrenForRegularNode(
   );
   const withOccurrences = addVirtualItems(
     withSuggestions,
-    occurrences,
+    sortedOccurrences,
     "occurrence"
   );
   const withVersions = addVirtualItems(withOccurrences, versions, "version");

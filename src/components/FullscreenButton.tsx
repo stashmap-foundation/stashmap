@@ -39,7 +39,9 @@ export function FullscreenButton(): JSX.Element | null {
     knowledgeDBs,
     nodeID,
     context,
-    relation?.id
+    relation?.id,
+    effectiveAuthor,
+    relation?.root
   )
     .filter(
       (candidate) =>
@@ -78,10 +80,6 @@ export function FullscreenButton(): JSX.Element | null {
   };
 
   const href = getTargetUrl();
-  if (process.env.DEBUG_FULLSCREEN === "1" && displayText === "Spain") {
-    // eslint-disable-next-line no-console
-    console.log(`[fullscreen] Spain href=${href} relation=${relation?.id} items=${relation?.items.size} fullscreenRelation=${fullscreenRelation?.id}`);
-  }
 
   const ariaLabel = displayText
     ? `open ${displayText} in fullscreen`

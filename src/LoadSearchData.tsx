@@ -39,7 +39,11 @@ function SearchCrefBuilder({
   const uniqueNodeIDs = foundNodeIDs.toSet().toList();
   const crefItems = uniqueNodeIDs.flatMap((nodeID) => {
     const refs = findRefsToNode(knowledgeDBs, nodeID);
-    const deduped = deduplicateRefsByContext(refs, effectiveAuthor);
+    const deduped = deduplicateRefsByContext(
+      refs,
+      knowledgeDBs,
+      effectiveAuthor
+    );
     if (deduped.size === 0) {
       return List<ID | LongID>();
     }

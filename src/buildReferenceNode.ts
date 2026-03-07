@@ -6,6 +6,7 @@ import {
   shortID,
   splitID,
   itemPassesFilters,
+  getNodeTextHash,
 } from "./connections";
 import {
   getVersionedDisplayText,
@@ -146,6 +147,46 @@ function resolveLabels(
     relation.root
   );
   return { contextLabels, targetLabel, fullContext };
+}
+
+function getSemanticNodeKey(
+  knowledgeDBs: KnowledgeDBs,
+  nodeID: LongID | ID,
+  author: PublicKey
+): string {
+  return (
+    getNodeTextHash(getNodeFromID(knowledgeDBs, shortID(nodeID) as ID, author)) ||
+    shortID(nodeID as ID)
+  );
+}
+
+function relationsMatchForVersion(
+  knowledgeDBs: KnowledgeDBs,
+  left: Relations,
+  right: Relations
+): boolean {
+  const useExactMatch =
+    left.author === right.author && left.root === right.root;
+  if (useExactMatch) {
+    return (
+      left.head === right.head && left.context.equals(right.context)
+    );
+  }
+
+  return (
+    getSemanticNodeKey(knowledgeDBs, left.head, left.author) ===
+      getSemanticNodeKey(knowledgeDBs, right.head, right.author) &&
+    left.context.size === right.context.size &&
+    left.context.every(
+      (nodeID, index) =>
+        getSemanticNodeKey(knowledgeDBs, nodeID, left.author) ===
+        getSemanticNodeKey(
+          knowledgeDBs,
+          right.context.get(index) as ID,
+          right.author
+        )
+    )
+  );
 }
 
 
@@ -430,8 +471,7 @@ export function buildReferenceItem(
   const parentRelation = getRelationForView(data, parentPath, stack);
   if (
     parentRelation &&
-    ref.relation.head === parentRelation.head &&
-    ref.relation.context.equals(parentRelation.context)
+    relationsMatchForVersion(data.knowledgeDBs, ref.relation, parentRelation)
   ) {
     const versionMeta = computeVersionMeta(data, viewPath, stack);
     return { ...outgoing, text: outgoing.text, versionMeta };

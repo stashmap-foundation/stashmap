@@ -35,7 +35,6 @@ import {
   LOG_NODE_ID,
   createConcreteRefId,
   isRefId,
-  findUniqueText,
   VERSIONS_NODE_ID,
 } from "./connections";
 import {
@@ -251,7 +250,9 @@ function addCrefToLog(plan: Plan, relationID: LongID): Plan {
   const logRelations = getAlternativeRelations(
     planWithLog.knowledgeDBs,
     LOG_NODE_ID,
-    List<ID>()
+    List<ID>(),
+    undefined,
+    planWithLog.user.publicKey
   )
     .filter(
       (candidate) =>
@@ -531,67 +532,6 @@ export function planExpandNode(
   );
 }
 
-
-function resolveCollisions(
-  plan: Plan,
-  nodeIDsArray: (LongID | ID)[],
-  parentViewPath: ViewPath,
-  stack: ID[],
-  excludeNodeIDs?: readonly ID[]
-): [Plan, (LongID | ID)[]] {
-  const relation = getRelationForView(plan, parentViewPath, stack);
-  if (!relation) {
-    return [plan, nodeIDsArray];
-  }
-
-  const [parentNodeID] = getNodeIDFromView(plan, parentViewPath);
-  const parentContext = getContext(plan, parentViewPath, stack);
-  const nodeContext = parentContext.push(parentNodeID);
-
-  return nodeIDsArray.reduce<[Plan, (LongID | ID)[]]>(
-    ([accPlan, accIDs], nodeID) => {
-      if (isRefId(nodeID)) {
-        return [accPlan, [...accIDs, nodeID]];
-      }
-
-      const alreadyExists = relation.items.some(
-        (item) =>
-          item.nodeID === nodeID &&
-          (!excludeNodeIDs || !excludeNodeIDs.includes(item.nodeID))
-      );
-      const alreadyAdded = accIDs.some((id) => id === nodeID);
-      if (!alreadyExists && !alreadyAdded) {
-        return [accPlan, [...accIDs, nodeID]];
-      }
-
-      const node = getNodeFromID(
-        accPlan.knowledgeDBs,
-        nodeID,
-        accPlan.user.publicKey
-      );
-      if (!node || node.type !== "text") {
-        return [accPlan, [...accIDs, nodeID]];
-      }
-
-      const relationIDs = relation.items.map((item) => item.nodeID).toArray();
-      const uniqueText = findUniqueText(node.text, relationIDs);
-      const variantNode = newNode(uniqueText);
-      const planWithVariant = planUpsertNode(accPlan, variantNode);
-      const planWithVersion = planCreateVersion(
-        planWithVariant,
-        variantNode.id,
-        node.text,
-        nodeContext,
-        relation.root
-      );
-      return [planWithVersion, [...accIDs, variantNode.id]];
-    },
-    [plan, []]
-  );
-}
-
-// excludeFromCollisions: node IDs about to be disconnected (e.g. during move),
-// so they shouldn't count as existing siblings when detecting collisions.
 export function planAddToParent(
   plan: Plan,
   nodeIDs: LongID | ID | (LongID | ID)[],
@@ -610,22 +550,14 @@ export function planAddToParent(
   const [, parentView] = getNodeIDFromView(plan, parentViewPath);
   const planWithExpand = planExpandNode(plan, parentView, parentViewPath);
 
-  const [planWithCollisions, resolvedIDs] = resolveCollisions(
-    planWithExpand,
-    nodeIDsArray,
-    parentViewPath,
-    stack,
-    excludeFromCollisions
-  );
-
   const updatedRelationsPlan = upsertRelations(
-    planWithCollisions,
+    planWithExpand,
     parentViewPath,
     stack,
     (relations) =>
       bulkAddRelations(
         relations,
-        resolvedIDs,
+        nodeIDsArray,
         relevance,
         argument,
         insertAtIndex
@@ -636,11 +568,11 @@ export function planAddToParent(
     updatedRelationsPlan,
     parentViewPath,
     stack as ID[],
-    resolvedIDs.length,
+    nodeIDsArray.length,
     insertAtIndex
   );
 
-  return [planUpdateViews(updatedRelationsPlan, updatedViews), resolvedIDs];
+  return [planUpdateViews(updatedRelationsPlan, updatedViews), nodeIDsArray];
 }
 
 type RelationsIdMapping = Map<LongID, LongID>;

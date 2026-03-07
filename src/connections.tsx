@@ -2,6 +2,7 @@ import { List, Set, Map } from "immutable";
 import crypto from "crypto";
 import { newRelations } from "./ViewContext";
 import { SEARCH_PREFIX } from "./constants";
+import { newDB } from "./knowledge";
 
 // Content-addressed node ID generation
 // Node ID = sha256(text).slice(0, 32) - no author prefix
@@ -29,6 +30,37 @@ export function isReferenceNode(node: KnowNode): node is ReferenceNode {
 
 const CONCRETE_REF_PREFIX = "cref:";
 const SHORT_NODE_ID_RE = /^[a-f0-9]{32}$/;
+
+function createRandomNodeID(): ID {
+  return crypto.randomBytes(16).toString("hex") as ID;
+}
+
+function getReservedNodeID(text: string): ID | undefined {
+  if (text === "~versions") {
+    return VERSIONS_NODE_ID;
+  }
+  if (text === "~Log") {
+    return LOG_NODE_ID;
+  }
+  if (text === "") {
+    return EMPTY_NODE_ID;
+  }
+  return undefined;
+}
+
+export function nodeIDFromSeed(seed: string): ID {
+  const normalized = seed.replace(/-/g, "");
+  return SHORT_NODE_ID_RE.test(normalized)
+    ? (normalized as ID)
+    : hashText(seed);
+}
+
+export function getNodeTextHash(node: KnowNode | undefined): ID | undefined {
+  if (!node || !isTextNode(node)) {
+    return undefined;
+  }
+  return node.textHash ?? hashText(node.text);
+}
 
 export function isRefId(id: ID | LongID): boolean {
   return id.startsWith(CONCRETE_REF_PREFIX);
@@ -172,9 +204,12 @@ export type ReferencedByRef = {
 
 export function deduplicateRefsByContext(
   refs: List<ReferencedByRef>,
+  knowledgeDBs: KnowledgeDBs,
   preferAuthor?: PublicKey
 ): List<ReferencedByRef> {
-  const grouped = refs.groupBy((ref) => ref.context.join(":"));
+  const grouped = refs.groupBy((ref) =>
+    getRefContextKey(knowledgeDBs, ref, preferAuthor)
+  );
   return grouped
     .map(
       (grp) =>
@@ -200,13 +235,117 @@ type RawAppearance = {
   relation: Relations;
   knowledgeDB: KnowledgeData;
   isHead: boolean;
+  matchedItemNodeID?: ID;
 };
+
+function getNodeForMatching(
+  knowledgeDBs: KnowledgeDBs,
+  nodeID: LongID | ID,
+  author: PublicKey
+): KnowNode | undefined {
+  if (isRefId(nodeID) || isSearchId(nodeID as ID)) {
+    return undefined;
+  }
+
+  const [remote, localID] = splitID(nodeID as ID);
+  const effectiveAuthor = remote || author;
+  const directNode = knowledgeDBs.get(effectiveAuthor)?.nodes.get(localID);
+  if (directNode) {
+    return directNode;
+  }
+
+  if (!remote) {
+    const defaultNode = newDB().nodes.get(localID);
+    if (defaultNode) {
+      return defaultNode;
+    }
+  }
+
+  return knowledgeDBs
+    .valueSeq()
+    .flatMap((db) => db.nodes.valueSeq())
+    .find((node) => shortID(node.id) === localID || getNodeTextHash(node) === localID);
+}
+
+function getSemanticMatchKey(
+  knowledgeDBs: KnowledgeDBs,
+  nodeID: LongID | ID,
+  author: PublicKey
+): ID {
+  return (
+    getNodeTextHash(getNodeForMatching(knowledgeDBs, nodeID, author)) ||
+    (shortID(nodeID as ID) as ID)
+  );
+}
+
+function nodesMatchForRefs(
+  knowledgeDBs: KnowledgeDBs,
+  candidateNodeID: LongID | ID,
+  candidateAuthor: PublicKey,
+  candidateRoot: ID,
+  targetNodeID: LongID | ID,
+  targetAuthor?: PublicKey,
+  targetRoot?: ID
+): boolean {
+  if (
+    targetAuthor !== undefined &&
+    targetRoot !== undefined &&
+    candidateAuthor === targetAuthor &&
+    candidateRoot === targetRoot
+  ) {
+    return shortID(candidateNodeID as ID) === shortID(targetNodeID as ID);
+  }
+
+  return (
+    getSemanticMatchKey(knowledgeDBs, candidateNodeID, candidateAuthor) ===
+    getSemanticMatchKey(
+      knowledgeDBs,
+      targetNodeID,
+      targetAuthor || candidateAuthor
+    )
+  );
+}
+
+function contextsMatchForRefs(
+  knowledgeDBs: KnowledgeDBs,
+  candidateContext: Context,
+  candidateAuthor: PublicKey,
+  candidateRoot: ID,
+  targetContext: Context,
+  targetAuthor?: PublicKey,
+  targetRoot?: ID
+): boolean {
+  if (
+    targetAuthor !== undefined &&
+    targetRoot !== undefined &&
+    candidateAuthor === targetAuthor &&
+    candidateRoot === targetRoot
+  ) {
+    return candidateContext.equals(targetContext);
+  }
+
+  return (
+    candidateContext.size === targetContext.size &&
+    candidateContext.every((nodeID, index) =>
+      nodesMatchForRefs(
+        knowledgeDBs,
+        nodeID,
+        candidateAuthor,
+        candidateRoot,
+        targetContext.get(index) as ID,
+        targetAuthor,
+        targetRoot
+      )
+    )
+  );
+}
 
 function findNodeAppearances(
   knowledgeDBs: KnowledgeDBs,
-  nodeID: LongID | ID
+  nodeID: LongID | ID,
+  targetAuthor?: PublicKey,
+  targetRoot?: ID
 ): List<RawAppearance> {
-  const targetShortID = shortID(nodeID);
   return knowledgeDBs.reduce((acc, knowledgeDB) => {
     return knowledgeDB.relations.reduce((rdx, relation) => {
       if (
@@ -215,16 +354,40 @@ function findNodeAppearances(
       ) {
         return rdx;
       }
-      const isInItems = relation.items.some(
-        (item) => item.nodeID === nodeID && item.relevance !== "not_relevant"
+      const matchedItem = relation.items.find(
+        (item) =>
+          item.relevance !== "not_relevant" &&
+          !isRefId(item.nodeID) &&
+          nodesMatchForRefs(
+            knowledgeDBs,
+            item.nodeID,
+            relation.author,
+            relation.root,
+            nodeID,
+            targetAuthor,
+            targetRoot
+          )
       );
+      const isInItems = !!matchedItem;
       const isHeadWithChildren =
-        relation.head === targetShortID && relation.items.size > 0;
+        relation.items.size > 0 &&
+        nodesMatchForRefs(
+          knowledgeDBs,
+          relation.head,
+          relation.author,
+          relation.root,
+          nodeID,
+          targetAuthor,
+          targetRoot
+        );
       if (isHeadWithChildren || isInItems) {
         return rdx.push({
           relation,
           knowledgeDB,
           isHead: isHeadWithChildren && !isInItems,
+          matchedItemNodeID: matchedItem
+            ? (shortID(matchedItem.nodeID) as ID)
+            : undefined,
         });
       }
       return rdx;
@@ -295,7 +458,7 @@ function resolveAppearance(
   app: RawAppearance,
   targetShortID: ID
 ): ReferencedByRef | undefined {
-  const { relation, knowledgeDB, isHead } = app;
+  const { relation, knowledgeDB, isHead, matchedItemNodeID } = app;
   if (isHead) {
     return {
       relationID: relation.id,
@@ -317,25 +480,63 @@ function resolveAppearance(
     relationID: relation.id,
     context: relation.context.push(relation.head as ID),
     updated: relation.updated,
-    targetNode: targetShortID,
+    targetNode: matchedItemNodeID || targetShortID,
   };
 }
 
 export function findRefsToNode(
   knowledgeDBs: KnowledgeDBs,
   nodeID: LongID | ID,
-  filterContext?: Context
+  filterContext?: Context,
+  targetAuthor?: PublicKey,
+  targetRoot?: ID
 ): List<ReferencedByRef> {
   const targetShortID = shortID(nodeID);
-  const appearances = findNodeAppearances(knowledgeDBs, nodeID);
-  const rawRefs = appearances
-    .map((app) => resolveAppearance(app, targetShortID))
-    .filter((ref): ref is ReferencedByRef => ref !== undefined)
+  const appearances = findNodeAppearances(
+    knowledgeDBs,
+    nodeID,
+    targetAuthor,
+    targetRoot
+  );
+  const resolvedRefs = appearances
+    .map((app) => {
+      const ref = resolveAppearance(app, targetShortID);
+      if (!ref) {
+        return undefined;
+      }
+      return {
+        ref,
+        author: app.relation.author,
+        root: app.relation.root,
+      };
+    })
+    .filter(
+      (
+        resolved
+      ): resolved is {
+        ref: ReferencedByRef;
+        author: PublicKey;
+        root: ID;
+      } => resolved !== undefined
+    )
     .toList();
 
   const allRefs = filterContext
-    ? rawRefs.filter((ref) => ref.context.equals(filterContext))
-    : rawRefs;
+    ? resolvedRefs
+        .filter(({ ref, author, root }) =>
+          contextsMatchForRefs(
+            knowledgeDBs,
+            ref.context,
+            author,
+            root,
+            filterContext,
+            targetAuthor,
+            targetRoot
+          )
+        )
+        .map(({ ref }) => ref)
+        .toList()
+    : resolvedRefs.map(({ ref }) => ref).toList();
 
   return allRefs
     .groupBy((ref) => ref.relationID)
@@ -357,9 +558,11 @@ function contextKeyForCref(
     effectiveAuthor
   );
   if (!rel) return undefined;
-  return parsed.targetNode
-    ? rel.context.push(rel.head as ID).join(":")
-    : rel.context.join(":");
+  return getSemanticContextKey(
+    knowledgeDBs,
+    parsed.targetNode ? rel.context.push(rel.head as ID) : rel.context,
+    rel.author
+  );
 }
 
 function coveredContextKeys(
@@ -370,7 +573,66 @@ function coveredContextKeys(
   return crefIDs.reduce((acc, crefID) => {
     const key = contextKeyForCref(knowledgeDBs, crefID, effectiveAuthor);
     return key !== undefined ? acc.add(key) : acc;
-  }, List<string>().toSet());
+  }, Set<string>());
+}
+
+function getSemanticContextKey(
+  knowledgeDBs: KnowledgeDBs,
+  context: Context,
+  author: PublicKey
+): string {
+  return context
+    .map((nodeID) => getSemanticMatchKey(knowledgeDBs, nodeID, author))
+    .join(":");
+}
+
+function getRefContextKey(
+  knowledgeDBs: KnowledgeDBs,
+  ref: ReferencedByRef,
+  effectiveAuthor?: PublicKey
+): string {
+  const [author] = splitID(ref.relationID);
+  const contextAuthor = author || effectiveAuthor;
+  if (!contextAuthor) {
+    return ref.context.join(":");
+  }
+  return getSemanticContextKey(
+    knowledgeDBs,
+    ref.context,
+    contextAuthor
+  );
+}
+
+function refHasActiveVersions(
+  knowledgeDBs: KnowledgeDBs,
+  ref: ReferencedByRef,
+  effectiveAuthor: PublicKey
+): boolean {
+  const relation = getRelationsNoReferencedBy(
+    knowledgeDBs,
+    ref.relationID,
+    effectiveAuthor
+  );
+  if (!relation) {
+    return false;
+  }
+
+  const targetNode = ref.targetNode || (relation.head as ID);
+  const baseContext = ref.targetNode
+    ? relation.context.push(relation.head as ID)
+    : relation.context;
+  const versionsContext = baseContext.push(targetNode);
+
+  return knowledgeDBs
+    .get(relation.author)
+    ?.relations
+    .valueSeq()
+    .some(
+      (candidate) =>
+        candidate.head === VERSIONS_NODE_ID &&
+        candidate.root === relation.root &&
+        candidate.context.equals(versionsContext)
+    ) ?? false;
 }
 
 export function getOccurrencesForNode(
@@ -379,10 +641,17 @@ export function getOccurrencesForNode(
   currentRelationID: LongID | undefined,
   effectiveAuthor: PublicKey,
   currentContext: Context,
+  currentRoot?: ID,
   currentItems?: List<RelationItem>,
   incomingCrefIDs?: List<LongID>
 ): List<LongID> {
-  const allRefs = findRefsToNode(knowledgeDBs, nodeID);
+  const allRefs = findRefsToNode(
+    knowledgeDBs,
+    nodeID,
+    undefined,
+    effectiveAuthor,
+    currentRoot
+  );
   const contextRoot = currentContext.first();
   const outgoingCrefIDs = currentItems
     ? currentItems
@@ -395,15 +664,54 @@ export function getOccurrencesForNode(
     outgoingCrefIDs.concat(incomingCrefIDs || List<LongID>()),
     effectiveAuthor
   );
+  const sharesSemanticRoot = (ref: ReferencedByRef): boolean => {
+    const refRoot = ref.context.first();
+    if (!contextRoot || !refRoot) {
+      return false;
+    }
+    const [refAuthor] = splitID(ref.relationID);
+    return (
+      getSemanticMatchKey(knowledgeDBs, refRoot as ID, refAuthor || effectiveAuthor) ===
+      getSemanticMatchKey(knowledgeDBs, contextRoot as ID, effectiveAuthor)
+    );
+  };
   const filtered = allRefs
     .filter((ref) => ref.relationID !== currentRelationID)
     .filter((ref) =>
       ref.targetNode
-        ? !contextRoot || ref.context.first() !== contextRoot
+        ? !contextRoot || !sharesSemanticRoot(ref)
         : currentContext.size > 0 && ref.context.size === 0
     )
-    .filter((ref) => !covered.has(ref.context.join(":")));
-  const deduped = deduplicateRefsByContext(filtered, effectiveAuthor);
+    .filter(
+      (ref) => !covered.has(getRefContextKey(knowledgeDBs, ref, effectiveAuthor))
+    );
+  const deduped = filtered
+    .groupBy((ref) => getRefContextKey(knowledgeDBs, ref, effectiveAuthor))
+    .map(
+      (group) =>
+        group
+          .sortBy((ref) => {
+            const [author] = splitID(ref.relationID);
+            const isOther =
+              effectiveAuthor &&
+              author !== undefined &&
+              author !== effectiveAuthor
+                ? 1
+                : 0;
+            const hasVersions = refHasActiveVersions(
+              knowledgeDBs,
+              ref,
+              effectiveAuthor
+            )
+              ? 0
+              : 1;
+            const targetPreference = ref.targetNode ? 0 : 1;
+            return [isOther, hasVersions, targetPreference, -ref.updated];
+          })
+          .first()!
+    )
+    .valueSeq()
+    .toList();
   return deduped
     .sortBy((ref) => `${-ref.updated}:${ref.context.join(":")}`)
     .map((ref) => createConcreteRefId(ref.relationID, ref.targetNode))
@@ -478,7 +786,11 @@ export function getIncomingCrefsForNode(
     }, acc);
   }, List<ReferencedByRef>());
 
-  const deduped = deduplicateRefsByContext(refs, effectiveAuthor);
+  const deduped = deduplicateRefsByContext(
+    refs,
+    knowledgeDBs,
+    effectiveAuthor
+  );
   return deduped
     .sortBy((ref) => `${-ref.updated}:${ref.context.join(":")}`)
     .map((ref) => createConcreteRefId(ref.relationID))
@@ -833,10 +1145,11 @@ export function bulkAddRelations(
   }, relations);
 }
 
-export function newNode(text: string): KnowNode {
+export function newNode(text: string, id?: ID): KnowNode {
   return {
     text,
-    id: hashText(text), // Content-addressed: ID = hash(text)
+    id: getReservedNodeID(text) ?? id ?? createRandomNodeID(),
+    textHash: hashText(text),
     type: "text",
   };
 }
@@ -932,15 +1245,4 @@ export function injectEmptyNodesIntoKnowledgeDBs(
     nodes: updatedNodes,
     relations: updatedRelations,
   });
-}
-
-export function findUniqueText(
-  text: string,
-  existingIDs: ID[],
-  n: number = 1
-): string {
-  const candidate = `${text} (${n})`;
-  return existingIDs.includes(hashText(candidate))
-    ? findUniqueText(text, existingIDs, n + 1)
-    : candidate;
 }

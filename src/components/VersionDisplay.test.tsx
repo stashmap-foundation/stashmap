@@ -38,7 +38,7 @@ describe("Version Display", () => {
 
     await screen.findByLabelText("edit BCN");
 
-    // Create second root referencing the same node (hashText("Barcelona"))
+    // Create second root referencing the same text in another tree
     await userEvent.click(await screen.findByLabelText("Create new note"));
     await type("Root2{Enter}{Tab}Barcelona{Enter}{Tab}Info{Escape}");
 
@@ -569,7 +569,7 @@ My Dashboard
   });
 });
 
-describe("Duplicate node collision resolution", () => {
+describe("Duplicate sibling independence", () => {
   test("Typing same text twice creates independent siblings", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
@@ -657,7 +657,7 @@ Root
     `);
   });
 
-  test("DnD copy into parent with same-text sibling creates independent node", async () => {
+  test("DnD copy into parent with same-text sibling keeps nodes independent", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
@@ -724,7 +724,7 @@ Root
     `);
   });
 
-  test("Paste collision: paste text matching existing sibling creates independent node", async () => {
+  test("Pasting text matching an existing sibling keeps both nodes independent", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
@@ -767,7 +767,7 @@ Root
     `);
   });
 
-  test("Cmd+V paste collision: paste duplicates with different children next to existing", async () => {
+  test("Cmd+V paste with duplicate text keeps both sibling subtrees independent", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 

@@ -225,10 +225,20 @@ export function TreeViewNodeLoader({
     : nodeIDs;
 
   const filter = nodeIDsWithRange.reduce((rdx, nodeID) => {
-    const withNode = addNodeToFilters(rdx, nodeID);
+    const withNode = addNodeToFilters(
+      rdx,
+      nodeID,
+      data.knowledgeDBs,
+      data.user.publicKey
+    );
 
     if (!isConcreteRefId(nodeID)) {
-      return addReferencedByToFilters(withNode, nodeID);
+      return addReferencedByToFilters(
+        withNode,
+        nodeID,
+        data.knowledgeDBs,
+        data.user.publicKey
+      );
     }
 
     const parsed = parseConcreteRefId(nodeID);
@@ -236,7 +246,13 @@ export function TreeViewNodeLoader({
       return withNode;
     }
 
-    const withRelation = addListToFilters(withNode, parsed.relationID, nodeID);
+    const withRelation = addListToFilters(
+      withNode,
+      parsed.relationID,
+      nodeID,
+      data.knowledgeDBs,
+      data.user.publicKey
+    );
 
     const relation = getRelationsNoReferencedBy(
       data.knowledgeDBs,
@@ -248,12 +264,23 @@ export function TreeViewNodeLoader({
     }
 
     const withTargetRefs = parsed.targetNode
-      ? addReferencedByToFilters(withRelation, parsed.targetNode)
+      ? addReferencedByToFilters(
+          withRelation,
+          parsed.targetNode,
+          data.knowledgeDBs,
+          data.user.publicKey
+        )
       : withRelation;
 
     const contextNodes = [...relation.context.toArray(), relation.head] as ID[];
     const withContextNodes = contextNodes.reduce(
-      (acc, contextNodeID) => addNodeToFilters(acc, contextNodeID),
+      (acc, contextNodeID) =>
+        addNodeToFilters(
+          acc,
+          contextNodeID,
+          data.knowledgeDBs,
+          data.user.publicKey
+        ),
       withTargetRefs
     );
     return addDescendantsToFilters(withContextNodes, relation.head);
@@ -489,7 +516,13 @@ export function TreeView(): JSX.Element {
       return baseFilter;
     }
     return searchRelation.items.reduce(
-      (rdx, item) => addReferencedByToFilters(rdx, item.nodeID),
+      (rdx, item) =>
+        addReferencedByToFilters(
+          rdx,
+          item.nodeID,
+          data.knowledgeDBs,
+          data.user.publicKey
+        ),
       baseFilter
     );
   })();

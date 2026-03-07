@@ -254,6 +254,7 @@ declare global {
 
   type TextNode = BasicNode & {
     type: "text";
+    textHash?: ID;
   };
 
   type ReferenceNode = {

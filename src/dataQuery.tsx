@@ -8,6 +8,7 @@ import {
   parseConcreteRefId,
   getRelationsNoReferencedBy,
   VERSIONS_NODE_ID,
+  getNodeTextHash,
 } from "./connections";
 import { parseRef } from "./buildReferenceNode";
 import { REFERENCED_BY } from "./constants";
@@ -47,6 +48,19 @@ function addIDToFilter(
     ...filter,
     [tag]: [...d, local],
   };
+}
+
+function getDocumentNodeQueryIDs(
+  knowledgeDBs: KnowledgeDBs,
+  myself: PublicKey,
+  id: LongID | ID
+): Array<LongID | ID> {
+  const queryIDs: Array<LongID | ID> = [id];
+  const textHash = getNodeTextHash(getNodeFromID(knowledgeDBs, id, myself));
+  if (textHash && !queryIDs.includes(textHash)) {
+    queryIDs.push(textHash);
+  }
+  return queryIDs;
 }
 
 type Filters = {
@@ -105,6 +119,8 @@ export function addRelationIDToFilters(
 export function addNodeToFilters(
   filters: Filters,
   id: LongID | ID,
+  knowledgeDBs: KnowledgeDBs,
+  myself: PublicKey,
   includeListQuery: boolean = false
 ): Filters {
   if (isConcreteRefId(id)) {
@@ -112,15 +128,24 @@ export function addNodeToFilters(
     if (parsed) {
       const withRelation = addRelationIDToFilters(filters, parsed.relationID);
       return parsed.targetNode
-        ? addNodeToFilters(withRelation, parsed.targetNode, includeListQuery)
+        ? addNodeToFilters(
+            withRelation,
+            parsed.targetNode,
+            knowledgeDBs,
+            myself,
+            includeListQuery
+          )
         : withRelation;
     }
   }
 
-  const baseFilters = {
-    ...addAuthorFromIDToFilters(filters, id),
-    documentByNode: addIDToFilter(filters.documentByNode, id, "#n"),
-  };
+  const baseFilters = getDocumentNodeQueryIDs(knowledgeDBs, myself, id).reduce(
+    (acc, queryID) => ({
+      ...addAuthorFromIDToFilters(acc, id),
+      documentByNode: addIDToFilter(acc.documentByNode, queryID, "#n"),
+    }),
+    filters
+  );
 
   if (!includeListQuery) {
     return baseFilters;
@@ -138,26 +163,40 @@ export function addNodeToFilters(
 
 export function addReferencedByToFilters(
   filters: Filters,
-  id: LongID | ID
+  id: LongID | ID,
+  knowledgeDBs: KnowledgeDBs,
+  myself: PublicKey
 ): Filters {
-  return {
-    ...addAuthorFromIDToFilters(filters, id),
-    documentByNode: addIDToFilter(filters.documentByNode, id, "#n"),
-  };
+  return getDocumentNodeQueryIDs(knowledgeDBs, myself, id).reduce(
+    (acc, queryID) => ({
+      ...addAuthorFromIDToFilters(acc, id),
+      documentByNode: addIDToFilter(acc.documentByNode, queryID, "#n"),
+    }),
+    filters
+  );
 }
 
 export function addListToFilters(
   filters: Filters,
   listID: LongID,
-  nodeID: LongID | ID
+  nodeID: LongID | ID,
+  knowledgeDBs: KnowledgeDBs,
+  myself: PublicKey
 ): Filters {
   if (listID === REFERENCED_BY) {
-    return addReferencedByToFilters(filters, nodeID);
+    return addReferencedByToFilters(filters, nodeID, knowledgeDBs, myself);
   }
 
   return {
     ...addRelationIDToFilters(filters, listID),
-    documentByNode: addIDToFilter(filters.documentByNode, nodeID, "#n"),
+    documentByNode: getDocumentNodeQueryIDs(
+      knowledgeDBs,
+      myself,
+      nodeID
+    ).reduce(
+      (acc, queryID) => addIDToFilter(acc, queryID, "#n"),
+      filters.documentByNode
+    ),
   };
 }
 
@@ -269,7 +308,7 @@ export function LoadData({
   referencedBy?: boolean;
   lists?: boolean;
 }): JSX.Element {
-  const { user, contacts, projectMembers } = useData();
+  const { user, contacts, projectMembers, knowledgeDBs } = useData();
   const effectiveAuthor = useCurrentPane().author;
 
   const baseFilter = createBaseFilter(
@@ -280,12 +319,23 @@ export function LoadData({
   );
 
   const filter = nodeIDs.reduce((acc, nodeID) => {
-    const withNode = addNodeToFilters(acc, nodeID, lists);
+    const withNode = addNodeToFilters(
+      acc,
+      nodeID,
+      knowledgeDBs,
+      user.publicKey,
+      lists
+    );
     const withDescendants = descendants
       ? addDescendantsToFilters(withNode, nodeID)
       : withNode;
     const withReferencedBy = referencedBy
-      ? addReferencedByToFilters(withDescendants, nodeID)
+      ? addReferencedByToFilters(
+          withDescendants,
+          nodeID,
+          knowledgeDBs,
+          user.publicKey
+        )
       : withDescendants;
     return withReferencedBy;
   }, baseFilter);
@@ -326,7 +376,8 @@ export function LoadRelationData({
   );
   const filter = relation
     ? [...relation.context.toArray(), relation.head].reduce(
-        (acc, nodeID) => addNodeToFilters(acc, nodeID),
+        (acc, nodeID) =>
+          addNodeToFilters(acc, nodeID, knowledgeDBs, user.publicKey),
         withRelation
       )
     : withRelation;

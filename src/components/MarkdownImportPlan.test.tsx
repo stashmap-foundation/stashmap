@@ -13,7 +13,6 @@ import {
 import {
   addRelationToRelations,
   getRelationsNoReferencedBy,
-  hashText,
   newNode,
   shortID,
 } from "../connections";
@@ -28,6 +27,7 @@ import {
 import {
   ALICE,
   expectTree,
+  findNodeByText,
   navigateToNodeViaSearch,
   renderApp,
   renderTree,
@@ -133,7 +133,8 @@ test("planCreateNodesFromMarkdownTrees creates only standalone relations", () =>
     trees
   );
   const parentID = topNodeIDs[0];
-  const childID = hashText("Child") as ID;
+  const childID = findNodeByText(plan, "Child")?.id;
+  const grandchildID = findNodeByText(plan, "Grandchild")?.id;
   const parentRelation = getRelationsNoReferencedBy(
     plan.knowledgeDBs,
     topRelationIDs[0],
@@ -141,11 +142,13 @@ test("planCreateNodesFromMarkdownTrees creates only standalone relations", () =>
   );
 
   expect(parentRelation).toBeDefined();
+  expect(childID).toBeDefined();
+  expect(grandchildID).toBeDefined();
 
   const standaloneChildRelation = getRelationsForCurrentTree(
     plan.knowledgeDBs,
     plan.user.publicKey,
-    childID,
+    childID!,
     List<ID>([parentID]),
     undefined,
     false,
@@ -153,15 +156,14 @@ test("planCreateNodesFromMarkdownTrees creates only standalone relations", () =>
   );
 
   expect(parentRelation?.items.first()?.nodeID).toEqual(childID);
-  expect(standaloneChildRelation?.items.first()?.nodeID).toEqual(
-    hashText("Grandchild")
-  );
+  expect(standaloneChildRelation?.items.first()?.nodeID).toEqual(grandchildID);
 });
 
 function setupRootPlan(aliceState: () => Parameters<typeof createPlan>[0]): {
   plan: Plan;
   parentPath: ViewPath;
   stack: ID[];
+  rootID: ID;
 } {
   const pk = aliceState().user.publicKey;
   const root = newNode("Root");
@@ -184,40 +186,42 @@ function setupRootPlan(aliceState: () => Parameters<typeof createPlan>[0]): {
     },
     views
   );
-  return { plan, parentPath, stack: [root.id] };
+  return { plan, parentPath, stack: [root.id], rootID: root.id };
 }
 
 test("planPasteMarkdownTrees moves children to parent context", () => {
   const [alice] = setup([ALICE]);
-  const { plan: basePlan, parentPath, stack } = setupRootPlan(alice);
+  const { plan: basePlan, parentPath, stack, rootID } = setupRootPlan(alice);
 
   const trees = parseMarkdownImportFiles([
     { name: "t.md", markdown: "# City\n\n## Vienna" },
   ]);
   const plan = planPasteMarkdownTrees(basePlan, trees, parentPath, stack, 0);
 
-  const cityID = hashText("City") as ID;
+  const cityID = findNodeByText(plan, "City")?.id;
+  const viennaID = findNodeByText(plan, "Vienna")?.id;
   const rootRelation = getRelationForView(plan, parentPath, stack);
+  expect(cityID).toBeDefined();
+  expect(viennaID).toBeDefined();
 
   const cityRelation = getRelationsForCurrentTree(
     plan.knowledgeDBs,
     plan.user.publicKey,
-    cityID,
-    List<ID>([hashText("Root") as ID]),
+    cityID!,
+    List<ID>([rootID]),
     undefined,
     false,
     rootRelation?.root
   );
-  expect(cityRelation?.items.first()?.nodeID).toEqual(hashText("Vienna"));
+  expect(cityRelation?.items.first()?.nodeID).toEqual(viennaID);
 });
 
 test("planPasteMarkdownTrees: collision does not shadow existing children", () => {
   const [alice] = setup([ALICE]);
-  const { plan: basePlan, parentPath, stack } = setupRootPlan(alice);
+  const { plan: basePlan, parentPath, stack, rootID } = setupRootPlan(alice);
 
   const existingCity = newNode("City");
   const existingVienna = newNode("Vienna");
-  const rootID = hashText("Root") as ID;
   const rootRelation = getRelationForView(basePlan, parentPath, stack);
   const cityRelations = addRelationToRelations(
     newRelations(
@@ -254,24 +258,23 @@ test("planPasteMarkdownTrees: collision does not shadow existing children", () =
   const existingCityRel = getRelationsForCurrentTree(
     plan.knowledgeDBs,
     plan.user.publicKey,
-    hashText("City") as ID,
+    existingCity.id,
     List<ID>([rootID]),
     undefined,
     false,
     getRelationForView(plan, parentPath, stack)?.root
   );
-  expect(
-    existingCityRel?.items.some((i) => i.nodeID === hashText("Vienna"))
-  ).toBe(true);
+  expect(existingCityRel?.items.some((i) => i.nodeID === existingVienna.id)).toBe(
+    true
+  );
 });
 
 test("buildDocumentEvents does not serialize pasted collision child as a standalone root", () => {
   const [alice] = setup([ALICE]);
-  const { plan: basePlan, parentPath, stack } = setupRootPlan(alice);
+  const { plan: basePlan, parentPath, stack, rootID } = setupRootPlan(alice);
 
   const existingCity = newNode("City");
   const existingVienna = newNode("Vienna");
-  const rootID = hashText("Root") as ID;
   const withExisting = planUpsertRelations(
     planUpsertNode(planUpsertNode(basePlan, existingCity), existingVienna),
     addRelationToRelations(
@@ -339,13 +342,13 @@ test("Planning multiple markdown files returns top nodes in import order", () =>
     { name: "two.md", markdown: "# Two" },
   ]);
 
-  expect(topNodeIDs).toEqual([hashText("One"), hashText("Two")]);
-  expect(
-    plan.knowledgeDBs.get(plan.user.publicKey)?.nodes.has(hashText("One"))
-  ).toBe(true);
-  expect(
-    plan.knowledgeDBs.get(plan.user.publicKey)?.nodes.has(hashText("Two"))
-  ).toBe(true);
+  const topTexts = topNodeIDs.map(
+    (id) => plan.knowledgeDBs.get(plan.user.publicKey)?.nodes.get(shortID(id))?.text
+  );
+
+  expect(topTexts).toEqual(["One", "Two"]);
+  expect(findNodeByText(plan, "One")).toBeDefined();
+  expect(findNodeByText(plan, "Two")).toBeDefined();
 });
 
 test("same-named siblings and grandchildren get independent children", async () => {

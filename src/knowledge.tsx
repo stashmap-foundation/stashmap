@@ -1,10 +1,11 @@
 import { Map } from "immutable";
-import { EMPTY_NODE_ID } from "./connections";
+import { EMPTY_NODE_ID, hashText } from "./connections";
 
 export function newDB(): KnowledgeData {
   const emptyNode: KnowNode = {
     id: EMPTY_NODE_ID,
     text: "",
+    textHash: hashText(""),
     type: "text",
   };
 

@@ -2,7 +2,7 @@ import { Set } from "immutable";
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../commons/Ui";
-import { deleteRelations } from "../connections";
+import { deleteRelations, getRelationItemNodeID } from "../connections";
 import {
   updateViewPathsAfterDeleteNode,
   useNode,
@@ -22,7 +22,10 @@ function disconnectNode(plan: Plan, toDisconnect: LongID | ID): Plan {
   const myDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
   return myDB.relations.reduce((rdx, relation) => {
     const toDelete = relation.items.reduce((indices, item, idx) => {
-      if (item.nodeID === toDisconnect) {
+      if (
+        getRelationItemNodeID(plan.knowledgeDBs, item, relation.author) ===
+        toDisconnect
+      ) {
         return indices.add(idx);
       }
       return indices;

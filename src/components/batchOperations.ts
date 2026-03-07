@@ -377,6 +377,7 @@ export function planBatchIndent(
                 fromKey,
                 toKey: viewPathToString(
                   addNodeToPathWithRelations(
+                    moved,
                     prevSibling.viewPath,
                     targetRelationAfter,
                     insertAt
@@ -459,6 +460,7 @@ export function planBatchOutdent(
                 fromKey,
                 toKey: viewPathToString(
                   addNodeToPathWithRelations(
+                    moved,
                     grandParentPath,
                     targetRelationAfter,
                     insertAt

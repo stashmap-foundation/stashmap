@@ -185,7 +185,7 @@ export function planPasteMarkdownTrees(
       planCreateNodesFromMarkdownTrees(accPlan, [tree]);
     const [planWithAdded, actualIDs] = planAddToParent(
       planWithNode,
-      topNodeIDs,
+      topRelationIDs,
       parentViewPath,
       stack,
       insertAt

@@ -89,14 +89,14 @@ describe("RELEVANCE_LABELS", () => {
 
 describe("itemMatchesType", () => {
   test("matches relevant items", () => {
-    const item: RelationItem = { nodeID: "test" as ID, relevance: "relevant" };
+    const item: RelationItem = { id: "test" as ID, relevance: "relevant" };
     expect(itemMatchesType(item, "relevant")).toBe(true);
     expect(itemMatchesType(item, "contains")).toBe(false);
   });
 
   test("matches maybe_relevant items", () => {
     const item: RelationItem = {
-      nodeID: "test" as ID,
+      id: "test" as ID,
       relevance: "maybe_relevant",
     };
     expect(itemMatchesType(item, "maybe_relevant")).toBe(true);
@@ -104,14 +104,14 @@ describe("itemMatchesType", () => {
   });
 
   test("matches contains items with undefined relevance", () => {
-    const item: RelationItem = { nodeID: "test" as ID, relevance: undefined };
+    const item: RelationItem = { id: "test" as ID, relevance: undefined };
     expect(itemMatchesType(item, "contains")).toBe(true);
     expect(itemMatchesType(item, "relevant")).toBe(false);
   });
 
   test("matches little_relevant items", () => {
     const item: RelationItem = {
-      nodeID: "test" as ID,
+      id: "test" as ID,
       relevance: "little_relevant",
     };
     expect(itemMatchesType(item, "little_relevant")).toBe(true);
@@ -120,7 +120,7 @@ describe("itemMatchesType", () => {
 
   test("matches not_relevant items", () => {
     const item: RelationItem = {
-      nodeID: "test" as ID,
+      id: "test" as ID,
       relevance: "not_relevant",
     };
     expect(itemMatchesType(item, "not_relevant")).toBe(true);
@@ -129,14 +129,14 @@ describe("itemMatchesType", () => {
 
   test("contains filter only matches items with undefined relevance AND undefined argument", () => {
     const itemWithArg: RelationItem = {
-      nodeID: "test" as ID,
+      id: "test" as ID,
       relevance: undefined,
       argument: "confirms",
     };
     expect(itemMatchesType(itemWithArg, "contains")).toBe(false);
 
     const itemWithoutArg: RelationItem = {
-      nodeID: "test" as ID,
+      id: "test" as ID,
       relevance: undefined,
     };
     expect(itemMatchesType(itemWithoutArg, "contains")).toBe(true);
@@ -144,12 +144,12 @@ describe("itemMatchesType", () => {
 
   test("matches argument types correctly", () => {
     const confirmItem: RelationItem = {
-      nodeID: "test" as ID,
+      id: "test" as ID,
       relevance: undefined,
       argument: "confirms",
     };
     const contraItem: RelationItem = {
-      nodeID: "test" as ID,
+      id: "test" as ID,
       relevance: undefined,
       argument: "contra",
     };

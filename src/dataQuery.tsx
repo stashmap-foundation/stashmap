@@ -9,6 +9,7 @@ import {
   getRelationsNoReferencedBy,
   VERSIONS_NODE_ID,
   getNodeTextHash,
+  getRelationItemNodeID,
 } from "./connections";
 import { parseRef } from "./buildReferenceNode";
 import { REFERENCED_BY } from "./constants";
@@ -436,7 +437,10 @@ export function LoadMissingVersionNodes({
       );
       if (!versionsRel) return acc;
 
-      const firstVersionID = versionsRel.items.first()?.nodeID;
+      const firstVersionItem = versionsRel.items.first();
+      const firstVersionID = firstVersionItem
+        ? getRelationItemNodeID(data.knowledgeDBs, firstVersionItem, author)
+        : undefined;
       if (!firstVersionID) return acc;
 
       const firstVersionNode = getNodeFromID(

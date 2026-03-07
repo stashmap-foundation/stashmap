@@ -22,6 +22,8 @@ import {
   findRefsToNode,
   getNodeTextHash,
   itemPassesFilters,
+  getRelationItemNodeID,
+  getRelationItemRelation,
 } from "./connections";
 import {
   buildOutgoingReference,
@@ -174,14 +176,14 @@ export function getSuggestionsForNode(
     ? getRelationsNoReferencedBy(knowledgeDBs, currentRelationId, myself)
     : undefined;
   const currentRelationItems: ImmutableSet<LongID | ID> = currentRelation
-    ? currentRelation.items.map((item) => item.nodeID).toSet()
+    ? currentRelation.items.map((item) => item.id).toSet()
     : ImmutableSet<LongID | ID>();
   const currentRelationItemKeys: ImmutableSet<string> = currentRelation
     ? currentRelation.items
         .map((item) =>
           getComparableSuggestionKey(
             knowledgeDBs,
-            item.nodeID,
+            getRelationItemNodeID(knowledgeDBs, item, currentRelation.author),
             currentRelation.author
           )
         )
@@ -191,10 +193,9 @@ export function getSuggestionsForNode(
   const declinedRelationCrefIDs: ImmutableSet<LongID | ID> = currentRelation
     ? currentRelation.items
         .filter(
-          (item) =>
-            isConcreteRefId(item.nodeID) && item.relevance === "not_relevant"
+          (item) => isConcreteRefId(item.id) && item.relevance === "not_relevant"
         )
-        .map((item) => item.nodeID)
+        .map((item) => item.id)
         .toSet()
     : ImmutableSet<LongID | ID>();
 
@@ -233,13 +234,18 @@ export function getSuggestionsForNode(
         if (
           !itemFilters.some((t) => itemMatchesType(item, t)) ||
           item.relevance === "not_relevant" ||
-          currentRelationItems.has(item.nodeID)
+          currentRelationItems.has(item.id)
         ) {
           return itemAcc;
         }
+        const candidateNodeID = getRelationItemNodeID(
+          knowledgeDBs,
+          item,
+          relations.author
+        );
         const candidateKey = getSemanticNodeKey(
           knowledgeDBs,
-          item.nodeID,
+          candidateNodeID,
           relations.author
         );
         if (
@@ -248,7 +254,7 @@ export function getSuggestionsForNode(
         ) {
           return itemAcc;
         }
-        return itemAcc.set(candidateKey, shortID(item.nodeID) as ID);
+        return itemAcc.set(candidateKey, shortID(candidateNodeID) as ID);
       }, acc);
     },
     OrderedMap<string, ID>()
@@ -384,8 +390,12 @@ function getComparableRelationItemKeys(
     )
     .map((item) =>
       useExactMatch
-        ? shortID(item.nodeID)
-        : getSemanticNodeKey(knowledgeDBs, item.nodeID, relation.author)
+        ? shortID(item.id)
+        : getSemanticNodeKey(
+            knowledgeDBs,
+            getRelationItemNodeID(knowledgeDBs, item, relation.author),
+            relation.author
+          )
     )
     .toSet();
 }
@@ -455,7 +465,7 @@ export function getVersionsForRelation(
   });
 
   const existingCrefIDs = currentRelation.items
-    .map((item) => item.nodeID)
+    .map((item) => item.id)
     .filter((id) => isConcreteRefId(id))
     .toSet();
   const currentExactItemIDs = getComparableRelationItemKeys(
@@ -508,8 +518,12 @@ export function getVersionsForRelation(
         )
         .map((item) =>
           useExactMatch
-            ? shortID(item.nodeID)
-            : getSemanticNodeKey(knowledgeDBs, item.nodeID, r.author)
+            ? shortID(item.id)
+            : getSemanticNodeKey(
+                knowledgeDBs,
+                getRelationItemNodeID(knowledgeDBs, item, r.author),
+                r.author
+              )
         )
         .filter((id) => !currentItemIDs.has(id));
       const hasUncoveredAdds = addIDs.some((id) => !coveredIDs.has(id));
@@ -731,6 +745,16 @@ function getDefaultView(id: ID, isRootNode: boolean): View {
   };
 }
 
+function getRelationItemViewNodeID(
+  knowledgeDBs: KnowledgeDBs | undefined,
+  relations: Relations,
+  item: RelationItem
+): LongID | ID {
+  return knowledgeDBs
+    ? getRelationItemNodeID(knowledgeDBs, item, relations.author)
+    : item.id;
+}
+
 export function getViewFromPath(data: Data, path: ViewPath): View {
   const { nodeID } = getLast(path);
   return (
@@ -821,26 +845,33 @@ export function resolveNodeStackToActualIDs(
     if (!currentRelation) {
       return undefined;
     }
+    const relation: Relations = currentRelation;
     const nextRequested = requestedStack[index];
-    const nextNodeID = currentRelation.items
-      .map((item) => item.nodeID)
-      .filter((itemNodeID) => !isRefId(itemNodeID))
-      .map((itemNodeID) => shortID(itemNodeID) as ID)
-      .find((itemNodeID) =>
+    const nextItem: RelationItem | undefined = relation.items.find(
+      (item: RelationItem) => {
+      const itemNodeID = getRelationItemNodeID(
+        knowledgeDBs,
+        item,
+        relation.author
+      );
+      return (
+        !isRefId(itemNodeID) &&
         relationHeadMatchesNode(knowledgeDBs, author, itemNodeID, nextRequested)
       );
+      }
+    );
+    const nextNodeID = nextItem
+      ? (shortID(
+          getRelationItemNodeID(knowledgeDBs, nextItem, relation.author)
+        ) as ID)
+      : undefined;
     if (!nextNodeID) {
       return undefined;
     }
     actualStack.push(nextNodeID);
-    const currentRoot = currentRelation.root;
-    currentRelation = getNewestRelationFromRoot(
-      knowledgeDBs,
-      author,
-      nextNodeID,
-      List<ID>(actualStack.slice(0, -1)),
-      currentRoot
-    );
+    currentRelation = nextItem
+      ? getRelationItemRelation(knowledgeDBs, nextItem, relation.author)
+      : undefined;
     if (!currentRelation && index < requestedStack.length - 1) {
       return undefined;
     }
@@ -953,6 +984,14 @@ export function getRelationForView(
 
   if (isConcreteRefId(nodeID)) {
     return getRelations(data.knowledgeDBs, nodeID, author);
+  }
+
+  const currentItem = getRelationItemForView(data, viewPath);
+  const currentItemRelation = currentItem
+    ? getRelationItemRelation(data.knowledgeDBs, currentItem, author)
+    : undefined;
+  if (currentItemRelation) {
+    return currentItemRelation;
   }
 
   return getRelationsForCurrentTree(
@@ -1159,7 +1198,14 @@ export function getVersionedDisplayText(
   );
   const firstVersion = versions.first();
   if (!firstVersion) return undefined;
-  return getNodeFromID(knowledgeDBs, firstVersion.nodeID, myself)?.text;
+  return (
+    getRelationItemRelation(knowledgeDBs, firstVersion, myself)?.text ||
+    getNodeFromID(
+      knowledgeDBs,
+      getRelationItemNodeID(knowledgeDBs, firstVersion, myself),
+      myself
+    )?.text
+  );
 }
 
 export function getNodeFromView(
@@ -1176,30 +1222,36 @@ export function getNodeFromView(
 
 export function calculateNodeIndex(
   relations: Relations,
-  index: number
+  index: number,
+  knowledgeDBs?: KnowledgeDBs
 ): NodeIndex {
   const item = relations.items.get(index);
   if (!item) {
     throw new Error(`No item found at index ${index}`);
   }
-  // find same relation before this index
-  return relations.items.slice(0, index).filter((i) => i.nodeID === item.nodeID)
-    .size as NodeIndex;
+  const itemNodeID = getRelationItemViewNodeID(knowledgeDBs, relations, item);
+  return relations.items
+    .slice(0, index)
+    .filter(
+      (candidate) =>
+        getRelationItemViewNodeID(knowledgeDBs, relations, candidate) ===
+        itemNodeID
+    ).size as NodeIndex;
 }
 
 export function calculateIndexFromNodeIndex(
   relations: Relations,
   node: LongID | ID,
-  nodeIndex: NodeIndex
+  nodeIndex: NodeIndex,
+  knowledgeDBs?: KnowledgeDBs
 ): number | undefined {
-  // Find the nth occurance of the node in the list
   const { items } = relations;
   const res = items.reduce(
     ([acc, found]: [number, boolean], item, idx): [number, boolean] => {
       if (found) {
         return [acc, true];
       }
-      if (item.nodeID === node) {
+      if (getRelationItemViewNodeID(knowledgeDBs, relations, item) === node) {
         if (acc === nodeIndex) {
           return [idx, true];
         }
@@ -1226,6 +1278,7 @@ export function addRelationsToLastElement(
 }
 
 export function addNodeToPathWithRelations(
+  data: Pick<Data, "knowledgeDBs">,
   path: ViewPath,
   relations: Relations,
   index: number
@@ -1234,9 +1287,10 @@ export function addNodeToPathWithRelations(
   if (!item) {
     throw new Error("No node found in relation at index");
   }
-  const nodeIndex = calculateNodeIndex(relations, index);
+  const nodeID = getRelationItemViewNodeID(data.knowledgeDBs, relations, item);
+  const nodeIndex = calculateNodeIndex(relations, index, data.knowledgeDBs);
   const pathWithRelations = addRelationsToLastElement(path, relations.id);
-  return [...pathWithRelations, { nodeID: item.nodeID, nodeIndex }];
+  return [...pathWithRelations, { nodeID, nodeIndex }];
 }
 
 export function addNodeToPath(
@@ -1249,7 +1303,7 @@ export function addNodeToPath(
   if (!relations) {
     throw new Error("Parent doesn't have relations, cannot add to path");
   }
-  return addNodeToPathWithRelations(path, relations, index);
+  return addNodeToPathWithRelations(data, path, relations, index);
 }
 
 export function useEffectiveAuthor(): PublicKey {
@@ -1290,7 +1344,12 @@ export function getRelationIndex(
   if (!relations) {
     return undefined;
   }
-  return calculateIndexFromNodeIndex(relations, nodeID, nodeIndex);
+  return calculateIndexFromNodeIndex(
+    relations,
+    nodeID,
+    nodeIndex,
+    data.knowledgeDBs
+  );
 }
 
 export function useRelationIndex(): number | undefined {
@@ -1389,7 +1448,7 @@ export function getLastChild(
     return undefined;
   }
   const lastIndex = relations.items.size - 1;
-  return addNodeToPathWithRelations(viewPath, relations, lastIndex);
+  return addNodeToPathWithRelations(data, viewPath, relations, lastIndex);
 }
 
 export function usePreviousSibling(): SiblingInfo | undefined {
@@ -1790,25 +1849,47 @@ export function updateViewPathsAfterMoveRelations(
     ...indices,
     ...remaining.slice(insertPos),
   ];
+  const knowledgeDBs = data.knowledgeDBs || Map<PublicKey, KnowledgeData>();
+  const currentUser = data.user?.publicKey || ("" as PublicKey);
 
   const renames = newOrder.reduce<
     Array<{ nodeID: LongID | ID; oldIdx: NodeIndex; newIdx: NodeIndex }>
   >((acc, oldPos, newPos) => {
     const item = oldItems.get(oldPos);
+    const relation = getRelations(
+      knowledgeDBs,
+      relationsID,
+      currentUser
+    );
     if (!item) {
       return acc;
     }
+    if (!relation) {
+      return acc;
+    }
+    const itemNodeID = getRelationItemViewNodeID(knowledgeDBs, relation, item);
     const oldNodeIndex = oldItems
       .slice(0, oldPos)
-      .filter((it) => it.nodeID === item.nodeID).size as NodeIndex;
+      .filter(
+        (candidate) =>
+          getRelationItemViewNodeID(knowledgeDBs, relation, candidate) ===
+          itemNodeID
+      ).size as NodeIndex;
     const newNodeIndex = newOrder
       .slice(0, newPos)
-      .filter((p) => oldItems.get(p)?.nodeID === item.nodeID)
+      .filter(
+        (position) =>
+          getRelationItemViewNodeID(
+            knowledgeDBs,
+            relation,
+            oldItems.get(position) as RelationItem
+          ) === itemNodeID
+      )
       .length as unknown as NodeIndex;
     if (oldNodeIndex !== newNodeIndex) {
       return [
         ...acc,
-        { nodeID: item.nodeID, oldIdx: oldNodeIndex, newIdx: newNodeIndex },
+        { nodeID: itemNodeID, oldIdx: oldNodeIndex, newIdx: newNodeIndex },
       ];
     }
     return acc;
@@ -1941,13 +2022,25 @@ export function bulkUpdateViewPathsAfterAddRelation(
       if (!item) {
         return rdx;
       }
+      const itemNodeID = getRelationItemViewNodeID(
+        data.knowledgeDBs,
+        relation,
+        item
+      );
       const addedNodeIndex = relation.items
         .slice(0, pos)
-        .filter((it) => it.nodeID === item.nodeID).size as NodeIndex;
+        .filter(
+          (candidate) =>
+            getRelationItemViewNodeID(
+              data.knowledgeDBs,
+              relation,
+              candidate
+            ) === itemNodeID
+        ).size as NodeIndex;
       return updateViewPathsAfterAddRelation(
         { ...data, views: rdx },
         relation.id,
-        item.nodeID,
+        itemNodeID,
         addedNodeIndex
       );
     },

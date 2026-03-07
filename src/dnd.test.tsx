@@ -19,6 +19,7 @@ import { dnd, getDropDestinationFromTreeView } from "./dnd";
 import {
   addRelationToRelations,
   createConcreteRefId,
+  getRelationItemNodeID,
   newNode,
   shortID,
 } from "./connections";
@@ -184,7 +185,11 @@ test("Diff items are always added, never moved", () => {
     ?.relations.get(shortID(aliceRelations.id));
 
   expect(updatedRelations?.items.size).toBe(2);
-  const nodeIDs = updatedRelations?.items.map((item) => item.nodeID).toArray();
+  const nodeIDs = updatedRelations?.items
+    .map((item) =>
+      getRelationItemNodeID(result.knowledgeDBs, item, updatedRelations.author)
+    )
+    .toArray();
   expect(nodeIDs).toContain(bobChild.id);
   expect(nodeIDs).toContain(aliceChild.id);
 });
@@ -259,7 +264,7 @@ test("Dragging a concrete reference keeps it as a reference by default", () => {
     .get(alicePK)
     ?.relations.get(shortID(rootRelations.id));
   const nodeIDs = updatedRootRelations?.items
-    .map((item) => item.nodeID)
+    .map((item) => item.id)
     .toArray();
 
   expect(nodeIDs).toEqual([concreteRefId, target.id, concreteRefId]);
@@ -336,7 +341,7 @@ test("Alt-dragging a concrete reference still copies it as a reference", () => {
     .get(alicePK)
     ?.relations.get(shortID(rootRelations.id));
   const nodeIDs = updatedRootRelations?.items
-    .map((item) => item.nodeID)
+    .map((item) => item.id)
     .toArray();
 
   expect(nodeIDs).toEqual([concreteRefId, target.id, concreteRefId]);
@@ -403,7 +408,7 @@ test("Alt-dragging a normal node creates a concrete reference", () => {
     .get(alicePK)
     ?.relations.get(shortID(rootRelations.id));
   const nodeIDs = updatedRootRelations?.items
-    .map((item) => item.nodeID)
+    .map((item) => item.id)
     .toArray();
 
   expect(nodeIDs?.length).toBe(3);
@@ -585,7 +590,6 @@ Spain
     await screen.findByLabelText("open Spain in fullscreen")
   );
 
-  console.log(">>> HERE", window.location.pathname);
   await expectTree(`
 Spain
   Sevilla

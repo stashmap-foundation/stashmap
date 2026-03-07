@@ -253,14 +253,14 @@ test("Alter View paths after disconnect with pane-prefixed paths", () => {
 });
 
 test("Calculate index from node index", () => {
-  // Items are now RelationItem objects with nodeID, relevance, and optional argument
+  // Items are now RelationItem objects with id, relevance, and optional argument
   const relations: Relations = {
     items: List([
-      { nodeID: "pl" as LongID, relevance: undefined as Relevance },
-      { nodeID: "oop" as LongID, relevance: undefined as Relevance },
-      { nodeID: "pl" as LongID, relevance: undefined as Relevance },
-      { nodeID: "pl" as LongID, relevance: undefined as Relevance },
-      { nodeID: "java" as LongID, relevance: undefined as Relevance },
+      { id: "pl" as LongID, relevance: undefined as Relevance },
+      { id: "oop" as LongID, relevance: undefined as Relevance },
+      { id: "pl" as LongID, relevance: undefined as Relevance },
+      { id: "pl" as LongID, relevance: undefined as Relevance },
+      { id: "java" as LongID, relevance: undefined as Relevance },
     ]),
     head: "test" as ID,
     context: List<ID>(),
@@ -534,8 +534,8 @@ test("updateViewPathsAfterMoveRelations preserves paths when relationsID starts 
   const data = { views } as unknown as Data;
 
   const oldItems = List([
-    { nodeID: "childA" as LongID, relevance: undefined },
-    { nodeID: "childB" as LongID, relevance: undefined },
+    { id: "childA" as LongID, relevance: undefined },
+    { id: "childB" as LongID, relevance: undefined },
   ] as RelationItem[]);
 
   const updatedViews = updateViewPathsAfterMoveRelations(

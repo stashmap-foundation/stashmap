@@ -18,6 +18,8 @@ import {
   addRelationToRelations,
   moveRelations,
   ensureRelationNativeFields,
+  getRelationItemNodeID,
+  getRelationItemRelation,
 } from "./connections";
 import {
   getNodeFromID,
@@ -661,14 +663,53 @@ export function createVersion(
       root
     );
 
+  const versionItemContext = versionsContext.push(VERSIONS_NODE_ID);
+  const ensureVersionRelation = (
+    accCtx: WalkContext,
+    nodeID: ID,
+    text: string
+  ): [WalkContext, LongID] => {
+    const versionRelation = {
+      ...newRelations(nodeID, versionItemContext, accCtx.publicKey, root),
+      text,
+      textHash: hashText(text),
+      parent: baseVersionsRelations.id,
+    };
+    return [walkUpsertRelation(accCtx, versionRelation), versionRelation.id];
+  };
+
   const originalIndex = baseVersionsRelations.items.findIndex(
-    (item) => item.nodeID === originalNodeID
+    (item) =>
+      getRelationItemNodeID(
+        withVersionsNode.knowledgeDBs,
+        item,
+        withVersionsNode.publicKey
+      ) === originalNodeID
   );
+  const [withOriginalRelation, originalRelationID] =
+    originalIndex < 0
+      ? ensureVersionRelation(
+          withVersionsNode,
+          originalNodeID,
+          getNodeFromID(
+            withVersionsNode.knowledgeDBs,
+            originalNodeID,
+            withVersionsNode.publicKey
+          )?.text ?? ""
+        )
+      : [
+          withVersionsNode,
+          getRelationItemRelation(
+            withVersionsNode.knowledgeDBs,
+            baseVersionsRelations.items.get(originalIndex)!,
+            withVersionsNode.publicKey
+          )!.id,
+        ];
   const versionsWithOriginal =
     originalIndex < 0
       ? addRelationToRelations(
           baseVersionsRelations,
-          originalNodeID,
+          originalRelationID,
           undefined,
           undefined,
           baseVersionsRelations.items.size
@@ -677,13 +718,28 @@ export function createVersion(
 
   const editedNodePosition = isInsideVersions
     ? versionsWithOriginal.items.findIndex(
-        (item) => item.nodeID === editedNodeID
+        (item) =>
+          getRelationItemNodeID(
+            withOriginalRelation.knowledgeDBs,
+            item,
+            withOriginalRelation.publicKey
+          ) === editedNodeID
       )
     : -1;
   const insertPosition = editedNodePosition >= 0 ? editedNodePosition : 0;
 
+  const [withVersionRelation, versionRelationID] = ensureVersionRelation(
+    withOriginalRelation,
+    versionNode.id,
+    newText
+  );
   const existingIndex = versionsWithOriginal.items.findIndex(
-    (item) => item.nodeID === versionNode.id
+    (item) =>
+      getRelationItemNodeID(
+        withVersionRelation.knowledgeDBs,
+        item,
+        withVersionRelation.publicKey
+      ) === versionNode.id
   );
 
   const withVersion =
@@ -691,13 +747,13 @@ export function createVersion(
       ? moveRelations(versionsWithOriginal, [existingIndex], insertPosition)
       : addRelationToRelations(
           versionsWithOriginal,
-          versionNode.id,
+          versionRelationID,
           undefined,
           undefined,
           insertPosition
         );
 
-  return walkUpsertRelation(withVersionsNode, withVersion);
+  return walkUpsertRelation(withVersionRelation, withVersion);
 }
 
 function materializeTreeNode(
@@ -706,7 +762,7 @@ function materializeTreeNode(
   context: List<ID>,
   root: ID,
   parent?: LongID
-): [WalkContext, ID] {
+): [WalkContext, ID, LongID] {
   const node = newNode(
     treeNode.text,
     treeNode.nodeID ??
@@ -736,22 +792,23 @@ function materializeTreeNode(
         const targetNode =
           parts.length > 1 ? (parts.slice(1).join(":") as ID) : undefined;
         const item: RelationItem = {
-          nodeID: createConcreteRefId(relationID, targetNode),
+          id: createConcreteRefId(relationID, targetNode),
           relevance: childNode.relevance,
           argument: childNode.argument,
           linkText: childNode.text,
         };
         return [accCtx, [...accItems, item]] as [WalkContext, RelationItem[]];
       }
-      const [afterChild, materializedID] = materializeTreeNode(
-        accCtx,
-        childNode,
-        childContext,
-        root,
-        relationBaseWithFields.id
-      );
+      const [afterChild, materializedID, materializedRelationID] =
+        materializeTreeNode(
+          accCtx,
+          childNode,
+          childContext,
+          root,
+          relationBaseWithFields.id
+        );
       const item: RelationItem = {
-        nodeID: materializedID,
+        id: materializedRelationID,
         relevance: childNode.relevance,
         argument: childNode.argument,
       };
@@ -787,7 +844,7 @@ function materializeTreeNode(
       ? { updated: withHidden.updated }
       : {}),
   };
-  return [walkUpsertRelation(withHidden, relation), node.id];
+  return [walkUpsertRelation(withHidden, relation), node.id, relation.id];
 }
 
 export function createNodesFromMarkdownTrees(
@@ -804,7 +861,7 @@ export function createNodesFromMarkdownTrees(
       const treeContext = treeNode.context
         ? List(treeNode.context.split(":") as ID[])
         : context;
-      const [nextCtx, topNodeID] = materializeTreeNode(
+      const [nextCtx, topNodeID, topRelationID] = materializeTreeNode(
         accCtx,
         treeWithUuid,
         treeContext,
@@ -813,10 +870,7 @@ export function createNodesFromMarkdownTrees(
       return [
         nextCtx,
         [...accTopNodeIDs, topNodeID],
-        [
-          ...accTopRelationIDs,
-          joinID(accCtx.publicKey, rootUuid as ID) as LongID,
-        ],
+        [...accTopRelationIDs, topRelationID],
       ];
     },
     [ctx, [] as ID[], [] as LongID[]] as [WalkContext, ID[], LongID[]]

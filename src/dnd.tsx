@@ -361,10 +361,11 @@ export function planMoveNodeWithView(
     sourceParentRelation !== undefined &&
     targetParentRelation !== undefined &&
     sourceParentRelation.id === targetParentRelation.id;
+  const sourceAddID = sourceRelation?.id ?? sourceNodeID;
 
   const [planWithAdd, [actualNodeID]] = planAddToParent(
     plan,
-    sourceNodeID,
+    sourceAddID,
     targetParentViewPath,
     stack,
     insertAtIndex,
@@ -397,6 +398,7 @@ export function planMoveNodeWithView(
 
   const targetIndex = insertAtIndex ?? relations.items.size - 1;
   const targetViewPath = addNodeToPathWithRelations(
+    planWithAdd,
     targetParentViewPath,
     relations,
     targetIndex
@@ -565,6 +567,7 @@ export function dnd(
           if (relations) {
             const targetIndex = insertAt ?? relations.items.size - 1;
             const targetViewPath = addNodeToPathWithRelations(
+              planWithAdd,
               toView,
               relations,
               targetIndex

@@ -7,6 +7,8 @@ import {
   splitID,
   itemPassesFilters,
   getNodeTextHash,
+  getRelationItemNodeID,
+  getRelationItemRelation,
 } from "./connections";
 import {
   getVersionedDisplayText,
@@ -84,7 +86,12 @@ export function parseRef(
 
   const relationContext = relation.context.map((id) => shortID(id) as ID);
   const sourceItem = targetNode
-    ? relation.items.find((item) => shortID(item.nodeID) === targetNode)
+    ? relation.items.find(
+        (item) =>
+          shortID(
+            getRelationItemNodeID(knowledgeDBs, item, relation.author)
+          ) === targetNode
+      )
     : undefined;
 
   return { relation, relationContext, targetNode, sourceItem };
@@ -98,15 +105,21 @@ function getReferencedChildRelation(
     return undefined;
   }
 
-  return getRelationsForCurrentTree(
-    knowledgeDBs,
-    ref.relation.author,
-    ref.targetNode,
-    ref.relationContext.push(shortID(ref.relation.head) as ID),
-    undefined,
-    false,
-    ref.relation.root
-  );
+  return ref.sourceItem
+    ? getRelationItemRelation(
+        knowledgeDBs,
+        ref.sourceItem,
+        ref.relation.author
+      )
+    : getRelationsForCurrentTree(
+        knowledgeDBs,
+        ref.relation.author,
+        ref.targetNode,
+        ref.relationContext.push(shortID(ref.relation.head) as ID),
+        undefined,
+        false,
+        ref.relation.root
+      );
 }
 
 function resolveLabels(
@@ -249,6 +262,7 @@ export function buildOutgoingReference(
 }
 
 function effectiveIDs(
+  knowledgeDBs: KnowledgeDBs,
   relation: Relations,
   activeFilters: (
     | Relevance
@@ -266,11 +280,18 @@ function effectiveIDs(
         itemPassesFilters(item, activeFilters) &&
         item.relevance !== "not_relevant"
     )
-    .map((item) => shortID(item.nodeID))
+    .map((item) =>
+      getSemanticNodeKey(
+        knowledgeDBs,
+        getRelationItemNodeID(knowledgeDBs, item, relation.author),
+        relation.author
+      )
+    )
     .toList();
 }
 
 export function computeRelationDiff(
+  knowledgeDBs: KnowledgeDBs,
   versionRelation: Relations,
   parentRelation: Relations | undefined,
   activeFilters: (
@@ -283,9 +304,13 @@ export function computeRelationDiff(
     | "contains"
   )[]
 ): { addCount: number; removeCount: number } {
-  const versionIDs = effectiveIDs(versionRelation, activeFilters).toSet();
+  const versionIDs = effectiveIDs(
+    knowledgeDBs,
+    versionRelation,
+    activeFilters
+  ).toSet();
   const parentIDs = parentRelation
-    ? effectiveIDs(parentRelation, activeFilters).toSet()
+    ? effectiveIDs(knowledgeDBs, parentRelation, activeFilters).toSet()
     : List<string>().toSet();
   return {
     addCount: versionIDs.filter((id) => !parentIDs.has(id)).size,
@@ -318,6 +343,7 @@ function computeVersionMeta(
     : undefined;
 
   const { addCount, removeCount } = computeRelationDiff(
+    data.knowledgeDBs,
     relation,
     parentRelation,
     activeFilters
@@ -331,8 +357,8 @@ function findCrefToNode(
   containingRelation: Relations | undefined
 ): RelationItem | undefined {
   return items.find((item) => {
-    if (!isConcreteRefId(item.nodeID)) return false;
-    const parsed = parseConcreteRefId(item.nodeID);
+    if (!isConcreteRefId(item.id)) return false;
+    const parsed = parseConcreteRefId(item.id);
     if (!parsed) return false;
     const matchesHead = parsed.relationID === targetRelation.id;
     const matchesItem =
@@ -387,7 +413,7 @@ export function buildReferenceItem(
       ? getRelationForView(data, parentPath, stack)
       : undefined;
     const parentItem = parentRelation?.items.find(
-      (item) => item.nodeID === refId
+      (item) => item.id === refId
     );
     return buildDeletedReference(
       refId,
@@ -476,7 +502,7 @@ export function buildReferenceItem(
   }
   if (!parentRelation) return outgoing;
 
-  const storedItem = parentRelation.items.find((item) => item.nodeID === refId);
+  const storedItem = parentRelation.items.find((item) => item.id === refId);
   const isNotRelevant = storedItem?.relevance === "not_relevant";
 
   const grandParentPath = getParentView(parentPath);

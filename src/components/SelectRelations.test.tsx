@@ -181,10 +181,10 @@ test("Diff items are not included when saving a relation", () => {
   const savedRelation = aliceDB?.relations.get(shortID(aliceRelations.id));
 
   expect(savedRelation?.items.size).toBe(1);
-  expect(savedRelation?.items.get(0)?.nodeID).toBe(aliceChildNode.id);
+  expect(savedRelation?.items.get(0)?.id).toBe(aliceChildNode.id);
   // Check that bob's child is not in alice's relation items
   expect(
-    savedRelation?.items.some((item) => item.nodeID === bobChildNode.id)
+    savedRelation?.items.some((item) => item.id === bobChildNode.id)
   ).toBe(false);
 });
 

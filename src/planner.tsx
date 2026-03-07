@@ -39,11 +39,13 @@ import {
   LOG_NODE_ID,
   createConcreteRefId,
   isRefId,
+  isSearchId,
   VERSIONS_NODE_ID,
   ensureRelationNativeFields,
 } from "./connections";
 import {
   newRelations,
+  newRelationsForNode,
   upsertRelations,
   ViewPath,
   NodeIndex,
@@ -341,7 +343,7 @@ function removeEmptyNodeFromKnowledgeDBs(
   }
 
   const filteredItems = existingRelations.items.filter(
-    (item) => !isEmptyNodeID(item.nodeID)
+    (item) => !isEmptyNodeID(item.id)
   );
   if (filteredItems.size === existingRelations.items.size) {
     return knowledgeDBs;
@@ -560,17 +562,119 @@ export function planAddToParent(
     return [plan, []];
   }
 
-  const [, parentView] = getNodeIDFromView(plan, parentViewPath);
-  const planWithExpand = planExpandNode(plan, parentView, parentViewPath);
+  const ensureParentRelation = (): [Plan, Relations] => {
+    const [, parentView] = getNodeIDFromView(plan, parentViewPath);
+    const planWithExpand = planExpandNode(plan, parentView, parentViewPath);
+    const existingRelation = getRelationForView(
+      planWithExpand,
+      parentViewPath,
+      stack
+    );
+    if (existingRelation) {
+      return [planWithExpand, existingRelation];
+    }
+    const planWithParentRelation = upsertRelations(
+      planWithExpand,
+      parentViewPath,
+      stack,
+      (relations) => relations
+    );
+    const parentRelation = getRelationForView(
+      planWithParentRelation,
+      parentViewPath,
+      stack
+    );
+    if (!parentRelation) {
+      throw new Error("Failed to create parent relation");
+    }
+    return [planWithParentRelation, parentRelation];
+  };
+
+  const [planWithParent, parentRelation] = ensureParentRelation();
+  const parentContext = getContext(planWithParent, parentViewPath, stack);
+  const [parentNodeID] = getNodeIDFromView(planWithParent, parentViewPath);
+  const childContext = parentContext.push(shortID(parentNodeID));
+
+  const [planWithChildren, relationItemPayload] = nodeIDsArray.reduce(
+    ([accPlan, accItems], objectID) => {
+      const localID = shortID(objectID as ID) as ID;
+      if (isConcreteRefId(objectID) || isSearchId(localID)) {
+        return [
+          accPlan,
+          [...accItems, { relationItemID: objectID, actualNodeID: objectID }],
+        ];
+      }
+
+      if (localID === VERSIONS_NODE_ID) {
+        const existingVersionsRelation = getRelationsForCurrentTree(
+          accPlan.knowledgeDBs,
+          accPlan.user.publicKey,
+          VERSIONS_NODE_ID,
+          childContext,
+          undefined,
+          false,
+          parentRelation.root
+        );
+        if (existingVersionsRelation) {
+          return [
+            accPlan,
+            [
+              ...accItems,
+              {
+                relationItemID: existingVersionsRelation.id,
+                actualNodeID: existingVersionsRelation.head as ID,
+              },
+            ],
+          ];
+        }
+      }
+
+      const existingRelation = getRelationsNoReferencedBy(
+        accPlan.knowledgeDBs,
+        objectID,
+        accPlan.user.publicKey
+      );
+      if (existingRelation && existingRelation.id === objectID) {
+        return [
+          accPlan,
+          [
+            ...accItems,
+            {
+              relationItemID: existingRelation.id,
+              actualNodeID: existingRelation.head as ID,
+            },
+          ],
+        ];
+      }
+
+      const childRelation = newRelationsForNode(
+        objectID,
+        childContext,
+        accPlan.user.publicKey,
+        parentRelation.root
+      );
+      return [
+        planUpsertRelations(accPlan, childRelation),
+        [
+          ...accItems,
+          {
+            relationItemID: childRelation.id,
+            actualNodeID: childRelation.head as ID,
+          },
+        ],
+      ];
+    },
+    [planWithParent, [] as Array<{ relationItemID: LongID | ID; actualNodeID: LongID | ID }>]
+  );
 
   const updatedRelationsPlan = upsertRelations(
-    planWithExpand,
+    planWithChildren,
     parentViewPath,
     stack,
     (relations) =>
       bulkAddRelations(
         relations,
-        nodeIDsArray,
+        relationItemPayload.map((item) => item.relationItemID),
         relevance,
         argument,
         insertAtIndex
@@ -585,7 +689,10 @@ export function planAddToParent(
     insertAtIndex
   );
 
-  return [planUpdateViews(updatedRelationsPlan, updatedViews), nodeIDsArray];
+  return [
+    planUpdateViews(updatedRelationsPlan, updatedViews),
+    relationItemPayload.map((item) => item.actualNodeID),
+  ];
 }
 
 type RelationsIdMapping = Map<LongID, LongID>;
@@ -619,39 +726,44 @@ function planCopyDescendantRelations(
       : filteredDescendants
   ).sortBy((relation) => relation.context.size);
 
-  const [resultPlan, resultMapping] = descendants.reduce(
-    ([accPlan, accMapping, accRoot], relation) => {
-      const newContext = transformContext(relation);
-      const head =
-        targetNodeID &&
-        relation.head === shortID(sourceNodeID) &&
-        contextsMatch(relation.context, sourceContext)
-          ? targetNodeID
-          : relation.head;
-      const baseRelation = newRelations(
-        head,
-        newContext,
-        accPlan.user.publicKey,
-        accRoot
-      );
-      const newRelation: Relations = {
-        ...baseRelation,
-        items: relation.items,
-        basedOn: relation.id,
-      };
+  let copiedRoot = root;
+  const copiedRelations = descendants.map((relation) => {
+    const newContext = transformContext(relation);
+    const head =
+      targetNodeID &&
+      relation.head === shortID(sourceNodeID) &&
+      contextsMatch(relation.context, sourceContext)
+        ? targetNodeID
+        : relation.head;
+    const baseRelation = newRelations(
+      head,
+      newContext,
+      plan.user.publicKey,
+      copiedRoot
+    );
+    copiedRoot = copiedRoot ?? baseRelation.root;
+    return { source: relation, copy: baseRelation };
+  });
 
-      return [
-        planUpsertRelations(accPlan, newRelation),
-        accMapping.set(relation.id, newRelation.id),
-        accRoot ?? newRelation.root,
-      ] as [Plan, RelationsIdMapping, ID | undefined];
-    },
-    [plan, Map<LongID, LongID>(), root] as [
-      Plan,
-      RelationsIdMapping,
-      ID | undefined
-    ]
+  const resultMapping = copiedRelations.reduce(
+    (acc, { source, copy }) => acc.set(source.id, copy.id),
+    Map<LongID, LongID>()
   );
+
+  const resultPlan = copiedRelations.reduce((accPlan, { source, copy }) => {
+    const items = source.items.map((item) => {
+      const mappedID = resultMapping.get(item.id as LongID);
+      return mappedID ? { ...item, id: mappedID } : item;
+    });
+    return planUpsertRelations(accPlan, {
+      ...copy,
+      items,
+      text: source.text,
+      textHash: source.textHash,
+      basedOn: source.id,
+    });
+  }, plan);
+
   return [resultPlan, resultMapping];
 }
 
@@ -822,7 +934,11 @@ export function planDeepCopyNode(
   const sourceContext = getContext(plan, sourceViewPath, sourceStack);
   const sourceRelation = getRelationForView(plan, sourceViewPath, sourceStack);
 
-  const resolveSource = (): { nodeID: LongID | ID; context: Context } => {
+  const resolveSource = (): {
+    nodeID: LongID | ID;
+    context: Context;
+    relation?: Relations;
+  } => {
     if (isConcreteRefId(sourceNodeID)) {
       const parsed = parseConcreteRefId(sourceNodeID);
       if (parsed) {
@@ -835,43 +951,69 @@ export function planDeepCopyNode(
           return {
             nodeID: relation.head,
             context: relation.context,
+            relation,
           };
         }
       }
     }
-    return { nodeID: sourceNodeID, context: sourceContext };
+    return { nodeID: sourceNodeID, context: sourceContext, relation: sourceRelation };
   };
 
   const resolved = resolveSource();
   const resolvedNodeID = resolved.nodeID;
   const resolvedContext = resolved.context;
+  const resolvedRelation = resolved.relation;
 
-  const targetParentContext = getContext(plan, targetParentViewPath, stack);
-  const [targetParentNodeID] = getNodeIDFromView(plan, targetParentViewPath);
-  const nodeNewContext = targetParentContext.push(shortID(targetParentNodeID));
+  const [planWithParent, targetParentRelation] = (() => {
+    const parentRelation = getRelationForView(plan, targetParentViewPath, stack);
+    if (parentRelation) {
+      return [plan, parentRelation] as const;
+    }
+    const planWithCreatedParent = upsertRelations(
+      plan,
+      targetParentViewPath,
+      stack,
+      (relations) => relations
+    );
+    const createdParent = getRelationForView(
+      planWithCreatedParent,
+      targetParentViewPath,
+      stack
+    );
+    if (!createdParent) {
+      throw new Error("Failed to create target parent relation");
+    }
+    return [planWithCreatedParent, createdParent] as const;
+  })();
 
-  const [planWithNode, [actualNodeID]] = planAddToParent(
-    plan,
-    resolvedNodeID,
-    targetParentViewPath,
-    stack,
-    insertAtIndex,
-    relevance,
-    argument
-  );
-
-  const copyNodeID = actualNodeID ?? resolvedNodeID;
-  const sourceChildContext = resolvedContext.push(shortID(resolvedNodeID));
-  const targetChildContext = nodeNewContext.push(shortID(copyNodeID));
-
-  const targetParentRelation = getRelationForView(
-    planWithNode,
+  const targetParentContext = getContext(
+    planWithParent,
     targetParentViewPath,
     stack
   );
+  const [targetParentNodeID] = getNodeIDFromView(
+    planWithParent,
+    targetParentViewPath
+  );
+  const nodeNewContext = targetParentContext.push(shortID(targetParentNodeID));
+  const sourceChildContext = resolvedContext.push(shortID(resolvedNodeID));
+  const targetChildContext = nodeNewContext.push(shortID(resolvedNodeID));
 
-  const [finalPlan, mapping] = planCopyDescendantRelations(
-    planWithNode,
+  if (!resolvedRelation) {
+    const [planWithNode] = planAddToParent(
+      planWithParent,
+      resolvedNodeID,
+      targetParentViewPath,
+      stack,
+      insertAtIndex,
+      relevance,
+      argument
+    );
+    return [planWithNode, Map<LongID, LongID>()];
+  }
+
+  const [planWithCopiedRelations, mapping] = planCopyDescendantRelations(
+    planWithParent,
     resolvedNodeID,
     resolvedContext,
     (relation) => {
@@ -885,9 +1027,24 @@ export function planDeepCopyNode(
           );
     },
     undefined,
-    sourceRelation,
-    copyNodeID !== resolvedNodeID ? copyNodeID : undefined,
-    targetParentRelation?.root
+    resolvedRelation,
+    undefined,
+    targetParentRelation.root
+  );
+
+  const copiedTopRelationID = mapping.get(resolvedRelation.id);
+  if (!copiedTopRelationID) {
+    return [planWithCopiedRelations, mapping];
+  }
+
+  const [finalPlan] = planAddToParent(
+    planWithCopiedRelations,
+    copiedTopRelationID,
+    targetParentViewPath,
+    stack,
+    insertAtIndex,
+    relevance,
+    argument
   );
 
   return [finalPlan, mapping];
@@ -919,6 +1076,7 @@ export function planDeepCopyNodeWithView(
 
   const targetIndex = insertAtIndex ?? relations.items.size - 1;
   const targetViewPath = addNodeToPathWithRelations(
+    planWithCopy,
     targetParentViewPath,
     relations,
     targetIndex
@@ -1586,7 +1744,7 @@ export function planSetEmptyNodePosition(
       type: "ADD_EMPTY_NODE",
       relationsID: relations.id,
       index: insertIndex,
-      relationItem: { nodeID: EMPTY_NODE_ID, relevance: undefined },
+      relationItem: { id: EMPTY_NODE_ID, relevance: undefined },
       paneIndex: getPaneIndex(parentPath),
     }),
   };

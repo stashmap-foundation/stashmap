@@ -253,14 +253,14 @@ export function eventToRelations(e: UnsignedEvent): Relations | undefined {
   // Parse basedOn from "b" tag: ["b", relationID]
   const basedOn = findTag(e, "b") as LongID | undefined;
 
-  // Parse items with relevance and optional argument: ["i", nodeID, relevance, argument?]
+  // Parse items with relevance and optional argument: ["i", itemID, relevance, argument?]
   // Invalid relevance/argument values are filtered to defaults
   const itemsAsTags = findAllTags(e, "i") || [];
   const items = List(
     itemsAsTags
       .filter((tagValues) => !tagValues[0].startsWith("ref:"))
       .map((tagValues) => ({
-        nodeID: tagValues[0] as LongID,
+        id: tagValues[0] as LongID,
         relevance: parseRelevance(tagValues[1]),
         argument: parseArgument(tagValues[2]),
       }))

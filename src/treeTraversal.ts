@@ -25,6 +25,7 @@ import {
   getOccurrencesForNode,
   getIncomingCrefsForNode,
   VERSIONS_NODE_ID,
+  getRelationItemNodeID,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
 import { buildOutgoingReference } from "./buildReferenceNode";
@@ -82,7 +83,9 @@ function getChildrenForConcreteRef(
 
   return {
     paths: sourceRelation.items
-      .map((_, i) => addNodeToPathWithRelations(parentPath, sourceRelation, i))
+      .map((_, i) =>
+        addNodeToPathWithRelations(data, parentPath, sourceRelation, i)
+      )
       .toList(),
     virtualItems: EMPTY_VIRTUAL_ITEMS,
     firstVirtualKeys: EMPTY_FIRST_VIRTUAL_KEYS,
@@ -135,14 +138,16 @@ function getChildrenForRegularNode(
             options?.isMarkdownExport || itemPassesFilters(item, activeFilters)
         )
         .map(({ index }) =>
-          addNodeToPathWithRelations(parentPath, relations, index)
+          addNodeToPathWithRelations(data, parentPath, relations, index)
         )
         .toList()
     : List<ViewPath>();
 
   if (options?.isMarkdownExport) {
     const hasVersionsChild = relations?.items.some(
-      (item) => item.nodeID === (VERSIONS_NODE_ID as LongID | ID)
+      (item) =>
+        getRelationItemNodeID(data.knowledgeDBs, item, relations.author) ===
+        (VERSIONS_NODE_ID as LongID | ID)
     );
     const versionsRel = !hasVersionsChild
       ? getVersionsRelations(
@@ -171,7 +176,7 @@ function getChildrenForRegularNode(
         virtualItems: Map<string, RelationItem>().set(
           viewPathToString(versionsPath),
           {
-            nodeID: VERSIONS_NODE_ID as LongID | ID,
+            id: VERSIONS_NODE_ID as LongID | ID,
             relevance: undefined as Relevance,
             virtualType: "version" as VirtualType,
           }
@@ -268,7 +273,7 @@ function getChildrenForRegularNode(
       return {
         paths: result.paths.push(path),
         virtualItems: result.virtualItems.set(viewPathToString(path), {
-          nodeID,
+          id: nodeID,
           relevance: undefined as Relevance,
           virtualType,
           ...(isCref ? { isCref: true } : {}),

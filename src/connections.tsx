@@ -174,6 +174,40 @@ export function getRelationsNoReferencedBy(
     .find((relation) => relation !== undefined);
 }
 
+export function getRelationItemRelation(
+  knowledgeDBs: KnowledgeDBs,
+  item: RelationItem,
+  myself: PublicKey
+): Relations | undefined {
+  if (isConcreteRefId(item.id)) {
+    return undefined;
+  }
+  return getRelationsNoReferencedBy(knowledgeDBs, item.id, myself);
+}
+
+export function getRelationItemNodeID(
+  knowledgeDBs: KnowledgeDBs,
+  item: RelationItem,
+  myself: PublicKey
+): LongID | ID {
+  return getRelationItemRelation(knowledgeDBs, item, myself)?.head ?? item.id;
+}
+
+export function getRelationItemTextHash(
+  knowledgeDBs: KnowledgeDBs,
+  item: RelationItem,
+  myself: PublicKey
+): ID {
+  const relation = getRelationItemRelation(knowledgeDBs, item, myself);
+  if (relation) {
+    return relation.textHash;
+  }
+  return (
+    getNodeTextHash(getNodeForMatching(knowledgeDBs, item.id, myself)) ||
+    (shortID(item.id as ID) as ID)
+  );
+}
+
 type RefTargetInfo = {
   stack: (ID | LongID)[];
   author: PublicKey;
@@ -444,10 +478,10 @@ function findNodeAppearances(
       const matchedItem = relation.items.find(
         (item) =>
           item.relevance !== "not_relevant" &&
-          !isRefId(item.nodeID) &&
+          !isRefId(getRelationItemNodeID(knowledgeDBs, item, relation.author)) &&
           nodesMatchForRefs(
             knowledgeDBs,
-            item.nodeID,
+            getRelationItemNodeID(knowledgeDBs, item, relation.author),
             relation.author,
             relation.root,
             nodeID,
@@ -473,7 +507,13 @@ function findNodeAppearances(
           knowledgeDB,
           isHead: isHeadWithChildren && !isInItems,
           matchedItemNodeID: matchedItem
-            ? (shortID(matchedItem.nodeID) as ID)
+            ? (shortID(
+                getRelationItemNodeID(
+                  knowledgeDBs,
+                  matchedItem,
+                  relation.author
+                )
+              ) as ID)
             : undefined,
         });
       }
@@ -739,7 +779,7 @@ export function getOccurrencesForNode(
   const contextRoot = currentContext.first();
   const outgoingCrefIDs = currentItems
     ? currentItems
-        .map((item) => item.nodeID)
+        .map((item) => item.id)
         .filter(isConcreteRefId)
         .toList()
     : List<LongID | ID>();
@@ -818,7 +858,7 @@ export function getIncomingCrefsForNode(
   const currentShortNodeID = shortID(currentNodeID);
   const outgoingTargetRelIDs = (currentItems || List<RelationItem>()).reduce(
     (acc, item) => {
-      const parsed = parseConcreteRefId(item.nodeID);
+      const parsed = parseConcreteRefId(item.id);
       if (!parsed) return acc;
       const withTarget = acc.add(parsed.relationID);
       if (!parsed.targetNode) return withTarget;
@@ -850,9 +890,9 @@ export function getIncomingCrefsForNode(
       if (outgoingTargetRelIDs.has(relation.id)) return rdx;
 
       const hasCrefToUs = relation.items.some((item) => {
-        if (!isConcreteRefId(item.nodeID)) return false;
+        if (!isConcreteRefId(item.id)) return false;
         if (item.relevance === "not_relevant") return false;
-        const parsed = parseConcreteRefId(item.nodeID);
+        const parsed = parseConcreteRefId(item.id);
         if (!parsed) return false;
         const matchesItem =
           !!parentRelationID &&
@@ -891,7 +931,7 @@ export function getSearchRelations(
   const uniqueNodeIDs = foundNodeIDs.toSet().toList();
   const items = uniqueNodeIDs.map(
     (nodeID): RelationItem => ({
-      nodeID,
+      id: nodeID,
       relevance: undefined as Relevance,
     })
   );
@@ -1084,7 +1124,7 @@ export function itemPassesFilters(
     | "contains"
   )[]
 ): boolean {
-  if (isEmptyNodeID(item.nodeID)) {
+  if (isEmptyNodeID(item.id)) {
     return true;
   }
 
@@ -1123,11 +1163,11 @@ export function aggregateWeightedVotes(
     const updatedVotes = filteredItems.map((item, index) => {
       const numerator = fib(length - index);
       const newVotes = (numerator / denominator) * weight;
-      const initialVotes = rdx.get(item.nodeID) || 0;
-      return { nodeID: item.nodeID, votes: initialVotes + newVotes };
+      const initialVotes = rdx.get(item.id) || 0;
+      return { id: item.id, votes: initialVotes + newVotes };
     });
-    return updatedVotes.reduce((red, { nodeID, votes }) => {
-      return red.set(nodeID, votes);
+    return updatedVotes.reduce((red, { id, votes }) => {
+      return red.set(id, votes);
     }, rdx);
   }, Map<LongID | ID, number>());
   return votesPerItem;
@@ -1150,11 +1190,11 @@ export function aggregateNegativeWeightedVotes(
     const updatedVotes = filteredItems.map((item) => {
       // vote negative with half of the weight on each item
       const newVotes = -weight / 2;
-      const initialVotes = rdx.get(item.nodeID) || 0;
-      return { nodeID: item.nodeID, votes: initialVotes + newVotes };
+      const initialVotes = rdx.get(item.id) || 0;
+      return { id: item.id, votes: initialVotes + newVotes };
     });
-    return updatedVotes.reduce((red, { nodeID, votes }) => {
-      return red.set(nodeID, votes);
+    return updatedVotes.reduce((red, { id, votes }) => {
+      return red.set(id, votes);
     }, rdx);
   }, Map<LongID | ID, number>());
   return votesPerItem;
@@ -1202,7 +1242,7 @@ export function addRelationToRelations(
   ord?: number
 ): Relations {
   const newItem: RelationItem = {
-    nodeID: objectID,
+    id: objectID,
     relevance,
     argument,
   };
@@ -1302,7 +1342,7 @@ export function injectEmptyNodesIntoKnowledgeDBs(
 
       // Check if empty node is already injected (from parent MergeKnowledgeDB)
       const alreadyHasEmpty = existingRelations.items.some(
-        (item) => item.nodeID === EMPTY_NODE_ID
+        (item) => item.id === EMPTY_NODE_ID
       );
       if (alreadyHasEmpty) {
         return relations;

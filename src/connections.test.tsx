@@ -49,7 +49,7 @@ function sampleNodes(): {
 
 // Helper to extract nodeIDs from RelationItems for easier testing
 function getNodeIDs(items: List<RelationItem>): List<LongID | ID> {
-  return items.map((item) => item.nodeID);
+  return items.map((item) => item.id);
 }
 
 test("Add new Connection", () => {
@@ -208,7 +208,7 @@ function makeItem(
   relevance?: Relevance,
   argument?: Argument
 ): RelationItem {
-  return { nodeID: nodeID as LongID, relevance, argument };
+  return { id: nodeID as LongID, relevance, argument };
 }
 
 test("aggregate weighted votes", () => {

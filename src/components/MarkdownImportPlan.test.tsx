@@ -12,6 +12,7 @@ import {
 } from "../planner";
 import {
   addRelationToRelations,
+  getRelationItemNodeID,
   getRelationsNoReferencedBy,
   newNode,
   shortID,
@@ -154,9 +155,20 @@ test("planCreateNodesFromMarkdownTrees creates only standalone relations", () =>
     false,
     parentRelation?.root
   );
+  const standaloneGrandchildRelation = getRelationsForCurrentTree(
+    plan.knowledgeDBs,
+    plan.user.publicKey,
+    grandchildID!,
+    List<ID>([parentID, childID!]),
+    undefined,
+    false,
+    parentRelation?.root
+  );
 
-  expect(parentRelation?.items.first()?.nodeID).toEqual(childID);
-  expect(standaloneChildRelation?.items.first()?.nodeID).toEqual(grandchildID);
+  expect(parentRelation?.items.first()?.id).toEqual(standaloneChildRelation?.id);
+  expect(standaloneChildRelation?.items.first()?.id).toEqual(
+    standaloneGrandchildRelation?.id
+  );
 });
 
 function setupRootPlan(aliceState: () => Parameters<typeof createPlan>[0]): {
@@ -213,7 +225,15 @@ test("planPasteMarkdownTrees moves children to parent context", () => {
     false,
     rootRelation?.root
   );
-  expect(cityRelation?.items.first()?.nodeID).toEqual(viennaID);
+  const firstCityItem = cityRelation?.items.first();
+  expect(firstCityItem).toBeDefined();
+  expect(
+    getRelationItemNodeID(
+      plan.knowledgeDBs,
+      firstCityItem!,
+      cityRelation!.author
+    )
+  ).toEqual(viennaID);
 });
 
 test("planPasteMarkdownTrees: collision does not shadow existing children", () => {
@@ -223,6 +243,12 @@ test("planPasteMarkdownTrees: collision does not shadow existing children", () =
   const existingCity = newNode("City");
   const existingVienna = newNode("Vienna");
   const rootRelation = getRelationForView(basePlan, parentPath, stack);
+  const existingViennaRelations = newRelations(
+    existingVienna.id,
+    List<ID>([rootID, existingCity.id]),
+    basePlan.user.publicKey,
+    rootRelation?.root
+  );
   const cityRelations = addRelationToRelations(
     newRelations(
       existingCity.id,
@@ -230,15 +256,18 @@ test("planPasteMarkdownTrees: collision does not shadow existing children", () =
       basePlan.user.publicKey,
       rootRelation?.root
     ),
-    existingVienna.id
+    existingViennaRelations.id
   );
   const withExisting = planUpsertRelations(
-    planUpsertNode(planUpsertNode(basePlan, existingCity), existingVienna),
+    planUpsertRelations(
+      planUpsertNode(planUpsertNode(basePlan, existingCity), existingVienna),
+      existingViennaRelations
+    ),
     cityRelations
   );
   const [withCityAdded] = planAddToParent(
     withExisting,
-    existingCity.id,
+    cityRelations.id,
     parentPath,
     stack,
     0
@@ -265,7 +294,7 @@ test("planPasteMarkdownTrees: collision does not shadow existing children", () =
     getRelationForView(plan, parentPath, stack)?.root
   );
   expect(
-    existingCityRel?.items.some((i) => i.nodeID === existingVienna.id)
+    existingCityRel?.items.some((i) => i.id === existingViennaRelations.id)
   ).toBe(true);
 });
 
@@ -275,8 +304,17 @@ test("buildDocumentEvents does not serialize pasted collision child as a standal
 
   const existingCity = newNode("City");
   const existingVienna = newNode("Vienna");
+  const existingViennaRelations = newRelations(
+    existingVienna.id,
+    List<ID>([rootID, existingCity.id]),
+    basePlan.user.publicKey,
+    getRelationForView(basePlan, parentPath, stack)?.root
+  );
   const withExisting = planUpsertRelations(
-    planUpsertNode(planUpsertNode(basePlan, existingCity), existingVienna),
+    planUpsertRelations(
+      planUpsertNode(planUpsertNode(basePlan, existingCity), existingVienna),
+      existingViennaRelations
+    ),
     addRelationToRelations(
       newRelations(
         existingCity.id,
@@ -284,12 +322,20 @@ test("buildDocumentEvents does not serialize pasted collision child as a standal
         basePlan.user.publicKey,
         getRelationForView(basePlan, parentPath, stack)?.root
       ),
-      existingVienna.id
+      existingViennaRelations.id
     )
   );
   const [withCityAdded] = planAddToParent(
     withExisting,
-    existingCity.id,
+    getRelationsForCurrentTree(
+      withExisting.knowledgeDBs,
+      withExisting.user.publicKey,
+      existingCity.id,
+      List<ID>([rootID]),
+      undefined,
+      false,
+      getRelationForView(withExisting, parentPath, stack)?.root
+    )!.id,
     parentPath,
     stack,
     0
@@ -309,19 +355,16 @@ test("buildDocumentEvents does not serialize pasted collision child as a standal
   const rootRelation = getRelationForView(plan, parentPath, stack);
   expect(rootRelation).toBeDefined();
 
-  const pastedNodeID = rootRelation?.items.first()?.nodeID;
-  expect(pastedNodeID).toBeDefined();
+  const pastedRelationID = rootRelation?.items.first()?.id as LongID | undefined;
+  expect(pastedRelationID).toBeDefined();
 
-  const pastedPath: ViewPath = [
-    0,
-    {
-      nodeID: rootRelation!.head as ID,
-      nodeIndex: 0 as NodeIndex,
-      relationsID: rootRelation!.id,
-    },
-    { nodeID: pastedNodeID!, nodeIndex: 0 as NodeIndex },
-  ];
-  const pastedRelation = getRelationForView(plan, pastedPath, stack);
+  const pastedRelation = pastedRelationID
+    ? getRelationsNoReferencedBy(
+        plan.knowledgeDBs,
+        pastedRelationID,
+        plan.user.publicKey
+      )
+    : undefined;
   expect(pastedRelation).toBeDefined();
   expect(shortID(pastedRelation!.id)).not.toEqual(pastedRelation!.root);
 

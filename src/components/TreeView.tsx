@@ -42,6 +42,7 @@ import {
   isConcreteRefId,
   parseConcreteRefId,
   getRelationsNoReferencedBy,
+  getRelationItemNodeID,
 } from "../connections";
 import { useApis } from "../Apis";
 import {
@@ -527,7 +528,11 @@ export function TreeView(): JSX.Element {
       (rdx, item) =>
         addReferencedByToFilters(
           rdx,
-          item.nodeID,
+          getRelationItemNodeID(
+            data.knowledgeDBs,
+            item,
+            searchRelation.author
+          ),
           data.knowledgeDBs,
           data.user.publicKey
         ),

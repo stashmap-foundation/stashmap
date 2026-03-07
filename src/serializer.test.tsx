@@ -156,8 +156,8 @@ test("filters out old abstract ref IDs (ref:) from items", () => {
   const relations = eventToRelations(event);
   expect(relations).toBeDefined();
   expect(relations!.items.size).toBe(2);
-  expect(relations!.items.get(0)?.nodeID).toBe("node1");
-  expect(relations!.items.get(1)?.nodeID).toBe("cref:alice_list123:node2");
+  expect(relations!.items.get(0)?.id).toBe("node1");
+  expect(relations!.items.get(1)?.id).toBe("cref:alice_list123:node2");
 });
 
 describe("jsonToViews validation", () => {

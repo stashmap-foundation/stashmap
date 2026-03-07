@@ -38,17 +38,6 @@ export function contextsMatch(a: Context, b: Context): boolean {
   return a.equals(b);
 }
 
-function debugVersions(
-  message: string,
-  payload: Record<string, unknown>
-): void {
-  if (process.env.DEBUG_VERSIONS !== "1") {
-    return;
-  }
-  // eslint-disable-next-line no-console
-  console.log(`[versions] ${message}`, payload);
-}
-
 /**
  * Calculate items that other users have in their relation lists
  * that the current user doesn't have.
@@ -101,12 +90,12 @@ export function getSuggestionsForNode(
 
   const declinedRelationCrefIDs: ImmutableSet<LongID | ID> = currentRelation
     ? currentRelation.items
-        .filter(
-          (item) =>
-            isConcreteRefId(item.nodeID) && item.relevance === "not_relevant"
-        )
-        .map((item) => item.nodeID)
-        .toSet()
+      .filter(
+        (item) =>
+          isConcreteRefId(item.nodeID) && item.relevance === "not_relevant"
+      )
+      .map((item) => item.nodeID)
+      .toSet()
     : ImmutableSet<LongID | ID>();
 
   const contextToMatch = parentContext || List<ID>();
@@ -228,39 +217,28 @@ export function getVersionsForRelation(
     contextToMatch,
     currentRelation?.id
   );
-  debugVersions("start", {
-    nodeID: shortID(nodeID),
-    context: contextToMatch.toArray(),
-    currentRelationID: currentRelation?.id,
-    alternatives: alternatives.map((r) => r.id).toArray(),
-  });
 
   const existingCrefIDs = currentRelation
     ? currentRelation.items
-        .map((item) => item.nodeID)
-        .filter((id) => isConcreteRefId(id))
-        .toSet()
+      .map((item) => item.nodeID)
+      .filter((id) => isConcreteRefId(id))
+      .toSet()
     : ImmutableSet<LongID | ID>();
 
   const currentItemIDs = currentRelation
     ? currentRelation.items
-        .filter(
-          (item) =>
-            itemPassesFilters(item, filterTypes) &&
-            item.relevance !== "not_relevant"
-        )
-        .map((item) => shortID(item.nodeID))
-        .toSet()
+      .filter(
+        (item) =>
+          itemPassesFilters(item, filterTypes) &&
+          item.relevance !== "not_relevant"
+      )
+      .map((item) => shortID(item.nodeID))
+      .toSet()
     : ImmutableSet<string>();
 
   return alternatives
     .filter((r) => {
       if (existingCrefIDs.has(createConcreteRefId(r.id))) {
-        debugVersions("filtered-existing-cref", {
-          nodeID: shortID(nodeID),
-          candidateRelationID: r.id,
-          currentRelationID: currentRelation?.id,
-        });
         return false;
       }
       const { addCount, removeCount } = computeRelationDiff(
@@ -269,10 +247,6 @@ export function getVersionsForRelation(
         filterTypes
       );
       if (addCount === 0 && removeCount === 0) {
-        debugVersions("filtered-no-diff", {
-          nodeID: shortID(nodeID),
-          candidateRelationID: r.id,
-        });
         return false;
       }
       const candidateItemIDs = r.items
@@ -284,10 +258,6 @@ export function getVersionsForRelation(
         .map((item) => shortID(item.nodeID))
         .toSet();
       if (candidateItemIDs.size === 0) {
-        debugVersions("filtered-empty-candidate", {
-          nodeID: shortID(nodeID),
-          candidateRelationID: r.id,
-        });
         return false;
       }
       const coveredIDs = coveredSuggestionIDs || ImmutableSet<string>();
@@ -295,19 +265,6 @@ export function getVersionsForRelation(
       const hasUncoveredAdds = addIDs.some((id) => !coveredIDs.has(id));
       const keep =
         hasUncoveredAdds || removeCount > suggestionSettings.maxSuggestions;
-      debugVersions("candidate", {
-        nodeID: shortID(nodeID),
-        context: contextToMatch.toArray(),
-        currentRelationID: currentRelation?.id,
-        candidateRelationID: r.id,
-        addCount,
-        removeCount,
-        addIDs: addIDs.toArray(),
-        coveredIDs: coveredIDs.toArray(),
-        hasUncoveredAdds,
-        threshold: suggestionSettings.maxSuggestions,
-        keep,
-      });
       return keep;
     })
     .sortBy((r) => -r.updated)
@@ -413,9 +370,8 @@ function convertViewPathToString(viewContext: ViewPath): string {
   ) as SubPathWithRelations[];
   const beginning = withoutLastElement.reduce(
     (acc: string, subPath: SubPathWithRelations): string => {
-      const postfix = `${encodeNodeID(subPath.nodeID)}:${
-        subPath.nodeIndex
-      }:${encodeNodeID(subPath.relationsID)}`;
+      const postfix = `${encodeNodeID(subPath.nodeID)}:${subPath.nodeIndex
+        }:${encodeNodeID(subPath.relationsID)}`;
       return acc !== "" ? `${acc}:${postfix}` : postfix;
     },
     ""
@@ -1329,8 +1285,8 @@ export function upsertRelations(
     newRelationsForNode(nodeID, context, plan.user.publicKey, parentRoot);
   const relations =
     shortID(nodeID) === VERSIONS_NODE_ID &&
-    base.items.size === 0 &&
-    context.size > 0
+      base.items.size === 0 &&
+      context.size > 0
       ? addRelationToRelations(base, context.last() as ID)
       : base;
 
@@ -1374,13 +1330,13 @@ function alterPath(
         acc.prevRelationsID === undefined
           ? parent
           : {
-              ...parent,
-              nodeIndex: calcIndex(
-                acc.prevRelationsID,
-                parent.nodeID as ID,
-                parent.nodeIndex
-              ),
-            },
+            ...parent,
+            nodeIndex: calcIndex(
+              acc.prevRelationsID,
+              parent.nodeID as ID,
+              parent.nodeIndex
+            ),
+          },
       ],
       prevRelationsID: parent.relationsID as LongID,
     }),

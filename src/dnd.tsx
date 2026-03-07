@@ -25,7 +25,6 @@ import {
   getLast,
   getContext,
   getRelationForView,
-  getDescendantRelations,
   getPaneIndex,
   isRoot,
   addNodeToPathWithRelations,
@@ -235,6 +234,7 @@ export function planDisconnectFromParent(
 
   const disconnectID = getLast(viewPath);
   const [nodeID] = getNodeIDFromView(plan, viewPath);
+  const sourceRelation = getRelationForView(plan, viewPath, stack);
   const parentRelation = getRelationForView(plan, parentPath, stack);
   if (!parentRelation) {
     return plan;
@@ -267,8 +267,9 @@ export function planDisconnectFromParent(
     return planWithViews;
   }
 
-  const context = getContext(plan, viewPath, stack);
-  return planDeleteDescendantRelations(planWithViews, nodeID, context);
+  return sourceRelation
+    ? planDeleteDescendantRelations(planWithViews, sourceRelation)
+    : planWithViews;
 }
 
 export function planDeleteNodeFromView(
@@ -290,22 +291,9 @@ export function planDeleteNodeFromView(
     return plan;
   }
 
-  const context = getContext(plan, viewPath, stack);
-
-  const descendantRelationIds = getDescendantRelations(
-    plan.knowledgeDBs,
-    nodeID,
-    context
-  )
-    .filter((r) => r.author === plan.user.publicKey)
-    .map((r) => r.id)
-    .toSet()
-    .add(relation.id);
-
   const planAfterDescendants = planDeleteDescendantRelations(
     plan,
-    nodeID,
-    context
+    relation
   );
   const planAfterDelete = planDeleteRelations(
     planAfterDescendants,
@@ -318,7 +306,13 @@ export function planDeleteNodeFromView(
       return true;
     }
     if (p.rootRelation !== undefined) {
-      return descendantRelationIds.has(p.rootRelation);
+      return (
+        getRelationForView(
+          planAfterDelete,
+          [i, p.rootRelation] as ViewPath,
+          p.stack
+        ) === undefined
+      );
     }
     if (p.stack.length === 0) {
       return false;
@@ -346,7 +340,6 @@ export function planMoveNodeWithView(
 ): Plan {
   const [sourceNodeID] = getNodeIDFromView(plan, sourceViewPath);
   const sourceStack = getPane(plan, sourceViewPath).stack;
-  const sourceContext = getContext(plan, sourceViewPath, sourceStack);
   const sourceRelation = getRelationForView(plan, sourceViewPath, sourceStack);
 
   const sourceParentPath = getParentView(sourceViewPath);
@@ -387,6 +380,11 @@ export function planMoveNodeWithView(
     targetParentViewPath
   );
   const targetContext = targetParentContext.push(shortID(targetParentNodeID));
+  const actualTargetParentRelation = getRelationForView(
+    planWithAdd,
+    targetParentViewPath,
+    stack
+  );
 
   const relations = getRelationForView(
     planWithAdd,
@@ -433,14 +431,17 @@ export function planMoveNodeWithView(
         )
       : disconnectedPlan;
 
+  if (!sourceRelation) {
+    return planWithDisconnect;
+  }
+
   return planMoveDescendantRelations(
     planWithDisconnect,
-    sourceNodeID,
-    sourceContext,
-    targetContext,
     sourceRelation,
+    targetContext,
+    actualTargetParentRelation?.id,
     moveNodeID !== sourceNodeID ? moveNodeID : undefined,
-    targetParentRelation?.root
+    actualTargetParentRelation?.root
   );
 }
 

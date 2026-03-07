@@ -321,7 +321,7 @@ function getNodeForMatching(
     );
 }
 
-function inferParentRelationID(
+export function inferParentRelationID(
   knowledgeDBs: KnowledgeDBs,
   relation: Relations
 ): LongID | undefined {
@@ -367,10 +367,7 @@ export function ensureRelationNativeFields(
       (relationNode && isTextNode(relationNode) ? relationNode.text : "") ||
       getFallbackRelationText(relation.head);
   const textHash = hashText(text);
-  const parent =
-    relation.parent ||
-    existingRelation?.parent ||
-    inferParentRelationID(knowledgeDBs, relation);
+  const parent = relation.parent || existingRelation?.parent;
 
   if (
     relation.text === text &&

@@ -51,13 +51,11 @@ import {
   NodeIndex,
   getNodeIDFromView,
   updateView,
-  contextsMatch,
   getContext,
   getParentView,
   getNodeFromID,
   getVersionedDisplayText,
   bulkUpdateViewPathsAfterAddRelation,
-  getDescendantRelations,
   copyViewsWithRelationsMapping,
   viewPathToString,
   getRelationForView,
@@ -651,7 +649,8 @@ export function planAddToParent(
         objectID,
         childContext,
         accPlan.user.publicKey,
-        parentRelation.root
+        parentRelation.root,
+        parentRelation.id
       );
       return [
         planUpsertRelations(accPlan, childRelation),
@@ -697,42 +696,80 @@ export function planAddToParent(
 
 type RelationsIdMapping = Map<LongID, LongID>;
 
+function getEffectiveParentRelationID(relation: Relations): LongID | undefined {
+  return relation.parent;
+}
+
+function getRelationSubtree(
+  plan: Plan,
+  sourceRelation: Relations,
+  filterRelation: (relation: Relations) => boolean = () => true
+): List<Relations> {
+  const authorRelations =
+    plan.knowledgeDBs.get(sourceRelation.author)?.relations.valueSeq().toList() ||
+    List<Relations>();
+  const childrenByParent = authorRelations
+    .filter((relation) => relation.root === sourceRelation.root)
+    .reduce(
+      (acc, relation) => {
+        const parentID = getEffectiveParentRelationID(relation);
+        if (!parentID) {
+          return acc;
+        }
+        return acc.update(parentID, List<Relations>(), (relations) =>
+          relations.push(relation)
+        );
+      },
+      Map<LongID, List<Relations>>()
+    );
+
+  const ordered: Relations[] = [];
+  const queue: Relations[] = filterRelation(sourceRelation) ? [sourceRelation] : [];
+  const seen = new Set<LongID>(queue.map((relation) => relation.id));
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current) {
+      continue;
+    }
+    ordered.push(current);
+    const children = childrenByParent.get(current.id, List<Relations>()).sortBy(
+      (relation) => relation.context.size
+    );
+    children.forEach((child) => {
+      if (seen.has(child.id) || !filterRelation(child)) {
+        return;
+      }
+      seen.add(child.id);
+      queue.push(child);
+    });
+  }
+
+  return List(ordered);
+}
+
 function planCopyDescendantRelations(
   plan: Plan,
-  sourceNodeID: LongID | ID,
-  sourceContext: Context,
+  sourceRelation: Relations,
   transformContext: (relation: Relations) => Context,
   filterRelation?: (relation: Relations) => boolean,
-  sourceRelation?: Relations,
+  targetParentRelationID?: LongID,
   targetNodeID?: LongID | ID,
   root?: ID
 ): [Plan, RelationsIdMapping] {
-  const allDescendants = getDescendantRelations(
-    plan.knowledgeDBs,
-    sourceNodeID,
-    sourceContext,
-    sourceRelation?.root
-  ).filter(filterRelation ?? (() => true));
-  const filteredDescendants = sourceRelation
-    ? allDescendants.filter(
-        (r) =>
-          r.head !== sourceRelation.head ||
-          !contextsMatch(r.context, sourceRelation.context)
-      )
-    : allDescendants;
-  const descendants: List<Relations> = (
-    sourceRelation
-      ? List<Relations>([sourceRelation]).concat(filteredDescendants)
-      : filteredDescendants
-  ).sortBy((relation) => relation.context.size);
+  const descendants = getRelationSubtree(
+    plan,
+    sourceRelation,
+    filterRelation ?? (() => true)
+  );
 
   let copiedRoot = root;
+  const sourceNodeID = sourceRelation.head as ID;
   const copiedRelations = descendants.map((relation) => {
     const newContext = transformContext(relation);
+    const isRootRelation = relation.id === sourceRelation.id;
     const head =
-      targetNodeID &&
-      relation.head === shortID(sourceNodeID) &&
-      contextsMatch(relation.context, sourceContext)
+      targetNodeID && isRootRelation
         ? targetNodeID
         : relation.head;
     const baseRelation = newRelations(
@@ -742,7 +779,11 @@ function planCopyDescendantRelations(
       copiedRoot
     );
     copiedRoot = copiedRoot ?? baseRelation.root;
-    return { source: relation, copy: baseRelation };
+    return {
+      source: relation,
+      sourceParentID: getEffectiveParentRelationID(relation),
+      copy: baseRelation,
+    };
   });
 
   const resultMapping = copiedRelations.reduce(
@@ -750,71 +791,64 @@ function planCopyDescendantRelations(
     Map<LongID, LongID>()
   );
 
-  const resultPlan = copiedRelations.reduce((accPlan, { source, copy }) => {
-    const items = source.items.map((item) => {
-      const mappedID = resultMapping.get(item.id as LongID);
-      return mappedID ? { ...item, id: mappedID } : item;
-    });
-    return planUpsertRelations(accPlan, {
-      ...copy,
-      items,
-      text: source.text,
-      textHash: source.textHash,
-      basedOn: source.id,
-    });
-  }, plan);
+  const resultPlan = copiedRelations.reduce(
+    (accPlan, { source, sourceParentID, copy }) => {
+      const isRootRelation = source.id === sourceRelation.id;
+      const items = source.items.map((item) => {
+        const mappedID = resultMapping.get(item.id as LongID);
+        return mappedID ? { ...item, id: mappedID } : item;
+      });
+      return planUpsertRelations(accPlan, {
+        ...copy,
+        items,
+        parent: isRootRelation
+          ? targetParentRelationID
+          : sourceParentID
+            ? resultMapping.get(sourceParentID)
+            : undefined,
+        text: source.text,
+        textHash: source.textHash,
+        basedOn: source.id,
+      });
+    },
+    plan
+  );
 
   return [resultPlan, resultMapping];
 }
 
 export function planMoveDescendantRelations(
   plan: Plan,
-  sourceNodeID: LongID | ID,
-  sourceContext: Context,
+  sourceRelation: Relations,
   targetContext: Context,
-  sourceRelation?: Relations,
+  targetParentRelationID?: LongID,
   targetNodeID?: LongID | ID,
   root?: ID
 ): Plan {
-  const allDescendants = getDescendantRelations(
-    plan.knowledgeDBs,
-    sourceNodeID,
-    sourceContext,
-    sourceRelation?.root
-  );
-  const descendants: List<Relations> = sourceRelation
-    ? allDescendants
-        .filter(
-          (r) =>
-            r.head !== sourceRelation.head ||
-            !contextsMatch(r.context, sourceRelation.context)
-        )
-        .push(sourceRelation)
-    : allDescendants;
-  const sortedDescendants = descendants.sortBy(
-    (relation) => relation.context.size
-  );
-
+  const descendants = getRelationSubtree(plan, sourceRelation);
+  const sourceNodeID = sourceRelation.head as ID;
+  const sourceContext = sourceRelation.context;
   const effectiveTargetNodeID = targetNodeID ?? sourceNodeID;
   const sourceChildContext = sourceContext.push(shortID(sourceNodeID));
   const targetChildContext = targetContext.push(shortID(effectiveTargetNodeID));
 
-  return sortedDescendants.reduce((accPlan, relation) => {
-    const isDirectChildrenRelation =
-      relation.head === shortID(sourceNodeID) &&
-      contextsMatch(relation.context, sourceContext);
-    const newContext = isDirectChildrenRelation
+  return descendants.reduce((accPlan, relation) => {
+    const isRootRelation = relation.id === sourceRelation.id;
+    const newContext = isRootRelation
       ? targetContext
       : targetChildContext.concat(
           relation.context.skip(sourceChildContext.size)
         );
-    const head = isDirectChildrenRelation
+    const head = isRootRelation
       ? shortID(effectiveTargetNodeID)
       : relation.head;
     return planUpsertRelations(accPlan, {
       ...relation,
       head,
       context: newContext,
+      parent: isRootRelation
+        ? targetParentRelationID
+        : getEffectiveParentRelationID(relation),
       root: root ?? relation.root,
     });
   }, plan);
@@ -829,6 +863,7 @@ export function planMoveTreeDescendantsToContext(
   stack: ID[],
   root?: ID
 ): Plan {
+  const targetParentRelation = getRelationForView(plan, parentViewPath, stack);
   const parentContext = getContext(plan, parentViewPath, stack);
   const [parentNodeID] = getNodeIDFromView(plan, parentViewPath);
   const targetContext = parentContext.push(shortID(parentNodeID));
@@ -843,12 +878,14 @@ export function planMoveTreeDescendantsToContext(
           accPlan.user.publicKey
         )
       : undefined;
+    if (!sourceRelation) {
+      return accPlan;
+    }
     return planMoveDescendantRelations(
       accPlan,
-      originalID,
-      List<ID>(),
-      targetContext,
       sourceRelation,
+      targetContext,
+      targetParentRelation?.id,
       actualID !== originalID ? actualID : undefined,
       root
     );
@@ -883,21 +920,16 @@ export function planForkPane(
       )
     : undefined;
 
-  const context = getContext(plan, viewPath, stack);
-  const entryNodeID = rootRelationData
-    ? (rootRelationData.head as ID)
-    : context.first() || (stack[stack.length - 1] as ID);
-  if (!entryNodeID) {
+  const sourceRelation =
+    rootRelationData || getRelationForView(plan, viewPath, stack);
+  if (!sourceRelation) {
     return plan;
   }
-  const entryContext = rootRelationData ? rootRelationData.context : List<ID>();
   const [planWithRelations, relationsIdMapping] = planCopyDescendantRelations(
     plan,
-    entryNodeID,
-    entryContext,
+    sourceRelation,
     (relation) => relation.context,
-    (relation) => relation.author === pane.author,
-    rootRelationData
+    (relation) => relation.author === pane.author
   );
   const updatedViews = updateViewsWithRelationsMapping(
     planWithRelations.views,
@@ -1014,20 +1046,17 @@ export function planDeepCopyNode(
 
   const [planWithCopiedRelations, mapping] = planCopyDescendantRelations(
     planWithParent,
-    resolvedNodeID,
-    resolvedContext,
+    resolvedRelation,
     (relation) => {
-      const isDirectChildrenRelation =
-        relation.head === shortID(resolvedNodeID) &&
-        contextsMatch(relation.context, resolvedContext);
-      return isDirectChildrenRelation
+      const isRootRelation = relation.id === resolvedRelation.id;
+      return isRootRelation
         ? nodeNewContext
         : targetChildContext.concat(
             relation.context.skip(sourceChildContext.size)
           );
     },
     undefined,
-    resolvedRelation,
+    targetParentRelation.id,
     undefined,
     targetParentRelation.root
   );
@@ -1340,14 +1369,12 @@ export function planDeleteRelations(plan: Plan, relationsID: LongID): Plan {
 
 export function planDeleteDescendantRelations(
   plan: Plan,
-  nodeID: LongID | ID,
-  context: Context
+  sourceRelation: Relations
 ): Plan {
-  const descendants = getDescendantRelations(
-    plan.knowledgeDBs,
-    nodeID,
-    context
-  ).filter((r) => r.author === plan.user.publicKey);
+  const descendants = getRelationSubtree(plan, sourceRelation)
+    .filter((relation) => relation.id !== sourceRelation.id)
+    .filter((relation) => relation.author === plan.user.publicKey)
+    .sortBy((relation) => -relation.context.size);
 
   return descendants.reduce(
     (accPlan, relation) => planDeleteRelations(accPlan, relation.id),

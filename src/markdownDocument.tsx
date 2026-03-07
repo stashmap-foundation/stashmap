@@ -645,6 +645,15 @@ export function createVersion(
   const withVersionsNode = walkUpsertNode(withVersionNode, versionsNode);
 
   const versionsContext = getVersionsContext(originalNodeID, context);
+  const parentRelation = getRelationsForCurrentTree(
+    withVersionsNode.knowledgeDBs,
+    withVersionsNode.publicKey,
+    originalNodeID,
+    context,
+    undefined,
+    context.size === 0,
+    root
+  );
   const baseVersionsRelations =
     getVersionsRelations(
       withVersionsNode.knowledgeDBs,
@@ -657,7 +666,8 @@ export function createVersion(
       VERSIONS_NODE_ID,
       versionsContext,
       withVersionsNode.publicKey,
-      root
+      root,
+      parentRelation?.id
     );
 
   const versionItemContext = versionsContext.push(VERSIONS_NODE_ID);

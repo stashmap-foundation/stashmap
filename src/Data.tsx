@@ -39,6 +39,11 @@ import {
   parseRelationUrl,
   parseAuthorFromSearch,
 } from "./navigationUrl";
+import {
+  ensureRelationNativeFields,
+  inferParentRelationID,
+  shortID,
+} from "./connections";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { generatePaneId } from "./SplitPanesContext";
 import { jsonToPanes, paneToJSON, Serializable } from "./serializer";
@@ -161,7 +166,21 @@ function processEventsByAuthor(
   const contacts = findContacts(authorEvents);
   const docResult = findDocumentNodesAndRelations(authorEvents);
   const nodes = findNodes(authorEvents).merge(docResult.nodes);
-  const relations = findRelations(authorEvents).merge(docResult.relations);
+  const rawRelations = findRelations(authorEvents).merge(docResult.relations);
+  const relations = rawRelations
+    .valueSeq()
+    .sortBy((relation) => relation.context.size)
+    .reduce((acc, relation) => {
+      const knowledgeDBs = Map<PublicKey, KnowledgeData>().set(relation.author, {
+        nodes,
+        relations: acc,
+      });
+      const normalized = ensureRelationNativeFields(knowledgeDBs, {
+        ...relation,
+        parent: relation.parent || inferParentRelationID(knowledgeDBs, relation),
+      });
+      return acc.set(shortID(normalized.id), normalized);
+    }, Map<string, Relations>());
   const views = findViews(authorEvents);
   const projectMembers = findMembers(authorEvents);
   const knowledgeDB = {

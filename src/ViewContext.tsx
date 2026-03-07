@@ -1592,7 +1592,8 @@ export function newRelations(
   head: LongID | ID,
   context: Context,
   myself: PublicKey,
-  root?: ID
+  root?: ID,
+  parent?: LongID
 ): Relations {
   const id = joinID(myself, v4());
   const localHead = shortID(head) as ID;
@@ -1613,7 +1614,7 @@ export function newRelations(
     id,
     text,
     textHash: hashText(text),
-    parent: undefined,
+    parent,
     updated: Date.now(),
     author: myself,
     root: root ?? shortID(id),
@@ -1626,9 +1627,10 @@ export function newRelationsForNode(
   nodeID: LongID | ID,
   context: Context,
   myself: PublicKey,
-  root?: ID
+  root?: ID,
+  parent?: LongID
 ): Relations {
-  const relations = newRelations(nodeID, context, myself, root);
+  const relations = newRelations(nodeID, context, myself, root, parent);
   if (shortID(nodeID) === VERSIONS_NODE_ID && context.size > 0) {
     const originalNodeID = context.last() as ID;
     return addRelationToRelations(relations, originalNodeID);
@@ -1645,7 +1647,8 @@ export function upsertRelations(
   const pane = getPane(plan, viewPath);
   const [nodeID] = getNodeIDFromView(plan, viewPath);
   const context = getContext(plan, viewPath, stack);
-  const parentRoot = getParentRelation(plan, viewPath)?.root;
+  const parentRelation = getParentRelation(plan, viewPath);
+  const parentRoot = parentRelation?.root;
   const author = getEffectiveAuthor(plan, viewPath);
 
   const currentRelation = getRelationsForCurrentTree(
@@ -1664,7 +1667,13 @@ export function upsertRelations(
 
   const base =
     currentRelation ||
-    newRelationsForNode(nodeID, context, plan.user.publicKey, parentRoot);
+    newRelationsForNode(
+      nodeID,
+      context,
+      plan.user.publicKey,
+      parentRoot,
+      parentRelation?.id
+    );
   const relations =
     shortID(nodeID) === VERSIONS_NODE_ID &&
     base.items.size === 0 &&

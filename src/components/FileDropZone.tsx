@@ -181,10 +181,8 @@ export function planPasteMarkdownTrees(
   return trees.reduce((accPlan, tree, idx) => {
     const insertAt =
       insertAtIndex !== undefined ? insertAtIndex + idx : undefined;
-    const [planWithNode, topNodeIDs, topRelationIDs] = planCreateNodesFromMarkdownTrees(
-      accPlan,
-      [tree]
-    );
+    const [planWithNode, topNodeIDs, topRelationIDs] =
+      planCreateNodesFromMarkdownTrees(accPlan, [tree]);
     const [planWithAdded, actualIDs] = planAddToParent(
       planWithNode,
       topNodeIDs,

@@ -145,7 +145,9 @@ export function NavigationStateProvider({
       if (!resolvedStack) {
         return p;
       }
-      const stackChanged = resolvedStack.some((id, index) => id !== p.stack[index]);
+      const stackChanged = resolvedStack.some(
+        (id, index) => id !== p.stack[index]
+      );
       return stackChanged ? { ...p, stack: resolvedStack } : p;
     });
     if (resolved.some((p, i) => p !== panes[i])) {

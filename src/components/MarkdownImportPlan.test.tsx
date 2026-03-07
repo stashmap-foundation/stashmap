@@ -264,9 +264,9 @@ test("planPasteMarkdownTrees: collision does not shadow existing children", () =
     false,
     getRelationForView(plan, parentPath, stack)?.root
   );
-  expect(existingCityRel?.items.some((i) => i.nodeID === existingVienna.id)).toBe(
-    true
-  );
+  expect(
+    existingCityRel?.items.some((i) => i.nodeID === existingVienna.id)
+  ).toBe(true);
 });
 
 test("buildDocumentEvents does not serialize pasted collision child as a standalone root", () => {
@@ -343,7 +343,8 @@ test("Planning multiple markdown files returns top nodes in import order", () =>
   ]);
 
   const topTexts = topNodeIDs.map(
-    (id) => plan.knowledgeDBs.get(plan.user.publicKey)?.nodes.get(shortID(id))?.text
+    (id) =>
+      plan.knowledgeDBs.get(plan.user.publicKey)?.nodes.get(shortID(id))?.text
   );
 
   expect(topTexts).toEqual(["One", "Two"]);

@@ -240,6 +240,9 @@ declare global {
     head: ID;
     context: Context;
     id: LongID;
+    text: string;
+    textHash: ID;
+    parent?: LongID;
     updated: number;
     author: PublicKey;
     basedOn?: LongID;

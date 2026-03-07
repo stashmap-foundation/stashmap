@@ -1,7 +1,7 @@
 import { List } from "immutable";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { ALICE, expectTree, renderTree, setup, type } from "../utils.test";
-import { updateItemArgument } from "../connections";
+import { hashText, updateItemArgument } from "../connections";
 
 describe("EvidenceSelector", () => {
   test("shows evidence selector for child items", async () => {
@@ -147,6 +147,9 @@ describe("updateItemArgument", () => {
       head: "head" as ID,
       context: List(),
       id: "rel1" as LongID,
+      text: "head",
+      textHash: hashText("head"),
+      parent: undefined,
       updated: Date.now(),
       author: "author" as PublicKey,
       root: "rel1" as ID,
@@ -169,6 +172,9 @@ describe("updateItemArgument", () => {
       head: "head" as ID,
       context: List(),
       id: "rel1" as LongID,
+      text: "head",
+      textHash: hashText("head"),
+      parent: undefined,
       updated: Date.now(),
       author: "author" as PublicKey,
       root: "rel1" as ID,
@@ -186,6 +192,9 @@ describe("updateItemArgument", () => {
       head: "head" as ID,
       context: List(),
       id: "rel1" as LongID,
+      text: "head",
+      textHash: hashText("head"),
+      parent: undefined,
       updated: Date.now(),
       author: "author" as PublicKey,
       root: "rel1" as ID,

@@ -108,24 +108,24 @@ function getChildrenForRegularNode(
   const relations = isSearchId(parentNodeID as ID)
     ? getRelations(data.knowledgeDBs, parentNodeID as ID, data.user.publicKey)
     : options?.isMarkdownExport
-      ? getRelationsForMarkdownExport(
-          data,
-          effectiveAuthor,
-          parentNodeID,
-          context,
-          rootRelation,
-          isRootNode,
-          currentRoot
-        )
-      : getRelationsForCurrentTree(
-          data.knowledgeDBs,
-          effectiveAuthor,
-          parentNodeID,
-          context,
-          rootRelation,
-          isRootNode,
-          currentRoot
-        );
+    ? getRelationsForMarkdownExport(
+        data,
+        effectiveAuthor,
+        parentNodeID,
+        context,
+        rootRelation,
+        isRootNode,
+        currentRoot
+      )
+    : getRelationsForCurrentTree(
+        data.knowledgeDBs,
+        effectiveAuthor,
+        parentNodeID,
+        context,
+        rootRelation,
+        isRootNode,
+        currentRoot
+      );
 
   const relationPaths = relations
     ? relations.items

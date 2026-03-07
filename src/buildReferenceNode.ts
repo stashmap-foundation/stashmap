@@ -155,8 +155,9 @@ function getSemanticNodeKey(
   author: PublicKey
 ): string {
   return (
-    getNodeTextHash(getNodeFromID(knowledgeDBs, shortID(nodeID) as ID, author)) ||
-    shortID(nodeID as ID)
+    getNodeTextHash(
+      getNodeFromID(knowledgeDBs, shortID(nodeID) as ID, author)
+    ) || shortID(nodeID as ID)
   );
 }
 
@@ -168,9 +169,7 @@ function relationsMatchForVersion(
   const useExactMatch =
     left.author === right.author && left.root === right.root;
   if (useExactMatch) {
-    return (
-      left.head === right.head && left.context.equals(right.context)
-    );
+    return left.head === right.head && left.context.equals(right.context);
   }
 
   return (
@@ -188,7 +187,6 @@ function relationsMatchForVersion(
     )
   );
 }
-
 
 function buildDeletedReference(
   refId: LongID,

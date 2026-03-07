@@ -10,8 +10,10 @@ import {
   isRefId,
   isSearchId,
   parseSearchId,
+  hashText,
   itemMatchesType,
   VERSIONS_NODE_ID,
+  LOG_NODE_ID,
   EMPTY_NODE_ID,
   addRelationToRelations,
   isConcreteRefId,
@@ -44,8 +46,9 @@ function getSemanticNodeKey(
   author: PublicKey
 ): string {
   return (
-    getNodeTextHash(getNodeFromID(knowledgeDBs, shortID(nodeID) as ID, author)) ||
-    shortID(nodeID)
+    getNodeTextHash(
+      getNodeFromID(knowledgeDBs, shortID(nodeID) as ID, author)
+    ) || shortID(nodeID)
   );
 }
 
@@ -175,24 +178,24 @@ export function getSuggestionsForNode(
     : ImmutableSet<LongID | ID>();
   const currentRelationItemKeys: ImmutableSet<string> = currentRelation
     ? currentRelation.items
-      .map((item) =>
-        getComparableSuggestionKey(
-          knowledgeDBs,
-          item.nodeID,
-          currentRelation.author
+        .map((item) =>
+          getComparableSuggestionKey(
+            knowledgeDBs,
+            item.nodeID,
+            currentRelation.author
+          )
         )
-      )
-      .toSet()
+        .toSet()
     : ImmutableSet<string>();
 
   const declinedRelationCrefIDs: ImmutableSet<LongID | ID> = currentRelation
     ? currentRelation.items
-      .filter(
-        (item) =>
-          isConcreteRefId(item.nodeID) && item.relevance === "not_relevant"
-      )
-      .map((item) => item.nodeID)
-      .toSet()
+        .filter(
+          (item) =>
+            isConcreteRefId(item.nodeID) && item.relevance === "not_relevant"
+        )
+        .map((item) => item.nodeID)
+        .toSet()
     : ImmutableSet<LongID | ID>();
 
   const contextToMatch = parentContext || List<ID>();
@@ -239,7 +242,10 @@ export function getSuggestionsForNode(
           item.nodeID,
           relations.author
         );
-        if (currentRelationItemKeys.has(candidateKey) || itemAcc.has(candidateKey)) {
+        if (
+          currentRelationItemKeys.has(candidateKey) ||
+          itemAcc.has(candidateKey)
+        ) {
           return itemAcc;
         }
         return itemAcc.set(candidateKey, shortID(item.nodeID) as ID);
@@ -314,43 +320,43 @@ export function getAlternativeRelations(
 ): List<Relations> {
   const localID = shortID(nodeID);
   const author = currentAuthor;
-  return knowledgeDBs
-    .toList()
-    .flatMap((db) =>
-      db.relations
-        .filter((r) => {
-          if (!author) {
-            return false;
-          }
-          const useExactMatch =
-            r.author === author && currentRoot !== undefined && r.root === currentRoot;
-          const matchesNode = useExactMatch
-            ? r.head === localID
-            : nodesSemanticallyMatch(
-                knowledgeDBs,
-                r.head,
-                r.author,
-                localID,
-                author
-              );
-          const matchesContext = useExactMatch
-            ? contextsMatch(r.context, context)
-            : contextsSemanticallyMatch(
-                knowledgeDBs,
-                r.context,
-                r.author,
-                context,
-                author
-              );
-          return (
-            matchesNode &&
-            r.id !== excludeRelationId &&
-            matchesContext &&
-            (r.items.size > 0 || r.root === shortID(r.id))
-          );
-        })
-        .toList()
-    );
+  return knowledgeDBs.toList().flatMap((db) =>
+    db.relations
+      .filter((r) => {
+        if (!author) {
+          return false;
+        }
+        const useExactMatch =
+          r.author === author &&
+          currentRoot !== undefined &&
+          r.root === currentRoot;
+        const matchesNode = useExactMatch
+          ? r.head === localID
+          : nodesSemanticallyMatch(
+              knowledgeDBs,
+              r.head,
+              r.author,
+              localID,
+              author
+            );
+        const matchesContext = useExactMatch
+          ? contextsMatch(r.context, context)
+          : contextsSemanticallyMatch(
+              knowledgeDBs,
+              r.context,
+              r.author,
+              context,
+              author
+            );
+        return (
+          matchesNode &&
+          r.id !== excludeRelationId &&
+          matchesContext &&
+          (r.items.size > 0 || r.root === shortID(r.id))
+        );
+      })
+      .toList()
+  );
 }
 
 function useExactItemMatchForRelation(
@@ -437,13 +443,15 @@ export function getVersionsForRelation(
     context: contextToMatch.toArray(),
     currentRelationID: currentRelation?.id,
     currentItemCount: currentRelation?.items.size,
-    alternatives: alternatives.map((r) => ({
-      id: r.id,
-      context: r.context.toArray(),
-      itemCount: r.items.size,
-      author: r.author,
-      root: r.root,
-    })).toArray(),
+    alternatives: alternatives
+      .map((r) => ({
+        id: r.id,
+        context: r.context.toArray(),
+        itemCount: r.items.size,
+        author: r.author,
+        root: r.root,
+      }))
+      .toArray(),
   });
 
   const existingCrefIDs = currentRelation.items
@@ -506,8 +514,7 @@ export function getVersionsForRelation(
         .filter((id) => !currentItemIDs.has(id));
       const hasUncoveredAdds = addIDs.some((id) => !coveredIDs.has(id));
       const keep =
-        hasUncoveredAdds || removeCount > suggestionSettings.maxSuggestions
-      ;
+        hasUncoveredAdds || removeCount > suggestionSettings.maxSuggestions;
       debugVersions("candidate", {
         nodeID: shortID(nodeID),
         context: contextToMatch.toArray(),
@@ -627,8 +634,9 @@ function convertViewPathToString(viewContext: ViewPath): string {
   ) as SubPathWithRelations[];
   const beginning = withoutLastElement.reduce(
     (acc: string, subPath: SubPathWithRelations): string => {
-      const postfix = `${encodeNodeID(subPath.nodeID)}:${subPath.nodeIndex
-        }:${encodeNodeID(subPath.relationsID)}`;
+      const postfix = `${encodeNodeID(subPath.nodeID)}:${
+        subPath.nodeIndex
+      }:${encodeNodeID(subPath.relationsID)}`;
       return acc !== "" ? `${acc}:${postfix}` : postfix;
     },
     ""
@@ -819,12 +827,7 @@ export function resolveNodeStackToActualIDs(
       .filter((itemNodeID) => !isRefId(itemNodeID))
       .map((itemNodeID) => shortID(itemNodeID) as ID)
       .find((itemNodeID) =>
-        relationHeadMatchesNode(
-          knowledgeDBs,
-          author,
-          itemNodeID,
-          nextRequested
-        )
+        relationHeadMatchesNode(knowledgeDBs, author, itemNodeID, nextRequested)
       );
     if (!nextNodeID) {
       return undefined;
@@ -852,11 +855,10 @@ function getRelationFromContextPath(
   nodeID: LongID | ID,
   context: Context
 ): Relations | undefined {
-  const resolved = resolveNodeStackToActualIDs(
-    knowledgeDBs,
-    author,
-    [...context.toArray(), shortID(nodeID) as ID]
-  );
+  const resolved = resolveNodeStackToActualIDs(knowledgeDBs, author, [
+    ...context.toArray(),
+    shortID(nodeID) as ID,
+  ]);
   return resolved?.relation;
 }
 
@@ -909,12 +911,7 @@ export function getRelationsForCurrentTree(
     return undefined;
   }
 
-  return getRelationFromContextPath(
-    knowledgeDBs,
-    paneAuthor,
-    nodeID,
-    context
-  );
+  return getRelationFromContextPath(knowledgeDBs, paneAuthor, nodeID, context);
 }
 
 export function getParentRelation(
@@ -1014,11 +1011,9 @@ export function getDescendantRelations(
   return allRelations.filter(
     (relations) =>
       (!root || relations.root === root) &&
-      (
-        (relations.head === localID &&
-          contextsMatch(relations.context, rootContext)) ||
-        contextStartsWith(relations.context, childContext)
-      )
+      ((relations.head === localID &&
+        contextsMatch(relations.context, rootContext)) ||
+        contextStartsWith(relations.context, childContext))
   );
 }
 
@@ -1611,11 +1606,25 @@ export function newRelations(
   root?: ID
 ): Relations {
   const id = joinID(myself, v4());
+  const localHead = shortID(head) as ID;
+  let text = "";
+  if (localHead === VERSIONS_NODE_ID) {
+    text = "~versions";
+  } else if (localHead === LOG_NODE_ID) {
+    text = "~Log";
+  } else if (localHead === EMPTY_NODE_ID) {
+    text = "";
+  } else if (isSearchId(localHead)) {
+    text = parseSearchId(localHead) || "";
+  }
   return {
-    head: shortID(head),
+    head: localHead,
     items: List<RelationItem>(),
     context,
     id,
+    text,
+    textHash: hashText(text),
+    parent: undefined,
     updated: Date.now(),
     author: myself,
     root: root ?? shortID(id),
@@ -1669,8 +1678,8 @@ export function upsertRelations(
     newRelationsForNode(nodeID, context, plan.user.publicKey, parentRoot);
   const relations =
     shortID(nodeID) === VERSIONS_NODE_ID &&
-      base.items.size === 0 &&
-      context.size > 0
+    base.items.size === 0 &&
+    context.size > 0
       ? addRelationToRelations(base, context.last() as ID)
       : base;
 
@@ -1714,13 +1723,13 @@ function alterPath(
         acc.prevRelationsID === undefined
           ? parent
           : {
-            ...parent,
-            nodeIndex: calcIndex(
-              acc.prevRelationsID,
-              parent.nodeID as ID,
-              parent.nodeIndex
-            ),
-          },
+              ...parent,
+              nodeIndex: calcIndex(
+                acc.prevRelationsID,
+                parent.nodeID as ID,
+                parent.nodeIndex
+              ),
+            },
       ],
       prevRelationsID: parent.relationsID as LongID,
     }),

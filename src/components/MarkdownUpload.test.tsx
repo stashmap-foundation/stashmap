@@ -11,10 +11,7 @@ import {
   setup,
   UpdateState,
 } from "../utils.test";
-import {
-  parseMarkdownHierarchy,
-  planPasteMarkdownTrees,
-} from "./FileDropZone";
+import { parseMarkdownHierarchy, planPasteMarkdownTrees } from "./FileDropZone";
 import { joinID, shortID } from "../connections";
 
 const TEST_FILE = `# Programming Languages

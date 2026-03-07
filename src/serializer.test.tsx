@@ -9,7 +9,12 @@ import {
 } from "./planner";
 import { ALICE, setup } from "./utils.test";
 import { newRelations } from "./ViewContext";
-import { addRelationToRelations, newNode, shortID } from "./connections";
+import {
+  addRelationToRelations,
+  hashText,
+  newNode,
+  shortID,
+} from "./connections";
 import { parseDocumentEvent } from "./markdownDocument";
 
 describe("eventToRelations validation", () => {
@@ -286,5 +291,62 @@ describe("basedOn serialization round-trip", () => {
       (relation) => relation.basedOn !== undefined
     );
     expect(relationWithBasedOn).toBeUndefined();
+  });
+
+  test("document serialization prefers relation text over node text", () => {
+    const [alice] = setup([ALICE]);
+    const rootNode = newNode("Root Node");
+    const childNode = newNode("Child Node");
+    const rootLabel = "Root Relation";
+    const childLabel = "Child Relation";
+    const plan = createPlan(alice());
+    const rootRelations = {
+      ...addRelationToRelations(
+        newRelations(rootNode.id, List<ID>(), plan.user.publicKey),
+        childNode.id
+      ),
+      text: rootLabel,
+      textHash: hashText(rootLabel),
+    };
+    const childRelations = {
+      ...newRelations(
+        childNode.id,
+        List<ID>([shortID(rootNode.id) as ID]),
+        plan.user.publicKey,
+        rootRelations.root
+      ),
+      text: childLabel,
+      textHash: hashText(childLabel),
+    };
+    const planWithRelation = planUpsertRelations(
+      planUpsertRelations(
+        planUpsertNode(planUpsertNode(plan, rootNode), childNode),
+        rootRelations
+      ),
+      childRelations
+    );
+
+    const events = buildDocumentEvents(planWithRelation);
+    const event = events.find((e) => e.kind === KIND_KNOWLEDGE_DOCUMENT);
+
+    expect(event).toBeDefined();
+    expect(event!.content).toContain(`# ${rootLabel} {`);
+    expect(event!.content).toContain(`- ${childLabel} {`);
+    expect(event!.content).not.toContain(rootNode.text);
+    expect(event!.content).not.toContain(childNode.text);
+    expect(event!.tags).toEqual(
+      expect.arrayContaining([
+        ["n", hashText(rootLabel)],
+        ["n", hashText(childLabel)],
+      ])
+    );
+
+    const parsed = parseDocumentEvent(event!);
+    expect(parsed.relations.get(shortID(rootRelations.id))?.text).toBe(
+      rootLabel
+    );
+    expect(parsed.relations.get(shortID(childRelations.id))?.text).toBe(
+      childLabel
+    );
   });
 });

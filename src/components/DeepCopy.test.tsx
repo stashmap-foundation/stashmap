@@ -1531,45 +1531,38 @@ My Notes
 });
 
 describe("Deep Copy - basedOn Tracking", () => {
+  type MarkdownTreeValue = {
+    uuid?: string;
+    basedOn?: string;
+    children: MarkdownTreeValue[];
+  };
+
   const collectTreeValues = (
-    trees: Array<{
-      uuid?: string;
-      basedOn?: string;
-      children: Array<{
-        uuid?: string;
-        basedOn?: string;
-        children: unknown[];
-      }>;
-    }>
+    trees: MarkdownTreeValue[]
   ): { uuids: string[]; basedOn: string[] } => {
-    const values = { uuids: [] as string[], basedOn: [] as string[] };
     const walk = (
-      nodes: Array<{
-        uuid?: string;
-        basedOn?: string;
-        children: unknown[];
-      }>
-    ): void => {
-      nodes.forEach((node) => {
-        if (node.uuid) values.uuids.push(node.uuid);
-        if (node.basedOn) values.basedOn.push(node.basedOn);
-        walk(
-          node.children as Array<{
-            uuid?: string;
-            basedOn?: string;
-            children: unknown[];
-          }>
-        );
-      });
-    };
-    walk(
-      trees as Array<{
-        uuid?: string;
-        basedOn?: string;
-        children: unknown[];
-      }>
-    );
-    return values;
+      nodes: MarkdownTreeValue[]
+    ): { uuids: string[]; basedOn: string[] } =>
+      nodes.reduce(
+        (acc, { uuid, basedOn, children }) => {
+          const childValues = walk(children);
+          return {
+            uuids: [
+              ...acc.uuids,
+              ...(uuid ? [uuid] : []),
+              ...childValues.uuids,
+            ],
+            basedOn: [
+              ...acc.basedOn,
+              ...(basedOn ? [basedOn] : []),
+              ...childValues.basedOn,
+            ],
+          };
+        },
+        { uuids: [] as string[], basedOn: [] as string[] }
+      );
+
+    return walk(trees);
   };
 
   test("Cross-pane deep copy sets basedOn on all copied relations", async () => {
@@ -1594,13 +1587,7 @@ My Notes
       );
     const bobRelationDTags = bobRelationEvents.flatMap((event) => {
       const trees = parseMarkdownHierarchy(event.content);
-      return collectTreeValues(
-        trees as Array<{
-          uuid?: string;
-          basedOn?: string;
-          children: unknown[];
-        }>
-      ).uuids;
+      return collectTreeValues(trees as MarkdownTreeValue[]).uuids;
     });
 
     cleanup();
@@ -1646,11 +1633,7 @@ Target
     aliceCopyEvents.forEach((e) => {
       const trees = parseMarkdownHierarchy(e.content);
       const basedOnValues = collectTreeValues(
-        trees as Array<{
-          uuid?: string;
-          basedOn?: string;
-          children: unknown[];
-        }>
+        trees as MarkdownTreeValue[]
       ).basedOn;
       basedOnValues.forEach((basedOnValue) => {
         const sourceDTag = basedOnValue.split("_").slice(1).join("_");
@@ -1696,7 +1679,8 @@ My Notes
       .getEvents()
       .slice(eventsBeforeAccept)
       .filter(
-        (e) => e.kind === KIND_KNOWLEDGE_DOCUMENT && e.content.includes('basedOn="')
+        (e) =>
+          e.kind === KIND_KNOWLEDGE_DOCUMENT && e.content.includes('basedOn="')
       );
 
     expect(newEvents.length).toBeGreaterThan(0);

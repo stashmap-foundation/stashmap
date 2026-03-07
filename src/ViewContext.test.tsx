@@ -8,6 +8,7 @@ import {
   bulkAddRelations,
   shortID,
   createConcreteRefId,
+  hashText,
 } from "./connections";
 import { execute } from "./executor";
 import {
@@ -78,10 +79,7 @@ test("Move View Settings on Delete", async () => {
   );
   const planWithRelations = planUpsertRelations(
     planUpsertRelations(
-      planUpsertRelations(
-        planWithNodes,
-        plChildrenRelations
-      ),
+      planUpsertRelations(planWithNodes, plChildrenRelations),
       wsRelations
     ),
     addRelationToRelations(
@@ -267,6 +265,9 @@ test("Calculate index from node index", () => {
     head: "test" as ID,
     context: List<ID>(),
     id: "test" as LongID,
+    text: "test",
+    textHash: hashText("test"),
+    parent: undefined,
     updated: 0,
     author: ALICE.publicKey,
     root: "test" as ID,

@@ -120,11 +120,7 @@ export async function execute({
     return Map();
   }
 
-  const finalizedEvents = await signEvents(
-    allEvents,
-    plan.user,
-    finalizeEvent
-  );
+  const finalizedEvents = await signEvents(allEvents, plan.user, finalizeEvent);
 
   if (finalizedEvents.size === 0) {
     return Map();

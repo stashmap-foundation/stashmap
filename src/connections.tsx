@@ -133,6 +133,23 @@ export function shortID(id: ID): string {
   return splitID(id)[1];
 }
 
+function getFallbackRelationText(head: LongID | ID): string {
+  const localHead = shortID(head as ID) as ID;
+  if (localHead === VERSIONS_NODE_ID) {
+    return "~versions";
+  }
+  if (localHead === LOG_NODE_ID) {
+    return "~Log";
+  }
+  if (localHead === EMPTY_NODE_ID) {
+    return "";
+  }
+  if (isSearchId(localHead)) {
+    return parseSearchId(localHead) || "";
+  }
+  return "";
+}
+
 export function getRelationsNoReferencedBy(
   knowledgeDBs: KnowledgeDBs,
   relationID: ID | undefined,
@@ -264,7 +281,77 @@ function getNodeForMatching(
   return knowledgeDBs
     .valueSeq()
     .flatMap((db) => db.nodes.valueSeq())
-    .find((node) => shortID(node.id) === localID || getNodeTextHash(node) === localID);
+    .find(
+      (node) =>
+        shortID(node.id) === localID || getNodeTextHash(node) === localID
+    );
+}
+
+function inferParentRelationID(
+  knowledgeDBs: KnowledgeDBs,
+  relation: Relations
+): LongID | undefined {
+  if (relation.context.size === 0) {
+    return undefined;
+  }
+
+  const parentHead = relation.context.last() as ID;
+  const parentContext = relation.context.butLast().toList() as Context;
+  return knowledgeDBs
+    .get(relation.author)
+    ?.relations.valueSeq()
+    .find(
+      (candidate) =>
+        candidate.root === relation.root &&
+        candidate.head === parentHead &&
+        candidate.context.equals(parentContext)
+    )?.id;
+}
+
+export function ensureRelationNativeFields(
+  knowledgeDBs: KnowledgeDBs,
+  relation: Relations
+): Relations {
+  const existingRelation = knowledgeDBs
+    .get(relation.author)
+    ?.relations.get(shortID(relation.id));
+  const relationNode = getNodeForMatching(
+    knowledgeDBs,
+    relation.head,
+    relation.author
+  );
+  const localHead = shortID(relation.head as ID) as ID;
+  const hasReservedHead =
+    localHead === VERSIONS_NODE_ID ||
+    localHead === LOG_NODE_ID ||
+    localHead === EMPTY_NODE_ID ||
+    isSearchId(localHead);
+  const shouldTrustRelationText = relation.text !== "" || hasReservedHead;
+  const text = shouldTrustRelationText
+    ? relation.text
+    : existingRelation?.text ||
+      (relationNode && isTextNode(relationNode) ? relationNode.text : "") ||
+      getFallbackRelationText(relation.head);
+  const textHash = hashText(text);
+  const parent =
+    relation.parent ||
+    existingRelation?.parent ||
+    inferParentRelationID(knowledgeDBs, relation);
+
+  if (
+    relation.text === text &&
+    relation.textHash === textHash &&
+    relation.parent === parent
+  ) {
+    return relation;
+  }
+
+  return {
+    ...relation,
+    text,
+    textHash,
+    parent,
+  };
 }
 
 function getSemanticMatchKey(
@@ -596,11 +683,7 @@ function getRefContextKey(
   if (!contextAuthor) {
     return ref.context.join(":");
   }
-  return getSemanticContextKey(
-    knowledgeDBs,
-    ref.context,
-    contextAuthor
-  );
+  return getSemanticContextKey(knowledgeDBs, ref.context, contextAuthor);
 }
 
 function refHasActiveVersions(
@@ -623,16 +706,17 @@ function refHasActiveVersions(
     : relation.context;
   const versionsContext = baseContext.push(targetNode);
 
-  return knowledgeDBs
-    .get(relation.author)
-    ?.relations
-    .valueSeq()
-    .some(
-      (candidate) =>
-        candidate.head === VERSIONS_NODE_ID &&
-        candidate.root === relation.root &&
-        candidate.context.equals(versionsContext)
-    ) ?? false;
+  return (
+    knowledgeDBs
+      .get(relation.author)
+      ?.relations.valueSeq()
+      .some(
+        (candidate) =>
+          candidate.head === VERSIONS_NODE_ID &&
+          candidate.root === relation.root &&
+          candidate.context.equals(versionsContext)
+      ) ?? false
+  );
 }
 
 export function getOccurrencesForNode(
@@ -671,7 +755,11 @@ export function getOccurrencesForNode(
     }
     const [refAuthor] = splitID(ref.relationID);
     return (
-      getSemanticMatchKey(knowledgeDBs, refRoot as ID, refAuthor || effectiveAuthor) ===
+      getSemanticMatchKey(
+        knowledgeDBs,
+        refRoot as ID,
+        refAuthor || effectiveAuthor
+      ) ===
       getSemanticMatchKey(knowledgeDBs, contextRoot as ID, effectiveAuthor)
     );
   };
@@ -683,7 +771,8 @@ export function getOccurrencesForNode(
         : currentContext.size > 0 && ref.context.size === 0
     )
     .filter(
-      (ref) => !covered.has(getRefContextKey(knowledgeDBs, ref, effectiveAuthor))
+      (ref) =>
+        !covered.has(getRefContextKey(knowledgeDBs, ref, effectiveAuthor))
     );
   const deduped = filtered
     .groupBy((ref) => getRefContextKey(knowledgeDBs, ref, effectiveAuthor))
@@ -786,11 +875,7 @@ export function getIncomingCrefsForNode(
     }, acc);
   }, List<ReferencedByRef>());
 
-  const deduped = deduplicateRefsByContext(
-    refs,
-    knowledgeDBs,
-    effectiveAuthor
-  );
+  const deduped = deduplicateRefsByContext(refs, knowledgeDBs, effectiveAuthor);
   return deduped
     .sortBy((ref) => `${-ref.updated}:${ref.context.join(":")}`)
     .map((ref) => createConcreteRefId(ref.relationID))

@@ -112,7 +112,11 @@ export function addRelationIDToFilters(
 ): Filters {
   return {
     ...addAuthorFromIDToFilters(filters, relationID as ID),
-    documentByRelation: addIDToFilter(filters.documentByRelation, relationID, "#r"),
+    documentByRelation: addIDToFilter(
+      filters.documentByRelation,
+      relationID,
+      "#r"
+    ),
   };
 }
 
@@ -420,7 +424,8 @@ export function LoadMissingVersionNodes({
         ? ref.relationContext.push(ref.relation.head as ID)
         : ref?.relationContext;
       const targetContext = refContext ?? context;
-      const targetRoot = ref?.relation.root || getRelationForView(data, viewPath, stack)?.root;
+      const targetRoot =
+        ref?.relation.root || getRelationForView(data, viewPath, stack)?.root;
 
       const versionsRel = getVersionsRelations(
         data.knowledgeDBs,

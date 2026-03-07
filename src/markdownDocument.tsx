@@ -10,12 +10,14 @@ import {
   joinID,
   newNode,
   nodeIDFromSeed,
+  getNodeTextHash,
   isConcreteRefId,
   parseConcreteRefId,
   createConcreteRefId,
   VERSIONS_NODE_ID,
   addRelationToRelations,
   moveRelations,
+  ensureRelationNativeFields,
 } from "./connections";
 import {
   getNodeFromID,
@@ -31,6 +33,7 @@ import {
   getVersionsContext,
   getVersionsRelations,
   getRelationsForCurrentTree,
+  getVersionedDisplayText,
 } from "./ViewContext";
 import { buildOutgoingReference } from "./buildReferenceNode";
 import { KIND_KNOWLEDGE_DOCUMENT, newTimestamp, msTag } from "./nostr";
@@ -57,8 +60,7 @@ function extractInlineContent(inline: Token): {
     .trim();
   const linkOpen = inline.children.find((c) => c.type === "link_open");
   const href = linkOpen?.attrGet("href");
-  const linkHref =
-    href && href.startsWith("#") ? href.slice(1) : undefined;
+  const linkHref = href && href.startsWith("#") ? href.slice(1) : undefined;
   const linkClass = linkOpen?.attrGet("class") || "";
   const linkClasses = linkClass.split(" ").filter(Boolean);
   const linkRelevance = (
@@ -248,8 +250,12 @@ export function parseMarkdownHierarchy(
           children: [],
           ...(uuid !== undefined && { uuid }),
           ...(nodeID !== undefined && { nodeID }),
-          ...(effectiveRelevance !== undefined && { relevance: effectiveRelevance }),
-          ...(effectiveArgument !== undefined && { argument: effectiveArgument }),
+          ...(effectiveRelevance !== undefined && {
+            relevance: effectiveRelevance,
+          }),
+          ...(effectiveArgument !== undefined && {
+            argument: effectiveArgument,
+          }),
           ...(linkHref !== undefined && { linkHref }),
           ...(hidden && { hidden }),
           ...(basedOn !== undefined && { basedOn }),
@@ -316,11 +322,7 @@ function formatCrefText(
   if (!parsed) {
     return undefined;
   }
-  const ref = buildOutgoingReference(
-    nodeID as LongID,
-    knowledgeDBs,
-    author
-  );
+  const ref = buildOutgoingReference(nodeID as LongID, knowledgeDBs, author);
   if (!ref) {
     return undefined;
   }
@@ -357,16 +359,62 @@ function getOwnRelationForDocumentSerialization(
   );
 }
 
-function serializeTree(
+function getSerializedRelationText(
   data: Data,
-  rootRelation: Relations
-): SerializeResult {
+  relation: Relations,
+  nodeID: LongID | ID,
+  context: List<ID>
+): { text: string; textHash: ID } {
+  const versionedText = getVersionedDisplayText(
+    data.knowledgeDBs,
+    relation.author,
+    shortID(nodeID as ID) as ID,
+    context,
+    relation.root
+  );
+  if (versionedText) {
+    return {
+      text: versionedText,
+      textHash: hashText(versionedText),
+    };
+  }
+
+  if (relation.text !== "" || shortID(nodeID as ID) === VERSIONS_NODE_ID) {
+    return {
+      text: relation.text,
+      textHash: relation.textHash,
+    };
+  }
+
+  const fallbackText =
+    getNodeFromID(data.knowledgeDBs, nodeID, relation.author)?.text ??
+    shortID(nodeID as ID);
+  return {
+    text: fallbackText,
+    textHash: hashText(fallbackText),
+  };
+}
+
+function buildRootPath(rootRelation: Relations): ViewPath {
+  return [
+    0,
+    { nodeID: rootRelation.head as LongID | ID, nodeIndex: 0 as NodeIndex },
+  ] as ViewPath;
+}
+
+function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
   const author = data.user.publicKey;
   const rootPath = buildRootPath(rootRelation);
   const stack = [rootRelation.head];
   const { paths, virtualItems } = getNodesInTree(
-    data, rootPath, stack, List<ViewPath>(), rootRelation.id,
-    author, undefined, { isMarkdownExport: true }
+    data,
+    rootPath,
+    stack,
+    List<ViewPath>(),
+    rootRelation.id,
+    author,
+    undefined,
+    { isMarkdownExport: true }
   );
   return paths.reduce<SerializeResult>(
     (acc, path) => {
@@ -374,23 +422,23 @@ function serializeTree(
       const [nodeID] = getNodeIDFromView(data, path);
       const indent = "  ".repeat(depth);
       const context = getContext(data, path, stack);
-      const contextHash = context.size > 0
-        ? hashText(context.join(":"))
-        : undefined;
+      const contextHash =
+        context.size > 0 ? hashText(context.join(":")) : undefined;
       const item = getRelationItemForView(data, path);
       const isVirtual = virtualItems.has(viewPathToString(path));
 
       if (isConcreteRefId(nodeID)) {
         const parsed = parseConcreteRefId(nodeID);
-        const crefText = formatCrefText(
-          data.knowledgeDBs, author, nodeID
-        );
+        const crefText = formatCrefText(data.knowledgeDBs, author, nodeID);
         if (!crefText || !parsed) return acc;
         const crefRelationUUID = shortID(parsed.relationID);
         const crefNodeHashes = parsed.targetNode
-          ? acc.nodeHashes.add(hashText(
-              getNodeFromID(data.knowledgeDBs, parsed.targetNode, author)?.text ?? parsed.targetNode
-            ))
+          ? acc.nodeHashes.add(
+              hashText(
+                getNodeFromID(data.knowledgeDBs, parsed.targetNode, author)
+                  ?.text ?? parsed.targetNode
+              )
+            )
           : acc.nodeHashes;
         const crefAttrs = formatAttrs("", item?.relevance, item?.argument, {
           hidden: isVirtual,
@@ -409,8 +457,6 @@ function serializeTree(
         };
       }
 
-      const nodeText = getNodeFromID(data.knowledgeDBs, nodeID, author)?.text;
-      const text = nodeText ?? getDisplayTextForView(data, path, stack);
       const ownRelation = getOwnRelationForDocumentSerialization(
         data,
         author,
@@ -419,6 +465,11 @@ function serializeTree(
         rootRelation,
         isRoot(path)
       );
+      const serializedRelation = ownRelation
+        ? getSerializedRelationText(data, ownRelation, nodeID, context)
+        : undefined;
+      const text =
+        serializedRelation?.text ?? getDisplayTextForView(data, path, stack);
       const uuid = ownRelation ? shortID(ownRelation.id) : v4();
 
       const line = `${indent}- ${text}${formatAttrs(
@@ -433,7 +484,9 @@ function serializeTree(
       )}`;
       return {
         lines: [...acc.lines, line],
-        nodeHashes: acc.nodeHashes.add(hashText(text)),
+        nodeHashes: acc.nodeHashes.add(
+          serializedRelation?.textHash ?? hashText(text)
+        ),
         nodeIDs: acc.nodeIDs.add(shortID(nodeID)),
         contextHashes: contextHash
           ? acc.contextHashes.add(contextHash)
@@ -451,13 +504,6 @@ function serializeTree(
   );
 }
 
-function buildRootPath(rootRelation: Relations): ViewPath {
-  return [
-    0,
-    { nodeID: rootRelation.head as LongID | ID, nodeIndex: 0 as NodeIndex },
-  ] as ViewPath;
-}
-
 function formatRootHeading(
   rootText: string,
   rootUuid: string,
@@ -471,13 +517,13 @@ function formatRootHeading(
   return `# ${rootText} {${parts.join(" ")}}`;
 }
 
-export function treeToMarkdown(
-  data: Data,
-  rootRelation: Relations
-): string {
-  const author = data.user.publicKey;
-  const rootNode = getNodeFromID(data.knowledgeDBs, rootRelation.head, author);
-  const rootText = rootNode?.text ?? rootRelation.head;
+export function treeToMarkdown(data: Data, rootRelation: Relations): string {
+  const { text: rootText } = getSerializedRelationText(
+    data,
+    rootRelation,
+    rootRelation.head,
+    rootRelation.context
+  );
   const rootUuid = shortID(rootRelation.id);
   const rootLine = formatRootHeading(
     rootText,
@@ -494,8 +540,12 @@ export function buildDocumentEvent(
   rootRelation: Relations
 ): UnsignedEvent {
   const author = data.user.publicKey;
-  const rootNode = getNodeFromID(data.knowledgeDBs, rootRelation.head, author);
-  const rootText = rootNode?.text ?? rootRelation.head;
+  const { text: rootText, textHash: rootTextHash } = getSerializedRelationText(
+    data,
+    rootRelation,
+    rootRelation.head,
+    rootRelation.context
+  );
   const rootUuid = shortID(rootRelation.id);
   const rootLine = formatRootHeading(
     rootText,
@@ -506,18 +556,22 @@ export function buildDocumentEvent(
   const result = serializeTree(data, rootRelation);
   const content = `${[rootLine, ...result.lines].join("\n")}\n`;
   const nTags = result.nodeHashes
-    .add(hashText(rootText))
+    .add(rootTextHash)
     .union(result.nodeIDs.add(rootRelation.head))
     .toArray()
     .map((value) => ["n", value]);
-  const rootContextHash = rootRelation.context.size > 0
-    ? hashText(rootRelation.context.join(":"))
-    : undefined;
+  const rootContextHash =
+    rootRelation.context.size > 0
+      ? hashText(rootRelation.context.join(":"))
+      : undefined;
   const allContextHashes = rootContextHash
     ? result.contextHashes.add(rootContextHash)
     : result.contextHashes;
   const cTags = allContextHashes.toArray().map((h) => ["c", h]);
-  const rTags = result.relationUUIDs.add(rootUuid).toArray().map((u) => ["r", u]);
+  const rTags = result.relationUUIDs
+    .add(rootUuid)
+    .toArray()
+    .map((u) => ["r", u]);
 
   return {
     kind: KIND_KNOWLEDGE_DOCUMENT,
@@ -546,15 +600,25 @@ function walkUpsertNode(ctx: WalkContext, node: KnowNode): WalkContext {
   };
 }
 
-function walkUpsertRelation(ctx: WalkContext, relation: Relations): WalkContext {
+function walkUpsertRelation(
+  ctx: WalkContext,
+  relation: Relations
+): WalkContext {
   const db = ctx.knowledgeDBs.get(ctx.publicKey, newDB());
+  const normalizedRelation = ensureRelationNativeFields(
+    ctx.knowledgeDBs,
+    relation
+  );
   return {
     ...ctx,
     knowledgeDBs: ctx.knowledgeDBs.set(ctx.publicKey, {
       ...db,
-      relations: db.relations.set(shortID(relation.id), relation),
+      relations: db.relations.set(
+        shortID(normalizedRelation.id),
+        normalizedRelation
+      ),
     }),
-    affectedRoots: ctx.affectedRoots.add(relation.root),
+    affectedRoots: ctx.affectedRoots.add(normalizedRelation.root),
   };
 }
 
@@ -640,7 +704,8 @@ function materializeTreeNode(
   ctx: WalkContext,
   treeNode: MarkdownTreeNode,
   context: List<ID>,
-  root: ID
+  root: ID,
+  parent?: LongID
 ): [WalkContext, ID] {
   const node = newNode(
     treeNode.text,
@@ -648,6 +713,18 @@ function materializeTreeNode(
       (treeNode.uuid ? nodeIDFromSeed(treeNode.uuid) : undefined)
   );
   const withNode = walkUpsertNode(ctx, node);
+  const baseRelation = treeNode.uuid
+    ? {
+        ...newRelations(node.id, context, withNode.publicKey, root),
+        id: joinID(withNode.publicKey, treeNode.uuid),
+      }
+    : newRelations(node.id, context, withNode.publicKey, root);
+  const relationBaseWithFields: Relations = {
+    ...baseRelation,
+    text: node.text,
+    textHash: getNodeTextHash(node) ?? hashText(node.text),
+    parent,
+  };
 
   const childContext = context.push(node.id);
   const visibleChildren = treeNode.children.filter((child) => !child.hidden);
@@ -656,7 +733,8 @@ function materializeTreeNode(
       if (childNode.linkHref) {
         const parts = childNode.linkHref.split(":");
         const relationID = parts[0] as LongID;
-        const targetNode = parts.length > 1 ? (parts.slice(1).join(":") as ID) : undefined;
+        const targetNode =
+          parts.length > 1 ? (parts.slice(1).join(":") as ID) : undefined;
         const item: RelationItem = {
           nodeID: createConcreteRefId(relationID, targetNode),
           relevance: childNode.relevance,
@@ -669,7 +747,8 @@ function materializeTreeNode(
         accCtx,
         childNode,
         childContext,
-        root
+        root,
+        relationBaseWithFields.id
       );
       const item: RelationItem = {
         nodeID: materializedID,
@@ -683,29 +762,30 @@ function materializeTreeNode(
 
   const hiddenChildren = treeNode.children.filter((child) => child.hidden);
   const withHidden = hiddenChildren.reduce(
-    (accCtx, child) => materializeTreeNode(accCtx, child, childContext, root)[0],
+    (accCtx, child) =>
+      materializeTreeNode(
+        accCtx,
+        child,
+        childContext,
+        root,
+        relationBaseWithFields.id
+      )[0],
     withVisible
   );
 
-  const baseRelation = treeNode.uuid
-    ? {
-        ...newRelations(node.id, context, withHidden.publicKey, root),
-        id: joinID(withHidden.publicKey, treeNode.uuid),
-      }
-    : newRelations(node.id, context, withHidden.publicKey, root);
   const relation: Relations = {
-    ...baseRelation,
+    ...relationBaseWithFields,
     items: List(childItems),
     ...(treeNode.basedOn
       ? {
-          basedOn: (
-            treeNode.basedOn.includes("_")
-              ? treeNode.basedOn
-              : joinID(withHidden.publicKey, treeNode.basedOn)
-          ) as LongID,
+          basedOn: (treeNode.basedOn.includes("_")
+            ? treeNode.basedOn
+            : joinID(withHidden.publicKey, treeNode.basedOn)) as LongID,
         }
       : {}),
-    ...(withHidden.updated !== undefined ? { updated: withHidden.updated } : {}),
+    ...(withHidden.updated !== undefined
+      ? { updated: withHidden.updated }
+      : {}),
   };
   return [walkUpsertRelation(withHidden, relation), node.id];
 }
@@ -733,7 +813,10 @@ export function createNodesFromMarkdownTrees(
       return [
         nextCtx,
         [...accTopNodeIDs, topNodeID],
-        [...accTopRelationIDs, joinID(accCtx.publicKey, rootUuid as ID) as LongID],
+        [
+          ...accTopRelationIDs,
+          joinID(accCtx.publicKey, rootUuid as ID) as LongID,
+        ],
       ];
     },
     [ctx, [] as ID[], [] as LongID[]] as [WalkContext, ID[], LongID[]]

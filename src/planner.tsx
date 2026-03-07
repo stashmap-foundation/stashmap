@@ -20,7 +20,11 @@ import { createPublishQueue } from "./PublishQueue";
 import type { StashmapDB } from "./indexedDB";
 import { viewDataToJSON } from "./serializer";
 import { newDB } from "./knowledge";
-import { buildDocumentEvent, WalkContext, createVersion } from "./markdownDocument";
+import {
+  buildDocumentEvent,
+  WalkContext,
+  createVersion,
+} from "./markdownDocument";
 import {
   shortID,
   newNode,
@@ -36,6 +40,7 @@ import {
   createConcreteRefId,
   isRefId,
   VERSIONS_NODE_ID,
+  ensureRelationNativeFields,
 } from "./connections";
 import {
   newRelations,
@@ -229,15 +234,19 @@ function ensureLogNode(plan: Plan): Plan {
 
 function upsertRelationsCore(plan: Plan, relations: Relations): Plan {
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
-  const updatedRelations = userDB.relations.set(
-    shortID(relations.id),
+  const normalizedRelations = ensureRelationNativeFields(
+    plan.knowledgeDBs,
     relations
+  );
+  const updatedRelations = userDB.relations.set(
+    shortID(normalizedRelations.id),
+    normalizedRelations
   );
   const updatedDB = {
     ...userDB,
     relations: updatedRelations,
   };
-  const affectedRoot = relations.root;
+  const affectedRoot = normalizedRelations.root;
   return {
     ...plan,
     knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
@@ -306,7 +315,11 @@ export function planCreateVersion(
     affectedRoots: plan.affectedRoots,
   };
   const result = createVersion(ctx, editedNodeID, newText, editContext, root);
-  return { ...plan, knowledgeDBs: result.knowledgeDBs, affectedRoots: result.affectedRoots };
+  return {
+    ...plan,
+    knowledgeDBs: result.knowledgeDBs,
+    affectedRoots: result.affectedRoots,
+  };
 }
 
 function removeEmptyNodeFromKnowledgeDBs(
@@ -600,9 +613,11 @@ function planCopyDescendantRelations(
           !contextsMatch(r.context, sourceRelation.context)
       )
     : allDescendants;
-  const descendants: List<Relations> = sourceRelation
-    ? List<Relations>([sourceRelation]).concat(filteredDescendants)
-    : filteredDescendants;
+  const descendants: List<Relations> = (
+    sourceRelation
+      ? List<Relations>([sourceRelation]).concat(filteredDescendants)
+      : filteredDescendants
+  ).sortBy((relation) => relation.context.size);
 
   const [resultPlan, resultMapping] = descendants.reduce(
     ([accPlan, accMapping, accRoot], relation) => {
@@ -634,7 +649,7 @@ function planCopyDescendantRelations(
     [plan, Map<LongID, LongID>(), root] as [
       Plan,
       RelationsIdMapping,
-      ID | undefined,
+      ID | undefined
     ]
   );
   return [resultPlan, resultMapping];
@@ -664,20 +679,23 @@ export function planMoveDescendantRelations(
         )
         .push(sourceRelation)
     : allDescendants;
+  const sortedDescendants = descendants.sortBy(
+    (relation) => relation.context.size
+  );
 
   const effectiveTargetNodeID = targetNodeID ?? sourceNodeID;
   const sourceChildContext = sourceContext.push(shortID(sourceNodeID));
   const targetChildContext = targetContext.push(shortID(effectiveTargetNodeID));
 
-  return descendants.reduce((accPlan, relation) => {
+  return sortedDescendants.reduce((accPlan, relation) => {
     const isDirectChildrenRelation =
       relation.head === shortID(sourceNodeID) &&
       contextsMatch(relation.context, sourceContext);
     const newContext = isDirectChildrenRelation
       ? targetContext
       : targetChildContext.concat(
-        relation.context.skip(sourceChildContext.size)
-      );
+          relation.context.skip(sourceChildContext.size)
+        );
     const head = isDirectChildrenRelation
       ? shortID(effectiveTargetNodeID)
       : relation.head;
@@ -1280,40 +1298,32 @@ export function buildDocumentEvents(
 ): List<UnsignedEvent & EventAttachment> {
   const author = plan.user.publicKey;
   const userDB = plan.knowledgeDBs.get(author, newDB());
-  return plan.affectedRoots.reduce(
-    (events, rootId) => {
-      const rootRelation = userDB.relations.find(
-        (r) => shortID(r.id) === rootId
-      );
-      const isStandaloneRootRelation =
-        !!rootRelation && rootRelation.root === shortID(rootRelation.id);
+  return plan.affectedRoots.reduce((events, rootId) => {
+    const rootRelation = userDB.relations.find((r) => shortID(r.id) === rootId);
+    const isStandaloneRootRelation =
+      !!rootRelation && rootRelation.root === shortID(rootRelation.id);
 
-      if (
-        !rootRelation ||
-        !isStandaloneRootRelation ||
-        rootRelation.head === VERSIONS_NODE_ID
-      ) {
-        const deleteEvent = {
-          kind: KIND_DELETE,
-          pubkey: author,
-          created_at: newTimestamp(),
-          tags: [
-            ["a", `${KIND_KNOWLEDGE_DOCUMENT}:${author}:${rootId}`],
-            ["k", `${KIND_KNOWLEDGE_DOCUMENT}`],
-            msTag(),
-          ],
-          content: "",
-        };
-        return events.push(deleteEvent as UnsignedEvent & EventAttachment);
-      }
-      const event = buildDocumentEvent(
-        plan,
-        rootRelation
-      );
-      return events.push(event as UnsignedEvent & EventAttachment);
-    },
-    plan.publishEvents
-  );
+    if (
+      !rootRelation ||
+      !isStandaloneRootRelation ||
+      rootRelation.head === VERSIONS_NODE_ID
+    ) {
+      const deleteEvent = {
+        kind: KIND_DELETE,
+        pubkey: author,
+        created_at: newTimestamp(),
+        tags: [
+          ["a", `${KIND_KNOWLEDGE_DOCUMENT}:${author}:${rootId}`],
+          ["k", `${KIND_KNOWLEDGE_DOCUMENT}`],
+          msTag(),
+        ],
+        content: "",
+      };
+      return events.push(deleteEvent as UnsignedEvent & EventAttachment);
+    }
+    const event = buildDocumentEvent(plan, rootRelation);
+    return events.push(event as UnsignedEvent & EventAttachment);
+  }, plan.publishEvents);
 }
 
 export function PlanningContextProvider({
@@ -1551,7 +1561,11 @@ export function planSetEmptyNodePosition(
 
   const pane = getPane(planWithExpanded, parentPath);
   const author = getEffectiveAuthor(planWithExpanded, parentPath);
-  const parentRoot = getRelationForView(planWithExpanded, parentPath, stack)?.root;
+  const parentRoot = getRelationForView(
+    planWithExpanded,
+    parentPath,
+    stack
+  )?.root;
   const relations = getRelationsForCurrentTree(
     planWithExpanded.knowledgeDBs,
     author,

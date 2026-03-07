@@ -516,26 +516,6 @@ export function getViewFromPath(data: Data, path: ViewPath): View {
   );
 }
 
-function getNewestRelationFromAuthor(
-  knowledgeDBs: KnowledgeDBs,
-  author: PublicKey,
-  nodeID: LongID | ID,
-  context: Context
-): Relations | undefined {
-  const localID = shortID(nodeID);
-  const authorDB = knowledgeDBs.get(author, newDB());
-  const relations = sortRelationsByDate(
-    authorDB.relations
-      .filter((r) => r.head === localID && contextsMatch(r.context, context))
-      .toList()
-  );
-  if (process.env.DEBUG_RELATIONS === "1" && relations.size > 1) {
-    // eslint-disable-next-line no-console
-    console.log(`[relations] AMBIGUOUS ${localID} ctx=${JSON.stringify(context.toArray())} matches=${relations.size} picked=${JSON.stringify({id: relations.first()?.id, items: relations.first()?.items.size, updated: relations.first()?.updated})} all=${JSON.stringify(relations.map((r) => ({ id: r.id, items: r.items.size, updated: r.updated })).toArray())}`);
-  }
-  return relations.first();
-}
-
 function getNewestStandaloneRelationFromAuthor(
   knowledgeDBs: KnowledgeDBs,
   author: PublicKey,
@@ -626,35 +606,6 @@ export function getNodeIDFromView(
   const view = getViewFromPath(data, viewPath);
   const { nodeID } = getLast(viewPath);
   return [nodeID, view];
-}
-
-export function getRelationsForContext(
-  knowledgeDBs: KnowledgeDBs,
-  paneAuthor: PublicKey,
-  nodeID: LongID | ID,
-  context: Context,
-  rootRelation: LongID | undefined,
-  isRootNode: boolean
-): Relations | undefined {
-  if (isRootNode && rootRelation) {
-    const relation = getRelationsNoReferencedBy(
-      knowledgeDBs,
-      rootRelation,
-      paneAuthor
-    );
-    if (relation) {
-      return relation;
-    }
-  }
-  const fallbackResult = getNewestRelationFromAuthor(knowledgeDBs, paneAuthor, nodeID, context);
-  if (process.env.DEBUG_RELATIONS === "1" && isRootNode && rootRelation) {
-    const [remote, localId] = splitID(rootRelation as ID);
-    const db = remote ? knowledgeDBs.get(remote) : knowledgeDBs.get(paneAuthor);
-    const hasKey = db?.relations.has(localId);
-    // eslint-disable-next-line no-console
-    console.log(`[relations] MISSED-ROOT rootRelation=${rootRelation} remote=${remote} localId=${localId} paneAuthor=${paneAuthor} dbExists=${!!db} hasKey=${hasKey} fallback=${fallbackResult?.id} fallbackItems=${fallbackResult?.items.size}`);
-  }
-  return fallbackResult;
 }
 
 export function getRelationsForCurrentTree(

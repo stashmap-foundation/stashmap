@@ -30,7 +30,7 @@ import {
   newRelations,
   getVersionsContext,
   getVersionsRelations,
-  getRelationsForContext,
+  getRelationsForCurrentTree,
 } from "./ViewContext";
 import { buildOutgoingReference } from "./buildReferenceNode";
 import { KIND_KNOWLEDGE_DOCUMENT, newTimestamp, msTag } from "./nostr";
@@ -333,32 +333,15 @@ function getOwnRelationForDocumentSerialization(
   rootRelation: Relations,
   isRootNode: boolean
 ): Relations | undefined {
-  const current = getRelationsForContext(
+  return getRelationsForCurrentTree(
     data.knowledgeDBs,
     author,
     nodeID,
     context,
     rootRelation.id,
-    isRootNode
+    isRootNode,
+    rootRelation.root
   );
-  if (isRootNode) {
-    return current;
-  }
-
-  const localID = shortID(nodeID);
-  const userDB = data.knowledgeDBs.get(author, newDB());
-  const sameRootRelation = userDB.relations
-    .filter(
-      (relation) =>
-        relation.head === localID &&
-        relation.root === rootRelation.root &&
-        relation.context.equals(context)
-    )
-    .toList()
-    .sort((a, b) => b.updated - a.updated)
-    .first();
-
-  return sameRootRelation ?? current;
 }
 
 function serializeTree(
@@ -531,7 +514,7 @@ export function createVersion(
   editedNodeID: ID,
   newText: string,
   editContext: List<ID>,
-  root?: ID
+  root: ID
 ): WalkContext {
   const isInsideVersions = editContext.last() === VERSIONS_NODE_ID;
 
@@ -550,34 +533,20 @@ export function createVersion(
   const withVersionsNode = walkUpsertNode(withVersionNode, versionsNode);
 
   const versionsContext = getVersionsContext(originalNodeID, context);
-  const containingRelation = root
-    ? undefined
-    : context.size > 0
-      ? getRelationsForContext(
-          withVersionsNode.knowledgeDBs,
-          withVersionsNode.publicKey,
-          context.last() as ID,
-          context.butLast().toList(),
-          undefined,
-          context.size === 1
-        )
-      : getRelationsForContext(
-          withVersionsNode.knowledgeDBs,
-          withVersionsNode.publicKey,
-          originalNodeID,
-          context,
-          undefined,
-          true
-        );
-  const effectiveRoot = root ?? containingRelation?.root;
   const baseVersionsRelations =
     getVersionsRelations(
       withVersionsNode.knowledgeDBs,
       withVersionsNode.publicKey,
       originalNodeID,
-      context
+      context,
+      root
     ) ||
-    newRelations(VERSIONS_NODE_ID, versionsContext, withVersionsNode.publicKey, effectiveRoot);
+    newRelations(
+      VERSIONS_NODE_ID,
+      versionsContext,
+      withVersionsNode.publicKey,
+      root
+    );
 
   const originalIndex = baseVersionsRelations.items.findIndex(
     (item) => item.nodeID === originalNodeID
@@ -706,9 +675,9 @@ export function createNodesFromMarkdownTrees(
   ctx: WalkContext,
   trees: MarkdownTreeNode[],
   context: List<ID> = List<ID>()
-): [WalkContext, topNodeIDs: ID[]] {
+): [WalkContext, topNodeIDs: ID[], topRelationIDs: LongID[]] {
   return trees.reduce(
-    ([accCtx, accTopNodeIDs], treeNode) => {
+    ([accCtx, accTopNodeIDs, accTopRelationIDs], treeNode) => {
       const rootUuid = treeNode.uuid ?? v4();
       const treeWithUuid = treeNode.uuid
         ? treeNode
@@ -722,9 +691,13 @@ export function createNodesFromMarkdownTrees(
         treeContext,
         rootUuid as ID
       );
-      return [nextCtx, [...accTopNodeIDs, topNodeID]];
+      return [
+        nextCtx,
+        [...accTopNodeIDs, topNodeID],
+        [...accTopRelationIDs, joinID(accCtx.publicKey, rootUuid as ID) as LongID],
+      ];
     },
-    [ctx, [] as ID[]] as [WalkContext, ID[]]
+    [ctx, [] as ID[], [] as LongID[]] as [WalkContext, ID[], LongID[]]
   );
 }
 

@@ -260,7 +260,7 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
   // child's relations have context=[parent] since child is under parent
   const childContext = List([shortID(parent.id)]);
   const childRelations = addRelationToRelations(
-    newRelations(child.id, childContext, alicePK),
+    newRelations(child.id, childContext, alicePK, parentRelations.root),
     aliceGrandchild.id
   );
   const bobChildRelations = addRelationToRelations(
@@ -436,7 +436,7 @@ test("Diff item paths are correctly identified as diff items", () => {
   // parent's relations have context=[root] since parent is under root
   const parentContext = List([shortID(root.id)]);
   const parentRelations = addRelationToRelations(
-    newRelations(parent.id, parentContext, alicePK),
+    newRelations(parent.id, parentContext, alicePK, rootRelations.root),
     aliceChild.id
   );
   const bobParentRelations = addRelationToRelations(

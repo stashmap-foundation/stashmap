@@ -14,7 +14,7 @@ import {
   getParentView,
   getLast,
   getRelationForView,
-  getRelationsForContext,
+  getRelationsForCurrentTree,
 } from "./ViewContext";
 import { getPane } from "./planner";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
@@ -24,13 +24,15 @@ function resolveNodeLabel(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
   nodeId: ID,
-  context: List<ID>
+  context: List<ID>,
+  root?: ID
 ): string {
   const versionedText = getVersionedDisplayText(
     knowledgeDBs,
     myself,
     nodeId,
-    context
+    context,
+    root
   );
   if (versionedText) {
     return versionedText;
@@ -42,11 +44,18 @@ function resolveNodeLabel(
 function resolveContextLabels(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
-  context: List<ID>
+  context: List<ID>,
+  root?: ID
 ): string[] {
   return context
     .map((nodeId, index) =>
-      resolveNodeLabel(knowledgeDBs, myself, nodeId, context.slice(0, index))
+      resolveNodeLabel(
+        knowledgeDBs,
+        myself,
+        nodeId,
+        context.slice(0, index),
+        root
+      )
     )
     .toArray();
 }
@@ -80,6 +89,25 @@ export function parseRef(
   return { relation, relationContext, targetNode, sourceItem };
 }
 
+function getReferencedChildRelation(
+  ref: ParsedRef,
+  knowledgeDBs: KnowledgeDBs
+): Relations | undefined {
+  if (!ref.targetNode) {
+    return undefined;
+  }
+
+  return getRelationsForCurrentTree(
+    knowledgeDBs,
+    ref.relation.author,
+    ref.targetNode,
+    ref.relationContext.push(shortID(ref.relation.head) as ID),
+    undefined,
+    false,
+    ref.relation.root
+  );
+}
+
 function resolveLabels(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
@@ -91,23 +119,31 @@ function resolveLabels(
     const contextLabels = resolveContextLabels(
       knowledgeDBs,
       myself,
-      relationContext
+      relationContext,
+      relation.root
     );
     const targetLabel = resolveNodeLabel(
       knowledgeDBs,
       myself,
       relation.head as ID,
-      relationContext
+      relationContext,
+      relation.root
     );
     return { contextLabels, targetLabel, fullContext: relationContext };
   }
   const fullContext = relationContext.push(relation.head as ID);
-  const contextLabels = resolveContextLabels(knowledgeDBs, myself, fullContext);
+  const contextLabels = resolveContextLabels(
+    knowledgeDBs,
+    myself,
+    fullContext,
+    relation.root
+  );
   const targetLabel = resolveNodeLabel(
     knowledgeDBs,
     myself,
     targetNode,
-    fullContext
+    fullContext,
+    relation.root
   );
   return { contextLabels, targetLabel, fullContext };
 }
@@ -288,16 +324,7 @@ function findIncomingCrefItem(
     containingRelation
   );
   if (fromSource) return fromSource;
-  const targetNodeRelation = ref.targetNode
-    ? getRelationsForContext(
-        data.knowledgeDBs,
-        data.user.publicKey,
-        ref.targetNode,
-        ref.relationContext.push(shortID(ref.relation.head) as ID),
-        undefined,
-        false
-      )
-    : undefined;
+  const targetNodeRelation = getReferencedChildRelation(ref, data.knowledgeDBs);
   return targetNodeRelation
     ? findCrefToNode(
         targetNodeRelation.items,
@@ -419,16 +446,7 @@ export function buildReferenceItem(
     ? getRelationForView(data, grandParentPath, stack)
     : undefined;
 
-  const targetNodeRelation = ref.targetNode
-    ? getRelationsForContext(
-        data.knowledgeDBs,
-        data.user.publicKey,
-        ref.targetNode,
-        ref.relationContext.push(shortID(ref.relation.head) as ID),
-        undefined,
-        false
-      )
-    : undefined;
+  const targetNodeRelation = getReferencedChildRelation(ref, data.knowledgeDBs);
 
   const findReverseCref = (
     items: List<RelationItem>

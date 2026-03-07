@@ -55,8 +55,8 @@ import {
   copyViewsWithRelationsMapping,
   viewPathToString,
   getRelationForView,
+  getAlternativeRelations,
   addNodeToPathWithRelations,
-  getRelationsForContext,
   getRelationsForCurrentTree,
   getEffectiveAuthor,
   isRoot,
@@ -248,14 +248,18 @@ function upsertRelationsCore(plan: Plan, relations: Relations): Plan {
 
 function addCrefToLog(plan: Plan, relationID: LongID): Plan {
   const planWithLog = ensureLogNode(plan);
-  const logRelations = getRelationsForContext(
+  const logRelations = getAlternativeRelations(
     planWithLog.knowledgeDBs,
-    planWithLog.user.publicKey,
     LOG_NODE_ID,
-    List<ID>(),
-    undefined,
-    false
-  );
+    List<ID>()
+  )
+    .filter(
+      (candidate) =>
+        candidate.author === planWithLog.user.publicKey &&
+        candidate.root === shortID(candidate.id)
+    )
+    .sort((a, b) => b.updated - a.updated)
+    .first();
   const relations =
     logRelations || newRelations(LOG_NODE_ID, List<ID>(), plan.user.publicKey);
   const crefId = createConcreteRefId(relationID);
@@ -292,14 +296,15 @@ export function planCreateVersion(
   plan: Plan,
   editedNodeID: ID,
   newText: string,
-  editContext: List<ID>
+  editContext: List<ID>,
+  root: ID
 ): Plan {
   const ctx: WalkContext = {
     knowledgeDBs: plan.knowledgeDBs,
     publicKey: plan.user.publicKey,
     affectedRoots: plan.affectedRoots,
   };
-  const result = createVersion(ctx, editedNodeID, newText, editContext);
+  const result = createVersion(ctx, editedNodeID, newText, editContext, root);
   return { ...plan, knowledgeDBs: result.knowledgeDBs, affectedRoots: result.affectedRoots };
 }
 
@@ -576,7 +581,8 @@ function resolveCollisions(
         planWithVariant,
         variantNode.id,
         node.text,
-        nodeContext
+        nodeContext,
+        relation.root
       );
       return [planWithVersion, [...accIDs, variantNode.id]];
     },
@@ -652,7 +658,8 @@ function planCopyDescendantRelations(
   const allDescendants = getDescendantRelations(
     plan.knowledgeDBs,
     sourceNodeID,
-    sourceContext
+    sourceContext,
+    sourceRelation?.root
   ).filter(filterRelation ?? (() => true));
   const filteredDescendants = sourceRelation
     ? allDescendants.filter(
@@ -713,7 +720,8 @@ export function planMoveDescendantRelations(
   const allDescendants = getDescendantRelations(
     plan.knowledgeDBs,
     sourceNodeID,
-    sourceContext
+    sourceContext,
+    sourceRelation?.root
   );
   const descendants: List<Relations> = sourceRelation
     ? allDescendants
@@ -736,8 +744,8 @@ export function planMoveDescendantRelations(
     const newContext = isDirectChildrenRelation
       ? targetContext
       : targetChildContext.concat(
-          relation.context.skip(sourceChildContext.size)
-        );
+        relation.context.skip(sourceChildContext.size)
+      );
     const head = isDirectChildrenRelation
       ? shortID(effectiveTargetNodeID)
       : relation.head;
@@ -753,6 +761,7 @@ export function planMoveDescendantRelations(
 export function planMoveTreeDescendantsToContext(
   plan: Plan,
   originalTopNodeIDs: ID[],
+  sourceRelationIDs: LongID[],
   actualNodeIDs: (LongID | ID)[],
   parentViewPath: ViewPath,
   stack: ID[],
@@ -764,12 +773,20 @@ export function planMoveTreeDescendantsToContext(
 
   return originalTopNodeIDs.reduce((accPlan, originalID, index) => {
     const actualID = actualNodeIDs[index];
+    const sourceRelationID = sourceRelationIDs[index];
+    const sourceRelation = sourceRelationID
+      ? getRelationsNoReferencedBy(
+          accPlan.knowledgeDBs,
+          sourceRelationID,
+          accPlan.user.publicKey
+        )
+      : undefined;
     return planMoveDescendantRelations(
       accPlan,
       originalID,
       List<ID>(),
       targetContext,
-      undefined,
+      sourceRelation,
       actualID !== originalID ? actualID : undefined,
       root
     );
@@ -1097,12 +1114,18 @@ export function planSaveNodeAndEnsureRelations(
   if (!node || node.type !== "text") return { plan, viewPath };
 
   const context = getContext(plan, viewPath, stack);
+  const treeRoot = getRelationForView(
+    plan,
+    getParentView(viewPath) || viewPath,
+    stack
+  )?.root;
   const displayText =
     getVersionedDisplayText(
       plan.knowledgeDBs,
       plan.user.publicKey,
       nodeID,
-      context
+      context,
+      treeRoot
     ) ??
     node.text ??
     "";
@@ -1110,7 +1133,9 @@ export function planSaveNodeAndEnsureRelations(
   if (trimmedText === displayText) return { plan, viewPath };
 
   return {
-    plan: planCreateVersion(plan, nodeID, trimmedText, context),
+    plan: treeRoot
+      ? planCreateVersion(plan, nodeID, trimmedText, context, treeRoot)
+      : plan,
     viewPath,
   };
 }
@@ -1328,7 +1353,14 @@ export function buildDocumentEvents(
       const rootRelation = userDB.relations.find(
         (r) => shortID(r.id) === rootId
       );
-      if (!rootRelation) {
+      const isStandaloneRootRelation =
+        !!rootRelation && rootRelation.root === shortID(rootRelation.id);
+
+      if (
+        !rootRelation ||
+        !isStandaloneRootRelation ||
+        rootRelation.head === VERSIONS_NODE_ID
+      ) {
         const deleteEvent = {
           kind: KIND_DELETE,
           pubkey: author,
@@ -1341,9 +1373,6 @@ export function buildDocumentEvents(
           content: "",
         };
         return events.push(deleteEvent as UnsignedEvent & EventAttachment);
-      }
-      if (rootRelation.head === VERSIONS_NODE_ID) {
-        return events;
       }
       const event = buildDocumentEvent(
         plan,

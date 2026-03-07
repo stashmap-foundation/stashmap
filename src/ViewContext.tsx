@@ -622,16 +622,13 @@ export function getRelationsForCurrentTree(
       : undefined);
 
   if (preferredRoot) {
-    const sameRootRelation = getNewestRelationFromRoot(
+    return getNewestRelationFromRoot(
       knowledgeDBs,
       paneAuthor,
       nodeID,
       context,
       preferredRoot
     );
-    if (sameRootRelation) {
-      return sameRootRelation;
-    }
   }
 
   return getRelationsForContext(
@@ -727,7 +724,8 @@ export function contextStartsWith(context: Context, prefix: Context): boolean {
 export function getDescendantRelations(
   knowledgeDBs: KnowledgeDBs,
   nodeID: LongID | ID,
-  rootContext: Context
+  rootContext: Context,
+  root?: ID
 ): List<Relations> {
   const localID = shortID(nodeID);
   const childContext = rootContext.push(localID);
@@ -739,9 +737,12 @@ export function getDescendantRelations(
 
   return allRelations.filter(
     (relations) =>
-      (relations.head === localID &&
-        contextsMatch(relations.context, rootContext)) ||
-      contextStartsWith(relations.context, childContext)
+      (!root || relations.root === root) &&
+      (
+        (relations.head === localID &&
+          contextsMatch(relations.context, rootContext)) ||
+        contextStartsWith(relations.context, childContext)
+      )
   );
 }
 
@@ -837,16 +838,18 @@ export function getVersionsRelations(
   knowledgeDBs: KnowledgeDBs,
   author: PublicKey,
   nodeID: ID,
-  context: Context
+  context: Context,
+  currentRoot?: ID
 ): Relations | undefined {
   const versionsContext = getVersionsContext(nodeID, context);
-  const result = getRelationsForContext(
+  const result = getRelationsForCurrentTree(
     knowledgeDBs,
     author,
     VERSIONS_NODE_ID,
     versionsContext,
     undefined,
-    false
+    false,
+    currentRoot
   );
   return result;
 }
@@ -858,7 +861,8 @@ export function getVersionedDisplayText(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
   nodeID: ID,
-  context: Context
+  context: Context,
+  currentRoot?: ID
 ): string | undefined {
   if (nodeID === EMPTY_NODE_ID) return undefined;
 
@@ -866,7 +870,8 @@ export function getVersionedDisplayText(
     knowledgeDBs,
     myself,
     nodeID,
-    context
+    context,
+    currentRoot
   );
   if (!versionsRelations) return undefined;
 
@@ -1195,11 +1200,13 @@ export function getDisplayTextForView(
   const [nodeID] = getNodeIDFromView(data, viewPath);
   const context = getContext(data, viewPath, stack);
   const effectiveAuthor = getEffectiveAuthor(data, viewPath);
+  const currentRoot = getRelationForView(data, viewPath, stack)?.root;
   const versionedText = getVersionedDisplayText(
     data.knowledgeDBs,
     effectiveAuthor,
     nodeID,
-    context
+    context,
+    currentRoot
   );
   return versionedText ?? node?.text ?? "";
 }

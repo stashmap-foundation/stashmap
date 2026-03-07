@@ -24,7 +24,6 @@ import {
   itemPassesFilters,
   getOccurrencesForNode,
   getIncomingCrefsForNode,
-  shortID,
   VERSIONS_NODE_ID,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
@@ -126,10 +125,6 @@ function getChildrenForRegularNode(
           isRootNode,
           currentRoot
         );
-  if (process.env.DEBUG_TREE === "1" && isRootNode) {
-    // eslint-disable-next-line no-console
-    console.log(`[tree] ROOT nodeID=${shortID(parentNodeID)} rootRelation=${rootRelation} author=${effectiveAuthor} relation=${relations?.id} items=${relations?.items.size} ctx=${JSON.stringify(context.toArray())}`);
-  }
 
   const relationPaths = relations
     ? relations.items
@@ -153,7 +148,8 @@ function getChildrenForRegularNode(
           data.knowledgeDBs,
           author,
           parentNodeID as ID,
-          context
+          context,
+          relations?.root ?? currentRoot
         )
       : undefined;
     if (versionsRel) {

@@ -395,7 +395,15 @@ export function planBatchIndent(
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
       return {
-        plan: planCreateVersion(moved, nodeID, editorText, newContext),
+        plan: targetRelationAfter
+          ? planCreateVersion(
+              moved,
+              nodeID,
+              editorText,
+              newContext,
+              targetRelationAfter.root
+            )
+          : moved,
         remappedKeys: nextRemappedKeys,
       };
     },
@@ -469,7 +477,15 @@ export function planBatchOutdent(
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
       return {
-        plan: planCreateVersion(moved, nodeID, editorText, newContext),
+        plan: targetRelationAfter
+          ? planCreateVersion(
+              moved,
+              nodeID,
+              editorText,
+              newContext,
+              targetRelationAfter.root
+            )
+          : moved,
         remappedKeys: nextRemappedKeys,
       };
     },

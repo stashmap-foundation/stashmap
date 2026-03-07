@@ -910,10 +910,6 @@ test("Bottom-half drop on last child of nested parent stays within that parent",
   const sevilla = newNode("Sevilla");
   const otherItem = newNode("Other Item");
 
-  const spainRelations = addRelationToRelations(
-    newRelations(spain.id, List([root.id]), alicePK),
-    sevilla.id
-  );
   const rootRelations = addRelationToRelations(
     addRelationToRelations(
       addRelationToRelations(
@@ -923,6 +919,10 @@ test("Bottom-half drop on last child of nested parent stays within that parent",
       spain.id
     ),
     otherItem.id
+  );
+  const spainRelations = addRelationToRelations(
+    newRelations(spain.id, List([root.id]), alicePK, rootRelations.root),
+    sevilla.id
   );
 
   const rootPath = [
@@ -1006,20 +1006,19 @@ function setupDepthClampTree() {
   const malaga = newNode("Malaga");
   const sevilla = newNode("Sevilla");
 
+  const hdRelations = addRelationToRelations(
+    addRelationToRelations(newRelations(hd.id, List(), alicePK), sf.id),
+    spain.id
+  );
   const spainRelations = addRelationToRelations(
     addRelationToRelations(
       addRelationToRelations(
-        newRelations(spain.id, List([hd.id]), alicePK),
+        newRelations(spain.id, List([hd.id]), alicePK, hdRelations.root),
         barcelona.id
       ),
       malaga.id
     ),
     sevilla.id
-  );
-
-  const hdRelations = addRelationToRelations(
-    addRelationToRelations(newRelations(hd.id, List(), alicePK), sf.id),
-    spain.id
   );
 
   const rootPath = [

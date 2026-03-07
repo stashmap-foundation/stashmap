@@ -229,7 +229,8 @@ describe("basedOn serialization round-trip", () => {
       ...newRelations(
         childNode.id,
         List<ID>([shortID(rootNode.id) as ID]),
-        plan.user.publicKey
+        plan.user.publicKey,
+        rootRelations.root
       ),
       basedOn: sourceRelationID,
     };
@@ -265,7 +266,8 @@ describe("basedOn serialization round-trip", () => {
     const childRelations = newRelations(
       childNode.id,
       List<ID>([shortID(rootNode.id) as ID]),
-      plan.user.publicKey
+      plan.user.publicKey,
+      rootRelations.root
     );
     const planWithRelation = planUpsertRelations(
       planUpsertRelations(

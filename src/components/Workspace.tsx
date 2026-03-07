@@ -10,6 +10,7 @@ import {
   getNodeFromView,
   getNodeFromID,
   getNodeIDFromView,
+  getRelationForView,
   getVersionedDisplayText,
   getContext,
   isExpanded,
@@ -610,11 +611,13 @@ function getDisplayTextForViewKey(
   const [nodeID] = getNodeIDFromView(data, viewPath);
   const context = getContext(data, viewPath, stack);
   const effectiveAuthor = getEffectiveAuthor(data, viewPath);
+  const currentRoot = getRelationForView(data, viewPath, stack)?.root;
   const versionedText = getVersionedDisplayText(
     data.knowledgeDBs,
     effectiveAuthor,
     nodeID as ID,
-    context
+    context,
+    currentRoot
   );
   return versionedText ?? node?.text ?? "";
 }

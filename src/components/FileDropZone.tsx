@@ -103,18 +103,26 @@ export function planCreateNodesFromMarkdownTrees(
   plan: Plan,
   trees: MarkdownTreeNode[],
   context: List<ID> = List<ID>()
-): [Plan, topNodeIDs: ID[]] {
+): [Plan, topNodeIDs: ID[], topRelationIDs: LongID[]] {
   const ctx: WalkContext = {
     knowledgeDBs: plan.knowledgeDBs,
     publicKey: plan.user.publicKey,
     affectedRoots: plan.affectedRoots,
   };
-  const [resultCtx, topNodeIDs] = createNodesFromMarkdownTrees(
+  const [resultCtx, topNodeIDs, topRelationIDs] = createNodesFromMarkdownTrees(
     ctx,
     trees,
     context
   );
-  return [{ ...plan, knowledgeDBs: resultCtx.knowledgeDBs, affectedRoots: resultCtx.affectedRoots }, topNodeIDs];
+  return [
+    {
+      ...plan,
+      knowledgeDBs: resultCtx.knowledgeDBs,
+      affectedRoots: resultCtx.affectedRoots,
+    },
+    topNodeIDs,
+    topRelationIDs,
+  ];
 }
 
 export function planCreateNodesFromMarkdownFiles(
@@ -123,7 +131,12 @@ export function planCreateNodesFromMarkdownFiles(
   context: List<ID> = List<ID>()
 ): [Plan, topNodeIDs: ID[]] {
   const trees = parseMarkdownImportFiles(files);
-  return planCreateNodesFromMarkdownTrees(plan, trees, context);
+  const [nextPlan, topNodeIDs] = planCreateNodesFromMarkdownTrees(
+    plan,
+    trees,
+    context
+  );
+  return [nextPlan, topNodeIDs];
 }
 
 function flattenTreeNodes(treeNodes: MarkdownTreeNode[]): MarkdownTreeNode[] {
@@ -168,7 +181,7 @@ export function planPasteMarkdownTrees(
   return trees.reduce((accPlan, tree, idx) => {
     const insertAt =
       insertAtIndex !== undefined ? insertAtIndex + idx : undefined;
-    const [planWithNode, topNodeIDs] = planCreateNodesFromMarkdownTrees(
+    const [planWithNode, topNodeIDs, topRelationIDs] = planCreateNodesFromMarkdownTrees(
       accPlan,
       [tree]
     );
@@ -182,6 +195,7 @@ export function planPasteMarkdownTrees(
     return planMoveTreeDescendantsToContext(
       planWithAdded,
       topNodeIDs,
+      topRelationIDs,
       actualIDs,
       parentViewPath,
       stack,

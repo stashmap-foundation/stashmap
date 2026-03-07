@@ -18,6 +18,7 @@ import {
   getVersionsRelations,
   getContext,
   getEffectiveAuthor,
+  getRelationForView,
   useViewPath,
   ViewPath,
 } from "./ViewContext";
@@ -368,12 +369,14 @@ export function LoadMissingVersionNodes({
         ? ref.relationContext.push(ref.relation.head as ID)
         : ref?.relationContext;
       const targetContext = refContext ?? context;
+      const targetRoot = ref?.relation.root || getRelationForView(data, viewPath, stack)?.root;
 
       const versionsRel = getVersionsRelations(
         data.knowledgeDBs,
         author,
         targetNodeID,
-        targetContext
+        targetContext,
+        targetRoot
       );
       if (!versionsRel) return acc;
 

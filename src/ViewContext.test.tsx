@@ -72,19 +72,20 @@ test("Move View Settings on Delete", async () => {
   // - c's children (cpp) have context [shortID(pl)] (viewPath includes pl as ancestor)
   const plChildrenContext = List<ID>();
   const cChildrenContext = List<ID>([shortID(pl.id)]);
+  const plChildrenRelations = bulkAddRelations(
+    newRelations(pl.id, plChildrenContext, publicKey),
+    [c.id, java.id]
+  );
   const planWithRelations = planUpsertRelations(
     planUpsertRelations(
       planUpsertRelations(
         planWithNodes,
-        bulkAddRelations(newRelations(pl.id, plChildrenContext, publicKey), [
-          c.id,
-          java.id,
-        ])
+        plChildrenRelations
       ),
       wsRelations
     ),
     addRelationToRelations(
-      newRelations(c.id, cChildrenContext, publicKey),
+      newRelations(c.id, cChildrenContext, publicKey, plChildrenRelations.root),
       cpp.id
     )
   );

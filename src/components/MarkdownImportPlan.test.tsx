@@ -1,6 +1,8 @@
 import { List, Map } from "immutable";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
 import {
+  buildDocumentEvents,
   createPlan,
   Plan,
   planAddToParent,
@@ -8,9 +10,10 @@ import {
   planUpsertRelations,
   planUpdateViews,
 } from "../planner";
-import { addRelationToRelations, hashText, newNode } from "../connections";
+import { addRelationToRelations, hashText, newNode, shortID } from "../connections";
 import {
   getRelationsForContext,
+  getRelationForView,
   newRelations,
   NodeIndex,
   ViewPath,
@@ -243,6 +246,71 @@ test("planPasteMarkdownTrees: collision does not shadow existing children", () =
   expect(
     existingCityRel?.items.some((i) => i.nodeID === hashText("Vienna"))
   ).toBe(true);
+});
+
+test("buildDocumentEvents does not serialize pasted collision child as a standalone root", () => {
+  const [alice] = setup([ALICE]);
+  const { plan: basePlan, parentPath, stack } = setupRootPlan(alice);
+
+  const existingCity = newNode("City");
+  const existingVienna = newNode("Vienna");
+  const rootID = hashText("Root") as ID;
+  const withExisting = planUpsertRelations(
+    planUpsertNode(planUpsertNode(basePlan, existingCity), existingVienna),
+    addRelationToRelations(
+      newRelations(
+        existingCity.id,
+        List<ID>([rootID]),
+        basePlan.user.publicKey,
+        getRelationForView(basePlan, parentPath, stack)?.root
+      ),
+      existingVienna.id
+    )
+  );
+  const [withCityAdded] = planAddToParent(
+    withExisting,
+    existingCity.id,
+    parentPath,
+    stack,
+    0
+  );
+
+  const trees = parseMarkdownImportFiles([
+    { name: "p.md", markdown: "# City\n\n## Paris" },
+  ]);
+  const plan = planPasteMarkdownTrees(
+    withCityAdded,
+    trees,
+    parentPath,
+    stack,
+    0
+  );
+
+  const rootRelation = getRelationForView(plan, parentPath, stack);
+  expect(rootRelation).toBeDefined();
+
+  const pastedNodeID = rootRelation?.items.first()?.nodeID;
+  expect(pastedNodeID).toBeDefined();
+
+  const pastedPath: ViewPath = [
+    0,
+    {
+      nodeID: rootRelation!.head as ID,
+      nodeIndex: 0 as NodeIndex,
+      relationsID: rootRelation!.id,
+    },
+    { nodeID: pastedNodeID!, nodeIndex: 0 as NodeIndex },
+  ];
+  const pastedRelation = getRelationForView(plan, pastedPath, stack);
+  expect(pastedRelation).toBeDefined();
+  expect(shortID(pastedRelation!.id)).not.toEqual(pastedRelation!.root);
+
+  const documentRoots = buildDocumentEvents(plan)
+    .filter((event) => event.kind === KIND_KNOWLEDGE_DOCUMENT)
+    .map((event) => event.tags.find(([tag]) => tag === "d")?.[1])
+    .toArray();
+
+  expect(documentRoots).not.toContain(shortID(pastedRelation!.id));
 });
 
 test("Planning multiple markdown files returns top nodes in import order", () => {

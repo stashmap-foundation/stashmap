@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { List } from "immutable";
-import { newRelations } from "../ViewContext";
+import { newRelations, NodeIndex, ViewPath } from "../ViewContext";
 import { execute } from "../executor";
 import { createPlan, planUpsertRelations } from "../planner";
 import {
@@ -13,9 +13,9 @@ import {
 } from "../utils.test";
 import {
   parseMarkdownHierarchy,
-  planCreateNodesFromMarkdown,
+  planPasteMarkdownTrees,
 } from "./FileDropZone";
-import { addRelationToRelations, joinID, shortID } from "../connections";
+import { joinID, shortID } from "../connections";
 
 const TEST_FILE = `# Programming Languages
 
@@ -30,21 +30,24 @@ Python is a programming language
 
 async function uploadMarkdown(alice: UpdateState): Promise<void> {
   const wsID = joinID(alice().user.publicKey, "my-first-workspace");
-  const [plan, topNodeID] = planCreateNodesFromMarkdown(
+  const basePlan = planUpsertRelations(
     createPlan(alice()),
-    TEST_FILE,
-    List([shortID(wsID)])
+    newRelations(wsID, List(), alice().user.publicKey)
   );
-  const addNodeToWS = planUpsertRelations(
-    plan,
-    addRelationToRelations(
-      newRelations(wsID, List(), alice().user.publicKey),
-      topNodeID
-    )
+  const workspacePath: ViewPath = [
+    0,
+    { nodeID: wsID, nodeIndex: 0 as NodeIndex },
+  ];
+  const plan = planPasteMarkdownTrees(
+    basePlan,
+    parseMarkdownHierarchy(TEST_FILE),
+    workspacePath,
+    [shortID(wsID) as ID],
+    0
   );
   await execute({
     ...alice(),
-    plan: addNodeToWS,
+    plan,
   });
 }
 

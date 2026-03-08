@@ -9,7 +9,7 @@ import {
   getVersionsRelations,
   getNodeIDFromView,
   getContext,
-  getRelationsForCurrentTree,
+  getRelationForView,
   getEffectiveAuthor,
   getParentRelation,
   isRoot,
@@ -20,6 +20,7 @@ import {
   isSearchId,
   getRelations,
   getRelationsNoReferencedBy,
+  shortID,
   itemPassesFilters,
   getOccurrencesForNode,
   getIncomingCrefsForNode,
@@ -41,26 +42,6 @@ export type TreeTraversalOptions = {
 
 const EMPTY_VIRTUAL_ITEMS: VirtualItemsMap = Map<string, RelationItem>();
 const EMPTY_FIRST_VIRTUAL_KEYS: ImmutableSet<string> = ImmutableSet<string>();
-
-function getRelationsForMarkdownExport(
-  data: Data,
-  effectiveAuthor: PublicKey,
-  parentNodeID: LongID | ID,
-  context: List<ID>,
-  rootRelation: LongID | undefined,
-  isRootNode: boolean,
-  currentRoot?: ID
-): Relations | undefined {
-  return getRelationsForCurrentTree(
-    data.knowledgeDBs,
-    effectiveAuthor,
-    parentNodeID,
-    context,
-    rootRelation,
-    isRootNode,
-    currentRoot
-  );
-}
 
 function getChildrenForConcreteRef(
   data: Data,
@@ -105,29 +86,13 @@ function getChildrenForRegularNode(
   const context = getContext(data, parentPath, stack);
   const currentRoot = getParentRelation(data, parentPath)?.root;
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
-  const isRootNode = isRoot(parentPath);
 
   const relations = isSearchId(parentNodeID as ID)
     ? getRelations(data.knowledgeDBs, parentNodeID as ID, data.user.publicKey)
-    : options?.isMarkdownExport
-    ? getRelationsForMarkdownExport(
-        data,
-        effectiveAuthor,
-        parentNodeID,
-        context,
-        rootRelation,
-        isRootNode,
-        currentRoot
-      )
-    : getRelationsForCurrentTree(
-        data.knowledgeDBs,
-        effectiveAuthor,
-        parentNodeID,
-        context,
-        rootRelation,
-        isRootNode,
-        currentRoot
-      );
+    : getRelationForView(data, parentPath, stack);
+  const relationNodeID = relations
+    ? ((shortID(relations.head as ID) as ID) as LongID | ID)
+    : parentNodeID;
 
   const relationPaths = relations
     ? relations.items
@@ -152,7 +117,7 @@ function getChildrenForRegularNode(
       ? getVersionsRelations(
           data.knowledgeDBs,
           author,
-          parentNodeID as ID,
+          (shortID(relations?.head || (parentNodeID as ID)) as ID),
           context,
           relations?.root ?? currentRoot
         )
@@ -196,11 +161,13 @@ function getChildrenForRegularNode(
 
   const incomingCrefs = getIncomingCrefsForNode(
     data.knowledgeDBs,
-    parentNodeID,
+    relationNodeID,
     containingRelationID,
     relations?.id,
     author,
-    relations?.items
+    relations?.items,
+    context,
+    relations?.root ?? currentRoot
   );
 
   const visibleIncomingCrefs = activeFilters.includes("incoming")
@@ -210,7 +177,7 @@ function getChildrenForRegularNode(
   const occurrences = activeFilters.includes("occurrence")
     ? getOccurrencesForNode(
         data.knowledgeDBs,
-        parentNodeID,
+        relationNodeID,
         relations?.id,
         effectiveAuthor,
         context,

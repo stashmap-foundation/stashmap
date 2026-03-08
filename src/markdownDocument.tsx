@@ -28,6 +28,7 @@ import {
   getNodeIDFromView,
   getDisplayTextForView,
   getRelationItemForView,
+  getRelationForView,
   getContext,
   viewPathToString,
   newRelations,
@@ -343,12 +344,18 @@ type SerializeResult = {
 
 function getOwnRelationForDocumentSerialization(
   data: Data,
+  path: ViewPath,
+  stack: ID[],
   author: PublicKey,
   nodeID: LongID | ID,
   context: List<ID>,
   rootRelation: Relations,
   isRootNode: boolean
 ): Relations | undefined {
+  const directRelation = getRelationForView(data, path, stack);
+  if (directRelation) {
+    return directRelation;
+  }
   return getRelationsForCurrentTree(
     data.knowledgeDBs,
     author,
@@ -460,6 +467,8 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
 
       const ownRelation = getOwnRelationForDocumentSerialization(
         data,
+        path,
+        stack,
         author,
         nodeID,
         context,
@@ -467,8 +476,11 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
         isRoot(path)
       );
       const serializedRelation = ownRelation
-        ? getSerializedRelationText(data, ownRelation, nodeID, context)
+        ? getSerializedRelationText(data, ownRelation, ownRelation.head, context)
         : undefined;
+      const serializedNodeID = ownRelation
+        ? (shortID(ownRelation.head as ID) as ID)
+        : (shortID(nodeID as ID) as ID);
       const text =
         serializedRelation?.text ?? getDisplayTextForView(data, path, stack);
       const uuid = ownRelation ? shortID(ownRelation.id) : v4();
@@ -480,7 +492,7 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
         {
           hidden: isVirtual,
           basedOn: ownRelation?.basedOn,
-          nodeID: shortID(nodeID) as ID,
+          nodeID: serializedNodeID,
         }
       )}`;
       return {
@@ -488,7 +500,7 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
         nodeHashes: acc.nodeHashes.add(
           serializedRelation?.textHash ?? hashText(text)
         ),
-        nodeIDs: acc.nodeIDs.add(shortID(nodeID)),
+        nodeIDs: acc.nodeIDs.add(serializedNodeID),
         contextHashes: contextHash
           ? acc.contextHashes.add(contextHash)
           : acc.contextHashes,
@@ -620,6 +632,18 @@ export function createVersion(
   root: ID
 ): WalkContext {
   const isInsideVersions = editContext.last() === VERSIONS_NODE_ID;
+  const currentRelation = getRelationsForCurrentTree(
+    ctx.knowledgeDBs,
+    ctx.publicKey,
+    editedNodeID,
+    editContext,
+    undefined,
+    editContext.size === 0,
+    root
+  );
+  const effectiveEditedNodeID = currentRelation
+    ? (shortID(currentRelation.head as ID) as ID)
+    : editedNodeID;
 
   const [originalNodeID, context]: [ID, List<ID>] =
     isInsideVersions && editContext.size >= 2
@@ -627,7 +651,7 @@ export function createVersion(
           editContext.get(editContext.size - 2) as ID,
           editContext.slice(0, -2).toList(),
         ]
-      : [editedNodeID, editContext];
+      : [effectiveEditedNodeID, editContext];
 
   const versionNode = newNode(newText);
 

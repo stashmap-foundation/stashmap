@@ -374,11 +374,15 @@ export function planMoveNodeWithView(
     planWithAdd,
     targetParentViewPath
   );
-  const targetContext = targetParentContext.push(shortID(targetParentNodeID));
   const actualTargetParentRelation = getRelationForView(
     planWithAdd,
     targetParentViewPath,
     stack
+  );
+  const targetContext = targetParentContext.push(
+    shortID(
+      (actualTargetParentRelation?.head as ID | undefined) ?? targetParentNodeID
+    )
   );
 
   const relations = getRelationForView(

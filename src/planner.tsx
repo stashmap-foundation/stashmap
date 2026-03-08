@@ -556,8 +556,9 @@ export function planAddToParent(
 
   const [planWithParent, parentRelation] = ensureParentRelation();
   const parentContext = getContext(planWithParent, parentViewPath, stack);
-  const [parentNodeID] = getNodeIDFromView(planWithParent, parentViewPath);
-  const childContext = parentContext.push(shortID(parentNodeID));
+  const childContext = parentContext.push(
+    shortID(parentRelation.head as ID) as ID
+  );
 
   const [planWithChildren, relationItemPayload] = nodeIDsArray.reduce(
     ([accPlan, accItems], objectOrID) => {
@@ -675,6 +676,30 @@ function getEffectiveParentRelationID(relation: Relations): LongID | undefined {
   return relation.parent;
 }
 
+function getRelationDepth(
+  relationsByID: Map<ID, Relations>,
+  relation: Relations
+): number {
+  let depth = 0;
+  let currentRelation: Relations | undefined = relation;
+  const seen = new Set<ID>();
+
+  while (currentRelation?.parent) {
+    const parentID = shortID(currentRelation.parent) as ID;
+    if (seen.has(parentID)) {
+      break;
+    }
+    seen.add(parentID);
+    currentRelation = relationsByID.get(parentID);
+    if (!currentRelation) {
+      break;
+    }
+    depth += 1;
+  }
+
+  return depth;
+}
+
 function getRelationSubtree(
   plan: Plan,
   sourceRelation: Relations,
@@ -683,6 +708,10 @@ function getRelationSubtree(
   const authorRelations =
     plan.knowledgeDBs.get(sourceRelation.author)?.relations.valueSeq().toList() ||
     List<Relations>();
+  const authorRelationsByID = authorRelations.reduce(
+    (acc, relation) => acc.set(shortID(relation.id), relation),
+    Map<ID, Relations>()
+  );
   const childrenByParent = authorRelations
     .filter((relation) => relation.root === sourceRelation.root)
     .reduce(
@@ -709,7 +738,7 @@ function getRelationSubtree(
     }
     ordered.push(current);
     const children = childrenByParent.get(current.id, List<Relations>()).sortBy(
-      (relation) => relation.context.size
+      (relation) => getRelationDepth(authorRelationsByID, relation)
     );
     children.forEach((child) => {
       if (seen.has(child.id) || !filterRelation(child)) {
@@ -841,7 +870,9 @@ export function planMoveTreeDescendantsToContext(
   const targetParentRelation = getRelationForView(plan, parentViewPath, stack);
   const parentContext = getContext(plan, parentViewPath, stack);
   const [parentNodeID] = getNodeIDFromView(plan, parentViewPath);
-  const targetContext = parentContext.push(shortID(parentNodeID));
+  const targetContext = parentContext.push(
+    shortID((targetParentRelation?.head as ID | undefined) ?? parentNodeID)
+  );
 
   return originalTopNodeIDs.reduce((accPlan, originalID, index) => {
     const actualID = actualNodeIDs[index];
@@ -1002,7 +1033,9 @@ export function planDeepCopyNode(
     planWithParent,
     targetParentViewPath
   );
-  const nodeNewContext = targetParentContext.push(shortID(targetParentNodeID));
+  const nodeNewContext = targetParentContext.push(
+    shortID((targetParentRelation.head as ID | undefined) ?? targetParentNodeID)
+  );
   const sourceChildContext = resolvedContext.push(shortID(resolvedNodeID));
   const targetChildContext = nodeNewContext.push(shortID(resolvedNodeID));
 
@@ -1198,6 +1231,10 @@ export function planSaveNodeAndEnsureRelations(
 ): SaveNodeResult {
   const trimmedText = text.trim();
   const [nodeID] = getNodeIDFromView(plan, viewPath);
+  const currentRelation = getRelationForView(plan, viewPath, stack);
+  const versionNodeID = currentRelation
+    ? (shortID(currentRelation.head as ID) as ID)
+    : (nodeID as ID);
   const parentPath = getParentView(viewPath);
 
   if (isEmptyNodeID(nodeID)) {
@@ -1245,27 +1282,24 @@ export function planSaveNodeAndEnsureRelations(
   }
 
   const context = getContext(plan, viewPath, stack);
-  const treeRoot = getRelationForView(
-    plan,
-    getParentView(viewPath) || viewPath,
-    stack
-  )?.root;
+  const treeRoot = currentRelation?.root;
   const displayText =
     getVersionedDisplayText(
       plan.knowledgeDBs,
       plan.user.publicKey,
-      nodeID,
+      versionNodeID,
       context,
       treeRoot
     ) ??
-    getTextForMatching(plan.knowledgeDBs, nodeID, plan.user.publicKey) ??
+    currentRelation?.text ??
+    getTextForMatching(plan.knowledgeDBs, versionNodeID, plan.user.publicKey) ??
     "";
 
   if (trimmedText === displayText) return { plan, viewPath };
 
   return {
     plan: treeRoot
-      ? planCreateVersion(plan, nodeID, trimmedText, context, treeRoot)
+      ? planCreateVersion(plan, versionNodeID, trimmedText, context, treeRoot)
       : plan,
     viewPath,
   };
@@ -1336,10 +1370,11 @@ export function planDeleteDescendantRelations(
   plan: Plan,
   sourceRelation: Relations
 ): Plan {
+  const userRelationsByID = plan.knowledgeDBs.get(plan.user.publicKey, newDB()).relations;
   const descendants = getRelationSubtree(plan, sourceRelation)
     .filter((relation) => relation.id !== sourceRelation.id)
     .filter((relation) => relation.author === plan.user.publicKey)
-    .sortBy((relation) => -relation.context.size);
+    .sortBy((relation) => -getRelationDepth(userRelationsByID, relation));
 
   return descendants.reduce(
     (accPlan, relation) => planDeleteRelations(accPlan, relation.id),
@@ -1699,33 +1734,14 @@ export function planSetEmptyNodePosition(
   );
 
   // 2. Use planExpandNode for consistent expansion handling
-  const [parentNodeID, parentView] = getNodeIDFromView(
-    planWithOwnRelations,
-    parentPath
-  );
-  const context = getContext(plan, parentPath, stack);
+  const [, parentView] = getNodeIDFromView(planWithOwnRelations, parentPath);
   const planWithExpanded = planExpandNode(
     planWithOwnRelations,
     parentView,
     parentPath
   );
 
-  const pane = getPane(planWithExpanded, parentPath);
-  const author = getEffectiveAuthor(planWithExpanded, parentPath);
-  const parentRoot = getRelationForView(
-    planWithExpanded,
-    parentPath,
-    stack
-  )?.root;
-  const relations = getRelationsForCurrentTree(
-    planWithExpanded.knowledgeDBs,
-    author,
-    parentNodeID,
-    context,
-    pane.rootRelation,
-    isRoot(parentPath),
-    parentRoot
-  );
+  const relations = getRelationForView(planWithExpanded, parentPath, stack);
   if (!relations) {
     return plan;
   }

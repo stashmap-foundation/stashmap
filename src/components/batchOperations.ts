@@ -346,7 +346,14 @@ export function planBatchIndent(
   );
 
   const prevSiblingContext = getContext(plan, prevSibling.viewPath, stack);
-  const newContext = prevSiblingContext.push(shortID(prevSibling.nodeID));
+  const prevSiblingRelation = getRelationForView(
+    plan,
+    prevSibling.viewPath,
+    stack
+  );
+  const newContext = prevSiblingContext.push(
+    shortID((prevSiblingRelation?.head as ID | undefined) ?? prevSibling.nodeID)
+  );
   const { plan: updated, remappedKeys } = viewPaths.reduce(
     (state, viewPath) => {
       const fromKey = viewPathToString(viewPath);
@@ -433,7 +440,16 @@ export function planBatchOutdent(
 
   const grandParentContext = getContext(plan, grandParentPath, stack);
   const [grandParentNodeID] = getNodeIDFromView(plan, grandParentPath);
-  const newContext = grandParentContext.push(shortID(grandParentNodeID));
+  const grandParentRelation = getRelationForView(
+    plan,
+    grandParentPath,
+    stack
+  );
+  const newContext = grandParentContext.push(
+    shortID(
+      (grandParentRelation?.head as ID | undefined) ?? grandParentNodeID
+    )
+  );
   const { plan: updated, remappedKeys } = viewPaths.reduce(
     (state, viewPath, idx) => {
       const fromKey = viewPathToString(viewPath);

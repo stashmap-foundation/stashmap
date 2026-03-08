@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -9,6 +9,7 @@ import {
   renderTree,
   type,
 } from "../utils.test";
+import { KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
 
 const addChildViaTab = async (
   parentLabel: string,
@@ -542,7 +543,7 @@ My Notes
 
   test("Editing root node persists after reload", async () => {
     const [alice] = setup([ALICE]);
-    renderTree(alice);
+    const { relayPool } = renderTree(alice);
 
     await type("My Notes{Escape}");
 
@@ -559,6 +560,15 @@ My Notes
     await expectTree(`
 My Dashboard
     `);
+
+    await waitFor(() => {
+      const docs = relayPool
+        .getEvents()
+        .filter((event) => event.kind === KIND_KNOWLEDGE_DOCUMENT);
+      expect(
+        docs.some((event) => event.content.includes("# My Dashboard"))
+      ).toBeTruthy();
+    });
 
     cleanup();
     renderTree(alice);

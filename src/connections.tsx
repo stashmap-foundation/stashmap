@@ -1090,9 +1090,18 @@ export function getIncomingCrefsForNode(
   parentRelationID: LongID | undefined,
   currentRelationID: LongID | undefined,
   effectiveAuthor: PublicKey,
-  currentItems?: List<RelationItem>
+  currentItems?: List<RelationItem>,
+  currentContext: Context = List<ID>(),
+  currentRoot?: ID
 ): List<LongID> {
   const currentShortNodeID = shortID(currentNodeID);
+  const currentHasVersions = nodeHasActiveVersions(
+    knowledgeDBs,
+    currentNodeID,
+    effectiveAuthor,
+    currentContext,
+    currentRoot
+  );
   const outgoingTargetRelIDs = (currentItems || List<RelationItem>()).reduce(
     (acc, item) => {
       const parsed = parseConcreteRefId(item.id);
@@ -1144,11 +1153,19 @@ export function getIncomingCrefsForNode(
 
       if (!hasCrefToUs) return rdx;
 
-      return rdx.push({
+      const ref: ReferencedByRef = {
         relationID: relation.id,
         context: relation.context,
         updated: relation.updated,
-      });
+      };
+      if (
+        currentHasVersions &&
+        !refHasActiveVersions(knowledgeDBs, ref, effectiveAuthor)
+      ) {
+        return rdx;
+      }
+
+      return rdx.push(ref);
     }, acc);
   }, List<ReferencedByRef>());
 

@@ -26,7 +26,7 @@ import {
 import {
   Plan,
   planExpandNode,
-  planCreateVersion,
+  planUpdateRelationText,
   planSaveNodeAndEnsureRelations,
   planUpdateEmptyNodeMetadata,
   planDeepCopyNode,
@@ -345,15 +345,6 @@ export function planBatchIndent(
     prevSibling.viewPath
   );
 
-  const prevSiblingContext = getContext(plan, prevSibling.viewPath, stack);
-  const prevSiblingRelation = getRelationForView(
-    plan,
-    prevSibling.viewPath,
-    stack
-  );
-  const newContext = prevSiblingContext.push(
-    shortID((prevSiblingRelation?.head as ID | undefined) ?? prevSibling.nodeID)
-  );
   const { plan: updated, remappedKeys } = viewPaths.reduce(
     (state, viewPath) => {
       const fromKey = viewPathToString(viewPath);
@@ -375,19 +366,21 @@ export function planBatchIndent(
         prevSibling.viewPath,
         stack
       );
-      const nextRemappedKeys =
+      const updatedViewPath =
         targetRelationAfter && insertAt < targetRelationAfter.items.size
+          ? addNodeToPathWithRelations(
+              prevSibling.viewPath,
+              targetRelationAfter,
+              insertAt
+            )
+          : undefined;
+      const nextRemappedKeys =
+        updatedViewPath
           ? [
               ...state.remappedKeys,
               {
                 fromKey,
-                toKey: viewPathToString(
-                  addNodeToPathWithRelations(
-                    prevSibling.viewPath,
-                    targetRelationAfter,
-                    insertAt
-                  )
-                ),
+                toKey: viewPathToString(updatedViewPath),
               },
             ]
           : state.remappedKeys;
@@ -401,14 +394,8 @@ export function planBatchIndent(
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
       return {
-        plan: targetRelationAfter
-          ? planCreateVersion(
-              moved,
-              nodeID,
-              editorText,
-              newContext,
-              targetRelationAfter.root
-            )
+        plan: updatedViewPath
+          ? planUpdateRelationText(moved, updatedViewPath, stack, editorText)
           : moved,
         remappedKeys: nextRemappedKeys,
       };
@@ -438,18 +425,6 @@ export function planBatchOutdent(
   const parentRelationIndex = getRelationIndex(plan, parentPath);
   if (parentRelationIndex === undefined) return undefined;
 
-  const grandParentContext = getContext(plan, grandParentPath, stack);
-  const [grandParentNodeID] = getNodeIDFromView(plan, grandParentPath);
-  const grandParentRelation = getRelationForView(
-    plan,
-    grandParentPath,
-    stack
-  );
-  const newContext = grandParentContext.push(
-    shortID(
-      (grandParentRelation?.head as ID | undefined) ?? grandParentNodeID
-    )
-  );
   const { plan: updated, remappedKeys } = viewPaths.reduce(
     (state, viewPath, idx) => {
       const fromKey = viewPathToString(viewPath);
@@ -466,19 +441,21 @@ export function planBatchOutdent(
         grandParentPath,
         stack
       );
-      const nextRemappedKeys =
+      const updatedViewPath =
         targetRelationAfter && insertAt < targetRelationAfter.items.size
+          ? addNodeToPathWithRelations(
+              grandParentPath,
+              targetRelationAfter,
+              insertAt
+            )
+          : undefined;
+      const nextRemappedKeys =
+        updatedViewPath
           ? [
               ...state.remappedKeys,
               {
                 fromKey,
-                toKey: viewPathToString(
-                  addNodeToPathWithRelations(
-                    grandParentPath,
-                    targetRelationAfter,
-                    insertAt
-                  )
-                ),
+                toKey: viewPathToString(updatedViewPath),
               },
             ]
           : state.remappedKeys;
@@ -492,14 +469,8 @@ export function planBatchOutdent(
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
       return {
-        plan: targetRelationAfter
-          ? planCreateVersion(
-              moved,
-              nodeID,
-              editorText,
-              newContext,
-              targetRelationAfter.root
-            )
+        plan: updatedViewPath
+          ? planUpdateRelationText(moved, updatedViewPath, stack, editorText)
           : moved,
         remappedKeys: nextRemappedKeys,
       };

@@ -9,8 +9,7 @@ import {
   getEffectiveAuthor,
   getNodeFromView,
   getNodeIDFromView,
-  getRelationForView,
-  getVersionedDisplayText,
+  getRootForView,
   getContext,
   isExpanded,
   parseViewPath,
@@ -56,7 +55,6 @@ import {
 import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import {
   LOG_NODE_ID,
-  VERSIONS_NODE_ID,
   getTextForMatching,
   isSearchId,
   shortID,
@@ -96,9 +94,7 @@ function BreadcrumbItem({
   isLast: boolean;
 }): JSX.Element {
   const { knowledgeDBs } = useData();
-  const label =
-    getTextForMatching(knowledgeDBs, nodeID, author) ||
-    (shortID(nodeID) === VERSIONS_NODE_ID ? "~versions" : "Loading...");
+  const label = getTextForMatching(knowledgeDBs, nodeID, author) || "Loading...";
 
   if (isLast) {
     return <span className="breadcrumb-current">{label}</span>;
@@ -630,17 +626,7 @@ function getDisplayTextForViewKey(
     return node.text;
   }
   const [nodeID] = getNodeIDFromView(data, viewPath);
-  const context = getContext(data, viewPath, stack);
-  const effectiveAuthor = getEffectiveAuthor(data, viewPath);
-  const currentRoot = getRelationForView(data, viewPath, stack)?.root;
-  const versionedText = getVersionedDisplayText(
-    data.knowledgeDBs,
-    effectiveAuthor,
-    nodeID as ID,
-    context,
-    currentRoot
-  );
-  return versionedText ?? node?.text ?? "";
+  return getTextForMatching(data.knowledgeDBs, nodeID as ID, data.user.publicKey) || node?.text || "";
 }
 
 function getActionTargetKeys(

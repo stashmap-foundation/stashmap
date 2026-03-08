@@ -14,12 +14,8 @@ import {
   isConcreteRefId,
   parseConcreteRefId,
   createConcreteRefId,
-  VERSIONS_NODE_ID,
-  addRelationToRelations,
-  moveRelations,
   ensureRelationNativeFields,
   getRelationItemNodeID,
-  getRelationItemRelation,
   getTextForMatching,
 } from "./connections";
 import {
@@ -32,10 +28,7 @@ import {
   getContext,
   viewPathToString,
   newRelations,
-  getVersionsContext,
-  getVersionsRelations,
   getRelationsForCurrentTree,
-  getVersionedDisplayText,
 } from "./ViewContext";
 import { buildOutgoingReference } from "./buildReferenceNode";
 import { KIND_KNOWLEDGE_DOCUMENT, newTimestamp, msTag } from "./nostr";
@@ -371,23 +364,9 @@ function getSerializedRelationText(
   data: Data,
   relation: Relations,
   nodeID: LongID | ID,
-  context: List<ID>
+  _context: List<ID>
 ): { text: string; textHash: ID } {
-  const versionedText = getVersionedDisplayText(
-    data.knowledgeDBs,
-    relation.author,
-    shortID(nodeID as ID) as ID,
-    context,
-    relation.root
-  );
-  if (versionedText) {
-    return {
-      text: versionedText,
-      textHash: hashText(versionedText),
-    };
-  }
-
-  if (relation.text !== "" || shortID(nodeID as ID) === VERSIONS_NODE_ID) {
+  if (relation.text !== "") {
     return {
       text: relation.text,
       textHash: relation.textHash,
@@ -430,7 +409,6 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
       const contextHash =
         context.size > 0 ? hashText(context.join(":")) : undefined;
       const item = getRelationItemForView(data, path);
-      const isVirtual = virtualItems.has(viewPathToString(path));
 
       if (isConcreteRefId(nodeID)) {
         const parsed = parseConcreteRefId(nodeID);
@@ -448,9 +426,7 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
               )
             )
           : acc.nodeHashes;
-        const crefAttrs = formatAttrs("", item?.relevance, item?.argument, {
-          hidden: isVirtual,
-        });
+        const crefAttrs = formatAttrs("", item?.relevance, item?.argument);
         return {
           ...acc,
           lines: [...acc.lines, `${indent}- ${crefText}${crefAttrs}`],
@@ -490,7 +466,6 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
         item?.relevance,
         item?.argument,
         {
-          hidden: isVirtual,
           basedOn: ownRelation?.basedOn,
           nodeID: serializedNodeID,
         }
@@ -624,158 +599,6 @@ function walkUpsertRelation(
   };
 }
 
-export function createVersion(
-  ctx: WalkContext,
-  editedNodeID: ID,
-  newText: string,
-  editContext: List<ID>,
-  root: ID
-): WalkContext {
-  const isInsideVersions = editContext.last() === VERSIONS_NODE_ID;
-  const currentRelation = getRelationsForCurrentTree(
-    ctx.knowledgeDBs,
-    ctx.publicKey,
-    editedNodeID,
-    editContext,
-    undefined,
-    editContext.size === 0,
-    root
-  );
-  const effectiveEditedNodeID = currentRelation
-    ? (shortID(currentRelation.head as ID) as ID)
-    : editedNodeID;
-
-  const [originalNodeID, context]: [ID, List<ID>] =
-    isInsideVersions && editContext.size >= 2
-      ? [
-          editContext.get(editContext.size - 2) as ID,
-          editContext.slice(0, -2).toList(),
-        ]
-      : [effectiveEditedNodeID, editContext];
-
-  const versionNode = newNode(newText);
-
-  const versionsNode = newNode("~versions");
-
-  const versionsContext = getVersionsContext(originalNodeID, context);
-  const parentRelation = getRelationsForCurrentTree(
-    ctx.knowledgeDBs,
-    ctx.publicKey,
-    originalNodeID,
-    context,
-    undefined,
-    context.size === 0,
-    root
-  );
-  const baseVersionsRelations =
-    getVersionsRelations(
-      ctx.knowledgeDBs,
-      ctx.publicKey,
-      originalNodeID,
-      context,
-      root
-    ) ||
-    newRelations(
-      VERSIONS_NODE_ID,
-      versionsContext,
-      ctx.publicKey,
-      root,
-      parentRelation?.id
-    );
-
-  const versionItemContext = versionsContext.push(VERSIONS_NODE_ID);
-  const ensureVersionRelation = (
-    accCtx: WalkContext,
-    nodeID: ID,
-    text: string
-  ): [WalkContext, LongID] => {
-    const versionRelation = {
-      ...newRelations(nodeID, versionItemContext, accCtx.publicKey, root),
-      text,
-      textHash: hashText(text),
-      parent: baseVersionsRelations.id,
-    };
-    return [walkUpsertRelation(accCtx, versionRelation), versionRelation.id];
-  };
-
-  const originalIndex = baseVersionsRelations.items.findIndex(
-    (item) =>
-      getRelationItemNodeID(
-        ctx.knowledgeDBs,
-        item,
-        ctx.publicKey
-      ) === originalNodeID
-  );
-  const [withOriginalRelation, originalRelationID] =
-    originalIndex < 0
-      ? ensureVersionRelation(
-          ctx,
-          originalNodeID,
-          getTextForMatching(
-            ctx.knowledgeDBs,
-            originalNodeID,
-            ctx.publicKey
-          ) ?? ""
-        )
-      : [
-          ctx,
-          getRelationItemRelation(
-            ctx.knowledgeDBs,
-            baseVersionsRelations.items.get(originalIndex)!,
-            ctx.publicKey
-          )!.id,
-        ];
-  const versionsWithOriginal =
-    originalIndex < 0
-      ? addRelationToRelations(
-          baseVersionsRelations,
-          originalRelationID,
-          undefined,
-          undefined,
-          baseVersionsRelations.items.size
-        )
-      : baseVersionsRelations;
-
-  const editedNodePosition = isInsideVersions
-    ? versionsWithOriginal.items.findIndex(
-        (item) =>
-          getRelationItemNodeID(
-            withOriginalRelation.knowledgeDBs,
-            item,
-            withOriginalRelation.publicKey
-          ) === editedNodeID
-      )
-    : -1;
-  const insertPosition = editedNodePosition >= 0 ? editedNodePosition : 0;
-
-  const [withVersionRelation, versionRelationID] = ensureVersionRelation(
-    withOriginalRelation,
-    versionNode.id,
-    newText
-  );
-  const existingIndex = versionsWithOriginal.items.findIndex(
-    (item) =>
-      getRelationItemNodeID(
-        withVersionRelation.knowledgeDBs,
-        item,
-        withVersionRelation.publicKey
-      ) === versionNode.id
-  );
-
-  const withVersion =
-    existingIndex >= 0
-      ? moveRelations(versionsWithOriginal, [existingIndex], insertPosition)
-      : addRelationToRelations(
-          versionsWithOriginal,
-          versionRelationID,
-          undefined,
-          undefined,
-          insertPosition
-        );
-
-  return walkUpsertRelation(withVersionRelation, withVersion);
-}
-
 function materializeTreeNode(
   ctx: WalkContext,
   treeNode: MarkdownTreeNode,
@@ -836,19 +659,6 @@ function materializeTreeNode(
     [ctx, [] as RelationItem[]] as [WalkContext, RelationItem[]]
   );
 
-  const hiddenChildren = treeNode.children.filter((child) => child.hidden);
-  const withHidden = hiddenChildren.reduce(
-    (accCtx, child) =>
-      materializeTreeNode(
-        accCtx,
-        child,
-        childContext,
-        root,
-        relationBaseWithFields.id
-      )[0],
-    withVisible
-  );
-
   const relation: Relations = {
     ...relationBaseWithFields,
     items: List(childItems),
@@ -856,14 +666,14 @@ function materializeTreeNode(
       ? {
           basedOn: (treeNode.basedOn.includes("_")
             ? treeNode.basedOn
-            : joinID(withHidden.publicKey, treeNode.basedOn)) as LongID,
+            : joinID(withVisible.publicKey, treeNode.basedOn)) as LongID,
         }
       : {}),
-    ...(withHidden.updated !== undefined
-      ? { updated: withHidden.updated }
+    ...(withVisible.updated !== undefined
+      ? { updated: withVisible.updated }
       : {}),
   };
-  return [walkUpsertRelation(withHidden, relation), node.id, relation.id];
+  return [walkUpsertRelation(withVisible, relation), node.id, relation.id];
 }
 
 export function createNodesFromMarkdownTrees(
@@ -871,7 +681,7 @@ export function createNodesFromMarkdownTrees(
   trees: MarkdownTreeNode[],
   context: List<ID> = List<ID>()
 ): [WalkContext, topNodeIDs: ID[], topRelationIDs: LongID[]] {
-  return trees.reduce(
+  return trees.filter((treeNode) => !treeNode.hidden).reduce(
     ([accCtx, accTopNodeIDs, accTopRelationIDs], treeNode) => {
       const rootUuid = treeNode.uuid ?? v4();
       const treeWithUuid = treeNode.uuid

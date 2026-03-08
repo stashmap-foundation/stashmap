@@ -12,10 +12,8 @@ import {
   parseSearchId,
   hashText,
   itemMatchesType,
-  VERSIONS_NODE_ID,
   LOG_NODE_ID,
   EMPTY_NODE_ID,
-  addRelationToRelations,
   isConcreteRefId,
   createConcreteRefId,
   parseConcreteRefId,
@@ -547,6 +545,8 @@ const VirtualItemsContext = React.createContext<VirtualItemsMap>(
   Map<string, RelationItem>()
 );
 
+const EMPTY_VIEW_PATH_PREFIX = "empty-row:";
+
 export const VirtualItemsProvider = VirtualItemsContext.Provider;
 
 export function useVirtualItemsMap(): VirtualItemsMap {
@@ -560,6 +560,14 @@ function encodePathID(id: string): string {
 
 function decodePathID(encoded: string): string {
   return encoded.replace(/%3A/g, ":");
+}
+
+function createEmptyViewPathID(relationsID: LongID): string {
+  return `${EMPTY_VIEW_PATH_PREFIX}${relationsID}`;
+}
+
+function isEmptyViewPathID(id: LongID | ID): boolean {
+  return id.startsWith(EMPTY_VIEW_PATH_PREFIX);
 }
 
 export function parseViewPath(path: string): ViewPath {
@@ -681,46 +689,9 @@ function relationMatchesRequestedNode(
   );
 }
 
-function relationMatchesRequestedNodeInVersions(
-  knowledgeDBs: KnowledgeDBs,
-  relation: Relations,
-  requestedNodeID: LongID | ID
-): boolean {
-  const versionsRelation = getVersionsRelations(
-    knowledgeDBs,
-    relation.author,
-    shortID(relation.head as ID) as ID,
-    relation.context,
-    relation.root
-  );
-  if (!versionsRelation) {
-    return false;
-  }
-
-  return versionsRelation.items.some((item) => {
-    if (isRefId(item.id) || isConcreteRefId(item.id)) {
-      return false;
-    }
-    const versionRelation = getRelationItemRelation(
-      knowledgeDBs,
-      item,
-      versionsRelation.author
-    );
-    return (
-      versionRelation !== undefined &&
-      relationMatchesRequestedNode(
-        knowledgeDBs,
-        versionRelation,
-        requestedNodeID
-      )
-    );
-  });
-}
-
 function getNodeIDForRelation(relation: Relations): ID {
   const localHead = shortID(relation.head as ID) as ID;
   if (
-    localHead === VERSIONS_NODE_ID ||
     localHead === LOG_NODE_ID ||
     localHead === EMPTY_NODE_ID ||
     isSearchId(localHead)
@@ -763,23 +734,7 @@ function getNewestStandaloneRootByNode(
   if (directMatch) {
     return directMatch;
   }
-  return sortRelationsByDate(
-    List(
-      knowledgeDBs
-        .get(author, newDB())
-        .relations.valueSeq()
-        .filter(
-          (relation) =>
-            relation.author === author &&
-            relation.root === shortID(relation.id) &&
-            relationMatchesRequestedNodeInVersions(
-              knowledgeDBs,
-              relation,
-              nodeID
-            )
-        )
-    )
-  ).first();
+  return undefined;
 }
 
 function getStandaloneRootByRootID(
@@ -831,22 +786,7 @@ function getNewestRelationFromRootBySemanticContext(
   if (directMatch) {
     return directMatch;
   }
-  return sortRelationsByDate(
-    List(
-      knowledgeDBs
-        .get(author, newDB())
-        .relations.valueSeq()
-        .filter(
-          (relation) =>
-            contextMatcher(relation) &&
-            relationMatchesRequestedNodeInVersions(
-              knowledgeDBs,
-              relation,
-              nodeID
-            )
-        )
-    )
-  ).first();
+  return undefined;
 }
 
 function getMatchingChildRelation(
@@ -868,15 +808,7 @@ function getMatchingChildRelation(
   if (directMatch) {
     return directMatch;
   }
-  return childRelations.find(
-    (relation): relation is Relations =>
-      relation !== undefined &&
-      relationMatchesRequestedNodeInVersions(
-        knowledgeDBs,
-        relation,
-        requestedNodeID
-      )
-  );
+  return undefined;
 }
 
 function resolveRequestedStackFromRoot(
@@ -887,13 +819,11 @@ function resolveRequestedStackFromRoot(
   if (requestedStack.length === 0) {
     return { actualStack: [] };
   }
-  const rootMatches =
-    relationMatchesRequestedNode(knowledgeDBs, rootRelation, requestedStack[0]) ||
-    relationMatchesRequestedNodeInVersions(
-      knowledgeDBs,
-      rootRelation,
-      requestedStack[0]
-    );
+  const rootMatches = relationMatchesRequestedNode(
+    knowledgeDBs,
+    rootRelation,
+    requestedStack[0]
+  );
   if (!rootMatches) {
     return undefined;
   }
@@ -960,6 +890,9 @@ function getViewRelationByID(
 
 function getNodeIDFromPath(data: Data, viewPath: ViewPath): LongID | ID {
   const currentID = getLast(viewPath);
+  if (isEmptyViewPathID(currentID)) {
+    return EMPTY_NODE_ID;
+  }
   if (isConcreteRefId(currentID)) {
     return currentID;
   }
@@ -1071,6 +1004,44 @@ export function getEffectiveAuthor(data: Data, viewPath: ViewPath): PublicKey {
   return parentRelation?.author || pane.author;
 }
 
+export function getRootForView(
+  data: Data,
+  viewPath: ViewPath,
+  stack: ID[]
+): ID | undefined {
+  const currentID = getLast(viewPath);
+  const directRelation = getViewRelationByID(
+    data.knowledgeDBs,
+    currentID,
+    data.user.publicKey
+  );
+  if (directRelation) {
+    return directRelation.root;
+  }
+
+  const parentRelation = getParentRelation(data, viewPath);
+  if (parentRelation) {
+    return parentRelation.root;
+  }
+
+  if (!isRoot(viewPath)) {
+    return undefined;
+  }
+
+  const [nodeID] = getNodeIDFromView(data, viewPath);
+  const context = getContext(data, viewPath, stack);
+  const pane = getPane(data, viewPath);
+  const author = getEffectiveAuthor(data, viewPath);
+  return getRelationsForCurrentTree(
+    data.knowledgeDBs,
+    author,
+    nodeID,
+    context,
+    pane.rootRelation,
+    true
+  )?.root;
+}
+
 export function getRelationForView(
   data: Data,
   viewPath: ViewPath,
@@ -1084,6 +1055,10 @@ export function getRelationForView(
   );
   if (directRelation) {
     return directRelation;
+  }
+
+  if (!isRoot(viewPath)) {
+    return undefined;
   }
 
   const [nodeID] = getNodeIDFromView(data, viewPath);
@@ -1186,14 +1161,6 @@ export type TypeFilters = (
   | "contains"
 )[];
 
-export const VERSION_FILTERS: TypeFilters = [
-  "relevant",
-  "little_relevant",
-  "contains",
-  "confirms",
-  "contra",
-];
-
 /**
  * Filter relation items by type filters.
  */
@@ -1208,77 +1175,6 @@ export function filterRelationItems(
   return items.filter((item) =>
     itemFilters.some((f) => itemMatchesType(item, f))
   );
-}
-
-/**
- * Get the context for looking up versions of a node.
- * This is the path TO the node plus the node's ID.
- */
-export function getVersionsContext(nodeID: ID, context: Context): Context {
-  return context.push(nodeID);
-}
-
-/**
- * Get the versions relations for a node.
- */
-export function getVersionsRelations(
-  knowledgeDBs: KnowledgeDBs,
-  author: PublicKey,
-  nodeID: ID,
-  context: Context,
-  currentRoot?: ID
-): Relations | undefined {
-  const versionsContext = getVersionsContext(nodeID, context);
-  return sortRelationsByDate(
-    List(
-      getIndexedRelationsForKeys(
-        knowledgeDBs.get(author, newDB()),
-        [VERSIONS_NODE_ID]
-      ).filter(
-        (relation) =>
-          relation.author === author &&
-          relation.context.equals(versionsContext) &&
-          (!currentRoot || relation.root === currentRoot)
-      )
-    )
-  ).first();
-}
-
-/**
- * Get versioned display text for a node.
- */
-export function getVersionedDisplayText(
-  knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey,
-  nodeID: ID,
-  context: Context,
-  currentRoot?: ID
-): string | undefined {
-  if (nodeID === EMPTY_NODE_ID) return undefined;
-
-  const versionsRelations = getVersionsRelations(
-    knowledgeDBs,
-    myself,
-    nodeID,
-    context,
-    currentRoot
-  );
-  if (!versionsRelations) return undefined;
-
-  const versions = filterRelationItems(
-    versionsRelations.items,
-    VERSION_FILTERS
-  );
-  const firstVersion = versions.first();
-  if (!firstVersion) return undefined;
-  const versionedText =
-    getRelationItemRelation(knowledgeDBs, firstVersion, myself)?.text ||
-    getTextForMatching(
-      knowledgeDBs,
-      getRelationItemNodeID(knowledgeDBs, firstVersion, myself),
-      myself
-    );
-  return versionedText;
 }
 
 export function getNodeFromView(
@@ -1318,7 +1214,9 @@ export function addNodeToPathWithRelations(
     throw new Error("No node found in relation at index");
   }
   const pathWithRelations = addRelationsToLastElement(path, relations.id);
-  return [...pathWithRelations, item.id] as ViewPath;
+  const nextSegment =
+    item.id === EMPTY_NODE_ID ? createEmptyViewPathID(relations.id) : item.id;
+  return [...pathWithRelations, nextSegment] as ViewPath;
 }
 
 export function addNodeToPath(
@@ -1372,7 +1270,11 @@ export function getRelationIndex(
     return undefined;
   }
   const itemID = getLast(viewPath);
-  const index = relations.items.findIndex((item) => item.id === itemID);
+  const index = relations.items.findIndex(
+    (item) =>
+      item.id === itemID ||
+      (item.id === EMPTY_NODE_ID && isEmptyViewPathID(itemID))
+  );
   return index >= 0 ? index : undefined;
 }
 
@@ -1570,23 +1472,12 @@ export function getDisplayTextForView(
   stack: ID[],
   virtualType?: VirtualType
 ): string {
-  const ownRelation = getRelationForView(data, viewPath, stack);
   const [node] = getNodeForView(data, viewPath, stack, virtualType);
   if (node?.type === "reference" || (node && isSearchId(node.id as ID))) {
     return node.text;
   }
-  const [nodeID] = getNodeIDFromView(data, viewPath);
-  const context = getContext(data, viewPath, stack);
-  const effectiveAuthor = getEffectiveAuthor(data, viewPath);
-  const currentRoot = ownRelation?.root;
-  const versionedText = getVersionedDisplayText(
-    data.knowledgeDBs,
-    effectiveAuthor,
-    ownRelation ? (shortID(ownRelation.head as ID) as ID) : (nodeID as ID),
-    context,
-    currentRoot
-  );
-  return versionedText ?? ownRelation?.text ?? node?.text ?? "";
+  const ownRelation = getRelationForView(data, viewPath, stack);
+  return ownRelation?.text ?? node?.text ?? "";
 }
 
 export function useDisplayText(): string {
@@ -1711,9 +1602,7 @@ export function newRelations(
   const localHead = shortID(head) as ID;
   let relationText = text ?? "";
   if (text === undefined) {
-    if (localHead === VERSIONS_NODE_ID) {
-      relationText = "~versions";
-    } else if (localHead === LOG_NODE_ID) {
+    if (localHead === LOG_NODE_ID) {
       relationText = "~Log";
     } else if (localHead === EMPTY_NODE_ID) {
       relationText = "";
@@ -1735,8 +1624,6 @@ export function newRelations(
   };
 }
 
-// Creates new relations, prepopulating ~versions with the original node
-// The versionsContext is [...path, originalNodeID], so originalNodeID is context.last()
 export function newRelationsForNode(
   nodeID: LongID | ID,
   context: Context,
@@ -1745,12 +1632,7 @@ export function newRelationsForNode(
   parent?: LongID,
   text?: string
 ): Relations {
-  const relations = newRelations(nodeID, context, myself, root, parent, text);
-  if (shortID(nodeID) === VERSIONS_NODE_ID && context.size > 0) {
-    const originalNodeID = context.last() as ID;
-    return addRelationToRelations(relations, originalNodeID);
-  }
-  return relations;
+  return newRelations(nodeID, context, myself, root, parent, text);
 }
 
 export function upsertRelations(
@@ -1778,15 +1660,9 @@ export function upsertRelations(
       parentRoot,
       parentRelation?.id
     );
-  const relations =
-    shortID(nodeID) === VERSIONS_NODE_ID &&
-    base.items.size === 0 &&
-    context.size > 0
-      ? addRelationToRelations(base, context.last() as ID)
-      : base;
 
   // Apply modification
-  const updatedRelations = modify(relations);
+  const updatedRelations = modify(base);
 
   // Skip event if items unchanged
   if (currentRelation && currentRelation.items.equals(updatedRelations.items)) {

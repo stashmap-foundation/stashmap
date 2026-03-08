@@ -12,7 +12,6 @@ import {
   getRelationItemRelation,
 } from "./connections";
 import {
-  getVersionedDisplayText,
   ViewPath,
   getParentView,
   getLast,
@@ -27,19 +26,9 @@ function resolveNodeLabel(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
   nodeId: ID,
-  context: List<ID>,
-  root?: ID
+  _context: List<ID>,
+  _root?: ID
 ): string {
-  const versionedText = getVersionedDisplayText(
-    knowledgeDBs,
-    myself,
-    nodeId,
-    context,
-    root
-  );
-  if (versionedText) {
-    return versionedText;
-  }
   return getTextForMatching(knowledgeDBs, nodeId, myself) || "Loading...";
 }
 

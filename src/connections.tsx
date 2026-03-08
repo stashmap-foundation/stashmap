@@ -9,9 +9,6 @@ export function hashText(text: string): ID {
   return crypto.createHash("sha256").update(text).digest("hex").slice(0, 32);
 }
 
-// Pre-computed hash for the ~versions node
-export const VERSIONS_NODE_ID = hashText("~versions");
-
 // Pre-computed hash for the ~Log node (home page, linked to root-level notes)
 export const LOG_NODE_ID = hashText("~Log");
 
@@ -35,9 +32,6 @@ function createRandomNodeID(): ID {
 }
 
 function getReservedNodeID(text: string): ID | undefined {
-  if (text === "~versions") {
-    return VERSIONS_NODE_ID;
-  }
   if (text === "~Log") {
     return LOG_NODE_ID;
   }
@@ -134,9 +128,6 @@ export function shortID(id: ID): string {
 
 function getFallbackRelationText(head: LongID | ID): string {
   const localHead = shortID(head as ID) as ID;
-  if (localHead === VERSIONS_NODE_ID) {
-    return "~versions";
-  }
   if (localHead === LOG_NODE_ID) {
     return "~Log";
   }
@@ -550,7 +541,6 @@ export function ensureRelationNativeFields(
     ?.relations.get(shortID(relation.id));
   const localHead = shortID(relation.head as ID) as ID;
   const hasReservedHead =
-    localHead === VERSIONS_NODE_ID ||
     localHead === LOG_NODE_ID ||
     localHead === EMPTY_NODE_ID ||
     isSearchId(localHead);
@@ -725,86 +715,17 @@ function findNodeAppearances(
   }, List<RawAppearance>());
 }
 
-function resolveVersionsParent(
-  relation: Relations
-): { parentNodeID: ID; parentContext: Context } | undefined {
-  const ctx = relation.context;
-  if (relation.head === VERSIONS_NODE_ID && ctx.size > 0) {
-    return {
-      parentNodeID: ctx.last() as ID,
-      parentContext: ctx.butLast().toList() as Context,
-    };
-  }
-  if (ctx.last() === VERSIONS_NODE_ID && ctx.size >= 2) {
-    return {
-      parentNodeID: ctx.get(ctx.size - 2) as ID,
-      parentContext: ctx.slice(0, ctx.size - 2).toList() as Context,
-    };
-  }
-  return undefined;
-}
-
-function findAncestorRef(
-  knowledgeDB: KnowledgeData,
-  parentNodeID: ID,
-  parentContext: Context,
-  author: PublicKey,
-  updated: number
-): ReferencedByRef | undefined {
-  if (parentContext.size > 0) {
-    const grandparentHead = parentContext.last() as ID;
-    const grandparentContext = parentContext.butLast().toList() as Context;
-    const grandparentRelation = knowledgeDB.relations.find(
-      (r) =>
-        r.head === grandparentHead &&
-        r.context.equals(grandparentContext) &&
-        r.author === author
-    );
-    if (grandparentRelation) {
-      return {
-        relationID: grandparentRelation.id,
-        context: parentContext,
-        updated,
-        targetNode: parentNodeID,
-      };
-    }
-  } else {
-    const parentRelation = knowledgeDB.relations.find(
-      (r) =>
-        r.head === parentNodeID && r.context.size === 0 && r.author === author
-    );
-    if (parentRelation) {
-      return {
-        relationID: parentRelation.id,
-        context: List<ID>() as Context,
-        updated,
-      };
-    }
-  }
-  return undefined;
-}
-
 function resolveAppearance(
   app: RawAppearance,
   targetShortID: ID
 ): ReferencedByRef | undefined {
-  const { relation, knowledgeDB, isHead, matchedItemNodeID } = app;
+  const { relation, isHead, matchedItemNodeID } = app;
   if (isHead) {
     return {
       relationID: relation.id,
       context: relation.context,
       updated: relation.updated,
     };
-  }
-  const versions = resolveVersionsParent(relation);
-  if (versions) {
-    return findAncestorRef(
-      knowledgeDB,
-      versions.parentNodeID,
-      versions.parentContext,
-      relation.author,
-      relation.updated
-    );
   }
   return {
     relationID: relation.id,
@@ -929,63 +850,6 @@ function getRefContextKey(
   return getSemanticContextKey(knowledgeDBs, ref.context, contextAuthor);
 }
 
-function refHasActiveVersions(
-  knowledgeDBs: KnowledgeDBs,
-  ref: ReferencedByRef,
-  effectiveAuthor: PublicKey
-): boolean {
-  const relation = getRelationsNoReferencedBy(
-    knowledgeDBs,
-    ref.relationID,
-    effectiveAuthor
-  );
-  if (!relation) {
-    return false;
-  }
-
-  const targetNode = ref.targetNode || (relation.head as ID);
-  const baseContext = ref.targetNode
-    ? relation.context.push(relation.head as ID)
-    : relation.context;
-  const versionsContext = baseContext.push(targetNode);
-
-  return (
-    knowledgeDBs
-      .get(relation.author)
-      ?.relations.valueSeq()
-      .some(
-        (candidate) =>
-          candidate.head === VERSIONS_NODE_ID &&
-          candidate.root === relation.root &&
-          candidate.context.equals(versionsContext)
-      ) ?? false
-  );
-}
-
-function nodeHasActiveVersions(
-  knowledgeDBs: KnowledgeDBs,
-  nodeID: LongID | ID,
-  effectiveAuthor: PublicKey,
-  currentContext: Context,
-  currentRoot?: ID
-): boolean {
-  if (!currentRoot || isRefId(nodeID) || isSearchId(nodeID as ID)) {
-    return false;
-  }
-  const versionsContext = currentContext.push(shortID(nodeID as ID) as ID);
-  return (
-    knowledgeDBs
-      .get(effectiveAuthor)
-      ?.relations.valueSeq()
-      .some(
-        (candidate) =>
-          candidate.head === VERSIONS_NODE_ID &&
-          candidate.root === currentRoot &&
-          candidate.context.equals(versionsContext)
-      ) ?? false
-  );
-}
-
 export function getOccurrencesForNode(
   knowledgeDBs: KnowledgeDBs,
   nodeID: LongID | ID,
@@ -1004,13 +868,6 @@ export function getOccurrencesForNode(
     currentRoot
   );
   const contextRoot = currentContext.first();
-  const currentHasVersions = nodeHasActiveVersions(
-    knowledgeDBs,
-    nodeID,
-    effectiveAuthor,
-    currentContext,
-    currentRoot
-  );
   const outgoingCrefIDs = currentItems
     ? currentItems
         .map((item) => item.id)
@@ -1045,9 +902,6 @@ export function getOccurrencesForNode(
         : currentContext.size > 0 && ref.context.size === 0
     )
     .filter(
-      (ref) => !currentHasVersions || refHasActiveVersions(knowledgeDBs, ref, effectiveAuthor)
-    )
-    .filter(
       (ref) =>
         !covered.has(getRefContextKey(knowledgeDBs, ref, effectiveAuthor))
     );
@@ -1064,15 +918,8 @@ export function getOccurrencesForNode(
               author !== effectiveAuthor
                 ? 1
                 : 0;
-            const hasVersions = refHasActiveVersions(
-              knowledgeDBs,
-              ref,
-              effectiveAuthor
-            )
-              ? 0
-              : 1;
             const targetPreference = ref.targetNode ? 0 : 1;
-            return [isOther, hasVersions, targetPreference, -ref.updated];
+            return [isOther, targetPreference, -ref.updated];
           })
           .first()!
     )
@@ -1095,13 +942,6 @@ export function getIncomingCrefsForNode(
   currentRoot?: ID
 ): List<LongID> {
   const currentShortNodeID = shortID(currentNodeID);
-  const currentHasVersions = nodeHasActiveVersions(
-    knowledgeDBs,
-    currentNodeID,
-    effectiveAuthor,
-    currentContext,
-    currentRoot
-  );
   const outgoingTargetRelIDs = (currentItems || List<RelationItem>()).reduce(
     (acc, item) => {
       const parsed = parseConcreteRefId(item.id);
@@ -1158,13 +998,6 @@ export function getIncomingCrefsForNode(
         context: relation.context,
         updated: relation.updated,
       };
-      if (
-        currentHasVersions &&
-        !refHasActiveVersions(knowledgeDBs, ref, effectiveAuthor)
-      ) {
-        return rdx;
-      }
-
       return rdx.push(ref);
     }, acc);
   }, List<ReferencedByRef>());

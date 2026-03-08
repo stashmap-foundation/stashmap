@@ -18,11 +18,7 @@ import { createPublishQueue } from "./PublishQueue";
 import type { StashmapDB } from "./indexedDB";
 import { viewDataToJSON } from "./serializer";
 import { newDB } from "./knowledge";
-import {
-  buildDocumentEvent,
-  WalkContext,
-  createVersion,
-} from "./markdownDocument";
+import { buildDocumentEvent } from "./markdownDocument";
 import {
   shortID,
   newNode,
@@ -41,7 +37,6 @@ import {
   isSearchId,
   hashText,
   getTextForMatching,
-  VERSIONS_NODE_ID,
   ensureRelationNativeFields,
 } from "./connections";
 import {
@@ -53,14 +48,12 @@ import {
   updateView,
   getContext,
   getParentView,
-  getVersionedDisplayText,
   bulkUpdateViewPathsAfterAddRelation,
   copyViewsWithRelationsMapping,
   viewPathToString,
   getRelationForView,
   getAlternativeRelations,
   addNodeToPathWithRelations,
-  getRelationsForCurrentTree,
   getEffectiveAuthor,
   isRoot,
   getPaneIndex,
@@ -268,24 +261,25 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
 
 type AddToParentTarget = LongID | ID | KnowNode;
 
-export function planCreateVersion(
+export function planUpdateRelationText(
   plan: Plan,
-  editedNodeID: ID,
-  newText: string,
-  editContext: List<ID>,
-  root: ID
+  viewPath: ViewPath,
+  stack: ID[],
+  text: string
 ): Plan {
-  const ctx: WalkContext = {
-    knowledgeDBs: plan.knowledgeDBs,
-    publicKey: plan.user.publicKey,
-    affectedRoots: plan.affectedRoots,
-  };
-  const result = createVersion(ctx, editedNodeID, newText, editContext, root);
-  return {
-    ...plan,
-    knowledgeDBs: result.knowledgeDBs,
-    affectedRoots: result.affectedRoots,
-  };
+  const currentRelation = getRelationForView(plan, viewPath, stack);
+  if (!currentRelation || currentRelation.author !== plan.user.publicKey) {
+    return plan;
+  }
+  if (currentRelation.text === text) {
+    return plan;
+  }
+  return planUpsertRelations(plan, {
+    ...currentRelation,
+    text,
+    textHash: hashText(text),
+    updated: Date.now(),
+  });
 }
 
 function removeEmptyNodeFromKnowledgeDBs(
@@ -576,30 +570,6 @@ export function planAddToParent(
           accPlan,
           [...accItems, { relationItemID: objectID, actualNodeID: objectID }],
         ];
-      }
-
-      if (localID === VERSIONS_NODE_ID) {
-        const existingVersionsRelation = getRelationsForCurrentTree(
-          accPlan.knowledgeDBs,
-          accPlan.user.publicKey,
-          VERSIONS_NODE_ID,
-          childContext,
-          undefined,
-          false,
-          parentRelation.root
-        );
-        if (existingVersionsRelation) {
-          return [
-            accPlan,
-            [
-              ...accItems,
-              {
-                relationItemID: existingVersionsRelation.id,
-                actualNodeID: existingVersionsRelation.head as ID,
-              },
-            ],
-          ];
-        }
       }
 
       const existingRelation = getRelationsNoReferencedBy(
@@ -1147,14 +1117,7 @@ export function planDeepCopyNodeWithView(
 }
 
 /**
- * Create a new node and add it to the plan, handling version awareness.
- * If the node (by content-addressed ID) already has ~versions in this context,
- * ensures the typed text becomes the active version.
- *
- * @param plan - The current plan
- * @param text - The text for the new node
- * @param context - The context where the node will be added (should include parent's ID)
- * @returns [updatedPlan, newNode] - The updated plan and the created node
+ * Create a new node value for insertion into the current relation tree.
  */
 export function planCreateNode(plan: Plan, text: string): [Plan, KnowNode] {
   const node = newNode(text);
@@ -1208,7 +1171,9 @@ function planCreateNoteAtRoot(
 
   const paneIndex = getPaneIndex(viewPath);
   const newPanes = planWithRelation.panes.map((p, i) =>
-    i === paneIndex ? { ...p, stack: [createdNode.id] } : p
+    i === paneIndex
+      ? { ...p, stack: [createdNode.id], rootRelation: createdRelation.id }
+      : p
   );
 
   const resultPlan = planUpdatePanes(planWithRelation, newPanes);
@@ -1232,9 +1197,6 @@ export function planSaveNodeAndEnsureRelations(
   const trimmedText = text.trim();
   const [nodeID] = getNodeIDFromView(plan, viewPath);
   const currentRelation = getRelationForView(plan, viewPath, stack);
-  const versionNodeID = currentRelation
-    ? (shortID(currentRelation.head as ID) as ID)
-    : (nodeID as ID);
   const parentPath = getParentView(viewPath);
 
   if (isEmptyNodeID(nodeID)) {
@@ -1281,25 +1243,16 @@ export function planSaveNodeAndEnsureRelations(
     return { plan, viewPath };
   }
 
-  const context = getContext(plan, viewPath, stack);
-  const treeRoot = currentRelation?.root;
   const displayText =
-    getVersionedDisplayText(
-      plan.knowledgeDBs,
-      plan.user.publicKey,
-      versionNodeID,
-      context,
-      treeRoot
-    ) ??
     currentRelation?.text ??
-    getTextForMatching(plan.knowledgeDBs, versionNodeID, plan.user.publicKey) ??
+    getTextForMatching(plan.knowledgeDBs, nodeID as ID, plan.user.publicKey) ??
     "";
 
   if (trimmedText === displayText) return { plan, viewPath };
 
   return {
-    plan: treeRoot
-      ? planCreateVersion(plan, versionNodeID, trimmedText, context, treeRoot)
+    plan: currentRelation
+      ? planUpdateRelationText(plan, viewPath, stack, trimmedText)
       : plan,
     viewPath,
   };
@@ -1489,11 +1442,7 @@ export function buildDocumentEvents(
     const isStandaloneRootRelation =
       !!rootRelation && rootRelation.root === shortID(rootRelation.id);
 
-    if (
-      !rootRelation ||
-      !isStandaloneRootRelation ||
-      rootRelation.head === VERSIONS_NODE_ID
-    ) {
+    if (!rootRelation || !isStandaloneRootRelation) {
       const deleteEvent = {
         kind: KIND_DELETE,
         pubkey: author,

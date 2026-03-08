@@ -6,7 +6,6 @@ import {
   addRelationsToLastElement,
   getSuggestionsForNode,
   getVersionsForRelation,
-  getVersionsRelations,
   getNodeIDFromView,
   getContext,
   getRelationForView,
@@ -24,7 +23,6 @@ import {
   itemPassesFilters,
   getOccurrencesForNode,
   getIncomingCrefsForNode,
-  VERSIONS_NODE_ID,
   getRelationItemNodeID,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
@@ -86,10 +84,10 @@ function getChildrenForRegularNode(
   const context = getContext(data, parentPath, stack);
   const currentRoot = getParentRelation(data, parentPath)?.root;
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
-
-  const relations = isSearchId(parentNodeID as ID)
+  const directRelations = isSearchId(parentNodeID as ID)
     ? getRelations(data.knowledgeDBs, parentNodeID as ID, data.user.publicKey)
     : getRelationForView(data, parentPath, stack);
+  const relations = directRelations;
   const relationNodeID = relations
     ? ((shortID(relations.head as ID) as ID) as LongID | ID)
     : parentNodeID;
@@ -108,43 +106,6 @@ function getChildrenForRegularNode(
     : List<ViewPath>();
 
   if (options?.isMarkdownExport) {
-    const hasVersionsChild = relations?.items.some(
-      (item) =>
-        getRelationItemNodeID(data.knowledgeDBs, item, relations.author) ===
-        (VERSIONS_NODE_ID as LongID | ID)
-    );
-    const versionsRel = !hasVersionsChild
-      ? getVersionsRelations(
-          data.knowledgeDBs,
-          author,
-          (shortID(relations?.head || (parentNodeID as ID)) as ID),
-          context,
-          relations?.root ?? currentRoot
-        )
-      : undefined;
-    if (versionsRel) {
-      const relationId = relations?.id || ("" as LongID);
-      const pathWithRelations = addRelationsToLastElement(
-        parentPath,
-        relationId
-      );
-      const versionsPath = [
-        ...pathWithRelations,
-        VERSIONS_NODE_ID as LongID | ID,
-      ] as ViewPath;
-      return {
-        paths: relationPaths.push(versionsPath),
-        virtualItems: Map<string, RelationItem>().set(
-          viewPathToString(versionsPath),
-          {
-            id: VERSIONS_NODE_ID as LongID | ID,
-            relevance: undefined as Relevance,
-            virtualType: "version" as VirtualType,
-          }
-        ),
-        firstVirtualKeys: EMPTY_FIRST_VIRTUAL_KEYS,
-      };
-    }
     return {
       paths: relationPaths,
       virtualItems: EMPTY_VIRTUAL_ITEMS,

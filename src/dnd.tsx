@@ -9,7 +9,6 @@ import {
   isRefId,
   isSearchId,
   shortID,
-  VERSIONS_NODE_ID,
 } from "./connections";
 import {
   parseViewPath,
@@ -212,8 +211,7 @@ export function getDropDestinationFromTreeView(
 /**
  * Disconnect a node from its current parent.
  * Also cleans up orphaned descendant relations, unless the node is a
- * reference (refs don't own descendants) or ~versions (version history
- * should survive temporary removal).
+ * reference (refs don't own descendants).
  */
 export function planDisconnectFromParent(
   plan: Plan,
@@ -258,10 +256,7 @@ export function planDisconnectFromParent(
 
   const planWithViews = planUpdateViews(updatedRelationsPlan, updatedViews);
 
-  const skipCleanup =
-    preserveDescendants ||
-    isRefId(nodeID) ||
-    shortID(nodeID) === VERSIONS_NODE_ID;
+  const skipCleanup = preserveDescendants || isRefId(nodeID);
   if (skipCleanup) {
     return resetInvalidPanes(planWithViews);
   }

@@ -88,36 +88,6 @@ Notes
     `);
   });
 
-  test("Edited node with ~versions shows only one incoming reference (deduplication)", async () => {
-    const [alice] = setup([ALICE]);
-    renderTree(alice);
-
-    await type(
-      "Notes{Enter}Test A{Enter}{Tab}~versions{Enter}{Tab}Test B{Escape}"
-    );
-    await userEvent.click(await screen.findByLabelText("Create new note"));
-    await type("Other{Enter}{Tab}Test B{Enter}{Tab}Child{Escape}");
-
-    await expectTree(`
-Other
-  Test B
-    Child
-    [C] Notes / Test B
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText(/open Notes \/ Test B in fullscreen/)
-    );
-
-    await expectTree(`
-Notes
-  Test B
-    ~versions
-      Test B
-      Test A
-    `);
-  });
-
   test("Concrete reference paths never show Loading text", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);

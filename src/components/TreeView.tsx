@@ -31,7 +31,6 @@ import {
   createBaseFilter,
   filtersToFilterArray,
   useQueryKnowledgeData,
-  LoadMissingVersionNodes,
 } from "../dataQuery";
 import { RegisterQuery } from "../LoadingStatus";
 import {
@@ -291,14 +290,12 @@ export function TreeViewNodeLoader({
   const { allEventsProcessed } = useQueryKnowledgeData(finalFilter);
 
   return (
-    <LoadMissingVersionNodes nodes={nodes}>
-      <RegisterQuery
-        nodesBeeingQueried={nodeIDs.map((longID) => shortID(longID)).toArray()}
-        allEventsProcessed={allEventsProcessed}
-      >
-        {children}
-      </RegisterQuery>
-    </LoadMissingVersionNodes>
+    <RegisterQuery
+      nodesBeeingQueried={nodeIDs.map((longID) => shortID(longID)).toArray()}
+      allEventsProcessed={allEventsProcessed}
+    >
+      {children}
+    </RegisterQuery>
   );
 }
 

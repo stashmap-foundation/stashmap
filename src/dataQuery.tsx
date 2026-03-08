@@ -7,20 +7,16 @@ import {
   isConcreteRefId,
   parseConcreteRefId,
   getRelationsNoReferencedBy,
-  VERSIONS_NODE_ID,
   getTextHashForMatching,
-  getRelationItemNodeID,
-  getRelationItemRelation,
 } from "./connections";
 import { parseRef } from "./buildReferenceNode";
 import { REFERENCED_BY } from "./constants";
 import {
   getNodeIDFromView,
   useNodeID,
-  getVersionsRelations,
   getContext,
   getEffectiveAuthor,
-  getRelationForView,
+  getRootForView,
   useViewPath,
   ViewPath,
 } from "./ViewContext";
@@ -156,14 +152,7 @@ export function addNodeToFilters(
     return baseFilters;
   }
 
-  return {
-    ...baseFilters,
-    documentByNode: addIDToFilter(
-      addIDToFilter(baseFilters.documentByNode, id, "#n"),
-      VERSIONS_NODE_ID,
-      "#n"
-    ),
-  };
+  return baseFilters;
 }
 
 export function addReferencedByToFilters(
@@ -388,75 +377,5 @@ export function LoadRelationData({
     : withRelation;
   const filterArray = filtersToFilterArray(filter);
   useQueryKnowledgeData(filterArray);
-  return <>{children}</>;
-}
-
-export function LoadMissingVersionNodes({
-  children,
-  nodes,
-}: {
-  children: React.ReactNode;
-  nodes?: List<ViewPath>;
-}): JSX.Element {
-  const data = useData();
-  const [contextNodeID] = useNodeID();
-  const contextViewPath = useViewPath();
-  const stack = usePaneStack();
-
-  const viewPaths = nodes ?? List([contextViewPath]);
-
-  const missingVersionNodeIDs: ID[] = viewPaths.reduce<ID[]>(
-    (acc, viewPath) => {
-      const [nodeID] = nodes
-        ? getNodeIDFromView(data, viewPath)
-        : [contextNodeID];
-      const context = getContext(data, viewPath, stack);
-      const effectiveAuthor = getEffectiveAuthor(data, viewPath);
-
-      const ref = isConcreteRefId(nodeID)
-        ? parseRef(nodeID as LongID, data.knowledgeDBs, data.user.publicKey)
-        : undefined;
-
-      const author = ref?.relation.author ?? effectiveAuthor;
-      const targetNodeID = ref
-        ? ref.targetNode || (ref.relation.head as ID)
-        : (nodeID as ID);
-      const refContext = ref?.targetNode
-        ? ref.relationContext.push(ref.relation.head as ID)
-        : ref?.relationContext;
-      const targetContext = refContext ?? context;
-      const targetRoot =
-        ref?.relation.root || getRelationForView(data, viewPath, stack)?.root;
-
-      const versionsRel = getVersionsRelations(
-        data.knowledgeDBs,
-        author,
-        targetNodeID,
-        targetContext,
-        targetRoot
-      );
-      if (!versionsRel) return acc;
-
-      const firstVersionItem = versionsRel.items.first();
-      const firstVersionID = firstVersionItem
-        ? getRelationItemNodeID(data.knowledgeDBs, firstVersionItem, author)
-        : undefined;
-      if (!firstVersionID) return acc;
-
-      const firstVersionRelation = firstVersionItem
-        ? getRelationItemRelation(data.knowledgeDBs, firstVersionItem, author)
-        : undefined;
-      if (!firstVersionRelation && !acc.includes(firstVersionID)) {
-        return [...acc, firstVersionID];
-      }
-      return acc;
-    },
-    []
-  );
-
-  if (missingVersionNodeIDs.length > 0) {
-    return <LoadData nodeIDs={missingVersionNodeIDs}>{children}</LoadData>;
-  }
-
   return <>{children}</>;
 }

@@ -4,6 +4,7 @@ import {
   updateItemArgument,
   isEmptyNodeID,
   shortID,
+  getTextForMatching,
 } from "../connections";
 import {
   ViewPath,
@@ -75,10 +76,7 @@ function getEditorTextForPath(
 }
 
 function getNodeText(plan: Plan, nodeID: ID | LongID): string {
-  const userDB = plan.knowledgeDBs.get(plan.user.publicKey);
-  if (!userDB) return "";
-  const node = userDB.nodes.get(nodeID as ID);
-  return node?.text ?? "";
+  return getTextForMatching(plan.knowledgeDBs, nodeID, plan.user.publicKey) ?? "";
 }
 
 function planUpdateOneRelevance(

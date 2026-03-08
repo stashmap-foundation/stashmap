@@ -2,6 +2,7 @@ import { List, Map } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
 import {
   findTag,
+  getEventMs,
   getMostRecentReplacableEvent,
   sortEvents,
 } from "./commons/useNostrQuery";
@@ -131,14 +132,31 @@ export function findDocumentNodesAndRelations(events: List<UnsignedEvent>): {
         event.kind === KIND_DELETE &&
         findTag(event, "k") === `${KIND_KNOWLEDGE_DOCUMENT}`
     )
-    .map((event) => findTag(event, "a"))
-    .filter((a): a is string => !!a)
-    .toSet();
+    .reduce((acc, event) => {
+      const key = findTag(event, "a");
+      if (!key) {
+        return acc;
+      }
+      const deletedAt = getEventMs(event);
+      const existing = acc.get(key);
+      if (!existing || deletedAt > existing) {
+        return acc.set(key, deletedAt);
+      }
+      return acc;
+    }, Map<string, number>());
   const docEvents = sortEvents(
     events.filter(
-      (event) =>
-        event.kind === KIND_KNOWLEDGE_DOCUMENT &&
-        !deletedKeys.has(getReplaceableKey(event) ?? "")
+      (event) => {
+        if (event.kind !== KIND_KNOWLEDGE_DOCUMENT) {
+          return false;
+        }
+        const replaceableKey = getReplaceableKey(event);
+        if (!replaceableKey) {
+          return false;
+        }
+        const deletedAt = deletedKeys.get(replaceableKey);
+        return deletedAt === undefined || getEventMs(event) > deletedAt;
+      }
     )
   );
   const allNodes = docEvents.reduce(
@@ -151,9 +169,16 @@ export function findDocumentNodesAndRelations(events: List<UnsignedEvent>): {
     .valueSeq()
     .filter((event): event is UnsignedEvent => event !== undefined)
     .toList();
-  const relations = deduped.reduce(
-    (acc, event) => acc.merge(parseDocumentEvent(event).relations),
-    Map<string, Relations>()
-  );
+  const parsedRelations = sortEvents(deduped)
+    .flatMap((event) => parseDocumentEvent(event).relations.valueSeq())
+    .toList();
+  const relations = parsedRelations.reduce((acc, relation) => {
+    const id = splitID(relation.id)[1];
+    const existing = acc.get(id);
+    if (!existing || relation.updated >= existing.updated) {
+      return acc.set(id, relation);
+    }
+    return acc;
+  }, Map<string, Relations>());
   return { nodes: allNodes, relations };
 }

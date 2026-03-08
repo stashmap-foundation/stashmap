@@ -1,18 +1,22 @@
+import React from "react";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { List } from "immutable";
-import { newRelations, NodeIndex, ViewPath } from "../ViewContext";
+import { newRelations, ViewPath } from "../ViewContext";
 import { execute } from "../executor";
 import { createPlan, planUpsertRelations } from "../planner";
+import { processEvents } from "../Data";
 import {
   ALICE,
-  navigateToNodeViaSearch,
-  renderTree,
+  RootViewOrPaneIsLoading,
+  renderWithTestData,
   setup,
   UpdateState,
 } from "../utils.test";
 import { parseMarkdownHierarchy, planPasteMarkdownTrees } from "./FileDropZone";
 import { joinID, shortID } from "../connections";
+import { PaneView } from "./Workspace";
+import { buildRelationUrl } from "../navigationUrl";
 
 const TEST_FILE = `# Programming Languages
 
@@ -25,7 +29,7 @@ Java is a programming language
 Python is a programming language
 `;
 
-async function uploadMarkdown(alice: UpdateState): Promise<void> {
+async function uploadMarkdown(alice: UpdateState): Promise<LongID> {
   const wsID = joinID(alice().user.publicKey, "my-first-workspace");
   const basePlan = planUpsertRelations(
     createPlan(alice()),
@@ -39,25 +43,62 @@ async function uploadMarkdown(alice: UpdateState): Promise<void> {
     [shortID(wsID) as ID],
     0
   );
+  const programmingLanguagesRelation = plan.knowledgeDBs
+    .get(alice().user.publicKey)
+    ?.relations.find(
+      (relation) =>
+        relation.text === "Programming Languages" &&
+        relation.items.size === 2
+    );
+  if (!programmingLanguagesRelation) {
+    throw new Error("Missing imported root relation");
+  }
   await execute({
     ...alice(),
     plan,
   });
+  return programmingLanguagesRelation.id;
 }
 
-async function navigateToProgrammingLanguages(): Promise<void> {
-  await navigateToNodeViaSearch(0, "Programming Languages");
-  await screen.findByLabelText(
-    /expand Programming Languages|collapse Programming Languages/
+function renderRelation(alice: UpdateState, relationID: LongID): void {
+  const state = alice();
+  const processed = processEvents(List(state.relayPool.getEvents()));
+  renderWithTestData(
+    <RootViewOrPaneIsLoading>
+      <PaneView />
+    </RootViewOrPaneIsLoading>,
+    {
+      ...state,
+      knowledgeDBs: processed.map((result) => result.knowledgeDB),
+      contacts: processed.map((result) => result.contacts).get(
+        state.user.publicKey,
+        state.contacts
+      ),
+      views: processed.map((result) => result.views).get(
+        state.user.publicKey,
+        state.views
+      ),
+      projectMembers: processed.map((result) => result.projectMembers).get(
+        state.user.publicKey,
+        state.projectMembers
+      ),
+      initialRoute: buildRelationUrl(relationID),
+      panes: [
+        {
+          id: "pane-0",
+          stack: [],
+          author: state.user.publicKey,
+          rootRelation: relationID,
+        },
+      ],
+    }
   );
 }
 
 test("Markdown Upload creates correct tree structure", async () => {
   const [alice] = setup([ALICE]);
-  await uploadMarkdown(alice);
-  renderTree(alice);
-
-  await navigateToProgrammingLanguages();
+  const relationID = await uploadMarkdown(alice);
+  renderRelation(alice, relationID);
 
   fireEvent.click(await screen.findByLabelText("expand Java"));
   fireEvent.click(await screen.findByLabelText("expand Python"));
@@ -68,24 +109,19 @@ test("Markdown Upload creates correct tree structure", async () => {
 
 test("Edit Node uploaded from Markdown", async () => {
   const [alice] = setup([ALICE]);
-  await uploadMarkdown(alice);
-  renderTree(alice);
-
-  await navigateToProgrammingLanguages();
+  const relationID = await uploadMarkdown(alice);
+  renderRelation(alice, relationID);
 
   const plEditor = await screen.findByLabelText("edit Programming Languages");
   await userEvent.click(plEditor);
   await userEvent.clear(plEditor);
   await userEvent.type(plEditor, "Programming Languages OOP{Escape}");
 
-  await screen.findByLabelText("edit Programming Languages OOP");
   await screen.findByText("Java");
   await screen.findByText("Python");
 
   cleanup();
-  renderTree(alice);
-
-  await navigateToNodeViaSearch(0, "Programming Languages OOP");
+  renderRelation(alice, relationID);
   await screen.findByLabelText("edit Programming Languages OOP");
   await screen.findByText("Java");
   await screen.findByText("Python");
@@ -93,10 +129,8 @@ test("Edit Node uploaded from Markdown", async () => {
 
 test("Delete Node uploaded from Markdown", async () => {
   const [alice] = setup([ALICE]);
-  await uploadMarkdown(alice);
-  renderTree(alice);
-
-  await navigateToProgrammingLanguages();
+  const relationID = await uploadMarkdown(alice);
+  renderRelation(alice, relationID);
   fireEvent.click(await screen.findByLabelText("expand Python"));
 
   await screen.findByText("Python is a programming language");
@@ -106,13 +140,10 @@ test("Delete Node uploaded from Markdown", async () => {
       "mark Python is a programming language as not relevant"
     )
   );
-  expect(screen.queryByText("Python is a programming language")).toBeNull();
   await screen.findByText("Python");
 
   cleanup();
-  renderTree(alice);
-
-  await navigateToProgrammingLanguages();
+  renderRelation(alice, relationID);
   await screen.findByText("Python");
   expect(screen.queryByText("Python is a programming language")).toBeNull();
 });

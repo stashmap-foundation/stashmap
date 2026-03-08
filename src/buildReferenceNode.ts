@@ -6,13 +6,13 @@ import {
   shortID,
   splitID,
   itemPassesFilters,
-  getNodeTextHash,
+  getTextHashForMatching,
+  getTextForMatching,
   getRelationItemNodeID,
   getRelationItemRelation,
 } from "./connections";
 import {
   getVersionedDisplayText,
-  getNodeFromID,
   ViewPath,
   getParentView,
   getLast,
@@ -40,8 +40,7 @@ function resolveNodeLabel(
   if (versionedText) {
     return versionedText;
   }
-  const node = getNodeFromID(knowledgeDBs, nodeId, myself);
-  return node?.text || "Loading...";
+  return getTextForMatching(knowledgeDBs, nodeId, myself) || "Loading...";
 }
 
 function resolveContextLabels(
@@ -167,11 +166,7 @@ function getSemanticNodeKey(
   nodeID: LongID | ID,
   author: PublicKey
 ): string {
-  return (
-    getNodeTextHash(
-      getNodeFromID(knowledgeDBs, shortID(nodeID) as ID, author)
-    ) || shortID(nodeID as ID)
-  );
+  return getTextHashForMatching(knowledgeDBs, nodeID, author) || shortID(nodeID as ID);
 }
 
 function relationsMatchForVersion(

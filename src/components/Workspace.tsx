@@ -8,7 +8,6 @@ import {
 import {
   getEffectiveAuthor,
   getNodeFromView,
-  getNodeFromID,
   getNodeIDFromView,
   getRelationForView,
   getVersionedDisplayText,
@@ -58,6 +57,7 @@ import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import {
   LOG_NODE_ID,
   VERSIONS_NODE_ID,
+  getTextForMatching,
   isSearchId,
   shortID,
 } from "../connections";
@@ -84,19 +84,20 @@ import { planDeleteNodeFromView } from "../dnd";
 
 function BreadcrumbItem({
   nodeID,
+  author,
   href,
   onClick,
   isLast,
 }: {
   nodeID: LongID | ID;
+  author: PublicKey;
   href: string;
   onClick: (e: React.MouseEvent) => void;
   isLast: boolean;
 }): JSX.Element {
-  const { knowledgeDBs, user } = useData();
-  const node = getNodeFromID(knowledgeDBs, nodeID as string, user.publicKey);
+  const { knowledgeDBs } = useData();
   const label =
-    node?.text ||
+    getTextForMatching(knowledgeDBs, nodeID, author) ||
     (shortID(nodeID) === VERSIONS_NODE_ID ? "~versions" : "Loading...");
 
   if (isLast) {
@@ -116,6 +117,24 @@ function BreadcrumbItem({
       <span className="breadcrumb-separator">/</span>
     </>
   );
+}
+
+function getOwnLogRelation(
+  knowledgeDBs: KnowledgeDBs,
+  author: PublicKey
+): Relations | undefined {
+  return knowledgeDBs
+    .get(author)
+    ?.relations.valueSeq()
+    .filter(
+      (relation) =>
+        relation.author === author &&
+        relation.head === LOG_NODE_ID &&
+        relation.context.size === 0 &&
+        relation.root === shortID(relation.id)
+    )
+    .sortBy((relation) => -relation.updated)
+    .first();
 }
 
 function Breadcrumbs(): JSX.Element {
@@ -140,6 +159,7 @@ function Breadcrumbs(): JSX.Element {
             <BreadcrumbItem
               key={nodeID as string}
               nodeID={nodeID}
+              author={pane.author}
               href={targetUrl}
               onClick={(e) => {
                 e.preventDefault();
@@ -183,13 +203,14 @@ function ForkButton(): JSX.Element | null {
 function HomeButton(): JSX.Element | null {
   const { knowledgeDBs, user } = useData();
   const navigatePane = useNavigatePane();
-
-  const logNode = getNodeFromID(knowledgeDBs, LOG_NODE_ID, user.publicKey);
-  if (!logNode) {
+  const logRelation = getOwnLogRelation(knowledgeDBs, user.publicKey);
+  if (!logRelation) {
     return null;
   }
-
-  const href = buildNodeUrl([LOG_NODE_ID], knowledgeDBs, user.publicKey) || "#";
+  const href = buildNodeUrl([LOG_NODE_ID], knowledgeDBs, user.publicKey);
+  if (!href) {
+    return null;
+  }
 
   return (
     <a
@@ -234,17 +255,16 @@ function useHomeShortcut(): void {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       if ((e.metaKey || e.ctrlKey) && e.key === "h") {
-        const logNode = getNodeFromID(
-          knowledgeDBs,
-          LOG_NODE_ID,
-          user.publicKey
-        );
-        if (logNode) {
-          e.preventDefault();
-          const href =
-            buildNodeUrl([LOG_NODE_ID], knowledgeDBs, user.publicKey) || "/";
-          navigatePane(href);
+        const logRelation = getOwnLogRelation(knowledgeDBs, user.publicKey);
+        if (!logRelation) {
+          return;
         }
+        const href = buildNodeUrl([LOG_NODE_ID], knowledgeDBs, user.publicKey);
+        if (!href) {
+          return;
+        }
+        e.preventDefault();
+        navigatePane(href);
       }
     };
 
@@ -311,7 +331,8 @@ function PaneHeader(): JSX.Element {
 }
 
 function CurrentNodeName(): JSX.Element {
-  const { knowledgeDBs, user } = useData();
+  const { knowledgeDBs } = useData();
+  const pane = useCurrentPane();
   const stack = usePaneStack();
   const currentNodeID = stack[stack.length - 1];
 
@@ -319,12 +340,9 @@ function CurrentNodeName(): JSX.Element {
     return <span>New Note</span>;
   }
 
-  const node = getNodeFromID(
-    knowledgeDBs,
-    currentNodeID as string,
-    user.publicKey
-  );
-  const displayName = node?.text || "...";
+  const displayName =
+    getTextForMatching(knowledgeDBs, currentNodeID as string, pane.author) ||
+    "...";
   const truncated =
     displayName.length > 20 ? `${displayName.slice(0, 20)}…` : displayName;
 
@@ -608,6 +626,9 @@ function getDisplayTextForViewKey(
 ): string {
   const viewPath = parseViewPath(viewKey);
   const [node] = getNodeFromView(data, viewPath);
+  if (node?.type === "reference" || (node && isSearchId(node.id as ID))) {
+    return node.text;
+  }
   const [nodeID] = getNodeIDFromView(data, viewPath);
   const context = getContext(data, viewPath, stack);
   const effectiveAuthor = getEffectiveAuthor(data, viewPath);

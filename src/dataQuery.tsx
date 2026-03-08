@@ -8,13 +8,13 @@ import {
   parseConcreteRefId,
   getRelationsNoReferencedBy,
   VERSIONS_NODE_ID,
-  getNodeTextHash,
+  getTextHashForMatching,
   getRelationItemNodeID,
+  getRelationItemRelation,
 } from "./connections";
 import { parseRef } from "./buildReferenceNode";
 import { REFERENCED_BY } from "./constants";
 import {
-  getNodeFromID,
   getNodeIDFromView,
   useNodeID,
   getVersionsRelations,
@@ -57,7 +57,7 @@ function getDocumentNodeQueryIDs(
   id: LongID | ID
 ): Array<LongID | ID> {
   const queryIDs: Array<LongID | ID> = [id];
-  const textHash = getNodeTextHash(getNodeFromID(knowledgeDBs, id, myself));
+  const textHash = getTextHashForMatching(knowledgeDBs, id, myself);
   if (textHash && !queryIDs.includes(textHash)) {
     queryIDs.push(textHash);
   }
@@ -443,12 +443,10 @@ export function LoadMissingVersionNodes({
         : undefined;
       if (!firstVersionID) return acc;
 
-      const firstVersionNode = getNodeFromID(
-        data.knowledgeDBs,
-        firstVersionID,
-        author
-      );
-      if (!firstVersionNode && !acc.includes(firstVersionID)) {
+      const firstVersionRelation = firstVersionItem
+        ? getRelationItemRelation(data.knowledgeDBs, firstVersionItem, author)
+        : undefined;
+      if (!firstVersionRelation && !acc.includes(firstVersionID)) {
         return [...acc, firstVersionID];
       }
       return acc;

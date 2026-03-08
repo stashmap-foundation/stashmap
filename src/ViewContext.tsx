@@ -20,7 +20,9 @@ import {
   createConcreteRefId,
   parseConcreteRefId,
   findRefsToNode,
-  getNodeTextHash,
+  getTextForMatching,
+  getTextHashForMatching,
+  getTextNodeForID,
   itemPassesFilters,
   getRelationItemNodeID,
   getRelationItemRelation,
@@ -35,9 +37,6 @@ import { Plan, planUpsertRelations, getPane } from "./planner";
 import { usePaneStack } from "./SplitPanesContext";
 import { DEFAULT_TYPE_FILTERS, suggestionSettings } from "./constants";
 
-// only exported for tests
-export type NodeIndex = number & { readonly "": unique symbol };
-
 export function contextsMatch(a: Context, b: Context): boolean {
   return a.equals(b);
 }
@@ -47,11 +46,7 @@ function getSemanticNodeKey(
   nodeID: LongID | ID,
   author: PublicKey
 ): string {
-  return (
-    getNodeTextHash(
-      getNodeFromID(knowledgeDBs, shortID(nodeID) as ID, author)
-    ) || shortID(nodeID)
-  );
+  return getTextHashForMatching(knowledgeDBs, nodeID, author) || shortID(nodeID);
 }
 
 function nodesSemanticallyMatch(
@@ -116,17 +111,6 @@ function getComparableSuggestionKey(
     parsed.targetNode || (relation.head as ID),
     relation.author
   );
-}
-
-function debugVersions(
-  message: string,
-  payload: Record<string, unknown>
-): void {
-  if (process.env.DEBUG_VERSIONS !== "1") {
-    return;
-  }
-  // eslint-disable-next-line no-console
-  console.log(`[versions] ${message} ${JSON.stringify(payload)}`);
 }
 
 /**
@@ -275,6 +259,13 @@ export function getSuggestionsForNode(
 
   const reduced = cappedCandidates.reduce(
     (acc, [, candidateID]) => {
+      if (isConcreteRefId(candidateID as LongID)) {
+        return {
+          ...acc,
+          suggestions: acc.suggestions.push(candidateID as LongID),
+          crefSuggestionIDs: acc.crefSuggestionIDs.add(candidateID),
+        };
+      }
       const refs = findRefsToNode(
         knowledgeDBs,
         candidateID,
@@ -291,6 +282,25 @@ export function getSuggestionsForNode(
           ...acc,
           suggestions: acc.suggestions.push(
             createConcreteRefId(first.relationID)
+          ),
+        };
+      }
+      const expandableRelation = getAlternativeRelations(
+        knowledgeDBs,
+        candidateID,
+        itemContext,
+        undefined,
+        currentRelation?.author || myself,
+        currentRelation?.root
+      )
+        .filter((relation) => relation.author !== myself && relation.items.size > 0)
+        .sortBy((relation) => -relation.updated)
+        .first();
+      if (expandableRelation) {
+        return {
+          ...acc,
+          suggestions: acc.suggestions.push(
+            createConcreteRefId(expandableRelation.id)
           ),
         };
       }
@@ -448,21 +458,6 @@ export function getVersionsForRelation(
     currentRelation?.author,
     currentRelation?.root
   );
-  debugVersions("start", {
-    nodeID: shortID(nodeID),
-    context: contextToMatch.toArray(),
-    currentRelationID: currentRelation?.id,
-    currentItemCount: currentRelation?.items.size,
-    alternatives: alternatives
-      .map((r) => ({
-        id: r.id,
-        context: r.context.toArray(),
-        itemCount: r.items.size,
-        author: r.author,
-        root: r.root,
-      }))
-      .toArray(),
-  });
 
   const existingCrefIDs = currentRelation.items
     .map((item) => item.id)
@@ -488,11 +483,6 @@ export function getVersionsForRelation(
         ? currentExactItemIDs
         : currentSemanticItemIDs;
       if (existingCrefIDs.has(createConcreteRefId(r.id))) {
-        debugVersions("filtered-existing-cref", {
-          nodeID: shortID(nodeID),
-          candidateRelationID: r.id,
-          currentRelationID: currentRelation?.id,
-        });
         return false;
       }
       const { addCount, removeCount } = computeComparableRelationDiff(
@@ -503,10 +493,6 @@ export function getVersionsForRelation(
         useExactMatch
       );
       if (addCount === 0 && removeCount === 0) {
-        debugVersions("filtered-no-diff", {
-          nodeID: shortID(nodeID),
-          candidateRelationID: r.id,
-        });
         return false;
       }
       const coveredIDs = coveredSuggestionIDs || ImmutableSet<string>();
@@ -529,20 +515,6 @@ export function getVersionsForRelation(
       const hasUncoveredAdds = addIDs.some((id) => !coveredIDs.has(id));
       const keep =
         hasUncoveredAdds || removeCount > suggestionSettings.maxSuggestions;
-      debugVersions("candidate", {
-        nodeID: shortID(nodeID),
-        context: contextToMatch.toArray(),
-        currentRelationID: currentRelation?.id,
-        candidateRelationID: r.id,
-        useExactMatch,
-        addCount,
-        removeCount,
-        addIDs: addIDs.toArray(),
-        coveredIDs: coveredIDs.toArray(),
-        hasUncoveredAdds,
-        threshold: suggestionSettings.maxSuggestions,
-        keep,
-      });
       return keep;
     })
     .sortBy((r) => -r.updated)
@@ -699,7 +671,7 @@ function relationHeadMatchesNode(
   if (head === localID) {
     return true;
   }
-  return getNodeTextHash(getNodeFromID(knowledgeDBs, head, author)) === localID;
+  return getTextHashForMatching(knowledgeDBs, head, author) === localID;
 }
 
 function getNewestStandaloneRelationFromAuthor(
@@ -1022,23 +994,6 @@ export function getDescendantRelations(
   );
 }
 
-function getNodeFromAnyDB(
-  knowledgeDBs: KnowledgeDBs,
-  id: string
-): KnowNode | undefined {
-  const directMatch = knowledgeDBs
-    .map((db) => db.nodes.get(id))
-    .filter((node) => node !== undefined)
-    .first(undefined);
-  if (directMatch) {
-    return directMatch;
-  }
-  return knowledgeDBs
-    .valueSeq()
-    .flatMap((db) => db.nodes.valueSeq())
-    .find((node) => getNodeTextHash(node) === id);
-}
-
 export function getNodeFromID(
   knowledgeDBs: KnowledgeDBs,
   id: ID | LongID,
@@ -1050,26 +1005,15 @@ export function getNodeFromID(
 
   // Handle search IDs - build virtual node from ID
   if (isSearchId(id as ID)) {
-    const query = parseSearchId(id as ID);
+    const query = parseSearchId(id as ID) || "";
     return {
       id: id as ID,
       text: `Search: ${query}`,
+      textHash: hashText(query),
       type: "text",
     };
   }
-
-  const [remote, knowID] = splitID(id);
-  const db = knowledgeDBs.get(remote || myself, newDB());
-  const node = db.nodes.get(knowID);
-  if (!node && remote === undefined) {
-    // Check for special local nodes like ROOT that aren't stored in events
-    const defaultNode = newDB().nodes.get(knowID);
-    if (defaultNode) {
-      return defaultNode;
-    }
-    return getNodeFromAnyDB(knowledgeDBs, knowID);
-  }
-  return node;
+  return getTextNodeForID(knowledgeDBs, id, myself);
 }
 
 export type TypeFilters = (
@@ -1164,14 +1108,14 @@ export function getVersionedDisplayText(
   );
   const firstVersion = versions.first();
   if (!firstVersion) return undefined;
-  return (
+  const versionedText =
     getRelationItemRelation(knowledgeDBs, firstVersion, myself)?.text ||
-    getNodeFromID(
+    getTextForMatching(
       knowledgeDBs,
       getRelationItemNodeID(knowledgeDBs, firstVersion, myself),
       myself
-    )?.text
-  );
+    );
+  return versionedText;
 }
 
 export function getNodeFromView(
@@ -1463,11 +1407,15 @@ export function getDisplayTextForView(
   stack: ID[],
   virtualType?: VirtualType
 ): string {
+  const ownRelation = getRelationForView(data, viewPath, stack);
   const [node] = getNodeForView(data, viewPath, stack, virtualType);
+  if (node?.type === "reference" || (node && isSearchId(node.id as ID))) {
+    return node.text;
+  }
   const [nodeID] = getNodeIDFromView(data, viewPath);
   const context = getContext(data, viewPath, stack);
   const effectiveAuthor = getEffectiveAuthor(data, viewPath);
-  const currentRoot = getRelationForView(data, viewPath, stack)?.root;
+  const currentRoot = ownRelation?.root;
   const versionedText = getVersionedDisplayText(
     data.knowledgeDBs,
     effectiveAuthor,
@@ -1475,7 +1423,7 @@ export function getDisplayTextForView(
     context,
     currentRoot
   );
-  return versionedText ?? node?.text ?? "";
+  return versionedText ?? ownRelation?.text ?? node?.text ?? "";
 }
 
 export function useDisplayText(): string {
@@ -1716,7 +1664,7 @@ export function updateViewPathsAfterAddRelation(
   data: Data,
   _relationsID: LongID,
   _addedNodeID: LongID | ID,
-  _addedNodeIndex: NodeIndex
+  _addedNodeIndex: number
 ): Views {
   return data.views;
 }
@@ -1732,7 +1680,7 @@ export function updateViewPathsAfterDisconnect(
   views: Views,
   disconnectNode: LongID | ID,
   fromRelation: LongID,
-  _nodeIndex: NodeIndex
+  _nodeIndex: number
 ): Views {
   return views.filterNot((_, key) => {
     try {

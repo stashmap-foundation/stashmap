@@ -40,6 +40,7 @@ import {
   createConcreteRefId,
   isRefId,
   isSearchId,
+  getTextForMatching,
   VERSIONS_NODE_ID,
   ensureRelationNativeFields,
 } from "./connections";
@@ -48,7 +49,6 @@ import {
   newRelationsForNode,
   upsertRelations,
   ViewPath,
-  NodeIndex,
   getNodeIDFromView,
   updateView,
   getContext,
@@ -1248,8 +1248,9 @@ export function planSaveNodeAndEnsureRelations(
     return { plan: resultPlan, viewPath };
   }
 
-  const node = getNodeFromID(plan.knowledgeDBs, nodeID, plan.user.publicKey);
-  if (!node || node.type !== "text") return { plan, viewPath };
+  if (isRefId(nodeID) || isSearchId(nodeID as ID)) {
+    return { plan, viewPath };
+  }
 
   const context = getContext(plan, viewPath, stack);
   const treeRoot = getRelationForView(
@@ -1265,7 +1266,7 @@ export function planSaveNodeAndEnsureRelations(
       context,
       treeRoot
     ) ??
-    node.text ??
+    getTextForMatching(plan.knowledgeDBs, nodeID, plan.user.publicKey) ??
     "";
 
   if (trimmedText === displayText) return { plan, viewPath };

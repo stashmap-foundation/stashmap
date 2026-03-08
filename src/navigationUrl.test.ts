@@ -9,22 +9,31 @@ import {
 } from "./navigationUrl";
 
 const ALICE_PK = "alice-pub-key" as PublicKey;
+const OTHER_PK = "other-author" as PublicKey;
 
-function knowledgeDBWithNodes(nodes: Array<{ text: string }>): KnowledgeDBs {
+function knowledgeDBWithNodes(
+  author: PublicKey,
+  nodes: Array<{ text: string }>
+): KnowledgeDBs {
   const db: KnowledgeData = {
     ...newDB(),
     nodes: Map(
       nodes.map((n) => [
         hashText(n.text),
-        { text: n.text, id: hashText(n.text) },
+        {
+          text: n.text,
+          id: hashText(n.text),
+          textHash: hashText(n.text),
+          type: "text",
+        },
       ])
     ) as KnowledgeData["nodes"],
   };
-  return Map<PublicKey, KnowledgeData>({ [ALICE_PK]: db });
+  return Map<PublicKey, KnowledgeData>({ [author]: db });
 }
 
 test("buildNodeUrl and pathToStack round-trip preserves node IDs", () => {
-  const knowledgeDBs = knowledgeDBWithNodes([
+  const knowledgeDBs = knowledgeDBWithNodes(ALICE_PK, [
     { text: "Holiday Destinations" },
     { text: "Barcelona" },
   ]);
@@ -52,16 +61,15 @@ test("buildNodeUrl with empty stack returns /", () => {
 });
 
 test("buildNodeUrl includes author param for other user", () => {
-  const knowledgeDBs = knowledgeDBWithNodes([{ text: "My Notes" }]);
+  const knowledgeDBs = knowledgeDBWithNodes(OTHER_PK, [{ text: "My Notes" }]);
   const stack = [hashText("My Notes")] as ID[];
-  const otherAuthor = "other-author" as PublicKey;
 
-  const path = buildNodeUrl(stack, knowledgeDBs, ALICE_PK, otherAuthor);
+  const path = buildNodeUrl(stack, knowledgeDBs, ALICE_PK, OTHER_PK);
   expect(path).toBe("/n/My%20Notes?author=other-author");
 });
 
 test("buildNodeUrl omits author param for own content", () => {
-  const knowledgeDBs = knowledgeDBWithNodes([{ text: "My Notes" }]);
+  const knowledgeDBs = knowledgeDBWithNodes(ALICE_PK, [{ text: "My Notes" }]);
   const stack = [hashText("My Notes")] as ID[];
 
   const path = buildNodeUrl(stack, knowledgeDBs, ALICE_PK, ALICE_PK);

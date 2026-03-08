@@ -16,7 +16,6 @@ import {
   upsertRelations,
   getParentKey,
   ViewPath,
-  NodeIndex,
   getParentView,
   updateViewPathsAfterMoveRelations,
   updateViewPathsAfterDisconnect,
@@ -254,7 +253,7 @@ export function planDisconnectFromParent(
     updatedRelationsPlan.views,
     disconnectID,
     parentRelation.id,
-    relationIndex as NodeIndex
+    relationIndex
   );
 
   const planWithViews = planUpdateViews(updatedRelationsPlan, updatedViews);

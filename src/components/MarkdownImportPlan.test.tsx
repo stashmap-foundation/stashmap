@@ -21,7 +21,6 @@ import {
   getRelationsForCurrentTree,
   getRelationForView,
   newRelations,
-  NodeIndex,
   ViewPath,
   viewPathToString,
 } from "../ViewContext";

@@ -7,6 +7,7 @@ import {
   findRefsToNode,
   deduplicateRefsByContext,
   createConcreteRefId,
+  buildTextNodesFromRelations,
 } from "./connections";
 import { MergeKnowledgeDB, useData } from "./DataContext";
 import { useReadRelays } from "./relays";
@@ -15,10 +16,9 @@ import { LoadData } from "./dataQuery";
 import { useCurrentPane } from "./SplitPanesContext";
 
 function getAllNodesFromDBs(knowledgeDBs: KnowledgeDBs): Map<string, KnowNode> {
-  return knowledgeDBs.reduce(
-    (acc, db) => acc.merge(db.nodes),
-    Map<string, KnowNode>()
-  );
+  return buildTextNodesFromRelations(
+    knowledgeDBs.valueSeq().flatMap((db) => db.relations.valueSeq())
+  ) as Map<string, KnowNode>;
 }
 
 function SearchCrefBuilder({

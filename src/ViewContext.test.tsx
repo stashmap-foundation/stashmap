@@ -42,8 +42,6 @@ import {
 import { TreeView } from "./components/TreeView";
 import { LoadData } from "./dataQuery";
 
-const TEST_ROOT = "testRoot" as LongID;
-
 test("Move View Settings on Delete", async () => {
   const [alice] = setup([ALICE]);
   const { publicKey } = alice().user;
@@ -60,13 +58,9 @@ test("Move View Settings on Delete", async () => {
     pl,
   ]);
 
-  const wsRelations = addRelationToRelations(
-    newRelations(TEST_ROOT, List(), publicKey),
-    pl.id
-  );
   // When viewing with pl as root:
-  // - pl's children (c, java) have empty context (stack=[pl], stackContext=[], viewPathContext=[])
-  // - c's children (cpp) have context [shortID(pl)] (viewPath includes pl as ancestor)
+  // - pl's children (c, java) have empty context
+  // - c's children (cpp) have context [shortID(pl)]
   const plChildrenContext = List<ID>();
   const cChildrenContext = List<ID>([shortID(pl.id)]);
   const plChildrenRelations = bulkAddRelations(
@@ -74,10 +68,7 @@ test("Move View Settings on Delete", async () => {
     [c.id, java.id]
   );
   const planWithRelations = planUpsertRelations(
-    planUpsertRelations(
-      planUpsertRelations(planWithNodes, plChildrenRelations),
-      wsRelations
-    ),
+    planUpsertRelations(planWithNodes, plChildrenRelations),
     addRelationToRelations(
       newRelations(c.id, cChildrenContext, publicKey, plChildrenRelations.root),
       cpp.id

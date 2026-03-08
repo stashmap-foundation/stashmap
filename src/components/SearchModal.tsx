@@ -5,6 +5,7 @@ import { useData } from "../DataContext";
 import { useApis } from "../Apis";
 import { KIND_SEARCH } from "../Data";
 import { findDocumentNodesAndRelations } from "../knowledgeEvents";
+import { buildTextNodesFromRelations } from "../connections";
 import { useReadRelays } from "../relays";
 
 function isMatch(input: string, test: string): boolean {
@@ -83,8 +84,11 @@ export function useSearchQuery(
       );
 
   const eventsAsList = events.toList();
-  const nodesFromDocumentEvents =
-    findDocumentNodesAndRelations(eventsAsList).nodes;
+  const relationsFromDocumentEvents =
+    findDocumentNodesAndRelations(eventsAsList).relations.valueSeq();
+  const nodesFromDocumentEvents = buildTextNodesFromRelations(
+    relationsFromDocumentEvents
+  );
   const nodesFromKnowledgeEvents = nip50
     ? nodesFromDocumentEvents.slice(0, 25)
     : filterForKeyword(nodesFromDocumentEvents, query);

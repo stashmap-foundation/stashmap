@@ -20,11 +20,10 @@ import {
   ensureRelationNativeFields,
   getRelationItemNodeID,
   getRelationItemRelation,
+  getTextForMatching,
 } from "./connections";
 import {
-  getNodeFromID,
   ViewPath,
-  NodeIndex,
   isRoot,
   getNodeIDFromView,
   getDisplayTextForView,
@@ -389,7 +388,7 @@ function getSerializedRelationText(
   }
 
   const fallbackText =
-    getNodeFromID(data.knowledgeDBs, nodeID, relation.author)?.text ??
+    getTextForMatching(data.knowledgeDBs, nodeID, relation.author) ??
     shortID(nodeID as ID);
   return {
     text: fallbackText,
@@ -434,8 +433,11 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
         const crefNodeHashes = parsed.targetNode
           ? acc.nodeHashes.add(
               hashText(
-                getNodeFromID(data.knowledgeDBs, parsed.targetNode, author)
-                  ?.text ?? parsed.targetNode
+                getTextForMatching(
+                  data.knowledgeDBs,
+                  parsed.targetNode,
+                  author
+                ) ?? parsed.targetNode
               )
             )
           : acc.nodeHashes;
@@ -698,11 +700,11 @@ export function createVersion(
       ? ensureVersionRelation(
           withVersionsNode,
           originalNodeID,
-          getNodeFromID(
+          getTextForMatching(
             withVersionsNode.knowledgeDBs,
             originalNodeID,
             withVersionsNode.publicKey
-          )?.text ?? ""
+          ) ?? ""
         )
       : [
           withVersionsNode,

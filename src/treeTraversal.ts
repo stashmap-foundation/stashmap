@@ -1,7 +1,6 @@
 import { List, Map, Set as ImmutableSet } from "immutable";
 import {
   ViewPath,
-  NodeIndex,
   VirtualItemsMap,
   addNodeToPathWithRelations,
   addRelationsToLastElement,

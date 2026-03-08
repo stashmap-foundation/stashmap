@@ -1,10 +1,9 @@
-import { hashText } from "./connections";
-import { getNodeFromID } from "./ViewContext";
+import { getTextForMatching, hashText } from "./connections";
 
 function stackToPath(
   stack: ID[],
   knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey
+  author: PublicKey
 ): string | undefined {
   if (stack.length === 0) {
     return "/";
@@ -13,11 +12,11 @@ function stackToPath(
     if (!acc) {
       return undefined;
     }
-    const node = getNodeFromID(knowledgeDBs, nodeID, myself);
-    if (!node?.text) {
+    const text = getTextForMatching(knowledgeDBs, nodeID, author);
+    if (!text) {
       return undefined;
     }
-    return [...acc, encodeURIComponent(node.text)];
+    return [...acc, encodeURIComponent(text)];
   }, []);
   if (!segments) {
     return undefined;
@@ -45,7 +44,8 @@ export function buildNodeUrl(
   myself: PublicKey,
   author?: PublicKey
 ): string | undefined {
-  const path = stackToPath(stack, knowledgeDBs, myself);
+  const effectiveAuthor = author || myself;
+  const path = stackToPath(stack, knowledgeDBs, effectiveAuthor);
   if (!path) {
     return undefined;
   }

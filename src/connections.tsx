@@ -2,7 +2,6 @@ import { List, Set, Map } from "immutable";
 import crypto from "crypto";
 import { newRelations } from "./ViewContext";
 import { SEARCH_PREFIX } from "./constants";
-import { newDB } from "./knowledge";
 
 // Content-addressed node ID generation
 // Node ID = sha256(text).slice(0, 32) - no author prefix
@@ -150,6 +149,216 @@ function getFallbackRelationText(head: LongID | ID): string {
   return "";
 }
 
+export function getRelationText(
+  relation: Relations | undefined
+): string | undefined {
+  if (!relation) {
+    return undefined;
+  }
+  const fallback = getFallbackRelationText(relation.head);
+  if (relation.text !== "") {
+    return relation.text;
+  }
+  return fallback || undefined;
+}
+
+function getRelationTextHash(
+  knowledgeDBs: KnowledgeDBs,
+  relation: Relations
+): ID {
+  if (getRelationText(relation) !== undefined) {
+    return relation.textHash;
+  }
+  const node = getNodeForMatching(
+    knowledgeDBs,
+    relation.head as LongID | ID,
+    relation.author
+  );
+  return getNodeTextHash(node) || hashText(node?.text || "");
+}
+
+function getMatchingRelations(
+  knowledgeDBs: KnowledgeDBs,
+  nodeID: LongID | ID,
+  author: PublicKey
+): Relations[] {
+  if (isRefId(nodeID) || isSearchId(nodeID as ID)) {
+    return [];
+  }
+
+  const [remote, localID] = splitID(nodeID as ID);
+  const preferredAuthor = remote || author;
+  const preferredDB = knowledgeDBs.get(preferredAuthor);
+  const otherDBs = remote
+    ? []
+    : knowledgeDBs
+        .filter((_, pk) => pk !== preferredAuthor)
+        .valueSeq()
+        .toArray();
+  const candidateDBs = [preferredDB, ...otherDBs].filter(
+    (db): db is KnowledgeData => db !== undefined
+  );
+
+  return candidateDBs
+    .flatMap((db) =>
+      db.relations
+        .valueSeq()
+        .filter((relation) => {
+          return relation.head === localID || relation.textHash === localID;
+        })
+        .toArray()
+    )
+    .sort((left, right) => {
+      const leftExact = left.head === localID ? 0 : 1;
+      const rightExact = right.head === localID ? 0 : 1;
+      if (leftExact !== rightExact) {
+        return leftExact - rightExact;
+      }
+      const leftPreferred = left.author === preferredAuthor ? 0 : 1;
+      const rightPreferred = right.author === preferredAuthor ? 0 : 1;
+      if (leftPreferred !== rightPreferred) {
+        return leftPreferred - rightPreferred;
+      }
+      return right.updated - left.updated;
+    });
+}
+
+export function getRelationForMatching(
+  knowledgeDBs: KnowledgeDBs,
+  nodeID: LongID | ID,
+  author: PublicKey
+): Relations | undefined {
+  return getMatchingRelations(knowledgeDBs, nodeID, author)[0];
+}
+
+export function getTextForMatching(
+  knowledgeDBs: KnowledgeDBs,
+  nodeID: LongID | ID,
+  author: PublicKey
+): string | undefined {
+  if (isRefId(nodeID)) {
+    return undefined;
+  }
+
+  const localID = shortID(nodeID as ID) as ID;
+  if (isSearchId(localID)) {
+    return parseSearchId(localID) || "";
+  }
+
+  const relation = getRelationForMatching(knowledgeDBs, nodeID, author);
+  const relationText = getRelationText(relation);
+  if (relationText !== undefined) {
+    return relationText;
+  }
+
+  const node = getNodeForMatching(knowledgeDBs, nodeID, author);
+  if (node?.text) {
+    return node.text;
+  }
+
+  return getFallbackRelationText(nodeID);
+}
+
+export function getTextHashForMatching(
+  knowledgeDBs: KnowledgeDBs,
+  nodeID: LongID | ID,
+  author: PublicKey
+): ID | undefined {
+  const relation = getRelationForMatching(knowledgeDBs, nodeID, author);
+  if (relation && getRelationText(relation) !== undefined) {
+    return relation.textHash;
+  }
+  const node = getNodeForMatching(knowledgeDBs, nodeID, author);
+  return getNodeTextHash(node) || (node?.text ? hashText(node.text) : undefined);
+}
+
+export function createTextNodeFromRelation(relation: Relations): TextNode {
+  return {
+    id: relation.head,
+    text: getRelationText(relation) || "",
+    textHash: relation.textHash,
+    type: "text",
+  };
+}
+
+export function buildTextNodesFromRelations(
+  relations: Iterable<Relations>
+): Map<string, TextNode> {
+  const latestByHead = Array.from(relations).reduce((acc, relation) => {
+    const existing = acc.get(relation.head);
+    const isNewer = !existing || relation.updated > existing.updated;
+    const isSameVersionNewerDisplay =
+      !!existing &&
+      relation.updated === existing.updated &&
+      relation.context.size < existing.context.size;
+    if (isNewer || isSameVersionNewerDisplay) {
+      return acc.set(relation.head, relation);
+    }
+    return acc;
+  }, Map<ID, Relations>());
+
+  return latestByHead.map((relation) =>
+    createTextNodeFromRelation(relation)
+  ) as Map<string, TextNode>;
+}
+
+function getCompatibilityNodeFromDBs(
+  knowledgeDBs: KnowledgeDBs,
+  nodeID: LongID | ID,
+  author: PublicKey
+): TextNode | undefined {
+  const [remote, localID] = splitID(nodeID as ID);
+  const effectiveAuthor = remote || author;
+  const directNode = knowledgeDBs.get(effectiveAuthor)?.nodes.get(localID);
+  if (directNode && isTextNode(directNode)) {
+    return directNode;
+  }
+
+  const matchedNode = knowledgeDBs
+    .valueSeq()
+    .flatMap((db) => db.nodes.valueSeq())
+    .find(
+      (node): node is TextNode =>
+        isTextNode(node) &&
+        (shortID(node.id) === localID || getNodeTextHash(node) === localID)
+    );
+  return matchedNode && isTextNode(matchedNode) ? matchedNode : undefined;
+}
+
+export function getTextNodeForID(
+  knowledgeDBs: KnowledgeDBs,
+  nodeID: LongID | ID,
+  author: PublicKey
+): TextNode | undefined {
+  if (isRefId(nodeID) || isSearchId(nodeID as ID)) {
+    return undefined;
+  }
+
+  const localID = shortID(nodeID as ID) as ID;
+  const relation = getRelationForMatching(knowledgeDBs, nodeID, author);
+  const relationText = getRelationText(relation);
+  if (relation && relationText !== undefined) {
+    return {
+      id: localID,
+      text: relationText,
+      textHash: relation.textHash,
+      type: "text",
+    };
+  }
+
+  const fallbackText = getFallbackRelationText(nodeID);
+  if (fallbackText !== "" || localID === EMPTY_NODE_ID) {
+    return {
+      id: localID,
+      text: fallbackText,
+      textHash: hashText(fallbackText),
+      type: "text",
+    };
+  }
+
+  return getCompatibilityNodeFromDBs(knowledgeDBs, nodeID, author);
+}
+
 export function getRelationsNoReferencedBy(
   knowledgeDBs: KnowledgeDBs,
   relationID: ID | undefined,
@@ -200,10 +409,10 @@ export function getRelationItemTextHash(
 ): ID {
   const relation = getRelationItemRelation(knowledgeDBs, item, myself);
   if (relation) {
-    return relation.textHash;
+    return getRelationTextHash(knowledgeDBs, relation);
   }
   return (
-    getNodeTextHash(getNodeForMatching(knowledgeDBs, item.id, myself)) ||
+    getTextHashForMatching(knowledgeDBs, item.id, myself) ||
     (shortID(item.id as ID) as ID)
   );
 }
@@ -294,31 +503,7 @@ function getNodeForMatching(
   nodeID: LongID | ID,
   author: PublicKey
 ): KnowNode | undefined {
-  if (isRefId(nodeID) || isSearchId(nodeID as ID)) {
-    return undefined;
-  }
-
-  const [remote, localID] = splitID(nodeID as ID);
-  const effectiveAuthor = remote || author;
-  const directNode = knowledgeDBs.get(effectiveAuthor)?.nodes.get(localID);
-  if (directNode) {
-    return directNode;
-  }
-
-  if (!remote) {
-    const defaultNode = newDB().nodes.get(localID);
-    if (defaultNode) {
-      return defaultNode;
-    }
-  }
-
-  return knowledgeDBs
-    .valueSeq()
-    .flatMap((db) => db.nodes.valueSeq())
-    .find(
-      (node) =>
-        shortID(node.id) === localID || getNodeTextHash(node) === localID
-    );
+  return getTextNodeForID(knowledgeDBs, nodeID, author);
 }
 
 export function inferParentRelationID(
@@ -391,7 +576,7 @@ function getSemanticMatchKey(
   author: PublicKey
 ): ID {
   return (
-    getNodeTextHash(getNodeForMatching(knowledgeDBs, nodeID, author)) ||
+    getTextHashForMatching(knowledgeDBs, nodeID, author) ||
     (shortID(nodeID as ID) as ID)
   );
 }
@@ -472,32 +657,45 @@ function findNodeAppearances(
       ) {
         return rdx;
       }
+      const targetSemanticKey = getSemanticMatchKey(
+        knowledgeDBs,
+        nodeID,
+        targetAuthor || relation.author
+      );
+      const matchesItem = (item: RelationItem): boolean => {
+        const itemNodeID = getRelationItemNodeID(
+          knowledgeDBs,
+          item,
+          relation.author
+        );
+        if (item.relevance === "not_relevant" || isRefId(itemNodeID)) {
+          return false;
+        }
+        if (
+          targetAuthor !== undefined &&
+          targetRoot !== undefined &&
+          relation.author === targetAuthor &&
+          relation.root === targetRoot
+        ) {
+          return shortID(itemNodeID as ID) === shortID(nodeID as ID);
+        }
+        return (
+          getRelationItemTextHash(knowledgeDBs, item, relation.author) ===
+          targetSemanticKey
+        );
+      };
       const matchedItem = relation.items.find(
-        (item) =>
-          item.relevance !== "not_relevant" &&
-          !isRefId(getRelationItemNodeID(knowledgeDBs, item, relation.author)) &&
-          nodesMatchForRefs(
-            knowledgeDBs,
-            getRelationItemNodeID(knowledgeDBs, item, relation.author),
-            relation.author,
-            relation.root,
-            nodeID,
-            targetAuthor,
-            targetRoot
-          )
+        (item) => matchesItem(item)
       );
       const isInItems = !!matchedItem;
       const isHeadWithChildren =
         relation.items.size > 0 &&
-        nodesMatchForRefs(
-          knowledgeDBs,
-          relation.head,
-          relation.author,
-          relation.root,
-          nodeID,
-          targetAuthor,
-          targetRoot
-        );
+        ((targetAuthor !== undefined &&
+          targetRoot !== undefined &&
+          relation.author === targetAuthor &&
+          relation.root === targetRoot &&
+          shortID(relation.head as ID) === shortID(nodeID as ID)) ||
+          getRelationTextHash(knowledgeDBs, relation) === targetSemanticKey);
       if (isHeadWithChildren || isInItems) {
         return rdx.push({
           relation,
@@ -756,6 +954,30 @@ function refHasActiveVersions(
   );
 }
 
+function nodeHasActiveVersions(
+  knowledgeDBs: KnowledgeDBs,
+  nodeID: LongID | ID,
+  effectiveAuthor: PublicKey,
+  currentContext: Context,
+  currentRoot?: ID
+): boolean {
+  if (!currentRoot || isRefId(nodeID) || isSearchId(nodeID as ID)) {
+    return false;
+  }
+  const versionsContext = currentContext.push(shortID(nodeID as ID) as ID);
+  return (
+    knowledgeDBs
+      .get(effectiveAuthor)
+      ?.relations.valueSeq()
+      .some(
+        (candidate) =>
+          candidate.head === VERSIONS_NODE_ID &&
+          candidate.root === currentRoot &&
+          candidate.context.equals(versionsContext)
+      ) ?? false
+  );
+}
+
 export function getOccurrencesForNode(
   knowledgeDBs: KnowledgeDBs,
   nodeID: LongID | ID,
@@ -774,6 +996,13 @@ export function getOccurrencesForNode(
     currentRoot
   );
   const contextRoot = currentContext.first();
+  const currentHasVersions = nodeHasActiveVersions(
+    knowledgeDBs,
+    nodeID,
+    effectiveAuthor,
+    currentContext,
+    currentRoot
+  );
   const outgoingCrefIDs = currentItems
     ? currentItems
         .map((item) => item.id)
@@ -806,6 +1035,9 @@ export function getOccurrencesForNode(
       ref.targetNode
         ? !contextRoot || !sharesSemanticRoot(ref)
         : currentContext.size > 0 && ref.context.size === 0
+    )
+    .filter(
+      (ref) => !currentHasVersions || refHasActiveVersions(knowledgeDBs, ref, effectiveAuthor)
     )
     .filter(
       (ref) =>
@@ -1358,13 +1590,8 @@ export function injectEmptyNodesIntoKnowledgeDBs(
     myDB.relations
   );
 
-  // Also add the empty node to the nodes map so useNode() can find it
-  const emptyNode = newNode("");
-  const updatedNodes = myDB.nodes.set(shortID(EMPTY_NODE_ID), emptyNode);
-
   return knowledgeDBs.set(myself, {
     ...myDB,
-    nodes: updatedNodes,
     relations: updatedRelations,
   });
 }

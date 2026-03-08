@@ -39,7 +39,6 @@ import {
   createPlan,
   planAddContact,
   planRemoveContact,
-  planUpsertRelations,
   PlanningContextProvider,
 } from "./planner";
 import { execute } from "./executor";
@@ -57,15 +56,9 @@ import {
   isUserLoggedInWithSeed,
 } from "./NostrAuthContext";
 import {
-  addRelationToRelations,
-  createNodeID,
-  getRelationsNoReferencedBy,
-  hashText,
-  shortID,
   EMPTY_NODE_ID,
 } from "./connections";
-import type { TextSeed } from "./connections";
-import { newRelations, RootViewContextProvider } from "./ViewContext";
+import { RootViewContextProvider } from "./ViewContext";
 import { LoadData } from "./dataQuery";
 import { LoadSearchData } from "./LoadSearchData";
 import { StorePreLoginContext } from "./StorePreLoginContext";
@@ -309,33 +302,6 @@ export function setup(
       };
     };
   });
-}
-
-export function findNodeByText(plan: Plan, text: string): TextSeed | undefined {
-  const { knowledgeDBs, user } = plan;
-  const userDB = knowledgeDBs.get(user.publicKey, newDB());
-  const relation = userDB.relations
-    .valueSeq()
-    .filter((candidate) => candidate.text === text)
-    .sortBy((candidate) => -candidate.updated)
-    .first();
-  if (relation) {
-    return {
-      id: relation.head,
-      text: relation.text,
-      textHash: relation.textHash,
-    };
-  }
-  return undefined;
-}
-
-function createInitialRoot(plan: Plan, rootText: string): [Plan, nodeID: ID] {
-  const rootNode = findNodeByText(plan, rootText);
-  if (!rootNode) {
-    throw new Error(`Test Setup Error: No Node with text ${rootText} found`);
-  }
-
-  return [plan, rootNode.id];
 }
 
 type RenderApis = Partial<TestApis> &
@@ -624,91 +590,6 @@ export async function type(text: string): Promise<void> {
   await userEvent.type(await findNewNodeEditor(), text);
 }
 
-type NodeDescription = [
-  string | TextSeed,
-  (NodeDescription[] | (string | TextSeed)[])?
-];
-
-function createNodesAndRelations(
-  plan: Plan,
-  currentRelationsID: LongID | undefined,
-  nodes: NodeDescription[],
-  context: Context = List()
-): Plan {
-  return List(nodes).reduce((rdx: Plan, nodeDescription: NodeDescription) => {
-    const currentRelations = currentRelationsID
-      ? getRelationsNoReferencedBy(
-          rdx.knowledgeDBs,
-          currentRelationsID,
-          rdx.user.publicKey
-        )
-      : undefined;
-    const textOrNode = Array.isArray(nodeDescription)
-      ? nodeDescription[0]
-      : nodeDescription;
-    const children = Array.isArray(nodeDescription)
-      ? (nodeDescription[1] as NodeDescription[] | undefined)
-      : undefined;
-    const node =
-      typeof textOrNode === "string"
-        ? {
-            id: createNodeID(textOrNode),
-            text: textOrNode,
-            textHash: hashText(textOrNode),
-          }
-        : textOrNode;
-    const nodeRelations = newRelations(
-      node.id,
-      context,
-      rdx.user.publicKey,
-      currentRelations?.root,
-      currentRelations?.id,
-      node.text
-    );
-    const planWithRelation = planUpsertRelations(rdx, nodeRelations);
-    const planWithUpdatedParent = currentRelations
-      ? planUpsertRelations(
-          planWithRelation,
-          addRelationToRelations(currentRelations, nodeRelations.id)
-        )
-      : planWithRelation;
-    if (!children) {
-      return planWithUpdatedParent;
-    }
-    // Children's context includes this node (including pane root)
-    const childContext = context.push(shortID(node.id));
-    return createNodesAndRelations(
-      planWithUpdatedParent,
-      nodeRelations.id,
-      children,
-      childContext
-    );
-  }, plan);
-}
-
-type Options = {
-  root: string;
-};
-
-export async function setupTestDB(
-  appState: TestAppState,
-  nodes: NodeDescription[],
-  options?: Options
-): Promise<Plan> {
-  const plan = createNodesAndRelations(createPlan(appState), undefined, nodes);
-  const defaultRoot =
-    appState.panes[0].stack[appState.panes[0].stack.length - 1];
-  const [planWithRoot] = options?.root
-    ? createInitialRoot(plan, options.root)
-    : [plan, defaultRoot];
-
-  await execute({
-    ...appState,
-    plan: planWithRoot,
-    finalizeEvent: mockFinalizeEvent(),
-  });
-  return planWithRoot;
-}
 
 export function extractNodes(container: Container): Array<string | null> {
   /* eslint-disable testing-library/no-node-access */

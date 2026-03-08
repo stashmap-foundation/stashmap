@@ -1,22 +1,21 @@
 import { Map } from "immutable";
-import { screen, fireEvent } from "@testing-library/react";
+import { cleanup, screen, fireEvent } from "@testing-library/react";
 import {
   ALICE,
   BOB,
   findEvent,
-  findNodeByText,
   follow,
   renderApp,
+  renderTree,
   setup,
-  setupTestDB,
   TEST_RELAYS,
   UpdateState,
+  type,
 } from "./utils.test";
 import { createPlan, planPublishRelayMetadata } from "./planner";
 import { execute } from "./executor";
 import { KIND_VIEWS } from "./nostr";
 import { flattenRelays } from "./relays";
-import type { TextSeed } from "./connections";
 
 test("Flatten relays", () => {
   expect(
@@ -40,9 +39,6 @@ test("Flatten relays", () => {
 
 async function setupTest(): Promise<{
   alice: UpdateState;
-  bob: UpdateState;
-  workspace: TextSeed;
-  bitcoin: TextSeed;
 }> {
   const [alice, bob] = setup([ALICE, BOB]);
   await follow(alice, bob().user.publicKey);
@@ -53,12 +49,12 @@ async function setupTest(): Promise<{
     ...bob(),
     plan: planPublishRelays,
   });
-  const db = await setupTestDB(alice(), [
-    ["Alice Workspace", [["Bitcoin", ["P2P", "Digital Gold"]]]],
-  ]);
-  const workspace = findNodeByText(db, "Alice Workspace") as TextSeed;
-  const bitcoin = findNodeByText(db, "Bitcoin") as TextSeed;
-  return { alice, bob, workspace, bitcoin };
+  renderTree(alice);
+  await type(
+    "Alice Workspace{Enter}{Tab}Bitcoin{Enter}{Tab}P2P{Enter}Digital Gold{Escape}"
+  );
+  cleanup();
+  return { alice };
 }
 
 test("Write views on user relays", async () => {

@@ -7,7 +7,6 @@ import {
   renderWithTestData,
   ALICE,
   setup,
-  setupTestDB,
   expectTree,
   findNewNodeEditor,
   BOB,
@@ -28,29 +27,33 @@ import {
 
 test("Move View Settings on Delete", async () => {
   const [alice] = setup([ALICE]);
-  await setupTestDB(
-    alice(),
-    [["Programming Languages", [["C", ["C++"]], ["Java"]]]],
-    {
-      root: "Programming Languages",
-    }
+  renderTree(alice);
+  await type(
+    "My Notes{Enter}{Tab}Programming Languages{Enter}{Tab}C{Enter}{Tab}C++{Enter}{Shift>}{Tab}{/Shift}Java{Escape}"
   );
-  renderApp({
-    ...alice(),
-    initialRoute: `/n/${encodeURIComponent("Programming Languages")}`,
-  });
-  // Root is expanded by default, find and expand C
-  await screen.findByText("C");
-  await userEvent.click(screen.getByLabelText("expand C"));
+
+  await expectTree(`
+My Notes
+  Programming Languages
+    C
+      C++
+    Java
+  `);
+
+  await userEvent.click(screen.getByLabelText("collapse My Notes"));
+  await userEvent.click(screen.getByLabelText("expand My Notes"));
+  await userEvent.click(screen.getByLabelText("collapse Programming Languages"));
+  await userEvent.click(screen.getByLabelText("expand Programming Languages"));
+  const cToggle = screen.getByLabelText(/expand C|collapse C/);
+  if (cToggle.getAttribute("aria-label") === "expand C") {
+    await userEvent.click(cToggle);
+  }
 
   await screen.findByText("C++");
-  // Remove JAVA Node
   await userEvent.click(screen.getByLabelText("mark Java as not relevant"));
-  // Ensure C is still expanded
   await screen.findByText("C++");
   screen.getByLabelText("collapse C");
 
-  // Collapse C
   await userEvent.click(screen.getByLabelText("collapse C"));
   screen.getByLabelText("expand C");
   expect(screen.queryByText("C++")).toBeNull();
@@ -298,41 +301,35 @@ Programming Languages
 
 test("Disconnect Nodes", async () => {
   const [alice] = setup([ALICE]);
-  // Create PL at root level so children have empty context
-  await setupTestDB(
-    alice(),
-    [["Programming Languages", ["C", "C++", "Java", "Rust"]]],
-    {
-      root: "Programming Languages",
-    }
+  renderTree(alice);
+  await type(
+    "My Notes{Enter}{Tab}Programming Languages{Enter}{Tab}C{Enter}C++{Enter}Java{Enter}Rust{Escape}"
   );
-  renderApp({
-    ...alice(),
-    initialRoute: `/n/${encodeURIComponent("Programming Languages")}`,
-  });
-  // Root is expanded by default
+
   await expectTree(`
-Programming Languages
-  C
-  C++
-  Java
-  Rust
+My Notes
+  Programming Languages
+    C
+    C++
+    Java
+    Rust
   `);
 
-  // marking nodes as not relevant removes them from the view
   fireEvent.click(await screen.findByLabelText("mark Java as not relevant"));
   await expectTree(`
-Programming Languages
-  C
-  C++
-  Rust
+My Notes
+  Programming Languages
+    C
+    C++
+    Rust
   `);
 
   fireEvent.click(await screen.findByLabelText("mark C as not relevant"));
   await expectTree(`
-Programming Languages
-  C++
-  Rust
+My Notes
+  Programming Languages
+    C++
+    Rust
   `);
 
   cleanup();

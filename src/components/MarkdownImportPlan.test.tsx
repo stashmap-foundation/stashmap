@@ -15,7 +15,6 @@ import {
 import {
   ALICE,
   expectTree,
-  findNodeByText,
   navigateToNodeViaSearch,
   renderApp,
   renderTree,
@@ -121,22 +120,38 @@ test("planCreateNodesFromMarkdownTrees creates only standalone relations", () =>
     trees
   );
   const parentID = topNodeIDs[0];
-  const childID = findNodeByText(plan, "Child")?.id;
-  const grandchildID = findNodeByText(plan, "Grandchild")?.id;
   const parentRelation = getRelationsNoReferencedBy(
     plan.knowledgeDBs,
     topRelationIDs[0],
     plan.user.publicKey
   );
+  const childRelationID = parentRelation?.items.first()?.id as LongID | undefined;
+  const childRelation = childRelationID
+    ? getRelationsNoReferencedBy(
+        plan.knowledgeDBs,
+        childRelationID,
+        plan.user.publicKey
+      )
+    : undefined;
+  const grandchildRelationID = childRelation?.items.first()?.id as
+    | LongID
+    | undefined;
+  const grandchildRelation = grandchildRelationID
+    ? getRelationsNoReferencedBy(
+        plan.knowledgeDBs,
+        grandchildRelationID,
+        plan.user.publicKey
+      )
+    : undefined;
 
   expect(parentRelation).toBeDefined();
-  expect(childID).toBeDefined();
-  expect(grandchildID).toBeDefined();
+  expect(childRelation?.text).toBe("Child");
+  expect(grandchildRelation?.text).toBe("Grandchild");
 
   const standaloneChildRelation = getRelationsForCurrentTree(
     plan.knowledgeDBs,
     plan.user.publicKey,
-    childID!,
+    childRelation!.head,
     List<ID>([parentID]),
     undefined,
     false,
@@ -145,8 +160,8 @@ test("planCreateNodesFromMarkdownTrees creates only standalone relations", () =>
   const standaloneGrandchildRelation = getRelationsForCurrentTree(
     plan.knowledgeDBs,
     plan.user.publicKey,
-    grandchildID!,
-    List<ID>([parentID, childID!]),
+    grandchildRelation!.head,
+    List<ID>([parentID, childRelation!.head]),
     undefined,
     false,
     parentRelation?.root
@@ -172,8 +187,6 @@ test("Planning multiple markdown files returns top nodes in import order", () =>
   );
 
   expect(topTexts).toEqual(["One", "Two"]);
-  expect(findNodeByText(plan, "One")).toBeDefined();
-  expect(findNodeByText(plan, "Two")).toBeDefined();
 });
 
 test("same-named siblings and grandchildren get independent children", async () => {

@@ -26,7 +26,6 @@ import {
 import { ViewPath, newRelations, viewPathToString } from "./ViewContext";
 import {
   createPlan,
-  planBulkUpsertNodes,
   planUpdateViews,
   planUpsertRelations,
 } from "./planner";
@@ -156,10 +155,7 @@ test("Diff items are always added, never moved", () => {
 
   const plan = planUpdateViews(
     planUpsertRelations(
-      planBulkUpsertNodes(
-        createPlan({ ...alice(), knowledgeDBs, views, panes }),
-        [parent, aliceChild]
-      ),
+      createPlan({ ...alice(), knowledgeDBs, views, panes }),
       aliceRelations
     ),
     views
@@ -242,10 +238,7 @@ test("Dragging a concrete reference keeps it as a reference by default", () => {
   const plan = planUpdateViews(
     planUpsertRelations(
       planUpsertRelations(
-        planBulkUpsertNodes(
-          createPlan({ ...alice(), knowledgeDBs, panes, views }),
-          [root, target, refTarget, refChild]
-        ),
+        createPlan({ ...alice(), knowledgeDBs, panes, views }),
         rootRelations
       ),
       refRelations
@@ -319,10 +312,7 @@ test("Alt-dragging a concrete reference still copies it as a reference", () => {
   const plan = planUpdateViews(
     planUpsertRelations(
       planUpsertRelations(
-        planBulkUpsertNodes(
-          createPlan({ ...alice(), knowledgeDBs, panes, views }),
-          [root, target, refTarget, refChild]
-        ),
+        createPlan({ ...alice(), knowledgeDBs, panes, views }),
         rootRelations
       ),
       refRelations
@@ -389,10 +379,7 @@ test("Alt-dragging a normal node creates a concrete reference", () => {
 
   const plan = planUpdateViews(
     planUpsertRelations(
-      planBulkUpsertNodes(
-        createPlan({ ...alice(), knowledgeDBs, panes, views }),
-        [root, sourceNode, target]
-      ),
+      createPlan({ ...alice(), knowledgeDBs, panes, views }),
       rootRelations
     ),
     views
@@ -996,10 +983,7 @@ test("Bottom-half drop on last child of nested parent stays within that parent",
   const plan = planUpdateViews(
     planUpsertRelations(
       planUpsertRelations(
-        planBulkUpsertNodes(
-          createPlan({ ...alice(), knowledgeDBs, panes, views }),
-          [root, barcelona, spain, sevilla, otherItem]
-        ),
+        createPlan({ ...alice(), knowledgeDBs, panes, views }),
         rootedRootRelations
       ),
       spainRelations
@@ -1128,10 +1112,7 @@ function setupDepthClampTree() {
   const plan = planUpdateViews(
     planUpsertRelations(
       planUpsertRelations(
-        planBulkUpsertNodes(
-          createPlan({ ...alice(), knowledgeDBs, panes, views }),
-          [hd, sf, spain, barcelona, malaga, sevilla]
-        ),
+        createPlan({ ...alice(), knowledgeDBs, panes, views }),
         rootedHdRelations
       ),
       spainRelations

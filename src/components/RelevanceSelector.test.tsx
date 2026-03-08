@@ -17,7 +17,7 @@ import {
   addRelationToRelations,
   itemMatchesType,
 } from "../connections";
-import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
+import { createPlan, planUpsertRelations } from "../planner";
 import { execute } from "../executor";
 import { newRelations } from "../ViewContext";
 import {

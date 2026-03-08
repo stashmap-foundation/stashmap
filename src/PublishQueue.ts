@@ -1,7 +1,7 @@
 import { List, Map } from "immutable";
 import { Event, SimplePool, UnsignedEvent } from "nostr-tools";
 import { FinalizeEvent } from "./Apis";
-import { KIND_DELETE, KIND_KNOWLEDGE_NODE } from "./nostr";
+import { KIND_DELETE } from "./nostr";
 import { signEvents, PUBLISH_TIMEOUT } from "./executor";
 import { applyWriteRelayConfig } from "./relays";
 import {
@@ -73,9 +73,6 @@ const getOutboxKey = (event: UnsignedEvent): string => {
     const aTag = event.tags.find((t) => t[0] === "a")?.[1];
     return `delete:${aTag || ""}`;
   }
-  if (event.kind === KIND_KNOWLEDGE_NODE) {
-    return `node:${dTag || ""}`;
-  }
   return dTag
     ? `${event.kind}:${event.pubkey}:${dTag}`
     : `${event.kind}:${event.pubkey}`;
@@ -84,11 +81,7 @@ const getOutboxKey = (event: UnsignedEvent): string => {
 const deleteTargetToOutboxKey = (aTagValue: string): string | undefined => {
   const parts = aTagValue.split(":");
   if (parts.length < 3) return undefined;
-  const kind = parseInt(parts[0], 10);
-  if (kind === KIND_KNOWLEDGE_NODE) {
-    return `node:${parts[2]}`;
-  }
-  return `${parts[0]}:${parts[1]}:${parts[2]}`;
+  return `${parts[0]}:${parts[1]}:${parts.slice(2).join(":")}`;
 };
 
 const publishToRelays = async (

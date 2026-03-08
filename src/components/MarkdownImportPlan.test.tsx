@@ -6,7 +6,6 @@ import {
   createPlan,
   Plan,
   planAddToParent,
-  planUpsertNode,
   planUpsertRelations,
   planUpdateViews,
 } from "../planner";
@@ -264,7 +263,7 @@ test("planPasteMarkdownTrees: collision does not shadow existing children", () =
   );
   const withExisting = planUpsertRelations(
     planUpsertRelations(
-      planUpsertNode(planUpsertNode(basePlan, existingCity), existingVienna),
+      basePlan,
       existingViennaRelations
     ),
     cityRelations
@@ -316,7 +315,7 @@ test("buildDocumentEvents does not serialize pasted collision child as a standal
   );
   const withExisting = planUpsertRelations(
     planUpsertRelations(
-      planUpsertNode(planUpsertNode(basePlan, existingCity), existingVienna),
+      basePlan,
       existingViennaRelations
     ),
     addRelationToRelations(

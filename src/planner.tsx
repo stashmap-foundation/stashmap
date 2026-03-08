@@ -4,7 +4,6 @@ import { UnsignedEvent, Event } from "nostr-tools";
 import {
   KIND_DELETE,
   KIND_KNOWLEDGE_DOCUMENT,
-  KIND_KNOWLEDGE_NODE,
   KIND_CONTACTLIST,
   KIND_VIEWS,
   KIND_MEMBERLIST,
@@ -202,13 +201,6 @@ export function planRemoveContact(plan: Plan, publicKey: PublicKey): Plan {
   };
 }
 
-export function planUpsertNode(plan: Plan, node: KnowNode): Plan {
-  // Legacy compatibility helper kept for tests while relations remain the
-  // authoritative source of text/hash data.
-  void node;
-  return plan;
-}
-
 function upsertRelationsCore(plan: Plan, relations: Relations): Plan {
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
   const normalizedRelations = ensureRelationNativeFields(
@@ -272,11 +264,6 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
     return basePlan;
   }
   return addCrefToLog(basePlan, relations.id);
-}
-
-export function planBulkUpsertNodes(plan: Plan, nodes: KnowNode[]): Plan {
-  void nodes;
-  return plan;
 }
 
 type AddToParentTarget = LongID | ID | KnowNode;

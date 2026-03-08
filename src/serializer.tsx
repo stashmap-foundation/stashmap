@@ -1,8 +1,5 @@
-import { Map, List } from "immutable";
-import { UnsignedEvent } from "nostr-tools";
+import { Map } from "immutable";
 import { parseViewPath } from "./ViewContext";
-import { joinID, hashText } from "./connections";
-import { findAllTags, findTag, getEventMs } from "./commons/useNostrQuery";
 
 export type Serializable =
   | string
@@ -51,36 +48,6 @@ function asArray(obj: Serializable | undefined): Array<Serializable> {
     return obj;
   }
   throw new Error(`${toString(obj)} is not an array`);
-}
-
-// Valid values for Relevance and Argument types
-const VALID_RELEVANCE: Relevance[] = [
-  "relevant",
-  "maybe_relevant",
-  "little_relevant",
-  "not_relevant",
-  undefined,
-];
-const VALID_ARGUMENT: Argument[] = ["confirms", "contra", undefined];
-
-function parseRelevance(value: string | undefined): Relevance {
-  if (value === undefined || value === "") {
-    return undefined;
-  }
-  if (VALID_RELEVANCE.includes(value as Relevance)) {
-    return value as Relevance;
-  }
-  return undefined;
-}
-
-function parseArgument(value: string | undefined): Argument {
-  if (value === undefined || value === "") {
-    return undefined;
-  }
-  if (!VALID_ARGUMENT.includes(value as Argument)) {
-    return undefined;
-  }
-  return value as Argument;
 }
 
 function parseTypeFilter(
@@ -236,74 +203,4 @@ export function viewDataToJSON(
     views: views.map((v) => viewToJSON(v)).toJSON(),
     panes: panes.map((p) => paneToJSON(p)),
   };
-}
-
-export function eventToRelations(e: UnsignedEvent): Relations | undefined {
-  const id = findTag(e, "d");
-  const head = findTag(e, "k") as ID;
-  const updated = getEventMs(e);
-  if (id === undefined || head === undefined) {
-    return undefined;
-  }
-
-  // Parse context from multiple "c" tags (each tag is ["c", ancestorID])
-  const contextTags = findAllTags(e, "c") || [];
-  const context = List(contextTags.map((tag) => tag[0] as ID));
-
-  // Parse basedOn from "b" tag: ["b", relationID]
-  const basedOn = findTag(e, "b") as LongID | undefined;
-  const parent = findTag(e, "parent") as LongID | undefined;
-
-  // Parse items with relevance and optional argument: ["i", itemID, relevance, argument?]
-  // Invalid relevance/argument values are filtered to defaults
-  const itemsAsTags = findAllTags(e, "i") || [];
-  const items = List(
-    itemsAsTags
-      .filter((tagValues) => !tagValues[0].startsWith("ref:"))
-      .map((tagValues) => ({
-        id: tagValues[0] as LongID,
-        relevance: parseRelevance(tagValues[1]),
-        argument: parseArgument(tagValues[2]),
-      }))
-  );
-
-  return {
-    id: joinID(e.pubkey, id),
-    head,
-    context,
-    updated,
-    items,
-    text: "",
-    textHash: head,
-    parent,
-    author: e.pubkey as PublicKey,
-    basedOn,
-    root: id as ID,
-  };
-}
-
-export function eventToTextNode(
-  e: UnsignedEvent
-): [id: string, node: KnowNode] | [undefined] {
-  const id = findTag(e, "d");
-  if (id === undefined) {
-    return [undefined];
-  }
-  const text = e.content;
-
-  // Verify content-addressed ID matches the hash of the text
-  const expectedHash = hashText(text);
-  if (id !== expectedHash) {
-    // eslint-disable-next-line no-console
-    console.warn(`Node ID mismatch: expected ${expectedHash}, got ${id}`);
-    return [undefined];
-  }
-
-  const textNode: TextNode = {
-    id: id as ID,
-    text,
-    textHash: expectedHash,
-    type: "text",
-  };
-  return [id, textNode];
 }

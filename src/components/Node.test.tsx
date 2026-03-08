@@ -35,7 +35,7 @@ import {
 import { TreeView } from "./TreeView";
 import { DraggableNote } from "./Draggable";
 import { TemporaryViewProvider } from "./TemporaryViewContext";
-import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
+import { createPlan, planUpsertRelations } from "../planner";
 import { execute } from "../executor";
 import { getNodesInTree } from "./Node";
 
@@ -60,7 +60,7 @@ test("Render non existing Node", async () => {
     "not-existing-id" as LongID
   );
   const plan = planUpsertRelations(
-    planUpsertNode(createPlan(alice()), pl),
+    createPlan(alice()),
     relations
   );
   await execute({
@@ -114,10 +114,7 @@ test("Edit node inline", async () => {
   );
   await execute({
     ...alice(),
-    plan: planUpsertRelations(
-      planUpsertNode(createPlan(alice()), note),
-      noteRelations
-    ),
+    plan: planUpsertRelations(createPlan(alice()), noteRelations),
   });
   renderWithTestData(
     <LoadData nodeIDs={[note.id]} descendants referencedBy lists>
@@ -162,10 +159,7 @@ test("Load Note from other User which is not a contact", async () => {
   );
   await execute({
     ...bob(),
-    plan: planUpsertRelations(
-      planUpsertNode(createPlan(bob()), bobsNote),
-      bobsRelations
-    ),
+    plan: planUpsertRelations(createPlan(bob()), bobsRelations),
   });
 
   const remoteBobsNoteID = joinID(bob().user.publicKey, bobsNote.id);
@@ -241,7 +235,7 @@ test.skip("Delete node", async () => {
   const note = newNode("My Note");
   await execute({
     ...alice(),
-    plan: planUpsertNode(createPlan(alice()), note),
+    plan: createPlan(alice()),
   });
   renderWithTestData(
     <LoadData nodeIDs={[note.id]} descendants referencedBy lists>

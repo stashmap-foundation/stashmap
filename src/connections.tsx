@@ -162,6 +162,59 @@ export function getRelationText(
   return fallback || undefined;
 }
 
+type RelationLookupIndex = globalThis.Map<string, Relations[]>;
+
+const relationLookupIndexCache = new WeakMap<KnowledgeData, RelationLookupIndex>();
+
+function getRelationLookupIndex(db: KnowledgeData): RelationLookupIndex {
+  const cached = relationLookupIndexCache.get(db);
+  if (cached) {
+    return cached;
+  }
+
+  const index = new globalThis.Map<string, Relations[]>();
+  const addToIndex = (key: string, relation: Relations): void => {
+    const existing = index.get(key);
+    if (existing) {
+      existing.push(relation);
+      return;
+    }
+    index.set(key, [relation]);
+  };
+
+  db.relations.valueSeq().forEach((relation) => {
+    addToIndex(relation.head, relation);
+    if (relation.textHash !== relation.head) {
+      addToIndex(relation.textHash, relation);
+    }
+  });
+
+  index.forEach((relations) => {
+    relations.sort((left, right) => right.updated - left.updated);
+  });
+
+  relationLookupIndexCache.set(db, index);
+  return index;
+}
+
+export function getIndexedRelationsForKeys(
+  db: KnowledgeData,
+  keys: string[]
+): Relations[] {
+  const uniqueKeys = Array.from(new globalThis.Set(keys));
+  const seen = new globalThis.Set<string>();
+  return uniqueKeys.flatMap((key) =>
+    (getRelationLookupIndex(db).get(key) || []).filter((relation) => {
+      const relationKey = shortID(relation.id);
+      if (seen.has(relationKey)) {
+        return false;
+      }
+      seen.add(relationKey);
+      return true;
+    })
+  );
+}
+
 function getRelationTextHash(
   knowledgeDBs: KnowledgeDBs,
   relation: Relations
@@ -200,14 +253,7 @@ function getMatchingRelations(
   );
 
   return candidateDBs
-    .flatMap((db) =>
-      db.relations
-        .valueSeq()
-        .filter((relation) => {
-          return relation.head === localID || relation.textHash === localID;
-        })
-        .toArray()
-    )
+    .flatMap((db) => getIndexedRelationsForKeys(db, [localID]))
     .sort((left, right) => {
       const leftExact = left.head === localID ? 0 : 1;
       const rightExact = right.head === localID ? 0 : 1;

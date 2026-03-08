@@ -26,6 +26,7 @@ import {
   itemPassesFilters,
   getRelationItemNodeID,
   getRelationItemRelation,
+  getIndexedRelationsForKeys,
 } from "./connections";
 import {
   buildOutgoingReference,
@@ -336,43 +337,47 @@ export function getAlternativeRelations(
 ): List<Relations> {
   const localID = shortID(nodeID);
   const author = currentAuthor;
-  return knowledgeDBs.toList().flatMap((db) =>
-    db.relations
-      .filter((r) => {
-        if (!author) {
-          return false;
+  if (!author) {
+    return List<Relations>();
+  }
+  const semanticKey = getSemanticNodeKey(knowledgeDBs, nodeID, author);
+  return knowledgeDBs
+    .entrySeq()
+    .flatMap(([, db]) =>
+      List(getIndexedRelationsForKeys(db, [localID, semanticKey])).filter(
+        (r) => {
+          const useExactMatch =
+            r.author === author &&
+            currentRoot !== undefined &&
+            r.root === currentRoot;
+          const matchesNode = useExactMatch
+            ? r.head === localID
+            : nodesSemanticallyMatch(
+                knowledgeDBs,
+                r.head,
+                r.author,
+                localID,
+                author
+              );
+          const matchesContext = useExactMatch
+            ? contextsMatch(r.context, context)
+            : contextsSemanticallyMatch(
+                knowledgeDBs,
+                r.context,
+                r.author,
+                context,
+                author
+              );
+          return (
+            matchesNode &&
+            r.id !== excludeRelationId &&
+            matchesContext &&
+            (r.items.size > 0 || r.root === shortID(r.id))
+          );
         }
-        const useExactMatch =
-          r.author === author &&
-          currentRoot !== undefined &&
-          r.root === currentRoot;
-        const matchesNode = useExactMatch
-          ? r.head === localID
-          : nodesSemanticallyMatch(
-              knowledgeDBs,
-              r.head,
-              r.author,
-              localID,
-              author
-            );
-        const matchesContext = useExactMatch
-          ? contextsMatch(r.context, context)
-          : contextsSemanticallyMatch(
-              knowledgeDBs,
-              r.context,
-              r.author,
-              context,
-              author
-            );
-        return (
-          matchesNode &&
-          r.id !== excludeRelationId &&
-          matchesContext &&
-          (r.items.size > 0 || r.root === shortID(r.id))
-        );
-      })
-      .toList()
-  );
+      )
+    )
+    .toList();
 }
 
 function useExactItemMatchForRelation(
@@ -674,23 +679,32 @@ function relationHeadMatchesNode(
   return getTextHashForMatching(knowledgeDBs, head, author) === localID;
 }
 
+function getAuthorCandidateRelations(
+  knowledgeDBs: KnowledgeDBs,
+  author: PublicKey,
+  nodeID: LongID | ID
+): Relations[] {
+  const authorDB = knowledgeDBs.get(author, newDB());
+  const localID = shortID(nodeID);
+  const semanticKey = getSemanticNodeKey(knowledgeDBs, nodeID, author);
+  return getIndexedRelationsForKeys(authorDB, [localID, semanticKey]);
+}
+
 function getNewestStandaloneRelationFromAuthor(
   knowledgeDBs: KnowledgeDBs,
   author: PublicKey,
   nodeID: LongID | ID,
   context: Context
 ): Relations | undefined {
-  const localID = shortID(nodeID);
-  const authorDB = knowledgeDBs.get(author, newDB());
   return sortRelationsByDate(
-    authorDB.relations
-      .filter(
+    List(
+      getAuthorCandidateRelations(knowledgeDBs, author, nodeID).filter(
         (r) =>
-          relationHeadMatchesNode(knowledgeDBs, author, r.head, localID) &&
+          relationHeadMatchesNode(knowledgeDBs, author, r.head, nodeID) &&
           r.root === shortID(r.id) &&
           contextsMatch(r.context, context)
       )
-      .toList()
+    )
   ).first();
 }
 
@@ -701,17 +715,15 @@ function getNewestRelationFromRoot(
   context: Context,
   root: ID
 ): Relations | undefined {
-  const localID = shortID(nodeID);
-  const authorDB = knowledgeDBs.get(author, newDB());
   return sortRelationsByDate(
-    authorDB.relations
-      .filter(
+    List(
+      getAuthorCandidateRelations(knowledgeDBs, author, nodeID).filter(
         (r) =>
-          relationHeadMatchesNode(knowledgeDBs, author, r.head, localID) &&
+          relationHeadMatchesNode(knowledgeDBs, author, r.head, nodeID) &&
           r.root === root &&
           contextsMatch(r.context, context)
       )
-      .toList()
+    )
   ).first();
 }
 
@@ -721,16 +733,14 @@ function getNewestRelationByContext(
   nodeID: LongID | ID,
   context: Context
 ): Relations | undefined {
-  const localID = shortID(nodeID);
-  const authorDB = knowledgeDBs.get(author, newDB());
   return sortRelationsByDate(
-    authorDB.relations
-      .filter(
+    List(
+      getAuthorCandidateRelations(knowledgeDBs, author, nodeID).filter(
         (r) =>
-          relationHeadMatchesNode(knowledgeDBs, author, r.head, localID) &&
+          relationHeadMatchesNode(knowledgeDBs, author, r.head, nodeID) &&
           contextsMatch(r.context, context)
       )
-      .toList()
+    )
   ).first();
 }
 

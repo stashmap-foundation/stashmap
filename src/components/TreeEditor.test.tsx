@@ -1384,7 +1384,7 @@ Root
       `);
     });
 
-    test("Clearing parent also deletes descendant relations", async () => {
+    test("Clearing parent deletes descendant relations and resets invalid panes", async () => {
       const [alice] = setup([ALICE]);
       renderApp(alice());
 
@@ -1412,7 +1412,7 @@ Child
 
       await expectTree(`
 Root
-Child
+[NEW NODE]
       `);
     });
 

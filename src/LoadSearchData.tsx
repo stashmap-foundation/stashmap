@@ -14,6 +14,7 @@ import { useReadRelays } from "./relays";
 import { useSearchQuery, filterForKeyword } from "./components/SearchModal";
 import { LoadData } from "./dataQuery";
 import { useCurrentPane } from "./SplitPanesContext";
+import { newDB } from "./knowledge";
 
 function getAllNodesFromDBs(knowledgeDBs: KnowledgeDBs): Map<string, KnowNode> {
   return buildTextNodesFromRelations(
@@ -25,12 +26,10 @@ function SearchCrefBuilder({
   children,
   searchId,
   foundNodeIDs,
-  searchNodes,
 }: {
   children: React.ReactNode;
   searchId: ID;
   foundNodeIDs: List<ID>;
-  searchNodes: Map<ID, KnowNode>;
 }): JSX.Element {
   const { knowledgeDBs, user } = useData();
   const pane = useCurrentPane();
@@ -59,7 +58,7 @@ function SearchCrefBuilder({
   );
 
   const syntheticDB: KnowledgeData = {
-    nodes: searchNodes as Map<ID, KnowNode>,
+    ...newDB(),
     relations: Map<ID, Relations>([[searchId, searchRelations]]),
   };
 
@@ -118,7 +117,6 @@ export function LoadSearchData({
       <SearchCrefBuilder
         searchId={searchId}
         foundNodeIDs={foundNodeIDs}
-        searchNodes={allSearchResults as Map<ID, KnowNode>}
       >
         {children}
       </SearchCrefBuilder>

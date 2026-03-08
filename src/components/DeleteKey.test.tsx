@@ -97,7 +97,7 @@ Root
     `);
   });
 
-  test("delete cleans up orphaned descendant relations", async () => {
+  test("delete cleans up orphaned descendant relations and resets invalid panes", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
@@ -130,7 +130,7 @@ Child
 
     await expectTree(`
 Root
-Child
+[NEW NODE]
     `);
   });
 

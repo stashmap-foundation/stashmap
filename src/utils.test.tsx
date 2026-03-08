@@ -39,7 +39,6 @@ import {
   createPlan,
   planAddContact,
   planRemoveContact,
-  planUpsertNode,
   planUpsertRelations,
   PlanningContextProvider,
 } from "./planner";
@@ -312,9 +311,21 @@ export function setup(
 
 export function findNodeByText(plan: Plan, text: string): KnowNode | undefined {
   const { knowledgeDBs, user } = plan;
-  return knowledgeDBs
-    .get(user.publicKey, newDB())
-    .nodes.find((node) => node.text === text);
+  const userDB = knowledgeDBs.get(user.publicKey, newDB());
+  const relation = userDB.relations
+    .valueSeq()
+    .filter((candidate) => candidate.text === text)
+    .sortBy((candidate) => -candidate.updated)
+    .first();
+  if (relation) {
+    return {
+      id: relation.head,
+      text: relation.text,
+      textHash: relation.textHash,
+      type: "text",
+    };
+  }
+  return undefined;
 }
 
 function createInitialRoot(plan: Plan, rootText?: string): [Plan, nodeID: ID] {
@@ -325,11 +336,11 @@ function createInitialRoot(plan: Plan, rootText?: string): [Plan, nodeID: ID] {
     throw new Error(`Test Setup Error: No Node with text ${rootText} found`);
   }
 
-  const planWithNode = rootText ? plan : planUpsertNode(plan, rootNode);
-  return [planWithNode, rootNode.id];
+  return [plan, rootNode.id];
 }
 
-type RenderApis = Partial<TestApis> & {
+type RenderApis = Partial<TestApis> &
+  Partial<DataContextProps> & {
   initialRoute?: string;
   includeFocusContext?: boolean;
   user?: User;
@@ -340,23 +351,25 @@ type RenderApis = Partial<TestApis> & {
 
 function TestPublishProvider({
   children,
+  initialDataContextProps,
 }: {
   children: React.ReactNode;
+  initialDataContextProps: DataContextProps;
 }): JSX.Element {
   const [publishEventsStatus, setPublishEventsStatus] = React.useState(
-    DEFAULT_DATA_CONTEXT_PROPS.publishEventsStatus
+    initialDataContextProps.publishEventsStatus
   );
   return (
     <DataContextProvider
-      user={DEFAULT_DATA_CONTEXT_PROPS.user}
-      contacts={DEFAULT_DATA_CONTEXT_PROPS.contacts}
-      contactsRelays={DEFAULT_DATA_CONTEXT_PROPS.contactsRelays}
-      knowledgeDBs={DEFAULT_DATA_CONTEXT_PROPS.knowledgeDBs}
-      relaysInfos={DEFAULT_DATA_CONTEXT_PROPS.relaysInfos}
+      user={initialDataContextProps.user}
+      contacts={initialDataContextProps.contacts}
+      contactsRelays={initialDataContextProps.contactsRelays}
+      knowledgeDBs={initialDataContextProps.knowledgeDBs}
+      relaysInfos={initialDataContextProps.relaysInfos}
       publishEventsStatus={publishEventsStatus}
-      views={DEFAULT_DATA_CONTEXT_PROPS.views}
-      projectMembers={DEFAULT_DATA_CONTEXT_PROPS.projectMembers}
-      panes={DEFAULT_DATA_CONTEXT_PROPS.panes}
+      views={initialDataContextProps.views}
+      projectMembers={initialDataContextProps.projectMembers}
+      panes={initialDataContextProps.panes}
     >
       <EventCacheProvider
         unpublishedEvents={publishEventsStatus.unsignedEvents}
@@ -379,6 +392,20 @@ export function renderApis(
   options?: RenderApis
 ): TestApis & RenderResult {
   const { fileStore, relayPool, finalizeEvent, nip11 } = applyApis(options);
+  const initialDataContextProps: DataContextProps = {
+    user: options?.user || DEFAULT_DATA_CONTEXT_PROPS.user,
+    contacts: options?.contacts || DEFAULT_DATA_CONTEXT_PROPS.contacts,
+    contactsRelays:
+      options?.contactsRelays || DEFAULT_DATA_CONTEXT_PROPS.contactsRelays,
+    knowledgeDBs: options?.knowledgeDBs || DEFAULT_DATA_CONTEXT_PROPS.knowledgeDBs,
+    relaysInfos: options?.relaysInfos || DEFAULT_DATA_CONTEXT_PROPS.relaysInfos,
+    publishEventsStatus:
+      options?.publishEventsStatus || DEFAULT_DATA_CONTEXT_PROPS.publishEventsStatus,
+    views: options?.views || DEFAULT_DATA_CONTEXT_PROPS.views,
+    projectMembers:
+      options?.projectMembers || DEFAULT_DATA_CONTEXT_PROPS.projectMembers,
+    panes: options?.panes || DEFAULT_DATA_CONTEXT_PROPS.panes,
+  };
 
   // If user is explicity undefined it will be overwritten, if not set default Alice is used
   const optionsWithDefaultUser = {
@@ -411,7 +438,7 @@ export function renderApis(
           timeToStorePreLoginEvents: 0,
         }}
       >
-        <TestPublishProvider>
+        <TestPublishProvider initialDataContextProps={initialDataContextProps}>
           <NostrAuthContextProvider
             defaultRelayUrls={
               optionsWithDefaultUser.defaultRelays ||
@@ -625,37 +652,32 @@ function createNodesAndRelations(
       : undefined;
     const node =
       typeof textOrNode === "string" ? newNode(textOrNode) : textOrNode;
-    // no need to upsert if it's already a node
-    const planWithNode =
-      typeof textOrNode === "string" ? planUpsertNode(rdx, node) : rdx;
-    // Add Node to current relation
-    const planWithUpdatedRelation = currentRelations
+    const nodeRelations = newRelations(
+      node.id,
+      context,
+      rdx.user.publicKey,
+      currentRelations?.root,
+      currentRelations?.id,
+      node.text
+    );
+    const planWithRelation = planUpsertRelations(rdx, nodeRelations);
+    const planWithUpdatedParent = currentRelations
       ? planUpsertRelations(
-          planWithNode,
-          addRelationToRelations(currentRelations, node.id)
+          planWithRelation,
+          addRelationToRelations(currentRelations, nodeRelations.id)
         )
-      : planWithNode;
-    if (children) {
-      // Create relations with current context (path to this node)
-      const relationForChildren = newRelations(
-        node.id,
-        context,
-        rdx.user.publicKey
-      );
-      const planWithRelations = planUpsertRelations(
-        planWithUpdatedRelation,
-        relationForChildren
-      );
-      // Children's context includes this node (including pane root)
-      const childContext = context.push(shortID(node.id));
-      return createNodesAndRelations(
-        planWithRelations,
-        relationForChildren.id,
-        children,
-        childContext
-      );
+      : planWithRelation;
+    if (!children) {
+      return planWithUpdatedParent;
     }
-    return planWithUpdatedRelation;
+    // Children's context includes this node (including pane root)
+    const childContext = context.push(shortID(node.id));
+    return createNodesAndRelations(
+      planWithUpdatedParent,
+      nodeRelations.id,
+      children,
+      childContext
+    );
   }, plan);
 }
 

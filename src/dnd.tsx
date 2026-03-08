@@ -263,12 +263,37 @@ export function planDisconnectFromParent(
     isRefId(nodeID) ||
     shortID(nodeID) === VERSIONS_NODE_ID;
   if (skipCleanup) {
-    return planWithViews;
+    return resetInvalidPanes(planWithViews);
   }
 
-  return sourceRelation
+  const cleanedPlan = sourceRelation
     ? planDeleteDescendantRelations(planWithViews, sourceRelation)
     : planWithViews;
+  return resetInvalidPanes(cleanedPlan);
+}
+
+function resetInvalidPanes(plan: Plan, paneIndexToReset?: number): Plan {
+  const shouldResetPane = (p: Pane, i: number): boolean => {
+    if (paneIndexToReset !== undefined && i === paneIndexToReset) {
+      return true;
+    }
+    if (p.rootRelation !== undefined) {
+      return (
+        getRelationForView(plan, [i, p.rootRelation] as ViewPath, p.stack) ===
+        undefined
+      );
+    }
+    if (p.stack.length === 0) {
+      return false;
+    }
+    const rootViewPath: ViewPath = [i, p.rootRelation || p.stack[p.stack.length - 1]];
+    return getRelationForView(plan, rootViewPath, p.stack) === undefined;
+  };
+
+  const newPanes = plan.panes.map((p, i) =>
+    shouldResetPane(p, i) ? { ...p, stack: [], rootRelation: undefined } : p
+  );
+  return planUpdatePanes(plan, newPanes);
 }
 
 export function planDeleteNodeFromView(
@@ -298,36 +323,7 @@ export function planDeleteNodeFromView(
     planAfterDescendants,
     relation.id
   );
-
-  const paneIndex = getPaneIndex(viewPath);
-  const shouldResetPane = (p: Pane, i: number): boolean => {
-    if (i === paneIndex) {
-      return true;
-    }
-    if (p.rootRelation !== undefined) {
-      return (
-        getRelationForView(
-          planAfterDelete,
-          [i, p.rootRelation] as ViewPath,
-          p.stack
-        ) === undefined
-      );
-    }
-    if (p.stack.length === 0) {
-      return false;
-    }
-    const rootViewPath: ViewPath = [i, p.rootRelation || p.stack[p.stack.length - 1]];
-    const paneRelation = getRelationForView(
-      planAfterDelete,
-      rootViewPath,
-      p.stack
-    );
-    return paneRelation === undefined;
-  };
-  const newPanes = planAfterDelete.panes.map((p, i) =>
-    shouldResetPane(p, i) ? { ...p, stack: [], rootRelation: undefined } : p
-  );
-  return planUpdatePanes(planAfterDelete, newPanes);
+  return resetInvalidPanes(planAfterDelete, getPaneIndex(viewPath));
 }
 
 export function planMoveNodeWithView(

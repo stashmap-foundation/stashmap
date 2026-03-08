@@ -4,7 +4,7 @@ import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
 import { useData } from "../DataContext";
 import { useApis } from "../Apis";
 import { KIND_SEARCH } from "../Data";
-import { findDocumentNodesAndRelations } from "../knowledgeEvents";
+import { findDocumentRelations } from "../knowledgeEvents";
 import { buildTextNodesFromRelations } from "../connections";
 import { useReadRelays } from "../relays";
 
@@ -85,7 +85,7 @@ export function useSearchQuery(
 
   const eventsAsList = events.toList();
   const relationsFromDocumentEvents =
-    findDocumentNodesAndRelations(eventsAsList).relations.valueSeq();
+    findDocumentRelations(eventsAsList).valueSeq();
   const nodesFromDocumentEvents = buildTextNodesFromRelations(
     relationsFromDocumentEvents
   );

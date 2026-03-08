@@ -252,9 +252,7 @@ describe("basedOn serialization round-trip", () => {
     expect(event).toBeDefined();
 
     const parsed = parseDocumentEvent(event!);
-    const relationWithBasedOn = parsed.relations.find(
-      (relation) => relation.basedOn !== undefined
-    );
+    const relationWithBasedOn = parsed.find((relation) => relation.basedOn !== undefined);
     expect(relationWithBasedOn).toBeDefined();
     expect(relationWithBasedOn!.basedOn).toContain(sourceRelationID);
   });
@@ -287,9 +285,7 @@ describe("basedOn serialization round-trip", () => {
     expect(event).toBeDefined();
 
     const parsed = parseDocumentEvent(event!);
-    const relationWithBasedOn = parsed.relations.find(
-      (relation) => relation.basedOn !== undefined
-    );
+    const relationWithBasedOn = parsed.find((relation) => relation.basedOn !== undefined);
     expect(relationWithBasedOn).toBeUndefined();
   });
 
@@ -342,11 +338,7 @@ describe("basedOn serialization round-trip", () => {
     );
 
     const parsed = parseDocumentEvent(event!);
-    expect(parsed.relations.get(shortID(rootRelations.id))?.text).toBe(
-      rootLabel
-    );
-    expect(parsed.relations.get(shortID(childRelations.id))?.text).toBe(
-      childLabel
-    );
+    expect(parsed.get(shortID(rootRelations.id))?.text).toBe(rootLabel);
+    expect(parsed.get(shortID(childRelations.id))?.text).toBe(childLabel);
   });
 });

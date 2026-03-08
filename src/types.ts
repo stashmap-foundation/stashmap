@@ -290,7 +290,6 @@ declare global {
   type RelationTypes = OrderedMap<ID, RelationType>;
 
   type KnowledgeData = {
-    nodes: Map<ID, KnowNode>;
     relations: Map<ID, Relations>;
   };
 

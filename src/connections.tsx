@@ -216,18 +216,10 @@ export function getIndexedRelationsForKeys(
 }
 
 function getRelationTextHash(
-  knowledgeDBs: KnowledgeDBs,
+  _knowledgeDBs: KnowledgeDBs,
   relation: Relations
 ): ID {
-  if (getRelationText(relation) !== undefined) {
-    return relation.textHash;
-  }
-  const node = getNodeForMatching(
-    knowledgeDBs,
-    relation.head as LongID | ID,
-    relation.author
-  );
-  return getNodeTextHash(node) || hashText(node?.text || "");
+  return relation.textHash;
 }
 
 function getMatchingRelations(
@@ -296,13 +288,10 @@ export function getTextForMatching(
   if (relationText !== undefined) {
     return relationText;
   }
-
-  const node = getNodeForMatching(knowledgeDBs, nodeID, author);
-  if (node?.text) {
-    return node.text;
-  }
-
-  return getFallbackRelationText(nodeID);
+  const fallbackText = getFallbackRelationText(nodeID);
+  return fallbackText !== "" || localID === EMPTY_NODE_ID
+    ? fallbackText
+    : undefined;
 }
 
 export function getTextHashForMatching(
@@ -311,11 +300,14 @@ export function getTextHashForMatching(
   author: PublicKey
 ): ID | undefined {
   const relation = getRelationForMatching(knowledgeDBs, nodeID, author);
-  if (relation && getRelationText(relation) !== undefined) {
+  if (relation) {
     return relation.textHash;
   }
-  const node = getNodeForMatching(knowledgeDBs, nodeID, author);
-  return getNodeTextHash(node) || (node?.text ? hashText(node.text) : undefined);
+  const localID = shortID(nodeID as ID) as ID;
+  const fallbackText = getFallbackRelationText(nodeID);
+  return fallbackText !== "" || localID === EMPTY_NODE_ID
+    ? hashText(fallbackText)
+    : undefined;
 }
 
 export function createTextNodeFromRelation(relation: Relations): TextNode {
@@ -348,29 +340,6 @@ export function buildTextNodesFromRelations(
   ) as Map<string, TextNode>;
 }
 
-function getCompatibilityNodeFromDBs(
-  knowledgeDBs: KnowledgeDBs,
-  nodeID: LongID | ID,
-  author: PublicKey
-): TextNode | undefined {
-  const [remote, localID] = splitID(nodeID as ID);
-  const effectiveAuthor = remote || author;
-  const directNode = knowledgeDBs.get(effectiveAuthor)?.nodes.get(localID);
-  if (directNode && isTextNode(directNode)) {
-    return directNode;
-  }
-
-  const matchedNode = knowledgeDBs
-    .valueSeq()
-    .flatMap((db) => db.nodes.valueSeq())
-    .find(
-      (node): node is TextNode =>
-        isTextNode(node) &&
-        (shortID(node.id) === localID || getNodeTextHash(node) === localID)
-    );
-  return matchedNode && isTextNode(matchedNode) ? matchedNode : undefined;
-}
-
 export function getTextNodeForID(
   knowledgeDBs: KnowledgeDBs,
   nodeID: LongID | ID,
@@ -401,8 +370,7 @@ export function getTextNodeForID(
       type: "text",
     };
   }
-
-  return getCompatibilityNodeFromDBs(knowledgeDBs, nodeID, author);
+  return undefined;
 }
 
 export function getRelationsNoReferencedBy(
@@ -580,11 +548,6 @@ export function ensureRelationNativeFields(
   const existingRelation = knowledgeDBs
     .get(relation.author)
     ?.relations.get(shortID(relation.id));
-  const relationNode = getNodeForMatching(
-    knowledgeDBs,
-    relation.head,
-    relation.author
-  );
   const localHead = shortID(relation.head as ID) as ID;
   const hasReservedHead =
     localHead === VERSIONS_NODE_ID ||
@@ -595,7 +558,6 @@ export function ensureRelationNativeFields(
   const text = shouldTrustRelationText
     ? relation.text
     : existingRelation?.text ||
-      (relationNode && isTextNode(relationNode) ? relationNode.text : "") ||
       getFallbackRelationText(relation.head);
   const textHash = hashText(text);
   const parent = relation.parent || existingRelation?.parent;

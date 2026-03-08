@@ -133,15 +133,11 @@ test("Diff items are always added, never moved", () => {
 
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
-      nodes: newDB()
-        .nodes.set(shortID(parent.id), parent)
-        .set(shortID(aliceChild.id), aliceChild),
       relations: newDB()
         .relations.set(shortID(aliceRelations.id), aliceRelations)
         .set(shortID(aliceChildRelations.id), aliceChildRelations),
     })
     .set(bobPK, {
-      nodes: newDB().nodes.set(shortID(bobChild.id), bobChild),
       relations: newDB()
         .relations.set(shortID(bobRelations.id), bobRelations)
         .set(shortID(bobChildRelations.id), bobChildRelations),

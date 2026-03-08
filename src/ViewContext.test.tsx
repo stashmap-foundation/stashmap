@@ -2,19 +2,7 @@ import React from "react";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { List, Map } from "immutable";
-import {
-  newNode,
-  addRelationToRelations,
-  bulkAddRelations,
-  shortID,
-  createConcreteRefId,
-} from "./connections";
-import { execute } from "./executor";
-import {
-  createPlan,
-  planBulkUpsertNodes,
-  planUpsertRelations,
-} from "./planner";
+import { createConcreteRefId } from "./connections";
 import {
   renderWithTestData,
   ALICE,
@@ -29,8 +17,6 @@ import {
   type,
 } from "./utils.test";
 import {
-  RootViewContextProvider,
-  newRelations,
   parseViewPath,
   viewPathToString,
   updateViewPathsAfterDisconnect,
@@ -39,55 +25,20 @@ import {
   updateViewPathsAfterMoveRelations,
   ViewPath,
 } from "./ViewContext";
-import { TreeView } from "./components/TreeView";
-import { LoadData } from "./dataQuery";
 
 test("Move View Settings on Delete", async () => {
   const [alice] = setup([ALICE]);
-  const { publicKey } = alice().user;
-
-  const c = newNode("C");
-  const cpp = newNode("C++");
-  const java = newNode("Java");
-  const pl = newNode("Programming Languages");
-
-  const planWithNodes = planBulkUpsertNodes(createPlan(alice()), [
-    c,
-    cpp,
-    java,
-    pl,
-  ]);
-
-  // When viewing with pl as root:
-  // - pl's children (c, java) have empty context
-  // - c's children (cpp) have context [shortID(pl)]
-  const plChildrenContext = List<ID>();
-  const cChildrenContext = List<ID>([shortID(pl.id)]);
-  const plChildrenRelations = bulkAddRelations(
-    newRelations(pl.id, plChildrenContext, publicKey),
-    [c.id, java.id]
+  await setupTestDB(
+    alice(),
+    [["Programming Languages", [["C", ["C++"]], ["Java"]]]],
+    {
+      root: "Programming Languages",
+    }
   );
-  const planWithRelations = planUpsertRelations(
-    planUpsertRelations(planWithNodes, plChildrenRelations),
-    addRelationToRelations(
-      newRelations(c.id, cChildrenContext, publicKey, plChildrenRelations.root),
-      cpp.id
-    )
-  );
-
-  await execute({
+  renderApp({
     ...alice(),
-    plan: planWithRelations,
+    initialRoute: `/n/${encodeURIComponent("Programming Languages")}`,
   });
-
-  renderWithTestData(
-    <LoadData nodeIDs={[pl.id]} descendants referencedBy lists>
-      <RootViewContextProvider root={pl.id}>
-        <TreeView />
-      </RootViewContextProvider>
-    </LoadData>,
-    alice()
-  );
   // Root is expanded by default, find and expand C
   await screen.findByText("C");
   await userEvent.click(screen.getByLabelText("expand C"));

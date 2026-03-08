@@ -1551,27 +1551,30 @@ export function newRelations(
   context: Context,
   myself: PublicKey,
   root?: ID,
-  parent?: LongID
+  parent?: LongID,
+  text?: string
 ): Relations {
   const id = joinID(myself, v4());
   const localHead = shortID(head) as ID;
-  let text = "";
-  if (localHead === VERSIONS_NODE_ID) {
-    text = "~versions";
-  } else if (localHead === LOG_NODE_ID) {
-    text = "~Log";
-  } else if (localHead === EMPTY_NODE_ID) {
-    text = "";
-  } else if (isSearchId(localHead)) {
-    text = parseSearchId(localHead) || "";
+  let relationText = text ?? "";
+  if (text === undefined) {
+    if (localHead === VERSIONS_NODE_ID) {
+      relationText = "~versions";
+    } else if (localHead === LOG_NODE_ID) {
+      relationText = "~Log";
+    } else if (localHead === EMPTY_NODE_ID) {
+      relationText = "";
+    } else if (isSearchId(localHead)) {
+      relationText = parseSearchId(localHead) || "";
+    }
   }
   return {
     head: localHead,
     items: List<RelationItem>(),
     context,
     id,
-    text,
-    textHash: hashText(text),
+    text: relationText,
+    textHash: hashText(relationText),
     parent,
     updated: Date.now(),
     author: myself,
@@ -1586,9 +1589,10 @@ export function newRelationsForNode(
   context: Context,
   myself: PublicKey,
   root?: ID,
-  parent?: LongID
+  parent?: LongID,
+  text?: string
 ): Relations {
-  const relations = newRelations(nodeID, context, myself, root, parent);
+  const relations = newRelations(nodeID, context, myself, root, parent, text);
   if (shortID(nodeID) === VERSIONS_NODE_ID && context.size > 0) {
     const originalNodeID = context.last() as ID;
     return addRelationToRelations(relations, originalNodeID);

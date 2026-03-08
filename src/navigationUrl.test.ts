@@ -1,6 +1,7 @@
-import { Map } from "immutable";
-import { hashText } from "./connections";
+import { List, Map } from "immutable";
+import { hashText, shortID } from "./connections";
 import { newDB } from "./knowledge";
+import { newRelations } from "./ViewContext";
 import {
   buildNodeUrl,
   pathToStack,
@@ -11,31 +12,26 @@ import {
 const ALICE_PK = "alice-pub-key" as PublicKey;
 const OTHER_PK = "other-author" as PublicKey;
 
-function knowledgeDBWithNodes(
+function knowledgeDBWithTexts(
   author: PublicKey,
-  nodes: Array<{ text: string }>
+  texts: string[]
 ): KnowledgeDBs {
+  const relations = texts.reduce((acc, text) => {
+    const head = hashText(text);
+    const relation = newRelations(head, List<ID>(), author, head, undefined, text);
+    return acc.set(shortID(relation.id), relation);
+  }, Map<string, Relations>());
   const db: KnowledgeData = {
     ...newDB(),
-    nodes: Map(
-      nodes.map((n) => [
-        hashText(n.text),
-        {
-          text: n.text,
-          id: hashText(n.text),
-          textHash: hashText(n.text),
-          type: "text",
-        },
-      ])
-    ) as KnowledgeData["nodes"],
+    relations,
   };
   return Map<PublicKey, KnowledgeData>({ [author]: db });
 }
 
 test("buildNodeUrl and pathToStack round-trip preserves node IDs", () => {
-  const knowledgeDBs = knowledgeDBWithNodes(ALICE_PK, [
-    { text: "Holiday Destinations" },
-    { text: "Barcelona" },
+  const knowledgeDBs = knowledgeDBWithTexts(ALICE_PK, [
+    "Holiday Destinations",
+    "Barcelona",
   ]);
   const stack = [
     hashText("Holiday Destinations"),
@@ -61,7 +57,7 @@ test("buildNodeUrl with empty stack returns /", () => {
 });
 
 test("buildNodeUrl includes author param for other user", () => {
-  const knowledgeDBs = knowledgeDBWithNodes(OTHER_PK, [{ text: "My Notes" }]);
+  const knowledgeDBs = knowledgeDBWithTexts(OTHER_PK, ["My Notes"]);
   const stack = [hashText("My Notes")] as ID[];
 
   const path = buildNodeUrl(stack, knowledgeDBs, ALICE_PK, OTHER_PK);
@@ -69,7 +65,7 @@ test("buildNodeUrl includes author param for other user", () => {
 });
 
 test("buildNodeUrl omits author param for own content", () => {
-  const knowledgeDBs = knowledgeDBWithNodes(ALICE_PK, [{ text: "My Notes" }]);
+  const knowledgeDBs = knowledgeDBWithTexts(ALICE_PK, ["My Notes"]);
   const stack = [hashText("My Notes")] as ID[];
 
   const path = buildNodeUrl(stack, knowledgeDBs, ALICE_PK, ALICE_PK);

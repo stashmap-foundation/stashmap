@@ -16,9 +16,7 @@ import { EventCacheProvider } from "./EventCache";
 import { findContacts, findMembers } from "./contacts";
 import { useApis } from "./Apis";
 import {
-  findNodes,
-  findRelations,
-  findDocumentNodesAndRelations,
+  findDocumentRelations,
   findViews,
 } from "./knowledgeEvents";
 import { newDB } from "./knowledge";
@@ -41,7 +39,6 @@ import {
 } from "./navigationUrl";
 import {
   ensureRelationNativeFields,
-  inferParentRelationID,
   shortID,
 } from "./connections";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
@@ -164,27 +161,21 @@ function processEventsByAuthor(
   authorEvents: List<UnsignedEvent | Event>
 ): ProcessedEvents {
   const contacts = findContacts(authorEvents);
-  const docResult = findDocumentNodesAndRelations(authorEvents);
-  const nodes = findNodes(authorEvents).merge(docResult.nodes);
-  const rawRelations = findRelations(authorEvents).merge(docResult.relations);
-  const relations = rawRelations
+  const relations = findDocumentRelations(authorEvents)
     .valueSeq()
     .sortBy((relation) => relation.context.size)
     .reduce((acc, relation) => {
       const knowledgeDBs = Map<PublicKey, KnowledgeData>().set(relation.author, {
-        nodes,
+        ...newDB(),
         relations: acc,
       });
-      const normalized = ensureRelationNativeFields(knowledgeDBs, {
-        ...relation,
-        parent: relation.parent || inferParentRelationID(knowledgeDBs, relation),
-      });
+      const normalized = ensureRelationNativeFields(knowledgeDBs, relation);
       return acc.set(shortID(normalized.id), normalized);
     }, Map<string, Relations>());
   const views = findViews(authorEvents);
   const projectMembers = findMembers(authorEvents);
   const knowledgeDB = {
-    nodes,
+    ...newDB(),
     relations,
   };
   const relays = findRelays(authorEvents);

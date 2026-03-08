@@ -307,7 +307,7 @@ function EditableContent(): JSX.Element {
         executePlan(
           planAddToParent(
             planWithNode,
-            newNode.id,
+            newNode,
             prevSibling.viewPath,
             stack
           )[0]
@@ -372,7 +372,7 @@ function EditableContent(): JSX.Element {
       executePlan(
         planAddToParent(
           planWithNode,
-          newNode.id,
+          newNode,
           grandParentPath,
           stack,
           parentRelationIndex + 1

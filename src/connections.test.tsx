@@ -18,7 +18,6 @@ import { newRelations } from "./ViewContext";
 import { newDB } from "./knowledge";
 
 function sampleNodes(): {
-  nodes: Map<ID, KnowNode>;
   relations: Relations;
   a: KnowNode;
   b: KnowNode;
@@ -36,15 +35,7 @@ function sampleNodes(): {
     newRelations(a.id, List(), ALICE.publicKey),
     [b.id, c.id, d.id, e.id]
   );
-
-  const nodes = Map({
-    [a.id]: a,
-    [b.id]: b,
-    [c.id]: c,
-    [d.id]: d,
-    [e.id]: e,
-  });
-  return { nodes, a, b, c, d, e, relations };
+  return { a, b, c, d, e, relations };
 }
 
 // Helper to extract nodeIDs from RelationItems for easier testing
@@ -97,12 +88,10 @@ test("findRefsToNode finds refs from multiple users", () => {
     [ALICE.publicKey]: {
       ...aliceDB,
       relations: Map({ [shortID(moneyRelations.id)]: moneyRelations }),
-      nodes: Map({ [btc.id]: btc, [money.id]: money }),
     },
     [BOB.publicKey]: {
       ...bobsDB,
       relations: Map({ [shortID(cryptoRelations.id)]: cryptoRelations }),
-      nodes: Map({ [crypto.id]: crypto }),
     },
   }) as KnowledgeDBs;
 
@@ -125,12 +114,10 @@ test("getRelationsNoReferencedBy resolves unscoped relation IDs across DBs", () 
   const dbs = Map({
     [ALICE.publicKey]: {
       ...newDB(),
-      nodes: Map({ [root.id]: root }),
       relations: Map<string, Relations>(),
     },
     [BOB.publicKey]: {
       ...newDB(),
-      nodes: Map({ [root.id]: root, [child.id]: child }),
       relations: Map({ [shortID(bobRelations.id)]: bobRelations }),
     },
   }) as KnowledgeDBs;

@@ -30,11 +30,6 @@ describe("findRefsToNode", () => {
       [ALICE.publicKey]: {
         ...newDB(),
         relations: Map({ [shortID(stuffRelations.id)]: stuffRelations }),
-        nodes: Map({
-          [myNotes.id]: myNotes,
-          [stuff.id]: stuff,
-          [child1.id]: child1,
-        }),
       },
     }) as KnowledgeDBs;
 
@@ -57,7 +52,6 @@ describe("findRefsToNode", () => {
       [ALICE.publicKey]: {
         ...newDB(),
         relations: Map({ [shortID(myNotesRelations.id)]: myNotesRelations }),
-        nodes: Map({ [myNotes.id]: myNotes, [stuff.id]: stuff }),
       },
     }) as KnowledgeDBs;
 
@@ -91,11 +85,6 @@ describe("findRefsToNode", () => {
         relations: Map({
           [shortID(myNotesRelations.id)]: myNotesRelations,
           [shortID(stuffRelations.id)]: stuffRelations,
-        }),
-        nodes: Map({
-          [myNotes.id]: myNotes,
-          [stuff.id]: stuff,
-          [child1.id]: child1,
         }),
       },
     }) as KnowledgeDBs;
@@ -143,11 +132,6 @@ describe("findRefsToNode", () => {
           [shortID(myNotesRelation.id)]: myNotesRelation,
           [shortID(stuffRelations.id)]: stuffRelations,
           [shortID(versionsRelations.id)]: versionsRelations,
-        }),
-        nodes: Map({
-          [myNotes.id]: myNotes,
-          [stuff.id]: stuff,
-          [stuffV2.id]: stuffV2,
         }),
       },
     }) as KnowledgeDBs;
@@ -200,12 +184,6 @@ describe("findRefsToNode", () => {
           [shortID(stuffRelations.id)]: stuffRelations,
           [shortID(versionRelation.id)]: versionRelation,
         }),
-        nodes: Map({
-          [myNotes.id]: myNotes,
-          [stuff.id]: stuff,
-          [someVersion.id]: someVersion,
-          [someChild.id]: someChild,
-        }),
       },
     }) as KnowledgeDBs;
 
@@ -241,10 +219,6 @@ describe("findRefsToNode", () => {
         relations: Map({
           [shortID(stuffRelation.id)]: stuffRelation,
           [shortID(versionsRelations.id)]: versionsRelations,
-        }),
-        nodes: Map({
-          [stuff.id]: stuff,
-          [stuffV2.id]: stuffV2,
         }),
       },
     }) as KnowledgeDBs;
@@ -291,11 +265,6 @@ describe("findRefsToNode", () => {
           [shortID(stuffRelations.id)]: stuffRelations,
           [shortID(versionsRelations.id)]: versionsRelations,
         }),
-        nodes: Map({
-          [myNotes.id]: myNotes,
-          [stuff.id]: stuff,
-          [stuffV2.id]: stuffV2,
-        }),
       },
     }) as KnowledgeDBs;
 
@@ -325,11 +294,6 @@ describe("findRefsToNode", () => {
         relations: Map({
           [shortID(myNotesRelations.id)]: myNotesRelations,
           [shortID(workRelations.id)]: workRelations,
-        }),
-        nodes: Map({
-          [myNotes.id]: myNotes,
-          [work.id]: work,
-          [stuff.id]: stuff,
         }),
       },
     }) as KnowledgeDBs;
@@ -374,12 +338,6 @@ describe("findRefsToNode", () => {
           [shortID(myNotesRelation.id)]: myNotesRelation,
           [shortID(stuffRelations.id)]: stuffRelations,
           [shortID(versionsRelations.id)]: versionsRelations,
-        }),
-        nodes: Map({
-          [myNotes.id]: myNotes,
-          [stuff.id]: stuff,
-          [stuffV1.id]: stuffV1,
-          [stuffV2.id]: stuffV2,
         }),
       },
     }) as KnowledgeDBs;

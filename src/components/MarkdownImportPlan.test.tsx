@@ -12,6 +12,7 @@ import {
 } from "../planner";
 import {
   addRelationToRelations,
+  getTextForMatching,
   getRelationItemNodeID,
   getRelationsNoReferencedBy,
   newNode,
@@ -178,9 +179,16 @@ function setupRootPlan(aliceState: () => Parameters<typeof createPlan>[0]): {
 } {
   const pk = aliceState().user.publicKey;
   const root = newNode("Root");
-  const rootRelations = newRelations(root.id, List(), pk);
+  const rootRelations = newRelations(
+    root.id,
+    List(),
+    pk,
+    undefined,
+    undefined,
+    root.text
+  );
   const planWithRoot = planUpsertRelations(
-    planUpsertNode(createPlan(aliceState()), root),
+    createPlan(aliceState()),
     rootRelations
   );
   const parentPath: ViewPath = [0, rootRelations.id];
@@ -382,8 +390,7 @@ test("Planning multiple markdown files returns top nodes in import order", () =>
   ]);
 
   const topTexts = topNodeIDs.map(
-    (id) =>
-      plan.knowledgeDBs.get(plan.user.publicKey)?.nodes.get(shortID(id))?.text
+    (id) => getTextForMatching(plan.knowledgeDBs, id, plan.user.publicKey)
   );
 
   expect(topTexts).toEqual(["One", "Two"]);

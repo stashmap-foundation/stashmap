@@ -7,16 +7,18 @@ import {
   updateViewPathsAfterDeleteNode,
   useNode,
   useNodeID,
+  useViewPath,
 } from "../ViewContext";
+import { usePaneStack } from "../SplitPanesContext";
 import { newDB } from "../knowledge";
 import {
   Plan,
-  planDeleteNode,
   planUpdateViews,
   planUpsertRelations,
   usePlanner,
 } from "../planner";
 import { isMutableNode } from "./TemporaryViewContext";
+import { planDeleteNodeFromView } from "../dnd";
 
 function disconnectNode(plan: Plan, toDisconnect: LongID | ID): Plan {
   const myDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
@@ -46,6 +48,8 @@ export function DeleteNode({
 }): JSX.Element | null {
   const [nodeID] = useNodeID();
   const [node] = useNode();
+  const viewPath = useViewPath();
+  const stack = usePaneStack();
   const navigate = useNavigate();
   const { createPlan, executePlan } = usePlanner();
 
@@ -53,10 +57,10 @@ export function DeleteNode({
     return null;
   }
   const deleteNode = (): void => {
-    const planWithDisconnectedNode = disconnectNode(createPlan(), nodeID);
-    const planWithDeletedNode = planDeleteNode(
-      planWithDisconnectedNode,
-      nodeID
+    const planWithDeletedNode = planDeleteNodeFromView(
+      disconnectNode(createPlan(), nodeID),
+      viewPath,
+      stack
     );
     executePlan(planWithDeletedNode);
     navigate("/");

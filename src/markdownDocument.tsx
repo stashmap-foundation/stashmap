@@ -590,17 +590,6 @@ export type WalkContext = {
   updated?: number;
 };
 
-function walkUpsertNode(ctx: WalkContext, node: KnowNode): WalkContext {
-  const db = ctx.knowledgeDBs.get(ctx.publicKey, newDB());
-  return {
-    ...ctx,
-    knowledgeDBs: ctx.knowledgeDBs.set(ctx.publicKey, {
-      ...db,
-      nodes: db.nodes.set(shortID(node.id), node),
-    }),
-  };
-}
-
 function walkUpsertRelation(
   ctx: WalkContext,
   relation: Relations
@@ -641,15 +630,13 @@ export function createVersion(
       : [editedNodeID, editContext];
 
   const versionNode = newNode(newText);
-  const withVersionNode = walkUpsertNode(ctx, versionNode);
 
   const versionsNode = newNode("~versions");
-  const withVersionsNode = walkUpsertNode(withVersionNode, versionsNode);
 
   const versionsContext = getVersionsContext(originalNodeID, context);
   const parentRelation = getRelationsForCurrentTree(
-    withVersionsNode.knowledgeDBs,
-    withVersionsNode.publicKey,
+    ctx.knowledgeDBs,
+    ctx.publicKey,
     originalNodeID,
     context,
     undefined,
@@ -658,8 +645,8 @@ export function createVersion(
   );
   const baseVersionsRelations =
     getVersionsRelations(
-      withVersionsNode.knowledgeDBs,
-      withVersionsNode.publicKey,
+      ctx.knowledgeDBs,
+      ctx.publicKey,
       originalNodeID,
       context,
       root
@@ -667,7 +654,7 @@ export function createVersion(
     newRelations(
       VERSIONS_NODE_ID,
       versionsContext,
-      withVersionsNode.publicKey,
+      ctx.publicKey,
       root,
       parentRelation?.id
     );
@@ -690,28 +677,28 @@ export function createVersion(
   const originalIndex = baseVersionsRelations.items.findIndex(
     (item) =>
       getRelationItemNodeID(
-        withVersionsNode.knowledgeDBs,
+        ctx.knowledgeDBs,
         item,
-        withVersionsNode.publicKey
+        ctx.publicKey
       ) === originalNodeID
   );
   const [withOriginalRelation, originalRelationID] =
     originalIndex < 0
       ? ensureVersionRelation(
-          withVersionsNode,
+          ctx,
           originalNodeID,
           getTextForMatching(
-            withVersionsNode.knowledgeDBs,
+            ctx.knowledgeDBs,
             originalNodeID,
-            withVersionsNode.publicKey
+            ctx.publicKey
           ) ?? ""
         )
       : [
-          withVersionsNode,
+          ctx,
           getRelationItemRelation(
-            withVersionsNode.knowledgeDBs,
+            ctx.knowledgeDBs,
             baseVersionsRelations.items.get(originalIndex)!,
-            withVersionsNode.publicKey
+            ctx.publicKey
           )!.id,
         ];
   const versionsWithOriginal =
@@ -777,13 +764,12 @@ function materializeTreeNode(
     treeNode.nodeID ??
       (treeNode.uuid ? nodeIDFromSeed(treeNode.uuid) : undefined)
   );
-  const withNode = walkUpsertNode(ctx, node);
   const baseRelation = treeNode.uuid
     ? {
-        ...newRelations(node.id, context, withNode.publicKey, root),
-        id: joinID(withNode.publicKey, treeNode.uuid),
+        ...newRelations(node.id, context, ctx.publicKey, root),
+        id: joinID(ctx.publicKey, treeNode.uuid),
       }
-    : newRelations(node.id, context, withNode.publicKey, root);
+    : newRelations(node.id, context, ctx.publicKey, root);
   const relationBaseWithFields: Relations = {
     ...baseRelation,
     text: node.text,
@@ -823,7 +809,7 @@ function materializeTreeNode(
       };
       return [afterChild, [...accItems, item]];
     },
-    [withNode, [] as RelationItem[]] as [WalkContext, RelationItem[]]
+    [ctx, [] as RelationItem[]] as [WalkContext, RelationItem[]]
   );
 
   const hiddenChildren = treeNode.children.filter((child) => child.hidden);
@@ -886,13 +872,12 @@ export function createNodesFromMarkdownTrees(
   );
 }
 
-export function parseDocumentEvent(event: UnsignedEvent): {
-  nodes: Map<string, KnowNode>;
-  relations: Map<string, Relations>;
-} {
+export function parseDocumentEvent(
+  event: UnsignedEvent
+): Map<string, Relations> {
   const dTagValue = findTag(event, "d");
   if (!dTagValue) {
-    return { nodes: Map(), relations: Map() };
+    return Map();
   }
 
   const author = event.pubkey as PublicKey;
@@ -905,8 +890,5 @@ export function parseDocumentEvent(event: UnsignedEvent): {
   };
   const [result] = createNodesFromMarkdownTrees(ctx, trees);
   const db = result.knowledgeDBs.get(author);
-  return {
-    nodes: db?.nodes ?? Map<string, KnowNode>(),
-    relations: db?.relations ?? Map<string, Relations>(),
-  };
+  return db?.relations ?? Map<string, Relations>();
 }

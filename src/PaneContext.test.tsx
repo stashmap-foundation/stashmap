@@ -6,8 +6,6 @@ import {
   ANON,
   setup,
   renderApp,
-  setupTestDB,
-  findNodeByText,
   findNewNodeEditor,
   follow,
   type,
@@ -27,10 +25,9 @@ test("App defaults to empty pane with new node editor when visiting /", async ()
 
 test("Navigate to specific node via URL using human-readable path", async () => {
   const [alice] = setup([ALICE]);
-  const db = await setupTestDB(alice(), [["Test Node", []]]);
-
-  const testNode = findNodeByText(db, "Test Node");
-  expect(testNode).toBeDefined();
+  renderApp(alice());
+  await type("Test Node{Escape}");
+  cleanup();
 
   renderApp({
     ...alice(),

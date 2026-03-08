@@ -4,7 +4,6 @@ import { UnsignedEvent, Event } from "nostr-tools";
 import {
   KIND_DELETE,
   KIND_KNOWLEDGE_DOCUMENT,
-  KIND_KNOWLEDGE_LIST,
   KIND_KNOWLEDGE_NODE,
   KIND_CONTACTLIST,
   KIND_VIEWS,
@@ -28,6 +27,7 @@ import {
 import {
   shortID,
   newNode,
+  isTextNode,
   addRelationToRelations,
   bulkAddRelations,
   EMPTY_NODE_ID,
@@ -40,6 +40,7 @@ import {
   createConcreteRefId,
   isRefId,
   isSearchId,
+  hashText,
   getTextForMatching,
   VERSIONS_NODE_ID,
   ensureRelationNativeFields,
@@ -53,7 +54,6 @@ import {
   updateView,
   getContext,
   getParentView,
-  getNodeFromID,
   getVersionedDisplayText,
   bulkUpdateViewPathsAfterAddRelation,
   copyViewsWithRelationsMapping,
@@ -203,33 +203,10 @@ export function planRemoveContact(plan: Plan, publicKey: PublicKey): Plan {
 }
 
 export function planUpsertNode(plan: Plan, node: KnowNode): Plan {
-  const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
-  const updatedNodes = userDB.nodes.set(shortID(node.id), node);
-  const updatedDB = {
-    ...userDB,
-    nodes: updatedNodes,
-  };
-  return {
-    ...plan,
-    knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
-  };
-}
-
-function ensureLogNode(plan: Plan): Plan {
-  const existingLog = getNodeFromID(
-    plan.knowledgeDBs,
-    LOG_NODE_ID,
-    plan.user.publicKey
-  );
-  if (existingLog) {
-    return plan;
-  }
-  const logNode: KnowNode = {
-    id: LOG_NODE_ID,
-    text: "~Log",
-    type: "text",
-  };
-  return planUpsertNode(plan, logNode);
+  // Legacy compatibility helper kept for tests while relations remain the
+  // authoritative source of text/hash data.
+  void node;
+  return plan;
 }
 
 function upsertRelationsCore(plan: Plan, relations: Relations): Plan {
@@ -255,17 +232,16 @@ function upsertRelationsCore(plan: Plan, relations: Relations): Plan {
 }
 
 function addCrefToLog(plan: Plan, relationID: LongID): Plan {
-  const planWithLog = ensureLogNode(plan);
   const logRelations = getAlternativeRelations(
-    planWithLog.knowledgeDBs,
+    plan.knowledgeDBs,
     LOG_NODE_ID,
     List<ID>(),
     undefined,
-    planWithLog.user.publicKey
+    plan.user.publicKey
   )
     .filter(
       (candidate) =>
-        candidate.author === planWithLog.user.publicKey &&
+        candidate.author === plan.user.publicKey &&
         candidate.root === shortID(candidate.id)
     )
     .sort((a, b) => b.updated - a.updated)
@@ -280,7 +256,7 @@ function addCrefToLog(plan: Plan, relationID: LongID): Plan {
     undefined,
     0
   );
-  return upsertRelationsCore(planWithLog, updatedRelations);
+  return upsertRelationsCore(plan, updatedRelations);
 }
 
 export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
@@ -299,8 +275,11 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
 }
 
 export function planBulkUpsertNodes(plan: Plan, nodes: KnowNode[]): Plan {
-  return nodes.reduce((p, node) => planUpsertNode(p, node), plan);
+  void nodes;
+  return plan;
 }
+
+type AddToParentTarget = LongID | ID | KnowNode;
 
 export function planCreateVersion(
   plan: Plan,
@@ -547,7 +526,7 @@ export function planExpandNode(
 
 export function planAddToParent(
   plan: Plan,
-  nodeIDs: LongID | ID | (LongID | ID)[],
+  nodeIDs: AddToParentTarget | AddToParentTarget[],
   parentViewPath: ViewPath,
   stack: ID[],
   insertAtIndex?: number,
@@ -594,7 +573,15 @@ export function planAddToParent(
   const childContext = parentContext.push(shortID(parentNodeID));
 
   const [planWithChildren, relationItemPayload] = nodeIDsArray.reduce(
-    ([accPlan, accItems], objectID) => {
+    ([accPlan, accItems], objectOrID) => {
+      const objectID =
+        typeof objectOrID === "string" ? objectOrID : objectOrID.id;
+      const objectText =
+        typeof objectOrID === "string"
+          ? undefined
+          : isTextNode(objectOrID)
+          ? objectOrID.text
+          : undefined;
       const localID = shortID(objectID as ID) as ID;
       if (isConcreteRefId(objectID) || isSearchId(localID)) {
         return [
@@ -650,7 +637,8 @@ export function planAddToParent(
         childContext,
         accPlan.user.publicKey,
         parentRelation.root,
-        parentRelation.id
+        parentRelation.id,
+        objectText
       );
       return [
         planUpsertRelations(accPlan, childRelation),
@@ -1032,9 +1020,24 @@ export function planDeepCopyNode(
   const targetChildContext = nodeNewContext.push(shortID(resolvedNodeID));
 
   if (!resolvedRelation) {
+    const sourceAuthor = getEffectiveAuthor(plan, sourceViewPath);
+    const text = getTextForMatching(
+      plan.knowledgeDBs,
+      resolvedNodeID,
+      sourceAuthor
+    );
+    const targetToAdd =
+      text !== undefined
+        ? ({
+            id: resolvedNodeID as ID,
+            text,
+            textHash: hashText(text),
+            type: "text",
+          } as TextNode)
+        : resolvedNodeID;
     const [planWithNode] = planAddToParent(
       planWithParent,
-      resolvedNodeID,
+      targetToAdd,
       targetParentViewPath,
       stack,
       insertAtIndex,
@@ -1135,8 +1138,7 @@ export function planDeepCopyNodeWithView(
  */
 export function planCreateNode(plan: Plan, text: string): [Plan, KnowNode] {
   const node = newNode(text);
-  const planWithNode = planUpsertNode(plan, node);
-  return [planWithNode, node];
+  return [plan, node];
 }
 
 export type ParsedLine = { text: string; depth: number };
@@ -1174,7 +1176,10 @@ function planCreateNoteAtRoot(
   const createdRelation = newRelations(
     createdNode.id,
     List<ID>(),
-    plan.user.publicKey
+    plan.user.publicKey,
+    undefined,
+    undefined,
+    createdNode.text
   );
   const planWithRelation = planUpsertRelations(
     planWithNode,
@@ -1238,7 +1243,7 @@ export function planSaveNodeAndEnsureRelations(
 
     const [resultPlan] = planAddToParent(
       planWithoutEmpty,
-      createdNode.id,
+      createdNode,
       parentPath,
       stack,
       emptyNodeIndex,
@@ -1299,60 +1304,32 @@ export function getNextInsertPosition(
   return [parentPath, stack, (relationIndex ?? 0) + 1];
 }
 
-function planDelete(
-  plan: Plan,
-  id: LongID | ID,
-  kind: number,
-  extraTags?: string[][]
-): Plan {
-  const deleteEvent = {
-    kind: KIND_DELETE,
-    pubkey: plan.user.publicKey,
-    created_at: newTimestamp(),
-    tags: [
-      ["a", `${kind}:${plan.user.publicKey}:${shortID(id)}`],
-      ["k", `${kind}`],
-      ...(extraTags || []),
-      msTag(),
-    ],
-    content: "",
-  };
-  return {
-    ...plan,
-    publishEvents: plan.publishEvents.push(deleteEvent),
-  };
-}
-
 export function planDeleteNode(plan: Plan, nodeID: LongID | ID): Plan {
   // Prevent deletion of empty placeholder node
   if (isEmptyNodeID(nodeID)) {
     return plan;
   }
+  const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
+  const ownedStandaloneRoots = userDB.relations
+    .valueSeq()
+    .filter(
+      (relation) =>
+        relation.author === plan.user.publicKey &&
+        relation.head === shortID(nodeID as ID) &&
+        relation.root === shortID(relation.id)
+    )
+    .sortBy((relation) => -relation.updated)
+    .toList();
 
-  const deletePlan = planDelete(plan, nodeID, KIND_KNOWLEDGE_NODE);
-  const userDB = plan.knowledgeDBs.get(deletePlan.user.publicKey, newDB());
-  const updatedNodes = userDB.nodes.remove(shortID(nodeID));
-  const updatedDB = {
-    ...userDB,
-    nodes: updatedNodes,
-  };
-  return {
-    ...deletePlan,
-    knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
-  };
+  return ownedStandaloneRoots.reduce((accPlan, relation) => {
+    const withDescendants = planDeleteDescendantRelations(accPlan, relation);
+    return planDeleteRelations(withDescendants, relation.id);
+  }, plan);
 }
 
 export function planDeleteRelations(plan: Plan, relationsID: LongID): Plan {
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
   const relation = userDB.relations.get(shortID(relationsID));
-  const headTag = relation ? [["head", relation.head]] : [];
-  const contextTags = relation
-    ? relation.context.toArray().map((id) => ["c", id])
-    : [];
-  const deletePlan = planDelete(plan, relationsID, KIND_KNOWLEDGE_LIST, [
-    ...headTag,
-    ...contextTags,
-  ]);
   const updatedRelations = userDB.relations.remove(shortID(relationsID));
   const updatedDB = {
     ...userDB,
@@ -1360,11 +1337,11 @@ export function planDeleteRelations(plan: Plan, relationsID: LongID): Plan {
   };
   const affectedRoot = relation?.root;
   return {
-    ...deletePlan,
+    ...plan,
     knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
     affectedRoots: affectedRoot
-      ? deletePlan.affectedRoots.add(affectedRoot)
-      : deletePlan.affectedRoots,
+      ? plan.affectedRoots.add(affectedRoot)
+      : plan.affectedRoots,
   };
 }
 

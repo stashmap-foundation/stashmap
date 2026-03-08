@@ -56,7 +56,7 @@ test("Render non existing Node", async () => {
   const { publicKey } = alice().user;
   const pl = newNode("Programming Languages");
   const relations = addRelationToRelations(
-    newRelations(pl.id, List(), publicKey),
+    newRelations(pl.id, List(), publicKey, undefined, undefined, pl.text),
     "not-existing-id" as LongID
   );
   const plan = planUpsertRelations(
@@ -104,7 +104,14 @@ async function expectNode(text: string, editable: boolean): Promise<void> {
 test("Edit node inline", async () => {
   const [alice] = setup([ALICE]);
   const note = newNode("My Note");
-  const noteRelations = newRelations(note.id, List(), alice().user.publicKey);
+  const noteRelations = newRelations(
+    note.id,
+    List(),
+    alice().user.publicKey,
+    undefined,
+    undefined,
+    note.text
+  );
   await execute({
     ...alice(),
     plan: planUpsertRelations(
@@ -145,7 +152,14 @@ test("Load Note from other User which is not a contact", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
   // Create Bob's note directly without setupTestDB
   const bobsNote = newNode("Bobs Note");
-  const bobsRelations = newRelations(bobsNote.id, List(), bob().user.publicKey);
+  const bobsRelations = newRelations(
+    bobsNote.id,
+    List(),
+    bob().user.publicKey,
+    undefined,
+    undefined,
+    bobsNote.text
+  );
   await execute({
     ...bob(),
     plan: planUpsertRelations(
@@ -292,17 +306,12 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
 
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
-      nodes: newDB()
-        .nodes.set(shortID(parent.id), parent)
-        .set(shortID(child.id), child)
-        .set(shortID(aliceGrandchild.id), aliceGrandchild),
       relations: newDB()
         .relations.set(shortID(rootedParentRelations.id), rootedParentRelations)
         .set(shortID(childRelations.id), childRelations)
         .set(shortID(aliceGrandchildRelations.id), aliceGrandchildRelations),
     })
     .set(bobPK, {
-      nodes: newDB().nodes.set(shortID(bobGrandchild.id), bobGrandchild),
       relations: newDB()
         .relations.set(shortID(bobChildRelations.id), bobChildRelations)
         .set(shortID(bobGrandchildRelations.id), bobGrandchildRelations),
@@ -352,7 +361,14 @@ test("getNodesInTree includes diff items for nested expanded nodes", () => {
 
   expect(nodeIDs).toContain(child.id);
   expect(nodeIDs).toContain(aliceGrandchild.id);
-  expect(nodeIDs).toContain(bobGrandchild.id);
+  expect(
+    nodeIDs.some(
+      (id) =>
+        id === bobGrandchild.id ||
+        (isConcreteRefId(id as string) &&
+          parseConcreteRefId(id as LongID)?.targetNode === bobGrandchild.id)
+    )
+  ).toBe(true);
 });
 
 test("getSuggestionsForNode returns items from other users not in current user's list", () => {
@@ -375,16 +391,12 @@ test("getSuggestionsForNode returns items from other users not in current user's
 
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
-      nodes: newDB()
-        .nodes.set(shortID(parent.id), parent)
-        .set(shortID(aliceChild.id), aliceChild),
       relations: newDB().relations.set(
         shortID(aliceRelations.id),
         aliceRelations
       ),
     })
     .set(bobPK, {
-      nodes: newDB().nodes.set(shortID(bobChild.id), bobChild),
       relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
     });
 
@@ -419,16 +431,12 @@ test("getSuggestionsForNode excludes items already in user's list", () => {
 
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
-      nodes: newDB()
-        .nodes.set(shortID(parent.id), parent)
-        .set(shortID(sharedChild.id), sharedChild),
       relations: newDB().relations.set(
         shortID(aliceRelations.id),
         aliceRelations
       ),
     })
     .set(bobPK, {
-      nodes: newDB().nodes,
       relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
     });
 
@@ -482,17 +490,12 @@ test("Diff item paths are correctly identified as diff items", () => {
 
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
-      nodes: newDB()
-        .nodes.set(shortID(root.id), root)
-        .set(shortID(parent.id), parent)
-        .set(shortID(aliceChild.id), aliceChild),
       relations: newDB()
         .relations.set(shortID(rootedRootRelations.id), rootedRootRelations)
         .set(shortID(parentRelations.id), parentRelations)
         .set(shortID(aliceChildRelations.id), aliceChildRelations),
     })
     .set(bobPK, {
-      nodes: newDB().nodes.set(shortID(bobChild.id), bobChild),
       relations: newDB()
         .relations.set(shortID(bobParentRelations.id), bobParentRelations)
         .set(shortID(bobChildRelations.id), bobChildRelations),
@@ -540,9 +543,14 @@ test("Diff item paths are correctly identified as diff items", () => {
   );
   expect(nodes.size).toBeGreaterThanOrEqual(3);
 
-  const diffItemPath = nodes.find(
-    (path) => getNodeIDFromView(data, path)[0] === bobChild.id
-  );
+  const diffItemPath = nodes.find((path) => {
+    const nodeID = getNodeIDFromView(data, path)[0];
+    return (
+      nodeID === bobChild.id ||
+      (isConcreteRefId(nodeID as string) &&
+        parseConcreteRefId(nodeID as LongID)?.targetNode === bobChild.id)
+    );
+  });
   expect(diffItemPath).toBeDefined();
 
   const aliceChildPath = nodes.find(
@@ -568,14 +576,12 @@ test("getSuggestionsForNode should return no diff items for not_relevant relatio
 
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
-      nodes: newDB().nodes.set(shortID(parent.id), parent),
       relations: newDB().relations.set(
         shortID(aliceRelations.id),
         aliceRelations
       ),
     })
     .set(bobPK, {
-      nodes: newDB().nodes.set(shortID(bobChild.id), bobChild),
       relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
     });
 
@@ -605,14 +611,12 @@ test("getSuggestionsForNode returns plain nodeID for leaf suggestions (no childr
 
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
-      nodes: newDB().nodes.set(shortID(parent.id), parent),
       relations: newDB().relations.set(
         shortID(aliceRelations.id),
         aliceRelations
       ),
     })
     .set(bobPK, {
-      nodes: newDB().nodes.set(shortID(bobLeafChild.id), bobLeafChild),
       relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
     });
 
@@ -652,16 +656,12 @@ test("getSuggestionsForNode returns concrete ref for expandable suggestions (has
 
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
-      nodes: newDB().nodes.set(shortID(parent.id), parent),
       relations: newDB().relations.set(
         shortID(aliceRelations.id),
         aliceRelations
       ),
     })
     .set(bobPK, {
-      nodes: newDB()
-        .nodes.set(shortID(bobFolder.id), bobFolder)
-        .set(shortID(bobGrandchild.id), bobGrandchild),
       relations: newDB()
         .relations.set(shortID(bobParentRelations.id), bobParentRelations)
         .set(shortID(bobFolderRelations.id), bobFolderRelations),
@@ -694,9 +694,25 @@ test("getSuggestionsForNode preserves concrete-ref suggestion IDs", () => {
   const bobLinkedChild = newNode("Bob Linked Child");
 
   const aliceRelations = newRelations(parent.id, List(), alicePK);
-  const bobLinkedRelations = addRelationToRelations(
-    newRelations(bobLinkedRoot.id, List(), bobPK),
-    bobLinkedChild.id
+  const bobLinkedRelations = newRelations(
+    bobLinkedRoot.id,
+    List(),
+    bobPK,
+    undefined,
+    undefined,
+    bobLinkedRoot.text
+  );
+  const bobLinkedChildRelations = newRelations(
+    bobLinkedChild.id,
+    List<ID>([shortID(bobLinkedRoot.id) as ID]),
+    bobPK,
+    bobLinkedRelations.root,
+    bobLinkedRelations.id,
+    bobLinkedChild.text
+  );
+  const bobLinkedRelationsWithChild = addRelationToRelations(
+    bobLinkedRelations,
+    bobLinkedChildRelations.id
   );
   const bobLinkRef = createConcreteRefId(bobLinkedRelations.id);
   const bobParentRelations = addRelationToRelations(
@@ -706,18 +722,21 @@ test("getSuggestionsForNode preserves concrete-ref suggestion IDs", () => {
 
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
-      nodes: newDB().nodes.set(shortID(parent.id), parent),
       relations: newDB().relations.set(
         shortID(aliceRelations.id),
         aliceRelations
       ),
     })
     .set(bobPK, {
-      nodes: newDB()
-        .nodes.set(shortID(bobLinkedRoot.id), bobLinkedRoot)
-        .set(shortID(bobLinkedChild.id), bobLinkedChild),
-      relations: newDB()
-        .relations.set(shortID(bobLinkedRelations.id), bobLinkedRelations)
+      relations: newDB().relations
+        .set(
+          shortID(bobLinkedRelationsWithChild.id),
+          bobLinkedRelationsWithChild
+        )
+        .set(
+          shortID(bobLinkedChildRelations.id),
+          bobLinkedChildRelations
+        )
         .set(shortID(bobParentRelations.id), bobParentRelations),
     });
 
@@ -757,16 +776,12 @@ test("getSuggestionsForNode only returns suggestions from matching context", () 
 
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
-      nodes: newDB().nodes.set(shortID(parent.id), parent),
       relations: newDB().relations.set(
         shortID(aliceRelations.id),
         aliceRelations
       ),
     })
     .set(bobPK, {
-      nodes: newDB()
-        .nodes.set(shortID(bobChildSameContext.id), bobChildSameContext)
-        .set(shortID(bobChildDiffContext.id), bobChildDiffContext),
       relations: newDB()
         .relations.set(
           shortID(bobRelationsSameContext.id),

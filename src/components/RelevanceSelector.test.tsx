@@ -841,32 +841,10 @@ describe("Relation lookup consistency (regression)", () => {
     expect(selectors.length).toBeGreaterThanOrEqual(1);
   });
 
-  test("setting relevance persists correctly on item accessed via nodeIndex", async () => {
+  test("setting relevance persists correctly for one of two duplicate children", async () => {
     const [alice] = setup([ALICE]);
-    const { publicKey: alicePK } = alice().user;
-
-    const parent = newNode("Parent");
-    const child = newNode("Child");
-
-    const relations = addRelationToRelations(
-      addRelationToRelations(
-        newRelations(parent.id, List(), alicePK),
-        child.id,
-        undefined
-      ),
-      child.id,
-      undefined
-    );
-
-    const plan = planUpsertRelations(
-      planUpsertNode(planUpsertNode(createPlan(alice()), parent), child),
-      relations
-    );
-    await execute({ ...alice(), plan });
-
     renderTree(alice);
-
-    await navigateToNodeViaSearch(0, "Parent");
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}Child{Escape}");
 
     const childElements = await screen.findAllByText("Child");
     expect(childElements.length).toBe(2);
@@ -888,43 +866,21 @@ describe("Relation lookup consistency (regression)", () => {
 describe("Multi-user relevance", () => {
   test("each user can set different relevance for same item", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
-    const { publicKey: alicePK } = alice().user;
     const { publicKey: bobPK } = bob().user;
+    renderTree(alice);
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
 
-    // Alice creates Parent -> Child
-    const parent = newNode("Parent");
-    const child = newNode("Child");
+    cleanup();
 
-    // Alice marks Child as relevant (default)
-    const aliceRelations = addRelationToRelations(
-      newRelations(parent.id, List(), alicePK),
-      child.id,
-      undefined // contains (default)
-    );
-
-    const alicePlan = planUpsertRelations(
-      planUpsertNode(planUpsertNode(createPlan(alice()), parent), child),
-      aliceRelations
-    );
-    await execute({ ...alice(), plan: alicePlan });
-
-    // Bob marks the same Child as not_relevant in his version
-    const bobRelations = addRelationToRelations(
-      newRelations(parent.id, List(), bobPK),
-      child.id,
-      "not_relevant"
-    );
-
-    const bobPlan = planUpsertRelations(createPlan(bob()), bobRelations);
-    await execute({ ...bob(), plan: bobPlan });
+    renderTree(bob);
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
+    fireEvent.click(screen.getByLabelText("mark Child as not relevant"));
+    cleanup();
 
     // Alice follows Bob
     await follow(alice, bobPK);
 
     renderTree(alice);
-
-    // Navigate to Parent
-    await navigateToNodeViaSearch(0, "Parent");
 
     // Child should be visible because Alice's relevance is "" (relevant)
     await screen.findByText("Child");

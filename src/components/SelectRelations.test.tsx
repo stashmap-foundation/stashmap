@@ -3,60 +3,69 @@ import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { List, Map } from "immutable";
 import { addRelationToRelations, newNode, shortID } from "../connections";
-import { DND } from "../dnd";
 import {
   ALICE,
   BOB,
-  renderWithTestData,
+  CAROL,
   setup,
   follow,
   renderTree,
   expectTree,
   type,
 } from "../utils.test";
-import {
-  RootViewContextProvider,
-  newRelations,
-  getSuggestionsForNode,
-} from "../ViewContext";
-import { TemporaryViewProvider } from "./TemporaryViewContext";
-import { createPlan, planUpsertNode, planUpsertRelations } from "../planner";
-import { execute } from "../executor";
-import { LoadData } from "../dataQuery";
-import { TreeView } from "./TreeView";
+import { newRelations, getSuggestionsForNode } from "../ViewContext";
 import { newDB } from "../knowledge";
+
+function createRelationTree(
+  author: PublicKey,
+  rootText: string,
+  childText: string,
+  sharedRootNode?: KnowNode,
+  sharedChildNode?: KnowNode
+): {
+  rootNode: KnowNode;
+  childNode: KnowNode;
+  rootRelation: Relations;
+  childRelation: Relations;
+} {
+  const rootNode = sharedRootNode ?? newNode(rootText);
+  const childNode = sharedChildNode ?? newNode(childText);
+  const rootRelation = newRelations(
+    rootNode.id,
+    List(),
+    author,
+    undefined,
+    undefined,
+    rootText
+  );
+  const childRelation = newRelations(
+    childNode.id,
+    List([rootNode.id]),
+    author,
+    rootRelation.root,
+    rootRelation.id,
+    childText
+  );
+
+  return {
+    rootNode,
+    childNode,
+    rootRelation: addRelationToRelations(rootRelation, childRelation.id),
+    childRelation,
+  };
+}
 
 test("Shows no dots when user is the only one with a relation", async () => {
   const [alice] = setup([ALICE]);
 
-  const { publicKey: alicePK } = alice().user;
-  const parentNode = newNode("Parent Node");
-  const childNode = newNode("Child Node");
-  const aliceRelations = addRelationToRelations(
-    newRelations(parentNode.id, List(), alicePK),
-    childNode.id
-  );
+  renderTree(alice);
+  await type("Root{Enter}Parent Node{Enter}{Tab}Child Node{Escape}");
 
-  const plan = planUpsertRelations(
-    planUpsertNode(planUpsertNode(createPlan(alice()), parentNode), childNode),
-    aliceRelations
-  );
-  await execute({ ...alice(), plan });
-
-  renderWithTestData(
-    <LoadData nodeIDs={[parentNode.id]} descendants referencedBy lists>
-      <RootViewContextProvider root={parentNode.id}>
-        <TemporaryViewProvider>
-          <DND>
-            <TreeView />
-          </DND>
-        </TemporaryViewProvider>
-      </RootViewContextProvider>
-    </LoadData>,
-    alice()
-  );
-
-  await screen.findByLabelText(/expand Parent Node|collapse Parent Node/);
+  await expectTree(`
+Root
+  Parent Node
+    Child Node
+  `);
 
   // Version selector should not appear when only one version exists
   // There's no "versions available" button since Alice is the only one
@@ -101,33 +110,31 @@ test("getSuggestionsForNode returns items from other users", () => {
   const { publicKey: bobPK } = bob().user;
 
   const parentNode = newNode("Parent Node");
-  const aliceChildNode = newNode("Alice's Child");
-  const aliceRelations = addRelationToRelations(
-    newRelations(parentNode.id, List(), alicePK),
-    aliceChildNode.id
+  const aliceTree = createRelationTree(
+    alicePK,
+    "Parent Node",
+    "Alice's Child",
+    parentNode
   );
-
-  const bobChildNode = newNode("Bob's Child");
-  const bobRelations = addRelationToRelations(
-    newRelations(parentNode.id, List(), bobPK),
-    bobChildNode.id
+  const bobTree = createRelationTree(
+    bobPK,
+    "Parent Node",
+    "Bob's Child",
+    parentNode
   );
 
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
       ...newDB(),
-      nodes: newDB()
-        .nodes.set(shortID(parentNode.id), parentNode)
-        .set(shortID(aliceChildNode.id), aliceChildNode),
-      relations: newDB().relations.set(
-        shortID(aliceRelations.id),
-        aliceRelations
-      ),
+      relations: newDB()
+        .relations.set(shortID(aliceTree.rootRelation.id), aliceTree.rootRelation)
+        .set(shortID(aliceTree.childRelation.id), aliceTree.childRelation),
     })
     .set(bobPK, {
       ...newDB(),
-      nodes: newDB().nodes.set(shortID(bobChildNode.id), bobChildNode),
-      relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
+      relations: newDB()
+        .relations.set(shortID(bobTree.rootRelation.id), bobTree.rootRelation)
+        .set(shortID(bobTree.childRelation.id), bobTree.childRelation),
     });
 
   const { suggestions: diffItems } = getSuggestionsForNode(
@@ -135,11 +142,11 @@ test("getSuggestionsForNode returns items from other users", () => {
     alicePK,
     parentNode.id,
     ["contains", "suggestions"],
-    aliceRelations.id
+    aliceTree.rootRelation.id
   );
 
   expect(diffItems.size).toBe(1);
-  expect(diffItems.get(0)).toBe(bobChildNode.id);
+  expect(diffItems.get(0)).toBe(bobTree.childNode.id);
 });
 
 test("Diff items are not included when saving a relation", () => {
@@ -148,43 +155,40 @@ test("Diff items are not included when saving a relation", () => {
   const { publicKey: bobPK } = bob().user;
 
   const parentNode = newNode("Parent Node");
-  const aliceChildNode = newNode("Alice's Child");
-  const aliceRelations = addRelationToRelations(
-    newRelations(parentNode.id, List(), alicePK),
-    aliceChildNode.id
+  const aliceTree = createRelationTree(
+    alicePK,
+    "Parent Node",
+    "Alice's Child",
+    parentNode
   );
-
-  const bobChildNode = newNode("Bob's Child");
-  const bobRelations = addRelationToRelations(
-    newRelations(parentNode.id, List(), bobPK),
-    bobChildNode.id
+  const bobTree = createRelationTree(
+    bobPK,
+    "Parent Node",
+    "Bob's Child",
+    parentNode
   );
 
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
       ...newDB(),
-      nodes: newDB()
-        .nodes.set(shortID(parentNode.id), parentNode)
-        .set(shortID(aliceChildNode.id), aliceChildNode),
-      relations: newDB().relations.set(
-        shortID(aliceRelations.id),
-        aliceRelations
-      ),
+      relations: newDB()
+        .relations.set(shortID(aliceTree.rootRelation.id), aliceTree.rootRelation)
+        .set(shortID(aliceTree.childRelation.id), aliceTree.childRelation),
     })
     .set(bobPK, {
       ...newDB(),
-      nodes: newDB().nodes.set(shortID(bobChildNode.id), bobChildNode),
-      relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
+      relations: newDB()
+        .relations.set(shortID(bobTree.rootRelation.id), bobTree.rootRelation)
+        .set(shortID(bobTree.childRelation.id), bobTree.childRelation),
     });
 
   const aliceDB = knowledgeDBs.get(alicePK);
-  const savedRelation = aliceDB?.relations.get(shortID(aliceRelations.id));
+  const savedRelation = aliceDB?.relations.get(shortID(aliceTree.rootRelation.id));
 
   expect(savedRelation?.items.size).toBe(1);
-  expect(savedRelation?.items.get(0)?.id).toBe(aliceChildNode.id);
-  // Check that bob's child is not in alice's relation items
+  expect(savedRelation?.items.get(0)?.id).toBe(aliceTree.childRelation.id);
   expect(
-    savedRelation?.items.some((item) => item.id === bobChildNode.id)
+    savedRelation?.items.some((item) => item.id === bobTree.childRelation.id)
   ).toBe(false);
 });
 
@@ -192,48 +196,49 @@ test("getSuggestionsForNode deduplicates items from multiple other users", () =>
   const [alice, bob] = setup([ALICE, BOB]);
   const { publicKey: alicePK } = alice().user;
   const { publicKey: bobPK } = bob().user;
-  const carolPK = "carol_public_key" as PublicKey;
+  const carolPK = CAROL.publicKey;
 
   const parentNode = newNode("Parent Node");
-  const aliceChildNode = newNode("Alice's Child");
-  const aliceRelations = addRelationToRelations(
-    newRelations(parentNode.id, List(), alicePK),
-    aliceChildNode.id
-  );
-
   const bobChildNode = newNode("Bob's Child");
-  const bobRelations = addRelationToRelations(
-    newRelations(parentNode.id, List(), bobPK),
-    bobChildNode.id
+  const aliceTree = createRelationTree(
+    alicePK,
+    "Parent Node",
+    "Alice's Child",
+    parentNode
   );
-
-  const carolRelations = addRelationToRelations(
-    newRelations(parentNode.id, List(), carolPK),
-    bobChildNode.id
+  const bobTree = createRelationTree(
+    bobPK,
+    "Parent Node",
+    "Bob's Child",
+    parentNode,
+    bobChildNode
+  );
+  const carolTree = createRelationTree(
+    carolPK,
+    "Parent Node",
+    "Bob's Child",
+    parentNode,
+    bobChildNode
   );
 
   const knowledgeDBs = Map<PublicKey, KnowledgeData>()
     .set(alicePK, {
       ...newDB(),
-      nodes: newDB()
-        .nodes.set(shortID(parentNode.id), parentNode)
-        .set(shortID(aliceChildNode.id), aliceChildNode),
-      relations: newDB().relations.set(
-        shortID(aliceRelations.id),
-        aliceRelations
-      ),
+      relations: newDB()
+        .relations.set(shortID(aliceTree.rootRelation.id), aliceTree.rootRelation)
+        .set(shortID(aliceTree.childRelation.id), aliceTree.childRelation),
     })
     .set(bobPK, {
       ...newDB(),
-      nodes: newDB().nodes.set(shortID(bobChildNode.id), bobChildNode),
-      relations: newDB().relations.set(shortID(bobRelations.id), bobRelations),
+      relations: newDB()
+        .relations.set(shortID(bobTree.rootRelation.id), bobTree.rootRelation)
+        .set(shortID(bobTree.childRelation.id), bobTree.childRelation),
     })
     .set(carolPK, {
       ...newDB(),
-      relations: newDB().relations.set(
-        shortID(carolRelations.id),
-        carolRelations
-      ),
+      relations: newDB()
+        .relations.set(shortID(carolTree.rootRelation.id), carolTree.rootRelation)
+        .set(shortID(carolTree.childRelation.id), carolTree.childRelation),
     });
 
   const { suggestions: diffItems } = getSuggestionsForNode(
@@ -241,7 +246,7 @@ test("getSuggestionsForNode deduplicates items from multiple other users", () =>
     alicePK,
     parentNode.id,
     ["contains", "suggestions"],
-    aliceRelations.id
+    aliceTree.rootRelation.id
   );
 
   expect(diffItems.size).toBe(1);

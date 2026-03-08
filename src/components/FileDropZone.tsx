@@ -6,7 +6,7 @@ import { ViewPath, getRelationForView } from "../ViewContext";
 import {
   Plan,
   ParsedLine,
-  planUpsertNode,
+  planUpsertRelations,
   planAddToParent,
   planMoveTreeDescendantsToContext,
   parseClipboardText,
@@ -18,6 +18,7 @@ import {
   WalkContext,
   createNodesFromMarkdownTrees,
 } from "../markdownDocument";
+import { newRelations } from "../ViewContext";
 
 export type { MarkdownTreeNode } from "../markdownDocument";
 export { parseMarkdownHierarchy } from "../markdownDocument";
@@ -166,7 +167,15 @@ export function planCreateNodesFromMarkdown(
   }
 
   const fallbackNode = newNode("Imported Markdown");
-  return [planUpsertNode(nextPlan, fallbackNode), fallbackNode.id];
+  const fallbackRelation = newRelations(
+    fallbackNode.id,
+    List<ID>(),
+    nextPlan.user.publicKey,
+    undefined,
+    undefined,
+    fallbackNode.text
+  );
+  return [planUpsertRelations(nextPlan, fallbackRelation), fallbackNode.id];
 }
 
 export function planPasteMarkdownTrees(

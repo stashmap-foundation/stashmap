@@ -8,99 +8,13 @@ import {
 } from "./commons/useNostrQuery";
 import {
   KIND_DELETE,
-  KIND_KNOWLEDGE_LIST,
-  KIND_KNOWLEDGE_NODE,
   KIND_KNOWLEDGE_DOCUMENT,
   KIND_VIEWS,
   getReplaceableKey,
 } from "./nostr";
-import {
-  Serializable,
-  jsonToViews,
-  jsonToPanes,
-  eventToRelations,
-  eventToTextNode,
-} from "./serializer";
-import { splitID, isSearchId } from "./connections";
+import { Serializable, jsonToPanes, jsonToViews } from "./serializer";
+import { splitID } from "./connections";
 import { parseDocumentEvent } from "./markdownDocument";
-
-function isTextNode(kind: number | string): boolean {
-  const kindAsNumber = typeof kind === "string" ? parseInt(kind, 10) : kind;
-  return kindAsNumber === KIND_KNOWLEDGE_NODE;
-}
-
-// Only listen to delete events where the signer created the node or relation
-function isDeletable(
-  event: UnsignedEvent | undefined,
-  nodes: Map<string, { id: ID }>
-): [false] | [true, string, string] {
-  if (!event) {
-    return [false];
-  }
-  const deleteTag = findTag(event, "a");
-  if (!deleteTag) {
-    return [false];
-  }
-  const [deleteKind, userPublicKey, eventToDeleteId] = deleteTag.split(":");
-  const itemToDelete = nodes.get(eventToDeleteId);
-  if (!itemToDelete) {
-    return [false];
-  }
-  const isDeletedByAuthor = userPublicKey === splitID(itemToDelete.id)[0];
-  if (isDeletedByAuthor && eventToDeleteId) {
-    return [true, eventToDeleteId, deleteKind];
-  }
-  return [false];
-}
-
-export function findNodes(events: List<UnsignedEvent>): Map<string, KnowNode> {
-  const sorted = sortEvents(
-    events.filter(
-      (event) => isTextNode(event.kind) || event.kind === KIND_DELETE
-    )
-  );
-  // use reduce in case of duplicate nodes, the newer version wins
-  return sorted.reduce((rdx, event) => {
-    if (event.kind === KIND_DELETE) {
-      const [deletable, eventToDeleteId, deleteKind] = isDeletable(event, rdx);
-      if (deletable && isTextNode(deleteKind)) {
-        return rdx.remove(eventToDeleteId);
-      }
-      return rdx;
-    }
-    const [id, node] = eventToTextNode(event);
-    return id ? rdx.set(id, node) : rdx;
-  }, Map<string, KnowNode>());
-}
-
-export function findRelations(
-  events: List<UnsignedEvent>
-): Map<string, Relations> {
-  const sorted = sortEvents(
-    events.filter(
-      (event) =>
-        event.kind === KIND_KNOWLEDGE_LIST || event.kind === KIND_DELETE
-    )
-  );
-  return sorted.reduce((rdx, event) => {
-    if (event.kind === KIND_DELETE) {
-      const [deletable, eventToDeleteId, deleteKind] = isDeletable(event, rdx);
-      if (deletable && deleteKind === `${KIND_KNOWLEDGE_LIST}`) {
-        return rdx.remove(eventToDeleteId);
-      }
-      return rdx;
-    }
-    const relations = eventToRelations(event);
-    if (!relations) {
-      return rdx;
-    }
-    if (isSearchId(relations.head as ID)) {
-      return rdx;
-    }
-    const id = splitID(relations.id)[1];
-    return rdx.set(id, relations);
-  }, Map<string, Relations>());
-}
 
 export function findViews(events: List<UnsignedEvent>): Views {
   const viewEvent = getMostRecentReplacableEvent(
@@ -122,10 +36,9 @@ export function findPanes(events: List<UnsignedEvent>): Pane[] {
   return jsonToPanes(JSON.parse(viewEvent.content) as Serializable);
 }
 
-export function findDocumentNodesAndRelations(events: List<UnsignedEvent>): {
-  nodes: Map<string, KnowNode>;
-  relations: Map<string, Relations>;
-} {
+export function findDocumentRelations(
+  events: List<UnsignedEvent>
+): Map<string, Relations> {
   const deletedKeys = events
     .filter(
       (event) =>
@@ -145,34 +58,31 @@ export function findDocumentNodesAndRelations(events: List<UnsignedEvent>): {
       return acc;
     }, Map<string, number>());
   const docEvents = sortEvents(
-    events.filter(
-      (event) => {
-        if (event.kind !== KIND_KNOWLEDGE_DOCUMENT) {
-          return false;
-        }
-        const replaceableKey = getReplaceableKey(event);
-        if (!replaceableKey) {
-          return false;
-        }
-        const deletedAt = deletedKeys.get(replaceableKey);
-        return deletedAt === undefined || getEventMs(event) > deletedAt;
+    events.filter((event) => {
+      if (event.kind !== KIND_KNOWLEDGE_DOCUMENT) {
+        return false;
       }
-    )
+      const replaceableKey = getReplaceableKey(event);
+      if (!replaceableKey) {
+        return false;
+      }
+      const deletedAt = deletedKeys.get(replaceableKey);
+      return deletedAt === undefined || getEventMs(event) > deletedAt;
+    })
   );
-  const allNodes = docEvents.reduce(
-    (acc, event) => acc.merge(parseDocumentEvent(event).nodes),
-    Map<string, KnowNode>()
-  );
+
   const deduped = docEvents
     .groupBy((event) => getReplaceableKey(event) ?? "")
     .map((group) => group.last())
     .valueSeq()
     .filter((event): event is UnsignedEvent => event !== undefined)
     .toList();
+
   const parsedRelations = sortEvents(deduped)
-    .flatMap((event) => parseDocumentEvent(event).relations.valueSeq())
+    .flatMap((event) => parseDocumentEvent(event).valueSeq())
     .toList();
-  const relations = parsedRelations.reduce((acc, relation) => {
+
+  return parsedRelations.reduce((acc, relation) => {
     const id = splitID(relation.id)[1];
     const existing = acc.get(id);
     if (!existing || relation.updated >= existing.updated) {
@@ -180,5 +90,4 @@ export function findDocumentNodesAndRelations(events: List<UnsignedEvent>): {
     }
     return acc;
   }, Map<string, Relations>());
-  return { nodes: allNodes, relations };
 }

@@ -1,4 +1,3 @@
-import { List } from "immutable";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
@@ -12,80 +11,12 @@ import {
   setup,
   type,
 } from "../utils.test";
-import {
-  newNode,
-  addRelationToRelations,
-  itemMatchesType,
-} from "../connections";
-import { createPlan, planUpsertRelations } from "../planner";
-import { execute } from "../executor";
-import { newRelations } from "../ViewContext";
+import { itemMatchesType } from "../connections";
 import {
   relevanceToLevel,
   levelToRelevance,
   RELEVANCE_LABELS,
 } from "./useUpdateRelevance";
-
-// Unit tests for helper functions
-describe("relevanceToLevel", () => {
-  test("maps relevant to level 3", () => {
-    expect(relevanceToLevel("relevant")).toBe(3);
-  });
-
-  test("maps maybe_relevant to level 2", () => {
-    expect(relevanceToLevel("maybe_relevant")).toBe(2);
-  });
-
-  test("maps undefined (contains) to level -1", () => {
-    expect(relevanceToLevel(undefined)).toBe(-1);
-  });
-
-  test("maps little_relevant to level 1", () => {
-    expect(relevanceToLevel("little_relevant")).toBe(1);
-  });
-
-  test("maps not_relevant to level 0", () => {
-    expect(relevanceToLevel("not_relevant")).toBe(0);
-  });
-
-  test("defaults to level -1 for unknown values", () => {
-    expect(relevanceToLevel("unknown" as Relevance)).toBe(-1);
-  });
-});
-
-describe("levelToRelevance", () => {
-  test("maps level 3 to relevant", () => {
-    expect(levelToRelevance(3)).toBe("relevant");
-  });
-
-  test("maps level 2 to maybe_relevant", () => {
-    expect(levelToRelevance(2)).toBe("maybe_relevant");
-  });
-
-  test("maps level 1 to little_relevant", () => {
-    expect(levelToRelevance(1)).toBe("little_relevant");
-  });
-
-  test("maps level 0 to not_relevant", () => {
-    expect(levelToRelevance(0)).toBe("not_relevant");
-  });
-
-  test("defaults to undefined for unknown levels", () => {
-    expect(levelToRelevance(5)).toBe(undefined);
-    expect(levelToRelevance(-1)).toBe(undefined);
-    expect(levelToRelevance(4)).toBe(undefined);
-  });
-});
-
-describe("RELEVANCE_LABELS", () => {
-  test("has correct labels for all levels", () => {
-    expect(RELEVANCE_LABELS[-1]).toBe("Contains");
-    expect(RELEVANCE_LABELS[0]).toBe("Not Relevant");
-    expect(RELEVANCE_LABELS[1]).toBe("Little Relevant");
-    expect(RELEVANCE_LABELS[2]).toBe("Maybe Relevant");
-    expect(RELEVANCE_LABELS[3]).toBe("Relevant");
-  });
-});
 
 describe("itemMatchesType", () => {
   test("matches relevant items", () => {

@@ -21,8 +21,7 @@ import { newDB } from "./knowledge";
 import { buildDocumentEvent } from "./markdownDocument";
 import {
   shortID,
-  newNode,
-  isTextNode,
+  createNodeID,
   addRelationToRelations,
   bulkAddRelations,
   EMPTY_NODE_ID,
@@ -38,7 +37,10 @@ import {
   hashText,
   getTextForMatching,
   ensureRelationNativeFields,
+  getRelationContext,
+  getRelationNodeID,
 } from "./connections";
+import type { TextSeed } from "./connections";
 import {
   newRelations,
   newRelationsForNode,
@@ -251,15 +253,15 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
 
   const isRootRelation =
     isNewRelation &&
-    relations.context.size === 0 &&
-    shortID(relations.head) !== LOG_NODE_ID;
+    !relations.parent &&
+    getRelationNodeID(relations) !== LOG_NODE_ID;
   if (!isRootRelation) {
     return basePlan;
   }
   return addCrefToLog(basePlan, relations.id);
 }
 
-type AddToParentTarget = LongID | ID | KnowNode;
+type AddToParentTarget = LongID | ID | TextSeed;
 
 export function planUpdateRelationText(
   plan: Plan,
@@ -550,20 +552,14 @@ export function planAddToParent(
 
   const [planWithParent, parentRelation] = ensureParentRelation();
   const parentContext = getContext(planWithParent, parentViewPath, stack);
-  const childContext = parentContext.push(
-    shortID(parentRelation.head as ID) as ID
-  );
+  const childContext = parentContext.push(getRelationNodeID(parentRelation));
 
   const [planWithChildren, relationItemPayload] = nodeIDsArray.reduce(
     ([accPlan, accItems], objectOrID) => {
       const objectID =
         typeof objectOrID === "string" ? objectOrID : objectOrID.id;
       const objectText =
-        typeof objectOrID === "string"
-          ? undefined
-          : isTextNode(objectOrID)
-          ? objectOrID.text
-          : undefined;
+        typeof objectOrID === "string" ? undefined : objectOrID.text;
       const localID = shortID(objectID as ID) as ID;
       if (isConcreteRefId(objectID) || isSearchId(localID)) {
         return [
@@ -584,7 +580,7 @@ export function planAddToParent(
             ...accItems,
             {
               relationItemID: existingRelation.id,
-              actualNodeID: existingRelation.head as ID,
+              actualNodeID: getRelationNodeID(existingRelation),
             },
           ],
         ];
@@ -604,7 +600,7 @@ export function planAddToParent(
           ...accItems,
           {
             relationItemID: childRelation.id,
-            actualNodeID: childRelation.head as ID,
+            actualNodeID: getRelationNodeID(childRelation),
           },
         ],
       ];
@@ -738,16 +734,16 @@ function planCopyDescendantRelations(
   );
 
   let copiedRoot = root;
-  const sourceNodeID = sourceRelation.head as ID;
+  const sourceNodeID = getRelationNodeID(sourceRelation);
   const copiedRelations = descendants.map((relation) => {
     const newContext = transformContext(relation);
     const isRootRelation = relation.id === sourceRelation.id;
-    const head =
+    const nodeID =
       targetNodeID && isRootRelation
         ? targetNodeID
-        : relation.head;
+        : getRelationNodeID(relation);
     const baseRelation = newRelations(
-      head,
+      nodeID,
       newContext,
       plan.user.publicKey,
       copiedRoot
@@ -800,25 +796,22 @@ export function planMoveDescendantRelations(
   root?: ID
 ): Plan {
   const descendants = getRelationSubtree(plan, sourceRelation);
-  const sourceNodeID = sourceRelation.head as ID;
-  const sourceContext = sourceRelation.context;
+  const sourceNodeID = getRelationNodeID(sourceRelation);
+  const sourceContext = getRelationContext(plan.knowledgeDBs, sourceRelation);
   const effectiveTargetNodeID = targetNodeID ?? sourceNodeID;
   const sourceChildContext = sourceContext.push(shortID(sourceNodeID));
   const targetChildContext = targetContext.push(shortID(effectiveTargetNodeID));
 
   return descendants.reduce((accPlan, relation) => {
     const isRootRelation = relation.id === sourceRelation.id;
+    const relationContext = getRelationContext(accPlan.knowledgeDBs, relation);
     const newContext = isRootRelation
       ? targetContext
       : targetChildContext.concat(
-          relation.context.skip(sourceChildContext.size)
+          relationContext.skip(sourceChildContext.size)
         );
-    const head = isRootRelation
-      ? shortID(effectiveTargetNodeID)
-      : relation.head;
     return planUpsertRelations(accPlan, {
       ...relation,
-      head,
       context: newContext,
       parent: isRootRelation
         ? targetParentRelationID
@@ -841,7 +834,9 @@ export function planMoveTreeDescendantsToContext(
   const parentContext = getContext(plan, parentViewPath, stack);
   const [parentNodeID] = getNodeIDFromView(plan, parentViewPath);
   const targetContext = parentContext.push(
-    shortID((targetParentRelation?.head as ID | undefined) ?? parentNodeID)
+    targetParentRelation
+      ? getRelationNodeID(targetParentRelation)
+      : (shortID(parentNodeID as ID) as ID)
   );
 
   return originalTopNodeIDs.reduce((accPlan, originalID, index) => {
@@ -904,7 +899,7 @@ export function planForkPane(
   const [planWithRelations, relationsIdMapping] = planCopyDescendantRelations(
     plan,
     sourceRelation,
-    (relation) => relation.context,
+    (relation) => getRelationContext(plan.knowledgeDBs, relation),
     (relation) => relation.author === pane.author
   );
   const updatedViews = updateViewsWithRelationsMapping(
@@ -957,8 +952,8 @@ export function planDeepCopyNode(
         );
         if (relation) {
           return {
-            nodeID: relation.head,
-            context: relation.context,
+            nodeID: getRelationNodeID(relation),
+            context: getRelationContext(plan.knowledgeDBs, relation),
             relation,
           };
         }
@@ -1004,7 +999,9 @@ export function planDeepCopyNode(
     targetParentViewPath
   );
   const nodeNewContext = targetParentContext.push(
-    shortID((targetParentRelation.head as ID | undefined) ?? targetParentNodeID)
+    targetParentRelation
+      ? getRelationNodeID(targetParentRelation)
+      : (shortID(targetParentNodeID as ID) as ID)
   );
   const sourceChildContext = resolvedContext.push(shortID(resolvedNodeID));
   const targetChildContext = nodeNewContext.push(shortID(resolvedNodeID));
@@ -1018,12 +1015,11 @@ export function planDeepCopyNode(
     );
     const targetToAdd =
       text !== undefined
-        ? ({
+        ? {
             id: resolvedNodeID as ID,
             text,
             textHash: hashText(text),
-            type: "text",
-          } as TextNode)
+          }
         : resolvedNodeID;
     const [planWithNode] = planAddToParent(
       planWithParent,
@@ -1042,10 +1038,14 @@ export function planDeepCopyNode(
     resolvedRelation,
     (relation) => {
       const isRootRelation = relation.id === resolvedRelation.id;
+      const relationContext = getRelationContext(
+        planWithParent.knowledgeDBs,
+        relation
+      );
       return isRootRelation
         ? nodeNewContext
         : targetChildContext.concat(
-            relation.context.skip(sourceChildContext.size)
+            relationContext.skip(sourceChildContext.size)
           );
     },
     undefined,
@@ -1119,8 +1119,12 @@ export function planDeepCopyNodeWithView(
 /**
  * Create a new node value for insertion into the current relation tree.
  */
-export function planCreateNode(plan: Plan, text: string): [Plan, KnowNode] {
-  const node = newNode(text);
+export function planCreateNode(plan: Plan, text: string): [Plan, TextSeed] {
+  const node = {
+    id: createNodeID(text),
+    text,
+    textHash: hashText(text),
+  };
   return [plan, node];
 }
 
@@ -1289,7 +1293,7 @@ export function planDeleteNode(plan: Plan, nodeID: LongID | ID): Plan {
     .filter(
       (relation) =>
         relation.author === plan.user.publicKey &&
-        relation.head === shortID(nodeID as ID) &&
+        shortID(getRelationNodeID(relation)) === shortID(nodeID as ID) &&
         relation.root === shortID(relation.id)
     )
     .sortBy((relation) => -relation.updated)

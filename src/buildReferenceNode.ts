@@ -10,13 +10,14 @@ import {
   getTextForMatching,
   getRelationItemNodeID,
   getRelationItemRelation,
+  getRelationContext,
+  getRelationNodeID,
 } from "./connections";
 import {
   ViewPath,
   getParentView,
   getLast,
   getRelationForView,
-  getRelationsForCurrentTree,
 } from "./ViewContext";
 import { getPane } from "./planner";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
@@ -92,22 +93,23 @@ function getReferencedChildRelation(
   if (!ref.targetNode) {
     return undefined;
   }
+  const targetNode = ref.targetNode;
 
-  return ref.sourceItem
-    ? getRelationItemRelation(
-        knowledgeDBs,
-        ref.sourceItem,
-        ref.relation.author
-      )
-    : getRelationsForCurrentTree(
-        knowledgeDBs,
-        ref.relation.author,
-        ref.targetNode,
-        ref.relationContext.push(shortID(ref.relation.head) as ID),
-        undefined,
-        false,
-        ref.relation.root
-      );
+  if (ref.sourceItem) {
+    return getRelationItemRelation(
+      knowledgeDBs,
+      ref.sourceItem,
+      ref.relation.author
+    );
+  }
+
+  return ref.relation.items
+    .map((item) => getRelationItemRelation(knowledgeDBs, item, ref.relation.author))
+    .find(
+      (relation): relation is Relations =>
+        relation !== undefined &&
+        shortID(relation.head as ID) === shortID(targetNode)
+    );
 }
 
 function resolveLabels(
@@ -127,13 +129,13 @@ function resolveLabels(
     const targetLabel = resolveNodeLabel(
       knowledgeDBs,
       myself,
-      relation.head as ID,
+      getRelationNodeID(relation),
       relationContext,
       relation.root
     );
     return { contextLabels, targetLabel, fullContext: relationContext };
   }
-  const fullContext = relationContext.push(relation.head as ID);
+  const fullContext = relationContext.push(shortID(relation.head as ID) as ID);
   const contextLabels = resolveContextLabels(
     knowledgeDBs,
     myself,
@@ -166,19 +168,32 @@ function relationsMatchForVersion(
   const useExactMatch =
     left.author === right.author && left.root === right.root;
   if (useExactMatch) {
-    return left.head === right.head && left.context.equals(right.context);
+    return (
+      getRelationNodeID(left) === getRelationNodeID(right) &&
+      left.context.equals(right.context)
+    );
   }
 
+  const leftContext = left.context;
+  const rightContext = right.context;
   return (
-    getSemanticNodeKey(knowledgeDBs, left.head, left.author) ===
-      getSemanticNodeKey(knowledgeDBs, right.head, right.author) &&
-    left.context.size === right.context.size &&
-    left.context.every(
+    getSemanticNodeKey(
+      knowledgeDBs,
+      getRelationNodeID(left),
+      left.author
+    ) ===
+      getSemanticNodeKey(
+        knowledgeDBs,
+        getRelationNodeID(right),
+        right.author
+      ) &&
+    leftContext.size === rightContext.size &&
+    leftContext.every(
       (nodeID, index) =>
         getSemanticNodeKey(knowledgeDBs, nodeID, left.author) ===
         getSemanticNodeKey(
           knowledgeDBs,
-          right.context.get(index) as ID,
+          rightContext.get(index) as ID,
           right.author
         )
     )
@@ -222,7 +237,7 @@ export function buildOutgoingReference(
   const ref = parseRef(refId, knowledgeDBs, myself);
   if (!ref) return buildDeletedReference(refId, myself);
 
-  const target = ref.targetNode || (ref.relation.head as ID);
+  const target = ref.targetNode || (shortID(ref.relation.head as ID) as ID);
   const { contextLabels, targetLabel, fullContext } = resolveLabels(
     knowledgeDBs,
     myself,
@@ -347,7 +362,7 @@ function findCrefToNode(
     const matchesHead = parsed.relationID === targetRelation.id;
     const matchesItem =
       !!containingRelation &&
-      parsed.targetNode === shortID(targetRelation.head) &&
+      parsed.targetNode === shortID(targetRelation.head as ID) &&
       parsed.relationID === containingRelation.id;
     return matchesHead || matchesItem;
   });

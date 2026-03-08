@@ -5,10 +5,10 @@ import {
   ViewPath,
   useViewPath,
   parseViewPath,
-  useNode,
+  useCurrentRelation,
   useDisplayText,
   useViewKey,
-  useRelationItem,
+  useCurrentEdge,
   useVirtualItemsMap,
 } from "../ViewContext";
 import { usePlanner } from "../planner";
@@ -49,7 +49,7 @@ function getArgumentLabel(argument: Argument): string {
 
 export function EvidenceSelector(): JSX.Element | null {
   const { currentArgument, isVisible } = useUpdateArgument();
-  const relationItem = useRelationItem();
+  const relationItem = useCurrentEdge();
   const virtualType = relationItem?.virtualType;
   const isAcceptableVirtual =
     virtualType === "incoming" ||
@@ -57,7 +57,7 @@ export function EvidenceSelector(): JSX.Element | null {
     virtualType === "version";
   const viewPath = useViewPath();
   const viewKey = useViewKey();
-  const [node] = useNode();
+  const currentRelation = useCurrentRelation();
   const versionedDisplayText = useDisplayText();
   const editorTextContext = useEditorText();
   const editorText = editorTextContext?.text ?? "";
@@ -69,7 +69,7 @@ export function EvidenceSelector(): JSX.Element | null {
   if (!isVisible && !isAcceptableVirtual) return null;
 
   const nodeName =
-    editorText.trim() || versionedDisplayText || node?.text || "item";
+    editorText.trim() || versionedDisplayText || currentRelation?.text || "item";
 
   const isInSelection = selection.has(viewKey) && selection.size > 1;
 

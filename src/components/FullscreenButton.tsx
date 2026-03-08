@@ -4,7 +4,7 @@ import {
   useViewPath,
   useDisplayText,
   useEffectiveAuthor,
-  useRelation,
+  useCurrentRelation,
   getAlternativeRelations,
   getContext,
   getNodeIDsForViewPath,
@@ -28,7 +28,7 @@ export function FullscreenButton(): JSX.Element | null {
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();
   const effectiveAuthor = useEffectiveAuthor();
-  const relation = useRelation();
+  const relation = useCurrentRelation();
   const context = getContext(data, viewPath, stack);
   const isFullscreenNode = viewPath.length === 2;
   if (isFullscreenNode) {

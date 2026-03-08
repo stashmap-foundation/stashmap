@@ -39,6 +39,7 @@ import {
 } from "./navigationUrl";
 import {
   ensureRelationNativeFields,
+  getRelationDepth,
   shortID,
 } from "./connections";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
@@ -161,9 +162,17 @@ function processEventsByAuthor(
   authorEvents: List<UnsignedEvent | Event>
 ): ProcessedEvents {
   const contacts = findContacts(authorEvents);
-  const relations = findDocumentRelations(authorEvents)
+  const documentRelations = findDocumentRelations(authorEvents);
+  const baseKnowledgeDBs = Map<PublicKey, KnowledgeData>().set(
+    authorEvents.first()?.pubkey as PublicKey,
+    {
+      ...newDB(),
+      relations: documentRelations,
+    }
+  );
+  const relations = documentRelations
     .valueSeq()
-    .sortBy((relation) => relation.context.size)
+    .sortBy((relation) => getRelationDepth(baseKnowledgeDBs, relation))
     .reduce((acc, relation) => {
       const knowledgeDBs = Map<PublicKey, KnowledgeData>().set(relation.author, {
         ...newDB(),

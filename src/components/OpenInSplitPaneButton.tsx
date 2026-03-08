@@ -5,7 +5,7 @@ import {
   useViewPath,
   updateViewPathsAfterPaneInsert,
   getEffectiveAuthor,
-  useRelation,
+  useCurrentRelation,
   getNodeIDsForViewPath,
 } from "../ViewContext";
 import {
@@ -28,7 +28,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
   const isMobile = useMediaQuery(IS_MOBILE);
   const { createPlan, executePlan } = usePlanner();
   const { knowledgeDBs } = data;
-  const relation = useRelation();
+  const relation = useCurrentRelation();
 
   if (isMobile) {
     return null;

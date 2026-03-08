@@ -1,7 +1,7 @@
 import { CSSProperties } from "react";
 import {
   useIsViewingOtherUserContent,
-  useRelationItem,
+  useCurrentEdge,
   useNodeID,
 } from "../ViewContext";
 import { isConcreteRefId } from "../connections";
@@ -51,7 +51,7 @@ function isReferenceVirtualType(virtualType: VirtualType | undefined): boolean {
 
 export function useItemStyle(): ItemStyle {
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
-  const currentItem = useRelationItem();
+  const currentItem = useCurrentEdge();
   const [nodeID] = useNodeID();
   const virtualType = currentItem?.virtualType;
 

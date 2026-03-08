@@ -4,7 +4,7 @@ import {
   getParentView,
   upsertRelations,
   useIsInSearchView,
-  useNode,
+  useCurrentRelation,
   useNodeID,
   getRelationForView,
   ViewPath,
@@ -53,7 +53,7 @@ export function useRelationItemContext(): RelationItemContext {
   const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
   const isInSearchView = useIsInSearchView();
-  const [node] = useNode();
+  const currentRelation = useCurrentRelation();
   const parentView = getParentView(viewPath);
 
   const [nodeID] = useNodeID();
@@ -62,7 +62,7 @@ export function useRelationItemContext(): RelationItemContext {
     ? getRelationForView(data, parentView, stack)?.id
     : undefined;
   const editorTextContext = useEditorText();
-  const nodeText = node?.text || "";
+  const nodeText = currentRelation?.text || "";
 
   const isVisible =
     !isInSearchView && relationIndex !== undefined && parentView !== undefined;

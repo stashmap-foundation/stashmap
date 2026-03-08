@@ -1,7 +1,7 @@
 import React from "react";
 import { List } from "immutable";
 import { useDropzone } from "react-dropzone";
-import { newNode } from "../connections";
+import { createNodeID, hashText } from "../connections";
 import { ViewPath, getRelationForView } from "../ViewContext";
 import {
   Plan,
@@ -146,11 +146,6 @@ function flattenTreeNodes(treeNodes: MarkdownTreeNode[]): MarkdownTreeNode[] {
   }, []);
 }
 
-export function createNodesFromMarkdown(markdownText: string): KnowNode[] {
-  const trees = parseMarkdownHierarchy(markdownText);
-  return flattenTreeNodes(trees).map((treeNode) => newNode(treeNode.text));
-}
-
 export function planCreateNodesFromMarkdown(
   plan: Plan,
   markdownText: string,
@@ -166,7 +161,11 @@ export function planCreateNodesFromMarkdown(
     return [nextPlan, topNodeIDs[0]];
   }
 
-  const fallbackNode = newNode("Imported Markdown");
+  const fallbackNode = {
+    id: createNodeID("Imported Markdown"),
+    text: "Imported Markdown",
+    textHash: hashText("Imported Markdown"),
+  };
   const fallbackRelation = newRelations(
     fallbackNode.id,
     List<ID>(),

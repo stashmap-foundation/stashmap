@@ -5,7 +5,7 @@ import {
   useViewKey,
   getRelationIndex,
   useDisplayText,
-  useNode,
+  useCurrentRelation,
 } from "../ViewContext";
 import { useData } from "../DataContext";
 import { planDeselectTemporarySelectionInView, usePlanner } from "../planner";
@@ -127,17 +127,17 @@ export function toggleEditing(
   };
 }
 
-export function isMutableNode(node: KnowNode | undefined): boolean {
-  return !!node && node.type === "text";
+export function isEditableRelation(relation: Relations | undefined): boolean {
+  return !!relation;
 }
 
 export function ToggleEditing(): JSX.Element | null {
-  const [node] = useNode();
+  const relation = useCurrentRelation();
   const displayText = useDisplayText();
   const ariaLabel = displayText ? `edit ${displayText}` : undefined;
   const { editingViews, setEditingState } = useTemporaryView();
   const viewKey = useViewKey();
-  if (!isMutableNode(node)) {
+  if (!isEditableRelation(relation)) {
     return null;
   }
   const onClick = (): void =>

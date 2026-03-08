@@ -7,7 +7,7 @@ import {
 
 import {
   getEffectiveAuthor,
-  getNodeFromView,
+  getDisplayTextForView,
   getNodeIDFromView,
   getRootForView,
   getContext,
@@ -55,6 +55,8 @@ import {
 import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import {
   LOG_NODE_ID,
+  getRelationContext,
+  getRelationNodeID,
   getTextForMatching,
   isSearchId,
   shortID,
@@ -125,8 +127,8 @@ function getOwnLogRelation(
     .filter(
       (relation) =>
         relation.author === author &&
-        relation.head === LOG_NODE_ID &&
-        relation.context.size === 0 &&
+        getRelationNodeID(relation) === LOG_NODE_ID &&
+        getRelationContext(knowledgeDBs, relation).size === 0 &&
         relation.root === shortID(relation.id)
     )
     .sortBy((relation) => -relation.updated)
@@ -621,12 +623,7 @@ function getDisplayTextForViewKey(
   viewKey: string
 ): string {
   const viewPath = parseViewPath(viewKey);
-  const [node] = getNodeFromView(data, viewPath);
-  if (node?.type === "reference" || (node && isSearchId(node.id as ID))) {
-    return node.text;
-  }
-  const [nodeID] = getNodeIDFromView(data, viewPath);
-  return getTextForMatching(data.knowledgeDBs, nodeID as ID, data.user.publicKey) || node?.text || "";
+  return getDisplayTextForView(data, viewPath, stack);
 }
 
 function getActionTargetKeys(

@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  useRelationItem,
+  useCurrentEdge,
   useIsRoot,
   useIsInSearchView,
   useIsViewingOtherUserContent,
@@ -13,7 +13,7 @@ import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 
 export function RightMenu(): JSX.Element {
-  const virtualType = useRelationItem()?.virtualType;
+  const virtualType = useCurrentEdge()?.virtualType;
   const isVirtualItem =
     virtualType === "suggestion" ||
     virtualType === "incoming" ||

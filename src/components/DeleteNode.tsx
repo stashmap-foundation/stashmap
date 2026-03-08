@@ -5,7 +5,7 @@ import { Button } from "../commons/Ui";
 import { deleteRelations, getRelationItemNodeID } from "../connections";
 import {
   updateViewPathsAfterDeleteNode,
-  useNode,
+  useCurrentRelation,
   useNodeID,
   useViewPath,
 } from "../ViewContext";
@@ -17,7 +17,7 @@ import {
   planUpsertRelations,
   usePlanner,
 } from "../planner";
-import { isMutableNode } from "./TemporaryViewContext";
+import { isEditableRelation } from "./TemporaryViewContext";
 import { planDeleteNodeFromView } from "../dnd";
 
 function disconnectNode(plan: Plan, toDisconnect: LongID | ID): Plan {
@@ -47,13 +47,13 @@ export function DeleteNode({
   afterOnClick: () => void;
 }): JSX.Element | null {
   const [nodeID] = useNodeID();
-  const [node] = useNode();
+  const relation = useCurrentRelation();
   const viewPath = useViewPath();
   const stack = usePaneStack();
   const navigate = useNavigate();
   const { createPlan, executePlan } = usePlanner();
 
-  if (!isMutableNode(node)) {
+  if (!isEditableRelation(relation)) {
     return null;
   }
   const deleteNode = (): void => {

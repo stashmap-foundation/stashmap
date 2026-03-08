@@ -58,11 +58,13 @@ import {
 } from "./NostrAuthContext";
 import {
   addRelationToRelations,
+  createNodeID,
   getRelationsNoReferencedBy,
-  newNode,
+  hashText,
   shortID,
   EMPTY_NODE_ID,
 } from "./connections";
+import type { TextSeed } from "./connections";
 import { newRelations, RootViewContextProvider } from "./ViewContext";
 import { LoadData } from "./dataQuery";
 import { LoadSearchData } from "./LoadSearchData";
@@ -309,7 +311,7 @@ export function setup(
   });
 }
 
-export function findNodeByText(plan: Plan, text: string): KnowNode | undefined {
+export function findNodeByText(plan: Plan, text: string): TextSeed | undefined {
   const { knowledgeDBs, user } = plan;
   const userDB = knowledgeDBs.get(user.publicKey, newDB());
   const relation = userDB.relations
@@ -322,16 +324,13 @@ export function findNodeByText(plan: Plan, text: string): KnowNode | undefined {
       id: relation.head,
       text: relation.text,
       textHash: relation.textHash,
-      type: "text",
     };
   }
   return undefined;
 }
 
-function createInitialRoot(plan: Plan, rootText?: string): [Plan, nodeID: ID] {
-  const rootNode = rootText
-    ? findNodeByText(plan, rootText)
-    : newNode("My Notes");
+function createInitialRoot(plan: Plan, rootText: string): [Plan, nodeID: ID] {
+  const rootNode = findNodeByText(plan, rootText);
   if (!rootNode) {
     throw new Error(`Test Setup Error: No Node with text ${rootText} found`);
   }
@@ -626,8 +625,8 @@ export async function type(text: string): Promise<void> {
 }
 
 type NodeDescription = [
-  string | KnowNode,
-  (NodeDescription[] | (string | KnowNode)[])?
+  string | TextSeed,
+  (NodeDescription[] | (string | TextSeed)[])?
 ];
 
 function createNodesAndRelations(
@@ -651,7 +650,13 @@ function createNodesAndRelations(
       ? (nodeDescription[1] as NodeDescription[] | undefined)
       : undefined;
     const node =
-      typeof textOrNode === "string" ? newNode(textOrNode) : textOrNode;
+      typeof textOrNode === "string"
+        ? {
+            id: createNodeID(textOrNode),
+            text: textOrNode,
+            textHash: hashText(textOrNode),
+          }
+        : textOrNode;
     const nodeRelations = newRelations(
       node.id,
       context,

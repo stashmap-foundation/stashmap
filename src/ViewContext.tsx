@@ -25,6 +25,8 @@ import {
   getRelationItemNodeID,
   getRelationItemRelation,
   getIndexedRelationsForKeys,
+  getRelationContext,
+  getRelationNodeID,
 } from "./connections";
 import {
   buildOutgoingReference,
@@ -107,7 +109,7 @@ function getComparableSuggestionKey(
 
   return getSemanticNodeKey(
     knowledgeDBs,
-    parsed.targetNode || (relation.head as ID),
+    parsed.targetNode || getRelationNodeID(relation),
     relation.author
   );
 }
@@ -192,7 +194,7 @@ export function getSuggestionsForNode(
           (r) =>
             nodesSemanticallyMatch(
               knowledgeDBs,
-              r.head,
+              getRelationNodeID(r),
               r.author,
               localID,
               myself
@@ -349,10 +351,10 @@ export function getAlternativeRelations(
             currentRoot !== undefined &&
             r.root === currentRoot;
           const matchesNode = useExactMatch
-            ? r.head === localID
+            ? shortID(getRelationNodeID(r)) === localID
             : nodesSemanticallyMatch(
                 knowledgeDBs,
-                r.head,
+                getRelationNodeID(r),
                 r.author,
                 localID,
                 author
@@ -631,6 +633,14 @@ export function getContext(
   viewPath: ViewPath,
   stack: ID[]
 ): Context {
+  const directRelation = getViewRelationByID(
+    data.knowledgeDBs,
+    getLast(viewPath),
+    data.user.publicKey
+  );
+  if (directRelation) {
+    return getRelationContext(data.knowledgeDBs, directRelation);
+  }
   if (isRoot(viewPath)) {
     return getContextFromStack(stack);
   }
@@ -641,7 +651,7 @@ export function getContext(
   const parentContext = getContext(data, parentPath, stack);
   const parentRelation = getRelationForView(data, parentPath, stack);
   if (parentRelation) {
-    return parentContext.push(shortID(parentRelation.head as ID) as ID);
+    return parentContext.push(getRelationNodeID(parentRelation));
   }
   const [parentNodeID] = getNodeIDFromView(data, parentPath);
   return parentContext.push(shortID(parentNodeID as ID) as ID);
@@ -680,25 +690,17 @@ function relationMatchesRequestedNode(
   requestedNodeID: LongID | ID
 ): boolean {
   const localID = shortID(requestedNodeID);
-  if (relation.textHash === localID || relation.head === localID) {
+  if (
+    relation.textHash === localID ||
+    shortID(relation.head as ID) === localID ||
+    shortID(getRelationNodeID(relation)) === localID
+  ) {
     return true;
   }
   return (
     getTextHashForMatching(knowledgeDBs, relation.textHash, relation.author) ===
     localID
   );
-}
-
-function getNodeIDForRelation(relation: Relations): ID {
-  const localHead = shortID(relation.head as ID) as ID;
-  if (
-    localHead === LOG_NODE_ID ||
-    localHead === EMPTY_NODE_ID ||
-    isSearchId(localHead)
-  ) {
-    return localHead;
-  }
-  return relation.text !== "" ? relation.textHash : localHead;
 }
 
 function getAuthorCandidateRelations(
@@ -769,7 +771,7 @@ function getNewestRelationFromRootBySemanticContext(
     relation.root === root &&
     contextsSemanticallyMatch(
       knowledgeDBs,
-      relation.context,
+      getRelationContext(knowledgeDBs, relation),
       relation.author,
       context,
       author
@@ -829,7 +831,7 @@ function resolveRequestedStackFromRoot(
   }
 
   let currentRelation: Relations | undefined = rootRelation;
-  const actualStack: ID[] = [getNodeIDForRelation(rootRelation)];
+  const actualStack: ID[] = [getRelationNodeID(rootRelation)];
 
   for (let index = 1; index < requestedStack.length; index += 1) {
     if (!currentRelation) {
@@ -843,7 +845,7 @@ function resolveRequestedStackFromRoot(
     if (!nextRelation) {
       return undefined;
     }
-    actualStack.push(getNodeIDForRelation(nextRelation));
+    actualStack.push(getRelationNodeID(nextRelation));
     currentRelation = nextRelation;
   }
 
@@ -885,7 +887,7 @@ function getViewRelationByID(
   id: LongID | ID,
   myself: PublicKey
 ): Relations | undefined {
-  return getRelations(knowledgeDBs, id, myself);
+  return getRelationsNoReferencedBy(knowledgeDBs, id, myself);
 }
 
 function getNodeIDFromPath(data: Data, viewPath: ViewPath): LongID | ID {
@@ -898,7 +900,7 @@ function getNodeIDFromPath(data: Data, viewPath: ViewPath): LongID | ID {
   }
   return (
     getRelationsNoReferencedBy(data.knowledgeDBs, currentID, data.user.publicKey)
-      ? getNodeIDForRelation(
+      ? getRelationNodeID(
           getRelationsNoReferencedBy(
             data.knowledgeDBs,
             currentID,
@@ -995,7 +997,7 @@ export function getParentRelation(
     return undefined;
   }
   const parentID = viewPath[viewPath.length - 2] as ViewPathSegment;
-  return getViewRelationByID(data.knowledgeDBs, parentID, data.user.publicKey);
+  return getRelations(data.knowledgeDBs, parentID, data.user.publicKey);
 }
 
 export function getEffectiveAuthor(data: Data, viewPath: ViewPath): PublicKey {
@@ -1123,32 +1125,10 @@ export function getDescendantRelations(
   return allRelations.filter(
     (relations) =>
       (!root || relations.root === root) &&
-      ((relations.head === localID &&
-        contextsMatch(relations.context, rootContext)) ||
-        contextStartsWith(relations.context, childContext))
+      ((shortID(getRelationNodeID(relations)) === localID &&
+        contextsMatch(getRelationContext(knowledgeDBs, relations), rootContext)) ||
+        contextStartsWith(getRelationContext(knowledgeDBs, relations), childContext))
   );
-}
-
-export function getNodeFromID(
-  knowledgeDBs: KnowledgeDBs,
-  id: ID | LongID,
-  myself: PublicKey
-): KnowNode | undefined {
-  if (isRefId(id)) {
-    return buildOutgoingReference(id as LongID, knowledgeDBs, myself);
-  }
-
-  // Handle search IDs - build virtual node from ID
-  if (isSearchId(id as ID)) {
-    const query = parseSearchId(id as ID) || "";
-    return {
-      id: id as ID,
-      text: `Search: ${query}`,
-      textHash: hashText(query),
-      type: "text",
-    };
-  }
-  return getTextNodeForID(knowledgeDBs, id, myself);
 }
 
 export type TypeFilters = (
@@ -1177,16 +1157,23 @@ export function filterRelationItems(
   );
 }
 
-export function getNodeFromView(
+export function getCurrentReferenceForView(
   data: Data,
-  viewPath: ViewPath
-): [KnowNode, View] | [undefined, undefined] {
-  const [nodeID, view] = getNodeIDFromView(data, viewPath);
-  const node = getNodeFromID(data.knowledgeDBs, nodeID, data.user.publicKey);
-  if (!node) {
-    return [undefined, undefined];
+  viewPath: ViewPath,
+  stack: ID[],
+  virtualType?: VirtualType
+): ReferenceNode | undefined {
+  const [nodeID] = getNodeIDFromView(data, viewPath);
+  if (!isRefId(nodeID)) {
+    return undefined;
   }
-  return [node, view];
+  return buildReferenceItem(
+    nodeID as LongID,
+    data,
+    viewPath,
+    stack,
+    virtualType
+  );
 }
 
 export function addRelationsToLastElement(
@@ -1238,7 +1225,7 @@ export function useEffectiveAuthor(): PublicKey {
   return getEffectiveAuthor(data, viewPath);
 }
 
-export function useRelation(): Relations | undefined {
+export function useCurrentRelation(): Relations | undefined {
   const data = useData();
   const viewPath = useViewPath();
   const stack = usePaneStack();
@@ -1284,7 +1271,7 @@ export function useRelationIndex(): number | undefined {
   return getRelationIndex(data, path);
 }
 
-export function getRelationItemForView(
+export function getCurrentEdgeForView(
   data: Data,
   viewPath: ViewPath
 ): RelationItem | undefined {
@@ -1296,7 +1283,7 @@ export function getRelationItemForView(
   return index !== undefined ? relation.items.get(index) : undefined;
 }
 
-export function useRelationItem(): RelationItem | undefined {
+export function useCurrentEdge(): RelationItem | undefined {
   const virtualItems = React.useContext(VirtualItemsContext);
   const data = useData();
   const viewPath = useViewPath();
@@ -1305,7 +1292,7 @@ export function useRelationItem(): RelationItem | undefined {
   if (virtualItem) {
     return virtualItem;
   }
-  return getRelationItemForView(data, viewPath);
+  return getCurrentEdgeForView(data, viewPath);
 }
 
 export type SiblingInfo = {
@@ -1429,74 +1416,40 @@ export function useNodeID(): [LongID | ID, View] {
   return getNodeIDFromView(data, viewPath);
 }
 
-export function getNodeForView(
-  data: Data,
-  viewPath: ViewPath,
-  stack: ID[],
-  virtualType?: VirtualType
-): [KnowNode, View] | [undefined, undefined] {
-  const [nodeID, view] = getNodeIDFromView(data, viewPath);
-
-  if (isRefId(nodeID)) {
-    const node = buildReferenceItem(
-      nodeID as LongID,
-      data,
-      viewPath,
-      stack,
-      virtualType
-    );
-    if (!node) {
-      return [undefined, undefined];
-    }
-    return [node, view];
-  }
-
-  const node = getNodeFromID(data.knowledgeDBs, nodeID, data.user.publicKey);
-  if (!node) {
-    return [undefined, undefined];
-  }
-  return [node, view];
-}
-
-export function useNode(): [KnowNode, View] | [undefined, undefined] {
-  const data = useData();
-  const viewPath = useViewPath();
-  const stack = usePaneStack();
-  const virtualItem = useRelationItem();
-  return getNodeForView(data, viewPath, stack, virtualItem?.virtualType);
-}
-
 export function getDisplayTextForView(
   data: Data,
   viewPath: ViewPath,
   stack: ID[],
   virtualType?: VirtualType
 ): string {
-  const [node] = getNodeForView(data, viewPath, stack, virtualType);
-  if (node?.type === "reference" || (node && isSearchId(node.id as ID))) {
-    return node.text;
+  const reference = getCurrentReferenceForView(
+    data,
+    viewPath,
+    stack,
+    virtualType
+  );
+  if (reference) {
+    return reference.text;
+  }
+  const [nodeID] = getNodeIDFromView(data, viewPath);
+  if (isSearchId(nodeID as ID)) {
+    const query = parseSearchId(nodeID as ID) || "";
+    return `Search: ${query}`;
   }
   const ownRelation = getRelationForView(data, viewPath, stack);
-  return ownRelation?.text ?? node?.text ?? "";
+  return (
+    ownRelation?.text ??
+    getTextForMatching(data.knowledgeDBs, nodeID, data.user.publicKey) ??
+    ""
+  );
 }
 
 export function useDisplayText(): string {
   const data = useData();
   const viewPath = useViewPath();
   const stack = usePaneStack();
-  const virtualType = useRelationItem()?.virtualType;
+  const virtualType = useCurrentEdge()?.virtualType;
   return getDisplayTextForView(data, viewPath, stack, virtualType);
-}
-
-export function getParentNode(
-  data: Data,
-  viewPath: ViewPath
-): [KnowNode, View] | [undefined, undefined] {
-  const parentPath = getParentView(viewPath);
-  if (!parentPath) {
-    return [undefined, undefined];
-  }
-  return getNodeFromView(data, parentPath);
 }
 
 export function getParentNodeID(
@@ -1508,12 +1461,6 @@ export function getParentNodeID(
     return [undefined, undefined];
   }
   return getNodeIDFromView(data, parentPath);
-}
-
-export function useParentNode(): [KnowNode, View] | [undefined, undefined] {
-  const data = useData();
-  const viewPath = useViewPath();
-  return getParentNode(data, viewPath);
 }
 
 export function isExpanded(data: Data, viewKey: string): boolean {

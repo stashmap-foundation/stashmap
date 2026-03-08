@@ -7,16 +7,16 @@ import {
   useViewPath,
   useViewKey,
   useNodeID,
-  useNode,
+  useCurrentRelation,
   useDisplayText,
   useIsViewingOtherUserContent,
-  useRelationItem,
+  useCurrentEdge,
 } from "../ViewContext";
 import { isEmptyNodeID } from "../connections";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
 import {
-  isMutableNode,
+  isEditableRelation,
   useIsEditingOn,
   useIsSelected,
 } from "./TemporaryViewContext";
@@ -74,7 +74,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     const path = useViewPath();
     const isNodeBeeingEdited = useIsEditingOn();
     const [nodeID] = useNodeID();
-    const [node] = useNode();
+    const relation = useCurrentRelation();
     const displayText = useDisplayText();
     const isEmptyNode = isEmptyNodeID(nodeID);
     const disableDrag = isNodeBeeingEdited || isEmptyNode;
@@ -129,7 +129,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
         data-row-depth={rowDepth}
         data-node-id={nodeID}
         data-node-text={displayText}
-        data-node-mutable={isMutableNode(node) ? "true" : "false"}
+        data-node-mutable={isEditableRelation(relation) ? "true" : "false"}
         data-selected={isSelected ? "true" : undefined}
         role="treeitem"
         aria-label={displayText}
@@ -182,7 +182,7 @@ function DraggableSuggestion({
   const ref = useRef<HTMLDivElement>(null);
   const path = useViewPath();
   const [nodeID] = useNodeID();
-  const [node] = useNode();
+  const relation = useCurrentRelation();
   const displayText = useDisplayText();
 
   const [{ isDragging }, drag, preview] = useDrag({
@@ -232,7 +232,7 @@ function DraggableSuggestion({
       data-row-depth={rowDepth}
       data-node-id={nodeID}
       data-node-text={displayText}
-      data-node-mutable={isMutableNode(node) ? "true" : "false"}
+      data-node-mutable={isEditableRelation(relation) ? "true" : "false"}
       data-selected={isSelected ? "true" : undefined}
       role="treeitem"
       aria-label={displayText}
@@ -276,7 +276,7 @@ export function ListItem({
   const viewKey = useViewKey();
   const viewPath = useViewPath();
   const [nodeID] = useNodeID();
-  const virtualType = useRelationItem()?.virtualType;
+  const virtualType = useCurrentEdge()?.virtualType;
   const isSuggestion = virtualType === "suggestion";
   const isCopyDrag =
     virtualType === "incoming" ||

@@ -15,14 +15,11 @@ export const LOG_NODE_ID = hashText("~Log");
 // Pre-computed hash for empty node (used as placeholder when creating new nodes)
 export const EMPTY_NODE_ID = hashText("") as ID;
 
-// Type guards for KnowNode union type
-export function isTextNode(node: KnowNode): node is TextNode {
-  return node.type === "text";
-}
-
-export function isReferenceNode(node: KnowNode): node is ReferenceNode {
-  return node.type === "reference";
-}
+export type TextSeed = {
+  id: ID;
+  text: string;
+  textHash: ID;
+};
 
 const CONCRETE_REF_PREFIX = "cref:";
 const SHORT_NODE_ID_RE = /^[a-f0-9]{32}$/;
@@ -41,18 +38,15 @@ function getReservedNodeID(text: string): ID | undefined {
   return undefined;
 }
 
+export function createNodeID(text: string, id?: ID): ID {
+  return getReservedNodeID(text) ?? id ?? createRandomNodeID();
+}
+
 export function nodeIDFromSeed(seed: string): ID {
   const normalized = seed.replace(/-/g, "");
   return SHORT_NODE_ID_RE.test(normalized)
     ? (normalized as ID)
     : hashText(seed);
-}
-
-export function getNodeTextHash(node: KnowNode | undefined): ID | undefined {
-  if (!node || !isTextNode(node)) {
-    return undefined;
-  }
-  return node.textHash ?? hashText(node.text);
 }
 
 export function isRefId(id: ID | LongID): boolean {
@@ -156,6 +150,7 @@ export function getRelationText(
 type RelationLookupIndex = globalThis.Map<string, Relations[]>;
 
 const relationLookupIndexCache = new WeakMap<KnowledgeData, RelationLookupIndex>();
+const relationContextCache = new WeakMap<KnowledgeData, globalThis.Map<string, Context>>();
 
 function getRelationLookupIndex(db: KnowledgeData): RelationLookupIndex {
   const cached = relationLookupIndexCache.get(db);
@@ -188,6 +183,16 @@ function getRelationLookupIndex(db: KnowledgeData): RelationLookupIndex {
   return index;
 }
 
+function getRelationContextIndex(db: KnowledgeData): globalThis.Map<string, Context> {
+  const cached = relationContextCache.get(db);
+  if (cached) {
+    return cached;
+  }
+  const index = new globalThis.Map<string, Context>();
+  relationContextCache.set(db, index);
+  return index;
+}
+
 export function getIndexedRelationsForKeys(
   db: KnowledgeData,
   keys: string[]
@@ -213,6 +218,89 @@ function getRelationTextHash(
   return relation.textHash;
 }
 
+export function getRelationNodeID(relation: Relations): ID {
+  const localHead = shortID(relation.head as ID) as ID;
+  if (
+    localHead === LOG_NODE_ID ||
+    localHead === EMPTY_NODE_ID ||
+    isSearchId(localHead)
+  ) {
+    return localHead;
+  }
+  return relation.text !== "" ? relation.textHash : localHead;
+}
+
+export function getRelationContext(
+  knowledgeDBs: KnowledgeDBs,
+  relation: Relations
+): Context {
+  const db = knowledgeDBs.get(relation.author);
+  const relationKey = shortID(relation.id);
+  if (db) {
+    const cached = getRelationContextIndex(db).get(relationKey);
+    if (cached) {
+      return cached;
+    }
+  }
+
+  const fallbackContext = relation.context;
+  if (!relation.parent) {
+    if (db) {
+      getRelationContextIndex(db).set(relationKey, fallbackContext);
+    }
+    return fallbackContext;
+  }
+
+  const visited = new globalThis.Set<string>([relationKey]);
+  const segments: ID[] = [];
+  let currentParentID: LongID | undefined = relation.parent;
+
+  while (currentParentID) {
+    const parentKey = shortID(currentParentID);
+    if (visited.has(parentKey)) {
+      if (db) {
+        getRelationContextIndex(db).set(relationKey, fallbackContext);
+      }
+      return fallbackContext;
+    }
+    visited.add(parentKey);
+
+    const parentRelation = getRelationsNoReferencedBy(
+      knowledgeDBs,
+      currentParentID,
+      relation.author
+    );
+    if (!parentRelation) {
+      if (db) {
+        getRelationContextIndex(db).set(relationKey, fallbackContext);
+      }
+      return fallbackContext;
+    }
+    segments.unshift(getRelationNodeID(parentRelation));
+    currentParentID = parentRelation.parent;
+  }
+
+  const derivedContext = List<ID>(segments);
+  if (db) {
+    getRelationContextIndex(db).set(relationKey, derivedContext);
+  }
+  return derivedContext;
+}
+
+export function getRelationStack(
+  knowledgeDBs: KnowledgeDBs,
+  relation: Relations
+): ID[] {
+  return [...getRelationContext(knowledgeDBs, relation).toArray(), getRelationNodeID(relation)];
+}
+
+export function getRelationDepth(
+  knowledgeDBs: KnowledgeDBs,
+  relation: Relations
+): number {
+  return getRelationContext(knowledgeDBs, relation).size;
+}
+
 function getMatchingRelations(
   knowledgeDBs: KnowledgeDBs,
   nodeID: LongID | ID,
@@ -220,6 +308,11 @@ function getMatchingRelations(
 ): Relations[] {
   if (isRefId(nodeID) || isSearchId(nodeID as ID)) {
     return [];
+  }
+
+  const directRelation = getRelationsNoReferencedBy(knowledgeDBs, nodeID, author);
+  if (directRelation) {
+    return [directRelation];
   }
 
   const [remote, localID] = splitID(nodeID as ID);
@@ -238,8 +331,8 @@ function getMatchingRelations(
   return candidateDBs
     .flatMap((db) => getIndexedRelationsForKeys(db, [localID]))
     .sort((left, right) => {
-      const leftExact = left.head === localID ? 0 : 1;
-      const rightExact = right.head === localID ? 0 : 1;
+      const leftExact = shortID(getRelationNodeID(left)) === localID ? 0 : 1;
+      const rightExact = shortID(getRelationNodeID(right)) === localID ? 0 : 1;
       if (leftExact !== rightExact) {
         return leftExact - rightExact;
       }
@@ -274,6 +367,11 @@ export function getTextForMatching(
     return parseSearchId(localID) || "";
   }
 
+  const directRelation = getRelationsNoReferencedBy(knowledgeDBs, nodeID, author);
+  if (directRelation) {
+    return getRelationText(directRelation);
+  }
+
   const relation = getRelationForMatching(knowledgeDBs, nodeID, author);
   const relationText = getRelationText(relation);
   if (relationText !== undefined) {
@@ -290,6 +388,10 @@ export function getTextHashForMatching(
   nodeID: LongID | ID,
   author: PublicKey
 ): ID | undefined {
+  const directRelation = getRelationsNoReferencedBy(knowledgeDBs, nodeID, author);
+  if (directRelation) {
+    return directRelation.textHash;
+  }
   const relation = getRelationForMatching(knowledgeDBs, nodeID, author);
   if (relation) {
     return relation.textHash;
@@ -301,46 +403,66 @@ export function getTextHashForMatching(
     : undefined;
 }
 
-export function createTextNodeFromRelation(relation: Relations): TextNode {
+export function createTextNodeFromRelation(relation: Relations): TextSeed {
   return {
-    id: relation.head,
+    id: getRelationNodeID(relation),
     text: getRelationText(relation) || "",
     textHash: relation.textHash,
-    type: "text",
   };
 }
 
 export function buildTextNodesFromRelations(
   relations: Iterable<Relations>
-): Map<string, TextNode> {
-  const latestByHead = Array.from(relations).reduce((acc, relation) => {
-    const existing = acc.get(relation.head);
+): Map<string, TextSeed> {
+  const relationList = Array.from(relations);
+  const knowledgeDBs = relationList.reduce((acc, relation) => {
+    const authorDB = acc.get(relation.author, { relations: Map<string, Relations>() });
+    return acc.set(relation.author, {
+      relations: authorDB.relations.set(shortID(relation.id), relation),
+    });
+  }, Map<PublicKey, KnowledgeData>());
+
+  const latestByHead = relationList.reduce((acc, relation) => {
+    const nodeID = getRelationNodeID(relation);
+    const existing = acc.get(nodeID);
     const isNewer = !existing || relation.updated > existing.updated;
     const isSameVersionNewerDisplay =
       !!existing &&
       relation.updated === existing.updated &&
-      relation.context.size < existing.context.size;
+      getRelationDepth(knowledgeDBs, relation) <
+        getRelationDepth(knowledgeDBs, existing);
     if (isNewer || isSameVersionNewerDisplay) {
-      return acc.set(relation.head, relation);
+      return acc.set(nodeID, relation);
     }
     return acc;
   }, Map<ID, Relations>());
 
   return latestByHead.map((relation) =>
     createTextNodeFromRelation(relation)
-  ) as Map<string, TextNode>;
+  ) as Map<string, TextSeed>;
 }
 
 export function getTextNodeForID(
   knowledgeDBs: KnowledgeDBs,
   nodeID: LongID | ID,
   author: PublicKey
-): TextNode | undefined {
+): TextSeed | undefined {
   if (isRefId(nodeID) || isSearchId(nodeID as ID)) {
     return undefined;
   }
 
   const localID = shortID(nodeID as ID) as ID;
+  const directRelation = getRelationsNoReferencedBy(knowledgeDBs, nodeID, author);
+  if (directRelation) {
+    const relationText = getRelationText(directRelation);
+    if (relationText !== undefined) {
+      return {
+        id: getRelationNodeID(directRelation),
+        text: relationText,
+        textHash: directRelation.textHash,
+      };
+    }
+  }
   const relation = getRelationForMatching(knowledgeDBs, nodeID, author);
   const relationText = getRelationText(relation);
   if (relation && relationText !== undefined) {
@@ -348,7 +470,6 @@ export function getTextNodeForID(
       id: localID,
       text: relationText,
       textHash: relation.textHash,
-      type: "text",
     };
   }
 
@@ -358,7 +479,6 @@ export function getTextNodeForID(
       id: localID,
       text: fallbackText,
       textHash: hashText(fallbackText),
-      type: "text",
     };
   }
   return undefined;
@@ -404,7 +524,8 @@ export function getRelationItemNodeID(
   item: RelationItem,
   myself: PublicKey
 ): LongID | ID {
-  return getRelationItemRelation(knowledgeDBs, item, myself)?.head ?? item.id;
+  const relation = getRelationItemRelation(knowledgeDBs, item, myself);
+  return relation?.head ?? item.id;
 }
 
 export function getRelationItemTextHash(
@@ -448,7 +569,7 @@ export function getRefTargetInfo(
     if (!relation) {
       return undefined;
     }
-    const stack = [...relation.context.toArray(), relation.head];
+    const stack = getRelationStack(knowledgeDBs, relation);
     return {
       stack,
       author: relation.author,
@@ -507,29 +628,8 @@ function getNodeForMatching(
   knowledgeDBs: KnowledgeDBs,
   nodeID: LongID | ID,
   author: PublicKey
-): KnowNode | undefined {
+): TextSeed | undefined {
   return getTextNodeForID(knowledgeDBs, nodeID, author);
-}
-
-export function inferParentRelationID(
-  knowledgeDBs: KnowledgeDBs,
-  relation: Relations
-): LongID | undefined {
-  if (relation.context.size === 0) {
-    return undefined;
-  }
-
-  const parentHead = relation.context.last() as ID;
-  const parentContext = relation.context.butLast().toList() as Context;
-  return knowledgeDBs
-    .get(relation.author)
-    ?.relations.valueSeq()
-    .find(
-      (candidate) =>
-        candidate.root === relation.root &&
-        candidate.head === parentHead &&
-        candidate.context.equals(parentContext)
-    )?.id;
 }
 
 export function ensureRelationNativeFields(
@@ -650,7 +750,7 @@ function findNodeAppearances(
   return knowledgeDBs.reduce((acc, knowledgeDB) => {
     return knowledgeDB.relations.reduce((rdx, relation) => {
       if (
-        isSearchId(relation.head as ID) ||
+        isSearchId(getRelationNodeID(relation)) ||
         relation.context.some((id) => isSearchId(id as ID))
       ) {
         return rdx;
@@ -692,7 +792,7 @@ function findNodeAppearances(
           targetRoot !== undefined &&
           relation.author === targetAuthor &&
           relation.root === targetRoot &&
-          shortID(relation.head as ID) === shortID(nodeID as ID)) ||
+          shortID(getRelationNodeID(relation) as ID) === shortID(nodeID as ID)) ||
           getRelationTextHash(knowledgeDBs, relation) === targetSemanticKey);
       if (isHeadWithChildren || isInItems) {
         return rdx.push({
@@ -716,20 +816,23 @@ function findNodeAppearances(
 }
 
 function resolveAppearance(
+  _knowledgeDBs: KnowledgeDBs,
   app: RawAppearance,
   targetShortID: ID
 ): ReferencedByRef | undefined {
   const { relation, isHead, matchedItemNodeID } = app;
+  const relationContext = relation.context;
+  const relationNodeID = shortID(relation.head as ID) as ID;
   if (isHead) {
     return {
       relationID: relation.id,
-      context: relation.context,
+      context: relationContext,
       updated: relation.updated,
     };
   }
   return {
     relationID: relation.id,
-    context: relation.context.push(relation.head as ID),
+    context: relationContext.push(relationNodeID),
     updated: relation.updated,
     targetNode: matchedItemNodeID || targetShortID,
   };
@@ -751,7 +854,7 @@ export function findRefsToNode(
   );
   const resolvedRefs = appearances
     .map((app) => {
-      const ref = resolveAppearance(app, targetShortID);
+      const ref = resolveAppearance(knowledgeDBs, app, targetShortID);
       if (!ref) {
         return undefined;
       }
@@ -811,7 +914,9 @@ function contextKeyForCref(
   if (!rel) return undefined;
   return getSemanticContextKey(
     knowledgeDBs,
-    parsed.targetNode ? rel.context.push(rel.head as ID) : rel.context,
+    parsed.targetNode
+      ? rel.context.push(shortID(rel.head as ID) as ID)
+      : rel.context,
     rel.author
   );
 }
@@ -942,6 +1047,15 @@ export function getIncomingCrefsForNode(
   currentRoot?: ID
 ): List<LongID> {
   const currentShortNodeID = shortID(currentNodeID);
+  const outgoingCrefIDs = (currentItems || List<RelationItem>())
+    .map((item) => item.id)
+    .filter(isConcreteRefId)
+    .toList();
+  const covered = coveredContextKeys(
+    knowledgeDBs,
+    outgoingCrefIDs,
+    effectiveAuthor
+  );
   const outgoingTargetRelIDs = (currentItems || List<RelationItem>()).reduce(
     (acc, item) => {
       const parsed = parseConcreteRefId(item.id);
@@ -954,14 +1068,20 @@ export function getIncomingCrefsForNode(
         effectiveAuthor
       );
       if (!targetRelation) return withTarget;
+      const targetNode = parsed.targetNode;
+      if (!targetNode) return withTarget;
       const childContext = targetRelation.context.push(
-        targetRelation.head as ID
+        shortID(targetRelation.head as ID) as ID
       );
-      const childRelation = knowledgeDBs
-        .valueSeq()
-        .flatMap((db) => db.relations.valueSeq())
+      const childRelation = targetRelation.items
+        .map((childItem) =>
+          getRelationItemRelation(knowledgeDBs, childItem, effectiveAuthor)
+        )
         .find(
-          (r) => r.head === parsed.targetNode && r.context.equals(childContext)
+          (child): child is Relations =>
+            !!child &&
+            child.context.equals(childContext) &&
+            shortID(getRelationNodeID(child)) === shortID(targetNode)
         );
       return childRelation ? withTarget.add(childRelation.id) : withTarget;
     },
@@ -972,7 +1092,7 @@ export function getIncomingCrefsForNode(
     return knowledgeDB.relations.reduce((rdx, relation) => {
       if (relation.id === parentRelationID) return rdx;
       if (relation.id === currentRelationID) return rdx;
-      if (relation.head === LOG_NODE_ID) return rdx;
+      if (getRelationNodeID(relation) === LOG_NODE_ID) return rdx;
       if (outgoingTargetRelIDs.has(relation.id)) return rdx;
 
       const hasCrefToUs = relation.items.some((item) => {
@@ -1004,6 +1124,9 @@ export function getIncomingCrefsForNode(
 
   const deduped = deduplicateRefsByContext(refs, knowledgeDBs, effectiveAuthor);
   return deduped
+    .filter(
+      (ref) => !covered.has(getRefContextKey(knowledgeDBs, ref, effectiveAuthor))
+    )
     .sortBy((ref) => `${-ref.updated}:${ref.context.join(":")}`)
     .map((ref) => createConcreteRefId(ref.relationID))
     .toList();
@@ -1146,7 +1269,7 @@ function filterVoteRelationLists(
   head: ID
 ): List<Relations> {
   return relations.filter((relation) => {
-    return shortID(relation.head) === shortID(head);
+    return shortID(getRelationNodeID(relation)) === shortID(head);
   });
 }
 
@@ -1355,15 +1478,6 @@ export function bulkAddRelations(
     const ord = startPos !== undefined ? startPos + currentIndex : undefined;
     return addRelationToRelations(rdx, id, relevance, argument, ord);
   }, relations);
-}
-
-export function newNode(text: string, id?: ID): KnowNode {
-  return {
-    text,
-    id: getReservedNodeID(text) ?? id ?? createRandomNodeID(),
-    textHash: hashText(text),
-    type: "text",
-  };
 }
 
 export type EmptyNodeData = {

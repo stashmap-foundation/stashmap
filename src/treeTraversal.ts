@@ -24,6 +24,7 @@ import {
   getOccurrencesForNode,
   getIncomingCrefsForNode,
   getRelationItemNodeID,
+  getRelationNodeID,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
 import { buildOutgoingReference } from "./buildReferenceNode";
@@ -88,9 +89,11 @@ function getChildrenForRegularNode(
     ? getRelations(data.knowledgeDBs, parentNodeID as ID, data.user.publicKey)
     : getRelationForView(data, parentPath, stack);
   const relations = directRelations;
-  const relationNodeID = relations
+  const relationNodeID = relations ? getRelationNodeID(relations) : parentNodeID;
+  const coordinateNodeID = relations
     ? ((shortID(relations.head as ID) as ID) as LongID | ID)
     : parentNodeID;
+  const coordinateContext = relations?.context ?? context;
 
   const relationPaths = relations
     ? relations.items
@@ -115,19 +118,16 @@ function getChildrenForRegularNode(
 
   const relationId = relations?.id || ("" as LongID);
 
-  const containingRelationID: LongID | undefined =
-    parentPath.length > 2
-      ? (parentPath[parentPath.length - 2] as LongID)
-      : undefined;
+  const containingRelationID = getParentRelation(data, parentPath)?.id;
 
   const incomingCrefs = getIncomingCrefsForNode(
     data.knowledgeDBs,
-    relationNodeID,
+    coordinateNodeID,
     containingRelationID,
     relations?.id,
     author,
     relations?.items,
-    context,
+    coordinateContext,
     relations?.root ?? currentRoot
   );
 
@@ -138,10 +138,10 @@ function getChildrenForRegularNode(
   const occurrences = activeFilters.includes("occurrence")
     ? getOccurrencesForNode(
         data.knowledgeDBs,
-        relationNodeID,
+        coordinateNodeID,
         relations?.id,
         effectiveAuthor,
-        context,
+        coordinateContext,
         relations?.root ?? currentRoot,
         relations?.items,
         incomingCrefs
@@ -164,12 +164,12 @@ function getChildrenForRegularNode(
     crefSuggestionIDs,
   } = isOwnContent
     ? getSuggestionsForNode(
-        data.knowledgeDBs,
-        data.user.publicKey,
-        parentNodeID,
-        activeFilters,
-        relations?.id,
-        context
+          data.knowledgeDBs,
+          data.user.publicKey,
+          coordinateNodeID,
+          activeFilters,
+          relations?.id,
+          coordinateContext
       )
     : {
         suggestions: List<LongID | ID>(),
@@ -207,10 +207,10 @@ function getChildrenForRegularNode(
   };
   const versions = getVersionsForRelation(
     data.knowledgeDBs,
-    parentNodeID,
+    coordinateNodeID,
     activeFilters,
     relations,
-    context,
+    coordinateContext,
     coveredCandidateIDs
   );
 

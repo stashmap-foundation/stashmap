@@ -1,7 +1,6 @@
 import React from "react";
 import { useMediaQuery } from "react-responsive";
 import {
-  useNode,
   useViewPath,
   ViewPath,
   useSearchDepth,
@@ -17,14 +16,15 @@ import {
   getRelationIndex,
   getNodeIDFromView,
   useIsViewingOtherUserContent,
-  useRelationItem,
+  useCurrentEdge,
   viewPathToString,
   useEffectiveAuthor,
+  useCurrentRelation,
+  getCurrentReferenceForView,
 } from "../ViewContext";
-import { isMutableNode } from "./TemporaryViewContext";
+import { isEditableRelation } from "./TemporaryViewContext";
 import { planBatchIndent, planBatchOutdent } from "./batchOperations";
 import {
-  isReferenceNode,
   getRefTargetInfo,
   isEmptyNodeID,
   isConcreteRefId,
@@ -161,7 +161,7 @@ function VersionContent({ node }: { node: ReferenceNode }): JSX.Element {
 }
 
 function ReferenceContent({ node }: { node: ReferenceNode }): JSX.Element {
-  const relationItem = useRelationItem();
+  const relationItem = useCurrentEdge();
   const virtualType = relationItem?.virtualType;
 
   if (virtualType === "version" || node.versionMeta) {
@@ -180,10 +180,14 @@ function ReferenceContent({ node }: { node: ReferenceNode }): JSX.Element {
 }
 
 function NodeContent(): JSX.Element {
-  const [node] = useNode();
+  const data = useData();
+  const viewPath = useViewPath();
+  const stack = usePaneStack();
+  const virtualType = useCurrentEdge()?.virtualType;
+  const node = getCurrentReferenceForView(data, viewPath, stack, virtualType);
   const displayText = useDisplayText();
 
-  if (node && node.type === "reference") {
+  if (node) {
     return <ReferenceContent node={node} />;
   }
 
@@ -196,7 +200,7 @@ function EditableContent(): JSX.Element {
   const paneIndex = usePaneIndex();
   const data = useData();
   const { createPlan, executePlan } = usePlanner();
-  const [node] = useNode();
+  const currentRelation = useCurrentRelation();
   const [nodeID] = useNodeID();
   const displayText = useDisplayText();
   const prevSibling = usePreviousSibling();
@@ -276,7 +280,7 @@ function EditableContent(): JSX.Element {
   };
 
   const handleTab = (text: string): void => {
-    if (!isEmptyNode && (!node || node.type !== "text")) {
+    if (!isEmptyNode && !isEditableRelation(currentRelation)) {
       return;
     }
 
@@ -381,7 +385,7 @@ function EditableContent(): JSX.Element {
       return;
     }
 
-    if (!node || node.type !== "text") return;
+    if (!isEditableRelation(currentRelation)) return;
 
     const viewKey = viewPathToString(viewPath);
     const result = planBatchOutdent(basePlan, [viewKey], stack, {
@@ -464,8 +468,7 @@ function EditableContent(): JSX.Element {
     }
   };
 
-  // For non-text nodes (and non-empty nodes), show read-only content
-  if (!isEmptyNode && (!node || node.type !== "text")) {
+  if (!isEmptyNode && !isEditableRelation(currentRelation)) {
     return <NodeContent />;
   }
 
@@ -488,13 +491,23 @@ function EditableContent(): JSX.Element {
 }
 
 function InteractiveNodeContent(): JSX.Element {
-  const [node] = useNode();
+  const data = useData();
+  const viewPath = useViewPath();
+  const stack = usePaneStack();
+  const currentRelation = useCurrentRelation();
   const [nodeID] = useNodeID();
   const isLoading = useNodeIsLoading();
   const isInSearchView = useIsInSearchView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
-  const virtualType = useRelationItem()?.virtualType;
+  const virtualType = useCurrentEdge()?.virtualType;
   const isEmptyNode = isEmptyNodeID(nodeID);
+  const displayText = useDisplayText();
+  const reference = getCurrentReferenceForView(
+    data,
+    viewPath,
+    stack,
+    virtualType
+  );
 
   const isReadonly =
     isInSearchView || isViewingOtherUserContent || virtualType !== undefined;
@@ -508,12 +521,11 @@ function InteractiveNodeContent(): JSX.Element {
     return isReadonly ? <></> : <EditableContent />;
   }
 
-  if (!node) {
+  if (!currentRelation && !reference && displayText === "") {
     return <ErrorContent />;
   }
 
-  // Editable content for mutable nodes (but read-only when viewing others' content)
-  if (isMutableNode(node) && !isReadonly) {
+  if (isEditableRelation(currentRelation) && !isReadonly) {
     return <EditableContent />;
   }
 
@@ -527,12 +539,16 @@ function NodeAutoLink({
   children: React.ReactNode;
 }): JSX.Element | null {
   const { knowledgeDBs, user } = useData();
-  const [node] = useNode();
+  const data = useData();
+  const viewPath = useViewPath();
+  const stack = usePaneStack();
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();
   const effectiveAuthor = useEffectiveAuthor();
+  const virtualType = useCurrentEdge()?.virtualType;
+  const node = getCurrentReferenceForView(data, viewPath, stack, virtualType);
 
-  if (node && isReferenceNode(node)) {
+  if (node) {
     const refInfo = getRefTargetInfo(node.id, knowledgeDBs, effectiveAuthor);
     if (refInfo) {
       const href = refInfo.rootRelation
@@ -667,17 +683,20 @@ export function Node({
 
   const { user } = useData();
   const [nodeID] = useNodeID();
-  const [node] = useNode();
+  const data = useData();
+  const stack = usePaneStack();
+  const currentRelation = useCurrentRelation();
   const isConcreteRef = isConcreteRefId(nodeID);
-  const virtualType = useRelationItem()?.virtualType;
+  const virtualType = useCurrentEdge()?.virtualType;
   const isViewingOtherUser = useIsViewingOtherUserContent();
+  const node = getCurrentReferenceForView(data, viewPath, stack, virtualType);
   const isOtherUser =
-    (node && isReferenceNode(node) && node.author !== user.publicKey) ||
+    (node && node.author !== user.publicKey) ||
     isViewingOtherUser;
 
   const isVersion =
     virtualType === "version" ||
-    (!virtualType && !!node && isReferenceNode(node) && !!node.versionMeta);
+    (!virtualType && !!node?.versionMeta);
   const isSuggestionWithChildren = isSuggestion && isConcreteRef;
   const showExpandCollapse =
     (!isSuggestion && !isVersion && !isConcreteRef) || isSuggestionWithChildren;
@@ -694,9 +713,7 @@ export function Node({
         data-suggestion={isSuggestion ? "true" : undefined}
         data-virtual-type={virtualType || (isVersion ? "version" : undefined)}
         data-other-user={isOtherUser ? "true" : undefined}
-        data-deleted={
-          node && isReferenceNode(node) && node.deleted ? "true" : undefined
-        }
+        data-deleted={node?.deleted ? "true" : undefined}
       >
         <div className="indicator-gutter">
           {isSuggestion && <SuggestionIndicator />}

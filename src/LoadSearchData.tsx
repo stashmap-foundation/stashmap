@@ -9,6 +9,7 @@ import {
   createConcreteRefId,
   buildTextNodesFromRelations,
 } from "./connections";
+import type { TextSeed } from "./connections";
 import { MergeKnowledgeDB, useData } from "./DataContext";
 import { useReadRelays } from "./relays";
 import { useSearchQuery, filterForKeyword } from "./components/SearchModal";
@@ -16,10 +17,10 @@ import { LoadData } from "./dataQuery";
 import { useCurrentPane } from "./SplitPanesContext";
 import { newDB } from "./knowledge";
 
-function getAllNodesFromDBs(knowledgeDBs: KnowledgeDBs): Map<string, KnowNode> {
+function getAllNodesFromDBs(knowledgeDBs: KnowledgeDBs): Map<string, TextSeed> {
   return buildTextNodesFromRelations(
     knowledgeDBs.valueSeq().flatMap((db) => db.relations.valueSeq())
-  ) as Map<string, KnowNode>;
+  ) as Map<string, TextSeed>;
 }
 
 function SearchCrefBuilder({

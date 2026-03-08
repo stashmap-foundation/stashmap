@@ -1,6 +1,11 @@
 import { Filter } from "nostr-tools";
 import React from "react";
-import { useNode, useNodeID } from "./ViewContext";
+import {
+  useCurrentRelation,
+  useDisplayText,
+  useNodeID,
+} from "./ViewContext";
+import { isEmptyNodeID } from "./connections";
 
 const QueryContext = React.createContext<
   { nodesBeeingQueried: string[]; allEventsProcessed: boolean } | undefined
@@ -29,11 +34,18 @@ export function extractNodesFromQueries(filters: Filter[]): string[] {
 }
 
 export function useNodeIsLoading(): boolean {
-  const [node] = useNode();
+  const relation = useCurrentRelation();
   const [nodeID] = useNodeID();
+  const displayText = useDisplayText();
   const context = React.useContext(QueryContext);
 
-  if (node || !context || context.allEventsProcessed) {
+  if (
+    relation ||
+    isEmptyNodeID(nodeID) ||
+    displayText !== "" ||
+    !context ||
+    context.allEventsProcessed
+  ) {
     return false;
   }
   return context.nodesBeeingQueried.includes(nodeID);

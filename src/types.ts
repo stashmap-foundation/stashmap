@@ -249,17 +249,6 @@ declare global {
     root: ID;
   };
 
-  type BasicNode = {
-    id: ID;
-    text: string;
-    type: "text" | "reference";
-  };
-
-  type TextNode = BasicNode & {
-    type: "text";
-    textHash?: ID;
-  };
-
   type ReferenceNode = {
     id: LongID;
     type: "reference";
@@ -276,11 +265,7 @@ declare global {
     deleted?: boolean;
   };
 
-  type KnowNode = TextNode | ReferenceNode;
-
   type Views = Map<string, View>;
-
-  type Nodes = Map<ID, KnowNode>;
 
   type RelationType = {
     color: string;

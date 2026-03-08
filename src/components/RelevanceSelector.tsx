@@ -11,7 +11,7 @@ import {
   useViewPath,
   parseViewPath,
   getParentView,
-  useNode,
+  useCurrentRelation,
   useDisplayText,
   useViewKey,
   useVirtualItemsMap,
@@ -75,7 +75,7 @@ export function RelevanceSelector({
 
   const viewPath = useViewPath();
   const viewKey = useViewKey();
-  const [node] = useNode();
+  const currentRelation = useCurrentRelation();
   const stack = usePaneStack();
   const virtualItemsMap = useVirtualItemsMap();
   const { createPlan, executePlan } = usePlanner();
@@ -83,7 +83,6 @@ export function RelevanceSelector({
   const { selection } = useTemporaryView();
 
   const isVirtual = virtualType !== undefined;
-  const suggestionNodeText = node?.text || "";
   const versionedDisplayText = useDisplayText();
   const editorTextContext = useEditorText();
   const editorText = editorTextContext?.text ?? "";
@@ -97,8 +96,8 @@ export function RelevanceSelector({
   const isNotRelevant = displayLevel === 0;
   const isContains = displayLevel === -1;
   const displayText = isVirtual
-    ? suggestionNodeText
-    : editorText.trim() || versionedDisplayText;
+    ? versionedDisplayText
+    : editorText.trim() || versionedDisplayText || currentRelation?.text || "";
 
   const isInSelection = selection.has(viewKey) && selection.size > 1;
 

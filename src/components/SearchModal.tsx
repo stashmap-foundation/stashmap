@@ -6,6 +6,7 @@ import { useApis } from "../Apis";
 import { KIND_SEARCH } from "../Data";
 import { findDocumentRelations } from "../knowledgeEvents";
 import { buildTextNodesFromRelations } from "../connections";
+import type { TextSeed } from "../connections";
 import { useReadRelays } from "../relays";
 
 function isMatch(input: string, test: string): boolean {
@@ -15,11 +16,11 @@ function isMatch(input: string, test: string): boolean {
 }
 
 export function filterForKeyword(
-  nodes: Map<string, KnowNode>,
+  nodes: Map<string, TextSeed>,
   filter: string
-): Map<string, KnowNode> {
+): Map<string, TextSeed> {
   return filter === ""
-    ? Map<string, KnowNode>()
+    ? Map<string, TextSeed>()
     : nodes
         .filter((node) => {
           return isMatch(filter, node.text);
@@ -31,7 +32,7 @@ export function useSearchQuery(
   query: string,
   relays: Relays,
   nip50: boolean
-): [Map<string, KnowNode>, boolean] {
+): [Map<string, TextSeed>, boolean] {
   const { relayPool } = useApis();
   const { contacts, user, projectMembers } = useData();
   const authors = contacts

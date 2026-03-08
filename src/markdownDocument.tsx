@@ -8,14 +8,15 @@ import {
   shortID,
   hashText,
   joinID,
-  newNode,
+  createNodeID,
   nodeIDFromSeed,
-  getNodeTextHash,
   isConcreteRefId,
   parseConcreteRefId,
   createConcreteRefId,
   ensureRelationNativeFields,
   getRelationItemNodeID,
+  getRelationContext,
+  getRelationNodeID,
   getTextForMatching,
 } from "./connections";
 import {
@@ -23,7 +24,7 @@ import {
   isRoot,
   getNodeIDFromView,
   getDisplayTextForView,
-  getRelationItemForView,
+  getCurrentEdgeForView,
   getRelationForView,
   getContext,
   viewPathToString,
@@ -389,7 +390,7 @@ function buildRootPath(rootRelation: Relations): ViewPath {
 function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
   const author = data.user.publicKey;
   const rootPath = buildRootPath(rootRelation);
-  const stack = [rootRelation.head];
+  const stack = [getRelationNodeID(rootRelation)];
   const { paths, virtualItems } = getNodesInTree(
     data,
     rootPath,
@@ -408,7 +409,7 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
       const context = getContext(data, path, stack);
       const contextHash =
         context.size > 0 ? hashText(context.join(":")) : undefined;
-      const item = getRelationItemForView(data, path);
+      const item = getCurrentEdgeForView(data, path);
 
       if (isConcreteRefId(nodeID)) {
         const parsed = parseConcreteRefId(nodeID);
@@ -452,7 +453,12 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
         isRoot(path)
       );
       const serializedRelation = ownRelation
-        ? getSerializedRelationText(data, ownRelation, ownRelation.head, context)
+        ? getSerializedRelationText(
+            data,
+            ownRelation,
+            getRelationNodeID(ownRelation),
+            context
+          )
         : undefined;
       const serializedNodeID = ownRelation
         ? (shortID(ownRelation.head as ID) as ID)
@@ -506,19 +512,16 @@ function formatRootHeading(
 }
 
 export function treeToMarkdown(data: Data, rootRelation: Relations): string {
+  const rootContext = getRelationContext(data.knowledgeDBs, rootRelation);
+  const rootNodeID = shortID(rootRelation.head as ID) as ID;
   const { text: rootText } = getSerializedRelationText(
     data,
     rootRelation,
-    rootRelation.head,
-    rootRelation.context
+    rootNodeID,
+    rootContext
   );
   const rootUuid = shortID(rootRelation.id);
-  const rootLine = formatRootHeading(
-    rootText,
-    rootUuid,
-    rootRelation.head as ID,
-    rootRelation.context
-  );
+  const rootLine = formatRootHeading(rootText, rootUuid, rootNodeID, rootContext);
   const { lines } = serializeTree(data, rootRelation);
   return `${[rootLine, ...lines].join("\n")}\n`;
 }
@@ -528,29 +531,26 @@ export function buildDocumentEvent(
   rootRelation: Relations
 ): UnsignedEvent {
   const author = data.user.publicKey;
+  const rootContext = getRelationContext(data.knowledgeDBs, rootRelation);
+  const rootNodeID = shortID(rootRelation.head as ID) as ID;
   const { text: rootText, textHash: rootTextHash } = getSerializedRelationText(
     data,
     rootRelation,
-    rootRelation.head,
-    rootRelation.context
+    rootNodeID,
+    rootContext
   );
   const rootUuid = shortID(rootRelation.id);
-  const rootLine = formatRootHeading(
-    rootText,
-    rootUuid,
-    rootRelation.head as ID,
-    rootRelation.context
-  );
+  const rootLine = formatRootHeading(rootText, rootUuid, rootNodeID, rootContext);
   const result = serializeTree(data, rootRelation);
   const content = `${[rootLine, ...result.lines].join("\n")}\n`;
   const nTags = result.nodeHashes
     .add(rootTextHash)
-    .union(result.nodeIDs.add(rootRelation.head))
+    .union(result.nodeIDs.add(rootNodeID))
     .toArray()
     .map((value) => ["n", value]);
   const rootContextHash =
-    rootRelation.context.size > 0
-      ? hashText(rootRelation.context.join(":"))
+    rootContext.size > 0
+      ? hashText(rootContext.join(":"))
       : undefined;
   const allContextHashes = rootContextHash
     ? result.contextHashes.add(rootContextHash)
@@ -606,11 +606,15 @@ function materializeTreeNode(
   root: ID,
   parent?: LongID
 ): [WalkContext, ID, LongID] {
-  const node = newNode(
-    treeNode.text,
-    treeNode.nodeID ??
-      (treeNode.uuid ? nodeIDFromSeed(treeNode.uuid) : undefined)
-  );
+  const node = {
+    id: createNodeID(
+      treeNode.text,
+      treeNode.nodeID ??
+        (treeNode.uuid ? nodeIDFromSeed(treeNode.uuid) : undefined)
+    ),
+    text: treeNode.text,
+    textHash: hashText(treeNode.text),
+  };
   const baseRelation = treeNode.uuid
     ? {
         ...newRelations(node.id, context, ctx.publicKey, root),
@@ -620,7 +624,7 @@ function materializeTreeNode(
   const relationBaseWithFields: Relations = {
     ...baseRelation,
     text: node.text,
-    textHash: getNodeTextHash(node) ?? hashText(node.text),
+    textHash: node.textHash ?? hashText(node.text),
     parent,
   };
 

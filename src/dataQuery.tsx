@@ -8,6 +8,7 @@ import {
   parseConcreteRefId,
   getRelationsNoReferencedBy,
   getTextHashForMatching,
+  getRelationStack,
 } from "./connections";
 import { parseRef } from "./buildReferenceNode";
 import { REFERENCED_BY } from "./constants";
@@ -369,7 +370,7 @@ export function LoadRelationData({
     effectiveAuthor
   );
   const filter = relation
-    ? [...relation.context.toArray(), relation.head].reduce(
+    ? getRelationStack(knowledgeDBs, relation).reduce(
         (acc, nodeID) =>
           addNodeToFilters(acc, nodeID, knowledgeDBs, user.publicKey),
         withRelation

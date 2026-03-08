@@ -16,6 +16,7 @@ import { createPlan, planPublishRelayMetadata } from "./planner";
 import { execute } from "./executor";
 import { KIND_VIEWS } from "./nostr";
 import { flattenRelays } from "./relays";
+import type { TextSeed } from "./connections";
 
 test("Flatten relays", () => {
   expect(
@@ -40,8 +41,8 @@ test("Flatten relays", () => {
 async function setupTest(): Promise<{
   alice: UpdateState;
   bob: UpdateState;
-  workspace: KnowNode;
-  bitcoin: KnowNode;
+  workspace: TextSeed;
+  bitcoin: TextSeed;
 }> {
   const [alice, bob] = setup([ALICE, BOB]);
   await follow(alice, bob().user.publicKey);
@@ -55,8 +56,8 @@ async function setupTest(): Promise<{
   const db = await setupTestDB(alice(), [
     ["Alice Workspace", [["Bitcoin", ["P2P", "Digital Gold"]]]],
   ]);
-  const workspace = findNodeByText(db, "Alice Workspace") as KnowNode;
-  const bitcoin = findNodeByText(db, "Bitcoin") as KnowNode;
+  const workspace = findNodeByText(db, "Alice Workspace") as TextSeed;
+  const bitcoin = findNodeByText(db, "Bitcoin") as TextSeed;
   return { alice, bob, workspace, bitcoin };
 }
 

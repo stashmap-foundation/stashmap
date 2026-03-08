@@ -41,6 +41,8 @@ import {
   parseConcreteRefId,
   getRelationsNoReferencedBy,
   getRelationItemNodeID,
+  getRelationNodeID,
+  getRelationStack,
 } from "../connections";
 import { useApis } from "../Apis";
 import {
@@ -272,7 +274,7 @@ export function TreeViewNodeLoader({
         )
       : withRelation;
 
-    const contextNodes = [...relation.context.toArray(), relation.head] as ID[];
+    const contextNodes = getRelationStack(data.knowledgeDBs, relation);
     const withContextNodes = contextNodes.reduce(
       (acc, contextNodeID) =>
         addNodeToFilters(
@@ -283,7 +285,10 @@ export function TreeViewNodeLoader({
         ),
       withTargetRefs
     );
-    return addDescendantsToFilters(withContextNodes, relation.head);
+    return addDescendantsToFilters(
+      withContextNodes,
+      getRelationNodeID(relation)
+    );
   }, baseFilter);
 
   const finalFilter = filtersToFilterArray(filter);

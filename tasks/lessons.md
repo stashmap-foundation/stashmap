@@ -1,5 +1,44 @@
 # Lessons Learned
 
+## Distinguish fork-vs-base from fork-vs-live-source
+
+**Date**: 2026-03-09
+**Context**: While discussing gardener proposals, I initially treated fork drift as something that might be acceptable after the first local edit.
+
+**Mistake**: The user clarified that even after local edits, a fork should not keep drifting against the live upstream version. Proposal intent should come from the fork's changes since it was created, not from unrelated upstream edits.
+
+**Rule**: When discussing fork/proposal semantics:
+1. Treat forks as detached workspaces
+2. Compute proposal deltas from fork current versus fork base
+3. Treat upstream changes as a separate status, not as proposal diff inflation
+4. Do not describe live-source comparison as the desired behavior for forks
+
+## Distinguish multi-document editing from proposal-internal linking
+
+**Date**: 2026-03-09
+**Context**: While refining the gardener workflow, I treated "editing multiple documents" and "linking between forked proposal copies" as the same restriction.
+
+**Mistake**: The real boundary is narrower. A gardener may edit multiple documents, but it should not create links to documents inside its own workspace. Proposal-internal links are the part that creates the hard adoption/remapping problem.
+
+**Rule**: When discussing the gardener model:
+1. Allow multi-document editing if needed
+2. Forbid links from one forked gardener document to another forked gardener document
+3. Prefer links from gardener documents to stable external targets only
+4. Use a `To Review` document for navigation instead of building a self-contained proposal graph
+
+## Do not assume agent features are integrated into the web app
+
+**Date**: 2026-03-09
+**Context**: While discussing the agentic workflow roadmap, I described the CLI authoring agent as if the web app would pass it current UI state such as the focused node and nearby tree context.
+
+**Mistake**: The intended model is that agents run externally, for example in a CLI or companion app. That means their context must come from graph queries and explicit user-provided targets, not from assumed in-app integration.
+
+**Rule**: When discussing agents in this project:
+1. Do not assume they are embedded in the web UI unless the user says so
+2. Separate external graph-query capabilities from in-app UI state
+3. For external agents, describe inputs in terms of paths, URLs, relation IDs, search, and graph slices
+4. Only talk about focused panes or selected nodes if the user explicitly wants app-integrated agent behavior
+
 ## NEVER delete existing tests — move and adapt them
 
 **Date**: 2026-02-23

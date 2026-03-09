@@ -74,6 +74,26 @@ URL patterns:
 
 `useNavigatePane()` updates the current pane's stack/rootRelation based on a URL.
 
+## Home And Log
+
+- `~Log` is the current home/log node (`LOG_NODE_ID`)
+- Creating a new standalone root relation automatically prepends a cref to that root into `~Log`
+- The home button and `H` shortcut navigate to `~Log` when it exists
+- This makes `~Log` function as an append-only stream of root documents rather than a curated dashboard
+
+## Contacts
+
+- Followed users are currently modeled separately from the knowledge graph as Nostr contacts
+- `Contact` already supports `publicKey`, `mainRelay`, and optional `userName`
+- The current contact parser reads `userName` from contact-list events, although the app does not fully surface it yet
+- A minimal address-book direction is to expose contacts through a `~Users` list while keeping `publicKey` as the stable identity
+
+## Forks And Versions
+
+- Version entries are currently computed by comparing an alternative relation to the current relation being viewed
+- This means an untouched fork can appear to drift further over time as the source author keeps editing
+- A cleaner direction for agent workflows is detached forks with a stored base snapshot, where proposal deltas are computed against fork base rather than live upstream
+
 ## Plan/Execute Pattern (`planner.tsx`)
 
 Changes are never applied directly. They're accumulated in a `Plan` (extends `Data` with pending events), then executed:

@@ -8,8 +8,8 @@ import {
   shortID,
   hashText,
   joinID,
-  createNodeID,
-  nodeIDFromSeed,
+  createSemanticID,
+  semanticIDFromSeed,
   isConcreteRefId,
   parseConcreteRefId,
   createConcreteRefId,
@@ -17,13 +17,13 @@ import {
   getConcreteRefTargetRelation,
   getRelationItemNodeID,
   getRelationContext,
-  getRelationNodeID,
+  getRelationSemanticID,
   getTextForMatching,
 } from "./connections";
 import {
   ViewPath,
   isRoot,
-  getNodeIDFromView,
+  getItemIDFromView,
   getDisplayTextForView,
   getCurrentEdgeForView,
   getRelationForView,
@@ -32,7 +32,7 @@ import {
   newRelations,
   getRelationsForCurrentTree,
 } from "./ViewContext";
-import { buildOutgoingReference } from "./buildReferenceNode";
+import { buildOutgoingReference } from "./buildReferenceRow";
 import { KIND_KNOWLEDGE_DOCUMENT, newTimestamp, msTag } from "./nostr";
 import { findTag } from "./commons/useNostrQuery";
 import { getNodesInTree } from "./treeTraversal";
@@ -423,7 +423,7 @@ function buildRootPath(rootRelation: Relations): ViewPath {
 function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
   const author = data.user.publicKey;
   const rootPath = buildRootPath(rootRelation);
-  const stack = [getRelationNodeID(rootRelation)];
+  const stack = [getRelationSemanticID(rootRelation)];
   const { paths, virtualItems } = getNodesInTree(
     data,
     rootPath,
@@ -437,7 +437,7 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
   return paths.reduce<SerializeResult>(
     (acc, path) => {
       const depth = path.length - 3;
-      const [nodeID] = getNodeIDFromView(data, path);
+      const [nodeID] = getItemIDFromView(data, path);
       const indent = "  ".repeat(depth);
       const context = getContext(data, path, stack);
       const contextHash =
@@ -465,7 +465,7 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
           lines: [...acc.lines, `${indent}- ${crefText}${crefAttrs}`],
           nodeHashes: crefNodeHashes,
           nodeIDs: targetRelation
-            ? acc.nodeIDs.add(getRelationNodeID(targetRelation))
+            ? acc.nodeIDs.add(getRelationSemanticID(targetRelation))
             : acc.nodeIDs,
           contextHashes: contextHash
             ? acc.contextHashes.add(contextHash)
@@ -488,12 +488,12 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
         ? getSerializedRelationText(
             data,
             ownRelation,
-            getRelationNodeID(ownRelation),
+            getRelationSemanticID(ownRelation),
             context
           )
         : undefined;
       const serializedNodeID = ownRelation
-        ? getRelationNodeID(ownRelation)
+        ? getRelationSemanticID(ownRelation)
         : (shortID(nodeID as ID) as ID);
       const text =
         serializedRelation?.text ?? getDisplayTextForView(data, path, stack);
@@ -557,7 +557,7 @@ function formatRootHeading(
 
 export function treeToMarkdown(data: Data, rootRelation: Relations): string {
   const rootContext = getRelationContext(data.knowledgeDBs, rootRelation);
-  const rootNodeID = getRelationNodeID(rootRelation);
+  const rootNodeID = getRelationSemanticID(rootRelation);
   const { text: rootText } = getSerializedRelationText(
     data,
     rootRelation,
@@ -581,7 +581,7 @@ export function buildDocumentEvent(
 ): UnsignedEvent {
   const author = data.user.publicKey;
   const rootContext = getRelationContext(data.knowledgeDBs, rootRelation);
-  const rootNodeID = getRelationNodeID(rootRelation);
+  const rootNodeID = getRelationSemanticID(rootRelation);
   const { text: rootText, textHash: rootTextHash } = getSerializedRelationText(
     data,
     rootRelation,
@@ -661,10 +661,10 @@ function materializeTreeNode(
   parent?: LongID
 ): [WalkContext, ID, LongID] {
   const node = {
-    id: createNodeID(
+    id: createSemanticID(
       treeNode.text,
       treeNode.nodeID ??
-        (treeNode.uuid ? nodeIDFromSeed(treeNode.uuid) : undefined)
+        (treeNode.uuid ? semanticIDFromSeed(treeNode.uuid) : undefined)
     ),
     text: treeNode.text,
     textHash: hashText(treeNode.text),

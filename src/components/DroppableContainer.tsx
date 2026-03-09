@@ -13,7 +13,7 @@ import {
 } from "../planner";
 import {
   ViewPath,
-  getNodeIDFromView,
+  getItemIDFromView,
   getParentKey,
   useViewPath,
   viewPathToString,
@@ -416,7 +416,7 @@ export function useDroppable({
                   destinationIndex,
                   pane.rootRelation
                 );
-          const [dropParentNodeID] = getNodeIDFromView(plan, dropParentPath);
+          const [dropParentNodeID] = getItemIDFromView(plan, dropParentPath);
 
           if (isEmptyNodeID(dropParentNodeID)) {
             const rootTree = buildRootTreeForEmptyRootDrop(importedTrees);
@@ -450,10 +450,10 @@ export function useDroppable({
 
       const dragItem = item as DragItemType;
       const plan = createPlan();
-      const [destinationRootNodeID] = getNodeIDFromView(plan, destination);
+      const [destinationRootNodeID] = getItemIDFromView(plan, destination);
 
       if (isEmptyNodeID(destinationRootNodeID)) {
-        const [sourceNodeID] = getNodeIDFromView(plan, dragItem.path);
+        const [sourceNodeID] = getItemIDFromView(plan, dragItem.path);
         const targetPaneIndex = destination[0] as number;
         const updatedPanes = plan.panes.map((p, idx) => {
           if (idx !== targetPaneIndex) return p;

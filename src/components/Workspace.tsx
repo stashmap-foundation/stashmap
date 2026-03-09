@@ -8,7 +8,7 @@ import {
 import {
   getEffectiveAuthor,
   getDisplayTextForView,
-  getNodeIDFromView,
+  getItemIDFromView,
   getRootForView,
   getContext,
   isExpanded,
@@ -57,7 +57,7 @@ import {
   LOG_NODE_ID,
   getRelationContext,
   getRelationStack,
-  getRelationNodeID,
+  getRelationSemanticID,
   getRelationsNoReferencedBy,
   getTextForMatching,
   isSearchId,
@@ -149,7 +149,7 @@ function getOwnLogRelation(
     .filter(
       (relation) =>
         relation.author === author &&
-        getRelationNodeID(relation) === LOG_NODE_ID &&
+        getRelationSemanticID(relation) === LOG_NODE_ID &&
         getRelationContext(knowledgeDBs, relation).size === 0 &&
         relation.root === shortID(relation.id)
     )
@@ -220,7 +220,7 @@ function createRelationBreadcrumbEntry(
   const rootRelation = getStandaloneRootRelation(knowledgeDBs, relation);
   return {
     key: `relation:${relation.id}`,
-    nodeID: getRelationNodeID(relation),
+    nodeID: getRelationSemanticID(relation),
     author: relation.author,
     target: {
       stack: getRelationStack(knowledgeDBs, relation),

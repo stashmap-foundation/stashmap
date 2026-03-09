@@ -6,7 +6,7 @@ import { deleteRelations, getRelationItemNodeID } from "../connections";
 import {
   updateViewPathsAfterDeleteNode,
   useCurrentRelation,
-  useNodeID,
+  useCurrentItemID,
   useViewPath,
 } from "../ViewContext";
 import { usePaneStack } from "../SplitPanesContext";
@@ -46,7 +46,7 @@ export function DeleteNode({
   withCaption?: boolean;
   afterOnClick: () => void;
 }): JSX.Element | null {
-  const [nodeID] = useNodeID();
+  const [nodeID] = useCurrentItemID();
   const relation = useCurrentRelation();
   const viewPath = useViewPath();
   const stack = usePaneStack();

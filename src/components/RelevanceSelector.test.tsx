@@ -292,14 +292,14 @@ Crypto
     [R] Money / Bitcoin
     `);
 
-    const refNode = screen.getByText(
+    const referenceRow = screen.getByText(
       (content, element) =>
         // eslint-disable-next-line testing-library/no-node-access
-        element?.closest('[data-testid="reference-node"]') !== null &&
+        element?.closest('[data-testid="reference-row"]') !== null &&
         content.includes("Money")
     );
     // eslint-disable-next-line testing-library/no-node-access
-    const styledSpan = refNode.closest(
+    const styledSpan = referenceRow.closest(
       "span[style*='text-decoration']"
     ) as HTMLElement;
     expect(styledSpan?.style.textDecoration).toBe("line-through");

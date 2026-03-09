@@ -8,7 +8,7 @@ import {
 import {
   getTextForMatching,
   getRelationsNoReferencedBy,
-  getRelationNodeID,
+  getRelationSemanticID,
 } from "../connections";
 import {
   ALICE,
@@ -146,12 +146,12 @@ test("planCreateNodesFromMarkdownTrees creates only standalone relations", () =>
   expect(childRelation?.text).toBe("Child");
   expect(grandchildRelation?.text).toBe("Grandchild");
 
-  expect(parentID).toEqual(getRelationNodeID(parentRelation!));
+  expect(parentID).toEqual(getRelationSemanticID(parentRelation!));
   expect(parentRelation?.items.first()?.id).toEqual(childRelation?.id);
   expect(
     getTextForMatching(
       plan.knowledgeDBs,
-      getRelationNodeID(childRelation!),
+      getRelationSemanticID(childRelation!),
       plan.user.publicKey
     )
   ).toBe("Child");
@@ -159,7 +159,7 @@ test("planCreateNodesFromMarkdownTrees creates only standalone relations", () =>
   expect(
     getTextForMatching(
       plan.knowledgeDBs,
-      getRelationNodeID(grandchildRelation!),
+      getRelationSemanticID(grandchildRelation!),
       plan.user.publicKey
     )
   ).toBe("Grandchild");

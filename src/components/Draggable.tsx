@@ -6,7 +6,7 @@ import {
   useIsInSearchView,
   useViewPath,
   useViewKey,
-  useNodeID,
+  useCurrentItemID,
   useCurrentRelation,
   useDisplayText,
   useIsViewingOtherUserContent,
@@ -73,7 +73,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
   ): JSX.Element => {
     const path = useViewPath();
     const isNodeBeeingEdited = useIsEditingOn();
-    const [nodeID] = useNodeID();
+    const [nodeID] = useCurrentItemID();
     const relation = useCurrentRelation();
     const displayText = useDisplayText();
     const isEmptyNode = isEmptyNodeID(nodeID);
@@ -181,7 +181,7 @@ function DraggableSuggestion({
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const path = useViewPath();
-  const [nodeID] = useNodeID();
+  const [nodeID] = useCurrentItemID();
   const relation = useCurrentRelation();
   const displayText = useDisplayText();
 
@@ -275,7 +275,7 @@ export function ListItem({
   const ref = useRef<HTMLDivElement>(null);
   const viewKey = useViewKey();
   const viewPath = useViewPath();
-  const [nodeID] = useNodeID();
+  const [nodeID] = useCurrentItemID();
   const virtualType = useCurrentEdge()?.virtualType;
   const isSuggestion = virtualType === "suggestion";
   const isCopyDrag =

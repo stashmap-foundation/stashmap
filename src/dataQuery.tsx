@@ -11,11 +11,11 @@ import {
   getTextHashForMatching,
   getRelationStack,
 } from "./connections";
-import { parseRef } from "./buildReferenceNode";
+import { parseRef } from "./buildReferenceRow";
 import { REFERENCED_BY } from "./constants";
 import {
-  getNodeIDFromView,
-  useNodeID,
+  getItemIDFromView,
+  useCurrentItemID,
   getContext,
   getEffectiveAuthor,
   getRootForView,

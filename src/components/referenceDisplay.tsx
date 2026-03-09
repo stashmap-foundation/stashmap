@@ -174,26 +174,26 @@ function partKey(part: ReferencePart, index: number): string {
 }
 
 export function ReferenceDisplay({
-  node,
+  reference,
 }: {
-  node: ReferenceNode;
+  reference: ReferenceRow;
 }): JSX.Element {
   const { user } = useData();
   const parts = buildReferenceParts({
-    displayAs: node.displayAs,
-    contextLabels: node.contextLabels,
-    targetLabel: node.targetLabel,
-    incomingRelevance: node.incomingRelevance,
-    incomingArgument: node.incomingArgument,
-    deleted: node.deleted,
+    displayAs: reference.displayAs,
+    contextLabels: reference.contextLabels,
+    targetLabel: reference.targetLabel,
+    incomingRelevance: reference.incomingRelevance,
+    incomingArgument: reference.incomingArgument,
+    deleted: reference.deleted,
   });
-  const isOtherUser = node.author !== user.publicKey;
-  const className = node.deleted
+  const isOtherUser = reference.author !== user.publicKey;
+  const className = reference.deleted
     ? "break-word deleted-reference"
     : "break-word";
 
   return (
-    <span className={className} data-testid="reference-node">
+    <span className={className} data-testid="reference-row">
       {parts.map((part, i) => (
         <React.Fragment key={partKey(part, i)}>
           {i > 0 && " "}

@@ -39,11 +39,11 @@ function getReservedNodeID(text: string): ID | undefined {
   return undefined;
 }
 
-export function createNodeID(text: string, id?: ID): ID {
+export function createSemanticID(text: string, id?: ID): ID {
   return getReservedNodeID(text) ?? id ?? createRandomNodeID();
 }
 
-export function nodeIDFromSeed(seed: string): ID {
+export function semanticIDFromSeed(seed: string): ID {
   const normalized = seed.replace(/-/g, "");
   return SHORT_NODE_ID_RE.test(normalized)
     ? (normalized as ID)
@@ -147,7 +147,7 @@ export function getRelationText(
   if (!relation) {
     return undefined;
   }
-  const fallback = getFallbackRelationText(getRelationNodeID(relation));
+  const fallback = getFallbackRelationText(getRelationSemanticID(relation));
   if (relation.text !== "") {
     return relation.text;
   }
@@ -176,7 +176,7 @@ function getRelationLookupIndex(db: KnowledgeData): RelationLookupIndex {
   };
 
   db.relations.valueSeq().forEach((relation) => {
-    const relationNodeID = getRelationNodeID(relation);
+    const relationNodeID = getRelationSemanticID(relation);
     addToIndex(relationNodeID, relation);
     if (relation.textHash !== relationNodeID) {
       addToIndex(relation.textHash, relation);
@@ -226,7 +226,7 @@ function getRelationTextHash(
   return relation.textHash;
 }
 
-export function getRelationNodeID(relation: Relations): ID {
+export function getRelationSemanticID(relation: Relations): ID {
   return relation.textHash;
 }
 
@@ -281,7 +281,7 @@ export function getRelationContext(
   }
 
   const derivedContext = parentChain.reduce(
-    (context, parentRelation) => context.push(getRelationNodeID(parentRelation)),
+    (context, parentRelation) => context.push(getRelationSemanticID(parentRelation)),
     parentChain.length > 0
       ? getRelationContext(knowledgeDBs, parentChain[0] as Relations)
       : List<ID>()
@@ -296,7 +296,7 @@ export function getRelationStack(
   knowledgeDBs: KnowledgeDBs,
   relation: Relations
 ): ID[] {
-  return [...getRelationContext(knowledgeDBs, relation).toArray(), getRelationNodeID(relation)];
+  return [...getRelationContext(knowledgeDBs, relation).toArray(), getRelationSemanticID(relation)];
 }
 
 export function getRelationDepth(
@@ -336,8 +336,8 @@ function getMatchingRelations(
   const indexedMatches = candidateDBs
     .flatMap((db) => getIndexedRelationsForKeys(db, [localID]))
     .sort((left, right) => {
-      const leftExact = shortID(getRelationNodeID(left)) === localID ? 0 : 1;
-      const rightExact = shortID(getRelationNodeID(right)) === localID ? 0 : 1;
+      const leftExact = shortID(getRelationSemanticID(left)) === localID ? 0 : 1;
+      const rightExact = shortID(getRelationSemanticID(right)) === localID ? 0 : 1;
       if (leftExact !== rightExact) {
         return leftExact - rightExact;
       }
@@ -414,7 +414,7 @@ export function getTextHashForMatching(
 
 export function createTextNodeFromRelation(relation: Relations): TextSeed {
   return {
-    id: getRelationNodeID(relation),
+    id: getRelationSemanticID(relation),
     text: getRelationText(relation) || "",
     textHash: relation.textHash,
   };
@@ -432,7 +432,7 @@ export function buildTextNodesFromRelations(
   }, Map<PublicKey, KnowledgeData>());
 
   const latestByHead = relationList.reduce((acc, relation) => {
-    const nodeID = getRelationNodeID(relation);
+    const nodeID = getRelationSemanticID(relation);
     const existing = acc.get(nodeID);
     const isNewer = !existing || relation.updated > existing.updated;
     const isSameVersionNewerDisplay =
@@ -466,7 +466,7 @@ export function getTextNodeForID(
     const relationText = getRelationText(directRelation);
     if (relationText !== undefined) {
       return {
-        id: getRelationNodeID(directRelation),
+        id: getRelationSemanticID(directRelation),
         text: relationText,
         textHash: directRelation.textHash,
       };
@@ -534,7 +534,7 @@ export function getRelationItemNodeID(
   myself: PublicKey
 ): LongID | ID {
   const relation = getRelationItemRelation(knowledgeDBs, item, myself);
-  return relation ? getRelationNodeID(relation) : item.id;
+  return relation ? getRelationSemanticID(relation) : item.id;
 }
 
 export function getRelationItemTextHash(
@@ -815,7 +815,7 @@ function findNodeAppearances(
   return knowledgeDBs.reduce((acc, knowledgeDB) => {
     return knowledgeDB.relations.reduce((rdx, relation) => {
       if (
-        isSearchId(getRelationNodeID(relation)) ||
+        isSearchId(getRelationSemanticID(relation)) ||
         getRelationContext(knowledgeDBs, relation).some((id) =>
           isSearchId(id as ID)
         )
@@ -859,7 +859,7 @@ function findNodeAppearances(
           targetRoot !== undefined &&
           relation.author === targetAuthor &&
           relation.root === targetRoot &&
-          shortID(getRelationNodeID(relation) as ID) === shortID(nodeID as ID)) ||
+          shortID(getRelationSemanticID(relation) as ID) === shortID(nodeID as ID)) ||
           getRelationTextHash(knowledgeDBs, relation) === targetSemanticKey);
       if (isHeadWithChildren || isInItems) {
         const matchedItemRelation = matchedItem
@@ -1144,7 +1144,7 @@ export function getIncomingCrefsForNode(
     return knowledgeDB.relations.reduce((rdx, relation) => {
       if (relation.id === parentRelationID) return rdx;
       if (relation.id === currentRelationID) return rdx;
-      if (getRelationNodeID(relation) === LOG_NODE_ID) return rdx;
+      if (getRelationSemanticID(relation) === LOG_NODE_ID) return rdx;
       if (outgoingTargetRelIDs.has(relation.id)) return rdx;
 
       const hasCrefToUs = relation.items.some((item) => {
@@ -1316,7 +1316,7 @@ function filterVoteRelationLists(
   head: ID
 ): List<Relations> {
   return relations.filter((relation) => {
-    return shortID(getRelationNodeID(relation)) === shortID(head);
+    return shortID(getRelationSemanticID(relation)) === shortID(head);
   });
 }
 

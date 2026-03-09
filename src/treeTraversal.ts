@@ -4,7 +4,7 @@ import {
   VirtualItemsMap,
   addNodeToPathWithRelations,
   addRelationsToLastElement,
-  getNodeIDFromView,
+  getItemIDFromView,
   getContext,
   getRelationForView,
   getEffectiveAuthor,
@@ -20,10 +20,10 @@ import {
   getOccurrencesForNode,
   getIncomingCrefsForNode,
   getRelationContext,
-  getRelationNodeID,
+  getRelationSemanticID,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
-import { buildOutgoingReference } from "./buildReferenceNode";
+import { buildOutgoingReference } from "./buildReferenceRow";
 import {
   getSuggestionsForNode,
   getVersionsForRelation,
@@ -89,7 +89,7 @@ function getChildrenForRegularNode(
     ? getRelations(data.knowledgeDBs, parentNodeID as ID, data.user.publicKey)
     : getRelationForView(data, parentPath, stack);
   const relations = directRelations;
-  const relationNodeID = relations ? getRelationNodeID(relations) : parentNodeID;
+  const relationNodeID = relations ? getRelationSemanticID(relations) : parentNodeID;
   const coordinateNodeID = relations ? relationNodeID : parentNodeID;
   const coordinateContext = relations
     ? getRelationContext(data.knowledgeDBs, relations)
@@ -253,7 +253,7 @@ export function getChildNodes(
   typeFilters: Pane["typeFilters"],
   options?: TreeTraversalOptions
 ): TreeResult {
-  const [parentNodeID] = getNodeIDFromView(data, parentPath);
+  const [parentNodeID] = getItemIDFromView(data, parentPath);
 
   if (isConcreteRefId(parentNodeID)) {
     return getChildrenForConcreteRef(data, parentPath, parentNodeID);
@@ -293,10 +293,10 @@ export function getNodesInTree(
 
   return childResult.paths.reduce(
     (result, childPath) => {
-      const [, childView] = getNodeIDFromView(data, childPath);
+      const [, childView] = getItemIDFromView(data, childPath);
       const withChild = result.paths.push(childPath);
 
-      const [childNodeID] = getNodeIDFromView(data, childPath);
+      const [childNodeID] = getItemIDFromView(data, childPath);
       const shouldRecurse = options?.isMarkdownExport
         ? !isConcreteRefId(childNodeID)
         : childView.expanded;

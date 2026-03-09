@@ -11,7 +11,7 @@ import {
   getTextForMatching,
   getRelationItemNodeID,
   getRelationContext,
-  getRelationNodeID,
+  getRelationSemanticID,
 } from "./connections";
 import {
   ViewPath,
@@ -111,7 +111,7 @@ function resolveLabels(
   const targetLabel = resolveNodeLabel(
     knowledgeDBs,
     myself,
-    getRelationNodeID(relation),
+    getRelationSemanticID(relation),
     relationContext,
     relation.root
   );
@@ -135,7 +135,7 @@ function relationsMatchForVersion(
     left.author === right.author && left.root === right.root;
   if (useExactMatch) {
     return (
-      getRelationNodeID(left) === getRelationNodeID(right) &&
+      getRelationSemanticID(left) === getRelationSemanticID(right) &&
       getRelationContext(knowledgeDBs, left).equals(
         getRelationContext(knowledgeDBs, right)
       )
@@ -147,12 +147,12 @@ function relationsMatchForVersion(
   return (
     getSemanticNodeKey(
       knowledgeDBs,
-      getRelationNodeID(left),
+      getRelationSemanticID(left),
       left.author
     ) ===
       getSemanticNodeKey(
         knowledgeDBs,
-        getRelationNodeID(right),
+        getRelationSemanticID(right),
         right.author
       ) &&
     leftContext.size === rightContext.size &&
@@ -172,7 +172,7 @@ function buildDeletedReference(
   refId: LongID,
   myself: PublicKey,
   linkText?: string
-): ReferenceNode | undefined {
+): ReferenceRow | undefined {
   const parsed = parseConcreteRefId(refId);
   if (!parsed) return undefined;
   const { relationID } = parsed;
@@ -200,7 +200,7 @@ export function buildOutgoingReference(
   refId: LongID,
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey
-): ReferenceNode | undefined {
+): ReferenceRow | undefined {
   const ref = parseRef(refId, knowledgeDBs, myself);
   if (!ref) return buildDeletedReference(refId, myself);
 
@@ -377,7 +377,7 @@ export function buildReferenceItem(
   viewPath: ViewPath,
   stack: ID[],
   virtualType?: VirtualType
-): ReferenceNode | undefined {
+): ReferenceRow | undefined {
   const ref = parseRef(refId, data.knowledgeDBs, data.user.publicKey);
   if (!ref) {
     const parentPath = getParentView(viewPath);

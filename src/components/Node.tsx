@@ -8,13 +8,13 @@ import {
   useIsExpanded,
   useIsRoot,
   useRelationIndex,
-  useNodeID,
+  useCurrentItemID,
   usePreviousSibling,
   useDisplayText,
   getParentView,
   getRelationForView,
   getRelationIndex,
-  getNodeIDFromView,
+  getItemIDFromView,
   useIsViewingOtherUserContent,
   useCurrentEdge,
   viewPathToString,
@@ -90,7 +90,7 @@ function getLevels(viewPath: ViewPath): number {
 }
 
 function ExpandCollapseToggle(): JSX.Element | null {
-  const [nodeID] = useNodeID();
+  const [nodeID] = useCurrentItemID();
   const displayText = useDisplayText();
   const onToggleExpanded = useOnToggleExpanded();
   const isExpanded = useIsExpanded();
@@ -134,13 +134,13 @@ function ErrorContent(): JSX.Element {
   return <span className="text-danger">Error: Node not found</span>;
 }
 
-function VersionContent({ node }: { node: ReferenceNode }): JSX.Element {
+function VersionContent({ reference }: { reference: ReferenceRow }): JSX.Element {
   const { user } = useData();
-  const meta = node.versionMeta;
-  const isOtherUser = node.author !== user.publicKey;
+  const meta = reference.versionMeta;
+  const isOtherUser = reference.author !== user.publicKey;
   const dateStr = meta ? new Date(meta.updated).toLocaleString() : "";
   return (
-    <span className="break-word" data-testid="reference-node">
+    <span className="break-word" data-testid="reference-row">
       {dateStr}
       <span style={{ fontStyle: "normal" }}>
         {isOtherUser && " \u{1F464}"}
@@ -161,23 +161,27 @@ function VersionContent({ node }: { node: ReferenceNode }): JSX.Element {
   );
 }
 
-function ReferenceContent({ node }: { node: ReferenceNode }): JSX.Element {
+function ReferenceContent({
+  reference,
+}: {
+  reference: ReferenceRow;
+}): JSX.Element {
   const relationItem = useCurrentEdge();
   const virtualType = relationItem?.virtualType;
 
-  if (virtualType === "version" || node.versionMeta) {
-    return <VersionContent node={node} />;
+  if (virtualType === "version" || reference.versionMeta) {
+    return <VersionContent reference={reference} />;
   }
 
   if (virtualType === "suggestion") {
     return (
-      <span className="break-word" data-testid="reference-node">
-        {node.targetLabel}
+      <span className="break-word" data-testid="reference-row">
+        {reference.targetLabel}
       </span>
     );
   }
 
-  return <ReferenceDisplay node={node} />;
+  return <ReferenceDisplay reference={reference} />;
 }
 
 function NodeContent(): JSX.Element {
@@ -185,11 +189,16 @@ function NodeContent(): JSX.Element {
   const viewPath = useViewPath();
   const stack = usePaneStack();
   const virtualType = useCurrentEdge()?.virtualType;
-  const node = getCurrentReferenceForView(data, viewPath, stack, virtualType);
+  const reference = getCurrentReferenceForView(
+    data,
+    viewPath,
+    stack,
+    virtualType
+  );
   const displayText = useDisplayText();
 
-  if (node) {
-    return <ReferenceContent node={node} />;
+  if (reference) {
+    return <ReferenceContent reference={reference} />;
   }
 
   return <span className="break-word">{displayText}</span>;
@@ -202,7 +211,7 @@ function EditableContent(): JSX.Element {
   const data = useData();
   const { createPlan, executePlan } = usePlanner();
   const currentRelation = useCurrentRelation();
-  const [nodeID] = useNodeID();
+  const [nodeID] = useCurrentItemID();
   const displayText = useDisplayText();
   const prevSibling = usePreviousSibling();
   const parentPath = getParentView(viewPath);
@@ -231,7 +240,7 @@ function EditableContent(): JSX.Element {
     plan: Plan,
     targetViewPath: ViewPath
   ): Plan => {
-    const [targetNodeID] = getNodeIDFromView(plan, targetViewPath);
+    const [targetNodeID] = getItemIDFromView(plan, targetViewPath);
     return planSetRowFocusIntent(plan, {
       paneIndex,
       viewKey: viewPathToString(targetViewPath),
@@ -496,7 +505,7 @@ function InteractiveNodeContent(): JSX.Element {
   const viewPath = useViewPath();
   const stack = usePaneStack();
   const currentRelation = useCurrentRelation();
-  const [nodeID] = useNodeID();
+  const [nodeID] = useCurrentItemID();
   const isLoading = useNodeIsLoading();
   const isInSearchView = useIsInSearchView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
@@ -686,7 +695,7 @@ export function Node({
   const clsBody = cardBodyClassName || "ps-0";
 
   const { user } = useData();
-  const [nodeID] = useNodeID();
+  const [nodeID] = useCurrentItemID();
   const data = useData();
   const stack = usePaneStack();
   const currentRelation = useCurrentRelation();

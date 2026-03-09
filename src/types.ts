@@ -256,7 +256,7 @@ declare global {
     root: ID;
   };
 
-  type ReferenceNode = {
+  type ReferenceRow = {
     id: LongID;
     type: "reference";
     text: string;

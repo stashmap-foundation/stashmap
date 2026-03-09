@@ -12,7 +12,7 @@ import {
   getRelationItemNodeID,
   getIndexedRelationsForKeys,
   getRelationContext,
-  getRelationNodeID,
+  getRelationSemanticID,
   getConcreteRefTargetRelation,
   getRelationsNoReferencedBy,
 } from "./connections";
@@ -104,7 +104,7 @@ function getComparableSuggestionKey(
 
   return getSemanticNodeKey(
     knowledgeDBs,
-    getRelationNodeID(targetRelation),
+    getRelationSemanticID(targetRelation),
     targetRelation.author
   );
 }
@@ -181,7 +181,7 @@ export function getSuggestionsForNode(
           (r) =>
             nodesSemanticallyMatch(
               knowledgeDBs,
-              getRelationNodeID(r),
+              getRelationSemanticID(r),
               r.author,
               localID,
               myself
@@ -346,10 +346,10 @@ export function getAlternativeRelations(
             r.root === currentRoot;
           const relationContext = getRelationContext(knowledgeDBs, r);
           const matchesNode = useExactMatch
-            ? shortID(getRelationNodeID(r)) === localID
+            ? shortID(getRelationSemanticID(r)) === localID
             : nodesSemanticallyMatch(
                 knowledgeDBs,
-                getRelationNodeID(r),
+                getRelationSemanticID(r),
                 r.author,
                 localID,
                 author

@@ -1,12 +1,12 @@
 import React from "react";
 import { useMediaQuery } from "react-responsive";
 import {
-  useNodeID,
+  useCurrentItemID,
   useViewPath,
   updateViewPathsAfterPaneInsert,
   getEffectiveAuthor,
   useCurrentRelation,
-  getNodeIDsForViewPath,
+  getItemIDsForViewPath,
   getCurrentReferenceForView,
   useCurrentEdge,
 } from "../ViewContext";
@@ -26,7 +26,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
   const stack = usePaneStack();
   const viewPath = useViewPath();
   const data = useData();
-  const [nodeID] = useNodeID();
+  const [nodeID] = useCurrentItemID();
   const isMobile = useMediaQuery(IS_MOBILE);
   const { createPlan, executePlan } = usePlanner();
   const { knowledgeDBs } = data;
@@ -79,7 +79,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
       return;
     }
 
-    const viewPathNodeIDs = getNodeIDsForViewPath(data, viewPath);
+    const viewPathNodeIDs = getItemIDsForViewPath(data, viewPath);
     const fullStack = [...paneStackWithoutRoot, ...viewPathNodeIDs];
     addPaneAt(
       insertIndex,

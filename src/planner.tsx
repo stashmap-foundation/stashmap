@@ -21,7 +21,7 @@ import { newDB } from "./knowledge";
 import { buildDocumentEvent } from "./markdownDocument";
 import {
   shortID,
-  createNodeID,
+  createSemanticID,
   addRelationToRelations,
   bulkAddRelations,
   EMPTY_NODE_ID,
@@ -38,7 +38,7 @@ import {
   getTextForMatching,
   ensureRelationNativeFields,
   getRelationContext,
-  getRelationNodeID,
+  getRelationSemanticID,
 } from "./connections";
 import type { TextSeed } from "./connections";
 import {
@@ -46,7 +46,7 @@ import {
   newRelationsForNode,
   upsertRelations,
   ViewPath,
-  getNodeIDFromView,
+  getItemIDFromView,
   updateView,
   getContext,
   getParentView,
@@ -255,7 +255,7 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
   const isRootRelation =
     isNewRelation &&
     !relations.parent &&
-    getRelationNodeID(relations) !== LOG_NODE_ID;
+    getRelationSemanticID(relations) !== LOG_NODE_ID;
   if (!isRootRelation) {
     return basePlan;
   }
@@ -524,7 +524,7 @@ export function planAddToParent(
   }
 
   const ensureParentRelation = (): [Plan, Relations] => {
-    const [, parentView] = getNodeIDFromView(plan, parentViewPath);
+    const [, parentView] = getItemIDFromView(plan, parentViewPath);
     const planWithExpand = planExpandNode(plan, parentView, parentViewPath);
     const existingRelation = getRelationForView(
       planWithExpand,
@@ -553,7 +553,7 @@ export function planAddToParent(
 
   const [planWithParent, parentRelation] = ensureParentRelation();
   const parentContext = getContext(planWithParent, parentViewPath, stack);
-  const childContext = parentContext.push(getRelationNodeID(parentRelation));
+  const childContext = parentContext.push(getRelationSemanticID(parentRelation));
 
   const [planWithChildren, relationItemPayload] = nodeIDsArray.reduce(
     ([accPlan, accItems], objectOrID) => {
@@ -581,7 +581,7 @@ export function planAddToParent(
             ...accItems,
             {
               relationItemID: existingRelation.id,
-              actualNodeID: getRelationNodeID(existingRelation),
+              actualNodeID: getRelationSemanticID(existingRelation),
             },
           ],
         ];
@@ -601,7 +601,7 @@ export function planAddToParent(
           ...accItems,
           {
             relationItemID: childRelation.id,
-            actualNodeID: getRelationNodeID(childRelation),
+            actualNodeID: getRelationSemanticID(childRelation),
           },
         ],
       ];
@@ -735,14 +735,14 @@ function planCopyDescendantRelations(
   );
 
   let copiedRoot = root;
-  const sourceNodeID = getRelationNodeID(sourceRelation);
+  const sourceNodeID = getRelationSemanticID(sourceRelation);
   const copiedRelations = descendants.map((relation) => {
     const newSemanticContext = getSemanticContext(relation);
     const isRootRelation = relation.id === sourceRelation.id;
     const nodeID =
       targetNodeID && isRootRelation
         ? targetNodeID
-        : getRelationNodeID(relation);
+        : getRelationSemanticID(relation);
     const baseRelation = newRelations(
       nodeID,
       newSemanticContext,
@@ -802,7 +802,7 @@ export function planMoveDescendantRelations(
   root?: ID
 ): Plan {
   const descendants = getRelationSubtree(plan, sourceRelation);
-  const sourceNodeID = getRelationNodeID(sourceRelation);
+  const sourceNodeID = getRelationSemanticID(sourceRelation);
   const sourceSemanticContext = getRelationContext(
     plan.knowledgeDBs,
     sourceRelation
@@ -849,10 +849,10 @@ export function planMoveTreeDescendantsToContext(
 ): Plan {
   const targetParentRelation = getRelationForView(plan, parentViewPath, stack);
   const parentContext = getContext(plan, parentViewPath, stack);
-  const [parentNodeID] = getNodeIDFromView(plan, parentViewPath);
+  const [parentNodeID] = getItemIDFromView(plan, parentViewPath);
   const targetSemanticContext = parentContext.push(
     targetParentRelation
-      ? getRelationNodeID(targetParentRelation)
+      ? getRelationSemanticID(targetParentRelation)
       : (shortID(parentNodeID as ID) as ID)
   );
 
@@ -949,7 +949,7 @@ export function planDeepCopyNode(
   relevance?: Relevance,
   argument?: Argument
 ): [Plan, RelationsIdMapping] {
-  const [sourceNodeID] = getNodeIDFromView(plan, sourceViewPath);
+  const [sourceNodeID] = getItemIDFromView(plan, sourceViewPath);
   const sourceStack = getPane(plan, sourceViewPath).stack;
   const sourceSemanticContext = getContext(plan, sourceViewPath, sourceStack);
   const sourceRelation = getRelationForView(plan, sourceViewPath, sourceStack);
@@ -967,7 +967,7 @@ export function planDeepCopyNode(
       );
       if (relation) {
         return {
-          nodeID: getRelationNodeID(relation),
+          nodeID: getRelationSemanticID(relation),
           semanticContext: getRelationContext(plan.knowledgeDBs, relation),
           relation,
         };
@@ -1012,13 +1012,13 @@ export function planDeepCopyNode(
     targetParentViewPath,
     stack
   );
-  const [targetParentNodeID] = getNodeIDFromView(
+  const [targetParentNodeID] = getItemIDFromView(
     planWithParent,
     targetParentViewPath
   );
   const nodeSemanticContext = targetParentSemanticContext.push(
     targetParentRelation
-      ? getRelationNodeID(targetParentRelation)
+      ? getRelationSemanticID(targetParentRelation)
       : (shortID(targetParentNodeID as ID) as ID)
   );
   const sourceChildContext = resolvedSemanticContext.push(shortID(resolvedNodeID));
@@ -1139,7 +1139,7 @@ export function planDeepCopyNodeWithView(
  */
 export function planCreateNode(plan: Plan, text: string): [Plan, TextSeed] {
   const node = {
-    id: createNodeID(text),
+    id: createSemanticID(text),
     text,
     textHash: hashText(text),
   };
@@ -1196,7 +1196,7 @@ function planCreateNoteAtRoot(
     i === paneIndex
       ? {
           ...p,
-          stack: [getRelationNodeID(createdRelation)],
+          stack: [getRelationSemanticID(createdRelation)],
           rootRelation: createdRelation.id,
         }
       : p
@@ -1221,7 +1221,7 @@ export function planSaveNodeAndEnsureRelations(
   argument?: Argument
 ): SaveNodeResult {
   const trimmedText = text.trim();
-  const [nodeID] = getNodeIDFromView(plan, viewPath);
+  const [nodeID] = getItemIDFromView(plan, viewPath);
   const currentRelation = getRelationForView(plan, viewPath, stack);
   const parentPath = getParentView(viewPath);
 
@@ -1315,7 +1315,7 @@ export function planDeleteNode(plan: Plan, nodeID: LongID | ID): Plan {
     .filter(
       (relation) =>
         relation.author === plan.user.publicKey &&
-        shortID(getRelationNodeID(relation)) === shortID(nodeID as ID) &&
+        shortID(getRelationSemanticID(relation)) === shortID(nodeID as ID) &&
         relation.root === shortID(relation.id)
     )
     .sortBy((relation) => -relation.updated)
@@ -1709,7 +1709,7 @@ export function planSetEmptyNodePosition(
   );
 
   // 2. Use planExpandNode for consistent expansion handling
-  const [, parentView] = getNodeIDFromView(planWithOwnRelations, parentPath);
+  const [, parentView] = getItemIDFromView(planWithOwnRelations, parentPath);
   const planWithExpanded = planExpandNode(
     planWithOwnRelations,
     parentView,

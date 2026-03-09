@@ -11,7 +11,7 @@ import {
   viewPathToString,
   ViewContext,
   useViewKey,
-  getNodeIDFromView,
+  getItemIDFromView,
   isExpanded,
   useDisplayText,
   getEffectiveAuthor,
@@ -43,7 +43,7 @@ import {
   getConcreteRefTargetRelation,
   getRelationsNoReferencedBy,
   getRelationItemNodeID,
-  getRelationNodeID,
+  getRelationSemanticID,
   getRelationStack,
 } from "../connections";
 import { useApis } from "../Apis";
@@ -138,7 +138,7 @@ function VirtuosoForColumn({
     }
     const index = nodes.findIndex(
       (path) =>
-        getLast(path) === scrollToId || getNodeIDFromView(data, path)[0] === scrollToId
+        getLast(path) === scrollToId || getItemIDFromView(data, path)[0] === scrollToId
     );
     if (index >= 0) {
       virtuosoRef.current.scrollToIndex({
@@ -223,7 +223,7 @@ export function TreeViewNodeLoader({
     effectiveAuthor
   );
 
-  const nodeIDs = nodes.map((path) => getNodeIDFromView(data, path)[0]);
+  const nodeIDs = nodes.map((path) => getItemIDFromView(data, path)[0]);
 
   const nodeIDsWithRange = range
     ? nodeIDs.slice(range.startIndex, range.endIndex + 1 + LOAD_EXTRA) // +1 because slice doesn't include last element
@@ -286,7 +286,7 @@ export function TreeViewNodeLoader({
     );
     return addDescendantsToFilters(
       withContextNodes,
-      getRelationNodeID(targetRelation || relation)
+      getRelationSemanticID(targetRelation || relation)
     );
   }, baseFilter);
 
@@ -505,7 +505,7 @@ export function TreeView(): JSX.Element {
   const data = useData();
   const viewPath = useViewPath();
   const effectiveAuthor = getEffectiveAuthor(data, viewPath);
-  const [rootNodeID] = getNodeIDFromView(data, viewPath);
+  const [rootNodeID] = getItemIDFromView(data, viewPath);
   const baseFilter = createBaseFilter(
     data.contacts,
     data.projectMembers,

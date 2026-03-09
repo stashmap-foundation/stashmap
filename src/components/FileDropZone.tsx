@@ -1,7 +1,7 @@
 import React from "react";
 import { List } from "immutable";
 import { useDropzone } from "react-dropzone";
-import { createNodeID, hashText } from "../connections";
+import { createSemanticID, hashText } from "../connections";
 import { ViewPath, getRelationForView } from "../ViewContext";
 import {
   Plan,
@@ -162,7 +162,7 @@ export function planCreateNodesFromMarkdown(
   }
 
   const fallbackNode = {
-    id: createNodeID("Imported Markdown"),
+    id: createSemanticID("Imported Markdown"),
     text: "Imported Markdown",
     textHash: hashText("Imported Markdown"),
   };

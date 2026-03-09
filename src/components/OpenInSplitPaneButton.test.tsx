@@ -61,7 +61,7 @@ My Notes
   await screen.findByLabelText("Search to change pane 1 content");
 });
 
-test("open reference node in split pane uses reference path", async () => {
+test("open reference row in split pane uses reference path", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
 

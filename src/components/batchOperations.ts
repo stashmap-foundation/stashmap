@@ -21,7 +21,7 @@ import {
   parseViewPath,
   getPreviousSibling,
   getContext,
-  getNodeIDFromView,
+  getItemIDFromView,
 } from "../ViewContext";
 import {
   Plan,
@@ -87,7 +87,7 @@ function planUpdateOneRelevance(
   editorText: string,
   virtualItemsMap: VirtualItemsMap
 ): Plan {
-  const [nodeID] = getNodeIDFromView(acc, viewPath);
+  const [nodeID] = getItemIDFromView(acc, viewPath);
   const parentView = getParentView(viewPath);
   if (!parentView) return acc;
 
@@ -163,7 +163,7 @@ function planUpdateOneArgument(
   editorText: string,
   virtualItemsMap: VirtualItemsMap
 ): Plan {
-  const [nodeID] = getNodeIDFromView(acc, viewPath);
+  const [nodeID] = getItemIDFromView(acc, viewPath);
   const parentView = getParentView(viewPath);
   if (!parentView) return acc;
 
@@ -388,7 +388,7 @@ export function planBatchIndent(
       if (!editorText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
-      const [nodeID] = getNodeIDFromView(state.plan, viewPath);
+      const [nodeID] = getItemIDFromView(state.plan, viewPath);
       const nodeText = getNodeText(state.plan, nodeID);
       if (editorText === nodeText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
@@ -463,7 +463,7 @@ export function planBatchOutdent(
       if (!editorText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
-      const [nodeID] = getNodeIDFromView(state.plan, viewPath);
+      const [nodeID] = getItemIDFromView(state.plan, viewPath);
       const nodeText = getNodeText(state.plan, nodeID);
       if (editorText === nodeText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };

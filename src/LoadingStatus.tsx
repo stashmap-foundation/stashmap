@@ -3,7 +3,7 @@ import React from "react";
 import {
   useCurrentRelation,
   useDisplayText,
-  useNodeID,
+  useCurrentItemID,
 } from "./ViewContext";
 import { isEmptyNodeID } from "./connections";
 
@@ -35,7 +35,7 @@ export function extractNodesFromQueries(filters: Filter[]): string[] {
 
 export function useNodeIsLoading(): boolean {
   const relation = useCurrentRelation();
-  const [nodeID] = useNodeID();
+  const [nodeID] = useCurrentItemID();
   const displayText = useDisplayText();
   const context = React.useContext(QueryContext);
 

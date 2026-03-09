@@ -751,14 +751,14 @@ function classifyRow(row: Element): RowInfo | null {
     '[role="textbox"][aria-label="new node editor"]'
   );
   const innerNode = row.querySelector(".inner-node");
-  const referenceNode = row.querySelector('[data-testid="reference-node"]');
+  const referenceRow = row.querySelector('[data-testid="reference-row"]');
   const noteEditor = innerNode?.querySelector(
     '[role="textbox"][aria-label^="edit "]'
   );
   /* eslint-enable testing-library/no-node-access */
   const gutter = getGutter(row);
 
-  const prefix = getItemPrefix(innerNode, !!referenceNode);
+  const prefix = getItemPrefix(innerNode, !!referenceRow);
 
   const withGutter = (info: RowInfo): RowInfo => ({ ...info, gutter });
 
@@ -799,8 +799,8 @@ function classifyRow(row: Element): RowInfo | null {
     });
   }
 
-  if (referenceNode) {
-    const rawText = referenceNode.textContent?.trim() || "";
+  if (referenceRow) {
+    const rawText = referenceRow.textContent?.trim() || "";
     const cleanText = rawText
       .replace(/👤/g, "")
       .replace(/^\[\[/, "")
@@ -810,9 +810,9 @@ function classifyRow(row: Element): RowInfo | null {
       ? (cleanText.match(/[+-]\d+/g) || []).join(" ")
       : cleanText;
     return withGutter({
-      element: referenceNode as HTMLElement,
+      element: referenceRow as HTMLElement,
       text: `${prefix}${displayText}`.trimEnd(),
-      indentLevel: getIndentLevel(referenceNode as HTMLElement),
+      indentLevel: getIndentLevel(referenceRow as HTMLElement),
     });
   }
 

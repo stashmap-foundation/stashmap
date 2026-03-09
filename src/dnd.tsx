@@ -8,6 +8,7 @@ import {
   createConcreteRefId,
   isRefId,
   isSearchId,
+  getRelationNodeID,
   shortID,
 } from "./connections";
 import {
@@ -376,7 +377,9 @@ export function planMoveNodeWithView(
   );
   const targetContext = targetParentContext.push(
     shortID(
-      (actualTargetParentRelation?.head as ID | undefined) ?? targetParentNodeID
+      (actualTargetParentRelation
+        ? getRelationNodeID(actualTargetParentRelation)
+        : targetParentNodeID) as ID
     )
   );
 

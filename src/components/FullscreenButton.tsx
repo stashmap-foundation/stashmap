@@ -5,7 +5,6 @@ import {
   useDisplayText,
   useEffectiveAuthor,
   useCurrentRelation,
-  getAlternativeRelations,
   getContext,
   getNodeIDsForViewPath,
 } from "../ViewContext";
@@ -17,6 +16,7 @@ import {
 import { getRefTargetInfo, isSearchId, shortID } from "../connections";
 import { useData } from "../DataContext";
 import { buildNodeUrl, buildRelationUrl } from "../navigationUrl";
+import { getAlternativeRelations } from "../footerSemantics";
 
 export function FullscreenButton(): JSX.Element | null {
   const stack = usePaneStack();

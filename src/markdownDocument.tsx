@@ -461,7 +461,7 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
           )
         : undefined;
       const serializedNodeID = ownRelation
-        ? (shortID(ownRelation.head as ID) as ID)
+        ? getRelationNodeID(ownRelation)
         : (shortID(nodeID as ID) as ID);
       const text =
         serializedRelation?.text ?? getDisplayTextForView(data, path, stack);
@@ -513,7 +513,7 @@ function formatRootHeading(
 
 export function treeToMarkdown(data: Data, rootRelation: Relations): string {
   const rootContext = getRelationContext(data.knowledgeDBs, rootRelation);
-  const rootNodeID = shortID(rootRelation.head as ID) as ID;
+  const rootNodeID = getRelationNodeID(rootRelation);
   const { text: rootText } = getSerializedRelationText(
     data,
     rootRelation,
@@ -532,7 +532,7 @@ export function buildDocumentEvent(
 ): UnsignedEvent {
   const author = data.user.publicKey;
   const rootContext = getRelationContext(data.knowledgeDBs, rootRelation);
-  const rootNodeID = shortID(rootRelation.head as ID) as ID;
+  const rootNodeID = getRelationNodeID(rootRelation);
   const { text: rootText, textHash: rootTextHash } = getSerializedRelationText(
     data,
     rootRelation,
@@ -628,7 +628,7 @@ function materializeTreeNode(
     parent,
   };
 
-  const childContext = context.push(node.id);
+  const childContext = context.push(relationBaseWithFields.textHash);
   const visibleChildren = treeNode.children.filter((child) => !child.hidden);
   const [withVisible, childItems] = visibleChildren.reduce(
     ([accCtx, accItems], childNode) => {
@@ -677,7 +677,7 @@ function materializeTreeNode(
       ? { updated: withVisible.updated }
       : {}),
   };
-  return [walkUpsertRelation(withVisible, relation), node.id, relation.id];
+  return [walkUpsertRelation(withVisible, relation), relation.textHash, relation.id];
 }
 
 export function createNodesFromMarkdownTrees(

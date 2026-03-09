@@ -54,12 +54,12 @@ import {
   copyViewsWithRelationsMapping,
   viewPathToString,
   getRelationForView,
-  getAlternativeRelations,
   addNodeToPathWithRelations,
   getEffectiveAuthor,
   isRoot,
   getPaneIndex,
 } from "./ViewContext";
+import { getAlternativeRelations } from "./footerSemantics";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useRelaysToCreatePlan } from "./relays";
 import { mergePublishResultsOfEvents } from "./commons/PublishingStatus";
@@ -1176,7 +1176,11 @@ function planCreateNoteAtRoot(
   const paneIndex = getPaneIndex(viewPath);
   const newPanes = planWithRelation.panes.map((p, i) =>
     i === paneIndex
-      ? { ...p, stack: [createdNode.id], rootRelation: createdRelation.id }
+      ? {
+          ...p,
+          stack: [getRelationNodeID(createdRelation)],
+          rootRelation: createdRelation.id,
+        }
       : p
   );
 

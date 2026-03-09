@@ -4,8 +4,6 @@ import {
   VirtualItemsMap,
   addNodeToPathWithRelations,
   addRelationsToLastElement,
-  getSuggestionsForNode,
-  getVersionsForRelation,
   getNodeIDFromView,
   getContext,
   getRelationForView,
@@ -18,16 +16,18 @@ import {
   isConcreteRefId,
   isSearchId,
   getRelations,
-  getRelationsNoReferencedBy,
-  shortID,
   itemPassesFilters,
   getOccurrencesForNode,
   getIncomingCrefsForNode,
-  getRelationItemNodeID,
+  getRelationContext,
   getRelationNodeID,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
 import { buildOutgoingReference } from "./buildReferenceNode";
+import {
+  getSuggestionsForNode,
+  getVersionsForRelation,
+} from "./footerSemantics";
 
 type TreeResult = {
   paths: List<ViewPath>;
@@ -90,10 +90,10 @@ function getChildrenForRegularNode(
     : getRelationForView(data, parentPath, stack);
   const relations = directRelations;
   const relationNodeID = relations ? getRelationNodeID(relations) : parentNodeID;
-  const coordinateNodeID = relations
-    ? ((shortID(relations.head as ID) as ID) as LongID | ID)
-    : parentNodeID;
-  const coordinateContext = relations?.context ?? context;
+  const coordinateNodeID = relations ? relationNodeID : parentNodeID;
+  const coordinateContext = relations
+    ? getRelationContext(data.knowledgeDBs, relations)
+    : context;
 
   const relationPaths = relations
     ? relations.items

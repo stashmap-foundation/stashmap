@@ -237,7 +237,6 @@ declare global {
 
   type Relations = {
     items: List<RelationItem>;
-    head: ID;
     context: Context;
     id: LongID;
     text: string;

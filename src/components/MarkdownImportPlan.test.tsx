@@ -8,10 +8,8 @@ import {
 import {
   getTextForMatching,
   getRelationsNoReferencedBy,
+  getRelationNodeID,
 } from "../connections";
-import {
-  getRelationsForCurrentTree,
-} from "../ViewContext";
 import {
   ALICE,
   expectTree,
@@ -148,29 +146,23 @@ test("planCreateNodesFromMarkdownTrees creates only standalone relations", () =>
   expect(childRelation?.text).toBe("Child");
   expect(grandchildRelation?.text).toBe("Grandchild");
 
-  const standaloneChildRelation = getRelationsForCurrentTree(
-    plan.knowledgeDBs,
-    plan.user.publicKey,
-    childRelation!.head,
-    List<ID>([parentID]),
-    undefined,
-    false,
-    parentRelation?.root
-  );
-  const standaloneGrandchildRelation = getRelationsForCurrentTree(
-    plan.knowledgeDBs,
-    plan.user.publicKey,
-    grandchildRelation!.head,
-    List<ID>([parentID, childRelation!.head]),
-    undefined,
-    false,
-    parentRelation?.root
-  );
-
-  expect(parentRelation?.items.first()?.id).toEqual(standaloneChildRelation?.id);
-  expect(standaloneChildRelation?.items.first()?.id).toEqual(
-    standaloneGrandchildRelation?.id
-  );
+  expect(parentID).toEqual(getRelationNodeID(parentRelation!));
+  expect(parentRelation?.items.first()?.id).toEqual(childRelation?.id);
+  expect(
+    getTextForMatching(
+      plan.knowledgeDBs,
+      getRelationNodeID(childRelation!),
+      plan.user.publicKey
+    )
+  ).toBe("Child");
+  expect(childRelation?.items.first()?.id).toEqual(grandchildRelation?.id);
+  expect(
+    getTextForMatching(
+      plan.knowledgeDBs,
+      getRelationNodeID(grandchildRelation!),
+      plan.user.publicKey
+    )
+  ).toBe("Grandchild");
 });
 
 test("Planning multiple markdown files returns top nodes in import order", () => {

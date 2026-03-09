@@ -73,7 +73,9 @@ export function parseRef(
   const relation = getRelationsNoReferencedBy(knowledgeDBs, relationID, myself);
   if (!relation) return undefined;
 
-  const relationContext = relation.context.map((id) => shortID(id) as ID);
+  const relationContext = getRelationContext(knowledgeDBs, relation).map(
+    (id) => shortID(id) as ID
+  );
   const sourceItem = targetNode
     ? relation.items.find(
         (item) =>
@@ -108,7 +110,7 @@ function getReferencedChildRelation(
     .find(
       (relation): relation is Relations =>
         relation !== undefined &&
-        shortID(relation.head as ID) === shortID(targetNode)
+        shortID(getRelationNodeID(relation)) === shortID(targetNode)
     );
 }
 
@@ -135,7 +137,7 @@ function resolveLabels(
     );
     return { contextLabels, targetLabel, fullContext: relationContext };
   }
-  const fullContext = relationContext.push(shortID(relation.head as ID) as ID);
+  const fullContext = relationContext.push(getRelationNodeID(relation));
   const contextLabels = resolveContextLabels(
     knowledgeDBs,
     myself,
@@ -170,12 +172,14 @@ function relationsMatchForVersion(
   if (useExactMatch) {
     return (
       getRelationNodeID(left) === getRelationNodeID(right) &&
-      left.context.equals(right.context)
+      getRelationContext(knowledgeDBs, left).equals(
+        getRelationContext(knowledgeDBs, right)
+      )
     );
   }
 
-  const leftContext = left.context;
-  const rightContext = right.context;
+  const leftContext = getRelationContext(knowledgeDBs, left);
+  const rightContext = getRelationContext(knowledgeDBs, right);
   return (
     getSemanticNodeKey(
       knowledgeDBs,
@@ -237,7 +241,7 @@ export function buildOutgoingReference(
   const ref = parseRef(refId, knowledgeDBs, myself);
   if (!ref) return buildDeletedReference(refId, myself);
 
-  const target = ref.targetNode || (shortID(ref.relation.head as ID) as ID);
+  const target = ref.targetNode || getRelationNodeID(ref.relation);
   const { contextLabels, targetLabel, fullContext } = resolveLabels(
     knowledgeDBs,
     myself,
@@ -362,7 +366,7 @@ function findCrefToNode(
     const matchesHead = parsed.relationID === targetRelation.id;
     const matchesItem =
       !!containingRelation &&
-      parsed.targetNode === shortID(targetRelation.head as ID) &&
+      parsed.targetNode === shortID(getRelationNodeID(targetRelation)) &&
       parsed.relationID === containingRelation.id;
     return matchesHead || matchesItem;
   });

@@ -174,7 +174,10 @@ export function planCreateNodesFromMarkdown(
     undefined,
     fallbackNode.text
   );
-  return [planUpsertRelations(nextPlan, fallbackRelation), fallbackNode.id];
+  return [
+    planUpsertRelations(nextPlan, fallbackRelation),
+    fallbackRelation.textHash,
+  ];
 }
 
 export function planPasteMarkdownTrees(

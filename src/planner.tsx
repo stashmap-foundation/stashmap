@@ -722,7 +722,7 @@ function getRelationSubtree(
 function planCopyDescendantRelations(
   plan: Plan,
   sourceRelation: Relations,
-  transformContext: (relation: Relations) => Context,
+  getSemanticContext: (relation: Relations) => Context,
   filterRelation?: (relation: Relations) => boolean,
   targetParentRelationID?: LongID,
   targetNodeID?: LongID | ID,
@@ -737,7 +737,7 @@ function planCopyDescendantRelations(
   let copiedRoot = root;
   const sourceNodeID = getRelationNodeID(sourceRelation);
   const copiedRelations = descendants.map((relation) => {
-    const newContext = transformContext(relation);
+    const newSemanticContext = getSemanticContext(relation);
     const isRootRelation = relation.id === sourceRelation.id;
     const nodeID =
       targetNodeID && isRootRelation
@@ -745,14 +745,14 @@ function planCopyDescendantRelations(
         : getRelationNodeID(relation);
     const baseRelation = newRelations(
       nodeID,
-      newContext,
+      newSemanticContext,
       plan.user.publicKey,
       copiedRoot
     );
     copiedRoot = copiedRoot ?? baseRelation.root;
     return {
       source: relation,
-      newContext,
+      newSemanticContext,
       sourceParentID: getEffectiveParentRelationID(relation),
       copy: baseRelation,
     };
@@ -764,7 +764,7 @@ function planCopyDescendantRelations(
   );
 
   const resultPlan = copiedRelations.reduce(
-    (accPlan, { source, newContext, sourceParentID, copy }) => {
+    (accPlan, { source, newSemanticContext, sourceParentID, copy }) => {
       const isRootRelation = source.id === sourceRelation.id;
       const items = source.items.map((item) => {
         const mappedID = resultMapping.get(item.id as LongID);
@@ -780,7 +780,7 @@ function planCopyDescendantRelations(
             : undefined,
         anchor:
           isRootRelation && !targetParentRelationID
-            ? createRootAnchor(newContext, source)
+            ? createRootAnchor(newSemanticContext, source)
             : undefined,
         text: source.text,
         textHash: source.textHash,
@@ -796,25 +796,33 @@ function planCopyDescendantRelations(
 export function planMoveDescendantRelations(
   plan: Plan,
   sourceRelation: Relations,
-  targetContext: Context,
+  targetSemanticContext: Context,
   targetParentRelationID?: LongID,
   targetNodeID?: LongID | ID,
   root?: ID
 ): Plan {
   const descendants = getRelationSubtree(plan, sourceRelation);
   const sourceNodeID = getRelationNodeID(sourceRelation);
-  const sourceContext = getRelationContext(plan.knowledgeDBs, sourceRelation);
+  const sourceSemanticContext = getRelationContext(
+    plan.knowledgeDBs,
+    sourceRelation
+  );
   const effectiveTargetNodeID = targetNodeID ?? sourceNodeID;
-  const sourceChildContext = sourceContext.push(shortID(sourceNodeID));
-  const targetChildContext = targetContext.push(shortID(effectiveTargetNodeID));
+  const sourceChildContext = sourceSemanticContext.push(shortID(sourceNodeID));
+  const targetChildContext = targetSemanticContext.push(
+    shortID(effectiveTargetNodeID)
+  );
 
   return descendants.reduce((accPlan, relation) => {
     const isRootRelation = relation.id === sourceRelation.id;
-    const relationContext = getRelationContext(accPlan.knowledgeDBs, relation);
-    const newContext = isRootRelation
-      ? targetContext
+    const relationSemanticContext = getRelationContext(
+      accPlan.knowledgeDBs,
+      relation
+    );
+    const newSemanticContext = isRootRelation
+      ? targetSemanticContext
       : targetChildContext.concat(
-          relationContext.skip(sourceChildContext.size)
+          relationSemanticContext.skip(sourceChildContext.size)
         );
     return planUpsertRelations(accPlan, {
       ...relation,
@@ -823,7 +831,7 @@ export function planMoveDescendantRelations(
         : getEffectiveParentRelationID(relation),
       anchor:
         isRootRelation && !targetParentRelationID
-          ? createRootAnchor(newContext)
+          ? createRootAnchor(newSemanticContext)
           : undefined,
       root: root ?? relation.root,
     });
@@ -842,7 +850,7 @@ export function planMoveTreeDescendantsToContext(
   const targetParentRelation = getRelationForView(plan, parentViewPath, stack);
   const parentContext = getContext(plan, parentViewPath, stack);
   const [parentNodeID] = getNodeIDFromView(plan, parentViewPath);
-  const targetContext = parentContext.push(
+  const targetSemanticContext = parentContext.push(
     targetParentRelation
       ? getRelationNodeID(targetParentRelation)
       : (shortID(parentNodeID as ID) as ID)
@@ -864,7 +872,7 @@ export function planMoveTreeDescendantsToContext(
     return planMoveDescendantRelations(
       accPlan,
       sourceRelation,
-      targetContext,
+      targetSemanticContext,
       targetParentRelation?.id,
       actualID !== originalID ? actualID : undefined,
       root
@@ -943,12 +951,12 @@ export function planDeepCopyNode(
 ): [Plan, RelationsIdMapping] {
   const [sourceNodeID] = getNodeIDFromView(plan, sourceViewPath);
   const sourceStack = getPane(plan, sourceViewPath).stack;
-  const sourceContext = getContext(plan, sourceViewPath, sourceStack);
+  const sourceSemanticContext = getContext(plan, sourceViewPath, sourceStack);
   const sourceRelation = getRelationForView(plan, sourceViewPath, sourceStack);
 
   const resolveSource = (): {
     nodeID: LongID | ID;
-    context: Context;
+    semanticContext: Context;
     relation?: Relations;
   } => {
     if (isConcreteRefId(sourceNodeID)) {
@@ -962,18 +970,22 @@ export function planDeepCopyNode(
         if (relation) {
           return {
             nodeID: getRelationNodeID(relation),
-            context: getRelationContext(plan.knowledgeDBs, relation),
+            semanticContext: getRelationContext(plan.knowledgeDBs, relation),
             relation,
           };
         }
       }
     }
-    return { nodeID: sourceNodeID, context: sourceContext, relation: sourceRelation };
+    return {
+      nodeID: sourceNodeID,
+      semanticContext: sourceSemanticContext,
+      relation: sourceRelation,
+    };
   };
 
   const resolved = resolveSource();
   const resolvedNodeID = resolved.nodeID;
-  const resolvedContext = resolved.context;
+  const resolvedSemanticContext = resolved.semanticContext;
   const resolvedRelation = resolved.relation;
 
   const [planWithParent, targetParentRelation] = (() => {
@@ -998,7 +1010,7 @@ export function planDeepCopyNode(
     return [planWithCreatedParent, createdParent] as const;
   })();
 
-  const targetParentContext = getContext(
+  const targetParentSemanticContext = getContext(
     planWithParent,
     targetParentViewPath,
     stack
@@ -1007,13 +1019,13 @@ export function planDeepCopyNode(
     planWithParent,
     targetParentViewPath
   );
-  const nodeNewContext = targetParentContext.push(
+  const nodeSemanticContext = targetParentSemanticContext.push(
     targetParentRelation
       ? getRelationNodeID(targetParentRelation)
       : (shortID(targetParentNodeID as ID) as ID)
   );
-  const sourceChildContext = resolvedContext.push(shortID(resolvedNodeID));
-  const targetChildContext = nodeNewContext.push(shortID(resolvedNodeID));
+  const sourceChildContext = resolvedSemanticContext.push(shortID(resolvedNodeID));
+  const targetChildContext = nodeSemanticContext.push(shortID(resolvedNodeID));
 
   if (!resolvedRelation) {
     const sourceAuthor = getEffectiveAuthor(plan, sourceViewPath);
@@ -1047,14 +1059,14 @@ export function planDeepCopyNode(
     resolvedRelation,
     (relation) => {
       const isRootRelation = relation.id === resolvedRelation.id;
-      const relationContext = getRelationContext(
+      const relationSemanticContext = getRelationContext(
         planWithParent.knowledgeDBs,
         relation
       );
       return isRootRelation
-        ? nodeNewContext
+        ? nodeSemanticContext
         : targetChildContext.concat(
-            relationContext.skip(sourceChildContext.size)
+            relationSemanticContext.skip(sourceChildContext.size)
           );
     },
     undefined,

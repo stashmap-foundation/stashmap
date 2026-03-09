@@ -371,7 +371,7 @@ function getOwnRelationForDocumentSerialization(
   stack: ID[],
   author: PublicKey,
   nodeID: LongID | ID,
-  context: List<ID>,
+  semanticContext: List<ID>,
   rootRelation: Relations,
   isRootNode: boolean
 ): Relations | undefined {
@@ -383,7 +383,7 @@ function getOwnRelationForDocumentSerialization(
     data.knowledgeDBs,
     author,
     nodeID,
-    context,
+    semanticContext,
     rootRelation.id,
     isRootNode,
     rootRelation.root
@@ -653,7 +653,7 @@ function walkUpsertRelation(
 function materializeTreeNode(
   ctx: WalkContext,
   treeNode: MarkdownTreeNode,
-  context: List<ID>,
+  semanticContext: List<ID>,
   root: ID,
   parent?: LongID
 ): [WalkContext, ID, LongID] {
@@ -668,10 +668,10 @@ function materializeTreeNode(
   };
   const baseRelation = treeNode.uuid
     ? {
-        ...newRelations(node.id, context, ctx.publicKey, root),
+        ...newRelations(node.id, semanticContext, ctx.publicKey, root),
         id: joinID(ctx.publicKey, treeNode.uuid),
       }
-    : newRelations(node.id, context, ctx.publicKey, root);
+    : newRelations(node.id, semanticContext, ctx.publicKey, root);
   const relationBaseWithFields: Relations = {
     ...baseRelation,
     text: node.text,
@@ -679,10 +679,12 @@ function materializeTreeNode(
     parent,
     anchor: parent
       ? undefined
-      : treeNode.anchor ?? createRootAnchor(context),
+      : treeNode.anchor ?? createRootAnchor(semanticContext),
   };
 
-  const childContext = context.push(relationBaseWithFields.textHash);
+  const childSemanticContext = semanticContext.push(
+    relationBaseWithFields.textHash
+  );
   const visibleChildren = treeNode.children.filter((child) => !child.hidden);
   const [withVisible, childItems] = visibleChildren.reduce(
     ([accCtx, accItems], childNode) => {
@@ -703,7 +705,7 @@ function materializeTreeNode(
         materializeTreeNode(
           accCtx,
           childNode,
-          childContext,
+          childSemanticContext,
           root,
           relationBaseWithFields.id
         );
@@ -737,7 +739,7 @@ function materializeTreeNode(
 export function createNodesFromMarkdownTrees(
   ctx: WalkContext,
   trees: MarkdownTreeNode[],
-  context: List<ID> = List<ID>()
+  semanticContext: List<ID> = List<ID>()
 ): [WalkContext, topNodeIDs: ID[], topRelationIDs: LongID[]] {
   return trees.filter((treeNode) => !treeNode.hidden).reduce(
     ([accCtx, accTopNodeIDs, accTopRelationIDs], treeNode) => {
@@ -745,11 +747,12 @@ export function createNodesFromMarkdownTrees(
       const treeWithUuid = treeNode.uuid
         ? treeNode
         : { ...treeNode, uuid: rootUuid };
-      const treeContext = treeNode.anchor?.snapshotContext ?? context;
+      const treeSemanticContext =
+        treeNode.anchor?.snapshotContext ?? semanticContext;
       const [nextCtx, topNodeID, topRelationID] = materializeTreeNode(
         accCtx,
         treeWithUuid,
-        treeContext,
+        treeSemanticContext,
         rootUuid as ID
       );
       return [

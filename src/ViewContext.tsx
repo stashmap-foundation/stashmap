@@ -254,32 +254,6 @@ function getStandaloneRootByRootID(
   ).first();
 }
 
-function getNewestRelationFromRootByContext(
-  knowledgeDBs: KnowledgeDBs,
-  author: PublicKey,
-  nodeID: LongID | ID,
-  context: Context,
-  root: ID
-): Relations | undefined {
-  const contextMatcher = (relation: Relations): boolean =>
-    relation.author === author &&
-    relation.root === root &&
-    getRelationContext(knowledgeDBs, relation).equals(context);
-  const directMatch = sortRelationsByDate(
-    List(
-      getAuthorCandidateRelations(knowledgeDBs, author, nodeID).filter(
-        (relation) =>
-          contextMatcher(relation) &&
-          relationMatchesRequestedNode(knowledgeDBs, relation, nodeID)
-      )
-    )
-  ).first();
-  if (directMatch) {
-    return directMatch;
-  }
-  return undefined;
-}
-
 function getMatchingChildRelation(
   knowledgeDBs: KnowledgeDBs,
   parentRelation: Relations,
@@ -422,7 +396,7 @@ export function getRelationsForCurrentTree(
   knowledgeDBs: KnowledgeDBs,
   paneAuthor: PublicKey,
   nodeID: LongID | ID,
-  context: Context,
+  semanticContext: Context,
   rootRelation: LongID | undefined,
   isRootNode: boolean,
   currentRoot?: ID
@@ -450,22 +424,12 @@ export function getRelationsForCurrentTree(
       paneAuthor,
       preferredRoot
     );
-    const resolved = root
+    return root
       ? resolveRequestedStackFromRoot(knowledgeDBs, root, [
-          ...context.toArray(),
+          ...semanticContext.toArray(),
           shortID(nodeID) as ID,
         ])?.relation
       : undefined;
-    return (
-      resolved ||
-      getNewestRelationFromRootByContext(
-        knowledgeDBs,
-        paneAuthor,
-        nodeID,
-        context,
-        preferredRoot
-      )
-    );
   }
 
   if (!isRootNode) {
@@ -473,7 +437,7 @@ export function getRelationsForCurrentTree(
   }
 
   return resolveNodeStackToActualIDs(knowledgeDBs, paneAuthor, [
-    ...context.toArray(),
+    ...semanticContext.toArray(),
     shortID(nodeID) as ID,
   ])?.relation;
 }
@@ -520,14 +484,14 @@ export function getRootForView(
   }
 
   const [nodeID] = getNodeIDFromView(data, viewPath);
-  const context = getContext(data, viewPath, stack);
+  const semanticContext = getContext(data, viewPath, stack);
   const pane = getPane(data, viewPath);
   const author = getEffectiveAuthor(data, viewPath);
   return getRelationsForCurrentTree(
     data.knowledgeDBs,
     author,
     nodeID,
-    context,
+    semanticContext,
     pane.rootRelation,
     true
   )?.root;
@@ -553,7 +517,7 @@ export function getRelationForView(
   }
 
   const [nodeID] = getNodeIDFromView(data, viewPath);
-  const context = getContext(data, viewPath, stack);
+  const semanticContext = getContext(data, viewPath, stack);
   const pane = getPane(data, viewPath);
   const parentRoot = getParentRelation(data, viewPath)?.root;
   const author = getEffectiveAuthor(data, viewPath);
@@ -562,7 +526,7 @@ export function getRelationForView(
     data.knowledgeDBs,
     author,
     nodeID,
-    context,
+    semanticContext,
     pane.rootRelation,
     isRoot(viewPath),
     parentRoot
@@ -1028,7 +992,7 @@ export function copyViewsWithRelationsMapping(
 
 export function newRelations(
   nodeID: LongID | ID,
-  context: Context,
+  semanticContext: Context,
   myself: PublicKey,
   root?: ID,
   parent?: LongID,
@@ -1058,7 +1022,7 @@ export function newRelations(
     text: relationText,
     textHash: relationTextHash,
     parent,
-    anchor: !parent ? createRootAnchor(context) : undefined,
+    anchor: !parent ? createRootAnchor(semanticContext) : undefined,
     updated: Date.now(),
     author: myself,
     root: root ?? shortID(id),
@@ -1067,13 +1031,13 @@ export function newRelations(
 
 export function newRelationsForNode(
   nodeID: LongID | ID,
-  context: Context,
+  semanticContext: Context,
   myself: PublicKey,
   root?: ID,
   parent?: LongID,
   text?: string
 ): Relations {
-  return newRelations(nodeID, context, myself, root, parent, text);
+  return newRelations(nodeID, semanticContext, myself, root, parent, text);
 }
 
 export function upsertRelations(
@@ -1083,7 +1047,7 @@ export function upsertRelations(
   modify: (relations: Relations) => Relations
 ): Plan {
   const [nodeID] = getNodeIDFromView(plan, viewPath);
-  const context = getContext(plan, viewPath, stack);
+  const semanticContext = getContext(plan, viewPath, stack);
   const parentRelation = getParentRelation(plan, viewPath);
   const parentRoot = parentRelation?.root;
   const currentRelation = getRelationForView(plan, viewPath, stack);
@@ -1096,7 +1060,7 @@ export function upsertRelations(
     currentRelation ||
     newRelationsForNode(
       nodeID,
-      context,
+      semanticContext,
       plan.user.publicKey,
       parentRoot,
       parentRelation?.id

@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
 import {
   ALICE,
-  BOB,
   setup,
   expectTree,
   renderApp,

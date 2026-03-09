@@ -798,14 +798,6 @@ type RawAppearance = {
   matchedItemRelation?: Relations;
 };
 
-function getNodeForMatching(
-  knowledgeDBs: KnowledgeDBs,
-  semanticID: LongID | ID,
-  author: PublicKey
-): TextSeed | undefined {
-  return getTextNodeForSemanticID(knowledgeDBs, semanticID, author);
-}
-
 export function ensureRelationNativeFields(
   knowledgeDBs: KnowledgeDBs,
   relation: Relations
@@ -1002,12 +994,11 @@ function findNodeAppearances(
 }
 
 function resolveAppearance(
-  _knowledgeDBs: KnowledgeDBs,
-  app: RawAppearance,
-  _targetShortID: ID
+  knowledgeDBs: KnowledgeDBs,
+  app: RawAppearance
 ): ReferencedByRef | undefined {
   const { relation, isHead, matchedItemRelation } = app;
-  const relationContext = getRelationContext(_knowledgeDBs, relation);
+  const relationContext = getRelationContext(knowledgeDBs, relation);
   if (isHead) {
     return {
       relationID: relation.id,
@@ -1018,7 +1009,7 @@ function resolveAppearance(
   if (matchedItemRelation) {
     return {
       relationID: matchedItemRelation.id,
-      context: getRelationContext(_knowledgeDBs, matchedItemRelation),
+      context: getRelationContext(knowledgeDBs, matchedItemRelation),
       updated: matchedItemRelation.updated,
     };
   }
@@ -1036,7 +1027,6 @@ export function findRefsToNode(
   targetAuthor?: PublicKey,
   targetRoot?: ID
 ): List<ReferencedByRef> {
-  const targetShortID = shortID(semanticID);
   const appearances = findNodeAppearances(
     knowledgeDBs,
     semanticID,
@@ -1045,7 +1035,7 @@ export function findRefsToNode(
   );
   const resolvedRefs = appearances
     .map((app) => {
-      const ref = resolveAppearance(knowledgeDBs, app, targetShortID);
+      const ref = resolveAppearance(knowledgeDBs, app);
       if (!ref) {
         return undefined;
       }

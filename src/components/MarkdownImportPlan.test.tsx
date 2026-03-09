@@ -1,7 +1,5 @@
-import { List } from "immutable";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
-import { KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
-import { createPlan, Plan } from "../planner";
+import { createPlan } from "../planner";
 import {
   getTextForSemanticID,
   getRelationsNoReferencedBy,
@@ -24,7 +22,6 @@ import {
   planCreateNodesFromMarkdown,
   planCreateNodesFromMarkdownFiles,
   planCreateNodesFromMarkdownTrees,
-  planPasteMarkdownTrees,
 } from "./FileDropZone";
 
 function flattenTexts(

@@ -1,7 +1,6 @@
 import React from "react";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Event } from "nostr-tools";
 import {
   setup,
   ALICE,
@@ -42,7 +41,7 @@ test("Details of Publishing Status", async () => {
       ...utils,
       relayPool: {
         ...utils.relayPool,
-        publish: (relays: Array<string>, _event: Event): Promise<string>[] => {
+        publish: (relays: Array<string>): Promise<string>[] => {
           const results = relays.map((_, i) => {
             if (i === 0 || i === 3) return Promise.resolve("fulfilled");
             if (i === 1) return Promise.reject(new Error("paid relay"));

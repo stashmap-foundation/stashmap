@@ -36,9 +36,7 @@ function argumentPrefix(argument?: Argument): string {
 function resolveNodeLabel(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
-  nodeId: ID,
-  _context: List<ID>,
-  _root?: ID
+  nodeId: ID
 ): string {
   return getTextForSemanticID(knowledgeDBs, nodeId, myself) || "Loading...";
 }
@@ -46,19 +44,10 @@ function resolveNodeLabel(
 function resolveContextLabels(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
-  context: List<ID>,
-  root?: ID
+  context: List<ID>
 ): string[] {
   return context
-    .map((nodeId, index) =>
-      resolveNodeLabel(
-        knowledgeDBs,
-        myself,
-        nodeId,
-        context.slice(0, index),
-        root
-      )
-    )
+    .map((nodeId) => resolveNodeLabel(knowledgeDBs, myself, nodeId))
     .toArray();
 }
 
@@ -105,15 +94,12 @@ function resolveLabels(
   const contextLabels = resolveContextLabels(
     knowledgeDBs,
     myself,
-    relationContext,
-    relation.root
+    relationContext
   );
   const targetLabel = resolveNodeLabel(
     knowledgeDBs,
     myself,
-    getRelationSemanticID(relation),
-    relationContext,
-    relation.root
+    getRelationSemanticID(relation)
   );
   return { contextLabels, targetLabel, fullContext: relationContext };
 }

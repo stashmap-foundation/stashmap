@@ -253,8 +253,7 @@ export function planDisconnectFromParent(
   const updatedViews = updateViewPathsAfterDisconnect(
     updatedRelationsPlan.views,
     disconnectID,
-    parentRelation.id,
-    relationIndex
+    parentRelation.id
   );
 
   const planWithViews = planUpdateViews(updatedRelationsPlan, updatedViews);
@@ -340,20 +339,6 @@ export function planMoveNodeWithView(
   const [sourceItemID] = getItemIDFromView(plan, sourceViewPath);
   const sourceStack = getPane(plan, sourceViewPath).stack;
   const sourceRelation = getRelationForView(plan, sourceViewPath, sourceStack);
-
-  const sourceParentPath = getParentView(sourceViewPath);
-  const sourceParentRelation = sourceParentPath
-    ? getRelationForView(plan, sourceParentPath, stack)
-    : undefined;
-  const targetParentRelation = getRelationForView(
-    plan,
-    targetParentViewPath,
-    stack
-  );
-  const isSameParentRelation =
-    sourceParentRelation !== undefined &&
-    targetParentRelation !== undefined &&
-    sourceParentRelation.id === targetParentRelation.id;
   const sourceAddID = sourceRelation?.id ?? sourceItemID;
 
   const [planWithAdd, [actualItemID]] = planAddToParent(
@@ -363,8 +348,7 @@ export function planMoveNodeWithView(
     stack,
     insertAtIndex,
     undefined,
-    undefined,
-    isSameParentRelation ? [shortID(sourceItemID)] : undefined
+    undefined
   );
 
   const moveItemID = actualItemID ?? sourceItemID;
@@ -528,13 +512,8 @@ export function dnd(
         return moveRelations(relations, sourceIndices.toArray(), dropIndex);
       }
     );
-    const updatedViews = updateViewPathsAfterMoveRelations(
-      updatedRelationsPlan,
-      toRelation.id,
-      toRelation.items,
-      sourceIndices.toArray(),
-      dropIndex
-    );
+    const updatedViews =
+      updateViewPathsAfterMoveRelations(updatedRelationsPlan);
     const reorderedPlan = planUpdateViews(updatedRelationsPlan, updatedViews);
     return virtualSources
       .toList()

@@ -17,7 +17,6 @@ import {
   createConcreteRefId,
   ensureRelationNativeFields,
   getConcreteRefTargetRelation,
-  getRelationItemSemanticID,
   getRelationContext,
   getRelationSemanticID,
   getTextForSemanticID,
@@ -30,7 +29,6 @@ import {
   getCurrentEdgeForView,
   getRelationForView,
   getContext,
-  viewPathToString,
   newRelations,
   getRelationsForCurrentTree,
 } from "./ViewContext";
@@ -395,8 +393,7 @@ function getOwnRelationForDocumentSerialization(
 function getSerializedRelationText(
   data: Data,
   relation: Relations,
-  semanticID: LongID | ID,
-  _context: List<ID>
+  semanticID: LongID | ID
 ): { text: string; textHash: ID } {
   if (relation.text !== "") {
     return {
@@ -422,7 +419,7 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
   const author = data.user.publicKey;
   const rootPath = buildRootPath(rootRelation);
   const stack = [getRelationSemanticID(rootRelation)];
-  const { paths, virtualItems } = getNodesInTree(
+  const { paths } = getNodesInTree(
     data,
     rootPath,
     stack,
@@ -481,8 +478,7 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
         ? getSerializedRelationText(
             data,
             ownRelation,
-            getRelationSemanticID(ownRelation),
-            semanticContext
+            getRelationSemanticID(ownRelation)
           )
         : undefined;
       const serializedSemanticID = ownRelation
@@ -550,8 +546,7 @@ export function treeToMarkdown(data: Data, rootRelation: Relations): string {
   const { text: rootText } = getSerializedRelationText(
     data,
     rootRelation,
-    rootSemanticID,
-    rootContext
+    rootSemanticID
   );
   const rootUuid = shortID(rootRelation.id);
   const rootLine = formatRootHeading(
@@ -574,8 +569,7 @@ export function buildDocumentEvent(
   const { text: rootText, textHash: rootTextHash } = getSerializedRelationText(
     data,
     rootRelation,
-    rootSemanticID,
-    rootContext
+    rootSemanticID
   );
   const rootUuid = shortID(rootRelation.id);
   const rootLine = formatRootHeading(
@@ -683,14 +677,13 @@ function materializeTreeNode(
         };
         return [accCtx, [...accItems, item]] as [WalkContext, RelationItem[]];
       }
-      const [afterChild, materializedID, materializedRelationID] =
-        materializeTreeNode(
-          accCtx,
-          childNode,
-          childSemanticContext,
-          root,
-          relationBaseWithFields.id
-        );
+      const [afterChild, , materializedRelationID] = materializeTreeNode(
+        accCtx,
+        childNode,
+        childSemanticContext,
+        root,
+        relationBaseWithFields.id
+      );
       const item: RelationItem = {
         id: materializedRelationID,
         relevance: childNode.relevance,

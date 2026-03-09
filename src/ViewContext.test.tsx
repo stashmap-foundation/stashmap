@@ -1,4 +1,3 @@
-import React from "react";
 import {
   cleanup,
   fireEvent,
@@ -7,17 +6,15 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { List, Map } from "immutable";
+import { Map } from "immutable";
 import { createConcreteRefId } from "./connections";
 import {
-  renderWithTestData,
   ALICE,
   setup,
   expectTree,
   findNewNodeEditor,
   BOB,
   follow,
-  renderApp,
   renderTree,
   type,
 } from "./utils.test";
@@ -160,8 +157,7 @@ test("Alter View paths after disconnect", () => {
   const updatedViews = updateViewPathsAfterDisconnect(
     views as unknown as Views,
     "n" as LongID,
-    "r" as LongID,
-    1 as never
+    "r" as LongID
   );
 
   const expectedResult = views
@@ -181,8 +177,7 @@ test("Alter View paths after disconnect with pane-prefixed paths", () => {
   const updatedViews = updateViewPathsAfterDisconnect(
     views as unknown as Views,
     "n" as LongID,
-    "r" as LongID,
-    1 as never
+    "r" as LongID
   );
 
   const expectedResult = views
@@ -508,18 +503,7 @@ test("updateViewPathsAfterMoveRelations preserves paths when relationsID starts 
 
   const data = { views } as unknown as Data;
 
-  const oldItems = List([
-    { id: "childA" as LongID, relevance: undefined },
-    { id: "childB" as LongID, relevance: undefined },
-  ] as RelationItem[]);
-
-  const updatedViews = updateViewPathsAfterMoveRelations(
-    data,
-    relID,
-    oldItems,
-    [0],
-    4
-  );
+  const updatedViews = updateViewPathsAfterMoveRelations(data);
 
   expect(updatedViews.has(childAPath)).toBe(true);
   expect(updatedViews.get(childAPath)?.expanded).toBe(true);

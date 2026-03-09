@@ -35,7 +35,6 @@ import {
 import { KIND_CONTACTLIST } from "./nostr";
 import { RequireLogin, UNAUTHENTICATED_USER_PK } from "./AppState";
 import {
-  Plan,
   createPlan,
   planAddContact,
   planRemoveContact,
@@ -60,7 +59,6 @@ import { RootViewContextProvider } from "./ViewContext";
 import { LoadData } from "./dataQuery";
 import { LoadSearchData } from "./LoadSearchData";
 import { StorePreLoginContext } from "./StorePreLoginContext";
-import { newDB } from "./knowledge";
 import { TemporaryViewProvider } from "./components/TemporaryViewContext";
 import { PaneView } from "./components/Workspace";
 import { DND } from "./dnd";

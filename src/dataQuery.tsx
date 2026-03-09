@@ -12,8 +12,7 @@ import {
   getRelationStack,
 } from "./connections";
 import { REFERENCED_BY } from "./constants";
-import { useViewPath } from "./ViewContext";
-import { usePaneStack, useCurrentPane } from "./SplitPanesContext";
+import { useCurrentPane } from "./SplitPanesContext";
 import { useData } from "./DataContext";
 import { useApis } from "./Apis";
 import { RegisterQuery, extractIDsFromQueries } from "./LoadingStatus";

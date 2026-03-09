@@ -1094,22 +1094,11 @@ function pathContainsSubpath(
   );
 }
 
-export function updateViewPathsAfterMoveRelations(
-  data: Data,
-  _relationsID: LongID,
-  _oldItems: List<RelationItem>,
-  _indices: Array<number>,
-  _startPosition?: number
-): Views {
+export function updateViewPathsAfterMoveRelations(data: Data): Views {
   return data.views;
 }
 
-export function updateViewPathsAfterAddRelation(
-  data: Data,
-  _relationsID: LongID,
-  _addedItemID: LongID | ID,
-  _addedItemIndex: number
-): Views {
+export function updateViewPathsAfterAddRelation(data: Data): Views {
   return data.views;
 }
 
@@ -1123,8 +1112,7 @@ export function updateViewPathsAfterDeleteItem(
 export function updateViewPathsAfterDisconnect(
   views: Views,
   disconnectNode: LongID | ID,
-  fromRelation: LongID,
-  _nodeIndex: number
+  fromRelation: LongID
 ): Views {
   return views.filterNot((_, key) => {
     try {
@@ -1171,12 +1159,6 @@ export function updateViewPathsAfterPaneInsert(
   });
 }
 
-export function bulkUpdateViewPathsAfterAddRelation(
-  data: Data,
-  _repoPath: ViewPath,
-  _stack: ID[],
-  _nAdds: number,
-  _startPos?: number
-): Views {
+export function bulkUpdateViewPathsAfterAddRelation(data: Data): Views {
   return data.views;
 }

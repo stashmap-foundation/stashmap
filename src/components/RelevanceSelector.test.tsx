@@ -12,11 +12,6 @@ import {
   type,
 } from "../utils.test";
 import { itemMatchesType } from "../connections";
-import {
-  relevanceToLevel,
-  levelToRelevance,
-  RELEVANCE_LABELS,
-} from "./useUpdateRelevance";
 
 describe("itemMatchesType", () => {
   test("matches relevant items", () => {

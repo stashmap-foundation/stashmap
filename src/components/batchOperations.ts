@@ -3,7 +3,6 @@ import {
   updateItemRelevance,
   updateItemArgument,
   isEmptySemanticID,
-  shortID,
   getTextForSemanticID,
 } from "../connections";
 import {
@@ -14,13 +13,11 @@ import {
   getParentRelation,
   getRelationIndex,
   upsertRelations,
-  getLast,
   getRelationForView,
   viewPathToString,
   getParentKey,
   parseViewPath,
   getPreviousSibling,
-  getContext,
   getItemIDFromView,
 } from "../ViewContext";
 import {

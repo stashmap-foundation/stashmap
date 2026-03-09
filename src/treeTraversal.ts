@@ -9,7 +9,6 @@ import {
   getRelationForView,
   getEffectiveAuthor,
   getParentRelation,
-  isRoot,
   viewPathToString,
 } from "./ViewContext";
 import {
@@ -181,7 +180,7 @@ function getChildrenForRegularNode(
     virtualType: VirtualType,
     crefIDs?: ImmutableSet<string>
   ): { paths: List<ViewPath>; virtualItems: VirtualItemsMap } =>
-    items.reduce((result, itemID, idx) => {
+    items.reduce((result, itemID) => {
       const pathWithRelations = addRelationsToLastElement(
         parentPath,
         relationId

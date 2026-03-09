@@ -57,7 +57,6 @@ import {
   getRelationForView,
   addNodeToPathWithRelations,
   getEffectiveAuthor,
-  isRoot,
   getPaneIndex,
 } from "./ViewContext";
 import { getAlternativeRelations } from "./footerSemantics";
@@ -517,8 +516,7 @@ export function planAddToParent(
   stack: ID[],
   insertAtIndex?: number,
   relevance?: Relevance,
-  argument?: Argument,
-  excludeFromCollisions?: readonly ID[]
+  argument?: Argument
 ): [Plan, (LongID | ID)[]] {
   const targetsArray = Array.isArray(targets) ? targets : [targets];
   if (targetsArray.length === 0) {
@@ -630,13 +628,8 @@ export function planAddToParent(
       )
   );
 
-  const updatedViews = bulkUpdateViewPathsAfterAddRelation(
-    updatedRelationsPlan,
-    parentViewPath,
-    stack as ID[],
-    targetsArray.length,
-    insertAtIndex
-  );
+  const updatedViews =
+    bulkUpdateViewPathsAfterAddRelation(updatedRelationsPlan);
 
   return [
     planUpdateViews(updatedRelationsPlan, updatedViews),
@@ -743,7 +736,6 @@ function planCopyDescendantRelations(
   );
 
   let copiedRoot = root;
-  const sourceSemanticID = getRelationSemanticID(sourceRelation);
   const copiedRelations = descendants.map((relation) => {
     const newSemanticContext = getSemanticContext(relation);
     const isRootRelation = relation.id === sourceRelation.id;

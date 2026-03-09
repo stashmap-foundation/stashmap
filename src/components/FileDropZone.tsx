@@ -139,12 +139,6 @@ export function planCreateNodesFromMarkdownFiles(
   return [nextPlan, topItemIDs];
 }
 
-function flattenTreeNodes(treeNodes: MarkdownTreeNode[]): MarkdownTreeNode[] {
-  return treeNodes.reduce((acc: MarkdownTreeNode[], treeNode) => {
-    return [...acc, treeNode, ...flattenTreeNodes(treeNode.children)];
-  }, []);
-}
-
 export function planCreateNodesFromMarkdown(
   plan: Plan,
   markdownText: string,

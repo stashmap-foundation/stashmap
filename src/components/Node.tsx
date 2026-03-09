@@ -697,7 +697,6 @@ export function Node({
   const [itemID] = useCurrentItemID();
   const data = useData();
   const stack = usePaneStack();
-  const currentRelation = useCurrentRelation();
   const isConcreteRef = isConcreteRefId(itemID);
   const virtualType = useCurrentEdge()?.virtualType;
   const isViewingOtherUser = useIsViewingOtherUserContent();

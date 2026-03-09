@@ -27,7 +27,6 @@ import {
 import {
   addNodeToFilters,
   addReferencedByToFilters,
-  addDescendantsToFilters,
   addListToFilters,
   createBaseFilter,
   filtersToFilterArray,
@@ -284,9 +283,11 @@ export function TreeViewNodeLoader({
         ),
       withRelation
     );
-    return addDescendantsToFilters(
+    return addNodeToFilters(
       withContextNodes,
-      getRelationSemanticID(targetRelation || relation)
+      getRelationSemanticID(targetRelation || relation),
+      data.knowledgeDBs,
+      data.user.publicKey
     );
   }, baseFilter);
 

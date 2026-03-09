@@ -282,7 +282,7 @@ function PaneContent(): JSX.Element {
       <LoadSearchData nodeIDs={pane.stack}>
         <LoadData nodeIDs={pane.stack}>
           <LoadData nodeIDs={[LOG_NODE_ID]} lists>
-            <LoadData nodeIDs={[rootNodeID]} descendants referencedBy lists>
+            <LoadData nodeIDs={[rootNodeID]} referencedBy lists>
               <RootViewContextProvider
                 root={rootNodeID as LongID}
                 paneIndex={paneIndex}

@@ -365,7 +365,6 @@ type SerializeResult = {
   lines: string[];
   nodeHashes: ImmutableSet<string>;
   nodeIDs: ImmutableSet<string>;
-  contextHashes: ImmutableSet<string>;
   relationUUIDs: ImmutableSet<string>;
 };
 
@@ -440,8 +439,6 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
       const [nodeID] = getItemIDFromView(data, path);
       const indent = "  ".repeat(depth);
       const context = getContext(data, path, stack);
-      const contextHash =
-        context.size > 0 ? hashText(context.join(":")) : undefined;
       const item = getCurrentEdgeForView(data, path);
 
       if (isConcreteRefId(nodeID)) {
@@ -467,9 +464,6 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
           nodeIDs: targetRelation
             ? acc.nodeIDs.add(getRelationSemanticID(targetRelation))
             : acc.nodeIDs,
-          contextHashes: contextHash
-            ? acc.contextHashes.add(contextHash)
-            : acc.contextHashes,
           relationUUIDs: acc.relationUUIDs.add(crefRelationUUID),
         };
       }
@@ -514,9 +508,6 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
           serializedRelation?.textHash ?? hashText(text)
         ),
         nodeIDs: acc.nodeIDs.add(serializedNodeID),
-        contextHashes: contextHash
-          ? acc.contextHashes.add(contextHash)
-          : acc.contextHashes,
         relationUUIDs: acc.relationUUIDs.add(uuid),
       };
     },
@@ -524,7 +515,6 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
       lines: [],
       nodeHashes: ImmutableSet<string>(),
       nodeIDs: ImmutableSet<string>(),
-      contextHashes: ImmutableSet<string>(),
       relationUUIDs: ImmutableSet<string>(),
     }
   );
@@ -602,14 +592,6 @@ export function buildDocumentEvent(
     .union(result.nodeIDs.add(rootNodeID))
     .toArray()
     .map((value) => ["n", value]);
-  const rootContextHash =
-    rootContext.size > 0
-      ? hashText(rootContext.join(":"))
-      : undefined;
-  const allContextHashes = rootContextHash
-    ? result.contextHashes.add(rootContextHash)
-    : result.contextHashes;
-  const cTags = allContextHashes.toArray().map((h) => ["c", h]);
   const rTags = result.relationUUIDs
     .add(rootUuid)
     .toArray()
@@ -619,7 +601,7 @@ export function buildDocumentEvent(
     kind: KIND_KNOWLEDGE_DOCUMENT,
     pubkey: author,
     created_at: newTimestamp(),
-    tags: [["d", rootUuid], ...nTags, ...cTags, ...rTags, msTag()],
+    tags: [["d", rootUuid], ...nTags, ...rTags, msTag()],
     content,
   };
 }

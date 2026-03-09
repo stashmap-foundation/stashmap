@@ -581,34 +581,6 @@ export function useIsInSearchView(): boolean {
   return useSearchDepth() !== undefined;
 }
 
-export function contextStartsWith(context: Context, prefix: Context): boolean {
-  if (prefix.size > context.size) return false;
-  return context.take(prefix.size).equals(prefix);
-}
-
-export function getDescendantRelations(
-  knowledgeDBs: KnowledgeDBs,
-  nodeID: LongID | ID,
-  rootContext: Context,
-  root?: ID
-): List<Relations> {
-  const localID = shortID(nodeID);
-  const childContext = rootContext.push(localID);
-
-  const allRelations = knowledgeDBs
-    .valueSeq()
-    .flatMap((db) => db.relations.valueSeq())
-    .toList();
-
-  return allRelations.filter(
-    (relations) =>
-      (!root || relations.root === root) &&
-      ((shortID(getRelationSemanticID(relations)) === localID &&
-        getRelationContext(knowledgeDBs, relations).equals(rootContext)) ||
-        contextStartsWith(getRelationContext(knowledgeDBs, relations), childContext))
-  );
-}
-
 export type TypeFilters = (
   | Relevance
   | Argument

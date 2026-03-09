@@ -65,7 +65,6 @@ function getDocumentNodeQueryIDs(
 type Filters = {
   documentByRelation: Filter;
   documentByNode: Filter;
-  documentByContext: Filter;
   deleteFilter: Filter;
   authors: PublicKey[];
 };
@@ -89,7 +88,6 @@ export function filtersToFilterArray(filters: Filters): Filter[] {
   return [
     sanitizeFilter({ ...filters.documentByRelation, authors }, "#r"),
     sanitizeFilter({ ...filters.documentByNode, authors }, "#n"),
-    sanitizeFilter({ ...filters.documentByContext, authors }, "#c"),
     sanitizeFilter({ ...filters.deleteFilter, authors }, "#k"),
   ].filter((f) => f !== undefined) as Filter[];
 }
@@ -202,17 +200,6 @@ export function addListToFilters(
   };
 }
 
-export function addDescendantsToFilters(
-  filters: Filters,
-  nodeID: LongID | ID
-): Filters {
-  return {
-    ...filters,
-    documentByContext: addIDToFilter(filters.documentByContext, nodeID, "#c"),
-    documentByNode: addIDToFilter(filters.documentByNode, nodeID, "#n"),
-  };
-}
-
 export function createBaseFilter(
   contacts: Contacts,
   projectMembers: Members,
@@ -232,9 +219,6 @@ export function createBaseFilter(
       kinds: [KIND_KNOWLEDGE_DOCUMENT],
     },
     documentByNode: {
-      kinds: [KIND_KNOWLEDGE_DOCUMENT],
-    },
-    documentByContext: {
       kinds: [KIND_KNOWLEDGE_DOCUMENT],
     },
     deleteFilter: {
@@ -300,13 +284,11 @@ export function useQueryKnowledgeData(filters: Filter[]): {
 export function LoadData({
   children,
   nodeIDs,
-  descendants,
   referencedBy,
   lists,
 }: {
   children: React.ReactNode;
   nodeIDs: ID[];
-  descendants?: boolean;
   referencedBy?: boolean;
   lists?: boolean;
 }): JSX.Element {
@@ -328,17 +310,14 @@ export function LoadData({
       user.publicKey,
       lists
     );
-    const withDescendants = descendants
-      ? addDescendantsToFilters(withNode, nodeID)
-      : withNode;
     const withReferencedBy = referencedBy
       ? addReferencedByToFilters(
-          withDescendants,
+          withNode,
           nodeID,
           knowledgeDBs,
           user.publicKey
         )
-      : withDescendants;
+      : withNode;
     return withReferencedBy;
   }, baseFilter);
 

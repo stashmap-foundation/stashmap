@@ -646,7 +646,7 @@ function RootViewOrPaneIsLoadingInner({
   return (
     <LoadSearchData nodeIDs={pane.stack}>
       <LoadData nodeIDs={pane.stack}>
-        <LoadData nodeIDs={[rootNodeID]} descendants referencedBy lists>
+        <LoadData nodeIDs={[rootNodeID]} referencedBy lists>
           <RootViewContextProvider
             root={rootNodeID as LongID}
             paneIndex={paneIndex}

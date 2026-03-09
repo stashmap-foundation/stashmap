@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { List, Map } from "immutable";
 import { createConcreteRefId } from "./connections";
@@ -295,6 +295,111 @@ Programming Languages
   FP
   Logic
   Scripting
+  `);
+  cleanup();
+});
+
+test("Forked subtree breadcrumbs show source ancestors and navigate back to source tree", async () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  await follow(alice, bob().user.publicKey);
+
+  renderTree(bob);
+  await type(
+    "My Notes{Enter}{Tab}Programming Languages{Enter}{Tab}OOP{Enter}{Tab}C++{Enter}Java{Enter}{Enter}FP{Enter}Logic{Enter}Scripting{Escape}"
+  );
+  cleanup();
+
+  renderTree(alice);
+  await type("My Notes{Enter}{Tab}Programming Languages{Escape}");
+  await userEvent.click(
+    await screen.findByLabelText("expand Programming Languages")
+  );
+  await userEvent.click(
+    await screen.findByLabelText(/open .* \+4 in fullscreen/)
+  );
+
+  await screen.findByText("READONLY");
+  await userEvent.click(
+    await screen.findByLabelText("fork to make your own copy")
+  );
+
+  await waitFor(() => {
+    expect(screen.queryByText("READONLY")).toBeNull();
+  });
+
+  const breadcrumbs = screen.getByRole("navigation", {
+    name: "Navigation breadcrumbs",
+  });
+  await within(breadcrumbs).findByLabelText("Navigate to My Notes");
+  expect(within(breadcrumbs).getByText("Programming Languages")).toBeDefined();
+
+  await userEvent.click(within(breadcrumbs).getByLabelText("Navigate to My Notes"));
+
+  await screen.findByText("READONLY");
+  await expectTree(`
+[O] My Notes
+  [O] Programming Languages
+  `);
+
+  await userEvent.click(
+    await screen.findByLabelText("expand Programming Languages")
+  );
+  await userEvent.click(await screen.findByLabelText("expand OOP"));
+  await expectTree(`
+[O] My Notes
+  [O] Programming Languages
+    [O] OOP
+      [O] C++
+      [O] Java
+    [O] FP
+    [O] Logic
+    [O] Scripting
+  `);
+  cleanup();
+});
+
+test("Forked subtree header source action opens source path", async () => {
+  const [alice, bob] = setup([ALICE, BOB]);
+  await follow(alice, bob().user.publicKey);
+
+  renderTree(bob);
+  await type(
+    "My Notes{Enter}{Tab}Programming Languages{Enter}{Tab}OOP{Enter}FP{Enter}Logic{Enter}Scripting{Escape}"
+  );
+  cleanup();
+
+  renderTree(alice);
+  await type("My Notes{Enter}{Tab}Programming Languages{Escape}");
+  await userEvent.click(
+    await screen.findByLabelText("expand Programming Languages")
+  );
+  const versionEntries = await screen.findAllByLabelText(/in fullscreen/);
+  await userEvent.click(versionEntries[versionEntries.length - 1]);
+
+  await screen.findByText("READONLY");
+  await userEvent.click(
+    await screen.findByLabelText("fork to make your own copy")
+  );
+
+  await waitFor(() => {
+    expect(screen.queryByText("READONLY")).toBeNull();
+  });
+
+  await screen.findByLabelText("Open source tree");
+  await userEvent.click(await screen.findByLabelText("Open source tree"));
+
+  await screen.findByText("READONLY");
+  const breadcrumbs = screen.getByRole("navigation", {
+    name: "Navigation breadcrumbs",
+  });
+  expect(within(breadcrumbs).getByText("My Notes")).toBeDefined();
+  expect(within(breadcrumbs).getByText("Programming Languages")).toBeDefined();
+  await expectTree(`
+[O] Programming Languages
+  [O] OOP
+  [O] FP
+  [O] Logic
+  [O] Scripting
   `);
   cleanup();
 });

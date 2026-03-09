@@ -56,12 +56,14 @@ import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import {
   LOG_NODE_ID,
   getRelationContext,
+  getRelationStack,
   getRelationNodeID,
+  getRelationsNoReferencedBy,
   getTextForMatching,
   isSearchId,
   shortID,
 } from "../connections";
-import { buildNodeUrl } from "../navigationUrl";
+import { buildNodeUrl, buildRelationUrl } from "../navigationUrl";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import {
   focusRow,
@@ -88,25 +90,45 @@ function BreadcrumbItem({
   href,
   onClick,
   isLast,
+  isSource = false,
+  disabled = false,
 }: {
   nodeID: LongID | ID;
   author: PublicKey;
-  href: string;
-  onClick: (e: React.MouseEvent) => void;
+  href?: string;
+  onClick?: (e: React.MouseEvent) => void;
   isLast: boolean;
+  isSource?: boolean;
+  disabled?: boolean;
 }): JSX.Element {
   const { knowledgeDBs } = useData();
   const label = getTextForMatching(knowledgeDBs, nodeID, author) || "Loading...";
+  const className = [
+    isLast ? "breadcrumb-current" : "breadcrumb-link",
+    isSource ? "breadcrumb-source" : "",
+    disabled ? "breadcrumb-disabled" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   if (isLast) {
-    return <span className="breadcrumb-current">{label}</span>;
+    return <span className={className}>{label}</span>;
+  }
+
+  if (!href || !onClick || disabled) {
+    return (
+      <>
+        <span className={className}>{label}</span>
+        <span className="breadcrumb-separator">/</span>
+      </>
+    );
   }
 
   return (
     <>
       <a
         href={href}
-        className="breadcrumb-link"
+        className={className}
         onClick={onClick}
         aria-label={`Navigate to ${label}`}
       >
@@ -135,38 +157,284 @@ function getOwnLogRelation(
     .first();
 }
 
+type BreadcrumbTarget = {
+  stack: ID[];
+  author: PublicKey;
+  rootRelation?: LongID;
+};
+
+type BreadcrumbEntry = {
+  key: string;
+  nodeID: LongID | ID;
+  author: PublicKey;
+  target?: BreadcrumbTarget;
+  isSource?: boolean;
+  disabled?: boolean;
+};
+
+function getStandaloneRootRelation(
+  knowledgeDBs: KnowledgeDBs,
+  relation: Relations
+): Relations | undefined {
+  return knowledgeDBs
+    .get(relation.author)
+    ?.relations.valueSeq()
+    .find(
+      (candidate) =>
+        candidate.author === relation.author &&
+        candidate.root === relation.root &&
+        candidate.root === shortID(candidate.id)
+    );
+}
+
+function getLiveAnchorSourceRelation(
+  knowledgeDBs: KnowledgeDBs,
+  relation: Relations
+): Relations | undefined {
+  const sourceAuthor = relation.anchor?.sourceAuthor || relation.author;
+  if (relation.anchor?.sourceRelationID) {
+    return getRelationsNoReferencedBy(
+      knowledgeDBs,
+      relation.anchor.sourceRelationID,
+      sourceAuthor
+    );
+  }
+  if (!relation.anchor?.sourceRootID) {
+    return undefined;
+  }
+  return knowledgeDBs
+    .get(sourceAuthor)
+    ?.relations.valueSeq()
+    .find(
+      (candidate) =>
+        candidate.author === sourceAuthor &&
+        candidate.root === relation.anchor?.sourceRootID &&
+        candidate.root === shortID(candidate.id)
+    );
+}
+
+function createRelationBreadcrumbEntry(
+  knowledgeDBs: KnowledgeDBs,
+  relation: Relations
+): BreadcrumbEntry {
+  const rootRelation = getStandaloneRootRelation(knowledgeDBs, relation);
+  return {
+    key: `relation:${relation.id}`,
+    nodeID: getRelationNodeID(relation),
+    author: relation.author,
+    target: {
+      stack: getRelationStack(knowledgeDBs, relation),
+      author: relation.author,
+      ...(rootRelation ? { rootRelation: rootRelation.id } : {}),
+    },
+  };
+}
+
+function createSnapshotBreadcrumbEntries(
+  anchor: RootAnchor | undefined,
+  fallbackAuthor: PublicKey
+): BreadcrumbEntry[] {
+  if (!anchor?.snapshotContext.size) {
+    return [];
+  }
+  const author = anchor.sourceAuthor || fallbackAuthor;
+  return anchor.snapshotContext.toArray().map((nodeID, index) => ({
+    key: `snapshot:${author}:${nodeID}:${index}`,
+    nodeID,
+    author,
+    disabled: true,
+    isSource: true,
+  }));
+}
+
+function buildAnchoredLineageEntries(
+  knowledgeDBs: KnowledgeDBs,
+  relation: Relations,
+  seen = new Set<string>()
+): BreadcrumbEntry[] {
+  if (seen.has(relation.id)) {
+    return [createRelationBreadcrumbEntry(knowledgeDBs, relation)];
+  }
+
+  const nextSeen = new Set(seen).add(relation.id);
+  if (relation.parent) {
+    const parentRelation = getRelationsNoReferencedBy(
+      knowledgeDBs,
+      relation.parent,
+      relation.author
+    );
+    if (parentRelation) {
+      return [
+        ...buildAnchoredLineageEntries(knowledgeDBs, parentRelation, nextSeen),
+        createRelationBreadcrumbEntry(knowledgeDBs, relation),
+      ];
+    }
+  }
+
+  const sourceRelation = getLiveAnchorSourceRelation(knowledgeDBs, relation);
+  if (sourceRelation) {
+    return [
+      ...buildAnchoredLineageEntries(knowledgeDBs, sourceRelation, nextSeen).slice(
+        0,
+        -1
+      ),
+      createRelationBreadcrumbEntry(knowledgeDBs, relation),
+    ];
+  }
+
+  return [
+    ...createSnapshotBreadcrumbEntries(relation.anchor, relation.author),
+    createRelationBreadcrumbEntry(knowledgeDBs, relation),
+  ];
+}
+
+function SourceButton(): JSX.Element | null {
+  const { knowledgeDBs, user } = useData();
+  const pane = useCurrentPane();
+  const { setPane } = useSplitPanes();
+  const paneHistory = usePaneHistory();
+  const rootRelation = pane.rootRelation
+    ? getRelationsNoReferencedBy(knowledgeDBs, pane.rootRelation, user.publicKey)
+    : undefined;
+
+  if (!rootRelation?.anchor) {
+    return null;
+  }
+
+  const sourceRelation = getLiveAnchorSourceRelation(knowledgeDBs, rootRelation);
+  if (!sourceRelation) {
+    return null;
+  }
+
+  const target: Pane = {
+    ...pane,
+    stack: [],
+    author: sourceRelation.author,
+    rootRelation: sourceRelation.id,
+    scrollToNodeId: undefined,
+  };
+
+  return (
+    <button
+      type="button"
+      className="header-action-btn"
+      onClick={() => {
+        paneHistory?.push(pane.id, pane);
+        setPane(target);
+      }}
+      aria-label="Open source tree"
+      title="Source"
+      data-pane-action="source"
+    >
+      source
+    </button>
+  );
+}
+
 function Breadcrumbs(): JSX.Element {
   const { knowledgeDBs, user } = useData();
   const stack = usePaneStack();
   const pane = useCurrentPane();
   const navigatePane = useNavigatePane();
+  const { setPane } = useSplitPanes();
+  const paneHistory = usePaneHistory();
+  const visibleStack = stack.filter((id) => !isSearchId(id as ID));
+  const rootRelation = pane.rootRelation
+    ? getRelationsNoReferencedBy(knowledgeDBs, pane.rootRelation, user.publicKey)
+    : undefined;
+  const anchoredEntries = (() => {
+    if (!rootRelation?.anchor) {
+      return undefined;
+    }
+
+    const sourceEntries: BreadcrumbEntry[] = buildAnchoredLineageEntries(
+      knowledgeDBs,
+      rootRelation
+    )
+      .slice(0, -1)
+      .map((entry) => ({ ...entry, isSource: true }));
+    const anchorPrefix = rootRelation.anchor.snapshotContext;
+    const localStack = visibleStack.slice(anchorPrefix.size);
+    const localEntries: BreadcrumbEntry[] = localStack.map((nodeID, index) => {
+      const nextTargetStack = [
+        ...anchorPrefix.toArray(),
+        ...localStack.slice(0, index + 1),
+      ] as ID[];
+      const entry: BreadcrumbEntry = {
+        key: `local:${pane.rootRelation}:${nextTargetStack.join(":")}`,
+        nodeID,
+        author: pane.author,
+        target: {
+          stack: nextTargetStack,
+          author: pane.author,
+          ...(pane.rootRelation ? { rootRelation: pane.rootRelation } : {}),
+        },
+      };
+      return entry;
+    });
+    return [...sourceEntries, ...localEntries];
+  })();
+  const entries: BreadcrumbEntry[] =
+    anchoredEntries ||
+    visibleStack.map((nodeID, index) => ({
+      key: `stack:${nodeID}:${index}`,
+      nodeID,
+      author: pane.author,
+      target: {
+        stack: visibleStack.slice(0, index + 1),
+        author: pane.author,
+      },
+    }));
 
   return (
     <nav className="breadcrumbs" aria-label="Navigation breadcrumbs">
-      {stack
-        .filter((id) => !isSearchId(id as ID))
-        .map((nodeID, index) => {
-          const targetUrl =
-            buildNodeUrl(
-              stack.slice(0, index + 1),
-              knowledgeDBs,
-              user.publicKey,
-              pane.author
-            ) || "#";
-          return (
-            <BreadcrumbItem
-              key={nodeID as string}
-              nodeID={nodeID}
-              author={pane.author}
-              href={targetUrl}
-              onClick={(e) => {
-                e.preventDefault();
-                navigatePane(targetUrl);
-              }}
-              isLast={index === stack.length - 1}
-            />
-          );
-        })}
+      {entries.map((entry, index) => {
+        const target = entry.target;
+        const targetUrl = target?.rootRelation
+          ? buildRelationUrl(
+              target.rootRelation,
+              target.stack[target.stack.length - 1]
+            )
+          : target
+            ? buildNodeUrl(
+                target.stack,
+                knowledgeDBs,
+                user.publicKey,
+                target.author
+              ) || "#"
+            : undefined;
+        const onClick = target
+          ? (e: React.MouseEvent): void => {
+              e.preventDefault();
+              paneHistory?.push(pane.id, pane);
+              if (anchoredEntries || target.rootRelation) {
+                setPane({
+                  ...pane,
+                  stack: target.stack,
+                  author: target.author,
+                  ...(target.rootRelation
+                    ? { rootRelation: target.rootRelation }
+                    : {}),
+                  scrollToNodeId: undefined,
+                });
+                return;
+              }
+              navigatePane(targetUrl || "#");
+            }
+          : undefined;
+        return (
+          <BreadcrumbItem
+            key={entry.key}
+            nodeID={entry.nodeID}
+            author={entry.author}
+            href={targetUrl}
+            onClick={onClick}
+            isLast={index === entries.length - 1}
+            isSource={entry.isSource}
+            disabled={entry.disabled}
+          />
+        );
+      })}
     </nav>
   );
 }
@@ -313,6 +581,7 @@ function PaneHeader(): JSX.Element {
       <div className="pane-header-left">
         <BackButton />
         <Breadcrumbs />
+        <SourceButton />
         <ForkButton />
         {isFirstPane && <SignInMenuBtn />}
       </div>

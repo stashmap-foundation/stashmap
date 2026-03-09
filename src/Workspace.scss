@@ -988,6 +988,19 @@ input:focus,
   }
 }
 
+.breadcrumb-source {
+  color: var(--base01);
+
+  &:hover {
+    color: var(--base1);
+  }
+}
+
+.breadcrumb-disabled {
+  cursor: default;
+  pointer-events: none;
+}
+
 .breadcrumb-separator {
   color: var(--base01);
   flex-shrink: 0;
@@ -1849,4 +1862,3 @@ body:not(.keyboard-input-mode) .hover-light-bg:hover {
   padding: 4px 8px;
   font-size: 0.85rem;
 }
-

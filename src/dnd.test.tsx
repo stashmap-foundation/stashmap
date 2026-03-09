@@ -238,12 +238,10 @@ Spain
 
   cleanup();
 
-  renderApp(alice());
-
-  await screen.findByLabelText("Navigate to Holiday Destinations");
-  await userEvent.click(
-    await screen.findByLabelText("Navigate to Holiday Destinations")
-  );
+  renderApp({
+    ...alice(),
+    initialRoute: "/n/Holiday%20Destinations",
+  });
 
   await userEvent.click(
     await screen.findByLabelText("edit Holiday Destinations")

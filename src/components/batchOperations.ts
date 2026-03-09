@@ -376,16 +376,15 @@ export function planBatchIndent(
               insertAt
             )
           : undefined;
-      const nextRemappedKeys =
-        updatedViewPath
-          ? [
-              ...state.remappedKeys,
-              {
-                fromKey,
-                toKey: viewPathToString(updatedViewPath),
-              },
-            ]
-          : state.remappedKeys;
+      const nextRemappedKeys = updatedViewPath
+        ? [
+            ...state.remappedKeys,
+            {
+              fromKey,
+              toKey: viewPathToString(updatedViewPath),
+            },
+          ]
+        : state.remappedKeys;
       const editorText = getEditorTextForPath(editorInfo, viewPath);
       if (!editorText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
@@ -451,16 +450,15 @@ export function planBatchOutdent(
               insertAt
             )
           : undefined;
-      const nextRemappedKeys =
-        updatedViewPath
-          ? [
-              ...state.remappedKeys,
-              {
-                fromKey,
-                toKey: viewPathToString(updatedViewPath),
-              },
-            ]
-          : state.remappedKeys;
+      const nextRemappedKeys = updatedViewPath
+        ? [
+            ...state.remappedKeys,
+            {
+              fromKey,
+              toKey: viewPathToString(updatedViewPath),
+            },
+          ]
+        : state.remappedKeys;
       const editorText = getEditorTextForPath(editorInfo, viewPath);
       if (!editorText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };

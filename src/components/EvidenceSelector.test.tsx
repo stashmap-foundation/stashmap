@@ -182,9 +182,7 @@ describe("updateItemArgument", () => {
 
   test("returns unchanged relations for invalid index", () => {
     const relations: Relations = {
-      items: List([
-        { id: "node1" as ID, relevance: undefined as Relevance },
-      ]),
+      items: List([{ id: "node1" as ID, relevance: undefined as Relevance }]),
       id: "rel1" as LongID,
       text: "head",
       textHash: hashText("head"),

@@ -62,9 +62,7 @@ function getChildrenForConcreteRef(
 
   return {
     paths: sourceRelation.items
-      .map((_, i) =>
-        addNodeToPathWithRelations(parentPath, sourceRelation, i)
-      )
+      .map((_, i) => addNodeToPathWithRelations(parentPath, sourceRelation, i))
       .toList(),
     virtualItems: EMPTY_VIRTUAL_ITEMS,
     firstVirtualKeys: EMPTY_FIRST_VIRTUAL_KEYS,
@@ -89,7 +87,9 @@ function getChildrenForRegularNode(
     ? getRelations(data.knowledgeDBs, parentItemID as ID, data.user.publicKey)
     : getRelationForView(data, parentPath, stack);
   const relations = directRelations;
-  const relationSemanticID = relations ? getRelationSemanticID(relations) : parentItemID;
+  const relationSemanticID = relations
+    ? getRelationSemanticID(relations)
+    : parentItemID;
   const coordinateSemanticID = relations ? relationSemanticID : parentItemID;
   const coordinateContext = relations
     ? getRelationContext(data.knowledgeDBs, relations)
@@ -126,9 +126,7 @@ function getChildrenForRegularNode(
     containingRelationID,
     relations?.id,
     author,
-    relations?.items,
-    coordinateContext,
-    relations?.root ?? currentRoot
+    relations?.items
   );
 
   const visibleIncomingCrefs = activeFilters.includes("incoming")
@@ -164,12 +162,12 @@ function getChildrenForRegularNode(
     crefSuggestionIDs,
   } = isOwnContent
     ? getSuggestionsForNode(
-          data.knowledgeDBs,
-          data.user.publicKey,
-          coordinateSemanticID,
-          activeFilters,
-          relations?.id,
-          coordinateContext
+        data.knowledgeDBs,
+        data.user.publicKey,
+        coordinateSemanticID,
+        activeFilters,
+        relations?.id,
+        coordinateContext
       )
     : {
         suggestions: List<LongID | ID>(),

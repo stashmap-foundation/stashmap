@@ -1,8 +1,10 @@
+/* eslint-disable functional/immutable-data */
 import { List, Map, Set as ImmutableSet } from "immutable";
 import { v4 } from "uuid";
 import { UnsignedEvent } from "nostr-tools";
 import MarkdownIt from "markdown-it";
 import attrs from "markdown-it-attrs";
+// eslint-disable-next-line import/no-unresolved
 import Token from "markdown-it/lib/token";
 import {
   shortID,
@@ -91,9 +93,7 @@ function extractAttrs(token: Token): {
     };
   }
   const uuid = token.attrs.find(([, value]) => value === "")?.[0];
-  const semanticID = (token.attrGet("semantic") || undefined) as
-    | ID
-    | undefined;
+  const semanticID = (token.attrGet("semantic") || undefined) as ID | undefined;
   const classAttr = token.attrGet("class") || "";
   const classes = classAttr.split(" ").filter(Boolean);
   const relevance = (
@@ -112,9 +112,8 @@ function extractAttrs(token: Token): {
   const sourceRelationID = (token.attrGet("sourceRelation") || undefined) as
     | LongID
     | undefined;
-  const sourceParentRelationID = (
-    token.attrGet("sourceParent") || undefined
-  ) as LongID | undefined;
+  const sourceParentRelationID = (token.attrGet("sourceParent") ||
+    undefined) as LongID | undefined;
   const anchor =
     anchorContext ||
     sourceAuthor ||
@@ -210,15 +209,7 @@ export function parseMarkdownHierarchy(
       if (!text) {
         continue;
       }
-      const {
-        uuid,
-        semanticID,
-        relevance,
-        argument,
-        hidden,
-        basedOn,
-        anchor,
-      } =
+      const { uuid, semanticID, relevance, argument, hidden, basedOn, anchor } =
         extractAttrs(token);
       while (
         headingStack.length > 0 &&
@@ -319,8 +310,6 @@ export function parseMarkdownHierarchy(
   }
   return roots;
 }
-/* eslint-enable functional/immutable-data, functional/no-let, no-continue */
-
 function formatAttrs(
   uuid: string,
   relevance: Relevance,
@@ -726,7 +715,11 @@ function materializeTreeNode(
       ? { updated: withVisible.updated }
       : {}),
   };
-  return [walkUpsertRelation(withVisible, relation), relation.textHash, relation.id];
+  return [
+    walkUpsertRelation(withVisible, relation),
+    relation.textHash,
+    relation.id,
+  ];
 }
 
 export function createNodesFromMarkdownTrees(
@@ -734,28 +727,30 @@ export function createNodesFromMarkdownTrees(
   trees: MarkdownTreeNode[],
   semanticContext: List<ID> = List<ID>()
 ): [WalkContext, topSemanticIDs: ID[], topRelationIDs: LongID[]] {
-  return trees.filter((treeNode) => !treeNode.hidden).reduce(
-    ([accCtx, accTopSemanticIDs, accTopRelationIDs], treeNode) => {
-      const rootUuid = treeNode.uuid ?? v4();
-      const treeWithUuid = treeNode.uuid
-        ? treeNode
-        : { ...treeNode, uuid: rootUuid };
-      const treeSemanticContext =
-        treeNode.anchor?.snapshotContext ?? semanticContext;
-      const [nextCtx, topSemanticID, topRelationID] = materializeTreeNode(
-        accCtx,
-        treeWithUuid,
-        treeSemanticContext,
-        rootUuid as ID
-      );
-      return [
-        nextCtx,
-        [...accTopSemanticIDs, topSemanticID],
-        [...accTopRelationIDs, topRelationID],
-      ];
-    },
-    [ctx, [] as ID[], [] as LongID[]] as [WalkContext, ID[], LongID[]]
-  );
+  return trees
+    .filter((treeNode) => !treeNode.hidden)
+    .reduce(
+      ([accCtx, accTopSemanticIDs, accTopRelationIDs], treeNode) => {
+        const rootUuid = treeNode.uuid ?? v4();
+        const treeWithUuid = treeNode.uuid
+          ? treeNode
+          : { ...treeNode, uuid: rootUuid };
+        const treeSemanticContext =
+          treeNode.anchor?.snapshotContext ?? semanticContext;
+        const [nextCtx, topSemanticID, topRelationID] = materializeTreeNode(
+          accCtx,
+          treeWithUuid,
+          treeSemanticContext,
+          rootUuid as ID
+        );
+        return [
+          nextCtx,
+          [...accTopSemanticIDs, topSemanticID],
+          [...accTopRelationIDs, topRelationID],
+        ];
+      },
+      [ctx, [] as ID[], [] as LongID[]] as [WalkContext, ID[], LongID[]]
+    );
 }
 
 export function parseDocumentEvent(

@@ -50,7 +50,9 @@ function getRequiredRelation(
   knowledgeDB: KnowledgeData,
   text: string
 ): Relations {
-  const relation = knowledgeDB.relations.find((candidate) => candidate.text === text);
+  const relation = knowledgeDB.relations.find(
+    (candidate) => candidate.text === text
+  );
   if (!relation) {
     throw new Error(`Missing relation: ${text}`);
   }

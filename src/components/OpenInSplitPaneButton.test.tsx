@@ -96,9 +96,7 @@ test("clicking a head-level reference opens its parent relation", async () => {
 
   await setupHeadLevelReferenceInSecondPane();
 
-  await userEvent.click(
-    screen.getByLabelText("Navigate to Root / Source")
-  );
+  await userEvent.click(screen.getByLabelText("Navigate to Root / Source"));
 
   await expectTree(`
 Root

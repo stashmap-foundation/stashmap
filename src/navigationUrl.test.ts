@@ -18,7 +18,14 @@ function knowledgeDBWithTexts(
 ): KnowledgeDBs {
   const relations = texts.reduce((acc, text) => {
     const head = hashText(text);
-    const relation = newRelations(head, List<ID>(), author, head, undefined, text);
+    const relation = newRelations(
+      head,
+      List<ID>(),
+      author,
+      head,
+      undefined,
+      text
+    );
     return acc.set(shortID(relation.id), relation);
   }, Map<string, Relations>());
   const db: KnowledgeData = {

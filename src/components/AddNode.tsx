@@ -205,7 +205,9 @@ export function MiniEditor({
     if (!relatedTarget) {
       return;
     }
-    const currentRow = editorRef.current?.closest('[data-row-focusable="true"]');
+    const currentRow = editorRef.current?.closest(
+      '[data-row-focusable="true"]'
+    );
     const sameRowTreeItem =
       relatedTarget instanceof HTMLElement &&
       relatedTarget.getAttribute("role") === "treeitem" &&

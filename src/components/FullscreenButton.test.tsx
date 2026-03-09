@@ -49,6 +49,8 @@ My Notes
   const breadcrumbs = screen.getByLabelText("Navigation breadcrumbs");
   expect(within(breadcrumbs).getByText("My Notes")).toBeDefined();
   expect(screen.queryByLabelText("Navigate to My Notes")).toBeNull();
-  expect(screen.queryByLabelText("Navigate to Holiday Destinations")).toBeNull();
+  expect(
+    screen.queryByLabelText("Navigate to Holiday Destinations")
+  ).toBeNull();
   expect(screen.queryByTestId("current-stack")).toBeNull();
 });

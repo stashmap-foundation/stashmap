@@ -49,15 +49,18 @@ export function FullscreenButton(): JSX.Element | null {
     return null;
   }
 
-  const refInfo = currentReference
-    ? virtualType === "version"
+  const refInfo = (() => {
+    if (!currentReference) {
+      return getRefTargetInfo(itemID, knowledgeDBs, effectiveAuthor);
+    }
+    return virtualType === "version"
       ? getRefTargetInfo(currentReference.id, knowledgeDBs, effectiveAuthor)
       : getRefLinkTargetInfo(
           currentReference.id,
           knowledgeDBs,
           effectiveAuthor
-        )
-    : getRefTargetInfo(itemID, knowledgeDBs, effectiveAuthor);
+        );
+  })();
   const standaloneRelation = getAlternativeRelations(
     knowledgeDBs,
     itemID,

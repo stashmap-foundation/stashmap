@@ -1,15 +1,16 @@
 import { List } from "immutable";
 
 export function createRootAnchor(
-  snapshotContext: Context = List<ID>(),
+  snapshotContext?: Context,
   sourceRelation?: Relations
 ): RootAnchor | undefined {
-  if (snapshotContext.size === 0 && !sourceRelation) {
+  const normalizedContext = snapshotContext ?? List<ID>();
+  if (normalizedContext.size === 0 && !sourceRelation) {
     return undefined;
   }
 
   return {
-    snapshotContext,
+    snapshotContext: normalizedContext,
     ...(sourceRelation
       ? {
           sourceAuthor: sourceRelation.author,

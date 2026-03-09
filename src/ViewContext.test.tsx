@@ -1,5 +1,11 @@
 import React from "react";
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { List, Map } from "immutable";
 import { createConcreteRefId } from "./connections";
@@ -42,7 +48,9 @@ My Notes
 
   await userEvent.click(screen.getByLabelText("collapse My Notes"));
   await userEvent.click(screen.getByLabelText("expand My Notes"));
-  await userEvent.click(screen.getByLabelText("collapse Programming Languages"));
+  await userEvent.click(
+    screen.getByLabelText("collapse Programming Languages")
+  );
   await userEvent.click(screen.getByLabelText("expand Programming Languages"));
   const cToggle = screen.getByLabelText(/expand C|collapse C/);
   if (cToggle.getAttribute("aria-label") === "expand C") {
@@ -186,12 +194,7 @@ test("Alter View paths after disconnect with pane-prefixed paths", () => {
 test("Parse View path", () => {
   expect(parseViewPath("p0:root")).toEqual([0, "root"]);
   expect(parseViewPath("p0:root:pl")).toEqual([0, "root", "pl"]);
-  expect(parseViewPath("p1:root:pl:oop")).toEqual([
-    1,
-    "root",
-    "pl",
-    "oop",
-  ]);
+  expect(parseViewPath("p1:root:pl:oop")).toEqual([1, "root", "pl", "oop"]);
 });
 
 test("View path roundtrip preserves concrete ref IDs", () => {
@@ -335,7 +338,9 @@ test("Forked subtree breadcrumbs show source ancestors and navigate back to sour
   await within(breadcrumbs).findByLabelText("Navigate to My Notes");
   expect(within(breadcrumbs).getByText("Programming Languages")).toBeDefined();
 
-  await userEvent.click(within(breadcrumbs).getByLabelText("Navigate to My Notes"));
+  await userEvent.click(
+    within(breadcrumbs).getByLabelText("Navigate to My Notes")
+  );
 
   await screen.findByText("READONLY");
   await expectTree(`

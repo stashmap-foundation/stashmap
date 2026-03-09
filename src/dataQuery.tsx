@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Filter } from "nostr-tools";
-import { List, Set } from "immutable";
+import { Set } from "immutable";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
 import {
   splitID,
@@ -11,17 +11,8 @@ import {
   getTextHashForSemanticID,
   getRelationStack,
 } from "./connections";
-import { parseRef } from "./buildReferenceRow";
 import { REFERENCED_BY } from "./constants";
-import {
-  getItemIDFromView,
-  useCurrentItemID,
-  getContext,
-  getEffectiveAuthor,
-  getRootForView,
-  useViewPath,
-  ViewPath,
-} from "./ViewContext";
+import { useViewPath } from "./ViewContext";
 import { usePaneStack, useCurrentPane } from "./SplitPanesContext";
 import { useData } from "./DataContext";
 import { useApis } from "./Apis";
@@ -54,12 +45,8 @@ function getDocumentSemanticQueryIDs(
   myself: PublicKey,
   id: LongID | ID
 ): Array<LongID | ID> {
-  const queryIDs: Array<LongID | ID> = [id];
   const textHash = getTextHashForSemanticID(knowledgeDBs, id, myself);
-  if (textHash && !queryIDs.includes(textHash)) {
-    queryIDs.push(textHash);
-  }
-  return queryIDs;
+  return textHash && textHash !== id ? [id, textHash] : [id];
 }
 
 type Filters = {
@@ -153,11 +140,7 @@ export function addItemToFilters(
   ).reduce(
     (acc, queryID) => ({
       ...addAuthorFromIDToFilters(acc, id),
-      documentBySemantic: addIDToFilter(
-        acc.documentBySemantic,
-        queryID,
-        "#n"
-      ),
+      documentBySemantic: addIDToFilter(acc.documentBySemantic, queryID, "#n"),
     }),
     filters
   );
@@ -178,11 +161,7 @@ export function addReferencedByToFilters(
   return getDocumentSemanticQueryIDs(knowledgeDBs, myself, id).reduce(
     (acc, queryID) => ({
       ...addAuthorFromIDToFilters(acc, id),
-      documentBySemantic: addIDToFilter(
-        acc.documentBySemantic,
-        queryID,
-        "#n"
-      ),
+      documentBySemantic: addIDToFilter(acc.documentBySemantic, queryID, "#n"),
     }),
     filters
   );
@@ -323,12 +302,7 @@ export function LoadData({
       lists
     );
     const withReferencedBy = referencedBy
-      ? addReferencedByToFilters(
-          withItem,
-          itemID,
-          knowledgeDBs,
-          user.publicKey
-        )
+      ? addReferencedByToFilters(withItem, itemID, knowledgeDBs, user.publicKey)
       : withItem;
     return withReferencedBy;
   }, baseFilter);
@@ -368,7 +342,7 @@ export function LoadRelationData({
     effectiveAuthor
   );
   const filter = relation
-      ? getRelationStack(knowledgeDBs, relation).reduce(
+    ? getRelationStack(knowledgeDBs, relation).reduce(
         (acc, semanticID) =>
           addItemToFilters(acc, semanticID, knowledgeDBs, user.publicKey),
         withRelation

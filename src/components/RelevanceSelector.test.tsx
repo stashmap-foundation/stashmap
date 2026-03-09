@@ -775,7 +775,9 @@ describe("Relation lookup consistency (regression)", () => {
   test("setting relevance persists correctly for one of two duplicate children", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
-    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}Child{Escape}");
+    await type(
+      "My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}Child{Escape}"
+    );
 
     const childElements = await screen.findAllByText("Child");
     expect(childElements.length).toBe(2);

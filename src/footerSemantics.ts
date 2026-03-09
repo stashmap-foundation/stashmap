@@ -158,7 +158,11 @@ export function getSuggestionsForNode(
         .map((item) =>
           getComparableSuggestionKey(
             knowledgeDBs,
-            getRelationItemSemanticID(knowledgeDBs, item, currentRelation.author),
+            getRelationItemSemanticID(
+              knowledgeDBs,
+              item,
+              currentRelation.author
+            ),
             currentRelation.author
           )
         )
@@ -168,7 +172,8 @@ export function getSuggestionsForNode(
   const declinedRelationCrefIDs: ImmutableSet<LongID | ID> = currentRelation
     ? currentRelation.items
         .filter(
-          (item) => isConcreteRefId(item.id) && item.relevance === "not_relevant"
+          (item) =>
+            isConcreteRefId(item.id) && item.relevance === "not_relevant"
         )
         .map((item) => item.id)
         .toSet()
@@ -276,6 +281,7 @@ export function getSuggestionsForNode(
           ),
         };
       }
+      // eslint-disable-next-line @typescript-eslint/no-use-before-define
       const expandableRelation = getAlternativeRelations(
         knowledgeDBs,
         candidateID,
@@ -284,7 +290,9 @@ export function getSuggestionsForNode(
         currentRelation?.author || myself,
         currentRelation?.root
       )
-        .filter((relation) => relation.author !== myself && relation.items.size > 0)
+        .filter(
+          (relation) => relation.author !== myself && relation.items.size > 0
+        )
         .sortBy((relation) => -relation.updated)
         .first();
       if (expandableRelation) {

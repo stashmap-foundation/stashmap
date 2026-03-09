@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data */
 import React from "react";
 import { List, Map } from "immutable";
 import { v4 } from "uuid";
@@ -6,7 +7,6 @@ import {
   getRelationsNoReferencedBy,
   joinID,
   shortID,
-  splitID,
   isRefId,
   isSearchId,
   parseSearchId,
@@ -22,10 +22,7 @@ import {
   getRelationContext,
   getRelationSemanticID,
 } from "./connections";
-import {
-  buildOutgoingReference,
-  buildReferenceItem,
-} from "./buildReferenceRow";
+import { buildReferenceItem } from "./buildReferenceRow";
 import { newDB } from "./knowledge";
 import { createRootAnchor } from "./rootAnchor";
 import { useData } from "./DataContext";
@@ -219,16 +216,13 @@ function getNewestStandaloneRootBySemanticID(
     author,
     semanticID
   ).filter(
-    (relation) => relation.author === author && relation.root === shortID(relation.id)
+    (relation) =>
+      relation.author === author && relation.root === shortID(relation.id)
   );
   const directMatch = sortRelationsByDate(
     List(
       candidateRoots.filter((relation) =>
-        relationMatchesRequestedSemanticID(
-          knowledgeDBs,
-          relation,
-          semanticID
-        )
+        relationMatchesRequestedSemanticID(knowledgeDBs, relation, semanticID)
       )
     )
   ).first();
@@ -250,9 +244,7 @@ function getStandaloneRootByRootID(
         .relations.valueSeq()
         .filter(
           (r) =>
-            r.author === author &&
-            r.root === root &&
-            r.root === shortID(r.id)
+            r.author === author && r.root === root && r.root === shortID(r.id)
         )
     )
   ).first();
@@ -263,12 +255,11 @@ function getMatchingChildRelation(
   parentRelation: Relations,
   requestedSemanticID: LongID | ID
 ): Relations | undefined {
-  const childRelations = parentRelation.items
-    .map((item) =>
-      isRefId(item.id) || isConcreteRefId(item.id)
-        ? undefined
-        : getRelationItemRelation(knowledgeDBs, item, parentRelation.author)
-    );
+  const childRelations = parentRelation.items.map((item) =>
+    isRefId(item.id) || isConcreteRefId(item.id)
+      ? undefined
+      : getRelationItemRelation(knowledgeDBs, item, parentRelation.author)
+  );
   const directMatch = childRelations.find(
     (relation): relation is Relations =>
       relation !== undefined &&
@@ -369,17 +360,19 @@ function getItemIDFromPath(data: Data, viewPath: ViewPath): LongID | ID {
   if (isConcreteRefId(currentID)) {
     return currentID;
   }
-  return (
-    getRelationsNoReferencedBy(data.knowledgeDBs, currentID, data.user.publicKey)
-      ? getRelationSemanticID(
-          getRelationsNoReferencedBy(
-            data.knowledgeDBs,
-            currentID,
-            data.user.publicKey
-          ) as Relations
-        )
-      : currentID
-  );
+  return getRelationsNoReferencedBy(
+    data.knowledgeDBs,
+    currentID,
+    data.user.publicKey
+  )
+    ? getRelationSemanticID(
+        getRelationsNoReferencedBy(
+          data.knowledgeDBs,
+          currentID,
+          data.user.publicKey
+        ) as Relations
+      )
+    : currentID;
 }
 
 export function getItemIDFromView(
@@ -413,7 +406,11 @@ function resolveRelationFromKnownRoot(
   semanticPath: ID[],
   preferredRoot: ID
 ): Relations | undefined {
-  const root = getStandaloneRootByRootID(knowledgeDBs, paneAuthor, preferredRoot);
+  const root = getStandaloneRootByRootID(
+    knowledgeDBs,
+    paneAuthor,
+    preferredRoot
+  );
   return root
     ? resolveRequestedStackFromRoot(knowledgeDBs, root, semanticPath)?.relation
     : undefined;
@@ -660,7 +657,9 @@ export function addNodeToPathWithRelations(
   }
   const pathWithRelations = addRelationsToLastElement(path, relations.id);
   const nextSegment =
-    item.id === EMPTY_SEMANTIC_ID ? createEmptyViewPathID(relations.id) : item.id;
+    item.id === EMPTY_SEMANTIC_ID
+      ? createEmptyViewPathID(relations.id)
+      : item.id;
   return [...pathWithRelations, nextSegment] as ViewPath;
 }
 
@@ -844,21 +843,17 @@ export function RootViewContextProvider({
   const stack = usePaneStack();
   const pane = data.panes[paneIndex];
   const rootContext = getContextFromStack(stack);
-  const resolvedRootRelation =
-    pane?.rootRelation
-      ? getRelations(data.knowledgeDBs, pane.rootRelation, data.user.publicKey)
-      : getRelationsForCurrentTree(
-          data.knowledgeDBs,
-          pane?.author || data.user.publicKey,
-          root,
-          rootContext,
-          undefined,
-          true
-        );
-  const startPath: ViewPath = [
-    paneIndex,
-    resolvedRootRelation?.id || root,
-  ];
+  const resolvedRootRelation = pane?.rootRelation
+    ? getRelations(data.knowledgeDBs, pane.rootRelation, data.user.publicKey)
+    : getRelationsForCurrentTree(
+        data.knowledgeDBs,
+        pane?.author || data.user.publicKey,
+        root,
+        rootContext,
+        undefined,
+        true
+      );
+  const startPath: ViewPath = [paneIndex, resolvedRootRelation?.id || root];
   const finalPath = (indices || List<number>()).reduce(
     (acc, index) => addNodeToPath(data, acc, index, stack),
     startPath
@@ -1015,14 +1010,16 @@ export function newRelations(
       relationText = parseSearchId(localSemanticID) || "";
     }
   }
-  const relationTextHash =
-    isSearchId(localSemanticID)
-      ? localSemanticID
-      : text !== undefined ||
-          localSemanticID === LOG_SEMANTIC_ID ||
-          localSemanticID === EMPTY_SEMANTIC_ID
-        ? hashText(relationText)
-        : localSemanticID;
+  const shouldHashRelationText =
+    text !== undefined ||
+    localSemanticID === LOG_SEMANTIC_ID ||
+    localSemanticID === EMPTY_SEMANTIC_ID;
+  const relationTextHash = (() => {
+    if (isSearchId(localSemanticID)) {
+      return localSemanticID;
+    }
+    return shouldHashRelationText ? hashText(relationText) : localSemanticID;
+  })();
   return {
     items: List<RelationItem>(),
     id,
@@ -1084,7 +1081,10 @@ export function upsertRelations(
   return planUpsertRelations(plan, updatedRelations);
 }
 
-function pathContainsSubpath(path: ViewPath, subpath: ViewPathSegment[]): boolean {
+function pathContainsSubpath(
+  path: ViewPath,
+  subpath: ViewPathSegment[]
+): boolean {
   if (subpath.length === 0 || path.length - 1 < subpath.length) {
     return false;
   }
@@ -1128,7 +1128,10 @@ export function updateViewPathsAfterDisconnect(
 ): Views {
   return views.filterNot((_, key) => {
     try {
-      return pathContainsSubpath(parseViewPath(key), [fromRelation, disconnectNode]);
+      return pathContainsSubpath(parseViewPath(key), [
+        fromRelation,
+        disconnectNode,
+      ]);
     } catch {
       return false;
     }

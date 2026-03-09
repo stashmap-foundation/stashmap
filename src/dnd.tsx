@@ -261,13 +261,19 @@ export function planDisconnectFromParent(
 
   const skipCleanup = preserveDescendants || isRefId(itemID);
   if (skipCleanup) {
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define
     return resetInvalidPanes(planWithViews);
   }
 
-  const cleanedPlan = sourceRelation
-    ? planDeleteDescendantRelations(planWithViews, sourceRelation)
-    : planWithViews;
-  return resetInvalidPanes(cleanedPlan);
+  if (sourceRelation) {
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define
+    return resetInvalidPanes(
+      // eslint-disable-next-line @typescript-eslint/no-use-before-define
+      planDeleteDescendantRelations(planWithViews, sourceRelation)
+    );
+  }
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
+  return resetInvalidPanes(planWithViews);
 }
 
 function resetInvalidPanes(plan: Plan, paneIndexToReset?: number): Plan {
@@ -284,7 +290,10 @@ function resetInvalidPanes(plan: Plan, paneIndexToReset?: number): Plan {
     if (p.stack.length === 0) {
       return false;
     }
-    const rootViewPath: ViewPath = [i, p.rootRelation || p.stack[p.stack.length - 1]];
+    const rootViewPath: ViewPath = [
+      i,
+      p.rootRelation || p.stack[p.stack.length - 1],
+    ];
     return getRelationForView(plan, rootViewPath, p.stack) === undefined;
   };
 
@@ -313,10 +322,7 @@ export function planDeleteNodeFromView(
     return plan;
   }
 
-  const planAfterDescendants = planDeleteDescendantRelations(
-    plan,
-    relation
-  );
+  const planAfterDescendants = planDeleteDescendantRelations(plan, relation);
   const planAfterDelete = planDeleteRelations(
     planAfterDescendants,
     relation.id

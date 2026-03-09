@@ -134,7 +134,11 @@ function ErrorContent(): JSX.Element {
   return <span className="text-danger">Error: Node not found</span>;
 }
 
-function VersionContent({ reference }: { reference: ReferenceRow }): JSX.Element {
+function VersionContent({
+  reference,
+}: {
+  reference: ReferenceRow;
+}): JSX.Element {
   const { user } = useData();
   const meta = reference.versionMeta;
   const isOtherUser = reference.author !== user.publicKey;
@@ -319,12 +323,7 @@ function EditableContent(): JSX.Element {
           trimmedText
         );
         executePlan(
-          planAddToParent(
-            planWithNode,
-            newNode,
-            prevSibling.viewPath,
-            stack
-          )[0]
+          planAddToParent(planWithNode, newNode, prevSibling.viewPath, stack)[0]
         );
       } else {
         executePlan(
@@ -704,12 +703,10 @@ export function Node({
   const isViewingOtherUser = useIsViewingOtherUserContent();
   const node = getCurrentReferenceForView(data, viewPath, stack, virtualType);
   const isOtherUser =
-    (node && node.author !== user.publicKey) ||
-    isViewingOtherUser;
+    (node && node.author !== user.publicKey) || isViewingOtherUser;
 
   const isVersion =
-    virtualType === "version" ||
-    (!virtualType && !!node?.versionMeta);
+    virtualType === "version" || (!virtualType && !!node?.versionMeta);
   const isSuggestionWithChildren = isSuggestion && isConcreteRef;
   const showExpandCollapse =
     (!isSuggestion && !isVersion && !isConcreteRef) || isSuggestionWithChildren;

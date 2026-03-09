@@ -69,7 +69,10 @@ export function EvidenceSelector(): JSX.Element | null {
   if (!isVisible && !isAcceptableVirtual) return null;
 
   const nodeName =
-    editorText.trim() || versionedDisplayText || currentRelation?.text || "item";
+    editorText.trim() ||
+    versionedDisplayText ||
+    currentRelation?.text ||
+    "item";
 
   const isInSelection = selection.has(viewKey) && selection.size > 1;
 

@@ -338,7 +338,6 @@ function getReferenceSourceRelations(
   ref: ParsedRef,
   knowledgeDBs: KnowledgeDBs
 ): Relations[] {
-  const relations = [ref.relation];
   const parentRelation = ref.relation.parent
     ? getRelationsNoReferencedBy(
         knowledgeDBs,
@@ -346,10 +345,9 @@ function getReferenceSourceRelations(
         ref.relation.author
       )
     : undefined;
-  if (parentRelation && parentRelation.id !== ref.relation.id) {
-    relations.push(parentRelation);
-  }
-  return relations;
+  return parentRelation && parentRelation.id !== ref.relation.id
+    ? [ref.relation, parentRelation]
+    : [ref.relation];
 }
 
 function findIncomingCrefItem(
@@ -387,9 +385,7 @@ export function buildReferenceItem(
     const parentRelation = parentPath
       ? getRelationForView(data, parentPath, stack)
       : undefined;
-    const parentItem = parentRelation?.items.find(
-      (item) => item.id === refId
-    );
+    const parentItem = parentRelation?.items.find((item) => item.id === refId);
     return buildDeletedReference(
       refId,
       data.user.publicKey,

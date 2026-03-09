@@ -55,9 +55,7 @@ import {
   NostrAuthContextProvider,
   isUserLoggedInWithSeed,
 } from "./NostrAuthContext";
-import {
-  EMPTY_SEMANTIC_ID,
-} from "./connections";
+import { EMPTY_SEMANTIC_ID } from "./connections";
 import { RootViewContextProvider } from "./ViewContext";
 import { LoadData } from "./dataQuery";
 import { LoadSearchData } from "./LoadSearchData";
@@ -306,13 +304,13 @@ export function setup(
 
 type RenderApis = Partial<TestApis> &
   Partial<DataContextProps> & {
-  initialRoute?: string;
-  includeFocusContext?: boolean;
-  user?: User;
-  defaultRelays?: Array<string>;
-  initialStack?: (LongID | ID)[];
-  db?: StashmapDB | null;
-};
+    initialRoute?: string;
+    includeFocusContext?: boolean;
+    user?: User;
+    defaultRelays?: Array<string>;
+    initialStack?: (LongID | ID)[];
+    db?: StashmapDB | null;
+  };
 
 function TestPublishProvider({
   children,
@@ -362,10 +360,12 @@ export function renderApis(
     contacts: options?.contacts || DEFAULT_DATA_CONTEXT_PROPS.contacts,
     contactsRelays:
       options?.contactsRelays || DEFAULT_DATA_CONTEXT_PROPS.contactsRelays,
-    knowledgeDBs: options?.knowledgeDBs || DEFAULT_DATA_CONTEXT_PROPS.knowledgeDBs,
+    knowledgeDBs:
+      options?.knowledgeDBs || DEFAULT_DATA_CONTEXT_PROPS.knowledgeDBs,
     relaysInfos: options?.relaysInfos || DEFAULT_DATA_CONTEXT_PROPS.relaysInfos,
     publishEventsStatus:
-      options?.publishEventsStatus || DEFAULT_DATA_CONTEXT_PROPS.publishEventsStatus,
+      options?.publishEventsStatus ||
+      DEFAULT_DATA_CONTEXT_PROPS.publishEventsStatus,
     views: options?.views || DEFAULT_DATA_CONTEXT_PROPS.views,
     projectMembers:
       options?.projectMembers || DEFAULT_DATA_CONTEXT_PROPS.projectMembers,
@@ -589,7 +589,6 @@ export async function findNewNodeEditor(): Promise<HTMLElement> {
 export async function type(text: string): Promise<void> {
   await userEvent.type(await findNewNodeEditor(), text);
 }
-
 
 export function extractNodes(container: Container): Array<string | null> {
   /* eslint-disable testing-library/no-node-access */

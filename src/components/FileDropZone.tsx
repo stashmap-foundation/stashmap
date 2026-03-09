@@ -2,7 +2,7 @@ import React from "react";
 import { List } from "immutable";
 import { useDropzone } from "react-dropzone";
 import { createSemanticID, hashText } from "../connections";
-import { ViewPath, getRelationForView } from "../ViewContext";
+import { ViewPath, getRelationForView, newRelations } from "../ViewContext";
 import {
   Plan,
   ParsedLine,
@@ -18,7 +18,6 @@ import {
   WalkContext,
   createNodesFromMarkdownTrees,
 } from "../markdownDocument";
-import { newRelations } from "../ViewContext";
 
 export type { MarkdownTreeNode } from "../markdownDocument";
 export { parseMarkdownHierarchy } from "../markdownDocument";

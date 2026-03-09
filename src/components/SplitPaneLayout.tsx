@@ -16,7 +16,11 @@ import {
 import { LoadData, LoadRelationData } from "../dataQuery";
 import { LoadSearchData } from "../LoadSearchData";
 import { PaneView } from "./Workspace";
-import { EMPTY_SEMANTIC_ID, createSearchId, LOG_SEMANTIC_ID } from "../connections";
+import {
+  EMPTY_SEMANTIC_ID,
+  createSearchId,
+  LOG_SEMANTIC_ID,
+} from "../connections";
 import { planUpdateViews, planUpdatePanes, usePlanner } from "../planner";
 import { useData } from "../DataContext";
 import { isUserLoggedIn, useLogout } from "../NostrAuthContext";
@@ -269,8 +273,7 @@ function PaneContent(): JSX.Element {
   const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
   const { user } = useData();
-  const rootSemanticID =
-    pane.stack[pane.stack.length - 1] || EMPTY_SEMANTIC_ID;
+  const rootSemanticID = pane.stack[pane.stack.length - 1] || EMPTY_SEMANTIC_ID;
 
   const isOtherUserContent = pane.author !== user.publicKey;
 

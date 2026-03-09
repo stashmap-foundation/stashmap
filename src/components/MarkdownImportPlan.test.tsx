@@ -1,10 +1,7 @@
 import { List } from "immutable";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
-import {
-  createPlan,
-  Plan,
-} from "../planner";
+import { createPlan, Plan } from "../planner";
 import {
   getTextForSemanticID,
   getRelationsNoReferencedBy,
@@ -123,7 +120,9 @@ test("planCreateNodesFromMarkdownTrees creates only standalone relations", () =>
     topRelationIDs[0],
     plan.user.publicKey
   );
-  const childRelationID = parentRelation?.items.first()?.id as LongID | undefined;
+  const childRelationID = parentRelation?.items.first()?.id as
+    | LongID
+    | undefined;
   const childRelation = childRelationID
     ? getRelationsNoReferencedBy(
         plan.knowledgeDBs,
@@ -174,8 +173,8 @@ test("Planning multiple markdown files returns top nodes in import order", () =>
     { name: "two.md", markdown: "# Two" },
   ]);
 
-  const topTexts = topNodeIDs.map(
-    (id) => getTextForSemanticID(plan.knowledgeDBs, id, plan.user.publicKey)
+  const topTexts = topNodeIDs.map((id) =>
+    getTextForSemanticID(plan.knowledgeDBs, id, plan.user.publicKey)
   );
 
   expect(topTexts).toEqual(["One", "Two"]);

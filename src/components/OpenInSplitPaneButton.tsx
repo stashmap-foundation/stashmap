@@ -55,19 +55,18 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
     const paneStackWithoutRoot = stack.slice(0, -1);
 
     const effectiveAuthor = getEffectiveAuthor(data, viewPath);
-    const refInfo = currentReference
-      ? virtualType === "version"
-        ? getRefTargetInfo(
-            currentReference.id,
-            knowledgeDBs,
-            effectiveAuthor
-          )
+    const refInfo = (() => {
+      if (!currentReference) {
+        return getRefTargetInfo(itemID, knowledgeDBs, effectiveAuthor);
+      }
+      return virtualType === "version"
+        ? getRefTargetInfo(currentReference.id, knowledgeDBs, effectiveAuthor)
         : getRefLinkTargetInfo(
             currentReference.id,
             knowledgeDBs,
             effectiveAuthor
-          )
-      : getRefTargetInfo(itemID, knowledgeDBs, effectiveAuthor);
+          );
+    })();
     if (refInfo) {
       addPaneAt(
         insertIndex,

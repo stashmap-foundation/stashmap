@@ -15,10 +15,7 @@ import { DataContextProvider, MergeKnowledgeDB } from "./DataContext";
 import { EventCacheProvider } from "./EventCache";
 import { findContacts, findMembers } from "./contacts";
 import { useApis } from "./Apis";
-import {
-  findDocumentRelations,
-  findViews,
-} from "./knowledgeEvents";
+import { findDocumentRelations, findViews } from "./knowledgeEvents";
 import { newDB } from "./knowledge";
 import { PlanningContextProvider, replaceUnauthenticatedUser } from "./planner";
 import { useUserRelayContext } from "./UserRelayContext";
@@ -174,10 +171,13 @@ function processEventsByAuthor(
     .valueSeq()
     .sortBy((relation) => getRelationDepth(baseKnowledgeDBs, relation))
     .reduce((acc, relation) => {
-      const knowledgeDBs = Map<PublicKey, KnowledgeData>().set(relation.author, {
-        ...newDB(),
-        relations: acc,
-      });
+      const knowledgeDBs = Map<PublicKey, KnowledgeData>().set(
+        relation.author,
+        {
+          ...newDB(),
+          relations: acc,
+        }
+      );
       const normalized = ensureRelationNativeFields(knowledgeDBs, relation);
       return acc.set(shortID(normalized.id), normalized);
     }, Map<string, Relations>());

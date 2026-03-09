@@ -137,7 +137,8 @@ function VirtuosoForColumn({
     }
     const index = nodes.findIndex(
       (path) =>
-        getLast(path) === scrollToId || getItemIDFromView(data, path)[0] === scrollToId
+        getLast(path) === scrollToId ||
+        getItemIDFromView(data, path)[0] === scrollToId
     );
     if (index >= 0) {
       virtuosoRef.current.scrollToIndex({

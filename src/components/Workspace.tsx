@@ -311,7 +311,7 @@ function SourceButton(): JSX.Element | null {
     stack: [],
     author: sourceRelation.author,
     rootRelation: sourceRelation.id,
-    scrollToNodeId: undefined,
+    scrollToId: undefined,
   };
 
   return (
@@ -415,7 +415,7 @@ function Breadcrumbs(): JSX.Element {
                   ...(target.rootRelation
                     ? { rootRelation: target.rootRelation }
                     : {}),
-                  scrollToNodeId: undefined,
+                  scrollToId: undefined,
                 });
                 return;
               }

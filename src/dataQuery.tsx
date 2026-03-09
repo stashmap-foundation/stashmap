@@ -6,6 +6,7 @@ import {
   splitID,
   isConcreteRefId,
   parseConcreteRefId,
+  getConcreteRefTargetRelation,
   getRelationsNoReferencedBy,
   getTextHashForMatching,
   getRelationStack,
@@ -129,15 +130,21 @@ export function addNodeToFilters(
     const parsed = parseConcreteRefId(id);
     if (parsed) {
       const withRelation = addRelationIDToFilters(filters, parsed.relationID);
-      return parsed.targetNode
-        ? addNodeToFilters(
-            withRelation,
-            parsed.targetNode,
-            knowledgeDBs,
-            myself,
-            includeListQuery
-          )
-        : withRelation;
+      const targetRelation = getConcreteRefTargetRelation(
+        knowledgeDBs,
+        id,
+        myself
+      );
+      if (!targetRelation) {
+        return withRelation;
+      }
+      return addNodeToFilters(
+        withRelation,
+        targetRelation.textHash,
+        knowledgeDBs,
+        myself,
+        includeListQuery
+      );
     }
   }
 

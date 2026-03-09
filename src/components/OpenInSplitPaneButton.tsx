@@ -7,6 +7,8 @@ import {
   getEffectiveAuthor,
   useCurrentRelation,
   getNodeIDsForViewPath,
+  getCurrentReferenceForView,
+  useCurrentEdge,
 } from "../ViewContext";
 import {
   useSplitPanes,
@@ -14,7 +16,7 @@ import {
   usePaneStack,
 } from "../SplitPanesContext";
 import { IS_MOBILE } from "./responsive";
-import { getRefTargetInfo } from "../connections";
+import { getRefLinkTargetInfo, getRefTargetInfo } from "../connections";
 import { planUpdateViews, usePlanner } from "../planner";
 import { useData } from "../DataContext";
 
@@ -29,6 +31,13 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
   const { createPlan, executePlan } = usePlanner();
   const { knowledgeDBs } = data;
   const relation = useCurrentRelation();
+  const virtualType = useCurrentEdge()?.virtualType;
+  const currentReference = getCurrentReferenceForView(
+    data,
+    viewPath,
+    stack,
+    virtualType
+  );
 
   if (isMobile) {
     return null;
@@ -46,14 +55,26 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
     const paneStackWithoutRoot = stack.slice(0, -1);
 
     const effectiveAuthor = getEffectiveAuthor(data, viewPath);
-    const refInfo = getRefTargetInfo(nodeID, knowledgeDBs, effectiveAuthor);
+    const refInfo = currentReference
+      ? virtualType === "version"
+        ? getRefTargetInfo(
+            currentReference.id,
+            knowledgeDBs,
+            effectiveAuthor
+          )
+        : getRefLinkTargetInfo(
+            currentReference.id,
+            knowledgeDBs,
+            effectiveAuthor
+          )
+      : getRefTargetInfo(nodeID, knowledgeDBs, effectiveAuthor);
     if (refInfo) {
       addPaneAt(
         insertIndex,
         refInfo.stack,
         refInfo.author,
         refInfo.rootRelation,
-        refInfo.scrollTo
+        refInfo.scrollToId
       );
       return;
     }

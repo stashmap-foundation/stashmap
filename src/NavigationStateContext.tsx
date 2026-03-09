@@ -6,7 +6,7 @@ import React, {
   useState,
 } from "react";
 import { useData } from "./DataContext";
-import { createConcreteRefId, getRefTargetInfo } from "./connections";
+import { getRelationRouteTargetInfo } from "./connections";
 import {
   pathToStack,
   buildNodeUrl,
@@ -121,16 +121,19 @@ export function NavigationStateProvider({
     }
     const resolved = panes.map((p) => {
       if (p.rootRelation && p.stack.length === 0) {
-        const crefId = createConcreteRefId(p.rootRelation);
-        const refInfo = getRefTargetInfo(crefId, knowledgeDBs, p.author);
-        if (!refInfo) {
+        const relationInfo = getRelationRouteTargetInfo(
+          p.rootRelation,
+          knowledgeDBs,
+          p.author
+        );
+        if (!relationInfo) {
           return p;
         }
         return {
           ...p,
-          stack: refInfo.stack,
-          author: refInfo.author,
-          rootRelation: refInfo.rootRelation,
+          stack: relationInfo.stack,
+          author: relationInfo.author,
+          rootRelation: relationInfo.rootRelation,
         };
       }
 

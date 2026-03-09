@@ -14,6 +14,7 @@ import {
   parseConcreteRefId,
   createConcreteRefId,
   ensureRelationNativeFields,
+  getConcreteRefTargetRelation,
   getRelationItemNodeID,
   getRelationContext,
   getRelationNodeID,
@@ -351,9 +352,12 @@ function formatCrefText(
   if (!ref) {
     return undefined;
   }
-  const href = parsed.targetNode
-    ? `${parsed.relationID}:${parsed.targetNode}`
-    : `${parsed.relationID}`;
+  const targetRelation = getConcreteRefTargetRelation(
+    knowledgeDBs,
+    nodeID,
+    author
+  );
+  const href = targetRelation ? `${targetRelation.id}` : `${parsed.relationID}`;
   return `[${ref.text}](#${href})`;
 }
 
@@ -444,25 +448,24 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
         const parsed = parseConcreteRefId(nodeID);
         const crefText = formatCrefText(data.knowledgeDBs, author, nodeID);
         if (!crefText || !parsed) return acc;
-        const crefRelationUUID = shortID(parsed.relationID);
-        const crefNodeHashes = parsed.targetNode
-          ? acc.nodeHashes.add(
-              hashText(
-                getTextForMatching(
-                  data.knowledgeDBs,
-                  parsed.targetNode,
-                  author
-                ) ?? parsed.targetNode
-              )
-            )
+        const targetRelation = getConcreteRefTargetRelation(
+          data.knowledgeDBs,
+          nodeID,
+          author
+        );
+        const crefRelationUUID = shortID(
+          (targetRelation?.id || parsed.relationID) as ID
+        );
+        const crefNodeHashes = targetRelation
+          ? acc.nodeHashes.add(hashText(targetRelation.text))
           : acc.nodeHashes;
         const crefAttrs = formatAttrs("", item?.relevance, item?.argument);
         return {
           ...acc,
           lines: [...acc.lines, `${indent}- ${crefText}${crefAttrs}`],
           nodeHashes: crefNodeHashes,
-          nodeIDs: parsed.targetNode
-            ? acc.nodeIDs.add(parsed.targetNode)
+          nodeIDs: targetRelation
+            ? acc.nodeIDs.add(getRelationNodeID(targetRelation))
             : acc.nodeIDs,
           contextHashes: contextHash
             ? acc.contextHashes.add(contextHash)
@@ -691,10 +694,8 @@ function materializeTreeNode(
       if (childNode.linkHref) {
         const parts = childNode.linkHref.split(":");
         const relationID = parts[0] as LongID;
-        const targetNode =
-          parts.length > 1 ? (parts.slice(1).join(":") as ID) : undefined;
         const item: RelationItem = {
-          id: createConcreteRefId(relationID, targetNode),
+          id: createConcreteRefId(relationID),
           relevance: childNode.relevance,
           argument: childNode.argument,
           linkText: childNode.text,

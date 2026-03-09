@@ -25,6 +25,7 @@ import {
 import { isEditableRelation } from "./TemporaryViewContext";
 import { planBatchIndent, planBatchOutdent } from "./batchOperations";
 import {
+  getRefLinkTargetInfo,
   getRefTargetInfo,
   isEmptyNodeID,
   isConcreteRefId,
@@ -549,10 +550,13 @@ function NodeAutoLink({
   const node = getCurrentReferenceForView(data, viewPath, stack, virtualType);
 
   if (node) {
-    const refInfo = getRefTargetInfo(node.id, knowledgeDBs, effectiveAuthor);
+    const refInfo =
+      virtualType === "version"
+        ? getRefTargetInfo(node.id, knowledgeDBs, effectiveAuthor)
+        : getRefLinkTargetInfo(node.id, knowledgeDBs, effectiveAuthor);
     if (refInfo) {
       const href = refInfo.rootRelation
-        ? buildRelationUrl(refInfo.rootRelation, refInfo.scrollTo)
+        ? buildRelationUrl(refInfo.rootRelation, refInfo.scrollToId)
         : buildNodeUrl(
             refInfo.stack,
             knowledgeDBs,

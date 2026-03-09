@@ -47,9 +47,7 @@ function SearchCrefBuilder({
     if (deduped.size === 0) {
       return List<ID | LongID>();
     }
-    return deduped.map((ref) =>
-      createConcreteRefId(ref.relationID, ref.targetNode)
-    );
+    return deduped.map((ref) => createConcreteRefId(ref.relationID));
   });
 
   const searchRelations = getSearchRelations(

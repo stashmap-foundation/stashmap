@@ -2,6 +2,7 @@ import { List } from "immutable";
 import {
   isConcreteRefId,
   parseConcreteRefId,
+  getConcreteRefTargetRelation,
   getRelationsNoReferencedBy,
   shortID,
   splitID,
@@ -9,7 +10,6 @@ import {
   getTextHashForMatching,
   getTextForMatching,
   getRelationItemNodeID,
-  getRelationItemRelation,
   getRelationContext,
   getRelationNodeID,
 } from "./connections";
@@ -22,6 +22,16 @@ import {
 import { getPane } from "./planner";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
 import { referenceToText } from "./components/referenceDisplay";
+
+function argumentPrefix(argument?: Argument): string {
+  if (argument === "confirms") {
+    return "+";
+  }
+  if (argument === "contra") {
+    return "-";
+  }
+  return "";
+}
 
 function resolveNodeLabel(
   knowledgeDBs: KnowledgeDBs,
@@ -55,7 +65,6 @@ function resolveContextLabels(
 export type ParsedRef = {
   relation: Relations;
   relationContext: List<ID>;
-  targetNode?: ID;
   sourceItem?: RelationItem;
 };
 
@@ -69,89 +78,44 @@ export function parseRef(
   }
   const parsed = parseConcreteRefId(refId);
   if (!parsed) return undefined;
-  const { relationID, targetNode } = parsed;
+  const { relationID } = parsed;
   const relation = getRelationsNoReferencedBy(knowledgeDBs, relationID, myself);
   if (!relation) return undefined;
 
   const relationContext = getRelationContext(knowledgeDBs, relation).map(
     (id) => shortID(id) as ID
   );
-  const sourceItem = targetNode
-    ? relation.items.find(
-        (item) =>
-          shortID(
-            getRelationItemNodeID(knowledgeDBs, item, relation.author)
-          ) === targetNode
-      )
+  const sourceItem = relation.parent
+    ? getRelationsNoReferencedBy(
+        knowledgeDBs,
+        relation.parent,
+        relation.author
+      )?.items.find((item) => item.id === relation.id)
     : undefined;
 
-  return { relation, relationContext, targetNode, sourceItem };
-}
-
-function getReferencedChildRelation(
-  ref: ParsedRef,
-  knowledgeDBs: KnowledgeDBs
-): Relations | undefined {
-  if (!ref.targetNode) {
-    return undefined;
-  }
-  const targetNode = ref.targetNode;
-
-  if (ref.sourceItem) {
-    return getRelationItemRelation(
-      knowledgeDBs,
-      ref.sourceItem,
-      ref.relation.author
-    );
-  }
-
-  return ref.relation.items
-    .map((item) => getRelationItemRelation(knowledgeDBs, item, ref.relation.author))
-    .find(
-      (relation): relation is Relations =>
-        relation !== undefined &&
-        shortID(getRelationNodeID(relation)) === shortID(targetNode)
-    );
+  return { relation, relationContext, sourceItem };
 }
 
 function resolveLabels(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
   relation: Relations,
-  relationContext: List<ID>,
-  targetNode?: ID
+  relationContext: List<ID>
 ): { contextLabels: string[]; targetLabel: string; fullContext: List<ID> } {
-  if (!targetNode) {
-    const contextLabels = resolveContextLabels(
-      knowledgeDBs,
-      myself,
-      relationContext,
-      relation.root
-    );
-    const targetLabel = resolveNodeLabel(
-      knowledgeDBs,
-      myself,
-      getRelationNodeID(relation),
-      relationContext,
-      relation.root
-    );
-    return { contextLabels, targetLabel, fullContext: relationContext };
-  }
-  const fullContext = relationContext.push(getRelationNodeID(relation));
   const contextLabels = resolveContextLabels(
     knowledgeDBs,
     myself,
-    fullContext,
+    relationContext,
     relation.root
   );
   const targetLabel = resolveNodeLabel(
     knowledgeDBs,
     myself,
-    targetNode,
-    fullContext,
+    getRelationNodeID(relation),
+    relationContext,
     relation.root
   );
-  return { contextLabels, targetLabel, fullContext };
+  return { contextLabels, targetLabel, fullContext: relationContext };
 }
 
 function getSemanticNodeKey(
@@ -211,7 +175,7 @@ function buildDeletedReference(
 ): ReferenceNode | undefined {
   const parsed = parseConcreteRefId(refId);
   if (!parsed) return undefined;
-  const { relationID, targetNode } = parsed;
+  const { relationID } = parsed;
   const [remote] = splitID(relationID);
   const author = remote || myself;
 
@@ -224,7 +188,6 @@ function buildDeletedReference(
     id: refId,
     type: "reference",
     text: `(deleted) ${linkText}`,
-    targetNode: targetNode || ("" as ID),
     targetContext: List<ID>(),
     contextLabels,
     targetLabel,
@@ -241,13 +204,11 @@ export function buildOutgoingReference(
   const ref = parseRef(refId, knowledgeDBs, myself);
   if (!ref) return buildDeletedReference(refId, myself);
 
-  const target = ref.targetNode || getRelationNodeID(ref.relation);
   const { contextLabels, targetLabel, fullContext } = resolveLabels(
     knowledgeDBs,
     myself,
     ref.relation,
-    ref.relationContext,
-    ref.targetNode
+    ref.relationContext
   );
   const contextPath = contextLabels.join(" / ");
   const text = contextPath ? `${contextPath} / ${targetLabel}` : targetLabel;
@@ -256,7 +217,6 @@ export function buildOutgoingReference(
     id: refId,
     type: "reference",
     text,
-    targetNode: target,
     targetContext: fullContext,
     contextLabels,
     targetLabel,
@@ -357,19 +317,36 @@ function computeVersionMeta(
 function findCrefToNode(
   items: List<RelationItem>,
   targetRelation: Relations,
-  containingRelation: Relations | undefined
+  knowledgeDBs: KnowledgeDBs,
+  myself: PublicKey
 ): RelationItem | undefined {
   return items.find((item) => {
     if (!isConcreteRefId(item.id)) return false;
-    const parsed = parseConcreteRefId(item.id);
-    if (!parsed) return false;
-    const matchesHead = parsed.relationID === targetRelation.id;
-    const matchesItem =
-      !!containingRelation &&
-      parsed.targetNode === shortID(getRelationNodeID(targetRelation)) &&
-      parsed.relationID === containingRelation.id;
-    return matchesHead || matchesItem;
+    const resolvedTarget = getConcreteRefTargetRelation(
+      knowledgeDBs,
+      item.id,
+      myself
+    );
+    return resolvedTarget?.id === targetRelation.id;
   });
+}
+
+function getReferenceSourceRelations(
+  ref: ParsedRef,
+  knowledgeDBs: KnowledgeDBs
+): Relations[] {
+  const relations = [ref.relation];
+  const parentRelation = ref.relation.parent
+    ? getRelationsNoReferencedBy(
+        knowledgeDBs,
+        ref.relation.parent,
+        ref.relation.author
+      )
+    : undefined;
+  if (parentRelation && parentRelation.id !== ref.relation.id) {
+    relations.push(parentRelation);
+  }
+  return relations;
 }
 
 function findIncomingCrefItem(
@@ -382,24 +359,16 @@ function findIncomingCrefItem(
   if (!parentPath) return undefined;
   const parentRelation = getRelationForView(data, parentPath, stack);
   if (!parentRelation) return undefined;
-  const grandParentPath = getParentView(parentPath);
-  const containingRelation = grandParentPath
-    ? getRelationForView(data, grandParentPath, stack)
-    : undefined;
-  const fromSource = findCrefToNode(
-    ref.relation.items,
-    parentRelation,
-    containingRelation
-  );
-  if (fromSource) return fromSource;
-  const targetNodeRelation = getReferencedChildRelation(ref, data.knowledgeDBs);
-  return targetNodeRelation
-    ? findCrefToNode(
-        targetNodeRelation.items,
+  return getReferenceSourceRelations(ref, data.knowledgeDBs)
+    .map((sourceRelation) =>
+      findCrefToNode(
+        sourceRelation.items,
         parentRelation,
-        containingRelation
+        data.knowledgeDBs,
+        data.user.publicKey
       )
-    : undefined;
+    )
+    .find((item) => item !== undefined);
 }
 
 export function buildReferenceItem(
@@ -508,27 +477,23 @@ export function buildReferenceItem(
   const storedItem = parentRelation.items.find((item) => item.id === refId);
   const isNotRelevant = storedItem?.relevance === "not_relevant";
 
-  const grandParentPath = getParentView(parentPath);
-  const containingRelation = grandParentPath
-    ? getRelationForView(data, grandParentPath, stack)
-    : undefined;
-
-  const targetNodeRelation = getReferencedChildRelation(ref, data.knowledgeDBs);
-
   const findReverseCref = (
     items: List<RelationItem>
   ): RelationItem | undefined =>
-    findCrefToNode(items, parentRelation, containingRelation);
+    findCrefToNode(
+      items,
+      parentRelation,
+      data.knowledgeDBs,
+      data.user.publicKey
+    );
 
-  const incomingCref =
-    findReverseCref(ref.relation.items) ||
-    (targetNodeRelation
-      ? findReverseCref(targetNodeRelation.items)
-      : undefined);
+  const incomingCref = getReferenceSourceRelations(ref, data.knowledgeDBs)
+    .map((sourceRelation) => findReverseCref(sourceRelation.items))
+    .find((item) => item !== undefined);
   const hasActiveIncoming =
     !!incomingCref && incomingCref.relevance !== "not_relevant";
 
-  const isOccurrenceOrigin = !!ref.targetNode && !!ref.sourceItem;
+  const isOccurrenceOrigin = false;
   const resolveDisplayAs = ():
     | "bidirectional"
     | "incoming"
@@ -540,7 +505,23 @@ export function buildReferenceItem(
   };
   const displayAs = resolveDisplayAs();
 
-  if (!displayAs) return outgoing;
+  if (!displayAs) {
+    const argument = argumentPrefix(
+      storedItem?.argument ?? ref.sourceItem?.argument
+    );
+    if (!argument) {
+      return outgoing;
+    }
+    const targetLabel = `${argument} ${outgoing.targetLabel}`;
+    return {
+      ...outgoing,
+      targetLabel,
+      text: referenceToText({
+        contextLabels: outgoing.contextLabels,
+        targetLabel,
+      }),
+    };
+  }
 
   const incomingRel =
     displayAs === "occurrence"

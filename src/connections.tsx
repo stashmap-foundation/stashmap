@@ -73,33 +73,30 @@ export function parseSearchId(id: ID): string | undefined {
   return id.slice(SEARCH_PREFIX.length);
 }
 
-export function createConcreteRefId(
-  relationID: LongID,
-  targetNode?: ID
-): LongID {
-  if (targetNode) {
-    return `${CONCRETE_REF_PREFIX}${relationID}:${targetNode}` as LongID;
-  }
+export function createConcreteRefId(relationID: LongID): LongID {
   return `${CONCRETE_REF_PREFIX}${relationID}` as LongID;
 }
 
 export function parseConcreteRefId(
   refId: ID | LongID
-): { relationID: LongID; targetNode?: ID } | undefined {
+): { relationID: LongID } | undefined {
   if (!isConcreteRefId(refId)) {
     return undefined;
   }
-  const content = refId.slice(CONCRETE_REF_PREFIX.length);
-  const colonIndex = content.lastIndexOf(":");
-  if (colonIndex === -1) {
-    return { relationID: content as LongID };
+  return { relationID: refId.slice(CONCRETE_REF_PREFIX.length) as LongID };
+}
+
+export function getConcreteRefTargetRelation(
+  knowledgeDBs: KnowledgeDBs,
+  refId: ID | LongID,
+  myself: PublicKey
+): Relations | undefined {
+  const parsed = parseConcreteRefId(refId);
+  if (!parsed) {
+    return undefined;
   }
-  const possibleTargetNode = content.slice(colonIndex + 1) as ID;
-  if (!SHORT_NODE_ID_RE.test(possibleTargetNode)) {
-    return { relationID: content as LongID };
-  }
-  const relationID = content.slice(0, colonIndex) as LongID;
-  return { relationID, targetNode: possibleTargetNode };
+
+  return getRelationsNoReferencedBy(knowledgeDBs, parsed.relationID, myself);
 }
 
 export function splitID(id: ID): [PublicKey | undefined, string] {
@@ -559,8 +556,28 @@ type RefTargetInfo = {
   stack: (ID | LongID)[];
   author: PublicKey;
   rootRelation?: LongID;
-  scrollTo?: ID;
+  scrollToId?: string;
 };
+
+export function getRelationRouteTargetInfo(
+  relationID: LongID,
+  knowledgeDBs: KnowledgeDBs,
+  effectiveAuthor: PublicKey
+): RefTargetInfo | undefined {
+  const relation = getRelationsNoReferencedBy(
+    knowledgeDBs,
+    relationID,
+    effectiveAuthor
+  );
+  if (!relation) {
+    return undefined;
+  }
+  return {
+    stack: getRelationStack(knowledgeDBs, relation),
+    author: relation.author,
+    rootRelation: relation.id,
+  };
+}
 
 export function getRefTargetInfo(
   refId: ID | LongID,
@@ -572,10 +589,9 @@ export function getRefTargetInfo(
     if (!parsed) {
       return undefined;
     }
-    const { relationID, targetNode } = parsed;
-    const relation = getRelationsNoReferencedBy(
+    const relation = getConcreteRefTargetRelation(
       knowledgeDBs,
-      relationID,
+      refId,
       effectiveAuthor
     );
     if (!relation) {
@@ -585,19 +601,51 @@ export function getRefTargetInfo(
     return {
       stack,
       author: relation.author,
-      rootRelation: relationID,
-      scrollTo: targetNode,
+      rootRelation: relation.id,
     };
   }
 
   return undefined;
 }
 
+export function getRefLinkTargetInfo(
+  refId: ID | LongID,
+  knowledgeDBs: KnowledgeDBs,
+  effectiveAuthor: PublicKey
+): RefTargetInfo | undefined {
+  if (!isConcreteRefId(refId)) {
+    return undefined;
+  }
+  const parsed = parseConcreteRefId(refId);
+  if (!parsed) {
+    return undefined;
+  }
+  const relation = getConcreteRefTargetRelation(
+    knowledgeDBs,
+    refId,
+    effectiveAuthor
+  );
+  if (!relation) {
+    return undefined;
+  }
+
+  const parentRelation = relation.parent
+    ? getRelationsNoReferencedBy(knowledgeDBs, relation.parent, relation.author)
+    : undefined;
+  const targetRoot = parentRelation || relation;
+
+  return {
+    stack: getRelationStack(knowledgeDBs, targetRoot),
+    author: targetRoot.author,
+    rootRelation: targetRoot.id,
+    scrollToId: targetRoot.id === relation.id ? undefined : relation.id,
+  };
+}
+
 export type ReferencedByRef = {
   relationID: LongID;
   context: Context;
   updated: number;
-  targetNode?: ID;
 };
 
 export function deduplicateRefsByContext(
@@ -618,10 +666,7 @@ export function deduplicateRefsByContext(
               preferAuthor && author !== undefined && author !== preferAuthor
                 ? 1
                 : 0;
-            // Prefer item-level refs (relation + target node) over head-level refs
-            // for the same context so navigation lands in parent context first.
-            const targetPreference = r.targetNode ? 0 : 1;
-            return [isOther, targetPreference, -r.updated];
+            return [isOther, -r.updated];
           })
           .first()!
     )
@@ -633,7 +678,7 @@ type RawAppearance = {
   relation: Relations;
   knowledgeDB: KnowledgeData;
   isHead: boolean;
-  matchedItemNodeID?: ID;
+  matchedItemRelation?: Relations;
 };
 
 function getNodeForMatching(
@@ -817,19 +862,14 @@ function findNodeAppearances(
           shortID(getRelationNodeID(relation) as ID) === shortID(nodeID as ID)) ||
           getRelationTextHash(knowledgeDBs, relation) === targetSemanticKey);
       if (isHeadWithChildren || isInItems) {
+        const matchedItemRelation = matchedItem
+          ? getRelationItemRelation(knowledgeDBs, matchedItem, relation.author)
+          : undefined;
         return rdx.push({
           relation,
           knowledgeDB,
           isHead: isHeadWithChildren && !isInItems,
-          matchedItemNodeID: matchedItem
-            ? (shortID(
-                getRelationItemNodeID(
-                  knowledgeDBs,
-                  matchedItem,
-                  relation.author
-                )
-              ) as ID)
-            : undefined,
+          matchedItemRelation,
         });
       }
       return rdx;
@@ -840,11 +880,10 @@ function findNodeAppearances(
 function resolveAppearance(
   _knowledgeDBs: KnowledgeDBs,
   app: RawAppearance,
-  targetShortID: ID
+  _targetShortID: ID
 ): ReferencedByRef | undefined {
-  const { relation, isHead, matchedItemNodeID } = app;
+  const { relation, isHead, matchedItemRelation } = app;
   const relationContext = getRelationContext(_knowledgeDBs, relation);
-  const relationNodeID = getRelationNodeID(relation);
   if (isHead) {
     return {
       relationID: relation.id,
@@ -852,11 +891,17 @@ function resolveAppearance(
       updated: relation.updated,
     };
   }
+  if (matchedItemRelation) {
+    return {
+      relationID: matchedItemRelation.id,
+      context: getRelationContext(_knowledgeDBs, matchedItemRelation),
+      updated: matchedItemRelation.updated,
+    };
+  }
   return {
     relationID: relation.id,
-    context: relationContext.push(relationNodeID),
+    context: relationContext,
     updated: relation.updated,
-    targetNode: matchedItemNodeID || targetShortID,
   };
 }
 
@@ -934,13 +979,18 @@ function contextKeyForCref(
     effectiveAuthor
   );
   if (!rel) return undefined;
-  const relationContext = getRelationContext(knowledgeDBs, rel);
+  const targetRelation = getConcreteRefTargetRelation(
+    knowledgeDBs,
+    crefID,
+    effectiveAuthor
+  );
+  if (!targetRelation) {
+    return undefined;
+  }
   return getSemanticContextKey(
     knowledgeDBs,
-    parsed.targetNode
-      ? relationContext.push(getRelationNodeID(rel))
-      : relationContext,
-    rel.author
+    getRelationContext(knowledgeDBs, targetRelation),
+    targetRelation.author
   );
 }
 
@@ -1025,9 +1075,9 @@ export function getOccurrencesForNode(
   const filtered = allRefs
     .filter((ref) => ref.relationID !== currentRelationID)
     .filter((ref) =>
-      ref.targetNode
-        ? !contextRoot || !sharesSemanticRoot(ref)
-        : currentContext.size > 0 && ref.context.size === 0
+      ref.context.size === 0
+        ? currentContext.size > 0
+        : !contextRoot || !sharesSemanticRoot(ref)
     )
     .filter(
       (ref) =>
@@ -1046,8 +1096,7 @@ export function getOccurrencesForNode(
               author !== effectiveAuthor
                 ? 1
                 : 0;
-            const targetPreference = ref.targetNode ? 0 : 1;
-            return [isOther, targetPreference, -ref.updated];
+            return [isOther, -ref.updated];
           })
           .first()!
     )
@@ -1055,7 +1104,7 @@ export function getOccurrencesForNode(
     .toList();
   return deduped
     .sortBy((ref) => `${-ref.updated}:${ref.context.join(":")}`)
-    .map((ref) => createConcreteRefId(ref.relationID, ref.targetNode))
+    .map((ref) => createConcreteRefId(ref.relationID))
     .toList();
 }
 
@@ -1081,33 +1130,12 @@ export function getIncomingCrefsForNode(
   );
   const outgoingTargetRelIDs = (currentItems || List<RelationItem>()).reduce(
     (acc, item) => {
-      const parsed = parseConcreteRefId(item.id);
-      if (!parsed) return acc;
-      const withTarget = acc.add(parsed.relationID);
-      if (!parsed.targetNode) return withTarget;
-      const targetRelation = getRelationsNoReferencedBy(
+      const targetRelation = getConcreteRefTargetRelation(
         knowledgeDBs,
-        parsed.relationID,
+        item.id,
         effectiveAuthor
       );
-      if (!targetRelation) return withTarget;
-      const targetNode = parsed.targetNode;
-      if (!targetNode) return withTarget;
-      const childContext = getRelationContext(
-        knowledgeDBs,
-        targetRelation
-      ).push(getRelationNodeID(targetRelation));
-      const childRelation = targetRelation.items
-        .map((childItem) =>
-          getRelationItemRelation(knowledgeDBs, childItem, effectiveAuthor)
-        )
-        .find(
-          (child): child is Relations =>
-            !!child &&
-            getRelationContext(knowledgeDBs, child).equals(childContext) &&
-            shortID(getRelationNodeID(child)) === shortID(targetNode)
-        );
-      return childRelation ? withTarget.add(childRelation.id) : withTarget;
+      return targetRelation ? acc.add(targetRelation.id) : acc;
     },
     Set<LongID>()
   );
@@ -1122,17 +1150,12 @@ export function getIncomingCrefsForNode(
       const hasCrefToUs = relation.items.some((item) => {
         if (!isConcreteRefId(item.id)) return false;
         if (item.relevance === "not_relevant") return false;
-        const parsed = parseConcreteRefId(item.id);
-        if (!parsed) return false;
-        const matchesItem =
-          !!parentRelationID &&
-          parsed.targetNode === currentShortNodeID &&
-          parsed.relationID === parentRelationID;
-        const matchesHead =
-          !!currentRelationID &&
-          !parsed.targetNode &&
-          parsed.relationID === currentRelationID;
-        return matchesItem || matchesHead;
+        const targetRelation = getConcreteRefTargetRelation(
+          knowledgeDBs,
+          item.id,
+          effectiveAuthor
+        );
+        return !!currentRelationID && targetRelation?.id === currentRelationID;
       });
 
       if (!hasCrefToUs) return rdx;

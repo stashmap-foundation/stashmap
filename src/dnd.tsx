@@ -6,6 +6,7 @@ import {
   moveRelations,
   deleteRelations,
   createConcreteRefId,
+  getConcreteRefTargetRelation,
   isRefId,
   isSearchId,
   getRelationNodeID,
@@ -29,6 +30,7 @@ import {
   addNodeToPathWithRelations,
   viewPathToString,
   copyViewsWithNewPrefix,
+  getCurrentReferenceForView,
 } from "./ViewContext";
 import { getNodesInTree } from "./components/Node";
 import {
@@ -651,17 +653,23 @@ export function dnd(
           )[0];
         }
         if (isSuggestion) {
-          const sourceParentPath = getParentView(sourcePath);
-          const sourceParentRelation = sourceParentPath
-            ? getRelationForView(accPlan, sourceParentPath, sourceStack)
+          const sourceReference = getCurrentReferenceForView(
+            accPlan,
+            sourcePath,
+            sourceStack,
+            "suggestion"
+          );
+          const sourceTargetRelation = sourceReference
+            ? getConcreteRefTargetRelation(
+                accPlan.knowledgeDBs,
+                sourceReference.id,
+                accPlan.user.publicKey
+              )
             : undefined;
-          if (sourceParentRelation) {
+          if (sourceTargetRelation) {
             return planAddToParent(
               accPlan,
-              createConcreteRefId(
-                sourceParentRelation.id,
-                shortID(sourceNodeID) as ID
-              ),
+              createConcreteRefId(sourceTargetRelation.id),
               toView,
               stack,
               insertAt

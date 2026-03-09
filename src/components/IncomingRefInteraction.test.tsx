@@ -849,7 +849,7 @@ Crypto
     `);
   });
 
-  test("mixed drag: regular node + incoming ref accepts incoming", async () => {
+  test("mixed drag: regular node + incoming ref keeps the direct target relation", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
     await setupItemLevelIncomingRef();
@@ -866,7 +866,7 @@ Crypto
     await expectTree(`
 Money
   Details
-  [R] Crypto <<< >>> ! Bitcoin
+  [R] Crypto / Bitcoin
   Bitcoin
     [I] Bitcoin ! <<< Crypto
     `);
@@ -877,7 +877,7 @@ Money
     await expectTree(`
 Money
   Details
-  [R] Crypto <<< >>> ! Bitcoin
+  [R] Crypto / Bitcoin
   Bitcoin
     [I] Bitcoin ! <<< Crypto
     `);

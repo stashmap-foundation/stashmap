@@ -147,7 +147,7 @@ declare global {
       | "occurrence"
       | "contains"
     )[];
-    scrollToNodeId?: string;
+    scrollToId?: string;
   };
 
   type Data = {
@@ -260,7 +260,6 @@ declare global {
     id: LongID;
     type: "reference";
     text: string;
-    targetNode: ID;
     targetContext: Context;
     contextLabels: string[];
     targetLabel: string;

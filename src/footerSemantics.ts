@@ -13,6 +13,7 @@ import {
   getIndexedRelationsForKeys,
   getRelationContext,
   getRelationNodeID,
+  getConcreteRefTargetRelation,
   getRelationsNoReferencedBy,
 } from "./connections";
 import { suggestionSettings } from "./constants";
@@ -92,14 +93,19 @@ function getComparableSuggestionKey(
     parsed.relationID,
     fallbackAuthor
   );
-  if (!relation) {
+  const targetRelation = getConcreteRefTargetRelation(
+    knowledgeDBs,
+    itemNodeID,
+    fallbackAuthor
+  );
+  if (!relation || !targetRelation) {
     return shortID(itemNodeID as ID);
   }
 
   return getSemanticNodeKey(
     knowledgeDBs,
-    parsed.targetNode || getRelationNodeID(relation),
-    relation.author
+    getRelationNodeID(targetRelation),
+    targetRelation.author
   );
 }
 
@@ -256,7 +262,7 @@ export function getSuggestionsForNode(
         currentRelation?.root
       );
       const headRefs = refs.filter(
-        (ref) => !ref.targetNode && splitID(ref.relationID)[0] !== myself
+        (ref) => splitID(ref.relationID)[0] !== myself
       );
       if (headRefs.size > 0) {
         const first = headRefs.sortBy((r) => -r.updated).first()!;

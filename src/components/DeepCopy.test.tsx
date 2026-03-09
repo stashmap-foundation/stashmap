@@ -1110,7 +1110,7 @@ My Notes
     BobChild
     `);
 
-    // Verify text shows "BobFolder" not something like "cref:abc123:..."
+    // Verify text shows "BobFolder" not something like "cref:abc123..."
     const folderText = screen.getByText("BobFolder");
     expect(folderText.textContent).toBe("BobFolder");
   });
@@ -1222,7 +1222,7 @@ My Notes
   Target
   [S] BobItem
 Target
-  [R] My Notes / BobItem
+  [OR] My Notes / BobItem
     `);
   });
 });

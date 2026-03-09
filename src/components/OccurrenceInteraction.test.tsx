@@ -253,7 +253,7 @@ describe("Occurrence keyboard argument", () => {
 Crypto
   Bitcoin
     Details
-    [R] Money / Bitcoin
+    [R] Money / + Bitcoin
     `);
     await screen.findByLabelText(/Evidence for.*Money.*Confirms/);
 
@@ -264,7 +264,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money / Bitcoin
+    [R] Money / + Bitcoin
     `);
     await screen.findByLabelText(/Evidence for.*Money.*Confirms/);
   });
@@ -281,7 +281,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money / Bitcoin
+    [R] Money / - Bitcoin
     `);
     await screen.findByLabelText(/Evidence for.*Money.*Contradicts/);
 
@@ -292,7 +292,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money / Bitcoin
+    [R] Money / - Bitcoin
     `);
     await screen.findByLabelText(/Evidence for.*Money.*Contradicts/);
   });
@@ -309,7 +309,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money / Bitcoin
+    [R] Money / + Bitcoin
     `);
     await screen.findByLabelText(/Evidence for.*Money.*Confirms/);
 
@@ -444,7 +444,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money / Bitcoin
+    [R] Money / + Bitcoin
     `);
     await screen.findByLabelText(/Evidence for.*Details.*Confirms/);
     await screen.findByLabelText(/Evidence for.*Money.*Confirms/);
@@ -456,7 +456,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money / Bitcoin
+    [R] Money / + Bitcoin
     `);
   });
 });
@@ -600,7 +600,7 @@ describe("Occurrence evidence selector", () => {
 Crypto
   Bitcoin
     Details
-    [R] Money / Bitcoin
+    [R] Money / + Bitcoin
     `);
     await screen.findByLabelText(/Evidence for.*Money.*Confirms/);
 
@@ -611,7 +611,7 @@ Crypto
 Crypto
   Bitcoin
     Details
-    [R] Money / Bitcoin
+    [R] Money / + Bitcoin
     `);
     await screen.findByLabelText(/Evidence for.*Money.*Confirms/);
   });
@@ -779,7 +779,7 @@ Crypto
     Details
     [C] Money / Bitcoin
 Money
-  [V]
+  [R] Money / Bitcoin
   Bitcoin
     `);
   });

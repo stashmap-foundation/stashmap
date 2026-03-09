@@ -180,10 +180,8 @@ Root
       Child1
       Child2
       [I] Target <<< Root
-Source
-  Child1
-  Child2
-  [I] Target <<< Root
+OtherParent
+  Source
   `);
 });
 

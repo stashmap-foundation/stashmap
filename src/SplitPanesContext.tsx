@@ -54,7 +54,7 @@ type PaneOperations = {
     stack: ID[],
     author: PublicKey,
     rootRelation?: LongID,
-    scrollToNodeId?: string
+    scrollToId?: string
   ) => void;
   removePane: (paneId: string) => void;
   setPane: (pane: Pane) => void;
@@ -70,14 +70,14 @@ export function useSplitPanes(): PaneOperations {
     stack: ID[],
     author: PublicKey,
     rootRelation?: LongID,
-    scrollToNodeId?: string
+    scrollToId?: string
   ): void => {
     const newPane: Pane = {
       id: generatePaneId(),
       stack,
       author,
       rootRelation,
-      scrollToNodeId,
+      scrollToId,
     };
     const newPanes = [...panes.slice(0, index), newPane, ...panes.slice(index)];
     const plan = createPlan();
@@ -116,7 +116,7 @@ export function useNavigatePane(): (url: string) => void {
     paneHistory?.push(pane.id, pane);
     const hashIndex = url.indexOf("#");
     const urlWithoutHash = hashIndex >= 0 ? url.slice(0, hashIndex) : url;
-    const scrollToNodeId =
+    const scrollToId =
       hashIndex >= 0 ? decodeURIComponent(url.slice(hashIndex + 1)) : undefined;
     const questionMarkIndex = urlWithoutHash.indexOf("?");
     const pathname =
@@ -133,7 +133,7 @@ export function useNavigatePane(): (url: string) => void {
         stack: [],
         author,
         rootRelation: relationID,
-        scrollToNodeId,
+        scrollToId,
       });
     } else {
       setPane({

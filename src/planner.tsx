@@ -29,7 +29,7 @@ import {
   getRelationsNoReferencedBy,
   computeEmptyNodeMetadata,
   isConcreteRefId,
-  parseConcreteRefId,
+  getConcreteRefTargetRelation,
   LOG_NODE_ID,
   createConcreteRefId,
   isRefId,
@@ -960,20 +960,17 @@ export function planDeepCopyNode(
     relation?: Relations;
   } => {
     if (isConcreteRefId(sourceNodeID)) {
-      const parsed = parseConcreteRefId(sourceNodeID);
-      if (parsed) {
-        const relation = getRelationsNoReferencedBy(
-          plan.knowledgeDBs,
-          parsed.relationID,
-          plan.user.publicKey
-        );
-        if (relation) {
-          return {
-            nodeID: getRelationNodeID(relation),
-            semanticContext: getRelationContext(plan.knowledgeDBs, relation),
-            relation,
-          };
-        }
+      const relation = getConcreteRefTargetRelation(
+        plan.knowledgeDBs,
+        sourceNodeID,
+        plan.user.publicKey
+      );
+      if (relation) {
+        return {
+          nodeID: getRelationNodeID(relation),
+          semanticContext: getRelationContext(plan.knowledgeDBs, relation),
+          relation,
+        };
       }
     }
     return {

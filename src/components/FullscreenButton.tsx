@@ -7,13 +7,20 @@ import {
   useCurrentRelation,
   getContext,
   getNodeIDsForViewPath,
+  getCurrentReferenceForView,
+  useCurrentEdge,
 } from "../ViewContext";
 import {
   usePaneStack,
   useCurrentPane,
   useNavigatePane,
 } from "../SplitPanesContext";
-import { getRefTargetInfo, isSearchId, shortID } from "../connections";
+import {
+  getRefLinkTargetInfo,
+  getRefTargetInfo,
+  isSearchId,
+  shortID,
+} from "../connections";
 import { useData } from "../DataContext";
 import { buildNodeUrl, buildRelationUrl } from "../navigationUrl";
 import { getAlternativeRelations } from "../footerSemantics";
@@ -30,12 +37,27 @@ export function FullscreenButton(): JSX.Element | null {
   const effectiveAuthor = useEffectiveAuthor();
   const relation = useCurrentRelation();
   const context = getContext(data, viewPath, stack);
+  const virtualType = useCurrentEdge()?.virtualType;
+  const currentReference = getCurrentReferenceForView(
+    data,
+    viewPath,
+    stack,
+    virtualType
+  );
   const isFullscreenNode = viewPath.length === 2;
   if (isFullscreenNode) {
     return null;
   }
 
-  const refInfo = getRefTargetInfo(nodeID, knowledgeDBs, effectiveAuthor);
+  const refInfo = currentReference
+    ? virtualType === "version"
+      ? getRefTargetInfo(currentReference.id, knowledgeDBs, effectiveAuthor)
+      : getRefLinkTargetInfo(
+          currentReference.id,
+          knowledgeDBs,
+          effectiveAuthor
+        )
+    : getRefTargetInfo(nodeID, knowledgeDBs, effectiveAuthor);
   const standaloneRelation = getAlternativeRelations(
     knowledgeDBs,
     nodeID,
@@ -55,7 +77,7 @@ export function FullscreenButton(): JSX.Element | null {
 
   const getTargetUrl = (): string => {
     if (refInfo?.rootRelation) {
-      return buildRelationUrl(refInfo.rootRelation, refInfo.scrollTo);
+      return buildRelationUrl(refInfo.rootRelation, refInfo.scrollToId);
     }
     if (fullscreenRelation) {
       return buildRelationUrl(fullscreenRelation.id);

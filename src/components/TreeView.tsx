@@ -16,6 +16,7 @@ import {
   useDisplayText,
   getEffectiveAuthor,
   VirtualItemsProvider,
+  getLast,
 } from "../ViewContext";
 import { useData } from "../DataContext";
 import {
@@ -39,6 +40,7 @@ import {
   getRelations,
   isConcreteRefId,
   parseConcreteRefId,
+  getConcreteRefTargetRelation,
   getRelationsNoReferencedBy,
   getRelationItemNodeID,
   getRelationNodeID,
@@ -75,7 +77,7 @@ function VirtuosoForColumn({
   activeRowKey,
   onRowFocus,
   onRowClick,
-  scrollToNodeId,
+  scrollToId,
   firstVirtualKeys,
 }: {
   nodes: List<ViewPath>;
@@ -88,7 +90,7 @@ function VirtuosoForColumn({
   activeRowKey: string;
   onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
   onRowClick?: (e: React.MouseEvent, viewKey: string) => void;
-  scrollToNodeId?: string;
+  scrollToId?: string;
   firstVirtualKeys: ImmutableSet<string>;
 }): JSX.Element {
   const data = useData();
@@ -131,11 +133,12 @@ function VirtuosoForColumn({
   }, [location]);
 
   useEffect(() => {
-    if (!scrollToNodeId || !virtuosoRef.current) {
+    if (!scrollToId || !virtuosoRef.current) {
       return;
     }
     const index = nodes.findIndex(
-      (path) => getNodeIDFromView(data, path)[0] === scrollToNodeId
+      (path) =>
+        getLast(path) === scrollToId || getNodeIDFromView(data, path)[0] === scrollToId
     );
     if (index >= 0) {
       virtuosoRef.current.scrollToIndex({
@@ -144,7 +147,7 @@ function VirtuosoForColumn({
         behavior: "auto",
       });
     }
-  }, [scrollToNodeId, nodes.size]);
+  }, [data, nodes, scrollToId]);
 
   return (
     <div ref={containerRef} aria-label={ariaLabel}>
@@ -265,15 +268,11 @@ export function TreeViewNodeLoader({
       return withRelation;
     }
 
-    const withTargetRefs = parsed.targetNode
-      ? addReferencedByToFilters(
-          withRelation,
-          parsed.targetNode,
-          data.knowledgeDBs,
-          data.user.publicKey
-        )
-      : withRelation;
-
+    const targetRelation = getConcreteRefTargetRelation(
+      data.knowledgeDBs,
+      nodeID,
+      data.user.publicKey
+    );
     const contextNodes = getRelationStack(data.knowledgeDBs, relation);
     const withContextNodes = contextNodes.reduce(
       (acc, contextNodeID) =>
@@ -283,11 +282,11 @@ export function TreeViewNodeLoader({
           data.knowledgeDBs,
           data.user.publicKey
         ),
-      withTargetRefs
+      withRelation
     );
     return addDescendantsToFilters(
       withContextNodes,
-      getRelationNodeID(relation)
+      getRelationNodeID(targetRelation || relation)
     );
   }, baseFilter);
 
@@ -493,7 +492,7 @@ function Tree(): JSX.Element | null {
             activeRowKey={activeRow.activeRowKey}
             onRowFocus={onRowFocus}
             onRowClick={onRowClick}
-            scrollToNodeId={pane.scrollToNodeId}
+            scrollToId={pane.scrollToId}
             firstVirtualKeys={firstVirtualKeys}
           />
         </TreeViewNodeLoader>

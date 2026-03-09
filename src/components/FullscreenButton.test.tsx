@@ -1,4 +1,4 @@
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -42,13 +42,13 @@ My Notes
   );
 
   await expectTree(`
-[O] Holiday Destinations
-  [O] Spain
+[O] My Notes
+  [O] Holiday Destinations
   `);
 
-  await screen.findByLabelText("Navigate to My Notes");
-  expect(
-    screen.queryByLabelText("Navigate to Holiday Destinations")
-  ).toBeNull();
+  const breadcrumbs = screen.getByLabelText("Navigation breadcrumbs");
+  expect(within(breadcrumbs).getByText("My Notes")).toBeDefined();
+  expect(screen.queryByLabelText("Navigate to My Notes")).toBeNull();
+  expect(screen.queryByLabelText("Navigate to Holiday Destinations")).toBeNull();
   expect(screen.queryByTestId("current-stack")).toBeNull();
 });

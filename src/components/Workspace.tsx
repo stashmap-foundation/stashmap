@@ -59,7 +59,7 @@ import {
   getRelationStack,
   getRelationSemanticID,
   getRelationsNoReferencedBy,
-  getTextForMatching,
+  getTextForSemanticID,
   isSearchId,
   shortID,
 } from "../connections";
@@ -102,7 +102,7 @@ function BreadcrumbItem({
   disabled?: boolean;
 }): JSX.Element {
   const { knowledgeDBs } = useData();
-  const label = getTextForMatching(knowledgeDBs, nodeID, author) || "Loading...";
+  const label = getTextForSemanticID(knowledgeDBs, nodeID, author) || "Loading...";
   const className = [
     isLast ? "breadcrumb-current" : "breadcrumb-link",
     isSource ? "breadcrumb-source" : "",
@@ -608,7 +608,11 @@ function CurrentNodeName(): JSX.Element {
   }
 
   const displayName =
-    getTextForMatching(knowledgeDBs, currentNodeID as string, pane.author) ||
+    getTextForSemanticID(
+      knowledgeDBs,
+      currentNodeID as string,
+      pane.author
+    ) ||
     "...";
   const truncated =
     displayName.length > 20 ? `${displayName.slice(0, 20)}…` : displayName;

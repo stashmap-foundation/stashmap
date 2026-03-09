@@ -6,7 +6,7 @@ import {
   Plan,
 } from "../planner";
 import {
-  getTextForMatching,
+  getTextForSemanticID,
   getRelationsNoReferencedBy,
   getRelationSemanticID,
 } from "../connections";
@@ -149,7 +149,7 @@ test("planCreateNodesFromMarkdownTrees creates only standalone relations", () =>
   expect(parentID).toEqual(getRelationSemanticID(parentRelation!));
   expect(parentRelation?.items.first()?.id).toEqual(childRelation?.id);
   expect(
-    getTextForMatching(
+    getTextForSemanticID(
       plan.knowledgeDBs,
       getRelationSemanticID(childRelation!),
       plan.user.publicKey
@@ -157,7 +157,7 @@ test("planCreateNodesFromMarkdownTrees creates only standalone relations", () =>
   ).toBe("Child");
   expect(childRelation?.items.first()?.id).toEqual(grandchildRelation?.id);
   expect(
-    getTextForMatching(
+    getTextForSemanticID(
       plan.knowledgeDBs,
       getRelationSemanticID(grandchildRelation!),
       plan.user.publicKey
@@ -175,7 +175,7 @@ test("Planning multiple markdown files returns top nodes in import order", () =>
   ]);
 
   const topTexts = topNodeIDs.map(
-    (id) => getTextForMatching(plan.knowledgeDBs, id, plan.user.publicKey)
+    (id) => getTextForSemanticID(plan.knowledgeDBs, id, plan.user.publicKey)
   );
 
   expect(topTexts).toEqual(["One", "Two"]);

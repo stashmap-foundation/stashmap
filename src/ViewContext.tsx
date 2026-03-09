@@ -15,7 +15,7 @@ import {
   LOG_NODE_ID,
   EMPTY_NODE_ID,
   isConcreteRefId,
-  getTextForMatching,
+  getTextForSemanticID,
   itemPassesFilters,
   getRelationItemRelation,
   getIndexedRelationsForKeys,
@@ -392,10 +392,38 @@ export function getItemIDsForViewPath(
   );
 }
 
+function buildRequestedSemanticPath(
+  semanticContext: Context,
+  itemID: LongID | ID
+): ID[] {
+  return [...semanticContext.toArray(), shortID(itemID) as ID];
+}
+
+function resolveRelationFromKnownRoot(
+  knowledgeDBs: KnowledgeDBs,
+  paneAuthor: PublicKey,
+  semanticPath: ID[],
+  preferredRoot: ID
+): Relations | undefined {
+  const root = getStandaloneRootByRootID(knowledgeDBs, paneAuthor, preferredRoot);
+  return root
+    ? resolveRequestedStackFromRoot(knowledgeDBs, root, semanticPath)?.relation
+    : undefined;
+}
+
+function resolveStandaloneRelationFromSemanticPath(
+  knowledgeDBs: KnowledgeDBs,
+  paneAuthor: PublicKey,
+  semanticPath: ID[]
+): Relations | undefined {
+  return resolveNodeStackToActualIDs(knowledgeDBs, paneAuthor, semanticPath)
+    ?.relation;
+}
+
 export function getRelationsForCurrentTree(
   knowledgeDBs: KnowledgeDBs,
   paneAuthor: PublicKey,
-  nodeID: LongID | ID,
+  itemID: LongID | ID,
   semanticContext: Context,
   rootRelation: LongID | undefined,
   isRootNode: boolean,
@@ -412,6 +440,7 @@ export function getRelationsForCurrentTree(
     }
   }
 
+  const semanticPath = buildRequestedSemanticPath(semanticContext, itemID);
   const preferredRoot =
     currentRoot ||
     (rootRelation
@@ -419,27 +448,23 @@ export function getRelationsForCurrentTree(
       : undefined);
 
   if (preferredRoot) {
-    const root = getStandaloneRootByRootID(
+    return resolveRelationFromKnownRoot(
       knowledgeDBs,
       paneAuthor,
+      semanticPath,
       preferredRoot
     );
-    return root
-      ? resolveRequestedStackFromRoot(knowledgeDBs, root, [
-          ...semanticContext.toArray(),
-          shortID(nodeID) as ID,
-        ])?.relation
-      : undefined;
   }
 
   if (!isRootNode) {
     return undefined;
   }
 
-  return resolveNodeStackToActualIDs(knowledgeDBs, paneAuthor, [
-    ...semanticContext.toArray(),
-    shortID(nodeID) as ID,
-  ])?.relation;
+  return resolveStandaloneRelationFromSemanticPath(
+    knowledgeDBs,
+    paneAuthor,
+    semanticPath
+  );
 }
 
 export function getParentRelation(
@@ -892,7 +917,7 @@ export function getDisplayTextForView(
   const ownRelation = getRelationForView(data, viewPath, stack);
   return (
     ownRelation?.text ??
-    getTextForMatching(data.knowledgeDBs, nodeID, data.user.publicKey) ??
+    getTextForSemanticID(data.knowledgeDBs, nodeID, data.user.publicKey) ??
     ""
   );
 }

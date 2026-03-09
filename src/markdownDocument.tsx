@@ -18,7 +18,7 @@ import {
   getRelationItemNodeID,
   getRelationContext,
   getRelationSemanticID,
-  getTextForMatching,
+  getTextForSemanticID,
 } from "./connections";
 import {
   ViewPath,
@@ -408,7 +408,7 @@ function getSerializedRelationText(
   }
 
   const fallbackText =
-    getTextForMatching(data.knowledgeDBs, nodeID, relation.author) ??
+    getTextForSemanticID(data.knowledgeDBs, nodeID, relation.author) ??
     shortID(nodeID as ID);
   return {
     text: fallbackText,

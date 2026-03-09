@@ -35,7 +35,7 @@ import {
   isRefId,
   isSearchId,
   hashText,
-  getTextForMatching,
+  getTextForSemanticID,
   ensureRelationNativeFields,
   getRelationContext,
   getRelationSemanticID,
@@ -1026,7 +1026,7 @@ export function planDeepCopyNode(
 
   if (!resolvedRelation) {
     const sourceAuthor = getEffectiveAuthor(plan, sourceViewPath);
-    const text = getTextForMatching(
+    const text = getTextForSemanticID(
       plan.knowledgeDBs,
       resolvedNodeID,
       sourceAuthor
@@ -1271,7 +1271,11 @@ export function planSaveNodeAndEnsureRelations(
 
   const displayText =
     currentRelation?.text ??
-    getTextForMatching(plan.knowledgeDBs, nodeID as ID, plan.user.publicKey) ??
+    getTextForSemanticID(
+      plan.knowledgeDBs,
+      nodeID as ID,
+      plan.user.publicKey
+    ) ??
     "";
 
   if (trimmedText === displayText) return { plan, viewPath };

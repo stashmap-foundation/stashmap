@@ -7,8 +7,8 @@ import {
   shortID,
   splitID,
   itemPassesFilters,
-  getTextHashForMatching,
-  getTextForMatching,
+  getTextHashForSemanticID,
+  getTextForSemanticID,
   getRelationItemNodeID,
   getRelationContext,
   getRelationSemanticID,
@@ -40,7 +40,7 @@ function resolveNodeLabel(
   _context: List<ID>,
   _root?: ID
 ): string {
-  return getTextForMatching(knowledgeDBs, nodeId, myself) || "Loading...";
+  return getTextForSemanticID(knowledgeDBs, nodeId, myself) || "Loading...";
 }
 
 function resolveContextLabels(
@@ -123,7 +123,10 @@ function getSemanticNodeKey(
   nodeID: LongID | ID,
   author: PublicKey
 ): string {
-  return getTextHashForMatching(knowledgeDBs, nodeID, author) || shortID(nodeID as ID);
+  return (
+    getTextHashForSemanticID(knowledgeDBs, nodeID, author) ||
+    shortID(nodeID as ID)
+  );
 }
 
 function relationsMatchForVersion(

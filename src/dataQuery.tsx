@@ -8,7 +8,7 @@ import {
   parseConcreteRefId,
   getConcreteRefTargetRelation,
   getRelationsNoReferencedBy,
-  getTextHashForMatching,
+  getTextHashForSemanticID,
   getRelationStack,
 } from "./connections";
 import { parseRef } from "./buildReferenceRow";
@@ -55,7 +55,7 @@ function getDocumentNodeQueryIDs(
   id: LongID | ID
 ): Array<LongID | ID> {
   const queryIDs: Array<LongID | ID> = [id];
-  const textHash = getTextHashForMatching(knowledgeDBs, id, myself);
+  const textHash = getTextHashForSemanticID(knowledgeDBs, id, myself);
   if (textHash && !queryIDs.includes(textHash)) {
     queryIDs.push(textHash);
   }

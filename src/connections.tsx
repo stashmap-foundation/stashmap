@@ -306,21 +306,25 @@ export function getRelationDepth(
   return getRelationContext(knowledgeDBs, relation).size;
 }
 
-function getMatchingRelations(
+function getRelationsForSemanticID(
   knowledgeDBs: KnowledgeDBs,
-  nodeID: LongID | ID,
+  semanticID: LongID | ID,
   author: PublicKey
 ): Relations[] {
-  if (isRefId(nodeID) || isSearchId(nodeID as ID)) {
+  if (isRefId(semanticID) || isSearchId(semanticID as ID)) {
     return [];
   }
 
-  const directRelation = getRelationsNoReferencedBy(knowledgeDBs, nodeID, author);
+  const directRelation = getRelationsNoReferencedBy(
+    knowledgeDBs,
+    semanticID,
+    author
+  );
   if (directRelation) {
     return [directRelation];
   }
 
-  const [remote, localID] = splitID(nodeID as ID);
+  const [remote, localID] = splitID(semanticID as ID);
   const preferredAuthor = remote || author;
   const preferredDB = knowledgeDBs.get(preferredAuthor);
   const otherDBs = remote
@@ -354,12 +358,12 @@ function getMatchingRelations(
   return [];
 }
 
-export function getRelationForMatching(
+export function getRelationForSemanticID(
   knowledgeDBs: KnowledgeDBs,
-  nodeID: LongID | ID,
+  semanticID: LongID | ID,
   author: PublicKey
 ): Relations | undefined {
-  return getMatchingRelations(knowledgeDBs, nodeID, author)[0];
+  return getRelationsForSemanticID(knowledgeDBs, semanticID, author)[0];
 }
 
 export function getTextForMatching(
@@ -381,11 +385,6 @@ export function getTextForMatching(
     return getRelationText(directRelation);
   }
 
-  const relation = getRelationForMatching(knowledgeDBs, nodeID, author);
-  const relationText = getRelationText(relation);
-  if (relationText !== undefined) {
-    return relationText;
-  }
   const fallbackText = getFallbackRelationText(nodeID);
   return fallbackText !== "" || localID === EMPTY_NODE_ID
     ? fallbackText
@@ -401,12 +400,66 @@ export function getTextHashForMatching(
   if (directRelation) {
     return directRelation.textHash;
   }
-  const relation = getRelationForMatching(knowledgeDBs, nodeID, author);
+  const localID = shortID(nodeID as ID) as ID;
+  const fallbackText = getFallbackRelationText(nodeID);
+  return fallbackText !== "" || localID === EMPTY_NODE_ID
+    ? hashText(fallbackText)
+    : undefined;
+}
+
+export function getTextForSemanticID(
+  knowledgeDBs: KnowledgeDBs,
+  semanticID: LongID | ID,
+  author: PublicKey
+): string | undefined {
+  if (isRefId(semanticID)) {
+    return undefined;
+  }
+
+  const localID = shortID(semanticID as ID) as ID;
+  if (isSearchId(localID)) {
+    return parseSearchId(localID) || "";
+  }
+
+  const directRelation = getRelationsNoReferencedBy(
+    knowledgeDBs,
+    semanticID,
+    author
+  );
+  if (directRelation) {
+    return getRelationText(directRelation);
+  }
+
+  const relation = getRelationForSemanticID(knowledgeDBs, semanticID, author);
+  const relationText = getRelationText(relation);
+  if (relationText !== undefined) {
+    return relationText;
+  }
+  const fallbackText = getFallbackRelationText(semanticID);
+  return fallbackText !== "" || localID === EMPTY_NODE_ID
+    ? fallbackText
+    : undefined;
+}
+
+export function getTextHashForSemanticID(
+  knowledgeDBs: KnowledgeDBs,
+  semanticID: LongID | ID,
+  author: PublicKey
+): ID | undefined {
+  const directRelation = getRelationsNoReferencedBy(
+    knowledgeDBs,
+    semanticID,
+    author
+  );
+  if (directRelation) {
+    return directRelation.textHash;
+  }
+  const relation = getRelationForSemanticID(knowledgeDBs, semanticID, author);
   if (relation) {
     return relation.textHash;
   }
-  const localID = shortID(nodeID as ID) as ID;
-  const fallbackText = getFallbackRelationText(nodeID);
+  const localID = shortID(semanticID as ID) as ID;
+  const fallbackText = getFallbackRelationText(semanticID);
   return fallbackText !== "" || localID === EMPTY_NODE_ID
     ? hashText(fallbackText)
     : undefined;
@@ -472,7 +525,43 @@ export function getTextNodeForID(
       };
     }
   }
-  const relation = getRelationForMatching(knowledgeDBs, nodeID, author);
+  const fallbackText = getFallbackRelationText(nodeID);
+  if (fallbackText !== "" || localID === EMPTY_NODE_ID) {
+    return {
+      id: localID,
+      text: fallbackText,
+      textHash: hashText(fallbackText),
+    };
+  }
+  return undefined;
+}
+
+export function getTextNodeForSemanticID(
+  knowledgeDBs: KnowledgeDBs,
+  semanticID: LongID | ID,
+  author: PublicKey
+): TextSeed | undefined {
+  if (isRefId(semanticID) || isSearchId(semanticID as ID)) {
+    return undefined;
+  }
+
+  const localID = shortID(semanticID as ID) as ID;
+  const directRelation = getRelationsNoReferencedBy(
+    knowledgeDBs,
+    semanticID,
+    author
+  );
+  if (directRelation) {
+    const relationText = getRelationText(directRelation);
+    if (relationText !== undefined) {
+      return {
+        id: getRelationSemanticID(directRelation),
+        text: relationText,
+        textHash: directRelation.textHash,
+      };
+    }
+  }
+  const relation = getRelationForSemanticID(knowledgeDBs, semanticID, author);
   const relationText = getRelationText(relation);
   if (relation && relationText !== undefined) {
     return {
@@ -482,7 +571,7 @@ export function getTextNodeForID(
     };
   }
 
-  const fallbackText = getFallbackRelationText(nodeID);
+  const fallbackText = getFallbackRelationText(semanticID);
   if (fallbackText !== "" || localID === EMPTY_NODE_ID) {
     return {
       id: localID,
@@ -686,7 +775,7 @@ function getNodeForMatching(
   nodeID: LongID | ID,
   author: PublicKey
 ): TextSeed | undefined {
-  return getTextNodeForID(knowledgeDBs, nodeID, author);
+  return getTextNodeForSemanticID(knowledgeDBs, nodeID, author);
 }
 
 export function ensureRelationNativeFields(
@@ -739,7 +828,7 @@ function getSemanticMatchKey(
   author: PublicKey
 ): ID {
   return (
-    getTextHashForMatching(knowledgeDBs, nodeID, author) ||
+    getTextHashForSemanticID(knowledgeDBs, nodeID, author) ||
     (shortID(nodeID as ID) as ID)
   );
 }

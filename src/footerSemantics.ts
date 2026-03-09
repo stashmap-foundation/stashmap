@@ -7,7 +7,7 @@ import {
   itemMatchesType,
   createConcreteRefId,
   findRefsToNode,
-  getTextHashForMatching,
+  getTextHashForSemanticID,
   itemPassesFilters,
   getRelationItemNodeID,
   getIndexedRelationsForKeys,
@@ -37,7 +37,7 @@ export function getSemanticNodeKey(
   nodeID: LongID | ID,
   author: PublicKey
 ): string {
-  return getTextHashForMatching(knowledgeDBs, nodeID, author) || shortID(nodeID);
+  return getTextHashForSemanticID(knowledgeDBs, nodeID, author) || shortID(nodeID);
 }
 
 export function nodesSemanticallyMatch(

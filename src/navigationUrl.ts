@@ -1,4 +1,4 @@
-import { getTextForMatching, hashText } from "./connections";
+import { getTextForSemanticID, hashText } from "./connections";
 
 function stackToPath(
   stack: ID[],
@@ -12,7 +12,7 @@ function stackToPath(
     if (!acc) {
       return undefined;
     }
-    const text = getTextForMatching(knowledgeDBs, nodeID, author);
+    const text = getTextForSemanticID(knowledgeDBs, nodeID, author);
     if (!text) {
       return undefined;
     }

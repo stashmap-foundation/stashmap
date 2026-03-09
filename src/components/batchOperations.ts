@@ -2,7 +2,7 @@ import { OrderedSet } from "immutable";
 import {
   updateItemRelevance,
   updateItemArgument,
-  isEmptyNodeID,
+  isEmptySemanticID,
   shortID,
   getTextForSemanticID,
 } from "../connections";
@@ -75,9 +75,9 @@ function getEditorTextForPath(
   return editorInfo.text;
 }
 
-function getNodeText(plan: Plan, nodeID: ID | LongID): string {
+function getNodeText(plan: Plan, itemID: ID | LongID): string {
   return (
-    getTextForSemanticID(plan.knowledgeDBs, nodeID, plan.user.publicKey) ?? ""
+    getTextForSemanticID(plan.knowledgeDBs, itemID, plan.user.publicKey) ?? ""
   );
 }
 
@@ -89,11 +89,11 @@ function planUpdateOneRelevance(
   editorText: string,
   virtualItemsMap: VirtualItemsMap
 ): Plan {
-  const [nodeID] = getItemIDFromView(acc, viewPath);
+  const [itemID] = getItemIDFromView(acc, viewPath);
   const parentView = getParentView(viewPath);
   if (!parentView) return acc;
 
-  if (isEmptyNodeID(nodeID)) {
+  if (isEmptySemanticID(itemID)) {
     const trimmed = editorText.trim();
     if (trimmed) {
       const { plan } = planSaveNodeAndEnsureRelations(
@@ -118,7 +118,7 @@ function planUpdateOneRelevance(
         if (virtualItem.isCref) {
           return planAddToParent(
             acc,
-            nodeID,
+            itemID,
             parentView,
             stack,
             undefined,
@@ -137,7 +137,7 @@ function planUpdateOneRelevance(
       }
       return planAddToParent(
         acc,
-        nodeID,
+        itemID,
         parentView,
         stack,
         undefined,
@@ -148,7 +148,7 @@ function planUpdateOneRelevance(
   }
 
   const basePlan =
-    editorText.trim() && editorText !== getNodeText(acc, nodeID)
+    editorText.trim() && editorText !== getNodeText(acc, itemID)
       ? planSaveNodeAndEnsureRelations(acc, editorText, viewPath, stack).plan
       : acc;
 
@@ -165,11 +165,11 @@ function planUpdateOneArgument(
   editorText: string,
   virtualItemsMap: VirtualItemsMap
 ): Plan {
-  const [nodeID] = getItemIDFromView(acc, viewPath);
+  const [itemID] = getItemIDFromView(acc, viewPath);
   const parentView = getParentView(viewPath);
   if (!parentView) return acc;
 
-  if (isEmptyNodeID(nodeID)) {
+  if (isEmptySemanticID(itemID)) {
     const trimmed = editorText.trim();
     if (trimmed) {
       const { plan } = planSaveNodeAndEnsureRelations(
@@ -204,7 +204,7 @@ function planUpdateOneArgument(
             )[0]
           : planAddToParent(
               acc,
-              nodeID,
+              itemID,
               parentView,
               stack,
               undefined,
@@ -217,7 +217,7 @@ function planUpdateOneArgument(
   }
 
   const basePlan =
-    editorText.trim() && editorText !== getNodeText(acc, nodeID)
+    editorText.trim() && editorText !== getNodeText(acc, itemID)
       ? planSaveNodeAndEnsureRelations(acc, editorText, viewPath, stack).plan
       : acc;
 
@@ -390,8 +390,8 @@ export function planBatchIndent(
       if (!editorText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
-      const [nodeID] = getItemIDFromView(state.plan, viewPath);
-      const nodeText = getNodeText(state.plan, nodeID);
+      const [itemID] = getItemIDFromView(state.plan, viewPath);
+      const nodeText = getNodeText(state.plan, itemID);
       if (editorText === nodeText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
@@ -465,8 +465,8 @@ export function planBatchOutdent(
       if (!editorText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
-      const [nodeID] = getItemIDFromView(state.plan, viewPath);
-      const nodeText = getNodeText(state.plan, nodeID);
+      const [itemID] = getItemIDFromView(state.plan, viewPath);
+      const nodeText = getNodeText(state.plan, itemID);
       if (editorText === nodeText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }

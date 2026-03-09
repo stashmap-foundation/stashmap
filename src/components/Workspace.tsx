@@ -54,7 +54,7 @@ import {
 } from "../planner";
 import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import {
-  LOG_NODE_ID,
+  LOG_SEMANTIC_ID,
   getRelationContext,
   getRelationStack,
   getRelationSemanticID,
@@ -85,7 +85,7 @@ import { getNodesInTree } from "./Node";
 import { planDeleteNodeFromView } from "../dnd";
 
 function BreadcrumbItem({
-  nodeID,
+  semanticID,
   author,
   href,
   onClick,
@@ -93,7 +93,7 @@ function BreadcrumbItem({
   isSource = false,
   disabled = false,
 }: {
-  nodeID: LongID | ID;
+  semanticID: LongID | ID;
   author: PublicKey;
   href?: string;
   onClick?: (e: React.MouseEvent) => void;
@@ -102,7 +102,7 @@ function BreadcrumbItem({
   disabled?: boolean;
 }): JSX.Element {
   const { knowledgeDBs } = useData();
-  const label = getTextForSemanticID(knowledgeDBs, nodeID, author) || "Loading...";
+  const label = getTextForSemanticID(knowledgeDBs, semanticID, author) || "Loading...";
   const className = [
     isLast ? "breadcrumb-current" : "breadcrumb-link",
     isSource ? "breadcrumb-source" : "",
@@ -149,7 +149,7 @@ function getOwnLogRelation(
     .filter(
       (relation) =>
         relation.author === author &&
-        getRelationSemanticID(relation) === LOG_NODE_ID &&
+        getRelationSemanticID(relation) === LOG_SEMANTIC_ID &&
         getRelationContext(knowledgeDBs, relation).size === 0 &&
         relation.root === shortID(relation.id)
     )
@@ -165,7 +165,7 @@ type BreadcrumbTarget = {
 
 type BreadcrumbEntry = {
   key: string;
-  nodeID: LongID | ID;
+  semanticID: LongID | ID;
   author: PublicKey;
   target?: BreadcrumbTarget;
   isSource?: boolean;
@@ -220,7 +220,7 @@ function createRelationBreadcrumbEntry(
   const rootRelation = getStandaloneRootRelation(knowledgeDBs, relation);
   return {
     key: `relation:${relation.id}`,
-    nodeID: getRelationSemanticID(relation),
+    semanticID: getRelationSemanticID(relation),
     author: relation.author,
     target: {
       stack: getRelationStack(knowledgeDBs, relation),
@@ -238,9 +238,9 @@ function createSnapshotBreadcrumbEntries(
     return [];
   }
   const author = anchor.sourceAuthor || fallbackAuthor;
-  return anchor.snapshotContext.toArray().map((nodeID, index) => ({
-    key: `snapshot:${author}:${nodeID}:${index}`,
-    nodeID,
+  return anchor.snapshotContext.toArray().map((semanticID, index) => ({
+    key: `snapshot:${author}:${semanticID}:${index}`,
+    semanticID,
     author,
     disabled: true,
     isSource: true,
@@ -355,14 +355,14 @@ function Breadcrumbs(): JSX.Element {
       .map((entry) => ({ ...entry, isSource: true }));
     const anchorPrefix = rootRelation.anchor.snapshotContext;
     const localStack = visibleStack.slice(anchorPrefix.size);
-    const localEntries: BreadcrumbEntry[] = localStack.map((nodeID, index) => {
+    const localEntries: BreadcrumbEntry[] = localStack.map((semanticID, index) => {
       const nextTargetStack = [
         ...anchorPrefix.toArray(),
         ...localStack.slice(0, index + 1),
       ] as ID[];
       const entry: BreadcrumbEntry = {
         key: `local:${pane.rootRelation}:${nextTargetStack.join(":")}`,
-        nodeID,
+        semanticID,
         author: pane.author,
         target: {
           stack: nextTargetStack,
@@ -376,9 +376,9 @@ function Breadcrumbs(): JSX.Element {
   })();
   const entries: BreadcrumbEntry[] =
     anchoredEntries ||
-    visibleStack.map((nodeID, index) => ({
-      key: `stack:${nodeID}:${index}`,
-      nodeID,
+    visibleStack.map((semanticID, index) => ({
+      key: `stack:${semanticID}:${index}`,
+      semanticID,
       author: pane.author,
       target: {
         stack: visibleStack.slice(0, index + 1),
@@ -425,7 +425,7 @@ function Breadcrumbs(): JSX.Element {
         return (
           <BreadcrumbItem
             key={entry.key}
-            nodeID={entry.nodeID}
+            semanticID={entry.semanticID}
             author={entry.author}
             href={targetUrl}
             onClick={onClick}
@@ -473,7 +473,7 @@ function HomeButton(): JSX.Element | null {
   if (!logRelation) {
     return null;
   }
-  const href = buildNodeUrl([LOG_NODE_ID], knowledgeDBs, user.publicKey);
+  const href = buildNodeUrl([LOG_SEMANTIC_ID], knowledgeDBs, user.publicKey);
   if (!href) {
     return null;
   }
@@ -525,7 +525,7 @@ function useHomeShortcut(): void {
         if (!logRelation) {
           return;
         }
-        const href = buildNodeUrl([LOG_NODE_ID], knowledgeDBs, user.publicKey);
+        const href = buildNodeUrl([LOG_SEMANTIC_ID], knowledgeDBs, user.publicKey);
         if (!href) {
           return;
         }
@@ -601,16 +601,16 @@ function CurrentNodeName(): JSX.Element {
   const { knowledgeDBs } = useData();
   const pane = useCurrentPane();
   const stack = usePaneStack();
-  const currentNodeID = stack[stack.length - 1];
+  const currentSemanticID = stack[stack.length - 1];
 
-  if (!currentNodeID) {
+  if (!currentSemanticID) {
     return <span>New Note</span>;
   }
 
   const displayName =
     getTextForSemanticID(
       knowledgeDBs,
-      currentNodeID as string,
+      currentSemanticID as string,
       pane.author
     ) ||
     "...";

@@ -52,7 +52,7 @@ function isReferenceVirtualType(virtualType: VirtualType | undefined): boolean {
 export function useItemStyle(): ItemStyle {
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const currentItem = useCurrentEdge();
-  const [nodeID] = useCurrentItemID();
+  const [itemID] = useCurrentItemID();
   const virtualType = currentItem?.virtualType;
 
   if (virtualType === "suggestion" || isViewingOtherUserContent) {
@@ -77,7 +77,7 @@ export function useItemStyle(): ItemStyle {
   const argument = currentItem?.argument;
   const normalizedRelevance =
     relevance === ("" as string) ? undefined : relevance;
-  const isOutgoingRef = isConcreteRefId(nodeID);
+  const isOutgoingRef = isConcreteRefId(itemID);
 
   return {
     cardStyle: {},

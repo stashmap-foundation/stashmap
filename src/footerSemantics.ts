@@ -9,7 +9,7 @@ import {
   findRefsToNode,
   getTextHashForSemanticID,
   itemPassesFilters,
-  getRelationItemNodeID,
+  getRelationItemSemanticID,
   getIndexedRelationsForKeys,
   getRelationContext,
   getRelationSemanticID,
@@ -34,22 +34,25 @@ export function contextsMatch(a: Context, b: Context): boolean {
 
 export function getSemanticNodeKey(
   knowledgeDBs: KnowledgeDBs,
-  nodeID: LongID | ID,
+  semanticID: LongID | ID,
   author: PublicKey
 ): string {
-  return getTextHashForSemanticID(knowledgeDBs, nodeID, author) || shortID(nodeID);
+  return (
+    getTextHashForSemanticID(knowledgeDBs, semanticID, author) ||
+    shortID(semanticID)
+  );
 }
 
 export function nodesSemanticallyMatch(
   knowledgeDBs: KnowledgeDBs,
-  leftNodeID: LongID | ID,
+  leftSemanticID: LongID | ID,
   leftAuthor: PublicKey,
-  rightNodeID: LongID | ID,
+  rightSemanticID: LongID | ID,
   rightAuthor: PublicKey
 ): boolean {
   return (
-    getSemanticNodeKey(knowledgeDBs, leftNodeID, leftAuthor) ===
-    getSemanticNodeKey(knowledgeDBs, rightNodeID, rightAuthor)
+    getSemanticNodeKey(knowledgeDBs, leftSemanticID, leftAuthor) ===
+    getSemanticNodeKey(knowledgeDBs, rightSemanticID, rightAuthor)
   );
 }
 
@@ -76,16 +79,16 @@ export function contextsSemanticallyMatch(
 
 function getComparableSuggestionKey(
   knowledgeDBs: KnowledgeDBs,
-  itemNodeID: LongID | ID,
+  itemSemanticID: LongID | ID,
   fallbackAuthor: PublicKey
 ): string {
-  if (!isConcreteRefId(itemNodeID)) {
-    return getSemanticNodeKey(knowledgeDBs, itemNodeID, fallbackAuthor);
+  if (!isConcreteRefId(itemSemanticID)) {
+    return getSemanticNodeKey(knowledgeDBs, itemSemanticID, fallbackAuthor);
   }
 
-  const parsed = parseConcreteRefId(itemNodeID);
+  const parsed = parseConcreteRefId(itemSemanticID);
   if (!parsed) {
-    return shortID(itemNodeID as ID);
+    return shortID(itemSemanticID as ID);
   }
 
   const relation = getRelationsNoReferencedBy(
@@ -95,11 +98,11 @@ function getComparableSuggestionKey(
   );
   const targetRelation = getConcreteRefTargetRelation(
     knowledgeDBs,
-    itemNodeID,
+    itemSemanticID,
     fallbackAuthor
   );
   if (!relation || !targetRelation) {
-    return shortID(itemNodeID as ID);
+    return shortID(itemSemanticID as ID);
   }
 
   return getSemanticNodeKey(
@@ -124,7 +127,7 @@ const EMPTY_SUGGESTIONS_RESULT: SuggestionsResult = {
 export function getSuggestionsForNode(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
-  nodeID: LongID | ID,
+  semanticID: LongID | ID,
   filterTypes: FooterTypeFilters,
   currentRelationId?: LongID,
   parentContext?: Context
@@ -142,7 +145,7 @@ export function getSuggestionsForNode(
       t !== "suggestions" && t !== "versions" && t !== undefined
   );
 
-  const [, localID] = splitID(nodeID);
+  const [, localID] = splitID(semanticID);
 
   const currentRelation = currentRelationId
     ? getRelationsNoReferencedBy(knowledgeDBs, currentRelationId, myself)
@@ -155,7 +158,7 @@ export function getSuggestionsForNode(
         .map((item) =>
           getComparableSuggestionKey(
             knowledgeDBs,
-            getRelationItemNodeID(knowledgeDBs, item, currentRelation.author),
+            getRelationItemSemanticID(knowledgeDBs, item, currentRelation.author),
             currentRelation.author
           )
         )
@@ -200,7 +203,7 @@ export function getSuggestionsForNode(
     )
     .sortBy((r) => -r.updated);
 
-  const candidateNodeIDs = otherRelations.reduce(
+  const candidateSemanticIDs = otherRelations.reduce(
     (acc: OrderedMap<string, ID>, relations: Relations) => {
       return relations.items.reduce((itemAcc, item: RelationItem) => {
         if (
@@ -210,14 +213,14 @@ export function getSuggestionsForNode(
         ) {
           return itemAcc;
         }
-        const candidateNodeID = getRelationItemNodeID(
+        const candidateSemanticID = getRelationItemSemanticID(
           knowledgeDBs,
           item,
           relations.author
         );
         const candidateKey = getSemanticNodeKey(
           knowledgeDBs,
-          candidateNodeID,
+          candidateSemanticID,
           relations.author
         );
         if (
@@ -226,17 +229,17 @@ export function getSuggestionsForNode(
         ) {
           return itemAcc;
         }
-        return itemAcc.set(candidateKey, shortID(candidateNodeID) as ID);
+        return itemAcc.set(candidateKey, shortID(candidateSemanticID) as ID);
       }, acc);
     },
     OrderedMap<string, ID>()
   );
 
-  if (candidateNodeIDs.size === 0) {
+  if (candidateSemanticIDs.size === 0) {
     return EMPTY_SUGGESTIONS_RESULT;
   }
 
-  const cappedCandidates = candidateNodeIDs
+  const cappedCandidates = candidateSemanticIDs
     .entrySeq()
     .take(suggestionSettings.maxSuggestions)
     .toList();
@@ -316,18 +319,18 @@ export function getSuggestionsForNode(
 
 export function getAlternativeRelations(
   knowledgeDBs: KnowledgeDBs,
-  nodeID: LongID | ID,
+  semanticID: LongID | ID,
   context: Context,
   excludeRelationId?: LongID,
   currentAuthor?: PublicKey,
   currentRoot?: ID
 ): List<Relations> {
-  const localID = shortID(nodeID);
+  const localID = shortID(semanticID);
   const author = currentAuthor;
   if (!author) {
     return List<Relations>();
   }
-  const semanticKey = getSemanticNodeKey(knowledgeDBs, nodeID, author);
+  const semanticKey = getSemanticNodeKey(knowledgeDBs, semanticID, author);
   return knowledgeDBs
     .entrySeq()
     .flatMap(([, db]) =>
@@ -403,7 +406,7 @@ function getComparableRelationItemKeys(
         ? shortID(item.id)
         : getSemanticNodeKey(
             knowledgeDBs,
-            getRelationItemNodeID(knowledgeDBs, item, relation.author),
+            getRelationItemSemanticID(knowledgeDBs, item, relation.author),
             relation.author
           )
     )
@@ -439,7 +442,7 @@ function computeComparableRelationDiff(
 
 export function getVersionsForRelation(
   knowledgeDBs: KnowledgeDBs,
-  nodeID: LongID | ID,
+  semanticID: LongID | ID,
   filterTypes: FooterTypeFilters,
   currentRelation?: Relations,
   parentContext?: Context,
@@ -452,7 +455,7 @@ export function getVersionsForRelation(
   const contextToMatch = parentContext || List<ID>();
   const alternatives = getAlternativeRelations(
     knowledgeDBs,
-    nodeID,
+    semanticID,
     contextToMatch,
     currentRelation?.id,
     currentRelation?.author,
@@ -507,7 +510,7 @@ export function getVersionsForRelation(
             ? shortID(item.id)
             : getSemanticNodeKey(
                 knowledgeDBs,
-                getRelationItemNodeID(knowledgeDBs, item, r.author),
+                getRelationItemSemanticID(knowledgeDBs, item, r.author),
                 r.author
               )
         )

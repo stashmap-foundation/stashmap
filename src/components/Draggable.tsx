@@ -12,7 +12,7 @@ import {
   useIsViewingOtherUserContent,
   useCurrentEdge,
 } from "../ViewContext";
-import { isEmptyNodeID } from "../connections";
+import { isEmptySemanticID } from "../connections";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
 import {
@@ -73,10 +73,10 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
   ): JSX.Element => {
     const path = useViewPath();
     const isNodeBeeingEdited = useIsEditingOn();
-    const [nodeID] = useCurrentItemID();
+    const [itemID] = useCurrentItemID();
     const relation = useCurrentRelation();
     const displayText = useDisplayText();
-    const isEmptyNode = isEmptyNodeID(nodeID);
+    const isEmptyNode = isEmptySemanticID(itemID);
     const disableDrag = isNodeBeeingEdited || isEmptyNode;
 
     const [{ isDragging }, drag, preview] = useDrag({
@@ -127,7 +127,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
         data-view-key={rowViewKey}
         data-row-index={rowIndex}
         data-row-depth={rowDepth}
-        data-node-id={nodeID}
+        data-node-id={itemID}
         data-node-text={displayText}
         data-node-mutable={isEditableRelation(relation) ? "true" : "false"}
         data-selected={isSelected ? "true" : undefined}
@@ -181,7 +181,7 @@ function DraggableSuggestion({
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const path = useViewPath();
-  const [nodeID] = useCurrentItemID();
+  const [itemID] = useCurrentItemID();
   const relation = useCurrentRelation();
   const displayText = useDisplayText();
 
@@ -230,7 +230,7 @@ function DraggableSuggestion({
       data-view-key={rowViewKey}
       data-row-index={rowIndex}
       data-row-depth={rowDepth}
-      data-node-id={nodeID}
+      data-node-id={itemID}
       data-node-text={displayText}
       data-node-mutable={isEditableRelation(relation) ? "true" : "false"}
       data-selected={isSelected ? "true" : undefined}
@@ -275,7 +275,7 @@ export function ListItem({
   const ref = useRef<HTMLDivElement>(null);
   const viewKey = useViewKey();
   const viewPath = useViewPath();
-  const [nodeID] = useCurrentItemID();
+  const [itemID] = useCurrentItemID();
   const virtualType = useCurrentEdge()?.virtualType;
   const isSuggestion = virtualType === "suggestion";
   const isCopyDrag =
@@ -287,7 +287,7 @@ export function ListItem({
   const selected = useIsSelected();
   const rowDepth = viewPath.length - 1;
   const isActiveRow = activeRowKey === viewKey;
-  const isEmptyNode = isEmptyNodeID(nodeID);
+  const isEmptyNode = isEmptySemanticID(itemID);
 
   const isReadonly = isInSearchView || isViewingOtherUserContent;
 

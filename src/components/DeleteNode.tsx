@@ -2,9 +2,9 @@ import { Set } from "immutable";
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../commons/Ui";
-import { deleteRelations, getRelationItemNodeID } from "../connections";
+import { deleteRelations, getRelationItemSemanticID } from "../connections";
 import {
-  updateViewPathsAfterDeleteNode,
+  updateViewPathsAfterDeleteItem,
   useCurrentRelation,
   useCurrentItemID,
   useViewPath,
@@ -25,7 +25,7 @@ function disconnectNode(plan: Plan, toDisconnect: LongID | ID): Plan {
   return myDB.relations.reduce((rdx, relation) => {
     const toDelete = relation.items.reduce((indices, item, idx) => {
       if (
-        getRelationItemNodeID(plan.knowledgeDBs, item, relation.author) ===
+        getRelationItemSemanticID(plan.knowledgeDBs, item, relation.author) ===
         toDisconnect
       ) {
         return indices.add(idx);
@@ -36,7 +36,7 @@ function disconnectNode(plan: Plan, toDisconnect: LongID | ID): Plan {
       return rdx;
     }
     return planUpsertRelations(rdx, deleteRelations(relation, toDelete));
-  }, planUpdateViews(plan, updateViewPathsAfterDeleteNode(plan.views, toDisconnect)));
+  }, planUpdateViews(plan, updateViewPathsAfterDeleteItem(plan.views, toDisconnect)));
 }
 
 export function DeleteNode({
@@ -46,7 +46,7 @@ export function DeleteNode({
   withCaption?: boolean;
   afterOnClick: () => void;
 }): JSX.Element | null {
-  const [nodeID] = useCurrentItemID();
+  const [itemID] = useCurrentItemID();
   const relation = useCurrentRelation();
   const viewPath = useViewPath();
   const stack = usePaneStack();
@@ -58,7 +58,7 @@ export function DeleteNode({
   }
   const deleteNode = (): void => {
     const planWithDeletedNode = planDeleteNodeFromView(
-      disconnectNode(createPlan(), nodeID),
+      disconnectNode(createPlan(), itemID),
       viewPath,
       stack
     );

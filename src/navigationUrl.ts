@@ -8,11 +8,11 @@ function stackToPath(
   if (stack.length === 0) {
     return "/";
   }
-  const segments = stack.reduce<string[] | undefined>((acc, nodeID) => {
+  const segments = stack.reduce<string[] | undefined>((acc, semanticID) => {
     if (!acc) {
       return undefined;
     }
-    const text = getTextForSemanticID(knowledgeDBs, nodeID, author);
+    const text = getTextForSemanticID(knowledgeDBs, semanticID, author);
     if (!text) {
       return undefined;
     }

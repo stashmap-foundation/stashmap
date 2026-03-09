@@ -16,7 +16,7 @@ import {
 import { LoadData, LoadRelationData } from "../dataQuery";
 import { LoadSearchData } from "../LoadSearchData";
 import { PaneView } from "./Workspace";
-import { EMPTY_NODE_ID, createSearchId, LOG_NODE_ID } from "../connections";
+import { EMPTY_SEMANTIC_ID, createSearchId, LOG_SEMANTIC_ID } from "../connections";
 import { planUpdateViews, planUpdatePanes, usePlanner } from "../planner";
 import { useData } from "../DataContext";
 import { isUserLoggedIn, useLogout } from "../NostrAuthContext";
@@ -269,7 +269,8 @@ function PaneContent(): JSX.Element {
   const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
   const { user } = useData();
-  const rootNodeID = pane.stack[pane.stack.length - 1] || EMPTY_NODE_ID;
+  const rootSemanticID =
+    pane.stack[pane.stack.length - 1] || EMPTY_SEMANTIC_ID;
 
   const isOtherUserContent = pane.author !== user.publicKey;
 
@@ -279,12 +280,12 @@ function PaneContent(): JSX.Element {
 
   const content = (
     <div className={paneClassName} data-pane-index={paneIndex}>
-      <LoadSearchData nodeIDs={pane.stack}>
-        <LoadData nodeIDs={pane.stack}>
-          <LoadData nodeIDs={[LOG_NODE_ID]} lists>
-            <LoadData nodeIDs={[rootNodeID]} referencedBy lists>
+      <LoadSearchData itemIDs={pane.stack}>
+        <LoadData itemIDs={pane.stack}>
+          <LoadData itemIDs={[LOG_SEMANTIC_ID]} lists>
+            <LoadData itemIDs={[rootSemanticID]} referencedBy lists>
               <RootViewContextProvider
-                root={rootNodeID as LongID}
+                root={rootSemanticID as LongID}
                 paneIndex={paneIndex}
               >
                 <PaneView />

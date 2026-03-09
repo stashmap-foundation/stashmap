@@ -3,7 +3,7 @@ import { OrderedSet } from "immutable";
 import { ConnectDropTarget, DropTargetMonitor, useDrop } from "react-dnd";
 import { NativeTypes } from "react-dnd-html5-backend";
 import { dnd, getDropDestinationFromTreeView } from "../dnd";
-import { isEmptyNodeID, shortID } from "../connections";
+import { isEmptySemanticID, shortID } from "../connections";
 import { deselectAllChildren, useTemporaryView } from "./TemporaryViewContext";
 import {
   Plan,
@@ -78,7 +78,7 @@ function getFilesFromNativeDrop(item: NativeFileDropItem): File[] {
 function planMaterializeImportedRoot(
   plan: Plan,
   paneIndex: number,
-  rootNodeID: ID
+  rootItemID: ID
 ): Plan {
   const updatedPanes = plan.panes.map((paneState, idx) => {
     if (idx !== paneIndex) {
@@ -86,7 +86,7 @@ function planMaterializeImportedRoot(
     }
     return {
       ...paneState,
-      stack: [rootNodeID],
+      stack: [rootItemID],
       rootRelation: undefined,
     };
   });
@@ -416,21 +416,21 @@ export function useDroppable({
                   destinationIndex,
                   pane.rootRelation
                 );
-          const [dropParentNodeID] = getItemIDFromView(plan, dropParentPath);
+          const [dropParentItemID] = getItemIDFromView(plan, dropParentPath);
 
-          if (isEmptyNodeID(dropParentNodeID)) {
+          if (isEmptySemanticID(dropParentItemID)) {
             const rootTree = buildRootTreeForEmptyRootDrop(importedTrees);
             if (!rootTree) {
               return;
             }
-            const [planWithMarkdown, topNodeIDs] =
+            const [planWithMarkdown, topItemIDs] =
               planCreateNodesFromMarkdownTrees(plan, [rootTree]);
-            const rootNodeID = topNodeIDs[0];
-            if (!rootNodeID) {
+            const rootItemID = topItemIDs[0];
+            if (!rootItemID) {
               return;
             }
             await executePlan(
-              planMaterializeImportedRoot(planWithMarkdown, path[0], rootNodeID)
+              planMaterializeImportedRoot(planWithMarkdown, path[0], rootItemID)
             );
             return;
           }
@@ -450,16 +450,16 @@ export function useDroppable({
 
       const dragItem = item as DragItemType;
       const plan = createPlan();
-      const [destinationRootNodeID] = getItemIDFromView(plan, destination);
+      const [destinationRootItemID] = getItemIDFromView(plan, destination);
 
-      if (isEmptyNodeID(destinationRootNodeID)) {
-        const [sourceNodeID] = getItemIDFromView(plan, dragItem.path);
+      if (isEmptySemanticID(destinationRootItemID)) {
+        const [sourceItemID] = getItemIDFromView(plan, dragItem.path);
         const targetPaneIndex = destination[0] as number;
         const updatedPanes = plan.panes.map((p, idx) => {
           if (idx !== targetPaneIndex) return p;
           return {
             ...p,
-            stack: [shortID(sourceNodeID) as ID],
+            stack: [shortID(sourceItemID) as ID],
             rootRelation: undefined,
           };
         });

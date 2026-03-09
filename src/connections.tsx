@@ -4,17 +4,16 @@ import { newRelations } from "./ViewContext";
 import { SEARCH_PREFIX } from "./constants";
 import { getRootAnchorContext, rootAnchorsEqual } from "./rootAnchor";
 
-// Content-addressed node ID generation
-// Node ID = sha256(text).slice(0, 32) - no author prefix
+// Semantic ID = sha256(text).slice(0, 32) - no author prefix
 export function hashText(text: string): ID {
   return crypto.createHash("sha256").update(text).digest("hex").slice(0, 32);
 }
 
-// Pre-computed hash for the ~Log node (home page, linked to root-level notes)
-export const LOG_NODE_ID = hashText("~Log");
+// Pre-computed semantic ID for the ~Log root
+export const LOG_SEMANTIC_ID = hashText("~Log");
 
-// Pre-computed hash for empty node (used as placeholder when creating new nodes)
-export const EMPTY_NODE_ID = hashText("") as ID;
+// Pre-computed semantic ID for the empty placeholder row
+export const EMPTY_SEMANTIC_ID = hashText("") as ID;
 
 export type TextSeed = {
   id: ID;
@@ -23,29 +22,29 @@ export type TextSeed = {
 };
 
 const CONCRETE_REF_PREFIX = "cref:";
-const SHORT_NODE_ID_RE = /^[a-f0-9]{32}$/;
+const SHORT_SEMANTIC_ID_RE = /^[a-f0-9]{32}$/;
 
-function createRandomNodeID(): ID {
+function createRandomSemanticID(): ID {
   return crypto.randomBytes(16).toString("hex") as ID;
 }
 
-function getReservedNodeID(text: string): ID | undefined {
+function getReservedSemanticID(text: string): ID | undefined {
   if (text === "~Log") {
-    return LOG_NODE_ID;
+    return LOG_SEMANTIC_ID;
   }
   if (text === "") {
-    return EMPTY_NODE_ID;
+    return EMPTY_SEMANTIC_ID;
   }
   return undefined;
 }
 
 export function createSemanticID(text: string, id?: ID): ID {
-  return getReservedNodeID(text) ?? id ?? createRandomNodeID();
+  return getReservedSemanticID(text) ?? id ?? createRandomSemanticID();
 }
 
 export function semanticIDFromSeed(seed: string): ID {
   const normalized = seed.replace(/-/g, "");
-  return SHORT_NODE_ID_RE.test(normalized)
+  return SHORT_SEMANTIC_ID_RE.test(normalized)
     ? (normalized as ID)
     : hashText(seed);
 }
@@ -129,10 +128,10 @@ function getFallbackRelationText(head?: LongID | ID): string {
     return "";
   }
   const localHead = shortID(head as ID) as ID;
-  if (localHead === LOG_NODE_ID) {
+  if (localHead === LOG_SEMANTIC_ID) {
     return "~Log";
   }
-  if (localHead === EMPTY_NODE_ID) {
+  if (localHead === EMPTY_SEMANTIC_ID) {
     return "";
   }
   if (isSearchId(localHead)) {
@@ -176,9 +175,9 @@ function getRelationLookupIndex(db: KnowledgeData): RelationLookupIndex {
   };
 
   db.relations.valueSeq().forEach((relation) => {
-    const relationNodeID = getRelationSemanticID(relation);
-    addToIndex(relationNodeID, relation);
-    if (relation.textHash !== relationNodeID) {
+    const relationSemanticID = getRelationSemanticID(relation);
+    addToIndex(relationSemanticID, relation);
+    if (relation.textHash !== relationSemanticID) {
       addToIndex(relation.textHash, relation);
     }
   });
@@ -368,41 +367,41 @@ export function getRelationForSemanticID(
 
 export function getTextForMatching(
   knowledgeDBs: KnowledgeDBs,
-  nodeID: LongID | ID,
+  semanticID: LongID | ID,
   author: PublicKey
 ): string | undefined {
-  if (isRefId(nodeID)) {
+  if (isRefId(semanticID)) {
     return undefined;
   }
 
-  const localID = shortID(nodeID as ID) as ID;
+  const localID = shortID(semanticID as ID) as ID;
   if (isSearchId(localID)) {
     return parseSearchId(localID) || "";
   }
 
-  const directRelation = getRelationsNoReferencedBy(knowledgeDBs, nodeID, author);
+  const directRelation = getRelationsNoReferencedBy(knowledgeDBs, semanticID, author);
   if (directRelation) {
     return getRelationText(directRelation);
   }
 
-  const fallbackText = getFallbackRelationText(nodeID);
-  return fallbackText !== "" || localID === EMPTY_NODE_ID
+  const fallbackText = getFallbackRelationText(semanticID);
+  return fallbackText !== "" || localID === EMPTY_SEMANTIC_ID
     ? fallbackText
     : undefined;
 }
 
 export function getTextHashForMatching(
   knowledgeDBs: KnowledgeDBs,
-  nodeID: LongID | ID,
+  semanticID: LongID | ID,
   author: PublicKey
 ): ID | undefined {
-  const directRelation = getRelationsNoReferencedBy(knowledgeDBs, nodeID, author);
+  const directRelation = getRelationsNoReferencedBy(knowledgeDBs, semanticID, author);
   if (directRelation) {
     return directRelation.textHash;
   }
-  const localID = shortID(nodeID as ID) as ID;
-  const fallbackText = getFallbackRelationText(nodeID);
-  return fallbackText !== "" || localID === EMPTY_NODE_ID
+  const localID = shortID(semanticID as ID) as ID;
+  const fallbackText = getFallbackRelationText(semanticID);
+  return fallbackText !== "" || localID === EMPTY_SEMANTIC_ID
     ? hashText(fallbackText)
     : undefined;
 }
@@ -436,7 +435,7 @@ export function getTextForSemanticID(
     return relationText;
   }
   const fallbackText = getFallbackRelationText(semanticID);
-  return fallbackText !== "" || localID === EMPTY_NODE_ID
+  return fallbackText !== "" || localID === EMPTY_SEMANTIC_ID
     ? fallbackText
     : undefined;
 }
@@ -460,7 +459,7 @@ export function getTextHashForSemanticID(
   }
   const localID = shortID(semanticID as ID) as ID;
   const fallbackText = getFallbackRelationText(semanticID);
-  return fallbackText !== "" || localID === EMPTY_NODE_ID
+  return fallbackText !== "" || localID === EMPTY_SEMANTIC_ID
     ? hashText(fallbackText)
     : undefined;
 }
@@ -485,8 +484,8 @@ export function buildTextNodesFromRelations(
   }, Map<PublicKey, KnowledgeData>());
 
   const latestByHead = relationList.reduce((acc, relation) => {
-    const nodeID = getRelationSemanticID(relation);
-    const existing = acc.get(nodeID);
+    const semanticID = getRelationSemanticID(relation);
+    const existing = acc.get(semanticID);
     const isNewer = !existing || relation.updated > existing.updated;
     const isSameVersionNewerDisplay =
       !!existing &&
@@ -494,7 +493,7 @@ export function buildTextNodesFromRelations(
       getRelationDepth(knowledgeDBs, relation) <
         getRelationDepth(knowledgeDBs, existing);
     if (isNewer || isSameVersionNewerDisplay) {
-      return acc.set(nodeID, relation);
+      return acc.set(semanticID, relation);
     }
     return acc;
   }, Map<ID, Relations>());
@@ -506,15 +505,15 @@ export function buildTextNodesFromRelations(
 
 export function getTextNodeForID(
   knowledgeDBs: KnowledgeDBs,
-  nodeID: LongID | ID,
+  semanticID: LongID | ID,
   author: PublicKey
 ): TextSeed | undefined {
-  if (isRefId(nodeID) || isSearchId(nodeID as ID)) {
+  if (isRefId(semanticID) || isSearchId(semanticID as ID)) {
     return undefined;
   }
 
-  const localID = shortID(nodeID as ID) as ID;
-  const directRelation = getRelationsNoReferencedBy(knowledgeDBs, nodeID, author);
+  const localID = shortID(semanticID as ID) as ID;
+  const directRelation = getRelationsNoReferencedBy(knowledgeDBs, semanticID, author);
   if (directRelation) {
     const relationText = getRelationText(directRelation);
     if (relationText !== undefined) {
@@ -525,8 +524,8 @@ export function getTextNodeForID(
       };
     }
   }
-  const fallbackText = getFallbackRelationText(nodeID);
-  if (fallbackText !== "" || localID === EMPTY_NODE_ID) {
+  const fallbackText = getFallbackRelationText(semanticID);
+  if (fallbackText !== "" || localID === EMPTY_SEMANTIC_ID) {
     return {
       id: localID,
       text: fallbackText,
@@ -572,7 +571,7 @@ export function getTextNodeForSemanticID(
   }
 
   const fallbackText = getFallbackRelationText(semanticID);
-  if (fallbackText !== "" || localID === EMPTY_NODE_ID) {
+  if (fallbackText !== "" || localID === EMPTY_SEMANTIC_ID) {
     return {
       id: localID,
       text: fallbackText,
@@ -617,7 +616,7 @@ export function getRelationItemRelation(
   return getRelationsNoReferencedBy(knowledgeDBs, item.id, myself);
 }
 
-export function getRelationItemNodeID(
+export function getRelationItemSemanticID(
   knowledgeDBs: KnowledgeDBs,
   item: RelationItem,
   myself: PublicKey
@@ -772,10 +771,10 @@ type RawAppearance = {
 
 function getNodeForMatching(
   knowledgeDBs: KnowledgeDBs,
-  nodeID: LongID | ID,
+  semanticID: LongID | ID,
   author: PublicKey
 ): TextSeed | undefined {
-  return getTextNodeForSemanticID(knowledgeDBs, nodeID, author);
+  return getTextNodeForSemanticID(knowledgeDBs, semanticID, author);
 }
 
 export function ensureRelationNativeFields(
@@ -785,22 +784,22 @@ export function ensureRelationNativeFields(
   const existingRelation = knowledgeDBs
     .get(relation.author)
     ?.relations.get(shortID(relation.id));
-  const relationNodeID = relation.textHash || existingRelation?.textHash || EMPTY_NODE_ID;
-  const hasReservedNodeID =
-    relationNodeID === LOG_NODE_ID ||
-    relationNodeID === EMPTY_NODE_ID ||
-    isSearchId(relationNodeID);
-  const shouldTrustRelationText = relation.text !== "" || hasReservedNodeID;
+  const relationSemanticID = relation.textHash || existingRelation?.textHash || EMPTY_SEMANTIC_ID;
+  const hasReservedSemanticID =
+    relationSemanticID === LOG_SEMANTIC_ID ||
+    relationSemanticID === EMPTY_SEMANTIC_ID ||
+    isSearchId(relationSemanticID);
+  const shouldTrustRelationText = relation.text !== "" || hasReservedSemanticID;
   const text = shouldTrustRelationText
     ? relation.text
     : existingRelation?.text ||
-      getFallbackRelationText(relationNodeID);
+      getFallbackRelationText(relationSemanticID);
   const textHash =
-    isSearchId(relationNodeID)
-      ? relationNodeID
-      : text !== "" || relationNodeID === LOG_NODE_ID || relationNodeID === EMPTY_NODE_ID
+    isSearchId(relationSemanticID)
+      ? relationSemanticID
+      : text !== "" || relationSemanticID === LOG_SEMANTIC_ID || relationSemanticID === EMPTY_SEMANTIC_ID
         ? hashText(text)
-        : relationNodeID;
+        : relationSemanticID;
   const parent = relation.parent || existingRelation?.parent;
   const anchor = parent ? undefined : relation.anchor ?? existingRelation?.anchor;
 
@@ -824,21 +823,21 @@ export function ensureRelationNativeFields(
 
 function getSemanticMatchKey(
   knowledgeDBs: KnowledgeDBs,
-  nodeID: LongID | ID,
+  semanticID: LongID | ID,
   author: PublicKey
 ): ID {
   return (
-    getTextHashForSemanticID(knowledgeDBs, nodeID, author) ||
-    (shortID(nodeID as ID) as ID)
+    getTextHashForSemanticID(knowledgeDBs, semanticID, author) ||
+    (shortID(semanticID as ID) as ID)
   );
 }
 
 function nodesMatchForRefs(
   knowledgeDBs: KnowledgeDBs,
-  candidateNodeID: LongID | ID,
+  candidateSemanticID: LongID | ID,
   candidateAuthor: PublicKey,
   candidateRoot: ID,
-  targetNodeID: LongID | ID,
+  targetSemanticID: LongID | ID,
   targetAuthor?: PublicKey,
   targetRoot?: ID
 ): boolean {
@@ -848,14 +847,14 @@ function nodesMatchForRefs(
     candidateAuthor === targetAuthor &&
     candidateRoot === targetRoot
   ) {
-    return shortID(candidateNodeID as ID) === shortID(targetNodeID as ID);
+    return shortID(candidateSemanticID as ID) === shortID(targetSemanticID as ID);
   }
 
   return (
-    getSemanticMatchKey(knowledgeDBs, candidateNodeID, candidateAuthor) ===
+    getSemanticMatchKey(knowledgeDBs, candidateSemanticID, candidateAuthor) ===
     getSemanticMatchKey(
       knowledgeDBs,
-      targetNodeID,
+      targetSemanticID,
       targetAuthor || candidateAuthor
     )
   );
@@ -881,10 +880,10 @@ function contextsMatchForRefs(
 
   return (
     candidateContext.size === targetContext.size &&
-    candidateContext.every((nodeID, index) =>
+    candidateContext.every((semanticID, index) =>
       nodesMatchForRefs(
         knowledgeDBs,
-        nodeID,
+        semanticID,
         candidateAuthor,
         candidateRoot,
         targetContext.get(index) as ID,
@@ -897,7 +896,7 @@ function contextsMatchForRefs(
 
 function findNodeAppearances(
   knowledgeDBs: KnowledgeDBs,
-  nodeID: LongID | ID,
+  semanticID: LongID | ID,
   targetAuthor?: PublicKey,
   targetRoot?: ID
 ): List<RawAppearance> {
@@ -913,16 +912,16 @@ function findNodeAppearances(
       }
       const targetSemanticKey = getSemanticMatchKey(
         knowledgeDBs,
-        nodeID,
+        semanticID,
         targetAuthor || relation.author
       );
       const matchesItem = (item: RelationItem): boolean => {
-        const itemNodeID = getRelationItemNodeID(
+        const itemSemanticID = getRelationItemSemanticID(
           knowledgeDBs,
           item,
           relation.author
         );
-        if (item.relevance === "not_relevant" || isRefId(itemNodeID)) {
+        if (item.relevance === "not_relevant" || isRefId(itemSemanticID)) {
           return false;
         }
         if (
@@ -931,7 +930,7 @@ function findNodeAppearances(
           relation.author === targetAuthor &&
           relation.root === targetRoot
         ) {
-          return shortID(itemNodeID as ID) === shortID(nodeID as ID);
+          return shortID(itemSemanticID as ID) === shortID(semanticID as ID);
         }
         return (
           getRelationItemTextHash(knowledgeDBs, item, relation.author) ===
@@ -948,7 +947,7 @@ function findNodeAppearances(
           targetRoot !== undefined &&
           relation.author === targetAuthor &&
           relation.root === targetRoot &&
-          shortID(getRelationSemanticID(relation) as ID) === shortID(nodeID as ID)) ||
+          shortID(getRelationSemanticID(relation) as ID) === shortID(semanticID as ID)) ||
           getRelationTextHash(knowledgeDBs, relation) === targetSemanticKey);
       if (isHeadWithChildren || isInItems) {
         const matchedItemRelation = matchedItem
@@ -996,15 +995,15 @@ function resolveAppearance(
 
 export function findRefsToNode(
   knowledgeDBs: KnowledgeDBs,
-  nodeID: LongID | ID,
+  semanticID: LongID | ID,
   filterContext?: Context,
   targetAuthor?: PublicKey,
   targetRoot?: ID
 ): List<ReferencedByRef> {
-  const targetShortID = shortID(nodeID);
+  const targetShortID = shortID(semanticID);
   const appearances = findNodeAppearances(
     knowledgeDBs,
-    nodeID,
+    semanticID,
     targetAuthor,
     targetRoot
   );
@@ -1100,7 +1099,7 @@ function getSemanticContextKey(
   author: PublicKey
 ): string {
   return context
-    .map((nodeID) => getSemanticMatchKey(knowledgeDBs, nodeID, author))
+    .map((semanticID) => getSemanticMatchKey(knowledgeDBs, semanticID, author))
     .join(":");
 }
 
@@ -1119,7 +1118,7 @@ function getRefContextKey(
 
 export function getOccurrencesForNode(
   knowledgeDBs: KnowledgeDBs,
-  nodeID: LongID | ID,
+  semanticID: LongID | ID,
   currentRelationID: LongID | undefined,
   effectiveAuthor: PublicKey,
   currentContext: Context,
@@ -1129,7 +1128,7 @@ export function getOccurrencesForNode(
 ): List<LongID> {
   const allRefs = findRefsToNode(
     knowledgeDBs,
-    nodeID,
+    semanticID,
     undefined,
     effectiveAuthor,
     currentRoot
@@ -1199,7 +1198,7 @@ export function getOccurrencesForNode(
 
 export function getIncomingCrefsForNode(
   knowledgeDBs: KnowledgeDBs,
-  currentNodeID: LongID | ID,
+  currentSemanticID: LongID | ID,
   parentRelationID: LongID | undefined,
   currentRelationID: LongID | undefined,
   effectiveAuthor: PublicKey,
@@ -1207,7 +1206,7 @@ export function getIncomingCrefsForNode(
   currentContext: Context = List<ID>(),
   currentRoot?: ID
 ): List<LongID> {
-  const currentShortNodeID = shortID(currentNodeID);
+  const currentShortSemanticID = shortID(currentSemanticID);
   const outgoingCrefIDs = (currentItems || List<RelationItem>())
     .map((item) => item.id)
     .filter(isConcreteRefId)
@@ -1233,7 +1232,7 @@ export function getIncomingCrefsForNode(
     return knowledgeDB.relations.reduce((rdx, relation) => {
       if (relation.id === parentRelationID) return rdx;
       if (relation.id === currentRelationID) return rdx;
-      if (getRelationSemanticID(relation) === LOG_NODE_ID) return rdx;
+      if (getRelationSemanticID(relation) === LOG_SEMANTIC_ID) return rdx;
       if (outgoingTargetRelIDs.has(relation.id)) return rdx;
 
       const hasCrefToUs = relation.items.some((item) => {
@@ -1276,8 +1275,8 @@ export function getSearchRelations(
   const rel = newRelations(searchId, List<ID>(), myself);
   const uniqueNodeIDs = foundNodeIDs.toSet().toList();
   const items = uniqueNodeIDs.map(
-    (nodeID): RelationItem => ({
-      id: nodeID,
+    (semanticID): RelationItem => ({
+      id: semanticID,
       relevance: undefined as Relevance,
     })
   );
@@ -1454,8 +1453,8 @@ export function itemMatchesType(
   return item.relevance === filterType;
 }
 
-export function isEmptyNodeID(id: LongID | ID): boolean {
-  return id === EMPTY_NODE_ID;
+export function isEmptySemanticID(semanticID: LongID | ID): boolean {
+  return semanticID === EMPTY_SEMANTIC_ID;
 }
 
 export function itemPassesFilters(
@@ -1470,7 +1469,7 @@ export function itemPassesFilters(
     | "contains"
   )[]
 ): boolean {
-  if (isEmptyNodeID(item.id)) {
+  if (isEmptySemanticID(item.id)) {
     return true;
   }
 
@@ -1679,7 +1678,7 @@ export function injectEmptyNodesIntoKnowledgeDBs(
 
       // Check if empty node is already injected (from parent MergeKnowledgeDB)
       const alreadyHasEmpty = existingRelations.items.some(
-        (item) => item.id === EMPTY_NODE_ID
+        (item) => item.id === EMPTY_SEMANTIC_ID
       );
       if (alreadyHasEmpty) {
         return relations;

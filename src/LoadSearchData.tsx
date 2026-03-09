@@ -26,19 +26,19 @@ function getAllNodesFromDBs(knowledgeDBs: KnowledgeDBs): Map<string, TextSeed> {
 function SearchCrefBuilder({
   children,
   searchId,
-  foundNodeIDs,
+  foundSemanticIDs,
 }: {
   children: React.ReactNode;
   searchId: ID;
-  foundNodeIDs: List<ID>;
+  foundSemanticIDs: List<ID>;
 }): JSX.Element {
   const { knowledgeDBs, user } = useData();
   const pane = useCurrentPane();
   const effectiveAuthor = pane.author;
 
-  const uniqueNodeIDs = foundNodeIDs.toSet().toList();
-  const crefItems = uniqueNodeIDs.flatMap((nodeID) => {
-    const refs = findRefsToNode(knowledgeDBs, nodeID);
+  const uniqueSemanticIDs = foundSemanticIDs.toSet().toList();
+  const crefItems = uniqueSemanticIDs.flatMap((semanticID) => {
+    const refs = findRefsToNode(knowledgeDBs, semanticID);
     const deduped = deduplicateRefsByContext(
       refs,
       knowledgeDBs,
@@ -72,10 +72,10 @@ function SearchCrefBuilder({
 
 export function LoadSearchData({
   children,
-  nodeIDs,
+  itemIDs,
 }: {
   children: React.ReactNode;
-  nodeIDs: (ID | LongID)[];
+  itemIDs: (ID | LongID)[];
 }): JSX.Element {
   const { relaysInfos, knowledgeDBs } = useData();
   const relays = useReadRelays({ user: true, contacts: true });
@@ -84,7 +84,7 @@ export function LoadSearchData({
     return relaysInfos.get(r.url)?.supported_nips?.includes(50);
   });
 
-  const searchEntries = nodeIDs
+  const searchEntries = itemIDs
     .filter((id) => isSearchId(id as ID))
     .map((id) => ({ id, query: parseSearchId(id as ID) }))
     .filter(
@@ -109,13 +109,13 @@ export function LoadSearchData({
   }
 
   const searchId = firstSearch.id as ID;
-  const foundNodeIDs = List(allSearchResults.keySeq().toArray() as ID[]);
+  const foundSemanticIDs = List(allSearchResults.keySeq().toArray() as ID[]);
 
   return (
-    <LoadData nodeIDs={foundNodeIDs.toArray()} referencedBy>
+    <LoadData itemIDs={foundSemanticIDs.toArray()} referencedBy>
       <SearchCrefBuilder
         searchId={searchId}
-        foundNodeIDs={foundNodeIDs}
+        foundSemanticIDs={foundSemanticIDs}
       >
         {children}
       </SearchCrefBuilder>

@@ -29,7 +29,7 @@ export function FullscreenButton(): JSX.Element | null {
   const stack = usePaneStack();
   const pane = useCurrentPane();
   const viewPath = useViewPath();
-  const [nodeID] = useCurrentItemID();
+  const [itemID] = useCurrentItemID();
   const data = useData();
   const { knowledgeDBs, user } = data;
   const displayText = useDisplayText();
@@ -57,10 +57,10 @@ export function FullscreenButton(): JSX.Element | null {
           knowledgeDBs,
           effectiveAuthor
         )
-    : getRefTargetInfo(nodeID, knowledgeDBs, effectiveAuthor);
+    : getRefTargetInfo(itemID, knowledgeDBs, effectiveAuthor);
   const standaloneRelation = getAlternativeRelations(
     knowledgeDBs,
-    nodeID,
+    itemID,
     context,
     relation?.id,
     effectiveAuthor,

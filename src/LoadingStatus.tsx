@@ -5,29 +5,29 @@ import {
   useDisplayText,
   useCurrentItemID,
 } from "./ViewContext";
-import { isEmptyNodeID } from "./connections";
+import { isEmptySemanticID } from "./connections";
 
 const QueryContext = React.createContext<
-  { nodesBeeingQueried: string[]; allEventsProcessed: boolean } | undefined
+  { idsBeingQueried: string[]; allEventsProcessed: boolean } | undefined
 >(undefined);
 
 export function RegisterQuery({
   children,
-  nodesBeeingQueried,
+  idsBeingQueried,
   allEventsProcessed,
 }: {
   children: React.ReactNode;
-  nodesBeeingQueried: string[];
+  idsBeingQueried: string[];
   allEventsProcessed: boolean;
 }): JSX.Element {
   return (
-    <QueryContext.Provider value={{ nodesBeeingQueried, allEventsProcessed }}>
+    <QueryContext.Provider value={{ idsBeingQueried, allEventsProcessed }}>
       {children}
     </QueryContext.Provider>
   );
 }
 
-export function extractNodesFromQueries(filters: Filter[]): string[] {
+export function extractIDsFromQueries(filters: Filter[]): string[] {
   return filters.reduce((acc, filter) => {
     return acc.concat(filter["#d"] || []);
   }, [] as string[]);
@@ -35,18 +35,18 @@ export function extractNodesFromQueries(filters: Filter[]): string[] {
 
 export function useNodeIsLoading(): boolean {
   const relation = useCurrentRelation();
-  const [nodeID] = useCurrentItemID();
+  const [itemID] = useCurrentItemID();
   const displayText = useDisplayText();
   const context = React.useContext(QueryContext);
 
   if (
     relation ||
-    isEmptyNodeID(nodeID) ||
+    isEmptySemanticID(itemID) ||
     displayText !== "" ||
     !context ||
     context.allEventsProcessed
   ) {
     return false;
   }
-  return context.nodesBeeingQueried.includes(nodeID);
+  return context.idsBeingQueried.includes(itemID);
 }

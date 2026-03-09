@@ -14,7 +14,7 @@ import {
   parseRelationUrl,
   parseAuthorFromSearch,
 } from "./navigationUrl";
-import { resolveNodeStackToActualIDs } from "./ViewContext";
+import { resolveSemanticStackToActualIDs } from "./ViewContext";
 import { usePlanner } from "./planner";
 import { generatePaneId } from "./SplitPanesContext";
 
@@ -140,7 +140,7 @@ export function NavigationStateProvider({
       if (p.stack.length === 0) {
         return p;
       }
-      const resolvedStack = resolveNodeStackToActualIDs(
+      const resolvedStack = resolveSemanticStackToActualIDs(
         knowledgeDBs,
         p.author,
         p.stack as ID[]

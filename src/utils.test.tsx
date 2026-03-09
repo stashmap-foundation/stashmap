@@ -56,7 +56,7 @@ import {
   isUserLoggedInWithSeed,
 } from "./NostrAuthContext";
 import {
-  EMPTY_NODE_ID,
+  EMPTY_SEMANTIC_ID,
 } from "./connections";
 import { RootViewContextProvider } from "./ViewContext";
 import { LoadData } from "./dataQuery";
@@ -502,7 +502,7 @@ export function renderWithTestData(
   const utils = renderApis(
     <Routes>
       <Route element={<RequireLogin />}>
-        {["*", "n/*", "r/:relationId", "d/:openNodeID", "join/:projectID"].map(
+        {["*", "n/*", "r/:relationId", "d/:openItemID", "join/:projectID"].map(
           (path) => (
             <Route
               key={path}
@@ -641,14 +641,14 @@ function RootViewOrPaneIsLoadingInner({
 }): JSX.Element {
   const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
-  const rootNodeID = pane.stack[pane.stack.length - 1] || EMPTY_NODE_ID;
+  const rootItemID = pane.stack[pane.stack.length - 1] || EMPTY_SEMANTIC_ID;
 
   return (
-    <LoadSearchData nodeIDs={pane.stack}>
-      <LoadData nodeIDs={pane.stack}>
-        <LoadData nodeIDs={[rootNodeID]} referencedBy lists>
+    <LoadSearchData itemIDs={pane.stack}>
+      <LoadData itemIDs={pane.stack}>
+        <LoadData itemIDs={[rootItemID]} referencedBy lists>
           <RootViewContextProvider
-            root={rootNodeID as LongID}
+            root={rootItemID as LongID}
             paneIndex={paneIndex}
           >
             <StorePreLoginContext>{children}</StorePreLoginContext>

@@ -9,7 +9,7 @@ import {
   getRelationForView,
   ViewPath,
 } from "../ViewContext";
-import { isEmptyNodeID } from "../connections";
+import { isEmptySemanticID } from "../connections";
 import {
   usePlanner,
   planUpdateEmptyNodeMetadata,
@@ -56,8 +56,8 @@ export function useRelationItemContext(): RelationItemContext {
   const currentRelation = useCurrentRelation();
   const parentView = getParentView(viewPath);
 
-  const [nodeID] = useCurrentItemID();
-  const isEmptyNode = isEmptyNodeID(nodeID);
+  const [itemID] = useCurrentItemID();
+  const isEmptyNode = isEmptySemanticID(itemID);
   const relationsID = parentView
     ? getRelationForView(data, parentView, stack)?.id
     : undefined;

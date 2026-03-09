@@ -233,7 +233,7 @@ export function planDisconnectFromParent(
   }
 
   const disconnectID = getLast(viewPath);
-  const [nodeID] = getItemIDFromView(plan, viewPath);
+  const [itemID] = getItemIDFromView(plan, viewPath);
   const sourceRelation = getRelationForView(plan, viewPath, stack);
   const parentRelation = getRelationForView(plan, parentPath, stack);
   if (!parentRelation) {
@@ -259,7 +259,7 @@ export function planDisconnectFromParent(
 
   const planWithViews = planUpdateViews(updatedRelationsPlan, updatedViews);
 
-  const skipCleanup = preserveDescendants || isRefId(nodeID);
+  const skipCleanup = preserveDescendants || isRefId(itemID);
   if (skipCleanup) {
     return resetInvalidPanes(planWithViews);
   }
@@ -303,8 +303,8 @@ export function planDeleteNodeFromView(
     return planDisconnectFromParent(plan, viewPath, stack);
   }
 
-  const [nodeID] = getItemIDFromView(plan, viewPath);
-  if (isSearchId(nodeID as ID)) {
+  const [itemID] = getItemIDFromView(plan, viewPath);
+  if (isSearchId(itemID as ID)) {
     return plan;
   }
 
@@ -331,7 +331,7 @@ export function planMoveNodeWithView(
   stack: ID[],
   insertAtIndex?: number
 ): Plan {
-  const [sourceNodeID] = getItemIDFromView(plan, sourceViewPath);
+  const [sourceItemID] = getItemIDFromView(plan, sourceViewPath);
   const sourceStack = getPane(plan, sourceViewPath).stack;
   const sourceRelation = getRelationForView(plan, sourceViewPath, sourceStack);
 
@@ -348,9 +348,9 @@ export function planMoveNodeWithView(
     sourceParentRelation !== undefined &&
     targetParentRelation !== undefined &&
     sourceParentRelation.id === targetParentRelation.id;
-  const sourceAddID = sourceRelation?.id ?? sourceNodeID;
+  const sourceAddID = sourceRelation?.id ?? sourceItemID;
 
-  const [planWithAdd, [actualNodeID]] = planAddToParent(
+  const [planWithAdd, [actualItemID]] = planAddToParent(
     plan,
     sourceAddID,
     targetParentViewPath,
@@ -358,17 +358,17 @@ export function planMoveNodeWithView(
     insertAtIndex,
     undefined,
     undefined,
-    isSameParentRelation ? [shortID(sourceNodeID)] : undefined
+    isSameParentRelation ? [shortID(sourceItemID)] : undefined
   );
 
-  const moveNodeID = actualNodeID ?? sourceNodeID;
+  const moveItemID = actualItemID ?? sourceItemID;
 
   const targetParentContext = getContext(
     planWithAdd,
     targetParentViewPath,
     stack
   );
-  const [targetParentNodeID] = getItemIDFromView(
+  const [targetParentItemID] = getItemIDFromView(
     planWithAdd,
     targetParentViewPath
   );
@@ -381,7 +381,7 @@ export function planMoveNodeWithView(
     shortID(
       (actualTargetParentRelation
         ? getRelationSemanticID(actualTargetParentRelation)
-        : targetParentNodeID) as ID
+        : targetParentItemID) as ID
     )
   );
 
@@ -439,7 +439,7 @@ export function planMoveNodeWithView(
     sourceRelation,
     targetContext,
     actualTargetParentRelation?.id,
-    moveNodeID !== sourceNodeID ? moveNodeID : undefined,
+    moveItemID !== sourceItemID ? moveItemID : undefined,
     actualTargetParentRelation?.root
   );
 }
@@ -534,11 +534,11 @@ export function dnd(
       .toList()
       .reduce((accPlan: Plan, s: string, idx: number) => {
         const sourcePath = parseViewPath(s);
-        const [sourceNodeID] = getItemIDFromView(accPlan, sourcePath);
+        const [sourceItemID] = getItemIDFromView(accPlan, sourcePath);
         const insertAt = dropIndex + sourceIndices.size + idx;
         return planAddToParent(
           accPlan,
-          sourceNodeID,
+          sourceItemID,
           toView,
           stack,
           insertAt
@@ -565,13 +565,13 @@ export function dnd(
       .toList()
       .reduce((accPlan: Plan, s: string, idx: number) => {
         const sourcePath = parseViewPath(s);
-        const [sourceNodeID] = getItemIDFromView(accPlan, sourcePath);
+        const [sourceItemID] = getItemIDFromView(accPlan, sourcePath);
         const insertAt = dropIndex + idx;
 
-        if (isRefId(sourceNodeID)) {
+        if (isRefId(sourceItemID)) {
           const [planWithAdd] = planAddToParent(
             accPlan,
-            sourceNodeID,
+            sourceItemID,
             toView,
             stack,
             insertAt
@@ -613,11 +613,11 @@ export function dnd(
     ? plan
     : planExpandNode(plan, toViewData, toView);
 
-  const shouldCreateReference = (sourceNodeID: LongID | ID): boolean => {
+  const shouldCreateReference = (sourceItemID: LongID | ID): boolean => {
     if (isSuggestion) {
       return !!invertCopyMode;
     }
-    const sourceIsReference = isRefId(sourceNodeID);
+    const sourceIsReference = isRefId(sourceItemID);
     if (sourceIsReference) {
       return true;
     }
@@ -625,11 +625,11 @@ export function dnd(
   };
 
   const toReferenceID = (
-    sourceNodeID: LongID | ID,
+    sourceItemID: LongID | ID,
     sourceRelation: Relations
   ): LongID | ID => {
-    if (isRefId(sourceNodeID)) {
-      return sourceNodeID;
+    if (isRefId(sourceItemID)) {
+      return sourceItemID;
     }
     return createConcreteRefId(sourceRelation.id);
   };
@@ -638,15 +638,15 @@ export function dnd(
     .toList()
     .reduce((accPlan: Plan, s: string, idx: number) => {
       const sourcePath = parseViewPath(s);
-      const [sourceNodeID] = getItemIDFromView(accPlan, sourcePath);
+      const [sourceItemID] = getItemIDFromView(accPlan, sourcePath);
       const sourceStack = getPane(accPlan, sourcePath).stack;
       const insertAt = dropIndex !== undefined ? dropIndex + idx : undefined;
 
-      if (shouldCreateReference(sourceNodeID)) {
-        if (isRefId(sourceNodeID)) {
+      if (shouldCreateReference(sourceItemID)) {
+        if (isRefId(sourceItemID)) {
           return planAddToParent(
             accPlan,
-            sourceNodeID,
+            sourceItemID,
             toView,
             stack,
             insertAt
@@ -689,7 +689,7 @@ export function dnd(
         )!;
         return planAddToParent(
           planWithRelation,
-          toReferenceID(sourceNodeID, sourceRelation),
+          toReferenceID(sourceItemID, sourceRelation),
           toView,
           stack,
           insertAt

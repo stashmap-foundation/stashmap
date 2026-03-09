@@ -15,7 +15,7 @@ import {
   createConcreteRefId,
   ensureRelationNativeFields,
   getConcreteRefTargetRelation,
-  getRelationItemNodeID,
+  getRelationItemSemanticID,
   getRelationContext,
   getRelationSemanticID,
   getTextForSemanticID,
@@ -72,7 +72,7 @@ function extractInlineContent(inline: Token): {
 
 function extractAttrs(token: Token): {
   uuid: string | undefined;
-  nodeID: ID | undefined;
+  semanticID: ID | undefined;
   relevance: Relevance;
   argument: Argument;
   hidden: boolean;
@@ -82,7 +82,7 @@ function extractAttrs(token: Token): {
   if (!token.attrs) {
     return {
       uuid: undefined,
-      nodeID: undefined,
+      semanticID: undefined,
       relevance: undefined,
       argument: undefined,
       hidden: false,
@@ -91,7 +91,9 @@ function extractAttrs(token: Token): {
     };
   }
   const uuid = token.attrs.find(([, value]) => value === "")?.[0];
-  const nodeID = (token.attrGet("node") || undefined) as ID | undefined;
+  const semanticID = (token.attrGet("semantic") || undefined) as
+    | ID
+    | undefined;
   const classAttr = token.attrGet("class") || "";
   const classes = classAttr.split(" ").filter(Boolean);
   const relevance = (
@@ -102,7 +104,7 @@ function extractAttrs(token: Token): {
   );
   const hidden = classes.includes("hidden");
   const basedOn = token.attrGet("basedOn") || undefined;
-  const context = token.attrGet("context") || undefined;
+  const anchorContext = token.attrGet("anchorContext") || undefined;
   const sourceAuthor = token.attrGet("sourceAuthor") || undefined;
   const sourceRootID = (token.attrGet("sourceRoot") || undefined) as
     | ID
@@ -114,14 +116,14 @@ function extractAttrs(token: Token): {
     token.attrGet("sourceParent") || undefined
   ) as LongID | undefined;
   const anchor =
-    context ||
+    anchorContext ||
     sourceAuthor ||
     sourceRootID ||
     sourceRelationID ||
     sourceParentRelationID
       ? {
-          snapshotContext: context
-            ? List(context.split(":") as ID[])
+          snapshotContext: anchorContext
+            ? List(anchorContext.split(":") as ID[])
             : List<ID>(),
           ...(sourceAuthor ? { sourceAuthor: sourceAuthor as PublicKey } : {}),
           ...(sourceRootID ? { sourceRootID } : {}),
@@ -129,14 +131,14 @@ function extractAttrs(token: Token): {
           ...(sourceParentRelationID ? { sourceParentRelationID } : {}),
         }
       : undefined;
-  return { uuid, nodeID, relevance, argument, hidden, basedOn, anchor };
+  return { uuid, semanticID, relevance, argument, hidden, basedOn, anchor };
 }
 
 export type MarkdownTreeNode = {
   text: string;
   children: MarkdownTreeNode[];
   uuid?: string;
-  nodeID?: ID;
+  semanticID?: ID;
   relevance?: Relevance;
   argument?: Argument;
   linkHref?: string;
@@ -180,7 +182,7 @@ export function parseMarkdownHierarchy(
 
   let pendingAttrs: {
     uuid: string | undefined;
-    nodeID: ID | undefined;
+    semanticID: ID | undefined;
     relevance: Relevance;
     argument: Argument;
     hidden: boolean;
@@ -188,7 +190,7 @@ export function parseMarkdownHierarchy(
     anchor: RootAnchor | undefined;
   } = {
     uuid: undefined,
-    nodeID: undefined,
+    semanticID: undefined,
     relevance: undefined,
     argument: undefined,
     hidden: false,
@@ -208,7 +210,15 @@ export function parseMarkdownHierarchy(
       if (!text) {
         continue;
       }
-      const { uuid, nodeID, relevance, argument, hidden, basedOn, anchor } =
+      const {
+        uuid,
+        semanticID,
+        relevance,
+        argument,
+        hidden,
+        basedOn,
+        anchor,
+      } =
         extractAttrs(token);
       while (
         headingStack.length > 0 &&
@@ -223,7 +233,7 @@ export function parseMarkdownHierarchy(
         text,
         children: [],
         ...(uuid !== undefined && { uuid }),
-        ...(nodeID !== undefined && { nodeID }),
+        ...(semanticID !== undefined && { semanticID }),
         ...(relevance !== undefined && { relevance }),
         ...(argument !== undefined && { argument }),
         ...(hidden && { hidden }),
@@ -267,7 +277,7 @@ export function parseMarkdownHierarchy(
         const parent =
           getLastDefinedListItem(listItemStack.slice(0, -1)) ||
           headingStack[headingStack.length - 1]?.node;
-        const { uuid, nodeID, relevance, argument, hidden, basedOn } =
+        const { uuid, semanticID, relevance, argument, hidden, basedOn } =
           pendingAttrs;
         const effectiveRelevance = linkRelevance ?? relevance;
         const effectiveArgument = linkArgument ?? argument;
@@ -275,7 +285,7 @@ export function parseMarkdownHierarchy(
           text,
           children: [],
           ...(uuid !== undefined && { uuid }),
-          ...(nodeID !== undefined && { nodeID }),
+          ...(semanticID !== undefined && { semanticID }),
           ...(effectiveRelevance !== undefined && {
             relevance: effectiveRelevance,
           }),
@@ -315,11 +325,11 @@ function formatAttrs(
   uuid: string,
   relevance: Relevance,
   argument: Argument,
-  options?: { hidden?: boolean; basedOn?: LongID; nodeID?: ID }
+  options?: { hidden?: boolean; basedOn?: LongID; semanticID?: ID }
 ): string {
   const parts: string[] = uuid ? [uuid] : [];
-  if (options?.nodeID) {
-    parts.push(`node="${options.nodeID}"`);
+  if (options?.semanticID) {
+    parts.push(`semantic="${options.semanticID}"`);
   }
   if (relevance) {
     parts.push(`.${relevance}`);
@@ -342,19 +352,19 @@ function formatAttrs(
 function formatCrefText(
   knowledgeDBs: KnowledgeDBs,
   author: PublicKey,
-  nodeID: LongID | ID
+  refID: LongID | ID
 ): string | undefined {
-  const parsed = parseConcreteRefId(nodeID);
+  const parsed = parseConcreteRefId(refID);
   if (!parsed) {
     return undefined;
   }
-  const ref = buildOutgoingReference(nodeID as LongID, knowledgeDBs, author);
+  const ref = buildOutgoingReference(refID as LongID, knowledgeDBs, author);
   if (!ref) {
     return undefined;
   }
   const targetRelation = getConcreteRefTargetRelation(
     knowledgeDBs,
-    nodeID,
+    refID,
     author
   );
   const href = targetRelation ? `${targetRelation.id}` : `${parsed.relationID}`;
@@ -364,7 +374,7 @@ function formatCrefText(
 type SerializeResult = {
   lines: string[];
   nodeHashes: ImmutableSet<string>;
-  nodeIDs: ImmutableSet<string>;
+  semanticIDs: ImmutableSet<string>;
   relationUUIDs: ImmutableSet<string>;
 };
 
@@ -373,7 +383,7 @@ function getOwnRelationForDocumentSerialization(
   path: ViewPath,
   stack: ID[],
   author: PublicKey,
-  nodeID: LongID | ID,
+  itemID: LongID | ID,
   semanticContext: List<ID>,
   rootRelation: Relations,
   isRootNode: boolean
@@ -385,7 +395,7 @@ function getOwnRelationForDocumentSerialization(
   return getRelationsForCurrentTree(
     data.knowledgeDBs,
     author,
-    nodeID,
+    itemID,
     semanticContext,
     rootRelation.id,
     isRootNode,
@@ -396,7 +406,7 @@ function getOwnRelationForDocumentSerialization(
 function getSerializedRelationText(
   data: Data,
   relation: Relations,
-  nodeID: LongID | ID,
+  semanticID: LongID | ID,
   _context: List<ID>
 ): { text: string; textHash: ID } {
   if (relation.text !== "") {
@@ -407,8 +417,8 @@ function getSerializedRelationText(
   }
 
   const fallbackText =
-    getTextForSemanticID(data.knowledgeDBs, nodeID, relation.author) ??
-    shortID(nodeID as ID);
+    getTextForSemanticID(data.knowledgeDBs, semanticID, relation.author) ??
+    shortID(semanticID as ID);
   return {
     text: fallbackText,
     textHash: hashText(fallbackText),
@@ -436,18 +446,18 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
   return paths.reduce<SerializeResult>(
     (acc, path) => {
       const depth = path.length - 3;
-      const [nodeID] = getItemIDFromView(data, path);
+      const [itemID] = getItemIDFromView(data, path);
       const indent = "  ".repeat(depth);
-      const context = getContext(data, path, stack);
+      const semanticContext = getContext(data, path, stack);
       const item = getCurrentEdgeForView(data, path);
 
-      if (isConcreteRefId(nodeID)) {
-        const parsed = parseConcreteRefId(nodeID);
-        const crefText = formatCrefText(data.knowledgeDBs, author, nodeID);
+      if (isConcreteRefId(itemID)) {
+        const parsed = parseConcreteRefId(itemID);
+        const crefText = formatCrefText(data.knowledgeDBs, author, itemID);
         if (!crefText || !parsed) return acc;
         const targetRelation = getConcreteRefTargetRelation(
           data.knowledgeDBs,
-          nodeID,
+          itemID,
           author
         );
         const crefRelationUUID = shortID(
@@ -461,9 +471,9 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
           ...acc,
           lines: [...acc.lines, `${indent}- ${crefText}${crefAttrs}`],
           nodeHashes: crefNodeHashes,
-          nodeIDs: targetRelation
-            ? acc.nodeIDs.add(getRelationSemanticID(targetRelation))
-            : acc.nodeIDs,
+          semanticIDs: targetRelation
+            ? acc.semanticIDs.add(getRelationSemanticID(targetRelation))
+            : acc.semanticIDs,
           relationUUIDs: acc.relationUUIDs.add(crefRelationUUID),
         };
       }
@@ -473,8 +483,8 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
         path,
         stack,
         author,
-        nodeID,
-        context,
+        itemID,
+        semanticContext,
         rootRelation,
         isRoot(path)
       );
@@ -483,12 +493,12 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
             data,
             ownRelation,
             getRelationSemanticID(ownRelation),
-            context
+            semanticContext
           )
         : undefined;
-      const serializedNodeID = ownRelation
+      const serializedSemanticID = ownRelation
         ? getRelationSemanticID(ownRelation)
-        : (shortID(nodeID as ID) as ID);
+        : (shortID(itemID as ID) as ID);
       const text =
         serializedRelation?.text ?? getDisplayTextForView(data, path, stack);
       const uuid = ownRelation ? shortID(ownRelation.id) : v4();
@@ -499,7 +509,7 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
         item?.argument,
         {
           basedOn: ownRelation?.basedOn,
-          nodeID: serializedNodeID,
+          semanticID: serializedSemanticID,
         }
       )}`;
       return {
@@ -507,14 +517,14 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
         nodeHashes: acc.nodeHashes.add(
           serializedRelation?.textHash ?? hashText(text)
         ),
-        nodeIDs: acc.nodeIDs.add(serializedNodeID),
+        semanticIDs: acc.semanticIDs.add(serializedSemanticID),
         relationUUIDs: acc.relationUUIDs.add(uuid),
       };
     },
     {
       lines: [],
       nodeHashes: ImmutableSet<string>(),
-      nodeIDs: ImmutableSet<string>(),
+      semanticIDs: ImmutableSet<string>(),
       relationUUIDs: ImmutableSet<string>(),
     }
   );
@@ -523,12 +533,12 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
 function formatRootHeading(
   rootText: string,
   rootUuid: string,
-  rootNodeID: ID,
+  rootSemanticID: ID,
   anchor?: RootAnchor
 ): string {
-  const parts = [rootUuid, `node="${rootNodeID}"`];
+  const parts = [rootUuid, `semantic="${rootSemanticID}"`];
   if (anchor?.snapshotContext.size) {
-    parts.push(`context="${anchor.snapshotContext.join(":")}"`);
+    parts.push(`anchorContext="${anchor.snapshotContext.join(":")}"`);
   }
   if (anchor?.sourceAuthor) {
     parts.push(`sourceAuthor="${anchor.sourceAuthor}"`);
@@ -547,18 +557,18 @@ function formatRootHeading(
 
 export function treeToMarkdown(data: Data, rootRelation: Relations): string {
   const rootContext = getRelationContext(data.knowledgeDBs, rootRelation);
-  const rootNodeID = getRelationSemanticID(rootRelation);
+  const rootSemanticID = getRelationSemanticID(rootRelation);
   const { text: rootText } = getSerializedRelationText(
     data,
     rootRelation,
-    rootNodeID,
+    rootSemanticID,
     rootContext
   );
   const rootUuid = shortID(rootRelation.id);
   const rootLine = formatRootHeading(
     rootText,
     rootUuid,
-    rootNodeID,
+    rootSemanticID,
     rootRelation.anchor ?? createRootAnchor(rootContext)
   );
   const { lines } = serializeTree(data, rootRelation);
@@ -571,25 +581,25 @@ export function buildDocumentEvent(
 ): UnsignedEvent {
   const author = data.user.publicKey;
   const rootContext = getRelationContext(data.knowledgeDBs, rootRelation);
-  const rootNodeID = getRelationSemanticID(rootRelation);
+  const rootSemanticID = getRelationSemanticID(rootRelation);
   const { text: rootText, textHash: rootTextHash } = getSerializedRelationText(
     data,
     rootRelation,
-    rootNodeID,
+    rootSemanticID,
     rootContext
   );
   const rootUuid = shortID(rootRelation.id);
   const rootLine = formatRootHeading(
     rootText,
     rootUuid,
-    rootNodeID,
+    rootSemanticID,
     rootRelation.anchor ?? createRootAnchor(rootContext)
   );
   const result = serializeTree(data, rootRelation);
   const content = `${[rootLine, ...result.lines].join("\n")}\n`;
   const nTags = result.nodeHashes
     .add(rootTextHash)
-    .union(result.nodeIDs.add(rootNodeID))
+    .union(result.semanticIDs.add(rootSemanticID))
     .toArray()
     .map((value) => ["n", value]);
   const rTags = result.relationUUIDs
@@ -645,7 +655,7 @@ function materializeTreeNode(
   const node = {
     id: createSemanticID(
       treeNode.text,
-      treeNode.nodeID ??
+      treeNode.semanticID ??
         (treeNode.uuid ? semanticIDFromSeed(treeNode.uuid) : undefined)
     ),
     text: treeNode.text,
@@ -723,16 +733,16 @@ export function createNodesFromMarkdownTrees(
   ctx: WalkContext,
   trees: MarkdownTreeNode[],
   semanticContext: List<ID> = List<ID>()
-): [WalkContext, topNodeIDs: ID[], topRelationIDs: LongID[]] {
+): [WalkContext, topSemanticIDs: ID[], topRelationIDs: LongID[]] {
   return trees.filter((treeNode) => !treeNode.hidden).reduce(
-    ([accCtx, accTopNodeIDs, accTopRelationIDs], treeNode) => {
+    ([accCtx, accTopSemanticIDs, accTopRelationIDs], treeNode) => {
       const rootUuid = treeNode.uuid ?? v4();
       const treeWithUuid = treeNode.uuid
         ? treeNode
         : { ...treeNode, uuid: rootUuid };
       const treeSemanticContext =
         treeNode.anchor?.snapshotContext ?? semanticContext;
-      const [nextCtx, topNodeID, topRelationID] = materializeTreeNode(
+      const [nextCtx, topSemanticID, topRelationID] = materializeTreeNode(
         accCtx,
         treeWithUuid,
         treeSemanticContext,
@@ -740,7 +750,7 @@ export function createNodesFromMarkdownTrees(
       );
       return [
         nextCtx,
-        [...accTopNodeIDs, topNodeID],
+        [...accTopSemanticIDs, topSemanticID],
         [...accTopRelationIDs, topRelationID],
       ];
     },

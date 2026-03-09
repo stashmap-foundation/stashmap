@@ -104,13 +104,13 @@ export function planCreateNodesFromMarkdownTrees(
   plan: Plan,
   trees: MarkdownTreeNode[],
   context: List<ID> = List<ID>()
-): [Plan, topNodeIDs: ID[], topRelationIDs: LongID[]] {
+): [Plan, topItemIDs: ID[], topRelationIDs: LongID[]] {
   const ctx: WalkContext = {
     knowledgeDBs: plan.knowledgeDBs,
     publicKey: plan.user.publicKey,
     affectedRoots: plan.affectedRoots,
   };
-  const [resultCtx, topNodeIDs, topRelationIDs] = createNodesFromMarkdownTrees(
+  const [resultCtx, topItemIDs, topRelationIDs] = createNodesFromMarkdownTrees(
     ctx,
     trees,
     context
@@ -121,7 +121,7 @@ export function planCreateNodesFromMarkdownTrees(
       knowledgeDBs: resultCtx.knowledgeDBs,
       affectedRoots: resultCtx.affectedRoots,
     },
-    topNodeIDs,
+    topItemIDs,
     topRelationIDs,
   ];
 }
@@ -130,14 +130,14 @@ export function planCreateNodesFromMarkdownFiles(
   plan: Plan,
   files: MarkdownImportFile[],
   context: List<ID> = List<ID>()
-): [Plan, topNodeIDs: ID[]] {
+): [Plan, topItemIDs: ID[]] {
   const trees = parseMarkdownImportFiles(files);
-  const [nextPlan, topNodeIDs] = planCreateNodesFromMarkdownTrees(
+  const [nextPlan, topItemIDs] = planCreateNodesFromMarkdownTrees(
     plan,
     trees,
     context
   );
-  return [nextPlan, topNodeIDs];
+  return [nextPlan, topItemIDs];
 }
 
 function flattenTreeNodes(treeNodes: MarkdownTreeNode[]): MarkdownTreeNode[] {
@@ -150,15 +150,15 @@ export function planCreateNodesFromMarkdown(
   plan: Plan,
   markdownText: string,
   context: List<ID> = List<ID>()
-): [Plan, topNodeID: ID] {
-  const [nextPlan, topNodeIDs] = planCreateNodesFromMarkdownFiles(
+): [Plan, topItemID: ID] {
+  const [nextPlan, topItemIDs] = planCreateNodesFromMarkdownFiles(
     plan,
     [{ name: "Imported Markdown", markdown: markdownText }],
     context
   );
 
-  if (topNodeIDs.length > 0) {
-    return [nextPlan, topNodeIDs[0]];
+  if (topItemIDs.length > 0) {
+    return [nextPlan, topItemIDs[0]];
   }
 
   const fallbackNode = {
@@ -192,7 +192,7 @@ export function planPasteMarkdownTrees(
   return trees.reduce((accPlan, tree, idx) => {
     const insertAt =
       insertAtIndex !== undefined ? insertAtIndex + idx : undefined;
-    const [planWithNode, topNodeIDs, topRelationIDs] =
+    const [planWithNode, topItemIDs, topRelationIDs] =
       planCreateNodesFromMarkdownTrees(accPlan, [tree]);
     const [planWithAdded, actualIDs] = planAddToParent(
       planWithNode,
@@ -203,7 +203,7 @@ export function planPasteMarkdownTrees(
     );
     return planMoveTreeDescendantsToContext(
       planWithAdded,
-      topNodeIDs,
+      topItemIDs,
       topRelationIDs,
       actualIDs,
       parentViewPath,
@@ -238,11 +238,11 @@ export function FileDropZone({
         })
       );
 
-      const [planWithMarkdown, topNodeIDs] = planCreateNodesFromMarkdownFiles(
+      const [planWithMarkdown, topItemIDs] = planCreateNodesFromMarkdownFiles(
         createPlan(),
         markdownFiles
       );
-      onDrop(planWithMarkdown, topNodeIDs);
+      onDrop(planWithMarkdown, topItemIDs);
     },
   });
   const className = isDragActive ? "dimmed flex-col-100" : "flex-col-100";

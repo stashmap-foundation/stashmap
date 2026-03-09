@@ -45,11 +45,11 @@ const EMPTY_FIRST_VIRTUAL_KEYS: ImmutableSet<string> = ImmutableSet<string>();
 function getChildrenForConcreteRef(
   data: Data,
   parentPath: ViewPath,
-  parentNodeID: LongID | ID
+  parentItemID: LongID | ID
 ): TreeResult {
   const sourceRelation = getRelations(
     data.knowledgeDBs,
-    parentNodeID,
+    parentItemID,
     data.user.publicKey
   );
   if (!sourceRelation || sourceRelation.items.size === 0) {
@@ -74,7 +74,7 @@ function getChildrenForConcreteRef(
 function getChildrenForRegularNode(
   data: Data,
   parentPath: ViewPath,
-  parentNodeID: LongID | ID,
+  parentItemID: LongID | ID,
   stack: ID[],
   rootRelation: LongID | undefined,
   author: PublicKey,
@@ -85,12 +85,12 @@ function getChildrenForRegularNode(
   const context = getContext(data, parentPath, stack);
   const currentRoot = getParentRelation(data, parentPath)?.root;
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
-  const directRelations = isSearchId(parentNodeID as ID)
-    ? getRelations(data.knowledgeDBs, parentNodeID as ID, data.user.publicKey)
+  const directRelations = isSearchId(parentItemID as ID)
+    ? getRelations(data.knowledgeDBs, parentItemID as ID, data.user.publicKey)
     : getRelationForView(data, parentPath, stack);
   const relations = directRelations;
-  const relationNodeID = relations ? getRelationSemanticID(relations) : parentNodeID;
-  const coordinateNodeID = relations ? relationNodeID : parentNodeID;
+  const relationSemanticID = relations ? getRelationSemanticID(relations) : parentItemID;
+  const coordinateSemanticID = relations ? relationSemanticID : parentItemID;
   const coordinateContext = relations
     ? getRelationContext(data.knowledgeDBs, relations)
     : context;
@@ -122,7 +122,7 @@ function getChildrenForRegularNode(
 
   const incomingCrefs = getIncomingCrefsForNode(
     data.knowledgeDBs,
-    coordinateNodeID,
+    coordinateSemanticID,
     containingRelationID,
     relations?.id,
     author,
@@ -138,7 +138,7 @@ function getChildrenForRegularNode(
   const occurrences = activeFilters.includes("occurrence")
     ? getOccurrencesForNode(
         data.knowledgeDBs,
-        coordinateNodeID,
+        coordinateSemanticID,
         relations?.id,
         effectiveAuthor,
         coordinateContext,
@@ -166,7 +166,7 @@ function getChildrenForRegularNode(
     ? getSuggestionsForNode(
           data.knowledgeDBs,
           data.user.publicKey,
-          coordinateNodeID,
+          coordinateSemanticID,
           activeFilters,
           relations?.id,
           coordinateContext
@@ -183,17 +183,17 @@ function getChildrenForRegularNode(
     virtualType: VirtualType,
     crefIDs?: ImmutableSet<string>
   ): { paths: List<ViewPath>; virtualItems: VirtualItemsMap } =>
-    items.reduce((result, nodeID, idx) => {
+    items.reduce((result, itemID, idx) => {
       const pathWithRelations = addRelationsToLastElement(
         parentPath,
         relationId
       );
-      const path = [...pathWithRelations, nodeID] as ViewPath;
-      const isCref = crefIDs?.has(nodeID as string);
+      const path = [...pathWithRelations, itemID] as ViewPath;
+      const isCref = crefIDs?.has(itemID as string);
       return {
         paths: result.paths.push(path),
         virtualItems: result.virtualItems.set(viewPathToString(path), {
-          id: nodeID,
+          id: itemID,
           relevance: undefined as Relevance,
           virtualType,
           ...(isCref ? { isCref: true } : {}),
@@ -207,7 +207,7 @@ function getChildrenForRegularNode(
   };
   const versions = getVersionsForRelation(
     data.knowledgeDBs,
-    coordinateNodeID,
+    coordinateSemanticID,
     activeFilters,
     relations,
     coordinateContext,
@@ -253,16 +253,16 @@ export function getChildNodes(
   typeFilters: Pane["typeFilters"],
   options?: TreeTraversalOptions
 ): TreeResult {
-  const [parentNodeID] = getItemIDFromView(data, parentPath);
+  const [parentItemID] = getItemIDFromView(data, parentPath);
 
-  if (isConcreteRefId(parentNodeID)) {
-    return getChildrenForConcreteRef(data, parentPath, parentNodeID);
+  if (isConcreteRefId(parentItemID)) {
+    return getChildrenForConcreteRef(data, parentPath, parentItemID);
   }
 
   return getChildrenForRegularNode(
     data,
     parentPath,
-    parentNodeID,
+    parentItemID,
     stack,
     rootRelation,
     author,
@@ -296,9 +296,9 @@ export function getNodesInTree(
       const [, childView] = getItemIDFromView(data, childPath);
       const withChild = result.paths.push(childPath);
 
-      const [childNodeID] = getItemIDFromView(data, childPath);
+      const [childItemID] = getItemIDFromView(data, childPath);
       const shouldRecurse = options?.isMarkdownExport
-        ? !isConcreteRefId(childNodeID)
+        ? !isConcreteRefId(childItemID)
         : childView.expanded;
       if (shouldRecurse) {
         const sub = getNodesInTree(

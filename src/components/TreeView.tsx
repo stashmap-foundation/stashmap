@@ -25,7 +25,7 @@ import {
   usePaneIndex,
 } from "../SplitPanesContext";
 import {
-  addNodeToFilters,
+  addItemToFilters,
   addReferencedByToFilters,
   addListToFilters,
   createBaseFilter,
@@ -41,7 +41,7 @@ import {
   parseConcreteRefId,
   getConcreteRefTargetRelation,
   getRelationsNoReferencedBy,
-  getRelationItemNodeID,
+  getRelationItemSemanticID,
   getRelationSemanticID,
   getRelationStack,
 } from "../connections";
@@ -222,38 +222,38 @@ export function TreeViewNodeLoader({
     effectiveAuthor
   );
 
-  const nodeIDs = nodes.map((path) => getItemIDFromView(data, path)[0]);
+  const itemIDs = nodes.map((path) => getItemIDFromView(data, path)[0]);
 
-  const nodeIDsWithRange = range
-    ? nodeIDs.slice(range.startIndex, range.endIndex + 1 + LOAD_EXTRA) // +1 because slice doesn't include last element
-    : nodeIDs;
+  const itemIDsWithRange = range
+    ? itemIDs.slice(range.startIndex, range.endIndex + 1 + LOAD_EXTRA) // +1 because slice doesn't include last element
+    : itemIDs;
 
-  const filter = nodeIDsWithRange.reduce((rdx, nodeID) => {
-    const withNode = addNodeToFilters(
+  const filter = itemIDsWithRange.reduce((rdx, itemID) => {
+    const withItem = addItemToFilters(
       rdx,
-      nodeID,
+      itemID,
       data.knowledgeDBs,
       data.user.publicKey
     );
 
-    if (!isConcreteRefId(nodeID)) {
+    if (!isConcreteRefId(itemID)) {
       return addReferencedByToFilters(
-        withNode,
-        nodeID,
+        withItem,
+        itemID,
         data.knowledgeDBs,
         data.user.publicKey
       );
     }
 
-    const parsed = parseConcreteRefId(nodeID);
+    const parsed = parseConcreteRefId(itemID);
     if (!parsed) {
-      return withNode;
+      return withItem;
     }
 
     const withRelation = addListToFilters(
-      withNode,
+      withItem,
       parsed.relationID,
-      nodeID,
+      itemID,
       data.knowledgeDBs,
       data.user.publicKey
     );
@@ -269,22 +269,22 @@ export function TreeViewNodeLoader({
 
     const targetRelation = getConcreteRefTargetRelation(
       data.knowledgeDBs,
-      nodeID,
+      itemID,
       data.user.publicKey
     );
-    const contextNodes = getRelationStack(data.knowledgeDBs, relation);
-    const withContextNodes = contextNodes.reduce(
-      (acc, contextNodeID) =>
-        addNodeToFilters(
+    const contextSemanticIDs = getRelationStack(data.knowledgeDBs, relation);
+    const withContextSemanticIDs = contextSemanticIDs.reduce(
+      (acc, contextSemanticID) =>
+        addItemToFilters(
           acc,
-          contextNodeID,
+          contextSemanticID,
           data.knowledgeDBs,
           data.user.publicKey
         ),
       withRelation
     );
-    return addNodeToFilters(
-      withContextNodes,
+    return addItemToFilters(
+      withContextSemanticIDs,
       getRelationSemanticID(targetRelation || relation),
       data.knowledgeDBs,
       data.user.publicKey
@@ -296,7 +296,7 @@ export function TreeViewNodeLoader({
 
   return (
     <RegisterQuery
-      nodesBeeingQueried={nodeIDs.map((longID) => shortID(longID)).toArray()}
+      idsBeingQueried={itemIDs.map((longID) => shortID(longID)).toArray()}
       allEventsProcessed={allEventsProcessed}
     >
       {children}
@@ -506,7 +506,7 @@ export function TreeView(): JSX.Element {
   const data = useData();
   const viewPath = useViewPath();
   const effectiveAuthor = getEffectiveAuthor(data, viewPath);
-  const [rootNodeID] = getItemIDFromView(data, viewPath);
+  const [rootItemID] = getItemIDFromView(data, viewPath);
   const baseFilter = createBaseFilter(
     data.contacts,
     data.projectMembers,
@@ -515,12 +515,12 @@ export function TreeView(): JSX.Element {
   );
 
   const searchFilter = (() => {
-    if (!isSearchId(rootNodeID as ID)) {
+    if (!isSearchId(rootItemID as ID)) {
       return baseFilter;
     }
     const searchRelation = getRelations(
       data.knowledgeDBs,
-      rootNodeID as ID,
+      rootItemID as ID,
       data.user.publicKey
     );
     if (!searchRelation) {
@@ -530,7 +530,7 @@ export function TreeView(): JSX.Element {
       (rdx, item) =>
         addReferencedByToFilters(
           rdx,
-          getRelationItemNodeID(
+          getRelationItemSemanticID(
             data.knowledgeDBs,
             item,
             searchRelation.author

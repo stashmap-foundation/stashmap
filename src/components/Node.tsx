@@ -27,7 +27,7 @@ import { planBatchIndent, planBatchOutdent } from "./batchOperations";
 import {
   getRefLinkTargetInfo,
   getRefTargetInfo,
-  isEmptyNodeID,
+  isEmptySemanticID,
   isConcreteRefId,
   computeEmptyNodeMetadata,
 } from "../connections";
@@ -90,11 +90,11 @@ function getLevels(viewPath: ViewPath): number {
 }
 
 function ExpandCollapseToggle(): JSX.Element | null {
-  const [nodeID] = useCurrentItemID();
+  const [itemID] = useCurrentItemID();
   const displayText = useDisplayText();
   const onToggleExpanded = useOnToggleExpanded();
   const isExpanded = useIsExpanded();
-  const isEmptyNode = isEmptyNodeID(nodeID);
+  const isEmptyNode = isEmptySemanticID(itemID);
   const onToggle = (): void => {
     if (isEmptyNode) return;
     onToggleExpanded(!isExpanded);
@@ -211,14 +211,14 @@ function EditableContent(): JSX.Element {
   const data = useData();
   const { createPlan, executePlan } = usePlanner();
   const currentRelation = useCurrentRelation();
-  const [nodeID] = useCurrentItemID();
+  const [itemID] = useCurrentItemID();
   const displayText = useDisplayText();
   const prevSibling = usePreviousSibling();
   const parentPath = getParentView(viewPath);
   const viewIsExpanded = useIsExpanded();
   const nodeIsRoot = useIsRoot();
   const relationIndex = useRelationIndex();
-  const isEmptyNode = isEmptyNodeID(nodeID);
+  const isEmptyNode = isEmptySemanticID(itemID);
   const nodeHasChildren = useNodeHasChildren();
   const nodeIsExpanded = viewIsExpanded && nodeHasChildren;
 
@@ -240,11 +240,11 @@ function EditableContent(): JSX.Element {
     plan: Plan,
     targetViewPath: ViewPath
   ): Plan => {
-    const [targetNodeID] = getItemIDFromView(plan, targetViewPath);
+    const [targetItemID] = getItemIDFromView(plan, targetViewPath);
     return planSetRowFocusIntent(plan, {
       paneIndex,
       viewKey: viewPathToString(targetViewPath),
-      nodeId: targetNodeID,
+      nodeId: targetItemID,
     });
   };
 
@@ -415,7 +415,7 @@ function EditableContent(): JSX.Element {
     rowIndex?: number;
   }): void => {
     const focusTargetNodeId =
-      nodeId && !isEmptyNodeID(nodeId as ID) ? nodeId : undefined;
+      nodeId && !isEmptySemanticID(nodeId as ID) ? nodeId : undefined;
     if (
       viewKey === undefined &&
       focusTargetNodeId === undefined &&
@@ -505,12 +505,12 @@ function InteractiveNodeContent(): JSX.Element {
   const viewPath = useViewPath();
   const stack = usePaneStack();
   const currentRelation = useCurrentRelation();
-  const [nodeID] = useCurrentItemID();
+  const [itemID] = useCurrentItemID();
   const isLoading = useNodeIsLoading();
   const isInSearchView = useIsInSearchView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const virtualType = useCurrentEdge()?.virtualType;
-  const isEmptyNode = isEmptyNodeID(nodeID);
+  const isEmptyNode = isEmptySemanticID(itemID);
   const displayText = useDisplayText();
   const reference = getCurrentReferenceForView(
     data,
@@ -695,11 +695,11 @@ export function Node({
   const clsBody = cardBodyClassName || "ps-0";
 
   const { user } = useData();
-  const [nodeID] = useCurrentItemID();
+  const [itemID] = useCurrentItemID();
   const data = useData();
   const stack = usePaneStack();
   const currentRelation = useCurrentRelation();
-  const isConcreteRef = isConcreteRefId(nodeID);
+  const isConcreteRef = isConcreteRefId(itemID);
   const virtualType = useCurrentEdge()?.virtualType;
   const isViewingOtherUser = useIsViewingOtherUserContent();
   const node = getCurrentReferenceForView(data, viewPath, stack, virtualType);

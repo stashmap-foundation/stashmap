@@ -49,10 +49,10 @@ import { NavigationStateProvider } from "./NavigationStateContext";
 
 export const defaultPane = (
   author: PublicKey,
-  rootNodeID?: LongID | ID
+  rootItemID?: LongID | ID
 ): Pane => ({
   id: generatePaneId(),
-  stack: rootNodeID ? [rootNodeID] : [],
+  stack: rootItemID ? [rootItemID] : [],
   author,
 });
 

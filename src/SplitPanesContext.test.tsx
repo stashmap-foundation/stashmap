@@ -125,7 +125,7 @@ test("usePaneIndex returns correct index for different panes", () => {
 function TestPaneNavigation(): JSX.Element {
   const { setPane } = useSplitPanes();
   const pane = useCurrentPane();
-  const rootNodeID = pane.stack[pane.stack.length - 1];
+  const rootItemID = pane.stack[pane.stack.length - 1];
 
   const popTo = (index: number): void => {
     if (index >= 0 && index < pane.stack.length) {
@@ -140,7 +140,7 @@ function TestPaneNavigation(): JSX.Element {
   return (
     <div>
       <div data-testid="stack">{pane.stack.join(",")}</div>
-      <div data-testid="root-node-id">{rootNodeID}</div>
+      <div data-testid="root-item-id">{rootItemID}</div>
       <button type="button" onClick={() => popTo(pane.stack.length - 2)}>
         Pop
       </button>
@@ -159,7 +159,7 @@ function TestPaneNavigation(): JSX.Element {
   );
 }
 
-test("popTo(length-2) removes last item and updates rootNodeID", async () => {
+test("popTo(length-2) removes last item and updates rootItemID", async () => {
   renderWithTestData(<TestPaneNavigation />);
 
   await screen.findByTestId("stack");
@@ -168,7 +168,7 @@ test("popTo(length-2) removes last item and updates rootNodeID", async () => {
 
   await act(async () => fireEvent.click(screen.getByText("Pop")));
   expect(screen.getByTestId("stack").textContent).toBe("new1,new2");
-  expect(screen.getByTestId("root-node-id").textContent).toBe("new2");
+  expect(screen.getByTestId("root-item-id").textContent).toBe("new2");
 });
 
 test("popTo with invalid index does not change stack", async () => {
@@ -179,7 +179,7 @@ test("popTo with invalid index does not change stack", async () => {
 
   await act(async () => fireEvent.click(screen.getByText("Pop")));
   expect(screen.getByTestId("stack").textContent).toBe("");
-  expect(screen.getByTestId("root-node-id").textContent).toBe("");
+  expect(screen.getByTestId("root-item-id").textContent).toBe("");
 });
 
 test("popTo navigates to specific stack index", async () => {
@@ -191,7 +191,7 @@ test("popTo navigates to specific stack index", async () => {
 
   await act(async () => fireEvent.click(screen.getByText("Pop To 0")));
   expect(screen.getByTestId("stack").textContent).toBe("new1");
-  expect(screen.getByTestId("root-node-id").textContent).toBe("new1");
+  expect(screen.getByTestId("root-item-id").textContent).toBe("new1");
 });
 
 test("setPane replaces entire stack with new path", async () => {
@@ -202,5 +202,5 @@ test("setPane replaces entire stack with new path", async () => {
 
   await act(async () => fireEvent.click(screen.getByText("Set Stack")));
   expect(screen.getByTestId("stack").textContent).toBe("new1,new2,new3");
-  expect(screen.getByTestId("root-node-id").textContent).toBe("new3");
+  expect(screen.getByTestId("root-item-id").textContent).toBe("new3");
 });

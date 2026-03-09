@@ -9,7 +9,7 @@ import {
   itemPassesFilters,
   getTextHashForSemanticID,
   getTextForSemanticID,
-  getRelationItemNodeID,
+  getRelationItemSemanticID,
   getRelationContext,
   getRelationSemanticID,
 } from "./connections";
@@ -120,12 +120,12 @@ function resolveLabels(
 
 function getSemanticNodeKey(
   knowledgeDBs: KnowledgeDBs,
-  nodeID: LongID | ID,
+  semanticID: LongID | ID,
   author: PublicKey
 ): string {
   return (
-    getTextHashForSemanticID(knowledgeDBs, nodeID, author) ||
-    shortID(nodeID as ID)
+    getTextHashForSemanticID(knowledgeDBs, semanticID, author) ||
+    shortID(semanticID as ID)
   );
 }
 
@@ -160,8 +160,8 @@ function relationsMatchForVersion(
       ) &&
     leftContext.size === rightContext.size &&
     leftContext.every(
-      (nodeID, index) =>
-        getSemanticNodeKey(knowledgeDBs, nodeID, left.author) ===
+      (semanticID, index) =>
+        getSemanticNodeKey(knowledgeDBs, semanticID, left.author) ===
         getSemanticNodeKey(
           knowledgeDBs,
           rightContext.get(index) as ID,
@@ -249,7 +249,7 @@ function effectiveIDs(
     .map((item) =>
       getSemanticNodeKey(
         knowledgeDBs,
-        getRelationItemNodeID(knowledgeDBs, item, relation.author),
+        getRelationItemSemanticID(knowledgeDBs, item, relation.author),
         relation.author
       )
     )

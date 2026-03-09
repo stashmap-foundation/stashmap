@@ -63,6 +63,7 @@ import { getAlternativeRelations } from "./footerSemantics";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useRelaysToCreatePlan } from "./relays";
 import { mergePublishResultsOfEvents } from "./commons/PublishingStatus";
+import { createRootAnchor } from "./rootAnchor";
 import {
   MultiSelectionState,
   clearSelection,
@@ -751,6 +752,7 @@ function planCopyDescendantRelations(
     copiedRoot = copiedRoot ?? baseRelation.root;
     return {
       source: relation,
+      newContext,
       sourceParentID: getEffectiveParentRelationID(relation),
       copy: baseRelation,
     };
@@ -762,7 +764,7 @@ function planCopyDescendantRelations(
   );
 
   const resultPlan = copiedRelations.reduce(
-    (accPlan, { source, sourceParentID, copy }) => {
+    (accPlan, { source, newContext, sourceParentID, copy }) => {
       const isRootRelation = source.id === sourceRelation.id;
       const items = source.items.map((item) => {
         const mappedID = resultMapping.get(item.id as LongID);
@@ -775,6 +777,10 @@ function planCopyDescendantRelations(
           ? targetParentRelationID
           : sourceParentID
             ? resultMapping.get(sourceParentID)
+            : undefined,
+        anchor:
+          isRootRelation && !targetParentRelationID
+            ? createRootAnchor(newContext, source)
             : undefined,
         text: source.text,
         textHash: source.textHash,
@@ -812,10 +818,13 @@ export function planMoveDescendantRelations(
         );
     return planUpsertRelations(accPlan, {
       ...relation,
-      context: newContext,
       parent: isRootRelation
         ? targetParentRelationID
         : getEffectiveParentRelationID(relation),
+      anchor:
+        isRootRelation && !targetParentRelationID
+          ? createRootAnchor(newContext)
+          : undefined,
       root: root ?? relation.root,
     });
   }, plan);

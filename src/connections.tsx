@@ -2,6 +2,7 @@ import { List, Set, Map } from "immutable";
 import crypto from "crypto";
 import { newRelations } from "./ViewContext";
 import { SEARCH_PREFIX } from "./constants";
+import { getRootAnchorContext, rootAnchorsEqual } from "./rootAnchor";
 
 // Content-addressed node ID generation
 // Node ID = sha256(text).slice(0, 32) - no author prefix
@@ -245,7 +246,7 @@ export function getRelationContext(
     }
   }
 
-  const fallbackContext = relation.context;
+  const fallbackContext = getRootAnchorContext(relation);
   if (!relation.parent) {
     if (db) {
       getRelationContextIndex(db).set(relationKey, fallbackContext);
@@ -667,11 +668,13 @@ export function ensureRelationNativeFields(
         ? hashText(text)
         : relationNodeID;
   const parent = relation.parent || existingRelation?.parent;
+  const anchor = parent ? undefined : relation.anchor ?? existingRelation?.anchor;
 
   if (
     relation.text === text &&
     relation.textHash === textHash &&
-    relation.parent === parent
+    relation.parent === parent &&
+    rootAnchorsEqual(relation.anchor, anchor)
   ) {
     return relation;
   }
@@ -681,6 +684,7 @@ export function ensureRelationNativeFields(
     text,
     textHash,
     parent,
+    anchor,
   };
 }
 

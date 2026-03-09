@@ -27,6 +27,7 @@ import {
   buildReferenceItem,
 } from "./buildReferenceNode";
 import { newDB } from "./knowledge";
+import { createRootAnchor } from "./rootAnchor";
 import { useData } from "./DataContext";
 import { Plan, planUpsertRelations, getPane } from "./planner";
 import { usePaneStack } from "./SplitPanesContext";
@@ -1053,11 +1054,11 @@ export function newRelations(
         : localNodeID;
   return {
     items: List<RelationItem>(),
-    context,
     id,
     text: relationText,
     textHash: relationTextHash,
     parent,
+    anchor: !parent ? createRootAnchor(context) : undefined,
     updated: Date.now(),
     author: myself,
     root: root ?? shortID(id),

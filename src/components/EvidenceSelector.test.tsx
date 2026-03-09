@@ -144,7 +144,6 @@ describe("updateItemArgument", () => {
         { id: "node1" as ID, relevance: undefined as Relevance },
         { id: "node2" as ID, relevance: undefined as Relevance },
       ]),
-      context: List(),
       id: "rel1" as LongID,
       text: "head",
       textHash: hashText("head"),
@@ -168,7 +167,6 @@ describe("updateItemArgument", () => {
           argument: "confirms" as Argument,
         },
       ]),
-      context: List(),
       id: "rel1" as LongID,
       text: "head",
       textHash: hashText("head"),
@@ -187,7 +185,6 @@ describe("updateItemArgument", () => {
       items: List([
         { id: "node1" as ID, relevance: undefined as Relevance },
       ]),
-      context: List(),
       id: "rel1" as LongID,
       text: "head",
       textHash: hashText("head"),

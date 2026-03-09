@@ -235,13 +235,21 @@ declare global {
     linkText?: string;
   };
 
+  type RootAnchor = {
+    snapshotContext: Context;
+    sourceAuthor?: PublicKey;
+    sourceRootID?: ID;
+    sourceRelationID?: LongID;
+    sourceParentRelationID?: LongID;
+  };
+
   type Relations = {
     items: List<RelationItem>;
-    context: Context;
     id: LongID;
     text: string;
     textHash: ID;
     parent?: LongID;
+    anchor?: RootAnchor;
     updated: number;
     author: PublicKey;
     basedOn?: LongID;

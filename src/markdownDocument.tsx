@@ -36,6 +36,7 @@ import { KIND_KNOWLEDGE_DOCUMENT, newTimestamp, msTag } from "./nostr";
 import { findTag } from "./commons/useNostrQuery";
 import { getNodesInTree } from "./treeTraversal";
 import { newDB } from "./knowledge";
+import { createRootAnchor } from "./rootAnchor";
 
 const markdown = new MarkdownIt();
 markdown.use(attrs);
@@ -75,7 +76,7 @@ function extractAttrs(token: Token): {
   argument: Argument;
   hidden: boolean;
   basedOn: string | undefined;
-  context: string | undefined;
+  anchor: RootAnchor | undefined;
 } {
   if (!token.attrs) {
     return {
@@ -85,7 +86,7 @@ function extractAttrs(token: Token): {
       argument: undefined,
       hidden: false,
       basedOn: undefined,
-      context: undefined,
+      anchor: undefined,
     };
   }
   const uuid = token.attrs.find(([, value]) => value === "")?.[0];
@@ -101,7 +102,33 @@ function extractAttrs(token: Token): {
   const hidden = classes.includes("hidden");
   const basedOn = token.attrGet("basedOn") || undefined;
   const context = token.attrGet("context") || undefined;
-  return { uuid, nodeID, relevance, argument, hidden, basedOn, context };
+  const sourceAuthor = token.attrGet("sourceAuthor") || undefined;
+  const sourceRootID = (token.attrGet("sourceRoot") || undefined) as
+    | ID
+    | undefined;
+  const sourceRelationID = (token.attrGet("sourceRelation") || undefined) as
+    | LongID
+    | undefined;
+  const sourceParentRelationID = (
+    token.attrGet("sourceParent") || undefined
+  ) as LongID | undefined;
+  const anchor =
+    context ||
+    sourceAuthor ||
+    sourceRootID ||
+    sourceRelationID ||
+    sourceParentRelationID
+      ? {
+          snapshotContext: context
+            ? List(context.split(":") as ID[])
+            : List<ID>(),
+          ...(sourceAuthor ? { sourceAuthor: sourceAuthor as PublicKey } : {}),
+          ...(sourceRootID ? { sourceRootID } : {}),
+          ...(sourceRelationID ? { sourceRelationID } : {}),
+          ...(sourceParentRelationID ? { sourceParentRelationID } : {}),
+        }
+      : undefined;
+  return { uuid, nodeID, relevance, argument, hidden, basedOn, anchor };
 }
 
 export type MarkdownTreeNode = {
@@ -114,7 +141,7 @@ export type MarkdownTreeNode = {
   linkHref?: string;
   hidden?: boolean;
   basedOn?: string;
-  context?: string;
+  anchor?: RootAnchor;
 };
 
 /* eslint-disable functional/immutable-data, functional/no-let, no-continue */
@@ -157,6 +184,7 @@ export function parseMarkdownHierarchy(
     argument: Argument;
     hidden: boolean;
     basedOn: string | undefined;
+    anchor: RootAnchor | undefined;
   } = {
     uuid: undefined,
     nodeID: undefined,
@@ -164,6 +192,7 @@ export function parseMarkdownHierarchy(
     argument: undefined,
     hidden: false,
     basedOn: undefined,
+    anchor: undefined,
   };
 
   for (let i = 0; i < tokens.length; i += 1) {
@@ -178,7 +207,7 @@ export function parseMarkdownHierarchy(
       if (!text) {
         continue;
       }
-      const { uuid, nodeID, relevance, argument, hidden, basedOn, context } =
+      const { uuid, nodeID, relevance, argument, hidden, basedOn, anchor } =
         extractAttrs(token);
       while (
         headingStack.length > 0 &&
@@ -198,7 +227,7 @@ export function parseMarkdownHierarchy(
         ...(argument !== undefined && { argument }),
         ...(hidden && { hidden }),
         ...(basedOn !== undefined && { basedOn }),
-        ...(context !== undefined && { context }),
+        ...(anchor !== undefined && { anchor }),
       };
       appendNode(roots, parent, node);
       headingStack.push({ level: headingLevel, node });
@@ -502,11 +531,23 @@ function formatRootHeading(
   rootText: string,
   rootUuid: string,
   rootNodeID: ID,
-  context: List<ID>
+  anchor?: RootAnchor
 ): string {
   const parts = [rootUuid, `node="${rootNodeID}"`];
-  if (context.size > 0) {
-    parts.push(`context="${context.join(":")}"`);
+  if (anchor?.snapshotContext.size) {
+    parts.push(`context="${anchor.snapshotContext.join(":")}"`);
+  }
+  if (anchor?.sourceAuthor) {
+    parts.push(`sourceAuthor="${anchor.sourceAuthor}"`);
+  }
+  if (anchor?.sourceRootID) {
+    parts.push(`sourceRoot="${anchor.sourceRootID}"`);
+  }
+  if (anchor?.sourceRelationID) {
+    parts.push(`sourceRelation="${anchor.sourceRelationID}"`);
+  }
+  if (anchor?.sourceParentRelationID) {
+    parts.push(`sourceParent="${anchor.sourceParentRelationID}"`);
   }
   return `# ${rootText} {${parts.join(" ")}}`;
 }
@@ -521,7 +562,12 @@ export function treeToMarkdown(data: Data, rootRelation: Relations): string {
     rootContext
   );
   const rootUuid = shortID(rootRelation.id);
-  const rootLine = formatRootHeading(rootText, rootUuid, rootNodeID, rootContext);
+  const rootLine = formatRootHeading(
+    rootText,
+    rootUuid,
+    rootNodeID,
+    rootRelation.anchor ?? createRootAnchor(rootContext)
+  );
   const { lines } = serializeTree(data, rootRelation);
   return `${[rootLine, ...lines].join("\n")}\n`;
 }
@@ -540,7 +586,12 @@ export function buildDocumentEvent(
     rootContext
   );
   const rootUuid = shortID(rootRelation.id);
-  const rootLine = formatRootHeading(rootText, rootUuid, rootNodeID, rootContext);
+  const rootLine = formatRootHeading(
+    rootText,
+    rootUuid,
+    rootNodeID,
+    rootRelation.anchor ?? createRootAnchor(rootContext)
+  );
   const result = serializeTree(data, rootRelation);
   const content = `${[rootLine, ...result.lines].join("\n")}\n`;
   const nTags = result.nodeHashes
@@ -626,6 +677,9 @@ function materializeTreeNode(
     text: node.text,
     textHash: node.textHash ?? hashText(node.text),
     parent,
+    anchor: parent
+      ? undefined
+      : treeNode.anchor ?? createRootAnchor(context),
   };
 
   const childContext = context.push(relationBaseWithFields.textHash);
@@ -691,9 +745,7 @@ export function createNodesFromMarkdownTrees(
       const treeWithUuid = treeNode.uuid
         ? treeNode
         : { ...treeNode, uuid: rootUuid };
-      const treeContext = treeNode.context
-        ? List(treeNode.context.split(":") as ID[])
-        : context;
+      const treeContext = treeNode.anchor?.snapshotContext ?? context;
       const [nextCtx, topNodeID, topRelationID] = materializeTreeNode(
         accCtx,
         treeWithUuid,

@@ -1,203 +1,391 @@
 # Architecture
 
-Stashmap is a decentralized knowledge management tool built on Nostr. Users create hierarchical trees of notes, link them with semantic relations, and collaborate via relay-based sync.
+Stashmap is a decentralized knowledge tool built on Nostr. The app stores and syncs trees of `Relations`, not a separate node graph. Tree structure is relation-first; semantic matching is an explicit secondary subsystem.
 
-## Data Model
+## Current Status
 
-**Content-addressed nodes**: `hashText(text).slice(0,32)` — same text always produces the same ID. Special IDs: `EMPTY_NODE_ID`, `VERSIONS_NODE_ID` (`~Versions`), `LOG_NODE_ID` (`~Log`).
+This document reflects the code as of March 10, 2026.
 
-**ID types**:
-- `ID` — 32-char hex hash of node text. Nodes are always identified by short ID.
-- `LongID` — `publicKey_shortID`. Only relations have LongIDs (per-author).
-- `PublicKey` — Nostr pubkey
-- Concrete ref IDs: `cref:relationID` or `cref:relationID:targetNode`
-- Search IDs: `search:query`
+Important architectural cuts that are already done:
+- `KnowledgeData.nodes` is gone
+- `Relations.head` and stored `Relations.context` are gone
+- `cref` is `cref:relationID` only
+- `~versions` / hidden rename-history subtrees are gone
+- document persistence is the only runtime write format
+- `~Log` is an explicit system root, not a semantic special case
 
-**KnowledgeData** (`Map<PublicKey, { nodes, relations, tombstones }>`): Each user has their own set of nodes, relations, and tombstones. Multiple users' data is merged for display.
+## Core Data Model
 
-**Relations** represent parent→children links with context:
-- `head`: parent node ID
-- `items`: `List<RelationItem>` — children with optional relevance/argument/virtualType
-- `context`: `List<ID>` — ancestor path to the head node
-- Same node can have different children in different contexts
+### IDs
 
-**RelationItem properties**:
-- `relevance`: "relevant" | "maybe_relevant" | "little_relevant" | "not_relevant" | undefined (=contains)
-- `argument`: "confirms" | "contra" | undefined
-- `virtualType`: "suggestion" | "incoming" | "version" | "occurrence" | "search"
+- `ID`: short 32-char semantic/content identifier
+- `LongID`: relation UUID with author prefix, e.g. `pubkey_uuid`
+- `PublicKey`: Nostr pubkey
 
-## Component Hierarchy
+Current identifier meanings:
+- `relationID`: a concrete relation UUID (`LongID`)
+- `semanticID`: semantic/content identity, currently `relation.textHash`
+- `rowID`: view-layer row identifier
+  - may be a `relationID`
+  - may be `cref:relationID`
+  - may be a search ID
+  - may be the temporary empty-row placeholder ID
 
+Search IDs still use `search:query`.
+
+Concrete references use:
+- `cref:relationID`
+
+There is no `nodeID` concept in the runtime architecture anymore.
+
+### KnowledgeDB
+
+Each author has one `KnowledgeData`:
+
+```ts
+type KnowledgeData = {
+  relations: OrderedMap<string, Relations>;
+}
 ```
-App (Routes: /n/*, /r/:id, /, profile, follow, relays)
-└── Dashboard → AppLayout
-    ├── NavbarControls (home, search, user menu)
-    └── DND (drag-drop context)
-        └── SplitPaneLayout
-            └── Pane[0..N] → TreeView (virtualized via react-virtuoso)
-                └── Node (recursive tree items)
+
+`KnowledgeDBs` is `Map<PublicKey, KnowledgeData>`.
+
+The app merges multiple authors' relation sets for display, but relations remain author-owned.
+
+### Relations
+
+`Relations` is the tree object:
+
+```ts
+type Relations = {
+  id: LongID;
+  items: List<RelationItem>;
+  text: string;
+  textHash: ID;
+  parent?: LongID;
+  root: ID;
+  author: PublicKey;
+  updated: number;
+  basedOn?: LongID;
+  anchor?: RootAnchor;
+  systemRole?: "log";
+}
 ```
 
-## Pane System (`SplitPanesContext.tsx`)
+Important invariants:
+- `id` is the structural identity
+- `text` is the visible label
+- `textHash` is the semantic identity
+- `parent` is the only stored structural ancestry link
+- `root` groups relations into one persisted document
+- standalone roots satisfy `root === shortID(id)`
 
-A `Pane` holds navigation state for one column:
-- `stack: ID[]` — node path (navigation history)
-- `author: PublicKey` — whose perspective to view
-- `rootRelation?: LongID` — show a specific relation as root (when navigating via cref)
-- `searchQuery?`, `scrollToNodeId?`
+`RelationItem` is the parent-child edge:
 
-Operations: `addPaneAt`, `removePane`, `setPane`. Panes persisted to localStorage.
+```ts
+type RelationItem = {
+  id: LongID | ID;
+  relevance: Relevance;
+  argument?: Argument;
+  virtualType?: VirtualType;
+  isCref?: boolean;
+  linkText?: string;
+}
+```
 
-Root node for a pane: `stack[stack.length - 1]` or `EMPTY_NODE_ID` if stack is empty.
+Interpretation:
+- normal children point to child relation IDs
+- refs point to `cref:relationID`
+- virtual rows are view-layer projections over relation items
 
-**Per-pane navigation history** (`PaneHistoryContext.tsx`): Stores previous `Pane` states per pane ID (max 50). `useNavigatePane()` pushes current pane state to history before navigating. The back button pops from this history and uses `replaceNextNavigation()` from `NavigationStateContext` to avoid polluting browser history. History is cleaned up when a pane is removed.
+### Root Anchors
 
-## View System (`ViewContext.tsx`)
+Stored context was replaced by explicit root-only anchor metadata:
 
-Views track UI state (expansion) per node per position in the tree.
+```ts
+type RootAnchor = {
+  snapshotContext: Context;
+  snapshotLabels?: string[];
+  sourceAuthor?: PublicKey;
+  sourceRootID?: ID;
+  sourceRelationID?: LongID;
+  sourceParentRelationID?: LongID;
+}
+```
 
-**ViewPath**: `[paneIndex, ...SubPathWithRelations[], SubPath]` — uniquely identifies a node's position. Serialized as `p0:nodeA:0:rel1:nodeB:0`.
+Purpose:
+- preserve semantic origin for standalone subtree forks/copies
+- support breadcrumb/source navigation
+- keep footer/list semantic matching stable even if the live source moves
 
-**View**: `{ expanded?: boolean, typeFilters?: [...] }`. Stored in `Views: Map<string, View>`.
+Rules:
+- only standalone roots may carry `anchor`
+- non-roots derive semantic context from `parent` chain
+- roots derive semantic context from `anchor.snapshotContext`
 
-**Defaults**: Root/search nodes default to `expanded: true`; non-root nodes default to `expanded: false`. `updateView` deletes keys that match defaults (storage optimization).
+### System Roots
 
-Views persist across pane navigation — expansion state is NOT cleared when pane content changes.
+Special roots are explicit metadata now, not semantic conventions.
 
-## Navigation (`navigationUrl.ts`)
+Currently supported:
+- `systemRole: "log"`
 
-URL patterns:
-- `/n/Parent/Child/Grandchild` → `pathToStack()` → array of hashed IDs
-- `/r/relationID` → direct relation view
-- `?author=publicKey` → view another user's perspective
-- `#nodeID` → scroll target
+`~Log` is the display text for the `"log"` system root, but root identity is the `systemRole`, not the text hash.
 
-`useNavigatePane()` updates the current pane's stack/rootRelation based on a URL.
+Helpers live in:
+- [systemRoots.ts](/Users/f/sandbox/stashmap-3/src/systemRoots.ts)
 
-## Home And Log
+## Tree, Views, And Panes
 
-- `~Log` is the current home/log node (`LOG_NODE_ID`)
-- Creating a new standalone root relation automatically prepends a cref to that root into `~Log`
-- The home button and `H` shortcut navigate to `~Log` when it exists
-- This makes `~Log` function as an append-only stream of root documents rather than a curated dashboard
+### Pane State
 
-## Contacts
+A pane stores one navigation target:
 
-- Followed users are currently modeled separately from the knowledge graph as Nostr contacts
-- `Contact` already supports `publicKey`, `mainRelay`, and optional `userName`
-- The current contact parser reads `userName` from contact-list events, although the app does not fully surface it yet
-- A minimal address-book direction is to expose contacts through a `~Users` list while keeping `publicKey` as the stable identity
-- Current read queries also use contacts as part of the author filter, so "follow" is presently both a public social action and a data-loading boundary
-- For agent workflows, the cleaner direction is to separate those concerns: keep follow public, but let local sync/query tools inherit a user's contact scope without publishing mirrored agent follow events
+```ts
+type Pane = {
+  id: string;
+  stack: ID[];
+  author: PublicKey;
+  rootRelation?: LongID;
+  searchQuery?: string;
+  typeFilters?: ...;
+  scrollToId?: string;
+}
+```
 
-## Forks And Versions
+Meaning:
+- `stack` is the semantic breadcrumb path
+- `rootRelation` optionally pins the pane to a concrete standalone root
+- `author` is the perspective used for semantic navigation and queries
 
-- Version entries are currently computed by comparing an alternative relation to the current relation being viewed
-- This means an untouched fork can appear to drift further over time as the source author keeps editing
-- A cleaner direction for agent workflows is detached forks with a stored base snapshot, where proposal deltas are computed against fork base rather than live upstream
+Routes:
+- `/n/...` -> semantic path navigation
+- `/r/:relationID` -> concrete root relation view
+- `?author=...` -> foreign author perspective
+- `#rowID` -> scroll target
 
-## External Agent Direction
+### View Paths
 
-- The simplest agent integration path is still external, not web-app embedded
-- The preferred V1 is sync-first:
-  - export the graph to a local markdown workspace for reading
-  - compute that workspace from the user's perspective, not from each agent's own follow list
-  - keep `sync pull` as a one-shot snapshot export in V1
-  - let agents use normal file tools such as `rg` for context
-  - keep a small `knowstr` CLI for writes only
-- Exported markdown should carry stable identifiers such as `relationID` and cref in frontmatter or a manifest
-- Write commands should be dry-run by default and require explicit apply/publish
-- Content should be markdown-first; JSON should be used for command planning and results
-- A richer read CLI can be postponed until the sync-first path proves insufficient
-- If continuous refresh is later needed, it should be a separate watch/daemon mode rather than changing what `sync pull` means
+View state is relation-path based, not node-hash based.
 
-## Plan/Execute Pattern (`planner.tsx`)
+`ViewContext.tsx` owns:
+- expansion state
+- row path serialization
+- current relation/edge lookup
+- pane-target building for fullscreen/split-pane/open-source actions
 
-Changes are never applied directly. They're accumulated in a `Plan` (extends `Data` with pending events), then executed:
+Important split:
+- `useCurrentRelation()` -> current row's backing `Relations`
+- `useCurrentEdge()` -> parent edge pointing to the row
 
-1. `createPlan()` — snapshot current Data
-2. `planUpsertNode(plan, node)`, `planUpsertRelations(plan, rels)`, etc.
-3. `executePlan(plan)` — sign events and publish
+The app no longer uses a fake `KnowNode` / `DisplayNode` layer for normal rows.
 
-## Publishing & Sync
+## Semantic Layer
 
-**Deletion & Tombstones**: When a relation is deleted, a `KIND_DELETE` event is published with `["head", headNodeID]` and `["c", contextNodeID]` tags preserving the relation's context path. `findTombstones()` parses these into `Tombstone = { head: ID, context: List<ID> }`, keyed by short relation ID. This allows deleted crefs in `~Log` to render their full context path (e.g. `(deleted) Investment / Alternative >>> Bitcoin`) instead of just the head label. `TreeViewNodeLoader` queries tombstone node IDs so labels resolve correctly.
+Semantic matching still exists, but it is explicitly isolated.
 
-**Nostr events**: Documents are `KIND_KNOWLEDGE_DOCUMENT` (34770) — a single markdown event containing an entire subtree. Legacy: nodes were `KIND_KNOWLEDGE_NODE` (34751), relations were `KIND_KNOWLEDGE_LIST` (34760). All events are replaceable (d-tag keyed).
+### What semantic IDs are for
 
-**Document format**: Each document is a markdown list with `{uuid .relevance .argument}` extensions per item. Root is an H1. `#n` tags contain `hashText(nodeText)` for each node; `#c` tags contain context hashes; `#d` tag = root UUID.
+Semantic IDs exist only to:
+- match semantically equivalent relations across authors/documents
+- drive `/n/...` navigation
+- build footer/list alternatives, suggestions, occurrences, and incoming refs
+- query candidate documents by semantic tags
 
-**Relations.root**: Every relation has a `root: ID` field pointing to the short ID of its document's root relation UUID. Root relations self-reference. This groups relations into documents for serialization.
+Semantic IDs are not used to define tree structure.
+Semantic IDs should not be used to invent concrete rows when a relation ID is available.
 
-**Write path**: `executePlan` → `buildDocumentEvents(plan)` groups changed relations by `root` field, re-serializes each affected root's full tree as a `KIND_KNOWLEDGE_DOCUMENT` event.
+### Semantic modules
 
-**Read path**: `findDocumentNodesAndRelations` deduplicates document events by replaceable key (keeping newest), parses markdown → nodes + relations. Nodes are collected from ALL document versions (content-addressed, immutable); relations only from latest version.
+- [semanticProjection.ts](/Users/f/sandbox/stashmap-3/src/semanticProjection.ts)
+  - semantic lookup
+  - context-aware matching
+  - footer/list projection
+  - ref/occurrence/incoming-ref grouping
 
-**Query filters** (`dataQuery.tsx`): `documentByID` (`#d`), `documentByNode` (`#n`), `documentByContext` (`#c`) — all using `KIND_KNOWLEDGE_DOCUMENT`.
+- [semanticNavigation.ts](/Users/f/sandbox/stashmap-3/src/semanticNavigation.ts)
+  - `/n/...` resolution
+  - semantic stack -> actual relation resolution
 
-**PublishQueue**: Debounces (5s prod, 100ms test), batches by kind, retries with backoff, persists to IndexedDB outbox.
+A lint rule prevents these modules from being imported broadly across the app. Only the explicit boundary files are allowlisted.
 
-**Data flow**: User input → Plan → executePlan → buildDocumentEvents → sign → PublishQueue → Nostr relays → remote users receive via subscription → EventCache → KnowledgeDBs → re-render.
+### Direct vs semantic logic
 
-## References, Occurrences & Suggestions
+Direct relation logic lives in:
+- [connections.tsx](/Users/f/sandbox/stashmap-3/src/connections.tsx)
 
-- **Suggestions**: Items other users added to the same node (virtualType: "suggestion")
-- **Versions**: Alternative relations for the same head node with diffs (virtualType: "version")
-- **Occurrences**: This node appears in another relation — same node, different context (virtualType: "occurrence"). Display: `Context / Target` with `[C]` tree prefix. Includes both item-level (node is a child in another tree) and head-level (node is head of a root-level relation) appearances.
-- **Outgoing references**: Stored cref items linking to another relation (display: `Context >>> Target`)
-- **Incoming references**: Another relation has a cref item pointing TO our relation (virtualType: "incoming"). Display: `Target <<< Context` with `[I]` tree prefix. Found via `getIncomingCrefsForNode` reverse lookup.
+That file should stay relation/item-focused:
+- parsing IDs
+- direct relation lookup
+- relation text/context derivation
+- cref target resolution
 
-Built via `getSuggestionsForNode`, `getVersionsForRelation`, `getOccurrencesForNode`, `getIncomingCrefsForNode`, `buildReferenceNode`.
+It should not grow general semantic fallback logic again.
 
-### Link Direction & Relevance Model
+## References, Alternatives, And Footer Rows
 
-A **concrete ref** (cref) stored in a relation creates an outgoing link (`>>>`). When the target relation also has a cref pointing back to our relation, the link is **bidirectional** (`<<< >>>`). The `<<<` arrow means "they have a cref to us" (incoming direction).
+The tree can render projected rows that are not ordinary structural child relations:
+- suggestions
+- incoming refs
+- occurrences
+- alternative lists (`[V]`, `[VO]`)
 
-**displayAs discriminant on ReferenceNode**: For stored cref items, `buildReferenceItem` sets `displayAs` to classify how the ref should be rendered:
-- `"bidirectional"`: target has a cref back to our relation, and our cref is not `not_relevant`
-- `"incoming"`: target has a cref back to us, but our stored cref IS `not_relevant`
-- `"occurrence"`: no cref back, but this is an occurrence origin (`targetNode` + `sourceItem` exist)
-- `undefined`: plain outgoing reference
+These are view projections, not core persisted tree objects.
 
-**Display matrix:**
+Concrete refs:
+- stored as `cref:relationID`
+- navigation semantics depend on the UI action
+  - generic fullscreen/open actions are structural
+  - footer/list projections may intentionally open alternative roots
+  - context-opening behaviors are handled in the view layer, not encoded in the cref string
 
-| displayAs | Display | Meaning |
-|---|---|---|
-| undefined | `Context >>> Target` | Plain outgoing reference |
-| "bidirectional" | `Context <<< >>> Target` | Mutual crefs between relations |
-| "incoming" | `Target <<< Context` | Stored cref is not_relevant, but they link to us |
-| "occurrence" | `Context / Target` (not_relevant) or `Context >>> Target` (relevant) | Node appears in target via sourceItem |
+Important UX rule:
+- generic actions on a visible row should open that concrete row
+- semantic alternative selection belongs in footer/list UI, not in generic structural buttons
 
-**Occurrence suppression**: Occurrences are suppressed when a stored outgoing cref OR an incoming cref already covers that context. Uses `coveredContextKeys` with merged outgoing + incoming cref IDs.
+Reference row building lives in:
+- [buildReferenceRow.ts](/Users/f/sandbox/stashmap-3/src/buildReferenceRow.ts)
 
-**Implementation**: `buildReferenceItem` in `buildReferenceNode.ts` checks for a reverse cref in the target relation's items (`incomingCref`). The `resolveDisplayAs` function determines the display mode based on whether the reverse cref exists, its relevance, and whether this is an occurrence origin.
+## Documents And Persistence
 
-## Key Patterns
+Runtime persistence is document-only.
 
-- **Immutable.js** everywhere (Map, List, Set, OrderedSet)
-- **Purely functional**: only `const`, no let/var
-- **Keyboard-first**: full vim-style navigation with focus restoration
-- **Multi-author merge**: all followed users' KnowledgeDBs displayed together
-- **Virtualization**: react-virtuoso for large trees
-- **Temporary UI state**: focus intents, multiselect, draft texts — not persisted to Nostr
+### Nostr kinds
+
+- `KIND_KNOWLEDGE_DOCUMENT = 34770`
+- `KIND_DELETE = 5`
+
+Legacy knowledge node/list kinds are gone from runtime code.
+
+### Document structure
+
+Each standalone root publishes one markdown document containing the whole tree under that root.
+
+Root headings and list items carry structured attributes such as:
+- `uuid`
+- `semantic`
+- `anchorContext`
+- `anchorLabels`
+- `systemRole`
+
+Documents also emit:
+- `#d` -> root relation UUID key
+- `#r` -> relation IDs contained/referenced
+- `#n` -> semantic IDs contained in the document
+- `#s` -> system roles such as `"log"`
+
+`#c` tags are gone.
+
+Markdown read/write lives in:
+- [markdownDocument.tsx](/Users/f/sandbox/stashmap-3/src/markdownDocument.tsx)
+
+### Write path
+
+All mutations go through the planner:
+
+1. `createPlan()`
+2. accumulate relation changes in the plan
+3. `executePlan(plan)`
+4. `buildDocumentEvents(plan)` reserializes affected standalone roots
+5. sign and publish document events
+
+Delete behavior is also document-root based now. There is no runtime knowledge-list delete path anymore.
+
+### Read/query path
+
+Queries are built in:
+- [dataQuery.tsx](/Users/f/sandbox/stashmap-3/src/dataQuery.tsx)
+
+Current query model:
+- `#r` for relation IDs
+- `#n` for semantic IDs
+- `#s` for system roots like `log`
+- delete filters for document cleanup
+
+The app loads candidate documents broadly, then does semantic discrimination locally.
+
+## `~Log`
+
+`~Log` is now a normal standalone root with:
+- `systemRole: "log"`
+- visible text from `getSystemRoleText("log")`
+
+Current behavior:
+- the app explicitly queries for log roots via `#s=["log"]`
+- creating a new standalone root adds a cref to it in the user's log root
+- home navigation uses the explicit loaded log root, not semantic lookup
+
+Relevant files:
+- [systemRoots.ts](/Users/f/sandbox/stashmap-3/src/systemRoots.ts)
+- [dataQuery.tsx](/Users/f/sandbox/stashmap-3/src/dataQuery.tsx)
+- [components/SplitPaneLayout.tsx](/Users/f/sandbox/stashmap-3/src/components/SplitPaneLayout.tsx)
+- [components/Workspace.tsx](/Users/f/sandbox/stashmap-3/src/components/Workspace.tsx)
+- [planner.tsx](/Users/f/sandbox/stashmap-3/src/planner.tsx)
+
+## Anchored Standalone Subtrees
+
+Forked/copied standalone subtrees are modeled as standalone roots with optional anchors, not as inline context-dependent overlays.
+
+Current behavior:
+- branch/subtree roots are structurally standalone
+- semantic origin is preserved through `anchor`
+- breadcrumbs can show source lineage
+- a pane can jump to the live source subtree via the header "source" action
+
+What this does not yet implement:
+- merge/rebase
+- inline overlay rendering of branch content into the source tree
+
+Those would require an explicit patch/overlay model, not just anchors.
+
+## Query And Navigation Boundaries
+
+There are two important boundaries in the current architecture:
+
+### Structural boundary
+
+Structural UI and planner code should operate on:
+- relation IDs
+- parent/root links
+- concrete ref IDs
+
+Structural actions should not silently jump through semantic alternatives.
+
+### Semantic boundary
+
+Semantic code is allowed only where the product actually needs semantic behavior:
+- `/n/...` navigation
+- footer/list alternatives
+- suggestions
+- occurrences
+- incoming refs
+- broad document queries by semantic ID
+
+If a file can work with a concrete relation ID, it should not import semantic helpers.
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `types.ts` | All type definitions |
-| `DataContext.tsx` | Provides Data to app |
-| `ViewContext.tsx` | View expansion state, view path logic |
-| `SplitPanesContext.tsx` | Pane management |
-| `planner.tsx` | Plan/execute, all plan operations |
-| `connections.tsx` | Node/relation utilities, hashText, ID parsing, occurrence/incoming ref lookup |
-| `treeTraversal.ts` | Computes children for tree nodes, wires virtual items |
-| `buildReferenceNode.ts` | Builds ReferenceNode display data from crefs |
-| `navigationUrl.ts` | URL ↔ navigation state |
-| `markdownDocument.tsx` | Markdown document serializer + parser |
-| `knowledgeEvents.tsx` | Nostr event parsing |
-| `dataQuery.tsx` | Relay query filter construction |
-| `executor.tsx` | Event signing and relay publishing |
-| `PublishQueue.ts` | Debounced publish queue |
-| `SplitPaneLayout.tsx` | Multi-pane layout component |
-| `TreeView.tsx` | Virtualized tree renderer |
+| [src/types.ts](/Users/f/sandbox/stashmap-3/src/types.ts) | Core runtime types |
+| [src/connections.tsx](/Users/f/sandbox/stashmap-3/src/connections.tsx) | Direct relation/item utilities |
+| [src/rootAnchor.ts](/Users/f/sandbox/stashmap-3/src/rootAnchor.ts) | Root-anchor creation and equality |
+| [src/systemRoots.ts](/Users/f/sandbox/stashmap-3/src/systemRoots.ts) | Explicit system-root helpers (`log`) |
+| [src/ViewContext.tsx](/Users/f/sandbox/stashmap-3/src/ViewContext.tsx) | View paths, current relation/edge, pane targets |
+| [src/semanticProjection.ts](/Users/f/sandbox/stashmap-3/src/semanticProjection.ts) | Semantic matching and footer/list projection |
+| [src/semanticNavigation.ts](/Users/f/sandbox/stashmap-3/src/semanticNavigation.ts) | `/n/...` semantic navigation |
+| [src/treeTraversal.ts](/Users/f/sandbox/stashmap-3/src/treeTraversal.ts) | Child row derivation, virtual rows |
+| [src/buildReferenceRow.ts](/Users/f/sandbox/stashmap-3/src/buildReferenceRow.ts) | Reference/occurrence/incoming row projection |
+| [src/planner.tsx](/Users/f/sandbox/stashmap-3/src/planner.tsx) | Plan/execute, all mutations |
+| [src/markdownDocument.tsx](/Users/f/sandbox/stashmap-3/src/markdownDocument.tsx) | Document parse/serialize |
+| [src/dataQuery.tsx](/Users/f/sandbox/stashmap-3/src/dataQuery.tsx) | Relay query construction |
+| [src/components/Workspace.tsx](/Users/f/sandbox/stashmap-3/src/components/Workspace.tsx) | Header, breadcrumbs, pane-level actions |
+| [src/components/TreeView.tsx](/Users/f/sandbox/stashmap-3/src/components/TreeView.tsx) | Virtualized tree rendering |
+
+## Remaining Cleanup Direction
+
+The major refactor is done. Remaining work is cleanup and stricter boundary enforcement:
+- shrink semantic-module allowlists further where possible
+- remove remaining semantic text lookup where explicit labels can be carried instead
+- reduce React `act(...)` warnings in tests
+- continue pruning stale naming/comments that still imply the old node model

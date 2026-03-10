@@ -142,21 +142,28 @@ It should not behave like a background proposer unless the user explicitly asks 
 
 This agent is not assumed to be embedded in the web app. It can be a CLI tool or companion app that talks to the user's graph directly.
 
-## CLI Agent Query Model
+The concrete V1 external-agent path for this is:
 
-Because the CLI agent writes as the user, it should be able to query the graph. Otherwise it is a blind writer.
+- read from a synced markdown workspace, specified in `knowstr-sync-v1.md`
+- write through a small mutation CLI, specified in `knowstr-cli-v1.md`
 
-The important correction is that this query model should not depend on the web app passing UI state like the currently focused node.
+## CLI Agent Context Model
 
-Instead, the external CLI agent should work from graph queries plus explicit user intent.
+Because the CLI agent writes as the user, it still needs context. But that context does not need to come from a rich read CLI.
+
+The important correction is:
+
+- the agent is external, not web-app embedded
+- the primary read surface can be a synced markdown workspace
+- read/search commands can be postponed if local files are enough
 
 Recommended capabilities:
 
-- search the user's graph for matching roots, documents, and paths
-- resolve an explicit target named by the user, such as `Projects / Knowstr`
-- inspect a target subtree before writing into it
-- read `~Home` to find canonical entry points
-- check whether a requested structure already exists before creating new documents
+- sync the graph into a local markdown workspace from the user's perspective
+- read `~Home` and `~Users` as exported markdown
+- inspect relevant root documents directly on disk
+- use `rg` and normal file navigation for discovery
+- extract exact cref or relation IDs from frontmatter or a manifest before writing
 
 Recommended inputs from the user:
 
@@ -167,12 +174,35 @@ Recommended inputs from the user:
 
 Default behavior:
 
-- if the user names a target, query and write there
-- if the user gives a URL or relation ID, resolve that target and write there
-- if the request clearly belongs under an existing root, query and reuse that root
+- if the user names a target, locate it in the synced workspace and write there
+- if the user gives a URL or relation ID, use that as the explicit write target
+- if the request clearly belongs under an existing root, find and reuse that root
 - otherwise create standalone roots and link them from `~Home`
 
 This keeps the CLI agent external to the web app while still making it context-aware.
+
+## Follow Versus Read Scope
+
+For agents, Knowstr should separate two ideas that are currently coupled in the app:
+
+- public follow/contact relationships
+- the set of authors whose data is available for local reading
+
+Quick path:
+
+- local companion agents should all read one shared synced workspace generated from the user's perspective
+- the user's follows define that shared read universe
+- agents do not need to follow the same people or each other just to read context
+- that shared workspace can start as an explicit snapshot, not a live continuously mutating mirror
+
+This means:
+
+- the user may follow agent pubkeys in order to see agent output
+- agent pubkeys do not need mirrored NIP-02 contact lists
+- if needed, sync/query tools can support `--as-user <pubkey>` or an equivalent local "inherit contacts from user" mode
+- extra authors can be explicitly added to local read scope without changing the agent's public follow graph
+
+This keeps follow social and public, while read scope becomes a local operational decision.
 
 ## How Restructuring Works
 
@@ -329,31 +359,37 @@ Success criteria:
 - multiple agents are manageable without remembering raw npubs
 - the feature adds no separate agent/user taxonomy
 
-### Phase 2: Add CLI Authoring
+### Phase 2: Add Sync Export And CLI Authoring
 
 Objective:
 
-- let the user create graph structures from natural-language instructions
+- let Claude Code or Codex read the graph naturally and then create graph structures from natural-language instructions
 
 Steps:
 
-1. Define a CLI command or prompt flow that takes a structure request
-2. Make the CLI agent write as the user
-3. Add graph query capability so the CLI agent can inspect the user's existing structure before writing
-4. Default target selection:
+1. Build `knowstr sync pull` to export a local markdown workspace
+2. Export `~Home`, `~Users`, and root documents with stable frontmatter/manifest metadata
+3. Make sync compute read scope from the user's perspective rather than from each agent's own follows
+4. Keep `sync pull` as a one-shot snapshot in V1, not a live listener
+5. Let the CLI agent read that workspace directly
+6. Add a small write CLI that writes as the user
+7. Default target selection:
    - explicit target path if provided
    - URL or relation ID if provided
-   - otherwise reuse an existing matching root if one exists
+   - otherwise reuse an existing matching root if one exists in the synced workspace
    - otherwise create standalone roots and link them from `~Home`
-5. Start with create-and-link workflows only
-6. Avoid background monitoring or autonomous edits in this phase
+8. Start with create-and-link workflows only
+9. Avoid background monitoring or autonomous edits in this phase
 
 Success criteria:
 
 - a user can describe a project structure in the CLI
+- the agent can answer questions by reading synced markdown files
+- agents do not need to publish copied follow graphs just to access shared context
+- agents do not need a mandatory repull after every write in order to remain useful
 - the resulting documents are created in the user's graph
 - `~Home` gets links, not embedded content trees
-- the CLI agent can reuse existing graph structure without depending on web-app integration
+- the external agent can reuse existing graph structure without depending on web-app integration or a large read API
 
 ### Phase 3: Add Background Agent Conventions
 
@@ -405,17 +441,20 @@ Recommended order:
 
 1. `~Home`
 2. `~Users`
-3. CLI authoring agent
-4. `agent/ingest`
-5. `agent/gardener`
-6. `agent/tasks`
-7. optional research/drafts agents
+3. sync export
+4. CLI authoring agent
+5. `agent/ingest`
+6. `agent/gardener`
+7. `agent/tasks`
+8. optional research/drafts agents
 
 Reasoning:
 
 - `~Home` provides the landing point
 - `~Users` makes people and agents manageable
+- sync export gives external agents a natural read surface
 - CLI authoring solves immediate graph creation
+- live watch/continuous refresh can come later only if snapshot pull proves too clumsy
 - ingest and gardener create the first real proposal loop
 - tasks is useful once there is enough source material to extract from
 

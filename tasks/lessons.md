@@ -1,5 +1,57 @@
 # Lessons Learned
 
+## Keep `sync pull` snapshot-based; add live refresh separately
+
+**Date**: 2026-03-10
+**Context**: While refining the sync-first agent model, I was still describing sync in a way that could blur one-shot snapshot export and continuous refresh.
+
+**Mistake**: That makes the first version harder to reason about and suggests agents may need to repull after every write. The better split is to keep `sync pull` as an explicit snapshot and only add a separate `watch` mode later if freshness actually becomes a problem.
+
+**Rule**: For the first agent sync model:
+1. `sync pull` means one-shot snapshot export
+2. Agents pull at task start, not automatically after every write
+3. Write commands should return enough IDs/results that an immediate repull is often unnecessary
+4. If continuous refresh is needed later, add a separate `sync watch` or daemon mode
+
+## Separate public follows from local agent read scope
+
+**Date**: 2026-03-09
+**Context**: While discussing multi-agent workflows, I treated "what an agent can read" as if it should be solved by making each agent follow the same authors as the user.
+
+**Mistake**: In Knowstr today, follows are both a social/public concept and a query boundary. Reusing public follow lists as the main agent read-scope mechanism would force agents to publish mirrored contact lists just to get context. That is the wrong layer.
+
+**Rule**: For agent workflows:
+1. Keep follow/contact events as public social state
+2. Model agent read scope as a local sync/query decision
+3. Let local agents inherit the user's read universe instead of publishing their own copied follow graphs
+4. Use options like `--as-user` or explicit include lists for local read scope when needed
+
+## Prefer sync-first markdown workspaces for agent context
+
+**Date**: 2026-03-09
+**Context**: While designing the first external-agent interface, I initially specified a read-heavy CLI with commands like `search`, `resolve`, and `subtree`.
+
+**Mistake**: That made the first interface more complex than necessary and underused the fact that Claude Code and Codex already work very well with local markdown files and shell search tools. The better first step is a synced markdown workspace for reading and a small write CLI for mutations.
+
+**Rule**: When designing external agent tooling for Knowstr:
+1. Prefer a sync/export tool as the first read surface
+2. Let agents read markdown files and use `rg` for discovery
+3. Keep JSON for command planning and results, not for primary content reading
+4. Postpone rich read/search CLI commands unless the synced workspace proves insufficient
+
+## Prefer crefs or relation IDs for writes, not plain paths
+
+**Date**: 2026-03-09
+**Context**: In the first CLI spec, I used path-like strings such as `Projects/Knowstr` directly in write examples like `create-ref`.
+
+**Mistake**: Paths are convenient for humans but ambiguous for writes. Stable write targets should use concrete relation identities, ideally cref or relation ID. Paths are acceptable only as a discovery layer that resolves to one unique target first.
+
+**Rule**: When designing external graph tools:
+1. Use paths for search and resolve
+2. Use cref or relation ID as the preferred write selector
+3. If a write command accepts a path, require explicit resolution to one unique target
+4. Never let write commands guess between multiple path matches
+
 ## Distinguish fork-vs-base from fork-vs-live-source
 
 **Date**: 2026-03-09

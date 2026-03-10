@@ -1,3 +1,23 @@
+# Sync-First Agent V1
+
+## Plan
+- [x] Write `knowstr-sync-v1.md` with a concrete markdown export format for agent reading
+- [x] Narrow `knowstr-cli-v1.md` to a write-only CLI that assumes agents read from the synced workspace
+- [x] Update `agentic-workflow.md` and `architecture.md` to make sync-first the preferred external-agent path
+
+## Verification
+- [x] Review the sync-first docs for consistency with the current graph model and the detached-fork roadmap
+- [x] Confirm read context comes from markdown export and the CLI stays write-focused
+
+## Review
+- Added `knowstr-sync-v1.md` with a read-only export model: synced markdown workspace, frontmatter IDs, manifest, and agent workflows for Claude Code/Codex.
+- Rewrote `knowstr-cli-v1.md` as a write-only CLI centered on markdown subtree insertion plus structured operations for refs, `~Home`, and `~Users`.
+- Updated `agentic-workflow.md` so the first external agent reads from synced markdown and writes through the small CLI, and adjusted the phase order accordingly.
+- Updated `architecture.md` and `tasks/lessons.md` to capture the sync-first direction and the markdown-for-content / JSON-for-control split.
+- Clarified that agent read scope should be inherited locally from the user's perspective, not implemented by making each agent publish mirrored follow lists.
+- Clarified that `sync pull` is a snapshot command in V1; continuous refresh belongs in a later separate `sync watch` mode.
+- No automated tests run because this task only changed documentation.
+
 # Agentic Workflow Roadmap
 
 ## Plan

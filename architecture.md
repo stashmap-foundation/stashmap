@@ -87,12 +87,29 @@ URL patterns:
 - `Contact` already supports `publicKey`, `mainRelay`, and optional `userName`
 - The current contact parser reads `userName` from contact-list events, although the app does not fully surface it yet
 - A minimal address-book direction is to expose contacts through a `~Users` list while keeping `publicKey` as the stable identity
+- Current read queries also use contacts as part of the author filter, so "follow" is presently both a public social action and a data-loading boundary
+- For agent workflows, the cleaner direction is to separate those concerns: keep follow public, but let local sync/query tools inherit a user's contact scope without publishing mirrored agent follow events
 
 ## Forks And Versions
 
 - Version entries are currently computed by comparing an alternative relation to the current relation being viewed
 - This means an untouched fork can appear to drift further over time as the source author keeps editing
 - A cleaner direction for agent workflows is detached forks with a stored base snapshot, where proposal deltas are computed against fork base rather than live upstream
+
+## External Agent Direction
+
+- The simplest agent integration path is still external, not web-app embedded
+- The preferred V1 is sync-first:
+  - export the graph to a local markdown workspace for reading
+  - compute that workspace from the user's perspective, not from each agent's own follow list
+  - keep `sync pull` as a one-shot snapshot export in V1
+  - let agents use normal file tools such as `rg` for context
+  - keep a small `knowstr` CLI for writes only
+- Exported markdown should carry stable identifiers such as `relationID` and cref in frontmatter or a manifest
+- Write commands should be dry-run by default and require explicit apply/publish
+- Content should be markdown-first; JSON should be used for command planning and results
+- A richer read CLI can be postponed until the sync-first path proves insufficient
+- If continuous refresh is later needed, it should be a separate watch/daemon mode rather than changing what `sync pull` means
 
 ## Plan/Execute Pattern (`planner.tsx`)
 

@@ -7,12 +7,14 @@ import {
   shortID,
   splitID,
   itemPassesFilters,
-  getTextHashForSemanticID,
-  getTextForSemanticID,
   getRelationItemSemanticID,
   getRelationContext,
   getRelationSemanticID,
 } from "./connections";
+import {
+  getTextHashForSemanticID,
+  getTextForSemanticID,
+} from "./semanticProjection";
 import {
   ViewPath,
   getParentView,

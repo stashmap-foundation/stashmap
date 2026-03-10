@@ -8,9 +8,9 @@ import {
   parseConcreteRefId,
   getConcreteRefTargetRelation,
   getRelationsNoReferencedBy,
-  getTextHashForSemanticID,
   getRelationStack,
 } from "./connections";
+import { getTextHashForSemanticID } from "./semanticProjection";
 import { REFERENCED_BY } from "./constants";
 import { useCurrentPane } from "./SplitPanesContext";
 import { useData } from "./DataContext";

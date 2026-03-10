@@ -81,6 +81,51 @@
     },
     "overrides": [
         {
+          "files": ["src/**/*.{ts,tsx}"],
+          "excludedFiles": [
+            "src/semanticProjection.ts",
+            "src/semanticNavigation.ts",
+            "src/navigationUrl.ts",
+            "src/NavigationStateContext.tsx",
+            "src/ViewContext.tsx",
+            "src/markdownDocument.tsx",
+            "src/buildReferenceRow.ts",
+            "src/treeTraversal.ts",
+            "src/LoadSearchData.tsx",
+            "src/dataQuery.tsx",
+            "src/planner.tsx",
+            "src/components/Workspace.tsx",
+            "src/components/batchOperations.ts",
+            "src/components/FullscreenButton.tsx",
+            "src/components/MarkdownImportPlan.test.tsx"
+          ],
+          "rules": {
+            "no-restricted-imports": [
+              "error",
+              {
+                "paths": [
+                  {
+                    "name": "./semanticProjection",
+                    "message": "Semantic projection helpers are restricted to semantic projection and navigation boundary files."
+                  },
+                  {
+                    "name": "../semanticProjection",
+                    "message": "Semantic projection helpers are restricted to semantic projection and navigation boundary files."
+                  },
+                  {
+                    "name": "./semanticNavigation",
+                    "message": "Semantic navigation helpers are restricted to navigation boundary files."
+                  },
+                  {
+                    "name": "../semanticNavigation",
+                    "message": "Semantic navigation helpers are restricted to navigation boundary files."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
           "files": ["*.test.tsx", "*.test.ts", "setupTests.js", "setupProxy.js", "**/testutils/*.tsx"],
           "rules": {
             "@typescript-eslint/no-unsafe-member-access": 0,

@@ -4,13 +4,12 @@ import {
   isSearchId,
   parseSearchId,
   getSearchRelations,
-  findRefsToNode,
-  deduplicateRefsByContext,
   createConcreteRefId,
   buildTextNodesFromRelations,
 } from "./connections";
 import type { TextSeed } from "./connections";
 import { MergeKnowledgeDB, useData } from "./DataContext";
+import { deduplicateRefsByContext, findRefsToNode } from "./semanticProjection";
 import { useReadRelays } from "./relays";
 import { useSearchQuery, filterForKeyword } from "./components/SearchModal";
 import { LoadData } from "./dataQuery";

@@ -1,10 +1,10 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { createPlan } from "../planner";
 import {
-  getTextForSemanticID,
   getRelationsNoReferencedBy,
   getRelationSemanticID,
 } from "../connections";
+import { getTextForSemanticID } from "../semanticProjection";
 import {
   ALICE,
   expectTree,

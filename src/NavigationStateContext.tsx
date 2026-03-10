@@ -14,7 +14,7 @@ import {
   parseRelationUrl,
   parseAuthorFromSearch,
 } from "./navigationUrl";
-import { resolveSemanticStackToActualIDs } from "./ViewContext";
+import { resolveSemanticStackToActualIDs } from "./semanticNavigation";
 import { usePlanner } from "./planner";
 import { generatePaneId } from "./SplitPanesContext";
 

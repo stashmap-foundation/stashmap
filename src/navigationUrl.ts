@@ -1,4 +1,5 @@
-import { getTextForSemanticID, hashText } from "./connections";
+import { hashText } from "./connections";
+import { getTextForSemanticID } from "./semanticProjection";
 
 function stackToPath(
   stack: ID[],

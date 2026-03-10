@@ -19,8 +19,8 @@ import {
   getConcreteRefTargetRelation,
   getRelationContext,
   getRelationSemanticID,
-  getTextForSemanticID,
 } from "./connections";
+import { getTextForSemanticID } from "./semanticProjection";
 import {
   ViewPath,
   isRoot,
@@ -30,7 +30,6 @@ import {
   getRelationForView,
   getContext,
   newRelations,
-  getRelationsForCurrentTree,
 } from "./ViewContext";
 import { buildOutgoingReference } from "./buildReferenceRow";
 import { KIND_KNOWLEDGE_DOCUMENT, newTimestamp, msTag } from "./nostr";
@@ -38,6 +37,7 @@ import { findTag } from "./commons/useNostrQuery";
 import { getNodesInTree } from "./treeTraversal";
 import { newDB } from "./knowledge";
 import { createRootAnchor } from "./rootAnchor";
+import { resolveSemanticRelationInCurrentTree } from "./semanticNavigation";
 
 const markdown = new MarkdownIt();
 markdown.use(attrs);
@@ -379,7 +379,7 @@ function getOwnRelationForDocumentSerialization(
   if (directRelation) {
     return directRelation;
   }
-  return getRelationsForCurrentTree(
+  return resolveSemanticRelationInCurrentTree(
     data.knowledgeDBs,
     author,
     itemID,

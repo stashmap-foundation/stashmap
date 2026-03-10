@@ -55,10 +55,10 @@ import {
   getRelationStack,
   getRelationSemanticID,
   getRelationsNoReferencedBy,
-  getTextForSemanticID,
   isSearchId,
   shortID,
 } from "../connections";
+import { getTextForSemanticID } from "../semanticProjection";
 import { buildNodeUrl, buildRelationUrl } from "../navigationUrl";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import {

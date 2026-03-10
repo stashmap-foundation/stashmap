@@ -16,17 +16,17 @@ import {
   isSearchId,
   getRelations,
   itemPassesFilters,
-  getOccurrencesForNode,
-  getIncomingCrefsForNode,
   getRelationContext,
   getRelationSemanticID,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
 import { buildOutgoingReference } from "./buildReferenceRow";
 import {
+  getIncomingCrefsForNode,
+  getOccurrencesForNode,
   getSuggestionsForNode,
   getVersionsForRelation,
-} from "./footerSemantics";
+} from "./semanticProjection";
 
 type TreeResult = {
   paths: List<ViewPath>;

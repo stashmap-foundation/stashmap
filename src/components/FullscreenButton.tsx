@@ -23,7 +23,7 @@ import {
 } from "../connections";
 import { useData } from "../DataContext";
 import { buildNodeUrl, buildRelationUrl } from "../navigationUrl";
-import { getAlternativeRelations } from "../footerSemantics";
+import { getAlternativeRelations } from "../semanticProjection";
 
 export function FullscreenButton(): JSX.Element | null {
   const stack = usePaneStack();

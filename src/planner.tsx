@@ -36,12 +36,15 @@ import {
   isRefId,
   isSearchId,
   hashText,
-  getTextForSemanticID,
   ensureRelationNativeFields,
   getRelationContext,
   getRelationSemanticID,
 } from "./connections";
 import type { TextSeed } from "./connections";
+import {
+  getAlternativeRelations,
+  getTextForSemanticID,
+} from "./semanticProjection";
 import {
   newRelations,
   newRelationsForSemanticID,
@@ -59,7 +62,6 @@ import {
   getEffectiveAuthor,
   getPaneIndex,
 } from "./ViewContext";
-import { getAlternativeRelations } from "./footerSemantics";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useRelaysToCreatePlan } from "./relays";
 import { mergePublishResultsOfEvents } from "./commons/PublishingStatus";

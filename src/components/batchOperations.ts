@@ -3,8 +3,8 @@ import {
   updateItemRelevance,
   updateItemArgument,
   isEmptySemanticID,
-  getTextForSemanticID,
 } from "../connections";
+import { getTextForSemanticID } from "../semanticProjection";
 import {
   ViewPath,
   VirtualItemsMap,

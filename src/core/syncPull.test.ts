@@ -4,7 +4,11 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { Event, Filter, matchFilter } from "nostr-tools";
-import { pullSyncWorkspace, SyncPullProfile, SyncQueryClient } from "./syncPull";
+import {
+  pullSyncWorkspace,
+  SyncPullProfile,
+  SyncQueryClient,
+} from "./syncPull";
 
 const ALICE = "a".repeat(64) as PublicKey;
 const BOB = "b".repeat(64) as PublicKey;
@@ -33,7 +37,10 @@ function documentEvent({
       ["d", rootUuid],
       ["ms", `${createdAt * 1000}`],
     ],
-    content: `# ${text} {${rootUuid} semantic="${semantic}"}\n- ${text} child {${rootUuid}-child semantic="${semantic.slice(0, 31)}1"}\n`,
+    content: `# ${text} {${rootUuid} semantic="${semantic}"}\n- ${text} child {${rootUuid}-child semantic="${semantic.slice(
+      0,
+      31
+    )}1"}\n`,
   };
 }
 
@@ -51,17 +58,22 @@ function contactListEvent(): Event {
 
 function makeClient(eventsByRelay: Record<string, Event[]>): {
   client: SyncQueryClient;
-  calls: Array<{ relays: string[]; filter: Filter }>;
+  getCalls: () => Array<{ relays: string[]; filter: Filter }>;
 } {
-  const calls: Array<{ relays: string[]; filter: Filter }> = [];
+  const querySync = jest.fn((relays: string[], filter: Filter) => {
+    const events = relays.flatMap((relay) => eventsByRelay[relay] || []);
+    return Promise.resolve(
+      events.filter((event) => matchFilter(filter, event))
+    );
+  });
   return {
-    calls,
+    getCalls: () =>
+      querySync.mock.calls.map(([relays, filter]) => ({
+        relays: relays as string[],
+        filter: filter as Filter,
+      })),
     client: {
-      async querySync(relays, filter) {
-        calls.push({ relays, filter });
-        const events = relays.flatMap((relay) => eventsByRelay[relay] || []);
-        return events.filter((event) => matchFilter(filter, event));
-      },
+      querySync,
       close() {
         return undefined;
       },
@@ -85,7 +97,7 @@ test("pullSyncWorkspace uses configured relays only and writes raw markdown docu
     text: "Bob Root",
     createdAt: 21,
   });
-  const { client, calls } = makeClient({
+  const { client, getCalls } = makeClient({
     [RELAY]: [contactListEvent(), aliceDoc, bobDoc],
   });
   const profile: SyncPullProfile = {
@@ -106,9 +118,10 @@ test("pullSyncWorkspace uses configured relays only and writes raw markdown docu
     { pubkey: BOB, last_document_created_at: 21 },
   ]);
   expect(manifest.documents).toHaveLength(2);
-  expect(calls.every(({ relays }) => relays.every((relay) => relay === RELAY))).toBe(
-    true
-  );
+  const calls = getCalls();
+  expect(
+    calls.every(({ relays }) => relays.every((relay) => relay === RELAY))
+  ).toBe(true);
 
   const alicePath = path.join(
     tempDir,
@@ -168,11 +181,12 @@ test("pullSyncWorkspace stores per-author watermarks for incremental refetch", a
     now: new Date("2026-03-10T13:00:00.000Z"),
   });
 
-  const aliceDocQuery = secondClient.calls.find(
+  const secondClientCalls = secondClient.getCalls();
+  const aliceDocQuery = secondClientCalls.find(
     ({ filter }) =>
       filter.kinds?.includes(34770) && filter.authors?.includes(ALICE)
   );
-  const bobDocQuery = secondClient.calls.find(
+  const bobDocQuery = secondClientCalls.find(
     ({ filter }) =>
       filter.kinds?.includes(34770) && filter.authors?.includes(BOB)
   );

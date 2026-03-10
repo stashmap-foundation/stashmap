@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { Event, EventTemplate, Filter, SimplePool } from "nostr-tools";
+import { Event, Filter, SimplePool } from "nostr-tools";
 import { Map, OrderedMap } from "immutable";
 import {
   getMostRecentReplacableEvent,

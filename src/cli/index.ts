@@ -30,11 +30,13 @@ async function main(): Promise<void> {
     return;
   }
 
-  throw new Error(`Unknown command: ${[command, subcommand].filter(Boolean).join(" ")}`);
+  throw new Error(
+    `Unknown command: ${[command, subcommand].filter(Boolean).join(" ")}`
+  );
 }
 
 main().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   process.stderr.write(`${JSON.stringify({ error: message }, null, 2)}\n`);
-  process.exitCode = 1;
+  process.exit(1);
 });

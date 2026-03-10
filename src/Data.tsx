@@ -31,8 +31,6 @@ import {
   parseRelationUrl,
   parseAuthorFromSearch,
 } from "./navigationUrl";
-import {
-} from "./connections";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { generatePaneId } from "./SplitPanesContext";
 import { jsonToPanes, paneToJSON, Serializable } from "./serializer";
@@ -40,7 +38,6 @@ import { NavigationStateProvider } from "./NavigationStateContext";
 import {
   mergeEvents,
   newProcessedEvents,
-  ProcessedEvents,
   processEvents,
 } from "./eventProcessing";
 

@@ -1,7 +1,7 @@
 import { SimplePool } from "nostr-tools";
 import { loadCliProfile } from "./config";
 import { SyncPullCliArgs } from "./types";
-import { pullSyncWorkspace } from "../core/syncPull";
+import { pullSyncWorkspace, SyncPullManifest } from "../core/syncPull";
 
 function requireValue(args: string[], index: number, flag: string): string {
   const value = args[index + 1];
@@ -12,46 +12,55 @@ function requireValue(args: string[], index: number, flag: string): string {
 }
 
 export function parseSyncPullArgs(args: string[]): SyncPullCliArgs {
-  const parsed: SyncPullCliArgs = {
+  const initial: SyncPullCliArgs = {
     relayUrls: [],
     help: false,
   };
 
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
+  const parseAt = (index: number, parsed: SyncPullCliArgs): SyncPullCliArgs => {
+    if (index >= args.length) {
+      return parsed;
+    }
+
+    const arg = args[index];
     switch (arg) {
       case "--help":
       case "-h":
-        parsed.help = true;
-        break;
+        return parseAt(index + 1, { ...parsed, help: true });
       case "--config":
-        parsed.configPath = requireValue(args, i, "--config");
-        i += 1;
-        break;
+        return parseAt(index + 2, {
+          ...parsed,
+          configPath: requireValue(args, index, "--config"),
+        });
       case "--out":
-        parsed.outDir = requireValue(args, i, "--out");
-        i += 1;
-        break;
+        return parseAt(index + 2, {
+          ...parsed,
+          outDir: requireValue(args, index, "--out"),
+        });
       case "--relay":
-        parsed.relayUrls.push(requireValue(args, i, "--relay"));
-        i += 1;
-        break;
+        return parseAt(index + 2, {
+          ...parsed,
+          relayUrls: parsed.relayUrls.concat(
+            requireValue(args, index, "--relay")
+          ),
+        });
       case "--max-wait": {
-        const value = requireValue(args, i, "--max-wait");
+        const value = requireValue(args, index, "--max-wait");
         const parsedValue = Number(value);
         if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
           throw new Error("--max-wait must be a positive number");
         }
-        parsed.maxWaitMs = parsedValue;
-        i += 1;
-        break;
+        return parseAt(index + 2, {
+          ...parsed,
+          maxWaitMs: parsedValue,
+        });
       }
       default:
         throw new Error(`Unknown sync pull argument: ${arg}`);
     }
-  }
+  };
 
-  return parsed;
+  return parseAt(0, initial);
 }
 
 export function syncPullHelp(): string {
@@ -62,7 +71,9 @@ export function syncPullHelp(): string {
   ].join("\n");
 }
 
-export async function runSyncPullCommand(args: string[]) {
+export async function runSyncPullCommand(
+  args: string[]
+): Promise<SyncPullManifest | { help: true; text: string }> {
   const parsed = parseSyncPullArgs(args);
   if (parsed.help) {
     return {

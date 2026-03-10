@@ -86,9 +86,11 @@ export function processEvents(
 ): Map<PublicKey, ProcessedEvents> {
   const groupedByAuthor = events.groupBy((event) => event.pubkey as PublicKey);
   return Map<PublicKey, ProcessedEvents>(
-    groupedByAuthor.toArray().map(([author, authorEvents]) => [
-      author,
-      processEventsByAuthor(List(authorEvents.valueSeq())),
-    ])
+    groupedByAuthor
+      .toArray()
+      .map(([author, authorEvents]) => [
+        author,
+        processEventsByAuthor(List(authorEvents.valueSeq())),
+      ])
   );
 }

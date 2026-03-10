@@ -3,12 +3,12 @@ import path from "path";
 import { List } from "immutable";
 import { Event, Filter } from "nostr-tools";
 import { findContacts } from "../contacts";
-import { findTag, getEventMs, getMostRecentReplacableEvent } from "../nostrEvents";
 import {
-  getReadRelays,
-  mergeRelays,
-  sanitizeRelays,
-} from "../relayUtils";
+  findTag,
+  getEventMs,
+  getMostRecentReplacableEvent,
+} from "../nostrEvents";
+import { getReadRelays, mergeRelays, sanitizeRelays } from "../relayUtils";
 import {
   KIND_CONTACTLIST,
   KIND_DELETE,
@@ -110,7 +110,9 @@ function manifestPath(workspaceDir: string): string {
   return path.join(workspaceDir, "manifest.json");
 }
 
-async function loadManifest(workspaceDir: string): Promise<SyncPullManifest | undefined> {
+async function loadManifest(
+  workspaceDir: string
+): Promise<SyncPullManifest | undefined> {
   try {
     const raw = await fs.readFile(manifestPath(workspaceDir), "utf8");
     return JSON.parse(raw) as SyncPullManifest;
@@ -119,7 +121,10 @@ async function loadManifest(workspaceDir: string): Promise<SyncPullManifest | un
   }
 }
 
-function resolveRelayUrls(profile: SyncPullProfile, options: SyncPullOptions): string[] {
+function resolveRelayUrls(
+  profile: SyncPullProfile,
+  options: SyncPullOptions
+): string[] {
   const explicitRelays = relaysFromUrls(options.relayUrls || []);
   if (explicitRelays.length > 0) {
     return uniqueRelayUrls(explicitRelays);
@@ -130,7 +135,9 @@ function resolveRelayUrls(profile: SyncPullProfile, options: SyncPullOptions): s
   );
   const relayUrls = uniqueRelayUrls(configuredRelays);
   if (relayUrls.length === 0) {
-    throw new Error("No read relays configured. Provide --relay or relays in .knowstr/profile.json");
+    throw new Error(
+      "No read relays configured. Provide --relay or relays in .knowstr/profile.json"
+    );
   }
   return relayUrls;
 }
@@ -147,7 +154,9 @@ async function queryFilters(
 
   const eventMap = new Map<string, Event>();
   const responses = await Promise.all(
-    filters.map((filter) => client.querySync(relayUrls, filter, { maxWait: maxWaitMs }))
+    filters.map((filter) =>
+      client.querySync(relayUrls, filter, { maxWait: maxWaitMs })
+    )
   );
 
   responses.flat().forEach((event) => {
@@ -165,7 +174,12 @@ function toDocumentFilePath(
 ): string {
   const safeDTag = slugify(dTag || "document");
   const titleSlug = slugify(getDocumentTitle(content));
-  return path.join(workspaceDir, "documents", author, `${safeDTag}-${titleSlug}.md`);
+  return path.join(
+    workspaceDir,
+    "documents",
+    author,
+    `${safeDTag}-${titleSlug}.md`
+  );
 }
 
 async function removeFileIfExists(filePath: string): Promise<void> {
@@ -206,7 +220,10 @@ async function writeDocumentFile(
   };
 }
 
-function latestContactPubkeys(contactEvents: Event[], userPubkey: PublicKey): PublicKey[] {
+function latestContactPubkeys(
+  contactEvents: Event[],
+  userPubkey: PublicKey
+): PublicKey[] {
   const latestContactList = getMostRecentReplacableEvent(
     List(contactEvents.filter((event) => event.kind === KIND_CONTACTLIST))
   );
@@ -222,14 +239,19 @@ function latestContactPubkeys(contactEvents: Event[], userPubkey: PublicKey): Pu
 function authorSyncMap(
   manifest: SyncPullManifest | undefined
 ): Map<PublicKey, StoredAuthor> {
-  return new Map((manifest?.authors || []).map((author) => [author.pubkey, author]));
+  return new Map(
+    (manifest?.authors || []).map((author) => [author.pubkey, author])
+  );
 }
 
 function documentMap(
   manifest: SyncPullManifest | undefined
 ): Map<string, StoredDocument> {
   return new Map(
-    (manifest?.documents || []).map((document) => [document.replaceable_key, document])
+    (manifest?.documents || []).map((document) => [
+      document.replaceable_key,
+      document,
+    ])
   );
 }
 
@@ -237,54 +259,71 @@ async function applyDeleteEvents(
   workspaceDir: string,
   documents: Map<string, StoredDocument>,
   deleteEvents: Event[]
-): Promise<void> {
-  for (const event of deleteEvents) {
-    const replaceableKey = findTag(event, "a");
-    if (!replaceableKey) {
-      continue;
-    }
+): Promise<Map<string, StoredDocument>> {
+  return deleteEvents.reduce(
+    async (
+      documentsPromise: Promise<Map<string, StoredDocument>>,
+      event: Event
+    ) => {
+      const currentDocuments = await documentsPromise;
+      const replaceableKey = findTag(event, "a");
+      const existing = replaceableKey
+        ? currentDocuments.get(replaceableKey)
+        : undefined;
+      if (
+        !replaceableKey ||
+        !existing ||
+        getEventMs(event) <= existing.updated_ms
+      ) {
+        return currentDocuments;
+      }
 
-    const existing = documents.get(replaceableKey);
-    if (!existing) {
-      continue;
-    }
-
-    if (getEventMs(event) <= existing.updated_ms) {
-      continue;
-    }
-
-    await removeFileIfExists(path.join(workspaceDir, existing.path));
-    documents.delete(replaceableKey);
-  }
+      await removeFileIfExists(path.join(workspaceDir, existing.path));
+      const nextDocuments = new Map(currentDocuments);
+      nextDocuments.delete(replaceableKey);
+      return nextDocuments;
+    },
+    Promise.resolve(documents)
+  );
 }
 
 async function applyDocumentEvents(
   workspaceDir: string,
   documents: Map<string, StoredDocument>,
   documentEvents: Event[]
-): Promise<void> {
+): Promise<Map<string, StoredDocument>> {
   const sortedEvents = [...documentEvents].sort((a, b) => {
     const diff = getEventMs(a) - getEventMs(b);
     return diff !== 0 ? diff : a.id.localeCompare(b.id);
   });
 
-  for (const event of sortedEvents) {
-    const replaceableKey = getReplaceableKey(event);
-    if (!replaceableKey) {
-      continue;
-    }
+  return sortedEvents.reduce(
+    async (
+      documentsPromise: Promise<Map<string, StoredDocument>>,
+      event: Event
+    ) => {
+      const currentDocuments = await documentsPromise;
+      const replaceableKey = getReplaceableKey(event);
+      if (!replaceableKey) {
+        return currentDocuments;
+      }
 
-    const nextDocument = await writeDocumentFile(workspaceDir, event);
-    if (!nextDocument) {
-      continue;
-    }
+      const nextDocument = await writeDocumentFile(workspaceDir, event);
+      if (!nextDocument) {
+        return currentDocuments;
+      }
 
-    const existing = documents.get(replaceableKey);
-    if (existing && existing.path !== nextDocument.path) {
-      await removeFileIfExists(path.join(workspaceDir, existing.path));
-    }
-    documents.set(replaceableKey, nextDocument);
-  }
+      const existing = currentDocuments.get(replaceableKey);
+      if (existing && existing.path !== nextDocument.path) {
+        await removeFileIfExists(path.join(workspaceDir, existing.path));
+      }
+
+      const nextDocuments = new Map(currentDocuments);
+      nextDocuments.set(replaceableKey, nextDocument);
+      return nextDocuments;
+    },
+    Promise.resolve(documents)
+  );
 }
 
 function buildAuthorEntries(
@@ -299,9 +338,9 @@ function buildAuthorEntries(
       const previous = previousAuthors.get(author);
       const authorEvents = fetchedEvents.get(author) || [];
       const latestCreatedAt = authorEvents.reduce(
-          (current, event) => Math.max(current, event.created_at),
-          previous?.last_document_created_at || 0
-        );
+        (current, event) => Math.max(current, event.created_at),
+        previous?.last_document_created_at || 0
+      );
       return {
         pubkey: author,
         last_document_created_at: latestCreatedAt,
@@ -313,15 +352,24 @@ async function removeOutOfScopeDocuments(
   workspaceDir: string,
   documents: Map<string, StoredDocument>,
   allowedAuthors: Set<PublicKey>
-): Promise<void> {
-  const entries = [...documents.entries()];
-  for (const [replaceableKey, document] of entries) {
-    if (allowedAuthors.has(document.author)) {
-      continue;
-    }
-    await removeFileIfExists(path.join(workspaceDir, document.path));
-    documents.delete(replaceableKey);
-  }
+): Promise<Map<string, StoredDocument>> {
+  return [...documents.entries()].reduce(
+    async (
+      documentsPromise: Promise<Map<string, StoredDocument>>,
+      [replaceableKey, document]: [string, StoredDocument]
+    ) => {
+      const currentDocuments = await documentsPromise;
+      if (allowedAuthors.has(document.author)) {
+        return currentDocuments;
+      }
+
+      await removeFileIfExists(path.join(workspaceDir, document.path));
+      const nextDocuments = new Map(currentDocuments);
+      nextDocuments.delete(replaceableKey);
+      return nextDocuments;
+    },
+    Promise.resolve(documents)
+  );
 }
 
 export async function pullSyncWorkspace(
@@ -336,7 +384,7 @@ export async function pullSyncWorkspace(
   const relayUrls = resolveRelayUrls(profile, options);
   const previousManifest = await loadManifest(workspaceDir);
   const previousAuthors = authorSyncMap(previousManifest);
-  const documents = documentMap(previousManifest);
+  const previousDocuments = documentMap(previousManifest);
 
   await fs.mkdir(path.join(workspaceDir, "documents"), { recursive: true });
 
@@ -347,48 +395,70 @@ export async function pullSyncWorkspace(
     maxWaitMs
   );
   const contactPubkeys = latestContactPubkeys(contactEvents, profile.pubkey);
-  const authors = [...new Set([profile.pubkey, ...contactPubkeys])] as PublicKey[];
+  const authors = [
+    ...new Set([profile.pubkey, ...contactPubkeys]),
+  ] as PublicKey[];
   const allowedAuthors = new Set(authors);
 
-  await removeOutOfScopeDocuments(workspaceDir, documents, allowedAuthors);
+  const initialDocuments = await removeOutOfScopeDocuments(
+    workspaceDir,
+    previousDocuments,
+    allowedAuthors
+  );
 
-  const fetchedEventsByAuthor = new Map<PublicKey, Event[]>();
+  const syncState = await authors.reduce(
+    async (
+      statePromise: Promise<{
+        documents: Map<string, StoredDocument>;
+        fetchedEventsByAuthor: Map<PublicKey, Event[]>;
+      }>,
+      author: PublicKey
+    ) => {
+      const state = await statePromise;
+      const previous = previousAuthors.get(author);
+      const since = previous?.last_document_created_at;
+      const authorEvents = await queryFilters(
+        client,
+        relayUrls,
+        [
+          {
+            authors: [author],
+            kinds: [KIND_KNOWLEDGE_DOCUMENT],
+            ...(since ? { since } : {}),
+          },
+          {
+            authors: [author],
+            kinds: [KIND_DELETE],
+            "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`],
+            ...(since ? { since } : {}),
+          },
+        ],
+        maxWaitMs
+      );
 
-  for (const author of authors) {
-    const previous = previousAuthors.get(author);
-    const since = previous?.last_document_created_at;
-    const authorEvents = await queryFilters(
-      client,
-      relayUrls,
-      [
-        {
-          authors: [author],
-          kinds: [KIND_KNOWLEDGE_DOCUMENT],
-          ...(since ? { since } : {}),
-        },
-        {
-          authors: [author],
-          kinds: [KIND_DELETE],
-          "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`],
-          ...(since ? { since } : {}),
-        },
-      ],
-      maxWaitMs
-    );
+      const documentsAfterDeletes = await applyDeleteEvents(
+        workspaceDir,
+        state.documents,
+        authorEvents.filter((event) => event.kind === KIND_DELETE)
+      );
+      const documentsAfterWrites = await applyDocumentEvents(
+        workspaceDir,
+        documentsAfterDeletes,
+        authorEvents.filter((event) => event.kind === KIND_KNOWLEDGE_DOCUMENT)
+      );
+      const fetchedEventsByAuthor = new Map(state.fetchedEventsByAuthor);
+      fetchedEventsByAuthor.set(author, authorEvents);
 
-    fetchedEventsByAuthor.set(author, authorEvents);
-
-    await applyDeleteEvents(
-      workspaceDir,
-      documents,
-      authorEvents.filter((event) => event.kind === KIND_DELETE)
-    );
-    await applyDocumentEvents(
-      workspaceDir,
-      documents,
-      authorEvents.filter((event) => event.kind === KIND_KNOWLEDGE_DOCUMENT)
-    );
-  }
+      return {
+        documents: documentsAfterWrites,
+        fetchedEventsByAuthor,
+      };
+    },
+    Promise.resolve({
+      documents: initialDocuments,
+      fetchedEventsByAuthor: new Map<PublicKey, Event[]>(),
+    })
+  );
 
   const manifest: SyncPullManifest = {
     workspace_version: WORKSPACE_VERSION,
@@ -396,8 +466,12 @@ export async function pullSyncWorkspace(
     synced_at: (options.now || new Date()).toISOString(),
     relay_urls: relayUrls,
     contact_pubkeys: contactPubkeys.slice().sort(),
-    authors: buildAuthorEntries(authors, previousAuthors, fetchedEventsByAuthor),
-    documents: [...documents.values()].sort((a, b) =>
+    authors: buildAuthorEntries(
+      authors,
+      previousAuthors,
+      syncState.fetchedEventsByAuthor
+    ),
+    documents: [...syncState.documents.values()].sort((a, b) =>
       a.path.localeCompare(b.path)
     ),
   };

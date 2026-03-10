@@ -41,7 +41,10 @@ function getAgentRoot(profilePath: string): string {
     : profileDir;
 }
 
-function parseRelayList(relays: RawRelay[] | undefined, source: string): Relays {
+function parseRelayList(
+  relays: RawRelay[] | undefined,
+  source: string
+): Relays {
   const normalized = (relays || []).map((relay) =>
     typeof relay === "string"
       ? { url: relay, read: true, write: true }
@@ -77,7 +80,9 @@ function parseBootstrapRelays(
 function parsePubkey(value: string | undefined): PublicKey {
   const normalized = (value || "").trim().toLowerCase();
   if (!/^[0-9a-f]{64}$/.test(normalized)) {
-    throw new Error("profile.json must include a valid 64-character hex pubkey");
+    throw new Error(
+      "profile.json must include a valid 64-character hex pubkey"
+    );
   }
   return normalized as PublicKey;
 }
@@ -106,7 +111,10 @@ export function loadCliProfile({
 
   return {
     pubkey: parsePubkey(profile.pubkey),
-    workspaceDir: resolveAbsolute(agentRoot, profile.workspace_dir || "./workspace"),
+    workspaceDir: resolveAbsolute(
+      agentRoot,
+      profile.workspace_dir || "./workspace"
+    ),
     bootstrapRelays: parseBootstrapRelays(
       profile.bootstrap_relays,
       `${resolvedConfigPath}#bootstrap_relays`

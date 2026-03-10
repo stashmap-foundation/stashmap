@@ -8,8 +8,6 @@ import {
   getWriteRelays,
   mergeRelays,
   sanitizeRelays,
-  sanitizeRelayUrl,
-  findRelays,
 } from "./relayUtils";
 
 export {

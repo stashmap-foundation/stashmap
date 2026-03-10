@@ -1,9 +1,7 @@
 import React, { createContext, useContext } from "react";
 import { List } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
-import {
-  getMostRecentReplacableEvent,
-} from "./nostrEvents";
+import { getMostRecentReplacableEvent } from "./nostrEvents";
 import { useEventQuery } from "./commons/useNostrQuery";
 import { createRelaysQuery, findAllRelays, sanitizeRelays } from "./relayUtils";
 import { useDefaultRelays, useUserOrAnon } from "./NostrAuthContext";

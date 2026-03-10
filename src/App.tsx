@@ -1,7 +1,6 @@
 import React, { useEffect } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import Dashboard from "./components/Dashboard";
-import { Follow } from "./components/Follow";
 import { RelaysWrapper } from "./components/Relays";
 import { RequireLogin } from "./AppState";
 import { SignUp } from "./SignUp";
@@ -42,7 +41,7 @@ export function App(): JSX.Element {
     <Routes>
       <Route element={<RequireLogin />}>
         <Route path="/" element={<Dashboard />}>
-          <Route path="follow" element={<Follow />} />
+          <Route path="follow" element={<Navigate replace to="/" />} />
           <Route path="relays" element={<RelaysWrapper />} />
           <Route path="signin" element={<SignInModal />} />
           <Route path="signup" element={<SignUp />} />

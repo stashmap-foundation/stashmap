@@ -216,6 +216,14 @@ function Data({ user, children }: DataProps): JSX.Element {
     });
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (db && typeof db.close === "function") {
+        db.close();
+      }
+    };
+  }, [db]);
+
   const onEventsAdded = useCallback(
     (events: Map<string, Event | UnsignedEvent>) => {
       if (!db) return;

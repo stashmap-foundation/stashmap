@@ -38,6 +38,7 @@ import { getNodesInTree } from "./treeTraversal";
 import { newDB } from "./knowledge";
 import { createRootAnchor } from "./rootAnchor";
 import { resolveSemanticRelationInCurrentTree } from "./semanticNavigation";
+import { LOG_ROOT_ROLE } from "./systemRoots";
 
 const markdown = new MarkdownIt();
 markdown.use(attrs);
@@ -79,6 +80,7 @@ function extractAttrs(token: Token): {
   basedOn: string | undefined;
   anchor: RootAnchor | undefined;
   systemRole: RootSystemRole | undefined;
+  userPublicKey: PublicKey | undefined;
 } {
   if (!token.attrs) {
     return {
@@ -90,6 +92,7 @@ function extractAttrs(token: Token): {
       basedOn: undefined,
       anchor: undefined,
       systemRole: undefined,
+      userPublicKey: undefined,
     };
   }
   const uuid = token.attrs.find(([, value]) => value === "")?.[0];
@@ -115,8 +118,11 @@ function extractAttrs(token: Token): {
     | undefined;
   const sourceParentRelationID = (token.attrGet("sourceParent") ||
     undefined) as LongID | undefined;
-  const systemRole = (token.attrGet("systemRole") || undefined) as
-    | RootSystemRole
+  const rawSystemRole = token.attrGet("systemRole") || undefined;
+  const systemRole =
+    rawSystemRole === LOG_ROOT_ROLE ? LOG_ROOT_ROLE : undefined;
+  const userPublicKey = (token.attrGet("userPublicKey") || undefined) as
+    | PublicKey
     | undefined;
   const anchor =
     anchorContext ||
@@ -151,6 +157,7 @@ function extractAttrs(token: Token): {
     basedOn,
     anchor,
     systemRole,
+    userPublicKey,
   };
 }
 
@@ -166,6 +173,7 @@ export type MarkdownTreeNode = {
   basedOn?: string;
   anchor?: RootAnchor;
   systemRole?: RootSystemRole;
+  userPublicKey?: PublicKey;
 };
 
 /* eslint-disable functional/immutable-data, functional/no-let, no-continue */
@@ -210,6 +218,7 @@ export function parseMarkdownHierarchy(
     basedOn: string | undefined;
     anchor: RootAnchor | undefined;
     systemRole: RootSystemRole | undefined;
+    userPublicKey: PublicKey | undefined;
   } = {
     uuid: undefined,
     semanticID: undefined,
@@ -219,6 +228,7 @@ export function parseMarkdownHierarchy(
     basedOn: undefined,
     anchor: undefined,
     systemRole: undefined,
+    userPublicKey: undefined,
   };
 
   for (let i = 0; i < tokens.length; i += 1) {
@@ -242,6 +252,7 @@ export function parseMarkdownHierarchy(
         basedOn,
         anchor,
         systemRole,
+        userPublicKey,
       } = extractAttrs(token);
       while (
         headingStack.length > 0 &&
@@ -263,6 +274,7 @@ export function parseMarkdownHierarchy(
         ...(basedOn !== undefined && { basedOn }),
         ...(anchor !== undefined && { anchor }),
         ...(systemRole !== undefined && { systemRole }),
+        ...(userPublicKey !== undefined && { userPublicKey }),
       };
       appendNode(roots, parent, node);
       headingStack.push({ level: headingLevel, node });
@@ -301,8 +313,15 @@ export function parseMarkdownHierarchy(
         const parent =
           getLastDefinedListItem(listItemStack.slice(0, -1)) ||
           headingStack[headingStack.length - 1]?.node;
-        const { uuid, semanticID, relevance, argument, hidden, basedOn } =
-          pendingAttrs;
+        const {
+          uuid,
+          semanticID,
+          relevance,
+          argument,
+          hidden,
+          basedOn,
+          userPublicKey,
+        } = pendingAttrs;
         const effectiveRelevance = linkRelevance ?? relevance;
         const effectiveArgument = linkArgument ?? argument;
         const node: MarkdownTreeNode = {
@@ -319,6 +338,7 @@ export function parseMarkdownHierarchy(
           ...(linkHref !== undefined && { linkHref }),
           ...(hidden && { hidden }),
           ...(basedOn !== undefined && { basedOn }),
+          ...(userPublicKey !== undefined && { userPublicKey }),
         };
         appendNode(roots, parent, node);
         listItemStack[currentItemIndex] = node;
@@ -347,11 +367,19 @@ function formatAttrs(
   uuid: string,
   relevance: Relevance,
   argument: Argument,
-  options?: { hidden?: boolean; basedOn?: LongID; semanticID?: ID }
+  options?: {
+    hidden?: boolean;
+    basedOn?: LongID;
+    semanticID?: ID;
+    userPublicKey?: PublicKey;
+  }
 ): string {
   const parts: string[] = uuid ? [uuid] : [];
   if (options?.semanticID) {
     parts.push(`semantic="${options.semanticID}"`);
+  }
+  if (options?.userPublicKey) {
+    parts.push(`userPublicKey="${options.userPublicKey}"`);
   }
   if (relevance) {
     parts.push(`.${relevance}`);
@@ -530,6 +558,7 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
         {
           basedOn: ownRelation?.basedOn,
           semanticID: serializedSemanticID,
+          userPublicKey: ownRelation?.userPublicKey,
         }
       )}`;
       return {
@@ -710,6 +739,7 @@ function materializeTreeNode(
       ? undefined
       : treeNode.anchor ?? createRootAnchor(semanticContext),
     systemRole: parent ? undefined : treeNode.systemRole,
+    userPublicKey: treeNode.userPublicKey,
   };
 
   const childSemanticContext = semanticContext.push(

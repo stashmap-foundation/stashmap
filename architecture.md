@@ -69,6 +69,7 @@ type Relations = {
   basedOn?: LongID;
   anchor?: RootAnchor;
   systemRole?: "log";
+  userPublicKey?: PublicKey;
 }
 ```
 
@@ -78,6 +79,7 @@ Important invariants:
 - `textHash` is the semantic identity
 - `parent` is the only stored structural ancestry link
 - `root` groups relations into one persisted document
+- `userPublicKey` binds a row to a stable followed pubkey even if the visible label is renamed
 - standalone roots satisfy `root === shortID(id)`
 
 `RelationItem` is the parent-child edge:
@@ -132,8 +134,37 @@ Currently supported:
 
 `~Log` is the display text for the `"log"` system root, but root identity is the `systemRole`, not the text hash.
 
+Operational rules:
+- system roots can be created lazily from UI actions
+- system roots are queried via the `#s` tag
+- system roots should not be auto-added back into `~Log`
+
+Contacts now preserve their lightweight metadata on read:
+- `mainRelay`
+- `userName`
+
+Rows can also persist a dedicated `userPublicKey` field in document markdown attrs.
+That field is what lets follow/unfollow keep working after a row is renamed from an `npub`
+to a friendlier label like `:robot: gardener`.
+
+UI rule:
+- rows with `userPublicKey` should look distinct in the existing gutter/marker system
+- the current implementation uses a gutter `@`, with muted color for a bound user entry and green for a followed one
+- this is separate from the violet `@` used for suggestion rows
+
+There is no reserved `~users` system root anymore. Address books are just ordinary
+documents that happen to contain rows with `userPublicKey`.
+
+Projection rule:
+- suggestion/version/incoming/occurrence overlays must respect the current visible-author set
+- cached events from previously followed authors may remain on disk, but they should not surface once the author is no longer visible through `contacts`, project members, or an explicitly opened author view
+
+Logout/cache rule:
+- logout should clear the IndexedDB-backed cache as well as auth state
+- clearing the DB must close active IndexedDB handles first, otherwise `deleteDatabase` can be blocked by the current tab and stale cache survives logout
+
 Helpers live in:
-- [systemRoots.ts](/Users/f/sandbox/stashmap-3/src/systemRoots.ts)
+- [systemRoots.ts](/Users/f/sandbox/stashmap-2/src/systemRoots.ts)
 
 ## Tree, Views, And Panes
 

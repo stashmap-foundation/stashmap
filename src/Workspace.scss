@@ -369,6 +369,18 @@ body {
   font-family: monospace;
 }
 
+.user-entry-indicator {
+  color: var(--base01);
+  font-weight: bold;
+  font-family: monospace;
+}
+
+.user-entry-indicator-following {
+  color: var(--green);
+  font-weight: bold;
+  font-family: monospace;
+}
+
 .version-indicator-other {
   color: var(--violet);
   font-weight: bold;

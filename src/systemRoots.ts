@@ -38,10 +38,17 @@ export function getOwnLogRoot(
   return getOwnSystemRoot(knowledgeDBs, author, LOG_ROOT_ROLE);
 }
 
+export function getSystemRoleSemanticID(systemRole: RootSystemRole): ID {
+  switch (systemRole) {
+    case LOG_ROOT_ROLE:
+    default:
+      return LOG_ROOT_SEMANTIC_ID;
+  }
+}
+
 export function getSystemRoleText(systemRole: RootSystemRole): string {
   switch (systemRole) {
     case LOG_ROOT_ROLE:
-      return LOG_ROOT_TEXT;
     default:
       return LOG_ROOT_TEXT;
   }

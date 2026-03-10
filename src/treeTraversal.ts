@@ -118,9 +118,17 @@ function getChildrenForRegularNode(
   const relationId = relations?.id || ("" as LongID);
 
   const containingRelationID = getParentRelation(data, parentPath)?.id;
+  const visibleAuthors = data.contacts
+    .keySeq()
+    .toSet()
+    .union(data.projectMembers.keySeq().toSet())
+    .add(data.user.publicKey)
+    .add(author)
+    .add(effectiveAuthor);
 
   const incomingCrefs = getIncomingCrefsForNode(
     data.knowledgeDBs,
+    visibleAuthors,
     coordinateSemanticID,
     containingRelationID,
     relations?.id,
@@ -134,6 +142,7 @@ function getChildrenForRegularNode(
   const occurrences = activeFilters.includes("occurrence")
     ? getOccurrencesForNode(
         data.knowledgeDBs,
+        visibleAuthors,
         coordinateSemanticID,
         relations?.id,
         effectiveAuthor,
@@ -157,6 +166,7 @@ function getChildrenForRegularNode(
   const { suggestions: diffItems, coveredCandidateIDs } = isOwnContent
     ? getSuggestionsForNode(
         data.knowledgeDBs,
+        visibleAuthors,
         data.user.publicKey,
         coordinateSemanticID,
         activeFilters,
@@ -197,6 +207,7 @@ function getChildrenForRegularNode(
   };
   const versions = getVersionsForRelation(
     data.knowledgeDBs,
+    visibleAuthors,
     coordinateSemanticID,
     activeFilters,
     relations,

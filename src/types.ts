@@ -254,6 +254,7 @@ declare global {
     parent?: LongID;
     anchor?: RootAnchor;
     systemRole?: RootSystemRole;
+    userPublicKey?: PublicKey;
     updated: number;
     author: PublicKey;
     basedOn?: LongID;

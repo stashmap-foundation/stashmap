@@ -131,7 +131,7 @@ export function ClosePaneButton(): JSX.Element {
   );
 }
 
-type CopiedField = "none" | "npub" | "nprofile" | "invite";
+type CopiedField = "none" | "npub" | "nprofile";
 
 export function PaneSettingsMenu({
   onShowShortcuts,
@@ -153,9 +153,6 @@ export function PaneSettingsMenu({
   const npub = isLoggedIn ? nip19.npubEncode(user.publicKey) : "";
   const nprofile = isLoggedIn
     ? nip19.nprofileEncode({ pubkey: user.publicKey })
-    : "";
-  const inviteLink = isLoggedIn
-    ? `${window.location.origin}/follow?publicKey=${user.publicKey}`
     : "";
 
   return (
@@ -197,33 +194,9 @@ export function PaneSettingsMenu({
                 {copied === "nprofile" ? "Copied!" : "Copy nprofile"}
               </div>
             </Dropdown.Item>
-            <Dropdown.Item
-              className="d-flex menu-item"
-              onClick={() => copyToClipboard(inviteLink, "invite")}
-              aria-label="copy invite link"
-              tabIndex={0}
-            >
-              <span className="d-block dropdown-item-icon" aria-hidden="true">
-                @
-              </span>
-              <div className="menu-item-text">
-                {copied === "invite" ? "Copied!" : "Copy invite link"}
-              </div>
-            </Dropdown.Item>
             <Dropdown.Divider />
           </>
         )}
-        <Dropdown.Item
-          className="d-flex menu-item"
-          onClick={() => navigate("/follow")}
-          aria-label="follow user"
-          tabIndex={0}
-        >
-          <span className="d-block dropdown-item-icon" aria-hidden="true">
-            +@
-          </span>
-          <div className="menu-item-text">Follow User</div>
-        </Dropdown.Item>
         <Dropdown.Item
           className="d-flex menu-item"
           onClick={() => navigate("/relays")}

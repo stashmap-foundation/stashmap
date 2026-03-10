@@ -53,6 +53,8 @@ function getContactsFromFollowList(followList: FollowList): Contacts {
         contact.publicKey,
         {
           publicKey: contact.publicKey,
+          ...(contact.mainRelay ? { mainRelay: contact.mainRelay } : {}),
+          ...(contact.userName ? { userName: contact.userName } : {}),
         },
       ];
     })

@@ -28,8 +28,8 @@ The user's graph remains authoritative. Agent output is either:
 This roadmap tries to introduce only:
 
 - one new reserved root: `~Home`
-- one new reserved root: `~Users`
 - one special rule: `~Home` is link-only
+- one row-level semantic field: `userPublicKey`
 - one convention: one pubkey per background agent
 
 Everything else should reuse existing behavior.
@@ -56,14 +56,16 @@ Example:
   [link] ~Log
 ```
 
-And separately:
+And separately, address books can just be ordinary documents:
 
 ```text
-~Users
-  Alice
-  Bob
+Agents
   :robot: gardener
   :robot: ingest
+
+Business Contacts
+  Alice
+  Bob
 ```
 
 Important constraint:
@@ -84,32 +86,46 @@ To prevent `~Home` from turning into one giant root document:
 
 This keeps `~Home` curated and small, while content lives in normal documents.
 
-## `~Users` Address Book
+## Address Books And User Entries
 
 Knowstr also needs a simple user directory, especially once multiple agents are present.
 
 The minimal model is:
 
-- one root list: `~Users`
-- each entry represents one user/contact
+- any row with `userPublicKey` is a user entry
+- user entries can live in ordinary documents anywhere
 - the stable identity is the user's `publicKey`
 - the visible text is just the editable label, for example `gardener` or `:robot: gardener`
+- each user entry can also hold local notes such as role, description, and operating constraints
+- `contacts` remains the global follow/read-scope backend
 
 Important non-goals:
 
-- no separate `Agents` list
+- no reserved address-book root
 - no new role/type schema
 - no extra contact object model inside the graph
 
-This should behave like an ordinary list in the UI:
+This should behave like ordinary Knowstr content in the UI:
 
 - sortable
 - renameable
 - navigable like other lists
+- good for local notes and agent-readable role descriptions
 
-But under the hood it should still key entries by `publicKey`, not by the visible label.
+User-specific actions should live there as well:
 
-That gives Knowstr a simple address book without inventing a parallel user-management system.
+- follow / unfollow
+- open profile
+- copy npub
+
+Direction:
+
+- user-organized address-book documents should become the primary UX for managing people and agents
+- the current `/follow` modal/menu flow should be removed rather than kept as the main management surface
+
+But under the hood the semantic key is still `publicKey`, not the visible label.
+
+That gives Knowstr a simple address-book model without inventing a parallel user-management system.
 
 ## Agent Roles
 
@@ -160,7 +176,7 @@ The important correction is:
 Recommended capabilities:
 
 - sync the graph into a local markdown workspace from the user's perspective
-- read `~Home` and `~Users` as exported markdown
+- read `~Home`, exported contacts, and relevant address-book docs as markdown
 - inspect relevant root documents directly on disk
 - use `rg` and normal file navigation for discovery
 - extract exact cref or relation IDs from frontmatter or a manifest before writing
@@ -339,24 +355,29 @@ Success criteria:
 - new root documents no longer clutter the curated home structure
 - `~Log` still works as history
 
-### Phase 1.5: Add `~Users`
+### Phase 1.5: User Entries And Contacts
 
 Objective:
 
-- give the user a graph-native address book for people and agents
+- make people and agents manageable without adding a reserved address-book root
 
 Steps:
 
-1. Introduce reserved node `~Users`
-2. Surface followed users there as ordinary list entries
+1. Make `userPublicKey` the semantic trigger for user entries
+2. Allow user entries in ordinary documents anywhere in the graph
 3. Keep `publicKey` as the stable identity for each entry
 4. Allow the visible label to be edited independently
-5. Reuse ordinary list affordances like sorting and navigation
+5. Put follow / unfollow actions on the user entry itself
+6. Export the current contact list separately for global discovery
+7. Remove the current `/follow` modal/menu flow
+8. Reuse ordinary list affordances like sorting and navigation
 
 Success criteria:
 
 - users can rename contacts and agents to human-friendly labels
+- users can organize address books however they want, such as `Agents`, `Private`, or `Business Contacts`
 - multiple agents are manageable without remembering raw npubs
+- follow state is managed from user entries plus `contacts`, not from a reserved root or separate modal
 - the feature adds no separate agent/user taxonomy
 
 ### Phase 2: Add Sync Export And CLI Authoring
@@ -368,7 +389,7 @@ Objective:
 Steps:
 
 1. Build `knowstr sync pull` to export a local markdown workspace
-2. Export `~Home`, `~Users`, and root documents with stable frontmatter/manifest metadata
+2. Export `~Home`, `CONTACTS.md`, and root documents with stable frontmatter/manifest metadata
 3. Make sync compute read scope from the user's perspective rather than from each agent's own follows
 4. Keep `sync pull` as a one-shot snapshot in V1, not a live listener
 5. Let the CLI agent read that workspace directly
@@ -440,7 +461,7 @@ Objective:
 Recommended order:
 
 1. `~Home`
-2. `~Users`
+2. user entries + contacts
 3. sync export
 4. CLI authoring agent
 5. `agent/ingest`
@@ -451,7 +472,7 @@ Recommended order:
 Reasoning:
 
 - `~Home` provides the landing point
-- `~Users` makes people and agents manageable
+- user entries and contacts make people and agents manageable without a reserved root
 - sync export gives external agents a natural read surface
 - CLI authoring solves immediate graph creation
 - live watch/continuous refresh can come later only if snapshot pull proves too clumsy
@@ -478,8 +499,9 @@ The simplest path is:
 
 1. Create `~Home` as a link-only dashboard
 2. Keep `~Log` as the automatic stream
-3. Add a CLI authoring agent that writes as the user
-4. Add background agents that propose from their own pubkeys
-5. Let the user adopt proposals with existing Knowstr primitives
+3. Treat people and agents as ordinary user entries keyed by `userPublicKey`
+4. Add a CLI authoring agent that writes as the user
+5. Add background agents that propose from their own pubkeys
+6. Let the user adopt proposals with existing Knowstr primitives
 
 That gets Knowstr to an agentic workflow without turning it into a separate orchestration system.

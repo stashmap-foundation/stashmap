@@ -1,5 +1,114 @@
 # Lessons Learned
 
+## Close active IndexedDB handles before clearing cache on logout
+
+**Date**: 2026-03-10
+**Context**: Logout already called `clearDatabase()`, but stale cached graph data could still survive because the app itself still held an open IndexedDB connection.
+
+**Mistake**: Deleting an IndexedDB database while the current tab still has it open can be blocked, which makes logout look like it cleared cache when it did not.
+
+**Rule**: For logout/cache clearing:
+1. Close tracked IndexedDB connections first
+2. Then clear the database
+3. Treat cache clearing as part of logout correctness, not as optional cleanup
+
+## Projection must respect current visible authors, not all cached authors
+
+**Date**: 2026-03-10
+**Context**: After unfollowing a contact, their suggestions still appeared, even after reload.
+
+**Mistake**: Query scope had changed, but projection code still scanned all authors present in `knowledgeDBs`. Because cached events survive unfollow and reload, old authors kept leaking into suggestions and related overlays.
+
+**Rule**: For overlays such as suggestions, versions, incoming refs, and occurrences:
+1. Filter by the current visible-author set
+2. Do not treat cached data as implicitly visible
+3. Use `contacts`, project members, and any explicitly viewed author as the visibility boundary
+
+## Remove obsolete route affordances when semantics move into the graph
+
+**Date**: 2026-03-10
+**Context**: After moving people-management semantics onto `userPublicKey` rows, the app still had a dedicated `/follow` page and invite-link share action.
+
+**Mistake**: That left a parallel UX alive after the real workflow had moved into ordinary graph content. Keeping dead route affordances around makes the product model harder to understand.
+
+**Rule**: When row-level graph semantics replace an old screen:
+1. Remove the obsolete menu/share entry points
+2. Delete the old page if it is no longer the intended workflow
+3. Redirect stale URLs to a safe default instead of leaving a dead route
+
+## Address books should stay ordinary documents
+
+**Date**: 2026-03-10
+**Context**: After trying a dedicated `~users` root, the cleaner model turned out to be row-level `userPublicKey` plus ordinary user-organized documents.
+
+**Mistake**: Treating address books as a reserved root added a product concept that the app no longer needed once user-entry behavior worked anywhere.
+
+**Rule**: For people/agent management:
+1. Keep `contacts` as the global follow-state backend
+2. Keep address-book organization in ordinary documents
+3. Use `userPublicKey` as the semantic trigger for follow/unfollow and related row behavior
+
+## Remove `~users` once `userPublicKey` is enough
+
+**Date**: 2026-03-10
+**Context**: After generalizing user-entry behavior, the app still had a dedicated `~users` system root and menu entry.
+
+**Mistake**: That left a product concept in place after its semantic job had already moved to `userPublicKey`. Once user entries can live anywhere, the reserved root adds opinionated structure without providing necessary behavior.
+
+**Rule**: When a row-level semantic field is sufficient:
+1. Prefer ordinary documents over a reserved root
+2. Keep only the minimal reserved roots the system truly needs
+3. Let menu flows disappear if they only existed to support the removed reserved root
+
+## Historical: Use lowercase `~users`
+
+**Date**: 2026-03-10
+**Context**: While discussing and documenting the address-book root, I kept using a mixed-case spelling for it.
+
+**Mistake**: The user explicitly wants the reserved root written as `~users`, and mixing the casing across docs, tests, and code makes the feature feel less intentional than the other reserved names.
+
+**Rule**: For this address-book feature:
+1. Write the reserved root as `~users`
+2. Keep constants, tests, and docs aligned to the same casing
+3. Treat `Users` as menu text if needed, but keep the root/node text lowercase
+
+## Historical: Use `user entry` or `user row`, not `card`
+
+**Date**: 2026-03-10
+**Context**: While describing the `~users` feature, I used the word "card" for the per-user document/row.
+
+**Mistake**: "Card" is not existing Knowstr vocabulary and suggests a special UI component that the product does not need. The user-facing concept here is just a normal user entry inside `~users`.
+
+**Rule**: In `~users` planning and implementation:
+1. Use `user entry` or `user row` as the term
+2. Do not introduce `card` as a product concept
+3. Keep `~users` aligned with normal Knowstr document/list language
+
+## Historical: Make `~users` the primary follow UX immediately
+
+**Date**: 2026-03-10
+**Context**: While sketching the `~users` address-book feature, I initially treated the current follow modal as something to keep around as a fallback entry point.
+
+**Mistake**: That preserves a split UX for the same task. If `~users` is the real place for people and agent management, keeping the old follow flow as a parallel management surface just prolongs bad UX and weakens the mental model.
+
+**Rule**: For the `~users` rollout:
+1. Put follow/unfollow actions on the user entry
+2. Make `~users` the primary place to add and manage people/agents
+3. Remove the old `/follow` modal/menu flow instead of keeping it as the main surface
+4. Keep contacts as backend follow state, but make `~users` the user-facing workflow
+
+## Historical: Make `userPublicKey` the semantic trigger, not the `~users` root
+
+**Date**: 2026-03-10
+**Context**: After the first `~users` implementation, follow/unfollow behavior still depended on the row living directly under the `~users` root.
+
+**Mistake**: That made `~users` too special. The cleaner model is that `~users` is just the default address-book location, while any row with a stable `userPublicKey` should behave like a user entry anywhere in the graph.
+
+**Rule**: For user-entry behavior:
+1. Use `userPublicKey` as the actual semantic trigger
+2. Let `~users` stay the default place the menu opens, not the only place user entries work
+3. Hide relevance/evidence and show follow/unfollow based on `userPublicKey`, not on root location
+
 ## Keep `sync pull` snapshot-based; add live refresh separately
 
 **Date**: 2026-03-10

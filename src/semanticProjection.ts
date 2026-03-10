@@ -520,6 +520,7 @@ export function deduplicateRefsByContext(
 
 export function getOccurrencesForNode(
   knowledgeDBs: KnowledgeDBs,
+  visibleAuthors: ImmutableSet<PublicKey>,
   semanticID: LongID | ID,
   currentRelationID: LongID | undefined,
   effectiveAuthor: PublicKey,
@@ -562,6 +563,10 @@ export function getOccurrencesForNode(
     );
   };
   const filtered = allRefs
+    .filter((ref) => {
+      const [author] = splitID(ref.relationID);
+      return !!author && visibleAuthors.has(author);
+    })
     .filter((ref) => ref.relationID !== currentRelationID)
     .filter((ref) =>
       ref.context.size === 0
@@ -599,6 +604,7 @@ export function getOccurrencesForNode(
 
 export function getIncomingCrefsForNode(
   knowledgeDBs: KnowledgeDBs,
+  visibleAuthors: ImmutableSet<PublicKey>,
   currentSemanticID: LongID | ID,
   parentRelationID: LongID | undefined,
   currentRelationID: LongID | undefined,
@@ -628,6 +634,7 @@ export function getIncomingCrefsForNode(
 
   const refs = knowledgeDBs.reduce((acc, knowledgeDB) => {
     return knowledgeDB.relations.reduce((rdx, relation) => {
+      if (!visibleAuthors.has(relation.author)) return rdx;
       if (relation.id === parentRelationID) return rdx;
       if (relation.id === currentRelationID) return rdx;
       if (relation.systemRole === LOG_ROOT_ROLE) return rdx;
@@ -713,6 +720,7 @@ const EMPTY_SUGGESTIONS_RESULT: SuggestionsResult = {
 
 export function getSuggestionsForNode(
   knowledgeDBs: KnowledgeDBs,
+  visibleAuthors: ImmutableSet<PublicKey>,
   myself: PublicKey,
   semanticID: LongID | ID,
   filterTypes: FooterTypeFilters,
@@ -768,7 +776,7 @@ export function getSuggestionsForNode(
 
   const contextToMatch = parentContext || List<ID>();
   const otherRelations: List<Relations> = knowledgeDBs
-    .filter((_, pk) => pk !== myself)
+    .filter((_, pk) => pk !== myself && visibleAuthors.has(pk))
     .toList()
     .flatMap((db) =>
       db.relations
@@ -848,6 +856,7 @@ export function getSuggestionsForNode(
 
 export function getAlternativeRelations(
   knowledgeDBs: KnowledgeDBs,
+  visibleAuthors: ImmutableSet<PublicKey>,
   semanticID: LongID | ID,
   context: Context,
   excludeRelationId?: LongID,
@@ -862,6 +871,7 @@ export function getAlternativeRelations(
   const semanticKey = getSemanticNodeKey(knowledgeDBs, semanticID, author);
   return knowledgeDBs
     .entrySeq()
+    .filter(([pk]) => visibleAuthors.has(pk))
     .flatMap(([, db]) =>
       List(getIndexedRelationsForKeys(db, [localID, semanticKey])).filter(
         (r) => {
@@ -971,6 +981,7 @@ function computeComparableRelationDiff(
 
 export function getVersionsForRelation(
   knowledgeDBs: KnowledgeDBs,
+  visibleAuthors: ImmutableSet<PublicKey>,
   semanticID: LongID | ID,
   filterTypes: FooterTypeFilters,
   currentRelation?: Relations,
@@ -984,6 +995,7 @@ export function getVersionsForRelation(
   const contextToMatch = parentContext || List<ID>();
   const alternatives = getAlternativeRelations(
     knowledgeDBs,
+    visibleAuthors,
     semanticID,
     contextToMatch,
     currentRelation?.id,

@@ -64,6 +64,7 @@ import { RightMenu } from "./RightMenu";
 import { useItemStyle } from "./useItemStyle";
 import { EditorTextProvider } from "./EditorTextContext";
 import { getChildNodes } from "../treeTraversal";
+import { getRelationUserPublicKey } from "../userEntries";
 
 export { getNodesInTree } from "../treeTraversal";
 
@@ -651,6 +652,25 @@ function IncomingRefGutterIndicator(): JSX.Element {
   );
 }
 
+function UserEntryIndicator({
+  isFollowing,
+}: {
+  isFollowing: boolean;
+}): JSX.Element {
+  return (
+    <span
+      className={
+        isFollowing ? "user-entry-indicator-following" : "user-entry-indicator"
+      }
+      title={isFollowing ? "Followed user entry" : "User entry"}
+      aria-hidden="true"
+      data-testid="user-entry-indicator"
+    >
+      @
+    </span>
+  );
+}
+
 function VersionIndicator({
   isOtherUser,
 }: {
@@ -697,6 +717,9 @@ export function Node({
   const currentRelation = useCurrentRelation();
   const isViewingOtherUser = useIsViewingOtherUserContent();
   const node = getCurrentReferenceForView(data, viewPath, stack, virtualType);
+  const userEntryPublicKey = getRelationUserPublicKey(currentRelation);
+  const isFollowingUserEntry =
+    !!userEntryPublicKey && data.contacts.has(userEntryPublicKey);
   const isOtherUser =
     (node && node.author !== user.publicKey) || isViewingOtherUser;
 
@@ -720,9 +743,17 @@ export function Node({
         data-virtual-type={virtualType || (isVersion ? "version" : undefined)}
         data-other-user={isOtherUser ? "true" : undefined}
         data-deleted={node?.deleted ? "true" : undefined}
+        data-user-entry={userEntryPublicKey ? "true" : undefined}
+        data-user-following={isFollowingUserEntry ? "true" : undefined}
       >
         <div className="indicator-gutter">
           {isSuggestion && <SuggestionIndicator />}
+          {!isSuggestion &&
+            !isVersion &&
+            !virtualType &&
+            userEntryPublicKey && (
+              <UserEntryIndicator isFollowing={isFollowingUserEntry} />
+            )}
           {isVersion && <VersionIndicator isOtherUser={!!isOtherUser} />}
           {virtualType === "occurrence" && <OccurrenceGutterIndicator />}
           {virtualType === "incoming" && <IncomingRefGutterIndicator />}

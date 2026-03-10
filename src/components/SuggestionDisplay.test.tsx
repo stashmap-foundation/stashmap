@@ -6,6 +6,7 @@ import {
   CAROL,
   setup,
   follow,
+  unfollow,
   renderTree,
   renderApp,
   findNewNodeEditor,
@@ -153,6 +154,33 @@ My Notes
   Shared
     AliceChild
     [S] BobChild
+    `);
+  });
+
+  test("unfollowing removes cached suggestions from that user", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    await follow(alice, bob().user.publicKey);
+
+    renderTree(bob);
+    await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}BobChild{Escape}");
+    cleanup();
+
+    renderTree(alice);
+    await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}AliceChild{Escape}");
+
+    await expectTree(`
+My Notes
+  Topic
+    AliceChild
+    [S] BobChild
+    `);
+
+    await unfollow(alice, bob().user.publicKey);
+
+    await expectTree(`
+My Notes
+  Topic
+    AliceChild
     `);
   });
 

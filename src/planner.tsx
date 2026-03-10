@@ -42,10 +42,10 @@ import {
 } from "./connections";
 import type { TextSeed } from "./connections";
 import {
-  getOwnLogRoot,
+  getOwnSystemRoot,
+  getSystemRoleSemanticID,
   getSystemRoleText,
   LOG_ROOT_ROLE,
-  LOG_ROOT_SEMANTIC_ID,
 } from "./systemRoots";
 import {
   newRelations,
@@ -67,6 +67,7 @@ import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useRelaysToCreatePlan } from "./relays";
 import { mergePublishResultsOfEvents } from "./commons/PublishingStatus";
 import { createRootAnchor } from "./rootAnchor";
+import { decodePublicKeyInputSync } from "./nostrPublicKeys";
 import {
   MultiSelectionState,
   clearSelection,
@@ -148,13 +149,19 @@ function setRelayConf(
 }
 
 export function planAddContact(plan: Plan, publicKey: PublicKey): Plan {
-  if (plan.contacts.has(publicKey)) {
+  return planUpsertContact(plan, { publicKey });
+}
+
+export function planUpsertContact(plan: Plan, contact: Contact): Plan {
+  const existing = plan.contacts.get(contact.publicKey);
+  if (
+    existing?.publicKey === contact.publicKey &&
+    existing?.mainRelay === contact.mainRelay &&
+    existing?.userName === contact.userName
+  ) {
     return plan;
   }
-  const newContact: Contact = {
-    publicKey,
-  };
-  const newContacts = plan.contacts.set(publicKey, newContact);
+  const newContacts = plan.contacts.set(contact.publicKey, contact);
   const contactListEvent = newContactListEvent(newContacts, plan.user);
   return {
     ...plan,
@@ -166,6 +173,58 @@ export function planAddContact(plan: Plan, publicKey: PublicKey): Plan {
         contacts: false,
       })
     ),
+  };
+}
+
+export function planEnsureSystemRoot(
+  plan: Plan,
+  systemRole: RootSystemRole
+): [Plan, Relations] {
+  const existing = getOwnSystemRoot(
+    plan.knowledgeDBs,
+    plan.user.publicKey,
+    systemRole
+  );
+  if (existing) {
+    return [plan, existing];
+  }
+
+  const relation = newRelations(
+    getSystemRoleSemanticID(systemRole),
+    List<ID>(),
+    plan.user.publicKey,
+    undefined,
+    undefined,
+    getSystemRoleText(systemRole),
+    systemRole
+  );
+
+  return [upsertRelationsCore(plan, relation), relation];
+}
+
+function getUsersEntryPublicKey(
+  text: string,
+  relation?: Relations
+): PublicKey | undefined {
+  return (
+    decodePublicKeyInputSync(text) ||
+    relation?.userPublicKey ||
+    decodePublicKeyInputSync(relation?.text)
+  );
+}
+
+function withUsersEntryPublicKey(
+  relation: Relations,
+  text = relation.text
+): Relations {
+  const userPublicKey = getUsersEntryPublicKey(text, relation);
+  if (!userPublicKey) {
+    return relation;
+  }
+
+  return {
+    ...relation,
+    userPublicKey,
   };
 }
 
@@ -247,18 +306,7 @@ function upsertRelationsCore(plan: Plan, relations: Relations): Plan {
 }
 
 function addCrefToLog(plan: Plan, relationID: LongID): Plan {
-  const logRelations = getOwnLogRoot(plan.knowledgeDBs, plan.user.publicKey);
-  const relations =
-    logRelations ||
-    newRelations(
-      LOG_ROOT_SEMANTIC_ID,
-      List<ID>(),
-      plan.user.publicKey,
-      undefined,
-      undefined,
-      getSystemRoleText(LOG_ROOT_ROLE),
-      LOG_ROOT_ROLE
-    );
+  const [planWithLog, relations] = planEnsureSystemRoot(plan, LOG_ROOT_ROLE);
   const crefId = createConcreteRefId(relationID);
   const updatedRelations = addRelationToRelations(
     relations,
@@ -267,7 +315,7 @@ function addCrefToLog(plan: Plan, relationID: LongID): Plan {
     undefined,
     0
   );
-  return upsertRelationsCore(plan, updatedRelations);
+  return upsertRelationsCore(planWithLog, updatedRelations);
 }
 
 export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
@@ -275,11 +323,9 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
   const isNewRelation = !userDB.relations.has(shortID(relations.id));
   const basePlan = upsertRelationsCore(plan, relations);
 
-  const isRootRelation =
-    isNewRelation &&
-    !relations.parent &&
-    relations.systemRole !== LOG_ROOT_ROLE;
-  if (!isRootRelation) {
+  const isRootRelation = isNewRelation && !relations.parent;
+  const shouldAddToLog = isRootRelation && relations.systemRole === undefined;
+  if (!shouldAddToLog) {
     return basePlan;
   }
   return addCrefToLog(basePlan, relations.id);
@@ -300,12 +346,15 @@ export function planUpdateRelationText(
   if (currentRelation.text === text) {
     return plan;
   }
-  return planUpsertRelations(plan, {
-    ...currentRelation,
-    text,
-    textHash: hashText(text),
-    updated: Date.now(),
-  });
+  return planUpsertRelations(
+    plan,
+    withUsersEntryPublicKey({
+      ...currentRelation,
+      text,
+      textHash: hashText(text),
+      updated: Date.now(),
+    })
+  );
 }
 
 function removeEmptyNodeFromKnowledgeDBs(
@@ -619,13 +668,16 @@ export function planAddToParent(
         parentRelation.id,
         objectText
       );
+      const relationWithUserPublicKey = objectText
+        ? withUsersEntryPublicKey(childRelation, objectText)
+        : childRelation;
       return [
-        planUpsertRelations(accPlan, childRelation),
+        planUpsertRelations(accPlan, relationWithUserPublicKey),
         [
           ...accItems,
           {
-            relationItemID: childRelation.id,
-            actualItemID: getRelationSemanticID(childRelation),
+            relationItemID: relationWithUserPublicKey.id,
+            actualItemID: getRelationSemanticID(relationWithUserPublicKey),
           },
         ],
       ];
@@ -1194,12 +1246,15 @@ function planCreateNoteAtRoot(
   viewPath: ViewPath
 ): SaveNodeResult {
   const [planWithNode, createdNode] = planCreateNode(plan, text);
-  const createdRelation = newRelations(
-    createdNode.id,
-    List<ID>(),
-    plan.user.publicKey,
-    undefined,
-    undefined,
+  const createdRelation = withUsersEntryPublicKey(
+    newRelations(
+      createdNode.id,
+      List<ID>(),
+      plan.user.publicKey,
+      undefined,
+      undefined,
+      createdNode.text
+    ),
     createdNode.text
   );
   const planWithRelation = planUpsertRelations(planWithNode, createdRelation);

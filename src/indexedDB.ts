@@ -5,6 +5,7 @@ const DB_NAME = "stashmap";
 const DB_VERSION = 1;
 const OUTBOX_STORE = "outbox";
 const EVENT_CACHE_STORE = "eventCache";
+const OPEN_DATABASES = new Set<StashmapDB>();
 
 export type OutboxEntry = {
   readonly key: string;
@@ -30,7 +31,18 @@ export const openDB = (): Promise<StashmapDB | null> => {
         db.createObjectStore(EVENT_CACHE_STORE, { keyPath: "id" });
       }
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      OPEN_DATABASES.add(db);
+      db.addEventListener("close", () => {
+        OPEN_DATABASES.delete(db);
+      });
+      db.addEventListener("versionchange", () => {
+        OPEN_DATABASES.delete(db);
+        db.close();
+      });
+      resolve(db);
+    };
     request.onerror = () => reject(request.error);
   });
 };
@@ -94,6 +106,13 @@ export const clearDatabase = (): Promise<void> =>
       resolve();
       return;
     }
+    OPEN_DATABASES.forEach((db) => {
+      try {
+        db.close();
+      } finally {
+        OPEN_DATABASES.delete(db);
+      }
+    });
     const request = indexedDB.deleteDatabase(DB_NAME);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);

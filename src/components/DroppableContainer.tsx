@@ -14,7 +14,7 @@ import {
 import {
   ViewPath,
   buildPaneTarget,
-  getItemIDFromView,
+  getRowIDFromView,
   getParentKey,
   useViewPath,
   viewPathToString,
@@ -417,7 +417,7 @@ export function useDroppable({
                   destinationIndex,
                   pane.rootRelation
                 );
-          const [dropParentItemID] = getItemIDFromView(plan, dropParentPath);
+          const [dropParentItemID] = getRowIDFromView(plan, dropParentPath);
 
           if (isEmptySemanticID(dropParentItemID)) {
             const rootTree = buildRootTreeForEmptyRootDrop(importedTrees);
@@ -451,7 +451,7 @@ export function useDroppable({
 
       const dragItem = item as DragItemType;
       const plan = createPlan();
-      const [destinationRootItemID] = getItemIDFromView(plan, destination);
+      const [destinationRootItemID] = getRowIDFromView(plan, destination);
 
       if (isEmptySemanticID(destinationRootItemID)) {
         const sourcePane = plan.panes[dragItem.path[0] as number];

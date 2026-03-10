@@ -17,7 +17,7 @@ import {
   getParentKey,
   parseViewPath,
   getPreviousSibling,
-  getItemIDFromView,
+  getRowIDFromView,
 } from "../ViewContext";
 import {
   Plan,
@@ -83,7 +83,7 @@ function planUpdateOneRelevance(
   editorText: string,
   virtualItemsMap: VirtualItemsMap
 ): Plan {
-  const [itemID] = getItemIDFromView(acc, viewPath);
+  const [itemID] = getRowIDFromView(acc, viewPath);
   const parentView = getParentView(viewPath);
   if (!parentView) return acc;
 
@@ -159,7 +159,7 @@ function planUpdateOneArgument(
   editorText: string,
   virtualItemsMap: VirtualItemsMap
 ): Plan {
-  const [itemID] = getItemIDFromView(acc, viewPath);
+  const [itemID] = getRowIDFromView(acc, viewPath);
   const parentView = getParentView(viewPath);
   if (!parentView) return acc;
 

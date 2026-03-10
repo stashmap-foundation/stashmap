@@ -21,7 +21,7 @@ import {
   updateViewPathsAfterMoveRelations,
   updateViewPathsAfterDisconnect,
   getRelationIndex,
-  getItemIDFromView,
+  getRowIDFromView,
   getLast,
   getContext,
   getRelationForView,
@@ -233,7 +233,7 @@ export function planDisconnectFromParent(
   }
 
   const disconnectID = getLast(viewPath);
-  const [itemID] = getItemIDFromView(plan, viewPath);
+  const [itemID] = getRowIDFromView(plan, viewPath);
   const sourceRelation = getRelationForView(plan, viewPath, stack);
   const parentRelation = getRelationForView(plan, parentPath, stack);
   if (!parentRelation) {
@@ -311,7 +311,7 @@ export function planDeleteNodeFromView(
     return planDisconnectFromParent(plan, viewPath, stack);
   }
 
-  const [itemID] = getItemIDFromView(plan, viewPath);
+  const [itemID] = getRowIDFromView(plan, viewPath);
   if (isSearchId(itemID as ID)) {
     return plan;
   }
@@ -336,7 +336,7 @@ export function planMoveNodeWithView(
   stack: ID[],
   insertAtIndex?: number
 ): Plan {
-  const [sourceItemID] = getItemIDFromView(plan, sourceViewPath);
+  const [sourceItemID] = getRowIDFromView(plan, sourceViewPath);
   const sourceStack = getPane(plan, sourceViewPath).stack;
   const sourceRelation = getRelationForView(plan, sourceViewPath, sourceStack);
   const sourceAddID = sourceRelation?.id ?? sourceItemID;
@@ -358,7 +358,7 @@ export function planMoveNodeWithView(
     targetParentViewPath,
     stack
   );
-  const [targetParentItemID] = getItemIDFromView(
+  const [targetParentRowID] = getRowIDFromView(
     planWithAdd,
     targetParentViewPath
   );
@@ -371,7 +371,7 @@ export function planMoveNodeWithView(
     shortID(
       (actualTargetParentRelation
         ? getRelationSemanticID(actualTargetParentRelation)
-        : targetParentItemID) as ID
+        : targetParentRowID) as ID
     )
   );
 
@@ -519,7 +519,7 @@ export function dnd(
       .toList()
       .reduce((accPlan: Plan, s: string, idx: number) => {
         const sourcePath = parseViewPath(s);
-        const [sourceItemID] = getItemIDFromView(accPlan, sourcePath);
+        const [sourceItemID] = getRowIDFromView(accPlan, sourcePath);
         const insertAt = dropIndex + sourceIndices.size + idx;
         return planAddToParent(
           accPlan,
@@ -550,7 +550,7 @@ export function dnd(
       .toList()
       .reduce((accPlan: Plan, s: string, idx: number) => {
         const sourcePath = parseViewPath(s);
-        const [sourceItemID] = getItemIDFromView(accPlan, sourcePath);
+        const [sourceItemID] = getRowIDFromView(accPlan, sourcePath);
         const insertAt = dropIndex + idx;
 
         if (isRefId(sourceItemID)) {
@@ -592,7 +592,7 @@ export function dnd(
       }, plan);
   }
 
-  const [, toViewData] = getItemIDFromView(plan, toView);
+  const [, toViewData] = getRowIDFromView(plan, toView);
 
   const expandedPlan = toViewData.expanded
     ? plan
@@ -623,7 +623,7 @@ export function dnd(
     .toList()
     .reduce((accPlan: Plan, s: string, idx: number) => {
       const sourcePath = parseViewPath(s);
-      const [sourceItemID] = getItemIDFromView(accPlan, sourcePath);
+      const [sourceItemID] = getRowIDFromView(accPlan, sourcePath);
       const sourceStack = getPane(accPlan, sourcePath).stack;
       const insertAt = dropIndex !== undefined ? dropIndex + idx : undefined;
 

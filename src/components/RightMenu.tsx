@@ -4,7 +4,7 @@ import {
   useIsRoot,
   useIsInSearchView,
   useIsViewingOtherUserContent,
-  useCurrentItemID,
+  useCurrentRowID,
 } from "../ViewContext";
 import { isEmptySemanticID } from "../connections";
 import { RelevanceSelector } from "./RelevanceSelector";
@@ -22,7 +22,7 @@ export function RightMenu(): JSX.Element {
   const isRoot = useIsRoot();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const isInSearchView = useIsInSearchView();
-  const [itemID] = useCurrentItemID();
+  const [itemID] = useCurrentRowID();
 
   const isReadonly =
     isRoot || isInSearchView || (isViewingOtherUserContent && !isVirtualItem);

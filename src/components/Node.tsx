@@ -8,13 +8,13 @@ import {
   useIsExpanded,
   useIsRoot,
   useRelationIndex,
-  useCurrentItemID,
+  useCurrentRowID,
   usePreviousSibling,
   useDisplayText,
   getParentView,
   getRelationForView,
   getRelationIndex,
-  getItemIDFromView,
+  getRowIDFromView,
   useIsViewingOtherUserContent,
   useCurrentEdge,
   viewPathToString,
@@ -90,7 +90,7 @@ function getLevels(viewPath: ViewPath): number {
 }
 
 function ExpandCollapseToggle(): JSX.Element | null {
-  const [itemID] = useCurrentItemID();
+  const [itemID] = useCurrentRowID();
   const displayText = useDisplayText();
   const onToggleExpanded = useOnToggleExpanded();
   const isExpanded = useIsExpanded();
@@ -215,7 +215,7 @@ function EditableContent(): JSX.Element {
   const data = useData();
   const { createPlan, executePlan } = usePlanner();
   const currentRelation = useCurrentRelation();
-  const [itemID] = useCurrentItemID();
+  const [itemID] = useCurrentRowID();
   const displayText = useDisplayText();
   const prevSibling = usePreviousSibling();
   const parentPath = getParentView(viewPath);
@@ -244,7 +244,7 @@ function EditableContent(): JSX.Element {
     plan: Plan,
     targetViewPath: ViewPath
   ): Plan => {
-    const [targetItemID] = getItemIDFromView(plan, targetViewPath);
+    const [targetItemID] = getRowIDFromView(plan, targetViewPath);
     return planSetRowFocusIntent(plan, {
       paneIndex,
       viewKey: viewPathToString(targetViewPath),
@@ -504,7 +504,7 @@ function InteractiveNodeContent(): JSX.Element {
   const viewPath = useViewPath();
   const stack = usePaneStack();
   const currentRelation = useCurrentRelation();
-  const [itemID] = useCurrentItemID();
+  const [itemID] = useCurrentRowID();
   const isLoading = useNodeIsLoading();
   const isInSearchView = useIsInSearchView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
@@ -694,7 +694,7 @@ export function Node({
   const clsBody = cardBodyClassName || "ps-0";
 
   const { user } = useData();
-  const [itemID] = useCurrentItemID();
+  const [itemID] = useCurrentRowID();
   const data = useData();
   const stack = usePaneStack();
   const isConcreteRef = isConcreteRefId(itemID);

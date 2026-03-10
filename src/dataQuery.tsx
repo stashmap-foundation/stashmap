@@ -39,6 +39,21 @@ function addIDToFilter(
   };
 }
 
+function addValueToFilter(
+  filter: Filter,
+  value: string,
+  tag: `#${string}`
+): Filter {
+  const values = filter[tag] || [];
+  if (values.includes(value)) {
+    return filter;
+  }
+  return {
+    ...filter,
+    [tag]: [...values, value],
+  };
+}
+
 function getDocumentSemanticQueryIDs(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
@@ -51,8 +66,10 @@ function getDocumentSemanticQueryIDs(
 type Filters = {
   documentByRelation: Filter;
   documentBySemantic: Filter;
+  documentBySystemRole: Filter;
   deleteFilter: Filter;
   authors: PublicKey[];
+  systemRoleAuthors: PublicKey[];
 };
 
 export function sanitizeFilter(
@@ -70,10 +87,14 @@ export function sanitizeFilter(
 }
 
 export function filtersToFilterArray(filters: Filters): Filter[] {
-  const { authors } = filters;
+  const { authors, systemRoleAuthors } = filters;
   return [
     sanitizeFilter({ ...filters.documentByRelation, authors }, "#r"),
     sanitizeFilter({ ...filters.documentBySemantic, authors }, "#n"),
+    sanitizeFilter(
+      { ...filters.documentBySystemRole, authors: systemRoleAuthors },
+      "#s"
+    ),
     sanitizeFilter({ ...filters.deleteFilter, authors }, "#k"),
   ].filter((f) => f !== undefined) as Filter[];
 }
@@ -99,6 +120,20 @@ export function addRelationIDToFilters(
       filters.documentByRelation,
       relationID,
       "#r"
+    ),
+  };
+}
+
+export function addSystemRoleToFilters(
+  filters: Filters,
+  systemRole: RootSystemRole
+): Filters {
+  return {
+    ...filters,
+    documentBySystemRole: addValueToFilter(
+      filters.documentBySystemRole,
+      systemRole,
+      "#s"
     ),
   };
 }
@@ -211,11 +246,15 @@ export function createBaseFilter(
     documentBySemantic: {
       kinds: [KIND_KNOWLEDGE_DOCUMENT],
     },
+    documentBySystemRole: {
+      kinds: [KIND_KNOWLEDGE_DOCUMENT],
+    },
     deleteFilter: {
       kinds: [KIND_DELETE],
       "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`],
     },
     authors,
+    systemRoleAuthors: [myself],
   };
 }
 
@@ -274,11 +313,13 @@ export function useQueryKnowledgeData(filters: Filter[]): {
 export function LoadData({
   children,
   itemIDs,
+  systemRoles,
   referencedBy,
   lists,
 }: {
   children: React.ReactNode;
   itemIDs: ID[];
+  systemRoles?: RootSystemRole[];
   referencedBy?: boolean;
   lists?: boolean;
 }): JSX.Element {
@@ -292,7 +333,7 @@ export function LoadData({
     effectiveAuthor
   );
 
-  const filter = itemIDs.reduce((acc, itemID) => {
+  const withItems = itemIDs.reduce((acc, itemID) => {
     const withItem = addItemToFilters(
       acc,
       itemID,
@@ -305,6 +346,11 @@ export function LoadData({
       : withItem;
     return withReferencedBy;
   }, baseFilter);
+
+  const filter = (systemRoles || []).reduce(
+    (acc, systemRole) => addSystemRoleToFilters(acc, systemRole),
+    withItems
+  );
 
   const filterArray = filtersToFilterArray(filter);
   const { allEventsProcessed } = useQueryKnowledgeData(filterArray);

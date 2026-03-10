@@ -3,8 +3,8 @@ import { createPlan } from "../planner";
 import {
   getRelationsNoReferencedBy,
   getRelationSemanticID,
+  shortID,
 } from "../connections";
-import { getTextForSemanticID } from "../semanticProjection";
 import {
   ALICE,
   expectTree,
@@ -144,21 +144,9 @@ test("planCreateNodesFromMarkdownTrees creates only standalone relations", () =>
 
   expect(parentID).toEqual(getRelationSemanticID(parentRelation!));
   expect(parentRelation?.items.first()?.id).toEqual(childRelation?.id);
-  expect(
-    getTextForSemanticID(
-      plan.knowledgeDBs,
-      getRelationSemanticID(childRelation!),
-      plan.user.publicKey
-    )
-  ).toBe("Child");
+  expect(childRelation?.text).toBe("Child");
   expect(childRelation?.items.first()?.id).toEqual(grandchildRelation?.id);
-  expect(
-    getTextForSemanticID(
-      plan.knowledgeDBs,
-      getRelationSemanticID(grandchildRelation!),
-      plan.user.publicKey
-    )
-  ).toBe("Grandchild");
+  expect(grandchildRelation?.text).toBe("Grandchild");
 });
 
 test("Planning multiple markdown files returns top nodes in import order", () => {
@@ -170,9 +158,16 @@ test("Planning multiple markdown files returns top nodes in import order", () =>
     { name: "two.md", markdown: "# Two" },
   ]);
 
-  const topTexts = topNodeIDs.map((id) =>
-    getTextForSemanticID(plan.knowledgeDBs, id, plan.user.publicKey)
-  );
+  const topTexts = topNodeIDs.map((semanticID) => {
+    return plan.knowledgeDBs
+      .get(plan.user.publicKey)
+      ?.relations.valueSeq()
+      .find(
+        (relation) =>
+          relation.root === shortID(relation.id) &&
+          getRelationSemanticID(relation) === semanticID
+      )?.text;
+  });
 
   expect(topTexts).toEqual(["One", "Two"]);
 });

@@ -23,6 +23,7 @@ import {
   LOG_SEMANTIC_ID,
 } from "./connections";
 import { suggestionSettings } from "./constants";
+import { LOG_ROOT_ROLE } from "./systemRoots";
 
 type FooterTypeFilters = (
   | Relevance
@@ -633,7 +634,7 @@ export function getIncomingCrefsForNode(
     return knowledgeDB.relations.reduce((rdx, relation) => {
       if (relation.id === parentRelationID) return rdx;
       if (relation.id === currentRelationID) return rdx;
-      if (getRelationSemanticID(relation) === LOG_SEMANTIC_ID) return rdx;
+      if (relation.systemRole === LOG_ROOT_ROLE) return rdx;
       if (outgoingTargetRelIDs.has(relation.id)) return rdx;
 
       const hasCrefToUs = relation.items.some((item) => {

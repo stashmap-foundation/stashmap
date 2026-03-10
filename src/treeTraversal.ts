@@ -4,7 +4,7 @@ import {
   VirtualItemsMap,
   addNodeToPathWithRelations,
   addRelationsToLastElement,
-  getItemIDFromView,
+  getRowIDFromView,
   getContext,
   getRelationForView,
   getEffectiveAuthor,
@@ -242,7 +242,7 @@ export function getChildNodes(
   typeFilters: Pane["typeFilters"],
   options?: TreeTraversalOptions
 ): TreeResult {
-  const [parentItemID] = getItemIDFromView(data, parentPath);
+  const [parentItemID] = getRowIDFromView(data, parentPath);
 
   if (isConcreteRefId(parentItemID)) {
     return getChildrenForConcreteRef(data, parentPath, parentItemID);
@@ -282,10 +282,10 @@ export function getNodesInTree(
 
   return childResult.paths.reduce(
     (result, childPath) => {
-      const [, childView] = getItemIDFromView(data, childPath);
+      const [, childView] = getRowIDFromView(data, childPath);
       const withChild = result.paths.push(childPath);
 
-      const [childItemID] = getItemIDFromView(data, childPath);
+      const [childItemID] = getRowIDFromView(data, childPath);
       const shouldRecurse = options?.isMarkdownExport
         ? !isConcreteRefId(childItemID)
         : childView.expanded;

@@ -95,9 +95,7 @@
             "src/dataQuery.tsx",
             "src/planner.tsx",
             "src/components/Workspace.tsx",
-            "src/components/batchOperations.ts",
-            "src/components/FullscreenButton.tsx",
-            "src/components/MarkdownImportPlan.test.tsx"
+            "src/components/FullscreenButton.tsx"
           ],
           "rules": {
             "no-restricted-imports": [

@@ -3,7 +3,7 @@ import React from "react";
 import {
   useCurrentRelation,
   useDisplayText,
-  useCurrentItemID,
+  useCurrentRowID,
 } from "./ViewContext";
 import { isEmptySemanticID } from "./connections";
 
@@ -35,7 +35,7 @@ export function extractIDsFromQueries(filters: Filter[]): string[] {
 
 export function useNodeIsLoading(): boolean {
   const relation = useCurrentRelation();
-  const [itemID] = useCurrentItemID();
+  const [itemID] = useCurrentRowID();
   const displayText = useDisplayText();
   const context = React.useContext(QueryContext);
 

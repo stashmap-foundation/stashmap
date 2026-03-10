@@ -16,15 +16,12 @@ import {
 import { LoadData, LoadRelationData } from "../dataQuery";
 import { LoadSearchData } from "../LoadSearchData";
 import { PaneView } from "./Workspace";
-import {
-  EMPTY_SEMANTIC_ID,
-  createSearchId,
-  LOG_SEMANTIC_ID,
-} from "../connections";
+import { EMPTY_SEMANTIC_ID, createSearchId } from "../connections";
 import { planUpdateViews, planUpdatePanes, usePlanner } from "../planner";
 import { useData } from "../DataContext";
 import { isUserLoggedIn, useLogout } from "../NostrAuthContext";
 import { useDragAutoScroll } from "../useDragAutoScroll";
+import { LOG_ROOT_ROLE } from "../systemRoots";
 
 export function PaneSearchButton(): JSX.Element {
   const { setPane } = useSplitPanes();
@@ -285,7 +282,7 @@ function PaneContent(): JSX.Element {
     <div className={paneClassName} data-pane-index={paneIndex}>
       <LoadSearchData itemIDs={pane.stack}>
         <LoadData itemIDs={pane.stack}>
-          <LoadData itemIDs={[LOG_SEMANTIC_ID]} lists>
+          <LoadData itemIDs={[]} systemRoles={[LOG_ROOT_ROLE]}>
             <LoadData itemIDs={[rootSemanticID]} referencedBy lists>
               <RootViewContextProvider
                 root={rootSemanticID as LongID}

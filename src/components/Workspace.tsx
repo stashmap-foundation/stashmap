@@ -50,8 +50,6 @@ import {
 } from "../planner";
 import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import {
-  LOG_SEMANTIC_ID,
-  getRelationContext,
   getRelationStack,
   getRelationSemanticID,
   getRelationsNoReferencedBy,
@@ -59,6 +57,7 @@ import {
   shortID,
 } from "../connections";
 import { getTextForSemanticID } from "../semanticProjection";
+import { getOwnLogRoot } from "../systemRoots";
 import { buildNodeUrl, buildRelationUrl } from "../navigationUrl";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import {
@@ -134,24 +133,6 @@ function BreadcrumbItem({
       <span className="breadcrumb-separator">/</span>
     </>
   );
-}
-
-function getOwnLogRelation(
-  knowledgeDBs: KnowledgeDBs,
-  author: PublicKey
-): Relations | undefined {
-  return knowledgeDBs
-    .get(author)
-    ?.relations.valueSeq()
-    .filter(
-      (relation) =>
-        relation.author === author &&
-        getRelationSemanticID(relation) === LOG_SEMANTIC_ID &&
-        getRelationContext(knowledgeDBs, relation).size === 0 &&
-        relation.root === shortID(relation.id)
-    )
-    .sortBy((relation) => -relation.updated)
-    .first();
 }
 
 type BreadcrumbTarget = {
@@ -486,14 +467,11 @@ function ForkButton(): JSX.Element | null {
 function HomeButton(): JSX.Element | null {
   const { knowledgeDBs, user } = useData();
   const navigatePane = useNavigatePane();
-  const logRelation = getOwnLogRelation(knowledgeDBs, user.publicKey);
+  const logRelation = getOwnLogRoot(knowledgeDBs, user.publicKey);
   if (!logRelation) {
     return null;
   }
-  const href = buildNodeUrl([LOG_SEMANTIC_ID], knowledgeDBs, user.publicKey);
-  if (!href) {
-    return null;
-  }
+  const href = buildRelationUrl(logRelation.id);
 
   return (
     <a
@@ -538,18 +516,11 @@ function useHomeShortcut(): void {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       if ((e.metaKey || e.ctrlKey) && e.key === "h") {
-        const logRelation = getOwnLogRelation(knowledgeDBs, user.publicKey);
+        const logRelation = getOwnLogRoot(knowledgeDBs, user.publicKey);
         if (!logRelation) {
           return;
         }
-        const href = buildNodeUrl(
-          [LOG_SEMANTIC_ID],
-          knowledgeDBs,
-          user.publicKey
-        );
-        if (!href) {
-          return;
-        }
+        const href = buildRelationUrl(logRelation.id);
         e.preventDefault();
         navigatePane(href);
       }

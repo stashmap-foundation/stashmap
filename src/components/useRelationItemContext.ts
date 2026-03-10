@@ -5,7 +5,7 @@ import {
   upsertRelations,
   useIsInSearchView,
   useCurrentRelation,
-  useCurrentItemID,
+  useCurrentRowID,
   getRelationForView,
   ViewPath,
 } from "../ViewContext";
@@ -56,7 +56,7 @@ export function useRelationItemContext(): RelationItemContext {
   const currentRelation = useCurrentRelation();
   const parentView = getParentView(viewPath);
 
-  const [itemID] = useCurrentItemID();
+  const [itemID] = useCurrentRowID();
   const isEmptyNode = isEmptySemanticID(itemID);
   const relationsID = parentView
     ? getRelationForView(data, parentView, stack)?.id

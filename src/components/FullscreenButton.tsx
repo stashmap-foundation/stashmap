@@ -1,12 +1,12 @@
 import React from "react";
 import {
-  useCurrentItemID,
+  useCurrentRowID,
   useViewPath,
   useDisplayText,
   useEffectiveAuthor,
   useCurrentRelation,
   getContext,
-  getItemIDsForViewPath,
+  getRowIDsForViewPath,
   getCurrentReferenceForView,
   useCurrentEdge,
 } from "../ViewContext";
@@ -29,7 +29,7 @@ export function FullscreenButton(): JSX.Element | null {
   const stack = usePaneStack();
   const pane = useCurrentPane();
   const viewPath = useViewPath();
-  const [itemID] = useCurrentItemID();
+  const [itemID] = useCurrentRowID();
   const data = useData();
   const { knowledgeDBs, user } = data;
   const displayText = useDisplayText();
@@ -88,7 +88,7 @@ export function FullscreenButton(): JSX.Element | null {
     const targetStack = (
       refInfo
         ? refInfo.stack
-        : [...stack.slice(0, -1), ...getItemIDsForViewPath(data, viewPath)]
+        : [...stack.slice(0, -1), ...getRowIDsForViewPath(data, viewPath)]
     ).filter((id) => !isSearchId(id as ID));
     return (
       buildNodeUrl(

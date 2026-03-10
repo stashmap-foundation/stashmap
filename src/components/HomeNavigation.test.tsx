@@ -1,9 +1,11 @@
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
 import {
   ALICE,
   BOB,
   expectTree,
+  findEvent,
   follow,
   renderApp,
   renderTree,
@@ -214,6 +216,37 @@ My Notes
   [R] Third Note
   [R] Second Note
   [R] First Note
+      `);
+    });
+
+    test("~Log survives cleanup and reload through systemRole query", async () => {
+      const [alice] = setup([ALICE]);
+      const { relayPool } = renderApp(alice());
+
+      await type("Reloaded Note{Escape}");
+
+      await findEvent(relayPool, {
+        kinds: [KIND_KNOWLEDGE_DOCUMENT],
+        authors: [alice().user.publicKey],
+        "#s": ["log"],
+      });
+
+      await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+      await expectTree(`
+~Log
+  [R] Reloaded Note
+      `);
+
+      cleanup();
+      renderApp(alice());
+
+      await screen.findByLabelText("Navigate to Log");
+      await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+      await expectTree(`
+~Log
+  [R] Reloaded Note
       `);
     });
 

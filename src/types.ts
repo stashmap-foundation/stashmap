@@ -243,6 +243,8 @@ declare global {
     sourceParentRelationID?: LongID;
   };
 
+  type RootSystemRole = "log";
+
   type Relations = {
     items: List<RelationItem>;
     id: LongID;
@@ -250,6 +252,7 @@ declare global {
     textHash: ID;
     parent?: LongID;
     anchor?: RootAnchor;
+    systemRole?: RootSystemRole;
     updated: number;
     author: PublicKey;
     basedOn?: LongID;

@@ -2,7 +2,7 @@ import { CSSProperties } from "react";
 import {
   useIsViewingOtherUserContent,
   useCurrentEdge,
-  useCurrentItemID,
+  useCurrentRowID,
 } from "../ViewContext";
 import { isConcreteRefId } from "../connections";
 import { TYPE_COLORS } from "../constants";
@@ -52,7 +52,7 @@ function isReferenceVirtualType(virtualType: VirtualType | undefined): boolean {
 export function useItemStyle(): ItemStyle {
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const currentItem = useCurrentEdge();
-  const [itemID] = useCurrentItemID();
+  const [itemID] = useCurrentRowID();
   const virtualType = currentItem?.virtualType;
 
   if (virtualType === "suggestion" || isViewingOtherUserContent) {

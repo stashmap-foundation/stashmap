@@ -11,7 +11,7 @@ import {
   viewPathToString,
   ViewContext,
   useViewKey,
-  getItemIDFromView,
+  getRowIDFromView,
   isExpanded,
   useDisplayText,
   getEffectiveAuthor,
@@ -138,7 +138,7 @@ function VirtuosoForColumn({
     const index = nodes.findIndex(
       (path) =>
         getLast(path) === scrollToId ||
-        getItemIDFromView(data, path)[0] === scrollToId
+        getRowIDFromView(data, path)[0] === scrollToId
     );
     if (index >= 0) {
       virtuosoRef.current.scrollToIndex({
@@ -223,7 +223,7 @@ export function TreeViewNodeLoader({
     effectiveAuthor
   );
 
-  const itemIDs = nodes.map((path) => getItemIDFromView(data, path)[0]);
+  const itemIDs = nodes.map((path) => getRowIDFromView(data, path)[0]);
 
   const itemIDsWithRange = range
     ? itemIDs.slice(range.startIndex, range.endIndex + 1 + LOAD_EXTRA) // +1 because slice doesn't include last element
@@ -507,7 +507,7 @@ export function TreeView(): JSX.Element {
   const data = useData();
   const viewPath = useViewPath();
   const effectiveAuthor = getEffectiveAuthor(data, viewPath);
-  const [rootItemID] = getItemIDFromView(data, viewPath);
+  const [rootItemID] = getRowIDFromView(data, viewPath);
   const baseFilter = createBaseFilter(
     data.contacts,
     data.projectMembers,

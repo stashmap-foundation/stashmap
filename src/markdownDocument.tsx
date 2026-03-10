@@ -24,7 +24,7 @@ import { getTextForSemanticID } from "./semanticProjection";
 import {
   ViewPath,
   isRoot,
-  getItemIDFromView,
+  getRowIDFromView,
   getDisplayTextForView,
   getCurrentEdgeForView,
   getRelationForView,
@@ -78,6 +78,7 @@ function extractAttrs(token: Token): {
   hidden: boolean;
   basedOn: string | undefined;
   anchor: RootAnchor | undefined;
+  systemRole: RootSystemRole | undefined;
 } {
   if (!token.attrs) {
     return {
@@ -88,6 +89,7 @@ function extractAttrs(token: Token): {
       hidden: false,
       basedOn: undefined,
       anchor: undefined,
+      systemRole: undefined,
     };
   }
   const uuid = token.attrs.find(([, value]) => value === "")?.[0];
@@ -112,6 +114,9 @@ function extractAttrs(token: Token): {
     | undefined;
   const sourceParentRelationID = (token.attrGet("sourceParent") ||
     undefined) as LongID | undefined;
+  const systemRole = (token.attrGet("systemRole") || undefined) as
+    | RootSystemRole
+    | undefined;
   const anchor =
     anchorContext ||
     sourceAuthor ||
@@ -128,7 +133,16 @@ function extractAttrs(token: Token): {
           ...(sourceParentRelationID ? { sourceParentRelationID } : {}),
         }
       : undefined;
-  return { uuid, semanticID, relevance, argument, hidden, basedOn, anchor };
+  return {
+    uuid,
+    semanticID,
+    relevance,
+    argument,
+    hidden,
+    basedOn,
+    anchor,
+    systemRole,
+  };
 }
 
 export type MarkdownTreeNode = {
@@ -142,6 +156,7 @@ export type MarkdownTreeNode = {
   hidden?: boolean;
   basedOn?: string;
   anchor?: RootAnchor;
+  systemRole?: RootSystemRole;
 };
 
 /* eslint-disable functional/immutable-data, functional/no-let, no-continue */
@@ -185,6 +200,7 @@ export function parseMarkdownHierarchy(
     hidden: boolean;
     basedOn: string | undefined;
     anchor: RootAnchor | undefined;
+    systemRole: RootSystemRole | undefined;
   } = {
     uuid: undefined,
     semanticID: undefined,
@@ -193,6 +209,7 @@ export function parseMarkdownHierarchy(
     hidden: false,
     basedOn: undefined,
     anchor: undefined,
+    systemRole: undefined,
   };
 
   for (let i = 0; i < tokens.length; i += 1) {
@@ -207,8 +224,16 @@ export function parseMarkdownHierarchy(
       if (!text) {
         continue;
       }
-      const { uuid, semanticID, relevance, argument, hidden, basedOn, anchor } =
-        extractAttrs(token);
+      const {
+        uuid,
+        semanticID,
+        relevance,
+        argument,
+        hidden,
+        basedOn,
+        anchor,
+        systemRole,
+      } = extractAttrs(token);
       while (
         headingStack.length > 0 &&
         headingStack[headingStack.length - 1].level >= headingLevel
@@ -228,6 +253,7 @@ export function parseMarkdownHierarchy(
         ...(hidden && { hidden }),
         ...(basedOn !== undefined && { basedOn }),
         ...(anchor !== undefined && { anchor }),
+        ...(systemRole !== undefined && { systemRole }),
       };
       appendNode(roots, parent, node);
       headingStack.push({ level: headingLevel, node });
@@ -432,7 +458,7 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
   return paths.reduce<SerializeResult>(
     (acc, path) => {
       const depth = path.length - 3;
-      const [itemID] = getItemIDFromView(data, path);
+      const [itemID] = getRowIDFromView(data, path);
       const indent = "  ".repeat(depth);
       const semanticContext = getContext(data, path, stack);
       const item = getCurrentEdgeForView(data, path);
@@ -519,7 +545,8 @@ function formatRootHeading(
   rootText: string,
   rootUuid: string,
   rootSemanticID: ID,
-  anchor?: RootAnchor
+  anchor?: RootAnchor,
+  systemRole?: RootSystemRole
 ): string {
   const parts = [rootUuid, `semantic="${rootSemanticID}"`];
   if (anchor?.snapshotContext.size) {
@@ -537,6 +564,9 @@ function formatRootHeading(
   if (anchor?.sourceParentRelationID) {
     parts.push(`sourceParent="${anchor.sourceParentRelationID}"`);
   }
+  if (systemRole) {
+    parts.push(`systemRole="${systemRole}"`);
+  }
   return `# ${rootText} {${parts.join(" ")}}`;
 }
 
@@ -553,7 +583,8 @@ export function treeToMarkdown(data: Data, rootRelation: Relations): string {
     rootText,
     rootUuid,
     rootSemanticID,
-    rootRelation.anchor ?? createRootAnchor(rootContext)
+    rootRelation.anchor ?? createRootAnchor(rootContext),
+    rootRelation.systemRole
   );
   const { lines } = serializeTree(data, rootRelation);
   return `${[rootLine, ...lines].join("\n")}\n`;
@@ -576,7 +607,8 @@ export function buildDocumentEvent(
     rootText,
     rootUuid,
     rootSemanticID,
-    rootRelation.anchor ?? createRootAnchor(rootContext)
+    rootRelation.anchor ?? createRootAnchor(rootContext),
+    rootRelation.systemRole
   );
   const result = serializeTree(data, rootRelation);
   const content = `${[rootLine, ...result.lines].join("\n")}\n`;
@@ -589,12 +621,15 @@ export function buildDocumentEvent(
     .add(rootUuid)
     .toArray()
     .map((u) => ["r", u]);
+  const systemRoleTags = rootRelation.systemRole
+    ? ([["s", rootRelation.systemRole]] as string[][])
+    : [];
 
   return {
     kind: KIND_KNOWLEDGE_DOCUMENT,
     pubkey: author,
     created_at: newTimestamp(),
-    tags: [["d", rootUuid], ...nTags, ...rTags, msTag()],
+    tags: [["d", rootUuid], ...nTags, ...rTags, ...systemRoleTags, msTag()],
     content,
   };
 }
@@ -658,6 +693,7 @@ function materializeTreeNode(
     anchor: parent
       ? undefined
       : treeNode.anchor ?? createRootAnchor(semanticContext),
+    systemRole: parent ? undefined : treeNode.systemRole,
   };
 
   const childSemanticContext = semanticContext.push(

@@ -13,13 +13,10 @@ import {
 } from "./nostr";
 import { DataContextProvider, MergeKnowledgeDB } from "./DataContext";
 import { EventCacheProvider } from "./EventCache";
-import { findContacts, findMembers } from "./contacts";
 import { useApis } from "./Apis";
-import { findDocumentRelations, findViews } from "./knowledgeEvents";
-import { newDB } from "./knowledge";
 import { PlanningContextProvider, replaceUnauthenticatedUser } from "./planner";
 import { useUserRelayContext } from "./UserRelayContext";
-import { flattenRelays, usePreloadRelays, findRelays } from "./relays";
+import { flattenRelays, usePreloadRelays } from "./relays";
 import { useDefaultRelays } from "./NostrAuthContext";
 import { useEventQuery } from "./commons/useNostrQuery";
 import {
@@ -35,14 +32,17 @@ import {
   parseAuthorFromSearch,
 } from "./navigationUrl";
 import {
-  ensureRelationNativeFields,
-  getRelationDepth,
-  shortID,
 } from "./connections";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { generatePaneId } from "./SplitPanesContext";
 import { jsonToPanes, paneToJSON, Serializable } from "./serializer";
 import { NavigationStateProvider } from "./NavigationStateContext";
+import {
+  mergeEvents,
+  newProcessedEvents,
+  ProcessedEvents,
+  processEvents,
+} from "./eventProcessing";
 
 export const defaultPane = (
   author: PublicKey,
@@ -122,91 +122,9 @@ type DataProps = {
   children: React.ReactNode;
 };
 
-type ProcessedEvents = {
-  knowledgeDB: KnowledgeData;
-  contacts: Contacts;
-  relays: Relays;
-  views: Views;
-  projectMembers: Members;
-};
-
-export function newProcessedEvents(): ProcessedEvents {
-  return {
-    knowledgeDB: newDB(),
-    contacts: Map<PublicKey, Contact>(),
-    relays: [],
-    views: Map<string, View>(),
-    projectMembers: Map<PublicKey, Member>(),
-  };
-}
-
 export const KIND_SEARCH = [KIND_KNOWLEDGE_DOCUMENT];
 
 export const KINDS_META = [KIND_SETTINGS, KIND_CONTACTLIST, KIND_VIEWS];
-
-function mergeEvents(
-  processed: ProcessedEvents,
-  events: List<UnsignedEvent | Event>
-): ProcessedEvents {
-  return {
-    ...processed,
-    contacts: processed.contacts.merge(findContacts(events)),
-    views: findViews(events).merge(processed.views),
-  };
-}
-
-function processEventsByAuthor(
-  authorEvents: List<UnsignedEvent | Event>
-): ProcessedEvents {
-  const contacts = findContacts(authorEvents);
-  const documentRelations = findDocumentRelations(authorEvents);
-  const baseKnowledgeDBs = Map<PublicKey, KnowledgeData>().set(
-    authorEvents.first()?.pubkey as PublicKey,
-    {
-      ...newDB(),
-      relations: documentRelations,
-    }
-  );
-  const relations = documentRelations
-    .valueSeq()
-    .sortBy((relation) => getRelationDepth(baseKnowledgeDBs, relation))
-    .reduce((acc, relation) => {
-      const knowledgeDBs = Map<PublicKey, KnowledgeData>().set(
-        relation.author,
-        {
-          ...newDB(),
-          relations: acc,
-        }
-      );
-      const normalized = ensureRelationNativeFields(knowledgeDBs, relation);
-      return acc.set(shortID(normalized.id), normalized);
-    }, Map<string, Relations>());
-  const views = findViews(authorEvents);
-  const projectMembers = findMembers(authorEvents);
-  const knowledgeDB = {
-    ...newDB(),
-    relations,
-  };
-  const relays = findRelays(authorEvents);
-  return {
-    contacts,
-    knowledgeDB,
-    relays,
-    views,
-    projectMembers,
-  };
-}
-
-export function processEvents(
-  events: List<UnsignedEvent>
-): Map<PublicKey, ProcessedEvents> {
-  const groupedByAuthor = events.groupBy((e) => e.pubkey as PublicKey);
-  return Map<PublicKey, ProcessedEvents>(
-    groupedByAuthor.toArray().map(([author, authorEvents]) => {
-      return [author, processEventsByAuthor(List(authorEvents.valueSeq()))];
-    })
-  );
-}
 
 export function useRelaysInfo(
   relays: Array<Relay>,

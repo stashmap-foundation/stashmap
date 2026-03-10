@@ -1,71 +1,26 @@
-import { EventTemplate } from "nostr-tools";
-import { List, Map } from "immutable";
-import { KIND_RELAY_METADATA_EVENT } from "./nostr";
-import {
-  findAllRelays,
-  getMostRecentReplacableEvent,
-} from "./commons/useNostrQuery";
+import { Map } from "immutable";
 import { useUserRelayContext } from "./UserRelayContext";
 import { useData } from "./DataContext";
 import { useDefaultRelays } from "./NostrAuthContext";
+import {
+  flattenRelays,
+  getReadRelays,
+  getWriteRelays,
+  mergeRelays,
+  sanitizeRelays,
+  sanitizeRelayUrl,
+  findRelays,
+} from "./relayUtils";
 
-export function sanitizeRelayUrl(url: string): string | undefined {
-  const trimmedUrl = url.trim();
-  const noAddWS =
-    trimmedUrl.startsWith("wss://") || trimmedUrl.startsWith("ws://");
-  const urlWithWS = noAddWS ? trimmedUrl : `wss://${trimmedUrl}`;
-  try {
-    return new URL(urlWithWS).toString();
-  } catch {
-    return undefined;
-  }
-}
-
-export function sanitizeRelays(relays: Array<Relay>): Array<Relay> {
-  return relays
-    .map((relay) => {
-      const sanitizedRelayUrl = sanitizeRelayUrl(relay.url);
-      return sanitizedRelayUrl
-        ? {
-            ...relay,
-            url: sanitizedRelayUrl,
-          }
-        : undefined;
-    })
-    .filter((r) => r !== undefined) as Array<Relay>;
-}
-
-export function findRelays(events: List<EventTemplate>): Relays {
-  const relaysEvent = getMostRecentReplacableEvent(
-    events.filter((e) => e.kind === KIND_RELAY_METADATA_EVENT)
-  );
-  if (!relaysEvent) {
-    return [];
-  }
-  return findAllRelays(relaysEvent);
-}
-
-export function mergeRelays<T extends Relays>(relays: T, relaysToMerge: T): T {
-  const combinedRelays = [...relays, ...relaysToMerge];
-  const uniqueRelays: T = combinedRelays.reduce(
-    (rdx: T, current: Relay | SuggestedRelay) => {
-      if (!rdx.some((relay) => relay.url === current.url)) {
-        return [...rdx, current] as T;
-      }
-      return rdx;
-    },
-    [] as unknown as T
-  );
-  return uniqueRelays;
-}
-
-export function getReadRelays(relays: Array<Relay>): Array<Relay> {
-  return relays.filter((r) => r.read === true);
-}
-
-export function getWriteRelays(relays: Array<Relay>): Array<Relay> {
-  return relays.filter((r) => r.write === true);
-}
+export {
+  flattenRelays,
+  getReadRelays,
+  getWriteRelays,
+  mergeRelays,
+  sanitizeRelays,
+  sanitizeRelayUrl,
+  findRelays,
+} from "./relayUtils";
 
 export function getSuggestedRelays(
   contactsRelays: Map<PublicKey, Relays>
@@ -98,10 +53,6 @@ export function getIsNecessaryReadRelays(
       return isOverlap ? rdx : mergeRelays(rdx, cRelays);
     }, [] as Relays);
   };
-}
-
-export function flattenRelays(relays: Map<PublicKey, Relays>): Relays {
-  return relays.reduce((acc: Relays, v) => [...acc, ...v], []);
 }
 
 function useContactsRelays(): Relays {

@@ -1,0 +1,413 @@
+import fs from "fs/promises";
+import path from "path";
+import { List } from "immutable";
+import { Event, Filter } from "nostr-tools";
+import { findContacts } from "../contacts";
+import { findTag, getEventMs, getMostRecentReplacableEvent } from "../nostrEvents";
+import {
+  getReadRelays,
+  mergeRelays,
+  sanitizeRelays,
+} from "../relayUtils";
+import {
+  KIND_CONTACTLIST,
+  KIND_DELETE,
+  KIND_KNOWLEDGE_DOCUMENT,
+  getReplaceableKey,
+} from "../nostr";
+
+const WORKSPACE_VERSION = 1;
+const DEFAULT_MAX_WAIT_MS = 20_000;
+
+export type SyncPullProfile = {
+  pubkey: PublicKey;
+  workspaceDir: string;
+  bootstrapRelays: Relays;
+  relays: Relays;
+  nsecFile?: string;
+};
+
+export type SyncPullOptions = {
+  outDir?: string;
+  relayUrls?: string[];
+  maxWaitMs?: number;
+  now?: Date;
+};
+
+export type SyncPullManifest = {
+  workspace_version: number;
+  as_user: PublicKey;
+  synced_at: string;
+  relay_urls: string[];
+  contact_pubkeys: PublicKey[];
+  authors: Array<{
+    pubkey: PublicKey;
+    last_document_created_at: number;
+  }>;
+  documents: Array<{
+    replaceable_key: string;
+    author: PublicKey;
+    event_id: string;
+    d_tag: string;
+    path: string;
+    created_at: number;
+    updated_ms: number;
+  }>;
+};
+
+type StoredDocument = SyncPullManifest["documents"][number];
+type StoredAuthor = SyncPullManifest["authors"][number];
+
+export type SyncQueryClient = {
+  querySync: (
+    relayUrls: string[],
+    filter: Filter,
+    params?: { maxWait?: number }
+  ) => Promise<Event[]>;
+  close?: (relayUrls: string[]) => void;
+};
+
+function uniqueRelayUrls(relays: Relays): string[] {
+  return [...new Set(sanitizeRelays(relays).map((relay) => relay.url))];
+}
+
+function relaysFromUrls(urls: string[]): Relays {
+  const normalized = urls.map((url) => ({
+    url,
+    read: true,
+    write: true,
+  }));
+  const sanitized = sanitizeRelays(normalized);
+  if (sanitized.length !== normalized.length) {
+    throw new Error("Invalid relay URL in --relay");
+  }
+  return sanitized;
+}
+
+function slugify(value: string): string {
+  const slug = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "document";
+}
+
+function getDocumentTitle(content: string): string {
+  const heading = content
+    .split("\n")
+    .find((line) => line.startsWith("# "))
+    ?.replace(/^#\s+/, "")
+    .replace(/\s+\{.*\}\s*$/, "")
+    .trim();
+  return heading || "document";
+}
+
+function relativeToWorkspace(workspaceDir: string, targetPath: string): string {
+  return path.relative(workspaceDir, targetPath).split(path.sep).join("/");
+}
+
+function manifestPath(workspaceDir: string): string {
+  return path.join(workspaceDir, "manifest.json");
+}
+
+async function loadManifest(workspaceDir: string): Promise<SyncPullManifest | undefined> {
+  try {
+    const raw = await fs.readFile(manifestPath(workspaceDir), "utf8");
+    return JSON.parse(raw) as SyncPullManifest;
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveRelayUrls(profile: SyncPullProfile, options: SyncPullOptions): string[] {
+  const explicitRelays = relaysFromUrls(options.relayUrls || []);
+  if (explicitRelays.length > 0) {
+    return uniqueRelayUrls(explicitRelays);
+  }
+
+  const configuredRelays = sanitizeRelays(
+    mergeRelays(profile.bootstrapRelays, getReadRelays(profile.relays))
+  );
+  const relayUrls = uniqueRelayUrls(configuredRelays);
+  if (relayUrls.length === 0) {
+    throw new Error("No read relays configured. Provide --relay or relays in .knowstr/profile.json");
+  }
+  return relayUrls;
+}
+
+async function queryFilters(
+  client: SyncQueryClient,
+  relayUrls: string[],
+  filters: Filter[],
+  maxWaitMs: number
+): Promise<Event[]> {
+  if (relayUrls.length === 0 || filters.length === 0) {
+    return [];
+  }
+
+  const eventMap = new Map<string, Event>();
+  const responses = await Promise.all(
+    filters.map((filter) => client.querySync(relayUrls, filter, { maxWait: maxWaitMs }))
+  );
+
+  responses.flat().forEach((event) => {
+    eventMap.set(event.id, event);
+  });
+
+  return [...eventMap.values()];
+}
+
+function toDocumentFilePath(
+  workspaceDir: string,
+  author: PublicKey,
+  dTag: string,
+  content: string
+): string {
+  const safeDTag = slugify(dTag || "document");
+  const titleSlug = slugify(getDocumentTitle(content));
+  return path.join(workspaceDir, "documents", author, `${safeDTag}-${titleSlug}.md`);
+}
+
+async function removeFileIfExists(filePath: string): Promise<void> {
+  try {
+    await fs.rm(filePath, { force: true });
+  } catch {
+    // ignore cleanup errors
+  }
+}
+
+async function writeDocumentFile(
+  workspaceDir: string,
+  event: Event
+): Promise<StoredDocument | undefined> {
+  const replaceableKey = getReplaceableKey(event);
+  const dTag = findTag(event, "d");
+  if (!replaceableKey || !dTag) {
+    return undefined;
+  }
+
+  const filePath = toDocumentFilePath(
+    workspaceDir,
+    event.pubkey as PublicKey,
+    dTag,
+    event.content
+  );
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, event.content, "utf8");
+
+  return {
+    replaceable_key: replaceableKey,
+    author: event.pubkey as PublicKey,
+    event_id: event.id,
+    d_tag: dTag,
+    path: relativeToWorkspace(workspaceDir, filePath),
+    created_at: event.created_at,
+    updated_ms: getEventMs(event),
+  };
+}
+
+function latestContactPubkeys(contactEvents: Event[], userPubkey: PublicKey): PublicKey[] {
+  const latestContactList = getMostRecentReplacableEvent(
+    List(contactEvents.filter((event) => event.kind === KIND_CONTACTLIST))
+  );
+  if (!latestContactList) {
+    return [];
+  }
+  return findContacts(List([latestContactList]))
+    .keySeq()
+    .filter((pubkey) => pubkey !== userPubkey)
+    .toArray();
+}
+
+function authorSyncMap(
+  manifest: SyncPullManifest | undefined
+): Map<PublicKey, StoredAuthor> {
+  return new Map((manifest?.authors || []).map((author) => [author.pubkey, author]));
+}
+
+function documentMap(
+  manifest: SyncPullManifest | undefined
+): Map<string, StoredDocument> {
+  return new Map(
+    (manifest?.documents || []).map((document) => [document.replaceable_key, document])
+  );
+}
+
+async function applyDeleteEvents(
+  workspaceDir: string,
+  documents: Map<string, StoredDocument>,
+  deleteEvents: Event[]
+): Promise<void> {
+  for (const event of deleteEvents) {
+    const replaceableKey = findTag(event, "a");
+    if (!replaceableKey) {
+      continue;
+    }
+
+    const existing = documents.get(replaceableKey);
+    if (!existing) {
+      continue;
+    }
+
+    if (getEventMs(event) <= existing.updated_ms) {
+      continue;
+    }
+
+    await removeFileIfExists(path.join(workspaceDir, existing.path));
+    documents.delete(replaceableKey);
+  }
+}
+
+async function applyDocumentEvents(
+  workspaceDir: string,
+  documents: Map<string, StoredDocument>,
+  documentEvents: Event[]
+): Promise<void> {
+  const sortedEvents = [...documentEvents].sort((a, b) => {
+    const diff = getEventMs(a) - getEventMs(b);
+    return diff !== 0 ? diff : a.id.localeCompare(b.id);
+  });
+
+  for (const event of sortedEvents) {
+    const replaceableKey = getReplaceableKey(event);
+    if (!replaceableKey) {
+      continue;
+    }
+
+    const nextDocument = await writeDocumentFile(workspaceDir, event);
+    if (!nextDocument) {
+      continue;
+    }
+
+    const existing = documents.get(replaceableKey);
+    if (existing && existing.path !== nextDocument.path) {
+      await removeFileIfExists(path.join(workspaceDir, existing.path));
+    }
+    documents.set(replaceableKey, nextDocument);
+  }
+}
+
+function buildAuthorEntries(
+  authors: PublicKey[],
+  previousAuthors: Map<PublicKey, StoredAuthor>,
+  fetchedEvents: Map<PublicKey, Event[]>
+): StoredAuthor[] {
+  return authors
+    .slice()
+    .sort()
+    .map((author) => {
+      const previous = previousAuthors.get(author);
+      const authorEvents = fetchedEvents.get(author) || [];
+      const latestCreatedAt = authorEvents.reduce(
+          (current, event) => Math.max(current, event.created_at),
+          previous?.last_document_created_at || 0
+        );
+      return {
+        pubkey: author,
+        last_document_created_at: latestCreatedAt,
+      };
+    });
+}
+
+async function removeOutOfScopeDocuments(
+  workspaceDir: string,
+  documents: Map<string, StoredDocument>,
+  allowedAuthors: Set<PublicKey>
+): Promise<void> {
+  const entries = [...documents.entries()];
+  for (const [replaceableKey, document] of entries) {
+    if (allowedAuthors.has(document.author)) {
+      continue;
+    }
+    await removeFileIfExists(path.join(workspaceDir, document.path));
+    documents.delete(replaceableKey);
+  }
+}
+
+export async function pullSyncWorkspace(
+  client: SyncQueryClient,
+  profile: SyncPullProfile,
+  options: SyncPullOptions = {}
+): Promise<SyncPullManifest> {
+  const workspaceDir = options.outDir
+    ? path.resolve(options.outDir)
+    : profile.workspaceDir;
+  const maxWaitMs = options.maxWaitMs ?? DEFAULT_MAX_WAIT_MS;
+  const relayUrls = resolveRelayUrls(profile, options);
+  const previousManifest = await loadManifest(workspaceDir);
+  const previousAuthors = authorSyncMap(previousManifest);
+  const documents = documentMap(previousManifest);
+
+  await fs.mkdir(path.join(workspaceDir, "documents"), { recursive: true });
+
+  const contactEvents = await queryFilters(
+    client,
+    relayUrls,
+    [{ authors: [profile.pubkey], kinds: [KIND_CONTACTLIST], limit: 1 }],
+    maxWaitMs
+  );
+  const contactPubkeys = latestContactPubkeys(contactEvents, profile.pubkey);
+  const authors = [...new Set([profile.pubkey, ...contactPubkeys])] as PublicKey[];
+  const allowedAuthors = new Set(authors);
+
+  await removeOutOfScopeDocuments(workspaceDir, documents, allowedAuthors);
+
+  const fetchedEventsByAuthor = new Map<PublicKey, Event[]>();
+
+  for (const author of authors) {
+    const previous = previousAuthors.get(author);
+    const since = previous?.last_document_created_at;
+    const authorEvents = await queryFilters(
+      client,
+      relayUrls,
+      [
+        {
+          authors: [author],
+          kinds: [KIND_KNOWLEDGE_DOCUMENT],
+          ...(since ? { since } : {}),
+        },
+        {
+          authors: [author],
+          kinds: [KIND_DELETE],
+          "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`],
+          ...(since ? { since } : {}),
+        },
+      ],
+      maxWaitMs
+    );
+
+    fetchedEventsByAuthor.set(author, authorEvents);
+
+    await applyDeleteEvents(
+      workspaceDir,
+      documents,
+      authorEvents.filter((event) => event.kind === KIND_DELETE)
+    );
+    await applyDocumentEvents(
+      workspaceDir,
+      documents,
+      authorEvents.filter((event) => event.kind === KIND_KNOWLEDGE_DOCUMENT)
+    );
+  }
+
+  const manifest: SyncPullManifest = {
+    workspace_version: WORKSPACE_VERSION,
+    as_user: profile.pubkey,
+    synced_at: (options.now || new Date()).toISOString(),
+    relay_urls: relayUrls,
+    contact_pubkeys: contactPubkeys.slice().sort(),
+    authors: buildAuthorEntries(authors, previousAuthors, fetchedEventsByAuthor),
+    documents: [...documents.values()].sort((a, b) =>
+      a.path.localeCompare(b.path)
+    ),
+  };
+
+  await fs.writeFile(
+    manifestPath(workspaceDir),
+    JSON.stringify(manifest, null, 2),
+    "utf8"
+  );
+
+  client.close?.(relayUrls);
+  return manifest;
+}

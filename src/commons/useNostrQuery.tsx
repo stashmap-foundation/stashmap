@@ -1,7 +1,11 @@
 import { useEffect, useState, useRef } from "react";
 import { Event, EventTemplate, Filter, SimplePool } from "nostr-tools";
-import { Collection, List, Map, OrderedMap } from "immutable";
-import { KIND_RELAY_METADATA_EVENT } from "../nostr";
+import { Map, OrderedMap } from "immutable";
+import {
+  getMostRecentReplacableEvent,
+  sanitizeAuthorsFilter,
+} from "../nostrEvents";
+import { createRelaysQuery, findAllRelays } from "../relayUtils";
 
 export type EventQueryResult = {
   events: OrderedMap<string, Event>;
@@ -20,63 +24,6 @@ const DEFAULTS: EventQueryProps = {
   readFromRelays: [],
   discardOld: false,
 };
-
-export function findAllTags(
-  event: EventTemplate,
-  tag: string
-): Array<Array<string>> | undefined {
-  const filtered = event.tags.filter(([tagName]) => tagName === tag);
-  if (filtered.length === 0) {
-    return undefined;
-  }
-  return filtered.map((t) => t.slice(1));
-}
-
-export function findTag(event: EventTemplate, tag: string): string | undefined {
-  const allTags = findAllTags(event, tag);
-  return allTags && allTags[0] && allTags[0][0];
-}
-
-export function getEventMs(event: EventTemplate): number {
-  const ms = event.tags?.find((t) => t[0] === "ms")?.[1];
-  return ms ? Number(ms) : event.created_at * 1000;
-}
-
-export function sortEvents<T extends EventTemplate>(events: List<T>): List<T> {
-  return events.sortBy(
-    (event, index) => [getEventMs(event), index] as [number, number],
-    (a, b) => {
-      if (a[0] !== b[0]) {
-        return a[0] < b[0] ? -1 : 1;
-      }
-      return a[1] < b[1] ? -1 : 1;
-    }
-  );
-}
-
-export function sortEventsDescending<T extends EventTemplate>(
-  events: List<T>
-): List<T> {
-  return events.sortBy(
-    (event, index) => [getEventMs(event), index],
-    (a, b) => {
-      if (a[0] !== b[0]) {
-        return a[0] < b[0] ? 1 : -1;
-      }
-      if (a[0] === b[0]) {
-        return a[1] < b[1] ? 1 : -1;
-      }
-      return 0;
-    }
-  );
-}
-
-export function getMostRecentReplacableEvent<T extends EventTemplate>(
-  events: Collection<string, T> | List<T>
-): T | undefined {
-  const listOfEvents = List.isList(events) ? events : events.toList();
-  return sortEventsDescending(listOfEvents).first(undefined);
-}
 
 function isValidWsUrl(url: string): boolean {
   try {
@@ -122,10 +69,7 @@ export function useEventQuery(
     ),
   ];
 
-  const isValidHexPubkey = (s: string): boolean => /^[0-9a-f]{64}$/.test(s);
-  const sanitizedFilters = filters.map((f) =>
-    f.authors ? { ...f, authors: f.authors.filter(isValidHexPubkey) } : f
-  );
+  const sanitizedFilters = filters.map(sanitizeAuthorsFilter);
 
   useEffect(() => {
     if (!enabled) {
@@ -169,44 +113,6 @@ export function useEventQuery(
   return {
     events,
     eose,
-  };
-}
-
-export function findAllRelays(event: EventTemplate): Array<Relay> {
-  const relayTags = findAllTags(event, "r");
-  if (!relayTags) {
-    return [];
-  }
-  return relayTags
-    .filter((tag) => tag.length >= 1)
-    .map((tag) => {
-      const { length } = tag;
-      const url = tag[0];
-      if (length === 1) {
-        return {
-          url,
-          read: true,
-          write: true,
-        };
-      }
-      const read =
-        (length >= 2 && tag[1] === "read") ||
-        (length >= 3 && tag[2] === "read");
-      const write =
-        (length >= 2 && tag[1] === "write") ||
-        (length >= 3 && tag[2] === "write");
-      return {
-        url,
-        read,
-        write,
-      };
-    });
-}
-
-export function createRelaysQuery(nostrPublicKeys: Array<string>): Filter {
-  return {
-    kinds: [KIND_RELAY_METADATA_EVENT],
-    authors: nostrPublicKeys,
   };
 }
 

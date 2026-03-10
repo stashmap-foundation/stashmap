@@ -1,10 +1,7 @@
 import { List, Map } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
 import { KIND_CONTACTLIST, KIND_MEMBERLIST } from "./nostr";
-import {
-  findAllTags,
-  getMostRecentReplacableEvent,
-} from "./commons/useNostrQuery";
+import { findAllTags, getMostRecentReplacableEvent } from "./nostrEvents";
 
 type FollowList = Array<Contact>;
 

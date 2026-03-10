@@ -3,10 +3,14 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "bin": {
+    "knowstr": "dist/cli/index.js"
+  },
   "scripts": {
     "test": "jest",
     "start": "webpack serve --config config/webpack/dev.config.js",
     "build": "webpack --config config/webpack/production.config.js",
+    "build:cli": "tsc -p tsconfig.cli.json",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
     "format": "prettier --write \"src/**/*.+(ts|tsx|js|jsx|json|md|)\" \"README.md\" \"scripts/*.js\"",
     "prettier": "prettier -c \"src/**/*.+(ts|tsx|js|jsx|json|md|)\" \"README.md\" \"scripts/*.js\"",

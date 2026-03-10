@@ -5,7 +5,7 @@ import {
   getEventMs,
   getMostRecentReplacableEvent,
   sortEvents,
-} from "./commons/useNostrQuery";
+} from "./nostrEvents";
 import {
   KIND_DELETE,
   KIND_KNOWLEDGE_DOCUMENT,

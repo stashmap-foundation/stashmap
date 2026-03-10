@@ -1,7 +1,7 @@
 import React, { useCallback } from "react";
 import { List, Map } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
-import { processEvents } from "./Data";
+import { processEvents } from "./eventProcessing";
 
 type EventCacheState = {
   knowledgeDBs: KnowledgeDBs;

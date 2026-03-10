@@ -33,7 +33,7 @@ import {
 } from "./ViewContext";
 import { buildOutgoingReference } from "./buildReferenceRow";
 import { KIND_KNOWLEDGE_DOCUMENT, newTimestamp, msTag } from "./nostr";
-import { findTag } from "./commons/useNostrQuery";
+import { findTag } from "./nostrEvents";
 import { getNodesInTree } from "./treeTraversal";
 import { newDB } from "./knowledge";
 import { createRootAnchor } from "./rootAnchor";

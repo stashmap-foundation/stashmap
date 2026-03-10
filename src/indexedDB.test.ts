@@ -87,6 +87,9 @@ test("clearDatabase closes tracked open databases before deleting", async () => 
   if (originalIndexedDBDescriptor) {
     Object.defineProperty(global, "indexedDB", originalIndexedDBDescriptor);
   } else {
-    delete (global as typeof global & { indexedDB?: IDBFactory }).indexedDB;
+    Reflect.deleteProperty(
+      global as typeof global & { indexedDB?: IDBFactory },
+      "indexedDB"
+    );
   }
 });

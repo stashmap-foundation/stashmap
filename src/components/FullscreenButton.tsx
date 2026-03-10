@@ -5,30 +5,20 @@ import {
   useDisplayText,
   useEffectiveAuthor,
   useCurrentRelation,
-  getRowIDsForViewPath,
   getCurrentReferenceForView,
   useCurrentEdge,
 } from "../ViewContext";
-import {
-  usePaneStack,
-  useCurrentPane,
-  useNavigatePane,
-} from "../SplitPanesContext";
-import {
-  getRefLinkTargetInfo,
-  getRefTargetInfo,
-  isSearchId,
-} from "../connections";
+import { usePaneStack, useNavigatePane } from "../SplitPanesContext";
+import { getRefLinkTargetInfo, getRefTargetInfo } from "../connections";
 import { useData } from "../DataContext";
-import { buildNodeUrl, buildRelationUrl } from "../navigationUrl";
+import { buildRelationUrl } from "../navigationUrl";
 
 export function FullscreenButton(): JSX.Element | null {
   const stack = usePaneStack();
-  const pane = useCurrentPane();
   const viewPath = useViewPath();
   const [itemID] = useCurrentRowID();
   const data = useData();
-  const { knowledgeDBs, user } = data;
+  const { knowledgeDBs } = data;
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();
   const effectiveAuthor = useEffectiveAuthor();
@@ -59,29 +49,19 @@ export function FullscreenButton(): JSX.Element | null {
   })();
   const fullscreenRelation = relation;
 
-  const getTargetUrl = (): string => {
+  const href = (() => {
     if (refInfo?.rootRelation) {
       return buildRelationUrl(refInfo.rootRelation, refInfo.scrollToId);
     }
     if (fullscreenRelation) {
       return buildRelationUrl(fullscreenRelation.id);
     }
-    const targetStack = (
-      refInfo
-        ? refInfo.stack
-        : [...stack.slice(0, -1), ...getRowIDsForViewPath(data, viewPath)]
-    ).filter((id) => !isSearchId(id as ID));
-    return (
-      buildNodeUrl(
-        targetStack,
-        knowledgeDBs,
-        user.publicKey,
-        refInfo?.author || pane.author
-      ) || "#"
-    );
-  };
+    return undefined;
+  })();
 
-  const href = getTargetUrl();
+  if (!href) {
+    return null;
+  }
 
   const ariaLabel = displayText
     ? `open ${displayText} in fullscreen`

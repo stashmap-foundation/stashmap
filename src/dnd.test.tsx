@@ -253,22 +253,6 @@ Spain
 
   await expectTree(`
 Spain
-  Sevilla
-  Barcelona
-  Madrid
-  Granada
-  [V] +2 -4
-  `);
-
-  const versionFullscreenBtns = await screen.findAllByLabelText(
-    /open .* in fullscreen/
-  );
-  await userEvent.click(
-    versionFullscreenBtns[versionFullscreenBtns.length - 1]
-  );
-
-  await expectTree(`
-Spain
   Valencia
   Malaga
   [S] Sevilla
@@ -276,6 +260,20 @@ Spain
   [S] Madrid
   [V] +4 -2
   [VO] +4 -2
+  `);
+
+  const versionFullscreenBtns = await screen.findAllByLabelText(
+    /open .* \+4 -2 in fullscreen/
+  );
+  await userEvent.click(versionFullscreenBtns[0]);
+
+  await expectTree(`
+Spain
+  Sevilla
+  Barcelona
+  Madrid
+  Granada
+  [V] +2 -4
   `);
 
   await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
@@ -291,17 +289,17 @@ Spain
 
   await expectTree(`
 Spain
-  Valencia
-  Malaga
-  [S] Sevilla
-  [S] Barcelona
-  [S] Madrid
-  [V] +4 -2
-  [VO] +4 -2
+  Sevilla
+  Barcelona
+  Madrid
+  Granada
+  [V] +2 -4
 Target
   Spain
-    Valencia
-    Malaga
+    Sevilla
+    Barcelona
+    Madrid
+    Granada
   `);
 });
 

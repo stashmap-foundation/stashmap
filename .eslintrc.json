@@ -94,8 +94,7 @@
             "src/LoadSearchData.tsx",
             "src/dataQuery.tsx",
             "src/planner.tsx",
-            "src/components/Workspace.tsx",
-            "src/components/FullscreenButton.tsx"
+            "src/components/Workspace.tsx"
           ],
           "rules": {
             "no-restricted-imports": [

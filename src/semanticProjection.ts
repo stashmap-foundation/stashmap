@@ -20,7 +20,6 @@ import {
   getRelationText,
   getConcreteRefTargetRelation,
   getRelationsNoReferencedBy,
-  LOG_SEMANTIC_ID,
 } from "./connections";
 import { suggestionSettings } from "./constants";
 import { LOG_ROOT_ROLE } from "./systemRoots";
@@ -50,9 +49,6 @@ function getFallbackSemanticText(semanticID?: LongID | ID): string {
     return "";
   }
   const localID = shortID(semanticID as ID) as ID;
-  if (localID === LOG_SEMANTIC_ID) {
-    return "~Log";
-  }
   if (localID === EMPTY_SEMANTIC_ID) {
     return "";
   }

@@ -31,7 +31,6 @@ import {
   computeEmptyNodeMetadata,
   isConcreteRefId,
   getConcreteRefTargetRelation,
-  LOG_SEMANTIC_ID,
   createConcreteRefId,
   isRefId,
   isSearchId,
@@ -41,7 +40,12 @@ import {
   getRelationSemanticID,
 } from "./connections";
 import type { TextSeed } from "./connections";
-import { getOwnLogRoot, getSystemRoleText, LOG_ROOT_ROLE } from "./systemRoots";
+import {
+  getOwnLogRoot,
+  getSystemRoleText,
+  LOG_ROOT_ROLE,
+  LOG_ROOT_SEMANTIC_ID,
+} from "./systemRoots";
 import {
   newRelations,
   newRelationsForSemanticID,
@@ -222,7 +226,7 @@ function addCrefToLog(plan: Plan, relationID: LongID): Plan {
   const relations =
     logRelations ||
     newRelations(
-      LOG_SEMANTIC_ID,
+      LOG_ROOT_SEMANTIC_ID,
       List<ID>(),
       plan.user.publicKey,
       undefined,

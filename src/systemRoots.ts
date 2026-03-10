@@ -1,6 +1,13 @@
+import crypto from "crypto";
 import { shortID } from "./connections";
 
 export const LOG_ROOT_ROLE: RootSystemRole = "log";
+export const LOG_ROOT_TEXT = "~Log";
+export const LOG_ROOT_SEMANTIC_ID = crypto
+  .createHash("sha256")
+  .update(LOG_ROOT_TEXT)
+  .digest("hex")
+  .slice(0, 32) as ID;
 
 export function isStandaloneRoot(relation: Relations): boolean {
   return relation.root === shortID(relation.id);
@@ -34,8 +41,8 @@ export function getOwnLogRoot(
 export function getSystemRoleText(systemRole: RootSystemRole): string {
   switch (systemRole) {
     case LOG_ROOT_ROLE:
-      return "~Log";
+      return LOG_ROOT_TEXT;
     default:
-      return "~Log";
+      return LOG_ROOT_TEXT;
   }
 }

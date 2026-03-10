@@ -10,9 +10,6 @@ export function hashText(text: string): ID {
   return crypto.createHash("sha256").update(text).digest("hex").slice(0, 32);
 }
 
-// Pre-computed semantic ID for the ~Log root
-export const LOG_SEMANTIC_ID = hashText("~Log");
-
 // Pre-computed semantic ID for the empty placeholder row
 export const EMPTY_SEMANTIC_ID = hashText("") as ID;
 
@@ -30,9 +27,6 @@ function createRandomSemanticID(): ID {
 }
 
 function getReservedSemanticID(text: string): ID | undefined {
-  if (text === "~Log") {
-    return LOG_SEMANTIC_ID;
-  }
   if (text === "") {
     return EMPTY_SEMANTIC_ID;
   }
@@ -129,9 +123,6 @@ function getFallbackRelationText(head?: LongID | ID): string {
     return "";
   }
   const localHead = shortID(head as ID) as ID;
-  if (localHead === LOG_SEMANTIC_ID) {
-    return "~Log";
-  }
   if (localHead === EMPTY_SEMANTIC_ID) {
     return "";
   }
@@ -496,17 +487,13 @@ export function ensureRelationNativeFields(
   const relationSemanticID =
     relation.textHash || existingRelation?.textHash || EMPTY_SEMANTIC_ID;
   const hasReservedSemanticID =
-    relationSemanticID === LOG_SEMANTIC_ID ||
-    relationSemanticID === EMPTY_SEMANTIC_ID ||
-    isSearchId(relationSemanticID);
+    relationSemanticID === EMPTY_SEMANTIC_ID || isSearchId(relationSemanticID);
   const shouldTrustRelationText = relation.text !== "" || hasReservedSemanticID;
   const text = shouldTrustRelationText
     ? relation.text
     : existingRelation?.text || getFallbackRelationText(relationSemanticID);
   const shouldHashText =
-    text !== "" ||
-    relationSemanticID === LOG_SEMANTIC_ID ||
-    relationSemanticID === EMPTY_SEMANTIC_ID;
+    text !== "" || relationSemanticID === EMPTY_SEMANTIC_ID;
   const textHash = (() => {
     if (isSearchId(relationSemanticID)) {
       return relationSemanticID;

@@ -5,7 +5,6 @@ import {
   useDisplayText,
   useEffectiveAuthor,
   useCurrentRelation,
-  getContext,
   getRowIDsForViewPath,
   getCurrentReferenceForView,
   useCurrentEdge,
@@ -19,11 +18,9 @@ import {
   getRefLinkTargetInfo,
   getRefTargetInfo,
   isSearchId,
-  shortID,
 } from "../connections";
 import { useData } from "../DataContext";
 import { buildNodeUrl, buildRelationUrl } from "../navigationUrl";
-import { getAlternativeRelations } from "../semanticProjection";
 
 export function FullscreenButton(): JSX.Element | null {
   const stack = usePaneStack();
@@ -36,7 +33,6 @@ export function FullscreenButton(): JSX.Element | null {
   const navigatePane = useNavigatePane();
   const effectiveAuthor = useEffectiveAuthor();
   const relation = useCurrentRelation();
-  const context = getContext(data, viewPath, stack);
   const virtualType = useCurrentEdge()?.virtualType;
   const currentReference = getCurrentReferenceForView(
     data,
@@ -61,22 +57,7 @@ export function FullscreenButton(): JSX.Element | null {
           effectiveAuthor
         );
   })();
-  const standaloneRelation = getAlternativeRelations(
-    knowledgeDBs,
-    itemID,
-    context,
-    relation?.id,
-    effectiveAuthor,
-    relation?.root
-  )
-    .filter(
-      (candidate) =>
-        candidate.author === effectiveAuthor &&
-        candidate.root === shortID(candidate.id)
-    )
-    .sortBy((candidate) => -candidate.updated)
-    .first();
-  const fullscreenRelation = standaloneRelation || relation;
+  const fullscreenRelation = relation;
 
   const getTargetUrl = (): string => {
     if (refInfo?.rootRelation) {

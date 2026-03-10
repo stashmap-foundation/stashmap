@@ -138,6 +138,7 @@ type BreadcrumbTarget = {
   stack: ID[];
   author: PublicKey;
   rootRelation?: LongID;
+  scrollToId?: string;
 };
 
 type BreadcrumbEntry = {
@@ -255,14 +256,13 @@ function createRelationBreadcrumbEntry(
   knowledgeDBs: KnowledgeDBs,
   relation: Relations
 ): BreadcrumbEntry {
-  const rootRelation = getStandaloneRootRelation(knowledgeDBs, relation);
   return {
     key: `relation:${relation.id}`,
     label: getBreadcrumbLabel(relation),
     target: {
       stack: getRelationStack(knowledgeDBs, relation),
       author: relation.author,
-      ...(rootRelation ? { rootRelation: rootRelation.id } : {}),
+      rootRelation: relation.id,
     },
   };
 }
@@ -423,7 +423,7 @@ function Breadcrumbs(): JSX.Element {
           target: {
             stack: nextTargetStack,
             author: pane.author,
-            ...(pane.rootRelation ? { rootRelation: pane.rootRelation } : {}),
+            ...(localRelation ? { rootRelation: localRelation.id } : {}),
           },
         };
         return entry;
@@ -446,6 +446,7 @@ function Breadcrumbs(): JSX.Element {
         target: {
           stack: targetStack,
           author: pane.author,
+          ...(targetRelation ? { rootRelation: targetRelation.id } : {}),
         },
       };
     });
@@ -456,10 +457,7 @@ function Breadcrumbs(): JSX.Element {
         const { target } = entry;
         const targetUrl = (() => {
           if (target?.rootRelation) {
-            return buildRelationUrl(
-              target.rootRelation,
-              target.stack[target.stack.length - 1]
-            );
+            return buildRelationUrl(target.rootRelation, target.scrollToId);
           }
           if (!target) {
             return undefined;
@@ -485,7 +483,7 @@ function Breadcrumbs(): JSX.Element {
                   ...(target.rootRelation
                     ? { rootRelation: target.rootRelation }
                     : {}),
-                  scrollToId: undefined,
+                  scrollToId: target.scrollToId,
                 });
                 return;
               }

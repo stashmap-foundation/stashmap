@@ -230,7 +230,7 @@ test("Opening /n/ URL with author param shows READONLY", async () => {
   `);
 });
 
-test("URL includes author param when viewing other user's content via breadcrumb", async () => {
+test("Breadcrumb navigation uses relation URLs when a concrete target exists", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
 
   renderApp(alice());
@@ -255,8 +255,9 @@ test("URL includes author param when viewing other user's content via breadcrumb
   await userEvent.click(await screen.findByLabelText("Navigate to My Notes"));
 
   await waitFor(() => {
-    expect(window.location.search).toContain("author=");
+    expect(window.location.pathname).toMatch(/^\/r\//);
   });
+  await screen.findByText("READONLY");
 });
 
 test("Clicking fullscreen while viewing other user's content preserves READONLY", async () => {

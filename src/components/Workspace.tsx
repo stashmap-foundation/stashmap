@@ -12,6 +12,8 @@ import {
   ViewPath,
   VirtualItemsMap,
   viewPathToString,
+  useCurrentRelation,
+  useDisplayText,
   useViewPath,
   useIsViewingOtherUserContent,
 } from "../ViewContext";
@@ -51,12 +53,14 @@ import {
 import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import {
   getRelationStack,
+  getRelationText,
+  getRelationItemRelation,
+  getRelationItemSemanticID,
   getRelationSemanticID,
   getRelationsNoReferencedBy,
   isSearchId,
   shortID,
 } from "../connections";
-import { getTextForSemanticID } from "../semanticProjection";
 import { getOwnLogRoot } from "../systemRoots";
 import { buildNodeUrl, buildRelationUrl } from "../navigationUrl";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
@@ -80,25 +84,20 @@ import { getNodesInTree } from "./Node";
 import { planDeleteNodeFromView } from "../dnd";
 
 function BreadcrumbItem({
-  semanticID,
-  author,
+  label,
   href,
   onClick,
   isLast,
   isSource = false,
   disabled = false,
 }: {
-  semanticID: LongID | ID;
-  author: PublicKey;
+  label: string;
   href?: string;
   onClick?: (e: React.MouseEvent) => void;
   isLast: boolean;
   isSource?: boolean;
   disabled?: boolean;
 }): JSX.Element {
-  const { knowledgeDBs } = useData();
-  const label =
-    getTextForSemanticID(knowledgeDBs, semanticID, author) || "Loading...";
   const className = [
     isLast ? "breadcrumb-current" : "breadcrumb-link",
     isSource ? "breadcrumb-source" : "",
@@ -143,12 +142,19 @@ type BreadcrumbTarget = {
 
 type BreadcrumbEntry = {
   key: string;
-  semanticID: LongID | ID;
-  author: PublicKey;
+  label: string;
   target?: BreadcrumbTarget;
   isSource?: boolean;
   disabled?: boolean;
 };
+
+function getBreadcrumbLabel(relation: Relations): string {
+  return (
+    getRelationText(relation) ||
+    shortID(getRelationSemanticID(relation)) ||
+    "..."
+  );
+}
 
 function getStandaloneRootRelation(
   knowledgeDBs: KnowledgeDBs,
@@ -163,6 +169,60 @@ function getStandaloneRootRelation(
         candidate.root === relation.root &&
         candidate.root === shortID(candidate.id)
     );
+}
+
+function resolveRelationFromSegments(
+  knowledgeDBs: KnowledgeDBs,
+  currentRelation: Relations,
+  semanticStack: ID[]
+): Relations | undefined {
+  if (semanticStack.length === 0) {
+    return currentRelation;
+  }
+
+  const currentAuthor = currentRelation.author;
+  const [nextSemanticID, ...rest] = semanticStack;
+  const matchingItem = currentRelation.items.find(
+    (item) =>
+      shortID(getRelationItemSemanticID(knowledgeDBs, item, currentAuthor)) ===
+      shortID(nextSemanticID as ID)
+  );
+
+  if (!matchingItem) {
+    return undefined;
+  }
+
+  const nextRelation = getRelationItemRelation(
+    knowledgeDBs,
+    matchingItem,
+    currentAuthor
+  );
+  return nextRelation
+    ? resolveRelationFromSegments(knowledgeDBs, nextRelation, rest as ID[])
+    : undefined;
+}
+
+function resolveRelationFromRootStack(
+  knowledgeDBs: KnowledgeDBs,
+  rootRelation: Relations,
+  semanticStack: ID[]
+): Relations | undefined {
+  if (semanticStack.length === 0) {
+    return undefined;
+  }
+  const treeRoot =
+    getStandaloneRootRelation(knowledgeDBs, rootRelation) || rootRelation;
+  const rootSemanticID = shortID(getRelationSemanticID(treeRoot));
+  const pathWithoutRoot =
+    shortID(semanticStack[0]) === rootSemanticID
+      ? semanticStack.slice(1)
+      : semanticStack;
+
+  return resolveRelationFromSegments(
+    knowledgeDBs,
+    treeRoot,
+    pathWithoutRoot as ID[]
+  );
 }
 
 function getLiveAnchorSourceRelation(
@@ -198,8 +258,7 @@ function createRelationBreadcrumbEntry(
   const rootRelation = getStandaloneRootRelation(knowledgeDBs, relation);
   return {
     key: `relation:${relation.id}`,
-    semanticID: getRelationSemanticID(relation),
-    author: relation.author,
+    label: getBreadcrumbLabel(relation),
     target: {
       stack: getRelationStack(knowledgeDBs, relation),
       author: relation.author,
@@ -218,8 +277,7 @@ function createSnapshotBreadcrumbEntries(
   const author = anchor.sourceAuthor || fallbackAuthor;
   return anchor.snapshotContext.toArray().map((semanticID, index) => ({
     key: `snapshot:${author}:${semanticID}:${index}`,
-    semanticID,
-    author,
+    label: anchor.snapshotLabels?.[index] || shortID(semanticID as ID),
     disabled: true,
     isSource: true,
   }));
@@ -294,7 +352,7 @@ function SourceButton(): JSX.Element | null {
 
   const target: Pane = {
     ...pane,
-    stack: [],
+    stack: getRelationStack(knowledgeDBs, sourceRelation),
     author: sourceRelation.author,
     rootRelation: sourceRelation.id,
     scrollToId: undefined,
@@ -324,6 +382,7 @@ function Breadcrumbs(): JSX.Element {
   const navigatePane = useNavigatePane();
   const { setPane } = useSplitPanes();
   const paneHistory = usePaneHistory();
+  const currentRelation = useCurrentRelation();
   const visibleStack = stack.filter((id) => !isSearchId(id as ID));
   const rootRelation = pane.rootRelation
     ? getRelationsNoReferencedBy(
@@ -331,7 +390,7 @@ function Breadcrumbs(): JSX.Element {
         pane.rootRelation,
         user.publicKey
       )
-    : undefined;
+    : currentRelation;
   const anchoredEntries = (() => {
     if (!rootRelation?.anchor) {
       return undefined;
@@ -351,10 +410,16 @@ function Breadcrumbs(): JSX.Element {
           ...anchorPrefix.toArray(),
           ...localStack.slice(0, index + 1),
         ] as ID[];
+        const localRelation = resolveRelationFromRootStack(
+          knowledgeDBs,
+          rootRelation,
+          localStack.slice(0, index + 1) as ID[]
+        );
         const entry: BreadcrumbEntry = {
           key: `local:${pane.rootRelation}:${nextTargetStack.join(":")}`,
-          semanticID,
-          author: pane.author,
+          label: localRelation
+            ? getBreadcrumbLabel(localRelation)
+            : shortID(semanticID as ID),
           target: {
             stack: nextTargetStack,
             author: pane.author,
@@ -368,15 +433,22 @@ function Breadcrumbs(): JSX.Element {
   })();
   const entries: BreadcrumbEntry[] =
     anchoredEntries ||
-    visibleStack.map((semanticID, index) => ({
-      key: `stack:${semanticID}:${index}`,
-      semanticID,
-      author: pane.author,
-      target: {
-        stack: visibleStack.slice(0, index + 1),
-        author: pane.author,
-      },
-    }));
+    visibleStack.map((semanticID, index) => {
+      const targetStack = visibleStack.slice(0, index + 1) as ID[];
+      const targetRelation = rootRelation
+        ? resolveRelationFromRootStack(knowledgeDBs, rootRelation, targetStack)
+        : undefined;
+      return {
+        key: `stack:${semanticID}:${index}`,
+        label: targetRelation
+          ? getBreadcrumbLabel(targetRelation)
+          : shortID(semanticID as ID),
+        target: {
+          stack: targetStack,
+          author: pane.author,
+        },
+      };
+    });
 
   return (
     <nav className="breadcrumbs" aria-label="Navigation breadcrumbs">
@@ -423,8 +495,7 @@ function Breadcrumbs(): JSX.Element {
         return (
           <BreadcrumbItem
             key={entry.key}
-            semanticID={entry.semanticID}
-            author={entry.author}
+            label={entry.label}
             href={targetUrl}
             onClick={onClick}
             isLast={index === entries.length - 1}
@@ -590,21 +661,13 @@ function PaneHeader(): JSX.Element {
 }
 
 function CurrentNodeName(): JSX.Element {
-  const { knowledgeDBs } = useData();
-  const pane = useCurrentPane();
   const stack = usePaneStack();
-  const currentSemanticID = stack[stack.length - 1];
+  const displayName = useDisplayText();
 
-  if (!currentSemanticID) {
+  if (!stack[stack.length - 1]) {
     return <span>New Note</span>;
   }
 
-  const displayName =
-    getTextForSemanticID(
-      knowledgeDBs,
-      currentSemanticID as string,
-      pane.author
-    ) || "...";
   const truncated =
     displayName.length > 20 ? `${displayName.slice(0, 20)}…` : displayName;
 

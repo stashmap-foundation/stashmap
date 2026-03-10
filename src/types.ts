@@ -237,6 +237,7 @@ declare global {
 
   type RootAnchor = {
     snapshotContext: Context;
+    snapshotLabels?: string[];
     sourceAuthor?: PublicKey;
     sourceRootID?: ID;
     sourceRelationID?: LongID;

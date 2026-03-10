@@ -38,6 +38,7 @@ import {
   ensureRelationNativeFields,
   getRelationContext,
   getRelationSemanticID,
+  getRelationText,
 } from "./connections";
 import type { TextSeed } from "./connections";
 import {
@@ -73,6 +74,30 @@ import {
   shiftSelect,
   toggleSelect,
 } from "./selection";
+
+function getAnchorSnapshotLabels(
+  knowledgeDBs: KnowledgeDBs,
+  relation: Relations
+): string[] {
+  const labels: string[] = [];
+  let parentRelationID = relation.parent;
+  while (parentRelationID) {
+    const parentRelation = getRelationsNoReferencedBy(
+      knowledgeDBs,
+      parentRelationID,
+      relation.author
+    );
+    if (!parentRelation) {
+      break;
+    }
+    labels.unshift(
+      getRelationText(parentRelation) ||
+        shortID(getRelationSemanticID(parentRelation))
+    );
+    parentRelationID = parentRelation.parent;
+  }
+  return labels;
+}
 
 export function getPane(plan: Plan | Data, viewPath: ViewPath): Pane {
   const paneIndex = viewPath[0];
@@ -780,7 +805,11 @@ function planCopyDescendantRelations(
           if (!isRootRelation || targetParentRelationID) {
             return undefined;
           }
-          return createRootAnchor(newSemanticContext, source);
+          return createRootAnchor(
+            newSemanticContext,
+            source,
+            getAnchorSnapshotLabels(accPlan.knowledgeDBs, source)
+          );
         })(),
         text: source.text,
         textHash: source.textHash,

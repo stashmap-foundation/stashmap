@@ -105,6 +105,7 @@ function extractAttrs(token: Token): {
   const hidden = classes.includes("hidden");
   const basedOn = token.attrGet("basedOn") || undefined;
   const anchorContext = token.attrGet("anchorContext") || undefined;
+  const anchorLabelsAttr = token.attrGet("anchorLabels") || undefined;
   const sourceAuthor = token.attrGet("sourceAuthor") || undefined;
   const sourceRootID = (token.attrGet("sourceRoot") || undefined) as
     | ID
@@ -119,6 +120,7 @@ function extractAttrs(token: Token): {
     | undefined;
   const anchor =
     anchorContext ||
+    anchorLabelsAttr ||
     sourceAuthor ||
     sourceRootID ||
     sourceRelationID ||
@@ -127,6 +129,13 @@ function extractAttrs(token: Token): {
           snapshotContext: anchorContext
             ? List(anchorContext.split(":") as ID[])
             : List<ID>(),
+          ...(anchorLabelsAttr
+            ? {
+                snapshotLabels: anchorLabelsAttr
+                  .split("|")
+                  .map((label) => decodeURIComponent(label)),
+              }
+            : {}),
           ...(sourceAuthor ? { sourceAuthor: sourceAuthor as PublicKey } : {}),
           ...(sourceRootID ? { sourceRootID } : {}),
           ...(sourceRelationID ? { sourceRelationID } : {}),
@@ -551,6 +560,13 @@ function formatRootHeading(
   const parts = [rootUuid, `semantic="${rootSemanticID}"`];
   if (anchor?.snapshotContext.size) {
     parts.push(`anchorContext="${anchor.snapshotContext.join(":")}"`);
+  }
+  if (anchor?.snapshotLabels?.length) {
+    parts.push(
+      `anchorLabels="${anchor.snapshotLabels
+        .map((label) => encodeURIComponent(label))
+        .join("|")}"`
+    );
   }
   if (anchor?.sourceAuthor) {
     parts.push(`sourceAuthor="${anchor.sourceAuthor}"`);

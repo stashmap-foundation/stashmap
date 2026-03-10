@@ -93,8 +93,7 @@
             "src/treeTraversal.ts",
             "src/LoadSearchData.tsx",
             "src/dataQuery.tsx",
-            "src/planner.tsx",
-            "src/components/Workspace.tsx"
+            "src/planner.tsx"
           ],
           "rules": {
             "no-restricted-imports": [

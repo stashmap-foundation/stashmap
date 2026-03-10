@@ -2,7 +2,8 @@ import { List } from "immutable";
 
 export function createRootAnchor(
   snapshotContext?: Context,
-  sourceRelation?: Relations
+  sourceRelation?: Relations,
+  snapshotLabels?: string[]
 ): RootAnchor | undefined {
   const normalizedContext = snapshotContext ?? List<ID>();
   if (normalizedContext.size === 0 && !sourceRelation) {
@@ -11,6 +12,7 @@ export function createRootAnchor(
 
   return {
     snapshotContext: normalizedContext,
+    ...(snapshotLabels?.length ? { snapshotLabels } : {}),
     ...(sourceRelation
       ? {
           sourceAuthor: sourceRelation.author,
@@ -40,6 +42,8 @@ export function rootAnchorsEqual(
   }
   return (
     left.snapshotContext.equals(right.snapshotContext) &&
+    JSON.stringify(left.snapshotLabels ?? []) ===
+      JSON.stringify(right.snapshotLabels ?? []) &&
     left.sourceAuthor === right.sourceAuthor &&
     left.sourceRootID === right.sourceRootID &&
     left.sourceRelationID === right.sourceRelationID &&

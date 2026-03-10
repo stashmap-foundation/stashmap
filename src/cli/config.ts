@@ -111,10 +111,7 @@ export function loadCliProfile({
 
   return {
     pubkey: parsePubkey(profile.pubkey),
-    workspaceDir: resolveAbsolute(
-      agentRoot,
-      profile.workspace_dir || "./workspace"
-    ),
+    workspaceDir: resolveAbsolute(agentRoot, profile.workspace_dir || "."),
     bootstrapRelays: parseBootstrapRelays(
       profile.bootstrap_relays,
       `${resolvedConfigPath}#bootstrap_relays`

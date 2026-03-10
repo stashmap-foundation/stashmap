@@ -216,15 +216,15 @@ My Notes
     );
 
     await expectTree(`
-[O] My Notes
-  [O] Holiday Destinations
+[O] Holiday Destinations
+  [O] Spain
     `);
 
     await userEvent.keyboard("j{Delete}");
 
     await expectTree(`
-[O] My Notes
-  [O] Holiday Destinations
+[O] Holiday Destinations
+  [O] Spain
     `);
   });
 

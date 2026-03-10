@@ -661,6 +661,20 @@ export function dnd(
             )[0];
           }
         }
+        const existingSourceRelation = getRelationForView(
+          accPlan,
+          sourcePath,
+          sourceStack
+        );
+        if (existingSourceRelation) {
+          return planAddToParent(
+            accPlan,
+            toReferenceID(sourceItemID, existingSourceRelation),
+            toView,
+            stack,
+            insertAt
+          )[0];
+        }
         const planWithRelation = upsertRelations(
           accPlan,
           sourcePath,

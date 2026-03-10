@@ -41,10 +41,7 @@ import {
   getRelationSemanticID,
 } from "./connections";
 import type { TextSeed } from "./connections";
-import {
-  getAlternativeRelations,
-  getTextForSemanticID,
-} from "./semanticProjection";
+import { getAlternativeRelations } from "./semanticProjection";
 import {
   newRelations,
   newRelationsForSemanticID,
@@ -59,7 +56,6 @@ import {
   viewPathToString,
   getRelationForView,
   addNodeToPathWithRelations,
-  getEffectiveAuthor,
   getPaneIndex,
 } from "./ViewContext";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
@@ -1038,30 +1034,9 @@ export function planDeepCopyNode(
   const targetChildContext = nodeSemanticContext.push(shortID(resolvedItemID));
 
   if (!resolvedRelation) {
-    const sourceAuthor = getEffectiveAuthor(plan, sourceViewPath);
-    const text = getTextForSemanticID(
-      plan.knowledgeDBs,
-      resolvedItemID,
-      sourceAuthor
+    throw new Error(
+      "Cannot deep copy a row without a concrete source relation"
     );
-    const targetToAdd =
-      text !== undefined
-        ? {
-            id: resolvedItemID as ID,
-            text,
-            textHash: hashText(text),
-          }
-        : resolvedItemID;
-    const [planWithNode] = planAddToParent(
-      planWithParent,
-      targetToAdd,
-      targetParentViewPath,
-      stack,
-      insertAtIndex,
-      relevance,
-      argument
-    );
-    return [planWithNode, Map<LongID, LongID>()];
   }
 
   const [planWithCopiedRelations, mapping] = planCopyDescendantRelations(
@@ -1279,14 +1254,7 @@ export function planSaveNodeAndEnsureRelations(
     return { plan, viewPath };
   }
 
-  const displayText =
-    currentRelation?.text ??
-    getTextForSemanticID(
-      plan.knowledgeDBs,
-      itemID as ID,
-      plan.user.publicKey
-    ) ??
-    "";
+  const displayText = currentRelation?.text ?? "";
 
   if (trimmedText === displayText) return { plan, viewPath };
 

@@ -3,7 +3,7 @@ import { OrderedSet } from "immutable";
 import { ConnectDropTarget, DropTargetMonitor, useDrop } from "react-dnd";
 import { NativeTypes } from "react-dnd-html5-backend";
 import { dnd, getDropDestinationFromTreeView } from "../dnd";
-import { isEmptySemanticID, shortID } from "../connections";
+import { isEmptySemanticID } from "../connections";
 import { deselectAllChildren, useTemporaryView } from "./TemporaryViewContext";
 import {
   Plan,
@@ -13,6 +13,7 @@ import {
 } from "../planner";
 import {
   ViewPath,
+  buildPaneTarget,
   getItemIDFromView,
   getParentKey,
   useViewPath,
@@ -453,14 +454,17 @@ export function useDroppable({
       const [destinationRootItemID] = getItemIDFromView(plan, destination);
 
       if (isEmptySemanticID(destinationRootItemID)) {
-        const [sourceItemID] = getItemIDFromView(plan, dragItem.path);
+        const sourcePane = plan.panes[dragItem.path[0] as number];
+        const target = buildPaneTarget(plan, dragItem.path, sourcePane.stack);
         const targetPaneIndex = destination[0] as number;
         const updatedPanes = plan.panes.map((p, idx) => {
           if (idx !== targetPaneIndex) return p;
           return {
-            ...p,
-            stack: [shortID(sourceItemID) as ID],
-            rootRelation: undefined,
+            id: p.id,
+            stack: target.stack,
+            author: target.author,
+            rootRelation: target.rootRelation,
+            scrollToId: target.scrollToId,
           };
         });
         executePlan(planUpdatePanes(plan, updatedPanes));

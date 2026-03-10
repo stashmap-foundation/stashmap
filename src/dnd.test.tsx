@@ -808,6 +808,37 @@ Root
   Spain
   France
 Spain
-  [C] Root / Spain
+  `);
+});
+
+test("Drag node with children into empty pane shows children", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp(alice());
+
+  await type("Root{Enter}Spain{Enter}{Tab}Barcelona{Enter}Madrid{Escape}");
+
+  await expectTree(`
+Root
+  Spain
+    Barcelona
+    Madrid
+  `);
+
+  await userEvent.click(screen.getByLabelText("Open new pane"));
+
+  const emptyTreeItems = await screen.findAllByRole("treeitem", { name: "" });
+  const dropTarget = emptyTreeItems[emptyTreeItems.length - 1];
+
+  fireEvent.dragStart(screen.getByText("Spain"));
+  fireEvent.drop(dropTarget);
+
+  await expectTree(`
+Root
+  Spain
+    Barcelona
+    Madrid
+Spain
+  Barcelona
+  Madrid
   `);
 });

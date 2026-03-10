@@ -18,10 +18,11 @@ import {
   itemPassesFilters,
   getRelationContext,
   getRelationSemanticID,
+  getRefLinkTargetInfo,
+  getRefTargetInfo,
 } from "./connections";
 import { buildReferenceItem } from "./buildReferenceRow";
 import { createRootAnchor } from "./rootAnchor";
-import { getTextForSemanticID } from "./semanticProjection";
 import { resolveSemanticRelationInCurrentTree } from "./semanticNavigation";
 import { useData } from "./DataContext";
 import { Plan, planUpsertRelations, getPane } from "./planner";
@@ -318,6 +319,63 @@ export function getRelationForView(
     isRoot(viewPath),
     parentRoot
   );
+}
+
+export function buildPaneTarget(
+  data: Data,
+  viewPath: ViewPath,
+  paneStack: ID[]
+): {
+  stack: ID[];
+  author: PublicKey;
+  rootRelation?: LongID;
+  scrollToId?: string;
+} {
+  const [itemID] = getItemIDFromView(data, viewPath);
+  const effectiveAuthor = getEffectiveAuthor(data, viewPath);
+  const virtualType = getCurrentEdgeForView(data, viewPath)?.virtualType;
+  const currentReference = getCurrentReferenceForView(
+    data,
+    viewPath,
+    paneStack,
+    virtualType
+  );
+  const refInfo = (() => {
+    if (!currentReference) {
+      return getRefTargetInfo(itemID, data.knowledgeDBs, effectiveAuthor);
+    }
+    return virtualType === "version"
+      ? getRefTargetInfo(
+          currentReference.id,
+          data.knowledgeDBs,
+          effectiveAuthor
+        )
+      : getRefLinkTargetInfo(
+          currentReference.id,
+          data.knowledgeDBs,
+          effectiveAuthor
+        );
+  })();
+  if (refInfo) {
+    return {
+      stack: refInfo.stack,
+      author: refInfo.author,
+      rootRelation: refInfo.rootRelation,
+      scrollToId: refInfo.scrollToId,
+    };
+  }
+
+  const paneStackWithoutRoot = paneStack.slice(0, -1);
+  const fullStack = [
+    ...paneStackWithoutRoot,
+    ...getItemIDsForViewPath(data, viewPath),
+  ];
+  const relation = getRelationForView(data, viewPath, paneStack);
+  return {
+    stack: fullStack,
+    author: effectiveAuthor,
+    rootRelation: relation?.id,
+  };
 }
 
 export function useSearchDepth(): number | undefined {
@@ -647,11 +705,7 @@ export function getDisplayTextForView(
     return `Search: ${query}`;
   }
   const ownRelation = getRelationForView(data, viewPath, stack);
-  return (
-    ownRelation?.text ??
-    getTextForSemanticID(data.knowledgeDBs, itemID, data.user.publicKey) ??
-    ""
-  );
+  return ownRelation?.text ?? "";
 }
 
 export function useDisplayText(): string {

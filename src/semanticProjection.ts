@@ -707,13 +707,11 @@ function getComparableSuggestionKey(
 export type SuggestionsResult = {
   suggestions: List<LongID | ID>;
   coveredCandidateIDs: ImmutableSet<string>;
-  crefSuggestionIDs: ImmutableSet<string>;
 };
 
 const EMPTY_SUGGESTIONS_RESULT: SuggestionsResult = {
   suggestions: List<LongID | ID>(),
   coveredCandidateIDs: ImmutableSet<string>(),
-  crefSuggestionIDs: ImmutableSet<string>(),
 };
 
 export function getSuggestionsForNode(
@@ -800,8 +798,8 @@ export function getSuggestionsForNode(
     )
     .sortBy((r) => -r.updated);
 
-  const candidateSemanticIDs = otherRelations.reduce(
-    (acc: OrderedMap<string, ID>, relations: Relations) => {
+  const candidateItemIDs = otherRelations.reduce(
+    (acc: OrderedMap<string, LongID | ID>, relations: Relations) => {
       return relations.items.reduce((itemAcc, item: RelationItem) => {
         if (
           !itemFilters.some((t) => itemMatchesType(item, t)) ||
@@ -826,94 +824,28 @@ export function getSuggestionsForNode(
         ) {
           return itemAcc;
         }
-        return itemAcc.set(candidateKey, shortID(candidateSemanticID) as ID);
+        return itemAcc.set(candidateKey, item.id);
       }, acc);
     },
-    OrderedMap<string, ID>()
+    OrderedMap<string, LongID | ID>()
   );
 
-  if (candidateSemanticIDs.size === 0) {
+  if (candidateItemIDs.size === 0) {
     return EMPTY_SUGGESTIONS_RESULT;
   }
 
-  const cappedCandidates = candidateSemanticIDs
+  const cappedCandidates = candidateItemIDs
     .entrySeq()
     .take(suggestionSettings.maxSuggestions)
     .toList();
 
-  const itemContext = parentContext
-    ? parentContext.push(localID as ID)
-    : List<ID>([localID as ID]);
-
-  const reduced = cappedCandidates.reduce(
-    (acc, [, candidateID]) => {
-      if (isConcreteRefId(candidateID as LongID)) {
-        return {
-          ...acc,
-          suggestions: acc.suggestions.push(candidateID as LongID),
-          crefSuggestionIDs: acc.crefSuggestionIDs.add(candidateID),
-        };
-      }
-      const refs = findRefsToNode(
-        knowledgeDBs,
-        candidateID,
-        itemContext,
-        currentRelation?.author || myself,
-        currentRelation?.root
-      );
-      const headRefs = refs.filter(
-        (ref) => splitID(ref.relationID)[0] !== myself
-      );
-      if (headRefs.size > 0) {
-        const first = headRefs.sortBy((r) => -r.updated).first()!;
-        return {
-          ...acc,
-          suggestions: acc.suggestions.push(
-            createConcreteRefId(first.relationID)
-          ),
-        };
-      }
-      // eslint-disable-next-line @typescript-eslint/no-use-before-define
-      const expandableRelation = getAlternativeRelations(
-        knowledgeDBs,
-        candidateID,
-        itemContext,
-        undefined,
-        currentRelation?.author || myself,
-        currentRelation?.root
-      )
-        .filter(
-          (relation) => relation.author !== myself && relation.items.size > 0
-        )
-        .sortBy((relation) => -relation.updated)
-        .first();
-      if (expandableRelation) {
-        return {
-          ...acc,
-          suggestions: acc.suggestions.push(
-            createConcreteRefId(expandableRelation.id)
-          ),
-        };
-      }
-      return {
-        suggestions: acc.suggestions.push(candidateID as LongID | ID),
-        crefSuggestionIDs: isConcreteRefId(candidateID as LongID)
-          ? acc.crefSuggestionIDs.add(candidateID)
-          : acc.crefSuggestionIDs,
-      };
-    },
-    {
-      suggestions: List<LongID | ID>(),
-      crefSuggestionIDs: ImmutableSet<string>(),
-    }
-  );
-
   return {
-    suggestions: reduced.suggestions,
+    suggestions: cappedCandidates
+      .map(([, candidateID]) => candidateID as LongID | ID)
+      .toList(),
     coveredCandidateIDs: cappedCandidates
       .map(([candidateKey]) => candidateKey)
       .toSet() as ImmutableSet<string>,
-    crefSuggestionIDs: reduced.crefSuggestionIDs,
   };
 }
 

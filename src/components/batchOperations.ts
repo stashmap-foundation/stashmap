@@ -4,7 +4,6 @@ import {
   updateItemArgument,
   isEmptySemanticID,
 } from "../connections";
-import { getTextForSemanticID } from "../semanticProjection";
 import {
   ViewPath,
   VirtualItemsMap,
@@ -72,10 +71,8 @@ function getEditorTextForPath(
   return editorInfo.text;
 }
 
-function getNodeText(plan: Plan, itemID: ID | LongID): string {
-  return (
-    getTextForSemanticID(plan.knowledgeDBs, itemID, plan.user.publicKey) ?? ""
-  );
+function getNodeText(plan: Plan, viewPath: ViewPath, stack: ID[]): string {
+  return getRelationForView(plan, viewPath, stack)?.text ?? "";
 }
 
 function planUpdateOneRelevance(
@@ -145,7 +142,7 @@ function planUpdateOneRelevance(
   }
 
   const basePlan =
-    editorText.trim() && editorText !== getNodeText(acc, itemID)
+    editorText.trim() && editorText !== getNodeText(acc, viewPath, stack)
       ? planSaveNodeAndEnsureRelations(acc, editorText, viewPath, stack).plan
       : acc;
 
@@ -214,7 +211,7 @@ function planUpdateOneArgument(
   }
 
   const basePlan =
-    editorText.trim() && editorText !== getNodeText(acc, itemID)
+    editorText.trim() && editorText !== getNodeText(acc, viewPath, stack)
       ? planSaveNodeAndEnsureRelations(acc, editorText, viewPath, stack).plan
       : acc;
 
@@ -386,8 +383,7 @@ export function planBatchIndent(
       if (!editorText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
-      const [itemID] = getItemIDFromView(state.plan, viewPath);
-      const nodeText = getNodeText(state.plan, itemID);
+      const nodeText = getNodeText(state.plan, viewPath, stack);
       if (editorText === nodeText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
@@ -460,8 +456,7 @@ export function planBatchOutdent(
       if (!editorText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
-      const [itemID] = getItemIDFromView(state.plan, viewPath);
-      const nodeText = getNodeText(state.plan, itemID);
+      const nodeText = getNodeText(state.plan, viewPath, stack);
       if (editorText === nodeText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }

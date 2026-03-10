@@ -699,6 +699,7 @@ export function Node({
   const stack = usePaneStack();
   const isConcreteRef = isConcreteRefId(itemID);
   const virtualType = useCurrentEdge()?.virtualType;
+  const currentRelation = useCurrentRelation();
   const isViewingOtherUser = useIsViewingOtherUserContent();
   const node = getCurrentReferenceForView(data, viewPath, stack, virtualType);
   const isOtherUser =
@@ -706,7 +707,8 @@ export function Node({
 
   const isVersion =
     virtualType === "version" || (!virtualType && !!node?.versionMeta);
-  const isSuggestionWithChildren = isSuggestion && isConcreteRef;
+  const isSuggestionWithChildren =
+    isSuggestion && (isConcreteRef || !!currentRelation);
   const showExpandCollapse =
     (!isSuggestion && !isVersion && !isConcreteRef) || isSuggestionWithChildren;
   const hasChildren = useNodeHasChildren();

@@ -131,7 +131,6 @@ function getChildrenForRegularNode(
   const visibleIncomingCrefs = activeFilters.includes("incoming")
     ? incomingCrefs
     : List<LongID>();
-
   const occurrences = activeFilters.includes("occurrence")
     ? getOccurrencesForNode(
         data.knowledgeDBs,
@@ -155,11 +154,7 @@ function getChildrenForRegularNode(
 
   const isOwnContent = effectiveAuthor === data.user.publicKey;
 
-  const {
-    suggestions: diffItems,
-    coveredCandidateIDs,
-    crefSuggestionIDs,
-  } = isOwnContent
+  const { suggestions: diffItems, coveredCandidateIDs } = isOwnContent
     ? getSuggestionsForNode(
         data.knowledgeDBs,
         data.user.publicKey,
@@ -171,14 +166,12 @@ function getChildrenForRegularNode(
     : {
         suggestions: List<LongID | ID>(),
         coveredCandidateIDs: ImmutableSet<string>(),
-        crefSuggestionIDs: ImmutableSet<string>(),
       };
 
   const addVirtualItems = (
     acc: { paths: List<ViewPath>; virtualItems: VirtualItemsMap },
     items: List<LongID | ID>,
-    virtualType: VirtualType,
-    crefIDs?: ImmutableSet<string>
+    virtualType: VirtualType
   ): { paths: List<ViewPath>; virtualItems: VirtualItemsMap } =>
     items.reduce((result, itemID) => {
       const pathWithRelations = addRelationsToLastElement(
@@ -186,7 +179,7 @@ function getChildrenForRegularNode(
         relationId
       );
       const path = [...pathWithRelations, itemID] as ViewPath;
-      const isCref = crefIDs?.has(itemID as string);
+      const isCref = isConcreteRefId(itemID as LongID);
       return {
         paths: result.paths.push(path),
         virtualItems: result.virtualItems.set(viewPathToString(path), {
@@ -219,8 +212,7 @@ function getChildrenForRegularNode(
   const withSuggestions = addVirtualItems(
     withIncoming,
     diffItems,
-    "suggestion",
-    crefSuggestionIDs
+    "suggestion"
   );
   const withOccurrences = addVirtualItems(
     withSuggestions,

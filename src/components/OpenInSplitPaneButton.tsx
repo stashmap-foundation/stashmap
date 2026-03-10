@@ -1,14 +1,9 @@
 import React from "react";
 import { useMediaQuery } from "react-responsive";
 import {
-  useCurrentItemID,
   useViewPath,
   updateViewPathsAfterPaneInsert,
-  getEffectiveAuthor,
-  useCurrentRelation,
-  getItemIDsForViewPath,
-  getCurrentReferenceForView,
-  useCurrentEdge,
+  buildPaneTarget,
 } from "../ViewContext";
 import {
   useSplitPanes,
@@ -16,7 +11,6 @@ import {
   usePaneStack,
 } from "../SplitPanesContext";
 import { IS_MOBILE } from "./responsive";
-import { getRefLinkTargetInfo, getRefTargetInfo } from "../connections";
 import { planUpdateViews, usePlanner } from "../planner";
 import { useData } from "../DataContext";
 
@@ -26,18 +20,8 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
   const stack = usePaneStack();
   const viewPath = useViewPath();
   const data = useData();
-  const [itemID] = useCurrentItemID();
   const isMobile = useMediaQuery(IS_MOBILE);
   const { createPlan, executePlan } = usePlanner();
-  const { knowledgeDBs } = data;
-  const relation = useCurrentRelation();
-  const virtualType = useCurrentEdge()?.virtualType;
-  const currentReference = getCurrentReferenceForView(
-    data,
-    viewPath,
-    stack,
-    virtualType
-  );
 
   if (isMobile) {
     return null;
@@ -52,39 +36,13 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
     );
     executePlan(planUpdateViews(plan, shiftedViews));
 
-    const paneStackWithoutRoot = stack.slice(0, -1);
-
-    const effectiveAuthor = getEffectiveAuthor(data, viewPath);
-    const refInfo = (() => {
-      if (!currentReference) {
-        return getRefTargetInfo(itemID, knowledgeDBs, effectiveAuthor);
-      }
-      return virtualType === "version"
-        ? getRefTargetInfo(currentReference.id, knowledgeDBs, effectiveAuthor)
-        : getRefLinkTargetInfo(
-            currentReference.id,
-            knowledgeDBs,
-            effectiveAuthor
-          );
-    })();
-    if (refInfo) {
-      addPaneAt(
-        insertIndex,
-        refInfo.stack,
-        refInfo.author,
-        refInfo.rootRelation,
-        refInfo.scrollToId
-      );
-      return;
-    }
-
-    const viewPathNodeIDs = getItemIDsForViewPath(data, viewPath);
-    const fullStack = [...paneStackWithoutRoot, ...viewPathNodeIDs];
+    const target = buildPaneTarget(data, viewPath, stack);
     addPaneAt(
       insertIndex,
-      fullStack,
-      getEffectiveAuthor(data, viewPath),
-      relation?.id
+      target.stack,
+      target.author,
+      target.rootRelation,
+      target.scrollToId
     );
   };
 

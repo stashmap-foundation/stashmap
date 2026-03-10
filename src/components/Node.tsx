@@ -59,7 +59,7 @@ import {
   useCurrentPane,
   useNavigatePane,
 } from "../SplitPanesContext";
-import { buildNodeUrl, buildRelationUrl } from "../navigationUrl";
+import { buildRelationUrl } from "../navigationUrl";
 import { RightMenu } from "./RightMenu";
 import { useItemStyle } from "./useItemStyle";
 import { EditorTextProvider } from "./EditorTextContext";
@@ -547,8 +547,8 @@ function NodeAutoLink({
 }: {
   children: React.ReactNode;
 }): JSX.Element | null {
-  const { knowledgeDBs, user } = useData();
   const data = useData();
+  const { knowledgeDBs } = data;
   const viewPath = useViewPath();
   const stack = usePaneStack();
   const displayText = useDisplayText();
@@ -565,12 +565,7 @@ function NodeAutoLink({
     if (refInfo) {
       const href = refInfo.rootRelation
         ? buildRelationUrl(refInfo.rootRelation, refInfo.scrollToId)
-        : buildNodeUrl(
-            refInfo.stack,
-            knowledgeDBs,
-            user.publicKey,
-            refInfo.author
-          ) || "#";
+        : "#";
       return (
         <a
           href={href}

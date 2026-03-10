@@ -49,8 +49,20 @@ function paneToUrl(
   myself: PublicKey
 ): string | undefined {
   if (activePane.rootRelation) {
-    return buildRelationUrl(activePane.rootRelation);
+    return buildRelationUrl(activePane.rootRelation, activePane.scrollToId);
   }
+
+  if (activePane.stack.length > 0) {
+    const resolved = resolveSemanticStackToActualIDs(
+      knowledgeDBs,
+      activePane.author,
+      activePane.stack as ID[]
+    );
+    if (resolved?.relation) {
+      return buildRelationUrl(resolved.relation.id, activePane.scrollToId);
+    }
+  }
+
   return buildNodeUrl(
     activePane.stack,
     knowledgeDBs,

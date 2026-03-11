@@ -303,7 +303,7 @@ export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
   return addCrefToLog(basePlan, relations.id);
 }
 
-type AddToParentTarget = LongID | ID | TextSeed;
+export type AddToParentTarget = LongID | ID | TextSeed;
 
 export function planUpdateRelationText(
   plan: Plan,
@@ -531,11 +531,10 @@ export function planExpandNode(
   );
 }
 
-export function planAddToParent(
+export function planAddTargetsToRelation(
   plan: Plan,
+  parentRelation: Relations,
   targets: AddToParentTarget | AddToParentTarget[],
-  parentViewPath: ViewPath,
-  stack: ID[],
   insertAtIndex?: number,
   relevance?: Relevance,
   argument?: Argument
@@ -545,36 +544,7 @@ export function planAddToParent(
     return [plan, []];
   }
 
-  const ensureParentRelation = (): [Plan, Relations] => {
-    const [, parentView] = getRowIDFromView(plan, parentViewPath);
-    const planWithExpand = planExpandNode(plan, parentView, parentViewPath);
-    const existingRelation = getRelationForView(
-      planWithExpand,
-      parentViewPath,
-      stack
-    );
-    if (existingRelation) {
-      return [planWithExpand, existingRelation];
-    }
-    const planWithParentRelation = upsertRelations(
-      planWithExpand,
-      parentViewPath,
-      stack,
-      (relations) => relations
-    );
-    const parentRelation = getRelationForView(
-      planWithParentRelation,
-      parentViewPath,
-      stack
-    );
-    if (!parentRelation) {
-      throw new Error("Failed to create parent relation");
-    }
-    return [planWithParentRelation, parentRelation];
-  };
-
-  const [planWithParent, parentRelation] = ensureParentRelation();
-  const parentContext = getContext(planWithParent, parentViewPath, stack);
+  const parentContext = getRelationContext(plan.knowledgeDBs, parentRelation);
   const childContext = parentContext.push(
     getRelationSemanticID(parentRelation)
   );
@@ -634,32 +604,76 @@ export function planAddToParent(
       ];
     },
     [
-      planWithParent,
+      plan,
       [] as Array<{ relationItemID: LongID | ID; actualItemID: LongID | ID }>,
     ]
   );
 
-  const updatedRelationsPlan = upsertRelations(
-    planWithChildren,
-    parentViewPath,
-    stack,
-    (relations) =>
+  return [
+    planUpsertRelations(
+      planWithChildren,
       bulkAddRelations(
-        relations,
+        parentRelation,
         relationItemPayload.map((item) => item.relationItemID),
         relevance,
         argument,
         insertAtIndex
       )
-  );
+    ),
+    relationItemPayload.map((item) => item.actualItemID),
+  ];
+}
 
+export function planAddToParent(
+  plan: Plan,
+  targets: AddToParentTarget | AddToParentTarget[],
+  parentViewPath: ViewPath,
+  stack: ID[],
+  insertAtIndex?: number,
+  relevance?: Relevance,
+  argument?: Argument
+): [Plan, (LongID | ID)[]] {
+  const ensureParentRelation = (): [Plan, Relations] => {
+    const [, parentView] = getRowIDFromView(plan, parentViewPath);
+    const planWithExpand = planExpandNode(plan, parentView, parentViewPath);
+    const existingRelation = getRelationForView(
+      planWithExpand,
+      parentViewPath,
+      stack
+    );
+    if (existingRelation) {
+      return [planWithExpand, existingRelation];
+    }
+    const planWithParentRelation = upsertRelations(
+      planWithExpand,
+      parentViewPath,
+      stack,
+      (relations) => relations
+    );
+    const parentRelation = getRelationForView(
+      planWithParentRelation,
+      parentViewPath,
+      stack
+    );
+    if (!parentRelation) {
+      throw new Error("Failed to create parent relation");
+    }
+    return [planWithParentRelation, parentRelation];
+  };
+
+  const [planWithParent, parentRelation] = ensureParentRelation();
+  const [updatedRelationsPlan, actualItemIDs] = planAddTargetsToRelation(
+    planWithParent,
+    parentRelation,
+    targets,
+    insertAtIndex,
+    relevance,
+    argument
+  );
   const updatedViews =
     bulkUpdateViewPathsAfterAddRelation(updatedRelationsPlan);
 
-  return [
-    planUpdateViews(updatedRelationsPlan, updatedViews),
-    relationItemPayload.map((item) => item.actualItemID),
-  ];
+  return [planUpdateViews(updatedRelationsPlan, updatedViews), actualItemIDs];
 }
 
 type RelationsIdMapping = Map<LongID, LongID>;

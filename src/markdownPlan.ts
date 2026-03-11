@@ -1,12 +1,20 @@
 import { List } from "immutable";
-import { createSemanticID, hashText, shortID } from "./connections";
+import {
+  createSemanticID,
+  getRelationContext,
+  getRelationSemanticID,
+  getRelationsNoReferencedBy,
+  hashText,
+  shortID,
+} from "./connections";
 import { MarkdownImportFile, parseMarkdownImportFiles } from "./markdownImport";
 import { createNodesFromMarkdownTrees, WalkContext } from "./markdownRelations";
 import { MarkdownTreeNode } from "./markdownTree";
 import {
+  AddToParentTarget,
   Plan,
-  planAddToParent,
-  planMoveTreeDescendantsToContext,
+  planAddTargetsToRelation,
+  planMoveDescendantRelations,
   planUpsertRelations,
 } from "./planner";
 import { newRelations } from "./relationFactory";
@@ -103,11 +111,42 @@ function removeTransientRootAffects(plan: Plan, relationIds: LongID[]): Plan {
   };
 }
 
-export function planInsertMarkdownTrees(
+function moveCreatedTreesToParentContext(
+  plan: Plan,
+  originalTopNodeIDs: ID[],
+  sourceRelationIDs: LongID[],
+  actualNodeIDs: (LongID | ID)[],
+  targetSemanticContext: Context,
+  parentRelation: Relations
+): Plan {
+  return originalTopNodeIDs.reduce((accPlan, originalID, index) => {
+    const actualID = actualNodeIDs[index];
+    const sourceRelationID = sourceRelationIDs[index];
+    const sourceRelation = sourceRelationID
+      ? getRelationsNoReferencedBy(
+          accPlan.knowledgeDBs,
+          sourceRelationID,
+          accPlan.user.publicKey
+        )
+      : undefined;
+    if (!sourceRelation) {
+      return accPlan;
+    }
+    return planMoveDescendantRelations(
+      accPlan,
+      sourceRelation,
+      targetSemanticContext,
+      parentRelation.id,
+      actualID !== originalID ? actualID : undefined,
+      parentRelation.root
+    );
+  }, plan);
+}
+
+export function planInsertMarkdownTreesByParentId(
   plan: Plan,
   trees: MarkdownTreeNode[],
-  parentViewPath: ViewPath,
-  stack: ID[],
+  parentRelationId: LongID,
   insertAtIndex?: number,
   relevance?: Relevance,
   argument?: Argument
@@ -126,27 +165,41 @@ export function planInsertMarkdownTrees(
     };
   }
 
-  const parentRelation = getRelationForView(plan, parentViewPath, stack);
-  const parentRoot = parentRelation?.root;
+  const parentRelation = getRelationsNoReferencedBy(
+    plan.knowledgeDBs,
+    parentRelationId,
+    plan.user.publicKey
+  );
+  if (!parentRelation) {
+    return {
+      plan,
+      topItemIDs: [],
+      topRelationIDs: [],
+      actualItemIDs: [],
+    };
+  }
+
   const [planWithNodes, topItemIDs, topRelationIDs] =
     planCreateNodesFromMarkdownTrees(plan, trees);
-  const [planWithAdded, actualItemIDs] = planAddToParent(
+  const [planWithAdded, actualItemIDs] = planAddTargetsToRelation(
     planWithNodes,
-    topRelationIDs,
-    parentViewPath,
-    stack,
+    parentRelation,
+    topRelationIDs as AddToParentTarget[],
     insertAtIndex,
     relevance,
     argument
   );
-  const movedPlan = planMoveTreeDescendantsToContext(
+  const targetSemanticContext = getRelationContext(
+    planWithAdded.knowledgeDBs,
+    parentRelation
+  ).push(getRelationSemanticID(parentRelation));
+  const movedPlan = moveCreatedTreesToParentContext(
     planWithAdded,
     topItemIDs,
     topRelationIDs,
     actualItemIDs,
-    parentViewPath,
-    stack,
-    parentRoot
+    targetSemanticContext,
+    parentRelation
   );
 
   return {
@@ -155,4 +208,36 @@ export function planInsertMarkdownTrees(
     topRelationIDs,
     actualItemIDs,
   };
+}
+
+export function planInsertMarkdownTrees(
+  plan: Plan,
+  trees: MarkdownTreeNode[],
+  parentViewPath: ViewPath,
+  stack: ID[],
+  insertAtIndex?: number,
+  relevance?: Relevance,
+  argument?: Argument
+): {
+  plan: Plan;
+  topItemIDs: ID[];
+  topRelationIDs: LongID[];
+  actualItemIDs: Array<LongID | ID>;
+} {
+  const parentRelation = getRelationForView(plan, parentViewPath, stack);
+  return parentRelation
+    ? planInsertMarkdownTreesByParentId(
+        plan,
+        trees,
+        parentRelation.id,
+        insertAtIndex,
+        relevance,
+        argument
+      )
+    : {
+        plan,
+        topItemIDs: [],
+        topRelationIDs: [],
+        actualItemIDs: [],
+      };
 }

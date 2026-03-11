@@ -1,18 +1,19 @@
 import { UnsignedEvent } from "nostr-tools";
-import { createConcreteRefId, joinID } from "../connections";
+import { getRelationsNoReferencedBy, joinID } from "../connections";
+import {
+  planInsertMarkdownUnderRelationById,
+  planLinkRelationById,
+  planMoveRelationItemById,
+  planRemoveRelationItemById,
+  planSetRelationTextById,
+  planUpdateRelationItemMetadataById,
+} from "../dataPlanner";
 import {
   buildKnowledgeDocumentEvents,
   createHeadlessPlan,
 } from "./headlessPlan";
-import { planInsertMarkdownTrees } from "../markdownPlan";
-import {
-  planDisconnectFromParent,
-  planMoveNodeWithView,
-} from "../treeMutations";
-import { planUpdateExistingItemMetadata } from "../relationItemMutations";
-import { Plan, planAddToParent, planUpdateRelationText } from "../planner";
+import { Plan } from "../planner";
 import { requireSingleRootMarkdownTree } from "../standaloneDocumentEvent";
-import { getRelationForView, getRelationIndex, ViewPath } from "../ViewContext";
 import { WorkspaceGraph } from "./workspaceGraph";
 
 type PositionOptions = {
@@ -20,22 +21,11 @@ type PositionOptions = {
   afterItemId?: LongID | ID;
 };
 
-const CLI_PANE_INDEX = 0;
-const CLI_STACK: ID[] = [];
-
-function relationViewPath(relationId: LongID): ViewPath {
-  return [CLI_PANE_INDEX, relationId];
-}
-
-function itemViewPath(parentRelationId: LongID, itemId: LongID | ID): ViewPath {
-  return [CLI_PANE_INDEX, parentRelationId, itemId];
-}
-
 function requireRelation(plan: Plan, relationId: LongID): Relations {
-  const relation = getRelationForView(
-    plan,
-    relationViewPath(relationId),
-    CLI_STACK
+  const relation = getRelationsNoReferencedBy(
+    plan.knowledgeDBs,
+    relationId,
+    plan.user.publicKey
   );
   if (!relation) {
     throw new Error(`Relation not found: ${relationId}`);
@@ -56,11 +46,11 @@ function requireItemIndex(
   parentRelationId: LongID,
   itemId: LongID | ID
 ): number {
-  const relationIndex = getRelationIndex(
+  const relationIndex = requireOwnedRelation(
     plan,
-    itemViewPath(parentRelationId, itemId)
-  );
-  if (relationIndex === undefined) {
+    parentRelationId
+  ).items.findIndex((item) => item.id === itemId);
+  if (relationIndex < 0) {
     throw new Error(`Item not found: ${itemId}`);
   }
   return relationIndex;
@@ -128,12 +118,7 @@ export function applyWorkspaceSetText(
 ): { plan: Plan; relationId: LongID } {
   requireOwnedRelation(plan, relationId);
   return {
-    plan: planUpdateRelationText(
-      plan,
-      relationViewPath(relationId),
-      CLI_STACK,
-      text
-    ),
+    plan: planSetRelationTextById(plan, relationId, text),
     relationId,
   };
 }
@@ -148,16 +133,15 @@ export function applyWorkspaceCreateUnder(
 ): { plan: Plan; relationId: LongID } {
   requireOwnedRelation(plan, parentRelationId);
   const rootTree = requireSingleRootMarkdownTree(markdownText);
-  const inserted = planInsertMarkdownTrees(
+  const inserted = planInsertMarkdownUnderRelationById(
     plan,
+    parentRelationId,
     [rootTree],
-    relationViewPath(parentRelationId),
-    CLI_STACK,
     resolveInsertAtIndex(plan, parentRelationId, position),
     normalizeRelevance(relevance),
     normalizeArgument(argument)
   );
-  const relationId = inserted.topRelationIDs[0];
+  const { relationId } = inserted;
   if (!relationId) {
     throw new Error(
       "stdin markdown must resolve to exactly one top-level root"
@@ -176,23 +160,20 @@ export function applyWorkspaceLink(
   position: PositionOptions,
   relevance: "contains" | Relevance = "contains",
   argument: "none" | Argument = "none"
-): { plan: Plan; itemId: LongID } {
+): { plan: Plan; itemId: LongID | ID } {
   requireOwnedRelation(plan, parentRelationId);
   requireRelation(plan, targetRelationId);
-  const itemId = createConcreteRefId(targetRelationId);
-  const insertAtIndex = resolveInsertAtIndex(plan, parentRelationId, position);
-  const [updatedPlan] = planAddToParent(
+  const linked = planLinkRelationById(
     plan,
-    itemId,
-    relationViewPath(parentRelationId),
-    CLI_STACK,
-    insertAtIndex,
+    parentRelationId,
+    targetRelationId,
+    resolveInsertAtIndex(plan, parentRelationId, position),
     normalizeRelevance(relevance),
     normalizeArgument(argument)
   );
   return {
-    plan: updatedPlan,
-    itemId,
+    plan: linked.plan,
+    itemId: linked.itemId,
   };
 }
 
@@ -203,17 +184,11 @@ export function applyWorkspaceSetRelevance(
   relevance: "contains" | Relevance
 ): { plan: Plan } {
   requireOwnedRelation(plan, parentRelationId);
-  const relationIndex = requireItemIndex(plan, parentRelationId, itemId);
+  requireItemIndex(plan, parentRelationId, itemId);
   return {
-    plan: planUpdateExistingItemMetadata(
-      plan,
-      relationViewPath(parentRelationId),
-      CLI_STACK,
-      relationIndex,
-      {
-        relevance: normalizeRelevance(relevance),
-      }
-    ),
+    plan: planUpdateRelationItemMetadataById(plan, parentRelationId, itemId, {
+      relevance: normalizeRelevance(relevance),
+    }),
   };
 }
 
@@ -224,17 +199,11 @@ export function applyWorkspaceSetArgument(
   argument: "none" | Argument
 ): { plan: Plan } {
   requireOwnedRelation(plan, parentRelationId);
-  const relationIndex = requireItemIndex(plan, parentRelationId, itemId);
+  requireItemIndex(plan, parentRelationId, itemId);
   return {
-    plan: planUpdateExistingItemMetadata(
-      plan,
-      relationViewPath(parentRelationId),
-      CLI_STACK,
-      relationIndex,
-      {
-        argument: normalizeArgument(argument),
-      }
-    ),
+    plan: planUpdateRelationItemMetadataById(plan, parentRelationId, itemId, {
+      argument: normalizeArgument(argument),
+    }),
   };
 }
 
@@ -246,11 +215,7 @@ export function applyWorkspaceRemoveItem(
   requireOwnedRelation(plan, parentRelationId);
   requireItemIndex(plan, parentRelationId, itemId);
   return {
-    plan: planDisconnectFromParent(
-      plan,
-      itemViewPath(parentRelationId, itemId),
-      CLI_STACK
-    ),
+    plan: planRemoveRelationItemById(plan, parentRelationId, itemId),
   };
 }
 
@@ -270,11 +235,11 @@ export function applyWorkspaceMoveItem(
     position
   );
   return {
-    plan: planMoveNodeWithView(
+    plan: planMoveRelationItemById(
       plan,
-      itemViewPath(sourceParentRelationId, itemId),
-      relationViewPath(targetParentRelationId),
-      CLI_STACK,
+      sourceParentRelationId,
+      itemId,
+      targetParentRelationId,
       insertAtIndex
     ),
   };

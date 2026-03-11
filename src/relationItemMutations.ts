@@ -26,7 +26,7 @@ export type RelationItemMetadata = {
   argument?: Argument;
 };
 
-function applyMetadataPatch(
+export function updateRelationItemMetadata(
   relations: Relations,
   relationIndex: number,
   metadata: RelationItemMetadata
@@ -52,7 +52,7 @@ export function planUpdateExistingItemMetadata(
   metadata: RelationItemMetadata
 ): Plan {
   return upsertRelations(plan, parentViewPath, stack, (relations) =>
-    applyMetadataPatch(relations, relationIndex, metadata)
+    updateRelationItemMetadata(relations, relationIndex, metadata)
   );
 }
 

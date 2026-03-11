@@ -1,20 +1,17 @@
 import fs from "fs/promises";
 import path from "path";
-import { Event, getPublicKey, finalizeEvent } from "nostr-tools";
-import { hexToBytes } from "@noble/hashes/utils";
-import { convertInputToPrivateKey } from "../nostrKey";
-import { getWriteRelays, relaysFromUrls, uniqueRelayUrls } from "../relayUtils";
 import {
   buildImportedMarkdownDocumentEvent,
   buildSingleRootMarkdownDocumentEvent,
   buildStandaloneRootDocumentEvent,
 } from "../standaloneDocumentEvent";
-
-export type WriteProfile = {
-  pubkey: PublicKey;
-  relays: Relays;
-  nsecFile?: string;
-};
+import {
+  loadWriteSecretKey,
+  publishUnsignedEvents,
+  resolveWriteRelayUrls,
+  WriteProfile,
+  WritePublisher,
+} from "./writeSupport";
 
 export type WriteCreateRootOptions = {
   title?: string;
@@ -24,39 +21,7 @@ export type WriteCreateRootOptions = {
   includeMarkdown?: boolean;
 };
 
-export type WritePublisher = {
-  publishEvent: (
-    relayUrls: string[],
-    event: Event
-  ) => Promise<PublishResultsOfEvent>;
-};
-
-function resolveWriteRelayUrls(
-  profile: WriteProfile,
-  relayUrls: string[] | undefined
-): string[] {
-  const explicitRelays = relaysFromUrls(relayUrls || []);
-  if (explicitRelays.length > 0) {
-    return uniqueRelayUrls(explicitRelays);
-  }
-
-  const configuredRelayUrls = uniqueRelayUrls(getWriteRelays(profile.relays));
-  if (configuredRelayUrls.length === 0) {
-    throw new Error(
-      "No write relays configured. Provide --relay or write-enabled relays in .knowstr/profile.json"
-    );
-  }
-  return configuredRelayUrls;
-}
-
-async function loadPrivateKeyHex(nsecFile: string): Promise<string> {
-  const raw = await fs.readFile(nsecFile, "utf8");
-  const privateKey = convertInputToPrivateKey(raw);
-  if (!privateKey) {
-    throw new Error(`Invalid private key in ${nsecFile}`);
-  }
-  return privateKey;
-}
+export type { WriteProfile, WritePublisher } from "./writeSupport";
 
 export async function writeCreateRoot(
   publisher: WritePublisher,
@@ -77,17 +42,8 @@ export async function writeCreateRoot(
   if ([hasTitle, hasFilePath, hasMarkdownText].filter(Boolean).length !== 1) {
     throw new Error("Provide exactly one of --title, --file, or --stdin");
   }
-  if (!profile.nsecFile) {
-    throw new Error("profile.json must include nsec_file for write commands");
-  }
 
-  const privateKeyHex = await loadPrivateKeyHex(profile.nsecFile);
-  const secretKey = hexToBytes(privateKeyHex);
-  const derivedPubkey = getPublicKey(secretKey) as PublicKey;
-  if (derivedPubkey !== profile.pubkey) {
-    throw new Error("nsec_file does not match profile pubkey");
-  }
-
+  const secretKey = await loadWriteSecretKey(profile);
   const relayUrls = resolveWriteRelayUrls(profile, options.relayUrls);
   const draft = (() => {
     if (options.filePath) {
@@ -117,16 +73,20 @@ export async function writeCreateRoot(
     );
   })();
   const resolvedDraft = await draft;
-  const event = finalizeEvent(resolvedDraft.event, secretKey);
-  const publishResult = await publisher.publishEvent(relayUrls, event);
+  const published = await publishUnsignedEvents(
+    publisher,
+    secretKey,
+    relayUrls,
+    [resolvedDraft.event]
+  );
 
   return {
-    event_id: event.id,
+    event_id: published.event_ids[0],
     relation_id: resolvedDraft.relationID,
     root_uuid: resolvedDraft.rootUuid,
     semantic_id: resolvedDraft.semanticID,
-    relay_urls: relayUrls,
-    publish_results: publishResult.results.toObject(),
+    relay_urls: published.relay_urls,
+    publish_results: published.publish_results[published.event_ids[0]] || {},
     ...(options.includeMarkdown
       ? { markdown: resolvedDraft.event.content }
       : {}),

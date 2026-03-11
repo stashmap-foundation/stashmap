@@ -67,7 +67,6 @@ import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useRelaysToCreatePlan } from "./relays";
 import { mergePublishResultsOfEvents } from "./commons/PublishingStatus";
 import { createRootAnchor } from "./rootAnchor";
-import { decodePublicKeyInputSync } from "./nostrPublicKeys";
 import {
   MultiSelectionState,
   clearSelection,
@@ -75,6 +74,7 @@ import {
   shiftSelect,
   toggleSelect,
 } from "./selection";
+import { withUsersEntryPublicKey } from "./userEntry";
 
 function getAnchorSnapshotLabels(
   knowledgeDBs: KnowledgeDBs,
@@ -200,32 +200,6 @@ export function planEnsureSystemRoot(
   );
 
   return [upsertRelationsCore(plan, relation), relation];
-}
-
-function getUsersEntryPublicKey(
-  text: string,
-  relation?: Relations
-): PublicKey | undefined {
-  return (
-    decodePublicKeyInputSync(text) ||
-    relation?.userPublicKey ||
-    decodePublicKeyInputSync(relation?.text)
-  );
-}
-
-function withUsersEntryPublicKey(
-  relation: Relations,
-  text = relation.text
-): Relations {
-  const userPublicKey = getUsersEntryPublicKey(text, relation);
-  if (!userPublicKey) {
-    return relation;
-  }
-
-  return {
-    ...relation,
-    userPublicKey,
-  };
 }
 
 export function planUpsertMemberlist(plan: Plan, members: Members): Plan {

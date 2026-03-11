@@ -1,16 +1,13 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data */
 import React from "react";
 import { List, Map } from "immutable";
-import { v4 } from "uuid";
 import {
   getRelations,
   getRelationsNoReferencedBy,
-  joinID,
   shortID,
   isRefId,
   isSearchId,
   parseSearchId,
-  hashText,
   itemMatchesType,
   EMPTY_SEMANTIC_ID,
   isConcreteRefId,
@@ -21,13 +18,14 @@ import {
   getRefTargetInfo,
 } from "./connections";
 import { buildReferenceItem } from "./buildReferenceRow";
-import { createRootAnchor } from "./rootAnchor";
 import { resolveSemanticRelationInCurrentTree } from "./semanticNavigation";
-import { getSystemRoleText } from "./systemRoots";
 import { useData } from "./DataContext";
 import { Plan, planUpsertRelations, getPane } from "./planner";
 import { usePaneStack } from "./SplitPanesContext";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
+import { newRelationsForSemanticID } from "./relationFactory";
+
+export { newRelations, newRelationsForSemanticID } from "./relationFactory";
 
 type ViewPathSegment = LongID | ID;
 
@@ -799,71 +797,6 @@ export function copyViewsWithRelationsMapping(
     const newKey = targetKey + mappedSuffix;
     return acc.set(newKey, view);
   }, views);
-}
-
-export function newRelations(
-  semanticID: LongID | ID,
-  semanticContext: Context,
-  myself: PublicKey,
-  root?: ID,
-  parent?: LongID,
-  text?: string,
-  systemRole?: RootSystemRole
-): Relations {
-  const id = joinID(myself, v4());
-  const localSemanticID = shortID(semanticID) as ID;
-  let relationText = text ?? "";
-  if (text === undefined) {
-    if (systemRole) {
-      relationText = getSystemRoleText(systemRole);
-    } else if (localSemanticID === EMPTY_SEMANTIC_ID) {
-      relationText = "";
-    } else if (isSearchId(localSemanticID)) {
-      relationText = parseSearchId(localSemanticID) || "";
-    }
-  }
-  const shouldHashRelationText =
-    text !== undefined ||
-    systemRole !== undefined ||
-    localSemanticID === EMPTY_SEMANTIC_ID;
-  const relationTextHash = (() => {
-    if (isSearchId(localSemanticID)) {
-      return localSemanticID;
-    }
-    return shouldHashRelationText ? hashText(relationText) : localSemanticID;
-  })();
-  return {
-    items: List<RelationItem>(),
-    id,
-    text: relationText,
-    textHash: relationTextHash,
-    parent,
-    anchor: !parent ? createRootAnchor(semanticContext) : undefined,
-    systemRole: !parent ? systemRole : undefined,
-    updated: Date.now(),
-    author: myself,
-    root: root ?? shortID(id),
-  };
-}
-
-export function newRelationsForSemanticID(
-  semanticID: LongID | ID,
-  semanticContext: Context,
-  myself: PublicKey,
-  root?: ID,
-  parent?: LongID,
-  text?: string,
-  systemRole?: RootSystemRole
-): Relations {
-  return newRelations(
-    semanticID,
-    semanticContext,
-    myself,
-    root,
-    parent,
-    text,
-    systemRole
-  );
 }
 
 export function upsertRelations(

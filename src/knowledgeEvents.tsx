@@ -14,7 +14,7 @@ import {
 } from "./nostr";
 import { Serializable, jsonToPanes, jsonToViews } from "./serializer";
 import { splitID } from "./connections";
-import { parseDocumentEvent } from "./markdownDocument";
+import { parseDocumentEvent } from "./markdownRelations";
 
 export function findViews(events: List<UnsignedEvent>): Views {
   const viewEvent = getMostRecentReplacableEvent(

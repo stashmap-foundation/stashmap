@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/immutable-data, functional/no-let */
 import { List, Set, Map } from "immutable";
 import crypto from "crypto";
-import { newRelations } from "./ViewContext";
+import { newRelations } from "./relationFactory";
 import { SEARCH_PREFIX } from "./constants";
 import { getRootAnchorContext, rootAnchorsEqual } from "./rootAnchor";
 

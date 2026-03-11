@@ -1,7 +1,6 @@
-import { updateItemRelevance } from "../connections";
 import { usePlanner } from "../planner";
 import { usePaneStack } from "../SplitPanesContext";
-import { planDisconnectFromParent } from "../dnd";
+import { planDisconnectFromParent } from "../treeMutations";
 import { useRelationItemContext } from "./useRelationItemContext";
 
 // Relevance mapped to levels (for 3-dot UI):
@@ -80,10 +79,7 @@ export function useUpdateRelevance(): UseUpdateRelevanceResult {
   const currentLevel = relevanceToLevel(currentRelevance);
 
   const setRelevance = (relevance: Relevance): void => {
-    updateMetadata(
-      (rels, index) => updateItemRelevance(rels, index, relevance),
-      { relevance }
-    );
+    updateMetadata({ relevance });
   };
 
   const setLevel = (level: number): void => {

@@ -1,34 +1,23 @@
 import { OrderedSet } from "immutable";
 import {
-  updateItemRelevance,
-  updateItemArgument,
-  isEmptySemanticID,
-} from "../connections";
-import {
   ViewPath,
   VirtualItemsMap,
   addNodeToPathWithRelations,
-  getParentView,
-  getParentRelation,
-  getRelationIndex,
-  upsertRelations,
-  getRelationForView,
-  viewPathToString,
   getParentKey,
-  parseViewPath,
+  getParentRelation,
+  getParentView,
   getPreviousSibling,
-  getRowIDFromView,
+  getRelationForView,
+  getRelationIndex,
+  parseViewPath,
+  viewPathToString,
 } from "../ViewContext";
+import { Plan, planExpandNode, planUpdateRelationText } from "../planner";
 import {
-  Plan,
-  planExpandNode,
-  planUpdateRelationText,
-  planSaveNodeAndEnsureRelations,
-  planUpdateEmptyNodeMetadata,
-  planDeepCopyNode,
-  planAddToParent,
-} from "../planner";
-import { planMoveNodeWithView } from "../dnd";
+  planUpdateViewItemMetadata,
+  RelationItemMetadata,
+} from "../relationItemMutations";
+import { planMoveNodeWithView } from "../treeMutations";
 
 export type EditorInfo = {
   text: string;
@@ -75,148 +64,21 @@ function getNodeText(plan: Plan, viewPath: ViewPath, stack: ID[]): string {
   return getRelationForView(plan, viewPath, stack)?.text ?? "";
 }
 
-function planUpdateOneRelevance(
+function planUpdateOneMetadata(
   acc: Plan,
   viewPath: ViewPath,
   stack: ID[],
-  relevance: Relevance,
+  metadata: RelationItemMetadata,
   editorText: string,
   virtualItemsMap: VirtualItemsMap
 ): Plan {
-  const [itemID] = getRowIDFromView(acc, viewPath);
-  const parentView = getParentView(viewPath);
-  if (!parentView) return acc;
-
-  if (isEmptySemanticID(itemID)) {
-    const trimmed = editorText.trim();
-    if (trimmed) {
-      const { plan } = planSaveNodeAndEnsureRelations(
-        acc,
-        trimmed,
-        viewPath,
-        stack,
-        relevance
-      );
-      return plan;
-    }
-    const relations = getRelationForView(acc, parentView, stack);
-    if (!relations) return acc;
-    return planUpdateEmptyNodeMetadata(acc, relations.id, { relevance });
-  }
-
-  const relationIndex = getRelationIndex(acc, viewPath);
-  if (relationIndex === undefined) {
-    const virtualItem = virtualItemsMap.get(viewPathToString(viewPath));
-    if (virtualItem) {
-      if (virtualItem.virtualType === "suggestion") {
-        if (virtualItem.isCref) {
-          return planAddToParent(
-            acc,
-            itemID,
-            parentView,
-            stack,
-            undefined,
-            relevance
-          )[0];
-        }
-        const [plan] = planDeepCopyNode(
-          acc,
-          viewPath,
-          parentView,
-          stack,
-          undefined,
-          relevance
-        );
-        return plan;
-      }
-      return planAddToParent(
-        acc,
-        itemID,
-        parentView,
-        stack,
-        undefined,
-        relevance
-      )[0];
-    }
-    return acc;
-  }
-
-  const basePlan =
-    editorText.trim() && editorText !== getNodeText(acc, viewPath, stack)
-      ? planSaveNodeAndEnsureRelations(acc, editorText, viewPath, stack).plan
-      : acc;
-
-  return upsertRelations(basePlan, parentView, stack, (rels) =>
-    updateItemRelevance(rels, relationIndex, relevance)
-  );
-}
-
-function planUpdateOneArgument(
-  acc: Plan,
-  viewPath: ViewPath,
-  stack: ID[],
-  argument: Argument,
-  editorText: string,
-  virtualItemsMap: VirtualItemsMap
-): Plan {
-  const [itemID] = getRowIDFromView(acc, viewPath);
-  const parentView = getParentView(viewPath);
-  if (!parentView) return acc;
-
-  if (isEmptySemanticID(itemID)) {
-    const trimmed = editorText.trim();
-    if (trimmed) {
-      const { plan } = planSaveNodeAndEnsureRelations(
-        acc,
-        trimmed,
-        viewPath,
-        stack,
-        undefined,
-        argument
-      );
-      return plan;
-    }
-    const relations = getRelationForView(acc, parentView, stack);
-    if (!relations) return acc;
-    return planUpdateEmptyNodeMetadata(acc, relations.id, { argument });
-  }
-
-  const relationIndex = getRelationIndex(acc, viewPath);
-  if (relationIndex === undefined) {
-    const virtualItem = virtualItemsMap.get(viewPathToString(viewPath));
-    if (virtualItem) {
-      const acceptedPlan =
-        virtualItem.virtualType === "suggestion" && !virtualItem.isCref
-          ? planDeepCopyNode(
-              acc,
-              viewPath,
-              parentView,
-              stack,
-              undefined,
-              undefined,
-              argument
-            )[0]
-          : planAddToParent(
-              acc,
-              itemID,
-              parentView,
-              stack,
-              undefined,
-              undefined,
-              argument
-            )[0];
-      return acceptedPlan;
-    }
-    return acc;
-  }
-
-  const basePlan =
-    editorText.trim() && editorText !== getNodeText(acc, viewPath, stack)
-      ? planSaveNodeAndEnsureRelations(acc, editorText, viewPath, stack).plan
-      : acc;
-
-  return upsertRelations(basePlan, parentView, stack, (rels) =>
-    updateItemArgument(rels, relationIndex, argument)
+  return planUpdateViewItemMetadata(
+    acc,
+    viewPath,
+    stack,
+    metadata,
+    editorText,
+    virtualItemsMap
   );
 }
 
@@ -230,11 +92,11 @@ export function planBatchRelevance(
 ): Plan {
   const updated = viewPaths.reduce(
     (acc, viewPath) =>
-      planUpdateOneRelevance(
+      planUpdateOneMetadata(
         acc,
         viewPath,
         stack,
-        relevance,
+        { relevance },
         getEditorTextForPath(editorInfo, viewPath),
         virtualItemsMap
       ),
@@ -253,11 +115,11 @@ export function planBatchArgument(
 ): Plan {
   const updated = viewPaths.reduce(
     (acc, viewPath) =>
-      planUpdateOneArgument(
+      planUpdateOneMetadata(
         acc,
         viewPath,
         stack,
-        argument,
+        { argument },
         getEditorTextForPath(editorInfo, viewPath),
         virtualItemsMap
       ),

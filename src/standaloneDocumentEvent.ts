@@ -1,99 +1,24 @@
-import crypto from "crypto";
-import { v4 } from "uuid";
 import { UnsignedEvent } from "nostr-tools";
-import { formatNodeAttrs, formatRootHeading } from "./documentFormat";
+import { getRelationSemanticID, shortID } from "./connections";
+import {
+  buildKnowledgeDocumentEvents,
+  createHeadlessPlan,
+} from "./core/headlessPlan";
 import { MarkdownImportFile, parseMarkdownImportFiles } from "./markdownImport";
+import { planCreateNodesFromMarkdownTrees } from "./markdownPlan";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
-import { KIND_KNOWLEDGE_DOCUMENT, msTag, newTimestamp } from "./nostr";
+import { KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
 
-function hashText(text: string): ID {
-  return crypto
-    .createHash("sha256")
-    .update(text)
-    .digest("hex")
-    .slice(0, 32) as ID;
-}
-
-function joinID(author: PublicKey, localID: string): LongID {
-  return `${author}_${localID}` as LongID;
-}
-
-type SerializedTree = {
-  lines: string[];
-  relationUUIDs: Set<string>;
-};
-
-function getNodeSemanticID(node: MarkdownTreeNode): ID {
-  return node.semanticID ?? hashText(node.text);
-}
-
-function getNodeUuid(node: MarkdownTreeNode): string {
-  return node.uuid ?? v4();
-}
-
-function getLinkRelationUuid(linkHref: string): string | undefined {
-  const relationID = linkHref.split(":")[0];
-  if (!relationID) {
-    return undefined;
+export function requireSingleRootMarkdownTree(
+  markdown: string,
+  errorMessage = "stdin markdown must resolve to exactly one top-level root"
+): MarkdownTreeNode {
+  const roots = parseMarkdownHierarchy(markdown).filter((root) => !root.hidden);
+  const rootTree = roots[0];
+  if (!rootTree || roots.length !== 1) {
+    throw new Error(errorMessage);
   }
-  return relationID.includes("_")
-    ? relationID.split("_").slice(1).join("_")
-    : relationID;
-}
-
-function serializeNodes(
-  children: MarkdownTreeNode[],
-  depth: number,
-  current: SerializedTree
-): SerializedTree {
-  return children.reduce((acc, node) => {
-    if (node.hidden) {
-      return acc;
-    }
-
-    const indent = "  ".repeat(depth);
-    if (node.linkHref) {
-      const relationUuid = getLinkRelationUuid(node.linkHref);
-      const next: SerializedTree = {
-        ...acc,
-        lines: [
-          ...acc.lines,
-          `${indent}- [${node.text}](#${node.linkHref})${formatNodeAttrs(
-            node.uuid ?? "",
-            node.relevance,
-            node.argument,
-            {
-              ...(node.semanticID ? { semanticID: node.semanticID } : {}),
-              ...(node.basedOn ? { basedOn: node.basedOn as LongID } : {}),
-            }
-          )}`,
-        ],
-        relationUUIDs: relationUuid
-          ? acc.relationUUIDs.add(relationUuid)
-          : acc.relationUUIDs,
-      };
-      return serializeNodes(node.children, depth + 1, next);
-    }
-
-    const uuid = getNodeUuid(node);
-    const semanticID = getNodeSemanticID(node);
-    const next: SerializedTree = {
-      lines: [
-        ...acc.lines,
-        `${indent}- ${node.text}${formatNodeAttrs(
-          uuid,
-          node.relevance,
-          node.argument,
-          {
-            semanticID,
-            ...(node.basedOn ? { basedOn: node.basedOn as LongID } : {}),
-          }
-        )}`,
-      ],
-      relationUUIDs: acc.relationUUIDs.add(uuid),
-    };
-    return serializeNodes(node.children, depth + 1, next);
-  }, current);
+  return rootTree;
 }
 
 function buildDocumentEventFromRootTree(
@@ -105,40 +30,31 @@ function buildDocumentEventFromRootTree(
   semanticID: ID;
   event: UnsignedEvent;
 } {
-  const rootUuid = getNodeUuid(rootTree);
-  const semanticID = getNodeSemanticID(rootTree);
-  const serialized = serializeNodes(rootTree.children, 0, {
-    lines: [],
-    relationUUIDs: new Set<string>(),
-  });
-  const rTags = [...serialized.relationUUIDs.add(rootUuid)].map((value) => [
-    "r",
-    value,
-  ]);
-  const systemRoleTags = rootTree.systemRole
-    ? ([["s", rootTree.systemRole]] as string[][])
-    : [];
-
+  const [planWithRoot, , topRelationIds] = planCreateNodesFromMarkdownTrees(
+    createHeadlessPlan(author),
+    [rootTree]
+  );
+  const relationID = topRelationIds[0];
+  if (!relationID) {
+    throw new Error("Markdown upload must resolve to exactly one root tree");
+  }
+  const relation = planWithRoot.knowledgeDBs
+    .get(author)
+    ?.relations.get(shortID(relationID));
+  if (!relation) {
+    throw new Error(`Created relation not found: ${relationID}`);
+  }
+  const event = buildKnowledgeDocumentEvents(planWithRoot).find(
+    (candidate) => candidate.kind === KIND_KNOWLEDGE_DOCUMENT
+  );
+  if (!event) {
+    throw new Error(`Document event not built for relation: ${relationID}`);
+  }
   return {
-    relationID: joinID(author, rootUuid),
-    rootUuid,
-    semanticID,
-    event: {
-      kind: KIND_KNOWLEDGE_DOCUMENT,
-      pubkey: author,
-      created_at: newTimestamp(),
-      tags: [["d", rootUuid], ...rTags, ...systemRoleTags, msTag()],
-      content: `${[
-        formatRootHeading(
-          rootTree.text,
-          rootUuid,
-          semanticID,
-          rootTree.anchor,
-          rootTree.systemRole
-        ),
-        ...serialized.lines,
-      ].join("\n")}\n`,
-    },
+    relationID,
+    rootUuid: shortID(relationID),
+    semanticID: getRelationSemanticID(relation),
+    event,
   };
 }
 
@@ -155,7 +71,6 @@ export function buildStandaloneRootDocumentEvent(
   return buildDocumentEventFromRootTree(author, {
     text: title,
     children: [],
-    semanticID: hashText(title),
     ...(systemRole ? { systemRole } : {}),
   });
 }
@@ -186,12 +101,8 @@ export function buildSingleRootMarkdownDocumentEvent(
   semanticID: ID;
   event: UnsignedEvent;
 } {
-  const roots = parseMarkdownHierarchy(markdown).filter((root) => !root.hidden);
-  const rootTree = roots[0];
-  if (!rootTree || roots.length !== 1) {
-    throw new Error(
-      "stdin markdown must resolve to exactly one top-level root"
-    );
-  }
-  return buildDocumentEventFromRootTree(author, rootTree);
+  return buildDocumentEventFromRootTree(
+    author,
+    requireSingleRootMarkdownTree(markdown)
+  );
 }

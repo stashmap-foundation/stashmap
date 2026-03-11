@@ -1,32 +1,22 @@
 import React from "react";
-import { List } from "immutable";
 import { useDropzone } from "react-dropzone";
-import { createSemanticID, hashText } from "../connections";
+import { ViewPath } from "../ViewContext";
+import { Plan, ParsedLine, parseClipboardText, usePlanner } from "../planner";
+import { MarkdownTreeNode, parseMarkdownHierarchy } from "../markdownDocument";
 import {
-  MarkdownImportFile,
-  parseMarkdownImportFiles,
-} from "../markdownImport";
-import { ViewPath, getRelationForView, newRelations } from "../ViewContext";
-import {
-  Plan,
-  ParsedLine,
-  planUpsertRelations,
-  planAddToParent,
-  planMoveTreeDescendantsToContext,
-  parseClipboardText,
-  usePlanner,
-} from "../planner";
-import {
-  MarkdownTreeNode,
-  parseMarkdownHierarchy,
-  WalkContext,
-  createNodesFromMarkdownTrees,
-} from "../markdownDocument";
+  planCreateNodesFromMarkdownFiles,
+  planInsertMarkdownTrees,
+} from "../markdownPlan";
 
 export type { MarkdownTreeNode } from "../markdownDocument";
 export { parseMarkdownHierarchy } from "../markdownDocument";
 export type { MarkdownImportFile } from "../markdownImport";
 export { parseMarkdownImportFiles } from "../markdownImport";
+export {
+  planCreateNodesFromMarkdown,
+  planCreateNodesFromMarkdownFiles,
+  planCreateNodesFromMarkdownTrees,
+} from "../markdownPlan";
 
 /* eslint-disable functional/immutable-data */
 export function parsedLinesToTrees(items: ParsedLine[]): MarkdownTreeNode[] {
@@ -72,80 +62,6 @@ export function buildRootTreeForEmptyRootDrop(
   };
 }
 
-export function planCreateNodesFromMarkdownTrees(
-  plan: Plan,
-  trees: MarkdownTreeNode[],
-  context: List<ID> = List<ID>()
-): [Plan, topItemIDs: ID[], topRelationIDs: LongID[]] {
-  const ctx: WalkContext = {
-    knowledgeDBs: plan.knowledgeDBs,
-    publicKey: plan.user.publicKey,
-    affectedRoots: plan.affectedRoots,
-  };
-  const [resultCtx, topItemIDs, topRelationIDs] = createNodesFromMarkdownTrees(
-    ctx,
-    trees,
-    context
-  );
-  return [
-    {
-      ...plan,
-      knowledgeDBs: resultCtx.knowledgeDBs,
-      affectedRoots: resultCtx.affectedRoots,
-    },
-    topItemIDs,
-    topRelationIDs,
-  ];
-}
-
-export function planCreateNodesFromMarkdownFiles(
-  plan: Plan,
-  files: MarkdownImportFile[],
-  context: List<ID> = List<ID>()
-): [Plan, topItemIDs: ID[]] {
-  const trees = parseMarkdownImportFiles(files);
-  const [nextPlan, topItemIDs] = planCreateNodesFromMarkdownTrees(
-    plan,
-    trees,
-    context
-  );
-  return [nextPlan, topItemIDs];
-}
-
-export function planCreateNodesFromMarkdown(
-  plan: Plan,
-  markdownText: string,
-  context: List<ID> = List<ID>()
-): [Plan, topItemID: ID] {
-  const [nextPlan, topItemIDs] = planCreateNodesFromMarkdownFiles(
-    plan,
-    [{ name: "Imported Markdown", markdown: markdownText }],
-    context
-  );
-
-  if (topItemIDs.length > 0) {
-    return [nextPlan, topItemIDs[0]];
-  }
-
-  const fallbackNode = {
-    id: createSemanticID("Imported Markdown"),
-    text: "Imported Markdown",
-    textHash: hashText("Imported Markdown"),
-  };
-  const fallbackRelation = newRelations(
-    fallbackNode.id,
-    List<ID>(),
-    nextPlan.user.publicKey,
-    undefined,
-    undefined,
-    fallbackNode.text
-  );
-  return [
-    planUpsertRelations(nextPlan, fallbackRelation),
-    fallbackRelation.textHash,
-  ];
-}
-
 export function planPasteMarkdownTrees(
   plan: Plan,
   trees: MarkdownTreeNode[],
@@ -153,30 +69,13 @@ export function planPasteMarkdownTrees(
   stack: ID[],
   insertAtIndex?: number
 ): Plan {
-  const parentRelation = getRelationForView(plan, parentViewPath, stack);
-  const parentRoot = parentRelation?.root;
-  return trees.reduce((accPlan, tree, idx) => {
-    const insertAt =
-      insertAtIndex !== undefined ? insertAtIndex + idx : undefined;
-    const [planWithNode, topItemIDs, topRelationIDs] =
-      planCreateNodesFromMarkdownTrees(accPlan, [tree]);
-    const [planWithAdded, actualIDs] = planAddToParent(
-      planWithNode,
-      topRelationIDs,
-      parentViewPath,
-      stack,
-      insertAt
-    );
-    return planMoveTreeDescendantsToContext(
-      planWithAdded,
-      topItemIDs,
-      topRelationIDs,
-      actualIDs,
-      parentViewPath,
-      stack,
-      parentRoot
-    );
-  }, plan);
+  return planInsertMarkdownTrees(
+    plan,
+    trees,
+    parentViewPath,
+    stack,
+    insertAtIndex
+  ).plan;
 }
 
 type FileDropZoneProps = {

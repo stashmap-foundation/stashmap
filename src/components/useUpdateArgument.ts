@@ -1,4 +1,3 @@
-import { updateItemArgument } from "../connections";
 import { useRelationItemContext } from "./useRelationItemContext";
 
 type UseUpdateArgumentResult = {
@@ -17,9 +16,7 @@ export function useUpdateArgument(): UseUpdateArgumentResult {
   const currentArgument = currentItem?.argument;
 
   const setArgument = (argument: Argument): void => {
-    updateMetadata((rels, index) => updateItemArgument(rels, index, argument), {
-      argument,
-    });
+    updateMetadata({ argument });
   };
 
   return {

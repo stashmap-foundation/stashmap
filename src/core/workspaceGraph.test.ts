@@ -7,17 +7,17 @@ import { parseDocumentEvent } from "../markdownRelations";
 import { KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
 import { buildSingleRootMarkdownDocumentEvent } from "../standaloneDocumentEvent";
 import {
-  buildWorkspaceDocumentEvents,
-  createUnderParent,
-  inspectChildren,
-  linkUnderParent,
-  loadWorkspaceGraph,
-  moveItem,
-  removeItem,
-  setItemArgument,
-  setItemRelevance,
-  setRelationText,
-} from "./workspaceGraph";
+  applyWorkspaceCreateUnder,
+  applyWorkspaceLink,
+  applyWorkspaceMoveItem,
+  applyWorkspaceRemoveItem,
+  applyWorkspaceSetArgument,
+  applyWorkspaceSetRelevance,
+  applyWorkspaceSetText,
+  buildWorkspacePlanDocumentEvents,
+  createWorkspacePlan,
+} from "./workspacePlan";
+import { inspectChildren, loadWorkspaceGraph } from "./workspaceGraph";
 
 const ALICE = "a".repeat(64) as PublicKey;
 
@@ -96,11 +96,58 @@ test("inspectChildren lists stable child item ids from the synced workspace", as
   const result = inspectChildren(graph, ALICE, homeDraft.relationID);
 
   expect(result.relation_id).toBe(homeDraft.relationID);
+  expect(result.skipped_document_count).toBe(0);
   expect(result.items.map((item) => item.text)).toEqual(["Plan", "Notes"]);
   expect(result.items.every((item) => item.kind === "relation")).toBe(true);
   expect(result.items.every((item) => item.relevance === "contains")).toBe(
     true
   );
+});
+
+test("loadWorkspaceGraph skips rootless documents instead of aborting", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-workspace-"));
+  const homeDraft = buildSingleRootMarkdownDocumentEvent(ALICE, "# Home\n");
+  writeWorkspace(tempDir, [homeDraft]);
+  const emptyDocumentPath = path.join(
+    tempDir,
+    "DOCUMENTS",
+    ALICE,
+    "empty-document.md"
+  );
+  fs.writeFileSync(emptyDocumentPath, "", "utf8");
+  fs.writeFileSync(
+    path.join(tempDir, "manifest.json"),
+    JSON.stringify(
+      {
+        ...JSON.parse(
+          fs.readFileSync(path.join(tempDir, "manifest.json"), "utf8")
+        ),
+        documents: [
+          manifestDocument(homeDraft, 0),
+          {
+            replaceable_key: `${KIND_KNOWLEDGE_DOCUMENT}:${ALICE}:empty-document`,
+            author: ALICE,
+            event_id: "event-empty",
+            d_tag: "empty-document",
+            path: `DOCUMENTS/${ALICE}/empty-document.md`,
+            created_at: homeDraft.event.created_at,
+            updated_ms: homeDraft.event.created_at * 1000,
+          },
+        ],
+      },
+      null,
+      2
+    )
+  );
+
+  const graph = await loadWorkspaceGraph(tempDir);
+  const result = inspectChildren(graph, ALICE, homeDraft.relationID);
+
+  expect(graph.skippedDocuments).toEqual([
+    `DOCUMENTS/${ALICE}/empty-document.md`,
+  ]);
+  expect(result.skipped_document_count).toBe(1);
+  expect(result.relation_id).toBe(homeDraft.relationID);
 });
 
 test("setRelationText, setItemRelevance, and setItemArgument republish the same root with updated edge metadata", async () => {
@@ -111,42 +158,30 @@ test("setRelationText, setItemRelevance, and setItemArgument republish the same 
   );
   writeWorkspace(tempDir, [homeDraft]);
   const graph = await loadWorkspaceGraph(tempDir);
+  const plan = createWorkspacePlan(graph, ALICE);
   const planRelation = parseRootRelations(homeDraft).find(
     (relation) => relation.text === "Plan"
   );
   expect(planRelation).toBeDefined();
 
-  const renamed = setRelationText(
-    graph,
-    ALICE,
+  const renamed = applyWorkspaceSetText(
+    plan,
     planRelation?.id as LongID,
     "Updated Plan"
   );
-  const reweighted = setItemRelevance(
-    {
-      ...graph,
-      knowledgeDBs: renamed.knowledgeDBs,
-    },
-    ALICE,
+  const reweighted = applyWorkspaceSetRelevance(
+    renamed.plan,
     homeDraft.relationID,
     planRelation?.id as LongID,
     "not_relevant"
   );
-  const argued = setItemArgument(
-    {
-      ...graph,
-      knowledgeDBs: reweighted.knowledgeDBs,
-    },
-    ALICE,
+  const argued = applyWorkspaceSetArgument(
+    reweighted.plan,
     homeDraft.relationID,
     planRelation?.id as LongID,
     "contra"
   );
-  const [event] = buildWorkspaceDocumentEvents(
-    argued.knowledgeDBs,
-    argued.rootRelationIds,
-    ALICE
-  );
+  const [event] = buildWorkspacePlanDocumentEvents(argued.plan);
   const relations = parseDocumentEvent(event).valueSeq().toArray();
   const republishedHome = relations.find(
     (relation) => relation.id === homeDraft.relationID
@@ -169,31 +204,23 @@ test("createUnderParent and linkUnderParent add owned children and crefs to the 
   );
   writeWorkspace(tempDir, [homeDraft, roadmapDraft]);
   const graph = await loadWorkspaceGraph(tempDir);
+  const plan = createWorkspacePlan(graph, ALICE);
 
-  const created = createUnderParent(
-    graph,
-    ALICE,
+  const created = applyWorkspaceCreateUnder(
+    plan,
     homeDraft.relationID,
     "# Notes\n\n## Detail\n",
     {},
     "maybe_relevant",
     "confirms"
   );
-  const linked = linkUnderParent(
-    {
-      ...graph,
-      knowledgeDBs: created.knowledgeDBs,
-    },
-    ALICE,
+  const linked = applyWorkspaceLink(
+    created.plan,
     homeDraft.relationID,
     roadmapDraft.relationID,
     {}
   );
-  const [event] = buildWorkspaceDocumentEvents(
-    linked.knowledgeDBs,
-    linked.rootRelationIds,
-    ALICE
-  );
+  const [event] = buildWorkspacePlanDocumentEvents(linked.plan);
 
   expect(event.content).toContain("- Notes {");
   expect(event.content).toContain(".maybe_relevant .confirms");
@@ -208,6 +235,7 @@ test("moveItem preserves relevance and argument across parents, and removeItem d
   );
   writeWorkspace(tempDir, [homeDraft]);
   const graph = await loadWorkspaceGraph(tempDir);
+  const plan = createWorkspacePlan(graph, ALICE);
   const relations = parseRootRelations(homeDraft);
   const bucketA = relations.find((relation) => relation.text === "Bucket A");
   const bucketB = relations.find((relation) => relation.text === "Bucket B");
@@ -217,19 +245,14 @@ test("moveItem preserves relevance and argument across parents, and removeItem d
   expect(bucketB).toBeDefined();
   expect(task).toBeDefined();
 
-  const moved = moveItem(
-    graph,
-    ALICE,
+  const moved = applyWorkspaceMoveItem(
+    plan,
     bucketA?.id as LongID,
     task?.id as LongID,
     bucketB?.id as LongID,
     {}
   );
-  const [movedEvent] = buildWorkspaceDocumentEvents(
-    moved.knowledgeDBs,
-    moved.rootRelationIds,
-    ALICE
-  );
+  const [movedEvent] = buildWorkspacePlanDocumentEvents(moved.plan);
   const movedRelations = parseDocumentEvent(movedEvent).valueSeq().toArray();
   const movedBucketA = movedRelations.find(
     (relation) => relation.id === bucketA?.id
@@ -243,20 +266,12 @@ test("moveItem preserves relevance and argument across parents, and removeItem d
   expect(movedBucketB?.items.first()?.relevance).toBe("relevant");
   expect(movedBucketB?.items.first()?.argument).toBe("contra");
 
-  const removed = removeItem(
-    {
-      ...graph,
-      knowledgeDBs: moved.knowledgeDBs,
-    },
-    ALICE,
+  const removed = applyWorkspaceRemoveItem(
+    moved.plan,
     bucketB?.id as LongID,
     task?.id as LongID
   );
-  const [removedEvent] = buildWorkspaceDocumentEvents(
-    removed.knowledgeDBs,
-    removed.rootRelationIds,
-    ALICE
-  );
+  const [removedEvent] = buildWorkspacePlanDocumentEvents(removed.plan);
   const removedRelations = parseDocumentEvent(removedEvent)
     .valueSeq()
     .toArray();

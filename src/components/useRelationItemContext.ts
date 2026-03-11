@@ -2,7 +2,6 @@ import {
   useRelationIndex,
   useViewPath,
   getParentView,
-  upsertRelations,
   useIsInSearchView,
   useCurrentRelation,
   useCurrentRowID,
@@ -10,12 +9,11 @@ import {
   ViewPath,
 } from "../ViewContext";
 import { isEmptySemanticID } from "../connections";
+import { usePlanner } from "../planner";
 import {
-  usePlanner,
-  planUpdateEmptyNodeMetadata,
-  planSaveNodeAndEnsureRelations,
-  Plan,
-} from "../planner";
+  planUpdateViewItemMetadata,
+  RelationItemMetadata,
+} from "../relationItemMutations";
 import { usePaneStack } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 import { useEditorText } from "./EditorTextContext";
@@ -32,10 +30,7 @@ type RelationItemContext = {
   parentView: ViewPath | undefined;
   relationsID: LongID | undefined;
   // Update function
-  updateMetadata: (
-    updater: (relations: Relations, index: number) => Relations,
-    metadata: { relevance?: Relevance; argument?: Argument }
-  ) => void;
+  updateMetadata: (metadata: RelationItemMetadata) => void;
 };
 
 /**
@@ -73,46 +68,24 @@ export function useRelationItemContext(): RelationItemContext {
       ? getRelationForView(data, parentView, stack)?.items.get(relationIndex!)
       : undefined;
 
-  const updateMetadata = (
-    updater: (relations: Relations, index: number) => Relations,
-    metadata: { relevance?: Relevance; argument?: Argument }
-  ): void => {
+  const updateMetadata = (metadata: RelationItemMetadata): void => {
     const editorText = editorTextContext?.text ?? "";
-    const hasEditorText = editorText.trim().length > 0;
-
-    if (isEmptyNode) {
-      if (!relationsID) return;
-      if (hasEditorText) {
-        const { plan } = planSaveNodeAndEnsureRelations(
-          createPlan(),
-          editorText,
-          viewPath,
-          stack,
-          metadata.relevance,
-          metadata.argument
-        );
-        executePlan(plan);
-      } else {
-        executePlan(
-          planUpdateEmptyNodeMetadata(createPlan(), relationsID, metadata)
-        );
-      }
+    if (isEmptyNode && !relationsID) return;
+    if (
+      !isEmptyNode &&
+      (!isVisible || !parentView || relationIndex === undefined)
+    )
       return;
-    }
 
-    if (!isVisible || !parentView || relationIndex === undefined) return;
-
-    const textChanged = hasEditorText && editorText !== nodeText;
-    const basePlan: Plan = createPlan();
-
-    const { plan: planWithSave } = textChanged
-      ? planSaveNodeAndEnsureRelations(basePlan, editorText, viewPath, stack)
-      : { plan: basePlan };
-
-    const plan = upsertRelations(planWithSave, parentView, stack, (rels) =>
-      updater(rels, relationIndex)
+    executePlan(
+      planUpdateViewItemMetadata(
+        createPlan(),
+        viewPath,
+        stack,
+        metadata,
+        editorText
+      )
     );
-    executePlan(plan);
   };
 
   return {

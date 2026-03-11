@@ -83,7 +83,7 @@ import {
   planBatchOutdent,
   getCurrentItem,
 } from "./batchOperations";
-import { planDeleteNodeFromView } from "../dnd";
+import { planDeleteNodeFromView } from "../treeMutations";
 
 function BreadcrumbItem({
   label,

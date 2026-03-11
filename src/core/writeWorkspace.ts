@@ -1,15 +1,16 @@
+import { inspectChildren, loadWorkspaceGraph } from "./workspaceGraph";
 import {
-  buildWorkspaceDocumentEvents,
-  createUnderParent,
-  inspectChildren,
-  linkUnderParent,
-  loadWorkspaceGraph,
-  moveItem,
-  removeItem,
-  setItemArgument,
-  setItemRelevance,
-  setRelationText,
-} from "./workspaceGraph";
+  applyWorkspaceCreateUnder,
+  applyWorkspaceLink,
+  applyWorkspaceMoveItem,
+  applyWorkspaceRemoveItem,
+  applyWorkspaceSetArgument,
+  applyWorkspaceSetRelevance,
+  applyWorkspaceSetText,
+  buildWorkspacePlanDocumentEvents,
+  createWorkspacePlan,
+  getAffectedRootRelationIds,
+} from "./workspacePlan";
 import {
   loadWriteSecretKey,
   publishUnsignedEvents,
@@ -34,9 +35,8 @@ async function publishWorkspaceMutation(
   publisher: WritePublisher,
   profile: WorkspaceWriteProfile,
   relayUrls: string[] | undefined,
-  mutate: (graph: Awaited<ReturnType<typeof loadWorkspaceGraph>>) => {
-    knowledgeDBs: KnowledgeDBs;
-    rootRelationIds: LongID[];
+  mutate: (plan: ReturnType<typeof createWorkspacePlan>) => {
+    plan: ReturnType<typeof createWorkspacePlan>;
     relationId?: LongID;
     itemId?: LongID | ID;
   }
@@ -49,14 +49,11 @@ async function publishWorkspaceMutation(
   publish_results: Record<string, Record<string, PublishStatus>>;
 }> {
   const graph = await loadWorkspaceGraph(profile.workspaceDir);
-  const mutation = mutate(graph);
+  const plan = createWorkspacePlan(graph, profile.pubkey);
+  const mutation = mutate(plan);
   const writeRelayUrls = resolveWriteRelayUrls(profile, relayUrls);
   const secretKey = await loadWriteSecretKey(profile);
-  const unsignedEvents = buildWorkspaceDocumentEvents(
-    mutation.knowledgeDBs,
-    mutation.rootRelationIds,
-    profile.pubkey
-  );
+  const unsignedEvents = buildWorkspacePlanDocumentEvents(mutation.plan);
   const published = await publishUnsignedEvents(
     publisher,
     secretKey,
@@ -66,7 +63,7 @@ async function publishWorkspaceMutation(
   return {
     ...(mutation.relationId ? { relation_id: mutation.relationId } : {}),
     ...(mutation.itemId ? { item_id: mutation.itemId } : {}),
-    affected_root_relation_ids: mutation.rootRelationIds,
+    affected_root_relation_ids: getAffectedRootRelationIds(mutation.plan),
     relay_urls: published.relay_urls,
     event_ids: published.event_ids,
     publish_results: published.publish_results,
@@ -86,8 +83,7 @@ export async function writeSetText(
     publisher,
     profile,
     options.relayUrls,
-    (graph) =>
-      setRelationText(graph, profile.pubkey, options.relationId, options.text)
+    (plan) => applyWorkspaceSetText(plan, options.relationId, options.text)
   );
 }
 
@@ -108,10 +104,9 @@ export async function writeCreateUnder(
     publisher,
     profile,
     options.relayUrls,
-    (graph) =>
-      createUnderParent(
-        graph,
-        profile.pubkey,
+    (plan) =>
+      applyWorkspaceCreateUnder(
+        plan,
         options.parentRelationId,
         options.markdownText,
         {
@@ -143,10 +138,9 @@ export async function writeLink(
     publisher,
     profile,
     options.relayUrls,
-    (graph) =>
-      linkUnderParent(
-        graph,
-        profile.pubkey,
+    (plan) =>
+      applyWorkspaceLink(
+        plan,
         options.parentRelationId,
         options.targetRelationId,
         {
@@ -175,10 +169,9 @@ export async function writeSetRelevance(
     publisher,
     profile,
     options.relayUrls,
-    (graph) =>
-      setItemRelevance(
-        graph,
-        profile.pubkey,
+    (plan) =>
+      applyWorkspaceSetRelevance(
+        plan,
         options.parentRelationId,
         options.itemId,
         options.relevance
@@ -200,10 +193,9 @@ export async function writeSetArgument(
     publisher,
     profile,
     options.relayUrls,
-    (graph) =>
-      setItemArgument(
-        graph,
-        profile.pubkey,
+    (plan) =>
+      applyWorkspaceSetArgument(
+        plan,
         options.parentRelationId,
         options.itemId,
         options.argument
@@ -224,13 +216,8 @@ export async function writeRemoveItem(
     publisher,
     profile,
     options.relayUrls,
-    (graph) =>
-      removeItem(
-        graph,
-        profile.pubkey,
-        options.parentRelationId,
-        options.itemId
-      )
+    (plan) =>
+      applyWorkspaceRemoveItem(plan, options.parentRelationId, options.itemId)
   );
 }
 
@@ -250,10 +237,9 @@ export async function writeMoveItem(
     publisher,
     profile,
     options.relayUrls,
-    (graph) =>
-      moveItem(
-        graph,
-        profile.pubkey,
+    (plan) =>
+      applyWorkspaceMoveItem(
+        plan,
         options.sourceParentRelationId,
         options.itemId,
         options.targetParentRelationId,

@@ -18,7 +18,7 @@ import {
   usePlanner,
 } from "../planner";
 import { isEditableRelation } from "./TemporaryViewContext";
-import { planDeleteNodeFromView } from "../dnd";
+import { planDeleteNodeFromView } from "../treeMutations";
 
 function disconnectNode(plan: Plan, toDisconnect: LongID | ID): Plan {
   const myDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());

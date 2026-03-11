@@ -1,4 +1,5 @@
 /* eslint-disable functional/immutable-data */
+import { Map as ImmutableMap } from "immutable";
 import { Event, Filter, SimplePool, UnsignedEvent } from "nostr-tools";
 import { findTag, getEventMs } from "./nostrEvents";
 import {
@@ -176,13 +177,19 @@ export function startPermanentDocumentSync({
   relayPool,
   relayUrls,
   authors,
+  addLiveEvents,
 }: {
-  db: StashmapDB;
+  db: StashmapDB | null;
   relayPool: SimplePool;
   relayUrls: string[];
   authors: PublicKey[];
+  addLiveEvents?: (events: ImmutableMap<string, Event | UnsignedEvent>) => void;
 }): () => void {
-  if (relayUrls.length === 0 || authors.length === 0) {
+  if (
+    relayUrls.length === 0 ||
+    authors.length === 0 ||
+    (!db && !addLiveEvents)
+  ) {
     return () => {};
   }
 
@@ -196,6 +203,9 @@ export function startPermanentDocumentSync({
     author: PublicKey,
     createdAt: number
   ): Promise<void> => {
+    if (!db) {
+      return;
+    }
     const existingCheckpoint = await getSyncCheckpoint(db, author);
     await putSyncCheckpoint(
       db,
@@ -208,6 +218,11 @@ export function startPermanentDocumentSync({
       return;
     }
     seenEventIds.add(event.id);
+
+    if (!db) {
+      addLiveEvents?.(ImmutableMap([[event.id, event]]));
+      return;
+    }
 
     const document = toStoredDocumentRecord(event);
     if (document) {

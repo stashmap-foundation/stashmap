@@ -6,7 +6,6 @@ import { RelayInformation } from "nostr-tools/lib/types/nip11";
 import {
   KIND_KNOWLEDGE_DOCUMENT,
   KIND_CONTACTLIST,
-  KIND_VIEWS,
   KIND_SETTINGS,
   KIND_RELAY_METADATA_EVENT,
 } from "./nostr";
@@ -23,16 +22,23 @@ import {
   parseRelationUrl,
   parseAuthorFromSearch,
 } from "./navigationUrl";
+import { splitID } from "./connections";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { generatePaneId } from "./SplitPanesContext";
-import { jsonToPanes, paneToJSON, Serializable } from "./serializer";
+import {
+  jsonToPanes,
+  jsonToViews,
+  paneToJSON,
+  Serializable,
+  viewDataToJSON,
+} from "./serializer";
 import { NavigationStateProvider } from "./NavigationStateContext";
 import {
   mergeEvents,
   newProcessedEvents,
   processEvents,
 } from "./eventProcessing";
-import { DocumentStoreProvider } from "./DocumentStore";
+import { DocumentStoreProvider, useDocumentStore } from "./DocumentStore";
 import { usePermanentDocumentSync } from "./usePermanentDocumentSync";
 
 export const defaultPane = (
@@ -77,14 +83,43 @@ function savePanesToStorage(publicKey: PublicKey, panes: Pane[]): void {
   }
 }
 
+function viewsStorageKey(publicKey: PublicKey): string {
+  return `stashmap-views-${publicKey}`;
+}
+
+function loadViewsFromStorage(publicKey: PublicKey): Views | undefined {
+  try {
+    const raw = localStorage.getItem(viewsStorageKey(publicKey));
+    if (!raw) {
+      return undefined;
+    }
+
+    return jsonToViews(JSON.parse(raw) as Serializable);
+  } catch {
+    return undefined;
+  }
+}
+
+function saveViewsToStorage(publicKey: PublicKey, views: Views): void {
+  try {
+    localStorage.setItem(
+      viewsStorageKey(publicKey),
+      JSON.stringify(viewDataToJSON(views, []))
+    );
+  } catch {
+    // ignore storage errors
+  }
+}
+
 function getInitialPanes(publicKey: PublicKey): Pane[] {
   const relationID = parseRelationUrl(window.location.pathname);
   if (relationID) {
+    const relationAuthor = splitID(relationID)[0] || publicKey;
     return [
       {
         id: generatePaneId(),
         stack: [],
-        author: publicKey,
+        author: relationAuthor,
         rootRelation: relationID,
       },
     ];
@@ -113,9 +148,45 @@ type DataProps = {
   children: React.ReactNode;
 };
 
+function PermanentDocumentSyncBridge({
+  db,
+  myself,
+  contacts,
+  projectMembers,
+  extraAuthors,
+  defaultRelays,
+  userRelays,
+  contactsRelays,
+}: {
+  db: StashmapDB | null;
+  myself: PublicKey;
+  contacts: Contacts;
+  projectMembers: Members;
+  extraAuthors: PublicKey[];
+  defaultRelays: Relays;
+  userRelays: Relays;
+  contactsRelays: Map<PublicKey, Relays>;
+}): null {
+  const addLiveEvents = useDocumentStore()?.addEvents;
+
+  usePermanentDocumentSync({
+    db,
+    myself,
+    contacts,
+    projectMembers,
+    extraAuthors,
+    addLiveEvents,
+    defaultRelays,
+    userRelays,
+    contactsRelays,
+  });
+
+  return null;
+}
+
 export const KIND_SEARCH = [KIND_KNOWLEDGE_DOCUMENT];
 
-export const KINDS_META = [KIND_SETTINGS, KIND_CONTACTLIST, KIND_VIEWS];
+export const KINDS_META = [KIND_SETTINGS, KIND_CONTACTLIST];
 
 export function useRelaysInfo(
   relays: Array<Relay>,
@@ -164,6 +235,9 @@ function Data({ user, children }: DataProps): JSX.Element {
   const [panes, setPanes] = useState<Pane[]>(() =>
     getInitialPanes(myPublicKey)
   );
+  const [views, setViews] = useState<Views>(
+    () => loadViewsFromStorage(myPublicKey) || Map<string, View>()
+  );
   const [newEventsAndPublishResults, setNewEventsAndPublishResults] =
     useState<EventState>({
       unsignedEvents: List(),
@@ -209,28 +283,35 @@ function Data({ user, children }: DataProps): JSX.Element {
       return;
     }
     const savedPanes = loadPanesFromStorage(myPublicKey);
+    const savedViews = loadViewsFromStorage(myPublicKey);
     if (savedPanes) {
       setPanes(savedPanes);
-      return;
+    } else {
+      setPanes((current) =>
+        current.map((p) => ({
+          ...p,
+          author: replaceUnauthenticatedUser(p.author, myPublicKey),
+        }))
+      );
     }
-    setPanes((current) =>
-      current.map((p) => ({
-        ...p,
-        author: replaceUnauthenticatedUser(p.author, myPublicKey),
-      }))
-    );
+    if (savedViews) {
+      setViews(savedViews);
+    }
   }, [myPublicKey]);
 
   useEffect(() => {
     savePanesToStorage(myPublicKey, panes);
   }, [panes, myPublicKey]);
 
+  useEffect(() => {
+    saveViewsToStorage(myPublicKey, views);
+  }, [views, myPublicKey]);
+
   const { events: mE, eose: metaEventsEose } = useEventQuery(
     relayPool,
     [
       { authors: [myPublicKey], kinds: [KIND_SETTINGS], limit: 1 },
       { authors: [myPublicKey], kinds: [KIND_CONTACTLIST], limit: 1 },
-      { authors: [myPublicKey], kinds: [KIND_VIEWS], limit: 1 },
     ],
     {
       readFromRelays: usePreloadRelays({
@@ -288,16 +369,6 @@ function Data({ user, children }: DataProps): JSX.Element {
 
   const projectMembers = Map<PublicKey, Member>();
 
-  usePermanentDocumentSync({
-    db,
-    myself: myPublicKey,
-    contacts,
-    projectMembers,
-    defaultRelays,
-    userRelays,
-    contactsRelays,
-  });
-
   return (
     <DataContextProvider
       contacts={contacts}
@@ -306,7 +377,7 @@ function Data({ user, children }: DataProps): JSX.Element {
       knowledgeDBs={Map<PublicKey, KnowledgeData>()}
       relaysInfos={searchRelaysInfo}
       publishEventsStatus={newEventsAndPublishResults}
-      views={processedMetaEvents.views}
+      views={views}
       panes={panes}
       projectMembers={projectMembers}
     >
@@ -314,10 +385,29 @@ function Data({ user, children }: DataProps): JSX.Element {
         db={db}
         unpublishedEvents={newEventsAndPublishResults.unsignedEvents}
       >
+        <PermanentDocumentSyncBridge
+          db={db}
+          myself={myPublicKey}
+          contacts={contacts}
+          projectMembers={projectMembers}
+          extraAuthors={[
+            ...new globalThis.Set(
+              panes.flatMap((pane) =>
+                pane.rootRelation
+                  ? [pane.author, splitID(pane.rootRelation)[0] || pane.author]
+                  : [pane.author]
+              )
+            ),
+          ]}
+          defaultRelays={defaultRelays}
+          userRelays={userRelays}
+          contactsRelays={contactsRelays}
+        />
         <MergeKnowledgeDB>
           <PlanningContextProvider
             setPublishEvents={setNewEventsAndPublishResults}
             setPanes={setPanes}
+            setViews={setViews}
             db={db}
             getRelays={() => ({
               defaultRelays,

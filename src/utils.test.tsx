@@ -56,8 +56,8 @@ import {
 } from "./NostrAuthContext";
 import { EMPTY_SEMANTIC_ID } from "./connections";
 import { RootViewContextProvider } from "./ViewContext";
-import { LoadData } from "./dataQuery";
 import { LoadSearchData } from "./LoadSearchData";
+import { LoadData } from "./dataQuery";
 import { StorePreLoginContext } from "./StorePreLoginContext";
 import { TemporaryViewProvider } from "./components/TemporaryViewContext";
 import { PaneView } from "./components/Workspace";
@@ -320,6 +320,7 @@ function TestPublishProvider({
   const [publishEventsStatus, setPublishEventsStatus] = React.useState(
     initialDataContextProps.publishEventsStatus
   );
+  const [views, setViews] = React.useState(initialDataContextProps.views);
   return (
     <DataContextProvider
       user={initialDataContextProps.user}
@@ -328,7 +329,7 @@ function TestPublishProvider({
       knowledgeDBs={initialDataContextProps.knowledgeDBs}
       relaysInfos={initialDataContextProps.relaysInfos}
       publishEventsStatus={publishEventsStatus}
-      views={initialDataContextProps.views}
+      views={views}
       projectMembers={initialDataContextProps.projectMembers}
       panes={initialDataContextProps.panes}
     >
@@ -339,6 +340,7 @@ function TestPublishProvider({
           <PlanningContextProvider
             setPublishEvents={setPublishEventsStatus}
             setPanes={() => {}}
+            setViews={setViews}
           >
             {children}
           </PlanningContextProvider>

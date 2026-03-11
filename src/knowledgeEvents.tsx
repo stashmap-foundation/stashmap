@@ -1,40 +1,13 @@
 import { List, Map } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
-import {
-  findTag,
-  getEventMs,
-  getMostRecentReplacableEvent,
-  sortEvents,
-} from "./nostrEvents";
+import { findTag, getEventMs, sortEvents } from "./nostrEvents";
 import {
   KIND_DELETE,
   KIND_KNOWLEDGE_DOCUMENT,
-  KIND_VIEWS,
   getReplaceableKey,
 } from "./nostr";
-import { Serializable, jsonToPanes, jsonToViews } from "./serializer";
 import { splitID } from "./connections";
 import { parseDocumentEvent } from "./markdownRelations";
-
-export function findViews(events: List<UnsignedEvent>): Views {
-  const viewEvent = getMostRecentReplacableEvent(
-    events.filter((event) => event.kind === KIND_VIEWS)
-  );
-  if (viewEvent === undefined) {
-    return Map<string, View>();
-  }
-  return jsonToViews(JSON.parse(viewEvent.content) as Serializable);
-}
-
-export function findPanes(events: List<UnsignedEvent>): Pane[] {
-  const viewEvent = getMostRecentReplacableEvent(
-    events.filter((event) => event.kind === KIND_VIEWS)
-  );
-  if (viewEvent === undefined) {
-    return [];
-  }
-  return jsonToPanes(JSON.parse(viewEvent.content) as Serializable);
-}
 
 export function findDocumentRelations(
   events: List<UnsignedEvent>

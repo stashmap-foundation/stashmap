@@ -28,7 +28,7 @@ import {
   getVersionsForRelation,
 } from "./semanticProjection";
 
-type TreeResult = {
+export type TreeResult = {
   paths: List<ViewPath>;
   virtualItems: VirtualItemsMap;
   firstVirtualKeys: ImmutableSet<string>;

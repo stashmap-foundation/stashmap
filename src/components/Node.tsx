@@ -30,6 +30,7 @@ import {
   isEmptySemanticID,
   isConcreteRefId,
   computeEmptyNodeMetadata,
+  getConcreteRefTargetRelation,
 } from "../connections";
 import { ReferenceDisplay } from "./referenceDisplay";
 import { IS_MOBILE } from "./responsive";
@@ -73,6 +74,27 @@ function useNodeHasChildren(): boolean {
   const viewPath = useViewPath();
   const stack = usePaneStack();
   const pane = useCurrentPane();
+  const [itemID] = useCurrentRowID();
+  const currentRelation = useCurrentRelation();
+  const effectiveAuthor = useEffectiveAuthor();
+
+  if (currentRelation) {
+    if (currentRelation.items.size > 0) {
+      return true;
+    }
+  }
+
+  if (isConcreteRefId(itemID)) {
+    const targetRelation = getConcreteRefTargetRelation(
+      data.knowledgeDBs,
+      itemID,
+      effectiveAuthor
+    );
+    if (targetRelation?.items.size) {
+      return true;
+    }
+  }
+
   const result = getChildNodes(
     data,
     viewPath,

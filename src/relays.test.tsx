@@ -3,18 +3,15 @@ import { cleanup, screen, fireEvent } from "@testing-library/react";
 import {
   ALICE,
   BOB,
-  findEvent,
   follow,
   renderApp,
   renderTree,
   setup,
-  TEST_RELAYS,
   UpdateState,
   type,
 } from "./utils.test";
 import { createPlan, planPublishRelayMetadata } from "./planner";
 import { execute } from "./executor";
-import { KIND_VIEWS } from "./nostr";
 import { flattenRelays } from "./relays";
 
 test("Flatten relays", () => {
@@ -57,14 +54,17 @@ async function setupTest(): Promise<{
   return { alice };
 }
 
-test("Write views on user relays", async () => {
+test("Store views locally instead of writing on relays", async () => {
   const { alice } = await setupTest();
   const aliceData = alice();
   aliceData.relayPool.resetPublishedOnRelays();
+  localStorage.clear();
+
+  const route = `/n/${encodeURIComponent("Alice Workspace")}`;
 
   renderApp({
     ...aliceData,
-    initialRoute: `/n/${encodeURIComponent("Alice Workspace")}`,
+    initialRoute: route,
   });
 
   const collapseButton = await screen.findByLabelText(
@@ -73,9 +73,17 @@ test("Write views on user relays", async () => {
     { timeout: 5000 }
   );
   fireEvent.click(collapseButton);
-  await findEvent(aliceData.relayPool, { kinds: [KIND_VIEWS] });
-  const publishedRelays = aliceData.relayPool.getPublishedOnRelays();
-  TEST_RELAYS.forEach((relay) => {
-    expect(publishedRelays).toContain(relay.url);
+
+  await screen.findByLabelText("expand Alice Workspace");
+  expect(aliceData.relayPool.getPublishedOnRelays()).toEqual([]);
+
+  cleanup();
+
+  renderApp({
+    ...aliceData,
+    initialRoute: route,
   });
+
+  await screen.findByLabelText("expand Alice Workspace");
+  expect(screen.queryByLabelText("collapse Alice Workspace")).toBeNull();
 });

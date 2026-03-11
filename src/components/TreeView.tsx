@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { List, Map, Set as ImmutableSet } from "immutable";
 import { ListRange, Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import { useLocation } from "react-router-dom";
@@ -25,25 +25,15 @@ import {
   usePaneIndex,
 } from "../SplitPanesContext";
 import {
-  addItemToFilters,
   addReferencedByToFilters,
-  addListToFilters,
   createBaseFilter,
   filtersToFilterArray,
   useQueryKnowledgeData,
 } from "../dataQuery";
-import { RegisterQuery } from "../LoadingStatus";
 import {
-  shortID,
   isSearchId,
   getRelations,
-  isConcreteRefId,
-  parseConcreteRefId,
-  getConcreteRefTargetRelation,
-  getRelationsNoReferencedBy,
   getRelationItemSemanticID,
-  getRelationSemanticID,
-  getRelationStack,
 } from "../connections";
 import { useApis } from "../Apis";
 import {
@@ -62,8 +52,56 @@ import {
   planToggleTemporarySelection,
   usePlanner,
 } from "../planner";
+import type { TreeResult } from "../treeTraversal";
 
-const LOAD_EXTRA = 10;
+const PaneTreeResultContext = React.createContext<TreeResult | undefined>(
+  undefined
+);
+
+export function usePaneTreeResult(): TreeResult | undefined {
+  return React.useContext(PaneTreeResultContext);
+}
+
+export function PaneTreeResultProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}): JSX.Element {
+  const data = useData();
+  const stack = usePaneStack();
+  const pane = useCurrentPane();
+  const viewPath = useViewPath();
+  const rootKey = viewPathToString(viewPath);
+  const isRootExpanded = isExpanded(data, rootKey);
+  const treeResult = useMemo(() => {
+    if (!isRootExpanded) {
+      return undefined;
+    }
+    return getNodesInTree(
+      data,
+      viewPath,
+      stack,
+      List<ViewPath>(),
+      pane.rootRelation,
+      pane.author,
+      pane.typeFilters
+    );
+  }, [
+    data,
+    isRootExpanded,
+    pane.author,
+    pane.rootRelation,
+    pane.typeFilters,
+    stack,
+    viewPath,
+  ]);
+
+  return (
+    <PaneTreeResultContext.Provider value={treeResult}>
+      {children}
+    </PaneTreeResultContext.Provider>
+  );
+}
 
 function VirtuosoForColumn({
   nodes,
@@ -204,110 +242,8 @@ function useKeyboardMode(): [
   return useState<KeyboardMode>("normal");
 }
 
-export function TreeViewNodeLoader({
-  children,
-  nodes,
-  range,
-}: {
-  range?: ListRange;
-  children: React.ReactNode;
-  nodes: List<ViewPath>;
-}): JSX.Element {
-  const data = useData();
-  const viewPath = useViewPath();
-  const effectiveAuthor = getEffectiveAuthor(data, viewPath);
-  const baseFilter = createBaseFilter(
-    data.contacts,
-    data.projectMembers,
-    data.user.publicKey,
-    effectiveAuthor
-  );
-
-  const itemIDs = nodes.map((path) => getRowIDFromView(data, path)[0]);
-
-  const itemIDsWithRange = range
-    ? itemIDs.slice(range.startIndex, range.endIndex + 1 + LOAD_EXTRA) // +1 because slice doesn't include last element
-    : itemIDs;
-
-  const filter = itemIDsWithRange.reduce((rdx, itemID) => {
-    const withItem = addItemToFilters(
-      rdx,
-      itemID,
-      data.knowledgeDBs,
-      data.user.publicKey
-    );
-
-    if (!isConcreteRefId(itemID)) {
-      return addReferencedByToFilters(
-        withItem,
-        itemID,
-        data.knowledgeDBs,
-        data.user.publicKey
-      );
-    }
-
-    const parsed = parseConcreteRefId(itemID);
-    if (!parsed) {
-      return withItem;
-    }
-
-    const withRelation = addListToFilters(
-      withItem,
-      parsed.relationID,
-      itemID,
-      data.knowledgeDBs,
-      data.user.publicKey
-    );
-
-    const relation = getRelationsNoReferencedBy(
-      data.knowledgeDBs,
-      parsed.relationID,
-      data.user.publicKey
-    );
-    if (!relation) {
-      return withRelation;
-    }
-
-    const targetRelation = getConcreteRefTargetRelation(
-      data.knowledgeDBs,
-      itemID,
-      data.user.publicKey
-    );
-    const contextSemanticIDs = getRelationStack(data.knowledgeDBs, relation);
-    const withContextSemanticIDs = contextSemanticIDs.reduce(
-      (acc, contextSemanticID) =>
-        addItemToFilters(
-          acc,
-          contextSemanticID,
-          data.knowledgeDBs,
-          data.user.publicKey
-        ),
-      withRelation
-    );
-    return addItemToFilters(
-      withContextSemanticIDs,
-      getRelationSemanticID(targetRelation || relation),
-      data.knowledgeDBs,
-      data.user.publicKey
-    );
-  }, baseFilter);
-
-  const finalFilter = filtersToFilterArray(filter);
-  const { allEventsProcessed } = useQueryKnowledgeData(finalFilter);
-
-  return (
-    <RegisterQuery
-      idsBeingQueried={itemIDs.map((longID) => shortID(longID)).toArray()}
-      allEventsProcessed={allEventsProcessed}
-    >
-      {children}
-    </RegisterQuery>
-  );
-}
-
 function Tree(): JSX.Element | null {
   const data = useData();
-  const stack = usePaneStack();
   const pane = useCurrentPane();
   const { fileStore } = useApis();
   const { getLocalStorage, setLocalStorage } = fileStore;
@@ -328,19 +264,7 @@ function Tree(): JSX.Element | null {
   >(null);
   const treeRootRef = useRef<HTMLDivElement>(null);
   const [keyboardMode, setKeyboardMode] = useKeyboardMode();
-  const viewKey = viewPathToString(viewPath);
-  const isRootExpanded = isExpanded(data, viewKey);
-  const treeResult = isRootExpanded
-    ? getNodesInTree(
-        data,
-        viewPath,
-        stack,
-        List<ViewPath>(),
-        pane.rootRelation,
-        pane.author,
-        pane.typeFilters
-      )
-    : undefined;
+  const treeResult = usePaneTreeResult();
   const childNodes = treeResult?.paths || List<ViewPath>();
   const virtualItems = treeResult?.virtualItems || Map<string, RelationItem>();
   const firstVirtualKeys =
@@ -482,22 +406,20 @@ function Tree(): JSX.Element | null {
         data-keyboard-mode={keyboardMode}
         data-total-rows={nodes.size}
       >
-        <TreeViewNodeLoader nodes={nodes} range={range}>
-          <VirtuosoForColumn
-            nodes={nodes}
-            range={range}
-            setRange={setRange}
-            startIndexFromStorage={startIndexFromStorage}
-            viewPath={viewPath}
-            onStopScrolling={onStopScrolling}
-            ariaLabel={ariaLabel}
-            activeRowKey={activeRow.activeRowKey}
-            onRowFocus={onRowFocus}
-            onRowClick={onRowClick}
-            scrollToId={pane.scrollToId}
-            firstVirtualKeys={firstVirtualKeys}
-          />
-        </TreeViewNodeLoader>
+        <VirtuosoForColumn
+          nodes={nodes}
+          range={range}
+          setRange={setRange}
+          startIndexFromStorage={startIndexFromStorage}
+          viewPath={viewPath}
+          onStopScrolling={onStopScrolling}
+          ariaLabel={ariaLabel}
+          activeRowKey={activeRow.activeRowKey}
+          onRowFocus={onRowFocus}
+          onRowClick={onRowClick}
+          scrollToId={pane.scrollToId}
+          firstVirtualKeys={firstVirtualKeys}
+        />
       </div>
     </VirtualItemsProvider>
   );
@@ -517,7 +439,7 @@ export function TreeView(): JSX.Element {
 
   const searchFilter = (() => {
     if (!isSearchId(rootItemID as ID)) {
-      return baseFilter;
+      return undefined;
     }
     const searchRelation = getRelations(
       data.knowledgeDBs,
@@ -525,7 +447,7 @@ export function TreeView(): JSX.Element {
       data.user.publicKey
     );
     if (!searchRelation) {
-      return baseFilter;
+      return undefined;
     }
     return searchRelation.items.reduce(
       (rdx, item) =>
@@ -543,7 +465,7 @@ export function TreeView(): JSX.Element {
     );
   })();
 
-  useQueryKnowledgeData(filtersToFilterArray(searchFilter));
+  useQueryKnowledgeData(searchFilter ? filtersToFilterArray(searchFilter) : []);
 
   return <Tree />;
 }

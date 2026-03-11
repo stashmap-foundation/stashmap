@@ -6,7 +6,6 @@ import {
   KIND_DELETE,
   KIND_KNOWLEDGE_DOCUMENT,
   KIND_CONTACTLIST,
-  KIND_VIEWS,
   KIND_MEMBERLIST,
   KIND_RELAY_METADATA_EVENT,
   newTimestamp,
@@ -17,7 +16,6 @@ import { execute, republishEvents } from "./executor";
 import { useApis } from "./Apis";
 import { createPublishQueue } from "./PublishQueue";
 import type { StashmapDB } from "./indexedDB";
-import { viewDataToJSON } from "./serializer";
 import { newDB } from "./knowledge";
 import { buildDocumentEvent } from "./markdownDocument";
 import {
@@ -366,32 +364,11 @@ function removeEmptyNodeFromKnowledgeDBs(
   });
 }
 
-function planPublishViews(plan: Plan, views: Views): Plan {
-  const publishEvents = plan.publishEvents.filterNot(
-    (event) => event.kind === KIND_VIEWS
-  );
-  const writeViewEvent = {
-    kind: KIND_VIEWS,
-    pubkey: plan.user.publicKey,
-    created_at: newTimestamp(),
-    tags: [msTag()],
-    content: JSON.stringify(viewDataToJSON(views, [])),
-  };
+export function planUpdateViews(plan: Plan, views: Views): Plan {
   return {
     ...plan,
     views,
-    publishEvents: publishEvents.push(
-      setRelayConf(writeViewEvent, {
-        defaultRelays: false,
-        user: true,
-        contacts: false,
-      })
-    ),
   };
-}
-
-export function planUpdateViews(plan: Plan, views: Views): Plan {
-  return planPublishViews(plan, views);
 }
 
 export function planUpdatePanes(plan: Plan, panes: Pane[]): Plan {
@@ -1537,12 +1514,14 @@ export function PlanningContextProvider({
   children,
   setPublishEvents,
   setPanes,
+  setViews,
   db,
   getRelays,
 }: {
   children: React.ReactNode;
   setPublishEvents: Dispatch<SetStateAction<EventState>>;
   setPanes: Dispatch<SetStateAction<Pane[]>>;
+  setViews: Dispatch<SetStateAction<Views>>;
   db?: StashmapDB | null;
   getRelays?: () => AllRelays;
 }): JSX.Element {
@@ -1607,6 +1586,7 @@ export function PlanningContextProvider({
 
   const executePlan = async (plan: Plan): Promise<void> => {
     setPanes(plan.panes);
+    setViews(plan.views);
     const filteredEvents = buildDocumentEvents(plan);
 
     if (filteredEvents.size === 0) {

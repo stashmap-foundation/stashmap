@@ -6,6 +6,7 @@ import {
   parseRelationUrl,
   parseAuthorFromSearch,
 } from "./navigationUrl";
+import { splitID } from "./connections";
 import { usePaneHistory } from "./PaneHistoryContext";
 
 const PaneIndexContext = createContext<number>(0);
@@ -131,7 +132,10 @@ export function useNavigatePane(): (url: string) => void {
       setPane({
         id: pane.id,
         stack: [],
-        author,
+        author:
+          parseAuthorFromSearch(search) ||
+          splitID(relationID)[0] ||
+          user.publicKey,
         rootRelation: relationID,
         scrollToId,
       });

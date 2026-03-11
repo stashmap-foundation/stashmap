@@ -14,8 +14,10 @@ import type {
   StoredDocumentRecord,
 } from "./indexedDB";
 import {
+  getCachedEvents,
   getStoredDeletes,
   getStoredDocuments,
+  putCachedEvents,
   subscribeDocumentStore,
 } from "./indexedDB";
 import { newDB } from "./knowledge";
@@ -255,6 +257,20 @@ function createSnapshotFromStoredRecords(
   };
 }
 
+function eventsToStoredRecords(events: ReadonlyArray<Event | UnsignedEvent>): {
+  readonly documents: ReadonlyArray<StoredDocumentRecord>;
+  readonly deletes: ReadonlyArray<StoredDeleteRecord>;
+} {
+  return {
+    documents: events
+      .map((event) => toStoredDocumentRecord(event))
+      .filter((record): record is StoredDocumentRecord => record !== undefined),
+    deletes: events
+      .map((event) => toStoredDeleteRecord(event))
+      .filter((record): record is StoredDeleteRecord => record !== undefined),
+  };
+}
+
 export function DocumentStoreProvider({
   children,
   db,
@@ -272,20 +288,52 @@ export function DocumentStoreProvider({
       return () => {};
     }
     const controller = new AbortController();
-    Promise.all([getStoredDocuments(db), getStoredDeletes(db)]).then(
-      ([documents, deletes]) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-        setSnapshot(createSnapshotFromStoredRecords(documents, deletes));
-      }
-    );
-    const unsubscribe = subscribeDocumentStore(db, (change) => {
+    const loadDocuments =
+      (typeof getStoredDocuments === "function"
+        ? getStoredDocuments(db)
+        : undefined) || Promise.resolve([]);
+    const loadDeletes =
+      (typeof getStoredDeletes === "function"
+        ? getStoredDeletes(db)
+        : undefined) || Promise.resolve([]);
+    Promise.all([loadDocuments, loadDeletes]).then(([documents, deletes]) => {
       if (controller.signal.aborted) {
         return;
       }
-      setSnapshot((current) => applyChangeToSnapshot(current, change));
+      if ((documents || []).length === 0 && (deletes || []).length === 0) {
+        const loadCachedEvents =
+          (typeof getCachedEvents === "function"
+            ? getCachedEvents(db)
+            : undefined) || Promise.resolve([]);
+        loadCachedEvents.then((cachedEvents) => {
+          if (controller.signal.aborted) {
+            return;
+          }
+          const { documents: cachedDocuments, deletes: cachedDeletes } =
+            eventsToStoredRecords(
+              (cachedEvents || []) as ReadonlyArray<Event | UnsignedEvent>
+            );
+          setSnapshot(
+            createSnapshotFromStoredRecords(cachedDocuments, cachedDeletes)
+          );
+        });
+        return;
+      }
+      setSnapshot(
+        createSnapshotFromStoredRecords(documents || [], deletes || [])
+      );
     });
+    const unsubscribeResult =
+      typeof subscribeDocumentStore === "function"
+        ? subscribeDocumentStore(db, (change) => {
+            if (controller.signal.aborted) {
+              return;
+            }
+            setSnapshot((current) => applyChangeToSnapshot(current, change));
+          })
+        : undefined;
+    const unsubscribe =
+      typeof unsubscribeResult === "function" ? unsubscribeResult : () => {};
     return () => {
       controller.abort();
       unsubscribe();
@@ -294,18 +342,8 @@ export function DocumentStoreProvider({
 
   const addEvents = React.useCallback(
     (events: ImmutableMap<string, Event | UnsignedEvent>) => {
-      const documents = events
-        .valueSeq()
-        .toArray()
-        .map((event) => toStoredDocumentRecord(event))
-        .filter(
-          (record): record is StoredDocumentRecord => record !== undefined
-        );
-      const deletes = events
-        .valueSeq()
-        .toArray()
-        .map((event) => toStoredDeleteRecord(event))
-        .filter((record): record is StoredDeleteRecord => record !== undefined);
+      const eventList = events.valueSeq().toArray();
+      const { documents, deletes } = eventsToStoredRecords(eventList);
 
       if (documents.length === 0 && deletes.length === 0) {
         return;
@@ -324,6 +362,12 @@ export function DocumentStoreProvider({
       deletes.forEach((deletion) => {
         applyStoredDelete(db, deletion).catch(() => undefined);
       });
+      if (typeof putCachedEvents === "function") {
+        putCachedEvents(
+          db,
+          eventList as ReadonlyArray<Record<string, unknown>>
+        ).catch(() => undefined);
+      }
     },
     [db]
   );

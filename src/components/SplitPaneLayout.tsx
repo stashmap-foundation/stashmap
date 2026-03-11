@@ -13,7 +13,6 @@ import {
   RootViewContextProvider,
   updateViewPathsAfterPaneDelete,
 } from "../ViewContext";
-import { LoadData, LoadRelationData } from "../dataQuery";
 import { LoadSearchData } from "../LoadSearchData";
 import { PaneView } from "./Workspace";
 import { EMPTY_SEMANTIC_ID, createSearchId } from "../connections";
@@ -21,7 +20,6 @@ import { planUpdateViews, planUpdatePanes, usePlanner } from "../planner";
 import { useData } from "../DataContext";
 import { isUserLoggedIn, useLogout } from "../NostrAuthContext";
 import { useDragAutoScroll } from "../useDragAutoScroll";
-import { LOG_ROOT_ROLE } from "../systemRoots";
 
 export function PaneSearchButton(): JSX.Element {
   const { setPane } = useSplitPanes();
@@ -243,7 +241,7 @@ function PaneContent(): JSX.Element {
   const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
   const { user } = useData();
-  const rootSemanticID = pane.stack[pane.stack.length - 1] || EMPTY_SEMANTIC_ID;
+  const rootItemID = pane.stack[pane.stack.length - 1] || EMPTY_SEMANTIC_ID;
 
   const isOtherUserContent = pane.author !== user.publicKey;
 
@@ -251,33 +249,18 @@ function PaneContent(): JSX.Element {
     ? "split-pane other-user-pane"
     : "split-pane";
 
-  const content = (
+  return (
     <div className={paneClassName} data-pane-index={paneIndex}>
       <LoadSearchData itemIDs={pane.stack}>
-        <LoadData itemIDs={pane.stack}>
-          <LoadData itemIDs={[]} systemRoles={[LOG_ROOT_ROLE]}>
-            <LoadData itemIDs={[rootSemanticID]} referencedBy lists>
-              <RootViewContextProvider
-                root={rootSemanticID as LongID}
-                paneIndex={paneIndex}
-              >
-                <PaneView />
-              </RootViewContextProvider>
-            </LoadData>
-          </LoadData>
-        </LoadData>
+        <RootViewContextProvider
+          root={rootItemID as LongID}
+          paneIndex={paneIndex}
+        >
+          <PaneView />
+        </RootViewContextProvider>
       </LoadSearchData>
     </div>
   );
-
-  if (pane.rootRelation) {
-    return (
-      <LoadRelationData relationID={pane.rootRelation}>
-        {content}
-      </LoadRelationData>
-    );
-  }
-  return content;
 }
 
 function PaneWrapper({ index }: { index: number }): JSX.Element {

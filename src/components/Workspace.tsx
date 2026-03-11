@@ -7,7 +7,6 @@ import {
 
 import {
   getDisplayTextForView,
-  isExpanded,
   parseViewPath,
   ViewPath,
   VirtualItemsMap,
@@ -27,7 +26,11 @@ import {
 } from "../SplitPanesContext";
 import { useNavigationState } from "../NavigationStateContext";
 import { usePaneHistory } from "../PaneHistoryContext";
-import { TreeView } from "./TreeView";
+import {
+  PaneTreeResultProvider,
+  TreeView,
+  usePaneTreeResult,
+} from "./TreeView";
 import { DroppableContainer } from "./DroppableContainer";
 import {
   PaneSearchButton,
@@ -80,7 +83,6 @@ import {
   planBatchOutdent,
   getCurrentItem,
 } from "./batchOperations";
-import { getNodesInTree } from "./Node";
 import { planDeleteNodeFromView } from "../dnd";
 
 function BreadcrumbItem({
@@ -976,24 +978,10 @@ function usePaneKeyboardNavigation(paneIndex: number): {
   const { selection, anchor } = useTemporaryView();
   const data = useData();
   const stack = usePaneStack();
-  const pane = useCurrentPane();
   const toggleFilter = useToggleFilter();
   const viewPath = useViewPath();
   const { createPlan, executePlan } = usePlanner();
-  const treeResult = useMemo(() => {
-    const rootKey = viewPathToString(viewPath);
-    return isExpanded(data, rootKey)
-      ? getNodesInTree(
-          data,
-          viewPath,
-          stack,
-          List<ViewPath>(),
-          pane.rootRelation,
-          pane.author,
-          pane.typeFilters
-        )
-      : undefined;
-  }, [data, viewPath, stack, pane.rootRelation]);
+  const treeResult = usePaneTreeResult();
   const orderedViewKeys = useMemo(
     () =>
       List<ViewPath>([viewPath])
@@ -1641,7 +1629,9 @@ function PaneViewInner(): JSX.Element {
 export function PaneView(): JSX.Element | null {
   return (
     <TemporaryViewProvider>
-      <PaneViewInner />
+      <PaneTreeResultProvider>
+        <PaneViewInner />
+      </PaneTreeResultProvider>
     </TemporaryViewProvider>
   );
 }

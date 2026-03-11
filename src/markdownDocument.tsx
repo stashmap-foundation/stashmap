@@ -2,10 +2,6 @@
 import { List, Map, Set as ImmutableSet } from "immutable";
 import { v4 } from "uuid";
 import { UnsignedEvent } from "nostr-tools";
-import MarkdownIt from "markdown-it";
-import attrs from "markdown-it-attrs";
-// eslint-disable-next-line import/no-unresolved
-import Token from "markdown-it/lib/token";
 import {
   shortID,
   hashText,
@@ -32,372 +28,17 @@ import {
   newRelations,
 } from "./ViewContext";
 import { buildOutgoingReference } from "./buildReferenceRow";
+import { formatNodeAttrs, formatRootHeading } from "./documentFormat";
+import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
 import { KIND_KNOWLEDGE_DOCUMENT, newTimestamp, msTag } from "./nostr";
 import { findTag } from "./nostrEvents";
 import { getNodesInTree } from "./treeTraversal";
 import { newDB } from "./knowledge";
 import { createRootAnchor } from "./rootAnchor";
 import { resolveSemanticRelationInCurrentTree } from "./semanticNavigation";
-import { LOG_ROOT_ROLE } from "./systemRoots";
 
-const markdown = new MarkdownIt();
-markdown.use(attrs);
-
-function extractInlineContent(inline: Token): {
-  text: string;
-  linkHref?: string;
-  linkRelevance?: Relevance;
-  linkArgument?: Argument;
-} {
-  if (!inline.children) {
-    return { text: inline.content.trim() };
-  }
-  const text = inline.children
-    .filter((c) => c.type === "text")
-    .map((c) => c.content)
-    .join("")
-    .trim();
-  const linkOpen = inline.children.find((c) => c.type === "link_open");
-  const href = linkOpen?.attrGet("href");
-  const linkHref = href && href.startsWith("#") ? href.slice(1) : undefined;
-  const linkClass = linkOpen?.attrGet("class") || "";
-  const linkClasses = linkClass.split(" ").filter(Boolean);
-  const linkRelevance = (
-    ["relevant", "maybe_relevant", "little_relevant", "not_relevant"] as const
-  ).find((r) => linkClasses.includes(r));
-  const linkArgument = (["confirms", "contra"] as const).find((a) =>
-    linkClasses.includes(a)
-  );
-  return { text, linkHref, linkRelevance, linkArgument };
-}
-
-function extractAttrs(token: Token): {
-  uuid: string | undefined;
-  semanticID: ID | undefined;
-  relevance: Relevance;
-  argument: Argument;
-  hidden: boolean;
-  basedOn: string | undefined;
-  anchor: RootAnchor | undefined;
-  systemRole: RootSystemRole | undefined;
-  userPublicKey: PublicKey | undefined;
-} {
-  if (!token.attrs) {
-    return {
-      uuid: undefined,
-      semanticID: undefined,
-      relevance: undefined,
-      argument: undefined,
-      hidden: false,
-      basedOn: undefined,
-      anchor: undefined,
-      systemRole: undefined,
-      userPublicKey: undefined,
-    };
-  }
-  const uuid = token.attrs.find(([, value]) => value === "")?.[0];
-  const semanticID = (token.attrGet("semantic") || undefined) as ID | undefined;
-  const classAttr = token.attrGet("class") || "";
-  const classes = classAttr.split(" ").filter(Boolean);
-  const relevance = (
-    ["relevant", "maybe_relevant", "little_relevant", "not_relevant"] as const
-  ).find((r) => classes.includes(r));
-  const argument = (["confirms", "contra"] as const).find((a) =>
-    classes.includes(a)
-  );
-  const hidden = classes.includes("hidden");
-  const basedOn = token.attrGet("basedOn") || undefined;
-  const anchorContext = token.attrGet("anchorContext") || undefined;
-  const anchorLabelsAttr = token.attrGet("anchorLabels") || undefined;
-  const sourceAuthor = token.attrGet("sourceAuthor") || undefined;
-  const sourceRootID = (token.attrGet("sourceRoot") || undefined) as
-    | ID
-    | undefined;
-  const sourceRelationID = (token.attrGet("sourceRelation") || undefined) as
-    | LongID
-    | undefined;
-  const sourceParentRelationID = (token.attrGet("sourceParent") ||
-    undefined) as LongID | undefined;
-  const rawSystemRole = token.attrGet("systemRole") || undefined;
-  const systemRole =
-    rawSystemRole === LOG_ROOT_ROLE ? LOG_ROOT_ROLE : undefined;
-  const userPublicKey = (token.attrGet("userPublicKey") || undefined) as
-    | PublicKey
-    | undefined;
-  const anchor =
-    anchorContext ||
-    anchorLabelsAttr ||
-    sourceAuthor ||
-    sourceRootID ||
-    sourceRelationID ||
-    sourceParentRelationID
-      ? {
-          snapshotContext: anchorContext
-            ? List(anchorContext.split(":") as ID[])
-            : List<ID>(),
-          ...(anchorLabelsAttr
-            ? {
-                snapshotLabels: anchorLabelsAttr
-                  .split("|")
-                  .map((label) => decodeURIComponent(label)),
-              }
-            : {}),
-          ...(sourceAuthor ? { sourceAuthor: sourceAuthor as PublicKey } : {}),
-          ...(sourceRootID ? { sourceRootID } : {}),
-          ...(sourceRelationID ? { sourceRelationID } : {}),
-          ...(sourceParentRelationID ? { sourceParentRelationID } : {}),
-        }
-      : undefined;
-  return {
-    uuid,
-    semanticID,
-    relevance,
-    argument,
-    hidden,
-    basedOn,
-    anchor,
-    systemRole,
-    userPublicKey,
-  };
-}
-
-export type MarkdownTreeNode = {
-  text: string;
-  children: MarkdownTreeNode[];
-  uuid?: string;
-  semanticID?: ID;
-  relevance?: Relevance;
-  argument?: Argument;
-  linkHref?: string;
-  hidden?: boolean;
-  basedOn?: string;
-  anchor?: RootAnchor;
-  systemRole?: RootSystemRole;
-  userPublicKey?: PublicKey;
-};
-
-/* eslint-disable functional/immutable-data, functional/no-let, no-continue */
-function appendNode(
-  roots: MarkdownTreeNode[],
-  parent: MarkdownTreeNode | undefined,
-  node: MarkdownTreeNode
-): void {
-  if (parent) {
-    parent.children.push(node);
-    return;
-  }
-  roots.push(node);
-}
-
-function getLastDefinedListItem(
-  listItemStack: Array<MarkdownTreeNode | undefined>
-): MarkdownTreeNode | undefined {
-  for (let i = listItemStack.length - 1; i >= 0; i -= 1) {
-    const listItem = listItemStack[i];
-    if (listItem) {
-      return listItem;
-    }
-  }
-  return undefined;
-}
-
-export function parseMarkdownHierarchy(
-  markdownText: string
-): MarkdownTreeNode[] {
-  const tokens = markdown.parse(markdownText, {});
-  const roots: MarkdownTreeNode[] = [];
-  const headingStack: Array<{ level: number; node: MarkdownTreeNode }> = [];
-  const listItemStack: Array<MarkdownTreeNode | undefined> = [];
-
-  let pendingAttrs: {
-    uuid: string | undefined;
-    semanticID: ID | undefined;
-    relevance: Relevance;
-    argument: Argument;
-    hidden: boolean;
-    basedOn: string | undefined;
-    anchor: RootAnchor | undefined;
-    systemRole: RootSystemRole | undefined;
-    userPublicKey: PublicKey | undefined;
-  } = {
-    uuid: undefined,
-    semanticID: undefined,
-    relevance: undefined,
-    argument: undefined,
-    hidden: false,
-    basedOn: undefined,
-    anchor: undefined,
-    systemRole: undefined,
-    userPublicKey: undefined,
-  };
-
-  for (let i = 0; i < tokens.length; i += 1) {
-    const token = tokens[i];
-    if (token.type === "heading_open") {
-      const headingLevel = Number(token.tag.replace("h", ""));
-      const inline = tokens[i + 1];
-      if (!inline || inline.type !== "inline") {
-        continue;
-      }
-      const { text } = extractInlineContent(inline);
-      if (!text) {
-        continue;
-      }
-      const {
-        uuid,
-        semanticID,
-        relevance,
-        argument,
-        hidden,
-        basedOn,
-        anchor,
-        systemRole,
-        userPublicKey,
-      } = extractAttrs(token);
-      while (
-        headingStack.length > 0 &&
-        headingStack[headingStack.length - 1].level >= headingLevel
-      ) {
-        headingStack.pop();
-      }
-      const parent =
-        getLastDefinedListItem(listItemStack) ||
-        headingStack[headingStack.length - 1]?.node;
-      const node: MarkdownTreeNode = {
-        text,
-        children: [],
-        ...(uuid !== undefined && { uuid }),
-        ...(semanticID !== undefined && { semanticID }),
-        ...(relevance !== undefined && { relevance }),
-        ...(argument !== undefined && { argument }),
-        ...(hidden && { hidden }),
-        ...(basedOn !== undefined && { basedOn }),
-        ...(anchor !== undefined && { anchor }),
-        ...(systemRole !== undefined && { systemRole }),
-        ...(userPublicKey !== undefined && { userPublicKey }),
-      };
-      appendNode(roots, parent, node);
-      headingStack.push({ level: headingLevel, node });
-      continue;
-    }
-
-    if (token.type === "list_item_open") {
-      pendingAttrs = extractAttrs(token);
-      listItemStack.push(undefined);
-      continue;
-    }
-
-    if (token.type === "list_item_close") {
-      listItemStack.pop();
-      continue;
-    }
-
-    if (token.type !== "paragraph_open") {
-      continue;
-    }
-
-    const inline = tokens[i + 1];
-    if (!inline || inline.type !== "inline") {
-      continue;
-    }
-    const { text, linkHref, linkRelevance, linkArgument } =
-      extractInlineContent(inline);
-    if (!text) {
-      continue;
-    }
-
-    if (listItemStack.length > 0) {
-      const currentItemIndex = listItemStack.length - 1;
-      const currentListNode = listItemStack[currentItemIndex];
-      if (!currentListNode) {
-        const parent =
-          getLastDefinedListItem(listItemStack.slice(0, -1)) ||
-          headingStack[headingStack.length - 1]?.node;
-        const {
-          uuid,
-          semanticID,
-          relevance,
-          argument,
-          hidden,
-          basedOn,
-          userPublicKey,
-        } = pendingAttrs;
-        const effectiveRelevance = linkRelevance ?? relevance;
-        const effectiveArgument = linkArgument ?? argument;
-        const node: MarkdownTreeNode = {
-          text,
-          children: [],
-          ...(uuid !== undefined && { uuid }),
-          ...(semanticID !== undefined && { semanticID }),
-          ...(effectiveRelevance !== undefined && {
-            relevance: effectiveRelevance,
-          }),
-          ...(effectiveArgument !== undefined && {
-            argument: effectiveArgument,
-          }),
-          ...(linkHref !== undefined && { linkHref }),
-          ...(hidden && { hidden }),
-          ...(basedOn !== undefined && { basedOn }),
-          ...(userPublicKey !== undefined && { userPublicKey }),
-        };
-        appendNode(roots, parent, node);
-        listItemStack[currentItemIndex] = node;
-        continue;
-      }
-      currentListNode.children.push({
-        text,
-        children: [],
-        ...(linkHref !== undefined && { linkHref }),
-        ...(linkRelevance !== undefined && { relevance: linkRelevance }),
-        ...(linkArgument !== undefined && { argument: linkArgument }),
-      });
-      continue;
-    }
-
-    const paragraphNode: MarkdownTreeNode = { text, children: [] };
-    appendNode(
-      roots,
-      headingStack[headingStack.length - 1]?.node,
-      paragraphNode
-    );
-  }
-  return roots;
-}
-function formatAttrs(
-  uuid: string,
-  relevance: Relevance,
-  argument: Argument,
-  options?: {
-    hidden?: boolean;
-    basedOn?: LongID;
-    semanticID?: ID;
-    userPublicKey?: PublicKey;
-  }
-): string {
-  const parts: string[] = uuid ? [uuid] : [];
-  if (options?.semanticID) {
-    parts.push(`semantic="${options.semanticID}"`);
-  }
-  if (options?.userPublicKey) {
-    parts.push(`userPublicKey="${options.userPublicKey}"`);
-  }
-  if (relevance) {
-    parts.push(`.${relevance}`);
-  }
-  if (argument) {
-    parts.push(`.${argument}`);
-  }
-  if (options?.hidden) {
-    parts.push(`.hidden`);
-  }
-  if (options?.basedOn) {
-    parts.push(`basedOn="${options.basedOn}"`);
-  }
-  if (parts.length === 0) {
-    return "";
-  }
-  return ` {${parts.join(" ")}}`;
-}
+export type { MarkdownTreeNode } from "./markdownTree";
+export { parseMarkdownHierarchy } from "./markdownTree";
 
 function formatCrefText(
   knowledgeDBs: KnowledgeDBs,
@@ -515,7 +156,7 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
         const crefNodeHashes = targetRelation
           ? acc.nodeHashes.add(hashText(targetRelation.text))
           : acc.nodeHashes;
-        const crefAttrs = formatAttrs("", item?.relevance, item?.argument);
+        const crefAttrs = formatNodeAttrs("", item?.relevance, item?.argument);
         return {
           ...acc,
           lines: [...acc.lines, `${indent}- ${crefText}${crefAttrs}`],
@@ -551,7 +192,7 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
         serializedRelation?.text ?? getDisplayTextForView(data, path, stack);
       const uuid = ownRelation ? shortID(ownRelation.id) : v4();
 
-      const line = `${indent}- ${text}${formatAttrs(
+      const line = `${indent}- ${text}${formatNodeAttrs(
         uuid,
         item?.relevance,
         item?.argument,
@@ -577,42 +218,6 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
       relationUUIDs: ImmutableSet<string>(),
     }
   );
-}
-
-function formatRootHeading(
-  rootText: string,
-  rootUuid: string,
-  rootSemanticID: ID,
-  anchor?: RootAnchor,
-  systemRole?: RootSystemRole
-): string {
-  const parts = [rootUuid, `semantic="${rootSemanticID}"`];
-  if (anchor?.snapshotContext.size) {
-    parts.push(`anchorContext="${anchor.snapshotContext.join(":")}"`);
-  }
-  if (anchor?.snapshotLabels?.length) {
-    parts.push(
-      `anchorLabels="${anchor.snapshotLabels
-        .map((label) => encodeURIComponent(label))
-        .join("|")}"`
-    );
-  }
-  if (anchor?.sourceAuthor) {
-    parts.push(`sourceAuthor="${anchor.sourceAuthor}"`);
-  }
-  if (anchor?.sourceRootID) {
-    parts.push(`sourceRoot="${anchor.sourceRootID}"`);
-  }
-  if (anchor?.sourceRelationID) {
-    parts.push(`sourceRelation="${anchor.sourceRelationID}"`);
-  }
-  if (anchor?.sourceParentRelationID) {
-    parts.push(`sourceParent="${anchor.sourceParentRelationID}"`);
-  }
-  if (systemRole) {
-    parts.push(`systemRole="${systemRole}"`);
-  }
-  return `# ${rootText} {${parts.join(" ")}}`;
 }
 
 export function treeToMarkdown(data: Data, rootRelation: Relations): string {

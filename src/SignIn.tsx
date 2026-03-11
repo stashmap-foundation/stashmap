@@ -1,10 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Form, Modal } from "react-bootstrap";
 import { useLocation, useNavigate } from "react-router-dom";
-import { getPublicKey, nip19 } from "nostr-tools";
-// eslint-disable-next-line import/no-unresolved
-import * as nip06 from "nostr-tools/nip06";
-import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { ErrorMessage } from "./commons/ErrorMessage";
 import { Button } from "./commons/Ui";
 import { createSubmitHandler } from "./commons/modalFormSubmitHandler";
@@ -19,28 +15,7 @@ import { execute } from "./executor";
 import { useApis } from "./Apis";
 import { KINDS_META } from "./Data";
 import { useStorePreLoginEvents } from "./StorePreLoginContext";
-
-/* eslint-disable no-empty */
-function convertInputToPrivateKey(input: string): string | undefined {
-  try {
-    const { type, data } = nip19.decode(input);
-    if (type !== "nsec") {
-      return undefined;
-    }
-    return bytesToHex(data);
-  } catch {}
-  try {
-    // Is this a seed phrase?
-    return nip06.privateKeyFromSeedWords(input);
-  } catch {}
-  try {
-    // Is this a private key?
-    getPublicKey(hexToBytes(input));
-    return input;
-  } catch {}
-  return undefined;
-}
-/* eslint-disable no-empty */
+import { convertInputToPrivateKey } from "./nostrKey";
 
 function SignInWithSeed({
   setPrivateKey,

@@ -1,48 +1,40 @@
 import { SimplePool } from "nostr-tools";
 import { loadCliProfile } from "./config";
+import { requireValue } from "./args";
 import { SyncPullCliArgs } from "./types";
 import { pullSyncWorkspace, SyncPullManifest } from "../core/syncPull";
 
-function requireValue(args: string[], index: number, flag: string): string {
-  const value = args[index + 1];
-  if (!value || value.startsWith("--")) {
-    throw new Error(`Missing value for ${flag}`);
-  }
-  return value;
-}
-
 export function parseSyncPullArgs(args: string[]): SyncPullCliArgs {
-  const initial: SyncPullCliArgs = {
-    relayUrls: [],
-    help: false,
-  };
-
-  const parseAt = (index: number, parsed: SyncPullCliArgs): SyncPullCliArgs => {
-    if (index >= args.length) {
-      return parsed;
+  const parse = (index: number, current: SyncPullCliArgs): SyncPullCliArgs => {
+    const arg = args[index];
+    if (!arg) {
+      return current;
     }
 
-    const arg = args[index];
     switch (arg) {
       case "--help":
       case "-h":
-        return parseAt(index + 1, { ...parsed, help: true });
+        return parse(index + 1, {
+          ...current,
+          help: true,
+        });
       case "--config":
-        return parseAt(index + 2, {
-          ...parsed,
+        return parse(index + 2, {
+          ...current,
           configPath: requireValue(args, index, "--config"),
         });
       case "--out":
-        return parseAt(index + 2, {
-          ...parsed,
+        return parse(index + 2, {
+          ...current,
           outDir: requireValue(args, index, "--out"),
         });
       case "--relay":
-        return parseAt(index + 2, {
-          ...parsed,
-          relayUrls: parsed.relayUrls.concat(
-            requireValue(args, index, "--relay")
-          ),
+        return parse(index + 2, {
+          ...current,
+          relayUrls: [
+            ...current.relayUrls,
+            requireValue(args, index, "--relay"),
+          ],
         });
       case "--max-wait": {
         const value = requireValue(args, index, "--max-wait");
@@ -50,8 +42,8 @@ export function parseSyncPullArgs(args: string[]): SyncPullCliArgs {
         if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
           throw new Error("--max-wait must be a positive number");
         }
-        return parseAt(index + 2, {
-          ...parsed,
+        return parse(index + 2, {
+          ...current,
           maxWaitMs: parsedValue,
         });
       }
@@ -60,7 +52,10 @@ export function parseSyncPullArgs(args: string[]): SyncPullCliArgs {
     }
   };
 
-  return parseAt(0, initial);
+  return parse(0, {
+    relayUrls: [],
+    help: false,
+  });
 }
 
 export function syncPullHelp(): string {
@@ -73,7 +68,7 @@ export function syncPullHelp(): string {
 
 export async function runSyncPullCommand(
   args: string[]
-): Promise<SyncPullManifest | { help: true; text: string }> {
+): Promise<{ help: true; text: string } | SyncPullManifest> {
   const parsed = parseSyncPullArgs(args);
   if (parsed.help) {
     return {

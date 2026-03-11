@@ -29,6 +29,23 @@ export function sanitizeRelays(relays: Array<Relay>): Array<Relay> {
     .filter((relay) => relay !== undefined) as Array<Relay>;
 }
 
+export function uniqueRelayUrls(relays: Relays): string[] {
+  return [...new Set(sanitizeRelays(relays).map((relay) => relay.url))];
+}
+
+export function relaysFromUrls(urls: string[]): Relays {
+  const normalized = urls.map((url) => ({
+    url,
+    read: true,
+    write: true,
+  }));
+  const sanitized = sanitizeRelays(normalized);
+  if (sanitized.length !== normalized.length) {
+    throw new Error("Invalid relay URL");
+  }
+  return sanitized;
+}
+
 export function findAllRelays(event: EventTemplate): Array<Relay> {
   const relayTags = findAllTags(event, "r");
   if (!relayTags) {

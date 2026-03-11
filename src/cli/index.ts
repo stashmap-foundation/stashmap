@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 import { runSyncPullCommand, syncPullHelp } from "./syncPull";
+import {
+  runWriteCreateRootCommand,
+  writeCreateRootHelp,
+} from "./writeCreateRoot";
 
 function generalHelp(): string {
   return [
@@ -7,8 +11,11 @@ function generalHelp(): string {
     "",
     "Commands:",
     "  sync pull   Export a local markdown workspace from relays",
+    "  write create-root   Publish a new standalone root",
     "",
     syncPullHelp(),
+    "",
+    writeCreateRootHelp(),
   ].join("\n");
 }
 
@@ -22,6 +29,16 @@ async function main(): Promise<void> {
 
   if (command === "sync" && subcommand === "pull") {
     const result = await runSyncPullCommand(rest);
+    if ("help" in result) {
+      process.stdout.write(`${result.text}\n`);
+      return;
+    }
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    return;
+  }
+
+  if (command === "write" && subcommand === "create-root") {
+    const result = await runWriteCreateRootCommand(rest);
     if ("help" in result) {
       process.stdout.write(`${result.text}\n`);
       return;

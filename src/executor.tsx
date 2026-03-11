@@ -7,49 +7,9 @@ import {
   isUserLoggedInWithExtension,
 } from "./NostrAuthContext";
 import { applyWriteRelayConfig } from "./relays";
+import { publishEventToRelays, PUBLISH_TIMEOUT } from "./nostrPublish";
 
-// Timeout in ms for pulish() on a relay
-export const PUBLISH_TIMEOUT = 5000;
-
-async function publishEvent(
-  relayPool: SimplePool,
-  event: Event,
-  writeRelayUrls: Array<string>
-): Promise<PublishResultsOfEvent> {
-  if (writeRelayUrls.length === 0) {
-    throw new Error("No relays to publish on");
-  }
-  const timeout = (ms: number): Promise<unknown> =>
-    new Promise((_, reject): void => {
-      setTimeout(() => reject(new Error("Timeout")), ms);
-    });
-  const results = await Promise.allSettled(
-    relayPool.publish(writeRelayUrls, event).map((promise) => {
-      return Promise.race([promise, timeout(PUBLISH_TIMEOUT)]);
-    })
-  );
-  // If one message can be sent publish is a success,
-  // otherwise it's a failure
-  const failures = results.filter((res) => res.status === "rejected");
-  if (failures.length === writeRelayUrls.length) {
-    // Reject only when all have failed
-    // eslint-disable-next-line no-console
-    failures.map((failure) => console.error(failure, event));
-    throw new Error(
-      `Failed to publish on: ${writeRelayUrls.map((url) => url).join(",")}`
-    );
-  }
-  return {
-    event,
-    results: writeRelayUrls.reduce((rdx, url, index) => {
-      const res = results[index];
-      return rdx.set(url, {
-        status: res.status,
-        reason: res.status === "rejected" ? (res.reason as string) : undefined,
-      });
-    }, Map<string, PublishStatus>()),
-  };
-}
+export { PUBLISH_TIMEOUT };
 
 export type SignedEventWithConf = {
   readonly event: VerifiedEvent;
@@ -134,7 +94,7 @@ export async function execute({
         plan.relays.contactsRelays,
         writeRelayConf
       );
-      return publishEvent(
+      return publishEventToRelays(
         relayPool,
         event,
         Array.from(new Set(writeRelayUrls.map((r: Relay) => r.url)))
@@ -166,7 +126,7 @@ export async function republishEvents({
   const results = await Promise.all(
     events
       .toArray()
-      .map((event) => publishEvent(relayPool, event, [writeRelayUrl]))
+      .map((event) => publishEventToRelays(relayPool, event, [writeRelayUrl]))
   );
 
   return results.reduce((rdx, result, index) => {

@@ -2,6 +2,10 @@ import React from "react";
 import { List } from "immutable";
 import { useDropzone } from "react-dropzone";
 import { createSemanticID, hashText } from "../connections";
+import {
+  MarkdownImportFile,
+  parseMarkdownImportFiles,
+} from "../markdownImport";
 import { ViewPath, getRelationForView, newRelations } from "../ViewContext";
 import {
   Plan,
@@ -21,19 +25,8 @@ import {
 
 export type { MarkdownTreeNode } from "../markdownDocument";
 export { parseMarkdownHierarchy } from "../markdownDocument";
-
-export type MarkdownImportFile = {
-  name: string;
-  markdown: string;
-};
-
-function titleFromFileName(fileName: string): string {
-  const baseName = fileName.replace(/\.[^/.]+$/u, "").trim();
-  if (baseName) {
-    return baseName;
-  }
-  return "Imported Markdown";
-}
+export type { MarkdownImportFile } from "../markdownImport";
+export { parseMarkdownImportFiles } from "../markdownImport";
 
 /* eslint-disable functional/immutable-data */
 export function parsedLinesToTrees(items: ParsedLine[]): MarkdownTreeNode[] {
@@ -62,26 +55,6 @@ export function parseTextToTrees(text: string): MarkdownTreeNode[] {
     return parseMarkdownHierarchy(text);
   }
   return parsedLinesToTrees(parseClipboardText(text));
-}
-
-function normalizeRootsForSingleFile(
-  roots: MarkdownTreeNode[],
-  fileName: string
-): MarkdownTreeNode[] {
-  if (roots.length <= 1) {
-    return roots;
-  }
-  return [{ text: titleFromFileName(fileName), children: roots }];
-}
-
-export function parseMarkdownImportFiles(
-  files: MarkdownImportFile[]
-): MarkdownTreeNode[] {
-  return files.reduce((acc: MarkdownTreeNode[], file: MarkdownImportFile) => {
-    const roots = parseMarkdownHierarchy(file.markdown);
-    const normalizedRoots = normalizeRootsForSingleFile(roots, file.name);
-    return [...acc, ...normalizedRoots];
-  }, []);
 }
 
 export function buildRootTreeForEmptyRootDrop(

@@ -1,12 +1,6 @@
 import React from "react";
 import { List, Map as ImmutableMap } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
-import {
-  ensureRelationNativeFields,
-  getRelationDepth,
-  shortID,
-  splitID,
-} from "./connections";
 import type {
   DocumentStoreChange,
   StashmapDB,
@@ -20,9 +14,9 @@ import {
   putCachedEvents,
   subscribeDocumentStore,
 } from "./indexedDB";
-import { newDB } from "./knowledge";
-import { parseDocumentEvent } from "./markdownDocument";
-import { KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
+import {
+  buildKnowledgeDBFromStoredDocuments,
+} from "./documentMaterialization";
 import {
   applyStoredDelete,
   applyStoredDocument,
@@ -53,68 +47,6 @@ function createEmptySnapshot(): DocumentSnapshot {
   };
 }
 
-function storedDocumentToEvent(document: StoredDocumentRecord): UnsignedEvent {
-  return {
-    pubkey: document.author,
-    created_at: document.createdAt,
-    kind: KIND_KNOWLEDGE_DOCUMENT,
-    tags: document.tags,
-    content: document.content,
-  };
-}
-
-function buildKnowledgeDBForAuthor(
-  author: PublicKey,
-  documents: ReadonlyArray<StoredDocumentRecord>
-): KnowledgeData | undefined {
-  if (documents.length === 0) {
-    return undefined;
-  }
-
-  const parsedRelations = List(
-    documents.flatMap((document) =>
-      parseDocumentEvent(storedDocumentToEvent(document)).valueSeq().toArray()
-    )
-  );
-
-  const documentRelations = parsedRelations.reduce((acc, relation) => {
-    const localID = splitID(relation.id)[1];
-    const existing = acc.get(localID);
-    if (!existing || relation.updated >= existing.updated) {
-      return acc.set(localID, relation);
-    }
-    return acc;
-  }, ImmutableMap<string, Relations>());
-
-  const baseKnowledgeDBs = ImmutableMap<PublicKey, KnowledgeData>().set(
-    author,
-    {
-      ...newDB(),
-      relations: documentRelations,
-    }
-  );
-
-  const relations = documentRelations
-    .valueSeq()
-    .sortBy((relation) => getRelationDepth(baseKnowledgeDBs, relation))
-    .reduce((acc, relation) => {
-      const knowledgeDBs = ImmutableMap<PublicKey, KnowledgeData>().set(
-        relation.author,
-        {
-          ...newDB(),
-          relations: acc,
-        }
-      );
-      const normalized = ensureRelationNativeFields(knowledgeDBs, relation);
-      return acc.set(shortID(normalized.id), normalized);
-    }, ImmutableMap<string, Relations>());
-
-  return {
-    ...newDB(),
-    relations,
-  };
-}
-
 function rebuildAuthors(
   snapshot: DocumentSnapshot,
   authors: ReadonlyArray<PublicKey>
@@ -125,7 +57,10 @@ function rebuildAuthors(
       .valueSeq()
       .filter((document) => document.author === author)
       .toArray();
-    const nextKnowledgeDB = buildKnowledgeDBForAuthor(author, authorDocuments);
+    const nextKnowledgeDB = buildKnowledgeDBFromStoredDocuments(
+      author,
+      authorDocuments
+    );
     return nextKnowledgeDB
       ? acc.set(author, nextKnowledgeDB)
       : acc.remove(author);

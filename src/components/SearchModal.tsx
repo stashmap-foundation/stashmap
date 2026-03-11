@@ -4,7 +4,7 @@ import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
 import { useData } from "../DataContext";
 import { useApis } from "../Apis";
 import { KIND_SEARCH } from "../Data";
-import { findDocumentRelations } from "../knowledgeEvents";
+import { findDocumentRelations } from "../documentMaterialization";
 import { buildTextNodesFromRelations } from "../connections";
 import type { TextSeed } from "../connections";
 import { useReadRelays } from "../relays";

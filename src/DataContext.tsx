@@ -2,7 +2,7 @@ import React from "react";
 import { Map } from "immutable";
 import { newDB } from "./knowledge";
 import { injectEmptyNodesIntoKnowledgeDBs } from "./connections";
-import { useCachedKnowledgeDBs } from "./EventCache";
+import { useDocumentKnowledgeDBs } from "./DocumentStore";
 
 export type DataContextProps = Data;
 
@@ -60,10 +60,11 @@ export function MergeKnowledgeDB({
   const { temporaryEvents } = data.publishEventsStatus;
   const myself = data.user.publicKey;
 
-  const cachedDBs = useCachedKnowledgeDBs();
+  const documentDBs = useDocumentKnowledgeDBs();
+  const mergedDataDBs = mergeKnowledgeDBs(data.knowledgeDBs, documentDBs);
   const baseDBs = knowledgeDBs
-    ? mergeKnowledgeDBs(knowledgeDBs, cachedDBs)
-    : cachedDBs;
+    ? mergeKnowledgeDBs(knowledgeDBs, mergedDataDBs)
+    : mergedDataDBs;
 
   const injectedDBs = injectEmptyNodesIntoKnowledgeDBs(
     baseDBs,

@@ -335,6 +335,13 @@ Current query model:
 
 The app loads candidate documents broadly, then does semantic discrimination locally.
 
+Important status note:
+- the current UI query model is transitional
+- it still contains overlapping pane/root/tree subscriptions
+- the intended next architecture is a permanent local document replica in IndexedDB
+- one broad live document sync plus paged historical backfill should replace most pane/tree document subscriptions
+- normal browsing should become local-first rather than query-driven
+
 ## `~Log`
 
 `~Log` is now a normal standalone root with:

@@ -15,10 +15,10 @@ import { REFERENCED_BY } from "./constants";
 import { useCurrentPane } from "./SplitPanesContext";
 import { useData } from "./DataContext";
 import { useApis } from "./Apis";
+import { useDocumentStore } from "./DocumentStore";
 import { RegisterQuery, extractIDsFromQueries } from "./LoadingStatus";
 import { useReadRelays } from "./relays";
 import { useEventQuery } from "./commons/useNostrQuery";
-import { useEventCache } from "./EventCache";
 
 function addIDToFilter(
   filter: Filter,
@@ -273,7 +273,7 @@ export function useQueryKnowledgeData(filters: Filter[]): {
   const [allEventsProcessed, setAllEventsProcessed] = useState(false);
   const setAllEventsProcessedTimeout = useRef<number | undefined>(undefined);
 
-  const eventCache = useEventCache();
+  const addDocumentEvents = useDocumentStore()?.addEvents;
 
   const disabled = isOnlyDelete(filters) || filters.length === 0;
   const { events, eose } = useEventQuery(relayPool, filters, {
@@ -285,10 +285,10 @@ export function useQueryKnowledgeData(filters: Filter[]): {
   });
 
   useEffect(() => {
-    if (eventCache && events.size > 0) {
-      eventCache.addEvents(events);
+    if (addDocumentEvents && events.size > 0) {
+      addDocumentEvents(events);
     }
-  }, [eventCache, events]);
+  }, [addDocumentEvents, events]);
 
   const serializedFilters = JSON.stringify(filters);
 

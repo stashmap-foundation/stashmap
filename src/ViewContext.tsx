@@ -201,12 +201,12 @@ function getRowIDFromPath(data: Data, viewPath: ViewPath): LongID | ID {
     data.user.publicKey
   )
     ? getRelationSemanticID(
-        getRelationsNoReferencedBy(
-          data.knowledgeDBs,
-          currentID,
-          data.user.publicKey
-        ) as Relations
-      )
+      getRelationsNoReferencedBy(
+        data.knowledgeDBs,
+        currentID,
+        data.user.publicKey
+      ) as Relations
+    )
     : currentID;
 }
 
@@ -344,15 +344,15 @@ export function buildPaneTarget(
     }
     return virtualType === "version"
       ? getRefTargetInfo(
-          currentReference.id,
-          data.knowledgeDBs,
-          effectiveAuthor
-        )
+        currentReference.id,
+        data.knowledgeDBs,
+        effectiveAuthor
+      )
       : getRefLinkTargetInfo(
-          currentReference.id,
-          data.knowledgeDBs,
-          effectiveAuthor
-        );
+        currentReference.id,
+        data.knowledgeDBs,
+        effectiveAuthor
+      );
   })();
   if (refInfo) {
     return {
@@ -659,13 +659,13 @@ export function RootViewContextProvider({
   const resolvedRootRelation = pane?.rootRelation
     ? getRelations(data.knowledgeDBs, pane.rootRelation, data.user.publicKey)
     : resolveSemanticRelationInCurrentTree(
-        data.knowledgeDBs,
-        pane?.author || data.user.publicKey,
-        root,
-        rootContext,
-        undefined,
-        true
-      );
+      data.knowledgeDBs,
+      pane?.author || data.user.publicKey,
+      root,
+      rootContext,
+      undefined,
+      true
+    );
   const startPath: ViewPath = [paneIndex, resolvedRootRelation?.id || root];
   const finalPath = (indices || List<number>()).reduce(
     (acc, index) => addNodeToPath(data, acc, index, stack),

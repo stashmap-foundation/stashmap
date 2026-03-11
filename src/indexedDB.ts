@@ -2,10 +2,17 @@
 import { UnsignedEvent } from "nostr-tools";
 
 const DB_NAME = "stashmap";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const OUTBOX_STORE = "outbox";
 const EVENT_CACHE_STORE = "eventCache";
+const DOCUMENT_STORE = "documents";
+const DOCUMENT_DELETE_STORE = "documentDeletes";
+const SYNC_CHECKPOINT_STORE = "syncCheckpoints";
 const OPEN_DATABASES = new Set<StashmapDB>();
+const DOCUMENT_STORE_LISTENERS = new WeakMap<
+  StashmapDB,
+  Set<(change: DocumentStoreChange) => void>
+>();
 
 export type OutboxEntry = {
   readonly key: string;
@@ -14,7 +21,75 @@ export type OutboxEntry = {
   readonly succeededRelays?: ReadonlyArray<string>;
 };
 
+export type StoredDocumentRecord = {
+  readonly replaceableKey: string;
+  readonly author: PublicKey;
+  readonly eventId: string;
+  readonly dTag: string;
+  readonly createdAt: number;
+  readonly updatedMs: number;
+  readonly content: string;
+  readonly tags: string[][];
+};
+
+export type StoredDeleteRecord = {
+  readonly replaceableKey: string;
+  readonly author: PublicKey;
+  readonly eventId: string;
+  readonly createdAt: number;
+  readonly deletedAt: number;
+};
+
+export type SyncCheckpointRecord = {
+  readonly author: PublicKey;
+  readonly docsBackfillComplete: boolean;
+  readonly deletesBackfillComplete: boolean;
+  readonly oldestFetchedDocCreatedAt?: number;
+  readonly oldestFetchedDeleteCreatedAt?: number;
+  readonly latestSeenLiveCreatedAt?: number;
+};
+
+export type DocumentStoreChange =
+  | {
+      readonly type: "document-put";
+      readonly document: StoredDocumentRecord;
+    }
+  | {
+      readonly type: "document-remove";
+      readonly replaceableKey: string;
+    }
+  | {
+      readonly type: "delete-put";
+      readonly deletion: StoredDeleteRecord;
+    }
+  | {
+      readonly type: "delete-remove";
+      readonly replaceableKey: string;
+    };
+
 export type StashmapDB = IDBDatabase;
+
+function notifyDocumentStoreListeners(
+  db: StashmapDB,
+  change: DocumentStoreChange
+): void {
+  DOCUMENT_STORE_LISTENERS.get(db)?.forEach((listener) => listener(change));
+}
+
+export function subscribeDocumentStore(
+  db: StashmapDB,
+  listener: (change: DocumentStoreChange) => void
+): () => void {
+  const listeners = DOCUMENT_STORE_LISTENERS.get(db) || new Set();
+  listeners.add(listener);
+  DOCUMENT_STORE_LISTENERS.set(db, listeners);
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0) {
+      DOCUMENT_STORE_LISTENERS.delete(db);
+    }
+  };
+}
 
 export const openDB = (): Promise<StashmapDB | null> => {
   if (typeof indexedDB === "undefined") {
@@ -29,6 +104,25 @@ export const openDB = (): Promise<StashmapDB | null> => {
       }
       if (!db.objectStoreNames.contains(EVENT_CACHE_STORE)) {
         db.createObjectStore(EVENT_CACHE_STORE, { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains(DOCUMENT_STORE)) {
+        const documents = db.createObjectStore(DOCUMENT_STORE, {
+          keyPath: "replaceableKey",
+        });
+        documents.createIndex("author", "author", { unique: false });
+        documents.createIndex("updatedMs", "updatedMs", { unique: false });
+      }
+      if (!db.objectStoreNames.contains(DOCUMENT_DELETE_STORE)) {
+        const deletes = db.createObjectStore(DOCUMENT_DELETE_STORE, {
+          keyPath: "replaceableKey",
+        });
+        deletes.createIndex("author", "author", { unique: false });
+        deletes.createIndex("deletedAt", "deletedAt", { unique: false });
+      }
+      if (!db.objectStoreNames.contains(SYNC_CHECKPOINT_STORE)) {
+        db.createObjectStore(SYNC_CHECKPOINT_STORE, {
+          keyPath: "author",
+        });
       }
     };
     request.onsuccess = () => {
@@ -98,6 +192,153 @@ export const putCachedEvents = (
     events.forEach((e) => store.put(e));
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
+  });
+
+export const getStoredDocuments = (
+  db: StashmapDB
+): Promise<ReadonlyArray<StoredDocumentRecord>> =>
+  new Promise((resolve, reject) => {
+    const request = txStore(db, DOCUMENT_STORE, "readonly").getAll();
+    request.onsuccess = () =>
+      resolve(request.result as ReadonlyArray<StoredDocumentRecord>);
+    request.onerror = () => reject(request.error);
+  });
+
+export const getStoredDocument = (
+  db: StashmapDB,
+  replaceableKey: string
+): Promise<StoredDocumentRecord | undefined> =>
+  new Promise((resolve, reject) => {
+    const request = txStore(db, DOCUMENT_STORE, "readonly").get(replaceableKey);
+    request.onsuccess = () =>
+      resolve(request.result as StoredDocumentRecord | undefined);
+    request.onerror = () => reject(request.error);
+  });
+
+export const putStoredDocument = (
+  db: StashmapDB,
+  document: StoredDocumentRecord
+): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const request = txStore(db, DOCUMENT_STORE, "readwrite").put(document);
+    request.onsuccess = () => {
+      notifyDocumentStoreListeners(db, {
+        type: "document-put",
+        document,
+      });
+      resolve();
+    };
+    request.onerror = () => reject(request.error);
+  });
+
+export const removeStoredDocument = (
+  db: StashmapDB,
+  replaceableKey: string
+): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const request = txStore(db, DOCUMENT_STORE, "readwrite").delete(
+      replaceableKey
+    );
+    request.onsuccess = () => {
+      notifyDocumentStoreListeners(db, {
+        type: "document-remove",
+        replaceableKey,
+      });
+      resolve();
+    };
+    request.onerror = () => reject(request.error);
+  });
+
+export const getStoredDeletes = (
+  db: StashmapDB
+): Promise<ReadonlyArray<StoredDeleteRecord>> =>
+  new Promise((resolve, reject) => {
+    const request = txStore(db, DOCUMENT_DELETE_STORE, "readonly").getAll();
+    request.onsuccess = () =>
+      resolve(request.result as ReadonlyArray<StoredDeleteRecord>);
+    request.onerror = () => reject(request.error);
+  });
+
+export const getStoredDelete = (
+  db: StashmapDB,
+  replaceableKey: string
+): Promise<StoredDeleteRecord | undefined> =>
+  new Promise((resolve, reject) => {
+    const request = txStore(db, DOCUMENT_DELETE_STORE, "readonly").get(
+      replaceableKey
+    );
+    request.onsuccess = () =>
+      resolve(request.result as StoredDeleteRecord | undefined);
+    request.onerror = () => reject(request.error);
+  });
+
+export const putStoredDelete = (
+  db: StashmapDB,
+  deletion: StoredDeleteRecord
+): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const request = txStore(db, DOCUMENT_DELETE_STORE, "readwrite").put(
+      deletion
+    );
+    request.onsuccess = () => {
+      notifyDocumentStoreListeners(db, {
+        type: "delete-put",
+        deletion,
+      });
+      resolve();
+    };
+    request.onerror = () => reject(request.error);
+  });
+
+export const removeStoredDelete = (
+  db: StashmapDB,
+  replaceableKey: string
+): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const request = txStore(db, DOCUMENT_DELETE_STORE, "readwrite").delete(
+      replaceableKey
+    );
+    request.onsuccess = () => {
+      notifyDocumentStoreListeners(db, {
+        type: "delete-remove",
+        replaceableKey,
+      });
+      resolve();
+    };
+    request.onerror = () => reject(request.error);
+  });
+
+export const getSyncCheckpoints = (
+  db: StashmapDB
+): Promise<ReadonlyArray<SyncCheckpointRecord>> =>
+  new Promise((resolve, reject) => {
+    const request = txStore(db, SYNC_CHECKPOINT_STORE, "readonly").getAll();
+    request.onsuccess = () =>
+      resolve(request.result as ReadonlyArray<SyncCheckpointRecord>);
+    request.onerror = () => reject(request.error);
+  });
+
+export const getSyncCheckpoint = (
+  db: StashmapDB,
+  author: PublicKey
+): Promise<SyncCheckpointRecord | undefined> =>
+  new Promise((resolve, reject) => {
+    const request = txStore(db, SYNC_CHECKPOINT_STORE, "readonly").get(author);
+    request.onsuccess = () =>
+      resolve(request.result as SyncCheckpointRecord | undefined);
+    request.onerror = () => reject(request.error);
+  });
+
+export const putSyncCheckpoint = (
+  db: StashmapDB,
+  checkpoint: SyncCheckpointRecord
+): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const request = txStore(db, SYNC_CHECKPOINT_STORE, "readwrite").put(
+      checkpoint
+    );
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
   });
 
 export const clearDatabase = (): Promise<void> =>

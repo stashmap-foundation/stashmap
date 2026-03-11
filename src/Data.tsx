@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { List, Map, Set, OrderedSet } from "immutable";
-import { Event, UnsignedEvent } from "nostr-tools";
 // eslint-disable-next-line import/no-unresolved
 import { RelayInformation } from "nostr-tools/lib/types/nip11";
 import {
@@ -12,20 +11,13 @@ import {
   KIND_RELAY_METADATA_EVENT,
 } from "./nostr";
 import { DataContextProvider, MergeKnowledgeDB } from "./DataContext";
-import { EventCacheProvider } from "./EventCache";
 import { useApis } from "./Apis";
 import { PlanningContextProvider, replaceUnauthenticatedUser } from "./planner";
 import { useUserRelayContext } from "./UserRelayContext";
 import { flattenRelays, usePreloadRelays } from "./relays";
 import { useDefaultRelays } from "./NostrAuthContext";
 import { useEventQuery } from "./commons/useNostrQuery";
-import {
-  openDB,
-  StashmapDB,
-  getCachedEvents,
-  getOutboxEvents,
-  putCachedEvents,
-} from "./indexedDB";
+import { openDB, StashmapDB, getOutboxEvents } from "./indexedDB";
 import {
   pathToStack,
   parseRelationUrl,
@@ -40,6 +32,8 @@ import {
   newProcessedEvents,
   processEvents,
 } from "./eventProcessing";
+import { DocumentStoreProvider } from "./DocumentStore";
+import { usePermanentDocumentSync } from "./usePermanentDocumentSync";
 
 export const defaultPane = (
   author: PublicKey,
@@ -184,24 +178,12 @@ function Data({ user, children }: DataProps): JSX.Element {
   const { relayPool } = useApis();
 
   const [db, setDb] = useState<StashmapDB | null>(null);
-  const [initialCachedEvents, setInitialCachedEvents] = useState<
-    Map<string, Event | UnsignedEvent>
-  >(Map());
 
   useEffect(() => {
     openDB().then(async (database) => {
       if (!database) return;
       setDb(database);
-      const [cached, outbox] = await Promise.all([
-        getCachedEvents(database),
-        getOutboxEvents(database),
-      ]);
-      const eventsMap = (cached as unknown as ReadonlyArray<Event>).reduce(
-        (rdx: Map<string, Event | UnsignedEvent>, event: Event) =>
-          event.id ? rdx.set(event.id, event) : rdx,
-        Map<string, Event | UnsignedEvent>()
-      );
-      setInitialCachedEvents(eventsMap);
+      const outbox = await getOutboxEvents(database);
       if (outbox.length > 0) {
         setNewEventsAndPublishResults((prev) => ({
           ...prev,
@@ -220,18 +202,6 @@ function Data({ user, children }: DataProps): JSX.Element {
       }
     };
   }, [db]);
-
-  const onEventsAdded = useCallback(
-    (events: Map<string, Event | UnsignedEvent>) => {
-      if (!db) return;
-      const asRecords = events
-        .valueSeq()
-        .toArray()
-        .map((e) => e as unknown as Record<string, unknown>);
-      putCachedEvents(db, asRecords).catch(() => {});
-    },
-    [db]
-  );
 
   const initialPublicKeyRef = useRef(myPublicKey);
   useEffect(() => {
@@ -318,6 +288,16 @@ function Data({ user, children }: DataProps): JSX.Element {
 
   const projectMembers = Map<PublicKey, Member>();
 
+  usePermanentDocumentSync({
+    db,
+    myself: myPublicKey,
+    contacts,
+    projectMembers,
+    defaultRelays,
+    userRelays,
+    contactsRelays,
+  });
+
   return (
     <DataContextProvider
       contacts={contacts}
@@ -330,10 +310,9 @@ function Data({ user, children }: DataProps): JSX.Element {
       panes={panes}
       projectMembers={projectMembers}
     >
-      <EventCacheProvider
+      <DocumentStoreProvider
+        db={db}
         unpublishedEvents={newEventsAndPublishResults.unsignedEvents}
-        initialCachedEvents={initialCachedEvents}
-        onEventsAdded={onEventsAdded}
       >
         <MergeKnowledgeDB>
           <PlanningContextProvider
@@ -349,7 +328,7 @@ function Data({ user, children }: DataProps): JSX.Element {
             <NavigationStateProvider>{children}</NavigationStateProvider>
           </PlanningContextProvider>
         </MergeKnowledgeDB>
-      </EventCacheProvider>
+      </DocumentStoreProvider>
     </DataContextProvider>
   );
 }

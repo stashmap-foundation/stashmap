@@ -48,7 +48,7 @@ import {
   DataContextProvider,
   MergeKnowledgeDB,
 } from "./DataContext";
-import { EventCacheProvider } from "./EventCache";
+import { DocumentStoreProvider } from "./DocumentStore";
 import { MockRelayPool, mockRelayPool } from "./nostrMock.test";
 import {
   NostrAuthContextProvider,
@@ -332,7 +332,7 @@ function TestPublishProvider({
       projectMembers={initialDataContextProps.projectMembers}
       panes={initialDataContextProps.panes}
     >
-      <EventCacheProvider
+      <DocumentStoreProvider
         unpublishedEvents={publishEventsStatus.unsignedEvents}
       >
         <MergeKnowledgeDB>
@@ -343,7 +343,7 @@ function TestPublishProvider({
             {children}
           </PlanningContextProvider>
         </MergeKnowledgeDB>
-      </EventCacheProvider>
+      </DocumentStoreProvider>
     </DataContextProvider>
   );
 }

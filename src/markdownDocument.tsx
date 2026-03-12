@@ -61,8 +61,6 @@ function formatCrefText(
 
 type SerializeResult = {
   lines: string[];
-  nodeHashes: ImmutableSet<string>;
-  semanticIDs: ImmutableSet<string>;
   relationUUIDs: ImmutableSet<string>;
 };
 
@@ -150,17 +148,10 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
         const crefRelationUUID = shortID(
           (targetRelation?.id || parsed.relationID) as ID
         );
-        const crefNodeHashes = targetRelation
-          ? acc.nodeHashes.add(hashText(targetRelation.text))
-          : acc.nodeHashes;
         const crefAttrs = formatNodeAttrs("", item?.relevance, item?.argument);
         return {
           ...acc,
           lines: [...acc.lines, `${indent}- ${crefText}${crefAttrs}`],
-          nodeHashes: crefNodeHashes,
-          semanticIDs: targetRelation
-            ? acc.semanticIDs.add(getRelationSemanticID(targetRelation))
-            : acc.semanticIDs,
           relationUUIDs: acc.relationUUIDs.add(crefRelationUUID),
         };
       }
@@ -201,17 +192,11 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
       )}`;
       return {
         lines: [...acc.lines, line],
-        nodeHashes: acc.nodeHashes.add(
-          serializedRelation?.textHash ?? hashText(text)
-        ),
-        semanticIDs: acc.semanticIDs.add(serializedSemanticID),
         relationUUIDs: acc.relationUUIDs.add(uuid),
       };
     },
     {
       lines: [],
-      nodeHashes: ImmutableSet<string>(),
-      semanticIDs: ImmutableSet<string>(),
       relationUUIDs: ImmutableSet<string>(),
     }
   );
@@ -244,7 +229,7 @@ export function buildDocumentEvent(
   const author = data.user.publicKey;
   const rootContext = getRelationContext(data.knowledgeDBs, rootRelation);
   const rootSemanticID = getRelationSemanticID(rootRelation);
-  const { text: rootText, textHash: rootTextHash } = getSerializedRelationText(
+  const { text: rootText } = getSerializedRelationText(
     data,
     rootRelation,
     rootSemanticID
@@ -259,11 +244,6 @@ export function buildDocumentEvent(
   );
   const result = serializeTree(data, rootRelation);
   const content = `${[rootLine, ...result.lines].join("\n")}\n`;
-  const nTags = result.nodeHashes
-    .add(rootTextHash)
-    .union(result.semanticIDs.add(rootSemanticID))
-    .toArray()
-    .map((value) => ["n", value]);
   const rTags = result.relationUUIDs
     .add(rootUuid)
     .toArray()
@@ -276,7 +256,7 @@ export function buildDocumentEvent(
     kind: KIND_KNOWLEDGE_DOCUMENT,
     pubkey: author,
     created_at: newTimestamp(),
-    tags: [["d", rootUuid], ...nTags, ...rTags, ...systemRoleTags, msTag()],
+    tags: [["d", rootUuid], ...rTags, ...systemRoleTags, msTag()],
     content,
   };
 }

@@ -12,7 +12,6 @@ import { MergeKnowledgeDB, useData } from "./DataContext";
 import { deduplicateRefsByContext, findRefsToNode } from "./semanticProjection";
 import { useReadRelays } from "./relays";
 import { useSearchQuery, filterForKeyword } from "./components/SearchModal";
-import { LoadData } from "./dataQuery";
 import { useCurrentPane } from "./SplitPanesContext";
 import { newDB } from "./knowledge";
 
@@ -111,13 +110,8 @@ export function LoadSearchData({
   const foundSemanticIDs = List(allSearchResults.keySeq().toArray() as ID[]);
 
   return (
-    <LoadData itemIDs={foundSemanticIDs.toArray()} referencedBy>
-      <SearchCrefBuilder
-        searchId={searchId}
-        foundSemanticIDs={foundSemanticIDs}
-      >
-        {children}
-      </SearchCrefBuilder>
-    </LoadData>
+    <SearchCrefBuilder searchId={searchId} foundSemanticIDs={foundSemanticIDs}>
+      {children}
+    </SearchCrefBuilder>
   );
 }

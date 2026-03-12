@@ -6,7 +6,6 @@ import {
   getRelationSemanticID,
   getRelationText,
   getRelationsNoReferencedBy,
-  hashText,
   isConcreteRefId,
   parseConcreteRefId,
   shortID,
@@ -17,8 +16,6 @@ import { createRootAnchor } from "./rootAnchor";
 
 type SerializeResult = {
   lines: string[];
-  nodeHashes: ImmutableSet<string>;
-  semanticIDs: ImmutableSet<string>;
   relationUUIDs: ImmutableSet<string>;
 };
 
@@ -60,12 +57,6 @@ function serializeRelationItems(
             item.argument
           )}`,
         ],
-        nodeHashes: targetRelation
-          ? acc.nodeHashes.add(targetRelation.textHash)
-          : acc.nodeHashes,
-        semanticIDs: targetRelation
-          ? acc.semanticIDs.add(getRelationSemanticID(targetRelation))
-          : acc.semanticIDs,
         relationUUIDs: acc.relationUUIDs.add(shortID(targetRelationID as ID)),
       };
     }
@@ -101,8 +92,6 @@ function serializeRelationItems(
           }
         )}`,
       ],
-      nodeHashes: acc.nodeHashes.add(resolvedChild.textHash),
-      semanticIDs: acc.semanticIDs.add(getRelationSemanticID(resolvedChild)),
       relationUUIDs: acc.relationUUIDs.add(shortID(resolvedChild.id)),
     };
     return serializeRelationItems(
@@ -129,16 +118,9 @@ export function buildDocumentEventFromRelations(
     0,
     {
       lines: [],
-      nodeHashes: ImmutableSet<string>(),
-      semanticIDs: ImmutableSet<string>(),
       relationUUIDs: ImmutableSet<string>(),
     }
   );
-  const nTags = serialized.nodeHashes
-    .add(rootRelation.textHash || hashText(rootText))
-    .union(serialized.semanticIDs.add(rootSemanticID))
-    .toArray()
-    .map((value) => ["n", value]);
   const rTags = serialized.relationUUIDs
     .add(rootUuid)
     .toArray()
@@ -151,7 +133,7 @@ export function buildDocumentEventFromRelations(
     kind: KIND_KNOWLEDGE_DOCUMENT,
     pubkey: rootRelation.author,
     created_at: newTimestamp(),
-    tags: [["d", rootUuid], ...nTags, ...rTags, ...systemRoleTags, msTag()],
+    tags: [["d", rootUuid], ...rTags, ...systemRoleTags, msTag()],
     content: `${[
       formatRootHeading(
         rootText,

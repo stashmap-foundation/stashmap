@@ -14,7 +14,6 @@ import {
   getRowIDFromView,
   isExpanded,
   useDisplayText,
-  getEffectiveAuthor,
   VirtualItemsProvider,
   getLast,
 } from "../ViewContext";
@@ -24,17 +23,6 @@ import {
   useCurrentPane,
   usePaneIndex,
 } from "../SplitPanesContext";
-import {
-  addReferencedByToFilters,
-  createBaseFilter,
-  filtersToFilterArray,
-  useQueryKnowledgeData,
-} from "../dataQuery";
-import {
-  isSearchId,
-  getRelations,
-  getRelationItemSemanticID,
-} from "../connections";
 import { useApis } from "../Apis";
 import {
   ActiveRowState,
@@ -426,46 +414,5 @@ function Tree(): JSX.Element | null {
 }
 
 export function TreeView(): JSX.Element {
-  const data = useData();
-  const viewPath = useViewPath();
-  const effectiveAuthor = getEffectiveAuthor(data, viewPath);
-  const [rootItemID] = getRowIDFromView(data, viewPath);
-  const baseFilter = createBaseFilter(
-    data.contacts,
-    data.projectMembers,
-    data.user.publicKey,
-    effectiveAuthor
-  );
-
-  const searchFilter = (() => {
-    if (!isSearchId(rootItemID as ID)) {
-      return undefined;
-    }
-    const searchRelation = getRelations(
-      data.knowledgeDBs,
-      rootItemID as ID,
-      data.user.publicKey
-    );
-    if (!searchRelation) {
-      return undefined;
-    }
-    return searchRelation.items.reduce(
-      (rdx, item) =>
-        addReferencedByToFilters(
-          rdx,
-          getRelationItemSemanticID(
-            data.knowledgeDBs,
-            item,
-            searchRelation.author
-          ),
-          data.knowledgeDBs,
-          data.user.publicKey
-        ),
-      baseFilter
-    );
-  })();
-
-  useQueryKnowledgeData(searchFilter ? filtersToFilterArray(searchFilter) : []);
-
   return <Tree />;
 }

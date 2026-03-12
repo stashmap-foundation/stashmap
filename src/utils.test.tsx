@@ -57,7 +57,6 @@ import {
 import { EMPTY_SEMANTIC_ID } from "./connections";
 import { RootViewContextProvider } from "./ViewContext";
 import { LoadSearchData } from "./LoadSearchData";
-import { LoadData } from "./dataQuery";
 import { StorePreLoginContext } from "./StorePreLoginContext";
 import { TemporaryViewProvider } from "./components/TemporaryViewContext";
 import { PaneView } from "./components/Workspace";
@@ -644,16 +643,12 @@ function RootViewOrPaneIsLoadingInner({
 
   return (
     <LoadSearchData itemIDs={pane.stack}>
-      <LoadData itemIDs={pane.stack}>
-        <LoadData itemIDs={[rootItemID]} referencedBy lists>
-          <RootViewContextProvider
-            root={rootItemID as LongID}
-            paneIndex={paneIndex}
-          >
-            <StorePreLoginContext>{children}</StorePreLoginContext>
-          </RootViewContextProvider>
-        </LoadData>
-      </LoadData>
+      <RootViewContextProvider
+        root={rootItemID as LongID}
+        paneIndex={paneIndex}
+      >
+        <StorePreLoginContext>{children}</StorePreLoginContext>
+      </RootViewContextProvider>
     </LoadSearchData>
   );
 }

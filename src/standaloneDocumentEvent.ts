@@ -20,8 +20,6 @@ function joinID(author: PublicKey, localID: string): LongID {
 
 type SerializedTree = {
   lines: string[];
-  nodeHashes: Set<string>;
-  semanticIDs: Set<string>;
   relationUUIDs: Set<string>;
 };
 
@@ -92,8 +90,6 @@ function serializeNodes(
           }
         )}`,
       ],
-      nodeHashes: acc.nodeHashes.add(hashText(node.text)),
-      semanticIDs: acc.semanticIDs.add(semanticID),
       relationUUIDs: acc.relationUUIDs.add(uuid),
     };
     return serializeNodes(node.children, depth + 1, next);
@@ -111,20 +107,10 @@ function buildDocumentEventFromRootTree(
 } {
   const rootUuid = getNodeUuid(rootTree);
   const semanticID = getNodeSemanticID(rootTree);
-  const rootTextHash = hashText(rootTree.text);
   const serialized = serializeNodes(rootTree.children, 0, {
     lines: [],
-    nodeHashes: new Set<string>(),
-    semanticIDs: new Set<string>(),
     relationUUIDs: new Set<string>(),
   });
-  const tagValues = new Set([
-    rootTextHash,
-    semanticID,
-    ...serialized.nodeHashes,
-    ...serialized.semanticIDs,
-  ]);
-  const nTags = [...tagValues].map((value) => ["n", value]);
   const rTags = [...serialized.relationUUIDs.add(rootUuid)].map((value) => [
     "r",
     value,
@@ -141,7 +127,7 @@ function buildDocumentEventFromRootTree(
       kind: KIND_KNOWLEDGE_DOCUMENT,
       pubkey: author,
       created_at: newTimestamp(),
-      tags: [["d", rootUuid], ...nTags, ...rTags, ...systemRoleTags, msTag()],
+      tags: [["d", rootUuid], ...rTags, ...systemRoleTags, msTag()],
       content: `${[
         formatRootHeading(
           rootTree.text,

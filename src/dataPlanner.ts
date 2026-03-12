@@ -5,7 +5,6 @@ import {
   getRelationContext,
   getRelationSemanticID,
   getRelationsNoReferencedBy,
-  hashText,
   isRefId,
   isSearchId,
   moveRelations,
@@ -173,7 +172,6 @@ export function planSetRelationTextById<T extends GraphPlan>(
     withUsersEntryPublicKey({
       ...currentRelation,
       text,
-      textHash: hashText(text),
       updated: Date.now(),
     })
   );

@@ -56,20 +56,27 @@ export async function loadWriteSecretKey(
   return secretKey;
 }
 
-export async function publishUnsignedEvents(
-  publisher: WritePublisher,
+export function signUnsignedEvents(
   secretKey: Uint8Array,
-  relayUrls: string[],
   unsignedEvents: UnsignedEvent[]
+): Event[] {
+  return unsignedEvents.map((unsignedEvent) =>
+    finalizeEvent(unsignedEvent, secretKey)
+  );
+}
+
+export async function publishSignedEvents(
+  publisher: WritePublisher,
+  relayUrls: string[],
+  events: Event[]
 ): Promise<{
   relay_urls: string[];
   event_ids: string[];
   publish_results: Record<string, Record<string, PublishStatus>>;
 }> {
-  const results = await unsignedEvents.reduce(
-    async (previous, unsignedEvent) => {
+  const results = await events.reduce(
+    async (previous, event) => {
       const settled = await previous;
-      const event = finalizeEvent(unsignedEvent, secretKey);
       const publishResult = await publisher.publishEvent(relayUrls, event);
       return [
         ...settled,
@@ -98,4 +105,21 @@ export async function publishUnsignedEvents(
       {} as Record<string, Record<string, PublishStatus>>
     ),
   };
+}
+
+export async function publishUnsignedEvents(
+  publisher: WritePublisher,
+  secretKey: Uint8Array,
+  relayUrls: string[],
+  unsignedEvents: UnsignedEvent[]
+): Promise<{
+  relay_urls: string[];
+  event_ids: string[];
+  publish_results: Record<string, Record<string, PublishStatus>>;
+}> {
+  return publishSignedEvents(
+    publisher,
+    relayUrls,
+    signUnsignedEvents(secretKey, unsignedEvents)
+  );
 }

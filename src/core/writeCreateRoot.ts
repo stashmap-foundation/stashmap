@@ -7,11 +7,15 @@ import {
 } from "../standaloneDocumentEvent";
 import {
   loadWriteSecretKey,
-  publishUnsignedEvents,
-  resolveWriteRelayUrls,
+  signUnsignedEvents,
   WriteProfile,
-  WritePublisher,
 } from "./writeSupport";
+import {
+  applyKnowledgeEventsToWorkspace,
+  loadOrCreateWorkspaceManifest,
+} from "./workspaceState";
+import { enqueuePendingWriteEntries } from "./pendingWrites";
+import { relaysFromUrls, uniqueRelayUrls } from "../relayUtils";
 
 export type WriteCreateRootOptions = {
   title?: string;
@@ -21,19 +25,23 @@ export type WriteCreateRootOptions = {
   includeMarkdown?: boolean;
 };
 
-export type { WriteProfile, WritePublisher } from "./writeSupport";
+export type WriteCreateRootProfile = WriteProfile & {
+  workspaceDir?: string;
+  knowstrHome?: string;
+};
+
+export type { WriteProfile } from "./writeSupport";
 
 export async function writeCreateRoot(
-  publisher: WritePublisher,
-  profile: WriteProfile,
+  profile: WriteCreateRootProfile,
   options: WriteCreateRootOptions
 ): Promise<{
   event_id: string;
   relation_id: LongID;
   root_uuid: string;
-  semantic_id: ID;
   relay_urls: string[];
-  publish_results: Record<string, PublishStatus>;
+  pending_event_ids: string[];
+  pending_count: number;
   markdown?: string;
 }> {
   const hasTitle = options.title !== undefined;
@@ -44,7 +52,10 @@ export async function writeCreateRoot(
   }
 
   const secretKey = await loadWriteSecretKey(profile);
-  const relayUrls = resolveWriteRelayUrls(profile, options.relayUrls);
+  const explicitRelayUrls =
+    options.relayUrls && options.relayUrls.length > 0
+      ? uniqueRelayUrls(relaysFromUrls(options.relayUrls))
+      : undefined;
   const draft = (() => {
     if (options.filePath) {
       return fs
@@ -73,20 +84,34 @@ export async function writeCreateRoot(
     );
   })();
   const resolvedDraft = await draft;
-  const published = await publishUnsignedEvents(
-    publisher,
-    secretKey,
-    relayUrls,
-    [resolvedDraft.event]
+  const signedEvents = signUnsignedEvents(secretKey, [resolvedDraft.event]);
+  if (profile.workspaceDir) {
+    const workspaceManifest = await loadOrCreateWorkspaceManifest(
+      profile.workspaceDir,
+      profile.pubkey
+    );
+    await applyKnowledgeEventsToWorkspace(
+      profile.workspaceDir,
+      workspaceManifest,
+      signedEvents
+    );
+  }
+  const pendingEntries = await enqueuePendingWriteEntries(
+    profile.knowstrHome,
+    signedEvents.map((event) => ({
+      event,
+      ...(explicitRelayUrls ? { relayUrls: explicitRelayUrls } : {}),
+    }))
   );
+  const eventId = signedEvents[0]?.id;
 
   return {
-    event_id: published.event_ids[0],
+    event_id: eventId || "",
     relation_id: resolvedDraft.relationID,
     root_uuid: resolvedDraft.rootUuid,
-    semantic_id: resolvedDraft.semanticID,
-    relay_urls: published.relay_urls,
-    publish_results: published.publish_results[published.event_ids[0]] || {},
+    relay_urls: explicitRelayUrls || [],
+    pending_event_ids: pendingEntries.map(({ event }) => event.id),
+    pending_count: pendingEntries.length,
     ...(options.includeMarkdown
       ? { markdown: resolvedDraft.event.content }
       : {}),

@@ -82,7 +82,6 @@ function serializeRelationItems(
           item.relevance,
           item.argument,
           {
-            semanticID: getRelationSemanticID(resolvedChild),
             ...(resolvedChild.basedOn
               ? { basedOn: resolvedChild.basedOn }
               : {}),
@@ -108,7 +107,6 @@ export function buildDocumentEventFromRelations(
   knowledgeDBs: KnowledgeDBs,
   rootRelation: Relations
 ): UnsignedEvent {
-  const rootSemanticID = getRelationSemanticID(rootRelation);
   const rootText = getSerializableRelationText(rootRelation);
   const rootUuid = shortID(rootRelation.id);
   const serialized = serializeRelationItems(
@@ -138,7 +136,6 @@ export function buildDocumentEventFromRelations(
       formatRootHeading(
         rootText,
         rootUuid,
-        rootSemanticID,
         rootRelation.anchor ??
           createRootAnchor(getRelationContext(knowledgeDBs, rootRelation)),
         rootRelation.systemRole

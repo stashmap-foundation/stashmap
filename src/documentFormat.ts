@@ -1,13 +1,11 @@
 export function formatRootHeading(
   rootText: string,
   rootUuid: string,
-  rootSemanticID: ID,
   anchor?: RootAnchor,
   systemRole?: RootSystemRole
 ): string {
   const parts = [
     rootUuid,
-    `semantic="${rootSemanticID}"`,
     ...(anchor?.snapshotContext.size
       ? [`anchorContext="${anchor.snapshotContext.join(":")}"`]
       : []),
@@ -38,13 +36,11 @@ export function formatNodeAttrs(
   options?: {
     hidden?: boolean;
     basedOn?: LongID;
-    semanticID?: ID;
     userPublicKey?: PublicKey;
   }
 ): string {
   const parts: string[] = [
     ...(uuid ? [uuid] : []),
-    ...(options?.semanticID ? [`semantic="${options.semanticID}"`] : []),
     ...(options?.userPublicKey
       ? [`userPublicKey="${options.userPublicKey}"`]
       : []),

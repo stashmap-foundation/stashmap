@@ -21,7 +21,6 @@ import { buildDocumentEvent } from "./markdownDocument";
 import { buildDocumentEventFromRelations } from "./relationsDocumentEvent";
 import {
   shortID,
-  createSemanticID,
   addRelationToRelations,
   bulkAddRelations,
   EMPTY_SEMANTIC_ID,
@@ -33,7 +32,6 @@ import {
   createConcreteRefId,
   isRefId,
   isSearchId,
-  hashText,
   ensureRelationNativeFields,
   getRelationContext,
   getRelationSemanticID,
@@ -42,13 +40,11 @@ import {
 import type { TextSeed } from "./connections";
 import {
   getOwnSystemRoot,
-  getSystemRoleSemanticID,
   getSystemRoleText,
   LOG_ROOT_ROLE,
 } from "./systemRoots";
 import {
   newRelations,
-  newRelationsForSemanticID,
   upsertRelations,
   ViewPath,
   getRowIDFromView,
@@ -110,6 +106,7 @@ type GraphPlanData = Pick<
   | "user"
   | "contactsRelays"
   | "knowledgeDBs"
+  | "semanticIndex"
   | "relaysInfos"
   | "projectMembers"
 >;
@@ -211,12 +208,11 @@ export function planEnsureSystemRoot<T extends GraphPlan>(
   }
 
   const relation = newRelations(
-    getSystemRoleSemanticID(systemRole),
+    getSystemRoleText(systemRole),
     List<ID>(),
     plan.user.publicKey,
     undefined,
     undefined,
-    getSystemRoleText(systemRole),
     systemRole
   );
 
@@ -361,7 +357,6 @@ export function planUpdateRelationText(
     withUsersEntryPublicKey({
       ...currentRelation,
       text,
-      textHash: hashText(text),
       updated: Date.now(),
     })
   );
@@ -619,13 +614,12 @@ export function planAddTargetsToRelation<T extends GraphPlan>(
         ];
       }
 
-      const childRelation = newRelationsForSemanticID(
-        objectID,
+      const childRelation = newRelations(
+        objectText || "",
         childContext,
         accPlan.user.publicKey,
         parentRelation.root,
-        parentRelation.id,
-        objectText
+        parentRelation.id
       );
       const relationWithUserPublicKey = objectText
         ? withUsersEntryPublicKey(childRelation, objectText)
@@ -816,12 +810,10 @@ function planCopyDescendantRelations(
   const copiedRelations = descendants.map((relation) => {
     const newSemanticContext = getSemanticContext(relation);
     const isRootRelation = relation.id === sourceRelation.id;
-    const semanticID =
-      targetSemanticID && isRootRelation
-        ? targetSemanticID
-        : getRelationSemanticID(relation);
     const baseRelation = newRelations(
-      semanticID,
+      isRootRelation && typeof targetSemanticID === "string"
+        ? targetSemanticID
+        : relation.text,
       newSemanticContext,
       plan.user.publicKey,
       copiedRoot
@@ -867,7 +859,6 @@ function planCopyDescendantRelations(
           );
         })(),
         text: source.text,
-        textHash: source.textHash,
         basedOn: source.id,
       });
     },
@@ -1210,9 +1201,8 @@ export function planDeepCopyNodeWithView(
  */
 export function planCreateNode(plan: Plan, text: string): [Plan, TextSeed] {
   const node = {
-    id: createSemanticID(text),
+    id: text as ID,
     text,
-    textHash: hashText(text),
   };
   return [plan, node];
 }
@@ -1250,14 +1240,7 @@ function planCreateNoteAtRoot(
 ): SaveNodeResult {
   const [planWithNode, createdNode] = planCreateNode(plan, text);
   const createdRelation = withUsersEntryPublicKey(
-    newRelations(
-      createdNode.id,
-      List<ID>(),
-      plan.user.publicKey,
-      undefined,
-      undefined,
-      createdNode.text
-    ),
+    newRelations(createdNode.text, List<ID>(), plan.user.publicKey),
     createdNode.text
   );
   const planWithRelation = planUpsertRelations(planWithNode, createdRelation);

@@ -6,6 +6,12 @@ export type SyncPullCliArgs = {
   help: boolean;
 };
 
+export type PushCliArgs = {
+  configPath?: string;
+  relayUrls: string[];
+  help: boolean;
+};
+
 export type WriteCreateRootCliArgs = {
   configPath?: string;
   relayUrls: string[];

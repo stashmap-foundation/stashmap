@@ -251,7 +251,6 @@ declare global {
     items: List<RelationItem>;
     id: LongID;
     text: string;
-    textHash: ID;
     parent?: LongID;
     anchor?: RootAnchor;
     systemRole?: RootSystemRole;

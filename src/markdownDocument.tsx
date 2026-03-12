@@ -4,7 +4,6 @@ import { v4 } from "uuid";
 import { UnsignedEvent } from "nostr-tools";
 import {
   shortID,
-  hashText,
   isConcreteRefId,
   parseConcreteRefId,
   getConcreteRefTargetRelation,
@@ -91,22 +90,20 @@ function getOwnRelationForDocumentSerialization(
 
 function getSerializedRelationText(
   data: Data,
-  relation: Relations,
-  semanticID: LongID | ID
-): { text: string; textHash: ID } {
+  relation: Relations
+): { text: string } {
   if (relation.text !== "") {
     return {
       text: relation.text,
-      textHash: relation.textHash,
     };
   }
 
+  const semanticID = getRelationSemanticID(relation);
   const fallbackText =
     getTextForSemanticID(data.knowledgeDBs, semanticID, relation.author) ??
     shortID(semanticID as ID);
   return {
     text: fallbackText,
-    textHash: hashText(fallbackText),
   };
 }
 
@@ -167,15 +164,8 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
         isRoot(path)
       );
       const serializedRelation = ownRelation
-        ? getSerializedRelationText(
-            data,
-            ownRelation,
-            getRelationSemanticID(ownRelation)
-          )
+        ? getSerializedRelationText(data, ownRelation)
         : undefined;
-      const serializedSemanticID = ownRelation
-        ? getRelationSemanticID(ownRelation)
-        : (shortID(itemID as ID) as ID);
       const text =
         serializedRelation?.text ?? getDisplayTextForView(data, path, stack);
       const uuid = ownRelation ? shortID(ownRelation.id) : v4();
@@ -186,7 +176,6 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
         item?.argument,
         {
           basedOn: ownRelation?.basedOn,
-          semanticID: serializedSemanticID,
           userPublicKey: ownRelation?.userPublicKey,
         }
       )}`;
@@ -204,17 +193,11 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
 
 export function treeToMarkdown(data: Data, rootRelation: Relations): string {
   const rootContext = getRelationContext(data.knowledgeDBs, rootRelation);
-  const rootSemanticID = getRelationSemanticID(rootRelation);
-  const { text: rootText } = getSerializedRelationText(
-    data,
-    rootRelation,
-    rootSemanticID
-  );
+  const { text: rootText } = getSerializedRelationText(data, rootRelation);
   const rootUuid = shortID(rootRelation.id);
   const rootLine = formatRootHeading(
     rootText,
     rootUuid,
-    rootSemanticID,
     rootRelation.anchor ?? createRootAnchor(rootContext),
     rootRelation.systemRole
   );
@@ -228,17 +211,11 @@ export function buildDocumentEvent(
 ): UnsignedEvent {
   const author = data.user.publicKey;
   const rootContext = getRelationContext(data.knowledgeDBs, rootRelation);
-  const rootSemanticID = getRelationSemanticID(rootRelation);
-  const { text: rootText } = getSerializedRelationText(
-    data,
-    rootRelation,
-    rootSemanticID
-  );
+  const { text: rootText } = getSerializedRelationText(data, rootRelation);
   const rootUuid = shortID(rootRelation.id);
   const rootLine = formatRootHeading(
     rootText,
     rootUuid,
-    rootSemanticID,
     rootRelation.anchor ?? createRootAnchor(rootContext),
     rootRelation.systemRole
   );

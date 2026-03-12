@@ -22,14 +22,19 @@ import {
 import { GraphPlan } from "../planner";
 import {
   loadWriteSecretKey,
-  publishUnsignedEvents,
-  resolveWriteRelayUrls,
+  signUnsignedEvents,
   WriteProfile,
-  WritePublisher,
 } from "./writeSupport";
+import {
+  applyKnowledgeEventsToWorkspace,
+  loadOrCreateWorkspaceManifest,
+} from "./workspaceState";
+import { enqueuePendingWriteEntries } from "./pendingWrites";
+import { relaysFromUrls, uniqueRelayUrls } from "../relayUtils";
 
 export type WorkspaceWriteProfile = WriteProfile & {
   workspaceDir: string;
+  knowstrHome?: string;
 };
 
 export async function inspectWorkspaceChildren(
@@ -41,7 +46,6 @@ export async function inspectWorkspaceChildren(
 }
 
 async function publishWorkspaceMutation(
-  publisher: WritePublisher,
   profile: WorkspaceWriteProfile,
   relayUrls: string[] | undefined,
   mutate: (plan: GraphPlan) => {
@@ -53,34 +57,49 @@ async function publishWorkspaceMutation(
   relation_id?: LongID;
   item_id?: LongID | ID;
   affected_root_relation_ids: LongID[];
-  relay_urls: string[];
   event_ids: string[];
-  publish_results: Record<string, Record<string, PublishStatus>>;
+  pending_event_ids: string[];
+  pending_count: number;
+  relay_urls: string[];
 }> {
   const graph = await loadWorkspaceGraph(profile.workspaceDir);
   const plan = createHeadlessPlan(profile.pubkey, graph.knowledgeDBs);
   const mutation = mutate(plan);
-  const writeRelayUrls = resolveWriteRelayUrls(profile, relayUrls);
+  const explicitRelayUrls =
+    relayUrls && relayUrls.length > 0
+      ? uniqueRelayUrls(relaysFromUrls(relayUrls))
+      : undefined;
   const secretKey = await loadWriteSecretKey(profile);
   const unsignedEvents = buildKnowledgeDocumentEvents(mutation.plan);
-  const published = await publishUnsignedEvents(
-    publisher,
-    secretKey,
-    writeRelayUrls,
-    unsignedEvents
+  const signedEvents = signUnsignedEvents(secretKey, unsignedEvents);
+  const workspaceManifest = await loadOrCreateWorkspaceManifest(
+    profile.workspaceDir,
+    profile.pubkey
+  );
+  await applyKnowledgeEventsToWorkspace(
+    profile.workspaceDir,
+    workspaceManifest,
+    signedEvents
+  );
+  const pendingEntries = await enqueuePendingWriteEntries(
+    profile.knowstrHome,
+    signedEvents.map((event) => ({
+      event,
+      ...(explicitRelayUrls ? { relayUrls: explicitRelayUrls } : {}),
+    }))
   );
   return {
     ...(mutation.relationId ? { relation_id: mutation.relationId } : {}),
     ...(mutation.itemId ? { item_id: mutation.itemId } : {}),
     affected_root_relation_ids: getAffectedRootRelationIds(mutation.plan),
-    relay_urls: published.relay_urls,
-    event_ids: published.event_ids,
-    publish_results: published.publish_results,
+    event_ids: signedEvents.map((event) => event.id),
+    pending_event_ids: pendingEntries.map(({ event }) => event.id),
+    pending_count: pendingEntries.length,
+    relay_urls: explicitRelayUrls || [],
   };
 }
 
 export async function writeSetText(
-  publisher: WritePublisher,
   profile: WorkspaceWriteProfile,
   options: {
     relationId: LongID;
@@ -88,22 +107,16 @@ export async function writeSetText(
     relayUrls?: string[];
   }
 ): Promise<Awaited<ReturnType<typeof publishWorkspaceMutation>>> {
-  return publishWorkspaceMutation(
-    publisher,
-    profile,
-    options.relayUrls,
-    (plan) => {
-      requireWritableRelationById(plan, options.relationId);
-      return {
-        plan: planSetRelationTextById(plan, options.relationId, options.text),
-        relationId: options.relationId,
-      };
-    }
-  );
+  return publishWorkspaceMutation(profile, options.relayUrls, (plan) => {
+    requireWritableRelationById(plan, options.relationId);
+    return {
+      plan: planSetRelationTextById(plan, options.relationId, options.text),
+      relationId: options.relationId,
+    };
+  });
 }
 
 export async function writeCreateUnder(
-  publisher: WritePublisher,
   profile: WorkspaceWriteProfile,
   options: {
     parentRelationId: LongID;
@@ -115,41 +128,33 @@ export async function writeCreateUnder(
     relayUrls?: string[];
   }
 ): Promise<Awaited<ReturnType<typeof publishWorkspaceMutation>>> {
-  return publishWorkspaceMutation(
-    publisher,
-    profile,
-    options.relayUrls,
-    (plan) => {
-      requireWritableRelationById(plan, options.parentRelationId);
-      const inserted = planInsertMarkdownUnderRelationById(
-        plan,
-        options.parentRelationId,
-        [requireSingleRootMarkdownTree(options.markdownText)],
-        resolveInsertAtIndexById(plan, options.parentRelationId, {
-          ...(options.beforeItemId
-            ? { beforeItemId: options.beforeItemId }
-            : {}),
-          ...(options.afterItemId ? { afterItemId: options.afterItemId } : {}),
-        }),
-        normalizeRelevanceInput(options.relevance || "contains"),
-        normalizeArgumentInput(options.argument || "none")
+  return publishWorkspaceMutation(profile, options.relayUrls, (plan) => {
+    requireWritableRelationById(plan, options.parentRelationId);
+    const inserted = planInsertMarkdownUnderRelationById(
+      plan,
+      options.parentRelationId,
+      [requireSingleRootMarkdownTree(options.markdownText)],
+      resolveInsertAtIndexById(plan, options.parentRelationId, {
+        ...(options.beforeItemId ? { beforeItemId: options.beforeItemId } : {}),
+        ...(options.afterItemId ? { afterItemId: options.afterItemId } : {}),
+      }),
+      normalizeRelevanceInput(options.relevance || "contains"),
+      normalizeArgumentInput(options.argument || "none")
+    );
+    const { relationId } = inserted;
+    if (!relationId) {
+      throw new Error(
+        "stdin markdown must resolve to exactly one top-level root"
       );
-      const { relationId } = inserted;
-      if (!relationId) {
-        throw new Error(
-          "stdin markdown must resolve to exactly one top-level root"
-        );
-      }
-      return {
-        plan: inserted.plan,
-        relationId,
-      };
     }
-  );
+    return {
+      plan: inserted.plan,
+      relationId,
+    };
+  });
 }
 
 export async function writeLink(
-  publisher: WritePublisher,
   profile: WorkspaceWriteProfile,
   options: {
     parentRelationId: LongID;
@@ -161,36 +166,28 @@ export async function writeLink(
     relayUrls?: string[];
   }
 ): Promise<Awaited<ReturnType<typeof publishWorkspaceMutation>>> {
-  return publishWorkspaceMutation(
-    publisher,
-    profile,
-    options.relayUrls,
-    (plan) => {
-      requireWritableRelationById(plan, options.parentRelationId);
-      requireRelationById(plan, options.targetRelationId);
-      const linked = planLinkRelationById(
-        plan,
-        options.parentRelationId,
-        options.targetRelationId,
-        resolveInsertAtIndexById(plan, options.parentRelationId, {
-          ...(options.beforeItemId
-            ? { beforeItemId: options.beforeItemId }
-            : {}),
-          ...(options.afterItemId ? { afterItemId: options.afterItemId } : {}),
-        }),
-        normalizeRelevanceInput(options.relevance || "contains"),
-        normalizeArgumentInput(options.argument || "none")
-      );
-      return {
-        plan: linked.plan,
-        itemId: linked.itemId,
-      };
-    }
-  );
+  return publishWorkspaceMutation(profile, options.relayUrls, (plan) => {
+    requireWritableRelationById(plan, options.parentRelationId);
+    requireRelationById(plan, options.targetRelationId);
+    const linked = planLinkRelationById(
+      plan,
+      options.parentRelationId,
+      options.targetRelationId,
+      resolveInsertAtIndexById(plan, options.parentRelationId, {
+        ...(options.beforeItemId ? { beforeItemId: options.beforeItemId } : {}),
+        ...(options.afterItemId ? { afterItemId: options.afterItemId } : {}),
+      }),
+      normalizeRelevanceInput(options.relevance || "contains"),
+      normalizeArgumentInput(options.argument || "none")
+    );
+    return {
+      plan: linked.plan,
+      itemId: linked.itemId,
+    };
+  });
 }
 
 export async function writeSetRelevance(
-  publisher: WritePublisher,
   profile: WorkspaceWriteProfile,
   options: {
     parentRelationId: LongID;
@@ -199,33 +196,27 @@ export async function writeSetRelevance(
     relayUrls?: string[];
   }
 ): Promise<Awaited<ReturnType<typeof publishWorkspaceMutation>>> {
-  return publishWorkspaceMutation(
-    publisher,
-    profile,
-    options.relayUrls,
-    (plan) => {
-      requireWritableRelationById(plan, options.parentRelationId);
-      requireRelationItemIndexById(
+  return publishWorkspaceMutation(profile, options.relayUrls, (plan) => {
+    requireWritableRelationById(plan, options.parentRelationId);
+    requireRelationItemIndexById(
+      plan,
+      options.parentRelationId,
+      options.itemId
+    );
+    return {
+      plan: planUpdateRelationItemMetadataById(
         plan,
         options.parentRelationId,
-        options.itemId
-      );
-      return {
-        plan: planUpdateRelationItemMetadataById(
-          plan,
-          options.parentRelationId,
-          options.itemId,
-          {
-            relevance: normalizeRelevanceInput(options.relevance),
-          }
-        ),
-      };
-    }
-  );
+        options.itemId,
+        {
+          relevance: normalizeRelevanceInput(options.relevance),
+        }
+      ),
+    };
+  });
 }
 
 export async function writeSetArgument(
-  publisher: WritePublisher,
   profile: WorkspaceWriteProfile,
   options: {
     parentRelationId: LongID;
@@ -234,33 +225,27 @@ export async function writeSetArgument(
     relayUrls?: string[];
   }
 ): Promise<Awaited<ReturnType<typeof publishWorkspaceMutation>>> {
-  return publishWorkspaceMutation(
-    publisher,
-    profile,
-    options.relayUrls,
-    (plan) => {
-      requireWritableRelationById(plan, options.parentRelationId);
-      requireRelationItemIndexById(
+  return publishWorkspaceMutation(profile, options.relayUrls, (plan) => {
+    requireWritableRelationById(plan, options.parentRelationId);
+    requireRelationItemIndexById(
+      plan,
+      options.parentRelationId,
+      options.itemId
+    );
+    return {
+      plan: planUpdateRelationItemMetadataById(
         plan,
         options.parentRelationId,
-        options.itemId
-      );
-      return {
-        plan: planUpdateRelationItemMetadataById(
-          plan,
-          options.parentRelationId,
-          options.itemId,
-          {
-            argument: normalizeArgumentInput(options.argument),
-          }
-        ),
-      };
-    }
-  );
+        options.itemId,
+        {
+          argument: normalizeArgumentInput(options.argument),
+        }
+      ),
+    };
+  });
 }
 
 export async function writeDeleteItem(
-  publisher: WritePublisher,
   profile: WorkspaceWriteProfile,
   options: {
     parentRelationId: LongID;
@@ -268,30 +253,24 @@ export async function writeDeleteItem(
     relayUrls?: string[];
   }
 ): Promise<Awaited<ReturnType<typeof publishWorkspaceMutation>>> {
-  return publishWorkspaceMutation(
-    publisher,
-    profile,
-    options.relayUrls,
-    (plan) => {
-      requireWritableRelationById(plan, options.parentRelationId);
-      requireRelationItemIndexById(
+  return publishWorkspaceMutation(profile, options.relayUrls, (plan) => {
+    requireWritableRelationById(plan, options.parentRelationId);
+    requireRelationItemIndexById(
+      plan,
+      options.parentRelationId,
+      options.itemId
+    );
+    return {
+      plan: planRemoveRelationItemById(
         plan,
         options.parentRelationId,
         options.itemId
-      );
-      return {
-        plan: planRemoveRelationItemById(
-          plan,
-          options.parentRelationId,
-          options.itemId
-        ),
-      };
-    }
-  );
+      ),
+    };
+  });
 }
 
 export async function writeMoveItem(
-  publisher: WritePublisher,
   profile: WorkspaceWriteProfile,
   options: {
     sourceParentRelationId: LongID;
@@ -302,34 +281,27 @@ export async function writeMoveItem(
     relayUrls?: string[];
   }
 ): Promise<Awaited<ReturnType<typeof publishWorkspaceMutation>>> {
-  return publishWorkspaceMutation(
-    publisher,
-    profile,
-    options.relayUrls,
-    (plan) => {
-      requireWritableRelationById(plan, options.sourceParentRelationId);
-      requireWritableRelationById(plan, options.targetParentRelationId);
-      requireRelationItemIndexById(
+  return publishWorkspaceMutation(profile, options.relayUrls, (plan) => {
+    requireWritableRelationById(plan, options.sourceParentRelationId);
+    requireWritableRelationById(plan, options.targetParentRelationId);
+    requireRelationItemIndexById(
+      plan,
+      options.sourceParentRelationId,
+      options.itemId
+    );
+    return {
+      plan: planMoveRelationItemById(
         plan,
         options.sourceParentRelationId,
-        options.itemId
-      );
-      return {
-        plan: planMoveRelationItemById(
-          plan,
-          options.sourceParentRelationId,
-          options.itemId,
-          options.targetParentRelationId,
-          resolveInsertAtIndexById(plan, options.targetParentRelationId, {
-            ...(options.beforeItemId
-              ? { beforeItemId: options.beforeItemId }
-              : {}),
-            ...(options.afterItemId
-              ? { afterItemId: options.afterItemId }
-              : {}),
-          })
-        ),
-      };
-    }
-  );
+        options.itemId,
+        options.targetParentRelationId,
+        resolveInsertAtIndexById(plan, options.targetParentRelationId, {
+          ...(options.beforeItemId
+            ? { beforeItemId: options.beforeItemId }
+            : {}),
+          ...(options.afterItemId ? { afterItemId: options.afterItemId } : {}),
+        })
+      ),
+    };
+  });
 }

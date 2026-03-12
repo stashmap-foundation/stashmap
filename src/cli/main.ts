@@ -2,11 +2,12 @@ import {
   inspectChildrenHelp,
   runInspectChildrenCommand,
 } from "./inspectChildren";
-import { syncPullHelp, runSyncPullCommand } from "./syncPull";
+import { pullHelp, runPullCommand } from "./syncPull";
 import {
   writeCreateRootHelp,
   runWriteCreateRootCommand,
 } from "./writeCreateRoot";
+import { pushHelp, runPushCommand } from "./push";
 import { runWriteMutationCommand, writeMutationsHelp } from "./writeMutations";
 
 function isHelpResult(value: unknown): value is { help: true; text: string } {
@@ -25,14 +26,17 @@ function generalHelp(): string {
     "Usage: knowstr <command>",
     "",
     "Commands:",
-    "  sync pull   Export a local markdown workspace from relays",
+    "  pull   Export a local markdown workspace from relays",
     "  inspect children   List a relation's direct items with stable IDs",
-    "  write create-root   Publish a new standalone root",
-    "  write <mutation>   Apply graph-aware edits to a synced workspace",
+    "  push   Publish queued local events to relays",
+    "  write create-root   Queue a new standalone root locally",
+    "  write <mutation>   Apply graph-aware local edits to a synced workspace",
     "",
-    syncPullHelp(),
+    pullHelp(),
     "",
     inspectChildrenHelp(),
+    "",
+    pushHelp(),
     "",
     writeCreateRootHelp(),
     "",
@@ -56,13 +60,18 @@ export async function runCli(argv: string[]): Promise<void> {
     return;
   }
 
-  if (command === "sync" && subcommand === "pull") {
-    printResult(await runSyncPullCommand(rest));
+  if (command === "pull") {
+    printResult(await runPullCommand([subcommand, ...rest].filter(Boolean)));
     return;
   }
 
   if (command === "inspect" && subcommand === "children") {
     printResult(await runInspectChildrenCommand(rest));
+    return;
+  }
+
+  if (command === "push") {
+    printResult(await runPushCommand([subcommand, ...rest].filter(Boolean)));
     return;
   }
 

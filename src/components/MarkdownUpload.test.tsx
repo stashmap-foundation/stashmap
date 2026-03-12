@@ -20,16 +20,24 @@ Python is a programming language
 
 async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
   const wsID = joinID(alice().user.publicKey, "my-first-workspace");
-  const basePlan = planUpsertRelations(
-    createPlan(alice()),
-    newRelations(wsID, List(), alice().user.publicKey)
-  );
-  const workspacePath: ViewPath = [0, wsID];
+  const workspaceText = "my-first-workspace";
+  const workspaceRelation: Relations = {
+    ...newRelations(
+      workspaceText,
+      List(),
+      alice().user.publicKey,
+      shortID(wsID) as ID
+    ),
+    id: wsID,
+    root: shortID(wsID) as ID,
+  };
+  const basePlan = planUpsertRelations(createPlan(alice()), workspaceRelation);
+  const workspacePath: ViewPath = [0, workspaceRelation.id];
   const plan = planPasteMarkdownTrees(
     basePlan,
     parseMarkdownHierarchy(TEST_FILE),
     workspacePath,
-    [shortID(wsID) as ID],
+    [workspaceRelation.text as ID],
     0
   );
 

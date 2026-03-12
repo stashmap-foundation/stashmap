@@ -69,7 +69,7 @@ function addRelationSemanticEntries(
   semanticIndex: SemanticIndex,
   relation: Relations
 ): void {
-  addToSetMap(semanticIndex.semantic, relation.textHash, relation.id);
+  addToSetMap(semanticIndex.semantic, relation.text, relation.id);
 
   relation.items.forEach((item) => {
     if (item.relevance === "not_relevant") {
@@ -92,7 +92,7 @@ function removeRelationSemanticEntries(
   semanticIndex: SemanticIndex,
   relation: Relations
 ): void {
-  removeFromSetMap(semanticIndex.semantic, relation.textHash, relation.id);
+  removeFromSetMap(semanticIndex.semantic, relation.text, relation.id);
 
   relation.items.forEach((item) => {
     if (item.relevance === "not_relevant") {

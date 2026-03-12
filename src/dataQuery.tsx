@@ -159,7 +159,7 @@ export function addItemToFilters(
       }
       return addItemToFilters(
         withRelation,
-        targetRelation.textHash,
+        targetRelation.text as ID,
         knowledgeDBs,
         myself,
         includeListQuery

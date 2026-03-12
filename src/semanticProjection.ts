@@ -1,7 +1,6 @@
 import { List, OrderedMap, Set as ImmutableSet } from "immutable";
 import {
   EMPTY_SEMANTIC_ID,
-  hashText,
   shortID,
   splitID,
   isRefId,
@@ -94,7 +93,7 @@ function getRelationsForSemanticID(
         .filter(
           (relation) =>
             shortID(getRelationSemanticID(relation)) === localID ||
-            relation.textHash === localID
+            relation.text === localID
         )
         .toArray()
     )
@@ -171,18 +170,18 @@ export function getTextHashForSemanticID(
     author
   );
   if (directRelation) {
-    return directRelation.textHash;
+    return directRelation.text as ID;
   }
 
   const relation = getRelationForSemanticID(knowledgeDBs, semanticID, author);
   if (relation) {
-    return relation.textHash;
+    return relation.text as ID;
   }
 
   const localID = shortID(semanticID as ID) as ID;
   const fallbackText = getFallbackSemanticText(semanticID);
   return fallbackText !== "" || localID === EMPTY_SEMANTIC_ID
-    ? hashText(fallbackText)
+    ? (fallbackText as ID)
     : undefined;
 }
 
@@ -716,7 +715,7 @@ export function getSuggestionsForNode(
   )
     .filter((relation) => relation.author !== myself)
     .filter((relation) => visibleAuthors.has(relation.author))
-    .filter((relation) => relation.textHash === semanticKey)
+    .filter((relation) => relation.text === semanticKey)
     .filter((relation) => relation.id !== currentRelationId)
     .filter(
       (relation) =>
@@ -801,7 +800,7 @@ export function getAlternativeRelations(
   const semanticKey = getSemanticNodeKey(knowledgeDBs, semanticID, author);
   return getSemanticCandidates(semanticIndex, semanticKey)
     .filter((relation) => visibleAuthors.has(relation.author))
-    .filter((relation) => relation.textHash === semanticKey)
+    .filter((relation) => relation.text === semanticKey)
     .filter((relation) => relation.id !== excludeRelationId)
     .filter(
       (relation) =>

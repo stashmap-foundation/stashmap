@@ -23,9 +23,9 @@ import { useData } from "./DataContext";
 import { Plan, planUpsertRelations, getPane } from "./planner";
 import { usePaneStack } from "./SplitPanesContext";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
-import { newRelationsForSemanticID } from "./relationFactory";
+import { newRelations } from "./relationFactory";
 
-export { newRelations, newRelationsForSemanticID } from "./relationFactory";
+export { newRelations } from "./relationFactory";
 
 type ViewPathSegment = LongID | ID;
 
@@ -805,7 +805,6 @@ export function upsertRelations(
   stack: ID[],
   modify: (relations: Relations) => Relations
 ): Plan {
-  const [itemID] = getRowIDFromView(plan, viewPath);
   const semanticContext = getContext(plan, viewPath, stack);
   const parentRelation = getParentRelation(plan, viewPath);
   const parentRoot = parentRelation?.root;
@@ -817,8 +816,8 @@ export function upsertRelations(
 
   const base =
     currentRelation ||
-    newRelationsForSemanticID(
-      itemID,
+    newRelations(
+      "",
       semanticContext,
       plan.user.publicKey,
       parentRoot,

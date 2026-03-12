@@ -1,5 +1,5 @@
 import { UnsignedEvent } from "nostr-tools";
-import { getRelationSemanticID, shortID } from "./connections";
+import { shortID } from "./connections";
 import {
   buildKnowledgeDocumentEvents,
   createHeadlessPlan,
@@ -27,7 +27,6 @@ function buildDocumentEventFromRootTree(
 ): {
   relationID: LongID;
   rootUuid: string;
-  semanticID: ID;
   event: UnsignedEvent;
 } {
   const [planWithRoot, , topRelationIds] = planCreateNodesFromMarkdownTrees(
@@ -53,7 +52,6 @@ function buildDocumentEventFromRootTree(
   return {
     relationID,
     rootUuid: shortID(relationID),
-    semanticID: getRelationSemanticID(relation),
     event,
   };
 }
@@ -65,7 +63,6 @@ export function buildStandaloneRootDocumentEvent(
 ): {
   relationID: LongID;
   rootUuid: string;
-  semanticID: ID;
   event: UnsignedEvent;
 } {
   return buildDocumentEventFromRootTree(author, {
@@ -81,7 +78,6 @@ export function buildImportedMarkdownDocumentEvent(
 ): {
   relationID: LongID;
   rootUuid: string;
-  semanticID: ID;
   event: UnsignedEvent;
 } {
   const roots = parseMarkdownImportFiles([file]).filter((root) => !root.hidden);
@@ -98,7 +94,6 @@ export function buildSingleRootMarkdownDocumentEvent(
 ): {
   relationID: LongID;
   rootUuid: string;
-  semanticID: ID;
   event: UnsignedEvent;
 } {
   return buildDocumentEventFromRootTree(

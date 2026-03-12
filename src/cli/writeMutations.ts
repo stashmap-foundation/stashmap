@@ -1,5 +1,4 @@
 import { text as readStreamText } from "stream/consumers";
-import { Event, SimplePool } from "nostr-tools";
 import { loadCliProfile } from "./config";
 import { requireValue } from "./args";
 import {
@@ -20,7 +19,6 @@ import {
   writeSetRelevance,
   writeSetText,
 } from "../core/writeWorkspace";
-import { publishEventToRelays } from "../nostrPublish";
 
 async function readStdin(): Promise<string> {
   return readStreamText(process.stdin);
@@ -100,23 +98,8 @@ export function writeMutationsHelp(): string {
     "  knowstr write delete-item --parent <relation-id> --item <item-id> [--config <path>] [--relay <url> ...]",
     "  knowstr write move-item --from-parent <relation-id> --item <item-id> --to-parent <relation-id> [--before <item-id>|--after <item-id>] [--config <path>] [--relay <url> ...]",
     "",
-    "Applies edge-aware relation edits in the local synced workspace and republishes only the affected root documents.",
+    "Applies edge-aware relation edits locally, updates the workspace immediately, and queues signed events for `knowstr push`.",
   ].join("\n");
-}
-
-function buildPublisher(): {
-  pool: SimplePool;
-  publishEvent: (
-    relayUrls: string[],
-    event: Event
-  ) => Promise<PublishResultsOfEvent>;
-} {
-  const pool = new SimplePool();
-  return {
-    pool,
-    publishEvent: (relayUrls, event) =>
-      publishEventToRelays(pool, event, relayUrls),
-  };
 }
 
 export function parseWriteSetTextArgs(args: string[]): WriteSetTextCliArgs {
@@ -496,119 +479,113 @@ export async function runWriteMutationCommand(
     };
   }
 
-  const { pool, publishEvent } = buildPublisher();
-
-  try {
-    if (subcommand === "set-text") {
-      const parsed = parseWriteSetTextArgs(args);
-      if (!parsed.relationId || parsed.text === undefined) {
-        throw new Error("--relation and --text are required");
-      }
-      const profile = loadCliProfile({ configPath: parsed.configPath });
-      return await writeSetText({ publishEvent }, profile, {
-        relationId: parsed.relationId,
-        text: parsed.text,
-        relayUrls: parsed.relayUrls,
-      });
+  if (subcommand === "set-text") {
+    const parsed = parseWriteSetTextArgs(args);
+    if (!parsed.relationId || parsed.text === undefined) {
+      throw new Error("--relation and --text are required");
     }
-
-    if (subcommand === "create-under") {
-      const parsed = parseWriteCreateUnderArgs(args);
-      if (!parsed.parentRelationId || !parsed.stdin) {
-        throw new Error("--parent and --stdin are required");
-      }
-      const profile = loadCliProfile({ configPath: parsed.configPath });
-      return await writeCreateUnder({ publishEvent }, profile, {
-        parentRelationId: parsed.parentRelationId,
-        markdownText: await readStdin(),
-        ...(parsed.beforeItemId ? { beforeItemId: parsed.beforeItemId } : {}),
-        ...(parsed.afterItemId ? { afterItemId: parsed.afterItemId } : {}),
-        ...(parsed.relevance ? { relevance: parsed.relevance } : {}),
-        ...(parsed.argument ? { argument: parsed.argument } : {}),
-        relayUrls: parsed.relayUrls,
-      });
-    }
-
-    if (subcommand === "link") {
-      const parsed = parseWriteLinkArgs(args);
-      if (!parsed.parentRelationId || !parsed.targetRelationId) {
-        throw new Error("--parent and --target are required");
-      }
-      const profile = loadCliProfile({ configPath: parsed.configPath });
-      return await writeLink({ publishEvent }, profile, {
-        parentRelationId: parsed.parentRelationId,
-        targetRelationId: parsed.targetRelationId,
-        ...(parsed.beforeItemId ? { beforeItemId: parsed.beforeItemId } : {}),
-        ...(parsed.afterItemId ? { afterItemId: parsed.afterItemId } : {}),
-        ...(parsed.relevance ? { relevance: parsed.relevance } : {}),
-        ...(parsed.argument ? { argument: parsed.argument } : {}),
-        relayUrls: parsed.relayUrls,
-      });
-    }
-
-    if (subcommand === "set-relevance") {
-      const parsed = parseWriteSetRelevanceArgs(args);
-      if (!parsed.parentRelationId || !parsed.itemId || !parsed.relevance) {
-        throw new Error("--parent, --item, and --value are required");
-      }
-      const profile = loadCliProfile({ configPath: parsed.configPath });
-      return await writeSetRelevance({ publishEvent }, profile, {
-        parentRelationId: parsed.parentRelationId,
-        itemId: parsed.itemId,
-        relevance: parsed.relevance,
-        relayUrls: parsed.relayUrls,
-      });
-    }
-
-    if (subcommand === "set-argument") {
-      const parsed = parseWriteSetArgumentArgs(args);
-      if (!parsed.parentRelationId || !parsed.itemId || !parsed.argument) {
-        throw new Error("--parent, --item, and --value are required");
-      }
-      const profile = loadCliProfile({ configPath: parsed.configPath });
-      return await writeSetArgument({ publishEvent }, profile, {
-        parentRelationId: parsed.parentRelationId,
-        itemId: parsed.itemId,
-        argument: parsed.argument,
-        relayUrls: parsed.relayUrls,
-      });
-    }
-
-    if (subcommand === "delete-item") {
-      const parsed = parseWriteDeleteItemArgs(args);
-      if (!parsed.parentRelationId || !parsed.itemId) {
-        throw new Error("--parent and --item are required");
-      }
-      const profile = loadCliProfile({ configPath: parsed.configPath });
-      return await writeDeleteItem({ publishEvent }, profile, {
-        parentRelationId: parsed.parentRelationId,
-        itemId: parsed.itemId,
-        relayUrls: parsed.relayUrls,
-      });
-    }
-
-    if (subcommand === "move-item") {
-      const parsed = parseWriteMoveItemArgs(args);
-      if (
-        !parsed.sourceParentRelationId ||
-        !parsed.itemId ||
-        !parsed.targetParentRelationId
-      ) {
-        throw new Error("--from-parent, --item, and --to-parent are required");
-      }
-      const profile = loadCliProfile({ configPath: parsed.configPath });
-      return await writeMoveItem({ publishEvent }, profile, {
-        sourceParentRelationId: parsed.sourceParentRelationId,
-        itemId: parsed.itemId,
-        targetParentRelationId: parsed.targetParentRelationId,
-        ...(parsed.beforeItemId ? { beforeItemId: parsed.beforeItemId } : {}),
-        ...(parsed.afterItemId ? { afterItemId: parsed.afterItemId } : {}),
-        relayUrls: parsed.relayUrls,
-      });
-    }
-
-    throw new Error(`Unknown write command: ${subcommand}`);
-  } finally {
-    pool.close([]);
+    const profile = loadCliProfile({ configPath: parsed.configPath });
+    return writeSetText(profile, {
+      relationId: parsed.relationId,
+      text: parsed.text,
+      relayUrls: parsed.relayUrls,
+    });
   }
+
+  if (subcommand === "create-under") {
+    const parsed = parseWriteCreateUnderArgs(args);
+    if (!parsed.parentRelationId || !parsed.stdin) {
+      throw new Error("--parent and --stdin are required");
+    }
+    const profile = loadCliProfile({ configPath: parsed.configPath });
+    return writeCreateUnder(profile, {
+      parentRelationId: parsed.parentRelationId,
+      markdownText: await readStdin(),
+      ...(parsed.beforeItemId ? { beforeItemId: parsed.beforeItemId } : {}),
+      ...(parsed.afterItemId ? { afterItemId: parsed.afterItemId } : {}),
+      ...(parsed.relevance ? { relevance: parsed.relevance } : {}),
+      ...(parsed.argument ? { argument: parsed.argument } : {}),
+      relayUrls: parsed.relayUrls,
+    });
+  }
+
+  if (subcommand === "link") {
+    const parsed = parseWriteLinkArgs(args);
+    if (!parsed.parentRelationId || !parsed.targetRelationId) {
+      throw new Error("--parent and --target are required");
+    }
+    const profile = loadCliProfile({ configPath: parsed.configPath });
+    return writeLink(profile, {
+      parentRelationId: parsed.parentRelationId,
+      targetRelationId: parsed.targetRelationId,
+      ...(parsed.beforeItemId ? { beforeItemId: parsed.beforeItemId } : {}),
+      ...(parsed.afterItemId ? { afterItemId: parsed.afterItemId } : {}),
+      ...(parsed.relevance ? { relevance: parsed.relevance } : {}),
+      ...(parsed.argument ? { argument: parsed.argument } : {}),
+      relayUrls: parsed.relayUrls,
+    });
+  }
+
+  if (subcommand === "set-relevance") {
+    const parsed = parseWriteSetRelevanceArgs(args);
+    if (!parsed.parentRelationId || !parsed.itemId || !parsed.relevance) {
+      throw new Error("--parent, --item, and --value are required");
+    }
+    const profile = loadCliProfile({ configPath: parsed.configPath });
+    return writeSetRelevance(profile, {
+      parentRelationId: parsed.parentRelationId,
+      itemId: parsed.itemId,
+      relevance: parsed.relevance,
+      relayUrls: parsed.relayUrls,
+    });
+  }
+
+  if (subcommand === "set-argument") {
+    const parsed = parseWriteSetArgumentArgs(args);
+    if (!parsed.parentRelationId || !parsed.itemId || !parsed.argument) {
+      throw new Error("--parent, --item, and --value are required");
+    }
+    const profile = loadCliProfile({ configPath: parsed.configPath });
+    return writeSetArgument(profile, {
+      parentRelationId: parsed.parentRelationId,
+      itemId: parsed.itemId,
+      argument: parsed.argument,
+      relayUrls: parsed.relayUrls,
+    });
+  }
+
+  if (subcommand === "delete-item") {
+    const parsed = parseWriteDeleteItemArgs(args);
+    if (!parsed.parentRelationId || !parsed.itemId) {
+      throw new Error("--parent and --item are required");
+    }
+    const profile = loadCliProfile({ configPath: parsed.configPath });
+    return writeDeleteItem(profile, {
+      parentRelationId: parsed.parentRelationId,
+      itemId: parsed.itemId,
+      relayUrls: parsed.relayUrls,
+    });
+  }
+
+  if (subcommand === "move-item") {
+    const parsed = parseWriteMoveItemArgs(args);
+    if (
+      !parsed.sourceParentRelationId ||
+      !parsed.itemId ||
+      !parsed.targetParentRelationId
+    ) {
+      throw new Error("--from-parent, --item, and --to-parent are required");
+    }
+    const profile = loadCliProfile({ configPath: parsed.configPath });
+    return writeMoveItem(profile, {
+      sourceParentRelationId: parsed.sourceParentRelationId,
+      itemId: parsed.itemId,
+      targetParentRelationId: parsed.targetParentRelationId,
+      ...(parsed.beforeItemId ? { beforeItemId: parsed.beforeItemId } : {}),
+      ...(parsed.afterItemId ? { afterItemId: parsed.afterItemId } : {}),
+      relayUrls: parsed.relayUrls,
+    });
+  }
+
+  throw new Error(`Unknown write command: ${subcommand}`);
 }

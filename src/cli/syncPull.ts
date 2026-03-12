@@ -4,7 +4,7 @@ import { requireValue } from "./args";
 import { SyncPullCliArgs } from "./types";
 import { pullSyncWorkspace, SyncPullManifest } from "../core/syncPull";
 
-export function parseSyncPullArgs(args: string[]): SyncPullCliArgs {
+export function parsePullArgs(args: string[]): SyncPullCliArgs {
   const parse = (index: number, current: SyncPullCliArgs): SyncPullCliArgs => {
     const arg = args[index];
     if (!arg) {
@@ -48,7 +48,7 @@ export function parseSyncPullArgs(args: string[]): SyncPullCliArgs {
         });
       }
       default:
-        throw new Error(`Unknown sync pull argument: ${arg}`);
+        throw new Error(`Unknown pull argument: ${arg}`);
     }
   };
 
@@ -58,22 +58,22 @@ export function parseSyncPullArgs(args: string[]): SyncPullCliArgs {
   });
 }
 
-export function syncPullHelp(): string {
+export function pullHelp(): string {
   return [
-    "Usage: knowstr sync pull [--config <path>] [--out <path>] [--relay <url> ...]",
+    "Usage: knowstr pull [--config <path>] [--out <path>] [--relay <url> ...]",
     "",
     "Reads the Knowstr graph from configured relays and exports a local workspace.",
   ].join("\n");
 }
 
-export async function runSyncPullCommand(
+export async function runPullCommand(
   args: string[]
 ): Promise<{ help: true; text: string } | SyncPullManifest> {
-  const parsed = parseSyncPullArgs(args);
+  const parsed = parsePullArgs(args);
   if (parsed.help) {
     return {
       help: true,
-      text: syncPullHelp(),
+      text: pullHelp(),
     };
   }
 

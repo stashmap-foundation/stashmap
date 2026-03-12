@@ -1,10 +1,8 @@
 import { text as readStreamText } from "stream/consumers";
-import { SimplePool } from "nostr-tools";
 import { loadCliProfile } from "./config";
 import { requireValue } from "./args";
 import { WriteCreateRootCliArgs } from "./types";
 import { writeCreateRoot } from "../core/writeCreateRoot";
-import { publishEventToRelays } from "../nostrPublish";
 
 async function readStdin(): Promise<string> {
   return readStreamText(process.stdin);
@@ -77,7 +75,7 @@ export function writeCreateRootHelp(): string {
   return [
     "Usage: knowstr write create-root (--title <text> | --file <path> | --stdin) [--config <path>] [--relay <url> ...] [--include-markdown]",
     "",
-    "Publishes a new standalone Knowstr root from a title stub, a markdown file, or stdin markdown.",
+    "Creates a new standalone Knowstr root locally, updates the workspace immediately, and queues it for `knowstr push`.",
   ].join("\n");
 }
 
@@ -103,23 +101,13 @@ export async function runWriteCreateRootCommand(
   }
 
   const profile = loadCliProfile({ configPath: parsed.configPath });
-  const pool = new SimplePool();
   const markdownText = parsed.stdin ? await readStdin() : undefined;
-
-  const result = await writeCreateRoot(
-    {
-      publishEvent: (relayUrls, event) =>
-        publishEventToRelays(pool, event, relayUrls),
-    },
-    profile,
-    {
-      title: parsed.title,
-      filePath: parsed.filePath,
-      markdownText,
-      relayUrls: parsed.relayUrls,
-      includeMarkdown: parsed.includeMarkdown,
-    }
-  );
-  pool.close(result.relay_urls);
+  const result = await writeCreateRoot(profile, {
+    title: parsed.title,
+    filePath: parsed.filePath,
+    markdownText,
+    relayUrls: parsed.relayUrls,
+    includeMarkdown: parsed.includeMarkdown,
+  });
   return result;
 }

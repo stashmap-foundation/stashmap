@@ -4,11 +4,8 @@ import { v4 } from "uuid";
 import { UnsignedEvent } from "nostr-tools";
 import {
   createConcreteRefId,
-  createSemanticID,
   ensureRelationNativeFields,
-  hashText,
   joinID,
-  semanticIDFromSeed,
   shortID,
 } from "./connections";
 import { newDB } from "./knowledge";
@@ -53,25 +50,14 @@ function materializeTreeNode(
   root: ID,
   parent?: LongID
 ): [WalkContext, ID, LongID] {
-  const node = {
-    id: createSemanticID(
-      treeNode.text,
-      treeNode.semanticID ??
-        (treeNode.uuid ? semanticIDFromSeed(treeNode.uuid) : undefined)
-    ),
-    text: treeNode.text,
-    textHash: hashText(treeNode.text),
-  };
   const baseRelation = treeNode.uuid
     ? {
-        ...newRelations(node.id, semanticContext, ctx.publicKey, root),
+        ...newRelations(treeNode.text, semanticContext, ctx.publicKey, root),
         id: joinID(ctx.publicKey, treeNode.uuid),
       }
-    : newRelations(node.id, semanticContext, ctx.publicKey, root);
+    : newRelations(treeNode.text, semanticContext, ctx.publicKey, root);
   const relationBaseWithFields: Relations = {
     ...baseRelation,
-    text: node.text,
-    textHash: node.textHash ?? hashText(node.text),
     parent,
     anchor: parent
       ? undefined
@@ -81,7 +67,7 @@ function materializeTreeNode(
   };
 
   const childSemanticContext = semanticContext.push(
-    relationBaseWithFields.textHash
+    relationBaseWithFields.text as ID
   );
   const visibleChildren = treeNode.children.filter((child) => !child.hidden);
   const [withVisible, childItems] = visibleChildren.reduce(
@@ -130,7 +116,7 @@ function materializeTreeNode(
   };
   return [
     walkUpsertRelation(withVisible, relation),
-    relation.textHash,
+    relation.text as ID,
     relation.id,
   ];
 }

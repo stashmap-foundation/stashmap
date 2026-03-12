@@ -1,4 +1,3 @@
-import { hashText } from "./connections";
 import { getTextForSemanticID } from "./semanticProjection";
 
 function stackToPath(
@@ -36,7 +35,7 @@ export function pathToStack(pathname: string): ID[] {
   return rest
     .split("/")
     .filter((seg) => seg.length > 0)
-    .map((seg) => hashText(decodeURIComponent(seg)));
+    .map((seg) => decodeURIComponent(seg) as ID);
 }
 
 export function buildNodeUrl(

@@ -1,47 +1,25 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/immutable-data, functional/no-let */
 import { List, Set, Map } from "immutable";
-import crypto from "crypto";
 import { newRelations } from "./relationFactory";
 import { SEARCH_PREFIX } from "./constants";
 import { getRootAnchorContext, rootAnchorsEqual } from "./rootAnchor";
 
-// Semantic ID = sha256(text).slice(0, 32) - no author prefix
-export function hashText(text: string): ID {
-  return crypto.createHash("sha256").update(text).digest("hex").slice(0, 32);
-}
-
-// Pre-computed semantic ID for the empty placeholder row
-export const EMPTY_SEMANTIC_ID = hashText("") as ID;
+// Empty text remains the sentinel for an empty placeholder row
+export const EMPTY_SEMANTIC_ID = "" as ID;
 
 export type TextSeed = {
   id: ID;
   text: string;
-  textHash: ID;
 };
 
 const CONCRETE_REF_PREFIX = "cref:";
-const SHORT_SEMANTIC_ID_RE = /^[a-f0-9]{32}$/;
-
-function createRandomSemanticID(): ID {
-  return crypto.randomBytes(16).toString("hex") as ID;
-}
-
-function getReservedSemanticID(text: string): ID | undefined {
-  if (text === "") {
-    return EMPTY_SEMANTIC_ID;
-  }
-  return undefined;
-}
 
 export function createSemanticID(text: string, id?: ID): ID {
-  return getReservedSemanticID(text) ?? id ?? createRandomSemanticID();
+  return (id ?? text) as ID;
 }
 
 export function semanticIDFromSeed(seed: string): ID {
-  const normalized = seed.replace(/-/g, "");
-  return SHORT_SEMANTIC_ID_RE.test(normalized)
-    ? (normalized as ID)
-    : hashText(seed);
+  return seed as ID;
 }
 
 export function isRefId(id: ID | LongID): boolean {
@@ -122,14 +100,14 @@ function getFallbackRelationText(head?: LongID | ID): string {
   if (!head) {
     return "";
   }
-  const localHead = shortID(head as ID) as ID;
+  const localHead = head as ID;
   if (localHead === EMPTY_SEMANTIC_ID) {
     return "";
   }
   if (isSearchId(localHead)) {
     return parseSearchId(localHead) || "";
   }
-  return "";
+  return localHead;
 }
 
 export function getRelationText(
@@ -175,9 +153,6 @@ function getRelationLookupIndex(db: KnowledgeData): RelationLookupIndex {
   db.relations.valueSeq().forEach((relation) => {
     const relationSemanticID = getRelationSemanticID(relation);
     addToIndex(relationSemanticID, relation);
-    if (relation.textHash !== relationSemanticID) {
-      addToIndex(relation.textHash, relation);
-    }
   });
 
   index.forEach((relations) => {
@@ -219,7 +194,11 @@ export function getIndexedRelationsForKeys(
 }
 
 export function getRelationSemanticID(relation: Relations): ID {
-  return relation.textHash;
+  const relationID = shortID(relation.id) as ID;
+  if (isSearchId(relationID)) {
+    return relationID;
+  }
+  return relation.text as ID;
 }
 
 export function getRelationContext(
@@ -306,7 +285,6 @@ export function createTextNodeFromRelation(relation: Relations): TextSeed {
   return {
     id: getRelationSemanticID(relation),
     text: getRelationText(relation) || "",
-    textHash: relation.textHash,
   };
 }
 
@@ -484,22 +462,8 @@ export function ensureRelationNativeFields(
   const existingRelation = knowledgeDBs
     .get(relation.author)
     ?.relations.get(shortID(relation.id));
-  const relationSemanticID =
-    relation.textHash || existingRelation?.textHash || EMPTY_SEMANTIC_ID;
-  const hasReservedSemanticID =
-    relationSemanticID === EMPTY_SEMANTIC_ID || isSearchId(relationSemanticID);
-  const shouldTrustRelationText = relation.text !== "" || hasReservedSemanticID;
-  const text = shouldTrustRelationText
-    ? relation.text
-    : existingRelation?.text || getFallbackRelationText(relationSemanticID);
-  const shouldHashText =
-    text !== "" || relationSemanticID === EMPTY_SEMANTIC_ID;
-  const textHash = (() => {
-    if (isSearchId(relationSemanticID)) {
-      return relationSemanticID;
-    }
-    return shouldHashText ? hashText(text) : relationSemanticID;
-  })();
+  const text =
+    relation.text || existingRelation?.text || getFallbackRelationText();
   const parent = relation.parent || existingRelation?.parent;
   const anchor = parent
     ? undefined
@@ -507,7 +471,6 @@ export function ensureRelationNativeFields(
 
   if (
     relation.text === text &&
-    relation.textHash === textHash &&
     relation.parent === parent &&
     rootAnchorsEqual(relation.anchor, anchor)
   ) {
@@ -517,7 +480,6 @@ export function ensureRelationNativeFields(
   return {
     ...relation,
     text,
-    textHash,
     parent,
     anchor,
   };
@@ -528,7 +490,7 @@ export function getSearchRelations(
   foundNodeIDs: List<ID>,
   myself: PublicKey
 ): Relations {
-  const rel = newRelations(searchId, List<ID>(), myself);
+  const rel = newRelations("", List<ID>(), myself);
   const uniqueNodeIDs = foundNodeIDs.toSet().toList();
   const items = uniqueNodeIDs.map(
     (semanticID): RelationItem => ({

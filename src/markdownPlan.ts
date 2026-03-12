@@ -1,10 +1,8 @@
 import { List } from "immutable";
 import {
-  createSemanticID,
   getRelationContext,
   getRelationSemanticID,
   getRelationsNoReferencedBy,
-  hashText,
   shortID,
 } from "./connections";
 import { MarkdownImportFile, parseMarkdownImportFiles } from "./markdownImport";
@@ -75,21 +73,13 @@ export function planCreateNodesFromMarkdown<T extends GraphPlan>(
 
   const fallbackText = "Imported Markdown";
   const fallbackRelation = newRelations(
-    createSemanticID(fallbackText),
+    fallbackText,
     List<ID>(),
-    nextPlan.user.publicKey,
-    undefined,
-    undefined,
-    fallbackText
+    nextPlan.user.publicKey
   );
-  const fallbackRelationWithText: Relations = {
-    ...fallbackRelation,
-    text: fallbackText,
-    textHash: hashText(fallbackText),
-  };
   return [
-    planUpsertRelations(nextPlan, fallbackRelationWithText),
-    fallbackRelation.textHash,
+    planUpsertRelations(nextPlan, fallbackRelation),
+    fallbackRelation.text as ID,
   ];
 }
 

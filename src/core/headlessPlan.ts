@@ -3,6 +3,7 @@ import { UnsignedEvent } from "nostr-tools";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
 import { joinID } from "../connections";
 import { buildDocumentEvents, createGraphPlan, GraphPlan } from "../planner";
+import { createEmptySemanticIndex } from "../semanticIndex";
 
 const EMPTY_RELAYS: AllRelays = {
   defaultRelays: [],
@@ -19,6 +20,7 @@ export function createHeadlessPlan(
     user: { publicKey: viewer },
     contactsRelays: Map<PublicKey, Relays>(),
     knowledgeDBs,
+    semanticIndex: createEmptySemanticIndex(),
     relaysInfos: Map(),
     projectMembers: Map<PublicKey, Member>(),
     relays: EMPTY_RELAYS,

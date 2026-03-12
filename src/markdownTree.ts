@@ -39,7 +39,6 @@ function extractInlineContent(inline: Token): {
 
 function extractAttrs(token: Token): {
   uuid: string | undefined;
-  semanticID: ID | undefined;
   relevance: Relevance;
   argument: Argument;
   hidden: boolean;
@@ -51,7 +50,6 @@ function extractAttrs(token: Token): {
   if (!token.attrs) {
     return {
       uuid: undefined,
-      semanticID: undefined,
       relevance: undefined,
       argument: undefined,
       hidden: false,
@@ -62,7 +60,6 @@ function extractAttrs(token: Token): {
     };
   }
   const uuid = token.attrs.find(([, value]) => value === "")?.[0];
-  const semanticID = (token.attrGet("semantic") || undefined) as ID | undefined;
   const classAttr = token.attrGet("class") || "";
   const classes = classAttr.split(" ").filter(Boolean);
   const relevance = (
@@ -116,7 +113,6 @@ function extractAttrs(token: Token): {
       : undefined;
   return {
     uuid,
-    semanticID,
     relevance,
     argument,
     hidden,
@@ -131,7 +127,6 @@ export type MarkdownTreeNode = {
   text: string;
   children: MarkdownTreeNode[];
   uuid?: string;
-  semanticID?: ID;
   relevance?: Relevance;
   argument?: Argument;
   linkHref?: string;
@@ -176,7 +171,6 @@ export function parseMarkdownHierarchy(
 
   let pendingAttrs: {
     uuid: string | undefined;
-    semanticID: ID | undefined;
     relevance: Relevance;
     argument: Argument;
     hidden: boolean;
@@ -186,7 +180,6 @@ export function parseMarkdownHierarchy(
     userPublicKey: PublicKey | undefined;
   } = {
     uuid: undefined,
-    semanticID: undefined,
     relevance: undefined,
     argument: undefined,
     hidden: false,
@@ -210,7 +203,6 @@ export function parseMarkdownHierarchy(
       }
       const {
         uuid,
-        semanticID,
         relevance,
         argument,
         hidden,
@@ -232,7 +224,6 @@ export function parseMarkdownHierarchy(
         text,
         children: [],
         ...(uuid !== undefined && { uuid }),
-        ...(semanticID !== undefined && { semanticID }),
         ...(relevance !== undefined && { relevance }),
         ...(argument !== undefined && { argument }),
         ...(hidden && { hidden }),
@@ -278,22 +269,14 @@ export function parseMarkdownHierarchy(
         const parent =
           getLastDefinedListItem(listItemStack.slice(0, -1)) ||
           headingStack[headingStack.length - 1]?.node;
-        const {
-          uuid,
-          semanticID,
-          relevance,
-          argument,
-          hidden,
-          basedOn,
-          userPublicKey,
-        } = pendingAttrs;
+        const { uuid, relevance, argument, hidden, basedOn, userPublicKey } =
+          pendingAttrs;
         const effectiveRelevance = linkRelevance ?? relevance;
         const effectiveArgument = linkArgument ?? argument;
         const node: MarkdownTreeNode = {
           text,
           children: [],
           ...(uuid !== undefined && { uuid }),
-          ...(semanticID !== undefined && { semanticID }),
           ...(effectiveRelevance !== undefined && {
             relevance: effectiveRelevance,
           }),

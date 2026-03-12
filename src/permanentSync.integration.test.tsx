@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { Event } from "nostr-tools";
 import { clearDatabase } from "./indexedDB";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
-import { LOG_ROOT_ROLE, LOG_ROOT_SEMANTIC_ID } from "./systemRoots";
+import { LOG_ROOT_ROLE } from "./systemRoots";
 import { ALICE, mockRelayPool, renderApp, setup } from "./utils.test";
 
 const TEST_RELAY = "wss://relay.test.first.success/";
@@ -30,7 +30,7 @@ function createLogDocumentEvent({
       ["ms", `${createdAt * 1000}`],
       ["s", LOG_ROOT_ROLE],
     ],
-    content: `# ~Log {${rootUuid} semantic="${LOG_ROOT_SEMANTIC_ID}" systemRole="${LOG_ROOT_ROLE}"}\n${body}`,
+    content: `# ~Log {${rootUuid} systemRole="${LOG_ROOT_ROLE}"}\n${body}`,
   };
 }
 

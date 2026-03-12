@@ -1,16 +1,25 @@
 import { inspectChildren, loadWorkspaceGraph } from "./workspaceGraph";
 import {
-  applyWorkspaceCreateUnder,
-  applyWorkspaceLink,
-  applyWorkspaceMoveItem,
-  applyWorkspaceRemoveItem,
-  applyWorkspaceSetArgument,
-  applyWorkspaceSetRelevance,
-  applyWorkspaceSetText,
-  buildWorkspacePlanDocumentEvents,
-  createWorkspacePlan,
+  normalizeArgumentInput,
+  normalizeRelevanceInput,
+  planInsertMarkdownUnderRelationById,
+  planLinkRelationById,
+  planMoveRelationItemById,
+  planRemoveRelationItemById,
+  planSetRelationTextById,
+  planUpdateRelationItemMetadataById,
+  requireRelationById,
+  requireRelationItemIndexById,
+  requireWritableRelationById,
+  resolveInsertAtIndexById,
+} from "../dataPlanner";
+import { requireSingleRootMarkdownTree } from "../standaloneDocumentEvent";
+import {
+  buildKnowledgeDocumentEvents,
+  createHeadlessPlan,
   getAffectedRootRelationIds,
-} from "./workspacePlan";
+} from "./headlessPlan";
+import { Plan } from "../planner";
 import {
   loadWriteSecretKey,
   publishUnsignedEvents,
@@ -35,8 +44,8 @@ async function publishWorkspaceMutation(
   publisher: WritePublisher,
   profile: WorkspaceWriteProfile,
   relayUrls: string[] | undefined,
-  mutate: (plan: ReturnType<typeof createWorkspacePlan>) => {
-    plan: ReturnType<typeof createWorkspacePlan>;
+  mutate: (plan: Plan) => {
+    plan: Plan;
     relationId?: LongID;
     itemId?: LongID | ID;
   }
@@ -49,11 +58,11 @@ async function publishWorkspaceMutation(
   publish_results: Record<string, Record<string, PublishStatus>>;
 }> {
   const graph = await loadWorkspaceGraph(profile.workspaceDir);
-  const plan = createWorkspacePlan(graph, profile.pubkey);
+  const plan = createHeadlessPlan(profile.pubkey, graph.knowledgeDBs);
   const mutation = mutate(plan);
   const writeRelayUrls = resolveWriteRelayUrls(profile, relayUrls);
   const secretKey = await loadWriteSecretKey(profile);
-  const unsignedEvents = buildWorkspacePlanDocumentEvents(mutation.plan);
+  const unsignedEvents = buildKnowledgeDocumentEvents(mutation.plan);
   const published = await publishUnsignedEvents(
     publisher,
     secretKey,
@@ -83,7 +92,13 @@ export async function writeSetText(
     publisher,
     profile,
     options.relayUrls,
-    (plan) => applyWorkspaceSetText(plan, options.relationId, options.text)
+    (plan) => {
+      requireWritableRelationById(plan, options.relationId);
+      return {
+        plan: planSetRelationTextById(plan, options.relationId, options.text),
+        relationId: options.relationId,
+      };
+    }
   );
 }
 
@@ -104,20 +119,32 @@ export async function writeCreateUnder(
     publisher,
     profile,
     options.relayUrls,
-    (plan) =>
-      applyWorkspaceCreateUnder(
+    (plan) => {
+      requireWritableRelationById(plan, options.parentRelationId);
+      const inserted = planInsertMarkdownUnderRelationById(
         plan,
         options.parentRelationId,
-        options.markdownText,
-        {
+        [requireSingleRootMarkdownTree(options.markdownText)],
+        resolveInsertAtIndexById(plan, options.parentRelationId, {
           ...(options.beforeItemId
             ? { beforeItemId: options.beforeItemId }
             : {}),
           ...(options.afterItemId ? { afterItemId: options.afterItemId } : {}),
-        },
-        options.relevance,
-        options.argument
-      )
+        }),
+        normalizeRelevanceInput(options.relevance || "contains"),
+        normalizeArgumentInput(options.argument || "none")
+      );
+      const { relationId } = inserted;
+      if (!relationId) {
+        throw new Error(
+          "stdin markdown must resolve to exactly one top-level root"
+        );
+      }
+      return {
+        plan: inserted.plan,
+        relationId,
+      };
+    }
   );
 }
 
@@ -138,20 +165,27 @@ export async function writeLink(
     publisher,
     profile,
     options.relayUrls,
-    (plan) =>
-      applyWorkspaceLink(
+    (plan) => {
+      requireWritableRelationById(plan, options.parentRelationId);
+      requireRelationById(plan, options.targetRelationId);
+      const linked = planLinkRelationById(
         plan,
         options.parentRelationId,
         options.targetRelationId,
-        {
+        resolveInsertAtIndexById(plan, options.parentRelationId, {
           ...(options.beforeItemId
             ? { beforeItemId: options.beforeItemId }
             : {}),
           ...(options.afterItemId ? { afterItemId: options.afterItemId } : {}),
-        },
-        options.relevance,
-        options.argument
-      )
+        }),
+        normalizeRelevanceInput(options.relevance || "contains"),
+        normalizeArgumentInput(options.argument || "none")
+      );
+      return {
+        plan: linked.plan,
+        itemId: linked.itemId,
+      };
+    }
   );
 }
 
@@ -169,13 +203,24 @@ export async function writeSetRelevance(
     publisher,
     profile,
     options.relayUrls,
-    (plan) =>
-      applyWorkspaceSetRelevance(
+    (plan) => {
+      requireWritableRelationById(plan, options.parentRelationId);
+      requireRelationItemIndexById(
         plan,
         options.parentRelationId,
-        options.itemId,
-        options.relevance
-      )
+        options.itemId
+      );
+      return {
+        plan: planUpdateRelationItemMetadataById(
+          plan,
+          options.parentRelationId,
+          options.itemId,
+          {
+            relevance: normalizeRelevanceInput(options.relevance),
+          }
+        ),
+      };
+    }
   );
 }
 
@@ -193,13 +238,24 @@ export async function writeSetArgument(
     publisher,
     profile,
     options.relayUrls,
-    (plan) =>
-      applyWorkspaceSetArgument(
+    (plan) => {
+      requireWritableRelationById(plan, options.parentRelationId);
+      requireRelationItemIndexById(
         plan,
         options.parentRelationId,
-        options.itemId,
-        options.argument
-      )
+        options.itemId
+      );
+      return {
+        plan: planUpdateRelationItemMetadataById(
+          plan,
+          options.parentRelationId,
+          options.itemId,
+          {
+            argument: normalizeArgumentInput(options.argument),
+          }
+        ),
+      };
+    }
   );
 }
 
@@ -216,8 +272,21 @@ export async function writeRemoveItem(
     publisher,
     profile,
     options.relayUrls,
-    (plan) =>
-      applyWorkspaceRemoveItem(plan, options.parentRelationId, options.itemId)
+    (plan) => {
+      requireWritableRelationById(plan, options.parentRelationId);
+      requireRelationItemIndexById(
+        plan,
+        options.parentRelationId,
+        options.itemId
+      );
+      return {
+        plan: planRemoveRelationItemById(
+          plan,
+          options.parentRelationId,
+          options.itemId
+        ),
+      };
+    }
   );
 }
 
@@ -237,18 +306,30 @@ export async function writeMoveItem(
     publisher,
     profile,
     options.relayUrls,
-    (plan) =>
-      applyWorkspaceMoveItem(
+    (plan) => {
+      requireWritableRelationById(plan, options.sourceParentRelationId);
+      requireWritableRelationById(plan, options.targetParentRelationId);
+      requireRelationItemIndexById(
         plan,
         options.sourceParentRelationId,
-        options.itemId,
-        options.targetParentRelationId,
-        {
-          ...(options.beforeItemId
-            ? { beforeItemId: options.beforeItemId }
-            : {}),
-          ...(options.afterItemId ? { afterItemId: options.afterItemId } : {}),
-        }
-      )
+        options.itemId
+      );
+      return {
+        plan: planMoveRelationItemById(
+          plan,
+          options.sourceParentRelationId,
+          options.itemId,
+          options.targetParentRelationId,
+          resolveInsertAtIndexById(plan, options.targetParentRelationId, {
+            ...(options.beforeItemId
+              ? { beforeItemId: options.beforeItemId }
+              : {}),
+            ...(options.afterItemId
+              ? { afterItemId: options.afterItemId }
+              : {}),
+          })
+        ),
+      };
+    }
   );
 }

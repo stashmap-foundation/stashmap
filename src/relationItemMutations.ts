@@ -1,14 +1,11 @@
-import {
-  isEmptySemanticID,
-  updateItemArgument,
-  updateItemRelevance,
-} from "./connections";
+import { isEmptySemanticID } from "./connections";
+import { planUpdateRelationItemMetadataById } from "./dataPlanner";
+import { RelationItemMetadata } from "./relationItemMetadata";
 import {
   getParentView,
   getRelationForView,
   getRelationIndex,
   getRowIDFromView,
-  upsertRelations,
   viewPathToString,
   ViewPath,
   VirtualItemsMap,
@@ -21,24 +18,7 @@ import {
   planUpdateEmptyNodeMetadata,
 } from "./planner";
 
-export type RelationItemMetadata = {
-  relevance?: Relevance;
-  argument?: Argument;
-};
-
-export function updateRelationItemMetadata(
-  relations: Relations,
-  relationIndex: number,
-  metadata: RelationItemMetadata
-): Relations {
-  const withRelevance =
-    "relevance" in metadata
-      ? updateItemRelevance(relations, relationIndex, metadata.relevance)
-      : relations;
-  return "argument" in metadata
-    ? updateItemArgument(withRelevance, relationIndex, metadata.argument)
-    : withRelevance;
-}
+export type { RelationItemMetadata } from "./relationItemMetadata";
 
 function getNodeText(plan: Plan, viewPath: ViewPath, stack: ID[]): string {
   return getRelationForView(plan, viewPath, stack)?.text ?? "";
@@ -51,9 +31,11 @@ export function planUpdateExistingItemMetadata(
   relationIndex: number,
   metadata: RelationItemMetadata
 ): Plan {
-  return upsertRelations(plan, parentViewPath, stack, (relations) =>
-    updateRelationItemMetadata(relations, relationIndex, metadata)
-  );
+  const relations = getRelationForView(plan, parentViewPath, stack);
+  const itemId = relations?.items.get(relationIndex)?.id;
+  return relations && itemId
+    ? planUpdateRelationItemMetadataById(plan, relations.id, itemId, metadata)
+    : plan;
 }
 
 export function planUpdateViewItemMetadata(

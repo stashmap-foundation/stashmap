@@ -23,8 +23,13 @@ import {
 import {
   RelationItemMetadata,
   updateRelationItemMetadata,
-} from "./relationItemMutations";
+} from "./relationItemMetadata";
 import { withUsersEntryPublicKey } from "./userEntry";
+
+export type RelationItemPosition = {
+  beforeItemId?: LongID | ID;
+  afterItemId?: LongID | ID;
+};
 
 function getWritableRelation(
   plan: Plan,
@@ -37,6 +42,29 @@ function getWritableRelation(
   );
   if (!relation || relation.author !== plan.user.publicKey) {
     return undefined;
+  }
+  return relation;
+}
+
+export function requireRelationById(plan: Plan, relationId: LongID): Relations {
+  const relation = getRelationsNoReferencedBy(
+    plan.knowledgeDBs,
+    relationId,
+    plan.user.publicKey
+  );
+  if (!relation) {
+    throw new Error(`Relation not found: ${relationId}`);
+  }
+  return relation;
+}
+
+export function requireWritableRelationById(
+  plan: Plan,
+  relationId: LongID
+): Relations {
+  const relation = requireRelationById(plan, relationId);
+  if (relation.author !== plan.user.publicKey) {
+    throw new Error(`Relation is not writable: ${relationId}`);
   }
   return relation;
 }
@@ -55,6 +83,61 @@ function requireRelationItem(
 ): RelationItem | undefined {
   const index = getRelationItemIndex(relation, itemId);
   return index === undefined ? undefined : relation.items.get(index);
+}
+
+export function requireRelationItemIndexById(
+  plan: Plan,
+  parentRelationId: LongID,
+  itemId: LongID | ID
+): number {
+  const relationIndex = requireWritableRelationById(
+    plan,
+    parentRelationId
+  ).items.findIndex((item) => item.id === itemId);
+  if (relationIndex < 0) {
+    throw new Error(`Item not found: ${itemId}`);
+  }
+  return relationIndex;
+}
+
+export function normalizeRelevanceInput(
+  value: "contains" | Relevance
+): Relevance {
+  return value === "contains" ? undefined : value;
+}
+
+export function normalizeArgumentInput(value: "none" | Argument): Argument {
+  return value === "none" ? undefined : value;
+}
+
+export function resolveInsertAtIndexById(
+  plan: Plan,
+  parentRelationId: LongID,
+  position: RelationItemPosition
+): number {
+  if (position.beforeItemId && position.afterItemId) {
+    throw new Error("Provide only one of --before or --after");
+  }
+  const parentRelation = requireWritableRelationById(plan, parentRelationId);
+  if (position.beforeItemId) {
+    const index = parentRelation.items.findIndex(
+      (item) => item.id === position.beforeItemId
+    );
+    if (index < 0) {
+      throw new Error(`Sibling item not found: ${position.beforeItemId}`);
+    }
+    return index;
+  }
+  if (position.afterItemId) {
+    const index = parentRelation.items.findIndex(
+      (item) => item.id === position.afterItemId
+    );
+    if (index < 0) {
+      throw new Error(`Sibling item not found: ${position.afterItemId}`);
+    }
+    return index + 1;
+  }
+  return parentRelation.items.size;
 }
 
 function insertRelationItem(
@@ -172,7 +255,8 @@ export function planInsertMarkdownUnderRelationById(
 export function planRemoveRelationItemById(
   plan: Plan,
   parentRelationId: LongID,
-  itemId: LongID | ID
+  itemId: LongID | ID,
+  preserveDescendants = false
 ): Plan {
   const parentRelation = getWritableRelation(plan, parentRelationId);
   if (!parentRelation) {
@@ -187,7 +271,7 @@ export function planRemoveRelationItemById(
     plan,
     deleteRelations(parentRelation, Set([relationIndex]))
   );
-  if (!item || isRefId(item.id)) {
+  if (preserveDescendants || !item || isRefId(item.id)) {
     return withoutItem;
   }
   const sourceRelation = getRelationsNoReferencedBy(

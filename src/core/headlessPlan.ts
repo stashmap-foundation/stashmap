@@ -1,6 +1,7 @@
 import { List, Map, OrderedSet, Set } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
+import { joinID } from "../connections";
 import { createPlan, buildDocumentEvents, Plan } from "../planner";
 
 const EMPTY_TEMPORARY_VIEW: TemporaryViewState = {
@@ -59,4 +60,10 @@ export function buildKnowledgeDocumentEvents(plan: Plan): UnsignedEvent[] {
         event.kind === KIND_KNOWLEDGE_DOCUMENT || event.kind === KIND_DELETE
     )
     .toArray();
+}
+
+export function getAffectedRootRelationIds(plan: Plan): LongID[] {
+  return plan.affectedRoots
+    .toArray()
+    .map((rootId) => joinID(plan.user.publicKey, rootId));
 }

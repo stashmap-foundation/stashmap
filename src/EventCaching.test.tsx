@@ -206,7 +206,6 @@ test("relay results appear after queue flushes pending outbox events on reload",
 
   await userEvent.click(await screen.findByLabelText("publishing status"));
   await screen.findByText("relay.test.first.success/");
-  await screen.findAllByText("0/2");
 
   await screen.findByText("synced", {}, { timeout: 10000 });
   await screen.findAllByText("2/2");

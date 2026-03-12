@@ -158,7 +158,7 @@ function PermanentDocumentSyncBridge({
   userRelays,
   contactsRelays,
 }: {
-  db: StashmapDB | null;
+  db: StashmapDB | null | undefined;
   myself: PublicKey;
   contacts: Contacts;
   projectMembers: Members;
@@ -170,7 +170,8 @@ function PermanentDocumentSyncBridge({
   const addLiveEvents = useDocumentStore()?.addEvents;
 
   usePermanentDocumentSync({
-    db,
+    enabled: db !== undefined,
+    db: db || null,
     myself,
     contacts,
     projectMembers,
@@ -251,12 +252,12 @@ function Data({ user, children }: DataProps): JSX.Element {
   const defaultRelays = useDefaultRelays();
   const { relayPool } = useApis();
 
-  const [db, setDb] = useState<StashmapDB | null>(null);
+  const [db, setDb] = useState<StashmapDB | null | undefined>(undefined);
 
   useEffect(() => {
     openDB().then(async (database) => {
+      setDb(database || null);
       if (!database) return;
-      setDb(database);
       const outbox = await getOutboxEvents(database);
       if (outbox.length > 0) {
         setNewEventsAndPublishResults((prev) => ({
@@ -382,7 +383,7 @@ function Data({ user, children }: DataProps): JSX.Element {
       projectMembers={projectMembers}
     >
       <DocumentStoreProvider
-        db={db}
+        db={db || null}
         unpublishedEvents={newEventsAndPublishResults.unsignedEvents}
       >
         <PermanentDocumentSyncBridge
@@ -408,7 +409,7 @@ function Data({ user, children }: DataProps): JSX.Element {
             setPublishEvents={setNewEventsAndPublishResults}
             setPanes={setPanes}
             setViews={setViews}
-            db={db}
+            db={db || null}
             getRelays={() => ({
               defaultRelays,
               userRelays,

@@ -10,6 +10,7 @@ import {
 } from "./permanentSync";
 
 export function usePermanentDocumentSync({
+  enabled = true,
   db,
   myself,
   contacts,
@@ -20,6 +21,7 @@ export function usePermanentDocumentSync({
   userRelays,
   contactsRelays,
 }: {
+  enabled?: boolean;
   db: StashmapDB | null;
   myself: PublicKey;
   contacts: Contacts;
@@ -59,6 +61,7 @@ export function usePermanentDocumentSync({
 
   useEffect(() => {
     if (
+      !enabled ||
       (!db && !addLiveEvents) ||
       relayUrls.length === 0 ||
       authors.length === 0
@@ -72,5 +75,5 @@ export function usePermanentDocumentSync({
       authors,
       addLiveEvents,
     });
-  }, [addLiveEvents, authors, db, relayPool, relayUrls]);
+  }, [addLiveEvents, authors, db, enabled, relayPool, relayUrls]);
 }

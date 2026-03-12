@@ -24,6 +24,24 @@ import {
   removeStoredDocument,
 } from "./indexedDB";
 
+const PERMANENT_SYNC_BACKFILL_PAGE_LIMIT = 200;
+const PERMANENT_SYNC_CATCH_UP_SAFETY_WINDOW_SECONDS = 5 * 60;
+const PERMANENT_SYNC_QUERY_MAX_WAIT_MS = 5_000;
+
+type PermanentSyncState = {
+  active: boolean;
+  seenEventIds: Set<string>;
+  checkpoints: Map<PublicKey, SyncCheckpointRecord>;
+};
+
+type SyncQueryPool = SimplePool & {
+  querySync?: (
+    relayUrls: string[],
+    filter: Filter,
+    params?: { maxWait?: number }
+  ) => Promise<Event[]>;
+};
+
 export function buildPermanentSyncAuthors(
   myself: PublicKey,
   contacts: Contacts,
@@ -46,13 +64,65 @@ export function buildPermanentSyncFilters(authors: PublicKey[]): Filter[] {
     {
       authors,
       kinds: [KIND_KNOWLEDGE_DOCUMENT],
+      limit: 0,
     },
     {
       authors,
       kinds: [KIND_DELETE],
       "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`],
+      limit: 0,
     },
   ];
+}
+
+export function buildPermanentCatchUpFilters(
+  authors: PublicKey[],
+  checkpoints: ReadonlyMap<PublicKey, SyncCheckpointRecord>
+): Filter[] {
+  const authorsWithCheckpoint = authors.filter(
+    (author) => (checkpoints.get(author)?.latestSeenLiveCreatedAt || 0) > 0
+  );
+  if (authorsWithCheckpoint.length === 0) {
+    return [];
+  }
+  const since = Math.max(
+    0,
+    authorsWithCheckpoint.reduce((minCreatedAt, author) => {
+      const createdAt = checkpoints.get(author)?.latestSeenLiveCreatedAt || 0;
+      return Math.min(minCreatedAt, createdAt);
+    }, Number.POSITIVE_INFINITY) - PERMANENT_SYNC_CATCH_UP_SAFETY_WINDOW_SECONDS
+  );
+  return [
+    {
+      authors: authorsWithCheckpoint,
+      kinds: [KIND_KNOWLEDGE_DOCUMENT],
+      since,
+    },
+    {
+      authors: authorsWithCheckpoint,
+      kinds: [KIND_DELETE],
+      "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`],
+      since,
+    },
+  ];
+}
+
+export function buildPermanentBackfillFilter({
+  author,
+  until,
+  kind,
+}: {
+  author: PublicKey;
+  until?: number;
+  kind: typeof KIND_KNOWLEDGE_DOCUMENT | typeof KIND_DELETE;
+}): Filter {
+  return {
+    authors: [author],
+    kinds: [kind],
+    ...(kind === KIND_DELETE ? { "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`] } : {}),
+    ...(until !== undefined ? { until } : {}),
+    limit: PERMANENT_SYNC_BACKFILL_PAGE_LIMIT,
+  };
 }
 
 function getStoredEventID(
@@ -131,6 +201,40 @@ export function mergeLiveSyncCheckpoint(
   };
 }
 
+export function mergeDocumentBackfillCheckpoint(
+  current: SyncCheckpointRecord | undefined,
+  author: PublicKey,
+  oldestFetchedDocCreatedAt: number | undefined,
+  docsBackfillComplete: boolean
+): SyncCheckpointRecord {
+  return {
+    author,
+    latestSeenLiveCreatedAt: current?.latestSeenLiveCreatedAt,
+    deletesBackfillComplete: current?.deletesBackfillComplete || false,
+    oldestFetchedDeleteCreatedAt: current?.oldestFetchedDeleteCreatedAt,
+    docsBackfillComplete,
+    oldestFetchedDocCreatedAt:
+      oldestFetchedDocCreatedAt ?? current?.oldestFetchedDocCreatedAt,
+  };
+}
+
+export function mergeDeleteBackfillCheckpoint(
+  current: SyncCheckpointRecord | undefined,
+  author: PublicKey,
+  oldestFetchedDeleteCreatedAt: number | undefined,
+  deletesBackfillComplete: boolean
+): SyncCheckpointRecord {
+  return {
+    author,
+    latestSeenLiveCreatedAt: current?.latestSeenLiveCreatedAt,
+    docsBackfillComplete: current?.docsBackfillComplete || false,
+    oldestFetchedDocCreatedAt: current?.oldestFetchedDocCreatedAt,
+    deletesBackfillComplete,
+    oldestFetchedDeleteCreatedAt:
+      oldestFetchedDeleteCreatedAt ?? current?.oldestFetchedDeleteCreatedAt,
+  };
+}
+
 export async function applyStoredDocument(
   db: StashmapDB,
   document: StoredDocumentRecord
@@ -172,6 +276,82 @@ export async function applyStoredDelete(
   }
 }
 
+function getQuerySync(
+  pool: SyncQueryPool
+):
+  | ((
+      relayUrls: string[],
+      filter: Filter,
+      params?: { maxWait?: number }
+    ) => Promise<Event[]>)
+  | undefined {
+  return typeof pool.querySync === "function"
+    ? pool.querySync.bind(pool)
+    : undefined;
+}
+
+async function queryPermanentSyncFilters(
+  relayPool: SyncQueryPool,
+  relayUrls: string[],
+  filters: Filter[]
+): Promise<Event[]> {
+  const querySync = getQuerySync(relayPool);
+  if (!querySync || relayUrls.length === 0 || filters.length === 0) {
+    return [];
+  }
+  const eventMap = new Map<string, Event>();
+  const responses = await Promise.all(
+    filters.map((filter) =>
+      querySync(relayUrls, filter, {
+        maxWait: PERMANENT_SYNC_QUERY_MAX_WAIT_MS,
+      })
+    )
+  );
+  responses.flat().forEach((event) => {
+    eventMap.set(event.id, event);
+  });
+  return [...eventMap.values()].sort((left, right) => {
+    if (left.created_at !== right.created_at) {
+      return left.created_at - right.created_at;
+    }
+    return left.id.localeCompare(right.id);
+  });
+}
+
+async function loadPermanentSyncCheckpoints(
+  db: StashmapDB | null,
+  authors: PublicKey[]
+): Promise<Map<PublicKey, SyncCheckpointRecord>> {
+  if (!db || authors.length === 0) {
+    return new Map();
+  }
+  const entries = await Promise.all(
+    authors.map(
+      async (author) => [author, await getSyncCheckpoint(db, author)] as const
+    )
+  );
+  return entries.reduce((acc, [author, checkpoint]) => {
+    if (checkpoint) {
+      acc.set(author, checkpoint);
+    }
+    return acc;
+  }, new Map<PublicKey, SyncCheckpointRecord>());
+}
+
+async function updateCheckpoint(
+  db: StashmapDB | null,
+  state: PermanentSyncState,
+  author: PublicKey,
+  updater: (current: SyncCheckpointRecord | undefined) => SyncCheckpointRecord
+): Promise<void> {
+  const nextCheckpoint = updater(state.checkpoints.get(author));
+  state.checkpoints.set(author, nextCheckpoint);
+  if (!db) {
+    return;
+  }
+  await putSyncCheckpoint(db, nextCheckpoint);
+}
+
 export function startPermanentDocumentSync({
   db,
   relayPool,
@@ -193,56 +373,170 @@ export function startPermanentDocumentSync({
     return () => {};
   }
 
-  const filters = buildPermanentSyncFilters(authors);
-  const seenEventIds = new Set<string>();
   const state = {
     active: true,
-  };
-
-  const updateLiveSyncCheckpoint = async (
-    author: PublicKey,
-    createdAt: number
-  ): Promise<void> => {
-    if (!db) {
-      return;
-    }
-    const existingCheckpoint = await getSyncCheckpoint(db, author);
-    await putSyncCheckpoint(
-      db,
-      mergeLiveSyncCheckpoint(existingCheckpoint, author, createdAt)
-    );
+    seenEventIds: new Set<string>(),
+    checkpoints: new Map<PublicKey, SyncCheckpointRecord>(),
   };
 
   const applyIncomingEvent = async (event: Event): Promise<void> => {
-    if (!state.active || !event.id || seenEventIds.has(event.id)) {
+    if (!state.active || !event.id || state.seenEventIds.has(event.id)) {
       return;
     }
-    seenEventIds.add(event.id);
+    state.seenEventIds.add(event.id);
 
     if (!db) {
       addLiveEvents?.(ImmutableMap([[event.id, event]]));
-      return;
     }
 
     const document = toStoredDocumentRecord(event);
     if (document) {
-      await applyStoredDocument(db, document);
-      await updateLiveSyncCheckpoint(document.author, document.createdAt);
+      if (db) {
+        await applyStoredDocument(db, document);
+      }
+      await updateCheckpoint(db, state, document.author, (current) =>
+        mergeLiveSyncCheckpoint(current, document.author, document.createdAt)
+      );
       return;
     }
 
     const deletion = toStoredDeleteRecord(event);
     if (deletion) {
-      await applyStoredDelete(db, deletion);
-      await updateLiveSyncCheckpoint(deletion.author, deletion.createdAt);
+      if (db) {
+        await applyStoredDelete(db, deletion);
+      }
+      await updateCheckpoint(db, state, deletion.author, (current) =>
+        mergeLiveSyncCheckpoint(current, deletion.author, deletion.createdAt)
+      );
     }
   };
 
-  const sub = relayPool.subscribeMany(relayUrls, filters, {
-    onevent(event: Event): void {
-      applyIncomingEvent(event).catch(() => undefined);
-    },
-  });
+  const applyQueriedEvents = async (
+    events: ReadonlyArray<Event>
+  ): Promise<void> => {
+    await Promise.all(events.map((event) => applyIncomingEvent(event)));
+  };
+
+  const runCatchUp = async (): Promise<void> => {
+    const filters = buildPermanentCatchUpFilters(authors, state.checkpoints);
+    const events = await queryPermanentSyncFilters(
+      relayPool as SyncQueryPool,
+      relayUrls,
+      filters
+    );
+    if (!state.active || events.length === 0) {
+      return;
+    }
+    await applyQueriedEvents(events);
+  };
+
+  const runBackfillPage = async ({
+    author,
+    kind,
+  }: {
+    author: PublicKey;
+    kind: typeof KIND_KNOWLEDGE_DOCUMENT | typeof KIND_DELETE;
+  }): Promise<void> => {
+    if (!state.active) {
+      return;
+    }
+    const checkpoint = state.checkpoints.get(author);
+    const isDocumentKind = kind === KIND_KNOWLEDGE_DOCUMENT;
+    const isComplete = isDocumentKind
+      ? checkpoint?.docsBackfillComplete
+      : checkpoint?.deletesBackfillComplete;
+    if (isComplete) {
+      return;
+    }
+    const oldestFetchedCreatedAt = isDocumentKind
+      ? checkpoint?.oldestFetchedDocCreatedAt
+      : checkpoint?.oldestFetchedDeleteCreatedAt;
+    const filter = buildPermanentBackfillFilter({
+      author,
+      kind,
+      until:
+        oldestFetchedCreatedAt !== undefined
+          ? oldestFetchedCreatedAt - 1
+          : undefined,
+    });
+    const events = await queryPermanentSyncFilters(
+      relayPool as SyncQueryPool,
+      relayUrls,
+      [filter]
+    );
+    if (!state.active) {
+      return;
+    }
+    if (events.length > 0) {
+      await applyQueriedEvents(events);
+    }
+    const oldestCreatedAt =
+      events.length > 0
+        ? events.reduce(
+            (oldest, event) => Math.min(oldest, event.created_at),
+            Number.POSITIVE_INFINITY
+          )
+        : undefined;
+    await updateCheckpoint(db, state, author, (current) =>
+      isDocumentKind
+        ? mergeDocumentBackfillCheckpoint(
+            current,
+            author,
+            oldestCreatedAt,
+            events.length < PERMANENT_SYNC_BACKFILL_PAGE_LIMIT
+          )
+        : mergeDeleteBackfillCheckpoint(
+            current,
+            author,
+            oldestCreatedAt,
+            events.length < PERMANENT_SYNC_BACKFILL_PAGE_LIMIT
+          )
+    );
+    if (events.length === PERMANENT_SYNC_BACKFILL_PAGE_LIMIT) {
+      await runBackfillPage({
+        author,
+        kind,
+      });
+    }
+  };
+
+  const runBackfillForAuthor = async (
+    pendingAuthors: PublicKey[]
+  ): Promise<void> => {
+    const [author, ...restAuthors] = pendingAuthors;
+    if (!author || !state.active) {
+      return;
+    }
+    await Promise.all([
+      runBackfillPage({
+        author,
+        kind: KIND_KNOWLEDGE_DOCUMENT,
+      }),
+      runBackfillPage({
+        author,
+        kind: KIND_DELETE,
+      }),
+    ]);
+    await runBackfillForAuthor(restAuthors);
+  };
+
+  loadPermanentSyncCheckpoints(db, authors)
+    .then(async (checkpoints) => {
+      state.checkpoints = checkpoints;
+      await runCatchUp();
+      await runBackfillForAuthor(authors);
+    })
+    .catch(() => undefined);
+
+  const sub = relayPool.subscribeMany(
+    relayUrls,
+    buildPermanentSyncFilters(authors),
+    {
+      onevent(event: Event): void {
+        applyIncomingEvent(event).catch(() => undefined);
+      },
+    }
+  );
 
   return () => {
     state.active = false;

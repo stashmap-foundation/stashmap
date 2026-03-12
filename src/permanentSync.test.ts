@@ -5,7 +5,11 @@ import {
   applyStoredDelete,
   applyStoredDocument,
   buildPermanentSyncAuthors,
+  buildPermanentCatchUpFilters,
+  buildPermanentBackfillFilter,
   buildPermanentSyncFilters,
+  mergeDeleteBackfillCheckpoint,
+  mergeDocumentBackfillCheckpoint,
   mergeLiveSyncCheckpoint,
   startPermanentDocumentSync,
   toStoredDeleteRecord,
@@ -53,13 +57,60 @@ test("buildPermanentSyncAuthors includes user and deduplicates contacts/members"
 
 test("buildPermanentSyncFilters creates broad document and delete filters", () => {
   expect(buildPermanentSyncFilters([ALICE, BOB])).toEqual([
-    { authors: [ALICE, BOB], kinds: [34770] },
+    { authors: [ALICE, BOB], kinds: [34770], limit: 0 },
     {
       authors: [ALICE, BOB],
       kinds: [5],
       "#k": ["34770"],
+      limit: 0,
     },
   ]);
+});
+
+test("buildPermanentCatchUpFilters narrows to authors with checkpoints", () => {
+  expect(
+    buildPermanentCatchUpFilters(
+      [ALICE, BOB],
+      new globalThis.Map([
+        [
+          ALICE,
+          {
+            author: ALICE,
+            docsBackfillComplete: false,
+            deletesBackfillComplete: false,
+            latestSeenLiveCreatedAt: 100,
+          },
+        ],
+      ])
+    )
+  ).toEqual([
+    {
+      authors: [ALICE],
+      kinds: [34770],
+      since: 0,
+    },
+    {
+      authors: [ALICE],
+      kinds: [5],
+      "#k": ["34770"],
+      since: 0,
+    },
+  ]);
+});
+
+test("buildPermanentBackfillFilter pages by author and until", () => {
+  expect(
+    buildPermanentBackfillFilter({
+      author: ALICE,
+      kind: 34770,
+      until: 55,
+    })
+  ).toEqual({
+    authors: [ALICE],
+    kinds: [34770],
+    until: 55,
+    limit: 200,
+  });
 });
 
 test("toStoredDocumentRecord extracts replaceable document fields", () => {
@@ -129,6 +180,54 @@ test("mergeLiveSyncCheckpoint keeps the latest seen created_at", () => {
     oldestFetchedDocCreatedAt: undefined,
     oldestFetchedDeleteCreatedAt: undefined,
     latestSeenLiveCreatedAt: 9,
+  });
+});
+
+test("mergeDocumentBackfillCheckpoint tracks oldest page and completion", () => {
+  expect(
+    mergeDocumentBackfillCheckpoint(
+      {
+        author: ALICE,
+        docsBackfillComplete: false,
+        deletesBackfillComplete: true,
+        oldestFetchedDeleteCreatedAt: 50,
+        latestSeenLiveCreatedAt: 90,
+      },
+      ALICE,
+      20,
+      true
+    )
+  ).toEqual({
+    author: ALICE,
+    docsBackfillComplete: true,
+    deletesBackfillComplete: true,
+    oldestFetchedDocCreatedAt: 20,
+    oldestFetchedDeleteCreatedAt: 50,
+    latestSeenLiveCreatedAt: 90,
+  });
+});
+
+test("mergeDeleteBackfillCheckpoint tracks oldest page and completion", () => {
+  expect(
+    mergeDeleteBackfillCheckpoint(
+      {
+        author: ALICE,
+        docsBackfillComplete: true,
+        deletesBackfillComplete: false,
+        oldestFetchedDocCreatedAt: 25,
+        latestSeenLiveCreatedAt: 90,
+      },
+      ALICE,
+      10,
+      true
+    )
+  ).toEqual({
+    author: ALICE,
+    docsBackfillComplete: true,
+    deletesBackfillComplete: true,
+    oldestFetchedDocCreatedAt: 25,
+    oldestFetchedDeleteCreatedAt: 10,
+    latestSeenLiveCreatedAt: 90,
   });
 });
 
@@ -237,4 +336,48 @@ test("startPermanentDocumentSync applies document events immediately", async () 
     ],
   });
   expect(indexedDBModule.putSyncCheckpoint).toHaveBeenCalled();
+});
+
+test("startPermanentDocumentSync uses live limit-0 subscription and catch-up queries", async () => {
+  indexedDBModule.getSyncCheckpoint.mockImplementation(
+    (db: StashmapDB, author: PublicKey) =>
+      author === ALICE
+        ? Promise.resolve({
+            author: ALICE,
+            docsBackfillComplete: true,
+            deletesBackfillComplete: true,
+            latestSeenLiveCreatedAt: 100,
+          })
+        : Promise.resolve(undefined)
+  );
+  const subscribeMany = jest.fn(() => ({ close: jest.fn() }));
+  const querySync = jest.fn(() => Promise.resolve([]));
+
+  startPermanentDocumentSync({
+    db: {} as StashmapDB,
+    relayPool: {
+      subscribeMany,
+      querySync,
+    } as unknown as import("nostr-tools").SimplePool,
+    relayUrls: ["wss://relay.example"],
+    authors: [ALICE],
+  });
+
+  await new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+
+  expect(subscribeMany).toHaveBeenCalledWith(
+    ["wss://relay.example"],
+    [
+      { authors: [ALICE], kinds: [34770], limit: 0 },
+      { authors: [ALICE], kinds: [5], "#k": ["34770"], limit: 0 },
+    ],
+    expect.any(Object)
+  );
+  expect(querySync).toHaveBeenCalledWith(
+    ["wss://relay.example"],
+    { authors: [ALICE], kinds: [34770], since: 0 },
+    { maxWait: 5000 }
+  );
 });

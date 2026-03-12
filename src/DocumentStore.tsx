@@ -14,9 +14,7 @@ import {
   putCachedEvents,
   subscribeDocumentStore,
 } from "./indexedDB";
-import {
-  buildKnowledgeDBFromStoredDocuments,
-} from "./documentMaterialization";
+import { buildKnowledgeDBFromStoredDocuments } from "./documentMaterialization";
 import {
   applyStoredDelete,
   applyStoredDocument,

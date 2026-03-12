@@ -72,7 +72,7 @@ export type WriteSetArgumentCliArgs = {
   help: boolean;
 };
 
-export type WriteRemoveItemCliArgs = {
+export type WriteDeleteItemCliArgs = {
   configPath?: string;
   parentRelationId?: LongID;
   itemId?: LongID | ID;

@@ -18,6 +18,7 @@ import { createPublishQueue } from "./PublishQueue";
 import type { StashmapDB } from "./indexedDB";
 import { newDB } from "./knowledge";
 import { buildDocumentEvent } from "./markdownDocument";
+import { buildDocumentEventFromRelations } from "./relationsDocumentEvent";
 import {
   shortID,
   createSemanticID,
@@ -103,13 +104,29 @@ export function getPane(plan: Plan | Data, viewPath: ViewPath): Pane {
   return plan.panes[paneIndex];
 }
 
-export type Plan = Data & {
+type GraphPlanData = Pick<
+  Data,
+  | "contacts"
+  | "user"
+  | "contactsRelays"
+  | "knowledgeDBs"
+  | "relaysInfos"
+  | "projectMembers"
+>;
+
+export type GraphPlan = GraphPlanData & {
   publishEvents: List<UnsignedEvent & EventAttachment>;
   affectedRoots: ImmutableSet<ID>;
   relays: AllRelays;
-  temporaryView: TemporaryViewState;
-  temporaryEvents: List<TemporaryEvent>;
 };
+
+export type WorkspacePlan = GraphPlan &
+  Pick<Data, "publishEventsStatus" | "views" | "panes"> & {
+    temporaryView: TemporaryViewState;
+    temporaryEvents: List<TemporaryEvent>;
+  };
+
+export type Plan = WorkspacePlan;
 
 function newContactListEvent(contacts: Contacts, user: User): UnsignedEvent {
   const tags = contacts
@@ -146,11 +163,17 @@ function setRelayConf(
   };
 }
 
-export function planAddContact(plan: Plan, publicKey: PublicKey): Plan {
+export function planAddContact<T extends GraphPlan>(
+  plan: T,
+  publicKey: PublicKey
+): T {
   return planUpsertContact(plan, { publicKey });
 }
 
-export function planUpsertContact(plan: Plan, contact: Contact): Plan {
+export function planUpsertContact<T extends GraphPlan>(
+  plan: T,
+  contact: Contact
+): T {
   const existing = plan.contacts.get(contact.publicKey);
   if (
     existing?.publicKey === contact.publicKey &&
@@ -174,10 +197,10 @@ export function planUpsertContact(plan: Plan, contact: Contact): Plan {
   };
 }
 
-export function planEnsureSystemRoot(
-  plan: Plan,
+export function planEnsureSystemRoot<T extends GraphPlan>(
+  plan: T,
   systemRole: RootSystemRole
-): [Plan, Relations] {
+): [T, Relations] {
   const existing = getOwnSystemRoot(
     plan.knowledgeDBs,
     plan.user.publicKey,
@@ -200,7 +223,10 @@ export function planEnsureSystemRoot(
   return [upsertRelationsCore(plan, relation), relation];
 }
 
-export function planUpsertMemberlist(plan: Plan, members: Members): Plan {
+export function planUpsertMemberlist<T extends GraphPlan>(
+  plan: T,
+  members: Members
+): T {
   const votesTags = members
     .valueSeq()
     .toArray()
@@ -224,7 +250,10 @@ export function planUpsertMemberlist(plan: Plan, members: Members): Plan {
   };
 }
 
-export function planAddContacts(plan: Plan, publicKeys: List<PublicKey>): Plan {
+export function planAddContacts<T extends GraphPlan>(
+  plan: T,
+  publicKeys: List<PublicKey>
+): T {
   const newContacts = publicKeys.reduce((rdx, publicKey) => {
     if (rdx.has(publicKey)) {
       return rdx;
@@ -242,7 +271,10 @@ export function planAddContacts(plan: Plan, publicKeys: List<PublicKey>): Plan {
   };
 }
 
-export function planRemoveContact(plan: Plan, publicKey: PublicKey): Plan {
+export function planRemoveContact<T extends GraphPlan>(
+  plan: T,
+  publicKey: PublicKey
+): T {
   const contactToRemove = plan.contacts.get(publicKey);
   if (!contactToRemove) {
     return plan;
@@ -255,7 +287,10 @@ export function planRemoveContact(plan: Plan, publicKey: PublicKey): Plan {
   };
 }
 
-function upsertRelationsCore(plan: Plan, relations: Relations): Plan {
+function upsertRelationsCore<T extends GraphPlan>(
+  plan: T,
+  relations: Relations
+): T {
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
   const normalizedRelations = ensureRelationNativeFields(
     plan.knowledgeDBs,
@@ -277,7 +312,7 @@ function upsertRelationsCore(plan: Plan, relations: Relations): Plan {
   };
 }
 
-function addCrefToLog(plan: Plan, relationID: LongID): Plan {
+function addCrefToLog<T extends GraphPlan>(plan: T, relationID: LongID): T {
   const [planWithLog, relations] = planEnsureSystemRoot(plan, LOG_ROOT_ROLE);
   const crefId = createConcreteRefId(relationID);
   const updatedRelations = addRelationToRelations(
@@ -290,7 +325,10 @@ function addCrefToLog(plan: Plan, relationID: LongID): Plan {
   return upsertRelationsCore(planWithLog, updatedRelations);
 }
 
-export function planUpsertRelations(plan: Plan, relations: Relations): Plan {
+export function planUpsertRelations<T extends GraphPlan>(
+  plan: T,
+  relations: Relations
+): T {
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
   const isNewRelation = !userDB.relations.has(shortID(relations.id));
   const basePlan = upsertRelationsCore(plan, relations);
@@ -531,14 +569,14 @@ export function planExpandNode(
   );
 }
 
-export function planAddTargetsToRelation(
-  plan: Plan,
+export function planAddTargetsToRelation<T extends GraphPlan>(
+  plan: T,
   parentRelation: Relations,
   targets: AddToParentTarget | AddToParentTarget[],
   insertAtIndex?: number,
   relevance?: Relevance,
   argument?: Argument
-): [Plan, (LongID | ID)[]] {
+): [T, (LongID | ID)[]] {
   const targetsArray = Array.isArray(targets) ? targets : [targets];
   if (targetsArray.length === 0) {
     return [plan, []];
@@ -707,7 +745,7 @@ function getRelationDepth(
 }
 
 function getRelationSubtree(
-  plan: Plan,
+  plan: GraphPlan,
   sourceRelation: Relations,
   filterRelation: (relation: Relations) => boolean = () => true
 ): List<Relations> {
@@ -839,14 +877,14 @@ function planCopyDescendantRelations(
   return [resultPlan, resultMapping];
 }
 
-export function planMoveDescendantRelations(
-  plan: Plan,
+export function planMoveDescendantRelations<T extends GraphPlan>(
+  plan: T,
   sourceRelation: Relations,
   targetSemanticContext: Context,
   targetParentRelationID?: LongID,
   targetSemanticID?: LongID | ID,
   root?: ID
-): Plan {
+): T {
   const descendants = getRelationSubtree(plan, sourceRelation);
   const sourceSemanticID = getRelationSemanticID(sourceRelation);
   const sourceSemanticContext = getRelationContext(
@@ -1361,7 +1399,10 @@ export function planDeleteSemanticID(
   }, plan);
 }
 
-export function planDeleteRelations(plan: Plan, relationsID: LongID): Plan {
+export function planDeleteRelations<T extends GraphPlan>(
+  plan: T,
+  relationsID: LongID
+): T {
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
   const relation = userDB.relations.get(shortID(relationsID));
   const updatedRelations = userDB.relations.remove(shortID(relationsID));
@@ -1379,10 +1420,10 @@ export function planDeleteRelations(plan: Plan, relationsID: LongID): Plan {
   };
 }
 
-export function planDeleteDescendantRelations(
-  plan: Plan,
+export function planDeleteDescendantRelations<T extends GraphPlan>(
+  plan: T,
   sourceRelation: Relations
-): Plan {
+): T {
   const userRelationsByID = plan.knowledgeDBs.get(
     plan.user.publicKey,
     newDB()
@@ -1496,7 +1537,7 @@ const PlanningContext = React.createContext<PlanningContextValue | undefined>(
 // Empty nodes are injected at read time via injectEmptyNodesIntoKnowledgeDBs,
 // so any relations modification will include them - we need to filter before publishing
 export function buildDocumentEvents(
-  plan: Plan
+  plan: GraphPlan
 ): List<UnsignedEvent & EventAttachment> {
   const author = plan.user.publicKey;
   const userDB = plan.knowledgeDBs.get(author, newDB());
@@ -1519,7 +1560,11 @@ export function buildDocumentEvents(
       };
       return events.push(deleteEvent as UnsignedEvent & EventAttachment);
     }
-    const event = buildDocumentEvent(plan, rootRelation);
+    const workspacePlan = plan as Partial<WorkspacePlan>;
+    const event =
+      workspacePlan.views !== undefined && workspacePlan.panes !== undefined
+        ? buildDocumentEvent(workspacePlan as Data, rootRelation)
+        : buildDocumentEventFromRelations(plan.knowledgeDBs, rootRelation);
     return events.push(event as UnsignedEvent & EventAttachment);
   }, plan.publishEvents);
 }
@@ -1693,6 +1738,20 @@ export function PlanningContextProvider({
   );
 }
 
+type CreateGraphPlanProps = GraphPlanData & {
+  publishEvents?: List<UnsignedEvent & EventAttachment>;
+  relays: AllRelays;
+};
+
+export function createGraphPlan(props: CreateGraphPlanProps): GraphPlan {
+  return {
+    ...props,
+    publishEvents:
+      props.publishEvents || List<UnsignedEvent & EventAttachment>([]),
+    affectedRoots: ImmutableSet<ID>(),
+  };
+}
+
 export function createPlan(
   props: Data & {
     publishEvents?: List<UnsignedEvent & EventAttachment>;
@@ -1700,10 +1759,10 @@ export function createPlan(
   }
 ): Plan {
   return {
-    ...props,
-    publishEvents:
-      props.publishEvents || List<UnsignedEvent & EventAttachment>([]),
-    affectedRoots: ImmutableSet<ID>(),
+    ...createGraphPlan(props),
+    publishEventsStatus: props.publishEventsStatus,
+    views: props.views,
+    panes: props.panes,
     temporaryView: props.publishEventsStatus.temporaryView,
     temporaryEvents: List<TemporaryEvent>(),
   };

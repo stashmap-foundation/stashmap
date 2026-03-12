@@ -79,7 +79,7 @@ export async function runCli(argv: string[]): Promise<void> {
       "link",
       "set-relevance",
       "set-argument",
-      "remove-item",
+      "delete-item",
       "move-item",
     ].includes(subcommand || "")
   ) {

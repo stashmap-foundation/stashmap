@@ -234,7 +234,7 @@ test("createUnderParent and linkUnderParent add owned children and crefs to the 
   expect(event.content).toContain(`[Roadmap](#${roadmapDraft.relationID})`);
 });
 
-test("moveItem preserves relevance and argument across parents, and removeItem deletes owned subtrees", async () => {
+test("moveItem preserves relevance and argument across parents, and delete-item semantics delete owned subtrees", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-workspace-"));
   const homeDraft = buildSingleRootMarkdownDocumentEvent(
     ALICE,
@@ -282,8 +282,41 @@ test("moveItem preserves relevance and argument across parents, and removeItem d
   const removedRelations = parseDocumentEvent(removedEvent)
     .valueSeq()
     .toArray();
+  const removedBucketB = removedRelations.find(
+    (relation) => relation.id === bucketB?.id
+  );
 
   expect(removedRelations.find((relation) => relation.id === task?.id)).toBe(
     undefined
   );
+  expect(removedBucketB?.items.find((item) => item.id === task?.id)).toBe(
+    undefined
+  );
+});
+
+test("moveItem rejects moving a relation under its own descendant", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-workspace-"));
+  const homeDraft = buildSingleRootMarkdownDocumentEvent(
+    ALICE,
+    "# Home\n\n## Parent\n\n### Child\n"
+  );
+  writeWorkspace(tempDir, [homeDraft]);
+  const graph = await loadWorkspaceGraph(tempDir);
+  const plan = createHeadlessPlan(ALICE, graph.knowledgeDBs);
+  const relations = parseRootRelations(homeDraft);
+  const parent = relations.find((relation) => relation.text === "Parent");
+  const child = relations.find((relation) => relation.text === "Child");
+
+  expect(parent).toBeDefined();
+  expect(child).toBeDefined();
+
+  expect(() =>
+    planMoveRelationItemById(
+      plan,
+      homeDraft.relationID,
+      parent?.id as LongID,
+      child?.id as LongID,
+      0
+    )
+  ).toThrow("Cannot move relation");
 });

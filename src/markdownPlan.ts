@@ -12,6 +12,7 @@ import { createNodesFromMarkdownTrees, WalkContext } from "./markdownRelations";
 import { MarkdownTreeNode } from "./markdownTree";
 import {
   AddToParentTarget,
+  GraphPlan,
   Plan,
   planAddTargetsToRelation,
   planMoveDescendantRelations,
@@ -20,11 +21,11 @@ import {
 import { newRelations } from "./relationFactory";
 import { getRelationForView, ViewPath } from "./ViewContext";
 
-export function planCreateNodesFromMarkdownTrees(
-  plan: Plan,
+export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
+  plan: T,
   trees: MarkdownTreeNode[],
   context: List<ID> = List<ID>()
-): [Plan, topItemIDs: ID[], topRelationIDs: LongID[]] {
+): [T, topItemIDs: ID[], topRelationIDs: LongID[]] {
   const walkContext: WalkContext = {
     knowledgeDBs: plan.knowledgeDBs,
     publicKey: plan.user.publicKey,
@@ -43,11 +44,11 @@ export function planCreateNodesFromMarkdownTrees(
   ];
 }
 
-export function planCreateNodesFromMarkdownFiles(
-  plan: Plan,
+export function planCreateNodesFromMarkdownFiles<T extends GraphPlan>(
+  plan: T,
   files: MarkdownImportFile[],
   context: List<ID> = List<ID>()
-): [Plan, topItemIDs: ID[]] {
+): [T, topItemIDs: ID[]] {
   const trees = parseMarkdownImportFiles(files);
   const [nextPlan, topItemIDs] = planCreateNodesFromMarkdownTrees(
     plan,
@@ -57,11 +58,11 @@ export function planCreateNodesFromMarkdownFiles(
   return [nextPlan, topItemIDs];
 }
 
-export function planCreateNodesFromMarkdown(
-  plan: Plan,
+export function planCreateNodesFromMarkdown<T extends GraphPlan>(
+  plan: T,
   markdownText: string,
   context: List<ID> = List<ID>()
-): [Plan, topItemID: ID] {
+): [T, topItemID: ID] {
   const [nextPlan, topItemIDs] = planCreateNodesFromMarkdownFiles(
     plan,
     [{ name: "Imported Markdown", markdown: markdownText }],
@@ -92,7 +93,10 @@ export function planCreateNodesFromMarkdown(
   ];
 }
 
-function removeTransientRootAffects(plan: Plan, relationIds: LongID[]): Plan {
+function removeTransientRootAffects<T extends GraphPlan>(
+  plan: T,
+  relationIds: LongID[]
+): T {
   const transientRootIds = relationIds.filter((relationId) => {
     const relation = plan.knowledgeDBs
       .get(plan.user.publicKey)
@@ -111,14 +115,14 @@ function removeTransientRootAffects(plan: Plan, relationIds: LongID[]): Plan {
   };
 }
 
-function moveCreatedTreesToParentContext(
-  plan: Plan,
+function moveCreatedTreesToParentContext<T extends GraphPlan>(
+  plan: T,
   originalTopNodeIDs: ID[],
   sourceRelationIDs: LongID[],
   actualNodeIDs: (LongID | ID)[],
   targetSemanticContext: Context,
   parentRelation: Relations
-): Plan {
+): T {
   return originalTopNodeIDs.reduce((accPlan, originalID, index) => {
     const actualID = actualNodeIDs[index];
     const sourceRelationID = sourceRelationIDs[index];
@@ -143,15 +147,15 @@ function moveCreatedTreesToParentContext(
   }, plan);
 }
 
-export function planInsertMarkdownTreesByParentId(
-  plan: Plan,
+export function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
+  plan: T,
   trees: MarkdownTreeNode[],
   parentRelationId: LongID,
   insertAtIndex?: number,
   relevance?: Relevance,
   argument?: Argument
 ): {
-  plan: Plan;
+  plan: T;
   topItemIDs: ID[];
   topRelationIDs: LongID[];
   actualItemIDs: Array<LongID | ID>;

@@ -1,6 +1,6 @@
 import { Event, EventTemplate, SimplePool, VerifiedEvent } from "nostr-tools";
 import { List, Map } from "immutable";
-import { Plan, buildDocumentEvents } from "./planner";
+import { buildDocumentEvents, GraphPlan } from "./planner";
 import { FinalizeEvent } from "./Apis";
 import {
   isUserLoggedIn,
@@ -64,7 +64,7 @@ export async function execute({
   relayPool,
   finalizeEvent,
 }: {
-  plan: Plan;
+  plan: GraphPlan;
   relayPool: SimplePool;
   finalizeEvent: FinalizeEvent;
 }): Promise<PublishResultsEventMap> {

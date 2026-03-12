@@ -19,7 +19,7 @@ import {
   createHeadlessPlan,
   getAffectedRootRelationIds,
 } from "./headlessPlan";
-import { Plan } from "../planner";
+import { GraphPlan } from "../planner";
 import {
   loadWriteSecretKey,
   publishUnsignedEvents,
@@ -44,8 +44,8 @@ async function publishWorkspaceMutation(
   publisher: WritePublisher,
   profile: WorkspaceWriteProfile,
   relayUrls: string[] | undefined,
-  mutate: (plan: Plan) => {
-    plan: Plan;
+  mutate: (plan: GraphPlan) => {
+    plan: GraphPlan;
     relationId?: LongID;
     itemId?: LongID | ID;
   }
@@ -259,7 +259,7 @@ export async function writeSetArgument(
   );
 }
 
-export async function writeRemoveItem(
+export async function writeDeleteItem(
   publisher: WritePublisher,
   profile: WorkspaceWriteProfile,
   options: {

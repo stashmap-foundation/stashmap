@@ -4,18 +4,18 @@ import { loadCliProfile } from "./config";
 import { requireValue } from "./args";
 import {
   WriteCreateUnderCliArgs,
+  WriteDeleteItemCliArgs,
   WriteLinkCliArgs,
   WriteMoveItemCliArgs,
-  WriteRemoveItemCliArgs,
   WriteSetArgumentCliArgs,
   WriteSetRelevanceCliArgs,
   WriteSetTextCliArgs,
 } from "./types";
 import {
   writeCreateUnder,
+  writeDeleteItem,
   writeLink,
   writeMoveItem,
-  writeRemoveItem,
   writeSetArgument,
   writeSetRelevance,
   writeSetText,
@@ -97,7 +97,7 @@ export function writeMutationsHelp(): string {
     "  knowstr write link --parent <relation-id> --target <relation-id> [--before <item-id>|--after <item-id>] [--relevance <contains|relevant|maybe_relevant|little_relevant|not_relevant>] [--argument <none|confirms|contra>] [--config <path>] [--relay <url> ...]",
     "  knowstr write set-relevance --parent <relation-id> --item <item-id> --value <contains|relevant|maybe_relevant|little_relevant|not_relevant> [--config <path>] [--relay <url> ...]",
     "  knowstr write set-argument --parent <relation-id> --item <item-id> --value <none|confirms|contra> [--config <path>] [--relay <url> ...]",
-    "  knowstr write remove-item --parent <relation-id> --item <item-id> [--config <path>] [--relay <url> ...]",
+    "  knowstr write delete-item --parent <relation-id> --item <item-id> [--config <path>] [--relay <url> ...]",
     "  knowstr write move-item --from-parent <relation-id> --item <item-id> --to-parent <relation-id> [--before <item-id>|--after <item-id>] [--config <path>] [--relay <url> ...]",
     "",
     "Applies edge-aware relation edits in the local synced workspace and republishes only the affected root documents.",
@@ -384,13 +384,13 @@ export function parseWriteSetArgumentArgs(
   return parse(0, { relayUrls: [], help: false });
 }
 
-export function parseWriteRemoveItemArgs(
+export function parseWriteDeleteItemArgs(
   args: string[]
-): WriteRemoveItemCliArgs {
+): WriteDeleteItemCliArgs {
   const parse = (
     index: number,
-    current: WriteRemoveItemCliArgs
-  ): WriteRemoveItemCliArgs => {
+    current: WriteDeleteItemCliArgs
+  ): WriteDeleteItemCliArgs => {
     const [afterRelayIndex, withRelay] = parseRelayArgs(args, index, current);
     if (afterRelayIndex !== index) {
       return parse(afterRelayIndex, withRelay);
@@ -419,7 +419,7 @@ export function parseWriteRemoveItemArgs(
           itemId: requireValue(args, index, "--item") as LongID | ID,
         });
       default:
-        throw new Error(`Unknown write remove-item argument: ${arg}`);
+        throw new Error(`Unknown write delete-item argument: ${arg}`);
     }
   };
   return parse(0, { relayUrls: [], help: false });
@@ -574,13 +574,13 @@ export async function runWriteMutationCommand(
       });
     }
 
-    if (subcommand === "remove-item") {
-      const parsed = parseWriteRemoveItemArgs(args);
+    if (subcommand === "delete-item") {
+      const parsed = parseWriteDeleteItemArgs(args);
       if (!parsed.parentRelationId || !parsed.itemId) {
         throw new Error("--parent and --item are required");
       }
       const profile = loadCliProfile({ configPath: parsed.configPath });
-      return await writeRemoveItem({ publishEvent }, profile, {
+      return await writeDeleteItem({ publishEvent }, profile, {
         parentRelationId: parsed.parentRelationId,
         itemId: parsed.itemId,
         relayUrls: parsed.relayUrls,

@@ -68,6 +68,7 @@ import {
 import { findContacts } from "./contacts";
 import { UserRelayContextProvider } from "./UserRelayContext";
 import { StashmapDB } from "./indexedDB";
+import { createEmptySemanticIndex } from "./semanticIndex";
 
 import {
   PaneIndexProvider,
@@ -221,6 +222,7 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
   contacts: Map<PublicKey, Contact>(),
   contactsRelays: Map<PublicKey, Relays>(),
   knowledgeDBs: Map<PublicKey, KnowledgeData>(),
+  semanticIndex: createEmptySemanticIndex(),
   relaysInfos: Map<string, RelayInformation | undefined>(),
   publishEventsStatus: {
     isLoading: false,
@@ -326,6 +328,7 @@ function TestPublishProvider({
       contacts={initialDataContextProps.contacts}
       contactsRelays={initialDataContextProps.contactsRelays}
       knowledgeDBs={initialDataContextProps.knowledgeDBs}
+      semanticIndex={initialDataContextProps.semanticIndex}
       relaysInfos={initialDataContextProps.relaysInfos}
       publishEventsStatus={publishEventsStatus}
       views={views}
@@ -361,6 +364,8 @@ export function renderApis(
       options?.contactsRelays || DEFAULT_DATA_CONTEXT_PROPS.contactsRelays,
     knowledgeDBs:
       options?.knowledgeDBs || DEFAULT_DATA_CONTEXT_PROPS.knowledgeDBs,
+    semanticIndex:
+      options?.semanticIndex || DEFAULT_DATA_CONTEXT_PROPS.semanticIndex,
     relaysInfos: options?.relaysInfos || DEFAULT_DATA_CONTEXT_PROPS.relaysInfos,
     publishEventsStatus:
       options?.publishEventsStatus ||

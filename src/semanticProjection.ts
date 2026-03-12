@@ -13,8 +13,6 @@ import {
   createConcreteRefId,
   itemPassesFilters,
   getRelationItemSemanticID,
-  getRelationItemRelation,
-  getIndexedRelationsForKeys,
   getRelationContext,
   getRelationSemanticID,
   getRelationText,
@@ -90,7 +88,16 @@ function getRelationsForSemanticID(
   );
 
   return List(
-    candidateDBs.flatMap((db) => getIndexedRelationsForKeys(db, [localID]))
+    candidateDBs.flatMap((db) =>
+      db.relations
+        .valueSeq()
+        .filter(
+          (relation) =>
+            shortID(getRelationSemanticID(relation)) === localID ||
+            relation.textHash === localID
+        )
+        .toArray()
+    )
   )
     .sort((left, right) => {
       const leftExact =
@@ -224,6 +231,23 @@ export function contextsSemanticallyMatch(
   );
 }
 
+function getSemanticCandidates(
+  semanticIndex: SemanticIndex,
+  semanticKey: string
+): List<Relations> {
+  const relationIDs = semanticIndex.semantic.get(semanticKey);
+  if (!relationIDs) {
+    return List<Relations>();
+  }
+
+  return List(
+    [...relationIDs]
+      .map((relationID) => semanticIndex.relationByID.get(relationID))
+      .filter((relation): relation is Relations => relation !== undefined)
+      .sort((left, right) => right.updated - left.updated)
+  );
+}
+
 function nodesMatchForRefs(
   knowledgeDBs: KnowledgeDBs,
   candidateSemanticID: LongID | ID,
@@ -288,124 +312,33 @@ function contextsMatchForRefs(
   );
 }
 
-type RawAppearance = {
-  relation: Relations;
-  isHead: boolean;
-  matchedItemRelation?: Relations;
-};
-
-function findNodeAppearances(
-  knowledgeDBs: KnowledgeDBs,
-  semanticID: LongID | ID,
-  targetAuthor?: PublicKey,
-  targetRoot?: ID
-): List<RawAppearance> {
-  return knowledgeDBs.reduce((acc, knowledgeDB) => {
-    return knowledgeDB.relations.reduce((rdx, relation) => {
-      if (
-        isSearchId(getRelationSemanticID(relation)) ||
-        getRelationContext(knowledgeDBs, relation).some((id) =>
-          isSearchId(id as ID)
-        )
-      ) {
-        return rdx;
-      }
-      const targetSemanticKey = getSemanticNodeKey(
-        knowledgeDBs,
-        semanticID,
-        targetAuthor || relation.author
-      );
-      const matchedItem = relation.items.find((item) => {
-        const itemSemanticID = getRelationItemSemanticID(
-          knowledgeDBs,
-          item,
-          relation.author
-        );
-        if (item.relevance === "not_relevant" || isRefId(itemSemanticID)) {
-          return false;
-        }
-        if (
-          targetAuthor !== undefined &&
-          targetRoot !== undefined &&
-          relation.author === targetAuthor &&
-          relation.root === targetRoot
-        ) {
-          return shortID(itemSemanticID as ID) === shortID(semanticID as ID);
-        }
-        return (
-          getTextHashForSemanticID(knowledgeDBs, item.id, relation.author) ===
-          targetSemanticKey
-        );
-      });
-      const isInItems = !!matchedItem;
-      const isHeadWithChildren =
-        relation.items.size > 0 &&
-        ((targetAuthor !== undefined &&
-          targetRoot !== undefined &&
-          relation.author === targetAuthor &&
-          relation.root === targetRoot &&
-          shortID(getRelationSemanticID(relation) as ID) ===
-            shortID(semanticID as ID)) ||
-          relation.textHash === targetSemanticKey);
-      if (!isHeadWithChildren && !isInItems) {
-        return rdx;
-      }
-      const matchedItemRelation = matchedItem
-        ? getRelationItemRelation(knowledgeDBs, matchedItem, relation.author)
-        : undefined;
-      return rdx.push({
-        relation,
-        isHead: isHeadWithChildren && !isInItems,
-        matchedItemRelation,
-      });
-    }, acc);
-  }, List<RawAppearance>());
-}
-
-function resolveAppearance(
-  knowledgeDBs: KnowledgeDBs,
-  app: RawAppearance
-): ReferencedByRef {
-  const { relation, isHead, matchedItemRelation } = app;
-  if (isHead) {
-    return {
-      relationID: relation.id,
-      context: getRelationContext(knowledgeDBs, relation),
-      updated: relation.updated,
-    };
-  }
-  if (matchedItemRelation) {
-    return {
-      relationID: matchedItemRelation.id,
-      context: getRelationContext(knowledgeDBs, matchedItemRelation),
-      updated: matchedItemRelation.updated,
-    };
-  }
-  return {
-    relationID: relation.id,
-    context: getRelationContext(knowledgeDBs, relation),
-    updated: relation.updated,
-  };
-}
-
 export function findRefsToNode(
   knowledgeDBs: KnowledgeDBs,
+  semanticIndex: SemanticIndex,
   semanticID: LongID | ID,
   filterContext?: Context,
   targetAuthor?: PublicKey,
   targetRoot?: ID
 ): List<ReferencedByRef> {
-  const appearances = findNodeAppearances(
-    knowledgeDBs,
-    semanticID,
-    targetAuthor,
-    targetRoot
-  );
-  const resolvedRefs = appearances
-    .map((app) => ({
-      ref: resolveAppearance(knowledgeDBs, app),
-      author: app.relation.author,
-      root: app.relation.root,
+  const targetSemanticKey = targetAuthor
+    ? getSemanticNodeKey(knowledgeDBs, semanticID, targetAuthor)
+    : shortID(semanticID as ID);
+  const resolvedRefs = getSemanticCandidates(semanticIndex, targetSemanticKey)
+    .filter((relation) => !isSearchId(getRelationSemanticID(relation)))
+    .filter(
+      (relation) =>
+        !getRelationContext(knowledgeDBs, relation).some((id) =>
+          isSearchId(id as ID)
+        )
+    )
+    .map((relation) => ({
+      ref: {
+        relationID: relation.id,
+        context: getRelationContext(knowledgeDBs, relation),
+        updated: relation.updated,
+      },
+      author: relation.author,
+      root: relation.root,
     }))
     .toList();
 
@@ -520,6 +453,7 @@ export function deduplicateRefsByContext(
 
 export function getOccurrencesForNode(
   knowledgeDBs: KnowledgeDBs,
+  semanticIndex: SemanticIndex,
   visibleAuthors: ImmutableSet<PublicKey>,
   semanticID: LongID | ID,
   currentRelationID: LongID | undefined,
@@ -531,6 +465,7 @@ export function getOccurrencesForNode(
 ): List<LongID> {
   const allRefs = findRefsToNode(
     knowledgeDBs,
+    semanticIndex,
     semanticID,
     undefined,
     effectiveAuthor,
@@ -604,6 +539,7 @@ export function getOccurrencesForNode(
 
 export function getIncomingCrefsForNode(
   knowledgeDBs: KnowledgeDBs,
+  semanticIndex: SemanticIndex,
   visibleAuthors: ImmutableSet<PublicKey>,
   currentSemanticID: LongID | ID,
   parentRelationID: LongID | undefined,
@@ -632,35 +568,26 @@ export function getIncomingCrefsForNode(
     ImmutableSet<LongID>()
   );
 
-  const refs = knowledgeDBs.reduce((acc, knowledgeDB) => {
-    return knowledgeDB.relations.reduce((rdx, relation) => {
-      if (!visibleAuthors.has(relation.author)) return rdx;
-      if (relation.id === parentRelationID) return rdx;
-      if (relation.id === currentRelationID) return rdx;
-      if (relation.systemRole === LOG_ROOT_ROLE) return rdx;
-      if (outgoingTargetRelIDs.has(relation.id)) return rdx;
-
-      const hasCrefToUs = relation.items.some((item) => {
-        if (!isConcreteRefId(item.id)) return false;
-        if (item.relevance === "not_relevant") return false;
-        const targetRelation = getConcreteRefTargetRelation(
-          knowledgeDBs,
-          item.id,
-          effectiveAuthor
-        );
-        return !!currentRelationID && targetRelation?.id === currentRelationID;
-      });
-
-      if (!hasCrefToUs) return rdx;
-
-      const ref: ReferencedByRef = {
-        relationID: relation.id,
-        context: getRelationContext(knowledgeDBs, relation),
-        updated: relation.updated,
-      };
-      return rdx.push(ref);
-    }, acc);
-  }, List<ReferencedByRef>());
+  const refs = List(
+    currentRelationID
+      ? [
+          ...(semanticIndex.incomingCrefs.get(currentRelationID) ||
+            new globalThis.Set<LongID>()),
+        ]
+          .map((relationID) => semanticIndex.relationByID.get(relationID))
+          .filter((relation): relation is Relations => relation !== undefined)
+          .filter((relation) => visibleAuthors.has(relation.author))
+          .filter((relation) => relation.id !== parentRelationID)
+          .filter((relation) => relation.id !== currentRelationID)
+          .filter((relation) => relation.systemRole !== LOG_ROOT_ROLE)
+          .filter((relation) => !outgoingTargetRelIDs.has(relation.id))
+          .map((relation) => ({
+            relationID: relation.id,
+            context: getRelationContext(knowledgeDBs, relation),
+            updated: relation.updated,
+          }))
+      : []
+  );
 
   const deduped = deduplicateRefsByContext(refs, knowledgeDBs, effectiveAuthor);
   return deduped
@@ -720,6 +647,7 @@ const EMPTY_SUGGESTIONS_RESULT: SuggestionsResult = {
 
 export function getSuggestionsForNode(
   knowledgeDBs: KnowledgeDBs,
+  semanticIndex: SemanticIndex,
   visibleAuthors: ImmutableSet<PublicKey>,
   myself: PublicKey,
   semanticID: LongID | ID,
@@ -740,7 +668,7 @@ export function getSuggestionsForNode(
       t !== "suggestions" && t !== "versions" && t !== undefined
   );
 
-  const [, localID] = splitID(semanticID);
+  const semanticKey = getSemanticNodeKey(knowledgeDBs, semanticID, myself);
 
   const currentRelation = currentRelationId
     ? getRelationsNoReferencedBy(knowledgeDBs, currentRelationId, myself)
@@ -775,31 +703,26 @@ export function getSuggestionsForNode(
     : ImmutableSet<LongID | ID>();
 
   const contextToMatch = parentContext || List<ID>();
-  const otherRelations: List<Relations> = knowledgeDBs
-    .filter((_, pk) => pk !== myself && visibleAuthors.has(pk))
-    .toList()
-    .flatMap((db) =>
-      db.relations
-        .filter(
-          (r) =>
-            nodesSemanticallyMatch(
-              knowledgeDBs,
-              getRelationSemanticID(r),
-              r.author,
-              localID,
-              myself
-            ) &&
-            r.id !== currentRelationId &&
-            !declinedRelationCrefIDs.has(createConcreteRefId(r.id)) &&
-            contextsSemanticallyMatch(
-              knowledgeDBs,
-              getRelationContext(knowledgeDBs, r),
-              r.author,
-              contextToMatch,
-              myself
-            )
-        )
-        .toList()
+  const otherRelations: List<Relations> = getSemanticCandidates(
+    semanticIndex,
+    semanticKey
+  )
+    .filter((relation) => relation.author !== myself)
+    .filter((relation) => visibleAuthors.has(relation.author))
+    .filter((relation) => relation.textHash === semanticKey)
+    .filter((relation) => relation.id !== currentRelationId)
+    .filter(
+      (relation) =>
+        !declinedRelationCrefIDs.has(createConcreteRefId(relation.id))
+    )
+    .filter((relation) =>
+      contextsSemanticallyMatch(
+        knowledgeDBs,
+        getRelationContext(knowledgeDBs, relation),
+        relation.author,
+        contextToMatch,
+        myself
+      )
     )
     .sortBy((r) => -r.updated);
 
@@ -856,6 +779,7 @@ export function getSuggestionsForNode(
 
 export function getAlternativeRelations(
   knowledgeDBs: KnowledgeDBs,
+  semanticIndex: SemanticIndex,
   visibleAuthors: ImmutableSet<PublicKey>,
   semanticID: LongID | ID,
   context: Context,
@@ -863,56 +787,35 @@ export function getAlternativeRelations(
   currentAuthor?: PublicKey,
   currentRoot?: ID
 ): List<Relations> {
-  const localID = shortID(semanticID);
   const author = currentAuthor;
   if (!author) {
     return List<Relations>();
   }
   const semanticKey = getSemanticNodeKey(knowledgeDBs, semanticID, author);
-  return knowledgeDBs
-    .entrySeq()
-    .filter(([pk]) => visibleAuthors.has(pk))
-    .flatMap(([, db]) =>
-      List(getIndexedRelationsForKeys(db, [localID, semanticKey])).filter(
-        (r) => {
-          if (
-            currentRoot !== undefined &&
-            r.author === author &&
-            r.root === currentRoot
-          ) {
-            return false;
-          }
-          const useExactMatch =
-            r.author === author &&
-            currentRoot !== undefined &&
-            r.root === currentRoot;
-          const relationContext = getRelationContext(knowledgeDBs, r);
-          const matchesNode = useExactMatch
-            ? shortID(getRelationSemanticID(r)) === localID
-            : nodesSemanticallyMatch(
-                knowledgeDBs,
-                getRelationSemanticID(r),
-                r.author,
-                localID,
-                author
-              );
-          const matchesContext = useExactMatch
-            ? contextsMatch(relationContext, context)
-            : contextsSemanticallyMatch(
-                knowledgeDBs,
-                relationContext,
-                r.author,
-                context,
-                author
-              );
-          return (
-            matchesNode &&
-            r.id !== excludeRelationId &&
-            matchesContext &&
-            (r.items.size > 0 || r.root === shortID(r.id))
-          );
-        }
+  return getSemanticCandidates(semanticIndex, semanticKey)
+    .filter((relation) => visibleAuthors.has(relation.author))
+    .filter((relation) => relation.textHash === semanticKey)
+    .filter((relation) => relation.id !== excludeRelationId)
+    .filter(
+      (relation) =>
+        !(
+          currentRoot !== undefined &&
+          relation.author === author &&
+          relation.root === currentRoot
+        )
+    )
+    .filter((relation) =>
+      contextsSemanticallyMatch(
+        knowledgeDBs,
+        getRelationContext(knowledgeDBs, relation),
+        relation.author,
+        context,
+        author
       )
+    )
+    .filter(
+      (relation) =>
+        relation.items.size > 0 || relation.root === shortID(relation.id)
     )
     .toList();
 }
@@ -981,6 +884,7 @@ function computeComparableRelationDiff(
 
 export function getVersionsForRelation(
   knowledgeDBs: KnowledgeDBs,
+  semanticIndex: SemanticIndex,
   visibleAuthors: ImmutableSet<PublicKey>,
   semanticID: LongID | ID,
   filterTypes: FooterTypeFilters,
@@ -995,6 +899,7 @@ export function getVersionsForRelation(
   const contextToMatch = parentContext || List<ID>();
   const alternatives = getAlternativeRelations(
     knowledgeDBs,
+    semanticIndex,
     visibleAuthors,
     semanticID,
     contextToMatch,

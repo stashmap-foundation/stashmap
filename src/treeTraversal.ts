@@ -128,6 +128,7 @@ function getChildrenForRegularNode(
 
   const incomingCrefs = getIncomingCrefsForNode(
     data.knowledgeDBs,
+    data.semanticIndex,
     visibleAuthors,
     coordinateSemanticID,
     containingRelationID,
@@ -142,6 +143,7 @@ function getChildrenForRegularNode(
   const occurrences = activeFilters.includes("occurrence")
     ? getOccurrencesForNode(
         data.knowledgeDBs,
+        data.semanticIndex,
         visibleAuthors,
         coordinateSemanticID,
         relations?.id,
@@ -166,6 +168,7 @@ function getChildrenForRegularNode(
   const { suggestions: diffItems, coveredCandidateIDs } = isOwnContent
     ? getSuggestionsForNode(
         data.knowledgeDBs,
+        data.semanticIndex,
         visibleAuthors,
         data.user.publicKey,
         coordinateSemanticID,
@@ -207,6 +210,7 @@ function getChildrenForRegularNode(
   };
   const versions = getVersionsForRelation(
     data.knowledgeDBs,
+    data.semanticIndex,
     visibleAuthors,
     coordinateSemanticID,
     activeFilters,

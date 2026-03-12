@@ -30,13 +30,13 @@ function SearchCrefBuilder({
   searchId: ID;
   foundSemanticIDs: List<ID>;
 }): JSX.Element {
-  const { knowledgeDBs, user } = useData();
+  const { knowledgeDBs, semanticIndex, user } = useData();
   const pane = useCurrentPane();
   const effectiveAuthor = pane.author;
 
   const uniqueSemanticIDs = foundSemanticIDs.toSet().toList();
   const crefItems = uniqueSemanticIDs.flatMap((semanticID) => {
-    const refs = findRefsToNode(knowledgeDBs, semanticID);
+    const refs = findRefsToNode(knowledgeDBs, semanticIndex, semanticID);
     const deduped = deduplicateRefsByContext(
       refs,
       knowledgeDBs,

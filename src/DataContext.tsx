@@ -2,7 +2,10 @@ import React from "react";
 import { Map } from "immutable";
 import { newDB } from "./knowledge";
 import { injectEmptyNodesIntoKnowledgeDBs } from "./connections";
-import { useDocumentKnowledgeDBs } from "./DocumentStore";
+import {
+  useDocumentKnowledgeDBs,
+  useDocumentSemanticIndex,
+} from "./DocumentStore";
 
 export type DataContextProps = Data;
 
@@ -61,6 +64,7 @@ export function MergeKnowledgeDB({
   const myself = data.user.publicKey;
 
   const documentDBs = useDocumentKnowledgeDBs();
+  const semanticIndex = useDocumentSemanticIndex();
   const mergedDataDBs = mergeKnowledgeDBs(data.knowledgeDBs, documentDBs);
   const baseDBs = knowledgeDBs
     ? mergeKnowledgeDBs(knowledgeDBs, mergedDataDBs)
@@ -77,6 +81,7 @@ export function MergeKnowledgeDB({
       value={{
         ...data,
         knowledgeDBs: injectedDBs,
+        semanticIndex,
       }}
     >
       {children}

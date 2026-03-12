@@ -14,22 +14,35 @@ import {
   putCachedEvents,
   subscribeDocumentStore,
 } from "./indexedDB";
-import { buildKnowledgeDBFromStoredDocuments } from "./documentMaterialization";
+import {
+  buildKnowledgeDBFromDocumentRelations,
+  storedDocumentToEvent,
+} from "./documentMaterialization";
 import {
   applyStoredDelete,
   applyStoredDocument,
   toStoredDeleteRecord,
   toStoredDocumentRecord,
 } from "./permanentSync";
+import { parseDocumentEvent } from "./markdownRelations";
+import {
+  addRelationsToSemanticIndex,
+  buildSemanticIndexFromDocuments,
+  createEmptySemanticIndex,
+  removeRelationsFromSemanticIndex,
+} from "./semanticIndex";
 
 type DocumentSnapshot = {
   documents: ImmutableMap<string, StoredDocumentRecord>;
   deletes: ImmutableMap<string, StoredDeleteRecord>;
+  relationsByDocumentKey: ImmutableMap<string, ImmutableMap<string, Relations>>;
   knowledgeDBs: KnowledgeDBs;
+  semanticIndex: SemanticIndex;
 };
 
 type DocumentStoreState = {
   knowledgeDBs: KnowledgeDBs;
+  semanticIndex: SemanticIndex;
   addEvents: (events: ImmutableMap<string, Event | UnsignedEvent>) => void;
 };
 
@@ -41,8 +54,34 @@ function createEmptySnapshot(): DocumentSnapshot {
   return {
     documents: ImmutableMap<string, StoredDocumentRecord>(),
     deletes: ImmutableMap<string, StoredDeleteRecord>(),
+    relationsByDocumentKey: ImmutableMap<
+      string,
+      ImmutableMap<string, Relations>
+    >(),
     knowledgeDBs: ImmutableMap<PublicKey, KnowledgeData>(),
+    semanticIndex: createEmptySemanticIndex(),
   };
+}
+
+function parseStoredDocumentRelations(
+  document: StoredDocumentRecord
+): ImmutableMap<string, Relations> {
+  return parseDocumentEvent(storedDocumentToEvent(document));
+}
+
+function getAuthorDocumentRelations(
+  snapshot: DocumentSnapshot,
+  author: PublicKey
+): ImmutableMap<string, Relations> {
+  return snapshot.documents.valueSeq().reduce((acc, document) => {
+    if (document.author !== author) {
+      return acc;
+    }
+    return acc.merge(
+      snapshot.relationsByDocumentKey.get(document.replaceableKey) ||
+        ImmutableMap<string, Relations>()
+    );
+  }, ImmutableMap<string, Relations>());
 }
 
 function rebuildAuthors(
@@ -51,13 +90,10 @@ function rebuildAuthors(
 ): KnowledgeDBs {
   const authorSet = new Set(authors);
   return [...authorSet].reduce((acc, author) => {
-    const authorDocuments = snapshot.documents
-      .valueSeq()
-      .filter((document) => document.author === author)
-      .toArray();
-    const nextKnowledgeDB = buildKnowledgeDBFromStoredDocuments(
+    const authorRelations = getAuthorDocumentRelations(snapshot, author);
+    const nextKnowledgeDB = buildKnowledgeDBFromDocumentRelations(
       author,
-      authorDocuments
+      authorRelations
     );
     return nextKnowledgeDB
       ? acc.set(author, nextKnowledgeDB)
@@ -69,8 +105,12 @@ function applyDocumentToSnapshot(
   snapshot: DocumentSnapshot,
   document: StoredDocumentRecord
 ): DocumentSnapshot {
+  const nextRelations = parseStoredDocumentRelations(document);
   const existingDocument = snapshot.documents.get(document.replaceableKey);
   const existingDelete = snapshot.deletes.get(document.replaceableKey);
+  const existingRelations =
+    snapshot.relationsByDocumentKey.get(document.replaceableKey) ||
+    ImmutableMap<string, Relations>();
 
   if (existingDelete && existingDelete.deletedAt >= document.updatedMs) {
     return snapshot;
@@ -83,14 +123,29 @@ function applyDocumentToSnapshot(
     existingDelete && document.updatedMs > existingDelete.deletedAt
       ? snapshot.deletes.remove(document.replaceableKey)
       : snapshot.deletes;
-  const nextSnapshot = {
+  const withoutExistingRelations =
+    existingRelations.size > 0
+      ? removeRelationsFromSemanticIndex(
+          snapshot.semanticIndex,
+          existingRelations
+        )
+      : snapshot.semanticIndex;
+  const nextSnapshotBase = {
     ...snapshot,
     documents: snapshot.documents.set(document.replaceableKey, document),
     deletes: nextDeletes,
+    relationsByDocumentKey: snapshot.relationsByDocumentKey.set(
+      document.replaceableKey,
+      nextRelations
+    ),
+    semanticIndex: addRelationsToSemanticIndex(
+      withoutExistingRelations,
+      nextRelations
+    ),
   };
-  const knowledgeDBs = rebuildAuthors(nextSnapshot, [document.author]);
+  const knowledgeDBs = rebuildAuthors(nextSnapshotBase, [document.author]);
   return {
-    ...nextSnapshot,
+    ...nextSnapshotBase,
     knowledgeDBs,
   };
 }
@@ -113,6 +168,18 @@ function applyDeleteToSnapshot(
         ? snapshot.documents.remove(deletion.replaceableKey)
         : snapshot.documents,
     deletes: snapshot.deletes.set(deletion.replaceableKey, deletion),
+    relationsByDocumentKey:
+      existingDocument && existingDocument.updatedMs <= deletion.deletedAt
+        ? snapshot.relationsByDocumentKey.remove(deletion.replaceableKey)
+        : snapshot.relationsByDocumentKey,
+    semanticIndex:
+      existingDocument && existingDocument.updatedMs <= deletion.deletedAt
+        ? removeRelationsFromSemanticIndex(
+            snapshot.semanticIndex,
+            snapshot.relationsByDocumentKey.get(deletion.replaceableKey) ||
+              ImmutableMap<string, Relations>()
+          )
+        : snapshot.semanticIndex,
   };
   const affectedAuthor = existingDocument?.author || deletion.author;
   return {
@@ -148,12 +215,22 @@ function applyChangeToSnapshot(
   }
   if (change.type === "document-remove") {
     const existingDocument = snapshot.documents.get(change.replaceableKey);
+    const existingRelations =
+      snapshot.relationsByDocumentKey.get(change.replaceableKey) ||
+      ImmutableMap<string, Relations>();
     if (!existingDocument) {
       return snapshot;
     }
     const nextSnapshot = {
       ...snapshot,
       documents: snapshot.documents.remove(change.replaceableKey),
+      relationsByDocumentKey: snapshot.relationsByDocumentKey.remove(
+        change.replaceableKey
+      ),
+      semanticIndex: removeRelationsFromSemanticIndex(
+        snapshot.semanticIndex,
+        existingRelations
+      ),
     };
     return {
       ...nextSnapshot,
@@ -174,16 +251,54 @@ function createSnapshotFromStoredRecords(
   documents: ReadonlyArray<StoredDocumentRecord>,
   deletes: ReadonlyArray<StoredDeleteRecord>
 ): DocumentSnapshot {
+  const latestDocuments = documents.reduce((acc, document) => {
+    const existing = acc.get(document.replaceableKey);
+    if (!existing || document.updatedMs > existing.updatedMs) {
+      return acc.set(document.replaceableKey, document);
+    }
+    return acc;
+  }, ImmutableMap<string, StoredDocumentRecord>());
+  const latestDeletes = deletes.reduce((acc, deletion) => {
+    const existing = acc.get(deletion.replaceableKey);
+    if (!existing || deletion.deletedAt > existing.deletedAt) {
+      return acc.set(deletion.replaceableKey, deletion);
+    }
+    return acc;
+  }, ImmutableMap<string, StoredDeleteRecord>());
+  const liveDocuments = latestDocuments.filter((document) => {
+    const deletion = latestDeletes.get(document.replaceableKey);
+    return !deletion || document.updatedMs > deletion.deletedAt;
+  });
+  const relationsByDocumentKey = ImmutableMap<
+    string,
+    ImmutableMap<string, Relations>
+  >(
+    liveDocuments
+      .valueSeq()
+      .map(
+        (document) =>
+          [document.replaceableKey, parseStoredDocumentRelations(document)] as [
+            string,
+            ImmutableMap<string, Relations>
+          ]
+      )
+      .toArray()
+  );
   const baseSnapshot = {
-    documents: ImmutableMap<string, StoredDocumentRecord>(
-      documents.map((document) => [document.replaceableKey, document])
-    ),
-    deletes: ImmutableMap<string, StoredDeleteRecord>(
-      deletes.map((deletion) => [deletion.replaceableKey, deletion])
-    ),
+    documents: liveDocuments,
+    deletes: latestDeletes,
+    relationsByDocumentKey,
     knowledgeDBs: ImmutableMap<PublicKey, KnowledgeData>(),
+    semanticIndex: buildSemanticIndexFromDocuments(relationsByDocumentKey),
   };
-  const authors = [...new Set(documents.map((document) => document.author))];
+  const authors = [
+    ...new Set(
+      liveDocuments
+        .valueSeq()
+        .map((document) => document.author)
+        .toArray()
+    ),
+  ];
   return {
     ...baseSnapshot,
     knowledgeDBs: rebuildAuthors(baseSnapshot, authors),
@@ -204,6 +319,29 @@ function eventsToStoredRecords(events: ReadonlyArray<Event | UnsignedEvent>): {
   };
 }
 
+function normalizeCachedEventRecord(
+  event: Event | UnsignedEvent
+): Record<string, unknown> | undefined {
+  if ("id" in event && typeof event.id === "string") {
+    return event as unknown as Record<string, unknown>;
+  }
+  const document = toStoredDocumentRecord(event);
+  if (document) {
+    return {
+      ...event,
+      id: document.eventId,
+    };
+  }
+  const deletion = toStoredDeleteRecord(event);
+  if (deletion) {
+    return {
+      ...event,
+      id: deletion.eventId,
+    };
+  }
+  return undefined;
+}
+
 export function DocumentStoreProvider({
   children,
   db,
@@ -215,6 +353,9 @@ export function DocumentStoreProvider({
 }): JSX.Element {
   const [snapshot, setSnapshot] =
     React.useState<DocumentSnapshot>(createEmptySnapshot);
+  const persistedUnpublishedKeysRef = React.useRef<globalThis.Set<string>>(
+    new globalThis.Set<string>()
+  );
 
   React.useEffect(() => {
     if (!db) {
@@ -298,14 +439,52 @@ export function DocumentStoreProvider({
       if (typeof putCachedEvents === "function") {
         putCachedEvents(
           db,
-          eventList as ReadonlyArray<Record<string, unknown>>
+          eventList
+            .map(normalizeCachedEventRecord)
+            .filter(
+              (event): event is Record<string, unknown> => event !== undefined
+            )
         ).catch(() => undefined);
       }
     },
     [db]
   );
 
-  const knowledgeDBs = React.useMemo(() => {
+  React.useEffect(() => {
+    if (!db || unpublishedEvents.size === 0) {
+      return;
+    }
+
+    const nextEvents = unpublishedEvents
+      .filter((event) => {
+        const document = toStoredDocumentRecord(event);
+        const deletion = toStoredDeleteRecord(event);
+        const key = document?.eventId || deletion?.eventId;
+        if (!key || persistedUnpublishedKeysRef.current.has(key)) {
+          return false;
+        }
+        persistedUnpublishedKeysRef.current.add(key);
+        return true;
+      })
+      .toList();
+
+    if (nextEvents.size === 0) {
+      return;
+    }
+
+    addEvents(
+      ImmutableMap<string, Event | UnsignedEvent>(
+        nextEvents
+          .map(
+            (event, index) =>
+              [`pending-${index}`, event] as [string, Event | UnsignedEvent]
+          )
+          .toArray()
+      )
+    );
+  }, [addEvents, db, unpublishedEvents]);
+
+  const activeSnapshot = React.useMemo(() => {
     const documents = unpublishedEvents
       .map((event) => toStoredDocumentRecord(event))
       .filter((record): record is StoredDocumentRecord => record !== undefined)
@@ -314,15 +493,16 @@ export function DocumentStoreProvider({
       .map((event) => toStoredDeleteRecord(event))
       .filter((record): record is StoredDeleteRecord => record !== undefined)
       .toArray();
-    return applyRecordsToSnapshot(snapshot, documents, deletes).knowledgeDBs;
+    return applyRecordsToSnapshot(snapshot, documents, deletes);
   }, [snapshot, unpublishedEvents]);
 
   const contextValue = React.useMemo(
     () => ({
-      knowledgeDBs,
+      knowledgeDBs: activeSnapshot.knowledgeDBs,
+      semanticIndex: activeSnapshot.semanticIndex,
       addEvents,
     }),
-    [addEvents, knowledgeDBs]
+    [activeSnapshot, addEvents]
   );
 
   return (
@@ -338,4 +518,11 @@ export function useDocumentStore(): DocumentStoreState | undefined {
 
 export function useDocumentKnowledgeDBs(): KnowledgeDBs {
   return React.useContext(DocumentStoreContext)?.knowledgeDBs || ImmutableMap();
+}
+
+export function useDocumentSemanticIndex(): SemanticIndex {
+  return (
+    React.useContext(DocumentStoreContext)?.semanticIndex ||
+    createEmptySemanticIndex()
+  );
 }

@@ -40,6 +40,7 @@ import {
 } from "./eventProcessing";
 import { DocumentStoreProvider, useDocumentStore } from "./DocumentStore";
 import { usePermanentDocumentSync } from "./usePermanentDocumentSync";
+import { createEmptySemanticIndex } from "./semanticIndex";
 
 export const defaultPane = (
   author: PublicKey,
@@ -376,6 +377,7 @@ function Data({ user, children }: DataProps): JSX.Element {
       user={user}
       contactsRelays={contactsRelays}
       knowledgeDBs={Map<PublicKey, KnowledgeData>()}
+      semanticIndex={createEmptySemanticIndex()}
       relaysInfos={searchRelaysInfo}
       publishEventsStatus={newEventsAndPublishResults}
       views={views}

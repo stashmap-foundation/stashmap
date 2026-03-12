@@ -155,6 +155,7 @@ declare global {
     user: User;
     contactsRelays: Map<PublicKey, Relays>;
     knowledgeDBs: KnowledgeDBs;
+    semanticIndex: SemanticIndex;
     relaysInfos: Map<string, RelayInformation | undefined>;
     publishEventsStatus: EventState;
     projectMembers: Members;
@@ -287,6 +288,12 @@ declare global {
 
   type KnowledgeData = {
     relations: Map<ID, Relations>;
+  };
+
+  type SemanticIndex = {
+    relationByID: globalThis.Map<LongID, Relations>;
+    semantic: globalThis.Map<string, globalThis.Set<LongID>>;
+    incomingCrefs: globalThis.Map<LongID, globalThis.Set<LongID>>;
   };
 
   // Temporary UI state (not persisted to Nostr)

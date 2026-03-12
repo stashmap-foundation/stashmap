@@ -472,6 +472,12 @@ export function getOccurrencesForNode(
     currentRoot
   );
   const contextRoot = currentContext.first();
+  const isInCurrentRootTree = (ref: ReferencedByRef): boolean => {
+    if (!currentRoot) {
+      return false;
+    }
+    return semanticIndex.relationByID.get(ref.relationID)?.root === currentRoot;
+  };
   const outgoingCrefIDs = currentItems
     ? currentItems
         .map((item) => item.id)
@@ -502,6 +508,7 @@ export function getOccurrencesForNode(
       const [author] = splitID(ref.relationID);
       return !!author && visibleAuthors.has(author);
     })
+    .filter((ref) => !isInCurrentRootTree(ref))
     .filter((ref) => ref.relationID !== currentRelationID)
     .filter((ref) =>
       ref.context.size === 0

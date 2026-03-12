@@ -31,6 +31,23 @@ Notes
     `);
   });
 
+  test("Occurrence does not show when duplicate node only exists elsewhere in the same tree", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type(
+      "Knowstr{Enter}{Tab}Is there a place for a Notekeeping tool in an AI world?{Enter}{Tab}Which AIs would I personally want?{Enter}{Tab}Project Specific AIs{Enter}{Tab}Knowstr{Escape}"
+    );
+
+    await expectTree(`
+Knowstr
+  Is there a place for a Notekeeping tool in an AI world?
+    Which AIs would I personally want?
+      Project Specific AIs
+        Knowstr
+    `);
+  });
+
   test("Other user's version shows as suggestion and version entry", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);

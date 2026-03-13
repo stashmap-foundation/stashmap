@@ -2,6 +2,7 @@ import { loadWorkspaceGraph } from "./workspaceGraph";
 import {
   normalizeArgumentInput,
   normalizeRelevanceInput,
+  planCopyRootById,
   planInsertMarkdownUnderRelationById,
   planLinkRelationById,
   planMoveRelationItemById,
@@ -172,6 +173,27 @@ export async function writeSetText(
     return {
       plan: planSetRelationTextById(plan, relationId as LongID, options.text),
       relationId: relationId as LongID,
+    };
+  });
+}
+
+export async function writeCopyRoot(
+  profile: WorkspaceWriteProfile,
+  options: {
+    relationId: ID;
+    relayUrls?: string[];
+  }
+): Promise<Awaited<ReturnType<typeof publishWorkspaceMutation>>> {
+  const relationId = resolveOwnWriteId(profile.pubkey, options.relationId);
+  if (!relationId || relationId.startsWith("cref:")) {
+    throw new Error(`Invalid relation ID: ${options.relationId}`);
+  }
+  return publishWorkspaceMutation(profile, options.relayUrls, (plan) => {
+    requireRelationById(plan, relationId as LongID);
+    const copied = planCopyRootById(plan, relationId as LongID);
+    return {
+      plan: copied.plan,
+      relationId: copied.relationId,
     };
   });
 }

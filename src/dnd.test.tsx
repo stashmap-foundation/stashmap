@@ -221,9 +221,7 @@ Holiday Destinations
   [VO] +2 -4
   `);
 
-  await userEvent.click(
-    await screen.findByLabelText("fork to make your own copy")
-  );
+  await userEvent.click(await screen.findByLabelText("copy root to edit"));
 
   await expectTree(`
 Spain

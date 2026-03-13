@@ -10,7 +10,12 @@ import { parseDocumentEvent } from "../markdownRelations";
 import { buildSingleRootMarkdownDocumentEvent } from "../standaloneDocumentEvent";
 import { loadPendingWriteEntries } from "./pendingWrites";
 import { loadWorkspaceGraph } from "./workspaceGraph";
-import { writeLink, writeMoveItem, writeSetText } from "./writeWorkspace";
+import {
+  writeCopyRoot,
+  writeLink,
+  writeMoveItem,
+  writeSetText,
+} from "./writeWorkspace";
 
 const PRIVATE_KEY = "1".repeat(64);
 const PUBKEY = getPublicKey(hexToBytes(PRIVATE_KEY)) as PublicKey;
@@ -215,6 +220,86 @@ test("writeLink allows linking another author's relation into the current user's
   );
   expect(updatedRoot?.event_id).toBe(result.event_ids[0]);
   expect(updatedContent).toContain(`[Shared Target](#${foreignTarget?.id})`);
+});
+
+test("writeCopyRoot creates an own standalone copy with basedOn lineage", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-write-"));
+  const knowstrHome = path.join(tempDir, ".knowstr");
+  const nsecPath = path.join(tempDir, "me.nsec");
+  fs.writeFileSync(nsecPath, PRIVATE_KEY);
+  const foreignDraft = buildSingleRootMarkdownDocumentEvent(
+    OTHER_PUBKEY,
+    "# Knowstr\n\n## Existing Point\n"
+  );
+  writeWorkspace(tempDir, [foreignDraft]);
+
+  const result = await writeCopyRoot(
+    {
+      pubkey: PUBKEY,
+      workspaceDir: tempDir,
+      knowstrHome,
+      relays: [{ url: "wss://write.example/", read: true, write: true }],
+      nsecFile: nsecPath,
+    },
+    {
+      relationId: foreignDraft.relationID,
+      relayUrls: ["wss://override.example/"],
+    }
+  );
+
+  const graph = await loadWorkspaceGraph(tempDir);
+  const copiedRoot = graph.documentsByRootRelationId.get(
+    result.relation_id as LongID
+  );
+  const copiedContent = fs.readFileSync(
+    path.join(tempDir, copiedRoot?.path || ""),
+    "utf8"
+  );
+  const pendingEntries = await loadPendingWriteEntries(knowstrHome);
+
+  expect(result.pending_count).toBe(1);
+  expect(result.relation_id).toMatch(
+    /^[0-9a-f]{64}_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+  );
+  expect(copiedRoot?.author).toBe(PUBKEY);
+  expect(copiedRoot?.event_id).toBe(result.event_ids[0]);
+  expect(copiedContent).toContain("# Knowstr {");
+  expect(copiedContent).toContain(`sourceRoot="${foreignDraft.relationID}"`);
+  expect(copiedContent).toContain(
+    `sourceRelation="${foreignDraft.relationID}"`
+  );
+  expect(pendingEntries[0]?.event.id).toBe(result.event_ids[0]);
+});
+
+test("writeCopyRoot rejects non-root relations", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-write-"));
+  const knowstrHome = path.join(tempDir, ".knowstr");
+  const nsecPath = path.join(tempDir, "me.nsec");
+  fs.writeFileSync(nsecPath, PRIVATE_KEY);
+  const foreignDraft = buildSingleRootMarkdownDocumentEvent(
+    OTHER_PUBKEY,
+    "# Knowstr\n\n## Existing Point\n"
+  );
+  writeWorkspace(tempDir, [foreignDraft]);
+  const childRelation = parseDocumentEvent(foreignDraft.event)
+    .valueSeq()
+    .find((relation) => relation.text === "Existing Point");
+
+  await expect(
+    writeCopyRoot(
+      {
+        pubkey: PUBKEY,
+        workspaceDir: tempDir,
+        knowstrHome,
+        relays: [{ url: "wss://write.example/", read: true, write: true }],
+        nsecFile: nsecPath,
+      },
+      {
+        relationId: childRelation?.id as LongID,
+        relayUrls: ["wss://override.example/"],
+      }
+    )
+  ).rejects.toThrow(`Relation is not a root: ${childRelation?.id}`);
 });
 
 test("writeMoveItem resolves a cref row from the target relation UUID", async () => {

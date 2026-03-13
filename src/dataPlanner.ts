@@ -13,6 +13,7 @@ import { MarkdownTreeNode } from "./markdownTree";
 import { planInsertMarkdownTreesByParentId } from "./markdownPlan";
 import {
   GraphPlan,
+  planCopyDescendantRelations,
   planDeleteDescendantRelations,
   planDeleteRelations,
   planMoveDescendantRelations,
@@ -255,6 +256,27 @@ export function planInsertMarkdownUnderRelationById<T extends GraphPlan>(
   return {
     plan: inserted.plan,
     relationId: inserted.topRelationIDs[0],
+  };
+}
+
+export function planCopyRootById<T extends GraphPlan>(
+  plan: T,
+  sourceRelationId: LongID
+): { plan: T; relationId?: LongID } {
+  const sourceRelation = requireRelationById(plan, sourceRelationId);
+  if (sourceRelation.parent) {
+    throw new Error(`Relation is not a root: ${sourceRelationId}`);
+  }
+  const [copiedPlan, mapping] = planCopyDescendantRelations(
+    plan,
+    sourceRelation,
+    (relation) => getRelationContext(plan.knowledgeDBs, relation),
+    (relation) => relation.author === sourceRelation.author
+  );
+
+  return {
+    plan: copiedPlan as T,
+    relationId: mapping.get(sourceRelation.id),
   };
 }
 

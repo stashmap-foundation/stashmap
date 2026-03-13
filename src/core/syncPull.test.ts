@@ -102,6 +102,7 @@ test("pullSyncWorkspace uses configured relays only and writes raw markdown docu
   });
   const profile: SyncPullProfile = {
     pubkey: ALICE,
+    readAs: ALICE,
     workspaceDir: tempDir,
     bootstrapRelays: [],
     relays: [{ url: RELAY, read: true, write: true }],
@@ -161,6 +162,43 @@ test("pullSyncWorkspace uses configured relays only and writes raw markdown docu
   );
 });
 
+test("pullSyncWorkspace can read another user's graph", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-sync-"));
+  const aliceDoc = documentEvent({
+    pubkey: ALICE,
+    rootUuid: "alice-root",
+    text: "Alice Root",
+    createdAt: FIRST_ALICE_CREATED_AT,
+  });
+  const bobDoc = documentEvent({
+    pubkey: BOB,
+    rootUuid: "bob-root",
+    text: "Bob Root",
+    createdAt: FIRST_BOB_CREATED_AT,
+  });
+  const { client } = makeClient({
+    [RELAY]: [contactListEvent(), aliceDoc, bobDoc],
+  });
+  const agentPubkey = "c".repeat(64) as PublicKey;
+  const profile: SyncPullProfile = {
+    pubkey: agentPubkey,
+    readAs: ALICE,
+    workspaceDir: tempDir,
+    bootstrapRelays: [],
+    relays: [{ url: RELAY, read: true, write: true }],
+  };
+
+  const manifest = await pullSyncWorkspace(client, profile, {
+    now: new Date("2026-03-10T12:00:00.000Z"),
+  });
+
+  expect(manifest.as_user).toBe(ALICE);
+  expect(manifest.documents.map((document) => document.author)).toEqual([
+    ALICE,
+    BOB,
+  ]);
+});
+
 test("pullSyncWorkspace refetches documents from a 7 day buffer", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-sync-"));
   const aliceDoc = documentEvent({
@@ -180,6 +218,7 @@ test("pullSyncWorkspace refetches documents from a 7 day buffer", async () => {
   });
   const profile: SyncPullProfile = {
     pubkey: ALICE,
+    readAs: ALICE,
     workspaceDir: tempDir,
     bootstrapRelays: [],
     relays: [{ url: RELAY, read: true, write: true }],
@@ -260,6 +299,7 @@ test("pullSyncWorkspace reapplies pending local writes after syncing", async () 
   });
   const profile: SyncPullProfile = {
     pubkey: ALICE,
+    readAs: ALICE,
     workspaceDir: tempDir,
     bootstrapRelays: [],
     relays: [{ url: RELAY, read: true, write: true }],

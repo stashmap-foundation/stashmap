@@ -228,13 +228,17 @@ test("createUnderParent and linkUnderParent add owned children and crefs to the 
     homeDraft.relationID,
     roadmapDraft.relationID
   );
-  const event = buildKnowledgeDocumentEvents(linked.plan).find(
+  const events = buildKnowledgeDocumentEvents(linked.plan);
+  const event = events.find(
     (candidate) => findTag(candidate, "d") === homeDraft.rootUuid
   );
 
   expect(event?.content).toContain("- Notes {");
   expect(event?.content).toContain(".maybe_relevant .confirms");
   expect(event?.content).toContain(`[Roadmap](#${roadmapDraft.relationID})`);
+  expect(
+    events.filter((candidate) => candidate.kind === KIND_KNOWLEDGE_DOCUMENT)
+  ).toHaveLength(1);
 });
 
 test("moveItem preserves relevance and argument across parents, and delete-item semantics delete owned subtrees", async () => {

@@ -61,10 +61,7 @@ test("Fork works when navigating to a version entry", async () => {
   });
 
   await screen.findByText("READONLY");
-
-  await userEvent.click(
-    await screen.findByLabelText("fork to make your own copy")
-  );
+  await userEvent.click(await screen.findByLabelText("copy root to edit"));
 
   await userEvent.click(await screen.findByLabelText("edit Cities"));
   await userEvent.keyboard("{Enter}");

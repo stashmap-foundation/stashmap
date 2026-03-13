@@ -99,7 +99,8 @@ function removeTransientRootAffects<T extends GraphPlan>(
   return {
     ...plan,
     affectedRoots: transientRootIds.reduce(
-      (affectedRoots, relationId) => affectedRoots.remove(shortID(relationId)),
+      (affectedRoots, relationId) =>
+        affectedRoots.remove(relationId).remove(shortID(relationId)),
       plan.affectedRoots
     ),
   };

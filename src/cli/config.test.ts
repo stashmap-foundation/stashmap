@@ -28,6 +28,7 @@ test("loadCliProfile defaults the workspace root to the current agent directory"
   expect(profile.configPath).toBe(configPath);
   expect(profile.agentRoot).toBe(agentDir);
   expect(profile.workspaceDir).toBe(agentDir);
+  expect(profile.readAs).toBe("a".repeat(64));
   expect(profile.nsecFile).toBe(path.join(agentDir, ".knowstr", "me.nsec"));
   expect(profile.bootstrapRelays.map((relay) => relay.url)).toEqual([
     "wss://bootstrap.example/",
@@ -35,4 +36,22 @@ test("loadCliProfile defaults the workspace root to the current agent directory"
   expect(profile.relays.map((relay) => relay.url)).toEqual([
     "wss://profile.example/",
   ]);
+});
+
+test("loadCliProfile supports reading as another user", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-config-"));
+  const agentDir = path.join(tempDir, "agents", "codex-me");
+  const knowstrDir = path.join(agentDir, ".knowstr");
+  const configPath = path.join(knowstrDir, "profile.json");
+
+  writeJson(configPath, {
+    pubkey: "a".repeat(64),
+    read_as: "b".repeat(64),
+    relays: ["wss://profile.example/"],
+  });
+
+  const profile = loadCliProfile({ cwd: agentDir });
+
+  expect(profile.pubkey).toBe("a".repeat(64));
+  expect(profile.readAs).toBe("b".repeat(64));
 });

@@ -1,5 +1,6 @@
 export type SyncPullCliArgs = {
   configPath?: string;
+  asUser?: PublicKey;
   outDir?: string;
   relayUrls: string[];
   maxWaitMs?: number;
@@ -26,6 +27,13 @@ export type WriteSetTextCliArgs = {
   configPath?: string;
   relationId?: LongID;
   text?: string;
+  relayUrls: string[];
+  help: boolean;
+};
+
+export type WriteCopyRootCliArgs = {
+  configPath?: string;
+  relationId?: LongID;
   relayUrls: string[];
   help: boolean;
 };

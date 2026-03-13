@@ -422,9 +422,7 @@ My Notes
       await screen.findByLabelText(/open .* \+4 in fullscreen/)
     );
     await screen.findByText("READONLY");
-    await userEvent.click(
-      await screen.findByLabelText("fork to make your own copy")
-    );
+    await userEvent.click(await screen.findByLabelText("copy root to edit"));
     await userEvent.click(
       await screen.findByLabelText("edit Holiday Destinations")
     );
@@ -435,9 +433,7 @@ My Notes
       await screen.findByLabelText(/open .* -4 in fullscreen/)
     );
     await screen.findByText("READONLY");
-    await userEvent.click(
-      await screen.findByLabelText("fork to make your own copy")
-    );
+    await userEvent.click(await screen.findByLabelText("copy root to edit"));
     await userEvent.click(
       await screen.findByLabelText("edit Holiday Destinations")
     );
@@ -658,9 +654,7 @@ Recipes
       await screen.findByLabelText(/open .* \+4 in fullscreen/)
     );
     await screen.findByText("READONLY");
-    await userEvent.click(
-      await screen.findByLabelText("fork to make your own copy")
-    );
+    await userEvent.click(await screen.findByLabelText("copy root to edit"));
     await userEvent.click(await screen.findByLabelText("edit Recipes"));
     await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Curry{Escape}");

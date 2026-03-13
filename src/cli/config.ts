@@ -13,6 +13,7 @@ type RawRelay =
 
 type RawProfile = {
   pubkey?: string;
+  read_as?: string;
   workspace_dir?: string;
   nsec_file?: string;
   bootstrap_relays?: string[];
@@ -111,6 +112,7 @@ export function loadCliProfile({
 
   return {
     pubkey: parsePubkey(profile.pubkey),
+    readAs: parsePubkey(profile.read_as || profile.pubkey),
     workspaceDir: resolveAbsolute(agentRoot, profile.workspace_dir || "."),
     bootstrapRelays: parseBootstrapRelays(
       profile.bootstrap_relays,

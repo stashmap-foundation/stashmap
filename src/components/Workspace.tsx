@@ -512,11 +512,21 @@ function Breadcrumbs(): JSX.Element {
 
 function ForkButton(): JSX.Element | null {
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
+  const currentPane = useCurrentPane();
+  const currentRelation = useCurrentRelation();
   const viewPath = useViewPath();
   const stack = usePaneStack();
+  const navigatePane = useNavigatePane();
   const { createPlan, executePlan } = usePlanner();
 
   if (!isViewingOtherUserContent) {
+    return null;
+  }
+
+  const rootRelationId = currentPane.rootRelation || currentRelation?.root;
+  const isAtRoot = !!currentRelation && currentRelation.id === rootRelationId;
+
+  if (!rootRelationId) {
     return null;
   }
 
@@ -525,14 +535,31 @@ function ForkButton(): JSX.Element | null {
     executePlan(plan);
   };
 
+  if (!isAtRoot) {
+    const href = buildRelationUrl(rootRelationId);
+    return (
+      <a
+        href={href}
+        className="header-action-btn"
+        onClick={(e) => {
+          e.preventDefault();
+          navigatePane(href);
+        }}
+        aria-label="Open root to make a copy"
+      >
+        open root to copy
+      </a>
+    );
+  }
+
   return (
     <button
       type="button"
       className="header-action-btn"
       onClick={handleFork}
-      aria-label="fork to make your own copy"
+      aria-label="copy root to edit"
     >
-      fork
+      copy to edit
     </button>
   );
 }

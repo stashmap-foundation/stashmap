@@ -2,6 +2,7 @@ import { text as readStreamText } from "stream/consumers";
 import { loadCliProfile } from "./config";
 import { requireValue } from "./args";
 import {
+  WriteCopyRootCliArgs,
   WriteCreateUnderCliArgs,
   WriteDeleteItemCliArgs,
   WriteLinkCliArgs,
@@ -11,6 +12,7 @@ import {
   WriteSetTextCliArgs,
 } from "./types";
 import {
+  writeCopyRoot,
   writeCreateUnder,
   writeDeleteItem,
   writeLink,
@@ -92,6 +94,7 @@ function parseRelayArgs<T extends { relayUrls: string[] }>(
 export function writeMutationsHelp(): string {
   return [
     "Usage:",
+    "  knowstr write copy-root --relation <relation-id> [--config <path>] [--relay <url> ...]",
     "  knowstr write set-text --relation <relation-id> --text <text> [--config <path>] [--relay <url> ...]",
     "  knowstr write create-under --parent <relation-id> --stdin [--before <item-id>|--after <item-id>] [--relevance <contains|relevant|maybe_relevant|little_relevant|not_relevant>] [--argument <none|confirms|contra>] [--config <path>] [--relay <url> ...]",
     "  knowstr write link --parent <relation-id> --target <relation-id> [--before <item-id>|--after <item-id>] [--relevance <contains|relevant|maybe_relevant|little_relevant|not_relevant>] [--argument <none|confirms|contra>] [--config <path>] [--relay <url> ...]",
@@ -103,6 +106,40 @@ export function writeMutationsHelp(): string {
     "Applies edge-aware relation edits locally, updates the workspace immediately, and queues signed events for `knowstr push`.",
     "Bare UUID operands are treated as your own `<pubkey>_<uuid>` IDs.",
   ].join("\n");
+}
+
+export function parseWriteCopyRootArgs(args: string[]): WriteCopyRootCliArgs {
+  const parse = (
+    index: number,
+    current: WriteCopyRootCliArgs
+  ): WriteCopyRootCliArgs => {
+    const [afterRelayIndex, withRelay] = parseRelayArgs(args, index, current);
+    if (afterRelayIndex !== index) {
+      return parse(afterRelayIndex, withRelay);
+    }
+    const arg = args[index];
+    if (!arg) {
+      return current;
+    }
+    switch (arg) {
+      case "--help":
+      case "-h":
+        return parse(index + 1, { ...current, help: true });
+      case "--config":
+        return parse(index + 2, {
+          ...current,
+          configPath: requireValue(args, index, "--config"),
+        });
+      case "--relation":
+        return parse(index + 2, {
+          ...current,
+          relationId: requireValue(args, index, "--relation") as LongID,
+        });
+      default:
+        throw new Error(`Unknown write copy-root argument: ${arg}`);
+    }
+  };
+  return parse(0, { relayUrls: [], help: false });
 }
 
 export function parseWriteSetTextArgs(args: string[]): WriteSetTextCliArgs {
@@ -480,6 +517,18 @@ export async function runWriteMutationCommand(
       help: true,
       text: writeMutationsHelp(),
     };
+  }
+
+  if (subcommand === "copy-root") {
+    const parsed = parseWriteCopyRootArgs(args);
+    if (!parsed.relationId) {
+      throw new Error("--relation is required");
+    }
+    const profile = loadCliProfile({ configPath: parsed.configPath });
+    return writeCopyRoot(profile, {
+      relationId: parsed.relationId,
+      relayUrls: parsed.relayUrls,
+    });
   }
 
   if (subcommand === "set-text") {

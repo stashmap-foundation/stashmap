@@ -851,41 +851,54 @@ function getRelationSubtree(
   return List(ordered);
 }
 
-function planCopyDescendantRelations(
-  plan: Plan,
+export function planCopyDescendantRelations<T extends GraphPlan>(
+  plan: T,
   sourceRelation: GraphNode,
   getSemanticContext: (relation: GraphNode) => Context,
   filterRelation?: (relation: GraphNode) => boolean,
   targetParentRelationID?: LongID,
   targetSemanticID?: ID,
   root?: ID
-): [Plan, RelationsIdMapping] {
+): [T, RelationsIdMapping] {
   const descendants = getRelationSubtree(
     plan,
     sourceRelation,
     filterRelation ?? (() => true)
   );
 
-  let copiedRoot = root;
-  const copiedRelations = descendants.map((relation) => {
-    const newSemanticContext = getSemanticContext(relation);
-    const isRootRelation = relation.id === sourceRelation.id;
-    const baseRelation = newRelations(
-      isRootRelation && typeof targetSemanticID === "string"
-        ? targetSemanticID
-        : relation.text,
-      newSemanticContext,
-      plan.user.publicKey,
-      copiedRoot
-    );
-    copiedRoot = copiedRoot ?? baseRelation.root;
-    return {
-      source: relation,
-      newSemanticContext,
-      sourceParentID: getEffectiveParentRelationID(relation),
-      copy: baseRelation,
-    };
-  });
+  const { copiedRelations } = descendants.reduce(
+    (acc, relation) => {
+      const newSemanticContext = getSemanticContext(relation);
+      const isRootRelation = relation.id === sourceRelation.id;
+      const baseRelation = newRelations(
+        isRootRelation && typeof targetSemanticID === "string"
+          ? targetSemanticID
+          : relation.text,
+        newSemanticContext,
+        plan.user.publicKey,
+        acc.copiedRoot
+      );
+      const nextCopiedRoot = acc.copiedRoot ?? baseRelation.root;
+      return {
+        copiedRoot: nextCopiedRoot,
+        copiedRelations: acc.copiedRelations.push({
+          source: relation,
+          newSemanticContext,
+          sourceParentID: getEffectiveParentRelationID(relation),
+          copy: baseRelation,
+        }),
+      };
+    },
+    {
+      copiedRoot: root,
+      copiedRelations: List<{
+        source: GraphNode;
+        newSemanticContext: Context;
+        sourceParentID?: LongID;
+        copy: GraphNode;
+      }>(),
+    }
+  );
 
   const resultMapping = copiedRelations.reduce(
     (acc, { source, copy }) => acc.set(source.id, copy.id),
@@ -904,7 +917,7 @@ function planCopyDescendantRelations(
         : sourceParentID
         ? resultMapping.get(sourceParentID)
         : undefined;
-      return planUpsertRelations(accPlan, {
+      return upsertRelationsCore(accPlan, {
         ...copy,
         children,
         parent: copiedParentID,
@@ -925,7 +938,7 @@ function planCopyDescendantRelations(
     plan
   );
 
-  return [resultPlan, resultMapping];
+  return [resultPlan as T, resultMapping];
 }
 
 export function planMoveDescendantRelations<T extends GraphPlan>(
@@ -1578,9 +1591,11 @@ export function buildDocumentEvents(
   return plan.affectedRoots.reduce((events, rootId) => {
     const rootRelation = userDB.nodes.find(
       (r) =>
-        r.id === rootId ||
-        shortID(r.id) === rootId ||
-        (!r.parent && (r.root === rootId || r.root === shortID(rootId as ID)))
+        !r.parent &&
+        (r.id === rootId ||
+          shortID(r.id) === rootId ||
+          r.root === rootId ||
+          r.root === shortID(rootId as ID))
     );
     if (!rootRelation) {
       const rootDTag = shortID(rootId as ID);

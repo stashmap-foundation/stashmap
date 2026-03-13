@@ -4,6 +4,14 @@ import { requireValue } from "./args";
 import { SyncPullCliArgs } from "./types";
 import { pullSyncWorkspace, SyncPullManifest } from "../core/syncPull";
 
+function parsePublicKeyArg(value: string, flagName: string): PublicKey {
+  const normalized = value.trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(normalized)) {
+    throw new Error(`${flagName} must be a valid 64-character hex pubkey`);
+  }
+  return normalized as PublicKey;
+}
+
 export function parsePullArgs(args: string[]): SyncPullCliArgs {
   const parse = (index: number, current: SyncPullCliArgs): SyncPullCliArgs => {
     const arg = args[index];
@@ -22,6 +30,14 @@ export function parsePullArgs(args: string[]): SyncPullCliArgs {
         return parse(index + 2, {
           ...current,
           configPath: requireValue(args, index, "--config"),
+        });
+      case "--as-user":
+        return parse(index + 2, {
+          ...current,
+          asUser: parsePublicKeyArg(
+            requireValue(args, index, "--as-user"),
+            "--as-user"
+          ),
         });
       case "--out":
         return parse(index + 2, {
@@ -60,7 +76,7 @@ export function parsePullArgs(args: string[]): SyncPullCliArgs {
 
 export function pullHelp(): string {
   return [
-    "Usage: knowstr pull [--config <path>] [--out <path>] [--relay <url> ...]",
+    "Usage: knowstr pull [--config <path>] [--as-user <pubkey>] [--out <path>] [--relay <url> ...]",
     "",
     "Reads the Knowstr graph from configured relays and exports a local workspace.",
   ].join("\n");
@@ -78,6 +94,12 @@ export async function runPullCommand(
   }
 
   const profile = loadCliProfile({ configPath: parsed.configPath });
+  const pullProfile = parsed.asUser
+    ? {
+        ...profile,
+        readAs: parsed.asUser,
+      }
+    : profile;
   const pool = new SimplePool();
 
   return pullSyncWorkspace(
@@ -86,7 +108,7 @@ export async function runPullCommand(
         pool.querySync(relayUrls, filter, params),
       close: (relayUrls) => pool.close(relayUrls),
     },
-    profile,
+    pullProfile,
     {
       outDir: parsed.outDir,
       relayUrls: parsed.relayUrls,

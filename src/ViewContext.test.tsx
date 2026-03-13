@@ -274,9 +274,7 @@ My Notes
   [O] Scripting
   `);
 
-  await userEvent.click(
-    await screen.findByLabelText("fork to make your own copy")
-  );
+  await userEvent.click(await screen.findByLabelText("copy root to edit"));
 
   await userEvent.click(
     await screen.findByLabelText("edit Programming Languages")
@@ -319,9 +317,7 @@ test("Forked subtree breadcrumbs show source ancestors and navigate back to sour
   );
 
   await screen.findByText("READONLY");
-  await userEvent.click(
-    await screen.findByLabelText("fork to make your own copy")
-  );
+  await userEvent.click(await screen.findByLabelText("copy root to edit"));
 
   await waitFor(() => {
     expect(screen.queryByText("READONLY")).toBeNull();
@@ -379,9 +375,7 @@ test("Forked subtree header source action opens source path", async () => {
   await userEvent.click(versionEntries[versionEntries.length - 1]);
 
   await screen.findByText("READONLY");
-  await userEvent.click(
-    await screen.findByLabelText("fork to make your own copy")
-  );
+  await userEvent.click(await screen.findByLabelText("copy root to edit"));
 
   await waitFor(() => {
     expect(screen.queryByText("READONLY")).toBeNull();

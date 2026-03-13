@@ -39,6 +39,7 @@ const SYNC_LOOKBACK_SECONDS = 7 * 24 * 60 * 60;
 
 export type SyncPullProfile = {
   pubkey: PublicKey;
+  readAs: PublicKey;
   workspaceDir: string;
   bootstrapRelays: Relays;
   relays: Relays;
@@ -193,12 +194,12 @@ export async function pullSyncWorkspace(
   const contactEvents = await queryFilters(
     client,
     relayUrls,
-    [{ authors: [profile.pubkey], kinds: [KIND_CONTACTLIST], limit: 1 }],
+    [{ authors: [profile.readAs], kinds: [KIND_CONTACTLIST], limit: 1 }],
     maxWaitMs
   );
-  const contactPubkeys = latestContactPubkeys(contactEvents, profile.pubkey);
+  const contactPubkeys = latestContactPubkeys(contactEvents, profile.readAs);
   const authors = [
-    ...new Set([profile.pubkey, ...contactPubkeys]),
+    ...new Set([profile.readAs, ...contactPubkeys]),
   ] as PublicKey[];
   const allowedAuthors = new Set(authors);
 
@@ -251,7 +252,7 @@ export async function pullSyncWorkspace(
 
   const manifest: SyncPullManifest = {
     workspace_version: WORKSPACE_VERSION,
-    as_user: profile.pubkey,
+    as_user: profile.readAs,
     synced_at: (options.now || new Date()).toISOString(),
     relay_urls: relayUrls,
     contact_pubkeys: contactPubkeys.slice().sort(),

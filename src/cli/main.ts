@@ -71,6 +71,7 @@ export async function runCli(argv: string[]): Promise<void> {
   if (
     command === "write" &&
     [
+      "copy-root",
       "set-text",
       "create-under",
       "link",

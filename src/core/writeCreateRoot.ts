@@ -92,6 +92,7 @@ export async function writeCreateRoot(
     );
     await applyKnowledgeEventsToWorkspace(
       profile.workspaceDir,
+      profile.knowstrHome,
       workspaceManifest,
       signedEvents
     );

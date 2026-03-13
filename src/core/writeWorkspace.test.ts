@@ -9,7 +9,10 @@ import { shortID } from "../connections";
 import { parseDocumentEvent } from "../markdownRelations";
 import { buildSingleRootMarkdownDocumentEvent } from "../standaloneDocumentEvent";
 import { loadPendingWriteEntries } from "./pendingWrites";
-import { loadWorkspaceGraph } from "./workspaceGraph";
+import {
+  ensureEditableDocumentHeader,
+  loadWorkspaceManifest,
+} from "./workspaceState";
 import {
   writeCopyRoot,
   writeLink,
@@ -33,6 +36,7 @@ function manifestDocument(
   event_id: string;
   d_tag: string;
   path: string;
+  base_path: string;
   created_at: number;
   updated_ms: number;
 } {
@@ -42,25 +46,35 @@ function manifestDocument(
     event_id: `event-${index}`,
     d_tag: draft.rootUuid,
     path: `DOCUMENTS/${draft.event.pubkey}/${draft.rootUuid}.md`,
+    base_path: `base/DOCUMENTS/${draft.event.pubkey}/${draft.rootUuid}.md`,
     created_at: draft.event.created_at,
     updated_ms: draft.event.created_at * 1000,
   };
 }
 
 function writeWorkspace(tempDir: string, drafts: WorkspaceDraft[]): void {
+  const knowstrHome = path.join(tempDir, ".knowstr");
   const documents = drafts.map((draft, index) =>
     manifestDocument(draft, index)
   );
   documents.forEach((document, index) => {
     const filePath = path.join(tempDir, document.path);
+    const basePath = path.join(knowstrHome, document.base_path);
+    const content = ensureEditableDocumentHeader(
+      drafts[index]?.event.content || "",
+      document.author,
+      document.d_tag
+    );
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, drafts[index]?.event.content || "", "utf8");
+    fs.mkdirSync(path.dirname(basePath), { recursive: true });
+    fs.writeFileSync(filePath, content, "utf8");
+    fs.writeFileSync(basePath, content, "utf8");
   });
   fs.writeFileSync(
     path.join(tempDir, "manifest.json"),
     JSON.stringify(
       {
-        workspace_version: 1,
+        workspace_version: 2,
         as_user: PUBKEY,
         synced_at: "2026-03-11T12:00:00.000Z",
         relay_urls: ["wss://relay.example/"],
@@ -111,8 +125,10 @@ test("writeSetText updates the local workspace and queues the signed event", asy
     }
   );
 
-  const graph = await loadWorkspaceGraph(tempDir);
-  const updatedRoot = graph.documentsByRootRelationId.get(homeDraft.relationID);
+  const manifest = await loadWorkspaceManifest(tempDir);
+  const updatedRoot = manifest?.documents.find(
+    (document) => document.event_id === result.event_ids[0]
+  );
   const pendingEntries = await loadPendingWriteEntries(knowstrHome);
 
   expect(updatedRoot?.event_id).toBe(result.event_ids[0]);
@@ -207,8 +223,12 @@ test("writeLink allows linking another author's relation into the current user's
     }
   );
 
-  const graph = await loadWorkspaceGraph(tempDir);
-  const updatedRoot = graph.documentsByRootRelationId.get(ownDraft.relationID);
+  const manifest = await loadWorkspaceManifest(tempDir);
+  const updatedRoot = manifest?.documents.find(
+    (document) =>
+      document.author === PUBKEY &&
+      document.replaceable_key.endsWith(ownDraft.rootUuid)
+  );
   const updatedContent = fs.readFileSync(
     path.join(tempDir, updatedRoot?.path || ""),
     "utf8"
@@ -247,9 +267,9 @@ test("writeCopyRoot creates an own standalone copy with basedOn lineage", async 
     }
   );
 
-  const graph = await loadWorkspaceGraph(tempDir);
-  const copiedRoot = graph.documentsByRootRelationId.get(
-    result.relation_id as LongID
+  const manifest = await loadWorkspaceManifest(tempDir);
+  const copiedRoot = manifest?.documents.find(
+    (document) => document.event_id === result.event_ids[0]
   );
   const copiedContent = fs.readFileSync(
     path.join(tempDir, copiedRoot?.path || ""),
@@ -358,8 +378,12 @@ test("writeMoveItem resolves a cref row from the target relation UUID", async ()
     }
   );
 
-  const graph = await loadWorkspaceGraph(tempDir);
-  const updatedRoot = graph.documentsByRootRelationId.get(ownDraft.relationID);
+  const manifest = await loadWorkspaceManifest(tempDir);
+  const updatedRoot = manifest?.documents.find(
+    (document) =>
+      document.author === PUBKEY &&
+      document.replaceable_key.endsWith(ownDraft.rootUuid)
+  );
   const updatedContent = fs.readFileSync(
     path.join(tempDir, updatedRoot?.path || ""),
     "utf8"

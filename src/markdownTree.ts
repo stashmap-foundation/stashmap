@@ -6,8 +6,12 @@ import attrs from "markdown-it-attrs";
 import Token from "markdown-it/lib/token";
 import { LOG_ROOT_ROLE } from "./systemRoots";
 
-const markdown = new MarkdownIt();
+const markdown = new MarkdownIt({ html: true });
 markdown.use(attrs);
+
+function isCommentOnlyContent(value: string): boolean {
+  return /^(?:<!--[\s\S]*?-->\s*)+$/.test(value.trim());
+}
 
 function extractInlineContent(inline: Token): {
   text: string;
@@ -16,7 +20,9 @@ function extractInlineContent(inline: Token): {
   linkArgument?: Argument;
 } {
   if (!inline.children) {
-    return { text: inline.content.trim() };
+    return {
+      text: isCommentOnlyContent(inline.content) ? "" : inline.content.trim(),
+    };
   }
   const text = inline.children
     .filter((c) => c.type === "text")
@@ -34,7 +40,12 @@ function extractInlineContent(inline: Token): {
   const linkArgument = (["confirms", "contra"] as const).find((a) =>
     linkClasses.includes(a)
   );
-  return { text, linkHref, linkRelevance, linkArgument };
+  return {
+    text: isCommentOnlyContent(text) ? "" : text,
+    linkHref,
+    linkRelevance,
+    linkArgument,
+  };
 }
 
 function extractAttrs(token: Token): {
@@ -130,6 +141,8 @@ export type MarkdownTreeNode = {
   relevance?: Relevance;
   argument?: Argument;
   linkHref?: string;
+  blockKind?: "heading" | "list_item" | "paragraph";
+  headingLevel?: number;
   hidden?: boolean;
   basedOn?: string;
   anchor?: RootAnchor;
@@ -223,6 +236,8 @@ export function parseMarkdownHierarchy(
       const node: MarkdownTreeNode = {
         text,
         children: [],
+        blockKind: "heading",
+        headingLevel,
         ...(uuid !== undefined && { uuid }),
         ...(relevance !== undefined && { relevance }),
         ...(argument !== undefined && { argument }),
@@ -276,6 +291,7 @@ export function parseMarkdownHierarchy(
         const node: MarkdownTreeNode = {
           text,
           children: [],
+          blockKind: "list_item",
           ...(uuid !== undefined && { uuid }),
           ...(effectiveRelevance !== undefined && {
             relevance: effectiveRelevance,
@@ -295,6 +311,7 @@ export function parseMarkdownHierarchy(
       currentListNode.children.push({
         text,
         children: [],
+        blockKind: "paragraph",
         ...(linkHref !== undefined && { linkHref }),
         ...(linkRelevance !== undefined && { relevance: linkRelevance }),
         ...(linkArgument !== undefined && { argument: linkArgument }),
@@ -302,7 +319,11 @@ export function parseMarkdownHierarchy(
       continue;
     }
 
-    const paragraphNode: MarkdownTreeNode = { text, children: [] };
+    const paragraphNode: MarkdownTreeNode = {
+      text,
+      children: [],
+      blockKind: "paragraph",
+    };
     appendNode(
       roots,
       headingStack[headingStack.length - 1]?.node,
@@ -310,4 +331,25 @@ export function parseMarkdownHierarchy(
     );
   }
   return roots;
+}
+
+export function parseEditableMarkdownDocument(markdownText: string): {
+  roots: MarkdownTreeNode[];
+  mainRoot?: MarkdownTreeNode;
+  deleteRoot?: MarkdownTreeNode;
+  hasNestedDeleteSection: boolean;
+} {
+  const roots = parseMarkdownHierarchy(markdownText).filter(
+    (root) => !root.hidden
+  );
+  const mainRoot = roots[0];
+  const deleteRoot = roots[1];
+  return {
+    roots,
+    mainRoot,
+    deleteRoot,
+    hasNestedDeleteSection: Boolean(
+      mainRoot?.children.some((child) => child.text === "Delete")
+    ),
+  };
 }

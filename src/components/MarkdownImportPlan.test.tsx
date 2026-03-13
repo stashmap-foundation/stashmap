@@ -52,8 +52,18 @@ test("Single file with multiple top-level roots is wrapped by filename", () => {
     {
       text: "roadmap",
       children: [
-        { text: "Phase 1", children: [] },
-        { text: "Phase 2", children: [] },
+        {
+          text: "Phase 1",
+          children: [],
+          blockKind: "heading",
+          headingLevel: 1,
+        },
+        {
+          text: "Phase 2",
+          children: [],
+          blockKind: "heading",
+          headingLevel: 1,
+        },
       ],
     },
   ]);
@@ -78,9 +88,10 @@ test("Parser strips leading list markers and keeps nesting", () => {
   expect(trees).toEqual([
     {
       text: "Parent",
+      blockKind: "list_item",
       children: [
-        { text: "Child", children: [] },
-        { text: "Numbered Child", children: [] },
+        { text: "Child", children: [], blockKind: "list_item" },
+        { text: "Numbered Child", children: [], blockKind: "list_item" },
       ],
     },
   ]);
@@ -233,7 +244,16 @@ test("parseTextToTrees detects markdown headers", () => {
   expect(headerTrees).toEqual([
     {
       text: "Root",
-      children: [{ text: "Child", children: [] }],
+      children: [
+        {
+          text: "Child",
+          children: [],
+          blockKind: "heading",
+          headingLevel: 2,
+        },
+      ],
+      blockKind: "heading",
+      headingLevel: 1,
     },
   ]);
 });

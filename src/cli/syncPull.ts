@@ -78,7 +78,7 @@ export function pullHelp(): string {
   return [
     "Usage: knowstr pull [--config <path>] [--as-user <pubkey>] [--out <path>] [--relay <url> ...]",
     "",
-    "Reads the Knowstr graph from configured relays and exports a local workspace.",
+    "Reads the Knowstr graph from configured relays, writes editable markdown documents, and refreshes hidden baselines.",
   ].join("\n");
 }
 

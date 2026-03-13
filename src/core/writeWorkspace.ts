@@ -135,6 +135,7 @@ async function publishWorkspaceMutation(
   );
   await applyKnowledgeEventsToWorkspace(
     profile.workspaceDir,
+    profile.knowstrHome,
     workspaceManifest,
     signedEvents
   );

@@ -47,6 +47,17 @@ function buildDocumentEventFromRootTree(
   };
 }
 
+export function buildDocumentEventFromMarkdownTree(
+  author: PublicKey,
+  rootTree: MarkdownTreeNode
+): {
+  relationID: LongID;
+  rootUuid: string;
+  event: UnsignedEvent;
+} {
+  return buildDocumentEventFromRootTree(author, rootTree);
+}
+
 export function buildStandaloneRootDocumentEvent(
   author: PublicKey,
   title: string,

@@ -22,7 +22,6 @@ import {
   WorkspaceAuthor,
   WorkspaceDocument,
   WorkspaceManifest,
-  applyKnowledgeEventsToWorkspace,
   applyDeleteEventsToWorkspaceDocuments,
   applyDocumentEventsToWorkspaceDocuments,
   authorMap,
@@ -30,9 +29,7 @@ import {
   loadWorkspaceManifest,
   removeWorkspaceFileIfExists,
   writeWorkspaceManifest,
-  writeWorkspaceInstructions,
 } from "./workspaceState";
-import { loadPendingWriteEntries } from "./pendingWrites";
 
 const DEFAULT_MAX_WAIT_MS = 20_000;
 const SYNC_LOOKBACK_SECONDS = 7 * 24 * 60 * 60;
@@ -175,6 +172,38 @@ async function removeOutOfScopeDocuments(
   }, Promise.resolve());
 }
 
+function resolveKnowstrHome(
+  workspaceDir: string,
+  profile: SyncPullProfile
+): string {
+  return profile.knowstrHome ?? path.join(workspaceDir, ".knowstr");
+}
+
+async function isLocallyEdited(
+  workspaceDir: string,
+  knowstrHome: string,
+  document: StoredDocument | undefined
+): Promise<boolean> {
+  if (!document?.base_path) {
+    return false;
+  }
+
+  try {
+    const [workspaceContent, baseContent] = await Promise.all([
+      fs.readFile(path.join(workspaceDir, document.path), "utf8"),
+      fs.readFile(path.join(knowstrHome, document.base_path), "utf8"),
+    ]);
+    return workspaceContent !== baseContent;
+  } catch {
+    return false;
+  }
+}
+
+function getReplaceableKeyFromDocumentEvent(event: Event): string | undefined {
+  const dTag = event.tags.find(([name]) => name === "d")?.[1];
+  return dTag ? `${event.kind}:${event.pubkey}:${dTag}` : undefined;
+}
+
 export async function pullSyncWorkspace(
   client: SyncQueryClient,
   profile: SyncPullProfile,
@@ -185,6 +214,7 @@ export async function pullSyncWorkspace(
     : profile.workspaceDir;
   const maxWaitMs = options.maxWaitMs ?? DEFAULT_MAX_WAIT_MS;
   const relayUrls = resolveRelayUrls(profile, options);
+  const knowstrHome = resolveKnowstrHome(workspaceDir, profile);
   const previousManifest = await loadWorkspaceManifest(workspaceDir);
   const previousAuthors = authorMap(previousManifest);
   const documents = documentMap(previousManifest);
@@ -238,15 +268,52 @@ export async function pullSyncWorkspace(
 
   await authorResults.reduce(async (previous, { authorEvents }) => {
     await previous;
+    const deleteEvents = (
+      await Promise.all(
+        authorEvents
+          .filter((event) => event.kind === KIND_DELETE)
+          .map(async (event) => {
+            const replaceableKey = event.tags.find(
+              ([name]) => name === "a"
+            )?.[1];
+            const existing = replaceableKey
+              ? documents.get(replaceableKey)
+              : undefined;
+            return (await isLocallyEdited(workspaceDir, knowstrHome, existing))
+              ? undefined
+              : event;
+          })
+      )
+    ).filter((event): event is Event => Boolean(event));
+    const documentEvents = (
+      await Promise.all(
+        authorEvents
+          .filter((event) => event.kind === KIND_KNOWLEDGE_DOCUMENT)
+          .map(async (event) => {
+            const replaceableKey = getReplaceableKeyFromDocumentEvent(event);
+            const existing = replaceableKey
+              ? documents.get(replaceableKey)
+              : undefined;
+            if (!existing || existing.event_id === event.id) {
+              return event;
+            }
+            return (await isLocallyEdited(workspaceDir, knowstrHome, existing))
+              ? undefined
+              : event;
+          })
+      )
+    ).filter((event): event is Event => Boolean(event));
     await applyDeleteEventsToWorkspaceDocuments(
       workspaceDir,
+      knowstrHome,
       documents,
-      authorEvents.filter((event) => event.kind === KIND_DELETE)
+      deleteEvents
     );
     await applyDocumentEventsToWorkspaceDocuments(
       workspaceDir,
+      knowstrHome,
       documents,
-      authorEvents.filter((event) => event.kind === KIND_KNOWLEDGE_DOCUMENT)
+      documentEvents
     );
   }, Promise.resolve());
 
@@ -267,13 +334,7 @@ export async function pullSyncWorkspace(
   };
 
   await writeWorkspaceManifest(workspaceDir, manifest);
-  await writeWorkspaceInstructions(workspaceDir, manifest);
-
-  const pendingEntries = await loadPendingWriteEntries(profile.knowstrHome);
-  const pendingEvents = pendingEntries.map(({ event }) => event);
 
   client.close?.(relayUrls);
-  return pendingEvents.length > 0
-    ? applyKnowledgeEventsToWorkspace(workspaceDir, manifest, pendingEvents)
-    : manifest;
+  return manifest;
 }

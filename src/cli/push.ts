@@ -2,15 +2,10 @@ import { SimplePool } from "nostr-tools";
 import { loadCliProfile } from "./config";
 import { requireValue } from "./args";
 import { PushCliArgs } from "./types";
-import {
-  loadPendingWriteEntries,
-  pushPendingWriteEntries,
-} from "../core/pendingWrites";
 import { publishEventToRelays } from "../nostrPublish";
-import { getWriteRelays, relaysFromUrls, uniqueRelayUrls } from "../relayUtils";
-import { WriteProfile } from "../core/writeSupport";
+import { pushEditedWorkspaceDocuments } from "../core/workspacePush";
 
-type PushProfile = WriteProfile & { knowstrHome?: string };
+type PushProfile = ReturnType<typeof loadCliProfile>;
 type PushPool = Pick<SimplePool, "publish" | "close">;
 
 export function parsePushArgs(args: string[]): PushCliArgs {
@@ -55,34 +50,17 @@ export function pushHelp(): string {
   return [
     "Usage: knowstr push [--config <path>] [--relay <url> ...]",
     "",
-    "Publishes queued signed events from .knowstr/pending-writes.json to relays.",
+    "Publishes locally edited workspace documents to relays.",
   ].join("\n");
-}
-
-async function fallbackCloseRelayUrls(
-  profile: PushProfile,
-  relayUrlsOverride: string[]
-): Promise<string[]> {
-  const pendingEntries = await loadPendingWriteEntries(profile.knowstrHome);
-  const queuedRelayUrls = pendingEntries.flatMap(
-    ({ relayUrls }) => relayUrls || []
-  );
-  return uniqueRelayUrls(
-    relaysFromUrls([
-      ...relayUrlsOverride,
-      ...queuedRelayUrls,
-      ...getWriteRelays(profile.relays).map(({ url }) => url),
-    ])
-  );
 }
 
 export async function pushPendingWritesWithPool(
   pool: PushPool,
   profile: PushProfile,
   relayUrlsOverride: string[]
-): Promise<Awaited<ReturnType<typeof pushPendingWriteEntries>>> {
+): Promise<Awaited<ReturnType<typeof pushEditedWorkspaceDocuments>>> {
   try {
-    const result = await pushPendingWriteEntries(
+    const result = await pushEditedWorkspaceDocuments(
       {
         publishEvent: (relayUrls, event) =>
           publishEventToRelays(pool, event, relayUrls),
@@ -93,7 +71,7 @@ export async function pushPendingWritesWithPool(
     pool.close(result.relay_urls);
     return result;
   } catch (error) {
-    pool.close(await fallbackCloseRelayUrls(profile, relayUrlsOverride));
+    pool.close(relayUrlsOverride);
     throw error;
   }
 }
@@ -102,7 +80,7 @@ export async function runPushCommand(
   args: string[]
 ): Promise<
   | { help: true; text: string }
-  | Awaited<ReturnType<typeof pushPendingWriteEntries>>
+  | Awaited<ReturnType<typeof pushEditedWorkspaceDocuments>>
 > {
   const parsed = parsePushArgs(args);
   if (parsed.help) {

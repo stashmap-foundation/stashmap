@@ -6,7 +6,7 @@ import path from "path";
 import { getPublicKey } from "nostr-tools";
 import { hexToBytes } from "@noble/hashes/utils";
 import { loadPendingWriteEntries } from "./pendingWrites";
-import { loadWorkspaceGraph } from "./workspaceGraph";
+import { loadWorkspaceManifest } from "./workspaceState";
 import { writeCreateRoot, WriteProfile } from "./writeCreateRoot";
 
 const PRIVATE_KEY = "1".repeat(64);
@@ -150,11 +150,14 @@ test("writeCreateRoot updates the local workspace and queue when workspaceDir is
     }
   );
 
-  const graph = await loadWorkspaceGraph(tempDir);
-  const writtenRoot = graph.documentsByRootRelationId.get(result.relation_id);
+  const manifest = await loadWorkspaceManifest(tempDir);
   const pendingEntries = await loadPendingWriteEntries(knowstrHome);
 
-  expect(writtenRoot?.event_id).toBe(result.event_id);
+  expect(
+    manifest?.documents.find(
+      (document) => document.event_id === result.event_id
+    )
+  ).toBeDefined();
   expect(pendingEntries.map(({ event }) => event.id)).toEqual([
     result.event_id,
   ]);

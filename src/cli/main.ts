@@ -1,10 +1,5 @@
 import { pullHelp, runPullCommand } from "./syncPull";
-import {
-  writeCreateRootHelp,
-  runWriteCreateRootCommand,
-} from "./writeCreateRoot";
 import { pushHelp, runPushCommand } from "./push";
-import { runWriteMutationCommand, writeMutationsHelp } from "./writeMutations";
 
 function isHelpResult(value: unknown): value is { help: true; text: string } {
   return (
@@ -22,18 +17,12 @@ function generalHelp(): string {
     "Usage: knowstr <command>",
     "",
     "Commands:",
-    "  pull   Export a local markdown workspace from relays",
-    "  push   Publish queued local events to relays",
-    "  write create-root   Queue a new standalone root locally",
-    "  write <mutation>   Apply graph-aware local edits to a synced workspace",
+    "  pull   Export a local editable markdown workspace from relays",
+    "  push   Publish edited workspace documents to relays",
     "",
     pullHelp(),
     "",
     pushHelp(),
-    "",
-    writeCreateRootHelp(),
-    "",
-    writeMutationsHelp(),
   ].join("\n");
 }
 
@@ -60,31 +49,6 @@ export async function runCli(argv: string[]): Promise<void> {
 
   if (command === "push") {
     printResult(await runPushCommand([subcommand, ...rest].filter(Boolean)));
-    return;
-  }
-
-  if (command === "write" && subcommand === "create-root") {
-    printResult(await runWriteCreateRootCommand(rest));
-    return;
-  }
-
-  if (
-    command === "write" &&
-    [
-      "copy-root",
-      "set-text",
-      "create-under",
-      "link",
-      "set-relevance",
-      "set-argument",
-      "delete-item",
-      "move-item",
-    ].includes(subcommand || "")
-  ) {
-    if (!subcommand) {
-      throw new Error("Missing write subcommand");
-    }
-    printResult(await runWriteMutationCommand(subcommand, rest));
     return;
   }
 

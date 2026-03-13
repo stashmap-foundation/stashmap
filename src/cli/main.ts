@@ -1,7 +1,3 @@
-import {
-  inspectChildrenHelp,
-  runInspectChildrenCommand,
-} from "./inspectChildren";
 import { pullHelp, runPullCommand } from "./syncPull";
 import {
   writeCreateRootHelp,
@@ -27,14 +23,11 @@ function generalHelp(): string {
     "",
     "Commands:",
     "  pull   Export a local markdown workspace from relays",
-    "  inspect children   List a relation's direct items with stable IDs",
     "  push   Publish queued local events to relays",
     "  write create-root   Queue a new standalone root locally",
     "  write <mutation>   Apply graph-aware local edits to a synced workspace",
     "",
     pullHelp(),
-    "",
-    inspectChildrenHelp(),
     "",
     pushHelp(),
     "",
@@ -62,11 +55,6 @@ export async function runCli(argv: string[]): Promise<void> {
 
   if (command === "pull") {
     printResult(await runPullCommand([subcommand, ...rest].filter(Boolean)));
-    return;
-  }
-
-  if (command === "inspect" && subcommand === "children") {
-    printResult(await runInspectChildrenCommand(rest));
     return;
   }
 

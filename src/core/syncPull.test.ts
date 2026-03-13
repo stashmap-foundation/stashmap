@@ -153,9 +153,6 @@ test("pullSyncWorkspace uses configured relays only and writes raw markdown docu
     "pipe the markdown into `knowstr write create-root --stdin`"
   );
   expect(agentsInstructions).toContain(
-    "knowstr inspect children --parent <relation-id>"
-  );
-  expect(agentsInstructions).toContain(
     "knowstr write move-item --from-parent <relation-id> --item <item-id> --to-parent <relation-id>"
   );
   expect(agentsInstructions).toContain("knowstr push");

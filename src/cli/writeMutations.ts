@@ -99,6 +99,7 @@ export function writeMutationsHelp(): string {
     "  knowstr write move-item --from-parent <relation-id> --item <item-id> --to-parent <relation-id> [--before <item-id>|--after <item-id>] [--config <path>] [--relay <url> ...]",
     "",
     "Applies edge-aware relation edits locally, updates the workspace immediately, and queues signed events for `knowstr push`.",
+    "Bare UUID operands are treated as your own `<pubkey>_<uuid>` IDs.",
   ].join("\n");
 }
 

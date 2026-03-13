@@ -1,4 +1,4 @@
-import { inspectChildren, loadWorkspaceGraph } from "./workspaceGraph";
+import { loadWorkspaceGraph } from "./workspaceGraph";
 import {
   normalizeArgumentInput,
   normalizeRelevanceInput,
@@ -21,6 +21,13 @@ import {
 } from "./headlessPlan";
 import { GraphPlan } from "../planner";
 import {
+  isConcreteRefId,
+  isSearchId,
+  joinID,
+  parseConcreteRefId,
+  shortID,
+} from "../connections";
+import {
   loadWriteSecretKey,
   signUnsignedEvents,
   WriteProfile,
@@ -37,12 +44,60 @@ export type WorkspaceWriteProfile = WriteProfile & {
   knowstrHome?: string;
 };
 
-export async function inspectWorkspaceChildren(
-  profile: Pick<WorkspaceWriteProfile, "workspaceDir" | "pubkey">,
-  parentRelationId: LongID
-): Promise<ReturnType<typeof inspectChildren>> {
-  const graph = await loadWorkspaceGraph(profile.workspaceDir);
-  return inspectChildren(graph, profile.pubkey, parentRelationId);
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function resolveOwnWriteId(
+  pubkey: PublicKey,
+  id: LongID | ID | undefined
+): LongID | ID | undefined {
+  if (!id || isConcreteRefId(id) || isSearchId(id as ID) || id.includes("_")) {
+    return id;
+  }
+  return UUID_RE.test(id) ? joinID(pubkey, id) : id;
+}
+
+function resolveParentItemId(
+  plan: GraphPlan,
+  parentRelationId: LongID,
+  pubkey: PublicKey,
+  itemId: LongID | ID | undefined
+): LongID | ID | undefined {
+  if (!itemId) {
+    return undefined;
+  }
+
+  const parentRelation = requireRelationById(plan, parentRelationId);
+  const ownResolvedItemId = resolveOwnWriteId(pubkey, itemId);
+  const candidates = parentRelation.items.reduce((acc, item) => {
+    if (item.id === itemId || item.id === ownResolvedItemId) {
+      return acc.includes(item.id) ? acc : [...acc, item.id];
+    }
+
+    const parsed = parseConcreteRefId(item.id);
+    if (!parsed) {
+      return acc;
+    }
+
+    if (
+      parsed.relationID === itemId ||
+      parsed.relationID === ownResolvedItemId ||
+      shortID(parsed.relationID) === itemId
+    ) {
+      return acc.includes(item.id) ? acc : [...acc, item.id];
+    }
+
+    return acc;
+  }, [] as Array<LongID | ID>);
+
+  if (candidates.length === 1) {
+    return candidates[0];
+  }
+  if (candidates.length > 1) {
+    throw new Error(`Ambiguous item ID under parent: ${itemId}`);
+  }
+
+  return ownResolvedItemId;
 }
 
 async function publishWorkspaceMutation(
@@ -102,16 +157,20 @@ async function publishWorkspaceMutation(
 export async function writeSetText(
   profile: WorkspaceWriteProfile,
   options: {
-    relationId: LongID;
+    relationId: LongID | ID;
     text: string;
     relayUrls?: string[];
   }
 ): Promise<Awaited<ReturnType<typeof publishWorkspaceMutation>>> {
+  const relationId = resolveOwnWriteId(profile.pubkey, options.relationId);
+  if (!relationId || relationId.startsWith("cref:")) {
+    throw new Error(`Invalid relation ID: ${options.relationId}`);
+  }
   return publishWorkspaceMutation(profile, options.relayUrls, (plan) => {
-    requireWritableRelationById(plan, options.relationId);
+    requireWritableRelationById(plan, relationId as LongID);
     return {
-      plan: planSetRelationTextById(plan, options.relationId, options.text),
-      relationId: options.relationId,
+      plan: planSetRelationTextById(plan, relationId as LongID, options.text),
+      relationId: relationId as LongID,
     };
   });
 }
@@ -119,7 +178,7 @@ export async function writeSetText(
 export async function writeCreateUnder(
   profile: WorkspaceWriteProfile,
   options: {
-    parentRelationId: LongID;
+    parentRelationId: LongID | ID;
     markdownText: string;
     beforeItemId?: LongID | ID;
     afterItemId?: LongID | ID;
@@ -128,15 +187,36 @@ export async function writeCreateUnder(
     relayUrls?: string[];
   }
 ): Promise<Awaited<ReturnType<typeof publishWorkspaceMutation>>> {
+  const parentRelationId = resolveOwnWriteId(
+    profile.pubkey,
+    options.parentRelationId
+  );
+  if (!parentRelationId || parentRelationId.startsWith("cref:")) {
+    throw new Error(`Invalid parent relation ID: ${options.parentRelationId}`);
+  }
+  const beforeItemId = resolveOwnWriteId(profile.pubkey, options.beforeItemId);
+  const afterItemId = resolveOwnWriteId(profile.pubkey, options.afterItemId);
   return publishWorkspaceMutation(profile, options.relayUrls, (plan) => {
-    requireWritableRelationById(plan, options.parentRelationId);
+    requireWritableRelationById(plan, parentRelationId as LongID);
+    const resolvedBeforeItemId = resolveParentItemId(
+      plan,
+      parentRelationId as LongID,
+      profile.pubkey,
+      beforeItemId
+    );
+    const resolvedAfterItemId = resolveParentItemId(
+      plan,
+      parentRelationId as LongID,
+      profile.pubkey,
+      afterItemId
+    );
     const inserted = planInsertMarkdownUnderRelationById(
       plan,
-      options.parentRelationId,
+      parentRelationId as LongID,
       [requireSingleRootMarkdownTree(options.markdownText)],
-      resolveInsertAtIndexById(plan, options.parentRelationId, {
-        ...(options.beforeItemId ? { beforeItemId: options.beforeItemId } : {}),
-        ...(options.afterItemId ? { afterItemId: options.afterItemId } : {}),
+      resolveInsertAtIndexById(plan, parentRelationId as LongID, {
+        ...(resolvedBeforeItemId ? { beforeItemId: resolvedBeforeItemId } : {}),
+        ...(resolvedAfterItemId ? { afterItemId: resolvedAfterItemId } : {}),
       }),
       normalizeRelevanceInput(options.relevance || "contains"),
       normalizeArgumentInput(options.argument || "none")
@@ -157,8 +237,8 @@ export async function writeCreateUnder(
 export async function writeLink(
   profile: WorkspaceWriteProfile,
   options: {
-    parentRelationId: LongID;
-    targetRelationId: LongID;
+    parentRelationId: LongID | ID;
+    targetRelationId: LongID | ID;
     beforeItemId?: LongID | ID;
     afterItemId?: LongID | ID;
     relevance?: "contains" | Relevance;
@@ -166,16 +246,44 @@ export async function writeLink(
     relayUrls?: string[];
   }
 ): Promise<Awaited<ReturnType<typeof publishWorkspaceMutation>>> {
+  const parentRelationId = resolveOwnWriteId(
+    profile.pubkey,
+    options.parentRelationId
+  );
+  const targetRelationId = resolveOwnWriteId(
+    profile.pubkey,
+    options.targetRelationId
+  );
+  if (!parentRelationId || parentRelationId.startsWith("cref:")) {
+    throw new Error(`Invalid parent relation ID: ${options.parentRelationId}`);
+  }
+  if (!targetRelationId || targetRelationId.startsWith("cref:")) {
+    throw new Error(`Invalid target relation ID: ${options.targetRelationId}`);
+  }
+  const beforeItemId = resolveOwnWriteId(profile.pubkey, options.beforeItemId);
+  const afterItemId = resolveOwnWriteId(profile.pubkey, options.afterItemId);
   return publishWorkspaceMutation(profile, options.relayUrls, (plan) => {
-    requireWritableRelationById(plan, options.parentRelationId);
-    requireRelationById(plan, options.targetRelationId);
+    requireWritableRelationById(plan, parentRelationId as LongID);
+    requireRelationById(plan, targetRelationId as LongID);
+    const resolvedBeforeItemId = resolveParentItemId(
+      plan,
+      parentRelationId as LongID,
+      profile.pubkey,
+      beforeItemId
+    );
+    const resolvedAfterItemId = resolveParentItemId(
+      plan,
+      parentRelationId as LongID,
+      profile.pubkey,
+      afterItemId
+    );
     const linked = planLinkRelationById(
       plan,
-      options.parentRelationId,
-      options.targetRelationId,
-      resolveInsertAtIndexById(plan, options.parentRelationId, {
-        ...(options.beforeItemId ? { beforeItemId: options.beforeItemId } : {}),
-        ...(options.afterItemId ? { afterItemId: options.afterItemId } : {}),
+      parentRelationId as LongID,
+      targetRelationId as LongID,
+      resolveInsertAtIndexById(plan, parentRelationId as LongID, {
+        ...(resolvedBeforeItemId ? { beforeItemId: resolvedBeforeItemId } : {}),
+        ...(resolvedAfterItemId ? { afterItemId: resolvedAfterItemId } : {}),
       }),
       normalizeRelevanceInput(options.relevance || "contains"),
       normalizeArgumentInput(options.argument || "none")
@@ -190,24 +298,38 @@ export async function writeLink(
 export async function writeSetRelevance(
   profile: WorkspaceWriteProfile,
   options: {
-    parentRelationId: LongID;
+    parentRelationId: LongID | ID;
     itemId: LongID | ID;
     relevance: "contains" | Relevance;
     relayUrls?: string[];
   }
 ): Promise<Awaited<ReturnType<typeof publishWorkspaceMutation>>> {
+  const parentRelationId = resolveOwnWriteId(
+    profile.pubkey,
+    options.parentRelationId
+  );
+  const itemId = resolveOwnWriteId(profile.pubkey, options.itemId);
+  if (!parentRelationId || parentRelationId.startsWith("cref:") || !itemId) {
+    throw new Error("Invalid parent relation ID or item ID");
+  }
   return publishWorkspaceMutation(profile, options.relayUrls, (plan) => {
-    requireWritableRelationById(plan, options.parentRelationId);
+    requireWritableRelationById(plan, parentRelationId as LongID);
+    const resolvedItemId = resolveParentItemId(
+      plan,
+      parentRelationId as LongID,
+      profile.pubkey,
+      itemId
+    );
     requireRelationItemIndexById(
       plan,
-      options.parentRelationId,
-      options.itemId
+      parentRelationId as LongID,
+      resolvedItemId as LongID | ID
     );
     return {
       plan: planUpdateRelationItemMetadataById(
         plan,
-        options.parentRelationId,
-        options.itemId,
+        parentRelationId as LongID,
+        resolvedItemId as LongID | ID,
         {
           relevance: normalizeRelevanceInput(options.relevance),
         }
@@ -219,24 +341,38 @@ export async function writeSetRelevance(
 export async function writeSetArgument(
   profile: WorkspaceWriteProfile,
   options: {
-    parentRelationId: LongID;
+    parentRelationId: LongID | ID;
     itemId: LongID | ID;
     argument: "none" | Argument;
     relayUrls?: string[];
   }
 ): Promise<Awaited<ReturnType<typeof publishWorkspaceMutation>>> {
+  const parentRelationId = resolveOwnWriteId(
+    profile.pubkey,
+    options.parentRelationId
+  );
+  const itemId = resolveOwnWriteId(profile.pubkey, options.itemId);
+  if (!parentRelationId || parentRelationId.startsWith("cref:") || !itemId) {
+    throw new Error("Invalid parent relation ID or item ID");
+  }
   return publishWorkspaceMutation(profile, options.relayUrls, (plan) => {
-    requireWritableRelationById(plan, options.parentRelationId);
+    requireWritableRelationById(plan, parentRelationId as LongID);
+    const resolvedItemId = resolveParentItemId(
+      plan,
+      parentRelationId as LongID,
+      profile.pubkey,
+      itemId
+    );
     requireRelationItemIndexById(
       plan,
-      options.parentRelationId,
-      options.itemId
+      parentRelationId as LongID,
+      resolvedItemId as LongID | ID
     );
     return {
       plan: planUpdateRelationItemMetadataById(
         plan,
-        options.parentRelationId,
-        options.itemId,
+        parentRelationId as LongID,
+        resolvedItemId as LongID | ID,
         {
           argument: normalizeArgumentInput(options.argument),
         }
@@ -248,23 +384,37 @@ export async function writeSetArgument(
 export async function writeDeleteItem(
   profile: WorkspaceWriteProfile,
   options: {
-    parentRelationId: LongID;
+    parentRelationId: LongID | ID;
     itemId: LongID | ID;
     relayUrls?: string[];
   }
 ): Promise<Awaited<ReturnType<typeof publishWorkspaceMutation>>> {
+  const parentRelationId = resolveOwnWriteId(
+    profile.pubkey,
+    options.parentRelationId
+  );
+  const itemId = resolveOwnWriteId(profile.pubkey, options.itemId);
+  if (!parentRelationId || parentRelationId.startsWith("cref:") || !itemId) {
+    throw new Error("Invalid parent relation ID or item ID");
+  }
   return publishWorkspaceMutation(profile, options.relayUrls, (plan) => {
-    requireWritableRelationById(plan, options.parentRelationId);
+    requireWritableRelationById(plan, parentRelationId as LongID);
+    const resolvedItemId = resolveParentItemId(
+      plan,
+      parentRelationId as LongID,
+      profile.pubkey,
+      itemId
+    );
     requireRelationItemIndexById(
       plan,
-      options.parentRelationId,
-      options.itemId
+      parentRelationId as LongID,
+      resolvedItemId as LongID | ID
     );
     return {
       plan: planRemoveRelationItemById(
         plan,
-        options.parentRelationId,
-        options.itemId
+        parentRelationId as LongID,
+        resolvedItemId as LongID | ID
       ),
     };
   });
@@ -273,33 +423,71 @@ export async function writeDeleteItem(
 export async function writeMoveItem(
   profile: WorkspaceWriteProfile,
   options: {
-    sourceParentRelationId: LongID;
+    sourceParentRelationId: LongID | ID;
     itemId: LongID | ID;
-    targetParentRelationId: LongID;
+    targetParentRelationId: LongID | ID;
     beforeItemId?: LongID | ID;
     afterItemId?: LongID | ID;
     relayUrls?: string[];
   }
 ): Promise<Awaited<ReturnType<typeof publishWorkspaceMutation>>> {
+  const sourceParentRelationId = resolveOwnWriteId(
+    profile.pubkey,
+    options.sourceParentRelationId
+  );
+  const itemId = resolveOwnWriteId(profile.pubkey, options.itemId);
+  const targetParentRelationId = resolveOwnWriteId(
+    profile.pubkey,
+    options.targetParentRelationId
+  );
+  if (
+    !sourceParentRelationId ||
+    sourceParentRelationId.startsWith("cref:") ||
+    !itemId ||
+    !targetParentRelationId ||
+    targetParentRelationId.startsWith("cref:")
+  ) {
+    throw new Error("Invalid source parent, target parent, or item ID");
+  }
+  const beforeItemId = resolveOwnWriteId(profile.pubkey, options.beforeItemId);
+  const afterItemId = resolveOwnWriteId(profile.pubkey, options.afterItemId);
   return publishWorkspaceMutation(profile, options.relayUrls, (plan) => {
-    requireWritableRelationById(plan, options.sourceParentRelationId);
-    requireWritableRelationById(plan, options.targetParentRelationId);
+    requireWritableRelationById(plan, sourceParentRelationId as LongID);
+    requireWritableRelationById(plan, targetParentRelationId as LongID);
+    const resolvedItemId = resolveParentItemId(
+      plan,
+      sourceParentRelationId as LongID,
+      profile.pubkey,
+      itemId
+    );
+    const resolvedBeforeItemId = resolveParentItemId(
+      plan,
+      targetParentRelationId as LongID,
+      profile.pubkey,
+      beforeItemId
+    );
+    const resolvedAfterItemId = resolveParentItemId(
+      plan,
+      targetParentRelationId as LongID,
+      profile.pubkey,
+      afterItemId
+    );
     requireRelationItemIndexById(
       plan,
-      options.sourceParentRelationId,
-      options.itemId
+      sourceParentRelationId as LongID,
+      resolvedItemId as LongID | ID
     );
     return {
       plan: planMoveRelationItemById(
         plan,
-        options.sourceParentRelationId,
-        options.itemId,
-        options.targetParentRelationId,
-        resolveInsertAtIndexById(plan, options.targetParentRelationId, {
-          ...(options.beforeItemId
-            ? { beforeItemId: options.beforeItemId }
+        sourceParentRelationId as LongID,
+        resolvedItemId as LongID | ID,
+        targetParentRelationId as LongID,
+        resolveInsertAtIndexById(plan, targetParentRelationId as LongID, {
+          ...(resolvedBeforeItemId
+            ? { beforeItemId: resolvedBeforeItemId }
             : {}),
-          ...(options.afterItemId ? { afterItemId: options.afterItemId } : {}),
+          ...(resolvedAfterItemId ? { afterItemId: resolvedAfterItemId } : {}),
         })
       ),
     };

@@ -22,12 +22,6 @@ export type WriteCreateRootCliArgs = {
   help: boolean;
 };
 
-export type InspectChildrenCliArgs = {
-  configPath?: string;
-  parentRelationId?: LongID;
-  help: boolean;
-};
-
 export type WriteSetTextCliArgs = {
   configPath?: string;
   relationId?: LongID;

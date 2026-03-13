@@ -5,12 +5,10 @@ import {
   getRelations,
   getRelationsNoReferencedBy,
   shortID,
-  isRefId,
   isSearchId,
   parseSearchId,
   itemMatchesType,
   EMPTY_SEMANTIC_ID,
-  isConcreteRefId,
   itemPassesFilters,
   getRelationContext,
   getRelationSemanticID,
@@ -193,9 +191,6 @@ function getRowIDFromPath(data: Data, viewPath: ViewPath): ID {
   if (isEmptyViewPathID(currentID)) {
     return EMPTY_SEMANTIC_ID;
   }
-  if (isConcreteRefId(currentID)) {
-    return currentID;
-  }
   const relation = getRelationsNoReferencedBy(
     data.knowledgeDBs,
     currentID,
@@ -319,7 +314,8 @@ export function getRelationForView(
 export function buildPaneTarget(
   data: Data,
   viewPath: ViewPath,
-  paneStack: ID[]
+  paneStack: ID[],
+  currentItem?: GraphNode
 ): {
   stack: ID[];
   author: PublicKey;
@@ -328,16 +324,25 @@ export function buildPaneTarget(
 } {
   const [itemID] = getRowIDFromView(data, viewPath);
   const effectiveAuthor = getEffectiveAuthor(data, viewPath);
-  const virtualType = getCurrentEdgeForView(data, viewPath)?.virtualType;
+  const currentEdge = currentItem || getCurrentEdgeForView(data, viewPath);
+  const virtualType = currentEdge?.virtualType;
   const currentRelation = getRelationForView(data, viewPath, paneStack);
   const currentReference = getCurrentReferenceForView(
     data,
     viewPath,
     paneStack,
-    virtualType
+    virtualType,
+    currentEdge
   );
   const refInfo = (() => {
     if (!currentReference) {
+      if (isRefNode(currentEdge)) {
+        return getRefLinkTargetInfo(
+          currentEdge.id,
+          data.knowledgeDBs,
+          effectiveAuthor
+        );
+      }
       if (isRefNode(currentRelation)) {
         return getRefLinkTargetInfo(
           currentRelation.id,
@@ -434,23 +439,21 @@ export function getCurrentReferenceForView(
   data: Data,
   viewPath: ViewPath,
   stack: ID[],
-  virtualType?: VirtualType
+  virtualType?: VirtualType,
+  currentItem?: GraphNode
 ): ReferenceRow | undefined {
-  const [itemID] = getRowIDFromView(data, viewPath);
-  const currentEdge = getCurrentEdgeForView(data, viewPath);
+  const currentEdge = currentItem || getCurrentEdgeForView(data, viewPath);
   const currentRelation = getRelationForView(data, viewPath, stack);
-  const isReference =
-    isRefId(itemID) || isRefNode(currentEdge) || isRefNode(currentRelation);
-  if (!isReference) {
+  let referenceID: LongID | undefined;
+  if (isRefNode(currentEdge)) {
+    referenceID = currentEdge.id as LongID;
+  } else if (isRefNode(currentRelation)) {
+    referenceID = currentRelation.id as LongID;
+  }
+  if (!referenceID) {
     return undefined;
   }
-  return buildReferenceItem(
-    itemID as LongID,
-    data,
-    viewPath,
-    stack,
-    virtualType
-  );
+  return buildReferenceItem(referenceID, data, viewPath, stack, virtualType);
 }
 
 export function addRelationsToLastElement(
@@ -458,7 +461,7 @@ export function addRelationsToLastElement(
   relationsID: LongID
 ): ViewPath {
   const last = getLast(path);
-  if (last === relationsID || isConcreteRefId(last)) {
+  if (last === relationsID) {
     return path;
   }
   return [
@@ -693,13 +696,15 @@ export function getDisplayTextForView(
   data: Data,
   viewPath: ViewPath,
   stack: ID[],
-  virtualType?: VirtualType
+  virtualType?: VirtualType,
+  currentItem?: GraphNode
 ): string {
   const reference = getCurrentReferenceForView(
     data,
     viewPath,
     stack,
-    virtualType
+    virtualType,
+    currentItem
   );
   if (reference) {
     return reference.text;
@@ -717,8 +722,9 @@ export function useDisplayText(): string {
   const data = useData();
   const viewPath = useViewPath();
   const stack = usePaneStack();
-  const virtualType = useCurrentEdge()?.virtualType;
-  return getDisplayTextForView(data, viewPath, stack, virtualType);
+  const currentItem = useCurrentEdge();
+  const virtualType = currentItem?.virtualType;
+  return getDisplayTextForView(data, viewPath, stack, virtualType, currentItem);
 }
 
 export function getParentRowID(

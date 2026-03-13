@@ -26,18 +26,16 @@ import {
   isEmptySemanticID,
   getRelationsNoReferencedBy,
   computeEmptyNodeMetadata,
-  isConcreteRefId,
   getConcreteRefTargetRelation,
-  createConcreteRefId,
-  parseConcreteRefId,
-  isRefId,
+  createRefTarget,
   isSearchId,
   ensureRelationNativeFields,
   getRelationContext,
   getRelationSemanticID,
   getRelationText,
+  isRefNode,
 } from "./connections";
-import type { TextSeed } from "./connections";
+import type { RefTargetSeed, TextSeed } from "./connections";
 import {
   getOwnSystemRoot,
   getSystemRoleText,
@@ -311,10 +309,9 @@ function upsertRelationsCore<T extends GraphPlan>(
 
 function addCrefToLog<T extends GraphPlan>(plan: T, relationID: LongID): T {
   const [planWithLog, nodes] = planEnsureSystemRoot(plan, LOG_ROOT_ROLE);
-  const crefId = createConcreteRefId(relationID);
   const updatedRelations = addRelationToRelations(
     nodes,
-    crefId,
+    createRefTarget(relationID),
     undefined,
     undefined,
     0
@@ -338,7 +335,7 @@ export function planUpsertRelations<T extends GraphPlan>(
   return addCrefToLog(basePlan, nodes.id);
 }
 
-export type AddToParentTarget = ID | TextSeed;
+export type AddToParentTarget = ID | TextSeed | RefTargetSeed;
 
 export function planUpdateRelationText(
   plan: Plan,
@@ -592,25 +589,32 @@ export function planAddTargetsToRelation<T extends GraphPlan>(
     [T, ChildPayload[]]
   >(
     ([accPlan, accItems], objectOrID) => {
+      const refTarget =
+        typeof objectOrID !== "string" && "targetID" in objectOrID
+          ? objectOrID
+          : undefined;
       const objectID =
-        typeof objectOrID === "string" ? objectOrID : objectOrID.id;
+        typeof objectOrID === "string"
+          ? objectOrID
+          : "id" in objectOrID
+          ? objectOrID.id
+          : objectOrID.targetID;
       const objectText =
-        typeof objectOrID === "string" ? undefined : objectOrID.text;
+        typeof objectOrID !== "string" && "text" in objectOrID
+          ? objectOrID.text
+          : undefined;
       const localID = shortID(objectID as ID) as ID;
-      if (isConcreteRefId(objectID) || isSearchId(localID)) {
-        const targetID = parseConcreteRefId(objectID as LongID)?.relationID;
-        const refNode = isConcreteRefId(objectID)
+      if (refTarget || isSearchId(localID)) {
+        const refNode = refTarget
           ? newRefNode(
               accPlan.user.publicKey,
               parentRelation.root,
-              getConcreteRefTargetRelation(
-                accPlan.knowledgeDBs,
-                objectID,
-                accPlan.user.publicKey
-              )?.id || (targetID as LongID),
+              refTarget.targetID,
               parentRelation.id,
               relevance,
-              argument
+              argument,
+              undefined,
+              refTarget.linkText
             )
           : ({
               children: List<GraphNode>(),
@@ -1109,7 +1113,12 @@ export function planDeepCopyNode(
     semanticContext: Context;
     relation?: GraphNode;
   } => {
-    if (isConcreteRefId(sourceItemID)) {
+    const sourceNode = getRelationsNoReferencedBy(
+      plan.knowledgeDBs,
+      sourceItemID,
+      plan.user.publicKey
+    );
+    if (isRefNode(sourceNode)) {
       const relation = getConcreteRefTargetRelation(
         plan.knowledgeDBs,
         sourceItemID,
@@ -1386,7 +1395,12 @@ export function planSaveNodeAndEnsureRelations(
     return { plan: resultPlan, viewPath };
   }
 
-  if (isRefId(itemID) || isSearchId(itemID as ID)) {
+  const currentItem = getRelationsNoReferencedBy(
+    plan.knowledgeDBs,
+    itemID,
+    plan.user.publicKey
+  );
+  if ((currentItem && isRefNode(currentItem)) || isSearchId(itemID as ID)) {
     return { plan, viewPath };
   }
 

@@ -4,6 +4,7 @@ import {
   useViewPath,
   updateViewPathsAfterPaneInsert,
   buildPaneTarget,
+  useCurrentEdge,
 } from "../ViewContext";
 import {
   useSplitPanes,
@@ -22,6 +23,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
   const data = useData();
   const isMobile = useMediaQuery(IS_MOBILE);
   const { createPlan, executePlan } = usePlanner();
+  const currentItem = useCurrentEdge();
 
   if (isMobile) {
     return null;
@@ -36,7 +38,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
     );
     executePlan(planUpdateViews(plan, shiftedViews));
 
-    const target = buildPaneTarget(data, viewPath, stack);
+    const target = buildPaneTarget(data, viewPath, stack, currentItem);
     addPaneAt(
       insertIndex,
       target.stack,

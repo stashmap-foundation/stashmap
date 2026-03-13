@@ -4,9 +4,6 @@ import { Set } from "immutable";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
 import {
   splitID,
-  isConcreteRefId,
-  parseConcreteRefId,
-  getConcreteRefTargetRelation,
   getRelationsNoReferencedBy,
   getRelationStack,
 } from "./connections";
@@ -141,28 +138,6 @@ export function addItemToFilters(
   myself: PublicKey,
   includeListQuery: boolean = false
 ): Filters {
-  if (isConcreteRefId(id)) {
-    const parsed = parseConcreteRefId(id);
-    if (parsed) {
-      const withRelation = addRelationIDToFilters(filters, parsed.relationID);
-      const targetRelation = getConcreteRefTargetRelation(
-        knowledgeDBs,
-        id,
-        myself
-      );
-      if (!targetRelation) {
-        return withRelation;
-      }
-      return addItemToFilters(
-        withRelation,
-        targetRelation.text as ID,
-        knowledgeDBs,
-        myself,
-        includeListQuery
-      );
-    }
-  }
-
   const baseFilters = getDocumentSemanticQueryIDs(
     knowledgeDBs,
     myself,

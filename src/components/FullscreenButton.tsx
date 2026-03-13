@@ -27,12 +27,14 @@ export function FullscreenButton(): JSX.Element | null {
   const navigatePane = useNavigatePane();
   const effectiveAuthor = useEffectiveAuthor();
   const relation = useCurrentRelation();
-  const virtualType = useCurrentEdge()?.virtualType;
+  const currentItem = useCurrentEdge();
+  const virtualType = currentItem?.virtualType;
   const currentReference = getCurrentReferenceForView(
     data,
     viewPath,
     stack,
-    virtualType
+    virtualType,
+    currentItem
   );
   const isFullscreenNode = viewPath.length === 2;
   if (isFullscreenNode) {

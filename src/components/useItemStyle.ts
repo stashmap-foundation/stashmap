@@ -1,10 +1,6 @@
 import { CSSProperties } from "react";
-import {
-  useIsViewingOtherUserContent,
-  useCurrentEdge,
-  useCurrentRowID,
-} from "../ViewContext";
-import { isConcreteRefId } from "../connections";
+import { useIsViewingOtherUserContent, useCurrentEdge } from "../ViewContext";
+import { isRefNode } from "../connections";
 import { TYPE_COLORS } from "../constants";
 
 type ItemStyle = {
@@ -52,7 +48,6 @@ function isReferenceVirtualType(virtualType: VirtualType | undefined): boolean {
 export function useItemStyle(): ItemStyle {
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const currentItem = useCurrentEdge();
-  const [itemID] = useCurrentRowID();
   const virtualType = currentItem?.virtualType;
 
   if (virtualType === "suggestion" || isViewingOtherUserContent) {
@@ -77,7 +72,7 @@ export function useItemStyle(): ItemStyle {
   const argument = currentItem?.argument;
   const normalizedRelevance =
     relevance === ("" as string) ? undefined : relevance;
-  const isOutgoingRef = isConcreteRefId(itemID);
+  const isOutgoingRef = isRefNode(currentItem);
 
   return {
     cardStyle: {},

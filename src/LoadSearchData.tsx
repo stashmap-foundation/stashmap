@@ -4,7 +4,6 @@ import {
   isSearchId,
   parseSearchId,
   getSearchRelations,
-  createConcreteRefId,
   buildTextNodesFromRelations,
 } from "./connections";
 import type { TextSeed } from "./connections";
@@ -45,13 +44,14 @@ function SearchCrefBuilder({
     if (deduped.size === 0) {
       return List<ID>();
     }
-    return deduped.map((ref) => createConcreteRefId(ref.relationID));
+    return deduped.map((ref) => ref.relationID as ID);
   });
 
   const searchRelations = getSearchRelations(
     searchId,
     crefItems.toList(),
-    user.publicKey
+    user.publicKey,
+    true
   );
 
   const syntheticDB: KnowledgeData = {

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/immutable-data, functional/no-let */
 import { List, Set, Map } from "immutable";
-import { newRelations } from "./relationFactory";
+import { newRefNode, newRelations } from "./relationFactory";
 import { SEARCH_PREFIX } from "./constants";
 import { getRootAnchorContext, rootAnchorsEqual } from "./rootAnchor";
 
@@ -12,7 +12,23 @@ export type TextSeed = {
   text: string;
 };
 
-const CONCRETE_REF_PREFIX = "cref:";
+export type RefTargetSeed = {
+  targetID: LongID;
+  linkText?: string;
+};
+
+export function createRefTarget(
+  targetID: LongID,
+  linkText?: string
+): RefTargetSeed {
+  return { targetID, linkText };
+}
+
+function isRefTargetSeed(
+  value: ID | TextSeed | RefTargetSeed
+): value is RefTargetSeed {
+  return typeof value === "object" && "targetID" in value;
+}
 
 function createInlineNode(
   parent: GraphNode,
@@ -30,27 +46,6 @@ function createInlineNode(
     root: parent.root,
     relevance,
     argument,
-  };
-}
-
-function createInlineRefNode(
-  parent: GraphNode,
-  targetID: LongID,
-  relevance?: Relevance,
-  argument?: Argument,
-  linkText?: string
-): GraphNode {
-  return {
-    ...createInlineNode(
-      parent,
-      createConcreteRefId(targetID),
-      relevance,
-      argument
-    ),
-    isRef: true,
-    isCref: true,
-    targetID,
-    linkText,
   };
 }
 
@@ -97,16 +92,7 @@ export function isRefNode(
 export function getRefTargetID(
   node: GraphNode | undefined
 ): LongID | undefined {
-  if (!node) {
-    return undefined;
-  }
-  if (node.targetID) {
-    return node.targetID;
-  }
-  if (isConcreteRefId(node.id)) {
-    return parseConcreteRefId(node.id)?.relationID;
-  }
-  return undefined;
+  return node?.targetID;
 }
 
 export function createSemanticID(text: string, id?: ID): ID {
@@ -115,14 +101,6 @@ export function createSemanticID(text: string, id?: ID): ID {
 
 export function semanticIDFromSeed(seed: string): ID {
   return seed as ID;
-}
-
-export function isRefId(id: ID): boolean {
-  return id.startsWith(CONCRETE_REF_PREFIX);
-}
-
-export function isConcreteRefId(id: ID): boolean {
-  return id.startsWith(CONCRETE_REF_PREFIX);
 }
 
 export function isSearchId(id: ID): boolean {
@@ -140,33 +118,20 @@ export function parseSearchId(id: ID): string | undefined {
   return id.slice(SEARCH_PREFIX.length);
 }
 
-export function createConcreteRefId(relationID: LongID): LongID {
-  return `${CONCRETE_REF_PREFIX}${relationID}` as LongID;
-}
-
-export function parseConcreteRefId(
-  refId: ID
-): { relationID: LongID } | undefined {
-  if (!isConcreteRefId(refId)) {
-    return undefined;
-  }
-  return { relationID: refId.slice(CONCRETE_REF_PREFIX.length) as LongID };
-}
-
 export function getConcreteRefTargetRelation(
   knowledgeDBs: KnowledgeDBs,
   refId: ID,
   myself: PublicKey
 ): GraphNode | undefined {
-  const parsed = parseConcreteRefId(refId);
-  if (parsed) {
-    return getRelationsNoReferencedBy(knowledgeDBs, parsed.relationID, myself);
+  const refOrRelation = getRelationsNoReferencedBy(knowledgeDBs, refId, myself);
+  if (isRefNode(refOrRelation)) {
+    return getRelationsNoReferencedBy(
+      knowledgeDBs,
+      refOrRelation.targetID,
+      myself
+    );
   }
-  const refNode = findEmbeddedNodeById(knowledgeDBs, refId);
-  const targetID = getRefTargetID(refNode);
-  return targetID
-    ? getRelationsNoReferencedBy(knowledgeDBs, targetID, myself)
-    : undefined;
+  return refOrRelation;
 }
 
 export function splitID(id: ID): [PublicKey | undefined, string] {
@@ -188,7 +153,7 @@ export function shortID(id: ID): string {
   if (!id) {
     return "";
   }
-  if (isSearchId(id) || isConcreteRefId(id)) {
+  if (isSearchId(id)) {
     return id;
   }
   return splitID(id)[1];
@@ -590,22 +555,35 @@ export function ensureRelationNativeFields(
 export function getSearchRelations(
   searchId: ID,
   foundNodeIDs: List<ID>,
-  myself: PublicKey
+  myself: PublicKey,
+  asRefs: boolean = false
 ): GraphNode {
   const rel = newRelations("", List<ID>(), myself);
   const uniqueNodeIDs = foundNodeIDs.toSet().toList();
   const children = uniqueNodeIDs.map(
-    (semanticID): GraphNode => ({
-      children: List<GraphNode>(),
-      id: semanticID,
-      text: "",
-      parent: rel.id as LongID,
-      updated: rel.updated,
-      author: rel.author,
-      root: rel.root,
-      relevance: undefined,
-      virtualType: "search",
-    })
+    (semanticID): GraphNode =>
+      asRefs
+        ? {
+            ...newRefNode(
+              rel.author,
+              searchId as LongID,
+              semanticID as LongID,
+              searchId as LongID
+            ),
+            updated: rel.updated,
+            virtualType: "search",
+          }
+        : {
+            children: List<GraphNode>(),
+            id: semanticID,
+            text: "",
+            parent: rel.id as LongID,
+            updated: rel.updated,
+            author: rel.author,
+            root: rel.root,
+            relevance: undefined,
+            virtualType: "search",
+          }
   );
   return { ...rel, id: searchId as LongID, children };
 }
@@ -615,16 +593,6 @@ export function getRelations(
   relationID: ID | undefined,
   myself: PublicKey
 ): GraphNode | undefined {
-  if (relationID && isConcreteRefId(relationID)) {
-    const parsed = parseConcreteRefId(relationID);
-    if (parsed) {
-      return getRelationsNoReferencedBy(
-        knowledgeDBs,
-        parsed.relationID,
-        myself
-      );
-    }
-  }
   return getRelationsNoReferencedBy(knowledgeDBs, relationID, myself);
 }
 
@@ -908,17 +876,21 @@ export function countRelevanceVoting(
 
 export function addRelationToRelations(
   nodes: GraphNode,
-  objectID: ID,
+  objectID: ID | RefTargetSeed,
   relevance?: Relevance,
   argument?: Argument,
   ord?: number
 ): GraphNode {
-  const newItem = isConcreteRefId(objectID)
-    ? createInlineRefNode(
-        nodes,
-        parseConcreteRefId(objectID)?.relationID ?? (objectID as LongID),
+  const newItem = isRefTargetSeed(objectID)
+    ? newRefNode(
+        nodes.author,
+        nodes.root as LongID,
+        objectID.targetID,
+        nodes.id as LongID,
         relevance,
-        argument
+        argument,
+        undefined,
+        objectID.linkText
       )
     : createInlineNode(nodes, objectID, relevance, argument);
   const defaultOrder = nodes.children.size;
@@ -934,7 +906,7 @@ export function addRelationToRelations(
 
 export function bulkAddRelations(
   nodes: GraphNode,
-  objectIDs: Array<ID>,
+  objectIDs: Array<ID | RefTargetSeed>,
   relevance?: Relevance,
   argument?: Argument,
   startPos?: number

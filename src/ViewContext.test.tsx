@@ -7,7 +7,6 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Map } from "immutable";
-import { createConcreteRefId } from "./connections";
 import {
   ALICE,
   setup,
@@ -192,31 +191,15 @@ test("Parse View path", () => {
   expect(parseViewPath("p1:root:pl:oop")).toEqual([1, "root", "pl", "oop"]);
 });
 
-test("View path roundtrip preserves concrete ref IDs", () => {
-  const refId = createConcreteRefId(
-    "alice_550e8400-e29b-41d4-a716-446655440000" as LongID
-  );
-  expect(refId).toBe("cref:alice_550e8400-e29b-41d4-a716-446655440000");
-
-  const viewPath: ViewPath = [0, "rel1" as LongID, refId];
+test("View path roundtrip preserves relation IDs", () => {
+  const relationId = "alice_550e8400-e29b-41d4-a716-446655440000" as LongID;
+  const viewPath: ViewPath = [0, "rel1" as LongID, relationId];
 
   const serialized = viewPathToString(viewPath);
   const parsed = parseViewPath(serialized);
 
   expect(parsed).toEqual(viewPath);
-  expect(parsed[2]).toBe("cref:alice_550e8400-e29b-41d4-a716-446655440000");
-});
-
-test("View path roundtrip preserves concrete ref IDs in middle of path", () => {
-  const refId = createConcreteRefId("someRelation" as LongID);
-
-  const viewPath: ViewPath = [1, refId, "child" as LongID];
-
-  const serialized = viewPathToString(viewPath);
-  const parsed = parseViewPath(serialized);
-
-  expect(parsed).toEqual(viewPath);
-  expect(parsed[1]).toBe("cref:someRelation");
+  expect(parsed[2]).toBe(relationId);
 });
 
 test("View doesn't change if list is forked from contact", async () => {

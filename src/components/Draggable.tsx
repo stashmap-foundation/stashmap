@@ -183,7 +183,7 @@ function DraggableSuggestion({
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const path = useViewPath();
-  const [itemID] = useCurrentRowID();
+  const currentItem = useCurrentEdge();
   const relation = useCurrentRelation();
   const displayText = useDisplayText();
 
@@ -196,7 +196,7 @@ function DraggableSuggestion({
         text: displayText,
         isSuggestion: true,
         nodeId: relation?.id,
-        targetId: relation ? getRefTargetID(relation) : undefined,
+        targetId: getRefTargetID(currentItem) || undefined,
       };
     },
     collect: (monitor) => ({
@@ -238,7 +238,7 @@ function DraggableSuggestion({
       data-view-key={rowViewKey}
       data-row-index={rowIndex}
       data-row-depth={rowDepth}
-      data-node-id={itemID}
+      data-node-id={currentItem?.id || relation?.id}
       data-node-text={displayText}
       data-node-mutable={isEditableRelation(relation) ? "true" : "false"}
       data-selected={isSelected ? "true" : undefined}

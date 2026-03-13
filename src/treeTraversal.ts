@@ -13,13 +13,13 @@ import {
   viewPathToString,
 } from "./ViewContext";
 import {
-  isConcreteRefId,
   isSearchId,
   getRelations,
   itemPassesFilters,
   getRelationContext,
   getRelationSemanticID,
   getConcreteRefTargetRelation,
+  getRefTargetID,
   isRefNode,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
@@ -47,9 +47,10 @@ const EMPTY_FIRST_VIRTUAL_KEYS: ImmutableSet<string> = ImmutableSet<string>();
 function getChildrenForConcreteRef(
   data: Data,
   parentPath: ViewPath,
-  parentItemID: ID
+  parentItemID: ID,
+  currentItem?: GraphNode
 ): TreeResult {
-  const refNode = getCurrentEdgeForView(data, parentPath);
+  const refNode = currentItem || getCurrentEdgeForView(data, parentPath);
   const sourceRelation =
     refNode && isRefNode(refNode)
       ? getConcreteRefTargetRelation(
@@ -188,32 +189,64 @@ function getChildrenForRegularNode(
         coveredCandidateIDs: ImmutableSet<string>(),
       };
 
+  const createVirtualItem = (
+    itemID: ID,
+    virtualType: VirtualType
+  ): GraphNode => {
+    const resolvedItem =
+      virtualType === "suggestion"
+        ? getRelations(data.knowledgeDBs, itemID, data.user.publicKey)
+        : undefined;
+    const suggestionTargetID =
+      resolvedItem && isRefNode(resolvedItem)
+        ? getRefTargetID(resolvedItem)
+        : undefined;
+    const targetID =
+      virtualType === "incoming" ||
+      virtualType === "occurrence" ||
+      virtualType === "version"
+        ? (itemID as LongID)
+        : suggestionTargetID;
+    return {
+      children: List<GraphNode>(),
+      id: (targetID || itemID) as ID,
+      text: resolvedItem?.text || "",
+      parent: relationId,
+      updated: resolvedItem?.updated ?? nodes?.updated ?? Date.now(),
+      author: resolvedItem?.author ?? nodes?.author ?? data.user.publicKey,
+      root: nodes?.root ?? relationId,
+      relevance: resolvedItem?.relevance,
+      argument: resolvedItem?.argument,
+      virtualType,
+      ...(targetID
+        ? {
+            isRef: true,
+            isCref: true,
+            targetID,
+            linkText: resolvedItem?.linkText,
+          }
+        : {}),
+    };
+  };
+
   const addVirtualItems = (
     acc: { paths: List<ViewPath>; virtualItems: VirtualItemsMap },
     children: List<ID>,
     virtualType: VirtualType
   ): { paths: List<ViewPath>; virtualItems: VirtualItemsMap } =>
     children.reduce((result, itemID) => {
+      const virtualItem = createVirtualItem(itemID, virtualType);
       const pathWithRelations = addRelationsToLastElement(
         parentPath,
         relationId
       );
-      const path = [...pathWithRelations, itemID] as ViewPath;
-      const isCref = isConcreteRefId(itemID as LongID);
+      const path = [...pathWithRelations, virtualItem.id] as ViewPath;
       return {
         paths: result.paths.push(path),
-        virtualItems: result.virtualItems.set(viewPathToString(path), {
-          children: List<GraphNode>(),
-          id: itemID,
-          text: "",
-          parent: relationId,
-          updated: nodes?.updated ?? Date.now(),
-          author: nodes?.author ?? data.user.publicKey,
-          root: nodes?.root ?? relationId,
-          relevance: undefined as Relevance,
-          virtualType,
-          ...(isCref ? { isCref: true } : {}),
-        }),
+        virtualItems: result.virtualItems.set(
+          viewPathToString(path),
+          virtualItem
+        ),
       };
     }, acc);
 
@@ -268,13 +301,21 @@ export function getChildNodes(
   rootRelation: LongID | undefined,
   author: PublicKey,
   typeFilters: Pane["typeFilters"],
-  options?: TreeTraversalOptions
+  options?: TreeTraversalOptions,
+  virtualItems: VirtualItemsMap = EMPTY_VIRTUAL_ITEMS
 ): TreeResult {
   const [parentItemID] = getRowIDFromView(data, parentPath);
-  const currentEdge = getCurrentEdgeForView(data, parentPath);
+  const currentEdge =
+    virtualItems.get(viewPathToString(parentPath)) ||
+    getCurrentEdgeForView(data, parentPath);
 
-  if (isConcreteRefId(parentItemID) || isRefNode(currentEdge)) {
-    return getChildrenForConcreteRef(data, parentPath, parentItemID);
+  if (isRefNode(currentEdge)) {
+    return getChildrenForConcreteRef(
+      data,
+      parentPath,
+      parentItemID,
+      currentEdge
+    );
   }
 
   return getChildrenForRegularNode(
@@ -297,7 +338,8 @@ export function getNodesInTree(
   rootRelation: LongID | undefined,
   author: PublicKey,
   typeFilters: Pane["typeFilters"],
-  options?: TreeTraversalOptions
+  options?: TreeTraversalOptions,
+  virtualItems: VirtualItemsMap = EMPTY_VIRTUAL_ITEMS
 ): TreeResult {
   const childResult = getChildNodes(
     data,
@@ -306,7 +348,8 @@ export function getNodesInTree(
     rootRelation,
     author,
     typeFilters,
-    options
+    options,
+    virtualItems
   );
 
   return childResult.paths.reduce(
@@ -314,10 +357,11 @@ export function getNodesInTree(
       const [, childView] = getRowIDFromView(data, childPath);
       const withChild = result.paths.push(childPath);
 
-      const [childItemID] = getRowIDFromView(data, childPath);
-      const childEdge = getCurrentEdgeForView(data, childPath);
+      const childEdge =
+        result.virtualItems.get(viewPathToString(childPath)) ||
+        getCurrentEdgeForView(data, childPath);
       const shouldRecurse = options?.isMarkdownExport
-        ? !(isConcreteRefId(childItemID) || isRefNode(childEdge))
+        ? !isRefNode(childEdge)
         : childView.expanded;
       if (shouldRecurse) {
         const sub = getNodesInTree(
@@ -328,7 +372,8 @@ export function getNodesInTree(
           rootRelation,
           author,
           typeFilters,
-          options
+          options,
+          result.virtualItems
         );
         return {
           paths: sub.paths,

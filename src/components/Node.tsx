@@ -28,9 +28,9 @@ import {
   getRefLinkTargetInfo,
   getRefTargetInfo,
   isEmptySemanticID,
-  isConcreteRefId,
   computeEmptyNodeMetadata,
   getConcreteRefTargetRelation,
+  isRefNode,
 } from "../connections";
 import { ReferenceDisplay } from "./referenceDisplay";
 import { IS_MOBILE } from "./responsive";
@@ -74,7 +74,7 @@ function useNodeHasChildren(): boolean {
   const viewPath = useViewPath();
   const stack = usePaneStack();
   const pane = useCurrentPane();
-  const [itemID] = useCurrentRowID();
+  const currentItem = useCurrentEdge();
   const currentRelation = useCurrentRelation();
   const effectiveAuthor = useEffectiveAuthor();
 
@@ -84,10 +84,10 @@ function useNodeHasChildren(): boolean {
     }
   }
 
-  if (isConcreteRefId(itemID)) {
+  if (currentItem && isRefNode(currentItem)) {
     const targetRelation = getConcreteRefTargetRelation(
       data.knowledgeDBs,
-      itemID,
+      currentItem.id,
       effectiveAuthor
     );
     if (targetRelation?.children.size) {
@@ -215,12 +215,14 @@ function NodeContent(): JSX.Element {
   const data = useData();
   const viewPath = useViewPath();
   const stack = usePaneStack();
-  const virtualType = useCurrentEdge()?.virtualType;
+  const currentItem = useCurrentEdge();
+  const virtualType = currentItem?.virtualType;
   const reference = getCurrentReferenceForView(
     data,
     viewPath,
     stack,
-    virtualType
+    virtualType,
+    currentItem
   );
   const displayText = useDisplayText();
 
@@ -531,14 +533,16 @@ function InteractiveNodeContent(): JSX.Element {
   const isLoading = useNodeIsLoading();
   const isInSearchView = useIsInSearchView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
-  const virtualType = useCurrentEdge()?.virtualType;
+  const currentItem = useCurrentEdge();
+  const virtualType = currentItem?.virtualType;
   const isEmptyNode = isEmptySemanticID(itemID);
   const displayText = useDisplayText();
   const reference = getCurrentReferenceForView(
     data,
     viewPath,
     stack,
-    virtualType
+    virtualType,
+    currentItem
   );
 
   const isReadonly =
@@ -577,8 +581,15 @@ function NodeAutoLink({
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();
   const effectiveAuthor = useEffectiveAuthor();
-  const virtualType = useCurrentEdge()?.virtualType;
-  const node = getCurrentReferenceForView(data, viewPath, stack, virtualType);
+  const currentItem = useCurrentEdge();
+  const virtualType = currentItem?.virtualType;
+  const node = getCurrentReferenceForView(
+    data,
+    viewPath,
+    stack,
+    virtualType,
+    currentItem
+  );
 
   if (node) {
     const refInfo =
@@ -731,14 +742,20 @@ export function Node({
   const clsBody = cardBodyClassName || "ps-0";
 
   const { user } = useData();
-  const [itemID] = useCurrentRowID();
   const data = useData();
   const stack = usePaneStack();
-  const isConcreteRef = isConcreteRefId(itemID);
-  const virtualType = useCurrentEdge()?.virtualType;
+  const currentItem = useCurrentEdge();
+  const isConcreteRef = isRefNode(currentItem);
+  const virtualType = currentItem?.virtualType;
   const currentRelation = useCurrentRelation();
   const isViewingOtherUser = useIsViewingOtherUserContent();
-  const node = getCurrentReferenceForView(data, viewPath, stack, virtualType);
+  const node = getCurrentReferenceForView(
+    data,
+    viewPath,
+    stack,
+    virtualType,
+    currentItem
+  );
   const userEntryPublicKey = getRelationUserPublicKey(currentRelation);
   const isFollowingUserEntry =
     !!userEntryPublicKey && data.contacts.has(userEntryPublicKey);

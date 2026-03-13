@@ -3,7 +3,6 @@ import {
   getConcreteRefTargetRelation,
   getRelationsNoReferencedBy,
   getRefTargetID,
-  isConcreteRefId,
   isRefNode,
   shortID,
   splitID,
@@ -66,30 +65,18 @@ export function parseRef(
   myself: PublicKey
 ): ParsedRef | undefined {
   const sourceItem = getRelationsNoReferencedBy(knowledgeDBs, refId, myself);
-  if (isRefNode(sourceItem)) {
-    const relation = getConcreteRefTargetRelation(knowledgeDBs, refId, myself);
-    if (!relation) return undefined;
-
-    const relationContext = getRelationContext(knowledgeDBs, relation).map(
-      (id) => shortID(id) as ID
-    );
-
-    return { relation, relationContext, sourceItem };
-  }
-
-  if (!isConcreteRefId(refId)) {
+  const relation = isRefNode(sourceItem)
+    ? getConcreteRefTargetRelation(knowledgeDBs, refId, myself)
+    : sourceItem;
+  if (!relation) {
     return undefined;
   }
-
-  const relation = getConcreteRefTargetRelation(knowledgeDBs, refId, myself);
-  if (!relation) return undefined;
-  const parsedSource = sourceItem || relation;
 
   const relationContext = getRelationContext(knowledgeDBs, relation).map(
     (id) => shortID(id) as ID
   );
 
-  return { relation, relationContext, sourceItem: parsedSource };
+  return { relation, relationContext, sourceItem: sourceItem || relation };
 }
 
 function resolveLabels(

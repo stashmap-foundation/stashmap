@@ -4,11 +4,8 @@ import { DndProvider, useDragLayer, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import {
   moveRelations,
-  createConcreteRefId,
-  getConcreteRefTargetRelation,
-  getRelationsNoReferencedBy,
+  createRefTarget,
   getRefTargetID,
-  isRefId,
   isRefNode,
 } from "./connections";
 import {
@@ -24,7 +21,6 @@ import {
   getPaneIndex,
   viewPathToString,
   getCurrentEdgeForView,
-  getCurrentReferenceForView,
 } from "./ViewContext";
 import { getNodesInTree } from "./components/Node";
 import {
@@ -269,6 +265,26 @@ export function dnd(
   const reorder =
     isSamePane && !skipMoveLogic && sameRelation && dropIndex !== undefined;
 
+  const addProjectedSourceAsReference = (
+    accPlan: Plan,
+    sourcePath: ViewPath,
+    insertAt: number
+  ): Plan => {
+    const [sourceItemID] = getRowIDFromView(accPlan, sourcePath);
+    const sourceStack = getPane(accPlan, sourcePath).stack;
+    const sourceRelation = getRelationForView(accPlan, sourcePath, sourceStack);
+    return planAddToParent(
+      accPlan,
+      createRefTarget(
+        sourceRelation?.id || (sourceItemID as LongID),
+        sourceRelation?.linkText
+      ),
+      toView,
+      stack,
+      insertAt
+    )[0];
+  };
+
   if (reorder) {
     const realSources = independentSources.filter(
       (n) => getRelationIndex(plan, parseViewPath(n)) !== undefined
@@ -294,15 +310,8 @@ export function dnd(
       .toList()
       .reduce((accPlan: Plan, s: string, idx: number) => {
         const sourcePath = parseViewPath(s);
-        const [sourceItemID] = getRowIDFromView(accPlan, sourcePath);
         const insertAt = dropIndex + sourceIndices.size + idx;
-        return planAddToParent(
-          accPlan,
-          sourceItemID,
-          toView,
-          stack,
-          insertAt
-        )[0];
+        return addProjectedSourceAsReference(accPlan, sourcePath, insertAt);
       }, reorderedPlan);
   }
 
@@ -321,7 +330,13 @@ export function dnd(
     if (isDropIntoOwnDescendant) {
       return plan;
     }
-    return independentSources
+    const realSources = independentSources.filter(
+      (n) => getRelationIndex(plan, parseViewPath(n)) !== undefined
+    );
+    const virtualSources = independentSources.filter(
+      (n) => getRelationIndex(plan, parseViewPath(n)) === undefined
+    );
+    const movedPlan = realSources
       .toList()
       .reduce((accPlan: Plan, s: string, idx: number) => {
         const sourcePath = parseViewPath(s);
@@ -334,6 +349,13 @@ export function dnd(
           insertAt
         );
       }, plan);
+    return virtualSources
+      .toList()
+      .reduce((accPlan: Plan, s: string, idx: number) => {
+        const sourcePath = parseViewPath(s);
+        const insertAt = dropIndex + realSources.size + idx;
+        return addProjectedSourceAsReference(accPlan, sourcePath, insertAt);
+      }, movedPlan);
   }
 
   const [, toViewData] = getRowIDFromView(plan, toView);
@@ -349,23 +371,35 @@ export function dnd(
     if (isSuggestion) {
       return !!invertCopyMode;
     }
-    const sourceIsReference =
-      isRefId(sourceItemID) || isRefNode(sourceRelation);
+    if (isCopyDrag) {
+      return true;
+    }
+    const sourceIsReference = isRefNode(sourceRelation);
     if (sourceIsReference) {
       return true;
     }
     return !!invertCopyMode;
   };
 
-  const toReferenceID = (sourceItemID: ID, sourceRelation: GraphNode): ID => {
-    const sourceRefTargetID = getRefTargetID(sourceRelation);
-    if (sourceRefTargetID) {
-      return createConcreteRefId(sourceRefTargetID);
+  const toReferenceTarget = (
+    sourceRelation: GraphNode
+  ): ReturnType<typeof createRefTarget> =>
+    createRefTarget(
+      getRefTargetID(sourceRelation) || sourceRelation.id,
+      sourceRelation.linkText
+    );
+
+  const getSuggestionTargetID = (
+    isPrimarySource: boolean,
+    sourceRelation?: GraphNode
+  ): LongID | undefined => {
+    if (isPrimarySource) {
+      return sourceDrag.targetId || sourceDrag.nodeId;
     }
-    if (isRefId(sourceItemID)) {
-      return sourceItemID;
+    if (sourceRelation) {
+      return getRefTargetID(sourceRelation) || sourceRelation.id;
     }
-    return createConcreteRefId(sourceRelation.id);
+    return undefined;
   };
 
   return independentSources
@@ -382,42 +416,15 @@ export function dnd(
       const insertAt = dropIndex !== undefined ? dropIndex + idx : undefined;
 
       if (shouldCreateReference(sourceItemID, sourceRelation)) {
-        if (isRefId(sourceItemID)) {
-          return planAddToParent(
-            accPlan,
-            sourceItemID,
-            toView,
-            stack,
-            insertAt
-          )[0];
-        }
         if (isSuggestion) {
-          const sourceTargetRelation =
-            s === source && (sourceDrag.targetId || sourceDrag.nodeId)
-              ? getRelationsNoReferencedBy(
-                  accPlan.knowledgeDBs,
-                  (sourceDrag.targetId || sourceDrag.nodeId) as LongID,
-                  accPlan.user.publicKey
-                )
-              : (() => {
-                  const sourceReference = getCurrentReferenceForView(
-                    accPlan,
-                    sourcePath,
-                    sourceStack,
-                    "suggestion"
-                  );
-                  return sourceReference
-                    ? getConcreteRefTargetRelation(
-                        accPlan.knowledgeDBs,
-                        sourceReference.id,
-                        accPlan.user.publicKey
-                      )
-                    : undefined;
-                })();
-          if (sourceTargetRelation) {
+          const sourceTargetID = getSuggestionTargetID(
+            s === source,
+            sourceRelation
+          );
+          if (sourceTargetID) {
             return planAddToParent(
               accPlan,
-              createConcreteRefId(sourceTargetRelation.id),
+              createRefTarget(sourceTargetID),
               toView,
               stack,
               insertAt
@@ -427,7 +434,7 @@ export function dnd(
         if (sourceRelation) {
           return planAddToParent(
             accPlan,
-            toReferenceID(sourceItemID, sourceRelation),
+            toReferenceTarget(sourceRelation),
             toView,
             stack,
             insertAt,
@@ -448,7 +455,7 @@ export function dnd(
         )!;
         return planAddToParent(
           planWithRelation,
-          toReferenceID(sourceItemID, sourceRelationWithUpsert),
+          toReferenceTarget(sourceRelationWithUpsert),
           toView,
           stack,
           insertAt,

@@ -1,9 +1,9 @@
 import {
-  createConcreteRefId,
-  isConcreteRefId,
+  createRefTarget,
   isEmptySemanticID,
   getRelationsNoReferencedBy,
-  parseConcreteRefId,
+  getRefTargetID,
+  isRefNode,
 } from "./connections";
 import { planUpdateRelationItemMetadataById } from "./dataPlanner";
 import { RelationItemMetadata } from "./relationItemMetadata";
@@ -80,7 +80,7 @@ export function planUpdateViewItemMetadata(
     if (!virtualItem) {
       return plan;
     }
-    if (virtualItem.virtualType === "suggestion" && !virtualItem.isCref) {
+    if (virtualItem.virtualType === "suggestion" && !isRefNode(virtualItem)) {
       return planDeepCopyNode(
         plan,
         viewPath,
@@ -91,20 +91,22 @@ export function planUpdateViewItemMetadata(
         metadata.argument
       )[0];
     }
-    const targetItemID =
-      virtualItem.virtualType === "occurrence" && !isConcreteRefId(itemID)
-        ? createConcreteRefId(itemID as LongID)
-        : itemID;
-    const inheritedSourceRelation = isConcreteRefId(targetItemID)
+    const targetID =
+      getRefTargetID(virtualItem) ||
+      (virtualItem.virtualType === "occurrence"
+        ? (itemID as LongID)
+        : undefined);
+    const targetItem = targetID ? createRefTarget(targetID) : itemID;
+    const inheritedSourceRelation = targetID
       ? getRelationsNoReferencedBy(
           plan.knowledgeDBs,
-          parseConcreteRefId(targetItemID)?.relationID,
+          targetID,
           plan.user.publicKey
         )
       : undefined;
     return planAddToParent(
       plan,
-      targetItemID,
+      targetItem,
       parentView,
       stack,
       undefined,

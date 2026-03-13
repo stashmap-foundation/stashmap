@@ -22,7 +22,6 @@ import {
 } from "./headlessPlan";
 import { GraphPlan } from "../planner";
 import {
-  isConcreteRefId,
   isSearchId,
   isRefNode,
   joinID,
@@ -53,7 +52,7 @@ function resolveOwnWriteId(
   pubkey: PublicKey,
   id: ID | undefined
 ): ID | undefined {
-  if (!id || isConcreteRefId(id) || isSearchId(id as ID) || id.includes("_")) {
+  if (!id || isSearchId(id as ID) || id.includes("_")) {
     return id;
   }
   return UUID_RE.test(id) ? joinID(pubkey, id) : id;

@@ -3,13 +3,9 @@ import {
   EMPTY_SEMANTIC_ID,
   shortID,
   splitID,
-  isRefId,
   isSearchId,
   parseSearchId,
-  isConcreteRefId,
-  parseConcreteRefId,
   itemMatchesType,
-  createConcreteRefId,
   itemPassesFilters,
   getRelationItemSemanticID,
   getRelationContext,
@@ -62,7 +58,7 @@ function getRelationsForSemanticID(
   semanticID: ID,
   author: PublicKey
 ): GraphNode[] {
-  if (isRefId(semanticID) || isSearchId(semanticID as ID)) {
+  if (isSearchId(semanticID as ID)) {
     return [];
   }
 
@@ -72,6 +68,9 @@ function getRelationsForSemanticID(
     author
   );
   if (directRelation) {
+    if (isRefNode(directRelation)) {
+      return [];
+    }
     return [directRelation];
   }
 
@@ -131,10 +130,6 @@ export function getTextForSemanticID(
   semanticID: ID,
   author: PublicKey
 ): string | undefined {
-  if (isRefId(semanticID)) {
-    return undefined;
-  }
-
   const localID = shortID(semanticID as ID) as ID;
   if (isSearchId(localID)) {
     return parseSearchId(localID) || "";
@@ -146,6 +141,9 @@ export function getTextForSemanticID(
     author
   );
   if (directRelation) {
+    if (isRefNode(directRelation)) {
+      return undefined;
+    }
     return getRelationText(directRelation);
   }
 
@@ -534,7 +532,7 @@ export function getOccurrencesForNode(
     .toList();
   return deduped
     .sortBy((ref) => `${-ref.updated}:${ref.context.join(":")}`)
-    .map((ref) => createConcreteRefId(ref.relationID))
+    .map((ref) => ref.relationID)
     .toList();
 }
 
@@ -597,7 +595,7 @@ export function getIncomingCrefsForNode(
         !covered.has(getRefContextKey(knowledgeDBs, ref, effectiveAuthor))
     )
     .sortBy((ref) => `${-ref.updated}:${ref.context.join(":")}`)
-    .map((ref) => createConcreteRefId(ref.relationID))
+    .map((ref) => ref.relationID)
     .toList();
 }
 
@@ -606,34 +604,7 @@ function getComparableSuggestionKey(
   itemSemanticID: ID,
   fallbackAuthor: PublicKey
 ): string {
-  if (!isConcreteRefId(itemSemanticID)) {
-    return getSemanticNodeKey(knowledgeDBs, itemSemanticID, fallbackAuthor);
-  }
-
-  const parsed = parseConcreteRefId(itemSemanticID);
-  if (!parsed) {
-    return shortID(itemSemanticID as ID);
-  }
-
-  const relation = getRelationsNoReferencedBy(
-    knowledgeDBs,
-    parsed.relationID,
-    fallbackAuthor
-  );
-  const targetRelation = getConcreteRefTargetRelation(
-    knowledgeDBs,
-    itemSemanticID,
-    fallbackAuthor
-  );
-  if (!relation || !targetRelation) {
-    return shortID(itemSemanticID as ID);
-  }
-
-  return getSemanticNodeKey(
-    knowledgeDBs,
-    getRelationSemanticID(targetRelation),
-    targetRelation.author
-  );
+  return getSemanticNodeKey(knowledgeDBs, itemSemanticID, fallbackAuthor);
 }
 
 export type SuggestionsResult = {
@@ -964,6 +935,6 @@ export function getVersionsForRelation(
       );
     })
     .sortBy((r) => -r.updated)
-    .map((r) => createConcreteRefId(r.id))
+    .map((r) => r.id)
     .toList();
 }

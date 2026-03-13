@@ -1,8 +1,8 @@
 import React from "react";
 import {
+  getConcreteRefTargetRelation,
   getRelationsNoReferencedBy,
-  isConcreteRefId,
-  parseConcreteRefId,
+  isRefNode,
   splitID,
 } from "../connections";
 import { useData } from "../DataContext";
@@ -16,19 +16,17 @@ export function ReferenceIndicators({
   refId: ID;
 }): JSX.Element | null {
   const { knowledgeDBs, user } = useData();
-
-  if (!isConcreteRefId(refId)) {
-    return null;
-  }
-
-  const parsed = parseConcreteRefId(refId);
-  if (!parsed) {
-    return null;
-  }
-
-  const relation = getRelationsNoReferencedBy(
+  const sourceItem = getRelationsNoReferencedBy(
     knowledgeDBs,
-    parsed.relationID,
+    refId,
+    user.publicKey
+  );
+  if (!isRefNode(sourceItem)) {
+    return null;
+  }
+  const relation = getConcreteRefTargetRelation(
+    knowledgeDBs,
+    refId,
     user.publicKey
   );
   if (!relation) {

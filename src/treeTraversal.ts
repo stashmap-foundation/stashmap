@@ -7,6 +7,7 @@ import {
   getRowIDFromView,
   getContext,
   getRelationForView,
+  getCurrentEdgeForView,
   getEffectiveAuthor,
   getParentRelation,
   viewPathToString,
@@ -18,6 +19,8 @@ import {
   itemPassesFilters,
   getRelationContext,
   getRelationSemanticID,
+  getConcreteRefTargetRelation,
+  isRefNode,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
 import { buildOutgoingReference } from "./buildReferenceRow";
@@ -38,20 +41,24 @@ export type TreeTraversalOptions = {
   isMarkdownExport?: boolean;
 };
 
-const EMPTY_VIRTUAL_ITEMS: VirtualItemsMap = Map<string, RelationItem>();
+const EMPTY_VIRTUAL_ITEMS: VirtualItemsMap = Map<string, GraphNode>();
 const EMPTY_FIRST_VIRTUAL_KEYS: ImmutableSet<string> = ImmutableSet<string>();
 
 function getChildrenForConcreteRef(
   data: Data,
   parentPath: ViewPath,
-  parentItemID: LongID | ID
+  parentItemID: ID
 ): TreeResult {
-  const sourceRelation = getRelations(
-    data.knowledgeDBs,
-    parentItemID,
-    data.user.publicKey
-  );
-  if (!sourceRelation || sourceRelation.items.size === 0) {
+  const refNode = getCurrentEdgeForView(data, parentPath);
+  const sourceRelation =
+    refNode && isRefNode(refNode)
+      ? getConcreteRefTargetRelation(
+          data.knowledgeDBs,
+          refNode.id,
+          data.user.publicKey
+        )
+      : getRelations(data.knowledgeDBs, parentItemID, data.user.publicKey);
+  if (!sourceRelation || sourceRelation.children.size === 0) {
     return {
       paths: List(),
       virtualItems: EMPTY_VIRTUAL_ITEMS,
@@ -60,7 +67,7 @@ function getChildrenForConcreteRef(
   }
 
   return {
-    paths: sourceRelation.items
+    paths: sourceRelation.children
       .map((_, i) => addNodeToPathWithRelations(parentPath, sourceRelation, i))
       .toList(),
     virtualItems: EMPTY_VIRTUAL_ITEMS,
@@ -71,7 +78,7 @@ function getChildrenForConcreteRef(
 function getChildrenForRegularNode(
   data: Data,
   parentPath: ViewPath,
-  parentItemID: LongID | ID,
+  parentItemID: ID,
   stack: ID[],
   rootRelation: LongID | undefined,
   author: PublicKey,
@@ -85,24 +92,24 @@ function getChildrenForRegularNode(
   const directRelations = isSearchId(parentItemID as ID)
     ? getRelations(data.knowledgeDBs, parentItemID as ID, data.user.publicKey)
     : getRelationForView(data, parentPath, stack);
-  const relations = directRelations;
-  const relationSemanticID = relations
-    ? getRelationSemanticID(relations)
+  const nodes = directRelations;
+  const relationSemanticID = nodes
+    ? getRelationSemanticID(nodes)
     : parentItemID;
-  const coordinateSemanticID = relations ? relationSemanticID : parentItemID;
-  const coordinateContext = relations
-    ? getRelationContext(data.knowledgeDBs, relations)
+  const coordinateSemanticID = nodes ? relationSemanticID : parentItemID;
+  const coordinateContext = nodes
+    ? getRelationContext(data.knowledgeDBs, nodes)
     : context;
 
-  const relationPaths = relations
-    ? relations.items
+  const relationPaths = nodes
+    ? nodes.children
         .map((item, i) => ({ item, index: i }))
         .filter(
           ({ item }) =>
             options?.isMarkdownExport || itemPassesFilters(item, activeFilters)
         )
         .map(({ index }) =>
-          addNodeToPathWithRelations(parentPath, relations, index)
+          addNodeToPathWithRelations(parentPath, nodes, index)
         )
         .toList()
     : List<ViewPath>();
@@ -115,7 +122,7 @@ function getChildrenForRegularNode(
     };
   }
 
-  const relationId = relations?.id || ("" as LongID);
+  const relationId = nodes?.id || ("" as LongID);
 
   const containingRelationID = getParentRelation(data, parentPath)?.id;
   const visibleAuthors = data.contacts
@@ -132,9 +139,9 @@ function getChildrenForRegularNode(
     visibleAuthors,
     coordinateSemanticID,
     containingRelationID,
-    relations?.id,
+    nodes?.id,
     author,
-    relations?.items
+    nodes?.children
   );
 
   const visibleIncomingCrefs = activeFilters.includes("incoming")
@@ -146,14 +153,14 @@ function getChildrenForRegularNode(
         data.semanticIndex,
         visibleAuthors,
         coordinateSemanticID,
-        relations?.id,
+        nodes?.id,
         effectiveAuthor,
         coordinateContext,
-        relations?.root ?? currentRoot,
-        relations?.items,
+        nodes?.root ?? currentRoot,
+        nodes?.children,
         incomingCrefs
       )
-    : List<LongID | ID>();
+    : List<ID>();
   const sortedOccurrences = occurrences.sortBy((refID) => {
     const reference = buildOutgoingReference(
       refID as LongID,
@@ -173,20 +180,20 @@ function getChildrenForRegularNode(
         data.user.publicKey,
         coordinateSemanticID,
         activeFilters,
-        relations?.id,
+        nodes?.id,
         coordinateContext
       )
     : {
-        suggestions: List<LongID | ID>(),
+        suggestions: List<ID>(),
         coveredCandidateIDs: ImmutableSet<string>(),
       };
 
   const addVirtualItems = (
     acc: { paths: List<ViewPath>; virtualItems: VirtualItemsMap },
-    items: List<LongID | ID>,
+    children: List<ID>,
     virtualType: VirtualType
   ): { paths: List<ViewPath>; virtualItems: VirtualItemsMap } =>
-    items.reduce((result, itemID) => {
+    children.reduce((result, itemID) => {
       const pathWithRelations = addRelationsToLastElement(
         parentPath,
         relationId
@@ -196,7 +203,13 @@ function getChildrenForRegularNode(
       return {
         paths: result.paths.push(path),
         virtualItems: result.virtualItems.set(viewPathToString(path), {
+          children: List<GraphNode>(),
           id: itemID,
+          text: "",
+          parent: relationId,
+          updated: nodes?.updated ?? Date.now(),
+          author: nodes?.author ?? data.user.publicKey,
+          root: nodes?.root ?? relationId,
           relevance: undefined as Relevance,
           virtualType,
           ...(isCref ? { isCref: true } : {}),
@@ -214,7 +227,7 @@ function getChildrenForRegularNode(
     visibleAuthors,
     coordinateSemanticID,
     activeFilters,
-    relations,
+    nodes,
     coordinateContext,
     coveredCandidateIDs
   );
@@ -258,8 +271,9 @@ export function getChildNodes(
   options?: TreeTraversalOptions
 ): TreeResult {
   const [parentItemID] = getRowIDFromView(data, parentPath);
+  const currentEdge = getCurrentEdgeForView(data, parentPath);
 
-  if (isConcreteRefId(parentItemID)) {
+  if (isConcreteRefId(parentItemID) || isRefNode(currentEdge)) {
     return getChildrenForConcreteRef(data, parentPath, parentItemID);
   }
 
@@ -301,8 +315,9 @@ export function getNodesInTree(
       const withChild = result.paths.push(childPath);
 
       const [childItemID] = getRowIDFromView(data, childPath);
+      const childEdge = getCurrentEdgeForView(data, childPath);
       const shouldRecurse = options?.isMarkdownExport
-        ? !isConcreteRefId(childItemID)
+        ? !(isConcreteRefId(childItemID) || isRefNode(childEdge))
         : childView.expanded;
       if (shouldRecurse) {
         const sub = getNodesInTree(

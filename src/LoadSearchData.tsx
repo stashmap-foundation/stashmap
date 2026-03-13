@@ -17,7 +17,7 @@ import { newDB } from "./knowledge";
 
 function getAllNodesFromDBs(knowledgeDBs: KnowledgeDBs): Map<string, TextSeed> {
   return buildTextNodesFromRelations(
-    knowledgeDBs.valueSeq().flatMap((db) => db.relations.valueSeq())
+    knowledgeDBs.valueSeq().flatMap((db) => db.nodes.valueSeq())
   ) as Map<string, TextSeed>;
 }
 
@@ -43,7 +43,7 @@ function SearchCrefBuilder({
       effectiveAuthor
     );
     if (deduped.size === 0) {
-      return List<ID | LongID>();
+      return List<ID>();
     }
     return deduped.map((ref) => createConcreteRefId(ref.relationID));
   });
@@ -56,7 +56,7 @@ function SearchCrefBuilder({
 
   const syntheticDB: KnowledgeData = {
     ...newDB(),
-    relations: Map<ID, Relations>([[searchId, searchRelations]]),
+    nodes: Map<ID, GraphNode>([[searchId, searchRelations]]),
   };
 
   const syntheticDBs: KnowledgeDBs = Map<PublicKey, KnowledgeData>([
@@ -73,7 +73,7 @@ export function LoadSearchData({
   itemIDs,
 }: {
   children: React.ReactNode;
-  itemIDs: (ID | LongID)[];
+  itemIDs: ID[];
 }): JSX.Element {
   const { relaysInfos, knowledgeDBs } = useData();
   const relays = useReadRelays({ user: true, contacts: true });
@@ -85,9 +85,7 @@ export function LoadSearchData({
   const searchEntries = itemIDs
     .filter((id) => isSearchId(id as ID))
     .map((id) => ({ id, query: parseSearchId(id as ID) }))
-    .filter(
-      (entry): entry is { id: ID | LongID; query: string } => !!entry.query
-    );
+    .filter((entry): entry is { id: ID; query: string } => !!entry.query);
 
   const firstSearch = searchEntries[0];
   const query = firstSearch?.query || "";

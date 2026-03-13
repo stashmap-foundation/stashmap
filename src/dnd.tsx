@@ -6,7 +6,10 @@ import {
   moveRelations,
   createConcreteRefId,
   getConcreteRefTargetRelation,
+  getRelationsNoReferencedBy,
+  getRefTargetID,
   isRefId,
+  isRefNode,
 } from "./connections";
 import {
   parseViewPath,
@@ -19,9 +22,8 @@ import {
   getRowIDFromView,
   getRelationForView,
   getPaneIndex,
-  addNodeToPathWithRelations,
   viewPathToString,
-  copyViewsWithNewPrefix,
+  getCurrentEdgeForView,
   getCurrentReferenceForView,
 } from "./ViewContext";
 import { getNodesInTree } from "./components/Node";
@@ -33,18 +35,21 @@ import {
   planAddToParent,
   getPane,
 } from "./planner";
-import {
-  planDisconnectFromParent,
-  planMoveNodeWithView,
-} from "./treeMutations";
+import { planMoveNodeWithView } from "./treeMutations";
+
+type DragSource = {
+  path: ViewPath;
+  nodeId?: LongID;
+  targetId?: LongID;
+};
 
 function getDropDestinationEndOfRoot(
   data: Data,
   root: ViewPath,
   stack: ID[]
 ): [ViewPath, number] {
-  const relations = getRelationForView(data, root, stack);
-  return [root, relations?.items.size || 0];
+  const nodes = getRelationForView(data, root, stack);
+  return [root, nodes?.children.size || 0];
 }
 
 function getInsertAfterNode(
@@ -108,7 +113,7 @@ function resolveDropByDepth(
       return [prevNode, idx ?? 0];
     }
     const relation = getRelationForView(data, prevNode, stack);
-    return [prevNode, relation?.items.size || 0];
+    return [prevNode, relation?.children.size || 0];
   }
 
   const ancestor = getAncestorAtDepth(prevNode, clampedDepth);
@@ -206,7 +211,7 @@ export function getDropDestinationFromTreeView(
 export function dnd(
   plan: Plan,
   selection: OrderedSet<string>,
-  source: string,
+  sourceDrag: DragSource,
   to: ViewPath,
   stack: ID[],
   indexTo: number | undefined,
@@ -218,7 +223,8 @@ export function dnd(
 ): Plan {
   const rootView = to;
 
-  const sourceViewPath = parseViewPath(source);
+  const source = viewPathToString(sourceDrag.path);
+  const sourceViewPath = sourceDrag.path;
   const sources = selection.contains(source) ? selection : OrderedSet([source]);
 
   const independentSources = sources.filterNot((s) =>
@@ -277,8 +283,8 @@ export function dnd(
       plan,
       toView,
       stack,
-      (relations: Relations) => {
-        return moveRelations(relations, sourceIndices.toArray(), dropIndex);
+      (nodes: GraphNode) => {
+        return moveRelations(nodes, sourceIndices.toArray(), dropIndex);
       }
     );
     const updatedViews =
@@ -319,38 +325,7 @@ export function dnd(
       .toList()
       .reduce((accPlan: Plan, s: string, idx: number) => {
         const sourcePath = parseViewPath(s);
-        const [sourceItemID] = getRowIDFromView(accPlan, sourcePath);
         const insertAt = dropIndex + idx;
-
-        if (isRefId(sourceItemID)) {
-          const [planWithAdd] = planAddToParent(
-            accPlan,
-            sourceItemID,
-            toView,
-            stack,
-            insertAt
-          );
-          const relations = getRelationForView(planWithAdd, toView, stack);
-          if (relations) {
-            const targetIndex = insertAt ?? relations.items.size - 1;
-            const targetViewPath = addNodeToPathWithRelations(
-              toView,
-              relations,
-              targetIndex
-            );
-            const sourceKey = viewPathToString(sourcePath);
-            const targetKey = viewPathToString(targetViewPath);
-            const updatedViews = copyViewsWithNewPrefix(
-              planWithAdd.views,
-              sourceKey,
-              targetKey
-            );
-            const planWithViews = planUpdateViews(planWithAdd, updatedViews);
-            return planDisconnectFromParent(planWithViews, sourcePath, stack);
-          }
-          return planDisconnectFromParent(planWithAdd, sourcePath, stack);
-        }
-
         return planMoveNodeWithView(
           accPlan,
           sourcePath,
@@ -367,21 +342,26 @@ export function dnd(
     ? plan
     : planExpandNode(plan, toViewData, toView);
 
-  const shouldCreateReference = (sourceItemID: LongID | ID): boolean => {
+  const shouldCreateReference = (
+    sourceItemID: ID,
+    sourceRelation?: GraphNode
+  ): boolean => {
     if (isSuggestion) {
       return !!invertCopyMode;
     }
-    const sourceIsReference = isRefId(sourceItemID);
+    const sourceIsReference =
+      isRefId(sourceItemID) || isRefNode(sourceRelation);
     if (sourceIsReference) {
       return true;
     }
     return !!invertCopyMode;
   };
 
-  const toReferenceID = (
-    sourceItemID: LongID | ID,
-    sourceRelation: Relations
-  ): LongID | ID => {
+  const toReferenceID = (sourceItemID: ID, sourceRelation: GraphNode): ID => {
+    const sourceRefTargetID = getRefTargetID(sourceRelation);
+    if (sourceRefTargetID) {
+      return createConcreteRefId(sourceRefTargetID);
+    }
     if (isRefId(sourceItemID)) {
       return sourceItemID;
     }
@@ -394,9 +374,14 @@ export function dnd(
       const sourcePath = parseViewPath(s);
       const [sourceItemID] = getRowIDFromView(accPlan, sourcePath);
       const sourceStack = getPane(accPlan, sourcePath).stack;
+      const sourceEdge = getCurrentEdgeForView(accPlan, sourcePath);
+      const sourceEdgeRelevance = sourceEdge?.relevance;
+      const sourceEdgeArgument = sourceEdge?.argument;
+      const sourceRelation =
+        getRelationForView(accPlan, sourcePath, sourceStack) || sourceEdge;
       const insertAt = dropIndex !== undefined ? dropIndex + idx : undefined;
 
-      if (shouldCreateReference(sourceItemID)) {
+      if (shouldCreateReference(sourceItemID, sourceRelation)) {
         if (isRefId(sourceItemID)) {
           return planAddToParent(
             accPlan,
@@ -407,19 +392,28 @@ export function dnd(
           )[0];
         }
         if (isSuggestion) {
-          const sourceReference = getCurrentReferenceForView(
-            accPlan,
-            sourcePath,
-            sourceStack,
-            "suggestion"
-          );
-          const sourceTargetRelation = sourceReference
-            ? getConcreteRefTargetRelation(
-                accPlan.knowledgeDBs,
-                sourceReference.id,
-                accPlan.user.publicKey
-              )
-            : undefined;
+          const sourceTargetRelation =
+            s === source && (sourceDrag.targetId || sourceDrag.nodeId)
+              ? getRelationsNoReferencedBy(
+                  accPlan.knowledgeDBs,
+                  (sourceDrag.targetId || sourceDrag.nodeId) as LongID,
+                  accPlan.user.publicKey
+                )
+              : (() => {
+                  const sourceReference = getCurrentReferenceForView(
+                    accPlan,
+                    sourcePath,
+                    sourceStack,
+                    "suggestion"
+                  );
+                  return sourceReference
+                    ? getConcreteRefTargetRelation(
+                        accPlan.knowledgeDBs,
+                        sourceReference.id,
+                        accPlan.user.publicKey
+                      )
+                    : undefined;
+                })();
           if (sourceTargetRelation) {
             return planAddToParent(
               accPlan,
@@ -430,18 +424,15 @@ export function dnd(
             )[0];
           }
         }
-        const existingSourceRelation = getRelationForView(
-          accPlan,
-          sourcePath,
-          sourceStack
-        );
-        if (existingSourceRelation) {
+        if (sourceRelation) {
           return planAddToParent(
             accPlan,
-            toReferenceID(sourceItemID, existingSourceRelation),
+            toReferenceID(sourceItemID, sourceRelation),
             toView,
             stack,
-            insertAt
+            insertAt,
+            sourceEdgeRelevance,
+            sourceEdgeArgument
           )[0];
         }
         const planWithRelation = upsertRelations(
@@ -450,17 +441,19 @@ export function dnd(
           sourceStack,
           (r) => r
         );
-        const sourceRelation = getRelationForView(
+        const sourceRelationWithUpsert = getRelationForView(
           planWithRelation,
           sourcePath,
           sourceStack
         )!;
         return planAddToParent(
           planWithRelation,
-          toReferenceID(sourceItemID, sourceRelation),
+          toReferenceID(sourceItemID, sourceRelationWithUpsert),
           toView,
           stack,
-          insertAt
+          insertAt,
+          sourceEdgeRelevance,
+          sourceEdgeArgument
         )[0];
       }
 

@@ -210,7 +210,9 @@ test("writeLink allows linking another author's relation into the current user's
   );
 
   expect(result.pending_count).toBe(1);
-  expect(result.item_id).toMatch(/^cref:/);
+  expect(result.item_id).toMatch(
+    /^[0-9a-f]{64}_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+  );
   expect(updatedRoot?.event_id).toBe(result.event_ids[0]);
   expect(updatedContent).toContain(`[Shared Target](#${foreignTarget?.id})`);
 });

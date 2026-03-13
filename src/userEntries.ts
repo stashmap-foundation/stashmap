@@ -1,7 +1,7 @@
 import { decodePublicKeyInputSync } from "./nostrPublicKeys";
 
 export function getRelationUserPublicKey(
-  relation?: Relations
+  relation?: GraphNode
 ): PublicKey | undefined {
   if (!relation) {
     return undefined;

@@ -1,10 +1,11 @@
+import { List } from "immutable";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { createPlan } from "../planner";
 import {
   getRelationsNoReferencedBy,
   getRelationSemanticID,
-  shortID,
 } from "../connections";
+import { isStandaloneRoot } from "../systemRoots";
 import {
   ALICE,
   expectTree,
@@ -32,6 +33,11 @@ function flattenTexts(
     const children = node.children as { text: string; children: unknown[] }[];
     return [...acc, node.text, ...flattenTexts(children)];
   }, []);
+}
+
+function nodeChildren(node: GraphNode | undefined): List<GraphNode> {
+  // eslint-disable-next-line testing-library/no-node-access
+  return node?.children || List<GraphNode>();
 }
 
 test("Single file with multiple top-level roots is wrapped by filename", () => {
@@ -97,7 +103,7 @@ test("Empty-root drop wrapper is only used for multiple imported trees", () => {
   });
 });
 
-test("planCreateNodesFromMarkdownTrees creates only standalone relations", () => {
+test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
   const [alice] = setup([ALICE]);
   const basePlan = createPlan(alice());
 
@@ -117,7 +123,7 @@ test("planCreateNodesFromMarkdownTrees creates only standalone relations", () =>
     topRelationIDs[0],
     plan.user.publicKey
   );
-  const childRelationID = parentRelation?.items.first()?.id as
+  const childRelationID = nodeChildren(parentRelation).first()?.id as
     | LongID
     | undefined;
   const childRelation = childRelationID
@@ -127,7 +133,7 @@ test("planCreateNodesFromMarkdownTrees creates only standalone relations", () =>
         plan.user.publicKey
       )
     : undefined;
-  const grandchildRelationID = childRelation?.items.first()?.id as
+  const grandchildRelationID = nodeChildren(childRelation).first()?.id as
     | LongID
     | undefined;
   const grandchildRelation = grandchildRelationID
@@ -143,9 +149,11 @@ test("planCreateNodesFromMarkdownTrees creates only standalone relations", () =>
   expect(grandchildRelation?.text).toBe("Grandchild");
 
   expect(parentID).toEqual(getRelationSemanticID(parentRelation!));
-  expect(parentRelation?.items.first()?.id).toEqual(childRelation?.id);
+  expect(nodeChildren(parentRelation).first()?.id).toEqual(childRelation?.id);
   expect(childRelation?.text).toBe("Child");
-  expect(childRelation?.items.first()?.id).toEqual(grandchildRelation?.id);
+  expect(nodeChildren(childRelation).first()?.id).toEqual(
+    grandchildRelation?.id
+  );
   expect(grandchildRelation?.text).toBe("Grandchild");
 });
 
@@ -161,10 +169,10 @@ test("Planning multiple markdown files returns top nodes in import order", () =>
   const topTexts = topNodeIDs.map((semanticID) => {
     return plan.knowledgeDBs
       .get(plan.user.publicKey)
-      ?.relations.valueSeq()
+      ?.nodes.valueSeq()
       .find(
         (relation) =>
-          relation.root === shortID(relation.id) &&
+          isStandaloneRoot(relation) &&
           getRelationSemanticID(relation) === semanticID
       )?.text;
   });

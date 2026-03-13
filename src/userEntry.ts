@@ -2,7 +2,7 @@ import { decodePublicKeyInputSync } from "./nostrPublicKeys";
 
 export function getUsersEntryPublicKey(
   text: string,
-  relation?: Relations
+  relation?: GraphNode
 ): PublicKey | undefined {
   return (
     decodePublicKeyInputSync(text) ||
@@ -12,9 +12,9 @@ export function getUsersEntryPublicKey(
 }
 
 export function withUsersEntryPublicKey(
-  relation: Relations,
+  relation: GraphNode,
   text = relation.text
-): Relations {
+): GraphNode {
   const userPublicKey = getUsersEntryPublicKey(text, relation);
   if (!userPublicKey) {
     return relation;

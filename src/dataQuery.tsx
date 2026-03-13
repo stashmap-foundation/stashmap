@@ -20,11 +20,7 @@ import { RegisterQuery, extractIDsFromQueries } from "./LoadingStatus";
 import { useReadRelays } from "./relays";
 import { useEventQuery } from "./commons/useNostrQuery";
 
-function addIDToFilter(
-  filter: Filter,
-  id: LongID | ID,
-  tag: `#${string}`
-): Filter {
+function addIDToFilter(filter: Filter, id: ID, tag: `#${string}`): Filter {
   const d = filter[tag] || [];
   const local = splitID(id)[1];
   // TODO: Add unknown remotes? Or even better create a filter for each unknown remote to query specific ids
@@ -57,8 +53,8 @@ function addValueToFilter(
 function getDocumentSemanticQueryIDs(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
-  id: LongID | ID
-): Array<LongID | ID> {
+  id: ID
+): Array<ID> {
   const textHash = getTextHashForSemanticID(knowledgeDBs, id, myself);
   return textHash && textHash !== id ? [id, textHash] : [id];
 }
@@ -99,7 +95,7 @@ export function filtersToFilterArray(filters: Filters): Filter[] {
   ].filter((f) => f !== undefined) as Filter[];
 }
 
-function addAuthorFromIDToFilters(filters: Filters, id: LongID | ID): Filters {
+function addAuthorFromIDToFilters(filters: Filters, id: ID): Filters {
   const author = splitID(id)[0];
   const isNewAuthor = author && !filters.authors.includes(author);
   const authors = isNewAuthor ? [...filters.authors, author] : filters.authors;
@@ -140,7 +136,7 @@ export function addSystemRoleToFilters(
 
 export function addItemToFilters(
   filters: Filters,
-  id: LongID | ID,
+  id: ID,
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
   includeListQuery: boolean = false
@@ -188,7 +184,7 @@ export function addItemToFilters(
 
 export function addReferencedByToFilters(
   filters: Filters,
-  id: LongID | ID,
+  id: ID,
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey
 ): Filters {
@@ -204,7 +200,7 @@ export function addReferencedByToFilters(
 export function addListToFilters(
   filters: Filters,
   listID: LongID,
-  itemID: LongID | ID,
+  itemID: ID,
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey
 ): Filters {

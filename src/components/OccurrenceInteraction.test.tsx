@@ -381,7 +381,7 @@ Crypto
     `);
   });
 
-  test("multiple regular items + multiple occurrences, ! sets relevance on all", async () => {
+  test("multiple regular children + multiple occurrences, ! sets relevance on all", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 

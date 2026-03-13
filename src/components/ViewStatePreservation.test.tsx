@@ -329,7 +329,7 @@ My Notes
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
     await navigateToNodeViaSearch(1, "Target");
 
-    // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
+    // Use toggle buttons as drop targets - they only exist in tree children, not breadcrumbs
     const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(screen.getAllByText("Source")[0]);
     await act(async () => {
@@ -391,7 +391,7 @@ My Notes
 Target
     `);
 
-    // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
+    // Use toggle buttons as drop targets - they only exist in tree children, not breadcrumbs
     const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(screen.getAllByText("Parent")[0]);
     await act(async () => {
@@ -443,7 +443,7 @@ My Notes
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
     await navigateToNodeViaSearch(1, "Target");
 
-    // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
+    // Use toggle buttons as drop targets - they only exist in tree children, not breadcrumbs
     const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(screen.getAllByText("Source")[0]);
     await act(async () => {
@@ -456,7 +456,7 @@ My Notes
 });
 
 describe("View State Preservation - Insert Operations", () => {
-  test("Insert at beginning - later expanded items stay expanded", async () => {
+  test("Insert at beginning - later expanded children stay expanded", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -487,7 +487,7 @@ My Notes
     await screen.findByLabelText("collapse A");
   });
 
-  test("Insert in middle - items after stay expanded", async () => {
+  test("Insert in middle - children after stay expanded", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 

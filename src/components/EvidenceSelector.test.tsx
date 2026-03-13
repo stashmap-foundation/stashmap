@@ -3,8 +3,27 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { ALICE, expectTree, renderTree, setup, type } from "../utils.test";
 import { updateItemArgument } from "../connections";
 
+function makeItem(
+  id: ID,
+  author: PublicKey,
+  root: ID,
+  relevance: Relevance,
+  argument?: Argument
+): GraphNode {
+  return {
+    children: List<GraphNode>(),
+    id,
+    text: "",
+    updated: Date.now(),
+    author,
+    root,
+    relevance,
+    ...(argument !== undefined ? { argument } : {}),
+  };
+}
+
 describe("EvidenceSelector", () => {
-  test("shows evidence selector for child items", async () => {
+  test("shows evidence selector for child children", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -139,10 +158,20 @@ Money
 // Tests for updateItemArgument function
 describe("updateItemArgument", () => {
   test("updates argument on existing item", () => {
-    const relations: Relations = {
-      items: List([
-        { id: "node1" as ID, relevance: undefined as Relevance },
-        { id: "node2" as ID, relevance: undefined as Relevance },
+    const nodes: GraphNode = {
+      children: List([
+        makeItem(
+          "node1" as ID,
+          "author" as PublicKey,
+          "rel1" as LongID,
+          undefined
+        ),
+        makeItem(
+          "node2" as ID,
+          "author" as PublicKey,
+          "rel1" as LongID,
+          undefined
+        ),
       ]),
       id: "rel1" as LongID,
       text: "head",
@@ -150,21 +179,25 @@ describe("updateItemArgument", () => {
       updated: Date.now(),
       author: "author" as PublicKey,
       root: "rel1" as ID,
+      relevance: undefined,
     };
 
-    const updated = updateItemArgument(relations, 0, "confirms");
-    expect(updated.items.get(0)?.argument).toBe("confirms");
-    expect(updated.items.get(1)?.argument).toBeUndefined();
+    const updated = updateItemArgument(nodes, 0, "confirms");
+    const { children } = updated;
+    expect(children.get(0)?.argument).toBe("confirms");
+    expect(children.get(1)?.argument).toBeUndefined();
   });
 
   test("can set argument to undefined", () => {
-    const relations: Relations = {
-      items: List([
-        {
-          id: "node1" as ID,
-          relevance: undefined as Relevance,
-          argument: "confirms" as Argument,
-        },
+    const nodes: GraphNode = {
+      children: List([
+        makeItem(
+          "node1" as ID,
+          "author" as PublicKey,
+          "rel1" as LongID,
+          undefined,
+          "confirms"
+        ),
       ]),
       id: "rel1" as LongID,
       text: "head",
@@ -172,24 +205,34 @@ describe("updateItemArgument", () => {
       updated: Date.now(),
       author: "author" as PublicKey,
       root: "rel1" as ID,
+      relevance: undefined,
     };
 
-    const updated = updateItemArgument(relations, 0, undefined);
-    expect(updated.items.get(0)?.argument).toBeUndefined();
+    const updated = updateItemArgument(nodes, 0, undefined);
+    const { children } = updated;
+    expect(children.get(0)?.argument).toBeUndefined();
   });
 
-  test("returns unchanged relations for invalid index", () => {
-    const relations: Relations = {
-      items: List([{ id: "node1" as ID, relevance: undefined as Relevance }]),
+  test("returns unchanged nodes for invalid index", () => {
+    const nodes: GraphNode = {
+      children: List([
+        makeItem(
+          "node1" as ID,
+          "author" as PublicKey,
+          "rel1" as LongID,
+          undefined
+        ),
+      ]),
       id: "rel1" as LongID,
       text: "head",
       parent: undefined,
       updated: Date.now(),
       author: "author" as PublicKey,
       root: "rel1" as ID,
+      relevance: undefined,
     };
 
-    const updated = updateItemArgument(relations, 5, "confirms");
-    expect(updated).toBe(relations);
+    const updated = updateItemArgument(nodes, 5, "confirms");
+    expect(updated).toBe(nodes);
   });
 });

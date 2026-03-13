@@ -133,7 +133,7 @@ function TestPaneNavigation(): JSX.Element {
     }
   };
 
-  const setStack = (newStack: (LongID | ID)[]): void => {
+  const setStack = (newStack: ID[]): void => {
     setPane({ ...pane, stack: newStack });
   };
 

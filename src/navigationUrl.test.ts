@@ -16,13 +16,13 @@ function knowledgeDBWithTexts(
   author: PublicKey,
   texts: string[]
 ): KnowledgeDBs {
-  const relations = texts.reduce((acc, text) => {
+  const nodes = texts.reduce((acc, text) => {
     const relation = newRelations(text, List<ID>(), author);
     return acc.set(shortID(relation.id), relation);
-  }, Map<string, Relations>());
+  }, Map<string, GraphNode>());
   const db: KnowledgeData = {
     ...newDB(),
-    relations,
+    nodes,
   };
   return Map<PublicKey, KnowledgeData>({ [author]: db });
 }

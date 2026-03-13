@@ -48,7 +48,7 @@ type MiniEditorProps = {
     rowIndex?: number;
   }) => void;
   onDelete?: () => void;
-  onPasteMultiLine?: (items: ParsedLine[], currentText: string) => void;
+  onPasteMultiLine?: (children: ParsedLine[], currentText: string) => void;
 };
 
 export function MiniEditor({
@@ -237,14 +237,14 @@ export function MiniEditor({
   const handlePaste = (e: React.ClipboardEvent): void => {
     e.preventDefault();
     const text = e.clipboardData.getData("text/plain");
-    const items = parseClipboardText(text);
-    if (items.length <= 1 || !onPasteMultiLine) {
+    const children = parseClipboardText(text);
+    if (children.length <= 1 || !onPasteMultiLine) {
       document.execCommand("insertText", false, text);
       return;
     }
-    document.execCommand("insertText", false, items[0].text);
+    document.execCommand("insertText", false, children[0].text);
     const currentText = editorRef.current?.textContent || "";
-    onPasteMultiLine(items.slice(1), currentText);
+    onPasteMultiLine(children.slice(1), currentText);
   };
 
   const moveCursorToEnd = (): void => {

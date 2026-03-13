@@ -33,6 +33,8 @@ export type DragItemType = {
   path: ViewPath;
   isSuggestion?: boolean;
   isCopyDrag?: boolean;
+  nodeId?: LongID;
+  targetId?: LongID;
 };
 
 type NativeFileDropItem = {
@@ -474,7 +476,7 @@ export function useDroppable({
       const dropped = dnd(
         plan,
         selection,
-        viewPathToString(dragItem.path),
+        dragItem,
         destination,
         stack,
         calcIndex(index, direction),

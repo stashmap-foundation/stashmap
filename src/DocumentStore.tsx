@@ -35,7 +35,7 @@ import {
 type DocumentSnapshot = {
   documents: ImmutableMap<string, StoredDocumentRecord>;
   deletes: ImmutableMap<string, StoredDeleteRecord>;
-  relationsByDocumentKey: ImmutableMap<string, ImmutableMap<string, Relations>>;
+  relationsByDocumentKey: ImmutableMap<string, ImmutableMap<string, GraphNode>>;
   knowledgeDBs: KnowledgeDBs;
   semanticIndex: SemanticIndex;
 };
@@ -56,7 +56,7 @@ function createEmptySnapshot(): DocumentSnapshot {
     deletes: ImmutableMap<string, StoredDeleteRecord>(),
     relationsByDocumentKey: ImmutableMap<
       string,
-      ImmutableMap<string, Relations>
+      ImmutableMap<string, GraphNode>
     >(),
     knowledgeDBs: ImmutableMap<PublicKey, KnowledgeData>(),
     semanticIndex: createEmptySemanticIndex(),
@@ -65,23 +65,23 @@ function createEmptySnapshot(): DocumentSnapshot {
 
 function parseStoredDocumentRelations(
   document: StoredDocumentRecord
-): ImmutableMap<string, Relations> {
+): ImmutableMap<string, GraphNode> {
   return parseDocumentEvent(storedDocumentToEvent(document));
 }
 
 function getAuthorDocumentRelations(
   snapshot: DocumentSnapshot,
   author: PublicKey
-): ImmutableMap<string, Relations> {
+): ImmutableMap<string, GraphNode> {
   return snapshot.documents.valueSeq().reduce((acc, document) => {
     if (document.author !== author) {
       return acc;
     }
     return acc.merge(
       snapshot.relationsByDocumentKey.get(document.replaceableKey) ||
-        ImmutableMap<string, Relations>()
+        ImmutableMap<string, GraphNode>()
     );
-  }, ImmutableMap<string, Relations>());
+  }, ImmutableMap<string, GraphNode>());
 }
 
 function rebuildAuthors(
@@ -110,7 +110,7 @@ function applyDocumentToSnapshot(
   const existingDelete = snapshot.deletes.get(document.replaceableKey);
   const existingRelations =
     snapshot.relationsByDocumentKey.get(document.replaceableKey) ||
-    ImmutableMap<string, Relations>();
+    ImmutableMap<string, GraphNode>();
 
   if (existingDelete && existingDelete.deletedAt >= document.updatedMs) {
     return snapshot;
@@ -177,7 +177,7 @@ function applyDeleteToSnapshot(
         ? removeRelationsFromSemanticIndex(
             snapshot.semanticIndex,
             snapshot.relationsByDocumentKey.get(deletion.replaceableKey) ||
-              ImmutableMap<string, Relations>()
+              ImmutableMap<string, GraphNode>()
           )
         : snapshot.semanticIndex,
   };
@@ -217,7 +217,7 @@ function applyChangeToSnapshot(
     const existingDocument = snapshot.documents.get(change.replaceableKey);
     const existingRelations =
       snapshot.relationsByDocumentKey.get(change.replaceableKey) ||
-      ImmutableMap<string, Relations>();
+      ImmutableMap<string, GraphNode>();
     if (!existingDocument) {
       return snapshot;
     }
@@ -271,7 +271,7 @@ function createSnapshotFromStoredRecords(
   });
   const relationsByDocumentKey = ImmutableMap<
     string,
-    ImmutableMap<string, Relations>
+    ImmutableMap<string, GraphNode>
   >(
     liveDocuments
       .valueSeq()
@@ -279,7 +279,7 @@ function createSnapshotFromStoredRecords(
         (document) =>
           [document.replaceableKey, parseStoredDocumentRelations(document)] as [
             string,
-            ImmutableMap<string, Relations>
+            ImmutableMap<string, GraphNode>
           ]
       )
       .toArray()

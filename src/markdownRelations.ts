@@ -2,17 +2,12 @@
 import { List, Map, Set as ImmutableSet } from "immutable";
 import { v4 } from "uuid";
 import { UnsignedEvent } from "nostr-tools";
-import {
-  createConcreteRefId,
-  ensureRelationNativeFields,
-  joinID,
-  shortID,
-} from "./connections";
+import { ensureRelationNativeFields, joinID, shortID } from "./connections";
 import { newDB } from "./knowledge";
 import { findTag } from "./nostrEvents";
 import { createRootAnchor } from "./rootAnchor";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
-import { newRelations } from "./relationFactory";
+import { newRefNode, newRelations } from "./relationFactory";
 
 export type WalkContext = {
   knowledgeDBs: KnowledgeDBs;
@@ -23,7 +18,7 @@ export type WalkContext = {
 
 function walkUpsertRelation(
   ctx: WalkContext,
-  relation: Relations
+  relation: GraphNode
 ): WalkContext {
   const db = ctx.knowledgeDBs.get(ctx.publicKey, newDB());
   const normalizedRelation = ensureRelationNativeFields(
@@ -34,10 +29,7 @@ function walkUpsertRelation(
     ...ctx,
     knowledgeDBs: ctx.knowledgeDBs.set(ctx.publicKey, {
       ...db,
-      relations: db.relations.set(
-        shortID(normalizedRelation.id),
-        normalizedRelation
-      ),
+      nodes: db.nodes.set(shortID(normalizedRelation.id), normalizedRelation),
     }),
     affectedRoots: ctx.affectedRoots.add(normalizedRelation.root),
   };
@@ -47,16 +39,16 @@ function materializeTreeNode(
   ctx: WalkContext,
   treeNode: MarkdownTreeNode,
   semanticContext: List<ID>,
-  root: ID,
+  root: LongID,
   parent?: LongID
-): [WalkContext, ID, LongID] {
+): [WalkContext, ID, GraphNode] {
   const baseRelation = treeNode.uuid
     ? {
         ...newRelations(treeNode.text, semanticContext, ctx.publicKey, root),
         id: joinID(ctx.publicKey, treeNode.uuid),
       }
     : newRelations(treeNode.text, semanticContext, ctx.publicKey, root);
-  const relationBaseWithFields: Relations = {
+  const relationBaseWithFields: GraphNode = {
     ...baseRelation,
     parent,
     anchor: parent
@@ -70,39 +62,47 @@ function materializeTreeNode(
     relationBaseWithFields.text as ID
   );
   const visibleChildren = treeNode.children.filter((child) => !child.hidden);
-  const [withVisible, childItems] = visibleChildren.reduce(
-    ([accCtx, accItems], childNode) => {
+  const [withVisible, childNodes] = visibleChildren.reduce(
+    ([accCtx, accChildren], childNode) => {
       if (childNode.linkHref) {
-        const parts = childNode.linkHref.split(":");
-        const relationID = parts[0] as LongID;
-        const item: RelationItem = {
-          id: createConcreteRefId(relationID),
-          relevance: childNode.relevance,
-          argument: childNode.argument,
-          linkText: childNode.text,
-        };
-        return [accCtx, [...accItems, item]] as [WalkContext, RelationItem[]];
+        const refNode = newRefNode(
+          ctx.publicKey,
+          root,
+          childNode.linkHref as LongID,
+          relationBaseWithFields.id,
+          childNode.relevance,
+          childNode.argument,
+          childNode.text,
+          childNode.text
+        );
+        return [accCtx, [...accChildren, refNode]] as [
+          WalkContext,
+          GraphNode[]
+        ];
       }
-      const [afterChild, , materializedRelationID] = materializeTreeNode(
+      const [afterChild, , materializedChild] = materializeTreeNode(
         accCtx,
         childNode,
         childSemanticContext,
         root,
         relationBaseWithFields.id
       );
-      const item: RelationItem = {
-        id: materializedRelationID,
+      const childWithParentMetadata: GraphNode = {
+        ...materializedChild,
         relevance: childNode.relevance,
         argument: childNode.argument,
       };
-      return [afterChild, [...accItems, item]];
+      return [
+        walkUpsertRelation(afterChild, childWithParentMetadata),
+        [...accChildren, childWithParentMetadata],
+      ];
     },
-    [ctx, [] as RelationItem[]] as [WalkContext, RelationItem[]]
+    [ctx, [] as GraphNode[]] as [WalkContext, GraphNode[]]
   );
 
-  const relation: Relations = {
+  const relation: GraphNode = {
     ...relationBaseWithFields,
-    items: List(childItems),
+    children: List(childNodes),
     ...(treeNode.basedOn
       ? {
           basedOn: (treeNode.basedOn.includes("_")
@@ -117,7 +117,7 @@ function materializeTreeNode(
   return [
     walkUpsertRelation(withVisible, relation),
     relation.text as ID,
-    relation.id,
+    relation,
   ];
 }
 
@@ -131,6 +131,7 @@ export function createNodesFromMarkdownTrees(
     .reduce(
       ([accCtx, accTopSemanticIDs, accTopRelationIDs], treeNode) => {
         const rootUuid = treeNode.uuid ?? v4();
+        const rootRelationID = joinID(ctx.publicKey, rootUuid);
         const treeWithUuid = treeNode.uuid
           ? treeNode
           : { ...treeNode, uuid: rootUuid };
@@ -140,12 +141,12 @@ export function createNodesFromMarkdownTrees(
           accCtx,
           treeWithUuid,
           treeSemanticContext,
-          rootUuid as ID
+          rootRelationID
         );
         return [
           nextCtx,
           [...accTopSemanticIDs, topSemanticID],
-          [...accTopRelationIDs, topRelationID],
+          [...accTopRelationIDs, topRelationID.id as LongID],
         ];
       },
       [ctx, [] as ID[], [] as LongID[]] as [WalkContext, ID[], LongID[]]
@@ -154,7 +155,7 @@ export function createNodesFromMarkdownTrees(
 
 export function parseDocumentEvent(
   event: UnsignedEvent
-): Map<string, Relations> {
+): Map<string, GraphNode> {
   const dTagValue = findTag(event, "d");
   if (!dTagValue) {
     return Map();
@@ -170,5 +171,5 @@ export function parseDocumentEvent(
   };
   const [result] = createNodesFromMarkdownTrees(ctx, trees);
   const db = result.knowledgeDBs.get(author);
-  return db?.relations ?? Map<string, Relations>();
+  return db?.nodes ?? Map<string, GraphNode>();
 }

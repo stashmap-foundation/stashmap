@@ -1,4 +1,10 @@
-import { isEmptySemanticID } from "./connections";
+import {
+  createConcreteRefId,
+  isConcreteRefId,
+  isEmptySemanticID,
+  getRelationsNoReferencedBy,
+  parseConcreteRefId,
+} from "./connections";
 import { planUpdateRelationItemMetadataById } from "./dataPlanner";
 import { RelationItemMetadata } from "./relationItemMetadata";
 import {
@@ -31,10 +37,10 @@ export function planUpdateExistingItemMetadata(
   relationIndex: number,
   metadata: RelationItemMetadata
 ): Plan {
-  const relations = getRelationForView(plan, parentViewPath, stack);
-  const itemId = relations?.items.get(relationIndex)?.id;
-  return relations && itemId
-    ? planUpdateRelationItemMetadataById(plan, relations.id, itemId, metadata)
+  const nodes = getRelationForView(plan, parentViewPath, stack);
+  const itemId = nodes?.children.get(relationIndex)?.id;
+  return nodes && itemId
+    ? planUpdateRelationItemMetadataById(plan, nodes.id, itemId, metadata)
     : plan;
 }
 
@@ -64,10 +70,8 @@ export function planUpdateViewItemMetadata(
         metadata.argument
       ).plan;
     }
-    const relations = getRelationForView(plan, parentView, stack);
-    return relations
-      ? planUpdateEmptyNodeMetadata(plan, relations.id, metadata)
-      : plan;
+    const nodes = getRelationForView(plan, parentView, stack);
+    return nodes ? planUpdateEmptyNodeMetadata(plan, nodes.id, metadata) : plan;
   }
 
   const relationIndex = getRelationIndex(plan, viewPath);
@@ -87,14 +91,25 @@ export function planUpdateViewItemMetadata(
         metadata.argument
       )[0];
     }
+    const targetItemID =
+      virtualItem.virtualType === "occurrence" && !isConcreteRefId(itemID)
+        ? createConcreteRefId(itemID as LongID)
+        : itemID;
+    const inheritedSourceRelation = isConcreteRefId(targetItemID)
+      ? getRelationsNoReferencedBy(
+          plan.knowledgeDBs,
+          parseConcreteRefId(targetItemID)?.relationID,
+          plan.user.publicKey
+        )
+      : undefined;
     return planAddToParent(
       plan,
-      itemID,
+      targetItemID,
       parentView,
       stack,
       undefined,
-      metadata.relevance,
-      metadata.argument
+      metadata.relevance ?? inheritedSourceRelation?.relevance,
+      metadata.argument ?? inheritedSourceRelation?.argument
     )[0];
   }
 

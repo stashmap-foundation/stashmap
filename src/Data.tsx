@@ -42,10 +42,7 @@ import { DocumentStoreProvider, useDocumentStore } from "./DocumentStore";
 import { usePermanentDocumentSync } from "./usePermanentDocumentSync";
 import { createEmptySemanticIndex } from "./semanticIndex";
 
-export const defaultPane = (
-  author: PublicKey,
-  rootItemID?: LongID | ID
-): Pane => ({
+export const defaultPane = (author: PublicKey, rootItemID?: ID): Pane => ({
   id: generatePaneId(),
   stack: rootItemID ? [rootItemID] : [],
   author,

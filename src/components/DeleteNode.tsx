@@ -20,10 +20,10 @@ import {
 import { isEditableRelation } from "./TemporaryViewContext";
 import { planDeleteNodeFromView } from "../treeMutations";
 
-function disconnectNode(plan: Plan, toDisconnect: LongID | ID): Plan {
+function disconnectNode(plan: Plan, toDisconnect: ID): Plan {
   const myDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
-  return myDB.relations.reduce((rdx, relation) => {
-    const toDelete = relation.items.reduce((indices, item, idx) => {
+  return myDB.nodes.reduce((rdx, relation) => {
+    const toDelete = relation.children.reduce((indices, item, idx) => {
       if (
         getRelationItemSemanticID(plan.knowledgeDBs, item, relation.author) ===
         toDisconnect

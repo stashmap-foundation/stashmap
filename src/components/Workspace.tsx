@@ -151,7 +151,7 @@ type BreadcrumbEntry = {
   disabled?: boolean;
 };
 
-function getBreadcrumbLabel(relation: Relations): string {
+function getBreadcrumbLabel(relation: GraphNode): string {
   return (
     getRelationText(relation) ||
     shortID(getRelationSemanticID(relation)) ||
@@ -161,31 +161,32 @@ function getBreadcrumbLabel(relation: Relations): string {
 
 function getStandaloneRootRelation(
   knowledgeDBs: KnowledgeDBs,
-  relation: Relations
-): Relations | undefined {
+  relation: GraphNode
+): GraphNode | undefined {
   return knowledgeDBs
     .get(relation.author)
-    ?.relations.valueSeq()
+    ?.nodes.valueSeq()
     .find(
       (candidate) =>
         candidate.author === relation.author &&
         candidate.root === relation.root &&
-        candidate.root === shortID(candidate.id)
+        !candidate.parent &&
+        candidate.root === candidate.id
     );
 }
 
 function resolveRelationFromSegments(
   knowledgeDBs: KnowledgeDBs,
-  currentRelation: Relations,
+  currentRelation: GraphNode,
   semanticStack: ID[]
-): Relations | undefined {
+): GraphNode | undefined {
   if (semanticStack.length === 0) {
     return currentRelation;
   }
 
   const currentAuthor = currentRelation.author;
   const [nextSemanticID, ...rest] = semanticStack;
-  const matchingItem = currentRelation.items.find(
+  const matchingItem = currentRelation.children.find(
     (item) =>
       shortID(getRelationItemSemanticID(knowledgeDBs, item, currentAuthor)) ===
       shortID(nextSemanticID as ID)
@@ -207,9 +208,9 @@ function resolveRelationFromSegments(
 
 function resolveRelationFromRootStack(
   knowledgeDBs: KnowledgeDBs,
-  rootRelation: Relations,
+  rootRelation: GraphNode,
   semanticStack: ID[]
-): Relations | undefined {
+): GraphNode | undefined {
   if (semanticStack.length === 0) {
     return undefined;
   }
@@ -230,8 +231,8 @@ function resolveRelationFromRootStack(
 
 function getLiveAnchorSourceRelation(
   knowledgeDBs: KnowledgeDBs,
-  relation: Relations
-): Relations | undefined {
+  relation: GraphNode
+): GraphNode | undefined {
   const sourceAuthor = relation.anchor?.sourceAuthor || relation.author;
   if (relation.anchor?.sourceRelationID) {
     return getRelationsNoReferencedBy(
@@ -245,18 +246,19 @@ function getLiveAnchorSourceRelation(
   }
   return knowledgeDBs
     .get(sourceAuthor)
-    ?.relations.valueSeq()
+    ?.nodes.valueSeq()
     .find(
       (candidate) =>
         candidate.author === sourceAuthor &&
         candidate.root === relation.anchor?.sourceRootID &&
-        candidate.root === shortID(candidate.id)
+        !candidate.parent &&
+        candidate.root === candidate.id
     );
 }
 
 function createRelationBreadcrumbEntry(
   knowledgeDBs: KnowledgeDBs,
-  relation: Relations
+  relation: GraphNode
 ): BreadcrumbEntry {
   return {
     key: `relation:${relation.id}`,
@@ -287,7 +289,7 @@ function createSnapshotBreadcrumbEntries(
 
 function buildAnchoredLineageEntries(
   knowledgeDBs: KnowledgeDBs,
-  relation: Relations,
+  relation: GraphNode,
   seen = new Set<string>()
 ): BreadcrumbEntry[] {
   if (seen.has(relation.id)) {
@@ -991,7 +993,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     [viewPath, treeResult]
   );
   const virtualItemsMap: VirtualItemsMap =
-    treeResult?.virtualItems || Map<string, RelationItem>();
+    treeResult?.virtualItems || Map<string, GraphNode>();
 
   const switchPane = (direction: -1 | 1): void => {
     const root = wrapperRef.current;

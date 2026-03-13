@@ -79,7 +79,7 @@ function useNodeHasChildren(): boolean {
   const effectiveAuthor = useEffectiveAuthor();
 
   if (currentRelation) {
-    if (currentRelation.items.size > 0) {
+    if (currentRelation.children.size > 0) {
       return true;
     }
   }
@@ -90,7 +90,7 @@ function useNodeHasChildren(): boolean {
       itemID,
       effectiveAuthor
     );
-    if (targetRelation?.items.size) {
+    if (targetRelation?.children.size) {
       return true;
     }
   }
@@ -455,7 +455,7 @@ function EditableContent(): JSX.Element {
   };
 
   const handlePasteMultiLine = (
-    items: ParsedLine[],
+    children: ParsedLine[],
     currentText: string
   ): void => {
     const { plan: basePlan, viewPath: updatedViewPath } =
@@ -465,7 +465,7 @@ function EditableContent(): JSX.Element {
         viewPath,
         stack
       );
-    const trees = parsedLinesToTrees(items);
+    const trees = parsedLinesToTrees(children);
     const parentOfSaved = getParentView(updatedViewPath);
     if (!parentOfSaved) {
       executePlan(

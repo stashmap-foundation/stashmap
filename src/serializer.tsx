@@ -175,7 +175,7 @@ function jsonToPane(s: Serializable): Pane | undefined {
   const obj = asObject(s);
   return {
     id: asString(obj.i),
-    stack: asArray(obj.s).map((id) => asString(id) as LongID | ID),
+    stack: asArray(obj.s).map((id) => asString(id) as ID),
     author: asString(obj.a) as PublicKey,
     rootRelation: obj.r !== undefined ? (asString(obj.r) as LongID) : undefined,
     typeFilters:

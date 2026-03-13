@@ -13,7 +13,7 @@ import { useData } from "../DataContext";
 export function ReferenceIndicators({
   refId,
 }: {
-  refId: LongID | ID;
+  refId: ID;
 }): JSX.Element | null {
   const { knowledgeDBs, user } = useData();
 

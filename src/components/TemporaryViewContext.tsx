@@ -8,6 +8,7 @@ import {
   useCurrentRelation,
 } from "../ViewContext";
 import { useData } from "../DataContext";
+import { isRefNode } from "../connections";
 import { planDeselectTemporarySelectionInView, usePlanner } from "../planner";
 
 export {
@@ -127,8 +128,8 @@ export function toggleEditing(
   };
 }
 
-export function isEditableRelation(relation: Relations | undefined): boolean {
-  return !!relation;
+export function isEditableRelation(relation: GraphNode | undefined): boolean {
+  return !!relation && !isRefNode(relation);
 }
 
 export function ToggleEditing(): JSX.Element | null {

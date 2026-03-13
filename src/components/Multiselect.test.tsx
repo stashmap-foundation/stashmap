@@ -872,7 +872,7 @@ Root
     `);
   });
 
-  test("three non-contiguous items reorder correctly", async () => {
+  test("three non-contiguous children reorder correctly", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
     await type(
@@ -925,7 +925,7 @@ Root
     `);
   });
 
-  test("cross-depth selection: all selected items move even from different parents", async () => {
+  test("cross-depth selection: all selected children move even from different parents", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
     await type(
@@ -1048,7 +1048,7 @@ Root
 });
 
 describe("Cross-depth DnD edge cases", () => {
-  test("cross-pane drag with cross-depth selection copies all selected items", async () => {
+  test("cross-pane drag with cross-depth selection copies all selected children", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
     await type(
@@ -1089,7 +1089,7 @@ Last
     `);
   });
 
-  test("same-pane move with cross-depth selection moves all selected items", async () => {
+  test("same-pane move with cross-depth selection moves all selected children", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
     await type(
@@ -1331,7 +1331,7 @@ Root
     `);
   });
 
-  test("cross-pane drag: items from 3 different parents", async () => {
+  test("cross-pane drag: children from 3 different parents", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
     await type(
@@ -1436,7 +1436,7 @@ Root
     `);
   });
 
-  test("cross-depth selection: move deep items to root container", async () => {
+  test("cross-depth selection: move deep children to root container", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
     await type(
@@ -1533,7 +1533,7 @@ B1
     `);
   });
 
-  test("cross-depth move: items from sibling branches move to target", async () => {
+  test("cross-depth move: children from sibling branches move to target", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
     await type(
@@ -1567,7 +1567,7 @@ Root
     `);
   });
 
-  test("cross-depth drag moves items from different parents to target", async () => {
+  test("cross-depth drag moves children from different parents to target", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
     await type(
@@ -1619,7 +1619,7 @@ Root
     `);
   });
 
-  test("Tab preserves order of selected items", async () => {
+  test("Tab preserves order of selected children", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
@@ -1783,7 +1783,7 @@ Root
     `);
   });
 
-  test("Shift+Tab preserves order of selected items", async () => {
+  test("Shift+Tab preserves order of selected children", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
@@ -1882,7 +1882,7 @@ Root
 });
 
 describe("View state preservation - multiselect DnD", () => {
-  test("move expanded items - both stay expanded", async () => {
+  test("move expanded children - both stay expanded", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
     await type("Root{Enter}{Tab}A{Enter}{Tab}A1{Escape}");
@@ -2052,7 +2052,7 @@ Root
 });
 
 describe("View state preservation - multiselect Tab indent", () => {
-  test("Tab indent expanded items - both stay expanded", async () => {
+  test("Tab indent expanded children - both stay expanded", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
     await type("Root{Enter}{Tab}Prev{Enter}A{Enter}{Tab}A1{Escape}");
@@ -2157,7 +2157,7 @@ Root
 });
 
 describe("View state preservation - multiselect Shift+Tab outdent", () => {
-  test("Shift+Tab outdent expanded items - both stay expanded", async () => {
+  test("Shift+Tab outdent expanded children - both stay expanded", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
     await type("Root{Enter}{Tab}Parent{Enter}{Tab}A{Enter}{Tab}A1{Escape}");
@@ -2432,7 +2432,7 @@ describe("Paste in normal mode (Cmd+V)", () => {
     });
   });
 
-  test("Cmd+V pastes flat items as children of focused row", async () => {
+  test("Cmd+V pastes flat children as children of focused row", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
@@ -2449,7 +2449,7 @@ Root
     `);
   });
 
-  test("Cmd+V pastes nested items preserving hierarchy", async () => {
+  test("Cmd+V pastes nested children preserving hierarchy", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 

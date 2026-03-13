@@ -1,20 +1,18 @@
-import { shortID } from "./connections";
-
 export const LOG_ROOT_ROLE: RootSystemRole = "log";
 export const LOG_ROOT_TEXT = "~Log";
 
-export function isStandaloneRoot(relation: Relations): boolean {
-  return relation.root === shortID(relation.id);
+export function isStandaloneRoot(relation: GraphNode): boolean {
+  return !relation.parent && relation.root === relation.id;
 }
 
 export function getOwnSystemRoot(
   knowledgeDBs: KnowledgeDBs,
   author: PublicKey,
   systemRole: RootSystemRole
-): Relations | undefined {
+): GraphNode | undefined {
   return knowledgeDBs
     .get(author)
-    ?.relations.valueSeq()
+    ?.nodes.valueSeq()
     .filter(
       (relation) =>
         relation.author === author &&
@@ -28,7 +26,7 @@ export function getOwnSystemRoot(
 export function getOwnLogRoot(
   knowledgeDBs: KnowledgeDBs,
   author: PublicKey
-): Relations | undefined {
+): GraphNode | undefined {
   return getOwnSystemRoot(knowledgeDBs, author, LOG_ROOT_ROLE);
 }
 

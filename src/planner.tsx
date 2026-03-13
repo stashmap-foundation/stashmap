@@ -22,7 +22,6 @@ import { buildDocumentEventFromRelations } from "./relationsDocumentEvent";
 import {
   shortID,
   addRelationToRelations,
-  bulkAddRelations,
   EMPTY_SEMANTIC_ID,
   isEmptySemanticID,
   getRelationsNoReferencedBy,
@@ -30,6 +29,7 @@ import {
   isConcreteRefId,
   getConcreteRefTargetRelation,
   createConcreteRefId,
+  parseConcreteRefId,
   isRefId,
   isSearchId,
   ensureRelationNativeFields,
@@ -58,6 +58,7 @@ import {
   addNodeToPathWithRelations,
   getPaneIndex,
 } from "./ViewContext";
+import { newRefNode } from "./relationFactory";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useRelaysToCreatePlan } from "./relays";
 import { mergePublishResultsOfEvents } from "./commons/PublishingStatus";
@@ -73,7 +74,7 @@ import { withUsersEntryPublicKey } from "./userEntry";
 
 function getAnchorSnapshotLabels(
   knowledgeDBs: KnowledgeDBs,
-  relation: Relations
+  relation: GraphNode
 ): string[] {
   const labels: string[] = [];
   let parentRelationID = relation.parent;
@@ -197,7 +198,7 @@ export function planUpsertContact<T extends GraphPlan>(
 export function planEnsureSystemRoot<T extends GraphPlan>(
   plan: T,
   systemRole: RootSystemRole
-): [T, Relations] {
+): [T, GraphNode] {
   const existing = getOwnSystemRoot(
     plan.knowledgeDBs,
     plan.user.publicKey,
@@ -285,20 +286,20 @@ export function planRemoveContact<T extends GraphPlan>(
 
 function upsertRelationsCore<T extends GraphPlan>(
   plan: T,
-  relations: Relations
+  nodes: GraphNode
 ): T {
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
   const normalizedRelations = ensureRelationNativeFields(
     plan.knowledgeDBs,
-    relations
+    nodes
   );
-  const updatedRelations = userDB.relations.set(
+  const updatedRelations = userDB.nodes.set(
     shortID(normalizedRelations.id),
     normalizedRelations
   );
   const updatedDB = {
     ...userDB,
-    relations: updatedRelations,
+    nodes: updatedRelations,
   };
   const affectedRoot = normalizedRelations.root;
   return {
@@ -309,10 +310,10 @@ function upsertRelationsCore<T extends GraphPlan>(
 }
 
 function addCrefToLog<T extends GraphPlan>(plan: T, relationID: LongID): T {
-  const [planWithLog, relations] = planEnsureSystemRoot(plan, LOG_ROOT_ROLE);
+  const [planWithLog, nodes] = planEnsureSystemRoot(plan, LOG_ROOT_ROLE);
   const crefId = createConcreteRefId(relationID);
   const updatedRelations = addRelationToRelations(
-    relations,
+    nodes,
     crefId,
     undefined,
     undefined,
@@ -323,21 +324,21 @@ function addCrefToLog<T extends GraphPlan>(plan: T, relationID: LongID): T {
 
 export function planUpsertRelations<T extends GraphPlan>(
   plan: T,
-  relations: Relations
+  nodes: GraphNode
 ): T {
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
-  const isNewRelation = !userDB.relations.has(shortID(relations.id));
-  const basePlan = upsertRelationsCore(plan, relations);
+  const isNewRelation = !userDB.nodes.has(shortID(nodes.id));
+  const basePlan = upsertRelationsCore(plan, nodes);
 
-  const isRootRelation = isNewRelation && !relations.parent;
-  const shouldAddToLog = isRootRelation && relations.systemRole === undefined;
+  const isRootRelation = isNewRelation && !nodes.parent;
+  const shouldAddToLog = isRootRelation && nodes.systemRole === undefined;
   if (!shouldAddToLog) {
     return basePlan;
   }
-  return addCrefToLog(basePlan, relations.id);
+  return addCrefToLog(basePlan, nodes.id);
 }
 
-export type AddToParentTarget = LongID | ID | TextSeed;
+export type AddToParentTarget = ID | TextSeed;
 
 export function planUpdateRelationText(
   plan: Plan,
@@ -375,25 +376,25 @@ function removeEmptyNodeFromKnowledgeDBs(
   const shortRelationsID = relationsID.includes("_")
     ? relationsID.split("_")[1]
     : relationsID;
-  const existingRelations = myDB.relations.get(shortRelationsID);
+  const existingRelations = myDB.nodes.get(shortRelationsID);
   if (!existingRelations) {
     return knowledgeDBs;
   }
 
-  const filteredItems = existingRelations.items.filter(
+  const filteredItems = existingRelations.children.filter(
     (item) => !isEmptySemanticID(item.id)
   );
-  if (filteredItems.size === existingRelations.items.size) {
+  if (filteredItems.size === existingRelations.children.size) {
     return knowledgeDBs;
   }
 
-  const updatedRelations = myDB.relations.set(shortRelationsID, {
+  const updatedRelations = myDB.nodes.set(shortRelationsID, {
     ...existingRelations,
-    items: filteredItems,
+    children: filteredItems,
   });
   return knowledgeDBs.set(publicKey, {
     ...myDB,
-    relations: updatedRelations,
+    nodes: updatedRelations,
   });
 }
 
@@ -566,12 +567,17 @@ export function planExpandNode(
 
 export function planAddTargetsToRelation<T extends GraphPlan>(
   plan: T,
-  parentRelation: Relations,
+  parentRelation: GraphNode,
   targets: AddToParentTarget | AddToParentTarget[],
   insertAtIndex?: number,
   relevance?: Relevance,
   argument?: Argument
-): [T, (LongID | ID)[]] {
+): [T, ID[]] {
+  type ChildPayload = {
+    childNode: GraphNode;
+    actualItemID: ID;
+  };
+
   const targetsArray = Array.isArray(targets) ? targets : [targets];
   if (targetsArray.length === 0) {
     return [plan, []];
@@ -582,7 +588,9 @@ export function planAddTargetsToRelation<T extends GraphPlan>(
     getRelationSemanticID(parentRelation)
   );
 
-  const [planWithChildren, relationItemPayload] = targetsArray.reduce(
+  const [planWithChildren, relationItemPayload] = targetsArray.reduce<
+    [T, ChildPayload[]]
+  >(
     ([accPlan, accItems], objectOrID) => {
       const objectID =
         typeof objectOrID === "string" ? objectOrID : objectOrID.id;
@@ -590,9 +598,40 @@ export function planAddTargetsToRelation<T extends GraphPlan>(
         typeof objectOrID === "string" ? undefined : objectOrID.text;
       const localID = shortID(objectID as ID) as ID;
       if (isConcreteRefId(objectID) || isSearchId(localID)) {
+        const targetID = parseConcreteRefId(objectID as LongID)?.relationID;
+        const refNode = isConcreteRefId(objectID)
+          ? newRefNode(
+              accPlan.user.publicKey,
+              parentRelation.root,
+              getConcreteRefTargetRelation(
+                accPlan.knowledgeDBs,
+                objectID,
+                accPlan.user.publicKey
+              )?.id || (targetID as LongID),
+              parentRelation.id,
+              relevance,
+              argument
+            )
+          : ({
+              children: List<GraphNode>(),
+              id: objectID,
+              text: "",
+              parent: parentRelation.id,
+              updated: Date.now(),
+              author: accPlan.user.publicKey,
+              root: parentRelation.root,
+              relevance,
+              argument,
+            } as GraphNode);
         return [
           accPlan,
-          [...accItems, { relationItemID: objectID, actualItemID: objectID }],
+          [
+            ...accItems,
+            {
+              childNode: refNode,
+              actualItemID: refNode.id,
+            },
+          ],
         ];
       }
 
@@ -607,8 +646,18 @@ export function planAddTargetsToRelation<T extends GraphPlan>(
           [
             ...accItems,
             {
-              relationItemID: existingRelation.id,
-              actualItemID: getRelationSemanticID(existingRelation),
+              childNode: {
+                ...existingRelation,
+                parent: parentRelation.id,
+                root: parentRelation.root,
+                relevance:
+                  relevance !== undefined
+                    ? relevance
+                    : existingRelation.relevance,
+                argument:
+                  argument !== undefined ? argument : existingRelation.argument,
+              },
+              actualItemID: existingRelation.id,
             },
           ],
         ];
@@ -629,29 +678,42 @@ export function planAddTargetsToRelation<T extends GraphPlan>(
         [
           ...accItems,
           {
-            relationItemID: relationWithUserPublicKey.id,
-            actualItemID: getRelationSemanticID(relationWithUserPublicKey),
+            childNode: {
+              ...relationWithUserPublicKey,
+              relevance,
+              argument,
+            },
+            actualItemID: relationWithUserPublicKey.id,
           },
         ],
       ];
     },
-    [
-      plan,
-      [] as Array<{ relationItemID: LongID | ID; actualItemID: LongID | ID }>,
-    ]
+    [plan, []]
+  );
+
+  const insertedRelation = relationItemPayload.reduce<GraphNode>(
+    (acc, item, currentIndex) => {
+      const ord =
+        insertAtIndex !== undefined ? insertAtIndex + currentIndex : undefined;
+      const defaultOrder = acc.children.size;
+      const withPush = {
+        ...acc,
+        children: acc.children.push(item.childNode),
+      };
+      return ord !== undefined && ord !== defaultOrder
+        ? {
+            ...withPush,
+            children: withPush.children
+              .filter((_, index) => index !== defaultOrder)
+              .splice(ord, 0, item.childNode),
+          }
+        : withPush;
+    },
+    parentRelation
   );
 
   return [
-    planUpsertRelations(
-      planWithChildren,
-      bulkAddRelations(
-        parentRelation,
-        relationItemPayload.map((item) => item.relationItemID),
-        relevance,
-        argument,
-        insertAtIndex
-      )
-    ),
+    planUpsertRelations(planWithChildren, insertedRelation),
     relationItemPayload.map((item) => item.actualItemID),
   ];
 }
@@ -664,8 +726,8 @@ export function planAddToParent(
   insertAtIndex?: number,
   relevance?: Relevance,
   argument?: Argument
-): [Plan, (LongID | ID)[]] {
-  const ensureParentRelation = (): [Plan, Relations] => {
+): [Plan, ID[]] {
+  const ensureParentRelation = (): [Plan, GraphNode] => {
     const [, parentView] = getRowIDFromView(plan, parentViewPath);
     const planWithExpand = planExpandNode(plan, parentView, parentViewPath);
     const existingRelation = getRelationForView(
@@ -680,7 +742,7 @@ export function planAddToParent(
       planWithExpand,
       parentViewPath,
       stack,
-      (relations) => relations
+      (nodes) => nodes
     );
     const parentRelation = getRelationForView(
       planWithParentRelation,
@@ -710,16 +772,16 @@ export function planAddToParent(
 
 type RelationsIdMapping = Map<LongID, LongID>;
 
-function getEffectiveParentRelationID(relation: Relations): LongID | undefined {
+function getEffectiveParentRelationID(relation: GraphNode): LongID | undefined {
   return relation.parent;
 }
 
 function getRelationDepth(
-  relationsByID: Map<ID, Relations>,
-  relation: Relations
+  relationsByID: Map<ID, GraphNode>,
+  relation: GraphNode
 ): number {
   let depth = 0;
-  let currentRelation: Relations | undefined = relation;
+  let currentRelation: GraphNode | undefined = relation;
   const seen = new Set<ID>();
 
   while (currentRelation?.parent) {
@@ -740,17 +802,15 @@ function getRelationDepth(
 
 function getRelationSubtree(
   plan: GraphPlan,
-  sourceRelation: Relations,
-  filterRelation: (relation: Relations) => boolean = () => true
-): List<Relations> {
+  sourceRelation: GraphNode,
+  filterRelation: (relation: GraphNode) => boolean = () => true
+): List<GraphNode> {
   const authorRelations =
-    plan.knowledgeDBs
-      .get(sourceRelation.author)
-      ?.relations.valueSeq()
-      .toList() || List<Relations>();
+    plan.knowledgeDBs.get(sourceRelation.author)?.nodes.valueSeq().toList() ||
+    List<GraphNode>();
   const authorRelationsByID = authorRelations.reduce(
     (acc, relation) => acc.set(shortID(relation.id), relation),
-    Map<ID, Relations>()
+    Map<ID, GraphNode>()
   );
   const childrenByParent = authorRelations
     .filter((relation) => relation.root === sourceRelation.root)
@@ -759,13 +819,13 @@ function getRelationSubtree(
       if (!parentID) {
         return acc;
       }
-      return acc.update(parentID, List<Relations>(), (relations) =>
-        relations.push(relation)
+      return acc.update(parentID, List<GraphNode>(), (nodes) =>
+        nodes.push(relation)
       );
-    }, Map<LongID, List<Relations>>());
+    }, Map<LongID, List<GraphNode>>());
 
-  const ordered: Relations[] = [];
-  const queue: Relations[] = filterRelation(sourceRelation)
+  const ordered: GraphNode[] = [];
+  const queue: GraphNode[] = filterRelation(sourceRelation)
     ? [sourceRelation]
     : [];
   const seen = new Set<LongID>(queue.map((relation) => relation.id));
@@ -777,7 +837,7 @@ function getRelationSubtree(
     }
     ordered.push(current);
     const children = childrenByParent
-      .get(current.id, List<Relations>())
+      .get(current.id, List<GraphNode>())
       .sortBy((relation) => getRelationDepth(authorRelationsByID, relation));
     children.forEach((child) => {
       if (seen.has(child.id) || !filterRelation(child)) {
@@ -793,11 +853,11 @@ function getRelationSubtree(
 
 function planCopyDescendantRelations(
   plan: Plan,
-  sourceRelation: Relations,
-  getSemanticContext: (relation: Relations) => Context,
-  filterRelation?: (relation: Relations) => boolean,
+  sourceRelation: GraphNode,
+  getSemanticContext: (relation: GraphNode) => Context,
+  filterRelation?: (relation: GraphNode) => boolean,
   targetParentRelationID?: LongID,
-  targetSemanticID?: LongID | ID,
+  targetSemanticID?: ID,
   root?: ID
 ): [Plan, RelationsIdMapping] {
   const descendants = getRelationSubtree(
@@ -835,7 +895,7 @@ function planCopyDescendantRelations(
   const resultPlan = copiedRelations.reduce(
     (accPlan, { source, newSemanticContext, sourceParentID, copy }) => {
       const isRootRelation = source.id === sourceRelation.id;
-      const items = source.items.map((item) => {
+      const children = source.children.map((item) => {
         const mappedID = resultMapping.get(item.id as LongID);
         return mappedID ? { ...item, id: mappedID } : item;
       });
@@ -846,7 +906,7 @@ function planCopyDescendantRelations(
         : undefined;
       return planUpsertRelations(accPlan, {
         ...copy,
-        items,
+        children,
         parent: copiedParentID,
         anchor: (() => {
           if (!isRootRelation || targetParentRelationID) {
@@ -870,10 +930,10 @@ function planCopyDescendantRelations(
 
 export function planMoveDescendantRelations<T extends GraphPlan>(
   plan: T,
-  sourceRelation: Relations,
+  sourceRelation: GraphNode,
   targetSemanticContext: Context,
   targetParentRelationID?: LongID,
-  targetSemanticID?: LongID | ID,
+  targetSemanticID?: ID,
   root?: ID
 ): T {
   const descendants = getRelationSubtree(plan, sourceRelation);
@@ -919,7 +979,7 @@ export function planMoveTreeDescendantsToContext(
   plan: Plan,
   originalTopNodeIDs: ID[],
   sourceRelationIDs: LongID[],
-  actualNodeIDs: (LongID | ID)[],
+  actualNodeIDs: ID[],
   parentViewPath: ViewPath,
   stack: ID[],
   root?: ID
@@ -1032,9 +1092,9 @@ export function planDeepCopyNode(
   const sourceRelation = getRelationForView(plan, sourceViewPath, sourceStack);
 
   const resolveSource = (): {
-    itemID: LongID | ID;
+    itemID: ID;
     semanticContext: Context;
-    relation?: Relations;
+    relation?: GraphNode;
   } => {
     if (isConcreteRefId(sourceItemID)) {
       const relation = getConcreteRefTargetRelation(
@@ -1075,7 +1135,7 @@ export function planDeepCopyNode(
       plan,
       targetParentViewPath,
       stack,
-      (relations) => relations
+      (nodes) => nodes
     );
     const createdParent = getRelationForView(
       planWithCreatedParent,
@@ -1167,19 +1227,15 @@ export function planDeepCopyNodeWithView(
     insertAtIndex
   );
 
-  const relations = getRelationForView(
-    planWithCopy,
-    targetParentViewPath,
-    stack
-  );
-  if (!relations || relations.items.size === 0) {
+  const nodes = getRelationForView(planWithCopy, targetParentViewPath, stack);
+  if (!nodes || nodes.children.size === 0) {
     return planWithCopy;
   }
 
-  const targetIndex = insertAtIndex ?? relations.items.size - 1;
+  const targetIndex = insertAtIndex ?? nodes.children.size - 1;
   const targetViewPath = addNodeToPathWithRelations(
     targetParentViewPath,
-    relations,
+    nodes,
     targetIndex
   );
 
@@ -1284,11 +1340,11 @@ export function planSaveNodeAndEnsureRelations(
       if (!trimmedText) return { plan, viewPath };
       return planCreateNoteAtRoot(plan, trimmedText, viewPath);
     }
-    const relations = getRelationForView(plan, parentPath, stack);
+    const nodes = getRelationForView(plan, parentPath, stack);
 
     if (!trimmedText) {
-      const resultPlan = relations
-        ? planRemoveEmptyNodePosition(plan, relations.id)
+      const resultPlan = nodes
+        ? planRemoveEmptyNodePosition(plan, nodes.id)
         : plan;
       return { plan: resultPlan, viewPath };
     }
@@ -1298,13 +1354,11 @@ export function planSaveNodeAndEnsureRelations(
     const emptyNodeMetadata = computeEmptyNodeMetadata(
       plan.publishEventsStatus.temporaryEvents
     );
-    const metadata = relations
-      ? emptyNodeMetadata.get(relations.id)
-      : undefined;
+    const metadata = nodes ? emptyNodeMetadata.get(nodes.id) : undefined;
     const emptyNodeIndex = metadata?.index ?? 0;
 
-    const planWithoutEmpty = relations
-      ? planRemoveEmptyNodePosition(planWithNode, relations.id)
+    const planWithoutEmpty = nodes
+      ? planRemoveEmptyNodePosition(planWithNode, nodes.id)
       : planWithNode;
 
     const [resultPlan] = planAddToParent(
@@ -1355,16 +1409,13 @@ export function getNextInsertPosition(
   return [parentPath, stack, (relationIndex ?? 0) + 1];
 }
 
-export function planDeleteSemanticID(
-  plan: Plan,
-  semanticID: LongID | ID
-): Plan {
+export function planDeleteSemanticID(plan: Plan, semanticID: ID): Plan {
   // Prevent deletion of empty placeholder node
   if (isEmptySemanticID(semanticID)) {
     return plan;
   }
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
-  const ownedStandaloneRoots = userDB.relations
+  const ownedStandaloneRoots = userDB.nodes
     .valueSeq()
     .filter(
       (relation) =>
@@ -1387,11 +1438,11 @@ export function planDeleteRelations<T extends GraphPlan>(
   relationsID: LongID
 ): T {
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
-  const relation = userDB.relations.get(shortID(relationsID));
-  const updatedRelations = userDB.relations.remove(shortID(relationsID));
+  const relation = userDB.nodes.get(shortID(relationsID));
+  const updatedRelations = userDB.nodes.remove(shortID(relationsID));
   const updatedDB = {
     ...userDB,
-    relations: updatedRelations,
+    nodes: updatedRelations,
   };
   const affectedRoot = relation?.root;
   return {
@@ -1405,12 +1456,12 @@ export function planDeleteRelations<T extends GraphPlan>(
 
 export function planDeleteDescendantRelations<T extends GraphPlan>(
   plan: T,
-  sourceRelation: Relations
+  sourceRelation: GraphNode
 ): T {
   const userRelationsByID = plan.knowledgeDBs.get(
     plan.user.publicKey,
     newDB()
-  ).relations;
+  ).nodes;
   const descendants = getRelationSubtree(plan, sourceRelation)
     .filter((relation) => relation.id !== sourceRelation.id)
     .filter((relation) => relation.author === plan.user.publicKey)
@@ -1518,24 +1569,27 @@ const PlanningContext = React.createContext<PlanningContextValue | undefined>(
 
 // Filter out empty placeholder nodes from events before publishing
 // Empty nodes are injected at read time via injectEmptyNodesIntoKnowledgeDBs,
-// so any relations modification will include them - we need to filter before publishing
+// so any nodes modification will include them - we need to filter before publishing
 export function buildDocumentEvents(
   plan: GraphPlan
 ): List<UnsignedEvent & EventAttachment> {
   const author = plan.user.publicKey;
   const userDB = plan.knowledgeDBs.get(author, newDB());
   return plan.affectedRoots.reduce((events, rootId) => {
-    const rootRelation = userDB.relations.find((r) => shortID(r.id) === rootId);
-    const isStandaloneRootRelation =
-      !!rootRelation && rootRelation.root === shortID(rootRelation.id);
-
-    if (!rootRelation || !isStandaloneRootRelation) {
+    const rootRelation = userDB.nodes.find(
+      (r) =>
+        r.id === rootId ||
+        shortID(r.id) === rootId ||
+        (!r.parent && (r.root === rootId || r.root === shortID(rootId as ID)))
+    );
+    if (!rootRelation) {
+      const rootDTag = shortID(rootId as ID);
       const deleteEvent = {
         kind: KIND_DELETE,
         pubkey: author,
         created_at: newTimestamp(),
         tags: [
-          ["a", `${KIND_KNOWLEDGE_DOCUMENT}:${author}:${rootId}`],
+          ["a", `${KIND_KNOWLEDGE_DOCUMENT}:${author}:${rootDTag}`],
           ["k", `${KIND_KNOWLEDGE_DOCUMENT}`],
           msTag(),
         ],
@@ -1782,7 +1836,7 @@ export function planSetEmptyNodePosition(
   stack: ID[],
   insertIndex: number
 ): Plan {
-  // 1. Ensure we have our own editable relations (copies remote if needed)
+  // 1. Ensure we have our own editable nodes (copies remote if needed)
   const planWithOwnRelations = upsertRelations(
     plan,
     parentPath,
@@ -1798,8 +1852,8 @@ export function planSetEmptyNodePosition(
     parentPath
   );
 
-  const relations = getRelationForView(planWithExpanded, parentPath, stack);
-  if (!relations) {
+  const nodes = getRelationForView(planWithExpanded, parentPath, stack);
+  if (!nodes) {
     return plan;
   }
 
@@ -1808,9 +1862,18 @@ export function planSetEmptyNodePosition(
     ...planWithExpanded,
     temporaryEvents: planWithExpanded.temporaryEvents.push({
       type: "ADD_EMPTY_NODE",
-      relationsID: relations.id,
+      relationsID: nodes.id,
       index: insertIndex,
-      relationItem: { id: EMPTY_SEMANTIC_ID, relevance: undefined },
+      relationItem: {
+        children: List<GraphNode>(),
+        id: EMPTY_SEMANTIC_ID,
+        text: "",
+        parent: nodes.id,
+        updated: Date.now(),
+        author: plan.user.publicKey,
+        root: nodes.root,
+        relevance: undefined,
+      },
       paneIndex: getPaneIndex(parentPath),
     }),
   };
@@ -1829,7 +1892,7 @@ export function planUpdateEmptyNodeMetadata(
     return plan;
   }
 
-  const updatedRelationItem: RelationItem = {
+  const updatedRelationItem: GraphNode = {
     ...existing.relationItem,
     relevance: metadata.relevance ?? existing.relationItem.relevance,
     argument: metadata.argument ?? existing.relationItem.argument,

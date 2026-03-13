@@ -6,14 +6,14 @@ export type RelationItemMetadata = {
 };
 
 export function updateRelationItemMetadata(
-  relations: Relations,
+  nodes: GraphNode,
   relationIndex: number,
   metadata: RelationItemMetadata
-): Relations {
+): GraphNode {
   const withRelevance =
     "relevance" in metadata
-      ? updateItemRelevance(relations, relationIndex, metadata.relevance)
-      : relations;
+      ? updateItemRelevance(nodes, relationIndex, metadata.relevance)
+      : nodes;
   return "argument" in metadata
     ? updateItemArgument(withRelevance, relationIndex, metadata.argument)
     : withRelevance;

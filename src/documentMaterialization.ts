@@ -30,7 +30,7 @@ export function storedDocumentToEvent(
 
 export function findDocumentRelations(
   events: List<UnsignedEvent | Event>
-): Map<string, Relations> {
+): Map<string, GraphNode> {
   const deletedKeys = events
     .filter(
       (event) =>
@@ -82,12 +82,12 @@ export function findDocumentRelations(
       return acc.set(id, relation);
     }
     return acc;
-  }, Map<string, Relations>());
+  }, Map<string, GraphNode>());
 }
 
 export function buildKnowledgeDBFromDocumentRelations(
   author: PublicKey,
-  documentRelations: Map<string, Relations>
+  documentRelations: Map<string, GraphNode>
 ): KnowledgeData | undefined {
   if (documentRelations.size === 0) {
     return undefined;
@@ -95,10 +95,10 @@ export function buildKnowledgeDBFromDocumentRelations(
 
   const baseKnowledgeDBs = Map<PublicKey, KnowledgeData>().set(author, {
     ...newDB(),
-    relations: documentRelations,
+    nodes: documentRelations,
   });
 
-  const relations = documentRelations
+  const nodes = documentRelations
     .valueSeq()
     .sortBy((relation) => getRelationDepth(baseKnowledgeDBs, relation))
     .reduce((acc, relation) => {
@@ -106,16 +106,16 @@ export function buildKnowledgeDBFromDocumentRelations(
         relation.author,
         {
           ...newDB(),
-          relations: acc,
+          nodes: acc,
         }
       );
       const normalized = ensureRelationNativeFields(knowledgeDBs, relation);
       return acc.set(shortID(normalized.id), normalized);
-    }, Map<string, Relations>());
+    }, Map<string, GraphNode>());
 
   return {
     ...newDB(),
-    relations,
+    nodes,
   };
 }
 

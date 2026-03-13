@@ -19,12 +19,12 @@ export {
 } from "../markdownPlan";
 
 /* eslint-disable functional/immutable-data */
-export function parsedLinesToTrees(items: ParsedLine[]): MarkdownTreeNode[] {
-  if (items.length === 0) return [];
-  const minDepth = Math.min(...items.map((i) => i.depth));
+export function parsedLinesToTrees(children: ParsedLine[]): MarkdownTreeNode[] {
+  if (children.length === 0) return [];
+  const minDepth = Math.min(...children.map((i) => i.depth));
   const roots: MarkdownTreeNode[] = [];
   const stack: MarkdownTreeNode[] = [];
-  items.forEach((item) => {
+  children.forEach((item) => {
     const depth = item.depth - minDepth;
     const node: MarkdownTreeNode = { text: item.text, children: [] };
     stack.length = Math.min(depth, stack.length);

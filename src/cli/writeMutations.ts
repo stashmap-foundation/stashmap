@@ -44,16 +44,18 @@ function parseArgument(value: string, flag: string): "none" | Argument {
   throw new Error(`Invalid ${flag} value: ${value}`);
 }
 
-function parsePositionArgs<
-  T extends { beforeItemId?: LongID | ID; afterItemId?: LongID | ID }
->(args: string[], index: number, current: T): [number, T] {
+function parsePositionArgs<T extends { beforeItemId?: ID; afterItemId?: ID }>(
+  args: string[],
+  index: number,
+  current: T
+): [number, T] {
   const arg = args[index];
   if (arg === "--before") {
     return [
       index + 2,
       {
         ...current,
-        beforeItemId: requireValue(args, index, "--before") as LongID | ID,
+        beforeItemId: requireValue(args, index, "--before") as ID,
       },
     ];
   }
@@ -62,7 +64,7 @@ function parsePositionArgs<
       index + 2,
       {
         ...current,
-        afterItemId: requireValue(args, index, "--after") as LongID | ID,
+        afterItemId: requireValue(args, index, "--after") as ID,
       },
     ];
   }
@@ -302,7 +304,7 @@ export function parseWriteSetRelevanceArgs(
       case "--item":
         return parse(index + 2, {
           ...current,
-          itemId: requireValue(args, index, "--item") as LongID | ID,
+          itemId: requireValue(args, index, "--item") as ID,
         });
       case "--value":
         return parse(index + 2, {
@@ -351,7 +353,7 @@ export function parseWriteSetArgumentArgs(
       case "--item":
         return parse(index + 2, {
           ...current,
-          itemId: requireValue(args, index, "--item") as LongID | ID,
+          itemId: requireValue(args, index, "--item") as ID,
         });
       case "--value":
         return parse(index + 2, {
@@ -400,7 +402,7 @@ export function parseWriteDeleteItemArgs(
       case "--item":
         return parse(index + 2, {
           ...current,
-          itemId: requireValue(args, index, "--item") as LongID | ID,
+          itemId: requireValue(args, index, "--item") as ID,
         });
       default:
         throw new Error(`Unknown write delete-item argument: ${arg}`);
@@ -451,7 +453,7 @@ export function parseWriteMoveItemArgs(args: string[]): WriteMoveItemCliArgs {
       case "--item":
         return parse(index + 2, {
           ...current,
-          itemId: requireValue(args, index, "--item") as LongID | ID,
+          itemId: requireValue(args, index, "--item") as ID,
         });
       case "--to-parent":
         return parse(index + 2, {

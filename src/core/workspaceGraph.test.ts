@@ -13,6 +13,7 @@ import {
 } from "../dataPlanner";
 import { parseDocumentEvent } from "../markdownRelations";
 import { KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
+import { findTag } from "../nostrEvents";
 import {
   buildSingleRootMarkdownDocumentEvent,
   requireSingleRootMarkdownTree,
@@ -84,7 +85,7 @@ function writeWorkspace(tempDir: string, drafts: WorkspaceDraft[]): void {
   );
 }
 
-function parseRootRelations(draft: WorkspaceDraft): Relations[] {
+function parseRootRelations(draft: WorkspaceDraft): GraphNode[] {
   return parseDocumentEvent(draft.event).valueSeq().toArray();
 }
 
@@ -101,9 +102,9 @@ test("inspectChildren lists stable child item ids from the synced workspace", as
 
   expect(result.relation_id).toBe(homeDraft.relationID);
   expect(result.skipped_document_count).toBe(0);
-  expect(result.items.map((item) => item.text)).toEqual(["Plan", "Notes"]);
-  expect(result.items.every((item) => item.kind === "relation")).toBe(true);
-  expect(result.items.every((item) => item.relevance === "contains")).toBe(
+  expect(result.children.map((item) => item.text)).toEqual(["Plan", "Notes"]);
+  expect(result.children.every((item) => item.kind === "relation")).toBe(true);
+  expect(result.children.every((item) => item.relevance === "contains")).toBe(
     true
   );
 });
@@ -190,17 +191,17 @@ test("setRelationText, setItemRelevance, and setItemArgument republish the same 
     }
   );
   const [event] = buildKnowledgeDocumentEvents(arguedPlan);
-  const relations = parseDocumentEvent(event).valueSeq().toArray();
-  const republishedHome = relations.find(
+  const nodes = parseDocumentEvent(event).valueSeq().toArray();
+  const republishedHome = nodes.find(
     (relation) => relation.id === homeDraft.relationID
   );
-  const republishedPlan = relations.find(
+  const republishedPlan = nodes.find(
     (relation) => relation.id === (planRelation?.id as LongID)
   );
 
   expect(republishedPlan?.text).toBe("Updated Plan");
-  expect(republishedHome?.items.first()?.relevance).toBe("not_relevant");
-  expect(republishedHome?.items.first()?.argument).toBe("contra");
+  expect(republishedHome?.children.first()?.relevance).toBe("not_relevant");
+  expect(republishedHome?.children.first()?.argument).toBe("contra");
 });
 
 test("createUnderParent and linkUnderParent add owned children and crefs to the existing root", async () => {
@@ -227,11 +228,13 @@ test("createUnderParent and linkUnderParent add owned children and crefs to the 
     homeDraft.relationID,
     roadmapDraft.relationID
   );
-  const [event] = buildKnowledgeDocumentEvents(linked.plan);
+  const event = buildKnowledgeDocumentEvents(linked.plan).find(
+    (candidate) => findTag(candidate, "d") === homeDraft.rootUuid
+  );
 
-  expect(event.content).toContain("- Notes {");
-  expect(event.content).toContain(".maybe_relevant .confirms");
-  expect(event.content).toContain(`[Roadmap](#${roadmapDraft.relationID})`);
+  expect(event?.content).toContain("- Notes {");
+  expect(event?.content).toContain(".maybe_relevant .confirms");
+  expect(event?.content).toContain(`[Roadmap](#${roadmapDraft.relationID})`);
 });
 
 test("moveItem preserves relevance and argument across parents, and delete-item semantics delete owned subtrees", async () => {
@@ -243,10 +246,10 @@ test("moveItem preserves relevance and argument across parents, and delete-item 
   writeWorkspace(tempDir, [homeDraft]);
   const graph = await loadWorkspaceGraph(tempDir);
   const plan = createHeadlessPlan(ALICE, graph.knowledgeDBs);
-  const relations = parseRootRelations(homeDraft);
-  const bucketA = relations.find((relation) => relation.text === "Bucket A");
-  const bucketB = relations.find((relation) => relation.text === "Bucket B");
-  const task = relations.find((relation) => relation.text === "Task");
+  const nodes = parseRootRelations(homeDraft);
+  const bucketA = nodes.find((relation) => relation.text === "Bucket A");
+  const bucketB = nodes.find((relation) => relation.text === "Bucket B");
+  const task = nodes.find((relation) => relation.text === "Task");
 
   expect(bucketA).toBeDefined();
   expect(bucketB).toBeDefined();
@@ -268,10 +271,10 @@ test("moveItem preserves relevance and argument across parents, and delete-item 
     (relation) => relation.id === bucketB?.id
   );
 
-  expect(movedBucketA?.items.size).toBe(0);
-  expect(movedBucketB?.items.first()?.id).toBe(task?.id);
-  expect(movedBucketB?.items.first()?.relevance).toBe("relevant");
-  expect(movedBucketB?.items.first()?.argument).toBe("contra");
+  expect(movedBucketA?.children.size).toBe(0);
+  expect(movedBucketB?.children.first()?.id).toBe(task?.id);
+  expect(movedBucketB?.children.first()?.relevance).toBe("relevant");
+  expect(movedBucketB?.children.first()?.argument).toBe("contra");
 
   const removedPlan = planRemoveRelationItemById(
     movedPlan,
@@ -289,7 +292,7 @@ test("moveItem preserves relevance and argument across parents, and delete-item 
   expect(removedRelations.find((relation) => relation.id === task?.id)).toBe(
     undefined
   );
-  expect(removedBucketB?.items.find((item) => item.id === task?.id)).toBe(
+  expect(removedBucketB?.children.find((item) => item.id === task?.id)).toBe(
     undefined
   );
 });
@@ -303,9 +306,9 @@ test("moveItem rejects moving a relation under its own descendant", async () => 
   writeWorkspace(tempDir, [homeDraft]);
   const graph = await loadWorkspaceGraph(tempDir);
   const plan = createHeadlessPlan(ALICE, graph.knowledgeDBs);
-  const relations = parseRootRelations(homeDraft);
-  const parent = relations.find((relation) => relation.text === "Parent");
-  const child = relations.find((relation) => relation.text === "Child");
+  const nodes = parseRootRelations(homeDraft);
+  const parent = nodes.find((relation) => relation.text === "Parent");
+  const child = nodes.find((relation) => relation.text === "Child");
 
   expect(parent).toBeDefined();
   expect(child).toBeDefined();

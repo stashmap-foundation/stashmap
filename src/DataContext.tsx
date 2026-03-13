@@ -39,7 +39,7 @@ function mergeDBNodesAndRelations(
     return existing;
   }
   return {
-    relations: existing.relations.merge(b.relations),
+    nodes: existing.nodes.merge(b.nodes),
   };
 }
 

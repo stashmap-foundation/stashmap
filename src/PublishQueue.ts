@@ -17,11 +17,11 @@ const MAX_BACKOFF_MS = 60000;
 const DEFAULT_BATCH_SIZE = 10;
 
 const toChunks = <T>(
-  items: ReadonlyArray<T>,
+  children: ReadonlyArray<T>,
   size: number
 ): ReadonlyArray<ReadonlyArray<T>> =>
-  Array.from({ length: Math.ceil(items.length / size) }, (_, i) =>
-    items.slice(i * size, (i + 1) * size)
+  Array.from({ length: Math.ceil(children.length / size) }, (_, i) =>
+    children.slice(i * size, (i + 1) * size)
   );
 
 type RelayBackoffState = {

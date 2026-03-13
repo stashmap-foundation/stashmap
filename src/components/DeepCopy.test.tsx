@@ -189,7 +189,7 @@ My Notes
     `);
   });
 
-  test("Tab indent cleans up old descendant relations (no orphaned references)", async () => {
+  test("Tab indent cleans up old descendant nodes (no orphaned references)", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -268,7 +268,7 @@ Notes
     `);
   });
 
-  test("Shift-Tab outdent cleans up old descendant relations (no orphaned references)", async () => {
+  test("Shift-Tab outdent cleans up old descendant nodes (no orphaned references)", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -493,7 +493,7 @@ My Notes
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
     await navigateToNodeViaSearch(1, "Target");
 
-    // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
+    // Use toggle buttons as drop targets - they only exist in tree children, not breadcrumbs
     // Target in pane 0 has expand, Target in pane 1 has collapse (root expanded by default but no children yet)
     const targetDropTargets = getDropTargets("Target");
 
@@ -552,7 +552,7 @@ My Notes
     await screen.findByLabelText("collapse Target");
 
     // Drag Source from pane 0 to Target in pane 1
-    // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
+    // Use toggle buttons as drop targets - they only exist in tree children, not breadcrumbs
     const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(screen.getAllByText("Source")[0]);
     fireEvent.drop(targetDropTargets[1]);
@@ -640,7 +640,7 @@ My Notes
     await navigateToNodeViaSearch(1, "Target");
 
     // Drag [S] BobItem from pane 0 to Target in pane 1
-    // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
+    // Use toggle buttons as drop targets - they only exist in tree children, not breadcrumbs
     const bobItemElements = screen.getAllByText("BobItem");
     const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(bobItemElements[0]);
@@ -757,7 +757,7 @@ My Notes
     await navigateToNodeViaSearch(1, "Target");
 
     // Drag collapsed [S] Folder from pane 0 to Target in pane 1
-    // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
+    // Use toggle buttons as drop targets - they only exist in tree children, not breadcrumbs
     const folderElements = screen.getAllByText("Folder");
     const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(folderElements[0]);
@@ -923,7 +923,7 @@ Target
     `);
 
     // Drag [S] BobFolder from pane 0 to Target root in pane 1
-    // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
+    // Use toggle buttons as drop targets - they only exist in tree children, not breadcrumbs
     const bobFolderElements = screen.getAllByText("BobFolder");
     const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(bobFolderElements[0]);
@@ -1173,7 +1173,7 @@ My Notes
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
     await navigateToNodeViaSearch(1, "Target");
 
-    // Use toggle buttons as drop targets - they only exist in tree items, not breadcrumbs
+    // Use toggle buttons as drop targets - they only exist in tree children, not breadcrumbs
     const targetDropTargets = getDropTargets("Target");
     fireEvent.dragStart(screen.getAllByText("BobItem")[0]);
     fireEvent.drop(targetDropTargets[1]);
@@ -1348,7 +1348,7 @@ My Notes
     expect(suggestionItem?.getAttribute("draggable")).toBe("true");
   });
 
-  test("Version items can be dragged", async () => {
+  test("Version children can be dragged", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
 
@@ -1481,7 +1481,7 @@ describe("Deep Copy - basedOn Tracking", () => {
     return walk(trees);
   };
 
-  test("Cross-pane deep copy sets basedOn on all copied relations", async () => {
+  test("Cross-pane deep copy sets basedOn on all copied nodes", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
 
     renderTree(bob);

@@ -374,7 +374,7 @@ My Notes
     expect(screen.queryByText("Error: Node not found")).toBeNull();
   });
 
-  test("suggestion not swallowed by items in other own relation", async () => {
+  test("suggestion not swallowed by children in other own relation", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
 
@@ -717,7 +717,7 @@ Target
     `);
     cleanup();
 
-    // Alice creates Target and sees Bob's items as suggestions
+    // Alice creates Target and sees Bob's children as suggestions
     renderTree(alice);
     await type("Target{Escape}");
 

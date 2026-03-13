@@ -1,9 +1,10 @@
 import { List } from "immutable";
 import {
-  isConcreteRefId,
-  parseConcreteRefId,
   getConcreteRefTargetRelation,
   getRelationsNoReferencedBy,
+  getRefTargetID,
+  isConcreteRefId,
+  isRefNode,
   shortID,
   splitID,
   itemPassesFilters,
@@ -54,9 +55,9 @@ function resolveContextLabels(
 }
 
 export type ParsedRef = {
-  relation: Relations;
+  relation: GraphNode;
   relationContext: List<ID>;
-  sourceItem?: RelationItem;
+  sourceItem?: GraphNode;
 };
 
 export function parseRef(
@@ -64,33 +65,37 @@ export function parseRef(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey
 ): ParsedRef | undefined {
+  const sourceItem = getRelationsNoReferencedBy(knowledgeDBs, refId, myself);
+  if (isRefNode(sourceItem)) {
+    const relation = getConcreteRefTargetRelation(knowledgeDBs, refId, myself);
+    if (!relation) return undefined;
+
+    const relationContext = getRelationContext(knowledgeDBs, relation).map(
+      (id) => shortID(id) as ID
+    );
+
+    return { relation, relationContext, sourceItem };
+  }
+
   if (!isConcreteRefId(refId)) {
     return undefined;
   }
-  const parsed = parseConcreteRefId(refId);
-  if (!parsed) return undefined;
-  const { relationID } = parsed;
-  const relation = getRelationsNoReferencedBy(knowledgeDBs, relationID, myself);
+
+  const relation = getConcreteRefTargetRelation(knowledgeDBs, refId, myself);
   if (!relation) return undefined;
+  const parsedSource = sourceItem || relation;
 
   const relationContext = getRelationContext(knowledgeDBs, relation).map(
     (id) => shortID(id) as ID
   );
-  const sourceItem = relation.parent
-    ? getRelationsNoReferencedBy(
-        knowledgeDBs,
-        relation.parent,
-        relation.author
-      )?.items.find((item) => item.id === relation.id)
-    : undefined;
 
-  return { relation, relationContext, sourceItem };
+  return { relation, relationContext, sourceItem: parsedSource };
 }
 
 function resolveLabels(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
-  relation: Relations,
+  relation: GraphNode,
   relationContext: List<ID>
 ): { contextLabels: string[]; targetLabel: string; fullContext: List<ID> } {
   const contextLabels = resolveContextLabels(
@@ -108,7 +113,7 @@ function resolveLabels(
 
 function getSemanticNodeKey(
   knowledgeDBs: KnowledgeDBs,
-  semanticID: LongID | ID,
+  semanticID: ID,
   author: PublicKey
 ): string {
   return (
@@ -119,8 +124,8 @@ function getSemanticNodeKey(
 
 function relationsMatchForVersion(
   knowledgeDBs: KnowledgeDBs,
-  left: Relations,
-  right: Relations
+  left: GraphNode,
+  right: GraphNode
 ): boolean {
   const useExactMatch =
     left.author === right.author && left.root === right.root;
@@ -164,10 +169,7 @@ function buildDeletedReference(
   myself: PublicKey,
   linkText?: string
 ): ReferenceRow | undefined {
-  const parsed = parseConcreteRefId(refId);
-  if (!parsed) return undefined;
-  const { relationID } = parsed;
-  const [remote] = splitID(relationID);
+  const [remote] = splitID(refId);
   const author = remote || myself;
 
   if (!linkText) return undefined;
@@ -217,7 +219,7 @@ export function buildOutgoingReference(
 
 function effectiveIDs(
   knowledgeDBs: KnowledgeDBs,
-  relation: Relations,
+  relation: GraphNode,
   activeFilters: (
     | Relevance
     | Argument
@@ -228,7 +230,7 @@ function effectiveIDs(
     | "contains"
   )[]
 ): List<string> {
-  return relation.items
+  return relation.children
     .filter(
       (item) =>
         itemPassesFilters(item, activeFilters) &&
@@ -246,8 +248,8 @@ function effectiveIDs(
 
 export function computeRelationDiff(
   knowledgeDBs: KnowledgeDBs,
-  versionRelation: Relations,
-  parentRelation: Relations | undefined,
+  versionRelation: GraphNode,
+  parentRelation: GraphNode | undefined,
   activeFilters: (
     | Relevance
     | Argument
@@ -278,12 +280,9 @@ function computeVersionMeta(
   stack: ID[]
 ): VersionMeta {
   const refId = getLast(viewPath);
-  const parsed = parseConcreteRefId(refId);
-  if (!parsed) return { updated: 0, addCount: 0, removeCount: 0 };
-
-  const relation = getRelationsNoReferencedBy(
+  const relation = getConcreteRefTargetRelation(
     data.knowledgeDBs,
-    parsed.relationID,
+    refId,
     data.user.publicKey
   );
   if (!relation) return { updated: 0, addCount: 0, removeCount: 0 };
@@ -306,18 +305,17 @@ function computeVersionMeta(
 }
 
 function findCrefToNode(
-  items: List<RelationItem>,
-  targetRelation: Relations,
+  children: List<GraphNode>,
+  targetRelation: GraphNode,
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey
-): RelationItem | undefined {
-  return items.find((item) => {
-    if (!isConcreteRefId(item.id)) return false;
-    const resolvedTarget = getConcreteRefTargetRelation(
-      knowledgeDBs,
-      item.id,
-      myself
-    );
+): GraphNode | undefined {
+  return children.find((item) => {
+    if (!isRefNode(item)) return false;
+    const targetID = getRefTargetID(item);
+    const resolvedTarget = targetID
+      ? getRelationsNoReferencedBy(knowledgeDBs, targetID, myself)
+      : undefined;
     return resolvedTarget?.id === targetRelation.id;
   });
 }
@@ -325,7 +323,7 @@ function findCrefToNode(
 function getReferenceSourceRelations(
   ref: ParsedRef,
   knowledgeDBs: KnowledgeDBs
-): Relations[] {
+): GraphNode[] {
   const parentRelation = ref.relation.parent
     ? getRelationsNoReferencedBy(
         knowledgeDBs,
@@ -343,7 +341,7 @@ function findIncomingCrefItem(
   data: Data,
   viewPath: ViewPath,
   stack: ID[]
-): RelationItem | undefined {
+): GraphNode | undefined {
   const parentPath = getParentView(viewPath);
   if (!parentPath) return undefined;
   const parentRelation = getRelationForView(data, parentPath, stack);
@@ -351,7 +349,7 @@ function findIncomingCrefItem(
   return getReferenceSourceRelations(ref, data.knowledgeDBs)
     .map((sourceRelation) =>
       findCrefToNode(
-        sourceRelation.items,
+        sourceRelation.children,
         parentRelation,
         data.knowledgeDBs,
         data.user.publicKey
@@ -373,7 +371,9 @@ export function buildReferenceItem(
     const parentRelation = parentPath
       ? getRelationForView(data, parentPath, stack)
       : undefined;
-    const parentItem = parentRelation?.items.find((item) => item.id === refId);
+    const parentItem = parentRelation?.children.find(
+      (item) => item.id === refId
+    );
     return buildDeletedReference(
       refId,
       data.user.publicKey,
@@ -461,21 +461,19 @@ export function buildReferenceItem(
   }
   if (!parentRelation) return outgoing;
 
-  const storedItem = parentRelation.items.find((item) => item.id === refId);
+  const storedItem = parentRelation.children.find((item) => item.id === refId);
   const isNotRelevant = storedItem?.relevance === "not_relevant";
 
-  const findReverseCref = (
-    items: List<RelationItem>
-  ): RelationItem | undefined =>
+  const findReverseCref = (children: List<GraphNode>): GraphNode | undefined =>
     findCrefToNode(
-      items,
+      children,
       parentRelation,
       data.knowledgeDBs,
       data.user.publicKey
     );
 
   const incomingCref = getReferenceSourceRelations(ref, data.knowledgeDBs)
-    .map((sourceRelation) => findReverseCref(sourceRelation.items))
+    .map((sourceRelation) => findReverseCref(sourceRelation.children))
     .find((item) => item !== undefined);
   const hasActiveIncoming =
     !!incomingCref && incomingCref.relevance !== "not_relevant";

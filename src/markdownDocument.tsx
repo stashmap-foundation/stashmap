@@ -4,11 +4,11 @@ import { v4 } from "uuid";
 import { UnsignedEvent } from "nostr-tools";
 import {
   shortID,
-  isConcreteRefId,
-  parseConcreteRefId,
   getConcreteRefTargetRelation,
   getRelationContext,
   getRelationSemanticID,
+  getRefTargetID,
+  isRefNode,
 } from "./connections";
 import { getTextForSemanticID } from "./semanticProjection";
 import {
@@ -39,22 +39,26 @@ export { parseMarkdownHierarchy } from "./markdownTree";
 function formatCrefText(
   knowledgeDBs: KnowledgeDBs,
   author: PublicKey,
-  refID: LongID | ID
+  refNode: GraphNode
 ): string | undefined {
-  const parsed = parseConcreteRefId(refID);
-  if (!parsed) {
+  const targetID = getRefTargetID(refNode);
+  if (!targetID) {
     return undefined;
   }
-  const ref = buildOutgoingReference(refID as LongID, knowledgeDBs, author);
+  const ref = buildOutgoingReference(
+    refNode.id as LongID,
+    knowledgeDBs,
+    author
+  );
   if (!ref) {
     return undefined;
   }
   const targetRelation = getConcreteRefTargetRelation(
     knowledgeDBs,
-    refID,
+    refNode.id,
     author
   );
-  const href = targetRelation ? `${targetRelation.id}` : `${parsed.relationID}`;
+  const href = targetRelation ? `${targetRelation.id}` : `${targetID}`;
   return `[${ref.text}](#${href})`;
 }
 
@@ -68,11 +72,11 @@ function getOwnRelationForDocumentSerialization(
   path: ViewPath,
   stack: ID[],
   author: PublicKey,
-  itemID: LongID | ID,
+  itemID: ID,
   semanticContext: List<ID>,
-  rootRelation: Relations,
+  rootRelation: GraphNode,
   isRootNode: boolean
-): Relations | undefined {
+): GraphNode | undefined {
   const directRelation = getRelationForView(data, path, stack);
   if (directRelation) {
     return directRelation;
@@ -90,7 +94,7 @@ function getOwnRelationForDocumentSerialization(
 
 function getSerializedRelationText(
   data: Data,
-  relation: Relations
+  relation: GraphNode
 ): { text: string } {
   if (relation.text !== "") {
     return {
@@ -107,11 +111,11 @@ function getSerializedRelationText(
   };
 }
 
-function buildRootPath(rootRelation: Relations): ViewPath {
+function buildRootPath(rootRelation: GraphNode): ViewPath {
   return [0, rootRelation.id];
 }
 
-function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
+function serializeTree(data: Data, rootRelation: GraphNode): SerializeResult {
   const author = data.user.publicKey;
   const rootPath = buildRootPath(rootRelation);
   const stack = [getRelationSemanticID(rootRelation)];
@@ -133,17 +137,17 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
       const semanticContext = getContext(data, path, stack);
       const item = getCurrentEdgeForView(data, path);
 
-      if (isConcreteRefId(itemID)) {
-        const parsed = parseConcreteRefId(itemID);
-        const crefText = formatCrefText(data.knowledgeDBs, author, itemID);
-        if (!crefText || !parsed) return acc;
+      if (isRefNode(item)) {
+        const crefText = formatCrefText(data.knowledgeDBs, author, item);
+        const targetID = getRefTargetID(item);
+        if (!crefText || !targetID) return acc;
         const targetRelation = getConcreteRefTargetRelation(
           data.knowledgeDBs,
-          itemID,
+          item.id,
           author
         );
         const crefRelationUUID = shortID(
-          (targetRelation?.id || parsed.relationID) as ID
+          (targetRelation?.id || targetID) as ID
         );
         const crefAttrs = formatNodeAttrs("", item?.relevance, item?.argument);
         return {
@@ -191,7 +195,7 @@ function serializeTree(data: Data, rootRelation: Relations): SerializeResult {
   );
 }
 
-export function treeToMarkdown(data: Data, rootRelation: Relations): string {
+export function treeToMarkdown(data: Data, rootRelation: GraphNode): string {
   const rootContext = getRelationContext(data.knowledgeDBs, rootRelation);
   const { text: rootText } = getSerializedRelationText(data, rootRelation);
   const rootUuid = shortID(rootRelation.id);
@@ -207,7 +211,7 @@ export function treeToMarkdown(data: Data, rootRelation: Relations): string {
 
 export function buildDocumentEvent(
   data: Data,
-  rootRelation: Relations
+  rootRelation: GraphNode
 ): UnsignedEvent {
   const author = data.user.publicKey;
   const rootContext = getRelationContext(data.knowledgeDBs, rootRelation);

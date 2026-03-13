@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { List } from "immutable";
 import {
   ALICE,
   BOB,
@@ -13,72 +14,65 @@ import {
 } from "../utils.test";
 import { itemMatchesType } from "../connections";
 
+function makeItem(
+  id: ID,
+  relevance: Relevance,
+  argument?: Argument
+): GraphNode {
+  return {
+    children: List<GraphNode>(),
+    id,
+    text: "",
+    updated: Date.now(),
+    author: ALICE.publicKey,
+    root: "root" as LongID,
+    relevance,
+    ...(argument !== undefined ? { argument } : {}),
+  };
+}
+
 describe("itemMatchesType", () => {
-  test("matches relevant items", () => {
-    const item: RelationItem = { id: "test" as ID, relevance: "relevant" };
+  test("matches relevant children", () => {
+    const item = makeItem("test" as ID, "relevant");
     expect(itemMatchesType(item, "relevant")).toBe(true);
     expect(itemMatchesType(item, "contains")).toBe(false);
   });
 
-  test("matches maybe_relevant items", () => {
-    const item: RelationItem = {
-      id: "test" as ID,
-      relevance: "maybe_relevant",
-    };
+  test("matches maybe_relevant children", () => {
+    const item = makeItem("test" as ID, "maybe_relevant");
     expect(itemMatchesType(item, "maybe_relevant")).toBe(true);
     expect(itemMatchesType(item, "relevant")).toBe(false);
   });
 
-  test("matches contains items with undefined relevance", () => {
-    const item: RelationItem = { id: "test" as ID, relevance: undefined };
+  test("matches contains children with undefined relevance", () => {
+    const item = makeItem("test" as ID, undefined);
     expect(itemMatchesType(item, "contains")).toBe(true);
     expect(itemMatchesType(item, "relevant")).toBe(false);
   });
 
-  test("matches little_relevant items", () => {
-    const item: RelationItem = {
-      id: "test" as ID,
-      relevance: "little_relevant",
-    };
+  test("matches little_relevant children", () => {
+    const item = makeItem("test" as ID, "little_relevant");
     expect(itemMatchesType(item, "little_relevant")).toBe(true);
     expect(itemMatchesType(item, "contains")).toBe(false);
   });
 
-  test("matches not_relevant items", () => {
-    const item: RelationItem = {
-      id: "test" as ID,
-      relevance: "not_relevant",
-    };
+  test("matches not_relevant children", () => {
+    const item = makeItem("test" as ID, "not_relevant");
     expect(itemMatchesType(item, "not_relevant")).toBe(true);
     expect(itemMatchesType(item, "contains")).toBe(false);
   });
 
-  test("contains filter only matches items with undefined relevance AND undefined argument", () => {
-    const itemWithArg: RelationItem = {
-      id: "test" as ID,
-      relevance: undefined,
-      argument: "confirms",
-    };
+  test("contains filter only matches children with undefined relevance AND undefined argument", () => {
+    const itemWithArg = makeItem("test" as ID, undefined, "confirms");
     expect(itemMatchesType(itemWithArg, "contains")).toBe(false);
 
-    const itemWithoutArg: RelationItem = {
-      id: "test" as ID,
-      relevance: undefined,
-    };
+    const itemWithoutArg = makeItem("test" as ID, undefined);
     expect(itemMatchesType(itemWithoutArg, "contains")).toBe(true);
   });
 
   test("matches argument types correctly", () => {
-    const confirmItem: RelationItem = {
-      id: "test" as ID,
-      relevance: undefined,
-      argument: "confirms",
-    };
-    const contraItem: RelationItem = {
-      id: "test" as ID,
-      relevance: undefined,
-      argument: "contra",
-    };
+    const confirmItem = makeItem("test" as ID, undefined, "confirms");
+    const contraItem = makeItem("test" as ID, undefined, "contra");
 
     expect(itemMatchesType(confirmItem, "confirms")).toBe(true);
     expect(itemMatchesType(confirmItem, "contra")).toBe(false);
@@ -89,7 +83,7 @@ describe("itemMatchesType", () => {
 
 // Integration tests for RelevanceSelector component
 describe("RelevanceSelector", () => {
-  test("shows relevance selector for child items", async () => {
+  test("shows relevance selector for child children", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -554,7 +548,7 @@ Crypto
 
 // Tests for relevance filtering
 describe("Relevance filtering", () => {
-  test("default filters show maybe relevant items", async () => {
+  test("default filters show maybe relevant children", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -564,7 +558,7 @@ describe("Relevance filtering", () => {
     await screen.findByText("Visible Item");
   });
 
-  test("marking items as not relevant hides them", async () => {
+  test("marking children as not relevant hides them", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -592,7 +586,7 @@ describe("Relevance filtering", () => {
     expect(screen.getByText("Child3")).toBeDefined();
   });
 
-  test("items default to maybe relevant and are visible", async () => {
+  test("children default to maybe relevant and are visible", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 

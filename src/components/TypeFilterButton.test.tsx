@@ -94,7 +94,7 @@ My Notes
     expect(screen.getByLabelText("toggle Contradicts filter")).toBeDefined();
   });
 
-  test("toggling filter hides/shows items", async () => {
+  test("toggling filter hides/shows children", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -105,7 +105,7 @@ My Notes
     await screen.findByText("Item One");
     await screen.findByText("Item Two");
 
-    // Toggle off "Contains" filter using inline dot (default relevance for new items is undefined/contains)
+    // Toggle off "Contains" filter using inline dot (default relevance for new children is undefined/contains)
     fireEvent.click(screen.getByLabelText("toggle Contains filter"));
 
     // Items should be hidden (they have default/contains relevance)
@@ -115,7 +115,7 @@ My Notes
     });
   });
 
-  test("enabling not_relevant filter shows hidden items", async () => {
+  test("enabling not_relevant filter shows hidden children", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -168,7 +168,7 @@ My Notes
 
     await screen.findByText("Test Item");
 
-    // Toggle off "Contains" filter using inline dot (default relevance for new items is undefined/contains)
+    // Toggle off "Contains" filter using inline dot (default relevance for new children is undefined/contains)
     await userEvent.click(screen.getByLabelText("toggle Contains filter"));
 
     // Item should be hidden

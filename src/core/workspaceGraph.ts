@@ -4,10 +4,10 @@ import { Map } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
 import {
   getConcreteRefTargetRelation,
+  getRefTargetID,
   getRelationsNoReferencedBy,
-  isConcreteRefId,
   joinID,
-  parseConcreteRefId,
+  isRefNode,
   shortID,
 } from "../connections";
 import { newDB } from "../knowledge";
@@ -47,14 +47,18 @@ function buildSyntheticDocumentEvent(
   };
 }
 
-function getRootRelationId(relation: Relations): LongID {
-  return joinID(relation.author, relation.root);
+function getRootRelationId(relation: GraphNode): LongID {
+  return relation.root.includes("_")
+    ? (relation.root as LongID)
+    : joinID(relation.author, relation.root);
 }
 
-function getRootRelation(
-  relations: Map<string, Relations>
-): Relations | undefined {
-  return relations.find((relation) => relation.root === shortID(relation.id));
+function getRootRelation(nodes: Map<string, GraphNode>): GraphNode | undefined {
+  return nodes.find(
+    (relation) =>
+      !relation.parent &&
+      (relation.root === relation.id || relation.root === shortID(relation.id))
+  );
 }
 
 function requireManifest(raw: string): SyncPullManifest {
@@ -65,7 +69,7 @@ function resolveRelation(
   knowledgeDBs: KnowledgeDBs,
   relationId: LongID,
   viewer: PublicKey
-): Relations {
+): GraphNode {
   const relation = getRelationsNoReferencedBy(knowledgeDBs, relationId, viewer);
   if (!relation) {
     throw new Error(`Relation not found: ${relationId}`);
@@ -84,10 +88,10 @@ export async function loadWorkspaceGraph(
         path.join(workspaceDir, document.path),
         "utf8"
       );
-      const relations = parseDocumentEvent(
+      const nodes = parseDocumentEvent(
         buildSyntheticDocumentEvent(document, content)
       );
-      const rootRelation = getRootRelation(relations);
+      const rootRelation = getRootRelation(nodes);
       if (!rootRelation) {
         return {
           skippedDocumentPath: document.path,
@@ -98,7 +102,7 @@ export async function loadWorkspaceGraph(
           ...document,
           root_relation_id: rootRelation.id,
         },
-        relations,
+        nodes,
       };
     })
   );
@@ -107,7 +111,7 @@ export async function loadWorkspaceGraph(
       entry
     ): entry is {
       document: WorkspaceDocument;
-      relations: Map<string, Relations>;
+      nodes: Map<string, GraphNode>;
     } => "document" in entry
   );
   const skippedDocuments = loadedEntries.reduce(
@@ -118,14 +122,14 @@ export async function loadWorkspaceGraph(
     [] as string[]
   );
 
-  const knowledgeDBs = entries.reduce((acc, { document, relations }) => {
+  const knowledgeDBs = entries.reduce((acc, { document, nodes }) => {
     const authorDB = acc.get(document.author, newDB());
     return acc.set(document.author, {
       ...authorDB,
-      relations: relations.reduce(
+      nodes: nodes.reduce(
         (relationAcc, relation) =>
           relationAcc.set(shortID(relation.id), relation),
-        authorDB.relations
+        authorDB.nodes
       ),
     });
   }, Map<PublicKey, KnowledgeData>());
@@ -151,9 +155,9 @@ export function inspectChildren(
   author: PublicKey;
   text: string;
   skipped_document_count: number;
-  items: Array<{
+  children: Array<{
     index: number;
-    item_id: LongID | ID;
+    item_id: ID;
     kind: "relation" | "cref";
     relation_id?: LongID;
     target_relation_id?: LongID;
@@ -173,25 +177,23 @@ export function inspectChildren(
     author: parentRelation.author,
     text: parentRelation.text,
     skipped_document_count: graph.skippedDocuments.length,
-    items: parentRelation.items.toArray().map((item, index) => {
-      if (isConcreteRefId(item.id)) {
-        const parsed = parseConcreteRefId(item.id);
+    children: parentRelation.children.toArray().map((item, index) => {
+      if (isRefNode(item)) {
         const targetRelation = getConcreteRefTargetRelation(
           graph.knowledgeDBs,
           item.id,
           viewer
         );
+        const targetRelationId = getRefTargetID(item);
         return {
           index,
           item_id: item.id,
           kind: "cref" as const,
-          target_relation_id: targetRelation?.id || parsed?.relationID,
+          target_relation_id: targetRelation?.id || targetRelationId,
           text:
             item.linkText ||
             (targetRelation ? targetRelation.text : "") ||
-            shortID(
-              (targetRelation?.id || parsed?.relationID || item.id) as ID
-            ),
+            shortID((targetRelation?.id || targetRelationId || item.id) as ID),
           relevance: (item.relevance || "contains") as
             | "contains"
             | Exclude<Relevance, undefined>,

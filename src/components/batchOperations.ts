@@ -28,15 +28,15 @@ export function getCurrentItem(
   data: Data,
   viewPath: ViewPath,
   virtualItemsMap: VirtualItemsMap
-): RelationItem | undefined {
+): GraphNode | undefined {
   const parentView = getParentView(viewPath);
   if (!parentView) return undefined;
-  const relations = getParentRelation(data, viewPath);
+  const nodes = getParentRelation(data, viewPath);
   const relationIndex = getRelationIndex(data, viewPath);
-  if (!relations || relationIndex === undefined) {
+  if (!nodes || relationIndex === undefined) {
     return virtualItemsMap.get(viewPathToString(viewPath));
   }
-  return relations.items.get(relationIndex);
+  return nodes.children.get(relationIndex);
 }
 
 function planClearSelection(plan: Plan): Plan {
@@ -211,7 +211,7 @@ export function planBatchIndent(
         prevSibling.viewPath,
         stack
       );
-      const insertAt = targetRelationBefore?.items.size ?? 0;
+      const insertAt = targetRelationBefore?.children.size ?? 0;
       const moved = planMoveNodeWithView(
         state.plan,
         viewPath,
@@ -225,7 +225,7 @@ export function planBatchIndent(
         stack
       );
       const updatedViewPath =
-        targetRelationAfter && insertAt < targetRelationAfter.items.size
+        targetRelationAfter && insertAt < targetRelationAfter.children.size
           ? addNodeToPathWithRelations(
               prevSibling.viewPath,
               targetRelationAfter,
@@ -298,7 +298,7 @@ export function planBatchOutdent(
         stack
       );
       const updatedViewPath =
-        targetRelationAfter && insertAt < targetRelationAfter.items.size
+        targetRelationAfter && insertAt < targetRelationAfter.children.size
           ? addNodeToPathWithRelations(
               grandParentPath,
               targetRelationAfter,

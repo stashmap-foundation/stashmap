@@ -56,7 +56,7 @@ function SignInWithSeed({
 
   return (
     <Form onSubmit={onSubmit}>
-      <div className="d-flex align-items-center gap-2">
+      <div className="d-flex align-children-center gap-2">
         <Form.Group controlId="inputSeed" className="flex-grow-1">
           <Form.Control
             type="password"
@@ -129,7 +129,7 @@ function SignInWithExtension({
 
   return (
     <Form onSubmit={onSubmit}>
-      <div className="d-flex align-items-center gap-2 mt-3">
+      <div className="d-flex align-children-center gap-2 mt-3">
         {loading ? (
           <div aria-label="loading" className="spinner-border" />
         ) : (

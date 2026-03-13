@@ -6,8 +6,8 @@ import {
   getRelationSemanticID,
   getRelationText,
   getRelationsNoReferencedBy,
-  isConcreteRefId,
-  parseConcreteRefId,
+  getRefTargetID,
+  isRefNode,
   shortID,
 } from "./connections";
 import { formatNodeAttrs, formatRootHeading } from "./documentFormat";
@@ -19,34 +19,34 @@ type SerializeResult = {
   relationUUIDs: ImmutableSet<string>;
 };
 
-function getSerializableRelationText(relation: Relations): string {
+function getSerializableRelationText(relation: GraphNode): string {
   return getRelationText(relation) || shortID(getRelationSemanticID(relation));
 }
 
 function serializeRelationItems(
   knowledgeDBs: KnowledgeDBs,
   author: PublicKey,
-  items: Relations["items"],
+  children: GraphNode["children"],
   depth: number,
   current: SerializeResult
 ): SerializeResult {
-  return items.reduce((acc, item) => {
+  return children.reduce((acc, item) => {
     const indent = "  ".repeat(depth);
-    if (isConcreteRefId(item.id)) {
-      const parsed = parseConcreteRefId(item.id);
-      if (!parsed) {
-        return acc;
-      }
+    if (isRefNode(item)) {
       const targetRelation = getConcreteRefTargetRelation(
         knowledgeDBs,
         item.id,
         author
       );
+      const targetRelationID = getRefTargetID(item);
+      if (!targetRelationID) {
+        return acc;
+      }
       const linkText =
         item.linkText ||
         (targetRelation ? getSerializableRelationText(targetRelation) : "") ||
-        shortID(parsed.relationID);
-      const targetRelationID = targetRelation?.id || parsed.relationID;
+        shortID(targetRelationID);
+      const hrefTarget = targetRelation?.id || targetRelationID;
       return {
         ...acc,
         lines: [
@@ -57,7 +57,7 @@ function serializeRelationItems(
             item.argument
           )}`,
         ],
-        relationUUIDs: acc.relationUUIDs.add(shortID(targetRelationID as ID)),
+        relationUUIDs: acc.relationUUIDs.add(shortID(hrefTarget as ID)),
       };
     }
 
@@ -68,7 +68,7 @@ function serializeRelationItems(
     );
     const resolvedChild =
       childRelation ||
-      knowledgeDBs.get(author)?.relations.get(shortID(item.id as ID));
+      knowledgeDBs.get(author)?.nodes.get(shortID(item.id as ID));
     if (!resolvedChild) {
       throw new Error(`Missing child relation: ${item.id}`);
     }
@@ -96,7 +96,7 @@ function serializeRelationItems(
     return serializeRelationItems(
       knowledgeDBs,
       author,
-      resolvedChild.items,
+      resolvedChild.children,
       depth + 1,
       next
     );
@@ -105,14 +105,14 @@ function serializeRelationItems(
 
 export function buildDocumentEventFromRelations(
   knowledgeDBs: KnowledgeDBs,
-  rootRelation: Relations
+  rootRelation: GraphNode
 ): UnsignedEvent {
   const rootText = getSerializableRelationText(rootRelation);
   const rootUuid = shortID(rootRelation.id);
   const serialized = serializeRelationItems(
     knowledgeDBs,
     rootRelation.author,
-    rootRelation.items,
+    rootRelation.children,
     0,
     {
       lines: [],

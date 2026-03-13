@@ -97,7 +97,7 @@ Root
     `);
   });
 
-  test("delete cleans up orphaned descendant relations and resets invalid panes", async () => {
+  test("delete cleans up orphaned descendant nodes and resets invalid panes", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
@@ -153,7 +153,7 @@ My Notes
     expect(screen.queryByText("Child")).toBeNull();
   });
 
-  test("delete root cleans up descendant relations", async () => {
+  test("delete root cleans up descendant nodes", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 

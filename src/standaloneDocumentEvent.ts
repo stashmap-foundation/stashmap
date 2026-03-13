@@ -1,13 +1,10 @@
 import { UnsignedEvent } from "nostr-tools";
 import { shortID } from "./connections";
-import {
-  buildKnowledgeDocumentEvents,
-  createHeadlessPlan,
-} from "./core/headlessPlan";
+import { createHeadlessPlan } from "./core/headlessPlan";
 import { MarkdownImportFile, parseMarkdownImportFiles } from "./markdownImport";
 import { planCreateNodesFromMarkdownTrees } from "./markdownPlan";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
-import { KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
+import { buildDocumentEventFromRelations } from "./relationsDocumentEvent";
 
 export function requireSingleRootMarkdownTree(
   markdown: string,
@@ -39,20 +36,14 @@ function buildDocumentEventFromRootTree(
   }
   const relation = planWithRoot.knowledgeDBs
     .get(author)
-    ?.relations.get(shortID(relationID));
+    ?.nodes.get(shortID(relationID));
   if (!relation) {
     throw new Error(`Created relation not found: ${relationID}`);
-  }
-  const event = buildKnowledgeDocumentEvents(planWithRoot).find(
-    (candidate) => candidate.kind === KIND_KNOWLEDGE_DOCUMENT
-  );
-  if (!event) {
-    throw new Error(`Document event not built for relation: ${relationID}`);
   }
   return {
     relationID,
     rootUuid: shortID(relationID),
-    event,
+    event: buildDocumentEventFromRelations(planWithRoot.knowledgeDBs, relation),
   };
 }
 

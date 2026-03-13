@@ -114,7 +114,7 @@ declare global {
         type: "ADD_EMPTY_NODE";
         relationsID: LongID;
         index: number;
-        relationItem: RelationItem;
+        relationItem: GraphNode;
         paneIndex: number;
       }
     | { type: "REMOVE_EMPTY_NODE"; relationsID: LongID };
@@ -136,7 +136,7 @@ declare global {
     id: string;
     stack: ID[];
     author: PublicKey;
-    rootRelation?: LongID;
+    rootRelation?: ID;
     searchQuery?: string;
     typeFilters?: (
       | Relevance
@@ -182,7 +182,7 @@ declare global {
 
   type Hash = string;
   type ID = string;
-  type LongID = string & { readonly "": unique symbol };
+  type LongID = string;
 
   type View = {
     expanded?: boolean;
@@ -201,8 +201,8 @@ declare global {
   // e.g., [scholarium-id, places-id] when viewing via "Scholarium > Places > Node"
   type Context = List<ID>;
 
-  // Relevance levels for relation items
-  // undefined = "contains" (no relevance set, default for new items)
+  // Relevance levels for relation children
+  // undefined = "contains" (no relevance set, default for new children)
   type Relevance =
     | "relevant"
     | "maybe_relevant"
@@ -210,7 +210,7 @@ declare global {
     | "not_relevant"
     | undefined;
 
-  // Argument types (evidence) for relation items
+  // Argument types (evidence) for relation children
   type Argument = "confirms" | "contra" | undefined;
 
   // Each item in a relation has relevance and optional argument
@@ -227,29 +227,20 @@ declare global {
     removeCount: number;
   };
 
-  type RelationItem = {
-    id: LongID | ID;
-    relevance: Relevance; // undefined = contains (default), "relevant", "maybe_relevant", "little_relevant", "not_relevant"
-    argument?: Argument; // "confirms", "contra", or undefined (neutral)
-    virtualType?: VirtualType;
-    isCref?: boolean;
-    linkText?: string;
-  };
-
   type RootAnchor = {
     snapshotContext: Context;
     snapshotLabels?: string[];
     sourceAuthor?: PublicKey;
     sourceRootID?: ID;
-    sourceRelationID?: LongID;
-    sourceParentRelationID?: LongID;
+    sourceRelationID?: ID;
+    sourceParentRelationID?: ID;
   };
 
   type RootSystemRole = "log";
 
-  type Relations = {
-    items: List<RelationItem>;
-    id: LongID;
+  type GraphNode = {
+    children: List<GraphNode>;
+    id: ID;
     text: string;
     parent?: LongID;
     anchor?: RootAnchor;
@@ -259,10 +250,18 @@ declare global {
     author: PublicKey;
     basedOn?: LongID;
     root: ID;
+    relevance: Relevance;
+    argument?: Argument;
+    virtualType?: VirtualType;
+    isRef?: boolean;
+    isCref?: boolean;
+    targetID?: LongID;
+    linkText?: string;
   };
 
+  // Pure View layer type representing a ref row in the UI, derived from GraphNode but with additional display-related fields
   type ReferenceRow = {
-    id: LongID;
+    id: ID;
     type: "reference";
     text: string;
     targetContext: Context;
@@ -286,11 +285,11 @@ declare global {
   type RelationTypes = OrderedMap<ID, RelationType>;
 
   type KnowledgeData = {
-    relations: Map<ID, Relations>;
+    nodes: Map<ID, GraphNode>;
   };
 
   type SemanticIndex = {
-    relationByID: globalThis.Map<LongID, Relations>;
+    relationByID: globalThis.Map<LongID, GraphNode>;
     semantic: globalThis.Map<string, globalThis.Set<LongID>>;
     incomingCrefs: globalThis.Map<LongID, globalThis.Set<LongID>>;
   };

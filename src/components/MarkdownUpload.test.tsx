@@ -21,7 +21,7 @@ Python is a programming language
 async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
   const wsID = joinID(alice().user.publicKey, "my-first-workspace");
   const workspaceText = "my-first-workspace";
-  const workspaceRelation: Relations = {
+  const workspaceRelation: GraphNode = {
     ...newRelations(
       workspaceText,
       List(),
@@ -57,8 +57,8 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
 function getRequiredRelation(
   knowledgeDB: KnowledgeData,
   text: string
-): Relations {
-  const relation = knowledgeDB.relations.find(
+): GraphNode {
+  const relation = knowledgeDB.nodes.find(
     (candidate) => candidate.text === text
   );
   if (!relation) {
@@ -69,10 +69,10 @@ function getRequiredRelation(
 
 function getChildTexts(
   knowledgeDB: KnowledgeData,
-  relation: Relations
+  relation: GraphNode
 ): string[] {
-  return relation.items
-    .map((item) => knowledgeDB.relations.get(shortID(item.id))?.text || "")
+  return relation.children
+    .map((item) => knowledgeDB.nodes.get(shortID(item.id))?.text || "")
     .toArray();
 }
 

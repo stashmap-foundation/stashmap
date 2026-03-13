@@ -90,7 +90,7 @@ function removeTransientRootAffects<T extends GraphPlan>(
   const transientRootIds = relationIds.filter((relationId) => {
     const relation = plan.knowledgeDBs
       .get(plan.user.publicKey)
-      ?.relations.get(shortID(relationId));
+      ?.nodes.get(shortID(relationId));
     return !!relation && relation.parent !== undefined;
   });
   if (transientRootIds.length === 0) {
@@ -109,9 +109,9 @@ function moveCreatedTreesToParentContext<T extends GraphPlan>(
   plan: T,
   originalTopNodeIDs: ID[],
   sourceRelationIDs: LongID[],
-  actualNodeIDs: (LongID | ID)[],
+  actualNodeIDs: ID[],
   targetSemanticContext: Context,
-  parentRelation: Relations
+  parentRelation: GraphNode
 ): T {
   return originalTopNodeIDs.reduce((accPlan, originalID, index) => {
     const actualID = actualNodeIDs[index];
@@ -148,7 +148,7 @@ export function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
   plan: T;
   topItemIDs: ID[];
   topRelationIDs: LongID[];
-  actualItemIDs: Array<LongID | ID>;
+  actualItemIDs: Array<ID>;
 } {
   if (trees.length === 0) {
     return {
@@ -216,7 +216,7 @@ export function planInsertMarkdownTrees(
   plan: Plan;
   topItemIDs: ID[];
   topRelationIDs: LongID[];
-  actualItemIDs: Array<LongID | ID>;
+  actualItemIDs: Array<ID>;
 } {
   const parentRelation = getRelationForView(plan, parentViewPath, stack);
   return parentRelation

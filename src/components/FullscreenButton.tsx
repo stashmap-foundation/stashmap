@@ -9,7 +9,11 @@ import {
   useCurrentEdge,
 } from "../ViewContext";
 import { usePaneStack, useNavigatePane } from "../SplitPanesContext";
-import { getRefLinkTargetInfo, getRefTargetInfo } from "../connections";
+import {
+  getRefLinkTargetInfo,
+  getRefTargetInfo,
+  isRefNode,
+} from "../connections";
 import { useData } from "../DataContext";
 import { buildRelationUrl } from "../navigationUrl";
 
@@ -37,6 +41,9 @@ export function FullscreenButton(): JSX.Element | null {
 
   const refInfo = (() => {
     if (!currentReference) {
+      if (isRefNode(relation)) {
+        return getRefLinkTargetInfo(relation.id, knowledgeDBs, effectiveAuthor);
+      }
       return getRefTargetInfo(itemID, knowledgeDBs, effectiveAuthor);
     }
     return virtualType === "version"

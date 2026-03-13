@@ -7,10 +7,11 @@ import {
   getRelationsNoReferencedBy,
   shortID,
 } from "./connections";
+import { isStandaloneRoot } from "./systemRoots";
 
 function relationMatchesRequestedSemanticID(
-  relation: Relations,
-  requestedSemanticID: LongID | ID
+  relation: GraphNode,
+  requestedSemanticID: ID
 ): boolean {
   return (
     shortID(getRelationSemanticID(relation)) === shortID(requestedSemanticID)
@@ -20,8 +21,8 @@ function relationMatchesRequestedSemanticID(
 function getAuthorCandidateRelations(
   knowledgeDBs: KnowledgeDBs,
   author: PublicKey,
-  semanticID: LongID | ID
-): Relations[] {
+  semanticID: ID
+): GraphNode[] {
   const authorDB = knowledgeDBs.get(author, newDB());
   return getIndexedRelationsForKeys(authorDB, [shortID(semanticID)]);
 }
@@ -29,12 +30,11 @@ function getAuthorCandidateRelations(
 function getNewestStandaloneRootBySemanticID(
   knowledgeDBs: KnowledgeDBs,
   author: PublicKey,
-  semanticID: LongID | ID
-): Relations | undefined {
+  semanticID: ID
+): GraphNode | undefined {
   return getAuthorCandidateRelations(knowledgeDBs, author, semanticID)
     .filter(
-      (relation) =>
-        relation.author === author && relation.root === shortID(relation.id)
+      (relation) => relation.author === author && isStandaloneRoot(relation)
     )
     .sort((left, right) => right.updated - left.updated)
     .find((relation) =>
@@ -46,15 +46,15 @@ function getStandaloneRootByRootID(
   knowledgeDBs: KnowledgeDBs,
   author: PublicKey,
   root: ID
-): Relations | undefined {
+): GraphNode | undefined {
   return knowledgeDBs
     .get(author, newDB())
-    .relations.valueSeq()
+    .nodes.valueSeq()
     .filter(
       (relation) =>
         relation.author === author &&
         relation.root === root &&
-        relation.root === shortID(relation.id)
+        isStandaloneRoot(relation)
     )
     .sort((left, right) => right.updated - left.updated)
     .first();
@@ -62,15 +62,15 @@ function getStandaloneRootByRootID(
 
 function getMatchingChildRelation(
   knowledgeDBs: KnowledgeDBs,
-  parentRelation: Relations,
-  requestedSemanticID: LongID | ID
-): Relations | undefined {
-  return parentRelation.items
+  parentRelation: GraphNode,
+  requestedSemanticID: ID
+): GraphNode | undefined {
+  return parentRelation.children
     .map((item) =>
       getRelationItemRelation(knowledgeDBs, item, parentRelation.author)
     )
     .find(
-      (relation): relation is Relations =>
+      (relation): relation is GraphNode =>
         relation !== undefined &&
         relationMatchesRequestedSemanticID(relation, requestedSemanticID)
     );
@@ -78,7 +78,7 @@ function getMatchingChildRelation(
 
 function resolveRequestedStackFromRoot(
   knowledgeDBs: KnowledgeDBs,
-  rootRelation: Relations,
+  rootRelation: GraphNode,
   requestedStack: ID[]
 ): ResolvedStack | undefined {
   if (requestedStack.length === 0) {
@@ -90,7 +90,7 @@ function resolveRequestedStackFromRoot(
     return undefined;
   }
 
-  let currentRelation: Relations | undefined = rootRelation;
+  let currentRelation: GraphNode | undefined = rootRelation;
   const actualStack: ID[] = [getRelationSemanticID(rootRelation)];
 
   for (let index = 1; index < requestedStack.length; index += 1) {
@@ -114,7 +114,7 @@ function resolveRequestedStackFromRoot(
 
 function buildRequestedSemanticPath(
   semanticContext: Context,
-  itemID: LongID | ID
+  itemID: ID
 ): ID[] {
   return [...semanticContext.toArray(), shortID(itemID) as ID];
 }
@@ -124,7 +124,7 @@ function resolveRelationFromKnownRoot(
   paneAuthor: PublicKey,
   semanticPath: ID[],
   preferredRoot: ID
-): Relations | undefined {
+): GraphNode | undefined {
   const root = getStandaloneRootByRootID(
     knowledgeDBs,
     paneAuthor,
@@ -139,14 +139,14 @@ function resolveStandaloneRelationFromSemanticPath(
   knowledgeDBs: KnowledgeDBs,
   paneAuthor: PublicKey,
   semanticPath: ID[]
-): Relations | undefined {
+): GraphNode | undefined {
   return resolveSemanticStackToActualIDs(knowledgeDBs, paneAuthor, semanticPath)
     ?.relation;
 }
 
 export type ResolvedStack = {
   actualStack: ID[];
-  relation?: Relations;
+  relation?: GraphNode;
 };
 
 export function resolveSemanticStackToActualIDs(
@@ -177,12 +177,12 @@ export function resolveSemanticStackToActualIDs(
 export function resolveSemanticRelationInCurrentTree(
   knowledgeDBs: KnowledgeDBs,
   paneAuthor: PublicKey,
-  itemID: LongID | ID,
+  itemID: ID,
   semanticContext: Context,
   rootRelation: LongID | undefined,
   isRootNode: boolean,
   currentRoot?: ID
-): Relations | undefined {
+): GraphNode | undefined {
   if (isRootNode && rootRelation) {
     const relation = getRelationsNoReferencedBy(
       knowledgeDBs,

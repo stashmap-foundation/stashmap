@@ -24,7 +24,7 @@ type RelationItemContext = {
   isVisible: boolean;
   isEmptyNode: boolean;
   nodeText: string;
-  currentItem: RelationItem | undefined;
+  currentItem: GraphNode | undefined;
   // For updating
   viewPath: ViewPath;
   parentView: ViewPath | undefined;
@@ -39,7 +39,7 @@ type RelationItemContext = {
  * Provides common data and an updateMetadata function that handles:
  * - Empty nodes with text: materialize via planSaveNodeAndEnsureRelations
  * - Empty nodes without text: update via planUpdateEmptyNodeMetadata
- * - Regular nodes: optionally save text, then update relations
+ * - Regular nodes: optionally save text, then update nodes
  */
 export function useRelationItemContext(): RelationItemContext {
   const data = useData();
@@ -65,7 +65,9 @@ export function useRelationItemContext(): RelationItemContext {
   // Get current item using context-aware lookup
   const currentItem =
     isVisible && parentView
-      ? getRelationForView(data, parentView, stack)?.items.get(relationIndex!)
+      ? getRelationForView(data, parentView, stack)?.children.get(
+          relationIndex!
+        )
       : undefined;
 
   const updateMetadata = (metadata: RelationItemMetadata): void => {

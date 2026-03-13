@@ -34,8 +34,8 @@ export type WriteCreateUnderCliArgs = {
   configPath?: string;
   parentRelationId?: LongID;
   stdin?: boolean;
-  beforeItemId?: LongID | ID;
-  afterItemId?: LongID | ID;
+  beforeItemId?: ID;
+  afterItemId?: ID;
   relevance?: "contains" | Relevance;
   argument?: "none" | Argument;
   relayUrls: string[];
@@ -46,8 +46,8 @@ export type WriteLinkCliArgs = {
   configPath?: string;
   parentRelationId?: LongID;
   targetRelationId?: LongID;
-  beforeItemId?: LongID | ID;
-  afterItemId?: LongID | ID;
+  beforeItemId?: ID;
+  afterItemId?: ID;
   relevance?: "contains" | Relevance;
   argument?: "none" | Argument;
   relayUrls: string[];
@@ -57,7 +57,7 @@ export type WriteLinkCliArgs = {
 export type WriteSetRelevanceCliArgs = {
   configPath?: string;
   parentRelationId?: LongID;
-  itemId?: LongID | ID;
+  itemId?: ID;
   relevance?: "contains" | Relevance;
   relayUrls: string[];
   help: boolean;
@@ -66,7 +66,7 @@ export type WriteSetRelevanceCliArgs = {
 export type WriteSetArgumentCliArgs = {
   configPath?: string;
   parentRelationId?: LongID;
-  itemId?: LongID | ID;
+  itemId?: ID;
   argument?: "none" | Argument;
   relayUrls: string[];
   help: boolean;
@@ -75,7 +75,7 @@ export type WriteSetArgumentCliArgs = {
 export type WriteDeleteItemCliArgs = {
   configPath?: string;
   parentRelationId?: LongID;
-  itemId?: LongID | ID;
+  itemId?: ID;
   relayUrls: string[];
   help: boolean;
 };
@@ -83,10 +83,10 @@ export type WriteDeleteItemCliArgs = {
 export type WriteMoveItemCliArgs = {
   configPath?: string;
   sourceParentRelationId?: LongID;
-  itemId?: LongID | ID;
+  itemId?: ID;
   targetParentRelationId?: LongID;
-  beforeItemId?: LongID | ID;
-  afterItemId?: LongID | ID;
+  beforeItemId?: ID;
+  afterItemId?: ID;
   relayUrls: string[];
   help: boolean;
 };

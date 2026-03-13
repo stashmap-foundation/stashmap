@@ -2,7 +2,7 @@ import { List } from "immutable";
 
 export function createRootAnchor(
   snapshotContext?: Context,
-  sourceRelation?: Relations,
+  sourceRelation?: GraphNode,
   snapshotLabels?: string[]
 ): RootAnchor | undefined {
   const normalizedContext = snapshotContext ?? List<ID>();
@@ -26,7 +26,7 @@ export function createRootAnchor(
   };
 }
 
-export function getRootAnchorContext(relation: Relations): Context {
+export function getRootAnchorContext(relation: GraphNode): Context {
   return relation.anchor?.snapshotContext ?? List<ID>();
 }
 

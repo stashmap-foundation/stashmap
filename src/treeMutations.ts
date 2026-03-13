@@ -140,9 +140,7 @@ export function planMoveNodeWithView(
     sourceAddID,
     targetParentViewPath,
     stack,
-    insertAtIndex,
-    undefined,
-    undefined
+    insertAtIndex
   );
 
   const moveItemID = actualItemID ?? sourceItemID;
@@ -169,19 +167,15 @@ export function planMoveNodeWithView(
     )
   );
 
-  const relations = getRelationForView(
-    planWithAdd,
-    targetParentViewPath,
-    stack
-  );
-  if (!relations || relations.items.size === 0) {
+  const nodes = getRelationForView(planWithAdd, targetParentViewPath, stack);
+  if (!nodes || nodes.children.size === 0) {
     return planDisconnectFromParent(planWithAdd, sourceViewPath, stack, true);
   }
 
-  const targetIndex = insertAtIndex ?? relations.items.size - 1;
+  const targetIndex = insertAtIndex ?? nodes.children.size - 1;
   const targetViewPath = addNodeToPathWithRelations(
     targetParentViewPath,
-    relations,
+    nodes,
     targetIndex
   );
 

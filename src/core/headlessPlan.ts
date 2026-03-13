@@ -39,5 +39,9 @@ export function buildKnowledgeDocumentEvents(plan: GraphPlan): UnsignedEvent[] {
 export function getAffectedRootRelationIds(plan: GraphPlan): LongID[] {
   return plan.affectedRoots
     .toArray()
-    .map((rootId) => joinID(plan.user.publicKey, rootId));
+    .map((rootId) =>
+      rootId.includes("_")
+        ? (rootId as LongID)
+        : joinID(plan.user.publicKey, rootId)
+    );
 }

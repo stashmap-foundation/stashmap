@@ -1384,7 +1384,7 @@ Root
       `);
     });
 
-    test("Clearing parent deletes descendant relations and resets invalid panes", async () => {
+    test("Clearing parent deletes descendant nodes and resets invalid panes", async () => {
       const [alice] = setup([ALICE]);
       renderApp(alice());
 

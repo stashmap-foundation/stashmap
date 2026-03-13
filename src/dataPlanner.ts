@@ -1,11 +1,10 @@
 import { Set } from "immutable";
 import {
-  createConcreteRefId,
   deleteRelations,
   getRelationContext,
   getRelationSemanticID,
   getRelationsNoReferencedBy,
-  isRefId,
+  isRefNode,
   isSearchId,
   moveRelations,
   shortID,
@@ -14,12 +13,12 @@ import { MarkdownTreeNode } from "./markdownTree";
 import { planInsertMarkdownTreesByParentId } from "./markdownPlan";
 import {
   GraphPlan,
-  planAddTargetsToRelation,
   planDeleteDescendantRelations,
   planDeleteRelations,
   planMoveDescendantRelations,
   planUpsertRelations,
 } from "./planner";
+import { newRefNode } from "./relationFactory";
 import {
   RelationItemMetadata,
   updateRelationItemMetadata,
@@ -27,14 +26,14 @@ import {
 import { withUsersEntryPublicKey } from "./userEntry";
 
 export type RelationItemPosition = {
-  beforeItemId?: LongID | ID;
-  afterItemId?: LongID | ID;
+  beforeItemId?: ID;
+  afterItemId?: ID;
 };
 
 function getWritableRelation(
   plan: GraphPlan,
   relationId: LongID
-): Relations | undefined {
+): GraphNode | undefined {
   const relation = getRelationsNoReferencedBy(
     plan.knowledgeDBs,
     relationId,
@@ -49,7 +48,7 @@ function getWritableRelation(
 export function requireRelationById(
   plan: GraphPlan,
   relationId: LongID
-): Relations {
+): GraphNode {
   const relation = getRelationsNoReferencedBy(
     plan.knowledgeDBs,
     relationId,
@@ -64,7 +63,7 @@ export function requireRelationById(
 export function requireWritableRelationById(
   plan: GraphPlan,
   relationId: LongID
-): Relations {
+): GraphNode {
   const relation = requireRelationById(plan, relationId);
   if (relation.author !== plan.user.publicKey) {
     throw new Error(`Relation is not writable: ${relationId}`);
@@ -73,30 +72,30 @@ export function requireWritableRelationById(
 }
 
 function getRelationItemIndex(
-  relation: Relations,
-  itemId: LongID | ID
+  relation: GraphNode,
+  itemId: ID
 ): number | undefined {
-  const index = relation.items.findIndex((item) => item.id === itemId);
+  const index = relation.children.findIndex((item) => item.id === itemId);
   return index >= 0 ? index : undefined;
 }
 
 function requireRelationItem(
-  relation: Relations,
-  itemId: LongID | ID
-): RelationItem | undefined {
+  relation: GraphNode,
+  itemId: ID
+): GraphNode | undefined {
   const index = getRelationItemIndex(relation, itemId);
-  return index === undefined ? undefined : relation.items.get(index);
+  return index === undefined ? undefined : relation.children.get(index);
 }
 
 export function requireRelationItemIndexById(
   plan: GraphPlan,
   parentRelationId: LongID,
-  itemId: LongID | ID
+  itemId: ID
 ): number {
   const relationIndex = requireWritableRelationById(
     plan,
     parentRelationId
-  ).items.findIndex((item) => item.id === itemId);
+  ).children.findIndex((item) => item.id === itemId);
   if (relationIndex < 0) {
     throw new Error(`Item not found: ${itemId}`);
   }
@@ -123,7 +122,7 @@ export function resolveInsertAtIndexById(
   }
   const parentRelation = requireWritableRelationById(plan, parentRelationId);
   if (position.beforeItemId) {
-    const index = parentRelation.items.findIndex(
+    const index = parentRelation.children.findIndex(
       (item) => item.id === position.beforeItemId
     );
     if (index < 0) {
@@ -132,7 +131,7 @@ export function resolveInsertAtIndexById(
     return index;
   }
   if (position.afterItemId) {
-    const index = parentRelation.items.findIndex(
+    const index = parentRelation.children.findIndex(
       (item) => item.id === position.afterItemId
     );
     if (index < 0) {
@@ -140,18 +139,18 @@ export function resolveInsertAtIndexById(
     }
     return index + 1;
   }
-  return parentRelation.items.size;
+  return parentRelation.children.size;
 }
 
 function insertRelationItem(
-  relation: Relations,
-  item: RelationItem,
+  relation: GraphNode,
+  item: GraphNode,
   insertAtIndex?: number
-): Relations {
-  const defaultIndex = relation.items.size;
+): GraphNode {
+  const defaultIndex = relation.children.size;
   const updatedWithPush = {
     ...relation,
-    items: relation.items.push(item),
+    children: relation.children.push(item),
   };
   return insertAtIndex === undefined || insertAtIndex === defaultIndex
     ? updatedWithPush
@@ -180,7 +179,7 @@ export function planSetRelationTextById<T extends GraphPlan>(
 export function planUpdateRelationItemMetadataById<T extends GraphPlan>(
   plan: T,
   parentRelationId: LongID,
-  itemId: LongID | ID,
+  itemId: ID,
   metadata: RelationItemMetadata
 ): T {
   const parentRelation = getWritableRelation(plan, parentRelationId);
@@ -204,7 +203,7 @@ export function planLinkRelationById<T extends GraphPlan>(
   insertAtIndex?: number,
   relevance?: Relevance,
   argument?: Argument
-): { plan: T; itemId: LongID | ID } {
+): { plan: T; itemId: ID } {
   const parentRelation = getWritableRelation(plan, parentRelationId);
   const targetRelation = getRelationsNoReferencedBy(
     plan.knowledgeDBs,
@@ -214,21 +213,26 @@ export function planLinkRelationById<T extends GraphPlan>(
   if (!parentRelation || !targetRelation) {
     return {
       plan,
-      itemId: createConcreteRefId(targetRelationId),
+      itemId: targetRelationId,
     };
   }
-  const itemId = createConcreteRefId(targetRelation.id);
-  const [nextPlan] = planAddTargetsToRelation(
-    plan,
-    parentRelation,
-    itemId,
-    insertAtIndex,
+  const refNode = newRefNode(
+    plan.user.publicKey,
+    parentRelation.root,
+    targetRelation.id,
+    parentRelation.id,
     relevance,
-    argument
+    argument,
+    "",
+    targetRelation.text
+  );
+  const nextPlan = planUpsertRelations(
+    plan,
+    insertRelationItem(parentRelation, refNode, insertAtIndex)
   );
   return {
     plan: nextPlan,
-    itemId,
+    itemId: refNode.id,
   };
 }
 
@@ -257,7 +261,7 @@ export function planInsertMarkdownUnderRelationById<T extends GraphPlan>(
 export function planRemoveRelationItemById<T extends GraphPlan>(
   plan: T,
   parentRelationId: LongID,
-  itemId: LongID | ID,
+  itemId: ID,
   preserveDescendants = false
 ): T {
   const parentRelation = getWritableRelation(plan, parentRelationId);
@@ -273,7 +277,7 @@ export function planRemoveRelationItemById<T extends GraphPlan>(
     plan,
     deleteRelations(parentRelation, Set([relationIndex]))
   );
-  if (!item || isRefId(item.id)) {
+  if (!item || isRefNode(item)) {
     return withoutItem;
   }
   const sourceRelation = getRelationsNoReferencedBy(
@@ -337,7 +341,7 @@ function wouldCreateDescendantCycle(
 export function planMoveRelationItemById<T extends GraphPlan>(
   plan: T,
   sourceParentRelationId: LongID,
-  itemId: LongID | ID,
+  itemId: ID,
   targetParentRelationId: LongID,
   insertAtIndex?: number
 ): T {
@@ -362,7 +366,7 @@ export function planMoveRelationItemById<T extends GraphPlan>(
       moveRelations(
         sourceParentRelation,
         [sourceIndex],
-        insertAtIndex ?? sourceParentRelation.items.size
+        insertAtIndex ?? sourceParentRelation.children.size
       )
     );
   }
@@ -372,7 +376,7 @@ export function planMoveRelationItemById<T extends GraphPlan>(
     return plan;
   }
   if (
-    !isRefId(sourceItem.id) &&
+    !isRefNode(sourceItem) &&
     !isSearchId(sourceItem.id as ID) &&
     wouldCreateDescendantCycle(
       plan,
@@ -401,7 +405,7 @@ export function planMoveRelationItemById<T extends GraphPlan>(
     insertRelationItem(writableTargetParent, sourceItem, insertAtIndex)
   );
 
-  if (isRefId(sourceItem.id) || isSearchId(sourceItem.id as ID)) {
+  if (isRefNode(sourceItem) || isSearchId(sourceItem.id as ID)) {
     return withMovedEdge;
   }
 

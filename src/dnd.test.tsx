@@ -185,7 +185,7 @@ OtherParent
   `);
 });
 
-test("Deep copy preserves all children when forked duplicate relations exist", async () => {
+test("Deep copy preserves all children when forked duplicate nodes exist", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
   await follow(alice, bob().user.publicKey);
 

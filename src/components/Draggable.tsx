@@ -12,7 +12,7 @@ import {
   useIsViewingOtherUserContent,
   useCurrentEdge,
 } from "../ViewContext";
-import { isEmptySemanticID } from "../connections";
+import { getRefTargetID, isEmptySemanticID } from "../connections";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
 import {
@@ -42,6 +42,8 @@ export type DragItemType = {
   path: ViewPath;
   text?: string;
   isCopyDrag?: boolean;
+  nodeId?: LongID;
+  targetId?: LongID;
 };
 
 type DraggableProps = {
@@ -189,7 +191,13 @@ function DraggableSuggestion({
     type: NOTE_TYPE,
     item: () => {
       clearDropIndent();
-      return { path, text: displayText, isSuggestion: true };
+      return {
+        path,
+        text: displayText,
+        isSuggestion: true,
+        nodeId: relation?.id,
+        targetId: relation ? getRefTargetID(relation) : undefined,
+      };
     },
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging(),

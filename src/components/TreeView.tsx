@@ -254,7 +254,7 @@ function Tree(): JSX.Element | null {
   const [keyboardMode, setKeyboardMode] = useKeyboardMode();
   const treeResult = usePaneTreeResult();
   const childNodes = treeResult?.paths || List<ViewPath>();
-  const virtualItems = treeResult?.virtualItems || Map<string, RelationItem>();
+  const virtualItems = treeResult?.virtualItems || Map<string, GraphNode>();
   const firstVirtualKeys =
     treeResult?.firstVirtualKeys || ImmutableSet<string>();
   // Include ROOT as the first node, followed by its children

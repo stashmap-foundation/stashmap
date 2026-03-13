@@ -307,7 +307,7 @@ type RenderApis = Partial<TestApis> &
     includeFocusContext?: boolean;
     user?: User;
     defaultRelays?: Array<string>;
-    initialStack?: (LongID | ID)[];
+    initialStack?: ID[];
     db?: StashmapDB | null;
   };
 

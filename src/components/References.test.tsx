@@ -4,6 +4,7 @@ import {
   ALICE,
   BOB,
   expectTree,
+  forkReadonlyRoot,
   follow,
   getPane,
   navigateToNodeViaSearch,
@@ -60,6 +61,7 @@ Notes
   test("Clicking version fullscreen opens with that author's content", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
+    await follow(bob, alice().user.publicKey);
 
     renderTree(alice);
     await type(
@@ -67,15 +69,17 @@ Notes
     );
     cleanup();
 
-    renderTree(bob);
-    await type(
-      "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Bob child{Enter}Bob2{Enter}Bob3{Enter}Bob4{Escape}"
-    );
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "Notes");
+    await userEvent.click(await screen.findByLabelText("open Cities in fullscreen"));
+    await userEvent.click(await screen.findByLabelText("open Barcelona in fullscreen"));
+    await userEvent.click(await screen.findByLabelText("edit Barcelona"));
+    await userEvent.keyboard("{Enter}");
+    await type("Bob child{Enter}Bob2{Enter}Bob3{Enter}Bob4{Escape}");
     cleanup();
 
     renderTree(alice);
     await userEvent.click(
-      await screen.findByLabelText(/open .* \+4 -1 in fullscreen/)
+      await screen.findByLabelText(/open .* \+4 in fullscreen/)
     );
 
     await expectTree(`
@@ -84,7 +88,69 @@ Notes
   [O] Bob2
   [O] Bob3
   [O] Bob4
-  [VO] +1 -4
+  [O] Alice child
+  [VO] -4
+    `);
+  });
+
+  test("Descendant versions appear when viewing the base version", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    await follow(alice, bob().user.publicKey);
+    await follow(bob, alice().user.publicKey);
+
+    renderTree(alice);
+    await type(
+      "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Alice child{Escape}"
+    );
+    cleanup();
+
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "Notes");
+    await userEvent.click(await screen.findByLabelText("open Cities in fullscreen"));
+    await userEvent.click(await screen.findByLabelText("open Barcelona in fullscreen"));
+    await userEvent.click(await screen.findByLabelText("edit Barcelona"));
+    await userEvent.keyboard("{Enter}");
+    await type("Bob child{Enter}Bob2{Enter}Bob3{Enter}Bob4{Escape}");
+    cleanup();
+
+    renderTree(alice);
+
+    await expectTree(`
+Notes
+  Cities
+    Barcelona
+      Alice child
+      [S] Bob child
+      [S] Bob2
+      [S] Bob3
+      [VO] +4
+    `);
+  });
+
+  test("Ancestor versions appear when viewing a fork", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+    await follow(bob, alice().user.publicKey);
+
+    renderTree(alice);
+    await type(
+      "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Alice child{Escape}"
+    );
+    cleanup();
+
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "Notes");
+    await userEvent.click(await screen.findByLabelText("open Cities in fullscreen"));
+    await userEvent.click(await screen.findByLabelText("open Barcelona in fullscreen"));
+    await userEvent.click(await screen.findByLabelText("edit Barcelona"));
+    await userEvent.keyboard("{Enter}");
+    await type("Bob child{Enter}Bob2{Enter}Bob3{Enter}Bob4{Escape}");
+
+    await expectTree(`
+Barcelona
+  Bob child
+  Bob2
+  Bob3
+  Bob4
+  Alice child
+  [VO] -4
     `);
   });
 

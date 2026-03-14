@@ -14,6 +14,8 @@ import {
   findNewNodeEditor,
   BOB,
   follow,
+  openReadonlyRoute,
+  renderApp,
   renderTree,
   type,
 } from "./utils.test";
@@ -220,32 +222,11 @@ My Notes
     Logic
     Scripting
   `);
+  const relationUrl = await openReadonlyRoute("Programming Languages");
   cleanup();
 
-  renderTree(alice);
-  await type("My Notes{Enter}{Tab}Programming Languages{Escape}");
-  await userEvent.click(
-    await screen.findByLabelText("expand Programming Languages")
-  );
-  await expectTree(`
-My Notes
-  Programming Languages
-    [S] OOP
-    [S] FP
-    [S] Logic
-    [VO] +4
-  `);
-
-  await userEvent.click(
-    await screen.findByLabelText(/open .* \+4 in fullscreen/)
-  );
-
-  await waitFor(() => {
-    expect(window.location.pathname).toMatch(/^\/r\//);
-  });
-
+  renderApp({ ...alice(), initialRoute: relationUrl });
   await screen.findByText("READONLY");
-
   await userEvent.click(await screen.findByLabelText("expand OOP"));
   await expectTree(`
 [O] Programming Languages
@@ -258,6 +239,18 @@ My Notes
   `);
 
   await userEvent.click(await screen.findByLabelText("copy root to edit"));
+  await waitFor(() => {
+    expect(screen.queryByText("READONLY")).toBeNull();
+  });
+  await expectTree(`
+Programming Languages
+  OOP
+    C++
+    Java
+  FP
+  Logic
+  Scripting
+  `);
 
   await userEvent.click(
     await screen.findByLabelText("edit Programming Languages")
@@ -288,23 +281,30 @@ test("Forked subtree breadcrumbs show source ancestors and navigate back to sour
   await type(
     "My Notes{Enter}{Tab}Programming Languages{Enter}{Tab}OOP{Enter}{Tab}C++{Enter}Java{Enter}{Enter}FP{Enter}Logic{Enter}Scripting{Escape}"
   );
+  const relationUrl = await openReadonlyRoute("Programming Languages");
   cleanup();
 
-  renderTree(alice);
-  await type("My Notes{Enter}{Tab}Programming Languages{Escape}");
-  await userEvent.click(
-    await screen.findByLabelText("expand Programming Languages")
-  );
-  await userEvent.click(
-    await screen.findByLabelText(/open .* \+4 in fullscreen/)
-  );
-
+  renderApp({ ...alice(), initialRoute: relationUrl });
   await screen.findByText("READONLY");
+  await expectTree(`
+[O] Programming Languages
+  [O] OOP
+  [O] FP
+  [O] Logic
+  [O] Scripting
+  `);
   await userEvent.click(await screen.findByLabelText("copy root to edit"));
 
   await waitFor(() => {
     expect(screen.queryByText("READONLY")).toBeNull();
   });
+  await expectTree(`
+Programming Languages
+  OOP
+  FP
+  Logic
+  Scripting
+  `);
 
   const breadcrumbs = screen.getByRole("navigation", {
     name: "Navigation breadcrumbs",
@@ -347,22 +347,30 @@ test("Forked subtree header source action opens source path", async () => {
   await type(
     "My Notes{Enter}{Tab}Programming Languages{Enter}{Tab}OOP{Enter}FP{Enter}Logic{Enter}Scripting{Escape}"
   );
+  const relationUrl = await openReadonlyRoute("Programming Languages");
   cleanup();
 
-  renderTree(alice);
-  await type("My Notes{Enter}{Tab}Programming Languages{Escape}");
-  await userEvent.click(
-    await screen.findByLabelText("expand Programming Languages")
-  );
-  const versionEntries = await screen.findAllByLabelText(/in fullscreen/);
-  await userEvent.click(versionEntries[versionEntries.length - 1]);
-
+  renderApp({ ...alice(), initialRoute: relationUrl });
   await screen.findByText("READONLY");
+  await expectTree(`
+[O] Programming Languages
+  [O] OOP
+  [O] FP
+  [O] Logic
+  [O] Scripting
+  `);
   await userEvent.click(await screen.findByLabelText("copy root to edit"));
 
   await waitFor(() => {
     expect(screen.queryByText("READONLY")).toBeNull();
   });
+  await expectTree(`
+Programming Languages
+  OOP
+  FP
+  Logic
+  Scripting
+  `);
 
   await screen.findByLabelText("Open source tree");
   await userEvent.click(await screen.findByLabelText("Open source tree"));

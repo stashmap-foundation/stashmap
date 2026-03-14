@@ -6,7 +6,9 @@ import {
   CAROL,
   setup,
   follow,
+  forkReadonlyRoot,
   unfollow,
+  readonlyRoute,
   renderTree,
   renderApp,
   findNewNodeEditor,
@@ -411,28 +413,29 @@ My Notes
     await type(
       "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Enter}France{Enter}Italy{Enter}Portugal{Escape}"
     );
-    cleanup();
-
-    renderTree(bob);
-    await type("My Notes{Enter}{Tab}Holiday Destinations{Escape}");
-    await maybeExpand("expand Holiday Destinations");
-
-    await userEvent.click(
-      await screen.findByLabelText(/open .* \+4 in fullscreen/)
+    await forkReadonlyRoot(
+      bob(),
+      alice().user.publicKey,
+      "My Notes",
+      "Holiday Destinations"
     );
-    await screen.findByText("READONLY");
-    await userEvent.click(await screen.findByLabelText("copy root to edit"));
+    await userEvent.click(
+      await screen.findByLabelText("open Holiday Destinations in fullscreen")
+    );
     await userEvent.click(
       await screen.findByLabelText("edit Holiday Destinations")
     );
     await userEvent.keyboard("{Enter}");
     await type("Austria{Enter}Berlin{Enter}Rome{Enter}Vienna{Escape}");
-
-    await userEvent.click(
-      await screen.findByLabelText(/open .* -4 in fullscreen/)
+    await forkReadonlyRoot(
+      bob(),
+      alice().user.publicKey,
+      "My Notes",
+      "Holiday Destinations"
     );
-    await screen.findByText("READONLY");
-    await userEvent.click(await screen.findByLabelText("copy root to edit"));
+    await userEvent.click(
+      await screen.findByLabelText("open Holiday Destinations in fullscreen")
+    );
     await userEvent.click(
       await screen.findByLabelText("edit Holiday Destinations")
     );
@@ -461,10 +464,14 @@ My Notes
     await follow(alice, bob().user.publicKey);
     await follow(alice, carol().user.publicKey);
 
-    renderTree(bob);
-    await type(
-      "Topic{Enter}{Tab}BobChild1{Enter}BobChild2{Enter}BobChild3{Enter}BobChild4{Escape}"
-    );
+    renderTree(alice);
+    await type("Topic{Escape}");
+    cleanup();
+
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "Topic");
+    await userEvent.click(await screen.findByLabelText("edit Topic"));
+    await userEvent.keyboard("{Enter}");
+    await type("BobChild1{Enter}BobChild2{Enter}BobChild3{Enter}BobChild4{Escape}");
     cleanup();
 
     renderTree(carol);
@@ -472,19 +479,19 @@ My Notes
     cleanup();
 
     renderTree(alice);
-    await type("Topic{Escape}");
 
     await expectTree(`
 Topic
   [S] CarolChild
   [S] BobChild1
   [S] BobChild2
-  [VO] +4
     `);
 
-    await userEvent.click(
-      await screen.findByLabelText(/open .* \+4 in fullscreen/)
-    );
+    cleanup();
+    renderApp({
+      ...alice(),
+      initialRoute: readonlyRoute(bob().user.publicKey, "Topic"),
+    });
     await screen.findByText("READONLY");
 
     await expectTree(`
@@ -493,45 +500,39 @@ Topic
   [O] BobChild2
   [O] BobChild3
   [O] BobChild4
-  [VO] -4
-  [VO] +1 -4
     `);
   });
 
-  test("declining version entry hides all suggestions from that list", async () => {
+  test("declining copied list suggestion hides it and reveals the next one", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
 
-    renderTree(bob);
-    await type(
-      "Holiday Destinations{Enter}{Tab}Spain{Enter}France{Enter}Italy{Enter}Portugal{Enter}Greece{Escape}"
-    );
+    renderTree(alice);
+    await type("Holiday Destinations{Escape}");
+    cleanup();
 
-    await expectTree(`
-Holiday Destinations
-  Spain
-  France
-  Italy
-  Portugal
-  Greece
-    `);
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "Holiday Destinations");
+    await userEvent.click(await screen.findByLabelText("edit Holiday Destinations"));
+    await userEvent.keyboard("{Enter}");
+    await type("Spain{Enter}France{Enter}Italy{Enter}Portugal{Enter}Greece{Escape}");
     cleanup();
 
     renderTree(alice);
-    await type("Holiday Destinations{Escape}");
 
     await expectTree(`
 Holiday Destinations
   [S] Spain
   [S] France
   [S] Italy
-  [VO] +5
     `);
 
-    await userEvent.click(await screen.findByLabelText(/decline.*\+5/));
+    await userEvent.click(await screen.findByLabelText("decline Spain"));
 
     await expectTree(`
 Holiday Destinations
+  [S] France
+  [S] Italy
+  [S] Portugal
     `);
   });
 
@@ -554,25 +555,27 @@ Recipes
     `);
   });
 
-  test("suggestions capped, version shows full diff, accepting surfaces next until version disappears", async () => {
+  test("accepting copied list suggestions reveals later suggestions", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
 
-    renderTree(bob);
-    await type(
-      "Holiday Destinations{Enter}{Tab}Spain{Enter}France{Enter}Italy{Enter}Portugal{Enter}Greece{Escape}"
-    );
+    renderTree(alice);
+    await type("Holiday Destinations{Escape}");
+    cleanup();
+
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "Holiday Destinations");
+    await userEvent.click(await screen.findByLabelText("edit Holiday Destinations"));
+    await userEvent.keyboard("{Enter}");
+    await type("Spain{Enter}France{Enter}Italy{Enter}Portugal{Enter}Greece{Escape}");
     cleanup();
 
     renderTree(alice);
-    await type("Holiday Destinations{Escape}");
 
     await expectTree(`
 Holiday Destinations
   [S] Spain
   [S] France
   [S] Italy
-  [VO] +5
     `);
 
     await userEvent.click(
@@ -585,7 +588,6 @@ Holiday Destinations
   [S] France
   [S] Italy
   [S] Portugal
-  [VO] +4
     `);
 
     await userEvent.click(
@@ -602,32 +604,38 @@ Holiday Destinations
     `);
   });
 
-  test("multiple users suggestions pooled newest first, version per user when exceeding cap", async () => {
+  test("multiple users suggestions are pooled newest first", async () => {
     const [alice, bob, carol] = setup([ALICE, BOB, CAROL]);
     await follow(alice, bob().user.publicKey);
     await follow(alice, carol().user.publicKey);
 
-    renderTree(bob);
-    await type("Cooking{Enter}{Tab}Pasta{Enter}Risotto{Escape}");
+    renderTree(alice);
+    await type("Cooking{Escape}");
     cleanup();
 
-    renderTree(carol);
-    await type("Cooking{Enter}{Tab}Sushi{Enter}Tacos{Enter}Curry{Escape}");
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "Cooking");
+    await userEvent.click(await screen.findByLabelText("edit Cooking"));
+    await userEvent.keyboard("{Enter}");
+    await type("Pasta{Enter}Risotto{Escape}");
+    cleanup();
+
+    await forkReadonlyRoot(carol(), alice().user.publicKey, "Cooking");
+    await userEvent.click(await screen.findByLabelText("edit Cooking"));
+    await userEvent.keyboard("{Enter}");
+    await type("Sushi{Enter}Tacos{Enter}Curry{Escape}");
     cleanup();
 
     renderTree(alice);
-    await type("Cooking{Escape}");
 
     await expectTree(`
 Cooking
   [S] Sushi
   [S] Tacos
   [S] Curry
-  [VO] +2
     `);
   });
 
-  test("fork of other user's list shows as own version entry", async () => {
+  test("fork of other user's list becomes an own editable note", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
     await follow(bob, alice().user.publicKey);
@@ -636,24 +644,7 @@ Cooking
     await type(
       "Recipes{Enter}{Tab}Pasta{Enter}Salad{Enter}Soup{Enter}Stew{Escape}"
     );
-    cleanup();
-
-    renderTree(bob);
-    await type("Recipes{Escape}");
-
-    await expectTree(`
-Recipes
-  [S] Pasta
-  [S] Salad
-  [S] Soup
-  [VO] +4
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText(/open .* \+4 in fullscreen/)
-    );
-    await screen.findByText("READONLY");
-    await userEvent.click(await screen.findByLabelText("copy root to edit"));
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "Recipes");
     await userEvent.click(await screen.findByLabelText("edit Recipes"));
     await userEvent.keyboard("{Enter}");
     await userEvent.type(await findNewNodeEditor(), "Curry{Escape}");
@@ -668,7 +659,6 @@ Recipes
   Salad
   Soup
   Stew
-  [V] -5
     `);
   });
 });
@@ -725,7 +715,6 @@ Target
     await expectTree(`
 Target
   [S] Items
-  [VO] +2
     `);
   });
 });

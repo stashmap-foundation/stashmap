@@ -3,6 +3,7 @@ import React from "react";
 import { RelayInformation } from "nostr-tools/lib/types/nip11";
 import { List, Map, Set, OrderedSet } from "immutable";
 import {
+  cleanup,
   render,
   screen,
   waitFor,
@@ -458,6 +459,45 @@ function renderApp(props: RenderApis): RenderViewResult {
     ...testApis,
     includeFocusContext: props.includeFocusContext,
   });
+}
+
+export function readonlyRoute(author: string, ...segments: string[]): string {
+  return `/n/${segments.map(encodeURIComponent).join("/")}?author=${author}`;
+}
+
+export async function forkReadonlyRoot(
+  viewer: RenderApis,
+  author: string,
+  ...segments: string[]
+): Promise<void> {
+  cleanup();
+  renderApp({
+    ...viewer,
+    initialRoute: readonlyRoute(author, ...segments),
+  });
+  await screen.findByText("READONLY");
+  const copyAction = await screen.findByLabelText(
+    /copy root to edit|Open root to make a copy/
+  );
+  if (copyAction.getAttribute("aria-label") === "copy root to edit") {
+    await userEvent.click(copyAction);
+    return;
+  }
+  await userEvent.click(copyAction);
+  await screen.findByText("READONLY");
+  await userEvent.click(await screen.findByLabelText("copy root to edit"));
+}
+
+export async function openReadonlyRoute(nodeLabel: string): Promise<string> {
+  await userEvent.click(
+    await screen.findByLabelText(`open ${nodeLabel} in fullscreen`)
+  );
+
+  await waitFor(() => {
+    expect(window.location.pathname).toMatch(/^\/r\//);
+  });
+
+  return window.location.pathname;
 }
 
 export function waitForLoadingToBeNull(): Promise<void> {

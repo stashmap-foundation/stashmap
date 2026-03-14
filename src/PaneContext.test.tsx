@@ -10,6 +10,7 @@ import {
   follow,
   type,
   expectTree,
+  openReadonlyRoute,
 } from "./utils.test";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { defaultPane } from "./Data";
@@ -39,27 +40,14 @@ test("Navigate to specific node via URL using human-readable path", async () => 
 
 test("Fork works when navigating to a version entry", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
-  await follow(bob, alice().user.publicKey);
-
   renderApp(alice());
   await type(
     "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Enter}Rome{Enter}Vienna{Escape}"
   );
+  const relationUrl = await openReadonlyRoute("Cities");
   cleanup();
 
-  renderApp(bob());
-  await type(
-    "My Notes{Enter}{Tab}Cities{Enter}{Tab}Barcelona{Enter}Madrid{Escape}"
-  );
-
-  await userEvent.click(
-    await screen.findByLabelText(/open .* \+4 -2 in fullscreen/)
-  );
-
-  await waitFor(() => {
-    expect(window.location.pathname).toMatch(/^\/r\//);
-  });
-
+  renderApp({ ...bob(), initialRoute: relationUrl });
   await screen.findByText("READONLY");
   await userEvent.click(await screen.findByLabelText("copy root to edit"));
 
@@ -74,7 +62,6 @@ Cities
   London
   Rome
   Vienna
-  [V] +2 -5
   `);
 });
 

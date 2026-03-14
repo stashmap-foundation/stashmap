@@ -4,7 +4,7 @@ import { List, Map } from "immutable";
 import {
   computeEmptyNodeMetadata,
   getRelations,
-  getRelationsNoReferencedBy,
+  getNode,
   shortID,
   isSearchId,
   parseSearchId,
@@ -184,7 +184,7 @@ function getViewRelationByID(
   id: ID,
   myself: PublicKey
 ): GraphNode | undefined {
-  return getRelationsNoReferencedBy(knowledgeDBs, id, myself);
+  return getNode(knowledgeDBs, id, myself);
 }
 
 function getEmptyRelationItem(
@@ -204,11 +204,7 @@ function getRowIDFromPath(data: Data, viewPath: ViewPath): ID {
   if (isEmptyViewPathID(currentID)) {
     return EMPTY_SEMANTIC_ID;
   }
-  const relation = getRelationsNoReferencedBy(
-    data.knowledgeDBs,
-    currentID,
-    data.user.publicKey
-  );
+  const relation = getNode(data.knowledgeDBs, currentID, data.user.publicKey);
   if (!relation) {
     return currentID;
   }
@@ -583,11 +579,7 @@ export function getCurrentEdgeForView(
   if (childID === EMPTY_SEMANTIC_ID) {
     return getEmptyRelationItem(data, parentRelation);
   }
-  return getRelationsNoReferencedBy(
-    data.knowledgeDBs,
-    childID,
-    data.user.publicKey
-  );
+  return getNode(data.knowledgeDBs, childID, data.user.publicKey);
 }
 
 export function useCurrentEdge(): GraphNode | undefined {
@@ -637,7 +629,7 @@ export function getPreviousSibling(
       if (childID === EMPTY_SEMANTIC_ID) {
         return found;
       }
-      const childRelation = getRelationsNoReferencedBy(
+      const childRelation = getNode(
         data.knowledgeDBs,
         childID,
         data.user.publicKey

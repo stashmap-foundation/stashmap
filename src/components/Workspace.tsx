@@ -57,10 +57,10 @@ import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import {
   getRelationStack,
   getRelationText,
-  getRelationItemRelation,
-  getRelationItemSemanticID,
+  getSemanticID,
   getRelationSemanticID,
-  getRelationsNoReferencedBy,
+  getNode,
+  getRefTargetID,
   isSearchId,
   shortID,
 } from "../connections";
@@ -188,7 +188,7 @@ function resolveRelationFromSegments(
   const [nextSemanticID, ...rest] = semanticStack;
   const matchingItem = currentRelation.children.find(
     (item) =>
-      shortID(getRelationItemSemanticID(knowledgeDBs, item, currentAuthor)) ===
+      shortID(getSemanticID(knowledgeDBs, item, currentAuthor)) ===
       shortID(nextSemanticID as ID)
   );
 
@@ -196,11 +196,11 @@ function resolveRelationFromSegments(
     return undefined;
   }
 
-  const nextRelation = getRelationItemRelation(
-    knowledgeDBs,
-    matchingItem,
-    currentAuthor
-  );
+  const matchingNode = getNode(knowledgeDBs, matchingItem, currentAuthor);
+  const targetID = matchingNode ? getRefTargetID(matchingNode) : undefined;
+  const nextRelation = targetID
+    ? getNode(knowledgeDBs, targetID, currentAuthor)
+    : matchingNode;
   return nextRelation
     ? resolveRelationFromSegments(knowledgeDBs, nextRelation, rest as ID[])
     : undefined;
@@ -235,7 +235,7 @@ function getLiveAnchorSourceRelation(
 ): GraphNode | undefined {
   const sourceAuthor = relation.anchor?.sourceAuthor || relation.author;
   if (relation.anchor?.sourceRelationID) {
-    return getRelationsNoReferencedBy(
+    return getNode(
       knowledgeDBs,
       relation.anchor.sourceRelationID,
       sourceAuthor
@@ -298,7 +298,7 @@ function buildAnchoredLineageEntries(
 
   const nextSeen = new Set(seen).add(relation.id);
   if (relation.parent) {
-    const parentRelation = getRelationsNoReferencedBy(
+    const parentRelation = getNode(
       knowledgeDBs,
       relation.parent,
       relation.author
@@ -335,11 +335,7 @@ function SourceButton(): JSX.Element | null {
   const { setPane } = useSplitPanes();
   const paneHistory = usePaneHistory();
   const rootRelation = pane.rootRelation
-    ? getRelationsNoReferencedBy(
-        knowledgeDBs,
-        pane.rootRelation,
-        user.publicKey
-      )
+    ? getNode(knowledgeDBs, pane.rootRelation, user.publicKey)
     : undefined;
 
   if (!rootRelation?.anchor) {
@@ -389,11 +385,7 @@ function Breadcrumbs(): JSX.Element {
   const currentRelation = useCurrentRelation();
   const visibleStack = stack.filter((id) => !isSearchId(id as ID));
   const rootRelation = pane.rootRelation
-    ? getRelationsNoReferencedBy(
-        knowledgeDBs,
-        pane.rootRelation,
-        user.publicKey
-      )
+    ? getNode(knowledgeDBs, pane.rootRelation, user.publicKey)
     : currentRelation;
   const anchoredEntries = (() => {
     if (!rootRelation?.anchor) {

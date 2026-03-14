@@ -23,7 +23,7 @@ import {
   shortID,
   EMPTY_SEMANTIC_ID,
   isEmptySemanticID,
-  getRelationsNoReferencedBy,
+  getNode,
   computeEmptyNodeMetadata,
   getConcreteRefTargetRelation,
   isSearchId,
@@ -75,7 +75,7 @@ function getAnchorSnapshotLabels(
   const labels: string[] = [];
   let parentRelationID = relation.parent;
   while (parentRelationID) {
-    const parentRelation = getRelationsNoReferencedBy(
+    const parentRelation = getNode(
       knowledgeDBs,
       parentRelationID,
       relation.author
@@ -639,7 +639,7 @@ export function planAddTargetsToRelation<T extends GraphPlan>(
         ];
       }
 
-      const existingRelation = getRelationsNoReferencedBy(
+      const existingRelation = getNode(
         accPlan.knowledgeDBs,
         objectID,
         accPlan.user.publicKey
@@ -1012,11 +1012,7 @@ export function planMoveTreeDescendantsToContext(
     const actualID = actualNodeIDs[index];
     const sourceRelationID = sourceRelationIDs[index];
     const sourceRelation = sourceRelationID
-      ? getRelationsNoReferencedBy(
-          accPlan.knowledgeDBs,
-          sourceRelationID,
-          accPlan.user.publicKey
-        )
+      ? getNode(accPlan.knowledgeDBs, sourceRelationID, accPlan.user.publicKey)
       : undefined;
     if (!sourceRelation) {
       return accPlan;
@@ -1053,7 +1049,7 @@ export function planForkPane(
   const pane = getPane(plan, viewPath);
 
   const rootRelationData = pane.rootRelation
-    ? getRelationsNoReferencedBy(
+    ? getNode(
         plan.knowledgeDBs,
         pane.rootRelation,
         pane.author || plan.user.publicKey
@@ -1111,7 +1107,7 @@ export function planDeepCopyNode(
     semanticContext: Context;
     relation?: GraphNode;
   } => {
-    const sourceNode = getRelationsNoReferencedBy(
+    const sourceNode = getNode(
       plan.knowledgeDBs,
       sourceItemID,
       plan.user.publicKey
@@ -1393,11 +1389,7 @@ export function planSaveNodeAndEnsureRelations(
     return { plan: resultPlan, viewPath };
   }
 
-  const currentItem = getRelationsNoReferencedBy(
-    plan.knowledgeDBs,
-    itemID,
-    plan.user.publicKey
-  );
+  const currentItem = getNode(plan.knowledgeDBs, itemID, plan.user.publicKey);
   if ((currentItem && isRefNode(currentItem)) || isSearchId(itemID as ID)) {
     return { plan, viewPath };
   }

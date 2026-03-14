@@ -2,11 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Filter } from "nostr-tools";
 import { Set } from "immutable";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
-import {
-  splitID,
-  getRelationsNoReferencedBy,
-  getRelationStack,
-} from "./connections";
+import { splitID, getNode, getRelationStack } from "./connections";
 import { getTextHashForSemanticID } from "./semanticProjection";
 import { REFERENCED_BY } from "./constants";
 import { useCurrentPane } from "./SplitPanesContext";
@@ -352,11 +348,7 @@ export function LoadRelationData({
     effectiveAuthor
   );
   const withRelation = addRelationIDToFilters(baseFilter, relationID);
-  const relation = getRelationsNoReferencedBy(
-    knowledgeDBs,
-    relationID,
-    effectiveAuthor
-  );
+  const relation = getNode(knowledgeDBs, relationID, effectiveAuthor);
   const filter = relation
     ? getRelationStack(knowledgeDBs, relation).reduce(
         (acc, semanticID) =>

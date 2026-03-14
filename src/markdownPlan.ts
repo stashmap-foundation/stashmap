@@ -2,7 +2,7 @@ import { List } from "immutable";
 import {
   getRelationContext,
   getRelationSemanticID,
-  getRelationsNoReferencedBy,
+  getNode,
   shortID,
 } from "./connections";
 import { MarkdownImportFile, parseMarkdownImportFiles } from "./markdownImport";
@@ -118,11 +118,7 @@ function moveCreatedTreesToParentContext<T extends GraphPlan>(
     const actualID = actualNodeIDs[index];
     const sourceRelationID = sourceRelationIDs[index];
     const sourceRelation = sourceRelationID
-      ? getRelationsNoReferencedBy(
-          accPlan.knowledgeDBs,
-          sourceRelationID,
-          accPlan.user.publicKey
-        )
+      ? getNode(accPlan.knowledgeDBs, sourceRelationID, accPlan.user.publicKey)
       : undefined;
     if (!sourceRelation) {
       return accPlan;
@@ -160,7 +156,7 @@ export function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
     };
   }
 
-  const parentRelation = getRelationsNoReferencedBy(
+  const parentRelation = getNode(
     plan.knowledgeDBs,
     parentRelationId,
     plan.user.publicKey

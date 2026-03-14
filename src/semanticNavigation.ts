@@ -4,7 +4,7 @@ import {
   getIndexedRelationsForKeys,
   getRelationChildNodes,
   getRelationSemanticID,
-  getRelationsNoReferencedBy,
+  getNode,
   shortID,
 } from "./connections";
 import { isStandaloneRoot } from "./systemRoots";
@@ -182,11 +182,7 @@ export function resolveSemanticRelationInCurrentTree(
   currentRoot?: ID
 ): GraphNode | undefined {
   if (isRootNode && rootRelation) {
-    const relation = getRelationsNoReferencedBy(
-      knowledgeDBs,
-      rootRelation,
-      paneAuthor
-    );
+    const relation = getNode(knowledgeDBs, rootRelation, paneAuthor);
     if (relation) {
       return relation;
     }
@@ -196,7 +192,7 @@ export function resolveSemanticRelationInCurrentTree(
   const preferredRoot =
     currentRoot ||
     (rootRelation
-      ? getRelationsNoReferencedBy(knowledgeDBs, rootRelation, paneAuthor)?.root
+      ? getNode(knowledgeDBs, rootRelation, paneAuthor)?.root
       : undefined);
 
   if (preferredRoot) {

@@ -1,7 +1,7 @@
 import React from "react";
 import {
   getConcreteRefTargetRelation,
-  getRelationsNoReferencedBy,
+  getNode,
   isRefNode,
   splitID,
 } from "../connections";
@@ -16,11 +16,7 @@ export function ReferenceIndicators({
   refId: ID;
 }): JSX.Element | null {
   const { knowledgeDBs, user } = useData();
-  const sourceItem = getRelationsNoReferencedBy(
-    knowledgeDBs,
-    refId,
-    user.publicKey
-  );
+  const sourceItem = getNode(knowledgeDBs, refId, user.publicKey);
   if (!isRefNode(sourceItem)) {
     return null;
   }

@@ -6,7 +6,7 @@ import {
   getConcreteRefTargetRelation,
   getRelationChildNodes,
   getRefTargetID,
-  getRelationsNoReferencedBy,
+  getNode,
   joinID,
   isRefNode,
   shortID,
@@ -71,7 +71,7 @@ function resolveRelation(
   relationId: LongID,
   viewer: PublicKey
 ): GraphNode {
-  const relation = getRelationsNoReferencedBy(knowledgeDBs, relationId, viewer);
+  const relation = getNode(knowledgeDBs, relationId, viewer);
   if (!relation) {
     throw new Error(`Relation not found: ${relationId}`);
   }

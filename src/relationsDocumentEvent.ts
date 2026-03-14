@@ -6,7 +6,7 @@ import {
   getRelationContext,
   getRelationSemanticID,
   getRelationText,
-  getRelationsNoReferencedBy,
+  getNode,
   getRefTargetID,
   isRefNode,
   shortID,
@@ -36,7 +36,7 @@ function serializeRelationItems(
     if (childID === EMPTY_SEMANTIC_ID) {
       return acc;
     }
-    const item = getRelationsNoReferencedBy(knowledgeDBs, childID, author);
+    const item = getNode(knowledgeDBs, childID, author);
     if (!item) {
       throw new Error(`Missing child relation: ${childID}`);
     }

@@ -2,13 +2,13 @@ import { List } from "immutable";
 import {
   getConcreteRefTargetRelation,
   getRelationChildNodes,
-  getRelationsNoReferencedBy,
+  getNode,
   getRefTargetID,
   isRefNode,
   shortID,
   splitID,
   itemPassesFilters,
-  getRelationItemSemanticID,
+  getSemanticID,
   getRelationContext,
   getRelationSemanticID,
 } from "./connections";
@@ -65,7 +65,7 @@ export function parseRef(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey
 ): ParsedRef | undefined {
-  const sourceItem = getRelationsNoReferencedBy(knowledgeDBs, refId, myself);
+  const sourceItem = getNode(knowledgeDBs, refId, myself);
   const relation = isRefNode(sourceItem)
     ? getConcreteRefTargetRelation(knowledgeDBs, refId, myself)
     : sourceItem;
@@ -227,7 +227,7 @@ function effectiveIDs(
     .map((item) =>
       getSemanticNodeKey(
         knowledgeDBs,
-        getRelationItemSemanticID(knowledgeDBs, item, relation.author),
+        getSemanticID(knowledgeDBs, item.id, relation.author),
         relation.author
       )
     )
@@ -299,12 +299,12 @@ function findCrefToNode(
   myself: PublicKey
 ): GraphNode | undefined {
   return children
-    .map((childID) => getRelationsNoReferencedBy(knowledgeDBs, childID, myself))
+    .map((childID) => getNode(knowledgeDBs, childID, myself))
     .find((item) => {
       if (!isRefNode(item)) return false;
       const targetID = getRefTargetID(item);
       const resolvedTarget = targetID
-        ? getRelationsNoReferencedBy(knowledgeDBs, targetID, myself)
+        ? getNode(knowledgeDBs, targetID, myself)
         : undefined;
       return resolvedTarget?.id === targetRelation.id;
     });
@@ -315,11 +315,7 @@ function getReferenceSourceRelations(
   knowledgeDBs: KnowledgeDBs
 ): GraphNode[] {
   const parentRelation = ref.relation.parent
-    ? getRelationsNoReferencedBy(
-        knowledgeDBs,
-        ref.relation.parent,
-        ref.relation.author
-      )
+    ? getNode(knowledgeDBs, ref.relation.parent, ref.relation.author)
     : undefined;
   return parentRelation && parentRelation.id !== ref.relation.id
     ? [ref.relation, parentRelation]
@@ -362,11 +358,7 @@ export function buildReferenceItem(
       ? getRelationForView(data, parentPath, stack)
       : undefined;
     const parentItem = parentRelation
-      ? getRelationsNoReferencedBy(
-          data.knowledgeDBs,
-          refId,
-          data.user.publicKey
-        )
+      ? getNode(data.knowledgeDBs, refId, data.user.publicKey)
       : undefined;
     return buildDeletedReference(
       refId,
@@ -455,11 +447,7 @@ export function buildReferenceItem(
   }
   if (!parentRelation) return outgoing;
 
-  const storedItem = getRelationsNoReferencedBy(
-    data.knowledgeDBs,
-    refId,
-    data.user.publicKey
-  );
+  const storedItem = getNode(data.knowledgeDBs, refId, data.user.publicKey);
   const isNotRelevant = storedItem?.relevance === "not_relevant";
 
   const findReverseCref = (children: List<ID>): GraphNode | undefined =>

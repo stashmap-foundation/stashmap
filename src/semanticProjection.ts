@@ -8,13 +8,13 @@ import {
   parseSearchId,
   itemMatchesType,
   itemPassesFilters,
-  getRelationItemSemanticID,
+  getSemanticID,
   getRelationContext,
   getRelationSemanticID,
   getRelationText,
   getConcreteRefTargetRelation,
   getRefTargetID,
-  getRelationsNoReferencedBy,
+  getNode,
   isRefNode,
 } from "./connections";
 import { suggestionSettings } from "./constants";
@@ -63,11 +63,7 @@ function getRelationsForSemanticID(
     return [];
   }
 
-  const directRelation = getRelationsNoReferencedBy(
-    knowledgeDBs,
-    semanticID,
-    author
-  );
+  const directRelation = getNode(knowledgeDBs, semanticID, author);
   if (directRelation) {
     if (isRefNode(directRelation)) {
       return [];
@@ -136,11 +132,7 @@ export function getTextForSemanticID(
     return parseSearchId(localID) || "";
   }
 
-  const directRelation = getRelationsNoReferencedBy(
-    knowledgeDBs,
-    semanticID,
-    author
-  );
+  const directRelation = getNode(knowledgeDBs, semanticID, author);
   if (directRelation) {
     if (isRefNode(directRelation)) {
       return undefined;
@@ -165,11 +157,7 @@ export function getTextHashForSemanticID(
   semanticID: ID,
   author: PublicKey
 ): ID | undefined {
-  const directRelation = getRelationsNoReferencedBy(
-    knowledgeDBs,
-    semanticID,
-    author
-  );
+  const directRelation = getNode(knowledgeDBs, semanticID, author);
   if (directRelation) {
     return directRelation.text as ID;
   }
@@ -428,11 +416,7 @@ function isInSystemRoot(
   if (!relation) {
     return false;
   }
-  const rootRelation = getRelationsNoReferencedBy(
-    knowledgeDBs,
-    relation.root,
-    relation.author
-  );
+  const rootRelation = getNode(knowledgeDBs, relation.root, relation.author);
   return rootRelation?.systemRole === systemRole;
 }
 
@@ -691,7 +675,7 @@ export function getSuggestionsForNode(
   const semanticKey = getSemanticNodeKey(knowledgeDBs, semanticID, myself);
 
   const currentRelation = currentRelationId
-    ? getRelationsNoReferencedBy(knowledgeDBs, currentRelationId, myself)
+    ? getNode(knowledgeDBs, currentRelationId, myself)
     : undefined;
   const currentRelationChildren = currentRelation
     ? getRelationChildNodes(
@@ -708,11 +692,7 @@ export function getSuggestionsForNode(
         .map((item) =>
           getComparableSuggestionKey(
             knowledgeDBs,
-            getRelationItemSemanticID(
-              knowledgeDBs,
-              item,
-              currentRelation.author
-            ),
+            getSemanticID(knowledgeDBs, item.id, currentRelation.author),
             currentRelation.author
           )
         )
@@ -761,9 +741,9 @@ export function getSuggestionsForNode(
           ) {
             return itemAcc;
           }
-          const candidateSemanticID = getRelationItemSemanticID(
+          const candidateSemanticID = getSemanticID(
             knowledgeDBs,
-            item,
+            item.id,
             nodes.author
           );
           const candidateKey = getSemanticNodeKey(
@@ -874,7 +854,7 @@ function getComparableRelationItemKeys(
         ? shortID(item.id)
         : getSemanticNodeKey(
             knowledgeDBs,
-            getRelationItemSemanticID(knowledgeDBs, item, relation.author),
+            getSemanticID(knowledgeDBs, item.id, relation.author),
             relation.author
           )
     )
@@ -987,7 +967,7 @@ export function getVersionsForRelation(
             ? shortID(item.id)
             : getSemanticNodeKey(
                 knowledgeDBs,
-                getRelationItemSemanticID(knowledgeDBs, item, r.author),
+                getSemanticID(knowledgeDBs, item.id, r.author),
                 r.author
               )
         )

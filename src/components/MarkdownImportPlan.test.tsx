@@ -3,7 +3,7 @@ import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { createPlan } from "../planner";
 import {
   getRelationChildNodes,
-  getRelationsNoReferencedBy,
+  getNode,
   getRelationSemanticID,
 } from "../connections";
 import { isStandaloneRoot } from "../systemRoots";
@@ -135,7 +135,7 @@ test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
     trees
   );
   const parentID = topNodeIDs[0];
-  const parentRelation = getRelationsNoReferencedBy(
+  const parentRelation = getNode(
     plan.knowledgeDBs,
     topRelationIDs[0],
     plan.user.publicKey
@@ -146,11 +146,7 @@ test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
     plan.user.publicKey
   ).first()?.id as LongID | undefined;
   const childRelation = childRelationID
-    ? getRelationsNoReferencedBy(
-        plan.knowledgeDBs,
-        childRelationID,
-        plan.user.publicKey
-      )
+    ? getNode(plan.knowledgeDBs, childRelationID, plan.user.publicKey)
     : undefined;
   const grandchildRelationID = nodeChildren(
     plan.knowledgeDBs,
@@ -158,11 +154,7 @@ test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
     plan.user.publicKey
   ).first()?.id as LongID | undefined;
   const grandchildRelation = grandchildRelationID
-    ? getRelationsNoReferencedBy(
-        plan.knowledgeDBs,
-        grandchildRelationID,
-        plan.user.publicKey
-      )
+    ? getNode(plan.knowledgeDBs, grandchildRelationID, plan.user.publicKey)
     : undefined;
 
   expect(parentRelation).toBeDefined();

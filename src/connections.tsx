@@ -64,13 +64,9 @@ export function getConcreteRefTargetRelation(
   refId: ID,
   myself: PublicKey
 ): GraphNode | undefined {
-  const refOrRelation = getRelationsNoReferencedBy(knowledgeDBs, refId, myself);
+  const refOrRelation = getNode(knowledgeDBs, refId, myself);
   if (isRefNode(refOrRelation)) {
-    return getRelationsNoReferencedBy(
-      knowledgeDBs,
-      refOrRelation.targetID,
-      myself
-    );
+    return getNode(knowledgeDBs, refOrRelation.targetID, myself);
   }
   return refOrRelation;
 }
@@ -240,7 +236,7 @@ export function getRelationContext(
     }
     visited.add(parentKey);
 
-    const parentRelation = getRelationsNoReferencedBy(
+    const parentRelation = getNode(
       knowledgeDBs,
       currentParentID,
       relation.author
@@ -325,64 +321,19 @@ export function buildTextNodesFromRelations(
   ) as Map<string, TextSeed>;
 }
 
-export function getRelationsNoReferencedBy(
+export function getNode(
   knowledgeDBs: KnowledgeDBs,
-  relationID: ID | undefined,
+  nodeID: ID | undefined,
   myself: PublicKey
 ): GraphNode | undefined {
-  if (!relationID) {
+  if (!nodeID) {
     return undefined;
   }
-  const [remote, id] = splitID(relationID);
+  const [remote, id] = splitID(nodeID);
   if (remote) {
     return knowledgeDBs.get(remote)?.nodes.get(id);
   }
-
-  const ownRelation = knowledgeDBs.get(myself)?.nodes.get(relationID);
-  if (ownRelation) {
-    return ownRelation;
-  }
-
-  return knowledgeDBs
-    .valueSeq()
-    .map((db) => db.nodes.get(relationID))
-    .find((relation) => relation !== undefined);
-}
-
-export function getRelationChildIndex(
-  relation: GraphNode,
-  itemId: ID
-): number | undefined {
-  const index = relation.children.findIndex(
-    (childID) =>
-      childID === itemId ||
-      (childID === EMPTY_SEMANTIC_ID && itemId === EMPTY_SEMANTIC_ID)
-  );
-  return index >= 0 ? index : undefined;
-}
-
-export function getRelationChildNode(
-  knowledgeDBs: KnowledgeDBs,
-  relation: GraphNode,
-  childID: ID,
-  myself: PublicKey
-): GraphNode | undefined {
-  if (childID === EMPTY_SEMANTIC_ID) {
-    return undefined;
-  }
-  return getRelationsNoReferencedBy(knowledgeDBs, childID, myself);
-}
-
-export function getRelationChildNodeByIndex(
-  knowledgeDBs: KnowledgeDBs,
-  relation: GraphNode,
-  index: number,
-  myself: PublicKey
-): GraphNode | undefined {
-  const childID = relation.children.get(index);
-  return childID
-    ? getRelationChildNode(knowledgeDBs, relation, childID, myself)
-    : undefined;
+  return knowledgeDBs.get(myself)?.nodes.get(nodeID);
 }
 
 export function getRelationChildNodes(
@@ -391,48 +342,23 @@ export function getRelationChildNodes(
   myself: PublicKey
 ): List<GraphNode> {
   return relation.children.reduce((acc, childID) => {
-    const childNode = getRelationChildNode(
-      knowledgeDBs,
-      relation,
-      childID,
-      myself
-    );
+    const childNode = getNode(knowledgeDBs, childID, myself);
     return childNode ? acc.push(childNode) : acc;
   }, List<GraphNode>());
 }
 
-export function getRelationItemRelation(
+export function getSemanticID(
   knowledgeDBs: KnowledgeDBs,
-  item: GraphNode | ID,
-  myself: PublicKey
-): GraphNode | undefined {
-  const relation =
-    typeof item === "string"
-      ? getRelationsNoReferencedBy(knowledgeDBs, item as LongID, myself)
-      : item;
-  if (!relation) {
-    return undefined;
-  }
-  const targetID = getRefTargetID(relation);
-  if (targetID) {
-    return getRelationsNoReferencedBy(knowledgeDBs, targetID, myself);
-  }
-  return getRelationsNoReferencedBy(knowledgeDBs, relation.id, myself);
-}
-
-export function getRelationItemSemanticID(
-  knowledgeDBs: KnowledgeDBs,
-  item: GraphNode | ID,
+  itemID: ID,
   myself: PublicKey
 ): ID {
-  const relation = getRelationItemRelation(knowledgeDBs, item, myself);
-  if (relation) {
-    return getRelationSemanticID(relation);
+  const node = getNode(knowledgeDBs, itemID as LongID, myself);
+  const targetID = node ? getRefTargetID(node) : undefined;
+  const targetNode = targetID ? getNode(knowledgeDBs, targetID, myself) : node;
+  if (targetNode) {
+    return getRelationSemanticID(targetNode);
   }
-  if (typeof item === "string") {
-    return item;
-  }
-  return item.id;
+  return itemID;
 }
 
 type RefTargetInfo = {
@@ -447,11 +373,7 @@ export function getRelationRouteTargetInfo(
   knowledgeDBs: KnowledgeDBs,
   effectiveAuthor: PublicKey
 ): RefTargetInfo | undefined {
-  const relation = getRelationsNoReferencedBy(
-    knowledgeDBs,
-    relationID,
-    effectiveAuthor
-  );
+  const relation = getNode(knowledgeDBs, relationID, effectiveAuthor);
   if (!relation) {
     return undefined;
   }
@@ -506,11 +428,7 @@ export function getRefLinkTargetInfo(
     );
   const parentRelation =
     (relation.parent
-      ? getRelationsNoReferencedBy(
-          knowledgeDBs,
-          relation.parent,
-          relation.author
-        )
+      ? getNode(knowledgeDBs, relation.parent, relation.author)
       : undefined) || containingParent;
   const targetRoot = parentRelation || relation;
 
@@ -603,7 +521,7 @@ export function getRelations(
   relationID: ID | undefined,
   myself: PublicKey
 ): GraphNode | undefined {
-  return getRelationsNoReferencedBy(knowledgeDBs, relationID, myself);
+  return getNode(knowledgeDBs, relationID, myself);
 }
 
 export function deleteRelations(

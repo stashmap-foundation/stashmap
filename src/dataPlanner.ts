@@ -3,7 +3,7 @@ import {
   deleteRelations,
   getRelationContext,
   getRelationSemanticID,
-  getRelationsNoReferencedBy,
+  getNode,
   isRefNode,
   isSearchId,
   moveRelations,
@@ -35,11 +35,7 @@ function getWritableRelation(
   plan: GraphPlan,
   relationId: LongID
 ): GraphNode | undefined {
-  const relation = getRelationsNoReferencedBy(
-    plan.knowledgeDBs,
-    relationId,
-    plan.user.publicKey
-  );
+  const relation = getNode(plan.knowledgeDBs, relationId, plan.user.publicKey);
   if (!relation || relation.author !== plan.user.publicKey) {
     return undefined;
   }
@@ -50,11 +46,7 @@ export function requireRelationById(
   plan: GraphPlan,
   relationId: LongID
 ): GraphNode {
-  const relation = getRelationsNoReferencedBy(
-    plan.knowledgeDBs,
-    relationId,
-    plan.user.publicKey
-  );
+  const relation = getNode(plan.knowledgeDBs, relationId, plan.user.publicKey);
   if (!relation) {
     throw new Error(`Relation not found: ${relationId}`);
   }
@@ -89,11 +81,7 @@ function requireRelationItem(
   const childID =
     index === undefined ? undefined : relation.children.get(index);
   return childID
-    ? getRelationsNoReferencedBy(
-        plan.knowledgeDBs,
-        childID,
-        plan.user.publicKey
-      )
+    ? getNode(plan.knowledgeDBs, childID, plan.user.publicKey)
     : undefined;
 }
 
@@ -215,7 +203,7 @@ export function planLinkRelationById<T extends GraphPlan>(
   argument?: Argument
 ): { plan: T; itemId: ID } {
   const parentRelation = getWritableRelation(plan, parentRelationId);
-  const targetRelation = getRelationsNoReferencedBy(
+  const targetRelation = getNode(
     plan.knowledgeDBs,
     targetRelationId,
     plan.user.publicKey
@@ -315,7 +303,7 @@ export function planRemoveRelationItemById<T extends GraphPlan>(
   if (!item || isRefNode(item)) {
     return withoutItem;
   }
-  const sourceRelation = getRelationsNoReferencedBy(
+  const sourceRelation = getNode(
     withoutItem.knowledgeDBs,
     item.id,
     withoutItem.user.publicKey
@@ -349,7 +337,7 @@ function wouldCreateDescendantCycle(
     return true;
   }
 
-  const currentRelation = getRelationsNoReferencedBy(
+  const currentRelation = getNode(
     plan.knowledgeDBs,
     targetParentRelationId,
     plan.user.publicKey
@@ -444,7 +432,7 @@ export function planMoveRelationItemById<T extends GraphPlan>(
     return withMovedEdge;
   }
 
-  const sourceRelation = getRelationsNoReferencedBy(
+  const sourceRelation = getNode(
     withMovedEdge.knowledgeDBs,
     sourceItem.id,
     withMovedEdge.user.publicKey

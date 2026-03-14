@@ -1,7 +1,7 @@
 import {
   createRefTarget,
   isEmptySemanticID,
-  getRelationsNoReferencedBy,
+  getNode,
   getRefTargetID,
   isRefNode,
 } from "./connections";
@@ -98,11 +98,7 @@ export function planUpdateViewItemMetadata(
         : undefined);
     const targetItem = targetID ? createRefTarget(targetID) : itemID;
     const inheritedSourceRelation = targetID
-      ? getRelationsNoReferencedBy(
-          plan.knowledgeDBs,
-          targetID,
-          plan.user.publicKey
-        )
+      ? getNode(plan.knowledgeDBs, targetID, plan.user.publicKey)
       : undefined;
     return planAddToParent(
       plan,

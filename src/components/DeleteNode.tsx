@@ -2,7 +2,7 @@ import { Set } from "immutable";
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../commons/Ui";
-import { deleteRelations, getRelationItemSemanticID } from "../connections";
+import { deleteRelations, getSemanticID } from "../connections";
 import {
   updateViewPathsAfterDeleteItem,
   useCurrentRelation,
@@ -25,8 +25,7 @@ function disconnectNode(plan: Plan, toDisconnect: ID): Plan {
   return myDB.nodes.reduce((rdx, relation) => {
     const toDelete = relation.children.reduce((indices, item, idx) => {
       if (
-        getRelationItemSemanticID(plan.knowledgeDBs, item, relation.author) ===
-        toDisconnect
+        getSemanticID(plan.knowledgeDBs, item, relation.author) === toDisconnect
       ) {
         return indices.add(idx);
       }

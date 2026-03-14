@@ -4,7 +4,7 @@ import {
   EMPTY_SEMANTIC_ID,
   getConcreteRefTargetRelation,
   getRelationContext,
-  getRelationSemanticID,
+  getSemanticID,
   getRelationText,
   getNode,
   getRefTargetID,
@@ -20,8 +20,13 @@ type SerializeResult = {
   relationUUIDs: ImmutableSet<string>;
 };
 
-function getSerializableRelationText(relation: GraphNode): string {
-  return getRelationText(relation) || shortID(getRelationSemanticID(relation));
+function getSerializableRelationText(
+  knowledgeDBs: KnowledgeDBs,
+  relation: GraphNode
+): string {
+  return (
+    getRelationText(relation) || shortID(getSemanticID(knowledgeDBs, relation))
+  );
 }
 
 function serializeRelationItems(
@@ -52,7 +57,9 @@ function serializeRelationItems(
       }
       const linkText =
         item.linkText ||
-        (targetRelation ? getSerializableRelationText(targetRelation) : "") ||
+        (targetRelation
+          ? getSerializableRelationText(knowledgeDBs, targetRelation)
+          : "") ||
         shortID(targetRelationID);
       const hrefTarget = targetRelation?.id || targetRelationID;
       return {
@@ -71,7 +78,7 @@ function serializeRelationItems(
 
     const resolvedChild = item;
 
-    const text = getSerializableRelationText(resolvedChild);
+    const text = getSerializableRelationText(knowledgeDBs, resolvedChild);
     const next: SerializeResult = {
       lines: [
         ...acc.lines,
@@ -105,7 +112,7 @@ export function buildDocumentEventFromRelations(
   knowledgeDBs: KnowledgeDBs,
   rootRelation: GraphNode
 ): UnsignedEvent {
-  const rootText = getSerializableRelationText(rootRelation);
+  const rootText = getSerializableRelationText(knowledgeDBs, rootRelation);
   const rootUuid = shortID(rootRelation.id);
   const serialized = serializeRelationItems(
     knowledgeDBs,

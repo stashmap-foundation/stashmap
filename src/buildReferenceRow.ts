@@ -10,7 +10,6 @@ import {
   itemPassesFilters,
   getSemanticID,
   getRelationContext,
-  getRelationSemanticID,
 } from "./connections";
 import {
   getTextHashForSemanticID,
@@ -94,7 +93,7 @@ function resolveLabels(
   const targetLabel = resolveNodeLabel(
     knowledgeDBs,
     myself,
-    getRelationSemanticID(relation)
+    getSemanticID(knowledgeDBs, relation)
   );
   return { contextLabels, targetLabel, fullContext: relationContext };
 }
@@ -119,7 +118,8 @@ function relationsMatchForVersion(
     left.author === right.author && left.root === right.root;
   if (useExactMatch) {
     return (
-      getRelationSemanticID(left) === getRelationSemanticID(right) &&
+      getSemanticID(knowledgeDBs, left) ===
+        getSemanticID(knowledgeDBs, right) &&
       getRelationContext(knowledgeDBs, left).equals(
         getRelationContext(knowledgeDBs, right)
       )
@@ -131,12 +131,12 @@ function relationsMatchForVersion(
   return (
     getSemanticNodeKey(
       knowledgeDBs,
-      getRelationSemanticID(left),
+      getSemanticID(knowledgeDBs, left),
       left.author
     ) ===
       getSemanticNodeKey(
         knowledgeDBs,
-        getRelationSemanticID(right),
+        getSemanticID(knowledgeDBs, right),
         right.author
       ) &&
     leftContext.size === rightContext.size &&
@@ -227,7 +227,7 @@ function effectiveIDs(
     .map((item) =>
       getSemanticNodeKey(
         knowledgeDBs,
-        getSemanticID(knowledgeDBs, item.id, relation.author),
+        getSemanticID(knowledgeDBs, item),
         relation.author
       )
     )

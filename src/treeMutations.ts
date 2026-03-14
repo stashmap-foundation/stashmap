@@ -1,4 +1,4 @@
-import { getRelationSemanticID, isSearchId, shortID } from "./connections";
+import { getSemanticID, isSearchId, shortID } from "./connections";
 import { planRemoveRelationItemById } from "./dataPlanner";
 import {
   ViewPath,
@@ -162,7 +162,7 @@ export function planMoveNodeWithView(
   const targetContext = targetParentContext.push(
     shortID(
       (actualTargetParentRelation
-        ? getRelationSemanticID(actualTargetParentRelation)
+        ? getSemanticID(planWithAdd.knowledgeDBs, actualTargetParentRelation)
         : targetParentRowID) as ID
     )
   );

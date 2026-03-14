@@ -1,7 +1,7 @@
 import { List } from "immutable";
 import {
   getRelationContext,
-  getRelationSemanticID,
+  getSemanticID,
   getNode,
   shortID,
 } from "./connections";
@@ -183,7 +183,7 @@ export function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
   const targetSemanticContext = getRelationContext(
     planWithAdded.knowledgeDBs,
     parentRelation
-  ).push(getRelationSemanticID(parentRelation));
+  ).push(getSemanticID(planWithAdded.knowledgeDBs, parentRelation));
   const movedPlan = moveCreatedTreesToParentContext(
     planWithAdded,
     topItemIDs,

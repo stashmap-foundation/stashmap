@@ -1,11 +1,7 @@
 import { List } from "immutable";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { createPlan } from "../planner";
-import {
-  getRelationChildNodes,
-  getNode,
-  getRelationSemanticID,
-} from "../connections";
+import { getRelationChildNodes, getNode, getSemanticID } from "../connections";
 import { isStandaloneRoot } from "../systemRoots";
 import {
   ALICE,
@@ -161,7 +157,7 @@ test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
   expect(childRelation?.text).toBe("Child");
   expect(grandchildRelation?.text).toBe("Grandchild");
 
-  expect(parentID).toEqual(getRelationSemanticID(parentRelation!));
+  expect(parentID).toEqual(getSemanticID(plan.knowledgeDBs, parentRelation!));
   expect(
     nodeChildren(plan.knowledgeDBs, parentRelation, plan.user.publicKey).first()
       ?.id
@@ -190,7 +186,7 @@ test("Planning multiple markdown files returns top nodes in import order", () =>
       .find(
         (relation) =>
           isStandaloneRoot(relation) &&
-          getRelationSemanticID(relation) === semanticID
+          getSemanticID(plan.knowledgeDBs, relation) === semanticID
       )?.text;
   });
 

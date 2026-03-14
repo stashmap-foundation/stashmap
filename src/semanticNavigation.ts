@@ -3,18 +3,20 @@ import { newDB } from "./knowledge";
 import {
   getIndexedRelationsForKeys,
   getRelationChildNodes,
-  getRelationSemanticID,
+  getSemanticID,
   getNode,
   shortID,
 } from "./connections";
 import { isStandaloneRoot } from "./systemRoots";
 
 function relationMatchesRequestedSemanticID(
+  knowledgeDBs: KnowledgeDBs,
   relation: GraphNode,
   requestedSemanticID: ID
 ): boolean {
   return (
-    shortID(getRelationSemanticID(relation)) === shortID(requestedSemanticID)
+    shortID(getSemanticID(knowledgeDBs, relation)) ===
+    shortID(requestedSemanticID)
   );
 }
 
@@ -24,7 +26,9 @@ function getAuthorCandidateRelations(
   semanticID: ID
 ): GraphNode[] {
   const authorDB = knowledgeDBs.get(author, newDB());
-  return getIndexedRelationsForKeys(authorDB, [shortID(semanticID)]);
+  return getIndexedRelationsForKeys(knowledgeDBs, authorDB, [
+    shortID(semanticID),
+  ]);
 }
 
 function getNewestStandaloneRootBySemanticID(
@@ -38,7 +42,7 @@ function getNewestStandaloneRootBySemanticID(
     )
     .sort((left, right) => right.updated - left.updated)
     .find((relation) =>
-      relationMatchesRequestedSemanticID(relation, semanticID)
+      relationMatchesRequestedSemanticID(knowledgeDBs, relation, semanticID)
     );
 }
 
@@ -70,7 +74,11 @@ function getMatchingChildRelation(
     parentRelation,
     parentRelation.author
   ).find((relation): relation is GraphNode =>
-    relationMatchesRequestedSemanticID(relation, requestedSemanticID)
+    relationMatchesRequestedSemanticID(
+      knowledgeDBs,
+      relation,
+      requestedSemanticID
+    )
   );
 }
 
@@ -83,13 +91,17 @@ function resolveRequestedStackFromRoot(
     return { actualStack: [] };
   }
   if (
-    !relationMatchesRequestedSemanticID(rootRelation, requestedStack[0] as ID)
+    !relationMatchesRequestedSemanticID(
+      knowledgeDBs,
+      rootRelation,
+      requestedStack[0] as ID
+    )
   ) {
     return undefined;
   }
 
   let currentRelation: GraphNode | undefined = rootRelation;
-  const actualStack: ID[] = [getRelationSemanticID(rootRelation)];
+  const actualStack: ID[] = [getSemanticID(knowledgeDBs, rootRelation)];
 
   for (let index = 1; index < requestedStack.length; index += 1) {
     if (!currentRelation) {
@@ -103,7 +115,7 @@ function resolveRequestedStackFromRoot(
     if (!nextRelation) {
       return undefined;
     }
-    actualStack.push(getRelationSemanticID(nextRelation));
+    actualStack.push(getSemanticID(knowledgeDBs, nextRelation));
     currentRelation = nextRelation;
   }
 

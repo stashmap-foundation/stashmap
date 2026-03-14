@@ -19,7 +19,7 @@ import {
   getRelations,
   itemPassesFilters,
   getRelationContext,
-  getRelationSemanticID,
+  getSemanticID,
   getConcreteRefTargetRelation,
   getRefTargetID,
   isRefNode,
@@ -100,7 +100,7 @@ function getChildrenForRegularNode(
     ? getRelationChildNodes(data.knowledgeDBs, nodes, data.user.publicKey)
     : List<GraphNode>();
   const relationSemanticID = nodes
-    ? getRelationSemanticID(nodes)
+    ? getSemanticID(data.knowledgeDBs, nodes)
     : parentItemID;
   const coordinateSemanticID = nodes ? relationSemanticID : parentItemID;
   const coordinateContext = nodes

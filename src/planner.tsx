@@ -29,7 +29,7 @@ import {
   isSearchId,
   ensureRelationNativeFields,
   getRelationContext,
-  getRelationSemanticID,
+  getSemanticID,
   getRelationText,
   isRefNode,
 } from "./connections";
@@ -85,7 +85,7 @@ function getAnchorSnapshotLabels(
     }
     labels.unshift(
       getRelationText(parentRelation) ||
-        shortID(getRelationSemanticID(parentRelation))
+        shortID(getSemanticID(knowledgeDBs, parentRelation))
     );
     parentRelationID = parentRelation.parent;
   }
@@ -582,7 +582,7 @@ export function planAddTargetsToRelation<T extends GraphPlan>(
 
   const parentContext = getRelationContext(plan.knowledgeDBs, parentRelation);
   const childContext = parentContext.push(
-    getRelationSemanticID(parentRelation)
+    getSemanticID(plan.knowledgeDBs, parentRelation)
   );
 
   const [planWithChildren, relationItemPayload] = targetsArray.reduce<
@@ -952,7 +952,7 @@ export function planMoveDescendantRelations<T extends GraphPlan>(
   root?: ID
 ): T {
   const descendants = getRelationSubtree(plan, sourceRelation);
-  const sourceSemanticID = getRelationSemanticID(sourceRelation);
+  const sourceSemanticID = getSemanticID(plan.knowledgeDBs, sourceRelation);
   const sourceSemanticContext = getRelationContext(
     plan.knowledgeDBs,
     sourceRelation
@@ -1004,7 +1004,7 @@ export function planMoveTreeDescendantsToContext(
   const [parentItemID] = getRowIDFromView(plan, parentViewPath);
   const targetSemanticContext = parentContext.push(
     targetParentRelation
-      ? getRelationSemanticID(targetParentRelation)
+      ? getSemanticID(plan.knowledgeDBs, targetParentRelation)
       : (shortID(parentItemID as ID) as ID)
   );
 
@@ -1120,7 +1120,7 @@ export function planDeepCopyNode(
       );
       if (relation) {
         return {
-          itemID: getRelationSemanticID(relation),
+          itemID: getSemanticID(plan.knowledgeDBs, relation),
           semanticContext: getRelationContext(plan.knowledgeDBs, relation),
           relation,
         };
@@ -1175,7 +1175,7 @@ export function planDeepCopyNode(
   );
   const nodeSemanticContext = targetParentSemanticContext.push(
     targetParentRelation
-      ? getRelationSemanticID(targetParentRelation)
+      ? getSemanticID(planWithParent.knowledgeDBs, targetParentRelation)
       : (shortID(targetParentRowID as ID) as ID)
   );
   const sourceChildContext = resolvedSemanticContext.push(
@@ -1322,7 +1322,9 @@ function planCreateNoteAtRoot(
     i === paneIndex
       ? {
           ...p,
-          stack: [getRelationSemanticID(createdRelation)],
+          stack: [
+            getSemanticID(planWithRelation.knowledgeDBs, createdRelation),
+          ],
           rootRelation: createdRelation.id,
         }
       : p
@@ -1437,7 +1439,7 @@ export function planDeleteSemanticID(plan: Plan, semanticID: ID): Plan {
     .filter(
       (relation) =>
         relation.author === plan.user.publicKey &&
-        shortID(getRelationSemanticID(relation)) ===
+        shortID(getSemanticID(plan.knowledgeDBs, relation)) ===
           shortID(semanticID as ID) &&
         relation.root === shortID(relation.id)
     )

@@ -6,7 +6,7 @@ import {
   shortID,
   getConcreteRefTargetRelation,
   getRelationContext,
-  getRelationSemanticID,
+  getSemanticID,
   getRefTargetID,
   isRefNode,
 } from "./connections";
@@ -102,7 +102,7 @@ function getSerializedRelationText(
     };
   }
 
-  const semanticID = getRelationSemanticID(relation);
+  const semanticID = getSemanticID(data.knowledgeDBs, relation);
   const fallbackText =
     getTextForSemanticID(data.knowledgeDBs, semanticID, relation.author) ??
     shortID(semanticID as ID);
@@ -118,7 +118,7 @@ function buildRootPath(rootRelation: GraphNode): ViewPath {
 function serializeTree(data: Data, rootRelation: GraphNode): SerializeResult {
   const author = data.user.publicKey;
   const rootPath = buildRootPath(rootRelation);
-  const stack = [getRelationSemanticID(rootRelation)];
+  const stack = [getSemanticID(data.knowledgeDBs, rootRelation)];
   const { paths } = getNodesInTree(
     data,
     rootPath,

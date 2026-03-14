@@ -8,9 +8,9 @@ import {
   parseSearchId,
   itemMatchesType,
   itemPassesFilters,
+  getNodeSemanticID,
   getSemanticID,
   getRelationContext,
-  getRelationSemanticID,
   getRelationText,
   getConcreteRefTargetRelation,
   getRefTargetID,
@@ -54,7 +54,7 @@ function getFallbackSemanticText(semanticID?: ID): string {
   return "";
 }
 
-function getRelationsForSemanticID(
+function getConcreteNodesForSemanticID(
   knowledgeDBs: KnowledgeDBs,
   semanticID: ID,
   author: PublicKey
@@ -90,17 +90,16 @@ function getRelationsForSemanticID(
         .valueSeq()
         .filter(
           (relation) =>
-            shortID(getRelationSemanticID(relation)) === localID ||
-            relation.text === localID
+            !isRefNode(relation) &&
+            (shortID(getNodeSemanticID(relation)) === localID ||
+              relation.text === localID)
         )
         .toArray()
     )
   )
     .sort((left, right) => {
-      const leftExact =
-        shortID(getRelationSemanticID(left)) === localID ? 0 : 1;
-      const rightExact =
-        shortID(getRelationSemanticID(right)) === localID ? 0 : 1;
+      const leftExact = shortID(getNodeSemanticID(left)) === localID ? 0 : 1;
+      const rightExact = shortID(getNodeSemanticID(right)) === localID ? 0 : 1;
       if (leftExact !== rightExact) {
         return leftExact - rightExact;
       }
@@ -114,12 +113,12 @@ function getRelationsForSemanticID(
     .toArray();
 }
 
-export function getRelationForSemanticID(
+export function getConcreteNodeForSemanticID(
   knowledgeDBs: KnowledgeDBs,
   semanticID: ID,
   author: PublicKey
 ): GraphNode | undefined {
-  return getRelationsForSemanticID(knowledgeDBs, semanticID, author)[0];
+  return getConcreteNodesForSemanticID(knowledgeDBs, semanticID, author)[0];
 }
 
 export function getTextForSemanticID(
@@ -140,7 +139,11 @@ export function getTextForSemanticID(
     return getRelationText(directRelation);
   }
 
-  const relation = getRelationForSemanticID(knowledgeDBs, semanticID, author);
+  const relation = getConcreteNodeForSemanticID(
+    knowledgeDBs,
+    semanticID,
+    author
+  );
   const relationText = getRelationText(relation);
   if (relationText !== undefined) {
     return relationText;
@@ -162,7 +165,11 @@ export function getTextHashForSemanticID(
     return directRelation.text as ID;
   }
 
-  const relation = getRelationForSemanticID(knowledgeDBs, semanticID, author);
+  const relation = getConcreteNodeForSemanticID(
+    knowledgeDBs,
+    semanticID,
+    author
+  );
   if (relation) {
     return relation.text as ID;
   }
@@ -312,7 +319,7 @@ export function findRefsToNode(
     ? getSemanticNodeKey(knowledgeDBs, semanticID, targetAuthor)
     : shortID(semanticID as ID);
   const resolvedRefs = getSemanticCandidates(semanticIndex, targetSemanticKey)
-    .filter((relation) => !isSearchId(getRelationSemanticID(relation)))
+    .filter((relation) => !isSearchId(getSemanticID(knowledgeDBs, relation)))
     .filter(
       (relation) =>
         !getRelationContext(knowledgeDBs, relation).some((id) =>
@@ -692,7 +699,7 @@ export function getSuggestionsForNode(
         .map((item) =>
           getComparableSuggestionKey(
             knowledgeDBs,
-            getSemanticID(knowledgeDBs, item.id, currentRelation.author),
+            getSemanticID(knowledgeDBs, item),
             currentRelation.author
           )
         )
@@ -741,11 +748,7 @@ export function getSuggestionsForNode(
           ) {
             return itemAcc;
           }
-          const candidateSemanticID = getSemanticID(
-            knowledgeDBs,
-            item.id,
-            nodes.author
-          );
+          const candidateSemanticID = getSemanticID(knowledgeDBs, item);
           const candidateKey = getSemanticNodeKey(
             knowledgeDBs,
             candidateSemanticID,
@@ -854,7 +857,7 @@ function getComparableRelationItemKeys(
         ? shortID(item.id)
         : getSemanticNodeKey(
             knowledgeDBs,
-            getSemanticID(knowledgeDBs, item.id, relation.author),
+            getSemanticID(knowledgeDBs, item),
             relation.author
           )
     )
@@ -967,7 +970,7 @@ export function getVersionsForRelation(
             ? shortID(item.id)
             : getSemanticNodeKey(
                 knowledgeDBs,
-                getSemanticID(knowledgeDBs, item.id, r.author),
+                getSemanticID(knowledgeDBs, item),
                 r.author
               )
         )

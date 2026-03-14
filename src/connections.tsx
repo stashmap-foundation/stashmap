@@ -36,12 +36,14 @@ export function getRefTargetID(
   return node?.targetID;
 }
 
-export function createSemanticID(text: string, id?: ID): ID {
-  return (id ?? text) as ID;
-}
-
-export function semanticIDFromSeed(seed: string): ID {
-  return seed as ID;
+export function getTargetNode(
+  knowledgeDBs: KnowledgeDBs,
+  node: GraphNode | undefined
+): GraphNode | undefined {
+  const targetID = getRefTargetID(node);
+  return targetID && node
+    ? getNode(knowledgeDBs, targetID, node.author)
+    : undefined;
 }
 
 export function isSearchId(id: ID): boolean {
@@ -64,11 +66,8 @@ export function getConcreteRefTargetRelation(
   refId: ID,
   myself: PublicKey
 ): GraphNode | undefined {
-  const refOrRelation = getNode(knowledgeDBs, refId, myself);
-  if (isRefNode(refOrRelation)) {
-    return getNode(knowledgeDBs, refOrRelation.targetID, myself);
-  }
-  return refOrRelation;
+  const node = getNode(knowledgeDBs, refId, myself);
+  return isRefNode(node) ? getTargetNode(knowledgeDBs, node) : node;
 }
 
 export function splitID(id: ID): [PublicKey | undefined, string] {
@@ -116,7 +115,10 @@ export function getRelationText(
   if (!relation) {
     return undefined;
   }
-  const fallback = getFallbackRelationText(getRelationSemanticID(relation));
+  const relationID = shortID(relation.id) as ID;
+  const fallback = getFallbackRelationText(
+    isSearchId(relationID) ? relationID : (relation.text as ID)
+  );
   if (relation.text !== "") {
     return relation.text;
   }
@@ -125,21 +127,15 @@ export function getRelationText(
 
 type RelationLookupIndex = globalThis.Map<string, GraphNode[]>;
 
-const relationLookupIndexCache = new WeakMap<
-  KnowledgeData,
-  RelationLookupIndex
->();
 const relationContextCache = new WeakMap<
   KnowledgeData,
   globalThis.Map<string, Context>
 >();
 
-function getRelationLookupIndex(db: KnowledgeData): RelationLookupIndex {
-  const cached = relationLookupIndexCache.get(db);
-  if (cached) {
-    return cached;
-  }
-
+function getRelationLookupIndex(
+  knowledgeDBs: KnowledgeDBs,
+  db: KnowledgeData
+): RelationLookupIndex {
   const index = new globalThis.Map<string, GraphNode[]>();
   const addToIndex = (key: string, relation: GraphNode): void => {
     const existing = index.get(key);
@@ -151,15 +147,13 @@ function getRelationLookupIndex(db: KnowledgeData): RelationLookupIndex {
   };
 
   db.nodes.valueSeq().forEach((relation) => {
-    const relationSemanticID = getRelationSemanticID(relation);
-    addToIndex(relationSemanticID, relation);
+    addToIndex(getSemanticID(knowledgeDBs, relation), relation);
   });
 
   index.forEach((nodes) => {
     nodes.sort((left, right) => right.updated - left.updated);
   });
 
-  relationLookupIndexCache.set(db, index);
   return index;
 }
 
@@ -176,29 +170,40 @@ function getRelationContextIndex(
 }
 
 export function getIndexedRelationsForKeys(
+  knowledgeDBs: KnowledgeDBs,
   db: KnowledgeData,
   keys: string[]
 ): GraphNode[] {
   const uniqueKeys = Array.from(new globalThis.Set(keys));
   const seen = new globalThis.Set<string>();
   return uniqueKeys.flatMap((key) =>
-    (getRelationLookupIndex(db).get(key) || []).filter((relation) => {
-      const relationKey = shortID(relation.id);
-      if (seen.has(relationKey)) {
-        return false;
+    (getRelationLookupIndex(knowledgeDBs, db).get(key) || []).filter(
+      (relation) => {
+        const relationKey = shortID(relation.id);
+        if (seen.has(relationKey)) {
+          return false;
+        }
+        seen.add(relationKey);
+        return true;
       }
-      seen.add(relationKey);
-      return true;
-    })
+    )
   );
 }
 
-export function getRelationSemanticID(relation: GraphNode): ID {
-  const relationID = shortID(relation.id) as ID;
-  if (isSearchId(relationID)) {
-    return relationID;
+export function getNodeSemanticID(node: GraphNode): ID {
+  const nodeID = shortID(node.id) as ID;
+  if (isSearchId(nodeID)) {
+    return nodeID;
   }
-  return relation.text as ID;
+  return node.text as ID;
+}
+
+export function getSemanticID(knowledgeDBs: KnowledgeDBs, node: GraphNode): ID {
+  const targetNode = getTargetNode(knowledgeDBs, node);
+  if (targetNode) {
+    return getSemanticID(knowledgeDBs, targetNode);
+  }
+  return getNodeSemanticID(node);
 }
 
 export function getRelationContext(
@@ -253,7 +258,7 @@ export function getRelationContext(
 
   const derivedContext = parentChain.reduce(
     (context, parentRelation) =>
-      context.push(getRelationSemanticID(parentRelation)),
+      context.push(getSemanticID(knowledgeDBs, parentRelation)),
     parentChain.length > 0
       ? getRelationContext(knowledgeDBs, parentChain[0] as GraphNode)
       : List<ID>()
@@ -270,7 +275,7 @@ export function getRelationStack(
 ): ID[] {
   return [
     ...getRelationContext(knowledgeDBs, relation).toArray(),
-    getRelationSemanticID(relation),
+    getSemanticID(knowledgeDBs, relation),
   ];
 }
 
@@ -283,7 +288,7 @@ export function getRelationDepth(
 
 export function createTextNodeFromRelation(relation: GraphNode): TextSeed {
   return {
-    id: getRelationSemanticID(relation),
+    id: getNodeSemanticID(relation),
     text: getRelationText(relation) || "",
   };
 }
@@ -291,7 +296,9 @@ export function createTextNodeFromRelation(relation: GraphNode): TextSeed {
 export function buildTextNodesFromRelations(
   nodes: Iterable<GraphNode>
 ): Map<string, TextSeed> {
-  const relationList = Array.from(nodes);
+  const relationList = Array.from(nodes).filter(
+    (relation) => !isRefNode(relation)
+  );
   const knowledgeDBs = relationList.reduce((acc, relation) => {
     const authorDB = acc.get(relation.author, {
       nodes: Map<string, GraphNode>(),
@@ -302,14 +309,14 @@ export function buildTextNodesFromRelations(
   }, Map<PublicKey, KnowledgeData>());
 
   const latestByHead = relationList.reduce((acc, relation) => {
-    const semanticID = getRelationSemanticID(relation);
+    const semanticID = getNodeSemanticID(relation);
     const existing = acc.get(semanticID);
     const isNewer = !existing || relation.updated > existing.updated;
     const isSameVersionNewerDisplay =
       !!existing &&
       relation.updated === existing.updated &&
       getRelationDepth(knowledgeDBs, relation) <
-      getRelationDepth(knowledgeDBs, existing);
+        getRelationDepth(knowledgeDBs, existing);
     if (isNewer || isSameVersionNewerDisplay) {
       return acc.set(semanticID, relation);
     }
@@ -345,20 +352,6 @@ export function getRelationChildNodes(
     const childNode = getNode(knowledgeDBs, childID, myself);
     return childNode ? acc.push(childNode) : acc;
   }, List<GraphNode>());
-}
-
-export function getSemanticID(
-  knowledgeDBs: KnowledgeDBs,
-  itemID: ID,
-  myself: PublicKey
-): ID {
-  const node = getNode(knowledgeDBs, itemID as LongID, myself);
-  const targetID = node ? getRefTargetID(node) : undefined;
-  const targetNode = targetID ? getNode(knowledgeDBs, targetID, myself) : node;
-  if (targetNode) {
-    return getRelationSemanticID(targetNode);
-  }
-  return itemID;
 }
 
 type RefTargetInfo = {
@@ -486,26 +479,26 @@ export function getSearchRelations(
     (semanticID): GraphNode =>
       asRefs
         ? {
-          ...newRefNode(
-            rel.author,
-            searchId as LongID,
-            semanticID as LongID,
-            searchId as LongID
-          ),
-          updated: rel.updated,
-          virtualType: "search",
-        }
+            ...newRefNode(
+              rel.author,
+              searchId as LongID,
+              semanticID as LongID,
+              searchId as LongID
+            ),
+            updated: rel.updated,
+            virtualType: "search",
+          }
         : {
-          children: List<ID>(),
-          id: semanticID,
-          text: "",
-          parent: searchId as LongID,
-          updated: rel.updated,
-          author: rel.author,
-          root: searchId as LongID,
-          relevance: undefined,
-          virtualType: "search",
-        }
+            children: List<ID>(),
+            id: semanticID,
+            text: "",
+            parent: searchId as LongID,
+            updated: rel.updated,
+            author: rel.author,
+            root: searchId as LongID,
+            relevance: undefined,
+            virtualType: "search",
+          }
   );
   return {
     relation: {
@@ -563,18 +556,6 @@ export function moveRelations(
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getSharesFromPublicKey(publicKey: PublicKey): number {
   return 10000; // TODO: implement
-}
-
-function getLatestvoteRelationListPerAuthor(
-  nodes: List<GraphNode>
-): Map<PublicKey, GraphNode> {
-  return nodes.reduce((acc, relation) => {
-    const isFound = acc.get(relation.author);
-    if (!!isFound && isFound.updated > relation.updated) {
-      return acc;
-    }
-    return acc.set(relation.author, relation);
-  }, Map<PublicKey, GraphNode>());
 }
 
 function fib(n: number): number {

@@ -12,7 +12,8 @@ import {
   EMPTY_SEMANTIC_ID,
   itemPassesFilters,
   getRelationContext,
-  getRelationSemanticID,
+  getNodeSemanticID,
+  getSemanticID,
   getRefLinkTargetInfo,
   getRefTargetInfo,
   isRefNode,
@@ -151,7 +152,7 @@ export function getContext(
   const parentContext = getContext(data, parentPath, stack);
   const parentRelation = getRelationForView(data, parentPath, stack);
   if (parentRelation) {
-    return parentContext.push(getRelationSemanticID(parentRelation));
+    return parentContext.push(getSemanticID(data.knowledgeDBs, parentRelation));
   }
   const [parentItemID] = getRowIDFromView(data, parentPath);
   return parentContext.push(shortID(parentItemID as ID) as ID);
@@ -211,7 +212,7 @@ function getRowIDFromPath(data: Data, viewPath: ViewPath): ID {
   if (isRefNode(relation)) {
     return relation.id;
   }
-  return getRelationSemanticID(relation);
+  return getNodeSemanticID(relation);
 }
 
 export function getRowIDFromView(data: Data, viewPath: ViewPath): [ID, View] {

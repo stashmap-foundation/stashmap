@@ -58,9 +58,8 @@ import {
   getRelationStack,
   getRelationText,
   getSemanticID,
-  getRelationSemanticID,
   getNode,
-  getRefTargetID,
+  getTargetNode,
   isSearchId,
   shortID,
 } from "../connections";
@@ -151,10 +150,13 @@ type BreadcrumbEntry = {
   disabled?: boolean;
 };
 
-function getBreadcrumbLabel(relation: GraphNode): string {
+function getBreadcrumbLabel(
+  knowledgeDBs: KnowledgeDBs,
+  relation: GraphNode
+): string {
   return (
     getRelationText(relation) ||
-    shortID(getRelationSemanticID(relation)) ||
+    shortID(getSemanticID(knowledgeDBs, relation)) ||
     "..."
   );
 }
@@ -184,23 +186,21 @@ function resolveRelationFromSegments(
     return currentRelation;
   }
 
-  const currentAuthor = currentRelation.author;
   const [nextSemanticID, ...rest] = semanticStack;
-  const matchingItem = currentRelation.children.find(
-    (item) =>
-      shortID(getSemanticID(knowledgeDBs, item, currentAuthor)) ===
-      shortID(nextSemanticID as ID)
-  );
-
-  if (!matchingItem) {
+  const matchingNode = currentRelation.children
+    .map((itemID) => getNode(knowledgeDBs, itemID, currentRelation.author))
+    .find(
+      (item): item is GraphNode =>
+        !!item &&
+        shortID(getSemanticID(knowledgeDBs, item)) ===
+          shortID(nextSemanticID as ID)
+    );
+  if (!matchingNode) {
     return undefined;
   }
 
-  const matchingNode = getNode(knowledgeDBs, matchingItem, currentAuthor);
-  const targetID = matchingNode ? getRefTargetID(matchingNode) : undefined;
-  const nextRelation = targetID
-    ? getNode(knowledgeDBs, targetID, currentAuthor)
-    : matchingNode;
+  const nextRelation =
+    getTargetNode(knowledgeDBs, matchingNode) || matchingNode;
   return nextRelation
     ? resolveRelationFromSegments(knowledgeDBs, nextRelation, rest as ID[])
     : undefined;
@@ -216,7 +216,7 @@ function resolveRelationFromRootStack(
   }
   const treeRoot =
     getStandaloneRootRelation(knowledgeDBs, rootRelation) || rootRelation;
-  const rootSemanticID = shortID(getRelationSemanticID(treeRoot));
+  const rootSemanticID = shortID(getSemanticID(knowledgeDBs, treeRoot));
   const pathWithoutRoot =
     shortID(semanticStack[0]) === rootSemanticID
       ? semanticStack.slice(1)
@@ -262,7 +262,7 @@ function createRelationBreadcrumbEntry(
 ): BreadcrumbEntry {
   return {
     key: `relation:${relation.id}`,
-    label: getBreadcrumbLabel(relation),
+    label: getBreadcrumbLabel(knowledgeDBs, relation),
     target: {
       stack: getRelationStack(knowledgeDBs, relation),
       author: relation.author,
@@ -414,7 +414,7 @@ function Breadcrumbs(): JSX.Element {
         const entry: BreadcrumbEntry = {
           key: `local:${pane.rootRelation}:${nextTargetStack.join(":")}`,
           label: localRelation
-            ? getBreadcrumbLabel(localRelation)
+            ? getBreadcrumbLabel(knowledgeDBs, localRelation)
             : shortID(semanticID as ID),
           target: {
             stack: nextTargetStack,
@@ -437,7 +437,7 @@ function Breadcrumbs(): JSX.Element {
       return {
         key: `stack:${semanticID}:${index}`,
         label: targetRelation
-          ? getBreadcrumbLabel(targetRelation)
+          ? getBreadcrumbLabel(knowledgeDBs, targetRelation)
           : shortID(semanticID as ID),
         target: {
           stack: targetStack,

@@ -3,12 +3,11 @@ import path from "path";
 import { Map } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
 import {
-  getConcreteRefTargetRelation,
   getRelationChildNodes,
-  getRefTargetID,
   getNode,
   joinID,
   isRefNode,
+  resolveNode,
   shortID,
 } from "../connections";
 import { newDB } from "../knowledge";
@@ -182,12 +181,8 @@ export function inspectChildren(
       .toArray()
       .map((item, index) => {
         if (isRefNode(item)) {
-          const targetRelation = getConcreteRefTargetRelation(
-            graph.knowledgeDBs,
-            item.id,
-            viewer
-          );
-          const targetRelationId = getRefTargetID(item);
+          const targetRelation = resolveNode(graph.knowledgeDBs, item);
+          const targetRelationId = item.targetID;
           return {
             index,
             item_id: item.id,

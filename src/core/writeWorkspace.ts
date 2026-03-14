@@ -26,7 +26,6 @@ import {
   isSearchId,
   isRefNode,
   joinID,
-  getRefTargetID,
   shortID,
 } from "../connections";
 import {
@@ -80,7 +79,7 @@ function resolveParentItemId(
       return acc.includes(item.id) ? acc : [...acc, item.id];
     }
 
-    const targetRelationId = isRefNode(item) ? getRefTargetID(item) : undefined;
+    const targetRelationId = isRefNode(item) ? item.targetID : undefined;
     if (!targetRelationId) {
       return acc;
     }

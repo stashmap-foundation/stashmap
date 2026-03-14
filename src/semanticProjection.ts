@@ -12,9 +12,8 @@ import {
   getSemanticID,
   getRelationContext,
   getRelationText,
-  getConcreteRefTargetRelation,
-  getRefTargetID,
   getNode,
+  resolveNode,
   isRefNode,
 } from "./connections";
 import { suggestionSettings } from "./constants";
@@ -389,10 +388,9 @@ function contextKeyForCref(
   crefID: ID,
   effectiveAuthor: PublicKey
 ): string | undefined {
-  const targetRelation = getConcreteRefTargetRelation(
+  const targetRelation = resolveNode(
     knowledgeDBs,
-    crefID,
-    effectiveAuthor
+    getNode(knowledgeDBs, crefID, effectiveAuthor)
   );
   if (!targetRelation) {
     return undefined;
@@ -488,7 +486,7 @@ export function getOccurrencesForNode(
     ? currentItems
         .filter(isRefNode)
         .flatMap((item) => {
-          const targetID = getRefTargetID(item);
+          const { targetID } = item;
           return targetID ? [targetID] : [];
         })
         .toSet()
@@ -592,11 +590,7 @@ export function getIncomingCrefsForNode(
   );
   const outgoingTargetRelIDs = (currentItems || List<GraphNode>()).reduce(
     (acc, item) => {
-      const targetRelation = getConcreteRefTargetRelation(
-        knowledgeDBs,
-        item.id,
-        effectiveAuthor
-      );
+      const targetRelation = resolveNode(knowledgeDBs, item);
       return targetRelation ? acc.add(targetRelation.id) : acc;
     },
     ImmutableSet<LongID>()
@@ -710,7 +704,7 @@ export function getSuggestionsForNode(
     ? currentRelationChildren
         .filter((item) => isRefNode(item) && item.relevance === "not_relevant")
         .flatMap((item) => {
-          const targetID = getRefTargetID(item);
+          const { targetID } = item;
           return targetID ? [targetID] : [];
         })
         .toSet()
@@ -923,7 +917,7 @@ export function getVersionsForRelation(
     currentRelation.author
   );
   const existingCrefTargetIDs = currentRelationChildren
-    .map((item) => getRefTargetID(item))
+    .map((item) => (isRefNode(item) ? item.targetID : undefined))
     .filter((id): id is LongID => !!id)
     .toSet();
   const currentExactItemIDs = getComparableRelationItemKeys(

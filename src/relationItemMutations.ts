@@ -2,7 +2,6 @@ import {
   createRefTarget,
   isEmptySemanticID,
   getNode,
-  getRefTargetID,
   isRefNode,
 } from "./connections";
 import { planUpdateRelationItemMetadataById } from "./dataPlanner";
@@ -92,7 +91,7 @@ export function planUpdateViewItemMetadata(
       )[0];
     }
     const targetID =
-      getRefTargetID(virtualItem) ||
+      virtualItem.targetID ||
       (virtualItem.virtualType === "occurrence"
         ? (itemID as LongID)
         : undefined);

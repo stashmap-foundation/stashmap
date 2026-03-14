@@ -20,8 +20,7 @@ import {
   itemPassesFilters,
   getRelationContext,
   getSemanticID,
-  getConcreteRefTargetRelation,
-  getRefTargetID,
+  resolveNode,
   isRefNode,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
@@ -55,11 +54,7 @@ function getChildrenForConcreteRef(
   const refNode = currentItem || getCurrentEdgeForView(data, parentPath);
   const sourceRelation =
     refNode && isRefNode(refNode)
-      ? getConcreteRefTargetRelation(
-          data.knowledgeDBs,
-          refNode.id,
-          data.user.publicKey
-        )
+      ? resolveNode(data.knowledgeDBs, refNode)
       : getRelations(data.knowledgeDBs, parentItemID, data.user.publicKey);
   if (!sourceRelation || sourceRelation.children.size === 0) {
     return {
@@ -211,10 +206,7 @@ function getChildrenForRegularNode(
       virtualType === "suggestion"
         ? getRelations(data.knowledgeDBs, itemID, data.user.publicKey)
         : undefined;
-    const suggestionTargetID =
-      resolvedItem && isRefNode(resolvedItem)
-        ? getRefTargetID(resolvedItem)
-        : undefined;
+    const suggestionTargetID = resolvedItem?.targetID;
     const targetID =
       virtualType === "incoming" ||
       virtualType === "occurrence" ||

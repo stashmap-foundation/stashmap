@@ -2,12 +2,11 @@ import { Set as ImmutableSet } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
 import {
   EMPTY_SEMANTIC_ID,
-  getConcreteRefTargetRelation,
   getRelationContext,
   getSemanticID,
   getRelationText,
   getNode,
-  getRefTargetID,
+  resolveNode,
   isRefNode,
   shortID,
 } from "./connections";
@@ -46,12 +45,8 @@ function serializeRelationItems(
       throw new Error(`Missing child relation: ${childID}`);
     }
     if (isRefNode(item)) {
-      const targetRelation = getConcreteRefTargetRelation(
-        knowledgeDBs,
-        item.id,
-        author
-      );
-      const targetRelationID = getRefTargetID(item);
+      const targetRelation = resolveNode(knowledgeDBs, item);
+      const targetRelationID = item.targetID;
       if (!targetRelationID) {
         return acc;
       }

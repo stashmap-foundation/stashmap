@@ -4,10 +4,9 @@ import { v4 } from "uuid";
 import { UnsignedEvent } from "nostr-tools";
 import {
   shortID,
-  getConcreteRefTargetRelation,
   getRelationContext,
   getSemanticID,
-  getRefTargetID,
+  resolveNode,
   isRefNode,
 } from "./connections";
 import { getTextForSemanticID } from "./semanticProjection";
@@ -41,7 +40,7 @@ function formatCrefText(
   author: PublicKey,
   refNode: GraphNode
 ): string | undefined {
-  const targetID = getRefTargetID(refNode);
+  const { targetID } = refNode;
   if (!targetID) {
     return undefined;
   }
@@ -53,11 +52,7 @@ function formatCrefText(
   if (!ref) {
     return undefined;
   }
-  const targetRelation = getConcreteRefTargetRelation(
-    knowledgeDBs,
-    refNode.id,
-    author
-  );
+  const targetRelation = resolveNode(knowledgeDBs, refNode);
   const href = targetRelation ? `${targetRelation.id}` : `${targetID}`;
   return `[${ref.text}](#${href})`;
 }
@@ -139,13 +134,9 @@ function serializeTree(data: Data, rootRelation: GraphNode): SerializeResult {
 
       if (isRefNode(item)) {
         const crefText = formatCrefText(data.knowledgeDBs, author, item);
-        const targetID = getRefTargetID(item);
+        const { targetID } = item;
         if (!crefText || !targetID) return acc;
-        const targetRelation = getConcreteRefTargetRelation(
-          data.knowledgeDBs,
-          item.id,
-          author
-        );
+        const targetRelation = resolveNode(data.knowledgeDBs, item);
         const crefRelationUUID = shortID(
           (targetRelation?.id || targetID) as ID
         );

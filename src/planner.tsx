@@ -24,8 +24,8 @@ import {
   EMPTY_SEMANTIC_ID,
   isEmptySemanticID,
   getNode,
+  resolveNode,
   computeEmptyNodeMetadata,
-  getConcreteRefTargetRelation,
   isSearchId,
   ensureRelationNativeFields,
   getRelationContext,
@@ -1113,11 +1113,7 @@ export function planDeepCopyNode(
       plan.user.publicKey
     );
     if (isRefNode(sourceNode)) {
-      const relation = getConcreteRefTargetRelation(
-        plan.knowledgeDBs,
-        sourceItemID,
-        plan.user.publicKey
-      );
+      const relation = resolveNode(plan.knowledgeDBs, sourceNode);
       if (relation) {
         return {
           itemID: getSemanticID(plan.knowledgeDBs, relation),

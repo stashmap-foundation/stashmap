@@ -30,20 +30,24 @@ export function isRefNode(
   return !!node && (node.isRef === true || node.targetID !== undefined);
 }
 
-export function getRefTargetID(
-  node: GraphNode | undefined
-): LongID | undefined {
-  return node?.targetID;
-}
-
 export function getTargetNode(
   knowledgeDBs: KnowledgeDBs,
   node: GraphNode | undefined
 ): GraphNode | undefined {
-  const targetID = getRefTargetID(node);
+  const targetID = node?.targetID;
   return targetID && node
     ? getNode(knowledgeDBs, targetID, node.author)
     : undefined;
+}
+
+export function resolveNode(
+  knowledgeDBs: KnowledgeDBs,
+  node: GraphNode | undefined
+): GraphNode | undefined {
+  if (!node) {
+    return undefined;
+  }
+  return isRefNode(node) ? getTargetNode(knowledgeDBs, node) : node;
 }
 
 export function isSearchId(id: ID): boolean {
@@ -59,15 +63,6 @@ export function parseSearchId(id: ID): string | undefined {
     return undefined;
   }
   return id.slice(SEARCH_PREFIX.length);
-}
-
-export function getConcreteRefTargetRelation(
-  knowledgeDBs: KnowledgeDBs,
-  refId: ID,
-  myself: PublicKey
-): GraphNode | undefined {
-  const node = getNode(knowledgeDBs, refId, myself);
-  return isRefNode(node) ? getTargetNode(knowledgeDBs, node) : node;
 }
 
 export function splitID(id: ID): [PublicKey | undefined, string] {
@@ -382,10 +377,9 @@ export function getRefTargetInfo(
   knowledgeDBs: KnowledgeDBs,
   effectiveAuthor: PublicKey
 ): RefTargetInfo | undefined {
-  const relation = getConcreteRefTargetRelation(
+  const relation = resolveNode(
     knowledgeDBs,
-    refId,
-    effectiveAuthor
+    getNode(knowledgeDBs, refId, effectiveAuthor)
   );
   if (!relation) {
     return undefined;
@@ -404,10 +398,9 @@ export function getRefLinkTargetInfo(
   knowledgeDBs: KnowledgeDBs,
   effectiveAuthor: PublicKey
 ): RefTargetInfo | undefined {
-  const relation = getConcreteRefTargetRelation(
+  const relation = resolveNode(
     knowledgeDBs,
-    refId,
-    effectiveAuthor
+    getNode(knowledgeDBs, refId, effectiveAuthor)
   );
   if (!relation) {
     return undefined;

@@ -1,5 +1,5 @@
 import { Map as ImmutableMap } from "immutable";
-import { EMPTY_SEMANTIC_ID, getRefTargetID, isRefNode } from "./connections";
+import { EMPTY_SEMANTIC_ID, isRefNode } from "./connections";
 
 export function createEmptySemanticIndex(): SemanticIndex {
   return {
@@ -80,7 +80,7 @@ function addRelationSemanticEntries(
       return;
     }
     const targetRelationID = isRefNode(childRelation)
-      ? getRefTargetID(childRelation)
+      ? childRelation.targetID
       : undefined;
     if (targetRelationID) {
       addToIncomingMap(
@@ -107,7 +107,7 @@ function removeRelationSemanticEntries(
       return;
     }
     const targetRelationID = isRefNode(childRelation)
-      ? getRefTargetID(childRelation)
+      ? childRelation.targetID
       : undefined;
     if (targetRelationID) {
       removeFromIncomingMap(

@@ -29,7 +29,7 @@ import {
   getRefTargetInfo,
   isEmptySemanticID,
   computeEmptyNodeMetadata,
-  getConcreteRefTargetRelation,
+  resolveNode,
   isRefNode,
 } from "../connections";
 import { ReferenceDisplay } from "./referenceDisplay";
@@ -76,7 +76,7 @@ function useNodeHasChildren(): boolean {
   const pane = useCurrentPane();
   const currentItem = useCurrentEdge();
   const currentRelation = useCurrentRelation();
-  const effectiveAuthor = useEffectiveAuthor();
+  useEffectiveAuthor();
 
   if (currentRelation) {
     if (currentRelation.children.size > 0) {
@@ -85,11 +85,7 @@ function useNodeHasChildren(): boolean {
   }
 
   if (currentItem && isRefNode(currentItem)) {
-    const targetRelation = getConcreteRefTargetRelation(
-      data.knowledgeDBs,
-      currentItem.id,
-      effectiveAuthor
-    );
+    const targetRelation = resolveNode(data.knowledgeDBs, currentItem);
     if (targetRelation?.children.size) {
       return true;
     }

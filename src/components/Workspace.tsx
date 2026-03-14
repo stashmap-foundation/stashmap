@@ -59,7 +59,7 @@ import {
   getRelationText,
   getSemanticID,
   getNode,
-  getTargetNode,
+  resolveNode,
   isSearchId,
   shortID,
 } from "../connections";
@@ -199,8 +199,7 @@ function resolveRelationFromSegments(
     return undefined;
   }
 
-  const nextRelation =
-    getTargetNode(knowledgeDBs, matchingNode) || matchingNode;
+  const nextRelation = resolveNode(knowledgeDBs, matchingNode) || matchingNode;
   return nextRelation
     ? resolveRelationFromSegments(knowledgeDBs, nextRelation, rest as ID[])
     : undefined;

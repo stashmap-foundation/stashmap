@@ -2,12 +2,7 @@ import React from "react";
 import { List, OrderedSet, Set } from "immutable";
 import { DndProvider, useDragLayer, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import {
-  moveRelations,
-  createRefTarget,
-  getRefTargetID,
-  isRefNode,
-} from "./connections";
+import { moveRelations, createRefTarget, isRefNode } from "./connections";
 import {
   parseViewPath,
   upsertRelations,
@@ -385,7 +380,7 @@ export function dnd(
     sourceRelation: GraphNode
   ): ReturnType<typeof createRefTarget> =>
     createRefTarget(
-      getRefTargetID(sourceRelation) || sourceRelation.id,
+      sourceRelation.targetID || sourceRelation.id,
       sourceRelation.linkText
     );
 
@@ -397,7 +392,7 @@ export function dnd(
       return sourceDrag.targetId || sourceDrag.nodeId;
     }
     if (sourceRelation) {
-      return getRefTargetID(sourceRelation) || sourceRelation.id;
+      return sourceRelation.targetID || sourceRelation.id;
     }
     return undefined;
   };

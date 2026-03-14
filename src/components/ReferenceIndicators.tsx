@@ -1,10 +1,5 @@
 import React from "react";
-import {
-  getConcreteRefTargetRelation,
-  getNode,
-  isRefNode,
-  splitID,
-} from "../connections";
+import { getNode, resolveNode, isRefNode, splitID } from "../connections";
 import { useData } from "../DataContext";
 
 /**
@@ -20,11 +15,7 @@ export function ReferenceIndicators({
   if (!isRefNode(sourceItem)) {
     return null;
   }
-  const relation = getConcreteRefTargetRelation(
-    knowledgeDBs,
-    refId,
-    user.publicKey
-  );
+  const relation = resolveNode(knowledgeDBs, sourceItem);
   if (!relation) {
     return null;
   }

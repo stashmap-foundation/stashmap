@@ -1,9 +1,8 @@
 import { List } from "immutable";
 import {
-  getConcreteRefTargetRelation,
   getRelationChildNodes,
   getNode,
-  getRefTargetID,
+  resolveNode,
   isRefNode,
   shortID,
   splitID,
@@ -65,9 +64,7 @@ export function parseRef(
   myself: PublicKey
 ): ParsedRef | undefined {
   const sourceItem = getNode(knowledgeDBs, refId, myself);
-  const relation = isRefNode(sourceItem)
-    ? getConcreteRefTargetRelation(knowledgeDBs, refId, myself)
-    : sourceItem;
+  const relation = resolveNode(knowledgeDBs, sourceItem);
   if (!relation) {
     return undefined;
   }
@@ -268,10 +265,9 @@ function computeVersionMeta(
   stack: ID[]
 ): VersionMeta {
   const refId = getLast(viewPath);
-  const relation = getConcreteRefTargetRelation(
+  const relation = resolveNode(
     data.knowledgeDBs,
-    refId,
-    data.user.publicKey
+    getNode(data.knowledgeDBs, refId, data.user.publicKey)
   );
   if (!relation) return { updated: 0, addCount: 0, removeCount: 0 };
 
@@ -302,10 +298,7 @@ function findCrefToNode(
     .map((childID) => getNode(knowledgeDBs, childID, myself))
     .find((item) => {
       if (!isRefNode(item)) return false;
-      const targetID = getRefTargetID(item);
-      const resolvedTarget = targetID
-        ? getNode(knowledgeDBs, targetID, myself)
-        : undefined;
+      const resolvedTarget = resolveNode(knowledgeDBs, item);
       return resolvedTarget?.id === targetRelation.id;
     });
 }

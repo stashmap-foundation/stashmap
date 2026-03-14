@@ -12,7 +12,7 @@ import {
   useIsViewingOtherUserContent,
   useCurrentEdge,
 } from "../ViewContext";
-import { getRefTargetID, isEmptySemanticID } from "../connections";
+import { isEmptySemanticID } from "../connections";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
 import {
@@ -196,7 +196,7 @@ function DraggableSuggestion({
         text: displayText,
         isSuggestion: true,
         nodeId: relation?.id,
-        targetId: getRefTargetID(currentItem) || undefined,
+        targetId: currentItem?.targetID || undefined,
       };
     },
     collect: (monitor) => ({

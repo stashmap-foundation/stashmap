@@ -30,7 +30,7 @@ import {
   ensureRelationNativeFields,
   getRelationContext,
   getSemanticID,
-  getRelationText,
+  getNodeText,
   isRefNode,
 } from "./connections";
 import type { RefTargetSeed, TextSeed } from "./connections";
@@ -84,7 +84,7 @@ function getAnchorSnapshotLabels(
       break;
     }
     labels.unshift(
-      getRelationText(parentRelation) ||
+      getNodeText(parentRelation) ||
         shortID(getSemanticID(knowledgeDBs, parentRelation))
     );
     parentRelationID = parentRelation.parent;

@@ -11,7 +11,7 @@ import {
   getNodeSemanticID,
   getSemanticID,
   getRelationContext,
-  getRelationText,
+  getNodeText,
   getNode,
   resolveNode,
   isRefNode,
@@ -135,7 +135,7 @@ export function getTextForSemanticID(
     if (isRefNode(directRelation)) {
       return undefined;
     }
-    return getRelationText(directRelation);
+    return getNodeText(directRelation);
   }
 
   const relation = getConcreteNodeForSemanticID(
@@ -143,7 +143,7 @@ export function getTextForSemanticID(
     semanticID,
     author
   );
-  const relationText = getRelationText(relation);
+  const relationText = getNodeText(relation);
   if (relationText !== undefined) {
     return relationText;
   }

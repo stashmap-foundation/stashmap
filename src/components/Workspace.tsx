@@ -56,7 +56,7 @@ import {
 import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import {
   getRelationStack,
-  getRelationText,
+  getNodeText,
   getSemanticID,
   getNode,
   resolveNode,
@@ -155,7 +155,7 @@ function getBreadcrumbLabel(
   relation: GraphNode
 ): string {
   return (
-    getRelationText(relation) ||
+    getNodeText(relation) ||
     shortID(getSemanticID(knowledgeDBs, relation)) ||
     "..."
   );

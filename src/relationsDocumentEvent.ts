@@ -4,7 +4,7 @@ import {
   EMPTY_SEMANTIC_ID,
   getRelationContext,
   getSemanticID,
-  getRelationText,
+  getNodeText,
   getNode,
   resolveNode,
   isRefNode,
@@ -24,7 +24,7 @@ function getSerializableRelationText(
   relation: GraphNode
 ): string {
   return (
-    getRelationText(relation) || shortID(getSemanticID(knowledgeDBs, relation))
+    getNodeText(relation) || shortID(getSemanticID(knowledgeDBs, relation))
   );
 }
 

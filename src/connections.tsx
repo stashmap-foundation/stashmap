@@ -90,34 +90,15 @@ export function shortID(id: ID): string {
   return splitID(id)[1];
 }
 
-function getFallbackRelationText(head?: ID): string {
-  if (!head) {
-    return "";
-  }
-  const localHead = head as ID;
-  if (localHead === EMPTY_SEMANTIC_ID) {
-    return "";
-  }
-  if (isSearchId(localHead)) {
-    return parseSearchId(localHead) || "";
-  }
-  return localHead;
-}
-
-export function getRelationText(
-  relation: GraphNode | undefined
-): string | undefined {
-  if (!relation) {
+export function getNodeText(node: GraphNode | undefined): string | undefined {
+  if (!node) {
     return undefined;
   }
-  const relationID = shortID(relation.id) as ID;
-  const fallback = getFallbackRelationText(
-    isSearchId(relationID) ? relationID : (relation.text as ID)
-  );
-  if (relation.text !== "") {
-    return relation.text;
+  if (node.text !== "") {
+    return node.text;
   }
-  return fallback || undefined;
+  const nodeID = shortID(node.id) as ID;
+  return isSearchId(nodeID) ? parseSearchId(nodeID) || "" : undefined;
 }
 
 type RelationLookupIndex = globalThis.Map<string, GraphNode[]>;
@@ -284,7 +265,7 @@ export function getRelationDepth(
 export function createTextNodeFromRelation(relation: GraphNode): TextSeed {
   return {
     id: getNodeSemanticID(relation),
-    text: getRelationText(relation) || "",
+    text: getNodeText(relation) || "",
   };
 }
 
@@ -433,8 +414,7 @@ export function ensureRelationNativeFields(
   const existingRelation = knowledgeDBs
     .get(relation.author)
     ?.nodes.get(shortID(relation.id));
-  const text =
-    relation.text || existingRelation?.text || getFallbackRelationText();
+  const text = relation.text || existingRelation?.text || "";
   const parent = relation.parent || existingRelation?.parent;
   const anchor = parent
     ? undefined

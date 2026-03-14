@@ -10,10 +10,7 @@ import {
   getSemanticID,
   getRelationContext,
 } from "./connections";
-import {
-  getTextHashForSemanticID,
-  getTextForSemanticID,
-} from "./semanticProjection";
+import { getTextForSemanticID } from "./semanticProjection";
 import {
   ViewPath,
   getParentView,
@@ -95,56 +92,15 @@ function resolveLabels(
   return { contextLabels, targetLabel, fullContext: relationContext };
 }
 
-function getSemanticNodeKey(
-  knowledgeDBs: KnowledgeDBs,
-  semanticID: ID,
-  author: PublicKey
-): string {
-  return (
-    getTextHashForSemanticID(knowledgeDBs, semanticID, author) ||
-    shortID(semanticID as ID)
-  );
-}
-
 function relationsMatchForVersion(
   knowledgeDBs: KnowledgeDBs,
   left: GraphNode,
   right: GraphNode
 ): boolean {
-  const useExactMatch =
-    left.author === right.author && left.root === right.root;
-  if (useExactMatch) {
-    return (
-      getSemanticID(knowledgeDBs, left) ===
-        getSemanticID(knowledgeDBs, right) &&
-      getRelationContext(knowledgeDBs, left).equals(
-        getRelationContext(knowledgeDBs, right)
-      )
-    );
-  }
-
-  const leftContext = getRelationContext(knowledgeDBs, left);
-  const rightContext = getRelationContext(knowledgeDBs, right);
   return (
-    getSemanticNodeKey(
-      knowledgeDBs,
-      getSemanticID(knowledgeDBs, left),
-      left.author
-    ) ===
-      getSemanticNodeKey(
-        knowledgeDBs,
-        getSemanticID(knowledgeDBs, right),
-        right.author
-      ) &&
-    leftContext.size === rightContext.size &&
-    leftContext.every(
-      (semanticID, index) =>
-        getSemanticNodeKey(knowledgeDBs, semanticID, left.author) ===
-        getSemanticNodeKey(
-          knowledgeDBs,
-          rightContext.get(index) as ID,
-          right.author
-        )
+    getSemanticID(knowledgeDBs, left) === getSemanticID(knowledgeDBs, right) &&
+    getRelationContext(knowledgeDBs, left).equals(
+      getRelationContext(knowledgeDBs, right)
     )
   );
 }
@@ -221,13 +177,7 @@ function effectiveIDs(
         itemPassesFilters(item, activeFilters) &&
         item.relevance !== "not_relevant"
     )
-    .map((item) =>
-      getSemanticNodeKey(
-        knowledgeDBs,
-        getSemanticID(knowledgeDBs, item),
-        relation.author
-      )
-    )
+    .map((item) => getSemanticID(knowledgeDBs, item))
     .toList();
 }
 

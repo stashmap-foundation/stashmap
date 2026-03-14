@@ -24,12 +24,10 @@ import {
   isRefNode,
 } from "./connections";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
-import { buildOutgoingReference } from "./buildReferenceRow";
 import {
+  getAlternativeFooterData,
   getIncomingCrefsForNode,
   getOccurrencesForNode,
-  getSuggestionsForNode,
-  getVersionsForRelation,
 } from "./semanticProjection";
 
 export type TreeResult = {
@@ -171,32 +169,18 @@ function getChildrenForRegularNode(
         incomingCrefs
       )
     : List<ID>();
-  const sortedOccurrences = occurrences.sortBy((refID) => {
-    const reference = buildOutgoingReference(
-      refID as LongID,
-      data.knowledgeDBs,
-      data.user.publicKey
-    );
-    return reference?.text || String(refID);
-  });
 
   const isOwnContent = effectiveAuthor === data.user.publicKey;
-
-  const { suggestions: diffItems, coveredCandidateIDs } = isOwnContent
-    ? getSuggestionsForNode(
-        data.knowledgeDBs,
-        data.semanticIndex,
-        visibleAuthors,
-        data.user.publicKey,
-        coordinateSemanticID,
-        activeFilters,
-        nodes?.id,
-        coordinateContext
-      )
-    : {
-        suggestions: List<ID>(),
-        coveredCandidateIDs: ImmutableSet<string>(),
-      };
+  const { suggestions: diffItems, versions } = getAlternativeFooterData(
+    data.knowledgeDBs,
+    data.semanticIndex,
+    visibleAuthors,
+    coordinateSemanticID,
+    activeFilters,
+    nodes,
+    coordinateContext,
+    isOwnContent
+  );
 
   const createVirtualItem = (
     itemID: ID,
@@ -260,16 +244,6 @@ function getChildrenForRegularNode(
     paths: List<ViewPath>(),
     virtualItems: EMPTY_VIRTUAL_ITEMS,
   };
-  const versions = getVersionsForRelation(
-    data.knowledgeDBs,
-    data.semanticIndex,
-    visibleAuthors,
-    coordinateSemanticID,
-    activeFilters,
-    nodes,
-    coordinateContext,
-    coveredCandidateIDs
-  );
 
   const withIncoming = addVirtualItems(
     initial,
@@ -283,7 +257,7 @@ function getChildrenForRegularNode(
   );
   const withOccurrences = addVirtualItems(
     withSuggestions,
-    sortedOccurrences,
+    occurrences,
     "occurrence"
   );
   const withVersions = addVirtualItems(withOccurrences, versions, "version");

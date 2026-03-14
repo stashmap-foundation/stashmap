@@ -483,6 +483,53 @@ function getAlternativeRelations(
     .toList();
 }
 
+function getVersionRelations(
+  semanticIndex: SemanticIndex,
+  visibleAuthors: ImmutableSet<PublicKey>,
+  currentRelation: GraphNode
+): List<GraphNode> {
+  const visited = new globalThis.Set<LongID>([currentRelation.id]);
+  const queue: LongID[] = [currentRelation.id];
+  const relations: GraphNode[] = [];
+
+  while (queue.length > 0) {
+    const relationID = queue.shift();
+    if (!relationID) {
+      continue;
+    }
+
+    const relation = semanticIndex.relationByID.get(relationID);
+    if (!relation) {
+      continue;
+    }
+
+    if (
+      relation.id !== currentRelation.id &&
+      !isRefNode(relation) &&
+      visibleAuthors.has(relation.author)
+    ) {
+      relations.push(relation);
+    }
+
+    if (relation.basedOn && !visited.has(relation.basedOn)) {
+      visited.add(relation.basedOn);
+      queue.push(relation.basedOn);
+    }
+
+    const derivedRelations = semanticIndex.basedOnIndex.get(relation.id);
+    derivedRelations?.forEach((derivedRelationID) => {
+      if (!visited.has(derivedRelationID)) {
+        visited.add(derivedRelationID);
+        queue.push(derivedRelationID);
+      }
+    });
+  }
+
+  return List(relations)
+    .sortBy((relation) => -relation.updated)
+    .toList();
+}
+
 type AlternativeSummary = {
   relation: GraphNode;
   filteredChildren: List<GraphNode>;
@@ -519,6 +566,11 @@ export function getAlternativeFooterData(
     visibleAuthors,
     semanticID,
     contextToMatch,
+    currentRelation
+  );
+  const versionRelations = getVersionRelations(
+    semanticIndex,
+    visibleAuthors,
     currentRelation
   );
 
@@ -559,29 +611,35 @@ export function getAlternativeFooterData(
     .map((item) => getNodeKey(knowledgeDBs, item))
     .toSet();
 
-  const summaries = alternatives.map((relation): AlternativeSummary => {
-    const useExactMatch = useExactItemMatchForRelation(
-      relation,
-      currentRelation
-    );
-    const filteredChildren = getFilteredRelationItems(
-      knowledgeDBs,
-      relation,
-      filterTypes
-    );
-    const candidateKeys = filteredChildren
-      .map((item) => getComparableItemKey(knowledgeDBs, item, useExactMatch))
-      .toSet();
-    const currentKeys = useExactMatch
-      ? currentExactItemKeys
-      : currentSemanticItemKeys;
-    return {
-      relation,
-      filteredChildren,
-      addKeys: candidateKeys.filter((key) => !currentKeys.has(key)).toSet(),
-      removeCount: currentKeys.filter((key) => !candidateKeys.has(key)).size,
-    };
-  });
+  const summarizeRelations = (
+    relations: List<GraphNode>
+  ): List<AlternativeSummary> =>
+    relations.map((relation): AlternativeSummary => {
+      const useExactMatch = useExactItemMatchForRelation(
+        relation,
+        currentRelation
+      );
+      const filteredChildren = getFilteredRelationItems(
+        knowledgeDBs,
+        relation,
+        filterTypes
+      );
+      const candidateKeys = filteredChildren
+        .map((item) => getComparableItemKey(knowledgeDBs, item, useExactMatch))
+        .toSet();
+      const currentKeys = useExactMatch
+        ? currentExactItemKeys
+        : currentSemanticItemKeys;
+      return {
+        relation,
+        filteredChildren,
+        addKeys: candidateKeys.filter((key) => !currentKeys.has(key)).toSet(),
+        removeCount: currentKeys.filter((key) => !candidateKeys.has(key)).size,
+      };
+    });
+
+  const summaries = summarizeRelations(alternatives);
+  const versionSummaries = summarizeRelations(versionRelations);
 
   const candidateItemIDs = suggestionsEnabled
     ? summaries
@@ -612,7 +670,7 @@ export function getAlternativeFooterData(
     .map(([candidateKey]) => candidateKey)
     .toSet() as ImmutableSet<string>;
   const versions = versionsEnabled
-    ? summaries
+    ? versionSummaries
         .filter(({ relation }) => !existingCrefTargetIDs.has(relation.id))
         .filter(
           ({ addKeys, removeCount }) => addKeys.size > 0 || removeCount > 0

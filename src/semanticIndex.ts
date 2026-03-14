@@ -6,6 +6,7 @@ export function createEmptySemanticIndex(): SemanticIndex {
     relationByID: new globalThis.Map<LongID, GraphNode>(),
     semantic: new globalThis.Map<string, globalThis.Set<LongID>>(),
     incomingCrefs: new globalThis.Map<LongID, globalThis.Set<LongID>>(),
+    basedOnIndex: new globalThis.Map<LongID, globalThis.Set<LongID>>(),
   };
 }
 
@@ -22,7 +23,7 @@ function addToSetMap(
   map.set(key, new globalThis.Set<LongID>([value]));
 }
 
-function addToIncomingMap(
+function addToRelationMap(
   map: globalThis.Map<LongID, globalThis.Set<LongID>>,
   targetRelationID: LongID,
   sourceRelationID: LongID
@@ -50,7 +51,7 @@ function removeFromSetMap(
   }
 }
 
-function removeFromIncomingMap(
+function removeFromRelationMap(
   map: globalThis.Map<LongID, globalThis.Set<LongID>>,
   targetRelationID: LongID,
   sourceRelationID: LongID
@@ -70,6 +71,9 @@ function addRelationSemanticEntries(
   relation: GraphNode
 ): void {
   addToSetMap(semanticIndex.semantic, relation.text, relation.id);
+  if (relation.basedOn) {
+    addToRelationMap(semanticIndex.basedOnIndex, relation.basedOn, relation.id);
+  }
 
   relation.children.forEach((childID) => {
     if (childID === EMPTY_SEMANTIC_ID) {
@@ -83,7 +87,7 @@ function addRelationSemanticEntries(
       ? childRelation.targetID
       : undefined;
     if (targetRelationID) {
-      addToIncomingMap(
+      addToRelationMap(
         semanticIndex.incomingCrefs,
         targetRelationID,
         relation.id
@@ -97,6 +101,13 @@ function removeRelationSemanticEntries(
   relation: GraphNode
 ): void {
   removeFromSetMap(semanticIndex.semantic, relation.text, relation.id);
+  if (relation.basedOn) {
+    removeFromRelationMap(
+      semanticIndex.basedOnIndex,
+      relation.basedOn,
+      relation.id
+    );
+  }
 
   relation.children.forEach((childID) => {
     if (childID === EMPTY_SEMANTIC_ID) {
@@ -110,7 +121,7 @@ function removeRelationSemanticEntries(
       ? childRelation.targetID
       : undefined;
     if (targetRelationID) {
-      removeFromIncomingMap(
+      removeFromRelationMap(
         semanticIndex.incomingCrefs,
         targetRelationID,
         relation.id
@@ -139,6 +150,12 @@ export function addRelationsToSemanticIndex(
     ),
     incomingCrefs: new globalThis.Map<LongID, globalThis.Set<LongID>>(
       [...semanticIndex.incomingCrefs.entries()].map(([key, ids]) => [
+        key,
+        new globalThis.Set<LongID>(ids),
+      ])
+    ),
+    basedOnIndex: new globalThis.Map<LongID, globalThis.Set<LongID>>(
+      [...semanticIndex.basedOnIndex.entries()].map(([key, ids]) => [
         key,
         new globalThis.Set<LongID>(ids),
       ])
@@ -175,6 +192,12 @@ export function removeRelationsFromSemanticIndex(
     ),
     incomingCrefs: new globalThis.Map<LongID, globalThis.Set<LongID>>(
       [...semanticIndex.incomingCrefs.entries()].map(([key, ids]) => [
+        key,
+        new globalThis.Set<LongID>(ids),
+      ])
+    ),
+    basedOnIndex: new globalThis.Map<LongID, globalThis.Set<LongID>>(
+      [...semanticIndex.basedOnIndex.entries()].map(([key, ids]) => [
         key,
         new globalThis.Set<LongID>(ids),
       ])

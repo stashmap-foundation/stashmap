@@ -285,6 +285,7 @@ declare global {
     relationByID: globalThis.Map<LongID, GraphNode>;
     semantic: globalThis.Map<string, globalThis.Set<LongID>>;
     incomingCrefs: globalThis.Map<LongID, globalThis.Set<LongID>>;
+    basedOnIndex: globalThis.Map<LongID, globalThis.Set<LongID>>;
   };
 
   // Temporary UI state (not persisted to Nostr)

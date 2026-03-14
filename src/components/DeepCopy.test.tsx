@@ -6,6 +6,7 @@ import {
   expectTree,
   findNewNodeEditor,
   follow,
+  forkReadonlyRoot,
   getPane,
   navigateToNodeViaSearch,
   renderApp,
@@ -465,11 +466,15 @@ My Notes
   Parent
     Child
       GrandChild
+      [V]
+    [V]
   Target
 Target
   Parent
     Child
       GrandChild
+      [V]
+    [V]
     `);
   });
 
@@ -1309,22 +1314,25 @@ My Notes
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
 
-    renderTree(bob);
-    await type(
-      "My Notes{Enter}{Tab}BobItem1{Enter}BobItem2{Enter}BobItem3{Enter}BobItem4{Escape}"
-    );
-
+    renderTree(alice);
+    await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}A1{Escape}");
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes", "Topic");
+    await userEvent.click(await screen.findByLabelText("open Topic in fullscreen"));
+    await userEvent.click(await screen.findByLabelText("edit Topic"));
+    await userEvent.keyboard("{Enter}");
+    await type("B1{Enter}B2{Enter}B3{Enter}B4{Escape}");
     cleanup();
 
     renderTree(alice);
-    await type("My Notes{Escape}");
 
     await expectTree(`
 My Notes
-  [S] BobItem1
-  [S] BobItem2
-  [S] BobItem3
-  [VO] +4
+  Topic
+    A1
+    [S] B1
+    [S] B2
+    [S] B3
+    [VO] +4
     `);
 
     // eslint-disable-next-line testing-library/no-node-access
@@ -1565,42 +1573,48 @@ describe("Deep Copy - Version DnD", () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
 
-    renderTree(bob);
-    await type("My Notes{Enter}{Tab}B1{Enter}B2{Enter}B3{Enter}B4{Escape}");
+    renderTree(alice);
+    await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}A1{Escape}");
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes", "Topic");
+    await userEvent.click(await screen.findByLabelText("open Topic in fullscreen"));
+    await userEvent.click(await screen.findByLabelText("edit Topic"));
+    await userEvent.keyboard("{Enter}");
+    await type("B1{Enter}B2{Enter}B3{Enter}B4{Escape}");
     cleanup();
 
     renderApp(alice());
-    await type("My Notes{Enter}{Tab}A1{Escape}");
 
     await expectTree(`
 My Notes
-  A1
-  [S] B1
-  [S] B2
-  [S] B3
-  [VO] +4 -1
+  Topic
+    A1
+    [S] B1
+    [S] B2
+    [S] B3
+    [VO] +4
     `);
 
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-    await navigateToNodeViaSearch(1, "My Notes");
+    await navigateToNodeViaSearch(1, "Topic");
 
     // eslint-disable-next-line testing-library/no-node-access
     const versionElement = document.querySelector(
       '[data-virtual-type="version"]'
     )!;
-    const dropTarget = getPane(1).getByLabelText("collapse My Notes");
+    const dropTarget = getPane(1).getByLabelText("collapse Topic");
     fireEvent.dragStart(versionElement);
     fireEvent.drop(dropTarget);
 
     await expectTree(`
 My Notes
-  [VO] +4 -2
-  A1
-  [S] B1
-  [S] B2
-  [S] B3
-My Notes
-  [VO] +4 -2
+  Topic
+    [VO] +4 -1
+    A1
+    [S] B1
+    [S] B2
+    [S] B3
+Topic
+  [VO] +4 -1
   A1
   [S] B1
   [S] B2
@@ -1612,20 +1626,25 @@ My Notes
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
 
-    renderTree(bob);
-    await type("My Notes{Enter}{Tab}B1{Enter}B2{Enter}B3{Enter}B4{Escape}");
+    renderTree(alice);
+    await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}A1{Escape}");
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes", "Topic");
+    await userEvent.click(await screen.findByLabelText("open Topic in fullscreen"));
+    await userEvent.click(await screen.findByLabelText("edit Topic"));
+    await userEvent.keyboard("{Enter}");
+    await type("B1{Enter}B2{Enter}B3{Enter}B4{Escape}");
     cleanup();
 
     renderTree(alice);
-    await type("My Notes{Enter}{Tab}A1{Escape}");
 
     await expectTree(`
 My Notes
-  A1
-  [S] B1
-  [S] B2
-  [S] B3
-  [VO] +4 -1
+  Topic
+    A1
+    [S] B1
+    [S] B2
+    [S] B3
+    [VO] +4
     `);
 
     // eslint-disable-next-line testing-library/no-node-access
@@ -1633,15 +1652,16 @@ My Notes
       '[data-virtual-type="version"]'
     )!;
     fireEvent.dragStart(versionElement);
-    fireEvent.drop(screen.getByLabelText("collapse My Notes"));
+    fireEvent.drop(screen.getByLabelText("collapse Topic"));
 
     await expectTree(`
 My Notes
-  [VO] +4 -2
-  A1
-  [S] B1
-  [S] B2
-  [S] B3
+  Topic
+    [VO] +4 -1
+    A1
+    [S] B1
+    [S] B2
+    [S] B3
     `);
   });
 });

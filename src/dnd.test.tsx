@@ -4,6 +4,7 @@ import {
   ALICE,
   BOB,
   expectTree,
+  forkReadonlyRoot,
   findNewNodeEditor,
   follow,
   navigateToNodeViaSearch,
@@ -189,51 +190,36 @@ test("Deep copy preserves all children when forked duplicate nodes exist", async
   const [alice, bob] = setup([ALICE, BOB]);
   await follow(alice, bob().user.publicKey);
 
-  renderTree(bob);
-  await type(
-    "Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Sevilla{Enter}Barcelona{Enter}Madrid{Enter}Granada{Escape}"
-  );
-  await expectTree(`
-Holiday Destinations
-  Spain
-    Sevilla
-    Barcelona
-    Madrid
-    Granada
-  `);
-  cleanup();
-
   renderTree(alice);
   await type(
     "Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Valencia{Enter}Malaga{Escape}"
   );
+  cleanup();
 
-  const versionEntries = await screen.findAllByLabelText(/in fullscreen/);
-  const versionFullscreen = versionEntries[versionEntries.length - 1];
-  await userEvent.click(versionFullscreen);
+  await forkReadonlyRoot(bob(), alice().user.publicKey, "Holiday Destinations");
+  await userEvent.click(await screen.findByLabelText("open Spain in fullscreen"));
+  await userEvent.click(await screen.findByLabelText("edit Spain"));
+  await userEvent.keyboard("{Enter}");
+  await type("Sevilla{Enter}Barcelona{Enter}Madrid{Enter}Granada{Escape}");
+  cleanup();
 
-  await expectTree(`
-[O] Spain
-  [O] Sevilla
-  [O] Barcelona
-  [O] Madrid
-  [O] Granada
-  [VO] +2 -4
-  `);
-
-  await userEvent.click(await screen.findByLabelText("copy root to edit"));
+  renderApp({
+    ...alice(),
+    initialRoute: "/n/Holiday%20Destinations",
+  });
+  await userEvent.click(await screen.findByLabelText("open Spain in fullscreen"));
 
   await expectTree(`
 Spain
-  Sevilla
-  Barcelona
-  Madrid
-  Granada
-  [V] +2 -4
+  Valencia
+  Malaga
+  [S] Sevilla
+  [S] Barcelona
+  [S] Madrid
+  [VO] +4
   `);
 
   cleanup();
-
   renderApp({
     ...alice(),
     initialRoute: "/n/Holiday%20Destinations",
@@ -256,22 +242,23 @@ Spain
   [S] Sevilla
   [S] Barcelona
   [S] Madrid
-  [V] +4 -2
-  [VO] +4 -2
+  [VO] +4
   `);
 
   const versionFullscreenBtns = await screen.findAllByLabelText(
-    /open .* \+4 -2 in fullscreen/
+    /open .* \+4 in fullscreen/
   );
   await userEvent.click(versionFullscreenBtns[0]);
 
   await expectTree(`
-Spain
-  Sevilla
-  Barcelona
-  Madrid
-  Granada
-  [V] +2 -4
+[O] Spain
+  [O] Sevilla
+  [O] Barcelona
+  [O] Madrid
+  [O] Granada
+  [O] Valencia
+  [O] Malaga
+  [VO] -4
   `);
 
   await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
@@ -286,18 +273,23 @@ Spain
   await userEvent.click(expandButtons[expandButtons.length - 1]);
 
   await expectTree(`
-Spain
-  Sevilla
-  Barcelona
-  Madrid
-  Granada
-  [V] +2 -4
+[O] Spain
+  [O] Sevilla
+  [O] Barcelona
+  [O] Madrid
+  [O] Granada
+  [O] Valencia
+  [O] Malaga
+  [VO] -4
 Target
   Spain
     Sevilla
     Barcelona
     Madrid
     Granada
+    Valencia
+    Malaga
+    [V] -4
   `);
 });
 

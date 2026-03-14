@@ -661,14 +661,6 @@ function SuggestionIndicator(): JSX.Element {
   );
 }
 
-function OccurrenceGutterIndicator(): JSX.Element {
-  return (
-    <span className="reference-indicator" title="Occurrence" aria-hidden="true">
-      =
-    </span>
-  );
-}
-
 function IncomingRefGutterIndicator(): JSX.Element {
   return (
     <span
@@ -790,7 +782,6 @@ export function Node({
               <UserEntryIndicator isFollowing={isFollowingUserEntry} />
             )}
           {isVersion && <VersionIndicator isOtherUser={!!isOtherUser} />}
-          {virtualType === "occurrence" && <OccurrenceGutterIndicator />}
           {virtualType === "incoming" && <IncomingRefGutterIndicator />}
           {relevance === "relevant" && !isSuggestion && (
             <span

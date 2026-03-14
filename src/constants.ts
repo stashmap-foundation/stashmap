@@ -13,7 +13,6 @@ export const DEFAULT_TYPE_FILTERS: (
   | "suggestions"
   | "versions"
   | "incoming"
-  | "occurrence"
   | "contains"
 )[] = [
   "relevant",
@@ -22,7 +21,6 @@ export const DEFAULT_TYPE_FILTERS: (
   "suggestions",
   "versions",
   "incoming",
-  "occurrence",
 ];
 
 export const suggestionSettings = { maxSuggestions: 5 };

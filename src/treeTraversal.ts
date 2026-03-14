@@ -27,7 +27,6 @@ import { DEFAULT_TYPE_FILTERS } from "./constants";
 import {
   getAlternativeFooterData,
   getIncomingCrefsForNode,
-  getOccurrencesForNode,
 } from "./semanticProjection";
 
 export type TreeResult = {
@@ -83,7 +82,6 @@ function getChildrenForRegularNode(
 ): TreeResult {
   const effectiveAuthor = getEffectiveAuthor(data, parentPath);
   const context = getContext(data, parentPath, stack);
-  const currentRoot = getParentRelation(data, parentPath)?.root;
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
   const directRelations = isSearchId(parentItemID as ID)
     ? getRelations(data.knowledgeDBs, parentItemID as ID, data.user.publicKey)
@@ -155,20 +153,6 @@ function getChildrenForRegularNode(
   const visibleIncomingCrefs = activeFilters.includes("incoming")
     ? incomingCrefs
     : List<LongID>();
-  const occurrences = activeFilters.includes("occurrence")
-    ? getOccurrencesForNode(
-        data.knowledgeDBs,
-        data.semanticIndex,
-        visibleAuthors,
-        coordinateSemanticID,
-        nodes?.id,
-        effectiveAuthor,
-        coordinateContext,
-        nodes?.root ?? currentRoot,
-        childNodes,
-        incomingCrefs
-      )
-    : List<ID>();
 
   const isOwnContent = effectiveAuthor === data.user.publicKey;
   const { suggestions: diffItems, versions } = getAlternativeFooterData(
@@ -192,9 +176,7 @@ function getChildrenForRegularNode(
         : undefined;
     const suggestionTargetID = resolvedItem?.targetID;
     const targetID =
-      virtualType === "incoming" ||
-      virtualType === "occurrence" ||
-      virtualType === "version"
+      virtualType === "incoming" || virtualType === "version"
         ? (itemID as LongID)
         : suggestionTargetID;
     return {
@@ -255,12 +237,7 @@ function getChildrenForRegularNode(
     diffItems,
     "suggestion"
   );
-  const withOccurrences = addVirtualItems(
-    withSuggestions,
-    occurrences,
-    "occurrence"
-  );
-  const withVersions = addVirtualItems(withOccurrences, versions, "version");
+  const withVersions = addVirtualItems(withSuggestions, versions, "version");
 
   const firstVirtualPath = withVersions.paths.first();
   const firstVirtualKeys = firstVirtualPath

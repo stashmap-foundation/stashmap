@@ -52,9 +52,7 @@ export function EvidenceSelector(): JSX.Element | null {
   const relationItem = useCurrentEdge();
   const virtualType = relationItem?.virtualType;
   const isAcceptableVirtual =
-    virtualType === "incoming" ||
-    virtualType === "occurrence" ||
-    virtualType === "version";
+    virtualType === "incoming" || virtualType === "version";
   const viewPath = useViewPath();
   const viewKey = useViewKey();
   const currentRelation = useCurrentRelation();

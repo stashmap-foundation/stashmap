@@ -65,7 +65,6 @@ export function RightMenu(): JSX.Element {
   const isVirtualItem =
     virtualType === "suggestion" ||
     virtualType === "incoming" ||
-    virtualType === "occurrence" ||
     virtualType === "version";
   const isRoot = useIsRoot();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();

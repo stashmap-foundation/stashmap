@@ -1,6 +1,15 @@
 import { List } from "immutable";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { ALICE, expectTree, renderTree, setup, type } from "../utils.test";
+import userEvent from "@testing-library/user-event";
+import {
+  ALICE,
+  expectTree,
+  navigateToNodeViaSearch,
+  renderApp,
+  renderTree,
+  setup,
+  type,
+} from "../utils.test";
 import { updateRelationItemMetadata } from "../relationItemMetadata";
 
 function makeItem(
@@ -110,21 +119,34 @@ Root
 
   test("incoming refs show both relevance and evidence selectors", async () => {
     const [alice] = setup([ALICE]);
-    renderTree(alice);
+    renderApp(alice());
 
-    await type("Crypto{Enter}{Tab}Bitcoin{Escape}");
-    fireEvent.click(screen.getByLabelText("Create new note"));
-    await type("Money{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+    await type("Source{Enter}{Tab}Child{Escape}");
+    await userEvent.click(await screen.findByLabelText("Create new note"));
+    await type("Target{Enter}{Tab}Items{Escape}");
+
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Source");
+
+    await userEvent.keyboard("{Alt>}");
+    const sourceItems = screen.getAllByRole("treeitem", { name: "Source" });
+    fireEvent.dragStart(sourceItems[sourceItems.length - 1]);
+    const targetItems = screen.getAllByRole("treeitem", { name: "Target" });
+    fireEvent.dragOver(targetItems[0], { altKey: true });
+    fireEvent.drop(targetItems[0], { altKey: true });
+    await userEvent.keyboard("{/Alt}");
+
+    await userEvent.click(screen.getAllByLabelText("Close pane")[0]);
+    await navigateToNodeViaSearch(0, "Source");
 
     await expectTree(`
-Money
-  Bitcoin
-    Details
-    [C] Crypto / Bitcoin
+Source
+  Child
+  [I] Target
     `);
 
-    await screen.findByLabelText(/decline Crypto \/ Bitcoin/);
-    await screen.findByLabelText(/Evidence for Crypto \/ Bitcoin/);
+    await screen.findByLabelText(/decline Target/);
+    await screen.findByLabelText(/Evidence for Target/);
   });
 
   test("evidence selector persists after setting", async () => {

@@ -58,7 +58,6 @@ function parseTypeFilter(
   | "suggestions"
   | "versions"
   | "incoming"
-  | "occurrence"
   | "contains"
   | null {
   if (value === "contains") {
@@ -87,22 +86,13 @@ function parseTypeFilter(
   if (value === "incoming") {
     return "incoming";
   }
-  if (value === "occurrence") {
-    return "occurrence";
-  }
   return null;
 }
 
 function parseTypeFilters(
   arr: Array<Serializable>
 ): Array<
-  | Relevance
-  | Argument
-  | "suggestions"
-  | "versions"
-  | "incoming"
-  | "occurrence"
-  | "contains"
+  Relevance | Argument | "suggestions" | "versions" | "incoming" | "contains"
 > {
   return arr
     .map((item) => parseTypeFilter(asString(item)))
@@ -115,7 +105,6 @@ function parseTypeFilters(
         | "suggestions"
         | "versions"
         | "incoming"
-        | "occurrence"
         | "contains" => parsed !== null
     );
 }

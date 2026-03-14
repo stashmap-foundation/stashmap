@@ -399,7 +399,6 @@ My Notes
   Holiday Destinations
     Spain
     [S] Austria
-    [C] Travel / Holiday Destinations
     `);
   });
 

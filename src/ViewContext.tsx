@@ -425,7 +425,6 @@ export type TypeFilters = (
   | "suggestions"
   | "versions"
   | "incoming"
-  | "occurrence"
   | "contains"
 )[];
 

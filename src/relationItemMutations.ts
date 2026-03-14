@@ -90,11 +90,7 @@ export function planUpdateViewItemMetadata(
         metadata.argument
       )[0];
     }
-    const targetID =
-      virtualItem.targetID ||
-      (virtualItem.virtualType === "occurrence"
-        ? (itemID as LongID)
-        : undefined);
+    const targetID = virtualItem.targetID || undefined;
     const targetItem = targetID ? createRefTarget(targetID) : itemID;
     const inheritedSourceRelation = targetID
       ? getNode(plan.knowledgeDBs, targetID, plan.user.publicKey)

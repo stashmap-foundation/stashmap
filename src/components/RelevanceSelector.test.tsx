@@ -7,7 +7,9 @@ import {
   CAROL,
   expectTree,
   follow,
+  getPane,
   navigateToNodeViaSearch,
+  renderApp,
   renderTree,
   setup,
   type,
@@ -29,6 +31,78 @@ function makeItem(
     relevance,
     ...(argument !== undefined ? { argument } : {}),
   };
+}
+
+async function createAcceptedItemLevelRefOnCurrentPane(
+  relevanceKey: "!" | "?" = "!"
+): Promise<void> {
+  const sourceBitcoin = getPane(1).getByRole("treeitem", { name: "Bitcoin" });
+  const targetBitcoin = getPane(0).getByRole("treeitem", { name: "Bitcoin" });
+
+  await userEvent.keyboard("{Alt>}");
+  fireEvent.dragStart(sourceBitcoin);
+  fireEvent.dragOver(targetBitcoin, { altKey: true });
+  fireEvent.drop(targetBitcoin, { altKey: true });
+  await userEvent.keyboard("{/Alt}");
+
+  await userEvent.click(
+    await getPane(0).findByRole("treeitem", {
+      name: /^Money \/ (?:[+-] )?Bitcoin$/,
+    })
+  );
+  await userEvent.keyboard(relevanceKey);
+}
+
+async function selectIncomingRefRow(
+  name: RegExp = /Bitcoin ! <<< Crypto/
+): Promise<void> {
+  const expandBitcoin = screen.queryByLabelText("expand Bitcoin");
+  if (expandBitcoin) {
+    await userEvent.click(expandBitcoin);
+  }
+  await userEvent.click(await screen.findByRole("treeitem", { name }));
+}
+
+async function setArgumentOnSource(argument: Argument): Promise<void> {
+  await userEvent.click(
+    screen.getByLabelText("Evidence for Bitcoin: No evidence type")
+  );
+  if (argument === "contra") {
+    await userEvent.click(
+      screen.getByLabelText("Evidence for Bitcoin: Confirms")
+    );
+  }
+}
+
+async function setupLocalIncomingRefOnMoney(
+  relevanceKey: "!" | "?" = "!"
+): Promise<void> {
+  await type("Money{Enter}{Tab}Bitcoin{Escape}");
+  await userEvent.click(await screen.findByLabelText("Create new note"));
+  await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+
+  await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+  await navigateToNodeViaSearch(1, "Money");
+  await createAcceptedItemLevelRefOnCurrentPane(relevanceKey);
+  await userEvent.click(getPane(1).getByLabelText("Close pane"));
+  await navigateToNodeViaSearch(0, "Money");
+}
+
+async function setupLocalOutgoingRefOnCrypto(
+  argument?: Argument
+): Promise<void> {
+  await type("Money{Enter}{Tab}Bitcoin{Escape}");
+  if (argument) {
+    await setArgumentOnSource(argument);
+  }
+  await userEvent.click(await screen.findByLabelText("Create new note"));
+  await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+
+  await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+  await navigateToNodeViaSearch(1, "Money");
+  await createAcceptedItemLevelRefOnCurrentPane("!");
+  await userEvent.click(getPane(1).getByLabelText("Close pane"));
+  await navigateToNodeViaSearch(0, "Crypto");
 }
 
 describe("itemMatchesType", () => {
@@ -107,72 +181,54 @@ My Notes
 
   test("accepting incoming ref as relevant makes it bidirectional, filter toggle preserves it", async () => {
     const [alice] = setup([ALICE]);
-    renderTree(alice);
+    renderApp(alice());
 
-    await type("Money{Enter}{Tab}Bitcoin{Escape}");
-    await userEvent.click(await screen.findByLabelText("Create new note"));
-    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [C] Money / Bitcoin
-    `);
+    await setupLocalIncomingRefOnMoney();
+    await selectIncomingRefRow();
 
     await userEvent.click(
-      await screen.findByLabelText(/accept Money \/ Bitcoin as relevant/)
+      await screen.findByLabelText(/accept Bitcoin ! <<< Crypto as relevant/)
     );
 
     await expectTree(`
-Crypto
+Money
   Bitcoin
-    Details
-    [R] Money / Bitcoin
+    [R] Crypto <<< >>> ! Bitcoin
     `);
 
     await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
 
     await expectTree(`
-Crypto
+Money
   Bitcoin
-    Details
     `);
 
     await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
 
     await expectTree(`
-Crypto
+Money
   Bitcoin
-    Details
-    [R] Money / Bitcoin
+    [R] Crypto <<< >>> ! Bitcoin
     `);
   });
 
   test("accepting incoming ref as maybe relevant makes it bidirectional, filter toggle preserves it", async () => {
     const [alice] = setup([ALICE]);
-    renderTree(alice);
+    renderApp(alice());
 
-    await type("Money{Enter}{Tab}Bitcoin{Escape}");
-    await userEvent.click(await screen.findByLabelText("Create new note"));
-    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [C] Money / Bitcoin
-    `);
+    await setupLocalIncomingRefOnMoney();
+    await selectIncomingRefRow();
 
     await userEvent.click(
-      await screen.findByLabelText(/accept Money \/ Bitcoin as maybe relevant/)
+      await screen.findByLabelText(
+        /accept Bitcoin ! <<< Crypto as maybe relevant/
+      )
     );
 
     await expectTree(`
-Crypto
+Money
   Bitcoin
-    Details
-    [R] Money / Bitcoin
+    [R] Crypto <<< >>> ! Bitcoin
     `);
 
     await userEvent.click(
@@ -180,9 +236,8 @@ Crypto
     );
 
     await expectTree(`
-Crypto
+Money
   Bitcoin
-    Details
     `);
 
     await userEvent.click(
@@ -190,41 +245,32 @@ Crypto
     );
 
     await expectTree(`
-Crypto
+Money
   Bitcoin
-    Details
-    [R] Money / Bitcoin
+    [R] Crypto <<< >>> ! Bitcoin
     `);
   });
 
   test("accepting incoming ref as little relevant makes it bidirectional, filter toggle preserves it", async () => {
     const [alice] = setup([ALICE]);
-    renderTree(alice);
+    renderApp(alice());
 
-    await type("Money{Enter}{Tab}Bitcoin{Escape}");
-    await userEvent.click(await screen.findByLabelText("Create new note"));
-    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
-
+    await setupLocalIncomingRefOnMoney();
     await userEvent.click(
       screen.getByLabelText("toggle Little Relevant filter")
     );
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [C] Money / Bitcoin
-    `);
+    await selectIncomingRefRow();
 
     await userEvent.click(
-      await screen.findByLabelText(/accept Money \/ Bitcoin as little relevant/)
+      await screen.findByLabelText(
+        /accept Bitcoin ! <<< Crypto as little relevant/
+      )
     );
 
     await expectTree(`
-Crypto
+Money
   Bitcoin
-    Details
-    [R] Money / Bitcoin
+    [R] Crypto <<< >>> ! Bitcoin
     `);
 
     await userEvent.click(
@@ -232,9 +278,8 @@ Crypto
     );
 
     await expectTree(`
-Crypto
+Money
   Bitcoin
-    Details
     `);
 
     await userEvent.click(
@@ -242,50 +287,39 @@ Crypto
     );
 
     await expectTree(`
-Crypto
+Money
   Bitcoin
-    Details
-    [R] Money / Bitcoin
+    [R] Crypto <<< >>> ! Bitcoin
     `);
   });
 
   test("declining incoming ref hides it, not relevant filter shows it struck through", async () => {
     const [alice] = setup([ALICE]);
-    renderTree(alice);
+    renderApp(alice());
 
-    await type("Money{Enter}{Tab}Bitcoin{Escape}");
-    await userEvent.click(await screen.findByLabelText("Create new note"));
-    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+    await setupLocalIncomingRefOnMoney();
+    await selectIncomingRefRow();
 
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [C] Money / Bitcoin
-    `);
-
-    fireEvent.click(screen.getByLabelText(/decline Money \/ Bitcoin/));
+    fireEvent.click(screen.getByLabelText(/decline Bitcoin ! <<< Crypto/));
 
     await expectTree(`
-Crypto
+Money
   Bitcoin
-    Details
     `);
 
     await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
 
     await expectTree(`
-Crypto
+Money
   Bitcoin
-    Details
-    [R] Money / Bitcoin
+    [R] Bitcoin ! <<< Crypto
     `);
 
     const referenceRow = screen.getByText(
       (content, element) =>
         // eslint-disable-next-line testing-library/no-node-access
         element?.closest('[data-testid="reference-row"]') !== null &&
-        content.includes("Money")
+        content.includes("Crypto")
     );
     // eslint-disable-next-line testing-library/no-node-access
     const styledSpan = referenceRow.closest(
@@ -296,101 +330,52 @@ Crypto
     await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
 
     await expectTree(`
+Money
+  Bitcoin
+    `);
+  });
+
+  test("incoming ref with confirms argument shows indicator, filter toggle preserves it", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await setupLocalOutgoingRefOnCrypto("confirms");
+
+    await expectTree(`
 Crypto
   Bitcoin
+    [R] Money / + Bitcoin
+    Details
+    `);
+
+    await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    Details
+    `);
+
+    await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
+
+    await expectTree(`
+Crypto
+  Bitcoin
+    [R] Money / + Bitcoin
     Details
     `);
   });
 
-  test("accepting incoming ref with confirms argument shows indicator, filter toggle preserves it", async () => {
+  test("incoming ref with contra argument shows indicator, filter toggle preserves it", async () => {
     const [alice] = setup([ALICE]);
-    renderTree(alice);
+    renderApp(alice());
 
-    await type("Money{Enter}{Tab}Bitcoin{Escape}");
-
-    await userEvent.click(
-      screen.getByLabelText("Evidence for Bitcoin: No evidence type")
-    );
-
-    await userEvent.click(await screen.findByLabelText("Create new note"));
-    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+    await setupLocalOutgoingRefOnCrypto("contra");
 
     await expectTree(`
 Crypto
   Bitcoin
-    Details
-    [C] Money / + Bitcoin
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText(/accept Money \/ \+ Bitcoin as relevant/)
-    );
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [R] Money / + Bitcoin
-    `);
-
-    await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    `);
-
-    await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [R] Money / + Bitcoin
-    `);
-  });
-
-  test("accepting occurrence with contra argument shows indicator, filter toggle preserves it", async () => {
-    const [alice] = setup([ALICE]);
-    renderTree(alice);
-
-    await type("Money{Enter}{Tab}Bitcoin{Escape}");
-
-    const evidenceBtn = screen.getByLabelText(
-      "Evidence for Bitcoin: No evidence type"
-    );
-    await userEvent.click(evidenceBtn);
-    await userEvent.click(
-      screen.getByLabelText("Evidence for Bitcoin: Confirms")
-    );
-
-    await userEvent.click(await screen.findByLabelText("Create new note"));
-    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [C] Money / - Bitcoin
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText(/accept Money \/ - Bitcoin as relevant/)
-    );
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
     [R] Money / - Bitcoin
-    `);
-
-    await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
-
-    await expectTree(`
-Crypto
-  Bitcoin
     Details
     `);
 
@@ -400,43 +385,51 @@ Crypto
 Crypto
   Bitcoin
     Details
+    `);
+
+    await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
+
+    await expectTree(`
+Crypto
+  Bitcoin
     [R] Money / - Bitcoin
+    Details
     `);
   });
 
   test("accepting incoming ref from other user as relevant makes it bidirectional", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
 
-    renderTree(bob);
-    await type("Money{Enter}{Tab}Bitcoin{Escape}");
+    renderApp(alice());
+    await type("Money{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+    cleanup();
+
+    await follow(bob, alice().user.publicKey);
+    renderApp(bob());
+    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Money");
+    await createAcceptedItemLevelRefOnCurrentPane("!");
     cleanup();
 
     await follow(alice, bob().user.publicKey);
-    renderTree(alice);
-    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [OC] Money / Bitcoin
-    `);
-
+    renderApp(alice());
+    await selectIncomingRefRow();
     await userEvent.click(
-      await screen.findByLabelText(/accept Money \/ Bitcoin as relevant/)
+      await screen.findByLabelText(/accept Bitcoin ! <<< Crypto as relevant/)
     );
 
     await expectTree(`
-Crypto
+Money
   Bitcoin
     Details
-    [OR] Money / Bitcoin
+    [OR] Crypto <<< >>> ! Bitcoin
     `);
 
     await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
 
     await expectTree(`
-Crypto
+Money
   Bitcoin
     Details
     `);
@@ -444,45 +437,49 @@ Crypto
     await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
 
     await expectTree(`
-Crypto
+Money
   Bitcoin
     Details
-    [OR] Money / Bitcoin
+    [OR] Crypto <<< >>> ! Bitcoin
     `);
   });
 
   test("accepting incoming ref suppresses duplicates from other users with same context", async () => {
     const [alice, bob, carol] = setup([ALICE, BOB, CAROL]);
 
-    renderTree(bob);
-    await type("Money{Enter}{Tab}Bitcoin{Escape}");
+    renderApp(alice());
+    await type("Money{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
     cleanup();
 
-    renderTree(carol);
-    await type("Money{Enter}{Tab}Bitcoin{Escape}");
+    await follow(bob, alice().user.publicKey);
+    renderApp(bob());
+    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Money");
+    await createAcceptedItemLevelRefOnCurrentPane("!");
+    cleanup();
+
+    await follow(carol, alice().user.publicKey);
+    renderApp(carol());
+    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Stuff{Escape}");
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Money");
+    await createAcceptedItemLevelRefOnCurrentPane("!");
     cleanup();
 
     await follow(alice, bob().user.publicKey);
     await follow(alice, carol().user.publicKey);
-    renderTree(alice);
-    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [OC] Money / Bitcoin
-    `);
-
+    renderApp(alice());
+    await selectIncomingRefRow();
     await userEvent.click(
-      await screen.findByLabelText(/accept Money \/ Bitcoin as relevant/)
+      await screen.findByLabelText(/accept Bitcoin ! <<< Crypto as relevant/)
     );
 
     await expectTree(`
-Crypto
+Money
   Bitcoin
     Details
-    [OR] Money / Bitcoin
+    [OR] Crypto <<< >>> ! Bitcoin
     `);
   });
 
@@ -998,239 +995,5 @@ My Notes
     `);
 
     expect(screen.getByText("BobFolder").textContent).toBe("BobFolder");
-  });
-});
-
-describe("Occurrence relevance", () => {
-  test("accepting occurrence as relevant, filter toggle preserves it", async () => {
-    const [alice, bob] = setup([ALICE, BOB]);
-
-    renderTree(bob);
-    await type("Bitcoin{Enter}{Tab}Price History{Escape}");
-    cleanup();
-
-    await follow(alice, bob().user.publicKey);
-    renderTree(alice);
-    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [OC] Bitcoin
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText(/accept Bitcoin as relevant/)
-    );
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [OR] Bitcoin
-    `);
-
-    await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    `);
-
-    await userEvent.click(screen.getByLabelText("toggle Relevant filter"));
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [OR] Bitcoin
-    `);
-  });
-
-  test("accepting occurrence as maybe relevant, filter toggle preserves it", async () => {
-    const [alice, bob] = setup([ALICE, BOB]);
-
-    renderTree(bob);
-    await type("Bitcoin{Enter}{Tab}Price History{Escape}");
-    cleanup();
-
-    await follow(alice, bob().user.publicKey);
-    renderTree(alice);
-    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [OC] Bitcoin
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText(/accept Bitcoin as maybe relevant/)
-    );
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [OR] Bitcoin
-    `);
-
-    await userEvent.click(
-      screen.getByLabelText("toggle Maybe Relevant filter")
-    );
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    `);
-
-    await userEvent.click(
-      screen.getByLabelText("toggle Maybe Relevant filter")
-    );
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [OR] Bitcoin
-    `);
-  });
-
-  test("accepting occurrence as little relevant, filter toggle preserves it", async () => {
-    const [alice, bob] = setup([ALICE, BOB]);
-
-    renderTree(bob);
-    await type("Bitcoin{Enter}{Tab}Price History{Escape}");
-    cleanup();
-
-    await follow(alice, bob().user.publicKey);
-    renderTree(alice);
-    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
-
-    await userEvent.click(
-      screen.getByLabelText("toggle Little Relevant filter")
-    );
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [OC] Bitcoin
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText(/accept Bitcoin as little relevant/)
-    );
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [OR] Bitcoin
-    `);
-
-    await userEvent.click(
-      screen.getByLabelText("toggle Little Relevant filter")
-    );
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    `);
-
-    await userEvent.click(
-      screen.getByLabelText("toggle Little Relevant filter")
-    );
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [OR] Bitcoin
-    `);
-  });
-
-  test("declining occurrence hides it, not relevant filter shows it struck through", async () => {
-    const [alice, bob] = setup([ALICE, BOB]);
-
-    renderTree(bob);
-    await type("Bitcoin{Enter}{Tab}Price History{Escape}");
-    cleanup();
-
-    await follow(alice, bob().user.publicKey);
-    renderTree(alice);
-    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [OC] Bitcoin
-    `);
-
-    fireEvent.click(screen.getByLabelText(/decline Bitcoin/));
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    `);
-
-    await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [OR] Bitcoin
-    `);
-
-    await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    `);
-  });
-
-  test("accepting occurrence suppresses duplicates from other users", async () => {
-    const [alice, bob, carol] = setup([ALICE, BOB, CAROL]);
-
-    renderTree(bob);
-    await type("Bitcoin{Enter}{Tab}Price History{Escape}");
-    cleanup();
-
-    renderTree(carol);
-    await type("Bitcoin{Enter}{Tab}Mining{Escape}");
-    cleanup();
-
-    await follow(alice, bob().user.publicKey);
-    await follow(alice, carol().user.publicKey);
-    renderTree(alice);
-    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [OC] Bitcoin
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText(/accept Bitcoin as relevant/)
-    );
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Details
-    [OR] Bitcoin
-    `);
   });
 });

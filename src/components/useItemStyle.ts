@@ -38,11 +38,7 @@ function getArgumentTextStyle(argument: Argument | undefined): CSSProperties {
 }
 
 function isReferenceVirtualType(virtualType: VirtualType | undefined): boolean {
-  return (
-    virtualType === "incoming" ||
-    virtualType === "occurrence" ||
-    virtualType === "version"
-  );
+  return virtualType === "incoming" || virtualType === "version";
 }
 
 export function useItemStyle(): ItemStyle {

@@ -6,6 +6,7 @@ import {
   BOB,
   expectTree,
   follow,
+  renderApp,
   renderTree,
   setup,
   type,
@@ -42,28 +43,32 @@ function areAllAncestorsExpanded(
   });
 }
 
-test("Node referenced from different roots shows incoming refs", async () => {
+test("search shows matches from different roots", async () => {
   const [alice] = setup([ALICE]);
-  renderTree(alice);
+  renderApp(alice());
 
   await type("Crypto{Enter}{Tab}Bitcoin{Escape}");
   await userEvent.click(await screen.findByLabelText("Create new note"));
   await type("P2P{Enter}{Tab}Bitcoin{Escape}");
-  await userEvent.click(await screen.findByLabelText("Create new note"));
-  await type("Money{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
+
+  await userEvent.click(
+    await screen.findByLabelText("Search to change pane 0 content")
+  );
+  await userEvent.type(
+    await screen.findByLabelText("search input"),
+    "Bitcoin{Enter}"
+  );
 
   await expectTree(`
-Money
-  Bitcoin
-    Details
-    [C] Crypto / Bitcoin
-    [C] P2P / Bitcoin
+Search: Bitcoin
+  [R] P2P / Bitcoin
+  [R] Crypto / Bitcoin
   `);
 });
 
-test("Multiple incoming refs each show correct source path", async () => {
+test("search shows each matching context path", async () => {
   const [alice] = setup([ALICE]);
-  renderTree(alice);
+  renderApp(alice());
 
   await type(
     "Notes{Enter}{Tab}Level1{Enter}{Tab}Level2{Enter}{Tab}Target{Escape}"
@@ -73,16 +78,22 @@ test("Multiple incoming refs each show correct source path", async () => {
     "Work{Enter}{Tab}Projects{Enter}{Tab}Target{Enter}{Tab}Child{Escape}"
   );
 
+  await userEvent.click(
+    await screen.findByLabelText("Search to change pane 0 content")
+  );
+  await userEvent.type(
+    await screen.findByLabelText("search input"),
+    "Target{Enter}"
+  );
+
   await expectTree(`
-Work
-  Projects
-    Target
-      Child
-      [C] Notes / Level1 / Level2 / Target
+Search: Target
+  [R] Work / Projects / Target
+  [R] Notes / Level1 / Level2 / Target
   `);
 });
 
-test("Other user's incoming ref shows other-user indicator", async () => {
+test("other user's search result shows other-user indicator", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
   await follow(alice, bob().user.publicKey);
 
@@ -90,14 +101,18 @@ test("Other user's incoming ref shows other-user indicator", async () => {
   await type("Bob Root{Enter}{Tab}Shared{Escape}");
   cleanup();
 
-  renderTree(alice);
-  await type("Alice Root{Enter}{Tab}Shared{Enter}{Tab}Detail{Escape}");
+  renderApp(alice());
+  await userEvent.click(
+    await screen.findByLabelText("Search to change pane 0 content")
+  );
+  await userEvent.type(
+    await screen.findByLabelText("search input"),
+    "Shared{Enter}"
+  );
 
   await expectTree(`
-Alice Root
-  Shared
-    Detail
-    [OC] Bob Root / Shared
+Search: Shared
+  [OR] Bob Root / Shared
   `);
 });
 

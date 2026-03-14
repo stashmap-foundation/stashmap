@@ -576,7 +576,6 @@ export function itemPassesFilters(
     | "suggestions"
     | "versions"
     | "incoming"
-    | "occurrence"
     | "contains"
   )[]
 ): boolean {

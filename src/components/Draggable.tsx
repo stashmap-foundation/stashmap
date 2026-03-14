@@ -286,10 +286,7 @@ export function ListItem({
   const [itemID] = useCurrentRowID();
   const virtualType = useCurrentEdge()?.virtualType;
   const isSuggestion = virtualType === "suggestion";
-  const isCopyDrag =
-    virtualType === "incoming" ||
-    virtualType === "occurrence" ||
-    virtualType === "version";
+  const isCopyDrag = virtualType === "incoming" || virtualType === "version";
   const isInSearchView = useIsInSearchView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const selected = useIsSelected();

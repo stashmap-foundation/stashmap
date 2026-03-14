@@ -68,23 +68,26 @@ test("open reference row in split pane uses reference path", async () => {
   await type(
     "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Escape}"
   );
-  await userEvent.click(await screen.findByLabelText("Create new note"));
-  await type("Countries in Europe{Enter}{Tab}Spain{Escape}");
 
-  await userEvent.click(await screen.findByLabelText("expand Spain"));
+  await userEvent.click(
+    await screen.findByLabelText("Search to change pane 0 content")
+  );
+  await userEvent.type(
+    await screen.findByLabelText("search input"),
+    "Spain{Enter}"
+  );
+
   await expectTree(`
-Countries in Europe
-  Spain
-    [C] My Notes / Holiday Destinations / Spain
+Search: Spain
+  [R] My Notes / Holiday Destinations / Spain
   `);
 
   const splitButtons = await screen.findAllByLabelText("open in split pane");
   await userEvent.click(splitButtons[splitButtons.length - 1]);
 
   await expectTree(`
-Countries in Europe
-  Spain
-    [C] My Notes / Holiday Destinations / Spain
+Search: Spain
+  [R] My Notes / Holiday Destinations / Spain
 Holiday Destinations
   Spain
   `);

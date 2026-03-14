@@ -1,36 +1,19 @@
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
   BOB,
   expectTree,
   follow,
+  getPane,
+  navigateToNodeViaSearch,
   renderApp,
   renderTree,
   setup,
   type,
 } from "../utils.test";
 
-describe("Incoming references and occurrences", () => {
-  test("Occurrence shows when same node is head of a root-level relation", async () => {
-    const [alice] = setup([ALICE]);
-    renderTree(alice);
-
-    await type("Barcelona{Enter}{Tab}Best Tapas{Escape}");
-    await userEvent.click(await screen.findByLabelText("Create new note"));
-    await type(
-      "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Sagrada Familia{Escape}"
-    );
-
-    await expectTree(`
-Notes
-  Cities
-    Barcelona
-      Sagrada Familia
-      [C] Barcelona
-    `);
-  });
-
+describe("References", () => {
   test("Occurrence does not show when duplicate node only exists elsewhere in the same tree", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
@@ -107,7 +90,7 @@ Notes
 
   test("Concrete reference paths never show Loading text", async () => {
     const [alice] = setup([ALICE]);
-    renderTree(alice);
+    renderApp(alice());
 
     await type(
       "Notes{Enter}Level1{Enter}{Tab}Level2{Enter}{Tab}Level3{Enter}{Tab}Target{Escape}"
@@ -115,11 +98,27 @@ Notes
     await userEvent.click(await screen.findByLabelText("Create new note"));
     await type("Other{Enter}{Tab}Target{Enter}{Tab}Child{Escape}");
 
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Notes");
+    await userEvent.click(getPane(1).getByLabelText("expand Level1"));
+    await userEvent.click(getPane(1).getByLabelText("expand Level2"));
+    await userEvent.click(getPane(1).getByLabelText("expand Level3"));
+
+    const source = getPane(1).getByRole("treeitem", { name: "Target" });
+    const target = getPane(0).getByRole("treeitem", { name: "Target" });
+
+    await userEvent.keyboard("{Alt>}");
+    fireEvent.dragStart(source);
+    fireEvent.dragOver(target, { altKey: true });
+    fireEvent.drop(target, { altKey: true });
+    await userEvent.keyboard("{/Alt}");
+    await userEvent.click(getPane(1).getByLabelText("Close pane"));
+
     await expectTree(`
 Other
   Target
+    [R] Notes / Level1 / Level2 / Level3 / Target
     Child
-    [C] Notes / Level1 / Level2 / Level3 / Target
     `);
 
     expect(screen.queryByText(/Loading/)).toBeNull();

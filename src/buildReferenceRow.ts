@@ -167,7 +167,6 @@ function effectiveIDs(
     | "suggestions"
     | "versions"
     | "incoming"
-    | "occurrence"
     | "contains"
   )[]
 ): List<string> {
@@ -191,7 +190,6 @@ export function computeRelationDiff(
     | "suggestions"
     | "versions"
     | "incoming"
-    | "occurrence"
     | "contains"
   )[]
 ): { addCount: number; removeCount: number } {
@@ -320,14 +318,13 @@ export function buildReferenceItem(
     return { ...outgoing, text: outgoing.targetLabel };
   }
 
-  if (virtualType === "incoming" || virtualType === "occurrence") {
+  if (virtualType === "incoming") {
     const outgoing = buildOutgoingReference(
       refId,
       data.knowledgeDBs,
       data.user.publicKey
     );
     if (!outgoing) return undefined;
-    const displayAs = virtualType as "incoming" | "occurrence";
     const crefItem =
       virtualType === "incoming"
         ? findIncomingCrefItem(ref, data, viewPath, stack)
@@ -335,7 +332,7 @@ export function buildReferenceItem(
     const incomingRelevance = crefItem?.relevance ?? ref.sourceItem?.relevance;
     const incomingArgument = crefItem?.argument ?? ref.sourceItem?.argument;
     const text = referenceToText({
-      displayAs,
+      displayAs: "incoming",
       contextLabels: outgoing.contextLabels,
       targetLabel: outgoing.targetLabel,
       incomingRelevance,
@@ -344,7 +341,7 @@ export function buildReferenceItem(
     return {
       ...outgoing,
       text,
-      displayAs,
+      displayAs: "incoming",
       incomingRelevance,
       incomingArgument,
     };
@@ -407,17 +404,10 @@ export function buildReferenceItem(
   const hasActiveIncoming =
     !!incomingCref && incomingCref.relevance !== "not_relevant";
 
-  const isOccurrenceOrigin = false;
-  const resolveDisplayAs = ():
-    | "bidirectional"
-    | "incoming"
-    | "occurrence"
-    | undefined => {
-    if (hasActiveIncoming) return isNotRelevant ? "incoming" : "bidirectional";
-    if (isOccurrenceOrigin) return "occurrence";
-    return undefined;
-  };
-  const displayAs = resolveDisplayAs();
+  const displayAs = (() => {
+    if (!hasActiveIncoming) return undefined;
+    return isNotRelevant ? "incoming" : "bidirectional";
+  })();
 
   if (!displayAs) {
     const argument = argumentPrefix(
@@ -437,14 +427,8 @@ export function buildReferenceItem(
     };
   }
 
-  const incomingRel =
-    displayAs === "occurrence"
-      ? ref.sourceItem!.relevance
-      : incomingCref!.relevance;
-  const incomingArg =
-    displayAs === "occurrence"
-      ? ref.sourceItem!.argument
-      : incomingCref!.argument;
+  const incomingRel = incomingCref!.relevance;
+  const incomingArg = incomingCref!.argument;
   const text = referenceToText({
     displayAs,
     contextLabels: outgoing.contextLabels,

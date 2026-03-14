@@ -301,49 +301,6 @@ Target
   `);
 });
 
-test("Incoming reference updates when source is moved (deep cleanup)", async () => {
-  const [alice] = setup([ALICE]);
-  renderApp(alice());
-
-  await type(
-    "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Barcelona{Enter}{Tab}Sagrada Familia{Escape}"
-  );
-
-  await userEvent.click(screen.getByLabelText("Open new pane"));
-  await type("Cities in Spain{Enter}{Tab}Barcelona{Escape}");
-
-  await userEvent.click(await screen.findByLabelText("expand Barcelona"));
-
-  await expectTree(`
-My Notes
-  Holiday Destinations
-    Spain
-      Barcelona
-        Sagrada Familia
-        [C] Cities in Spain / Barcelona
-Cities in Spain
-  Barcelona
-    [C] My Notes / Holiday Destinations / Spain / Barcelona
-  `);
-
-  const spain = screen.getByRole("treeitem", { name: "Spain" });
-  const hdToggle = screen.getByLabelText("collapse Holiday Destinations");
-  fireEvent.dragStart(spain);
-  fireEvent.drop(hdToggle);
-
-  await expectTree(`
-My Notes
-  Holiday Destinations
-  Spain
-    Barcelona
-      Sagrada Familia
-      [C] Cities in Spain / Barcelona
-Cities in Spain
-  Barcelona
-    [C] My Notes / Spain / Barcelona
-  `);
-});
-
 test("Drag node onto expanded sibling's child moves it", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
@@ -370,6 +327,74 @@ Holiday Destinations
   Spain
     Barcelona
     Sevilla
+  `);
+});
+
+test("search result path updates when source is moved", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp(alice());
+
+  await type(
+    "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Barcelona{Enter}{Tab}Sagrada Familia{Escape}"
+  );
+
+  await userEvent.click(
+    await screen.findByLabelText("Search to change pane 0 content")
+  );
+  await userEvent.type(
+    await screen.findByLabelText("search input"),
+    "Barcelona{Enter}"
+  );
+
+  await expectTree(`
+Search: Barcelona
+  [R] My Notes / Holiday Destinations / Spain / Barcelona
+  `);
+
+  await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+  await userEvent.click(await screen.findByLabelText("Navigate to My Notes"));
+
+  const myNotesFullscreenButtons = screen.queryAllByLabelText(
+    "open My Notes in fullscreen"
+  );
+  if (myNotesFullscreenButtons.length > 0) {
+    await userEvent.click(
+      myNotesFullscreenButtons[myNotesFullscreenButtons.length - 1]
+    );
+  }
+
+  await expectTree(`
+My Notes
+  Holiday Destinations
+    Spain
+      Barcelona
+        Sagrada Familia
+  `);
+
+  const spain = screen.getByRole("treeitem", { name: "Spain" });
+  const hdToggle = screen.getByLabelText("collapse Holiday Destinations");
+  fireEvent.dragStart(spain);
+  fireEvent.drop(hdToggle);
+
+  await expectTree(`
+My Notes
+  Holiday Destinations
+  Spain
+    Barcelona
+      Sagrada Familia
+  `);
+
+  await userEvent.click(
+    await screen.findByLabelText("Search to change pane 0 content")
+  );
+  await userEvent.type(
+    await screen.findByLabelText("search input"),
+    "Barcelona{Enter}"
+  );
+
+  await expectTree(`
+Search: Barcelona
+  [R] My Notes / Spain / Barcelona
   `);
 });
 

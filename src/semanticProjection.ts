@@ -24,7 +24,6 @@ type FooterTypeFilters = (
   | "suggestions"
   | "versions"
   | "incoming"
-  | "occurrence"
   | "contains"
 )[];
 
@@ -330,88 +329,6 @@ export function deduplicateRefsByContext(
     .toList();
 }
 
-export function getOccurrencesForNode(
-  knowledgeDBs: KnowledgeDBs,
-  semanticIndex: SemanticIndex,
-  visibleAuthors: ImmutableSet<PublicKey>,
-  semanticID: ID,
-  currentRelationID: LongID | undefined,
-  effectiveAuthor: PublicKey,
-  currentContext: Context,
-  currentRoot?: ID,
-  currentItems?: List<GraphNode>,
-  incomingCrefIDs?: List<LongID>
-): List<LongID> {
-  const semanticKey = semanticID;
-  const contextRoot = currentContext.first();
-  const isInCurrentRootTree = (relation: GraphNode): boolean =>
-    !!currentRoot && relation.root === currentRoot;
-  const outgoingCrefIDs = currentItems
-    ? currentItems
-        .filter(isRefNode)
-        .map((item) => item.id)
-        .toList()
-    : List<ID>();
-  const covered = coveredContextKeys(
-    knowledgeDBs,
-    outgoingCrefIDs.concat(incomingCrefIDs || List<LongID>()),
-    effectiveAuthor
-  );
-  const sharesSemanticRoot = (ref: ReferencedByRef): boolean => {
-    const refRoot = ref.context.first();
-    if (!contextRoot || !refRoot) {
-      return false;
-    }
-    return refRoot === contextRoot;
-  };
-  const filtered = getSemanticCandidates(semanticIndex, semanticKey)
-    .filter((relation) => !isRefNode(relation))
-    .filter((relation) => visibleAuthors.has(relation.author))
-    .filter(
-      (relation) => !isInSystemRoot(knowledgeDBs, relation, LOG_ROOT_ROLE)
-    )
-    .filter((relation) => !isInCurrentRootTree(relation))
-    .filter((relation) => relation.id !== currentRelationID)
-    .map((relation) => ({
-      ref: {
-        relationID: relation.id,
-        context: getRelationContext(knowledgeDBs, relation),
-        updated: relation.updated,
-      },
-    }))
-    .filter(({ ref }) => !ref.context.some((id) => isSearchId(id as ID)))
-    .map(({ ref }) => ref)
-    .filter((ref) =>
-      ref.context.size === 0
-        ? currentContext.size > 0
-        : !contextRoot || !sharesSemanticRoot(ref)
-    )
-    .filter((ref) => !covered.has(getRefContextKey(knowledgeDBs, ref)));
-  const deduped = filtered
-    .groupBy((ref) => getRefContextKey(knowledgeDBs, ref))
-    .map(
-      (group) =>
-        group
-          .sortBy((ref) => {
-            const [author] = splitID(ref.relationID);
-            const isOther =
-              effectiveAuthor &&
-              author !== undefined &&
-              author !== effectiveAuthor
-                ? 1
-                : 0;
-            return [isOther, -ref.updated];
-          })
-          .first()!
-    )
-    .valueSeq()
-    .toList();
-  return deduped
-    .sortBy((ref) => getRefContextKey(knowledgeDBs, ref))
-    .map((ref) => ref.relationID)
-    .toList();
-}
-
 export function getIncomingCrefsForNode(
   knowledgeDBs: KnowledgeDBs,
   semanticIndex: SemanticIndex,
@@ -492,7 +409,6 @@ function getFooterItemFilters(
       t !== "suggestions" &&
       t !== "versions" &&
       t !== "incoming" &&
-      t !== "occurrence" &&
       t !== undefined
   );
 }

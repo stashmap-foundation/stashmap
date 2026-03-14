@@ -189,154 +189,6 @@ My Notes
     `);
   });
 
-  test("Tab indent cleans up old descendant nodes (no orphaned references)", async () => {
-    const [alice] = setup([ALICE]);
-    renderTree(alice);
-
-    await type(
-      "Notes{Enter}{Tab}Sibling{Enter}Cities{Enter}{Tab}Barcelona{Escape}"
-    );
-    await userEvent.click(await screen.findByLabelText("Create new note"));
-    await type("Travel{Enter}{Tab}Barcelona{Escape}");
-    await maybeExpand("expand Barcelona");
-
-    await expectTree(`
-Travel
-  Barcelona
-    [C] Notes / Cities / Barcelona
-    `);
-
-    cleanup();
-    renderApp(alice());
-
-    await expectTree(`
-Travel
-  Barcelona
-    [C] Notes / Cities / Barcelona
-    `);
-
-    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-    await userEvent.click(await screen.findByLabelText("expand Barcelona"));
-
-    await expectTree(`
-Travel
-  Barcelona
-    [C] Notes / Cities / Barcelona
-Travel
-  Barcelona
-    [C] Notes / Cities / Barcelona
-    `);
-
-    await navigateToNodeViaSearch(1, "Notes");
-    await userEvent.click(screen.getAllByLabelText("expand Cities")[0]);
-
-    await expectTree(`
-Travel
-  Barcelona
-    [C] Notes / Cities / Barcelona
-Notes
-  Sibling
-  Cities
-    Barcelona
-    `);
-
-    const citiesEditors = screen.getAllByLabelText("edit Cities");
-    await userEvent.click(citiesEditors[citiesEditors.length - 1]);
-    await userEvent.keyboard("{Home}{Tab}");
-
-    await expectTree(`
-Travel
-  Barcelona
-    [C] Notes / Sibling / Cities / Barcelona
-Notes
-  Sibling
-    Cities
-      Barcelona
-    `);
-
-    cleanup();
-    renderApp(alice());
-
-    await expectTree(`
-Travel
-  Barcelona
-    [C] Notes / Sibling / Cities / Barcelona
-Notes
-  Sibling
-    Cities
-      Barcelona
-    `);
-  });
-
-  test("Shift-Tab outdent cleans up old descendant nodes (no orphaned references)", async () => {
-    const [alice] = setup([ALICE]);
-    renderTree(alice);
-
-    await type(
-      "Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}{Tab}Barcelona{Escape}"
-    );
-    await userEvent.click(await screen.findByLabelText("Create new note"));
-    await type("Travel{Enter}{Tab}Barcelona{Escape}");
-    await maybeExpand("expand Barcelona");
-
-    await expectTree(`
-Travel
-  Barcelona
-    [C] Notes / Parent / Child / Barcelona
-    `);
-
-    cleanup();
-    renderApp(alice());
-
-    await expectTree(`
-Travel
-  Barcelona
-    [C] Notes / Parent / Child / Barcelona
-    `);
-
-    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
-    await navigateToNodeViaSearch(1, "Notes");
-    await userEvent.click(screen.getAllByLabelText("expand Parent")[0]);
-    await userEvent.click(screen.getAllByLabelText("expand Child")[0]);
-
-    await expectTree(`
-Travel
-  Barcelona
-    [C] Notes / Parent / Child / Barcelona
-Notes
-  Parent
-    Child
-      Barcelona
-    `);
-
-    const childEditor = screen.getAllByLabelText("edit Child")[0];
-    await userEvent.click(childEditor);
-    await userEvent.keyboard("{Home}{Shift>}{Tab}{/Shift}");
-
-    await expectTree(`
-Travel
-  Barcelona
-    [C] Notes / Child / Barcelona
-Notes
-  Parent
-  Child
-    Barcelona
-    `);
-
-    cleanup();
-    renderApp(alice());
-
-    await expectTree(`
-Travel
-  Barcelona
-    [C] Notes / Child / Barcelona
-Notes
-  Parent
-  Child
-    Barcelona
-    `);
-  });
-
   test("Tab indent preserves relation URL for deeply nested descendants", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
@@ -422,6 +274,111 @@ My Notes
     await expectTree(`
 Child
   GrandChild
+    `);
+  });
+
+  test("Tab indent cleans up old descendant search paths", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type(
+      "Notes{Enter}{Tab}Sibling{Enter}Cities{Enter}{Tab}Barcelona{Escape}"
+    );
+
+    await userEvent.click(
+      await screen.findByLabelText("Search to change pane 0 content")
+    );
+    await userEvent.type(
+      await screen.findByLabelText("search input"),
+      "Barcelona{Enter}"
+    );
+
+    await expectTree(`
+Search: Barcelona
+  [R] Notes / Cities / Barcelona
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await navigateToNodeViaSearch(0, "Notes");
+    await maybeExpand("expand Cities");
+
+    const citiesEditors = screen.getAllByLabelText("edit Cities");
+    await userEvent.click(citiesEditors[citiesEditors.length - 1]);
+    await userEvent.keyboard("{Home}{Tab}");
+
+    await expectTree(`
+Notes
+  Sibling
+    Cities
+      Barcelona
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText("Search to change pane 0 content")
+    );
+    await userEvent.type(
+      await screen.findByLabelText("search input"),
+      "Barcelona{Enter}"
+    );
+
+    await expectTree(`
+Search: Barcelona
+  [R] Notes / Sibling / Cities / Barcelona
+    `);
+  });
+
+  test("Shift-Tab outdent cleans up old descendant search paths", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type(
+      "Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}{Tab}Barcelona{Escape}"
+    );
+
+    await userEvent.click(
+      await screen.findByLabelText("Search to change pane 0 content")
+    );
+    await userEvent.type(
+      await screen.findByLabelText("search input"),
+      "Barcelona{Enter}"
+    );
+
+    await expectTree(`
+Search: Barcelona
+  [R] Notes / Parent / Child / Barcelona
+    `);
+
+    cleanup();
+    renderApp(alice());
+
+    await navigateToNodeViaSearch(0, "Notes");
+    await maybeExpand("expand Parent");
+    await maybeExpand("expand Child");
+
+    const childEditor = screen.getAllByLabelText("edit Child")[0];
+    await userEvent.click(childEditor);
+    await userEvent.keyboard("{Home}{Shift>}{Tab}{/Shift}");
+
+    await expectTree(`
+Notes
+  Parent
+  Child
+    Barcelona
+    `);
+
+    await userEvent.click(
+      await screen.findByLabelText("Search to change pane 0 content")
+    );
+    await userEvent.type(
+      await screen.findByLabelText("search input"),
+      "Barcelona{Enter}"
+    );
+
+    await expectTree(`
+Search: Barcelona
+  [R] Notes / Child / Barcelona
     `);
   });
 });

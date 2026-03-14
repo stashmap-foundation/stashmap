@@ -6,6 +6,7 @@ import {
   CAROL,
   expectTree,
   follow,
+  getPane,
   renderApp,
   renderTree,
   setup,
@@ -18,19 +19,39 @@ async function clickRow(name: string): Promise<void> {
   await userEvent.click(row);
 }
 
-async function setupItemLevelIncomingRef(): Promise<void> {
+async function createAcceptedItemLevelRefOnCurrentPane(
+  relevanceKey: "!" | "?" = "!"
+): Promise<void> {
+  const sourceBitcoin = getPane(1).getByRole("treeitem", { name: "Bitcoin" });
+  const targetBitcoin = getPane(0).getByRole("treeitem", { name: "Bitcoin" });
+
+  await userEvent.keyboard("{Alt>}");
+  fireEvent.dragStart(sourceBitcoin);
+  fireEvent.dragOver(targetBitcoin, { altKey: true });
+  fireEvent.drop(targetBitcoin, { altKey: true });
+  await userEvent.keyboard("{/Alt}");
+
+  await userEvent.click(await getPane(0).findByLabelText("Money / Bitcoin"));
+  await userEvent.keyboard(relevanceKey);
+}
+
+async function setupItemLevelIncomingRef(
+  relevanceKey: "!" | "?" = "!"
+): Promise<void> {
   await type("Money{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
   await userEvent.click(await screen.findByLabelText("Create new note"));
   await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Info{Escape}");
 
-  await clickRow("Money / Bitcoin");
-  await userEvent.keyboard("!");
+  await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+  await navigateToNodeViaSearch(1, "Money");
+  await createAcceptedItemLevelRefOnCurrentPane(relevanceKey);
+  await userEvent.click(getPane(1).getByLabelText("Close pane"));
 
   await expectTree(`
 Crypto
   Bitcoin
-    Info
     [R] Money / Bitcoin
+    Info
     `);
 
   await navigateToNodeViaSearch(0, "Money");
@@ -39,7 +60,7 @@ Crypto
 Money
   Bitcoin
     Details
-    [I] Bitcoin ! <<< Crypto
+    [I] Bitcoin ${relevanceKey} <<< Crypto
     `);
 }
 
@@ -47,15 +68,15 @@ async function setupTwoIncomingRefs(): Promise<void> {
   await type("Money{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
   await userEvent.click(await screen.findByLabelText("Create new note"));
   await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Info{Escape}");
-
-  await clickRow("Money / Bitcoin");
-  await userEvent.keyboard("!");
-
   await userEvent.click(await screen.findByLabelText("Create new note"));
   await type("Tech{Enter}{Tab}Bitcoin{Enter}{Tab}Stuff{Escape}");
-
-  await clickRow("Money / Bitcoin");
-  await userEvent.keyboard("!");
+  await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+  await navigateToNodeViaSearch(1, "Money");
+  await navigateToNodeViaSearch(0, "Crypto");
+  await createAcceptedItemLevelRefOnCurrentPane("!");
+  await navigateToNodeViaSearch(0, "Tech");
+  await createAcceptedItemLevelRefOnCurrentPane("!");
+  await userEvent.click(getPane(1).getByLabelText("Close pane"));
 
   await navigateToNodeViaSearch(0, "Money");
 
@@ -69,29 +90,18 @@ Money
 }
 
 describe("Incoming reference display", () => {
-  test("cref from another context shows as incoming ref on target", async () => {
+  test("item-level cref shows as outgoing ref on target and incoming ref on source", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
-    await type("Money{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
-    await userEvent.click(await screen.findByLabelText("Create new note"));
-    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Info{Escape}");
+    await setupItemLevelIncomingRef();
 
+    await navigateToNodeViaSearch(0, "Crypto");
     await expectTree(`
 Crypto
   Bitcoin
-    Info
-    [C] Money / Bitcoin
-    `);
-
-    await clickRow("Money / Bitcoin");
-    await userEvent.keyboard("!");
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Info
     [R] Money / Bitcoin
+    Info
     `);
 
     await navigateToNodeViaSearch(0, "Money");
@@ -118,21 +128,7 @@ Money
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
-    await type("Money{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
-    await userEvent.click(await screen.findByLabelText("Create new note"));
-    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Info{Escape}");
-
-    await clickRow("Money / Bitcoin");
-    await userEvent.keyboard("?");
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Info
-    [R] Money / Bitcoin
-    `);
-
-    await navigateToNodeViaSearch(0, "Money");
+    await setupItemLevelIncomingRef("?");
 
     await expectTree(`
 Money
@@ -680,54 +676,6 @@ Money
     [I] Bitcoin ! <<< Crypto
     `);
   });
-
-  test("toggle Occurrences filter off hides occurrences but NOT incoming refs", async () => {
-    const [alice] = setup([ALICE]);
-    renderApp(alice());
-
-    await type("Money{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
-    await userEvent.click(await screen.findByLabelText("Create new note"));
-    await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Info{Escape}");
-
-    await clickRow("Money / Bitcoin");
-    await userEvent.keyboard("!");
-
-    await userEvent.click(await screen.findByLabelText("Create new note"));
-    await type("Tech{Enter}{Tab}Bitcoin{Enter}{Tab}Stuff{Escape}");
-
-    await navigateToNodeViaSearch(0, "Money");
-
-    await expectTree(`
-Money
-  Bitcoin
-    Details
-    [I] Bitcoin ! <<< Crypto
-    [C] Tech / Bitcoin
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText("toggle Occurrences filter")
-    );
-
-    await expectTree(`
-Money
-  Bitcoin
-    Details
-    [I] Bitcoin ! <<< Crypto
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText("toggle Occurrences filter")
-    );
-
-    await expectTree(`
-Money
-  Bitcoin
-    Details
-    [I] Bitcoin ! <<< Crypto
-    [C] Tech / Bitcoin
-    `);
-  });
 });
 
 describe("Drag and drop incoming refs", () => {
@@ -967,8 +915,8 @@ Money
     await expectTree(`
 Crypto
   Bitcoin
-    Info
     [R] Money <<< >>> ! Bitcoin
+    Info
     `);
 
     await clickRow("Money <<< >>> ! Bitcoin");
@@ -1022,8 +970,8 @@ Money
     await expectTree(`
 Crypto
   Bitcoin
-    Info
     [R] Money <<< >>> ! Bitcoin
+    Info
     `);
 
     cleanup();
@@ -1043,8 +991,8 @@ Money
     await expectTree(`
 Crypto
   Bitcoin
-    Info
     [R] Money <<< >>> ! Bitcoin
+    Info
     `);
   });
 });
@@ -1053,31 +1001,16 @@ describe("Multi-user incoming refs", () => {
   test("incoming ref from other user shows [OI] prefix", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
 
-    renderTree(alice);
+    renderApp(alice());
     await type("Money{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
     cleanup();
 
     await follow(bob, alice().user.publicKey);
-    renderTree(bob);
+    renderApp(bob());
     await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Info{Escape}");
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Info
-    [OC] Money / Bitcoin
-    `);
-
-    const row = await screen.findByLabelText("Money / Bitcoin");
-    await userEvent.click(row);
-    await userEvent.keyboard("!");
-
-    await expectTree(`
-Crypto
-  Bitcoin
-    Info
-    [OR] Money / Bitcoin
-    `);
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Money");
+    await createAcceptedItemLevelRefOnCurrentPane("!");
 
     cleanup();
 
@@ -1105,17 +1038,16 @@ Money
   test("accepting [OI] incoming ref creates bidirectional", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
 
-    renderTree(alice);
+    renderApp(alice());
     await type("Money{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
     cleanup();
 
     await follow(bob, alice().user.publicKey);
-    renderTree(bob);
+    renderApp(bob());
     await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Info{Escape}");
-
-    const row = await screen.findByLabelText("Money / Bitcoin");
-    await userEvent.click(row);
-    await userEvent.keyboard("!");
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Money");
+    await createAcceptedItemLevelRefOnCurrentPane("!");
     cleanup();
 
     await follow(alice, bob().user.publicKey);
@@ -1153,17 +1085,16 @@ Money
   test("declining [OI] incoming ref hides it", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
 
-    renderTree(alice);
+    renderApp(alice());
     await type("Money{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
     cleanup();
 
     await follow(bob, alice().user.publicKey);
-    renderTree(bob);
+    renderApp(bob());
     await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Info{Escape}");
-
-    const row = await screen.findByLabelText("Money / Bitcoin");
-    await userEvent.click(row);
-    await userEvent.keyboard("!");
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Money");
+    await createAcceptedItemLevelRefOnCurrentPane("!");
     cleanup();
 
     await follow(alice, bob().user.publicKey);
@@ -1204,26 +1135,24 @@ Money
   test("dedup: Bob + Carol both have crefs to Alice, only one incoming shows", async () => {
     const [alice, bob, carol] = setup([ALICE, BOB, CAROL]);
 
-    renderTree(alice);
+    renderApp(alice());
     await type("Money{Enter}{Tab}Bitcoin{Enter}{Tab}Details{Escape}");
     cleanup();
 
     await follow(bob, alice().user.publicKey);
-    renderTree(bob);
+    renderApp(bob());
     await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Info{Escape}");
-
-    const bobRow = await screen.findByLabelText("Money / Bitcoin");
-    await userEvent.click(bobRow);
-    await userEvent.keyboard("!");
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Money");
+    await createAcceptedItemLevelRefOnCurrentPane("!");
     cleanup();
 
     await follow(carol, alice().user.publicKey);
-    renderTree(carol);
+    renderApp(carol());
     await type("Crypto{Enter}{Tab}Bitcoin{Enter}{Tab}Stuff{Escape}");
-
-    const carolRow = await screen.findByLabelText("Money / Bitcoin");
-    await userEvent.click(carolRow);
-    await userEvent.keyboard("!");
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Money");
+    await createAcceptedItemLevelRefOnCurrentPane("!");
     cleanup();
 
     await follow(alice, bob().user.publicKey);
@@ -1270,8 +1199,8 @@ Money
     await expectTree(`
 Crypto
   Bitcoin
-    Info
     [R] Money <<< >>> ! Bitcoin
+    Info
     `);
 
     await userEvent.click(await screen.findByLabelText("edit Crypto"));
@@ -1352,8 +1281,8 @@ Money
     await expectTree(`
 Crypto
   Bitcoin
-    Info
     [R] Money <<< >>> ! Bitcoin
+    Info
     `);
 
     await userEvent.click(await screen.findByLabelText("edit Crypto"));

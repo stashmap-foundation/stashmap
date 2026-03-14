@@ -8,7 +8,7 @@ type ReferencePart =
   | { type: "indicator"; relevance: Relevance; argument?: Argument };
 
 type ReferenceDisplayConfig = {
-  displayAs?: "bidirectional" | "incoming" | "occurrence";
+  displayAs?: "bidirectional" | "incoming";
   contextLabels: string[];
   targetLabel: string;
   incomingRelevance?: Relevance;
@@ -91,17 +91,6 @@ function buildReferenceParts(
             { type: "text" as const, value: reversedContext },
           ]
         : []),
-    ];
-  }
-
-  if (displayAs === "occurrence") {
-    const separator: ReferencePart = { type: "text", value: "/" };
-    return [
-      ...(contextPath
-        ? [{ type: "text" as const, value: contextPath }, separator]
-        : []),
-      ...indicator,
-      target,
     ];
   }
 

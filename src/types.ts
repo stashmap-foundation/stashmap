@@ -144,7 +144,6 @@ declare global {
       | "suggestions"
       | "versions"
       | "incoming"
-      | "occurrence"
       | "contains"
     )[];
     scrollToId?: string;
@@ -192,7 +191,6 @@ declare global {
       | "suggestions"
       | "versions"
       | "incoming"
-      | "occurrence"
       | "contains"
     >;
   };
@@ -214,12 +212,7 @@ declare global {
   type Argument = "confirms" | "contra" | undefined;
 
   // Each item in a relation has relevance and optional argument
-  type VirtualType =
-    | "suggestion"
-    | "search"
-    | "incoming"
-    | "occurrence"
-    | "version";
+  type VirtualType = "suggestion" | "search" | "incoming" | "version";
 
   type VersionMeta = {
     updated: number;
@@ -270,7 +263,7 @@ declare global {
     author: PublicKey;
     incomingRelevance?: Relevance;
     incomingArgument?: Argument;
-    displayAs?: "bidirectional" | "incoming" | "occurrence";
+    displayAs?: "bidirectional" | "incoming";
     versionMeta?: VersionMeta;
     deleted?: boolean;
   };

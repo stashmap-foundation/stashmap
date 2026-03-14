@@ -1,7 +1,7 @@
 import { List } from "immutable";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { ALICE, expectTree, renderTree, setup, type } from "../utils.test";
-import { updateItemArgument } from "../connections";
+import { updateRelationItemMetadata } from "../relationItemMetadata";
 
 function makeItem(
   id: ID,
@@ -11,7 +11,7 @@ function makeItem(
   argument?: Argument
 ): GraphNode {
   return {
-    children: List<GraphNode>(),
+    children: List<ID>(),
     id,
     text: "",
     updated: Date.now(),
@@ -155,84 +155,41 @@ Money
   });
 });
 
-// Tests for updateItemArgument function
-describe("updateItemArgument", () => {
+describe("updateRelationItemMetadata", () => {
   test("updates argument on existing item", () => {
-    const nodes: GraphNode = {
-      children: List([
-        makeItem(
-          "node1" as ID,
-          "author" as PublicKey,
-          "rel1" as LongID,
-          undefined
-        ),
-        makeItem(
-          "node2" as ID,
-          "author" as PublicKey,
-          "rel1" as LongID,
-          undefined
-        ),
-      ]),
-      id: "rel1" as LongID,
-      text: "head",
-      parent: undefined,
-      updated: Date.now(),
-      author: "author" as PublicKey,
-      root: "rel1" as ID,
-      relevance: undefined,
-    };
+    const item = makeItem(
+      "node1" as ID,
+      "author" as PublicKey,
+      "rel1" as LongID,
+      undefined
+    );
 
-    const updated = updateItemArgument(nodes, 0, "confirms");
-    const { children } = updated;
-    expect(children.get(0)?.argument).toBe("confirms");
-    expect(children.get(1)?.argument).toBeUndefined();
+    const updated = updateRelationItemMetadata(item, { argument: "confirms" });
+    expect(updated.argument).toBe("confirms");
   });
 
   test("can set argument to undefined", () => {
-    const nodes: GraphNode = {
-      children: List([
-        makeItem(
-          "node1" as ID,
-          "author" as PublicKey,
-          "rel1" as LongID,
-          undefined,
-          "confirms"
-        ),
-      ]),
-      id: "rel1" as LongID,
-      text: "head",
-      parent: undefined,
-      updated: Date.now(),
-      author: "author" as PublicKey,
-      root: "rel1" as ID,
-      relevance: undefined,
-    };
+    const item = makeItem(
+      "node1" as ID,
+      "author" as PublicKey,
+      "rel1" as LongID,
+      undefined,
+      "confirms"
+    );
 
-    const updated = updateItemArgument(nodes, 0, undefined);
-    const { children } = updated;
-    expect(children.get(0)?.argument).toBeUndefined();
+    const updated = updateRelationItemMetadata(item, { argument: undefined });
+    expect(updated.argument).toBeUndefined();
   });
 
-  test("returns unchanged nodes for invalid index", () => {
-    const nodes: GraphNode = {
-      children: List([
-        makeItem(
-          "node1" as ID,
-          "author" as PublicKey,
-          "rel1" as LongID,
-          undefined
-        ),
-      ]),
-      id: "rel1" as LongID,
-      text: "head",
-      parent: undefined,
-      updated: Date.now(),
-      author: "author" as PublicKey,
-      root: "rel1" as ID,
-      relevance: undefined,
-    };
+  test("returns unchanged node when metadata is empty", () => {
+    const item = makeItem(
+      "node1" as ID,
+      "author" as PublicKey,
+      "rel1" as LongID,
+      undefined
+    );
 
-    const updated = updateItemArgument(nodes, 5, "confirms");
-    expect(updated).toBe(nodes);
+    const updated = updateRelationItemMetadata(item, {});
+    expect(updated).toEqual(item);
   });
 });

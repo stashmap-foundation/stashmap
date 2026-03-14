@@ -4,6 +4,7 @@ import { Map } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
 import {
   getConcreteRefTargetRelation,
+  getRelationChildNodes,
   getRefTargetID,
   getRelationsNoReferencedBy,
   joinID,
@@ -177,23 +178,46 @@ export function inspectChildren(
     author: parentRelation.author,
     text: parentRelation.text,
     skipped_document_count: graph.skippedDocuments.length,
-    children: parentRelation.children.toArray().map((item, index) => {
-      if (isRefNode(item)) {
-        const targetRelation = getConcreteRefTargetRelation(
+    children: getRelationChildNodes(graph.knowledgeDBs, parentRelation, viewer)
+      .toArray()
+      .map((item, index) => {
+        if (isRefNode(item)) {
+          const targetRelation = getConcreteRefTargetRelation(
+            graph.knowledgeDBs,
+            item.id,
+            viewer
+          );
+          const targetRelationId = getRefTargetID(item);
+          return {
+            index,
+            item_id: item.id,
+            kind: "cref" as const,
+            target_relation_id: targetRelation?.id || targetRelationId,
+            text:
+              item.linkText ||
+              (targetRelation ? targetRelation.text : "") ||
+              shortID(
+                (targetRelation?.id || targetRelationId || item.id) as ID
+              ),
+            relevance: (item.relevance || "contains") as
+              | "contains"
+              | Exclude<Relevance, undefined>,
+            argument: (item.argument || "none") as
+              | "none"
+              | Exclude<Argument, undefined>,
+          };
+        }
+        const childRelation = resolveRelation(
           graph.knowledgeDBs,
-          item.id,
+          item.id as LongID,
           viewer
         );
-        const targetRelationId = getRefTargetID(item);
         return {
           index,
           item_id: item.id,
-          kind: "cref" as const,
-          target_relation_id: targetRelation?.id || targetRelationId,
-          text:
-            item.linkText ||
-            (targetRelation ? targetRelation.text : "") ||
-            shortID((targetRelation?.id || targetRelationId || item.id) as ID),
+          kind: "relation" as const,
+          relation_id: childRelation.id,
+          text: childRelation.text,
           relevance: (item.relevance || "contains") as
             | "contains"
             | Exclude<Relevance, undefined>,
@@ -201,25 +225,6 @@ export function inspectChildren(
             | "none"
             | Exclude<Argument, undefined>,
         };
-      }
-      const childRelation = resolveRelation(
-        graph.knowledgeDBs,
-        item.id as LongID,
-        viewer
-      );
-      return {
-        index,
-        item_id: item.id,
-        kind: "relation" as const,
-        relation_id: childRelation.id,
-        text: childRelation.text,
-        relevance: (item.relevance || "contains") as
-          | "contains"
-          | Exclude<Relevance, undefined>,
-        argument: (item.argument || "none") as
-          | "none"
-          | Exclude<Argument, undefined>,
-      };
-    }),
+      }),
   };
 }

@@ -76,16 +76,25 @@ function getRelationItemIndex(
   relation: GraphNode,
   itemId: ID
 ): number | undefined {
-  const index = relation.children.findIndex((item) => item.id === itemId);
+  const index = relation.children.findIndex((childID) => childID === itemId);
   return index >= 0 ? index : undefined;
 }
 
 function requireRelationItem(
+  plan: GraphPlan,
   relation: GraphNode,
   itemId: ID
 ): GraphNode | undefined {
   const index = getRelationItemIndex(relation, itemId);
-  return index === undefined ? undefined : relation.children.get(index);
+  const childID =
+    index === undefined ? undefined : relation.children.get(index);
+  return childID
+    ? getRelationsNoReferencedBy(
+        plan.knowledgeDBs,
+        childID,
+        plan.user.publicKey
+      )
+    : undefined;
 }
 
 export function requireRelationItemIndexById(
@@ -96,7 +105,7 @@ export function requireRelationItemIndexById(
   const relationIndex = requireWritableRelationById(
     plan,
     parentRelationId
-  ).children.findIndex((item) => item.id === itemId);
+  ).children.findIndex((childID) => childID === itemId);
   if (relationIndex < 0) {
     throw new Error(`Item not found: ${itemId}`);
   }
@@ -124,7 +133,7 @@ export function resolveInsertAtIndexById(
   const parentRelation = requireWritableRelationById(plan, parentRelationId);
   if (position.beforeItemId) {
     const index = parentRelation.children.findIndex(
-      (item) => item.id === position.beforeItemId
+      (childID) => childID === position.beforeItemId
     );
     if (index < 0) {
       throw new Error(`Sibling item not found: ${position.beforeItemId}`);
@@ -133,7 +142,7 @@ export function resolveInsertAtIndexById(
   }
   if (position.afterItemId) {
     const index = parentRelation.children.findIndex(
-      (item) => item.id === position.afterItemId
+      (childID) => childID === position.afterItemId
     );
     if (index < 0) {
       throw new Error(`Sibling item not found: ${position.afterItemId}`);
@@ -151,7 +160,7 @@ function insertRelationItem(
   const defaultIndex = relation.children.size;
   const updatedWithPush = {
     ...relation,
-    children: relation.children.push(item),
+    children: relation.children.push(item.id),
   };
   return insertAtIndex === undefined || insertAtIndex === defaultIndex
     ? updatedWithPush
@@ -191,10 +200,10 @@ export function planUpdateRelationItemMetadataById<T extends GraphPlan>(
   if (relationIndex === undefined) {
     return plan;
   }
-  return planUpsertRelations(
-    plan,
-    updateRelationItemMetadata(parentRelation, relationIndex, metadata)
-  );
+  const item = requireRelationItem(plan, parentRelation, itemId);
+  return item
+    ? planUpsertRelations(plan, updateRelationItemMetadata(item, metadata))
+    : plan;
 }
 
 export function planLinkRelationById<T extends GraphPlan>(
@@ -227,10 +236,14 @@ export function planLinkRelationById<T extends GraphPlan>(
     "",
     targetRelation.text
   );
-  const nextPlan = planUpsertRelations(
-    plan,
-    insertRelationItem(parentRelation, refNode, insertAtIndex)
-  );
+  const planWithRefNode = planUpsertRelations(plan, refNode);
+  const writableParent = getWritableRelation(planWithRefNode, parentRelationId);
+  const nextPlan = writableParent
+    ? planUpsertRelations(
+        planWithRefNode,
+        insertRelationItem(writableParent, refNode, insertAtIndex)
+      )
+    : planWithRefNode;
   return {
     plan: nextPlan,
     itemId: refNode.id,
@@ -294,7 +307,7 @@ export function planRemoveRelationItemById<T extends GraphPlan>(
   if (relationIndex === undefined) {
     return plan;
   }
-  const item = requireRelationItem(parentRelation, itemId);
+  const item = requireRelationItem(plan, parentRelation, itemId);
   const withoutItem = planUpsertRelations(
     plan,
     deleteRelations(parentRelation, Set([relationIndex]))
@@ -393,7 +406,7 @@ export function planMoveRelationItemById<T extends GraphPlan>(
     );
   }
 
-  const sourceItem = requireRelationItem(sourceParentRelation, itemId);
+  const sourceItem = requireRelationItem(plan, sourceParentRelation, itemId);
   if (!sourceItem) {
     return plan;
   }

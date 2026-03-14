@@ -239,7 +239,7 @@ declare global {
   type RootSystemRole = "log";
 
   type GraphNode = {
-    children: List<GraphNode>;
+    children: List<ID>;
     id: ID;
     text: string;
     parent?: LongID;

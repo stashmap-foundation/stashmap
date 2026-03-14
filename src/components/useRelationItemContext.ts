@@ -6,6 +6,7 @@ import {
   useCurrentRelation,
   useCurrentRowID,
   getRelationForView,
+  getCurrentEdgeForView,
   ViewPath,
 } from "../ViewContext";
 import { isEmptySemanticID } from "../connections";
@@ -64,11 +65,7 @@ export function useRelationItemContext(): RelationItemContext {
 
   // Get current item using context-aware lookup
   const currentItem =
-    isVisible && parentView
-      ? getRelationForView(data, parentView, stack)?.children.get(
-          relationIndex!
-        )
-      : undefined;
+    isVisible && parentView ? getCurrentEdgeForView(data, viewPath) : undefined;
 
   const updateMetadata = (metadata: RelationItemMetadata): void => {
     const editorText = editorTextContext?.text ?? "";

@@ -2,6 +2,7 @@ import { List } from "immutable";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { createPlan } from "../planner";
 import {
+  getRelationChildNodes,
   getRelationsNoReferencedBy,
   getRelationSemanticID,
 } from "../connections";
@@ -35,9 +36,14 @@ function flattenTexts(
   }, []);
 }
 
-function nodeChildren(node: GraphNode | undefined): List<GraphNode> {
-  // eslint-disable-next-line testing-library/no-node-access
-  return node?.children || List<GraphNode>();
+function nodeChildren(
+  knowledgeDBs: KnowledgeDBs,
+  node: GraphNode | undefined,
+  myself: PublicKey
+): List<GraphNode> {
+  return node
+    ? getRelationChildNodes(knowledgeDBs, node, myself)
+    : List<GraphNode>();
 }
 
 test("Single file with multiple top-level roots is wrapped by filename", () => {
@@ -134,9 +140,11 @@ test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
     topRelationIDs[0],
     plan.user.publicKey
   );
-  const childRelationID = nodeChildren(parentRelation).first()?.id as
-    | LongID
-    | undefined;
+  const childRelationID = nodeChildren(
+    plan.knowledgeDBs,
+    parentRelation,
+    plan.user.publicKey
+  ).first()?.id as LongID | undefined;
   const childRelation = childRelationID
     ? getRelationsNoReferencedBy(
         plan.knowledgeDBs,
@@ -144,9 +152,11 @@ test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
         plan.user.publicKey
       )
     : undefined;
-  const grandchildRelationID = nodeChildren(childRelation).first()?.id as
-    | LongID
-    | undefined;
+  const grandchildRelationID = nodeChildren(
+    plan.knowledgeDBs,
+    childRelation,
+    plan.user.publicKey
+  ).first()?.id as LongID | undefined;
   const grandchildRelation = grandchildRelationID
     ? getRelationsNoReferencedBy(
         plan.knowledgeDBs,
@@ -160,11 +170,15 @@ test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
   expect(grandchildRelation?.text).toBe("Grandchild");
 
   expect(parentID).toEqual(getRelationSemanticID(parentRelation!));
-  expect(nodeChildren(parentRelation).first()?.id).toEqual(childRelation?.id);
+  expect(
+    nodeChildren(plan.knowledgeDBs, parentRelation, plan.user.publicKey).first()
+      ?.id
+  ).toEqual(childRelation?.id);
   expect(childRelation?.text).toBe("Child");
-  expect(nodeChildren(childRelation).first()?.id).toEqual(
-    grandchildRelation?.id
-  );
+  expect(
+    nodeChildren(plan.knowledgeDBs, childRelation, plan.user.publicKey).first()
+      ?.id
+  ).toEqual(grandchildRelation?.id);
   expect(grandchildRelation?.text).toBe("Grandchild");
 });
 

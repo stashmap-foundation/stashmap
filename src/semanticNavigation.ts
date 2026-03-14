@@ -2,7 +2,7 @@
 import { newDB } from "./knowledge";
 import {
   getIndexedRelationsForKeys,
-  getRelationItemRelation,
+  getRelationChildNodes,
   getRelationSemanticID,
   getRelationsNoReferencedBy,
   shortID,
@@ -65,15 +65,13 @@ function getMatchingChildRelation(
   parentRelation: GraphNode,
   requestedSemanticID: ID
 ): GraphNode | undefined {
-  return parentRelation.children
-    .map((item) =>
-      getRelationItemRelation(knowledgeDBs, item, parentRelation.author)
-    )
-    .find(
-      (relation): relation is GraphNode =>
-        relation !== undefined &&
-        relationMatchesRequestedSemanticID(relation, requestedSemanticID)
-    );
+  return getRelationChildNodes(
+    knowledgeDBs,
+    parentRelation,
+    parentRelation.author
+  ).find((relation): relation is GraphNode =>
+    relationMatchesRequestedSemanticID(relation, requestedSemanticID)
+  );
 }
 
 function resolveRequestedStackFromRoot(

@@ -20,7 +20,7 @@ function makeItem(
   argument?: Argument
 ): GraphNode {
   return {
-    children: List<GraphNode>(),
+    children: List<ID>(),
     id,
     text: "",
     updated: Date.now(),

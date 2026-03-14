@@ -1,5 +1,5 @@
 import { Map as ImmutableMap } from "immutable";
-import { getRefTargetID, isRefNode } from "./connections";
+import { EMPTY_SEMANTIC_ID, getRefTargetID, isRefNode } from "./connections";
 
 export function createEmptySemanticIndex(): SemanticIndex {
   return {
@@ -71,11 +71,17 @@ function addRelationSemanticEntries(
 ): void {
   addToSetMap(semanticIndex.semantic, relation.text, relation.id);
 
-  relation.children.forEach((item) => {
-    if (item.relevance === "not_relevant") {
+  relation.children.forEach((childID) => {
+    if (childID === EMPTY_SEMANTIC_ID) {
       return;
     }
-    const targetRelationID = isRefNode(item) ? getRefTargetID(item) : undefined;
+    const childRelation = semanticIndex.relationByID.get(childID as LongID);
+    if (!childRelation || childRelation.relevance === "not_relevant") {
+      return;
+    }
+    const targetRelationID = isRefNode(childRelation)
+      ? getRefTargetID(childRelation)
+      : undefined;
     if (targetRelationID) {
       addToIncomingMap(
         semanticIndex.incomingCrefs,
@@ -92,11 +98,17 @@ function removeRelationSemanticEntries(
 ): void {
   removeFromSetMap(semanticIndex.semantic, relation.text, relation.id);
 
-  relation.children.forEach((item) => {
-    if (item.relevance === "not_relevant") {
+  relation.children.forEach((childID) => {
+    if (childID === EMPTY_SEMANTIC_ID) {
       return;
     }
-    const targetRelationID = isRefNode(item) ? getRefTargetID(item) : undefined;
+    const childRelation = semanticIndex.relationByID.get(childID as LongID);
+    if (!childRelation || childRelation.relevance === "not_relevant") {
+      return;
+    }
+    const targetRelationID = isRefNode(childRelation)
+      ? getRefTargetID(childRelation)
+      : undefined;
     if (targetRelationID) {
       removeFromIncomingMap(
         semanticIndex.incomingCrefs,

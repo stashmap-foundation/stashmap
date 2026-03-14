@@ -38,7 +38,7 @@ export function planUpdateExistingItemMetadata(
   metadata: RelationItemMetadata
 ): Plan {
   const nodes = getRelationForView(plan, parentViewPath, stack);
-  const itemId = nodes?.children.get(relationIndex)?.id;
+  const itemId = nodes?.children.get(relationIndex);
   return nodes && itemId
     ? planUpdateRelationItemMetadataById(plan, nodes.id, itemId, metadata)
     : plan;

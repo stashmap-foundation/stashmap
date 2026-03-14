@@ -3,8 +3,8 @@ import {
   ViewPath,
   VirtualItemsMap,
   addNodeToPathWithRelations,
+  getCurrentEdgeForView,
   getParentKey,
-  getParentRelation,
   getParentView,
   getPreviousSibling,
   getRelationForView,
@@ -29,14 +29,10 @@ export function getCurrentItem(
   viewPath: ViewPath,
   virtualItemsMap: VirtualItemsMap
 ): GraphNode | undefined {
-  const parentView = getParentView(viewPath);
-  if (!parentView) return undefined;
-  const nodes = getParentRelation(data, viewPath);
-  const relationIndex = getRelationIndex(data, viewPath);
-  if (!nodes || relationIndex === undefined) {
-    return virtualItemsMap.get(viewPathToString(viewPath));
-  }
-  return nodes.children.get(relationIndex);
+  return (
+    getCurrentEdgeForView(data, viewPath) ||
+    virtualItemsMap.get(viewPathToString(viewPath))
+  );
 }
 
 function planClearSelection(plan: Plan): Plan {

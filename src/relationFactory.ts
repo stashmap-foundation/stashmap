@@ -13,7 +13,7 @@ export function newRelations(
 ): GraphNode {
   const id = joinID(myself, v4());
   return {
-    children: List<GraphNode>(),
+    children: List<ID>(),
     id,
     text,
     parent,
@@ -37,7 +37,7 @@ export function newRefNode(
   linkText?: string
 ): GraphNode {
   return {
-    children: List<GraphNode>(),
+    children: List<ID>(),
     id: joinID(myself, v4()),
     text: text || "",
     parent,

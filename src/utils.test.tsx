@@ -976,7 +976,12 @@ export async function navigateToNodeViaSearch(
   const navigateButtons = paneScope.getAllByRole("link", {
     name: new RegExp(`Navigate to.*${nodeName}`, "i"),
   });
-  await userEvent.click(navigateButtons[0]);
+  const exactNavigateButton =
+    navigateButtons.find(
+      (button) =>
+        button.getAttribute("aria-label") === `Navigate to ${nodeName}`
+    ) || navigateButtons[0];
+  await userEvent.click(exactNavigateButton);
 
   // Navigation can finish before descendants are rendered; wait for the target
   // row/editor without relying on expand/collapse controls.

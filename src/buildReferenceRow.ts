@@ -1,6 +1,7 @@
 import { List } from "immutable";
 import {
   getConcreteRefTargetRelation,
+  getRelationChildNodes,
   getRelationsNoReferencedBy,
   getRefTargetID,
   isRefNode,
@@ -217,7 +218,7 @@ function effectiveIDs(
     | "contains"
   )[]
 ): List<string> {
-  return relation.children
+  return getRelationChildNodes(knowledgeDBs, relation, relation.author)
     .filter(
       (item) =>
         itemPassesFilters(item, activeFilters) &&
@@ -292,19 +293,21 @@ function computeVersionMeta(
 }
 
 function findCrefToNode(
-  children: List<GraphNode>,
+  children: List<ID>,
   targetRelation: GraphNode,
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey
 ): GraphNode | undefined {
-  return children.find((item) => {
-    if (!isRefNode(item)) return false;
-    const targetID = getRefTargetID(item);
-    const resolvedTarget = targetID
-      ? getRelationsNoReferencedBy(knowledgeDBs, targetID, myself)
-      : undefined;
-    return resolvedTarget?.id === targetRelation.id;
-  });
+  return children
+    .map((childID) => getRelationsNoReferencedBy(knowledgeDBs, childID, myself))
+    .find((item) => {
+      if (!isRefNode(item)) return false;
+      const targetID = getRefTargetID(item);
+      const resolvedTarget = targetID
+        ? getRelationsNoReferencedBy(knowledgeDBs, targetID, myself)
+        : undefined;
+      return resolvedTarget?.id === targetRelation.id;
+    });
 }
 
 function getReferenceSourceRelations(
@@ -358,9 +361,13 @@ export function buildReferenceItem(
     const parentRelation = parentPath
       ? getRelationForView(data, parentPath, stack)
       : undefined;
-    const parentItem = parentRelation?.children.find(
-      (item) => item.id === refId
-    );
+    const parentItem = parentRelation
+      ? getRelationsNoReferencedBy(
+          data.knowledgeDBs,
+          refId,
+          data.user.publicKey
+        )
+      : undefined;
     return buildDeletedReference(
       refId,
       data.user.publicKey,
@@ -448,10 +455,14 @@ export function buildReferenceItem(
   }
   if (!parentRelation) return outgoing;
 
-  const storedItem = parentRelation.children.find((item) => item.id === refId);
+  const storedItem = getRelationsNoReferencedBy(
+    data.knowledgeDBs,
+    refId,
+    data.user.publicKey
+  );
   const isNotRelevant = storedItem?.relevance === "not_relevant";
 
-  const findReverseCref = (children: List<GraphNode>): GraphNode | undefined =>
+  const findReverseCref = (children: List<ID>): GraphNode | undefined =>
     findCrefToNode(
       children,
       parentRelation,

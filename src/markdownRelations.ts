@@ -62,7 +62,7 @@ function materializeTreeNode(
     relationBaseWithFields.text as ID
   );
   const visibleChildren = treeNode.children.filter((child) => !child.hidden);
-  const [withVisible, childNodes] = visibleChildren.reduce(
+  const [withVisible, childIDs] = visibleChildren.reduce(
     ([accCtx, accChildren], childNode) => {
       if (childNode.linkHref) {
         const refNode = newRefNode(
@@ -75,10 +75,10 @@ function materializeTreeNode(
           childNode.text,
           childNode.text
         );
-        return [accCtx, [...accChildren, refNode]] as [
-          WalkContext,
-          GraphNode[]
-        ];
+        return [
+          walkUpsertRelation(accCtx, refNode),
+          [...accChildren, refNode.id],
+        ] as [WalkContext, ID[]];
       }
       const [afterChild, , materializedChild] = materializeTreeNode(
         accCtx,
@@ -94,15 +94,15 @@ function materializeTreeNode(
       };
       return [
         walkUpsertRelation(afterChild, childWithParentMetadata),
-        [...accChildren, childWithParentMetadata],
+        [...accChildren, childWithParentMetadata.id],
       ];
     },
-    [ctx, [] as GraphNode[]] as [WalkContext, GraphNode[]]
+    [ctx, [] as ID[]] as [WalkContext, ID[]]
   );
 
   const relation: GraphNode = {
     ...relationBaseWithFields,
-    children: List(childNodes),
+    children: List(childIDs),
     ...(treeNode.basedOn
       ? {
           basedOn: (treeNode.basedOn.includes("_")

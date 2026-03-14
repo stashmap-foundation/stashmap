@@ -13,6 +13,8 @@ import {
   viewPathToString,
 } from "./ViewContext";
 import {
+  EMPTY_SEMANTIC_ID,
+  getRelationChildNodes,
   isSearchId,
   getRelations,
   itemPassesFilters,
@@ -94,6 +96,9 @@ function getChildrenForRegularNode(
     ? getRelations(data.knowledgeDBs, parentItemID as ID, data.user.publicKey)
     : getRelationForView(data, parentPath, stack);
   const nodes = directRelations;
+  const childNodes = nodes
+    ? getRelationChildNodes(data.knowledgeDBs, nodes, data.user.publicKey)
+    : List<GraphNode>();
   const relationSemanticID = nodes
     ? getRelationSemanticID(nodes)
     : parentItemID;
@@ -104,10 +109,19 @@ function getChildrenForRegularNode(
 
   const relationPaths = nodes
     ? nodes.children
-        .map((item, i) => ({ item, index: i }))
-        .filter(
-          ({ item }) =>
-            options?.isMarkdownExport || itemPassesFilters(item, activeFilters)
+        .map((childID, index) => ({
+          childID,
+          item:
+            childID === EMPTY_SEMANTIC_ID
+              ? undefined
+              : getRelations(data.knowledgeDBs, childID, data.user.publicKey),
+          index,
+        }))
+        .filter(({ childID, item }) =>
+          options?.isMarkdownExport
+            ? !!item
+            : childID === EMPTY_SEMANTIC_ID ||
+              (!!item && itemPassesFilters(item, activeFilters))
         )
         .map(({ index }) =>
           addNodeToPathWithRelations(parentPath, nodes, index)
@@ -142,7 +156,7 @@ function getChildrenForRegularNode(
     containingRelationID,
     nodes?.id,
     author,
-    nodes?.children
+    childNodes
   );
 
   const visibleIncomingCrefs = activeFilters.includes("incoming")
@@ -158,7 +172,7 @@ function getChildrenForRegularNode(
         effectiveAuthor,
         coordinateContext,
         nodes?.root ?? currentRoot,
-        nodes?.children,
+        childNodes,
         incomingCrefs
       )
     : List<ID>();
@@ -208,7 +222,7 @@ function getChildrenForRegularNode(
         ? (itemID as LongID)
         : suggestionTargetID;
     return {
-      children: List<GraphNode>(),
+      children: List<ID>(),
       id: (targetID || itemID) as ID,
       text: resolvedItem?.text || "",
       parent: relationId,

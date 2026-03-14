@@ -21,13 +21,11 @@ import { buildDocumentEvent } from "./markdownDocument";
 import { buildDocumentEventFromRelations } from "./relationsDocumentEvent";
 import {
   shortID,
-  addRelationToRelations,
   EMPTY_SEMANTIC_ID,
   isEmptySemanticID,
   getRelationsNoReferencedBy,
   computeEmptyNodeMetadata,
   getConcreteRefTargetRelation,
-  createRefTarget,
   isSearchId,
   ensureRelationNativeFields,
   getRelationContext,
@@ -309,14 +307,17 @@ function upsertRelationsCore<T extends GraphPlan>(
 
 function addCrefToLog<T extends GraphPlan>(plan: T, relationID: LongID): T {
   const [planWithLog, nodes] = planEnsureSystemRoot(plan, LOG_ROOT_ROLE);
-  const updatedRelations = addRelationToRelations(
-    nodes,
-    createRefTarget(relationID),
-    undefined,
-    undefined,
-    0
+  const crefNode = newRefNode(
+    plan.user.publicKey,
+    nodes.root as LongID,
+    relationID,
+    nodes.id as LongID
   );
-  return upsertRelationsCore(planWithLog, updatedRelations);
+  const planWithCref = upsertRelationsCore(planWithLog, crefNode);
+  return upsertRelationsCore(planWithCref, {
+    ...nodes,
+    children: nodes.children.insert(0, crefNode.id),
+  });
 }
 
 export function planUpsertRelations<T extends GraphPlan>(
@@ -379,7 +380,7 @@ function removeEmptyNodeFromKnowledgeDBs(
   }
 
   const filteredItems = existingRelations.children.filter(
-    (item) => !isEmptySemanticID(item.id)
+    (itemID) => !isEmptySemanticID(itemID)
   );
   if (filteredItems.size === existingRelations.children.size) {
     return knowledgeDBs;
@@ -571,8 +572,7 @@ export function planAddTargetsToRelation<T extends GraphPlan>(
   argument?: Argument
 ): [T, ID[]] {
   type ChildPayload = {
-    childNode: GraphNode;
-    actualItemID: ID;
+    childID: ID;
   };
 
   const targetsArray = Array.isArray(targets) ? targets : [targets];
@@ -605,7 +605,7 @@ export function planAddTargetsToRelation<T extends GraphPlan>(
           : undefined;
       const localID = shortID(objectID as ID) as ID;
       if (refTarget || isSearchId(localID)) {
-        const refNode = refTarget
+        const childNode = refTarget
           ? newRefNode(
               accPlan.user.publicKey,
               parentRelation.root,
@@ -617,7 +617,7 @@ export function planAddTargetsToRelation<T extends GraphPlan>(
               refTarget.linkText
             )
           : ({
-              children: List<GraphNode>(),
+              children: List<ID>(),
               id: objectID,
               text: "",
               parent: parentRelation.id,
@@ -627,13 +627,13 @@ export function planAddTargetsToRelation<T extends GraphPlan>(
               relevance,
               argument,
             } as GraphNode);
+        const planWithChild = planUpsertRelations(accPlan, childNode);
         return [
-          accPlan,
+          planWithChild,
           [
             ...accItems,
             {
-              childNode: refNode,
-              actualItemID: refNode.id,
+              childID: childNode.id,
             },
           ],
         ];
@@ -645,23 +645,21 @@ export function planAddTargetsToRelation<T extends GraphPlan>(
         accPlan.user.publicKey
       );
       if (existingRelation && existingRelation.id === objectID) {
+        const updatedChild = {
+          ...existingRelation,
+          parent: parentRelation.id,
+          root: parentRelation.root,
+          relevance:
+            relevance !== undefined ? relevance : existingRelation.relevance,
+          argument:
+            argument !== undefined ? argument : existingRelation.argument,
+        };
         return [
-          accPlan,
+          planUpsertRelations(accPlan, updatedChild),
           [
             ...accItems,
             {
-              childNode: {
-                ...existingRelation,
-                parent: parentRelation.id,
-                root: parentRelation.root,
-                relevance:
-                  relevance !== undefined
-                    ? relevance
-                    : existingRelation.relevance,
-                argument:
-                  argument !== undefined ? argument : existingRelation.argument,
-              },
-              actualItemID: existingRelation.id,
+              childID: updatedChild.id,
             },
           ],
         ];
@@ -677,17 +675,17 @@ export function planAddTargetsToRelation<T extends GraphPlan>(
       const relationWithUserPublicKey = objectText
         ? withUsersEntryPublicKey(childRelation, objectText)
         : childRelation;
+      const relationWithMetadata = {
+        ...relationWithUserPublicKey,
+        relevance,
+        argument,
+      };
       return [
-        planUpsertRelations(accPlan, relationWithUserPublicKey),
+        planUpsertRelations(accPlan, relationWithMetadata),
         [
           ...accItems,
           {
-            childNode: {
-              ...relationWithUserPublicKey,
-              relevance,
-              argument,
-            },
-            actualItemID: relationWithUserPublicKey.id,
+            childID: relationWithMetadata.id,
           },
         ],
       ];
@@ -702,14 +700,14 @@ export function planAddTargetsToRelation<T extends GraphPlan>(
       const defaultOrder = acc.children.size;
       const withPush = {
         ...acc,
-        children: acc.children.push(item.childNode),
+        children: acc.children.push(item.childID),
       };
       return ord !== undefined && ord !== defaultOrder
         ? {
             ...withPush,
             children: withPush.children
               .filter((_, index) => index !== defaultOrder)
-              .splice(ord, 0, item.childNode),
+              .splice(ord, 0, item.childID),
           }
         : withPush;
     },
@@ -718,7 +716,7 @@ export function planAddTargetsToRelation<T extends GraphPlan>(
 
   return [
     planUpsertRelations(planWithChildren, insertedRelation),
-    relationItemPayload.map((item) => item.actualItemID),
+    relationItemPayload.map((item) => item.childID),
   ];
 }
 
@@ -912,9 +910,9 @@ export function planCopyDescendantRelations<T extends GraphPlan>(
   const resultPlan = copiedRelations.reduce(
     (accPlan, { source, newSemanticContext, sourceParentID, copy }) => {
       const isRootRelation = source.id === sourceRelation.id;
-      const children = source.children.map((item) => {
-        const mappedID = resultMapping.get(item.id as LongID);
-        return mappedID ? { ...item, id: mappedID } : item;
+      const children = source.children.map((childID) => {
+        const mappedID = resultMapping.get(childID as LongID);
+        return mappedID || childID;
       });
       const copiedParentID = isRootRelation
         ? targetParentRelationID
@@ -1894,7 +1892,7 @@ export function planSetEmptyNodePosition(
       relationsID: nodes.id,
       index: insertIndex,
       relationItem: {
-        children: List<GraphNode>(),
+        children: List<ID>(),
         id: EMPTY_SEMANTIC_ID,
         text: "",
         parent: nodes.id,

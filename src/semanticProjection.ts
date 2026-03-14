@@ -1,6 +1,7 @@
 import { List, OrderedMap, Set as ImmutableSet } from "immutable";
 import {
   EMPTY_SEMANTIC_ID,
+  getRelationChildNodes,
   shortID,
   splitID,
   isSearchId,
@@ -419,6 +420,22 @@ function coveredContextKeys(
   }, ImmutableSet<string>());
 }
 
+function isInSystemRoot(
+  knowledgeDBs: KnowledgeDBs,
+  relation: GraphNode | undefined,
+  systemRole: RootSystemRole
+): boolean {
+  if (!relation) {
+    return false;
+  }
+  const rootRelation = getRelationsNoReferencedBy(
+    knowledgeDBs,
+    relation.root,
+    relation.author
+  );
+  return rootRelation?.systemRole === systemRole;
+}
+
 export function deduplicateRefsByContext(
   refs: List<ReferencedByRef>,
   knowledgeDBs: KnowledgeDBs,
@@ -476,6 +493,15 @@ export function getOccurrencesForNode(
         .map((item) => item.id)
         .toList()
     : List<ID>();
+  const outgoingTargetRelationIDs = currentItems
+    ? currentItems
+        .filter(isRefNode)
+        .flatMap((item) => {
+          const targetID = getRefTargetID(item);
+          return targetID ? [targetID] : [];
+        })
+        .toSet()
+    : ImmutableSet<LongID>();
   const covered = coveredContextKeys(
     knowledgeDBs,
     outgoingCrefIDs.concat(incomingCrefIDs || List<LongID>()),
@@ -500,6 +526,24 @@ export function getOccurrencesForNode(
       const [author] = splitID(ref.relationID);
       return !!author && visibleAuthors.has(author);
     })
+    .filter((ref) => {
+      const relation = semanticIndex.relationByID.get(ref.relationID);
+      return !(
+        relation &&
+        isRefNode(relation) &&
+        relation.parent &&
+        ((incomingCrefIDs || List<LongID>()).includes(relation.parent) ||
+          outgoingTargetRelationIDs.has(relation.parent))
+      );
+    })
+    .filter(
+      (ref) =>
+        !isInSystemRoot(
+          knowledgeDBs,
+          semanticIndex.relationByID.get(ref.relationID),
+          LOG_ROOT_ROLE
+        )
+    )
     .filter((ref) => !isInCurrentRootTree(ref))
     .filter((ref) => ref.relationID !== currentRelationID)
     .filter((ref) =>
@@ -578,7 +622,11 @@ export function getIncomingCrefsForNode(
           .filter((relation) => visibleAuthors.has(relation.author))
           .filter((relation) => relation.id !== parentRelationID)
           .filter((relation) => relation.id !== currentRelationID)
-          .filter((relation) => relation.systemRole !== LOG_ROOT_ROLE)
+          .filter(
+            (relation) =>
+              relation.systemRole !== LOG_ROOT_ROLE &&
+              !isInSystemRoot(knowledgeDBs, relation, LOG_ROOT_ROLE)
+          )
           .filter((relation) => !outgoingTargetRelIDs.has(relation.id))
           .map((relation) => ({
             relationID: relation.id,
@@ -645,11 +693,18 @@ export function getSuggestionsForNode(
   const currentRelation = currentRelationId
     ? getRelationsNoReferencedBy(knowledgeDBs, currentRelationId, myself)
     : undefined;
+  const currentRelationChildren = currentRelation
+    ? getRelationChildNodes(
+        knowledgeDBs,
+        currentRelation,
+        currentRelation.author
+      )
+    : List<GraphNode>();
   const currentRelationItems: ImmutableSet<ID> = currentRelation
-    ? currentRelation.children.map((item) => item.id).toSet()
+    ? currentRelationChildren.map((item) => item.id).toSet()
     : ImmutableSet<ID>();
   const currentRelationItemKeys: ImmutableSet<string> = currentRelation
-    ? currentRelation.children
+    ? currentRelationChildren
         .map((item) =>
           getComparableSuggestionKey(
             knowledgeDBs,
@@ -665,7 +720,7 @@ export function getSuggestionsForNode(
     : ImmutableSet<string>();
 
   const declinedRelationTargetIDs: ImmutableSet<LongID> = currentRelation
-    ? currentRelation.children
+    ? currentRelationChildren
         .filter((item) => isRefNode(item) && item.relevance === "not_relevant")
         .flatMap((item) => {
           const targetID = getRefTargetID(item);
@@ -697,32 +752,35 @@ export function getSuggestionsForNode(
 
   const candidateItemIDs = otherRelations.reduce(
     (acc: OrderedMap<string, ID>, nodes: GraphNode) => {
-      return nodes.children.reduce((itemAcc, item: GraphNode) => {
-        if (
-          !itemFilters.some((t) => itemMatchesType(item, t)) ||
-          item.relevance === "not_relevant" ||
-          currentRelationItems.has(item.id)
-        ) {
-          return itemAcc;
-        }
-        const candidateSemanticID = getRelationItemSemanticID(
-          knowledgeDBs,
-          item,
-          nodes.author
-        );
-        const candidateKey = getSemanticNodeKey(
-          knowledgeDBs,
-          candidateSemanticID,
-          nodes.author
-        );
-        if (
-          currentRelationItemKeys.has(candidateKey) ||
-          itemAcc.has(candidateKey)
-        ) {
-          return itemAcc;
-        }
-        return itemAcc.set(candidateKey, item.id);
-      }, acc);
+      return getRelationChildNodes(knowledgeDBs, nodes, nodes.author).reduce(
+        (itemAcc, item: GraphNode) => {
+          if (
+            !itemFilters.some((t) => itemMatchesType(item, t)) ||
+            item.relevance === "not_relevant" ||
+            currentRelationItems.has(item.id)
+          ) {
+            return itemAcc;
+          }
+          const candidateSemanticID = getRelationItemSemanticID(
+            knowledgeDBs,
+            item,
+            nodes.author
+          );
+          const candidateKey = getSemanticNodeKey(
+            knowledgeDBs,
+            candidateSemanticID,
+            nodes.author
+          );
+          if (
+            currentRelationItemKeys.has(candidateKey) ||
+            itemAcc.has(candidateKey)
+          ) {
+            return itemAcc;
+          }
+          return itemAcc.set(candidateKey, item.id);
+        },
+        acc
+      );
     },
     OrderedMap<string, ID>()
   );
@@ -805,7 +863,7 @@ function getComparableRelationItemKeys(
   filterTypes: FooterTypeFilters,
   useExactMatch: boolean
 ): ImmutableSet<string> {
-  return relation.children
+  return getRelationChildNodes(knowledgeDBs, relation, relation.author)
     .filter(
       (item) =>
         itemPassesFilters(item, filterTypes) &&
@@ -876,7 +934,12 @@ export function getVersionsForRelation(
     currentRelation?.root
   );
 
-  const existingCrefTargetIDs = currentRelation.children
+  const currentRelationChildren = getRelationChildNodes(
+    knowledgeDBs,
+    currentRelation,
+    currentRelation.author
+  );
+  const existingCrefTargetIDs = currentRelationChildren
     .map((item) => getRefTargetID(item))
     .filter((id): id is LongID => !!id)
     .toSet();
@@ -913,7 +976,7 @@ export function getVersionsForRelation(
         return false;
       }
       const coveredIDs = coveredSuggestionIDs || ImmutableSet<string>();
-      const addIDs = r.children
+      const addIDs = getRelationChildNodes(knowledgeDBs, r, r.author)
         .filter(
           (item) =>
             itemPassesFilters(item, filterTypes) &&

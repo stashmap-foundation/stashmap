@@ -72,7 +72,7 @@ function getChildTexts(
   relation: GraphNode
 ): string[] {
   return relation.children
-    .map((item) => knowledgeDB.nodes.get(shortID(item.id))?.text || "")
+    .map((childID) => knowledgeDB.nodes.get(shortID(childID))?.text || "")
     .toArray();
 }
 

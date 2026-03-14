@@ -2,6 +2,7 @@
 import React from "react";
 import { List, Map } from "immutable";
 import {
+  computeEmptyNodeMetadata,
   getRelations,
   getRelationsNoReferencedBy,
   shortID,
@@ -184,6 +185,18 @@ function getViewRelationByID(
   myself: PublicKey
 ): GraphNode | undefined {
   return getRelationsNoReferencedBy(knowledgeDBs, id, myself);
+}
+
+function getEmptyRelationItem(
+  data: Data,
+  parentRelation: GraphNode | undefined
+): GraphNode | undefined {
+  if (!parentRelation) {
+    return undefined;
+  }
+  return computeEmptyNodeMetadata(data.publishEventsStatus.temporaryEvents).get(
+    parentRelation.id as LongID
+  )?.relationItem;
 }
 
 function getRowIDFromPath(data: Data, viewPath: ViewPath): ID {
@@ -476,13 +489,13 @@ export function addNodeToPathWithRelations(
   nodes: GraphNode,
   index: number
 ): ViewPath {
-  const item = nodes.children.get(index);
-  if (!item) {
+  const itemID = nodes.children.get(index);
+  if (itemID === undefined) {
     throw new Error("No node found in relation at index");
   }
   const pathWithRelations = addRelationsToLastElement(path, nodes.id);
   const nextSegment =
-    item.id === EMPTY_SEMANTIC_ID ? createEmptyViewPathID(nodes.id) : item.id;
+    itemID === EMPTY_SEMANTIC_ID ? createEmptyViewPathID(nodes.id) : itemID;
   return [...pathWithRelations, nextSegment] as ViewPath;
 }
 
@@ -538,9 +551,9 @@ export function getRelationIndex(
   }
   const itemID = getLast(viewPath);
   const index = nodes.children.findIndex(
-    (item) =>
-      item.id === itemID ||
-      (item.id === EMPTY_SEMANTIC_ID && isEmptyViewPathID(itemID))
+    (childID) =>
+      childID === itemID ||
+      (childID === EMPTY_SEMANTIC_ID && isEmptyViewPathID(itemID))
   );
   return index >= 0 ? index : undefined;
 }
@@ -555,12 +568,26 @@ export function getCurrentEdgeForView(
   data: Data,
   viewPath: ViewPath
 ): GraphNode | undefined {
-  const relation = getParentRelation(data, viewPath);
-  if (!relation) {
+  const parentRelation = getParentRelation(data, viewPath);
+  if (!parentRelation) {
     return undefined;
   }
   const index = getRelationIndex(data, viewPath);
-  return index !== undefined ? relation.children.get(index) : undefined;
+  if (index === undefined) {
+    return undefined;
+  }
+  const childID = parentRelation.children.get(index);
+  if (childID === undefined) {
+    return undefined;
+  }
+  if (childID === EMPTY_SEMANTIC_ID) {
+    return getEmptyRelationItem(data, parentRelation);
+  }
+  return getRelationsNoReferencedBy(
+    data.knowledgeDBs,
+    childID,
+    data.user.publicKey
+  );
 }
 
 export function useCurrentEdge(): GraphNode | undefined {
@@ -606,10 +633,19 @@ export function getPreviousSibling(
 
   const prevIndex = parentRelation.children
     .slice(0, relationIndex)
-    .reduce<number>(
-      (found, item, i) => (itemPassesFilters(item, activeFilters) ? i : found),
-      -1
-    );
+    .reduce<number>((found, childID, i) => {
+      if (childID === EMPTY_SEMANTIC_ID) {
+        return found;
+      }
+      const childRelation = getRelationsNoReferencedBy(
+        data.knowledgeDBs,
+        childID,
+        data.user.publicKey
+      );
+      return childRelation && itemPassesFilters(childRelation, activeFilters)
+        ? i
+        : found;
+    }, -1);
 
   if (prevIndex === -1) {
     return undefined;

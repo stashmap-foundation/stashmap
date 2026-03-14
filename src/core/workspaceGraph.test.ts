@@ -200,8 +200,9 @@ test("setRelationText, setItemRelevance, and setItemArgument republish the same 
   );
 
   expect(republishedPlan?.text).toBe("Updated Plan");
-  expect(republishedHome?.children.first()?.relevance).toBe("not_relevant");
-  expect(republishedHome?.children.first()?.argument).toBe("contra");
+  expect(republishedHome?.children.first()).toBe(planRelation?.id);
+  expect(republishedPlan?.relevance).toBe("not_relevant");
+  expect(republishedPlan?.argument).toBe("contra");
 });
 
 test("createUnderParent and linkUnderParent add owned children and crefs to the existing root", async () => {
@@ -274,11 +275,14 @@ test("moveItem preserves relevance and argument across parents, and delete-item 
   const movedBucketB = movedRelations.find(
     (relation) => relation.id === bucketB?.id
   );
+  const movedTask = movedRelations.find(
+    (relation) => relation.id === movedBucketB?.children.first()
+  );
 
   expect(movedBucketA?.children.size).toBe(0);
-  expect(movedBucketB?.children.first()?.id).toBe(task?.id);
-  expect(movedBucketB?.children.first()?.relevance).toBe("relevant");
-  expect(movedBucketB?.children.first()?.argument).toBe("contra");
+  expect(movedBucketB?.children.first()).toBe(task?.id);
+  expect(movedTask?.relevance).toBe("relevant");
+  expect(movedTask?.argument).toBe("contra");
 
   const removedPlan = planRemoveRelationItemById(
     movedPlan,
@@ -296,7 +300,7 @@ test("moveItem preserves relevance and argument across parents, and delete-item 
   expect(removedRelations.find((relation) => relation.id === task?.id)).toBe(
     undefined
   );
-  expect(removedBucketB?.children.find((item) => item.id === task?.id)).toBe(
+  expect(removedBucketB?.children.find((itemID) => itemID === task?.id)).toBe(
     undefined
   );
 });

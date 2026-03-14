@@ -22,6 +22,7 @@ import {
 } from "./headlessPlan";
 import { GraphPlan } from "../planner";
 import {
+  getRelationChildNodes,
   isSearchId,
   isRefNode,
   joinID,
@@ -70,7 +71,11 @@ function resolveParentItemId(
 
   const parentRelation = requireRelationById(plan, parentRelationId);
   const ownResolvedItemId = resolveOwnWriteId(pubkey, itemId);
-  const candidates = parentRelation.children.reduce((acc, item) => {
+  const candidates = getRelationChildNodes(
+    plan.knowledgeDBs,
+    parentRelation,
+    plan.user.publicKey
+  ).reduce((acc, item) => {
     if (item.id === itemId || item.id === ownResolvedItemId) {
       return acc.includes(item.id) ? acc : [...acc, item.id];
     }

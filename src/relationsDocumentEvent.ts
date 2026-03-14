@@ -1,6 +1,7 @@
 import { Set as ImmutableSet } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
 import {
+  EMPTY_SEMANTIC_ID,
   getConcreteRefTargetRelation,
   getRelationContext,
   getRelationSemanticID,
@@ -30,8 +31,15 @@ function serializeRelationItems(
   depth: number,
   current: SerializeResult
 ): SerializeResult {
-  return children.reduce((acc, item) => {
+  return children.reduce((acc, childID) => {
     const indent = "  ".repeat(depth);
+    if (childID === EMPTY_SEMANTIC_ID) {
+      return acc;
+    }
+    const item = getRelationsNoReferencedBy(knowledgeDBs, childID, author);
+    if (!item) {
+      throw new Error(`Missing child relation: ${childID}`);
+    }
     if (isRefNode(item)) {
       const targetRelation = getConcreteRefTargetRelation(
         knowledgeDBs,
@@ -61,17 +69,7 @@ function serializeRelationItems(
       };
     }
 
-    const childRelation = getRelationsNoReferencedBy(
-      knowledgeDBs,
-      item.id,
-      author
-    );
-    const resolvedChild =
-      childRelation ||
-      knowledgeDBs.get(author)?.nodes.get(shortID(item.id as ID));
-    if (!resolvedChild) {
-      throw new Error(`Missing child relation: ${item.id}`);
-    }
+    const resolvedChild = item;
 
     const text = getSerializableRelationText(resolvedChild);
     const next: SerializeResult = {

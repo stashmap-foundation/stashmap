@@ -5,6 +5,7 @@ import {
   parseSearchId,
   getSearchRelations,
   buildTextNodesFromRelations,
+  shortID,
 } from "./connections";
 import type { TextSeed } from "./connections";
 import { MergeKnowledgeDB, useData } from "./DataContext";
@@ -47,16 +48,22 @@ function SearchCrefBuilder({
     return deduped.map((ref) => ref.relationID as ID);
   });
 
-  const searchRelations = getSearchRelations(
+  const { relation: searchRelation, childNodes } = getSearchRelations(
     searchId,
     crefItems.toList(),
     user.publicKey,
     true
   );
+  const syntheticEntries: [ID, GraphNode][] = [
+    [searchId, searchRelation] as [ID, GraphNode],
+    ...childNodes
+      .map((node) => [shortID(node.id) as ID, node] as [ID, GraphNode])
+      .toArray(),
+  ];
 
   const syntheticDB: KnowledgeData = {
     ...newDB(),
-    nodes: Map<ID, GraphNode>([[searchId, searchRelations]]),
+    nodes: Map<ID, GraphNode>(syntheticEntries),
   };
 
   const syntheticDBs: KnowledgeDBs = Map<PublicKey, KnowledgeData>([

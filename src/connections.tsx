@@ -309,7 +309,7 @@ export function buildTextNodesFromRelations(
       !!existing &&
       relation.updated === existing.updated &&
       getRelationDepth(knowledgeDBs, relation) <
-        getRelationDepth(knowledgeDBs, existing);
+      getRelationDepth(knowledgeDBs, existing);
     if (isNewer || isSameVersionNewerDisplay) {
       return acc.set(semanticID, relation);
     }
@@ -486,26 +486,26 @@ export function getSearchRelations(
     (semanticID): GraphNode =>
       asRefs
         ? {
-            ...newRefNode(
-              rel.author,
-              searchId as LongID,
-              semanticID as LongID,
-              searchId as LongID
-            ),
-            updated: rel.updated,
-            virtualType: "search",
-          }
+          ...newRefNode(
+            rel.author,
+            searchId as LongID,
+            semanticID as LongID,
+            searchId as LongID
+          ),
+          updated: rel.updated,
+          virtualType: "search",
+        }
         : {
-            children: List<ID>(),
-            id: semanticID,
-            text: "",
-            parent: searchId as LongID,
-            updated: rel.updated,
-            author: rel.author,
-            root: searchId as LongID,
-            relevance: undefined,
-            virtualType: "search",
-          }
+          children: List<ID>(),
+          id: semanticID,
+          text: "",
+          parent: searchId as LongID,
+          updated: rel.updated,
+          author: rel.author,
+          root: searchId as LongID,
+          relevance: undefined,
+          virtualType: "search",
+        }
   );
   return {
     relation: {
@@ -563,15 +563,6 @@ export function moveRelations(
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getSharesFromPublicKey(publicKey: PublicKey): number {
   return 10000; // TODO: implement
-}
-
-function filterVoteRelationLists(
-  nodes: List<GraphNode>,
-  head: ID
-): List<GraphNode> {
-  return nodes.filter((relation) => {
-    return shortID(getRelationSemanticID(relation)) === shortID(head);
-  });
 }
 
 function getLatestvoteRelationListPerAuthor(
@@ -709,43 +700,6 @@ export function aggregateNegativeWeightedVotes(
     }, rdx);
   }, Map<ID, number>());
   return votesPerItem;
-}
-
-export function countRelationVotes(
-  nodes: List<GraphNode>,
-  head: ID,
-  type: Relevance | Argument | "contains"
-): Map<ID, number> {
-  const filteredVoteRelations = filterVoteRelationLists(nodes, head);
-  const latestVotesPerAuthor = getLatestvoteRelationListPerAuthor(
-    filteredVoteRelations
-  );
-  const listsOfVotes = latestVotesPerAuthor
-    .map((relation) => {
-      return {
-        children: relation.children.reduce((acc, childID) => {
-          const child = nodes.find((node) => node.id === childID);
-          return child ? acc.push(child) : acc;
-        }, List<GraphNode>()),
-        weight: getSharesFromPublicKey(relation.author),
-      };
-    })
-    .toList();
-  return type === "not_relevant"
-    ? aggregateNegativeWeightedVotes(listsOfVotes, type)
-    : aggregateWeightedVotes(listsOfVotes, type);
-}
-
-export function countRelevanceVoting(
-  nodes: List<GraphNode>,
-  head: ID
-): Map<ID, number> {
-  const positiveVotes = countRelationVotes(nodes, head, "contains");
-  const negativeVotes = countRelationVotes(nodes, head, "not_relevant");
-  return negativeVotes.reduce((rdx, negativeVote, key) => {
-    const positiveVote = positiveVotes.get(key, 0);
-    return rdx.set(key, positiveVote + negativeVote);
-  }, positiveVotes);
 }
 
 export type EmptyNodeData = {

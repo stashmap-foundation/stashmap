@@ -76,9 +76,9 @@ function getConcreteNodesForSemanticID(
   const otherDBs = remote
     ? []
     : knowledgeDBs
-        .filter((_, pk) => pk !== preferredAuthor)
-        .valueSeq()
-        .toArray();
+      .filter((_, pk) => pk !== preferredAuthor)
+      .valueSeq()
+      .toArray();
   const candidateDBs = [preferredDB, ...otherDBs].filter(
     (db): db is KnowledgeData => db !== undefined
   );
@@ -338,19 +338,19 @@ export function findRefsToNode(
 
   const allRefs = filterContext
     ? resolvedRefs
-        .filter(({ ref, author, root }) =>
-          contextsMatchForRefs(
-            knowledgeDBs,
-            ref.context,
-            author,
-            root,
-            filterContext,
-            targetAuthor,
-            targetRoot
-          )
+      .filter(({ ref, author, root }) =>
+        contextsMatchForRefs(
+          knowledgeDBs,
+          ref.context,
+          author,
+          root,
+          filterContext,
+          targetAuthor,
+          targetRoot
         )
-        .map(({ ref }) => ref)
-        .toList()
+      )
+      .map(({ ref }) => ref)
+      .toList()
     : resolvedRefs.map(({ ref }) => ref).toList();
 
   return allRefs
@@ -461,36 +461,20 @@ export function getOccurrencesForNode(
   currentItems?: List<GraphNode>,
   incomingCrefIDs?: List<LongID>
 ): List<LongID> {
-  const allRefs = findRefsToNode(
+  const semanticKey = getSemanticNodeKey(
     knowledgeDBs,
-    semanticIndex,
     semanticID,
-    undefined,
-    effectiveAuthor,
-    currentRoot
+    effectiveAuthor
   );
   const contextRoot = currentContext.first();
-  const isInCurrentRootTree = (ref: ReferencedByRef): boolean => {
-    if (!currentRoot) {
-      return false;
-    }
-    return semanticIndex.relationByID.get(ref.relationID)?.root === currentRoot;
-  };
+  const isInCurrentRootTree = (relation: GraphNode): boolean =>
+    !!currentRoot && relation.root === currentRoot;
   const outgoingCrefIDs = currentItems
     ? currentItems
-        .filter(isRefNode)
-        .map((item) => item.id)
-        .toList()
+      .filter(isRefNode)
+      .map((item) => item.id)
+      .toList()
     : List<ID>();
-  const outgoingTargetRelationIDs = currentItems
-    ? currentItems
-        .filter(isRefNode)
-        .flatMap((item) => {
-          const { targetID } = item;
-          return targetID ? [targetID] : [];
-        })
-        .toSet()
-    : ImmutableSet<LongID>();
   const covered = coveredContextKeys(
     knowledgeDBs,
     outgoingCrefIDs.concat(incomingCrefIDs || List<LongID>()),
@@ -510,31 +494,23 @@ export function getOccurrencesForNode(
       ) === getSemanticNodeKey(knowledgeDBs, contextRoot as ID, effectiveAuthor)
     );
   };
-  const filtered = allRefs
-    .filter((ref) => {
-      const [author] = splitID(ref.relationID);
-      return !!author && visibleAuthors.has(author);
-    })
-    .filter((ref) => {
-      const relation = semanticIndex.relationByID.get(ref.relationID);
-      return !(
-        relation &&
-        isRefNode(relation) &&
-        relation.parent &&
-        ((incomingCrefIDs || List<LongID>()).includes(relation.parent) ||
-          outgoingTargetRelationIDs.has(relation.parent))
-      );
-    })
+  const filtered = getSemanticCandidates(semanticIndex, semanticKey)
+    .filter((relation) => !isRefNode(relation))
+    .filter((relation) => visibleAuthors.has(relation.author))
     .filter(
-      (ref) =>
-        !isInSystemRoot(
-          knowledgeDBs,
-          semanticIndex.relationByID.get(ref.relationID),
-          LOG_ROOT_ROLE
-        )
+      (relation) => !isInSystemRoot(knowledgeDBs, relation, LOG_ROOT_ROLE)
     )
-    .filter((ref) => !isInCurrentRootTree(ref))
-    .filter((ref) => ref.relationID !== currentRelationID)
+    .filter((relation) => !isInCurrentRootTree(relation))
+    .filter((relation) => relation.id !== currentRelationID)
+    .map((relation) => ({
+      ref: {
+        relationID: relation.id,
+        context: getRelationContext(knowledgeDBs, relation),
+        updated: relation.updated,
+      },
+    }))
+    .filter(({ ref }) => !ref.context.some((id) => isSearchId(id as ID)))
+    .map(({ ref }) => ref)
     .filter((ref) =>
       ref.context.size === 0
         ? currentContext.size > 0
@@ -553,8 +529,8 @@ export function getOccurrencesForNode(
             const [author] = splitID(ref.relationID);
             const isOther =
               effectiveAuthor &&
-              author !== undefined &&
-              author !== effectiveAuthor
+                author !== undefined &&
+                author !== effectiveAuthor
                 ? 1
                 : 0;
             return [isOther, -ref.updated];
@@ -599,25 +575,25 @@ export function getIncomingCrefsForNode(
   const refs = List(
     currentRelationID
       ? [
-          ...(semanticIndex.incomingCrefs.get(currentRelationID) ||
-            new globalThis.Set<LongID>()),
-        ]
-          .map((relationID) => semanticIndex.relationByID.get(relationID))
-          .filter((relation): relation is GraphNode => relation !== undefined)
-          .filter((relation) => visibleAuthors.has(relation.author))
-          .filter((relation) => relation.id !== parentRelationID)
-          .filter((relation) => relation.id !== currentRelationID)
-          .filter(
-            (relation) =>
-              relation.systemRole !== LOG_ROOT_ROLE &&
-              !isInSystemRoot(knowledgeDBs, relation, LOG_ROOT_ROLE)
-          )
-          .filter((relation) => !outgoingTargetRelIDs.has(relation.id))
-          .map((relation) => ({
-            relationID: relation.id,
-            context: getRelationContext(knowledgeDBs, relation),
-            updated: relation.updated,
-          }))
+        ...(semanticIndex.incomingCrefs.get(currentRelationID) ||
+          new globalThis.Set<LongID>()),
+      ]
+        .map((relationID) => semanticIndex.relationByID.get(relationID))
+        .filter((relation): relation is GraphNode => relation !== undefined)
+        .filter((relation) => visibleAuthors.has(relation.author))
+        .filter((relation) => relation.id !== parentRelationID)
+        .filter((relation) => relation.id !== currentRelationID)
+        .filter(
+          (relation) =>
+            relation.systemRole !== LOG_ROOT_ROLE &&
+            !isInSystemRoot(knowledgeDBs, relation, LOG_ROOT_ROLE)
+        )
+        .filter((relation) => !outgoingTargetRelIDs.has(relation.id))
+        .map((relation) => ({
+          relationID: relation.id,
+          context: getRelationContext(knowledgeDBs, relation),
+          updated: relation.updated,
+        }))
       : []
   );
 
@@ -680,34 +656,34 @@ export function getSuggestionsForNode(
     : undefined;
   const currentRelationChildren = currentRelation
     ? getRelationChildNodes(
-        knowledgeDBs,
-        currentRelation,
-        currentRelation.author
-      )
+      knowledgeDBs,
+      currentRelation,
+      currentRelation.author
+    )
     : List<GraphNode>();
   const currentRelationItems: ImmutableSet<ID> = currentRelation
     ? currentRelationChildren.map((item) => item.id).toSet()
     : ImmutableSet<ID>();
   const currentRelationItemKeys: ImmutableSet<string> = currentRelation
     ? currentRelationChildren
-        .map((item) =>
-          getComparableSuggestionKey(
-            knowledgeDBs,
-            getSemanticID(knowledgeDBs, item),
-            currentRelation.author
-          )
+      .map((item) =>
+        getComparableSuggestionKey(
+          knowledgeDBs,
+          getSemanticID(knowledgeDBs, item),
+          currentRelation.author
         )
-        .toSet()
+      )
+      .toSet()
     : ImmutableSet<string>();
 
   const declinedRelationTargetIDs: ImmutableSet<LongID> = currentRelation
     ? currentRelationChildren
-        .filter((item) => isRefNode(item) && item.relevance === "not_relevant")
-        .flatMap((item) => {
-          const { targetID } = item;
-          return targetID ? [targetID] : [];
-        })
-        .toSet()
+      .filter((item) => isRefNode(item) && item.relevance === "not_relevant")
+      .flatMap((item) => {
+        const { targetID } = item;
+        return targetID ? [targetID] : [];
+      })
+      .toSet()
     : ImmutableSet<LongID>();
 
   const contextToMatch = parentContext || List<ID>();
@@ -850,10 +826,10 @@ function getComparableRelationItemKeys(
       useExactMatch
         ? shortID(item.id)
         : getSemanticNodeKey(
-            knowledgeDBs,
-            getSemanticID(knowledgeDBs, item),
-            relation.author
-          )
+          knowledgeDBs,
+          getSemanticID(knowledgeDBs, item),
+          relation.author
+        )
     )
     .toSet();
 }
@@ -873,11 +849,11 @@ function computeComparableRelationDiff(
   );
   const parentIDs = parentRelation
     ? getComparableRelationItemKeys(
-        knowledgeDBs,
-        parentRelation,
-        activeFilters,
-        useExactMatch
-      )
+      knowledgeDBs,
+      parentRelation,
+      activeFilters,
+      useExactMatch
+    )
     : ImmutableSet<string>();
   return {
     addCount: versionIDs.filter((id) => !parentIDs.has(id)).size,
@@ -963,10 +939,10 @@ export function getVersionsForRelation(
           useExactMatch
             ? shortID(item.id)
             : getSemanticNodeKey(
-                knowledgeDBs,
-                getSemanticID(knowledgeDBs, item),
-                r.author
-              )
+              knowledgeDBs,
+              getSemanticID(knowledgeDBs, item),
+              r.author
+            )
         )
         .filter((id) => !currentItemIDs.has(id));
       const hasUncoveredAdds = addIDs.some((id) => !coveredIDs.has(id));

@@ -297,3 +297,29 @@ test("pullSyncWorkspace does not overwrite a locally edited document", async () 
     "Remote Updated Root"
   );
 });
+
+test("pullSyncWorkspace preserves unpushed new documents", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-sync-"));
+  const knowstrHome = path.join(tempDir, ".knowstr");
+  const profile: SyncPullProfile = {
+    pubkey: ALICE,
+    readAs: ALICE,
+    workspaceDir: tempDir,
+    bootstrapRelays: [],
+    relays: [{ url: RELAY, read: true, write: true }],
+    knowstrHome,
+  };
+
+  const authorDir = path.join(tempDir, "DOCUMENTS", ALICE);
+  fs.mkdirSync(authorDir, { recursive: true });
+  const newDocPath = path.join(authorDir, "my-draft.md");
+  fs.writeFileSync(newDocPath, "# My Draft\n- some notes\n");
+
+  const { client } = makeClient({
+    [RELAY]: [contactListEvent()],
+  });
+  await pullSyncWorkspace(client, profile);
+
+  expect(fs.existsSync(newDocPath)).toBe(true);
+  expect(fs.readFileSync(newDocPath, "utf8")).toContain("My Draft");
+});

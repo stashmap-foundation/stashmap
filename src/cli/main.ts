@@ -1,3 +1,4 @@
+import { initHelp, runInitCommand } from "./init";
 import { pullHelp, runPullCommand } from "./syncPull";
 import { pushHelp, runPushCommand } from "./push";
 
@@ -17,8 +18,11 @@ function generalHelp(): string {
     "Usage: knowstr <command>",
     "",
     "Commands:",
+    "  init   Initialize a new Knowstr workspace",
     "  pull   Export a local editable markdown workspace from relays",
     "  push   Publish edited workspace documents to relays",
+    "",
+    initHelp(),
     "",
     pullHelp(),
     "",
@@ -39,6 +43,11 @@ export async function runCli(argv: string[]): Promise<void> {
 
   if (!command || command === "--help" || command === "-h") {
     process.stdout.write(`${generalHelp()}\n`);
+    return;
+  }
+
+  if (command === "init") {
+    printResult(runInitCommand([subcommand, ...rest].filter(Boolean)));
     return;
   }
 

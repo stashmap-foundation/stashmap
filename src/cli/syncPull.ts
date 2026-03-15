@@ -1,15 +1,18 @@
 import { SimplePool } from "nostr-tools";
+import { decodePublicKeyInputSync } from "../nostrPublicKeys";
 import { loadCliProfile } from "./config";
 import { requireValue } from "./args";
 import { SyncPullCliArgs } from "./types";
 import { pullSyncWorkspace, PullResult } from "../core/syncPull";
 
 function parsePublicKeyArg(value: string, flagName: string): PublicKey {
-  const normalized = value.trim().toLowerCase();
-  if (!/^[0-9a-f]{64}$/.test(normalized)) {
-    throw new Error(`${flagName} must be a valid 64-character hex pubkey`);
+  const decoded = decodePublicKeyInputSync(value);
+  if (!decoded) {
+    throw new Error(
+      `${flagName} must be a valid pubkey (hex, npub, or nprofile)`
+    );
   }
-  return normalized as PublicKey;
+  return decoded;
 }
 
 export function parsePullArgs(args: string[]): SyncPullCliArgs {
@@ -76,7 +79,7 @@ export function parsePullArgs(args: string[]): SyncPullCliArgs {
 
 export function pullHelp(): string {
   return [
-    "Usage: knowstr pull [--config <path>] [--as-user <pubkey>] [--out <path>] [--relay <url> ...]",
+    "Usage: knowstr pull [--config <path>] [--as-user <pubkey|npub>] [--out <path>] [--relay <url> ...]",
     "",
     "Reads the Knowstr graph from configured relays, writes editable markdown documents, and refreshes hidden baselines.",
   ].join("\n");

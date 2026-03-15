@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { decodePublicKeyInputSync } from "../nostrPublicKeys";
 import { sanitizeRelays } from "../relayUtils";
 import { SyncPullProfile } from "../core/syncPull";
 
@@ -79,13 +80,13 @@ function parseBootstrapRelays(
 }
 
 function parsePubkey(value: string | undefined): PublicKey {
-  const normalized = (value || "").trim().toLowerCase();
-  if (!/^[0-9a-f]{64}$/.test(normalized)) {
+  const decoded = decodePublicKeyInputSync(value);
+  if (!decoded) {
     throw new Error(
-      "profile.json must include a valid 64-character hex pubkey"
+      "profile.json must include a valid pubkey (hex, npub, or nprofile)"
     );
   }
-  return normalized as PublicKey;
+  return decoded;
 }
 
 export function loadCliProfile({

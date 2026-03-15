@@ -1,6 +1,7 @@
 /** @jest-environment node */
 
 import fs from "fs";
+import { nip19 } from "nostr-tools";
 import os from "os";
 import path from "path";
 import { loadCliProfile } from "./config";
@@ -54,4 +55,27 @@ test("loadCliProfile supports reading as another user", () => {
 
   expect(profile.pubkey).toBe("a".repeat(64));
   expect(profile.readAs).toBe("b".repeat(64));
+});
+
+test("loadCliProfile accepts npub values for pubkey and read_as", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-config-"));
+  const agentDir = path.join(tempDir, "agents", "codex-me");
+  const knowstrDir = path.join(agentDir, ".knowstr");
+  const configPath = path.join(knowstrDir, "profile.json");
+
+  const hexPubkey = "a".repeat(64);
+  const hexReadAs = "b".repeat(64);
+  const npubPubkey = nip19.npubEncode(hexPubkey);
+  const npubReadAs = nip19.npubEncode(hexReadAs);
+
+  writeJson(configPath, {
+    pubkey: npubPubkey,
+    read_as: npubReadAs,
+    relays: ["wss://profile.example/"],
+  });
+
+  const profile = loadCliProfile({ cwd: agentDir });
+
+  expect(profile.pubkey).toBe(hexPubkey);
+  expect(profile.readAs).toBe(hexReadAs);
 });

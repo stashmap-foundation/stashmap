@@ -3,9 +3,9 @@ import { OrderedSet, Set } from "immutable";
 import {
   parseViewPath,
   useViewKey,
-  getRelationIndex,
+  getNodeIndexForView,
   useDisplayText,
-  useCurrentRelation,
+  useCurrentNode,
 } from "../ViewContext";
 import { useData } from "../DataContext";
 import { isRefNode } from "../connections";
@@ -84,7 +84,7 @@ function getSelectedIndices(
   return getSelectedInView(selection, viewKey)
     .map((key) => {
       const path = parseViewPath(key);
-      return getRelationIndex(data, path);
+      return getNodeIndexForView(data, path);
     })
     .filter((n) => n !== undefined) as OrderedSet<number>;
 }
@@ -133,7 +133,7 @@ export function isEditableRelation(relation: GraphNode | undefined): boolean {
 }
 
 export function ToggleEditing(): JSX.Element | null {
-  const relation = useCurrentRelation();
+  const relation = useCurrentNode();
   const displayText = useDisplayText();
   const ariaLabel = displayText ? `edit ${displayText}` : undefined;
   const { editingViews, setEditingState } = useTemporaryView();

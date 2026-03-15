@@ -1,7 +1,7 @@
 import { List, OrderedMap, Set as ImmutableSet } from "immutable";
 import {
   EMPTY_SEMANTIC_ID,
-  getRelationChildNodes,
+  getChildNodes,
   shortID,
   splitID,
   isSearchId,
@@ -9,7 +9,7 @@ import {
   itemPassesFilters,
   getNodeSemanticID,
   getSemanticID,
-  getRelationContext,
+  getNodeContext,
   getNodeText,
   getNode,
   resolveNode,
@@ -224,14 +224,14 @@ export function findRefsToNode(
     .filter((relation) => !isSearchId(getSemanticID(knowledgeDBs, relation)))
     .filter(
       (relation) =>
-        !getRelationContext(knowledgeDBs, relation).some((id) =>
+        !getNodeContext(knowledgeDBs, relation).some((id) =>
           isSearchId(id as ID)
         )
     )
     .map((relation) => ({
       ref: {
         relationID: relation.id,
-        context: getRelationContext(knowledgeDBs, relation),
+        context: getNodeContext(knowledgeDBs, relation),
         updated: relation.updated,
       },
       author: relation.author,
@@ -279,7 +279,7 @@ function contextKeyForCref(
   if (!targetRelation) {
     return undefined;
   }
-  return getContextKey(getRelationContext(knowledgeDBs, targetRelation));
+  return getContextKey(getNodeContext(knowledgeDBs, targetRelation));
 }
 
 function coveredContextKeys(
@@ -375,7 +375,7 @@ export function getIncomingCrefsForNode(
           .filter((relation) => !outgoingTargetRelIDs.has(relation.id))
           .map((relation) => ({
             relationID: relation.id,
-            context: getRelationContext(knowledgeDBs, relation),
+            context: getNodeContext(knowledgeDBs, relation),
             updated: relation.updated,
           }))
       : []
@@ -419,7 +419,7 @@ function getFilteredRelationItems(
   filterTypes: FooterTypeFilters
 ): List<GraphNode> {
   const itemFilters = getFooterItemFilters(filterTypes);
-  return getRelationChildNodes(knowledgeDBs, relation, relation.author)
+  return getChildNodes(knowledgeDBs, relation, relation.author)
     .filter(
       (item) =>
         itemPassesFilters(item, itemFilters) &&
@@ -588,7 +588,7 @@ export function getAlternativeFooterData(
     currentRelation
   );
 
-  const currentRelationChildren = getRelationChildNodes(
+  const currentRelationChildren = getChildNodes(
     knowledgeDBs,
     currentRelation,
     currentRelation.author

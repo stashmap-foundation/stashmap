@@ -1,6 +1,6 @@
 import { List } from "immutable";
 import {
-  getRelationChildNodes,
+  getChildNodes,
   getNode,
   resolveNode,
   isRefNode,
@@ -8,14 +8,14 @@ import {
   splitID,
   itemPassesFilters,
   getSemanticID,
-  getRelationContext,
+  getNodeContext,
 } from "./connections";
 import { getTextForSemanticID } from "./semanticProjection";
 import {
   ViewPath,
   getParentView,
   getLast,
-  getRelationForView,
+  getNodeForView,
 } from "./ViewContext";
 import { getPane } from "./planner";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
@@ -66,7 +66,7 @@ export function parseRef(
     return undefined;
   }
 
-  const relationContext = getRelationContext(knowledgeDBs, relation).map(
+  const relationContext = getNodeContext(knowledgeDBs, relation).map(
     (id) => shortID(id) as ID
   );
 
@@ -99,8 +99,8 @@ function relationsMatchForVersion(
 ): boolean {
   return (
     getSemanticID(knowledgeDBs, left) === getSemanticID(knowledgeDBs, right) &&
-    getRelationContext(knowledgeDBs, left).equals(
-      getRelationContext(knowledgeDBs, right)
+    getNodeContext(knowledgeDBs, left).equals(
+      getNodeContext(knowledgeDBs, right)
     )
   );
 }
@@ -170,7 +170,7 @@ function effectiveIDs(
     | "contains"
   )[]
 ): List<string> {
-  return getRelationChildNodes(knowledgeDBs, relation, relation.author)
+  return getChildNodes(knowledgeDBs, relation, relation.author)
     .filter(
       (item) =>
         itemPassesFilters(item, activeFilters) &&
@@ -224,7 +224,7 @@ function computeVersionMeta(
 
   const parentPath = getParentView(viewPath);
   const parentRelation = parentPath
-    ? getRelationForView(data, parentPath, stack)
+    ? getNodeForView(data, parentPath, stack)
     : undefined;
 
   const { addCount, removeCount } = computeRelationDiff(
@@ -271,7 +271,7 @@ function findIncomingCrefItem(
 ): GraphNode | undefined {
   const parentPath = getParentView(viewPath);
   if (!parentPath) return undefined;
-  const parentRelation = getRelationForView(data, parentPath, stack);
+  const parentRelation = getNodeForView(data, parentPath, stack);
   if (!parentRelation) return undefined;
   return getReferenceSourceRelations(ref, data.knowledgeDBs)
     .map((sourceRelation) =>
@@ -296,7 +296,7 @@ export function buildReferenceItem(
   if (!ref) {
     const parentPath = getParentView(viewPath);
     const parentRelation = parentPath
-      ? getRelationForView(data, parentPath, stack)
+      ? getNodeForView(data, parentPath, stack)
       : undefined;
     const parentItem = parentRelation
       ? getNode(data.knowledgeDBs, refId, data.user.publicKey)
@@ -377,7 +377,7 @@ export function buildReferenceItem(
   const parentPath = getParentView(viewPath);
   if (!parentPath) return outgoing;
 
-  const parentRelation = getRelationForView(data, parentPath, stack);
+  const parentRelation = getNodeForView(data, parentPath, stack);
   if (
     parentRelation &&
     relationsMatchForVersion(data.knowledgeDBs, ref.relation, parentRelation)

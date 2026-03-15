@@ -6,7 +6,7 @@ import React, {
   useState,
 } from "react";
 import { useData } from "./DataContext";
-import { getRelationRouteTargetInfo } from "./connections";
+import { getNodeRouteTargetInfo } from "./connections";
 import {
   pathToStack,
   buildNodeUrl,
@@ -133,7 +133,7 @@ export function NavigationStateProvider({
     }
     const resolved = panes.map((p) => {
       if (p.rootRelation && p.stack.length === 0) {
-        const relationInfo = getRelationRouteTargetInfo(
+        const relationInfo = getNodeRouteTargetInfo(
           p.rootRelation,
           knowledgeDBs,
           p.author

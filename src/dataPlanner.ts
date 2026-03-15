@@ -1,7 +1,7 @@
 import { Set } from "immutable";
 import {
   deleteRelations,
-  getRelationContext,
+  getNodeContext,
   getSemanticID,
   getNode,
   isRefNode,
@@ -271,7 +271,7 @@ export function planCopyRootById<T extends GraphPlan>(
   const [copiedPlan, mapping] = planCopyDescendantRelations(
     plan,
     sourceRelation,
-    (relation) => getRelationContext(plan.knowledgeDBs, relation),
+    (relation) => getNodeContext(plan.knowledgeDBs, relation),
     (relation) => relation.author === sourceRelation.author
   );
 
@@ -315,7 +315,7 @@ export function planRemoveRelationItemById<T extends GraphPlan>(
     return planMoveDescendantRelations(
       withoutItem,
       sourceRelation,
-      getRelationContext(withoutItem.knowledgeDBs, sourceRelation),
+      getNodeContext(withoutItem.knowledgeDBs, sourceRelation),
       undefined,
       undefined,
       shortID(sourceRelation.id)
@@ -441,7 +441,7 @@ export function planMoveRelationItemById<T extends GraphPlan>(
     return withMovedEdge;
   }
 
-  const targetSemanticContext = getRelationContext(
+  const targetSemanticContext = getNodeContext(
     withMovedEdge.knowledgeDBs,
     writableTargetParent
   ).push(getSemanticID(withMovedEdge.knowledgeDBs, writableTargetParent));

@@ -8,8 +8,8 @@ import { planUpdateRelationItemMetadataById } from "./dataPlanner";
 import { RelationItemMetadata } from "./relationItemMetadata";
 import {
   getParentView,
-  getRelationForView,
-  getRelationIndex,
+  getNodeForView,
+  getNodeIndexForView,
   getRowIDFromView,
   viewPathToString,
   ViewPath,
@@ -26,7 +26,7 @@ import {
 export type { RelationItemMetadata } from "./relationItemMetadata";
 
 function getNodeText(plan: Plan, viewPath: ViewPath, stack: ID[]): string {
-  return getRelationForView(plan, viewPath, stack)?.text ?? "";
+  return getNodeForView(plan, viewPath, stack)?.text ?? "";
 }
 
 export function planUpdateExistingItemMetadata(
@@ -36,7 +36,7 @@ export function planUpdateExistingItemMetadata(
   relationIndex: number,
   metadata: RelationItemMetadata
 ): Plan {
-  const nodes = getRelationForView(plan, parentViewPath, stack);
+  const nodes = getNodeForView(plan, parentViewPath, stack);
   const itemId = nodes?.children.get(relationIndex);
   return nodes && itemId
     ? planUpdateRelationItemMetadataById(plan, nodes.id, itemId, metadata)
@@ -69,11 +69,11 @@ export function planUpdateViewItemMetadata(
         metadata.argument
       ).plan;
     }
-    const nodes = getRelationForView(plan, parentView, stack);
+    const nodes = getNodeForView(plan, parentView, stack);
     return nodes ? planUpdateEmptyNodeMetadata(plan, nodes.id, metadata) : plan;
   }
 
-  const relationIndex = getRelationIndex(plan, viewPath);
+  const relationIndex = getNodeIndexForView(plan, viewPath);
   if (relationIndex === undefined) {
     const virtualItem = virtualItemsMap?.get(viewPathToString(viewPath));
     if (!virtualItem) {

@@ -4,7 +4,7 @@ import { createHeadlessPlan } from "./core/headlessPlan";
 import { MarkdownImportFile, parseMarkdownImportFiles } from "./markdownImport";
 import { planCreateNodesFromMarkdownTrees } from "./markdownPlan";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
-import { buildDocumentEventFromRelations } from "./relationsDocumentEvent";
+import { buildDocumentEventFromNodes } from "./relationsDocumentEvent";
 
 export function requireSingleRootMarkdownTree(
   markdown: string,
@@ -43,7 +43,7 @@ function buildDocumentEventFromRootTree(
   return {
     relationID,
     rootUuid: shortID(relationID),
-    event: buildDocumentEventFromRelations(planWithRoot.knowledgeDBs, relation),
+    event: buildDocumentEventFromNodes(planWithRoot.knowledgeDBs, relation),
   };
 }
 

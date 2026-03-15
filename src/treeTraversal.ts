@@ -5,7 +5,7 @@ import {
   addNodeToPathWithRelations,
   addRelationsToLastElement,
   getRowIDFromView,
-  getRelationForView,
+  getNodeForView,
   getCurrentEdgeForView,
   getEffectiveAuthor,
   getParentRelation,
@@ -13,9 +13,9 @@ import {
 } from "./ViewContext";
 import {
   EMPTY_SEMANTIC_ID,
-  getRelationChildNodes,
+  getChildNodes as getNodeChildren,
   isSearchId,
-  getRelations,
+  getNode,
   itemPassesFilters,
   getSemanticID,
   resolveNode,
@@ -50,7 +50,7 @@ function getChildrenForConcreteRef(
   const sourceRelation =
     refNode && isRefNode(refNode)
       ? resolveNode(data.knowledgeDBs, refNode)
-      : getRelations(data.knowledgeDBs, parentItemID, data.user.publicKey);
+      : getNode(data.knowledgeDBs, parentItemID, data.user.publicKey);
   if (!sourceRelation || sourceRelation.children.size === 0) {
     return {
       paths: List(),
@@ -81,11 +81,11 @@ function getChildrenForRegularNode(
   const effectiveAuthor = getEffectiveAuthor(data, parentPath);
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
   const directRelations = isSearchId(parentItemID as ID)
-    ? getRelations(data.knowledgeDBs, parentItemID as ID, data.user.publicKey)
-    : getRelationForView(data, parentPath, stack);
+    ? getNode(data.knowledgeDBs, parentItemID as ID, data.user.publicKey)
+    : getNodeForView(data, parentPath, stack);
   const nodes = directRelations;
   const childNodes = nodes
-    ? getRelationChildNodes(data.knowledgeDBs, nodes, data.user.publicKey)
+    ? getNodeChildren(data.knowledgeDBs, nodes, data.user.publicKey)
     : List<GraphNode>();
   const relationSemanticID = nodes
     ? getSemanticID(data.knowledgeDBs, nodes)
@@ -99,7 +99,7 @@ function getChildrenForRegularNode(
           item:
             childID === EMPTY_SEMANTIC_ID
               ? undefined
-              : getRelations(data.knowledgeDBs, childID, data.user.publicKey),
+              : getNode(data.knowledgeDBs, childID, data.user.publicKey),
           index,
         }))
         .filter(({ childID, item }) =>
@@ -164,7 +164,7 @@ function getChildrenForRegularNode(
   ): GraphNode => {
     const resolvedItem =
       virtualType === "suggestion"
-        ? getRelations(data.knowledgeDBs, itemID, data.user.publicKey)
+        ? getNode(data.knowledgeDBs, itemID, data.user.publicKey)
         : undefined;
     const suggestionTargetID = resolvedItem?.targetID;
     const targetID =
@@ -243,7 +243,7 @@ function getChildrenForRegularNode(
   };
 }
 
-export function getChildNodes(
+export function getTreeChildren(
   data: Data,
   parentPath: ViewPath,
   stack: ID[],
@@ -290,7 +290,7 @@ export function getNodesInTree(
   options?: TreeTraversalOptions,
   virtualItems: VirtualItemsMap = EMPTY_VIRTUAL_ITEMS
 ): TreeResult {
-  const childResult = getChildNodes(
+  const childResult = getTreeChildren(
     data,
     parentPath,
     stack,

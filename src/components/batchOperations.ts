@@ -7,8 +7,8 @@ import {
   getParentKey,
   getParentView,
   getPreviousSibling,
-  getRelationForView,
-  getRelationIndex,
+  getNodeForView,
+  getNodeIndexForView,
   parseViewPath,
   viewPathToString,
 } from "../ViewContext";
@@ -57,7 +57,7 @@ function getEditorTextForPath(
 }
 
 function getNodeText(plan: Plan, viewPath: ViewPath, stack: ID[]): string {
-  return getRelationForView(plan, viewPath, stack)?.text ?? "";
+  return getNodeForView(plan, viewPath, stack)?.text ?? "";
 }
 
 function planUpdateOneMetadata(
@@ -173,8 +173,8 @@ function remapSelectionForMovedKeys(
 
 function sortByRelationIndex(plan: Plan, viewPaths: ViewPath[]): ViewPath[] {
   return [...viewPaths].sort((a, b) => {
-    const idxA = getRelationIndex(plan, a) ?? 0;
-    const idxB = getRelationIndex(plan, b) ?? 0;
+    const idxA = getNodeIndexForView(plan, a) ?? 0;
+    const idxB = getNodeIndexForView(plan, b) ?? 0;
     return idxA - idxB;
   });
 }
@@ -202,7 +202,7 @@ export function planBatchIndent(
   const { plan: updated, remappedKeys } = viewPaths.reduce(
     (state, viewPath) => {
       const fromKey = viewPathToString(viewPath);
-      const targetRelationBefore = getRelationForView(
+      const targetRelationBefore = getNodeForView(
         state.plan,
         prevSibling.viewPath,
         stack
@@ -215,7 +215,7 @@ export function planBatchIndent(
         stack,
         insertAt
       );
-      const targetRelationAfter = getRelationForView(
+      const targetRelationAfter = getNodeForView(
         moved,
         prevSibling.viewPath,
         stack
@@ -274,7 +274,7 @@ export function planBatchOutdent(
   const grandParentPath = getParentView(parentPath);
   if (!grandParentPath) return undefined;
 
-  const parentRelationIndex = getRelationIndex(plan, parentPath);
+  const parentRelationIndex = getNodeIndexForView(plan, parentPath);
   if (parentRelationIndex === undefined) return undefined;
 
   const { plan: updated, remappedKeys } = viewPaths.reduce(
@@ -288,11 +288,7 @@ export function planBatchOutdent(
         stack,
         insertAt
       );
-      const targetRelationAfter = getRelationForView(
-        moved,
-        grandParentPath,
-        stack
-      );
+      const targetRelationAfter = getNodeForView(moved, grandParentPath, stack);
       const updatedViewPath =
         targetRelationAfter && insertAt < targetRelationAfter.children.size
           ? addNodeToPathWithRelations(

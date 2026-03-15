@@ -28,6 +28,7 @@ type ParsedComment = {
   uuid: string;
   hidden: boolean;
   basedOn: string | undefined;
+  snapshotDTag: string | undefined;
   anchor: RootAnchor | undefined;
   systemRole: RootSystemRole | undefined;
   userPublicKey: PublicKey | undefined;
@@ -48,6 +49,7 @@ function parseIdComment(content: string): ParsedComment | undefined {
 
   const hidden = rest.includes(" hidden");
   const basedOn = attrsMap.basedOn || undefined;
+  const snapshotDTag = attrsMap.snapshot || undefined;
   const anchorContext = attrsMap.anchorContext || undefined;
   const anchorLabelsAttr = attrsMap.anchorLabels || undefined;
   const sourceAuthor = attrsMap.sourceAuthor || undefined;
@@ -94,6 +96,7 @@ function parseIdComment(content: string): ParsedComment | undefined {
     uuid,
     hidden,
     basedOn,
+    snapshotDTag,
     anchor,
     systemRole,
     userPublicKey,
@@ -182,6 +185,7 @@ export type MarkdownTreeNode = {
   headingLevel?: number;
   hidden?: boolean;
   basedOn?: string;
+  snapshotDTag?: string;
   anchor?: RootAnchor;
   systemRole?: RootSystemRole;
   userPublicKey?: PublicKey;
@@ -253,6 +257,9 @@ export function parseMarkdownHierarchy(
         ...(commentAttrs?.basedOn !== undefined && {
           basedOn: commentAttrs.basedOn,
         }),
+        ...(commentAttrs?.snapshotDTag !== undefined && {
+          snapshotDTag: commentAttrs.snapshotDTag,
+        }),
         ...(commentAttrs?.anchor !== undefined && {
           anchor: commentAttrs.anchor,
         }),
@@ -317,6 +324,9 @@ export function parseMarkdownHierarchy(
           ...(commentAttrs?.hidden && { hidden: true }),
           ...(commentAttrs?.basedOn !== undefined && {
             basedOn: commentAttrs.basedOn,
+          }),
+          ...(commentAttrs?.snapshotDTag !== undefined && {
+            snapshotDTag: commentAttrs.snapshotDTag,
           }),
           ...(commentAttrs?.userPublicKey !== undefined && {
             userPublicKey: commentAttrs.userPublicKey,

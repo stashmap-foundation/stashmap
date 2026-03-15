@@ -16,7 +16,10 @@ import {
   type,
   type UpdateState,
 } from "../utils.test";
-import { KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
+import {
+  KIND_KNOWLEDGE_DOCUMENT,
+  KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
+} from "../nostr";
 import { parseMarkdownHierarchy } from "../markdownDocument";
 
 const maybeExpand = async (label: string): Promise<void> => {
@@ -1614,6 +1617,32 @@ My Notes
       );
 
     expect(newEvents.length).toBeGreaterThan(0);
+  });
+
+  test("Forking readonly root publishes a snapshot event and stores its pointer", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(alice);
+    await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}Child{Escape}");
+    cleanup();
+
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+
+    const bobEvents = bob().relayPool.getEvents();
+    const snapshotEvents = bobEvents.filter(
+      (event) =>
+        event.kind === KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT &&
+        event.pubkey === BOB.publicKey
+    );
+    expect(snapshotEvents).toHaveLength(1);
+
+    const bobDocumentEvents = bobEvents.filter(
+      (event) =>
+        event.kind === KIND_KNOWLEDGE_DOCUMENT && event.pubkey === BOB.publicKey
+    );
+    expect(
+      bobDocumentEvents.some((event) => event.content.includes('snapshot="'))
+    ).toBe(true);
   });
 });
 

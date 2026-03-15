@@ -5,7 +5,7 @@ import {
   ViewPath,
   useViewPath,
   parseViewPath,
-  useCurrentRelation,
+  useCurrentNode,
   useDisplayText,
   useViewKey,
   useCurrentEdge,
@@ -55,7 +55,7 @@ export function EvidenceSelector(): JSX.Element | null {
     virtualType === "incoming" || virtualType === "version";
   const viewPath = useViewPath();
   const viewKey = useViewKey();
-  const currentRelation = useCurrentRelation();
+  const currentRelation = useCurrentNode();
   const versionedDisplayText = useDisplayText();
   const editorTextContext = useEditorText();
   const editorText = editorTextContext?.text ?? "";

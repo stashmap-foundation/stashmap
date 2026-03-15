@@ -1,7 +1,7 @@
 import { List } from "immutable";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { createPlan } from "../planner";
-import { getRelationChildNodes, getNode, getSemanticID } from "../connections";
+import { getChildNodes, getNode, getSemanticID } from "../connections";
 import { isStandaloneRoot } from "../systemRoots";
 import {
   ALICE,
@@ -37,9 +37,7 @@ function nodeChildren(
   node: GraphNode | undefined,
   myself: PublicKey
 ): List<GraphNode> {
-  return node
-    ? getRelationChildNodes(knowledgeDBs, node, myself)
-    : List<GraphNode>();
+  return node ? getChildNodes(knowledgeDBs, node, myself) : List<GraphNode>();
 }
 
 test("Single file with multiple top-level roots is wrapped by filename", () => {

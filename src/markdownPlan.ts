@@ -1,10 +1,5 @@
 import { List } from "immutable";
-import {
-  getRelationContext,
-  getSemanticID,
-  getNode,
-  shortID,
-} from "./connections";
+import { getNodeContext, getSemanticID, getNode, shortID } from "./connections";
 import { MarkdownImportFile, parseMarkdownImportFiles } from "./markdownImport";
 import { createNodesFromMarkdownTrees, WalkContext } from "./markdownRelations";
 import { MarkdownTreeNode } from "./markdownTree";
@@ -17,7 +12,7 @@ import {
   planUpsertRelations,
 } from "./planner";
 import { newRelations } from "./relationFactory";
-import { getRelationForView, ViewPath } from "./ViewContext";
+import { getNodeForView, ViewPath } from "./ViewContext";
 
 export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
   plan: T,
@@ -180,7 +175,7 @@ export function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
     relevance,
     argument
   );
-  const targetSemanticContext = getRelationContext(
+  const targetSemanticContext = getNodeContext(
     planWithAdded.knowledgeDBs,
     parentRelation
   ).push(getSemanticID(planWithAdded.knowledgeDBs, parentRelation));
@@ -215,7 +210,7 @@ export function planInsertMarkdownTrees(
   topRelationIDs: LongID[];
   actualItemIDs: Array<ID>;
 } {
-  const parentRelation = getRelationForView(plan, parentViewPath, stack);
+  const parentRelation = getNodeForView(plan, parentViewPath, stack);
   return parentRelation
     ? planInsertMarkdownTreesByParentId(
         plan,

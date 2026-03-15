@@ -2,7 +2,7 @@
 import { List, Map, Set as ImmutableSet } from "immutable";
 import { v4 } from "uuid";
 import { UnsignedEvent } from "nostr-tools";
-import { ensureRelationNativeFields, joinID, shortID } from "./connections";
+import { ensureNodeNativeFields, joinID, shortID } from "./connections";
 import { newDB } from "./knowledge";
 import { findTag } from "./nostrEvents";
 import { createRootAnchor } from "./rootAnchor";
@@ -21,10 +21,7 @@ function walkUpsertRelation(
   relation: GraphNode
 ): WalkContext {
   const db = ctx.knowledgeDBs.get(ctx.publicKey, newDB());
-  const normalizedRelation = ensureRelationNativeFields(
-    ctx.knowledgeDBs,
-    relation
-  );
+  const normalizedRelation = ensureNodeNativeFields(ctx.knowledgeDBs, relation);
   return {
     ...ctx,
     knowledgeDBs: ctx.knowledgeDBs.set(ctx.publicKey, {
@@ -56,6 +53,7 @@ function materializeTreeNode(
       : treeNode.anchor ?? createRootAnchor(semanticContext),
     systemRole: parent ? undefined : treeNode.systemRole,
     userPublicKey: treeNode.userPublicKey,
+    snapshotDTag: parent ? undefined : treeNode.snapshotDTag,
   };
 
   const childSemanticContext = semanticContext.push(

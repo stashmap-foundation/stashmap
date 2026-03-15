@@ -1,7 +1,7 @@
 import { UnsignedEvent } from "nostr-tools";
 import {
   EMPTY_SEMANTIC_ID,
-  getRelationContext,
+  getNodeContext,
   getSemanticID,
   getNodeText,
   getNode,
@@ -14,7 +14,12 @@ import {
   formatPrefixMarkers,
   formatRootHeading,
 } from "./documentFormat";
-import { KIND_KNOWLEDGE_DOCUMENT, msTag, newTimestamp } from "./nostr";
+import {
+  KIND_KNOWLEDGE_DOCUMENT,
+  KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
+  msTag,
+  newTimestamp,
+} from "./nostr";
 import { createRootAnchor } from "./rootAnchor";
 
 type SerializeResult = {
@@ -98,9 +103,12 @@ function serializeRelationItems(
   }, current);
 }
 
-export function buildDocumentEventFromRelations(
+export function buildDocumentEventFromNodes(
   knowledgeDBs: KnowledgeDBs,
-  rootRelation: GraphNode
+  rootRelation: GraphNode,
+  options?: {
+    snapshotDTag?: string;
+  }
 ): UnsignedEvent {
   const rootText = getSerializableRelationText(knowledgeDBs, rootRelation);
   const rootUuid = shortID(rootRelation.id);
@@ -127,11 +135,35 @@ export function buildDocumentEventFromRelations(
         rootText,
         rootUuid,
         rootRelation.basedOn,
+        options?.snapshotDTag ?? rootRelation.snapshotDTag,
         rootRelation.anchor ??
-          createRootAnchor(getRelationContext(knowledgeDBs, rootRelation)),
+          createRootAnchor(getNodeContext(knowledgeDBs, rootRelation)),
         rootRelation.systemRole
       ),
       ...serialized.lines,
     ].join("\n")}\n`,
+  };
+}
+
+export function buildSnapshotEventFromNodes(
+  knowledgeDBs: KnowledgeDBs,
+  snapshotAuthor: PublicKey,
+  snapshotDTag: string,
+  sourceRootRelation: GraphNode
+): UnsignedEvent {
+  const snapshotContent = buildDocumentEventFromNodes(
+    knowledgeDBs,
+    sourceRootRelation
+  ).content;
+  return {
+    kind: KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
+    pubkey: snapshotAuthor,
+    created_at: newTimestamp(),
+    tags: [
+      ["d", snapshotDTag],
+      ["source", shortID(sourceRootRelation.id)],
+      msTag(),
+    ],
+    content: snapshotContent,
   };
 }

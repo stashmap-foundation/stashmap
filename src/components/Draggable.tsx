@@ -7,7 +7,7 @@ import {
   useViewPath,
   useViewKey,
   useCurrentRowID,
-  useCurrentRelation,
+  useCurrentNode,
   useDisplayText,
   useIsViewingOtherUserContent,
   useCurrentEdge,
@@ -76,7 +76,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     const path = useViewPath();
     const isNodeBeeingEdited = useIsEditingOn();
     const [itemID] = useCurrentRowID();
-    const relation = useCurrentRelation();
+    const relation = useCurrentNode();
     const displayText = useDisplayText();
     const isEmptyNode = isEmptySemanticID(itemID);
     const disableDrag = isNodeBeeingEdited || isEmptyNode;
@@ -184,7 +184,7 @@ function DraggableSuggestion({
   const ref = useRef<HTMLDivElement>(null);
   const path = useViewPath();
   const currentItem = useCurrentEdge();
-  const relation = useCurrentRelation();
+  const relation = useCurrentNode();
   const displayText = useDisplayText();
 
   const [{ isDragging }, drag, preview] = useDrag({

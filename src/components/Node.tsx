@@ -7,19 +7,19 @@ import {
   useIsInSearchView,
   useIsExpanded,
   useIsRoot,
-  useRelationIndex,
+  useNodeIndex,
   useCurrentRowID,
   usePreviousSibling,
   useDisplayText,
   getParentView,
-  getRelationForView,
-  getRelationIndex,
+  getNodeForView,
+  getNodeIndexForView,
   getRowIDFromView,
   useIsViewingOtherUserContent,
   useCurrentEdge,
   viewPathToString,
   useEffectiveAuthor,
-  useCurrentRelation,
+  useCurrentNode,
   getCurrentReferenceForView,
 } from "../ViewContext";
 import { isEditableRelation } from "./TemporaryViewContext";
@@ -64,7 +64,7 @@ import { buildRelationUrl } from "../navigationUrl";
 import { RightMenu } from "./RightMenu";
 import { useItemStyle } from "./useItemStyle";
 import { EditorTextProvider } from "./EditorTextContext";
-import { getChildNodes } from "../treeTraversal";
+import { getTreeChildren } from "../treeTraversal";
 import { getRelationUserPublicKey } from "../userEntries";
 
 export { getNodesInTree } from "../treeTraversal";
@@ -75,7 +75,7 @@ function useNodeHasChildren(): boolean {
   const stack = usePaneStack();
   const pane = useCurrentPane();
   const currentItem = useCurrentEdge();
-  const currentRelation = useCurrentRelation();
+  const currentRelation = useCurrentNode();
   useEffectiveAuthor();
 
   if (currentRelation) {
@@ -91,7 +91,7 @@ function useNodeHasChildren(): boolean {
     }
   }
 
-  const result = getChildNodes(
+  const result = getTreeChildren(
     data,
     viewPath,
     stack,
@@ -235,14 +235,14 @@ function EditableContent(): JSX.Element {
   const paneIndex = usePaneIndex();
   const data = useData();
   const { createPlan, executePlan } = usePlanner();
-  const currentRelation = useCurrentRelation();
+  const currentRelation = useCurrentNode();
   const [itemID] = useCurrentRowID();
   const displayText = useDisplayText();
   const prevSibling = usePreviousSibling();
   const parentPath = getParentView(viewPath);
   const viewIsExpanded = useIsExpanded();
   const nodeIsRoot = useIsRoot();
-  const relationIndex = useRelationIndex();
+  const relationIndex = useNodeIndex();
   const isEmptyNode = isEmptySemanticID(itemID);
   const nodeHasChildren = useNodeHasChildren();
   const nodeIsExpanded = viewIsExpanded && nodeHasChildren;
@@ -251,7 +251,7 @@ function EditableContent(): JSX.Element {
     data.publishEventsStatus.temporaryEvents
   );
   const parentRelation = parentPath
-    ? getRelationForView(data, parentPath, stack)
+    ? getNodeForView(data, parentPath, stack)
     : undefined;
   const emptyData = parentRelation
     ? emptyNodeMetadata.get(parentRelation.id)
@@ -324,11 +324,7 @@ function EditableContent(): JSX.Element {
 
     if (isEmptyNode) {
       if (!prevSibling || !parentPath) return;
-      const currentParentRelation = getRelationForView(
-        basePlan,
-        parentPath,
-        stack
-      );
+      const currentParentRelation = getNodeForView(basePlan, parentPath, stack);
       const planWithoutEmpty = currentParentRelation
         ? planRemoveEmptyNodePosition(basePlan, currentParentRelation.id)
         : basePlan;
@@ -375,14 +371,10 @@ function EditableContent(): JSX.Element {
       if (!parentPath) return;
       const grandParentPath = getParentView(parentPath);
       if (!grandParentPath) return;
-      const parentRelationIndex = getRelationIndex(basePlan, parentPath);
+      const parentRelationIndex = getNodeIndexForView(basePlan, parentPath);
       if (parentRelationIndex === undefined) return;
 
-      const currentParentRelation = getRelationForView(
-        basePlan,
-        parentPath,
-        stack
-      );
+      const currentParentRelation = getNodeForView(basePlan, parentPath, stack);
       const planWithoutEmpty = currentParentRelation
         ? planRemoveEmptyNodePosition(basePlan, currentParentRelation.id)
         : basePlan;
@@ -471,7 +463,7 @@ function EditableContent(): JSX.Element {
       );
       return;
     }
-    const savedIndex = getRelationIndex(basePlan, updatedViewPath);
+    const savedIndex = getNodeIndexForView(basePlan, updatedViewPath);
     const insertAt = savedIndex !== undefined ? savedIndex + 1 : 0;
     executePlan(
       planPasteMarkdownTrees(basePlan, trees, parentOfSaved, stack, insertAt)
@@ -492,7 +484,7 @@ function EditableContent(): JSX.Element {
   const handleClose = (): void => {
     if (!isEmptyNode || !parentPath) return;
     const plan = createPlan();
-    const closeParentRelation = getRelationForView(plan, parentPath, stack);
+    const closeParentRelation = getNodeForView(plan, parentPath, stack);
     if (closeParentRelation) {
       executePlan(planRemoveEmptyNodePosition(plan, closeParentRelation.id));
     }
@@ -524,7 +516,7 @@ function InteractiveNodeContent(): JSX.Element {
   const data = useData();
   const viewPath = useViewPath();
   const stack = usePaneStack();
-  const currentRelation = useCurrentRelation();
+  const currentRelation = useCurrentNode();
   const [itemID] = useCurrentRowID();
   const isLoading = useNodeIsLoading();
   const isInSearchView = useIsInSearchView();
@@ -735,7 +727,7 @@ export function Node({
   const currentItem = useCurrentEdge();
   const isConcreteRef = isRefNode(currentItem);
   const virtualType = currentItem?.virtualType;
-  const currentRelation = useCurrentRelation();
+  const currentRelation = useCurrentNode();
   const isViewingOtherUser = useIsViewingOtherUserContent();
   const node = getCurrentReferenceForView(
     data,

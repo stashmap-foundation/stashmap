@@ -1,11 +1,11 @@
 import {
-  useRelationIndex,
+  useNodeIndex,
   useViewPath,
   getParentView,
   useIsInSearchView,
-  useCurrentRelation,
+  useCurrentNode,
   useCurrentRowID,
-  getRelationForView,
+  getNodeForView,
   getCurrentEdgeForView,
   ViewPath,
 } from "../ViewContext";
@@ -45,17 +45,17 @@ type RelationItemContext = {
 export function useRelationItemContext(): RelationItemContext {
   const data = useData();
   const viewPath = useViewPath();
-  const relationIndex = useRelationIndex();
+  const relationIndex = useNodeIndex();
   const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
   const isInSearchView = useIsInSearchView();
-  const currentRelation = useCurrentRelation();
+  const currentRelation = useCurrentNode();
   const parentView = getParentView(viewPath);
 
   const [itemID] = useCurrentRowID();
   const isEmptyNode = isEmptySemanticID(itemID);
   const relationsID = parentView
-    ? getRelationForView(data, parentView, stack)?.id
+    ? getNodeForView(data, parentView, stack)?.id
     : undefined;
   const editorTextContext = useEditorText();
   const nodeText = currentRelation?.text || "";

@@ -239,6 +239,7 @@ declare global {
     anchor?: RootAnchor;
     systemRole?: RootSystemRole;
     userPublicKey?: PublicKey;
+    snapshotDTag?: string;
     updated: number;
     author: PublicKey;
     basedOn?: LongID;

@@ -10,9 +10,9 @@ import {
   ViewPath,
   getParentView,
   updateViewPathsAfterMoveRelations,
-  getRelationIndex,
+  getNodeIndexForView,
   getRowIDFromView,
-  getRelationForView,
+  getNodeForView,
   getPaneIndex,
   viewPathToString,
   getCurrentEdgeForView,
@@ -39,7 +39,7 @@ function getDropDestinationEndOfRoot(
   root: ViewPath,
   stack: ID[]
 ): [ViewPath, number] {
-  const nodes = getRelationForView(data, root, stack);
+  const nodes = getNodeForView(data, root, stack);
   return [root, nodes?.children.size || 0];
 }
 
@@ -51,7 +51,7 @@ function getInsertAfterNode(
   if (!parentView) {
     return undefined;
   }
-  const index = getRelationIndex(data, node);
+  const index = getNodeIndexForView(data, node);
   if (index === undefined) {
     return undefined;
   }
@@ -93,17 +93,17 @@ function resolveDropByDepth(
     if (!parentView) {
       return getDropDestinationEndOfRoot(data, root, stack);
     }
-    const idx = getRelationIndex(data, dropBefore);
+    const idx = getNodeIndexForView(data, dropBefore);
     return [parentView, idx || 0];
   }
 
   const prevDepth = prevNode.length - 1;
   if (clampedDepth === prevDepth + 1) {
     if (dropBefore && dropBefore.length - 1 === clampedDepth) {
-      const idx = getRelationIndex(data, dropBefore);
+      const idx = getNodeIndexForView(data, dropBefore);
       return [prevNode, idx ?? 0];
     }
-    const relation = getRelationForView(data, prevNode, stack);
+    const relation = getNodeForView(data, prevNode, stack);
     return [prevNode, relation?.children.size || 0];
   }
 
@@ -195,7 +195,7 @@ export function getDropDestinationFromTreeView(
   if (!parentView) {
     return getDropDestinationEndOfRoot(data, root, stack);
   }
-  const index = getRelationIndex(data, dropBefore);
+  const index = getNodeIndexForView(data, dropBefore);
   return [parentView, index || 0];
 }
 
@@ -238,9 +238,9 @@ export function dnd(
         );
 
   const fromRelation = sourceParentPath
-    ? getRelationForView(plan, sourceParentPath, stack)
+    ? getNodeForView(plan, sourceParentPath, stack)
     : undefined;
-  const toRelation = getRelationForView(plan, toView, stack);
+  const toRelation = getNodeForView(plan, toView, stack);
 
   const sourcePaneIndex = getPaneIndex(sourceViewPath);
   const targetPaneIndex = getPaneIndex(rootView);
@@ -267,7 +267,7 @@ export function dnd(
   ): Plan => {
     const [sourceItemID] = getRowIDFromView(accPlan, sourcePath);
     const sourceStack = getPane(accPlan, sourcePath).stack;
-    const sourceRelation = getRelationForView(accPlan, sourcePath, sourceStack);
+    const sourceRelation = getNodeForView(accPlan, sourcePath, sourceStack);
     return planAddToParent(
       accPlan,
       createRefTarget(
@@ -282,13 +282,13 @@ export function dnd(
 
   if (reorder) {
     const realSources = independentSources.filter(
-      (n) => getRelationIndex(plan, parseViewPath(n)) !== undefined
+      (n) => getNodeIndexForView(plan, parseViewPath(n)) !== undefined
     );
     const virtualSources = independentSources.filter(
-      (n) => getRelationIndex(plan, parseViewPath(n)) === undefined
+      (n) => getNodeIndexForView(plan, parseViewPath(n)) === undefined
     );
     const sourceIndices = List(
-      realSources.map((n) => getRelationIndex(plan, parseViewPath(n)))
+      realSources.map((n) => getNodeIndexForView(plan, parseViewPath(n)))
     ).filter((n) => n !== undefined) as List<number>;
     const updatedRelationsPlan = upsertRelations(
       plan,
@@ -326,10 +326,10 @@ export function dnd(
       return plan;
     }
     const realSources = independentSources.filter(
-      (n) => getRelationIndex(plan, parseViewPath(n)) !== undefined
+      (n) => getNodeIndexForView(plan, parseViewPath(n)) !== undefined
     );
     const virtualSources = independentSources.filter(
-      (n) => getRelationIndex(plan, parseViewPath(n)) === undefined
+      (n) => getNodeIndexForView(plan, parseViewPath(n)) === undefined
     );
     const movedPlan = realSources
       .toList()
@@ -407,7 +407,7 @@ export function dnd(
       const sourceEdgeRelevance = sourceEdge?.relevance;
       const sourceEdgeArgument = sourceEdge?.argument;
       const sourceRelation =
-        getRelationForView(accPlan, sourcePath, sourceStack) || sourceEdge;
+        getNodeForView(accPlan, sourcePath, sourceStack) || sourceEdge;
       const insertAt = dropIndex !== undefined ? dropIndex + idx : undefined;
 
       if (shouldCreateReference(sourceItemID, sourceRelation)) {
@@ -443,7 +443,7 @@ export function dnd(
           sourceStack,
           (r) => r
         );
-        const sourceRelationWithUpsert = getRelationForView(
+        const sourceRelationWithUpsert = getNodeForView(
           planWithRelation,
           sourcePath,
           sourceStack

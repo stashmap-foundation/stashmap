@@ -11,7 +11,7 @@ import {
   useViewPath,
   parseViewPath,
   getParentView,
-  useCurrentRelation,
+  useCurrentNode,
   useDisplayText,
   useViewKey,
   useVirtualItemsMap,
@@ -75,7 +75,7 @@ export function RelevanceSelector({
 
   const viewPath = useViewPath();
   const viewKey = useViewKey();
-  const currentRelation = useCurrentRelation();
+  const currentRelation = useCurrentNode();
   const stack = usePaneStack();
   const virtualItemsMap = useVirtualItemsMap();
   const { createPlan, executePlan } = usePlanner();

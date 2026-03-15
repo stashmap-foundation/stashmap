@@ -2,12 +2,14 @@ export function formatRootHeading(
   rootText: string,
   rootUuid: string,
   basedOn?: LongID,
+  snapshotDTag?: string,
   anchor?: RootAnchor,
   systemRole?: RootSystemRole
 ): string {
   const parts = [
     `id:${rootUuid}`,
     ...(basedOn ? [`basedOn="${basedOn}"`] : []),
+    ...(snapshotDTag ? [`snapshot="${snapshotDTag}"`] : []),
     ...(anchor?.snapshotContext.size
       ? [`anchorContext="${anchor.snapshotContext.join(":")}"`]
       : []),

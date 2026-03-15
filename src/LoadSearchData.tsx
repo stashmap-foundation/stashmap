@@ -4,7 +4,7 @@ import {
   isSearchId,
   parseSearchId,
   getSearchRelations,
-  buildTextNodesFromRelations,
+  buildTextNodesFromGraphNodes,
   shortID,
 } from "./connections";
 import type { TextSeed } from "./connections";
@@ -16,7 +16,7 @@ import { useCurrentPane } from "./SplitPanesContext";
 import { newDB } from "./knowledge";
 
 function getAllNodesFromDBs(knowledgeDBs: KnowledgeDBs): Map<string, TextSeed> {
-  return buildTextNodesFromRelations(
+  return buildTextNodesFromGraphNodes(
     knowledgeDBs.valueSeq().flatMap((db) => db.nodes.valueSeq())
   ) as Map<string, TextSeed>;
 }

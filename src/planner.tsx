@@ -18,7 +18,10 @@ import { createPublishQueue } from "./PublishQueue";
 import type { StashmapDB } from "./indexedDB";
 import { newDB } from "./knowledge";
 import { buildDocumentEvent } from "./markdownDocument";
-import { buildDocumentEventFromRelations } from "./relationsDocumentEvent";
+import {
+  buildDocumentEventFromNodes,
+  buildSnapshotEventFromNodes,
+} from "./relationsDocumentEvent";
 import {
   shortID,
   EMPTY_SEMANTIC_ID,
@@ -27,8 +30,8 @@ import {
   resolveNode,
   computeEmptyNodeMetadata,
   isSearchId,
-  ensureRelationNativeFields,
-  getRelationContext,
+  ensureNodeNativeFields,
+  getNodeContext,
   getSemanticID,
   getNodeText,
   isRefNode,
@@ -50,7 +53,7 @@ import {
   bulkUpdateViewPathsAfterAddRelation,
   copyViewsWithRelationsMapping,
   viewPathToString,
-  getRelationForView,
+  getNodeForView,
   addNodeToPathWithRelations,
   getPaneIndex,
 } from "./ViewContext";
@@ -279,10 +282,7 @@ function upsertRelationsCore<T extends GraphPlan>(
   nodes: GraphNode
 ): T {
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
-  const normalizedRelations = ensureRelationNativeFields(
-    plan.knowledgeDBs,
-    nodes
-  );
+  const normalizedRelations = ensureNodeNativeFields(plan.knowledgeDBs, nodes);
   const updatedRelations = userDB.nodes.set(
     shortID(normalizedRelations.id),
     normalizedRelations
@@ -338,7 +338,7 @@ export function planUpdateRelationText(
   stack: ID[],
   text: string
 ): Plan {
-  const currentRelation = getRelationForView(plan, viewPath, stack);
+  const currentRelation = getNodeForView(plan, viewPath, stack);
   if (!currentRelation || currentRelation.author !== plan.user.publicKey) {
     return plan;
   }
@@ -581,7 +581,7 @@ export function planAddTargetsToRelation<T extends GraphPlan>(
     return [plan, []];
   }
 
-  const parentContext = getRelationContext(plan.knowledgeDBs, parentRelation);
+  const parentContext = getNodeContext(plan.knowledgeDBs, parentRelation);
   const childContext = parentContext.push(
     getSemanticID(plan.knowledgeDBs, parentRelation)
   );
@@ -733,7 +733,7 @@ export function planAddToParent(
   const ensureParentRelation = (): [Plan, GraphNode] => {
     const [, parentView] = getRowIDFromView(plan, parentViewPath);
     const planWithExpand = planExpandNode(plan, parentView, parentViewPath);
-    const existingRelation = getRelationForView(
+    const existingRelation = getNodeForView(
       planWithExpand,
       parentViewPath,
       stack
@@ -747,7 +747,7 @@ export function planAddToParent(
       stack,
       (nodes) => nodes
     );
-    const parentRelation = getRelationForView(
+    const parentRelation = getNodeForView(
       planWithParentRelation,
       parentViewPath,
       stack
@@ -779,7 +779,7 @@ function getEffectiveParentRelationID(relation: GraphNode): LongID | undefined {
   return relation.parent;
 }
 
-function getRelationDepth(
+function getNodeDepth(
   relationsByID: Map<ID, GraphNode>,
   relation: GraphNode
 ): number {
@@ -841,7 +841,7 @@ function getRelationSubtree(
     ordered.push(current);
     const children = childrenByParent
       .get(current.id, List<GraphNode>())
-      .sortBy((relation) => getRelationDepth(authorRelationsByID, relation));
+      .sortBy((relation) => getNodeDepth(authorRelationsByID, relation));
     children.forEach((child) => {
       if (seen.has(child.id) || !filterRelation(child)) {
         return;
@@ -954,7 +954,7 @@ export function planMoveDescendantRelations<T extends GraphPlan>(
 ): T {
   const descendants = getRelationSubtree(plan, sourceRelation);
   const sourceSemanticID = getSemanticID(plan.knowledgeDBs, sourceRelation);
-  const sourceSemanticContext = getRelationContext(
+  const sourceSemanticContext = getNodeContext(
     plan.knowledgeDBs,
     sourceRelation
   );
@@ -968,7 +968,7 @@ export function planMoveDescendantRelations<T extends GraphPlan>(
 
   return descendants.reduce((accPlan, relation) => {
     const isRootRelation = relation.id === sourceRelation.id;
-    const relationSemanticContext = getRelationContext(
+    const relationSemanticContext = getNodeContext(
       accPlan.knowledgeDBs,
       relation
     );
@@ -1000,7 +1000,7 @@ export function planMoveTreeDescendantsToContext(
   stack: ID[],
   root?: ID
 ): Plan {
-  const targetParentRelation = getRelationForView(plan, parentViewPath, stack);
+  const targetParentRelation = getNodeForView(plan, parentViewPath, stack);
   const parentContext = getContext(plan, parentViewPath, stack);
   const [parentItemID] = getRowIDFromView(plan, parentViewPath);
   const targetSemanticContext = parentContext.push(
@@ -1058,14 +1058,14 @@ export function planForkPane(
     : undefined;
 
   const sourceRelation =
-    rootRelationData || getRelationForView(plan, viewPath, stack);
+    rootRelationData || getNodeForView(plan, viewPath, stack);
   if (!sourceRelation) {
     return plan;
   }
   const [planWithRelations, relationsIdMapping] = planCopyDescendantRelations(
     plan,
     sourceRelation,
-    (relation) => getRelationContext(plan.knowledgeDBs, relation),
+    (relation) => getNodeContext(plan.knowledgeDBs, relation),
     (relation) => relation.author === pane.author
   );
   const updatedViews = updateViewsWithRelationsMapping(
@@ -1101,7 +1101,7 @@ export function planDeepCopyNode(
   const [sourceItemID] = getRowIDFromView(plan, sourceViewPath);
   const sourceStack = getPane(plan, sourceViewPath).stack;
   const sourceSemanticContext = getContext(plan, sourceViewPath, sourceStack);
-  const sourceRelation = getRelationForView(plan, sourceViewPath, sourceStack);
+  const sourceRelation = getNodeForView(plan, sourceViewPath, sourceStack);
 
   const resolveSource = (): {
     itemID: ID;
@@ -1118,7 +1118,7 @@ export function planDeepCopyNode(
       if (relation) {
         return {
           itemID: getSemanticID(plan.knowledgeDBs, relation),
-          semanticContext: getRelationContext(plan.knowledgeDBs, relation),
+          semanticContext: getNodeContext(plan.knowledgeDBs, relation),
           relation,
         };
       }
@@ -1136,11 +1136,7 @@ export function planDeepCopyNode(
   const resolvedRelation = resolved.relation;
 
   const [planWithParent, targetParentRelation] = (() => {
-    const parentRelation = getRelationForView(
-      plan,
-      targetParentViewPath,
-      stack
-    );
+    const parentRelation = getNodeForView(plan, targetParentViewPath, stack);
     if (parentRelation) {
       return [plan, parentRelation] as const;
     }
@@ -1150,7 +1146,7 @@ export function planDeepCopyNode(
       stack,
       (nodes) => nodes
     );
-    const createdParent = getRelationForView(
+    const createdParent = getNodeForView(
       planWithCreatedParent,
       targetParentViewPath,
       stack
@@ -1191,7 +1187,7 @@ export function planDeepCopyNode(
     resolvedRelation,
     (relation) => {
       const isRootRelation = relation.id === resolvedRelation.id;
-      const relationSemanticContext = getRelationContext(
+      const relationSemanticContext = getNodeContext(
         planWithParent.knowledgeDBs,
         relation
       );
@@ -1240,7 +1236,7 @@ export function planDeepCopyNodeWithView(
     insertAtIndex
   );
 
-  const nodes = getRelationForView(planWithCopy, targetParentViewPath, stack);
+  const nodes = getNodeForView(planWithCopy, targetParentViewPath, stack);
   if (!nodes || nodes.children.size === 0) {
     return planWithCopy;
   }
@@ -1347,7 +1343,7 @@ export function planSaveNodeAndEnsureRelations(
 ): SaveNodeResult {
   const trimmedText = text.trim();
   const [itemID] = getRowIDFromView(plan, viewPath);
-  const currentRelation = getRelationForView(plan, viewPath, stack);
+  const currentRelation = getNodeForView(plan, viewPath, stack);
   const parentPath = getParentView(viewPath);
 
   if (isEmptySemanticID(itemID)) {
@@ -1355,7 +1351,7 @@ export function planSaveNodeAndEnsureRelations(
       if (!trimmedText) return { plan, viewPath };
       return planCreateNoteAtRoot(plan, trimmedText, viewPath);
     }
-    const nodes = getRelationForView(plan, parentPath, stack);
+    const nodes = getNodeForView(plan, parentPath, stack);
 
     if (!trimmedText) {
       const resultPlan = nodes
@@ -1481,7 +1477,7 @@ export function planDeleteDescendantRelations<T extends GraphPlan>(
   const descendants = getRelationSubtree(plan, sourceRelation)
     .filter((relation) => relation.id !== sourceRelation.id)
     .filter((relation) => relation.author === plan.user.publicKey)
-    .sortBy((relation) => -getRelationDepth(userRelationsByID, relation));
+    .sortBy((relation) => -getNodeDepth(userRelationsByID, relation));
 
   return descendants.reduce(
     (accPlan, relation) => planDeleteRelations(accPlan, relation.id),
@@ -1615,12 +1611,35 @@ export function buildDocumentEvents(
       };
       return events.push(deleteEvent as UnsignedEvent & EventAttachment);
     }
+    const snapshotSourceRoot =
+      rootRelation.basedOn && !rootRelation.snapshotDTag
+        ? getNode(plan.knowledgeDBs, rootRelation.basedOn, author)
+        : undefined;
+    const createdSnapshotDTag = snapshotSourceRoot
+      ? `snapshot-${shortID(rootRelation.id as ID)}`
+      : undefined;
+    const snapshotEvent = snapshotSourceRoot
+      ? (buildSnapshotEventFromNodes(
+          plan.knowledgeDBs,
+          author,
+          createdSnapshotDTag as string,
+          snapshotSourceRoot
+        ) as UnsignedEvent & EventAttachment)
+      : undefined;
     const workspacePlan = plan as Partial<WorkspacePlan>;
     const event =
       workspacePlan.views !== undefined && workspacePlan.panes !== undefined
-        ? buildDocumentEvent(workspacePlan as Data, rootRelation)
-        : buildDocumentEventFromRelations(plan.knowledgeDBs, rootRelation);
-    return events.push(event as UnsignedEvent & EventAttachment);
+        ? buildDocumentEvent(workspacePlan as Data, rootRelation, {
+            snapshotDTag: rootRelation.snapshotDTag ?? createdSnapshotDTag,
+          })
+        : buildDocumentEventFromNodes(plan.knowledgeDBs, rootRelation, {
+            snapshotDTag: rootRelation.snapshotDTag ?? createdSnapshotDTag,
+          });
+    return snapshotEvent
+      ? events
+          .push(snapshotEvent)
+          .push(event as UnsignedEvent & EventAttachment)
+      : events.push(event as UnsignedEvent & EventAttachment);
   }, plan.publishEvents);
 }
 
@@ -1870,7 +1889,7 @@ export function planSetEmptyNodePosition(
     parentPath
   );
 
-  const nodes = getRelationForView(planWithExpanded, parentPath, stack);
+  const nodes = getNodeForView(planWithExpanded, parentPath, stack);
   if (!nodes) {
     return plan;
   }

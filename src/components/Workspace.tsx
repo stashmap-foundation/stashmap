@@ -11,7 +11,7 @@ import {
   ViewPath,
   VirtualItemsMap,
   viewPathToString,
-  useCurrentRelation,
+  useCurrentNode,
   useDisplayText,
   useViewPath,
   useIsViewingOtherUserContent,
@@ -55,7 +55,7 @@ import {
 } from "../planner";
 import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import {
-  getRelationStack,
+  getNodeStack,
   getNodeText,
   getSemanticID,
   getNode,
@@ -263,7 +263,7 @@ function createRelationBreadcrumbEntry(
     key: `relation:${relation.id}`,
     label: getBreadcrumbLabel(knowledgeDBs, relation),
     target: {
-      stack: getRelationStack(knowledgeDBs, relation),
+      stack: getNodeStack(knowledgeDBs, relation),
       author: relation.author,
       rootRelation: relation.id,
     },
@@ -351,7 +351,7 @@ function SourceButton(): JSX.Element | null {
 
   const target: Pane = {
     ...pane,
-    stack: getRelationStack(knowledgeDBs, sourceRelation),
+    stack: getNodeStack(knowledgeDBs, sourceRelation),
     author: sourceRelation.author,
     rootRelation: sourceRelation.id,
     scrollToId: undefined,
@@ -381,7 +381,7 @@ function Breadcrumbs(): JSX.Element {
   const navigatePane = useNavigatePane();
   const { setPane } = useSplitPanes();
   const paneHistory = usePaneHistory();
-  const currentRelation = useCurrentRelation();
+  const currentRelation = useCurrentNode();
   const visibleStack = stack.filter((id) => !isSearchId(id as ID));
   const rootRelation = pane.rootRelation
     ? getNode(knowledgeDBs, pane.rootRelation, user.publicKey)
@@ -504,7 +504,7 @@ function Breadcrumbs(): JSX.Element {
 function ForkButton(): JSX.Element | null {
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const currentPane = useCurrentPane();
-  const currentRelation = useCurrentRelation();
+  const currentRelation = useCurrentNode();
   const viewPath = useViewPath();
   const stack = usePaneStack();
   const navigatePane = useNavigatePane();

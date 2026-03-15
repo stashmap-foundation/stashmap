@@ -1,8 +1,8 @@
 import { List, Map } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
 import {
-  ensureRelationNativeFields,
-  getRelationDepth,
+  ensureNodeNativeFields,
+  getNodeDepth,
   shortID,
   splitID,
 } from "./connections";
@@ -100,7 +100,7 @@ export function buildKnowledgeDBFromDocumentRelations(
 
   const nodes = documentRelations
     .valueSeq()
-    .sortBy((relation) => getRelationDepth(baseKnowledgeDBs, relation))
+    .sortBy((relation) => getNodeDepth(baseKnowledgeDBs, relation))
     .reduce((acc, relation) => {
       const knowledgeDBs = Map<PublicKey, KnowledgeData>().set(
         relation.author,
@@ -109,7 +109,7 @@ export function buildKnowledgeDBFromDocumentRelations(
           nodes: acc,
         }
       );
-      const normalized = ensureRelationNativeFields(knowledgeDBs, relation);
+      const normalized = ensureNodeNativeFields(knowledgeDBs, relation);
       return acc.set(shortID(normalized.id), normalized);
     }, Map<string, GraphNode>());
 

@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data */
 import { newDB } from "./knowledge";
 import {
-  getIndexedRelationsForKeys,
-  getRelationChildNodes,
+  getIndexedNodesForKeys,
+  getChildNodes,
   getSemanticID,
   getNode,
   shortID,
@@ -26,9 +26,7 @@ function getAuthorCandidateRelations(
   semanticID: ID
 ): GraphNode[] {
   const authorDB = knowledgeDBs.get(author, newDB());
-  return getIndexedRelationsForKeys(knowledgeDBs, authorDB, [
-    shortID(semanticID),
-  ]);
+  return getIndexedNodesForKeys(knowledgeDBs, authorDB, [shortID(semanticID)]);
 }
 
 function getNewestStandaloneRootBySemanticID(
@@ -69,7 +67,7 @@ function getMatchingChildRelation(
   parentRelation: GraphNode,
   requestedSemanticID: ID
 ): GraphNode | undefined {
-  return getRelationChildNodes(
+  return getChildNodes(
     knowledgeDBs,
     parentRelation,
     parentRelation.author

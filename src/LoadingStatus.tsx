@@ -1,10 +1,6 @@
 import { Filter } from "nostr-tools";
 import React from "react";
-import {
-  useCurrentRelation,
-  useDisplayText,
-  useCurrentRowID,
-} from "./ViewContext";
+import { useCurrentNode, useDisplayText, useCurrentRowID } from "./ViewContext";
 import { isEmptySemanticID } from "./connections";
 
 const QueryContext = React.createContext<
@@ -34,7 +30,7 @@ export function extractIDsFromQueries(filters: Filter[]): string[] {
 }
 
 export function useNodeIsLoading(): boolean {
-  const relation = useCurrentRelation();
+  const relation = useCurrentNode();
   const [itemID] = useCurrentRowID();
   const displayText = useDisplayText();
   const context = React.useContext(QueryContext);

@@ -5,7 +5,7 @@ import { Button } from "../commons/Ui";
 import { deleteRelations, getNode, getSemanticID } from "../connections";
 import {
   updateViewPathsAfterDeleteItem,
-  useCurrentRelation,
+  useCurrentNode,
   useCurrentRowID,
   useViewPath,
 } from "../ViewContext";
@@ -48,7 +48,7 @@ export function DeleteNode({
   afterOnClick: () => void;
 }): JSX.Element | null {
   const [itemID] = useCurrentRowID();
-  const relation = useCurrentRelation();
+  const relation = useCurrentNode();
   const viewPath = useViewPath();
   const stack = usePaneStack();
   const navigate = useNavigate();

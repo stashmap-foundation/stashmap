@@ -4,7 +4,7 @@ import {
   useViewPath,
   useDisplayText,
   useEffectiveAuthor,
-  useCurrentRelation,
+  useCurrentNode,
   getCurrentReferenceForView,
   useCurrentEdge,
 } from "../ViewContext";
@@ -26,7 +26,7 @@ export function FullscreenButton(): JSX.Element | null {
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();
   const effectiveAuthor = useEffectiveAuthor();
-  const relation = useCurrentRelation();
+  const relation = useCurrentNode();
   const currentItem = useCurrentEdge();
   const virtualType = currentItem?.virtualType;
   const currentReference = getCurrentReferenceForView(

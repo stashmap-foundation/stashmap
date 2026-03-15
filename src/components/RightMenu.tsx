@@ -5,7 +5,7 @@ import {
   useIsInSearchView,
   useIsViewingOtherUserContent,
   useCurrentRowID,
-  useCurrentRelation,
+  useCurrentNode,
   useDisplayText,
 } from "../ViewContext";
 import { isEmptySemanticID } from "../connections";
@@ -20,7 +20,7 @@ import { getRelationUserPublicKey } from "../userEntries";
 import { decodePublicKeyInputSync } from "../nostrPublicKeys";
 
 function useCurrentUserEntryPublicKey(): PublicKey | undefined {
-  return getRelationUserPublicKey(useCurrentRelation());
+  return getRelationUserPublicKey(useCurrentNode());
 }
 
 function FollowUserEntryButton(): JSX.Element | null {

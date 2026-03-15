@@ -4,7 +4,7 @@ import { v4 } from "uuid";
 import { UnsignedEvent } from "nostr-tools";
 import {
   shortID,
-  getRelationContext,
+  getNodeContext,
   getSemanticID,
   resolveNode,
   isRefNode,
@@ -16,7 +16,7 @@ import {
   getRowIDFromView,
   getDisplayTextForView,
   getCurrentEdgeForView,
-  getRelationForView,
+  getNodeForView,
   getContext,
 } from "./ViewContext";
 import { buildOutgoingReference } from "./buildReferenceRow";
@@ -75,7 +75,7 @@ function getOwnRelationForDocumentSerialization(
   rootRelation: GraphNode,
   isRootNode: boolean
 ): GraphNode | undefined {
-  const directRelation = getRelationForView(data, path, stack);
+  const directRelation = getNodeForView(data, path, stack);
   if (directRelation) {
     return directRelation;
   }
@@ -179,13 +179,14 @@ function serializeTree(data: Data, rootRelation: GraphNode): SerializeResult {
 }
 
 export function treeToMarkdown(data: Data, rootRelation: GraphNode): string {
-  const rootContext = getRelationContext(data.knowledgeDBs, rootRelation);
+  const rootContext = getNodeContext(data.knowledgeDBs, rootRelation);
   const { text: rootText } = getSerializedRelationText(data, rootRelation);
   const rootUuid = shortID(rootRelation.id);
   const rootLine = formatRootHeading(
     rootText,
     rootUuid,
     rootRelation.basedOn,
+    rootRelation.snapshotDTag,
     rootRelation.anchor ?? createRootAnchor(rootContext),
     rootRelation.systemRole
   );
@@ -195,16 +196,20 @@ export function treeToMarkdown(data: Data, rootRelation: GraphNode): string {
 
 export function buildDocumentEvent(
   data: Data,
-  rootRelation: GraphNode
+  rootRelation: GraphNode,
+  options?: {
+    snapshotDTag?: string;
+  }
 ): UnsignedEvent {
   const author = data.user.publicKey;
-  const rootContext = getRelationContext(data.knowledgeDBs, rootRelation);
+  const rootContext = getNodeContext(data.knowledgeDBs, rootRelation);
   const { text: rootText } = getSerializedRelationText(data, rootRelation);
   const rootUuid = shortID(rootRelation.id);
   const rootLine = formatRootHeading(
     rootText,
     rootUuid,
     rootRelation.basedOn,
+    options?.snapshotDTag ?? rootRelation.snapshotDTag,
     rootRelation.anchor ?? createRootAnchor(rootContext),
     rootRelation.systemRole
   );

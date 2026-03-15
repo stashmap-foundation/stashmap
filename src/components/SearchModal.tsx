@@ -5,7 +5,7 @@ import { useData } from "../DataContext";
 import { useApis } from "../Apis";
 import { KIND_SEARCH } from "../Data";
 import { findDocumentRelations } from "../documentMaterialization";
-import { buildTextNodesFromRelations } from "../connections";
+import { buildTextNodesFromGraphNodes } from "../connections";
 import type { TextSeed } from "../connections";
 import { useReadRelays } from "../relays";
 
@@ -87,7 +87,7 @@ export function useSearchQuery(
   const eventsAsList = events.toList();
   const relationsFromDocumentEvents =
     findDocumentRelations(eventsAsList).valueSeq();
-  const nodesFromDocumentEvents = buildTextNodesFromRelations(
+  const nodesFromDocumentEvents = buildTextNodesFromGraphNodes(
     relationsFromDocumentEvents
   );
   const nodesFromKnowledgeEvents = nip50

@@ -446,58 +446,112 @@ function getComparableItemKey(
   return useExactMatch ? shortID(item.id) : getNodeKey(knowledgeDBs, item);
 }
 
-function getVersionRelations(
+function isVisibleVersion(
+  node: GraphNode,
+  visibleAuthors: ImmutableSet<PublicKey>
+): boolean {
+  return !isRefNode(node) && visibleAuthors.has(node.author);
+}
+
+function getPastVersions(
   semanticIndex: SemanticIndex,
   visibleAuthors: ImmutableSet<PublicKey>,
-  currentRelation: GraphNode
+  currentNode: GraphNode
 ): List<GraphNode> {
-  const visit = (
-    pending: List<LongID>,
-    visited: ImmutableSet<LongID>,
-    collected: List<GraphNode>
-  ): List<GraphNode> => {
-    const relationID = pending.first();
-    if (!relationID) {
-      return collected;
-    }
+  if (!currentNode.basedOn) {
+    return List<GraphNode>();
+  }
 
-    const relation = semanticIndex.relationByID.get(relationID);
-    const rest = pending.shift();
-    if (!relation) {
-      return visit(rest, visited, collected);
-    }
+  const pastVersion = semanticIndex.relationByID.get(currentNode.basedOn);
+  if (!pastVersion) {
+    return List<GraphNode>();
+  }
 
-    const nextCollected =
-      relation.id !== currentRelation.id &&
-      !isRefNode(relation) &&
-      visibleAuthors.has(relation.author)
-        ? collected.push(relation)
-        : collected;
+  const visiblePast = isVisibleVersion(pastVersion, visibleAuthors)
+    ? List<GraphNode>([pastVersion])
+    : List<GraphNode>();
 
-    const ancestorIDs = relation.basedOn
-      ? List<LongID>([relation.basedOn])
-      : List<LongID>();
-    const derivedIDs = List([
-      ...(semanticIndex.basedOnIndex.get(relation.id) || []),
-    ] as LongID[]);
-    const nextIDs = ancestorIDs
-      .concat(derivedIDs)
-      .filter((nextID) => !visited.has(nextID))
-      .toList();
+  return visiblePast
+    .concat(getPastVersions(semanticIndex, visibleAuthors, pastVersion))
+    .toList();
+}
 
-    return visit(
-      rest.concat(nextIDs),
-      visited.union(nextIDs) as ImmutableSet<LongID>,
-      nextCollected
-    );
-  };
+function getFutureVersions(
+  semanticIndex: SemanticIndex,
+  visibleAuthors: ImmutableSet<PublicKey>,
+  currentNode: GraphNode,
+  excludedIDs: ImmutableSet<LongID> = ImmutableSet<LongID>(),
+  visited: ImmutableSet<LongID> = ImmutableSet<LongID>([currentNode.id])
+): List<GraphNode> {
+  const futureIDs = List([
+    ...(semanticIndex.basedOnIndex.get(currentNode.id) || []),
+  ] as LongID[]).filter((nextID) => !visited.has(nextID));
 
-  return visit(
-    List<LongID>([currentRelation.id]),
-    ImmutableSet<LongID>([currentRelation.id]),
+  return futureIDs
+    .reduce((collected, futureID) => {
+      const futureVersion = semanticIndex.relationByID.get(futureID);
+      if (!futureVersion) {
+        return collected;
+      }
+
+      const visibleFuture =
+        isVisibleVersion(futureVersion, visibleAuthors) &&
+        !excludedIDs.has(futureVersion.id)
+          ? List<GraphNode>([futureVersion])
+          : List<GraphNode>();
+
+      return collected
+        .concat(visibleFuture)
+        .concat(
+          getFutureVersions(
+            semanticIndex,
+            visibleAuthors,
+            futureVersion,
+            excludedIDs,
+            visited.add(futureID) as ImmutableSet<LongID>
+          )
+        )
+        .toList();
+    }, List<GraphNode>())
+    .toList();
+}
+
+function getVersions(
+  semanticIndex: SemanticIndex,
+  visibleAuthors: ImmutableSet<PublicKey>,
+  currentNode: GraphNode
+): List<GraphNode> {
+  const pastVersions = getPastVersions(
+    semanticIndex,
+    visibleAuthors,
+    currentNode
+  );
+  const lineageNodes = List<GraphNode>([currentNode]).concat(pastVersions);
+  const lineageIDs = lineageNodes
+    .map((node) => node.id as LongID)
+    .toSet() as ImmutableSet<LongID>;
+  const futureVersions = lineageNodes.reduce(
+    (collected, lineageNode) =>
+      collected
+        .concat(
+          getFutureVersions(
+            semanticIndex,
+            visibleAuthors,
+            lineageNode,
+            lineageIDs
+          )
+        )
+        .toList(),
     List<GraphNode>()
-  )
-    .sortBy((relation) => -relation.updated)
+  );
+
+  return pastVersions
+    .concat(futureVersions)
+    .groupBy((node) => node.id)
+    .map((group) => group.first())
+    .valueSeq()
+    .filter((node): node is GraphNode => node !== undefined)
+    .sortBy((node) => -node.updated)
     .toList();
 }
 
@@ -528,7 +582,7 @@ export function getAlternativeFooterData(
     return EMPTY_ALTERNATIVE_FOOTER_RESULT;
   }
 
-  const versionRelations = getVersionRelations(
+  const versionNodes = getVersions(
     semanticIndex,
     visibleAuthors,
     currentRelation
@@ -598,7 +652,7 @@ export function getAlternativeFooterData(
       };
     });
 
-  const versionSummaries = summarizeRelations(versionRelations);
+  const versionSummaries = summarizeRelations(versionNodes);
 
   const candidateItemIDs = suggestionsEnabled
     ? versionSummaries

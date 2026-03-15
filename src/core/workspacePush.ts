@@ -1,7 +1,10 @@
 import fs from "fs/promises";
 import path from "path";
-import { Event, UnsignedEvent } from "nostr-tools";
-import { buildDocumentEventFromMarkdownTree } from "../standaloneDocumentEvent";
+import {
+  buildDocumentEventFromMarkdownTree,
+  requireSingleRootMarkdownTree,
+} from "../standaloneDocumentEvent";
+import { MarkdownTreeNode } from "../markdownTree";
 import {
   publishSignedEvents,
   resolveWriteRelayUrls,
@@ -11,10 +14,11 @@ import {
   WritePublisher,
 } from "./writeSupport";
 import {
-  applyKnowledgeEventsToWorkspace,
-  ensureEditableDocumentHeader,
-  loadWorkspaceManifest,
-  WorkspaceManifest,
+  DOCUMENTS_DIR,
+  extractDTagFromHeader,
+  readBaselineContent,
+  removeWorkspaceFileIfExists,
+  writeDocumentFiles,
 } from "./workspaceState";
 import { validateEditedDocumentIntegrity } from "./workspaceIntegrity";
 
@@ -23,8 +27,10 @@ type WorkspacePushProfile = WriteProfile & {
   knowstrHome?: string;
 };
 
-type ChangedWorkspaceDocument = {
-  document: WorkspaceManifest["documents"][number];
+type ChangedDocument = {
+  filePath: string;
+  author: PublicKey;
+  dTag: string | undefined;
   currentContent: string;
   baselineContent: string;
 };
@@ -33,79 +39,81 @@ function resolveKnowstrHome(profile: WorkspacePushProfile): string {
   return profile.knowstrHome ?? path.join(profile.workspaceDir, ".knowstr");
 }
 
-function basePathForDocument(
+async function scanWorkspaceDocuments(
+  workspaceDir: string,
   knowstrHome: string,
-  document: WorkspaceManifest["documents"][number]
-): string {
-  return document.base_path
-    ? path.join(knowstrHome, document.base_path)
-    : path.join(knowstrHome, "base", document.path);
-}
+  author: PublicKey
+): Promise<ChangedDocument[]> {
+  const authorPath = path.join(workspaceDir, DOCUMENTS_DIR, author);
+  try {
+    await fs.access(authorPath);
+  } catch {
+    return [];
+  }
 
-async function readChangedWorkspaceDocuments(
-  profile: WorkspacePushProfile,
-  manifest: WorkspaceManifest
-): Promise<ChangedWorkspaceDocument[]> {
-  const knowstrHome = resolveKnowstrHome(profile);
-  const maybeDocuments = await Promise.all(
-    manifest.documents.map(async (document) => {
-      const documentPath = path.join(profile.workspaceDir, document.path);
-      const basePath = basePathForDocument(knowstrHome, document);
-      const [currentContent, baselineContent] = await Promise.all([
-        fs.readFile(documentPath, "utf8"),
-        fs.readFile(basePath, "utf8"),
-      ]);
-      return currentContent === baselineContent
-        ? undefined
-        : {
-            document,
-            currentContent,
-            baselineContent,
-          };
+  const files = await fs.readdir(authorPath);
+  const mdFiles = files.filter((f) => f.endsWith(".md"));
+
+  const docs = await Promise.all(
+    mdFiles.map(async (file) => {
+      const filePath = path.join(authorPath, file);
+      const currentContent = await fs.readFile(filePath, "utf8");
+      const dTag = extractDTagFromHeader(currentContent);
+      if (!dTag) {
+        return {
+          filePath,
+          author,
+          dTag: undefined,
+          currentContent,
+          baselineContent: "",
+        };
+      }
+
+      const baseline = await readBaselineContent(knowstrHome, author, dTag);
+      if (baseline && baseline === currentContent) {
+        return undefined;
+      }
+      if (!baseline) {
+        return {
+          filePath,
+          author,
+          dTag,
+          currentContent,
+          baselineContent: "",
+        };
+      }
+      return {
+        filePath,
+        author,
+        dTag,
+        currentContent,
+        baselineContent: baseline,
+      };
     })
   );
 
-  return maybeDocuments.filter(
-    (document): document is ChangedWorkspaceDocument => Boolean(document)
-  );
+  return docs.filter((doc): doc is ChangedDocument => doc !== undefined);
 }
 
-function buildUnsignedDocumentEventFromContent(
-  pubkey: PublicKey,
-  dTag: string,
-  baselineContent: string,
-  content: string
-): {
-  event: UnsignedEvent;
-  deletedMarkers: string[];
-} {
-  const { sanitizedRoot, deletedMarkers } = validateEditedDocumentIntegrity(
-    baselineContent,
-    content
-  );
-  const builtEvent = buildDocumentEventFromMarkdownTree(pubkey, sanitizedRoot);
-  return {
-    event: {
-      ...builtEvent.event,
-      content: ensureEditableDocumentHeader(
-        builtEvent.event.content,
-        pubkey,
-        dTag,
-        { includeDeleteSection: false }
-      ),
-    },
-    deletedMarkers,
-  };
+function hasAnyUuidMarker(node: MarkdownTreeNode): boolean {
+  if (node.uuid) {
+    return true;
+  }
+  return node.children.some((child) => hasAnyUuidMarker(child));
 }
 
-type ProcessedPushResult = {
-  manifest: WorkspaceManifest;
-  eventIds: string[];
-  updatedPaths: string[];
-  copiedPaths: string[];
-  remainingPaths: string[];
-  publishResults: Record<string, Record<string, PublishStatus>>;
-};
+function buildNewDocumentTree(content: string): MarkdownTreeNode {
+  const rootTree = requireSingleRootMarkdownTree(
+    content,
+    "New document must contain exactly one top-level root"
+  );
+  if (hasAnyUuidMarker(rootTree)) {
+    throw new Error(
+      "New documents must not contain ks:id markers — they are generated on push"
+    );
+  }
+  return rootTree;
+}
 
 function allRelaysFulfilled(
   publishResults: Record<string, PublishStatus>
@@ -124,26 +132,22 @@ export async function pushEditedWorkspaceDocuments(
   relay_urls: string[];
   changed_paths: string[];
   updated_paths: string[];
-  copied_paths: string[];
   remaining_paths: string[];
   publish_results: Record<string, Record<string, PublishStatus>>;
 }> {
-  const manifest = await loadWorkspaceManifest(profile.workspaceDir);
-  if (!manifest) {
-    throw new Error(`Missing workspace manifest: ${profile.workspaceDir}`);
-  }
-
-  const changedDocuments = await readChangedWorkspaceDocuments(
-    profile,
-    manifest
+  const knowstrHome = resolveKnowstrHome(profile);
+  const changedDocuments = await scanWorkspaceDocuments(
+    profile.workspaceDir,
+    knowstrHome,
+    profile.pubkey
   );
+
   if (changedDocuments.length === 0) {
     return {
       event_ids: [],
       relay_urls: [],
       changed_paths: [],
       updated_paths: [],
-      copied_paths: [],
       remaining_paths: [],
       publish_results: {},
     };
@@ -151,18 +155,28 @@ export async function pushEditedWorkspaceDocuments(
 
   const relayUrls = resolveWriteRelayUrls(profile, relayUrlsOverride);
   const secretKey = await loadWriteSecretKey(profile);
-  const knowstrHome = resolveKnowstrHome(profile);
 
   const processed = await changedDocuments.reduce(
     async (previous, changed) => {
       const acc = await previous;
-      const unsignedEvent = buildUnsignedDocumentEventFromContent(
+      const rootTree =
+        changed.baselineContent && changed.dTag
+          ? validateEditedDocumentIntegrity(
+              changed.baselineContent,
+              changed.currentContent
+            ).sanitizedRoot
+          : buildNewDocumentTree(changed.currentContent);
+      const builtEvent = buildDocumentEventFromMarkdownTree(
         profile.pubkey,
-        changed.document.d_tag,
-        changed.baselineContent,
-        changed.currentContent
+        rootTree
       );
-      const [event] = signUnsignedEvents(secretKey, [unsignedEvent.event]);
+      const unsignedEvent = builtEvent.event;
+      const eventDTag =
+        changed.dTag || unsignedEvent.tags.find(([k]) => k === "d")?.[1];
+      if (!eventDTag) {
+        return acc;
+      }
+      const [event] = signUnsignedEvents(secretKey, [unsignedEvent]);
       const published = await publishSignedEvents(publisher, relayUrls, [
         event,
       ]);
@@ -172,7 +186,7 @@ export async function pushEditedWorkspaceDocuments(
         return {
           ...acc,
           eventIds: [...acc.eventIds, event.id],
-          remainingPaths: [...acc.remainingPaths, changed.document.path],
+          remainingPaths: [...acc.remainingPaths, changed.filePath],
           publishResults: {
             ...acc.publishResults,
             [event.id]: eventPublishResults,
@@ -180,39 +194,21 @@ export async function pushEditedWorkspaceDocuments(
         };
       }
 
-      if (changed.document.author !== profile.pubkey) {
-        await fs.writeFile(
-          path.join(profile.workspaceDir, changed.document.path),
-          changed.baselineContent,
-          "utf8"
-        );
-      }
-
-      const nextManifest = await applyKnowledgeEventsToWorkspace(
+      const written = await writeDocumentFiles(
         profile.workspaceDir,
         knowstrHome,
-        acc.manifest,
-        [event as Event]
+        event
       );
-      if (changed.document.author === profile.pubkey) {
-        await fs.writeFile(
-          basePathForDocument(knowstrHome, changed.document),
-          changed.currentContent,
-          "utf8"
-        );
+      if (written && written.workspacePath !== changed.filePath) {
+        await removeWorkspaceFileIfExists(changed.filePath);
       }
 
       return {
-        manifest: nextManifest,
         eventIds: [...acc.eventIds, event.id],
-        updatedPaths:
-          changed.document.author === profile.pubkey
-            ? [...acc.updatedPaths, changed.document.path]
-            : acc.updatedPaths,
-        copiedPaths:
-          changed.document.author !== profile.pubkey
-            ? [...acc.copiedPaths, changed.document.path]
-            : acc.copiedPaths,
+        updatedPaths: [
+          ...acc.updatedPaths,
+          written?.workspacePath ?? changed.filePath,
+        ],
         remainingPaths: acc.remainingPaths,
         publishResults: {
           ...acc.publishResults,
@@ -220,11 +216,14 @@ export async function pushEditedWorkspaceDocuments(
         },
       };
     },
-    Promise.resolve<ProcessedPushResult>({
-      manifest,
+    Promise.resolve<{
+      eventIds: string[];
+      updatedPaths: string[];
+      remainingPaths: string[];
+      publishResults: Record<string, Record<string, PublishStatus>>;
+    }>({
       eventIds: [],
       updatedPaths: [],
-      copiedPaths: [],
       remainingPaths: [],
       publishResults: {},
     })
@@ -233,9 +232,8 @@ export async function pushEditedWorkspaceDocuments(
   return {
     event_ids: processed.eventIds,
     relay_urls: relayUrls,
-    changed_paths: changedDocuments.map(({ document }) => document.path),
+    changed_paths: changedDocuments.map(({ filePath }) => filePath),
     updated_paths: processed.updatedPaths,
-    copied_paths: processed.copiedPaths,
     remaining_paths: processed.remainingPaths,
     publish_results: processed.publishResults,
   };

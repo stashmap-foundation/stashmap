@@ -3,7 +3,7 @@ import path from "path";
 import { List } from "immutable";
 import { Event, Filter } from "nostr-tools";
 import { findContacts } from "../contacts";
-import { getMostRecentReplacableEvent } from "../nostrEvents";
+import { findTag, getMostRecentReplacableEvent } from "../nostrEvents";
 import {
   getReadRelays,
   mergeRelays,
@@ -18,21 +18,15 @@ import {
 } from "../nostr";
 import {
   DOCUMENTS_DIR,
-  WORKSPACE_VERSION,
-  WorkspaceAuthor,
-  WorkspaceDocument,
-  WorkspaceManifest,
-  applyDeleteEventsToWorkspaceDocuments,
-  applyDocumentEventsToWorkspaceDocuments,
-  authorMap,
-  documentMap,
-  loadWorkspaceManifest,
+  baselinePath,
+  isLocallyEdited,
+  readBaselineContent,
   removeWorkspaceFileIfExists,
-  writeWorkspaceManifest,
+  writeDocumentFiles,
+  findWorkspaceFileByDTag,
 } from "./workspaceState";
 
 const DEFAULT_MAX_WAIT_MS = 20_000;
-const SYNC_LOOKBACK_SECONDS = 7 * 24 * 60 * 60;
 
 export type SyncPullProfile = {
   pubkey: PublicKey;
@@ -48,13 +42,15 @@ export type SyncPullOptions = {
   outDir?: string;
   relayUrls?: string[];
   maxWaitMs?: number;
-  now?: Date;
 };
 
-export type SyncPullManifest = WorkspaceManifest;
-
-type StoredDocument = WorkspaceDocument;
-type StoredAuthor = WorkspaceAuthor;
+export type PullResult = {
+  relay_urls: string[];
+  contact_pubkeys: PublicKey[];
+  updated_paths: string[];
+  skipped_paths: string[];
+  deleted_paths: string[];
+};
 
 export type SyncQueryClient = {
   querySync: (
@@ -126,52 +122,6 @@ function latestContactPubkeys(
     .toArray();
 }
 
-function bufferedSince(author: StoredAuthor | undefined): number | undefined {
-  if (!author) {
-    return undefined;
-  }
-
-  return Math.max(0, author.last_document_created_at - SYNC_LOOKBACK_SECONDS);
-}
-
-function buildAuthorEntries(
-  authors: PublicKey[],
-  previousAuthors: Map<PublicKey, StoredAuthor>,
-  fetchedEvents: Map<PublicKey, Event[]>
-): StoredAuthor[] {
-  return authors
-    .slice()
-    .sort()
-    .map((author) => {
-      const previous = previousAuthors.get(author);
-      const authorEvents = fetchedEvents.get(author) || [];
-      const latestCreatedAt = authorEvents.reduce(
-        (current, event) => Math.max(current, event.created_at),
-        previous?.last_document_created_at || 0
-      );
-      return {
-        pubkey: author,
-        last_document_created_at: latestCreatedAt,
-      };
-    });
-}
-
-async function removeOutOfScopeDocuments(
-  workspaceDir: string,
-  documents: Map<string, StoredDocument>,
-  allowedAuthors: Set<PublicKey>
-): Promise<void> {
-  const entries = [...documents.entries()];
-  await entries.reduce(async (previous, [replaceableKey, document]) => {
-    await previous;
-    if (allowedAuthors.has(document.author)) {
-      return;
-    }
-    await removeWorkspaceFileIfExists(path.join(workspaceDir, document.path));
-    documents.delete(replaceableKey);
-  }, Promise.resolve());
-}
-
 function resolveKnowstrHome(
   workspaceDir: string,
   profile: SyncPullProfile
@@ -179,45 +129,153 @@ function resolveKnowstrHome(
   return profile.knowstrHome ?? path.join(workspaceDir, ".knowstr");
 }
 
-async function isLocallyEdited(
-  workspaceDir: string,
-  knowstrHome: string,
-  document: StoredDocument | undefined
-): Promise<boolean> {
-  if (!document?.base_path) {
-    return false;
-  }
+function latestEventsByDTag(events: Event[]): Event[] {
+  const byDTag = new Map<string, Event>();
+  events.forEach((event) => {
+    const dTag = findTag(event, "d");
+    if (!dTag) {
+      return;
+    }
+    const existing = byDTag.get(dTag);
+    if (!existing || event.created_at > existing.created_at) {
+      byDTag.set(dTag, event);
+    }
+  });
+  return [...byDTag.values()];
+}
 
+async function removeOutOfScopeAuthorDirs(
+  workspaceDir: string,
+  allowedAuthors: Set<PublicKey>
+): Promise<string[]> {
+  const documentsDir = path.join(workspaceDir, DOCUMENTS_DIR);
   try {
-    const [workspaceContent, baseContent] = await Promise.all([
-      fs.readFile(path.join(workspaceDir, document.path), "utf8"),
-      fs.readFile(path.join(knowstrHome, document.base_path), "utf8"),
-    ]);
-    return workspaceContent !== baseContent;
+    const entries = await fs.readdir(documentsDir);
+    const results = await entries.reduce(async (previous, entry) => {
+      const acc = await previous;
+      if (allowedAuthors.has(entry as PublicKey)) {
+        return acc;
+      }
+      const dirPath = path.join(documentsDir, entry);
+      const stat = await fs.stat(dirPath);
+      if (!stat.isDirectory()) {
+        return acc;
+      }
+      const files = await fs.readdir(dirPath);
+      const filePaths = files.map((f) => path.join(dirPath, f));
+      await Promise.all(filePaths.map((fp) => removeWorkspaceFileIfExists(fp)));
+      await fs.rmdir(dirPath).catch(() => undefined);
+      return [...acc, ...filePaths];
+    }, Promise.resolve([] as string[]));
+    return results;
   } catch {
-    return false;
+    return [];
   }
 }
 
-function getReplaceableKeyFromDocumentEvent(event: Event): string | undefined {
-  const dTag = event.tags.find(([name]) => name === "d")?.[1];
-  return dTag ? `${event.kind}:${event.pubkey}:${dTag}` : undefined;
+type AuthorPullResult = {
+  updated: string[];
+  skipped: string[];
+  deleted: string[];
+};
+
+async function processDeleteEvents(
+  deleteEvents: Event[],
+  author: PublicKey,
+  workspaceDir: string,
+  knowstrHome: string
+): Promise<AuthorPullResult> {
+  return deleteEvents.reduce(
+    async (previous, event) => {
+      const acc = await previous;
+      const aTag = findTag(event, "a");
+      if (!aTag) {
+        return acc;
+      }
+      const dTag = aTag.split(":")[2];
+      if (!dTag) {
+        return acc;
+      }
+      const baseline = await readBaselineContent(knowstrHome, author, dTag);
+      if (!baseline) {
+        return acc;
+      }
+      const existingPath = await findWorkspaceFileByDTag(
+        workspaceDir,
+        author,
+        dTag
+      );
+      if (existingPath && (await isLocallyEdited(existingPath, baseline))) {
+        return { ...acc, skipped: [...acc.skipped, existingPath] };
+      }
+      if (existingPath) {
+        await removeWorkspaceFileIfExists(existingPath);
+      }
+      await removeWorkspaceFileIfExists(
+        baselinePath(knowstrHome, author, dTag)
+      );
+      return existingPath
+        ? { ...acc, deleted: [...acc.deleted, existingPath] }
+        : acc;
+    },
+    Promise.resolve<AuthorPullResult>({
+      updated: [],
+      skipped: [],
+      deleted: [],
+    })
+  );
+}
+
+async function processDocumentEvents(
+  documentEvents: Event[],
+  author: PublicKey,
+  workspaceDir: string,
+  knowstrHome: string
+): Promise<AuthorPullResult> {
+  return documentEvents.reduce(
+    async (previous, event) => {
+      const acc = await previous;
+      const dTag = findTag(event, "d");
+      if (!dTag) {
+        return acc;
+      }
+
+      const baseline = await readBaselineContent(knowstrHome, author, dTag);
+      if (baseline) {
+        const existingPath = await findWorkspaceFileByDTag(
+          workspaceDir,
+          author,
+          dTag
+        );
+        if (existingPath && (await isLocallyEdited(existingPath, baseline))) {
+          return { ...acc, skipped: [...acc.skipped, existingPath] };
+        }
+      }
+
+      const result = await writeDocumentFiles(workspaceDir, knowstrHome, event);
+      return result
+        ? { ...acc, updated: [...acc.updated, result.workspacePath] }
+        : acc;
+    },
+    Promise.resolve<AuthorPullResult>({
+      updated: [],
+      skipped: [],
+      deleted: [],
+    })
+  );
 }
 
 export async function pullSyncWorkspace(
   client: SyncQueryClient,
   profile: SyncPullProfile,
   options: SyncPullOptions = {}
-): Promise<SyncPullManifest> {
+): Promise<PullResult> {
   const workspaceDir = options.outDir
     ? path.resolve(options.outDir)
     : profile.workspaceDir;
   const maxWaitMs = options.maxWaitMs ?? DEFAULT_MAX_WAIT_MS;
   const relayUrls = resolveRelayUrls(profile, options);
   const knowstrHome = resolveKnowstrHome(workspaceDir, profile);
-  const previousManifest = await loadWorkspaceManifest(workspaceDir);
-  const previousAuthors = authorMap(previousManifest);
-  const documents = documentMap(previousManifest);
 
   await fs.mkdir(path.join(workspaceDir, DOCUMENTS_DIR), { recursive: true });
 
@@ -233,108 +291,75 @@ export async function pullSyncWorkspace(
   ] as PublicKey[];
   const allowedAuthors = new Set(authors);
 
-  await removeOutOfScopeDocuments(workspaceDir, documents, allowedAuthors);
+  const deletedOutOfScope = await removeOutOfScopeAuthorDirs(
+    workspaceDir,
+    allowedAuthors
+  );
 
   const authorResults = await Promise.all(
     authors.map(async (author) => {
-      const previous = previousAuthors.get(author);
-      const since = bufferedSince(previous);
       const authorEvents = await queryFilters(
         client,
         relayUrls,
         [
-          {
-            authors: [author],
-            kinds: [KIND_KNOWLEDGE_DOCUMENT],
-            ...(since !== undefined ? { since } : {}),
-          },
+          { authors: [author], kinds: [KIND_KNOWLEDGE_DOCUMENT] },
           {
             authors: [author],
             kinds: [KIND_DELETE],
             "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`],
-            ...(since !== undefined ? { since } : {}),
           },
         ],
         maxWaitMs
       );
 
-      return { author, authorEvents };
+      const deleteEvents = authorEvents.filter(
+        (event) => event.kind === KIND_DELETE
+      );
+      const documentEvents = latestEventsByDTag(
+        authorEvents.filter((event) => event.kind === KIND_KNOWLEDGE_DOCUMENT)
+      );
+
+      const deleteResult = await processDeleteEvents(
+        deleteEvents,
+        author,
+        workspaceDir,
+        knowstrHome
+      );
+      const docResult = await processDocumentEvents(
+        documentEvents,
+        author,
+        workspaceDir,
+        knowstrHome
+      );
+
+      return {
+        updated: [...deleteResult.updated, ...docResult.updated],
+        skipped: [...deleteResult.skipped, ...docResult.skipped],
+        deleted: [...deleteResult.deleted, ...docResult.deleted],
+      };
     })
   );
 
-  const fetchedEventsByAuthor = new Map(
-    authorResults.map(({ author, authorEvents }) => [author, authorEvents])
+  const combined = authorResults.reduce(
+    (acc, result) => ({
+      updated: [...acc.updated, ...result.updated],
+      skipped: [...acc.skipped, ...result.skipped],
+      deleted: [...acc.deleted, ...result.deleted],
+    }),
+    {
+      updated: [] as string[],
+      skipped: [] as string[],
+      deleted: [] as string[],
+    }
   );
 
-  await authorResults.reduce(async (previous, { authorEvents }) => {
-    await previous;
-    const deleteEvents = (
-      await Promise.all(
-        authorEvents
-          .filter((event) => event.kind === KIND_DELETE)
-          .map(async (event) => {
-            const replaceableKey = event.tags.find(
-              ([name]) => name === "a"
-            )?.[1];
-            const existing = replaceableKey
-              ? documents.get(replaceableKey)
-              : undefined;
-            return (await isLocallyEdited(workspaceDir, knowstrHome, existing))
-              ? undefined
-              : event;
-          })
-      )
-    ).filter((event): event is Event => Boolean(event));
-    const documentEvents = (
-      await Promise.all(
-        authorEvents
-          .filter((event) => event.kind === KIND_KNOWLEDGE_DOCUMENT)
-          .map(async (event) => {
-            const replaceableKey = getReplaceableKeyFromDocumentEvent(event);
-            const existing = replaceableKey
-              ? documents.get(replaceableKey)
-              : undefined;
-            if (!existing || existing.event_id === event.id) {
-              return event;
-            }
-            return (await isLocallyEdited(workspaceDir, knowstrHome, existing))
-              ? undefined
-              : event;
-          })
-      )
-    ).filter((event): event is Event => Boolean(event));
-    await applyDeleteEventsToWorkspaceDocuments(
-      workspaceDir,
-      knowstrHome,
-      documents,
-      deleteEvents
-    );
-    await applyDocumentEventsToWorkspaceDocuments(
-      workspaceDir,
-      knowstrHome,
-      documents,
-      documentEvents
-    );
-  }, Promise.resolve());
+  client.close?.(relayUrls);
 
-  const manifest: SyncPullManifest = {
-    workspace_version: WORKSPACE_VERSION,
-    as_user: profile.readAs,
-    synced_at: (options.now || new Date()).toISOString(),
+  return {
     relay_urls: relayUrls,
     contact_pubkeys: contactPubkeys.slice().sort(),
-    authors: buildAuthorEntries(
-      authors,
-      previousAuthors,
-      fetchedEventsByAuthor
-    ),
-    documents: [...documents.values()].sort((a, b) =>
-      a.path.localeCompare(b.path)
-    ),
+    updated_paths: combined.updated,
+    skipped_paths: combined.skipped,
+    deleted_paths: [...deletedOutOfScope, ...combined.deleted],
   };
-
-  await writeWorkspaceManifest(workspaceDir, manifest);
-
-  client.close?.(relayUrls);
-  return manifest;
 }

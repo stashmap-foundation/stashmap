@@ -420,6 +420,58 @@ If a file can work with a concrete relation ID, it should not import semantic he
 | [src/components/Workspace.tsx](/Users/f/sandbox/stashmap-3/src/components/Workspace.tsx) | Header, breadcrumbs, pane-level actions |
 | [src/components/TreeView.tsx](/Users/f/sandbox/stashmap-3/src/components/TreeView.tsx) | Virtualized tree rendering |
 
+## CLI Workspace Sync
+
+The CLI (`src/cli/`) provides `pull` and `push` commands for offline workspace editing.
+
+### Filesystem layout
+
+```
+DOCUMENTS/{author}/{title}.md     ← human-readable name, editable
+.knowstr/base/{author}/{dTag}.md  ← stable name keyed by dTag, system-managed
+.knowstr/profile.json             ← pubkey, relays, nsec_file
+```
+
+### Design principles
+
+- **No manifest.** Filesystem is the source of truth. No `manifest.json`, no sync-state file.
+- **Three-way comparison**: relay state vs baseline vs workspace.
+- **Baselines keyed by dTag** (stable identity). Workspace files named by title (human-friendly).
+- **Change detection = content comparison.** File differs from baseline → changed.
+- **Full pull every time.** No `since` filter, no incremental state. Relay returns latest replaceable events; compare against baselines to skip unchanged.
+- **Local file deletion is a no-op.** File reappears on next pull.
+
+### Pull (`src/core/syncPull.ts`)
+
+1. Query relays for contacts (kind 3), derive author list
+2. Query relays for ALL documents + deletes per author (no `since`)
+3. For each relay event: compare against baseline at `.knowstr/base/{author}/{dTag}.md`
+   - No baseline → new → write workspace + baseline
+   - Baseline matches → skip
+   - Baseline differs, workspace not locally edited → update both
+   - Baseline differs, workspace locally edited → skip (preserve local edits)
+4. Delete events: remove baseline + workspace (unless locally edited)
+5. Remove author directories not in contact list
+
+### Push (`src/core/workspacePush.ts`)
+
+1. Scan `DOCUMENTS/**/*.md`
+2. Extract dTag from editing header (`<!-- ks:root=... -->`)
+3. Compare against baseline at `.knowstr/base/{author}/{dTag}.md`
+4. If different → validate integrity, build event, publish, update baseline
+
+### Key CLI files
+
+| File | Purpose |
+|------|---------|
+| `src/core/workspaceState.ts` | File path helpers, document writing, baseline management |
+| `src/core/syncPull.ts` | Full pull from relays, content comparison |
+| `src/core/workspacePush.ts` | Scan filesystem, diff vs baseline, publish |
+| `src/core/workspaceIntegrity.ts` | Validate edited documents (marker integrity) |
+| `src/core/writeSupport.ts` | Relay publishing, secret key loading |
+| `src/cli/syncPull.ts` | CLI pull command wiring |
+| `src/cli/push.ts` | CLI push command wiring |
+
 ## Remaining Cleanup Direction
 
 The major refactor is done. Remaining work is cleanup and stricter boundary enforcement:

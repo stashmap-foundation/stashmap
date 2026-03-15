@@ -13,10 +13,8 @@ import {
 const ALICE = "a".repeat(64) as PublicKey;
 const BOB = "b".repeat(64) as PublicKey;
 const RELAY = "wss://profile.example/";
-const ONE_DAY_SECONDS = 24 * 60 * 60;
-const LOOKBACK_SECONDS = 7 * ONE_DAY_SECONDS;
 const FIRST_ALICE_CREATED_AT = 1_700_000_000;
-const FIRST_BOB_CREATED_AT = FIRST_ALICE_CREATED_AT + ONE_DAY_SECONDS;
+const FIRST_BOB_CREATED_AT = FIRST_ALICE_CREATED_AT + 24 * 60 * 60;
 
 function documentEvent({
   pubkey,
@@ -104,7 +102,7 @@ function makeClient(eventsByRelay: Record<string, Event[]>): {
   };
 }
 
-test("pullSyncWorkspace uses configured relays only and writes editable markdown documents plus hidden baselines", async () => {
+test("pullSyncWorkspace writes editable markdown documents plus hidden baselines keyed by dTag", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-sync-"));
   const knowstrHome = path.join(tempDir, ".knowstr");
   const aliceDoc = documentEvent({
@@ -131,39 +129,18 @@ test("pullSyncWorkspace uses configured relays only and writes editable markdown
     relays: [{ url: RELAY, read: true, write: true }],
   };
 
-  const manifest = await pullSyncWorkspace(client, profile, {
-    now: new Date("2026-03-10T12:00:00.000Z"),
-  });
+  const result = await pullSyncWorkspace(client, profile);
 
-  expect(manifest.relay_urls).toEqual([RELAY]);
-  expect(manifest.contact_pubkeys).toEqual([BOB]);
-  expect(manifest.authors).toEqual([
-    { pubkey: ALICE, last_document_created_at: FIRST_ALICE_CREATED_AT },
-    { pubkey: BOB, last_document_created_at: FIRST_BOB_CREATED_AT },
-  ]);
-  expect(manifest.documents).toHaveLength(2);
+  expect(result.relay_urls).toEqual([RELAY]);
+  expect(result.contact_pubkeys).toEqual([BOB]);
   expect(
     calls.every(({ relays }) => relays.every((relay) => relay === RELAY))
   ).toBe(true);
 
-  const alicePath = path.join(
-    tempDir,
-    manifest.documents.find((document) => document.author === ALICE)?.path || ""
-  );
-  const bobPath = path.join(
-    tempDir,
-    manifest.documents.find((document) => document.author === BOB)?.path || ""
-  );
-  const aliceBasePath = path.join(
-    knowstrHome,
-    manifest.documents.find((document) => document.author === ALICE)
-      ?.base_path || ""
-  );
-  const bobBasePath = path.join(
-    knowstrHome,
-    manifest.documents.find((document) => document.author === BOB)?.base_path ||
-      ""
-  );
+  const alicePath = path.join(tempDir, "DOCUMENTS", ALICE, "alice-root.md");
+  const bobPath = path.join(tempDir, "DOCUMENTS", BOB, "bob-root.md");
+  const aliceBasePath = path.join(knowstrHome, "base", ALICE, "alice-root.md");
+  const bobBasePath = path.join(knowstrHome, "base", BOB, "bob-root.md");
 
   const aliceContent = fs.readFileSync(alicePath, "utf8");
   const bobContent = fs.readFileSync(bobPath, "utf8");
@@ -173,9 +150,8 @@ test("pullSyncWorkspace uses configured relays only and writes editable markdown
   expect(bobContent).toContain(bobDoc.content.trim());
   expect(fs.readFileSync(aliceBasePath, "utf8")).toBe(aliceContent);
   expect(fs.readFileSync(bobBasePath, "utf8")).toBe(bobContent);
-  expect(alicePath).toContain(`${path.sep}DOCUMENTS${path.sep}`);
-  expect(bobPath).toContain(`${path.sep}DOCUMENTS${path.sep}`);
-  expect(fs.existsSync(path.join(tempDir, "AGENTS.md"))).toBe(false);
+  expect(result.updated_paths).toHaveLength(2);
+  expect(fs.existsSync(path.join(tempDir, "manifest.json"))).toBe(false);
 });
 
 test("pullSyncWorkspace can read another user's graph", async () => {
@@ -205,18 +181,18 @@ test("pullSyncWorkspace can read another user's graph", async () => {
     relays: [{ url: RELAY, read: true, write: true }],
   };
 
-  const manifest = await pullSyncWorkspace(client, profile, {
-    now: new Date("2026-03-10T12:00:00.000Z"),
-  });
+  const result = await pullSyncWorkspace(client, profile);
 
-  expect(manifest.as_user).toBe(ALICE);
-  expect(manifest.documents.map((document) => document.author)).toEqual([
-    ALICE,
-    BOB,
-  ]);
+  expect(result.contact_pubkeys).toEqual([BOB]);
+  expect(
+    fs.existsSync(path.join(tempDir, "DOCUMENTS", ALICE, "alice-root.md"))
+  ).toBe(true);
+  expect(
+    fs.existsSync(path.join(tempDir, "DOCUMENTS", BOB, "bob-root.md"))
+  ).toBe(true);
 });
 
-test("pullSyncWorkspace refetches documents from a 7 day buffer", async () => {
+test("pullSyncWorkspace updates documents on re-pull with new content", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-sync-"));
   const aliceDoc = documentEvent({
     pubkey: ALICE,
@@ -242,55 +218,28 @@ test("pullSyncWorkspace refetches documents from a 7 day buffer", async () => {
     relays: [{ url: RELAY, read: true, write: true }],
   };
 
-  await pullSyncWorkspace(firstClient.client, profile, {
-    now: new Date("2026-03-10T12:00:00.000Z"),
-  });
+  await pullSyncWorkspace(firstClient.client, profile);
 
   const bobDocV2 = documentEvent({
     pubkey: BOB,
     rootUuid: "bob-root",
     text: "Bob Root Updated",
-    createdAt: FIRST_BOB_CREATED_AT + LOOKBACK_SECONDS + ONE_DAY_SECONDS,
+    createdAt: FIRST_BOB_CREATED_AT + 24 * 60 * 60,
   });
   const secondClient = makeClient({
-    [RELAY]: [contactListEvent(), aliceDoc, bobDocV1, bobDocV2],
+    [RELAY]: [contactListEvent(), aliceDoc, bobDocV2],
   });
 
-  const manifest = await pullSyncWorkspace(secondClient.client, profile, {
-    now: new Date("2026-03-10T13:00:00.000Z"),
-  });
+  await pullSyncWorkspace(secondClient.client, profile);
 
-  const aliceDocQuery = secondClient.calls.find(
-    ({ filter }) =>
-      filter.kinds?.includes(34770) && filter.authors?.includes(ALICE)
-  );
-  const bobDocQuery = secondClient.calls.find(
-    ({ filter }) =>
-      filter.kinds?.includes(34770) && filter.authors?.includes(BOB)
-  );
-
-  expect(aliceDocQuery?.filter.since).toBe(
-    FIRST_ALICE_CREATED_AT - LOOKBACK_SECONDS
-  );
-  expect(bobDocQuery?.filter.since).toBe(
-    FIRST_BOB_CREATED_AT - LOOKBACK_SECONDS
-  );
-  expect(manifest.authors).toEqual([
-    { pubkey: ALICE, last_document_created_at: FIRST_ALICE_CREATED_AT },
-    {
-      pubkey: BOB,
-      last_document_created_at:
-        FIRST_BOB_CREATED_AT + LOOKBACK_SECONDS + ONE_DAY_SECONDS,
-    },
-  ]);
-
-  const bobPath = path.join(
-    tempDir,
-    manifest.documents.find((document) => document.author === BOB)?.path || ""
-  );
+  const bobPath = path.join(tempDir, "DOCUMENTS", BOB, "bob-root-updated.md");
   const bobContent = fs.readFileSync(bobPath, "utf8");
   expectEditableHeader(bobContent, BOB, "bob-root");
   expect(bobContent).toContain(bobDocV2.content.trim());
+
+  expect(
+    fs.existsSync(path.join(tempDir, "DOCUMENTS", BOB, "bob-root.md"))
+  ).toBe(false);
 });
 
 test("pullSyncWorkspace does not overwrite a locally edited document", async () => {
@@ -314,12 +263,13 @@ test("pullSyncWorkspace does not overwrite a locally edited document", async () 
   const firstClient = makeClient({
     [RELAY]: [contactListEvent(), existingDoc],
   });
-  const firstManifest = await pullSyncWorkspace(firstClient.client, profile, {
-    now: new Date("2026-03-10T12:00:00.000Z"),
-  });
+  await pullSyncWorkspace(firstClient.client, profile);
+
   const documentPath = path.join(
     tempDir,
-    firstManifest.documents[0]?.path || ""
+    "DOCUMENTS",
+    ALICE,
+    "original-root.md"
   );
   fs.writeFileSync(
     documentPath,
@@ -332,16 +282,14 @@ test("pullSyncWorkspace does not overwrite a locally edited document", async () 
     pubkey: ALICE,
     rootUuid: "local-root",
     text: "Remote Updated Root",
-    createdAt: FIRST_ALICE_CREATED_AT + ONE_DAY_SECONDS,
+    createdAt: FIRST_ALICE_CREATED_AT + 24 * 60 * 60,
   });
   const secondClient = makeClient({
     [RELAY]: [contactListEvent(), existingDoc, remoteUpdatedDoc],
   });
-  const manifest = await pullSyncWorkspace(secondClient.client, profile, {
-    now: new Date("2026-03-10T13:00:00.000Z"),
-  });
+  const result = await pullSyncWorkspace(secondClient.client, profile);
 
-  expect(manifest.documents).toHaveLength(1);
+  expect(result.skipped_paths).toHaveLength(1);
   expect(fs.readFileSync(documentPath, "utf8")).toContain(
     "Locally Edited Root"
   );

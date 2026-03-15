@@ -2,7 +2,7 @@ import { SimplePool } from "nostr-tools";
 import { loadCliProfile } from "./config";
 import { requireValue } from "./args";
 import { SyncPullCliArgs } from "./types";
-import { pullSyncWorkspace, SyncPullManifest } from "../core/syncPull";
+import { pullSyncWorkspace, PullResult } from "../core/syncPull";
 
 function parsePublicKeyArg(value: string, flagName: string): PublicKey {
   const normalized = value.trim().toLowerCase();
@@ -84,7 +84,7 @@ export function pullHelp(): string {
 
 export async function runPullCommand(
   args: string[]
-): Promise<{ help: true; text: string } | SyncPullManifest> {
+): Promise<{ help: true; text: string } | PullResult> {
   const parsed = parsePullArgs(args);
   if (parsed.help) {
     return {

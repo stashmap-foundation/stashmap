@@ -1,44 +1,12 @@
 import fs from "fs/promises";
 import path from "path";
 import { Event } from "nostr-tools";
-import { findTag, getEventMs } from "../nostrEvents";
-import {
-  KIND_DELETE,
-  KIND_KNOWLEDGE_DOCUMENT,
-  getReplaceableKey,
-} from "../nostr";
+import { findTag } from "../nostrEvents";
 import { joinID } from "../connections";
 import { parseMarkdownHierarchy } from "../markdownTree";
 
-export const WORKSPACE_VERSION = 2;
 export const DOCUMENTS_DIR = "DOCUMENTS";
 export const BASELINE_DIR = "base";
-
-export type WorkspaceAuthor = {
-  pubkey: PublicKey;
-  last_document_created_at: number;
-};
-
-export type WorkspaceDocument = {
-  replaceable_key: string;
-  author: PublicKey;
-  event_id: string;
-  d_tag: string;
-  path: string;
-  base_path?: string;
-  created_at: number;
-  updated_ms: number;
-};
-
-export type WorkspaceManifest = {
-  workspace_version: number;
-  as_user: PublicKey;
-  synced_at: string;
-  relay_urls: string[];
-  contact_pubkeys: PublicKey[];
-  authors: WorkspaceAuthor[];
-  documents: WorkspaceDocument[];
-};
 
 function slugify(value: string): string {
   const slug = value
@@ -56,25 +24,6 @@ function getDocumentTitle(content: string): string {
     .replace(/\s+\{.*\}\s*$/, "")
     .trim();
   return heading || "document";
-}
-
-function relativeToWorkspace(workspaceDir: string, targetPath: string): string {
-  return path.relative(workspaceDir, targetPath).split(path.sep).join("/");
-}
-
-function relativeToKnowstrHome(
-  knowstrHome: string,
-  targetPath: string
-): string {
-  return path.relative(knowstrHome, targetPath).split(path.sep).join("/");
-}
-
-export function manifestPath(workspaceDir: string): string {
-  return path.join(workspaceDir, "manifest.json");
-}
-
-function baselineFilePath(knowstrHome: string, documentPath: string): string {
-  return path.join(knowstrHome, BASELINE_DIR, documentPath);
 }
 
 function editingHeaderLines(
@@ -153,56 +102,21 @@ export function ensureEditableDocumentHeader(
   ].join("\n")}`;
 }
 
-export async function loadWorkspaceManifest(
-  workspaceDir: string
-): Promise<WorkspaceManifest | undefined> {
-  try {
-    const raw = await fs.readFile(manifestPath(workspaceDir), "utf8");
-    return JSON.parse(raw) as WorkspaceManifest;
-  } catch {
-    return undefined;
-  }
+export function baselinePath(
+  knowstrHome: string,
+  author: PublicKey,
+  dTag: string
+): string {
+  return path.join(knowstrHome, BASELINE_DIR, author, `${dTag}.md`);
 }
 
-export async function writeWorkspaceManifest(
-  workspaceDir: string,
-  manifest: WorkspaceManifest
-): Promise<void> {
-  await fs.writeFile(
-    manifestPath(workspaceDir),
-    JSON.stringify(manifest, null, 2),
-    "utf8"
-  );
-}
-
-export function createEmptyWorkspaceManifest(
-  asUser: PublicKey
-): WorkspaceManifest {
-  return {
-    workspace_version: WORKSPACE_VERSION,
-    as_user: asUser,
-    synced_at: new Date(0).toISOString(),
-    relay_urls: [],
-    contact_pubkeys: [],
-    authors: [],
-    documents: [],
-  };
-}
-
-function toDocumentFilePath(
+function workspaceFilePath(
   workspaceDir: string,
   author: PublicKey,
-  dTag: string,
   content: string
 ): string {
-  const safeDTag = slugify(dTag || "document");
   const titleSlug = slugify(getDocumentTitle(content));
-  return path.join(
-    workspaceDir,
-    DOCUMENTS_DIR,
-    author,
-    `${safeDTag}-${titleSlug}.md`
-  );
+  return path.join(workspaceDir, DOCUMENTS_DIR, author, `${titleSlug}.md`);
 }
 
 export async function removeWorkspaceFileIfExists(
@@ -211,216 +125,96 @@ export async function removeWorkspaceFileIfExists(
   try {
     await fs.rm(filePath, { force: true });
   } catch {
-    // ignore cleanup errors
+    /* ignore cleanup errors */
   }
 }
 
-async function writeDocumentFile(
+export function extractDTagFromHeader(content: string): string | undefined {
+  const match = content.match(/<!-- ks:root=(\S+)/);
+  return match?.[1];
+}
+
+export async function findWorkspaceFileByDTag(
   workspaceDir: string,
-  knowstrHome: string | undefined,
+  author: PublicKey,
+  dTag: string
+): Promise<string | undefined> {
+  const authorDir = path.join(workspaceDir, DOCUMENTS_DIR, author);
+  try {
+    const files = await fs.readdir(authorDir);
+    const mdFiles = files.filter((f) => f.endsWith(".md"));
+    const results = await Promise.all(
+      mdFiles.map(async (file) => {
+        const filePath = path.join(authorDir, file);
+        const content = await fs.readFile(filePath, "utf8");
+        const fileDTag = extractDTagFromHeader(content);
+        return fileDTag === dTag ? filePath : undefined;
+      })
+    );
+    return results.find((result): result is string => result !== undefined);
+  } catch {
+    return undefined;
+  }
+}
+
+export async function writeDocumentFiles(
+  workspaceDir: string,
+  knowstrHome: string,
   event: Event
-): Promise<WorkspaceDocument | undefined> {
-  const replaceableKey = getReplaceableKey(event);
+): Promise<{ workspacePath: string; baselinePath: string } | undefined> {
   const dTag = findTag(event, "d");
-  if (!replaceableKey || !dTag) {
+  if (!dTag) {
     return undefined;
   }
 
+  const author = event.pubkey as PublicKey;
   const editableContent = ensureEditableDocumentHeader(
     event.content,
-    event.pubkey as PublicKey,
+    author,
     dTag
   );
-  const filePath = toDocumentFilePath(
-    workspaceDir,
-    event.pubkey as PublicKey,
-    dTag,
-    editableContent
-  );
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, editableContent, "utf8");
 
-  const basePath = knowstrHome
-    ? baselineFilePath(knowstrHome, relativeToWorkspace(workspaceDir, filePath))
-    : undefined;
-  if (basePath) {
-    await fs.mkdir(path.dirname(basePath), { recursive: true });
-    await fs.writeFile(basePath, editableContent, "utf8");
+  const existingWorkspacePath = await findWorkspaceFileByDTag(
+    workspaceDir,
+    author,
+    dTag
+  );
+  const wsPath = workspaceFilePath(workspaceDir, author, editableContent);
+
+  if (existingWorkspacePath && existingWorkspacePath !== wsPath) {
+    await removeWorkspaceFileIfExists(existingWorkspacePath);
   }
 
-  return {
-    replaceable_key: replaceableKey,
-    author: event.pubkey as PublicKey,
-    event_id: event.id,
-    d_tag: dTag,
-    path: relativeToWorkspace(workspaceDir, filePath),
-    ...(basePath
-      ? {
-          base_path: relativeToKnowstrHome(knowstrHome as string, basePath),
-        }
-      : {}),
-    created_at: event.created_at,
-    updated_ms: getEventMs(event),
-  };
+  await fs.mkdir(path.dirname(wsPath), { recursive: true });
+  await fs.writeFile(wsPath, editableContent, "utf8");
+
+  const basePath = baselinePath(knowstrHome, author, dTag);
+  await fs.mkdir(path.dirname(basePath), { recursive: true });
+  await fs.writeFile(basePath, editableContent, "utf8");
+
+  return { workspacePath: wsPath, baselinePath: basePath };
 }
 
-export function documentMap(
-  manifest: WorkspaceManifest | undefined
-): Map<string, WorkspaceDocument> {
-  return new Map(
-    (manifest?.documents || []).map((document) => [
-      document.replaceable_key,
-      document,
-    ])
-  );
+export async function readBaselineContent(
+  knowstrHome: string,
+  author: PublicKey,
+  dTag: string
+): Promise<string | undefined> {
+  try {
+    return await fs.readFile(baselinePath(knowstrHome, author, dTag), "utf8");
+  } catch {
+    return undefined;
+  }
 }
 
-export function authorMap(
-  manifest: WorkspaceManifest | undefined
-): Map<PublicKey, WorkspaceAuthor> {
-  return new Map(
-    (manifest?.authors || []).map((author) => [author.pubkey, author])
-  );
-}
-
-export async function applyDeleteEventsToWorkspaceDocuments(
-  workspaceDir: string,
-  knowstrHome: string | undefined,
-  documents: Map<string, WorkspaceDocument>,
-  deleteEvents: Event[]
-): Promise<void> {
-  await deleteEvents.reduce(async (previous, event) => {
-    await previous;
-    const replaceableKey = findTag(event, "a");
-    const existing = replaceableKey ? documents.get(replaceableKey) : undefined;
-    if (
-      !replaceableKey ||
-      !existing ||
-      getEventMs(event) <= existing.updated_ms
-    ) {
-      return;
-    }
-
-    await removeWorkspaceFileIfExists(path.join(workspaceDir, existing.path));
-    if (knowstrHome && existing.base_path) {
-      await removeWorkspaceFileIfExists(
-        path.join(knowstrHome, existing.base_path)
-      );
-    }
-    documents.delete(replaceableKey);
-  }, Promise.resolve());
-}
-
-export async function applyDocumentEventsToWorkspaceDocuments(
-  workspaceDir: string,
-  knowstrHome: string | undefined,
-  documents: Map<string, WorkspaceDocument>,
-  documentEvents: Event[]
-): Promise<void> {
-  const sortedEvents = [...documentEvents].sort((a, b) => {
-    const diff = getEventMs(a) - getEventMs(b);
-    return diff !== 0 ? diff : a.id.localeCompare(b.id);
-  });
-
-  await sortedEvents.reduce(async (previous, event) => {
-    await previous;
-    const replaceableKey = getReplaceableKey(event);
-    if (!replaceableKey) {
-      return;
-    }
-
-    const existing = documents.get(replaceableKey);
-    if (existing?.event_id === event.id) {
-      return;
-    }
-
-    const nextDocument = await writeDocumentFile(
-      workspaceDir,
-      knowstrHome,
-      event
-    );
-    if (!nextDocument) {
-      return;
-    }
-
-    if (existing && existing.path !== nextDocument.path) {
-      await removeWorkspaceFileIfExists(path.join(workspaceDir, existing.path));
-    }
-    documents.set(replaceableKey, nextDocument);
-  }, Promise.resolve());
-}
-
-export function updateAuthorsFromKnowledgeDocumentEvents(
-  previousAuthors: Map<PublicKey, WorkspaceAuthor>,
-  documentEvents: Event[]
-): WorkspaceAuthor[] {
-  const authors = new Set<PublicKey>(previousAuthors.keys());
-  documentEvents.forEach((event) => {
-    authors.add(event.pubkey as PublicKey);
-  });
-
-  return [...authors].sort().map((pubkey) => {
-    const previous = previousAuthors.get(pubkey);
-    const latestCreatedAt = documentEvents
-      .filter((event) => event.pubkey === pubkey)
-      .reduce(
-        (current, event) => Math.max(current, event.created_at),
-        previous?.last_document_created_at || 0
-      );
-    return {
-      pubkey,
-      last_document_created_at: latestCreatedAt,
-    };
-  });
-}
-
-export async function applyKnowledgeEventsToWorkspace(
-  workspaceDir: string,
-  knowstrHome: string | undefined,
-  baseManifest: WorkspaceManifest,
-  events: Event[]
-): Promise<WorkspaceManifest> {
-  await fs.mkdir(path.join(workspaceDir, DOCUMENTS_DIR), { recursive: true });
-  const documents = documentMap(baseManifest);
-  const documentEvents = events.filter(
-    (event) => event.kind === KIND_KNOWLEDGE_DOCUMENT
-  );
-  const deleteEvents = events.filter((event) => event.kind === KIND_DELETE);
-
-  await applyDeleteEventsToWorkspaceDocuments(
-    workspaceDir,
-    knowstrHome,
-    documents,
-    deleteEvents
-  );
-  await applyDocumentEventsToWorkspaceDocuments(
-    workspaceDir,
-    knowstrHome,
-    documents,
-    documentEvents
-  );
-
-  const nextManifest: WorkspaceManifest = {
-    ...baseManifest,
-    documents: [...documents.values()].sort((a, b) =>
-      a.path.localeCompare(b.path)
-    ),
-    authors: updateAuthorsFromKnowledgeDocumentEvents(
-      authorMap(baseManifest),
-      documentEvents
-    ),
-  };
-
-  await writeWorkspaceManifest(workspaceDir, nextManifest);
-  return nextManifest;
-}
-
-export async function loadOrCreateWorkspaceManifest(
-  workspaceDir: string,
-  asUser: PublicKey
-): Promise<WorkspaceManifest> {
-  return (
-    (await loadWorkspaceManifest(workspaceDir)) ||
-    createEmptyWorkspaceManifest(asUser)
-  );
+export async function isLocallyEdited(
+  workspacePath: string,
+  baselineContent: string
+): Promise<boolean> {
+  try {
+    const workspaceContent = await fs.readFile(workspacePath, "utf8");
+    return workspaceContent !== baselineContent;
+  } catch {
+    return false;
+  }
 }

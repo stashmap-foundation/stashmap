@@ -19,7 +19,7 @@ export const DEFAULT_RELAYS: Relays = [
   { url: "wss://relay.primal.net/", read: true, write: true },
   { url: "wss://nos.lol/", read: true, write: true },
   { url: "wss://nostr.mom/", read: true, write: true },
-  { url: "wss://nostr.noones.com/", read: true, write: true },
+  //  { url: "wss://nostr.noones.com/", read: true, write: true },
 ];
 
 export function newTimestamp(): number {

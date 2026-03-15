@@ -7,6 +7,7 @@ import { hexToBytes } from "@noble/hashes/utils";
 import { Event, Filter, matchFilter, getPublicKey } from "nostr-tools";
 import { LoadedCliProfile } from "./config";
 import { pushPendingWritesWithPool } from "./push";
+import { KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
 import {
   pullSyncWorkspace,
   SyncPullProfile,
@@ -26,7 +27,7 @@ function documentEvent(
     id: `${rootUuid}-${createdAt}`.padEnd(64, "0"),
     pubkey: ALICE,
     created_at: createdAt,
-    kind: 34771,
+    kind: KIND_KNOWLEDGE_DOCUMENT,
     sig: "0".repeat(128),
     tags: [
       ["d", rootUuid],

@@ -1,6 +1,7 @@
 import { Event } from "nostr-tools";
 import { Map } from "immutable";
 import type { StashmapDB } from "./indexedDB";
+import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
 import {
   applyStoredDelete,
   applyStoredDocument,
@@ -57,11 +58,11 @@ test("buildPermanentSyncAuthors includes user and deduplicates contacts/members"
 
 test("buildPermanentSyncFilters creates broad document and delete filters", () => {
   expect(buildPermanentSyncFilters([ALICE, BOB])).toEqual([
-    { authors: [ALICE, BOB], kinds: [34771], limit: 0 },
+    { authors: [ALICE, BOB], kinds: [KIND_KNOWLEDGE_DOCUMENT], limit: 0 },
     {
       authors: [ALICE, BOB],
-      kinds: [5],
-      "#k": ["34771"],
+      kinds: [KIND_DELETE],
+      "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`],
       limit: 0,
     },
   ]);
@@ -86,13 +87,13 @@ test("buildPermanentCatchUpFilters narrows to authors with checkpoints", () => {
   ).toEqual([
     {
       authors: [ALICE],
-      kinds: [34771],
+      kinds: [KIND_KNOWLEDGE_DOCUMENT],
       since: 0,
     },
     {
       authors: [ALICE],
-      kinds: [5],
-      "#k": ["34771"],
+      kinds: [KIND_DELETE],
+      "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`],
       since: 0,
     },
   ]);
@@ -102,12 +103,12 @@ test("buildPermanentBackfillFilter pages by author and until", () => {
   expect(
     buildPermanentBackfillFilter({
       author: ALICE,
-      kind: 34771,
+      kind: KIND_KNOWLEDGE_DOCUMENT,
       until: 55,
     })
   ).toEqual({
     authors: [ALICE],
-    kinds: [34771],
+    kinds: [KIND_KNOWLEDGE_DOCUMENT],
     until: 55,
     limit: 200,
   });
@@ -118,7 +119,7 @@ test("toStoredDocumentRecord extracts replaceable document fields", () => {
     id: "doc-1",
     pubkey: ALICE,
     created_at: 10,
-    kind: 34771,
+    kind: KIND_KNOWLEDGE_DOCUMENT,
     tags: [
       ["d", "root-1"],
       ["ms", "1234"],
@@ -127,7 +128,7 @@ test("toStoredDocumentRecord extracts replaceable document fields", () => {
   } as unknown as Event;
 
   expect(toStoredDocumentRecord(event)).toEqual({
-    replaceableKey: "34771:alice:root-1",
+    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:alice:root-1`,
     author: ALICE,
     eventId: "doc-1",
     dTag: "root-1",
@@ -143,17 +144,17 @@ test("toStoredDeleteRecord extracts document delete records", () => {
     id: "del-1",
     pubkey: ALICE,
     created_at: 11,
-    kind: 5,
+    kind: KIND_DELETE,
     tags: [
-      ["a", "34771:alice:root-1"],
-      ["k", "34771"],
+      ["a", `${KIND_KNOWLEDGE_DOCUMENT}:alice:root-1`],
+      ["k", `${KIND_KNOWLEDGE_DOCUMENT}`],
       ["ms", "2234"],
     ],
     content: "",
   } as unknown as Event;
 
   expect(toStoredDeleteRecord(event)).toEqual({
-    replaceableKey: "34771:alice:root-1",
+    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:alice:root-1`,
     author: ALICE,
     eventId: "del-1",
     createdAt: 11,
@@ -235,7 +236,7 @@ test("applyStoredDocument ignores a document hidden by a newer delete", async ()
   const db = {} as StashmapDB;
   indexedDBModule.getStoredDocument.mockResolvedValue(undefined);
   indexedDBModule.getStoredDelete.mockResolvedValue({
-    replaceableKey: "34771:alice:root-1",
+    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:alice:root-1`,
     author: ALICE,
     eventId: "del-1",
     createdAt: 11,
@@ -243,7 +244,7 @@ test("applyStoredDocument ignores a document hidden by a newer delete", async ()
   });
 
   await applyStoredDocument(db, {
-    replaceableKey: "34771:alice:root-1",
+    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:alice:root-1`,
     author: ALICE,
     eventId: "doc-1",
     dTag: "root-1",
@@ -259,7 +260,7 @@ test("applyStoredDocument ignores a document hidden by a newer delete", async ()
 test("applyStoredDelete removes an older stored document", async () => {
   const db = {} as StashmapDB;
   indexedDBModule.getStoredDocument.mockResolvedValue({
-    replaceableKey: "34771:alice:root-1",
+    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:alice:root-1`,
     author: ALICE,
     eventId: "doc-1",
     dTag: "root-1",
@@ -271,7 +272,7 @@ test("applyStoredDelete removes an older stored document", async () => {
   indexedDBModule.getStoredDelete.mockResolvedValue(undefined);
 
   await applyStoredDelete(db, {
-    replaceableKey: "34771:alice:root-1",
+    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:alice:root-1`,
     author: ALICE,
     eventId: "del-1",
     createdAt: 11,
@@ -281,7 +282,7 @@ test("applyStoredDelete removes an older stored document", async () => {
   expect(indexedDBModule.putStoredDelete).toHaveBeenCalled();
   expect(indexedDBModule.removeStoredDocument).toHaveBeenCalledWith(
     db,
-    "34771:alice:root-1"
+    `${KIND_KNOWLEDGE_DOCUMENT}:alice:root-1`
   );
 });
 
@@ -300,7 +301,7 @@ test("startPermanentDocumentSync applies document events immediately", async () 
         id: "doc-1",
         pubkey: ALICE,
         created_at: 10,
-        kind: 34771,
+        kind: KIND_KNOWLEDGE_DOCUMENT,
         tags: [
           ["d", "root-1"],
           ["ms", "1234"],
@@ -323,7 +324,7 @@ test("startPermanentDocumentSync applies document events immediately", async () 
   });
 
   expect(indexedDBModule.putStoredDocument).toHaveBeenCalledWith(db, {
-    replaceableKey: "34771:alice:root-1",
+    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:alice:root-1`,
     author: ALICE,
     eventId: "doc-1",
     dTag: "root-1",
@@ -373,19 +374,35 @@ test("startPermanentDocumentSync uses live limit-0 subscription and catch-up sub
   expect(subscribeMany).toHaveBeenCalledWith(
     ["wss://relay.example"],
     [
-      { authors: [ALICE], kinds: [34771], limit: 0 },
-      { authors: [ALICE], kinds: [5], "#k": ["34771"], limit: 0 },
+      {
+        authors: [ALICE],
+        kinds: [KIND_KNOWLEDGE_DOCUMENT],
+        limit: 0,
+      },
+      {
+        authors: [ALICE],
+        kinds: [KIND_DELETE],
+        "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`],
+        limit: 0,
+      },
     ],
     expect.any(Object)
   );
   expect(subscribeMany).toHaveBeenCalledWith(
     ["wss://relay.example"],
-    [{ authors: [ALICE], kinds: [34771], since: 0 }],
+    [{ authors: [ALICE], kinds: [KIND_KNOWLEDGE_DOCUMENT], since: 0 }],
     expect.any(Object)
   );
   expect(subscribeMany).toHaveBeenCalledWith(
     ["wss://relay.example"],
-    [{ authors: [ALICE], kinds: [5], "#k": ["34771"], since: 0 }],
+    [
+      {
+        authors: [ALICE],
+        kinds: [KIND_DELETE],
+        "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`],
+        since: 0,
+      },
+    ],
     expect.any(Object)
   );
 });

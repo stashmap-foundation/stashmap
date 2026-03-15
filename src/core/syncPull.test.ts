@@ -4,6 +4,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { Event, Filter, matchFilter } from "nostr-tools";
+import { KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
 import {
   pullSyncWorkspace,
   SyncPullProfile,
@@ -31,7 +32,7 @@ function documentEvent({
     id: `${pubkey.slice(0, 8)}-${rootUuid}-${createdAt}`.padEnd(64, "0"),
     pubkey,
     created_at: createdAt,
-    kind: 34771,
+    kind: KIND_KNOWLEDGE_DOCUMENT,
     sig: "0".repeat(128),
     tags: [
       ["d", rootUuid],

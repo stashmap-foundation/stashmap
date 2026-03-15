@@ -1,5 +1,5 @@
 /* eslint-disable functional/immutable-data */
-import { List, Set as ImmutableSet } from "immutable";
+import { List } from "immutable";
 import { v4 } from "uuid";
 import { UnsignedEvent } from "nostr-tools";
 import {
@@ -59,7 +59,6 @@ function formatCrefText(
 
 type SerializeResult = {
   lines: string[];
-  relationUUIDs: ImmutableSet<string>;
 };
 
 function getOwnRelationForDocumentSerialization(
@@ -136,15 +135,10 @@ function serializeTree(data: Data, rootRelation: GraphNode): SerializeResult {
         const crefText = formatCrefText(data.knowledgeDBs, author, item);
         const { targetID } = item;
         if (!crefText || !targetID) return acc;
-        const targetRelation = resolveNode(data.knowledgeDBs, item);
-        const crefRelationUUID = shortID(
-          (targetRelation?.id || targetID) as ID
-        );
         const crefAttrs = formatNodeAttrs("", item?.relevance, item?.argument);
         return {
           ...acc,
           lines: [...acc.lines, `${indent}- ${crefText}${crefAttrs}`],
-          relationUUIDs: acc.relationUUIDs.add(crefRelationUUID),
         };
       }
 
@@ -176,12 +170,10 @@ function serializeTree(data: Data, rootRelation: GraphNode): SerializeResult {
       )}`;
       return {
         lines: [...acc.lines, line],
-        relationUUIDs: acc.relationUUIDs.add(uuid),
       };
     },
     {
       lines: [],
-      relationUUIDs: ImmutableSet<string>(),
     }
   );
 }
@@ -216,10 +208,6 @@ export function buildDocumentEvent(
   );
   const result = serializeTree(data, rootRelation);
   const content = `${[rootLine, ...result.lines].join("\n")}\n`;
-  const rTags = result.relationUUIDs
-    .add(rootUuid)
-    .toArray()
-    .map((u) => ["r", u]);
   const systemRoleTags = rootRelation.systemRole
     ? ([["s", rootRelation.systemRole]] as string[][])
     : [];
@@ -228,7 +216,7 @@ export function buildDocumentEvent(
     kind: KIND_KNOWLEDGE_DOCUMENT,
     pubkey: author,
     created_at: newTimestamp(),
-    tags: [["d", rootUuid], ...rTags, ...systemRoleTags, msTag()],
+    tags: [["d", rootUuid], ...systemRoleTags, msTag()],
     content,
   };
 }

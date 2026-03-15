@@ -301,11 +301,10 @@ Root headings and list items carry structured attributes such as:
 
 Documents also emit:
 - `#d` -> root relation UUID key
-- `#r` -> relation IDs contained/referenced
 - `#n` -> semantic IDs contained in the document
 - `#s` -> system roles such as `"log"`
 
-`#c` tags are gone.
+`#c` and `#r` tags are gone.
 
 Markdown read/write lives in:
 - [markdownDocument.tsx](/Users/f/sandbox/stashmap-3/src/markdownDocument.tsx)
@@ -328,7 +327,6 @@ Queries are built in:
 - [dataQuery.tsx](/Users/f/sandbox/stashmap-3/src/dataQuery.tsx)
 
 Current query model:
-- `#r` for relation IDs
 - `#n` for semantic IDs
 - `#s` for system roots like `log`
 - delete filters for document cleanup

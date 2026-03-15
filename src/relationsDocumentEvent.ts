@@ -1,4 +1,3 @@
-import { Set as ImmutableSet } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
 import {
   EMPTY_SEMANTIC_ID,
@@ -16,7 +15,6 @@ import { createRootAnchor } from "./rootAnchor";
 
 type SerializeResult = {
   lines: string[];
-  relationUUIDs: ImmutableSet<string>;
 };
 
 function getSerializableRelationText(
@@ -56,7 +54,6 @@ function serializeRelationItems(
           ? getSerializableRelationText(knowledgeDBs, targetRelation)
           : "") ||
         shortID(targetRelationID);
-      const hrefTarget = targetRelation?.id || targetRelationID;
       return {
         ...acc,
         lines: [
@@ -67,7 +64,6 @@ function serializeRelationItems(
             item.argument
           )}`,
         ],
-        relationUUIDs: acc.relationUUIDs.add(shortID(hrefTarget as ID)),
       };
     }
 
@@ -91,7 +87,6 @@ function serializeRelationItems(
           }
         )}`,
       ],
-      relationUUIDs: acc.relationUUIDs.add(shortID(resolvedChild.id)),
     };
     return serializeRelationItems(
       knowledgeDBs,
@@ -116,13 +111,8 @@ export function buildDocumentEventFromRelations(
     0,
     {
       lines: [],
-      relationUUIDs: ImmutableSet<string>(),
     }
   );
-  const rTags = serialized.relationUUIDs
-    .add(rootUuid)
-    .toArray()
-    .map((uuid) => ["r", uuid]);
   const systemRoleTags = rootRelation.systemRole
     ? ([["s", rootRelation.systemRole]] as string[][])
     : [];
@@ -131,7 +121,7 @@ export function buildDocumentEventFromRelations(
     kind: KIND_KNOWLEDGE_DOCUMENT,
     pubkey: rootRelation.author,
     created_at: newTimestamp(),
-    tags: [["d", rootUuid], ...rTags, ...systemRoleTags, msTag()],
+    tags: [["d", rootUuid], ...systemRoleTags, msTag()],
     content: `${[
       formatRootHeading(
         rootText,

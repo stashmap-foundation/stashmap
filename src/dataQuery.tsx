@@ -1,15 +1,11 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Filter } from "nostr-tools";
 import { Set } from "immutable";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
-import { splitID, getNode, getRelationStack } from "./connections";
+import { splitID } from "./connections";
 import { getTextHashForSemanticID } from "./semanticProjection";
-import { REFERENCED_BY } from "./constants";
-import { useCurrentPane } from "./SplitPanesContext";
-import { useData } from "./DataContext";
 import { useApis } from "./Apis";
 import { useDocumentStore } from "./DocumentStore";
-import { RegisterQuery, extractIDsFromQueries } from "./LoadingStatus";
 import { useReadRelays } from "./relays";
 import { useEventQuery } from "./commons/useNostrQuery";
 
@@ -53,7 +49,6 @@ function getDocumentSemanticQueryIDs(
 }
 
 type Filters = {
-  documentByRelation: Filter;
   documentBySemantic: Filter;
   documentBySystemRole: Filter;
   deleteFilter: Filter;
@@ -78,7 +73,6 @@ export function sanitizeFilter(
 export function filtersToFilterArray(filters: Filters): Filter[] {
   const { authors, systemRoleAuthors } = filters;
   return [
-    sanitizeFilter({ ...filters.documentByRelation, authors }, "#r"),
     sanitizeFilter({ ...filters.documentBySemantic, authors }, "#n"),
     sanitizeFilter(
       { ...filters.documentBySystemRole, authors: systemRoleAuthors },
@@ -96,20 +90,6 @@ function addAuthorFromIDToFilters(filters: Filters, id: ID): Filters {
   return {
     ...filters,
     authors,
-  };
-}
-
-export function addRelationIDToFilters(
-  filters: Filters,
-  relationID: LongID
-): Filters {
-  return {
-    ...addAuthorFromIDToFilters(filters, relationID as ID),
-    documentByRelation: addIDToFilter(
-      filters.documentByRelation,
-      relationID,
-      "#r"
-    ),
   };
 }
 
@@ -168,30 +148,6 @@ export function addReferencedByToFilters(
   );
 }
 
-export function addListToFilters(
-  filters: Filters,
-  listID: LongID,
-  itemID: ID,
-  knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey
-): Filters {
-  if (listID === REFERENCED_BY) {
-    return addReferencedByToFilters(filters, itemID, knowledgeDBs, myself);
-  }
-
-  return {
-    ...addRelationIDToFilters(filters, listID),
-    documentBySemantic: getDocumentSemanticQueryIDs(
-      knowledgeDBs,
-      myself,
-      itemID
-    ).reduce(
-      (acc, queryID) => addIDToFilter(acc, queryID, "#n"),
-      filters.documentBySemantic
-    ),
-  };
-}
-
 export function createBaseFilter(
   contacts: Contacts,
   projectMembers: Members,
@@ -207,9 +163,6 @@ export function createBaseFilter(
       : []),
   ];
   return {
-    documentByRelation: {
-      kinds: [KIND_KNOWLEDGE_DOCUMENT],
-    },
     documentBySemantic: {
       kinds: [KIND_KNOWLEDGE_DOCUMENT],
     },
@@ -275,88 +228,4 @@ export function useQueryKnowledgeData(filters: Filter[]): {
   }, [events.size, eose, serializedFilters, disabled, eventLoadingTimeout]);
 
   return { allEventsProcessed };
-}
-
-export function LoadData({
-  children,
-  itemIDs,
-  systemRoles,
-  referencedBy,
-  lists,
-}: {
-  children: React.ReactNode;
-  itemIDs: ID[];
-  systemRoles?: RootSystemRole[];
-  referencedBy?: boolean;
-  lists?: boolean;
-}): JSX.Element {
-  const { user, contacts, projectMembers, knowledgeDBs } = useData();
-  const effectiveAuthor = useCurrentPane().author;
-
-  const baseFilter = createBaseFilter(
-    contacts,
-    projectMembers,
-    user.publicKey,
-    effectiveAuthor
-  );
-
-  const withItems = itemIDs.reduce((acc, itemID) => {
-    const withItem = addItemToFilters(
-      acc,
-      itemID,
-      knowledgeDBs,
-      user.publicKey,
-      lists
-    );
-    const withReferencedBy = referencedBy
-      ? addReferencedByToFilters(withItem, itemID, knowledgeDBs, user.publicKey)
-      : withItem;
-    return withReferencedBy;
-  }, baseFilter);
-
-  const filter = (systemRoles || []).reduce(
-    (acc, systemRole) => addSystemRoleToFilters(acc, systemRole),
-    withItems
-  );
-
-  const filterArray = filtersToFilterArray(filter);
-  const { allEventsProcessed } = useQueryKnowledgeData(filterArray);
-
-  return (
-    <RegisterQuery
-      idsBeingQueried={extractIDsFromQueries(filterArray)}
-      allEventsProcessed={allEventsProcessed}
-    >
-      {children}
-    </RegisterQuery>
-  );
-}
-
-export function LoadRelationData({
-  children,
-  relationID,
-}: {
-  children: React.ReactNode;
-  relationID: LongID;
-}): JSX.Element {
-  const { knowledgeDBs, user, contacts, projectMembers } = useData();
-  const effectiveAuthor = useCurrentPane().author;
-  const baseFilter = createBaseFilter(
-    contacts,
-    projectMembers,
-    user.publicKey,
-    effectiveAuthor
-  );
-  const withRelation = addRelationIDToFilters(baseFilter, relationID);
-  const relation = getNode(knowledgeDBs, relationID, effectiveAuthor);
-  const filter = relation
-    ? getRelationStack(knowledgeDBs, relation).reduce(
-        (acc, semanticID) =>
-          addItemToFilters(acc, semanticID, knowledgeDBs, user.publicKey),
-        withRelation
-      )
-    : withRelation;
-  const filterArray = filtersToFilterArray(filter);
-  useQueryKnowledgeData(filterArray);
-  return <>{children}</>;
 }

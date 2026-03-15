@@ -104,6 +104,8 @@ export async function runPullCommand(
 
   return pullSyncWorkspace(
     {
+      subscribeMany: (relayUrls, filters, params) =>
+        pool.subscribeMany(relayUrls, filters, params),
       querySync: (relayUrls, filter, params) =>
         pool.querySync(relayUrls, filter, params),
       close: (relayUrls) => pool.close(relayUrls),

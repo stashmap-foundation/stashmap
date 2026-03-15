@@ -27,6 +27,7 @@ export type MockRelayPool = SimplePool & {
   getPublishedOnRelays: () => Array<string>;
   resetPublishedOnRelays: () => void;
   getSubscriptions: () => Array<SubscriptionRecord>;
+  getSubscribeManyCalls: () => Array<SubscriptionRecord>;
   getQuerySyncCalls: () => Array<QueryRecord>;
 };
 
@@ -82,6 +83,7 @@ export function mockRelayPool(): MockRelayPool {
   let subs = Map<string, Subscription>();
   // eslint-disable-next-line functional/no-let
   let subscriptionRecords = Map<string, SubscriptionRecord>();
+  const subscribeManyCalls: Array<SubscriptionRecord> = [];
   // eslint-disable-next-line functional/no-let
   let publishedOnRelays: Array<string> = [];
   // eslint-disable-next-line functional/no-let
@@ -102,6 +104,8 @@ export function mockRelayPool(): MockRelayPool {
       } as Subscription;
       subs = subs.set(id, subscription);
       subscriptionRecords = subscriptionRecords.set(id, { filters, relays });
+      // eslint-disable-next-line functional/immutable-data
+      subscribeManyCalls.push({ filters, relays });
       replayEvents(subscription, events);
 
       return {
@@ -129,6 +133,7 @@ export function mockRelayPool(): MockRelayPool {
       publishedOnRelays = [];
     },
     getSubscriptions: () => subscriptionRecords.valueSeq().toArray(),
+    getSubscribeManyCalls: () => subscribeManyCalls,
     getQuerySyncCalls: () => queryRecords.valueSeq().toArray(),
   } as unknown as MockRelayPool;
 }

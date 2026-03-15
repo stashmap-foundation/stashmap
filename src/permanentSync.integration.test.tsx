@@ -81,14 +81,26 @@ function getDocumentSyncSubscriptions(
     );
 }
 
-function getDocumentSyncQueries(
+function getDocumentSyncCalls(
   relayPool: ReturnType<typeof mockRelayPool>
-): ReturnType<typeof mockRelayPool>["getQuerySyncCalls"] extends () => infer T
+): ReturnType<
+  typeof mockRelayPool
+>["getSubscribeManyCalls"] extends () => infer T
   ? T
   : never {
   return relayPool
-    .getQuerySyncCalls()
-    .filter((query) => isDocumentSyncFilter(query.filter));
+    .getSubscribeManyCalls()
+    .filter((subscription) =>
+      subscription.filters.some((filter) => isDocumentSyncFilter(filter))
+    );
+}
+
+function getHistoricalDocumentSyncCalls(
+  relayPool: ReturnType<typeof mockRelayPool>
+): ReturnType<typeof getDocumentSyncCalls> {
+  return getDocumentSyncCalls(relayPool).filter(
+    (subscription) => !subscription.filters.some((filter) => filter.limit === 0)
+  );
 }
 
 beforeEach(async () => {
@@ -137,7 +149,28 @@ describe("permanent live sync integration", () => {
       ])
     );
     expect(getDocumentSyncSubscriptions(relayPool)).toHaveLength(1);
-    expect(getDocumentSyncQueries(relayPool)).toHaveLength(2);
+    expect(getHistoricalDocumentSyncCalls(relayPool)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          filters: [
+            expect.objectContaining({
+              authors: [ALICE.publicKey],
+              kinds: [KIND_KNOWLEDGE_DOCUMENT],
+            }),
+          ],
+        }),
+        expect.objectContaining({
+          filters: [
+            expect.objectContaining({
+              authors: [ALICE.publicKey],
+              kinds: [KIND_DELETE],
+              "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`],
+            }),
+          ],
+        }),
+      ])
+    );
+    expect(getHistoricalDocumentSyncCalls(relayPool)).toHaveLength(2);
   });
 
   test("live subscription applies new documents pushed after mount", async () => {
@@ -202,8 +235,9 @@ describe("permanent live sync integration", () => {
     renderApp(alice());
     await screen.findByLabelText("Navigate to Log");
 
-    const initialQueryCount = getDocumentSyncQueries(relayPool).length;
-    expect(initialQueryCount).toBe(2);
+    const initialHistoricalCallCount =
+      getHistoricalDocumentSyncCalls(relayPool).length;
+    expect(initialHistoricalCallCount).toBe(2);
   });
 
   test("newer replacement document wins during historical sync", async () => {

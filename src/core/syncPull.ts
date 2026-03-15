@@ -25,6 +25,7 @@ import {
   writeDocumentFiles,
   findWorkspaceFileByDTag,
 } from "./workspaceState";
+import { collectEventsUntilIdle, EventQueryClient } from "../eventQuery";
 
 const DEFAULT_MAX_WAIT_MS = 20_000;
 
@@ -52,12 +53,7 @@ export type PullResult = {
   deleted_paths: string[];
 };
 
-export type SyncQueryClient = {
-  querySync: (
-    relayUrls: string[],
-    filter: Filter,
-    params?: { maxWait?: number }
-  ) => Promise<Event[]>;
+export type SyncQueryClient = EventQueryClient & {
   close?: (relayUrls: string[]) => void;
 };
 
@@ -95,7 +91,9 @@ async function queryFilters(
   const eventMap = new Map<string, Event>();
   const responses = await Promise.all(
     filters.map((filter) =>
-      client.querySync(relayUrls, filter, { maxWait: maxWaitMs })
+      collectEventsUntilIdle(client, relayUrls, [filter], {
+        maxWait: maxWaitMs,
+      })
     )
   );
 

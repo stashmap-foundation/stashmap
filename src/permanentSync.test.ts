@@ -338,7 +338,7 @@ test("startPermanentDocumentSync applies document events immediately", async () 
   expect(indexedDBModule.putSyncCheckpoint).toHaveBeenCalled();
 });
 
-test("startPermanentDocumentSync uses live limit-0 subscription and catch-up queries", async () => {
+test("startPermanentDocumentSync uses live limit-0 subscription and catch-up subscriptions", async () => {
   indexedDBModule.getSyncCheckpoint.mockImplementation(
     (db: StashmapDB, author: PublicKey) =>
       author === ALICE
@@ -350,14 +350,17 @@ test("startPermanentDocumentSync uses live limit-0 subscription and catch-up que
           })
         : Promise.resolve(undefined)
   );
-  const subscribeMany = jest.fn(() => ({ close: jest.fn() }));
-  const querySync = jest.fn(() => Promise.resolve([]));
+  const subscribeMany = jest.fn((_relayUrls, _filters, params) => {
+    Promise.resolve().then(() => {
+      params.onclose?.();
+    });
+    return { close: jest.fn() };
+  });
 
   startPermanentDocumentSync({
     db: {} as StashmapDB,
     relayPool: {
       subscribeMany,
-      querySync,
     } as unknown as import("nostr-tools").SimplePool,
     relayUrls: ["wss://relay.example"],
     authors: [ALICE],
@@ -375,9 +378,14 @@ test("startPermanentDocumentSync uses live limit-0 subscription and catch-up que
     ],
     expect.any(Object)
   );
-  expect(querySync).toHaveBeenCalledWith(
+  expect(subscribeMany).toHaveBeenCalledWith(
     ["wss://relay.example"],
-    { authors: [ALICE], kinds: [34770], since: 0 },
-    { maxWait: 5000 }
+    [{ authors: [ALICE], kinds: [34770], since: 0 }],
+    expect.any(Object)
+  );
+  expect(subscribeMany).toHaveBeenCalledWith(
+    ["wss://relay.example"],
+    [{ authors: [ALICE], kinds: [5], "#k": ["34770"], since: 0 }],
+    expect.any(Object)
   );
 });

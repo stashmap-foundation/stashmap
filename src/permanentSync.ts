@@ -23,6 +23,7 @@ import {
   removeStoredDelete,
   removeStoredDocument,
 } from "./indexedDB";
+import { collectEventsUntilIdle } from "./eventQuery";
 
 const PERMANENT_SYNC_BACKFILL_PAGE_LIMIT = 200;
 const PERMANENT_SYNC_CATCH_UP_SAFETY_WINDOW_SECONDS = 5 * 60;
@@ -32,14 +33,6 @@ type PermanentSyncState = {
   active: boolean;
   seenEventIds: Set<string>;
   checkpoints: Map<PublicKey, SyncCheckpointRecord>;
-};
-
-type SyncQueryPool = SimplePool & {
-  querySync?: (
-    relayUrls: string[],
-    filter: Filter,
-    params?: { maxWait?: number }
-  ) => Promise<Event[]>;
 };
 
 export function buildPermanentSyncAuthors(
@@ -276,33 +269,18 @@ export async function applyStoredDelete(
   }
 }
 
-function getQuerySync(
-  pool: SyncQueryPool
-):
-  | ((
-      relayUrls: string[],
-      filter: Filter,
-      params?: { maxWait?: number }
-    ) => Promise<Event[]>)
-  | undefined {
-  return typeof pool.querySync === "function"
-    ? pool.querySync.bind(pool)
-    : undefined;
-}
-
 async function queryPermanentSyncFilters(
-  relayPool: SyncQueryPool,
+  relayPool: SimplePool,
   relayUrls: string[],
   filters: Filter[]
 ): Promise<Event[]> {
-  const querySync = getQuerySync(relayPool);
-  if (!querySync || relayUrls.length === 0 || filters.length === 0) {
+  if (relayUrls.length === 0 || filters.length === 0) {
     return [];
   }
   const eventMap = new Map<string, Event>();
   const responses = await Promise.all(
     filters.map((filter) =>
-      querySync(relayUrls, filter, {
+      collectEventsUntilIdle(relayPool, relayUrls, [filter], {
         maxWait: PERMANENT_SYNC_QUERY_MAX_WAIT_MS,
       })
     )
@@ -420,7 +398,7 @@ export function startPermanentDocumentSync({
   const runCatchUp = async (): Promise<void> => {
     const filters = buildPermanentCatchUpFilters(authors, state.checkpoints);
     const events = await queryPermanentSyncFilters(
-      relayPool as SyncQueryPool,
+      relayPool,
       relayUrls,
       filters
     );
@@ -459,11 +437,9 @@ export function startPermanentDocumentSync({
           ? oldestFetchedCreatedAt - 1
           : undefined,
     });
-    const events = await queryPermanentSyncFilters(
-      relayPool as SyncQueryPool,
-      relayUrls,
-      [filter]
-    );
+    const events = await queryPermanentSyncFilters(relayPool, relayUrls, [
+      filter,
+    ]);
     if (!state.active) {
       return;
     }

@@ -7,7 +7,6 @@ import {
   setup,
   renderApp,
   findNewNodeEditor,
-  follow,
   type,
   expectTree,
   openReadonlyRoute,

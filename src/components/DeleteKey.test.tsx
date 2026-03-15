@@ -6,6 +6,7 @@ import {
   expectTree,
   findNewNodeEditor,
   follow,
+  forkReadonlyRoot,
   navigateToNodeViaSearch,
   renderApp,
   renderTree,
@@ -188,9 +189,9 @@ Child
 
   test("cannot delete other user's root", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
-    await follow(alice, bob().user.publicKey);
+    await follow(bob, alice().user.publicKey);
 
-    renderTree(bob);
+    renderTree(alice);
     await type(
       "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Escape}"
     );
@@ -201,30 +202,34 @@ My Notes
     Spain
     `);
 
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await type("Travel Ideas{Escape}");
     cleanup();
 
+    await follow(alice, bob().user.publicKey);
     renderTree(alice);
-    await type("My Notes{Escape}");
 
     await expectTree(`
 My Notes
-  [S] Holiday Destinations
+  Holiday Destinations
+    Spain
+  [S] Travel Ideas
     `);
 
     await userEvent.click(
-      await screen.findByLabelText("open Holiday Destinations in fullscreen")
+      await screen.findByLabelText("open Travel Ideas in fullscreen")
     );
 
     await expectTree(`
-[O] Holiday Destinations
-  [O] Spain
+[O] Travel Ideas
     `);
 
     await userEvent.keyboard("j{Delete}");
 
     await expectTree(`
-[O] Holiday Destinations
-  [O] Spain
+[O] Travel Ideas
     `);
   });
 

@@ -16,7 +16,7 @@ import {
   isRefNode,
 } from "./connections";
 import { suggestionSettings } from "./constants";
-import { isStandaloneRoot, LOG_ROOT_ROLE } from "./systemRoots";
+import { LOG_ROOT_ROLE } from "./systemRoots";
 
 type FooterTypeFilters = (
   | Relevance
@@ -446,86 +446,57 @@ function getComparableItemKey(
   return useExactMatch ? shortID(item.id) : getNodeKey(knowledgeDBs, item);
 }
 
-function getAlternativeRelations(
-  knowledgeDBs: KnowledgeDBs,
-  semanticIndex: SemanticIndex,
-  visibleAuthors: ImmutableSet<PublicKey>,
-  semanticID: ID,
-  context: Context,
-  currentRelation: GraphNode
-): List<GraphNode> {
-  return getSemanticCandidates(semanticIndex, semanticID)
-    .filter((relation) => !isRefNode(relation))
-    .filter((relation) => visibleAuthors.has(relation.author))
-    .filter((relation) => relation.id !== currentRelation.id)
-    .filter(
-      (relation) =>
-        !(
-          relation.author === currentRelation.author &&
-          relation.root === currentRelation.root
-        )
-    )
-    .filter(
-      (relation) =>
-        relation.systemRole === LOG_ROOT_ROLE ||
-        !isInSystemRoot(knowledgeDBs, relation, LOG_ROOT_ROLE)
-    )
-    .filter((relation) =>
-      contextsSemanticallyMatch(
-        getRelationContext(knowledgeDBs, relation),
-        context
-      )
-    )
-    .filter(
-      (relation) => relation.children.size > 0 || isStandaloneRoot(relation)
-    )
-    .sortBy((relation) => -relation.updated)
-    .toList();
-}
-
 function getVersionRelations(
   semanticIndex: SemanticIndex,
   visibleAuthors: ImmutableSet<PublicKey>,
   currentRelation: GraphNode
 ): List<GraphNode> {
-  const visited = new globalThis.Set<LongID>([currentRelation.id]);
-  const queue: LongID[] = [currentRelation.id];
-  const relations: GraphNode[] = [];
-
-  while (queue.length > 0) {
-    const relationID = queue.shift();
+  const visit = (
+    pending: List<LongID>,
+    visited: ImmutableSet<LongID>,
+    collected: List<GraphNode>
+  ): List<GraphNode> => {
+    const relationID = pending.first();
     if (!relationID) {
-      continue;
+      return collected;
     }
 
     const relation = semanticIndex.relationByID.get(relationID);
+    const rest = pending.shift();
     if (!relation) {
-      continue;
+      return visit(rest, visited, collected);
     }
 
-    if (
+    const nextCollected =
       relation.id !== currentRelation.id &&
       !isRefNode(relation) &&
       visibleAuthors.has(relation.author)
-    ) {
-      relations.push(relation);
-    }
+        ? collected.push(relation)
+        : collected;
 
-    if (relation.basedOn && !visited.has(relation.basedOn)) {
-      visited.add(relation.basedOn);
-      queue.push(relation.basedOn);
-    }
+    const ancestorIDs = relation.basedOn
+      ? List<LongID>([relation.basedOn])
+      : List<LongID>();
+    const derivedIDs = List([
+      ...(semanticIndex.basedOnIndex.get(relation.id) || []),
+    ] as LongID[]);
+    const nextIDs = ancestorIDs
+      .concat(derivedIDs)
+      .filter((nextID) => !visited.has(nextID))
+      .toList();
 
-    const derivedRelations = semanticIndex.basedOnIndex.get(relation.id);
-    derivedRelations?.forEach((derivedRelationID) => {
-      if (!visited.has(derivedRelationID)) {
-        visited.add(derivedRelationID);
-        queue.push(derivedRelationID);
-      }
-    });
-  }
+    return visit(
+      rest.concat(nextIDs),
+      visited.union(nextIDs) as ImmutableSet<LongID>,
+      nextCollected
+    );
+  };
 
-  return List(relations)
+  return visit(
+    List<LongID>([currentRelation.id]),
+    ImmutableSet<LongID>([currentRelation.id]),
+    List<GraphNode>()
+  )
     .sortBy((relation) => -relation.updated)
     .toList();
 }
@@ -541,10 +512,8 @@ export function getAlternativeFooterData(
   knowledgeDBs: KnowledgeDBs,
   semanticIndex: SemanticIndex,
   visibleAuthors: ImmutableSet<PublicKey>,
-  semanticID: ID,
   filterTypes: FooterTypeFilters,
   currentRelation?: GraphNode,
-  parentContext?: Context,
   showSuggestions: boolean = true
 ): AlternativeFooterResult {
   if (!currentRelation || !filterTypes || filterTypes.length === 0) {
@@ -559,15 +528,6 @@ export function getAlternativeFooterData(
     return EMPTY_ALTERNATIVE_FOOTER_RESULT;
   }
 
-  const contextToMatch = parentContext || List<ID>();
-  const alternatives = getAlternativeRelations(
-    knowledgeDBs,
-    semanticIndex,
-    visibleAuthors,
-    semanticID,
-    contextToMatch,
-    currentRelation
-  );
   const versionRelations = getVersionRelations(
     semanticIndex,
     visibleAuthors,
@@ -638,12 +598,10 @@ export function getAlternativeFooterData(
       };
     });
 
-  const summaries = summarizeRelations(alternatives);
   const versionSummaries = summarizeRelations(versionRelations);
 
   const candidateItemIDs = suggestionsEnabled
-    ? summaries
-        .filter(({ relation }) => relation.author !== currentRelation.author)
+    ? versionSummaries
         .filter(({ relation }) => !declinedTargetIDs.has(relation.id))
         .reduce((acc, { filteredChildren }) => {
           return filteredChildren.reduce((itemAcc, item) => {

@@ -4,7 +4,9 @@ import {
   ALICE,
   BOB,
   setup,
+  forkReadonlyRoot,
   follow,
+  navigateToNodeViaSearch,
   renderTree,
   expectTree,
   type,
@@ -31,20 +33,22 @@ test("Shows dots when only other user has relation (current user has none)", asy
   const [alice, bob] = setup([ALICE, BOB]);
   await follow(alice, bob().user.publicKey);
 
-  renderTree(bob);
-  await type("Root{Enter}Parent Node{Enter}{Tab}Bob Child{Escape}");
-
-  await expectTree(`
-Root
-  Parent Node
-    Bob Child
-  `);
-
-  cleanup();
-
   renderTree(alice);
   await type("Root{Enter}Parent Node{Escape}");
 
+  cleanup();
+
+  await forkReadonlyRoot(bob(), alice().user.publicKey, "Root");
+  await userEvent.click(
+    await screen.findByLabelText("open Parent Node in fullscreen")
+  );
+  await userEvent.click(await screen.findByLabelText("edit Parent Node"));
+  await userEvent.keyboard("{Enter}");
+  await type("Bob Child{Escape}");
+  cleanup();
+
+  renderTree(alice);
+  await navigateToNodeViaSearch(0, "Root");
   await expectTree(`
 Root
   Parent Node

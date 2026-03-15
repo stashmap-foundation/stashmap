@@ -17,33 +17,23 @@ import {
   navigateToNodeViaSearch,
 } from "../utils.test";
 
-const maybeExpand = async (label: string): Promise<void> => {
-  const btn = screen.queryByLabelText(label);
-  if (btn) {
-    await userEvent.click(btn);
-  }
-};
-
 describe("Suggestion Display", () => {
   test("Suggestion from other user shows without breadcrumbs", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
-
-    renderTree(bob);
-    await type(
-      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Enter}France{Escape}"
-    );
-
-    await expectTree(`
-My Notes
-  Holiday Destinations
-    Spain
-    France
-    `);
-    cleanup();
+    await follow(bob, alice().user.publicKey);
 
     renderTree(alice);
     await type("My Notes{Escape}");
+    cleanup();
+
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await type("Holiday Destinations{Enter}{Tab}Spain{Enter}France{Escape}");
+    cleanup();
+
+    renderTree(alice);
     await expectTree(`
 My Notes
   [S] Holiday Destinations
@@ -53,49 +43,52 @@ My Notes
   test("Other user's children show as suggestions with version", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
-
-    renderTree(bob);
-    await type(
-      "My Notes{Enter}{Tab}Topic{Enter}{Tab}Child1{Enter}Child2{Escape}"
-    );
-
-    await expectTree(`
-My Notes
-  Topic
-    Child1
-    Child2
-    `);
-    cleanup();
+    await follow(bob, alice().user.publicKey);
 
     renderTree(alice);
     await type("My Notes{Enter}{Tab}Topic{Escape}");
-    await maybeExpand("expand Topic");
+    cleanup();
+
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+    await userEvent.click(
+      await screen.findByLabelText("open Topic in fullscreen")
+    );
+    await userEvent.click(await screen.findByLabelText("edit Topic"));
+    await userEvent.keyboard("{Enter}");
+    await type("Child1{Enter}Child2{Escape}");
+    cleanup();
+
+    renderTree(alice);
+    await userEvent.click(
+      await screen.findByLabelText("open Topic in fullscreen")
+    );
 
     await expectTree(`
-My Notes
-  Topic
-    [S] Child1
-    [S] Child2
+Topic
+  [S] Child1
+  [S] Child2
     `);
   });
 
   test("Suggestion and version appear when both users have same topic", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
-
-    renderTree(bob);
-    await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}BobChild{Escape}");
-
-    await expectTree(`
-My Notes
-  Topic
-    BobChild
-    `);
-    cleanup();
+    await follow(bob, alice().user.publicKey);
 
     renderTree(alice);
     await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}AliceChild{Escape}");
+    cleanup();
 
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+    await userEvent.click(
+      await screen.findByLabelText("open Topic in fullscreen")
+    );
+    await userEvent.click(await screen.findByLabelText("edit Topic"));
+    await userEvent.keyboard("{Enter}");
+    await type("BobChild{Escape}");
+    cleanup();
+
+    renderTree(alice);
     await expectTree(`
 My Notes
   Topic
@@ -138,19 +131,20 @@ Search: Barcelona
     await follow(alice, bob().user.publicKey);
     await follow(bob, alice().user.publicKey);
 
-    renderTree(bob);
-    await type("My Notes{Enter}{Tab}Shared{Enter}{Tab}BobChild{Escape}");
+    renderTree(alice);
+    await type("My Notes{Enter}{Tab}Shared{Enter}{Tab}AliceChild{Escape}");
+    cleanup();
 
-    await expectTree(`
-My Notes
-  Shared
-    BobChild
-    `);
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+    await userEvent.click(
+      await screen.findByLabelText("open Shared in fullscreen")
+    );
+    await userEvent.click(await screen.findByLabelText("edit Shared"));
+    await userEvent.keyboard("{Enter}");
+    await type("BobChild{Escape}");
     cleanup();
 
     renderTree(alice);
-    await type("My Notes{Enter}{Tab}Shared{Enter}{Tab}AliceChild{Escape}");
-
     await expectTree(`
 My Notes
   Shared
@@ -162,14 +156,22 @@ My Notes
   test("unfollowing removes cached suggestions from that user", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
-
-    renderTree(bob);
-    await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}BobChild{Escape}");
-    cleanup();
+    await follow(bob, alice().user.publicKey);
 
     renderTree(alice);
     await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}AliceChild{Escape}");
+    cleanup();
 
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+    await userEvent.click(
+      await screen.findByLabelText("open Topic in fullscreen")
+    );
+    await userEvent.click(await screen.findByLabelText("edit Topic"));
+    await userEvent.keyboard("{Enter}");
+    await type("BobChild{Escape}");
+    cleanup();
+
+    renderTree(alice);
     await expectTree(`
 My Notes
   Topic
@@ -189,63 +191,69 @@ My Notes
   test("Expanding a suggestion shows the other user's grandchildren", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
-
-    renderTree(bob);
-    await type(
-      "My Notes{Enter}{Tab}Recipes{Enter}{Tab}Pasta{Enter}{Tab}Carbonara{Enter}Bolognese{Escape}"
-    );
-
-    await expectTree(`
-My Notes
-  Recipes
-    Pasta
-      Carbonara
-      Bolognese
-    `);
-    cleanup();
+    await follow(bob, alice().user.publicKey);
 
     renderTree(alice);
     await type("My Notes{Enter}{Tab}Recipes{Escape}");
+    cleanup();
 
-    await maybeExpand("expand Recipes");
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+    await userEvent.click(
+      await screen.findByLabelText("open Recipes in fullscreen")
+    );
+    await userEvent.click(await screen.findByLabelText("edit Recipes"));
+    await userEvent.keyboard("{Enter}");
+    await type("Pasta{Enter}{Tab}Carbonara{Enter}Bolognese{Escape}");
+    cleanup();
+
+    renderTree(alice);
+    await userEvent.click(
+      await screen.findByLabelText("open Recipes in fullscreen")
+    );
 
     await expectTree(`
-My Notes
-  Recipes
-    [S] Pasta
+Recipes
+  [S] Pasta
     `);
 
     await userEvent.click(await screen.findByLabelText("expand Pasta"));
 
     await expectTree(`
-My Notes
-  Recipes
-    [S] Pasta
-      [O] Carbonara
-      [O] Bolognese
+Recipes
+  [S] Pasta
+    [O] Carbonara
+    [O] Bolognese
     `);
   });
 
   test("only one divider line when suggestion is expanded", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
-
-    renderTree(bob);
-    await type(
-      "My Notes{Enter}{Tab}Recipes{Enter}{Tab}Pasta{Enter}{Tab}Carbonara{Escape}"
-    );
-    cleanup();
+    await follow(bob, alice().user.publicKey);
 
     renderTree(alice);
     await type("My Notes{Enter}{Tab}Recipes{Escape}");
-    await maybeExpand("expand Recipes");
+    cleanup();
+
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+    await userEvent.click(
+      await screen.findByLabelText("open Recipes in fullscreen")
+    );
+    await userEvent.click(await screen.findByLabelText("edit Recipes"));
+    await userEvent.keyboard("{Enter}");
+    await type("Pasta{Enter}{Tab}Carbonara{Escape}");
+    cleanup();
+
+    renderTree(alice);
+    await userEvent.click(
+      await screen.findByLabelText("open Recipes in fullscreen")
+    );
     await userEvent.click(await screen.findByLabelText("expand Pasta"));
 
     await expectTree(`
-My Notes
-  Recipes
-    [S] Pasta
-      [O] Carbonara
+Recipes
+  [S] Pasta
+    [O] Carbonara
     `);
 
     // eslint-disable-next-line testing-library/no-node-access
@@ -256,80 +264,75 @@ My Notes
   test("Deep suggestion tree is fully expandable", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
-
-    renderTree(bob);
-    await type(
-      "My Notes{Enter}{Tab}Recipes{Enter}{Tab}Pasta{Enter}{Tab}Carbonara{Enter}{Tab}Ingredients{Escape}"
-    );
-
-    await expectTree(`
-My Notes
-  Recipes
-    Pasta
-      Carbonara
-        Ingredients
-    `);
-    cleanup();
+    await follow(bob, alice().user.publicKey);
 
     renderTree(alice);
     await type("My Notes{Enter}{Tab}Recipes{Escape}");
+    cleanup();
 
-    await maybeExpand("expand Recipes");
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+    await userEvent.click(
+      await screen.findByLabelText("open Recipes in fullscreen")
+    );
+    await userEvent.click(await screen.findByLabelText("edit Recipes"));
+    await userEvent.keyboard("{Enter}");
+    await type("Pasta{Enter}{Tab}Carbonara{Enter}{Tab}Ingredients{Escape}");
+    cleanup();
+
+    renderTree(alice);
+    await userEvent.click(
+      await screen.findByLabelText("open Recipes in fullscreen")
+    );
 
     await expectTree(`
-My Notes
-  Recipes
-    [S] Pasta
+Recipes
+  [S] Pasta
     `);
 
     await userEvent.click(await screen.findByLabelText("expand Pasta"));
 
     await expectTree(`
-My Notes
-  Recipes
-    [S] Pasta
-      [O] Carbonara
+Recipes
+  [S] Pasta
+    [O] Carbonara
     `);
 
     await userEvent.click(await screen.findByLabelText("expand Carbonara"));
 
     await expectTree(`
-My Notes
-  Recipes
-    [S] Pasta
-      [O] Carbonara
-        [O] Ingredients
+Recipes
+  [S] Pasta
+    [O] Carbonara
+      [O] Ingredients
     `);
   });
 
   test("Copied suggestion becomes regular item without [S] marker", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
-
-    renderTree(bob);
-    await type("My Notes{Enter}{Tab}Recipes{Enter}{Tab}Pasta{Escape}");
-
-    await expectTree(`
-My Notes
-  Recipes
-    Pasta
-    `);
-    cleanup();
+    await follow(bob, alice().user.publicKey);
 
     renderTree(alice);
     await type("My Notes{Enter}{Tab}Recipes{Escape}");
+    cleanup();
+
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+    await userEvent.click(
+      await screen.findByLabelText("open Recipes in fullscreen")
+    );
+    await userEvent.click(await screen.findByLabelText("edit Recipes"));
+    await userEvent.keyboard("{Enter}");
+    await type("Pasta{Escape}");
+    cleanup();
+
+    renderTree(alice);
+    await userEvent.click(
+      await screen.findByLabelText("open Recipes in fullscreen")
+    );
 
     await expectTree(`
-My Notes
-  Recipes
-    `);
-
-    await maybeExpand("expand Recipes");
-
-    await expectTree(`
-My Notes
-  Recipes
-    [S] Pasta
+Recipes
+  [S] Pasta
     `);
 
     await userEvent.click(await screen.findByLabelText("edit Recipes"));
@@ -337,28 +340,32 @@ My Notes
     await userEvent.type(await findNewNodeEditor(), "Pasta{Escape}");
 
     await expectTree(`
-My Notes
-  Recipes
-    Pasta
+Recipes
+  Pasta
     `);
   });
 
   test("Other user's ~Log cref suggestions resolve to linked note text", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
-
-    renderTree(bob);
-    await type("Bob Root{Enter}{Tab}Bob Child{Escape}");
-    cleanup();
+    await follow(bob, alice().user.publicKey);
 
     renderTree(alice);
     await type("Alice Root{Escape}");
+    cleanup();
+
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "Alice Root");
+    await userEvent.click(await screen.findByLabelText("edit Alice Root"));
+    await userEvent.keyboard("{Enter}");
+    await type("Bob Child{Escape}");
+    cleanup();
+
+    renderTree(alice);
     await userEvent.click(await screen.findByLabelText("Navigate to Log"));
 
     await expectTree(`
 ~Log
   [R] Alice Root
-  [S] Bob Root
     `);
 
     expect(screen.queryByText("Error: Node not found")).toBeNull();
@@ -370,7 +377,6 @@ My Notes
     await expectTree(`
 ~Log
   [R] Alice Root
-  [S] Bob Root
     `);
 
     expect(screen.queryByText("Error: Node not found")).toBeNull();
@@ -379,12 +385,7 @@ My Notes
   test("suggestion not swallowed by children in other own relation", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
-
-    renderTree(bob);
-    await type(
-      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Enter}Austria{Escape}"
-    );
-    cleanup();
+    await follow(bob, alice().user.publicKey);
 
     renderTree(alice);
     await type(
@@ -395,6 +396,20 @@ My Notes
     await type(
       "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Escape}"
     );
+    cleanup();
+
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+    await userEvent.click(
+      await screen.findByLabelText("open Holiday Destinations in fullscreen")
+    );
+    await userEvent.click(
+      await screen.findByLabelText("edit Holiday Destinations")
+    );
+    await userEvent.keyboard("{Enter}");
+    await type("Austria{Escape}");
+    cleanup();
+
+    renderTree(alice);
 
     await expectTree(`
 My Notes
@@ -463,6 +478,8 @@ My Notes
     const [alice, bob, carol] = setup([ALICE, BOB, CAROL]);
     await follow(alice, bob().user.publicKey);
     await follow(alice, carol().user.publicKey);
+    await follow(bob, alice().user.publicKey);
+    await follow(carol, alice().user.publicKey);
 
     renderTree(alice);
     await type("Topic{Escape}");
@@ -471,11 +488,15 @@ My Notes
     await forkReadonlyRoot(bob(), alice().user.publicKey, "Topic");
     await userEvent.click(await screen.findByLabelText("edit Topic"));
     await userEvent.keyboard("{Enter}");
-    await type("BobChild1{Enter}BobChild2{Enter}BobChild3{Enter}BobChild4{Escape}");
+    await type(
+      "BobChild1{Enter}BobChild2{Enter}BobChild3{Enter}BobChild4{Escape}"
+    );
     cleanup();
 
-    renderTree(carol);
-    await type("Topic{Enter}{Tab}CarolChild{Escape}");
+    await forkReadonlyRoot(carol(), alice().user.publicKey, "Topic");
+    await userEvent.click(await screen.findByLabelText("edit Topic"));
+    await userEvent.keyboard("{Enter}");
+    await type("CarolChild{Escape}");
     cleanup();
 
     renderTree(alice);
@@ -485,6 +506,7 @@ Topic
   [S] CarolChild
   [S] BobChild1
   [S] BobChild2
+  [VO] +4
     `);
 
     cleanup();
@@ -500,21 +522,32 @@ Topic
   [O] BobChild2
   [O] BobChild3
   [O] BobChild4
+  [VO] +1 -4
+  [VO] -4
     `);
   });
 
   test("declining copied list suggestion hides it and reveals the next one", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
+    await follow(bob, alice().user.publicKey);
 
     renderTree(alice);
     await type("Holiday Destinations{Escape}");
     cleanup();
 
-    await forkReadonlyRoot(bob(), alice().user.publicKey, "Holiday Destinations");
-    await userEvent.click(await screen.findByLabelText("edit Holiday Destinations"));
+    await forkReadonlyRoot(
+      bob(),
+      alice().user.publicKey,
+      "Holiday Destinations"
+    );
+    await userEvent.click(
+      await screen.findByLabelText("edit Holiday Destinations")
+    );
     await userEvent.keyboard("{Enter}");
-    await type("Spain{Enter}France{Enter}Italy{Enter}Portugal{Enter}Greece{Escape}");
+    await type(
+      "Spain{Enter}France{Enter}Italy{Enter}Portugal{Enter}Greece{Escape}"
+    );
     cleanup();
 
     renderTree(alice);
@@ -524,6 +557,7 @@ Holiday Destinations
   [S] Spain
   [S] France
   [S] Italy
+  [VO] +5
     `);
 
     await userEvent.click(await screen.findByLabelText("decline Spain"));
@@ -533,19 +567,26 @@ Holiday Destinations
   [S] France
   [S] Italy
   [S] Portugal
+  [VO] +5
     `);
   });
 
   test("no version shown when all suggestions fit within cap", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
-
-    renderTree(bob);
-    await type("Recipes{Enter}{Tab}Pasta{Enter}Risotto{Enter}Curry{Escape}");
-    cleanup();
+    await follow(bob, alice().user.publicKey);
 
     renderTree(alice);
     await type("Recipes{Escape}");
+    cleanup();
+
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "Recipes");
+    await userEvent.click(await screen.findByLabelText("edit Recipes"));
+    await userEvent.keyboard("{Enter}");
+    await type("Pasta{Enter}Risotto{Enter}Curry{Escape}");
+    cleanup();
+
+    renderTree(alice);
 
     await expectTree(`
 Recipes
@@ -558,15 +599,24 @@ Recipes
   test("accepting copied list suggestions reveals later suggestions", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
+    await follow(bob, alice().user.publicKey);
 
     renderTree(alice);
     await type("Holiday Destinations{Escape}");
     cleanup();
 
-    await forkReadonlyRoot(bob(), alice().user.publicKey, "Holiday Destinations");
-    await userEvent.click(await screen.findByLabelText("edit Holiday Destinations"));
+    await forkReadonlyRoot(
+      bob(),
+      alice().user.publicKey,
+      "Holiday Destinations"
+    );
+    await userEvent.click(
+      await screen.findByLabelText("edit Holiday Destinations")
+    );
     await userEvent.keyboard("{Enter}");
-    await type("Spain{Enter}France{Enter}Italy{Enter}Portugal{Enter}Greece{Escape}");
+    await type(
+      "Spain{Enter}France{Enter}Italy{Enter}Portugal{Enter}Greece{Escape}"
+    );
     cleanup();
 
     renderTree(alice);
@@ -576,6 +626,7 @@ Holiday Destinations
   [S] Spain
   [S] France
   [S] Italy
+  [VO] +5
     `);
 
     await userEvent.click(
@@ -588,6 +639,7 @@ Holiday Destinations
   [S] France
   [S] Italy
   [S] Portugal
+  [VO] +4
     `);
 
     await userEvent.click(
@@ -608,6 +660,8 @@ Holiday Destinations
     const [alice, bob, carol] = setup([ALICE, BOB, CAROL]);
     await follow(alice, bob().user.publicKey);
     await follow(alice, carol().user.publicKey);
+    await follow(bob, alice().user.publicKey);
+    await follow(carol, alice().user.publicKey);
 
     renderTree(alice);
     await type("Cooking{Escape}");
@@ -632,6 +686,7 @@ Cooking
   [S] Sushi
   [S] Tacos
   [S] Curry
+  [VO] +2
     `);
   });
 
@@ -667,17 +722,18 @@ describe("Cref suggestions", () => {
   test("declining cref suggestion hides it permanently", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
+    await follow(bob, alice().user.publicKey);
 
-    // Bob creates Source (with child) and Target, then alt-drags Source into Target
+    renderApp(alice());
+    await type("Target{Enter}{Tab}Items{Escape}");
+    cleanup();
+
+    // Bob creates Source (with child), forks Target, then alt-drags Source into his copy.
     renderApp(bob());
     await type("Source{Enter}{Tab}Child{Escape}");
-    await userEvent.click(await screen.findByLabelText("Create new note"));
-    await type("Target{Enter}{Tab}Items{Escape}");
+    cleanup();
 
-    await expectTree(`
-Target
-  Items
-    `);
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "Target");
 
     await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
     await navigateToNodeViaSearch(1, "Source");
@@ -700,21 +756,21 @@ Target
     `);
     cleanup();
 
-    // Alice creates Target and sees Bob's children as suggestions
+    // Alice sees Bob's extra cref-derived items as suggestions on her base version.
     renderTree(alice);
-    await type("Target{Escape}");
 
     await expectTree(`
 Target
+  Items
   [S] Source
-  [S] Items
     `);
 
     await userEvent.click(await screen.findByLabelText("decline Source"));
 
     await expectTree(`
 Target
-  [S] Items
+  Items
+  [VO] +1
     `);
   });
 });

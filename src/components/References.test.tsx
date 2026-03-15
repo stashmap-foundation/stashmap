@@ -35,6 +35,7 @@ Knowstr
   test("Other user's version shows as suggestion and version entry", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
+    await follow(bob, alice().user.publicKey);
 
     renderTree(alice);
     await type(
@@ -42,10 +43,16 @@ Knowstr
     );
     cleanup();
 
-    renderTree(bob);
-    await type(
-      "Notes{Enter}Cities{Enter}{Tab}Barcelona{Enter}{Tab}Bob child{Escape}"
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "Notes");
+    await userEvent.click(
+      await screen.findByLabelText("open Cities in fullscreen")
     );
+    await userEvent.click(
+      await screen.findByLabelText("open Barcelona in fullscreen")
+    );
+    await userEvent.click(await screen.findByLabelText("edit Barcelona"));
+    await userEvent.keyboard("{Enter}");
+    await type("Bob child{Escape}");
     cleanup();
 
     renderTree(alice);
@@ -70,8 +77,12 @@ Notes
     cleanup();
 
     await forkReadonlyRoot(bob(), alice().user.publicKey, "Notes");
-    await userEvent.click(await screen.findByLabelText("open Cities in fullscreen"));
-    await userEvent.click(await screen.findByLabelText("open Barcelona in fullscreen"));
+    await userEvent.click(
+      await screen.findByLabelText("open Cities in fullscreen")
+    );
+    await userEvent.click(
+      await screen.findByLabelText("open Barcelona in fullscreen")
+    );
     await userEvent.click(await screen.findByLabelText("edit Barcelona"));
     await userEvent.keyboard("{Enter}");
     await type("Bob child{Enter}Bob2{Enter}Bob3{Enter}Bob4{Escape}");
@@ -105,8 +116,12 @@ Notes
     cleanup();
 
     await forkReadonlyRoot(bob(), alice().user.publicKey, "Notes");
-    await userEvent.click(await screen.findByLabelText("open Cities in fullscreen"));
-    await userEvent.click(await screen.findByLabelText("open Barcelona in fullscreen"));
+    await userEvent.click(
+      await screen.findByLabelText("open Cities in fullscreen")
+    );
+    await userEvent.click(
+      await screen.findByLabelText("open Barcelona in fullscreen")
+    );
     await userEvent.click(await screen.findByLabelText("edit Barcelona"));
     await userEvent.keyboard("{Enter}");
     await type("Bob child{Enter}Bob2{Enter}Bob3{Enter}Bob4{Escape}");
@@ -137,8 +152,12 @@ Notes
     cleanup();
 
     await forkReadonlyRoot(bob(), alice().user.publicKey, "Notes");
-    await userEvent.click(await screen.findByLabelText("open Cities in fullscreen"));
-    await userEvent.click(await screen.findByLabelText("open Barcelona in fullscreen"));
+    await userEvent.click(
+      await screen.findByLabelText("open Cities in fullscreen")
+    );
+    await userEvent.click(
+      await screen.findByLabelText("open Barcelona in fullscreen")
+    );
     await userEvent.click(await screen.findByLabelText("edit Barcelona"));
     await userEvent.keyboard("{Enter}");
     await type("Bob child{Enter}Bob2{Enter}Bob3{Enter}Bob4{Escape}");

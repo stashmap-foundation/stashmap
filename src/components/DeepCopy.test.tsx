@@ -14,6 +14,7 @@ import {
   setup,
   textContent,
   type,
+  type UpdateState,
 } from "../utils.test";
 import { KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
 import { parseMarkdownHierarchy } from "../markdownDocument";
@@ -33,6 +34,25 @@ const getDropTargets = (nodeName: string): HTMLElement[] => {
     return toggleTargets as HTMLElement[];
   }
   return screen.getAllByRole("treeitem", { name: nodeName }) as HTMLElement[];
+};
+
+const createForkedMyNotesVersion = async (
+  alice: UpdateState,
+  bob: UpdateState,
+  aliceInput: string,
+  bobRootInput: string
+): Promise<void> => {
+  renderTree(alice);
+  await type(aliceInput);
+  cleanup();
+
+  await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
+  await type(bobRootInput);
+  cleanup();
+
+  await follow(alice, bob().user.publicKey);
 };
 
 describe("Deep Copy - Tab Indent", () => {
@@ -538,22 +558,24 @@ Target
 describe("Deep Copy - Suggestion DnD", () => {
   test("A1: Same-pane DnD suggestion as sibling accepts and removes suggestion", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Enter}{Tab}Target{Escape}",
+      "BobItem{Escape}"
+    );
 
-    // Bob creates BobItem
     renderTree(bob);
-    await type("My Notes{Enter}{Tab}BobItem{Escape}");
 
     await expectTree(`
 My Notes
   BobItem
+  Target
     `);
 
     cleanup();
 
-    // Alice follows Bob and creates Target
-    await follow(alice, bob().user.publicKey);
     renderTree(alice);
-    await type("My Notes{Enter}{Tab}Target{Escape}");
 
     await expectTree(`
 My Notes
@@ -573,22 +595,24 @@ My Notes
 
   test("A2: Cross-pane DnD suggestion into expanded node with no children", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Enter}{Tab}Target{Escape}",
+      "BobItem{Escape}"
+    );
 
-    // Bob creates BobItem
     renderTree(bob);
-    await type("My Notes{Enter}{Tab}BobItem{Escape}");
 
     await expectTree(`
 My Notes
   BobItem
+  Target
     `);
 
     cleanup();
 
-    // Alice follows Bob and creates Target
-    await follow(alice, bob().user.publicKey);
     renderApp(alice());
-    await type("My Notes{Enter}{Tab}Target{Escape}");
     await maybeExpand("expand Target");
 
     await expectTree(`
@@ -621,12 +645,14 @@ Target
 
   test("B1: Same-pane DnD suggestion with collapsed children deep copies all including grandchildren", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
-
-    // Bob creates Folder with children and grandchildren
-    renderTree(bob);
-    await type(
-      "My Notes{Enter}{Tab}Folder{Enter}{Tab}Child{Enter}{Tab}GrandChild1{Enter}GrandChild2{Escape}"
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Enter}{Tab}Target{Escape}",
+      "Folder{Enter}{Tab}Child{Enter}{Tab}GrandChild1{Enter}GrandChild2{Escape}"
     );
+
+    renderTree(bob);
 
     await expectTree(`
 My Notes
@@ -634,14 +660,12 @@ My Notes
     Child
       GrandChild1
       GrandChild2
+  Target
     `);
 
     cleanup();
 
-    // Alice follows Bob and creates Target
-    await follow(alice, bob().user.publicKey);
     renderTree(alice);
-    await type("My Notes{Enter}{Tab}Target{Escape}");
 
     // [S] Folder is collapsed by default
     await expectTree(`
@@ -684,12 +708,14 @@ My Notes
 
   test("B2: Cross-pane DnD suggestion with collapsed children deep copies all including grandchildren", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
-
-    // Bob creates Folder with children and grandchildren
-    renderTree(bob);
-    await type(
-      "My Notes{Enter}{Tab}Folder{Enter}{Tab}Child{Enter}{Tab}GrandChild1{Enter}GrandChild2{Escape}"
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Enter}{Tab}Target{Escape}",
+      "Folder{Enter}{Tab}Child{Enter}{Tab}GrandChild1{Enter}GrandChild2{Escape}"
     );
+
+    renderTree(bob);
 
     await expectTree(`
 My Notes
@@ -697,14 +723,12 @@ My Notes
     Child
       GrandChild1
       GrandChild2
+  Target
     `);
 
     cleanup();
 
-    // Alice follows Bob and creates Target
-    await follow(alice, bob().user.publicKey);
     renderApp(alice());
-    await type("My Notes{Enter}{Tab}Target{Escape}");
     await maybeExpand("expand Target");
 
     // [S] Folder is collapsed by default
@@ -766,33 +790,24 @@ Target
 
   test("C1: Same-pane DnD suggestion into node with existing children preserves both", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Enter}{Tab}Target{Enter}{Tab}AliceChild{Escape}",
+      "BobFolder{Enter}{Tab}BobChild{Escape}"
+    );
 
-    // Bob creates Folder with BobChild
     renderTree(bob);
-    await type("My Notes{Enter}{Tab}BobFolder{Enter}{Tab}BobChild{Escape}");
 
     await expectTree(`
 My Notes
   BobFolder
     BobChild
-    `);
-
-    cleanup();
-
-    // Alice creates Target with AliceChild
-    renderTree(alice);
-    await type("My Notes{Enter}{Tab}Target{Enter}{Tab}AliceChild{Escape}");
-
-    await expectTree(`
-My Notes
   Target
-    AliceChild
     `);
 
     cleanup();
 
-    // Alice follows Bob
-    await follow(alice, bob().user.publicKey);
     renderTree(alice);
 
     await expectTree(`
@@ -832,36 +847,25 @@ My Notes
 
   test("C2: Cross-pane DnD suggestion into node with existing children preserves both", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
-
-    // Bob creates Folder with BobChild and BobGrandChild
-    renderTree(bob);
-    await type(
-      "My Notes{Enter}{Tab}BobFolder{Enter}{Tab}BobChild{Enter}{Tab}BobGrandChild{Escape}"
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Enter}{Tab}Target{Enter}{Tab}AliceChild{Escape}",
+      "BobFolder{Enter}{Tab}BobChild{Enter}{Tab}BobGrandChild{Escape}"
     );
+
+    renderTree(bob);
 
     await expectTree(`
 My Notes
   BobFolder
     BobChild
       BobGrandChild
-    `);
-
-    cleanup();
-
-    // Alice creates Target with AliceChild
-    renderTree(alice);
-    await type("My Notes{Enter}{Tab}Target{Enter}{Tab}AliceChild{Escape}");
-
-    await expectTree(`
-My Notes
   Target
-    AliceChild
     `);
 
     cleanup();
 
-    // Alice follows Bob
-    await follow(alice, bob().user.publicKey);
     renderApp(alice());
 
     await expectTree(`
@@ -943,10 +947,14 @@ Target
 describe("Deep Copy - Relevance Selector Bugs", () => {
   test("D: Accepting suggestion via relevance selector does not create duplicates", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Escape}",
+      "BobItem{Escape}"
+    );
 
-    // Bob creates BobItem
     renderTree(bob);
-    await type("My Notes{Enter}{Tab}BobItem{Escape}");
 
     await expectTree(`
 My Notes
@@ -955,10 +963,7 @@ My Notes
 
     cleanup();
 
-    // Alice follows Bob
-    await follow(alice, bob().user.publicKey);
     renderTree(alice);
-    await type("My Notes{Escape}");
 
     // Alice sees [S] BobItem as suggestion
     await expectTree(`
@@ -983,10 +988,14 @@ My Notes
 
   test("D2: Accept then delete suggestion should not multiply duplicates", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Escape}",
+      "BobItem{Escape}"
+    );
 
-    // Bob creates BobItem
     renderTree(bob);
-    await type("My Notes{Enter}{Tab}BobItem{Escape}");
 
     await expectTree(`
 My Notes
@@ -995,10 +1004,7 @@ My Notes
 
     cleanup();
 
-    // Alice follows Bob
-    await follow(alice, bob().user.publicKey);
     renderTree(alice);
-    await type("My Notes{Escape}");
 
     // Alice sees [S] BobItem
     await expectTree(`
@@ -1029,10 +1035,14 @@ My Notes
 
   test("D3: Suggestion with children - accept via relevance should not show full cref path", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Escape}",
+      "BobFolder{Enter}{Tab}BobChild{Escape}"
+    );
 
-    // Bob creates BobFolder with child
     renderTree(bob);
-    await type("My Notes{Enter}{Tab}BobFolder{Enter}{Tab}BobChild{Escape}");
 
     await expectTree(`
 My Notes
@@ -1042,10 +1052,7 @@ My Notes
 
     cleanup();
 
-    // Alice follows Bob
-    await follow(alice, bob().user.publicKey);
     renderTree(alice);
-    await type("My Notes{Escape}");
 
     // Alice sees [S] BobFolder
     await expectTree(`
@@ -1081,20 +1088,24 @@ My Notes
 describe("Deep Copy - Simple Suggestion DnD (No Children)", () => {
   test("E1: Same-pane DnD simple suggestion becomes sibling", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Enter}{Tab}Target{Escape}",
+      "BobItem{Escape}"
+    );
 
     renderTree(bob);
-    await type("My Notes{Enter}{Tab}BobItem{Escape}");
 
     await expectTree(`
 My Notes
   BobItem
+  Target
     `);
 
     cleanup();
 
-    await follow(alice, bob().user.publicKey);
     renderTree(alice);
-    await type("My Notes{Enter}{Tab}Target{Escape}");
 
     await expectTree(`
 My Notes
@@ -1114,15 +1125,24 @@ My Notes
 
   test("E2: Cross-pane DnD simple suggestion into target", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Enter}{Tab}Target{Escape}",
+      "BobItem{Escape}"
+    );
 
     renderTree(bob);
-    await type("My Notes{Enter}{Tab}BobItem{Escape}");
+
+    await expectTree(`
+My Notes
+  BobItem
+  Target
+    `);
 
     cleanup();
 
-    await follow(alice, bob().user.publicKey);
     renderApp(alice());
-    await type("My Notes{Enter}{Tab}Target{Escape}");
 
     await maybeExpand("expand Target");
 
@@ -1151,15 +1171,24 @@ Target
 
   test("E3: Alt + cross-pane DnD simple suggestion creates a reference copy", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Enter}{Tab}Target{Escape}",
+      "BobItem{Escape}"
+    );
 
     renderTree(bob);
-    await type("My Notes{Enter}{Tab}BobItem{Escape}");
+
+    await expectTree(`
+My Notes
+  BobItem
+  Target
+    `);
 
     cleanup();
 
-    await follow(alice, bob().user.publicKey);
     renderApp(alice());
-    await type("My Notes{Enter}{Tab}Target{Escape}");
 
     await maybeExpand("expand Target");
 
@@ -1286,17 +1315,24 @@ Target
 describe("Deep Copy - Edit Restrictions", () => {
   test("Suggestions are draggable", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
-    await follow(alice, bob().user.publicKey);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Escape}",
+      "Holiday Destinations{Enter}{Tab}Barcelona{Escape}"
+    );
 
     renderTree(bob);
-    await type(
-      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Barcelona{Escape}"
-    );
+
+    await expectTree(`
+My Notes
+  Holiday Destinations
+    Barcelona
+    `);
 
     cleanup();
 
     renderTree(alice);
-    await type("My Notes{Escape}");
 
     await expectTree(`
 My Notes
@@ -1317,7 +1353,9 @@ My Notes
     renderTree(alice);
     await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}A1{Escape}");
     await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes", "Topic");
-    await userEvent.click(await screen.findByLabelText("open Topic in fullscreen"));
+    await userEvent.click(
+      await screen.findByLabelText("open Topic in fullscreen")
+    );
     await userEvent.click(await screen.findByLabelText("edit Topic"));
     await userEvent.keyboard("{Enter}");
     await type("B1{Enter}B2{Enter}B3{Enter}B4{Escape}");
@@ -1346,9 +1384,14 @@ My Notes
 
   test("H: Children of suggestions cannot be edited", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Escape}",
+      "BobFolder{Enter}{Tab}BobChild{Escape}"
+    );
 
     renderTree(bob);
-    await type("My Notes{Enter}{Tab}BobFolder{Enter}{Tab}BobChild{Escape}");
 
     await expectTree(`
 My Notes
@@ -1358,9 +1401,7 @@ My Notes
 
     cleanup();
 
-    await follow(alice, bob().user.publicKey);
     renderTree(alice);
-    await type("My Notes{Escape}");
 
     await expectTree(`
 My Notes
@@ -1381,9 +1422,14 @@ My Notes
 
   test("I: Single node suggestions (without children) cannot be edited", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Escape}",
+      "BobLeafNode{Escape}"
+    );
 
     renderTree(bob);
-    await type("My Notes{Enter}{Tab}BobLeafNode{Escape}");
 
     await expectTree(`
 My Notes
@@ -1392,9 +1438,7 @@ My Notes
 
     cleanup();
 
-    await follow(alice, bob().user.publicKey);
     renderTree(alice);
-    await type("My Notes{Escape}");
 
     await expectTree(`
 My Notes
@@ -1448,18 +1492,24 @@ describe("Deep Copy - basedOn Tracking", () => {
 
   test("Cross-pane deep copy sets basedOn on all copied nodes", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Enter}{Tab}Target{Escape}",
+      "BobFolder{Enter}{Tab}BobChild{Enter}{Tab}BobGrandChild{Escape}"
+    );
 
     renderTree(bob);
-    await type(
-      "My Notes{Enter}{Tab}BobFolder{Enter}{Tab}BobChild{Enter}{Tab}BobGrandChild{Escape}"
-    );
 
     await expectTree(`
 My Notes
   BobFolder
     BobChild
       BobGrandChild
+  Target
     `);
+
+    cleanup();
 
     const bobRelationEvents = bob()
       .relayPool.getEvents()
@@ -1471,11 +1521,7 @@ My Notes
       return collectTreeValues(trees as MarkdownTreeValue[]).uuids;
     });
 
-    cleanup();
-
-    await follow(alice, bob().user.publicKey);
     const utils = renderApp(alice());
-    await type("My Notes{Enter}{Tab}Target{Escape}");
     await maybeExpand("expand Target");
 
     await expectTree(`
@@ -1525,9 +1571,14 @@ Target
 
   test("Accepting suggestion via relevance selector sets basedOn", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Escape}",
+      "BobFolder{Enter}{Tab}BobChild{Escape}"
+    );
 
     renderTree(bob);
-    await type("My Notes{Enter}{Tab}BobFolder{Enter}{Tab}BobChild{Escape}");
 
     await expectTree(`
 My Notes
@@ -1537,9 +1588,7 @@ My Notes
 
     cleanup();
 
-    await follow(alice, bob().user.publicKey);
     const utils = renderTree(alice);
-    await type("My Notes{Escape}");
 
     await expectTree(`
 My Notes
@@ -1576,7 +1625,9 @@ describe("Deep Copy - Version DnD", () => {
     renderTree(alice);
     await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}A1{Escape}");
     await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes", "Topic");
-    await userEvent.click(await screen.findByLabelText("open Topic in fullscreen"));
+    await userEvent.click(
+      await screen.findByLabelText("open Topic in fullscreen")
+    );
     await userEvent.click(await screen.findByLabelText("edit Topic"));
     await userEvent.keyboard("{Enter}");
     await type("B1{Enter}B2{Enter}B3{Enter}B4{Escape}");
@@ -1629,7 +1680,9 @@ Topic
     renderTree(alice);
     await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}A1{Escape}");
     await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes", "Topic");
-    await userEvent.click(await screen.findByLabelText("open Topic in fullscreen"));
+    await userEvent.click(
+      await screen.findByLabelText("open Topic in fullscreen")
+    );
     await userEvent.click(await screen.findByLabelText("edit Topic"));
     await userEvent.keyboard("{Enter}");
     await type("B1{Enter}B2{Enter}B3{Enter}B4{Escape}");

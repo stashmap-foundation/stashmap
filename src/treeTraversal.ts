@@ -5,7 +5,6 @@ import {
   addNodeToPathWithRelations,
   addRelationsToLastElement,
   getRowIDFromView,
-  getContext,
   getRelationForView,
   getCurrentEdgeForView,
   getEffectiveAuthor,
@@ -18,7 +17,6 @@ import {
   isSearchId,
   getRelations,
   itemPassesFilters,
-  getRelationContext,
   getSemanticID,
   resolveNode,
   isRefNode,
@@ -81,7 +79,6 @@ function getChildrenForRegularNode(
   options?: TreeTraversalOptions
 ): TreeResult {
   const effectiveAuthor = getEffectiveAuthor(data, parentPath);
-  const context = getContext(data, parentPath, stack);
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
   const directRelations = isSearchId(parentItemID as ID)
     ? getRelations(data.knowledgeDBs, parentItemID as ID, data.user.publicKey)
@@ -94,9 +91,6 @@ function getChildrenForRegularNode(
     ? getSemanticID(data.knowledgeDBs, nodes)
     : parentItemID;
   const coordinateSemanticID = nodes ? relationSemanticID : parentItemID;
-  const coordinateContext = nodes
-    ? getRelationContext(data.knowledgeDBs, nodes)
-    : context;
 
   const relationPaths = nodes
     ? nodes.children
@@ -159,10 +153,8 @@ function getChildrenForRegularNode(
     data.knowledgeDBs,
     data.semanticIndex,
     visibleAuthors,
-    coordinateSemanticID,
     activeFilters,
     nodes,
-    coordinateContext,
     isOwnContent
   );
 

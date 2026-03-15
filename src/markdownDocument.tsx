@@ -185,6 +185,7 @@ export function treeToMarkdown(data: Data, rootRelation: GraphNode): string {
   const rootLine = formatRootHeading(
     rootText,
     rootUuid,
+    rootRelation.basedOn,
     rootRelation.anchor ?? createRootAnchor(rootContext),
     rootRelation.systemRole
   );
@@ -203,6 +204,7 @@ export function buildDocumentEvent(
   const rootLine = formatRootHeading(
     rootText,
     rootUuid,
+    rootRelation.basedOn,
     rootRelation.anchor ?? createRootAnchor(rootContext),
     rootRelation.systemRole
   );

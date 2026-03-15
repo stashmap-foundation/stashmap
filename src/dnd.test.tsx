@@ -197,7 +197,9 @@ test("Deep copy preserves all children when forked duplicate nodes exist", async
   cleanup();
 
   await forkReadonlyRoot(bob(), alice().user.publicKey, "Holiday Destinations");
-  await userEvent.click(await screen.findByLabelText("open Spain in fullscreen"));
+  await userEvent.click(
+    await screen.findByLabelText("open Spain in fullscreen")
+  );
   await userEvent.click(await screen.findByLabelText("edit Spain"));
   await userEvent.keyboard("{Enter}");
   await type("Sevilla{Enter}Barcelona{Enter}Madrid{Enter}Granada{Escape}");
@@ -207,7 +209,9 @@ test("Deep copy preserves all children when forked duplicate nodes exist", async
     ...alice(),
     initialRoute: "/n/Holiday%20Destinations",
   });
-  await userEvent.click(await screen.findByLabelText("open Spain in fullscreen"));
+  await userEvent.click(
+    await screen.findByLabelText("open Spain in fullscreen")
+  );
 
   await expectTree(`
 Spain

@@ -126,6 +126,7 @@ export function buildDocumentEventFromRelations(
       formatRootHeading(
         rootText,
         rootUuid,
+        rootRelation.basedOn,
         rootRelation.anchor ??
           createRootAnchor(getRelationContext(knowledgeDBs, rootRelation)),
         rootRelation.systemRole

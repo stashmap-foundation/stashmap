@@ -6,6 +6,7 @@ import {
   BOB,
   expectTree,
   findEvent,
+  forkReadonlyRoot,
   follow,
   renderApp,
   renderTree,
@@ -49,16 +50,25 @@ describe("Home Navigation", () => {
       const [alice, bob] = setup([ALICE, BOB]);
       await follow(alice, bob().user.publicKey);
 
-      renderTree(bob);
-      await type(
-        "My Notes{Enter}{Tab}Programming Languages{Enter}{Tab}Rust{Enter}{Tab}Memory Safety{Escape}"
+      renderTree(alice);
+      await type("My Notes{Enter}{Tab}Programming Languages{Escape}");
+      cleanup();
+
+      await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+      await userEvent.click(
+        await screen.findByLabelText("open Programming Languages in fullscreen")
       );
+      await userEvent.click(
+        await screen.findByLabelText("edit Programming Languages")
+      );
+      await userEvent.keyboard("{Enter}");
+      await type("Rust{Enter}{Tab}Memory Safety{Escape}");
       cleanup();
 
       renderTree(alice);
-      await type("Alice Home Note{Escape}");
       await userEvent.click(await screen.findByLabelText("Create new note"));
-      await type("My Notes{Enter}{Tab}Programming Languages{Escape}");
+      await type("Alice Home Note{Escape}");
+      await navigateToNodeViaSearch(0, "My Notes");
 
       await userEvent.click(
         await screen.findByLabelText("expand Programming Languages")

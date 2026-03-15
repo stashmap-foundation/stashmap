@@ -5,7 +5,9 @@ import {
   BOB,
   expectTree,
   findNewNodeEditor,
+  forkReadonlyRoot,
   follow,
+  navigateToNodeViaSearch,
   renderTree,
   setup,
 } from "../utils.test";
@@ -13,24 +15,23 @@ import {
 test("Reference node opens with only reference path, not current pane stack", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
 
-  renderTree(bob);
-  await userEvent.type(
-    await findNewNodeEditor(),
-    "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Escape}"
-  );
-
-  await expectTree(`
-My Notes
-  Holiday Destinations
-    Spain
-  `);
+  renderTree(alice);
+  await userEvent.type(await findNewNodeEditor(), "My Notes{Escape}");
 
   cleanup();
 
   await follow(alice, bob().user.publicKey);
+  await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
+  await userEvent.type(
+    await findNewNodeEditor(),
+    "Holiday Destinations{Enter}{Tab}Spain{Escape}"
+  );
+  cleanup();
 
   renderTree(alice);
-  await userEvent.type(await findNewNodeEditor(), "My Notes{Escape}");
+  await navigateToNodeViaSearch(0, "My Notes");
 
   await expectTree(`
 My Notes

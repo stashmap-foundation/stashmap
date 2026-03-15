@@ -7,12 +7,14 @@ import {
   CAROL,
   expectTree,
   follow,
+  forkReadonlyRoot,
   getPane,
   navigateToNodeViaSearch,
   renderApp,
   renderTree,
   setup,
   type,
+  type UpdateState,
 } from "../utils.test";
 import { itemMatchesType } from "../connections";
 
@@ -31,6 +33,50 @@ function makeItem(
     relevance,
     ...(argument !== undefined ? { argument } : {}),
   };
+}
+
+async function createForkedMyNotesVersion(
+  alice: UpdateState,
+  bob: UpdateState,
+  aliceInput: string,
+  bobRootInput: string
+): Promise<void> {
+  renderTree(alice);
+  await type(aliceInput);
+  cleanup();
+
+  await follow(bob, alice().user.publicKey);
+  await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await userEvent.keyboard("{Enter}");
+  await type(bobRootInput);
+  cleanup();
+
+  await follow(alice, bob().user.publicKey);
+}
+
+async function createForkedMyNotesNodeVersion(
+  alice: UpdateState,
+  bob: UpdateState,
+  aliceInput: string,
+  nodeLabel: string,
+  bobNodeInput: string
+): Promise<void> {
+  renderTree(alice);
+  await type(aliceInput);
+  cleanup();
+
+  await follow(bob, alice().user.publicKey);
+  await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+  await userEvent.click(
+    await screen.findByLabelText(`open ${nodeLabel} in fullscreen`)
+  );
+  await userEvent.click(await screen.findByLabelText(`edit ${nodeLabel}`));
+  await userEvent.keyboard("{Enter}");
+  await type(bobNodeInput);
+  cleanup();
+
+  await follow(alice, bob().user.publicKey);
 }
 
 async function createAcceptedItemLevelRefOnCurrentPane(
@@ -602,14 +648,15 @@ describe("Relevance filtering", () => {
 describe("Diff item relevance selection", () => {
   test("diff item shows RelevanceSelector with no dots selected", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
-    await follow(alice, bob().user.publicKey);
-
-    renderTree(bob);
-    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Bob Child{Escape}");
-    cleanup();
+    await createForkedMyNotesNodeVersion(
+      alice,
+      bob,
+      "My Notes{Enter}{Tab}Parent{Enter}{Tab}Alice Child{Escape}",
+      "Parent",
+      "Bob Child{Escape}"
+    );
 
     renderTree(alice);
-    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Alice Child{Escape}");
 
     // Navigate to Parent
     await navigateToNodeViaSearch(0, "Parent");
@@ -624,14 +671,15 @@ describe("Diff item relevance selection", () => {
 
   test("clicking dot on diff item accepts it with that relevance", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
-    await follow(alice, bob().user.publicKey);
-
-    renderTree(bob);
-    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Bob Child{Escape}");
-    cleanup();
+    await createForkedMyNotesNodeVersion(
+      alice,
+      bob,
+      "My Notes{Enter}{Tab}Parent{Enter}{Tab}Alice Child{Escape}",
+      "Parent",
+      "Bob Child{Escape}"
+    );
 
     renderTree(alice);
-    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Alice Child{Escape}");
 
     // Navigate to Parent
     await navigateToNodeViaSearch(0, "Parent");
@@ -652,14 +700,15 @@ describe("Diff item relevance selection", () => {
 
   test("clicking X on diff item declines it as not relevant", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
-    await follow(alice, bob().user.publicKey);
-
-    renderTree(bob);
-    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Bob Child{Escape}");
-    cleanup();
+    await createForkedMyNotesNodeVersion(
+      alice,
+      bob,
+      "My Notes{Enter}{Tab}Parent{Enter}{Tab}Alice Child{Escape}",
+      "Parent",
+      "Bob Child{Escape}"
+    );
 
     renderTree(alice);
-    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Alice Child{Escape}");
 
     // Navigate to Parent
     await navigateToNodeViaSearch(0, "Parent");
@@ -809,15 +858,14 @@ describe("Multi-user relevance", () => {
 describe("Accepting suggestions via RelevanceSelector", () => {
   test("accepting with level 3 sets relevance to relevant", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Escape}",
+      "BobItem{Escape}"
+    );
 
-    renderTree(bob);
-    await type("My Notes{Enter}{Tab}BobItem{Escape}");
-
-    cleanup();
-
-    await follow(alice, bob().user.publicKey);
     renderTree(alice);
-    await type("My Notes{Escape}");
 
     await expectTree(`
 My Notes
@@ -836,15 +884,14 @@ My Notes
 
   test("accepting with level 2 sets relevance to maybe relevant", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Escape}",
+      "BobItem{Escape}"
+    );
 
-    renderTree(bob);
-    await type("My Notes{Enter}{Tab}BobItem{Escape}");
-
-    cleanup();
-
-    await follow(alice, bob().user.publicKey);
     renderTree(alice);
-    await type("My Notes{Escape}");
 
     await expectTree(`
 My Notes
@@ -863,15 +910,14 @@ My Notes
 
   test("accepting with level 1 sets relevance to little relevant", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Escape}",
+      "BobItem{Escape}"
+    );
 
-    renderTree(bob);
-    await type("My Notes{Enter}{Tab}BobItem{Escape}");
-
-    cleanup();
-
-    await follow(alice, bob().user.publicKey);
     renderTree(alice);
-    await type("My Notes{Escape}");
 
     await userEvent.click(
       screen.getByLabelText("toggle Little Relevant filter")
@@ -894,15 +940,14 @@ My Notes
 
   test("declining suggestion sets relevance to not_relevant", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Escape}",
+      "BobItem{Escape}"
+    );
 
-    renderTree(bob);
-    await type("My Notes{Enter}{Tab}BobItem{Escape}");
-
-    cleanup();
-
-    await follow(alice, bob().user.publicKey);
     renderTree(alice);
-    await type("My Notes{Escape}");
 
     await expectTree(`
 My Notes
@@ -913,6 +958,7 @@ My Notes
 
     await expectTree(`
 My Notes
+  [VO] +1
     `);
 
     await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
@@ -920,6 +966,7 @@ My Notes
     await expectTree(`
 My Notes
   BobItem
+  [VO] +1
     `);
 
     await screen.findByLabelText("mark BobItem as contains");
@@ -927,15 +974,14 @@ My Notes
 
   test("accepted item is no longer a suggestion", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Escape}",
+      "BobItem{Escape}"
+    );
 
-    renderTree(bob);
-    await type("My Notes{Enter}{Tab}BobItem{Escape}");
-
-    cleanup();
-
-    await follow(alice, bob().user.publicKey);
     renderTree(alice);
-    await type("My Notes{Escape}");
 
     await expectTree(`
 My Notes
@@ -954,15 +1000,14 @@ My Notes
 
   test("cref suggestion resolves correctly with relevance", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
+    await createForkedMyNotesVersion(
+      alice,
+      bob,
+      "My Notes{Escape}",
+      "BobFolder{Enter}{Tab}BobChild{Escape}"
+    );
 
-    renderTree(bob);
-    await type("My Notes{Enter}{Tab}BobFolder{Enter}{Tab}BobChild{Escape}");
-
-    cleanup();
-
-    await follow(alice, bob().user.publicKey);
     renderTree(alice);
-    await type("My Notes{Escape}");
 
     await expectTree(`
 My Notes

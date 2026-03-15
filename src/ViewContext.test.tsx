@@ -14,6 +14,7 @@ import {
   findNewNodeEditor,
   BOB,
   follow,
+  forkReadonlyRoot,
   openReadonlyRoute,
   renderApp,
   renderTree,
@@ -126,15 +127,18 @@ My Notes
   `);
   cleanup();
 
-  renderTree(bob);
-  await type("My Notes{Enter}{Tab}Cities{Enter}{Tab}Madrid{Escape}");
+  await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+  await userEvent.click(await screen.findByLabelText("expand Cities"));
+  await userEvent.click(await screen.findByLabelText("edit Cities"));
+  await userEvent.keyboard("{Enter}");
+  await type("Madrid{Escape}");
 
   await expectTree(`
 My Notes
   Cities
     Madrid
-    [S] Paris
-    [S] London
+    Paris
+    London
   `);
   cleanup();
 

@@ -49,13 +49,13 @@ function resolveContextLabels(
     .toArray();
 }
 
-export type ParsedRef = {
+type ParsedRef = {
   relation: GraphNode;
   relationContext: List<ID>;
   sourceItem?: GraphNode;
 };
 
-export function parseRef(
+function parseRef(
   refId: LongID,
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey
@@ -180,7 +180,7 @@ function effectiveIDs(
     .toList();
 }
 
-export function computeRelationDiff(
+function computeRelationDiff(
   knowledgeDBs: KnowledgeDBs,
   versionRelation: GraphNode,
   parentRelation: GraphNode | undefined,

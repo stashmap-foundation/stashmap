@@ -6,7 +6,7 @@ import { joinID } from "../connections";
 import { parseMarkdownHierarchy } from "../markdownTree";
 
 export const DOCUMENTS_DIR = "DOCUMENTS";
-export const BASELINE_DIR = "base";
+const BASELINE_DIR = "base";
 
 function slugify(value: string): string {
   const slug = value
@@ -76,7 +76,7 @@ export function stripFrontMatter(content: string): string {
   return content.slice(match[0].length);
 }
 
-export function ensureEditableDocumentHeader(
+function ensureEditableDocumentHeader(
   content: string,
   author: PublicKey,
   dTag: string,

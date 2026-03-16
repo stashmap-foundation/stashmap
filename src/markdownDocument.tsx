@@ -30,12 +30,6 @@ import { getNodesInTree } from "./treeTraversal";
 import { createRootAnchor } from "./rootAnchor";
 import { resolveSemanticRelationInCurrentTree } from "./semanticNavigation";
 
-export {
-  createNodesFromMarkdownTrees,
-  parseDocumentEvent,
-  type WalkContext,
-} from "./markdownRelations";
-
 export type { MarkdownTreeNode } from "./markdownTree";
 export { parseMarkdownHierarchy } from "./markdownTree";
 
@@ -176,22 +170,6 @@ function serializeTree(data: Data, rootRelation: GraphNode): SerializeResult {
       lines: [],
     }
   );
-}
-
-export function treeToMarkdown(data: Data, rootRelation: GraphNode): string {
-  const rootContext = getNodeContext(data.knowledgeDBs, rootRelation);
-  const { text: rootText } = getSerializedRelationText(data, rootRelation);
-  const rootUuid = shortID(rootRelation.id);
-  const rootLine = formatRootHeading(
-    rootText,
-    rootUuid,
-    rootRelation.basedOn,
-    rootRelation.snapshotDTag,
-    rootRelation.anchor ?? createRootAnchor(rootContext),
-    rootRelation.systemRole
-  );
-  const { lines } = serializeTree(data, rootRelation);
-  return `${[rootLine, ...lines].join("\n")}\n`;
 }
 
 export function buildDocumentEvent(

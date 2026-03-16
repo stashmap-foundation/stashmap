@@ -1,5 +1,5 @@
 export const LOG_ROOT_ROLE: RootSystemRole = "log";
-export const LOG_ROOT_TEXT = "~Log";
+const LOG_ROOT_TEXT = "~Log";
 
 export function isStandaloneRoot(relation: GraphNode): boolean {
   return !relation.parent && relation.root === relation.id;

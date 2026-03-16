@@ -7,11 +7,7 @@ import { StorePreLoginContext } from "../StorePreLoginContext";
 import { DND } from "../dnd";
 import { PaneHistoryProvider } from "../PaneHistoryContext";
 
-export function AppLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}): JSX.Element {
+function AppLayout({ children }: { children: React.ReactNode }): JSX.Element {
   return (
     <div className="h-100 w-100 position-absolute knowledge-exchange">
       <div

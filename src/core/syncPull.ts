@@ -39,7 +39,7 @@ export type SyncPullProfile = {
   knowstrHome?: string;
 };
 
-export type SyncPullOptions = {
+type SyncPullOptions = {
   outDir?: string;
   relayUrls?: string[];
   maxWaitMs?: number;

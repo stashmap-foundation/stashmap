@@ -7,7 +7,6 @@ import {
   shortID,
   isSearchId,
   parseSearchId,
-  itemMatchesType,
   EMPTY_SEMANTIC_ID,
   itemPassesFilters,
   getNodeContext,
@@ -173,7 +172,7 @@ function getDefaultView(id: ID, isRootNode: boolean): View {
   };
 }
 
-export function getViewFromPath(data: Data, path: ViewPath): View {
+function getViewFromPath(data: Data, path: ViewPath): View {
   const itemID = getRowIDFromPath(data, path);
   return (
     getViewExactMatch(data.views, path) || getDefaultView(itemID, isRoot(path))
@@ -220,10 +219,7 @@ export function getRowIDFromView(data: Data, viewPath: ViewPath): [ID, View] {
   return [getRowIDFromPath(data, viewPath), view];
 }
 
-export function getRowIDsForViewPath(
-  data: Data,
-  viewPath: ViewPath
-): Array<ID> {
+function getRowIDsForViewPath(data: Data, viewPath: ViewPath): Array<ID> {
   const paneIndex = getPaneIndex(viewPath);
   return (viewPath.slice(1) as ViewPathSegment[]).map((_, index, segments) =>
     getRowIDFromPath(data, [paneIndex, ...segments.slice(0, index + 1)])
@@ -245,44 +241,6 @@ export function getEffectiveAuthor(data: Data, viewPath: ViewPath): PublicKey {
   const pane = getPane(data, viewPath);
   const parentRelation = getParentRelation(data, viewPath);
   return parentRelation?.author || pane.author;
-}
-
-export function getRootForView(
-  data: Data,
-  viewPath: ViewPath,
-  stack: ID[]
-): ID | undefined {
-  const currentID = getLast(viewPath);
-  const directRelation = getViewRelationByID(
-    data.knowledgeDBs,
-    currentID,
-    data.user.publicKey
-  );
-  if (directRelation) {
-    return directRelation.root;
-  }
-
-  const parentRelation = getParentRelation(data, viewPath);
-  if (parentRelation) {
-    return parentRelation.root;
-  }
-
-  if (!isRoot(viewPath)) {
-    return undefined;
-  }
-
-  const [itemID] = getRowIDFromView(data, viewPath);
-  const semanticContext = getContext(data, viewPath, stack);
-  const pane = getPane(data, viewPath);
-  const author = getEffectiveAuthor(data, viewPath);
-  return resolveSemanticRelationInCurrentTree(
-    data.knowledgeDBs,
-    author,
-    itemID,
-    semanticContext,
-    pane.rootRelation,
-    true
-  )?.root;
 }
 
 export function getNodeForView(
@@ -419,31 +377,6 @@ export function useIsInSearchView(): boolean {
   return useSearchDepth() !== undefined;
 }
 
-export type TypeFilters = (
-  | Relevance
-  | Argument
-  | "suggestions"
-  | "versions"
-  | "incoming"
-  | "contains"
-)[];
-
-/**
- * Filter child nodes by type filters.
- */
-export function filterNodeChildren(
-  children: List<GraphNode>,
-  filters: TypeFilters
-): List<GraphNode> {
-  const itemFilters = filters.filter(
-    (f): f is Relevance | Argument | "contains" =>
-      f !== "suggestions" && f !== undefined
-  );
-  return children.filter((item) =>
-    itemFilters.some((f) => itemMatchesType(item, f))
-  );
-}
-
 export function getCurrentReferenceForView(
   data: Data,
   viewPath: ViewPath,
@@ -495,7 +428,7 @@ export function addNodeToPathWithRelations(
   return [...pathWithRelations, nextSegment] as ViewPath;
 }
 
-export function addNodeToPath(
+function addNodeToPath(
   data: Data,
   path: ViewPath,
   index: number,
@@ -525,16 +458,6 @@ export function useIsViewingOtherUserContent(): boolean {
   const { user } = useData();
   const effectiveAuthor = useEffectiveAuthor();
   return effectiveAuthor !== user.publicKey;
-}
-
-export function popViewPath(
-  viewContext: ViewPath,
-  times: number
-): ViewPath | undefined {
-  return Array.from({ length: times }).reduce<ViewPath | undefined>(
-    (current) => (current ? getParentView(current) : undefined),
-    viewContext
-  );
 }
 
 export function getNodeIndexForView(
@@ -594,7 +517,7 @@ export function useCurrentEdge(): GraphNode | undefined {
   return getCurrentEdgeForView(data, viewPath);
 }
 
-export type SiblingInfo = {
+type SiblingInfo = {
   viewPath: ViewPath;
   itemID: ID;
   view: View;
@@ -654,22 +577,6 @@ export function getPreviousSibling(
   } catch {
     return undefined;
   }
-}
-
-/**
- * Get the last direct child of a node, or undefined if no children.
- */
-export function getLastChild(
-  data: Data,
-  viewPath: ViewPath,
-  stack: ID[]
-): ViewPath | undefined {
-  const nodes = getNodeForView(data, viewPath, stack);
-  if (!nodes || nodes.children.size === 0) {
-    return undefined;
-  }
-  const lastIndex = nodes.children.size - 1;
-  return addNodeToPathWithRelations(viewPath, nodes, lastIndex);
 }
 
 export function usePreviousSibling(): SiblingInfo | undefined {
@@ -762,17 +669,6 @@ export function useDisplayText(): string {
   return getDisplayTextForView(data, viewPath, stack, virtualType, currentItem);
 }
 
-export function getParentRowID(
-  data: Data,
-  viewPath: ViewPath
-): [ID, View] | [undefined, undefined] {
-  const parentPath = getParentView(viewPath);
-  if (!parentPath) {
-    return [undefined, undefined];
-  }
-  return getRowIDFromView(data, parentPath);
-}
-
 export function isExpanded(data: Data, viewKey: string): boolean {
   const viewPath = parseViewPath(viewKey);
   const view = getViewFromPath(data, viewPath);
@@ -806,11 +702,6 @@ export function updateView(views: Views, path: ViewPath, view: View): Views {
     return views.delete(key);
   }
   return views.set(key, view);
-}
-
-export function deleteChildViews(views: Views, path: ViewPath): Views {
-  const key = viewPathToString(path);
-  return views.filter((_, k) => !k.startsWith(key) || k === key);
 }
 
 export function copyViewsWithNewPrefix(
@@ -901,17 +792,6 @@ function pathContainsSubpath(
 
 export function updateViewPathsAfterMoveRelations(data: Data): Views {
   return data.views;
-}
-
-export function updateViewPathsAfterAddRelation(data: Data): Views {
-  return data.views;
-}
-
-export function updateViewPathsAfterDeleteItem(
-  views: Views,
-  itemID: ID
-): Views {
-  return views.filterNot((_, k) => k.includes(itemID));
 }
 
 export function updateViewPathsAfterDisconnect(

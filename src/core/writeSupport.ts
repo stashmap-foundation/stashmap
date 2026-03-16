@@ -106,20 +106,3 @@ export async function publishSignedEvents(
     ),
   };
 }
-
-export async function publishUnsignedEvents(
-  publisher: WritePublisher,
-  secretKey: Uint8Array,
-  relayUrls: string[],
-  unsignedEvents: UnsignedEvent[]
-): Promise<{
-  relay_urls: string[];
-  event_ids: string[];
-  publish_results: Record<string, Record<string, PublishStatus>>;
-}> {
-  return publishSignedEvents(
-    publisher,
-    relayUrls,
-    signUnsignedEvents(secretKey, unsignedEvents)
-  );
-}

@@ -1,8 +1,5 @@
 import { Map } from "immutable";
-import { UnsignedEvent } from "nostr-tools";
-import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
-import { joinID } from "../connections";
-import { buildDocumentEvents, createGraphPlan, GraphPlan } from "../planner";
+import { createGraphPlan, GraphPlan } from "../planner";
 import { createEmptySemanticIndex } from "../semanticIndex";
 
 const EMPTY_RELAYS: AllRelays = {
@@ -25,23 +22,4 @@ export function createHeadlessPlan(
     projectMembers: Map<PublicKey, Member>(),
     relays: EMPTY_RELAYS,
   });
-}
-
-export function buildKnowledgeDocumentEvents(plan: GraphPlan): UnsignedEvent[] {
-  return buildDocumentEvents(plan)
-    .filter(
-      (event) =>
-        event.kind === KIND_KNOWLEDGE_DOCUMENT || event.kind === KIND_DELETE
-    )
-    .toArray();
-}
-
-export function getAffectedRootRelationIds(plan: GraphPlan): LongID[] {
-  return plan.affectedRoots
-    .toArray()
-    .map((rootId) =>
-      rootId.includes("_")
-        ? (rootId as LongID)
-        : joinID(plan.user.publicKey, rootId)
-    );
 }

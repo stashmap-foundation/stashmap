@@ -15,9 +15,7 @@ function getUrlFromText(text: string): string | undefined {
   return match ? match[0] : undefined;
 }
 
-export async function getImageUrlFromText(
-  text: string
-): Promise<string | undefined> {
+async function getImageUrlFromText(text: string): Promise<string | undefined> {
   const url = getUrlFromText(text);
   if (!url) {
     return Promise.resolve(undefined);
@@ -289,14 +287,4 @@ export function MiniEditor({
       </span>
     </span>
   );
-}
-
-// Legacy Editor - wraps MiniEditor (kept for backward compatibility during transition)
-type EditorProps = {
-  onCreateNode: (text: string) => void;
-  onClose: () => void;
-};
-
-export function Editor({ onCreateNode, onClose }: EditorProps): JSX.Element {
-  return <MiniEditor onSave={(text) => onCreateNode(text)} onClose={onClose} />;
 }

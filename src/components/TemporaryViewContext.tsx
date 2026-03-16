@@ -1,23 +1,11 @@
 import React, { useState } from "react";
 import { OrderedSet, Set } from "immutable";
-import {
-  parseViewPath,
-  useViewKey,
-  getNodeIndexForView,
-  useDisplayText,
-  useCurrentNode,
-} from "../ViewContext";
+import { useViewKey } from "../ViewContext";
 import { useData } from "../DataContext";
 import { isRefNode } from "../connections";
-import { planDeselectTemporarySelectionInView, usePlanner } from "../planner";
+import { deselectAllChildren } from "../selection";
 
-export {
-  clearSelection,
-  deselectAllChildren,
-  selectSingle,
-  shiftSelect,
-  toggleSelect,
-} from "../selection";
+export { deselectAllChildren };
 
 type MultiSelection = {
   selection: OrderedSet<string>;
@@ -44,9 +32,6 @@ type EditorOpen = EditorOpenState & {
 
 type TemporaryView = MultiSelection & Editing & EditorOpen;
 
-type FindSelectedByPostfix = (postfix: string) => Set<string>;
-type DeselectByPostfix = (postfix: string) => void;
-
 const TemporaryViewContext = React.createContext<TemporaryView | undefined>(
   undefined
 );
@@ -69,44 +54,6 @@ export function useIsSelected(): boolean {
   return selection.contains(viewKey);
 }
 
-export function getSelectedInView(
-  selection: OrderedSet<string>,
-  viewKey: string
-): OrderedSet<string> {
-  return selection.filter((sel) => sel.startsWith(viewKey));
-}
-
-function getSelectedIndices(
-  data: Data,
-  selection: OrderedSet<string>,
-  viewKey: string
-): OrderedSet<number> {
-  return getSelectedInView(selection, viewKey)
-    .map((key) => {
-      const path = parseViewPath(key);
-      return getNodeIndexForView(data, path);
-    })
-    .filter((n) => n !== undefined) as OrderedSet<number>;
-}
-
-export function useSelectedIndices(): OrderedSet<number> {
-  const { selection } = useTemporaryView();
-  const data = useData();
-  const viewKey = useViewKey();
-  return getSelectedIndices(data, selection, viewKey);
-}
-
-export function useGetSelectedInView(): FindSelectedByPostfix {
-  const { selection } = useTemporaryView();
-  return (postfix) => getSelectedInView(selection, postfix);
-}
-
-export function useDeselectAllInView(): DeselectByPostfix {
-  const { createPlan, executePlan } = usePlanner();
-  return (viewKey) =>
-    executePlan(planDeselectTemporarySelectionInView(createPlan(), viewKey));
-}
-
 function isEditingOn(editingViews: Set<string>, viewKey: string): boolean {
   return editingViews.has(viewKey);
 }
@@ -117,75 +64,8 @@ export function useIsEditingOn(): boolean {
   return isEditingOn(editingViews, viewKey);
 }
 
-export function toggleEditing(
-  editingViews: Set<string>,
-  viewKey: string
-): EditingState {
-  return {
-    editingViews: isEditingOn(editingViews, viewKey)
-      ? editingViews.remove(viewKey)
-      : editingViews.add(viewKey),
-  };
-}
-
 export function isEditableRelation(relation: GraphNode | undefined): boolean {
   return !!relation && !isRefNode(relation);
-}
-
-export function ToggleEditing(): JSX.Element | null {
-  const relation = useCurrentNode();
-  const displayText = useDisplayText();
-  const ariaLabel = displayText ? `edit ${displayText}` : undefined;
-  const { editingViews, setEditingState } = useTemporaryView();
-  const viewKey = useViewKey();
-  if (!isEditableRelation(relation)) {
-    return null;
-  }
-  const onClick = (): void =>
-    setEditingState(toggleEditing(editingViews, viewKey));
-
-  return (
-    <button
-      type="button"
-      className="btn btn-icon"
-      onClick={onClick}
-      aria-label={ariaLabel}
-    >
-      <span aria-hidden="true">✎</span>
-    </button>
-  );
-}
-
-function isEditorOpen(editorOpenViews: Set<string>, viewKey: string): boolean {
-  return editorOpenViews.has(viewKey);
-}
-
-export function useIsEditorOpen(): boolean {
-  const { editorOpenViews } = useTemporaryView();
-  const viewKey = useViewKey();
-  return isEditorOpen(editorOpenViews, viewKey);
-}
-
-export function closeEditor(
-  editorOpenViews: Set<string>,
-  viewKey: string
-): EditorOpenState {
-  return {
-    editorOpenViews: isEditorOpen(editorOpenViews, viewKey)
-      ? editorOpenViews.remove(viewKey)
-      : editorOpenViews,
-  };
-}
-
-export function openEditor(
-  editorOpenViews: Set<string>,
-  viewKey: string
-): EditorOpenState {
-  return {
-    editorOpenViews: !isEditorOpen(editorOpenViews, viewKey)
-      ? editorOpenViews.add(viewKey)
-      : editorOpenViews,
-  };
 }
 
 export function TemporaryViewProvider({

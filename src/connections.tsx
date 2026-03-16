@@ -30,7 +30,7 @@ export function isRefNode(
   return !!node && (node.isRef === true || node.targetID !== undefined);
 }
 
-export function getTargetNode(
+function getTargetNode(
   knowledgeDBs: KnowledgeDBs,
   node: GraphNode | undefined
 ): GraphNode | undefined {
@@ -256,7 +256,7 @@ export function getNodeDepth(
   return getNodeContext(knowledgeDBs, node).size;
 }
 
-export function createTextNodeFromGraphNode(node: GraphNode): TextSeed {
+function createTextNodeFromGraphNode(node: GraphNode): TextSeed {
   return {
     id: getNodeSemanticID(node),
     text: getNodeText(node) || "",
@@ -487,13 +487,6 @@ export function deleteRelations(
   };
 }
 
-export function isRemote(
-  remote: PublicKey | undefined,
-  myself: PublicKey
-): boolean {
-  return remote !== undefined && remote !== myself;
-}
-
 export function moveRelations(
   nodes: GraphNode,
   indices: Array<number>,
@@ -513,25 +506,6 @@ export function moveRelations(
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getSharesFromPublicKey(publicKey: PublicKey): number {
   return 10000; // TODO: implement
-}
-
-function fib(n: number): number {
-  // fibonacci sequence starting with 1,2,3,5,8,13,21,34,55,89,144,233,377,610,987,1597,...
-  if (n <= 1) {
-    return n;
-  }
-  if (n === 2) {
-    return 2;
-  }
-  return fib(n - 1) + fib(n - 2);
-}
-
-function fibsum(n: number): number {
-  // sum of fibonacci sequence
-  // sequence starting with 1,3,6,11,19,32,53,87, 142, 231, 375, 608, 985, 1595,...
-  // fibsum(n) = fibsum(n - 1) + fib(n), with induction and the definition of fib() it follows that
-  // fibsum(n) = fib(n + 2) - 2
-  return fib(n + 2) - 2;
 }
 
 // Check if an item matches a filter type (relevance, argument, or contains)
@@ -584,62 +558,7 @@ export function itemPassesFilters(
   return true;
 }
 
-export function aggregateWeightedVotes(
-  listsOfVotes: List<{ children: List<GraphNode>; weight: number }>,
-  filterType: Relevance | Argument | "contains"
-): Map<ID, number> {
-  const votesPerItem = listsOfVotes.reduce((rdx, v) => {
-    const { weight } = v;
-    // Filter children by type
-    const filteredItems = v.children.filter((item) =>
-      itemMatchesType(item, filterType)
-    );
-    const length = filteredItems.size;
-    const denominator = fibsum(length);
-    if (length === 0) {
-      return rdx;
-    }
-    const updatedVotes = filteredItems.map((item, index) => {
-      const numerator = fib(length - index);
-      const newVotes = (numerator / denominator) * weight;
-      const initialVotes = rdx.get(item.id) || 0;
-      return { id: item.id, votes: initialVotes + newVotes };
-    });
-    return updatedVotes.reduce((red, { id, votes }) => {
-      return red.set(id, votes);
-    }, rdx);
-  }, Map<ID, number>());
-  return votesPerItem;
-}
-
-export function aggregateNegativeWeightedVotes(
-  listsOfVotes: List<{ children: List<GraphNode>; weight: number }>,
-  filterType: Relevance | Argument | "contains"
-): Map<ID, number> {
-  const votesPerItem = listsOfVotes.reduce((rdx, v) => {
-    const { weight } = v;
-    // Filter children by type
-    const filteredItems = v.children.filter((item) =>
-      itemMatchesType(item, filterType)
-    );
-    const length = filteredItems.size;
-    if (length === 0) {
-      return rdx;
-    }
-    const updatedVotes = filteredItems.map((item) => {
-      // vote negative with half of the weight on each item
-      const newVotes = -weight / 2;
-      const initialVotes = rdx.get(item.id) || 0;
-      return { id: item.id, votes: initialVotes + newVotes };
-    });
-    return updatedVotes.reduce((red, { id, votes }) => {
-      return red.set(id, votes);
-    }, rdx);
-  }, Map<ID, number>());
-  return votesPerItem;
-}
-
-export type EmptyNodeData = {
+type EmptyNodeData = {
   index: number;
   relationItem: GraphNode;
   paneIndex: number;
@@ -663,13 +582,6 @@ export function computeEmptyNodeMetadata(
     }
     return metadata;
   }, Map<LongID, EmptyNodeData>());
-}
-
-// Convenience function for when only positions are needed
-export function computeEmptyNodePositions(
-  temporaryEvents: List<TemporaryEvent>
-): Map<LongID, number> {
-  return computeEmptyNodeMetadata(temporaryEvents).map((data) => data.index);
 }
 
 // Inject empty nodes back into nodes based on temporaryEvents

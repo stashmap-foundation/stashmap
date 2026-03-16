@@ -34,7 +34,7 @@ export function sortEvents<T extends EventTemplate>(events: List<T>): List<T> {
   );
 }
 
-export function sortEventsDescending<T extends EventTemplate>(
+function sortEventsDescending<T extends EventTemplate>(
   events: List<T>
 ): List<T> {
   return events.sortBy(

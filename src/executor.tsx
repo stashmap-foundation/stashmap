@@ -11,7 +11,7 @@ import { publishEventToRelays, PUBLISH_TIMEOUT } from "./nostrPublish";
 
 export { PUBLISH_TIMEOUT };
 
-export type SignedEventWithConf = {
+type SignedEventWithConf = {
   readonly event: VerifiedEvent;
   readonly writeRelayConf?: WriteRelayConf;
 };

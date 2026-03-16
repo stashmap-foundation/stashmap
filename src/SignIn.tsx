@@ -157,7 +157,7 @@ function SignInWithExtension({
   );
 }
 
-export function useIsUnsavedChanges(): boolean {
+function useIsUnsavedChanges(): boolean {
   const { publishEventsStatus } = useData();
   return publishEventsStatus.unsignedEvents.size > 0;
 }

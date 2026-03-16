@@ -1,7 +1,7 @@
 import React, { CSSProperties } from "react";
 import { Badge as BSBadge, Card } from "react-bootstrap";
 
-export type Children = {
+type Children = {
   children?: React.ReactNode;
 };
 
@@ -43,38 +43,6 @@ export function Badge({
         </div>
       )}
     </>
-  );
-}
-
-export function PaneColumn({
-  children,
-  columnSpan,
-  dataTestId,
-}: Children & {
-  columnSpan?: number;
-  dataTestId?: string;
-}): JSX.Element {
-  return (
-    <div
-      className="pane-column"
-      data-testid={dataTestId || "pane-col"}
-      style={columnSpan ? { gridColumn: `span ${columnSpan}` } : {}}
-    >
-      {children}
-    </div>
-  );
-}
-
-export function UIColumn({
-  children,
-  keyString,
-}: Children & {
-  keyString?: string;
-}): JSX.Element {
-  return (
-    <div className="mb-2 outer-node flex-col" key={keyString || "outer-node"}>
-      <div className="flex-col max-height-100">{children}</div>
-    </div>
   );
 }
 
@@ -149,28 +117,6 @@ export function Button({
       tabIndex={0}
     >
       {children && children}
-    </button>
-  );
-}
-
-export function CloseButton({ onClose }: { onClose: () => void }): JSX.Element {
-  return (
-    <button className="btn btn-icon" type="button" onClick={onClose}>
-      <span aria-hidden="true">×</span>
-      <span className="visually-hidden">Close</span>
-    </button>
-  );
-}
-
-export function CancelButton({
-  onClose,
-}: {
-  onClose: () => void;
-}): JSX.Element {
-  return (
-    <button className="btn btn-icon" type="button" onClick={onClose}>
-      <span aria-hidden="true">⊘</span>
-      <span className="visually-hidden">Cancel</span>
     </button>
   );
 }

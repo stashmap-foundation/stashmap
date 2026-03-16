@@ -1,14 +1,8 @@
-import React from "react";
-import { useDropzone } from "react-dropzone";
 import { ViewPath } from "../ViewContext";
-import { Plan, ParsedLine, parseClipboardText, usePlanner } from "../planner";
+import { Plan, ParsedLine, parseClipboardText } from "../planner";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "../markdownDocument";
-import {
-  planCreateNodesFromMarkdownFiles,
-  planInsertMarkdownTrees,
-} from "../markdownPlan";
+import { planInsertMarkdownTrees } from "../markdownPlan";
 
-export type { MarkdownTreeNode } from "../markdownDocument";
 export { parseMarkdownHierarchy } from "../markdownDocument";
 export type { MarkdownImportFile } from "../markdownImport";
 export { parseMarkdownImportFiles } from "../markdownImport";
@@ -77,45 +71,3 @@ export function planPasteMarkdownTrees(
     insertAtIndex
   ).plan;
 }
-
-type FileDropZoneProps = {
-  children: React.ReactNode;
-  onDrop: (plan: Plan, topNodes: Array<ID>) => void;
-};
-
-/* eslint-disable react/jsx-props-no-spreading */
-export function FileDropZone({
-  children,
-  onDrop,
-}: FileDropZoneProps): JSX.Element {
-  const { createPlan } = usePlanner();
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    noClick: true,
-    noKeyboard: true,
-    accept: [".md", ".markdown"],
-    onDrop: async (acceptedFiles: Array<File>) => {
-      const markdownFiles = await Promise.all(
-        acceptedFiles.map(async (file) => {
-          return {
-            name: file.name,
-            markdown: await file.text(),
-          };
-        })
-      );
-
-      const [planWithMarkdown, topItemIDs] = planCreateNodesFromMarkdownFiles(
-        createPlan(),
-        markdownFiles
-      );
-      onDrop(planWithMarkdown, topItemIDs);
-    },
-  });
-  const className = isDragActive ? "dimmed flex-col-100" : "flex-col-100";
-  return (
-    <div {...getRootProps({ className })}>
-      {children}
-      <input {...getInputProps()} />
-    </div>
-  );
-}
-/* eslint-enable react/jsx-props-no-spreading */

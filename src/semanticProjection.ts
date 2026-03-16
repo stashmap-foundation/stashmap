@@ -27,15 +27,11 @@ type FooterTypeFilters = (
   | "contains"
 )[];
 
-export type ReferencedByRef = {
+type ReferencedByRef = {
   relationID: LongID;
   context: Context;
   updated: number;
 };
-
-export function contextsMatch(a: Context, b: Context): boolean {
-  return a.equals(b);
-}
 
 function getFallbackSemanticText(semanticID?: ID): string {
   if (!semanticID) {
@@ -110,7 +106,7 @@ function getConcreteNodesForSemanticID(
     .toArray();
 }
 
-export function getConcreteNodeForSemanticID(
+function getConcreteNodeForSemanticID(
   knowledgeDBs: KnowledgeDBs,
   semanticID: ID,
   author: PublicKey
@@ -149,32 +145,6 @@ export function getTextForSemanticID(
   const fallbackText = getFallbackSemanticText(semanticID);
   return fallbackText !== "" || localID === EMPTY_SEMANTIC_ID
     ? fallbackText
-    : undefined;
-}
-
-export function getTextHashForSemanticID(
-  knowledgeDBs: KnowledgeDBs,
-  semanticID: ID,
-  author: PublicKey
-): ID | undefined {
-  const directRelation = getNode(knowledgeDBs, semanticID, author);
-  if (directRelation) {
-    return directRelation.text as ID;
-  }
-
-  const relation = getConcreteNodeForSemanticID(
-    knowledgeDBs,
-    semanticID,
-    author
-  );
-  if (relation) {
-    return relation.text as ID;
-  }
-
-  const localID = shortID(semanticID as ID) as ID;
-  const fallbackText = getFallbackSemanticText(semanticID);
-  return fallbackText !== "" || localID === EMPTY_SEMANTIC_ID
-    ? (fallbackText as ID)
     : undefined;
 }
 
@@ -389,7 +359,7 @@ export function getIncomingCrefsForNode(
     .toList();
 }
 
-export type AlternativeFooterResult = {
+type AlternativeFooterResult = {
   suggestions: List<ID>;
   coveredCandidateIDs: ImmutableSet<string>;
   versions: List<LongID>;

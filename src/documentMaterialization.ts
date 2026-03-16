@@ -128,17 +128,3 @@ export function buildKnowledgeDBFromDocumentEvents(
     findDocumentRelations(events)
   );
 }
-
-export function buildKnowledgeDBFromStoredDocuments(
-  author: PublicKey,
-  documents: ReadonlyArray<StoredDocumentRecord>
-): KnowledgeData | undefined {
-  if (documents.length === 0) {
-    return undefined;
-  }
-
-  return buildKnowledgeDBFromDocumentEvents(
-    author,
-    List(documents.map((document) => storedDocumentToEvent(document)))
-  );
-}

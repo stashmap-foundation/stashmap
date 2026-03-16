@@ -145,7 +145,7 @@ function ExpandCollapseToggle(): JSX.Element | null {
   );
 }
 
-export function LoadingNode(): JSX.Element {
+function LoadingNode(): JSX.Element {
   return <span className="skeleton-bar" />;
 }
 
@@ -610,7 +610,7 @@ function NodeAutoLink({
 export const INDENTATION = 25;
 const ARROW_WIDTH = 0;
 
-export function Indent({
+function Indent({
   levels,
   colorLevels,
 }: {

@@ -129,7 +129,7 @@ function moveCreatedTreesToParentContext<T extends GraphPlan>(
   }, plan);
 }
 
-export function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
+function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
   plan: T,
   trees: MarkdownTreeNode[],
   parentRelationId: LongID,

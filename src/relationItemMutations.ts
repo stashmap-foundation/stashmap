@@ -29,7 +29,7 @@ function getNodeText(plan: Plan, viewPath: ViewPath, stack: ID[]): string {
   return getNodeForView(plan, viewPath, stack)?.text ?? "";
 }
 
-export function planUpdateExistingItemMetadata(
+function planUpdateExistingItemMetadata(
   plan: Plan,
   parentViewPath: ViewPath,
   stack: ID[],

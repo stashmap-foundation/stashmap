@@ -8,7 +8,7 @@ import { pushEditedWorkspaceDocuments } from "../core/workspacePush";
 type PushProfile = ReturnType<typeof loadCliProfile>;
 type PushPool = Pick<SimplePool, "publish" | "close">;
 
-export function parsePushArgs(args: string[]): PushCliArgs {
+function parsePushArgs(args: string[]): PushCliArgs {
   const parse = (index: number, current: PushCliArgs): PushCliArgs => {
     const arg = args[index];
     if (!arg) {

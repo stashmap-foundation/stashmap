@@ -15,7 +15,7 @@ function parsePublicKeyArg(value: string, flagName: string): PublicKey {
   return decoded;
 }
 
-export function parsePullArgs(args: string[]): SyncPullCliArgs {
+function parsePullArgs(args: string[]): SyncPullCliArgs {
   const parse = (index: number, current: SyncPullCliArgs): SyncPullCliArgs => {
     const arg = args[index];
     if (!arg) {

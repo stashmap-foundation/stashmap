@@ -38,14 +38,6 @@ function clearDragDescendants(): void {
   });
 }
 
-export type DragItemType = {
-  path: ViewPath;
-  text?: string;
-  isCopyDrag?: boolean;
-  nodeId?: LongID;
-  targetId?: LongID;
-};
-
 type DraggableProps = {
   className?: string;
   copyDrag?: boolean;
@@ -152,15 +144,6 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     );
   }
 );
-
-export function DraggableNote(): JSX.Element {
-  const ref = useRef<HTMLDivElement>(null);
-  return (
-    <div className="visible-on-hover">
-      <Draggable ref={ref} />
-    </div>
-  );
-}
 
 function DraggableSuggestion({
   className,

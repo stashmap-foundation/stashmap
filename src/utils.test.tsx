@@ -27,7 +27,6 @@ import userEvent from "@testing-library/user-event";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { sha256 } from "@noble/hashes/sha256";
 import { schnorr } from "@noble/curves/secp256k1";
-import { Container } from "react-dom";
 import { VirtuosoMockContext } from "react-virtuoso";
 import {
   FocusContext,
@@ -83,21 +82,16 @@ test.skip("skip", () => {});
 export const ALICE_PRIVATE_KEY =
   "04d22f1cf58c28647c7b7dc198dcbc4de860948933e56001ab9fc17e1b8d072e";
 
-export const BOB_PRIVATE_KEY =
+const BOB_PRIVATE_KEY =
   "00000f1cf58c28647c7b7dc198dcbc4de860948933e56001ab9fc17e1b8d072e";
 
 export const BOB_PUBLIC_KEY =
   "71a20276981b2a5019f634adfe10accd7e188f3eb5f57079da52de40b742a923" as PublicKey;
 
-export const CAROL_PRIVATE_KEY =
+const CAROL_PRIVATE_KEY =
   "10000f1cf58c28647c7b7dc198dcbc4de860948933e56001ab9fc17e1b8d072e";
 export const CAROL_PUBLIC_KEY =
   "074eb94a7a3d34102b563b540ac505e4fa8f71e3091f1e39a77d32e813c707d2" as PublicKey;
-
-export const STASHMAP_PUBLIC_KEY =
-  "0d88016ab939e885e59c0cb7775fe06cdfa94bce46547c8b37a87a02130e4e76" as PublicKey;
-export const STASHMAP_PRIVATE_KEY =
-  "cdf051a1564177fa20bb831847011e8d4e5168ed8f74448c82c4279bf8766512";
 
 const UNAUTHENTICATED_ALICE: Contact = {
   publicKey:
@@ -113,25 +107,15 @@ const ALICE: User = {
   privateKey: hexToBytes(ALICE_PRIVATE_KEY),
 };
 
-const UNAUTHENTICATED_BOB: Contact = {
-  publicKey: BOB_PUBLIC_KEY,
-};
-
 export const BOB: KeyPair = {
   publicKey: BOB_PUBLIC_KEY,
   privateKey: hexToBytes(BOB_PRIVATE_KEY),
-};
-
-const UNAUTHENTICATED_CAROL: Contact = {
-  publicKey: CAROL_PUBLIC_KEY,
 };
 
 export const CAROL: User = {
   publicKey: CAROL_PUBLIC_KEY,
   privateKey: hexToBytes(CAROL_PRIVATE_KEY),
 };
-
-export const bobsNip05Identifier = "bob@bobsdomain.com";
 
 export const TEST_RELAYS = [
   { url: "wss://relay.test.first.success/", read: true, write: true },
@@ -162,7 +146,7 @@ function mockFileStore(): MockFileStore {
   };
 }
 
-export function finalizeEventWithoutWasm(
+function finalizeEventWithoutWasm(
   t: EventTemplate,
   secretKey: Uint8Array
 ): VerifiedEvent {
@@ -500,17 +484,6 @@ export async function openReadonlyRoute(nodeLabel: string): Promise<string> {
   return window.location.pathname;
 }
 
-export function waitForLoadingToBeNull(): Promise<void> {
-  return waitFor(
-    () => {
-      expect(screen.queryByLabelText("loading")).toBeNull();
-    },
-    {
-      // it tests which use real encryption can be slow
-      timeout: 10000,
-    }
-  );
-}
 export async function follow(
   cU: UpdateState,
   publicKey: PublicKey
@@ -566,60 +539,6 @@ export function renderWithTestData(
   return { ...props, ...utils };
 }
 
-// @Deprecated
-export function expectTextContent(
-  element: HTMLElement,
-  textContent: Array<string>
-): void {
-  expect(element.textContent).toEqual(textContent.join(""));
-}
-
-function isElementMatchingSearchText(
-  text: string,
-  element: Element | null
-): boolean {
-  if (
-    element === null ||
-    element === undefined ||
-    element.textContent === null ||
-    element.textContent === ""
-  ) {
-    return false;
-  }
-  const searchTextParts = text.split(" ");
-  return searchTextParts.every((part: string) =>
-    element.textContent?.includes(part)
-  );
-}
-
-function isNoChildDivElements(element: Element | null): boolean {
-  if (element === null) {
-    return true;
-  }
-  return Array.from(element.children).every((child) => child.tagName !== "DIV");
-}
-
-export function matchSplitText(text: string): MatcherFunction {
-  const customTextMatcher = (
-    content: string,
-    element: Element | null
-  ): boolean => {
-    if (
-      isElementMatchingSearchText(text, element) &&
-      isNoChildDivElements(element)
-    ) {
-      // eslint-disable-next-line testing-library/no-node-access
-      const childElements = element ? Array.from(element.children) : [];
-      const foundChildElements = childElements.filter((child) =>
-        isElementMatchingSearchText(text, child)
-      );
-      return foundChildElements.length === 0;
-    }
-    return false;
-  };
-  return customTextMatcher;
-}
-
 /**
  * Finds the empty "note editor" (for creating new nodes).
  */
@@ -632,37 +551,6 @@ export async function findNewNodeEditor(): Promise<HTMLElement> {
  */
 export async function type(text: string): Promise<void> {
   await userEvent.type(await findNewNodeEditor(), text);
-}
-
-export function extractNodes(container: Container): Array<string | null> {
-  /* eslint-disable testing-library/no-node-access */
-  // Find both read-only nodes (.break-word) and editable nodes ([role="textbox"])
-  const readOnlyNodes = container.querySelectorAll(
-    "[data-item-index] .inner-node .break-word"
-  );
-  const editableNodes = container.querySelectorAll(
-    '[data-item-index] .inner-node [role="textbox"][aria-label="note editor"]'
-  );
-  // Combine and sort by document order using toSorted() for immutability
-  const allNodes = [...Array.from(readOnlyNodes), ...Array.from(editableNodes)];
-  // Sort by document position to get correct order
-  /* eslint-disable functional/immutable-data, no-bitwise */
-  const sortedNodes = [...allNodes].sort((a, b) => {
-    const position = a.compareDocumentPosition(b);
-    if ((position & Node.DOCUMENT_POSITION_FOLLOWING) !== 0) return -1;
-    if ((position & Node.DOCUMENT_POSITION_PRECEDING) !== 0) return 1;
-    return 0;
-  });
-  /* eslint-enable functional/immutable-data, no-bitwise */
-  /* eslint-enable testing-library/no-node-access */
-  return sortedNodes.map((el) => el.textContent);
-}
-
-export function hexToRgb(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgb(${r}, ${g}, ${b})`;
 }
 
 export async function findEvent(
@@ -901,7 +789,7 @@ type TreeOptions = {
   showGutter?: boolean;
 };
 
-export async function getTreeStructure(options?: TreeOptions): Promise<string> {
+async function getTreeStructure(options?: TreeOptions): Promise<string> {
   await waitFor(() => {
     expect(screen.queryByText("Loading...")).toBeNull();
   });
@@ -1121,10 +1009,4 @@ export function expectIndentationLimits(
   };
 }
 
-export {
-  ALICE,
-  UNAUTHENTICATED_BOB,
-  UNAUTHENTICATED_CAROL,
-  renderApp,
-  mockRelayPool,
-};
+export { ALICE, renderApp, mockRelayPool };

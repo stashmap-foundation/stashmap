@@ -6,7 +6,6 @@ import {
   KIND_DELETE,
   KIND_KNOWLEDGE_DOCUMENT,
   KIND_CONTACTLIST,
-  KIND_MEMBERLIST,
   KIND_RELAY_METADATA_EVENT,
   newTimestamp,
   msTag,
@@ -65,7 +64,6 @@ import { createRootAnchor } from "./rootAnchor";
 import {
   MultiSelectionState,
   clearSelection,
-  deselectAllChildren,
   shiftSelect,
   toggleSelect,
 } from "./selection";
@@ -118,7 +116,7 @@ export type GraphPlan = GraphPlanData & {
   relays: AllRelays;
 };
 
-export type WorkspacePlan = GraphPlan &
+type WorkspacePlan = GraphPlan &
   Pick<Data, "publishEventsStatus" | "views" | "panes"> & {
     temporaryView: TemporaryViewState;
     temporaryEvents: List<TemporaryEvent>;
@@ -188,7 +186,7 @@ export function planUpsertContact<T extends GraphPlan>(
   };
 }
 
-export function planEnsureSystemRoot<T extends GraphPlan>(
+function planEnsureSystemRoot<T extends GraphPlan>(
   plan: T,
   systemRole: RootSystemRole
 ): [T, GraphNode] {
@@ -211,33 +209,6 @@ export function planEnsureSystemRoot<T extends GraphPlan>(
   );
 
   return [upsertRelationsCore(plan, relation), relation];
-}
-
-export function planUpsertMemberlist<T extends GraphPlan>(
-  plan: T,
-  members: Members
-): T {
-  const votesTags = members
-    .valueSeq()
-    .toArray()
-    .map((v) => ["votes", v.publicKey, `${v.votes}`]);
-  const contactListEvent = newContactListEvent(members, plan.user);
-  const memberListEvent = {
-    ...contactListEvent,
-    kind: KIND_MEMBERLIST,
-    tags: [...contactListEvent.tags, ...votesTags],
-  };
-  return {
-    ...plan,
-    publishEvents: plan.publishEvents.push(
-      setRelayConf(memberListEvent, {
-        defaultRelays: false,
-        user: false,
-
-        contacts: false,
-      })
-    ),
-  };
 }
 
 export function planAddContacts<T extends GraphPlan>(
@@ -514,18 +485,6 @@ export function planSelectAllTemporaryRows(
     baseSelection: OrderedSet<string>(orderedKeys),
     shiftSelection: OrderedSet<string>(),
     anchor: anchor ?? plan.temporaryView.anchor,
-  });
-}
-
-export function planDeselectTemporarySelectionInView(
-  plan: Plan,
-  viewKey: string
-): Plan {
-  const current = getTemporarySelectionState(plan);
-  return planSetTemporarySelectionState(plan, {
-    baseSelection: deselectAllChildren(current.baseSelection, viewKey),
-    shiftSelection: deselectAllChildren(current.shiftSelection, viewKey),
-    anchor: current.anchor,
   });
 }
 
@@ -854,7 +813,7 @@ function getRelationSubtree(
   return List(ordered);
 }
 
-export function planCopyDescendantRelations<T extends GraphPlan>(
+function planCopyDescendantRelations<T extends GraphPlan>(
   plan: T,
   sourceRelation: GraphNode,
   getSemanticContext: (relation: GraphNode) => Context,
@@ -988,44 +947,6 @@ export function planMoveDescendantRelations<T extends GraphPlan>(
           : undefined,
       root: root ?? relation.root,
     });
-  }, plan);
-}
-
-export function planMoveTreeDescendantsToContext(
-  plan: Plan,
-  originalTopNodeIDs: ID[],
-  sourceRelationIDs: LongID[],
-  actualNodeIDs: ID[],
-  parentViewPath: ViewPath,
-  stack: ID[],
-  root?: ID
-): Plan {
-  const targetParentRelation = getNodeForView(plan, parentViewPath, stack);
-  const parentContext = getContext(plan, parentViewPath, stack);
-  const [parentItemID] = getRowIDFromView(plan, parentViewPath);
-  const targetSemanticContext = parentContext.push(
-    targetParentRelation
-      ? getSemanticID(plan.knowledgeDBs, targetParentRelation)
-      : (shortID(parentItemID as ID) as ID)
-  );
-
-  return originalTopNodeIDs.reduce((accPlan, originalID, index) => {
-    const actualID = actualNodeIDs[index];
-    const sourceRelationID = sourceRelationIDs[index];
-    const sourceRelation = sourceRelationID
-      ? getNode(accPlan.knowledgeDBs, sourceRelationID, accPlan.user.publicKey)
-      : undefined;
-    if (!sourceRelation) {
-      return accPlan;
-    }
-    return planMoveDescendantRelations(
-      accPlan,
-      sourceRelation,
-      targetSemanticContext,
-      targetParentRelation?.id,
-      actualID !== originalID ? actualID : undefined,
-      root
-    );
   }, plan);
 }
 
@@ -1293,7 +1214,7 @@ export function parseClipboardText(text: string): ParsedLine[] {
     .filter((item) => item.text.length > 0);
 }
 
-export type SaveNodeResult = {
+type SaveNodeResult = {
   plan: Plan;
   viewPath: ViewPath;
 };
@@ -1419,30 +1340,6 @@ export function getNextInsertPosition(
   if (!parentPath) return null;
 
   return [parentPath, stack, (relationIndex ?? 0) + 1];
-}
-
-export function planDeleteSemanticID(plan: Plan, semanticID: ID): Plan {
-  // Prevent deletion of empty placeholder node
-  if (isEmptySemanticID(semanticID)) {
-    return plan;
-  }
-  const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
-  const ownedStandaloneRoots = userDB.nodes
-    .valueSeq()
-    .filter(
-      (relation) =>
-        relation.author === plan.user.publicKey &&
-        shortID(getSemanticID(plan.knowledgeDBs, relation)) ===
-          shortID(semanticID as ID) &&
-        relation.root === shortID(relation.id)
-    )
-    .sortBy((relation) => -relation.updated)
-    .toList();
-
-  return ownedStandaloneRoots.reduce((accPlan, relation) => {
-    const withDescendants = planDeleteDescendantRelations(accPlan, relation);
-    return planDeleteRelations(withDescendants, relation.id);
-  }, plan);
 }
 
 export function planDeleteRelations<T extends GraphPlan>(

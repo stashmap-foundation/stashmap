@@ -3,7 +3,6 @@ export const KIND_SETTINGS = 11071;
 export const KIND_KNOWLEDGE_DOCUMENT = 34770;
 export const KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT = 34771;
 
-export const KIND_NIP05 = 0;
 export const KIND_CONTACTLIST = 3;
 export const KIND_DELETE = 5;
 

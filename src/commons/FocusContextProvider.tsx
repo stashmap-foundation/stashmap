@@ -9,18 +9,6 @@ export const FocusContext = React.createContext<InputElementFocus | undefined>(
   undefined
 );
 
-function getFocusContextOrThrow(): InputElementFocus {
-  const context = React.useContext(FocusContext);
-  if (context === undefined) {
-    throw new Error("FocusContext not provided");
-  }
-  return context;
-}
-
-export function useInputElementFocus(): InputElementFocus {
-  return getFocusContextOrThrow();
-}
-
 export function FocusContextProvider({
   children,
 }: {

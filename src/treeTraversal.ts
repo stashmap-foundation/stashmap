@@ -33,7 +33,7 @@ export type TreeResult = {
   firstVirtualKeys: ImmutableSet<string>;
 };
 
-export type TreeTraversalOptions = {
+type TreeTraversalOptions = {
   isMarkdownExport?: boolean;
 };
 

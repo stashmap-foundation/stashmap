@@ -5,7 +5,7 @@ export type ActiveRowState = {
   activeRowIndex: number;
 };
 
-export const ROW_SELECTOR = '[data-row-focusable="true"]';
+const ROW_SELECTOR = '[data-row-focusable="true"]';
 
 export function isEditableElement(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
@@ -57,7 +57,7 @@ export function focusRow(row: HTMLElement | undefined): void {
   row.focus();
 }
 
-export type ScrollToRowFn = (index: number, done?: () => void) => void;
+type ScrollToRowFn = (index: number, done?: () => void) => void;
 
 const scrollCallbacks = new Map<HTMLElement, ScrollToRowFn>();
 

@@ -29,7 +29,7 @@ import {
   planPasteMarkdownTrees,
 } from "./FileDropZone";
 
-export type DragItemType = {
+type DragItemType = {
   path: ViewPath;
   isSuggestion?: boolean;
   isCopyDrag?: boolean;

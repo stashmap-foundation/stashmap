@@ -6,17 +6,6 @@ export type MultiSelectionState = {
   anchor: string;
 };
 
-export function selectSingle(
-  _state: MultiSelectionState,
-  viewKey: string
-): MultiSelectionState {
-  return {
-    baseSelection: OrderedSet<string>([viewKey]),
-    shiftSelection: OrderedSet<string>(),
-    anchor: viewKey,
-  };
-}
-
 export function toggleSelect(
   state: MultiSelectionState,
   viewKey: string

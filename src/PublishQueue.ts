@@ -49,7 +49,7 @@ export type QueueStatus = {
   }>;
 };
 
-export type PublishQueueConfig = {
+type PublishQueueConfig = {
   readonly db: StashmapDB | null;
   readonly debounceMs?: number;
   readonly batchSize?: number;
@@ -57,7 +57,7 @@ export type PublishQueueConfig = {
   readonly onResults: (results: PublishResultsEventMap) => void;
 };
 
-export type PublishQueue = {
+type PublishQueue = {
   readonly enqueue: (events: List<UnsignedEvent & EventAttachment>) => void;
   readonly getStatus: () => QueueStatus;
   readonly init: () => Promise<void>;

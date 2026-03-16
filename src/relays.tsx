@@ -12,12 +12,10 @@ import {
 
 export {
   flattenRelays,
-  getReadRelays,
   getWriteRelays,
   mergeRelays,
   sanitizeRelays,
   sanitizeRelayUrl,
-  findRelays,
 } from "./relayUtils";
 
 export function getSuggestedRelays(

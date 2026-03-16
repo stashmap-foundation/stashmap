@@ -1,18 +1,14 @@
 import { useEffect, useState, useRef } from "react";
 import { Event, Filter, SimplePool } from "nostr-tools";
 import { Map, OrderedMap } from "immutable";
-import {
-  getMostRecentReplacableEvent,
-  sanitizeAuthorsFilter,
-} from "../nostrEvents";
-import { createRelaysQuery, findAllRelays } from "../relayUtils";
+import { sanitizeAuthorsFilter } from "../nostrEvents";
 
-export type EventQueryResult = {
+type EventQueryResult = {
   events: OrderedMap<string, Event>;
   eose: boolean;
 };
 
-export type EventQueryProps = {
+type EventQueryProps = {
   enabled?: boolean;
   readFromRelays?: Array<Relay>;
   discardOld?: boolean;
@@ -114,33 +110,4 @@ export function useEventQuery(
     events,
     eose,
   };
-}
-
-export function useRelaysQuery(
-  simplePool: SimplePool,
-  authors: Array<string>,
-  enabled: boolean,
-  startingRelays: Array<Relay>
-): {
-  relays: Array<Relay>;
-  eose: boolean;
-} {
-  const { events, eose } = useEventQuery(
-    simplePool,
-    [createRelaysQuery(authors)],
-    {
-      enabled,
-      readFromRelays: startingRelays,
-    }
-  );
-
-  if (!eose) {
-    return { relays: startingRelays, eose };
-  }
-  const newestEvent = getMostRecentReplacableEvent(events);
-
-  if (newestEvent) {
-    return { relays: findAllRelays(newestEvent), eose };
-  }
-  return { relays: startingRelays, eose };
 }

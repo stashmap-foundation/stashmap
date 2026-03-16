@@ -1,7 +1,6 @@
 import { UnsignedEvent } from "nostr-tools";
 import { shortID } from "./connections";
 import { createHeadlessPlan } from "./core/headlessPlan";
-import { MarkdownImportFile, parseMarkdownImportFiles } from "./markdownImport";
 import { planCreateNodesFromMarkdownTrees } from "./markdownPlan";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
 import { buildDocumentEventFromNodes } from "./relationsDocumentEvent";
@@ -56,50 +55,4 @@ export function buildDocumentEventFromMarkdownTree(
   event: UnsignedEvent;
 } {
   return buildDocumentEventFromRootTree(author, rootTree);
-}
-
-export function buildStandaloneRootDocumentEvent(
-  author: PublicKey,
-  title: string,
-  systemRole?: RootSystemRole
-): {
-  relationID: LongID;
-  rootUuid: string;
-  event: UnsignedEvent;
-} {
-  return buildDocumentEventFromRootTree(author, {
-    text: title,
-    children: [],
-    ...(systemRole ? { systemRole } : {}),
-  });
-}
-
-export function buildImportedMarkdownDocumentEvent(
-  author: PublicKey,
-  file: MarkdownImportFile
-): {
-  relationID: LongID;
-  rootUuid: string;
-  event: UnsignedEvent;
-} {
-  const roots = parseMarkdownImportFiles([file]).filter((root) => !root.hidden);
-  const rootTree = roots[0];
-  if (!rootTree || roots.length !== 1) {
-    throw new Error("Markdown upload must resolve to exactly one root tree");
-  }
-  return buildDocumentEventFromRootTree(author, rootTree);
-}
-
-export function buildSingleRootMarkdownDocumentEvent(
-  author: PublicKey,
-  markdown: string
-): {
-  relationID: LongID;
-  rootUuid: string;
-  event: UnsignedEvent;
-} {
-  return buildDocumentEventFromRootTree(
-    author,
-    requireSingleRootMarkdownTree(markdown)
-  );
 }

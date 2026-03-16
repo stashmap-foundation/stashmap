@@ -308,16 +308,6 @@ export const removeStoredDelete = (
     request.onerror = () => reject(request.error);
   });
 
-export const getSyncCheckpoints = (
-  db: StashmapDB
-): Promise<ReadonlyArray<SyncCheckpointRecord>> =>
-  new Promise((resolve, reject) => {
-    const request = txStore(db, SYNC_CHECKPOINT_STORE, "readonly").getAll();
-    request.onsuccess = () =>
-      resolve(request.result as ReadonlyArray<SyncCheckpointRecord>);
-    request.onerror = () => reject(request.error);
-  });
-
 export const getSyncCheckpoint = (
   db: StashmapDB,
   author: PublicKey

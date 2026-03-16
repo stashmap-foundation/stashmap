@@ -11,7 +11,6 @@ type Context = {
   user: User | undefined;
   setUser: (user: User | undefined) => void;
   defaultRelays: Relays;
-  defaultPaneRoot?: LongID;
 };
 
 const NostrAuthContext = React.createContext<Context | undefined>(undefined);
@@ -58,14 +57,6 @@ export function useDefaultRelays(): Relays {
     throw new Error("NostrAuthContext missing");
   }
   return context.defaultRelays;
-}
-
-export function useDefaultPaneRoot(): LongID | undefined {
-  const context = React.useContext(NostrAuthContext);
-  if (!context) {
-    throw new Error("NostrAuthContext missing");
-  }
-  return context.defaultPaneRoot;
 }
 
 function userFromPrivateKey(privateKey: string): User {
@@ -131,11 +122,9 @@ export function useLogout(): () => void {
 
 export function NostrAuthContextProvider({
   defaultRelayUrls,
-  defaultPaneRoot,
   children,
 }: {
   defaultRelayUrls?: Array<string>;
-  defaultPaneRoot?: LongID;
   children: React.ReactNode;
 }): JSX.Element {
   const { fileStore } = useApis();
@@ -167,7 +156,6 @@ export function NostrAuthContextProvider({
         setUser,
         user,
         defaultRelays: relays,
-        defaultPaneRoot,
       }}
     >
       {children}

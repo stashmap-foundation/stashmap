@@ -152,7 +152,7 @@ function resolveStandaloneRelationFromSemanticPath(
     ?.relation;
 }
 
-export type ResolvedStack = {
+type ResolvedStack = {
   actualStack: ID[];
   relation?: GraphNode;
 };

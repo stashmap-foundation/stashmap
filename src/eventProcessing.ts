@@ -5,7 +5,7 @@ import { buildKnowledgeDBFromDocumentEvents } from "./documentMaterialization";
 import { newDB } from "./knowledge";
 import { findRelays } from "./relayUtils";
 
-export type ProcessedEvents = {
+type ProcessedEvents = {
   knowledgeDB: KnowledgeData;
   contacts: Contacts;
   relays: Relays;

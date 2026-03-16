@@ -5,7 +5,7 @@ import { decodePublicKeyInputSync } from "../nostrPublicKeys";
 import { DEFAULT_RELAYS } from "../nostr";
 import { requireValue } from "./args";
 
-export type InitCliArgs = {
+type InitCliArgs = {
   readonly: boolean;
   asUser?: PublicKey;
   doc?: string;
@@ -13,7 +13,7 @@ export type InitCliArgs = {
   help: boolean;
 };
 
-export type InitResult = {
+type InitResult = {
   config_path: string;
   pubkey: string;
   npub: string;
@@ -32,7 +32,7 @@ function parsePublicKeyArg(value: string, flagName: string): PublicKey {
   return decoded;
 }
 
-export function parseInitArgs(args: string[]): InitCliArgs {
+function parseInitArgs(args: string[]): InitCliArgs {
   const parse = (index: number, current: InitCliArgs): InitCliArgs => {
     const arg = args[index];
     if (!arg) {

@@ -5,7 +5,7 @@ import { findAllTags, getMostRecentReplacableEvent } from "./nostrEvents";
 
 type FollowList = Array<Contact>;
 
-export function parseFollowListEvent(event: UnsignedEvent): FollowList {
+function parseFollowListEvent(event: UnsignedEvent): FollowList {
   const contactListTags = findAllTags(event, "p");
   if (!contactListTags) {
     return [];

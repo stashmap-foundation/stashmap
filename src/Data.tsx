@@ -187,7 +187,7 @@ export const KIND_SEARCH = [KIND_KNOWLEDGE_DOCUMENT];
 
 export const KINDS_META = [KIND_SETTINGS, KIND_CONTACTLIST];
 
-export function useRelaysInfo(
+function useRelaysInfo(
   relays: Array<Relay>,
   eose: boolean
 ): Map<string, RelayInformation | undefined> {

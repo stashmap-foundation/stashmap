@@ -126,7 +126,6 @@ function getChildrenForRegularNode(
   const visibleAuthors = data.contacts
     .keySeq()
     .toSet()
-    .union(data.projectMembers.keySeq().toSet())
     .add(data.user.publicKey)
     .add(author)
     .add(effectiveAuthor);

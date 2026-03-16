@@ -150,7 +150,6 @@ function PermanentDocumentSyncBridge({
   db,
   myself,
   contacts,
-  projectMembers,
   extraAuthors,
   defaultRelays,
   userRelays,
@@ -159,7 +158,6 @@ function PermanentDocumentSyncBridge({
   db: StashmapDB | null | undefined;
   myself: PublicKey;
   contacts: Contacts;
-  projectMembers: Members;
   extraAuthors: PublicKey[];
   defaultRelays: Relays;
   userRelays: Relays;
@@ -172,7 +170,6 @@ function PermanentDocumentSyncBridge({
     db: db || null,
     myself,
     contacts,
-    projectMembers,
     extraAuthors,
     addLiveEvents,
     defaultRelays,
@@ -366,8 +363,6 @@ function Data({ user, children }: DataProps): JSX.Element {
     isRelaysLoaded
   );
 
-  const projectMembers = Map<PublicKey, Member>();
-
   return (
     <DataContextProvider
       contacts={contacts}
@@ -379,7 +374,6 @@ function Data({ user, children }: DataProps): JSX.Element {
       publishEventsStatus={newEventsAndPublishResults}
       views={views}
       panes={panes}
-      projectMembers={projectMembers}
     >
       <DocumentStoreProvider
         db={db || null}
@@ -389,7 +383,6 @@ function Data({ user, children }: DataProps): JSX.Element {
           db={db}
           myself={myPublicKey}
           contacts={contacts}
-          projectMembers={projectMembers}
           extraAuthors={[
             ...new globalThis.Set(
               panes.flatMap((pane) =>

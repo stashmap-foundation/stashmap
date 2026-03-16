@@ -14,7 +14,6 @@ export function usePermanentDocumentSync({
   db,
   myself,
   contacts,
-  projectMembers,
   extraAuthors = [],
   addLiveEvents,
   defaultRelays,
@@ -25,7 +24,6 @@ export function usePermanentDocumentSync({
   db: StashmapDB | null;
   myself: PublicKey;
   contacts: Contacts;
-  projectMembers: Members;
   extraAuthors?: PublicKey[];
   addLiveEvents?: (events: Map<string, Event | UnsignedEvent>) => void;
   defaultRelays: Relays;
@@ -37,11 +35,11 @@ export function usePermanentDocumentSync({
     () =>
       [
         ...new globalThis.Set([
-          ...buildPermanentSyncAuthors(myself, contacts, projectMembers),
+          ...buildPermanentSyncAuthors(myself, contacts),
           ...extraAuthors,
         ]),
       ].sort(),
-    [myself, contacts, projectMembers, extraAuthors]
+    [myself, contacts, extraAuthors]
   );
   const relayUrls = useMemo(
     () =>

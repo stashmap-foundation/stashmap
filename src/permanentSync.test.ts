@@ -46,11 +46,10 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
-test("buildPermanentSyncAuthors includes user and deduplicates contacts/members", () => {
+test("buildPermanentSyncAuthors includes user and deduplicates contacts", () => {
   const authors = buildPermanentSyncAuthors(
     ALICE,
-    Map([[BOB, { publicKey: BOB }]]),
-    Map([[ALICE, { publicKey: ALICE, votes: 1 }]])
+    Map([[BOB, { publicKey: BOB }]])
   );
 
   expect(authors).toEqual([ALICE, BOB]);

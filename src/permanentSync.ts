@@ -37,16 +37,9 @@ type PermanentSyncState = {
 
 export function buildPermanentSyncAuthors(
   myself: PublicKey,
-  contacts: Contacts,
-  projectMembers: Members
+  contacts: Contacts
 ): PublicKey[] {
-  return contacts
-    .keySeq()
-    .toSet()
-    .union(projectMembers.keySeq().toSet())
-    .add(myself)
-    .toArray()
-    .sort();
+  return contacts.keySeq().toSet().add(myself).toArray().sort();
 }
 
 export function buildPermanentSyncFilters(authors: PublicKey[]): Filter[] {

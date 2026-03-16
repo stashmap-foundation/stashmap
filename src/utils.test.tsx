@@ -227,7 +227,6 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
     userRelays: [{ url: "wss://user.relay", read: true, write: true }],
     contactsRelays: [{ url: "wss://contacts.relay", read: true, write: true }],
   },
-  projectMembers: Map<PublicKey, Member>(),
   panes: [{ id: "pane-0", stack: [], author: ALICE.publicKey }],
 };
 
@@ -312,7 +311,6 @@ function TestPublishProvider({
       relaysInfos={initialDataContextProps.relaysInfos}
       publishEventsStatus={publishEventsStatus}
       views={views}
-      projectMembers={initialDataContextProps.projectMembers}
       panes={initialDataContextProps.panes}
     >
       <DocumentStoreProvider
@@ -351,8 +349,6 @@ export function renderApis(
       options?.publishEventsStatus ||
       DEFAULT_DATA_CONTEXT_PROPS.publishEventsStatus,
     views: options?.views || DEFAULT_DATA_CONTEXT_PROPS.views,
-    projectMembers:
-      options?.projectMembers || DEFAULT_DATA_CONTEXT_PROPS.projectMembers,
     panes: options?.panes || DEFAULT_DATA_CONTEXT_PROPS.panes,
   };
 

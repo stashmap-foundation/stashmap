@@ -503,26 +503,26 @@ function getSharesFromPublicKey(publicKey: PublicKey): number {
   return 10000; // TODO: implement
 }
 
-// Check if an item matches a filter type (relevance, argument, or contains)
-export function itemMatchesType(
-  item: GraphNode,
+// Check if a node matches a filter type (relevance, argument, or contains)
+export function nodeMatchesType(
+  node: GraphNode,
   filterType: Relevance | Argument | "contains"
 ): boolean {
   if (filterType === "confirms" || filterType === "contra") {
-    return item.argument === filterType;
+    return node.argument === filterType;
   }
   if (filterType === "contains") {
-    return item.relevance === undefined && item.argument === undefined;
+    return node.relevance === undefined && node.argument === undefined;
   }
-  return item.relevance === filterType;
+  return node.relevance === filterType;
 }
 
 export function isEmptySemanticID(semanticID: ID): boolean {
   return semanticID === EMPTY_SEMANTIC_ID;
 }
 
-export function itemPassesFilters(
-  item: GraphNode,
+export function nodePassesFilters(
+  node: GraphNode,
   activeFilters: (
     | Relevance
     | Argument
@@ -532,12 +532,12 @@ export function itemPassesFilters(
     | "contains"
   )[]
 ): boolean {
-  if (isEmptySemanticID(item.id)) {
+  if (isEmptySemanticID(node.id)) {
     return true;
   }
 
   const relevanceFilter =
-    item.relevance === undefined ? "contains" : item.relevance;
+    node.relevance === undefined ? "contains" : node.relevance;
   if (!activeFilters.includes(relevanceFilter)) {
     return false;
   }
@@ -545,7 +545,7 @@ export function itemPassesFilters(
   const hasArgumentFilter =
     activeFilters.includes("confirms") || activeFilters.includes("contra");
   if (hasArgumentFilter) {
-    if (!item.argument || !activeFilters.includes(item.argument)) {
+    if (!node.argument || !activeFilters.includes(node.argument)) {
       return false;
     }
   }
@@ -555,7 +555,7 @@ export function itemPassesFilters(
 
 type EmptyNodeData = {
   index: number;
-  nodeItem: GraphNode;
+  emptyNode: GraphNode;
   paneIndex: number;
 };
 
@@ -568,7 +568,7 @@ export function computeEmptyNodeMetadata(
     if (event.type === "ADD_EMPTY_NODE") {
       return metadata.set(event.nodeID, {
         index: event.index,
-        nodeItem: event.nodeItem,
+        emptyNode: event.emptyNode,
         paneIndex: event.paneIndex,
       });
     }

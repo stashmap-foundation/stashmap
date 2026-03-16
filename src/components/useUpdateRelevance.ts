@@ -1,5 +1,5 @@
 import { usePlanner } from "../planner";
-import { usePaneStack } from "../SplitPanesContext";
+import { usePaneStack } from "../features/navigation/SplitPanesContext";
 import { planDisconnectFromParent } from "../treeMutations";
 import { useNodeItemContext } from "./useNodeItemContext";
 

@@ -1,5 +1,8 @@
 import { CSSProperties } from "react";
-import { useIsViewingOtherUserContent, useCurrentEdge } from "../ViewContext";
+import {
+  useCurrentEdge,
+  useIsViewingOtherUserContent,
+} from "../features/tree/RowContext";
 import { isRefNode } from "../connections";
 import { TYPE_COLORS } from "../constants";
 

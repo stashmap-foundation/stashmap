@@ -1,5 +1,6 @@
 import { List } from "immutable";
-import { newNode, RowPath } from "../ViewContext";
+import { newNode } from "../nodeFactory";
+import { type RowPath } from "../rows/rowPaths";
 import { execute } from "../executor";
 import { createPlan, planUpsertNodes } from "../planner";
 import { processEvents } from "../eventProcessing";

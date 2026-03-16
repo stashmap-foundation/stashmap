@@ -12,7 +12,7 @@ import { MergeKnowledgeDB, useData } from "./DataContext";
 import { deduplicateRefsByContext, findRefsToNode } from "./semanticProjection";
 import { useReadRelays } from "./relays";
 import { useSearchQuery, filterForKeyword } from "./components/SearchModal";
-import { useCurrentPane } from "./SplitPanesContext";
+import { useCurrentPane } from "./features/navigation/SplitPanesContext";
 import { newDB } from "./knowledge";
 
 function getAllNodesFromDBs(knowledgeDBs: KnowledgeDBs): Map<string, TextSeed> {

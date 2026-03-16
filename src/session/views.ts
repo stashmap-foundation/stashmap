@@ -6,7 +6,7 @@ import {
   parseRowPath,
   RowPath,
   rowPathToString,
-} from "./rowPaths";
+} from "../rows/rowPaths";
 
 function getDefaultView(id: ID, isRootNode: boolean): View {
   return {

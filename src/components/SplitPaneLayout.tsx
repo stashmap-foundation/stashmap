@@ -8,18 +8,20 @@ import {
   usePaneIndex,
   useCurrentPane,
   generatePaneId,
-} from "../SplitPanesContext";
+} from "../features/navigation/SplitPanesContext";
+import { RootViewContextProvider } from "../features/tree/RowContext";
 import {
-  RootViewContextProvider,
+  planUpdateViews,
   updateRowPathsAfterPaneDelete,
-} from "../ViewContext";
+} from "../session/views";
 import { LoadSearchData } from "../LoadSearchData";
 import { PaneView } from "./Workspace";
 import { EMPTY_SEMANTIC_ID, createSearchId } from "../connections";
-import { planUpdateViews, planUpdatePanes, usePlanner } from "../planner";
+import { usePlanner } from "../planner";
 import { useData } from "../DataContext";
 import { isUserLoggedIn, useLogout } from "../NostrAuthContext";
 import { useDragAutoScroll } from "../useDragAutoScroll";
+import { planUpdatePanes } from "../session/panes";
 
 export function PaneSearchButton(): JSX.Element {
   const { setPane } = useSplitPanes();
@@ -241,7 +243,7 @@ function PaneContent(): JSX.Element {
   const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
   const { user } = useData();
-  const rootItemID = pane.stack[pane.stack.length - 1] || EMPTY_SEMANTIC_ID;
+  const rootNodeID = pane.stack[pane.stack.length - 1] || EMPTY_SEMANTIC_ID;
 
   const isOtherUserContent = pane.author !== user.publicKey;
 
@@ -253,7 +255,7 @@ function PaneContent(): JSX.Element {
     <div className={paneClassName} data-pane-index={paneIndex}>
       <LoadSearchData itemIDs={pane.stack}>
         <RootViewContextProvider
-          root={rootItemID as LongID}
+          root={rootNodeID as LongID}
           paneIndex={paneIndex}
         >
           <PaneView />

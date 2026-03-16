@@ -139,11 +139,6 @@
                   },
                   {
                     "target": "./src/session",
-                    "from": "./src/rows",
-                    "message": "session must not import rows."
-                  },
-                  {
-                    "target": "./src/session",
                     "from": "./src/app",
                     "message": "session must not import app."
                   },

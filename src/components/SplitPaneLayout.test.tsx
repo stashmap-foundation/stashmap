@@ -1,7 +1,7 @@
 import React from "react";
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { PaneIndexProvider } from "../SplitPanesContext";
+import { PaneIndexProvider } from "../features/navigation/SplitPanesContext";
 import { ClosePaneButton } from "./SplitPaneLayout";
 import {
   ALICE,

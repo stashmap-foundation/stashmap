@@ -136,6 +136,32 @@ I’d structure the first pass like this:
 - Moved the view-only `VirtualRowsMap` type from `src/ViewContext.tsx` into `src/rows/types.ts`
   - `src/ViewContext.tsx` currently re-exports the type to keep existing imports stable
 
+- Moved `RowPath` primitives from `src/session/rowPaths.ts` into `src/rows/rowPaths.ts`
+  - `src/session/rowPaths.ts` currently re-exports them as a compatibility shim
+
+- Introduced dedicated row modules:
+  - `src/rows/resolveRow.ts`
+  - `src/rows/display.ts`
+  - row-layer callers are now starting to import from these directly instead of `src/ViewContext.tsx`
+
+- Emptied `src/ViewContext.tsx`
+  - all function implementations were moved out
+  - all callers were rewired to the new module homes
+  - `src/ViewContext.tsx` has now been deleted
+  - React row context/hooks moved to `src/features/tree/RowContext.tsx`
+  - `upsertNodes` moved to `src/app/actions.ts`
+
+- Moved navigation React contexts into `src/features/navigation`
+  - `src/features/navigation/SplitPanesContext.tsx`
+  - `src/features/navigation/NavigationStateContext.tsx`
+  - all callers were rewired away from the old flat `src` files
+  - `src/SplitPanesContext.tsx` and `src/NavigationStateContext.tsx` have now been deleted
+
+- Moved tree projection into `src/rows/projectTree.ts`
+  - `getTreeChildren` and `getNodesInTree` now live in the `rows` layer
+  - callers were rewired away from `src/treeTraversal.ts`
+  - `src/treeTraversal.ts` has now been deleted
+
 - Renamed row-address primitives from `ViewPath` to `RowPath`
   - renamed:
     - `ViewPath` -> `RowPath`
@@ -145,11 +171,13 @@ I’d structure the first pass like this:
     - `useViewPath` -> `useRowPath`
   - this was kept in `src/session/rowPaths.ts` for now to avoid reopening layer rules mid-move
 
-## Current Blockers
+## Resolved
 
-- Row resolution is still mixed into `src/ViewContext.tsx`
-  - even with `RowPath` naming in place, functions like `getRowIDFromView`, `getCurrentEdgeForView`, and `getDisplayTextForView` still mix row resolution, graph lookup, and React-adjacent exports
-  - the next step is to decide whether `src/session/rowPaths.ts` should stay in `session` or move into `rows`
+- Row resolution no longer lives in `src/ViewContext.tsx`
+  - `RowPath` moved into `src/rows/rowPaths.ts`
+  - row resolution moved into `src/rows/resolveRow.ts`
+  - row display moved into `src/rows/display.ts`
+  - React row context/hooks moved into `src/features/tree/RowContext.tsx`
 
 And the rule for ambiguous cases should be:
 

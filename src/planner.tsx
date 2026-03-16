@@ -42,20 +42,25 @@ import {
   LOG_ROOT_ROLE,
 } from "./systemRoots";
 import {
-  newNode,
-  upsertNodes,
-  RowPath,
   getRowIDFromView,
   getContext,
-  getParentRowPath,
-  bulkUpdateRowPathsAfterAddNode,
-  copyViewsWithNodesMapping,
-  rowPathToString,
   getNodeForView,
   addNodeToPathWithNodes,
+} from "./rows/resolveRow";
+import {
   getPaneIndex,
-} from "./ViewContext";
-import { newRefNode } from "./nodeFactory";
+  getParentRowPath,
+  type RowPath,
+  rowPathToString,
+} from "./rows/rowPaths";
+import {
+  bulkUpdateRowPathsAfterAddNode,
+  copyViewsWithNodesMapping,
+  planExpandNode,
+  planUpdateViews,
+} from "./session/views";
+import { newNode, newRefNode } from "./nodeFactory";
+import { upsertNodes } from "./app/actions";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useRelaysToCreatePlan } from "./relays";
 import { mergePublishResultsOfEvents } from "./commons/PublishingStatus";
@@ -63,7 +68,6 @@ import { createRootAnchor } from "./rootAnchor";
 import { withUsersEntryPublicKey, getNodeUserPublicKey } from "./userEntry";
 import { decodePublicKeyInputSync } from "./nostrPublicKeys";
 import { getPane, planUpdatePanes } from "./session/panes";
-import { planExpandNode, planUpdateViews } from "./session/views";
 
 function getAnchorSnapshotLabels(
   knowledgeDBs: KnowledgeDBs,
@@ -86,16 +90,6 @@ function getAnchorSnapshotLabels(
 }
 
 export { getPane } from "./session/panes";
-export { planUpdatePanes } from "./session/panes";
-export { planSetRowFocusIntent } from "./session/focus";
-export {
-  planClearTemporarySelection,
-  planSelectAllTemporaryRows,
-  planSetTemporarySelectionState,
-  planShiftTemporarySelection,
-  planToggleTemporarySelection,
-} from "./session/selection";
-export { planExpandNode, planUpdateViews } from "./session/views";
 
 type GraphPlanData = Pick<
   Data,
@@ -1121,8 +1115,8 @@ export function planSaveNodeAndEnsureNodes(
       parentPath,
       stack,
       emptyNodeIndex,
-      relevance ?? metadata?.nodeItem.relevance,
-      argument ?? metadata?.nodeItem.argument
+      relevance ?? metadata?.emptyNode.relevance,
+      argument ?? metadata?.emptyNode.argument
     );
     return { plan: resultPlan, rowPath };
   }
@@ -1615,7 +1609,7 @@ export function planSetEmptyNodePosition(
       type: "ADD_EMPTY_NODE",
       nodeID: nodes.id,
       index: insertIndex,
-      nodeItem: {
+      emptyNode: {
         children: List<ID>(),
         id: EMPTY_SEMANTIC_ID,
         text: "",
@@ -1643,10 +1637,10 @@ export function planUpdateEmptyNodeMetadata(
     return plan;
   }
 
-  const updatedNodeItem: GraphNode = {
-    ...existing.nodeItem,
-    relevance: metadata.relevance ?? existing.nodeItem.relevance,
-    argument: metadata.argument ?? existing.nodeItem.argument,
+  const updatedEmptyNode: GraphNode = {
+    ...existing.emptyNode,
+    relevance: metadata.relevance ?? existing.emptyNode.relevance,
+    argument: metadata.argument ?? existing.emptyNode.argument,
   };
 
   return {
@@ -1655,7 +1649,7 @@ export function planUpdateEmptyNodeMetadata(
       type: "ADD_EMPTY_NODE",
       nodeID,
       index: existing.index,
-      nodeItem: updatedNodeItem,
+      emptyNode: updatedEmptyNode,
       paneIndex: existing.paneIndex,
     }),
   };

@@ -113,7 +113,7 @@ declare global {
         type: "ADD_EMPTY_NODE";
         nodeID: LongID;
         index: number;
-        nodeItem: GraphNode;
+        emptyNode: GraphNode;
         paneIndex: number;
       }
     | { type: "REMOVE_EMPTY_NODE"; nodeID: LongID };

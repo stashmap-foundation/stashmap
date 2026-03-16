@@ -5,22 +5,18 @@ import { NativeTypes } from "react-dnd-html5-backend";
 import { dnd, getDropDestinationFromTreeView } from "../dnd";
 import { isEmptySemanticID } from "../connections";
 import { deselectAllChildren, useTemporaryView } from "./TemporaryViewContext";
-import {
-  Plan,
-  planSetTemporarySelectionState,
-  planUpdatePanes,
-  usePlanner,
-} from "../planner";
-import {
-  RowPath,
-  buildPaneTarget,
-  getRowIDFromView,
-  getParentKey,
-  useRowPath,
-  rowPathToString,
-} from "../ViewContext";
+import { Plan, usePlanner } from "../planner";
+import { buildPaneTarget, getRowIDFromView } from "../rows/resolveRow";
+import { type RowPath, rowPathToString } from "../rows/rowPaths";
+import { planUpdatePanes } from "../session/panes";
+import { planSetTemporarySelectionState } from "../session/selection";
+import { getParentKey } from "../session/views";
+import { useRowPath } from "../features/tree/RowContext";
 import { NOTE_TYPE, INDENTATION } from "./Node";
-import { usePaneStack, useCurrentPane } from "../SplitPanesContext";
+import {
+  usePaneStack,
+  useCurrentPane,
+} from "../features/navigation/SplitPanesContext";
 import {
   buildRootTreeForEmptyRootDrop,
   MarkdownImportFile,
@@ -81,7 +77,7 @@ function getFilesFromNativeDrop(item: NativeFileDropItem): File[] {
 function planMaterializeImportedRoot(
   plan: Plan,
   paneIndex: number,
-  rootItemID: ID
+  rootNodeID: ID
 ): Plan {
   const updatedPanes = plan.panes.map((paneState, idx) => {
     if (idx !== paneIndex) {
@@ -89,7 +85,7 @@ function planMaterializeImportedRoot(
     }
     return {
       ...paneState,
-      stack: [rootItemID],
+      stack: [rootNodeID],
       rootNodeId: undefined,
     };
   });
@@ -428,12 +424,12 @@ export function useDroppable({
             }
             const [planWithMarkdown, topItemIDs] =
               planCreateNodesFromMarkdownTrees(plan, [rootTree]);
-            const rootItemID = topItemIDs[0];
-            if (!rootItemID) {
+            const rootNodeID = topItemIDs[0];
+            if (!rootNodeID) {
               return;
             }
             await executePlan(
-              planMaterializeImportedRoot(planWithMarkdown, path[0], rootItemID)
+              planMaterializeImportedRoot(planWithMarkdown, path[0], rootNodeID)
             );
             return;
           }

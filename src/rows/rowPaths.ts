@@ -14,24 +14,24 @@ function decodePathID(encoded: string): string {
 export function parseRowPath(path: string): RowPath {
   const pieces = path.split(":");
   if (pieces.length < 2) {
-    throw new Error("Invalid view path");
+    throw new Error("Invalid row path");
   }
 
   const panePart = pieces[0];
   if (!panePart.startsWith("p")) {
-    throw new Error("Invalid view path");
+    throw new Error("Invalid row path");
   }
 
   const paneIndex = parseInt(panePart.substring(1), 10);
   if (Number.isNaN(paneIndex)) {
-    throw new Error("Invalid view path");
+    throw new Error("Invalid row path");
   }
 
   const pathPieces = pieces
     .slice(1)
     .map((piece) => decodePathID(piece) as RowPathSegment);
   if (pathPieces.length === 0) {
-    throw new Error("Invalid view path");
+    throw new Error("Invalid row path");
   }
 
   return [paneIndex, ...pathPieces];

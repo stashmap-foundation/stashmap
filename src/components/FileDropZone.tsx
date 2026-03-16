@@ -1,4 +1,4 @@
-import { RowPath } from "../ViewContext";
+import { type RowPath } from "../rows/rowPaths";
 import { Plan, ParsedLine, parseClipboardText } from "../planner";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "../markdownDocument";
 import { planInsertMarkdownTrees } from "../markdownPlan";

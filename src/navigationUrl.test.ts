@@ -1,7 +1,7 @@
 import { List, Map } from "immutable";
 import { shortID } from "./connections";
 import { newDB } from "./knowledge";
-import { newNode } from "./ViewContext";
+import { newNode } from "./nodeFactory";
 import {
   buildNodeUrl,
   pathToStack,

@@ -2,16 +2,16 @@ import React, { useEffect, useRef } from "react";
 import { ConnectableElement, useDrag } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
 import {
-  RowPath,
+  useCurrentEdge,
+  useCurrentNode,
+  useCurrentRowID,
+  useDisplayText,
   useIsInSearchView,
+  useIsViewingOtherUserContent,
   useRowPath,
   useViewKey,
-  useCurrentRowID,
-  useCurrentNode,
-  useDisplayText,
-  useIsViewingOtherUserContent,
-  useCurrentEdge,
-} from "../ViewContext";
+} from "../features/tree/RowContext";
+import { type RowPath } from "../rows/rowPaths";
 import { isEmptySemanticID } from "../connections";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";

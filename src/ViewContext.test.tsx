@@ -20,15 +20,13 @@ import {
   renderTree,
   type,
 } from "./utils.test";
+import { parseRowPath, rowPathToString, RowPath } from "./rows/rowPaths";
 import {
-  parseRowPath,
-  rowPathToString,
   updateRowPathsAfterDisconnect,
+  updateRowPathsAfterMoveNodes,
   updateRowPathsAfterPaneDelete,
   updateRowPathsAfterPaneInsert,
-  updateRowPathsAfterMoveNodes,
-  RowPath,
-} from "./ViewContext";
+} from "./session/views";
 
 test("Move View Settings on Delete", async () => {
   const [alice] = setup([ALICE]);

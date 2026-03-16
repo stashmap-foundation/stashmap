@@ -1,18 +1,17 @@
 import React from "react";
 import { TYPE_COLORS } from "../constants";
 import { useUpdateArgument } from "./useUpdateArgument";
+import { parseRowPath, type RowPath } from "../rows/rowPaths";
 import {
-  RowPath,
-  useRowPath,
-  parseRowPath,
+  useCurrentEdge,
   useCurrentNode,
   useDisplayText,
+  useRowPath,
   useViewKey,
-  useCurrentEdge,
   useVirtualRowsMap,
-} from "../ViewContext";
+} from "../features/tree/RowContext";
 import { usePlanner } from "../planner";
-import { usePaneStack } from "../SplitPanesContext";
+import { usePaneStack } from "../features/navigation/SplitPanesContext";
 import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
 import { useTemporaryView } from "./TemporaryViewContext";

@@ -12,7 +12,8 @@ import {
   planUpsertNodes,
 } from "./planner";
 import { newNode } from "./nodeFactory";
-import { getNodeForView, RowPath } from "./ViewContext";
+import { getNodeForView } from "./rows/resolveRow";
+import { type RowPath } from "./rows/rowPaths";
 
 export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
   plan: T,

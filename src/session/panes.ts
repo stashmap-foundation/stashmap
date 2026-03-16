@@ -1,4 +1,4 @@
-import type { RowPath } from "./rowPaths";
+import type { RowPath } from "../rows/rowPaths";
 
 export function generatePaneId(): string {
   return `pane-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -20,10 +20,10 @@ export function planUpdatePanes<T extends HasPanes>(plan: T, panes: Pane[]): T {
   };
 }
 
-export function defaultPane(author: PublicKey, rootItemID?: ID): Pane {
+export function defaultPane(author: PublicKey, rootNodeID?: ID): Pane {
   return {
     id: generatePaneId(),
-    stack: rootItemID ? [rootItemID] : [],
+    stack: rootNodeID ? [rootNodeID] : [],
     author,
   };
 }

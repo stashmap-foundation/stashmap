@@ -16,7 +16,7 @@ import {
   type,
   type UpdateState,
 } from "../utils.test";
-import { itemMatchesType } from "../connections";
+import { nodeMatchesType } from "../connections";
 
 function makeItem(
   id: ID,
@@ -151,53 +151,53 @@ async function setupLocalOutgoingRefOnCrypto(
   await navigateToNodeViaSearch(0, "Crypto");
 }
 
-describe("itemMatchesType", () => {
+describe("nodeMatchesType", () => {
   test("matches relevant children", () => {
     const item = makeItem("test" as ID, "relevant");
-    expect(itemMatchesType(item, "relevant")).toBe(true);
-    expect(itemMatchesType(item, "contains")).toBe(false);
+    expect(nodeMatchesType(item, "relevant")).toBe(true);
+    expect(nodeMatchesType(item, "contains")).toBe(false);
   });
 
   test("matches maybe_relevant children", () => {
     const item = makeItem("test" as ID, "maybe_relevant");
-    expect(itemMatchesType(item, "maybe_relevant")).toBe(true);
-    expect(itemMatchesType(item, "relevant")).toBe(false);
+    expect(nodeMatchesType(item, "maybe_relevant")).toBe(true);
+    expect(nodeMatchesType(item, "relevant")).toBe(false);
   });
 
   test("matches contains children with undefined relevance", () => {
     const item = makeItem("test" as ID, undefined);
-    expect(itemMatchesType(item, "contains")).toBe(true);
-    expect(itemMatchesType(item, "relevant")).toBe(false);
+    expect(nodeMatchesType(item, "contains")).toBe(true);
+    expect(nodeMatchesType(item, "relevant")).toBe(false);
   });
 
   test("matches little_relevant children", () => {
     const item = makeItem("test" as ID, "little_relevant");
-    expect(itemMatchesType(item, "little_relevant")).toBe(true);
-    expect(itemMatchesType(item, "contains")).toBe(false);
+    expect(nodeMatchesType(item, "little_relevant")).toBe(true);
+    expect(nodeMatchesType(item, "contains")).toBe(false);
   });
 
   test("matches not_relevant children", () => {
     const item = makeItem("test" as ID, "not_relevant");
-    expect(itemMatchesType(item, "not_relevant")).toBe(true);
-    expect(itemMatchesType(item, "contains")).toBe(false);
+    expect(nodeMatchesType(item, "not_relevant")).toBe(true);
+    expect(nodeMatchesType(item, "contains")).toBe(false);
   });
 
   test("contains filter only matches children with undefined relevance AND undefined argument", () => {
     const itemWithArg = makeItem("test" as ID, undefined, "confirms");
-    expect(itemMatchesType(itemWithArg, "contains")).toBe(false);
+    expect(nodeMatchesType(itemWithArg, "contains")).toBe(false);
 
     const itemWithoutArg = makeItem("test" as ID, undefined);
-    expect(itemMatchesType(itemWithoutArg, "contains")).toBe(true);
+    expect(nodeMatchesType(itemWithoutArg, "contains")).toBe(true);
   });
 
   test("matches argument types correctly", () => {
     const confirmItem = makeItem("test" as ID, undefined, "confirms");
     const contraItem = makeItem("test" as ID, undefined, "contra");
 
-    expect(itemMatchesType(confirmItem, "confirms")).toBe(true);
-    expect(itemMatchesType(confirmItem, "contra")).toBe(false);
-    expect(itemMatchesType(contraItem, "contra")).toBe(true);
-    expect(itemMatchesType(contraItem, "confirms")).toBe(false);
+    expect(nodeMatchesType(confirmItem, "confirms")).toBe(true);
+    expect(nodeMatchesType(confirmItem, "contra")).toBe(false);
+    expect(nodeMatchesType(contraItem, "contra")).toBe(true);
+    expect(nodeMatchesType(contraItem, "confirms")).toBe(false);
   });
 });
 

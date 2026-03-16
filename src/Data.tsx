@@ -24,8 +24,7 @@ import {
 } from "./navigationUrl";
 import { splitID } from "./connections";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
-import { generatePaneId } from "./SplitPanesContext";
-import { defaultPane } from "./session/panes";
+import { defaultPane, generatePaneId } from "./session/panes";
 
 import {
   jsonToPanes,
@@ -34,7 +33,7 @@ import {
   Serializable,
   viewDataToJSON,
 } from "./serializer";
-import { NavigationStateProvider } from "./NavigationStateContext";
+import { NavigationStateProvider } from "./features/navigation/NavigationStateContext";
 import {
   mergeEvents,
   newProcessedEvents,

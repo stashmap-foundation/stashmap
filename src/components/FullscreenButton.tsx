@@ -1,14 +1,17 @@
 import React from "react";
+import { getCurrentReferenceForView } from "../rows/resolveRow";
 import {
+  useCurrentEdge,
+  useCurrentNode,
   useCurrentRowID,
-  useRowPath,
   useDisplayText,
   useEffectiveAuthor,
-  useCurrentNode,
-  getCurrentReferenceForView,
-  useCurrentEdge,
-} from "../ViewContext";
-import { usePaneStack, useNavigatePane } from "../SplitPanesContext";
+  useRowPath,
+} from "../features/tree/RowContext";
+import {
+  usePaneStack,
+  useNavigatePane,
+} from "../features/navigation/SplitPanesContext";
 import {
   getRefLinkTargetInfo,
   getRefTargetInfo,

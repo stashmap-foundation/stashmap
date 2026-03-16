@@ -11,14 +11,13 @@ import {
 } from "./connections";
 import { getTextForSemanticID } from "./semanticProjection";
 import {
-  RowPath,
-  isRoot,
+  getContext,
   getRowIDFromView,
-  getDisplayTextForView,
   getCurrentEdgeForView,
   getNodeForView,
-  getContext,
-} from "./ViewContext";
+} from "./rows/resolveRow";
+import { getDisplayTextForView } from "./rows/display";
+import { type RowPath, isRoot } from "./rows/rowPaths";
 import { buildOutgoingReference } from "./buildReferenceRow";
 import {
   formatNodeAttrs,
@@ -26,9 +25,9 @@ import {
   formatRootHeading,
 } from "./documentFormat";
 import { KIND_KNOWLEDGE_DOCUMENT, newTimestamp, msTag } from "./nostr";
-import { getNodesInTree } from "./treeTraversal";
+import { getNodesInTree } from "./rows/projectTree";
 import { createRootAnchor } from "./rootAnchor";
-import { resolveSemanticNodeInCurrentTree } from "./semanticNavigation";
+import { resolveSemanticNodeInCurrentTree } from "./graph/semanticResolution";
 
 export type { MarkdownTreeNode } from "./markdownTree";
 export { parseMarkdownHierarchy } from "./markdownTree";

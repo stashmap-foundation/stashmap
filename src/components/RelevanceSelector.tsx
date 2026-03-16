@@ -6,18 +6,16 @@ import {
   levelToRelevance,
   RELEVANCE_LABELS,
 } from "./useUpdateRelevance";
+import { parseRowPath, getParentRowPath, type RowPath } from "../rows/rowPaths";
 import {
-  RowPath,
-  useRowPath,
-  parseRowPath,
-  getParentRowPath,
   useCurrentNode,
   useDisplayText,
+  useRowPath,
   useViewKey,
   useVirtualRowsMap,
-} from "../ViewContext";
+} from "../features/tree/RowContext";
 import { usePlanner } from "../planner";
-import { usePaneStack } from "../SplitPanesContext";
+import { usePaneStack } from "../features/navigation/SplitPanesContext";
 import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
 import { useTemporaryView } from "./TemporaryViewContext";

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { OrderedSet, Set } from "immutable";
-import { useViewKey } from "../ViewContext";
+import { useViewKey } from "../features/tree/RowContext";
 import { useData } from "../DataContext";
 import { isRefNode } from "../connections";
 import { deselectAllChildren } from "../selection";

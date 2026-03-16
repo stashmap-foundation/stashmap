@@ -6,23 +6,21 @@ import { useDragAutoScroll } from "../useDragAutoScroll";
 import { ListItem } from "./Draggable";
 import { getNodesInTree } from "./Node";
 import {
-  useRowPath,
-  RowPath,
-  rowPathToString,
   ViewContext,
-  useViewKey,
-  getRowIDFromView,
-  isExpanded,
-  useDisplayText,
   VirtualRowsProvider,
-  getLast,
-} from "../ViewContext";
+  useDisplayText,
+  useRowPath,
+  useViewKey,
+} from "../features/tree/RowContext";
+import { getRowIDFromView } from "../rows/resolveRow";
+import { getLast, type RowPath, rowPathToString } from "../rows/rowPaths";
+import { isExpanded } from "../session/views";
 import { useData } from "../DataContext";
 import {
   usePaneStack,
   useCurrentPane,
   usePaneIndex,
-} from "../SplitPanesContext";
+} from "../features/navigation/SplitPanesContext";
 import { useApis } from "../Apis";
 import {
   ActiveRowState,
@@ -34,13 +32,13 @@ import {
   unregisterScrollToRow,
 } from "./keyboardNavigation";
 import { useTemporaryView } from "./TemporaryViewContext";
+import { usePlanner } from "../planner";
 import {
   planClearTemporarySelection,
   planShiftTemporarySelection,
   planToggleTemporarySelection,
-  usePlanner,
-} from "../planner";
-import type { TreeResult } from "../treeTraversal";
+} from "../session/selection";
+import type { TreeResult } from "../rows/projectTree";
 
 const PaneTreeResultContext = React.createContext<TreeResult | undefined>(
   undefined

@@ -6,17 +6,13 @@ import {
   isRefNode,
   shortID,
   splitID,
-  itemPassesFilters,
+  nodePassesFilters,
   getSemanticID,
   getNodeContext,
 } from "./connections";
 import { getTextForSemanticID } from "./semanticProjection";
-import {
-  RowPath,
-  getParentRowPath,
-  getLast,
-  getNodeForView,
-} from "./ViewContext";
+import { getLast, getParentRowPath, type RowPath } from "./rows/rowPaths";
+import { getNodeForView } from "./rows/resolveRow";
 import { getPane } from "./planner";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
 import { referenceToText } from "./components/referenceDisplay";
@@ -169,7 +165,7 @@ function effectiveIDs(
   return getChildNodes(knowledgeDBs, node, node.author)
     .filter(
       (item) =>
-        itemPassesFilters(item, activeFilters) &&
+        nodePassesFilters(item, activeFilters) &&
         item.relevance !== "not_relevant"
     )
     .map((item) => getSemanticID(knowledgeDBs, item))
@@ -281,7 +277,7 @@ function findIncomingCrefItem(
     .find((item) => item !== undefined);
 }
 
-export function buildReferenceItem(
+export function buildReferenceRow(
   refId: LongID,
   data: Data,
   rowPath: RowPath,

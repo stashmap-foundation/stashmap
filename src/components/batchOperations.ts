@@ -1,18 +1,20 @@
 import { OrderedSet } from "immutable";
 import type { VirtualRowsMap } from "../rows/types";
 import {
-  RowPath,
   addNodeToPathWithNodes,
   getCurrentEdgeForView,
-  getParentKey,
-  getParentRowPath,
   getPreviousSibling,
   getNodeForView,
   getNodeIndexForView,
+} from "../rows/resolveRow";
+import {
+  getParentRowPath,
   parseRowPath,
+  type RowPath,
   rowPathToString,
-} from "../ViewContext";
-import { Plan, planExpandNode, planUpdateNodeText } from "../planner";
+} from "../rows/rowPaths";
+import { getParentKey, planExpandNode } from "../session/views";
+import { Plan, planUpdateNodeText } from "../planner";
 import {
   planUpdateViewItemMetadata,
   NodeItemMetadata,

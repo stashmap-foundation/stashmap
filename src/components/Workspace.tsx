@@ -1,21 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { List, Map, OrderedSet } from "immutable";
 import type { VirtualRowsMap } from "../rows/types";
+import { getDisplayTextForView } from "../rows/display";
+import { parseRowPath, type RowPath, rowPathToString } from "../rows/rowPaths";
 import {
   TemporaryViewProvider,
   useTemporaryView,
 } from "./TemporaryViewContext";
 
 import {
-  getDisplayTextForView,
-  parseRowPath,
-  RowPath,
-  rowPathToString,
   useCurrentNode,
   useDisplayText,
-  useRowPath,
   useIsViewingOtherUserContent,
-} from "../ViewContext";
+  useRowPath,
+} from "../features/tree/RowContext";
 import { useData } from "../DataContext";
 import {
   useCurrentPane,
@@ -23,8 +21,8 @@ import {
   usePaneIndex,
   useNavigatePane,
   useSplitPanes,
-} from "../SplitPanesContext";
-import { useNavigationState } from "../NavigationStateContext";
+} from "../features/navigation/SplitPanesContext";
+import { useNavigationState } from "../features/navigation/NavigationStateContext";
 import { usePaneHistory } from "../PaneHistoryContext";
 import {
   PaneTreeResultProvider,
@@ -45,14 +43,13 @@ import {
 import { NewPaneButton } from "./OpenInSplitPaneButton";
 import { PublishingStatusWrapper } from "./PublishingStatusWrapper";
 import { SignInMenuBtn } from "../SignIn";
+import { usePlanner, planForkPane } from "../planner";
 import {
-  usePlanner,
-  planForkPane,
   planClearTemporarySelection,
   planSelectAllTemporaryRows,
   planShiftTemporarySelection,
   planToggleTemporarySelection,
-} from "../planner";
+} from "../session/selection";
 import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import {
   getNodeStack,

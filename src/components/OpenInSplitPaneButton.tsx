@@ -1,18 +1,18 @@
 import React from "react";
 import { useMediaQuery } from "react-responsive";
+import { buildPaneTarget } from "../rows/resolveRow";
 import {
-  useRowPath,
+  planUpdateViews,
   updateRowPathsAfterPaneInsert,
-  buildPaneTarget,
-  useCurrentEdge,
-} from "../ViewContext";
+} from "../session/views";
+import { useCurrentEdge, useRowPath } from "../features/tree/RowContext";
 import {
   useSplitPanes,
   usePaneIndex,
   usePaneStack,
-} from "../SplitPanesContext";
+} from "../features/navigation/SplitPanesContext";
 import { IS_MOBILE } from "./responsive";
-import { planUpdateViews, usePlanner } from "../planner";
+import { usePlanner } from "../planner";
 import { useData } from "../DataContext";
 
 export function OpenInSplitPaneButton(): JSX.Element | null {

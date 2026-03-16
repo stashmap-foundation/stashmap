@@ -7,13 +7,15 @@ import {
 import { planUpdateNodeItemMetadataById } from "./dataPlanner";
 import { NodeItemMetadata } from "./nodeItemMetadata";
 import {
-  getParentRowPath,
   getNodeForView,
   getNodeIndexForView,
   getRowIDFromView,
+} from "./rows/resolveRow";
+import {
+  getParentRowPath,
   rowPathToString,
-  RowPath,
-} from "./ViewContext";
+  type RowPath,
+} from "./rows/rowPaths";
 import type { VirtualRowsMap } from "./rows/types";
 import {
   Plan,

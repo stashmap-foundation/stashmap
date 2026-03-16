@@ -5,24 +5,28 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { moveNodes, createRefTarget, isRefNode } from "./connections";
 import {
   parseRowPath,
-  upsertNodes,
-  getParentKey,
   RowPath,
   getParentRowPath,
-  updateRowPathsAfterMoveNodes,
+  getPaneIndex,
+  rowPathToString,
+} from "./rows/rowPaths";
+import {
   getNodeIndexForView,
   getRowIDFromView,
   getNodeForView,
-  getPaneIndex,
-  rowPathToString,
   getCurrentEdgeForView,
-} from "./ViewContext";
+} from "./rows/resolveRow";
+import { upsertNodes } from "./app/actions";
+import {
+  getParentKey,
+  planExpandNode,
+  planUpdateViews,
+  updateRowPathsAfterMoveNodes,
+} from "./session/views";
 import { getNodesInTree } from "./components/Node";
 import {
   Plan,
-  planUpdateViews,
   planDeepCopyNodeWithView,
-  planExpandNode,
   planAddToParent,
   getPane,
 } from "./planner";

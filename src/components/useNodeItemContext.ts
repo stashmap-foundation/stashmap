@@ -1,21 +1,19 @@
+import { getNodeForView, getCurrentEdgeForView } from "../rows/resolveRow";
+import { type RowPath, getParentRowPath } from "../rows/rowPaths";
 import {
-  useNodeIndex,
-  useRowPath,
-  getParentRowPath,
-  useIsInSearchView,
   useCurrentNode,
   useCurrentRowID,
-  getNodeForView,
-  getCurrentEdgeForView,
-  RowPath,
-} from "../ViewContext";
+  useIsInSearchView,
+  useNodeIndex,
+  useRowPath,
+} from "../features/tree/RowContext";
 import { isEmptySemanticID } from "../connections";
 import { usePlanner } from "../planner";
 import {
   planUpdateViewItemMetadata,
   NodeItemMetadata,
 } from "../nodeItemMutations";
-import { usePaneStack } from "../SplitPanesContext";
+import { usePaneStack } from "../features/navigation/SplitPanesContext";
 import { useData } from "../DataContext";
 import { useEditorText } from "./EditorTextContext";
 

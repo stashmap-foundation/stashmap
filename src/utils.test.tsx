@@ -51,7 +51,7 @@ import {
   isUserLoggedInWithSeed,
 } from "./NostrAuthContext";
 import { EMPTY_SEMANTIC_ID } from "./connections";
-import { RootViewContextProvider } from "./ViewContext";
+import { RootViewContextProvider } from "./features/tree/RowContext";
 import { LoadSearchData } from "./LoadSearchData";
 import { StorePreLoginContext } from "./StorePreLoginContext";
 import { TemporaryViewProvider } from "./components/TemporaryViewContext";
@@ -70,7 +70,7 @@ import {
   PaneIndexProvider,
   useCurrentPane,
   usePaneIndex,
-} from "./SplitPanesContext";
+} from "./features/navigation/SplitPanesContext";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 test.skip("skip", () => {});
@@ -551,12 +551,12 @@ function RootViewOrPaneIsLoadingInner({
 }): JSX.Element {
   const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
-  const rootItemID = pane.stack[pane.stack.length - 1] || EMPTY_SEMANTIC_ID;
+  const rootNodeID = pane.stack[pane.stack.length - 1] || EMPTY_SEMANTIC_ID;
 
   return (
     <LoadSearchData itemIDs={pane.stack}>
       <RootViewContextProvider
-        root={rootItemID as LongID}
+        root={rootNodeID as LongID}
         paneIndex={paneIndex}
       >
         <StorePreLoginContext>{children}</StorePreLoginContext>

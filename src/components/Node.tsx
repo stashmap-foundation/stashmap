@@ -1,27 +1,31 @@
 import React from "react";
 import { useMediaQuery } from "react-responsive";
 import {
-  useRowPath,
-  RowPath,
-  useSearchDepth,
-  useIsInSearchView,
-  useIsExpanded,
-  useIsRoot,
-  useNodeIndex,
-  useCurrentRowID,
-  usePreviousSibling,
-  useDisplayText,
-  getParentRowPath,
   getNodeForView,
   getNodeIndexForView,
   getRowIDFromView,
-  useIsViewingOtherUserContent,
-  useCurrentEdge,
-  rowPathToString,
-  useEffectiveAuthor,
-  useCurrentNode,
   getCurrentReferenceForView,
-} from "../ViewContext";
+} from "../rows/resolveRow";
+import {
+  getParentRowPath,
+  type RowPath,
+  rowPathToString,
+} from "../rows/rowPaths";
+import {
+  useCurrentEdge,
+  useCurrentNode,
+  useCurrentRowID,
+  useDisplayText,
+  useEffectiveAuthor,
+  useIsExpanded,
+  useIsInSearchView,
+  useIsRoot,
+  useIsViewingOtherUserContent,
+  useNodeIndex,
+  usePreviousSibling,
+  useRowPath,
+  useSearchDepth,
+} from "../features/tree/RowContext";
 import { isEditableNode } from "./TemporaryViewContext";
 import { planBatchIndent, planBatchOutdent } from "./batchOperations";
 import {
@@ -43,13 +47,13 @@ import {
   planSetEmptyNodePosition,
   planSaveNodeAndEnsureNodes,
   getNextInsertPosition,
-  planExpandNode,
   planRemoveEmptyNodePosition,
   planCreateNode,
   planAddToParent,
-  planSetRowFocusIntent,
   ParsedLine,
 } from "../planner";
+import { planSetRowFocusIntent } from "../session/focus";
+import { planExpandNode } from "../session/views";
 import { parsedLinesToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import { planDisconnectFromParent } from "../treeMutations";
 import { useNodeIsLoading } from "../LoadingStatus";
@@ -59,15 +63,15 @@ import {
   usePaneIndex,
   useCurrentPane,
   useNavigatePane,
-} from "../SplitPanesContext";
+} from "../features/navigation/SplitPanesContext";
 import { buildNodeRouteUrl } from "../navigationUrl";
 import { RightMenu } from "./RightMenu";
 import { useItemStyle } from "./useItemStyle";
 import { EditorTextProvider } from "./EditorTextContext";
-import { getTreeChildren } from "../treeTraversal";
+import { getTreeChildren } from "../rows/projectTree";
 import { getNodeUserPublicKey } from "../userEntry";
 
-export { getNodesInTree } from "../treeTraversal";
+export { getNodesInTree } from "../rows/projectTree";
 
 function useNodeHasChildren(): boolean {
   const data = useData();

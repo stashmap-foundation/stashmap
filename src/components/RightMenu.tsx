@@ -7,7 +7,7 @@ import {
   useCurrentRowID,
   useCurrentNode,
   useDisplayText,
-} from "../ViewContext";
+} from "../features/tree/RowContext";
 import { isEmptySemanticID } from "../connections";
 import { useData } from "../DataContext";
 import { RelevanceSelector } from "./RelevanceSelector";

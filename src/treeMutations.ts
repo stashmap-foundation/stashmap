@@ -1,20 +1,25 @@
 import { getSemanticID, isSearchId, shortID } from "./connections";
 import { planRemoveNodeItemById } from "./dataPlanner";
 import {
-  RowPath,
   getContext,
-  getParentRowPath,
-  updateRowPathsAfterDisconnect,
   getNodeIndexForView,
   getRowIDFromView,
-  getLast,
   getNodeForView,
-  getPaneIndex,
-  isRoot,
   addNodeToPathWithNodes,
+} from "./rows/resolveRow";
+import {
+  getLast,
+  getPaneIndex,
+  getParentRowPath,
+  isRoot,
+  type RowPath,
   rowPathToString,
+} from "./rows/rowPaths";
+import {
   copyViewsWithNewPrefix,
-} from "./ViewContext";
+  planUpdateViews,
+  updateRowPathsAfterDisconnect,
+} from "./session/views";
 import {
   getPane,
   Plan,
@@ -22,9 +27,8 @@ import {
   planDeleteNodes,
   planDeleteDescendantNodes,
   planMoveDescendantNodes,
-  planUpdatePanes,
-  planUpdateViews,
 } from "./planner";
+import { planUpdatePanes } from "./session/panes";
 
 function resetInvalidPanes(plan: Plan, paneIndexToReset?: number): Plan {
   const shouldResetPane = (p: Pane, i: number): boolean => {

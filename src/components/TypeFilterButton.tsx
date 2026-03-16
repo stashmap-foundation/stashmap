@@ -1,7 +1,8 @@
 import React from "react";
-import { planUpdatePanes, usePlanner } from "../planner";
+import { usePlanner } from "../planner";
+import { planUpdatePanes } from "../session/panes";
 import { useData } from "../DataContext";
-import { useCurrentPane } from "../SplitPanesContext";
+import { useCurrentPane } from "../features/navigation/SplitPanesContext";
 import { DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
 
 const RELEVANCE_FILTERS: {

@@ -1,7 +1,6 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { FocusContextProvider } from "./commons/FocusContextProvider";
 import * as serviceWorker from "./serviceWorker";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./theme/solarized.scss";
@@ -31,9 +30,7 @@ if (root !== null) {
       <NostrProvider apis={{ fileStore: createFileStore() }}>
         <NostrAuthContextProvider defaultRelayUrls={defaultRelayUrls}>
           <UserRelayContextProvider>
-            <FocusContextProvider>
-              <App />
-            </FocusContextProvider>
+            <App />
           </UserRelayContextProvider>
         </NostrAuthContextProvider>
       </NostrProvider>

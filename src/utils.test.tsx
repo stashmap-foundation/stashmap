@@ -28,10 +28,6 @@ import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { sha256 } from "@noble/hashes/sha256";
 import { schnorr } from "@noble/curves/secp256k1";
 import { VirtuosoMockContext } from "react-virtuoso";
-import {
-  FocusContext,
-  FocusContextProvider,
-} from "./commons/FocusContextProvider";
 import { KIND_CONTACTLIST } from "./nostr";
 import { RequireLogin, UNAUTHENTICATED_USER_PK } from "./AppState";
 import {
@@ -289,7 +285,6 @@ export function setup(
 type RenderApis = Partial<TestApis> &
   Partial<DataContextProps> & {
     initialRoute?: string;
-    includeFocusContext?: boolean;
     user?: User;
     defaultRelays?: Array<string>;
     initialStack?: ID[];
@@ -404,18 +399,7 @@ export function renderApis(
                 <VirtuosoMockContext.Provider
                   value={{ viewportHeight: 10000, itemHeight: 100 }}
                 >
-                  {options?.includeFocusContext === true ? (
-                    <FocusContextProvider>{children}</FocusContextProvider>
-                  ) : (
-                    <FocusContext.Provider
-                      value={{
-                        isInputElementInFocus: true,
-                        setIsInputElementInFocus: jest.fn(),
-                      }}
-                    >
-                      {children}
-                    </FocusContext.Provider>
-                  )}
+                  {children}
                 </VirtuosoMockContext.Provider>
               </PaneIndexProvider>
             </UserRelayContextProvider>
@@ -441,7 +425,6 @@ function renderApp(props: RenderApis): RenderViewResult {
   const testApis = applyApis(props);
   return renderApis(<App />, {
     ...testApis,
-    includeFocusContext: props.includeFocusContext,
   });
 }
 

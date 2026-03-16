@@ -69,6 +69,7 @@ import {
 } from "./selection";
 import { withUsersEntryPublicKey, getNodeUserPublicKey } from "./userEntry";
 import { decodePublicKeyInputSync } from "./nostrPublicKeys";
+import { getPane } from "./session/panes";
 
 function getAnchorSnapshotLabels(
   knowledgeDBs: KnowledgeDBs,
@@ -90,10 +91,7 @@ function getAnchorSnapshotLabels(
   return labels;
 }
 
-export function getPane(plan: Plan | Data, viewPath: ViewPath): Pane {
-  const paneIndex = viewPath[0];
-  return plan.panes[paneIndex];
-}
+export { getPane } from "./session/panes";
 
 type GraphPlanData = Pick<
   Data,

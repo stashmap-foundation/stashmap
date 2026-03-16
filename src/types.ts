@@ -1,8 +1,12 @@
-import { Map, OrderedMap, List, OrderedSet, Set } from "immutable";
+import { Map, OrderedMap, List } from "immutable";
 import { Event, EventTemplate, UnsignedEvent } from "nostr-tools";
 // eslint-disable-next-line import/no-unresolved
 import { RelayInformation } from "nostr-tools/lib/types/nip11";
 import { QueueStatus } from "./PublishQueue";
+import type {
+  RowFocusIntent as SessionRowFocusIntent,
+  TemporaryViewState as SessionTemporaryViewState,
+} from "./session/types";
 
 declare global {
   type Children = {
@@ -284,26 +288,7 @@ declare global {
   };
 
   // Temporary UI state (not persisted to Nostr)
-  type TemporaryViewState = {
-    // Per-pane row focus target for deterministic keyboard focus restoration
-    rowFocusIntents: Map<number, RowFocusIntent>;
-    // Multiselect
-    baseSelection: OrderedSet<string>;
-    shiftSelection: OrderedSet<string>;
-    anchor: string;
-    // Editing state
-    editingViews: Set<string>;
-    // AddToNode editor open state
-    editorOpenViews: Set<string>;
-    // Draft texts: draftID → current text being typed
-    draftTexts: Map<string, string>;
-  };
+  type TemporaryViewState = SessionTemporaryViewState;
 
-  type RowFocusIntent = {
-    requestId: number;
-    paneIndex: number;
-    viewKey?: string;
-    nodeId?: string;
-    rowIndex?: number;
-  };
+  type RowFocusIntent = SessionRowFocusIntent;
 }

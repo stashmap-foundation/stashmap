@@ -24,12 +24,34 @@ import { usePaneStack } from "./SplitPanesContext";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
 import { newNode } from "./nodeFactory";
 import { getNodeUserPublicKey } from "./userEntry";
+import {
+  getLast,
+  getPaneIndex,
+  getParentView,
+  isRoot,
+  parseViewPath,
+  ViewPath,
+  viewPathToString,
+} from "./session/viewPaths";
+import { isExpanded } from "./session/views";
 
 export { newNode } from "./nodeFactory";
-
-type ViewPathSegment = ID;
-
-export type ViewPath = readonly [number, ...ViewPathSegment[]];
+export {
+  getLast,
+  getPaneIndex,
+  getParentView,
+  isRoot,
+  parseViewPath,
+  type ViewPath,
+  viewPathToString,
+} from "./session/viewPaths";
+export {
+  copyViewsWithNewPrefix,
+  copyViewsWithNodesMapping,
+  getParentKey,
+  isExpanded,
+  updateView,
+} from "./session/views";
 
 export const ViewContext = React.createContext<ViewPath | undefined>(undefined);
 
@@ -55,15 +77,6 @@ export function useVirtualRowsMap(): VirtualRowsMap {
   return React.useContext(VirtualRowsContext);
 }
 
-// Encode path IDs to handle colons in ref IDs (ref:ctx:target format)
-function encodePathID(id: string): string {
-  return id.replace(/:/g, "%3A");
-}
-
-function decodePathID(encoded: string): string {
-  return encoded.replace(/%3A/g, ":");
-}
-
 function createEmptyViewPathID(nodeID: LongID): string {
   return `${EMPTY_VIEW_PATH_PREFIX}${nodeID}`;
 }
@@ -72,60 +85,8 @@ function isEmptyViewPathID(id: ID): boolean {
   return id.startsWith(EMPTY_VIEW_PATH_PREFIX);
 }
 
-export function parseViewPath(path: string): ViewPath {
-  const pieces = path.split(":");
-  if (pieces.length < 2) {
-    throw new Error("Invalid view path");
-  }
-
-  const panePart = pieces[0];
-  if (!panePart.startsWith("p")) {
-    throw new Error("Invalid view path");
-  }
-
-  const paneIndex = parseInt(panePart.substring(1), 10);
-  if (Number.isNaN(paneIndex)) {
-    throw new Error("Invalid view path");
-  }
-
-  const pathPieces = pieces
-    .slice(1)
-    .map((piece) => decodePathID(piece) as ViewPathSegment);
-  if (pathPieces.length === 0) {
-    throw new Error("Invalid view path");
-  }
-
-  return [paneIndex, ...pathPieces];
-}
-
-function convertViewPathToString(viewContext: ViewPath): string {
-  const paneIndex = viewContext[0] as number;
-  const pathPart = (viewContext.slice(1) as readonly ViewPathSegment[])
-    .map((segment) => encodePathID(segment))
-    .join(":");
-  return `p${paneIndex}:${pathPart}`;
-}
-
-// TODO: delete this export
-export const viewPathToString = convertViewPathToString;
-
 function getContextFromStack(stack: ID[]): Context {
   return List(stack.slice(0, -1));
-}
-
-export function isRoot(viewPath: ViewPath): boolean {
-  return viewPath.length === 2;
-}
-
-export function getPaneIndex(viewContext: ViewPath): number {
-  return viewContext[0] as number;
-}
-
-export function getParentView(viewContext: ViewPath): ViewPath | undefined {
-  if (isRoot(viewContext)) {
-    return undefined;
-  }
-  return viewContext.slice(0, -1) as unknown as ViewPath;
 }
 
 export function getContext(
@@ -162,20 +123,12 @@ function getViewExactMatch(views: Views, path: ViewPath): View | undefined {
   return views.get(viewKey);
 }
 
-export function getLast(viewContext: ViewPath): ViewPathSegment {
-  return viewContext[viewContext.length - 1] as ViewPathSegment;
-}
-
-function getDefaultView(id: ID, isRootNode: boolean): View {
-  return {
-    expanded: isRootNode || isSearchId(id),
-  };
-}
-
 function getViewFromPath(data: Data, path: ViewPath): View {
   const rowID = getRowIDFromPath(data, path);
   return (
-    getViewExactMatch(data.views, path) || getDefaultView(rowID, isRoot(path))
+    getViewExactMatch(data.views, path) || {
+      expanded: isRoot(path) || isSearchId(rowID),
+    }
   );
 }
 
@@ -221,7 +174,7 @@ export function getRowIDFromView(data: Data, viewPath: ViewPath): [ID, View] {
 
 function getRowIDsForViewPath(data: Data, viewPath: ViewPath): Array<ID> {
   const paneIndex = getPaneIndex(viewPath);
-  return (viewPath.slice(1) as ViewPathSegment[]).map((_, index, segments) =>
+  return (viewPath.slice(1) as ID[]).map((_, index, segments) =>
     getRowIDFromPath(data, [paneIndex, ...segments.slice(0, index + 1)])
   );
 }
@@ -233,7 +186,7 @@ export function getParentNode(
   if (isRoot(viewPath)) {
     return undefined;
   }
-  const parentID = viewPath[viewPath.length - 2] as ViewPathSegment;
+  const parentID = viewPath[viewPath.length - 2] as ID;
   return getNode(data.knowledgeDBs, parentID, data.user.publicKey);
 }
 
@@ -408,7 +361,7 @@ export function addNodesToLastElement(
   }
   return [
     getPaneIndex(path),
-    ...(path.slice(1, -1) as ViewPathSegment[]),
+    ...(path.slice(1, -1) as ID[]),
     nodeID,
   ] as ViewPath;
 }
@@ -669,12 +622,6 @@ export function useDisplayText(): string {
   return getDisplayTextForView(data, viewPath, stack, virtualType, currentRow);
 }
 
-export function isExpanded(data: Data, viewKey: string): boolean {
-  const viewPath = parseViewPath(viewKey);
-  const view = getViewFromPath(data, viewPath);
-  return view.expanded === true;
-}
-
 export function useViewKey(): string {
   return viewPathToString(useViewPath());
 }
@@ -687,55 +634,6 @@ export function useIsExpanded(): boolean {
 
 export function useIsRoot(): boolean {
   return isRoot(useViewPath());
-}
-
-export function getParentKey(viewKey: string): string {
-  return viewKey.split(":").slice(0, -1).join(":");
-}
-
-export function updateView(views: Views, path: ViewPath, view: View): Views {
-  const key = viewPathToString(path);
-  const rowID = getLast(path);
-  const defaultView = getDefaultView(rowID, isRoot(path));
-  const isDefault = view.expanded === defaultView.expanded && !view.typeFilters;
-  if (isDefault) {
-    return views.delete(key);
-  }
-  return views.set(key, view);
-}
-
-export function copyViewsWithNewPrefix(
-  views: Views,
-  sourceKey: string,
-  targetKey: string
-): Views {
-  const viewsToCopy = views.filter(
-    (_, k) => k.startsWith(`${sourceKey}:`) || k === sourceKey
-  );
-  return viewsToCopy.reduce((acc, view, key) => {
-    const newKey = targetKey + key.slice(sourceKey.length);
-    return acc.set(newKey, view);
-  }, views);
-}
-
-export function copyViewsWithNodesMapping(
-  views: Views,
-  sourceKey: string,
-  targetKey: string,
-  nodesIdMapping: Map<LongID, LongID>
-): Views {
-  const viewsToCopy = views.filter(
-    (_, k) => k.startsWith(`${sourceKey}:`) || k === sourceKey
-  );
-  return viewsToCopy.reduce((acc, view, key) => {
-    const suffix = key.slice(sourceKey.length);
-    const mappedSuffix = nodesIdMapping.reduce(
-      (s, newId, oldId) => s.split(oldId).join(newId),
-      suffix
-    );
-    const newKey = targetKey + mappedSuffix;
-    return acc.set(newKey, view);
-  }, views);
 }
 
 export function upsertNodes(
@@ -774,14 +672,11 @@ export function upsertNodes(
   return planUpsertNodes(plan, updatedNodes);
 }
 
-function pathContainsSubpath(
-  path: ViewPath,
-  subpath: ViewPathSegment[]
-): boolean {
+function pathContainsSubpath(path: ViewPath, subpath: ID[]): boolean {
   if (subpath.length === 0 || path.length - 1 < subpath.length) {
     return false;
   }
-  const segments = path.slice(1) as ViewPathSegment[];
+  const segments = path.slice(1) as ID[];
   return segments.some((_, index) =>
     subpath.every((segment, offset) => segments[index + offset] === segment)
   );

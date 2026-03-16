@@ -81,6 +81,103 @@
     },
     "overrides": [
         {
+          "files": ["src/{graph,rows,session,app,infra,ui}/**/*.{ts,tsx,js,jsx}"],
+          "rules": {
+            "import/no-restricted-paths": [
+              "error",
+              {
+                "zones": [
+                  {
+                    "target": "./src/graph",
+                    "from": "./src/rows",
+                    "message": "graph must not import rows."
+                  },
+                  {
+                    "target": "./src/graph",
+                    "from": "./src/session",
+                    "message": "graph must not import session."
+                  },
+                  {
+                    "target": "./src/graph",
+                    "from": "./src/app",
+                    "message": "graph must not import app."
+                  },
+                  {
+                    "target": "./src/graph",
+                    "from": "./src/infra",
+                    "message": "graph must not import infra."
+                  },
+                  {
+                    "target": "./src/graph",
+                    "from": "./src/ui",
+                    "message": "graph must not import ui."
+                  },
+                  {
+                    "target": "./src/rows",
+                    "from": "./src/session",
+                    "message": "rows must not import session."
+                  },
+                  {
+                    "target": "./src/rows",
+                    "from": "./src/app",
+                    "message": "rows must not import app."
+                  },
+                  {
+                    "target": "./src/rows",
+                    "from": "./src/infra",
+                    "message": "rows must not import infra."
+                  },
+                  {
+                    "target": "./src/rows",
+                    "from": "./src/ui",
+                    "message": "rows must not import ui."
+                  },
+                  {
+                    "target": "./src/session",
+                    "from": "./src/graph",
+                    "message": "session must not import graph."
+                  },
+                  {
+                    "target": "./src/session",
+                    "from": "./src/rows",
+                    "message": "session must not import rows."
+                  },
+                  {
+                    "target": "./src/session",
+                    "from": "./src/app",
+                    "message": "session must not import app."
+                  },
+                  {
+                    "target": "./src/session",
+                    "from": "./src/infra",
+                    "message": "session must not import infra."
+                  },
+                  {
+                    "target": "./src/session",
+                    "from": "./src/ui",
+                    "message": "session must not import ui."
+                  },
+                  {
+                    "target": "./src/app",
+                    "from": "./src/infra",
+                    "message": "app must not import infra."
+                  },
+                  {
+                    "target": "./src/app",
+                    "from": "./src/ui",
+                    "message": "app must not import ui."
+                  },
+                  {
+                    "target": "./src/infra",
+                    "from": "./src/ui",
+                    "message": "infra must not import ui."
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
           "files": ["src/**/*.{ts,tsx}"],
           "excludedFiles": [
             "src/semanticProjection.ts",

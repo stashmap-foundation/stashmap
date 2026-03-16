@@ -8,12 +8,10 @@ import {
 } from "./navigationUrl";
 import { splitID } from "./connections";
 import { usePaneHistory } from "./PaneHistoryContext";
+import { generatePaneId } from "./session/panes";
 
 const PaneIndexContext = createContext<number>(0);
-
-export function generatePaneId(): string {
-  return `pane-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
+export { generatePaneId } from "./session/panes";
 
 export function PaneIndexProvider({
   children,

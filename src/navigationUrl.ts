@@ -24,19 +24,12 @@ function stackToPath(
   return `/n/${segments.join("/")}`;
 }
 
-export function pathToStack(pathname: string): ID[] {
-  if (!pathname.startsWith("/n/")) {
-    return [];
-  }
-  const rest = pathname.slice(3);
-  if (!rest) {
-    return [];
-  }
-  return rest
-    .split("/")
-    .filter((seg) => seg.length > 0)
-    .map((seg) => decodeURIComponent(seg) as ID);
-}
+export {
+  buildNodeRouteUrl,
+  parseAuthorFromSearch,
+  parseNodeRouteUrl,
+  pathToStack,
+} from "./session/navigation";
 
 export function buildNodeUrl(
   stack: ID[],
@@ -53,23 +46,4 @@ export function buildNodeUrl(
     return `${path}?author=${author}`;
   }
   return path;
-}
-
-export function buildNodeRouteUrl(rootNode: LongID, scrollToId?: ID): string {
-  const base = `/r/${encodeURIComponent(rootNode)}`;
-  return scrollToId ? `${base}#${encodeURIComponent(scrollToId)}` : base;
-}
-
-export function parseNodeRouteUrl(pathname: string): LongID | undefined {
-  const match = pathname.match(/^\/r\/(.+)$/);
-  if (!match) {
-    return undefined;
-  }
-  return decodeURIComponent(match[1]) as LongID;
-}
-
-export function parseAuthorFromSearch(search: string): PublicKey | undefined {
-  const params = new URLSearchParams(search);
-  const author = params.get("author");
-  return author ? (author as PublicKey) : undefined;
 }

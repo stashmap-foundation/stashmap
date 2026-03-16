@@ -1,0 +1,22 @@
+import type { ViewPath } from "./viewPaths";
+
+export function generatePaneId(): string {
+  return `pane-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+type HasPanes = {
+  panes: Pane[];
+};
+
+export function getPane(plan: HasPanes, viewPath: ViewPath): Pane {
+  const paneIndex = viewPath[0];
+  return plan.panes[paneIndex];
+}
+
+export function defaultPane(author: PublicKey, rootItemID?: ID): Pane {
+  return {
+    id: generatePaneId(),
+    stack: rootItemID ? [rootItemID] : [],
+    author,
+  };
+}

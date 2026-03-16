@@ -25,6 +25,8 @@ import {
 import { splitID } from "./connections";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { generatePaneId } from "./SplitPanesContext";
+import { defaultPane } from "./session/panes";
+
 import {
   jsonToPanes,
   jsonToViews,
@@ -42,11 +44,7 @@ import { DocumentStoreProvider, useDocumentStore } from "./DocumentStore";
 import { usePermanentDocumentSync } from "./usePermanentDocumentSync";
 import { createEmptySemanticIndex } from "./semanticIndex";
 
-export const defaultPane = (author: PublicKey, rootItemID?: ID): Pane => ({
-  id: generatePaneId(),
-  stack: rootItemID ? [rootItemID] : [],
-  author,
-});
+export { defaultPane } from "./session/panes";
 
 function panesStorageKey(publicKey: PublicKey): string {
   return `stashmap-panes-${publicKey}`;

@@ -5,7 +5,7 @@ export function formatRootHeading(
   systemRole?: RootSystemRole
 ): string {
   const parts = [
-    rootUuid,
+    `id:${rootUuid}`,
     ...(anchor?.snapshotContext.size
       ? [`anchorContext="${anchor.snapshotContext.join(":")}"`]
       : []),
@@ -26,13 +26,11 @@ export function formatRootHeading(
       : []),
     ...(systemRole ? [`systemRole="${systemRole}"`] : []),
   ];
-  return `# ${rootText} {${parts.join(" ")}}`;
+  return `# ${rootText} <!-- ${parts.join(" ")} -->`;
 }
 
 export function formatNodeAttrs(
   uuid: string,
-  relevance: Relevance,
-  argument: Argument,
   options?: {
     hidden?: boolean;
     basedOn?: LongID;
@@ -40,17 +38,42 @@ export function formatNodeAttrs(
   }
 ): string {
   const parts: string[] = [
-    ...(uuid ? [uuid] : []),
+    ...(uuid ? [`id:${uuid}`] : []),
     ...(options?.userPublicKey
       ? [`userPublicKey="${options.userPublicKey}"`]
       : []),
-    ...(relevance ? [`.${relevance}`] : []),
-    ...(argument ? [`.${argument}`] : []),
-    ...(options?.hidden ? [".hidden"] : []),
+    ...(options?.hidden ? ["hidden"] : []),
     ...(options?.basedOn ? [`basedOn="${options.basedOn}"`] : []),
   ];
   if (parts.length === 0) {
     return "";
   }
-  return ` {${parts.join(" ")}}`;
+  return ` <!-- ${parts.join(" ")} -->`;
+}
+
+const RELEVANCE_PREFIX: Record<string, string> = {
+  relevant: "(!)",
+  maybe_relevant: "(?)",
+  little_relevant: "(~)",
+  not_relevant: "(x)",
+};
+
+const ARGUMENT_PREFIX: Record<string, string> = {
+  confirms: "(+)",
+  contra: "(-)",
+};
+
+export function formatPrefixMarkers(
+  relevance: Relevance,
+  argument: Argument
+): string {
+  const parts: string[] = [
+    ...(relevance && RELEVANCE_PREFIX[relevance]
+      ? [RELEVANCE_PREFIX[relevance]]
+      : []),
+    ...(argument && ARGUMENT_PREFIX[argument]
+      ? [ARGUMENT_PREFIX[argument]]
+      : []),
+  ];
+  return parts.length > 0 ? `${parts.join(" ")} ` : "";
 }

@@ -21,38 +21,27 @@ function getDocumentTitle(content: string): string {
     .split("\n")
     .find((line) => line.startsWith("# "))
     ?.replace(/^#\s+/, "")
-    .replace(/\s+\{.*\}\s*$/, "")
+    .replace(/\s*<!--.*-->\s*$/, "")
     .trim();
   return heading || "document";
 }
 
-function editingHeaderLines(
-  author: PublicKey,
-  dTag: string
-): readonly string[] {
+function editingFrontMatter(author: PublicKey, dTag: string): string {
   const rootRelationId = joinID(author, dTag);
   return [
-    `<!-- ks:root=${dTag} sourceAuthor=${author} sourceRoot=${rootRelationId} sourceRelation=${rootRelationId} -->`,
-    [
-      "<!-- ks:editing",
-      "Markers:",
-      "- (!) relevant",
-      "- (?) maybe_relevant",
-      "- (~) little_relevant",
-      "- (x) not_relevant",
-      "- (+) confirms",
-      "- (-) contra",
-      "",
-      "Rules:",
-      "- Preserve existing ks:id marker lines when moving or renaming rows.",
-      "- Never invent ks:id markers for new rows; write new rows as plain markdown without ks:id.",
-      "- Never edit ks metadata lines by hand.",
-      '- To delete, move the row with its marker into the final "# Delete" root.',
-      '- Keep "# Delete" as the last root.',
-      "- push will reject lost, duplicated, or invented markers.",
-      "-->",
-    ].join("\n"),
-  ] as const;
+    "---",
+    `root: ${dTag}`,
+    `author: ${author}`,
+    `sourceRoot: ${rootRelationId}`,
+    `sourceRelation: ${rootRelationId}`,
+    "editing: |",
+    "  Edit text freely. Never modify <!-- id:... --> comments.",
+    "  Never add <!-- id:... --> to new items. Push will reject invented IDs.",
+    "  Markers: (!) relevant (?) maybe relevant (~) little relevant (x) not relevant (+) confirms (-) contra",
+    '  Delete: move lines with their comments under "# Delete"',
+    "  Push changes with: knowstr push",
+    "---",
+  ].join("\n");
 }
 
 function hasDeleteHeadingSection(content: string): boolean {
@@ -79,6 +68,14 @@ function ensureTrailingNewline(content: string): string {
   return content.endsWith("\n") ? content : `${content}\n`;
 }
 
+export function stripFrontMatter(content: string): string {
+  const match = content.match(/^---\n[\s\S]*?\n---\n/);
+  if (!match) {
+    return content;
+  }
+  return content.slice(match[0].length);
+}
+
 export function ensureEditableDocumentHeader(
   content: string,
   author: PublicKey,
@@ -91,15 +88,11 @@ export function ensureEditableDocumentHeader(
     options?.includeDeleteSection === false
       ? ensureTrailingNewline(content)
       : ensureDeleteHeadingSection(content);
-  if (contentWithDeleteSection.includes("<!-- ks:root=")) {
+  if (contentWithDeleteSection.startsWith("---\n")) {
     return contentWithDeleteSection;
   }
 
-  return `${[
-    ...editingHeaderLines(author, dTag),
-    "",
-    contentWithDeleteSection,
-  ].join("\n")}`;
+  return `${editingFrontMatter(author, dTag)}\n\n${contentWithDeleteSection}`;
 }
 
 export function baselinePath(
@@ -115,7 +108,7 @@ function workspaceFilePath(
   author: PublicKey,
   content: string
 ): string {
-  const titleSlug = slugify(getDocumentTitle(content));
+  const titleSlug = slugify(getDocumentTitle(stripFrontMatter(content)));
   return path.join(workspaceDir, DOCUMENTS_DIR, author, `${titleSlug}.md`);
 }
 
@@ -130,8 +123,12 @@ export async function removeWorkspaceFileIfExists(
 }
 
 export function extractDTagFromHeader(content: string): string | undefined {
-  const match = content.match(/<!-- ks:root=(\S+)/);
-  return match?.[1];
+  const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!fmMatch) {
+    return undefined;
+  }
+  const rootMatch = fmMatch[1].match(/^root:\s*(.+)$/m);
+  return rootMatch?.[1].trim();
 }
 
 export async function findWorkspaceFileByDTag(

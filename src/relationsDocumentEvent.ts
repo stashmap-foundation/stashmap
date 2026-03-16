@@ -9,7 +9,11 @@ import {
   isRefNode,
   shortID,
 } from "./connections";
-import { formatNodeAttrs, formatRootHeading } from "./documentFormat";
+import {
+  formatNodeAttrs,
+  formatPrefixMarkers,
+  formatRootHeading,
+} from "./documentFormat";
 import { KIND_KNOWLEDGE_DOCUMENT, msTag, newTimestamp } from "./nostr";
 import { createRootAnchor } from "./rootAnchor";
 
@@ -54,15 +58,12 @@ function serializeRelationItems(
           ? getSerializableRelationText(knowledgeDBs, targetRelation)
           : "") ||
         shortID(targetRelationID);
+      const prefix = formatPrefixMarkers(item.relevance, item.argument);
       return {
         ...acc,
         lines: [
           ...acc.lines,
-          `${indent}- [${linkText}](#${targetRelationID})${formatNodeAttrs(
-            "",
-            item.relevance,
-            item.argument
-          )}`,
+          `${indent}- ${prefix}[${linkText}](#${targetRelationID})`,
         ],
       };
     }
@@ -70,13 +71,12 @@ function serializeRelationItems(
     const resolvedChild = item;
 
     const text = getSerializableRelationText(knowledgeDBs, resolvedChild);
+    const prefix = formatPrefixMarkers(item.relevance, item.argument);
     const next: SerializeResult = {
       lines: [
         ...acc.lines,
-        `${indent}- ${text}${formatNodeAttrs(
+        `${indent}- ${prefix}${text}${formatNodeAttrs(
           shortID(resolvedChild.id),
-          item.relevance,
-          item.argument,
           {
             ...(resolvedChild.basedOn
               ? { basedOn: resolvedChild.basedOn }

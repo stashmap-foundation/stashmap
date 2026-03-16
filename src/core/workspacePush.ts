@@ -18,6 +18,7 @@ import {
   extractDTagFromHeader,
   readBaselineContent,
   removeWorkspaceFileIfExists,
+  stripFrontMatter,
   writeDocumentFiles,
 } from "./workspaceState";
 import { validateEditedDocumentIntegrity } from "./workspaceIntegrity";
@@ -162,10 +163,10 @@ export async function pushEditedWorkspaceDocuments(
       const rootTree =
         changed.baselineContent && changed.dTag
           ? validateEditedDocumentIntegrity(
-              changed.baselineContent,
-              changed.currentContent
+              stripFrontMatter(changed.baselineContent),
+              stripFrontMatter(changed.currentContent)
             ).sanitizedRoot
-          : buildNewDocumentTree(changed.currentContent);
+          : buildNewDocumentTree(stripFrontMatter(changed.currentContent));
       const builtEvent = buildDocumentEventFromMarkdownTree(
         profile.pubkey,
         rootTree

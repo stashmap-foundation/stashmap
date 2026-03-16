@@ -2,13 +2,13 @@
 
 import { validateEditedDocumentIntegrity } from "./workspaceIntegrity";
 
-const BASELINE = `# Root {root}\n- Keep {keep}\n- Remove {remove}\n`;
+const BASELINE = `# Root <!-- id:root -->\n- Keep <!-- id:keep -->\n- Remove <!-- id:remove -->\n`;
 
 test("validateEditedDocumentIntegrity rejects duplicate markers", () => {
   expect(() =>
     validateEditedDocumentIntegrity(
       BASELINE,
-      "# Root {root}\n- Keep {keep}\n- Also Keep {keep}\n- Remove {remove}\n"
+      "# Root <!-- id:root -->\n- Keep <!-- id:keep -->\n- Also Keep <!-- id:keep -->\n- Remove <!-- id:remove -->\n"
     )
   ).toThrow("Edited document contains duplicate markers: keep");
 });
@@ -17,14 +17,17 @@ test("validateEditedDocumentIntegrity rejects invented markers", () => {
   expect(() =>
     validateEditedDocumentIntegrity(
       BASELINE,
-      "# Root {root}\n- Keep {keep}\n- Remove {remove}\n- New {new-marker}\n"
+      "# Root <!-- id:root -->\n- Keep <!-- id:keep -->\n- Remove <!-- id:remove -->\n- New <!-- id:new-marker -->\n"
     )
   ).toThrow("Edited document invents new markers: new-marker");
 });
 
 test("validateEditedDocumentIntegrity rejects lost markers", () => {
   expect(() =>
-    validateEditedDocumentIntegrity(BASELINE, "# Root {root}\n- Keep {keep}\n")
+    validateEditedDocumentIntegrity(
+      BASELINE,
+      "# Root <!-- id:root -->\n- Keep <!-- id:keep -->\n"
+    )
   ).toThrow("Edited document loses markers: remove");
 });
 
@@ -32,11 +35,11 @@ test("validateEditedDocumentIntegrity accepts delete-by-move and strips the Dele
   const result = validateEditedDocumentIntegrity(
     BASELINE,
     [
-      "# Root {root}",
-      "- Keep {keep}",
+      "# Root <!-- id:root -->",
+      "- Keep <!-- id:keep -->",
       "",
       "# Delete",
-      "- Remove {remove}",
+      "- Remove <!-- id:remove -->",
       "",
     ].join("\n")
   );
@@ -52,10 +55,10 @@ test("validateEditedDocumentIntegrity rejects list-style Delete sections", () =>
     validateEditedDocumentIntegrity(
       BASELINE,
       [
-        "# Root {root}",
-        "- Keep {keep}",
+        "# Root <!-- id:root -->",
+        "- Keep <!-- id:keep -->",
         "- Delete",
-        "  - Remove {remove}",
+        "  - Remove <!-- id:remove -->",
         "",
       ].join("\n")
     )

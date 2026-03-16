@@ -147,7 +147,7 @@ test("replay honors limit 0 but still delivers future matching events", () => {
     id: "old-event".padEnd(64, "0"),
     pubkey: "alice" as PublicKey,
     created_at: 10,
-    kind: 34770,
+    kind: 34771,
     sig: "0".repeat(128),
     tags: [["d", "root-1"]],
     content: "# Old Root",
@@ -157,7 +157,7 @@ test("replay honors limit 0 but still delivers future matching events", () => {
   const receiveEvent = jest.fn();
   relayPool.subscribeMany(
     ["wss://relay.test/"],
-    [{ authors: ["alice"], kinds: [34770], limit: 0 }],
+    [{ authors: ["alice"], kinds: [34771], limit: 0 }],
     {
       onevent: receiveEvent,
     }
@@ -186,7 +186,7 @@ test("replay honors since, until, and limit semantics", () => {
         id: `event-${createdAt}`.padEnd(64, `${createdAt % 10}`),
         pubkey: "alice" as PublicKey,
         created_at: createdAt,
-        kind: 34770,
+        kind: 34771,
         sig: "0".repeat(128),
         tags: [["d", `root-${createdAt}`]],
         content: `# Root ${createdAt}`,
@@ -202,7 +202,7 @@ test("replay honors since, until, and limit semantics", () => {
     [
       {
         authors: ["alice"],
-        kinds: [34770],
+        kinds: [34771],
         since: 9,
         until: 20,
         limit: 2,

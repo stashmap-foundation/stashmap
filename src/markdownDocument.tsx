@@ -20,7 +20,11 @@ import {
   getContext,
 } from "./ViewContext";
 import { buildOutgoingReference } from "./buildReferenceRow";
-import { formatNodeAttrs, formatRootHeading } from "./documentFormat";
+import {
+  formatNodeAttrs,
+  formatPrefixMarkers,
+  formatRootHeading,
+} from "./documentFormat";
 import { KIND_KNOWLEDGE_DOCUMENT, newTimestamp, msTag } from "./nostr";
 import { getNodesInTree } from "./treeTraversal";
 import { createRootAnchor } from "./rootAnchor";
@@ -135,10 +139,10 @@ function serializeTree(data: Data, rootRelation: GraphNode): SerializeResult {
         const crefText = formatCrefText(data.knowledgeDBs, author, item);
         const { targetID } = item;
         if (!crefText || !targetID) return acc;
-        const crefAttrs = formatNodeAttrs("", item?.relevance, item?.argument);
+        const prefix = formatPrefixMarkers(item?.relevance, item?.argument);
         return {
           ...acc,
-          lines: [...acc.lines, `${indent}- ${crefText}${crefAttrs}`],
+          lines: [...acc.lines, `${indent}- ${prefix}${crefText}`],
         };
       }
 
@@ -158,16 +162,12 @@ function serializeTree(data: Data, rootRelation: GraphNode): SerializeResult {
       const text =
         serializedRelation?.text ?? getDisplayTextForView(data, path, stack);
       const uuid = ownRelation ? shortID(ownRelation.id) : v4();
+      const prefix = formatPrefixMarkers(item?.relevance, item?.argument);
 
-      const line = `${indent}- ${text}${formatNodeAttrs(
-        uuid,
-        item?.relevance,
-        item?.argument,
-        {
-          basedOn: ownRelation?.basedOn,
-          userPublicKey: ownRelation?.userPublicKey,
-        }
-      )}`;
+      const line = `${indent}- ${prefix}${text}${formatNodeAttrs(uuid, {
+        basedOn: ownRelation?.basedOn,
+        userPublicKey: ownRelation?.userPublicKey,
+      })}`;
       return {
         lines: [...acc.lines, line],
       };

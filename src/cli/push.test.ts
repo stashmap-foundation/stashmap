@@ -26,13 +26,13 @@ function documentEvent(
     id: `${rootUuid}-${createdAt}`.padEnd(64, "0"),
     pubkey: ALICE,
     created_at: createdAt,
-    kind: 34770,
+    kind: 34771,
     sig: "0".repeat(128),
     tags: [
       ["d", rootUuid],
       ["ms", `${createdAt * 1000}`],
     ],
-    content: `# ${text} {${rootUuid}}\n- ${text} child {${rootUuid}-child}\n`,
+    content: `# ${text} <!-- id:${rootUuid} -->\n- ${text} child <!-- id:${rootUuid}-child -->\n`,
   };
 }
 
@@ -145,8 +145,8 @@ test("pushing a new document writes workspace file with UUIDs and editing header
   expect(fs.existsSync(originalPath)).toBe(false);
   const canonicalPath = path.join(authorDir, "my-new-doc.md");
   const updatedContent = fs.readFileSync(canonicalPath, "utf8");
-  expect(updatedContent).toContain("<!-- ks:root=");
-  expect(updatedContent).toContain("{");
+  expect(updatedContent).toContain("---\n");
+  expect(updatedContent).toContain("<!-- id:");
   expect(updatedContent).toContain("My New Doc");
 
   const baseFiles = fs.readdirSync(path.join(knowstrHome, "base", ALICE));

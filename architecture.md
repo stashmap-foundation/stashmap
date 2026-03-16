@@ -283,7 +283,7 @@ Runtime persistence is document-only.
 
 ### Nostr kinds
 
-- `KIND_KNOWLEDGE_DOCUMENT = 34770`
+- `KIND_KNOWLEDGE_DOCUMENT = 34771`
 - `KIND_DELETE = 5`
 
 Legacy knowledge node/list kinds are gone from runtime code.

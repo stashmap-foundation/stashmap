@@ -31,13 +31,13 @@ function documentEvent({
     id: `${pubkey.slice(0, 8)}-${rootUuid}-${createdAt}`.padEnd(64, "0"),
     pubkey,
     created_at: createdAt,
-    kind: 34770,
+    kind: 34771,
     sig: "0".repeat(128),
     tags: [
       ["d", rootUuid],
       ["ms", `${createdAt * 1000}`],
     ],
-    content: `# ${text} {${rootUuid}}\n- ${text} child {${rootUuid}-child}\n`,
+    content: `# ${text} <!-- id:${rootUuid} -->\n- ${text} child <!-- id:${rootUuid}-child -->\n`,
   };
 }
 
@@ -58,19 +58,14 @@ function expectEditableHeader(
   author: PublicKey,
   rootUuid: string
 ): void {
-  expect(content).toContain(
-    `<!-- ks:root=${rootUuid} sourceAuthor=${author} sourceRoot=${author}_${rootUuid} sourceRelation=${author}_${rootUuid} -->`
-  );
-  expect(content).toContain("<!-- ks:editing");
-  expect(content).toContain("Markers:");
-  expect(content).toContain("- (!) relevant");
-  expect(content).toContain(
-    "- Never invent ks:id markers for new rows; write new rows as plain markdown without ks:id."
-  );
-  expect(content).toContain(
-    '- To delete, move the row with its marker into the final "# Delete" root.'
-  );
-  expect(content).toContain('- Keep "# Delete" as the last root.');
+  expect(content).toContain("---\n");
+  expect(content).toContain(`root: ${rootUuid}`);
+  expect(content).toContain(`author: ${author}`);
+  expect(content).toContain(`sourceRoot: ${author}_${rootUuid}`);
+  expect(content).toContain(`sourceRelation: ${author}_${rootUuid}`);
+  expect(content).toContain("editing: |");
+  expect(content).toContain("Never modify <!-- id:... --> comments.");
+  expect(content).toContain("Push will reject invented IDs.");
   expect(content).toContain("\n# Delete\n");
 }
 

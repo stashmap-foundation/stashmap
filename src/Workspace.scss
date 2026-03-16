@@ -1181,7 +1181,7 @@ input:focus,
 // 17. SELECT RELATION
 // ============================================
 
-.select-relation {
+.select-node {
   .dropdown .btn {
     border-radius: 0 35px 35px 0 !important;
   }
@@ -1205,7 +1205,7 @@ input:focus,
   }
 }
 
-.new-relation {
+.new-node {
   border-radius: 35px !important;
   padding: 0.45rem;
   line-height: 0.5;
@@ -1216,7 +1216,7 @@ input:focus,
   margin-top: 5px;
 }
 
-.relation-type-selection-color {
+.node-type-selection-color {
   border-radius: 35px !important;
   padding: 0.45rem;
   line-height: 0.5;

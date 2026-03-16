@@ -19,13 +19,13 @@ import {
 import { buildReferenceItem } from "./buildReferenceRow";
 import { resolveSemanticNodeInCurrentTree } from "./semanticNavigation";
 import { useData } from "./DataContext";
-import { Plan, planUpsertRelations, getPane } from "./planner";
+import { Plan, planUpsertNodes, getPane } from "./planner";
 import { usePaneStack } from "./SplitPanesContext";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
-import { newNode } from "./relationFactory";
+import { newNode } from "./nodeFactory";
 import { getNodeUserPublicKey } from "./userEntry";
 
-export { newNode } from "./relationFactory";
+export { newNode } from "./nodeFactory";
 
 type ViewPathSegment = ID;
 
@@ -64,8 +64,8 @@ function decodePathID(encoded: string): string {
   return encoded.replace(/%3A/g, ":");
 }
 
-function createEmptyViewPathID(relationsID: LongID): string {
-  return `${EMPTY_VIEW_PATH_PREFIX}${relationsID}`;
+function createEmptyViewPathID(nodeID: LongID): string {
+  return `${EMPTY_VIEW_PATH_PREFIX}${nodeID}`;
 }
 
 function isEmptyViewPathID(id: ID): boolean {
@@ -133,13 +133,13 @@ export function getContext(
   viewPath: ViewPath,
   stack: ID[]
 ): Context {
-  const directRelation = getViewRelationByID(
+  const directNode = getViewNodeByID(
     data.knowledgeDBs,
     getLast(viewPath),
     data.user.publicKey
   );
-  if (directRelation) {
-    return getNodeContext(data.knowledgeDBs, directRelation);
+  if (directNode) {
+    return getNodeContext(data.knowledgeDBs, directNode);
   }
   if (isRoot(viewPath)) {
     return getContextFromStack(stack);
@@ -149,9 +149,9 @@ export function getContext(
     throw new Error("Cannot determine context: no parent path found");
   }
   const parentContext = getContext(data, parentPath, stack);
-  const parentRelation = getNodeForView(data, parentPath, stack);
-  if (parentRelation) {
-    return parentContext.push(getSemanticID(data.knowledgeDBs, parentRelation));
+  const parentNode = getNodeForView(data, parentPath, stack);
+  if (parentNode) {
+    return parentContext.push(getSemanticID(data.knowledgeDBs, parentNode));
   }
   const [parentItemID] = getRowIDFromView(data, parentPath);
   return parentContext.push(shortID(parentItemID as ID) as ID);
@@ -179,7 +179,7 @@ function getViewFromPath(data: Data, path: ViewPath): View {
   );
 }
 
-function getViewRelationByID(
+function getViewNodeByID(
   knowledgeDBs: KnowledgeDBs,
   id: ID,
   myself: PublicKey
@@ -187,16 +187,16 @@ function getViewRelationByID(
   return getNode(knowledgeDBs, id, myself);
 }
 
-function getEmptyRelationItem(
+function getEmptyNodeItem(
   data: Data,
-  parentRelation: GraphNode | undefined
+  parentNode: GraphNode | undefined
 ): GraphNode | undefined {
-  if (!parentRelation) {
+  if (!parentNode) {
     return undefined;
   }
   return computeEmptyNodeMetadata(data.publishEventsStatus.temporaryEvents).get(
-    parentRelation.id as LongID
-  )?.relationItem;
+    parentNode.id as LongID
+  )?.nodeItem;
 }
 
 function getRowIDFromPath(data: Data, viewPath: ViewPath): ID {
@@ -204,14 +204,14 @@ function getRowIDFromPath(data: Data, viewPath: ViewPath): ID {
   if (isEmptyViewPathID(currentID)) {
     return EMPTY_SEMANTIC_ID;
   }
-  const relation = getNode(data.knowledgeDBs, currentID, data.user.publicKey);
-  if (!relation) {
+  const node = getNode(data.knowledgeDBs, currentID, data.user.publicKey);
+  if (!node) {
     return currentID;
   }
-  if (isRefNode(relation)) {
-    return relation.id;
+  if (isRefNode(node)) {
+    return node.id;
   }
-  return getNodeSemanticID(relation);
+  return getNodeSemanticID(node);
 }
 
 export function getRowIDFromView(data: Data, viewPath: ViewPath): [ID, View] {
@@ -226,7 +226,7 @@ function getRowIDsForViewPath(data: Data, viewPath: ViewPath): Array<ID> {
   );
 }
 
-export function getParentRelation(
+export function getParentNode(
   data: Data,
   viewPath: ViewPath
 ): GraphNode | undefined {
@@ -239,8 +239,8 @@ export function getParentRelation(
 
 export function getEffectiveAuthor(data: Data, viewPath: ViewPath): PublicKey {
   const pane = getPane(data, viewPath);
-  const parentRelation = getParentRelation(data, viewPath);
-  return parentRelation?.author || pane.author;
+  const parentNode = getParentNode(data, viewPath);
+  return parentNode?.author || pane.author;
 }
 
 export function getNodeForView(
@@ -249,13 +249,13 @@ export function getNodeForView(
   stack: ID[]
 ): GraphNode | undefined {
   const currentID = getLast(viewPath);
-  const directRelation = getViewRelationByID(
+  const directNode = getViewNodeByID(
     data.knowledgeDBs,
     currentID,
     data.user.publicKey
   );
-  if (directRelation) {
-    return directRelation;
+  if (directNode) {
+    return directNode;
   }
 
   if (!isRoot(viewPath)) {
@@ -265,7 +265,7 @@ export function getNodeForView(
   const [itemID] = getRowIDFromView(data, viewPath);
   const semanticContext = getContext(data, viewPath, stack);
   const pane = getPane(data, viewPath);
-  const parentRoot = getParentRelation(data, viewPath)?.root;
+  const parentRoot = getParentNode(data, viewPath)?.root;
   const author = getEffectiveAuthor(data, viewPath);
 
   return resolveSemanticNodeInCurrentTree(
@@ -294,7 +294,7 @@ export function buildPaneTarget(
   const effectiveAuthor = getEffectiveAuthor(data, viewPath);
   const currentEdge = currentItem || getCurrentEdgeForView(data, viewPath);
   const virtualType = currentEdge?.virtualType;
-  const currentRelation = getNodeForView(data, viewPath, paneStack);
+  const currentNode = getNodeForView(data, viewPath, paneStack);
   const currentReference = getCurrentReferenceForView(
     data,
     viewPath,
@@ -311,9 +311,9 @@ export function buildPaneTarget(
           effectiveAuthor
         );
       }
-      if (isRefNode(currentRelation)) {
+      if (isRefNode(currentNode)) {
         return getRefLinkTargetInfo(
-          currentRelation.id,
+          currentNode.id,
           data.knowledgeDBs,
           effectiveAuthor
         );
@@ -346,11 +346,11 @@ export function buildPaneTarget(
     ...paneStackWithoutRoot,
     ...getRowIDsForViewPath(data, viewPath),
   ];
-  const relation = getNodeForView(data, viewPath, paneStack);
+  const node = getNodeForView(data, viewPath, paneStack);
   return {
     stack: fullStack,
     author: effectiveAuthor,
-    rootNodeId: relation?.id,
+    rootNodeId: node?.id,
   };
 }
 
@@ -385,12 +385,12 @@ export function getCurrentReferenceForView(
   currentItem?: GraphNode
 ): ReferenceRow | undefined {
   const currentEdge = currentItem || getCurrentEdgeForView(data, viewPath);
-  const currentRelation = getNodeForView(data, viewPath, stack);
+  const currentNode = getNodeForView(data, viewPath, stack);
   let referenceID: LongID | undefined;
   if (isRefNode(currentEdge)) {
     referenceID = currentEdge.id as LongID;
-  } else if (isRefNode(currentRelation)) {
-    referenceID = currentRelation.id as LongID;
+  } else if (isRefNode(currentNode)) {
+    referenceID = currentNode.id as LongID;
   }
   if (!referenceID) {
     return undefined;
@@ -398,22 +398,22 @@ export function getCurrentReferenceForView(
   return buildReferenceItem(referenceID, data, viewPath, stack, virtualType);
 }
 
-export function addRelationsToLastElement(
+export function addNodesToLastElement(
   path: ViewPath,
-  relationsID: LongID
+  nodeID: LongID
 ): ViewPath {
   const last = getLast(path);
-  if (last === relationsID) {
+  if (last === nodeID) {
     return path;
   }
   return [
     getPaneIndex(path),
     ...(path.slice(1, -1) as ViewPathSegment[]),
-    relationsID,
+    nodeID,
   ] as ViewPath;
 }
 
-export function addNodeToPathWithRelations(
+export function addNodeToPathWithNodes(
   path: ViewPath,
   nodes: GraphNode,
   index: number
@@ -422,10 +422,10 @@ export function addNodeToPathWithRelations(
   if (itemID === undefined) {
     throw new Error("No child node found at index");
   }
-  const pathWithRelations = addRelationsToLastElement(path, nodes.id);
+  const pathWithNodes = addNodesToLastElement(path, nodes.id);
   const nextSegment =
     itemID === EMPTY_SEMANTIC_ID ? createEmptyViewPathID(nodes.id) : itemID;
-  return [...pathWithRelations, nextSegment] as ViewPath;
+  return [...pathWithNodes, nextSegment] as ViewPath;
 }
 
 function addNodeToPath(
@@ -438,7 +438,7 @@ function addNodeToPath(
   if (!nodes) {
     throw new Error("Parent doesn't have nodes, cannot add to path");
   }
-  return addNodeToPathWithRelations(path, nodes, index);
+  return addNodeToPathWithNodes(path, nodes, index);
 }
 
 export function useEffectiveAuthor(): PublicKey {
@@ -464,7 +464,7 @@ export function getNodeIndexForView(
   data: Data,
   viewPath: ViewPath
 ): number | undefined {
-  const nodes = getParentRelation(data, viewPath);
+  const nodes = getParentNode(data, viewPath);
   if (!nodes) {
     return undefined;
   }
@@ -487,20 +487,20 @@ export function getCurrentEdgeForView(
   data: Data,
   viewPath: ViewPath
 ): GraphNode | undefined {
-  const parentRelation = getParentRelation(data, viewPath);
-  if (!parentRelation) {
+  const parentNode = getParentNode(data, viewPath);
+  if (!parentNode) {
     return undefined;
   }
   const index = getNodeIndexForView(data, viewPath);
   if (index === undefined) {
     return undefined;
   }
-  const childID = parentRelation.children.get(index);
+  const childID = parentNode.children.get(index);
   if (childID === undefined) {
     return undefined;
   }
   if (childID === EMPTY_SEMANTIC_ID) {
-    return getEmptyRelationItem(data, parentRelation);
+    return getEmptyNodeItem(data, parentNode);
   }
   return getNode(data.knowledgeDBs, childID, data.user.publicKey);
 }
@@ -528,8 +528,8 @@ export function getPreviousSibling(
   viewPath: ViewPath,
   stack: ID[]
 ): SiblingInfo | undefined {
-  const relationIndex = getNodeIndexForView(data, viewPath);
-  if (relationIndex === undefined || relationIndex === 0) {
+  const nodeIndex = getNodeIndexForView(data, viewPath);
+  if (nodeIndex === undefined || nodeIndex === 0) {
     return undefined;
   }
 
@@ -538,26 +538,26 @@ export function getPreviousSibling(
     return undefined;
   }
 
-  const parentRelation = getParentRelation(data, viewPath);
-  if (!parentRelation) {
+  const parentNode = getParentNode(data, viewPath);
+  if (!parentNode) {
     return undefined;
   }
 
   const pane = getPane(data, viewPath);
   const activeFilters = pane.typeFilters || DEFAULT_TYPE_FILTERS;
 
-  const prevIndex = parentRelation.children
-    .slice(0, relationIndex)
+  const prevIndex = parentNode.children
+    .slice(0, nodeIndex)
     .reduce<number>((found, childID, i) => {
       if (childID === EMPTY_SEMANTIC_ID) {
         return found;
       }
-      const childRelation = getNode(
+      const childNode = getNode(
         data.knowledgeDBs,
         childID,
         data.user.publicKey
       );
-      return childRelation && itemPassesFilters(childRelation, activeFilters)
+      return childNode && itemPassesFilters(childNode, activeFilters)
         ? i
         : found;
     }, -1);
@@ -649,15 +649,15 @@ export function getDisplayTextForView(
     const query = parseSearchId(itemID as ID) || "";
     return `Search: ${query}`;
   }
-  const ownRelation = getNodeForView(data, viewPath, stack);
-  const userPublicKey = getNodeUserPublicKey(ownRelation);
+  const ownNode = getNodeForView(data, viewPath, stack);
+  const userPublicKey = getNodeUserPublicKey(ownNode);
   const contactPetname = userPublicKey
     ? data.contacts.get(userPublicKey)?.userName
     : undefined;
   if (contactPetname) {
     return contactPetname;
   }
-  return ownRelation?.text ?? "";
+  return ownNode?.text ?? "";
 }
 
 export function useDisplayText(): string {
@@ -718,18 +718,18 @@ export function copyViewsWithNewPrefix(
   }, views);
 }
 
-export function copyViewsWithRelationsMapping(
+export function copyViewsWithNodesMapping(
   views: Views,
   sourceKey: string,
   targetKey: string,
-  relationsIdMapping: Map<LongID, LongID>
+  nodesIdMapping: Map<LongID, LongID>
 ): Views {
   const viewsToCopy = views.filter(
     (_, k) => k.startsWith(`${sourceKey}:`) || k === sourceKey
   );
   return viewsToCopy.reduce((acc, view, key) => {
     const suffix = key.slice(sourceKey.length);
-    const mappedSuffix = relationsIdMapping.reduce(
+    const mappedSuffix = nodesIdMapping.reduce(
       (s, newId, oldId) => s.split(oldId).join(newId),
       suffix
     );
@@ -738,43 +738,40 @@ export function copyViewsWithRelationsMapping(
   }, views);
 }
 
-export function upsertRelations(
+export function upsertNodes(
   plan: Plan,
   viewPath: ViewPath,
   stack: ID[],
   modify: (nodes: GraphNode) => GraphNode
 ): Plan {
   const semanticContext = getContext(plan, viewPath, stack);
-  const parentRelation = getParentRelation(plan, viewPath);
-  const parentRoot = parentRelation?.root;
-  const currentRelation = getNodeForView(plan, viewPath, stack);
+  const parentNode = getParentNode(plan, viewPath);
+  const parentRoot = parentNode?.root;
+  const currentNode = getNodeForView(plan, viewPath, stack);
 
-  if (currentRelation && currentRelation.author !== plan.user.publicKey) {
+  if (currentNode && currentNode.author !== plan.user.publicKey) {
     throw new Error("Cannot edit another user's nodes");
   }
 
   const base =
-    currentRelation ||
+    currentNode ||
     newNode(
       "",
       semanticContext,
       plan.user.publicKey,
       parentRoot,
-      parentRelation?.id
+      parentNode?.id
     );
 
   // Apply modification
-  const updatedRelations = modify(base);
+  const updatedNodes = modify(base);
 
   // Skip event if children unchanged
-  if (
-    currentRelation &&
-    currentRelation.children.equals(updatedRelations.children)
-  ) {
+  if (currentNode && currentNode.children.equals(updatedNodes.children)) {
     return plan;
   }
 
-  return planUpsertRelations(plan, updatedRelations);
+  return planUpsertNodes(plan, updatedNodes);
 }
 
 function pathContainsSubpath(
@@ -790,19 +787,19 @@ function pathContainsSubpath(
   );
 }
 
-export function updateViewPathsAfterMoveRelations(data: Data): Views {
+export function updateViewPathsAfterMoveNodes(data: Data): Views {
   return data.views;
 }
 
 export function updateViewPathsAfterDisconnect(
   views: Views,
   disconnectNode: ID,
-  fromRelation: LongID
+  fromNode: LongID
 ): Views {
   return views.filterNot((_, key) => {
     try {
       return pathContainsSubpath(parseViewPath(key), [
-        fromRelation,
+        fromNode,
         disconnectNode,
       ]);
     } catch {
@@ -844,6 +841,6 @@ export function updateViewPathsAfterPaneInsert(
   });
 }
 
-export function bulkUpdateViewPathsAfterAddRelation(data: Data): Views {
+export function bulkUpdateViewPathsAfterAddNode(data: Data): Views {
   return data.views;
 }

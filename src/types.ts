@@ -112,12 +112,12 @@ declare global {
   type TemporaryEvent =
     | {
         type: "ADD_EMPTY_NODE";
-        relationsID: LongID;
+        nodeID: LongID;
         index: number;
-        relationItem: GraphNode;
+        nodeItem: GraphNode;
         paneIndex: number;
       }
-    | { type: "REMOVE_EMPTY_NODE"; relationsID: LongID };
+    | { type: "REMOVE_EMPTY_NODE"; nodeID: LongID };
 
   type EventState = PublishEvents<EventAttachment> & {
     preLoginEvents: List<UnsignedEvent & EventAttachment>;
@@ -199,7 +199,7 @@ declare global {
   // e.g., [scholarium-id, places-id] when viewing via "Scholarium > Places > Node"
   type Context = List<ID>;
 
-  // Relevance levels for relation children
+  // Relevance levels for node children
   // undefined = "contains" (no relevance set, default for new children)
   type Relevance =
     | "relevant"
@@ -208,10 +208,10 @@ declare global {
     | "not_relevant"
     | undefined;
 
-  // Argument types (evidence) for relation children
+  // Argument types (evidence) for node children
   type Argument = "confirms" | "contra" | undefined;
 
-  // Each item in a relation has relevance and optional argument
+  // Each item in a node has relevance and optional argument
   type VirtualType = "suggestion" | "search" | "incoming" | "version";
 
   type VersionMeta = {
@@ -225,8 +225,8 @@ declare global {
     snapshotLabels?: string[];
     sourceAuthor?: PublicKey;
     sourceRootID?: ID;
-    sourceRelationID?: ID;
-    sourceParentRelationID?: ID;
+    sourceNodeID?: ID;
+    sourceParentNodeID?: ID;
   };
 
   type RootSystemRole = "log";
@@ -271,19 +271,19 @@ declare global {
 
   type Views = Map<string, View>;
 
-  type RelationType = {
+  type NodeType = {
     color: string;
     label: string;
-    invertedRelationLabel: string;
+    invertedNodeLabel: string;
   };
-  type RelationTypes = OrderedMap<ID, RelationType>;
+  type NodeTypes = OrderedMap<ID, NodeType>;
 
   type KnowledgeData = {
     nodes: Map<ID, GraphNode>;
   };
 
   type SemanticIndex = {
-    relationByID: globalThis.Map<LongID, GraphNode>;
+    nodeByID: globalThis.Map<LongID, GraphNode>;
     semantic: globalThis.Map<string, globalThis.Set<LongID>>;
     incomingCrefs: globalThis.Map<LongID, globalThis.Set<LongID>>;
     basedOnIndex: globalThis.Map<LongID, globalThis.Set<LongID>>;

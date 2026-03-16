@@ -1,5 +1,5 @@
 import { getSemanticID, isSearchId, shortID } from "./connections";
-import { planRemoveRelationItemById } from "./dataPlanner";
+import { planRemoveNodeItemById } from "./dataPlanner";
 import {
   ViewPath,
   getContext,
@@ -11,7 +11,7 @@ import {
   getNodeForView,
   getPaneIndex,
   isRoot,
-  addNodeToPathWithRelations,
+  addNodeToPathWithNodes,
   viewPathToString,
   copyViewsWithNewPrefix,
 } from "./ViewContext";
@@ -19,9 +19,9 @@ import {
   getPane,
   Plan,
   planAddToParent,
-  planDeleteRelations,
-  planDeleteDescendantRelations,
-  planMoveDescendantRelations,
+  planDeleteNodes,
+  planDeleteDescendantNodes,
+  planMoveDescendantNodes,
   planUpdatePanes,
   planUpdateViews,
 } from "./planner";
@@ -64,34 +64,34 @@ export function planDisconnectFromParent(
     return plan;
   }
 
-  const relationIndex = getNodeIndexForView(plan, viewPath);
-  if (relationIndex === undefined) {
+  const nodeIndex = getNodeIndexForView(plan, viewPath);
+  if (nodeIndex === undefined) {
     return plan;
   }
 
   const disconnectID = getLast(viewPath);
-  const parentRelation = getNodeForView(plan, parentPath, stack);
-  if (!parentRelation) {
+  const parentNode = getNodeForView(plan, parentPath, stack);
+  if (!parentNode) {
     return plan;
   }
-  if (parentRelation.author !== plan.user.publicKey) {
+  if (parentNode.author !== plan.user.publicKey) {
     return plan;
   }
 
-  const updatedRelationsPlan = planRemoveRelationItemById(
+  const updatedNodesPlan = planRemoveNodeItemById(
     plan,
-    parentRelation.id,
+    parentNode.id,
     getLast(viewPath),
     preserveDescendants === undefined ? false : !!preserveDescendants
   );
 
   const updatedViews = updateViewPathsAfterDisconnect(
-    updatedRelationsPlan.views,
+    updatedNodesPlan.views,
     disconnectID,
-    parentRelation.id
+    parentNode.id
   );
 
-  const planWithViews = planUpdateViews(updatedRelationsPlan, updatedViews);
+  const planWithViews = planUpdateViews(updatedNodesPlan, updatedViews);
 
   return resetInvalidPanes(planWithViews);
 }
@@ -110,16 +110,13 @@ export function planDeleteNodeFromView(
     return plan;
   }
 
-  const relation = getNodeForView(plan, viewPath, stack);
-  if (!relation || relation.author !== plan.user.publicKey) {
+  const node = getNodeForView(plan, viewPath, stack);
+  if (!node || node.author !== plan.user.publicKey) {
     return plan;
   }
 
-  const planAfterDescendants = planDeleteDescendantRelations(plan, relation);
-  const planAfterDelete = planDeleteRelations(
-    planAfterDescendants,
-    relation.id
-  );
+  const planAfterDescendants = planDeleteDescendantNodes(plan, node);
+  const planAfterDelete = planDeleteNodes(planAfterDescendants, node.id);
   return resetInvalidPanes(planAfterDelete, getPaneIndex(viewPath));
 }
 
@@ -132,8 +129,8 @@ export function planMoveNodeWithView(
 ): Plan {
   const [sourceItemID] = getRowIDFromView(plan, sourceViewPath);
   const sourceStack = getPane(plan, sourceViewPath).stack;
-  const sourceRelation = getNodeForView(plan, sourceViewPath, sourceStack);
-  const sourceAddID = sourceRelation?.id ?? sourceItemID;
+  const sourceNode = getNodeForView(plan, sourceViewPath, sourceStack);
+  const sourceAddID = sourceNode?.id ?? sourceItemID;
 
   const [planWithAdd, [actualItemID]] = planAddToParent(
     plan,
@@ -154,15 +151,15 @@ export function planMoveNodeWithView(
     planWithAdd,
     targetParentViewPath
   );
-  const actualTargetParentRelation = getNodeForView(
+  const actualTargetParentNode = getNodeForView(
     planWithAdd,
     targetParentViewPath,
     stack
   );
   const targetContext = targetParentContext.push(
     shortID(
-      (actualTargetParentRelation
-        ? getSemanticID(planWithAdd.knowledgeDBs, actualTargetParentRelation)
+      (actualTargetParentNode
+        ? getSemanticID(planWithAdd.knowledgeDBs, actualTargetParentNode)
         : targetParentRowID) as ID
     )
   );
@@ -173,7 +170,7 @@ export function planMoveNodeWithView(
   }
 
   const targetIndex = insertAtIndex ?? nodes.children.size - 1;
-  const targetViewPath = addNodeToPathWithRelations(
+  const targetViewPath = addNodeToPathWithNodes(
     targetParentViewPath,
     nodes,
     targetIndex
@@ -208,16 +205,16 @@ export function planMoveNodeWithView(
         )
       : disconnectedPlan;
 
-  if (!sourceRelation) {
+  if (!sourceNode) {
     return planWithDisconnect;
   }
 
-  return planMoveDescendantRelations(
+  return planMoveDescendantNodes(
     planWithDisconnect,
-    sourceRelation,
+    sourceNode,
     targetContext,
-    actualTargetParentRelation?.id,
+    actualTargetParentNode?.id,
     moveItemID !== sourceItemID ? moveItemID : undefined,
-    actualTargetParentRelation?.root
+    actualTargetParentNode?.root
   );
 }

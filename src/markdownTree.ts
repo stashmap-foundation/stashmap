@@ -54,10 +54,8 @@ function parseIdComment(content: string): ParsedComment | undefined {
   const anchorLabelsAttr = attrsMap.anchorLabels || undefined;
   const sourceAuthor = attrsMap.sourceAuthor || undefined;
   const sourceRootID = (attrsMap.sourceRoot || undefined) as ID | undefined;
-  const sourceRelationID = (attrsMap.sourceRelation || undefined) as
-    | LongID
-    | undefined;
-  const sourceParentRelationID = (attrsMap.sourceParent || undefined) as
+  const sourceNodeID = (attrsMap.sourceNode || undefined) as LongID | undefined;
+  const sourceParentNodeID = (attrsMap.sourceParent || undefined) as
     | LongID
     | undefined;
   const rawSystemRole = attrsMap.systemRole || undefined;
@@ -72,8 +70,8 @@ function parseIdComment(content: string): ParsedComment | undefined {
     anchorLabelsAttr ||
     sourceAuthor ||
     sourceRootID ||
-    sourceRelationID ||
-    sourceParentRelationID
+    sourceNodeID ||
+    sourceParentNodeID
       ? {
           snapshotContext: anchorContext
             ? List(anchorContext.split(":") as ID[])
@@ -87,8 +85,8 @@ function parseIdComment(content: string): ParsedComment | undefined {
             : {}),
           ...(sourceAuthor ? { sourceAuthor: sourceAuthor as PublicKey } : {}),
           ...(sourceRootID ? { sourceRootID } : {}),
-          ...(sourceRelationID ? { sourceRelationID } : {}),
-          ...(sourceParentRelationID ? { sourceParentRelationID } : {}),
+          ...(sourceNodeID ? { sourceNodeID } : {}),
+          ...(sourceParentNodeID ? { sourceParentNodeID } : {}),
         }
       : undefined;
 

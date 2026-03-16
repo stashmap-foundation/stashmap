@@ -776,7 +776,7 @@ describe("X toggle (not_relevant)", () => {
   });
 });
 
-describe("Relation lookup consistency (regression)", () => {
+describe("Node lookup consistency (regression)", () => {
   test("setting relevance to little_relevant hides item", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);

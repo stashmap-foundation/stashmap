@@ -16,7 +16,7 @@ import { isEmptySemanticID } from "../connections";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
 import {
-  isEditableRelation,
+  isEditableNode,
   useIsEditingOn,
   useIsSelected,
 } from "./TemporaryViewContext";
@@ -68,7 +68,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     const path = useViewPath();
     const isNodeBeeingEdited = useIsEditingOn();
     const [itemID] = useCurrentRowID();
-    const relation = useCurrentNode();
+    const node = useCurrentNode();
     const displayText = useDisplayText();
     const isEmptyNode = isEmptySemanticID(itemID);
     const disableDrag = isNodeBeeingEdited || isEmptyNode;
@@ -123,7 +123,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
         data-row-depth={rowDepth}
         data-node-id={itemID}
         data-node-text={displayText}
-        data-node-mutable={isEditableRelation(relation) ? "true" : "false"}
+        data-node-mutable={isEditableNode(node) ? "true" : "false"}
         data-selected={isSelected ? "true" : undefined}
         role="treeitem"
         aria-label={displayText}
@@ -167,7 +167,7 @@ function DraggableSuggestion({
   const ref = useRef<HTMLDivElement>(null);
   const path = useViewPath();
   const currentItem = useCurrentEdge();
-  const relation = useCurrentNode();
+  const node = useCurrentNode();
   const displayText = useDisplayText();
 
   const [{ isDragging }, drag, preview] = useDrag({
@@ -178,7 +178,7 @@ function DraggableSuggestion({
         path,
         text: displayText,
         isSuggestion: true,
-        nodeId: relation?.id,
+        nodeId: node?.id,
         targetId: currentItem?.targetID || undefined,
       };
     },
@@ -221,9 +221,9 @@ function DraggableSuggestion({
       data-view-key={rowViewKey}
       data-row-index={rowIndex}
       data-row-depth={rowDepth}
-      data-node-id={currentItem?.id || relation?.id}
+      data-node-id={currentItem?.id || node?.id}
       data-node-text={displayText}
-      data-node-mutable={isEditableRelation(relation) ? "true" : "false"}
+      data-node-mutable={isEditableNode(node) ? "true" : "false"}
       data-selected={isSelected ? "true" : undefined}
       role="treeitem"
       aria-label={displayText}

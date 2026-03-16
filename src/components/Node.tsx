@@ -22,7 +22,7 @@ import {
   useCurrentNode,
   getCurrentReferenceForView,
 } from "../ViewContext";
-import { isEditableRelation } from "./TemporaryViewContext";
+import { isEditableNode } from "./TemporaryViewContext";
 import { planBatchIndent, planBatchOutdent } from "./batchOperations";
 import {
   getRefLinkTargetInfo,
@@ -35,13 +35,13 @@ import {
 import { ReferenceDisplay } from "./referenceDisplay";
 import { IS_MOBILE } from "./responsive";
 import { MiniEditor, preventEditorBlur } from "./AddNode";
-import { useOnToggleExpanded } from "./SelectRelations";
+import { useOnToggleExpanded } from "./SelectNodes";
 import { useData } from "../DataContext";
 import {
   Plan,
   usePlanner,
   planSetEmptyNodePosition,
-  planSaveNodeAndEnsureRelations,
+  planSaveNodeAndEnsureNodes,
   getNextInsertPosition,
   planExpandNode,
   planRemoveEmptyNodePosition,
@@ -60,7 +60,7 @@ import {
   useCurrentPane,
   useNavigatePane,
 } from "../SplitPanesContext";
-import { buildRelationUrl } from "../navigationUrl";
+import { buildNodeRouteUrl } from "../navigationUrl";
 import { RightMenu } from "./RightMenu";
 import { useItemStyle } from "./useItemStyle";
 import { EditorTextProvider } from "./EditorTextContext";
@@ -75,18 +75,18 @@ function useNodeHasChildren(): boolean {
   const stack = usePaneStack();
   const pane = useCurrentPane();
   const currentItem = useCurrentEdge();
-  const currentRelation = useCurrentNode();
+  const currentNode = useCurrentNode();
   useEffectiveAuthor();
 
-  if (currentRelation) {
-    if (currentRelation.children.size > 0) {
+  if (currentNode) {
+    if (currentNode.children.size > 0) {
       return true;
     }
   }
 
   if (currentItem && isRefNode(currentItem)) {
-    const targetRelation = resolveNode(data.knowledgeDBs, currentItem);
-    if (targetRelation?.children.size) {
+    const targetNode = resolveNode(data.knowledgeDBs, currentItem);
+    if (targetNode?.children.size) {
       return true;
     }
   }
@@ -189,8 +189,8 @@ function ReferenceContent({
 }: {
   reference: ReferenceRow;
 }): JSX.Element {
-  const relationItem = useCurrentEdge();
-  const virtualType = relationItem?.virtualType;
+  const nodeItem = useCurrentEdge();
+  const virtualType = nodeItem?.virtualType;
 
   if (virtualType === "version" || reference.versionMeta) {
     return <VersionContent reference={reference} />;
@@ -235,14 +235,14 @@ function EditableContent(): JSX.Element {
   const paneIndex = usePaneIndex();
   const data = useData();
   const { createPlan, executePlan } = usePlanner();
-  const currentRelation = useCurrentNode();
+  const currentNode = useCurrentNode();
   const [itemID] = useCurrentRowID();
   const displayText = useDisplayText();
   const prevSibling = usePreviousSibling();
   const parentPath = getParentView(viewPath);
   const viewIsExpanded = useIsExpanded();
   const nodeIsRoot = useIsRoot();
-  const relationIndex = useNodeIndex();
+  const nodeIndex = useNodeIndex();
   const isEmptyNode = isEmptySemanticID(itemID);
   const nodeHasChildren = useNodeHasChildren();
   const nodeIsExpanded = viewIsExpanded && nodeHasChildren;
@@ -250,11 +250,11 @@ function EditableContent(): JSX.Element {
   const emptyNodeMetadata = computeEmptyNodeMetadata(
     data.publishEventsStatus.temporaryEvents
   );
-  const parentRelation = parentPath
+  const parentNode = parentPath
     ? getNodeForView(data, parentPath, stack)
     : undefined;
-  const emptyData = parentRelation
-    ? emptyNodeMetadata.get(parentRelation.id)
+  const emptyData = parentNode
+    ? emptyNodeMetadata.get(parentNode.id)
     : undefined;
   const isRootEmptyNode = isEmptyNode && !parentPath;
   const shouldAutoFocus =
@@ -279,7 +279,7 @@ function EditableContent(): JSX.Element {
     submitted?: boolean
   ): void => {
     const { plan: basePlan, viewPath: updatedViewPath } =
-      planSaveNodeAndEnsureRelations(createPlan(), text, viewPath, stack);
+      planSaveNodeAndEnsureNodes(createPlan(), text, viewPath, stack);
     const planWithEscFocus = escapeFocusPendingRef.current
       ? planWithRowFocusIntent(basePlan, updatedViewPath)
       : basePlan;
@@ -296,7 +296,7 @@ function EditableContent(): JSX.Element {
       updatedViewPath,
       nodeIsRoot,
       nodeIsExpanded,
-      relationIndex
+      nodeIndex
     );
 
     if (!nextPosition) {
@@ -315,7 +315,7 @@ function EditableContent(): JSX.Element {
   };
 
   const handleTab = (text: string): void => {
-    if (!isEmptyNode && !isEditableRelation(currentRelation)) {
+    if (!isEmptyNode && !isEditableNode(currentNode)) {
       return;
     }
 
@@ -324,9 +324,9 @@ function EditableContent(): JSX.Element {
 
     if (isEmptyNode) {
       if (!prevSibling || !parentPath) return;
-      const currentParentRelation = getNodeForView(basePlan, parentPath, stack);
-      const planWithoutEmpty = currentParentRelation
-        ? planRemoveEmptyNodePosition(basePlan, currentParentRelation.id)
+      const currentParentNode = getNodeForView(basePlan, parentPath, stack);
+      const planWithoutEmpty = currentParentNode
+        ? planRemoveEmptyNodePosition(basePlan, currentParentNode.id)
         : basePlan;
       const planWithExpand = planExpandNode(
         planWithoutEmpty,
@@ -371,12 +371,12 @@ function EditableContent(): JSX.Element {
       if (!parentPath) return;
       const grandParentPath = getParentView(parentPath);
       if (!grandParentPath) return;
-      const parentRelationIndex = getNodeIndexForView(basePlan, parentPath);
-      if (parentRelationIndex === undefined) return;
+      const parentNodeIndex = getNodeIndexForView(basePlan, parentPath);
+      if (parentNodeIndex === undefined) return;
 
-      const currentParentRelation = getNodeForView(basePlan, parentPath, stack);
-      const planWithoutEmpty = currentParentRelation
-        ? planRemoveEmptyNodePosition(basePlan, currentParentRelation.id)
+      const currentParentNode = getNodeForView(basePlan, parentPath, stack);
+      const planWithoutEmpty = currentParentNode
+        ? planRemoveEmptyNodePosition(basePlan, currentParentNode.id)
         : basePlan;
 
       if (!trimmedText) {
@@ -385,7 +385,7 @@ function EditableContent(): JSX.Element {
             planWithoutEmpty,
             grandParentPath,
             stack,
-            parentRelationIndex + 1
+            parentNodeIndex + 1
           )
         );
         return;
@@ -401,13 +401,13 @@ function EditableContent(): JSX.Element {
           newNode,
           grandParentPath,
           stack,
-          parentRelationIndex + 1
+          parentNodeIndex + 1
         )[0]
       );
       return;
     }
 
-    if (!isEditableRelation(currentRelation)) return;
+    if (!isEditableNode(currentNode)) return;
 
     const viewKey = viewPathToString(viewPath);
     const result = planBatchOutdent(basePlan, [viewKey], stack, {
@@ -449,12 +449,7 @@ function EditableContent(): JSX.Element {
     currentText: string
   ): void => {
     const { plan: basePlan, viewPath: updatedViewPath } =
-      planSaveNodeAndEnsureRelations(
-        createPlan(),
-        currentText,
-        viewPath,
-        stack
-      );
+      planSaveNodeAndEnsureNodes(createPlan(), currentText, viewPath, stack);
     const trees = parsedLinesToTrees(children);
     const parentOfSaved = getParentView(updatedViewPath);
     if (!parentOfSaved) {
@@ -484,19 +479,19 @@ function EditableContent(): JSX.Element {
   const handleClose = (): void => {
     if (!isEmptyNode || !parentPath) return;
     const plan = createPlan();
-    const closeParentRelation = getNodeForView(plan, parentPath, stack);
-    if (closeParentRelation) {
-      executePlan(planRemoveEmptyNodePosition(plan, closeParentRelation.id));
+    const closeParentNode = getNodeForView(plan, parentPath, stack);
+    if (closeParentNode) {
+      executePlan(planRemoveEmptyNodePosition(plan, closeParentNode.id));
     }
   };
 
-  if (!isEmptyNode && !isEditableRelation(currentRelation)) {
+  if (!isEmptyNode && !isEditableNode(currentNode)) {
     return <NodeContent />;
   }
 
   return (
     <MiniEditor
-      key={`${viewPathToString(viewPath)}:${relationIndex}`}
+      key={`${viewPathToString(viewPath)}:${nodeIndex}`}
       initialText={displayText}
       onSave={handleSave}
       onTab={handleTab}
@@ -516,7 +511,7 @@ function InteractiveNodeContent(): JSX.Element {
   const data = useData();
   const viewPath = useViewPath();
   const stack = usePaneStack();
-  const currentRelation = useCurrentNode();
+  const currentNode = useCurrentNode();
   const [itemID] = useCurrentRowID();
   const isLoading = useNodeIsLoading();
   const isInSearchView = useIsInSearchView();
@@ -545,11 +540,11 @@ function InteractiveNodeContent(): JSX.Element {
     return isReadonly ? <></> : <EditableContent />;
   }
 
-  if (!currentRelation && !reference && displayText === "") {
+  if (!currentNode && !reference && displayText === "") {
     return <ErrorContent />;
   }
 
-  if (isEditableRelation(currentRelation) && !isReadonly) {
+  if (isEditableNode(currentNode) && !isReadonly) {
     return <EditableContent />;
   }
 
@@ -586,7 +581,7 @@ function NodeAutoLink({
         : getRefLinkTargetInfo(node.id, knowledgeDBs, effectiveAuthor);
     if (refInfo) {
       const href = refInfo.rootNodeId
-        ? buildRelationUrl(refInfo.rootNodeId, refInfo.scrollToId)
+        ? buildNodeRouteUrl(refInfo.rootNodeId, refInfo.scrollToId)
         : "#";
       return (
         <a
@@ -727,7 +722,7 @@ export function Node({
   const currentItem = useCurrentEdge();
   const isConcreteRef = isRefNode(currentItem);
   const virtualType = currentItem?.virtualType;
-  const currentRelation = useCurrentNode();
+  const currentNode = useCurrentNode();
   const isViewingOtherUser = useIsViewingOtherUserContent();
   const node = getCurrentReferenceForView(
     data,
@@ -736,7 +731,7 @@ export function Node({
     virtualType,
     currentItem
   );
-  const userEntryPublicKey = getNodeUserPublicKey(currentRelation);
+  const userEntryPublicKey = getNodeUserPublicKey(currentNode);
   const isFollowingUserEntry =
     !!userEntryPublicKey && data.contacts.has(userEntryPublicKey);
   const isOtherUser =
@@ -745,7 +740,7 @@ export function Node({
   const isVersion =
     virtualType === "version" || (!virtualType && !!node?.versionMeta);
   const isSuggestionWithChildren =
-    isSuggestion && (isConcreteRef || !!currentRelation);
+    isSuggestion && (isConcreteRef || !!currentNode);
   const showExpandCollapse =
     (!isSuggestion && !isVersion && !isConcreteRef) || isSuggestionWithChildren;
   const hasChildren = useNodeHasChildren();

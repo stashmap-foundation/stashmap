@@ -1,8 +1,8 @@
 export const LOG_ROOT_ROLE: RootSystemRole = "log";
 const LOG_ROOT_TEXT = "~Log";
 
-export function isStandaloneRoot(relation: GraphNode): boolean {
-  return !relation.parent && relation.root === relation.id;
+export function isStandaloneRoot(node: GraphNode): boolean {
+  return !node.parent && node.root === node.id;
 }
 
 export function getOwnSystemRoot(
@@ -14,12 +14,12 @@ export function getOwnSystemRoot(
     .get(author)
     ?.nodes.valueSeq()
     .filter(
-      (relation) =>
-        relation.author === author &&
-        relation.systemRole === systemRole &&
-        isStandaloneRoot(relation)
+      (node) =>
+        node.author === author &&
+        node.systemRole === systemRole &&
+        isStandaloneRoot(node)
     )
-    .sortBy((relation) => -relation.updated)
+    .sortBy((node) => -node.updated)
     .first();
 }
 

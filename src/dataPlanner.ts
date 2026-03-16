@@ -1,6 +1,6 @@
 import { Set } from "immutable";
 import {
-  deleteRelations,
+  deleteNodes,
   getNodeContext,
   getNode,
   isRefNode,
@@ -8,110 +8,103 @@ import {
 } from "./connections";
 import {
   GraphPlan,
-  planDeleteDescendantRelations,
-  planDeleteRelations,
-  planMoveDescendantRelations,
-  planUpsertRelations,
+  planDeleteDescendantNodes,
+  planDeleteNodes,
+  planMoveDescendantNodes,
+  planUpsertNodes,
 } from "./planner";
-import {
-  RelationItemMetadata,
-  updateRelationItemMetadata,
-} from "./relationItemMetadata";
+import { NodeItemMetadata, updateNodeItemMetadata } from "./nodeItemMetadata";
 
-function getWritableRelation(
+function getWritableNode(
   plan: GraphPlan,
-  relationId: LongID
+  nodeId: LongID
 ): GraphNode | undefined {
-  const relation = getNode(plan.knowledgeDBs, relationId, plan.user.publicKey);
-  if (!relation || relation.author !== plan.user.publicKey) {
+  const node = getNode(plan.knowledgeDBs, nodeId, plan.user.publicKey);
+  if (!node || node.author !== plan.user.publicKey) {
     return undefined;
   }
-  return relation;
+  return node;
 }
 
-function getRelationItemIndex(
-  relation: GraphNode,
-  itemId: ID
-): number | undefined {
-  const index = relation.children.findIndex((childID) => childID === itemId);
+function getNodeItemIndex(node: GraphNode, itemId: ID): number | undefined {
+  const index = node.children.findIndex((childID) => childID === itemId);
   return index >= 0 ? index : undefined;
 }
 
-function requireRelationItem(
+function requireNodeItem(
   plan: GraphPlan,
-  relation: GraphNode,
+  node: GraphNode,
   itemId: ID
 ): GraphNode | undefined {
-  const index = getRelationItemIndex(relation, itemId);
-  const childID =
-    index === undefined ? undefined : relation.children.get(index);
+  const index = getNodeItemIndex(node, itemId);
+  const childID = index === undefined ? undefined : node.children.get(index);
   return childID
     ? getNode(plan.knowledgeDBs, childID, plan.user.publicKey)
     : undefined;
 }
 
-export function planUpdateRelationItemMetadataById<T extends GraphPlan>(
+export function planUpdateNodeItemMetadataById<T extends GraphPlan>(
   plan: T,
-  parentRelationId: LongID,
+  parentNodeId: LongID,
   itemId: ID,
-  metadata: RelationItemMetadata
+  metadata: NodeItemMetadata
 ): T {
-  const parentRelation = getWritableRelation(plan, parentRelationId);
-  if (!parentRelation) {
+  const parentNode = getWritableNode(plan, parentNodeId);
+  if (!parentNode) {
     return plan;
   }
-  const relationIndex = getRelationItemIndex(parentRelation, itemId);
-  if (relationIndex === undefined) {
+  const nodeIndex = getNodeItemIndex(parentNode, itemId);
+  if (nodeIndex === undefined) {
     return plan;
   }
-  const item = requireRelationItem(plan, parentRelation, itemId);
+  const item = requireNodeItem(plan, parentNode, itemId);
   return item
-    ? planUpsertRelations(plan, updateRelationItemMetadata(item, metadata))
+    ? planUpsertNodes(plan, updateNodeItemMetadata(item, metadata))
     : plan;
 }
 
-export function planRemoveRelationItemById<T extends GraphPlan>(
+export function planRemoveNodeItemById<T extends GraphPlan>(
   plan: T,
-  parentRelationId: LongID,
+  parentNodeId: LongID,
   itemId: ID,
   preserveDescendants = false
 ): T {
-  const parentRelation = getWritableRelation(plan, parentRelationId);
-  if (!parentRelation) {
+  const parentNode = getWritableNode(plan, parentNodeId);
+  if (!parentNode) {
     return plan;
   }
-  const relationIndex = getRelationItemIndex(parentRelation, itemId);
-  if (relationIndex === undefined) {
+  const nodeIndex = getNodeItemIndex(parentNode, itemId);
+  if (nodeIndex === undefined) {
     return plan;
   }
-  const item = requireRelationItem(plan, parentRelation, itemId);
-  const withoutItem = planUpsertRelations(
+  const item = requireNodeItem(plan, parentNode, itemId);
+  const withoutItem = planUpsertNodes(
     plan,
-    deleteRelations(parentRelation, Set([relationIndex]))
+    deleteNodes(parentNode, Set([nodeIndex]))
   );
   if (!item || isRefNode(item)) {
     return withoutItem;
   }
-  const sourceRelation = getNode(
+  const sourceNode = getNode(
     withoutItem.knowledgeDBs,
     item.id,
     withoutItem.user.publicKey
   );
-  if (!sourceRelation) {
+  if (!sourceNode) {
     return withoutItem;
   }
   if (preserveDescendants) {
-    return planMoveDescendantRelations(
+    return planMoveDescendantNodes(
       withoutItem,
-      sourceRelation,
-      getNodeContext(withoutItem.knowledgeDBs, sourceRelation),
+      sourceNode,
+      getNodeContext(withoutItem.knowledgeDBs, sourceNode),
       undefined,
       undefined,
-      shortID(sourceRelation.id)
+      shortID(sourceNode.id)
     );
   }
-  return planDeleteRelations(
-    planDeleteDescendantRelations(withoutItem, sourceRelation),
-    sourceRelation.id
+  return planDeleteNodes(
+    planDeleteDescendantNodes(withoutItem, sourceNode),
+    sourceNode.id
   );
 }

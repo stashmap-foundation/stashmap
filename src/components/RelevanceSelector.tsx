@@ -75,7 +75,7 @@ export function RelevanceSelector({
 
   const viewPath = useViewPath();
   const viewKey = useViewKey();
-  const currentRelation = useCurrentNode();
+  const currentNode = useCurrentNode();
   const stack = usePaneStack();
   const virtualItemsMap = useVirtualItemsMap();
   const { createPlan, executePlan } = usePlanner();
@@ -97,7 +97,7 @@ export function RelevanceSelector({
   const isContains = displayLevel === -1;
   const displayText = isVirtual
     ? versionedDisplayText
-    : editorText.trim() || versionedDisplayText || currentRelation?.text || "";
+    : editorText.trim() || versionedDisplayText || currentNode?.text || "";
 
   const isInSelection = selection.has(viewKey) && selection.size > 1;
 

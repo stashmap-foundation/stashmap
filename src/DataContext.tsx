@@ -30,7 +30,7 @@ export function DataContextProvider({
   return <DataContext.Provider value={props}>{children}</DataContext.Provider>;
 }
 
-function mergeDBNodesAndRelations(
+function mergeDBNodesAndNodes(
   a: KnowledgeData | undefined,
   b: KnowledgeData | undefined
 ): KnowledgeData {
@@ -47,7 +47,7 @@ function mergeKnowledgeDBs(a: KnowledgeDBs, b: KnowledgeDBs): KnowledgeDBs {
   const allUsers = a.keySeq().toSet().union(b.keySeq().toSet());
   return Map<PublicKey, KnowledgeData>(
     allUsers.toArray().map((userPK) => {
-      return [userPK, mergeDBNodesAndRelations(a.get(userPK), b.get(userPK))];
+      return [userPK, mergeDBNodesAndNodes(a.get(userPK), b.get(userPK))];
     })
   );
 }

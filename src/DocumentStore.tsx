@@ -15,7 +15,7 @@ import {
   subscribeDocumentStore,
 } from "./indexedDB";
 import {
-  buildKnowledgeDBFromDocumentRelations,
+  buildKnowledgeDBFromDocumentNodes,
   storedDocumentToEvent,
 } from "./documentMaterialization";
 import {
@@ -24,18 +24,18 @@ import {
   toStoredDeleteRecord,
   toStoredDocumentRecord,
 } from "./permanentSync";
-import { parseDocumentEvent } from "./markdownRelations";
+import { parseDocumentEvent } from "./markdownNodes";
 import {
-  addRelationsToSemanticIndex,
+  addNodesToSemanticIndex,
   buildSemanticIndexFromDocuments,
   createEmptySemanticIndex,
-  removeRelationsFromSemanticIndex,
+  removeNodesFromSemanticIndex,
 } from "./semanticIndex";
 
 type DocumentSnapshot = {
   documents: ImmutableMap<string, StoredDocumentRecord>;
   deletes: ImmutableMap<string, StoredDeleteRecord>;
-  relationsByDocumentKey: ImmutableMap<string, ImmutableMap<string, GraphNode>>;
+  nodesByDocumentKey: ImmutableMap<string, ImmutableMap<string, GraphNode>>;
   knowledgeDBs: KnowledgeDBs;
   semanticIndex: SemanticIndex;
 };
@@ -54,22 +54,19 @@ function createEmptySnapshot(): DocumentSnapshot {
   return {
     documents: ImmutableMap<string, StoredDocumentRecord>(),
     deletes: ImmutableMap<string, StoredDeleteRecord>(),
-    relationsByDocumentKey: ImmutableMap<
-      string,
-      ImmutableMap<string, GraphNode>
-    >(),
+    nodesByDocumentKey: ImmutableMap<string, ImmutableMap<string, GraphNode>>(),
     knowledgeDBs: ImmutableMap<PublicKey, KnowledgeData>(),
     semanticIndex: createEmptySemanticIndex(),
   };
 }
 
-function parseStoredDocumentRelations(
+function parseStoredDocumentNodes(
   document: StoredDocumentRecord
 ): ImmutableMap<string, GraphNode> {
   return parseDocumentEvent(storedDocumentToEvent(document));
 }
 
-function getAuthorDocumentRelations(
+function getAuthorDocumentNodes(
   snapshot: DocumentSnapshot,
   author: PublicKey
 ): ImmutableMap<string, GraphNode> {
@@ -78,7 +75,7 @@ function getAuthorDocumentRelations(
       return acc;
     }
     return acc.merge(
-      snapshot.relationsByDocumentKey.get(document.replaceableKey) ||
+      snapshot.nodesByDocumentKey.get(document.replaceableKey) ||
         ImmutableMap<string, GraphNode>()
     );
   }, ImmutableMap<string, GraphNode>());
@@ -90,10 +87,10 @@ function rebuildAuthors(
 ): KnowledgeDBs {
   const authorSet = new Set(authors);
   return [...authorSet].reduce((acc, author) => {
-    const authorRelations = getAuthorDocumentRelations(snapshot, author);
-    const nextKnowledgeDB = buildKnowledgeDBFromDocumentRelations(
+    const authorNodes = getAuthorDocumentNodes(snapshot, author);
+    const nextKnowledgeDB = buildKnowledgeDBFromDocumentNodes(
       author,
-      authorRelations
+      authorNodes
     );
     return nextKnowledgeDB
       ? acc.set(author, nextKnowledgeDB)
@@ -105,11 +102,11 @@ function applyDocumentToSnapshot(
   snapshot: DocumentSnapshot,
   document: StoredDocumentRecord
 ): DocumentSnapshot {
-  const nextRelations = parseStoredDocumentRelations(document);
+  const nextNodes = parseStoredDocumentNodes(document);
   const existingDocument = snapshot.documents.get(document.replaceableKey);
   const existingDelete = snapshot.deletes.get(document.replaceableKey);
-  const existingRelations =
-    snapshot.relationsByDocumentKey.get(document.replaceableKey) ||
+  const existingNodes =
+    snapshot.nodesByDocumentKey.get(document.replaceableKey) ||
     ImmutableMap<string, GraphNode>();
 
   if (existingDelete && existingDelete.deletedAt >= document.updatedMs) {
@@ -123,25 +120,19 @@ function applyDocumentToSnapshot(
     existingDelete && document.updatedMs > existingDelete.deletedAt
       ? snapshot.deletes.remove(document.replaceableKey)
       : snapshot.deletes;
-  const withoutExistingRelations =
-    existingRelations.size > 0
-      ? removeRelationsFromSemanticIndex(
-          snapshot.semanticIndex,
-          existingRelations
-        )
+  const withoutExistingNodes =
+    existingNodes.size > 0
+      ? removeNodesFromSemanticIndex(snapshot.semanticIndex, existingNodes)
       : snapshot.semanticIndex;
   const nextSnapshotBase = {
     ...snapshot,
     documents: snapshot.documents.set(document.replaceableKey, document),
     deletes: nextDeletes,
-    relationsByDocumentKey: snapshot.relationsByDocumentKey.set(
+    nodesByDocumentKey: snapshot.nodesByDocumentKey.set(
       document.replaceableKey,
-      nextRelations
+      nextNodes
     ),
-    semanticIndex: addRelationsToSemanticIndex(
-      withoutExistingRelations,
-      nextRelations
-    ),
+    semanticIndex: addNodesToSemanticIndex(withoutExistingNodes, nextNodes),
   };
   const knowledgeDBs = rebuildAuthors(nextSnapshotBase, [document.author]);
   return {
@@ -168,15 +159,15 @@ function applyDeleteToSnapshot(
         ? snapshot.documents.remove(deletion.replaceableKey)
         : snapshot.documents,
     deletes: snapshot.deletes.set(deletion.replaceableKey, deletion),
-    relationsByDocumentKey:
+    nodesByDocumentKey:
       existingDocument && existingDocument.updatedMs <= deletion.deletedAt
-        ? snapshot.relationsByDocumentKey.remove(deletion.replaceableKey)
-        : snapshot.relationsByDocumentKey,
+        ? snapshot.nodesByDocumentKey.remove(deletion.replaceableKey)
+        : snapshot.nodesByDocumentKey,
     semanticIndex:
       existingDocument && existingDocument.updatedMs <= deletion.deletedAt
-        ? removeRelationsFromSemanticIndex(
+        ? removeNodesFromSemanticIndex(
             snapshot.semanticIndex,
-            snapshot.relationsByDocumentKey.get(deletion.replaceableKey) ||
+            snapshot.nodesByDocumentKey.get(deletion.replaceableKey) ||
               ImmutableMap<string, GraphNode>()
           )
         : snapshot.semanticIndex,
@@ -215,8 +206,8 @@ function applyChangeToSnapshot(
   }
   if (change.type === "document-remove") {
     const existingDocument = snapshot.documents.get(change.replaceableKey);
-    const existingRelations =
-      snapshot.relationsByDocumentKey.get(change.replaceableKey) ||
+    const existingNodes =
+      snapshot.nodesByDocumentKey.get(change.replaceableKey) ||
       ImmutableMap<string, GraphNode>();
     if (!existingDocument) {
       return snapshot;
@@ -224,12 +215,12 @@ function applyChangeToSnapshot(
     const nextSnapshot = {
       ...snapshot,
       documents: snapshot.documents.remove(change.replaceableKey),
-      relationsByDocumentKey: snapshot.relationsByDocumentKey.remove(
+      nodesByDocumentKey: snapshot.nodesByDocumentKey.remove(
         change.replaceableKey
       ),
-      semanticIndex: removeRelationsFromSemanticIndex(
+      semanticIndex: removeNodesFromSemanticIndex(
         snapshot.semanticIndex,
-        existingRelations
+        existingNodes
       ),
     };
     return {
@@ -269,7 +260,7 @@ function createSnapshotFromStoredRecords(
     const deletion = latestDeletes.get(document.replaceableKey);
     return !deletion || document.updatedMs > deletion.deletedAt;
   });
-  const relationsByDocumentKey = ImmutableMap<
+  const nodesByDocumentKey = ImmutableMap<
     string,
     ImmutableMap<string, GraphNode>
   >(
@@ -277,7 +268,7 @@ function createSnapshotFromStoredRecords(
       .valueSeq()
       .map(
         (document) =>
-          [document.replaceableKey, parseStoredDocumentRelations(document)] as [
+          [document.replaceableKey, parseStoredDocumentNodes(document)] as [
             string,
             ImmutableMap<string, GraphNode>
           ]
@@ -287,9 +278,9 @@ function createSnapshotFromStoredRecords(
   const baseSnapshot = {
     documents: liveDocuments,
     deletes: latestDeletes,
-    relationsByDocumentKey,
+    nodesByDocumentKey,
     knowledgeDBs: ImmutableMap<PublicKey, KnowledgeData>(),
-    semanticIndex: buildSemanticIndexFromDocuments(relationsByDocumentKey),
+    semanticIndex: buildSemanticIndexFromDocuments(nodesByDocumentKey),
   };
   const authors = [
     ...new Set(

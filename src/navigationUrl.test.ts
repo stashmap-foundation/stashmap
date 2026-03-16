@@ -5,7 +5,7 @@ import { newNode } from "./ViewContext";
 import {
   buildNodeUrl,
   pathToStack,
-  parseRelationUrl,
+  parseNodeRouteUrl,
   parseAuthorFromSearch,
 } from "./navigationUrl";
 
@@ -74,11 +74,11 @@ test("pathToStack with non /n/ path returns empty array", () => {
   expect(pathToStack("/n/")).toEqual([]);
 });
 
-test("parseRelationUrl extracts relation ID", () => {
-  expect(parseRelationUrl("/r/some-relation-id")).toBe("some-relation-id");
-  expect(parseRelationUrl("/r/encoded%2Fid")).toBe("encoded/id");
-  expect(parseRelationUrl("/n/something")).toBeUndefined();
-  expect(parseRelationUrl("/")).toBeUndefined();
+test("parseNodeRouteUrl extracts node ID", () => {
+  expect(parseNodeRouteUrl("/r/some-node-id")).toBe("some-node-id");
+  expect(parseNodeRouteUrl("/r/encoded%2Fid")).toBe("encoded/id");
+  expect(parseNodeRouteUrl("/n/something")).toBeUndefined();
+  expect(parseNodeRouteUrl("/")).toBeUndefined();
 });
 
 test("parseAuthorFromSearch extracts author", () => {

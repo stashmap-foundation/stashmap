@@ -797,7 +797,7 @@ Crypto
     `);
   });
 
-  test("mixed drag: regular node + incoming ref keeps the direct target relation", async () => {
+  test("mixed drag: regular node + incoming ref keeps the direct target node", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
     await setupItemLevelIncomingRef();
@@ -1179,7 +1179,7 @@ Money
 });
 
 describe("Tombstone / deleted ref interactions", () => {
-  test("accept incoming ref, delete source relation, outgoing cref shows [D]", async () => {
+  test("accept incoming ref, delete source node, outgoing cref shows [D]", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
     await setupItemLevelIncomingRef();

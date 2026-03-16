@@ -22,11 +22,9 @@ export function formatRootHeading(
       : []),
     ...(anchor?.sourceAuthor ? [`sourceAuthor="${anchor.sourceAuthor}"`] : []),
     ...(anchor?.sourceRootID ? [`sourceRoot="${anchor.sourceRootID}"`] : []),
-    ...(anchor?.sourceRelationID
-      ? [`sourceRelation="${anchor.sourceRelationID}"`]
-      : []),
-    ...(anchor?.sourceParentRelationID
-      ? [`sourceParent="${anchor.sourceParentRelationID}"`]
+    ...(anchor?.sourceNodeID ? [`sourceNode="${anchor.sourceNodeID}"`] : []),
+    ...(anchor?.sourceParentNodeID
+      ? [`sourceParent="${anchor.sourceParentNodeID}"`]
       : []),
     ...(systemRole ? [`systemRole="${systemRole}"`] : []),
   ];

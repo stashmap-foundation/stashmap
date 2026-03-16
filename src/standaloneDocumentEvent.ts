@@ -3,7 +3,7 @@ import { shortID } from "./connections";
 import { createHeadlessPlan } from "./core/headlessPlan";
 import { planCreateNodesFromMarkdownTrees } from "./markdownPlan";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
-import { buildDocumentEventFromNodes } from "./relationsDocumentEvent";
+import { buildDocumentEventFromNodes } from "./nodesDocumentEvent";
 
 export function requireSingleRootMarkdownTree(
   markdown: string,
@@ -21,28 +21,28 @@ function buildDocumentEventFromRootTree(
   author: PublicKey,
   rootTree: MarkdownTreeNode
 ): {
-  relationID: LongID;
+  nodeID: LongID;
   rootUuid: string;
   event: UnsignedEvent;
 } {
-  const [planWithRoot, , topRelationIds] = planCreateNodesFromMarkdownTrees(
+  const [planWithRoot, , topNodeIds] = planCreateNodesFromMarkdownTrees(
     createHeadlessPlan(author),
     [rootTree]
   );
-  const relationID = topRelationIds[0];
-  if (!relationID) {
+  const nodeID = topNodeIds[0];
+  if (!nodeID) {
     throw new Error("Markdown upload must resolve to exactly one root tree");
   }
-  const relation = planWithRoot.knowledgeDBs
+  const node = planWithRoot.knowledgeDBs
     .get(author)
-    ?.nodes.get(shortID(relationID));
-  if (!relation) {
-    throw new Error(`Created relation not found: ${relationID}`);
+    ?.nodes.get(shortID(nodeID));
+  if (!node) {
+    throw new Error(`Created node not found: ${nodeID}`);
   }
   return {
-    relationID,
-    rootUuid: shortID(relationID),
-    event: buildDocumentEventFromNodes(planWithRoot.knowledgeDBs, relation),
+    nodeID,
+    rootUuid: shortID(nodeID),
+    event: buildDocumentEventFromNodes(planWithRoot.knowledgeDBs, node),
   };
 }
 
@@ -50,7 +50,7 @@ export function buildDocumentEventFromMarkdownTree(
   author: PublicKey,
   rootTree: MarkdownTreeNode
 ): {
-  relationID: LongID;
+  nodeID: LongID;
   rootUuid: string;
   event: UnsignedEvent;
 } {

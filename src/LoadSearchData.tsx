@@ -3,7 +3,7 @@ import { Map, List } from "immutable";
 import {
   isSearchId,
   parseSearchId,
-  getSearchRelations,
+  getSearchNodes,
   buildTextNodesFromGraphNodes,
   shortID,
 } from "./connections";
@@ -45,17 +45,17 @@ function SearchCrefBuilder({
     if (deduped.size === 0) {
       return List<ID>();
     }
-    return deduped.map((ref) => ref.relationID as ID);
+    return deduped.map((ref) => ref.nodeID as ID);
   });
 
-  const { relation: searchRelation, childNodes } = getSearchRelations(
+  const { node: searchNode, childNodes } = getSearchNodes(
     searchId,
     crefItems.toList(),
     user.publicKey,
     true
   );
   const syntheticEntries: [ID, GraphNode][] = [
-    [searchId, searchRelation] as [ID, GraphNode],
+    [searchId, searchNode] as [ID, GraphNode],
     ...childNodes
       .map((node) => [shortID(node.id) as ID, node] as [ID, GraphNode])
       .toArray(),

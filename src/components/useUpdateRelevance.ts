@@ -1,7 +1,7 @@
 import { usePlanner } from "../planner";
 import { usePaneStack } from "../SplitPanesContext";
 import { planDisconnectFromParent } from "../treeMutations";
-import { useRelationItemContext } from "./useRelationItemContext";
+import { useNodeItemContext } from "./useNodeItemContext";
 
 // Relevance mapped to levels (for 3-dot UI):
 // "relevant" = 3 (3 dots)
@@ -71,7 +71,7 @@ export function useUpdateRelevance(): UseUpdateRelevanceResult {
   const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
   const { isVisible, nodeText, currentItem, viewPath, updateMetadata } =
-    useRelationItemContext();
+    useNodeItemContext();
 
   const rawRelevance = currentItem?.relevance;
   const currentRelevance: Relevance =

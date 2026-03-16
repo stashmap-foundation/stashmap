@@ -4,8 +4,8 @@ import {
   getNode,
   isRefNode,
 } from "./connections";
-import { planUpdateRelationItemMetadataById } from "./dataPlanner";
-import { RelationItemMetadata } from "./relationItemMetadata";
+import { planUpdateNodeItemMetadataById } from "./dataPlanner";
+import { NodeItemMetadata } from "./nodeItemMetadata";
 import {
   getParentView,
   getNodeForView,
@@ -19,11 +19,11 @@ import {
   Plan,
   planAddToParent,
   planDeepCopyNode,
-  planSaveNodeAndEnsureRelations,
+  planSaveNodeAndEnsureNodes,
   planUpdateEmptyNodeMetadata,
 } from "./planner";
 
-export type { RelationItemMetadata } from "./relationItemMetadata";
+export type { NodeItemMetadata } from "./nodeItemMetadata";
 
 function getNodeText(plan: Plan, viewPath: ViewPath, stack: ID[]): string {
   return getNodeForView(plan, viewPath, stack)?.text ?? "";
@@ -33,13 +33,13 @@ function planUpdateExistingItemMetadata(
   plan: Plan,
   parentViewPath: ViewPath,
   stack: ID[],
-  relationIndex: number,
-  metadata: RelationItemMetadata
+  nodeIndex: number,
+  metadata: NodeItemMetadata
 ): Plan {
   const nodes = getNodeForView(plan, parentViewPath, stack);
-  const itemId = nodes?.children.get(relationIndex);
+  const itemId = nodes?.children.get(nodeIndex);
   return nodes && itemId
-    ? planUpdateRelationItemMetadataById(plan, nodes.id, itemId, metadata)
+    ? planUpdateNodeItemMetadataById(plan, nodes.id, itemId, metadata)
     : plan;
 }
 
@@ -47,7 +47,7 @@ export function planUpdateViewItemMetadata(
   plan: Plan,
   viewPath: ViewPath,
   stack: ID[],
-  metadata: RelationItemMetadata,
+  metadata: NodeItemMetadata,
   editorText: string,
   virtualItemsMap?: VirtualItemsMap
 ): Plan {
@@ -60,7 +60,7 @@ export function planUpdateViewItemMetadata(
   if (isEmptySemanticID(itemID)) {
     const trimmed = editorText.trim();
     if (trimmed) {
-      return planSaveNodeAndEnsureRelations(
+      return planSaveNodeAndEnsureNodes(
         plan,
         trimmed,
         viewPath,
@@ -73,8 +73,8 @@ export function planUpdateViewItemMetadata(
     return nodes ? planUpdateEmptyNodeMetadata(plan, nodes.id, metadata) : plan;
   }
 
-  const relationIndex = getNodeIndexForView(plan, viewPath);
-  if (relationIndex === undefined) {
+  const nodeIndex = getNodeIndexForView(plan, viewPath);
+  if (nodeIndex === undefined) {
     const virtualItem = virtualItemsMap?.get(viewPathToString(viewPath));
     if (!virtualItem) {
       return plan;
@@ -92,7 +92,7 @@ export function planUpdateViewItemMetadata(
     }
     const targetID = virtualItem.targetID || undefined;
     const targetItem = targetID ? createRefTarget(targetID) : itemID;
-    const inheritedSourceRelation = targetID
+    const inheritedSourceNode = targetID
       ? getNode(plan.knowledgeDBs, targetID, plan.user.publicKey)
       : undefined;
     return planAddToParent(
@@ -101,22 +101,22 @@ export function planUpdateViewItemMetadata(
       parentView,
       stack,
       undefined,
-      metadata.relevance ?? inheritedSourceRelation?.relevance,
-      metadata.argument ?? inheritedSourceRelation?.argument
+      metadata.relevance ?? inheritedSourceNode?.relevance,
+      metadata.argument ?? inheritedSourceNode?.argument
     )[0];
   }
 
   const trimmed = editorText.trim();
   const basePlan =
     trimmed && trimmed !== getNodeText(plan, viewPath, stack)
-      ? planSaveNodeAndEnsureRelations(plan, editorText, viewPath, stack).plan
+      ? planSaveNodeAndEnsureNodes(plan, editorText, viewPath, stack).plan
       : plan;
 
   return planUpdateExistingItemMetadata(
     basePlan,
     parentView,
     stack,
-    relationIndex,
+    nodeIndex,
     metadata
   );
 }

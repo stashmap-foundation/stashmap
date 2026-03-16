@@ -55,15 +55,12 @@ export function buildNodeUrl(
   return path;
 }
 
-export function buildRelationUrl(
-  rootRelation: LongID,
-  scrollToId?: ID
-): string {
-  const base = `/r/${encodeURIComponent(rootRelation)}`;
+export function buildNodeRouteUrl(rootNode: LongID, scrollToId?: ID): string {
+  const base = `/r/${encodeURIComponent(rootNode)}`;
   return scrollToId ? `${base}#${encodeURIComponent(scrollToId)}` : base;
 }
 
-export function parseRelationUrl(pathname: string): LongID | undefined {
+export function parseNodeRouteUrl(pathname: string): LongID | undefined {
   const match = pathname.match(/^\/r\/(.+)$/);
   if (!match) {
     return undefined;

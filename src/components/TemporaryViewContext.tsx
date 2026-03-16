@@ -64,8 +64,8 @@ export function useIsEditingOn(): boolean {
   return isEditingOn(editingViews, viewKey);
 }
 
-export function isEditableRelation(relation: GraphNode | undefined): boolean {
-  return !!relation && !isRefNode(relation);
+export function isEditableNode(node: GraphNode | undefined): boolean {
+  return !!node && !isRefNode(node);
 }
 
 export function TemporaryViewProvider({

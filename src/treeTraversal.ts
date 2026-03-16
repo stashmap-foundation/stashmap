@@ -2,13 +2,13 @@ import { List, Map, Set as ImmutableSet } from "immutable";
 import {
   ViewPath,
   VirtualItemsMap,
-  addNodeToPathWithRelations,
-  addRelationsToLastElement,
+  addNodeToPathWithNodes,
+  addNodesToLastElement,
   getRowIDFromView,
   getNodeForView,
   getCurrentEdgeForView,
   getEffectiveAuthor,
-  getParentRelation,
+  getParentNode,
   viewPathToString,
 } from "./ViewContext";
 import {
@@ -47,11 +47,11 @@ function getChildrenForConcreteRef(
   currentItem?: GraphNode
 ): TreeResult {
   const refNode = currentItem || getCurrentEdgeForView(data, parentPath);
-  const sourceRelation =
+  const sourceNode =
     refNode && isRefNode(refNode)
       ? resolveNode(data.knowledgeDBs, refNode)
       : getNode(data.knowledgeDBs, parentItemID, data.user.publicKey);
-  if (!sourceRelation || sourceRelation.children.size === 0) {
+  if (!sourceNode || sourceNode.children.size === 0) {
     return {
       paths: List(),
       virtualItems: EMPTY_VIRTUAL_ITEMS,
@@ -60,8 +60,8 @@ function getChildrenForConcreteRef(
   }
 
   return {
-    paths: sourceRelation.children
-      .map((_, i) => addNodeToPathWithRelations(parentPath, sourceRelation, i))
+    paths: sourceNode.children
+      .map((_, i) => addNodeToPathWithNodes(parentPath, sourceNode, i))
       .toList(),
     virtualItems: EMPTY_VIRTUAL_ITEMS,
     firstVirtualKeys: EMPTY_FIRST_VIRTUAL_KEYS,
@@ -73,26 +73,26 @@ function getChildrenForRegularNode(
   parentPath: ViewPath,
   parentItemID: ID,
   stack: ID[],
-  rootRelation: LongID | undefined,
+  rootNode: LongID | undefined,
   author: PublicKey,
   typeFilters: Pane["typeFilters"],
   options?: TreeTraversalOptions
 ): TreeResult {
   const effectiveAuthor = getEffectiveAuthor(data, parentPath);
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
-  const directRelations = isSearchId(parentItemID as ID)
+  const directNodes = isSearchId(parentItemID as ID)
     ? getNode(data.knowledgeDBs, parentItemID as ID, data.user.publicKey)
     : getNodeForView(data, parentPath, stack);
-  const nodes = directRelations;
+  const nodes = directNodes;
   const childNodes = nodes
     ? getNodeChildren(data.knowledgeDBs, nodes, data.user.publicKey)
     : List<GraphNode>();
-  const relationSemanticID = nodes
+  const nodeSemanticID = nodes
     ? getSemanticID(data.knowledgeDBs, nodes)
     : parentItemID;
-  const coordinateSemanticID = nodes ? relationSemanticID : parentItemID;
+  const coordinateSemanticID = nodes ? nodeSemanticID : parentItemID;
 
-  const relationPaths = nodes
+  const nodePaths = nodes
     ? nodes.children
         .map((childID, index) => ({
           childID,
@@ -108,23 +108,21 @@ function getChildrenForRegularNode(
             : childID === EMPTY_SEMANTIC_ID ||
               (!!item && itemPassesFilters(item, activeFilters))
         )
-        .map(({ index }) =>
-          addNodeToPathWithRelations(parentPath, nodes, index)
-        )
+        .map(({ index }) => addNodeToPathWithNodes(parentPath, nodes, index))
         .toList()
     : List<ViewPath>();
 
   if (options?.isMarkdownExport) {
     return {
-      paths: relationPaths,
+      paths: nodePaths,
       virtualItems: EMPTY_VIRTUAL_ITEMS,
       firstVirtualKeys: EMPTY_FIRST_VIRTUAL_KEYS,
     };
   }
 
-  const relationId = nodes?.id || ("" as LongID);
+  const nodeId = nodes?.id || ("" as LongID);
 
-  const containingRelationID = getParentRelation(data, parentPath)?.id;
+  const containingNodeID = getParentNode(data, parentPath)?.id;
   const visibleAuthors = data.contacts
     .keySeq()
     .toSet()
@@ -138,7 +136,7 @@ function getChildrenForRegularNode(
     data.semanticIndex,
     visibleAuthors,
     coordinateSemanticID,
-    containingRelationID,
+    containingNodeID,
     nodes?.id,
     author,
     childNodes
@@ -175,10 +173,10 @@ function getChildrenForRegularNode(
       children: List<ID>(),
       id: (targetID || itemID) as ID,
       text: resolvedItem?.text || "",
-      parent: relationId,
+      parent: nodeId,
       updated: resolvedItem?.updated ?? nodes?.updated ?? Date.now(),
       author: resolvedItem?.author ?? nodes?.author ?? data.user.publicKey,
-      root: nodes?.root ?? relationId,
+      root: nodes?.root ?? nodeId,
       relevance: resolvedItem?.relevance,
       argument: resolvedItem?.argument,
       virtualType,
@@ -200,11 +198,8 @@ function getChildrenForRegularNode(
   ): { paths: List<ViewPath>; virtualItems: VirtualItemsMap } =>
     children.reduce((result, itemID) => {
       const virtualItem = createVirtualItem(itemID, virtualType);
-      const pathWithRelations = addRelationsToLastElement(
-        parentPath,
-        relationId
-      );
-      const path = [...pathWithRelations, virtualItem.id] as ViewPath;
+      const pathWithNodes = addNodesToLastElement(parentPath, nodeId);
+      const path = [...pathWithNodes, virtualItem.id] as ViewPath;
       return {
         paths: result.paths.push(path),
         virtualItems: result.virtualItems.set(
@@ -237,7 +232,7 @@ function getChildrenForRegularNode(
     : EMPTY_FIRST_VIRTUAL_KEYS;
 
   return {
-    paths: relationPaths.concat(withVersions.paths),
+    paths: nodePaths.concat(withVersions.paths),
     virtualItems: withVersions.virtualItems,
     firstVirtualKeys,
   };
@@ -247,7 +242,7 @@ export function getTreeChildren(
   data: Data,
   parentPath: ViewPath,
   stack: ID[],
-  rootRelation: LongID | undefined,
+  rootNode: LongID | undefined,
   author: PublicKey,
   typeFilters: Pane["typeFilters"],
   options?: TreeTraversalOptions,
@@ -272,7 +267,7 @@ export function getTreeChildren(
     parentPath,
     parentItemID,
     stack,
-    rootRelation,
+    rootNode,
     author,
     typeFilters,
     options
@@ -284,7 +279,7 @@ export function getNodesInTree(
   parentPath: ViewPath,
   stack: ID[],
   ctx: List<ViewPath>,
-  rootRelation: LongID | undefined,
+  rootNode: LongID | undefined,
   author: PublicKey,
   typeFilters: Pane["typeFilters"],
   options?: TreeTraversalOptions,
@@ -294,7 +289,7 @@ export function getNodesInTree(
     data,
     parentPath,
     stack,
-    rootRelation,
+    rootNode,
     author,
     typeFilters,
     options,
@@ -318,7 +313,7 @@ export function getNodesInTree(
           childPath,
           stack,
           withChild,
-          rootRelation,
+          rootNode,
           author,
           typeFilters,
           options,

@@ -2,7 +2,7 @@ import { OrderedSet } from "immutable";
 import {
   ViewPath,
   VirtualItemsMap,
-  addNodeToPathWithRelations,
+  addNodeToPathWithNodes,
   getCurrentEdgeForView,
   getParentKey,
   getParentView,
@@ -12,11 +12,11 @@ import {
   parseViewPath,
   viewPathToString,
 } from "../ViewContext";
-import { Plan, planExpandNode, planUpdateRelationText } from "../planner";
+import { Plan, planExpandNode, planUpdateNodeText } from "../planner";
 import {
   planUpdateViewItemMetadata,
-  RelationItemMetadata,
-} from "../relationItemMutations";
+  NodeItemMetadata,
+} from "../nodeItemMutations";
 import { planMoveNodeWithView } from "../treeMutations";
 
 export type EditorInfo = {
@@ -64,7 +64,7 @@ function planUpdateOneMetadata(
   acc: Plan,
   viewPath: ViewPath,
   stack: ID[],
-  metadata: RelationItemMetadata,
+  metadata: NodeItemMetadata,
   editorText: string,
   virtualItemsMap: VirtualItemsMap
 ): Plan {
@@ -171,7 +171,7 @@ function remapSelectionForMovedKeys(
   };
 }
 
-function sortByRelationIndex(plan: Plan, viewPaths: ViewPath[]): ViewPath[] {
+function sortByNodeIndex(plan: Plan, viewPaths: ViewPath[]): ViewPath[] {
   return [...viewPaths].sort((a, b) => {
     const idxA = getNodeIndexForView(plan, a) ?? 0;
     const idxB = getNodeIndexForView(plan, b) ?? 0;
@@ -187,7 +187,7 @@ export function planBatchIndent(
 ): Plan | undefined {
   if (!allSameParent(viewKeys)) return undefined;
 
-  const viewPaths = sortByRelationIndex(plan, viewKeys.map(parseViewPath));
+  const viewPaths = sortByNodeIndex(plan, viewKeys.map(parseViewPath));
   const firstPath = viewPaths[0];
 
   const prevSibling = getPreviousSibling(plan, firstPath, stack);
@@ -202,12 +202,12 @@ export function planBatchIndent(
   const { plan: updated, remappedKeys } = viewPaths.reduce(
     (state, viewPath) => {
       const fromKey = viewPathToString(viewPath);
-      const targetRelationBefore = getNodeForView(
+      const targetNodeBefore = getNodeForView(
         state.plan,
         prevSibling.viewPath,
         stack
       );
-      const insertAt = targetRelationBefore?.children.size ?? 0;
+      const insertAt = targetNodeBefore?.children.size ?? 0;
       const moved = planMoveNodeWithView(
         state.plan,
         viewPath,
@@ -215,16 +215,16 @@ export function planBatchIndent(
         stack,
         insertAt
       );
-      const targetRelationAfter = getNodeForView(
+      const targetNodeAfter = getNodeForView(
         moved,
         prevSibling.viewPath,
         stack
       );
       const updatedViewPath =
-        targetRelationAfter && insertAt < targetRelationAfter.children.size
-          ? addNodeToPathWithRelations(
+        targetNodeAfter && insertAt < targetNodeAfter.children.size
+          ? addNodeToPathWithNodes(
               prevSibling.viewPath,
-              targetRelationAfter,
+              targetNodeAfter,
               insertAt
             )
           : undefined;
@@ -247,7 +247,7 @@ export function planBatchIndent(
       }
       return {
         plan: updatedViewPath
-          ? planUpdateRelationText(moved, updatedViewPath, stack, editorText)
+          ? planUpdateNodeText(moved, updatedViewPath, stack, editorText)
           : moved,
         remappedKeys: nextRemappedKeys,
       };
@@ -266,7 +266,7 @@ export function planBatchOutdent(
 ): Plan | undefined {
   if (!allSameParent(viewKeys)) return undefined;
 
-  const viewPaths = sortByRelationIndex(plan, viewKeys.map(parseViewPath));
+  const viewPaths = sortByNodeIndex(plan, viewKeys.map(parseViewPath));
   const firstPath = viewPaths[0];
   const parentPath = getParentView(firstPath);
   if (!parentPath) return undefined;
@@ -274,13 +274,13 @@ export function planBatchOutdent(
   const grandParentPath = getParentView(parentPath);
   if (!grandParentPath) return undefined;
 
-  const parentRelationIndex = getNodeIndexForView(plan, parentPath);
-  if (parentRelationIndex === undefined) return undefined;
+  const parentNodeIndex = getNodeIndexForView(plan, parentPath);
+  if (parentNodeIndex === undefined) return undefined;
 
   const { plan: updated, remappedKeys } = viewPaths.reduce(
     (state, viewPath, idx) => {
       const fromKey = viewPathToString(viewPath);
-      const insertAt = parentRelationIndex + 1 + idx;
+      const insertAt = parentNodeIndex + 1 + idx;
       const moved = planMoveNodeWithView(
         state.plan,
         viewPath,
@@ -288,14 +288,10 @@ export function planBatchOutdent(
         stack,
         insertAt
       );
-      const targetRelationAfter = getNodeForView(moved, grandParentPath, stack);
+      const targetNodeAfter = getNodeForView(moved, grandParentPath, stack);
       const updatedViewPath =
-        targetRelationAfter && insertAt < targetRelationAfter.children.size
-          ? addNodeToPathWithRelations(
-              grandParentPath,
-              targetRelationAfter,
-              insertAt
-            )
+        targetNodeAfter && insertAt < targetNodeAfter.children.size
+          ? addNodeToPathWithNodes(grandParentPath, targetNodeAfter, insertAt)
           : undefined;
       const nextRemappedKeys = updatedViewPath
         ? [
@@ -316,7 +312,7 @@ export function planBatchOutdent(
       }
       return {
         plan: updatedViewPath
-          ? planUpdateRelationText(moved, updatedViewPath, stack, editorText)
+          ? planUpdateNodeText(moved, updatedViewPath, stack, editorText)
           : moved,
         remappedKeys: nextRemappedKeys,
       };

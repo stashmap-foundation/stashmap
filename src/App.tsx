@@ -47,7 +47,7 @@ export function App(): JSX.Element {
           <Route path="signup" element={<SignUp />} />
         </Route>
         <Route path="/n/*" element={<Dashboard />} />
-        <Route path="/r/:relationId" element={<Dashboard />} />
+        <Route path="/r/:nodeId" element={<Dashboard />} />
       </Route>
     </Routes>
   );

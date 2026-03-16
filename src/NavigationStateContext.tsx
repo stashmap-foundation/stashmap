@@ -10,8 +10,8 @@ import { getNodeRouteTargetInfo } from "./connections";
 import {
   pathToStack,
   buildNodeUrl,
-  buildRelationUrl,
-  parseRelationUrl,
+  buildNodeRouteUrl,
+  parseNodeRouteUrl,
   parseAuthorFromSearch,
 } from "./navigationUrl";
 import { resolveSemanticStackToActualIDs } from "./semanticNavigation";
@@ -49,7 +49,7 @@ function paneToUrl(
   myself: PublicKey
 ): string | undefined {
   if (activePane.rootNodeId) {
-    return buildRelationUrl(activePane.rootNodeId, activePane.scrollToId);
+    return buildNodeRouteUrl(activePane.rootNodeId, activePane.scrollToId);
   }
 
   if (activePane.stack.length > 0) {
@@ -59,7 +59,7 @@ function paneToUrl(
       activePane.stack as ID[]
     );
     if (resolved?.node) {
-      return buildRelationUrl(resolved.node.id, activePane.scrollToId);
+      return buildNodeRouteUrl(resolved.node.id, activePane.scrollToId);
     }
   }
 
@@ -77,13 +77,13 @@ function urlToPane(
   fallbackAuthor: PublicKey
 ): Pane {
   const author = parseAuthorFromSearch(search) || fallbackAuthor;
-  const relationID = parseRelationUrl(pathname);
-  if (relationID) {
+  const nodeID = parseNodeRouteUrl(pathname);
+  if (nodeID) {
     return {
       id: generatePaneId(),
       stack: [],
       author: fallbackAuthor,
-      rootNodeId: relationID,
+      rootNodeId: nodeID,
     };
   }
   return {
@@ -133,19 +133,19 @@ export function NavigationStateProvider({
     }
     const resolved = panes.map((p) => {
       if (p.rootNodeId && p.stack.length === 0) {
-        const relationInfo = getNodeRouteTargetInfo(
+        const nodeInfo = getNodeRouteTargetInfo(
           p.rootNodeId,
           knowledgeDBs,
           p.author
         );
-        if (!relationInfo) {
+        if (!nodeInfo) {
           return p;
         }
         return {
           ...p,
-          stack: relationInfo.stack,
-          author: relationInfo.author,
-          rootNodeId: relationInfo.rootNodeId,
+          stack: nodeInfo.stack,
+          author: nodeInfo.author,
+          rootNodeId: nodeInfo.rootNodeId,
         };
       }
 

@@ -209,7 +209,7 @@ Other
     expect(screen.queryByText(/Loading/)).toBeNull();
   });
 
-  test("Deleted relation shows (deleted) indicator in ~Log", async () => {
+  test("Deleted node shows (deleted) indicator in ~Log", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 
@@ -250,7 +250,7 @@ My Notes
     `);
   });
 
-  test("Deleted nested relation shows context path in ~Log", async () => {
+  test("Deleted nested node shows context path in ~Log", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
 

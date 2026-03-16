@@ -12,7 +12,7 @@ import {
   type,
 } from "../utils.test";
 
-test("Shows no dots when user is the only one with a relation", async () => {
+test("Shows no dots when user is the only one with a node", async () => {
   const [alice] = setup([ALICE]);
 
   renderTree(alice);
@@ -29,7 +29,7 @@ Root
   expect(screen.queryByLabelText(/versions available/)).toBeNull();
 });
 
-test("Shows dots when only other user has relation (current user has none)", async () => {
+test("Shows dots when only other user has node (current user has none)", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
   await follow(alice, bob().user.publicKey);
 

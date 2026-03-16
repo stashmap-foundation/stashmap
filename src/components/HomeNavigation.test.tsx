@@ -182,7 +182,7 @@ My Notes
       await screen.findByLabelText("collapse ~Log");
     });
 
-    test("note under ~Log is a reference to actual relation", async () => {
+    test("note under ~Log is a reference to actual node", async () => {
       const [alice] = setup([ALICE]);
       renderApp(alice());
 

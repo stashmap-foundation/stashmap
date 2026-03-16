@@ -13,15 +13,15 @@ import { isEmptySemanticID } from "../connections";
 import { usePlanner } from "../planner";
 import {
   planUpdateViewItemMetadata,
-  RelationItemMetadata,
-} from "../relationItemMutations";
+  NodeItemMetadata,
+} from "../nodeItemMutations";
 import { usePaneStack } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 import { useEditorText } from "./EditorTextContext";
 
-type RelationItemContext = {
+type NodeItemContext = {
   // Current state
-  relationIndex: number | undefined;
+  nodeIndex: number | undefined;
   isVisible: boolean;
   isEmptyNode: boolean;
   nodeText: string;
@@ -29,51 +29,48 @@ type RelationItemContext = {
   // For updating
   viewPath: ViewPath;
   parentView: ViewPath | undefined;
-  relationsID: LongID | undefined;
+  nodeID: LongID | undefined;
   // Update function
-  updateMetadata: (metadata: RelationItemMetadata) => void;
+  updateMetadata: (metadata: NodeItemMetadata) => void;
 };
 
 /**
- * Shared hook for relation item context.
+ * Shared hook for node item context.
  * Used by useUpdateRelevance and useUpdateArgument.
  * Provides common data and an updateMetadata function that handles:
- * - Empty nodes with text: materialize via planSaveNodeAndEnsureRelations
+ * - Empty nodes with text: materialize via planSaveNodeAndEnsureNodes
  * - Empty nodes without text: update via planUpdateEmptyNodeMetadata
  * - Regular nodes: optionally save text, then update nodes
  */
-export function useRelationItemContext(): RelationItemContext {
+export function useNodeItemContext(): NodeItemContext {
   const data = useData();
   const viewPath = useViewPath();
-  const relationIndex = useNodeIndex();
+  const nodeIndex = useNodeIndex();
   const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
   const isInSearchView = useIsInSearchView();
-  const currentRelation = useCurrentNode();
+  const currentNode = useCurrentNode();
   const parentView = getParentView(viewPath);
 
   const [itemID] = useCurrentRowID();
   const isEmptyNode = isEmptySemanticID(itemID);
-  const relationsID = parentView
+  const nodeID = parentView
     ? getNodeForView(data, parentView, stack)?.id
     : undefined;
   const editorTextContext = useEditorText();
-  const nodeText = currentRelation?.text || "";
+  const nodeText = currentNode?.text || "";
 
   const isVisible =
-    !isInSearchView && relationIndex !== undefined && parentView !== undefined;
+    !isInSearchView && nodeIndex !== undefined && parentView !== undefined;
 
   // Get current item using context-aware lookup
   const currentItem =
     isVisible && parentView ? getCurrentEdgeForView(data, viewPath) : undefined;
 
-  const updateMetadata = (metadata: RelationItemMetadata): void => {
+  const updateMetadata = (metadata: NodeItemMetadata): void => {
     const editorText = editorTextContext?.text ?? "";
-    if (isEmptyNode && !relationsID) return;
-    if (
-      !isEmptyNode &&
-      (!isVisible || !parentView || relationIndex === undefined)
-    )
+    if (isEmptyNode && !nodeID) return;
+    if (!isEmptyNode && (!isVisible || !parentView || nodeIndex === undefined))
       return;
 
     executePlan(
@@ -88,14 +85,14 @@ export function useRelationItemContext(): RelationItemContext {
   };
 
   return {
-    relationIndex,
+    nodeIndex,
     isVisible,
     isEmptyNode,
     nodeText,
     currentItem,
     viewPath,
     parentView,
-    relationsID,
+    nodeID,
     updateMetadata,
   };
 }

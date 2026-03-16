@@ -10,7 +10,7 @@ import {
   setup,
   type,
 } from "../utils.test";
-import { updateRelationItemMetadata } from "../relationItemMetadata";
+import { updateNodeItemMetadata } from "../nodeItemMetadata";
 
 function makeItem(
   id: ID,
@@ -177,7 +177,7 @@ Source
   });
 });
 
-describe("updateRelationItemMetadata", () => {
+describe("updateNodeItemMetadata", () => {
   test("updates argument on existing item", () => {
     const item = makeItem(
       "node1" as ID,
@@ -186,7 +186,7 @@ describe("updateRelationItemMetadata", () => {
       undefined
     );
 
-    const updated = updateRelationItemMetadata(item, { argument: "confirms" });
+    const updated = updateNodeItemMetadata(item, { argument: "confirms" });
     expect(updated.argument).toBe("confirms");
   });
 
@@ -199,7 +199,7 @@ describe("updateRelationItemMetadata", () => {
       "confirms"
     );
 
-    const updated = updateRelationItemMetadata(item, { argument: undefined });
+    const updated = updateNodeItemMetadata(item, { argument: undefined });
     expect(updated.argument).toBeUndefined();
   });
 
@@ -211,7 +211,7 @@ describe("updateRelationItemMetadata", () => {
       undefined
     );
 
-    const updated = updateRelationItemMetadata(item, {});
+    const updated = updateNodeItemMetadata(item, {});
     expect(updated).toEqual(item);
   });
 });

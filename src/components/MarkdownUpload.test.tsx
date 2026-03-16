@@ -1,7 +1,7 @@
 import { List } from "immutable";
 import { newNode, ViewPath } from "../ViewContext";
 import { execute } from "../executor";
-import { createPlan, planUpsertRelations } from "../planner";
+import { createPlan, planUpsertNodes } from "../planner";
 import { processEvents } from "../eventProcessing";
 import { ALICE, setup, UpdateState } from "../utils.test";
 import { parseMarkdownHierarchy, planPasteMarkdownTrees } from "./FileDropZone";
@@ -31,7 +31,7 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
     id: wsID,
     root: shortID(wsID) as ID,
   };
-  const basePlan = planUpsertRelations(createPlan(alice()), workspaceNode);
+  const basePlan = planUpsertNodes(createPlan(alice()), workspaceNode);
   const workspacePath: ViewPath = [0, workspaceNode.id];
   const plan = planPasteMarkdownTrees(
     basePlan,
@@ -54,24 +54,16 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
   return knowledgeDB;
 }
 
-function getRequiredRelation(
-  knowledgeDB: KnowledgeData,
-  text: string
-): GraphNode {
-  const relation = knowledgeDB.nodes.find(
-    (candidate) => candidate.text === text
-  );
-  if (!relation) {
-    throw new Error(`Missing relation: ${text}`);
+function getRequiredNode(knowledgeDB: KnowledgeData, text: string): GraphNode {
+  const node = knowledgeDB.nodes.find((candidate) => candidate.text === text);
+  if (!node) {
+    throw new Error(`Missing node: ${text}`);
   }
-  return relation;
+  return node;
 }
 
-function getChildTexts(
-  knowledgeDB: KnowledgeData,
-  relation: GraphNode
-): string[] {
-  return relation.children
+function getChildTexts(knowledgeDB: KnowledgeData, node: GraphNode): string[] {
+  return node.children
     .map((childID) => knowledgeDB.nodes.get(shortID(childID))?.text || "")
     .toArray();
 }
@@ -80,12 +72,12 @@ test("Markdown upload persists imported tree structure", async () => {
   const [alice] = setup([ALICE]);
   const knowledgeDB = await uploadMarkdown(alice);
 
-  const programmingLanguages = getRequiredRelation(
+  const programmingLanguages = getRequiredNode(
     knowledgeDB,
     "Programming Languages"
   );
-  const java = getRequiredRelation(knowledgeDB, "Java");
-  const python = getRequiredRelation(knowledgeDB, "Python");
+  const java = getRequiredNode(knowledgeDB, "Java");
+  const python = getRequiredNode(knowledgeDB, "Python");
 
   expect(getChildTexts(knowledgeDB, programmingLanguages)).toEqual([
     "Java",

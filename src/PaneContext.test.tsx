@@ -43,10 +43,10 @@ test("Fork works when navigating to a version entry", async () => {
   await type(
     "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Enter}Rome{Enter}Vienna{Escape}"
   );
-  const relationUrl = await openReadonlyRoute("Cities");
+  const nodeUrl = await openReadonlyRoute("Cities");
   cleanup();
 
-  renderApp({ ...bob(), initialRoute: relationUrl });
+  renderApp({ ...bob(), initialRoute: nodeUrl });
   await screen.findByText("READONLY");
   await userEvent.click(await screen.findByLabelText("copy root to edit"));
 
@@ -64,7 +64,7 @@ Cities
   `);
 });
 
-test("Bob can view Alice's relation via /r/ URL without following her", async () => {
+test("Bob can view Alice's node via /r/ URL without following her", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
 
   renderApp(alice());
@@ -79,10 +79,10 @@ test("Bob can view Alice's relation via /r/ URL without following her", async ()
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/r\//);
   });
-  const relationUrl = window.location.pathname;
+  const nodeUrl = window.location.pathname;
   cleanup();
 
-  renderApp({ ...bob(), initialRoute: relationUrl });
+  renderApp({ ...bob(), initialRoute: nodeUrl });
 
   await expectTree(`
 [O] Cities
@@ -91,7 +91,7 @@ test("Bob can view Alice's relation via /r/ URL without following her", async ()
   `);
 });
 
-test("Anonymous user can view relation via /r/ URL", async () => {
+test("Anonymous user can view node via /r/ URL", async () => {
   const [alice, anon] = setup([ALICE, ANON]);
 
   renderApp(alice());
@@ -106,10 +106,10 @@ test("Anonymous user can view relation via /r/ URL", async () => {
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/r\//);
   });
-  const relationUrl = window.location.pathname;
+  const nodeUrl = window.location.pathname;
   cleanup();
 
-  renderApp({ ...anon(), initialRoute: relationUrl });
+  renderApp({ ...anon(), initialRoute: nodeUrl });
 
   await expectTree(`
 Cities
@@ -138,10 +138,10 @@ test("Anonymous user sees versioned node text via /r/ URL", async () => {
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/r\//);
   });
-  const relationUrl = window.location.pathname;
+  const nodeUrl = window.location.pathname;
   cleanup();
 
-  renderApp({ ...anon(), initialRoute: relationUrl });
+  renderApp({ ...anon(), initialRoute: nodeUrl });
 
   await expectTree(`
 Cities
@@ -165,10 +165,10 @@ test("Clicking breadcrumb while viewing other user's content preserves READONLY"
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/r\//);
   });
-  const relationUrl = window.location.pathname;
+  const nodeUrl = window.location.pathname;
   cleanup();
 
-  renderApp({ ...bob(), initialRoute: relationUrl });
+  renderApp({ ...bob(), initialRoute: nodeUrl });
 
   await screen.findByText("READONLY");
   await expectTree(`
@@ -213,7 +213,7 @@ test("Opening /n/ URL with author param shows READONLY", async () => {
   `);
 });
 
-test("Breadcrumb navigation uses relation URLs when a concrete target exists", async () => {
+test("Breadcrumb navigation uses node URLs when a concrete target exists", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
 
   renderApp(alice());
@@ -228,10 +228,10 @@ test("Breadcrumb navigation uses relation URLs when a concrete target exists", a
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/r\//);
   });
-  const relationUrl = window.location.pathname;
+  const nodeUrl = window.location.pathname;
   cleanup();
 
-  renderApp({ ...bob(), initialRoute: relationUrl });
+  renderApp({ ...bob(), initialRoute: nodeUrl });
 
   await screen.findByText("READONLY");
 
@@ -258,10 +258,10 @@ test("Clicking fullscreen while viewing other user's content preserves READONLY"
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/r\//);
   });
-  const relationUrl = window.location.pathname;
+  const nodeUrl = window.location.pathname;
   cleanup();
 
-  renderApp({ ...bob(), initialRoute: relationUrl });
+  renderApp({ ...bob(), initialRoute: nodeUrl });
 
   await screen.findByText("READONLY");
   await expectTree(`
@@ -295,10 +295,10 @@ test("Relay filters never contain invalid pubkeys when anonymous user views /r/ 
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/r\//);
   });
-  const relationUrl = window.location.pathname;
+  const nodeUrl = window.location.pathname;
   cleanup();
 
-  const { relayPool } = renderApp({ ...anon(), initialRoute: relationUrl });
+  const { relayPool } = renderApp({ ...anon(), initialRoute: nodeUrl });
 
   await expectTree(`
 Cities
@@ -326,7 +326,7 @@ test("/r/ URL takes priority over stale history state", async () => {
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/r\//);
   });
-  const relationUrl = window.location.pathname;
+  const nodeUrl = window.location.pathname;
   cleanup();
 
   const stalePanes = [defaultPane(bob().user.publicKey)];
@@ -339,7 +339,7 @@ test("/r/ URL takes priority over stale history state", async () => {
       }
     );
 
-  renderApp({ ...bob(), initialRoute: relationUrl });
+  renderApp({ ...bob(), initialRoute: nodeUrl });
 
   jest.restoreAllMocks();
 

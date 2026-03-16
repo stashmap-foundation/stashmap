@@ -124,48 +124,47 @@ test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
       markdown: "# Parent\n\n## Child\n\n### Grandchild",
     },
   ]);
-  const [plan, topNodeIDs, topRelationIDs] = planCreateNodesFromMarkdownTrees(
+  const [plan, topItemIDs, topNodeIDs] = planCreateNodesFromMarkdownTrees(
     basePlan,
     trees
   );
-  const parentID = topNodeIDs[0];
-  const parentRelation = getNode(
+  const parentItemID = topItemIDs[0];
+  const parentNodeID = topNodeIDs[0];
+  const parentNode = getNode(
     plan.knowledgeDBs,
-    topRelationIDs[0],
+    parentNodeID,
     plan.user.publicKey
   );
-  const childRelationID = nodeChildren(
+  const childNodeID = nodeChildren(
     plan.knowledgeDBs,
-    parentRelation,
+    parentNode,
     plan.user.publicKey
   ).first()?.id as LongID | undefined;
-  const childRelation = childRelationID
-    ? getNode(plan.knowledgeDBs, childRelationID, plan.user.publicKey)
+  const childNode = childNodeID
+    ? getNode(plan.knowledgeDBs, childNodeID, plan.user.publicKey)
     : undefined;
-  const grandchildRelationID = nodeChildren(
+  const grandchildNodeID = nodeChildren(
     plan.knowledgeDBs,
-    childRelation,
+    childNode,
     plan.user.publicKey
   ).first()?.id as LongID | undefined;
-  const grandchildRelation = grandchildRelationID
-    ? getNode(plan.knowledgeDBs, grandchildRelationID, plan.user.publicKey)
+  const grandchildNode = grandchildNodeID
+    ? getNode(plan.knowledgeDBs, grandchildNodeID, plan.user.publicKey)
     : undefined;
 
-  expect(parentRelation).toBeDefined();
-  expect(childRelation?.text).toBe("Child");
-  expect(grandchildRelation?.text).toBe("Grandchild");
+  expect(parentNode).toBeDefined();
+  expect(childNode?.text).toBe("Child");
+  expect(grandchildNode?.text).toBe("Grandchild");
 
-  expect(parentID).toEqual(getSemanticID(plan.knowledgeDBs, parentRelation!));
+  expect(parentItemID).toEqual(getSemanticID(plan.knowledgeDBs, parentNode!));
   expect(
-    nodeChildren(plan.knowledgeDBs, parentRelation, plan.user.publicKey).first()
-      ?.id
-  ).toEqual(childRelation?.id);
-  expect(childRelation?.text).toBe("Child");
+    nodeChildren(plan.knowledgeDBs, parentNode, plan.user.publicKey).first()?.id
+  ).toEqual(childNode?.id);
+  expect(childNode?.text).toBe("Child");
   expect(
-    nodeChildren(plan.knowledgeDBs, childRelation, plan.user.publicKey).first()
-      ?.id
-  ).toEqual(grandchildRelation?.id);
-  expect(grandchildRelation?.text).toBe("Grandchild");
+    nodeChildren(plan.knowledgeDBs, childNode, plan.user.publicKey).first()?.id
+  ).toEqual(grandchildNode?.id);
+  expect(grandchildNode?.text).toBe("Grandchild");
 });
 
 test("Planning multiple markdown files returns top nodes in import order", () => {
@@ -182,9 +181,9 @@ test("Planning multiple markdown files returns top nodes in import order", () =>
       .get(plan.user.publicKey)
       ?.nodes.valueSeq()
       .find(
-        (relation) =>
-          isStandaloneRoot(relation) &&
-          getSemanticID(plan.knowledgeDBs, relation) === semanticID
+        (node) =>
+          isStandaloneRoot(node) &&
+          getSemanticID(plan.knowledgeDBs, node) === semanticID
       )?.text;
   });
 

@@ -50,8 +50,8 @@ function formatCrefText(
   if (!ref) {
     return undefined;
   }
-  const targetRelation = resolveNode(knowledgeDBs, refNode);
-  const href = targetRelation ? `${targetRelation.id}` : `${targetID}`;
+  const targetNode = resolveNode(knowledgeDBs, refNode);
+  const href = targetNode ? `${targetNode.id}` : `${targetID}`;
   return `[${ref.text}](#${href})`;
 }
 
@@ -59,7 +59,7 @@ type SerializeResult = {
   lines: string[];
 };
 
-function getOwnRelationForDocumentSerialization(
+function getOwnNodeForDocumentSerialization(
   data: Data,
   path: ViewPath,
   stack: ID[],
@@ -69,9 +69,9 @@ function getOwnRelationForDocumentSerialization(
   rootNode: GraphNode,
   isRootNode: boolean
 ): GraphNode | undefined {
-  const directRelation = getNodeForView(data, path, stack);
-  if (directRelation) {
-    return directRelation;
+  const directNode = getNodeForView(data, path, stack);
+  if (directNode) {
+    return directNode;
   }
   return resolveSemanticNodeInCurrentTree(
     data.knowledgeDBs,
@@ -84,19 +84,16 @@ function getOwnRelationForDocumentSerialization(
   );
 }
 
-function getSerializedRelationText(
-  data: Data,
-  relation: GraphNode
-): { text: string } {
-  if (relation.text !== "") {
+function getSerializedNodeText(data: Data, node: GraphNode): { text: string } {
+  if (node.text !== "") {
     return {
-      text: relation.text,
+      text: node.text,
     };
   }
 
-  const semanticID = getSemanticID(data.knowledgeDBs, relation);
+  const semanticID = getSemanticID(data.knowledgeDBs, node);
   const fallbackText =
-    getTextForSemanticID(data.knowledgeDBs, semanticID, relation.author) ??
+    getTextForSemanticID(data.knowledgeDBs, semanticID, node.author) ??
     shortID(semanticID as ID);
   return {
     text: fallbackText,
@@ -140,7 +137,7 @@ function serializeTree(data: Data, rootNode: GraphNode): SerializeResult {
         };
       }
 
-      const ownRelation = getOwnRelationForDocumentSerialization(
+      const ownNode = getOwnNodeForDocumentSerialization(
         data,
         path,
         stack,
@@ -150,17 +147,17 @@ function serializeTree(data: Data, rootNode: GraphNode): SerializeResult {
         rootNode,
         isRoot(path)
       );
-      const serializedRelation = ownRelation
-        ? getSerializedRelationText(data, ownRelation)
+      const serializedNode = ownNode
+        ? getSerializedNodeText(data, ownNode)
         : undefined;
       const text =
-        serializedRelation?.text ?? getDisplayTextForView(data, path, stack);
-      const uuid = ownRelation ? shortID(ownRelation.id) : v4();
+        serializedNode?.text ?? getDisplayTextForView(data, path, stack);
+      const uuid = ownNode ? shortID(ownNode.id) : v4();
       const prefix = formatPrefixMarkers(item?.relevance, item?.argument);
 
       const line = `${indent}- ${prefix}${text}${formatNodeAttrs(uuid, {
-        basedOn: ownRelation?.basedOn,
-        userPublicKey: ownRelation?.userPublicKey,
+        basedOn: ownNode?.basedOn,
+        userPublicKey: ownNode?.userPublicKey,
       })}`;
       return {
         lines: [...acc.lines, line],
@@ -181,7 +178,7 @@ export function buildDocumentEvent(
 ): UnsignedEvent {
   const author = data.user.publicKey;
   const rootContext = getNodeContext(data.knowledgeDBs, rootNode);
-  const { text: rootText } = getSerializedRelationText(data, rootNode);
+  const { text: rootText } = getSerializedNodeText(data, rootNode);
   const rootUuid = shortID(rootNode.id);
   const rootLine = formatRootHeading(
     rootText,

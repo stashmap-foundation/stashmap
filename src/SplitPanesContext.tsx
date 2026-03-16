@@ -3,7 +3,7 @@ import { planUpdatePanes, usePlanner } from "./planner";
 import { useData } from "./DataContext";
 import {
   pathToStack,
-  parseRelationUrl,
+  parseNodeRouteUrl,
   parseAuthorFromSearch,
 } from "./navigationUrl";
 import { splitID } from "./connections";
@@ -122,16 +122,14 @@ export function useNavigatePane(): (url: string) => void {
     const search =
       questionMarkIndex >= 0 ? urlWithoutHash.slice(questionMarkIndex) : "";
     const author = parseAuthorFromSearch(search) || user.publicKey;
-    const relationID = parseRelationUrl(pathname);
-    if (relationID) {
+    const nodeID = parseNodeRouteUrl(pathname);
+    if (nodeID) {
       setPane({
         id: pane.id,
         stack: [],
         author:
-          parseAuthorFromSearch(search) ||
-          splitID(relationID)[0] ||
-          user.publicKey,
-        rootNodeId: relationID,
+          parseAuthorFromSearch(search) || splitID(nodeID)[0] || user.publicKey,
+        rootNodeId: nodeID,
         scrollToId,
       });
     } else {

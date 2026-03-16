@@ -1,11 +1,11 @@
-export type RelationItemMetadata = {
+export type NodeItemMetadata = {
   relevance?: Relevance;
   argument?: Argument;
 };
 
-export function updateRelationItemMetadata(
+export function updateNodeItemMetadata(
   node: GraphNode,
-  metadata: RelationItemMetadata
+  metadata: NodeItemMetadata
 ): GraphNode {
   return {
     ...node,

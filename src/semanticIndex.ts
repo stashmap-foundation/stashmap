@@ -3,7 +3,7 @@ import { EMPTY_SEMANTIC_ID, isRefNode } from "./connections";
 
 export function createEmptySemanticIndex(): SemanticIndex {
   return {
-    relationByID: new globalThis.Map<LongID, GraphNode>(),
+    nodeByID: new globalThis.Map<LongID, GraphNode>(),
     semantic: new globalThis.Map<string, globalThis.Set<LongID>>(),
     incomingCrefs: new globalThis.Map<LongID, globalThis.Set<LongID>>(),
     basedOnIndex: new globalThis.Map<LongID, globalThis.Set<LongID>>(),
@@ -23,17 +23,17 @@ function addToSetMap(
   map.set(key, new globalThis.Set<LongID>([value]));
 }
 
-function addToRelationMap(
+function addToNodeMap(
   map: globalThis.Map<LongID, globalThis.Set<LongID>>,
-  targetRelationID: LongID,
-  sourceRelationID: LongID
+  targetNodeID: LongID,
+  sourceNodeID: LongID
 ): void {
-  const existing = map.get(targetRelationID);
+  const existing = map.get(targetNodeID);
   if (existing) {
-    existing.add(sourceRelationID);
+    existing.add(sourceNodeID);
     return;
   }
-  map.set(targetRelationID, new globalThis.Set<LongID>([sourceRelationID]));
+  map.set(targetNodeID, new globalThis.Set<LongID>([sourceNodeID]));
 }
 
 function removeFromSetMap(
@@ -51,86 +51,70 @@ function removeFromSetMap(
   }
 }
 
-function removeFromRelationMap(
+function removeFromNodeMap(
   map: globalThis.Map<LongID, globalThis.Set<LongID>>,
-  targetRelationID: LongID,
-  sourceRelationID: LongID
+  targetNodeID: LongID,
+  sourceNodeID: LongID
 ): void {
-  const existing = map.get(targetRelationID);
+  const existing = map.get(targetNodeID);
   if (!existing) {
     return;
   }
-  existing.delete(sourceRelationID);
+  existing.delete(sourceNodeID);
   if (existing.size === 0) {
-    map.delete(targetRelationID);
+    map.delete(targetNodeID);
   }
 }
 
-function addRelationSemanticEntries(
+function addNodeSemanticEntries(
   semanticIndex: SemanticIndex,
-  relation: GraphNode
+  node: GraphNode
 ): void {
-  addToSetMap(semanticIndex.semantic, relation.text, relation.id);
-  if (relation.basedOn) {
-    addToRelationMap(semanticIndex.basedOnIndex, relation.basedOn, relation.id);
+  addToSetMap(semanticIndex.semantic, node.text, node.id);
+  if (node.basedOn) {
+    addToNodeMap(semanticIndex.basedOnIndex, node.basedOn, node.id);
   }
 
-  relation.children.forEach((childID) => {
+  node.children.forEach((childID) => {
     if (childID === EMPTY_SEMANTIC_ID) {
       return;
     }
-    const childRelation = semanticIndex.relationByID.get(childID as LongID);
-    if (!childRelation || childRelation.relevance === "not_relevant") {
+    const childNode = semanticIndex.nodeByID.get(childID as LongID);
+    if (!childNode || childNode.relevance === "not_relevant") {
       return;
     }
-    const targetRelationID = isRefNode(childRelation)
-      ? childRelation.targetID
-      : undefined;
-    if (targetRelationID) {
-      addToRelationMap(
-        semanticIndex.incomingCrefs,
-        targetRelationID,
-        relation.id
-      );
+    const targetNodeID = isRefNode(childNode) ? childNode.targetID : undefined;
+    if (targetNodeID) {
+      addToNodeMap(semanticIndex.incomingCrefs, targetNodeID, node.id);
     }
   });
 }
 
-function removeRelationSemanticEntries(
+function removeNodeSemanticEntries(
   semanticIndex: SemanticIndex,
-  relation: GraphNode
+  node: GraphNode
 ): void {
-  removeFromSetMap(semanticIndex.semantic, relation.text, relation.id);
-  if (relation.basedOn) {
-    removeFromRelationMap(
-      semanticIndex.basedOnIndex,
-      relation.basedOn,
-      relation.id
-    );
+  removeFromSetMap(semanticIndex.semantic, node.text, node.id);
+  if (node.basedOn) {
+    removeFromNodeMap(semanticIndex.basedOnIndex, node.basedOn, node.id);
   }
 
-  relation.children.forEach((childID) => {
+  node.children.forEach((childID) => {
     if (childID === EMPTY_SEMANTIC_ID) {
       return;
     }
-    const childRelation = semanticIndex.relationByID.get(childID as LongID);
-    if (!childRelation || childRelation.relevance === "not_relevant") {
+    const childNode = semanticIndex.nodeByID.get(childID as LongID);
+    if (!childNode || childNode.relevance === "not_relevant") {
       return;
     }
-    const targetRelationID = isRefNode(childRelation)
-      ? childRelation.targetID
-      : undefined;
-    if (targetRelationID) {
-      removeFromRelationMap(
-        semanticIndex.incomingCrefs,
-        targetRelationID,
-        relation.id
-      );
+    const targetNodeID = isRefNode(childNode) ? childNode.targetID : undefined;
+    if (targetNodeID) {
+      removeFromNodeMap(semanticIndex.incomingCrefs, targetNodeID, node.id);
     }
   });
 }
 
-export function addRelationsToSemanticIndex(
+export function addNodesToSemanticIndex(
   semanticIndex: SemanticIndex,
   nodes: ImmutableMap<string, GraphNode>
 ): SemanticIndex {
@@ -139,9 +123,7 @@ export function addRelationsToSemanticIndex(
   }
 
   const nextIndex: SemanticIndex = {
-    relationByID: new globalThis.Map<LongID, GraphNode>(
-      semanticIndex.relationByID
-    ),
+    nodeByID: new globalThis.Map<LongID, GraphNode>(semanticIndex.nodeByID),
     semantic: new globalThis.Map<string, globalThis.Set<LongID>>(
       [...semanticIndex.semantic.entries()].map(([key, ids]) => [
         key,
@@ -162,17 +144,17 @@ export function addRelationsToSemanticIndex(
     ),
   };
 
-  nodes.valueSeq().forEach((relation) => {
-    nextIndex.relationByID.set(relation.id, relation);
+  nodes.valueSeq().forEach((node) => {
+    nextIndex.nodeByID.set(node.id, node);
   });
 
-  nodes.valueSeq().forEach((relation) => {
-    addRelationSemanticEntries(nextIndex, relation);
+  nodes.valueSeq().forEach((node) => {
+    addNodeSemanticEntries(nextIndex, node);
   });
   return nextIndex;
 }
 
-export function removeRelationsFromSemanticIndex(
+export function removeNodesFromSemanticIndex(
   semanticIndex: SemanticIndex,
   nodes: ImmutableMap<string, GraphNode>
 ): SemanticIndex {
@@ -181,9 +163,7 @@ export function removeRelationsFromSemanticIndex(
   }
 
   const nextIndex: SemanticIndex = {
-    relationByID: new globalThis.Map<LongID, GraphNode>(
-      semanticIndex.relationByID
-    ),
+    nodeByID: new globalThis.Map<LongID, GraphNode>(semanticIndex.nodeByID),
     semantic: new globalThis.Map<string, globalThis.Set<LongID>>(
       [...semanticIndex.semantic.entries()].map(([key, ids]) => [
         key,
@@ -204,22 +184,22 @@ export function removeRelationsFromSemanticIndex(
     ),
   };
 
-  nodes.valueSeq().forEach((relation) => {
-    removeRelationSemanticEntries(nextIndex, relation);
+  nodes.valueSeq().forEach((node) => {
+    removeNodeSemanticEntries(nextIndex, node);
   });
-  nodes.valueSeq().forEach((relation) => {
-    nextIndex.relationByID.delete(relation.id);
+  nodes.valueSeq().forEach((node) => {
+    nextIndex.nodeByID.delete(node.id);
   });
   return nextIndex;
 }
 
 export function buildSemanticIndexFromDocuments(
-  relationsByDocumentKey: ImmutableMap<string, ImmutableMap<string, GraphNode>>
+  nodesByDocumentKey: ImmutableMap<string, ImmutableMap<string, GraphNode>>
 ): SemanticIndex {
-  return relationsByDocumentKey
+  return nodesByDocumentKey
     .valueSeq()
     .reduce(
-      (acc, nodes) => addRelationsToSemanticIndex(acc, nodes),
+      (acc, nodes) => addNodesToSemanticIndex(acc, nodes),
       createEmptySemanticIndex()
     );
 }

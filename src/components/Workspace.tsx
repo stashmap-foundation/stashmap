@@ -64,7 +64,7 @@ import {
   shortID,
 } from "../connections";
 import { getOwnLogRoot } from "../systemRoots";
-import { buildNodeUrl, buildRelationUrl } from "../navigationUrl";
+import { buildNodeUrl, buildNodeRouteUrl } from "../navigationUrl";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import {
   focusRow,
@@ -152,43 +152,41 @@ type BreadcrumbEntry = {
 
 function getBreadcrumbLabel(
   knowledgeDBs: KnowledgeDBs,
-  relation: GraphNode
+  node: GraphNode
 ): string {
   return (
-    getNodeText(relation) ||
-    shortID(getSemanticID(knowledgeDBs, relation)) ||
-    "..."
+    getNodeText(node) || shortID(getSemanticID(knowledgeDBs, node)) || "..."
   );
 }
 
-function getStandaloneRootRelation(
+function getStandaloneRootNode(
   knowledgeDBs: KnowledgeDBs,
-  relation: GraphNode
+  node: GraphNode
 ): GraphNode | undefined {
   return knowledgeDBs
-    .get(relation.author)
+    .get(node.author)
     ?.nodes.valueSeq()
     .find(
       (candidate) =>
-        candidate.author === relation.author &&
-        candidate.root === relation.root &&
+        candidate.author === node.author &&
+        candidate.root === node.root &&
         !candidate.parent &&
         candidate.root === candidate.id
     );
 }
 
-function resolveRelationFromSegments(
+function resolveNodeFromSegments(
   knowledgeDBs: KnowledgeDBs,
-  currentRelation: GraphNode,
+  currentNode: GraphNode,
   semanticStack: ID[]
 ): GraphNode | undefined {
   if (semanticStack.length === 0) {
-    return currentRelation;
+    return currentNode;
   }
 
   const [nextSemanticID, ...rest] = semanticStack;
-  const matchingNode = currentRelation.children
-    .map((itemID) => getNode(knowledgeDBs, itemID, currentRelation.author))
+  const matchingNode = currentNode.children
+    .map((itemID) => getNode(knowledgeDBs, itemID, currentNode.author))
     .find(
       (item): item is GraphNode =>
         !!item &&
@@ -199,13 +197,13 @@ function resolveRelationFromSegments(
     return undefined;
   }
 
-  const nextRelation = resolveNode(knowledgeDBs, matchingNode) || matchingNode;
-  return nextRelation
-    ? resolveRelationFromSegments(knowledgeDBs, nextRelation, rest as ID[])
+  const nextNode = resolveNode(knowledgeDBs, matchingNode) || matchingNode;
+  return nextNode
+    ? resolveNodeFromSegments(knowledgeDBs, nextNode, rest as ID[])
     : undefined;
 }
 
-function resolveRelationFromRootStack(
+function resolveNodeFromRootStack(
   knowledgeDBs: KnowledgeDBs,
   rootNode: GraphNode,
   semanticStack: ID[]
@@ -213,34 +211,29 @@ function resolveRelationFromRootStack(
   if (semanticStack.length === 0) {
     return undefined;
   }
-  const treeRoot =
-    getStandaloneRootRelation(knowledgeDBs, rootNode) || rootNode;
+  const treeRoot = getStandaloneRootNode(knowledgeDBs, rootNode) || rootNode;
   const rootSemanticID = shortID(getSemanticID(knowledgeDBs, treeRoot));
   const pathWithoutRoot =
     shortID(semanticStack[0]) === rootSemanticID
       ? semanticStack.slice(1)
       : semanticStack;
 
-  return resolveRelationFromSegments(
+  return resolveNodeFromSegments(
     knowledgeDBs,
     treeRoot,
     pathWithoutRoot as ID[]
   );
 }
 
-function getLiveAnchorSourceRelation(
+function getLiveAnchorSourceNode(
   knowledgeDBs: KnowledgeDBs,
-  relation: GraphNode
+  node: GraphNode
 ): GraphNode | undefined {
-  const sourceAuthor = relation.anchor?.sourceAuthor || relation.author;
-  if (relation.anchor?.sourceRelationID) {
-    return getNode(
-      knowledgeDBs,
-      relation.anchor.sourceRelationID,
-      sourceAuthor
-    );
+  const sourceAuthor = node.anchor?.sourceAuthor || node.author;
+  if (node.anchor?.sourceNodeID) {
+    return getNode(knowledgeDBs, node.anchor.sourceNodeID, sourceAuthor);
   }
-  if (!relation.anchor?.sourceRootID) {
+  if (!node.anchor?.sourceRootID) {
     return undefined;
   }
   return knowledgeDBs
@@ -249,23 +242,23 @@ function getLiveAnchorSourceRelation(
     .find(
       (candidate) =>
         candidate.author === sourceAuthor &&
-        candidate.root === relation.anchor?.sourceRootID &&
+        candidate.root === node.anchor?.sourceRootID &&
         !candidate.parent &&
         candidate.root === candidate.id
     );
 }
 
-function createRelationBreadcrumbEntry(
+function createNodeBreadcrumbEntry(
   knowledgeDBs: KnowledgeDBs,
-  relation: GraphNode
+  node: GraphNode
 ): BreadcrumbEntry {
   return {
-    key: `relation:${relation.id}`,
-    label: getBreadcrumbLabel(knowledgeDBs, relation),
+    key: `node:${node.id}`,
+    label: getBreadcrumbLabel(knowledgeDBs, node),
     target: {
-      stack: getNodeStack(knowledgeDBs, relation),
-      author: relation.author,
-      rootNodeId: relation.id,
+      stack: getNodeStack(knowledgeDBs, node),
+      author: node.author,
+      rootNodeId: node.id,
     },
   };
 }
@@ -288,43 +281,38 @@ function createSnapshotBreadcrumbEntries(
 
 function buildAnchoredLineageEntries(
   knowledgeDBs: KnowledgeDBs,
-  relation: GraphNode,
+  node: GraphNode,
   seen = new Set<string>()
 ): BreadcrumbEntry[] {
-  if (seen.has(relation.id)) {
-    return [createRelationBreadcrumbEntry(knowledgeDBs, relation)];
+  if (seen.has(node.id)) {
+    return [createNodeBreadcrumbEntry(knowledgeDBs, node)];
   }
 
-  const nextSeen = new Set(seen).add(relation.id);
-  if (relation.parent) {
-    const parentRelation = getNode(
-      knowledgeDBs,
-      relation.parent,
-      relation.author
-    );
-    if (parentRelation) {
+  const nextSeen = new Set(seen).add(node.id);
+  if (node.parent) {
+    const parentNode = getNode(knowledgeDBs, node.parent, node.author);
+    if (parentNode) {
       return [
-        ...buildAnchoredLineageEntries(knowledgeDBs, parentRelation, nextSeen),
-        createRelationBreadcrumbEntry(knowledgeDBs, relation),
+        ...buildAnchoredLineageEntries(knowledgeDBs, parentNode, nextSeen),
+        createNodeBreadcrumbEntry(knowledgeDBs, node),
       ];
     }
   }
 
-  const sourceNode = getLiveAnchorSourceRelation(knowledgeDBs, relation);
+  const sourceNode = getLiveAnchorSourceNode(knowledgeDBs, node);
   if (sourceNode) {
     return [
-      ...buildAnchoredLineageEntries(
-        knowledgeDBs,
-        sourceNode,
-        nextSeen
-      ).slice(0, -1),
-      createRelationBreadcrumbEntry(knowledgeDBs, relation),
+      ...buildAnchoredLineageEntries(knowledgeDBs, sourceNode, nextSeen).slice(
+        0,
+        -1
+      ),
+      createNodeBreadcrumbEntry(knowledgeDBs, node),
     ];
   }
 
   return [
-    ...createSnapshotBreadcrumbEntries(relation.anchor, relation.author),
-    createRelationBreadcrumbEntry(knowledgeDBs, relation),
+    ...createSnapshotBreadcrumbEntries(node.anchor, node.author),
+    createNodeBreadcrumbEntry(knowledgeDBs, node),
   ];
 }
 
@@ -341,7 +329,7 @@ function SourceButton(): JSX.Element | null {
     return null;
   }
 
-  const sourceNode = getLiveAnchorSourceRelation(knowledgeDBs, rootNode);
+  const sourceNode = getLiveAnchorSourceNode(knowledgeDBs, rootNode);
   if (!sourceNode) {
     return null;
   }
@@ -378,11 +366,11 @@ function Breadcrumbs(): JSX.Element {
   const navigatePane = useNavigatePane();
   const { setPane } = useSplitPanes();
   const paneHistory = usePaneHistory();
-  const currentRelation = useCurrentNode();
+  const currentNode = useCurrentNode();
   const visibleStack = stack.filter((id) => !isSearchId(id as ID));
   const rootNode = pane.rootNodeId
     ? getNode(knowledgeDBs, pane.rootNodeId, user.publicKey)
-    : currentRelation;
+    : currentNode;
   const anchoredEntries = (() => {
     if (!rootNode?.anchor) {
       return undefined;
@@ -402,7 +390,7 @@ function Breadcrumbs(): JSX.Element {
           ...anchorPrefix.toArray(),
           ...localStack.slice(0, index + 1),
         ] as ID[];
-        const localNode = resolveRelationFromRootStack(
+        const localNode = resolveNodeFromRootStack(
           knowledgeDBs,
           rootNode,
           localStack.slice(0, index + 1) as ID[]
@@ -428,7 +416,7 @@ function Breadcrumbs(): JSX.Element {
     visibleStack.map((semanticID, index) => {
       const targetStack = visibleStack.slice(0, index + 1) as ID[];
       const targetNode = rootNode
-        ? resolveRelationFromRootStack(knowledgeDBs, rootNode, targetStack)
+        ? resolveNodeFromRootStack(knowledgeDBs, rootNode, targetStack)
         : undefined;
       return {
         key: `stack:${semanticID}:${index}`,
@@ -449,7 +437,7 @@ function Breadcrumbs(): JSX.Element {
         const { target } = entry;
         const targetUrl = (() => {
           if (target?.rootNodeId) {
-            return buildRelationUrl(target.rootNodeId, target.scrollToId);
+            return buildNodeRouteUrl(target.rootNodeId, target.scrollToId);
           }
           if (!target) {
             return undefined;
@@ -501,7 +489,7 @@ function Breadcrumbs(): JSX.Element {
 function ForkButton(): JSX.Element | null {
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const currentPane = useCurrentPane();
-  const currentRelation = useCurrentNode();
+  const currentNode = useCurrentNode();
   const viewPath = useViewPath();
   const stack = usePaneStack();
   const navigatePane = useNavigatePane();
@@ -511,8 +499,8 @@ function ForkButton(): JSX.Element | null {
     return null;
   }
 
-  const rootNodeId = currentPane.rootNodeId || currentRelation?.root;
-  const isAtRoot = !!currentRelation && currentRelation.id === rootNodeId;
+  const rootNodeId = currentPane.rootNodeId || currentNode?.root;
+  const isAtRoot = !!currentNode && currentNode.id === rootNodeId;
 
   if (!rootNodeId) {
     return null;
@@ -524,7 +512,7 @@ function ForkButton(): JSX.Element | null {
   };
 
   if (!isAtRoot) {
-    const href = buildRelationUrl(rootNodeId);
+    const href = buildNodeRouteUrl(rootNodeId);
     return (
       <a
         href={href}
@@ -555,11 +543,11 @@ function ForkButton(): JSX.Element | null {
 function HomeButton(): JSX.Element | null {
   const { knowledgeDBs, user } = useData();
   const navigatePane = useNavigatePane();
-  const logRelation = getOwnLogRoot(knowledgeDBs, user.publicKey);
-  if (!logRelation) {
+  const logNode = getOwnLogRoot(knowledgeDBs, user.publicKey);
+  if (!logNode) {
     return null;
   }
-  const href = buildRelationUrl(logRelation.id);
+  const href = buildNodeRouteUrl(logNode.id);
 
   return (
     <a
@@ -604,11 +592,11 @@ function useHomeShortcut(): void {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       if ((e.metaKey || e.ctrlKey) && e.key === "h") {
-        const logRelation = getOwnLogRoot(knowledgeDBs, user.publicKey);
-        if (!logRelation) {
+        const logNode = getOwnLogRoot(knowledgeDBs, user.publicKey);
+        if (!logNode) {
           return;
         }
-        const href = buildRelationUrl(logRelation.id);
+        const href = buildNodeRouteUrl(logNode.id);
         e.preventDefault();
         navigatePane(href);
       }

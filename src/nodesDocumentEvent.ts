@@ -26,16 +26,14 @@ type SerializeResult = {
   lines: string[];
 };
 
-function getSerializableRelationText(
+function getSerializableNodeText(
   knowledgeDBs: KnowledgeDBs,
-  relation: GraphNode
+  node: GraphNode
 ): string {
-  return (
-    getNodeText(relation) || shortID(getSemanticID(knowledgeDBs, relation))
-  );
+  return getNodeText(node) || shortID(getSemanticID(knowledgeDBs, node));
 }
 
-function serializeRelationItems(
+function serializeNodeItems(
   knowledgeDBs: KnowledgeDBs,
   author: PublicKey,
   children: GraphNode["children"],
@@ -49,33 +47,31 @@ function serializeRelationItems(
     }
     const item = getNode(knowledgeDBs, childID, author);
     if (!item) {
-      throw new Error(`Missing child relation: ${childID}`);
+      throw new Error(`Missing child node: ${childID}`);
     }
     if (isRefNode(item)) {
-      const targetRelation = resolveNode(knowledgeDBs, item);
-      const targetRelationID = item.targetID;
-      if (!targetRelationID) {
+      const targetNode = resolveNode(knowledgeDBs, item);
+      const targetNodeID = item.targetID;
+      if (!targetNodeID) {
         return acc;
       }
       const linkText =
         item.linkText ||
-        (targetRelation
-          ? getSerializableRelationText(knowledgeDBs, targetRelation)
-          : "") ||
-        shortID(targetRelationID);
+        (targetNode ? getSerializableNodeText(knowledgeDBs, targetNode) : "") ||
+        shortID(targetNodeID);
       const prefix = formatPrefixMarkers(item.relevance, item.argument);
       return {
         ...acc,
         lines: [
           ...acc.lines,
-          `${indent}- ${prefix}[${linkText}](#${targetRelationID})`,
+          `${indent}- ${prefix}[${linkText}](#${targetNodeID})`,
         ],
       };
     }
 
     const resolvedChild = item;
 
-    const text = getSerializableRelationText(knowledgeDBs, resolvedChild);
+    const text = getSerializableNodeText(knowledgeDBs, resolvedChild);
     const prefix = formatPrefixMarkers(item.relevance, item.argument);
     const next: SerializeResult = {
       lines: [
@@ -93,7 +89,7 @@ function serializeRelationItems(
         )}`,
       ],
     };
-    return serializeRelationItems(
+    return serializeNodeItems(
       knowledgeDBs,
       author,
       resolvedChild.children,
@@ -110,9 +106,9 @@ export function buildDocumentEventFromNodes(
     snapshotDTag?: string;
   }
 ): UnsignedEvent {
-  const rootText = getSerializableRelationText(knowledgeDBs, rootNode);
+  const rootText = getSerializableNodeText(knowledgeDBs, rootNode);
   const rootUuid = shortID(rootNode.id);
-  const serialized = serializeRelationItems(
+  const serialized = serializeNodeItems(
     knowledgeDBs,
     rootNode.author,
     rootNode.children,
@@ -149,11 +145,11 @@ export function buildSnapshotEventFromNodes(
   knowledgeDBs: KnowledgeDBs,
   snapshotAuthor: PublicKey,
   snapshotDTag: string,
-  sourceRootRelation: GraphNode
+  sourceRootNode: GraphNode
 ): UnsignedEvent {
   const snapshotContent = buildDocumentEventFromNodes(
     knowledgeDBs,
-    sourceRootRelation
+    sourceRootNode
   ).content;
   return {
     kind: KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
@@ -161,7 +157,7 @@ export function buildSnapshotEventFromNodes(
     created_at: newTimestamp(),
     tags: [
       ["d", snapshotDTag],
-      ["source", shortID(sourceRootRelation.id)],
+      ["source", shortID(sourceRootNode.id)],
       msTag(),
     ],
     content: snapshotContent,

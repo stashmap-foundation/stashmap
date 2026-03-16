@@ -213,7 +213,7 @@ My Notes
     `);
   });
 
-  test("Tab indent preserves relation URL for deeply nested descendants", async () => {
+  test("Tab indent preserves node URL for deeply nested descendants", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -232,8 +232,8 @@ My Notes
     const fullscreenLink = await screen.findByLabelText(
       "open Child in fullscreen"
     );
-    const relationUrl = fullscreenLink.getAttribute("href");
-    expect(relationUrl).toMatch(/^\/r\//);
+    const nodeUrl = fullscreenLink.getAttribute("href");
+    expect(nodeUrl).toMatch(/^\/r\//);
 
     const parentEditor = await screen.findByLabelText("edit Parent");
     await userEvent.click(parentEditor);
@@ -249,7 +249,7 @@ My Notes
 
     cleanup();
 
-    renderApp({ ...alice(), initialRoute: relationUrl as string });
+    renderApp({ ...alice(), initialRoute: nodeUrl as string });
 
     await expectTree(`
 Child
@@ -257,7 +257,7 @@ Child
     `);
   });
 
-  test("Shift-Tab outdent preserves relation URL for deeply nested descendants", async () => {
+  test("Shift-Tab outdent preserves node URL for deeply nested descendants", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
@@ -276,8 +276,8 @@ My Notes
     const fullscreenLink = await screen.findByLabelText(
       "open Child in fullscreen"
     );
-    const relationUrl = fullscreenLink.getAttribute("href");
-    expect(relationUrl).toMatch(/^\/r\//);
+    const nodeUrl = fullscreenLink.getAttribute("href");
+    expect(nodeUrl).toMatch(/^\/r\//);
 
     const innerEditor = await screen.findByLabelText("edit Inner");
     await userEvent.click(innerEditor);
@@ -293,7 +293,7 @@ My Notes
 
     cleanup();
 
-    renderApp({ ...alice(), initialRoute: relationUrl as string });
+    renderApp({ ...alice(), initialRoute: nodeUrl as string });
 
     await expectTree(`
 Child
@@ -543,7 +543,7 @@ My Notes
     fireEvent.drop(targetDropTargets[1]);
 
     // After DnD, Target shows Source with Child (from new copy)
-    // not Another Child (the old relation is overwritten in view)
+    // not Another Child (the old node is overwritten in view)
     await expectTree(`
 My Notes
   Source
@@ -1514,12 +1514,12 @@ My Notes
 
     cleanup();
 
-    const bobRelationEvents = bob()
+    const bobNodeEvents = bob()
       .relayPool.getEvents()
       .filter(
         (e) => e.kind === KIND_KNOWLEDGE_DOCUMENT && e.pubkey === BOB.publicKey
       );
-    const bobRelationDTags = bobRelationEvents.flatMap((event) => {
+    const bobNodeDTags = bobNodeEvents.flatMap((event) => {
       const trees = parseMarkdownHierarchy(event.content);
       return collectTreeValues(trees as MarkdownTreeValue[]).uuids;
     });
@@ -1567,7 +1567,7 @@ Target
       ).basedOn;
       basedOnValues.forEach((basedOnValue) => {
         const sourceDTag = basedOnValue.split("_").slice(1).join("_");
-        expect(bobRelationDTags).toContain(sourceDTag);
+        expect(bobNodeDTags).toContain(sourceDTag);
       });
     });
   });

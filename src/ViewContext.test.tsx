@@ -26,7 +26,7 @@ import {
   updateViewPathsAfterDisconnect,
   updateViewPathsAfterPaneDelete,
   updateViewPathsAfterPaneInsert,
-  updateViewPathsAfterMoveRelations,
+  updateViewPathsAfterMoveNodes,
   ViewPath,
 } from "./ViewContext";
 
@@ -197,15 +197,15 @@ test("Parse View path", () => {
   expect(parseViewPath("p1:root:pl:oop")).toEqual([1, "root", "pl", "oop"]);
 });
 
-test("View path roundtrip preserves relation IDs", () => {
-  const relationId = "alice_550e8400-e29b-41d4-a716-446655440000" as LongID;
-  const viewPath: ViewPath = [0, "rel1" as LongID, relationId];
+test("View path roundtrip preserves node IDs", () => {
+  const nodeId = "alice_550e8400-e29b-41d4-a716-446655440000" as LongID;
+  const viewPath: ViewPath = [0, "rel1" as LongID, nodeId];
 
   const serialized = viewPathToString(viewPath);
   const parsed = parseViewPath(serialized);
 
   expect(parsed).toEqual(viewPath);
-  expect(parsed[2]).toBe(relationId);
+  expect(parsed[2]).toBe(nodeId);
 });
 
 test("View doesn't change if list is forked from contact", async () => {
@@ -226,10 +226,10 @@ My Notes
     Logic
     Scripting
   `);
-  const relationUrl = await openReadonlyRoute("Programming Languages");
+  const nodeUrl = await openReadonlyRoute("Programming Languages");
   cleanup();
 
-  renderApp({ ...alice(), initialRoute: relationUrl });
+  renderApp({ ...alice(), initialRoute: nodeUrl });
   await screen.findByText("READONLY");
   await userEvent.click(await screen.findByLabelText("expand OOP"));
   await expectTree(`
@@ -285,10 +285,10 @@ test("Forked subtree breadcrumbs show source ancestors and navigate back to sour
   await type(
     "My Notes{Enter}{Tab}Programming Languages{Enter}{Tab}OOP{Enter}{Tab}C++{Enter}Java{Enter}{Enter}FP{Enter}Logic{Enter}Scripting{Escape}"
   );
-  const relationUrl = await openReadonlyRoute("Programming Languages");
+  const nodeUrl = await openReadonlyRoute("Programming Languages");
   cleanup();
 
-  renderApp({ ...alice(), initialRoute: relationUrl });
+  renderApp({ ...alice(), initialRoute: nodeUrl });
   await screen.findByText("READONLY");
   await expectTree(`
 [O] Programming Languages
@@ -351,10 +351,10 @@ test("Forked subtree header source action opens source path", async () => {
   await type(
     "My Notes{Enter}{Tab}Programming Languages{Enter}{Tab}OOP{Enter}FP{Enter}Logic{Enter}Scripting{Escape}"
   );
-  const relationUrl = await openReadonlyRoute("Programming Languages");
+  const nodeUrl = await openReadonlyRoute("Programming Languages");
   cleanup();
 
-  renderApp({ ...alice(), initialRoute: relationUrl });
+  renderApp({ ...alice(), initialRoute: nodeUrl });
   await screen.findByText("READONLY");
   await expectTree(`
 [O] Programming Languages
@@ -477,7 +477,7 @@ test("updateViewPathsAfterPaneInsert shifts pane indices at and after insertion 
   expect(updatedViews.get("p3:root")?.expanded).toBe(true);
 });
 
-test("updateViewPathsAfterMoveRelations preserves paths when relationsID starts with digit", () => {
+test("updateViewPathsAfterMoveNodes preserves paths when nodeID starts with digit", () => {
   const relID = "3abc_uuid" as LongID;
   const childAPath = `p0:root:${relID}:childA`;
   const childADeepPath = `p0:root:${relID}:childA:innerRel:grand`;
@@ -492,7 +492,7 @@ test("updateViewPathsAfterMoveRelations preserves paths when relationsID starts 
 
   const data = { views } as unknown as Data;
 
-  const updatedViews = updateViewPathsAfterMoveRelations(data);
+  const updatedViews = updateViewPathsAfterMoveNodes(data);
 
   expect(updatedViews.has(childAPath)).toBe(true);
   expect(updatedViews.get(childAPath)?.expanded).toBe(true);

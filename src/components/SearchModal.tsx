@@ -4,7 +4,7 @@ import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
 import { useData } from "../DataContext";
 import { useApis } from "../Apis";
 import { KIND_SEARCH } from "../Data";
-import { findDocumentRelations } from "../documentMaterialization";
+import { findDocumentNodes } from "../documentMaterialization";
 import { buildTextNodesFromGraphNodes } from "../connections";
 import type { TextSeed } from "../connections";
 import { useReadRelays } from "../relays";
@@ -85,14 +85,11 @@ export function useSearchQuery(
       );
 
   const eventsAsList = events.toList();
-  const relationsFromDocumentEvents =
-    findDocumentRelations(eventsAsList).valueSeq();
-  const nodesFromDocumentEvents = buildTextNodesFromGraphNodes(
-    relationsFromDocumentEvents
-  );
+  const documentNodes = findDocumentNodes(eventsAsList).valueSeq();
+  const textNodes = buildTextNodesFromGraphNodes(documentNodes);
   const nodesFromKnowledgeEvents = nip50
-    ? nodesFromDocumentEvents.slice(0, 25)
-    : filterForKeyword(nodesFromDocumentEvents, query);
+    ? textNodes.slice(0, 25)
+    : filterForKeyword(textNodes, query);
 
   const isQueryFinished = eose;
   const isEose = isQueryFinished || relays.length === 0;

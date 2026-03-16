@@ -93,7 +93,7 @@ Holiday Destinations
   `);
 });
 
-test("clicking a head-level reference opens its parent relation", async () => {
+test("clicking a head-level reference opens its parent node", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
 
@@ -113,7 +113,7 @@ Root
   `);
 });
 
-test("open head-level reference in split pane uses parent relation route", async () => {
+test("open head-level reference in split pane uses parent node route", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
 

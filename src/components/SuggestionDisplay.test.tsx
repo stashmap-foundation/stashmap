@@ -382,7 +382,7 @@ Recipes
     expect(screen.queryByText("Error: Node not found")).toBeNull();
   });
 
-  test("suggestion not swallowed by children in other own relation", async () => {
+  test("suggestion not swallowed by children in other own node", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
     await follow(bob, alice().user.publicKey);

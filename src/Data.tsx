@@ -19,7 +19,7 @@ import { useEventQuery } from "./commons/useNostrQuery";
 import { openDB, StashmapDB, getOutboxEvents } from "./indexedDB";
 import {
   pathToStack,
-  parseRelationUrl,
+  parseNodeRouteUrl,
   parseAuthorFromSearch,
 } from "./navigationUrl";
 import { splitID } from "./connections";
@@ -110,15 +110,15 @@ function saveViewsToStorage(publicKey: PublicKey, views: Views): void {
 }
 
 function getInitialPanes(publicKey: PublicKey): Pane[] {
-  const relationID = parseRelationUrl(window.location.pathname);
-  if (relationID) {
-    const relationAuthor = splitID(relationID)[0] || publicKey;
+  const nodeID = parseNodeRouteUrl(window.location.pathname);
+  if (nodeID) {
+    const nodeAuthor = splitID(nodeID)[0] || publicKey;
     return [
       {
         id: generatePaneId(),
         stack: [],
-        author: relationAuthor,
-        rootNodeId: relationID,
+        author: nodeAuthor,
+        rootNodeId: nodeID,
       },
     ];
   }

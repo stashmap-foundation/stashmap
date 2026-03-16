@@ -15,7 +15,7 @@ import {
   isRefNode,
 } from "../connections";
 import { useData } from "../DataContext";
-import { buildRelationUrl } from "../navigationUrl";
+import { buildNodeRouteUrl } from "../navigationUrl";
 
 export function FullscreenButton(): JSX.Element | null {
   const stack = usePaneStack();
@@ -26,7 +26,7 @@ export function FullscreenButton(): JSX.Element | null {
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();
   const effectiveAuthor = useEffectiveAuthor();
-  const relation = useCurrentNode();
+  const node = useCurrentNode();
   const currentItem = useCurrentEdge();
   const virtualType = currentItem?.virtualType;
   const currentReference = getCurrentReferenceForView(
@@ -43,8 +43,8 @@ export function FullscreenButton(): JSX.Element | null {
 
   const refInfo = (() => {
     if (!currentReference) {
-      if (isRefNode(relation)) {
-        return getRefLinkTargetInfo(relation.id, knowledgeDBs, effectiveAuthor);
+      if (isRefNode(node)) {
+        return getRefLinkTargetInfo(node.id, knowledgeDBs, effectiveAuthor);
       }
       return getRefTargetInfo(itemID, knowledgeDBs, effectiveAuthor);
     }
@@ -56,14 +56,14 @@ export function FullscreenButton(): JSX.Element | null {
           effectiveAuthor
         );
   })();
-  const fullscreenRelation = relation;
+  const fullscreenNode = node;
 
   const href = (() => {
     if (refInfo?.rootNodeId) {
-      return buildRelationUrl(refInfo.rootNodeId, refInfo.scrollToId);
+      return buildNodeRouteUrl(refInfo.rootNodeId, refInfo.scrollToId);
     }
-    if (fullscreenRelation) {
-      return buildRelationUrl(fullscreenRelation.id);
+    if (fullscreenNode) {
+      return buildNodeRouteUrl(fullscreenNode.id);
     }
     return undefined;
   })();

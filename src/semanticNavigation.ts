@@ -9,18 +9,17 @@ import {
 } from "./connections";
 import { isStandaloneRoot } from "./systemRoots";
 
-function relationMatchesRequestedSemanticID(
+function nodeMatchesRequestedSemanticID(
   knowledgeDBs: KnowledgeDBs,
-  relation: GraphNode,
+  node: GraphNode,
   requestedSemanticID: ID
 ): boolean {
   return (
-    shortID(getSemanticID(knowledgeDBs, relation)) ===
-    shortID(requestedSemanticID)
+    shortID(getSemanticID(knowledgeDBs, node)) === shortID(requestedSemanticID)
   );
 }
 
-function getAuthorCandidateRelations(
+function getAuthorCandidateNodes(
   knowledgeDBs: KnowledgeDBs,
   author: PublicKey,
   semanticID: ID
@@ -34,13 +33,11 @@ function getNewestStandaloneRootBySemanticID(
   author: PublicKey,
   semanticID: ID
 ): GraphNode | undefined {
-  return getAuthorCandidateRelations(knowledgeDBs, author, semanticID)
-    .filter(
-      (relation) => relation.author === author && isStandaloneRoot(relation)
-    )
+  return getAuthorCandidateNodes(knowledgeDBs, author, semanticID)
+    .filter((node) => node.author === author && isStandaloneRoot(node))
     .sort((left, right) => right.updated - left.updated)
-    .find((relation) =>
-      relationMatchesRequestedSemanticID(knowledgeDBs, relation, semanticID)
+    .find((node) =>
+      nodeMatchesRequestedSemanticID(knowledgeDBs, node, semanticID)
     );
 }
 
@@ -53,30 +50,21 @@ function getStandaloneRootByRootID(
     .get(author, newDB())
     .nodes.valueSeq()
     .filter(
-      (relation) =>
-        relation.author === author &&
-        relation.root === root &&
-        isStandaloneRoot(relation)
+      (node) =>
+        node.author === author && node.root === root && isStandaloneRoot(node)
     )
     .sort((left, right) => right.updated - left.updated)
     .first();
 }
 
-function getMatchingChildRelation(
+function getMatchingChildNode(
   knowledgeDBs: KnowledgeDBs,
-  parentRelation: GraphNode,
+  parentNode: GraphNode,
   requestedSemanticID: ID
 ): GraphNode | undefined {
-  return getChildNodes(
-    knowledgeDBs,
-    parentRelation,
-    parentRelation.author
-  ).find((relation): relation is GraphNode =>
-    relationMatchesRequestedSemanticID(
-      knowledgeDBs,
-      relation,
-      requestedSemanticID
-    )
+  return getChildNodes(knowledgeDBs, parentNode, parentNode.author).find(
+    (node): node is GraphNode =>
+      nodeMatchesRequestedSemanticID(knowledgeDBs, node, requestedSemanticID)
   );
 }
 
@@ -89,7 +77,7 @@ function resolveRequestedStackFromRoot(
     return { actualStack: [] };
   }
   if (
-    !relationMatchesRequestedSemanticID(
+    !nodeMatchesRequestedSemanticID(
       knowledgeDBs,
       rootNode,
       requestedStack[0] as ID
@@ -105,7 +93,7 @@ function resolveRequestedStackFromRoot(
     if (!currentNode) {
       return undefined;
     }
-    const nextNode = getMatchingChildRelation(
+    const nextNode = getMatchingChildNode(
       knowledgeDBs,
       currentNode,
       requestedStack[index] as ID
@@ -127,7 +115,7 @@ function buildRequestedSemanticPath(
   return [...semanticContext.toArray(), shortID(itemID) as ID];
 }
 
-function resolveRelationFromKnownRoot(
+function resolveNodeFromKnownRoot(
   knowledgeDBs: KnowledgeDBs,
   paneAuthor: PublicKey,
   semanticPath: ID[],
@@ -143,7 +131,7 @@ function resolveRelationFromKnownRoot(
     : undefined;
 }
 
-function resolveStandaloneRelationFromSemanticPath(
+function resolveStandaloneNodeFromSemanticPath(
   knowledgeDBs: KnowledgeDBs,
   paneAuthor: PublicKey,
   semanticPath: ID[]
@@ -206,7 +194,7 @@ export function resolveSemanticNodeInCurrentTree(
       : undefined);
 
   if (preferredRoot) {
-    return resolveRelationFromKnownRoot(
+    return resolveNodeFromKnownRoot(
       knowledgeDBs,
       paneAuthor,
       semanticPath,
@@ -218,7 +206,7 @@ export function resolveSemanticNodeInCurrentTree(
     return undefined;
   }
 
-  return resolveStandaloneRelationFromSemanticPath(
+  return resolveStandaloneNodeFromSemanticPath(
     knowledgeDBs,
     paneAuthor,
     semanticPath

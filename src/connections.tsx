@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/immutable-data, functional/no-let */
 import { List, Set, Map } from "immutable";
-import { newRefNode, newNode } from "./relationFactory";
+import { newRefNode, newNode } from "./nodeFactory";
 import { SEARCH_PREFIX } from "./constants";
 import { getRootAnchorContext, rootAnchorsEqual } from "./rootAnchor";
 
@@ -350,19 +350,19 @@ export function getRefTargetInfo(
   knowledgeDBs: KnowledgeDBs,
   effectiveAuthor: PublicKey
 ): RefTargetInfo | undefined {
-  const relation = resolveNode(
+  const node = resolveNode(
     knowledgeDBs,
     getNode(knowledgeDBs, refId, effectiveAuthor)
   );
-  if (!relation) {
+  if (!node) {
     return undefined;
   }
 
-  const stack = getNodeStack(knowledgeDBs, relation);
+  const stack = getNodeStack(knowledgeDBs, node);
   return {
     stack,
-    author: relation.author,
-    rootNodeId: relation.id,
+    author: node.author,
+    rootNodeId: node.id,
   };
 }
 
@@ -371,69 +371,67 @@ export function getRefLinkTargetInfo(
   knowledgeDBs: KnowledgeDBs,
   effectiveAuthor: PublicKey
 ): RefTargetInfo | undefined {
-  const relation = resolveNode(
+  const node = resolveNode(
     knowledgeDBs,
     getNode(knowledgeDBs, refId, effectiveAuthor)
   );
-  if (!relation) {
+  if (!node) {
     return undefined;
   }
 
   const containingParent = knowledgeDBs
-    .get(relation.author)
+    .get(node.author)
     ?.nodes.valueSeq()
     .find((candidate) =>
-      candidate.children.some((childID) => childID === relation.id)
+      candidate.children.some((childID) => childID === node.id)
     );
-  const parentRelation =
-    (relation.parent
-      ? getNode(knowledgeDBs, relation.parent, relation.author)
+  const parentNode =
+    (node.parent
+      ? getNode(knowledgeDBs, node.parent, node.author)
       : undefined) || containingParent;
-  const targetRoot = parentRelation || relation;
+  const targetRoot = parentNode || node;
 
   return {
     stack: getNodeStack(knowledgeDBs, targetRoot),
     author: targetRoot.author,
     rootNodeId: targetRoot.id,
-    scrollToId: targetRoot.id === relation.id ? undefined : relation.id,
+    scrollToId: targetRoot.id === node.id ? undefined : node.id,
   };
 }
 
 export function ensureNodeNativeFields(
   knowledgeDBs: KnowledgeDBs,
-  relation: GraphNode
+  node: GraphNode
 ): GraphNode {
-  const existingRelation = knowledgeDBs
-    .get(relation.author)
-    ?.nodes.get(shortID(relation.id));
-  const text = relation.text || existingRelation?.text || "";
-  const parent = relation.parent || existingRelation?.parent;
-  const anchor = parent
-    ? undefined
-    : relation.anchor ?? existingRelation?.anchor;
+  const existingNode = knowledgeDBs
+    .get(node.author)
+    ?.nodes.get(shortID(node.id));
+  const text = node.text || existingNode?.text || "";
+  const parent = node.parent || existingNode?.parent;
+  const anchor = parent ? undefined : node.anchor ?? existingNode?.anchor;
 
   if (
-    relation.text === text &&
-    relation.parent === parent &&
-    rootAnchorsEqual(relation.anchor, anchor)
+    node.text === text &&
+    node.parent === parent &&
+    rootAnchorsEqual(node.anchor, anchor)
   ) {
-    return relation;
+    return node;
   }
 
   return {
-    ...relation,
+    ...node,
     text,
     parent,
     anchor,
   };
 }
 
-export function getSearchRelations(
+export function getSearchNodes(
   searchId: ID,
   foundNodeIDs: List<ID>,
   myself: PublicKey,
   asRefs: boolean = false
-): { relation: GraphNode; childNodes: List<GraphNode> } {
+): { node: GraphNode; childNodes: List<GraphNode> } {
   const rel = {
     ...newNode("", List<ID>(), myself),
     id: searchId as LongID,
@@ -466,7 +464,7 @@ export function getSearchRelations(
           }
   );
   return {
-    relation: {
+    node: {
       ...rel,
       children: childNodes.map((child) => child.id).toList(),
     },
@@ -474,10 +472,7 @@ export function getSearchRelations(
   };
 }
 
-export function deleteRelations(
-  nodes: GraphNode,
-  indices: Set<number>
-): GraphNode {
+export function deleteNodes(nodes: GraphNode, indices: Set<number>): GraphNode {
   const children = indices
     .sortBy((index) => -index)
     .reduce((r, deleteIndex) => r.delete(deleteIndex), nodes.children);
@@ -487,7 +482,7 @@ export function deleteRelations(
   };
 }
 
-export function moveRelations(
+export function moveNodes(
   nodes: GraphNode,
   indices: Array<number>,
   startPosition: number
@@ -560,7 +555,7 @@ export function itemPassesFilters(
 
 type EmptyNodeData = {
   index: number;
-  relationItem: GraphNode;
+  nodeItem: GraphNode;
   paneIndex: number;
 };
 
@@ -571,14 +566,14 @@ export function computeEmptyNodeMetadata(
 ): Map<LongID, EmptyNodeData> {
   return temporaryEvents.reduce((metadata, event) => {
     if (event.type === "ADD_EMPTY_NODE") {
-      return metadata.set(event.relationsID, {
+      return metadata.set(event.nodeID, {
         index: event.index,
-        relationItem: event.relationItem,
+        nodeItem: event.nodeItem,
         paneIndex: event.paneIndex,
       });
     }
     if (event.type === "REMOVE_EMPTY_NODE") {
-      return metadata.delete(event.relationsID);
+      return metadata.delete(event.nodeID);
     }
     return metadata;
   }, Map<LongID, EmptyNodeData>());
@@ -604,37 +599,34 @@ export function injectEmptyNodesIntoKnowledgeDBs(
   }
 
   // For each empty node, insert into the corresponding nodes with its metadata
-  const updatedRelations = emptyNodeMetadata.reduce(
-    (nodes, data, relationsID) => {
-      const shortRelationsID = splitID(relationsID)[1];
-      const existingRelations = nodes.get(shortRelationsID);
-      if (!existingRelations) {
-        return nodes;
-      }
+  const updatedNodes = emptyNodeMetadata.reduce((nodes, data, nodeID) => {
+    const shortNodesID = splitID(nodeID)[1];
+    const existingNodes = nodes.get(shortNodesID);
+    if (!existingNodes) {
+      return nodes;
+    }
 
-      // Check if empty node is already injected (from parent MergeKnowledgeDB)
-      const alreadyHasEmpty = existingRelations.children.some(
-        (itemID) => itemID === EMPTY_SEMANTIC_ID
-      );
-      if (alreadyHasEmpty) {
-        return nodes;
-      }
+    // Check if empty node is already injected (from parent MergeKnowledgeDB)
+    const alreadyHasEmpty = existingNodes.children.some(
+      (itemID) => itemID === EMPTY_SEMANTIC_ID
+    );
+    if (alreadyHasEmpty) {
+      return nodes;
+    }
 
-      // Insert empty node at the specified index with its metadata (relevance, argument)
-      const updatedItems = existingRelations.children.insert(
-        data.index,
-        EMPTY_SEMANTIC_ID
-      );
-      return nodes.set(shortRelationsID, {
-        ...existingRelations,
-        children: updatedItems,
-      });
-    },
-    myDB.nodes
-  );
+    // Insert empty node at the specified index with its metadata (relevance, argument)
+    const updatedItems = existingNodes.children.insert(
+      data.index,
+      EMPTY_SEMANTIC_ID
+    );
+    return nodes.set(shortNodesID, {
+      ...existingNodes,
+      children: updatedItems,
+    });
+  }, myDB.nodes);
 
   return knowledgeDBs.set(myself, {
     ...myDB,
-    nodes: updatedRelations,
+    nodes: updatedNodes,
   });
 }

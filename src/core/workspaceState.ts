@@ -27,13 +27,13 @@ function getDocumentTitle(content: string): string {
 }
 
 function editingFrontMatter(author: PublicKey, dTag: string): string {
-  const rootRelationId = joinID(author, dTag);
+  const rootNodeId = joinID(author, dTag);
   return [
     "---",
     `root: ${dTag}`,
     `author: ${author}`,
-    `sourceRoot: ${rootRelationId}`,
-    `sourceRelation: ${rootRelationId}`,
+    `sourceRoot: ${rootNodeId}`,
+    `sourceNode: ${rootNodeId}`,
     "editing: |",
     "  Edit text freely. Never modify <!-- id:... --> comments.",
     "  Never add <!-- id:... --> to new items. Push will reject invented IDs.",

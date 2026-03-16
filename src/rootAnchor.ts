@@ -2,32 +2,32 @@ import { List } from "immutable";
 
 export function createRootAnchor(
   snapshotContext?: Context,
-  sourceRelation?: GraphNode,
+  sourceNode?: GraphNode,
   snapshotLabels?: string[]
 ): RootAnchor | undefined {
   const normalizedContext = snapshotContext ?? List<ID>();
-  if (normalizedContext.size === 0 && !sourceRelation) {
+  if (normalizedContext.size === 0 && !sourceNode) {
     return undefined;
   }
 
   return {
     snapshotContext: normalizedContext,
     ...(snapshotLabels?.length ? { snapshotLabels } : {}),
-    ...(sourceRelation
+    ...(sourceNode
       ? {
-          sourceAuthor: sourceRelation.author,
-          sourceRootID: sourceRelation.root,
-          sourceRelationID: sourceRelation.id,
-          ...(sourceRelation.parent
-            ? { sourceParentRelationID: sourceRelation.parent }
+          sourceAuthor: sourceNode.author,
+          sourceRootID: sourceNode.root,
+          sourceNodeID: sourceNode.id,
+          ...(sourceNode.parent
+            ? { sourceParentNodeID: sourceNode.parent }
             : {}),
         }
       : {}),
   };
 }
 
-export function getRootAnchorContext(relation: GraphNode): Context {
-  return relation.anchor?.snapshotContext ?? List<ID>();
+export function getRootAnchorContext(node: GraphNode): Context {
+  return node.anchor?.snapshotContext ?? List<ID>();
 }
 
 export function rootAnchorsEqual(
@@ -46,7 +46,7 @@ export function rootAnchorsEqual(
       JSON.stringify(right.snapshotLabels ?? []) &&
     left.sourceAuthor === right.sourceAuthor &&
     left.sourceRootID === right.sourceRootID &&
-    left.sourceRelationID === right.sourceRelationID &&
-    left.sourceParentRelationID === right.sourceParentRelationID
+    left.sourceNodeID === right.sourceNodeID &&
+    left.sourceParentNodeID === right.sourceParentNodeID
   );
 }

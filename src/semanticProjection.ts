@@ -28,7 +28,7 @@ type FooterTypeFilters = (
 )[];
 
 type ReferencedByRef = {
-  relationID: LongID;
+  nodeID: LongID;
   context: Context;
   updated: number;
 };
@@ -56,12 +56,12 @@ function getConcreteNodesForSemanticID(
     return [];
   }
 
-  const directRelation = getNode(knowledgeDBs, semanticID, author);
-  if (directRelation) {
-    if (isRefNode(directRelation)) {
+  const directNode = getNode(knowledgeDBs, semanticID, author);
+  if (directNode) {
+    if (isRefNode(directNode)) {
       return [];
     }
-    return [directRelation];
+    return [directNode];
   }
 
   const [remote, localID] = splitID(semanticID as ID);
@@ -82,10 +82,10 @@ function getConcreteNodesForSemanticID(
       db.nodes
         .valueSeq()
         .filter(
-          (relation) =>
-            !isRefNode(relation) &&
-            (shortID(getNodeSemanticID(relation)) === localID ||
-              relation.text === localID)
+          (node) =>
+            !isRefNode(node) &&
+            (shortID(getNodeSemanticID(node)) === localID ||
+              node.text === localID)
         )
         .toArray()
     )
@@ -124,22 +124,18 @@ export function getTextForSemanticID(
     return parseSearchId(localID) || "";
   }
 
-  const directRelation = getNode(knowledgeDBs, semanticID, author);
-  if (directRelation) {
-    if (isRefNode(directRelation)) {
+  const directNode = getNode(knowledgeDBs, semanticID, author);
+  if (directNode) {
+    if (isRefNode(directNode)) {
       return undefined;
     }
-    return getNodeText(directRelation);
+    return getNodeText(directNode);
   }
 
-  const relation = getConcreteNodeForSemanticID(
-    knowledgeDBs,
-    semanticID,
-    author
-  );
-  const relationText = getNodeText(relation);
-  if (relationText !== undefined) {
-    return relationText;
+  const node = getConcreteNodeForSemanticID(knowledgeDBs, semanticID, author);
+  const nodeText = getNodeText(node);
+  if (nodeText !== undefined) {
+    return nodeText;
   }
 
   const fallbackText = getFallbackSemanticText(semanticID);
@@ -167,15 +163,15 @@ function getSemanticCandidates(
   semanticIndex: SemanticIndex,
   semanticKey: string
 ): List<GraphNode> {
-  const relationIDs = semanticIndex.semantic.get(semanticKey);
-  if (!relationIDs) {
+  const nodeIDs = semanticIndex.semantic.get(semanticKey);
+  if (!nodeIDs) {
     return List<GraphNode>();
   }
 
   return List(
-    [...relationIDs]
-      .map((relationID) => semanticIndex.relationByID.get(relationID))
-      .filter((relation): relation is GraphNode => relation !== undefined)
+    [...nodeIDs]
+      .map((nodeID) => semanticIndex.nodeByID.get(nodeID))
+      .filter((node): node is GraphNode => node !== undefined)
       .sort((left, right) => right.updated - left.updated)
   );
 }
@@ -191,21 +187,19 @@ export function findRefsToNode(
   const targetSemanticKey =
     targetAuthor && targetRoot ? semanticID : (shortID(semanticID as ID) as ID);
   const resolvedRefs = getSemanticCandidates(semanticIndex, targetSemanticKey)
-    .filter((relation) => !isSearchId(getSemanticID(knowledgeDBs, relation)))
+    .filter((node) => !isSearchId(getSemanticID(knowledgeDBs, node)))
     .filter(
-      (relation) =>
-        !getNodeContext(knowledgeDBs, relation).some((id) =>
-          isSearchId(id as ID)
-        )
+      (node) =>
+        !getNodeContext(knowledgeDBs, node).some((id) => isSearchId(id as ID))
     )
-    .map((relation) => ({
+    .map((node) => ({
       ref: {
-        relationID: relation.id,
-        context: getNodeContext(knowledgeDBs, relation),
-        updated: relation.updated,
+        nodeID: node.id,
+        context: getNodeContext(knowledgeDBs, node),
+        updated: node.updated,
       },
-      author: relation.author,
-      root: relation.root,
+      author: node.author,
+      root: node.root,
     }))
     .toList();
 
@@ -224,7 +218,7 @@ export function findRefsToNode(
     : resolvedRefs.map(({ ref }) => ref).toList();
 
   return allRefs
-    .groupBy((ref) => ref.relationID)
+    .groupBy((ref) => ref.nodeID)
     .map((grp) => grp.first()!)
     .valueSeq()
     .toList();
@@ -242,14 +236,14 @@ function contextKeyForCref(
   crefID: ID,
   effectiveAuthor: PublicKey
 ): string | undefined {
-  const targetRelation = resolveNode(
+  const targetNode = resolveNode(
     knowledgeDBs,
     getNode(knowledgeDBs, crefID, effectiveAuthor)
   );
-  if (!targetRelation) {
+  if (!targetNode) {
     return undefined;
   }
-  return getContextKey(getNodeContext(knowledgeDBs, targetRelation));
+  return getContextKey(getNodeContext(knowledgeDBs, targetNode));
 }
 
 function coveredContextKeys(
@@ -265,13 +259,13 @@ function coveredContextKeys(
 
 function isInSystemRoot(
   knowledgeDBs: KnowledgeDBs,
-  relation: GraphNode | undefined,
+  node: GraphNode | undefined,
   systemRole: RootSystemRole
 ): boolean {
-  if (!relation) {
+  if (!node) {
     return false;
   }
-  const rootNode = getNode(knowledgeDBs, relation.root, relation.author);
+  const rootNode = getNode(knowledgeDBs, node.root, node.author);
   return rootNode?.systemRole === systemRole;
 }
 
@@ -286,7 +280,7 @@ export function deduplicateRefsByContext(
       (group) =>
         group
           .sortBy((ref) => {
-            const [author] = splitID(ref.relationID);
+            const [author] = splitID(ref.nodeID);
             const isOther =
               preferAuthor && author !== undefined && author !== preferAuthor
                 ? 1
@@ -304,8 +298,8 @@ export function getIncomingCrefsForNode(
   semanticIndex: SemanticIndex,
   visibleAuthors: ImmutableSet<PublicKey>,
   currentSemanticID: ID,
-  parentRelationID: LongID | undefined,
-  currentRelationID: LongID | undefined,
+  parentNodeID: LongID | undefined,
+  currentNodeID: LongID | undefined,
   effectiveAuthor: PublicKey,
   currentItems?: List<GraphNode>
 ): List<LongID> {
@@ -320,33 +314,33 @@ export function getIncomingCrefsForNode(
   );
   const outgoingTargetRelIDs = (currentItems || List<GraphNode>()).reduce(
     (acc, item) => {
-      const targetRelation = resolveNode(knowledgeDBs, item);
-      return targetRelation ? acc.add(targetRelation.id) : acc;
+      const targetNode = resolveNode(knowledgeDBs, item);
+      return targetNode ? acc.add(targetNode.id) : acc;
     },
     ImmutableSet<LongID>()
   );
 
   const refs = List(
-    currentRelationID
+    currentNodeID
       ? [
-          ...(semanticIndex.incomingCrefs.get(currentRelationID) ||
+          ...(semanticIndex.incomingCrefs.get(currentNodeID) ||
             new globalThis.Set<LongID>()),
         ]
-          .map((relationID) => semanticIndex.relationByID.get(relationID))
-          .filter((relation): relation is GraphNode => relation !== undefined)
-          .filter((relation) => visibleAuthors.has(relation.author))
-          .filter((relation) => relation.id !== parentRelationID)
-          .filter((relation) => relation.id !== currentRelationID)
+          .map((nodeID) => semanticIndex.nodeByID.get(nodeID))
+          .filter((node): node is GraphNode => node !== undefined)
+          .filter((node) => visibleAuthors.has(node.author))
+          .filter((node) => node.id !== parentNodeID)
+          .filter((node) => node.id !== currentNodeID)
           .filter(
-            (relation) =>
-              relation.systemRole !== LOG_ROOT_ROLE &&
-              !isInSystemRoot(knowledgeDBs, relation, LOG_ROOT_ROLE)
+            (node) =>
+              node.systemRole !== LOG_ROOT_ROLE &&
+              !isInSystemRoot(knowledgeDBs, node, LOG_ROOT_ROLE)
           )
-          .filter((relation) => !outgoingTargetRelIDs.has(relation.id))
-          .map((relation) => ({
-            relationID: relation.id,
-            context: getNodeContext(knowledgeDBs, relation),
-            updated: relation.updated,
+          .filter((node) => !outgoingTargetRelIDs.has(node.id))
+          .map((node) => ({
+            nodeID: node.id,
+            context: getNodeContext(knowledgeDBs, node),
+            updated: node.updated,
           }))
       : []
   );
@@ -355,7 +349,7 @@ export function getIncomingCrefsForNode(
   return deduped
     .filter((ref) => !covered.has(getRefContextKey(knowledgeDBs, ref)))
     .sortBy((ref) => `${-ref.updated}:${ref.context.join(":")}`)
-    .map((ref) => ref.relationID)
+    .map((ref) => ref.nodeID)
     .toList();
 }
 
@@ -383,13 +377,13 @@ function getFooterItemFilters(
   );
 }
 
-function getFilteredRelationItems(
+function getFilteredNodeItems(
   knowledgeDBs: KnowledgeDBs,
-  relation: GraphNode,
+  node: GraphNode,
   filterTypes: FooterTypeFilters
 ): List<GraphNode> {
   const itemFilters = getFooterItemFilters(filterTypes);
-  return getChildNodes(knowledgeDBs, relation, relation.author)
+  return getChildNodes(knowledgeDBs, node, node.author)
     .filter(
       (item) =>
         itemPassesFilters(item, itemFilters) &&
@@ -398,14 +392,11 @@ function getFilteredRelationItems(
     .toList();
 }
 
-function useExactItemMatchForRelation(
-  relation: GraphNode,
-  currentRelation: GraphNode
+function useExactItemMatchForNode(
+  node: GraphNode,
+  currentNode: GraphNode
 ): boolean {
-  return (
-    relation.author === currentRelation.author &&
-    relation.root === currentRelation.root
-  );
+  return node.author === currentNode.author && node.root === currentNode.root;
 }
 
 function getComparableItemKey(
@@ -432,7 +423,7 @@ function getPastVersions(
     return List<GraphNode>();
   }
 
-  const pastVersion = semanticIndex.relationByID.get(currentNode.basedOn);
+  const pastVersion = semanticIndex.nodeByID.get(currentNode.basedOn);
   if (!pastVersion) {
     return List<GraphNode>();
   }
@@ -459,7 +450,7 @@ function getFutureVersions(
 
   return futureIDs
     .reduce((collected, futureID) => {
-      const futureVersion = semanticIndex.relationByID.get(futureID);
+      const futureVersion = semanticIndex.nodeByID.get(futureID);
       if (!futureVersion) {
         return collected;
       }
@@ -526,7 +517,7 @@ function getVersions(
 }
 
 type AlternativeSummary = {
-  relation: GraphNode;
+  node: GraphNode;
   filteredChildren: List<GraphNode>;
   addKeys: ImmutableSet<string>;
   removeCount: number;
@@ -537,10 +528,10 @@ export function getAlternativeFooterData(
   semanticIndex: SemanticIndex,
   visibleAuthors: ImmutableSet<PublicKey>,
   filterTypes: FooterTypeFilters,
-  currentRelation?: GraphNode,
+  currentNode?: GraphNode,
   showSuggestions: boolean = true
 ): AlternativeFooterResult {
-  if (!currentRelation || !filterTypes || filterTypes.length === 0) {
+  if (!currentNode || !filterTypes || filterTypes.length === 0) {
     return EMPTY_ALTERNATIVE_FOOTER_RESULT;
   }
 
@@ -552,60 +543,49 @@ export function getAlternativeFooterData(
     return EMPTY_ALTERNATIVE_FOOTER_RESULT;
   }
 
-  const versionNodes = getVersions(
-    semanticIndex,
-    visibleAuthors,
-    currentRelation
-  );
+  const versionNodes = getVersions(semanticIndex, visibleAuthors, currentNode);
 
-  const currentRelationChildren = getChildNodes(
+  const currentNodeChildren = getChildNodes(
     knowledgeDBs,
-    currentRelation,
-    currentRelation.author
+    currentNode,
+    currentNode.author
   );
-  const existingCrefTargetIDs = currentRelationChildren
+  const existingCrefTargetIDs = currentNodeChildren
     .map((item) => (isRefNode(item) ? item.targetID : undefined))
     .filter((id): id is LongID => !!id)
     .toSet();
-  const declinedTargetIDs = currentRelationChildren
+  const declinedTargetIDs = currentNodeChildren
     .filter((item) => isRefNode(item) && item.relevance === "not_relevant")
     .flatMap((item) => {
       const { targetID } = item;
       return targetID ? [targetID] : [];
     })
     .toSet();
-  const currentRelationItemIDs = currentRelationChildren
-    .map((item) => item.id)
-    .toSet();
-  const currentRelationItemKeys = currentRelationChildren
+  const currentNodeItemIDs = currentNodeChildren.map((item) => item.id).toSet();
+  const currentNodeItemKeys = currentNodeChildren
     .map((item) => getNodeKey(knowledgeDBs, item))
     .toSet();
-  const currentExactItemKeys = getFilteredRelationItems(
+  const currentExactItemKeys = getFilteredNodeItems(
     knowledgeDBs,
-    currentRelation,
+    currentNode,
     filterTypes
   )
     .map((item) => shortID(item.id))
     .toSet();
-  const currentSemanticItemKeys = getFilteredRelationItems(
+  const currentSemanticItemKeys = getFilteredNodeItems(
     knowledgeDBs,
-    currentRelation,
+    currentNode,
     filterTypes
   )
     .map((item) => getNodeKey(knowledgeDBs, item))
     .toSet();
 
-  const summarizeRelations = (
-    relations: List<GraphNode>
-  ): List<AlternativeSummary> =>
-    relations.map((relation): AlternativeSummary => {
-      const useExactMatch = useExactItemMatchForRelation(
-        relation,
-        currentRelation
-      );
-      const filteredChildren = getFilteredRelationItems(
+  const summarizeNodes = (nodes: List<GraphNode>): List<AlternativeSummary> =>
+    nodes.map((node): AlternativeSummary => {
+      const useExactMatch = useExactItemMatchForNode(node, currentNode);
+      const filteredChildren = getFilteredNodeItems(
         knowledgeDBs,
-        relation,
+        node,
         filterTypes
       );
       const candidateKeys = filteredChildren
@@ -615,26 +595,26 @@ export function getAlternativeFooterData(
         ? currentExactItemKeys
         : currentSemanticItemKeys;
       return {
-        relation,
+        node,
         filteredChildren,
         addKeys: candidateKeys.filter((key) => !currentKeys.has(key)).toSet(),
         removeCount: currentKeys.filter((key) => !candidateKeys.has(key)).size,
       };
     });
 
-  const versionSummaries = summarizeRelations(versionNodes);
+  const versionSummaries = summarizeNodes(versionNodes);
 
   const candidateItemIDs = suggestionsEnabled
     ? versionSummaries
-        .filter(({ relation }) => !declinedTargetIDs.has(relation.id))
+        .filter(({ node }) => !declinedTargetIDs.has(node.id))
         .reduce((acc, { filteredChildren }) => {
           return filteredChildren.reduce((itemAcc, item) => {
-            if (currentRelationItemIDs.has(item.id)) {
+            if (currentNodeItemIDs.has(item.id)) {
               return itemAcc;
             }
             const candidateKey = getNodeKey(knowledgeDBs, item);
             if (
-              currentRelationItemKeys.has(candidateKey) ||
+              currentNodeItemKeys.has(candidateKey) ||
               itemAcc.has(candidateKey)
             ) {
               return itemAcc;
@@ -653,7 +633,7 @@ export function getAlternativeFooterData(
     .toSet() as ImmutableSet<string>;
   const versions = versionsEnabled
     ? versionSummaries
-        .filter(({ relation }) => !existingCrefTargetIDs.has(relation.id))
+        .filter(({ node }) => !existingCrefTargetIDs.has(node.id))
         .filter(
           ({ addKeys, removeCount }) => addKeys.size > 0 || removeCount > 0
         )
@@ -662,7 +642,7 @@ export function getAlternativeFooterData(
             addKeys.some((key) => !coveredCandidateIDs.has(key)) ||
             removeCount > suggestionSettings.maxSuggestions
         )
-        .map(({ relation }) => relation.id)
+        .map(({ node }) => node.id)
         .toList()
     : List<LongID>();
 

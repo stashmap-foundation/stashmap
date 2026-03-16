@@ -63,7 +63,7 @@ function expectEditableHeader(
   expect(content).toContain(`root: ${rootUuid}`);
   expect(content).toContain(`author: ${author}`);
   expect(content).toContain(`sourceRoot: ${author}_${rootUuid}`);
-  expect(content).toContain(`sourceRelation: ${author}_${rootUuid}`);
+  expect(content).toContain(`sourceNode: ${author}_${rootUuid}`);
   expect(content).toContain("editing: |");
   expect(content).toContain("Never modify <!-- id:... --> comments.");
   expect(content).toContain("Push will reject invented IDs.");

@@ -1,4 +1,4 @@
-import { useRelationItemContext } from "./useRelationItemContext";
+import { useNodeItemContext } from "./useNodeItemContext";
 
 type UseUpdateArgumentResult = {
   currentArgument: Argument;
@@ -11,7 +11,7 @@ type UseUpdateArgumentResult = {
  * Used by EvidenceSelector.
  */
 export function useUpdateArgument(): UseUpdateArgumentResult {
-  const { isVisible, currentItem, updateMetadata } = useRelationItemContext();
+  const { isVisible, currentItem, updateMetadata } = useNodeItemContext();
 
   const currentArgument = currentItem?.argument;
 

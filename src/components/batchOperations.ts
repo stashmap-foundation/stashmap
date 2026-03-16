@@ -1,16 +1,16 @@
 import { OrderedSet } from "immutable";
+import type { VirtualRowsMap } from "../rows/types";
 import {
-  ViewPath,
-  VirtualRowsMap,
+  RowPath,
   addNodeToPathWithNodes,
   getCurrentEdgeForView,
   getParentKey,
-  getParentView,
+  getParentRowPath,
   getPreviousSibling,
   getNodeForView,
   getNodeIndexForView,
-  parseViewPath,
-  viewPathToString,
+  parseRowPath,
+  rowPathToString,
 } from "../ViewContext";
 import { Plan, planExpandNode, planUpdateNodeText } from "../planner";
 import {
@@ -21,17 +21,17 @@ import { planMoveNodeWithView } from "../treeMutations";
 
 export type EditorInfo = {
   text: string;
-  viewPath: ViewPath;
+  rowPath: RowPath;
 };
 
 export function getCurrentRow(
   data: Data,
-  viewPath: ViewPath,
+  rowPath: RowPath,
   virtualRowsMap: VirtualRowsMap
 ): GraphNode | undefined {
   return (
-    getCurrentEdgeForView(data, viewPath) ||
-    virtualRowsMap.get(viewPathToString(viewPath))
+    getCurrentEdgeForView(data, rowPath) ||
+    virtualRowsMap.get(rowPathToString(rowPath))
   );
 }
 
@@ -48,21 +48,21 @@ function planClearSelection(plan: Plan): Plan {
 
 function getEditorTextForPath(
   editorInfo: EditorInfo | undefined,
-  viewPath: ViewPath
+  rowPath: RowPath
 ): string {
   if (!editorInfo) return "";
-  if (viewPathToString(editorInfo.viewPath) !== viewPathToString(viewPath))
+  if (rowPathToString(editorInfo.rowPath) !== rowPathToString(rowPath))
     return "";
   return editorInfo.text;
 }
 
-function getNodeText(plan: Plan, viewPath: ViewPath, stack: ID[]): string {
-  return getNodeForView(plan, viewPath, stack)?.text ?? "";
+function getNodeText(plan: Plan, rowPath: RowPath, stack: ID[]): string {
+  return getNodeForView(plan, rowPath, stack)?.text ?? "";
 }
 
 function planUpdateOneMetadata(
   acc: Plan,
-  viewPath: ViewPath,
+  rowPath: RowPath,
   stack: ID[],
   metadata: NodeItemMetadata,
   editorText: string,
@@ -70,7 +70,7 @@ function planUpdateOneMetadata(
 ): Plan {
   return planUpdateViewItemMetadata(
     acc,
-    viewPath,
+    rowPath,
     stack,
     metadata,
     editorText,
@@ -80,20 +80,20 @@ function planUpdateOneMetadata(
 
 export function planBatchRelevance(
   plan: Plan,
-  viewPaths: ViewPath[],
+  rowPaths: RowPath[],
   stack: ID[],
   relevance: Relevance,
   virtualRowsMap: VirtualRowsMap,
   editorInfo?: EditorInfo
 ): Plan {
-  const updated = viewPaths.reduce(
-    (acc, viewPath) =>
+  const updated = rowPaths.reduce(
+    (acc, rowPath) =>
       planUpdateOneMetadata(
         acc,
-        viewPath,
+        rowPath,
         stack,
         { relevance },
-        getEditorTextForPath(editorInfo, viewPath),
+        getEditorTextForPath(editorInfo, rowPath),
         virtualRowsMap
       ),
     plan
@@ -103,20 +103,20 @@ export function planBatchRelevance(
 
 export function planBatchArgument(
   plan: Plan,
-  viewPaths: ViewPath[],
+  rowPaths: RowPath[],
   stack: ID[],
   argument: Argument,
   virtualRowsMap: VirtualRowsMap,
   editorInfo?: EditorInfo
 ): Plan {
-  const updated = viewPaths.reduce(
-    (acc, viewPath) =>
+  const updated = rowPaths.reduce(
+    (acc, rowPath) =>
       planUpdateOneMetadata(
         acc,
-        viewPath,
+        rowPath,
         stack,
         { argument },
-        getEditorTextForPath(editorInfo, viewPath),
+        getEditorTextForPath(editorInfo, rowPath),
         virtualRowsMap
       ),
     plan
@@ -171,8 +171,8 @@ function remapSelectionForMovedKeys(
   };
 }
 
-function sortByNodeIndex(plan: Plan, viewPaths: ViewPath[]): ViewPath[] {
-  return [...viewPaths].sort((a, b) => {
+function sortByNodeIndex(plan: Plan, rowPaths: RowPath[]): RowPath[] {
+  return [...rowPaths].sort((a, b) => {
     const idxA = getNodeIndexForView(plan, a) ?? 0;
     const idxB = getNodeIndexForView(plan, b) ?? 0;
     return idxA - idxB;
@@ -187,8 +187,8 @@ export function planBatchIndent(
 ): Plan | undefined {
   if (!allSameParent(viewKeys)) return undefined;
 
-  const viewPaths = sortByNodeIndex(plan, viewKeys.map(parseViewPath));
-  const firstPath = viewPaths[0];
+  const rowPaths = sortByNodeIndex(plan, viewKeys.map(parseRowPath));
+  const firstPath = rowPaths[0];
 
   const prevSibling = getPreviousSibling(plan, firstPath, stack);
   if (!prevSibling) return undefined;
@@ -196,58 +196,54 @@ export function planBatchIndent(
   const planWithExpand = planExpandNode(
     plan,
     prevSibling.view,
-    prevSibling.viewPath
+    prevSibling.rowPath
   );
 
-  const { plan: updated, remappedKeys } = viewPaths.reduce(
-    (state, viewPath) => {
-      const fromKey = viewPathToString(viewPath);
+  const { plan: updated, remappedKeys } = rowPaths.reduce(
+    (state, rowPath) => {
+      const fromKey = rowPathToString(rowPath);
       const targetNodeBefore = getNodeForView(
         state.plan,
-        prevSibling.viewPath,
+        prevSibling.rowPath,
         stack
       );
       const insertAt = targetNodeBefore?.children.size ?? 0;
       const moved = planMoveNodeWithView(
         state.plan,
-        viewPath,
-        prevSibling.viewPath,
+        rowPath,
+        prevSibling.rowPath,
         stack,
         insertAt
       );
-      const targetNodeAfter = getNodeForView(
-        moved,
-        prevSibling.viewPath,
-        stack
-      );
-      const updatedViewPath =
+      const targetNodeAfter = getNodeForView(moved, prevSibling.rowPath, stack);
+      const updatedRowPath =
         targetNodeAfter && insertAt < targetNodeAfter.children.size
           ? addNodeToPathWithNodes(
-              prevSibling.viewPath,
+              prevSibling.rowPath,
               targetNodeAfter,
               insertAt
             )
           : undefined;
-      const nextRemappedKeys = updatedViewPath
+      const nextRemappedKeys = updatedRowPath
         ? [
             ...state.remappedKeys,
             {
               fromKey,
-              toKey: viewPathToString(updatedViewPath),
+              toKey: rowPathToString(updatedRowPath),
             },
           ]
         : state.remappedKeys;
-      const editorText = getEditorTextForPath(editorInfo, viewPath);
+      const editorText = getEditorTextForPath(editorInfo, rowPath);
       if (!editorText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
-      const nodeText = getNodeText(state.plan, viewPath, stack);
+      const nodeText = getNodeText(state.plan, rowPath, stack);
       if (editorText === nodeText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
       return {
-        plan: updatedViewPath
-          ? planUpdateNodeText(moved, updatedViewPath, stack, editorText)
+        plan: updatedRowPath
+          ? planUpdateNodeText(moved, updatedRowPath, stack, editorText)
           : moved,
         remappedKeys: nextRemappedKeys,
       };
@@ -266,53 +262,53 @@ export function planBatchOutdent(
 ): Plan | undefined {
   if (!allSameParent(viewKeys)) return undefined;
 
-  const viewPaths = sortByNodeIndex(plan, viewKeys.map(parseViewPath));
-  const firstPath = viewPaths[0];
-  const parentPath = getParentView(firstPath);
+  const rowPaths = sortByNodeIndex(plan, viewKeys.map(parseRowPath));
+  const firstPath = rowPaths[0];
+  const parentPath = getParentRowPath(firstPath);
   if (!parentPath) return undefined;
 
-  const grandParentPath = getParentView(parentPath);
+  const grandParentPath = getParentRowPath(parentPath);
   if (!grandParentPath) return undefined;
 
   const parentNodeIndex = getNodeIndexForView(plan, parentPath);
   if (parentNodeIndex === undefined) return undefined;
 
-  const { plan: updated, remappedKeys } = viewPaths.reduce(
-    (state, viewPath, idx) => {
-      const fromKey = viewPathToString(viewPath);
+  const { plan: updated, remappedKeys } = rowPaths.reduce(
+    (state, rowPath, idx) => {
+      const fromKey = rowPathToString(rowPath);
       const insertAt = parentNodeIndex + 1 + idx;
       const moved = planMoveNodeWithView(
         state.plan,
-        viewPath,
+        rowPath,
         grandParentPath,
         stack,
         insertAt
       );
       const targetNodeAfter = getNodeForView(moved, grandParentPath, stack);
-      const updatedViewPath =
+      const updatedRowPath =
         targetNodeAfter && insertAt < targetNodeAfter.children.size
           ? addNodeToPathWithNodes(grandParentPath, targetNodeAfter, insertAt)
           : undefined;
-      const nextRemappedKeys = updatedViewPath
+      const nextRemappedKeys = updatedRowPath
         ? [
             ...state.remappedKeys,
             {
               fromKey,
-              toKey: viewPathToString(updatedViewPath),
+              toKey: rowPathToString(updatedRowPath),
             },
           ]
         : state.remappedKeys;
-      const editorText = getEditorTextForPath(editorInfo, viewPath);
+      const editorText = getEditorTextForPath(editorInfo, rowPath);
       if (!editorText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
-      const nodeText = getNodeText(state.plan, viewPath, stack);
+      const nodeText = getNodeText(state.plan, rowPath, stack);
       if (editorText === nodeText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
       return {
-        plan: updatedViewPath
-          ? planUpdateNodeText(moved, updatedViewPath, stack, editorText)
+        plan: updatedRowPath
+          ? planUpdateNodeText(moved, updatedRowPath, stack, editorText)
           : moved,
         remappedKeys: nextRemappedKeys,
       };

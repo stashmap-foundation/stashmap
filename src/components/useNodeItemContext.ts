@@ -1,13 +1,13 @@
 import {
   useNodeIndex,
-  useViewPath,
-  getParentView,
+  useRowPath,
+  getParentRowPath,
   useIsInSearchView,
   useCurrentNode,
   useCurrentRowID,
   getNodeForView,
   getCurrentEdgeForView,
-  ViewPath,
+  RowPath,
 } from "../ViewContext";
 import { isEmptySemanticID } from "../connections";
 import { usePlanner } from "../planner";
@@ -27,8 +27,8 @@ type NodeItemContext = {
   nodeText: string;
   currentRow: GraphNode | undefined;
   // For updating
-  viewPath: ViewPath;
-  parentView: ViewPath | undefined;
+  rowPath: RowPath;
+  parentView: RowPath | undefined;
   nodeID: LongID | undefined;
   // Update function
   updateMetadata: (metadata: NodeItemMetadata) => void;
@@ -44,13 +44,13 @@ type NodeItemContext = {
  */
 export function useNodeItemContext(): NodeItemContext {
   const data = useData();
-  const viewPath = useViewPath();
+  const rowPath = useRowPath();
   const nodeIndex = useNodeIndex();
   const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
   const isInSearchView = useIsInSearchView();
   const currentNode = useCurrentNode();
-  const parentView = getParentView(viewPath);
+  const parentView = getParentRowPath(rowPath);
 
   const [rowID] = useCurrentRowID();
   const isEmptyNode = isEmptySemanticID(rowID);
@@ -65,7 +65,7 @@ export function useNodeItemContext(): NodeItemContext {
 
   // Get the current row using context-aware lookup
   const currentRow =
-    isVisible && parentView ? getCurrentEdgeForView(data, viewPath) : undefined;
+    isVisible && parentView ? getCurrentEdgeForView(data, rowPath) : undefined;
 
   const updateMetadata = (metadata: NodeItemMetadata): void => {
     const editorText = editorTextContext?.text ?? "";
@@ -76,7 +76,7 @@ export function useNodeItemContext(): NodeItemContext {
     executePlan(
       planUpdateViewItemMetadata(
         createPlan(),
-        viewPath,
+        rowPath,
         stack,
         metadata,
         editorText
@@ -90,7 +90,7 @@ export function useNodeItemContext(): NodeItemContext {
     isEmptyNode,
     nodeText,
     currentRow,
-    viewPath,
+    rowPath,
     parentView,
     nodeID,
     updateMetadata,

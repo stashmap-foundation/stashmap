@@ -2,9 +2,9 @@ import React from "react";
 import { TYPE_COLORS } from "../constants";
 import { useUpdateArgument } from "./useUpdateArgument";
 import {
-  ViewPath,
-  useViewPath,
-  parseViewPath,
+  RowPath,
+  useRowPath,
+  parseRowPath,
   useCurrentNode,
   useDisplayText,
   useViewKey,
@@ -53,7 +53,7 @@ export function EvidenceSelector(): JSX.Element | null {
   const virtualType = currentRow?.virtualType;
   const isAcceptableVirtual =
     virtualType === "incoming" || virtualType === "version";
-  const viewPath = useViewPath();
+  const rowPath = useRowPath();
   const viewKey = useViewKey();
   const currentNode = useCurrentNode();
   const versionedDisplayText = useDisplayText();
@@ -71,11 +71,11 @@ export function EvidenceSelector(): JSX.Element | null {
 
   const isInSelection = selection.has(viewKey) && selection.size > 1;
 
-  const getActionPaths = (): ViewPath[] =>
-    isInSelection ? selection.toArray().map(parseViewPath) : [viewPath];
+  const getActionPaths = (): RowPath[] =>
+    isInSelection ? selection.toArray().map(parseRowPath) : [rowPath];
 
   const getEditorInfo = (): EditorInfo | undefined =>
-    editorText ? { text: editorText, viewPath } : undefined;
+    editorText ? { text: editorText, rowPath } : undefined;
 
   const handleClick = (): void => {
     const nextArgument = getNextArgument(currentArgument);

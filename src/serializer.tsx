@@ -1,5 +1,5 @@
 import { Map } from "immutable";
-import { parseViewPath } from "./ViewContext";
+import { parseRowPath } from "./ViewContext";
 
 export type Serializable =
   | string
@@ -139,7 +139,7 @@ export function jsonToViews(s: Serializable): Map<string, View> {
         return false;
       }
       try {
-        parseViewPath(k);
+        parseRowPath(k);
         return true;
       } catch {
         return false;

@@ -70,7 +70,7 @@ type UseUpdateRelevanceResult = {
 export function useUpdateRelevance(): UseUpdateRelevanceResult {
   const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
-  const { isVisible, nodeText, currentRow, viewPath, updateMetadata } =
+  const { isVisible, nodeText, currentRow, rowPath, updateMetadata } =
     useNodeItemContext();
 
   const rawRelevance = currentRow?.relevance;
@@ -88,7 +88,7 @@ export function useUpdateRelevance(): UseUpdateRelevanceResult {
 
   const removeFromList = (): void => {
     if (!isVisible) return;
-    const plan = planDisconnectFromParent(createPlan(), viewPath, stack);
+    const plan = planDisconnectFromParent(createPlan(), rowPath, stack);
     executePlan(plan);
   };
 

@@ -2,9 +2,9 @@ import React, { useEffect, useRef } from "react";
 import { ConnectableElement, useDrag } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
 import {
-  ViewPath,
+  RowPath,
   useIsInSearchView,
-  useViewPath,
+  useRowPath,
   useViewKey,
   useCurrentRowID,
   useCurrentNode,
@@ -65,7 +65,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     }: DraggableProps,
     ref
   ): JSX.Element => {
-    const path = useViewPath();
+    const path = useRowPath();
     const isNodeBeeingEdited = useIsEditingOn();
     const [rowID] = useCurrentRowID();
     const node = useCurrentNode();
@@ -165,7 +165,7 @@ function DraggableSuggestion({
   onRowClick?: (e: React.MouseEvent, viewKey: string) => void;
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
-  const path = useViewPath();
+  const path = useRowPath();
   const currentRow = useCurrentEdge();
   const node = useCurrentNode();
   const displayText = useDisplayText();
@@ -246,18 +246,18 @@ function DraggableSuggestion({
 
 export function ListItem({
   index,
-  treeViewPath,
+  treeRowPath,
   nextDepth,
-  nextViewPathStr,
+  nextRowPathStr,
   activeRowKey,
   onRowFocus,
   onRowClick,
   isFirstVirtual,
 }: {
   index: number;
-  treeViewPath: ViewPath;
+  treeRowPath: RowPath;
   nextDepth?: number;
-  nextViewPathStr?: string;
+  nextRowPathStr?: string;
   activeRowKey: string;
   onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
   onRowClick?: (e: React.MouseEvent, viewKey: string) => void;
@@ -265,7 +265,7 @@ export function ListItem({
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const viewKey = useViewKey();
-  const viewPath = useViewPath();
+  const rowPath = useRowPath();
   const [rowID] = useCurrentRowID();
   const virtualType = useCurrentEdge()?.virtualType;
   const isSuggestion = virtualType === "suggestion";
@@ -273,18 +273,18 @@ export function ListItem({
   const isInSearchView = useIsInSearchView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const selected = useIsSelected();
-  const rowDepth = viewPath.length - 1;
+  const rowDepth = rowPath.length - 1;
   const isActiveRow = activeRowKey === viewKey;
   const isEmptyNode = isEmptySemanticID(rowID);
 
   const isReadonly = isInSearchView || isViewingOtherUserContent;
 
   const [{ dragDirection }, drop] = useDroppable({
-    destination: treeViewPath,
+    destination: treeRowPath,
     index,
     ref,
     nextDepth,
-    nextViewPathStr,
+    nextRowPathStr,
   });
 
   if (isSuggestion) {

@@ -12,12 +12,12 @@ import {
   usePlanner,
 } from "../planner";
 import {
-  ViewPath,
+  RowPath,
   buildPaneTarget,
   getRowIDFromView,
   getParentKey,
-  useViewPath,
-  viewPathToString,
+  useRowPath,
+  rowPathToString,
 } from "../ViewContext";
 import { NOTE_TYPE, INDENTATION } from "./Node";
 import { usePaneStack, useCurrentPane } from "../SplitPanesContext";
@@ -30,7 +30,7 @@ import {
 } from "./FileDropZone";
 
 type DragItemType = {
-  path: ViewPath;
+  path: RowPath;
   isSuggestion?: boolean;
   isCopyDrag?: boolean;
   nodeId?: LongID;
@@ -99,7 +99,7 @@ function planMaterializeImportedRoot(
 function calcDragDirection(
   ref: RefObject<HTMLElement>,
   monitor: DropTargetMonitor<DropItemType>,
-  path: ViewPath
+  path: RowPath
 ): number | undefined {
   if (!monitor.isOver({ shallow: true })) {
     return undefined;
@@ -109,8 +109,8 @@ function calcDragDirection(
   }
   const item = monitor.getItem() as DragItemType | undefined;
   if (item?.path) {
-    const sourceStr = viewPathToString(item.path);
-    const targetStr = viewPathToString(path);
+    const sourceStr = rowPathToString(item.path);
+    const targetStr = rowPathToString(path);
     if (targetStr === sourceStr || targetStr.startsWith(`${sourceStr}:`)) {
       return undefined;
     }
@@ -179,7 +179,7 @@ export function clearDropIndent(): void {
 export function computeDepthLimits(
   currentDepth: number,
   nextDepth: number | undefined,
-  nextViewPathStr: string | undefined,
+  nextRowPathStr: string | undefined,
   sourcePathStr: string | undefined,
   rootDepth: number
 ): { minDepth: number; maxDepth: number } {
@@ -189,9 +189,9 @@ export function computeDepthLimits(
   }
   if (
     sourcePathStr &&
-    nextViewPathStr &&
-    (nextViewPathStr === sourcePathStr ||
-      nextViewPathStr.startsWith(`${sourcePathStr}:`))
+    nextRowPathStr &&
+    (nextRowPathStr === sourcePathStr ||
+      nextRowPathStr.startsWith(`${sourcePathStr}:`))
   ) {
     return { minDepth: rootDepth + 1, maxDepth };
   }
@@ -203,13 +203,13 @@ export function useDroppable({
   index,
   ref,
   nextDepth,
-  nextViewPathStr,
+  nextRowPathStr,
 }: {
-  destination: ViewPath;
+  destination: RowPath;
   index?: number;
   ref: RefObject<HTMLElement>;
   nextDepth?: number;
-  nextViewPathStr?: string;
+  nextRowPathStr?: string;
 }): [
   { dragDirection: number | undefined; isOver: boolean },
   ConnectDropTarget
@@ -218,7 +218,7 @@ export function useDroppable({
   const { createPlan, executePlan } = usePlanner();
   const stack = usePaneStack();
   const pane = useCurrentPane();
-  const path = useViewPath();
+  const path = useRowPath();
   const invertCopyModeRef = useRef(false);
 
   const isListItem = index !== undefined;
@@ -262,7 +262,7 @@ export function useDroppable({
     computeDepthLimits(
       currentDepth,
       nextDepth,
-      nextViewPathStr,
+      nextRowPathStr,
       sourcePathStr,
       rootDepth
     );
@@ -296,7 +296,7 @@ export function useDroppable({
 
     const dragItem = monitor.getItem() as DragItemType | undefined;
     const sourcePathStr = dragItem?.path
-      ? viewPathToString(dragItem.path)
+      ? rowPathToString(dragItem.path)
       : undefined;
     const { minDepth, maxDepth } = calcDepthLimits(sourcePathStr);
 
@@ -358,7 +358,7 @@ export function useDroppable({
               | DragItemType
               | undefined;
             const collectSourcePath = collectDragItem?.path
-              ? viewPathToString(collectDragItem.path)
+              ? rowPathToString(collectDragItem.path)
               : undefined;
             const { minDepth, maxDepth } = calcDepthLimits(collectSourcePath);
             globalDragIndent.targetDepth = Math.max(
@@ -486,7 +486,7 @@ export function useDroppable({
         targetDepth,
         dragItem.isCopyDrag
       );
-      const parentKey = getParentKey(viewPathToString(dragItem.path));
+      const parentKey = getParentKey(rowPathToString(dragItem.path));
       executePlan(
         planSetTemporarySelectionState(dropped, {
           baseSelection: deselectAllChildren(selection, parentKey),
@@ -505,7 +505,7 @@ export function DroppableContainer({
   disabled,
 }: DroppableContainerProps): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
-  const path = useViewPath();
+  const path = useRowPath();
   const [{ isOver }, drop] = useDroppable({
     destination: path,
     ref,

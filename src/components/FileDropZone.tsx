@@ -1,4 +1,4 @@
-import { ViewPath } from "../ViewContext";
+import { RowPath } from "../ViewContext";
 import { Plan, ParsedLine, parseClipboardText } from "../planner";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "../markdownDocument";
 import { planInsertMarkdownTrees } from "../markdownPlan";
@@ -59,14 +59,14 @@ export function buildRootTreeForEmptyRootDrop(
 export function planPasteMarkdownTrees(
   plan: Plan,
   trees: MarkdownTreeNode[],
-  parentViewPath: ViewPath,
+  parentRowPath: RowPath,
   stack: ID[],
   insertAtIndex?: number
 ): Plan {
   return planInsertMarkdownTrees(
     plan,
     trees,
-    parentViewPath,
+    parentRowPath,
     stack,
     insertAtIndex
   ).plan;

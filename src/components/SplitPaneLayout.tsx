@@ -11,7 +11,7 @@ import {
 } from "../SplitPanesContext";
 import {
   RootViewContextProvider,
-  updateViewPathsAfterPaneDelete,
+  updateRowPathsAfterPaneDelete,
 } from "../ViewContext";
 import { LoadSearchData } from "../LoadSearchData";
 import { PaneView } from "./Workspace";
@@ -109,7 +109,7 @@ export function ClosePaneButton(): JSX.Element {
       executePlan(planUpdatePanes(plan, [freshPane]));
       return;
     }
-    const updatedViews = updateViewPathsAfterPaneDelete(plan.views, paneIndex);
+    const updatedViews = updateRowPathsAfterPaneDelete(plan.views, paneIndex);
     const newPanes = panes.filter((p) => p.id !== panes[paneIndex].id);
     const planWithViews = planUpdateViews(plan, updatedViews);
     executePlan(planUpdatePanes(planWithViews, newPanes));

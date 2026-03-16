@@ -7,10 +7,10 @@ import {
   RELEVANCE_LABELS,
 } from "./useUpdateRelevance";
 import {
-  ViewPath,
-  useViewPath,
-  parseViewPath,
-  getParentView,
+  RowPath,
+  useRowPath,
+  parseRowPath,
+  getParentRowPath,
   useCurrentNode,
   useDisplayText,
   useViewKey,
@@ -73,13 +73,13 @@ export function RelevanceSelector({
 
   const { currentRelevance, isVisible } = useUpdateRelevance();
 
-  const viewPath = useViewPath();
+  const rowPath = useRowPath();
   const viewKey = useViewKey();
   const currentNode = useCurrentNode();
   const stack = usePaneStack();
   const virtualRowsMap = useVirtualRowsMap();
   const { createPlan, executePlan } = usePlanner();
-  const parentPath = getParentView(viewPath);
+  const parentPath = getParentRowPath(rowPath);
   const { selection } = useTemporaryView();
 
   const isVirtual = virtualType !== undefined;
@@ -101,11 +101,11 @@ export function RelevanceSelector({
 
   const isInSelection = selection.has(viewKey) && selection.size > 1;
 
-  const getActionPaths = (): ViewPath[] =>
-    isInSelection ? selection.toArray().map(parseViewPath) : [viewPath];
+  const getActionPaths = (): RowPath[] =>
+    isInSelection ? selection.toArray().map(parseRowPath) : [rowPath];
 
   const getEditorInfo = (): EditorInfo | undefined =>
-    editorText ? { text: editorText, viewPath } : undefined;
+    editorText ? { text: editorText, rowPath } : undefined;
 
   const handleSetLevel = (level: number): void => {
     const relevance = levelToRelevance(level === currentLevel ? -1 : level);

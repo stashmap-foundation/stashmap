@@ -12,8 +12,8 @@ import {
 } from "./connections";
 import { getTextForSemanticID } from "./semanticProjection";
 import {
-  ViewPath,
-  getParentView,
+  RowPath,
+  getParentRowPath,
   getLast,
   getNodeForView,
 } from "./ViewContext";
@@ -205,20 +205,20 @@ function computeNodeDiff(
 
 function computeVersionMeta(
   data: Data,
-  viewPath: ViewPath,
+  rowPath: RowPath,
   stack: ID[]
 ): VersionMeta {
-  const refId = getLast(viewPath);
+  const refId = getLast(rowPath);
   const node = resolveNode(
     data.knowledgeDBs,
     getNode(data.knowledgeDBs, refId, data.user.publicKey)
   );
   if (!node) return { updated: 0, addCount: 0, removeCount: 0 };
 
-  const pane = getPane(data, viewPath);
+  const pane = getPane(data, rowPath);
   const activeFilters = pane.typeFilters || DEFAULT_TYPE_FILTERS;
 
-  const parentPath = getParentView(viewPath);
+  const parentPath = getParentRowPath(rowPath);
   const parentNode = parentPath
     ? getNodeForView(data, parentPath, stack)
     : undefined;
@@ -262,10 +262,10 @@ function getReferenceSourceNodes(
 function findIncomingCrefItem(
   ref: ParsedRef,
   data: Data,
-  viewPath: ViewPath,
+  rowPath: RowPath,
   stack: ID[]
 ): GraphNode | undefined {
-  const parentPath = getParentView(viewPath);
+  const parentPath = getParentRowPath(rowPath);
   if (!parentPath) return undefined;
   const parentNode = getNodeForView(data, parentPath, stack);
   if (!parentNode) return undefined;
@@ -284,13 +284,13 @@ function findIncomingCrefItem(
 export function buildReferenceItem(
   refId: LongID,
   data: Data,
-  viewPath: ViewPath,
+  rowPath: RowPath,
   stack: ID[],
   virtualType?: VirtualType
 ): ReferenceRow | undefined {
   const ref = parseRef(refId, data.knowledgeDBs, data.user.publicKey);
   if (!ref) {
-    const parentPath = getParentView(viewPath);
+    const parentPath = getParentRowPath(rowPath);
     const parentNode = parentPath
       ? getNodeForView(data, parentPath, stack)
       : undefined;
@@ -323,7 +323,7 @@ export function buildReferenceItem(
     if (!outgoing) return undefined;
     const crefItem =
       virtualType === "incoming"
-        ? findIncomingCrefItem(ref, data, viewPath, stack)
+        ? findIncomingCrefItem(ref, data, rowPath, stack)
         : undefined;
     const incomingRelevance = crefItem?.relevance ?? ref.sourceItem?.relevance;
     const incomingArgument = crefItem?.argument ?? ref.sourceItem?.argument;
@@ -344,7 +344,7 @@ export function buildReferenceItem(
   }
 
   if (virtualType === "version") {
-    const versionMeta = computeVersionMeta(data, viewPath, stack);
+    const versionMeta = computeVersionMeta(data, rowPath, stack);
     const outgoing = buildOutgoingReference(
       refId,
       data.knowledgeDBs,
@@ -370,7 +370,7 @@ export function buildReferenceItem(
   );
   if (!outgoing || !ref) return outgoing;
 
-  const parentPath = getParentView(viewPath);
+  const parentPath = getParentRowPath(rowPath);
   if (!parentPath) return outgoing;
 
   const parentNode = getNodeForView(data, parentPath, stack);
@@ -378,7 +378,7 @@ export function buildReferenceItem(
     parentNode &&
     nodesMatchForVersion(data.knowledgeDBs, ref.node, parentNode)
   ) {
-    const versionMeta = computeVersionMeta(data, viewPath, stack);
+    const versionMeta = computeVersionMeta(data, rowPath, stack);
     return { ...outgoing, text: outgoing.text, versionMeta };
   }
   if (!parentNode) return outgoing;

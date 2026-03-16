@@ -11,7 +11,7 @@ import {
 } from "./connections";
 import { getTextForSemanticID } from "./semanticProjection";
 import {
-  ViewPath,
+  RowPath,
   isRoot,
   getRowIDFromView,
   getDisplayTextForView,
@@ -61,7 +61,7 @@ type SerializeResult = {
 
 function getOwnNodeForDocumentSerialization(
   data: Data,
-  path: ViewPath,
+  path: RowPath,
   stack: ID[],
   author: PublicKey,
   itemID: ID,
@@ -100,7 +100,7 @@ function getSerializedNodeText(data: Data, node: GraphNode): { text: string } {
   };
 }
 
-function buildRootPath(rootNode: GraphNode): ViewPath {
+function buildRootPath(rootNode: GraphNode): RowPath {
   return [0, rootNode.id];
 }
 
@@ -112,7 +112,7 @@ function serializeTree(data: Data, rootNode: GraphNode): SerializeResult {
     data,
     rootPath,
     stack,
-    List<ViewPath>(),
+    List<RowPath>(),
     rootNode.id,
     author,
     undefined,

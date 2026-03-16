@@ -3,10 +3,10 @@ import { isSearchId } from "../connections";
 import {
   getLast,
   isRoot,
-  parseViewPath,
-  ViewPath,
-  viewPathToString,
-} from "./viewPaths";
+  parseRowPath,
+  RowPath,
+  rowPathToString,
+} from "./rowPaths";
 
 function getDefaultView(id: ID, isRootNode: boolean): View {
   return {
@@ -15,10 +15,10 @@ function getDefaultView(id: ID, isRootNode: boolean): View {
 }
 
 export function isExpanded(data: Data, viewKey: string): boolean {
-  const viewPath = parseViewPath(viewKey);
+  const rowPath = parseRowPath(viewKey);
   const view =
     data.views.get(viewKey) ||
-    getDefaultView(getLast(viewPath), isRoot(viewPath));
+    getDefaultView(getLast(rowPath), isRoot(rowPath));
   return view.expanded === true;
 }
 
@@ -26,8 +26,8 @@ export function getParentKey(viewKey: string): string {
   return viewKey.split(":").slice(0, -1).join(":");
 }
 
-export function updateView(views: Views, path: ViewPath, view: View): Views {
-  const key = viewPathToString(path);
+export function updateView(views: Views, path: RowPath, view: View): Views {
+  const key = rowPathToString(path);
   const rowID = getLast(path);
   const defaultView = getDefaultView(rowID, isRoot(path));
   const isDefault = view.expanded === defaultView.expanded && !view.typeFilters;
@@ -85,21 +85,21 @@ export function planUpdateViews<T extends HasViews>(plan: T, views: Views): T {
 export function planExpandNode<T extends HasViews>(
   plan: T,
   view: View,
-  viewPath: ViewPath
+  rowPath: RowPath
 ): T {
   if (view.expanded) {
     return plan;
   }
   return planUpdateViews(
     plan,
-    updateView(plan.views, viewPath, {
+    updateView(plan.views, rowPath, {
       ...view,
       expanded: true,
     })
   );
 }
 
-function pathContainsSubpath(path: ViewPath, subpath: ID[]): boolean {
+function pathContainsSubpath(path: RowPath, subpath: ID[]): boolean {
   if (subpath.length === 0 || path.length - 1 < subpath.length) {
     return false;
   }
@@ -109,28 +109,25 @@ function pathContainsSubpath(path: ViewPath, subpath: ID[]): boolean {
   );
 }
 
-export function updateViewPathsAfterMoveNodes(data: Data): Views {
+export function updateRowPathsAfterMoveNodes(data: Data): Views {
   return data.views;
 }
 
-export function updateViewPathsAfterDisconnect(
+export function updateRowPathsAfterDisconnect(
   views: Views,
   disconnectNode: ID,
   fromNode: LongID
 ): Views {
   return views.filterNot((_, key) => {
     try {
-      return pathContainsSubpath(parseViewPath(key), [
-        fromNode,
-        disconnectNode,
-      ]);
+      return pathContainsSubpath(parseRowPath(key), [fromNode, disconnectNode]);
     } catch {
       return false;
     }
   });
 }
 
-export function updateViewPathsAfterPaneDelete(
+export function updateRowPathsAfterPaneDelete(
   views: Views,
   removedPaneIndex: number
 ): Views {
@@ -147,7 +144,7 @@ export function updateViewPathsAfterPaneDelete(
     });
 }
 
-export function updateViewPathsAfterPaneInsert(
+export function updateRowPathsAfterPaneInsert(
   views: Views,
   insertedPaneIndex: number
 ): Views {
@@ -162,6 +159,6 @@ export function updateViewPathsAfterPaneInsert(
   });
 }
 
-export function bulkUpdateViewPathsAfterAddNode(data: Data): Views {
+export function bulkUpdateRowPathsAfterAddNode(data: Data): Views {
   return data.views;
 }

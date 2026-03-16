@@ -23,13 +23,13 @@
 
 BAD - Unit test with mocked ViewContext and fake node IDs:
 ```tsx
-const viewPath: ViewPath = [
+const rowPath: RowPath = [
   0,
   { nodeID: "fakeRoot" as LongID, nodeIndex: 0 as NodeIndex },
   { nodeID: refId, nodeIndex: 0 as NodeIndex },
 ];
 renderWithTestData(
-  <ViewContext.Provider value={viewPath}>
+  <ViewContext.Provider value={rowPath}>
     <FullscreenButton />
   </ViewContext.Provider>
 );

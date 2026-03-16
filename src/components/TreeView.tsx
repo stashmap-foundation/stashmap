@@ -6,9 +6,9 @@ import { useDragAutoScroll } from "../useDragAutoScroll";
 import { ListItem } from "./Draggable";
 import { getNodesInTree } from "./Node";
 import {
-  useViewPath,
-  ViewPath,
-  viewPathToString,
+  useRowPath,
+  RowPath,
+  rowPathToString,
   ViewContext,
   useViewKey,
   getRowIDFromView,
@@ -58,8 +58,8 @@ export function PaneTreeResultProvider({
   const data = useData();
   const stack = usePaneStack();
   const pane = useCurrentPane();
-  const viewPath = useViewPath();
-  const rootKey = viewPathToString(viewPath);
+  const rowPath = useRowPath();
+  const rootKey = rowPathToString(rowPath);
   const isRootExpanded = isExpanded(data, rootKey);
   const treeResult = useMemo(() => {
     if (!isRootExpanded) {
@@ -67,9 +67,9 @@ export function PaneTreeResultProvider({
     }
     return getNodesInTree(
       data,
-      viewPath,
+      rowPath,
       stack,
-      List<ViewPath>(),
+      List<RowPath>(),
       pane.rootNodeId,
       pane.author,
       pane.typeFilters
@@ -81,7 +81,7 @@ export function PaneTreeResultProvider({
     pane.rootNodeId,
     pane.typeFilters,
     stack,
-    viewPath,
+    rowPath,
   ]);
 
   return (
@@ -97,7 +97,7 @@ function VirtuosoForColumn({
   range,
   setRange,
   onStopScrolling,
-  viewPath,
+  rowPath,
   ariaLabel,
   activeRowKey,
   onRowFocus,
@@ -105,11 +105,11 @@ function VirtuosoForColumn({
   scrollToId,
   firstVirtualKeys,
 }: {
-  nodes: List<ViewPath>;
+  nodes: List<RowPath>;
   startIndexFromStorage: number;
   range: ListRange;
   setRange: React.Dispatch<React.SetStateAction<ListRange>>;
-  viewPath: ViewPath;
+  rowPath: RowPath;
   onStopScrolling: (isScrolling: boolean) => void;
   ariaLabel: string | undefined;
   activeRowKey: string;
@@ -196,16 +196,16 @@ function VirtuosoForColumn({
         itemContent={(index, path) => {
           const nextPath =
             index < nodes.size - 1 ? nodes.get(index + 1) : undefined;
-          const pathKey = viewPathToString(path);
+          const pathKey = rowPathToString(path);
           const isFirstVirtual = firstVirtualKeys.has(pathKey);
           return (
             <ViewContext.Provider value={path} key={pathKey}>
               <ListItem
                 index={index}
-                treeViewPath={viewPath}
+                treeRowPath={rowPath}
                 nextDepth={nextPath ? nextPath.length - 1 : undefined}
-                nextViewPathStr={
-                  nextPath ? viewPathToString(nextPath) : undefined
+                nextRowPathStr={
+                  nextPath ? rowPathToString(nextPath) : undefined
                 }
                 activeRowKey={activeRowKey}
                 onRowFocus={onRowFocus}
@@ -242,7 +242,7 @@ function Tree(): JSX.Element | null {
     startIndex: startIndexFromStorage,
     endIndex: startIndexFromStorage,
   });
-  const viewPath = useViewPath();
+  const rowPath = useRowPath();
   const [activeRow, setActiveRow] = useState<ActiveRowState>({
     activeRowKey: "",
     activeRowIndex: 0,
@@ -253,13 +253,13 @@ function Tree(): JSX.Element | null {
   const treeRootRef = useRef<HTMLDivElement>(null);
   const [keyboardMode, setKeyboardMode] = useKeyboardMode();
   const treeResult = usePaneTreeResult();
-  const childNodes = treeResult?.paths || List<ViewPath>();
+  const childNodes = treeResult?.paths || List<RowPath>();
   const virtualRows = treeResult?.virtualRows || Map<string, GraphNode>();
   const firstVirtualKeys =
     treeResult?.firstVirtualKeys || ImmutableSet<string>();
   // Include ROOT as the first node, followed by its children
-  const nodes = List<ViewPath>([viewPath]).concat(childNodes);
-  const nodeKeys = nodes.map((path) => viewPathToString(path)).toArray();
+  const nodes = List<RowPath>([rowPath]).concat(childNodes);
+  const nodeKeys = nodes.map((path) => rowPathToString(path)).toArray();
   const displayText = useDisplayText();
   const ariaLabel = displayText ? `related to ${displayText}` : undefined;
   const rowFocusIntent =
@@ -399,7 +399,7 @@ function Tree(): JSX.Element | null {
           range={range}
           setRange={setRange}
           startIndexFromStorage={startIndexFromStorage}
-          viewPath={viewPath}
+          rowPath={rowPath}
           onStopScrolling={onStopScrolling}
           ariaLabel={ariaLabel}
           activeRowKey={activeRow.activeRowKey}

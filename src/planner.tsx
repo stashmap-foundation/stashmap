@@ -44,13 +44,13 @@ import {
 import {
   newNode,
   upsertNodes,
-  ViewPath,
+  RowPath,
   getRowIDFromView,
   getContext,
-  getParentView,
-  bulkUpdateViewPathsAfterAddNode,
+  getParentRowPath,
+  bulkUpdateRowPathsAfterAddNode,
   copyViewsWithNodesMapping,
-  viewPathToString,
+  rowPathToString,
   getNodeForView,
   addNodeToPathWithNodes,
   getPaneIndex,
@@ -299,11 +299,11 @@ export type AddToParentTarget = ID | TextSeed | RefTargetSeed;
 
 export function planUpdateNodeText(
   plan: Plan,
-  viewPath: ViewPath,
+  rowPath: RowPath,
   stack: ID[],
   text: string
 ): Plan {
-  const currentNode = getNodeForView(plan, viewPath, stack);
+  const currentNode = getNodeForView(plan, rowPath, stack);
   if (!currentNode || currentNode.author !== plan.user.publicKey) {
     return plan;
   }
@@ -534,30 +534,26 @@ export function planAddTargetsToNode<T extends GraphPlan>(
 export function planAddToParent(
   plan: Plan,
   targets: AddToParentTarget | AddToParentTarget[],
-  parentViewPath: ViewPath,
+  parentRowPath: RowPath,
   stack: ID[],
   insertAtIndex?: number,
   relevance?: Relevance,
   argument?: Argument
 ): [Plan, ID[]] {
   const ensureParentNode = (): [Plan, GraphNode] => {
-    const [, parentView] = getRowIDFromView(plan, parentViewPath);
-    const planWithExpand = planExpandNode(plan, parentView, parentViewPath);
-    const existingNode = getNodeForView(planWithExpand, parentViewPath, stack);
+    const [, parentView] = getRowIDFromView(plan, parentRowPath);
+    const planWithExpand = planExpandNode(plan, parentView, parentRowPath);
+    const existingNode = getNodeForView(planWithExpand, parentRowPath, stack);
     if (existingNode) {
       return [planWithExpand, existingNode];
     }
     const planWithParentNode = upsertNodes(
       planWithExpand,
-      parentViewPath,
+      parentRowPath,
       stack,
       (nodes) => nodes
     );
-    const parentNode = getNodeForView(
-      planWithParentNode,
-      parentViewPath,
-      stack
-    );
+    const parentNode = getNodeForView(planWithParentNode, parentRowPath, stack);
     if (!parentNode) {
       throw new Error("Failed to create parent node");
     }
@@ -573,7 +569,7 @@ export function planAddToParent(
     relevance,
     argument
   );
-  const updatedViews = bulkUpdateViewPathsAfterAddNode(updatedNodesPlan);
+  const updatedViews = bulkUpdateRowPathsAfterAddNode(updatedNodesPlan);
 
   return [planUpdateViews(updatedNodesPlan, updatedViews), actualItemIDs];
 }
@@ -796,12 +792,8 @@ function updateViewsWithNodesMapping(
   });
 }
 
-export function planForkPane(
-  plan: Plan,
-  viewPath: ViewPath,
-  stack: ID[]
-): Plan {
-  const pane = getPane(plan, viewPath);
+export function planForkPane(plan: Plan, rowPath: RowPath, stack: ID[]): Plan {
+  const pane = getPane(plan, rowPath);
 
   const rootNode = pane.rootNodeId
     ? getNode(
@@ -811,7 +803,7 @@ export function planForkPane(
       )
     : undefined;
 
-  const sourceNode = rootNode || getNodeForView(plan, viewPath, stack);
+  const sourceNode = rootNode || getNodeForView(plan, rowPath, stack);
   if (!sourceNode) {
     return plan;
   }
@@ -826,7 +818,7 @@ export function planForkPane(
     nodesIdMapping
   );
   const planWithUpdatedViews = planUpdateViews(planWithNodes, updatedViews);
-  const paneIndex = viewPath[0];
+  const paneIndex = rowPath[0];
   const newRootNodeId = pane.rootNodeId
     ? nodesIdMapping.get(pane.rootNodeId)
     : undefined;
@@ -844,17 +836,17 @@ export function planForkPane(
 
 export function planDeepCopyNode(
   plan: Plan,
-  sourceViewPath: ViewPath,
-  targetParentViewPath: ViewPath,
+  sourceRowPath: RowPath,
+  targetParentRowPathPath: RowPath,
   stack: ID[],
   insertAtIndex?: number,
   relevance?: Relevance,
   argument?: Argument
 ): [Plan, NodesIdMapping] {
-  const [sourceItemID] = getRowIDFromView(plan, sourceViewPath);
-  const sourceStack = getPane(plan, sourceViewPath).stack;
-  const sourceSemanticContext = getContext(plan, sourceViewPath, sourceStack);
-  const sourceNode = getNodeForView(plan, sourceViewPath, sourceStack);
+  const [sourceItemID] = getRowIDFromView(plan, sourceRowPath);
+  const sourceStack = getPane(plan, sourceRowPath).stack;
+  const sourceSemanticContext = getContext(plan, sourceRowPath, sourceStack);
+  const sourceNode = getNodeForView(plan, sourceRowPath, sourceStack);
 
   const resolveSource = (): {
     itemID: ID;
@@ -889,19 +881,19 @@ export function planDeepCopyNode(
   const resolvedNode = resolved.node;
 
   const [planWithParent, targetParentNode] = (() => {
-    const parentNode = getNodeForView(plan, targetParentViewPath, stack);
+    const parentNode = getNodeForView(plan, targetParentRowPathPath, stack);
     if (parentNode) {
       return [plan, parentNode] as const;
     }
     const planWithCreatedParent = upsertNodes(
       plan,
-      targetParentViewPath,
+      targetParentRowPathPath,
       stack,
       (nodes) => nodes
     );
     const createdParent = getNodeForView(
       planWithCreatedParent,
-      targetParentViewPath,
+      targetParentRowPathPath,
       stack
     );
     if (!createdParent) {
@@ -912,12 +904,12 @@ export function planDeepCopyNode(
 
   const targetParentSemanticContext = getContext(
     planWithParent,
-    targetParentViewPath,
+    targetParentRowPathPath,
     stack
   );
   const [targetParentRowID] = getRowIDFromView(
     planWithParent,
-    targetParentViewPath
+    targetParentRowPathPath
   );
   const targetRootContext = targetParentSemanticContext.push(
     targetParentNode
@@ -964,7 +956,7 @@ export function planDeepCopyNode(
   const [finalPlan] = planAddToParent(
     planWithCopiedNodes,
     copiedTopNodeID,
-    targetParentViewPath,
+    targetParentRowPathPath,
     stack,
     insertAtIndex,
     relevance,
@@ -976,33 +968,33 @@ export function planDeepCopyNode(
 
 export function planDeepCopyNodeWithView(
   plan: Plan,
-  sourceViewPath: ViewPath,
-  targetParentViewPath: ViewPath,
+  sourceRowPath: RowPath,
+  targetParentRowPathPath: RowPath,
   stack: ID[],
   insertAtIndex?: number
 ): Plan {
   const [planWithCopy, nodesIdMapping] = planDeepCopyNode(
     plan,
-    sourceViewPath,
-    targetParentViewPath,
+    sourceRowPath,
+    targetParentRowPathPath,
     stack,
     insertAtIndex
   );
 
-  const nodes = getNodeForView(planWithCopy, targetParentViewPath, stack);
+  const nodes = getNodeForView(planWithCopy, targetParentRowPathPath, stack);
   if (!nodes || nodes.children.size === 0) {
     return planWithCopy;
   }
 
   const targetIndex = insertAtIndex ?? nodes.children.size - 1;
-  const targetViewPath = addNodeToPathWithNodes(
-    targetParentViewPath,
+  const targetRowPath = addNodeToPathWithNodes(
+    targetParentRowPathPath,
     nodes,
     targetIndex
   );
 
-  const sourceKey = viewPathToString(sourceViewPath);
-  const targetKey = viewPathToString(targetViewPath);
+  const sourceKey = rowPathToString(sourceRowPath);
+  const targetKey = rowPathToString(targetRowPath);
 
   const updatedViews = copyViewsWithNodesMapping(
     planWithCopy.views,
@@ -1048,13 +1040,13 @@ export function parseClipboardText(text: string): ParsedLine[] {
 
 type SaveNodeResult = {
   plan: Plan;
-  viewPath: ViewPath;
+  rowPath: RowPath;
 };
 
 function planCreateNoteAtRoot(
   plan: Plan,
   text: string,
-  viewPath: ViewPath
+  rowPath: RowPath
 ): SaveNodeResult {
   const [planWithSeed, createdSeed] = planCreateNode(plan, text);
   const createdNode = withUsersEntryPublicKey(
@@ -1063,7 +1055,7 @@ function planCreateNoteAtRoot(
   );
   const planWithNode = planUpsertNodes(planWithSeed, createdNode);
 
-  const paneIndex = getPaneIndex(viewPath);
+  const paneIndex = getPaneIndex(rowPath);
   const newPanes = planWithNode.panes.map((p, i) =>
     i === paneIndex
       ? {
@@ -1075,32 +1067,32 @@ function planCreateNoteAtRoot(
   );
 
   const resultPlan = planUpdatePanes(planWithNode, newPanes);
-  const newViewPath: ViewPath = [paneIndex, createdNode.id];
+  const newRowPath: RowPath = [paneIndex, createdNode.id];
 
-  return { plan: resultPlan, viewPath: newViewPath };
+  return { plan: resultPlan, rowPath: newRowPath };
 }
 
 /**
  * Save node text - either materialize an empty node or create a version for existing node.
- * Returns the updated plan and the viewPath of the saved node.
+ * Returns the updated plan and the rowPath of the saved node.
  */
 export function planSaveNodeAndEnsureNodes(
   plan: Plan,
   text: string,
-  viewPath: ViewPath,
+  rowPath: RowPath,
   stack: ID[],
   relevance?: Relevance,
   argument?: Argument
 ): SaveNodeResult {
   const trimmedText = text.trim();
-  const [itemID] = getRowIDFromView(plan, viewPath);
-  const currentNode = getNodeForView(plan, viewPath, stack);
-  const parentPath = getParentView(viewPath);
+  const [itemID] = getRowIDFromView(plan, rowPath);
+  const currentNode = getNodeForView(plan, rowPath, stack);
+  const parentPath = getParentRowPath(rowPath);
 
   if (isEmptySemanticID(itemID)) {
     if (!parentPath) {
-      if (!trimmedText) return { plan, viewPath };
-      return planCreateNoteAtRoot(plan, trimmedText, viewPath);
+      if (!trimmedText) return { plan, rowPath };
+      return planCreateNoteAtRoot(plan, trimmedText, rowPath);
     }
     const nodes = getNodeForView(plan, parentPath, stack);
 
@@ -1108,7 +1100,7 @@ export function planSaveNodeAndEnsureNodes(
       const resultPlan = nodes
         ? planRemoveEmptyNodePosition(plan, nodes.id)
         : plan;
-      return { plan: resultPlan, viewPath };
+      return { plan: resultPlan, rowPath };
     }
 
     const [planWithNode, createdNode] = planCreateNode(plan, trimmedText);
@@ -1132,41 +1124,41 @@ export function planSaveNodeAndEnsureNodes(
       relevance ?? metadata?.nodeItem.relevance,
       argument ?? metadata?.nodeItem.argument
     );
-    return { plan: resultPlan, viewPath };
+    return { plan: resultPlan, rowPath };
   }
 
   const currentItem = getNode(plan.knowledgeDBs, itemID, plan.user.publicKey);
   if ((currentItem && isRefNode(currentItem)) || isSearchId(itemID as ID)) {
-    return { plan, viewPath };
+    return { plan, rowPath };
   }
 
   const displayText = currentNode?.text ?? "";
 
-  if (trimmedText === displayText) return { plan, viewPath };
+  if (trimmedText === displayText) return { plan, rowPath };
 
   return {
     plan: currentNode
-      ? planUpdateNodeText(plan, viewPath, stack, trimmedText)
+      ? planUpdateNodeText(plan, rowPath, stack, trimmedText)
       : plan,
-    viewPath,
+    rowPath,
   };
 }
 
 export function getNextInsertPosition(
   plan: Plan,
-  viewPath: ViewPath,
+  rowPath: RowPath,
   nodeIsRoot: boolean,
   nodeIsExpanded: boolean,
   nodeIndex: number | undefined
-): [ViewPath, ID[], number] | null {
-  const paneIndex = viewPath[0];
+): [RowPath, ID[], number] | null {
+  const paneIndex = rowPath[0];
   const { stack } = plan.panes[paneIndex];
 
   if (nodeIsRoot || nodeIsExpanded) {
-    return [viewPath, stack, 0];
+    return [rowPath, stack, 0];
   }
 
-  const parentPath = getParentView(viewPath);
+  const parentPath = getParentRowPath(rowPath);
   if (!parentPath) return null;
 
   return [parentPath, stack, (nodeIndex ?? 0) + 1];
@@ -1596,7 +1588,7 @@ export function usePlanner(): Planner {
 // This is simpler than creating actual node events - just stores where to inject
 export function planSetEmptyNodePosition(
   plan: Plan,
-  parentPath: ViewPath,
+  parentPath: RowPath,
   stack: ID[],
   insertIndex: number
 ): Plan {

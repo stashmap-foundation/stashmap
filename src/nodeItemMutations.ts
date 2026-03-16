@@ -7,14 +7,14 @@ import {
 import { planUpdateNodeItemMetadataById } from "./dataPlanner";
 import { NodeItemMetadata } from "./nodeItemMetadata";
 import {
-  getParentView,
+  getParentRowPath,
   getNodeForView,
   getNodeIndexForView,
   getRowIDFromView,
-  viewPathToString,
-  ViewPath,
-  VirtualRowsMap,
+  rowPathToString,
+  RowPath,
 } from "./ViewContext";
+import type { VirtualRowsMap } from "./rows/types";
 import {
   Plan,
   planAddToParent,
@@ -25,18 +25,18 @@ import {
 
 export type { NodeItemMetadata } from "./nodeItemMetadata";
 
-function getNodeText(plan: Plan, viewPath: ViewPath, stack: ID[]): string {
-  return getNodeForView(plan, viewPath, stack)?.text ?? "";
+function getNodeText(plan: Plan, rowPath: RowPath, stack: ID[]): string {
+  return getNodeForView(plan, rowPath, stack)?.text ?? "";
 }
 
 function planUpdateExistingItemMetadata(
   plan: Plan,
-  parentViewPath: ViewPath,
+  parentRowPath: RowPath,
   stack: ID[],
   nodeIndex: number,
   metadata: NodeItemMetadata
 ): Plan {
-  const nodes = getNodeForView(plan, parentViewPath, stack);
+  const nodes = getNodeForView(plan, parentRowPath, stack);
   const itemId = nodes?.children.get(nodeIndex);
   return nodes && itemId
     ? planUpdateNodeItemMetadataById(plan, nodes.id, itemId, metadata)
@@ -45,14 +45,14 @@ function planUpdateExistingItemMetadata(
 
 export function planUpdateViewItemMetadata(
   plan: Plan,
-  viewPath: ViewPath,
+  rowPath: RowPath,
   stack: ID[],
   metadata: NodeItemMetadata,
   editorText: string,
   virtualRowsMap?: VirtualRowsMap
 ): Plan {
-  const [rowID] = getRowIDFromView(plan, viewPath);
-  const parentView = getParentView(viewPath);
+  const [rowID] = getRowIDFromView(plan, rowPath);
+  const parentView = getParentRowPath(rowPath);
   if (!parentView) {
     return plan;
   }
@@ -63,7 +63,7 @@ export function planUpdateViewItemMetadata(
       return planSaveNodeAndEnsureNodes(
         plan,
         trimmed,
-        viewPath,
+        rowPath,
         stack,
         metadata.relevance,
         metadata.argument
@@ -73,16 +73,16 @@ export function planUpdateViewItemMetadata(
     return nodes ? planUpdateEmptyNodeMetadata(plan, nodes.id, metadata) : plan;
   }
 
-  const nodeIndex = getNodeIndexForView(plan, viewPath);
+  const nodeIndex = getNodeIndexForView(plan, rowPath);
   if (nodeIndex === undefined) {
-    const virtualRow = virtualRowsMap?.get(viewPathToString(viewPath));
+    const virtualRow = virtualRowsMap?.get(rowPathToString(rowPath));
     if (!virtualRow) {
       return plan;
     }
     if (virtualRow.virtualType === "suggestion" && !isRefNode(virtualRow)) {
       return planDeepCopyNode(
         plan,
-        viewPath,
+        rowPath,
         parentView,
         stack,
         undefined,
@@ -108,8 +108,8 @@ export function planUpdateViewItemMetadata(
 
   const trimmed = editorText.trim();
   const basePlan =
-    trimmed && trimmed !== getNodeText(plan, viewPath, stack)
-      ? planSaveNodeAndEnsureNodes(plan, editorText, viewPath, stack).plan
+    trimmed && trimmed !== getNodeText(plan, rowPath, stack)
+      ? planSaveNodeAndEnsureNodes(plan, editorText, rowPath, stack).plan
       : plan;
 
   return planUpdateExistingItemMetadata(

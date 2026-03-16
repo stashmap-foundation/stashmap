@@ -21,13 +21,13 @@ import {
   type,
 } from "./utils.test";
 import {
-  parseViewPath,
-  viewPathToString,
-  updateViewPathsAfterDisconnect,
-  updateViewPathsAfterPaneDelete,
-  updateViewPathsAfterPaneInsert,
-  updateViewPathsAfterMoveNodes,
-  ViewPath,
+  parseRowPath,
+  rowPathToString,
+  updateRowPathsAfterDisconnect,
+  updateRowPathsAfterPaneDelete,
+  updateRowPathsAfterPaneInsert,
+  updateRowPathsAfterMoveNodes,
+  RowPath,
 } from "./ViewContext";
 
 test("Move View Settings on Delete", async () => {
@@ -159,7 +159,7 @@ test("Alter View paths after disconnect", () => {
     "p0:root2:r:nested:r:n": { e: "delete" },
     "p0:root2:r:other": { e: "p0:root2:r:other" },
   });
-  const updatedViews = updateViewPathsAfterDisconnect(
+  const updatedViews = updateRowPathsAfterDisconnect(
     views as unknown as Views,
     "n" as LongID,
     "r" as LongID
@@ -179,7 +179,7 @@ test("Alter View paths after disconnect with pane-prefixed paths", () => {
     "p1:root:r:n": { e: "delete" },
     "p1:root:r:other": { e: "p1:root:r:other" },
   });
-  const updatedViews = updateViewPathsAfterDisconnect(
+  const updatedViews = updateRowPathsAfterDisconnect(
     views as unknown as Views,
     "n" as LongID,
     "r" as LongID
@@ -192,19 +192,19 @@ test("Alter View paths after disconnect with pane-prefixed paths", () => {
 });
 
 test("Parse View path", () => {
-  expect(parseViewPath("p0:root")).toEqual([0, "root"]);
-  expect(parseViewPath("p0:root:pl")).toEqual([0, "root", "pl"]);
-  expect(parseViewPath("p1:root:pl:oop")).toEqual([1, "root", "pl", "oop"]);
+  expect(parseRowPath("p0:root")).toEqual([0, "root"]);
+  expect(parseRowPath("p0:root:pl")).toEqual([0, "root", "pl"]);
+  expect(parseRowPath("p1:root:pl:oop")).toEqual([1, "root", "pl", "oop"]);
 });
 
 test("View path roundtrip preserves node IDs", () => {
   const nodeId = "alice_550e8400-e29b-41d4-a716-446655440000" as LongID;
-  const viewPath: ViewPath = [0, "rel1" as LongID, nodeId];
+  const rowPath: RowPath = [0, "rel1" as LongID, nodeId];
 
-  const serialized = viewPathToString(viewPath);
-  const parsed = parseViewPath(serialized);
+  const serialized = rowPathToString(rowPath);
+  const parsed = parseRowPath(serialized);
 
-  expect(parsed).toEqual(viewPath);
+  expect(parsed).toEqual(rowPath);
   expect(parsed[2]).toBe(nodeId);
 });
 
@@ -431,7 +431,7 @@ My Notes
   cleanup();
 });
 
-test("updateViewPathsAfterPaneDelete removes views for deleted pane and shifts indices", () => {
+test("updateRowPathsAfterPaneDelete removes views for deleted pane and shifts indices", () => {
   const views = Map<string, View>({
     "p0:root": { expanded: false },
     "p0:root:node1": { expanded: true },
@@ -442,7 +442,7 @@ test("updateViewPathsAfterPaneDelete removes views for deleted pane and shifts i
     "p3:root": { expanded: true },
   });
 
-  const updatedViews = updateViewPathsAfterPaneDelete(views, 1);
+  const updatedViews = updateRowPathsAfterPaneDelete(views, 1);
 
   expect(updatedViews.has("p0:root")).toBe(true);
   expect(updatedViews.has("p0:root:node1")).toBe(true);
@@ -453,7 +453,7 @@ test("updateViewPathsAfterPaneDelete removes views for deleted pane and shifts i
   expect(updatedViews.has("p3:root")).toBe(false);
 });
 
-test("updateViewPathsAfterPaneInsert shifts pane indices at and after insertion point", () => {
+test("updateRowPathsAfterPaneInsert shifts pane indices at and after insertion point", () => {
   const views = Map<string, View>({
     "p0:root": { expanded: false },
     "p0:root:node1": { expanded: true },
@@ -462,7 +462,7 @@ test("updateViewPathsAfterPaneInsert shifts pane indices at and after insertion 
     "p2:root": { expanded: true },
   });
 
-  const updatedViews = updateViewPathsAfterPaneInsert(views, 1);
+  const updatedViews = updateRowPathsAfterPaneInsert(views, 1);
 
   expect(updatedViews.has("p0:root")).toBe(true);
   expect(updatedViews.get("p0:root")?.expanded).toBe(false);
@@ -477,7 +477,7 @@ test("updateViewPathsAfterPaneInsert shifts pane indices at and after insertion 
   expect(updatedViews.get("p3:root")?.expanded).toBe(true);
 });
 
-test("updateViewPathsAfterMoveNodes preserves paths when nodeID starts with digit", () => {
+test("updateRowPathsAfterMoveNodes preserves paths when nodeID starts with digit", () => {
   const relID = "3abc_uuid" as LongID;
   const childAPath = `p0:root:${relID}:childA`;
   const childADeepPath = `p0:root:${relID}:childA:innerRel:grand`;
@@ -492,7 +492,7 @@ test("updateViewPathsAfterMoveNodes preserves paths when nodeID starts with digi
 
   const data = { views } as unknown as Data;
 
-  const updatedViews = updateViewPathsAfterMoveNodes(data);
+  const updatedViews = updateRowPathsAfterMoveNodes(data);
 
   expect(updatedViews.has(childAPath)).toBe(true);
   expect(updatedViews.get(childAPath)?.expanded).toBe(true);

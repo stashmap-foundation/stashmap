@@ -1,5 +1,5 @@
 import { List } from "immutable";
-import { newNode, ViewPath } from "../ViewContext";
+import { newNode, RowPath } from "../ViewContext";
 import { execute } from "../executor";
 import { createPlan, planUpsertNodes } from "../planner";
 import { processEvents } from "../eventProcessing";
@@ -32,7 +32,7 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
     root: shortID(wsID) as ID,
   };
   const basePlan = planUpsertNodes(createPlan(alice()), workspaceNode);
-  const workspacePath: ViewPath = [0, workspaceNode.id];
+  const workspacePath: RowPath = [0, workspaceNode.id];
   const plan = planPasteMarkdownTrees(
     basePlan,
     parseMarkdownHierarchy(TEST_FILE),

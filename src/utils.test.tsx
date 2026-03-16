@@ -942,7 +942,7 @@ function getDropDepthLimits(
   const nextDepth = nextRow
     ? Number(nextRow.getAttribute("data-row-depth"))
     : undefined;
-  const nextViewPathStr = nextRow
+  const nextRowPathStr = nextRow
     ? nextRow.getAttribute("data-view-key") ?? undefined
     : undefined;
   const sourcePathStr = sourceRow.getAttribute("data-view-key") ?? undefined;
@@ -954,7 +954,7 @@ function getDropDepthLimits(
   return computeDepthLimits(
     currentDepth,
     nextDepth,
-    nextViewPathStr,
+    nextRowPathStr,
     sourcePathStr,
     rootDepth
   );

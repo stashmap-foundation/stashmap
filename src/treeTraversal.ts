@@ -1,7 +1,7 @@
 import { List, Map, Set as ImmutableSet } from "immutable";
+import type { VirtualRowsMap } from "./rows/types";
 import {
-  ViewPath,
-  VirtualRowsMap,
+  RowPath,
   addNodeToPathWithNodes,
   addNodesToLastElement,
   getRowIDFromView,
@@ -9,7 +9,7 @@ import {
   getCurrentEdgeForView,
   getEffectiveAuthor,
   getParentNode,
-  viewPathToString,
+  rowPathToString,
 } from "./ViewContext";
 import {
   EMPTY_SEMANTIC_ID,
@@ -28,7 +28,7 @@ import {
 } from "./semanticProjection";
 
 export type TreeResult = {
-  paths: List<ViewPath>;
+  paths: List<RowPath>;
   virtualRows: VirtualRowsMap;
   firstVirtualKeys: ImmutableSet<string>;
 };
@@ -42,7 +42,7 @@ const EMPTY_FIRST_VIRTUAL_KEYS: ImmutableSet<string> = ImmutableSet<string>();
 
 function getChildrenForConcreteRef(
   data: Data,
-  parentPath: ViewPath,
+  parentPath: RowPath,
   parentRowID: ID,
   currentRow?: GraphNode
 ): TreeResult {
@@ -70,7 +70,7 @@ function getChildrenForConcreteRef(
 
 function getChildrenForRegularNode(
   data: Data,
-  parentPath: ViewPath,
+  parentPath: RowPath,
   parentRowID: ID,
   stack: ID[],
   rootNode: LongID | undefined,
@@ -110,7 +110,7 @@ function getChildrenForRegularNode(
         )
         .map(({ index }) => addNodeToPathWithNodes(parentPath, nodes, index))
         .toList()
-    : List<ViewPath>();
+    : List<RowPath>();
 
   if (options?.isMarkdownExport) {
     return {
@@ -188,22 +188,22 @@ function getChildrenForRegularNode(
   };
 
   const addVirtualRows = (
-    acc: { paths: List<ViewPath>; virtualRows: VirtualRowsMap },
+    acc: { paths: List<RowPath>; virtualRows: VirtualRowsMap },
     children: List<ID>,
     virtualType: VirtualType
-  ): { paths: List<ViewPath>; virtualRows: VirtualRowsMap } =>
+  ): { paths: List<RowPath>; virtualRows: VirtualRowsMap } =>
     children.reduce((result, rowID) => {
       const virtualRow = createVirtualRow(rowID, virtualType);
       const pathWithNodes = addNodesToLastElement(parentPath, nodeId);
-      const path = [...pathWithNodes, virtualRow.id] as ViewPath;
+      const path = [...pathWithNodes, virtualRow.id] as RowPath;
       return {
         paths: result.paths.push(path),
-        virtualRows: result.virtualRows.set(viewPathToString(path), virtualRow),
+        virtualRows: result.virtualRows.set(rowPathToString(path), virtualRow),
       };
     }, acc);
 
   const initial = {
-    paths: List<ViewPath>(),
+    paths: List<RowPath>(),
     virtualRows: EMPTY_VIRTUAL_ROWS,
   };
 
@@ -217,7 +217,7 @@ function getChildrenForRegularNode(
 
   const firstVirtualPath = withVersions.paths.first();
   const firstVirtualKeys = firstVirtualPath
-    ? EMPTY_FIRST_VIRTUAL_KEYS.add(viewPathToString(firstVirtualPath))
+    ? EMPTY_FIRST_VIRTUAL_KEYS.add(rowPathToString(firstVirtualPath))
     : EMPTY_FIRST_VIRTUAL_KEYS;
 
   return {
@@ -229,7 +229,7 @@ function getChildrenForRegularNode(
 
 export function getTreeChildren(
   data: Data,
-  parentPath: ViewPath,
+  parentPath: RowPath,
   stack: ID[],
   rootNode: LongID | undefined,
   author: PublicKey,
@@ -239,7 +239,7 @@ export function getTreeChildren(
 ): TreeResult {
   const [parentRowID] = getRowIDFromView(data, parentPath);
   const currentEdge =
-    virtualRows.get(viewPathToString(parentPath)) ||
+    virtualRows.get(rowPathToString(parentPath)) ||
     getCurrentEdgeForView(data, parentPath);
 
   if (isRefNode(currentEdge)) {
@@ -265,9 +265,9 @@ export function getTreeChildren(
 
 export function getNodesInTree(
   data: Data,
-  parentPath: ViewPath,
+  parentPath: RowPath,
   stack: ID[],
-  ctx: List<ViewPath>,
+  ctx: List<RowPath>,
   rootNode: LongID | undefined,
   author: PublicKey,
   typeFilters: Pane["typeFilters"],
@@ -291,7 +291,7 @@ export function getNodesInTree(
       const withChild = result.paths.push(childPath);
 
       const childEdge =
-        result.virtualRows.get(viewPathToString(childPath)) ||
+        result.virtualRows.get(rowPathToString(childPath)) ||
         getCurrentEdgeForView(data, childPath);
       const shouldRecurse = options?.isMarkdownExport
         ? !isRefNode(childEdge)

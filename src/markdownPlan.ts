@@ -12,7 +12,7 @@ import {
   planUpsertNodes,
 } from "./planner";
 import { newNode } from "./nodeFactory";
-import { getNodeForView, ViewPath } from "./ViewContext";
+import { getNodeForView, RowPath } from "./ViewContext";
 
 export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
   plan: T,
@@ -199,7 +199,7 @@ function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
 export function planInsertMarkdownTrees(
   plan: Plan,
   trees: MarkdownTreeNode[],
-  parentViewPath: ViewPath,
+  parentRowPath: RowPath,
   stack: ID[],
   insertAtIndex?: number,
   relevance?: Relevance,
@@ -210,7 +210,7 @@ export function planInsertMarkdownTrees(
   topNodeIDs: LongID[];
   actualItemIDs: Array<ID>;
 } {
-  const parentNode = getNodeForView(plan, parentViewPath, stack);
+  const parentNode = getNodeForView(plan, parentRowPath, stack);
   return parentNode
     ? planInsertMarkdownTreesByParentId(
         plan,

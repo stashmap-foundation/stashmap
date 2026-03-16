@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { List, Map, OrderedSet } from "immutable";
+import type { VirtualRowsMap } from "../rows/types";
 import {
   TemporaryViewProvider,
   useTemporaryView,
@@ -7,13 +8,12 @@ import {
 
 import {
   getDisplayTextForView,
-  parseViewPath,
-  ViewPath,
-  VirtualRowsMap,
-  viewPathToString,
+  parseRowPath,
+  RowPath,
+  rowPathToString,
   useCurrentNode,
   useDisplayText,
-  useViewPath,
+  useRowPath,
   useIsViewingOtherUserContent,
 } from "../ViewContext";
 import { useData } from "../DataContext";
@@ -490,7 +490,7 @@ function ForkButton(): JSX.Element | null {
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const currentPane = useCurrentPane();
   const currentNode = useCurrentNode();
-  const viewPath = useViewPath();
+  const rowPath = useRowPath();
   const stack = usePaneStack();
   const navigatePane = useNavigatePane();
   const { createPlan, executePlan } = usePlanner();
@@ -507,7 +507,7 @@ function ForkButton(): JSX.Element | null {
   }
 
   const handleFork = (): void => {
-    const plan = planForkPane(createPlan(), viewPath, stack);
+    const plan = planForkPane(createPlan(), rowPath, stack);
     executePlan(plan);
   };
 
@@ -904,7 +904,7 @@ function refocusPaneAfterRowMutation(root: HTMLElement): void {
 }
 
 function getRowDepthFromViewKey(viewKey: string): number {
-  return parseViewPath(viewKey).length - 1;
+  return parseRowPath(viewKey).length - 1;
 }
 
 function getSubtreeKeysFromOrderedKeys(
@@ -953,8 +953,8 @@ function getDisplayTextForViewKey(
   stack: ID[],
   viewKey: string
 ): string {
-  const viewPath = parseViewPath(viewKey);
-  return getDisplayTextForView(data, viewPath, stack);
+  const rowPath = parseRowPath(viewKey);
+  return getDisplayTextForView(data, rowPath, stack);
 }
 
 function getActionTargetKeys(
@@ -983,16 +983,16 @@ function usePaneKeyboardNavigation(paneIndex: number): {
   const data = useData();
   const stack = usePaneStack();
   const toggleFilter = useToggleFilter();
-  const viewPath = useViewPath();
+  const rowPath = useRowPath();
   const { createPlan, executePlan } = usePlanner();
   const treeResult = usePaneTreeResult();
   const orderedViewKeys = useMemo(
     () =>
-      List<ViewPath>([viewPath])
-        .concat(treeResult?.paths || List<ViewPath>())
-        .map((path) => viewPathToString(path))
+      List<RowPath>([rowPath])
+        .concat(treeResult?.paths || List<RowPath>())
+        .map((path) => rowPathToString(path))
         .toArray(),
-    [viewPath, treeResult]
+    [rowPath, treeResult]
   );
   const virtualRowsMap: VirtualRowsMap =
     treeResult?.virtualRows || Map<string, GraphNode>();
@@ -1303,7 +1303,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       }
       e.preventDefault();
       const activeRowKey = getRowKey(activeRow);
-      const parentPath = parseViewPath(activeRowKey);
+      const parentPath = parseRowPath(activeRowKey);
       navigator.clipboard.readText().then((text) => {
         const trees = parseTextToTrees(text);
         if (trees.length === 0) {
@@ -1496,7 +1496,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       e.preventDefault();
       const keys = getActionTargetKeys(selection, activeRow, orderedViewKeys);
       const focusIndex = computeFocusIndexAfterDeletion(keys, orderedViewKeys);
-      const paths = keys.map(parseViewPath);
+      const paths = keys.map(parseRowPath);
       const result = planClearTemporarySelection(
         paths.reduce(
           (acc, path) => planDeleteNodeFromView(acc, path, stack),
@@ -1528,10 +1528,10 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       e.preventDefault();
       const plan = createPlan();
       const keys = getActionTargetKeys(selection, activeRow, orderedViewKeys);
-      const paths = keys.map(parseViewPath);
-      const activeViewPath = parseViewPath(getRowKey(activeRow));
+      const paths = keys.map(parseRowPath);
+      const activeRowPath = parseRowPath(getRowKey(activeRow));
       const targetRelevance = SYMBOL_TO_RELEVANCE[e.key];
-      const currentRow = getCurrentRow(plan, activeViewPath, virtualRowsMap);
+      const currentRow = getCurrentRow(plan, activeRowPath, virtualRowsMap);
       const relevance =
         currentRow?.relevance === targetRelevance ? undefined : targetRelevance;
       executePlan(
@@ -1545,14 +1545,14 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       e.preventDefault();
       const plan = createPlan();
       const keys = getActionTargetKeys(selection, activeRow, orderedViewKeys);
-      const paths = keys.map(parseViewPath);
-      const activeViewPath = parseViewPath(getRowKey(activeRow));
+      const paths = keys.map(parseRowPath);
+      const activeRowPath = parseRowPath(getRowKey(activeRow));
       const targetArgument: Argument = (() => {
         if (e.key === "+") return "confirms" as const;
         if (e.key === "-") return "contra" as const;
         return undefined;
       })();
-      const currentRow = getCurrentRow(plan, activeViewPath, virtualRowsMap);
+      const currentRow = getCurrentRow(plan, activeRowPath, virtualRowsMap);
       const argument: Argument =
         currentRow?.argument === targetArgument ? undefined : targetArgument;
       executePlan(

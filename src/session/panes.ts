@@ -1,4 +1,4 @@
-import type { ViewPath } from "./viewPaths";
+import type { RowPath } from "./rowPaths";
 
 export function generatePaneId(): string {
   return `pane-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -8,8 +8,8 @@ type HasPanes = {
   panes: Pane[];
 };
 
-export function getPane(plan: HasPanes, viewPath: ViewPath): Pane {
-  const paneIndex = viewPath[0];
+export function getPane(plan: HasPanes, rowPath: RowPath): Pane {
+  const paneIndex = rowPath[0];
   return plan.panes[paneIndex];
 }
 

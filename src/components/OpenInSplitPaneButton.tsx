@@ -1,8 +1,8 @@
 import React from "react";
 import { useMediaQuery } from "react-responsive";
 import {
-  useViewPath,
-  updateViewPathsAfterPaneInsert,
+  useRowPath,
+  updateRowPathsAfterPaneInsert,
   buildPaneTarget,
   useCurrentEdge,
 } from "../ViewContext";
@@ -19,7 +19,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
   const { addPaneAt } = useSplitPanes();
   const paneIndex = usePaneIndex();
   const stack = usePaneStack();
-  const viewPath = useViewPath();
+  const rowPath = useRowPath();
   const data = useData();
   const isMobile = useMediaQuery(IS_MOBILE);
   const { createPlan, executePlan } = usePlanner();
@@ -32,13 +32,10 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
   const onClick = (): void => {
     const insertIndex = paneIndex + 1;
     const plan = createPlan();
-    const shiftedViews = updateViewPathsAfterPaneInsert(
-      plan.views,
-      insertIndex
-    );
+    const shiftedViews = updateRowPathsAfterPaneInsert(plan.views, insertIndex);
     executePlan(planUpdateViews(plan, shiftedViews));
 
-    const target = buildPaneTarget(data, viewPath, stack, currentRow);
+    const target = buildPaneTarget(data, rowPath, stack, currentRow);
     addPaneAt(
       insertIndex,
       target.stack,
@@ -76,10 +73,7 @@ export function NewPaneButton(): JSX.Element | null {
   const onClick = (): void => {
     const insertIndex = paneIndex + 1;
     const plan = createPlan();
-    const shiftedViews = updateViewPathsAfterPaneInsert(
-      plan.views,
-      insertIndex
-    );
+    const shiftedViews = updateRowPathsAfterPaneInsert(plan.views, insertIndex);
     executePlan(planUpdateViews(plan, shiftedViews));
     addPaneAt(insertIndex, [], user.publicKey);
   };

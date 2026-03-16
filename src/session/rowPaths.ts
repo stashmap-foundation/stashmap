@@ -1,6 +1,6 @@
-type ViewPathSegment = ID;
+type RowPathSegment = ID;
 
-export type ViewPath = readonly [number, ...ViewPathSegment[]];
+export type RowPath = readonly [number, ...RowPathSegment[]];
 
 // Encode path IDs to handle colons in ref IDs (ref:ctx:target format)
 function encodePathID(id: string): string {
@@ -11,7 +11,7 @@ function decodePathID(encoded: string): string {
   return encoded.replace(/%3A/g, ":");
 }
 
-export function parseViewPath(path: string): ViewPath {
+export function parseRowPath(path: string): RowPath {
   const pieces = path.split(":");
   if (pieces.length < 2) {
     throw new Error("Invalid view path");
@@ -29,7 +29,7 @@ export function parseViewPath(path: string): ViewPath {
 
   const pathPieces = pieces
     .slice(1)
-    .map((piece) => decodePathID(piece) as ViewPathSegment);
+    .map((piece) => decodePathID(piece) as RowPathSegment);
   if (pathPieces.length === 0) {
     throw new Error("Invalid view path");
   }
@@ -37,29 +37,29 @@ export function parseViewPath(path: string): ViewPath {
   return [paneIndex, ...pathPieces];
 }
 
-export function viewPathToString(viewPath: ViewPath): string {
-  const paneIndex = viewPath[0] as number;
-  const pathPart = (viewPath.slice(1) as readonly ViewPathSegment[])
+export function rowPathToString(rowPath: RowPath): string {
+  const paneIndex = rowPath[0] as number;
+  const pathPart = (rowPath.slice(1) as readonly RowPathSegment[])
     .map((segment) => encodePathID(segment))
     .join(":");
   return `p${paneIndex}:${pathPart}`;
 }
 
-export function isRoot(viewPath: ViewPath): boolean {
-  return viewPath.length === 2;
+export function isRoot(rowPath: RowPath): boolean {
+  return rowPath.length === 2;
 }
 
-export function getPaneIndex(viewPath: ViewPath): number {
-  return viewPath[0] as number;
+export function getPaneIndex(rowPath: RowPath): number {
+  return rowPath[0] as number;
 }
 
-export function getParentView(viewPath: ViewPath): ViewPath | undefined {
-  if (isRoot(viewPath)) {
+export function getParentRowPath(rowPath: RowPath): RowPath | undefined {
+  if (isRoot(rowPath)) {
     return undefined;
   }
-  return viewPath.slice(0, -1) as unknown as ViewPath;
+  return rowPath.slice(0, -1) as unknown as RowPath;
 }
 
-export function getLast(viewPath: ViewPath): ViewPathSegment {
-  return viewPath[viewPath.length - 1] as ViewPathSegment;
+export function getLast(rowPath: RowPath): RowPathSegment {
+  return rowPath[rowPath.length - 1] as RowPathSegment;
 }

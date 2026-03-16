@@ -1,7 +1,7 @@
 import React from "react";
 import {
   useCurrentRowID,
-  useViewPath,
+  useRowPath,
   useDisplayText,
   useEffectiveAuthor,
   useCurrentNode,
@@ -19,7 +19,7 @@ import { buildNodeRouteUrl } from "../navigationUrl";
 
 export function FullscreenButton(): JSX.Element | null {
   const stack = usePaneStack();
-  const viewPath = useViewPath();
+  const rowPath = useRowPath();
   const [rowID] = useCurrentRowID();
   const data = useData();
   const { knowledgeDBs } = data;
@@ -31,12 +31,12 @@ export function FullscreenButton(): JSX.Element | null {
   const virtualType = currentRow?.virtualType;
   const currentReference = getCurrentReferenceForView(
     data,
-    viewPath,
+    rowPath,
     stack,
     virtualType,
     currentRow
   );
-  const isFullscreenNode = viewPath.length === 2;
+  const isFullscreenNode = rowPath.length === 2;
   if (isFullscreenNode) {
     return null;
   }

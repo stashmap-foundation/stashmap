@@ -7,16 +7,11 @@ import React, {
 } from "react";
 import { useData } from "./DataContext";
 import { getNodeRouteTargetInfo } from "./connections";
-import {
-  pathToStack,
-  buildNodeUrl,
-  buildNodeRouteUrl,
-  parseNodeRouteUrl,
-  parseAuthorFromSearch,
-} from "./navigationUrl";
+import { buildNodeUrl, buildNodeRouteUrl } from "./navigationUrl";
 import { resolveSemanticStackToActualIDs } from "./semanticNavigation";
 import { usePlanner } from "./planner";
-import { generatePaneId } from "./SplitPanesContext";
+import type { HistoryState } from "./session/navigation";
+import { urlToPane } from "./session/navigation";
 
 type NavigationStateContextType = {
   activePaneIndex: number;
@@ -37,11 +32,6 @@ export function useNavigationState(): NavigationStateContextType {
   }
   return context;
 }
-
-type HistoryState = {
-  panes: Pane[];
-  activePaneIndex: number;
-};
 
 function paneToUrl(
   activePane: Pane,
@@ -69,28 +59,6 @@ function paneToUrl(
     myself,
     activePane.author
   );
-}
-
-function urlToPane(
-  pathname: string,
-  search: string,
-  fallbackAuthor: PublicKey
-): Pane {
-  const author = parseAuthorFromSearch(search) || fallbackAuthor;
-  const nodeID = parseNodeRouteUrl(pathname);
-  if (nodeID) {
-    return {
-      id: generatePaneId(),
-      stack: [],
-      author: fallbackAuthor,
-      rootNodeId: nodeID,
-    };
-  }
-  return {
-    id: generatePaneId(),
-    stack: pathToStack(pathname),
-    author,
-  };
 }
 
 export function NavigationStateProvider({

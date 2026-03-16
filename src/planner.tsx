@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data, no-continue, no-nested-ternary */
 import React, { Dispatch, SetStateAction, useEffect, useRef } from "react";
-import { List, Map, OrderedSet, Set as ImmutableSet } from "immutable";
+import { List, Map, Set as ImmutableSet } from "immutable";
 import { UnsignedEvent, Event } from "nostr-tools";
 import {
   KIND_DELETE,
@@ -46,7 +46,6 @@ import {
   upsertNodes,
   ViewPath,
   getRowIDFromView,
-  updateView,
   getContext,
   getParentView,
   bulkUpdateViewPathsAfterAddNode,
@@ -61,15 +60,10 @@ import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { useRelaysToCreatePlan } from "./relays";
 import { mergePublishResultsOfEvents } from "./commons/PublishingStatus";
 import { createRootAnchor } from "./rootAnchor";
-import {
-  MultiSelectionState,
-  clearSelection,
-  shiftSelect,
-  toggleSelect,
-} from "./selection";
 import { withUsersEntryPublicKey, getNodeUserPublicKey } from "./userEntry";
 import { decodePublicKeyInputSync } from "./nostrPublicKeys";
-import { getPane } from "./session/panes";
+import { getPane, planUpdatePanes } from "./session/panes";
+import { planExpandNode, planUpdateViews } from "./session/views";
 
 function getAnchorSnapshotLabels(
   knowledgeDBs: KnowledgeDBs,
@@ -92,6 +86,16 @@ function getAnchorSnapshotLabels(
 }
 
 export { getPane } from "./session/panes";
+export { planUpdatePanes } from "./session/panes";
+export { planSetRowFocusIntent } from "./session/focus";
+export {
+  planClearTemporarySelection,
+  planSelectAllTemporaryRows,
+  planSetTemporarySelectionState,
+  planShiftTemporarySelection,
+  planToggleTemporarySelection,
+} from "./session/selection";
+export { planExpandNode, planUpdateViews } from "./session/views";
 
 type GraphPlanData = Pick<
   Data,
@@ -356,126 +360,6 @@ function removeEmptyNodeFromKnowledgeDBs(
   });
 }
 
-export function planUpdateViews(plan: Plan, views: Views): Plan {
-  return {
-    ...plan,
-    views,
-  };
-}
-
-export function planUpdatePanes(plan: Plan, panes: Pane[]): Plan {
-  return {
-    ...plan,
-    panes,
-  };
-}
-
-export function planSetRowFocusIntent(
-  plan: Plan,
-  intent: Omit<RowFocusIntent, "requestId">
-): Plan {
-  const currentMaxRequestId = Math.max(
-    0,
-    ...plan.temporaryView.rowFocusIntents
-      .valueSeq()
-      .map((currentIntent) => currentIntent.requestId)
-      .toArray()
-  );
-  const requestId = currentMaxRequestId + 1;
-  return {
-    ...plan,
-    temporaryView: {
-      ...plan.temporaryView,
-      rowFocusIntents: plan.temporaryView.rowFocusIntents.set(
-        intent.paneIndex,
-        {
-          ...intent,
-          requestId,
-        }
-      ),
-    },
-  };
-}
-
-function getTemporarySelectionState(plan: Plan): MultiSelectionState {
-  return {
-    baseSelection: plan.temporaryView.baseSelection,
-    shiftSelection: plan.temporaryView.shiftSelection,
-    anchor: plan.temporaryView.anchor,
-  };
-}
-
-export function planSetTemporarySelectionState(
-  plan: Plan,
-  state: MultiSelectionState
-): Plan {
-  return {
-    ...plan,
-    temporaryView: {
-      ...plan.temporaryView,
-      baseSelection: state.baseSelection,
-      shiftSelection: state.shiftSelection,
-      anchor: state.anchor,
-    },
-  };
-}
-
-export function planToggleTemporarySelection(
-  plan: Plan,
-  viewKey: string
-): Plan {
-  return planSetTemporarySelectionState(
-    plan,
-    toggleSelect(getTemporarySelectionState(plan), viewKey)
-  );
-}
-
-export function planShiftTemporarySelection(
-  plan: Plan,
-  orderedKeys: string[],
-  targetViewKey: string,
-  fallbackAnchor?: string
-): Plan {
-  const current = getTemporarySelectionState(plan);
-  const effectiveAnchor = current.anchor || fallbackAnchor;
-  if (!effectiveAnchor) {
-    return plan;
-  }
-  return planSetTemporarySelectionState(
-    plan,
-    shiftSelect(
-      {
-        ...current,
-        anchor: effectiveAnchor,
-      },
-      orderedKeys,
-      targetViewKey
-    )
-  );
-}
-
-export function planClearTemporarySelection(plan: Plan, anchor?: string): Plan {
-  return planSetTemporarySelectionState(
-    plan,
-    clearSelection({
-      ...getTemporarySelectionState(plan),
-      anchor: anchor ?? plan.temporaryView.anchor,
-    })
-  );
-}
-
-export function planSelectAllTemporaryRows(
-  plan: Plan,
-  orderedKeys: string[],
-  anchor?: string
-): Plan {
-  return planSetTemporarySelectionState(plan, {
-    baseSelection: OrderedSet<string>(orderedKeys),
-    shiftSelection: OrderedSet<string>(),
-    anchor: anchor ?? plan.temporaryView.anchor,
-  });
-}
-
 export function planRemoveEmptyNodePosition(plan: Plan, nodeID: LongID): Plan {
   return {
     ...plan,
@@ -489,23 +373,6 @@ export function planRemoveEmptyNodePosition(plan: Plan, nodeID: LongID): Plan {
       nodeID,
     }),
   };
-}
-
-export function planExpandNode(
-  plan: Plan,
-  view: View,
-  viewPath: ViewPath
-): Plan {
-  if (view.expanded) {
-    return plan;
-  }
-  return planUpdateViews(
-    plan,
-    updateView(plan.views, viewPath, {
-      ...view,
-      expanded: true,
-    })
-  );
 }
 
 export function planAddTargetsToNode<T extends GraphPlan>(

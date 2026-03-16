@@ -94,6 +94,36 @@ I’d structure the first pass like this:
 - Moved `defaultPane` from `src/Data.tsx` into `src/session/panes.ts`
   - `src/Data.tsx` currently re-exports it to keep existing imports stable
 
+- Moved session-only planner commands into `src/session/*`
+  - moved to `src/session/panes.ts`:
+    - `planUpdatePanes`
+  - moved to `src/session/views.ts`:
+    - `planUpdateViews`
+    - `planExpandNode`
+  - moved to `src/session/focus.ts`:
+    - `planSetRowFocusIntent`
+  - moved to `src/session/selection.ts`:
+    - `planSetTemporarySelectionState`
+    - `planToggleTemporarySelection`
+    - `planShiftTemporarySelection`
+    - `planClearTemporarySelection`
+    - `planSelectAllTemporaryRows`
+  - `src/planner.tsx` currently re-exports these to keep existing imports stable
+
+- Moved pure navigation-session state helpers from `src/NavigationStateContext.tsx` into `src/session/navigation.ts`
+  - moved:
+    - `HistoryState`
+    - `urlToPane`
+
+- Moved pure view-path maintenance helpers from `src/ViewContext.tsx` into `src/session/views.ts`
+  - moved:
+    - `updateViewPathsAfterMoveNodes`
+    - `updateViewPathsAfterDisconnect`
+    - `updateViewPathsAfterPaneDelete`
+    - `updateViewPathsAfterPaneInsert`
+    - `bulkUpdateViewPathsAfterAddNode`
+  - `src/ViewContext.tsx` currently re-exports these to keep existing imports stable
+
 And the rule for ambiguous cases should be:
 
 - “Can this module exist without React?”

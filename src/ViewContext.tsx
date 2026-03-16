@@ -29,7 +29,6 @@ import {
   getPaneIndex,
   getParentView,
   isRoot,
-  parseViewPath,
   ViewPath,
   viewPathToString,
 } from "./session/viewPaths";
@@ -46,10 +45,15 @@ export {
   viewPathToString,
 } from "./session/viewPaths";
 export {
+  bulkUpdateViewPathsAfterAddNode,
   copyViewsWithNewPrefix,
   copyViewsWithNodesMapping,
   getParentKey,
   isExpanded,
+  updateViewPathsAfterDisconnect,
+  updateViewPathsAfterMoveNodes,
+  updateViewPathsAfterPaneDelete,
+  updateViewPathsAfterPaneInsert,
   updateView,
 } from "./session/views";
 
@@ -670,72 +674,4 @@ export function upsertNodes(
   }
 
   return planUpsertNodes(plan, updatedNodes);
-}
-
-function pathContainsSubpath(path: ViewPath, subpath: ID[]): boolean {
-  if (subpath.length === 0 || path.length - 1 < subpath.length) {
-    return false;
-  }
-  const segments = path.slice(1) as ID[];
-  return segments.some((_, index) =>
-    subpath.every((segment, offset) => segments[index + offset] === segment)
-  );
-}
-
-export function updateViewPathsAfterMoveNodes(data: Data): Views {
-  return data.views;
-}
-
-export function updateViewPathsAfterDisconnect(
-  views: Views,
-  disconnectNode: ID,
-  fromNode: LongID
-): Views {
-  return views.filterNot((_, key) => {
-    try {
-      return pathContainsSubpath(parseViewPath(key), [
-        fromNode,
-        disconnectNode,
-      ]);
-    } catch {
-      return false;
-    }
-  });
-}
-
-export function updateViewPathsAfterPaneDelete(
-  views: Views,
-  removedPaneIndex: number
-): Views {
-  return views
-    .filterNot((_, key) => key.startsWith(`p${removedPaneIndex}:`))
-    .mapKeys((key) => {
-      const match = key.match(/^p(\d+):/);
-      if (!match) return key;
-      const paneIndex = parseInt(match[1], 10);
-      if (paneIndex > removedPaneIndex) {
-        return key.replace(/^p\d+:/, `p${paneIndex - 1}:`);
-      }
-      return key;
-    });
-}
-
-export function updateViewPathsAfterPaneInsert(
-  views: Views,
-  insertedPaneIndex: number
-): Views {
-  // When inserting a pane at index N, shift all pane indices >= N up by 1
-  return views.mapKeys((key) => {
-    const match = key.match(/^p(\d+):/);
-    if (!match) return key;
-    const paneIndex = parseInt(match[1], 10);
-    if (paneIndex >= insertedPaneIndex) {
-      return key.replace(/^p\d+:/, `p${paneIndex + 1}:`);
-    }
-    return key;
-  });
-}
-
-export function bulkUpdateViewPathsAfterAddNode(data: Data): Views {
-  return data.views;
 }

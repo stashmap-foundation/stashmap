@@ -1,3 +1,10 @@
+import { generatePaneId } from "./panes";
+
+export type HistoryState = {
+  panes: Pane[];
+  activePaneIndex: number;
+};
+
 export function pathToStack(pathname: string): ID[] {
   if (!pathname.startsWith("/n/")) {
     return [];
@@ -29,4 +36,26 @@ export function parseAuthorFromSearch(search: string): PublicKey | undefined {
   const params = new URLSearchParams(search);
   const author = params.get("author");
   return author ? (author as PublicKey) : undefined;
+}
+
+export function urlToPane(
+  pathname: string,
+  search: string,
+  fallbackAuthor: PublicKey
+): Pane {
+  const author = parseAuthorFromSearch(search) || fallbackAuthor;
+  const nodeID = parseNodeRouteUrl(pathname);
+  if (nodeID) {
+    return {
+      id: generatePaneId(),
+      stack: [],
+      author: fallbackAuthor,
+      rootNodeId: nodeID,
+    };
+  }
+  return {
+    id: generatePaneId(),
+    stack: pathToStack(pathname),
+    author,
+  };
 }

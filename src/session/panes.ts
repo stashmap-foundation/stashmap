@@ -13,6 +13,13 @@ export function getPane(plan: HasPanes, viewPath: ViewPath): Pane {
   return plan.panes[paneIndex];
 }
 
+export function planUpdatePanes<T extends HasPanes>(plan: T, panes: Pane[]): T {
+  return {
+    ...plan,
+    panes,
+  };
+}
+
 export function defaultPane(author: PublicKey, rootItemID?: ID): Pane {
   return {
     id: generatePaneId(),

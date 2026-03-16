@@ -19,7 +19,6 @@ export function createHeadlessPlan(
     knowledgeDBs,
     semanticIndex: createEmptySemanticIndex(),
     relaysInfos: Map(),
-    projectMembers: Map<PublicKey, Member>(),
     relays: EMPTY_RELAYS,
   });
 }

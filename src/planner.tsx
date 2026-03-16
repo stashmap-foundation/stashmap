@@ -103,7 +103,6 @@ type GraphPlanData = Pick<
   | "knowledgeDBs"
   | "semanticIndex"
   | "relaysInfos"
-  | "projectMembers"
 >;
 
 export type GraphPlan = GraphPlanData & {

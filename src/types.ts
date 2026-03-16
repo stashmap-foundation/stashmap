@@ -81,16 +81,11 @@ declare global {
     userName?: string;
   };
 
-  export type Member = Contact & {
-    votes: number;
-  };
-
   export type HasPublicKey = {
     publicKey: PublicKey;
   };
 
   type Contacts = Map<PublicKey, Contact>;
-  type Members = Map<PublicKey, Member>;
 
   type KnowledgeDBs = Map<PublicKey, KnowledgeData>;
 
@@ -157,7 +152,6 @@ declare global {
     semanticIndex: SemanticIndex;
     relaysInfos: Map<string, RelayInformation | undefined>;
     publishEventsStatus: EventState;
-    projectMembers: Members;
 
     views: Views;
     panes: Pane[];

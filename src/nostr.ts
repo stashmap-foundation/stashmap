@@ -6,12 +6,6 @@ export const KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT = 34771;
 export const KIND_CONTACTLIST = 3;
 export const KIND_DELETE = 5;
 
-// Same as 3, but also excepts the `votes` tag to be set for each
-// contact
-// Missing votes tag will be treated as 0
-// Votes tag without a contact will be ignored
-export const KIND_MEMBERLIST = 34850;
-
 export const KIND_RELAY_METADATA_EVENT = 10002;
 export const DEFAULT_RELAYS: Relays = [
   { url: "wss://nostr.nodesmap.com/", read: true, write: true },

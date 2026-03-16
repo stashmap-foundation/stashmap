@@ -1,6 +1,6 @@
 import { List, Map } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
-import { findContacts, findMembers } from "./contacts";
+import { findContacts } from "./contacts";
 import { buildKnowledgeDBFromDocumentEvents } from "./documentMaterialization";
 import { newDB } from "./knowledge";
 import { findRelays } from "./relayUtils";
@@ -9,7 +9,6 @@ type ProcessedEvents = {
   knowledgeDB: KnowledgeData;
   contacts: Contacts;
   relays: Relays;
-  projectMembers: Members;
 };
 
 export function newProcessedEvents(): ProcessedEvents {
@@ -17,7 +16,6 @@ export function newProcessedEvents(): ProcessedEvents {
     knowledgeDB: newDB(),
     contacts: Map<PublicKey, Contact>(),
     relays: [],
-    projectMembers: Map<PublicKey, Member>(),
   };
 }
 
@@ -35,7 +33,6 @@ function processEventsByAuthor(
   authorEvents: List<UnsignedEvent | Event>
 ): ProcessedEvents {
   const contacts = findContacts(authorEvents);
-  const projectMembers = findMembers(authorEvents);
   const author = authorEvents.first()?.pubkey as PublicKey | undefined;
   const knowledgeDB =
     author && buildKnowledgeDBFromDocumentEvents(author, authorEvents);
@@ -44,7 +41,6 @@ function processEventsByAuthor(
     contacts,
     knowledgeDB: knowledgeDB || newDB(),
     relays,
-    projectMembers,
   };
 }
 

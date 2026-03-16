@@ -34,13 +34,8 @@ export function useSearchQuery(
   nip50: boolean
 ): [Map<string, TextSeed>, boolean] {
   const { relayPool } = useApis();
-  const { contacts, user, projectMembers } = useData();
-  const authors = contacts
-    .keySeq()
-    .toSet()
-    .merge(projectMembers.keySeq().toSet())
-    .add(user.publicKey)
-    .toArray();
+  const { contacts, user } = useData();
+  const authors = contacts.keySeq().toSet().add(user.publicKey).toArray();
   const enabled = query !== "" && relays.length > 0;
 
   const basicFilter = {

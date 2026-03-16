@@ -36,7 +36,7 @@ import { KIND_CONTACTLIST } from "./nostr";
 import { RequireLogin, UNAUTHENTICATED_USER_PK } from "./AppState";
 import {
   createPlan,
-  planAddContact,
+  planUpsertContact,
   planRemoveContact,
   PlanningContextProvider,
 } from "./planner";
@@ -476,7 +476,7 @@ export async function follow(
   publicKey: PublicKey
 ): Promise<void> {
   const utils = cU();
-  const plan = planAddContact(createPlan(utils), publicKey);
+  const plan = planUpsertContact(createPlan(utils), { publicKey });
   await execute({
     ...utils,
     plan,

@@ -25,6 +25,7 @@ import { Plan, planUpsertRelations, getPane } from "./planner";
 import { usePaneStack } from "./SplitPanesContext";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
 import { newRelations } from "./relationFactory";
+import { getRelationUserPublicKey } from "./userEntries";
 
 export { newRelations } from "./relationFactory";
 
@@ -743,6 +744,13 @@ export function getDisplayTextForView(
     return `Search: ${query}`;
   }
   const ownRelation = getRelationForView(data, viewPath, stack);
+  const userPublicKey = getRelationUserPublicKey(ownRelation);
+  const contactPetname = userPublicKey
+    ? data.contacts.get(userPublicKey)?.userName
+    : undefined;
+  if (contactPetname) {
+    return contactPetname;
+  }
   return ownRelation?.text ?? "";
 }
 

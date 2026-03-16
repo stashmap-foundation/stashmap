@@ -22,6 +22,23 @@ test("findContacts preserves relay and userName metadata", () => {
   });
 });
 
+test("findContacts preserves userName when relay is empty", () => {
+  const event = {
+    kind: KIND_CONTACTLIST,
+    pubkey: BOB_PUBLIC_KEY,
+    created_at: newTimestamp(),
+    tags: [["p", CAROL_PUBLIC_KEY, "", "gardener"]],
+    content: "",
+  } as UnsignedEvent;
+
+  const contacts = findContacts(List([event]));
+
+  expect(contacts.get(CAROL_PUBLIC_KEY)).toEqual({
+    publicKey: CAROL_PUBLIC_KEY,
+    userName: "gardener",
+  });
+});
+
 test("parseVotes reads vote tags from member list events", () => {
   const event = {
     kind: KIND_MEMBERLIST,

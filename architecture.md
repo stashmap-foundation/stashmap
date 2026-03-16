@@ -141,7 +141,17 @@ Operational rules:
 
 Contacts now preserve their lightweight metadata on read:
 - `mainRelay`
-- `userName`
+- `userName` (petname)
+
+The `userName` field in the contact list acts as a **petname** (NIP-02 fourth tag element).
+When a user entry is renamed to a custom name (not a decodeable npub/hex key):
+- If the user is already followed, the petname is updated in the contact list
+- If the user is being followed, the current custom name is stored as the petname
+- Display prefers the contact petname over the document text, so the same user
+  shows the same name across all documents
+
+Contact tag format follows NIP-02: `["p", pubkey, relay, petname]`.
+When there is a petname but no relay, an empty string is used for the relay position.
 
 Rows can also persist a dedicated `userPublicKey` field in document markdown attrs.
 That field is what lets follow/unfollow keep working after a row is renamed from an `npub`

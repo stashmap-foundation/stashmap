@@ -66,7 +66,8 @@ import {
   shiftSelect,
   toggleSelect,
 } from "./selection";
-import { withUsersEntryPublicKey } from "./userEntry";
+import { withUsersEntryPublicKey, getUsersEntryPublicKey } from "./userEntry";
+import { decodePublicKeyInputSync } from "./nostrPublicKeys";
 
 function getAnchorSnapshotLabels(
   knowledgeDBs: KnowledgeDBs,
@@ -134,7 +135,7 @@ function newContactListEvent(contacts: Contacts, user: User): UnsignedEvent {
         return ["p", c.publicKey, c.mainRelay];
       }
       if (c.userName) {
-        return ["p", c.publicKey, c.userName];
+        return ["p", c.publicKey, "", c.userName];
       }
       return ["p", c.publicKey];
     });
@@ -155,13 +156,6 @@ function setRelayConf(
     ...event,
     writeRelayConf: conf,
   };
-}
-
-export function planAddContact<T extends GraphPlan>(
-  plan: T,
-  publicKey: PublicKey
-): T {
-  return planUpsertContact(plan, { publicKey });
 }
 
 export function planUpsertContact<T extends GraphPlan>(
@@ -351,14 +345,21 @@ export function planUpdateRelationText(
   if (currentRelation.text === text) {
     return plan;
   }
-  return planUpsertRelations(
-    plan,
-    withUsersEntryPublicKey({
-      ...currentRelation,
-      text,
-      updated: Date.now(),
-    })
-  );
+  const updatedRelation = withUsersEntryPublicKey({
+    ...currentRelation,
+    text,
+    updated: Date.now(),
+  });
+  const basePlan = planUpsertRelations(plan, updatedRelation);
+  const userPublicKey = getUsersEntryPublicKey(text, currentRelation);
+  const isCustomName = !decodePublicKeyInputSync(text);
+  if (userPublicKey && basePlan.contacts.has(userPublicKey)) {
+    return planUpsertContact(basePlan, {
+      ...basePlan.contacts.get(userPublicKey)!,
+      userName: isCustomName ? text : undefined,
+    });
+  }
+  return basePlan;
 }
 
 function removeEmptyNodeFromKnowledgeDBs(

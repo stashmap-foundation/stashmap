@@ -1,7 +1,7 @@
 import { List, Map } from "immutable";
 import { shortID } from "./connections";
 import { newDB } from "./knowledge";
-import { newRelations } from "./ViewContext";
+import { newNode } from "./ViewContext";
 import {
   buildNodeUrl,
   pathToStack,
@@ -17,8 +17,8 @@ function knowledgeDBWithTexts(
   texts: string[]
 ): KnowledgeDBs {
   const nodes = texts.reduce((acc, text) => {
-    const relation = newRelations(text, List<ID>(), author);
-    return acc.set(shortID(relation.id), relation);
+    const node = newNode(text, List<ID>(), author);
+    return acc.set(shortID(node.id), node);
   }, Map<string, GraphNode>());
   const db: KnowledgeData = {
     ...newDB(),

@@ -1,27 +1,27 @@
 import { decodePublicKeyInputSync } from "./nostrPublicKeys";
 
-export function getUsersEntryPublicKey(
-  text: string,
-  relation?: GraphNode
+export function getNodeUserPublicKey(
+  node?: GraphNode,
+  text = node?.text
 ): PublicKey | undefined {
   return (
     decodePublicKeyInputSync(text) ||
-    relation?.userPublicKey ||
-    decodePublicKeyInputSync(relation?.text)
+    node?.userPublicKey ||
+    decodePublicKeyInputSync(node?.text)
   );
 }
 
 export function withUsersEntryPublicKey(
-  relation: GraphNode,
-  text = relation.text
+  node: GraphNode,
+  text = node.text
 ): GraphNode {
-  const userPublicKey = getUsersEntryPublicKey(text, relation);
+  const userPublicKey = getNodeUserPublicKey(node, text);
   if (!userPublicKey) {
-    return relation;
+    return node;
   }
 
   return {
-    ...relation,
+    ...node,
     userPublicKey,
   };
 }

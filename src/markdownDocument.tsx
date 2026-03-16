@@ -28,7 +28,7 @@ import {
 import { KIND_KNOWLEDGE_DOCUMENT, newTimestamp, msTag } from "./nostr";
 import { getNodesInTree } from "./treeTraversal";
 import { createRootAnchor } from "./rootAnchor";
-import { resolveSemanticRelationInCurrentTree } from "./semanticNavigation";
+import { resolveSemanticNodeInCurrentTree } from "./semanticNavigation";
 
 export type { MarkdownTreeNode } from "./markdownTree";
 export { parseMarkdownHierarchy } from "./markdownTree";
@@ -66,21 +66,21 @@ function getOwnRelationForDocumentSerialization(
   author: PublicKey,
   itemID: ID,
   semanticContext: List<ID>,
-  rootRelation: GraphNode,
+  rootNode: GraphNode,
   isRootNode: boolean
 ): GraphNode | undefined {
   const directRelation = getNodeForView(data, path, stack);
   if (directRelation) {
     return directRelation;
   }
-  return resolveSemanticRelationInCurrentTree(
+  return resolveSemanticNodeInCurrentTree(
     data.knowledgeDBs,
     author,
     itemID,
     semanticContext,
-    rootRelation.id,
+    rootNode.id,
     isRootNode,
-    rootRelation.root
+    rootNode.root
   );
 }
 
@@ -103,20 +103,20 @@ function getSerializedRelationText(
   };
 }
 
-function buildRootPath(rootRelation: GraphNode): ViewPath {
-  return [0, rootRelation.id];
+function buildRootPath(rootNode: GraphNode): ViewPath {
+  return [0, rootNode.id];
 }
 
-function serializeTree(data: Data, rootRelation: GraphNode): SerializeResult {
+function serializeTree(data: Data, rootNode: GraphNode): SerializeResult {
   const author = data.user.publicKey;
-  const rootPath = buildRootPath(rootRelation);
-  const stack = [getSemanticID(data.knowledgeDBs, rootRelation)];
+  const rootPath = buildRootPath(rootNode);
+  const stack = [getSemanticID(data.knowledgeDBs, rootNode)];
   const { paths } = getNodesInTree(
     data,
     rootPath,
     stack,
     List<ViewPath>(),
-    rootRelation.id,
+    rootNode.id,
     author,
     undefined,
     { isMarkdownExport: true }
@@ -147,7 +147,7 @@ function serializeTree(data: Data, rootRelation: GraphNode): SerializeResult {
         author,
         itemID,
         semanticContext,
-        rootRelation,
+        rootNode,
         isRoot(path)
       );
       const serializedRelation = ownRelation
@@ -174,27 +174,27 @@ function serializeTree(data: Data, rootRelation: GraphNode): SerializeResult {
 
 export function buildDocumentEvent(
   data: Data,
-  rootRelation: GraphNode,
+  rootNode: GraphNode,
   options?: {
     snapshotDTag?: string;
   }
 ): UnsignedEvent {
   const author = data.user.publicKey;
-  const rootContext = getNodeContext(data.knowledgeDBs, rootRelation);
-  const { text: rootText } = getSerializedRelationText(data, rootRelation);
-  const rootUuid = shortID(rootRelation.id);
+  const rootContext = getNodeContext(data.knowledgeDBs, rootNode);
+  const { text: rootText } = getSerializedRelationText(data, rootNode);
+  const rootUuid = shortID(rootNode.id);
   const rootLine = formatRootHeading(
     rootText,
     rootUuid,
-    rootRelation.basedOn,
-    options?.snapshotDTag ?? rootRelation.snapshotDTag,
-    rootRelation.anchor ?? createRootAnchor(rootContext),
-    rootRelation.systemRole
+    rootNode.basedOn,
+    options?.snapshotDTag ?? rootNode.snapshotDTag,
+    rootNode.anchor ?? createRootAnchor(rootContext),
+    rootNode.systemRole
   );
-  const result = serializeTree(data, rootRelation);
+  const result = serializeTree(data, rootNode);
   const content = `${[rootLine, ...result.lines].join("\n")}\n`;
-  const systemRoleTags = rootRelation.systemRole
-    ? ([["s", rootRelation.systemRole]] as string[][])
+  const systemRoleTags = rootNode.systemRole
+    ? ([["s", rootNode.systemRole]] as string[][])
     : [];
 
   return {

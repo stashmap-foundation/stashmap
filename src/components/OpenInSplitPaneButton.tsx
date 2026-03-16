@@ -43,7 +43,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
       insertIndex,
       target.stack,
       target.author,
-      target.rootRelation,
+      target.rootNodeId,
       target.scrollToId
     );
   };

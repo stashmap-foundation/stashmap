@@ -17,15 +17,15 @@ import {
   isRefNode,
 } from "./connections";
 import { buildReferenceItem } from "./buildReferenceRow";
-import { resolveSemanticRelationInCurrentTree } from "./semanticNavigation";
+import { resolveSemanticNodeInCurrentTree } from "./semanticNavigation";
 import { useData } from "./DataContext";
 import { Plan, planUpsertRelations, getPane } from "./planner";
 import { usePaneStack } from "./SplitPanesContext";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
-import { newRelations } from "./relationFactory";
-import { getRelationUserPublicKey } from "./userEntries";
+import { newNode } from "./relationFactory";
+import { getNodeUserPublicKey } from "./userEntry";
 
-export { newRelations } from "./relationFactory";
+export { newNode } from "./relationFactory";
 
 type ViewPathSegment = ID;
 
@@ -268,12 +268,12 @@ export function getNodeForView(
   const parentRoot = getParentRelation(data, viewPath)?.root;
   const author = getEffectiveAuthor(data, viewPath);
 
-  return resolveSemanticRelationInCurrentTree(
+  return resolveSemanticNodeInCurrentTree(
     data.knowledgeDBs,
     author,
     itemID,
     semanticContext,
-    pane.rootRelation,
+    pane.rootNodeId,
     isRoot(viewPath),
     parentRoot
   );
@@ -287,7 +287,7 @@ export function buildPaneTarget(
 ): {
   stack: ID[];
   author: PublicKey;
-  rootRelation?: LongID;
+  rootNodeId?: LongID;
   scrollToId?: string;
 } {
   const [itemID] = getRowIDFromView(data, viewPath);
@@ -336,7 +336,7 @@ export function buildPaneTarget(
     return {
       stack: refInfo.stack,
       author: refInfo.author,
-      rootRelation: refInfo.rootRelation,
+      rootNodeId: refInfo.rootNodeId,
       scrollToId: refInfo.scrollToId,
     };
   }
@@ -350,7 +350,7 @@ export function buildPaneTarget(
   return {
     stack: fullStack,
     author: effectiveAuthor,
-    rootRelation: relation?.id,
+    rootNodeId: relation?.id,
   };
 }
 
@@ -601,9 +601,9 @@ export function RootViewContextProvider({
   const stack = usePaneStack();
   const pane = data.panes[paneIndex];
   const rootContext = getContextFromStack(stack);
-  const resolvedRootRelation = pane?.rootRelation
-    ? getNode(data.knowledgeDBs, pane.rootRelation, data.user.publicKey)
-    : resolveSemanticRelationInCurrentTree(
+  const resolvedRootNode = pane?.rootNodeId
+    ? getNode(data.knowledgeDBs, pane.rootNodeId, data.user.publicKey)
+    : resolveSemanticNodeInCurrentTree(
         data.knowledgeDBs,
         pane?.author || data.user.publicKey,
         root,
@@ -611,7 +611,7 @@ export function RootViewContextProvider({
         undefined,
         true
       );
-  const startPath: ViewPath = [paneIndex, resolvedRootRelation?.id || root];
+  const startPath: ViewPath = [paneIndex, resolvedRootNode?.id || root];
   const finalPath = (indices || List<number>()).reduce(
     (acc, index) => addNodeToPath(data, acc, index, stack),
     startPath
@@ -650,7 +650,7 @@ export function getDisplayTextForView(
     return `Search: ${query}`;
   }
   const ownRelation = getNodeForView(data, viewPath, stack);
-  const userPublicKey = getRelationUserPublicKey(ownRelation);
+  const userPublicKey = getNodeUserPublicKey(ownRelation);
   const contactPetname = userPublicKey
     ? data.contacts.get(userPublicKey)?.userName
     : undefined;
@@ -755,7 +755,7 @@ export function upsertRelations(
 
   const base =
     currentRelation ||
-    newRelations(
+    newNode(
       "",
       semanticContext,
       plan.user.publicKey,

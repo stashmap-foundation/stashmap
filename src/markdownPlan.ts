@@ -11,7 +11,7 @@ import {
   planMoveDescendantRelations,
   planUpsertRelations,
 } from "./planner";
-import { newRelations } from "./relationFactory";
+import { newNode } from "./relationFactory";
 import { getNodeForView, ViewPath } from "./ViewContext";
 
 export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
@@ -67,7 +67,7 @@ export function planCreateNodesFromMarkdown<T extends GraphPlan>(
   }
 
   const fallbackText = "Imported Markdown";
-  const fallbackRelation = newRelations(
+  const fallbackRelation = newNode(
     fallbackText,
     List<ID>(),
     nextPlan.user.publicKey

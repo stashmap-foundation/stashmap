@@ -7,7 +7,7 @@ import { newDB } from "./knowledge";
 import { findTag } from "./nostrEvents";
 import { createRootAnchor } from "./rootAnchor";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
-import { newRefNode, newRelations } from "./relationFactory";
+import { newRefNode, newNode } from "./relationFactory";
 
 export type WalkContext = {
   knowledgeDBs: KnowledgeDBs;
@@ -41,10 +41,10 @@ function materializeTreeNode(
 ): [WalkContext, ID, GraphNode] {
   const baseRelation = treeNode.uuid
     ? {
-        ...newRelations(treeNode.text, semanticContext, ctx.publicKey, root),
+        ...newNode(treeNode.text, semanticContext, ctx.publicKey, root),
         id: joinID(ctx.publicKey, treeNode.uuid),
       }
-    : newRelations(treeNode.text, semanticContext, ctx.publicKey, root);
+    : newNode(treeNode.text, semanticContext, ctx.publicKey, root);
   const relationBaseWithFields: GraphNode = {
     ...baseRelation,
     parent,

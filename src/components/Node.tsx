@@ -65,7 +65,7 @@ import { RightMenu } from "./RightMenu";
 import { useItemStyle } from "./useItemStyle";
 import { EditorTextProvider } from "./EditorTextContext";
 import { getTreeChildren } from "../treeTraversal";
-import { getRelationUserPublicKey } from "../userEntries";
+import { getNodeUserPublicKey } from "../userEntry";
 
 export { getNodesInTree } from "../treeTraversal";
 
@@ -95,7 +95,7 @@ function useNodeHasChildren(): boolean {
     data,
     viewPath,
     stack,
-    pane.rootRelation,
+    pane.rootNodeId,
     pane.author,
     pane.typeFilters
   );
@@ -585,8 +585,8 @@ function NodeAutoLink({
         ? getRefTargetInfo(node.id, knowledgeDBs, effectiveAuthor)
         : getRefLinkTargetInfo(node.id, knowledgeDBs, effectiveAuthor);
     if (refInfo) {
-      const href = refInfo.rootRelation
-        ? buildRelationUrl(refInfo.rootRelation, refInfo.scrollToId)
+      const href = refInfo.rootNodeId
+        ? buildRelationUrl(refInfo.rootNodeId, refInfo.scrollToId)
         : "#";
       return (
         <a
@@ -736,7 +736,7 @@ export function Node({
     virtualType,
     currentItem
   );
-  const userEntryPublicKey = getRelationUserPublicKey(currentRelation);
+  const userEntryPublicKey = getNodeUserPublicKey(currentRelation);
   const isFollowingUserEntry =
     !!userEntryPublicKey && data.contacts.has(userEntryPublicKey);
   const isOtherUser =

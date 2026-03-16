@@ -42,7 +42,7 @@ import {
   LOG_ROOT_ROLE,
 } from "./systemRoots";
 import {
-  newRelations,
+  newNode,
   upsertRelations,
   ViewPath,
   getRowIDFromView,
@@ -67,7 +67,7 @@ import {
   shiftSelect,
   toggleSelect,
 } from "./selection";
-import { withUsersEntryPublicKey, getUsersEntryPublicKey } from "./userEntry";
+import { withUsersEntryPublicKey, getNodeUserPublicKey } from "./userEntry";
 import { decodePublicKeyInputSync } from "./nostrPublicKeys";
 
 function getAnchorSnapshotLabels(
@@ -199,7 +199,7 @@ function planEnsureSystemRoot<T extends GraphPlan>(
     return [plan, existing];
   }
 
-  const relation = newRelations(
+  const relation = newNode(
     getSystemRoleText(systemRole),
     List<ID>(),
     plan.user.publicKey,
@@ -322,7 +322,7 @@ export function planUpdateRelationText(
     updated: Date.now(),
   });
   const basePlan = planUpsertRelations(plan, updatedRelation);
-  const userPublicKey = getUsersEntryPublicKey(text, currentRelation);
+  const userPublicKey = getNodeUserPublicKey(currentRelation, text);
   const isCustomName = !decodePublicKeyInputSync(text);
   if (userPublicKey && basePlan.contacts.has(userPublicKey)) {
     return planUpsertContact(basePlan, {
@@ -625,7 +625,7 @@ export function planAddTargetsToRelation<T extends GraphPlan>(
         ];
       }
 
-      const childRelation = newRelations(
+      const childRelation = newNode(
         objectText || "",
         childContext,
         accPlan.user.publicKey,
@@ -832,7 +832,7 @@ function planCopyDescendantRelations<T extends GraphPlan>(
     (acc, relation) => {
       const newSemanticContext = getSemanticContext(relation);
       const isRootRelation = relation.id === sourceRelation.id;
-      const baseRelation = newRelations(
+      const baseRelation = newNode(
         isRootRelation && typeof targetSemanticID === "string"
           ? targetSemanticID
           : relation.text,
@@ -970,24 +970,23 @@ export function planForkPane(
 ): Plan {
   const pane = getPane(plan, viewPath);
 
-  const rootRelationData = pane.rootRelation
+  const rootNode = pane.rootNodeId
     ? getNode(
         plan.knowledgeDBs,
-        pane.rootRelation,
+        pane.rootNodeId,
         pane.author || plan.user.publicKey
       )
     : undefined;
 
-  const sourceRelation =
-    rootRelationData || getNodeForView(plan, viewPath, stack);
-  if (!sourceRelation) {
+  const sourceNode = rootNode || getNodeForView(plan, viewPath, stack);
+  if (!sourceNode) {
     return plan;
   }
   const [planWithRelations, relationsIdMapping] = planCopyDescendantRelations(
     plan,
-    sourceRelation,
-    (relation) => getNodeContext(plan.knowledgeDBs, relation),
-    (relation) => relation.author === pane.author
+    sourceNode,
+    (node) => getNodeContext(plan.knowledgeDBs, node),
+    (node) => node.author === pane.author
   );
   const updatedViews = updateViewsWithRelationsMapping(
     planWithRelations.views,
@@ -995,15 +994,15 @@ export function planForkPane(
   );
   const planWithUpdatedViews = planUpdateViews(planWithRelations, updatedViews);
   const paneIndex = viewPath[0];
-  const newRootRelation = pane.rootRelation
-    ? relationsIdMapping.get(pane.rootRelation)
+  const newRootNodeId = pane.rootNodeId
+    ? relationsIdMapping.get(pane.rootNodeId)
     : undefined;
   const newPanes = planWithUpdatedViews.panes.map((p, i) =>
     i === paneIndex
       ? {
           ...p,
           author: plan.user.publicKey,
-          rootRelation: newRootRelation,
+          rootNodeId: newRootNodeId,
         }
       : p
   );
@@ -1027,7 +1026,7 @@ export function planDeepCopyNode(
   const resolveSource = (): {
     itemID: ID;
     semanticContext: Context;
-    relation?: GraphNode;
+    node?: GraphNode;
   } => {
     const sourceNode = getNode(
       plan.knowledgeDBs,
@@ -1040,21 +1039,21 @@ export function planDeepCopyNode(
         return {
           itemID: getSemanticID(plan.knowledgeDBs, relation),
           semanticContext: getNodeContext(plan.knowledgeDBs, relation),
-          relation,
+          node: relation,
         };
       }
     }
     return {
       itemID: sourceItemID,
       semanticContext: sourceSemanticContext,
-      relation: sourceRelation,
+      node: sourceRelation,
     };
   };
 
   const resolved = resolveSource();
   const resolvedItemID = resolved.itemID;
   const resolvedSemanticContext = resolved.semanticContext;
-  const resolvedRelation = resolved.relation;
+  const resolvedRelation = resolved.node;
 
   const [planWithParent, targetParentRelation] = (() => {
     const parentRelation = getNodeForView(plan, targetParentViewPath, stack);
@@ -1226,7 +1225,7 @@ function planCreateNoteAtRoot(
 ): SaveNodeResult {
   const [planWithNode, createdNode] = planCreateNode(plan, text);
   const createdRelation = withUsersEntryPublicKey(
-    newRelations(createdNode.text, List<ID>(), plan.user.publicKey),
+    newNode(createdNode.text, List<ID>(), plan.user.publicKey),
     createdNode.text
   );
   const planWithRelation = planUpsertRelations(planWithNode, createdRelation);
@@ -1239,7 +1238,7 @@ function planCreateNoteAtRoot(
           stack: [
             getSemanticID(planWithRelation.knowledgeDBs, createdRelation),
           ],
-          rootRelation: createdRelation.id,
+          rootNodeId: createdRelation.id,
         }
       : p
   );

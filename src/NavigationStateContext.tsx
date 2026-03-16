@@ -48,8 +48,8 @@ function paneToUrl(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey
 ): string | undefined {
-  if (activePane.rootRelation) {
-    return buildRelationUrl(activePane.rootRelation, activePane.scrollToId);
+  if (activePane.rootNodeId) {
+    return buildRelationUrl(activePane.rootNodeId, activePane.scrollToId);
   }
 
   if (activePane.stack.length > 0) {
@@ -58,8 +58,8 @@ function paneToUrl(
       activePane.author,
       activePane.stack as ID[]
     );
-    if (resolved?.relation) {
-      return buildRelationUrl(resolved.relation.id, activePane.scrollToId);
+    if (resolved?.node) {
+      return buildRelationUrl(resolved.node.id, activePane.scrollToId);
     }
   }
 
@@ -83,7 +83,7 @@ function urlToPane(
       id: generatePaneId(),
       stack: [],
       author: fallbackAuthor,
-      rootRelation: relationID,
+      rootNodeId: relationID,
     };
   }
   return {
@@ -126,15 +126,15 @@ export function NavigationStateProvider({
 
   useEffect(() => {
     const needsResolution = panes.some(
-      (p) => (p.rootRelation && p.stack.length === 0) || p.stack.length > 0
+      (p) => (p.rootNodeId && p.stack.length === 0) || p.stack.length > 0
     );
     if (!needsResolution) {
       return;
     }
     const resolved = panes.map((p) => {
-      if (p.rootRelation && p.stack.length === 0) {
+      if (p.rootNodeId && p.stack.length === 0) {
         const relationInfo = getNodeRouteTargetInfo(
-          p.rootRelation,
+          p.rootNodeId,
           knowledgeDBs,
           p.author
         );
@@ -145,7 +145,7 @@ export function NavigationStateProvider({
           ...p,
           stack: relationInfo.stack,
           author: relationInfo.author,
-          rootRelation: relationInfo.rootRelation,
+          rootNodeId: relationInfo.rootNodeId,
         };
       }
 

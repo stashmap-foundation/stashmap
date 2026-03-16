@@ -31,9 +31,9 @@ function resetInvalidPanes(plan: Plan, paneIndexToReset?: number): Plan {
     if (paneIndexToReset !== undefined && i === paneIndexToReset) {
       return true;
     }
-    if (p.rootRelation !== undefined) {
+    if (p.rootNodeId !== undefined) {
       return (
-        getNodeForView(plan, [i, p.rootRelation] as ViewPath, p.stack) ===
+        getNodeForView(plan, [i, p.rootNodeId] as ViewPath, p.stack) ===
         undefined
       );
     }
@@ -42,13 +42,13 @@ function resetInvalidPanes(plan: Plan, paneIndexToReset?: number): Plan {
     }
     const rootViewPath: ViewPath = [
       i,
-      p.rootRelation || p.stack[p.stack.length - 1],
+      p.rootNodeId || p.stack[p.stack.length - 1],
     ];
     return getNodeForView(plan, rootViewPath, p.stack) === undefined;
   };
 
   const newPanes = plan.panes.map((p, i) =>
-    shouldResetPane(p, i) ? { ...p, stack: [], rootRelation: undefined } : p
+    shouldResetPane(p, i) ? { ...p, stack: [], rootNodeId: undefined } : p
   );
   return planUpdatePanes(plan, newPanes);
 }

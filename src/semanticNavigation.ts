@@ -82,7 +82,7 @@ function getMatchingChildRelation(
 
 function resolveRequestedStackFromRoot(
   knowledgeDBs: KnowledgeDBs,
-  rootRelation: GraphNode,
+  rootNode: GraphNode,
   requestedStack: ID[]
 ): ResolvedStack | undefined {
   if (requestedStack.length === 0) {
@@ -91,33 +91,33 @@ function resolveRequestedStackFromRoot(
   if (
     !relationMatchesRequestedSemanticID(
       knowledgeDBs,
-      rootRelation,
+      rootNode,
       requestedStack[0] as ID
     )
   ) {
     return undefined;
   }
 
-  let currentRelation: GraphNode | undefined = rootRelation;
-  const actualStack: ID[] = [getSemanticID(knowledgeDBs, rootRelation)];
+  let currentNode: GraphNode | undefined = rootNode;
+  const actualStack: ID[] = [getSemanticID(knowledgeDBs, rootNode)];
 
   for (let index = 1; index < requestedStack.length; index += 1) {
-    if (!currentRelation) {
+    if (!currentNode) {
       return undefined;
     }
-    const nextRelation = getMatchingChildRelation(
+    const nextNode = getMatchingChildRelation(
       knowledgeDBs,
-      currentRelation,
+      currentNode,
       requestedStack[index] as ID
     );
-    if (!nextRelation) {
+    if (!nextNode) {
       return undefined;
     }
-    actualStack.push(getSemanticID(knowledgeDBs, nextRelation));
-    currentRelation = nextRelation;
+    actualStack.push(getSemanticID(knowledgeDBs, nextNode));
+    currentNode = nextNode;
   }
 
-  return { actualStack, relation: currentRelation };
+  return { actualStack, node: currentNode };
 }
 
 function buildRequestedSemanticPath(
@@ -139,7 +139,7 @@ function resolveRelationFromKnownRoot(
     preferredRoot
   );
   return root
-    ? resolveRequestedStackFromRoot(knowledgeDBs, root, semanticPath)?.relation
+    ? resolveRequestedStackFromRoot(knowledgeDBs, root, semanticPath)?.node
     : undefined;
 }
 
@@ -149,12 +149,12 @@ function resolveStandaloneRelationFromSemanticPath(
   semanticPath: ID[]
 ): GraphNode | undefined {
   return resolveSemanticStackToActualIDs(knowledgeDBs, paneAuthor, semanticPath)
-    ?.relation;
+    ?.node;
 }
 
 type ResolvedStack = {
   actualStack: ID[];
-  relation?: GraphNode;
+  node?: GraphNode;
 };
 
 export function resolveSemanticStackToActualIDs(
@@ -182,27 +182,27 @@ export function resolveSemanticStackToActualIDs(
   );
 }
 
-export function resolveSemanticRelationInCurrentTree(
+export function resolveSemanticNodeInCurrentTree(
   knowledgeDBs: KnowledgeDBs,
   paneAuthor: PublicKey,
   itemID: ID,
   semanticContext: Context,
-  rootRelation: LongID | undefined,
+  rootNodeId: LongID | undefined,
   isRootNode: boolean,
   currentRoot?: ID
 ): GraphNode | undefined {
-  if (isRootNode && rootRelation) {
-    const relation = getNode(knowledgeDBs, rootRelation, paneAuthor);
-    if (relation) {
-      return relation;
+  if (isRootNode && rootNodeId) {
+    const node = getNode(knowledgeDBs, rootNodeId, paneAuthor);
+    if (node) {
+      return node;
     }
   }
 
   const semanticPath = buildRequestedSemanticPath(semanticContext, itemID);
   const preferredRoot =
     currentRoot ||
-    (rootRelation
-      ? getNode(knowledgeDBs, rootRelation, paneAuthor)?.root
+    (rootNodeId
+      ? getNode(knowledgeDBs, rootNodeId, paneAuthor)?.root
       : undefined);
 
   if (preferredRoot) {

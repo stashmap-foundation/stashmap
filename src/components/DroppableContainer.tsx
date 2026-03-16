@@ -90,7 +90,7 @@ function planMaterializeImportedRoot(
     return {
       ...paneState,
       stack: [rootItemID],
-      rootRelation: undefined,
+      rootNodeId: undefined,
     };
   });
   return planUpdatePanes(plan, updatedPanes);
@@ -417,7 +417,7 @@ export function useDroppable({
                   destination,
                   stack,
                   destinationIndex,
-                  pane.rootRelation
+                  pane.rootNodeId
                 );
           const [dropParentItemID] = getRowIDFromView(plan, dropParentPath);
 
@@ -465,7 +465,7 @@ export function useDroppable({
             id: p.id,
             stack: target.stack,
             author: target.author,
-            rootRelation: target.rootRelation,
+            rootNodeId: target.rootNodeId,
             scrollToId: target.scrollToId,
           };
         });
@@ -480,7 +480,7 @@ export function useDroppable({
         destination,
         stack,
         calcIndex(index, direction),
-        pane.rootRelation,
+        pane.rootNodeId,
         dragItem.isSuggestion,
         invertCopyModeRef.current,
         targetDepth,

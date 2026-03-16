@@ -3,7 +3,7 @@ import { v4 } from "uuid";
 import { joinID } from "./connections";
 import { createRootAnchor } from "./rootAnchor";
 
-export function newRelations(
+export function newNode(
   text: string,
   semanticContext: Context,
   myself: PublicKey,

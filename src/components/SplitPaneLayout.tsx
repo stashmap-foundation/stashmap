@@ -43,7 +43,7 @@ export function PaneSearchButton(): JSX.Element {
         ...pane,
         stack: [searchId],
         author: user.publicKey,
-        rootRelation: undefined,
+        rootNodeId: undefined,
       });
       setShowInput(false);
       setQuery("");

@@ -271,8 +271,8 @@ function isInSystemRoot(
   if (!relation) {
     return false;
   }
-  const rootRelation = getNode(knowledgeDBs, relation.root, relation.author);
-  return rootRelation?.systemRole === systemRole;
+  const rootNode = getNode(knowledgeDBs, relation.root, relation.author);
+  return rootNode?.systemRole === systemRole;
 }
 
 export function deduplicateRefsByContext(

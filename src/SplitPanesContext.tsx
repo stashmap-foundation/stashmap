@@ -49,7 +49,7 @@ type PaneOperations = {
     index: number,
     stack: ID[],
     author: PublicKey,
-    rootRelation?: LongID,
+    rootNodeId?: LongID,
     scrollToId?: string
   ) => void;
   removePane: (paneId: string) => void;
@@ -65,14 +65,14 @@ export function useSplitPanes(): PaneOperations {
     index: number,
     stack: ID[],
     author: PublicKey,
-    rootRelation?: LongID,
+    rootNodeId?: LongID,
     scrollToId?: string
   ): void => {
     const newPane: Pane = {
       id: generatePaneId(),
       stack,
       author,
-      rootRelation,
+      rootNodeId,
       scrollToId,
     };
     const newPanes = [...panes.slice(0, index), newPane, ...panes.slice(index)];
@@ -131,7 +131,7 @@ export function useNavigatePane(): (url: string) => void {
           parseAuthorFromSearch(search) ||
           splitID(relationID)[0] ||
           user.publicKey,
-        rootRelation: relationID,
+        rootNodeId: relationID,
         scrollToId,
       });
     } else {

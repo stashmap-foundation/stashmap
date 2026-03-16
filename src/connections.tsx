@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/immutable-data, functional/no-let */
 import { List, Set, Map } from "immutable";
-import { newRefNode, newRelations } from "./relationFactory";
+import { newRefNode, newNode } from "./relationFactory";
 import { SEARCH_PREFIX } from "./constants";
 import { getRootAnchorContext, rootAnchorsEqual } from "./rootAnchor";
 
@@ -325,7 +325,7 @@ export function getChildNodes(
 type RefTargetInfo = {
   stack: ID[];
   author: PublicKey;
-  rootRelation?: LongID;
+  rootNodeId?: LongID;
   scrollToId?: string;
 };
 
@@ -341,7 +341,7 @@ export function getNodeRouteTargetInfo(
   return {
     stack: getNodeStack(knowledgeDBs, node),
     author: node.author,
-    rootRelation: node.id,
+    rootNodeId: node.id,
   };
 }
 
@@ -362,7 +362,7 @@ export function getRefTargetInfo(
   return {
     stack,
     author: relation.author,
-    rootRelation: relation.id,
+    rootNodeId: relation.id,
   };
 }
 
@@ -394,7 +394,7 @@ export function getRefLinkTargetInfo(
   return {
     stack: getNodeStack(knowledgeDBs, targetRoot),
     author: targetRoot.author,
-    rootRelation: targetRoot.id,
+    rootNodeId: targetRoot.id,
     scrollToId: targetRoot.id === relation.id ? undefined : relation.id,
   };
 }
@@ -435,7 +435,7 @@ export function getSearchRelations(
   asRefs: boolean = false
 ): { relation: GraphNode; childNodes: List<GraphNode> } {
   const rel = {
-    ...newRelations("", List<ID>(), myself),
+    ...newNode("", List<ID>(), myself),
     id: searchId as LongID,
     root: searchId as LongID,
   };

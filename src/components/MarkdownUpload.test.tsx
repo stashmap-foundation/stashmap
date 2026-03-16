@@ -1,5 +1,5 @@
 import { List } from "immutable";
-import { newRelations, ViewPath } from "../ViewContext";
+import { newNode, ViewPath } from "../ViewContext";
 import { execute } from "../executor";
 import { createPlan, planUpsertRelations } from "../planner";
 import { processEvents } from "../eventProcessing";
@@ -21,8 +21,8 @@ Python is a programming language
 async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
   const wsID = joinID(alice().user.publicKey, "my-first-workspace");
   const workspaceText = "my-first-workspace";
-  const workspaceRelation: GraphNode = {
-    ...newRelations(
+  const workspaceNode: GraphNode = {
+    ...newNode(
       workspaceText,
       List(),
       alice().user.publicKey,
@@ -31,13 +31,13 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
     id: wsID,
     root: shortID(wsID) as ID,
   };
-  const basePlan = planUpsertRelations(createPlan(alice()), workspaceRelation);
-  const workspacePath: ViewPath = [0, workspaceRelation.id];
+  const basePlan = planUpsertRelations(createPlan(alice()), workspaceNode);
+  const workspacePath: ViewPath = [0, workspaceNode.id];
   const plan = planPasteMarkdownTrees(
     basePlan,
     parseMarkdownHierarchy(TEST_FILE),
     workspacePath,
-    [workspaceRelation.text as ID],
+    [workspaceNode.text as ID],
     0
   );
 

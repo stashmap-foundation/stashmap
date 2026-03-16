@@ -138,7 +138,7 @@ function BreadcrumbItem({
 type BreadcrumbTarget = {
   stack: ID[];
   author: PublicKey;
-  rootRelation?: LongID;
+  rootNodeId?: LongID;
   scrollToId?: string;
 };
 
@@ -207,14 +207,14 @@ function resolveRelationFromSegments(
 
 function resolveRelationFromRootStack(
   knowledgeDBs: KnowledgeDBs,
-  rootRelation: GraphNode,
+  rootNode: GraphNode,
   semanticStack: ID[]
 ): GraphNode | undefined {
   if (semanticStack.length === 0) {
     return undefined;
   }
   const treeRoot =
-    getStandaloneRootRelation(knowledgeDBs, rootRelation) || rootRelation;
+    getStandaloneRootRelation(knowledgeDBs, rootNode) || rootNode;
   const rootSemanticID = shortID(getSemanticID(knowledgeDBs, treeRoot));
   const pathWithoutRoot =
     shortID(semanticStack[0]) === rootSemanticID
@@ -265,7 +265,7 @@ function createRelationBreadcrumbEntry(
     target: {
       stack: getNodeStack(knowledgeDBs, relation),
       author: relation.author,
-      rootRelation: relation.id,
+      rootNodeId: relation.id,
     },
   };
 }
@@ -310,12 +310,12 @@ function buildAnchoredLineageEntries(
     }
   }
 
-  const sourceRelation = getLiveAnchorSourceRelation(knowledgeDBs, relation);
-  if (sourceRelation) {
+  const sourceNode = getLiveAnchorSourceRelation(knowledgeDBs, relation);
+  if (sourceNode) {
     return [
       ...buildAnchoredLineageEntries(
         knowledgeDBs,
-        sourceRelation,
+        sourceNode,
         nextSeen
       ).slice(0, -1),
       createRelationBreadcrumbEntry(knowledgeDBs, relation),
@@ -333,27 +333,24 @@ function SourceButton(): JSX.Element | null {
   const pane = useCurrentPane();
   const { setPane } = useSplitPanes();
   const paneHistory = usePaneHistory();
-  const rootRelation = pane.rootRelation
-    ? getNode(knowledgeDBs, pane.rootRelation, user.publicKey)
+  const rootNode = pane.rootNodeId
+    ? getNode(knowledgeDBs, pane.rootNodeId, user.publicKey)
     : undefined;
 
-  if (!rootRelation?.anchor) {
+  if (!rootNode?.anchor) {
     return null;
   }
 
-  const sourceRelation = getLiveAnchorSourceRelation(
-    knowledgeDBs,
-    rootRelation
-  );
-  if (!sourceRelation) {
+  const sourceNode = getLiveAnchorSourceRelation(knowledgeDBs, rootNode);
+  if (!sourceNode) {
     return null;
   }
 
   const target: Pane = {
     ...pane,
-    stack: getNodeStack(knowledgeDBs, sourceRelation),
-    author: sourceRelation.author,
-    rootRelation: sourceRelation.id,
+    stack: getNodeStack(knowledgeDBs, sourceNode),
+    author: sourceNode.author,
+    rootNodeId: sourceNode.id,
     scrollToId: undefined,
   };
 
@@ -383,21 +380,21 @@ function Breadcrumbs(): JSX.Element {
   const paneHistory = usePaneHistory();
   const currentRelation = useCurrentNode();
   const visibleStack = stack.filter((id) => !isSearchId(id as ID));
-  const rootRelation = pane.rootRelation
-    ? getNode(knowledgeDBs, pane.rootRelation, user.publicKey)
+  const rootNode = pane.rootNodeId
+    ? getNode(knowledgeDBs, pane.rootNodeId, user.publicKey)
     : currentRelation;
   const anchoredEntries = (() => {
-    if (!rootRelation?.anchor) {
+    if (!rootNode?.anchor) {
       return undefined;
     }
 
     const sourceEntries: BreadcrumbEntry[] = buildAnchoredLineageEntries(
       knowledgeDBs,
-      rootRelation
+      rootNode
     )
       .slice(0, -1)
       .map((entry) => ({ ...entry, isSource: true }));
-    const anchorPrefix = rootRelation.anchor.snapshotContext;
+    const anchorPrefix = rootNode.anchor.snapshotContext;
     const localStack = visibleStack.slice(anchorPrefix.size);
     const localEntries: BreadcrumbEntry[] = localStack.map(
       (semanticID, index) => {
@@ -405,20 +402,20 @@ function Breadcrumbs(): JSX.Element {
           ...anchorPrefix.toArray(),
           ...localStack.slice(0, index + 1),
         ] as ID[];
-        const localRelation = resolveRelationFromRootStack(
+        const localNode = resolveRelationFromRootStack(
           knowledgeDBs,
-          rootRelation,
+          rootNode,
           localStack.slice(0, index + 1) as ID[]
         );
         const entry: BreadcrumbEntry = {
-          key: `local:${pane.rootRelation}:${nextTargetStack.join(":")}`,
-          label: localRelation
-            ? getBreadcrumbLabel(knowledgeDBs, localRelation)
+          key: `local:${pane.rootNodeId}:${nextTargetStack.join(":")}`,
+          label: localNode
+            ? getBreadcrumbLabel(knowledgeDBs, localNode)
             : shortID(semanticID as ID),
           target: {
             stack: nextTargetStack,
             author: pane.author,
-            ...(localRelation ? { rootRelation: localRelation.id } : {}),
+            ...(localNode ? { rootNodeId: localNode.id } : {}),
           },
         };
         return entry;
@@ -430,18 +427,18 @@ function Breadcrumbs(): JSX.Element {
     anchoredEntries ||
     visibleStack.map((semanticID, index) => {
       const targetStack = visibleStack.slice(0, index + 1) as ID[];
-      const targetRelation = rootRelation
-        ? resolveRelationFromRootStack(knowledgeDBs, rootRelation, targetStack)
+      const targetNode = rootNode
+        ? resolveRelationFromRootStack(knowledgeDBs, rootNode, targetStack)
         : undefined;
       return {
         key: `stack:${semanticID}:${index}`,
-        label: targetRelation
-          ? getBreadcrumbLabel(knowledgeDBs, targetRelation)
+        label: targetNode
+          ? getBreadcrumbLabel(knowledgeDBs, targetNode)
           : shortID(semanticID as ID),
         target: {
           stack: targetStack,
           author: pane.author,
-          ...(targetRelation ? { rootRelation: targetRelation.id } : {}),
+          ...(targetNode ? { rootNodeId: targetNode.id } : {}),
         },
       };
     });
@@ -451,8 +448,8 @@ function Breadcrumbs(): JSX.Element {
       {entries.map((entry, index) => {
         const { target } = entry;
         const targetUrl = (() => {
-          if (target?.rootRelation) {
-            return buildRelationUrl(target.rootRelation, target.scrollToId);
+          if (target?.rootNodeId) {
+            return buildRelationUrl(target.rootNodeId, target.scrollToId);
           }
           if (!target) {
             return undefined;
@@ -470,13 +467,13 @@ function Breadcrumbs(): JSX.Element {
           ? (e: React.MouseEvent): void => {
               e.preventDefault();
               paneHistory?.push(pane.id, pane);
-              if (anchoredEntries || target.rootRelation) {
+              if (anchoredEntries || target.rootNodeId) {
                 setPane({
                   ...pane,
                   stack: target.stack,
                   author: target.author,
-                  ...(target.rootRelation
-                    ? { rootRelation: target.rootRelation }
+                  ...(target.rootNodeId
+                    ? { rootNodeId: target.rootNodeId }
                     : {}),
                   scrollToId: target.scrollToId,
                 });
@@ -514,10 +511,10 @@ function ForkButton(): JSX.Element | null {
     return null;
   }
 
-  const rootRelationId = currentPane.rootRelation || currentRelation?.root;
-  const isAtRoot = !!currentRelation && currentRelation.id === rootRelationId;
+  const rootNodeId = currentPane.rootNodeId || currentRelation?.root;
+  const isAtRoot = !!currentRelation && currentRelation.id === rootNodeId;
 
-  if (!rootRelationId) {
+  if (!rootNodeId) {
     return null;
   }
 
@@ -527,7 +524,7 @@ function ForkButton(): JSX.Element | null {
   };
 
   if (!isAtRoot) {
-    const href = buildRelationUrl(rootRelationId);
+    const href = buildRelationUrl(rootNodeId);
     return (
       <a
         href={href}

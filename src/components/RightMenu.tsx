@@ -16,11 +16,11 @@ import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 import { usePlanner, planUpsertContact, planRemoveContact } from "../planner";
 import { preventEditorBlur } from "./AddNode";
-import { getRelationUserPublicKey } from "../userEntries";
+import { getNodeUserPublicKey } from "../userEntry";
 import { decodePublicKeyInputSync } from "../nostrPublicKeys";
 
 function useCurrentUserEntryPublicKey(): PublicKey | undefined {
-  return getRelationUserPublicKey(useCurrentNode());
+  return getNodeUserPublicKey(useCurrentNode());
 }
 
 function FollowUserEntryButton(): JSX.Element | null {

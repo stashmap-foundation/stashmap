@@ -118,7 +118,7 @@ function getInitialPanes(publicKey: PublicKey): Pane[] {
         id: generatePaneId(),
         stack: [],
         author: relationAuthor,
-        rootRelation: relationID,
+        rootNodeId: relationID,
       },
     ];
   }
@@ -393,8 +393,8 @@ function Data({ user, children }: DataProps): JSX.Element {
           extraAuthors={[
             ...new globalThis.Set(
               panes.flatMap((pane) =>
-                pane.rootRelation
-                  ? [pane.author, splitID(pane.rootRelation)[0] || pane.author]
+                pane.rootNodeId
+                  ? [pane.author, splitID(pane.rootNodeId)[0] || pane.author]
                   : [pane.author]
               )
             ),

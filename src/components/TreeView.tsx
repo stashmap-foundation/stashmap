@@ -70,7 +70,7 @@ export function PaneTreeResultProvider({
       viewPath,
       stack,
       List<ViewPath>(),
-      pane.rootRelation,
+      pane.rootNodeId,
       pane.author,
       pane.typeFilters
     );
@@ -78,7 +78,7 @@ export function PaneTreeResultProvider({
     data,
     isRootExpanded,
     pane.author,
-    pane.rootRelation,
+    pane.rootNodeId,
     pane.typeFilters,
     stack,
     viewPath,

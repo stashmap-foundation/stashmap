@@ -136,7 +136,7 @@ declare global {
     id: string;
     stack: ID[];
     author: PublicKey;
-    rootRelation?: ID;
+    rootNodeId?: ID;
     searchQuery?: string;
     typeFilters?: (
       | Relevance

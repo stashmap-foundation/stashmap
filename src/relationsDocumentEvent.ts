@@ -105,40 +105,40 @@ function serializeRelationItems(
 
 export function buildDocumentEventFromNodes(
   knowledgeDBs: KnowledgeDBs,
-  rootRelation: GraphNode,
+  rootNode: GraphNode,
   options?: {
     snapshotDTag?: string;
   }
 ): UnsignedEvent {
-  const rootText = getSerializableRelationText(knowledgeDBs, rootRelation);
-  const rootUuid = shortID(rootRelation.id);
+  const rootText = getSerializableRelationText(knowledgeDBs, rootNode);
+  const rootUuid = shortID(rootNode.id);
   const serialized = serializeRelationItems(
     knowledgeDBs,
-    rootRelation.author,
-    rootRelation.children,
+    rootNode.author,
+    rootNode.children,
     0,
     {
       lines: [],
     }
   );
-  const systemRoleTags = rootRelation.systemRole
-    ? ([["s", rootRelation.systemRole]] as string[][])
+  const systemRoleTags = rootNode.systemRole
+    ? ([["s", rootNode.systemRole]] as string[][])
     : [];
 
   return {
     kind: KIND_KNOWLEDGE_DOCUMENT,
-    pubkey: rootRelation.author,
+    pubkey: rootNode.author,
     created_at: newTimestamp(),
     tags: [["d", rootUuid], ...systemRoleTags, msTag()],
     content: `${[
       formatRootHeading(
         rootText,
         rootUuid,
-        rootRelation.basedOn,
-        options?.snapshotDTag ?? rootRelation.snapshotDTag,
-        rootRelation.anchor ??
-          createRootAnchor(getNodeContext(knowledgeDBs, rootRelation)),
-        rootRelation.systemRole
+        rootNode.basedOn,
+        options?.snapshotDTag ?? rootNode.snapshotDTag,
+        rootNode.anchor ??
+          createRootAnchor(getNodeContext(knowledgeDBs, rootNode)),
+        rootNode.systemRole
       ),
       ...serialized.lines,
     ].join("\n")}\n`,

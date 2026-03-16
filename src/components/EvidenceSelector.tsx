@@ -9,7 +9,7 @@ import {
   useDisplayText,
   useViewKey,
   useCurrentEdge,
-  useVirtualItemsMap,
+  useVirtualRowsMap,
 } from "../ViewContext";
 import { usePlanner } from "../planner";
 import { usePaneStack } from "../SplitPanesContext";
@@ -49,8 +49,8 @@ function getArgumentLabel(argument: Argument): string {
 
 export function EvidenceSelector(): JSX.Element | null {
   const { currentArgument, isVisible } = useUpdateArgument();
-  const nodeItem = useCurrentEdge();
-  const virtualType = nodeItem?.virtualType;
+  const currentRow = useCurrentEdge();
+  const virtualType = currentRow?.virtualType;
   const isAcceptableVirtual =
     virtualType === "incoming" || virtualType === "version";
   const viewPath = useViewPath();
@@ -62,12 +62,12 @@ export function EvidenceSelector(): JSX.Element | null {
   const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
   const { selection } = useTemporaryView();
-  const virtualItemsMap = useVirtualItemsMap();
+  const virtualRowsMap = useVirtualRowsMap();
 
   if (!isVisible && !isAcceptableVirtual) return null;
 
   const nodeName =
-    editorText.trim() || versionedDisplayText || currentNode?.text || "item";
+    editorText.trim() || versionedDisplayText || currentNode?.text || "row";
 
   const isInSelection = selection.has(viewKey) && selection.size > 1;
 
@@ -85,7 +85,7 @@ export function EvidenceSelector(): JSX.Element | null {
         getActionPaths(),
         stack,
         nextArgument,
-        virtualItemsMap,
+        virtualRowsMap,
         getEditorInfo()
       )
     );

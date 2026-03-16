@@ -14,7 +14,7 @@ import {
   getRowIDFromView,
   isExpanded,
   useDisplayText,
-  VirtualItemsProvider,
+  VirtualRowsProvider,
   getLast,
 } from "../ViewContext";
 import { useData } from "../DataContext";
@@ -254,7 +254,7 @@ function Tree(): JSX.Element | null {
   const [keyboardMode, setKeyboardMode] = useKeyboardMode();
   const treeResult = usePaneTreeResult();
   const childNodes = treeResult?.paths || List<ViewPath>();
-  const virtualItems = treeResult?.virtualItems || Map<string, GraphNode>();
+  const virtualRows = treeResult?.virtualRows || Map<string, GraphNode>();
   const firstVirtualKeys =
     treeResult?.firstVirtualKeys || ImmutableSet<string>();
   // Include ROOT as the first node, followed by its children
@@ -388,7 +388,7 @@ function Tree(): JSX.Element | null {
   };
 
   return (
-    <VirtualItemsProvider value={virtualItems}>
+    <VirtualRowsProvider value={virtualRows}>
       <div
         ref={treeRootRef}
         data-keyboard-mode={keyboardMode}
@@ -409,7 +409,7 @@ function Tree(): JSX.Element | null {
           firstVirtualKeys={firstVirtualKeys}
         />
       </div>
-    </VirtualItemsProvider>
+    </VirtualRowsProvider>
   );
 }
 

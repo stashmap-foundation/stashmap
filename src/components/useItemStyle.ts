@@ -43,8 +43,8 @@ function isReferenceVirtualType(virtualType: VirtualType | undefined): boolean {
 
 export function useItemStyle(): ItemStyle {
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
-  const currentItem = useCurrentEdge();
-  const virtualType = currentItem?.virtualType;
+  const currentRow = useCurrentEdge();
+  const virtualType = currentRow?.virtualType;
 
   if (virtualType === "suggestion" || isViewingOtherUserContent) {
     return {
@@ -64,11 +64,11 @@ export function useItemStyle(): ItemStyle {
     };
   }
 
-  const relevance = currentItem?.relevance;
-  const argument = currentItem?.argument;
+  const relevance = currentRow?.relevance;
+  const argument = currentRow?.argument;
   const normalizedRelevance =
     relevance === ("" as string) ? undefined : relevance;
-  const isOutgoingRef = isRefNode(currentItem);
+  const isOutgoingRef = isRefNode(currentRow);
 
   return {
     cardStyle: {},

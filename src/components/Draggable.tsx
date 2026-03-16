@@ -67,10 +67,10 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
   ): JSX.Element => {
     const path = useViewPath();
     const isNodeBeeingEdited = useIsEditingOn();
-    const [itemID] = useCurrentRowID();
+    const [rowID] = useCurrentRowID();
     const node = useCurrentNode();
     const displayText = useDisplayText();
-    const isEmptyNode = isEmptySemanticID(itemID);
+    const isEmptyNode = isEmptySemanticID(rowID);
     const disableDrag = isNodeBeeingEdited || isEmptyNode;
 
     const [{ isDragging }, drag, preview] = useDrag({
@@ -121,7 +121,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
         data-view-key={rowViewKey}
         data-row-index={rowIndex}
         data-row-depth={rowDepth}
-        data-node-id={itemID}
+        data-node-id={rowID}
         data-node-text={displayText}
         data-node-mutable={isEditableNode(node) ? "true" : "false"}
         data-selected={isSelected ? "true" : undefined}
@@ -166,7 +166,7 @@ function DraggableSuggestion({
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const path = useViewPath();
-  const currentItem = useCurrentEdge();
+  const currentRow = useCurrentEdge();
   const node = useCurrentNode();
   const displayText = useDisplayText();
 
@@ -179,7 +179,7 @@ function DraggableSuggestion({
         text: displayText,
         isSuggestion: true,
         nodeId: node?.id,
-        targetId: currentItem?.targetID || undefined,
+        targetId: currentRow?.targetID || undefined,
       };
     },
     collect: (monitor) => ({
@@ -221,7 +221,7 @@ function DraggableSuggestion({
       data-view-key={rowViewKey}
       data-row-index={rowIndex}
       data-row-depth={rowDepth}
-      data-node-id={currentItem?.id || node?.id}
+      data-node-id={currentRow?.id || node?.id}
       data-node-text={displayText}
       data-node-mutable={isEditableNode(node) ? "true" : "false"}
       data-selected={isSelected ? "true" : undefined}
@@ -266,7 +266,7 @@ export function ListItem({
   const ref = useRef<HTMLDivElement>(null);
   const viewKey = useViewKey();
   const viewPath = useViewPath();
-  const [itemID] = useCurrentRowID();
+  const [rowID] = useCurrentRowID();
   const virtualType = useCurrentEdge()?.virtualType;
   const isSuggestion = virtualType === "suggestion";
   const isCopyDrag = virtualType === "incoming" || virtualType === "version";
@@ -275,7 +275,7 @@ export function ListItem({
   const selected = useIsSelected();
   const rowDepth = viewPath.length - 1;
   const isActiveRow = activeRowKey === viewKey;
-  const isEmptyNode = isEmptySemanticID(itemID);
+  const isEmptyNode = isEmptySemanticID(rowID);
 
   const isReadonly = isInSearchView || isViewingOtherUserContent;
 

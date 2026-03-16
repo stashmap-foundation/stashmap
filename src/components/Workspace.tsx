@@ -9,7 +9,7 @@ import {
   getDisplayTextForView,
   parseViewPath,
   ViewPath,
-  VirtualItemsMap,
+  VirtualRowsMap,
   viewPathToString,
   useCurrentNode,
   useDisplayText,
@@ -80,7 +80,7 @@ import {
   planBatchArgument,
   planBatchIndent,
   planBatchOutdent,
-  getCurrentItem,
+  getCurrentRow,
 } from "./batchOperations";
 import { planDeleteNodeFromView } from "../treeMutations";
 
@@ -994,8 +994,8 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         .toArray(),
     [viewPath, treeResult]
   );
-  const virtualItemsMap: VirtualItemsMap =
-    treeResult?.virtualItems || Map<string, GraphNode>();
+  const virtualRowsMap: VirtualRowsMap =
+    treeResult?.virtualRows || Map<string, GraphNode>();
 
   const switchPane = (direction: -1 | 1): void => {
     const root = wrapperRef.current;
@@ -1531,13 +1531,11 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       const paths = keys.map(parseViewPath);
       const activeViewPath = parseViewPath(getRowKey(activeRow));
       const targetRelevance = SYMBOL_TO_RELEVANCE[e.key];
-      const currentItem = getCurrentItem(plan, activeViewPath, virtualItemsMap);
+      const currentRow = getCurrentRow(plan, activeViewPath, virtualRowsMap);
       const relevance =
-        currentItem?.relevance === targetRelevance
-          ? undefined
-          : targetRelevance;
+        currentRow?.relevance === targetRelevance ? undefined : targetRelevance;
       executePlan(
-        planBatchRelevance(plan, paths, stack, relevance, virtualItemsMap)
+        planBatchRelevance(plan, paths, stack, relevance, virtualRowsMap)
       );
       refocusPaneAfterRowMutation(root);
       return;
@@ -1554,11 +1552,11 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         if (e.key === "-") return "contra" as const;
         return undefined;
       })();
-      const currentItem = getCurrentItem(plan, activeViewPath, virtualItemsMap);
+      const currentRow = getCurrentRow(plan, activeViewPath, virtualRowsMap);
       const argument: Argument =
-        currentItem?.argument === targetArgument ? undefined : targetArgument;
+        currentRow?.argument === targetArgument ? undefined : targetArgument;
       executePlan(
-        planBatchArgument(plan, paths, stack, argument, virtualItemsMap)
+        planBatchArgument(plan, paths, stack, argument, virtualRowsMap)
       );
       refocusPaneAfterRowMutation(root);
       return;

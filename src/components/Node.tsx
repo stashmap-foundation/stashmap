@@ -74,7 +74,7 @@ function useNodeHasChildren(): boolean {
   const viewPath = useViewPath();
   const stack = usePaneStack();
   const pane = useCurrentPane();
-  const currentItem = useCurrentEdge();
+  const currentRow = useCurrentEdge();
   const currentNode = useCurrentNode();
   useEffectiveAuthor();
 
@@ -84,8 +84,8 @@ function useNodeHasChildren(): boolean {
     }
   }
 
-  if (currentItem && isRefNode(currentItem)) {
-    const targetNode = resolveNode(data.knowledgeDBs, currentItem);
+  if (currentRow && isRefNode(currentRow)) {
+    const targetNode = resolveNode(data.knowledgeDBs, currentRow);
     if (targetNode?.children.size) {
       return true;
     }
@@ -109,11 +109,11 @@ function getLevels(viewPath: ViewPath): number {
 }
 
 function ExpandCollapseToggle(): JSX.Element | null {
-  const [itemID] = useCurrentRowID();
+  const [rowID] = useCurrentRowID();
   const displayText = useDisplayText();
   const onToggleExpanded = useOnToggleExpanded();
   const isExpanded = useIsExpanded();
-  const isEmptyNode = isEmptySemanticID(itemID);
+  const isEmptyNode = isEmptySemanticID(rowID);
   const onToggle = (): void => {
     if (isEmptyNode) return;
     onToggleExpanded(!isExpanded);
@@ -189,8 +189,8 @@ function ReferenceContent({
 }: {
   reference: ReferenceRow;
 }): JSX.Element {
-  const nodeItem = useCurrentEdge();
-  const virtualType = nodeItem?.virtualType;
+  const currentRow = useCurrentEdge();
+  const virtualType = currentRow?.virtualType;
 
   if (virtualType === "version" || reference.versionMeta) {
     return <VersionContent reference={reference} />;
@@ -211,14 +211,14 @@ function NodeContent(): JSX.Element {
   const data = useData();
   const viewPath = useViewPath();
   const stack = usePaneStack();
-  const currentItem = useCurrentEdge();
-  const virtualType = currentItem?.virtualType;
+  const currentRow = useCurrentEdge();
+  const virtualType = currentRow?.virtualType;
   const reference = getCurrentReferenceForView(
     data,
     viewPath,
     stack,
     virtualType,
-    currentItem
+    currentRow
   );
   const displayText = useDisplayText();
 
@@ -236,14 +236,14 @@ function EditableContent(): JSX.Element {
   const data = useData();
   const { createPlan, executePlan } = usePlanner();
   const currentNode = useCurrentNode();
-  const [itemID] = useCurrentRowID();
+  const [rowID] = useCurrentRowID();
   const displayText = useDisplayText();
   const prevSibling = usePreviousSibling();
   const parentPath = getParentView(viewPath);
   const viewIsExpanded = useIsExpanded();
   const nodeIsRoot = useIsRoot();
   const nodeIndex = useNodeIndex();
-  const isEmptyNode = isEmptySemanticID(itemID);
+  const isEmptyNode = isEmptySemanticID(rowID);
   const nodeHasChildren = useNodeHasChildren();
   const nodeIsExpanded = viewIsExpanded && nodeHasChildren;
 
@@ -512,20 +512,20 @@ function InteractiveNodeContent(): JSX.Element {
   const viewPath = useViewPath();
   const stack = usePaneStack();
   const currentNode = useCurrentNode();
-  const [itemID] = useCurrentRowID();
+  const [rowID] = useCurrentRowID();
   const isLoading = useNodeIsLoading();
   const isInSearchView = useIsInSearchView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
-  const currentItem = useCurrentEdge();
-  const virtualType = currentItem?.virtualType;
-  const isEmptyNode = isEmptySemanticID(itemID);
+  const currentRow = useCurrentEdge();
+  const virtualType = currentRow?.virtualType;
+  const isEmptyNode = isEmptySemanticID(rowID);
   const displayText = useDisplayText();
   const reference = getCurrentReferenceForView(
     data,
     viewPath,
     stack,
     virtualType,
-    currentItem
+    currentRow
   );
 
   const isReadonly =
@@ -564,14 +564,14 @@ function NodeAutoLink({
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();
   const effectiveAuthor = useEffectiveAuthor();
-  const currentItem = useCurrentEdge();
-  const virtualType = currentItem?.virtualType;
+  const currentRow = useCurrentEdge();
+  const virtualType = currentRow?.virtualType;
   const node = getCurrentReferenceForView(
     data,
     viewPath,
     stack,
     virtualType,
-    currentItem
+    currentRow
   );
 
   if (node) {
@@ -719,9 +719,9 @@ export function Node({
   const { user } = useData();
   const data = useData();
   const stack = usePaneStack();
-  const currentItem = useCurrentEdge();
-  const isConcreteRef = isRefNode(currentItem);
-  const virtualType = currentItem?.virtualType;
+  const currentRow = useCurrentEdge();
+  const isConcreteRef = isRefNode(currentRow);
+  const virtualType = currentRow?.virtualType;
   const currentNode = useCurrentNode();
   const isViewingOtherUser = useIsViewingOtherUserContent();
   const node = getCurrentReferenceForView(
@@ -729,7 +729,7 @@ export function Node({
     viewPath,
     stack,
     virtualType,
-    currentItem
+    currentRow
   );
   const userEntryPublicKey = getNodeUserPublicKey(currentNode);
   const isFollowingUserEntry =

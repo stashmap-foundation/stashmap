@@ -13,7 +13,7 @@ import {
   getRowIDFromView,
   viewPathToString,
   ViewPath,
-  VirtualItemsMap,
+  VirtualRowsMap,
 } from "./ViewContext";
 import {
   Plan,
@@ -49,15 +49,15 @@ export function planUpdateViewItemMetadata(
   stack: ID[],
   metadata: NodeItemMetadata,
   editorText: string,
-  virtualItemsMap?: VirtualItemsMap
+  virtualRowsMap?: VirtualRowsMap
 ): Plan {
-  const [itemID] = getRowIDFromView(plan, viewPath);
+  const [rowID] = getRowIDFromView(plan, viewPath);
   const parentView = getParentView(viewPath);
   if (!parentView) {
     return plan;
   }
 
-  if (isEmptySemanticID(itemID)) {
+  if (isEmptySemanticID(rowID)) {
     const trimmed = editorText.trim();
     if (trimmed) {
       return planSaveNodeAndEnsureNodes(
@@ -75,11 +75,11 @@ export function planUpdateViewItemMetadata(
 
   const nodeIndex = getNodeIndexForView(plan, viewPath);
   if (nodeIndex === undefined) {
-    const virtualItem = virtualItemsMap?.get(viewPathToString(viewPath));
-    if (!virtualItem) {
+    const virtualRow = virtualRowsMap?.get(viewPathToString(viewPath));
+    if (!virtualRow) {
       return plan;
     }
-    if (virtualItem.virtualType === "suggestion" && !isRefNode(virtualItem)) {
+    if (virtualRow.virtualType === "suggestion" && !isRefNode(virtualRow)) {
       return planDeepCopyNode(
         plan,
         viewPath,
@@ -90,8 +90,8 @@ export function planUpdateViewItemMetadata(
         metadata.argument
       )[0];
     }
-    const targetID = virtualItem.targetID || undefined;
-    const targetItem = targetID ? createRefTarget(targetID) : itemID;
+    const targetID = virtualRow.targetID || undefined;
+    const targetItem = targetID ? createRefTarget(targetID) : rowID;
     const inheritedSourceNode = targetID
       ? getNode(plan.knowledgeDBs, targetID, plan.user.publicKey)
       : undefined;

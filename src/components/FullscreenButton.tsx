@@ -20,21 +20,21 @@ import { buildNodeRouteUrl } from "../navigationUrl";
 export function FullscreenButton(): JSX.Element | null {
   const stack = usePaneStack();
   const viewPath = useViewPath();
-  const [itemID] = useCurrentRowID();
+  const [rowID] = useCurrentRowID();
   const data = useData();
   const { knowledgeDBs } = data;
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();
   const effectiveAuthor = useEffectiveAuthor();
   const node = useCurrentNode();
-  const currentItem = useCurrentEdge();
-  const virtualType = currentItem?.virtualType;
+  const currentRow = useCurrentEdge();
+  const virtualType = currentRow?.virtualType;
   const currentReference = getCurrentReferenceForView(
     data,
     viewPath,
     stack,
     virtualType,
-    currentItem
+    currentRow
   );
   const isFullscreenNode = viewPath.length === 2;
   if (isFullscreenNode) {
@@ -46,7 +46,7 @@ export function FullscreenButton(): JSX.Element | null {
       if (isRefNode(node)) {
         return getRefLinkTargetInfo(node.id, knowledgeDBs, effectiveAuthor);
       }
-      return getRefTargetInfo(itemID, knowledgeDBs, effectiveAuthor);
+      return getRefTargetInfo(rowID, knowledgeDBs, effectiveAuthor);
     }
     return virtualType === "version"
       ? getRefTargetInfo(currentReference.id, knowledgeDBs, effectiveAuthor)

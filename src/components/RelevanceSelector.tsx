@@ -14,7 +14,7 @@ import {
   useCurrentNode,
   useDisplayText,
   useViewKey,
-  useVirtualItemsMap,
+  useVirtualRowsMap,
 } from "../ViewContext";
 import { usePlanner } from "../planner";
 import { usePaneStack } from "../SplitPanesContext";
@@ -77,7 +77,7 @@ export function RelevanceSelector({
   const viewKey = useViewKey();
   const currentNode = useCurrentNode();
   const stack = usePaneStack();
-  const virtualItemsMap = useVirtualItemsMap();
+  const virtualRowsMap = useVirtualRowsMap();
   const { createPlan, executePlan } = usePlanner();
   const parentPath = getParentView(viewPath);
   const { selection } = useTemporaryView();
@@ -115,7 +115,7 @@ export function RelevanceSelector({
         getActionPaths(),
         stack,
         relevance,
-        virtualItemsMap,
+        virtualRowsMap,
         getEditorInfo()
       )
     );
@@ -131,7 +131,7 @@ export function RelevanceSelector({
         getActionPaths(),
         stack,
         relevance,
-        virtualItemsMap,
+        virtualRowsMap,
         getEditorInfo()
       )
     );

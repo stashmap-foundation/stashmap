@@ -23,7 +23,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
   const data = useData();
   const isMobile = useMediaQuery(IS_MOBILE);
   const { createPlan, executePlan } = usePlanner();
-  const currentItem = useCurrentEdge();
+  const currentRow = useCurrentEdge();
 
   if (isMobile) {
     return null;
@@ -38,7 +38,7 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
     );
     executePlan(planUpdateViews(plan, shiftedViews));
 
-    const target = buildPaneTarget(data, viewPath, stack, currentItem);
+    const target = buildPaneTarget(data, viewPath, stack, currentRow);
     addPaneAt(
       insertIndex,
       target.stack,

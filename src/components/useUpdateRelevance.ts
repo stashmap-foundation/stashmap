@@ -64,16 +64,16 @@ type UseUpdateRelevanceResult = {
 };
 
 /**
- * Hook for updating item relevance.
+ * Hook for updating row relevance.
  * Used by RelevanceSelector.
  */
 export function useUpdateRelevance(): UseUpdateRelevanceResult {
   const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
-  const { isVisible, nodeText, currentItem, viewPath, updateMetadata } =
+  const { isVisible, nodeText, currentRow, viewPath, updateMetadata } =
     useNodeItemContext();
 
-  const rawRelevance = currentItem?.relevance;
+  const rawRelevance = currentRow?.relevance;
   const currentRelevance: Relevance =
     (rawRelevance as string) === "" ? undefined : rawRelevance;
   const currentLevel = relevanceToLevel(currentRelevance);

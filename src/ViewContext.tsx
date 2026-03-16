@@ -41,18 +41,18 @@ export function useViewPath(): ViewPath {
   return context;
 }
 
-export type VirtualItemsMap = Map<string, GraphNode>;
+export type VirtualRowsMap = Map<string, GraphNode>;
 
-const VirtualItemsContext = React.createContext<VirtualItemsMap>(
+const VirtualRowsContext = React.createContext<VirtualRowsMap>(
   Map<string, GraphNode>()
 );
 
 const EMPTY_VIEW_PATH_PREFIX = "empty-row:";
 
-export const VirtualItemsProvider = VirtualItemsContext.Provider;
+export const VirtualRowsProvider = VirtualRowsContext.Provider;
 
-export function useVirtualItemsMap(): VirtualItemsMap {
-  return React.useContext(VirtualItemsContext);
+export function useVirtualRowsMap(): VirtualRowsMap {
+  return React.useContext(VirtualRowsContext);
 }
 
 // Encode path IDs to handle colons in ref IDs (ref:ctx:target format)
@@ -153,8 +153,8 @@ export function getContext(
   if (parentNode) {
     return parentContext.push(getSemanticID(data.knowledgeDBs, parentNode));
   }
-  const [parentItemID] = getRowIDFromView(data, parentPath);
-  return parentContext.push(shortID(parentItemID as ID) as ID);
+  const [parentRowID] = getRowIDFromView(data, parentPath);
+  return parentContext.push(shortID(parentRowID as ID) as ID);
 }
 
 function getViewExactMatch(views: Views, path: ViewPath): View | undefined {
@@ -173,9 +173,9 @@ function getDefaultView(id: ID, isRootNode: boolean): View {
 }
 
 function getViewFromPath(data: Data, path: ViewPath): View {
-  const itemID = getRowIDFromPath(data, path);
+  const rowID = getRowIDFromPath(data, path);
   return (
-    getViewExactMatch(data.views, path) || getDefaultView(itemID, isRoot(path))
+    getViewExactMatch(data.views, path) || getDefaultView(rowID, isRoot(path))
   );
 }
 
@@ -262,7 +262,7 @@ export function getNodeForView(
     return undefined;
   }
 
-  const [itemID] = getRowIDFromView(data, viewPath);
+  const [rowID] = getRowIDFromView(data, viewPath);
   const semanticContext = getContext(data, viewPath, stack);
   const pane = getPane(data, viewPath);
   const parentRoot = getParentNode(data, viewPath)?.root;
@@ -271,7 +271,7 @@ export function getNodeForView(
   return resolveSemanticNodeInCurrentTree(
     data.knowledgeDBs,
     author,
-    itemID,
+    rowID,
     semanticContext,
     pane.rootNodeId,
     isRoot(viewPath),
@@ -283,16 +283,16 @@ export function buildPaneTarget(
   data: Data,
   viewPath: ViewPath,
   paneStack: ID[],
-  currentItem?: GraphNode
+  currentRow?: GraphNode
 ): {
   stack: ID[];
   author: PublicKey;
   rootNodeId?: LongID;
   scrollToId?: string;
 } {
-  const [itemID] = getRowIDFromView(data, viewPath);
+  const [rowID] = getRowIDFromView(data, viewPath);
   const effectiveAuthor = getEffectiveAuthor(data, viewPath);
-  const currentEdge = currentItem || getCurrentEdgeForView(data, viewPath);
+  const currentEdge = currentRow || getCurrentEdgeForView(data, viewPath);
   const virtualType = currentEdge?.virtualType;
   const currentNode = getNodeForView(data, viewPath, paneStack);
   const currentReference = getCurrentReferenceForView(
@@ -318,7 +318,7 @@ export function buildPaneTarget(
           effectiveAuthor
         );
       }
-      return getRefTargetInfo(itemID, data.knowledgeDBs, effectiveAuthor);
+      return getRefTargetInfo(rowID, data.knowledgeDBs, effectiveAuthor);
     }
     return virtualType === "version"
       ? getRefTargetInfo(
@@ -363,8 +363,8 @@ export function useSearchDepth(): number | undefined {
     depth: number
   ): number | undefined => {
     if (!currentPath) return undefined;
-    const [itemID] = getRowIDFromView(data, currentPath);
-    if (isSearchId(itemID as ID)) {
+    const [rowID] = getRowIDFromView(data, currentPath);
+    if (isSearchId(rowID as ID)) {
       return depth;
     }
     return loop(getParentView(currentPath), depth + 1);
@@ -382,9 +382,9 @@ export function getCurrentReferenceForView(
   viewPath: ViewPath,
   stack: ID[],
   virtualType?: VirtualType,
-  currentItem?: GraphNode
+  currentRow?: GraphNode
 ): ReferenceRow | undefined {
-  const currentEdge = currentItem || getCurrentEdgeForView(data, viewPath);
+  const currentEdge = currentRow || getCurrentEdgeForView(data, viewPath);
   const currentNode = getNodeForView(data, viewPath, stack);
   let referenceID: LongID | undefined;
   if (isRefNode(currentEdge)) {
@@ -418,13 +418,13 @@ export function addNodeToPathWithNodes(
   nodes: GraphNode,
   index: number
 ): ViewPath {
-  const itemID = nodes.children.get(index);
-  if (itemID === undefined) {
+  const rowID = nodes.children.get(index);
+  if (rowID === undefined) {
     throw new Error("No child node found at index");
   }
   const pathWithNodes = addNodesToLastElement(path, nodes.id);
   const nextSegment =
-    itemID === EMPTY_SEMANTIC_ID ? createEmptyViewPathID(nodes.id) : itemID;
+    rowID === EMPTY_SEMANTIC_ID ? createEmptyViewPathID(nodes.id) : rowID;
   return [...pathWithNodes, nextSegment] as ViewPath;
 }
 
@@ -468,11 +468,11 @@ export function getNodeIndexForView(
   if (!nodes) {
     return undefined;
   }
-  const itemID = getLast(viewPath);
+  const rowID = getLast(viewPath);
   const index = nodes.children.findIndex(
     (childID) =>
-      childID === itemID ||
-      (childID === EMPTY_SEMANTIC_ID && isEmptyViewPathID(itemID))
+      childID === rowID ||
+      (childID === EMPTY_SEMANTIC_ID && isEmptyViewPathID(rowID))
   );
   return index >= 0 ? index : undefined;
 }
@@ -506,20 +506,20 @@ export function getCurrentEdgeForView(
 }
 
 export function useCurrentEdge(): GraphNode | undefined {
-  const virtualItems = React.useContext(VirtualItemsContext);
+  const virtualRows = React.useContext(VirtualRowsContext);
   const data = useData();
   const viewPath = useViewPath();
   const viewKey = viewPathToString(viewPath);
-  const virtualItem = virtualItems.get(viewKey);
-  if (virtualItem) {
-    return virtualItem;
+  const virtualRow = virtualRows.get(viewKey);
+  if (virtualRow) {
+    return virtualRow;
   }
   return getCurrentEdgeForView(data, viewPath);
 }
 
 type SiblingInfo = {
   viewPath: ViewPath;
-  itemID: ID;
+  rowID: ID;
   view: View;
 };
 
@@ -568,10 +568,10 @@ export function getPreviousSibling(
 
   try {
     const prevSiblingPath = addNodeToPath(data, parentPath, prevIndex, stack);
-    const [prevItemID, prevView] = getRowIDFromView(data, prevSiblingPath);
+    const [prevRowID, prevView] = getRowIDFromView(data, prevSiblingPath);
     return {
       viewPath: prevSiblingPath,
-      itemID: prevItemID,
+      rowID: prevRowID,
       view: prevView,
     };
   } catch {
@@ -632,21 +632,21 @@ export function getDisplayTextForView(
   viewPath: ViewPath,
   stack: ID[],
   virtualType?: VirtualType,
-  currentItem?: GraphNode
+  currentRow?: GraphNode
 ): string {
   const reference = getCurrentReferenceForView(
     data,
     viewPath,
     stack,
     virtualType,
-    currentItem
+    currentRow
   );
   if (reference) {
     return reference.text;
   }
-  const [itemID] = getRowIDFromView(data, viewPath);
-  if (isSearchId(itemID as ID)) {
-    const query = parseSearchId(itemID as ID) || "";
+  const [rowID] = getRowIDFromView(data, viewPath);
+  if (isSearchId(rowID as ID)) {
+    const query = parseSearchId(rowID as ID) || "";
     return `Search: ${query}`;
   }
   const ownNode = getNodeForView(data, viewPath, stack);
@@ -664,9 +664,9 @@ export function useDisplayText(): string {
   const data = useData();
   const viewPath = useViewPath();
   const stack = usePaneStack();
-  const currentItem = useCurrentEdge();
-  const virtualType = currentItem?.virtualType;
-  return getDisplayTextForView(data, viewPath, stack, virtualType, currentItem);
+  const currentRow = useCurrentEdge();
+  const virtualType = currentRow?.virtualType;
+  return getDisplayTextForView(data, viewPath, stack, virtualType, currentRow);
 }
 
 export function isExpanded(data: Data, viewKey: string): boolean {
@@ -695,8 +695,8 @@ export function getParentKey(viewKey: string): string {
 
 export function updateView(views: Views, path: ViewPath, view: View): Views {
   const key = viewPathToString(path);
-  const itemID = getLast(path);
-  const defaultView = getDefaultView(itemID, isRoot(path));
+  const rowID = getLast(path);
+  const defaultView = getDefaultView(rowID, isRoot(path));
   const isDefault = view.expanded === defaultView.expanded && !view.typeFilters;
   if (isDefault) {
     return views.delete(key);

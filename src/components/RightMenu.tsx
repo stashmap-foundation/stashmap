@@ -77,7 +77,7 @@ export function RightMenu(): JSX.Element {
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const isInSearchView = useIsInSearchView();
   const userEntryPublicKey = useCurrentUserEntryPublicKey();
-  const [itemID] = useCurrentRowID();
+  const [rowID] = useCurrentRowID();
 
   const isReadonly =
     isRoot || isInSearchView || (isViewingOtherUserContent && !isVirtualItem);
@@ -94,7 +94,7 @@ export function RightMenu(): JSX.Element {
           <EvidenceSelector />
         )}
       </div>
-      {!isEmptySemanticID(itemID) && (
+      {!isEmptySemanticID(rowID) && (
         <div className="action-slot">
           <FollowUserEntryButton />
           <FullscreenButton />

@@ -7,13 +7,13 @@ type UseUpdateArgumentResult = {
 };
 
 /**
- * Hook for updating item argument (confirms/contra/none).
+ * Hook for updating row argument (confirms/contra/none).
  * Used by EvidenceSelector.
  */
 export function useUpdateArgument(): UseUpdateArgumentResult {
-  const { isVisible, currentItem, updateMetadata } = useNodeItemContext();
+  const { isVisible, currentRow, updateMetadata } = useNodeItemContext();
 
-  const currentArgument = currentItem?.argument;
+  const currentArgument = currentRow?.argument;
 
   const setArgument = (argument: Argument): void => {
     updateMetadata({ argument });

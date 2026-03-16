@@ -1,7 +1,7 @@
 import { OrderedSet } from "immutable";
 import {
   ViewPath,
-  VirtualItemsMap,
+  VirtualRowsMap,
   addNodeToPathWithNodes,
   getCurrentEdgeForView,
   getParentKey,
@@ -24,14 +24,14 @@ export type EditorInfo = {
   viewPath: ViewPath;
 };
 
-export function getCurrentItem(
+export function getCurrentRow(
   data: Data,
   viewPath: ViewPath,
-  virtualItemsMap: VirtualItemsMap
+  virtualRowsMap: VirtualRowsMap
 ): GraphNode | undefined {
   return (
     getCurrentEdgeForView(data, viewPath) ||
-    virtualItemsMap.get(viewPathToString(viewPath))
+    virtualRowsMap.get(viewPathToString(viewPath))
   );
 }
 
@@ -66,7 +66,7 @@ function planUpdateOneMetadata(
   stack: ID[],
   metadata: NodeItemMetadata,
   editorText: string,
-  virtualItemsMap: VirtualItemsMap
+  virtualRowsMap: VirtualRowsMap
 ): Plan {
   return planUpdateViewItemMetadata(
     acc,
@@ -74,7 +74,7 @@ function planUpdateOneMetadata(
     stack,
     metadata,
     editorText,
-    virtualItemsMap
+    virtualRowsMap
   );
 }
 
@@ -83,7 +83,7 @@ export function planBatchRelevance(
   viewPaths: ViewPath[],
   stack: ID[],
   relevance: Relevance,
-  virtualItemsMap: VirtualItemsMap,
+  virtualRowsMap: VirtualRowsMap,
   editorInfo?: EditorInfo
 ): Plan {
   const updated = viewPaths.reduce(
@@ -94,7 +94,7 @@ export function planBatchRelevance(
         stack,
         { relevance },
         getEditorTextForPath(editorInfo, viewPath),
-        virtualItemsMap
+        virtualRowsMap
       ),
     plan
   );
@@ -106,7 +106,7 @@ export function planBatchArgument(
   viewPaths: ViewPath[],
   stack: ID[],
   argument: Argument,
-  virtualItemsMap: VirtualItemsMap,
+  virtualRowsMap: VirtualRowsMap,
   editorInfo?: EditorInfo
 ): Plan {
   const updated = viewPaths.reduce(
@@ -117,7 +117,7 @@ export function planBatchArgument(
         stack,
         { argument },
         getEditorTextForPath(editorInfo, viewPath),
-        virtualItemsMap
+        virtualRowsMap
       ),
     plan
   );

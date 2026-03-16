@@ -25,7 +25,7 @@ type NodeItemContext = {
   isVisible: boolean;
   isEmptyNode: boolean;
   nodeText: string;
-  currentItem: GraphNode | undefined;
+  currentRow: GraphNode | undefined;
   // For updating
   viewPath: ViewPath;
   parentView: ViewPath | undefined;
@@ -35,7 +35,7 @@ type NodeItemContext = {
 };
 
 /**
- * Shared hook for node item context.
+ * Shared hook for node row context.
  * Used by useUpdateRelevance and useUpdateArgument.
  * Provides common data and an updateMetadata function that handles:
  * - Empty nodes with text: materialize via planSaveNodeAndEnsureNodes
@@ -52,8 +52,8 @@ export function useNodeItemContext(): NodeItemContext {
   const currentNode = useCurrentNode();
   const parentView = getParentView(viewPath);
 
-  const [itemID] = useCurrentRowID();
-  const isEmptyNode = isEmptySemanticID(itemID);
+  const [rowID] = useCurrentRowID();
+  const isEmptyNode = isEmptySemanticID(rowID);
   const nodeID = parentView
     ? getNodeForView(data, parentView, stack)?.id
     : undefined;
@@ -63,8 +63,8 @@ export function useNodeItemContext(): NodeItemContext {
   const isVisible =
     !isInSearchView && nodeIndex !== undefined && parentView !== undefined;
 
-  // Get current item using context-aware lookup
-  const currentItem =
+  // Get the current row using context-aware lookup
+  const currentRow =
     isVisible && parentView ? getCurrentEdgeForView(data, viewPath) : undefined;
 
   const updateMetadata = (metadata: NodeItemMetadata): void => {
@@ -89,7 +89,7 @@ export function useNodeItemContext(): NodeItemContext {
     isVisible,
     isEmptyNode,
     nodeText,
-    currentItem,
+    currentRow,
     viewPath,
     parentView,
     nodeID,

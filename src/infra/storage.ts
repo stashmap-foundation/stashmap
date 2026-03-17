@@ -15,6 +15,13 @@ import { splitID } from "../graph/context";
 import { UNAUTHENTICATED_USER_PK } from "../app/auth";
 import { defaultPane, generatePaneId } from "../session/panes";
 
+type BrowserStorage = {
+  getItem: (key: string) => string | null;
+  setItem: (key: string, value: string) => void;
+};
+
+type HistoryState = { panes?: Pane[] } | null;
+
 function panesStorageKey(publicKey: PublicKey): string {
   return `stashmap-panes-${publicKey}`;
 }
@@ -23,9 +30,12 @@ function viewsStorageKey(publicKey: PublicKey): string {
   return `stashmap-views-${publicKey}`;
 }
 
-export function loadPanesFromStorage(publicKey: PublicKey): Pane[] | undefined {
+export function loadPanesFromStorage(
+  storage: Pick<BrowserStorage, "getItem">,
+  publicKey: PublicKey
+): Pane[] | undefined {
   try {
-    const raw = localStorage.getItem(panesStorageKey(publicKey));
+    const raw = storage.getItem(panesStorageKey(publicKey));
     if (!raw) {
       return undefined;
     }
@@ -36,12 +46,16 @@ export function loadPanesFromStorage(publicKey: PublicKey): Pane[] | undefined {
   }
 }
 
-export function savePanesToStorage(publicKey: PublicKey, panes: Pane[]): void {
+export function savePanesToStorage(
+  storage: Pick<BrowserStorage, "setItem">,
+  publicKey: PublicKey,
+  panes: Pane[]
+): void {
   if (publicKey === UNAUTHENTICATED_USER_PK) {
     return;
   }
   try {
-    localStorage.setItem(
+    storage.setItem(
       panesStorageKey(publicKey),
       JSON.stringify(panes.map((pane) => paneToJSON(pane)))
     );
@@ -50,9 +64,12 @@ export function savePanesToStorage(publicKey: PublicKey, panes: Pane[]): void {
   }
 }
 
-export function loadViewsFromStorage(publicKey: PublicKey): Views | undefined {
+export function loadViewsFromStorage(
+  storage: Pick<BrowserStorage, "getItem">,
+  publicKey: PublicKey
+): Views | undefined {
   try {
-    const raw = localStorage.getItem(viewsStorageKey(publicKey));
+    const raw = storage.getItem(viewsStorageKey(publicKey));
     if (!raw) {
       return undefined;
     }
@@ -62,9 +79,13 @@ export function loadViewsFromStorage(publicKey: PublicKey): Views | undefined {
   }
 }
 
-export function saveViewsToStorage(publicKey: PublicKey, views: Views): void {
+export function saveViewsToStorage(
+  storage: Pick<BrowserStorage, "setItem">,
+  publicKey: PublicKey,
+  views: Views
+): void {
   try {
-    localStorage.setItem(
+    storage.setItem(
       viewsStorageKey(publicKey),
       JSON.stringify(viewDataToJSON(views, []))
     );
@@ -73,8 +94,15 @@ export function saveViewsToStorage(publicKey: PublicKey, views: Views): void {
   }
 }
 
-export function getInitialPanes(publicKey: PublicKey): Pane[] {
-  const nodeID = parseNodeRouteUrl(window.location.pathname);
+export function getInitialPanes(props: {
+  publicKey: PublicKey;
+  pathname: string;
+  search: string;
+  historyState: HistoryState;
+  loadStoredPanes: (publicKey: PublicKey) => Pane[] | undefined;
+}): Pane[] {
+  const { publicKey, pathname, search, historyState, loadStoredPanes } = props;
+  const nodeID = parseNodeRouteUrl(pathname);
   if (nodeID) {
     const nodeAuthor = splitID(nodeID)[0] || publicKey;
     return [
@@ -86,17 +114,15 @@ export function getInitialPanes(publicKey: PublicKey): Pane[] {
       },
     ];
   }
-  const urlStack = pathToStack(window.location.pathname);
+  const urlStack = pathToStack(pathname);
   if (urlStack.length > 0) {
-    const urlAuthor =
-      parseAuthorFromSearch(window.location.search) || publicKey;
+    const urlAuthor = parseAuthorFromSearch(search) || publicKey;
     return [{ id: generatePaneId(), stack: urlStack, author: urlAuthor }];
   }
-  const historyState = window.history.state as { panes?: Pane[] } | null;
   if (historyState?.panes && historyState.panes.length > 0) {
     return historyState.panes;
   }
-  const stored = loadPanesFromStorage(publicKey);
+  const stored = loadStoredPanes(publicKey);
   if (stored) {
     return stored;
   }

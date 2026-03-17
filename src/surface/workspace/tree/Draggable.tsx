@@ -1,0 +1,334 @@
+import React, { useEffect, useRef } from "react";
+import { ConnectableElement, useDrag } from "react-dnd";
+import { getEmptyImage } from "react-dnd-html5-backend";
+import {
+  useCurrentEdge,
+  useCurrentNode,
+  useCurrentRowID,
+  useDisplayText,
+  useIsInSearchView,
+  useIsViewingOtherUserContent,
+  useRowPath,
+  useViewKey,
+} from "./RowContext";
+import { type RowPath } from "../../../rows/rowPaths";
+import { isEmptySemanticID } from "../../../graph/context";
+import { NOTE_TYPE, Node } from "../node/NodeView";
+import { useDroppable, clearDropIndent } from "./DroppableContainer";
+import {
+  isEditableNode,
+  useIsEditingOn,
+  useIsSelected,
+} from "./TemporaryViewContext";
+import { isEditableElement, KeyboardMode } from "./keyboardNavigation";
+
+function markDragDescendants(sourceViewKey: string): void {
+  const prefix = `${sourceViewKey}:`;
+  document.querySelectorAll(".item").forEach((el) => {
+    const key = el.getAttribute("data-view-key");
+    if (key && key.startsWith(prefix)) {
+      el.classList.add("is-dragging-child");
+    }
+  });
+}
+
+function clearDragDescendants(): void {
+  document.querySelectorAll(".is-dragging-child").forEach((el) => {
+    el.classList.remove("is-dragging-child");
+  });
+}
+
+type DraggableProps = {
+  className?: string;
+  copyDrag?: boolean;
+  rowViewKey?: string;
+  rowIndex?: number;
+  rowDepth?: number;
+  isActiveRow?: boolean;
+  isSelected?: boolean;
+  onRowFocus?: (key: string, index: number, mode: KeyboardMode) => void;
+  onRowClick?: (e: React.MouseEvent, viewKey: string) => void;
+};
+
+const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
+  (
+    {
+      className,
+      copyDrag = false,
+      rowViewKey = "",
+      rowIndex = 0,
+      rowDepth = 0,
+      isActiveRow = false,
+      isSelected = false,
+      onRowFocus = () => {},
+      onRowClick,
+    }: DraggableProps,
+    ref
+  ): JSX.Element => {
+    const path = useRowPath();
+    const isNodeBeeingEdited = useIsEditingOn();
+    const [rowID] = useCurrentRowID();
+    const node = useCurrentNode();
+    const displayText = useDisplayText();
+    const isEmptyNode = isEmptySemanticID(rowID);
+    const disableDrag = isNodeBeeingEdited || isEmptyNode;
+
+    const [{ isDragging }, drag, preview] = useDrag({
+      type: NOTE_TYPE,
+      item: () => {
+        clearDropIndent();
+        markDragDescendants(rowViewKey);
+        return { path, text: displayText, isCopyDrag: copyDrag || undefined };
+      },
+      collect: (monitor) => ({
+        isDragging: !!monitor.isDragging(),
+      }),
+      canDrag: () => !disableDrag,
+      end: () => {
+        clearDragDescendants();
+      },
+    });
+
+    useEffect(() => {
+      preview(getEmptyImage(), { captureDraggingState: true });
+    }, [preview]);
+
+    drag(ref as ConnectableElement);
+
+    const handleClick = (e: React.MouseEvent): void => {
+      if (!onRowClick) {
+        return;
+      }
+      const target = e.target as HTMLElement;
+      if (isEditableElement(target)) {
+        return;
+      }
+      if (
+        target.closest(
+          "button, a, input, textarea, select, [role='button'], [data-node-action], [data-pane-action]"
+        )
+      ) {
+        return;
+      }
+      onRowClick(e, rowViewKey);
+    };
+
+    return (
+      <div
+        ref={ref}
+        className={`item ${isDragging ? "is-dragging" : ""}`}
+        data-row-focusable="true"
+        data-view-key={rowViewKey}
+        data-row-index={rowIndex}
+        data-row-depth={rowDepth}
+        data-node-id={rowID}
+        data-node-text={displayText}
+        data-node-mutable={isEditableNode(node) ? "true" : "false"}
+        data-selected={isSelected ? "true" : undefined}
+        role="treeitem"
+        aria-label={displayText}
+        aria-selected={isActiveRow}
+        tabIndex={isActiveRow ? 0 : -1}
+        onFocusCapture={(e) =>
+          onRowFocus(
+            rowViewKey,
+            rowIndex,
+            isEditableElement(e.target) ? "insert" : "normal"
+          )
+        }
+        onClick={handleClick}
+        onKeyDown={() => {}}
+      >
+        <Node className={className} />
+      </div>
+    );
+  }
+);
+
+function DraggableSuggestion({
+  className,
+  rowViewKey,
+  rowIndex,
+  rowDepth,
+  isActiveRow,
+  isSelected = false,
+  onRowFocus,
+  onRowClick,
+}: {
+  className?: string;
+  rowViewKey: string;
+  rowIndex: number;
+  rowDepth: number;
+  isActiveRow: boolean;
+  isSelected?: boolean;
+  onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
+  onRowClick?: (e: React.MouseEvent, viewKey: string) => void;
+}): JSX.Element {
+  const ref = useRef<HTMLDivElement>(null);
+  const path = useRowPath();
+  const currentRow = useCurrentEdge();
+  const node = useCurrentNode();
+  const displayText = useDisplayText();
+
+  const [{ isDragging }, drag, preview] = useDrag({
+    type: NOTE_TYPE,
+    item: () => {
+      clearDropIndent();
+      return {
+        path,
+        text: displayText,
+        isSuggestion: true,
+        nodeId: node?.id,
+        targetId: currentRow?.targetID || undefined,
+      };
+    },
+    collect: (monitor) => ({
+      isDragging: !!monitor.isDragging(),
+    }),
+  });
+
+  useEffect(() => {
+    preview(getEmptyImage(), { captureDraggingState: true });
+  }, [preview]);
+
+  drag(ref as ConnectableElement);
+
+  const handleClick = (e: React.MouseEvent): void => {
+    if (!onRowClick) {
+      return;
+    }
+    const target = e.target as HTMLElement;
+    if (isEditableElement(target)) {
+      return;
+    }
+    if (
+      target.closest(
+        "button, a, input, textarea, select, [role='button'], [data-node-action], [data-pane-action]"
+      )
+    ) {
+      return;
+    }
+    onRowClick(e, rowViewKey);
+  };
+
+  return (
+    <div
+      ref={ref}
+      className={`item suggestion-item ${isDragging ? "is-dragging" : ""} ${
+        className || ""
+      }`}
+      data-row-focusable="true"
+      data-view-key={rowViewKey}
+      data-row-index={rowIndex}
+      data-row-depth={rowDepth}
+      data-node-id={currentRow?.id || node?.id}
+      data-node-text={displayText}
+      data-node-mutable={isEditableNode(node) ? "true" : "false"}
+      data-selected={isSelected ? "true" : undefined}
+      role="treeitem"
+      aria-label={displayText}
+      aria-selected={isActiveRow}
+      tabIndex={isActiveRow ? 0 : -1}
+      onFocusCapture={(e) =>
+        onRowFocus(
+          rowViewKey,
+          rowIndex,
+          isEditableElement(e.target) ? "insert" : "normal"
+        )
+      }
+      onClick={handleClick}
+      onKeyDown={() => {}}
+    >
+      <Node className={className} isSuggestion />
+    </div>
+  );
+}
+
+export function ListItem({
+  index,
+  treeRowPath,
+  nextDepth,
+  nextRowPathStr,
+  activeRowKey,
+  onRowFocus,
+  onRowClick,
+  isFirstVirtual,
+}: {
+  index: number;
+  treeRowPath: RowPath;
+  nextDepth?: number;
+  nextRowPathStr?: string;
+  activeRowKey: string;
+  onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
+  onRowClick?: (e: React.MouseEvent, viewKey: string) => void;
+  isFirstVirtual?: boolean;
+}): JSX.Element {
+  const ref = useRef<HTMLDivElement>(null);
+  const viewKey = useViewKey();
+  const rowPath = useRowPath();
+  const [rowID] = useCurrentRowID();
+  const virtualType = useCurrentEdge()?.virtualType;
+  const isSuggestion = virtualType === "suggestion";
+  const isCopyDrag = virtualType === "incoming" || virtualType === "version";
+  const isInSearchView = useIsInSearchView();
+  const isViewingOtherUserContent = useIsViewingOtherUserContent();
+  const selected = useIsSelected();
+  const rowDepth = rowPath.length - 1;
+  const isActiveRow = activeRowKey === viewKey;
+  const isEmptyNode = isEmptySemanticID(rowID);
+
+  const isReadonly = isInSearchView || isViewingOtherUserContent;
+
+  const [{ dragDirection }, drop] = useDroppable({
+    destination: treeRowPath,
+    index,
+    ref,
+    nextDepth,
+    nextRowPathStr,
+  });
+
+  if (isSuggestion) {
+    return (
+      <div
+        className={`visible-on-hover suggestion-item-container${
+          isFirstVirtual ? " first-virtual" : ""
+        }`}
+      >
+        <DraggableSuggestion
+          rowViewKey={viewKey}
+          rowIndex={index}
+          rowDepth={rowDepth}
+          isActiveRow={isActiveRow}
+          isSelected={selected}
+          onRowFocus={onRowFocus}
+          onRowClick={onRowClick}
+        />
+      </div>
+    );
+  }
+
+  if (!isReadonly && !isCopyDrag) {
+    drop(ref);
+  }
+
+  const className =
+    dragDirection === -1 && !isEmptyNode ? "dragging-over-bottom" : "";
+  return (
+    <div
+      className={`visible-on-hover${isFirstVirtual ? " first-virtual" : ""}`}
+    >
+      <Draggable
+        ref={ref}
+        className={className}
+        copyDrag={isCopyDrag}
+        rowViewKey={viewKey}
+        rowIndex={index}
+        rowDepth={rowDepth}
+        isActiveRow={isActiveRow}
+        isSelected={selected}
+        onRowFocus={onRowFocus}
+        onRowClick={onRowClick}
+      />
+    </div>
+  );
+}

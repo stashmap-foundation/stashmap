@@ -1,17 +1,17 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import * as serviceWorker from "./features/app-shell/serviceWorker";
+import * as serviceWorker from "./surface/app-shell/serviceWorker";
 import "bootstrap/dist/css/bootstrap.min.css";
-import "./features/app-shell/styles/solarized.scss";
-import "./features/app-shell/assets/fonts/nostr/css/nostr.css";
-import "./features/app-shell/styles/Workspace.scss";
-import "./features/app-shell/styles/App.css";
-import { App } from "./features/app-shell/App";
-import type { LocalStorage } from "./features/app-shell/types";
-import { NostrAuthContextProvider } from "./features/app-shell/NostrAuthContext";
-import { NostrProvider } from "./features/app-shell/NostrProvider";
-import { UserRelayContextProvider } from "./features/app-shell/UserRelayContext";
+import "./surface/app-shell/styles/solarized.scss";
+import "./surface/app-shell/assets/fonts/nostr/css/nostr.css";
+import "./surface/app-shell/styles/Workspace.scss";
+import "./surface/app-shell/styles/App.css";
+import { App } from "./surface/app-shell/App";
+import type { LocalStorage } from "./surface/app-shell/types";
+import { NostrAuthContextProvider } from "./surface/app-shell/NostrAuthContext";
+import { NostrProvider } from "./surface/app-shell/NostrProvider";
+import { UserRelayContextProvider } from "./surface/app-shell/UserRelayContext";
 
 const defaultRelayUrls = process.env.DEFAULT_RELAYS?.split(",");
 

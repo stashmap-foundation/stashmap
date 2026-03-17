@@ -81,7 +81,7 @@
     },
     "overrides": [
         {
-          "files": ["src/{graph,rows,session,app,infra,ui}/**/*.{ts,tsx,js,jsx}"],
+          "files": ["src/{graph,rows,session,app,infra}/**/*.{ts,tsx,js,jsx}"],
           "rules": {
             "import/no-restricted-paths": [
               "error",
@@ -108,11 +108,6 @@
                     "message": "graph must not import infra."
                   },
                   {
-                    "target": "./src/graph",
-                    "from": "./src/ui",
-                    "message": "graph must not import ui."
-                  },
-                  {
                     "target": "./src/rows",
                     "from": "./src/session",
                     "message": "rows must not import session."
@@ -126,11 +121,6 @@
                     "target": "./src/rows",
                     "from": "./src/infra",
                     "message": "rows must not import infra."
-                  },
-                  {
-                    "target": "./src/rows",
-                    "from": "./src/ui",
-                    "message": "rows must not import ui."
                   },
                   {
                     "target": "./src/session",
@@ -148,24 +138,9 @@
                     "message": "session must not import infra."
                   },
                   {
-                    "target": "./src/session",
-                    "from": "./src/ui",
-                    "message": "session must not import ui."
-                  },
-                  {
                     "target": "./src/app",
                     "from": "./src/infra",
                     "message": "app must not import infra."
-                  },
-                  {
-                    "target": "./src/app",
-                    "from": "./src/ui",
-                    "message": "app must not import ui."
-                  },
-                  {
-                    "target": "./src/infra",
-                    "from": "./src/ui",
-                    "message": "infra must not import ui."
                   }
                 ]
               }
@@ -239,28 +214,76 @@
               "zones": [
                 {
                   "target": "./src/graph",
-                  "from": "./src/features",
-                  "message": "graph must not import features."
+                  "from": "./src/surface",
+                  "message": "graph must not import surface."
                 },
                 {
                   "target": "./src/rows",
-                  "from": "./src/features",
-                  "message": "rows must not import features."
+                  "from": "./src/surface",
+                  "message": "rows must not import surface."
                 },
                 {
                   "target": "./src/session",
-                  "from": "./src/features",
-                  "message": "session must not import features."
+                  "from": "./src/surface",
+                  "message": "session must not import surface."
                 },
                 {
                   "target": "./src/app",
-                  "from": "./src/features",
-                  "message": "app must not import features."
+                  "from": "./src/surface",
+                  "message": "app must not import surface."
                 },
                 {
                   "target": "./src/infra",
-                  "from": "./src/features",
-                  "message": "infra must not import features."
+                  "from": "./src/surface",
+                  "message": "infra must not import surface."
+                }
+              ]
+            }
+          ],
+          "no-restricted-imports": [
+            "error",
+            {
+              "paths": [
+                {
+                  "name": "react",
+                  "message": "React imports are only allowed in surface."
+                }
+              ]
+            }
+          ],
+          "no-restricted-globals": [
+            "error",
+            {
+              "name": "window",
+              "message": "Browser globals are only allowed in surface."
+            },
+            {
+              "name": "document",
+              "message": "Browser globals are only allowed in surface."
+            },
+            {
+              "name": "localStorage",
+              "message": "Browser globals are only allowed in surface."
+            }
+          ]
+        }
+      },
+      {
+        "files": ["src/surface/shared/**/*.{ts,tsx,js,jsx}"],
+        "rules": {
+          "import/no-restricted-paths": [
+            "error",
+            {
+              "zones": [
+                {
+                  "target": "./src/surface/shared",
+                  "from": "./src/surface/app-shell",
+                  "message": "surface/shared must not import app-shell."
+                },
+                {
+                  "target": "./src/surface/shared",
+                  "from": "./src/surface/workspace",
+                  "message": "surface/shared must not import workspace."
                 }
               ]
             }

@@ -57,12 +57,12 @@ Layers
   - src/infra/markdown/*
   - src/infra/cli/*
   - src/infra/sync/*
-  - src/features/app-shell/*
-  - src/features/navigation/*
-  - src/features/tree/*
-  - src/features/editor/*
-  - src/features/search/*
-  - src/features/references/*
+  - src/surface/app-shell/*
+  - src/surface/workspace/layout/*
+  - src/surface/workspace/tree/*
+  - src/surface/workspace/editor/*
+  - src/surface/workspace/search/*
+  - src/surface/workspace/references/*
 
   Core Type Split
   This is the most important architectural line:

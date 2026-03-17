@@ -1,0 +1,900 @@
+/* eslint-disable testing-library/no-unnecessary-act, @typescript-eslint/require-await */
+import {
+  act,
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import {
+  ALICE,
+  expectTree,
+  findNewNodeEditor,
+  navigateToNodeViaSearch,
+  renderApp,
+  renderTree,
+  setup,
+  type,
+} from "../../../tests/testutils";
+
+async function deleteItem(itemName: string): Promise<void> {
+  await userEvent.click(screen.getByLabelText(`edit ${itemName}`));
+  await userEvent.keyboard("{Escape}{Delete}");
+  await waitFor(() => {
+    expect(screen.queryByText(itemName)).toBeNull();
+  });
+}
+
+const maybeExpand = async (label: string): Promise<void> => {
+  const btn = screen.queryByLabelText(label);
+  if (btn) {
+    await userEvent.click(btn);
+  }
+};
+
+const getDropTargets = (nodeName: string): HTMLElement[] => {
+  const toggleTargets = screen.queryAllByLabelText(
+    new RegExp(`(?:expand|collapse) ${nodeName}`)
+  );
+  if (toggleTargets.length > 0) {
+    return toggleTargets as HTMLElement[];
+  }
+  return screen.getAllByRole("treeitem", { name: nodeName }) as HTMLElement[];
+};
+
+describe("View State Preservation - Reorder Within Same List", () => {
+  test("Move expanded item down - item stays expanded", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("My Notes{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "B{Enter}C{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand A"));
+
+    await expectTree(`
+My Notes
+  A
+    ChildOfA
+  B
+  C
+    `);
+
+    await screen.findByLabelText("collapse A");
+
+    fireEvent.dragStart(screen.getByText("A"));
+    fireEvent.drop(screen.getByText("B"));
+
+    await expectTree(`
+My Notes
+  B
+  A
+    ChildOfA
+  C
+    `);
+
+    await screen.findByLabelText("collapse A");
+  });
+
+  test("Move expanded item up - item stays expanded", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type(
+      "My Notes{Enter}{Tab}A{Enter}B{Enter}C{Enter}{Tab}ChildOfC{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  A
+  B
+  C
+    ChildOfC
+    `);
+
+    await screen.findByLabelText("collapse C");
+
+    fireEvent.dragStart(screen.getByText("C"));
+    fireEvent.drop(screen.getByLabelText("My Notes"));
+
+    await expectTree(`
+My Notes
+  C
+    ChildOfC
+  A
+  B
+    `);
+
+    await screen.findByLabelText("collapse C");
+  });
+
+  test("Move collapsed item - siblings with expanded state preserved", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("My Notes{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "B{Enter}C{Enter}{Tab}ChildOfC{Escape}"
+    );
+    await userEvent.click(await screen.findByLabelText("expand A"));
+
+    await expectTree(`
+My Notes
+  A
+    ChildOfA
+  B
+  C
+    ChildOfC
+    `);
+
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse C");
+
+    fireEvent.dragStart(screen.getByText("B"));
+    fireEvent.drop(screen.getByLabelText("My Notes"));
+
+    await expectTree(`
+My Notes
+  B
+  A
+    ChildOfA
+  C
+    ChildOfC
+    `);
+
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse C");
+  });
+
+  test("Move item with expanded children and grandchildren", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type(
+      "My Notes{Enter}{Tab}A{Enter}B{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  A
+  B
+    Child
+      GrandChild
+    `);
+
+    await screen.findByLabelText("collapse B");
+    await screen.findByLabelText("collapse Child");
+
+    fireEvent.dragStart(screen.getByText("B"));
+    fireEvent.drop(screen.getByLabelText("My Notes"));
+
+    await expectTree(`
+My Notes
+  B
+    Child
+      GrandChild
+  A
+    `);
+
+    await screen.findByLabelText("collapse B");
+    await screen.findByLabelText("collapse Child");
+  });
+});
+
+describe("View State Preservation - Indent/Outdent (Tab/Shift+Tab)", () => {
+  test("Tab indent expanded item - stays expanded", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type(
+      "My Notes{Enter}{Tab}Sibling{Enter}Target{Enter}{Tab}Child{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Sibling
+  Target
+    Child
+    `);
+
+    await screen.findByLabelText("collapse Target");
+
+    const targetEditor = await screen.findByLabelText("edit Target");
+    await userEvent.click(targetEditor);
+    await userEvent.keyboard("{Home}{Tab}");
+
+    await expectTree(`
+My Notes
+  Sibling
+    Target
+      Child
+    `);
+
+    await screen.findByLabelText("collapse Target");
+  });
+
+  test("Tab indent with deeply nested expanded descendants", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type(
+      "My Notes{Enter}{Tab}Sibling{Enter}Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Sibling
+  Parent
+    Child
+      GrandChild
+    `);
+
+    await screen.findByLabelText("collapse Parent");
+    await screen.findByLabelText("collapse Child");
+
+    const parentEditor = await screen.findByLabelText("edit Parent");
+    await userEvent.click(parentEditor);
+    await userEvent.keyboard("{Home}{Tab}");
+
+    await expectTree(`
+My Notes
+  Sibling
+    Parent
+      Child
+        GrandChild
+    `);
+
+    await screen.findByLabelText("collapse Parent");
+    await screen.findByLabelText("collapse Child");
+  });
+
+  test("Tab indent preserves sibling expanded states", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("My Notes{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "B{Enter}C{Enter}{Tab}ChildOfC{Escape}"
+    );
+    await userEvent.click(await screen.findByLabelText("expand A"));
+
+    await expectTree(`
+My Notes
+  A
+    ChildOfA
+  B
+  C
+    ChildOfC
+    `);
+
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse C");
+
+    const bEditor = await screen.findByLabelText("edit B");
+    await userEvent.click(bEditor);
+    await userEvent.keyboard("{Home}{Tab}");
+
+    await expectTree(`
+My Notes
+  A
+    ChildOfA
+    B
+  C
+    ChildOfC
+    `);
+
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse C");
+  });
+});
+
+describe("View State Preservation - Cross-Pane DnD (Copy)", () => {
+  test("Cross-pane copy of expanded item preserves expanded state", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("My Notes{Enter}{Tab}Source{Enter}{Tab}Child{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("collapse Source"));
+    const sourceEditor = await screen.findByLabelText("edit Source");
+    await userEvent.click(sourceEditor);
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand Source"));
+    await maybeExpand("expand Target");
+
+    await expectTree(`
+My Notes
+  Source
+    Child
+  Target
+    `);
+
+    await screen.findByLabelText("collapse Source");
+
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Target");
+
+    // Use toggle buttons as drop targets - they only exist in tree children, not breadcrumbs
+    const targetDropTargets = getDropTargets("Target");
+    fireEvent.dragStart(screen.getAllByText("Source")[0]);
+    await act(async () => {
+      fireEvent.drop(targetDropTargets[1]);
+    });
+
+    const collapseButtons = screen.getAllByLabelText("collapse Source");
+    expect(collapseButtons.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test("Cross-pane copy of deeply nested expanded tree", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type(
+      "My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
+    );
+
+    await userEvent.click(await screen.findByLabelText("collapse Parent"));
+    const parentEditor = await screen.findByLabelText("edit Parent");
+    await userEvent.click(parentEditor);
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand Parent"));
+    await maybeExpand("expand Target");
+
+    await expectTree(`
+My Notes
+  Parent
+    Child
+      GrandChild
+  Target
+    `);
+
+    await screen.findByLabelText("collapse Parent");
+    await screen.findByLabelText("collapse Child");
+
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+
+    await expectTree(`
+My Notes
+  Parent
+    Child
+      GrandChild
+  Target
+My Notes
+  Parent
+  Target
+    `);
+
+    await navigateToNodeViaSearch(1, "Target");
+
+    await expectTree(`
+My Notes
+  Parent
+    Child
+      GrandChild
+  Target
+Target
+    `);
+
+    // Use toggle buttons as drop targets - they only exist in tree children, not breadcrumbs
+    const targetDropTargets = getDropTargets("Target");
+    fireEvent.dragStart(screen.getAllByText("Parent")[0]);
+    await act(async () => {
+      fireEvent.drop(targetDropTargets[1]);
+    });
+
+    await expectTree(`
+My Notes
+  Parent
+    Child
+      GrandChild
+      [V]
+    [V]
+  Target
+Target
+  Parent
+    Child
+      GrandChild
+      [V]
+    [V]
+    `);
+
+    const collapseParentButtons = screen.getAllByLabelText("collapse Parent");
+    expect(collapseParentButtons.length).toBeGreaterThanOrEqual(2);
+
+    const collapseChildButtons = screen.getAllByLabelText("collapse Child");
+    expect(collapseChildButtons.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test("Cross-pane copy doesn't affect source expanded states", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("My Notes{Enter}{Tab}Source{Enter}{Tab}Child{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("collapse Source"));
+    const sourceEditor = await screen.findByLabelText("edit Source");
+    await userEvent.click(sourceEditor);
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Target{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand Source"));
+    await maybeExpand("expand Target");
+
+    await expectTree(`
+My Notes
+  Source
+    Child
+  Target
+    `);
+
+    await screen.findByLabelText("collapse Source");
+
+    await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+    await navigateToNodeViaSearch(1, "Target");
+
+    // Use toggle buttons as drop targets - they only exist in tree children, not breadcrumbs
+    const targetDropTargets = getDropTargets("Target");
+    fireEvent.dragStart(screen.getAllByText("Source")[0]);
+    await act(async () => {
+      fireEvent.drop(targetDropTargets[1]);
+    });
+
+    const collapseSourceButtons = screen.getAllByLabelText("collapse Source");
+    expect(collapseSourceButtons.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("View State Preservation - Insert Operations", () => {
+  test("Insert at beginning - later expanded children stay expanded", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("My Notes{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}");
+
+    await expectTree(`
+My Notes
+  A
+    ChildOfA
+    `);
+
+    await screen.findByLabelText("collapse A");
+
+    await userEvent.click(await screen.findByLabelText("edit My Notes"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Inserted{Escape}");
+
+    fireEvent.dragStart(screen.getByText("Inserted"));
+    fireEvent.drop(screen.getByLabelText("My Notes"));
+
+    await expectTree(`
+My Notes
+  Inserted
+  A
+    ChildOfA
+    `);
+
+    await screen.findByLabelText("collapse A");
+  });
+
+  test("Insert in middle - children after stay expanded", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("My Notes{Enter}{Tab}A{Enter}B{Enter}{Tab}ChildOfB{Escape}");
+
+    await expectTree(`
+My Notes
+  A
+  B
+    ChildOfB
+    `);
+
+    await screen.findByLabelText("collapse B");
+
+    const aEditor = await screen.findByLabelText("edit A");
+    await userEvent.click(aEditor);
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Inserted{Escape}");
+
+    await expectTree(`
+My Notes
+  A
+  Inserted
+  B
+    ChildOfB
+    `);
+
+    await screen.findByLabelText("collapse B");
+  });
+
+  test("Insert child - parent's other expanded children stay expanded", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type(
+      "My Notes{Enter}{Tab}Parent{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  Parent
+    A
+      ChildOfA
+    `);
+
+    await screen.findByLabelText("collapse A");
+
+    await userEvent.click(await screen.findByLabelText("edit Parent"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "Inserted{Escape}");
+
+    await expectTree(`
+My Notes
+  Parent
+    Inserted
+    A
+      ChildOfA
+    `);
+
+    await screen.findByLabelText("collapse A");
+  });
+});
+
+describe("View State Preservation - Delete Operations", () => {
+  test("Delete item before expanded item - expanded item stays expanded", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type(
+      "My Notes{Enter}{Tab}ToDelete{Enter}Keeper{Enter}{Tab}Child{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  ToDelete
+  Keeper
+    Child
+    `);
+
+    await screen.findByLabelText("collapse Keeper");
+
+    await deleteItem("ToDelete");
+
+    await expectTree(`
+My Notes
+  Keeper
+    Child
+    `);
+
+    await screen.findByLabelText("collapse Keeper");
+  });
+
+  test("Delete item after expanded item - expanded item stays expanded", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("My Notes{Enter}{Tab}Keeper{Enter}{Tab}Child{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("collapse Keeper"));
+    const keeperEditor = await screen.findByLabelText("edit Keeper");
+    await userEvent.click(keeperEditor);
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "ToDelete{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand Keeper"));
+
+    await expectTree(`
+My Notes
+  Keeper
+    Child
+  ToDelete
+    `);
+
+    await screen.findByLabelText("collapse Keeper");
+
+    await deleteItem("ToDelete");
+
+    await expectTree(`
+My Notes
+  Keeper
+    Child
+    `);
+
+    await screen.findByLabelText("collapse Keeper");
+  });
+
+  test("Delete sibling - other siblings keep expanded state", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("My Notes{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "ToDelete{Enter}C{Enter}{Tab}ChildOfC{Escape}"
+    );
+    await userEvent.click(await screen.findByLabelText("expand A"));
+
+    await expectTree(`
+My Notes
+  A
+    ChildOfA
+  ToDelete
+  C
+    ChildOfC
+    `);
+
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse C");
+
+    await deleteItem("ToDelete");
+
+    await expectTree(`
+My Notes
+  A
+    ChildOfA
+  C
+    ChildOfC
+    `);
+
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse C");
+  });
+});
+
+describe("View State Preservation - Complex Tree Operations", () => {
+  test("Move parent - all descendant expanded states preserved", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type(
+      "My Notes{Enter}{Tab}Target{Enter}Source{Enter}{Tab}L1{Enter}{Tab}L2{Enter}{Tab}L3{Escape}"
+    );
+
+    await maybeExpand("expand Target");
+
+    await expectTree(`
+My Notes
+  Target
+  Source
+    L1
+      L2
+        L3
+    `);
+
+    await screen.findByLabelText("collapse Source");
+    await screen.findByLabelText("collapse L1");
+    await screen.findByLabelText("collapse L2");
+
+    const sourceEditor = await screen.findByLabelText("edit Source");
+    await userEvent.click(sourceEditor);
+    await userEvent.keyboard("{Home}{Tab}");
+
+    await expectTree(`
+My Notes
+  Target
+    Source
+      L1
+        L2
+          L3
+    `);
+
+    await screen.findByLabelText("collapse Source");
+    await screen.findByLabelText("collapse L1");
+    await screen.findByLabelText("collapse L2");
+  });
+
+  test("Multiple operations preserve state", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("My Notes{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "B{Enter}{Tab}ChildOfB{Escape}"
+    );
+
+    await userEvent.click(await screen.findByLabelText("collapse B"));
+    await userEvent.click(await screen.findByLabelText("edit B"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "C{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand A"));
+    await userEvent.click(await screen.findByLabelText("expand B"));
+
+    await expectTree(`
+My Notes
+  A
+    ChildOfA
+  B
+    ChildOfB
+  C
+    `);
+
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse B");
+
+    fireEvent.dragStart(screen.getByText("C"));
+    fireEvent.drop(screen.getByLabelText("My Notes"));
+
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse B");
+
+    await userEvent.click(await screen.findByLabelText("edit B"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "NewChild{Escape}");
+
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse B");
+
+    fireEvent.dragStart(screen.getByText("A"));
+    fireEvent.drop(screen.getByText("C"));
+
+    await expectTree(`
+My Notes
+  C
+  A
+    ChildOfA
+  B
+    NewChild
+    ChildOfB
+    `);
+
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse B");
+  });
+
+  test("Reorder after reload preserves expanded states", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("My Notes{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(
+      await findNewNodeEditor(),
+      "B{Enter}C{Enter}{Tab}ChildOfC{Escape}"
+    );
+    await userEvent.click(await screen.findByLabelText("expand A"));
+
+    await expectTree(`
+My Notes
+  A
+    ChildOfA
+  B
+  C
+    ChildOfC
+    `);
+
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse C");
+
+    cleanup();
+    renderTree(alice);
+
+    await expectTree(`
+My Notes
+  A
+    ChildOfA
+  B
+  C
+    ChildOfC
+    `);
+
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse C");
+
+    fireEvent.dragStart(screen.getByText("B"));
+    fireEvent.drop(screen.getByLabelText("My Notes"));
+
+    await expectTree(`
+My Notes
+  B
+  A
+    ChildOfA
+  C
+    ChildOfC
+    `);
+
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse C");
+  });
+});
+
+describe("View State Preservation - Pane Content Switching", () => {
+  test("Expanded nodes survive navigation to different root and back", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type("My Notes{Enter}{Tab}A{Enter}{Tab}ChildOfA{Escape}");
+
+    await userEvent.click(await screen.findByLabelText("collapse A"));
+    await userEvent.click(await screen.findByLabelText("edit A"));
+    await userEvent.keyboard("{Enter}");
+    await userEvent.type(await findNewNodeEditor(), "B{Escape}");
+    await userEvent.click(await screen.findByLabelText("expand A"));
+
+    await expectTree(`
+My Notes
+  A
+    ChildOfA
+  B
+    `);
+
+    await screen.findByLabelText("collapse A");
+
+    await userEvent.click(await screen.findByLabelText("open A in fullscreen"));
+    await screen.findByRole("treeitem", { name: "A" });
+
+    await userEvent.click(await screen.findByLabelText("Navigate to My Notes"));
+
+    await expectTree(`
+My Notes
+  A
+    ChildOfA
+  B
+    `);
+
+    await screen.findByLabelText("collapse A");
+  });
+
+  test("Deeply nested expanded states survive navigation", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type(
+      "My Notes{Enter}{Tab}A{Enter}{Tab}Child{Enter}{Tab}GrandChild{Escape}"
+    );
+
+    await expectTree(`
+My Notes
+  A
+    Child
+      GrandChild
+    `);
+
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse Child");
+
+    await userEvent.click(await screen.findByLabelText("open A in fullscreen"));
+
+    await expectTree(`
+A
+  Child
+    `);
+
+    await userEvent.click(await screen.findByLabelText("Navigate to My Notes"));
+
+    await expectTree(`
+My Notes
+  A
+    Child
+      GrandChild
+    `);
+
+    await screen.findByLabelText("collapse A");
+    await screen.findByLabelText("collapse Child");
+  });
+});

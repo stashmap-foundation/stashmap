@@ -72,6 +72,7 @@ export type FlushDeps = {
   readonly relays: AllRelays;
   readonly relayPool: SimplePool;
   readonly finalizeEvent: FinalizeEvent;
+  readonly signWithExtension?: (event: EventTemplate) => Promise<Event>;
 };
 
 export type QueueStatus = {
@@ -103,6 +104,7 @@ type PublishQueue = {
   readonly enqueue: (events: List<UnsignedEvent>) => void;
   readonly getStatus: () => QueueStatus;
   readonly init: () => Promise<void>;
+  readonly persistPending: () => void;
   readonly destroy: () => void;
 };
 
@@ -216,28 +218,28 @@ export function buildDocumentEvents(plan: GraphPlan): List<UnsignedEvent> {
 export async function signEvents(
   events: List<EventTemplate>,
   user: User,
-  finalizeEvent: FinalizeEvent
+  finalizeEvent: FinalizeEvent,
+  signWithExtension?: (event: EventTemplate) => Promise<Event>
 ): Promise<List<SignedEventWithConf>> {
   if (!isUserLoggedIn(user)) {
     return List();
   }
 
-  const signEventWithExtension = async (
-    event: EventTemplate
-  ): Promise<Event> => {
-    try {
-      return window.nostr.signEvent(event);
-      // eslint-disable-next-line no-empty
-    } catch {
-      throw new Error("Failed to sign event with extension");
-    }
-  };
-
   return isUserLoggedInWithExtension(user)
     ? List<SignedEventWithConf>(
         await Promise.all(
           events.map(async (event) => ({
-            event: (await signEventWithExtension(event)) as VerifiedEvent,
+            event: (await (async (): Promise<Event> => {
+              if (!signWithExtension) {
+                throw new Error("Missing extension signing implementation");
+              }
+              try {
+                return signWithExtension(event);
+                // eslint-disable-next-line no-empty
+              } catch {
+                throw new Error("Failed to sign event with extension");
+              }
+            })()) as VerifiedEvent,
           }))
         )
       )
@@ -255,11 +257,13 @@ export async function execute({
   relays,
   relayPool,
   finalizeEvent,
+  signWithExtension,
 }: {
   plan: GraphPlan;
   relays: AllRelays;
   relayPool: SimplePool;
   finalizeEvent: FinalizeEvent;
+  signWithExtension?: (event: EventTemplate) => Promise<Event>;
 }): Promise<PublishResultsEventMap> {
   const allEvents = buildDocumentEvents(plan);
 
@@ -269,7 +273,12 @@ export async function execute({
     return Map();
   }
 
-  const finalizedEvents = await signEvents(allEvents, plan.user, finalizeEvent);
+  const finalizedEvents = await signEvents(
+    allEvents,
+    plan.user,
+    finalizeEvent,
+    signWithExtension
+  );
 
   if (finalizedEvents.size === 0) {
     return Map();
@@ -471,7 +480,12 @@ export const createPublishQueue = (
     deps: FlushDeps
   ): Promise<void> => {
     const chunkEvents = List(chunk.map(([, entry]) => entry.event));
-    const signed = await signEvents(chunkEvents, deps.user, deps.finalizeEvent);
+    const signed = await signEvents(
+      chunkEvents,
+      deps.user,
+      deps.finalizeEvent,
+      deps.signWithExtension
+    );
     if (signed.size === 0) return;
 
     // eslint-disable-next-line functional/no-let
@@ -602,7 +616,8 @@ export const createPublishQueue = (
       const signed = await signEvents(
         List([event]),
         deps.user,
-        deps.finalizeEvent
+        deps.finalizeEvent,
+        deps.signWithExtension
       );
       const first = signed.first();
       if (!first) return;
@@ -668,7 +683,7 @@ export const createPublishQueue = (
     }
   };
 
-  const handleBeforeUnload = (): void => {
+  const persistPending = (): void => {
     buffer.forEach((entry) => {
       persistToOutbox(entry);
     });
@@ -690,15 +705,13 @@ export const createPublishQueue = (
       // eslint-disable-next-line no-console
       console.error("Failed to load outbox from IndexedDB");
     }
-    window.addEventListener("beforeunload", handleBeforeUnload);
   };
 
   const destroy = (): void => {
     destroyed = true;
     if (timer) clearTimeout(timer);
     if (retryTimer) clearTimeout(retryTimer);
-    window.removeEventListener("beforeunload", handleBeforeUnload);
   };
 
-  return { enqueue, getStatus, init, destroy };
+  return { enqueue, getStatus, init, persistPending, destroy };
 };

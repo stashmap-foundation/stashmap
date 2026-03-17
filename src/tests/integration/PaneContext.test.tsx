@@ -11,8 +11,8 @@ import {
   expectTree,
   openReadonlyRoute,
 } from "../testutils";
-import { UNAUTHENTICATED_USER_PK } from "../../features/app-shell/RequireLogin";
-import { defaultPane } from "../../features/app-shell/Data";
+import { UNAUTHENTICATED_USER_PK } from "../../surface/app-shell/RequireLogin";
+import { defaultPane } from "../../surface/app-shell/Data";
 
 test("App defaults to empty pane with new node editor when visiting /", async () => {
   const [alice] = setup([ALICE]);

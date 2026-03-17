@@ -3,12 +3,12 @@
 - Move first, don’t rewrite.
     - preserve function bodies and signatures for now
 - Enforce boundaries strictly.
-    - if a function needs React, hooks, JSX, or browser-only APIs, it goes under features
+    - if a function needs React, hooks, JSX, or browser-only APIs, it goes under surface
     - if that placement feels wrong, record it in move.md instead of cheating the boundary
 - Keep the app compiling during the move.
     - the easiest way is to move implementations to the new files and leave temporary re-exports from old locations
 - Don’t use workspace as a top-level architecture name.
-    - use graph, rows, session, app, infra, features
+    - use graph, rows, session, app, infra, surface
 
 I’d structure the first pass like this:
 
@@ -17,7 +17,7 @@ I’d structure the first pass like this:
 - src/session/
 - src/app/
 - src/infra/
-- src/features/
+- src/surface/
 - move.md
 
 ## Initial Setup
@@ -27,31 +27,31 @@ I’d structure the first pass like this:
 - Created `src/session/`
 - Created `src/app/`
 - Created `src/infra/`
-- Created `src/features/`
+- Created `src/surface/`
 - Added ESLint import boundary rules for the new layer directories
-- Created the first-pass target files for `graph`, `rows`, `session`, `app`, `infra`, and `features`
+- Created the first-pass target files for `graph`, `rows`, `session`, `app`, `infra`, and `surface`
 
 ## Boundary Rules
 
-- `graph` must not import `rows`, `session`, `app`, `infra`, or `features`
-- `rows` may depend on `graph`, but not on `session`, `app`, `infra`, or `features`
-- `session` is isolated and must not import `graph`, `rows`, `app`, `infra`, or `features`
-- `app` may orchestrate `graph`, `rows`, and `session`, but must not import `infra` or `features`
-- `infra` must not import `features`
-- `features` is allowed to depend on lower layers during the move; if a React-bound function lands in the wrong feature or clearly belongs elsewhere later, record that explicitly here
+- `graph` must not import `rows`, `session`, `app`, `infra`, or `surface`
+- `rows` may depend on `graph`, but not on `session`, `app`, `infra`, or `surface`
+- `session` is isolated and must not import `graph`, `rows`, `app`, `infra`, or `surface`
+- `app` may orchestrate `graph`, `rows`, and `session`, but must not import `infra` or `surface`
+- `infra` must not import `surface`
+- `surface` is allowed to depend on lower layers during the move; if a React-bound function lands in the wrong surface slice or clearly belongs elsewhere later, record that explicitly here
 
 ## Feature Targets
 
-- `src/features/app-shell/`
-- `src/features/navigation/`
-- `src/features/tree/`
-- `src/features/editor/`
-- `src/features/search/`
-- `src/features/references/`
+- `src/surface/app-shell/`
+- `src/surface/workspace/layout/`
+- `src/surface/workspace/tree/`
+- `src/surface/workspace/editor/`
+- `src/surface/workspace/search/`
+- `src/surface/workspace/references/`
 
 ## Completed Moves
 
-- Removed lower-layer imports from `features/*`
+- Removed lower-layer imports from `surface/*`
   - moved `UNAUTHENTICATED_USER_PK` and login-state helpers into `src/app/auth.ts`
   - moved `FinalizeEvent` into `src/infra/apiTypes.ts`
   - moved app-owned runtime types `Data` and `EventState` into `src/app/types.ts`
@@ -161,12 +161,12 @@ I’d structure the first pass like this:
   - all function implementations were moved out
   - all callers were rewired to the new module homes
   - `src/ViewContext.tsx` has now been deleted
-  - React row context/hooks moved to `src/features/tree/RowContext.tsx`
+  - React row context/hooks moved to `src/surface/workspace/tree/RowContext.tsx`
   - `upsertNodes` moved to `src/app/actions.ts`
 
 - Moved navigation React contexts into `src/features/navigation`
-  - `src/features/navigation/SplitPanesContext.tsx`
-  - `src/features/navigation/NavigationStateContext.tsx`
+  - `src/surface/workspace/layout/SplitPanesContext.tsx`
+  - `src/surface/workspace/layout/NavigationStateContext.tsx`
   - all callers were rewired away from the old flat `src` files
   - `src/SplitPanesContext.tsx` and `src/NavigationStateContext.tsx` have now been deleted
 
@@ -183,7 +183,7 @@ I’d structure the first pass like this:
     - `planRemoveChildNodeById`
   - moved to `src/app/editorActions.ts`:
     - `planUpdateRowNodeMetadata`
-  - moved to `src/features/tree/useChildNodeContext.ts`:
+  - moved to `src/surface/workspace/tree/useChildNodeContext.ts`:
     - `useChildNodeContext`
   - deleted:
     - `src/nodeItemMetadata.ts`
@@ -209,7 +209,7 @@ I’d structure the first pass like this:
     - parent insertion
     - pane forking
     - subtree deep-copy orchestration
-  - moved to `src/features/app-shell/PlannerContext.tsx`:
+  - moved to `src/surface/app-shell/PlannerContext.tsx`:
     - `PlanningContextProvider`
     - `usePlanner`
   - `src/planner.tsx` is now only a compatibility barrel
@@ -220,9 +220,9 @@ I’d structure the first pass like this:
     - initial pane bootstrap from route/history/storage
   - moved to `src/graph/queries.ts`:
     - `mergeKnowledgeDBs`
-  - moved to `src/features/app-shell/PermanentDocumentSyncBridge.tsx`:
+  - moved to `src/surface/app-shell/PermanentDocumentSyncBridge.tsx`:
     - permanent sync bridge component
-  - moved to `src/features/app-shell/useRelaysInfo.ts`:
+  - moved to `src/surface/app-shell/useRelaysInfo.ts`:
     - relay info fetching hook
   - `src/Data.tsx` now keeps feature-level app-shell wiring and state bootstrap
   - `src/DataContext.tsx` now keeps provider composition and imports merge helpers from `graph`
@@ -253,121 +253,121 @@ I’d structure the first pass like this:
   - `src/connections.tsx`, `src/semanticIndex.ts`, and `src/knowledge.tsx` are now compatibility barrels only
 
 - Moved tree feature React implementations out of flat legacy files
-  - moved to `src/features/tree/PaneView.tsx`:
+  - moved to `src/surface/workspace/pane/PaneView.tsx`:
     - former `src/components/Workspace.tsx` implementation
-  - moved to `src/features/tree/NodeView.tsx`:
+  - moved to `src/surface/workspace/node/NodeView.tsx`:
     - former `src/components/Node.tsx` implementation
-  - moved to `src/features/navigation/SplitPaneLayout.tsx`:
+  - moved to `src/surface/workspace/layout/SplitPaneLayout.tsx`:
     - former `src/components/SplitPaneLayout.tsx` implementation
-  - moved to `src/features/tree/DND.tsx`:
+  - moved to `src/surface/workspace/tree/DND.tsx`:
     - former `src/dnd.tsx` implementation
   - `src/components/Workspace.tsx`, `src/components/Node.tsx`, `src/components/SplitPaneLayout.tsx`, and `src/dnd.tsx` are now compatibility barrels only
 
 - Moved remaining tree/search helper implementations into `src/features/*`
-  - moved to `src/features/tree/TemporaryViewContext.tsx`:
+  - moved to `src/surface/workspace/tree/TemporaryViewContext.tsx`:
     - former `src/components/TemporaryViewContext.tsx` implementation
-  - moved to `src/features/tree/AddNode.tsx`:
+  - moved to `src/surface/workspace/node/AddNode.tsx`:
     - former `src/components/AddNode.tsx` implementation
-  - moved to `src/features/tree/SelectNodes.tsx`:
+  - moved to `src/surface/workspace/tree/SelectNodes.tsx`:
     - former `src/components/SelectNodes.tsx` implementation
-  - moved to `src/features/tree/RightMenu.tsx`:
+  - moved to `src/surface/workspace/menu/RightMenu.tsx`:
     - former `src/components/RightMenu.tsx` implementation
-  - moved to `src/features/references/ReferenceDisplay.tsx`:
+  - moved to `src/surface/workspace/references/ReferenceDisplay.tsx`:
     - former `src/components/referenceDisplay.tsx` implementation
-  - moved to `src/features/search/LoadSearchData.tsx`:
+  - moved to `src/surface/workspace/search/LoadSearchData.tsx`:
     - former `src/LoadSearchData.tsx` implementation
   - old flat files are now compatibility barrels only
 
 - Moved app-shell runtime React implementations into `src/features/app-shell` and `src/features/navigation`
-  - moved to `src/features/app-shell/Data.tsx`:
+  - moved to `src/surface/app-shell/Data.tsx`:
     - former `src/Data.tsx` implementation
-  - moved to `src/features/app-shell/DataContext.tsx`:
+  - moved to `src/surface/app-shell/DataContext.tsx`:
     - former `src/DataContext.tsx` implementation
-  - moved to `src/features/app-shell/DocumentStore.tsx`:
+  - moved to `src/surface/app-shell/DocumentStore.tsx`:
     - former `src/DocumentStore.tsx` implementation
-  - moved to `src/features/navigation/PaneHistoryContext.tsx`:
+  - moved to `src/surface/workspace/layout/PaneHistoryContext.tsx`:
     - former `src/PaneHistoryContext.tsx` implementation
-  - moved to `src/features/app-shell/UserRelayContext.tsx`:
+  - moved to `src/surface/app-shell/UserRelayContext.tsx`:
     - former `src/UserRelayContext.tsx` implementation
   - old flat files are now compatibility barrels only
 
 - Moved app-shell auth/provider/router-support implementations into `src/features/app-shell`
-  - moved to `src/features/app-shell/ApiContext.tsx`:
+  - moved to `src/surface/app-shell/ApiContext.tsx`:
     - former `src/Apis.tsx` implementation
-  - moved to `src/features/app-shell/NostrAuthContext.tsx`:
+  - moved to `src/surface/app-shell/NostrAuthContext.tsx`:
     - former `src/NostrAuthContext.tsx` implementation
-  - moved to `src/features/app-shell/NostrProvider.tsx`:
+  - moved to `src/surface/app-shell/NostrProvider.tsx`:
     - former `src/NostrProvider.tsx` implementation
-  - moved to `src/features/app-shell/RequireLogin.tsx`:
+  - moved to `src/surface/app-shell/RequireLogin.tsx`:
     - former `src/AppState.tsx` implementation
-  - moved to `src/features/app-shell/StorePreLoginContext.tsx`:
+  - moved to `src/surface/app-shell/StorePreLoginContext.tsx`:
     - former `src/StorePreLoginContext.tsx` implementation
-  - moved to `src/features/app-shell/AppShell.tsx`:
+  - moved to `src/surface/app-shell/AppShell.tsx`:
     - former `src/components/Dashboard.tsx` implementation
-  - moved to `src/features/tree/LoadingStatus.tsx`:
+  - moved to `src/surface/workspace/tree/LoadingStatus.tsx`:
     - former `src/LoadingStatus.tsx` implementation
   - old flat files are now compatibility barrels only
 
 - Moved remaining tree/editor/navigation helper implementations into `src/features/*`
-  - moved to `src/features/tree/TreeView.tsx`:
+  - moved to `src/surface/workspace/tree/TreeView.tsx`:
     - former `src/components/TreeView.tsx` implementation
-  - moved to `src/features/tree/Draggable.tsx`:
+  - moved to `src/surface/workspace/tree/Draggable.tsx`:
     - former `src/components/Draggable.tsx` implementation
-  - moved to `src/features/tree/DroppableContainer.tsx`:
+  - moved to `src/surface/workspace/tree/DroppableContainer.tsx`:
     - former `src/components/DroppableContainer.tsx` implementation
-  - moved to `src/features/editor/EditorTextContext.tsx`:
+  - moved to `src/surface/workspace/editor/EditorTextContext.tsx`:
     - former `src/components/EditorTextContext.tsx` implementation
-  - moved to `src/features/tree/EvidenceSelector.tsx`:
+  - moved to `src/surface/workspace/gutter/EvidenceSelector.tsx`:
     - former `src/components/EvidenceSelector.tsx` implementation
-  - moved to `src/features/tree/RelevanceSelector.tsx`:
+  - moved to `src/surface/workspace/gutter/RelevanceSelector.tsx`:
     - former `src/components/RelevanceSelector.tsx` implementation
-  - moved to `src/features/tree/FileDropZone.tsx`:
+  - moved to `src/surface/workspace/editor/FileDropZone.tsx`:
     - former `src/components/FileDropZone.tsx` implementation
-  - moved to `src/features/tree/FullscreenButton.tsx`:
+  - moved to `src/surface/workspace/gutter/FullscreenButton.tsx`:
     - former `src/components/FullscreenButton.tsx` implementation
-  - moved to `src/features/navigation/OpenInSplitPaneButton.tsx`:
+  - moved to `src/surface/workspace/layout/OpenInSplitPaneButton.tsx`:
     - former `src/components/OpenInSplitPaneButton.tsx` implementation
-  - moved to `src/features/tree/TypeFilterButton.tsx`:
+  - moved to `src/surface/workspace/gutter/TypeFilterButton.tsx`:
     - former `src/components/TypeFilterButton.tsx` implementation
-  - moved to `src/features/tree/keyboardNavigation.ts`:
+  - moved to `src/surface/workspace/tree/keyboardNavigation.ts`:
     - former `src/components/keyboardNavigation.ts` implementation
-  - moved to `src/features/navigation/responsive.tsx`:
+  - moved to `src/surface/workspace/layout/responsive.tsx`:
     - former `src/components/responsive.tsx` implementation
-  - moved to `src/features/tree/useRowStyle.ts`:
+  - moved to `src/surface/workspace/node/useRowStyle.ts`:
     - former `src/components/useItemStyle.ts` implementation
     - production callers now use `useRowStyle`; the old `useItemStyle` name only survives as a compatibility export
-  - moved to `src/features/app-shell/NavbarControls.tsx`:
+  - moved to `src/surface/app-shell/NavbarControls.tsx`:
     - former `src/components/NavbarControls.tsx` implementation
   - old flat files are now compatibility barrels only
 
 - Moved auth/search/relay-management feature implementations into `src/features/*`
-  - moved to `src/features/app-shell/PublishingStatusWrapper.tsx`:
+  - moved to `src/surface/app-shell/PublishingStatusWrapper.tsx`:
     - former `src/components/PublishingStatusWrapper.tsx` implementation
-  - moved to `src/features/app-shell/Relays.tsx`:
+  - moved to `src/surface/app-shell/Relays.tsx`:
     - former `src/components/Relays.tsx` implementation
-  - moved to `src/features/search/SearchModal.tsx`:
+  - moved to `src/surface/workspace/search/SearchModal.tsx`:
     - former `src/components/SearchModal.tsx` implementation
-  - moved to `src/features/tree/KeyboardShortcutsModal.tsx`:
+  - moved to `src/surface/workspace/tree/KeyboardShortcutsModal.tsx`:
     - former `src/components/KeyboardShortcutsModal.tsx` implementation
-  - moved to `src/features/app-shell/SignIn.tsx`:
+  - moved to `src/surface/app-shell/SignIn.tsx`:
     - former `src/SignIn.tsx` implementation
-  - moved to `src/features/app-shell/SignUp.tsx`:
+  - moved to `src/surface/app-shell/SignUp.tsx`:
     - former `src/SignUp.tsx` implementation
-  - moved to `src/features/app-shell/usePermanentDocumentSync.ts`:
+  - moved to `src/surface/app-shell/usePermanentDocumentSync.ts`:
     - former `src/usePermanentDocumentSync.ts` implementation
   - old flat files are now compatibility barrels only
 
 - Moved remaining app-shell/router/runtime helpers into final homes
-  - moved to `src/features/app-shell/App.tsx`:
+  - moved to `src/surface/app-shell/App.tsx`:
     - former `src/App.tsx` implementation
-  - moved to `src/features/navigation/useDragAutoScroll.ts`:
+  - moved to `src/surface/workspace/layout/useDragAutoScroll.ts`:
     - former `src/useDragAutoScroll.ts` implementation
   - moved to `src/infra/nostr.ts`:
     - former `src/PublishQueue.ts` implementation
   - old flat files are now compatibility barrels only
 
 - Split relay logic by layer
-  - moved React relay hooks into `src/features/app-shell/useRelays.ts`:
+  - moved React relay hooks into `src/surface/app-shell/useRelays.ts`:
     - `useReadRelays`
     - `usePreloadRelays`
     - `useRelaysToCreatePlan`
@@ -381,7 +381,7 @@ I’d structure the first pass like this:
 - Reduced reference-row cross-layer coupling
   - moved `referenceToText` into `src/rows/display.ts`
   - `src/buildReferenceRow.ts` now depends on `rows/display` and `session/panes` instead of depending on feature/UI code and planner just to format reference text and read pane state
-  - `src/features/references/ReferenceDisplay.tsx` now keeps only the React rendering layer
+  - `src/surface/workspace/references/ReferenceDisplay.tsx` now keeps only the React rendering layer
 
 - Boundary hold:
   - `buildNodeUrl` remains in `src/navigationUrl.ts`
@@ -393,14 +393,14 @@ I’d structure the first pass like this:
     - `planDisconnectFromParent`
     - `planDeleteNodeFromView`
     - `planMoveNodeWithView`
-  - moved to `src/features/tree/batchOperations.ts`:
+  - moved to `src/surface/workspace/tree/batchOperations.ts`:
     - batch relevance/argument updates
     - batch indent/outdent behavior
     - current-row helper for batch operations
-  - moved to `src/features/tree/useUpdateRelevance.ts`:
+  - moved to `src/surface/workspace/tree/useUpdateRelevance.ts`:
     - relevance conversion helpers
     - `useUpdateRelevance`
-  - moved to `src/features/tree/useUpdateArgument.ts`:
+  - moved to `src/surface/workspace/tree/useUpdateArgument.ts`:
     - `useUpdateArgument`
   - `src/treeMutations.ts`, `src/components/batchOperations.ts`, `src/components/useUpdateRelevance.ts`, and `src/components/useUpdateArgument.ts` are now compatibility barrels only
 
@@ -418,13 +418,13 @@ I’d structure the first pass like this:
   - keep the constructors in the flat graph boundary file for now instead of weakening lint rules
 
 - Drained the largest legacy tree UI modules into `features/tree`
-  - moved the `PaneView` implementation from `src/components/Workspace.tsx` to `src/features/tree/PaneView.tsx`
-  - moved the `Node` implementation from `src/components/Node.tsx` to `src/features/tree/NodeView.tsx`
+  - moved the `PaneView` implementation from `src/components/Workspace.tsx` to `src/surface/workspace/pane/PaneView.tsx`
+  - moved the `Node` implementation from `src/components/Node.tsx` to `src/surface/workspace/node/NodeView.tsx`
   - `src/components/Workspace.tsx` and `src/components/Node.tsx` are now compatibility barrels only
 
 - Drained pane layout and drag/drop implementation out of the flat layer
-  - moved the split-pane layout implementation from `src/components/SplitPaneLayout.tsx` to `src/features/navigation/SplitPaneLayout.tsx`
-  - moved the DnD implementation from `src/dnd.tsx` to `src/features/tree/DND.tsx`
+  - moved the split-pane layout implementation from `src/components/SplitPaneLayout.tsx` to `src/surface/workspace/layout/SplitPaneLayout.tsx`
+  - moved the DnD implementation from `src/dnd.tsx` to `src/surface/workspace/tree/DND.tsx`
   - `src/components/SplitPaneLayout.tsx` and `src/dnd.tsx` are now compatibility barrels only
 
 - Renamed row-address primitives from `ViewPath` to `RowPath`
@@ -442,7 +442,7 @@ I’d structure the first pass like this:
   - `RowPath` moved into `src/rows/rowPaths.ts`
   - row resolution moved into `src/rows/resolveRow.ts`
   - row display moved into `src/rows/display.ts`
-  - React row context/hooks moved into `src/features/tree/RowContext.tsx`
+  - React row context/hooks moved into `src/surface/workspace/tree/RowContext.tsx`
 
 - Removed the legacy `src/connections.tsx` compatibility barrel
   - rewired all remaining production and test imports directly to:

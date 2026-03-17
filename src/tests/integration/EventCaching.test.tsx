@@ -21,7 +21,7 @@ import {
   removeOutboxEvent,
   OutboxEntry,
 } from "../../infra/indexedDB";
-import { PaneView } from "../../features/tree/PaneView";
+import { PaneView } from "../../surface/workspace/pane/PaneView";
 
 jest.mock("../../infra/indexedDB");
 

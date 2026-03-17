@@ -32,42 +32,42 @@ import { KIND_CONTACTLIST } from "../../infra/nostrCore";
 import {
   RequireLogin,
   UNAUTHENTICATED_USER_PK,
-} from "../../features/app-shell/RequireLogin";
+} from "../../surface/app-shell/RequireLogin";
 import { EMPTY_SEMANTIC_ID } from "../../graph/types";
 import { createPlan } from "../../app/actions";
 import { planUpsertContact, planRemoveContact } from "../../graph/commands";
-import { PlanningContextProvider } from "../../features/app-shell/PlannerContext";
+import { PlanningContextProvider } from "../../surface/app-shell/PlannerContext";
 import { execute } from "../../infra/nostr";
 import {
   ApiProvider,
   Apis,
   FinalizeEvent,
-} from "../../features/app-shell/ApiContext";
-import { App } from "../../features/app-shell/App";
+} from "../../surface/app-shell/ApiContext";
+import { App } from "../../surface/app-shell/App";
 import {
   DataContextProps,
   DataContextProvider,
   MergeKnowledgeDB,
-} from "../../features/app-shell/DataContext";
-import type { LocalStorage } from "../../features/app-shell/types";
-import { DocumentStoreProvider } from "../../features/app-shell/DocumentStore";
+} from "../../surface/app-shell/DataContext";
+import type { LocalStorage } from "../../surface/app-shell/types";
+import { DocumentStoreProvider } from "../../surface/app-shell/DocumentStore";
 import { MockRelayPool, mockRelayPool } from "./nostrMock";
 import {
   NostrAuthContextProvider,
   isUserLoggedInWithSeed,
-} from "../../features/app-shell/NostrAuthContext";
-import { RootViewContextProvider } from "../../features/tree/RowContext";
-import { LoadSearchData } from "../../features/search/LoadSearchData";
-import { StorePreLoginContext } from "../../features/app-shell/StorePreLoginContext";
-import { TemporaryViewProvider } from "../../features/tree/TemporaryViewContext";
-import { PaneView } from "../../features/tree/PaneView";
-import { DND } from "../../features/tree/DND";
+} from "../../surface/app-shell/NostrAuthContext";
+import { RootViewContextProvider } from "../../surface/workspace/tree/RowContext";
+import { LoadSearchData } from "../../surface/workspace/search/LoadSearchData";
+import { StorePreLoginContext } from "../../surface/app-shell/StorePreLoginContext";
+import { TemporaryViewProvider } from "../../surface/workspace/tree/TemporaryViewContext";
+import { PaneView } from "../../surface/workspace/pane/PaneView";
+import { DND } from "../../surface/workspace/tree/DND";
 import {
   computeDepthLimits,
   setDropIndentDepth,
-} from "../../features/tree/DroppableContainer";
+} from "../../surface/workspace/tree/DroppableContainer";
 import { findContacts } from "../../infra/contacts";
-import { UserRelayContextProvider } from "../../features/app-shell/UserRelayContext";
+import { UserRelayContextProvider } from "../../surface/app-shell/UserRelayContext";
 import { StashmapDB } from "../../infra/indexedDB";
 import type {
   AllRelays,
@@ -81,7 +81,7 @@ import {
   PaneIndexProvider,
   useCurrentPane,
   usePaneIndex,
-} from "../../features/navigation/SplitPanesContext";
+} from "../../surface/workspace/layout/SplitPanesContext";
 import type { RowFocusIntent, View } from "../../session/types";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function

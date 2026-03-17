@@ -1,0 +1,423 @@
+{
+  "workspace_version": 2,
+  "as_user": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+  "synced_at": "2026-03-15T11:12:01.634Z",
+  "relay_urls": [
+    "wss://nostr.nodesmap.com/"
+  ],
+  "contact_pubkeys": [
+    "04c915daefee38317fa734444acee390a8269fe5810b2241e5e6dd343dfbecc9",
+    "10c26335067206d4dc2d96186a074e847c2770b8941638baec5b365f9cfda851",
+    "1afbd7863422ba56da899aae689b03a55392dc5f132c17fddcdf5097f8e9ee2d",
+    "29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595",
+    "32e1827635450ebb3c5a7d12c1f8e7b2b514439ac10a67eef3d9fd9c5c68e245",
+    "47b8080d998ae2dd5ea0a64c56036576eae6b3b0219cd681f7c5c61c2bb04d57",
+    "6e468422dfb74a5738702a8823b9b28168abab8655faacb6853cd0ee15deee93",
+    "8cab35328084b1e19aa00651f310e109da189d699f97ac0bc501061bf6913b1c",
+    "cbe2c8ca2ac188b2db8370f8d31714c9239c3a115541f32915d41f4ee7f4403b",
+    "de7ecd1e2976a6adb2ffa5f4db81a7d812c8bb6698aa00dcf1e76adb55efd645",
+    "fe0a574e2be83600609cd034cc4ae76d35549e4966194c556002cbf549971517"
+  ],
+  "authors": [
+    {
+      "pubkey": "04c915daefee38317fa734444acee390a8269fe5810b2241e5e6dd343dfbecc9",
+      "last_document_created_at": 0
+    },
+    {
+      "pubkey": "10c26335067206d4dc2d96186a074e847c2770b8941638baec5b365f9cfda851",
+      "last_document_created_at": 0
+    },
+    {
+      "pubkey": "1afbd7863422ba56da899aae689b03a55392dc5f132c17fddcdf5097f8e9ee2d",
+      "last_document_created_at": 0
+    },
+    {
+      "pubkey": "29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595",
+      "last_document_created_at": 1773425906
+    },
+    {
+      "pubkey": "32e1827635450ebb3c5a7d12c1f8e7b2b514439ac10a67eef3d9fd9c5c68e245",
+      "last_document_created_at": 0
+    },
+    {
+      "pubkey": "47b8080d998ae2dd5ea0a64c56036576eae6b3b0219cd681f7c5c61c2bb04d57",
+      "last_document_created_at": 0
+    },
+    {
+      "pubkey": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "last_document_created_at": 1773443827
+    },
+    {
+      "pubkey": "6e468422dfb74a5738702a8823b9b28168abab8655faacb6853cd0ee15deee93",
+      "last_document_created_at": 0
+    },
+    {
+      "pubkey": "8cab35328084b1e19aa00651f310e109da189d699f97ac0bc501061bf6913b1c",
+      "last_document_created_at": 0
+    },
+    {
+      "pubkey": "cbe2c8ca2ac188b2db8370f8d31714c9239c3a115541f32915d41f4ee7f4403b",
+      "last_document_created_at": 0
+    },
+    {
+      "pubkey": "de7ecd1e2976a6adb2ffa5f4db81a7d812c8bb6698aa00dcf1e76adb55efd645",
+      "last_document_created_at": 0
+    },
+    {
+      "pubkey": "fe0a574e2be83600609cd034cc4ae76d35549e4966194c556002cbf549971517",
+      "last_document_created_at": 1773150044
+    }
+  ],
+  "documents": [
+    {
+      "replaceable_key": "34770:29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595:1062b457-3271-4cb8-b982-1953c05acee8",
+      "author": "29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595",
+      "event_id": "7351c739cbd1119562547b1c0014a0df2225d7cdb6f32c3d93da77b3b8da6824",
+      "d_tag": "1062b457-3271-4cb8-b982-1953c05acee8",
+      "path": "DOCUMENTS/29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595/1062b457-3271-4cb8-b982-1953c05acee8-return-the-local-file-path-when-copying-a-root-so-agents-can-continue-editing-the-copied-document-immediately.md",
+      "base_path": "base/DOCUMENTS/29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595/1062b457-3271-4cb8-b982-1953c05acee8-return-the-local-file-path-when-copying-a-root-so-agents-can-continue-editing-the-copied-document-immediately.md",
+      "created_at": 1773413641,
+      "updated_ms": 1773413641598
+    },
+    {
+      "replaceable_key": "34770:29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595:3f34acb3-62eb-416b-a13f-8ab4025fc8de",
+      "author": "29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595",
+      "event_id": "72790953b3e806bfcf23b5d31908a66eefa9f11e7930ea81b616cd6e64b312af",
+      "d_tag": "3f34acb3-62eb-416b-a13f-8ab4025fc8de",
+      "path": "DOCUMENTS/29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595/3f34acb3-62eb-416b-a13f-8ab4025fc8de-allow-npub-values-in-knowstr-profile-json-and-in-as-user-instead-of-requiring-only-hex-pubkeys.md",
+      "base_path": "base/DOCUMENTS/29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595/3f34acb3-62eb-416b-a13f-8ab4025fc8de-allow-npub-values-in-knowstr-profile-json-and-in-as-user-instead-of-requiring-only-hex-pubkeys.md",
+      "created_at": 1773413699,
+      "updated_ms": 1773413699367
+    },
+    {
+      "replaceable_key": "34770:29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595:4273e20c-722e-45bd-8571-6c339766b1ab",
+      "author": "29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595",
+      "event_id": "1db02bed5070b78e96adf6f0b417c6bbc310f08ea99f8aaabd62e8cad7e07d50",
+      "d_tag": "4273e20c-722e-45bd-8571-6c339766b1ab",
+      "path": "DOCUMENTS/29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595/4273e20c-722e-45bd-8571-6c339766b1ab-agent-cli-ergonomics.md",
+      "base_path": "base/DOCUMENTS/29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595/4273e20c-722e-45bd-8571-6c339766b1ab-agent-cli-ergonomics.md",
+      "created_at": 1773413591,
+      "updated_ms": 1773413591003
+    },
+    {
+      "replaceable_key": "34770:29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595:4bcf2698-4583-4fa7-abe9-3664f1aaff27",
+      "author": "29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595",
+      "event_id": "3e4125472130715ac34e779ba01aac03b7d70e0002b53c22b1e94e5254052f9b",
+      "d_tag": "4bcf2698-4583-4fa7-abe9-3664f1aaff27",
+      "path": "DOCUMENTS/29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595/4bcf2698-4583-4fa7-abe9-3664f1aaff27-knowstr.md",
+      "base_path": "base/DOCUMENTS/29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595/4bcf2698-4583-4fa7-abe9-3664f1aaff27-knowstr.md",
+      "created_at": 1773425906,
+      "updated_ms": 1773425906190
+    },
+    {
+      "replaceable_key": "34770:29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595:506578a4-73cb-47cb-ac45-15a87cba2385",
+      "author": "29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595",
+      "event_id": "376fe275798cf520580f368574a3026367d91ef4b20bfcdcac646836cd2c7ddb",
+      "d_tag": "506578a4-73cb-47cb-ac45-15a87cba2385",
+      "path": "DOCUMENTS/29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595/506578a4-73cb-47cb-ac45-15a87cba2385-support-knowstr-write-help-at-the-command-level-instead-of-returning-unknown-command-write-help.md",
+      "base_path": "base/DOCUMENTS/29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595/506578a4-73cb-47cb-ac45-15a87cba2385-support-knowstr-write-help-at-the-command-level-instead-of-returning-unknown-command-write-help.md",
+      "created_at": 1773413700,
+      "updated_ms": 1773413700443
+    },
+    {
+      "replaceable_key": "34770:29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595:97a7b1dd-cf69-47ab-9c43-265250b7e0b8",
+      "author": "29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595",
+      "event_id": "46ebbd265035ae37def4364285d9c219a3e99f3f177db408c14f009f0f62933f",
+      "d_tag": "97a7b1dd-cf69-47ab-9c43-265250b7e0b8",
+      "path": "DOCUMENTS/29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595/97a7b1dd-cf69-47ab-9c43-265250b7e0b8-need-a-better-subtree-copy-model.md",
+      "base_path": "base/DOCUMENTS/29ea0d71281e5a0a30fbcaf02e1ec91105227c961cb4dc658e1ffe9d7f9a7595/97a7b1dd-cf69-47ab-9c43-265250b7e0b8-need-a-better-subtree-copy-model.md",
+      "created_at": 1773413591,
+      "updated_ms": 1773413591011
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:08736291-ffd1-451f-b97f-90c371805e10",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "1709eda7d908d263bd6996e3807ed9554aafaeca872a86101f2df0d45bd684ab",
+      "d_tag": "08736291-ffd1-451f-b97f-90c371805e10",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/08736291-ffd1-451f-b97f-90c371805e10-justin-wolfers-and-eric-zitzewitz-prediction-markets-journal-of-economic-perspectives-18-no-2-june-2004-107-26-https-doi-org-10-1257-0895330041371321.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/08736291-ffd1-451f-b97f-90c371805e10-justin-wolfers-and-eric-zitzewitz-prediction-markets-journal-of-economic-perspectives-18-no-2-june-2004-107-26-https-doi-org-10-1257-0895330041371321.md",
+      "created_at": 1772617593,
+      "updated_ms": 1772617593638
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:087f6c77-d699-43fa-9a3d-18bada675fe6",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "ff64f5845b8972204604870b52e83973a6d0ff86aac72a2730a8240c6f9ad2f0",
+      "d_tag": "087f6c77-d699-43fa-9a3d-18bada675fe6",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/087f6c77-d699-43fa-9a3d-18bada675fe6-imported-markdown-files.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/087f6c77-d699-43fa-9a3d-18bada675fe6-imported-markdown-files.md",
+      "created_at": 1772626973,
+      "updated_ms": 1772626973304
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:0b307166-5010-4b37-88fa-eedd426685e2",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "e0b9b0db83654d689f72977179f876ee52efa4adb12be91756b75c331fdbada6",
+      "d_tag": "0b307166-5010-4b37-88fa-eedd426685e2",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/0b307166-5010-4b37-88fa-eedd426685e2-delete.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/0b307166-5010-4b37-88fa-eedd426685e2-delete.md",
+      "created_at": 1772114433,
+      "updated_ms": 1772114433640
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:0e09e5ed-740c-48b3-a2c3-90f4a7232558",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "d360d2d34104634588d92ec703c5a213ae54a336b30526e28550fa8d503b98c8",
+      "d_tag": "0e09e5ed-740c-48b3-a2c3-90f4a7232558",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/0e09e5ed-740c-48b3-a2c3-90f4a7232558-leighton-vaughan-williams-ed-prediction-markets-theory-and-applications-new-york-ny-routledge-2011.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/0e09e5ed-740c-48b3-a2c3-90f4a7232558-leighton-vaughan-williams-ed-prediction-markets-theory-and-applications-new-york-ny-routledge-2011.md",
+      "created_at": 1772617593,
+      "updated_ms": 1772617593636
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:0f7bf9e8-612b-4219-a2e1-00da11f8ee51",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "6b1d50da3c8d9cfe444e1f32b3e7f35fa4d1d2ad77314bb4c85db4c1062d6906",
+      "d_tag": "0f7bf9e8-612b-4219-a2e1-00da11f8ee51",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/0f7bf9e8-612b-4219-a2e1-00da11f8ee51-todo.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/0f7bf9e8-612b-4219-a2e1-00da11f8ee51-todo.md",
+      "created_at": 1772709091,
+      "updated_ms": 1772709091841
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:2bfc642c-2059-45b4-83ee-f5a7936e7e57",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "5bc78f0d2b1a25d57388949626aff247d6e210b6d6a3050fdc8c7a2868d4e252",
+      "d_tag": "2bfc642c-2059-45b4-83ee-f5a7936e7e57",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/2bfc642c-2059-45b4-83ee-f5a7936e7e57-robin-hanson-decision-markets-for-policy-advice-in-promoting-the-general-welfare-new-perspectives-on-government-performance-brookings-institution-press-2006-151-73.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/2bfc642c-2059-45b4-83ee-f5a7936e7e57-robin-hanson-decision-markets-for-policy-advice-in-promoting-the-general-welfare-new-perspectives-on-government-performance-brookings-institution-press-2006-151-73.md",
+      "created_at": 1772617593,
+      "updated_ms": 1772617593631
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:30710e72-2822-455a-a580-baa3946c330f",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "4208473fc859483677fc89e4893f776a25fe2501616371e9becceb824d7f5a41",
+      "d_tag": "30710e72-2822-455a-a580-baa3946c330f",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/30710e72-2822-455a-a580-baa3946c330f-robin-hanson-could-gambling-save-science-encouraging-an-honest-consensus-social-epistemology-9-no-1-january-1-1995-3-33-https-doi-org-10-1080-02691729508578768.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/30710e72-2822-455a-a580-baa3946c330f-robin-hanson-could-gambling-save-science-encouraging-an-honest-consensus-social-epistemology-9-no-1-january-1-1995-3-33-https-doi-org-10-1080-02691729508578768.md",
+      "created_at": 1772617593,
+      "updated_ms": 1772617593630
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:3b9c2df8-9236-444c-ad33-ec71bc940b2e",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "8dc9b4a67eaaf70e959b4d3a5c389415cc599303ea0a360ca7fede3286537605",
+      "d_tag": "3b9c2df8-9236-444c-ad33-ec71bc940b2e",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/3b9c2df8-9236-444c-ad33-ec71bc940b2e-coworkers.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/3b9c2df8-9236-444c-ad33-ec71bc940b2e-coworkers.md",
+      "created_at": 1773410000,
+      "updated_ms": 1773410000390
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:3c4a3c10-a1cc-4b2c-bb43-65d924f83a80",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "30fed78fe81951554cae259f9035a9cc32a58023ac1c36b29c8c77ee8161d74d",
+      "d_tag": "3c4a3c10-a1cc-4b2c-bb43-65d924f83a80",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/3c4a3c10-a1cc-4b2c-bb43-65d924f83a80-delete.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/3c4a3c10-a1cc-4b2c-bb43-65d924f83a80-delete.md",
+      "created_at": 1772115720,
+      "updated_ms": 1772115720013
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:40ace101-2f34-4c4f-976e-af9e9ef18e2a",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "23d7a4327e2237ec0aafac489c87765e57ed92224985852157169521707253c2",
+      "d_tag": "40ace101-2f34-4c4f-976e-af9e9ef18e2a",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/40ace101-2f34-4c4f-976e-af9e9ef18e2a-scholarium.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/40ace101-2f34-4c4f-976e-af9e9ef18e2a-scholarium.md",
+      "created_at": 1772643529,
+      "updated_ms": 1772643529855
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:461cb279-f6a2-47cb-ad77-a0c549259186",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "8abeb75fd44695f37245bf8ff55772c0987b32a8b202096fe550eb8feb32633d",
+      "d_tag": "461cb279-f6a2-47cb-ad77-a0c549259186",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/461cb279-f6a2-47cb-ad77-a0c549259186-knowstr.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/461cb279-f6a2-47cb-ad77-a0c549259186-knowstr.md",
+      "created_at": 1773402838,
+      "updated_ms": 1773402838109
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:574a8c0a-da3a-4340-9ac0-f58cdee79c0f",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "bf10a2cb9068841a32645b02fc6ac0f80373c44e9b0124ff32ef4f4225828e4c",
+      "d_tag": "574a8c0a-da3a-4340-9ac0-f58cdee79c0f",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/574a8c0a-da3a-4340-9ac0-f58cdee79c0f-test.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/574a8c0a-da3a-4340-9ac0-f58cdee79c0f-test.md",
+      "created_at": 1772623370,
+      "updated_ms": 1772623370442
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:686e97e5-8f6a-4eee-af03-20715f10986a",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "7d3e544e5e27596c5a9845b1dbdbcb9c4c681efb8d560846ed1eb32b8c453e02",
+      "d_tag": "686e97e5-8f6a-4eee-af03-20715f10986a",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/686e97e5-8f6a-4eee-af03-20715f10986a-bugs.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/686e97e5-8f6a-4eee-af03-20715f10986a-bugs.md",
+      "created_at": 1773346569,
+      "updated_ms": 1773346569658
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:69fac961-55fc-4990-ad88-f82d40ae3748",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "5a363eddc0ec6f2a8bed31991ba8f50770044253cb7681c199248043e9447a3f",
+      "d_tag": "69fac961-55fc-4990-ad88-f82d40ae3748",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/69fac961-55fc-4990-ad88-f82d40ae3748-delete.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/69fac961-55fc-4990-ad88-f82d40ae3748-delete.md",
+      "created_at": 1772115551,
+      "updated_ms": 1772115551273
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:7d138dba-cf7b-4f92-ac44-d960ff1e04e3",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "555468d25fb5c4c312aaf8eaec80c93d3aca9a9cdc4e94b8965fa2b27b9e90c8",
+      "d_tag": "7d138dba-cf7b-4f92-ac44-d960ff1e04e3",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/7d138dba-cf7b-4f92-ac44-d960ff1e04e3-log.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/7d138dba-cf7b-4f92-ac44-d960ff1e04e3-log.md",
+      "created_at": 1772626196,
+      "updated_ms": 1772626196054
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:7f6c290c-8283-4fd9-8c8f-060b5b7a005c",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "a30db981c4a692f57dac8480ff6b0bf85dd85d17e3517b5b43091911d816d8ff",
+      "d_tag": "7f6c290c-8283-4fd9-8c8f-060b5b7a005c",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/7f6c290c-8283-4fd9-8c8f-060b5b7a005c-users.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/7f6c290c-8283-4fd9-8c8f-060b5b7a005c-users.md",
+      "created_at": 1773144844,
+      "updated_ms": 1773144844520
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:9cceda87-44cb-4507-ad2e-fe36cb23cc27",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "872ad89e889ac217380d94076c133a0842cb447d2a9a9f84b0bdc9b9232cbf9c",
+      "d_tag": "9cceda87-44cb-4507-ad2e-fe36cb23cc27",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/9cceda87-44cb-4507-ad2e-fe36cb23cc27-document.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/9cceda87-44cb-4507-ad2e-fe36cb23cc27-document.md",
+      "created_at": 1773144722,
+      "updated_ms": 1773144722972
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:9d230e1c-9f39-4ae0-af4f-f5ff30acbfe1",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "dc3acc5be5dfe7c2ac0e0b15942baad42dd45b88061c5cc430114bbb965ce23c",
+      "d_tag": "9d230e1c-9f39-4ae0-af4f-f5ff30acbfe1",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/9d230e1c-9f39-4ae0-af4f-f5ff30acbfe1-delete.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/9d230e1c-9f39-4ae0-af4f-f5ff30acbfe1-delete.md",
+      "created_at": 1772115543,
+      "updated_ms": 1772115543953
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:9e0004eb-e635-42d6-a034-fcb340133b6e",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "2f7f0903d09d0b9951c7b6e2d879978e39b40bc45f3e70d3640bb23382a3fad9",
+      "d_tag": "9e0004eb-e635-42d6-a034-fcb340133b6e",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/9e0004eb-e635-42d6-a034-fcb340133b6e-this-is-a-root-node.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/9e0004eb-e635-42d6-a034-fcb340133b6e-this-is-a-root-node.md",
+      "created_at": 1773402887,
+      "updated_ms": 1773402887079
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:a094647c-da22-49f4-b404-b4850d75d3f5",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "fc5f5a0da9cc21b14d47ec45c5a0b9052a5f853e9401a9b701e0f9f585aca517",
+      "d_tag": "a094647c-da22-49f4-b404-b4850d75d3f5",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/a094647c-da22-49f4-b404-b4850d75d3f5-roadmap.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/a094647c-da22-49f4-b404-b4850d75d3f5-roadmap.md",
+      "created_at": 1773402487,
+      "updated_ms": 1773402487664
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:a6ce5928-3fb7-4a4f-91e9-10186479b4b0",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "67422e65d29a08f6830ab3f197441119b702eb629ed2a3e64ae9876fd849280a",
+      "d_tag": "a6ce5928-3fb7-4a4f-91e9-10186479b4b0",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/a6ce5928-3fb7-4a4f-91e9-10186479b4b0-knowstr.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/a6ce5928-3fb7-4a4f-91e9-10186479b4b0-knowstr.md",
+      "created_at": 1773443827,
+      "updated_ms": 1773443827349
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:b229d79a-447c-43b8-af3d-d89ccaec4846",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "bf560eaad5250eaeb808fba59dd70eaa90c83bc2504a44ac3ab7a5dc2f5476e7",
+      "d_tag": "b229d79a-447c-43b8-af3d-d89ccaec4846",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/b229d79a-447c-43b8-af3d-d89ccaec4846-done.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/b229d79a-447c-43b8-af3d-d89ccaec4846-done.md",
+      "created_at": 1773402838,
+      "updated_ms": 1773402838105
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:ba15128d-72c7-44dd-8c61-9337ebd0d23c",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "e653a1a71a7d045f21c8f11a6300dc849381f7ab755a3536858e3b948389961b",
+      "d_tag": "ba15128d-72c7-44dd-8c61-9337ebd0d23c",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/ba15128d-72c7-44dd-8c61-9337ebd0d23c-jim-bell-assassination-politics-1995-http-www-outpost-of-freedom-com-jimbellap-htm.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/ba15128d-72c7-44dd-8c61-9337ebd0d23c-jim-bell-assassination-politics-1995-http-www-outpost-of-freedom-com-jimbellap-htm.md",
+      "created_at": 1772617593,
+      "updated_ms": 1772617593611
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:c111d4d6-fe3c-4f73-8a95-d43ede243bcd",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "69f518209100f142e89bfa0098341decbfe20a5624e7bb535d498d2b31cfd33b",
+      "d_tag": "c111d4d6-fe3c-4f73-8a95-d43ede243bcd",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/c111d4d6-fe3c-4f73-8a95-d43ede243bcd-mvp.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/c111d4d6-fe3c-4f73-8a95-d43ede243bcd-mvp.md",
+      "created_at": 1772708996,
+      "updated_ms": 1772708996050
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:c55088c6-dee1-4eea-b42f-3a8a1dbed434",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "0d6f8761fa63ae8d69d953588e0e07f6ede22dbfd5c26dcc4b54f737482fbd29",
+      "d_tag": "c55088c6-dee1-4eea-b42f-3a8a1dbed434",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/c55088c6-dee1-4eea-b42f-3a8a1dbed434-robin-hanson-shall-we-vote-on-values-but-bet-on-beliefs-journal-of-political-philosophy-21-no-2-2013-151-78-https-doi-org-10-1111-jopp-12008.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/c55088c6-dee1-4eea-b42f-3a8a1dbed434-robin-hanson-shall-we-vote-on-values-but-bet-on-beliefs-journal-of-political-philosophy-21-no-2-2013-151-78-https-doi-org-10-1111-jopp-12008.md",
+      "created_at": 1772617593,
+      "updated_ms": 1772617593632
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:d11b3cc7-380d-46ea-8402-4b966bb080a6",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "3f5677e31116d161a7dbfbe122b24d4ca3214d6fdacae088a75e189cad5f7500",
+      "d_tag": "d11b3cc7-380d-46ea-8402-4b966bb080a6",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/d11b3cc7-380d-46ea-8402-4b966bb080a6-log.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/d11b3cc7-380d-46ea-8402-4b966bb080a6-log.md",
+      "created_at": 1773426048,
+      "updated_ms": 1773426048655
+    },
+    {
+      "replaceable_key": "34770:4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c:e41fd5d6-e144-4df8-bbfc-3d026b1d6b6d",
+      "author": "4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c",
+      "event_id": "ea8c48ececbd929e6d2d83779946c1417142f8b7eb89d202ff0509a93cca4ce2",
+      "d_tag": "e41fd5d6-e144-4df8-bbfc-3d026b1d6b6d",
+      "path": "DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/e41fd5d6-e144-4df8-bbfc-3d026b1d6b6d-imported-markdown-files.md",
+      "base_path": "base/DOCUMENTS/4e89370bea5fd8f0e2608371e373b41e620f9cd7bfb365494c8e8fc0a8af203c/e41fd5d6-e144-4df8-bbfc-3d026b1d6b6d-imported-markdown-files.md",
+      "created_at": 1772626147,
+      "updated_ms": 1772626147701
+    },
+    {
+      "replaceable_key": "34770:fe0a574e2be83600609cd034cc4ae76d35549e4966194c556002cbf549971517:282393c7-83c7-4888-9177-58c2028281f1",
+      "author": "fe0a574e2be83600609cd034cc4ae76d35549e4966194c556002cbf549971517",
+      "event_id": "b1cae554c3210cc46f19966db9f6d7b4818cd13e7e07f911b972914d641df5d4",
+      "d_tag": "282393c7-83c7-4888-9177-58c2028281f1",
+      "path": "DOCUMENTS/fe0a574e2be83600609cd034cc4ae76d35549e4966194c556002cbf549971517/282393c7-83c7-4888-9177-58c2028281f1-bitcoin.md",
+      "base_path": "base/DOCUMENTS/fe0a574e2be83600609cd034cc4ae76d35549e4966194c556002cbf549971517/282393c7-83c7-4888-9177-58c2028281f1-bitcoin.md",
+      "created_at": 1773150044,
+      "updated_ms": 1773150044597
+    },
+    {
+      "replaceable_key": "34770:fe0a574e2be83600609cd034cc4ae76d35549e4966194c556002cbf549971517:3b0c593e-cb72-4cca-97ad-013a8b97f329",
+      "author": "fe0a574e2be83600609cd034cc4ae76d35549e4966194c556002cbf549971517",
+      "event_id": "75c8f90777191372a12d110c03f3d8b1b98a3d73bf96256494f89cd71f499fdb",
+      "d_tag": "3b0c593e-cb72-4cca-97ad-013a8b97f329",
+      "path": "DOCUMENTS/fe0a574e2be83600609cd034cc4ae76d35549e4966194c556002cbf549971517/3b0c593e-cb72-4cca-97ad-013a8b97f329-log.md",
+      "base_path": "base/DOCUMENTS/fe0a574e2be83600609cd034cc4ae76d35549e4966194c556002cbf549971517/3b0c593e-cb72-4cca-97ad-013a8b97f329-log.md",
+      "created_at": 1773150033,
+      "updated_ms": 1773150033621
+    }
+  ]
+}

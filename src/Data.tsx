@@ -1,8 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { List, Map, Set, OrderedSet } from "immutable";
-// eslint-disable-next-line import/no-unresolved
-import { RelayInformation } from "nostr-tools/lib/types/nip11";
 import {
   KIND_KNOWLEDGE_DOCUMENT,
   KIND_CONTACTLIST,
@@ -11,207 +9,42 @@ import {
 } from "./nostr";
 import { DataContextProvider, MergeKnowledgeDB } from "./DataContext";
 import { useApis } from "./Apis";
-import { PlanningContextProvider, replaceUnauthenticatedUser } from "./planner";
+import { replaceUnauthenticatedUser } from "./app/actions";
+import { PlanningContextProvider } from "./features/app-shell/PlannerContext";
 import { useUserRelayContext } from "./UserRelayContext";
 import { flattenRelays, usePreloadRelays } from "./relays";
 import { useDefaultRelays } from "./NostrAuthContext";
 import { useEventQuery } from "./commons/useNostrQuery";
 import { openDB, StashmapDB, getOutboxEvents } from "./indexedDB";
-import {
-  pathToStack,
-  parseNodeRouteUrl,
-  parseAuthorFromSearch,
-} from "./navigationUrl";
 import { splitID } from "./connections";
-import { UNAUTHENTICATED_USER_PK } from "./AppState";
-import { defaultPane, generatePaneId } from "./session/panes";
-
 import {
-  jsonToPanes,
-  jsonToViews,
-  paneToJSON,
-  Serializable,
-  viewDataToJSON,
-} from "./serializer";
+  getInitialPanes,
+  loadPanesFromStorage,
+  loadViewsFromStorage,
+  savePanesToStorage,
+  saveViewsToStorage,
+} from "./infra/storage";
 import { NavigationStateProvider } from "./features/navigation/NavigationStateContext";
 import {
   mergeEvents,
   newProcessedEvents,
   processEvents,
 } from "./eventProcessing";
-import { DocumentStoreProvider, useDocumentStore } from "./DocumentStore";
-import { usePermanentDocumentSync } from "./usePermanentDocumentSync";
+import { DocumentStoreProvider } from "./DocumentStore";
 import { createEmptySemanticIndex } from "./semanticIndex";
+import { PermanentDocumentSyncBridge } from "./features/app-shell/PermanentDocumentSyncBridge";
+import { useRelaysInfo } from "./features/app-shell/useRelaysInfo";
 
 export { defaultPane } from "./session/panes";
-
-function panesStorageKey(publicKey: PublicKey): string {
-  return `stashmap-panes-${publicKey}`;
-}
-
-function loadPanesFromStorage(publicKey: PublicKey): Pane[] | undefined {
-  try {
-    const raw = localStorage.getItem(panesStorageKey(publicKey));
-    if (!raw) {
-      return undefined;
-    }
-    const panes = jsonToPanes({ panes: JSON.parse(raw) as Serializable });
-
-    return panes.length > 0 ? panes : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function savePanesToStorage(publicKey: PublicKey, panes: Pane[]): void {
-  if (publicKey === UNAUTHENTICATED_USER_PK) {
-    return;
-  }
-  try {
-    const serialized = panes.map((p) => paneToJSON(p));
-    localStorage.setItem(
-      panesStorageKey(publicKey),
-      JSON.stringify(serialized)
-    );
-  } catch {
-    // ignore storage errors
-  }
-}
-
-function viewsStorageKey(publicKey: PublicKey): string {
-  return `stashmap-views-${publicKey}`;
-}
-
-function loadViewsFromStorage(publicKey: PublicKey): Views | undefined {
-  try {
-    const raw = localStorage.getItem(viewsStorageKey(publicKey));
-    if (!raw) {
-      return undefined;
-    }
-
-    return jsonToViews(JSON.parse(raw) as Serializable);
-  } catch {
-    return undefined;
-  }
-}
-
-function saveViewsToStorage(publicKey: PublicKey, views: Views): void {
-  try {
-    localStorage.setItem(
-      viewsStorageKey(publicKey),
-      JSON.stringify(viewDataToJSON(views, []))
-    );
-  } catch {
-    // ignore storage errors
-  }
-}
-
-function getInitialPanes(publicKey: PublicKey): Pane[] {
-  const nodeID = parseNodeRouteUrl(window.location.pathname);
-  if (nodeID) {
-    const nodeAuthor = splitID(nodeID)[0] || publicKey;
-    return [
-      {
-        id: generatePaneId(),
-        stack: [],
-        author: nodeAuthor,
-        rootNodeId: nodeID,
-      },
-    ];
-  }
-  const urlStack = pathToStack(window.location.pathname);
-  if (urlStack.length > 0) {
-    const urlAuthor =
-      parseAuthorFromSearch(window.location.search) || publicKey;
-    return [{ id: generatePaneId(), stack: urlStack, author: urlAuthor }];
-  }
-  const historyState = window.history.state as {
-    panes?: Pane[];
-  } | null;
-  if (historyState?.panes && historyState.panes.length > 0) {
-    return historyState.panes;
-  }
-  const stored = loadPanesFromStorage(publicKey);
-  if (stored) {
-    return stored;
-  }
-  return [defaultPane(publicKey)];
-}
 
 type DataProps = {
   user: User;
   children: React.ReactNode;
 };
 
-function PermanentDocumentSyncBridge({
-  db,
-  myself,
-  contacts,
-  extraAuthors,
-  defaultRelays,
-  userRelays,
-  contactsRelays,
-}: {
-  db: StashmapDB | null | undefined;
-  myself: PublicKey;
-  contacts: Contacts;
-  extraAuthors: PublicKey[];
-  defaultRelays: Relays;
-  userRelays: Relays;
-  contactsRelays: Map<PublicKey, Relays>;
-}): null {
-  const addLiveEvents = useDocumentStore()?.addEvents;
-
-  usePermanentDocumentSync({
-    enabled: db !== undefined,
-    db: db || null,
-    myself,
-    contacts,
-    extraAuthors,
-    addLiveEvents,
-    defaultRelays,
-    userRelays,
-    contactsRelays,
-  });
-
-  return null;
-}
-
 export const KIND_SEARCH = [KIND_KNOWLEDGE_DOCUMENT];
 
 export const KINDS_META = [KIND_SETTINGS, KIND_CONTACTLIST];
-
-function useRelaysInfo(
-  relays: Array<Relay>,
-  eose: boolean
-): Map<string, RelayInformation | undefined> {
-  const { nip11 } = useApis();
-  const [infos, setInfos] = useState<Map<string, RelayInformation | undefined>>(
-    Map<string, RelayInformation | undefined>()
-  );
-  useEffect(() => {
-    if (!eose) {
-      return;
-    }
-
-    (async () => {
-      const fetchedInfos = await Promise.all(
-        relays.map(
-          async (relay): Promise<[string, RelayInformation | undefined]> => {
-            try {
-              const info = await nip11.fetchRelayInformation(relay.url);
-              return [relay.url, info];
-            } catch {
-              return [relay.url, undefined];
-            }
-          }
-        )
-      );
-      setInfos(Map(fetchedInfos));
-    })();
-  }, [JSON.stringify(relays.map((r) => r.url)), eose]);
-  return infos;
-}
 
 const DEFAULT_TEMPORARY_VIEW: TemporaryViewState = {
   rowFocusIntents: Map<number, RowFocusIntent>(),

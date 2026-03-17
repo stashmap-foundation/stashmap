@@ -10,7 +10,7 @@ import {
   setup,
   type,
 } from "../utils.test";
-import { updateNodeItemMetadata } from "../nodeItemMetadata";
+import { updateChildNodeMetadata } from "../graph/commands";
 
 function makeItem(
   id: ID,
@@ -177,7 +177,7 @@ Source
   });
 });
 
-describe("updateNodeItemMetadata", () => {
+describe("updateChildNodeMetadata", () => {
   test("updates argument on existing item", () => {
     const item = makeItem(
       "node1" as ID,
@@ -186,7 +186,7 @@ describe("updateNodeItemMetadata", () => {
       undefined
     );
 
-    const updated = updateNodeItemMetadata(item, { argument: "confirms" });
+    const updated = updateChildNodeMetadata(item, { argument: "confirms" });
     expect(updated.argument).toBe("confirms");
   });
 
@@ -199,7 +199,7 @@ describe("updateNodeItemMetadata", () => {
       "confirms"
     );
 
-    const updated = updateNodeItemMetadata(item, { argument: undefined });
+    const updated = updateChildNodeMetadata(item, { argument: undefined });
     expect(updated.argument).toBeUndefined();
   });
 
@@ -211,7 +211,7 @@ describe("updateNodeItemMetadata", () => {
       undefined
     );
 
-    const updated = updateNodeItemMetadata(item, {});
+    const updated = updateChildNodeMetadata(item, {});
     expect(updated).toEqual(item);
   });
 });

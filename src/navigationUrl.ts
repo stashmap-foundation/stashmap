@@ -1,5 +1,13 @@
 import { getTextForSemanticID } from "./semanticProjection";
 
+export {
+  buildNodeRouteUrl,
+  parseAuthorFromSearch,
+  parseNodeRouteUrl,
+  pathToStack,
+  urlToPane,
+} from "./session/navigation";
+
 function stackToPath(
   stack: ID[],
   knowledgeDBs: KnowledgeDBs,
@@ -23,13 +31,6 @@ function stackToPath(
   }
   return `/n/${segments.join("/")}`;
 }
-
-export {
-  buildNodeRouteUrl,
-  parseAuthorFromSearch,
-  parseNodeRouteUrl,
-  pathToStack,
-} from "./session/navigation";
 
 export function buildNodeUrl(
   stack: ID[],

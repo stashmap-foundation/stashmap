@@ -162,6 +162,122 @@ I’d structure the first pass like this:
   - callers were rewired away from `src/treeTraversal.ts`
   - `src/treeTraversal.ts` has now been deleted
 
+- Moved child-node metadata and row-driven metadata updates out of flat legacy files
+  - moved to `src/graph/commands.ts`:
+    - `ChildNodeMetadata`
+    - `updateChildNodeMetadata`
+    - `planUpdateChildNodeMetadataById`
+    - `planRemoveChildNodeById`
+  - moved to `src/app/editorActions.ts`:
+    - `planUpdateRowNodeMetadata`
+  - moved to `src/features/tree/useChildNodeContext.ts`:
+    - `useChildNodeContext`
+  - deleted:
+    - `src/nodeItemMetadata.ts`
+    - `src/nodeItemMutations.ts`
+    - `src/dataPlanner.ts`
+    - `src/components/useNodeItemContext.ts`
+
+- Drained `src/planner.tsx` into layer-appropriate homes
+  - moved to `src/graph/commands.ts`:
+    - graph plan construction and graph mutations
+    - contact mutation planning
+    - child attachment and subtree copy/move/delete helpers
+  - moved to `src/app/actions.ts`:
+    - unpublished-event rewriting
+    - relay metadata event building
+    - document-event construction
+    - workspace plan construction
+  - moved to `src/app/editorActions.ts`:
+    - node text save/update flow
+    - empty-node materialization/update flow
+    - clipboard parsing
+  - moved to `src/app/treeActions.ts`:
+    - parent insertion
+    - pane forking
+    - subtree deep-copy orchestration
+  - moved to `src/features/app-shell/PlannerContext.tsx`:
+    - `PlanningContextProvider`
+    - `usePlanner`
+  - `src/planner.tsx` is now only a compatibility barrel
+
+- Drained `src/Data.tsx` and `src/DataContext.tsx` utility logic into lower layers
+  - moved to `src/infra/storage.ts`:
+    - pane/view local-storage load/save
+    - initial pane bootstrap from route/history/storage
+  - moved to `src/graph/queries.ts`:
+    - `mergeKnowledgeDBs`
+  - moved to `src/features/app-shell/PermanentDocumentSyncBridge.tsx`:
+    - permanent sync bridge component
+  - moved to `src/features/app-shell/useRelaysInfo.ts`:
+    - relay info fetching hook
+  - `src/Data.tsx` now keeps feature-level app-shell wiring and state bootstrap
+  - `src/DataContext.tsx` now keeps provider composition and imports merge helpers from `graph`
+
+- Drained flat graph utility modules into `src/graph/*`
+  - moved to `src/graph/types.ts`:
+    - `EMPTY_SEMANTIC_ID`
+    - `TextSeed`
+    - `RefTargetSeed`
+    - `newDB`
+  - moved to `src/graph/context.ts`:
+    - search-id helpers
+    - semantic-id/context helpers
+    - node stack/depth helpers
+    - text-seed building helpers
+  - moved to `src/graph/queries.ts`:
+    - node lookup helpers
+    - child-node lookup
+    - search-node materialization
+    - node child reorder/delete helpers
+    - empty-node injection helpers
+    - filter helpers
+  - moved to `src/graph/references.ts`:
+    - ref detection/resolution
+    - route target resolution for refs and concrete nodes
+  - moved to `src/graph/semanticIndex.ts`:
+    - semantic index construction/update helpers
+  - `src/connections.tsx`, `src/semanticIndex.ts`, and `src/knowledge.tsx` are now compatibility barrels only
+
+- Boundary hold:
+  - `buildNodeUrl` remains in `src/navigationUrl.ts`
+  - reason: moving it into `src/session/navigation.ts` would violate the lint boundary because it depends on semantic projection (`getTextForSemanticID`)
+  - keep it in the flat navigation boundary file for now instead of weakening the rule
+
+- Moved legacy tree mutation/application helpers out of flat files
+  - moved to `src/app/treeActions.ts`:
+    - `planDisconnectFromParent`
+    - `planDeleteNodeFromView`
+    - `planMoveNodeWithView`
+  - moved to `src/features/tree/batchOperations.ts`:
+    - batch relevance/argument updates
+    - batch indent/outdent behavior
+    - current-row helper for batch operations
+  - moved to `src/features/tree/useUpdateRelevance.ts`:
+    - relevance conversion helpers
+    - `useUpdateRelevance`
+  - moved to `src/features/tree/useUpdateArgument.ts`:
+    - `useUpdateArgument`
+  - `src/treeMutations.ts`, `src/components/batchOperations.ts`, `src/components/useUpdateRelevance.ts`, and `src/components/useUpdateArgument.ts` are now compatibility barrels only
+
+- Moved remaining low-level graph helpers out of flat files
+  - moved to `src/graph/context.ts`:
+    - root-anchor helpers
+    - node public-key stamping helpers
+  - moved to `src/graph/queries.ts`:
+    - system-root lookup helpers
+  - `src/rootAnchor.ts`, `src/systemRoots.ts`, and `src/userEntry.ts` are now compatibility barrels only
+
+- Boundary / lint hold:
+  - `src/nodeFactory.ts` stays as the implementation home for `newNode` and `newRefNode`
+  - reason: moving these constructors into `src/graph/commands.ts` pulled `uuid` into a stricter lint context and produced unsafe-type errors
+  - keep the constructors in the flat graph boundary file for now instead of weakening lint rules
+
+- Drained the largest legacy tree UI modules into `features/tree`
+  - moved the `PaneView` implementation from `src/components/Workspace.tsx` to `src/features/tree/PaneView.tsx`
+  - moved the `Node` implementation from `src/components/Node.tsx` to `src/features/tree/NodeView.tsx`
+  - `src/components/Workspace.tsx` and `src/components/Node.tsx` are now compatibility barrels only
+
 - Renamed row-address primitives from `ViewPath` to `RowPath`
   - renamed:
     - `ViewPath` -> `RowPath`

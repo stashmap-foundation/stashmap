@@ -1,7 +1,6 @@
 import React from "react";
-import { Map } from "immutable";
-import { newDB } from "./knowledge";
 import { injectEmptyNodesIntoKnowledgeDBs } from "./connections";
+import { mergeKnowledgeDBs } from "./graph/queries";
 import {
   useDocumentKnowledgeDBs,
   useDocumentSemanticIndex,
@@ -28,28 +27,6 @@ export function DataContextProvider({
   children: React.ReactNode;
 }): JSX.Element {
   return <DataContext.Provider value={props}>{children}</DataContext.Provider>;
-}
-
-function mergeDBNodesAndNodes(
-  a: KnowledgeData | undefined,
-  b: KnowledgeData | undefined
-): KnowledgeData {
-  const existing = a || newDB();
-  if (b === undefined) {
-    return existing;
-  }
-  return {
-    nodes: existing.nodes.merge(b.nodes),
-  };
-}
-
-function mergeKnowledgeDBs(a: KnowledgeDBs, b: KnowledgeDBs): KnowledgeDBs {
-  const allUsers = a.keySeq().toSet().union(b.keySeq().toSet());
-  return Map<PublicKey, KnowledgeData>(
-    allUsers.toArray().map((userPK) => {
-      return [userPK, mergeDBNodesAndNodes(a.get(userPK), b.get(userPK))];
-    })
-  );
 }
 
 export function MergeKnowledgeDB({

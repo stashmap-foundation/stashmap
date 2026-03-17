@@ -1,7 +1,7 @@
 import type { Map as ImmutableMap } from "immutable";
 import type { StashmapDB } from "../../indexedDB";
-import { useDocumentStore } from "../../DocumentStore";
-import { usePermanentDocumentSync } from "../../usePermanentDocumentSync";
+import { useDocumentStore } from "./DocumentStore";
+import { usePermanentDocumentSync } from "./usePermanentDocumentSync";
 
 export function PermanentDocumentSyncBridge({
   db,

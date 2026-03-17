@@ -10,7 +10,7 @@ import {
 import {
   TemporaryViewProvider,
   useTemporaryView,
-} from "../../components/TemporaryViewContext";
+} from "./TemporaryViewContext";
 
 import {
   useCurrentNode,
@@ -27,26 +27,26 @@ import {
   useSplitPanes,
 } from "../navigation/SplitPanesContext";
 import { useNavigationState } from "../navigation/NavigationStateContext";
-import { usePaneHistory } from "../../PaneHistoryContext";
+import { usePaneHistory } from "../navigation/PaneHistoryContext";
 import {
   PaneTreeResultProvider,
   TreeView,
   usePaneTreeResult,
-} from "../../components/TreeView";
-import { DroppableContainer } from "../../components/DroppableContainer";
+} from "./TreeView";
+import { DroppableContainer } from "./DroppableContainer";
 import {
   PaneSearchButton,
   PaneSettingsMenu,
   ClosePaneButton,
-} from "../../components/SplitPaneLayout";
+} from "../navigation/SplitPaneLayout";
 import {
   InlineFilterDots,
   FilterId,
   useToggleFilter,
-} from "../../components/TypeFilterButton";
-import { NewPaneButton } from "../../components/OpenInSplitPaneButton";
-import { PublishingStatusWrapper } from "../../components/PublishingStatusWrapper";
-import { SignInMenuBtn } from "../../SignIn";
+} from "./TypeFilterButton";
+import { NewPaneButton } from "../navigation/OpenInSplitPaneButton";
+import { PublishingStatusWrapper } from "../app-shell/PublishingStatusWrapper";
+import { SignInMenuBtn } from "../app-shell/SignIn";
 import { usePlanner, planForkPane } from "../../planner";
 import {
   planClearTemporarySelection,
@@ -54,10 +54,7 @@ import {
   planShiftTemporarySelection,
   planToggleTemporarySelection,
 } from "../../session/selection";
-import {
-  parseTextToTrees,
-  planPasteMarkdownTrees,
-} from "../../components/FileDropZone";
+import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import {
   getNodeStack,
   getNodeText,
@@ -69,7 +66,7 @@ import {
 } from "../../connections";
 import { getOwnLogRoot } from "../../systemRoots";
 import { buildNodeUrl, buildNodeRouteUrl } from "../../navigationUrl";
-import { KeyboardShortcutsModal } from "../../components/KeyboardShortcutsModal";
+import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import {
   focusRow,
   getFocusableRows,
@@ -78,7 +75,7 @@ import {
   getRowKey,
   getScrollToRow,
   isEditableElement,
-} from "../../components/keyboardNavigation";
+} from "./keyboardNavigation";
 import {
   planBatchRelevance,
   planBatchArgument,

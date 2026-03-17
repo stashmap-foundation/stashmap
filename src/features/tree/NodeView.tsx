@@ -26,7 +26,7 @@ import {
   useRowPath,
   useSearchDepth,
 } from "./RowContext";
-import { isEditableNode } from "../../components/TemporaryViewContext";
+import { isEditableNode } from "./TemporaryViewContext";
 import { planBatchIndent, planBatchOutdent } from "./batchOperations";
 import {
   getRefLinkTargetInfo,
@@ -36,10 +36,10 @@ import {
   resolveNode,
   isRefNode,
 } from "../../connections";
-import { ReferenceDisplay } from "../../components/referenceDisplay";
-import { IS_MOBILE } from "../../components/responsive";
-import { MiniEditor, preventEditorBlur } from "../../components/AddNode";
-import { useOnToggleExpanded } from "../../components/SelectNodes";
+import { ReferenceDisplay } from "../references/ReferenceDisplay";
+import { IS_MOBILE } from "../navigation/responsive";
+import { MiniEditor, preventEditorBlur } from "./AddNode";
+import { useOnToggleExpanded } from "./SelectNodes";
 import { useData } from "../../DataContext";
 import {
   Plan,
@@ -54,12 +54,9 @@ import {
 } from "../../planner";
 import { planSetRowFocusIntent } from "../../session/focus";
 import { planExpandNode } from "../../session/views";
-import {
-  parsedLinesToTrees,
-  planPasteMarkdownTrees,
-} from "../../components/FileDropZone";
+import { parsedLinesToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import { planDisconnectFromParent } from "../../treeMutations";
-import { useNodeIsLoading } from "../../LoadingStatus";
+import { useNodeIsLoading } from "./LoadingStatus";
 import { NodeCard } from "../../commons/Ui";
 import {
   usePaneStack,
@@ -68,9 +65,9 @@ import {
   useNavigatePane,
 } from "../navigation/SplitPanesContext";
 import { buildNodeRouteUrl } from "../../navigationUrl";
-import { RightMenu } from "../../components/RightMenu";
-import { useItemStyle } from "../../components/useItemStyle";
-import { EditorTextProvider } from "../../components/EditorTextContext";
+import { RightMenu } from "./RightMenu";
+import { useRowStyle } from "./useRowStyle";
+import { EditorTextProvider } from "../editor/EditorTextContext";
 import { getTreeChildren } from "../../rows/projectTree";
 import { getNodeUserPublicKey } from "../../userEntry";
 
@@ -714,7 +711,7 @@ export function Node({
   const rowPath = useRowPath();
   const levels = getLevels(rowPath);
   const searchDepth = useSearchDepth();
-  const { cardStyle, textStyle, textClassName, relevance } = useItemStyle();
+  const { cardStyle, textStyle, textClassName, relevance } = useRowStyle();
   const defaultCls = isDesktop ? "hover-light-bg" : "";
   const cls =
     className !== undefined ? `${className} hover-light-bg` : defaultCls;

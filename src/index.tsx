@@ -8,9 +8,9 @@ import "./assets/fonts/nostr/css/nostr.css";
 import "./Workspace.scss";
 import "./App.css";
 import { App } from "./App";
-import { NostrAuthContextProvider } from "./NostrAuthContext";
-import { NostrProvider } from "./NostrProvider";
-import { UserRelayContextProvider } from "./UserRelayContext";
+import { NostrAuthContextProvider } from "./features/app-shell/NostrAuthContext";
+import { NostrProvider } from "./features/app-shell/NostrProvider";
+import { UserRelayContextProvider } from "./features/app-shell/UserRelayContext";
 
 const defaultRelayUrls = process.env.DEFAULT_RELAYS?.split(",");
 

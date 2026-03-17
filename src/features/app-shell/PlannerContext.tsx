@@ -2,7 +2,7 @@ import React, { Dispatch, SetStateAction, useEffect, useRef } from "react";
 import { Event } from "nostr-tools";
 import { List, Set as ImmutableSet } from "immutable";
 import { execute, republishEvents } from "../../executor";
-import { useApis } from "../../Apis";
+import { useApis } from "./ApiContext";
 import { createPublishQueue } from "../../PublishQueue";
 import type { StashmapDB } from "../../indexedDB";
 import { useData } from "../../DataContext";

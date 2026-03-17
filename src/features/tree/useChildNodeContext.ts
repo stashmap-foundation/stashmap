@@ -15,7 +15,7 @@ import {
 } from "../../app/editorActions";
 import { usePaneStack } from "../navigation/SplitPanesContext";
 import { useData } from "../../DataContext";
-import { useEditorText } from "../../components/EditorTextContext";
+import { useEditorText } from "../editor/EditorTextContext";
 
 type ChildNodeContext = {
   nodeIndex: number | undefined;

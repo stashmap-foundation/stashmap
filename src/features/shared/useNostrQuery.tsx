@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { Event, Filter, SimplePool } from "nostr-tools";
 import { Map, OrderedMap } from "immutable";
-import { sanitizeAuthorsFilter } from "../../nostrEvents";
+import { sanitizeAuthorsFilter } from "../../infra/nostrEvents";
 
 type EventQueryResult = {
   events: OrderedMap<string, Event>;

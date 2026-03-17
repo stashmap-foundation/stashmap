@@ -5,13 +5,16 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { useData } from "../../DataContext";
+import { useData } from "../app-shell/DataContext";
 import { getNodeRouteTargetInfo } from "../../graph/references";
-import { buildNodeUrl, buildNodeRouteUrl } from "../../navigationUrl";
+import { buildNodeUrl } from "../../graph/nodeUrl";
 import { resolveSemanticStackToActualIDs } from "../../graph/semanticResolution";
-import { usePlanner } from "../../planner";
-import type { HistoryState } from "../../session/navigation";
-import { urlToPane } from "../../session/navigation";
+import { usePlanner } from "../app-shell/PlannerContext";
+import {
+  buildNodeRouteUrl,
+  type HistoryState,
+  urlToPane,
+} from "../../session/navigation";
 
 type NavigationStateContextType = {
   activePaneIndex: number;

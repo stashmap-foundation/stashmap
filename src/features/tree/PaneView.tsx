@@ -18,7 +18,7 @@ import {
   useIsViewingOtherUserContent,
   useRowPath,
 } from "./RowContext";
-import { useData } from "../../DataContext";
+import { useData } from "../app-shell/DataContext";
 import {
   useCurrentPane,
   usePaneStack,
@@ -47,7 +47,8 @@ import {
 import { NewPaneButton } from "../navigation/OpenInSplitPaneButton";
 import { PublishingStatusWrapper } from "../app-shell/PublishingStatusWrapper";
 import { SignInMenuBtn } from "../app-shell/SignIn";
-import { usePlanner, planForkPane } from "../../planner";
+import { planDeleteNodeFromView, planForkPane } from "../../app/treeActions";
+import { usePlanner } from "../app-shell/PlannerContext";
 import {
   planClearTemporarySelection,
   planSelectAllTemporaryRows,
@@ -62,10 +63,10 @@ import {
   isSearchId,
   shortID,
 } from "../../graph/context";
-import { getNode } from "../../graph/queries";
+import { getNode, getOwnLogRoot } from "../../graph/queries";
 import { resolveNode } from "../../graph/references";
-import { getOwnLogRoot } from "../../systemRoots";
-import { buildNodeUrl, buildNodeRouteUrl } from "../../navigationUrl";
+import { buildNodeUrl } from "../../graph/nodeUrl";
+import { buildNodeRouteUrl } from "../../session/navigation";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import {
   focusRow,
@@ -83,7 +84,6 @@ import {
   planBatchOutdent,
   getCurrentRow,
 } from "./batchOperations";
-import { planDeleteNodeFromView } from "../../treeMutations";
 
 function BreadcrumbItem({
   label,

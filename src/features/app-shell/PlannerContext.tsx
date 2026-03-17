@@ -1,14 +1,18 @@
 import React, { Dispatch, SetStateAction, useEffect, useRef } from "react";
 import { Event } from "nostr-tools";
 import { List, Set as ImmutableSet } from "immutable";
-import { execute, republishEvents } from "../../executor";
+import {
+  buildDocumentEvents,
+  createPublishQueue,
+  execute,
+  republishEvents,
+} from "../../infra/nostr";
 import { useApis } from "./ApiContext";
-import { createPublishQueue } from "../../PublishQueue";
-import type { StashmapDB } from "../../indexedDB";
-import { useData } from "../../DataContext";
-import { useRelaysToCreatePlan } from "../../relays";
+import type { StashmapDB } from "../../infra/indexedDB";
+import { useData } from "./DataContext";
+import { useRelaysToCreatePlan } from "./useRelays";
 import { mergePublishResultsOfEvents } from "../shared/PublishingStatus";
-import { buildDocumentEvents, createPlan } from "../../app/actions";
+import { createPlan } from "../../app/actions";
 import type { Plan } from "../../app/types";
 
 type ExecutePlan = (plan: Plan) => Promise<void>;

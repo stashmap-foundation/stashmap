@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { useEditorText } from "../editor/EditorTextContext";
 import { isEditableElement } from "./keyboardNavigation";
-import { ParsedLine, parseClipboardText } from "../../planner";
+import { ParsedLine, parseClipboardText } from "../../app/editorActions";
 
 export function preventEditorBlur(e: React.MouseEvent): void {
   if (isEditableElement(document.activeElement)) {

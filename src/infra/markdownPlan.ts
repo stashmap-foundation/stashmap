@@ -7,11 +7,11 @@ import { MarkdownTreeNode } from "./markdownTree";
 import {
   AddToParentTarget,
   GraphPlan,
-  Plan,
   planAddTargetsToNode,
   planMoveDescendantNodes,
   planUpsertNodes,
-} from "../planner";
+} from "../graph/commands";
+import type { Plan } from "../app/types";
 import { newNode } from "../graph/nodeFactory";
 import { getNodeForView } from "../rows/resolveRow";
 import { type RowPath } from "../rows/rowPaths";

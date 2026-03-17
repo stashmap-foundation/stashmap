@@ -2,7 +2,7 @@ import { Map } from "immutable";
 import { useEffect, useMemo } from "react";
 import { Event, UnsignedEvent } from "nostr-tools";
 import { useApis } from "./ApiContext";
-import type { StashmapDB } from "../../indexedDB";
+import type { StashmapDB } from "../../infra/indexedDB";
 import {
   flattenRelays,
   getReadRelays,
@@ -11,7 +11,7 @@ import {
 import {
   buildPermanentSyncAuthors,
   startPermanentDocumentSync,
-} from "../../permanentSync";
+} from "../../infra/permanentSync";
 
 export function usePermanentDocumentSync({
   enabled = true,

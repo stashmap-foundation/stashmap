@@ -6,16 +6,17 @@ import {
   KIND_CONTACTLIST,
   KIND_SETTINGS,
   KIND_RELAY_METADATA_EVENT,
-} from "../../nostr";
-import { DataContextProvider, MergeKnowledgeDB } from "../../DataContext";
+} from "../../infra/nostrCore";
+import { DataContextProvider, MergeKnowledgeDB } from "./DataContext";
 import { useApis } from "./ApiContext";
 import { replaceUnauthenticatedUser } from "../../app/actions";
 import { PlanningContextProvider } from "./PlannerContext";
 import { useUserRelayContext } from "./UserRelayContext";
-import { flattenRelays, usePreloadRelays } from "../../relays";
+import { flattenRelays } from "../../infra/relayUtils";
+import { usePreloadRelays } from "./useRelays";
 import { useDefaultRelays } from "./NostrAuthContext";
 import { useEventQuery } from "../shared/useNostrQuery";
-import { openDB, StashmapDB, getOutboxEvents } from "../../indexedDB";
+import { openDB, StashmapDB, getOutboxEvents } from "../../infra/indexedDB";
 import { splitID } from "../../graph/context";
 import {
   getInitialPanes,
@@ -29,9 +30,9 @@ import {
   mergeEvents,
   newProcessedEvents,
   processEvents,
-} from "../../eventProcessing";
+} from "../../infra/eventProcessing";
 import { DocumentStoreProvider } from "./DocumentStore";
-import { createEmptySemanticIndex } from "../../semanticIndex";
+import { createEmptySemanticIndex } from "../../graph/semanticIndex";
 import { PermanentDocumentSyncBridge } from "./PermanentDocumentSyncBridge";
 import { useRelaysInfo } from "./useRelaysInfo";
 

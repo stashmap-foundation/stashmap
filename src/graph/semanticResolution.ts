@@ -1,8 +1,7 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data */
-import { getChildNodes, getNode } from "./queries";
 import { getIndexedNodesForKeys, getSemanticID, shortID } from "./context";
 import { newDB } from "./types";
-import { isStandaloneRoot } from "../systemRoots";
+import { getChildNodes, getNode, isStandaloneRoot } from "./queries";
 
 function nodeMatchesRequestedSemanticID(
   knowledgeDBs: KnowledgeDBs,

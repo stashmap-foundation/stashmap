@@ -1,4 +1,4 @@
-import { usePlanner } from "../../planner";
+import { usePlanner } from "../app-shell/PlannerContext";
 import { usePaneStack } from "../navigation/SplitPanesContext";
 import { planDisconnectFromParent } from "../../app/treeActions";
 import { useChildNodeContext } from "./useChildNodeContext";

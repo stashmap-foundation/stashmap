@@ -1,6 +1,6 @@
 import { useDefaultRelays } from "./NostrAuthContext";
 import { useUserRelayContext } from "./UserRelayContext";
-import { useData } from "../../DataContext";
+import { useData } from "./DataContext";
 import {
   flattenRelays,
   getReadRelays,

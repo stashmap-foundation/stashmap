@@ -9,9 +9,10 @@ import {
   useLogin,
   useLoginWithExtension,
 } from "./NostrAuthContext";
-import { useData } from "../../DataContext";
-import { planRewriteUnpublishedEvents, usePlanner } from "../../planner";
-import { execute } from "../../executor";
+import { useData } from "./DataContext";
+import { planRewriteUnpublishedEvents } from "../../app/actions";
+import { usePlanner } from "./PlannerContext";
+import { execute } from "../../infra/nostr";
 import { useApis } from "./ApiContext";
 import { KINDS_META } from "./Data";
 import { useStorePreLoginEvents } from "./StorePreLoginContext";

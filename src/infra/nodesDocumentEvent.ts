@@ -1,8 +1,9 @@
 import { UnsignedEvent } from "nostr-tools";
 import {
+  createRootAnchor,
   getNodeContext,
-  getSemanticID,
   getNodeText,
+  getSemanticID,
   shortID,
 } from "../graph/context";
 import { getNode } from "../graph/queries";
@@ -18,8 +19,7 @@ import {
   KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
   msTag,
   newTimestamp,
-} from "../nostr";
-import { createRootAnchor } from "../rootAnchor";
+} from "./nostrCore";
 
 type SerializeResult = {
   lines: string[];

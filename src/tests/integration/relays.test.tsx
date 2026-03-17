@@ -10,9 +10,9 @@ import {
   UpdateState,
   type,
 } from "../testutils";
-import { createPlan, planPublishRelayMetadata } from "../../planner";
-import { execute } from "../../executor";
-import { flattenRelays } from "../../relays";
+import { createPlan } from "../../app/actions";
+import { execute, planPublishRelayMetadata } from "../../infra/nostr";
+import { flattenRelays } from "../../infra/relayUtils";
 
 test("Flatten relays", () => {
   expect(

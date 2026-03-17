@@ -1,6 +1,6 @@
 import React from "react";
-import { TYPE_COLORS } from "../../constants";
-import { useData } from "../../DataContext";
+import { TYPE_COLORS } from "../shared/typeColors";
+import { useData } from "../app-shell/DataContext";
 
 type ReferencePart =
   | { type: "text"; value: string }

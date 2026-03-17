@@ -1,9 +1,8 @@
 import { List } from "immutable";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
-import { createPlan } from "../../planner";
+import { createPlan } from "../../app/actions";
 import { getSemanticID } from "../../graph/context";
-import { getChildNodes, getNode } from "../../graph/queries";
-import { isStandaloneRoot } from "../../systemRoots";
+import { getChildNodes, getNode, isStandaloneRoot } from "../../graph/queries";
 import {
   ALICE,
   expectTree,
@@ -12,7 +11,7 @@ import {
   renderTree,
   setup,
 } from "../../tests/testutils";
-import { execute } from "../../executor";
+import { execute } from "../../infra/nostr";
 import {
   buildRootTreeForEmptyRootDrop,
   parseMarkdownHierarchy,

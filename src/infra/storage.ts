@@ -4,14 +4,14 @@ import {
   paneToJSON,
   Serializable,
   viewDataToJSON,
-} from "../serializer";
+} from "../session/serializer";
 import {
   pathToStack,
   parseNodeRouteUrl,
   parseAuthorFromSearch,
-} from "../navigationUrl";
+} from "../session/navigation";
 import { splitID } from "../graph/context";
-import { UNAUTHENTICATED_USER_PK } from "../AppState";
+import { UNAUTHENTICATED_USER_PK } from "../features/app-shell/RequireLogin";
 import { defaultPane, generatePaneId } from "../session/panes";
 
 function panesStorageKey(publicKey: PublicKey): string {

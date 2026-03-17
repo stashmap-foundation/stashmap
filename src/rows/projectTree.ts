@@ -18,7 +18,7 @@ import {
 import { EMPTY_SEMANTIC_ID } from "../graph/types";
 import { isSearchId } from "../graph/context";
 import { resolveNode, isRefNode } from "../graph/references";
-import { DEFAULT_TYPE_FILTERS } from "../constants";
+import { DEFAULT_TYPE_FILTERS } from "./settings";
 import {
   getAlternativeNodeData,
   getIncomingReferenceNodeIds,

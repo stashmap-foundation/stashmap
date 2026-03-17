@@ -1,5 +1,10 @@
 import { List, OrderedMap, Set as ImmutableSet } from "immutable";
-import { getChildNodes, getNode, nodePassesFilters } from "../graph/queries";
+import {
+  getChildNodes,
+  getNode,
+  LOG_ROOT_ROLE,
+  nodePassesFilters,
+} from "../graph/queries";
 import {
   splitID,
   shortID,
@@ -7,8 +12,7 @@ import {
   getNodeContext,
 } from "../graph/context";
 import { resolveNode, isRefNode } from "../graph/references";
-import { suggestionSettings } from "../constants";
-import { LOG_ROOT_ROLE } from "../systemRoots";
+import { suggestionSettings } from "./settings";
 
 type AlternativeNodeFilters = (
   | Relevance

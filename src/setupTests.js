@@ -1,7 +1,7 @@
 import { Buffer } from "buffer";
 import crypto from "crypto";
 import { TextEncoder, TextDecoder } from "util";
-import { suggestionSettings } from "./constants";
+import { suggestionSettings } from "./rows/settings";
 
 // Not a typescript file so disable typescript linting rules
 /* eslint-disable @typescript-eslint/explicit-function-return-type */

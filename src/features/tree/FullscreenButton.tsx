@@ -14,8 +14,8 @@ import {
   getRefTargetInfo,
   isRefNode,
 } from "../../graph/references";
-import { useData } from "../../DataContext";
-import { buildNodeRouteUrl } from "../../navigationUrl";
+import { useData } from "../app-shell/DataContext";
+import { buildNodeRouteUrl } from "../../session/navigation";
 
 export function FullscreenButton(): JSX.Element | null {
   const stack = usePaneStack();

@@ -8,12 +8,12 @@ import {
 } from "../../graph/context";
 import { getSearchNodes } from "../../graph/queries";
 import { newDB, type TextSeed } from "../../graph/types";
-import { MergeKnowledgeDB, useData } from "../../DataContext";
+import { MergeKnowledgeDB, useData } from "../app-shell/DataContext";
 import {
   deduplicateRefsByContext,
   findRefsToNode,
-} from "../../semanticProjection";
-import { useReadRelays } from "../../relays";
+} from "../../graph/semanticProjection";
+import { useReadRelays } from "../app-shell/useRelays";
 import { useSearchQuery, filterForKeyword } from "./SearchModal";
 import { useCurrentPane } from "../navigation/SplitPanesContext";
 

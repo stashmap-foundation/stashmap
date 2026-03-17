@@ -20,8 +20,8 @@ import {
 import {
   KIND_KNOWLEDGE_DOCUMENT,
   KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
-} from "../../nostr";
-import { parseMarkdownHierarchy } from "../../markdownDocument";
+} from "../../infra/nostrCore";
+import { parseMarkdownHierarchy } from "../../infra/markdownDocument";
 
 const maybeExpand = async (label: string): Promise<void> => {
   const btn = screen.queryByLabelText(label);

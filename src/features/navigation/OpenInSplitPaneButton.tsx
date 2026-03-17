@@ -8,8 +8,8 @@ import {
 import { useCurrentEdge, useRowPath } from "../tree/RowContext";
 import { useSplitPanes, usePaneIndex, usePaneStack } from "./SplitPanesContext";
 import { IS_MOBILE } from "./responsive";
-import { usePlanner } from "../../planner";
-import { useData } from "../../DataContext";
+import { usePlanner } from "../app-shell/PlannerContext";
+import { useData } from "../app-shell/DataContext";
 
 export function OpenInSplitPaneButton(): JSX.Element | null {
   const { addPaneAt } = useSplitPanes();

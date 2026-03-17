@@ -1,7 +1,7 @@
 import { planUpdateViews, updateView } from "../../session/views";
 import { useCurrentRowID, useRowPath } from "./RowContext";
-import { useData } from "../../DataContext";
-import { usePlanner } from "../../planner";
+import { useData } from "../app-shell/DataContext";
+import { usePlanner } from "../app-shell/PlannerContext";
 
 export function useOnToggleExpanded(): (expand: boolean) => void {
   const data = useData();

@@ -1,9 +1,10 @@
 import React from "react";
-import { usePlanner } from "../../planner";
+import { usePlanner } from "../app-shell/PlannerContext";
 import { planUpdatePanes } from "../../session/panes";
-import { useData } from "../../DataContext";
+import { useData } from "../app-shell/DataContext";
 import { useCurrentPane } from "../navigation/SplitPanesContext";
-import { DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../../constants";
+import { DEFAULT_TYPE_FILTERS } from "../../rows/settings";
+import { TYPE_COLORS } from "../shared/typeColors";
 
 const RELEVANCE_FILTERS: {
   id: Relevance | "contains";

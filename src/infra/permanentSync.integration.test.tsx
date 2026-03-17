@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { Event } from "nostr-tools";
 import { clearDatabase } from "./indexedDB";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "./nostrCore";
-import { LOG_ROOT_ROLE } from "../systemRoots";
+import { LOG_ROOT_ROLE } from "../graph/queries";
 import { ALICE, mockRelayPool, renderApp, setup } from "../tests/testutils";
 
 const TEST_RELAY = "wss://relay.test.first.success/";

@@ -3,7 +3,7 @@ import { List } from "immutable";
 import MarkdownIt from "markdown-it";
 // eslint-disable-next-line import/no-unresolved
 import Token from "markdown-it/lib/token";
-import { LOG_ROOT_ROLE } from "../systemRoots";
+import { LOG_ROOT_ROLE } from "../graph/queries";
 
 const markdown = new MarkdownIt({ html: true });
 

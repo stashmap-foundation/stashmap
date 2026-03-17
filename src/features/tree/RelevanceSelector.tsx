@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { TYPE_COLORS } from "../../constants";
+import { TYPE_COLORS } from "../shared/typeColors";
 import {
   useUpdateRelevance,
   relevanceToLevel,
@@ -18,7 +18,7 @@ import {
   useViewKey,
   useVirtualRowsMap,
 } from "./RowContext";
-import { usePlanner } from "../../planner";
+import { usePlanner } from "../app-shell/PlannerContext";
 import { usePaneStack } from "../navigation/SplitPanesContext";
 import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "../editor/EditorTextContext";

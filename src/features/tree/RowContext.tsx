@@ -3,7 +3,7 @@ import { List, Map } from "immutable";
 import { isSearchId } from "../../graph/context";
 import { getNode } from "../../graph/queries";
 import { resolveSemanticNodeInCurrentTree } from "../../graph/semanticResolution";
-import { useData } from "../../DataContext";
+import { useData } from "../app-shell/DataContext";
 import { usePaneStack } from "../navigation/SplitPanesContext";
 import { getDisplayTextForView } from "../../rows/display";
 import {

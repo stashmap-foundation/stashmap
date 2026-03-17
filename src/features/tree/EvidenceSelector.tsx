@@ -1,5 +1,5 @@
 import React from "react";
-import { TYPE_COLORS } from "../../constants";
+import { TYPE_COLORS } from "../shared/typeColors";
 import { useUpdateArgument } from "./useUpdateArgument";
 import { parseRowPath, type RowPath } from "../../rows/rowPaths";
 import {
@@ -10,7 +10,7 @@ import {
   useViewKey,
   useVirtualRowsMap,
 } from "./RowContext";
-import { usePlanner } from "../../planner";
+import { usePlanner } from "../app-shell/PlannerContext";
 import { usePaneStack } from "../navigation/SplitPanesContext";
 import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "../editor/EditorTextContext";

@@ -1,13 +1,13 @@
 import { Map } from "immutable";
 import { useEventQuery } from "../shared/useNostrQuery";
-import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../../nostr";
-import { useData } from "../../DataContext";
+import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../../infra/nostrCore";
+import { useData } from "../app-shell/DataContext";
 import { useApis } from "../app-shell/ApiContext";
 import { KIND_SEARCH } from "../app-shell/Data";
-import { findDocumentNodes } from "../../documentMaterialization";
+import { findDocumentNodes } from "../../infra/documentMaterialization";
 import { buildTextNodesFromGraphNodes } from "../../graph/context";
 import type { TextSeed } from "../../graph/types";
-import { useReadRelays } from "../../relays";
+import { useReadRelays } from "../app-shell/useRelays";
 
 function isMatch(input: string, test: string): boolean {
   const searchStr = input.toLowerCase().replace(/\n/g, "");

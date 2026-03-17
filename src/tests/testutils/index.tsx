@@ -28,43 +28,47 @@ import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { sha256 } from "@noble/hashes/sha256";
 import { schnorr } from "@noble/curves/secp256k1";
 import { VirtuosoMockContext } from "react-virtuoso";
-import { KIND_CONTACTLIST } from "../../nostr";
-import { RequireLogin, UNAUTHENTICATED_USER_PK } from "../../AppState";
-import { EMPTY_SEMANTIC_ID } from "../../graph/types";
+import { KIND_CONTACTLIST } from "../../infra/nostrCore";
 import {
-  createPlan,
-  planUpsertContact,
-  planRemoveContact,
-  PlanningContextProvider,
-} from "../../planner";
-import { execute } from "../../executor";
-import { ApiProvider, Apis, FinalizeEvent } from "../../Apis";
-import { App } from "../../App";
+  RequireLogin,
+  UNAUTHENTICATED_USER_PK,
+} from "../../features/app-shell/RequireLogin";
+import { EMPTY_SEMANTIC_ID } from "../../graph/types";
+import { createPlan } from "../../app/actions";
+import { planUpsertContact, planRemoveContact } from "../../graph/commands";
+import { PlanningContextProvider } from "../../features/app-shell/PlannerContext";
+import { execute } from "../../infra/nostr";
+import {
+  ApiProvider,
+  Apis,
+  FinalizeEvent,
+} from "../../features/app-shell/ApiContext";
+import { App } from "../../features/app-shell/App";
 import {
   DataContextProps,
   DataContextProvider,
   MergeKnowledgeDB,
-} from "../../DataContext";
-import { DocumentStoreProvider } from "../../DocumentStore";
+} from "../../features/app-shell/DataContext";
+import { DocumentStoreProvider } from "../../features/app-shell/DocumentStore";
 import { MockRelayPool, mockRelayPool } from "./nostrMock";
 import {
   NostrAuthContextProvider,
   isUserLoggedInWithSeed,
-} from "../../NostrAuthContext";
+} from "../../features/app-shell/NostrAuthContext";
 import { RootViewContextProvider } from "../../features/tree/RowContext";
-import { LoadSearchData } from "../../LoadSearchData";
-import { StorePreLoginContext } from "../../StorePreLoginContext";
+import { LoadSearchData } from "../../features/search/LoadSearchData";
+import { StorePreLoginContext } from "../../features/app-shell/StorePreLoginContext";
 import { TemporaryViewProvider } from "../../features/tree/TemporaryViewContext";
 import { PaneView } from "../../features/tree/PaneView";
-import { DND } from "../../dnd";
+import { DND } from "../../features/tree/DND";
 import {
   computeDepthLimits,
   setDropIndentDepth,
 } from "../../features/tree/DroppableContainer";
-import { findContacts } from "../../contacts";
-import { UserRelayContextProvider } from "../../UserRelayContext";
-import { StashmapDB } from "../../indexedDB";
-import { createEmptySemanticIndex } from "../../semanticIndex";
+import { findContacts } from "../../infra/contacts";
+import { UserRelayContextProvider } from "../../features/app-shell/UserRelayContext";
+import { StashmapDB } from "../../infra/indexedDB";
+import { createEmptySemanticIndex } from "../../graph/semanticIndex";
 
 import {
   PaneIndexProvider,

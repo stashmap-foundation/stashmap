@@ -3,14 +3,14 @@ import { Event, UnsignedEvent } from "nostr-tools";
 import { ensureNodeNativeFields } from "../graph/queries";
 import { getNodeDepth, shortID, splitID } from "../graph/context";
 import { newDB } from "../graph/types";
-import type { StoredDocumentRecord } from "../indexedDB";
+import type { StoredDocumentRecord } from "./indexedDB";
 import { parseDocumentEvent } from "./markdownNodes";
 import {
   KIND_DELETE,
   KIND_KNOWLEDGE_DOCUMENT,
   getReplaceableKey,
-} from "../nostr";
-import { findTag, getEventMs, sortEvents } from "../nostrEvents";
+} from "./nostrCore";
+import { findTag, getEventMs, sortEvents } from "./nostrEvents";
 
 export function storedDocumentToEvent(
   document: StoredDocumentRecord

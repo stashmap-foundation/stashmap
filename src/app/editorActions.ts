@@ -1,10 +1,15 @@
 import { List } from "immutable";
 import { createRefTarget, isRefNode } from "../graph/references";
-import { isEmptySemanticID, getSemanticID, isSearchId } from "../graph/context";
+import {
+  getNodeUserPublicKey,
+  isEmptySemanticID,
+  getSemanticID,
+  isSearchId,
+  withUsersEntryPublicKey,
+} from "../graph/context";
 import { getNode, computeEmptyNodeMetadata } from "../graph/queries";
 import { EMPTY_SEMANTIC_ID, type TextSeed } from "../graph/types";
 import { newNode } from "../graph/nodeFactory";
-import { withUsersEntryPublicKey, getNodeUserPublicKey } from "../userEntry";
 import { decodePublicKeyInputSync } from "../graph/publicKeys";
 import type { ChildNodeMetadata } from "../graph/commands";
 import {
@@ -21,12 +26,12 @@ import {
   getParentRowPath,
   rowPathToString,
   type RowPath,
+  getPaneIndex,
 } from "../rows/rowPaths";
 import type { VirtualRowsMap } from "../rows/types";
 import { planAddToParent, planDeepCopyNode } from "./treeActions";
 import type { Plan } from "./types";
 import { upsertNodes } from "./actions";
-import { getPaneIndex } from "../rows/rowPaths";
 import { planExpandNode } from "../session/views";
 
 export type { ChildNodeMetadata } from "../graph/commands";

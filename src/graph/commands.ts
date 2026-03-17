@@ -5,26 +5,29 @@ import {
   Set as ImmutableSet,
 } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
-import { deleteNodes, getNode, ensureNodeNativeFields } from "./queries";
 import {
   getNodeContext,
+  getNodeUserPublicKey,
   getNodeText,
   getSemanticID,
   isSearchId,
   shortID,
+  withUsersEntryPublicKey,
+  createRootAnchor,
 } from "./context";
-import { isRefNode } from "./references";
-import { newDB, type RefTargetSeed, type TextSeed } from "./types";
-import { KIND_CONTACTLIST, newTimestamp, msTag } from "../nostr";
-import { newNode, newRefNode } from "./nodeFactory";
 import {
+  deleteNodes,
+  ensureNodeNativeFields,
+  getNode,
   getOwnSystemRoot,
   getSystemRoleText,
   LOG_ROOT_ROLE,
-} from "../systemRoots";
-import { withUsersEntryPublicKey, getNodeUserPublicKey } from "../userEntry";
+} from "./queries";
+import { isRefNode } from "./references";
+import { newDB, type RefTargetSeed, type TextSeed } from "./types";
+import { KIND_CONTACTLIST, newTimestamp, msTag } from "./eventProtocol";
+import { newNode, newRefNode } from "./nodeFactory";
 import { decodePublicKeyInputSync } from "./publicKeys";
-import { createRootAnchor } from "../rootAnchor";
 
 export type ChildNodeMetadata = {
   relevance?: Relevance;

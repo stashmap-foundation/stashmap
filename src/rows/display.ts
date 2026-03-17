@@ -1,5 +1,8 @@
-import { isSearchId, parseSearchId } from "../graph/context";
-import { getNodeUserPublicKey } from "../userEntry";
+import {
+  getNodeUserPublicKey,
+  isSearchId,
+  parseSearchId,
+} from "../graph/context";
 import { type RowPath } from "./rowPaths";
 import {
   getCurrentReferenceForView,

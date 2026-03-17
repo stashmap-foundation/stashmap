@@ -2,7 +2,12 @@
 import { List } from "immutable";
 import { v4 } from "uuid";
 import { UnsignedEvent } from "nostr-tools";
-import { shortID, getNodeContext, getSemanticID } from "../graph/context";
+import {
+  createRootAnchor,
+  getNodeContext,
+  getSemanticID,
+  shortID,
+} from "../graph/context";
 import { resolveNode, isRefNode } from "../graph/references";
 import { getTextForSemanticID } from "../graph/semanticText";
 import {
@@ -19,9 +24,8 @@ import {
   formatPrefixMarkers,
   formatRootHeading,
 } from "./documentFormat";
-import { KIND_KNOWLEDGE_DOCUMENT, newTimestamp, msTag } from "../nostr";
+import { KIND_KNOWLEDGE_DOCUMENT, newTimestamp, msTag } from "./nostrCore";
 import { getNodesInTree } from "../rows/projectTree";
-import { createRootAnchor } from "../rootAnchor";
 import { resolveSemanticNodeInCurrentTree } from "../graph/semanticResolution";
 
 export type { MarkdownTreeNode } from "./markdownTree";

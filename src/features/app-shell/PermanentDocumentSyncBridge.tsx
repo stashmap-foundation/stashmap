@@ -1,5 +1,5 @@
 import type { Map as ImmutableMap } from "immutable";
-import type { StashmapDB } from "../../indexedDB";
+import type { StashmapDB } from "../../infra/indexedDB";
 import { useDocumentStore } from "./DocumentStore";
 import { usePermanentDocumentSync } from "./usePermanentDocumentSync";
 

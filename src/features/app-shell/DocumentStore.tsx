@@ -6,31 +6,31 @@ import type {
   StashmapDB,
   StoredDeleteRecord,
   StoredDocumentRecord,
-} from "../../indexedDB";
+} from "../../infra/indexedDB";
 import {
   getCachedEvents,
   getStoredDeletes,
   getStoredDocuments,
   putCachedEvents,
   subscribeDocumentStore,
-} from "../../indexedDB";
+} from "../../infra/indexedDB";
 import {
   buildKnowledgeDBFromDocumentNodes,
   storedDocumentToEvent,
-} from "../../documentMaterialization";
+} from "../../infra/documentMaterialization";
 import {
   applyStoredDelete,
   applyStoredDocument,
   toStoredDeleteRecord,
   toStoredDocumentRecord,
-} from "../../permanentSync";
-import { parseDocumentEvent } from "../../markdownNodes";
+} from "../../infra/permanentSync";
+import { parseDocumentEvent } from "../../infra/markdownNodes";
 import {
   addNodesToSemanticIndex,
   buildSemanticIndexFromDocuments,
   createEmptySemanticIndex,
   removeNodesFromSemanticIndex,
-} from "../../semanticIndex";
+} from "../../graph/semanticIndex";
 
 type DocumentSnapshot = {
   documents: ImmutableMap<string, StoredDocumentRecord>;

@@ -1,18 +1,18 @@
 /* eslint-disable functional/immutable-data */
 import { Map as ImmutableMap } from "immutable";
 import { Event, Filter, SimplePool, UnsignedEvent } from "nostr-tools";
-import { findTag, getEventMs } from "../nostrEvents";
+import { findTag, getEventMs } from "./nostrEvents";
 import {
   KIND_DELETE,
   KIND_KNOWLEDGE_DOCUMENT,
   getReplaceableKey,
-} from "../nostr";
+} from "./nostrCore";
 import type {
   StashmapDB,
   StoredDeleteRecord,
   StoredDocumentRecord,
   SyncCheckpointRecord,
-} from "../indexedDB";
+} from "./indexedDB";
 import {
   getSyncCheckpoint,
   getStoredDelete,
@@ -22,8 +22,8 @@ import {
   putSyncCheckpoint,
   removeStoredDelete,
   removeStoredDocument,
-} from "../indexedDB";
-import { collectEventsUntilIdle } from "../eventQuery";
+} from "./indexedDB";
+import { collectEventsUntilIdle } from "./eventQuery";
 
 const PERMANENT_SYNC_BACKFILL_PAGE_LIMIT = 200;
 const PERMANENT_SYNC_CATCH_UP_SAFETY_WINDOW_SECONDS = 5 * 60;

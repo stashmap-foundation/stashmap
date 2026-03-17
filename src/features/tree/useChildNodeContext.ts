@@ -8,13 +8,13 @@ import {
   useRowPath,
 } from "./RowContext";
 import { isEmptySemanticID } from "../../graph/context";
-import { usePlanner } from "../../planner";
+import { usePlanner } from "../app-shell/PlannerContext";
 import {
   planUpdateRowNodeMetadata,
   type ChildNodeMetadata,
 } from "../../app/editorActions";
 import { usePaneStack } from "../navigation/SplitPanesContext";
-import { useData } from "../../DataContext";
+import { useData } from "../app-shell/DataContext";
 import { useEditorText } from "../editor/EditorTextContext";
 
 type ChildNodeContext = {

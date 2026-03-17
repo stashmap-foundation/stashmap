@@ -1,13 +1,13 @@
 import { List, Map } from "immutable";
 import { shortID } from "../../graph/context";
-import { newDB } from "../../knowledge";
+import { newDB } from "../../graph/types";
 import { newNode } from "../../graph/nodeFactory";
+import { buildNodeUrl } from "../../graph/nodeUrl";
 import {
-  buildNodeUrl,
   pathToStack,
   parseNodeRouteUrl,
   parseAuthorFromSearch,
-} from "../../navigationUrl";
+} from "../../session/navigation";
 
 const ALICE_PK = "alice-pub-key" as PublicKey;
 const OTHER_PK = "other-author" as PublicKey;

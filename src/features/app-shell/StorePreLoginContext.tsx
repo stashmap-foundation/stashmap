@@ -2,9 +2,10 @@ import React from "react";
 import { List } from "immutable";
 import { useDebouncedCallback } from "use-debounce";
 import { useApis } from "./ApiContext";
-import { KIND_CONTACTLIST } from "../../nostr";
-import { planAddContacts, usePlanner } from "../../planner";
-import { execute } from "../../executor";
+import { KIND_CONTACTLIST } from "../../infra/nostrCore";
+import { planAddContacts } from "../../graph/commands";
+import { usePlanner } from "./PlannerContext";
+import { execute } from "../../infra/nostr";
 
 type StorePreLoginData = (eventKinds: List<number>) => void;
 

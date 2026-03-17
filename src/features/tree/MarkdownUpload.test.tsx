@@ -1,9 +1,10 @@
 import { List } from "immutable";
 import { newNode } from "../../graph/nodeFactory";
 import { type RowPath } from "../../rows/rowPaths";
-import { execute } from "../../executor";
-import { createPlan, planUpsertNodes } from "../../planner";
-import { processEvents } from "../../eventProcessing";
+import { execute } from "../../infra/nostr";
+import { createPlan } from "../../app/actions";
+import { planUpsertNodes } from "../../graph/commands";
+import { processEvents } from "../../infra/eventProcessing";
 import { ALICE, setup, UpdateState } from "../../tests/testutils";
 import { parseMarkdownHierarchy, planPasteMarkdownTrees } from "./FileDropZone";
 import { joinID, shortID } from "../../graph/context";

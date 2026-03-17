@@ -16,7 +16,7 @@ import {
 } from "./rowPaths";
 import { referenceToText } from "./display";
 import { getNodeForView } from "./resolveRow";
-import { DEFAULT_TYPE_FILTERS } from "../constants";
+import { DEFAULT_TYPE_FILTERS } from "./settings";
 
 function argumentPrefix(argument?: Argument): string {
   if (argument === "confirms") {

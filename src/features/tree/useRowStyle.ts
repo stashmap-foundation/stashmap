@@ -1,7 +1,7 @@
 import { CSSProperties } from "react";
 import { useCurrentEdge, useIsViewingOtherUserContent } from "./RowContext";
 import { isRefNode } from "../../graph/references";
-import { TYPE_COLORS } from "../../constants";
+import { TYPE_COLORS } from "../shared/typeColors";
 
 type RowStyle = {
   cardStyle: CSSProperties;

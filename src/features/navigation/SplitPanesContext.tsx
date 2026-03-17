@@ -1,13 +1,13 @@
 import React, { createContext, useContext } from "react";
-import { usePlanner } from "../../planner";
-import { useData } from "../../DataContext";
+import { usePlanner } from "../app-shell/PlannerContext";
+import { useData } from "../app-shell/DataContext";
 import {
   pathToStack,
   parseNodeRouteUrl,
   parseAuthorFromSearch,
-} from "../../navigationUrl";
+} from "../../session/navigation";
 import { splitID } from "../../graph/context";
-import { usePaneHistory } from "../../PaneHistoryContext";
+import { usePaneHistory } from "./PaneHistoryContext";
 import { generatePaneId, planUpdatePanes } from "../../session/panes";
 
 const PaneIndexContext = createContext<number>(0);

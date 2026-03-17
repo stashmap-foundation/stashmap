@@ -29,7 +29,7 @@ import {
 import { isEditableNode } from "./TemporaryViewContext";
 import { planBatchIndent, planBatchOutdent } from "./batchOperations";
 import { computeEmptyNodeMetadata } from "../../graph/queries";
-import { isEmptySemanticID } from "../../graph/context";
+import { getNodeUserPublicKey, isEmptySemanticID } from "../../graph/context";
 import {
   getRefLinkTargetInfo,
   getRefTargetInfo,
@@ -40,22 +40,24 @@ import { ReferenceDisplay } from "../references/ReferenceDisplay";
 import { IS_MOBILE } from "../navigation/responsive";
 import { MiniEditor, preventEditorBlur } from "./AddNode";
 import { useOnToggleExpanded } from "./SelectNodes";
-import { useData } from "../../DataContext";
+import { useData } from "../app-shell/DataContext";
 import {
-  Plan,
-  usePlanner,
   planSetEmptyNodePosition,
   planSaveNodeAndEnsureNodes,
   getNextInsertPosition,
   planRemoveEmptyNodePosition,
   planCreateNode,
-  planAddToParent,
   ParsedLine,
-} from "../../planner";
+} from "../../app/editorActions";
+import type { Plan } from "../../app/types";
+import {
+  planAddToParent,
+  planDisconnectFromParent,
+} from "../../app/treeActions";
+import { usePlanner } from "../app-shell/PlannerContext";
 import { planSetRowFocusIntent } from "../../session/focus";
 import { planExpandNode } from "../../session/views";
 import { parsedLinesToTrees, planPasteMarkdownTrees } from "./FileDropZone";
-import { planDisconnectFromParent } from "../../treeMutations";
 import { useNodeIsLoading } from "./LoadingStatus";
 import { NodeCard } from "../shared/Ui";
 import {
@@ -64,12 +66,11 @@ import {
   useCurrentPane,
   useNavigatePane,
 } from "../navigation/SplitPanesContext";
-import { buildNodeRouteUrl } from "../../navigationUrl";
+import { buildNodeRouteUrl } from "../../session/navigation";
 import { RightMenu } from "./RightMenu";
 import { useRowStyle } from "./useRowStyle";
 import { EditorTextProvider } from "../editor/EditorTextContext";
 import { getTreeChildren } from "../../rows/projectTree";
-import { getNodeUserPublicKey } from "../../userEntry";
 
 export { getNodesInTree } from "../../rows/projectTree";
 

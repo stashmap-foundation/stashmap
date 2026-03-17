@@ -20,10 +20,10 @@ import {
   putOutboxEvent,
   removeOutboxEvent,
   OutboxEntry,
-} from "../../indexedDB";
+} from "../../infra/indexedDB";
 import { PaneView } from "../../features/tree/PaneView";
 
-jest.mock("../../indexedDB");
+jest.mock("../../infra/indexedDB");
 
 const mockRelayPoolWithFailure = (failingRelay: string): MockRelayPool => {
   const base = mockRelayPool();

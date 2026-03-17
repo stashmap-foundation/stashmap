@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Map } from "immutable";
 import { Event } from "nostr-tools";
-import { KIND_RELAY_METADATA_EVENT } from "../../nostr";
+import { KIND_RELAY_METADATA_EVENT } from "../../infra/nostrCore";
 import { Relays, addRelayWarningText } from "./Relays";
 import {
   ALICE,
@@ -14,7 +14,7 @@ import {
   renderWithTestData,
   CAROL,
 } from "../../tests/testutils";
-import { relayTags } from "../../planner";
+import { relayTags } from "../../infra/nostr";
 
 const filterRelayMetadataEvents = (event: Event): boolean =>
   event.kind === KIND_RELAY_METADATA_EVENT;

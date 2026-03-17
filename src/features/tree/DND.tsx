@@ -25,13 +25,13 @@ import {
   updateRowPathsAfterMoveNodes,
 } from "../../session/views";
 import { getNodesInTree } from "./NodeView";
+import type { Plan } from "../../app/types";
 import {
-  Plan,
   planDeepCopyNodeWithView,
   planAddToParent,
-  getPane,
-} from "../../planner";
-import { planMoveNodeWithView } from "../../treeMutations";
+  planMoveNodeWithView,
+} from "../../app/treeActions";
+import { getPane } from "../../session/panes";
 
 type DragSource = {
   path: RowPath;

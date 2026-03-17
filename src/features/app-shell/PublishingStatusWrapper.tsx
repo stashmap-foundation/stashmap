@@ -1,10 +1,10 @@
 import React from "react";
 import { Dropdown } from "react-bootstrap";
 import { useMediaQuery } from "react-responsive";
-import { useData } from "../../DataContext";
+import { useData } from "./DataContext";
 import { IS_MOBILE } from "../navigation/responsive";
 import { PublishingStatusContent } from "../shared/PublishingStatus";
-import { getWriteRelays } from "../../relays";
+import { getWriteRelays } from "../../infra/relayUtils";
 import { useUserRelayContext } from "./UserRelayContext";
 
 function getRelayRatio(

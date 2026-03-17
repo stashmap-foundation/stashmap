@@ -18,10 +18,10 @@ import { LoadSearchData } from "../search/LoadSearchData";
 import { PaneView } from "../tree/PaneView";
 import { createSearchId } from "../../graph/context";
 import { EMPTY_SEMANTIC_ID } from "../../graph/types";
-import { usePlanner } from "../../planner";
-import { useData } from "../../DataContext";
+import { usePlanner } from "../app-shell/PlannerContext";
+import { useData } from "../app-shell/DataContext";
 import { isUserLoggedIn, useLogout } from "../app-shell/NostrAuthContext";
-import { useDragAutoScroll } from "../../useDragAutoScroll";
+import { useDragAutoScroll } from "./useDragAutoScroll";
 import { planUpdatePanes } from "../../session/panes";
 
 export function PaneSearchButton(): JSX.Element {

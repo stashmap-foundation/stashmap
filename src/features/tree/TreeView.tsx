@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { List, Map, Set as ImmutableSet } from "immutable";
 import { ListRange, Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import { useLocation } from "react-router-dom";
-import { useDragAutoScroll } from "../../useDragAutoScroll";
+import { useDragAutoScroll } from "../navigation/useDragAutoScroll";
 import { ListItem } from "./Draggable";
 import { getNodesInTree } from "./NodeView";
 import {
@@ -15,7 +15,7 @@ import {
 import { getRowIDFromView } from "../../rows/resolveRow";
 import { getLast, type RowPath, rowPathToString } from "../../rows/rowPaths";
 import { isExpanded } from "../../session/views";
-import { useData } from "../../DataContext";
+import { useData } from "../app-shell/DataContext";
 import {
   usePaneStack,
   useCurrentPane,
@@ -32,7 +32,7 @@ import {
   unregisterScrollToRow,
 } from "./keyboardNavigation";
 import { useTemporaryView } from "./TemporaryViewContext";
-import { usePlanner } from "../../planner";
+import { usePlanner } from "../app-shell/PlannerContext";
 import {
   planClearTemporarySelection,
   planShiftTemporarySelection,

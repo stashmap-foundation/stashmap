@@ -1,6 +1,6 @@
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { KIND_KNOWLEDGE_DOCUMENT } from "../../nostr";
+import { KIND_KNOWLEDGE_DOCUMENT } from "../../infra/nostrCore";
 import {
   ALICE,
   BOB,

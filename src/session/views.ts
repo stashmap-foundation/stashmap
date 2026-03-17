@@ -1,5 +1,4 @@
 import { Map } from "immutable";
-import { SEARCH_PREFIX } from "../constants";
 import {
   getLast,
   isRoot,
@@ -7,6 +6,8 @@ import {
   RowPath,
   rowPathToString,
 } from "../rows/rowPaths";
+
+const SEARCH_PREFIX = "~Search:";
 
 function getDefaultView(id: ID, isRootNode: boolean): View {
   return {

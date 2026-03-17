@@ -1,7 +1,7 @@
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Event } from "nostr-tools";
-import { KIND_KNOWLEDGE_DOCUMENT } from "../../nostr";
+import { KIND_KNOWLEDGE_DOCUMENT } from "../../infra/nostrCore";
 import {
   ALICE,
   setup,

@@ -1,16 +1,42 @@
 import { List, Map } from "immutable";
-import { Event, SimplePool, UnsignedEvent } from "nostr-tools";
-import { FinalizeEvent } from "../Apis";
-import { KIND_DELETE } from "../nostr";
-import { signEvents, PUBLISH_TIMEOUT } from "../executor";
-import { applyWriteRelayConfig } from "../relays";
+import {
+  Event,
+  EventTemplate,
+  SimplePool,
+  UnsignedEvent,
+  VerifiedEvent,
+} from "nostr-tools";
+import { FinalizeEvent } from "../features/app-shell/ApiContext";
+import {
+  isUserLoggedIn,
+  isUserLoggedInWithExtension,
+} from "../features/app-shell/NostrAuthContext";
+import type { Plan } from "../app/types";
+import type { GraphPlan } from "../graph/commands";
+import { getNode } from "../graph/queries";
+import { shortID } from "../graph/context";
+import { newDB } from "../graph/types";
+import {
+  KIND_DELETE,
+  KIND_KNOWLEDGE_DOCUMENT,
+  KIND_RELAY_METADATA_EVENT,
+  msTag,
+  newTimestamp,
+} from "./nostrCore";
+import { applyWriteRelayConfig } from "./relayUtils";
+import { buildDocumentEvent } from "./markdownDocument";
+import {
+  buildDocumentEventFromNodes,
+  buildSnapshotEventFromNodes,
+} from "./nodesDocumentEvent";
 import {
   StashmapDB,
   OutboxEntry,
   getOutboxEvents,
   putOutboxEvent,
   removeOutboxEvent,
-} from "../indexedDB";
+} from "./indexedDB";
+import { publishEventToRelays, PUBLISH_TIMEOUT } from "./nostrPublish";
 
 const DEFAULT_DEBOUNCE_MS = process.env.NODE_ENV === "test" ? 100 : 5000;
 const MAX_BACKOFF_MS = 60000;
@@ -49,6 +75,11 @@ export type QueueStatus = {
   }>;
 };
 
+type SignedEventWithConf = {
+  readonly event: VerifiedEvent;
+  readonly writeRelayConf?: WriteRelayConf;
+};
+
 type PublishQueueConfig = {
   readonly db: StashmapDB | null;
   readonly debounceMs?: number;
@@ -63,6 +94,222 @@ type PublishQueue = {
   readonly init: () => Promise<void>;
   readonly destroy: () => void;
 };
+
+export function relayTags(relays: Relays): string[][] {
+  return relays
+    .map((relay) => {
+      if (relay.read && relay.write) {
+        return ["r", relay.url];
+      }
+      if (relay.read) {
+        return ["r", relay.url, "read"];
+      }
+      if (relay.write) {
+        return ["r", relay.url, "write"];
+      }
+      return [];
+    })
+    .filter((tag) => tag.length > 0);
+}
+
+export function planPublishRelayMetadata(plan: Plan, relays: Relays): Plan {
+  const tags = relayTags(relays);
+  const publishRelayMetadataEvent = {
+    kind: KIND_RELAY_METADATA_EVENT,
+    pubkey: plan.user.publicKey,
+    created_at: newTimestamp(),
+    tags: [...tags, msTag()],
+    content: "",
+    writeRelayConf: {
+      defaultRelays: true,
+      user: true,
+      extraRelays: relays,
+    },
+  };
+  return {
+    ...plan,
+    publishEvents: plan.publishEvents.push(publishRelayMetadataEvent),
+  };
+}
+
+export function buildDocumentEvents(
+  plan: GraphPlan
+): List<UnsignedEvent & EventAttachment> {
+  const author = plan.user.publicKey;
+  const userDB = plan.knowledgeDBs.get(author, newDB());
+  return plan.affectedRoots.reduce<List<UnsignedEvent & EventAttachment>>(
+    (events, rootId) => {
+      const rootNode = userDB.nodes.find(
+        (node: GraphNode) =>
+          !node.parent &&
+          (node.id === rootId ||
+            shortID(node.id) === rootId ||
+            node.root === rootId ||
+            node.root === shortID(rootId as ID))
+      );
+      if (!rootNode) {
+        const rootDTag = shortID(rootId as ID);
+        const deleteEvent = {
+          kind: KIND_DELETE,
+          pubkey: author,
+          created_at: newTimestamp(),
+          tags: [
+            ["a", `${KIND_KNOWLEDGE_DOCUMENT}:${author}:${rootDTag}`],
+            ["k", `${KIND_KNOWLEDGE_DOCUMENT}`],
+            msTag(),
+          ],
+          content: "",
+        };
+        return events.push(deleteEvent as UnsignedEvent & EventAttachment);
+      }
+      const snapshotSourceRoot =
+        rootNode.basedOn && !rootNode.snapshotDTag
+          ? getNode(plan.knowledgeDBs, rootNode.basedOn, author)
+          : undefined;
+      const createdSnapshotDTag = snapshotSourceRoot
+        ? `snapshot-${shortID(rootNode.id as ID)}`
+        : undefined;
+      const snapshotEvent = snapshotSourceRoot
+        ? (buildSnapshotEventFromNodes(
+            plan.knowledgeDBs,
+            author,
+            createdSnapshotDTag as string,
+            snapshotSourceRoot
+          ) as UnsignedEvent & EventAttachment)
+        : undefined;
+      const workspacePlan = plan as Partial<Plan>;
+      const event =
+        workspacePlan.views !== undefined && workspacePlan.panes !== undefined
+          ? buildDocumentEvent(workspacePlan as Data, rootNode, {
+              snapshotDTag: rootNode.snapshotDTag ?? createdSnapshotDTag,
+            })
+          : buildDocumentEventFromNodes(plan.knowledgeDBs, rootNode, {
+              snapshotDTag: rootNode.snapshotDTag ?? createdSnapshotDTag,
+            });
+      return snapshotEvent
+        ? events
+            .push(snapshotEvent)
+            .push(event as UnsignedEvent & EventAttachment)
+        : events.push(event as UnsignedEvent & EventAttachment);
+    },
+    plan.publishEvents
+  );
+}
+
+export async function signEvents(
+  events: List<EventTemplate & EventAttachment>,
+  user: User,
+  finalizeEvent: FinalizeEvent
+): Promise<List<SignedEventWithConf>> {
+  if (!isUserLoggedIn(user)) {
+    return List();
+  }
+
+  const signEventWithExtension = async (
+    event: EventTemplate
+  ): Promise<Event> => {
+    try {
+      return window.nostr.signEvent(event);
+      // eslint-disable-next-line no-empty
+    } catch {
+      throw new Error("Failed to sign event with extension");
+    }
+  };
+
+  return isUserLoggedInWithExtension(user)
+    ? List<SignedEventWithConf>(
+        await Promise.all(
+          events.map(async (e) => {
+            const { writeRelayConf, ...template } = e;
+            const signedEvent = await signEventWithExtension(template);
+            return {
+              event: signedEvent as VerifiedEvent,
+              writeRelayConf,
+            };
+          })
+        )
+      )
+    : events.map((e) => {
+        const { writeRelayConf, ...template } = e;
+        const event = finalizeEvent(
+          template,
+          (user as KeyPair).privateKey
+        ) as VerifiedEvent;
+        return { event, writeRelayConf };
+      });
+}
+
+export async function execute({
+  plan,
+  relayPool,
+  finalizeEvent,
+}: {
+  plan: GraphPlan;
+  relayPool: SimplePool;
+  finalizeEvent: FinalizeEvent;
+}): Promise<PublishResultsEventMap> {
+  const allEvents = buildDocumentEvents(plan);
+
+  if (allEvents.size === 0) {
+    // eslint-disable-next-line no-console
+    console.warn("Won't execute Noop plan");
+    return Map();
+  }
+
+  const finalizedEvents = await signEvents(allEvents, plan.user, finalizeEvent);
+
+  if (finalizedEvents.size === 0) {
+    return Map();
+  }
+
+  const results = await Promise.all(
+    finalizedEvents.toArray().map(({ event, writeRelayConf }) => {
+      const writeRelayUrls = applyWriteRelayConfig(
+        plan.relays.defaultRelays,
+        plan.relays.userRelays,
+        plan.relays.contactsRelays,
+        writeRelayConf
+      );
+      return publishEventToRelays(
+        relayPool,
+        event,
+        Array.from(new Set(writeRelayUrls.map((r: Relay) => r.url)))
+      );
+    })
+  );
+
+  return results.reduce((rdx, result, index) => {
+    const eventId = finalizedEvents.get(index)?.event.id;
+    return eventId ? rdx.set(eventId, result) : rdx;
+  }, Map<string, PublishResultsOfEvent>());
+}
+
+export async function republishEvents({
+  events,
+  relayPool,
+  writeRelayUrl,
+}: {
+  events: List<Event>;
+  relayPool: SimplePool;
+  writeRelayUrl: string;
+}): Promise<PublishResultsEventMap> {
+  if (events.size === 0) {
+    // eslint-disable-next-line no-console
+    console.warn("Won't republish noop events");
+    return Map();
+  }
+
+  const results = await Promise.all(
+    events
+      .toArray()
+      .map((event) => publishEventToRelays(relayPool, event, [writeRelayUrl]))
+  );
+
+  return results.reduce((rdx, result, index) => {
+    const eventId = events.get(index)?.id;
+    return eventId ? rdx.set(eventId, result) : rdx;
+  }, Map<string, PublishResultsOfEvent>());
+}
 
 const getDTag = (event: UnsignedEvent): string | undefined =>
   event.tags.find((t) => t[0] === "d")?.[1];

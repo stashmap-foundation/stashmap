@@ -9,11 +9,12 @@ import {
   getSuggestedRelays,
   getIsNecessaryReadRelays,
   sanitizeRelayUrl,
-  useRelaysForRelayManagement,
-} from "../../relays";
-import { useData } from "../../DataContext";
+} from "../../infra/relayUtils";
+import { useRelaysForRelayManagement } from "./useRelays";
+import { useData } from "./DataContext";
 import { useDefaultRelays } from "./NostrAuthContext";
-import { planPublishRelayMetadata, usePlanner } from "../../planner";
+import { planPublishRelayMetadata } from "../../infra/nostr";
+import { usePlanner } from "./PlannerContext";
 
 function ReadWriteButton({
   isPressed,

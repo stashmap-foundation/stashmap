@@ -1,14 +1,14 @@
 import React, { createContext, useContext } from "react";
 import { List } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
-import { getMostRecentReplacableEvent } from "../../nostrEvents";
+import { getMostRecentReplacableEvent } from "../../infra/nostrEvents";
 import { useEventQuery } from "../shared/useNostrQuery";
 import {
   createRelaysQuery,
   findAllRelays,
   sanitizeRelays,
 } from "../../infra/relayUtils";
-import { useDefaultRelays, useUserOrAnon } from "../../NostrAuthContext";
+import { useDefaultRelays, useUserOrAnon } from "./NostrAuthContext";
 import { useApis } from "./ApiContext";
 
 type UserRelayInfo = {

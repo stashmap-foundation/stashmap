@@ -1,6 +1,6 @@
 import { waitFor } from "@testing-library/react";
 import { ALICE, renderTree, setup } from "../testutils";
-import { KIND_CONTACTLIST, KIND_SETTINGS } from "../../nostr";
+import { KIND_CONTACTLIST, KIND_SETTINGS } from "../../infra/nostrCore";
 
 test("meta query uses separate filters with limit 1 for each replaceable kind", async () => {
   const [alice] = setup([ALICE]);

@@ -8,18 +8,14 @@ import {
   useCurrentNode,
   useDisplayText,
 } from "./RowContext";
-import { isEmptySemanticID } from "../../graph/context";
-import { useData } from "../../DataContext";
-import {
-  usePlanner,
-  planUpsertContact,
-  planRemoveContact,
-} from "../../planner";
+import { getNodeUserPublicKey, isEmptySemanticID } from "../../graph/context";
+import { useData } from "../app-shell/DataContext";
+import { usePlanner } from "../app-shell/PlannerContext";
+import { planUpsertContact, planRemoveContact } from "../../graph/commands";
 import { OpenInSplitPaneButton } from "../navigation/OpenInSplitPaneButton";
 import { preventEditorBlur } from "./AddNode";
 import { EvidenceSelector } from "./EvidenceSelector";
 import { FullscreenButton } from "./FullscreenButton";
-import { getNodeUserPublicKey } from "../../userEntry";
 import { RelevanceSelector } from "./RelevanceSelector";
 import { decodePublicKeyInputSync } from "../../graph/publicKeys";
 

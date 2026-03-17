@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { getPublicKey } from "nostr-tools";
 import { hexToBytes } from "@noble/hashes/utils";
-import { DEFAULT_RELAYS } from "../../nostr";
+import { DEFAULT_RELAYS } from "../../infra/nostrCore";
 import { useApis } from "./ApiContext";
 import { UNAUTHENTICATED_USER_PK } from "./RequireLogin";
-import { sanitizeRelays } from "../../relays";
-import { clearDatabase } from "../../indexedDB";
+import { sanitizeRelays } from "../../infra/relayUtils";
+import { clearDatabase } from "../../infra/indexedDB";
 
 type Context = {
   user: User | undefined;

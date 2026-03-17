@@ -477,6 +477,24 @@ I’d structure the first pass like this:
   - kept the old top-level paths as compatibility barrels
   - `src/infra/permanentSync.ts` intentionally imports `../indexedDB` and `../eventQuery` through the compatibility layer so the existing Jest mocks still intercept those dependencies
 
+- Split execution/publishing into `app` and `infra`
+  - moved:
+    - `src/executor.tsx` -> `src/app/executor.ts`
+    - `src/nostrPublish.ts` -> `src/infra/nostrPublish.ts`
+  - kept the old top-level paths as compatibility barrels
+  - decision:
+    - `executor` was placed in `app`, not `infra`, because it still depends on user/auth/finalization surfaces and orchestrates plan execution rather than raw transport publishing
+
+- Moved the remaining small shared foundation helpers into structured layers
+  - moved:
+    - `src/contacts.ts` -> `src/infra/contacts.ts`
+    - `src/serializer.tsx` -> `src/session/serializer.ts`
+    - `src/nostr.ts` -> `src/infra/nostrCore.ts`
+    - `src/nostrEvents.ts` -> `src/infra/nostrEvents.ts`
+  - kept the old top-level paths as compatibility barrels
+  - intentionally left `src/types.ts` in place for now
+    - it is still the global declaration hub and needs a more deliberate split than a mechanical move
+
 And the rule for ambiguous cases should be:
 
 - “Can this module exist without React?”

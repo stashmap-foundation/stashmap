@@ -353,6 +353,23 @@ I’d structure the first pass like this:
     - former `src/PublishQueue.ts` implementation
   - old flat files are now compatibility barrels only
 
+- Split relay logic by layer
+  - moved React relay hooks into `src/features/app-shell/useRelays.ts`:
+    - `useReadRelays`
+    - `usePreloadRelays`
+    - `useRelaysToCreatePlan`
+    - `useRelaysForRelayManagement`
+  - moved pure relay rules into `src/relayUtils.ts`:
+    - `getSuggestedRelays`
+    - `getIsNecessaryReadRelays`
+    - `applyWriteRelayConfig`
+  - `src/relays.tsx` is now a compatibility surface that re-exports pure relay utilities and feature-level relay hooks
+
+- Reduced reference-row cross-layer coupling
+  - moved `referenceToText` into `src/rows/display.ts`
+  - `src/buildReferenceRow.ts` now depends on `rows/display` and `session/panes` instead of depending on feature/UI code and planner just to format reference text and read pane state
+  - `src/features/references/ReferenceDisplay.tsx` now keeps only the React rendering layer
+
 - Boundary hold:
   - `buildNodeUrl` remains in `src/navigationUrl.ts`
   - reason: moving it into `src/session/navigation.ts` would violate the lint boundary because it depends on semantic projection (`getTextForSemanticID`)

@@ -119,17 +119,6 @@ function buildReferenceParts(
   ];
 }
 
-function partToText(part: ReferencePart): string {
-  if (part.type === "indicator") {
-    return relevanceChar(part.relevance) + argumentChar(part.argument);
-  }
-  return part.value;
-}
-
-export function referenceToText(config: ReferenceDisplayConfig): string {
-  return buildReferenceParts(config).map(partToText).join(" ");
-}
-
 function RenderPart({ part }: { part: ReferencePart }): JSX.Element {
   if (part.type === "arrow") {
     return <span className="ref-separator">{part.value}</span>;

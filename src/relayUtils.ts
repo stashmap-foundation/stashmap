@@ -119,3 +119,53 @@ export function getWriteRelays(relays: Array<Relay>): Array<Relay> {
 export function flattenRelays(relays: Map<PublicKey, Relays>): Relays {
   return relays.reduce((acc: Relays, value) => [...acc, ...value], []);
 }
+
+export function getSuggestedRelays(
+  contactsRelays: Map<PublicKey, Relays>
+): Array<SuggestedRelay> {
+  const contactsWriteRelays = getWriteRelays(
+    sanitizeRelays(Array.from(contactsRelays.values()).flat())
+  );
+  return contactsWriteRelays
+    .reduce((rdx: Map<string, SuggestedRelay>, relay: Relay) => {
+      const foundRelay = rdx.find((r) => r.url === relay.url);
+      return rdx.set(relay.url, {
+        ...relay,
+        numberOfContacts: foundRelay ? foundRelay.numberOfContacts + 1 : 1,
+      });
+    }, Map<string, SuggestedRelay>())
+    .valueSeq()
+    .toArray();
+}
+
+export function getIsNecessaryReadRelays(
+  contactsRelays: Map<PublicKey, Relays>
+): (relayState: Relays) => Relays {
+  return (relayState: Relays) => {
+    return contactsRelays.reduce((rdx: Relays, cRelays: Relays): Relays => {
+      const cWriteRelays = getWriteRelays(cRelays);
+      const relayStateReadRelays = getReadRelays(relayState);
+      const isOverlap = relayStateReadRelays.some((relay) =>
+        cWriteRelays.some((cRelay) => relay.url === cRelay.url)
+      );
+      return isOverlap ? rdx : mergeRelays(rdx, cRelays);
+    }, [] as Relays);
+  };
+}
+
+export function applyWriteRelayConfig(
+  defaultRelays: Relays,
+  userRelays: Relays,
+  contactsRelays: Relays,
+  config?: WriteRelayConf
+): Relays {
+  if (!config) {
+    return getWriteRelays(userRelays);
+  }
+  return getWriteRelays([
+    ...(config.defaultRelays ? defaultRelays : []),
+    ...(config.user ? userRelays : []),
+    ...(config.contacts ? contactsRelays : []),
+    ...(config.extraRelays ? config.extraRelays : []),
+  ]);
+}

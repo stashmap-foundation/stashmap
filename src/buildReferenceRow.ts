@@ -12,10 +12,10 @@ import {
 } from "./connections";
 import { getTextForSemanticID } from "./semanticProjection";
 import { getLast, getParentRowPath, type RowPath } from "./rows/rowPaths";
+import { referenceToText } from "./rows/display";
 import { getNodeForView } from "./rows/resolveRow";
-import { getPane } from "./planner";
+import { getPane } from "./session/panes";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
-import { referenceToText } from "./components/referenceDisplay";
 
 function argumentPrefix(argument?: Argument): string {
   if (argument === "confirms") {

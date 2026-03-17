@@ -1,4 +1,15 @@
 import { List } from "immutable";
+import { EMPTY_SEMANTIC_ID } from "../graph/types";
+import type {
+  KnowledgeDBs,
+  Argument,
+  GraphNode,
+  ID,
+  LongID,
+  Relevance,
+  TextSeed,
+} from "../graph/types";
+import type { PublicKey } from "../graph/identity";
 import { createRefTarget, isRefNode } from "../graph/references";
 import {
   getNodeUserPublicKey,
@@ -8,7 +19,6 @@ import {
   withUsersEntryPublicKey,
 } from "../graph/context";
 import { getNode, computeEmptyNodeMetadata } from "../graph/queries";
-import { EMPTY_SEMANTIC_ID, type TextSeed } from "../graph/types";
 import { newNode } from "../graph/nodeFactory";
 import { decodePublicKeyInputSync } from "../graph/publicKeys";
 import type { ChildNodeMetadata } from "../graph/commands";

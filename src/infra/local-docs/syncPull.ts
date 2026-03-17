@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { List } from "immutable";
 import { Event, Filter } from "nostr-tools";
+import type { Relays } from "../publishTypes";
 import { findContacts } from "../contacts";
 import { findTag, getMostRecentReplacableEvent } from "../nostrEvents";
 import {

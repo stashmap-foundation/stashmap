@@ -1,5 +1,30 @@
 import { Map, OrderedSet, Set } from "immutable";
 
+export type TypeFilter =
+  | Relevance
+  | Argument
+  | "suggestions"
+  | "versions"
+  | "incoming"
+  | "contains";
+
+export type Pane = {
+  id: string;
+  stack: ID[];
+  author: PublicKey;
+  rootNodeId?: ID;
+  searchQuery?: string;
+  typeFilters?: TypeFilter[];
+  scrollToId?: string;
+};
+
+export type View = {
+  expanded?: boolean;
+  typeFilters?: TypeFilter[];
+};
+
+export type Views = Map<string, View>;
+
 export type RowFocusIntent = {
   requestId: number;
   paneIndex: number;

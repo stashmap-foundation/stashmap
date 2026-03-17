@@ -1,6 +1,13 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Map } from "immutable";
+import type { PublicKey } from "../../graph/identity";
+import type {
+  Relay,
+  Relays,
+  SuggestedRelay,
+  SuggestedRelays,
+} from "../../infra/publishTypes";
 import { Button } from "../shared/Ui";
 import { ModalForm } from "../shared/ModalForm";
 import { ErrorMessage } from "../shared/ErrorMessage";

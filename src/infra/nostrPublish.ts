@@ -1,5 +1,6 @@
 import { Event, SimplePool } from "nostr-tools";
 import { Map } from "immutable";
+import type { PublishResultsOfEvent, PublishStatus } from "./publishTypes";
 
 export const PUBLISH_TIMEOUT = 5000;
 

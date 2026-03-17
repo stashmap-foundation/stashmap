@@ -16,6 +16,14 @@ import {
   planCopyDescendantNodes,
   type AddToParentTarget,
 } from "../graph/commands";
+import type {
+  Context,
+  GraphNode,
+  ID,
+  LongID,
+  Relevance,
+  Argument,
+} from "../graph/types";
 import {
   getNodeIndexForView,
   getRowIDFromView,
@@ -40,6 +48,7 @@ import {
   updateRowPathsAfterDisconnect,
 } from "../session/views";
 import { getPane, planUpdatePanes } from "../session/panes";
+import type { Pane, Views } from "../session/types";
 import { upsertNodes } from "./actions";
 import type { Plan } from "./types";
 

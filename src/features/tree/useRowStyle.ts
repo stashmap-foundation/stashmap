@@ -1,4 +1,5 @@
 import { CSSProperties } from "react";
+import type { VirtualType } from "../../graph/types";
 import { useCurrentEdge, useIsViewingOtherUserContent } from "./RowContext";
 import { isRefNode } from "../../graph/references";
 import { TYPE_COLORS } from "../shared/typeColors";

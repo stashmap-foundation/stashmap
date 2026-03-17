@@ -1,4 +1,11 @@
 import { List } from "immutable";
+import type {
+  Context,
+  GraphNode,
+  KnowledgeDBs,
+  KnowledgeData,
+  SemanticIndex,
+} from "./types";
 import {
   shortID,
   splitID,

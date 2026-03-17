@@ -1,5 +1,6 @@
 import React from "react";
 import { useMediaQuery } from "react-responsive";
+import type { ReferenceRow } from "../../rows/types";
 import {
   getNodeForView,
   getNodeIndexForView,

@@ -1,5 +1,12 @@
 import React from "react";
 import { Map, List } from "immutable";
+import { newDB } from "../../graph/types";
+import type {
+  GraphNode,
+  KnowledgeDBs,
+  KnowledgeData,
+  TextSeed,
+} from "../../graph/types";
 import {
   isSearchId,
   parseSearchId,
@@ -7,7 +14,6 @@ import {
   shortID,
 } from "../../graph/context";
 import { getSearchNodes } from "../../graph/queries";
-import { newDB, type TextSeed } from "../../graph/types";
 import { MergeKnowledgeDB, useData } from "../app-shell/DataContext";
 import {
   deduplicateRefsByContext,

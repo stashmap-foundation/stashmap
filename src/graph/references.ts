@@ -1,4 +1,11 @@
-import { type RefTargetSeed } from "./types";
+import type { PublicKey } from "./identity";
+import type {
+  GraphNode,
+  ID,
+  KnowledgeDBs,
+  LongID,
+  RefTargetSeed,
+} from "./types";
 import { getNode } from "./queries";
 import { getNodeStack } from "./context";
 

@@ -1,4 +1,11 @@
 import { List, OrderedMap, Set as ImmutableSet } from "immutable";
+import type {
+  Context,
+  GraphNode,
+  KnowledgeDBs,
+  RootSystemRole,
+  SemanticIndex,
+} from "../graph/types";
 import {
   getChildNodes,
   getNode,

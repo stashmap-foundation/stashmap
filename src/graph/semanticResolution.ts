@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data */
+import type { Context, GraphNode, KnowledgeDBs } from "./types";
 import { getIndexedNodesForKeys, getSemanticID, shortID } from "./context";
 import { newDB } from "./types";
 import { getChildNodes, getNode, isStandaloneRoot } from "./queries";

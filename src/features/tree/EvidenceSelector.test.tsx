@@ -11,6 +11,7 @@ import {
   type,
 } from "../../tests/testutils";
 import { updateChildNodeMetadata } from "../../graph/commands";
+import type { GraphNode } from "../../graph/types";
 
 function makeItem(
   id: ID,

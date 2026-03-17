@@ -3,6 +3,8 @@ import { Event, UnsignedEvent } from "nostr-tools";
 import { findContacts } from "./contacts";
 import { buildKnowledgeDBFromDocumentEvents } from "./documentMaterialization";
 import { newDB } from "../graph/types";
+import type { KnowledgeData } from "../graph/types";
+import type { Relays } from "./publishTypes";
 import { findRelays } from "./relayUtils";
 
 type ProcessedEvents = {

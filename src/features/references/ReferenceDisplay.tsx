@@ -1,4 +1,5 @@
 import React from "react";
+import type { ReferenceRow } from "../../rows/types";
 import { TYPE_COLORS } from "../shared/typeColors";
 import { useData } from "../app-shell/DataContext";
 

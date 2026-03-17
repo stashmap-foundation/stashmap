@@ -1,6 +1,19 @@
 import { List, Map, Set as ImmutableSet } from "immutable";
 import { newNode, newRefNode } from "./nodeFactory";
-import { newDB, EMPTY_SEMANTIC_ID } from "./types";
+import {
+  newDB,
+  EMPTY_SEMANTIC_ID,
+  type Argument,
+  type GraphNode,
+  type ID,
+  type KnowledgeDBs,
+  type KnowledgeData,
+  type LongID,
+  type Relevance,
+  type RootSystemRole,
+} from "./types";
+import type { PublicKey } from "./identity";
+import type { TemporaryEvent } from "../features/app-shell/types";
 import { rootAnchorsEqual, splitID, shortID } from "./context";
 
 export const LOG_ROOT_ROLE: RootSystemRole = "log";

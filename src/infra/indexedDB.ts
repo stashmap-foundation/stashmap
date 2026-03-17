@@ -1,5 +1,6 @@
 /* eslint-disable functional/immutable-data */
 import { UnsignedEvent } from "nostr-tools";
+import type { EventAttachment } from "./publishTypes";
 
 const DB_NAME = "stashmap";
 const DB_VERSION = 2;

@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data */
 import { List } from "immutable";
+import type { Data } from "../features/app-shell/types";
+import type { PublicKey } from "../graph/identity";
 import {
   computeEmptyNodeMetadata,
   getNode,
@@ -12,7 +14,15 @@ import {
   getNodeSemanticID,
   getSemanticID,
 } from "../graph/context";
-import { EMPTY_SEMANTIC_ID } from "../graph/types";
+import {
+  EMPTY_SEMANTIC_ID,
+  type Context,
+  type GraphNode,
+  type ID,
+  type KnowledgeDBs,
+  type LongID,
+  type VirtualType,
+} from "../graph/types";
 import {
   getRefLinkTargetInfo,
   getRefTargetInfo,
@@ -21,6 +31,7 @@ import {
 import { buildReferenceRow } from "./buildReferenceRow";
 import { resolveSemanticNodeInCurrentTree } from "../graph/semanticResolution";
 import { DEFAULT_TYPE_FILTERS } from "./settings";
+import type { ReferenceRow } from "./types";
 import {
   getLast,
   getPaneIndex,
@@ -29,6 +40,7 @@ import {
   type RowPath,
   rowPathToString,
 } from "./rowPaths";
+import type { View, Views } from "../session/types";
 
 const EMPTY_ROW_PATH_PREFIX = "empty-row:";
 

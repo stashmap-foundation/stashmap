@@ -8,6 +8,7 @@ import { processEvents } from "../../infra/eventProcessing";
 import { ALICE, setup, UpdateState } from "../../tests/testutils";
 import { parseMarkdownHierarchy, planPasteMarkdownTrees } from "./FileDropZone";
 import { joinID, shortID } from "../../graph/context";
+import type { GraphNode, KnowledgeData } from "../../graph/types";
 
 const TEST_FILE = `# Programming Languages
 

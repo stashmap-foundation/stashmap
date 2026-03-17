@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { OrderedSet, Set } from "immutable";
+import type { GraphNode } from "../../graph/types";
 import { useViewKey } from "./RowContext";
 import { useData } from "../app-shell/DataContext";
 import { isRefNode } from "../../graph/references";

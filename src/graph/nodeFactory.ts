@@ -1,5 +1,6 @@
 import { List } from "immutable";
 import { v4 } from "uuid";
+import type { Context, GraphNode, RootSystemRole } from "./types";
 import { createRootAnchor, joinID } from "./context";
 
 export function newNode(

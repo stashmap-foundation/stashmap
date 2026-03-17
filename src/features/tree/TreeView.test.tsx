@@ -11,6 +11,7 @@ import {
   setup,
   type,
 } from "../../tests/testutils";
+import type { Views } from "../../session/types";
 
 function getAncestorPaths(path: string, rootKey: string): string[] {
   const suffix = path.slice(rootKey.length);

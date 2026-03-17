@@ -1,5 +1,6 @@
 import { getNodeForView, getCurrentEdgeForView } from "../../rows/resolveRow";
 import { type RowPath, getParentRowPath } from "../../rows/rowPaths";
+import type { GraphNode } from "../../graph/types";
 import {
   useCurrentNode,
   useCurrentRowID,

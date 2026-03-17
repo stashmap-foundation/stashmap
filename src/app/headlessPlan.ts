@@ -1,6 +1,9 @@
 import { Map } from "immutable";
 import { createGraphPlan, GraphPlan } from "../graph/commands";
+import type { Contact, PublicKey } from "../graph/identity";
+import type { KnowledgeData, KnowledgeDBs } from "../graph/types";
 import { createEmptySemanticIndex } from "../graph/semanticIndex";
+import type { AllRelays, Relays } from "../infra/publishTypes";
 
 const EMPTY_RELAYS: AllRelays = {
   defaultRelays: [],

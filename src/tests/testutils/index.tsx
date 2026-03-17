@@ -49,6 +49,7 @@ import {
   DataContextProvider,
   MergeKnowledgeDB,
 } from "../../features/app-shell/DataContext";
+import type { Data, LocalStorage } from "../../features/app-shell/types";
 import { DocumentStoreProvider } from "../../features/app-shell/DocumentStore";
 import { MockRelayPool, mockRelayPool } from "./nostrMock";
 import {
@@ -68,13 +69,20 @@ import {
 import { findContacts } from "../../infra/contacts";
 import { UserRelayContextProvider } from "../../features/app-shell/UserRelayContext";
 import { StashmapDB } from "../../infra/indexedDB";
+import type {
+  AllRelays,
+  PublishResultsOfEvent,
+  Relays,
+} from "../../infra/publishTypes";
 import { createEmptySemanticIndex } from "../../graph/semanticIndex";
+import type { KnowledgeData } from "../../graph/types";
 
 import {
   PaneIndexProvider,
   useCurrentPane,
   usePaneIndex,
 } from "../../features/navigation/SplitPanesContext";
+import type { RowFocusIntent, View } from "../../session/types";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 test.skip("skip", () => {});

@@ -3,6 +3,8 @@ import {
   injectEmptyNodesIntoKnowledgeDBs,
   mergeKnowledgeDBs,
 } from "../../graph/queries";
+import type { KnowledgeDBs } from "../../graph/types";
+import type { Data } from "./types";
 import {
   useDocumentKnowledgeDBs,
   useDocumentSemanticIndex,

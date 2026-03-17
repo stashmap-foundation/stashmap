@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { Event, Filter, SimplePool } from "nostr-tools";
 import { Map, OrderedMap } from "immutable";
+import type { Relay } from "../../infra/publishTypes";
 import { sanitizeAuthorsFilter } from "../../infra/nostrEvents";
 
 type EventQueryResult = {

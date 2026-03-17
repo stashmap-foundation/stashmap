@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Dropdown } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { nip19 } from "nostr-tools";
+import type { Pane } from "../../session/types";
 import {
   useSplitPanes,
   PaneIndexProvider,

@@ -1,6 +1,13 @@
 import React from "react";
 import { List, Map as ImmutableMap } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
+import type { PublicKey } from "../../graph/identity";
+import type {
+  GraphNode,
+  KnowledgeDBs,
+  KnowledgeData,
+  SemanticIndex,
+} from "../../graph/types";
 import type {
   DocumentStoreChange,
   StashmapDB,

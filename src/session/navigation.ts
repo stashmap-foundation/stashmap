@@ -1,4 +1,5 @@
 import { generatePaneId } from "./panes";
+import type { Pane } from "./types";
 
 export type HistoryState = {
   panes: Pane[];

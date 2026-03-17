@@ -1,4 +1,5 @@
 import React, { createContext, useContext } from "react";
+import type { Pane } from "../../session/types";
 import { usePlanner } from "../app-shell/PlannerContext";
 import { useData } from "../app-shell/DataContext";
 import {

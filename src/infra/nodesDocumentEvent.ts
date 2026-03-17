@@ -9,6 +9,8 @@ import {
 import { getNode } from "../graph/queries";
 import { resolveNode, isRefNode } from "../graph/references";
 import { EMPTY_SEMANTIC_ID as EMPTY_NODE_ID } from "../graph/types";
+import type { PublicKey } from "../graph/identity";
+import type { GraphNode, KnowledgeDBs } from "../graph/types";
 import {
   formatNodeAttrs,
   formatPrefixMarkers,

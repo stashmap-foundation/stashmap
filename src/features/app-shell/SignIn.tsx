@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Form, Modal } from "react-bootstrap";
 import { useLocation, useNavigate } from "react-router-dom";
+import type { PublicKey } from "../../graph/identity";
+import type { Nostr } from "../../infra/publishTypes";
 import { ErrorMessage } from "../shared/ErrorMessage";
 import { Button } from "../shared/Ui";
 import { createSubmitHandler } from "../shared/modalFormSubmitHandler";
@@ -17,6 +19,7 @@ import { useApis } from "./ApiContext";
 import { KINDS_META } from "./Data";
 import { useStorePreLoginEvents } from "./StorePreLoginContext";
 import { convertInputToPrivateKey } from "../../infra/nostrKey";
+import type { LocationState } from "./types";
 
 function SignInWithSeed({
   setPrivateKey,
@@ -104,7 +107,8 @@ function SignInWithExtension({
     PublicKey | undefined
   > => {
     try {
-      return window.nostr.getPublicKey();
+      const { nostr } = window as Window & { nostr?: Nostr };
+      return nostr?.getPublicKey();
       // eslint-disable-next-line no-empty
     } catch {
       return undefined;

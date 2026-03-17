@@ -2,6 +2,7 @@ import React from "react";
 import { EventTemplate, SimplePool, VerifiedEvent } from "nostr-tools";
 // eslint-disable-next-line import/no-unresolved
 import { RelayInformation } from "nostr-tools/lib/types/nip11";
+import type { LocalStorage } from "./types";
 
 export type FinalizeEvent = (
   t: EventTemplate,

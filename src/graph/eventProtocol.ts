@@ -1,3 +1,5 @@
+import type { Relays } from "../infra/publishTypes";
+
 export const KIND_SETTINGS = 11071;
 
 export const KIND_KNOWLEDGE_DOCUMENT = 34770;

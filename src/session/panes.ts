@@ -1,4 +1,5 @@
 import type { RowPath } from "../rows/rowPaths";
+import type { Pane } from "./types";
 
 export function generatePaneId(): string {
   return `pane-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;

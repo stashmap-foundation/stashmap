@@ -5,9 +5,9 @@ import {
   Set as ImmutableSet,
 } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
+import type { Contacts, Contact, PublicKey, User } from "./identity";
 import {
   getNodeContext,
-  getNodeUserPublicKey,
   getNodeText,
   getSemanticID,
   isSearchId,
@@ -24,25 +24,39 @@ import {
   LOG_ROOT_ROLE,
 } from "./queries";
 import { isRefNode } from "./references";
-import { newDB, type RefTargetSeed, type TextSeed } from "./types";
+import {
+  newDB,
+  type RefTargetSeed,
+  type TextSeed,
+  Context,
+  GraphNode,
+  KnowledgeDBs,
+  RootSystemRole,
+} from "./types";
 import { KIND_CONTACTLIST, newTimestamp, msTag } from "./eventProtocol";
 import { newNode, newRefNode } from "./nodeFactory";
-import { decodePublicKeyInputSync } from "./publicKeys";
+import type {
+  AllRelays,
+  EventAttachment,
+  WriteRelayConf,
+} from "../infra/publishTypes";
 
 export type ChildNodeMetadata = {
   relevance?: Relevance;
   argument?: Argument;
 };
 
-type GraphPlanData = Pick<
-  Data,
-  | "contacts"
-  | "user"
-  | "contactsRelays"
-  | "knowledgeDBs"
-  | "semanticIndex"
-  | "relaysInfos"
->;
+type GraphPlanData = {
+  contacts: Contacts;
+  user: User;
+  contactsRelays: Map<PublicKey, import("../infra/publishTypes").Relays>;
+  knowledgeDBs: KnowledgeDBs;
+  semanticIndex: import("./types").SemanticIndex;
+  relaysInfos: Map<
+    string,
+    import("nostr-tools/lib/types/nip11").RelayInformation | undefined
+  >;
+};
 
 export type GraphPlan = GraphPlanData & {
   publishEvents: List<UnsignedEvent & EventAttachment>;
@@ -270,31 +284,6 @@ function getWritableNode(
     return undefined;
   }
   return node;
-}
-
-export function planUpdateNodeText<T extends GraphPlan>(
-  plan: T,
-  node: GraphNode,
-  text: string
-): T {
-  if (node.author !== plan.user.publicKey || node.text === text) {
-    return plan;
-  }
-  const updatedNode = withUsersEntryPublicKey({
-    ...node,
-    text,
-    updated: Date.now(),
-  });
-  const basePlan = planUpsertNodes(plan, updatedNode);
-  const userPublicKey = getNodeUserPublicKey(node, text);
-  const isCustomName = !decodePublicKeyInputSync(text);
-  if (userPublicKey && basePlan.contacts.has(userPublicKey)) {
-    return planUpsertContact(basePlan, {
-      ...basePlan.contacts.get(userPublicKey)!,
-      userName: isCustomName ? text : undefined,
-    });
-  }
-  return basePlan;
 }
 
 function getChildNodeIndex(

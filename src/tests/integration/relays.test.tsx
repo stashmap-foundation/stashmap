@@ -12,6 +12,7 @@ import {
 } from "../testutils";
 import { createPlan } from "../../app/actions";
 import { execute, planPublishRelayMetadata } from "../../infra/nostr";
+import type { Relays } from "../../infra/publishTypes";
 import { flattenRelays } from "../../infra/relayUtils";
 
 test("Flatten relays", () => {

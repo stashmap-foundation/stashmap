@@ -3,6 +3,14 @@ import {
   isSearchId,
   parseSearchId,
 } from "../graph/context";
+import type { Data } from "../features/app-shell/types";
+import type {
+  Argument,
+  GraphNode,
+  ID,
+  Relevance,
+  VirtualType,
+} from "../graph/types";
 import { type RowPath } from "./rowPaths";
 import {
   getCurrentReferenceForView,

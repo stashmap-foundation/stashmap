@@ -4,7 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { Map } from "immutable";
 import { Event } from "nostr-tools";
 import { KIND_RELAY_METADATA_EVENT } from "../../infra/nostrCore";
-import { Relays, addRelayWarningText } from "./Relays";
+import { Relays as RelaysView, addRelayWarningText } from "./Relays";
+import type { Relays } from "../../infra/publishTypes";
 import {
   ALICE,
   setup,
@@ -152,7 +153,7 @@ test("Stop writing to an existing Nostr Relay", async () => {
 test("Suggest Relays of a contact", async () => {
   const [alice] = setup([ALICE], {});
   renderWithTestData(
-    <Relays
+    <RelaysView
       defaultRelays={TEST_RELAYS}
       relays={TEST_RELAYS}
       contactsRelays={Map<PublicKey, Relays>({

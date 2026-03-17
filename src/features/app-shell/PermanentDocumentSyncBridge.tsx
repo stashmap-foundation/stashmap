@@ -1,4 +1,6 @@
 import type { Map as ImmutableMap } from "immutable";
+import type { Contacts, PublicKey } from "../../graph/identity";
+import type { Relays } from "../../infra/publishTypes";
 import type { StashmapDB } from "../../infra/indexedDB";
 import { useDocumentStore } from "./DocumentStore";
 import { usePermanentDocumentSync } from "./usePermanentDocumentSync";

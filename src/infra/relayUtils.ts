@@ -1,5 +1,12 @@
 import { List, Map } from "immutable";
 import { EventTemplate, Filter } from "nostr-tools";
+import type { PublicKey } from "../graph/identity";
+import type {
+  Relay,
+  Relays,
+  SuggestedRelay,
+  WriteRelayConf,
+} from "./publishTypes";
 import { KIND_RELAY_METADATA_EVENT } from "./nostrCore";
 import { findAllTags, getMostRecentReplacableEvent } from "./nostrEvents";
 

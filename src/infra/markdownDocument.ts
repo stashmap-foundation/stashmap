@@ -2,6 +2,8 @@
 import { List } from "immutable";
 import { v4 } from "uuid";
 import { UnsignedEvent } from "nostr-tools";
+import type { Data } from "../features/app-shell/types";
+import type { PublicKey } from "../graph/identity";
 import {
   createRootAnchor,
   getNodeContext,
@@ -19,6 +21,7 @@ import {
 import { getDisplayTextForView } from "../rows/display";
 import { buildOutgoingReference } from "../rows/buildReferenceRow";
 import { type RowPath, isRoot } from "../rows/rowPaths";
+import type { GraphNode, KnowledgeDBs } from "../graph/types";
 import {
   formatNodeAttrs,
   formatPrefixMarkers,

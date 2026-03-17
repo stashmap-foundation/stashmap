@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { List, Map, Set as ImmutableSet } from "immutable";
 import { ListRange, Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import { useLocation } from "react-router-dom";
+import type { GraphNode } from "../../graph/types";
 import { useDragAutoScroll } from "../navigation/useDragAutoScroll";
 import { ListItem } from "./Draggable";
 import { getNodesInTree } from "./NodeView";

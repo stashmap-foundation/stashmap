@@ -1,6 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./styles/App.css";
 import { List, Map, Set, OrderedSet } from "immutable";
+import type { PublicKey, User } from "../../graph/identity";
+import type { KnowledgeData } from "../../graph/types";
+import type { Relays } from "../../infra/publishTypes";
+import type {
+  Pane,
+  RowFocusIntent,
+  TemporaryViewState,
+  View,
+  Views,
+} from "../../session/types";
 import {
   KIND_KNOWLEDGE_DOCUMENT,
   KIND_CONTACTLIST,
@@ -35,6 +45,7 @@ import { DocumentStoreProvider } from "./DocumentStore";
 import { createEmptySemanticIndex } from "../../graph/semanticIndex";
 import { PermanentDocumentSyncBridge } from "./PermanentDocumentSyncBridge";
 import { useRelaysInfo } from "./useRelaysInfo";
+import type { EventState } from "./types";
 
 export { defaultPane } from "../../session/panes";
 

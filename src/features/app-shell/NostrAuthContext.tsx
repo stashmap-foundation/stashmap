@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { getPublicKey } from "nostr-tools";
 import { hexToBytes } from "@noble/hashes/utils";
+import type { KeyPair, PublicKey, User } from "../../graph/identity";
+import type { Relays } from "../../infra/publishTypes";
 import { DEFAULT_RELAYS } from "../../infra/nostrCore";
 import { useApis } from "./ApiContext";
 import { UNAUTHENTICATED_USER_PK } from "./RequireLogin";

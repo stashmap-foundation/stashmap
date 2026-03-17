@@ -8,6 +8,7 @@ import "./features/app-shell/assets/fonts/nostr/css/nostr.css";
 import "./features/app-shell/styles/Workspace.scss";
 import "./features/app-shell/styles/App.css";
 import { App } from "./features/app-shell/App";
+import type { LocalStorage } from "./features/app-shell/types";
 import { NostrAuthContextProvider } from "./features/app-shell/NostrAuthContext";
 import { NostrProvider } from "./features/app-shell/NostrProvider";
 import { UserRelayContextProvider } from "./features/app-shell/UserRelayContext";

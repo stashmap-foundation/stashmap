@@ -1,4 +1,5 @@
 import { List } from "immutable";
+import type { GraphNode, KnowledgeDBs, KnowledgeData } from "./types";
 import {
   shortID,
   splitID,

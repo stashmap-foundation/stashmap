@@ -6,6 +6,7 @@ import {
   UnsignedEvent,
   VerifiedEvent,
 } from "nostr-tools";
+import type { Data } from "../features/app-shell/types";
 import { FinalizeEvent } from "../features/app-shell/ApiContext";
 import {
   isUserLoggedIn,
@@ -13,9 +14,21 @@ import {
 } from "../features/app-shell/NostrAuthContext";
 import type { Plan } from "../app/types";
 import type { GraphPlan } from "../graph/commands";
+import type { User } from "../graph/identity";
 import { getNode } from "../graph/queries";
 import { shortID } from "../graph/context";
 import { newDB } from "../graph/types";
+import type { GraphNode, ID } from "../graph/types";
+import type {
+  AllRelays,
+  EventAttachment,
+  PublishResultsEventMap,
+  PublishResultsOfEvent,
+  PublishStatus,
+  Relay,
+  Relays,
+  WriteRelayConf,
+} from "./publishTypes";
 import {
   KIND_DELETE,
   KIND_KNOWLEDGE_DOCUMENT,

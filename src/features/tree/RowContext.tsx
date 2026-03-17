@@ -1,5 +1,7 @@
 import React from "react";
 import { List, Map } from "immutable";
+import type { GraphNode } from "../../graph/types";
+import type { View } from "../../session/types";
 import { isSearchId } from "../../graph/context";
 import { getNode } from "../../graph/queries";
 import { resolveSemanticNodeInCurrentTree } from "../../graph/semanticResolution";

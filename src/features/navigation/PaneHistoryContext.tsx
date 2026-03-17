@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useRef, useCallback } from "react";
+import type { Pane } from "../../session/types";
 
 const MAX_HISTORY = 50;
 

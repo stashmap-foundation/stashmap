@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Map } from "immutable";
 // eslint-disable-next-line import/no-unresolved
 import { RelayInformation } from "nostr-tools/lib/types/nip11";
+import type { Relay } from "../../infra/publishTypes";
 import { useApis } from "./ApiContext";
 
 export function useRelaysInfo(

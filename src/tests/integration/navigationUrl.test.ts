@@ -3,6 +3,7 @@ import { shortID } from "../../graph/context";
 import { newDB } from "../../graph/types";
 import { newNode } from "../../graph/nodeFactory";
 import { buildNodeUrl } from "../../graph/nodeUrl";
+import type { GraphNode, KnowledgeDBs, KnowledgeData } from "../../graph/types";
 import {
   pathToStack,
   parseNodeRouteUrl,

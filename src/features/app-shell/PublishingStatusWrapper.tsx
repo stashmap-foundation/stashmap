@@ -1,11 +1,13 @@
 import React from "react";
 import { Dropdown } from "react-bootstrap";
 import { useMediaQuery } from "react-responsive";
+import type { PublishResultsEventMap } from "../../infra/publishTypes";
 import { useData } from "./DataContext";
 import { IS_MOBILE } from "../navigation/responsive";
 import { PublishingStatusContent } from "../shared/PublishingStatus";
 import { getWriteRelays } from "../../infra/relayUtils";
 import { useUserRelayContext } from "./UserRelayContext";
+import type { EventState } from "./types";
 
 function getRelayRatio(
   results: PublishResultsEventMap,

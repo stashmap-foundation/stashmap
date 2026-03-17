@@ -1,5 +1,6 @@
 import React from "react";
 import { Outlet } from "react-router-dom";
+import type { PublicKey } from "../../graph/identity";
 import "./styles/App.css";
 import Data from "./Data";
 import { useUser } from "./NostrAuthContext";

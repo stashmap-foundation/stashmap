@@ -1,3 +1,8 @@
+import type {
+  AllRelays,
+  Relays,
+  WriteRelayConf,
+} from "../../infra/publishTypes";
 import { useDefaultRelays } from "./NostrAuthContext";
 import { useUserRelayContext } from "./UserRelayContext";
 import { useData } from "./DataContext";

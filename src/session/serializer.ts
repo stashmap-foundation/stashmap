@@ -1,5 +1,6 @@
 import { Map } from "immutable";
 import { parseRowPath } from "../rows/rowPaths";
+import type { Pane, View } from "./types";
 
 export type Serializable =
   | string

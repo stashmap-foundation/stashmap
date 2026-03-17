@@ -1,6 +1,8 @@
 import { Map } from "immutable";
 import { useEffect, useMemo } from "react";
 import { Event, UnsignedEvent } from "nostr-tools";
+import type { Contacts, PublicKey } from "../../graph/identity";
+import type { Relays } from "../../infra/publishTypes";
 import { useApis } from "./ApiContext";
 import type { StashmapDB } from "../../infra/indexedDB";
 import {

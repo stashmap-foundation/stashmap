@@ -1,4 +1,5 @@
 import { Map as ImmutableMap } from "immutable";
+import type { GraphNode, SemanticIndex } from "./types";
 import { EMPTY_SEMANTIC_ID } from "./types";
 import { isRefNode } from "./references";
 

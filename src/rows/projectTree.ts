@@ -1,4 +1,8 @@
 import { List, Map, Set as ImmutableSet } from "immutable";
+import type { Data } from "../features/app-shell/types";
+import type { PublicKey } from "../graph/identity";
+import type { GraphNode, ID, LongID, VirtualType } from "../graph/types";
+import type { Pane } from "../session/types";
 import type { VirtualRowsMap } from "./types";
 import { type RowPath, rowPathToString } from "./rowPaths";
 import {

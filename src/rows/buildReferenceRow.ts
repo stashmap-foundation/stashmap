@@ -1,4 +1,12 @@
 import { List } from "immutable";
+import type { Data } from "../features/app-shell/types";
+import type {
+  GraphNode,
+  KnowledgeDBs,
+  VersionMeta,
+  VirtualType,
+} from "../graph/types";
+import type { ReferenceRow } from "./types";
 import { getChildNodes, getNode, nodePassesFilters } from "../graph/queries";
 import {
   shortID,

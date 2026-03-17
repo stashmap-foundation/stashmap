@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import type { VirtualType } from "../../graph/types";
 import { TYPE_COLORS } from "../shared/typeColors";
 import {
   useUpdateRelevance,

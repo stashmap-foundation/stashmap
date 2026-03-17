@@ -1,3 +1,12 @@
+import type { PublicKey } from "../graph/identity";
+import type {
+  Argument,
+  LongID,
+  Relevance,
+  RootAnchor,
+  RootSystemRole,
+} from "../graph/types";
+
 export function formatRootHeading(
   rootText: string,
   rootUuid: string,

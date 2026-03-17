@@ -3,6 +3,7 @@ import { Event, UnsignedEvent } from "nostr-tools";
 import { ensureNodeNativeFields } from "../graph/queries";
 import { getNodeDepth, shortID, splitID } from "../graph/context";
 import { newDB } from "../graph/types";
+import type { GraphNode, KnowledgeData } from "../graph/types";
 import type { StoredDocumentRecord } from "./indexedDB";
 import { parseDocumentEvent } from "./markdownNodes";
 import {

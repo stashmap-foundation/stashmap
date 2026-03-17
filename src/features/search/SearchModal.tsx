@@ -1,4 +1,5 @@
 import { Map } from "immutable";
+import type { Relays } from "../../infra/publishTypes";
 import { useEventQuery } from "../shared/useNostrQuery";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../../infra/nostrCore";
 import { useData } from "../app-shell/DataContext";

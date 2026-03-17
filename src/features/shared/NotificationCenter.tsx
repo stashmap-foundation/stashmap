@@ -2,6 +2,7 @@ import React from "react";
 import { Dropdown } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { Map } from "immutable";
+import type { NotificationMessage } from "../app-shell/types";
 import { Badge } from "./Ui";
 
 /* eslint-disable react/no-array-index-key */

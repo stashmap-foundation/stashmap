@@ -21,6 +21,8 @@ import {
   type,
 } from "../testutils";
 import { parseRowPath, rowPathToString, RowPath } from "../../rows/rowPaths";
+import type { Data } from "../../features/app-shell/types";
+import type { View, Views } from "../../session/types";
 import {
   updateRowPathsAfterDisconnect,
   updateRowPathsAfterMoveNodes,

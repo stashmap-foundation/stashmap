@@ -1,4 +1,6 @@
 import { OrderedSet } from "immutable";
+import type { Data } from "../app-shell/types";
+import type { GraphNode } from "../../graph/types";
 import type { VirtualRowsMap } from "../../rows/types";
 import {
   addNodeToPathWithNodes,

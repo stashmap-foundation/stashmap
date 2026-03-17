@@ -12,6 +12,7 @@ import {
   setup,
 } from "../../tests/testutils";
 import { execute } from "../../infra/nostr";
+import type { GraphNode, KnowledgeDBs } from "../../graph/types";
 import {
   buildRootTreeForEmptyRootDrop,
   parseMarkdownHierarchy,

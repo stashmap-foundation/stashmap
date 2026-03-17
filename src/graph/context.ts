@@ -1,7 +1,18 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/immutable-data, functional/no-let */
 import { List, Map } from "immutable";
 import { decodePublicKeyInputSync } from "./publicKeys";
-import { EMPTY_SEMANTIC_ID, type TextSeed } from "./types";
+import {
+  EMPTY_SEMANTIC_ID,
+  type Context,
+  type GraphNode,
+  type ID,
+  type KnowledgeDBs,
+  type KnowledgeData,
+  type LongID,
+  type RootAnchor,
+  type TextSeed,
+} from "./types";
+import type { PublicKey } from "./identity";
 import { getNode } from "./queries";
 import { isRefNode } from "./references";
 

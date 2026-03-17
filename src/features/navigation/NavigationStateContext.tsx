@@ -5,6 +5,8 @@ import React, {
   useRef,
   useState,
 } from "react";
+import type { KnowledgeDBs } from "../../graph/types";
+import type { Pane } from "../../session/types";
 import { useData } from "../app-shell/DataContext";
 import { getNodeRouteTargetInfo } from "../../graph/references";
 import { buildNodeUrl } from "../../graph/nodeUrl";

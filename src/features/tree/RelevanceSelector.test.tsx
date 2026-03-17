@@ -17,6 +17,7 @@ import {
   type UpdateState,
 } from "../../tests/testutils";
 import { nodeMatchesType } from "../../graph/queries";
+import type { GraphNode } from "../../graph/types";
 
 function makeItem(
   id: ID,

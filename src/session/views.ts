@@ -6,6 +6,8 @@ import {
   RowPath,
   rowPathToString,
 } from "../rows/rowPaths";
+import type { Data } from "../features/app-shell/types";
+import type { View, Views } from "./types";
 
 const SEARCH_PREFIX = "~Search:";
 

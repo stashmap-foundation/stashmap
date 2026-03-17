@@ -5,6 +5,7 @@ import {
   Serializable,
   viewDataToJSON,
 } from "../session/serializer";
+import type { Pane, Views } from "../session/types";
 import {
   pathToStack,
   parseNodeRouteUrl,

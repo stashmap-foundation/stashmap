@@ -1,6 +1,7 @@
 import React, { createContext, useContext } from "react";
 import { List } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
+import type { Relays } from "../../infra/publishTypes";
 import { getMostRecentReplacableEvent } from "../../infra/nostrEvents";
 import { useEventQuery } from "../shared/useNostrQuery";
 import {

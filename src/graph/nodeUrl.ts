@@ -1,3 +1,4 @@
+import type { KnowledgeDBs } from "./types";
 import { getTextForSemanticID } from "./semanticText";
 
 function stackToPath(

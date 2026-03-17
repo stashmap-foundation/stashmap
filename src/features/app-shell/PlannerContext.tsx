@@ -1,6 +1,13 @@
 import React, { Dispatch, SetStateAction, useEffect, useRef } from "react";
 import { Event } from "nostr-tools";
 import { List, Set as ImmutableSet } from "immutable";
+import type { ID } from "../../graph/types";
+import type {
+  AllRelays,
+  Relays,
+  RepublishEvents,
+} from "../../infra/publishTypes";
+import type { Pane, Views } from "../../session/types";
 import {
   buildDocumentEvents,
   createPublishQueue,
@@ -14,6 +21,7 @@ import { useRelaysToCreatePlan } from "./useRelays";
 import { mergePublishResultsOfEvents } from "../shared/PublishingStatus";
 import { createPlan } from "../../app/actions";
 import type { Plan } from "../../app/types";
+import type { EventState } from "./types";
 
 type ExecutePlan = (plan: Plan) => Promise<void>;
 

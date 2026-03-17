@@ -1,13 +1,9 @@
 import { List, Map } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
-import {
-  ensureNodeNativeFields,
-  getNodeDepth,
-  shortID,
-  splitID,
-} from "./connections";
+import { ensureNodeNativeFields } from "./graph/queries";
+import { getNodeDepth, shortID, splitID } from "./graph/context";
+import { newDB } from "./graph/types";
 import type { StoredDocumentRecord } from "./indexedDB";
-import { newDB } from "./knowledge";
 import { parseDocumentEvent } from "./markdownNodes";
 import {
   KIND_DELETE,

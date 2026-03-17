@@ -1,6 +1,7 @@
 import React from "react";
 import { List, Map } from "immutable";
-import { getNode, isSearchId } from "../../connections";
+import { isSearchId } from "../../graph/context";
+import { getNode } from "../../graph/queries";
 import { resolveSemanticNodeInCurrentTree } from "../../graph/semanticResolution";
 import { useData } from "../../DataContext";
 import { usePaneStack } from "../navigation/SplitPanesContext";

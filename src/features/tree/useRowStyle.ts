@@ -1,6 +1,6 @@
 import { CSSProperties } from "react";
 import { useCurrentEdge, useIsViewingOtherUserContent } from "./RowContext";
-import { isRefNode } from "../../connections";
+import { isRefNode } from "../../graph/references";
 import { TYPE_COLORS } from "../../constants";
 
 type RowStyle = {

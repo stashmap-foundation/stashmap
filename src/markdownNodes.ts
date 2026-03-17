@@ -2,8 +2,9 @@
 import { List, Map, Set as ImmutableSet } from "immutable";
 import { v4 } from "uuid";
 import { UnsignedEvent } from "nostr-tools";
-import { ensureNodeNativeFields, joinID, shortID } from "./connections";
-import { newDB } from "./knowledge";
+import { ensureNodeNativeFields } from "./graph/queries";
+import { joinID, shortID } from "./graph/context";
+import { newDB } from "./graph/types";
 import { findTag } from "./nostrEvents";
 import { createRootAnchor } from "./rootAnchor";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";

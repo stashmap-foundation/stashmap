@@ -2,13 +2,8 @@
 import { List } from "immutable";
 import { v4 } from "uuid";
 import { UnsignedEvent } from "nostr-tools";
-import {
-  shortID,
-  getNodeContext,
-  getSemanticID,
-  resolveNode,
-  isRefNode,
-} from "./connections";
+import { shortID, getNodeContext, getSemanticID } from "./graph/context";
+import { resolveNode, isRefNode } from "./graph/references";
 import { getTextForSemanticID } from "./semanticProjection";
 import {
   getContext,

@@ -6,7 +6,7 @@ import React, {
   useState,
 } from "react";
 import { useData } from "../../DataContext";
-import { getNodeRouteTargetInfo } from "../../connections";
+import { getNodeRouteTargetInfo } from "../../graph/references";
 import { buildNodeUrl, buildNodeRouteUrl } from "../../navigationUrl";
 import { resolveSemanticStackToActualIDs } from "../../graph/semanticResolution";
 import { usePlanner } from "../../planner";

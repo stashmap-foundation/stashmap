@@ -3,11 +3,11 @@ import { Map, List } from "immutable";
 import {
   isSearchId,
   parseSearchId,
-  getSearchNodes,
   buildTextNodesFromGraphNodes,
   shortID,
-} from "../../connections";
-import type { TextSeed } from "../../connections";
+} from "../../graph/context";
+import { getSearchNodes } from "../../graph/queries";
+import { newDB, type TextSeed } from "../../graph/types";
 import { MergeKnowledgeDB, useData } from "../../DataContext";
 import {
   deduplicateRefsByContext,
@@ -16,7 +16,6 @@ import {
 import { useReadRelays } from "../../relays";
 import { useSearchQuery, filterForKeyword } from "./SearchModal";
 import { useCurrentPane } from "../navigation/SplitPanesContext";
-import { newDB } from "../../knowledge";
 
 function getAllNodesFromDBs(knowledgeDBs: KnowledgeDBs): Map<string, TextSeed> {
   return buildTextNodesFromGraphNodes(

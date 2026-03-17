@@ -1,14 +1,13 @@
 import { UnsignedEvent } from "nostr-tools";
 import {
-  EMPTY_SEMANTIC_ID,
   getNodeContext,
   getSemanticID,
   getNodeText,
-  getNode,
-  resolveNode,
-  isRefNode,
   shortID,
-} from "./connections";
+} from "./graph/context";
+import { getNode } from "./graph/queries";
+import { resolveNode, isRefNode } from "./graph/references";
+import { EMPTY_SEMANTIC_ID as EMPTY_NODE_ID } from "./graph/types";
 import {
   formatNodeAttrs,
   formatPrefixMarkers,
@@ -42,7 +41,7 @@ function serializeNodeItems(
 ): SerializeResult {
   return children.reduce((acc, childID) => {
     const indent = "  ".repeat(depth);
-    if (childID === EMPTY_SEMANTIC_ID) {
+    if (childID === EMPTY_NODE_ID) {
       return acc;
     }
     const item = getNode(knowledgeDBs, childID, author);

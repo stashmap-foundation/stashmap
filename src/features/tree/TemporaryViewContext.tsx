@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { OrderedSet, Set } from "immutable";
 import { useViewKey } from "./RowContext";
 import { useData } from "../../DataContext";
-import { isRefNode } from "../../connections";
+import { isRefNode } from "../../graph/references";
 import { deselectAllChildren } from "../../selection";
 
 export { deselectAllChildren };

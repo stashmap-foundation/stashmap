@@ -10,7 +10,7 @@ import {
   parseNodeRouteUrl,
   parseAuthorFromSearch,
 } from "../navigationUrl";
-import { splitID } from "../connections";
+import { splitID } from "../graph/context";
 import { UNAUTHENTICATED_USER_PK } from "../AppState";
 import { defaultPane, generatePaneId } from "../session/panes";
 

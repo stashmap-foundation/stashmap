@@ -28,14 +28,14 @@ import {
 } from "./RowContext";
 import { isEditableNode } from "./TemporaryViewContext";
 import { planBatchIndent, planBatchOutdent } from "./batchOperations";
+import { computeEmptyNodeMetadata } from "../../graph/queries";
+import { isEmptySemanticID } from "../../graph/context";
 import {
   getRefLinkTargetInfo,
   getRefTargetInfo,
-  isEmptySemanticID,
-  computeEmptyNodeMetadata,
   resolveNode,
   isRefNode,
-} from "../../connections";
+} from "../../graph/references";
 import { ReferenceDisplay } from "../references/ReferenceDisplay";
 import { IS_MOBILE } from "../navigation/responsive";
 import { MiniEditor, preventEditorBlur } from "./AddNode";

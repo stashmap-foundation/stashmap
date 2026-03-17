@@ -1,13 +1,12 @@
 import { Map } from "immutable";
 import {
-  getNode,
   getNodeContext,
   getSemanticID,
   isSearchId,
-  resolveNode,
-  isRefNode,
   shortID,
-} from "../connections";
+} from "../graph/context";
+import { getNode } from "../graph/queries";
+import { resolveNode, isRefNode } from "../graph/references";
 import {
   planDeleteDescendantNodes,
   planDeleteNodes,

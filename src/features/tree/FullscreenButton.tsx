@@ -13,7 +13,7 @@ import {
   getRefLinkTargetInfo,
   getRefTargetInfo,
   isRefNode,
-} from "../../connections";
+} from "../../graph/references";
 import { useData } from "../../DataContext";
 import { buildNodeRouteUrl } from "../../navigationUrl";
 

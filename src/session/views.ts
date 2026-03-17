@@ -1,5 +1,5 @@
 import { Map } from "immutable";
-import { isSearchId } from "../connections";
+import { SEARCH_PREFIX } from "../constants";
 import {
   getLast,
   isRoot,
@@ -10,7 +10,7 @@ import {
 
 function getDefaultView(id: ID, isRootNode: boolean): View {
   return {
-    expanded: isRootNode || isSearchId(id),
+    expanded: isRootNode || id.startsWith(SEARCH_PREFIX),
   };
 }
 

@@ -12,8 +12,9 @@ import {
   buildDocumentEventFromNodes,
   buildSnapshotEventFromNodes,
 } from "../nodesDocumentEvent";
-import { shortID, getNode } from "../connections";
-import { newDB } from "../knowledge";
+import { shortID } from "../graph/context";
+import { getNode } from "../graph/queries";
+import { newDB } from "../graph/types";
 import { UNAUTHENTICATED_USER_PK } from "../AppState";
 import {
   createGraphPlan,

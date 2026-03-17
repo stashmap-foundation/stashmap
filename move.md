@@ -431,6 +431,14 @@ I’d structure the first pass like this:
   - row display moved into `src/rows/display.ts`
   - React row context/hooks moved into `src/features/tree/RowContext.tsx`
 
+- Removed the legacy `src/connections.tsx` compatibility barrel
+  - rewired all remaining production and test imports directly to:
+    - `src/graph/context.ts`
+    - `src/graph/queries.ts`
+    - `src/graph/references.ts`
+    - `src/graph/types.ts`
+  - deleted `src/connections.tsx`
+
 And the rule for ambiguous cases should be:
 
 - “Can this module exist without React?”

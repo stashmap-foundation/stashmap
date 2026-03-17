@@ -3,7 +3,7 @@ import { OrderedSet } from "immutable";
 import { ConnectDropTarget, DropTargetMonitor, useDrop } from "react-dnd";
 import { NativeTypes } from "react-dnd-html5-backend";
 import { dnd, getDropDestinationFromTreeView } from "./DND";
-import { isEmptySemanticID } from "../../connections";
+import { isEmptySemanticID } from "../../graph/context";
 import { deselectAllChildren, useTemporaryView } from "./TemporaryViewContext";
 import { Plan, usePlanner } from "../../planner";
 import { buildPaneTarget, getRowIDFromView } from "../../rows/resolveRow";

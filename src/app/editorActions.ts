@@ -1,15 +1,8 @@
 import { List } from "immutable";
-import {
-  createRefTarget,
-  isEmptySemanticID,
-  getNode,
-  isRefNode,
-  computeEmptyNodeMetadata,
-  EMPTY_SEMANTIC_ID,
-  getSemanticID,
-  isSearchId,
-} from "../connections";
-import type { TextSeed } from "../connections";
+import { createRefTarget, isRefNode } from "../graph/references";
+import { isEmptySemanticID, getSemanticID, isSearchId } from "../graph/context";
+import { getNode, computeEmptyNodeMetadata } from "../graph/queries";
+import { EMPTY_SEMANTIC_ID, type TextSeed } from "../graph/types";
 import { newNode } from "../nodeFactory";
 import { withUsersEntryPublicKey, getNodeUserPublicKey } from "../userEntry";
 import { decodePublicKeyInputSync } from "../nostrPublicKeys";

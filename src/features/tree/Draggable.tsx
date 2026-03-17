@@ -12,7 +12,7 @@ import {
   useViewKey,
 } from "./RowContext";
 import { type RowPath } from "../../rows/rowPaths";
-import { isEmptySemanticID } from "../../connections";
+import { isEmptySemanticID } from "../../graph/context";
 import { NOTE_TYPE, Node } from "./NodeView";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
 import {

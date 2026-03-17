@@ -59,11 +59,11 @@ import {
   getNodeStack,
   getNodeText,
   getSemanticID,
-  getNode,
-  resolveNode,
   isSearchId,
   shortID,
-} from "../../connections";
+} from "../../graph/context";
+import { getNode } from "../../graph/queries";
+import { resolveNode } from "../../graph/references";
 import { getOwnLogRoot } from "../../systemRoots";
 import { buildNodeUrl, buildNodeRouteUrl } from "../../navigationUrl";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";

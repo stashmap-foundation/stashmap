@@ -11,14 +11,13 @@ import {
   getRowIDFromView,
 } from "./resolveRow";
 import {
-  EMPTY_SEMANTIC_ID,
   getChildNodes as getNodeChildren,
-  isSearchId,
   getNode,
   nodePassesFilters,
-  resolveNode,
-  isRefNode,
-} from "../connections";
+} from "../graph/queries";
+import { EMPTY_SEMANTIC_ID } from "../graph/types";
+import { isSearchId } from "../graph/context";
+import { resolveNode, isRefNode } from "../graph/references";
 import { DEFAULT_TYPE_FILTERS } from "../constants";
 import {
   getAlternativeNodeData,

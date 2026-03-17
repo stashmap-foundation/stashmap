@@ -1,4 +1,4 @@
-import { isSearchId, parseSearchId } from "../connections";
+import { isSearchId, parseSearchId } from "../graph/context";
 import { getNodeUserPublicKey } from "../userEntry";
 import { type RowPath } from "./rowPaths";
 import {

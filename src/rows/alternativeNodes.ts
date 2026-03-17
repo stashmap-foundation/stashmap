@@ -1,15 +1,12 @@
 import { List, OrderedMap, Set as ImmutableSet } from "immutable";
+import { getChildNodes, getNode, nodePassesFilters } from "../graph/queries";
 import {
-  getChildNodes,
-  getNode,
   splitID,
   shortID,
-  nodePassesFilters,
   getSemanticID,
   getNodeContext,
-  resolveNode,
-  isRefNode,
-} from "../connections";
+} from "../graph/context";
+import { resolveNode, isRefNode } from "../graph/references";
 import { suggestionSettings } from "../constants";
 import { LOG_ROOT_ROLE } from "../systemRoots";
 

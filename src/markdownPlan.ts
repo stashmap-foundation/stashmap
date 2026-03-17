@@ -1,5 +1,6 @@
 import { List } from "immutable";
-import { getNodeContext, getSemanticID, getNode, shortID } from "./connections";
+import { getNodeContext, getSemanticID, shortID } from "./graph/context";
+import { getNode } from "./graph/queries";
 import { MarkdownImportFile, parseMarkdownImportFiles } from "./markdownImport";
 import { createNodesFromMarkdownTrees, WalkContext } from "./markdownNodes";
 import { MarkdownTreeNode } from "./markdownTree";

@@ -6,7 +6,7 @@ import {
   parseNodeRouteUrl,
   parseAuthorFromSearch,
 } from "../../navigationUrl";
-import { splitID } from "../../connections";
+import { splitID } from "../../graph/context";
 import { usePaneHistory } from "../../PaneHistoryContext";
 import { generatePaneId, planUpdatePanes } from "../../session/panes";
 

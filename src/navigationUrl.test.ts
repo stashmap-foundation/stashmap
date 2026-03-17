@@ -1,5 +1,5 @@
 import { List, Map } from "immutable";
-import { shortID } from "./connections";
+import { shortID } from "./graph/context";
 import { newDB } from "./knowledge";
 import { newNode } from "./nodeFactory";
 import {

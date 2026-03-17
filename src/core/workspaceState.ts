@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { Event } from "nostr-tools";
 import { findTag } from "../nostrEvents";
-import { joinID } from "../connections";
+import { joinID } from "../graph/context";
 import { parseMarkdownHierarchy } from "../markdownTree";
 
 export const DOCUMENTS_DIR = "DOCUMENTS";

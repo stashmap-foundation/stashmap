@@ -16,7 +16,7 @@ import { flattenRelays, usePreloadRelays } from "../../relays";
 import { useDefaultRelays } from "./NostrAuthContext";
 import { useEventQuery } from "../../commons/useNostrQuery";
 import { openDB, StashmapDB, getOutboxEvents } from "../../indexedDB";
-import { splitID } from "../../connections";
+import { splitID } from "../../graph/context";
 import {
   getInitialPanes,
   loadPanesFromStorage,

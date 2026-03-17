@@ -1,6 +1,6 @@
 import { List } from "immutable";
 import { v4 } from "uuid";
-import { joinID } from "./connections";
+import { joinID } from "./graph/context";
 import { createRootAnchor } from "./rootAnchor";
 
 export function newNode(

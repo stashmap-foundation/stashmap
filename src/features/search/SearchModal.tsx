@@ -5,8 +5,8 @@ import { useData } from "../../DataContext";
 import { useApis } from "../app-shell/ApiContext";
 import { KIND_SEARCH } from "../app-shell/Data";
 import { findDocumentNodes } from "../../documentMaterialization";
-import { buildTextNodesFromGraphNodes } from "../../connections";
-import type { TextSeed } from "../../connections";
+import { buildTextNodesFromGraphNodes } from "../../graph/context";
+import type { TextSeed } from "../../graph/types";
 import { useReadRelays } from "../../relays";
 
 function isMatch(input: string, test: string): boolean {

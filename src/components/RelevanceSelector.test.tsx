@@ -16,7 +16,7 @@ import {
   type,
   type UpdateState,
 } from "../utils.test";
-import { nodeMatchesType } from "../connections";
+import { nodeMatchesType } from "../graph/queries";
 
 function makeItem(
   id: ID,

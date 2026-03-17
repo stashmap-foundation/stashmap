@@ -3,17 +3,21 @@ import { List } from "immutable";
 import {
   computeEmptyNodeMetadata,
   getNode,
+  nodePassesFilters,
+} from "../graph/queries";
+import {
   shortID,
   isSearchId,
-  EMPTY_SEMANTIC_ID,
-  nodePassesFilters,
   getNodeContext,
   getNodeSemanticID,
   getSemanticID,
+} from "../graph/context";
+import { EMPTY_SEMANTIC_ID } from "../graph/types";
+import {
   getRefLinkTargetInfo,
   getRefTargetInfo,
   isRefNode,
-} from "../connections";
+} from "../graph/references";
 import { buildReferenceRow } from "../buildReferenceRow";
 import { resolveSemanticNodeInCurrentTree } from "../graph/semanticResolution";
 import { DEFAULT_TYPE_FILTERS } from "../constants";

@@ -1,6 +1,5 @@
 import { List } from "immutable";
 import {
-  EMPTY_SEMANTIC_ID,
   shortID,
   splitID,
   isSearchId,
@@ -9,9 +8,10 @@ import {
   getSemanticID,
   getNodeContext,
   getNodeText,
-  getNode,
-  isRefNode,
-} from "./connections";
+} from "./graph/context";
+import { getNode } from "./graph/queries";
+import { isRefNode } from "./graph/references";
+import { EMPTY_SEMANTIC_ID as EMPTY_NODE_ID } from "./graph/types";
 
 type ReferencedByRef = {
   nodeID: LongID;
@@ -24,7 +24,7 @@ function getFallbackSemanticText(semanticID?: ID): string {
     return "";
   }
   const localID = shortID(semanticID as ID) as ID;
-  if (localID === EMPTY_SEMANTIC_ID) {
+  if (localID === EMPTY_NODE_ID) {
     return "";
   }
   if (isSearchId(localID)) {
@@ -125,7 +125,7 @@ export function getTextForSemanticID(
   }
 
   const fallbackText = getFallbackSemanticText(semanticID);
-  return fallbackText !== "" || localID === EMPTY_SEMANTIC_ID
+  return fallbackText !== "" || localID === EMPTY_NODE_ID
     ? fallbackText
     : undefined;
 }

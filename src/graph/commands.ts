@@ -5,20 +5,17 @@ import {
   Set as ImmutableSet,
 } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
+import { deleteNodes, getNode, ensureNodeNativeFields } from "./queries";
 import {
-  deleteNodes,
   getNodeContext,
-  getNode,
-  ensureNodeNativeFields,
   getNodeText,
   getSemanticID,
   isSearchId,
-  isRefNode,
   shortID,
-} from "../connections";
-import type { RefTargetSeed, TextSeed } from "../connections";
+} from "./context";
+import { isRefNode } from "./references";
+import { newDB, type RefTargetSeed, type TextSeed } from "./types";
 import { KIND_CONTACTLIST, newTimestamp, msTag } from "../nostr";
-import { newDB } from "../knowledge";
 import { newNode, newRefNode } from "../nodeFactory";
 import {
   getOwnSystemRoot,

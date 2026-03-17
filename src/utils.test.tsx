@@ -30,6 +30,7 @@ import { schnorr } from "@noble/curves/secp256k1";
 import { VirtuosoMockContext } from "react-virtuoso";
 import { KIND_CONTACTLIST } from "./nostr";
 import { RequireLogin, UNAUTHENTICATED_USER_PK } from "./AppState";
+import { EMPTY_SEMANTIC_ID } from "./graph/types";
 import {
   createPlan,
   planUpsertContact,
@@ -50,7 +51,6 @@ import {
   NostrAuthContextProvider,
   isUserLoggedInWithSeed,
 } from "./NostrAuthContext";
-import { EMPTY_SEMANTIC_ID } from "./connections";
 import { RootViewContextProvider } from "./features/tree/RowContext";
 import { LoadSearchData } from "./LoadSearchData";
 import { StorePreLoginContext } from "./StorePreLoginContext";

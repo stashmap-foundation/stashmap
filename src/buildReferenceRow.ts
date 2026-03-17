@@ -1,15 +1,12 @@
 import { List } from "immutable";
+import { getChildNodes, getNode, nodePassesFilters } from "./graph/queries";
 import {
-  getChildNodes,
-  getNode,
-  resolveNode,
-  isRefNode,
   shortID,
   splitID,
-  nodePassesFilters,
   getSemanticID,
   getNodeContext,
-} from "./connections";
+} from "./graph/context";
+import { resolveNode, isRefNode } from "./graph/references";
 import { getTextForSemanticID } from "./semanticProjection";
 import { getLast, getParentRowPath, type RowPath } from "./rows/rowPaths";
 import { referenceToText } from "./rows/display";

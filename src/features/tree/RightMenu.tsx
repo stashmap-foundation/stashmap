@@ -8,7 +8,7 @@ import {
   useCurrentNode,
   useDisplayText,
 } from "./RowContext";
-import { isEmptySemanticID } from "../../connections";
+import { isEmptySemanticID } from "../../graph/context";
 import { useData } from "../../DataContext";
 import {
   usePlanner,

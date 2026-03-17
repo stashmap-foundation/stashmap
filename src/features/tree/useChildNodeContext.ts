@@ -7,7 +7,7 @@ import {
   useNodeIndex,
   useRowPath,
 } from "./RowContext";
-import { isEmptySemanticID } from "../../connections";
+import { isEmptySemanticID } from "../../graph/context";
 import { usePlanner } from "../../planner";
 import {
   planUpdateRowNodeMetadata,

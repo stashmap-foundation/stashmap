@@ -1,7 +1,8 @@
 import { List } from "immutable";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { createPlan } from "../planner";
-import { getChildNodes, getNode, getSemanticID } from "../connections";
+import { getSemanticID } from "../graph/context";
+import { getChildNodes, getNode } from "../graph/queries";
 import { isStandaloneRoot } from "../systemRoots";
 import {
   ALICE,

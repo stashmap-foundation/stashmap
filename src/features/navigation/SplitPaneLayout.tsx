@@ -16,7 +16,8 @@ import {
 } from "../../session/views";
 import { LoadSearchData } from "../search/LoadSearchData";
 import { PaneView } from "../tree/PaneView";
-import { EMPTY_SEMANTIC_ID, createSearchId } from "../../connections";
+import { createSearchId } from "../../graph/context";
+import { EMPTY_SEMANTIC_ID } from "../../graph/types";
 import { usePlanner } from "../../planner";
 import { useData } from "../../DataContext";
 import { isUserLoggedIn, useLogout } from "../app-shell/NostrAuthContext";

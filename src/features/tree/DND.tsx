@@ -2,7 +2,8 @@ import React from "react";
 import { List, OrderedSet, Set } from "immutable";
 import { DndProvider, useDragLayer, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { moveNodes, createRefTarget, isRefNode } from "../../connections";
+import { moveNodes } from "../../graph/queries";
+import { createRefTarget, isRefNode } from "../../graph/references";
 import {
   parseRowPath,
   RowPath,

@@ -1,4 +1,4 @@
-import { getTextForSemanticID } from "./semanticProjection";
+import { getTextForSemanticID } from "./graph/semanticText";
 
 export {
   buildNodeRouteUrl,

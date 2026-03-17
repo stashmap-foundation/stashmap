@@ -7,7 +7,7 @@ import {
   getNodeContext,
 } from "./graph/context";
 import { resolveNode, isRefNode } from "./graph/references";
-import { getTextForSemanticID } from "./semanticProjection";
+import { getTextForSemanticID } from "./graph/semanticText";
 import { getLast, getParentRowPath, type RowPath } from "./rows/rowPaths";
 import { referenceToText } from "./rows/display";
 import { getNodeForView } from "./rows/resolveRow";

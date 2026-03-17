@@ -439,6 +439,26 @@ I’d structure the first pass like this:
     - `src/graph/types.ts`
   - deleted `src/connections.tsx`
 
+- Moved the pure markdown infrastructure slice into `src/infra/*`
+  - moved:
+    - `src/documentFormat.ts` -> `src/infra/documentFormat.ts`
+    - `src/documentMaterialization.ts` -> `src/infra/documentMaterialization.ts`
+    - `src/markdownImport.ts` -> `src/infra/markdownImport.ts`
+    - `src/markdownNodes.ts` -> `src/infra/markdownNodes.ts`
+    - `src/markdownTree.ts` -> `src/infra/markdownTree.ts`
+    - `src/nodesDocumentEvent.ts` -> `src/infra/nodesDocumentEvent.ts`
+  - kept the old top-level paths as compatibility barrels
+
+- Moved the remaining markdown flow into `src/infra/*`
+  - moved:
+    - `src/markdownDocument.tsx` -> `src/infra/markdownDocument.ts`
+    - `src/markdownPlan.ts` -> `src/infra/markdownPlan.ts`
+    - `src/standaloneDocumentEvent.ts` -> `src/infra/standaloneDocumentEvent.ts`
+  - kept the old top-level paths as compatibility barrels
+  - temporary compromise:
+    - `markdownDocument` and `markdownPlan` still depend on rows/session/app concepts
+    - they are in `infra` for now because the current lint graph forbids `app -> infra`, and moving them into `app` would immediately violate the boundary rules
+
 And the rule for ambiguous cases should be:
 
 - “Can this module exist without React?”

@@ -1,13 +1,9 @@
 import React from "react";
-import { EventTemplate, SimplePool, VerifiedEvent } from "nostr-tools";
+import { SimplePool } from "nostr-tools";
 // eslint-disable-next-line import/no-unresolved
 import { RelayInformation } from "nostr-tools/lib/types/nip11";
 import type { LocalStorage } from "./types";
-
-export type FinalizeEvent = (
-  t: EventTemplate,
-  secretKey: Uint8Array
-) => VerifiedEvent;
+import type { FinalizeEvent } from "../../infra/apiTypes";
 
 export type Apis = {
   fileStore: LocalStorage;
@@ -22,6 +18,8 @@ export type Apis = {
 };
 
 const ApiContext = React.createContext<Apis | undefined>(undefined);
+
+export type { FinalizeEvent } from "../../infra/apiTypes";
 
 export function useApis(): Apis {
   const context = React.useContext(ApiContext);

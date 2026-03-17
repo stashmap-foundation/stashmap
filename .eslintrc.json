@@ -229,6 +229,43 @@
             "testing-library/no-manual-cleanup": 0,
             "prettier/prettier": ["error", { "endOfLine": "auto" }]
           }
+      },
+      {
+        "files": ["src/{graph,rows,session,app,infra}/**/*.{ts,tsx,js,jsx}"],
+        "rules": {
+          "import/no-restricted-paths": [
+            "error",
+            {
+              "zones": [
+                {
+                  "target": "./src/graph",
+                  "from": "./src/features",
+                  "message": "graph must not import features."
+                },
+                {
+                  "target": "./src/rows",
+                  "from": "./src/features",
+                  "message": "rows must not import features."
+                },
+                {
+                  "target": "./src/session",
+                  "from": "./src/features",
+                  "message": "session must not import features."
+                },
+                {
+                  "target": "./src/app",
+                  "from": "./src/features",
+                  "message": "app must not import features."
+                },
+                {
+                  "target": "./src/infra",
+                  "from": "./src/features",
+                  "message": "infra must not import features."
+                }
+              ]
+            }
+          ]
+        }
       }
     ]
 }

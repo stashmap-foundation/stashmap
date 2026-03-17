@@ -1,10 +1,10 @@
 import { List } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
-import { UNAUTHENTICATED_USER_PK } from "../features/app-shell/RequireLogin";
-import type { Data, TemporaryEvent } from "../features/app-shell/types";
+import { UNAUTHENTICATED_USER_PK } from "./auth";
+import type { Data, Plan } from "./types";
 import { createGraphPlan, planUpsertNodes } from "../graph/commands";
 import type { GraphNode, ID } from "../graph/types";
-import type { Plan } from "./types";
+import type { TemporaryEvent } from "../session/types";
 import { newNode } from "../graph/nodeFactory";
 import { getContext, getNodeForView, getParentNode } from "../rows/resolveRow";
 import { type RowPath } from "../rows/rowPaths";

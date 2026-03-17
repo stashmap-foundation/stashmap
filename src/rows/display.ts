@@ -3,7 +3,6 @@ import {
   isSearchId,
   parseSearchId,
 } from "../graph/context";
-import type { Data } from "../features/app-shell/types";
 import type {
   Argument,
   GraphNode,
@@ -11,6 +10,7 @@ import type {
   Relevance,
   VirtualType,
 } from "../graph/types";
+import type { RowsData } from "./data";
 import { type RowPath } from "./rowPaths";
 import {
   getCurrentReferenceForView,
@@ -19,7 +19,7 @@ import {
 } from "./resolveRow";
 
 export function getDisplayTextForView(
-  data: Data,
+  data: RowsData,
   rowPath: RowPath,
   stack: ID[],
   virtualType?: VirtualType,

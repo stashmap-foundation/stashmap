@@ -6,10 +6,13 @@ import {
   RowPath,
   rowPathToString,
 } from "../rows/rowPaths";
-import type { Data } from "../features/app-shell/types";
 import type { View, Views } from "./types";
 
 const SEARCH_PREFIX = "~Search:";
+
+type HasViews = {
+  views: Views;
+};
 
 function getDefaultView(id: ID, isRootNode: boolean): View {
   return {
@@ -17,7 +20,7 @@ function getDefaultView(id: ID, isRootNode: boolean): View {
   };
 }
 
-export function isExpanded(data: Data, viewKey: string): boolean {
+export function isExpanded(data: HasViews, viewKey: string): boolean {
   const rowPath = parseRowPath(viewKey);
   const view =
     data.views.get(viewKey) ||
@@ -74,10 +77,6 @@ export function copyViewsWithNodesMapping(
   }, views);
 }
 
-type HasViews = {
-  views: Views;
-};
-
 export function planUpdateViews<T extends HasViews>(plan: T, views: Views): T {
   return {
     ...plan,
@@ -112,7 +111,7 @@ function pathContainsSubpath(path: RowPath, subpath: ID[]): boolean {
   );
 }
 
-export function updateRowPathsAfterMoveNodes(data: Data): Views {
+export function updateRowPathsAfterMoveNodes(data: HasViews): Views {
   return data.views;
 }
 
@@ -162,6 +161,6 @@ export function updateRowPathsAfterPaneInsert(
   });
 }
 
-export function bulkUpdateRowPathsAfterAddNode(data: Data): Views {
+export function bulkUpdateRowPathsAfterAddNode(data: HasViews): Views {
   return data.views;
 }

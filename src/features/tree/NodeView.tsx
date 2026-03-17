@@ -29,7 +29,6 @@ import {
 } from "./RowContext";
 import { isEditableNode } from "./TemporaryViewContext";
 import { planBatchIndent, planBatchOutdent } from "./batchOperations";
-import { computeEmptyNodeMetadata } from "../../graph/queries";
 import { getNodeUserPublicKey, isEmptySemanticID } from "../../graph/context";
 import {
   getRefLinkTargetInfo,
@@ -57,6 +56,7 @@ import {
 } from "../../app/treeActions";
 import { usePlanner } from "../app-shell/PlannerContext";
 import { planSetRowFocusIntent } from "../../session/focus";
+import { computeEmptyNodeMetadata } from "../../session/temporaryNodes";
 import { planExpandNode } from "../../session/views";
 import { parsedLinesToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import { useNodeIsLoading } from "./LoadingStatus";

@@ -1,4 +1,5 @@
 import { Map, OrderedSet, Set } from "immutable";
+import type { GraphNode, LongID } from "../graph/types";
 
 export type TypeFilter =
   | Relevance
@@ -42,3 +43,13 @@ export type TemporaryViewState = {
   editorOpenViews: Set<string>;
   draftTexts: Map<string, string>;
 };
+
+export type TemporaryEvent =
+  | {
+      type: "ADD_EMPTY_NODE";
+      nodeID: LongID;
+      index: number;
+      emptyNode: GraphNode;
+      paneIndex: number;
+    }
+  | { type: "REMOVE_EMPTY_NODE"; nodeID: LongID };

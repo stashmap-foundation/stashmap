@@ -1,11 +1,11 @@
 import { List } from "immutable";
-import type { Data } from "../features/app-shell/types";
 import type {
   GraphNode,
   KnowledgeDBs,
   VersionMeta,
   VirtualType,
 } from "../graph/types";
+import type { RowsData } from "./data";
 import type { ReferenceRow } from "./types";
 import { getChildNodes, getNode, nodePassesFilters } from "../graph/queries";
 import {
@@ -209,7 +209,7 @@ function computeNodeDiff(
 }
 
 function computeVersionMeta(
-  data: Data,
+  data: RowsData,
   rowPath: RowPath,
   stack: ID[]
 ): VersionMeta {
@@ -266,7 +266,7 @@ function getReferenceSourceNodes(
 
 function findIncomingCrefItem(
   ref: ParsedRef,
-  data: Data,
+  data: RowsData,
   rowPath: RowPath,
   stack: ID[]
 ): GraphNode | undefined {
@@ -288,7 +288,7 @@ function findIncomingCrefItem(
 
 export function buildReferenceRow(
   refId: LongID,
-  data: Data,
+  data: RowsData,
   rowPath: RowPath,
   stack: ID[],
   virtualType?: VirtualType

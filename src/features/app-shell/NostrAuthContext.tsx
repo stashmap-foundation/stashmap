@@ -1,13 +1,18 @@
 import React, { useState } from "react";
 import { getPublicKey } from "nostr-tools";
 import { hexToBytes } from "@noble/hashes/utils";
-import type { KeyPair, PublicKey, User } from "../../graph/identity";
+import type { PublicKey, User } from "../../graph/identity";
 import type { Relays } from "../../infra/publishTypes";
 import { DEFAULT_RELAYS } from "../../infra/nostrCore";
 import { useApis } from "./ApiContext";
-import { UNAUTHENTICATED_USER_PK } from "./RequireLogin";
 import { sanitizeRelays } from "../../infra/relayUtils";
 import { clearDatabase } from "../../infra/indexedDB";
+import {
+  isUserLoggedIn,
+  isUserLoggedInWithExtension,
+  isUserLoggedInWithSeed,
+  UNAUTHENTICATED_USER_PK,
+} from "../../app/auth";
 
 type Context = {
   user: User | undefined;
@@ -24,22 +29,7 @@ function getPublicKeyFromContext(context: Context): PublicKey | undefined {
   return context.user.publicKey;
 }
 
-export function isUserLoggedInWithSeed(user: User): user is KeyPair {
-  return (user as KeyPair).privateKey !== undefined;
-}
-
-export function isUserLoggedInWithExtension(
-  user: User
-): user is { publicKey: PublicKey } {
-  if (isUserLoggedInWithSeed(user)) {
-    return false;
-  }
-  return user.publicKey !== UNAUTHENTICATED_USER_PK;
-}
-
-export function isUserLoggedIn(user: User): boolean {
-  return isUserLoggedInWithSeed(user) || isUserLoggedInWithExtension(user);
-}
+export { isUserLoggedIn, isUserLoggedInWithExtension, isUserLoggedInWithSeed };
 
 export function useUser(): User | undefined {
   const context = React.useContext(NostrAuthContext);

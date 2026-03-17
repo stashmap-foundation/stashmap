@@ -1,5 +1,4 @@
 Layers
-
   - graph
       - persisted domain model only
       - GraphNode, refs, roots, relevance, argument, semantic context

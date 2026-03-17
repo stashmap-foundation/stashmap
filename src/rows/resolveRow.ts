@@ -1,12 +1,7 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data */
-import { List } from "immutable";
-import type { Data } from "../features/app-shell/types";
+import { List, Map } from "immutable";
 import type { PublicKey } from "../graph/identity";
-import {
-  computeEmptyNodeMetadata,
-  getNode,
-  nodePassesFilters,
-} from "../graph/queries";
+import { getNode, nodePassesFilters } from "../graph/queries";
 import {
   shortID,
   isSearchId,
@@ -16,13 +11,11 @@ import {
 } from "../graph/context";
 import {
   EMPTY_SEMANTIC_ID,
-  type Argument,
   type Context,
   type GraphNode,
   type ID,
   type KnowledgeDBs,
   type LongID,
-  type Relevance,
   type VirtualType,
 } from "../graph/types";
 import {
@@ -31,6 +24,7 @@ import {
   isRefNode,
 } from "../graph/references";
 import { buildReferenceRow } from "./buildReferenceRow";
+import type { RowView, RowViews, RowsData } from "./data";
 import { resolveSemanticNodeInCurrentTree } from "../graph/semanticResolution";
 import { DEFAULT_TYPE_FILTERS } from "./settings";
 import type { ReferenceRow } from "./types";
@@ -44,21 +38,6 @@ import {
 } from "./rowPaths";
 
 const EMPTY_ROW_PATH_PREFIX = "empty-row:";
-
-type RowTypeFilter =
-  | Relevance
-  | Argument
-  | "suggestions"
-  | "versions"
-  | "incoming"
-  | "contains";
-
-type RowView = {
-  expanded?: boolean;
-  typeFilters?: RowTypeFilter[];
-};
-
-type RowViews = import("immutable").Map<string, RowView>;
 
 function createEmptyRowPathID(nodeID: LongID): string {
   return `${EMPTY_ROW_PATH_PREFIX}${nodeID}`;
@@ -89,18 +68,26 @@ function getViewNodeByID(
 }
 
 function getEmptyPlaceholderNode(
-  data: Data,
+  data: RowsData,
   parentNode: GraphNode | undefined
 ): GraphNode | undefined {
   if (!parentNode) {
     return undefined;
   }
-  return computeEmptyNodeMetadata(data.publishEventsStatus.temporaryEvents).get(
-    parentNode.id as LongID
-  )?.emptyNode;
+  return data.publishEventsStatus.temporaryEvents
+    .reduce<Map<LongID, GraphNode>>((metadata, event) => {
+      if (event.type === "ADD_EMPTY_NODE") {
+        return metadata.set(event.nodeID, event.emptyNode);
+      }
+      if (event.type === "REMOVE_EMPTY_NODE") {
+        return metadata.delete(event.nodeID);
+      }
+      return metadata;
+    }, Map<LongID, GraphNode>())
+    .get(parentNode.id as LongID);
 }
 
-function getRowIDFromPath(data: Data, rowPath: RowPath): ID {
+function getRowIDFromPath(data: RowsData, rowPath: RowPath): ID {
   const currentID = getLast(rowPath);
   if (isEmptyRowPathID(currentID)) {
     return EMPTY_SEMANTIC_ID;
@@ -115,7 +102,7 @@ function getRowIDFromPath(data: Data, rowPath: RowPath): ID {
   return getNodeSemanticID(node);
 }
 
-function getViewFromPath(data: Data, path: RowPath): RowView {
+function getViewFromPath(data: RowsData, path: RowPath): RowView {
   const rowID = getRowIDFromPath(data, path);
   return (
     getViewExactMatch(data.views, path) || {
@@ -124,14 +111,18 @@ function getViewFromPath(data: Data, path: RowPath): RowView {
   );
 }
 
-function getRowIDsForRowPath(data: Data, rowPath: RowPath): Array<ID> {
+function getRowIDsForRowPath(data: RowsData, rowPath: RowPath): Array<ID> {
   const paneIndex = getPaneIndex(rowPath);
   return (rowPath.slice(1) as ID[]).map((_, index, segments) =>
     getRowIDFromPath(data, [paneIndex, ...segments.slice(0, index + 1)])
   );
 }
 
-export function getContext(data: Data, rowPath: RowPath, stack: ID[]): Context {
+export function getContext(
+  data: RowsData,
+  rowPath: RowPath,
+  stack: ID[]
+): Context {
   const directNode = getViewNodeByID(
     data.knowledgeDBs,
     getLast(rowPath),
@@ -156,13 +147,16 @@ export function getContext(data: Data, rowPath: RowPath, stack: ID[]): Context {
   return parentContext.push(shortID(parentRowID as ID) as ID);
 }
 
-export function getRowIDFromView(data: Data, rowPath: RowPath): [ID, RowView] {
+export function getRowIDFromView(
+  data: RowsData,
+  rowPath: RowPath
+): [ID, RowView] {
   const view = getViewFromPath(data, rowPath);
   return [getRowIDFromPath(data, rowPath), view];
 }
 
 export function getParentNode(
-  data: Data,
+  data: RowsData,
   rowPath: RowPath
 ): GraphNode | undefined {
   if (isRoot(rowPath)) {
@@ -172,14 +166,17 @@ export function getParentNode(
   return getNode(data.knowledgeDBs, parentID, data.user.publicKey);
 }
 
-export function getEffectiveAuthor(data: Data, rowPath: RowPath): PublicKey {
+export function getEffectiveAuthor(
+  data: RowsData,
+  rowPath: RowPath
+): PublicKey {
   const pane = data.panes[getPaneIndex(rowPath)];
   const parentNode = getParentNode(data, rowPath);
   return parentNode?.author || pane.author;
 }
 
 export function getNodeForView(
-  data: Data,
+  data: RowsData,
   rowPath: RowPath,
   stack: ID[]
 ): GraphNode | undefined {
@@ -215,7 +212,7 @@ export function getNodeForView(
 }
 
 export function buildPaneTarget(
-  data: Data,
+  data: RowsData,
   rowPath: RowPath,
   paneStack: ID[],
   currentRow?: GraphNode
@@ -290,7 +287,7 @@ export function buildPaneTarget(
 }
 
 export function getCurrentReferenceForView(
-  data: Data,
+  data: RowsData,
   rowPath: RowPath,
   stack: ID[],
   virtualType?: VirtualType,
@@ -338,7 +335,7 @@ export function addNodeToPathWithNodes(
 }
 
 export function addNodeToPath(
-  data: Data,
+  data: RowsData,
   path: RowPath,
   index: number,
   stack: ID[]
@@ -351,7 +348,7 @@ export function addNodeToPath(
 }
 
 export function getNodeIndexForView(
-  data: Data,
+  data: RowsData,
   rowPath: RowPath
 ): number | undefined {
   const nodes = getParentNode(data, rowPath);
@@ -368,7 +365,7 @@ export function getNodeIndexForView(
 }
 
 export function getCurrentEdgeForView(
-  data: Data,
+  data: RowsData,
   rowPath: RowPath
 ): GraphNode | undefined {
   const parentNode = getParentNode(data, rowPath);
@@ -396,7 +393,7 @@ export type SiblingInfo = {
 };
 
 export function getPreviousSibling(
-  data: Data,
+  data: RowsData,
   rowPath: RowPath,
   stack: ID[]
 ): SiblingInfo | undefined {

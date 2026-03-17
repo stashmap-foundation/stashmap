@@ -1,14 +1,7 @@
 import { List, Map, Set as ImmutableSet } from "immutable";
-import type { Data } from "../features/app-shell/types";
 import type { PublicKey } from "../graph/identity";
-import type {
-  Argument,
-  GraphNode,
-  ID,
-  LongID,
-  Relevance,
-  VirtualType,
-} from "../graph/types";
+import type { GraphNode, ID, LongID, VirtualType } from "../graph/types";
+import type { RowTypeFilter, RowsData } from "./data";
 import type { VirtualRowsMap } from "./types";
 import { type RowPath, rowPathToString } from "./rowPaths";
 import {
@@ -44,21 +37,13 @@ type TreeTraversalOptions = {
   isMarkdownExport?: boolean;
 };
 
-type RowTypeFilter =
-  | Relevance
-  | Argument
-  | "suggestions"
-  | "versions"
-  | "incoming"
-  | "contains";
-
 type RowTypeFilters = RowTypeFilter[] | undefined;
 
 const EMPTY_VIRTUAL_ROWS: VirtualRowsMap = Map<string, GraphNode>();
 const EMPTY_FIRST_VIRTUAL_KEYS: ImmutableSet<string> = ImmutableSet<string>();
 
 function getChildrenForConcreteRef(
-  data: Data,
+  data: RowsData,
   parentPath: RowPath,
   parentRowID: ID,
   currentRow?: GraphNode
@@ -86,7 +71,7 @@ function getChildrenForConcreteRef(
 }
 
 function getChildrenForRegularNode(
-  data: Data,
+  data: RowsData,
   parentPath: RowPath,
   parentRowID: ID,
   stack: ID[],
@@ -244,7 +229,7 @@ function getChildrenForRegularNode(
 }
 
 export function getTreeChildren(
-  data: Data,
+  data: RowsData,
   parentPath: RowPath,
   stack: ID[],
   rootNode: LongID | undefined,
@@ -280,7 +265,7 @@ export function getTreeChildren(
 }
 
 export function getNodesInTree(
-  data: Data,
+  data: RowsData,
   parentPath: RowPath,
   stack: ID[],
   ctx: List<RowPath>,

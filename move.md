@@ -51,6 +51,19 @@ I’d structure the first pass like this:
 
 ## Completed Moves
 
+- Removed lower-layer imports from `features/*`
+  - moved `UNAUTHENTICATED_USER_PK` and login-state helpers into `src/app/auth.ts`
+  - moved `FinalizeEvent` into `src/infra/apiTypes.ts`
+  - moved app-owned runtime types `Data` and `EventState` into `src/app/types.ts`
+  - lower layers now use narrower local contracts instead of importing app-shell runtime bags:
+    - `src/rows/data.ts`
+    - `src/infra/markdownDocument.ts` via `MarkdownDocumentData`
+    - `src/session/views.ts` via `HasViews`
+  - moved temporary empty-node query helpers out of `graph` usage paths:
+    - `TemporaryEvent` remains session-owned
+    - feature/app code uses `src/session/temporaryNodes.ts`
+    - row resolution now derives empty placeholders from row-local structural event data instead of importing `session`
+
 - Extracted row-path utilities from `src/ViewContext.tsx` into `src/session/rowPaths.ts`
   - moved:
     - `RowPath`

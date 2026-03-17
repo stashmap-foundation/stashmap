@@ -1,9 +1,7 @@
 import React from "react";
-import {
-  injectEmptyNodesIntoKnowledgeDBs,
-  mergeKnowledgeDBs,
-} from "../../graph/queries";
+import { mergeKnowledgeDBs } from "../../graph/queries";
 import type { KnowledgeDBs } from "../../graph/types";
+import { injectEmptyNodesIntoKnowledgeDBs } from "../../session/temporaryNodes";
 import type { Data } from "./types";
 import {
   useDocumentKnowledgeDBs,

@@ -1,11 +1,11 @@
 import React from "react";
 import { Outlet } from "react-router-dom";
-import type { PublicKey } from "../../graph/identity";
 import "./styles/App.css";
 import Data from "./Data";
 import { useUser } from "./NostrAuthContext";
+import { UNAUTHENTICATED_USER_PK } from "../../app/auth";
 
-export const UNAUTHENTICATED_USER_PK = "UNAUTHENTICATEDUSERPK" as PublicKey;
+export { UNAUTHENTICATED_USER_PK } from "../../app/auth";
 
 export function RequireLogin(): JSX.Element {
   const user = useUser() || {

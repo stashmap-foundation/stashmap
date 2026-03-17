@@ -6,12 +6,7 @@ import {
   UnsignedEvent,
   VerifiedEvent,
 } from "nostr-tools";
-import type { Data } from "../features/app-shell/types";
-import { FinalizeEvent } from "../features/app-shell/ApiContext";
-import {
-  isUserLoggedIn,
-  isUserLoggedInWithExtension,
-} from "../features/app-shell/NostrAuthContext";
+import { isUserLoggedIn, isUserLoggedInWithExtension } from "../app/auth";
 import type { Plan } from "../app/types";
 import type { GraphPlan } from "../graph/commands";
 import type { User } from "../graph/identity";
@@ -19,6 +14,7 @@ import { getNode } from "../graph/queries";
 import { shortID } from "../graph/context";
 import { newDB } from "../graph/types";
 import type { GraphNode, ID } from "../graph/types";
+import type { FinalizeEvent } from "./apiTypes";
 import type {
   AllRelays,
   PublishResultsEventMap,
@@ -40,6 +36,7 @@ import {
   uniqueRelayUrls,
 } from "./relayUtils";
 import { buildDocumentEvent } from "./markdownDocument";
+import type { MarkdownDocumentData } from "./markdownDocument";
 import {
   buildDocumentEventFromNodes,
   buildSnapshotEventFromNodes,
@@ -204,7 +201,7 @@ export function buildDocumentEvents(plan: GraphPlan): List<UnsignedEvent> {
     const workspacePlan = plan as Partial<Plan>;
     const event =
       workspacePlan.views !== undefined && workspacePlan.panes !== undefined
-        ? buildDocumentEvent(workspacePlan as Data, rootNode, {
+        ? buildDocumentEvent(workspacePlan as MarkdownDocumentData, rootNode, {
             snapshotDTag: rootNode.snapshotDTag ?? createdSnapshotDTag,
           })
         : buildDocumentEventFromNodes(plan.knowledgeDBs, rootNode, {

@@ -12,7 +12,7 @@ import {
   parseAuthorFromSearch,
 } from "../session/navigation";
 import { splitID } from "../graph/context";
-import { UNAUTHENTICATED_USER_PK } from "../features/app-shell/RequireLogin";
+import { UNAUTHENTICATED_USER_PK } from "../app/auth";
 import { defaultPane, generatePaneId } from "../session/panes";
 
 function panesStorageKey(publicKey: PublicKey): string {

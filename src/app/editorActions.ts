@@ -18,7 +18,7 @@ import {
   isSearchId,
   withUsersEntryPublicKey,
 } from "../graph/context";
-import { getNode, computeEmptyNodeMetadata } from "../graph/queries";
+import { getNode } from "../graph/queries";
 import { newNode } from "../graph/nodeFactory";
 import { decodePublicKeyInputSync } from "../graph/publicKeys";
 import type { ChildNodeMetadata } from "../graph/commands";
@@ -43,6 +43,7 @@ import { planAddToParent, planDeepCopyNode } from "./treeActions";
 import type { Plan } from "./types";
 import { upsertNodes } from "./actions";
 import { planExpandNode } from "../session/views";
+import { computeEmptyNodeMetadata } from "../session/temporaryNodes";
 
 export type { ChildNodeMetadata } from "../graph/commands";
 

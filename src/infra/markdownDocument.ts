@@ -1,9 +1,9 @@
 /* eslint-disable functional/immutable-data */
-import { List } from "immutable";
+import { List, type Map } from "immutable";
 import { v4 } from "uuid";
 import { UnsignedEvent } from "nostr-tools";
-import type { Data } from "../features/app-shell/types";
-import type { PublicKey } from "../graph/identity";
+import type { RelayInformation } from "nostr-tools/lib/types/nip11";
+import type { Contacts, PublicKey, User } from "../graph/identity";
 import {
   createRootAnchor,
   getNodeContext,
@@ -21,7 +21,8 @@ import {
 import { getDisplayTextForView } from "../rows/display";
 import { buildOutgoingReference } from "../rows/buildReferenceRow";
 import { type RowPath, isRoot } from "../rows/rowPaths";
-import type { GraphNode, KnowledgeDBs } from "../graph/types";
+import type { GraphNode, KnowledgeDBs, SemanticIndex } from "../graph/types";
+import type { Pane, Views } from "../session/types";
 import {
   formatNodeAttrs,
   formatPrefixMarkers,
@@ -30,9 +31,33 @@ import {
 import { KIND_KNOWLEDGE_DOCUMENT, newTimestamp, msTag } from "./nostrCore";
 import { getNodesInTree } from "../rows/projectTree";
 import { resolveSemanticNodeInCurrentTree } from "../graph/semanticResolution";
+import type { Relays } from "./publishTypes";
 
 export type { MarkdownTreeNode } from "./markdownTree";
 export { parseMarkdownHierarchy } from "./markdownTree";
+
+export type MarkdownDocumentData = {
+  contacts: Contacts;
+  user: User;
+  contactsRelays: Map<PublicKey, Relays>;
+  knowledgeDBs: KnowledgeDBs;
+  semanticIndex: SemanticIndex;
+  relaysInfos: Map<string, RelayInformation | undefined>;
+  publishEventsStatus: {
+    temporaryEvents: List<
+      | {
+          type: "ADD_EMPTY_NODE";
+          nodeID: LongID;
+          index: number;
+          emptyNode: GraphNode;
+          paneIndex: number;
+        }
+      | { type: "REMOVE_EMPTY_NODE"; nodeID: LongID }
+    >;
+  };
+  views: Views;
+  panes: Pane[];
+};
 
 function formatCrefText(
   knowledgeDBs: KnowledgeDBs,
@@ -61,7 +86,7 @@ type SerializeResult = {
 };
 
 function getOwnNodeForDocumentSerialization(
-  data: Data,
+  data: MarkdownDocumentData,
   path: RowPath,
   stack: ID[],
   author: PublicKey,
@@ -85,7 +110,10 @@ function getOwnNodeForDocumentSerialization(
   );
 }
 
-function getSerializedNodeText(data: Data, node: GraphNode): { text: string } {
+function getSerializedNodeText(
+  data: MarkdownDocumentData,
+  node: GraphNode
+): { text: string } {
   if (node.text !== "") {
     return {
       text: node.text,
@@ -105,7 +133,10 @@ function buildRootPath(rootNode: GraphNode): RowPath {
   return [0, rootNode.id];
 }
 
-function serializeTree(data: Data, rootNode: GraphNode): SerializeResult {
+function serializeTree(
+  data: MarkdownDocumentData,
+  rootNode: GraphNode
+): SerializeResult {
   const author = data.user.publicKey;
   const rootPath = buildRootPath(rootNode);
   const stack = [getSemanticID(data.knowledgeDBs, rootNode)];
@@ -171,7 +202,7 @@ function serializeTree(data: Data, rootNode: GraphNode): SerializeResult {
 }
 
 export function buildDocumentEvent(
-  data: Data,
+  data: MarkdownDocumentData,
   rootNode: GraphNode,
   options?: {
     snapshotDTag?: string;

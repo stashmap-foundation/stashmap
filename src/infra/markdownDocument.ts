@@ -12,8 +12,8 @@ import {
   getNodeForView,
 } from "../rows/resolveRow";
 import { getDisplayTextForView } from "../rows/display";
+import { buildOutgoingReference } from "../rows/buildReferenceRow";
 import { type RowPath, isRoot } from "../rows/rowPaths";
-import { buildOutgoingReference } from "../buildReferenceRow";
 import {
   formatNodeAttrs,
   formatPrefixMarkers,

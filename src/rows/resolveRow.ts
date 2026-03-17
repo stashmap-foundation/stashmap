@@ -18,7 +18,7 @@ import {
   getRefTargetInfo,
   isRefNode,
 } from "../graph/references";
-import { buildReferenceRow } from "../buildReferenceRow";
+import { buildReferenceRow } from "./buildReferenceRow";
 import { resolveSemanticNodeInCurrentTree } from "../graph/semanticResolution";
 import { DEFAULT_TYPE_FILTERS } from "../constants";
 import {

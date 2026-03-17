@@ -459,6 +459,24 @@ I’d structure the first pass like this:
     - `markdownDocument` and `markdownPlan` still depend on rows/session/app concepts
     - they are in `infra` for now because the current lint graph forbids `app -> infra`, and moving them into `app` would immediately violate the boundary rules
 
+- Moved the semantic/reference slice into structured layers
+  - moved:
+    - `src/semanticProjection.ts` -> `src/graph/semanticProjection.ts`
+    - `src/buildReferenceRow.ts` -> `src/rows/buildReferenceRow.ts`
+  - split `buildNodeUrl` out of the mixed URL surface:
+    - added `src/graph/nodeUrl.ts`
+    - `src/navigationUrl.ts` is now a compatibility surface over `graph/nodeUrl` and `session/navigation`
+  - removed the `session` dependency from `buildReferenceRow` by resolving the pane from `RowPath` directly
+
+- Moved the persistence/sync/runtime slice into `src/infra/*`
+  - moved:
+    - `src/indexedDB.ts` -> `src/infra/indexedDB.ts`
+    - `src/permanentSync.ts` -> `src/infra/permanentSync.ts`
+    - `src/eventProcessing.ts` -> `src/infra/eventProcessing.ts`
+    - `src/eventQuery.ts` -> `src/infra/eventQuery.ts`
+  - kept the old top-level paths as compatibility barrels
+  - `src/infra/permanentSync.ts` intentionally imports `../indexedDB` and `../eventQuery` through the compatibility layer so the existing Jest mocks still intercept those dependencies
+
 And the rule for ambiguous cases should be:
 
 - “Can this module exist without React?”

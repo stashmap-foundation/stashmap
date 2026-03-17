@@ -1,7 +1,11 @@
 import { useDefaultRelays } from "./NostrAuthContext";
 import { useUserRelayContext } from "./UserRelayContext";
 import { useData } from "../../DataContext";
-import { flattenRelays, getReadRelays, getWriteRelays } from "../../relayUtils";
+import {
+  flattenRelays,
+  getReadRelays,
+  getWriteRelays,
+} from "../../infra/relayUtils";
 
 function useContactsRelays(): Relays {
   return flattenRelays(useData().contactsRelays);

@@ -1,8 +1,7 @@
 import { List, Map, Set as ImmutableSet } from "immutable";
-import { newNode, newRefNode } from "../nodeFactory";
+import { newNode, newRefNode } from "./nodeFactory";
 import { newDB, EMPTY_SEMANTIC_ID } from "./types";
-import { splitID, shortID } from "./context";
-import { rootAnchorsEqual } from "../rootAnchor";
+import { rootAnchorsEqual, splitID, shortID } from "./context";
 
 export const LOG_ROOT_ROLE: RootSystemRole = "log";
 const LOG_ROOT_TEXT = "~Log";

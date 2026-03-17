@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Form, Modal } from "react-bootstrap";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ErrorMessage } from "../../commons/ErrorMessage";
-import { Button } from "../../commons/Ui";
-import { createSubmitHandler } from "../../commons/modalFormSubmitHandler";
+import { ErrorMessage } from "../shared/ErrorMessage";
+import { Button } from "../shared/Ui";
+import { createSubmitHandler } from "../shared/modalFormSubmitHandler";
 import {
   isUserLoggedIn,
   useLogin,
@@ -15,7 +15,7 @@ import { execute } from "../../executor";
 import { useApis } from "./ApiContext";
 import { KINDS_META } from "./Data";
 import { useStorePreLoginEvents } from "./StorePreLoginContext";
-import { convertInputToPrivateKey } from "../../nostrKey";
+import { convertInputToPrivateKey } from "../../infra/nostrKey";
 
 function SignInWithSeed({
   setPrivateKey,

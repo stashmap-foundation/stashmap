@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Map } from "immutable";
-import { Button } from "../../commons/Ui";
-import { ModalForm } from "../../commons/ModalForm";
-import { ErrorMessage } from "../../commons/ErrorMessage";
+import { Button } from "../shared/Ui";
+import { ModalForm } from "../shared/ModalForm";
+import { ErrorMessage } from "../shared/ErrorMessage";
 import {
   mergeRelays,
   getSuggestedRelays,

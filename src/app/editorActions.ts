@@ -3,9 +3,9 @@ import { createRefTarget, isRefNode } from "../graph/references";
 import { isEmptySemanticID, getSemanticID, isSearchId } from "../graph/context";
 import { getNode, computeEmptyNodeMetadata } from "../graph/queries";
 import { EMPTY_SEMANTIC_ID, type TextSeed } from "../graph/types";
-import { newNode } from "../nodeFactory";
+import { newNode } from "../graph/nodeFactory";
 import { withUsersEntryPublicKey, getNodeUserPublicKey } from "../userEntry";
-import { decodePublicKeyInputSync } from "../nostrPublicKeys";
+import { decodePublicKeyInputSync } from "../graph/publicKeys";
 import type { ChildNodeMetadata } from "../graph/commands";
 import {
   planUpdateChildNodeMetadataById,

@@ -57,7 +57,7 @@ import { planExpandNode } from "../../session/views";
 import { parsedLinesToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import { planDisconnectFromParent } from "../../treeMutations";
 import { useNodeIsLoading } from "./LoadingStatus";
-import { NodeCard } from "../../commons/Ui";
+import { NodeCard } from "../shared/Ui";
 import {
   usePaneStack,
   usePaneIndex,

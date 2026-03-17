@@ -1,6 +1,6 @@
 import { UnsignedEvent } from "nostr-tools";
 import { shortID } from "../graph/context";
-import { createHeadlessPlan } from "../core/headlessPlan";
+import { createHeadlessPlan } from "../app/headlessPlan";
 import { planCreateNodesFromMarkdownTrees } from "./markdownPlan";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
 import { buildDocumentEventFromNodes } from "./nodesDocumentEvent";

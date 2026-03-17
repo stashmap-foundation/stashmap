@@ -12,7 +12,7 @@ import {
   planMoveDescendantNodes,
   planUpsertNodes,
 } from "../planner";
-import { newNode } from "../nodeFactory";
+import { newNode } from "../graph/nodeFactory";
 import { getNodeForView } from "../rows/resolveRow";
 import { type RowPath } from "../rows/rowPaths";
 

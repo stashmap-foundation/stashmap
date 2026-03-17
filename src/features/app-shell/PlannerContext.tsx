@@ -7,7 +7,7 @@ import { createPublishQueue } from "../../PublishQueue";
 import type { StashmapDB } from "../../indexedDB";
 import { useData } from "../../DataContext";
 import { useRelaysToCreatePlan } from "../../relays";
-import { mergePublishResultsOfEvents } from "../../commons/PublishingStatus";
+import { mergePublishResultsOfEvents } from "../shared/PublishingStatus";
 import { buildDocumentEvents, createPlan } from "../../app/actions";
 import type { Plan } from "../../app/types";
 

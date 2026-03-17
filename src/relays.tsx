@@ -14,4 +14,4 @@ export {
   mergeRelays,
   sanitizeRelays,
   sanitizeRelayUrl,
-} from "./relayUtils";
+} from "./infra/relayUtils";

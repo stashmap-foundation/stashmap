@@ -1,12 +1,12 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import * as serviceWorker from "./serviceWorker";
+import * as serviceWorker from "./features/app-shell/serviceWorker";
 import "bootstrap/dist/css/bootstrap.min.css";
-import "./theme/solarized.scss";
-import "./assets/fonts/nostr/css/nostr.css";
-import "./Workspace.scss";
-import "./App.css";
+import "./features/app-shell/styles/solarized.scss";
+import "./features/app-shell/assets/fonts/nostr/css/nostr.css";
+import "./features/app-shell/styles/Workspace.scss";
+import "./features/app-shell/styles/App.css";
 import { App } from "./App";
 import { NostrAuthContextProvider } from "./features/app-shell/NostrAuthContext";
 import { NostrProvider } from "./features/app-shell/NostrProvider";

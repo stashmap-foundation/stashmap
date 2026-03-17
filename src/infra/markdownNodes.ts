@@ -8,7 +8,7 @@ import { newDB } from "../graph/types";
 import { findTag } from "../nostrEvents";
 import { createRootAnchor } from "../rootAnchor";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
-import { newRefNode, newNode } from "../nodeFactory";
+import { newRefNode, newNode } from "../graph/nodeFactory";
 
 export type WalkContext = {
   knowledgeDBs: KnowledgeDBs;

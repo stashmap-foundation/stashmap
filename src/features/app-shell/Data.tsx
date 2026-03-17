@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import "../../App.css";
+import "./styles/App.css";
 import { List, Map, Set, OrderedSet } from "immutable";
 import {
   KIND_KNOWLEDGE_DOCUMENT,
@@ -14,7 +14,7 @@ import { PlanningContextProvider } from "./PlannerContext";
 import { useUserRelayContext } from "./UserRelayContext";
 import { flattenRelays, usePreloadRelays } from "../../relays";
 import { useDefaultRelays } from "./NostrAuthContext";
-import { useEventQuery } from "../../commons/useNostrQuery";
+import { useEventQuery } from "../shared/useNostrQuery";
 import { openDB, StashmapDB, getOutboxEvents } from "../../indexedDB";
 import { splitID } from "../../graph/context";
 import {

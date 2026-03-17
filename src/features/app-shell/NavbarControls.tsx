@@ -1,5 +1,5 @@
 import React from "react";
-import { NotificationCenter } from "../../commons/NotificationCenter";
+import { NotificationCenter } from "../shared/NotificationCenter";
 
 export function NavbarControls(): JSX.Element {
   // Settings menu and PublishingStatus moved to first split pane header

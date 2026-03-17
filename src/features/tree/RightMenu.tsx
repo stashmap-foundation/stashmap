@@ -21,7 +21,7 @@ import { EvidenceSelector } from "./EvidenceSelector";
 import { FullscreenButton } from "./FullscreenButton";
 import { getNodeUserPublicKey } from "../../userEntry";
 import { RelevanceSelector } from "./RelevanceSelector";
-import { decodePublicKeyInputSync } from "../../nostrPublicKeys";
+import { decodePublicKeyInputSync } from "../../graph/publicKeys";
 
 function useCurrentUserEntryPublicKey(): PublicKey | undefined {
   return getNodeUserPublicKey(useCurrentNode());

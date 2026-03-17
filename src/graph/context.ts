@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/immutable-data, functional/no-let */
 import { List, Map } from "immutable";
 import { SEARCH_PREFIX } from "../constants";
-import { decodePublicKeyInputSync } from "../nostrPublicKeys";
+import { decodePublicKeyInputSync } from "./publicKeys";
 import { EMPTY_SEMANTIC_ID, type TextSeed } from "./types";
 import { getNode } from "./queries";
 import { isRefNode } from "./references";

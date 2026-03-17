@@ -3,7 +3,11 @@ import { useEffect, useMemo } from "react";
 import { Event, UnsignedEvent } from "nostr-tools";
 import { useApis } from "./ApiContext";
 import type { StashmapDB } from "../../indexedDB";
-import { flattenRelays, getReadRelays, sanitizeRelays } from "../../relayUtils";
+import {
+  flattenRelays,
+  getReadRelays,
+  sanitizeRelays,
+} from "../../infra/relayUtils";
 import {
   buildPermanentSyncAuthors,
   startPermanentDocumentSync,

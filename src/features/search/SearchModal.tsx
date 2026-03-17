@@ -1,5 +1,5 @@
 import { Map } from "immutable";
-import { useEventQuery } from "../../commons/useNostrQuery";
+import { useEventQuery } from "../shared/useNostrQuery";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../../nostr";
 import { useData } from "../../DataContext";
 import { useApis } from "../app-shell/ApiContext";

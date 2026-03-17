@@ -22,7 +22,7 @@ import {
   type GraphPlan,
 } from "../graph/commands";
 import type { Plan } from "./types";
-import { newNode } from "../nodeFactory";
+import { newNode } from "../graph/nodeFactory";
 import { getContext, getNodeForView, getParentNode } from "../rows/resolveRow";
 import { type RowPath } from "../rows/rowPaths";
 

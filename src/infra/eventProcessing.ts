@@ -3,7 +3,7 @@ import { Event, UnsignedEvent } from "nostr-tools";
 import { findContacts } from "../contacts";
 import { buildKnowledgeDBFromDocumentEvents } from "./documentMaterialization";
 import { newDB } from "../graph/types";
-import { findRelays } from "../relayUtils";
+import { findRelays } from "./relayUtils";
 
 type ProcessedEvents = {
   knowledgeDB: KnowledgeData;

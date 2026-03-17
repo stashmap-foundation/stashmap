@@ -16,14 +16,14 @@ import {
 import { isRefNode } from "./references";
 import { newDB, type RefTargetSeed, type TextSeed } from "./types";
 import { KIND_CONTACTLIST, newTimestamp, msTag } from "../nostr";
-import { newNode, newRefNode } from "../nodeFactory";
+import { newNode, newRefNode } from "./nodeFactory";
 import {
   getOwnSystemRoot,
   getSystemRoleText,
   LOG_ROOT_ROLE,
 } from "../systemRoots";
 import { withUsersEntryPublicKey, getNodeUserPublicKey } from "../userEntry";
-import { decodePublicKeyInputSync } from "../nostrPublicKeys";
+import { decodePublicKeyInputSync } from "./publicKeys";
 import { createRootAnchor } from "../rootAnchor";
 
 export type ChildNodeMetadata = {

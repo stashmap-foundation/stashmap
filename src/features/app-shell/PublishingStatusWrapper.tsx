@@ -3,7 +3,7 @@ import { Dropdown } from "react-bootstrap";
 import { useMediaQuery } from "react-responsive";
 import { useData } from "../../DataContext";
 import { IS_MOBILE } from "../navigation/responsive";
-import { PublishingStatusContent } from "../../commons/PublishingStatus";
+import { PublishingStatusContent } from "../shared/PublishingStatus";
 import { getWriteRelays } from "../../relays";
 import { useUserRelayContext } from "./UserRelayContext";
 

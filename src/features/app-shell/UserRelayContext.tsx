@@ -2,12 +2,12 @@ import React, { createContext, useContext } from "react";
 import { List } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
 import { getMostRecentReplacableEvent } from "../../nostrEvents";
-import { useEventQuery } from "../../commons/useNostrQuery";
+import { useEventQuery } from "../shared/useNostrQuery";
 import {
   createRelaysQuery,
   findAllRelays,
   sanitizeRelays,
-} from "../../relayUtils";
+} from "../../infra/relayUtils";
 import { useDefaultRelays, useUserOrAnon } from "../../NostrAuthContext";
 import { useApis } from "./ApiContext";
 

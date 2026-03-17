@@ -4,7 +4,15 @@ import type { Data, TemporaryEvent } from "../features/app-shell/types";
 import type { TemporaryViewState } from "../session/types";
 
 export type WorkspacePlan = GraphPlan &
-  Pick<Data, "publishEventsStatus" | "views" | "panes"> & {
+  Pick<
+    Data,
+    | "contactsRelays"
+    | "semanticIndex"
+    | "relaysInfos"
+    | "publishEventsStatus"
+    | "views"
+    | "panes"
+  > & {
     temporaryView: TemporaryViewState;
     temporaryEvents: List<TemporaryEvent>;
   };

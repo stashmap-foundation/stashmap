@@ -3,7 +3,6 @@ import { UnsignedEvent } from "nostr-tools";
 import { UNAUTHENTICATED_USER_PK } from "../features/app-shell/RequireLogin";
 import type { Data, TemporaryEvent } from "../features/app-shell/types";
 import { createGraphPlan, planUpsertNodes } from "../graph/commands";
-import type { EventAttachment, AllRelays } from "../infra/publishTypes";
 import type { GraphNode, ID } from "../graph/types";
 import type { Plan } from "./types";
 import { newNode } from "../graph/nodeFactory";
@@ -81,12 +80,19 @@ export function planRewriteUnpublishedEvents(
 
 export function createPlan(
   props: Data & {
-    publishEvents?: List<UnsignedEvent & EventAttachment>;
-    relays: AllRelays;
+    publishEvents?: List<UnsignedEvent>;
   }
 ): Plan {
   return {
-    ...createGraphPlan(props),
+    ...createGraphPlan({
+      contacts: props.contacts,
+      user: props.user,
+      knowledgeDBs: props.knowledgeDBs,
+      publishEvents: props.publishEvents,
+    }),
+    contactsRelays: props.contactsRelays,
+    semanticIndex: props.semanticIndex,
+    relaysInfos: props.relaysInfos,
     publishEventsStatus: props.publishEventsStatus,
     views: props.views,
     panes: props.panes,

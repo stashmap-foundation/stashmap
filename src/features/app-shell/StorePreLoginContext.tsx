@@ -6,6 +6,7 @@ import { KIND_CONTACTLIST } from "../../infra/nostrCore";
 import { planAddContacts } from "../../graph/commands";
 import { usePlanner } from "./PlannerContext";
 import { execute } from "../../infra/nostr";
+import { useRelaysToCreatePlan } from "./useRelays";
 
 type StorePreLoginData = (eventKinds: List<number>) => void;
 
@@ -28,6 +29,7 @@ export function StorePreLoginContext({
 }): JSX.Element {
   const { createPlan, setPublishEvents } = usePlanner();
   const { relayPool, finalizeEvent, timeToStorePreLoginEvents } = useApis();
+  const relays = useRelaysToCreatePlan();
 
   const storeMergeEvents = useDebouncedCallback(
     async (eventKinds: List<number>) => {
@@ -40,6 +42,7 @@ export function StorePreLoginContext({
         : plan;
       const results = await execute({
         plan: withContacts,
+        relays,
         relayPool,
         finalizeEvent,
       });

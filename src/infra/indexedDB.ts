@@ -1,6 +1,5 @@
 /* eslint-disable functional/immutable-data */
 import { UnsignedEvent } from "nostr-tools";
-import type { EventAttachment } from "./publishTypes";
 
 const DB_NAME = "stashmap";
 const DB_VERSION = 2;
@@ -17,7 +16,7 @@ const DOCUMENT_STORE_LISTENERS = new WeakMap<
 
 export type OutboxEntry = {
   readonly key: string;
-  readonly event: UnsignedEvent & EventAttachment;
+  readonly event: UnsignedEvent;
   readonly createdAt: number;
   readonly succeededRelays?: ReadonlyArray<string>;
 };

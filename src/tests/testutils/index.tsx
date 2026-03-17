@@ -49,7 +49,7 @@ import {
   DataContextProvider,
   MergeKnowledgeDB,
 } from "../../features/app-shell/DataContext";
-import type { Data, LocalStorage } from "../../features/app-shell/types";
+import type { LocalStorage } from "../../features/app-shell/types";
 import { DocumentStoreProvider } from "../../features/app-shell/DocumentStore";
 import { MockRelayPool, mockRelayPool } from "./nostrMock";
 import {

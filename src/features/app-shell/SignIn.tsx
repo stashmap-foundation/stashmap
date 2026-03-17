@@ -15,6 +15,7 @@ import { useData } from "./DataContext";
 import { planRewriteUnpublishedEvents } from "../../app/actions";
 import { usePlanner } from "./PlannerContext";
 import { execute } from "../../infra/nostr";
+import { useRelaysToCreatePlan } from "./useRelays";
 import { useApis } from "./ApiContext";
 import { KINDS_META } from "./Data";
 import { useStorePreLoginEvents } from "./StorePreLoginContext";
@@ -180,6 +181,7 @@ export function SignInModal(): JSX.Element {
     navigate(referrer || "/");
   };
   const storeMergeEvents = useStorePreLoginEvents();
+  const relays = useRelaysToCreatePlan();
 
   const signIn = ({
     withExtension,
@@ -221,6 +223,7 @@ export function SignInModal(): JSX.Element {
       });
       execute({
         plan: { ...plan, publishEvents: nonMergeEvents },
+        relays,
         relayPool,
         finalizeEvent,
       }).then((results) => {

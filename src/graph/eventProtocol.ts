@@ -1,5 +1,3 @@
-import type { Relays } from "../infra/publishTypes";
-
 export const KIND_SETTINGS = 11071;
 
 export const KIND_KNOWLEDGE_DOCUMENT = 34770;
@@ -9,13 +7,6 @@ export const KIND_CONTACTLIST = 3;
 export const KIND_DELETE = 5;
 
 export const KIND_RELAY_METADATA_EVENT = 10002;
-export const DEFAULT_RELAYS: Relays = [
-  { url: "wss://nostr.nodesmap.com/", read: true, write: true },
-  { url: "wss://relay.damus.io/", read: true, write: true },
-  { url: "wss://relay.primal.net/", read: true, write: true },
-  { url: "wss://nos.lol/", read: true, write: true },
-  { url: "wss://nostr.mom/", read: true, write: true },
-];
 
 export function newTimestamp(): number {
   return Math.floor(Date.now() / 1000);

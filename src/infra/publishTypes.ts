@@ -28,7 +28,7 @@ export type PublishResultsOfEvent = {
 
 export type PublishResultsEventMap = Map<string, PublishResultsOfEvent>;
 
-export type PublishEvents<T = void> = {
+export type PublishEvents<T = unknown> = {
   unsignedEvents: List<UnsignedEvent & T>;
   results: PublishResultsEventMap;
   isLoading: boolean;

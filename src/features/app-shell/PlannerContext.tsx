@@ -17,7 +17,6 @@ import {
 import { useApis } from "./ApiContext";
 import type { StashmapDB } from "../../infra/indexedDB";
 import { useData } from "./DataContext";
-import { useRelaysToCreatePlan } from "./useRelays";
 import { mergePublishResultsOfEvents } from "../shared/PublishingStatus";
 import { createPlan } from "../../app/actions";
 import type { Plan } from "../../app/types";
@@ -168,6 +167,7 @@ export function PlanningContextProvider({
 
     const results = await execute({
       plan: filteredPlan,
+      relays: depsRef.current.relays,
       relayPool,
       finalizeEvent,
     });
@@ -211,12 +211,8 @@ export function PlanningContextProvider({
 
 export function usePlanner(): Planner {
   const data = useData();
-  const relays = useRelaysToCreatePlan();
   const createPlanningContext = (): Plan => {
-    return createPlan({
-      ...data,
-      relays,
-    });
+    return createPlan(data);
   };
   const planningContext = React.useContext(PlanningContext);
   if (planningContext === undefined) {

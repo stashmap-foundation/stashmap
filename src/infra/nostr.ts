@@ -21,13 +21,10 @@ import { newDB } from "../graph/types";
 import type { GraphNode, ID } from "../graph/types";
 import type {
   AllRelays,
-  EventAttachment,
   PublishResultsEventMap,
   PublishResultsOfEvent,
   PublishStatus,
-  Relay,
   Relays,
-  WriteRelayConf,
 } from "./publishTypes";
 import {
   KIND_DELETE,
@@ -36,7 +33,12 @@ import {
   msTag,
   newTimestamp,
 } from "./nostrCore";
-import { applyWriteRelayConfig } from "./relayUtils";
+import {
+  findAllRelays,
+  getWriteRelays,
+  mergeRelays,
+  uniqueRelayUrls,
+} from "./relayUtils";
 import { buildDocumentEvent } from "./markdownDocument";
 import {
   buildDocumentEventFromNodes,
@@ -90,7 +92,6 @@ export type QueueStatus = {
 
 type SignedEventWithConf = {
   readonly event: VerifiedEvent;
-  readonly writeRelayConf?: WriteRelayConf;
 };
 
 type PublishQueueConfig = {
@@ -102,7 +103,7 @@ type PublishQueueConfig = {
 };
 
 type PublishQueue = {
-  readonly enqueue: (events: List<UnsignedEvent & EventAttachment>) => void;
+  readonly enqueue: (events: List<UnsignedEvent>) => void;
   readonly getStatus: () => QueueStatus;
   readonly init: () => Promise<void>;
   readonly destroy: () => void;
@@ -133,11 +134,6 @@ export function planPublishRelayMetadata(plan: Plan, relays: Relays): Plan {
     created_at: newTimestamp(),
     tags: [...tags, msTag()],
     content: "",
-    writeRelayConf: {
-      defaultRelays: true,
-      user: true,
-      extraRelays: relays,
-    },
   };
   return {
     ...plan,
@@ -145,72 +141,83 @@ export function planPublishRelayMetadata(plan: Plan, relays: Relays): Plan {
   };
 }
 
-export function buildDocumentEvents(
-  plan: GraphPlan
-): List<UnsignedEvent & EventAttachment> {
+function resolveWriteRelayUrlsForEvent(
+  event: UnsignedEvent,
+  relays: AllRelays
+): string[] {
+  if (event.kind === KIND_RELAY_METADATA_EVENT) {
+    const defaultWriteRelays = getWriteRelays(relays.defaultRelays);
+    const userWriteRelays = getWriteRelays(relays.userRelays);
+    const taggedWriteRelays = getWriteRelays(findAllRelays(event));
+    return uniqueRelayUrls(
+      mergeRelays(
+        mergeRelays(defaultWriteRelays, userWriteRelays),
+        taggedWriteRelays
+      )
+    );
+  }
+  return uniqueRelayUrls(getWriteRelays(relays.userRelays));
+}
+
+export function buildDocumentEvents(plan: GraphPlan): List<UnsignedEvent> {
   const author = plan.user.publicKey;
   const userDB = plan.knowledgeDBs.get(author, newDB());
-  return plan.affectedRoots.reduce<List<UnsignedEvent & EventAttachment>>(
-    (events, rootId) => {
-      const rootNode = userDB.nodes.find(
-        (node: GraphNode) =>
-          !node.parent &&
-          (node.id === rootId ||
-            shortID(node.id) === rootId ||
-            node.root === rootId ||
-            node.root === shortID(rootId as ID))
-      );
-      if (!rootNode) {
-        const rootDTag = shortID(rootId as ID);
-        const deleteEvent = {
-          kind: KIND_DELETE,
-          pubkey: author,
-          created_at: newTimestamp(),
-          tags: [
-            ["a", `${KIND_KNOWLEDGE_DOCUMENT}:${author}:${rootDTag}`],
-            ["k", `${KIND_KNOWLEDGE_DOCUMENT}`],
-            msTag(),
-          ],
-          content: "",
-        };
-        return events.push(deleteEvent as UnsignedEvent & EventAttachment);
-      }
-      const snapshotSourceRoot =
-        rootNode.basedOn && !rootNode.snapshotDTag
-          ? getNode(plan.knowledgeDBs, rootNode.basedOn, author)
-          : undefined;
-      const createdSnapshotDTag = snapshotSourceRoot
-        ? `snapshot-${shortID(rootNode.id as ID)}`
+  return plan.affectedRoots.reduce<List<UnsignedEvent>>((events, rootId) => {
+    const rootNode = userDB.nodes.find(
+      (node: GraphNode) =>
+        !node.parent &&
+        (node.id === rootId ||
+          shortID(node.id) === rootId ||
+          node.root === rootId ||
+          node.root === shortID(rootId as ID))
+    );
+    if (!rootNode) {
+      const rootDTag = shortID(rootId as ID);
+      const deleteEvent = {
+        kind: KIND_DELETE,
+        pubkey: author,
+        created_at: newTimestamp(),
+        tags: [
+          ["a", `${KIND_KNOWLEDGE_DOCUMENT}:${author}:${rootDTag}`],
+          ["k", `${KIND_KNOWLEDGE_DOCUMENT}`],
+          msTag(),
+        ],
+        content: "",
+      };
+      return events.push(deleteEvent as UnsignedEvent);
+    }
+    const snapshotSourceRoot =
+      rootNode.basedOn && !rootNode.snapshotDTag
+        ? getNode(plan.knowledgeDBs, rootNode.basedOn, author)
         : undefined;
-      const snapshotEvent = snapshotSourceRoot
-        ? (buildSnapshotEventFromNodes(
-            plan.knowledgeDBs,
-            author,
-            createdSnapshotDTag as string,
-            snapshotSourceRoot
-          ) as UnsignedEvent & EventAttachment)
-        : undefined;
-      const workspacePlan = plan as Partial<Plan>;
-      const event =
-        workspacePlan.views !== undefined && workspacePlan.panes !== undefined
-          ? buildDocumentEvent(workspacePlan as Data, rootNode, {
-              snapshotDTag: rootNode.snapshotDTag ?? createdSnapshotDTag,
-            })
-          : buildDocumentEventFromNodes(plan.knowledgeDBs, rootNode, {
-              snapshotDTag: rootNode.snapshotDTag ?? createdSnapshotDTag,
-            });
-      return snapshotEvent
-        ? events
-            .push(snapshotEvent)
-            .push(event as UnsignedEvent & EventAttachment)
-        : events.push(event as UnsignedEvent & EventAttachment);
-    },
-    plan.publishEvents
-  );
+    const createdSnapshotDTag = snapshotSourceRoot
+      ? `snapshot-${shortID(rootNode.id as ID)}`
+      : undefined;
+    const snapshotEvent = snapshotSourceRoot
+      ? (buildSnapshotEventFromNodes(
+          plan.knowledgeDBs,
+          author,
+          createdSnapshotDTag as string,
+          snapshotSourceRoot
+        ) as UnsignedEvent)
+      : undefined;
+    const workspacePlan = plan as Partial<Plan>;
+    const event =
+      workspacePlan.views !== undefined && workspacePlan.panes !== undefined
+        ? buildDocumentEvent(workspacePlan as Data, rootNode, {
+            snapshotDTag: rootNode.snapshotDTag ?? createdSnapshotDTag,
+          })
+        : buildDocumentEventFromNodes(plan.knowledgeDBs, rootNode, {
+            snapshotDTag: rootNode.snapshotDTag ?? createdSnapshotDTag,
+          });
+    return snapshotEvent
+      ? events.push(snapshotEvent).push(event as UnsignedEvent)
+      : events.push(event as UnsignedEvent);
+  }, plan.publishEvents);
 }
 
 export async function signEvents(
-  events: List<EventTemplate & EventAttachment>,
+  events: List<EventTemplate>,
   user: User,
   finalizeEvent: FinalizeEvent
 ): Promise<List<SignedEventWithConf>> {
@@ -232,32 +239,28 @@ export async function signEvents(
   return isUserLoggedInWithExtension(user)
     ? List<SignedEventWithConf>(
         await Promise.all(
-          events.map(async (e) => {
-            const { writeRelayConf, ...template } = e;
-            const signedEvent = await signEventWithExtension(template);
-            return {
-              event: signedEvent as VerifiedEvent,
-              writeRelayConf,
-            };
-          })
+          events.map(async (event) => ({
+            event: (await signEventWithExtension(event)) as VerifiedEvent,
+          }))
         )
       )
-    : events.map((e) => {
-        const { writeRelayConf, ...template } = e;
-        const event = finalizeEvent(
-          template,
+    : events.map((event) => {
+        const signedEvent = finalizeEvent(
+          event,
           (user as KeyPair).privateKey
         ) as VerifiedEvent;
-        return { event, writeRelayConf };
+        return { event: signedEvent };
       });
 }
 
 export async function execute({
   plan,
+  relays,
   relayPool,
   finalizeEvent,
 }: {
   plan: GraphPlan;
+  relays: AllRelays;
   relayPool: SimplePool;
   finalizeEvent: FinalizeEvent;
 }): Promise<PublishResultsEventMap> {
@@ -276,18 +279,9 @@ export async function execute({
   }
 
   const results = await Promise.all(
-    finalizedEvents.toArray().map(({ event, writeRelayConf }) => {
-      const writeRelayUrls = applyWriteRelayConfig(
-        plan.relays.defaultRelays,
-        plan.relays.userRelays,
-        plan.relays.contactsRelays,
-        writeRelayConf
-      );
-      return publishEventToRelays(
-        relayPool,
-        event,
-        Array.from(new Set(writeRelayUrls.map((r: Relay) => r.url)))
-      );
+    finalizedEvents.toArray().map(({ event }) => {
+      const writeRelayUrls = resolveWriteRelayUrlsForEvent(event, relays);
+      return publishEventToRelays(relayPool, event, writeRelayUrls);
     })
   );
 
@@ -471,17 +465,9 @@ export const createPublishQueue = (
   };
 
   const resolveWriteRelayUrls = (
-    writeRelayConf: WriteRelayConf | undefined,
+    event: UnsignedEvent,
     relays: AllRelays
-  ): ReadonlyArray<string> => {
-    const writeRelays = applyWriteRelayConfig(
-      relays.defaultRelays,
-      relays.userRelays,
-      relays.contactsRelays,
-      writeRelayConf
-    );
-    return Array.from(new Set(writeRelays.map((r: Relay) => r.url)));
-  };
+  ): string[] => resolveWriteRelayUrlsForEvent(event, relays);
 
   const processBatch = async (
     chunk: ReadonlyArray<[string, OutboxEntry]>,
@@ -497,9 +483,9 @@ export const createPublishQueue = (
     const relaySuccesses = new Set<string>();
 
     await Promise.all(
-      signed.toArray().map(async ({ event, writeRelayConf }, index) => {
+      signed.toArray().map(async ({ event }, index) => {
         const [entryKey, outboxEntry] = chunk[index];
-        const relayUrls = resolveWriteRelayUrls(writeRelayConf, deps.relays);
+        const relayUrls = resolveWriteRelayUrls(outboxEntry.event, deps.relays);
         const alreadyDone = outboxEntry.succeededRelays || [];
         const needsPublish = relayUrls.filter(
           (url) => !alreadyDone.includes(url)
@@ -612,7 +598,7 @@ export const createPublishQueue = (
   }
 
   const publishDeleteImmediate = async (
-    event: UnsignedEvent & EventAttachment
+    event: UnsignedEvent
   ): Promise<void> => {
     try {
       const deps = config.getDeps();
@@ -624,10 +610,7 @@ export const createPublishQueue = (
       const first = signed.first();
       if (!first) return;
 
-      const relayUrls = resolveWriteRelayUrls(
-        first.writeRelayConf,
-        deps.relays
-      );
+      const relayUrls = resolveWriteRelayUrls(event, deps.relays);
 
       const relayResults = await publishToRelays(
         deps.relayPool,
@@ -651,7 +634,7 @@ export const createPublishQueue = (
     }
   };
 
-  const enqueue = (events: List<UnsignedEvent & EventAttachment>): void => {
+  const enqueue = (events: List<UnsignedEvent>): void => {
     if (destroyed) return;
 
     // eslint-disable-next-line functional/no-let

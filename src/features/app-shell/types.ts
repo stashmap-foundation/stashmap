@@ -1,13 +1,9 @@
 import { List, Map } from "immutable";
+import type { UnsignedEvent } from "nostr-tools";
 import type { RelayInformation } from "nostr-tools/lib/types/nip11";
 import type { Contacts, PublicKey, User } from "../../graph/identity";
 import type { KnowledgeDBs, SemanticIndex, GraphNode } from "../../graph/types";
-import type {
-  QueueStatus,
-  PublishEvents,
-  EventAttachment,
-  AllRelays,
-} from "../../infra/publishTypes";
+import type { QueueStatus, PublishEvents } from "../../infra/publishTypes";
 import type {
   Pane,
   RowFocusIntent,
@@ -52,8 +48,8 @@ export type TemporaryEvent =
     }
   | { type: "REMOVE_EMPTY_NODE"; nodeID: string };
 
-export type EventState = PublishEvents<EventAttachment> & {
-  preLoginEvents: List<import("nostr-tools").UnsignedEvent & EventAttachment>;
+export type EventState = PublishEvents & {
+  preLoginEvents: List<UnsignedEvent>;
   temporaryView: TemporaryViewState;
   temporaryEvents: List<TemporaryEvent>;
   queueStatus?: QueueStatus;
@@ -72,4 +68,3 @@ export type Data = {
 };
 
 export type RowFocusIntentState = RowFocusIntent;
-export type AppRelays = AllRelays;

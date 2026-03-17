@@ -16,11 +16,13 @@ import {
 } from "../graph/context";
 import {
   EMPTY_SEMANTIC_ID,
+  type Argument,
   type Context,
   type GraphNode,
   type ID,
   type KnowledgeDBs,
   type LongID,
+  type Relevance,
   type VirtualType,
 } from "../graph/types";
 import {
@@ -40,9 +42,23 @@ import {
   type RowPath,
   rowPathToString,
 } from "./rowPaths";
-import type { View, Views } from "../session/types";
 
 const EMPTY_ROW_PATH_PREFIX = "empty-row:";
+
+type RowTypeFilter =
+  | Relevance
+  | Argument
+  | "suggestions"
+  | "versions"
+  | "incoming"
+  | "contains";
+
+type RowView = {
+  expanded?: boolean;
+  typeFilters?: RowTypeFilter[];
+};
+
+type RowViews = import("immutable").Map<string, RowView>;
 
 function createEmptyRowPathID(nodeID: LongID): string {
   return `${EMPTY_ROW_PATH_PREFIX}${nodeID}`;
@@ -56,7 +72,10 @@ export function getContextFromStack(stack: ID[]): Context {
   return List(stack.slice(0, -1));
 }
 
-function getViewExactMatch(views: Views, path: RowPath): View | undefined {
+function getViewExactMatch(
+  views: RowViews,
+  path: RowPath
+): RowView | undefined {
   const viewKey = rowPathToString(path);
   return views.get(viewKey);
 }
@@ -96,7 +115,7 @@ function getRowIDFromPath(data: Data, rowPath: RowPath): ID {
   return getNodeSemanticID(node);
 }
 
-function getViewFromPath(data: Data, path: RowPath): View {
+function getViewFromPath(data: Data, path: RowPath): RowView {
   const rowID = getRowIDFromPath(data, path);
   return (
     getViewExactMatch(data.views, path) || {
@@ -137,7 +156,7 @@ export function getContext(data: Data, rowPath: RowPath, stack: ID[]): Context {
   return parentContext.push(shortID(parentRowID as ID) as ID);
 }
 
-export function getRowIDFromView(data: Data, rowPath: RowPath): [ID, View] {
+export function getRowIDFromView(data: Data, rowPath: RowPath): [ID, RowView] {
   const view = getViewFromPath(data, rowPath);
   return [getRowIDFromPath(data, rowPath), view];
 }
@@ -373,7 +392,7 @@ export function getCurrentEdgeForView(
 export type SiblingInfo = {
   rowPath: RowPath;
   rowID: ID;
-  view: View;
+  view: RowView;
 };
 
 export function getPreviousSibling(

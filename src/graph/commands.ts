@@ -35,11 +35,6 @@ import {
 } from "./types";
 import { KIND_CONTACTLIST, newTimestamp, msTag } from "./eventProtocol";
 import { newNode, newRefNode } from "./nodeFactory";
-import type {
-  AllRelays,
-  EventAttachment,
-  WriteRelayConf,
-} from "../infra/publishTypes";
 
 export type ChildNodeMetadata = {
   relevance?: Relevance;
@@ -49,24 +44,16 @@ export type ChildNodeMetadata = {
 type GraphPlanData = {
   contacts: Contacts;
   user: User;
-  contactsRelays: Map<PublicKey, import("../infra/publishTypes").Relays>;
   knowledgeDBs: KnowledgeDBs;
-  semanticIndex: import("./types").SemanticIndex;
-  relaysInfos: Map<
-    string,
-    import("nostr-tools/lib/types/nip11").RelayInformation | undefined
-  >;
 };
 
 export type GraphPlan = GraphPlanData & {
-  publishEvents: List<UnsignedEvent & EventAttachment>;
+  publishEvents: List<UnsignedEvent>;
   affectedRoots: ImmutableSet<ID>;
-  relays: AllRelays;
 };
 
 type CreateGraphPlanProps = GraphPlanData & {
-  publishEvents?: List<UnsignedEvent & EventAttachment>;
-  relays: AllRelays;
+  publishEvents?: List<UnsignedEvent>;
 };
 
 export function updateChildNodeMetadata(
@@ -122,16 +109,6 @@ function newContactListEvent(contacts: Contacts, user: User): UnsignedEvent {
   };
 }
 
-function setRelayConf(
-  event: UnsignedEvent,
-  conf: WriteRelayConf
-): UnsignedEvent & EventAttachment {
-  return {
-    ...event,
-    writeRelayConf: conf,
-  };
-}
-
 function upsertNodesCore<T extends GraphPlan>(plan: T, node: GraphNode): T {
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
   const normalizedNode = ensureNodeNativeFields(plan.knowledgeDBs, node);
@@ -153,8 +130,7 @@ function upsertNodesCore<T extends GraphPlan>(plan: T, node: GraphNode): T {
 export function createGraphPlan(props: CreateGraphPlanProps): GraphPlan {
   return {
     ...props,
-    publishEvents:
-      props.publishEvents || List<UnsignedEvent & EventAttachment>([]),
+    publishEvents: props.publishEvents || List<UnsignedEvent>([]),
     affectedRoots: ImmutableSet<ID>(),
   };
 }
@@ -175,13 +151,7 @@ export function planUpsertContact<T extends GraphPlan>(
   const contactListEvent = newContactListEvent(newContacts, plan.user);
   return {
     ...plan,
-    publishEvents: plan.publishEvents.push(
-      setRelayConf(contactListEvent, {
-        defaultRelays: false,
-        user: true,
-        contacts: false,
-      })
-    ),
+    publishEvents: plan.publishEvents.push(contactListEvent),
   };
 }
 

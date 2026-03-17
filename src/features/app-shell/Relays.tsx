@@ -4,7 +4,7 @@ import { Map } from "immutable";
 import type { PublicKey } from "../../graph/identity";
 import type {
   Relay,
-  Relays,
+  Relays as RelayList,
   SuggestedRelay,
   SuggestedRelays,
 } from "../../infra/publishTypes";
@@ -225,10 +225,10 @@ export function Relays({
   onSubmit,
   readonly,
 }: {
-  defaultRelays: Relays;
-  relays: Relays;
-  contactsRelays: Map<PublicKey, Relays>;
-  onSubmit: (relayState: Relays) => Promise<void>;
+  defaultRelays: RelayList;
+  relays: RelayList;
+  contactsRelays: Map<PublicKey, RelayList>;
+  onSubmit: (relayState: RelayList) => Promise<void>;
   readonly?: boolean;
 }): JSX.Element {
   const navigate = useNavigate();
@@ -249,7 +249,7 @@ export function Relays({
     return relays.some((r) => r.url === rel.url) ? rdx : [...rdx, rel];
   }, [] as SuggestedRelays);
   const [relayState, setRelayState] = useState<{
-    myRelays: Relays;
+    myRelays: RelayList;
     suggested: SuggestedRelays;
   }>({
     myRelays: relays,
@@ -339,7 +339,7 @@ export function RelaysWrapper(): JSX.Element {
   const defaultRelays = useDefaultRelays();
   const { contactsRelays } = useData();
   const relays = useRelaysForRelayManagement();
-  const submit = async (relayState: Relays): Promise<void> => {
+  const submit = async (relayState: RelayList): Promise<void> => {
     const plan = planPublishRelayMetadata(createPlan(), relayState);
     await executePlan(plan);
     navigate("/");

@@ -2,10 +2,10 @@ import React from "react";
 import { List, OrderedSet, Set } from "immutable";
 import { DndProvider, useDragLayer, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import type { Data } from "../../app-shell/types";
 import type { GraphNode } from "../../../graph/types";
 import { moveNodes } from "../../../graph/queries";
 import { createRefTarget, isRefNode } from "../../../graph/references";
+import type { RowsData } from "../../../rows/data";
 import {
   parseRowPath,
   RowPath,
@@ -22,10 +22,10 @@ import {
 import { upsertNodes } from "../../../app/actions";
 import {
   getParentKey,
-  planExpandNode,
   planUpdateViews,
   updateRowPathsAfterMoveNodes,
 } from "../../../session/views";
+import { planExpandNode } from "../../../app/navigationActions";
 import { getNodesInTree } from "../node/NodeView";
 import type { Plan } from "../../../app/types";
 import {
@@ -42,7 +42,7 @@ type DragSource = {
 };
 
 function getDropDestinationEndOfRoot(
-  data: Data,
+  data: RowsData,
   root: RowPath,
   stack: ID[]
 ): [RowPath, number] {
@@ -51,7 +51,7 @@ function getDropDestinationEndOfRoot(
 }
 
 function getInsertAfterNode(
-  data: Data,
+  data: RowsData,
   node: RowPath
 ): [RowPath, number] | undefined {
   const parentView = getParentRowPath(node);
@@ -77,7 +77,7 @@ function getAncestorAtDepth(path: RowPath, depth: number): RowPath | undefined {
 }
 
 function resolveDropByDepth(
-  data: Data,
+  data: RowsData,
   root: RowPath,
   stack: ID[],
   prevNode: RowPath | undefined,
@@ -143,7 +143,7 @@ function findNextNonSource(
 }
 
 export function getDropDestinationFromTreeView(
-  data: Data,
+  data: RowsData,
   root: RowPath,
   stack: ID[],
   destinationIndex: number,
@@ -151,7 +151,7 @@ export function getDropDestinationFromTreeView(
   targetDepth?: number,
   sourceKeys?: Set<string>
 ): [RowPath, number] {
-  const pane = getPane(data, root);
+  const pane = getPane(data, getPaneIndex(root));
   const { paths: nodes } = getNodesInTree(
     data,
     root,
@@ -270,7 +270,7 @@ export function dnd(
     insertAt: number
   ): Plan => {
     const [sourceItemID] = getRowIDFromView(accPlan, sourcePath);
-    const sourceStack = getPane(accPlan, sourcePath).stack;
+    const sourceStack = getPane(accPlan, getPaneIndex(sourcePath)).stack;
     const sourceNode = getNodeForView(accPlan, sourcePath, sourceStack);
     return planAddToParent(
       accPlan,
@@ -402,7 +402,7 @@ export function dnd(
     .reduce((accPlan: Plan, s: string, idx: number) => {
       const sourcePath = parseRowPath(s);
       const [sourceItemID] = getRowIDFromView(accPlan, sourcePath);
-      const sourceStack = getPane(accPlan, sourcePath).stack;
+      const sourceStack = getPane(accPlan, getPaneIndex(sourcePath)).stack;
       const sourceEdge = getCurrentEdgeForView(accPlan, sourcePath);
       const sourceEdgeRelevance = sourceEdge?.relevance;
       const sourceEdgeArgument = sourceEdge?.argument;

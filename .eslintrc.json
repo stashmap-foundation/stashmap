@@ -124,6 +124,11 @@
                   },
                   {
                     "target": "./src/session",
+                    "from": "./src/rows",
+                    "message": "session must not import rows."
+                  },
+                  {
+                    "target": "./src/session",
                     "from": "./src/graph",
                     "message": "session must not import graph."
                   },
@@ -141,6 +146,31 @@
                     "target": "./src/app",
                     "from": "./src/infra",
                     "message": "app must not import infra."
+                  },
+                  {
+                    "target": "./src/graph",
+                    "from": "./src/surface",
+                    "message": "graph must not import surface."
+                  },
+                  {
+                    "target": "./src/rows",
+                    "from": "./src/surface",
+                    "message": "rows must not import surface."
+                  },
+                  {
+                    "target": "./src/session",
+                    "from": "./src/surface",
+                    "message": "session must not import surface."
+                  },
+                  {
+                    "target": "./src/app",
+                    "from": "./src/surface",
+                    "message": "app must not import surface."
+                  },
+                  {
+                    "target": "./src/infra",
+                    "from": "./src/surface",
+                    "message": "infra must not import surface."
                   }
                 ]
               }
@@ -208,38 +238,6 @@
       {
         "files": ["src/{graph,rows,session,app,infra}/**/*.{ts,tsx,js,jsx}"],
         "rules": {
-          "import/no-restricted-paths": [
-            "error",
-            {
-              "zones": [
-                {
-                  "target": "./src/graph",
-                  "from": "./src/surface",
-                  "message": "graph must not import surface."
-                },
-                {
-                  "target": "./src/rows",
-                  "from": "./src/surface",
-                  "message": "rows must not import surface."
-                },
-                {
-                  "target": "./src/session",
-                  "from": "./src/surface",
-                  "message": "session must not import surface."
-                },
-                {
-                  "target": "./src/app",
-                  "from": "./src/surface",
-                  "message": "app must not import surface."
-                },
-                {
-                  "target": "./src/infra",
-                  "from": "./src/surface",
-                  "message": "infra must not import surface."
-                }
-              ]
-            }
-          ],
           "no-restricted-imports": [
             "error",
             {

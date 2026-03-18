@@ -1,6 +1,39 @@
-import type { RowFocusIntent } from "../../session/types";
+import { List, type Map } from "immutable";
+import type { UnsignedEvent } from "nostr-tools";
+import type { RelayInformation } from "nostr-tools/lib/types/nip11";
+import type { Contacts, PublicKey, User } from "../../graph/identity";
+import type { KnowledgeDBs, SemanticIndex } from "../../graph/types";
+import type {
+  Pane,
+  RowFocusIntent,
+  TemporaryEvent,
+  TemporaryViewState,
+  Views,
+} from "../../session/types";
+import type {
+  PublishEvents,
+  QueueStatus,
+  Relays,
+} from "../../infra/publishTypes";
 
-export type { Data, EventState } from "../../app/types";
+export type EventState = PublishEvents & {
+  preLoginEvents: List<UnsignedEvent>;
+  temporaryView: TemporaryViewState;
+  temporaryEvents: List<TemporaryEvent>;
+  queueStatus?: QueueStatus;
+};
+
+export type Data = {
+  contacts: Contacts;
+  user: User;
+  contactsRelays: Map<PublicKey, Relays>;
+  knowledgeDBs: KnowledgeDBs;
+  semanticIndex: SemanticIndex;
+  relaysInfos: Map<string, RelayInformation | undefined>;
+  publishEventsStatus: EventState;
+  views: Views;
+  panes: Pane[];
+};
 
 export type NotificationMessage = {
   title: string;

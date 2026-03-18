@@ -6,6 +6,7 @@ import { dnd, getDropDestinationFromTreeView } from "./DND";
 import { isEmptySemanticID } from "../../../graph/context";
 import { deselectAllChildren, useTemporaryView } from "./TemporaryViewContext";
 import type { Plan } from "../../../app/types";
+import type { RowsData } from "../../../rows/data";
 import { usePlanner } from "../../app-shell/PlannerContext";
 import { buildPaneTarget, getRowIDFromView } from "../../../rows/resolveRow";
 import { type RowPath, rowPathToString } from "../../../rows/rowPaths";
@@ -407,7 +408,7 @@ export function useDroppable({
             destinationIndex === undefined
               ? [destination, undefined]
               : getDropDestinationFromTreeView(
-                  plan,
+                  plan as RowsData,
                   destination,
                   stack,
                   destinationIndex,

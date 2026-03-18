@@ -1,4 +1,5 @@
-import { planUpdateViews, updateView } from "../../../session/views";
+import { updateView } from "../../../app/navigationActions";
+import { planUpdateViews } from "../../../session/views";
 import { useCurrentRowID, useRowPath } from "./RowContext";
 import { useData } from "../../app-shell/DataContext";
 import { usePlanner } from "../../app-shell/PlannerContext";

@@ -1,5 +1,4 @@
 import { Map } from "immutable";
-import { parseRowPath } from "../rows/rowPaths";
 import type { Pane, View } from "./types";
 
 export type Serializable =
@@ -135,17 +134,7 @@ export function jsonToViews(s: Serializable): Map<string, View> {
   }
   return Map(asObject(obj.views))
     .map((v) => jsonToView(v))
-    .filter((v, k) => {
-      if (v === undefined) {
-        return false;
-      }
-      try {
-        parseRowPath(k);
-        return true;
-      } catch {
-        return false;
-      }
-    }) as Map<string, View>;
+    .filter((v): v is View => v !== undefined) as Map<string, View>;
 }
 
 export function paneToJSON(pane: Pane): Serializable {

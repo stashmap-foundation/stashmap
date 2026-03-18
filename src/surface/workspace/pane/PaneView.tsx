@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { List, Map, OrderedSet } from "immutable";
-import type { Data } from "../../app-shell/types";
 import type { GraphNode, KnowledgeDBs, RootAnchor } from "../../../graph/types";
 import type { Pane } from "../../../session/types";
+import type { RowsData } from "../../../rows/data";
 import type { VirtualRowsMap } from "../../../rows/types";
 import { getDisplayTextForView } from "../../../rows/display";
 import {
@@ -956,7 +956,7 @@ function computeFocusIndexAfterDeletion(
 }
 
 function getDisplayTextForViewKey(
-  data: Data,
+  data: RowsData,
   stack: ID[],
   viewKey: string
 ): string {

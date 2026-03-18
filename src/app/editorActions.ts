@@ -42,8 +42,8 @@ import type { VirtualRowsMap } from "../rows/types";
 import { planAddToParent, planDeepCopyNode } from "./treeActions";
 import type { Plan } from "./types";
 import { upsertNodes } from "./actions";
-import { planExpandNode } from "../session/views";
 import { computeEmptyNodeMetadata } from "../session/temporaryNodes";
+import { planExpandNode } from "./navigationActions";
 
 export type { ChildNodeMetadata } from "../graph/commands";
 

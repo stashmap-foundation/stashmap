@@ -1,6 +1,6 @@
 import { OrderedSet } from "immutable";
-import type { Data } from "../../app-shell/types";
 import type { GraphNode } from "../../../graph/types";
+import type { RowsData } from "../../../rows/data";
 import type { VirtualRowsMap } from "../../../rows/types";
 import {
   addNodeToPathWithNodes,
@@ -15,7 +15,8 @@ import {
   type RowPath,
   rowPathToString,
 } from "../../../rows/rowPaths";
-import { getParentKey, planExpandNode } from "../../../session/views";
+import { planExpandNode } from "../../../app/navigationActions";
+import { getParentKey } from "../../../session/views";
 import type { Plan } from "../../../app/types";
 import {
   planUpdateNodeText,
@@ -30,7 +31,7 @@ export type EditorInfo = {
 };
 
 export function getCurrentRow(
-  data: Data,
+  data: RowsData,
   rowPath: RowPath,
   virtualRowsMap: VirtualRowsMap
 ): GraphNode | undefined {

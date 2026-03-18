@@ -51,6 +51,10 @@ I’d structure the first pass like this:
 
 ## Completed Moves
 
+- `RowPath` remains owned by `src/rows/rowPaths.ts`
+  - `session` is allowed to depend on the row-addressing surface for pane/view serialization and view-state bookkeeping
+  - no duplicated row-path implementation exists in `session`
+
 - Removed lower-layer imports from `surface/*`
   - moved `UNAUTHENTICATED_USER_PK` and login-state helpers into `src/app/auth.ts`
   - moved `FinalizeEvent` into `src/infra/apiTypes.ts`

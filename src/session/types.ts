@@ -1,5 +1,4 @@
-import { Map, OrderedSet, Set } from "immutable";
-import type { GraphNode, LongID } from "../graph/types";
+import { List, Map, OrderedSet, Set } from "immutable";
 
 export type TypeFilter =
   | Relevance
@@ -26,6 +25,18 @@ export type View = {
 
 export type Views = Map<string, View>;
 
+export type EmptyNodeDraft = {
+  children: List<ID>;
+  id: ID;
+  text: string;
+  parent?: LongID;
+  updated: number;
+  author: PublicKey;
+  root: ID;
+  relevance: Relevance;
+  argument?: Argument;
+};
+
 export type RowFocusIntent = {
   requestId: number;
   paneIndex: number;
@@ -49,7 +60,7 @@ export type TemporaryEvent =
       type: "ADD_EMPTY_NODE";
       nodeID: LongID;
       index: number;
-      emptyNode: GraphNode;
+      emptyNode: EmptyNodeDraft;
       paneIndex: number;
     }
   | { type: "REMOVE_EMPTY_NODE"; nodeID: LongID };

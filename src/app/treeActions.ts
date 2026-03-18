@@ -43,10 +43,12 @@ import {
   bulkUpdateRowPathsAfterAddNode,
   copyViewsWithNodesMapping,
   copyViewsWithNewPrefix,
-  planExpandNode,
   planUpdateViews,
-  updateRowPathsAfterDisconnect,
 } from "../session/views";
+import {
+  planExpandNode,
+  updateRowPathsAfterDisconnect,
+} from "./navigationActions";
 import { getPane, planUpdatePanes } from "../session/panes";
 import type { Pane, Views } from "../session/types";
 import { upsertNodes } from "./actions";
@@ -108,7 +110,7 @@ export function planAddToParent(
 }
 
 export function planForkPane(plan: Plan, rowPath: RowPath, stack: ID[]): Plan {
-  const pane = getPane(plan, rowPath);
+  const pane = getPane(plan, getPaneIndex(rowPath));
   const rootNode = pane.rootNodeId
     ? getNode(
         plan.knowledgeDBs,
@@ -157,7 +159,7 @@ export function planDeepCopyNode(
   argument?: Argument
 ): [Plan, Map<LongID, LongID>] {
   const [sourceRowID] = getRowIDFromView(plan, sourceRowPath);
-  const sourceStack = getPane(plan, sourceRowPath).stack;
+  const sourceStack = getPane(plan, getPaneIndex(sourceRowPath)).stack;
   const sourceSemanticContext = getContext(plan, sourceRowPath, sourceStack);
   const sourceNode = getNodeForView(plan, sourceRowPath, sourceStack);
 
@@ -417,7 +419,7 @@ export function planMoveNodeWithView(
   insertAtIndex?: number
 ): Plan {
   const [sourceRowID] = getRowIDFromView(plan, sourceRowPath);
-  const sourceStack = getPane(plan, sourceRowPath).stack;
+  const sourceStack = getPane(plan, getPaneIndex(sourceRowPath)).stack;
   const sourceNode = getNodeForView(plan, sourceRowPath, sourceStack);
   const sourceAddID = sourceNode?.id ?? sourceRowID;
 

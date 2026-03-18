@@ -26,7 +26,7 @@ import {
   rowPathToString,
 } from "../../../rows/rowPaths";
 import type { VirtualRowsMap } from "../../../rows/types";
-import { isExpanded } from "../../../session/views";
+import { isExpanded } from "../../../app/navigationActions";
 
 export const ViewContext = React.createContext<RowPath | undefined>(undefined);
 

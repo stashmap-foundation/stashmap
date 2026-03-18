@@ -1,7 +1,8 @@
 import React from "react";
 import { mergeKnowledgeDBs } from "../../graph/queries";
 import type { KnowledgeDBs } from "../../graph/types";
-import { injectEmptyNodesIntoKnowledgeDBs } from "../../session/temporaryNodes";
+import { computeEmptyNodeMetadata } from "../../session/temporaryNodes";
+import { injectEmptyNodesIntoKnowledgeDBs } from "../../rows/temporaryNodes";
 import type { Data } from "./types";
 import {
   useDocumentKnowledgeDBs,
@@ -49,9 +50,10 @@ export function MergeKnowledgeDB({
     ? mergeKnowledgeDBs(knowledgeDBs, mergedDataDBs)
     : mergedDataDBs;
 
+  const emptyNodeMetadata = computeEmptyNodeMetadata(temporaryEvents);
   const injectedDBs = injectEmptyNodesIntoKnowledgeDBs(
     baseDBs,
-    temporaryEvents,
+    emptyNodeMetadata,
     myself
   );
 

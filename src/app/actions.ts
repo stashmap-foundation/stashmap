@@ -1,13 +1,32 @@
 import { List } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
 import { UNAUTHENTICATED_USER_PK } from "./auth";
-import type { Data, Plan } from "./types";
+import type { Plan } from "./types";
 import { createGraphPlan, planUpsertNodes } from "../graph/commands";
-import type { GraphNode, ID } from "../graph/types";
-import type { TemporaryEvent } from "../session/types";
+import type { Contacts, User } from "../graph/identity";
+import type { GraphNode, ID, SemanticIndex } from "../graph/types";
+import type {
+  Pane,
+  TemporaryEvent,
+  TemporaryViewState,
+  Views,
+} from "../session/types";
 import { newNode } from "../graph/nodeFactory";
 import { getContext, getNodeForView, getParentNode } from "../rows/resolveRow";
 import { type RowPath } from "../rows/rowPaths";
+
+type CreatePlanInput = {
+  contacts: Contacts;
+  user: User;
+  knowledgeDBs: Plan["knowledgeDBs"];
+  semanticIndex: SemanticIndex;
+  publishEventsStatus: {
+    temporaryView: TemporaryViewState;
+    temporaryEvents: List<TemporaryEvent>;
+  };
+  views: Views;
+  panes: Pane[];
+};
 
 export function upsertNodes(
   plan: Plan,
@@ -79,7 +98,7 @@ export function planRewriteUnpublishedEvents(
 }
 
 export function createPlan(
-  props: Data & {
+  props: CreatePlanInput & {
     publishEvents?: List<UnsignedEvent>;
   }
 ): Plan {
@@ -90,9 +109,7 @@ export function createPlan(
       knowledgeDBs: props.knowledgeDBs,
       publishEvents: props.publishEvents,
     }),
-    contactsRelays: props.contactsRelays,
     semanticIndex: props.semanticIndex,
-    relaysInfos: props.relaysInfos,
     publishEventsStatus: props.publishEventsStatus,
     views: props.views,
     panes: props.panes,

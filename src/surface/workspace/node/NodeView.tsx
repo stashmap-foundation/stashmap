@@ -60,7 +60,7 @@ import {
 import { usePlanner } from "../../app-shell/PlannerContext";
 import { planSetRowFocusIntent } from "../../../session/focus";
 import { computeEmptyNodeMetadata } from "../../../session/temporaryNodes";
-import { planExpandNode } from "../../../session/views";
+import { planExpandNode } from "../../../app/navigationActions";
 import {
   parsedLinesToTrees,
   planPasteMarkdownTrees,

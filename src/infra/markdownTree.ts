@@ -160,8 +160,11 @@ function extractInlineContent(inline: Token): {
     };
   }
   const textParts = inline.children
-    .filter((c) => c.type === "text" || c.type === "softbreak")
-    .map((c) => (c.type === "softbreak" ? " " : c.content))
+    .filter(
+      (c) =>
+        c.type === "text" || c.type === "softbreak" || c.type === "hardbreak"
+    )
+    .map((c) => (c.type === "text" ? c.content : " "))
     .join("")
     .trim();
   const { cleanText, relevance, argument } = extractPrefixMarkers(textParts);

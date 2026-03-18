@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { generateSecretKey, getPublicKey, nip19 } from "nostr-tools";
-import { decodePublicKeyInputSync } from "../../graph/publicKeys";
+import { decodePublicKeyInputSync } from "../../graph/public";
 import type { Relays } from "../publishTypes";
 import { DEFAULT_RELAYS } from "../nostrCore";
 import { requireValue } from "./args";

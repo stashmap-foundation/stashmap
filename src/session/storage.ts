@@ -4,16 +4,27 @@ import {
   paneToJSON,
   Serializable,
   viewDataToJSON,
-} from "../session/serializer";
-import type { Pane, Views } from "../session/types";
+} from "./serializer";
+import type { Pane, Views } from "./types";
 import {
   pathToStack,
   parseNodeRouteUrl,
   parseAuthorFromSearch,
-} from "../session/navigation";
-import { splitID } from "../graph/context";
-import { UNAUTHENTICATED_USER_PK } from "../app/auth";
-import { defaultPane, generatePaneId } from "../session/panes";
+} from "./navigation";
+import { defaultPane, generatePaneId } from "./panes";
+
+const UNAUTHENTICATED_USER_PK = "UNAUTHENTICATEDUSERPK" as PublicKey;
+
+function splitID(id: ID): [PublicKey | undefined, string] {
+  if (!id) {
+    return [undefined, ""];
+  }
+  const split = id.split("_");
+  if (split.length === 1) {
+    return [undefined, split[0]];
+  }
+  return [split[0] as PublicKey, split.slice(1).join(":")];
+}
 
 type BrowserStorage = {
   getItem: (key: string) => string | null;

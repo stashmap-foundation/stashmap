@@ -482,8 +482,11 @@ export async function follow(
   const utils = cU();
   const plan = planUpsertContact(createPlan(utils), { publicKey });
   await execute({
-    ...utils,
-    plan,
+    events: plan.publishEvents,
+    user: plan.user,
+    relays: utils.relays,
+    relayPool: utils.relayPool,
+    finalizeEvent: utils.finalizeEvent,
   });
 }
 
@@ -494,8 +497,11 @@ export async function unfollow(
   const utils = cU();
   const plan = planRemoveContact(createPlan(utils), publicKey);
   await execute({
-    ...utils,
-    plan,
+    events: plan.publishEvents,
+    user: plan.user,
+    relays: utils.relays,
+    relayPool: utils.relayPool,
+    finalizeEvent: utils.finalizeEvent,
   });
 }
 

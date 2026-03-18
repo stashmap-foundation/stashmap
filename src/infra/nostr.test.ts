@@ -1,7 +1,7 @@
 import { hexToBytes } from "@noble/hashes/utils";
 import { List } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
-import type { User } from "../graph/identity";
+import type { User } from "../graph/public";
 import type { AllRelays, EventAttachment } from "./publishTypes";
 import { KIND_KNOWLEDGE_DOCUMENT } from "./nostrCore";
 import { mockRelayPool, MockRelayPool } from "../tests/testutils/nostrMock";

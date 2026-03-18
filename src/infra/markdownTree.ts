@@ -3,9 +3,13 @@ import { List } from "immutable";
 import MarkdownIt from "markdown-it";
 // eslint-disable-next-line import/no-unresolved
 import Token from "markdown-it/lib/token";
-import { LOG_ROOT_ROLE } from "../graph/queries";
-import type { PublicKey } from "../graph/identity";
-import type { Argument, RootAnchor, RootSystemRole } from "../graph/types";
+import type {
+  Argument,
+  PublicKey,
+  RootAnchor,
+  RootSystemRole,
+} from "../graph/public";
+import { LOG_ROOT_ROLE } from "../graph/public";
 
 const markdown = new MarkdownIt({ html: true });
 

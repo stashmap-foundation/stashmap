@@ -289,6 +289,49 @@
             }
           ]
         }
+      },
+      {
+        "files": ["src/infra/**/*.{ts,tsx,js,jsx}"],
+        "rules": {
+          "import/no-restricted-paths": [
+            "error",
+            {
+              "zones": [
+                {
+                  "target": "./src/infra",
+                  "from": "./src/app",
+                  "message": "infra must not import app."
+                },
+                {
+                  "target": "./src/infra",
+                  "from": "./src/rows",
+                  "message": "infra must not import rows."
+                },
+                {
+                  "target": "./src/infra",
+                  "from": "./src/session",
+                  "message": "infra must not import session."
+                }
+              ]
+            }
+          ],
+          "no-restricted-imports": [
+            "error",
+            {
+              "patterns": [
+                {
+                  "group": [
+                    "../graph/*",
+                    "../../graph/*",
+                    "!../graph/public",
+                    "!../../graph/public"
+                  ],
+                  "message": "infra must import graph through graph/public."
+                }
+              ]
+            }
+          ]
+        }
       }
     ]
 }

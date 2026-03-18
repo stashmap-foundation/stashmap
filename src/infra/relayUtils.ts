@@ -1,6 +1,6 @@
 import { List, Map } from "immutable";
 import { EventTemplate, Filter } from "nostr-tools";
-import type { PublicKey } from "../graph/identity";
+import type { PublicKey } from "../graph/public";
 import type {
   Relay,
   Relays,

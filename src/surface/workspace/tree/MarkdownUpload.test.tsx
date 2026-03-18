@@ -2,6 +2,7 @@ import { List } from "immutable";
 import { newNode } from "../../../graph/nodeFactory";
 import { type RowPath } from "../../../rows/rowPaths";
 import { execute } from "../../../infra/nostr";
+import { buildDocumentEvents } from "../../app-shell/documentEvents";
 import { createPlan } from "../../../app/actions";
 import { planUpsertNodes } from "../../../graph/commands";
 import { processEvents } from "../../../infra/eventProcessing";
@@ -48,8 +49,11 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
   );
 
   await execute({
-    ...alice(),
-    plan,
+    events: buildDocumentEvents(plan),
+    user: plan.user,
+    relays: alice().relays,
+    relayPool: alice().relayPool,
+    finalizeEvent: alice().finalizeEvent,
   });
 
   const processed = processEvents(List(alice().relayPool.getEvents()));

@@ -1,6 +1,6 @@
 import { List, Map } from "immutable";
 import { Event, EventTemplate, UnsignedEvent } from "nostr-tools";
-import type { PublicKey } from "../graph/identity";
+import type { PublicKey } from "../graph/public";
 
 export type Relay = {
   url: string;

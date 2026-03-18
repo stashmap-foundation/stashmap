@@ -1,6 +1,12 @@
+import { Map } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
-import { shortID } from "../graph/context";
-import { createHeadlessPlan } from "../app/headlessPlan";
+import {
+  createGraphPlan,
+  shortID,
+  type Contact,
+  type KnowledgeData,
+  type PublicKey,
+} from "../graph/public";
 import { planCreateNodesFromMarkdownTrees } from "./markdownPlan";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
 import { buildDocumentEventFromNodes } from "./nodesDocumentEvent";
@@ -26,7 +32,11 @@ function buildDocumentEventFromRootTree(
   event: UnsignedEvent;
 } {
   const [planWithRoot, , topNodeIds] = planCreateNodesFromMarkdownTrees(
-    createHeadlessPlan(author),
+    createGraphPlan({
+      contacts: Map<PublicKey, Contact>(),
+      user: { publicKey: author },
+      knowledgeDBs: Map<PublicKey, KnowledgeData>(),
+    }),
     [rootTree]
   );
   const nodeID = topNodeIds[0];

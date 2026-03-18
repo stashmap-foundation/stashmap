@@ -21,7 +21,7 @@ import {
   KIND_KNOWLEDGE_DOCUMENT,
   KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
 } from "../../../infra/nostrCore";
-import { parseMarkdownHierarchy } from "../../../infra/markdownDocument";
+import { parseMarkdownHierarchy } from "../../../infra/markdownTree";
 
 const maybeExpand = async (label: string): Promise<void> => {
   const btn = screen.queryByLabelText(label);

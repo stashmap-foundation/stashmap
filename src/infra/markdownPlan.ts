@@ -1,21 +1,21 @@
 import { List } from "immutable";
-import { getNodeContext, getSemanticID, shortID } from "../graph/context";
-import { getNode } from "../graph/queries";
-import type { Context, GraphNode } from "../graph/types";
-import { MarkdownImportFile, parseMarkdownImportFiles } from "./markdownImport";
-import { createNodesFromMarkdownTrees, WalkContext } from "./markdownNodes";
-import { MarkdownTreeNode } from "./markdownTree";
 import {
-  AddToParentTarget,
-  GraphPlan,
+  getNode,
+  getNodeContext,
+  getSemanticID,
+  newNode,
   planAddTargetsToNode,
   planMoveDescendantNodes,
   planUpsertNodes,
-} from "../graph/commands";
-import type { Plan } from "../app/types";
-import { newNode } from "../graph/nodeFactory";
-import { getNodeForView } from "../rows/resolveRow";
-import { type RowPath } from "../rows/rowPaths";
+  shortID,
+  type AddToParentTarget,
+  type Context,
+  type GraphNode,
+  type GraphPlan,
+} from "../graph/public";
+import { MarkdownImportFile, parseMarkdownImportFiles } from "./markdownImport";
+import { createNodesFromMarkdownTrees, WalkContext } from "./markdownNodes";
+import { MarkdownTreeNode } from "./markdownTree";
 
 export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
   plan: T,
@@ -132,7 +132,7 @@ function moveCreatedTreesToParentContext<T extends GraphPlan>(
   }, plan);
 }
 
-function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
+export function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
   plan: T,
   trees: MarkdownTreeNode[],
   parentNodeId: LongID,
@@ -197,36 +197,4 @@ function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
     topNodeIDs,
     actualItemIDs,
   };
-}
-
-export function planInsertMarkdownTrees(
-  plan: Plan,
-  trees: MarkdownTreeNode[],
-  parentRowPath: RowPath,
-  stack: ID[],
-  insertAtIndex?: number,
-  relevance?: Relevance,
-  argument?: Argument
-): {
-  plan: Plan;
-  topItemIDs: ID[];
-  topNodeIDs: LongID[];
-  actualItemIDs: Array<ID>;
-} {
-  const parentNode = getNodeForView(plan, parentRowPath, stack);
-  return parentNode
-    ? planInsertMarkdownTreesByParentId(
-        plan,
-        trees,
-        parentNode.id,
-        insertAtIndex,
-        relevance,
-        argument
-      )
-    : {
-        plan,
-        topItemIDs: [],
-        topNodeIDs: [],
-        actualItemIDs: [],
-      };
 }

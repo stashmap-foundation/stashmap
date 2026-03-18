@@ -1,5 +1,5 @@
 import { SimplePool } from "nostr-tools";
-import { decodePublicKeyInputSync } from "../../graph/publicKeys";
+import { decodePublicKeyInputSync } from "../../graph/public";
 import { loadCliProfile } from "./config";
 import { requireValue } from "./args";
 import { SyncPullCliArgs } from "./types";

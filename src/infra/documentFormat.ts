@@ -1,11 +1,11 @@
-import type { PublicKey } from "../graph/identity";
 import type {
   Argument,
   LongID,
+  PublicKey,
   Relevance,
   RootAnchor,
   RootSystemRole,
-} from "../graph/types";
+} from "../graph/public";
 
 export function formatRootHeading(
   rootText: string,

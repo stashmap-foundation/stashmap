@@ -41,7 +41,8 @@ export function StorePreLoginContext({
         ? planAddContacts(plan, plan.contacts.keySeq().toList())
         : plan;
       const results = await execute({
-        plan: withContacts,
+        events: withContacts.publishEvents,
+        user: withContacts.user,
         relays,
         relayPool,
         finalizeEvent,

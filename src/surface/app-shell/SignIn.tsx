@@ -222,7 +222,8 @@ export function SignInModal(): JSX.Element {
         };
       });
       execute({
-        plan: { ...plan, publishEvents: nonMergeEvents },
+        events: nonMergeEvents,
+        user: plan.user,
         relays,
         relayPool,
         finalizeEvent,

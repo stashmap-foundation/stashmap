@@ -6,7 +6,7 @@ import {
   loadViewsFromStorage as loadViews,
   savePanesToStorage as savePanes,
   saveViewsToStorage as saveViews,
-} from "../../infra/storage";
+} from "../../session/storage";
 
 export function loadPanesFromStorage(publicKey: PublicKey): Pane[] | undefined {
   return loadPanes(localStorage, publicKey);

@@ -16,6 +16,7 @@ import {
   setup,
 } from "../../../tests/testutils";
 import { execute } from "../../../infra/nostr";
+import { buildDocumentEvents } from "../../app-shell/documentEvents";
 import type { GraphNode, KnowledgeDBs } from "../../../graph/types";
 import {
   buildRootTreeForEmptyRootDrop,
@@ -214,8 +215,11 @@ test("same-named siblings and grandchildren get independent children", async () 
 
   const [plan] = planCreateNodesFromMarkdown(createPlan(alice()), markdown);
   await execute({
-    ...alice(),
-    plan,
+    events: buildDocumentEvents(plan),
+    user: plan.user,
+    relays: alice().relays,
+    relayPool: alice().relayPool,
+    finalizeEvent: alice().finalizeEvent,
   });
 
   cleanup();

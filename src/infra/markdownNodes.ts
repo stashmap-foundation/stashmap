@@ -2,14 +2,21 @@
 import { List, Map, Set as ImmutableSet } from "immutable";
 import { v4 } from "uuid";
 import { UnsignedEvent } from "nostr-tools";
-import type { PublicKey } from "../graph/identity";
-import { ensureNodeNativeFields } from "../graph/queries";
-import { createRootAnchor, joinID, shortID } from "../graph/context";
-import { newDB } from "../graph/types";
-import type { GraphNode, KnowledgeDBs, KnowledgeData } from "../graph/types";
+import {
+  createRootAnchor,
+  ensureNodeNativeFields,
+  joinID,
+  newDB,
+  newNode,
+  newRefNode,
+  shortID,
+  type GraphNode,
+  type KnowledgeDBs,
+  type KnowledgeData,
+  type PublicKey,
+} from "../graph/public";
 import { findTag } from "./nostrEvents";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
-import { newRefNode, newNode } from "../graph/nodeFactory";
 
 export type WalkContext = {
   knowledgeDBs: KnowledgeDBs;

@@ -1,13 +1,14 @@
 import { type RowPath } from "../../../rows/rowPaths";
 import type { Plan } from "../../../app/types";
+import { getNodeForView } from "../../../rows/resolveRow";
 import { ParsedLine, parseClipboardText } from "../../../app/editorActions";
 import {
   MarkdownTreeNode,
   parseMarkdownHierarchy,
-} from "../../../infra/markdownDocument";
-import { planInsertMarkdownTrees } from "../../../infra/markdownPlan";
+} from "../../../infra/markdownTree";
+import { planInsertMarkdownTreesByParentId } from "../../../infra/markdownPlan";
 
-export { parseMarkdownHierarchy } from "../../../infra/markdownDocument";
+export { parseMarkdownHierarchy } from "../../../infra/markdownTree";
 export type { MarkdownImportFile } from "../../../infra/markdownImport";
 export { parseMarkdownImportFiles } from "../../../infra/markdownImport";
 export {
@@ -67,11 +68,13 @@ export function planPasteMarkdownTrees(
   stack: ID[],
   insertAtIndex?: number
 ): Plan {
-  return planInsertMarkdownTrees(
-    plan,
-    trees,
-    parentRowPath,
-    stack,
-    insertAtIndex
-  ).plan;
+  const parentNode = getNodeForView(plan, parentRowPath, stack);
+  return parentNode
+    ? planInsertMarkdownTreesByParentId(
+        plan,
+        trees,
+        parentNode.id,
+        insertAtIndex
+      ).plan
+    : plan;
 }

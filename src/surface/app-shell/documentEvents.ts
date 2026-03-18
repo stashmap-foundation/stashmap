@@ -3,38 +3,54 @@ import { List, type Map } from "immutable";
 import { v4 } from "uuid";
 import { UnsignedEvent } from "nostr-tools";
 import type { RelayInformation } from "nostr-tools/lib/types/nip11";
-import type { Contacts, PublicKey, User } from "../graph/identity";
+import type { Contacts, PublicKey, User } from "../../graph/identity";
 import {
   createRootAnchor,
   getNodeContext,
   getSemanticID,
   shortID,
-} from "../graph/context";
-import { resolveNode, isRefNode } from "../graph/references";
-import { getTextForSemanticID } from "../graph/semanticText";
+} from "../../graph/context";
+import { getNode } from "../../graph/queries";
+import { resolveNode, isRefNode } from "../../graph/references";
+import { getTextForSemanticID } from "../../graph/semanticText";
 import {
   getContext,
   getRowIDFromView,
   getCurrentEdgeForView,
   getNodeForView,
-} from "../rows/resolveRow";
-import { getDisplayTextForView } from "../rows/display";
-import { buildOutgoingReference } from "../rows/buildReferenceRow";
-import { type RowPath, isRoot } from "../rows/rowPaths";
-import type { GraphNode, KnowledgeDBs, SemanticIndex } from "../graph/types";
-import type { Pane, Views } from "../session/types";
+} from "../../rows/resolveRow";
+import { getDisplayTextForView } from "../../rows/display";
+import { buildOutgoingReference } from "../../rows/buildReferenceRow";
+import { type RowPath, isRoot } from "../../rows/rowPaths";
+import {
+  newDB,
+  type GraphNode,
+  type KnowledgeDBs,
+  type SemanticIndex,
+} from "../../graph/types";
+import type { Pane, Views } from "../../session/types";
 import {
   formatNodeAttrs,
   formatPrefixMarkers,
   formatRootHeading,
-} from "./documentFormat";
-import { KIND_KNOWLEDGE_DOCUMENT, newTimestamp, msTag } from "./nostrCore";
-import { getNodesInTree } from "../rows/projectTree";
-import { resolveSemanticNodeInCurrentTree } from "../graph/semanticResolution";
-import type { Relays } from "./publishTypes";
+} from "../../infra/documentFormat";
+import {
+  KIND_DELETE,
+  KIND_KNOWLEDGE_DOCUMENT,
+  msTag,
+  newTimestamp,
+} from "../../infra/nostrCore";
+import {
+  buildDocumentEventFromNodes,
+  buildSnapshotEventFromNodes,
+} from "../../infra/nodesDocumentEvent";
+import { getNodesInTree } from "../../rows/projectTree";
+import { resolveSemanticNodeInCurrentTree } from "../../graph/semanticResolution";
+import type { Relays } from "../../infra/publishTypes";
+import type { GraphPlan } from "../../graph/commands";
 
-export type { MarkdownTreeNode } from "./markdownTree";
-export { parseMarkdownHierarchy } from "./markdownTree";
+export type { MarkdownTreeNode } from "../../infra/markdownTree";
+export { parseMarkdownHierarchy } from "../../infra/markdownTree";
 
 export type MarkdownDocumentData = {
   contacts: Contacts;
@@ -233,4 +249,61 @@ export function buildDocumentEvent(
     tags: [["d", rootUuid], ...systemRoleTags, msTag()],
     content,
   };
+}
+
+export function buildDocumentEvents(plan: GraphPlan): List<UnsignedEvent> {
+  const author = plan.user.publicKey;
+  const userDB = plan.knowledgeDBs.get(author, newDB());
+  return plan.affectedRoots.reduce<List<UnsignedEvent>>((events, rootId) => {
+    const rootNode = userDB.nodes.find(
+      (node: GraphNode) =>
+        !node.parent &&
+        (node.id === rootId ||
+          shortID(node.id) === rootId ||
+          node.root === rootId ||
+          node.root === shortID(rootId as ID))
+    );
+    if (!rootNode) {
+      const rootDTag = shortID(rootId as ID);
+      const deleteEvent = {
+        kind: KIND_DELETE,
+        pubkey: author,
+        created_at: newTimestamp(),
+        tags: [
+          ["a", `${KIND_KNOWLEDGE_DOCUMENT}:${author}:${rootDTag}`],
+          ["k", `${KIND_KNOWLEDGE_DOCUMENT}`],
+          msTag(),
+        ],
+        content: "",
+      };
+      return events.push(deleteEvent as UnsignedEvent);
+    }
+    const snapshotSourceRoot =
+      rootNode.basedOn && !rootNode.snapshotDTag
+        ? getNode(plan.knowledgeDBs, rootNode.basedOn, author)
+        : undefined;
+    const createdSnapshotDTag = snapshotSourceRoot
+      ? `snapshot-${shortID(rootNode.id as ID)}`
+      : undefined;
+    const snapshotEvent = snapshotSourceRoot
+      ? (buildSnapshotEventFromNodes(
+          plan.knowledgeDBs,
+          author,
+          createdSnapshotDTag as string,
+          snapshotSourceRoot
+        ) as UnsignedEvent)
+      : undefined;
+    const workspacePlan = plan as Partial<MarkdownDocumentData>;
+    const event =
+      workspacePlan.views !== undefined && workspacePlan.panes !== undefined
+        ? buildDocumentEvent(workspacePlan as MarkdownDocumentData, rootNode, {
+            snapshotDTag: rootNode.snapshotDTag ?? createdSnapshotDTag,
+          })
+        : buildDocumentEventFromNodes(plan.knowledgeDBs, rootNode, {
+            snapshotDTag: rootNode.snapshotDTag ?? createdSnapshotDTag,
+          });
+    return snapshotEvent
+      ? events.push(snapshotEvent).push(event as UnsignedEvent)
+      : events.push(event as UnsignedEvent);
+  }, plan.publishEvents);
 }

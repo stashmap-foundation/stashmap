@@ -1,6 +1,6 @@
 import type { Relays } from "./publishTypes";
 
-export * from "../graph/eventProtocol";
+export * from "../graph/public";
 
 export const DEFAULT_RELAYS: Relays = [
   { url: "wss://nostr.nodesmap.com/", read: true, write: true },

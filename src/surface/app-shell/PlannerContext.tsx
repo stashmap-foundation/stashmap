@@ -8,8 +8,8 @@ import type {
   RepublishEvents,
 } from "../../infra/publishTypes";
 import type { Pane, Views } from "../../session/types";
+import { buildDocumentEvents } from "./documentEvents";
 import {
-  buildDocumentEvents,
   createPublishQueue,
   execute,
   republishEvents,
@@ -179,7 +179,8 @@ export function PlanningContextProvider({
     };
 
     const results = await execute({
-      plan: filteredPlan,
+      events: filteredPlan.publishEvents,
+      user: filteredPlan.user,
       relays: depsRef.current.relays,
       relayPool,
       finalizeEvent,

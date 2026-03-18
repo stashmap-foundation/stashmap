@@ -44,8 +44,11 @@ async function setupTest(): Promise<{
     { url: "wss://relay.bob.lol/", read: true, write: true },
   ]);
   await execute({
-    ...bob(),
-    plan: planPublishRelays,
+    events: planPublishRelays.publishEvents,
+    user: planPublishRelays.user,
+    relays: bob().relays,
+    relayPool: bob().relayPool,
+    finalizeEvent: bob().finalizeEvent,
   });
   renderTree(alice);
   await type(

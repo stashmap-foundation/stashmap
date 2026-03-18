@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { decodePublicKeyInputSync } from "../../graph/publicKeys";
+import { decodePublicKeyInputSync } from "../../graph/public";
 import type { Relays } from "../publishTypes";
 import { sanitizeRelays } from "../relayUtils";
 import { SyncPullProfile } from "../local-docs/syncPull";

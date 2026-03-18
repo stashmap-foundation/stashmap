@@ -6,14 +6,7 @@ import {
   UnsignedEvent,
   VerifiedEvent,
 } from "nostr-tools";
-import { isUserLoggedIn, isUserLoggedInWithExtension } from "../app/auth";
-import type { Plan } from "../app/types";
-import type { GraphPlan } from "../graph/commands";
-import type { User } from "../graph/identity";
-import { getNode } from "../graph/queries";
-import { shortID } from "../graph/context";
-import { newDB } from "../graph/types";
-import type { GraphNode, ID } from "../graph/types";
+import type { KeyPair, PublicKey, User } from "../graph/public";
 import type { FinalizeEvent } from "./apiTypes";
 import type {
   AllRelays,
@@ -24,7 +17,6 @@ import type {
 } from "./publishTypes";
 import {
   KIND_DELETE,
-  KIND_KNOWLEDGE_DOCUMENT,
   KIND_RELAY_METADATA_EVENT,
   msTag,
   newTimestamp,
@@ -35,12 +27,6 @@ import {
   mergeRelays,
   uniqueRelayUrls,
 } from "./relayUtils";
-import { buildDocumentEvent } from "./markdownDocument";
-import type { MarkdownDocumentData } from "./markdownDocument";
-import {
-  buildDocumentEventFromNodes,
-  buildSnapshotEventFromNodes,
-} from "./nodesDocumentEvent";
 import {
   StashmapDB,
   OutboxEntry,
@@ -108,6 +94,27 @@ type PublishQueue = {
   readonly destroy: () => void;
 };
 
+type HasPublishEvents = {
+  readonly user: User;
+  readonly publishEvents: List<UnsignedEvent>;
+};
+
+function isUserLoggedInWithSeed(user: User): user is KeyPair {
+  return (user as KeyPair).privateKey !== undefined;
+}
+
+function isUserLoggedInWithExtension(user: User): user is {
+  publicKey: PublicKey;
+} {
+  return (
+    !isUserLoggedInWithSeed(user) && user.publicKey !== "UNAUTHENTICATEDUSERPK"
+  );
+}
+
+function isUserLoggedIn(user: User): boolean {
+  return isUserLoggedInWithSeed(user) || isUserLoggedInWithExtension(user);
+}
+
 export function relayTags(relays: Relays): string[][] {
   return relays
     .map((relay) => {
@@ -125,7 +132,10 @@ export function relayTags(relays: Relays): string[][] {
     .filter((tag) => tag.length > 0);
 }
 
-export function planPublishRelayMetadata(plan: Plan, relays: Relays): Plan {
+export function planPublishRelayMetadata<T extends HasPublishEvents>(
+  plan: T,
+  relays: Relays
+): T {
   const tags = relayTags(relays);
   const publishRelayMetadataEvent = {
     kind: KIND_RELAY_METADATA_EVENT,
@@ -156,63 +166,6 @@ function resolveWriteRelayUrlsForEvent(
     );
   }
   return uniqueRelayUrls(getWriteRelays(relays.userRelays));
-}
-
-export function buildDocumentEvents(plan: GraphPlan): List<UnsignedEvent> {
-  const author = plan.user.publicKey;
-  const userDB = plan.knowledgeDBs.get(author, newDB());
-  return plan.affectedRoots.reduce<List<UnsignedEvent>>((events, rootId) => {
-    const rootNode = userDB.nodes.find(
-      (node: GraphNode) =>
-        !node.parent &&
-        (node.id === rootId ||
-          shortID(node.id) === rootId ||
-          node.root === rootId ||
-          node.root === shortID(rootId as ID))
-    );
-    if (!rootNode) {
-      const rootDTag = shortID(rootId as ID);
-      const deleteEvent = {
-        kind: KIND_DELETE,
-        pubkey: author,
-        created_at: newTimestamp(),
-        tags: [
-          ["a", `${KIND_KNOWLEDGE_DOCUMENT}:${author}:${rootDTag}`],
-          ["k", `${KIND_KNOWLEDGE_DOCUMENT}`],
-          msTag(),
-        ],
-        content: "",
-      };
-      return events.push(deleteEvent as UnsignedEvent);
-    }
-    const snapshotSourceRoot =
-      rootNode.basedOn && !rootNode.snapshotDTag
-        ? getNode(plan.knowledgeDBs, rootNode.basedOn, author)
-        : undefined;
-    const createdSnapshotDTag = snapshotSourceRoot
-      ? `snapshot-${shortID(rootNode.id as ID)}`
-      : undefined;
-    const snapshotEvent = snapshotSourceRoot
-      ? (buildSnapshotEventFromNodes(
-          plan.knowledgeDBs,
-          author,
-          createdSnapshotDTag as string,
-          snapshotSourceRoot
-        ) as UnsignedEvent)
-      : undefined;
-    const workspacePlan = plan as Partial<Plan>;
-    const event =
-      workspacePlan.views !== undefined && workspacePlan.panes !== undefined
-        ? buildDocumentEvent(workspacePlan as MarkdownDocumentData, rootNode, {
-            snapshotDTag: rootNode.snapshotDTag ?? createdSnapshotDTag,
-          })
-        : buildDocumentEventFromNodes(plan.knowledgeDBs, rootNode, {
-            snapshotDTag: rootNode.snapshotDTag ?? createdSnapshotDTag,
-          });
-    return snapshotEvent
-      ? events.push(snapshotEvent).push(event as UnsignedEvent)
-      : events.push(event as UnsignedEvent);
-  }, plan.publishEvents);
 }
 
 export async function signEvents(
@@ -253,29 +206,29 @@ export async function signEvents(
 }
 
 export async function execute({
-  plan,
+  events,
+  user,
   relays,
   relayPool,
   finalizeEvent,
   signWithExtension,
 }: {
-  plan: GraphPlan;
+  events: List<UnsignedEvent>;
+  user: User;
   relays: AllRelays;
   relayPool: SimplePool;
   finalizeEvent: FinalizeEvent;
   signWithExtension?: (event: EventTemplate) => Promise<Event>;
 }): Promise<PublishResultsEventMap> {
-  const allEvents = buildDocumentEvents(plan);
-
-  if (allEvents.size === 0) {
+  if (events.size === 0) {
     // eslint-disable-next-line no-console
     console.warn("Won't execute Noop plan");
     return Map();
   }
 
   const finalizedEvents = await signEvents(
-    allEvents,
-    plan.user,
+    events,
+    user,
     finalizeEvent,
     signWithExtension
   );

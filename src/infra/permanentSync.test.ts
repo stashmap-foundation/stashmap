@@ -1,7 +1,11 @@
 import { Event } from "nostr-tools";
 import { Map } from "immutable";
 import type { StashmapDB } from "./indexedDB";
-import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "./nostrCore";
+import {
+  KIND_DELETE,
+  KIND_KNOWLEDGE_DOCUMENT,
+  KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
+} from "./nostrCore";
 import {
   applyStoredDelete,
   applyStoredDocument,
@@ -15,6 +19,7 @@ import {
   startPermanentDocumentSync,
   toStoredDeleteRecord,
   toStoredDocumentRecord,
+  toStoredSnapshotRecord,
 } from "./permanentSync";
 
 jest.mock("./indexedDB", () => ({
@@ -404,4 +409,44 @@ test("startPermanentDocumentSync uses live limit-0 subscription and catch-up sub
     ],
     expect.any(Object)
   );
+});
+
+test("toStoredSnapshotRecord extracts snapshot fields correctly", () => {
+  const event = {
+    id: "snap-1",
+    pubkey: ALICE,
+    created_at: 20,
+    kind: KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
+    tags: [
+      ["d", "snapshot-dtag"],
+      ["source", "root-short-id"],
+      ["ms", "5678"],
+    ],
+    content: "# Snapshot Root",
+  } as unknown as Event;
+
+  expect(toStoredSnapshotRecord(event)).toEqual({
+    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT}:alice:snapshot-dtag`,
+    author: ALICE,
+    eventId: "snap-1",
+    dTag: "snapshot-dtag",
+    sourceRootShortID: "root-short-id",
+    createdAt: 20,
+    updatedMs: 5678,
+    content: "# Snapshot Root",
+    tags: event.tags,
+  });
+});
+
+test("toStoredSnapshotRecord returns undefined for non-snapshot events", () => {
+  const docEvent = {
+    id: "doc-1",
+    pubkey: ALICE,
+    created_at: 10,
+    kind: KIND_KNOWLEDGE_DOCUMENT,
+    tags: [["d", "root-1"]],
+    content: "# Root",
+  } as unknown as Event;
+
+  expect(toStoredSnapshotRecord(docEvent)).toBeUndefined();
 });

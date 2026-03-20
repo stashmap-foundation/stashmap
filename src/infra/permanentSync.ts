@@ -5,12 +5,14 @@ import { findTag, getEventMs } from "./nostrEvents";
 import {
   KIND_DELETE,
   KIND_KNOWLEDGE_DOCUMENT,
+  KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
   getReplaceableKey,
 } from "./nostrCore";
 import type {
   StashmapDB,
   StoredDeleteRecord,
   StoredDocumentRecord,
+  StoredSnapshotRecord,
   SyncCheckpointRecord,
 } from "./indexedDB";
 import {
@@ -111,7 +113,7 @@ export function buildPermanentBackfillFilter({
   };
 }
 
-function getStoredEventID(
+export function getStoredEventID(
   event: Event | UnsignedEvent,
   replaceableKey: string
 ): string {
@@ -166,6 +168,31 @@ export function toStoredDeleteRecord(
     eventId: getStoredEventID(event, replaceableKey),
     createdAt: event.created_at,
     deletedAt: getEventMs(event),
+  };
+}
+
+export function toStoredSnapshotRecord(
+  event: Event | UnsignedEvent
+): StoredSnapshotRecord | undefined {
+  if (event.kind !== KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT) {
+    return undefined;
+  }
+  const replaceableKey = getReplaceableKey(event);
+  const dTag = findTag(event, "d");
+  const sourceRootShortID = findTag(event, "source");
+  if (!replaceableKey || !dTag || !sourceRootShortID) {
+    return undefined;
+  }
+  return {
+    replaceableKey,
+    author: event.pubkey as PublicKey,
+    eventId: getStoredEventID(event, replaceableKey),
+    dTag,
+    sourceRootShortID,
+    createdAt: event.created_at,
+    updatedMs: getEventMs(event),
+    content: event.content,
+    tags: event.tags,
   };
 }
 

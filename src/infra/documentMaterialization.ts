@@ -30,6 +30,12 @@ export function storedDocumentToEvent(
   };
 }
 
+export function parseStoredDocumentNodes(
+  document: StoredDocumentRecord
+): Map<string, GraphNode> {
+  return parseDocumentEvent(storedDocumentToEvent(document));
+}
+
 export function findDocumentNodes(
   events: List<UnsignedEvent | Event>
 ): Map<string, GraphNode> {
@@ -116,6 +122,50 @@ export function buildKnowledgeDBFromDocumentNodes(
     ...newDB(),
     nodes,
   };
+}
+
+export function getAuthorDocumentNodes(
+  documents: Map<string, StoredDocumentRecord>,
+  nodesByDocumentKey: Map<string, Map<string, GraphNode>>,
+  author: PublicKey
+): Map<string, GraphNode> {
+  return documents.valueSeq().reduce((acc, document) => {
+    if (document.author !== author) {
+      return acc;
+    }
+    return acc.merge(
+      nodesByDocumentKey.get(document.replaceableKey) ||
+        Map<string, GraphNode>()
+    );
+  }, Map<string, GraphNode>());
+}
+
+export function rebuildDocumentKnowledgeDBs({
+  knowledgeDBs,
+  documents,
+  nodesByDocumentKey,
+  authors,
+}: {
+  knowledgeDBs: Map<PublicKey, KnowledgeData>;
+  documents: Map<string, StoredDocumentRecord>;
+  nodesByDocumentKey: Map<string, Map<string, GraphNode>>;
+  authors: ReadonlyArray<PublicKey>;
+}): Map<PublicKey, KnowledgeData> {
+  const authorSet = new Set(authors);
+  return [...authorSet].reduce((acc, author) => {
+    const authorNodes = getAuthorDocumentNodes(
+      documents,
+      nodesByDocumentKey,
+      author
+    );
+    const nextKnowledgeDB = buildKnowledgeDBFromDocumentNodes(
+      author,
+      authorNodes
+    );
+    return nextKnowledgeDB
+      ? acc.set(author, nextKnowledgeDB)
+      : acc.remove(author);
+  }, knowledgeDBs);
 }
 
 export function buildKnowledgeDBFromDocumentEvents(

@@ -15,11 +15,14 @@ import { MockRelayPool, mockRelayPool } from "../testutils/nostrMock";
 import {
   openDB,
   getCachedEvents,
+  getStoredDeletes,
+  getStoredDocuments,
   putCachedEvents,
   getOutboxEvents,
   putOutboxEvent,
   removeOutboxEvent,
   OutboxEntry,
+  subscribeDocumentStore,
 } from "../../infra/indexedDB";
 import { PaneView } from "../../surface/workspace/pane/PaneView";
 
@@ -50,6 +53,8 @@ beforeEach(() => {
   // eslint-disable-next-line functional/immutable-data
   outboxStore.length = 0;
   jest.mocked(openDB).mockResolvedValue({ __fake: true } as never);
+  jest.mocked(getStoredDocuments).mockResolvedValue([] as never);
+  jest.mocked(getStoredDeletes).mockResolvedValue([] as never);
   jest
     .mocked(getCachedEvents)
     .mockImplementation(
@@ -95,6 +100,9 @@ beforeEach(() => {
     }
     return Promise.resolve();
   }) as never);
+  jest
+    .mocked(subscribeDocumentStore)
+    .mockImplementation((() => () => undefined) as never);
 });
 
 test("published events are cached and available on reload", async () => {

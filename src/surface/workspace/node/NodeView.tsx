@@ -179,18 +179,19 @@ function VersionContent({
       {dateStr}
       <span style={{ fontStyle: "normal" }}>
         {isOtherUser && " \u{1F464}"}
-        {meta && meta.addCount > 0 && (
+        {meta && meta.diffStatus === "computed" && meta.addCount > 0 && (
           <>
             {" "}
             <span style={{ color: "var(--green)" }}>+{meta.addCount}</span>
           </>
         )}
-        {meta && meta.removeCount > 0 && (
+        {meta && meta.diffStatus === "computed" && meta.removeCount > 0 && (
           <>
             {" "}
             <span style={{ color: "var(--red)" }}>-{meta.removeCount}</span>
           </>
         )}
+        {meta && meta.diffStatus === "loading" && " ..."}
       </span>
     </span>
   );

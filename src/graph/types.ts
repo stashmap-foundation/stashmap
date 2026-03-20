@@ -18,10 +18,14 @@ export type Argument = "confirms" | "contra" | undefined;
 
 export type VirtualType = "suggestion" | "search" | "incoming" | "version";
 
+export type DiffStatus = "computed" | "loading" | "unavailable";
+
 export type VersionMeta = {
   updated: number;
   addCount: number;
   removeCount: number;
+  snapshotDTag?: string;
+  diffStatus: DiffStatus;
 };
 
 export type RootAnchor = {

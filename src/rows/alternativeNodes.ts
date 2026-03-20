@@ -176,12 +176,14 @@ type AlternativeNodeResult = {
   suggestions: List<ID>;
   coveredCandidateIDs: ImmutableSet<string>;
   versions: List<LongID>;
+  allVersions: List<LongID>;
 };
 
 const EMPTY_ALTERNATIVE_NODE_RESULT: AlternativeNodeResult = {
   suggestions: List<ID>(),
   coveredCandidateIDs: ImmutableSet<string>(),
   versions: List<LongID>(),
+  allVersions: List<LongID>(),
 };
 
 function getAlternativeNodeFilters(
@@ -296,7 +298,7 @@ function getFutureVersions(
     .toList();
 }
 
-function getVersions(
+export function getVersions(
   semanticIndex: SemanticIndex,
   visibleAuthors: ImmutableSet<PublicKey>,
   currentNode: GraphNode
@@ -452,6 +454,13 @@ export function getAlternativeNodeData(
   const coveredCandidateIDs = cappedCandidates
     .map(([candidateKey]) => candidateKey)
     .toSet() as ImmutableSet<string>;
+  const allVersions = versionsEnabled
+    ? versionSummaries
+        .filter(({ node }) => !existingCrefTargetNodeIDs.has(node.id))
+        .map(({ node }) => node.id)
+        .toList()
+    : List<LongID>();
+
   const versions = versionsEnabled
     ? versionSummaries
         .filter(({ node }) => !existingCrefTargetNodeIDs.has(node.id))
@@ -473,5 +482,6 @@ export function getAlternativeNodeData(
       .toList(),
     coveredCandidateIDs,
     versions,
+    allVersions,
   };
 }

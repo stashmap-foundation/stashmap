@@ -218,7 +218,13 @@ function computeVersionMeta(
     data.knowledgeDBs,
     getNode(data.knowledgeDBs, refId, data.user.publicKey)
   );
-  if (!node) return { updated: 0, addCount: 0, removeCount: 0 };
+  if (!node)
+    return {
+      updated: 0,
+      addCount: 0,
+      removeCount: 0,
+      diffStatus: "unavailable",
+    };
 
   const pane = data.panes[getPaneIndex(rowPath)];
   const activeFilters = pane.typeFilters || DEFAULT_TYPE_FILTERS;
@@ -234,7 +240,26 @@ function computeVersionMeta(
     parentNode,
     activeFilters
   );
-  return { updated: node.updated, addCount, removeCount };
+  return {
+    updated: node.updated,
+    addCount,
+    removeCount,
+    snapshotDTag: node.snapshotDTag,
+    diffStatus: "computed",
+  };
+}
+
+function getDiffParts(meta: VersionMeta): string[] {
+  if (meta.diffStatus === "computed") {
+    return [
+      ...(meta.addCount > 0 ? [`+${meta.addCount}`] : []),
+      ...(meta.removeCount > 0 ? [`-${meta.removeCount}`] : []),
+    ];
+  }
+  if (meta.diffStatus === "loading") {
+    return ["..."];
+  }
+  return [];
 }
 
 function findCrefToNode(
@@ -358,11 +383,11 @@ export function buildReferenceRow(
     if (!outgoing) return undefined;
     const isOtherUser = outgoing.author !== data.user.publicKey;
     const dateStr = new Date(versionMeta.updated).toLocaleString();
+    const diffParts = getDiffParts(versionMeta);
     const parts = [
       dateStr,
       ...(isOtherUser ? ["\u{1F464}"] : []),
-      ...(versionMeta.addCount > 0 ? [`+${versionMeta.addCount}`] : []),
-      ...(versionMeta.removeCount > 0 ? [`-${versionMeta.removeCount}`] : []),
+      ...diffParts,
     ];
     const text = parts.join(" ");
     return { ...outgoing, text, versionMeta };

@@ -4,7 +4,7 @@ import { isEditableElement } from "../tree/keyboardNavigation";
 import {
   ParsedLine,
   parseClipboardText,
-} from "../../../planner/session/editorActions";
+} from "../../../usecases/session/editorActions";
 
 export function preventEditorBlur(e: React.MouseEvent): void {
   if (isEditableElement(document.activeElement)) {

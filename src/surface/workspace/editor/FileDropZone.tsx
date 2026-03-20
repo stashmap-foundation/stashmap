@@ -1,10 +1,10 @@
 import { type RowPath } from "../../../rows/rowPaths";
-import type { Plan } from "../../../planner/session/types";
+import type { Plan } from "../../../usecases/session/types";
 import { getNodeForView } from "../../../rows/resolveRow";
 import {
   ParsedLine,
   parseClipboardText,
-} from "../../../planner/session/editorActions";
+} from "../../../usecases/session/editorActions";
 import {
   MarkdownTreeNode,
   parseMarkdownHierarchy,

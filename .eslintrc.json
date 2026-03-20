@@ -99,7 +99,7 @@
                   },
                   {
                     "target": "./src/graph",
-                    "from": "./src/planner",
+                    "from": "./src/usecases",
                     "message": "graph must not import planner."
                   },
                   {
@@ -114,7 +114,7 @@
                   },
                   {
                     "target": "./src/rows",
-                    "from": "./src/planner",
+                    "from": "./src/usecases",
                     "message": "rows must not import planner."
                   },
                   {
@@ -134,7 +134,7 @@
                   },
                   {
                     "target": "./src/session",
-                    "from": "./src/planner",
+                    "from": "./src/usecases",
                     "message": "session must not import planner."
                   },
                   {
@@ -143,9 +143,9 @@
                     "message": "session must not import infra."
                   },
                   {
-                    "target": "./src/planner",
+                    "target": "./src/usecases",
                     "from": "./src/infra",
-                    "message": "planner must not import infra."
+                    "message": "usecases must not import infra."
                   },
                   {
                     "target": "./src/graph",
@@ -163,9 +163,9 @@
                     "message": "session must not import surface."
                   },
                   {
-                    "target": "./src/planner",
+                    "target": "./src/usecases",
                     "from": "./src/surface",
-                    "message": "planner must not import surface."
+                    "message": "usecases must not import surface."
                   },
                   {
                     "target": "./src/infra",
@@ -190,7 +190,7 @@
             "src/treeTraversal.ts",
             "src/LoadSearchData.tsx",
             "src/dataQuery.tsx",
-            "src/planner.tsx"
+            "src/usecases.tsx"
           ],
           "rules": {
             "no-restricted-imports": [
@@ -298,7 +298,7 @@
               "zones": [
                 {
                   "target": "./src/infra",
-                  "from": "./src/planner",
+                  "from": "./src/usecases",
                   "message": "infra must not import planner."
                 },
                 {
@@ -341,8 +341,8 @@
               "zones": [
                 {
                   "target": "./src/infra/cli",
-                  "from": "./src/planner/session",
-                  "message": "cli must not import planner/session. Use planner/core or graph-safe planner APIs."
+                  "from": "./src/usecases/session",
+                  "message": "cli must not import usecases/session. Use usecases/core or graph-safe planner APIs."
                 },
                 {
                   "target": "./src/infra/cli",
@@ -368,14 +368,14 @@
               "patterns": [
                 {
                   "group": [
-                    "../../planner/session",
-                    "../../planner/session/*",
-                    "../planner/session",
-                    "../planner/session/*",
+                    "../../usecases/session",
+                    "../../usecases/session/*",
+                    "../usecases/session",
+                    "../usecases/session/*",
                     "./session",
                     "./session/*"
                   ],
-                  "message": "cli must not import planner/session. Use planner/core or graph-safe planner APIs."
+                  "message": "cli must not import usecases/session. Use usecases/core or graph-safe planner APIs."
                 },
                 {
                   "group": [
@@ -392,26 +392,26 @@
         }
       },
       {
-        "files": ["src/planner/core/**/*.{ts,tsx,js,jsx}"],
+        "files": ["src/usecases/core/**/*.{ts,tsx,js,jsx}"],
         "rules": {
           "import/no-restricted-paths": [
             "error",
             {
               "zones": [
                 {
-                  "target": "./src/planner/core",
-                  "from": "./src/planner/session",
-                  "message": "planner/core must not import planner/session."
+                  "target": "./src/usecases/core",
+                  "from": "./src/usecases/session",
+                  "message": "usecases/core must not import usecases/session."
                 },
                 {
-                  "target": "./src/planner/core",
+                  "target": "./src/usecases/core",
                   "from": "./src/session",
-                  "message": "planner/core must not import session."
+                  "message": "usecases/core must not import session."
                 },
                 {
-                  "target": "./src/planner/core",
+                  "target": "./src/usecases/core",
                   "from": "./src/rows",
-                  "message": "planner/core must not import rows."
+                  "message": "usecases/core must not import rows."
                 }
               ]
             }

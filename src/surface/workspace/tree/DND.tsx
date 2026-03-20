@@ -19,20 +19,20 @@ import {
   getNodeForView,
   getCurrentEdgeForView,
 } from "../../../rows/resolveRow";
-import { upsertNodes } from "../../../planner/session/actions";
+import { upsertNodes } from "../../../usecases/session/actions";
 import {
   getParentKey,
   planUpdateViews,
   updateRowPathsAfterMoveNodes,
 } from "../../../session/views";
-import { planExpandNode } from "../../../planner/session/navigationActions";
+import { planExpandNode } from "../../../usecases/session/navigationActions";
 import { getNodesInTree } from "../node/NodeView";
-import type { Plan } from "../../../planner/session/types";
+import type { Plan } from "../../../usecases/session/types";
 import {
   planDeepCopyNodeWithView,
   planAddToParent,
   planMoveNodeWithView,
-} from "../../../planner/session/treeActions";
+} from "../../../usecases/session/treeActions";
 import { getPane } from "../../../session/panes";
 
 type DragSource = {

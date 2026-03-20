@@ -12,7 +12,7 @@ import {
   useLoginWithExtension,
 } from "./NostrAuthContext";
 import { useData } from "./DataContext";
-import { planRewriteUnpublishedEvents } from "../../planner/core/actions";
+import { planRewriteUnpublishedEvents } from "../../usecases/core/actions";
 import { usePlanner } from "./PlannerContext";
 import { execute } from "../../infra/nostr";
 import { useRelaysToCreatePlan } from "./useRelays";

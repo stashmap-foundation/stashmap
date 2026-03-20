@@ -10,7 +10,7 @@ import {
   UpdateState,
   type,
 } from "../testutils";
-import { createPlan } from "../../planner/session/actions";
+import { createPlan } from "../../usecases/session/actions";
 import { execute, planPublishRelayMetadata } from "../../infra/nostr";
 import type { Relays } from "../../infra/publishTypes";
 import { flattenRelays } from "../../infra/relayUtils";

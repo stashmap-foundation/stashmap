@@ -15,15 +15,15 @@ import {
   type RowPath,
   rowPathToString,
 } from "../../../rows/rowPaths";
-import { planExpandNode } from "../../../planner/session/navigationActions";
+import { planExpandNode } from "../../../usecases/session/navigationActions";
 import { getParentKey } from "../../../session/views";
-import type { Plan } from "../../../planner/session/types";
+import type { Plan } from "../../../usecases/session/types";
 import {
   planUpdateNodeText,
   planUpdateRowNodeMetadata,
   type ChildNodeMetadata,
-} from "../../../planner/session/editorActions";
-import { planMoveNodeWithView } from "../../../planner/session/treeActions";
+} from "../../../usecases/session/editorActions";
+import { planMoveNodeWithView } from "../../../usecases/session/treeActions";
 
 export type EditorInfo = {
   text: string;

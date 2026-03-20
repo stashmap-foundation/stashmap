@@ -1,6 +1,6 @@
 import { List } from "immutable";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
-import { createPlan } from "../../../planner/session/actions";
+import { createPlan } from "../../../usecases/session/actions";
 import { getSemanticID } from "../../../graph/context";
 import {
   getChildNodes,

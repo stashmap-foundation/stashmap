@@ -3,7 +3,7 @@ import { newNode } from "../../../graph/nodeFactory";
 import { type RowPath } from "../../../rows/rowPaths";
 import { execute } from "../../../infra/nostr";
 import { buildDocumentEvents } from "../../app-shell/documentEvents";
-import { createPlan } from "../../../planner/session/actions";
+import { createPlan } from "../../../usecases/session/actions";
 import { planUpsertNodes } from "../../../graph/commands";
 import { processEvents } from "../../../infra/eventProcessing";
 import { ALICE, setup, UpdateState } from "../../../tests/testutils";

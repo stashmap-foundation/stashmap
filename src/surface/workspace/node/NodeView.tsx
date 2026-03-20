@@ -51,16 +51,16 @@ import {
   planRemoveEmptyNodePosition,
   planCreateNode,
   ParsedLine,
-} from "../../../planner/session/editorActions";
-import type { Plan } from "../../../planner/session/types";
+} from "../../../usecases/session/editorActions";
+import type { Plan } from "../../../usecases/session/types";
 import {
   planAddToParent,
   planDisconnectFromParent,
-} from "../../../planner/session/treeActions";
+} from "../../../usecases/session/treeActions";
 import { usePlanner } from "../../app-shell/PlannerContext";
 import { planSetRowFocusIntent } from "../../../session/focus";
 import { computeEmptyNodeMetadata } from "../../../session/temporaryNodes";
-import { planExpandNode } from "../../../planner/session/navigationActions";
+import { planExpandNode } from "../../../usecases/session/navigationActions";
 import {
   parsedLinesToTrees,
   planPasteMarkdownTrees,

@@ -23,7 +23,7 @@ import {
 import { parseRowPath, rowPathToString, RowPath } from "../../rows/rowPaths";
 import type { Data } from "../../surface/app-shell/types";
 import type { View, Views } from "../../session/types";
-import { updateRowPathsAfterDisconnect } from "../../planner/session/navigationActions";
+import { updateRowPathsAfterDisconnect } from "../../usecases/session/navigationActions";
 import {
   updateRowPathsAfterMoveNodes,
   updateRowPathsAfterPaneDelete,

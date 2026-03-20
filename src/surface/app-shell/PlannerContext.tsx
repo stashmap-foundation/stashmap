@@ -18,8 +18,8 @@ import { useApis } from "./ApiContext";
 import type { StashmapDB } from "../../infra/indexedDB";
 import { useData } from "./DataContext";
 import { mergePublishResultsOfEvents } from "../shared/PublishingStatus";
-import { createPlan } from "../../planner/session/actions";
-import type { Plan } from "../../planner/session/types";
+import { createPlan } from "../../usecases/session/actions";
+import type { Plan } from "../../usecases/session/types";
 import type { EventState } from "./types";
 
 type ExecutePlan = (plan: Plan) => Promise<void>;

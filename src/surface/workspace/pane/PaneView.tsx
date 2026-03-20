@@ -53,7 +53,7 @@ import { SignInMenuBtn } from "../../app-shell/SignIn";
 import {
   planDeleteNodeFromView,
   planForkPane,
-} from "../../../planner/session/treeActions";
+} from "../../../usecases/session/treeActions";
 import { usePlanner } from "../../app-shell/PlannerContext";
 import {
   planClearTemporarySelection,

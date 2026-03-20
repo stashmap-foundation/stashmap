@@ -1,6 +1,6 @@
 import { usePlanner } from "../../app-shell/PlannerContext";
 import { usePaneStack } from "../layout/SplitPanesContext";
-import { planDisconnectFromParent } from "../../../planner/session/treeActions";
+import { planDisconnectFromParent } from "../../../usecases/session/treeActions";
 import { useChildNodeContext } from "./useChildNodeContext";
 
 export function relevanceToLevel(relevance: Relevance): number {

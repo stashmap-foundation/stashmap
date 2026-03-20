@@ -3,24 +3,24 @@ import type {
   GraphNode,
   KnowledgeDBs,
   KnowledgeData,
-  PublicKey,
   SemanticIndex,
-} from "../graph/public";
+} from "../../graph/types";
+import type { PublicKey } from "../../graph/identity";
 import {
   addNodesToSemanticIndex,
   buildSemanticIndexFromDocuments,
   createEmptySemanticIndex,
   removeNodesFromSemanticIndex,
-} from "../graph/public";
+} from "../../graph/semanticIndex";
 import type {
   DocumentStoreChange,
   StoredDeleteRecord,
   StoredDocumentRecord,
-} from "./indexedDB";
+} from "../../infra/indexedDB";
 import {
   parseStoredDocumentNodes,
   rebuildDocumentKnowledgeDBs,
-} from "./documentMaterialization";
+} from "../../infra/documentMaterialization";
 
 export type DocumentSnapshot = {
   documents: ImmutableMap<string, StoredDocumentRecord>;

@@ -50,7 +50,10 @@ import {
 import { NewPaneButton } from "../layout/OpenInSplitPaneButton";
 import { PublishingStatusWrapper } from "../../app-shell/PublishingStatusWrapper";
 import { SignInMenuBtn } from "../../app-shell/SignIn";
-import { planDeleteNodeFromView, planForkPane } from "../../../app/treeActions";
+import {
+  planDeleteNodeFromView,
+  planForkPane,
+} from "../../../planner/session/treeActions";
 import { usePlanner } from "../../app-shell/PlannerContext";
 import {
   planClearTemporarySelection,

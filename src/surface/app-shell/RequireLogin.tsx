@@ -3,9 +3,9 @@ import { Outlet } from "react-router-dom";
 import "./styles/App.css";
 import Data from "./Data";
 import { useUser } from "./NostrAuthContext";
-import { UNAUTHENTICATED_USER_PK } from "../../app/auth";
+import { UNAUTHENTICATED_USER_PK } from "../../planner/core/auth";
 
-export { UNAUTHENTICATED_USER_PK } from "../../app/auth";
+export { UNAUTHENTICATED_USER_PK } from "../../planner/core/auth";
 
 export function RequireLogin(): JSX.Element {
   const user = useUser() || {

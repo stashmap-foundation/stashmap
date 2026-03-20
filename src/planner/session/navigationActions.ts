@@ -1,12 +1,12 @@
-import type { View, Views } from "../session/types";
-import { planUpdateViews } from "../session/views";
+import type { View, Views } from "../../session/types";
+import { planUpdateViews } from "../../session/views";
 import {
   getLast,
   isRoot,
   parseRowPath,
   type RowPath,
   rowPathToString,
-} from "../rows/rowPaths";
+} from "../../rows/rowPaths";
 
 const SEARCH_PREFIX = "~Search:";
 

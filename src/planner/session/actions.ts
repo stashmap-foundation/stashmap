@@ -1,19 +1,22 @@
 import { List } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
-import { UNAUTHENTICATED_USER_PK } from "./auth";
-import type { Plan } from "./types";
-import { createGraphPlan, planUpsertNodes } from "../graph/commands";
-import type { Contacts, User } from "../graph/identity";
-import type { GraphNode, ID, SemanticIndex } from "../graph/types";
+import { createGraphPlan, planUpsertNodes } from "../../graph/commands";
+import type { Contacts, User } from "../../graph/identity";
+import type { GraphNode, ID, SemanticIndex } from "../../graph/types";
+import { newNode } from "../../graph/nodeFactory";
+import {
+  getContext,
+  getNodeForView,
+  getParentNode,
+} from "../../rows/resolveRow";
+import { type RowPath } from "../../rows/rowPaths";
 import type {
   Pane,
   TemporaryEvent,
   TemporaryViewState,
   Views,
-} from "../session/types";
-import { newNode } from "../graph/nodeFactory";
-import { getContext, getNodeForView, getParentNode } from "../rows/resolveRow";
-import { type RowPath } from "../rows/rowPaths";
+} from "../../session/types";
+import type { Plan } from "./types";
 
 type CreatePlanInput = {
   contacts: Contacts;
@@ -60,41 +63,6 @@ export function upsertNodes(
   }
 
   return planUpsertNodes(plan, updatedNodes);
-}
-
-export function replaceUnauthenticatedUser<T extends string>(
-  from: T,
-  publicKey: string
-): T {
-  return from.replaceAll(UNAUTHENTICATED_USER_PK, publicKey) as T;
-}
-
-function rewriteIDs(event: UnsignedEvent): UnsignedEvent {
-  const replacedTags = event.tags.map((tag) =>
-    tag.map((value) => replaceUnauthenticatedUser(value, event.pubkey))
-  );
-  return {
-    ...event,
-    content: replaceUnauthenticatedUser(event.content, event.pubkey),
-    tags: replacedTags,
-  };
-}
-
-export function planRewriteUnpublishedEvents(
-  plan: Plan,
-  events: List<UnsignedEvent>
-): Plan {
-  const allEvents = plan.publishEvents.concat(events);
-  const rewrittenEvents = allEvents.map((event) =>
-    rewriteIDs({
-      ...event,
-      pubkey: plan.user.publicKey,
-    })
-  );
-  return {
-    ...plan,
-    publishEvents: rewrittenEvents,
-  };
 }
 
 export function createPlan(

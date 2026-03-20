@@ -34,7 +34,7 @@ import {
   UNAUTHENTICATED_USER_PK,
 } from "../../surface/app-shell/RequireLogin";
 import { EMPTY_SEMANTIC_ID } from "../../graph/types";
-import { createPlan } from "../../app/actions";
+import { createPlan } from "../../planner/session/actions";
 import { planUpsertContact, planRemoveContact } from "../../graph/commands";
 import { PlanningContextProvider } from "../../surface/app-shell/PlannerContext";
 import { execute } from "../../infra/nostr";

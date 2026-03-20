@@ -11,11 +11,12 @@ import {
 import {
   applyChangeToSnapshot,
   applyRecordsToSnapshot,
+  createSnapshotFromStoredRecords,
   createEmptySnapshot,
   type DocumentSnapshot,
-} from "../../infra/documentStoreState";
+} from "./documentStoreState";
 import {
-  loadInitialDocumentStoreSnapshot,
+  loadInitialDocumentStoreRecords,
   persistDocumentStoreEvents,
   subscribeToDocumentStore,
 } from "../../infra/documentStoreRepository";
@@ -50,11 +51,11 @@ export function DocumentStoreProvider({
       return () => {};
     }
     const controller = new AbortController();
-    loadInitialDocumentStoreSnapshot(db).then((nextSnapshot) => {
+    loadInitialDocumentStoreRecords(db).then(({ documents, deletes }) => {
       if (controller.signal.aborted) {
         return;
       }
-      setSnapshot(nextSnapshot);
+      setSnapshot(createSnapshotFromStoredRecords(documents, deletes));
     });
     const unsubscribe = subscribeToDocumentStore(db, (change) => {
       if (controller.signal.aborted) {

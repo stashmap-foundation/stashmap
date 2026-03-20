@@ -1,5 +1,10 @@
 import { Event, UnsignedEvent } from "nostr-tools";
-import type { DocumentStoreChange, StashmapDB } from "./indexedDB";
+import type {
+  DocumentStoreChange,
+  StashmapDB,
+  StoredDeleteRecord,
+  StoredDocumentRecord,
+} from "./indexedDB";
 import {
   getCachedEvents,
   getStoredDeletes,
@@ -11,15 +16,12 @@ import {
   eventsToStoredRecords,
   normalizeCachedEventRecord,
 } from "./documentStoreRecords";
-import {
-  createSnapshotFromStoredRecords,
-  type DocumentSnapshot,
-} from "./documentStoreState";
 import { applyStoredDelete, applyStoredDocument } from "./permanentSync";
 
-export async function loadInitialDocumentStoreSnapshot(
-  db: StashmapDB
-): Promise<DocumentSnapshot> {
+export async function loadInitialDocumentStoreRecords(db: StashmapDB): Promise<{
+  readonly documents: ReadonlyArray<StoredDocumentRecord>;
+  readonly deletes: ReadonlyArray<StoredDeleteRecord>;
+}> {
   const [documents, deletes] = await Promise.all([
     getStoredDocuments(db),
     getStoredDeletes(db),
@@ -27,14 +29,15 @@ export async function loadInitialDocumentStoreSnapshot(
 
   if (documents.length === 0 && deletes.length === 0) {
     const cachedEvents = await getCachedEvents(db);
-    const { documents: cachedDocuments, deletes: cachedDeletes } =
-      eventsToStoredRecords(
-        cachedEvents as ReadonlyArray<Event | UnsignedEvent>
-      );
-    return createSnapshotFromStoredRecords(cachedDocuments, cachedDeletes);
+    return eventsToStoredRecords(
+      cachedEvents as ReadonlyArray<Event | UnsignedEvent>
+    );
   }
 
-  return createSnapshotFromStoredRecords(documents, deletes);
+  return {
+    documents,
+    deletes,
+  };
 }
 
 export function subscribeToDocumentStore(

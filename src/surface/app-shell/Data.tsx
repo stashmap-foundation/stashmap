@@ -19,7 +19,7 @@ import {
 } from "../../infra/nostrCore";
 import { DataContextProvider, MergeKnowledgeDB } from "./DataContext";
 import { useApis } from "./ApiContext";
-import { replaceUnauthenticatedUser } from "../../app/actions";
+import { replaceUnauthenticatedUser } from "../../planner/core/actions";
 import { PlanningContextProvider } from "./PlannerContext";
 import { useUserRelayContext } from "./UserRelayContext";
 import { flattenRelays } from "../../infra/relayUtils";

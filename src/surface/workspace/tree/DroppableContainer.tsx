@@ -5,7 +5,7 @@ import { NativeTypes } from "react-dnd-html5-backend";
 import { dnd, getDropDestinationFromTreeView } from "./DND";
 import { isEmptySemanticID } from "../../../graph/context";
 import { deselectAllChildren, useTemporaryView } from "./TemporaryViewContext";
-import type { Plan } from "../../../app/types";
+import type { Plan } from "../../../planner/session/types";
 import type { RowsData } from "../../../rows/data";
 import { usePlanner } from "../../app-shell/PlannerContext";
 import { buildPaneTarget, getRowIDFromView } from "../../../rows/resolveRow";

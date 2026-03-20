@@ -15,7 +15,7 @@ import {
 } from "./RowContext";
 import { getRowIDFromView } from "../../../rows/resolveRow";
 import { getLast, type RowPath, rowPathToString } from "../../../rows/rowPaths";
-import { isExpanded } from "../../../app/navigationActions";
+import { isExpanded } from "../../../planner/session/navigationActions";
 import { useData } from "../../app-shell/DataContext";
 import {
   usePaneStack,

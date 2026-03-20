@@ -1,4 +1,4 @@
-import type { KeyPair, PublicKey, User } from "../graph/identity";
+import type { KeyPair, PublicKey, User } from "../../graph/identity";
 
 export const UNAUTHENTICATED_USER_PK = "UNAUTHENTICATEDUSERPK" as PublicKey;
 

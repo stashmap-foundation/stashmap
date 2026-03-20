@@ -1,5 +1,5 @@
 import { List } from "immutable";
-import { EMPTY_SEMANTIC_ID } from "../graph/types";
+import { EMPTY_SEMANTIC_ID } from "../../graph/types";
 import type {
   KnowledgeDBs,
   Argument,
@@ -8,44 +8,44 @@ import type {
   LongID,
   Relevance,
   TextSeed,
-} from "../graph/types";
-import type { PublicKey } from "../graph/identity";
-import { createRefTarget, isRefNode } from "../graph/references";
+} from "../../graph/types";
+import type { PublicKey } from "../../graph/identity";
+import { createRefTarget, isRefNode } from "../../graph/references";
 import {
   getNodeUserPublicKey,
   isEmptySemanticID,
   getSemanticID,
   isSearchId,
   withUsersEntryPublicKey,
-} from "../graph/context";
-import { getNode } from "../graph/queries";
-import { newNode } from "../graph/nodeFactory";
-import { decodePublicKeyInputSync } from "../graph/publicKeys";
-import type { ChildNodeMetadata } from "../graph/commands";
+} from "../../graph/context";
+import { getNode } from "../../graph/queries";
+import { newNode } from "../../graph/nodeFactory";
+import { decodePublicKeyInputSync } from "../../graph/publicKeys";
+import type { ChildNodeMetadata } from "../../graph/commands";
 import {
   planUpdateChildNodeMetadataById,
   planUpsertContact,
   planUpsertNodes,
-} from "../graph/commands";
+} from "../../graph/commands";
 import {
   getNodeForView,
   getNodeIndexForView,
   getRowIDFromView,
-} from "../rows/resolveRow";
+} from "../../rows/resolveRow";
 import {
   getParentRowPath,
   rowPathToString,
   type RowPath,
   getPaneIndex,
-} from "../rows/rowPaths";
-import type { VirtualRowsMap } from "../rows/types";
+} from "../../rows/rowPaths";
+import type { VirtualRowsMap } from "../../rows/types";
 import { planAddToParent, planDeepCopyNode } from "./treeActions";
 import type { Plan } from "./types";
 import { upsertNodes } from "./actions";
-import { computeEmptyNodeMetadata } from "../session/temporaryNodes";
+import { computeEmptyNodeMetadata } from "../../session/temporaryNodes";
 import { planExpandNode } from "./navigationActions";
 
-export type { ChildNodeMetadata } from "../graph/commands";
+export type { ChildNodeMetadata } from "../../graph/commands";
 
 function getNodeText(plan: Plan, rowPath: RowPath, stack: ID[]): string {
   return getNodeForView(plan, rowPath, stack)?.text ?? "";

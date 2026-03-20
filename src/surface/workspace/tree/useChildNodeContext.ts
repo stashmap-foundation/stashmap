@@ -16,7 +16,7 @@ import { usePlanner } from "../../app-shell/PlannerContext";
 import {
   planUpdateRowNodeMetadata,
   type ChildNodeMetadata,
-} from "../../../app/editorActions";
+} from "../../../planner/session/editorActions";
 import { usePaneStack } from "../layout/SplitPanesContext";
 import { useData } from "../../app-shell/DataContext";
 import { useEditorText } from "../editor/EditorTextContext";

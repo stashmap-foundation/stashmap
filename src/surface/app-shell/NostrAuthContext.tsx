@@ -12,7 +12,7 @@ import {
   isUserLoggedInWithExtension,
   isUserLoggedInWithSeed,
   UNAUTHENTICATED_USER_PK,
-} from "../../app/auth";
+} from "../../planner/core/auth";
 
 type Context = {
   user: User | undefined;

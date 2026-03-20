@@ -4,9 +4,9 @@ import {
   getSemanticID,
   isSearchId,
   shortID,
-} from "../graph/context";
-import { getNode } from "../graph/queries";
-import { resolveNode, isRefNode } from "../graph/references";
+} from "../../graph/context";
+import { getNode } from "../../graph/queries";
+import { resolveNode, isRefNode } from "../../graph/references";
 import {
   planDeleteDescendantNodes,
   planDeleteNodes,
@@ -15,7 +15,7 @@ import {
   planAddTargetsToNode,
   planCopyDescendantNodes,
   type AddToParentTarget,
-} from "../graph/commands";
+} from "../../graph/commands";
 import type {
   Context,
   GraphNode,
@@ -23,14 +23,14 @@ import type {
   LongID,
   Relevance,
   Argument,
-} from "../graph/types";
+} from "../../graph/types";
 import {
   getNodeIndexForView,
   getRowIDFromView,
   getContext,
   getNodeForView,
   addNodeToPathWithNodes,
-} from "../rows/resolveRow";
+} from "../../rows/resolveRow";
 import {
   getLast,
   getPaneIndex,
@@ -38,19 +38,19 @@ import {
   isRoot,
   type RowPath,
   rowPathToString,
-} from "../rows/rowPaths";
+} from "../../rows/rowPaths";
 import {
   bulkUpdateRowPathsAfterAddNode,
   copyViewsWithNodesMapping,
   copyViewsWithNewPrefix,
   planUpdateViews,
-} from "../session/views";
+} from "../../session/views";
 import {
   planExpandNode,
   updateRowPathsAfterDisconnect,
 } from "./navigationActions";
-import { getPane, planUpdatePanes } from "../session/panes";
-import type { Pane, Views } from "../session/types";
+import { getPane, planUpdatePanes } from "../../session/panes";
+import type { Pane, Views } from "../../session/types";
 import { upsertNodes } from "./actions";
 import type { Plan } from "./types";
 

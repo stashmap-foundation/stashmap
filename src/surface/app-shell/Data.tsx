@@ -41,9 +41,8 @@ import {
   newProcessedEvents,
   processEvents,
 } from "../../infra/eventProcessing";
-import { DocumentStoreProvider } from "./DocumentStore";
 import { createEmptySemanticIndex } from "../../graph/semanticIndex";
-import { PermanentDocumentSyncBridge } from "./PermanentDocumentSyncBridge";
+import { GraphProvider } from "./GraphProvider";
 import { useRelaysInfo } from "./useRelaysInfo";
 import type { EventState } from "./types";
 
@@ -217,27 +216,24 @@ function Data({ user, children }: DataProps): JSX.Element {
       views={views}
       panes={panes}
     >
-      <DocumentStoreProvider
+      <GraphProvider
         db={db || null}
+        myself={myPublicKey}
+        contacts={contacts}
+        extraAuthors={[
+          ...new globalThis.Set(
+            panes.flatMap((pane) =>
+              pane.rootNodeId
+                ? [pane.author, splitID(pane.rootNodeId)[0] || pane.author]
+                : [pane.author]
+            )
+          ),
+        ]}
+        defaultRelays={defaultRelays}
+        userRelays={userRelays}
+        contactsRelays={contactsRelays}
         unpublishedEvents={newEventsAndPublishResults.unsignedEvents}
       >
-        <PermanentDocumentSyncBridge
-          db={db}
-          myself={myPublicKey}
-          contacts={contacts}
-          extraAuthors={[
-            ...new globalThis.Set(
-              panes.flatMap((pane) =>
-                pane.rootNodeId
-                  ? [pane.author, splitID(pane.rootNodeId)[0] || pane.author]
-                  : [pane.author]
-              )
-            ),
-          ]}
-          defaultRelays={defaultRelays}
-          userRelays={userRelays}
-          contactsRelays={contactsRelays}
-        />
         <MergeKnowledgeDB>
           <PlanningContextProvider
             setPublishEvents={setNewEventsAndPublishResults}
@@ -253,7 +249,7 @@ function Data({ user, children }: DataProps): JSX.Element {
             <NavigationStateProvider>{children}</NavigationStateProvider>
           </PlanningContextProvider>
         </MergeKnowledgeDB>
-      </DocumentStoreProvider>
+      </GraphProvider>
     </DataContextProvider>
   );
 }

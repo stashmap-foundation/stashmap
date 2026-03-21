@@ -29,6 +29,7 @@ import {
 } from "../tree/RowContext";
 import { isEditableNode } from "../tree/TemporaryViewContext";
 import { planBatchIndent, planBatchOutdent } from "../tree/batchOperations";
+import { UNAUTHENTICATED_USER_PK } from "../../app-shell/RequireLogin";
 import {
   getNodeUserPublicKey,
   isEmptySemanticID,
@@ -744,8 +745,10 @@ export function Node({
   const userEntryPublicKey = getNodeUserPublicKey(currentNode);
   const isFollowingUserEntry =
     !!userEntryPublicKey && data.contacts.has(userEntryPublicKey);
+  const showOtherUserMarker = user.publicKey !== UNAUTHENTICATED_USER_PK;
   const isOtherUser =
-    (node && node.author !== user.publicKey) || isViewingOtherUser;
+    showOtherUserMarker &&
+    ((node && node.author !== user.publicKey) || isViewingOtherUser);
 
   const isVersion =
     virtualType === "version" || (!virtualType && !!node?.versionMeta);

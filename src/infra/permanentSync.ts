@@ -37,25 +37,34 @@ type PermanentSyncState = {
   checkpoints: Map<PublicKey, SyncCheckpointRecord>;
 };
 
+function isValidSyncAuthor(author: PublicKey): boolean {
+  return /^[0-9a-f]{64}$/.test(author);
+}
+
+function sanitizeSyncAuthors(authors: ReadonlyArray<PublicKey>): PublicKey[] {
+  return [...new Set(authors.filter(isValidSyncAuthor))].sort();
+}
+
 export function buildPermanentSyncAuthors(
   myself: PublicKey,
   contacts: Contacts
 ): PublicKey[] {
-  return contacts.keySeq().toSet().add(myself).toArray().sort();
+  return sanitizeSyncAuthors(contacts.keySeq().toSet().add(myself).toArray());
 }
 
 export function buildPermanentSyncFilters(authors: PublicKey[]): Filter[] {
-  if (authors.length === 0) {
+  const sanitizedAuthors = sanitizeSyncAuthors(authors);
+  if (sanitizedAuthors.length === 0) {
     return [];
   }
   return [
     {
-      authors,
+      authors: sanitizedAuthors,
       kinds: [KIND_KNOWLEDGE_DOCUMENT],
       limit: 0,
     },
     {
-      authors,
+      authors: sanitizedAuthors,
       kinds: [KIND_DELETE],
       "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`],
       limit: 0,
@@ -67,7 +76,7 @@ export function buildPermanentCatchUpFilters(
   authors: PublicKey[],
   checkpoints: ReadonlyMap<PublicKey, SyncCheckpointRecord>
 ): Filter[] {
-  const authorsWithCheckpoint = authors.filter(
+  const authorsWithCheckpoint = sanitizeSyncAuthors(authors).filter(
     (author) => (checkpoints.get(author)?.latestSeenLiveCreatedAt || 0) > 0
   );
   if (authorsWithCheckpoint.length === 0) {
@@ -356,17 +365,22 @@ export function startPermanentDocumentSync({
   relayUrls,
   authors,
   addLiveEvents,
+  writeEvents,
 }: {
   db: StashmapDB | null;
   relayPool: SimplePool;
   relayUrls: string[];
   authors: PublicKey[];
   addLiveEvents?: (events: ImmutableMap<string, Event | UnsignedEvent>) => void;
+  writeEvents?: (
+    events: ImmutableMap<string, Event | UnsignedEvent>
+  ) => void | Promise<void>;
 }): () => void {
+  const sanitizedAuthors = sanitizeSyncAuthors(authors);
   if (
     relayUrls.length === 0 ||
-    authors.length === 0 ||
-    (!db && !addLiveEvents)
+    sanitizedAuthors.length === 0 ||
+    (!db && !addLiveEvents && !writeEvents)
   ) {
     return () => {};
   }
@@ -383,13 +397,17 @@ export function startPermanentDocumentSync({
     }
     state.seenEventIds.add(event.id);
 
-    if (!db) {
+    if (writeEvents) {
+      await writeEvents(ImmutableMap([[event.id, event]]));
+    } else if (!db) {
       addLiveEvents?.(ImmutableMap([[event.id, event]]));
     }
 
     const document = toStoredDocumentRecord(event);
     if (document) {
-      if (db) {
+      if (writeEvents) {
+        // Repository-backed sync already persisted the event above.
+      } else if (db) {
         await applyStoredDocument(db, document);
       }
       await updateCheckpoint(db, state, document.author, (current) =>
@@ -400,7 +418,9 @@ export function startPermanentDocumentSync({
 
     const deletion = toStoredDeleteRecord(event);
     if (deletion) {
-      if (db) {
+      if (writeEvents) {
+        // Repository-backed sync already persisted the event above.
+      } else if (db) {
         await applyStoredDelete(db, deletion);
       }
       await updateCheckpoint(db, state, deletion.author, (current) =>
@@ -416,7 +436,10 @@ export function startPermanentDocumentSync({
   };
 
   const runCatchUp = async (): Promise<void> => {
-    const filters = buildPermanentCatchUpFilters(authors, state.checkpoints);
+    const filters = buildPermanentCatchUpFilters(
+      sanitizedAuthors,
+      state.checkpoints
+    );
     const events = await queryPermanentSyncFilters(
       relayPool,
       relayUrls,
@@ -516,17 +539,17 @@ export function startPermanentDocumentSync({
     await runBackfillForAuthor(restAuthors);
   };
 
-  loadPermanentSyncCheckpoints(db, authors)
+  loadPermanentSyncCheckpoints(db, sanitizedAuthors)
     .then(async (checkpoints) => {
       state.checkpoints = checkpoints;
       await runCatchUp();
-      await runBackfillForAuthor(authors);
+      await runBackfillForAuthor(sanitizedAuthors);
     })
     .catch(() => undefined);
 
   const sub = relayPool.subscribeMany(
     relayUrls,
-    buildPermanentSyncFilters(authors),
+    buildPermanentSyncFilters(sanitizedAuthors),
     {
       onevent(event: Event): void {
         applyIncomingEvent(event).catch(() => undefined);

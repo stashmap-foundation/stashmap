@@ -10,6 +10,18 @@ import type {
   SemanticIndex,
 } from "../graph/types";
 
+type RowsSnapshotRecord = {
+  replaceableKey: string;
+  author: PublicKey;
+  dTag: string;
+  eventId: string;
+  sourceRootShortID: string;
+  createdAt: number;
+  updatedMs: number;
+  content: string;
+  tags: string[][];
+};
+
 export type RowTypeFilter =
   | Relevance
   | Argument
@@ -46,6 +58,8 @@ export type RowsData = {
   user: User;
   knowledgeDBs: KnowledgeDBs;
   semanticIndex: SemanticIndex;
+  snapshots?: Map<string, RowsSnapshotRecord>;
+  snapshotStatuses?: Map<string, "loading" | "loaded" | "unavailable">;
   publishEventsStatus: {
     temporaryEvents: List<RowsTemporaryEvent>;
   };

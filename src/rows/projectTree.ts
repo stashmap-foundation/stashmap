@@ -26,11 +26,13 @@ import {
   getAlternativeNodeData,
   getIncomingReferenceNodeIds,
 } from "./alternativeNodes";
+import { getVersionSnapshotKeys, type SnapshotKey } from "./versionService";
 
 export type TreeResult = {
   paths: List<RowPath>;
   virtualRows: VirtualRowsMap;
   firstVirtualKeys: ImmutableSet<string>;
+  versionSnapshotKeys: List<SnapshotKey>;
 };
 
 type TreeTraversalOptions = {
@@ -58,6 +60,7 @@ function getChildrenForConcreteRef(
       paths: List(),
       virtualRows: EMPTY_VIRTUAL_ROWS,
       firstVirtualKeys: EMPTY_FIRST_VIRTUAL_KEYS,
+      versionSnapshotKeys: List<SnapshotKey>(),
     };
   }
 
@@ -67,6 +70,7 @@ function getChildrenForConcreteRef(
       .toList(),
     virtualRows: EMPTY_VIRTUAL_ROWS,
     firstVirtualKeys: EMPTY_FIRST_VIRTUAL_KEYS,
+    versionSnapshotKeys: List<SnapshotKey>(),
   };
 }
 
@@ -115,6 +119,7 @@ function getChildrenForRegularNode(
       paths: nodePaths,
       virtualRows: EMPTY_VIRTUAL_ROWS,
       firstVirtualKeys: EMPTY_FIRST_VIRTUAL_KEYS,
+      versionSnapshotKeys: List<SnapshotKey>(),
     };
   }
 
@@ -143,7 +148,11 @@ function getChildrenForRegularNode(
     : List<LongID>();
 
   const isOwnContent = effectiveAuthor === data.user.publicKey;
-  const { suggestions: suggestionNodeIDs, versions } = getAlternativeNodeData(
+  const {
+    suggestions: suggestionNodeIDs,
+    versions,
+    allVersions,
+  } = getAlternativeNodeData(
     data.knowledgeDBs,
     data.semanticIndex,
     visibleAuthors,
@@ -220,11 +229,17 @@ function getChildrenForRegularNode(
   const firstVirtualKeys = firstVirtualPath
     ? EMPTY_FIRST_VIRTUAL_KEYS.add(rowPathToString(firstVirtualPath))
     : EMPTY_FIRST_VIRTUAL_KEYS;
+  const versionSnapshotKeys = getVersionSnapshotKeys(
+    data.knowledgeDBs,
+    allVersions,
+    data.user.publicKey
+  );
 
   return {
     paths: nodePaths.concat(withVersions.paths),
     virtualRows: withVersions.virtualRows,
     firstVirtualKeys,
+    versionSnapshotKeys,
   };
 }
 
@@ -313,6 +328,9 @@ export function getNodesInTree(
           paths: sub.paths,
           virtualRows: result.virtualRows.merge(sub.virtualRows),
           firstVirtualKeys: result.firstVirtualKeys.union(sub.firstVirtualKeys),
+          versionSnapshotKeys: result.versionSnapshotKeys.concat(
+            sub.versionSnapshotKeys
+          ),
         };
       }
       return { ...result, paths: withChild };
@@ -321,6 +339,7 @@ export function getNodesInTree(
       paths: ctx,
       virtualRows: childResult.virtualRows,
       firstVirtualKeys: childResult.firstVirtualKeys,
+      versionSnapshotKeys: childResult.versionSnapshotKeys,
     }
   );
 }

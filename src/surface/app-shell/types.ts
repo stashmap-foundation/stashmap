@@ -3,6 +3,7 @@ import type { UnsignedEvent } from "nostr-tools";
 import type { RelayInformation } from "nostr-tools/lib/types/nip11";
 import type { Contacts, PublicKey, User } from "../../graph/identity";
 import type { KnowledgeDBs, SemanticIndex } from "../../graph/types";
+import type { StoredSnapshotRecord } from "../../infra/indexedDB";
 import type {
   Pane,
   RowFocusIntent,
@@ -23,12 +24,16 @@ export type EventState = PublishEvents & {
   queueStatus?: QueueStatus;
 };
 
+export type SnapshotLoadStatus = "loading" | "loaded" | "unavailable";
+
 export type Data = {
   contacts: Contacts;
   user: User;
   contactsRelays: Map<PublicKey, Relays>;
   knowledgeDBs: KnowledgeDBs;
   semanticIndex: SemanticIndex;
+  snapshots?: Map<string, StoredSnapshotRecord>;
+  snapshotStatuses?: Map<string, SnapshotLoadStatus>;
   relaysInfos: Map<string, RelayInformation | undefined>;
   publishEventsStatus: EventState;
   views: Views;

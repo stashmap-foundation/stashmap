@@ -5,9 +5,11 @@ import { computeEmptyNodeMetadata } from "../../session/temporaryNodes";
 import { injectEmptyNodesIntoKnowledgeDBs } from "../../rows/temporaryNodes";
 import type { Data } from "./types";
 import {
-  useDocumentKnowledgeDBs,
-  useDocumentSemanticIndex,
-} from "./DocumentStore";
+  useGraphKnowledgeDBs,
+  useGraphSemanticIndex,
+  useGraphSnapshots,
+  useGraphSnapshotStatuses,
+} from "./GraphProvider";
 
 export type DataContextProps = Data;
 
@@ -43,8 +45,10 @@ export function MergeKnowledgeDB({
   const { temporaryEvents } = data.publishEventsStatus;
   const myself = data.user.publicKey;
 
-  const documentDBs = useDocumentKnowledgeDBs();
-  const semanticIndex = useDocumentSemanticIndex();
+  const documentDBs = useGraphKnowledgeDBs();
+  const semanticIndex = useGraphSemanticIndex();
+  const snapshots = useGraphSnapshots();
+  const snapshotStatuses = useGraphSnapshotStatuses();
   const mergedDataDBs = mergeKnowledgeDBs(data.knowledgeDBs, documentDBs);
   const baseDBs = knowledgeDBs
     ? mergeKnowledgeDBs(knowledgeDBs, mergedDataDBs)
@@ -63,6 +67,8 @@ export function MergeKnowledgeDB({
         ...data,
         knowledgeDBs: injectedDBs,
         semanticIndex,
+        snapshots,
+        snapshotStatuses,
       }}
     >
       {children}

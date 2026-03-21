@@ -130,16 +130,18 @@ export function RootViewContextProvider({
   const stack = usePaneStack();
   const pane = data.panes[paneIndex];
   const rootContext = getContextFromStack(stack);
-  const resolvedRootNode = pane?.rootNodeId
-    ? getNode(data.knowledgeDBs, pane.rootNodeId, data.user.publicKey)
-    : resolveSemanticNodeInCurrentTree(
-        data.knowledgeDBs,
-        pane?.author || data.user.publicKey,
-        root,
-        rootContext,
-        undefined,
-        true
-      );
+  const resolvedRootNode =
+    (pane?.rootNodeId
+      ? getNode(data.knowledgeDBs, pane.rootNodeId, data.user.publicKey)
+      : undefined) ||
+    resolveSemanticNodeInCurrentTree(
+      data.knowledgeDBs,
+      pane?.author || data.user.publicKey,
+      root,
+      rootContext,
+      undefined,
+      true
+    );
   const startPath: RowPath = [paneIndex, resolvedRootNode?.id || root];
   const finalPath = (indices || List<number>()).reduce(
     (acc, index) => addNodeToPath(data, acc, index, stack),

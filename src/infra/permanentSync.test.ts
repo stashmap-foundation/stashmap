@@ -44,8 +44,10 @@ const indexedDBModule = jest.requireMock("./indexedDB") as {
   putSyncCheckpoint: jest.Mock;
 };
 
-const ALICE = "alice" as PublicKey;
-const BOB = "bob" as PublicKey;
+const ALICE =
+  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as PublicKey;
+const BOB =
+  "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" as PublicKey;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -132,7 +134,7 @@ test("toStoredDocumentRecord extracts replaceable document fields", () => {
   } as unknown as Event;
 
   expect(toStoredDocumentRecord(event)).toEqual({
-    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:alice:root-1`,
+    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:${ALICE}:root-1`,
     author: ALICE,
     eventId: "doc-1",
     dTag: "root-1",
@@ -150,7 +152,7 @@ test("toStoredDeleteRecord extracts document delete records", () => {
     created_at: 11,
     kind: KIND_DELETE,
     tags: [
-      ["a", `${KIND_KNOWLEDGE_DOCUMENT}:alice:root-1`],
+      ["a", `${KIND_KNOWLEDGE_DOCUMENT}:${ALICE}:root-1`],
       ["k", `${KIND_KNOWLEDGE_DOCUMENT}`],
       ["ms", "2234"],
     ],
@@ -158,7 +160,7 @@ test("toStoredDeleteRecord extracts document delete records", () => {
   } as unknown as Event;
 
   expect(toStoredDeleteRecord(event)).toEqual({
-    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:alice:root-1`,
+    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:${ALICE}:root-1`,
     author: ALICE,
     eventId: "del-1",
     createdAt: 11,
@@ -240,7 +242,7 @@ test("applyStoredDocument ignores a document hidden by a newer delete", async ()
   const db = {} as StashmapDB;
   indexedDBModule.getStoredDocument.mockResolvedValue(undefined);
   indexedDBModule.getStoredDelete.mockResolvedValue({
-    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:alice:root-1`,
+    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:${ALICE}:root-1`,
     author: ALICE,
     eventId: "del-1",
     createdAt: 11,
@@ -248,7 +250,7 @@ test("applyStoredDocument ignores a document hidden by a newer delete", async ()
   });
 
   await applyStoredDocument(db, {
-    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:alice:root-1`,
+    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:${ALICE}:root-1`,
     author: ALICE,
     eventId: "doc-1",
     dTag: "root-1",
@@ -264,7 +266,7 @@ test("applyStoredDocument ignores a document hidden by a newer delete", async ()
 test("applyStoredDelete removes an older stored document", async () => {
   const db = {} as StashmapDB;
   indexedDBModule.getStoredDocument.mockResolvedValue({
-    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:alice:root-1`,
+    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:${ALICE}:root-1`,
     author: ALICE,
     eventId: "doc-1",
     dTag: "root-1",
@@ -276,7 +278,7 @@ test("applyStoredDelete removes an older stored document", async () => {
   indexedDBModule.getStoredDelete.mockResolvedValue(undefined);
 
   await applyStoredDelete(db, {
-    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:alice:root-1`,
+    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:${ALICE}:root-1`,
     author: ALICE,
     eventId: "del-1",
     createdAt: 11,
@@ -286,7 +288,7 @@ test("applyStoredDelete removes an older stored document", async () => {
   expect(indexedDBModule.putStoredDelete).toHaveBeenCalled();
   expect(indexedDBModule.removeStoredDocument).toHaveBeenCalledWith(
     db,
-    `${KIND_KNOWLEDGE_DOCUMENT}:alice:root-1`
+    `${KIND_KNOWLEDGE_DOCUMENT}:${ALICE}:root-1`
   );
 });
 
@@ -328,7 +330,7 @@ test("startPermanentDocumentSync applies document events immediately", async () 
   });
 
   expect(indexedDBModule.putStoredDocument).toHaveBeenCalledWith(db, {
-    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:alice:root-1`,
+    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT}:${ALICE}:root-1`,
     author: ALICE,
     eventId: "doc-1",
     dTag: "root-1",
@@ -426,7 +428,7 @@ test("toStoredSnapshotRecord extracts snapshot fields correctly", () => {
   } as unknown as Event;
 
   expect(toStoredSnapshotRecord(event)).toEqual({
-    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT}:alice:snapshot-dtag`,
+    replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT}:${ALICE}:snapshot-dtag`,
     author: ALICE,
     eventId: "snap-1",
     dTag: "snapshot-dtag",

@@ -7,7 +7,7 @@ import type {
 } from "../graph/types";
 import type { RowsData } from "./data";
 import type { ReferenceRow } from "./types";
-import { getChildNodes, getNode, nodePassesFilters } from "../graph/queries";
+import { getNode } from "../graph/queries";
 import {
   shortID,
   splitID,
@@ -16,15 +16,10 @@ import {
 } from "../graph/context";
 import { resolveNode, isRefNode } from "../graph/references";
 import { getTextForSemanticID } from "../graph/semanticText";
-import {
-  getLast,
-  getPaneIndex,
-  getParentRowPath,
-  type RowPath,
-} from "./rowPaths";
+import { getParentRowPath, type RowPath } from "./rowPaths";
 import { referenceToText } from "./display";
 import { getNodeForView } from "./resolveRow";
-import { DEFAULT_TYPE_FILTERS } from "./settings";
+import { getVersionMeta } from "./versionService";
 
 function argumentPrefix(argument?: Argument): string {
   if (argument === "confirms") {
@@ -159,96 +154,6 @@ export function buildOutgoingReference(
   };
 }
 
-function effectiveIDs(
-  knowledgeDBs: KnowledgeDBs,
-  node: GraphNode,
-  activeFilters: (
-    | Relevance
-    | Argument
-    | "suggestions"
-    | "versions"
-    | "incoming"
-    | "contains"
-  )[]
-): List<string> {
-  return getChildNodes(knowledgeDBs, node, node.author)
-    .filter(
-      (item) =>
-        nodePassesFilters(item, activeFilters) &&
-        item.relevance !== "not_relevant"
-    )
-    .map((item) => getSemanticID(knowledgeDBs, item))
-    .toList();
-}
-
-function computeNodeDiff(
-  knowledgeDBs: KnowledgeDBs,
-  versionNode: GraphNode,
-  parentNode: GraphNode | undefined,
-  activeFilters: (
-    | Relevance
-    | Argument
-    | "suggestions"
-    | "versions"
-    | "incoming"
-    | "contains"
-  )[]
-): { addCount: number; removeCount: number } {
-  const versionIDs = effectiveIDs(
-    knowledgeDBs,
-    versionNode,
-    activeFilters
-  ).toSet();
-  const parentIDs = parentNode
-    ? effectiveIDs(knowledgeDBs, parentNode, activeFilters).toSet()
-    : List<string>().toSet();
-  return {
-    addCount: versionIDs.filter((id) => !parentIDs.has(id)).size,
-    removeCount: parentIDs.filter((id) => !versionIDs.has(id)).size,
-  };
-}
-
-function computeVersionMeta(
-  data: RowsData,
-  rowPath: RowPath,
-  stack: ID[]
-): VersionMeta {
-  const refId = getLast(rowPath);
-  const node = resolveNode(
-    data.knowledgeDBs,
-    getNode(data.knowledgeDBs, refId, data.user.publicKey)
-  );
-  if (!node)
-    return {
-      updated: 0,
-      addCount: 0,
-      removeCount: 0,
-      diffStatus: "unavailable",
-    };
-
-  const pane = data.panes[getPaneIndex(rowPath)];
-  const activeFilters = pane.typeFilters || DEFAULT_TYPE_FILTERS;
-
-  const parentPath = getParentRowPath(rowPath);
-  const parentNode = parentPath
-    ? getNodeForView(data, parentPath, stack)
-    : undefined;
-
-  const { addCount, removeCount } = computeNodeDiff(
-    data.knowledgeDBs,
-    node,
-    parentNode,
-    activeFilters
-  );
-  return {
-    updated: node.updated,
-    addCount,
-    removeCount,
-    snapshotDTag: node.snapshotDTag,
-    diffStatus: "computed",
-  };
-}
-
 function getDiffParts(meta: VersionMeta): string[] {
   if (meta.diffStatus === "computed") {
     return [
@@ -374,7 +279,7 @@ export function buildReferenceRow(
   }
 
   if (virtualType === "version") {
-    const versionMeta = computeVersionMeta(data, rowPath, stack);
+    const versionMeta = getVersionMeta(data, rowPath, stack);
     const outgoing = buildOutgoingReference(
       refId,
       data.knowledgeDBs,
@@ -408,7 +313,7 @@ export function buildReferenceRow(
     parentNode &&
     nodesMatchForVersion(data.knowledgeDBs, ref.node, parentNode)
   ) {
-    const versionMeta = computeVersionMeta(data, rowPath, stack);
+    const versionMeta = getVersionMeta(data, rowPath, stack);
     return { ...outgoing, text: outgoing.text, versionMeta };
   }
   if (!parentNode) return outgoing;

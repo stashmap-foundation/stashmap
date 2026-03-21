@@ -14,6 +14,10 @@ const DOCUMENT_STORE_LISTENERS = new WeakMap<
   StashmapDB,
   Set<(change: DocumentStoreChange) => void>
 >();
+const SNAPSHOT_STORE_LISTENERS = new WeakMap<
+  StashmapDB,
+  Set<(change: SnapshotStoreChange) => void>
+>();
 
 export type OutboxEntry = {
   readonly key: string;
@@ -80,6 +84,11 @@ export type DocumentStoreChange =
       readonly replaceableKey: string;
     };
 
+export type SnapshotStoreChange = {
+  readonly type: "snapshot-put";
+  readonly snapshot: StoredSnapshotRecord;
+};
+
 export type StashmapDB = IDBDatabase;
 
 function notifyDocumentStoreListeners(
@@ -87,6 +96,13 @@ function notifyDocumentStoreListeners(
   change: DocumentStoreChange
 ): void {
   DOCUMENT_STORE_LISTENERS.get(db)?.forEach((listener) => listener(change));
+}
+
+function notifySnapshotStoreListeners(
+  db: StashmapDB,
+  change: SnapshotStoreChange
+): void {
+  SNAPSHOT_STORE_LISTENERS.get(db)?.forEach((listener) => listener(change));
 }
 
 export function subscribeDocumentStore(
@@ -100,6 +116,21 @@ export function subscribeDocumentStore(
     listeners.delete(listener);
     if (listeners.size === 0) {
       DOCUMENT_STORE_LISTENERS.delete(db);
+    }
+  };
+}
+
+export function subscribeSnapshotStore(
+  db: StashmapDB,
+  listener: (change: SnapshotStoreChange) => void
+): () => void {
+  const listeners = SNAPSHOT_STORE_LISTENERS.get(db) || new Set();
+  listeners.add(listener);
+  SNAPSHOT_STORE_LISTENERS.set(db, listeners);
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0) {
+      SNAPSHOT_STORE_LISTENERS.delete(db);
     }
   };
 }
@@ -367,7 +398,13 @@ export const putStoredSnapshot = (
 ): Promise<void> =>
   new Promise((resolve, reject) => {
     const request = txStore(db, SNAPSHOT_STORE, "readwrite").put(snapshot);
-    request.onsuccess = () => resolve();
+    request.onsuccess = () => {
+      notifySnapshotStoreListeners(db, {
+        type: "snapshot-put",
+        snapshot,
+      });
+      resolve();
+    };
     request.onerror = () => reject(request.error);
   });
 

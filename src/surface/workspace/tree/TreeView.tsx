@@ -23,6 +23,7 @@ import {
   usePaneIndex,
 } from "../layout/SplitPanesContext";
 import { useApis } from "../../app-shell/ApiContext";
+import { useEnsureSnapshotsLoaded } from "../../app-shell/GraphProvider";
 import {
   ActiveRowState,
   KeyboardMode,
@@ -60,6 +61,7 @@ export function PaneTreeResultProvider({
   const rowPath = useRowPath();
   const rootKey = rowPathToString(rowPath);
   const isRootExpanded = isExpanded(data, rootKey);
+  const ensureSnapshotsLoaded = useEnsureSnapshotsLoaded();
   const treeResult = useMemo(() => {
     if (!isRootExpanded) {
       return undefined;
@@ -82,6 +84,15 @@ export function PaneTreeResultProvider({
     stack,
     rowPath,
   ]);
+
+  useEffect(() => {
+    if (!treeResult || treeResult.versionSnapshotKeys.size === 0) {
+      return;
+    }
+    ensureSnapshotsLoaded(treeResult.versionSnapshotKeys.toArray()).catch(
+      () => undefined
+    );
+  }, [ensureSnapshotsLoaded, treeResult]);
 
   return (
     <PaneTreeResultContext.Provider value={treeResult}>

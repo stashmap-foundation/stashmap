@@ -2,7 +2,7 @@
 import { UnsignedEvent } from "nostr-tools";
 
 const DB_NAME = "stashmap";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const OUTBOX_STORE = "outbox";
 const EVENT_CACHE_STORE = "eventCache";
 const DOCUMENT_STORE = "documents";
@@ -97,8 +97,9 @@ export const openDB = (): Promise<StashmapDB | null> => {
   }
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
       const db = request.result;
+      const { oldVersion } = event;
       if (!db.objectStoreNames.contains(OUTBOX_STORE)) {
         db.createObjectStore(OUTBOX_STORE, { keyPath: "key" });
       }
@@ -123,6 +124,11 @@ export const openDB = (): Promise<StashmapDB | null> => {
         db.createObjectStore(SYNC_CHECKPOINT_STORE, {
           keyPath: "author",
         });
+      }
+      if (oldVersion < 3) {
+        request.transaction?.objectStore(DOCUMENT_STORE).clear();
+        request.transaction?.objectStore(DOCUMENT_DELETE_STORE).clear();
+        request.transaction?.objectStore(SYNC_CHECKPOINT_STORE).clear();
       }
     };
     request.onsuccess = () => {

@@ -11,6 +11,7 @@ import {
   matchFilters,
 } from "nostr-tools";
 import { v4 } from "uuid";
+import { KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT } from "./nostr";
 
 type SubscriptionRecord = {
   filters: Filter[];
@@ -147,7 +148,7 @@ test("replay honors limit 0 but still delivers future matching events", () => {
     id: "old-event".padEnd(64, "0"),
     pubkey: "alice" as PublicKey,
     created_at: 10,
-    kind: 34771,
+    kind: KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
     sig: "0".repeat(128),
     tags: [["d", "root-1"]],
     content: "# Old Root",
@@ -157,7 +158,13 @@ test("replay honors limit 0 but still delivers future matching events", () => {
   const receiveEvent = jest.fn();
   relayPool.subscribeMany(
     ["wss://relay.test/"],
-    [{ authors: ["alice"], kinds: [34771], limit: 0 }],
+    [
+      {
+        authors: ["alice"],
+        kinds: [KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT],
+        limit: 0,
+      },
+    ],
     {
       onevent: receiveEvent,
     }
@@ -186,7 +193,7 @@ test("replay honors since, until, and limit semantics", () => {
         id: `event-${createdAt}`.padEnd(64, `${createdAt % 10}`),
         pubkey: "alice" as PublicKey,
         created_at: createdAt,
-        kind: 34771,
+        kind: KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
         sig: "0".repeat(128),
         tags: [["d", `root-${createdAt}`]],
         content: `# Root ${createdAt}`,
@@ -202,7 +209,7 @@ test("replay honors since, until, and limit semantics", () => {
     [
       {
         authors: ["alice"],
-        kinds: [34771],
+        kinds: [KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT],
         since: 9,
         until: 20,
         limit: 2,

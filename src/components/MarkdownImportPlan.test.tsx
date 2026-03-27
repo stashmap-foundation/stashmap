@@ -100,6 +100,30 @@ test("Parser strips leading list markers and keeps nesting", () => {
   expect(allTexts.every((text) => !/^[-+*]|\d+\./u.test(text))).toBe(true);
 });
 
+test("Parser turns hard-wrapped list item breaks into spaces", () => {
+  const trees = parseMarkdownHierarchy(`
+- The Endogenous personality is the 'inner' Man; a person whose outlook on life
+is 'inward.' He is inner-directed, inner-driven, inner-motivated; one who uses
+inner modes of thinking, inner evaluations, intuition; one who is to a high
+degree autonomous, self-sufficient; one who is relatively indifferent to
+social pressures, influences and inducements. He stands in stark contrast
+`);
+
+  expect(trees).toEqual([
+    {
+      text: [
+        "The Endogenous personality is the 'inner' Man; a person whose outlook on life",
+        "is 'inward.' He is inner-directed, inner-driven, inner-motivated; one who uses",
+        "inner modes of thinking, inner evaluations, intuition; one who is to a high",
+        "degree autonomous, self-sufficient; one who is relatively indifferent to",
+        "social pressures, influences and inducements. He stands in stark contrast",
+      ].join(" "),
+      blockKind: "list_item",
+      children: [],
+    },
+  ]);
+});
+
 test("Empty-root drop wrapper is only used for multiple imported trees", () => {
   const singleTree = [{ text: "Only", children: [] }];
   expect(buildRootTreeForEmptyRootDrop(singleTree)).toEqual(singleTree[0]);

@@ -111,7 +111,7 @@ export function buildPermanentBackfillFilter({
   };
 }
 
-function getStoredEventID(
+export function getStoredEventID(
   event: Event | UnsignedEvent,
   replaceableKey: string
 ): string {

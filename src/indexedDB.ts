@@ -2,12 +2,13 @@
 import { UnsignedEvent } from "nostr-tools";
 
 const DB_NAME = "stashmap";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const OUTBOX_STORE = "outbox";
 const EVENT_CACHE_STORE = "eventCache";
 const DOCUMENT_STORE = "documents";
 const DOCUMENT_DELETE_STORE = "documentDeletes";
 const SYNC_CHECKPOINT_STORE = "syncCheckpoints";
+const SNAPSHOT_STORE = "snapshots";
 const OPEN_DATABASES = new Set<StashmapDB>();
 const DOCUMENT_STORE_LISTENERS = new WeakMap<
   StashmapDB,
@@ -38,6 +39,10 @@ export type StoredDeleteRecord = {
   readonly eventId: string;
   readonly createdAt: number;
   readonly deletedAt: number;
+};
+
+export type StoredSnapshotRecord = StoredDocumentRecord & {
+  readonly sourceRootShortID?: string;
 };
 
 export type SyncCheckpointRecord = {
@@ -123,6 +128,11 @@ export const openDB = (): Promise<StashmapDB | null> => {
       if (!db.objectStoreNames.contains(SYNC_CHECKPOINT_STORE)) {
         db.createObjectStore(SYNC_CHECKPOINT_STORE, {
           keyPath: "author",
+        });
+      }
+      if (!db.objectStoreNames.contains(SNAPSHOT_STORE)) {
+        db.createObjectStore(SNAPSHOT_STORE, {
+          keyPath: "replaceableKey",
         });
       }
       if (oldVersion < 3) {
@@ -333,6 +343,27 @@ export const putSyncCheckpoint = (
     const request = txStore(db, SYNC_CHECKPOINT_STORE, "readwrite").put(
       checkpoint
     );
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+
+export const getStoredSnapshot = (
+  db: StashmapDB,
+  replaceableKey: string
+): Promise<StoredSnapshotRecord | undefined> =>
+  new Promise((resolve, reject) => {
+    const request = txStore(db, SNAPSHOT_STORE, "readonly").get(replaceableKey);
+    request.onsuccess = () =>
+      resolve(request.result as StoredSnapshotRecord | undefined);
+    request.onerror = () => reject(request.error);
+  });
+
+export const putStoredSnapshot = (
+  db: StashmapDB,
+  snapshot: StoredSnapshotRecord
+): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const request = txStore(db, SNAPSHOT_STORE, "readwrite").put(snapshot);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
   });

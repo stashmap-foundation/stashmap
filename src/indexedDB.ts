@@ -43,6 +43,7 @@ export type StoredDeleteRecord = {
 
 export type StoredSnapshotRecord = StoredDocumentRecord & {
   readonly sourceRootShortID?: string;
+  readonly sourceAuthor: PublicKey;
 };
 
 export type SyncCheckpointRecord = {

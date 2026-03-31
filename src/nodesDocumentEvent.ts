@@ -158,6 +158,7 @@ export function buildSnapshotEventFromNodes(
     tags: [
       ["d", snapshotDTag],
       ["source", shortID(sourceRootNode.id)],
+      ["source_author", sourceRootNode.author],
       msTag(),
     ],
     content: snapshotContent,

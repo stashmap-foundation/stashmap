@@ -5,6 +5,7 @@ import { findTag, getEventMs } from "./nostrEvents";
 import {
   KIND_DELETE,
   KIND_KNOWLEDGE_DOCUMENT,
+  KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
   getReplaceableKey,
 } from "./nostr";
 import type {
@@ -49,7 +50,7 @@ export function buildPermanentSyncFilters(authors: PublicKey[]): Filter[] {
   return [
     {
       authors,
-      kinds: [KIND_KNOWLEDGE_DOCUMENT],
+      kinds: [KIND_KNOWLEDGE_DOCUMENT, KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT],
       limit: 0,
     },
     {
@@ -489,10 +490,23 @@ export function startPermanentDocumentSync({
     await runBackfillForAuthor(restAuthors);
   };
 
+  const runSnapshotSync = async (): Promise<void> => {
+    if (!state.active || authors.length === 0) {
+      return;
+    }
+    const events = await queryPermanentSyncFilters(relayPool, relayUrls, [
+      { authors, kinds: [KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT] },
+    ]);
+    if (state.active && events.length > 0) {
+      await applyQueriedEvents(events);
+    }
+  };
+
   loadPermanentSyncCheckpoints(db, authors)
     .then(async (checkpoints) => {
       state.checkpoints = checkpoints;
       await runCatchUp();
+      await runSnapshotSync();
       await runBackfillForAuthor(authors);
     })
     .catch(() => undefined);

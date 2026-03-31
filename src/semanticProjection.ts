@@ -1,4 +1,4 @@
-import { List, OrderedMap, Set as ImmutableSet } from "immutable";
+import { List, Map, OrderedMap, Set as ImmutableSet } from "immutable";
 import {
   EMPTY_SEMANTIC_ID,
   getChildNodes,
@@ -17,6 +17,7 @@ import {
 } from "./connections";
 import { suggestionSettings } from "./constants";
 import { LOG_ROOT_ROLE } from "./systemRoots";
+import { computeVersionDiff } from "./domain/snapshotBaseline";
 
 type FooterTypeFilters = (
   | Relevance
@@ -142,10 +143,6 @@ export function getTextForSemanticID(
   return fallbackText !== "" || localID === EMPTY_SEMANTIC_ID
     ? fallbackText
     : undefined;
-}
-
-function getNodeKey(knowledgeDBs: KnowledgeDBs, node: GraphNode): ID {
-  return getSemanticID(knowledgeDBs, node);
 }
 
 function getContextKey(context: Context): string {
@@ -355,57 +352,13 @@ export function getIncomingCrefsForNode(
 
 type AlternativeFooterResult = {
   suggestions: List<ID>;
-  coveredCandidateIDs: ImmutableSet<string>;
   versions: List<LongID>;
 };
 
 const EMPTY_ALTERNATIVE_FOOTER_RESULT: AlternativeFooterResult = {
   suggestions: List<ID>(),
-  coveredCandidateIDs: ImmutableSet<string>(),
   versions: List<LongID>(),
 };
-
-function getFooterItemFilters(
-  filterTypes: FooterTypeFilters
-): (Relevance | Argument | "contains")[] {
-  return filterTypes.filter(
-    (t): t is Relevance | Argument | "contains" =>
-      t !== "suggestions" &&
-      t !== "versions" &&
-      t !== "incoming" &&
-      t !== undefined
-  );
-}
-
-function getFilteredNodeItems(
-  knowledgeDBs: KnowledgeDBs,
-  node: GraphNode,
-  filterTypes: FooterTypeFilters
-): List<GraphNode> {
-  const itemFilters = getFooterItemFilters(filterTypes);
-  return getChildNodes(knowledgeDBs, node, node.author)
-    .filter(
-      (item) =>
-        itemPassesFilters(item, itemFilters) &&
-        item.relevance !== "not_relevant"
-    )
-    .toList();
-}
-
-function useExactItemMatchForNode(
-  node: GraphNode,
-  currentNode: GraphNode
-): boolean {
-  return node.author === currentNode.author && node.root === currentNode.root;
-}
-
-function getComparableItemKey(
-  knowledgeDBs: KnowledgeDBs,
-  item: GraphNode,
-  useExactMatch: boolean
-): string {
-  return useExactMatch ? shortID(item.id) : getNodeKey(knowledgeDBs, item);
-}
 
 function isVisibleVersion(
   node: GraphNode,
@@ -516,20 +469,14 @@ function getVersions(
     .toList();
 }
 
-type AlternativeSummary = {
-  node: GraphNode;
-  filteredChildren: List<GraphNode>;
-  addKeys: ImmutableSet<string>;
-  removeCount: number;
-};
-
 export function getAlternativeFooterData(
   knowledgeDBs: KnowledgeDBs,
   semanticIndex: SemanticIndex,
   visibleAuthors: ImmutableSet<PublicKey>,
   filterTypes: FooterTypeFilters,
   currentNode?: GraphNode,
-  showSuggestions: boolean = true
+  showSuggestions: boolean = true,
+  snapshotNodes: SnapshotNodes = Map<string, Map<string, GraphNode>>()
 ): AlternativeFooterResult {
   if (!currentNode || !filterTypes || filterTypes.length === 0) {
     return EMPTY_ALTERNATIVE_FOOTER_RESULT;
@@ -543,114 +490,87 @@ export function getAlternativeFooterData(
     return EMPTY_ALTERNATIVE_FOOTER_RESULT;
   }
 
-  const versionNodes = getVersions(semanticIndex, visibleAuthors, currentNode);
-
   const currentNodeChildren = getChildNodes(
     knowledgeDBs,
     currentNode,
     currentNode.author
   );
+  const currentOriginKeys = currentNodeChildren
+    .map((item) => (item.basedOn ?? item.id) as string)
+    .toSet();
+  const currentFilteredOutOriginKeys = currentNodeChildren
+    .filter((item) => !itemPassesFilters(item, filterTypes))
+    .map((item) => (item.basedOn ?? item.id) as string)
+    .toSet();
+  const declinedTargetIDs = currentNodeChildren
+    .filter((item) => isRefNode(item) && item.relevance === "not_relevant")
+    .flatMap((item) => (item.targetID ? [item.targetID] : []))
+    .toSet();
   const existingCrefTargetIDs = currentNodeChildren
     .map((item) => (isRefNode(item) ? item.targetID : undefined))
     .filter((id): id is LongID => !!id)
     .toSet();
-  const declinedTargetIDs = currentNodeChildren
-    .filter((item) => isRefNode(item) && item.relevance === "not_relevant")
-    .flatMap((item) => {
-      const { targetID } = item;
-      return targetID ? [targetID] : [];
-    })
-    .toSet();
-  const currentNodeItemIDs = currentNodeChildren.map((item) => item.id).toSet();
-  const currentNodeItemKeys = currentNodeChildren
-    .map((item) => getNodeKey(knowledgeDBs, item))
-    .toSet();
-  const currentExactItemKeys = getFilteredNodeItems(
-    knowledgeDBs,
-    currentNode,
-    filterTypes
-  )
-    .map((item) => shortID(item.id))
-    .toSet();
-  const currentSemanticItemKeys = getFilteredNodeItems(
-    knowledgeDBs,
-    currentNode,
-    filterTypes
-  )
-    .map((item) => getNodeKey(knowledgeDBs, item))
-    .toSet();
 
-  const summarizeNodes = (nodes: List<GraphNode>): List<AlternativeSummary> =>
-    nodes.map((node): AlternativeSummary => {
-      const useExactMatch = useExactItemMatchForNode(node, currentNode);
-      const filteredChildren = getFilteredNodeItems(
-        knowledgeDBs,
-        node,
-        filterTypes
-      );
-      const candidateKeys = filteredChildren
-        .map((item) => getComparableItemKey(knowledgeDBs, item, useExactMatch))
-        .toSet();
-      const currentKeys = useExactMatch
-        ? currentExactItemKeys
-        : currentSemanticItemKeys;
-      return {
-        node,
-        filteredChildren,
-        addKeys: candidateKeys.filter((key) => !currentKeys.has(key)).toSet(),
-        removeCount: currentKeys.filter((key) => !candidateKeys.has(key)).size,
-      };
-    });
+  const versionNodes = getVersions(semanticIndex, visibleAuthors, currentNode);
+  const versionDiffs = versionNodes.map((versionNode) =>
+    computeVersionDiff(snapshotNodes, knowledgeDBs, currentNode, versionNode)
+  );
 
-  const versionSummaries = summarizeNodes(versionNodes);
-
-  const candidateItemIDs = suggestionsEnabled
-    ? versionSummaries
+  const allSuggestionCandidates = suggestionsEnabled
+    ? versionDiffs
         .filter(({ node }) => !declinedTargetIDs.has(node.id))
-        .reduce((acc, { filteredChildren }) => {
-          return filteredChildren.reduce((itemAcc, item) => {
-            if (currentNodeItemIDs.has(item.id)) {
-              return itemAcc;
-            }
-            const candidateKey = getNodeKey(knowledgeDBs, item);
-            if (
-              currentNodeItemKeys.has(candidateKey) ||
-              itemAcc.has(candidateKey)
-            ) {
-              return itemAcc;
-            }
-            return itemAcc.set(candidateKey, item.id);
-          }, acc);
-        }, OrderedMap<string, ID>())
+        .reduce(
+          (acc, { additions }) =>
+            additions
+              .filter((item) => itemPassesFilters(item, filterTypes))
+              .reduce((itemAcc, item) => {
+                const originKey = (item.basedOn ?? item.id) as string;
+                if (currentOriginKeys.has(originKey) || itemAcc.has(originKey)) {
+                  return itemAcc;
+                }
+                return itemAcc.set(originKey, item.id);
+              }, acc),
+          OrderedMap<string, ID>()
+        )
     : OrderedMap<string, ID>();
 
-  const cappedCandidates = candidateItemIDs
-    .entrySeq()
+  const suggestions = allSuggestionCandidates
+    .valueSeq()
     .take(suggestionSettings.maxSuggestions)
     .toList();
-  const coveredCandidateIDs = cappedCandidates
-    .map(([candidateKey]) => candidateKey)
-    .toSet() as ImmutableSet<string>;
+
+  const displayedSuggestionOriginKeys = allSuggestionCandidates
+    .keySeq()
+    .take(suggestionSettings.maxSuggestions)
+    .toSet();
+
   const versions = versionsEnabled
-    ? versionSummaries
+    ? versionDiffs
         .filter(({ node }) => !existingCrefTargetIDs.has(node.id))
-        .filter(
-          ({ addKeys, removeCount }) => addKeys.size > 0 || removeCount > 0
-        )
-        .filter(
-          ({ addKeys, removeCount }) =>
-            addKeys.some((key) => !coveredCandidateIDs.has(key)) ||
-            removeCount > suggestionSettings.maxSuggestions
-        )
+        .filter(({ additions, deletions }) => {
+          const addCount = additions.filter(
+            (item) =>
+              itemPassesFilters(item, filterTypes) &&
+              !currentOriginKeys.has((item.basedOn ?? item.id) as string)
+          ).size;
+          const uncoveredAddCount = addCount - additions.filter(
+            (item) =>
+              itemPassesFilters(item, filterTypes) &&
+              !currentOriginKeys.has((item.basedOn ?? item.id) as string) &&
+              displayedSuggestionOriginKeys.has(
+                (item.basedOn ?? item.id) as string
+              )
+          ).size;
+          const removeCount = deletions.filter(
+            (item) =>
+              currentOriginKeys.has(item.id as string) &&
+              !currentFilteredOutOriginKeys.has(item.id as string)
+          ).size;
+          return uncoveredAddCount > 0 || removeCount > 0;
+        })
         .map(({ node }) => node.id)
         .toList()
     : List<LongID>();
 
-  return {
-    suggestions: cappedCandidates
-      .map(([, candidateID]) => candidateID as ID)
-      .toList(),
-    coveredCandidateIDs,
-    versions,
-  };
+  return { suggestions, versions };
 }

@@ -89,6 +89,8 @@ declare global {
 
   type KnowledgeDBs = Map<PublicKey, KnowledgeData>;
 
+  type SnapshotNodes = Map<string, Map<string, GraphNode>>;
+
   type LocationState = {
     referrer?: string;
   };
@@ -149,6 +151,7 @@ declare global {
     user: User;
     contactsRelays: Map<PublicKey, Relays>;
     knowledgeDBs: KnowledgeDBs;
+    snapshotNodes: SnapshotNodes;
     semanticIndex: SemanticIndex;
     relaysInfos: Map<string, RelayInformation | undefined>;
     publishEventsStatus: EventState;

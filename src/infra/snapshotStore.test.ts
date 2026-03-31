@@ -1,33 +1,34 @@
 import { Event } from "nostr-tools";
-import type { StashmapDB } from "./indexedDB";
-import type { EventQueryClient } from "./eventQuery";
+import type { StashmapDB } from "../indexedDB";
+import type { EventQueryClient } from "../eventQuery";
 import {
   KIND_KNOWLEDGE_DOCUMENT,
   KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
-} from "./nostr";
+} from "../nostr";
 import { toStoredSnapshotRecord, fetchSnapshots } from "./snapshotStore";
 
-jest.mock("./indexedDB", () => ({
-  ...jest.requireActual("./indexedDB"),
+jest.mock("../indexedDB", () => ({
+  ...jest.requireActual("../indexedDB"),
   getStoredSnapshot: jest.fn(),
   putStoredSnapshot: jest.fn(() => Promise.resolve()),
 }));
 
-jest.mock("./eventQuery", () => ({
-  ...jest.requireActual("./eventQuery"),
+jest.mock("../eventQuery", () => ({
+  ...jest.requireActual("../eventQuery"),
   collectEventsUntilIdle: jest.fn(() => Promise.resolve([])),
 }));
 
-const indexedDBModule = jest.requireMock("./indexedDB") as {
+const indexedDBModule = jest.requireMock("../indexedDB") as {
   getStoredSnapshot: jest.Mock;
   putStoredSnapshot: jest.Mock;
 };
 
-const eventQueryModule = jest.requireMock("./eventQuery") as {
+const eventQueryModule = jest.requireMock("../eventQuery") as {
   collectEventsUntilIdle: jest.Mock;
 };
 
 const FAKE_AUTHOR = "alice" as PublicKey;
+const SOURCE_AUTHOR = "source_alice" as PublicKey;
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -43,6 +44,7 @@ test("toStoredSnapshotRecord converts a valid snapshot event", () => {
       ["d", "root-1"],
       ["ms", "5000"],
       ["source", "src-root-short"],
+      ["source_author", SOURCE_AUTHOR],
     ],
     content: "# Snapshot",
   } as unknown as Event;
@@ -56,6 +58,7 @@ test("toStoredSnapshotRecord converts a valid snapshot event", () => {
     updatedMs: 5000,
     content: "# Snapshot",
     tags: event.tags,
+    sourceAuthor: SOURCE_AUTHOR,
     sourceRootShortID: "src-root-short",
   });
 });
@@ -98,6 +101,7 @@ test("toStoredSnapshotRecord extracts sourceRootShortID from source tag", () => 
     tags: [
       ["d", "root-1"],
       ["source", "my-source-root"],
+      ["source_author", SOURCE_AUTHOR],
     ],
     content: "# Snapshot",
   } as unknown as Event;
@@ -106,7 +110,7 @@ test("toStoredSnapshotRecord extracts sourceRootShortID from source tag", () => 
   expect(record?.sourceRootShortID).toBe("my-source-root");
 });
 
-test("toStoredSnapshotRecord works without source tag", () => {
+test("toStoredSnapshotRecord returns undefined without source_author tag", () => {
   const event = {
     id: "snap-4",
     pubkey: FAKE_AUTHOR,
@@ -116,9 +120,7 @@ test("toStoredSnapshotRecord works without source tag", () => {
     content: "# Snapshot",
   } as unknown as Event;
 
-  const record = toStoredSnapshotRecord(event);
-  expect(record).toBeDefined();
-  expect(record?.sourceRootShortID).toBeUndefined();
+  expect(toStoredSnapshotRecord(event)).toBeUndefined();
 });
 
 test("fetchSnapshots returns cached snapshot without relay query", async () => {
@@ -126,6 +128,7 @@ test("fetchSnapshots returns cached snapshot without relay query", async () => {
   const cachedRecord = {
     replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT}:alice:root-1`,
     author: FAKE_AUTHOR,
+    sourceAuthor: SOURCE_AUTHOR,
     eventId: "snap-1",
     dTag: "root-1",
     createdAt: 10,
@@ -158,6 +161,7 @@ test("fetchSnapshots queries relays for uncached snapshots and stores them", asy
     tags: [
       ["d", "root-1"],
       ["ms", "5000"],
+      ["source_author", SOURCE_AUTHOR],
     ],
     content: "# Snapshot",
   } as unknown as Event;
@@ -181,6 +185,7 @@ test("fetchSnapshots handles mixed cached and uncached", async () => {
   const cachedRecord = {
     replaceableKey: `${KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT}:alice:root-1`,
     author: FAKE_AUTHOR,
+    sourceAuthor: SOURCE_AUTHOR,
     eventId: "snap-1",
     dTag: "root-1",
     createdAt: 10,
@@ -204,6 +209,7 @@ test("fetchSnapshots handles mixed cached and uncached", async () => {
     tags: [
       ["d", "root-2"],
       ["ms", "6000"],
+      ["source_author", SOURCE_AUTHOR],
     ],
     content: "# Uncached",
   } as unknown as Event;

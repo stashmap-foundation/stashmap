@@ -371,6 +371,7 @@ function Data({ user, children }: DataProps): JSX.Element {
       semanticIndex={createEmptySemanticIndex()}
       relaysInfos={searchRelaysInfo}
       publishEventsStatus={newEventsAndPublishResults}
+      snapshotNodes={Map()}
       views={views}
       panes={panes}
     >

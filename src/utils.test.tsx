@@ -221,6 +221,7 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
     },
     temporaryEvents: List(),
   },
+  snapshotNodes: Map(),
   views: Map<string, View>(),
   relays: {
     defaultRelays: [{ url: "wss://default.relay", read: true, write: true }],
@@ -310,6 +311,7 @@ function TestPublishProvider({
       semanticIndex={initialDataContextProps.semanticIndex}
       relaysInfos={initialDataContextProps.relaysInfos}
       publishEventsStatus={publishEventsStatus}
+      snapshotNodes={initialDataContextProps.snapshotNodes}
       views={views}
       panes={initialDataContextProps.panes}
     >
@@ -348,6 +350,7 @@ export function renderApis(
     publishEventsStatus:
       options?.publishEventsStatus ||
       DEFAULT_DATA_CONTEXT_PROPS.publishEventsStatus,
+    snapshotNodes: DEFAULT_DATA_CONTEXT_PROPS.snapshotNodes,
     views: options?.views || DEFAULT_DATA_CONTEXT_PROPS.views,
     panes: options?.panes || DEFAULT_DATA_CONTEXT_PROPS.panes,
   };

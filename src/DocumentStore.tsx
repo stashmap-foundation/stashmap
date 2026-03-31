@@ -6,6 +6,7 @@ import type {
   StashmapDB,
   StoredDeleteRecord,
   StoredDocumentRecord,
+  StoredSnapshotRecord,
 } from "./indexedDB";
 import {
   getCachedEvents,
@@ -26,6 +27,10 @@ import {
 } from "./permanentSync";
 import { parseDocumentEvent } from "./markdownNodes";
 import {
+  toStoredSnapshotRecord,
+  materializeSnapshot,
+} from "./infra/snapshotStore";
+import {
   addNodesToSemanticIndex,
   buildSemanticIndexFromDocuments,
   createEmptySemanticIndex,
@@ -43,6 +48,7 @@ type DocumentSnapshot = {
 type DocumentStoreState = {
   knowledgeDBs: KnowledgeDBs;
   semanticIndex: SemanticIndex;
+  snapshotNodes: SnapshotNodes;
   addEvents: (events: ImmutableMap<string, Event | UnsignedEvent>) => void;
 };
 
@@ -410,6 +416,23 @@ export function DocumentStoreProvider({
       const eventList = events.valueSeq().toArray();
       const { documents, deletes } = eventsToStoredRecords(eventList);
 
+      const snapshotRecords = eventList
+        .map((event) => toStoredSnapshotRecord(event))
+        .filter(
+          (record): record is StoredSnapshotRecord => record !== undefined
+        );
+
+      if (snapshotRecords.length > 0) {
+        setSnapshotNodes((prev) =>
+          snapshotRecords.reduce((acc, record) => {
+            if (acc.has(record.dTag)) {
+              return acc;
+            }
+            return acc.set(record.dTag, materializeSnapshot(record));
+          }, prev)
+        );
+      }
+
       if (documents.length === 0 && deletes.length === 0) {
         return;
       }
@@ -487,13 +510,30 @@ export function DocumentStoreProvider({
     return applyRecordsToSnapshot(snapshot, documents, deletes);
   }, [snapshot, unpublishedEvents]);
 
+  const [snapshotNodes, setSnapshotNodes] = React.useState<SnapshotNodes>(
+    ImmutableMap()
+  );
+
+  React.useEffect(() => {
+    setSnapshotNodes((prev) =>
+      unpublishedEvents.reduce((acc, event) => {
+        const record = toStoredSnapshotRecord(event);
+        if (!record || acc.has(record.dTag)) {
+          return acc;
+        }
+        return acc.set(record.dTag, materializeSnapshot(record));
+      }, prev)
+    );
+  }, [unpublishedEvents]);
+
   const contextValue = React.useMemo(
     () => ({
       knowledgeDBs: activeSnapshot.knowledgeDBs,
       semanticIndex: activeSnapshot.semanticIndex,
+      snapshotNodes,
       addEvents,
     }),
-    [activeSnapshot, addEvents]
+    [activeSnapshot, addEvents, snapshotNodes]
   );
 
   return (
@@ -515,5 +555,11 @@ export function useDocumentSemanticIndex(): SemanticIndex {
   return (
     React.useContext(DocumentStoreContext)?.semanticIndex ||
     createEmptySemanticIndex()
+  );
+}
+
+export function useDocumentSnapshotNodes(): SnapshotNodes {
+  return (
+    React.useContext(DocumentStoreContext)?.snapshotNodes || ImmutableMap()
   );
 }

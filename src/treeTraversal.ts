@@ -152,7 +152,8 @@ function getChildrenForRegularNode(
     visibleAuthors,
     activeFilters,
     nodes,
-    isOwnContent
+    isOwnContent,
+    data.snapshotNodes
   );
 
   const createVirtualRow = (rowID: ID, virtualType: VirtualType): GraphNode => {

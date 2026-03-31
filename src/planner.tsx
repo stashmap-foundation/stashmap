@@ -101,6 +101,7 @@ type GraphPlanData = Pick<
   | "user"
   | "contactsRelays"
   | "knowledgeDBs"
+  | "snapshotNodes"
   | "semanticIndex"
   | "relaysInfos"
 >;

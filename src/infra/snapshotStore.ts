@@ -1,13 +1,14 @@
 import { Map } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
-import { KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT, getReplaceableKey } from "./nostr";
-import { findTag, getEventMs } from "./nostrEvents";
-import { collectEventsUntilIdle, EventQueryClient } from "./eventQuery";
-import { parseDocumentEvent } from "./markdownNodes";
-import { storedDocumentToEvent } from "./documentMaterialization";
-import { getStoredEventID } from "./permanentSync";
-import type { StashmapDB, StoredSnapshotRecord } from "./indexedDB";
-import { getStoredSnapshot, putStoredSnapshot } from "./indexedDB";
+import { KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT, getReplaceableKey } from "../nostr";
+import { findTag, getEventMs } from "../nostrEvents";
+import { collectEventsUntilIdle, EventQueryClient } from "../eventQuery";
+import { parseDocumentEvent } from "../markdownNodes";
+import { storedDocumentToEvent } from "../documentMaterialization";
+import { joinID } from "../connections";
+import { getStoredEventID } from "../permanentSync";
+import type { StashmapDB, StoredSnapshotRecord } from "../indexedDB";
+import { getStoredSnapshot, putStoredSnapshot } from "../indexedDB";
 
 export type SnapshotRequest = {
   readonly author: PublicKey;
@@ -28,6 +29,10 @@ export function toStoredSnapshotRecord(
     return undefined;
   }
   const sourceRootShortID = findTag(event, "source");
+  const sourceAuthor = findTag(event, "source_author") as PublicKey | undefined;
+  if (!sourceAuthor) {
+    return undefined;
+  }
   return {
     replaceableKey,
     author: event.pubkey as PublicKey,
@@ -37,6 +42,7 @@ export function toStoredSnapshotRecord(
     updatedMs: getEventMs(event),
     content: event.content,
     tags: event.tags,
+    sourceAuthor,
     ...(sourceRootShortID !== undefined ? { sourceRootShortID } : {}),
   };
 }
@@ -109,7 +115,14 @@ export async function fetchSnapshots(
 export function materializeSnapshot(
   record: StoredSnapshotRecord
 ): Map<string, GraphNode> {
-  return parseDocumentEvent(storedDocumentToEvent(record));
+  const event = storedDocumentToEvent(record);
+  const nodes = parseDocumentEvent({
+    ...event,
+    pubkey: record.sourceAuthor,
+  });
+  return nodes.mapKeys((shortId) =>
+    joinID(record.sourceAuthor, shortId)
+  );
 }
 
 export async function loadAndMaterializeSnapshots(

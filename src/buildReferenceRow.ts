@@ -19,6 +19,7 @@ import {
 } from "./ViewContext";
 import { getPane } from "./planner";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
+import { computeVersionDiff } from "./domain/snapshotBaseline";
 import { referenceToText } from "./components/referenceDisplay";
 
 function argumentPrefix(argument?: Argument): string {

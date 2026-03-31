@@ -522,8 +522,7 @@ Topic
   [O] BobChild2
   [O] BobChild3
   [O] BobChild4
-  [VO] +1 -4
-  [VO] -4
+  [VO] +1
     `);
   });
 

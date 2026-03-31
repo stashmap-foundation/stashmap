@@ -1085,8 +1085,6 @@ Root
 Last
   Deep
   Shallow
-  [V] -1
-  [V] -1
     `);
   });
 
@@ -1158,8 +1156,6 @@ Root
   Shallow
 Shallow
   Deep
-  [V] -1
-  [V] -1
     `);
   });
 
@@ -1234,8 +1230,6 @@ Root
   D
 D
   C
-  [V] -1
-  [V] -1
     `);
   });
 
@@ -1379,8 +1373,6 @@ Root
 C1
   A1
   B1
-  [V] -1
-  [V] -1
     `);
   });
 
@@ -1495,12 +1487,10 @@ Root
 Root
   Parent
     Deep
-    [V]
   Target
 Target
   Parent
     Deep
-    [V]
     `);
   });
 
@@ -1530,17 +1520,11 @@ Target
 Root
   A
     A1
-    [V]
-    [V]
   B
     B1
 B1
   A
     A1
-    [V]
-    [V]
-  [V] -1
-  [V] -1
     `);
   });
 

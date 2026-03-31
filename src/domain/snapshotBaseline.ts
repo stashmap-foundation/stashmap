@@ -1,5 +1,5 @@
-import { List, Map as ImmutableMap } from "immutable";
-import { getChildNodes, getNode } from "../connections";
+import { List, Map as ImmutableMap, Set as ImmutableSet } from "immutable";
+import { getChildNodes, getNode, itemPassesFilters } from "../connections";
 
 export type VersionDiff = {
   readonly node: GraphNode;
@@ -39,9 +39,7 @@ function findSnapshotBaseline(
   if (!snapshotMap) {
     return undefined;
   }
-  const lookupID =
-    forkedNode === currentNode ? currentNode.basedOn : currentNode.id;
-  const snapshotNode = snapshotMap.get(lookupID as string);
+  const snapshotNode = snapshotMap.get(forkedNode.basedOn as string);
   if (!snapshotNode) {
     return undefined;
   }

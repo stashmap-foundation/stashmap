@@ -262,7 +262,6 @@ Spain
   [O] Granada
   [O] Valencia
   [O] Malaga
-  [VO] -4
   `);
 
   await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
@@ -284,7 +283,6 @@ Spain
   [O] Granada
   [O] Valencia
   [O] Malaga
-  [VO] -4
 Target
   Spain
     Sevilla
@@ -293,7 +291,6 @@ Target
     Granada
     Valencia
     Malaga
-    [V] -4
   `);
 });
 

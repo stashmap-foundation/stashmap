@@ -498,6 +498,9 @@ export function getAlternativeFooterData(
   const currentOriginKeys = currentNodeChildren
     .map((item) => (item.basedOn ?? item.id) as string)
     .toSet();
+  const currentSemanticIDs = currentNodeChildren
+    .map((item) => getNodeSemanticID(item) as string)
+    .toSet();
   const currentFilteredOutOriginKeys = currentNodeChildren
     .filter((item) => !itemPassesFilters(item, filterTypes))
     .map((item) => (item.basedOn ?? item.id) as string)
@@ -525,7 +528,11 @@ export function getAlternativeFooterData(
               .filter((item) => itemPassesFilters(item, filterTypes))
               .reduce((itemAcc, item) => {
                 const originKey = (item.basedOn ?? item.id) as string;
-                if (currentOriginKeys.has(originKey) || itemAcc.has(originKey)) {
+                if (
+                  currentOriginKeys.has(originKey) ||
+                  currentSemanticIDs.has(getNodeSemanticID(item) as string) ||
+                  itemAcc.has(originKey)
+                ) {
                   return itemAcc;
                 }
                 return itemAcc.set(originKey, item.id);
@@ -548,25 +555,21 @@ export function getAlternativeFooterData(
     ? versionDiffs
         .filter(({ node }) => !existingCrefTargetIDs.has(node.id))
         .filter(({ additions, deletions }) => {
-          const addCount = additions.filter(
-            (item) =>
-              itemPassesFilters(item, filterTypes) &&
-              !currentOriginKeys.has((item.basedOn ?? item.id) as string)
-          ).size;
-          const uncoveredAddCount = addCount - additions.filter(
+          const uncoveredAdditions = additions.filter(
             (item) =>
               itemPassesFilters(item, filterTypes) &&
               !currentOriginKeys.has((item.basedOn ?? item.id) as string) &&
-              displayedSuggestionOriginKeys.has(
+              !currentSemanticIDs.has(getNodeSemanticID(item) as string) &&
+              !displayedSuggestionOriginKeys.has(
                 (item.basedOn ?? item.id) as string
               )
-          ).size;
+          );
           const removeCount = deletions.filter(
             (item) =>
               currentOriginKeys.has(item.id as string) &&
               !currentFilteredOutOriginKeys.has(item.id as string)
           ).size;
-          return uncoveredAddCount > 0 || removeCount > 0;
+          return uncoveredAdditions.size > 0 || removeCount > 0;
         })
         .map(({ node }) => node.id)
         .toList()

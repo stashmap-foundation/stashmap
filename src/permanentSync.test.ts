@@ -1,7 +1,11 @@
 import { Event } from "nostr-tools";
 import { Map } from "immutable";
 import type { StashmapDB } from "./indexedDB";
-import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
+import {
+  KIND_DELETE,
+  KIND_KNOWLEDGE_DOCUMENT,
+  KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
+} from "./nostr";
 import {
   applyStoredDelete,
   applyStoredDocument,
@@ -57,7 +61,7 @@ test("buildPermanentSyncAuthors includes user and deduplicates contacts", () => 
 
 test("buildPermanentSyncFilters creates broad document and delete filters", () => {
   expect(buildPermanentSyncFilters([ALICE, BOB])).toEqual([
-    { authors: [ALICE, BOB], kinds: [KIND_KNOWLEDGE_DOCUMENT], limit: 0 },
+    { authors: [ALICE, BOB], kinds: [KIND_KNOWLEDGE_DOCUMENT, KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT], limit: 0 },
     {
       authors: [ALICE, BOB],
       kinds: [KIND_DELETE],
@@ -375,7 +379,7 @@ test("startPermanentDocumentSync uses live limit-0 subscription and catch-up sub
     [
       {
         authors: [ALICE],
-        kinds: [KIND_KNOWLEDGE_DOCUMENT],
+        kinds: [KIND_KNOWLEDGE_DOCUMENT, KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT],
         limit: 0,
       },
       {

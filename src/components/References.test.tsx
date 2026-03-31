@@ -100,7 +100,6 @@ Notes
   [O] Bob3
   [O] Bob4
   [O] Alice child
-  [VO] -4
     `);
   });
 
@@ -169,7 +168,6 @@ Barcelona
   Bob3
   Bob4
   Alice child
-  [VO] -4
     `);
   });
 

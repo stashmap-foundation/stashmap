@@ -403,15 +403,11 @@ My Notes
   Parent
     Child
       GrandChild
-      [V]
-    [V]
   Target
 Target
   Parent
     Child
       GrandChild
-      [V]
-    [V]
     `);
 
     const collapseParentButtons = screen.getAllByLabelText("collapse Parent");

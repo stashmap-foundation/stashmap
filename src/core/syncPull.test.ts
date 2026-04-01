@@ -4,7 +4,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { Event, Filter, matchFilter } from "nostr-tools";
-import { KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
+import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
 import {
   pullSyncWorkspace,
   SyncPullProfile,
@@ -318,4 +318,138 @@ test("pullSyncWorkspace preserves unpushed new documents", async () => {
 
   expect(fs.existsSync(newDocPath)).toBe(true);
   expect(fs.readFileSync(newDocPath, "utf8")).toContain("My Draft");
+});
+
+function deleteEvent({
+  pubkey,
+  rootUuid,
+  createdAt,
+}: {
+  pubkey: PublicKey;
+  rootUuid: string;
+  createdAt: number;
+}): Event {
+  return {
+    id: `del-${pubkey.slice(0, 8)}-${rootUuid}-${createdAt}`.padEnd(64, "0"),
+    pubkey,
+    created_at: createdAt,
+    kind: KIND_DELETE,
+    sig: "0".repeat(128),
+    tags: [
+      ["k", `${KIND_KNOWLEDGE_DOCUMENT}`],
+      ["a", `${KIND_KNOWLEDGE_DOCUMENT}:${pubkey}:${rootUuid}`],
+    ],
+    content: "",
+  };
+}
+
+test("pullSyncWorkspace skips documents that have been deleted", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-sync-"));
+  const knowstrHome = path.join(tempDir, ".knowstr");
+  const aliceDoc = documentEvent({
+    pubkey: ALICE,
+    rootUuid: "alice-root",
+    text: "Alice Root",
+    createdAt: FIRST_ALICE_CREATED_AT,
+  });
+  const aliceDelete = deleteEvent({
+    pubkey: ALICE,
+    rootUuid: "alice-root",
+    createdAt: FIRST_ALICE_CREATED_AT + 1,
+  });
+  const { client } = makeClient({
+    [RELAY]: [contactListEvent(), aliceDoc, aliceDelete],
+  });
+  const profile: SyncPullProfile = {
+    pubkey: ALICE,
+    readAs: ALICE,
+    workspaceDir: tempDir,
+    knowstrHome,
+    bootstrapRelays: [],
+    relays: [{ url: RELAY, read: true, write: true }],
+  };
+
+  const result = await pullSyncWorkspace(client, profile);
+
+  const alicePath = path.join(tempDir, "DOCUMENTS", ALICE, "alice-root.md");
+  expect(fs.existsSync(alicePath)).toBe(false);
+  expect(result.updated_paths).toHaveLength(0);
+});
+
+test("pullSyncWorkspace writes document re-created after deletion", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-sync-"));
+  const knowstrHome = path.join(tempDir, ".knowstr");
+  const aliceDelete = deleteEvent({
+    pubkey: ALICE,
+    rootUuid: "alice-root",
+    createdAt: FIRST_ALICE_CREATED_AT,
+  });
+  const aliceDoc = documentEvent({
+    pubkey: ALICE,
+    rootUuid: "alice-root",
+    text: "Alice Root Recreated",
+    createdAt: FIRST_ALICE_CREATED_AT + 1,
+  });
+  const { client } = makeClient({
+    [RELAY]: [contactListEvent(), aliceDoc, aliceDelete],
+  });
+  const profile: SyncPullProfile = {
+    pubkey: ALICE,
+    readAs: ALICE,
+    workspaceDir: tempDir,
+    knowstrHome,
+    bootstrapRelays: [],
+    relays: [{ url: RELAY, read: true, write: true }],
+  };
+
+  const result = await pullSyncWorkspace(client, profile);
+
+  const alicePath = path.join(
+    tempDir,
+    "DOCUMENTS",
+    ALICE,
+    "alice-root-recreated.md"
+  );
+  expect(fs.existsSync(alicePath)).toBe(true);
+  expect(result.updated_paths).toHaveLength(1);
+});
+
+test("pullSyncWorkspace removes previously pulled document on re-pull with delete event", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-sync-"));
+  const knowstrHome = path.join(tempDir, ".knowstr");
+  const aliceDoc = documentEvent({
+    pubkey: ALICE,
+    rootUuid: "alice-root",
+    text: "Alice Root",
+    createdAt: FIRST_ALICE_CREATED_AT,
+  });
+  const profile: SyncPullProfile = {
+    pubkey: ALICE,
+    readAs: ALICE,
+    workspaceDir: tempDir,
+    knowstrHome,
+    bootstrapRelays: [],
+    relays: [{ url: RELAY, read: true, write: true }],
+  };
+
+  const firstClient = makeClient({
+    [RELAY]: [contactListEvent(), aliceDoc],
+  });
+  await pullSyncWorkspace(firstClient.client, profile);
+
+  const alicePath = path.join(tempDir, "DOCUMENTS", ALICE, "alice-root.md");
+  expect(fs.existsSync(alicePath)).toBe(true);
+
+  const aliceDelete = deleteEvent({
+    pubkey: ALICE,
+    rootUuid: "alice-root",
+    createdAt: FIRST_ALICE_CREATED_AT + 1,
+  });
+  const secondClient = makeClient({
+    [RELAY]: [contactListEvent(), aliceDoc, aliceDelete],
+  });
+  const result = await pullSyncWorkspace(secondClient.client, profile);
+
+  expect(fs.existsSync(alicePath)).toBe(false);
+  expect(result.deleted_paths).toContain(alicePath);
 });

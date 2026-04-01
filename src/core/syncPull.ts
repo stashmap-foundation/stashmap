@@ -224,17 +224,46 @@ async function processDeleteEvents(
   );
 }
 
+function deletedDTagsFromEvents(deleteEvents: Event[]): Map<string, number> {
+  const deletedDTags = new Map<string, number>();
+  deleteEvents.forEach((event) => {
+    const aTag = findTag(event, "a");
+    if (!aTag) {
+      return;
+    }
+    const dTag = aTag.split(":")[2];
+    if (!dTag) {
+      return;
+    }
+    const existing = deletedDTags.get(dTag);
+    if (!existing || event.created_at > existing) {
+      deletedDTags.set(dTag, event.created_at);
+    }
+  });
+  return deletedDTags;
+}
+
 async function processDocumentEvents(
   documentEvents: Event[],
+  deleteEvents: Event[],
   author: PublicKey,
   workspaceDir: string,
   knowstrHome: string
 ): Promise<AuthorPullResult> {
+  const deletedDTags = deletedDTagsFromEvents(deleteEvents);
   return documentEvents.reduce(
     async (previous, event) => {
       const acc = await previous;
       const dTag = findTag(event, "d");
       if (!dTag) {
+        return acc;
+      }
+
+      const deleteTimestamp = deletedDTags.get(dTag);
+      if (
+        deleteTimestamp !== undefined &&
+        event.created_at <= deleteTimestamp
+      ) {
         return acc;
       }
 
@@ -325,6 +354,7 @@ export async function pullSyncWorkspace(
       );
       const docResult = await processDocumentEvents(
         documentEvents,
+        deleteEvents,
         author,
         workspaceDir,
         knowstrHome

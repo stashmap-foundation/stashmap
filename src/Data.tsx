@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import "./App.css";
 import { List, Map, Set, OrderedSet } from "immutable";
 // eslint-disable-next-line import/no-unresolved
 import { RelayInformation } from "nostr-tools/lib/types/nip11";

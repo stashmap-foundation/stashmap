@@ -361,6 +361,13 @@ export function startPermanentDocumentSync({
       addLiveEvents?.(ImmutableMap([[event.id, event]]));
     }
 
+    if (event.kind === KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT) {
+      if (db) {
+        addLiveEvents?.(ImmutableMap([[event.id, event]]));
+      }
+      return;
+    }
+
     const document = toStoredDocumentRecord(event);
     if (document) {
       if (db) {

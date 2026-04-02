@@ -146,7 +146,7 @@ function getChildrenForRegularNode(
     : List<LongID>();
 
   const isOwnContent = effectiveAuthor === data.user.publicKey;
-  const { suggestions: diffItems, versions } = getAlternativeFooterData(
+  const { suggestions: diffItems, versionMetas } = getAlternativeFooterData(
     data.knowledgeDBs,
     data.semanticIndex,
     visibleAuthors,
@@ -166,6 +166,8 @@ function getChildrenForRegularNode(
       virtualType === "incoming" || virtualType === "version"
         ? (rowID as LongID)
         : suggestionTargetID;
+    const versionMeta =
+      virtualType === "version" ? versionMetas.get(rowID as LongID) : undefined;
     return {
       children: List<ID>(),
       id: (targetID || rowID) as ID,
@@ -177,6 +179,7 @@ function getChildrenForRegularNode(
       relevance: sourceRowNode?.relevance,
       argument: sourceRowNode?.argument,
       virtualType,
+      versionMeta,
       ...(targetID
         ? {
             isRef: true,
@@ -214,7 +217,11 @@ function getChildrenForRegularNode(
     "incoming"
   );
   const withSuggestions = addVirtualRows(withIncoming, diffItems, "suggestion");
-  const withVersions = addVirtualRows(withSuggestions, versions, "version");
+  const withVersions = addVirtualRows(
+    withSuggestions,
+    versionMetas.keySeq().toList() as List<ID>,
+    "version"
+  );
 
   const firstVirtualPath = withVersions.paths.first();
   const firstVirtualKeys = firstVirtualPath

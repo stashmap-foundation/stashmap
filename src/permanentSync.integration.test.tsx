@@ -139,7 +139,10 @@ describe("permanent live sync integration", () => {
           filters: [
             expect.objectContaining({
               authors: [ALICE.publicKey],
-              kinds: [KIND_KNOWLEDGE_DOCUMENT, KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT],
+              kinds: [
+                KIND_KNOWLEDGE_DOCUMENT,
+                KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
+              ],
               limit: 0,
             }),
             expect.objectContaining({

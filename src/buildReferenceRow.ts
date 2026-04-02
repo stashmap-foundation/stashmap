@@ -19,7 +19,6 @@ import {
 } from "./ViewContext";
 import { getPane } from "./planner";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
-import { computeVersionDiff } from "./domain/snapshotBaseline";
 import { referenceToText } from "./components/referenceDisplay";
 
 function argumentPrefix(argument?: Argument): string {
@@ -287,7 +286,8 @@ export function buildReferenceItem(
   data: Data,
   viewPath: ViewPath,
   stack: ID[],
-  virtualType?: VirtualType
+  virtualType?: VirtualType,
+  versionMeta?: VersionMeta
 ): ReferenceRow | undefined {
   const ref = parseRef(refId, data.knowledgeDBs, data.user.publicKey);
   if (!ref) {
@@ -344,8 +344,7 @@ export function buildReferenceItem(
     };
   }
 
-  if (virtualType === "version") {
-    const versionMeta = computeVersionMeta(data, viewPath, stack);
+  if (virtualType === "version" && versionMeta) {
     const outgoing = buildOutgoingReference(
       refId,
       data.knowledgeDBs,
@@ -379,8 +378,12 @@ export function buildReferenceItem(
     parentNode &&
     nodesMatchForVersion(data.knowledgeDBs, ref.node, parentNode)
   ) {
-    const versionMeta = computeVersionMeta(data, viewPath, stack);
-    return { ...outgoing, text: outgoing.text, versionMeta };
+    const computedVersionMeta = computeVersionMeta(data, viewPath, stack);
+    return {
+      ...outgoing,
+      text: outgoing.text,
+      versionMeta: computedVersionMeta,
+    };
   }
   if (!parentNode) return outgoing;
 

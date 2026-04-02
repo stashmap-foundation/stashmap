@@ -958,7 +958,6 @@ My Notes
 
     await expectTree(`
 My Notes
-  [VO] +1
     `);
 
     await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
@@ -966,7 +965,6 @@ My Notes
     await expectTree(`
 My Notes
   BobItem
-  [VO] +1
     `);
 
     await screen.findByLabelText("mark BobItem as contains");

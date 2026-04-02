@@ -120,9 +120,7 @@ export function materializeSnapshot(
     ...event,
     pubkey: record.sourceAuthor,
   });
-  return nodes.mapKeys((shortId) =>
-    joinID(record.sourceAuthor, shortId)
-  );
+  return nodes.mapKeys((shortId) => joinID(record.sourceAuthor, shortId));
 }
 
 export async function loadAndMaterializeSnapshots(

@@ -244,6 +244,7 @@ declare global {
     relevance: Relevance;
     argument?: Argument;
     virtualType?: VirtualType;
+    versionMeta?: VersionMeta;
     isRef?: boolean;
     isCref?: boolean;
     targetID?: LongID;

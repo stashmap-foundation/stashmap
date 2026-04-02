@@ -566,7 +566,7 @@ Holiday Destinations
   [S] France
   [S] Italy
   [S] Portugal
-  [VO] +5
+  [VO] +4
     `);
   });
 
@@ -769,7 +769,6 @@ Target
     await expectTree(`
 Target
   Items
-  [VO] +1
     `);
   });
 });

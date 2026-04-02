@@ -352,12 +352,12 @@ export function getIncomingCrefsForNode(
 
 type AlternativeFooterResult = {
   suggestions: List<ID>;
-  versions: List<LongID>;
+  versionMetas: Map<LongID, VersionMeta>;
 };
 
 const EMPTY_ALTERNATIVE_FOOTER_RESULT: AlternativeFooterResult = {
   suggestions: List<ID>(),
-  versions: List<LongID>(),
+  versionMetas: Map<LongID, VersionMeta>(),
 };
 
 function isVisibleVersion(
@@ -551,29 +551,42 @@ export function getAlternativeFooterData(
     .take(suggestionSettings.maxSuggestions)
     .toSet();
 
-  const versions = versionsEnabled
+  const versionMetas = versionsEnabled
     ? versionDiffs
         .filter(({ node }) => !existingCrefTargetIDs.has(node.id))
-        .filter(({ additions, deletions }) => {
-          const uncoveredAdditions = additions.filter(
+        .reduce((acc, { node, additions, deletions }) => {
+          const addCount = additions.filter(
             (item) =>
               itemPassesFilters(item, filterTypes) &&
               !currentOriginKeys.has((item.basedOn ?? item.id) as string) &&
-              !currentSemanticIDs.has(getNodeSemanticID(item) as string) &&
-              !displayedSuggestionOriginKeys.has(
-                (item.basedOn ?? item.id) as string
-              )
-          );
+              !currentSemanticIDs.has(getNodeSemanticID(item) as string)
+          ).size;
+          const uncoveredAddCount =
+            addCount -
+            additions.filter(
+              (item) =>
+                itemPassesFilters(item, filterTypes) &&
+                !currentOriginKeys.has((item.basedOn ?? item.id) as string) &&
+                !currentSemanticIDs.has(getNodeSemanticID(item) as string) &&
+                displayedSuggestionOriginKeys.has(
+                  (item.basedOn ?? item.id) as string
+                )
+            ).size;
           const removeCount = deletions.filter(
             (item) =>
               currentOriginKeys.has(item.id as string) &&
               !currentFilteredOutOriginKeys.has(item.id as string)
           ).size;
-          return uncoveredAdditions.size > 0 || removeCount > 0;
-        })
-        .map(({ node }) => node.id)
-        .toList()
-    : List<LongID>();
+          if (uncoveredAddCount <= 0 && removeCount <= 0) {
+            return acc;
+          }
+          return acc.set(node.id, {
+            updated: node.updated,
+            addCount,
+            removeCount,
+          });
+        }, Map<LongID, VersionMeta>())
+    : Map<LongID, VersionMeta>();
 
-  return { suggestions, versions };
+  return { suggestions, versionMetas };
 }

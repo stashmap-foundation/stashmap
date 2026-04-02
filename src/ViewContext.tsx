@@ -395,7 +395,14 @@ export function getCurrentReferenceForView(
   if (!referenceID) {
     return undefined;
   }
-  return buildReferenceItem(referenceID, data, viewPath, stack, virtualType);
+  return buildReferenceItem(
+    referenceID,
+    data,
+    viewPath,
+    stack,
+    virtualType,
+    currentRow?.versionMeta
+  );
 }
 
 export function addNodesToLastElement(

@@ -411,6 +411,10 @@ export function DocumentStoreProvider({
     };
   }, [db]);
 
+  const [snapshotNodes, setSnapshotNodes] = React.useState<SnapshotNodes>(
+    ImmutableMap()
+  );
+
   const addEvents = React.useCallback(
     (events: ImmutableMap<string, Event | UnsignedEvent>) => {
       const eventList = events.valueSeq().toArray();
@@ -509,10 +513,6 @@ export function DocumentStoreProvider({
       .toArray();
     return applyRecordsToSnapshot(snapshot, documents, deletes);
   }, [snapshot, unpublishedEvents]);
-
-  const [snapshotNodes, setSnapshotNodes] = React.useState<SnapshotNodes>(
-    ImmutableMap()
-  );
 
   React.useEffect(() => {
     setSnapshotNodes((prev) =>

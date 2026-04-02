@@ -61,7 +61,11 @@ test("buildPermanentSyncAuthors includes user and deduplicates contacts", () => 
 
 test("buildPermanentSyncFilters creates broad document and delete filters", () => {
   expect(buildPermanentSyncFilters([ALICE, BOB])).toEqual([
-    { authors: [ALICE, BOB], kinds: [KIND_KNOWLEDGE_DOCUMENT, KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT], limit: 0 },
+    {
+      authors: [ALICE, BOB],
+      kinds: [KIND_KNOWLEDGE_DOCUMENT, KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT],
+      limit: 0,
+    },
     {
       authors: [ALICE, BOB],
       kinds: [KIND_DELETE],

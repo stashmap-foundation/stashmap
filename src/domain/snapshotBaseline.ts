@@ -1,5 +1,5 @@
-import { List, Map as ImmutableMap, Set as ImmutableSet } from "immutable";
-import { getChildNodes, getNode, itemPassesFilters } from "../connections";
+import { List, Map as ImmutableMap } from "immutable";
+import { getChildNodes, getNode } from "../connections";
 
 export type VersionDiff = {
   readonly node: GraphNode;
@@ -23,11 +23,9 @@ function findSnapshotBaseline(
   currentNode: GraphNode,
   versionNode: GraphNode
 ): List<GraphNode> | undefined {
-  const forkedNode = versionNode.basedOn
-    ? versionNode
-    : currentNode.basedOn
-      ? currentNode
-      : undefined;
+  const forkedByVersion = versionNode.basedOn ? versionNode : undefined;
+  const forkedNode =
+    forkedByVersion || (currentNode.basedOn ? currentNode : undefined);
   if (!forkedNode) {
     return undefined;
   }
@@ -70,9 +68,7 @@ export function computeVersionDiff(
     versionNode,
     versionNode.author
   );
-  const snapshotChildIDs = snapshotChildren
-    .map((c) => c.id as string)
-    .toSet();
+  const snapshotChildIDs = snapshotChildren.map((c) => c.id as string).toSet();
   const versionMatchKeys = versionChildren.map(originKey).toSet();
   return {
     node: versionNode,

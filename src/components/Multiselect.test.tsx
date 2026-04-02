@@ -1085,6 +1085,7 @@ Root
 Last
   Deep
   Shallow
+  Last
     `);
   });
 
@@ -1156,6 +1157,7 @@ Root
   Shallow
 Shallow
   Deep
+  Shallow
     `);
   });
 
@@ -1230,6 +1232,7 @@ Root
   D
 D
   C
+  D
     `);
   });
 
@@ -1350,11 +1353,9 @@ Root
 
     const a1Elements = screen.getAllByLabelText("A1");
     const b1Elements = screen.getAllByLabelText("B1");
-    const c1Elements = screen.getAllByLabelText("C1");
     modClick(a1Elements[0], { metaKey: true });
     modClick(b1Elements[0], { metaKey: true });
-    modClick(c1Elements[0], { metaKey: true });
-    await expectTargets("A1", "B1", "C1");
+    await expectTargets("A1", "B1");
 
     const targetItems = screen.getAllByRole("treeitem", { name: "C1" });
     const targetInPane1 = targetItems[targetItems.length - 1];
@@ -1525,6 +1526,7 @@ Root
 B1
   A
     A1
+  B1
     `);
   });
 

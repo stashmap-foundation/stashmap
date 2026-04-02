@@ -61,7 +61,7 @@ Key principles:
 
 ## Architecture File
 
-- Maintain an "architecture.md" file in the root of the repo.
+- Maintain an architecture document using knowstr (the app we are building) use the cli to push and pull updates
 - Read that file before starting a task and update it whenever you have learnings about the system architecture or whenever we make architectural decisions.
 
 ## Plan Mode Default

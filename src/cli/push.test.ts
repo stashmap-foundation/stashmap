@@ -167,3 +167,56 @@ test("pushing a new document writes workspace file with UUIDs and editing header
   expect(result2.changed_paths).toHaveLength(0);
   expect(pool.publish).not.toHaveBeenCalled();
 });
+
+test("pushing a new front-matter document preserves metadata and does not render it into notes", async () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-push-fm-"));
+  const knowstrHome = path.join(tempDir, ".knowstr");
+  const profile: SyncPullProfile = {
+    pubkey: ALICE,
+    readAs: ALICE,
+    workspaceDir: tempDir,
+    knowstrHome,
+    bootstrapRelays: [],
+    relays: [{ url: RELAY, read: true, write: true }],
+    nsecFile: path.join(tempDir, "me.nsec"),
+  };
+  fs.writeFileSync(profile.nsecFile as string, PRIVATE_KEY);
+
+  const authorDir = path.join(tempDir, "DOCUMENTS", ALICE);
+  fs.mkdirSync(authorDir, { recursive: true });
+  const originalPath = path.join(authorDir, "problem.md");
+  fs.writeFileSync(
+    originalPath,
+    `---
+title: "Alice and Bob Huddle"
+source_id: "src_alice_bob_huddle_2026-04-02_full"
+---
+
+- First point
+- Second point
+`
+  );
+
+  const pool = {
+    close: jest.fn(),
+    publish: jest.fn((relayUrls: string[]) =>
+      relayUrls.map(() => Promise.resolve("ok"))
+    ),
+  };
+
+  await pushPendingWritesWithPool(pool, profile as LoadedCliProfile, []);
+
+  const publishedEvent = pool.publish.mock.calls[0]?.[1] as Event | undefined;
+  expect(publishedEvent?.content).toContain('title: "Alice and Bob Huddle"');
+  expect(publishedEvent?.content).toContain(
+    'source_id: "src_alice_bob_huddle_2026-04-02_full"'
+  );
+  expect(publishedEvent?.content).toContain("# Alice and Bob Huddle <!-- id:");
+  expect(publishedEvent?.content).toContain("- First point");
+
+  const canonicalPath = path.join(authorDir, "alice-and-bob-huddle.md");
+  const updatedContent = fs.readFileSync(canonicalPath, "utf8");
+  expect(updatedContent).toContain("root:");
+  expect(updatedContent).toContain('title: "Alice and Bob Huddle"');
+  expect(updatedContent).toContain("# Alice and Bob Huddle");
+});

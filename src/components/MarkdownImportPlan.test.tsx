@@ -1,6 +1,6 @@
 import { List } from "immutable";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
-import { createPlan } from "../planner";
+import { createPlan, buildDocumentEvents } from "../planner";
 import { getChildNodes, getNode, getSemanticID } from "../connections";
 import { isStandaloneRoot } from "../systemRoots";
 import {
@@ -12,8 +12,10 @@ import {
   setup,
 } from "../utils.test";
 import { execute } from "../executor";
+import { processEvents } from "../eventProcessing";
 import {
   buildRootTreeForEmptyRootDrop,
+  dropLeadingYamlEchoRoots,
   parseMarkdownHierarchy,
   parseMarkdownImportFiles,
   parseTextToTrees,
@@ -66,6 +68,102 @@ test("Single file with multiple top-level roots is wrapped by filename", () => {
         },
       ],
     },
+  ]);
+});
+
+test("Front matter is not rendered and title can supply the import root", () => {
+  const trees = parseMarkdownImportFiles([
+    {
+      name: "problem.md",
+      markdown: `---
+title: "Imported Title"
+source_id: "src_problem"
+---
+
+- first
+- second
+`,
+    },
+  ]);
+
+  expect(trees).toEqual([
+    {
+      text: "Imported Title",
+      frontMatter: `---
+title: "Imported Title"
+source_id: "src_problem"
+---
+`,
+      children: [
+        {
+          text: "first",
+          children: [],
+          blockKind: "list_item",
+        },
+        {
+          text: "second",
+          children: [],
+          blockKind: "list_item",
+        },
+      ],
+    },
+  ]);
+});
+
+test("Imported front matter stays out of the rendered tree after document-event roundtrip", () => {
+  const [alice] = setup([ALICE]);
+  const basePlan = createPlan(alice());
+  const [plan] = planCreateNodesFromMarkdownFiles(basePlan, [
+    {
+      name: "problem.md",
+      markdown: `---
+title: "Alice and Bob Huddle"
+authors:
+  - "Alice"
+  - "Bob"
+tags:
+  - transcript
+  - meeting
+---
+
+- First point
+- Second point
+`,
+    },
+  ]);
+
+  const events = buildDocumentEvents(plan);
+  const processed = processEvents(events);
+  const knowledgeDB = processed.get(alice().user.publicKey)?.knowledgeDB;
+  const texts = knowledgeDB?.nodes
+    .valueSeq()
+    .map((node) => node.text)
+    .toArray();
+
+  expect(texts).toContain("Alice and Bob Huddle");
+  expect(texts).toContain("First point");
+  expect(texts).toContain("Second point");
+  expect(texts).not.toContain('title: "Alice and Bob Huddle"');
+  expect(texts).not.toContain("authors:");
+  expect(texts).not.toContain("Alice");
+  expect(texts).not.toContain("Bob");
+  expect(texts).not.toContain("tags:");
+  expect(texts).not.toContain("transcript");
+  expect(texts).not.toContain("meeting");
+});
+
+test("Leading YAML-like roots are dropped when front matter exists", () => {
+  const cleaned = dropLeadingYamlEchoRoots(
+    [
+      { text: 'source_id: "src_1"', children: [], blockKind: "paragraph" },
+      { text: "authors:", children: [{ text: "Alice", children: [] }] },
+      { text: "First point", children: [], blockKind: "list_item" },
+    ],
+    '---\ntitle: "Doc"\n---\n'
+  );
+
+  expect(cleaned).toEqual([
+    { text: "First point", children: [], blockKind: "list_item" },
   ]);
 });
 

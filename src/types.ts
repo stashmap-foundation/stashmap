@@ -232,6 +232,7 @@ declare global {
     children: List<ID>;
     id: ID;
     text: string;
+    frontMatter?: string;
     parent?: LongID;
     anchor?: RootAnchor;
     systemRole?: RootSystemRole;

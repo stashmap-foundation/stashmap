@@ -26,6 +26,13 @@ type SerializeResult = {
   lines: string[];
 };
 
+function withFrontMatter(content: string, frontMatter?: string): string {
+  if (!frontMatter) {
+    return content;
+  }
+  return `${frontMatter}${content}`;
+}
+
 function getSerializableNodeText(
   knowledgeDBs: KnowledgeDBs,
   node: GraphNode
@@ -126,18 +133,21 @@ export function buildDocumentEventFromNodes(
     pubkey: rootNode.author,
     created_at: newTimestamp(),
     tags: [["d", rootUuid], ...systemRoleTags, msTag()],
-    content: `${[
-      formatRootHeading(
-        rootText,
-        rootUuid,
-        rootNode.basedOn,
-        options?.snapshotDTag ?? rootNode.snapshotDTag,
-        rootNode.anchor ??
-          createRootAnchor(getNodeContext(knowledgeDBs, rootNode)),
-        rootNode.systemRole
-      ),
-      ...serialized.lines,
-    ].join("\n")}\n`,
+    content: withFrontMatter(
+      `${[
+        formatRootHeading(
+          rootText,
+          rootUuid,
+          rootNode.basedOn,
+          options?.snapshotDTag ?? rootNode.snapshotDTag,
+          rootNode.anchor ??
+            createRootAnchor(getNodeContext(knowledgeDBs, rootNode)),
+          rootNode.systemRole
+        ),
+        ...serialized.lines,
+      ].join("\n")}\n`,
+      rootNode.frontMatter
+    ),
   };
 }
 

@@ -1,11 +1,13 @@
 /* eslint-disable functional/immutable-data, functional/no-let, no-continue */
 import { List } from "immutable";
 import MarkdownIt from "markdown-it";
+import markdownItFrontMatter from "markdown-it-front-matter";
 // eslint-disable-next-line import/no-unresolved
 import Token from "markdown-it/lib/token";
 import { LOG_ROOT_ROLE } from "./systemRoots";
 
 const markdown = new MarkdownIt({ html: true });
+markdown.use(markdownItFrontMatter, () => undefined);
 
 const ID_COMMENT_RE = /^<!--\s+id:(\S+)(.*?)-->$/;
 const ATTR_RE = /(\w+)="([^"]*)"/g;
@@ -178,6 +180,7 @@ function extractInlineContent(inline: Token): {
 export type MarkdownTreeNode = {
   text: string;
   children: MarkdownTreeNode[];
+  frontMatter?: string;
   uuid?: string;
   relevance?: Relevance;
   argument?: Argument;

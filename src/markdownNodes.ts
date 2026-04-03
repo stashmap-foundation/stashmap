@@ -8,6 +8,8 @@ import { findTag } from "./nostrEvents";
 import { createRootAnchor } from "./rootAnchor";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
 import { newRefNode, newNode } from "./nodeFactory";
+import { extractImportedFrontMatter } from "./markdownFrontMatter";
+import { dropLeadingYamlEchoRoots } from "./markdownImport";
 
 export type WalkContext = {
   knowledgeDBs: KnowledgeDBs;
@@ -45,6 +47,7 @@ function materializeTreeNode(
   const nodeBaseWithFields: GraphNode = {
     ...baseNode,
     parent,
+    frontMatter: parent ? undefined : treeNode.frontMatter,
     anchor: parent
       ? undefined
       : treeNode.anchor ?? createRootAnchor(semanticContext),
@@ -153,7 +156,13 @@ export function parseDocumentEvent(
   }
 
   const author = event.pubkey as PublicKey;
-  const trees = parseMarkdownHierarchy(event.content);
+  const { body, frontMatter } = extractImportedFrontMatter(event.content);
+  const trees = dropLeadingYamlEchoRoots(
+    parseMarkdownHierarchy(body),
+    frontMatter
+  ).map((tree, index) =>
+    index === 0 && frontMatter ? { ...tree, frontMatter } : tree
+  );
   const ctx: WalkContext = {
     knowledgeDBs: Map<PublicKey, KnowledgeData>(),
     publicKey: author,

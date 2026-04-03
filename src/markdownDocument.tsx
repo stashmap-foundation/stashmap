@@ -59,6 +59,13 @@ type SerializeResult = {
   lines: string[];
 };
 
+function withFrontMatter(content: string, frontMatter?: string): string {
+  if (!frontMatter) {
+    return content;
+  }
+  return `${frontMatter}${content}`;
+}
+
 function getOwnNodeForDocumentSerialization(
   data: Data,
   path: ViewPath,
@@ -189,7 +196,10 @@ export function buildDocumentEvent(
     rootNode.systemRole
   );
   const result = serializeTree(data, rootNode);
-  const content = `${[rootLine, ...result.lines].join("\n")}\n`;
+  const content = withFrontMatter(
+    `${[rootLine, ...result.lines].join("\n")}\n`,
+    rootNode.frontMatter
+  );
   const systemRoleTags = rootNode.systemRole
     ? ([["s", rootNode.systemRole]] as string[][])
     : [];

@@ -4,6 +4,7 @@ import { Event } from "nostr-tools";
 import { findTag } from "../nostrEvents";
 import { joinID } from "../connections";
 import { parseMarkdownHierarchy } from "../markdownTree";
+import { stripFrontMatter as stripLeadingFrontMatter } from "../markdownFrontMatter";
 
 export const DOCUMENTS_DIR = "DOCUMENTS";
 const BASELINE_DIR = "base";
@@ -69,11 +70,16 @@ function ensureTrailingNewline(content: string): string {
 }
 
 export function stripFrontMatter(content: string): string {
-  const match = content.match(/^---\n[\s\S]*?\n---\n/);
-  if (!match) {
-    return content;
+  return stripLeadingFrontMatter(content);
+}
+
+export function extractDTagFromHeader(content: string): string | undefined {
+  const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!fmMatch) {
+    return undefined;
   }
-  return content.slice(match[0].length);
+  const rootMatch = fmMatch[1].match(/^root:\s*(.+)$/m);
+  return rootMatch?.[1].trim();
 }
 
 function ensureEditableDocumentHeader(
@@ -88,7 +94,7 @@ function ensureEditableDocumentHeader(
     options?.includeDeleteSection === false
       ? ensureTrailingNewline(content)
       : ensureDeleteHeadingSection(content);
-  if (contentWithDeleteSection.startsWith("---\n")) {
+  if (extractDTagFromHeader(contentWithDeleteSection)) {
     return contentWithDeleteSection;
   }
 
@@ -120,15 +126,6 @@ export async function removeWorkspaceFileIfExists(
   } catch {
     /* ignore cleanup errors */
   }
-}
-
-export function extractDTagFromHeader(content: string): string | undefined {
-  const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
-  if (!fmMatch) {
-    return undefined;
-  }
-  const rootMatch = fmMatch[1].match(/^root:\s*(.+)$/m);
-  return rootMatch?.[1].trim();
 }
 
 export async function findWorkspaceFileByDTag(

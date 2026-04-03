@@ -5,7 +5,10 @@ import { planInsertMarkdownTrees } from "../markdownPlan";
 
 export { parseMarkdownHierarchy } from "../markdownDocument";
 export type { MarkdownImportFile } from "../markdownImport";
-export { parseMarkdownImportFiles } from "../markdownImport";
+export {
+  dropLeadingYamlEchoRoots,
+  parseMarkdownImportFiles,
+} from "../markdownImport";
 export {
   planCreateNodesFromMarkdown,
   planCreateNodesFromMarkdownFiles,

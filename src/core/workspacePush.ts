@@ -4,7 +4,8 @@ import {
   buildDocumentEventFromMarkdownTree,
   requireSingleRootMarkdownTree,
 } from "../standaloneDocumentEvent";
-import { MarkdownTreeNode } from "../markdownTree";
+import { MarkdownTreeNode, parseMarkdownHierarchy } from "../markdownTree";
+import { extractMarkdownImportPayload } from "../markdownImport";
 import {
   publishSignedEvents,
   resolveWriteRelayUrls,
@@ -104,16 +105,38 @@ function hasAnyUuidMarker(node: MarkdownTreeNode): boolean {
 }
 
 function buildNewDocumentTree(content: string): MarkdownTreeNode {
-  const rootTree = requireSingleRootMarkdownTree(
-    content,
-    "New document must contain exactly one top-level root"
-  );
-  if (hasAnyUuidMarker(rootTree)) {
+  const { body, frontMatter, metadata } = extractMarkdownImportPayload(content);
+  const roots = parseMarkdownHierarchy(body).filter((root) => !root.hidden);
+  const singleRoot =
+    roots.length === 1 && (!metadata.title || roots[0]?.blockKind === "heading")
+      ? roots[0]
+      : undefined;
+  const titledRoot = metadata.title
+    ? {
+        text: metadata.title,
+        children: roots,
+        ...(frontMatter ? { frontMatter } : {}),
+      }
+    : undefined;
+  const rootTree =
+    singleRoot ||
+    titledRoot ||
+    requireSingleRootMarkdownTree(
+      body,
+      "New document must contain exactly one top-level root"
+    );
+  if (!rootTree) {
+    throw new Error("New document must contain exactly one top-level root");
+  }
+  const rootTreeWithFrontMatter = frontMatter
+    ? { ...rootTree, frontMatter }
+    : rootTree;
+  if (hasAnyUuidMarker(rootTreeWithFrontMatter)) {
     throw new Error(
       "New documents must not contain ks:id markers — they are generated on push"
     );
   }
-  return rootTree;
+  return rootTreeWithFrontMatter;
 }
 
 function allRelaysFulfilled(
@@ -160,13 +183,19 @@ export async function pushEditedWorkspaceDocuments(
   const processed = await changedDocuments.reduce(
     async (previous, changed) => {
       const acc = await previous;
+      const { frontMatter } = extractMarkdownImportPayload(
+        changed.currentContent
+      );
       const rootTree =
         changed.baselineContent && changed.dTag
-          ? validateEditedDocumentIntegrity(
-              stripFrontMatter(changed.baselineContent),
-              stripFrontMatter(changed.currentContent)
-            ).sanitizedRoot
-          : buildNewDocumentTree(stripFrontMatter(changed.currentContent));
+          ? {
+              ...validateEditedDocumentIntegrity(
+                stripFrontMatter(changed.baselineContent),
+                stripFrontMatter(changed.currentContent)
+              ).sanitizedRoot,
+              ...(frontMatter ? { frontMatter } : {}),
+            }
+          : buildNewDocumentTree(changed.currentContent);
       const builtEvent = buildDocumentEventFromMarkdownTree(
         profile.pubkey,
         rootTree

@@ -15,14 +15,25 @@ export async function publishEventToRelays(
     throw new Error("No relays to publish on");
   }
 
-  const timeout = (ms: number): Promise<unknown> =>
-    new Promise((_, reject): void => {
-      setTimeout(() => reject(new Error("Timeout")), ms);
+  const withTimeout = (promise: Promise<unknown>): Promise<unknown> =>
+    new Promise((resolve, reject): void => {
+      const timeoutId = setTimeout(
+        () => reject(new Error("Timeout")),
+        timeoutMs
+      );
+      promise.then(
+        (value) => {
+          clearTimeout(timeoutId);
+          resolve(value);
+        },
+        (error) => {
+          clearTimeout(timeoutId);
+          reject(error);
+        }
+      );
     });
   const results = await Promise.allSettled(
-    relayPool.publish(writeRelayUrls, event).map((promise) => {
-      return Promise.race([promise, timeout(timeoutMs)]);
-    })
+    relayPool.publish(writeRelayUrls, event).map(withTimeout)
   );
 
   const failures = results.filter((res) => res.status === "rejected");

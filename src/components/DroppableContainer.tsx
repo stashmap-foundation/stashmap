@@ -35,6 +35,7 @@ type DragItemType = {
   isCopyDrag?: boolean;
   nodeId?: LongID;
   targetId?: LongID;
+  linkText?: string;
 };
 
 type NativeFileDropItem = {

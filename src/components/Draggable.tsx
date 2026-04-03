@@ -12,7 +12,7 @@ import {
   useIsViewingOtherUserContent,
   useCurrentEdge,
 } from "../ViewContext";
-import { isEmptySemanticID } from "../connections";
+import { isEmptySemanticID, isRefNode } from "../connections";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
 import {
@@ -69,6 +69,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     const isNodeBeeingEdited = useIsEditingOn();
     const [rowID] = useCurrentRowID();
     const node = useCurrentNode();
+    const currentRow = useCurrentEdge();
     const displayText = useDisplayText();
     const isEmptyNode = isEmptySemanticID(rowID);
     const disableDrag = isNodeBeeingEdited || isEmptyNode;
@@ -78,7 +79,15 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
       item: () => {
         clearDropIndent();
         markDragDescendants(rowViewKey);
-        return { path, text: displayText, isCopyDrag: copyDrag || undefined };
+        const dragNode = node || currentRow;
+        return {
+          path,
+          text: displayText,
+          isCopyDrag: copyDrag || undefined,
+          nodeId: dragNode?.id,
+          targetId: isRefNode(dragNode) ? dragNode.targetID : undefined,
+          linkText: dragNode?.linkText,
+        };
       },
       collect: (monitor) => ({
         isDragging: !!monitor.isDragging(),
@@ -269,7 +278,10 @@ export function ListItem({
   const [rowID] = useCurrentRowID();
   const virtualType = useCurrentEdge()?.virtualType;
   const isSuggestion = virtualType === "suggestion";
-  const isCopyDrag = virtualType === "incoming" || virtualType === "version";
+  const isCopyDrag =
+    virtualType === "incoming" ||
+    virtualType === "version" ||
+    virtualType === "search";
   const isInSearchView = useIsInSearchView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const selected = useIsSelected();

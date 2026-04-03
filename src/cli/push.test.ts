@@ -87,9 +87,10 @@ test("pushPendingWritesWithPool publishes edited workspace documents, refreshes 
   const close = jest.fn();
   const pool = {
     close,
-    publish: jest.fn((relayUrls: string[]) =>
-      relayUrls.map(() => Promise.resolve("ok"))
-    ),
+    publish: jest.fn((...args: [string[], Event]) => {
+      const [relayUrls] = args;
+      return relayUrls.map(() => Promise.resolve("ok"));
+    }),
   };
 
   const result = await pushPendingWritesWithPool(
@@ -129,9 +130,10 @@ test("pushing a new document writes workspace file with UUIDs and editing header
 
   const pool = {
     close: jest.fn(),
-    publish: jest.fn((relayUrls: string[]) =>
-      relayUrls.map(() => Promise.resolve("ok"))
-    ),
+    publish: jest.fn((...args: [string[], Event]) => {
+      const [relayUrls] = args;
+      return relayUrls.map(() => Promise.resolve("ok"));
+    }),
   };
 
   const result = await pushPendingWritesWithPool(
@@ -199,9 +201,10 @@ source_id: "src_alice_bob_huddle_2026-04-02_full"
 
   const pool = {
     close: jest.fn(),
-    publish: jest.fn((relayUrls: string[]) =>
-      relayUrls.map(() => Promise.resolve("ok"))
-    ),
+    publish: jest.fn((...args: [string[], Event]) => {
+      const [relayUrls] = args;
+      return relayUrls.map(() => Promise.resolve("ok"));
+    }),
   };
 
   await pushPendingWritesWithPool(pool, profile as LoadedCliProfile, []);

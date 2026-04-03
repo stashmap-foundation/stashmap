@@ -7,10 +7,12 @@ import {
   forkReadonlyRoot,
   findNewNodeEditor,
   follow,
+  getPane,
   navigateToNodeViaSearch,
   renderApp,
   renderTree,
   setup,
+  textContent,
   type,
   setDropIndentLevel,
   expectIndentationLimits,
@@ -388,6 +390,39 @@ My Notes
   await expectTree(`
 Search: Barcelona
   [R] My Notes / Spain / Barcelona
+  `);
+});
+
+test("dragging a search result to another pane adds it as a reference", async () => {
+  const [alice] = setup([ALICE]);
+  renderApp(alice());
+
+  await type("My Notes{Enter}{Tab}Source{Enter}Target{Escape}");
+
+  await userEvent.click(
+    await screen.findByLabelText("Search to change pane 0 content")
+  );
+  await userEvent.type(
+    await screen.findByLabelText("search input"),
+    "Source{Enter}"
+  );
+
+  await expectTree(`
+Search: Source
+  [R] My Notes / Source
+  `);
+
+  await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
+  await navigateToNodeViaSearch(1, "Target");
+
+  fireEvent.dragStart(getPane(0).getByText(textContent("My Notes / Source")));
+  fireEvent.drop(getPane(1).getByRole("treeitem", { name: "Target" }));
+
+  await expectTree(`
+Search: Source
+  [R] My Notes / Source
+Target
+  [R] My Notes / Source
   `);
 });
 

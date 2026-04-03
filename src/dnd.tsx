@@ -32,6 +32,7 @@ type DragSource = {
   path: ViewPath;
   nodeId?: LongID;
   targetId?: LongID;
+  linkText?: string;
 };
 
 function getDropDestinationEndOfRoot(
@@ -421,6 +422,19 @@ export function dnd(
               insertAt
             )[0];
           }
+        }
+        const dragTargetID =
+          s === source ? sourceDrag.targetId || sourceDrag.nodeId : undefined;
+        if (dragTargetID) {
+          return planAddToParent(
+            accPlan,
+            createRefTarget(dragTargetID, sourceDrag.linkText),
+            toView,
+            stack,
+            insertAt,
+            sourceEdgeRelevance,
+            sourceEdgeArgument
+          )[0];
         }
         if (sourceNode) {
           return planAddToParent(

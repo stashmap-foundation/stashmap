@@ -672,11 +672,21 @@ body {
 }
 
 @include respond-below(xs) {
-  .item[data-selected="true"] .right-menu .relevance-slot > *,
-  .item[data-selected="true"] .right-menu .evidence-slot > *,
-  .item[data-selected="true"] .right-menu .action-slot > * {
-    opacity: 1;
-    visibility: visible;
+  .right-menu {
+    display: none;
+  }
+
+  .item:focus .right-menu,
+  .item:focus-within .right-menu,
+  .item[data-selected="true"] .right-menu {
+    display: flex;
+
+    .relevance-slot > *,
+    .evidence-slot > *,
+    .action-slot > * {
+      opacity: 1;
+      visibility: visible;
+    }
   }
 }
 

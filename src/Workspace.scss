@@ -481,6 +481,10 @@ body {
     color: transparent;
     cursor: default;
   }
+
+  @include respond-below(xs) {
+    font-size: 0.85rem;
+  }
 }
 
 .node-marker {
@@ -942,6 +946,9 @@ input:focus,
 
 .inner-node .card-body {
   padding: 6px 0;
+  @include respond-below(xs) {
+    padding: 8px 0;
+  }
 }
 
 // Node row - the main container for all node content

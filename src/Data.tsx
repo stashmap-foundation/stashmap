@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { List, Map, Set, OrderedSet } from "immutable";
 // eslint-disable-next-line import/no-unresolved
 import { RelayInformation } from "nostr-tools/lib/types/nip11";
@@ -327,11 +327,29 @@ function Data({ user, children }: DataProps): JSX.Element {
     (_, k) => k !== myPublicKey
   );
 
+  const extraAuthors = useMemo(
+    () => [
+      ...new globalThis.Set(
+        panes.flatMap((pane) =>
+          pane.rootNodeId
+            ? [pane.author, splitID(pane.rootNodeId)[0] || pane.author]
+            : [pane.author]
+        )
+      ),
+    ],
+    [panes]
+  );
+
   const { events: contactRelayEvents } = useEventQuery(
     relayPool,
     [
       {
-        authors: contacts.keySeq().toArray(),
+        authors: [
+          ...new globalThis.Set([
+            ...contacts.keySeq().toArray(),
+            ...extraAuthors.filter((a) => a !== myPublicKey),
+          ]),
+        ],
         kinds: [KIND_RELAY_METADATA_EVENT],
       },
     ],
@@ -383,15 +401,7 @@ function Data({ user, children }: DataProps): JSX.Element {
           db={db}
           myself={myPublicKey}
           contacts={contacts}
-          extraAuthors={[
-            ...new globalThis.Set(
-              panes.flatMap((pane) =>
-                pane.rootNodeId
-                  ? [pane.author, splitID(pane.rootNodeId)[0] || pane.author]
-                  : [pane.author]
-              )
-            ),
-          ]}
+          extraAuthors={extraAuthors}
           defaultRelays={defaultRelays}
           userRelays={userRelays}
           contactsRelays={contactsRelays}

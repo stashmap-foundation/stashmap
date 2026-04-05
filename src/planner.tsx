@@ -872,6 +872,8 @@ function planCopyDescendantNodes<T extends GraphPlan>(
         })(),
         text: source.text,
         basedOn: source.id,
+        relevance: source.relevance,
+        argument: source.argument,
       });
     },
     plan

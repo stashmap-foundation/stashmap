@@ -46,12 +46,28 @@ export function useItemStyle(): ItemStyle {
   const currentRow = useCurrentEdge();
   const virtualType = currentRow?.virtualType;
 
-  if (virtualType === "suggestion" || isViewingOtherUserContent) {
+  if (virtualType === "suggestion") {
     return {
       cardStyle: {},
       textStyle: {},
       textClassName: "text-readonly",
       relevance: undefined,
+    };
+  }
+
+  if (isViewingOtherUserContent) {
+    const relevance = currentRow?.relevance;
+    const argument = currentRow?.argument;
+    const normalizedRelevance =
+      relevance === ("" as string) ? undefined : relevance;
+    return {
+      cardStyle: {},
+      textStyle: {
+        ...getRelevanceTextStyle(normalizedRelevance),
+        ...getArgumentTextStyle(argument),
+      },
+      textClassName: "text-readonly",
+      relevance: normalizedRelevance,
     };
   }
 

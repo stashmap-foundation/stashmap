@@ -85,6 +85,7 @@ import {
 } from "./batchOperations";
 import { planDeleteNodeFromView } from "../treeMutations";
 import { IS_MOBILE } from "./responsive";
+import { MobileActionBar } from "./MobileActionBar";
 
 function BreadcrumbItem({
   label,
@@ -734,7 +735,7 @@ const KEY_TO_FILTER: Record<string, FilterId> = {
   "0": "incoming",
 };
 
-function getActiveRow(root: HTMLElement): HTMLElement | undefined {
+export function getActiveRow(root: HTMLElement): HTMLElement | undefined {
   const rows = getFocusableRows(root);
   return rows.find((row) => row.tabIndex === 0);
 }
@@ -884,14 +885,14 @@ function setSelectedPane(targetPane: HTMLElement): void {
   targetPane.setAttribute("data-keyboard-pane-selected", "true");
 }
 
-const SYMBOL_TO_RELEVANCE: Record<string, Relevance> = {
+export const SYMBOL_TO_RELEVANCE: Record<string, Relevance> = {
   x: "not_relevant",
   "~": "little_relevant",
   "?": "maybe_relevant",
   "!": "relevant",
 };
 
-function refocusPaneAfterRowMutation(root: HTMLElement): void {
+export function refocusPaneAfterRowMutation(root: HTMLElement): void {
   window.setTimeout(() => {
     const { activeElement } = document;
     if (activeElement instanceof HTMLElement && root.contains(activeElement)) {
@@ -960,7 +961,7 @@ function getDisplayTextForViewKey(
   return getDisplayTextForView(data, viewPath, stack);
 }
 
-function getActionTargetKeys(
+export function getActionTargetKeys(
   selection: OrderedSet<string>,
   activeRow: HTMLElement,
   orderedViewKeys: string[]
@@ -1626,6 +1627,7 @@ function PaneViewInner(): JSX.Element {
       >
         <TreeView />
       </DroppableContainer>
+      <MobileActionBar wrapperRef={wrapperRef} />
       <PaneStatusLine onShowShortcuts={() => setShowShortcuts(true)} />
     </div>
   );

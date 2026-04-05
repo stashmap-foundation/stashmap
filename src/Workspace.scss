@@ -679,18 +679,26 @@ body {
   .right-menu {
     display: none;
   }
+}
 
-  .item:focus .right-menu,
-  .item:focus-within .right-menu,
-  .item[data-selected="true"] .right-menu {
+.mobile-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 16px;
+  background: var(--base02);
+  border-top: 1px solid var(--base01);
+  flex-shrink: 0;
+
+  .relevance-symbol,
+  .evidence-selector {
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
     display: flex;
-
-    .relevance-slot > *,
-    .evidence-slot > *,
-    .action-slot > * {
-      opacity: 1;
-      visibility: visible;
-    }
+    align-items: center;
+    justify-content: center;
   }
 }
 

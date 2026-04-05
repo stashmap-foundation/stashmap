@@ -1,5 +1,4 @@
 import React from "react";
-import { useMediaQuery } from "react-responsive";
 import {
   useViewPath,
   ViewPath,
@@ -33,7 +32,6 @@ import {
   isRefNode,
 } from "../connections";
 import { ReferenceDisplay } from "./referenceDisplay";
-import { IS_MOBILE } from "./responsive";
 import { MiniEditor, preventEditorBlur } from "./AddNode";
 import { useOnToggleExpanded } from "./SelectNodes";
 import { useData } from "../DataContext";
@@ -706,14 +704,12 @@ export function Node({
   cardBodyClassName?: string;
   isSuggestion?: boolean;
 }): JSX.Element | null {
-  const isDesktop = !useMediaQuery(IS_MOBILE);
   const viewPath = useViewPath();
   const levels = getLevels(viewPath);
   const searchDepth = useSearchDepth();
   const { cardStyle, textStyle, textClassName, relevance } = useItemStyle();
-  const defaultCls = isDesktop ? "hover-light-bg" : "";
   const cls =
-    className !== undefined ? `${className} hover-light-bg` : defaultCls;
+    className !== undefined ? `${className} hover-light-bg` : "hover-light-bg";
   const clsBody = cardBodyClassName || "ps-0";
 
   const { user } = useData();

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useMediaQuery } from "react-responsive";
 import { Dropdown } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { nip19 } from "nostr-tools";
@@ -20,6 +21,7 @@ import { planUpdateViews, planUpdatePanes, usePlanner } from "../planner";
 import { useData } from "../DataContext";
 import { isUserLoggedIn, useLogout } from "../NostrAuthContext";
 import { useDragAutoScroll } from "../useDragAutoScroll";
+import { IS_MOBILE } from "./responsive";
 
 export function PaneSearchButton(): JSX.Element {
   const { setPane } = useSplitPanes();
@@ -92,11 +94,16 @@ export function PaneSearchButton(): JSX.Element {
   );
 }
 
-export function ClosePaneButton(): JSX.Element {
+export function ClosePaneButton(): JSX.Element | null {
+  const isMobile = useMediaQuery(IS_MOBILE);
   const { panes } = useSplitPanes();
   const paneIndex = usePaneIndex();
   const { createPlan, executePlan } = usePlanner();
   const { user } = useData();
+
+  if (isMobile) {
+    return null;
+  }
 
   const handleRemovePane = (): void => {
     const plan = createPlan();

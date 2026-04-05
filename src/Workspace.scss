@@ -104,8 +104,7 @@ body {
   overflow-x: hidden;
   position: relative;
   padding-top: 6px;
-  padding-left: 16px;
-
+  padding-left: 0px;
 }
 
 // Split pane layout
@@ -117,6 +116,9 @@ body {
   gap: 1px;
   background-color: var(--base01);
   overflow-x: auto;
+  @include respond-below(xs) {
+    scroll-snap-type: x mandatory;
+  }
 }
 
 .split-pane {
@@ -127,6 +129,10 @@ body {
   flex-direction: column;
   background-color: var(--base03);
   overflow: hidden;
+  @include respond-below(xs) {
+    flex: 1 0 100vw;
+    scroll-snap-align: start;
+  }
 }
 
 .split-pane-add {
@@ -665,6 +671,15 @@ body {
   visibility: visible;
 }
 
+@include respond-below(xs) {
+  .item[data-selected="true"] .right-menu .relevance-slot > *,
+  .item[data-selected="true"] .right-menu .evidence-slot > *,
+  .item[data-selected="true"] .right-menu .action-slot > * {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
 // ============================================
 // 7. FORMS & INPUTS
 // ============================================
@@ -978,6 +993,9 @@ input:focus,
   color: var(--base00);
   min-width: 0;
   overflow: hidden;
+  @include respond-below(xs) {
+    display: none;
+  }
 }
 
 .breadcrumb-link {
@@ -1716,6 +1734,11 @@ body:not(.keyboard-input-mode) .hover-light-bg:hover {
 
   &:hover {
     transform: scale(1.2);
+  }
+
+  @include respond-below(xs) {
+    padding: 8px 8px;
+    font-size: 16px;
   }
 }
 

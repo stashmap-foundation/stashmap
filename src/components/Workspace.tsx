@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useMediaQuery } from "react-responsive";
 import { List, Map, OrderedSet } from "immutable";
 import {
   TemporaryViewProvider,
@@ -83,6 +84,7 @@ import {
   getCurrentRow,
 } from "./batchOperations";
 import { planDeleteNodeFromView } from "../treeMutations";
+import { IS_MOBILE } from "./responsive";
 
 function BreadcrumbItem({
   label,
@@ -487,6 +489,7 @@ function Breadcrumbs(): JSX.Element {
 }
 
 function ForkButton(): JSX.Element | null {
+  const isMobile = useMediaQuery(IS_MOBILE);
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const currentPane = useCurrentPane();
   const currentNode = useCurrentNode();
@@ -523,7 +526,7 @@ function ForkButton(): JSX.Element | null {
         }}
         aria-label="Open root to make a copy"
       >
-        open root to copy
+        {isMobile ? "copy" : "open root to copy"}
       </a>
     );
   }
@@ -535,7 +538,7 @@ function ForkButton(): JSX.Element | null {
       onClick={handleFork}
       aria-label="copy root to edit"
     >
-      copy to edit
+      {isMobile ? "copy" : "copy to edit"}
     </button>
   );
 }

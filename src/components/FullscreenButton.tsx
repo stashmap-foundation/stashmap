@@ -1,4 +1,5 @@
 import React from "react";
+import { useMediaQuery } from "react-responsive";
 import {
   useCurrentRowID,
   useViewPath,
@@ -16,8 +17,10 @@ import {
 } from "../connections";
 import { useData } from "../DataContext";
 import { buildNodeRouteUrl } from "../navigationUrl";
+import { IS_MOBILE } from "./responsive";
 
 export function FullscreenButton(): JSX.Element | null {
+  const isMobile = useMediaQuery(IS_MOBILE);
   const stack = usePaneStack();
   const viewPath = useViewPath();
   const [rowID] = useCurrentRowID();
@@ -37,7 +40,7 @@ export function FullscreenButton(): JSX.Element | null {
     currentRow
   );
   const isFullscreenNode = viewPath.length === 2;
-  if (isFullscreenNode) {
+  if (isFullscreenNode || isMobile) {
     return null;
   }
 

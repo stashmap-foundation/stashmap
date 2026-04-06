@@ -2,7 +2,6 @@ export const SEARCH_PREFIX = "~Search:";
 
 export const DEFAULT_TYPE_FILTERS: (
   | Relevance
-  | Argument
   | "suggestions"
   | "versions"
   | "incoming"

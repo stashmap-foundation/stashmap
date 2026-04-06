@@ -18,11 +18,6 @@ describe("TYPE_COLORS", () => {
     expect(TYPE_COLORS.not_relevant).toBe("#93a1a1");
   });
 
-  test("has correct colors for argument types", () => {
-    expect(TYPE_COLORS.confirms).toBe("#859900");
-    expect(TYPE_COLORS.contra).toBe("#dc322f");
-  });
-
   test("has inactive color", () => {
     expect(TYPE_COLORS.inactive).toBe("#586e75");
   });
@@ -39,14 +34,6 @@ describe("DEFAULT_TYPE_FILTERS", () => {
 
   test("includes contains", () => {
     expect(DEFAULT_TYPE_FILTERS).toContain("contains");
-  });
-
-  test("excludes confirms by default", () => {
-    expect(DEFAULT_TYPE_FILTERS).not.toContain("confirms");
-  });
-
-  test("excludes contra by default", () => {
-    expect(DEFAULT_TYPE_FILTERS).not.toContain("contra");
   });
 
   test("includes little_relevant by default", () => {
@@ -90,8 +77,6 @@ My Notes
       screen.getByLabelText("toggle Little Relevant filter")
     ).toBeDefined();
     expect(screen.getByLabelText("toggle Not Relevant filter")).toBeDefined();
-    expect(screen.getByLabelText("toggle Confirms filter")).toBeDefined();
-    expect(screen.getByLabelText("toggle Contradicts filter")).toBeDefined();
   });
 
   test("toggling filter hides/shows children", async () => {

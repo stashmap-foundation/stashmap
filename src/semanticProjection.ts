@@ -21,7 +21,6 @@ import { computeVersionDiff } from "./domain/snapshotBaseline";
 
 type FooterTypeFilters = (
   | Relevance
-  | Argument
   | "suggestions"
   | "versions"
   | "incoming"

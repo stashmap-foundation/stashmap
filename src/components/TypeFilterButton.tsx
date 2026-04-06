@@ -45,26 +45,6 @@ const RELEVANCE_FILTERS: {
   },
 ];
 
-const ARGUMENT_FILTERS: {
-  id: "confirms" | "contra";
-  label: string;
-  color: string;
-  symbol: string;
-}[] = [
-  {
-    id: "confirms",
-    label: "Confirms",
-    color: TYPE_COLORS.confirms,
-    symbol: "+",
-  },
-  {
-    id: "contra",
-    label: "Contradicts",
-    color: TYPE_COLORS.contra,
-    symbol: "-",
-  },
-];
-
 const SUGGESTIONS_FILTER = {
   id: "suggestions" as const,
   label: "Suggestions",
@@ -88,7 +68,6 @@ const INCOMING_FILTER = {
 
 export type FilterId =
   | Relevance
-  | Argument
   | "suggestions"
   | "versions"
   | "incoming"
@@ -144,7 +123,6 @@ function ClickableFilterSymbol({
 
 const ALL_FILTERS = [
   ...RELEVANCE_FILTERS,
-  ...ARGUMENT_FILTERS,
   SUGGESTIONS_FILTER,
   VERSIONS_FILTER,
   INCOMING_FILTER,
@@ -206,19 +184,6 @@ export function InlineFilterDots(): JSX.Element {
     <div className="inline-filter-symbols">
       <span className="filter-group">
         {RELEVANCE_FILTERS.map((f) => (
-          <ClickableFilterSymbol
-            key={f.id}
-            id={f.id}
-            label={f.label}
-            color={f.color}
-            symbol={f.symbol}
-            isActive={isFilterActive(f.id)}
-            onClick={handleFilterToggle}
-          />
-        ))}
-      </span>
-      <span className="filter-group">
-        {ARGUMENT_FILTERS.map((f) => (
           <ClickableFilterSymbol
             key={f.id}
             id={f.id}

@@ -52,14 +52,7 @@ function asArray(obj: Serializable | undefined): Array<Serializable> {
 
 function parseTypeFilter(
   value: string
-):
-  | Relevance
-  | Argument
-  | "suggestions"
-  | "versions"
-  | "incoming"
-  | "contains"
-  | null {
+): Relevance | "suggestions" | "versions" | "incoming" | "contains" | null {
   if (value === "contains") {
     return "contains";
   }
@@ -73,9 +66,6 @@ function parseTypeFilter(
     value === "not_relevant"
   ) {
     return value as Relevance;
-  }
-  if (value === "confirms" || value === "contra") {
-    return value as Argument;
   }
   if (value === "suggestions") {
     return "suggestions";
@@ -91,9 +81,7 @@ function parseTypeFilter(
 
 function parseTypeFilters(
   arr: Array<Serializable>
-): Array<
-  Relevance | Argument | "suggestions" | "versions" | "incoming" | "contains"
-> {
+): Array<Relevance | "suggestions" | "versions" | "incoming" | "contains"> {
   return arr
     .map((item) => parseTypeFilter(asString(item)))
     .filter(
@@ -101,7 +89,6 @@ function parseTypeFilters(
         parsed
       ): parsed is
         | Relevance
-        | Argument
         | "suggestions"
         | "versions"
         | "incoming"

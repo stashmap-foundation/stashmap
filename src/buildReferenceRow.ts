@@ -159,7 +159,6 @@ function effectiveIDs(
   node: GraphNode,
   activeFilters: (
     | Relevance
-    | Argument
     | "suggestions"
     | "versions"
     | "incoming"
@@ -182,7 +181,6 @@ function computeNodeDiff(
   parentNode: GraphNode | undefined,
   activeFilters: (
     | Relevance
-    | Argument
     | "suggestions"
     | "versions"
     | "incoming"

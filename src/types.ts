@@ -137,7 +137,6 @@ declare global {
     searchQuery?: string;
     typeFilters?: (
       | Relevance
-      | Argument
       | "suggestions"
       | "versions"
       | "incoming"
@@ -183,12 +182,7 @@ declare global {
   type View = {
     expanded?: boolean;
     typeFilters?: Array<
-      | Relevance
-      | Argument
-      | "suggestions"
-      | "versions"
-      | "incoming"
-      | "contains"
+      Relevance | "suggestions" | "versions" | "incoming" | "contains"
     >;
   };
 

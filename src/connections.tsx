@@ -503,20 +503,6 @@ function getSharesFromPublicKey(publicKey: PublicKey): number {
   return 10000; // TODO: implement
 }
 
-// Check if an item matches a filter type (relevance, argument, or contains)
-export function itemMatchesType(
-  item: GraphNode,
-  filterType: Relevance | Argument | "contains"
-): boolean {
-  if (filterType === "confirms" || filterType === "contra") {
-    return item.argument === filterType;
-  }
-  if (filterType === "contains") {
-    return item.relevance === undefined && item.argument === undefined;
-  }
-  return item.relevance === filterType;
-}
-
 export function isEmptySemanticID(semanticID: ID): boolean {
   return semanticID === EMPTY_SEMANTIC_ID;
 }
@@ -525,7 +511,6 @@ export function itemPassesFilters(
   item: GraphNode,
   activeFilters: (
     | Relevance
-    | Argument
     | "suggestions"
     | "versions"
     | "incoming"
@@ -540,14 +525,6 @@ export function itemPassesFilters(
     item.relevance === undefined ? "contains" : item.relevance;
   if (!activeFilters.includes(relevanceFilter)) {
     return false;
-  }
-
-  const hasArgumentFilter =
-    activeFilters.includes("confirms") || activeFilters.includes("contra");
-  if (hasArgumentFilter) {
-    if (!item.argument || !activeFilters.includes(item.argument)) {
-      return false;
-    }
   }
 
   return true;

@@ -747,7 +747,6 @@ body {
 input:focus,
 [contenteditable]:focus {
   outline: none;
-  background-color: var(--base02);
 }
 
 .input-group:focus-within {
@@ -1098,7 +1097,8 @@ input:focus,
 
 .mini-editor {
   outline: none;
-  min-width: 1px;
+  display: inline-block;
+  min-width: 10px;
 }
 
 // ============================================

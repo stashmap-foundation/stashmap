@@ -1,10 +1,11 @@
 import React from "react";
 import { useMediaQuery } from "react-responsive";
+import { Dropdown } from "react-bootstrap";
 import { planUpdatePanes, usePlanner } from "../planner";
 import { useData } from "../DataContext";
 import { useCurrentPane } from "../SplitPanesContext";
 import { DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
-import { IS_MOBILE } from "./responsive";
+import { IS_SMALL_SCREEN } from "./responsive";
 
 const RELEVANCE_FILTERS: {
   id: Relevance | "contains";
@@ -141,21 +142,70 @@ function ClickableFilterSymbol({
   );
 }
 
+const ALL_FILTERS = [
+  ...RELEVANCE_FILTERS,
+  ...ARGUMENT_FILTERS,
+  SUGGESTIONS_FILTER,
+  VERSIONS_FILTER,
+  INCOMING_FILTER,
+];
+
+function FilterPopover({
+  currentFilters,
+  onToggle,
+}: {
+  currentFilters: FilterId[];
+  onToggle: (id: FilterId) => void;
+}): JSX.Element {
+  const isFilterActive = (id: FilterId): boolean => currentFilters.includes(id);
+  return (
+    <Dropdown className="filter-popover">
+      <Dropdown.Toggle
+        as="button"
+        className="btn btn-icon"
+        aria-label="open filter menu"
+      >
+        ∇
+      </Dropdown.Toggle>
+      <Dropdown.Menu>
+        <div className="filter-popover-symbols">
+          {ALL_FILTERS.map((f) => (
+            <ClickableFilterSymbol
+              key={f.id}
+              id={f.id}
+              label={f.label}
+              color={f.color}
+              symbol={f.symbol}
+              isActive={isFilterActive(f.id)}
+              onClick={onToggle}
+            />
+          ))}
+        </div>
+      </Dropdown.Menu>
+    </Dropdown>
+  );
+}
+
 export function InlineFilterDots(): JSX.Element {
-  const isMobile = useMediaQuery(IS_MOBILE);
+  const isSmallScreen = useMediaQuery(IS_SMALL_SCREEN);
   const pane = useCurrentPane();
   const currentFilters = pane.typeFilters || DEFAULT_TYPE_FILTERS;
   const isFilterActive = (id: FilterId): boolean => currentFilters.includes(id);
   const handleFilterToggle = useToggleFilter();
 
-  const relevanceFilters = isMobile
-    ? RELEVANCE_FILTERS.filter((f) => f.id !== "contains")
-    : RELEVANCE_FILTERS;
+  if (isSmallScreen) {
+    return (
+      <FilterPopover
+        currentFilters={currentFilters}
+        onToggle={handleFilterToggle}
+      />
+    );
+  }
 
   return (
     <div className="inline-filter-symbols">
       <span className="filter-group">
-        {relevanceFilters.map((f) => (
+        {RELEVANCE_FILTERS.map((f) => (
           <ClickableFilterSymbol
             key={f.id}
             id={f.id}
@@ -167,47 +217,43 @@ export function InlineFilterDots(): JSX.Element {
           />
         ))}
       </span>
-      {!isMobile && (
-        <>
-          <span className="filter-group">
-            {ARGUMENT_FILTERS.map((f) => (
-              <ClickableFilterSymbol
-                key={f.id}
-                id={f.id}
-                label={f.label}
-                color={f.color}
-                symbol={f.symbol}
-                isActive={isFilterActive(f.id)}
-                onClick={handleFilterToggle}
-              />
-            ))}
-          </span>
+      <span className="filter-group">
+        {ARGUMENT_FILTERS.map((f) => (
           <ClickableFilterSymbol
-            id={SUGGESTIONS_FILTER.id}
-            label={SUGGESTIONS_FILTER.label}
-            color={SUGGESTIONS_FILTER.color}
-            symbol={SUGGESTIONS_FILTER.symbol}
-            isActive={isFilterActive(SUGGESTIONS_FILTER.id)}
+            key={f.id}
+            id={f.id}
+            label={f.label}
+            color={f.color}
+            symbol={f.symbol}
+            isActive={isFilterActive(f.id)}
             onClick={handleFilterToggle}
           />
-          <ClickableFilterSymbol
-            id={VERSIONS_FILTER.id}
-            label={VERSIONS_FILTER.label}
-            color={VERSIONS_FILTER.color}
-            symbol={VERSIONS_FILTER.symbol}
-            isActive={isFilterActive(VERSIONS_FILTER.id)}
-            onClick={handleFilterToggle}
-          />
-          <ClickableFilterSymbol
-            id={INCOMING_FILTER.id}
-            label={INCOMING_FILTER.label}
-            color={INCOMING_FILTER.color}
-            symbol={INCOMING_FILTER.symbol}
-            isActive={isFilterActive(INCOMING_FILTER.id)}
-            onClick={handleFilterToggle}
-          />
-        </>
-      )}
+        ))}
+      </span>
+      <ClickableFilterSymbol
+        id={SUGGESTIONS_FILTER.id}
+        label={SUGGESTIONS_FILTER.label}
+        color={SUGGESTIONS_FILTER.color}
+        symbol={SUGGESTIONS_FILTER.symbol}
+        isActive={isFilterActive(SUGGESTIONS_FILTER.id)}
+        onClick={handleFilterToggle}
+      />
+      <ClickableFilterSymbol
+        id={VERSIONS_FILTER.id}
+        label={VERSIONS_FILTER.label}
+        color={VERSIONS_FILTER.color}
+        symbol={VERSIONS_FILTER.symbol}
+        isActive={isFilterActive(VERSIONS_FILTER.id)}
+        onClick={handleFilterToggle}
+      />
+      <ClickableFilterSymbol
+        id={INCOMING_FILTER.id}
+        label={INCOMING_FILTER.label}
+        color={INCOMING_FILTER.color}
+        symbol={INCOMING_FILTER.symbol}
+        isActive={isFilterActive(INCOMING_FILTER.id)}
+        onClick={handleFilterToggle}
+      />
     </div>
   );
 }

@@ -1687,6 +1687,7 @@ body:not(.keyboard-input-mode) .hover-light-bg:hover {
   padding: 4px 10px;
   font-size: 0.85rem;
   margin-left: 8px;
+  white-space: nowrap;
 
   &:hover {
     background: var(--base01);
@@ -1714,6 +1715,23 @@ body:not(.keyboard-input-mode) .hover-light-bg:hover {
 }
 
 .inline-filter-symbols {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.filter-popover {
+  .dropdown-toggle::after {
+    display: none;
+  }
+
+  .dropdown-menu {
+    padding: 4px;
+    min-width: auto;
+  }
+}
+
+.filter-popover-symbols {
   display: flex;
   align-items: center;
   gap: 0;

@@ -60,11 +60,13 @@ export function useItemStyle(): ItemStyle {
     const argument = currentRow?.argument;
     const normalizedRelevance =
       relevance === ("" as string) ? undefined : relevance;
+    const argumentStyle = getArgumentTextStyle(argument);
     return {
       cardStyle: {},
       textStyle: {
         ...getRelevanceTextStyle(normalizedRelevance),
-        ...getArgumentTextStyle(argument),
+        ...argumentStyle,
+        ...(argumentStyle.color ? { opacity: 0.6 } : {}),
       },
       textClassName: "text-readonly",
       relevance: normalizedRelevance,

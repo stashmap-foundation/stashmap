@@ -952,7 +952,7 @@ input:focus,
 .inner-node .card-body {
   padding: 6px 0;
   @include respond-below(xs) {
-    padding: 8px 0;
+    padding: 8px 16px 8px 0;
   }
 }
 

@@ -686,10 +686,8 @@ body {
   align-items: center;
   justify-content: center;
   gap: 2px;
-  padding: 6px 16px;
-  background: var(--base02);
-  border-top: 1px solid var(--base01);
-  flex-shrink: 0;
+  padding: 4px 16px;
+  background: transparent;
 
   .relevance-symbol,
   .evidence-selector {

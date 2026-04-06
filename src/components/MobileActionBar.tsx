@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useMediaQuery } from "react-responsive";
 import { List, Map } from "immutable";
 import { TYPE_COLORS } from "../constants";
@@ -144,14 +145,14 @@ export function MobileActionBar({
   if (!isMobile || !activeRow) return null;
   if (isRowReadonly(activeRow, isOtherUser, isInSearch)) return null;
   if (isUserEntryRow(activeRow)) return null;
-
   const activeViewPath = parseViewPath(getRowKey(activeRow));
   const currentRowData = getCurrentRow(data, activeViewPath, virtualRowsMap);
   const currentLevel = relevanceToLevel(currentRowData?.relevance);
   const currentArgument = currentRowData?.argument;
 
   const innerNode = activeRow.querySelector(".inner-node");
-  const virtualType = innerNode?.getAttribute("data-virtual-type");
+  if (!innerNode) return null;
+  const virtualType = innerNode.getAttribute("data-virtual-type");
   const isSuggestion = virtualType === "suggestion";
 
   const handleRelevance = (level: number): void => {
@@ -187,7 +188,7 @@ export function MobileActionBar({
     refocusPaneAfterRowMutation(root);
   };
 
-  return (
+  const bar = (
     <div className="mobile-action-bar">
       <div className="pill relevance-selector">
         {[0, 1, 2, 3].map((level) => (
@@ -263,4 +264,6 @@ export function MobileActionBar({
       )}
     </div>
   );
+
+  return createPortal(bar, innerNode);
 }

@@ -49,8 +49,8 @@ describe("DEFAULT_TYPE_FILTERS", () => {
     expect(DEFAULT_TYPE_FILTERS).not.toContain("contra");
   });
 
-  test("excludes little_relevant by default", () => {
-    expect(DEFAULT_TYPE_FILTERS).not.toContain("little_relevant");
+  test("includes little_relevant by default", () => {
+    expect(DEFAULT_TYPE_FILTERS).toContain("little_relevant");
   });
 
   test("excludes not_relevant by default", () => {

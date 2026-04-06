@@ -33,24 +33,13 @@ My Notes
     });
   });
 
-  test("typing text then clicking little relevant materializes with opacity styling", async () => {
+  test("typing text then clicking little relevant materializes and stays visible", async () => {
     const [alice] = setup([ALICE]);
     renderTree(alice);
 
     await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Faded");
 
-    // Click "little relevant"
     fireEvent.click(screen.getByLabelText("set Faded to little relevant"));
-
-    // Node should be hidden (default filters exclude little_relevant)
-    await waitFor(() => {
-      expect(screen.queryByText("Faded")).toBeNull();
-    });
-
-    // Enable little_relevant filter to verify node was created
-    await userEvent.click(
-      screen.getByLabelText("toggle Little Relevant filter")
-    );
 
     await expectTree(`
 My Notes
@@ -58,7 +47,6 @@ My Notes
     Faded
     `);
 
-    // Verify the node was created with correct text
     const fadedNode = await screen.findByLabelText("edit Faded");
     expect(fadedNode).toBeDefined();
   });

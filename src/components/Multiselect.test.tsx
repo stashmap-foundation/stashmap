@@ -497,17 +497,22 @@ Root
     await expectRelevance("B", "Maybe Relevant");
   });
 
-  test("~ on selection hides all selected (filtered by default)", async () => {
+  test("~ on selection sets little_relevant on all selected (visible by default)", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
     await type("Root{Enter}{Tab}A{Enter}B{Enter}C{Escape}");
     await clickRow("A");
     await userEvent.keyboard("{Shift>}j{/Shift}");
     await userEvent.keyboard("~");
-    await expectTree(`
+    await expectTree(
+      `
 Root
+  {~} A
+  {~} B
   C
-    `);
+    `,
+      { showGutter: true }
+    );
   });
 
   test("selection clears after relevance operation", async () => {

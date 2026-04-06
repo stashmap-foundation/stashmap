@@ -182,23 +182,13 @@ Money
     );
   });
 
-  test("~ accepts incoming as little_relevant (filtered by default)", async () => {
+  test("~ accepts incoming as little_relevant (visible by default)", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());
     await setupItemLevelIncomingRef();
 
     await clickRow("Bitcoin ! <<< Crypto");
     await userEvent.keyboard("~");
-
-    await expectTree(`
-Money
-  Bitcoin
-    Details
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText("toggle Little Relevant filter")
-    );
 
     await expectTree(
       `

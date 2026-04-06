@@ -1,10 +1,5 @@
 export const SEARCH_PREFIX = "~Search:";
 
-// Default type filters for children view
-// Relevance filters: show relevant, maybe_relevant, and contains by default
-// little_relevant and not_relevant are hidden by default
-// Contains: children with undefined relevance and undefined argument
-// Suggestions from other users: ON by default
 export const DEFAULT_TYPE_FILTERS: (
   | Relevance
   | Argument
@@ -15,6 +10,7 @@ export const DEFAULT_TYPE_FILTERS: (
 )[] = [
   "relevant",
   "maybe_relevant",
+  "little_relevant",
   "contains",
   "suggestions",
   "versions",

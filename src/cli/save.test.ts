@@ -187,8 +187,22 @@ test("save rejects losing an existing node id from the workspace", async () => {
   const removedLine = extractLine(saved, "remove me");
   fs.writeFileSync(documentPath, saved.replace(`${removedLine}\n`, ""));
 
-  await expect(runSaveCommand(["--config", profilePath])).rejects.toThrow(
-    /loses existing node ids/
+  await expect(runSaveCommand(["--config", profilePath])).rejects.toMatchObject(
+    {
+      message: expect.stringContaining("Workspace loses existing node ids"),
+    }
+  );
+  await expect(runSaveCommand(["--config", profilePath])).rejects.toMatchObject(
+    {
+      message: expect.stringContaining(removedLine),
+    }
+  );
+  await expect(runSaveCommand(["--config", profilePath])).rejects.toMatchObject(
+    {
+      message: expect.stringContaining(
+        'Restore the missing line, or move it under "# Delete" to delete it explicitly.'
+      ),
+    }
   );
 });
 

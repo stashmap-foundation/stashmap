@@ -27,6 +27,12 @@ type NodeIndexState = {
   nodes: Record<string, string>;
 };
 
+type MissingNodeRecovery = {
+  nodeId: string;
+  docId: string;
+  originalLine?: string;
+};
+
 type NormalizedWorkspaceDocument = {
   filePath: string;
   relativePath: string;
@@ -199,6 +205,62 @@ async function readBaseline(
   } catch {
     return undefined;
   }
+}
+
+function findLineForNodeId(
+  baselineContent: string,
+  nodeId: string
+): string | undefined {
+  return baselineContent
+    .split(/\r?\n/u)
+    .find((line) => line.includes(`<!-- id:${nodeId}`));
+}
+
+async function buildMissingNodeRecoveries(
+  knowstrHome: string,
+  previousNodeIndex: NodeIndexState,
+  lostNodeIds: string[]
+): Promise<MissingNodeRecovery[]> {
+  const uniqueDocIds = [
+    ...new Set(lostNodeIds.map((nodeId) => previousNodeIndex.nodes[nodeId])),
+  ];
+  const baselines = Object.fromEntries(
+    await Promise.all(
+      uniqueDocIds.map(async (docId) => [
+        docId,
+        await readBaseline(knowstrHome, docId),
+      ])
+    )
+  ) as Record<string, string | undefined>;
+
+  return lostNodeIds.map((nodeId) => {
+    const docId = previousNodeIndex.nodes[nodeId];
+    const baselineContent = baselines[docId];
+
+    return {
+      nodeId,
+      docId,
+      ...(baselineContent
+        ? {
+            originalLine: findLineForNodeId(baselineContent, nodeId),
+          }
+        : {}),
+    };
+  });
+}
+
+function formatMissingNodeError(recoveries: MissingNodeRecovery[]): string {
+  return [
+    `Workspace loses existing node ids: ${recoveries
+      .map((recovery) => recovery.nodeId)
+      .join(", ")}`,
+    'Restore the missing line, or move it under "# Delete" to delete it explicitly.',
+    ...recoveries.map((recovery) =>
+      recovery.originalLine
+        ? `- ${recovery.nodeId}: ${recovery.originalLine}`
+        : `- ${recovery.nodeId}: original line not found in saved baseline for doc ${recovery.docId}`
+    ),
+  ].join("\n");
 }
 
 async function loadPreviousNodeIndex(
@@ -388,10 +450,11 @@ function buildWorkspaceNodeIndex(
   );
 }
 
-function validateWorkspaceIntegrity(
+async function validateWorkspaceIntegrity(
+  knowstrHome: string,
   previousNodeIndex: NodeIndexState,
   normalizedDocuments: NormalizedWorkspaceDocument[]
-): Record<string, string> {
+): Promise<Record<string, string>> {
   const docIdCounts = normalizedDocuments.reduce(
     (acc, document) => ({
       ...acc,
@@ -431,7 +494,13 @@ function validateWorkspaceIntegrity(
 
   if (lostNodeIds.length > 0) {
     throw new Error(
-      `Workspace loses existing node ids: ${lostNodeIds.join(", ")}`
+      formatMissingNodeError(
+        await buildMissingNodeRecoveries(
+          knowstrHome,
+          previousNodeIndex,
+          lostNodeIds
+        )
+      )
     );
   }
 
@@ -459,7 +528,8 @@ export async function saveEditedWorkspaceDocuments(
     normalizeWorkspaceDocument(profile, document)
   );
   const previousNodeIndex = await loadPreviousNodeIndex(profile.knowstrHome);
-  const nextNodeIndex = validateWorkspaceIntegrity(
+  const nextNodeIndex = await validateWorkspaceIntegrity(
+    profile.knowstrHome,
     previousNodeIndex,
     normalizedDocuments
   );

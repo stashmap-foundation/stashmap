@@ -13,10 +13,10 @@ if (nodeRequire.extensions && !nodeRequire.extensions[".css"]) {
   nodeRequire.extensions[".css"] = () => undefined;
 }
 
+const { formatCliError } = nodeRequire("./output") as typeof import("./output");
 const { runCli } = nodeRequire("./main") as typeof import("./main");
 
 runCli(process.argv.slice(2)).catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`${JSON.stringify({ error: message }, null, 2)}\n`);
+  process.stderr.write(formatCliError(error));
   process.exit(1);
 });

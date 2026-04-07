@@ -244,6 +244,10 @@ declare global {
     isCref?: boolean;
     targetID?: LongID;
     linkText?: string;
+    blockKind?: "heading" | "list_item" | "paragraph";
+    headingLevel?: number;
+    listOrdered?: boolean;
+    listStart?: number;
   };
 
   // Pure View layer type representing a ref row in the UI, derived from GraphNode but with additional display-related fields

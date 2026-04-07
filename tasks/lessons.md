@@ -319,6 +319,21 @@ To distinguish them, propagate the information from the source:
 
 **General principle**: When all items look the same structurally (all cref IDs), the distinction must be propagated from where it originates, not inferred at the consumption site.
 
+## Markdown serializer indent must match parent marker width
+
+**Date**: 2026-04-07
+**Context**: Adding heading/ordered-list preservation to the CLI save pipeline. Nested bullets under ordered list items were silently corrupted on the second save — nested content escaped the list and `2. second` became `5. second`.
+
+**Mistake**: Hardcoded a uniform 2-space indent for all nested content in the serializer. Worked for bullet trees by accident (bullet marker `- ` has content column 2), but broke for ordered lists where `1. ` has content column 3.
+
+**Root cause (CommonMark §5.2)**: A list item's continuation content must be indented to the content column of the first line, which equals marker width W + N spaces after marker. For `- ` that's 2, for `1. ` it's 3, for `10. ` it's 4. Less than that and the line "escapes" the list; the parser then starts a new list with `<ol start="N">`, so the next time we serialize we get wrong numbers.
+
+**Rule**: Any markdown serializer that emits nested lists must compute child indent from the parent's content column, never from a fixed nesting depth:
+1. Pass `indent: string` (not `depth: number`) through recursion
+2. Compute `childIndent = parentIndent + " ".repeat(W + N)` based on parent's marker width
+3. For bullets: `parentIndent + "  "` (2 chars). For ordered: `parentIndent + " ".repeat(String(number).length + 2)` (handles single and multi-digit)
+4. Test roundtrip stability by calling the save path twice and asserting `changed_paths === []` on the second run — cosmetic tests aren't enough, byte-level idempotency is what catches this class of bug
+
 ## Creating Crefs in Tests: Use Alt-Drag, Not Typing
 
 **Date**: 2026-02-27

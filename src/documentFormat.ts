@@ -79,3 +79,41 @@ export function formatPrefixMarkers(
   ];
   return parts.length > 0 ? `${parts.join(" ")} ` : "";
 }
+
+function clampHeadingLevel(level: number): number {
+  if (level < 1) {
+    return 1;
+  }
+  if (level > 6) {
+    return 6;
+  }
+  return level;
+}
+
+export function formatHeadingLine(
+  level: number,
+  prefix: string,
+  text: string,
+  attrs: string
+): string {
+  return `${"#".repeat(clampHeadingLevel(level))} ${prefix}${text}${attrs}`;
+}
+
+export function formatBulletLine(
+  indent: string,
+  prefix: string,
+  text: string,
+  attrs: string
+): string {
+  return `${indent}- ${prefix}${text}${attrs}`;
+}
+
+export function formatOrderedLine(
+  indent: string,
+  number: number,
+  prefix: string,
+  text: string,
+  attrs: string
+): string {
+  return `${indent}${number}. ${prefix}${text}${attrs}`;
+}

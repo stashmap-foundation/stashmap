@@ -189,7 +189,13 @@ test("Parser strips leading list markers and keeps nesting", () => {
       blockKind: "list_item",
       children: [
         { text: "Child", children: [], blockKind: "list_item" },
-        { text: "Numbered Child", children: [], blockKind: "list_item" },
+        {
+          text: "Numbered Child",
+          children: [],
+          blockKind: "list_item",
+          listOrdered: true,
+          listStart: 1,
+        },
       ],
     },
   ]);

@@ -187,6 +187,8 @@ export type MarkdownTreeNode = {
   linkHref?: string;
   blockKind?: "heading" | "list_item" | "paragraph";
   headingLevel?: number;
+  listOrdered?: boolean;
+  listStart?: number;
   hidden?: boolean;
   basedOn?: string;
   snapshotDTag?: string;
@@ -219,6 +221,8 @@ function getLastDefinedListItem(
   return undefined;
 }
 
+type ListKind = { ordered: boolean; start: number };
+
 export function parseMarkdownHierarchy(
   markdownText: string
 ): MarkdownTreeNode[] {
@@ -226,9 +230,28 @@ export function parseMarkdownHierarchy(
   const roots: MarkdownTreeNode[] = [];
   const headingStack: Array<{ level: number; node: MarkdownTreeNode }> = [];
   const listItemStack: Array<MarkdownTreeNode | undefined> = [];
+  const listKindStack: ListKind[] = [];
 
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i];
+    if (
+      token.type === "bullet_list_open" ||
+      token.type === "ordered_list_open"
+    ) {
+      const startAttr = token.attrGet("start");
+      listKindStack.push({
+        ordered: token.type === "ordered_list_open",
+        start: startAttr ? Number(startAttr) : 1,
+      });
+      continue;
+    }
+    if (
+      token.type === "bullet_list_close" ||
+      token.type === "ordered_list_close"
+    ) {
+      listKindStack.pop();
+      continue;
+    }
     if (token.type === "heading_open") {
       const headingLevel = Number(token.tag.replace("h", ""));
       const inline = tokens[i + 1];
@@ -313,10 +336,15 @@ export function parseMarkdownHierarchy(
           headingStack[headingStack.length - 1]?.node;
         const effectiveRelevance = relevance;
         const effectiveArgument = argument;
+        const currentListKind = listKindStack[listKindStack.length - 1];
         const node: MarkdownTreeNode = {
           text,
           children: [],
           blockKind: "list_item",
+          ...(currentListKind?.ordered && {
+            listOrdered: true,
+            listStart: currentListKind.start,
+          }),
           ...(commentAttrs?.uuid !== undefined && { uuid: commentAttrs.uuid }),
           ...(effectiveRelevance !== undefined && {
             relevance: effectiveRelevance,

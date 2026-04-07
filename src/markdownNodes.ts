@@ -54,6 +54,14 @@ function materializeTreeNode(
     systemRole: parent ? undefined : treeNode.systemRole,
     userPublicKey: treeNode.userPublicKey,
     snapshotDTag: parent ? undefined : treeNode.snapshotDTag,
+    ...(treeNode.blockKind !== undefined && { blockKind: treeNode.blockKind }),
+    ...(treeNode.headingLevel !== undefined && {
+      headingLevel: treeNode.headingLevel,
+    }),
+    ...(treeNode.listOrdered !== undefined && {
+      listOrdered: treeNode.listOrdered,
+    }),
+    ...(treeNode.listStart !== undefined && { listStart: treeNode.listStart }),
   };
 
   const childSemanticContext = semanticContext.push(

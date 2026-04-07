@@ -104,7 +104,13 @@ test("Markdown parser preserves list nesting and strips list markers", () => {
       blockKind: "list_item",
       children: [
         { text: "Child", children: [], blockKind: "list_item" },
-        { text: "Numbered child", children: [], blockKind: "list_item" },
+        {
+          text: "Numbered child",
+          children: [],
+          blockKind: "list_item",
+          listOrdered: true,
+          listStart: 1,
+        },
       ],
     },
   ]);

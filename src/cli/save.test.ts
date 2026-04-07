@@ -237,6 +237,180 @@ test("save allows explicit deletion via # Delete", async () => {
   expect(result.updated_paths).toEqual([documentPath]);
 });
 
+test("save preserves heading levels", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "headings.md");
+  fs.writeFileSync(
+    documentPath,
+    "# Project\n## Section\n### Subsection\n- bullet under sub\n"
+  );
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+  expect(result.changed_paths).toEqual([documentPath]);
+
+  const saved = fs.readFileSync(documentPath, "utf8");
+  expect(saved).toContain("# Project <!-- id:");
+  expect(saved).toContain("## Section <!-- id:");
+  expect(saved).toContain("### Subsection <!-- id:");
+  expect(saved).toContain("- bullet under sub <!-- id:");
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
+});
+
+test("save preserves ordered lists", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "recipe.md");
+  fs.writeFileSync(documentPath, "# Recipe\n1. one\n2. two\n3. three\n");
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+  expect(result.changed_paths).toEqual([documentPath]);
+
+  const saved = fs.readFileSync(documentPath, "utf8");
+  expect(saved).toContain("1. one <!-- id:");
+  expect(saved).toContain("2. two <!-- id:");
+  expect(saved).toContain("3. three <!-- id:");
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
+});
+
+test("save preserves mixed structure with ordered items and nested bullets", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "mixed.md");
+  fs.writeFileSync(
+    documentPath,
+    "# Project\n## Steps\n1. first\n   - nested a\n   - nested b\n2. second\n"
+  );
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+  expect(result.changed_paths).toEqual([documentPath]);
+
+  const saved = fs.readFileSync(documentPath, "utf8");
+  expect(saved).toContain("# Project <!-- id:");
+  expect(saved).toContain("## Steps <!-- id:");
+  expect(saved).toContain("1. first <!-- id:");
+  expect(saved).toContain("   - nested a <!-- id:");
+  expect(saved).toContain("   - nested b <!-- id:");
+  expect(saved).toContain("2. second <!-- id:");
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
+});
+
+test("save preserves siblings under multiple headings", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "siblings.md");
+  fs.writeFileSync(
+    documentPath,
+    "# Project\n## Section A\n- one\n- two\n## Section B\n- three\n"
+  );
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+  expect(result.changed_paths).toEqual([documentPath]);
+
+  const saved = fs.readFileSync(documentPath, "utf8");
+  expect(saved).toContain("## Section A <!-- id:");
+  expect(saved).toContain("## Section B <!-- id:");
+  expect(saved).toContain("- one <!-- id:");
+  expect(saved).toContain("- two <!-- id:");
+  expect(saved).toContain("- three <!-- id:");
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
+});
+
+test("save preserves headings, ordered lists, and bullets end-to-end", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "kitchen-sink.md");
+  fs.writeFileSync(
+    documentPath,
+    [
+      "# Project",
+      "## Section",
+      "### Subsection",
+      "1. one",
+      "2. two",
+      "- bullet",
+      "",
+    ].join("\n")
+  );
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+  expect(result.changed_paths).toEqual([documentPath]);
+
+  const saved = fs.readFileSync(documentPath, "utf8");
+  expect(saved).toContain("# Project <!-- id:");
+  expect(saved).toContain("## Section <!-- id:");
+  expect(saved).toContain("### Subsection <!-- id:");
+  expect(saved).toContain("1. one <!-- id:");
+  expect(saved).toContain("2. two <!-- id:");
+  expect(saved).toContain("- bullet <!-- id:");
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
+});
+
 test("save skips .knowstr, .git, and node_modules and does not need nsec", async () => {
   const workspaceDir = makeTempDir();
   const profilePath = writeProfile(workspaceDir, {

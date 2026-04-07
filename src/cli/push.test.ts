@@ -170,6 +170,41 @@ test("pushing a new document writes workspace file with UUIDs and editing header
   expect(pool.publish).not.toHaveBeenCalled();
 });
 
+test("push with no relays throws a clear error", async () => {
+  const tempDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), "knowstr-push-no-relays-")
+  );
+  const knowstrHome = path.join(tempDir, ".knowstr");
+  const profile: SyncPullProfile = {
+    pubkey: ALICE,
+    readAs: ALICE,
+    workspaceDir: tempDir,
+    knowstrHome,
+    bootstrapRelays: [],
+    relays: [],
+    nsecFile: path.join(tempDir, "me.nsec"),
+  };
+  fs.writeFileSync(profile.nsecFile as string, PRIVATE_KEY);
+
+  const authorDir = path.join(tempDir, "DOCUMENTS", ALICE);
+  fs.mkdirSync(authorDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(authorDir, "scratch.md"),
+    "# Private Doc\n- alpha\n- beta\n"
+  );
+
+  const pool = {
+    close: jest.fn(),
+    publish: jest.fn(),
+  };
+
+  await expect(
+    pushPendingWritesWithPool(pool, profile as LoadedCliProfile, [])
+  ).rejects.toThrow(/No write relays configured/);
+
+  expect(pool.publish).not.toHaveBeenCalled();
+});
+
 test("pushing a new front-matter document preserves metadata and does not render it into notes", async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-push-fm-"));
   const knowstrHome = path.join(tempDir, ".knowstr");

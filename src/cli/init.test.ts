@@ -12,7 +12,7 @@ function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-init-"));
 }
 
-test("init creates profile.json and me.nsec with valid keypair", () => {
+test("init creates profile.json and me.nsec with valid keypair and empty relays by default", () => {
   const cwd = makeTempDir();
   const result = runInitCommand([], cwd);
 
@@ -20,7 +20,6 @@ test("init creates profile.json and me.nsec with valid keypair", () => {
     throw new Error("unexpected help");
   }
 
-  expect(result.readonly).toBe(false);
   expect(result.config_path).toBe(path.join(cwd, ".knowstr", "profile.json"));
 
   const profile = JSON.parse(fs.readFileSync(result.config_path, "utf8")) as {
@@ -30,7 +29,8 @@ test("init creates profile.json and me.nsec with valid keypair", () => {
   };
   expect(profile.nsec_file).toBe("./.knowstr/me.nsec");
   expect(profile.pubkey.startsWith("npub1")).toBe(true);
-  expect(profile.relays.length).toBeGreaterThan(0);
+  expect(profile.relays).toEqual([]);
+  expect(result.relays).toEqual([]);
 
   const nsecContent = fs
     .readFileSync(path.join(cwd, ".knowstr", "me.nsec"), "utf8")
@@ -43,35 +43,24 @@ test("init creates profile.json and me.nsec with valid keypair", () => {
   expect(result.npub).toBe(nip19.npubEncode(derivedPubkey));
 });
 
-test("init --readonly --as-user creates read-only profile without nsec", () => {
+test("init --relay adds explicit relays to profile", () => {
   const cwd = makeTempDir();
-  const hex = "a".repeat(64);
-  const npub = nip19.npubEncode(hex);
-  const result = runInitCommand(["--readonly", "--as-user", npub], cwd);
+  const result = runInitCommand(
+    ["--relay", "wss://a.example/", "--relay", "wss://b.example/"],
+    cwd
+  );
 
   if ("help" in result) {
     throw new Error("unexpected help");
   }
 
-  expect(result.readonly).toBe(true);
-  expect(result.pubkey).toBe(hex);
-  expect(fs.existsSync(path.join(cwd, ".knowstr", "me.nsec"))).toBe(false);
-
   const profile = JSON.parse(fs.readFileSync(result.config_path, "utf8")) as {
-    pubkey: string;
-    nsec_file?: string;
-    relays: Array<{ write: boolean }>;
+    relays: Array<{ url: string; read: boolean; write: boolean }>;
   };
-  expect(profile.nsec_file).toBeUndefined();
-  expect(profile.pubkey).toBe(npub);
-  expect(profile.relays.every((r) => r.write === false)).toBe(true);
-});
-
-test("init --readonly without --as-user throws", () => {
-  const cwd = makeTempDir();
-  expect(() => runInitCommand(["--readonly"], cwd)).toThrow(
-    "--readonly requires --as-user"
-  );
+  expect(profile.relays).toEqual([
+    { url: "wss://a.example/", read: true, write: true },
+    { url: "wss://b.example/", read: true, write: true },
+  ]);
 });
 
 test("init refuses to overwrite existing profile.json", () => {
@@ -80,24 +69,16 @@ test("init refuses to overwrite existing profile.json", () => {
   expect(() => runInitCommand([], cwd)).toThrow("already exists");
 });
 
-test("init --as-user sets read_as and --doc sets workspace_dir", () => {
+test("init --doc sets workspace_dir", () => {
   const cwd = makeTempDir();
-  const hex = "b".repeat(64);
-  const result = runInitCommand(
-    ["--as-user", hex, "--doc", "./workspace"],
-    cwd
-  );
+  const result = runInitCommand(["--doc", "./workspace"], cwd);
 
   if ("help" in result) {
     throw new Error("unexpected help");
   }
 
-  expect(result.read_as).toBe(hex);
-
   const profile = JSON.parse(fs.readFileSync(result.config_path, "utf8")) as {
-    read_as: string;
     workspace_dir: string;
   };
-  expect(profile.read_as).toBe(nip19.npubEncode(hex));
   expect(profile.workspace_dir).toBe("./workspace");
 });

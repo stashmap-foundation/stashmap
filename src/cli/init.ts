@@ -2,12 +2,9 @@ import fs from "fs";
 import path from "path";
 import { generateSecretKey, getPublicKey, nip19 } from "nostr-tools";
 import { decodePublicKeyInputSync } from "../nostrPublicKeys";
-import { DEFAULT_RELAYS } from "../nostr";
 import { requireValue } from "./args";
 
 type InitCliArgs = {
-  readonly: boolean;
-  asUser?: PublicKey;
   doc?: string;
   relayUrls: string[];
   help: boolean;
@@ -17,20 +14,8 @@ type InitResult = {
   config_path: string;
   pubkey: string;
   npub: string;
-  read_as?: string;
-  readonly: boolean;
   relays: string[];
 };
-
-function parsePublicKeyArg(value: string, flagName: string): PublicKey {
-  const decoded = decodePublicKeyInputSync(value);
-  if (!decoded) {
-    throw new Error(
-      `${flagName} must be a valid pubkey (hex, npub, or nprofile)`
-    );
-  }
-  return decoded;
-}
 
 function parseInitArgs(args: string[]): InitCliArgs {
   const parse = (index: number, current: InitCliArgs): InitCliArgs => {
@@ -43,16 +28,6 @@ function parseInitArgs(args: string[]): InitCliArgs {
       case "--help":
       case "-h":
         return parse(index + 1, { ...current, help: true });
-      case "--readonly":
-        return parse(index + 1, { ...current, readonly: true });
-      case "--as-user":
-        return parse(index + 2, {
-          ...current,
-          asUser: parsePublicKeyArg(
-            requireValue(args, index, "--as-user"),
-            "--as-user"
-          ),
-        });
       case "--doc":
         return parse(index + 2, {
           ...current,
@@ -72,7 +47,6 @@ function parseInitArgs(args: string[]): InitCliArgs {
   };
 
   return parse(0, {
-    readonly: false,
     relayUrls: [],
     help: false,
   });
@@ -80,10 +54,10 @@ function parseInitArgs(args: string[]): InitCliArgs {
 
 export function initHelp(): string {
   return [
-    "Usage: knowstr init [--readonly] [--as-user <pubkey|npub>] [--doc <dir>] [--relay <url> ...]",
+    "Usage: knowstr init [--doc <dir>] [--relay <url> ...]",
     "",
-    "Initializes a new Knowstr workspace with .knowstr/profile.json.",
-    "Generates a new keypair unless --readonly is set.",
+    "Initializes a new Knowstr workspace with .knowstr/profile.json and a new keypair.",
+    "Relays are optional. With no relays configured, use 'knowstr save' for local-only work.",
   ].join("\n");
 }
 
@@ -92,23 +66,10 @@ function buildRelays(parsed: InitCliArgs): Relays {
     return parsed.relayUrls.map((url) => ({
       url,
       read: true,
-      write: !parsed.readonly,
+      write: true,
     }));
   }
-  return DEFAULT_RELAYS.map((r) => ({
-    ...r,
-    write: parsed.readonly ? false : r.write,
-  }));
-}
-
-function buildReadonlyProfile(
-  asUser: PublicKey,
-  relays: Relays
-): Record<string, unknown> {
-  return {
-    pubkey: nip19.npubEncode(asUser as string),
-    relays,
-  };
+  return [];
 }
 
 function buildWriteProfile(
@@ -127,9 +88,6 @@ function buildWriteProfile(
     pubkey: nip19.npubEncode(pubkey),
     nsec_file: "./.knowstr/me.nsec",
     relays,
-    ...(parsed.asUser
-      ? { read_as: nip19.npubEncode(parsed.asUser as string) }
-      : {}),
     ...(parsed.doc ? { workspace_dir: parsed.doc } : {}),
   };
 }
@@ -143,12 +101,6 @@ export function runInitCommand(
     return { help: true, text: initHelp() };
   }
 
-  if (parsed.readonly && !parsed.asUser) {
-    throw new Error(
-      "--readonly requires --as-user to specify whose data to read"
-    );
-  }
-
   const knowstrDir = path.join(cwd, ".knowstr");
   const configPath = path.join(knowstrDir, "profile.json");
 
@@ -159,16 +111,11 @@ export function runInitCommand(
   fs.mkdirSync(knowstrDir, { recursive: true });
 
   const relays = buildRelays(parsed);
-
-  const profile = parsed.readonly
-    ? buildReadonlyProfile(parsed.asUser as PublicKey, relays)
-    : buildWriteProfile(knowstrDir, parsed, relays);
+  const profile = buildWriteProfile(knowstrDir, parsed, relays);
 
   fs.writeFileSync(configPath, `${JSON.stringify(profile, null, 2)}\n`);
-
   const writtenProfile = JSON.parse(fs.readFileSync(configPath, "utf8")) as {
     pubkey: string;
-    read_as?: string;
   };
   const pubkey = decodePublicKeyInputSync(writtenProfile.pubkey) as PublicKey;
 
@@ -176,12 +123,6 @@ export function runInitCommand(
     config_path: configPath,
     pubkey,
     npub: nip19.npubEncode(pubkey),
-    ...(writtenProfile.read_as
-      ? {
-          read_as: decodePublicKeyInputSync(writtenProfile.read_as) as string,
-        }
-      : {}),
-    readonly: parsed.readonly,
     relays: relays.map((r) => r.url),
   };
 }

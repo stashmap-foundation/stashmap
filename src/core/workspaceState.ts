@@ -82,7 +82,7 @@ export function extractDTagFromHeader(content: string): string | undefined {
   return rootMatch?.[1].trim();
 }
 
-function ensureEditableDocumentHeader(
+export function ensureEditableDocumentHeader(
   content: string,
   author: PublicKey,
   dTag: string,

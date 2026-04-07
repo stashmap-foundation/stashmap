@@ -98,10 +98,13 @@ export function loadCliProfile({
   env?: NodeJS.ProcessEnv;
   configPath?: string;
 } = {}): LoadedCliProfile {
-  const knowstrHome = resolveKnowstrHome(cwd, env);
   const resolvedConfigPath = configPath
     ? resolveAbsolute(cwd, configPath)
-    : path.join(knowstrHome, "profile.json");
+    : path.join(resolveKnowstrHome(cwd, env), "profile.json");
+  const agentRoot = getAgentRoot(resolvedConfigPath);
+  const knowstrHome = env.KNOWSTR_HOME
+    ? resolveKnowstrHome(cwd, env)
+    : path.join(agentRoot, ".knowstr");
 
   if (!fs.existsSync(resolvedConfigPath)) {
     throw new Error(`Missing Knowstr profile: ${resolvedConfigPath}`);
@@ -109,7 +112,6 @@ export function loadCliProfile({
 
   const raw = fs.readFileSync(resolvedConfigPath, "utf8");
   const profile = JSON.parse(raw) as RawProfile;
-  const agentRoot = getAgentRoot(resolvedConfigPath);
 
   return {
     pubkey: parsePubkey(profile.pubkey),

@@ -490,6 +490,278 @@ test("save preserves headings, ordered lists, and bullets end-to-end", async () 
   expect(second.updated_paths).toEqual([]);
 });
 
+test("save preserves inline code in bullet items", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "inline-code.md");
+  fs.writeFileSync(
+    documentPath,
+    "# Project\n- run `knowstr save` after editing\n- nothing fancy here\n"
+  );
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+  expect(result.changed_paths).toEqual([documentPath]);
+
+  const saved = fs.readFileSync(documentPath, "utf8");
+  expect(saved).toContain("- run `knowstr save` after editing <!-- id:");
+  expect(saved).toContain("- nothing fancy here <!-- id:");
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
+});
+
+test("save preserves inline code in headings", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "heading-code.md");
+  fs.writeFileSync(
+    documentPath,
+    "# Using `knowstr`\n## The `save` command\n- sub\n"
+  );
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+  expect(result.changed_paths).toEqual([documentPath]);
+
+  const saved = fs.readFileSync(documentPath, "utf8");
+  expect(saved).toContain("# Using `knowstr` <!-- id:");
+  expect(saved).toContain("## The `save` command <!-- id:");
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
+});
+
+test("save preserves backtick-wrapped link markdown literally", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "backtick-link.md");
+  fs.writeFileSync(
+    documentPath,
+    "# Project\n- to demo use `[Title](#abc)` syntax\n"
+  );
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+  expect(result.changed_paths).toEqual([documentPath]);
+
+  const saved = fs.readFileSync(documentPath, "utf8");
+  expect(saved).toContain("- to demo use `[Title](#abc)` syntax <!-- id:");
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
+});
+
+test("save preserves inline code combined with prefix markers", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "prefix-code.md");
+  fs.writeFileSync(
+    documentPath,
+    "# Project\n- (!) see `foo.ts`\n- (?) maybe `bar`\n"
+  );
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+  expect(result.changed_paths).toEqual([documentPath]);
+
+  const saved = fs.readFileSync(documentPath, "utf8");
+  expect(saved).toContain("- (!) see `foo.ts` <!-- id:");
+  expect(saved).toContain("- (?) maybe `bar` <!-- id:");
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
+});
+
+test("save preserves bold and italic emphasis", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "emphasis.md");
+  fs.writeFileSync(
+    documentPath,
+    "# Project\n- this is **bold** and *italic*\n"
+  );
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+  expect(result.changed_paths).toEqual([documentPath]);
+
+  const saved = fs.readFileSync(documentPath, "utf8");
+  expect(saved).toContain("- this is **bold** and *italic* <!-- id:");
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
+});
+
+test("save preserves non-ref external link markdown literally", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "external-link.md");
+  fs.writeFileSync(
+    documentPath,
+    "# Project\n- see [docs](https://example.com) for details\n"
+  );
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+  expect(result.changed_paths).toEqual([documentPath]);
+
+  const saved = fs.readFileSync(documentPath, "utf8");
+  expect(saved).toContain(
+    "- see [docs](https://example.com) for details <!-- id:"
+  );
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
+});
+
+test("save still treats whole-line ref-style link as ref node", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "ref-node.md");
+  fs.writeFileSync(documentPath, "# Project\n- target\n");
+
+  await runSaveCommand(["--config", profilePath]);
+
+  const firstSave = fs.readFileSync(documentPath, "utf8");
+  const targetLine = extractLine(firstSave, "- target <!-- id:");
+  const idMatch = targetLine.match(/id:(\S+)/);
+  if (!idMatch?.[1]) {
+    throw new Error("missing target id");
+  }
+  const targetId = idMatch[1];
+
+  fs.writeFileSync(
+    documentPath,
+    firstSave.replace(
+      `${targetLine}\n`,
+      `${targetLine}\n- [Linked](#${targetId})\n`
+    )
+  );
+
+  const secondResult = await runSaveCommand(["--config", profilePath]);
+  if ("help" in secondResult) {
+    throw new Error("unexpected help");
+  }
+
+  const secondSave = fs.readFileSync(documentPath, "utf8");
+  expect(secondSave).toContain(`- [Linked](#${targetId})`);
+  const linkedLine = extractLine(secondSave, `- [Linked](#${targetId})`);
+  expect(linkedLine).toBe(`- [Linked](#${targetId})`);
+
+  const third = await runSaveCommand(["--config", profilePath]);
+  if ("help" in third) {
+    throw new Error("unexpected help");
+  }
+  expect(third.changed_paths).toEqual([]);
+  expect(third.updated_paths).toEqual([]);
+});
+
+test("save kitchen-sink idempotency for inline formatting", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "inline-kitchen-sink.md");
+  fs.writeFileSync(
+    documentPath,
+    [
+      "# Using `knowstr`",
+      "## The `save` command",
+      "1. run `knowstr save` then **verify**",
+      "2. check *output* carefully",
+      "- (!) see `foo.ts` for details",
+      "",
+    ].join("\n")
+  );
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+  expect(result.changed_paths).toEqual([documentPath]);
+
+  const saved = fs.readFileSync(documentPath, "utf8");
+  expect(saved).toContain("# Using `knowstr` <!-- id:");
+  expect(saved).toContain("## The `save` command <!-- id:");
+  expect(saved).toContain("1. run `knowstr save` then **verify** <!-- id:");
+  expect(saved).toContain("2. check *output* carefully <!-- id:");
+  expect(saved).toContain("- (!) see `foo.ts` for details <!-- id:");
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
+});
+
 test("save skips .knowstr, .git, and node_modules and does not need nsec", async () => {
   const workspaceDir = makeTempDir();
   const profilePath = writeProfile(workspaceDir, {

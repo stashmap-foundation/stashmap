@@ -11,6 +11,7 @@ markdown.use(markdownItFrontMatter, () => undefined);
 
 const ID_COMMENT_RE = /^<!--\s+id:(\S+)(.*?)-->$/;
 const ATTR_RE = /(\w+)="([^"]*)"/g;
+const REF_LINK_RE = /^\[([^\]]*)\]\(#([^)]+)\)$/;
 
 const RELEVANCE_PREFIXES: Record<string, Relevance> = {
   "(!)": "relevant",
@@ -155,23 +156,28 @@ function extractInlineContent(inline: Token): {
       argument,
     };
   }
-  const textParts = inline.children
-    .filter(
-      (c) =>
-        c.type === "text" || c.type === "softbreak" || c.type === "hardbreak"
-    )
-    .map((c) => (c.type === "text" ? c.content : " "))
-    .join("")
+  const commentChild = inline.children.find(
+    (c) => c.type === "html_inline" && ID_COMMENT_RE.test(c.content.trim())
+  );
+  const raw = (
+    commentChild
+      ? inline.content.replace(commentChild.content, "")
+      : inline.content
+  )
+    .replace(/\n/g, " ")
     .trim();
-  const { cleanText, relevance, argument } = extractPrefixMarkers(textParts);
-
-  const linkOpen = inline.children.find((c) => c.type === "link_open");
-  const href = linkOpen?.attrGet("href");
-  const linkHref = href && href.startsWith("#") ? href.slice(1) : undefined;
-
+  const { cleanText, relevance, argument } = extractPrefixMarkers(raw);
+  const refMatch = cleanText.match(REF_LINK_RE);
+  if (refMatch) {
+    return {
+      text: refMatch[1],
+      linkHref: refMatch[2],
+      relevance,
+      argument,
+    };
+  }
   return {
     text: cleanText,
-    linkHref,
     relevance,
     argument,
   };

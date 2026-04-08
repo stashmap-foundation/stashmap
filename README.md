@@ -2,6 +2,13 @@
 
 - node v16.14.2
 
+# Build cli
+
+  npx esbuild src/cli/index.ts \
+    --bundle --platform=node --target=node20 --format=cjs \
+    --outfile=dist/knowstr.js \
+    --loader:.css=empty
+
 ### Build workspaces
 
 Before starting or testing the App, run:

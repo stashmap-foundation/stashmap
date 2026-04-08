@@ -5,13 +5,13 @@ import { buildDocumentEventFromMarkdownTree } from "../standaloneDocumentEvent";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "../markdownTree";
 import { extractMarkdownImportPayload } from "../markdownImport";
 
-type WorkspaceSaveProfile = {
+export type WorkspaceSaveProfile = {
   pubkey: PublicKey;
   workspaceDir: string;
   knowstrHome: string;
 };
 
-type ScannedWorkspaceDocument = {
+export type ScannedWorkspaceDocument = {
   filePath: string;
   relativePath: string;
   currentContent: string;
@@ -22,7 +22,7 @@ type ScannedWorkspaceDocument = {
   deleteRoot?: MarkdownTreeNode;
 };
 
-type NodeIndexState = {
+export type NodeIndexState = {
   version: 1;
   nodes: Record<string, string>;
 };
@@ -31,9 +31,16 @@ type MissingNodeRecovery = {
   nodeId: string;
   docId: string;
   originalLine?: string;
+  baselineLineNumber?: number;
 };
 
-type NormalizedWorkspaceDocument = {
+type DocLossGroup = {
+  docId: string;
+  relativePath?: string;
+  recoveries: MissingNodeRecovery[];
+};
+
+export type NormalizedWorkspaceDocument = {
   filePath: string;
   relativePath: string;
   docId: string;
@@ -47,11 +54,11 @@ type NormalizedWorkspaceDocument = {
 const SKIPPED_DIRS = new Set([".git", ".knowstr", "node_modules"]);
 const DOC_ID_RE = /^knowstr_doc_id:\s*(.+)$/mu;
 
-function baselineFilePath(knowstrHome: string, docId: string): string {
+export function baselineFilePath(knowstrHome: string, docId: string): string {
   return path.join(knowstrHome, "base", "by-doc-id", `${docId}.md`);
 }
 
-function nodeIndexPath(knowstrHome: string): string {
+export function nodeIndexPath(knowstrHome: string): string {
   return path.join(knowstrHome, "state", "node-index.json");
 }
 
@@ -207,13 +214,16 @@ async function readBaseline(
   }
 }
 
-function findLineForNodeId(
+function findLineWithNumberForNodeId(
   baselineContent: string,
   nodeId: string
-): string | undefined {
-  return baselineContent
-    .split(/\r?\n/u)
-    .find((line) => line.includes(`<!-- id:${nodeId}`));
+): { line: string; lineNumber: number } | undefined {
+  const lines = baselineContent.split(/\r?\n/u);
+  const index = lines.findIndex((line) => line.includes(`<!-- id:${nodeId}`));
+  if (index === -1) {
+    return undefined;
+  }
+  return { line: lines[index], lineNumber: index };
 }
 
 async function buildMissingNodeRecoveries(
@@ -236,34 +246,103 @@ async function buildMissingNodeRecoveries(
   return lostNodeIds.map((nodeId) => {
     const docId = previousNodeIndex.nodes[nodeId];
     const baselineContent = baselines[docId];
+    const found = baselineContent
+      ? findLineWithNumberForNodeId(baselineContent, nodeId)
+      : undefined;
 
     return {
       nodeId,
       docId,
-      ...(baselineContent
-        ? {
-            originalLine: findLineForNodeId(baselineContent, nodeId),
-          }
+      ...(found
+        ? { originalLine: found.line, baselineLineNumber: found.lineNumber }
         : {}),
     };
   });
 }
 
-function formatMissingNodeError(recoveries: MissingNodeRecovery[]): string {
+function groupRecoveriesByDoc(
+  recoveries: MissingNodeRecovery[],
+  docIdToRelativePath: Record<string, string>
+): DocLossGroup[] {
+  const groups = recoveries.reduce((acc, recovery) => {
+    const existing = acc[recovery.docId];
+    const next = existing
+      ? { ...existing, recoveries: [...existing.recoveries, recovery] }
+      : {
+          docId: recovery.docId,
+          ...(docIdToRelativePath[recovery.docId]
+            ? { relativePath: docIdToRelativePath[recovery.docId] }
+            : {}),
+          recoveries: [recovery],
+        };
+    return { ...acc, [recovery.docId]: next };
+  }, {} as Record<string, DocLossGroup>);
+
+  return Object.values(groups)
+    .map((group) => ({
+      ...group,
+      recoveries: [...group.recoveries].sort((left, right) => {
+        const leftLine = left.baselineLineNumber ?? Number.MAX_SAFE_INTEGER;
+        const rightLine = right.baselineLineNumber ?? Number.MAX_SAFE_INTEGER;
+        if (leftLine !== rightLine) {
+          return leftLine - rightLine;
+        }
+        return left.nodeId.localeCompare(right.nodeId);
+      }),
+    }))
+    .sort((left, right) => {
+      const leftPresent = left.relativePath !== undefined;
+      const rightPresent = right.relativePath !== undefined;
+      if (leftPresent !== rightPresent) {
+        return leftPresent ? 1 : -1;
+      }
+      const leftKey = left.relativePath ?? left.docId;
+      const rightKey = right.relativePath ?? right.docId;
+      return leftKey.localeCompare(rightKey);
+    });
+}
+
+function formatRecoveryLine(recovery: MissingNodeRecovery): string {
+  if (recovery.originalLine) {
+    return `  ${recovery.originalLine}`;
+  }
+  return `  line not found in baseline for id ${recovery.nodeId}`;
+}
+
+function formatGroup(group: DocLossGroup): string {
+  const header = group.relativePath
+    ? `${group.docId} — file at ${group.relativePath}:`
+    : `${group.docId} — file no longer in workspace (fully lost):`;
+  return [header, ...group.recoveries.map(formatRecoveryLine)].join("\n");
+}
+
+function formatMissingNodeError(
+  recoveries: MissingNodeRecovery[],
+  docIdToRelativePath: Record<string, string>
+): string {
+  const groups = groupRecoveriesByDoc(recoveries, docIdToRelativePath);
+
   return [
-    `Workspace loses existing node ids: ${recoveries
-      .map((recovery) => recovery.nodeId)
-      .join(", ")}`,
+    "Workspace loses existing node ids.",
     'Restore the missing line, or move it under "# Delete" to delete it explicitly.',
-    ...recoveries.map((recovery) =>
-      recovery.originalLine
-        ? `- ${recovery.nodeId}: ${recovery.originalLine}`
-        : `- ${recovery.nodeId}: original line not found in saved baseline for doc ${recovery.docId}`
-    ),
+    "",
+    ...groups.map(formatGroup),
+    "",
+    "To accept these losses, restore the missing lines, move them under a `# Delete`",
+    "heading, or run:",
+    "",
+    "  knowstr rm <id-or-path> [<id-or-path> ...]",
+    "",
+    "`knowstr rm` accepts any mix of file paths, doc ids, and node ids in a single",
+    "invocation. Examples:",
+    "  knowstr rm <docId>                              # accept a fully lost doc",
+    "  knowstr rm notes/projects.md                    # delete a present file",
+    "  knowstr rm <nodeId> [<nodeId> ...]              # accept individual lost nodes",
+    "  knowstr rm <docId> notes/projects.md <nodeId>   # mixed",
   ].join("\n");
 }
 
-async function loadPreviousNodeIndex(
+export async function loadPreviousNodeIndex(
   knowstrHome: string
 ): Promise<NodeIndexState> {
   try {
@@ -281,7 +360,7 @@ async function loadPreviousNodeIndex(
   }
 }
 
-async function writeNodeIndex(
+export async function writeNodeIndex(
   knowstrHome: string,
   nodes: Record<string, string>
 ): Promise<void> {
@@ -327,7 +406,7 @@ async function collectMarkdownFiles(
   }, Promise.resolve([] as string[]));
 }
 
-async function scanWorkspaceDocuments(
+export async function scanWorkspaceDocuments(
   profile: WorkspaceSaveProfile
 ): Promise<ScannedWorkspaceDocument[]> {
   const markdownFiles = await collectMarkdownFiles(profile.workspaceDir);
@@ -364,7 +443,7 @@ async function scanWorkspaceDocuments(
   );
 }
 
-function normalizeWorkspaceDocument(
+export function normalizeWorkspaceDocument(
   profile: WorkspaceSaveProfile,
   document: ScannedWorkspaceDocument
 ): NormalizedWorkspaceDocument {
@@ -450,7 +529,7 @@ function buildWorkspaceNodeIndex(
   );
 }
 
-async function validateWorkspaceIntegrity(
+export async function validateWorkspaceIntegrity(
   knowstrHome: string,
   previousNodeIndex: NodeIndexState,
   normalizedDocuments: NormalizedWorkspaceDocument[]
@@ -493,13 +572,21 @@ async function validateWorkspaceIntegrity(
     .sort();
 
   if (lostNodeIds.length > 0) {
+    const docIdToRelativePath = normalizedDocuments.reduce(
+      (acc, document) => ({
+        ...acc,
+        [document.docId]: document.relativePath,
+      }),
+      {} as Record<string, string>
+    );
     throw new Error(
       formatMissingNodeError(
         await buildMissingNodeRecoveries(
           knowstrHome,
           previousNodeIndex,
           lostNodeIds
-        )
+        ),
+        docIdToRelativePath
       )
     );
   }

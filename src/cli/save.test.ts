@@ -206,6 +206,85 @@ test("save rejects losing an existing node id from the workspace", async () => {
   );
 });
 
+test("save error message groups lost nodes by docId, labels file presence, and points to knowstr rm", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const stillPresentPath = path.join(workspaceDir, "notes", "projects.md");
+  const fullyLostPath = path.join(workspaceDir, "holiday.md");
+  fs.mkdirSync(path.dirname(stillPresentPath), { recursive: true });
+  fs.writeFileSync(
+    stillPresentPath,
+    "# Projects\n- Buy ingredients\n- Plan menu\n"
+  );
+  fs.writeFileSync(
+    fullyLostPath,
+    "# Holiday Plans\n- Spain\n- France\n- Italy\n"
+  );
+
+  await runSaveCommand(["--config", profilePath]);
+
+  const savedProjects = fs.readFileSync(stillPresentPath, "utf8");
+  const savedHoliday = fs.readFileSync(fullyLostPath, "utf8");
+  const projectsDocId = extractDocId(savedProjects);
+  const holidayDocId = extractDocId(savedHoliday);
+
+  const buyIngredientsLine = extractLine(savedProjects, "Buy ingredients");
+  const planMenuLine = extractLine(savedProjects, "Plan menu");
+  fs.writeFileSync(
+    stillPresentPath,
+    savedProjects
+      .replace(`${buyIngredientsLine}\n`, "")
+      .replace(`${planMenuLine}\n`, "")
+  );
+
+  const holidayHeadingLine = extractLine(savedHoliday, "# Holiday Plans");
+  const spainLine = extractLine(savedHoliday, "Spain");
+  const franceLine = extractLine(savedHoliday, "France");
+  const italyLine = extractLine(savedHoliday, "Italy");
+  fs.rmSync(fullyLostPath);
+
+  const error = await runSaveCommand(["--config", profilePath]).then(
+    () => {
+      throw new Error("expected save to reject");
+    },
+    (err: Error) => err
+  );
+
+  expect(error.message).toContain("Workspace loses existing node ids");
+  expect(error.message).toContain(
+    `${holidayDocId} — file no longer in workspace (fully lost):`
+  );
+  expect(error.message).toContain(
+    `${projectsDocId} — file at notes/projects.md:`
+  );
+  expect(error.message).toContain(holidayHeadingLine);
+  expect(error.message).toContain(spainLine);
+  expect(error.message).toContain(franceLine);
+  expect(error.message).toContain(italyLine);
+  expect(error.message).toContain(buyIngredientsLine);
+  expect(error.message).toContain(planMenuLine);
+  expect(error.message).toContain("knowstr rm <id-or-path> [<id-or-path> ...]");
+  expect(error.message).toContain(
+    "file paths, doc ids, and node ids in a single"
+  );
+
+  const holidayIdx = error.message.indexOf(holidayHeadingLine);
+  const spainIdx = error.message.indexOf(spainLine);
+  const franceIdx = error.message.indexOf(franceLine);
+  const italyIdx = error.message.indexOf(italyLine);
+  expect(holidayIdx).toBeLessThan(spainIdx);
+  expect(spainIdx).toBeLessThan(franceIdx);
+  expect(franceIdx).toBeLessThan(italyIdx);
+
+  const buyIdx = error.message.indexOf(buyIngredientsLine);
+  const planIdx = error.message.indexOf(planMenuLine);
+  expect(buyIdx).toBeLessThan(planIdx);
+});
+
 test("save allows explicit deletion via # Delete", async () => {
   const workspaceDir = makeTempDir();
   const profilePath = writeProfile(workspaceDir, {

@@ -60,7 +60,8 @@ test("save assigns knowstr_doc_id and node ids in place and writes a baseline by
   expect(result.updated_paths).toEqual([documentPath]);
 
   const savedContent = fs.readFileSync(documentPath, "utf8");
-  expect(savedContent).toMatch(/^---\nknowstr_doc_id:\s.+\n---\n\n#/);
+  expect(savedContent).toMatch(/^---\nknowstr_doc_id:\s.+\n/);
+  expect(savedContent).toMatch(/\n---\n\n# Project /);
   expect(savedContent).toContain("# Project <!-- id:");
   expect(savedContent).toContain("- alpha <!-- id:");
   expect(savedContent).toContain("- beta <!-- id:");
@@ -394,7 +395,7 @@ test("save allows explicit deletion via # Delete", async () => {
 
   const rewritten = fs.readFileSync(documentPath, "utf8");
   expect(rewritten).not.toContain("delete me");
-  expect(rewritten).not.toContain("# Delete");
+  expect(rewritten).not.toMatch(/^# Delete\b/mu);
   expect(result.updated_paths).toEqual([documentPath]);
 });
 
@@ -972,4 +973,82 @@ test("save skips .knowstr, .git, and node_modules and does not need nsec", async
   expect(
     fs.readFileSync(path.join(workspaceDir, ".git", "ignored.md"), "utf8")
   ).toBe("# Ignore\n");
+});
+
+test("save writes editing instructions with markers and save command hint into frontmatter", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "notes.md");
+  fs.writeFileSync(documentPath, "# Notes\n- one\n");
+
+  await runSaveCommand(["--config", profilePath]);
+
+  const savedContent = fs.readFileSync(documentPath, "utf8");
+  expect(savedContent).toContain("editing: |");
+  expect(savedContent).toContain(
+    "Edit text freely. Never modify <!-- id:... --> comments."
+  );
+  expect(savedContent).toContain(
+    "Never add <!-- id:... --> to new items. knowstr save will reject invented IDs."
+  );
+  expect(savedContent).toContain(
+    "Markers: (!) relevant (?) maybe relevant (~) little relevant (x) not relevant (+) confirms (-) contra"
+  );
+  expect(savedContent).toContain(
+    'Delete: move lines with their comments under "# Delete"'
+  );
+  expect(savedContent).toContain("Save changes with: knowstr save");
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
+});
+
+test("save refreshes a stale editing block next to existing user frontmatter", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "doc.md");
+  fs.writeFileSync(
+    documentPath,
+    `---
+title: "Doc"
+editing: |
+  stale instructions that should be overwritten
+  second stale line
+custom: yes
+---
+
+# Doc
+- one
+`
+  );
+
+  await runSaveCommand(["--config", profilePath]);
+
+  const savedContent = fs.readFileSync(documentPath, "utf8");
+  expect(savedContent).toContain('title: "Doc"');
+  expect(savedContent).toContain("custom: yes");
+  expect(savedContent).toContain("knowstr_doc_id:");
+  expect(savedContent).not.toContain("stale instructions");
+  expect(savedContent).not.toContain("second stale line");
+  expect(savedContent).toContain("Save changes with: knowstr save");
+  expect(savedContent).toContain("Markers: (!) relevant (?) maybe relevant");
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
 });

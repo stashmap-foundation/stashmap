@@ -54,6 +54,29 @@ export type NormalizedWorkspaceDocument = {
 const SKIPPED_DIRS = new Set([".git", ".knowstr", "node_modules"]);
 const DOC_ID_RE = /^knowstr_doc_id:\s*(.+)$/mu;
 
+const EDITING_BLOCK = [
+  "editing: |",
+  "  Edit text freely. Never modify <!-- id:... --> comments.",
+  "  Never add <!-- id:... --> to new items. knowstr save will reject invented IDs.",
+  "  Markers: (!) relevant (?) maybe relevant (~) little relevant (x) not relevant (+) confirms (-) contra",
+  '  Delete: move lines with their comments under "# Delete"',
+  "  Save changes with: knowstr save",
+].join("\n");
+
+function stripEditingBlock(innerContent: string): string {
+  const lines = innerContent.split("\n");
+  const editingIdx = lines.findIndex((line) => /^editing:\s*\|/u.test(line));
+  if (editingIdx === -1) {
+    return innerContent;
+  }
+  const endIdx = lines.findIndex(
+    (line, index) => index > editingIdx && line.length > 0 && !/^\s/u.test(line)
+  );
+  const before = lines.slice(0, editingIdx);
+  const after = endIdx === -1 ? [] : lines.slice(endIdx);
+  return [...before, ...after].join("\n").replace(/\n+$/u, "");
+}
+
 export function baselineFilePath(knowstrHome: string, docId: string): string {
   return path.join(knowstrHome, "base", "by-doc-id", `${docId}.md`);
 }
@@ -77,35 +100,27 @@ function ensureKnowstrDocIdFrontMatter(frontMatterRaw: string | undefined): {
   docId: string;
   frontMatter: string;
 } {
-  if (!frontMatterRaw) {
-    const docId = randomUUID();
-    return {
-      docId,
-      frontMatter: `---\nknowstr_doc_id: ${docId}\n---\n`,
-    };
-  }
+  const rawInner = frontMatterRaw
+    ? frontMatterRaw
+        .replace(/^---\r?\n/u, "")
+        .replace(/\r?\n---(?:\r?\n)?$/u, "")
+    : "";
+  const innerWithoutEditing = stripEditingBlock(rawInner);
 
-  const match = frontMatterRaw.match(DOC_ID_RE);
-  if (match?.[1]) {
-    return {
-      docId: stripWrappingQuotes(match[1]),
-      frontMatter: frontMatterRaw,
-    };
-  }
+  const docIdMatch = innerWithoutEditing.match(DOC_ID_RE);
+  const docId = docIdMatch?.[1]
+    ? stripWrappingQuotes(docIdMatch[1])
+    : randomUUID();
 
-  const innerContent = frontMatterRaw
-    .replace(/^---\r?\n/u, "")
-    .replace(/\r?\n---(?:\r?\n)?$/u, "");
-  const docId = randomUUID();
-  const trailingNewline =
-    innerContent.endsWith("\n") || innerContent.length === 0;
-  const mergedContent = `${innerContent}${
-    trailingNewline ? "" : "\n"
-  }knowstr_doc_id: ${docId}\n`;
+  const innerWithDocId = docIdMatch
+    ? innerWithoutEditing
+    : `${innerWithoutEditing}${
+        innerWithoutEditing ? "\n" : ""
+      }knowstr_doc_id: ${docId}`;
 
   return {
     docId,
-    frontMatter: `---\n${mergedContent}---\n`,
+    frontMatter: `---\n${innerWithDocId}\n${EDITING_BLOCK}\n---\n`,
   };
 }
 

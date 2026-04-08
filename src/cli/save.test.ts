@@ -60,7 +60,7 @@ test("save assigns knowstr_doc_id and node ids in place and writes a baseline by
   expect(result.updated_paths).toEqual([documentPath]);
 
   const savedContent = fs.readFileSync(documentPath, "utf8");
-  expect(savedContent).toMatch(/^---\nknowstr_doc_id:\s.+\n---\n#/);
+  expect(savedContent).toMatch(/^---\nknowstr_doc_id:\s.+\n---\n\n#/);
   expect(savedContent).toContain("# Project <!-- id:");
   expect(savedContent).toContain("- alpha <!-- id:");
   expect(savedContent).toContain("- beta <!-- id:");
@@ -109,6 +109,88 @@ custom: yes
   expect(savedContent).toContain("custom: yes");
   expect(savedContent).toContain("knowstr_doc_id:");
   expect(savedContent).toContain("# Doc <!-- id:");
+});
+
+test("save inserts blank line after frontmatter and is idempotent", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "doc.md");
+  fs.writeFileSync(
+    documentPath,
+    `---
+title: "Doc"
+---
+
+- one
+`
+  );
+
+  await runSaveCommand(["--config", profilePath]);
+
+  const savedContent = fs.readFileSync(documentPath, "utf8");
+  expect(savedContent).toMatch(/\n---\n\n# /);
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
+});
+
+test("save inserts blank lines around headings but not between siblings", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "blank-lines.md");
+  fs.writeFileSync(
+    documentPath,
+    "# Project\n## Section A\n- item 1\n- item 2\n## Section B\n1. step one\n"
+  );
+
+  await runSaveCommand(["--config", profilePath]);
+
+  const saved = fs.readFileSync(documentPath, "utf8");
+  const lines = saved.split("\n");
+
+  const findIndex = (needle: string): number => {
+    const index = lines.findIndex((line) => line.includes(needle));
+    if (index === -1) {
+      throw new Error(`missing line containing ${needle}`);
+    }
+    return index;
+  };
+
+  const sectionAIndex = findIndex("## Section A");
+  const item1Index = findIndex("- item 1 <!-- id:");
+  const item2Index = findIndex("- item 2 <!-- id:");
+  const sectionBIndex = findIndex("## Section B");
+  const stepOneIndex = findIndex("1. step one <!-- id:");
+
+  expect(lines[sectionAIndex - 1]).toBe("");
+  expect(lines[item1Index - 1]).toBe("");
+  expect(lines[sectionBIndex - 1]).toBe("");
+  expect(lines[stepOneIndex - 1]).toBe("");
+  expect(item2Index).toBe(item1Index + 1);
+
+  lines.forEach((line, index) => {
+    if (index === 0) return;
+    expect(line === "" && lines[index - 1] === "").toBe(false);
+  });
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
 });
 
 test("save is a no-op when nothing changed", async () => {
@@ -753,6 +835,98 @@ test("save kitchen-sink idempotency for inline formatting", async () => {
   expect(saved).toContain("1. run `knowstr save` then **verify** <!-- id:");
   expect(saved).toContain("2. check *output* carefully <!-- id:");
   expect(saved).toContain("- (!) see `foo.ts` for details <!-- id:");
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
+});
+
+test("save kitchen-sink blank-line layout around headings and chains", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "blank-kitchen-sink.md");
+  fs.writeFileSync(
+    documentPath,
+    [
+      "# Project",
+      "## Overview",
+      "- intro bullet",
+      "- another intro",
+      "## Steps",
+      "### Prep",
+      "1. prep one",
+      "2. prep two",
+      "## Followups",
+      "### Notes",
+      "- note one",
+      "",
+    ].join("\n")
+  );
+
+  await runSaveCommand(["--config", profilePath]);
+
+  const saved = fs.readFileSync(documentPath, "utf8");
+  const lines = saved.split("\n");
+
+  const findIndex = (needle: string): number => {
+    const index = lines.findIndex((line) => line.includes(needle));
+    if (index === -1) {
+      throw new Error(`missing line containing ${needle}`);
+    }
+    return index;
+  };
+
+  const headingNeedles = [
+    "# Project",
+    "## Overview",
+    "## Steps",
+    "### Prep",
+    "## Followups",
+    "### Notes",
+  ];
+  const headingIndices = headingNeedles.map(findIndex);
+  headingIndices.forEach((index, position) => {
+    if (position === 0) {
+      return;
+    }
+    expect(lines[index - 1]).toBe("");
+  });
+  headingIndices.forEach((index) => {
+    if (index + 1 >= lines.length) {
+      return;
+    }
+    const nextLine = lines[index + 1];
+    expect(nextLine === "").toBe(true);
+  });
+
+  const overviewIndex = findIndex("## Overview");
+  const stepsIndex = findIndex("## Steps");
+  const prepIndex = findIndex("### Prep");
+  const adjacentHeadingPairs: [number, number][] = [
+    [stepsIndex, prepIndex],
+    [findIndex("## Followups"), findIndex("### Notes")],
+  ];
+  adjacentHeadingPairs.forEach(([first, second]) => {
+    expect(second - first).toBe(2);
+    expect(lines[first + 1]).toBe("");
+  });
+
+  const introIndex = findIndex("- intro bullet <!-- id:");
+  const anotherIntroIndex = findIndex("- another intro <!-- id:");
+  expect(anotherIntroIndex).toBe(introIndex + 1);
+  expect(introIndex - 1).toBe(overviewIndex + 1);
+
+  lines.forEach((line, index) => {
+    if (index === 0) return;
+    expect(line === "" && lines[index - 1] === "").toBe(false);
+  });
 
   const second = await runSaveCommand(["--config", profilePath]);
   if ("help" in second) {

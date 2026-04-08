@@ -117,3 +117,13 @@ export function formatOrderedLine(
 ): string {
   return `${indent}${number}. ${prefix}${text}${attrs}`;
 }
+
+export function formatWithFrontMatter(
+  content: string,
+  frontMatter?: string
+): string {
+  if (!frontMatter) {
+    return content;
+  }
+  return `${frontMatter}\n${content}`;
+}

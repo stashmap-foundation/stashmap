@@ -16,6 +16,7 @@ import {
   formatOrderedLine,
   formatPrefixMarkers,
   formatRootHeading,
+  formatWithFrontMatter,
 } from "./documentFormat";
 import {
   KIND_KNOWLEDGE_DOCUMENT,
@@ -29,11 +30,21 @@ type SerializeResult = {
   lines: string[];
 };
 
-function withFrontMatter(content: string, frontMatter?: string): string {
-  if (!frontMatter) {
-    return content;
-  }
-  return `${frontMatter}${content}`;
+const HEADING_LINE_RE = /^#{1,6} /;
+
+function addBlankLinesAroundHeadings(lines: string[]): string[] {
+  return lines.reduce<string[]>((acc, line, index) => {
+    const isHeading = HEADING_LINE_RE.test(line);
+    const prevLine = acc.length > 0 ? acc[acc.length - 1] : undefined;
+    const prevIsHeading =
+      prevLine !== undefined && HEADING_LINE_RE.test(prevLine);
+    const needsBlankBefore = isHeading && index > 0 && prevLine !== "";
+    const needsBlankAfterPrev = prevIsHeading && !isHeading && prevLine !== "";
+    if (needsBlankBefore || needsBlankAfterPrev) {
+      return [...acc, "", line];
+    }
+    return [...acc, line];
+  }, []);
 }
 
 function getSerializableNodeText(
@@ -163,8 +174,8 @@ export function buildDocumentEventFromNodes(
     pubkey: rootNode.author,
     created_at: newTimestamp(),
     tags: [["d", rootUuid], ...systemRoleTags, msTag()],
-    content: withFrontMatter(
-      `${[
+    content: formatWithFrontMatter(
+      `${addBlankLinesAroundHeadings([
         formatRootHeading(
           rootText,
           rootUuid,
@@ -175,7 +186,7 @@ export function buildDocumentEventFromNodes(
           rootNode.systemRole
         ),
         ...serialized.lines,
-      ].join("\n")}\n`,
+      ]).join("\n")}\n`,
       rootNode.frontMatter
     ),
   };

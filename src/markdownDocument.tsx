@@ -24,6 +24,7 @@ import {
   formatNodeAttrs,
   formatPrefixMarkers,
   formatRootHeading,
+  formatWithFrontMatter,
 } from "./documentFormat";
 import { KIND_KNOWLEDGE_DOCUMENT, newTimestamp, msTag } from "./nostr";
 import { getNodesInTree } from "./treeTraversal";
@@ -58,13 +59,6 @@ function formatCrefText(
 type SerializeResult = {
   lines: string[];
 };
-
-function withFrontMatter(content: string, frontMatter?: string): string {
-  if (!frontMatter) {
-    return content;
-  }
-  return `${frontMatter}${content}`;
-}
 
 function getOwnNodeForDocumentSerialization(
   data: Data,
@@ -196,7 +190,7 @@ export function buildDocumentEvent(
     rootNode.systemRole
   );
   const result = serializeTree(data, rootNode);
-  const content = withFrontMatter(
+  const content = formatWithFrontMatter(
     `${[rootLine, ...result.lines].join("\n")}\n`,
     rootNode.frontMatter
   );

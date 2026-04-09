@@ -38,7 +38,7 @@ export function saveHelp(): string {
   return [
     "Usage: knowstr save [--config <path>]",
     "",
-    "Runs local integrity checks, assigns IDs, and refreshes mirrored baselines without publishing.",
+    "Runs local integrity checks and assigns IDs without publishing.",
   ].join("\n");
 }
 

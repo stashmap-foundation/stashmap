@@ -20,14 +20,6 @@ function writeProfile(
   return profilePath;
 }
 
-function extractDocId(content: string): string {
-  const match = content.match(/^knowstr_doc_id:\s*(.+)$/m);
-  if (!match?.[1]) {
-    throw new Error("missing knowstr_doc_id");
-  }
-  return match[1].trim();
-}
-
 function extractLine(content: string, pattern: string): string {
   const line = content
     .split("\n")
@@ -38,7 +30,7 @@ function extractLine(content: string, pattern: string): string {
   return line;
 }
 
-test("save assigns knowstr_doc_id and node ids in place and writes a baseline by doc id", async () => {
+test("save assigns knowstr_doc_id and node ids in place", async () => {
   const workspaceDir = makeTempDir();
   const profilePath = writeProfile(workspaceDir, {
     pubkey: "a".repeat(64),
@@ -57,7 +49,6 @@ test("save assigns knowstr_doc_id and node ids in place and writes a baseline by
   }
 
   expect(result.changed_paths).toEqual([documentPath]);
-  expect(result.updated_paths).toEqual([documentPath]);
 
   const savedContent = fs.readFileSync(documentPath, "utf8");
   expect(savedContent).toMatch(/^---\nknowstr_doc_id:\s.+\n/);
@@ -65,17 +56,6 @@ test("save assigns knowstr_doc_id and node ids in place and writes a baseline by
   expect(savedContent).toContain("# Project <!-- id:");
   expect(savedContent).toContain("- alpha <!-- id:");
   expect(savedContent).toContain("- beta <!-- id:");
-
-  const docId = extractDocId(savedContent);
-  const baselinePath = path.join(
-    workspaceDir,
-    ".knowstr",
-    "base",
-    "by-doc-id",
-    `${docId}.md`
-  );
-  expect(fs.existsSync(baselinePath)).toBe(true);
-  expect(fs.readFileSync(baselinePath, "utf8")).toBe(savedContent);
   expect(path.relative(workspaceDir, documentPath)).toBe(
     "notes/nested/project.md"
   );
@@ -140,7 +120,6 @@ title: "Doc"
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save inserts blank lines around headings but not between siblings", async () => {
@@ -191,7 +170,6 @@ test("save inserts blank lines around headings but not between siblings", async 
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save is a no-op when nothing changed", async () => {
@@ -212,7 +190,6 @@ test("save is a no-op when nothing changed", async () => {
   }
 
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save allows moving a node from one document to another", async () => {
@@ -246,10 +223,6 @@ test("save allows moving a node from one document to another", async () => {
     throw new Error("unexpected help");
   }
 
-  expect(result.updated_paths).toHaveLength(2);
-  expect(result.updated_paths).toEqual(
-    expect.arrayContaining([docAPath, docBPath])
-  );
   expect(fs.readFileSync(docAPath, "utf8")).not.toContain("move me");
   expect(fs.readFileSync(docBPath, "utf8")).toContain("move me");
 });
@@ -274,7 +247,6 @@ test("save succeeds when a previously saved node id is removed", async () => {
   if ("help" in result) {
     throw new Error("unexpected help");
   }
-  expect(result.updated_paths).toEqual([documentPath]);
   const rewritten = fs.readFileSync(documentPath, "utf8");
   expect(rewritten).not.toContain("remove me");
   expect(rewritten).toContain("- keep <!-- id:");
@@ -337,7 +309,6 @@ test("save preserves heading levels", async () => {
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save preserves ordered lists", async () => {
@@ -366,7 +337,6 @@ test("save preserves ordered lists", async () => {
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save preserves mixed structure with ordered items and nested bullets", async () => {
@@ -401,7 +371,6 @@ test("save preserves mixed structure with ordered items and nested bullets", asy
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save preserves siblings under multiple headings", async () => {
@@ -435,7 +404,6 @@ test("save preserves siblings under multiple headings", async () => {
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save preserves headings, ordered lists, and bullets end-to-end", async () => {
@@ -478,7 +446,6 @@ test("save preserves headings, ordered lists, and bullets end-to-end", async () 
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save preserves inline code in bullet items", async () => {
@@ -509,7 +476,6 @@ test("save preserves inline code in bullet items", async () => {
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save preserves inline code in headings", async () => {
@@ -540,7 +506,6 @@ test("save preserves inline code in headings", async () => {
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save preserves backtick-wrapped link markdown literally", async () => {
@@ -570,7 +535,6 @@ test("save preserves backtick-wrapped link markdown literally", async () => {
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save preserves inline code combined with prefix markers", async () => {
@@ -601,7 +565,6 @@ test("save preserves inline code combined with prefix markers", async () => {
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save preserves bold and italic emphasis", async () => {
@@ -631,7 +594,6 @@ test("save preserves bold and italic emphasis", async () => {
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save preserves non-ref external link markdown literally", async () => {
@@ -663,7 +625,6 @@ test("save preserves non-ref external link markdown literally", async () => {
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save still treats whole-line ref-style link as ref node", async () => {
@@ -709,7 +670,6 @@ test("save still treats whole-line ref-style link as ref node", async () => {
     throw new Error("unexpected help");
   }
   expect(third.changed_paths).toEqual([]);
-  expect(third.updated_paths).toEqual([]);
 });
 
 test("save still treats prefixed whole-line ref-style link as ref node", async () => {
@@ -755,7 +715,6 @@ test("save still treats prefixed whole-line ref-style link as ref node", async (
     throw new Error("unexpected help");
   }
   expect(third.changed_paths).toEqual([]);
-  expect(third.updated_paths).toEqual([]);
 });
 
 test("save kitchen-sink idempotency for inline formatting", async () => {
@@ -796,7 +755,6 @@ test("save kitchen-sink idempotency for inline formatting", async () => {
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save kitchen-sink blank-line layout around headings and chains", async () => {
@@ -888,7 +846,6 @@ test("save kitchen-sink blank-line layout around headings and chains", async () 
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save skips .knowstr, .git, and node_modules and does not need nsec", async () => {
@@ -923,7 +880,7 @@ test("save skips .knowstr, .git, and node_modules and does not need nsec", async
     throw new Error("unexpected help");
   }
 
-  expect(result.updated_paths).toEqual([documentPath]);
+  expect(result.changed_paths).toEqual([documentPath]);
   expect(
     fs.readFileSync(path.join(workspaceDir, ".git", "ignored.md"), "utf8")
   ).toBe("# Ignore\n");
@@ -959,7 +916,6 @@ test("save writes editing instructions with markers and save command hint into f
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save refreshes a stale editing block next to existing user frontmatter", async () => {
@@ -1001,7 +957,6 @@ custom: yes
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save preserves an HTML id-comment placeholder inside an inline code span", async () => {
@@ -1033,7 +988,6 @@ test("save preserves an HTML id-comment placeholder inside an inline code span",
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save preserves two inline code spans that look like HTML id comments", async () => {
@@ -1064,7 +1018,6 @@ test("save preserves two inline code spans that look like HTML id comments", asy
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save preserves a trailing inline code span with comment-like content", async () => {
@@ -1095,7 +1048,6 @@ test("save preserves a trailing inline code span with comment-like content", asy
     throw new Error("unexpected help");
   }
   expect(second.changed_paths).toEqual([]);
-  expect(second.updated_paths).toEqual([]);
 });
 
 test("save survives an inline code span whose content equals the line's id comment", async () => {
@@ -1145,5 +1097,4 @@ test("save survives an inline code span whose content equals the line's id comme
     throw new Error("unexpected help");
   }
   expect(third.changed_paths).toEqual([]);
-  expect(third.updated_paths).toEqual([]);
 });

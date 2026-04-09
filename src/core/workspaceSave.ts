@@ -8,7 +8,6 @@ import { extractMarkdownImportPayload } from "../markdownImport";
 export type WorkspaceSaveProfile = {
   pubkey: PublicKey;
   workspaceDir: string;
-  knowstrHome: string;
 };
 
 type ScannedWorkspaceDocument = {
@@ -17,7 +16,6 @@ type ScannedWorkspaceDocument = {
   currentContent: string;
   docId: string;
   frontMatter: string;
-  baselineContent?: string;
   mainRoot: MarkdownTreeNode;
 };
 
@@ -28,7 +26,6 @@ type NormalizedWorkspaceDocument = {
   normalizedContent: string;
   activeNodeIds: string[];
   changed: boolean;
-  baselineChanged: boolean;
 };
 
 const SKIPPED_DIRS = new Set([".git", ".knowstr", "node_modules"]);
@@ -54,10 +51,6 @@ function stripEditingBlock(innerContent: string): string {
   const before = lines.slice(0, editingIdx);
   const after = endIdx === -1 ? [] : lines.slice(endIdx);
   return [...before, ...after].join("\n").replace(/\n+$/u, "");
-}
-
-function baselineFilePath(knowstrHome: string, docId: string): string {
-  return path.join(knowstrHome, "base", "by-doc-id", `${docId}.md`);
 }
 
 function stripWrappingQuotes(value: string): string {
@@ -97,13 +90,6 @@ function ensureKnowstrDocIdFrontMatter(frontMatterRaw: string | undefined): {
     docId,
     frontMatter: `---\n${innerWithDocId}\n${EDITING_BLOCK}\n---\n`,
   };
-}
-
-function hasAnyUuidMarker(node: MarkdownTreeNode): boolean {
-  if (node.uuid) {
-    return true;
-  }
-  return node.children.some((child) => hasAnyUuidMarker(child));
 }
 
 function collectNodeIds(node: MarkdownTreeNode): string[] {
@@ -162,17 +148,6 @@ function parseWorkspaceDocumentRoots(
     ...mainRoot,
     frontMatter,
   } as MarkdownTreeNode;
-}
-
-async function readBaseline(
-  knowstrHome: string,
-  docId: string
-): Promise<string | undefined> {
-  try {
-    return await fs.readFile(baselineFilePath(knowstrHome, docId), "utf8");
-  } catch {
-    return undefined;
-  }
 }
 
 async function collectMarkdownFiles(
@@ -237,7 +212,6 @@ async function scanWorkspaceDocuments(
         currentContent,
         docId,
         frontMatter,
-        baselineContent: await readBaseline(profile.knowstrHome, docId),
         mainRoot,
       };
     })
@@ -248,24 +222,10 @@ function normalizeWorkspaceDocument(
   profile: WorkspaceSaveProfile,
   document: ScannedWorkspaceDocument
 ): NormalizedWorkspaceDocument {
-  const rootTree =
-    document.baselineContent === undefined
-      ? parseWorkspaceDocumentRoots(
-          extractMarkdownImportPayload(document.currentContent).body,
-          extractMarkdownImportPayload(document.currentContent).metadata.title,
-          document.frontMatter,
-          document.relativePath
-        )
-      : {
-          ...document.mainRoot,
-          frontMatter: document.frontMatter,
-        };
-
-  if (document.baselineContent === undefined && hasAnyUuidMarker(rootTree)) {
-    throw new Error(
-      `New document ${document.relativePath} must not contain pre-existing id markers`
-    );
-  }
+  const rootTree = {
+    ...document.mainRoot,
+    frontMatter: document.frontMatter,
+  };
 
   const builtEvent = buildDocumentEventFromMarkdownTree(
     profile.pubkey,
@@ -289,7 +249,6 @@ function normalizeWorkspaceDocument(
     normalizedContent,
     activeNodeIds,
     changed: document.currentContent !== normalizedContent,
-    baselineChanged: document.baselineContent !== normalizedContent,
   };
 }
 
@@ -329,21 +288,10 @@ function validateWorkspaceIntegrity(
   }
 }
 
-async function writeBaseline(
-  knowstrHome: string,
-  docId: string,
-  content: string
-): Promise<void> {
-  const filePath = baselineFilePath(knowstrHome, docId);
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, content, "utf8");
-}
-
 export async function saveEditedWorkspaceDocuments(
   profile: WorkspaceSaveProfile
 ): Promise<{
   changed_paths: string[];
-  updated_paths: string[];
 }> {
   const scannedDocuments = await scanWorkspaceDocuments(profile);
   const normalizedDocuments = scannedDocuments.map((document) =>
@@ -351,36 +299,16 @@ export async function saveEditedWorkspaceDocuments(
   );
   validateWorkspaceIntegrity(normalizedDocuments);
 
-  const updatedPaths = await normalizedDocuments.reduce(
-    async (previous, document) => {
-      const acc = await previous;
-
-      if (!document.changed && !document.baselineChanged) {
-        return acc;
-      }
-
-      if (document.changed) {
-        await fs.writeFile(
-          document.filePath,
-          document.normalizedContent,
-          "utf8"
-        );
-      }
-      await writeBaseline(
-        profile.knowstrHome,
-        document.docId,
-        document.normalizedContent
-      );
-
-      return [...acc, document.filePath];
-    },
-    Promise.resolve([] as string[])
+  const changedDocuments = normalizedDocuments.filter(
+    (document) => document.changed
+  );
+  await Promise.all(
+    changedDocuments.map((document) =>
+      fs.writeFile(document.filePath, document.normalizedContent, "utf8")
+    )
   );
 
   return {
-    changed_paths: normalizedDocuments
-      .filter((document) => document.changed)
-      .map((document) => document.filePath),
-    updated_paths: updatedPaths,
+    changed_paths: changedDocuments.map((document) => document.filePath),
   };
 }

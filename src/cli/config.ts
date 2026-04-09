@@ -2,7 +2,6 @@ import fs from "fs";
 import path from "path";
 import { decodePublicKeyInputSync } from "../nostrPublicKeys";
 import { sanitizeRelays } from "../relayUtils";
-import { SyncPullProfile } from "../core/syncPull";
 
 type RawRelay =
   | string
@@ -21,7 +20,13 @@ type RawProfile = {
   relays?: RawRelay[];
 };
 
-export type LoadedCliProfile = SyncPullProfile & {
+export type LoadedCliProfile = {
+  pubkey: PublicKey;
+  readAs: PublicKey;
+  workspaceDir: string;
+  bootstrapRelays: Relays;
+  relays: Relays;
+  nsecFile?: string;
   configPath: string;
   knowstrHome: string;
   agentRoot: string;

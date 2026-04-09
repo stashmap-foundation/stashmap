@@ -11,7 +11,7 @@ export type WorkspaceSaveProfile = {
   knowstrHome: string;
 };
 
-export type ScannedWorkspaceDocument = {
+type ScannedWorkspaceDocument = {
   filePath: string;
   relativePath: string;
   currentContent: string;
@@ -19,34 +19,14 @@ export type ScannedWorkspaceDocument = {
   frontMatter: string;
   baselineContent?: string;
   mainRoot: MarkdownTreeNode;
-  deleteRoot?: MarkdownTreeNode;
 };
 
-export type NodeIndexState = {
-  version: 1;
-  nodes: Record<string, string>;
-};
-
-type MissingNodeRecovery = {
-  nodeId: string;
-  docId: string;
-  originalLine?: string;
-  baselineLineNumber?: number;
-};
-
-type DocLossGroup = {
-  docId: string;
-  relativePath?: string;
-  recoveries: MissingNodeRecovery[];
-};
-
-export type NormalizedWorkspaceDocument = {
+type NormalizedWorkspaceDocument = {
   filePath: string;
   relativePath: string;
   docId: string;
   normalizedContent: string;
   activeNodeIds: string[];
-  deletedNodeIds: string[];
   changed: boolean;
   baselineChanged: boolean;
 };
@@ -59,7 +39,6 @@ const EDITING_BLOCK = [
   "  Edit text freely. Never modify <!-- id:... --> comments.",
   "  Never add <!-- id:... --> to new items. knowstr save will reject invented IDs.",
   "  Markers: (!) relevant (?) maybe relevant (~) little relevant (x) not relevant (+) confirms (-) contra",
-  '  Delete: move lines with their comments under "# Delete"',
   "  Save changes with: knowstr save",
 ].join("\n");
 
@@ -77,12 +56,8 @@ function stripEditingBlock(innerContent: string): string {
   return [...before, ...after].join("\n").replace(/\n+$/u, "");
 }
 
-export function baselineFilePath(knowstrHome: string, docId: string): string {
+function baselineFilePath(knowstrHome: string, docId: string): string {
   return path.join(knowstrHome, "base", "by-doc-id", `${docId}.md`);
-}
-
-export function nodeIndexPath(knowstrHome: string): string {
-  return path.join(knowstrHome, "state", "node-index.json");
 }
 
 function stripWrappingQuotes(value: string): string {
@@ -158,10 +133,7 @@ function parseWorkspaceDocumentRoots(
   title: string | undefined,
   frontMatter: string,
   relativePath: string
-): {
-  mainRoot: MarkdownTreeNode;
-  deleteRoot?: MarkdownTreeNode;
-} {
+): MarkdownTreeNode {
   const roots = parseMarkdownHierarchy(body).filter((root) => !root.hidden);
   if (roots.length === 0) {
     throw new Error(
@@ -169,37 +141,14 @@ function parseWorkspaceDocumentRoots(
     );
   }
 
-  const deleteRootCandidate = roots[roots.length - 1];
-  const hasDeleteRoot =
-    deleteRootCandidate?.text === "Delete" &&
-    deleteRootCandidate.blockKind === "heading" &&
-    deleteRootCandidate.headingLevel === 1;
-  const deleteRoot = hasDeleteRoot ? deleteRootCandidate : undefined;
-  const activeRoots = deleteRoot ? roots.slice(0, -1) : roots;
-
-  const hasNestedDeleteSection = activeRoots.some((root) =>
-    root.children.some((child) => child.text === "Delete")
-  );
-  if (hasNestedDeleteSection) {
-    throw new Error(
-      'Delete section must be a separate "# Delete" root at the end of the file'
-    );
-  }
-  if (activeRoots.length === 0) {
-    throw new Error(
-      `Document ${relativePath} must contain exactly one main root`
-    );
-  }
-
   const singleRoot =
-    activeRoots.length === 1 &&
-    (!title || activeRoots[0]?.blockKind === "heading")
-      ? activeRoots[0]
+    roots.length === 1 && (!title || roots[0]?.blockKind === "heading")
+      ? roots[0]
       : undefined;
   const titledRoot = title
     ? {
         text: title,
-        children: activeRoots,
+        children: roots,
       }
     : undefined;
   const mainRoot = singleRoot || titledRoot;
@@ -210,12 +159,9 @@ function parseWorkspaceDocumentRoots(
   }
 
   return {
-    mainRoot: {
-      ...mainRoot,
-      frontMatter,
-    } as MarkdownTreeNode,
-    ...(deleteRoot ? { deleteRoot } : {}),
-  };
+    ...mainRoot,
+    frontMatter,
+  } as MarkdownTreeNode;
 }
 
 async function readBaseline(
@@ -227,165 +173,6 @@ async function readBaseline(
   } catch {
     return undefined;
   }
-}
-
-function findLineWithNumberForNodeId(
-  baselineContent: string,
-  nodeId: string
-): { line: string; lineNumber: number } | undefined {
-  const lines = baselineContent.split(/\r?\n/u);
-  const index = lines.findIndex((line) => line.includes(`<!-- id:${nodeId}`));
-  if (index === -1) {
-    return undefined;
-  }
-  return { line: lines[index], lineNumber: index };
-}
-
-async function buildMissingNodeRecoveries(
-  knowstrHome: string,
-  previousNodeIndex: NodeIndexState,
-  lostNodeIds: string[]
-): Promise<MissingNodeRecovery[]> {
-  const uniqueDocIds = [
-    ...new Set(lostNodeIds.map((nodeId) => previousNodeIndex.nodes[nodeId])),
-  ];
-  const baselines = Object.fromEntries(
-    await Promise.all(
-      uniqueDocIds.map(async (docId) => [
-        docId,
-        await readBaseline(knowstrHome, docId),
-      ])
-    )
-  ) as Record<string, string | undefined>;
-
-  return lostNodeIds.map((nodeId) => {
-    const docId = previousNodeIndex.nodes[nodeId];
-    const baselineContent = baselines[docId];
-    const found = baselineContent
-      ? findLineWithNumberForNodeId(baselineContent, nodeId)
-      : undefined;
-
-    return {
-      nodeId,
-      docId,
-      ...(found
-        ? { originalLine: found.line, baselineLineNumber: found.lineNumber }
-        : {}),
-    };
-  });
-}
-
-function groupRecoveriesByDoc(
-  recoveries: MissingNodeRecovery[],
-  docIdToRelativePath: Record<string, string>
-): DocLossGroup[] {
-  const groups = recoveries.reduce((acc, recovery) => {
-    const existing = acc[recovery.docId];
-    const next = existing
-      ? { ...existing, recoveries: [...existing.recoveries, recovery] }
-      : {
-          docId: recovery.docId,
-          ...(docIdToRelativePath[recovery.docId]
-            ? { relativePath: docIdToRelativePath[recovery.docId] }
-            : {}),
-          recoveries: [recovery],
-        };
-    return { ...acc, [recovery.docId]: next };
-  }, {} as Record<string, DocLossGroup>);
-
-  return Object.values(groups)
-    .map((group) => ({
-      ...group,
-      recoveries: [...group.recoveries].sort((left, right) => {
-        const leftLine = left.baselineLineNumber ?? Number.MAX_SAFE_INTEGER;
-        const rightLine = right.baselineLineNumber ?? Number.MAX_SAFE_INTEGER;
-        if (leftLine !== rightLine) {
-          return leftLine - rightLine;
-        }
-        return left.nodeId.localeCompare(right.nodeId);
-      }),
-    }))
-    .sort((left, right) => {
-      const leftPresent = left.relativePath !== undefined;
-      const rightPresent = right.relativePath !== undefined;
-      if (leftPresent !== rightPresent) {
-        return leftPresent ? 1 : -1;
-      }
-      const leftKey = left.relativePath ?? left.docId;
-      const rightKey = right.relativePath ?? right.docId;
-      return leftKey.localeCompare(rightKey);
-    });
-}
-
-function formatRecoveryLine(recovery: MissingNodeRecovery): string {
-  if (recovery.originalLine) {
-    return `  ${recovery.originalLine}`;
-  }
-  return `  line not found in baseline for id ${recovery.nodeId}`;
-}
-
-function formatGroup(group: DocLossGroup): string {
-  const header = group.relativePath
-    ? `${group.docId} — file at ${group.relativePath}:`
-    : `${group.docId} — file no longer in workspace (fully lost):`;
-  return [header, ...group.recoveries.map(formatRecoveryLine)].join("\n");
-}
-
-function formatMissingNodeError(
-  recoveries: MissingNodeRecovery[],
-  docIdToRelativePath: Record<string, string>
-): string {
-  const groups = groupRecoveriesByDoc(recoveries, docIdToRelativePath);
-
-  return [
-    "Workspace loses existing node ids.",
-    'Restore the missing line, or move it under "# Delete" to delete it explicitly.',
-    "",
-    ...groups.map(formatGroup),
-    "",
-    "To accept these losses, restore the missing lines, move them under a `# Delete`",
-    "heading, or run:",
-    "",
-    "  knowstr rm <id-or-path> [<id-or-path> ...]",
-    "",
-    "`knowstr rm` accepts any mix of file paths, doc ids, and node ids in a single",
-    "invocation. Examples:",
-    "  knowstr rm <docId>                              # accept a fully lost doc",
-    "  knowstr rm notes/projects.md                    # delete a present file",
-    "  knowstr rm <nodeId> [<nodeId> ...]              # accept individual lost nodes",
-    "  knowstr rm <docId> notes/projects.md <nodeId>   # mixed",
-  ].join("\n");
-}
-
-export async function loadPreviousNodeIndex(
-  knowstrHome: string
-): Promise<NodeIndexState> {
-  try {
-    const raw = await fs.readFile(nodeIndexPath(knowstrHome), "utf8");
-    const parsed = JSON.parse(raw) as NodeIndexState;
-    return {
-      version: 1,
-      nodes: parsed.nodes || {},
-    };
-  } catch {
-    return {
-      version: 1,
-      nodes: {},
-    };
-  }
-}
-
-export async function writeNodeIndex(
-  knowstrHome: string,
-  nodes: Record<string, string>
-): Promise<void> {
-  const filePath = nodeIndexPath(knowstrHome);
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(
-    filePath,
-    `${JSON.stringify({ version: 1, nodes }, null, 2)}\n`,
-    "utf8"
-  );
 }
 
 async function collectMarkdownFiles(
@@ -421,7 +208,7 @@ async function collectMarkdownFiles(
   }, Promise.resolve([] as string[]));
 }
 
-export async function scanWorkspaceDocuments(
+async function scanWorkspaceDocuments(
   profile: WorkspaceSaveProfile
 ): Promise<ScannedWorkspaceDocument[]> {
   const markdownFiles = await collectMarkdownFiles(profile.workspaceDir);
@@ -437,7 +224,7 @@ export async function scanWorkspaceDocuments(
       } = extractMarkdownImportPayload(currentContent);
       const { docId, frontMatter } =
         ensureKnowstrDocIdFrontMatter(currentFrontMatter);
-      const { mainRoot, deleteRoot } = parseWorkspaceDocumentRoots(
+      const mainRoot = parseWorkspaceDocumentRoots(
         body,
         metadata.title,
         frontMatter,
@@ -452,13 +239,12 @@ export async function scanWorkspaceDocuments(
         frontMatter,
         baselineContent: await readBaseline(profile.knowstrHome, docId),
         mainRoot,
-        ...(deleteRoot ? { deleteRoot } : {}),
       };
     })
   );
 }
 
-export function normalizeWorkspaceDocument(
+function normalizeWorkspaceDocument(
   profile: WorkspaceSaveProfile,
   document: ScannedWorkspaceDocument
 ): NormalizedWorkspaceDocument {
@@ -469,7 +255,7 @@ export function normalizeWorkspaceDocument(
           extractMarkdownImportPayload(document.currentContent).metadata.title,
           document.frontMatter,
           document.relativePath
-        ).mainRoot
+        )
       : {
           ...document.mainRoot,
           frontMatter: document.frontMatter,
@@ -493,7 +279,7 @@ export function normalizeWorkspaceDocument(
     normalizedMetadata.title,
     document.frontMatter,
     document.relativePath
-  ).mainRoot;
+  );
   const activeNodeIds = collectNodeIds(normalizedRoot);
 
   return {
@@ -502,53 +288,18 @@ export function normalizeWorkspaceDocument(
     docId: document.docId,
     normalizedContent,
     activeNodeIds,
-    deletedNodeIds: document.deleteRoot
-      ? collectNodeIds(document.deleteRoot)
-      : [],
     changed: document.currentContent !== normalizedContent,
     baselineChanged: document.baselineContent !== normalizedContent,
   };
 }
 
-function buildWorkspaceNodeIndex(
-  normalizedDocuments: NormalizedWorkspaceDocument[]
-): {
-  nodeIndex: Record<string, string>;
-  allNodeIds: string[];
-  deletedNodeIds: string[];
-} {
-  return normalizedDocuments.reduce(
-    (acc, document) => ({
-      nodeIndex: {
-        ...acc.nodeIndex,
-        ...document.activeNodeIds.reduce(
-          (docAcc, nodeId) => ({
-            ...docAcc,
-            [nodeId]: document.docId,
-          }),
-          {} as Record<string, string>
-        ),
-      },
-      allNodeIds: [
-        ...acc.allNodeIds,
-        ...document.activeNodeIds,
-        ...document.deletedNodeIds,
-      ],
-      deletedNodeIds: [...acc.deletedNodeIds, ...document.deletedNodeIds],
-    }),
-    {
-      nodeIndex: {} as Record<string, string>,
-      allNodeIds: [] as string[],
-      deletedNodeIds: [] as string[],
-    }
-  );
+function collectAllNodeIds(documents: NormalizedWorkspaceDocument[]): string[] {
+  return documents.flatMap((document) => document.activeNodeIds);
 }
 
-export async function validateWorkspaceIntegrity(
-  knowstrHome: string,
-  previousNodeIndex: NodeIndexState,
+function validateWorkspaceIntegrity(
   normalizedDocuments: NormalizedWorkspaceDocument[]
-): Promise<Record<string, string>> {
+): void {
   const docIdCounts = normalizedDocuments.reduce(
     (acc, document) => ({
       ...acc,
@@ -569,44 +320,13 @@ export async function validateWorkspaceIntegrity(
     );
   }
 
-  const { nodeIndex, allNodeIds, deletedNodeIds } =
-    buildWorkspaceNodeIndex(normalizedDocuments);
+  const allNodeIds = collectAllNodeIds(normalizedDocuments);
   const duplicateNodeIds = findDuplicateIds(allNodeIds);
   if (duplicateNodeIds.length > 0) {
     throw new Error(
       `Workspace contains duplicate node ids: ${duplicateNodeIds.join(", ")}`
     );
   }
-
-  const allowedNodeIds = new Set([
-    ...Object.keys(nodeIndex),
-    ...deletedNodeIds,
-  ]);
-  const lostNodeIds = Object.keys(previousNodeIndex.nodes)
-    .filter((nodeId) => !allowedNodeIds.has(nodeId))
-    .sort();
-
-  if (lostNodeIds.length > 0) {
-    const docIdToRelativePath = normalizedDocuments.reduce(
-      (acc, document) => ({
-        ...acc,
-        [document.docId]: document.relativePath,
-      }),
-      {} as Record<string, string>
-    );
-    throw new Error(
-      formatMissingNodeError(
-        await buildMissingNodeRecoveries(
-          knowstrHome,
-          previousNodeIndex,
-          lostNodeIds
-        ),
-        docIdToRelativePath
-      )
-    );
-  }
-
-  return nodeIndex;
 }
 
 async function writeBaseline(
@@ -629,12 +349,7 @@ export async function saveEditedWorkspaceDocuments(
   const normalizedDocuments = scannedDocuments.map((document) =>
     normalizeWorkspaceDocument(profile, document)
   );
-  const previousNodeIndex = await loadPreviousNodeIndex(profile.knowstrHome);
-  const nextNodeIndex = await validateWorkspaceIntegrity(
-    profile.knowstrHome,
-    previousNodeIndex,
-    normalizedDocuments
-  );
+  validateWorkspaceIntegrity(normalizedDocuments);
 
   const updatedPaths = await normalizedDocuments.reduce(
     async (previous, document) => {
@@ -661,8 +376,6 @@ export async function saveEditedWorkspaceDocuments(
     },
     Promise.resolve([] as string[])
   );
-
-  await writeNodeIndex(profile.knowstrHome, nextNodeIndex);
 
   return {
     changed_paths: normalizedDocuments

@@ -409,24 +409,3 @@ export function parseMarkdownHierarchy(
   }
   return roots;
 }
-
-export function parseEditableMarkdownDocument(markdownText: string): {
-  roots: MarkdownTreeNode[];
-  mainRoot?: MarkdownTreeNode;
-  deleteRoot?: MarkdownTreeNode;
-  hasNestedDeleteSection: boolean;
-} {
-  const roots = parseMarkdownHierarchy(markdownText).filter(
-    (root) => !root.hidden
-  );
-  const mainRoot = roots[0];
-  const deleteRoot = roots[1];
-  return {
-    roots,
-    mainRoot,
-    deleteRoot,
-    hasNestedDeleteSection: Boolean(
-      mainRoot?.children.some((child) => child.text === "Delete")
-    ),
-  };
-}

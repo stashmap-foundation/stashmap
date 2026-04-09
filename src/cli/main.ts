@@ -1,6 +1,5 @@
 import { initHelp, runInitCommand } from "./init";
 import { saveHelp, runSaveCommand } from "./save";
-import { rmHelp, runRmCommand } from "./rm";
 
 function isHelpResult(value: unknown): value is { help: true; text: string } {
   return (
@@ -20,13 +19,10 @@ function generalHelp(): string {
     "Commands:",
     "  init   Initialize a new Knowstr workspace",
     "  save   Run local integrity checks and assign IDs without publishing",
-    "  rm     Explicitly accept deletion of a file, doc, or lost node id",
     "",
     initHelp(),
     "",
     saveHelp(),
-    "",
-    rmHelp(),
   ].join("\n");
 }
 
@@ -53,11 +49,6 @@ export async function runCli(argv: string[]): Promise<void> {
 
   if (command === "save") {
     printResult(await runSaveCommand([subcommand, ...rest].filter(Boolean)));
-    return;
-  }
-
-  if (command === "rm") {
-    printResult(await runRmCommand([subcommand, ...rest].filter(Boolean)));
     return;
   }
 

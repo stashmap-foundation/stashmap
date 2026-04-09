@@ -448,6 +448,45 @@ test("save preserves headings, ordered lists, and bullets end-to-end", async () 
   expect(second.changed_paths).toEqual([]);
 });
 
+test("save preserves ordered list numbers when preceded by bullet siblings", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "mixed-siblings.md");
+  fs.writeFileSync(
+    documentPath,
+    [
+      "# Topic",
+      "- intro bullet",
+      "37. first ordered",
+      "38. second ordered",
+      "39. third ordered",
+      "",
+    ].join("\n")
+  );
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+  expect(result.changed_paths).toEqual([documentPath]);
+
+  const saved = fs.readFileSync(documentPath, "utf8");
+  expect(saved).toContain("- intro bullet <!-- id:");
+  expect(saved).toContain("37. first ordered <!-- id:");
+  expect(saved).toContain("38. second ordered <!-- id:");
+  expect(saved).toContain("39. third ordered <!-- id:");
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+});
+
 test("save preserves inline code in bullet items", async () => {
   const workspaceDir = makeTempDir();
   const profilePath = writeProfile(workspaceDir, {

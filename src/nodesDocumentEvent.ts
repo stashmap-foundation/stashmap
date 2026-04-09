@@ -61,90 +61,107 @@ function serializeNodeItems(
   indent: string,
   current: SerializeResult
 ): SerializeResult {
-  return children.reduce((acc, childID, index) => {
-    if (childID === EMPTY_SEMANTIC_ID) {
-      return acc;
-    }
-    const item = getNode(knowledgeDBs, childID, author);
-    if (!item) {
-      throw new Error(`Missing child node: ${childID}`);
-    }
-    if (isRefNode(item)) {
-      const targetNode = resolveNode(knowledgeDBs, item);
-      const targetNodeID = item.targetID;
-      if (!targetNodeID) {
+  const result = children.reduce<SerializeResult & { orderedCount: number }>(
+    (acc, childID) => {
+      if (childID === EMPTY_SEMANTIC_ID) {
         return acc;
       }
-      const linkText =
-        item.linkText ||
-        (targetNode ? getSerializableNodeText(knowledgeDBs, targetNode) : "") ||
-        shortID(targetNodeID);
+      const item = getNode(knowledgeDBs, childID, author);
+      if (!item) {
+        throw new Error(`Missing child node: ${childID}`);
+      }
+      if (isRefNode(item)) {
+        const targetNode = resolveNode(knowledgeDBs, item);
+        const targetNodeID = item.targetID;
+        if (!targetNodeID) {
+          return acc;
+        }
+        const linkText =
+          item.linkText ||
+          (targetNode
+            ? getSerializableNodeText(knowledgeDBs, targetNode)
+            : "") ||
+          shortID(targetNodeID);
+        const prefix = formatPrefixMarkers(item.relevance, item.argument);
+        return {
+          orderedCount: 0,
+          lines: [
+            ...acc.lines,
+            `${indent}- ${prefix}[${linkText}](#${targetNodeID})`,
+          ],
+        };
+      }
+
+      const resolvedChild = item;
+      const text = getSerializableNodeText(knowledgeDBs, resolvedChild);
       const prefix = formatPrefixMarkers(item.relevance, item.argument);
+      const attrs = formatNodeAttrs(shortID(resolvedChild.id), {
+        ...(resolvedChild.basedOn ? { basedOn: resolvedChild.basedOn } : {}),
+        ...(resolvedChild.userPublicKey
+          ? { userPublicKey: resolvedChild.userPublicKey }
+          : {}),
+      });
+
+      if (resolvedChild.blockKind === "heading") {
+        const level = resolvedChild.headingLevel ?? 2;
+        const next: SerializeResult = {
+          lines: [...acc.lines, formatHeadingLine(level, prefix, text, attrs)],
+        };
+        return {
+          ...serializeNodeItems(
+            knowledgeDBs,
+            author,
+            resolvedChild.children,
+            "",
+            next
+          ),
+          orderedCount: 0,
+        };
+      }
+
+      if (
+        resolvedChild.blockKind === "list_item" &&
+        resolvedChild.listOrdered === true
+      ) {
+        const number = (resolvedChild.listStart ?? 1) + acc.orderedCount;
+        const childIndent = `${indent}${" ".repeat(
+          String(number).length + 2
+        )}`;
+        const next: SerializeResult = {
+          lines: [
+            ...acc.lines,
+            formatOrderedLine(indent, number, prefix, text, attrs),
+          ],
+        };
+        return {
+          ...serializeNodeItems(
+            knowledgeDBs,
+            author,
+            resolvedChild.children,
+            childIndent,
+            next
+          ),
+          orderedCount: acc.orderedCount + 1,
+        };
+      }
+
+      const next: SerializeResult = {
+        lines: [...acc.lines, formatBulletLine(indent, prefix, text, attrs)],
+      };
       return {
-        ...acc,
-        lines: [
-          ...acc.lines,
-          `${indent}- ${prefix}[${linkText}](#${targetNodeID})`,
-        ],
+        ...serializeNodeItems(
+          knowledgeDBs,
+          author,
+          resolvedChild.children,
+          `${indent}  `,
+          next
+        ),
+        orderedCount: 0,
       };
-    }
-
-    const resolvedChild = item;
-    const text = getSerializableNodeText(knowledgeDBs, resolvedChild);
-    const prefix = formatPrefixMarkers(item.relevance, item.argument);
-    const attrs = formatNodeAttrs(shortID(resolvedChild.id), {
-      ...(resolvedChild.basedOn ? { basedOn: resolvedChild.basedOn } : {}),
-      ...(resolvedChild.userPublicKey
-        ? { userPublicKey: resolvedChild.userPublicKey }
-        : {}),
-    });
-
-    if (resolvedChild.blockKind === "heading") {
-      const level = resolvedChild.headingLevel ?? 2;
-      const next: SerializeResult = {
-        lines: [...acc.lines, formatHeadingLine(level, prefix, text, attrs)],
-      };
-      return serializeNodeItems(
-        knowledgeDBs,
-        author,
-        resolvedChild.children,
-        "",
-        next
-      );
-    }
-
-    if (
-      resolvedChild.blockKind === "list_item" &&
-      resolvedChild.listOrdered === true
-    ) {
-      const number = (resolvedChild.listStart ?? 1) + index;
-      const childIndent = `${indent}${" ".repeat(String(number).length + 2)}`;
-      const next: SerializeResult = {
-        lines: [
-          ...acc.lines,
-          formatOrderedLine(indent, number, prefix, text, attrs),
-        ],
-      };
-      return serializeNodeItems(
-        knowledgeDBs,
-        author,
-        resolvedChild.children,
-        childIndent,
-        next
-      );
-    }
-
-    const next: SerializeResult = {
-      lines: [...acc.lines, formatBulletLine(indent, prefix, text, attrs)],
-    };
-    return serializeNodeItems(
-      knowledgeDBs,
-      author,
-      resolvedChild.children,
-      `${indent}  `,
-      next
-    );
-  }, current);
+    },
+    { ...current, orderedCount: 0 }
+  );
+  return { lines: result.lines };
 }
 
 export function buildDocumentEventFromNodes(

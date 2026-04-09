@@ -124,9 +124,7 @@ function serializeNodeItems(
         resolvedChild.listOrdered === true
       ) {
         const number = (resolvedChild.listStart ?? 1) + acc.orderedCount;
-        const childIndent = `${indent}${" ".repeat(
-          String(number).length + 2
-        )}`;
+        const childIndent = `${indent}${" ".repeat(String(number).length + 2)}`;
         const next: SerializeResult = {
           lines: [
             ...acc.lines,

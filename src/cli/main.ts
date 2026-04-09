@@ -20,6 +20,8 @@ function generalHelp(): string {
     "  init   Initialize a new Knowstr workspace",
     "  save   Run local integrity checks and assign IDs without publishing",
     "",
+    "Use a .knowstrignore file to exclude files/directories from save.",
+    "",
     initHelp(),
     "",
     saveHelp(),

@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
+import ignore, { Ignore } from "ignore";
 import { buildDocumentEventFromMarkdownTree } from "../standaloneDocumentEvent";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "../markdownTree";
 import { extractMarkdownImportPayload } from "../markdownImport";
@@ -28,7 +29,7 @@ type NormalizedWorkspaceDocument = {
   changed: boolean;
 };
 
-const SKIPPED_DIRS = new Set([".git", ".knowstr", "node_modules"]);
+const ALWAYS_IGNORED = [".git", ".knowstr", "node_modules"];
 const DOC_ID_RE = /^knowstr_doc_id:\s*(.+)$/mu;
 
 const EDITING_BLOCK = [
@@ -150,8 +151,21 @@ function parseWorkspaceDocumentRoots(
   } as MarkdownTreeNode;
 }
 
+async function loadIgnorePatterns(workspaceDir: string): Promise<Ignore> {
+  const ig = ignore().add(ALWAYS_IGNORED);
+  const ignorePath = path.join(workspaceDir, ".knowstrignore");
+  try {
+    const content = await fs.readFile(ignorePath, "utf8");
+    ig.add(content);
+  } catch {
+    // no .knowstrignore file
+  }
+  return ig;
+}
+
 async function collectMarkdownFiles(
   workspaceDir: string,
+  ig: Ignore,
   relativeDir = ""
 ): Promise<string[]> {
   const dirPath = path.join(workspaceDir, relativeDir);
@@ -165,17 +179,22 @@ async function collectMarkdownFiles(
     const nextRelativePath = path.join(relativeDir, entry.name);
 
     if (entry.isDirectory()) {
-      if (SKIPPED_DIRS.has(entry.name)) {
+      if (ig.ignores(`${nextRelativePath}/`)) {
         return acc;
       }
       const nestedFiles = await collectMarkdownFiles(
         workspaceDir,
+        ig,
         nextRelativePath
       );
       return [...acc, ...nestedFiles];
     }
 
     if (!entry.isFile() || !entry.name.endsWith(".md")) {
+      return acc;
+    }
+
+    if (ig.ignores(nextRelativePath)) {
       return acc;
     }
 
@@ -186,7 +205,8 @@ async function collectMarkdownFiles(
 async function scanWorkspaceDocuments(
   profile: WorkspaceSaveProfile
 ): Promise<ScannedWorkspaceDocument[]> {
-  const markdownFiles = await collectMarkdownFiles(profile.workspaceDir);
+  const ig = await loadIgnorePatterns(profile.workspaceDir);
+  const markdownFiles = await collectMarkdownFiles(profile.workspaceDir, ig);
 
   return Promise.all(
     markdownFiles.map(async (filePath) => {

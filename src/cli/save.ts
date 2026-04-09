@@ -39,6 +39,12 @@ export function saveHelp(): string {
     "Usage: knowstr save [--config <path>]",
     "",
     "Runs local integrity checks and assigns IDs without publishing.",
+    "",
+    "Ignoring files:",
+    "  Place a .knowstrignore file in the workspace root to exclude",
+    "  files and directories. Uses gitignore syntax.",
+    "",
+    "  .git, .knowstr, and node_modules are always ignored.",
   ].join("\n");
 }
 

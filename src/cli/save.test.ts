@@ -1089,6 +1089,109 @@ test("save preserves a trailing inline code span with comment-like content", asy
   expect(second.changed_paths).toEqual([]);
 });
 
+test(".knowstrignore ignores a directory", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const draftsDir = path.join(workspaceDir, "drafts");
+  fs.mkdirSync(draftsDir, { recursive: true });
+  fs.writeFileSync(path.join(draftsDir, "secret.md"), "# Secret\n- hidden\n");
+  const documentPath = path.join(workspaceDir, "public.md");
+  fs.writeFileSync(documentPath, "# Public\n- visible\n");
+  fs.writeFileSync(path.join(workspaceDir, ".knowstrignore"), "drafts/\n");
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+
+  expect(result.changed_paths).toEqual([documentPath]);
+  expect(fs.readFileSync(path.join(draftsDir, "secret.md"), "utf8")).toBe(
+    "# Secret\n- hidden\n"
+  );
+});
+
+test(".knowstrignore ignores a specific file", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  fs.writeFileSync(
+    path.join(workspaceDir, "secret.md"),
+    "# Secret\n- hidden\n"
+  );
+  const documentPath = path.join(workspaceDir, "public.md");
+  fs.writeFileSync(documentPath, "# Public\n- visible\n");
+  fs.writeFileSync(path.join(workspaceDir, ".knowstrignore"), "secret.md\n");
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+
+  expect(result.changed_paths).toEqual([documentPath]);
+  expect(fs.readFileSync(path.join(workspaceDir, "secret.md"), "utf8")).toBe(
+    "# Secret\n- hidden\n"
+  );
+});
+
+test(".knowstrignore supports glob patterns", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  fs.writeFileSync(
+    path.join(workspaceDir, "temp-notes.md"),
+    "# Temp\n- scratch\n"
+  );
+  const documentPath = path.join(workspaceDir, "real-notes.md");
+  fs.writeFileSync(documentPath, "# Real\n- keep\n");
+  fs.writeFileSync(path.join(workspaceDir, ".knowstrignore"), "temp-*\n");
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+
+  expect(result.changed_paths).toEqual([documentPath]);
+  expect(
+    fs.readFileSync(path.join(workspaceDir, "temp-notes.md"), "utf8")
+  ).toBe("# Temp\n- scratch\n");
+});
+
+test(".knowstrignore handles comments and blank lines", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  fs.writeFileSync(
+    path.join(workspaceDir, "secret.md"),
+    "# Secret\n- hidden\n"
+  );
+  const documentPath = path.join(workspaceDir, "public.md");
+  fs.writeFileSync(documentPath, "# Public\n- visible\n");
+  fs.writeFileSync(
+    path.join(workspaceDir, ".knowstrignore"),
+    "# This is a comment\n\nsecret.md\n\n# Another comment\n"
+  );
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+
+  expect(result.changed_paths).toEqual([documentPath]);
+});
+
 test("save survives an inline code span whose content equals the line's id comment", async () => {
   const workspaceDir = makeTempDir();
   const profilePath = writeProfile(workspaceDir, {

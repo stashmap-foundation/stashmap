@@ -104,6 +104,19 @@ function parseIdComment(content: string): ParsedComment | undefined {
   };
 }
 
+function stripTrailingHtmlComment(
+  content: string,
+  comment: string | undefined
+): string {
+  if (!comment) {
+    return content;
+  }
+  const trimmed = content.trimEnd();
+  return trimmed.endsWith(comment)
+    ? trimmed.slice(0, -comment.length)
+    : content;
+}
+
 function extractCommentAttrs(inline: Token): ParsedComment | undefined {
   if (!inline.children) {
     return undefined;
@@ -159,13 +172,11 @@ function extractInlineContent(inline: Token): {
   const commentChild = inline.children.find(
     (c) => c.type === "html_inline" && ID_COMMENT_RE.test(c.content.trim())
   );
-  const raw = (
-    commentChild
-      ? inline.content.replace(commentChild.content, "")
-      : inline.content
-  )
-    .replace(/\n/g, " ")
-    .trim();
+  const stripped = stripTrailingHtmlComment(
+    inline.content,
+    commentChild?.content
+  );
+  const raw = stripped.replace(/\n/g, " ").trim();
   const { cleanText, relevance, argument } = extractPrefixMarkers(raw);
   const refMatch = cleanText.match(REF_LINK_RE);
   if (refMatch) {

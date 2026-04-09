@@ -804,6 +804,52 @@ test("save still treats whole-line ref-style link as ref node", async () => {
   expect(third.updated_paths).toEqual([]);
 });
 
+test("save still treats prefixed whole-line ref-style link as ref node", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "prefixed-ref-node.md");
+  fs.writeFileSync(documentPath, "# Project\n- target\n");
+
+  await runSaveCommand(["--config", profilePath]);
+
+  const firstSave = fs.readFileSync(documentPath, "utf8");
+  const targetLine = extractLine(firstSave, "- target <!-- id:");
+  const idMatch = targetLine.match(/id:(\S+)/);
+  if (!idMatch?.[1]) {
+    throw new Error("missing target id");
+  }
+  const targetId = idMatch[1];
+
+  fs.writeFileSync(
+    documentPath,
+    firstSave.replace(
+      `${targetLine}\n`,
+      `${targetLine}\n- (!) [Linked](#${targetId})\n`
+    )
+  );
+
+  const secondResult = await runSaveCommand(["--config", profilePath]);
+  if ("help" in secondResult) {
+    throw new Error("unexpected help");
+  }
+
+  const secondSave = fs.readFileSync(documentPath, "utf8");
+  expect(secondSave).toContain(`- (!) [Linked](#${targetId})`);
+  const linkedLine = extractLine(secondSave, `- (!) [Linked](#${targetId})`);
+  expect(linkedLine).toBe(`- (!) [Linked](#${targetId})`);
+
+  const third = await runSaveCommand(["--config", profilePath]);
+  if ("help" in third) {
+    throw new Error("unexpected help");
+  }
+  expect(third.changed_paths).toEqual([]);
+  expect(third.updated_paths).toEqual([]);
+});
+
 test("save kitchen-sink idempotency for inline formatting", async () => {
   const workspaceDir = makeTempDir();
   const profilePath = writeProfile(workspaceDir, {
@@ -1051,4 +1097,148 @@ custom: yes
   }
   expect(second.changed_paths).toEqual([]);
   expect(second.updated_paths).toEqual([]);
+});
+
+test("save preserves an HTML id-comment placeholder inside an inline code span", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "comment-in-code.md");
+  fs.writeFileSync(
+    documentPath,
+    "# Project\n- Every node has a UUID stored as an HTML comment: `<!-- id:uuid -->`.\n"
+  );
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+  expect(result.changed_paths).toEqual([documentPath]);
+
+  const saved = fs.readFileSync(documentPath, "utf8");
+  expect(saved).toContain(
+    "- Every node has a UUID stored as an HTML comment: `<!-- id:uuid -->`. <!-- id:"
+  );
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
+});
+
+test("save preserves two inline code spans that look like HTML id comments", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "two-code-comments.md");
+  fs.writeFileSync(
+    documentPath,
+    "# Project\n- Two code spans: `<!-- id:xxxx -->` and `<!-- id:yyyy -->` both inside.\n"
+  );
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+
+  const saved = fs.readFileSync(documentPath, "utf8");
+  expect(saved).toContain(
+    "- Two code spans: `<!-- id:xxxx -->` and `<!-- id:yyyy -->` both inside. <!-- id:"
+  );
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
+});
+
+test("save preserves a trailing inline code span with comment-like content", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "trailing-code-comment.md");
+  fs.writeFileSync(
+    documentPath,
+    "# Project\n- Trailing code span with comment-like content: ending in `<!-- id:qqqq -->`\n"
+  );
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+
+  const saved = fs.readFileSync(documentPath, "utf8");
+  expect(saved).toContain(
+    "- Trailing code span with comment-like content: ending in `<!-- id:qqqq -->` <!-- id:"
+  );
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+  expect(second.updated_paths).toEqual([]);
+});
+
+test("save survives an inline code span whose content equals the line's id comment", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "code-id-collision.md");
+  fs.writeFileSync(
+    documentPath,
+    "# Project\n- collision line `<!-- id:placeholder -->` end\n"
+  );
+
+  await runSaveCommand(["--config", profilePath]);
+
+  const firstSave = fs.readFileSync(documentPath, "utf8");
+  const collisionLine = extractLine(firstSave, "- collision line");
+  const idMatch = collisionLine.match(/<!-- id:(\S+) -->\s*$/);
+  if (!idMatch?.[1]) {
+    throw new Error("missing assigned id");
+  }
+  const assignedId = idMatch[1];
+
+  const collidingLine = `- collision line \`<!-- id:${assignedId} -->\` end <!-- id:${assignedId} -->`;
+  fs.writeFileSync(
+    documentPath,
+    firstSave.replace(collisionLine, collidingLine)
+  );
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+
+  const afterSecond = fs.readFileSync(documentPath, "utf8");
+  expect(afterSecond).toContain(collidingLine);
+  expect(afterSecond).not.toContain("collision line `` end");
+  const collidingLineCount = afterSecond
+    .split("\n")
+    .filter((line) => line === collidingLine).length;
+  expect(collidingLineCount).toBe(1);
+
+  const third = await runSaveCommand(["--config", profilePath]);
+  if ("help" in third) {
+    throw new Error("unexpected help");
+  }
+  expect(third.changed_paths).toEqual([]);
+  expect(third.updated_paths).toEqual([]);
 });

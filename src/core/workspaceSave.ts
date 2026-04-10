@@ -36,7 +36,7 @@ const EDITING_BLOCK = [
   "editing: |",
   "  Edit text freely. Never modify <!-- id:... --> comments.",
   "  Never add <!-- id:... --> to new items. knowstr save will reject invented IDs.",
-  "  Markers: (!) relevant (?) maybe relevant (~) little relevant (x) not relevant (+) confirms (-) contra",
+  "  Markers: (!) relevant (?) maybe (~) little relevant (x) not relevant (+) confirms (-) contra. Combine: (-!) contra+relevant (-~) contra+little relevant",
   "  Save changes with: knowstr save",
 ].join("\n");
 

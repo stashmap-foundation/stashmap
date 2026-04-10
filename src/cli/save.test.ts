@@ -606,6 +606,37 @@ test("save preserves inline code combined with prefix markers", async () => {
   expect(second.changed_paths).toEqual([]);
 });
 
+test("save round-trips combined prefix markers like (-!) and (-~)", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "combined-markers.md");
+  fs.writeFileSync(
+    documentPath,
+    "# Project\n- (-!) contra relevant\n- (-~) contra little\n- (+!) confirms relevant\n"
+  );
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+  expect(result.changed_paths).toEqual([documentPath]);
+
+  const saved = fs.readFileSync(documentPath, "utf8");
+  expect(saved).toContain("- (-!) contra relevant <!-- id:");
+  expect(saved).toContain("- (-~) contra little <!-- id:");
+  expect(saved).toContain("- (+!) confirms relevant <!-- id:");
+
+  const second = await runSaveCommand(["--config", profilePath]);
+  if ("help" in second) {
+    throw new Error("unexpected help");
+  }
+  expect(second.changed_paths).toEqual([]);
+});
+
 test("save preserves bold and italic emphasis", async () => {
   const workspaceDir = makeTempDir();
   const profilePath = writeProfile(workspaceDir, {
@@ -946,7 +977,7 @@ test("save writes editing instructions with markers and save command hint into f
     "Never add <!-- id:... --> to new items. knowstr save will reject invented IDs."
   );
   expect(savedContent).toContain(
-    "Markers: (!) relevant (?) maybe relevant (~) little relevant (x) not relevant (+) confirms (-) contra"
+    "Markers: (!) relevant (?) maybe (~) little relevant (x) not relevant (+) confirms (-) contra. Combine: (-!) contra+relevant (-~) contra+little relevant"
   );
   expect(savedContent).toContain("Save changes with: knowstr save");
 
@@ -989,7 +1020,7 @@ custom: yes
   expect(savedContent).not.toContain("stale instructions");
   expect(savedContent).not.toContain("second stale line");
   expect(savedContent).toContain("Save changes with: knowstr save");
-  expect(savedContent).toContain("Markers: (!) relevant (?) maybe relevant");
+  expect(savedContent).toContain("Markers: (!) relevant (?) maybe (~)");
 
   const second = await runSaveCommand(["--config", profilePath]);
   if ("help" in second) {

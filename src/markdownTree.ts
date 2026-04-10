@@ -13,19 +13,19 @@ const ID_COMMENT_RE = /^<!--\s+id:(\S+)(.*?)-->$/;
 const ATTR_RE = /(\w+)="([^"]*)"/g;
 const REF_LINK_RE = /^\[([^\]]*)\]\(#([^)]+)\)$/;
 
-const RELEVANCE_PREFIXES: Record<string, Relevance> = {
-  "(!)": "relevant",
-  "(?)": "maybe_relevant",
-  "(~)": "little_relevant",
-  "(x)": "not_relevant",
+const RELEVANCE_CHARS: Record<string, Relevance> = {
+  "!": "relevant",
+  "?": "maybe_relevant",
+  "~": "little_relevant",
+  x: "not_relevant",
 };
 
-const ARGUMENT_PREFIXES: Record<string, Argument> = {
-  "(+)": "confirms",
-  "(-)": "contra",
+const ARGUMENT_CHARS: Record<string, Argument> = {
+  "+": "confirms",
+  "-": "contra",
 };
 
-const PREFIX_RE = /^(\([!?~x+-]\)\s*)+/;
+const PREFIX_RE = /^(\([!?~x+-]{1,2}\)\s*)+/;
 
 type ParsedComment = {
   uuid: string;
@@ -144,10 +144,16 @@ function extractPrefixMarkers(text: string): {
   const prefixTokens = prefixStr.trim().split(/\s+/);
 
   const { relevance, argument } = prefixTokens.reduce(
-    (acc, tok) => ({
-      relevance: RELEVANCE_PREFIXES[tok] || acc.relevance,
-      argument: ARGUMENT_PREFIXES[tok] || acc.argument,
-    }),
+    (acc, tok) => {
+      const inner = tok.slice(1, -1);
+      return [...inner].reduce(
+        (a, ch) => ({
+          relevance: RELEVANCE_CHARS[ch] || a.relevance,
+          argument: ARGUMENT_CHARS[ch] || a.argument,
+        }),
+        acc
+      );
+    },
     { relevance: undefined as Relevance, argument: undefined as Argument }
   );
 

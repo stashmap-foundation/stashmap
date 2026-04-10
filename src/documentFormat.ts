@@ -53,31 +53,34 @@ export function formatNodeAttrs(
   return ` <!-- ${parts.join(" ")} -->`;
 }
 
-const RELEVANCE_PREFIX: Record<string, string> = {
-  relevant: "(!)",
-  maybe_relevant: "(?)",
-  little_relevant: "(~)",
-  not_relevant: "(x)",
+const RELEVANCE_CHAR: Record<string, string> = {
+  relevant: "!",
+  maybe_relevant: "?",
+  little_relevant: "~",
+  not_relevant: "x",
 };
 
-const ARGUMENT_PREFIX: Record<string, string> = {
-  confirms: "(+)",
-  contra: "(-)",
+const ARGUMENT_CHAR: Record<string, string> = {
+  confirms: "+",
+  contra: "-",
 };
 
 export function formatPrefixMarkers(
   relevance: Relevance,
   argument: Argument
 ): string {
-  const parts: string[] = [
-    ...(relevance && RELEVANCE_PREFIX[relevance]
-      ? [RELEVANCE_PREFIX[relevance]]
-      : []),
-    ...(argument && ARGUMENT_PREFIX[argument]
-      ? [ARGUMENT_PREFIX[argument]]
-      : []),
-  ];
-  return parts.length > 0 ? `${parts.join(" ")} ` : "";
+  const argChar = argument ? ARGUMENT_CHAR[argument] : undefined;
+  const relChar = relevance ? RELEVANCE_CHAR[relevance] : undefined;
+  if (argChar && relChar) {
+    return `(${argChar}${relChar}) `;
+  }
+  if (argChar) {
+    return `(${argChar}) `;
+  }
+  if (relChar) {
+    return `(${relChar}) `;
+  }
+  return "";
 }
 
 function clampHeadingLevel(level: number): number {

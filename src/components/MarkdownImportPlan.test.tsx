@@ -385,6 +385,76 @@ test("parseTextToTrees detects markdown headers", () => {
   ]);
 });
 
+test("parseMarkdownHierarchy parses combined prefix markers (-!)", () => {
+  const trees = parseMarkdownHierarchy("# Root\n- (-!) contra and relevant\n");
+  expect(trees).toEqual([
+    expect.objectContaining({
+      text: "Root",
+      children: [
+        expect.objectContaining({
+          text: "contra and relevant",
+          argument: "contra",
+          relevance: "relevant",
+        }),
+      ],
+    }),
+  ]);
+});
+
+test("parseMarkdownHierarchy parses combined prefix markers (-~)", () => {
+  const trees = parseMarkdownHierarchy(
+    "# Root\n- (-~) contra and little relevant\n"
+  );
+  expect(trees).toEqual([
+    expect.objectContaining({
+      children: [
+        expect.objectContaining({
+          text: "contra and little relevant",
+          argument: "contra",
+          relevance: "little_relevant",
+        }),
+      ],
+    }),
+  ]);
+});
+
+test("parseMarkdownHierarchy parses combined prefix markers (+!)", () => {
+  const trees = parseMarkdownHierarchy(
+    "# Root\n- (+!) confirms and relevant\n"
+  );
+  expect(trees).toEqual([
+    expect.objectContaining({
+      children: [
+        expect.objectContaining({
+          text: "confirms and relevant",
+          argument: "confirms",
+          relevance: "relevant",
+        }),
+      ],
+    }),
+  ]);
+});
+
+test("parseMarkdownHierarchy still parses single prefix markers", () => {
+  const trees = parseMarkdownHierarchy(
+    "# Root\n- (!) relevant only\n- (-) contra only\n"
+  );
+  expect(trees).toEqual([
+    expect.objectContaining({
+      children: [
+        expect.objectContaining({
+          text: "relevant only",
+          relevance: "relevant",
+        }),
+        expect.objectContaining({
+          text: "contra only",
+          argument: "contra",
+        }),
+      ],
+    }),
+  ]);
+});
+
 test("parseTextToTrees falls back to indentation parser", () => {
   const indentTrees = parseTextToTrees("Root\n\tChild\n\t\tGrandchild");
   expect(indentTrees).toEqual([

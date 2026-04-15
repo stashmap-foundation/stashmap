@@ -1,3 +1,4 @@
+import { applyHelp, runApplyCommand } from "./apply";
 import { initHelp, runInitCommand } from "./init";
 import { saveHelp, runSaveCommand } from "./save";
 
@@ -19,12 +20,15 @@ function generalHelp(): string {
     "Commands:",
     "  init   Initialize a new Knowstr workspace",
     "  save   Run local integrity checks and assign IDs without publishing",
+    "  apply  Apply markdown files from ./inbox into the local graph",
     "",
     "Use a .knowstrignore file to exclude files/directories from save.",
     "",
     initHelp(),
     "",
     saveHelp(),
+    "",
+    applyHelp(),
   ].join("\n");
 }
 
@@ -51,6 +55,11 @@ export async function runCli(argv: string[]): Promise<void> {
 
   if (command === "save") {
     printResult(await runSaveCommand([subcommand, ...rest].filter(Boolean)));
+    return;
+  }
+
+  if (command === "apply") {
+    printResult(await runApplyCommand([subcommand, ...rest].filter(Boolean)));
     return;
   }
 

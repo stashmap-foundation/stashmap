@@ -1120,6 +1120,33 @@ test("save preserves a trailing inline code span with comment-like content", asy
   expect(second.changed_paths).toEqual([]);
 });
 
+test("save ignores the top-level inbox folder", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const inboxDir = path.join(workspaceDir, "inbox");
+  fs.mkdirSync(inboxDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(inboxDir, "foreign.md"),
+    "# Foreign\n- should stay untouched\n"
+  );
+  const documentPath = path.join(workspaceDir, "public.md");
+  fs.writeFileSync(documentPath, "# Public\n- visible\n");
+
+  const result = await runSaveCommand(["--config", profilePath]);
+  if ("help" in result) {
+    throw new Error("unexpected help");
+  }
+
+  expect(result.changed_paths).toEqual([documentPath]);
+  expect(fs.readFileSync(path.join(inboxDir, "foreign.md"), "utf8")).toBe(
+    "# Foreign\n- should stay untouched\n"
+  );
+});
+
 test(".knowstrignore ignores a directory", async () => {
   const workspaceDir = makeTempDir();
   const profilePath = writeProfile(workspaceDir, {

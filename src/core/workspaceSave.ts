@@ -11,7 +11,7 @@ export type WorkspaceSaveProfile = {
   workspaceDir: string;
 };
 
-type ScannedWorkspaceDocument = {
+export type ScannedWorkspaceDocument = {
   filePath: string;
   relativePath: string;
   currentContent: string;
@@ -30,6 +30,7 @@ type NormalizedWorkspaceDocument = {
 };
 
 const ALWAYS_IGNORED = [".git", ".knowstr", "node_modules"];
+const RESERVED_WORKSPACE_IGNORES = ["inbox/"];
 const DOC_ID_RE = /^knowstr_doc_id:\s*(.+)$/mu;
 
 const EDITING_BLOCK = [
@@ -65,7 +66,9 @@ function stripWrappingQuotes(value: string): string {
   return trimmed;
 }
 
-function ensureKnowstrDocIdFrontMatter(frontMatterRaw: string | undefined): {
+export function ensureKnowstrDocIdFrontMatter(
+  frontMatterRaw: string | undefined
+): {
   docId: string;
   frontMatter: string;
 } {
@@ -93,7 +96,7 @@ function ensureKnowstrDocIdFrontMatter(frontMatterRaw: string | undefined): {
   };
 }
 
-function collectNodeIds(node: MarkdownTreeNode): string[] {
+export function collectNodeIds(node: MarkdownTreeNode): string[] {
   return [
     ...(node.uuid ? [node.uuid] : []),
     ...node.children.flatMap((child) => collectNodeIds(child)),
@@ -115,7 +118,7 @@ function findDuplicateIds(values: string[]): string[] {
     .sort();
 }
 
-function parseWorkspaceDocumentRoots(
+export function parseWorkspaceDocumentRoots(
   body: string,
   title: string | undefined,
   frontMatter: string,
@@ -151,8 +154,11 @@ function parseWorkspaceDocumentRoots(
   } as MarkdownTreeNode;
 }
 
-async function loadIgnorePatterns(workspaceDir: string): Promise<Ignore> {
-  const ig = ignore().add(ALWAYS_IGNORED);
+async function loadIgnorePatterns(
+  workspaceDir: string,
+  ignoredPatterns: string[] = RESERVED_WORKSPACE_IGNORES
+): Promise<Ignore> {
+  const ig = ignore().add([...ALWAYS_IGNORED, ...ignoredPatterns]);
   const ignorePath = path.join(workspaceDir, ".knowstrignore");
   try {
     const content = await fs.readFile(ignorePath, "utf8");
@@ -202,10 +208,16 @@ async function collectMarkdownFiles(
   }, Promise.resolve([] as string[]));
 }
 
-async function scanWorkspaceDocuments(
-  profile: WorkspaceSaveProfile
+export async function scanWorkspaceDocuments(
+  profile: WorkspaceSaveProfile,
+  options: {
+    ignoredPatterns?: string[];
+  } = {}
 ): Promise<ScannedWorkspaceDocument[]> {
-  const ig = await loadIgnorePatterns(profile.workspaceDir);
+  const ig = await loadIgnorePatterns(
+    profile.workspaceDir,
+    options.ignoredPatterns
+  );
   const markdownFiles = await collectMarkdownFiles(profile.workspaceDir, ig);
 
   return Promise.all(

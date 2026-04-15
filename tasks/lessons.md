@@ -243,6 +243,55 @@
 4. CLAUDE.md says "Reuse code!" — this is a hard requirement, not a suggestion
 5. Common patterns to watch for: deduplication, sorting, ID parsing, context key building, covered-context checks
 
+## Multi-user CLI: inbox apply should normalize raw inbox edits instead of rejecting id-less additions
+
+**Date**: 2026-04-13
+**Context**: The user copied a saved document into `inbox/`, manually added `Germany` and `Berlin` without ids, and `knowstr apply` logged the file as invalid.
+
+**Mistake**: Raw inbox is a staging area humans may edit directly. Rejecting id-less additions makes the MVP unusable in the obvious manual workflow.
+
+**Rule**: For `knowstr apply`:
+1. Preserve existing ids from raw inbox docs
+2. Auto-assign ids to newly added inbox nodes during apply normalization
+3. Only reject inbox files for real structural problems, not for missing ids on new additions
+
+## Multi-user CLI: avoid `~` in actual filenames
+
+**Date**: 2026-04-13
+**Context**: Used `~log.md` as the on-disk filename for the CLI log.
+
+**Mistake**: `~` in actual filenames is awkward in shells and needs escaping. The user wants the readable concept without awkward paths.
+
+**Rule**: For CLI workspace artifacts:
+1. Prefer plain filenames such as `knowstr_log.md`
+2. Keep `~Log` as document text if useful, but not as the literal filename by default
+
+## Multi-user CLI discussion: be concise and do not treat root UUID as special
+
+**Date**: 2026-04-13
+**Context**: While discussing the CLI snapshot/apply model, I gave overly long answers and introduced `rootUuid` as if it had special semantic status.
+
+**Mistake**: The user wants a dialogue, not long essays. For identity, the meaningful cross-user key is effectively `(author, uuid)` on the transport/baseline side, not a privileged root UUID. Also, delete inference is acceptable once a baseline exists because inbox/raw is expected to contain complete documents, not partial exports.
+
+**Rule**: In multi-user CLI discussions:
+1. Keep answers short and interactive
+2. Do not elevate `rootUuid` to a special merge concept unless strictly necessary
+3. Assume deletes can be inferred from absence when a baseline exists and raw inputs are complete
+4. Answer the concrete folder/UX question directly before adding theory
+
+## Multi-user CLI design: treat node UUIDs as the only semantic merge key
+
+**Date**: 2026-04-13
+**Context**: While sketching first multi-user sharing UX, I over-emphasized `knowstr_doc_id` and drifted toward reintroducing long IDs for distinguishing local vs inbox state.
+
+**Mistake**: For cooperative sharing, the user's intended identity model is preserved node UUIDs. Inbox-vs-graph should be represented by storage/state, not by minting a second identity namespace. `knowstr_doc_id` may be useful as packaging/grouping, but it is not the core merge key.
+
+**Rule**: For multi-user CLI design:
+1. Use short node UUIDs as the semantic identity
+2. Do not reintroduce long IDs just to distinguish inbox from graph
+3. Represent `graph` vs `inbox/raw` vs `inbox` by storage location and explicit state
+4. Treat document/thread IDs as optional grouping metadata, not the primary merge key
+
 ## Project lessons go in tasks/lessons.md, NOT MEMORY.md
 
 **Date**: 2026-02-23

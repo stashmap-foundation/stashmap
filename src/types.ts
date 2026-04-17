@@ -60,8 +60,14 @@ declare global {
     signEvent: (event: EventTemplate) => Promise<Event>;
   };
 
+  type DesktopShellBridge = {
+    isElectron: boolean;
+    platform?: string;
+  };
+
   interface Window {
     nostr: Nostr;
+    knowstrDesktop?: DesktopShellBridge;
   }
 
   export type KeyPair = {

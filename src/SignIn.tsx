@@ -16,6 +16,7 @@ import { useApis } from "./Apis";
 import { KINDS_META } from "./Data";
 import { useStorePreLoginEvents } from "./StorePreLoginContext";
 import { convertInputToPrivateKey } from "./nostrKey";
+import { supportsExtensionLogin } from "./runtimeEnvironment";
 
 function SignInWithSeed({
   setPrivateKey,
@@ -81,15 +82,37 @@ function SignInWithSeed({
   );
 }
 
-function SignInWithExtension({
-  setPublicKey,
+function CreateAccountButton({
+  referrer,
+  className,
 }: {
-  setPublicKey: (publicKey: PublicKey) => void;
+  referrer: string;
+  className?: string;
 }): JSX.Element {
   const navigate = useNavigate();
+  return (
+    <Button
+      className={className || "btn btn-outline-dark"}
+      onClick={() => {
+        navigate("/signup", {
+          state: { referrer },
+        });
+      }}
+    >
+      Create new Account
+    </Button>
+  );
+}
+
+function SignInWithExtension({
+  setPublicKey,
+  referrer,
+}: {
+  setPublicKey: (publicKey: PublicKey) => void;
+  referrer: string;
+}): JSX.Element {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { pathname, search, hash } = new URL(window.location.href);
 
   const componentIsMounted = useRef(true);
   useEffect(() => {
@@ -137,16 +160,10 @@ function SignInWithExtension({
             Continue with Extension
           </Button>
         )}
-        <Button
+        <CreateAccountButton
+          referrer={referrer}
           className="btn btn-outline-dark"
-          onClick={() => {
-            navigate("/signup", {
-              state: { referrer: pathname + search + hash },
-            });
-          }}
-        >
-          Create new Account
-        </Button>
+        />
       </div>
       {error && (
         <div className="mt-2">
@@ -165,12 +182,14 @@ function useIsUnsavedChanges(): boolean {
 export function SignInModal(): JSX.Element {
   const login = useLogin();
   const loginWithExtension = useLoginWithExtension();
+  const allowExtensionLogin = supportsExtensionLogin();
   const navigate = useNavigate();
   const location = useLocation();
   const { publishEventsStatus } = useData();
   const { relayPool, finalizeEvent } = useApis();
   const { createPlan, setPublishEvents } = usePlanner();
   const referrer = (location.state as LocationState | undefined)?.referrer;
+  const signInReferrer = `${location.pathname}${location.search}${location.hash}`;
   const onHide = (): void => {
     navigate(referrer || "/");
   };
@@ -253,11 +272,21 @@ export function SignInModal(): JSX.Element {
             signIn({ withExtension: false, key: privateKey })
           }
         />
-        <SignInWithExtension
-          setPublicKey={(publicKey) =>
-            signIn({ withExtension: true, key: publicKey })
-          }
-        />
+        {allowExtensionLogin ? (
+          <SignInWithExtension
+            setPublicKey={(publicKey) =>
+              signIn({ withExtension: true, key: publicKey })
+            }
+            referrer={signInReferrer}
+          />
+        ) : (
+          <div className="mt-3 d-flex flex-column gap-2 align-items-start">
+            <div className="text-muted">
+              Desktop app currently supports nsec or private key login.
+            </div>
+            <CreateAccountButton referrer={signInReferrer} />
+          </div>
+        )}
       </Modal.Body>
     </Modal>
   );

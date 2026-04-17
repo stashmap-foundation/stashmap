@@ -2,6 +2,20 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { renderApp, findNewNodeEditor } from "./utils.test";
+import * as runtimeEnvironment from "./runtimeEnvironment";
+
+jest.mock("./runtimeEnvironment", () => {
+  const actual = jest.requireActual("./runtimeEnvironment");
+  return {
+    ...actual,
+    supportsExtensionLogin: jest.fn(),
+  };
+});
+
+const mockedSupportsExtensionLogin =
+  runtimeEnvironment.supportsExtensionLogin as jest.MockedFunction<
+    typeof runtimeEnvironment.supportsExtensionLogin
+  >;
 
 // eslint-disable-next-line no-console
 const originalConsoleError = console.error;
@@ -14,6 +28,10 @@ beforeAll(() => {
 });
 afterAll(() => {
   jest.restoreAllMocks();
+});
+
+beforeEach(() => {
+  mockedSupportsExtensionLogin.mockReturnValue(true);
 });
 
 test("Login and logout with seed phrase", async () => {
@@ -74,6 +92,36 @@ test("Display Error", async () => {
     "0000completenonsense{enter}"
   );
   await screen.findByText("Input is not a valid nsec, private key or mnemonic");
+});
+
+test("desktop sign in hides extension login", async () => {
+  mockedSupportsExtensionLogin.mockReturnValue(false);
+
+  renderApp({ user: undefined });
+  await userEvent.click(await screen.findByLabelText("sign in"));
+
+  expect(
+    screen.queryByRole("button", { name: "Continue with Extension" })
+  ).toBeNull();
+  await screen.findByText(
+    "Desktop app currently supports nsec or private key login."
+  );
+  await screen.findByRole("button", { name: "Create new Account" });
+});
+
+test("desktop sign in can open account creation", async () => {
+  mockedSupportsExtensionLogin.mockReturnValue(false);
+
+  renderApp({ user: undefined });
+  await userEvent.click(await screen.findByLabelText("sign in"));
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Create new Account" })
+  );
+
+  await screen.findByText("Secure your Private Key");
+  await screen.findByLabelText("Mnemonic");
+  await screen.findByLabelText("Private Key");
+  await screen.findByLabelText("Public Key");
 });
 
 test("Logout clears history state and does not save panes for unauthenticated user", async () => {

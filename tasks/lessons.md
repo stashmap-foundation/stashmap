@@ -1,5 +1,84 @@
 # Lessons Learned
 
+## When the user has already manually verified behavior, record it instead of restating uncertainty
+
+**Date**: 2026-04-16
+**Context**: After the user had already run Electron successfully, I was still framing the manual smoke pass as pending.
+
+**Mistake**: That ignored fresh user verification and made the status sound less certain than it was.
+
+**Rule**: When the user reports they already tested something manually:
+1. Treat that as a real verification signal
+2. Update the task/review status accordingly
+3. Do not keep presenting the same manual check as still pending
+4. Move on to the next concrete gap
+
+## Desktop login fallback must still include account creation
+
+**Date**: 2026-04-16
+**Context**: After hiding extension login in Electron, I also removed the only visible path to create a new account and generate an nsec.
+
+**Mistake**: Replacing one auth affordance without preserving the adjacent create-account flow left desktop users unable to onboard.
+
+**Rule**: When disabling an auth method in one surface:
+1. Check what secondary actions were bundled with it
+2. Preserve account creation and recovery flows explicitly
+3. For Electron, always keep a visible path to generate a new nsec/private key
+4. Test the full click path from sign-in modal to generated credentials
+
+## Electron desktop should not rely on extension signing
+
+**Date**: 2026-04-16
+**Context**: While starting the Electron wrapper, I was still implicitly carrying over the browser extension login/signing path.
+
+**Mistake**: Browser extension signing is a web assumption and should not be treated as part of the first Electron milestone.
+
+**Rule**: For the first Electron app:
+1. Assume extension signing/login is unavailable
+2. Prefer nsec/private-key login for desktop
+3. Hide or disable extension-specific auth affordances in Electron
+4. Validate desktop auth flows separately from the browser
+
+## Prefer Electron wrapper first when adding desktop capability
+
+**Date**: 2026-04-16
+**Context**: I was still steering toward backend refactoring and filesystem support first, while the user wanted the easiest first step for a desktop app.
+
+**Mistake**: That tries to solve architecture cleanup and new storage semantics before proving the desktop shell itself. A simpler milestone is to wrap the existing Nostr-backed app in Electron first, then add filesystem support.
+
+**Rule**: When moving Knowstr to desktop:
+1. Prefer proving the shell first with the existing backend
+2. Keep the first desktop milestone as close as possible to current product behavior
+3. Add the filesystem backend only after Electron packaging/auth/basic editing work
+4. Sequence architecture cleanup behind the simplest useful shipped desktop version
+
+## Do not invent a workspace chooser where the deployment only has one source
+
+**Date**: 2026-04-16
+**Context**: I proposed an "open workspace" UX abstraction for both local and online modes.
+
+**Mistake**: That adds product abstraction the user did not ask for. If knowstr.com only has one available source in that deployment, the UX should stay direct rather than making users choose a conceptual workspace/backend.
+
+**Rule**: For Knowstr UX planning:
+1. Do not introduce a source/workspace picker unless users truly need to choose between multiple available sources in that surface
+2. Keep knowstr.com direct if it only supports the online mode there
+3. Share internal architecture where useful, but do not force that abstraction into the user-facing UX
+4. Prefer deployment-specific entry UX over generic abstraction when the generic abstraction adds friction
+
+## Prefer one collaboration model with multiple storage backends
+
+**Date**: 2026-04-16
+**Context**: I proposed preserving the current frontend multi-user/follow/deep-copy mechanic and adding local filesystem mode beside it.
+
+**Mistake**: That keeps two product semantics alive when the intended direction is already clear. The right simplification is to keep one merge model (inbox/apply with stable UUIDs) and let filesystem vs Nostr be only storage differences.
+
+**Rule**: When planning Knowstr architecture:
+1. Prefer one collaboration/merge model across surfaces
+2. Treat filesystem vs Nostr as backend differences, not as reasons for separate product semantics
+3. If an existing frontend sharing model is off-direction, remove it instead of designing around it
+4. Build new UI/backend boundaries around the canonical inbox/merge workflow
+
+
 ## Close active IndexedDB handles before clearing cache on logout
 
 **Date**: 2026-03-10

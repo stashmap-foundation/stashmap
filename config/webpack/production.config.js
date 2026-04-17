@@ -20,7 +20,7 @@ module.exports = {
     path: path.join(__dirname, "../../build"),
     filename: "static/js/[name].[contenthash:8].js",
     chunkFilename: "static/js/[name].[contenthash:8].chunk.js",
-    publicPath: "/",
+    publicPath: process.env.WEBPACK_PUBLIC_PATH || "/",
   },
   optimization: {
     minimize: true,
@@ -96,6 +96,7 @@ module.exports = {
     new HtmlWebpackPlugin({
       title: "Dev",
       template: paths.appHtml,
+      baseHref: process.env.WEBPACK_PUBLIC_PATH || "/",
       favicon: "./public/favicon.ico",
       minify: {
         removeComments: true,

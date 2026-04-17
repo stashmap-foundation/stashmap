@@ -88,6 +88,7 @@ module.exports = {
     new HtmlWebpackPlugin({
       title: "Dev",
       template: paths.appHtml,
+      baseHref: "/",
     }),
     new webpack.DefinePlugin({
       "process.env": JSON.stringify({

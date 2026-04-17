@@ -46,6 +46,127 @@ The current frontend follow/deep-copy multi-user mechanic is out of direction an
 
 ## Implementation
 
+### Phase 2 — Step 1: Introduce `BackendContext` + `NostrBackendProvider`
+
+**Scope:** Stand up the new context/provider seam without changing any existing callers. After this step, all current behavior is identical; we just have a new provider in the tree that exposes the same capabilities via a new API surface, ready for callers to migrate in step 2.
+
+**Design (short-term shape per architecture.md):**
+
+New file `src/BackendContext.tsx`:
+- `type Backend = { subscribe, publish }` where:
+  - `subscribe(relays: Relay[], filters: Filter[], callbacks: { onevent, oneose }) => { close: () => void }` — thin wrapper over `relayPool.subscribeMany`
+  - `publish(relays: Relay[], event: Event) => Promise<string[]>` — wraps `relayPool.publish` collecting per-relay results
+- `BackendContext = React.createContext<Backend | undefined>(undefined)`
+- `useBackend(): Backend` hook that throws if not provided (mirrors `useApis` convention from `Apis.tsx:25`)
+- `BackendProvider({ backend, children })` is a pass-through
+
+New file `src/NostrBackendProvider.tsx`:
+- Consumes `useApis()` internally to get `relayPool` and `finalizeEvent`
+- Builds the `Backend` object that wraps those
+- Wraps children in `BackendProvider`
+- Mounts inside `NostrProvider` in `src/index.tsx` so it has access to the `Apis` context
+
+Provider tree after this step (`src/index.tsx`):
+```
+NostrProvider
+  NostrBackendProvider        ← NEW
+    NostrAuthContextProvider
+      UserRelayContextProvider
+        App
+```
+
+**Tests (before implementation):**
+
+- [x] `src/BackendContext.test.tsx`: `useBackend` throws with a clear error when no provider is in the tree (mirrors the error shape of `useApis`). One test, minimal.
+- [x] `src/NostrBackendProvider.test.tsx`: integration-style — mount a tiny test component inside `NostrProvider` + `NostrBackendProvider`, assert `useBackend()` returns an object with `subscribe` and `publish` functions. No real relay traffic; just verifies wiring.
+- [x] Full existing suite must still pass unchanged (`npm test`, `npm run typescript`, `npm run lint`). This is the real verification that step 1 is non-invasive.
+
+**Implementation:**
+
+- [x] Write failing tests for `BackendContext` and `NostrBackendProvider`.
+- [x] Create `src/BackendContext.tsx` with `Backend` type, `BackendContext`, `useBackend`, `BackendProvider`.
+- [x] Create `src/NostrBackendProvider.tsx` that reads `useApis()` and wraps `relayPool.subscribeMany` / `relayPool.publish` into the `Backend` shape.
+- [x] Mount `NostrBackendProvider` in `src/index.tsx` between `NostrProvider` and `NostrAuthContextProvider`.
+- [x] Run `npm test -- --runInBand src/BackendContext.test.tsx src/NostrBackendProvider.test.tsx`.
+- [x] Run `npm run typescript`.
+- [x] Run `npm run lint`.
+- [x] Run full test suite to confirm no regressions (62 suites, 729 tests pass).
+
+**Non-goals for this step (deferred to later steps):**
+
+- Not migrating `useEventQuery` callers.
+- Not touching `planner.execute()`.
+- Not replacing `useApis().relayPool` anywhere.
+- Not designing the target document-centric shape — that's after filesystem backend exists.
+
+---
+
+### Phase 2 — Step 2: Migrate `useEventQuery` callers to `useBackend()`
+
+**Scope:** `useEventQuery` is the last Nostr-specific subscription surface in the renderer. Swap its parameter from `SimplePool` to `Backend`, then update every call site to pass `useBackend()` instead of `useApis().relayPool`. Behavior is identical since `Backend.subscribe` is a direct passthrough to `relayPool.subscribeMany`.
+
+**Callers to migrate** (found via `rg useEventQuery`):
+- `src/commons/useNostrQuery.tsx:33` — signature change
+- `src/UserRelayContext.tsx:34` — drop `useApis().relayPool`, use `useBackend()`
+- `src/Data.tsx:305, 343` — drop `useApis().relayPool` (line 247), use `useBackend()`
+- `src/components/SearchModal.tsx:63` — drop `useApis().relayPool` (line 36), use `useBackend()`
+
+**Test harness update:**
+- `src/utils.test.tsx` — wrap children in `NostrBackendProvider` inside `ApiProvider` so `useBackend()` resolves in tests. This is the one place all integration tests mount the provider stack.
+
+**Tests:**
+- [x] Full existing suite must still pass unchanged — since behavior is identical, this is the verification. No new tests needed (`useEventQuery` has no direct test today; integration tests exercise it via `UserRelayContext`, `Data`, `SearchModal`).
+
+**Implementation:**
+- [x] Change `useEventQuery` signature: `relayPool: SimplePool` → `backend: Backend`; body: `relayPool.subscribeMany` → `backend.subscribe`.
+- [x] Migrate `UserRelayContext.tsx`.
+- [x] Migrate `Data.tsx` (two call sites, one `useApis` declaration to swap).
+- [x] Migrate `SearchModal.tsx`.
+- [x] Update `src/utils.test.tsx` harness to include `NostrBackendProvider`.
+- [x] Run `npm run typescript`.
+- [x] Run `npm run lint`.
+- [x] Run full test suite (62 suites, 729 tests pass).
+
+---
+
+### Phase 2 — Step 3: Migrate publish path to `useBackend()`
+
+**Scope:** `relayPool.publish` is the last Nostr-specific dependency in the planner/executor/publish-queue. Swap it to `Backend.publish` so the planner becomes backend-agnostic. `Backend.publish` has the exact same signature as `SimplePool.publish`, so this is mechanical.
+
+**Type change:**
+- `Pick<SimplePool, "publish">` → `Pick<Backend, "publish">` (same structural shape).
+
+**Call-site migrations:**
+- `src/nostrPublish.ts` — `publishEventToRelays(relayPool, ...)` → `publishEventToRelays(backend, ...)`.
+- `src/executor.tsx` — `execute({plan, relayPool, finalizeEvent})` → `execute({plan, backend, finalizeEvent})`; same for `republishEvents`.
+- `src/PublishQueue.ts` — `FlushDeps.relayPool` → `FlushDeps.backend`; internal `publishToRelays` helper.
+- `src/planner.tsx` — `useApis()` no longer destructures `relayPool`; pull `backend` from `useBackend()`. Pass through to `depsRef`, `execute`, `republishEvents`.
+- `src/SignIn.tsx:189, 238` — drop `relayPool` from `useApis()` destructure, add `useBackend()`.
+- `src/StorePreLoginContext.tsx:29, 42` — same.
+
+**Test harness:**
+- `src/utils.test.tsx:applyApis` — add `backend` to `TestApis` derived from `relayPool` so test spreads `{ ...utils, plan }` work.
+- `src/PublishQueue.test.ts` — update `getDeps` FlushDeps from `relayPool: ...` to `backend: ...`.
+
+**Tests:** Full existing suite passes (behavior is identical; publish surface is structurally the same). No new tests needed.
+
+**Implementation:**
+- [x] Update `nostrPublish.ts`.
+- [x] Update `executor.tsx`.
+- [x] Update `PublishQueue.ts`.
+- [x] Update `planner.tsx`.
+- [x] Update `SignIn.tsx`.
+- [x] Update `StorePreLoginContext.tsx`.
+- [x] Update `utils.test.tsx` harness (add `backend` to `TestApis`).
+- [x] Update `PublishQueue.test.ts` getDeps.
+- [x] Run `npm run typescript`.
+- [x] Run `npm run lint`.
+- [x] Run full test suite (62 suites, 729 tests pass).
+
+**After step 3**, the renderer no longer references `relayPool` except inside `NostrBackendProvider`. The seam is complete; step 4 can begin on the filesystem backend.
+
+---
+
 ### Phase 1: Electron wrapper with current Nostr backend
 
 - [x] Add Electron app scaffolding.

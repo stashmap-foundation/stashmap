@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from "react";
-import { Event, Filter, SimplePool } from "nostr-tools";
+import { Event, Filter } from "nostr-tools";
 import { Map, OrderedMap } from "immutable";
 import { sanitizeAuthorsFilter } from "../nostrEvents";
+import { Backend } from "../BackendContext";
 
 type EventQueryResult = {
   events: OrderedMap<string, Event>;
@@ -31,7 +32,7 @@ function isValidWsUrl(url: string): boolean {
 }
 
 export function useEventQuery(
-  relayPool: SimplePool,
+  backend: Backend,
   filters: Filter[],
   opts?: EventQueryProps
 ): EventQueryResult {
@@ -72,7 +73,7 @@ export function useEventQuery(
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       return () => {};
     }
-    const sub = relayPool.subscribeMany(relayUrls, sanitizedFilters, {
+    const sub = backend.subscribe(relayUrls, sanitizedFilters, {
       onevent(event: Event): void {
         if (!componentIsMounted.current) {
           return;

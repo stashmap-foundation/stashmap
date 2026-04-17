@@ -13,6 +13,7 @@ import { useData } from "./DataContext";
 import { planRewriteUnpublishedEvents, usePlanner } from "./planner";
 import { execute } from "./executor";
 import { useApis } from "./Apis";
+import { useBackend } from "./BackendContext";
 import { KINDS_META } from "./Data";
 import { useStorePreLoginEvents } from "./StorePreLoginContext";
 import { convertInputToPrivateKey } from "./nostrKey";
@@ -186,7 +187,8 @@ export function SignInModal(): JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
   const { publishEventsStatus } = useData();
-  const { relayPool, finalizeEvent } = useApis();
+  const { finalizeEvent } = useApis();
+  const backend = useBackend();
   const { createPlan, setPublishEvents } = usePlanner();
   const referrer = (location.state as LocationState | undefined)?.referrer;
   const signInReferrer = `${location.pathname}${location.search}${location.hash}`;
@@ -235,7 +237,7 @@ export function SignInModal(): JSX.Element {
       });
       execute({
         plan: { ...plan, publishEvents: nonMergeEvents },
-        relayPool,
+        backend,
         finalizeEvent,
       }).then((results) => {
         setPublishEvents((current) => {

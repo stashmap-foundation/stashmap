@@ -10,6 +10,7 @@ import {
 } from "./nostr";
 import { DataContextProvider, MergeKnowledgeDB } from "./DataContext";
 import { useApis } from "./Apis";
+import { useBackend } from "./BackendContext";
 import { PlanningContextProvider, replaceUnauthenticatedUser } from "./planner";
 import { useUserRelayContext } from "./UserRelayContext";
 import { flattenRelays, usePreloadRelays } from "./relays";
@@ -244,7 +245,7 @@ function Data({ user, children }: DataProps): JSX.Element {
     });
   const { isRelaysLoaded, userRelays } = useUserRelayContext();
   const defaultRelays = useDefaultRelays();
-  const { relayPool } = useApis();
+  const backend = useBackend();
 
   const [db, setDb] = useState<StashmapDB | null | undefined>(undefined);
 
@@ -303,7 +304,7 @@ function Data({ user, children }: DataProps): JSX.Element {
   }, [views, myPublicKey]);
 
   const { events: mE, eose: metaEventsEose } = useEventQuery(
-    relayPool,
+    backend,
     [
       { authors: [myPublicKey], kinds: [KIND_SETTINGS], limit: 1 },
       { authors: [myPublicKey], kinds: [KIND_CONTACTLIST], limit: 1 },
@@ -341,7 +342,7 @@ function Data({ user, children }: DataProps): JSX.Element {
   );
 
   const { events: contactRelayEvents } = useEventQuery(
-    relayPool,
+    backend,
     [
       {
         authors: [

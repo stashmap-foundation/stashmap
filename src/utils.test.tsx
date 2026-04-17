@@ -38,6 +38,8 @@ import {
 } from "./planner";
 import { execute } from "./executor";
 import { ApiProvider, Apis, FinalizeEvent } from "./Apis";
+import { Backend } from "./BackendContext";
+import { NostrBackendProvider } from "./NostrBackendProvider";
 import { App } from "./App";
 import {
   DataContextProps,
@@ -169,14 +171,22 @@ export function mockFinalizeEvent(): FinalizeEvent {
 type TestApis = Omit<Apis, "fileStore" | "relayPool"> & {
   fileStore: MockFileStore;
   relayPool: MockRelayPool;
+  backend: Backend;
 };
 
 function applyApis(props?: Partial<TestApis>): TestApis {
+  const relayPool = props?.relayPool || mockRelayPool();
+  const backend: Backend = props?.backend || {
+    subscribe: (relays, filters, params) =>
+      relayPool.subscribeMany(relays, filters, params),
+    publish: (relays, event) => relayPool.publish(relays, event),
+  };
   return {
     eventLoadingTimeout: 0,
     timeToStorePreLoginEvents: 0,
     fileStore: props?.fileStore || mockFileStore(),
-    relayPool: props?.relayPool || mockRelayPool(),
+    relayPool,
+    backend,
     finalizeEvent: props?.finalizeEvent || mockFinalizeEvent(),
     nip11: props?.nip11 || {
       searchDebounce: 0,
@@ -336,7 +346,8 @@ export function renderApis(
   children: React.ReactElement,
   options?: RenderApis
 ): TestApis & RenderResult {
-  const { fileStore, relayPool, finalizeEvent, nip11 } = applyApis(options);
+  const { fileStore, relayPool, backend, finalizeEvent, nip11 } =
+    applyApis(options);
   const initialDataContextProps: DataContextProps = {
     user: options?.user || DEFAULT_DATA_CONTEXT_PROPS.user,
     contacts: options?.contacts || DEFAULT_DATA_CONTEXT_PROPS.contacts,
@@ -386,30 +397,35 @@ export function renderApis(
           timeToStorePreLoginEvents: 0,
         }}
       >
-        <TestPublishProvider initialDataContextProps={initialDataContextProps}>
-          <NostrAuthContextProvider
-            defaultRelayUrls={
-              optionsWithDefaultUser.defaultRelays ||
-              TEST_RELAYS.map((r) => r.url)
-            }
+        <NostrBackendProvider>
+          <TestPublishProvider
+            initialDataContextProps={initialDataContextProps}
           >
-            <UserRelayContextProvider>
-              <PaneIndexProvider index={0}>
-                <VirtuosoMockContext.Provider
-                  value={{ viewportHeight: 10000, itemHeight: 100 }}
-                >
-                  {children}
-                </VirtuosoMockContext.Provider>
-              </PaneIndexProvider>
-            </UserRelayContextProvider>
-          </NostrAuthContextProvider>
-        </TestPublishProvider>
+            <NostrAuthContextProvider
+              defaultRelayUrls={
+                optionsWithDefaultUser.defaultRelays ||
+                TEST_RELAYS.map((r) => r.url)
+              }
+            >
+              <UserRelayContextProvider>
+                <PaneIndexProvider index={0}>
+                  <VirtuosoMockContext.Provider
+                    value={{ viewportHeight: 10000, itemHeight: 100 }}
+                  >
+                    {children}
+                  </VirtuosoMockContext.Provider>
+                </PaneIndexProvider>
+              </UserRelayContextProvider>
+            </NostrAuthContextProvider>
+          </TestPublishProvider>
+        </NostrBackendProvider>
       </ApiProvider>
     </BrowserRouter>
   );
   return {
     fileStore,
     relayPool,
+    backend,
     finalizeEvent,
     nip11,
     eventLoadingTimeout: 0,

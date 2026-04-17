@@ -1,6 +1,7 @@
 import { List, Map } from "immutable";
-import { Event, SimplePool, UnsignedEvent } from "nostr-tools";
+import { Event, UnsignedEvent } from "nostr-tools";
 import { FinalizeEvent } from "./Apis";
+import { Backend } from "./BackendContext";
 import { KIND_DELETE } from "./nostr";
 import { signEvents, PUBLISH_TIMEOUT } from "./executor";
 import { applyWriteRelayConfig } from "./relays";
@@ -32,7 +33,7 @@ type RelayBackoffState = {
 export type FlushDeps = {
   readonly user: User;
   readonly relays: AllRelays;
-  readonly relayPool: SimplePool;
+  readonly backend: Pick<Backend, "publish">;
   readonly finalizeEvent: FinalizeEvent;
 };
 
@@ -85,7 +86,7 @@ const deleteTargetToOutboxKey = (aTagValue: string): string | undefined => {
 };
 
 const publishToRelays = async (
-  relayPool: SimplePool,
+  backend: Pick<Backend, "publish">,
   event: Event,
   writeRelayUrls: ReadonlyArray<string>
 ): Promise<Map<string, PublishStatus>> => {
@@ -98,7 +99,7 @@ const publishToRelays = async (
     });
 
   const results = await Promise.allSettled(
-    relayPool
+    backend
       .publish([...writeRelayUrls], event)
       .map((promise) =>
         Promise.race([promise, timeoutPromise(PUBLISH_TIMEOUT)])
@@ -255,7 +256,7 @@ export const createPublishQueue = (
         }
 
         const relayResults = await publishToRelays(
-          deps.relayPool,
+          deps.backend,
           event,
           availableUrls
         );
@@ -370,7 +371,7 @@ export const createPublishQueue = (
       );
 
       const relayResults = await publishToRelays(
-        deps.relayPool,
+        deps.backend,
         first.event,
         relayUrls
       );

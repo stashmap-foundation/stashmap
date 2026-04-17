@@ -13,6 +13,7 @@ import {
 import { useData } from "./DataContext";
 import { execute, republishEvents } from "./executor";
 import { useApis } from "./Apis";
+import { useBackend } from "./BackendContext";
 import { createPublishQueue } from "./PublishQueue";
 import type { StashmapDB } from "./indexedDB";
 import { newDB } from "./knowledge";
@@ -1523,7 +1524,8 @@ export function PlanningContextProvider({
   db?: StashmapDB | null;
   getRelays?: () => AllRelays;
 }): JSX.Element {
-  const { relayPool, finalizeEvent } = useApis();
+  const { finalizeEvent } = useApis();
+  const backend = useBackend();
   const { user } = useData();
 
   const depsRef = useRef({
@@ -1535,14 +1537,14 @@ export function PlanningContextProvider({
           userRelays: [] as Relays,
           contactsRelays: [] as Relays,
         },
-    relayPool,
+    backend,
     finalizeEvent,
   });
   // eslint-disable-next-line functional/immutable-data
   depsRef.current = {
     user,
     relays: getRelays ? getRelays() : depsRef.current.relays,
-    relayPool,
+    backend,
     finalizeEvent,
   };
 
@@ -1632,7 +1634,7 @@ export function PlanningContextProvider({
 
     const results = await execute({
       plan: filteredPlan,
-      relayPool,
+      backend,
       finalizeEvent,
     });
 
@@ -1651,7 +1653,7 @@ export function PlanningContextProvider({
   ): Promise<void> => {
     const results = await republishEvents({
       events,
-      relayPool,
+      backend,
       writeRelayUrl: relayUrl,
     });
     setPublishEvents((prevStatus) => {

@@ -1,12 +1,13 @@
-import { Event, SimplePool } from "nostr-tools";
+import { Event } from "nostr-tools";
 import { Map } from "immutable";
+import { Backend } from "./BackendContext";
 
 export const PUBLISH_TIMEOUT = 5000;
 
-type PublishPool = Pick<SimplePool, "publish">;
+export type PublishBackend = Pick<Backend, "publish">;
 
 export async function publishEventToRelays(
-  relayPool: PublishPool,
+  backend: PublishBackend,
   event: Event,
   writeRelayUrls: string[],
   timeoutMs: number = PUBLISH_TIMEOUT
@@ -33,7 +34,7 @@ export async function publishEventToRelays(
       );
     });
   const results = await Promise.allSettled(
-    relayPool.publish(writeRelayUrls, event).map(withTimeout)
+    backend.publish(writeRelayUrls, event).map(withTimeout)
   );
 
   const failures = results.filter((res) => res.status === "rejected");

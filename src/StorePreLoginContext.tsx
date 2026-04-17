@@ -2,6 +2,7 @@ import React from "react";
 import { List } from "immutable";
 import { useDebouncedCallback } from "use-debounce";
 import { useApis } from "./Apis";
+import { useBackend } from "./BackendContext";
 import { KIND_CONTACTLIST } from "./nostr";
 import { planAddContacts, usePlanner } from "./planner";
 import { execute } from "./executor";
@@ -26,7 +27,8 @@ export function StorePreLoginContext({
   children: React.ReactNode;
 }): JSX.Element {
   const { createPlan, setPublishEvents } = usePlanner();
-  const { relayPool, finalizeEvent, timeToStorePreLoginEvents } = useApis();
+  const { finalizeEvent, timeToStorePreLoginEvents } = useApis();
+  const backend = useBackend();
 
   const storeMergeEvents = useDebouncedCallback(
     async (eventKinds: List<number>) => {
@@ -39,7 +41,7 @@ export function StorePreLoginContext({
         : plan;
       const results = await execute({
         plan: withContacts,
-        relayPool,
+        backend,
         finalizeEvent,
       });
       setPublishEvents((current) => {

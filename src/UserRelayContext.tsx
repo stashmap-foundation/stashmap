@@ -5,7 +5,7 @@ import { getMostRecentReplacableEvent } from "./nostrEvents";
 import { useEventQuery } from "./commons/useNostrQuery";
 import { createRelaysQuery, findAllRelays, sanitizeRelays } from "./relayUtils";
 import { useDefaultRelays, useUserOrAnon } from "./NostrAuthContext";
-import { useApis } from "./Apis";
+import { useBackend } from "./BackendContext";
 
 type UserRelayInfo = {
   userRelays: Relays;
@@ -30,9 +30,9 @@ export function UserRelayContextProvider({
 }): JSX.Element {
   const user = useUserOrAnon();
   const defaultRelays = useDefaultRelays();
-  const { relayPool } = useApis();
+  const backend = useBackend();
   const { events: relaysEvents, eose: relaysEose } = useEventQuery(
-    relayPool,
+    backend,
     [createRelaysQuery([user.publicKey])],
     { readFromRelays: defaultRelays }
   );

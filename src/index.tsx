@@ -9,6 +9,7 @@ import "./Workspace.scss";
 import "./App.css";
 import { App } from "./App";
 import { NostrAuthContextProvider } from "./NostrAuthContext";
+import { NostrBackendProvider } from "./NostrBackendProvider";
 import { NostrProvider } from "./NostrProvider";
 import { UserRelayContextProvider } from "./UserRelayContext";
 import { shouldUseHashRouter } from "./runtimeEnvironment";
@@ -31,11 +32,13 @@ if (root !== null) {
   createRoot(root).render(
     <Router>
       <NostrProvider apis={{ fileStore: createFileStore() }}>
-        <NostrAuthContextProvider defaultRelayUrls={defaultRelayUrls}>
-          <UserRelayContextProvider>
-            <App />
-          </UserRelayContextProvider>
-        </NostrAuthContextProvider>
+        <NostrBackendProvider>
+          <NostrAuthContextProvider defaultRelayUrls={defaultRelayUrls}>
+            <UserRelayContextProvider>
+              <App />
+            </UserRelayContextProvider>
+          </NostrAuthContextProvider>
+        </NostrBackendProvider>
       </NostrProvider>
     </Router>
   );

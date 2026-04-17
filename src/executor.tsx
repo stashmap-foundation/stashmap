@@ -1,7 +1,8 @@
-import { Event, EventTemplate, SimplePool, VerifiedEvent } from "nostr-tools";
+import { Event, EventTemplate, VerifiedEvent } from "nostr-tools";
 import { List, Map } from "immutable";
 import { buildDocumentEvents, GraphPlan } from "./planner";
 import { FinalizeEvent } from "./Apis";
+import { Backend } from "./BackendContext";
 import {
   isUserLoggedIn,
   isUserLoggedInWithExtension,
@@ -61,11 +62,11 @@ export async function signEvents(
 
 export async function execute({
   plan,
-  relayPool,
+  backend,
   finalizeEvent,
 }: {
   plan: GraphPlan;
-  relayPool: SimplePool;
+  backend: Pick<Backend, "publish">;
   finalizeEvent: FinalizeEvent;
 }): Promise<PublishResultsEventMap> {
   // buildDocumentEvents returns plan.publishEvents + generated document events.
@@ -95,7 +96,7 @@ export async function execute({
         writeRelayConf
       );
       return publishEventToRelays(
-        relayPool,
+        backend,
         event,
         Array.from(new Set(writeRelayUrls.map((r: Relay) => r.url)))
       );
@@ -110,11 +111,11 @@ export async function execute({
 
 export async function republishEvents({
   events,
-  relayPool,
+  backend,
   writeRelayUrl,
 }: {
   events: List<Event>;
-  relayPool: SimplePool;
+  backend: Pick<Backend, "publish">;
   writeRelayUrl: string;
 }): Promise<PublishResultsEventMap> {
   if (events.size === 0) {
@@ -126,7 +127,7 @@ export async function republishEvents({
   const results = await Promise.all(
     events
       .toArray()
-      .map((event) => publishEventToRelays(relayPool, event, [writeRelayUrl]))
+      .map((event) => publishEventToRelays(backend, event, [writeRelayUrl]))
   );
 
   return results.reduce((rdx, result, index) => {

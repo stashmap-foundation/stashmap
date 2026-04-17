@@ -73,7 +73,7 @@ const makeQueue = (
     getDeps: (): FlushDeps => ({
       user: ALICE_USER,
       relays: TEST_RELAYS,
-      relayPool: relayPool as never,
+      backend: relayPool,
       finalizeEvent: mockFinalizeEvent(),
     }),
     onResults,
@@ -204,7 +204,7 @@ test("clears events from buffer when their target relay is removed from config",
     getDeps: (): FlushDeps => ({
       user: ALICE_USER,
       relays: relayConfig.current,
-      relayPool: failPool as never,
+      backend: failPool,
       finalizeEvent: mockFinalizeEvent(),
     }),
     onResults,
@@ -262,7 +262,7 @@ test("publishes events enqueued during an in-progress flush", async () => {
     getDeps: (): FlushDeps => ({
       user: ALICE_USER,
       relays: TEST_RELAYS,
-      relayPool: controlledPool as never,
+      backend: controlledPool,
       finalizeEvent: mockFinalizeEvent(),
     }),
     onResults,

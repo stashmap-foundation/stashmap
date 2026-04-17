@@ -2,7 +2,7 @@ import { Map } from "immutable";
 import { useEventQuery } from "../commons/useNostrQuery";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
 import { useData } from "../DataContext";
-import { useApis } from "../Apis";
+import { useBackend } from "../BackendContext";
 import { KIND_SEARCH } from "../Data";
 import { findDocumentNodes } from "../documentMaterialization";
 import { buildTextNodesFromGraphNodes } from "../connections";
@@ -33,7 +33,7 @@ export function useSearchQuery(
   relays: Relays,
   nip50: boolean
 ): [Map<string, TextSeed>, boolean] {
-  const { relayPool } = useApis();
+  const backend = useBackend();
   const { contacts, user } = useData();
   const authors = contacts.keySeq().toSet().add(user.publicKey).toArray();
   const enabled = query !== "" && relays.length > 0;
@@ -61,7 +61,7 @@ export function useSearchQuery(
   ];
 
   const { events: preFilteredEvents, eose } = useEventQuery(
-    relayPool,
+    backend,
     searchFilters,
     {
       enabled,

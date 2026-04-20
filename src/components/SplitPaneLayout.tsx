@@ -226,7 +226,7 @@ export function PaneSettingsMenu({
             <div className="menu-item-text">Shortcuts</div>
           </Dropdown.Item>
         )}
-        {isLoggedIn && (
+        {isLoggedIn && logout && (
           <Dropdown.Item
             className="d-flex menu-item"
             onClick={logout}

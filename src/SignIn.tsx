@@ -204,6 +204,9 @@ export function SignInModal(): JSX.Element {
     withExtension: boolean;
     key: string | PublicKey;
   }): void => {
+    if (!login || !loginWithExtension) {
+      return;
+    }
     const preLoginPlan = createPlan();
 
     const user = withExtension

@@ -15,7 +15,9 @@ export function FilesystemWorkspaceLoader(): null {
       return;
     }
     // eslint-disable-next-line no-console
-    console.log(`[filesystem] injecting ${events.length} events into DocumentStore`);
+    console.log(
+      `[filesystem] injecting ${events.length} events into DocumentStore`
+    );
     addEvents(
       ImmutableMap<string, Event | UnsignedEvent>(
         events.map(

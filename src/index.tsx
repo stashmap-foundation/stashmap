@@ -9,6 +9,7 @@ import "./Workspace.scss";
 import "./App.css";
 import { App } from "./App";
 import { FilesystemBackendProvider } from "./FilesystemBackendProvider";
+import { FilesystemIdentityProvider } from "./FilesystemIdentityProvider";
 import { NostrAuthContextProvider } from "./NostrAuthContext";
 import { NostrBackendProvider } from "./NostrBackendProvider";
 import { NostrProvider } from "./NostrProvider";
@@ -41,15 +42,22 @@ async function bootstrap(): Promise<void> {
   const Backend = isFilesystemModeActive()
     ? FilesystemBackendProvider
     : NostrBackendProvider;
+  const Identity = isFilesystemModeActive()
+    ? FilesystemIdentityProvider
+    : (props: { children: React.ReactNode }) => (
+        <NostrAuthContextProvider defaultRelayUrls={defaultRelayUrls}>
+          {props.children}
+        </NostrAuthContextProvider>
+      );
   createRoot(root).render(
     <Router>
       <NostrProvider apis={{ fileStore: createFileStore() }}>
         <Backend>
-          <NostrAuthContextProvider defaultRelayUrls={defaultRelayUrls}>
+          <Identity>
             <UserRelayContextProvider>
               <App />
             </UserRelayContextProvider>
-          </NostrAuthContextProvider>
+          </Identity>
         </Backend>
       </NostrProvider>
     </Router>

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { getPublicKey } from "nostr-tools";
 import { hexToBytes } from "@noble/hashes/utils";
 import { DEFAULT_RELAYS } from "./nostr";
@@ -7,20 +7,17 @@ import { UNAUTHENTICATED_USER_PK } from "./AppState";
 import { sanitizeRelays } from "./relays";
 import { clearDatabase } from "./indexedDB";
 
-type Context = {
+type IdentityContextValue = {
   user: User | undefined;
-  setUser: (user: User | undefined) => void;
+  login?: (privateKey: string) => User;
+  loginWithExtension?: (publicKey: PublicKey) => User;
+  logout?: () => Promise<void>;
   defaultRelays: Relays;
 };
 
-const NostrAuthContext = React.createContext<Context | undefined>(undefined);
-
-function getPublicKeyFromContext(context: Context): PublicKey | undefined {
-  if (!context.user) {
-    return undefined;
-  }
-  return context.user.publicKey;
-}
+export const NostrAuthContext = React.createContext<
+  IdentityContextValue | undefined
+>(undefined);
 
 export function isUserLoggedInWithSeed(user: User): user is KeyPair {
   return (user as KeyPair).privateKey !== undefined;
@@ -68,56 +65,30 @@ function userFromPrivateKey(privateKey: string): User {
   };
 }
 
-export function useLogin(): (privateKey: string) => User {
+export function useLogin(): ((privateKey: string) => User) | undefined {
   const context = React.useContext(NostrAuthContext);
-  const { fileStore } = useApis();
-  const { setLocalStorage } = fileStore;
   if (!context) {
     throw new Error("NostrAuthContext missing");
   }
-  return (privateKey) => {
-    setLocalStorage("privateKey", privateKey);
-    const user = userFromPrivateKey(privateKey);
-    context.setUser(user);
-    return user;
-  };
+  return context.login;
 }
 
-export function useLoginWithExtension(): (publicKey: PublicKey) => User {
+export function useLoginWithExtension():
+  | ((publicKey: PublicKey) => User)
+  | undefined {
   const context = React.useContext(NostrAuthContext);
-  const { fileStore } = useApis();
-  const { setLocalStorage } = fileStore;
   if (!context) {
     throw new Error("NostrAuthContext missing");
   }
-  return (publicKey) => {
-    setLocalStorage("publicKey", publicKey);
-    const user = { publicKey };
-    context.setUser(user);
-    return user;
-  };
+  return context.loginWithExtension;
 }
 
-export function useLogout(): () => void {
+export function useLogout(): (() => Promise<void>) | undefined {
   const context = React.useContext(NostrAuthContext);
-  const { fileStore } = useApis();
-  const { deleteLocalStorage } = fileStore;
   if (!context) {
     throw new Error("NostrAuthContext missing");
   }
-
-  return async () => {
-    const publicKey = getPublicKeyFromContext(context);
-    if (publicKey) {
-      deleteLocalStorage(publicKey);
-    }
-    deleteLocalStorage("privateKey");
-    deleteLocalStorage("publicKey");
-    context.setUser(undefined);
-    await clearDatabase();
-    window.history.replaceState(null, "", "/");
-    window.location.reload();
-  };
+  return context.logout;
 }
 
 export function NostrAuthContextProvider({
@@ -133,7 +104,6 @@ export function NostrAuthContextProvider({
     privKeyFromStorage !== null
       ? userFromPrivateKey(privKeyFromStorage)
       : undefined;
-  // when logging in with an extension, the publicKey is stored in local storage
   const pubKeyFromStorage = fileStore.getLocalStorage("publicKey");
   const userWithPubkeyFromStorage =
     pubKeyFromStorage !== null
@@ -144,20 +114,46 @@ export function NostrAuthContextProvider({
   );
   const relays = defaultRelayUrls
     ? sanitizeRelays(
-        defaultRelayUrls?.map((url) => {
-          return { url, read: true, write: true };
-        })
+        defaultRelayUrls.map((url) => ({ url, read: true, write: true }))
       )
     : DEFAULT_RELAYS;
 
+  const value = useMemo<IdentityContextValue>(() => {
+    const login = (privateKey: string): User => {
+      fileStore.setLocalStorage("privateKey", privateKey);
+      const nextUser = userFromPrivateKey(privateKey);
+      setUser(nextUser);
+      return nextUser;
+    };
+    const loginWithExtension = (publicKey: PublicKey): User => {
+      fileStore.setLocalStorage("publicKey", publicKey);
+      const nextUser = { publicKey };
+      setUser(nextUser);
+      return nextUser;
+    };
+    const logout = async (): Promise<void> => {
+      const publicKey = user?.publicKey;
+      if (publicKey) {
+        fileStore.deleteLocalStorage(publicKey);
+      }
+      fileStore.deleteLocalStorage("privateKey");
+      fileStore.deleteLocalStorage("publicKey");
+      setUser(undefined);
+      await clearDatabase();
+      window.history.replaceState(null, "", "/");
+      window.location.reload();
+    };
+    return {
+      user,
+      login,
+      loginWithExtension,
+      logout,
+      defaultRelays: relays,
+    };
+  }, [user, relays, fileStore]);
+
   return (
-    <NostrAuthContext.Provider
-      value={{
-        setUser,
-        user,
-        defaultRelays: relays,
-      }}
-    >
+    <NostrAuthContext.Provider value={value}>
       {children}
     </NostrAuthContext.Provider>
   );

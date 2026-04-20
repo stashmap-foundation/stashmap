@@ -157,8 +157,15 @@ function VirtuosoForColumn({
     }
   }, [location]);
 
+  const handledScrollToIdRef = useRef<string | undefined>(undefined);
+
   useEffect(() => {
     if (!scrollToId || !virtuosoRef.current) {
+      // eslint-disable-next-line functional/immutable-data
+      handledScrollToIdRef.current = undefined;
+      return;
+    }
+    if (handledScrollToIdRef.current === scrollToId) {
       return;
     }
     const index = nodes.findIndex(
@@ -172,6 +179,8 @@ function VirtuosoForColumn({
         align: "center",
         behavior: "auto",
       });
+      // eslint-disable-next-line functional/immutable-data
+      handledScrollToIdRef.current = scrollToId;
     }
   }, [data, nodes, scrollToId]);
 

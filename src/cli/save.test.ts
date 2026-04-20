@@ -787,6 +787,51 @@ test("save still treats prefixed whole-line ref-style link as ref node", async (
   expect(third.changed_paths).toEqual([]);
 });
 
+test("save treats ref-style link with bracketed text as ref node", async () => {
+  const workspaceDir = makeTempDir();
+  const profilePath = writeProfile(workspaceDir, {
+    pubkey: "a".repeat(64),
+    workspace_dir: ".",
+    relays: [],
+  });
+  const documentPath = path.join(workspaceDir, "bracketed-ref.md");
+  fs.writeFileSync(documentPath, "# Project\n- target\n");
+
+  await runSaveCommand(["--config", profilePath]);
+
+  const firstSave = fs.readFileSync(documentPath, "utf8");
+  const targetLine = extractLine(firstSave, "- target <!-- id:");
+  const idMatch = targetLine.match(/id:(\S+)/);
+  if (!idMatch?.[1]) {
+    throw new Error("missing target id");
+  }
+  const targetId = idMatch[1];
+
+  const linkedText = `Kant […] took the argument (p. 43)`;
+  fs.writeFileSync(
+    documentPath,
+    firstSave.replace(
+      `${targetLine}\n`,
+      `${targetLine}\n- [${linkedText}](#${targetId})\n`
+    )
+  );
+
+  const secondResult = await runSaveCommand(["--config", profilePath]);
+  if ("help" in secondResult) {
+    throw new Error("unexpected help");
+  }
+
+  const secondSave = fs.readFileSync(documentPath, "utf8");
+  const linkedLine = extractLine(secondSave, `- [${linkedText}](#${targetId})`);
+  expect(linkedLine).toBe(`- [${linkedText}](#${targetId})`);
+
+  const third = await runSaveCommand(["--config", profilePath]);
+  if ("help" in third) {
+    throw new Error("unexpected help");
+  }
+  expect(third.changed_paths).toEqual([]);
+});
+
 test("save kitchen-sink idempotency for inline formatting", async () => {
   const workspaceDir = makeTempDir();
   const profilePath = writeProfile(workspaceDir, {

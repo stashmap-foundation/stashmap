@@ -11,7 +11,6 @@ markdown.use(markdownItFrontMatter, () => undefined);
 
 const ID_COMMENT_RE = /^<!--\s+id:(\S+)(.*?)-->$/;
 const ATTR_RE = /(\w+)="([^"]*)"/g;
-const REF_LINK_RE = /^\[([^\]]*)\]\(#([^)]+)\)$/;
 
 const RELEVANCE_CHARS: Record<string, Relevance> = {
   "!": "relevant",
@@ -117,17 +116,60 @@ function stripTrailingHtmlComment(
     : content;
 }
 
+function isIdComment(token: Token): boolean {
+  return (
+    token.type === "html_inline" && ID_COMMENT_RE.test(token.content.trim())
+  );
+}
+
 function extractCommentAttrs(inline: Token): ParsedComment | undefined {
   if (!inline.children) {
     return undefined;
   }
-  const htmlInline = inline.children.find(
-    (c) => c.type === "html_inline" && ID_COMMENT_RE.test(c.content.trim())
-  );
+  const htmlInline = inline.children.find(isIdComment);
   if (!htmlInline) {
     return undefined;
   }
   return parseIdComment(htmlInline.content);
+}
+
+function childrenToText(children: readonly Token[]): string {
+  return children
+    .map((c) => {
+      if (c.type === "softbreak" || c.type === "hardbreak") return " ";
+      if (c.type === "code_inline") return `\`${c.content}\``;
+      return c.content;
+    })
+    .join("");
+}
+
+function extractRefLink(
+  children: readonly Token[]
+): { prefixSource: string; text: string; linkHref: string } | undefined {
+  const tokens = children.filter((c) => !isIdComment(c));
+  const openIdx = tokens.findIndex((c) => c.type === "link_open");
+  if (openIdx < 0) return undefined;
+  const closeIdx = tokens.findIndex(
+    (c, i) => i > openIdx && c.type === "link_close"
+  );
+  if (closeIdx < 0) return undefined;
+
+  const href = tokens[openIdx].attrGet("href");
+  if (!href || !href.startsWith("#")) return undefined;
+
+  const trailing = tokens.slice(closeIdx + 1);
+  const trailingIsBlank = trailing.every(
+    (c) => c.type === "text" && c.content.trim() === ""
+  );
+  if (!trailingIsBlank) return undefined;
+
+  const leading = tokens.slice(0, openIdx);
+  const prefixSource = childrenToText(leading);
+  if (prefixSource.replace(PREFIX_RE, "").trim() !== "") return undefined;
+
+  const inner = tokens.slice(openIdx + 1, closeIdx);
+  const text = childrenToText(inner).replace(/\n/g, " ").trim();
+  return { prefixSource, text, linkHref: href.slice(1) };
 }
 
 function extractPrefixMarkers(text: string): {
@@ -175,24 +217,23 @@ function extractInlineContent(inline: Token): {
       argument,
     };
   }
-  const commentChild = inline.children.find(
-    (c) => c.type === "html_inline" && ID_COMMENT_RE.test(c.content.trim())
-  );
+  const refLink = extractRefLink(inline.children);
+  if (refLink) {
+    const { relevance, argument } = extractPrefixMarkers(refLink.prefixSource);
+    return {
+      text: refLink.text,
+      linkHref: refLink.linkHref,
+      relevance,
+      argument,
+    };
+  }
+  const commentChild = inline.children.find(isIdComment);
   const stripped = stripTrailingHtmlComment(
     inline.content,
     commentChild?.content
   );
   const raw = stripped.replace(/\n/g, " ").trim();
   const { cleanText, relevance, argument } = extractPrefixMarkers(raw);
-  const refMatch = cleanText.match(REF_LINK_RE);
-  if (refMatch) {
-    return {
-      text: refMatch[1],
-      linkHref: refMatch[2],
-      relevance,
-      argument,
-    };
-  }
   return {
     text: cleanText,
     relevance,

@@ -91,6 +91,21 @@ test("Markdown upload persists imported tree structure", async () => {
   ]);
 });
 
+test("Markdown parser extracts ref link whose text contains brackets", () => {
+  const targetId = "abc123_def456";
+  const linkedText = `Kant […] took the argument (p. 43)`;
+  const parsed = parseMarkdownHierarchy(`- [${linkedText}](#${targetId})\n`);
+
+  expect(parsed).toEqual([
+    {
+      text: linkedText,
+      blockKind: "list_item",
+      children: [],
+      linkHref: targetId,
+    },
+  ]);
+});
+
 test("Markdown parser preserves list nesting and strips list markers", () => {
   const parsed = parseMarkdownHierarchy(`
 - Parent

@@ -8,11 +8,16 @@ import "./assets/fonts/nostr/css/nostr.css";
 import "./Workspace.scss";
 import "./App.css";
 import { App } from "./App";
+import { FilesystemBackendProvider } from "./FilesystemBackendProvider";
 import { NostrAuthContextProvider } from "./NostrAuthContext";
 import { NostrBackendProvider } from "./NostrBackendProvider";
 import { NostrProvider } from "./NostrProvider";
 import { UserRelayContextProvider } from "./UserRelayContext";
 import { shouldUseHashRouter } from "./runtimeEnvironment";
+import {
+  isFilesystemModeActive,
+  loadFilesystemWorkspaceBeforeReact,
+} from "./filesystemBootstrap";
 
 const defaultRelayUrls = process.env.DEFAULT_RELAYS?.split(",");
 
@@ -27,21 +32,30 @@ function createFileStore(): LocalStorage {
 
 const Router = shouldUseHashRouter() ? HashRouter : BrowserRouter;
 
-const root = document.getElementById("root");
-if (root !== null) {
+async function bootstrap(): Promise<void> {
+  await loadFilesystemWorkspaceBeforeReact();
+  const root = document.getElementById("root");
+  if (root === null) {
+    return;
+  }
+  const Backend = isFilesystemModeActive()
+    ? FilesystemBackendProvider
+    : NostrBackendProvider;
   createRoot(root).render(
     <Router>
       <NostrProvider apis={{ fileStore: createFileStore() }}>
-        <NostrBackendProvider>
+        <Backend>
           <NostrAuthContextProvider defaultRelayUrls={defaultRelayUrls}>
             <UserRelayContextProvider>
               <App />
             </UserRelayContextProvider>
           </NostrAuthContextProvider>
-        </NostrBackendProvider>
+        </Backend>
       </NostrProvider>
     </Router>
   );
 }
+
+bootstrap();
 
 serviceWorker.unregister();

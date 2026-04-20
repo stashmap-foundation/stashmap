@@ -1,8 +1,65 @@
-const { app, BrowserWindow, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, shell } = require("electron");
+const fs = require("fs");
+const os = require("os");
 const path = require("path");
 
 const devServerUrl = process.env.ELECTRON_START_URL;
 const isDev = !!devServerUrl;
+
+function resolveProfilePath() {
+  if (process.env.KNOWSTR_PROFILE) {
+    return path.resolve(process.env.KNOWSTR_PROFILE);
+  }
+  if (process.env.KNOWSTR_HOME) {
+    return path.join(path.resolve(process.env.KNOWSTR_HOME), "profile.json");
+  }
+  if (process.env.KNOWSTR_WORKSPACE) {
+    return path.join(
+      path.resolve(process.env.KNOWSTR_WORKSPACE),
+      ".knowstr",
+      "profile.json"
+    );
+  }
+  return path.join(os.homedir(), ".knowstr", "profile.json");
+}
+
+function readProfile() {
+  const profilePath = resolveProfilePath();
+  if (!fs.existsSync(profilePath)) {
+    throw new Error(
+      `Missing Knowstr profile: ${profilePath}. Set KNOWSTR_PROFILE, KNOWSTR_HOME, or KNOWSTR_WORKSPACE to point at your workspace.`
+    );
+  }
+  const raw = fs.readFileSync(profilePath, "utf8");
+  const parsed = JSON.parse(raw);
+  const agentRoot =
+    path.basename(path.dirname(profilePath)) === ".knowstr"
+      ? path.dirname(path.dirname(profilePath))
+      : path.dirname(profilePath);
+  const workspaceDir = parsed.workspace_dir
+    ? path.resolve(agentRoot, parsed.workspace_dir)
+    : agentRoot;
+  return {
+    pubkey: parsed.pubkey,
+    workspaceDir,
+    profilePath,
+  };
+}
+
+async function loadWorkspace() {
+  const profile = readProfile();
+  // eslint-disable-next-line global-require, import/no-unresolved
+  const { loadWorkspaceAsEvents } = require("../dist/core/workspaceBackend");
+  const events = await loadWorkspaceAsEvents({
+    pubkey: profile.pubkey,
+    workspaceDir: profile.workspaceDir,
+  });
+  return {
+    pubkey: profile.pubkey,
+    workspaceDir: profile.workspaceDir,
+    events,
+  };
+}
 
 function createWindow() {
   const window = new BrowserWindow({
@@ -54,6 +111,8 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  ipcMain.handle("workspace:load", async () => loadWorkspace());
+
   createWindow();
 
   app.on("activate", () => {

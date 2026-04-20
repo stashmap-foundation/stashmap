@@ -1,6 +1,17 @@
+import { UnsignedEvent } from "nostr-tools";
+
+export type DesktopWorkspaceLoad = {
+  pubkey: string;
+  workspaceDir: string;
+  events: UnsignedEvent[];
+};
+
 export type DesktopShellBridge = {
   isElectron: boolean;
   platform?: string;
+  workspace?: {
+    load: () => Promise<DesktopWorkspaceLoad>;
+  };
 };
 
 export function getDesktopBridgeFromWindow(source: {
@@ -9,7 +20,7 @@ export function getDesktopBridgeFromWindow(source: {
   return source.knowstrDesktop;
 }
 
-function getDesktopBridge(): DesktopShellBridge | undefined {
+export function getDesktopBridge(): DesktopShellBridge | undefined {
   return getDesktopBridgeFromWindow(window);
 }
 

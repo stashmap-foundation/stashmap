@@ -11,6 +11,8 @@ import {
 import { DataContextProvider, MergeKnowledgeDB } from "./DataContext";
 import { useApis } from "./Apis";
 import { useBackend } from "./BackendContext";
+import { FilesystemWorkspaceLoader } from "./FilesystemWorkspaceLoader";
+import { isFilesystemModeActive } from "./filesystemBootstrap";
 import { PlanningContextProvider, replaceUnauthenticatedUser } from "./planner";
 import { useUserRelayContext } from "./UserRelayContext";
 import { flattenRelays, usePreloadRelays } from "./relays";
@@ -395,18 +397,21 @@ function Data({ user, children }: DataProps): JSX.Element {
       panes={panes}
     >
       <DocumentStoreProvider
-        db={db || null}
+        db={isFilesystemModeActive() ? null : db || null}
         unpublishedEvents={newEventsAndPublishResults.unsignedEvents}
       >
-        <PermanentDocumentSyncBridge
-          db={db}
-          myself={myPublicKey}
-          contacts={contacts}
-          extraAuthors={extraAuthors}
-          defaultRelays={defaultRelays}
-          userRelays={userRelays}
-          contactsRelays={contactsRelays}
-        />
+        <FilesystemWorkspaceLoader />
+        {!isFilesystemModeActive() && (
+          <PermanentDocumentSyncBridge
+            db={db}
+            myself={myPublicKey}
+            contacts={contacts}
+            extraAuthors={extraAuthors}
+            defaultRelays={defaultRelays}
+            userRelays={userRelays}
+            contactsRelays={contactsRelays}
+          />
+        )}
         <MergeKnowledgeDB>
           <PlanningContextProvider
             setPublishEvents={setNewEventsAndPublishResults}

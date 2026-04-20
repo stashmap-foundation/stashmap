@@ -167,6 +167,82 @@ NostrProvider
 
 ---
 
+### Phase 2 — Step 4a: `loadWorkspaceAsEvents` (pure Node helper)
+
+**Scope:** Build the smallest slice of the filesystem backend — a pure Node function that reads a workspace directory and returns unsigned Nostr events, composing two existing helpers (`scanWorkspaceDocuments` + `buildDocumentEventFromMarkdownTree`). No IPC, no Electron, no renderer. Just a library function with a jest test against a temp directory. This is what `Backend.subscribe` will emit on first load.
+
+**Key finding from investigation:** The pure helpers (`parseWorkspaceDocumentRoots`, `buildDocumentEventFromMarkdownTree`, `extractMarkdownImportPayload`, `parseDocumentEvent`) are already isomorphic. Only `scanWorkspaceDocuments`/`saveEditedWorkspaceDocuments` do fs I/O, which is fine for main-process code. We just need to compose them into a `Backend`-shaped load call.
+
+**Design:**
+
+New file `src/core/workspaceBackend.ts`:
+- `loadWorkspaceAsEvents(profile: WorkspaceSaveProfile) => Promise<ReadonlyArray<UnsignedEvent>>` — composes `scanWorkspaceDocuments` + `buildDocumentEventFromMarkdownTree` into one call. Attaches `frontMatter` to the root tree before building (mirrors `normalizeWorkspaceDocument` in `workspaceSave.ts`).
+
+**Tests** (node jest env, using `fs.mkdtempSync` pattern from `src/cli/save.test.ts`):
+
+New file `src/core/workspaceBackend.test.ts`:
+- [x] Empty workspace → empty array of events.
+- [x] One markdown file with `# Title\n- a\n- b` → one `UnsignedEvent` with correct `pubkey`.
+- [x] Multiple markdown files → matching number of events.
+- [x] `.knowstrignore` excluded files not returned.
+
+**Implementation:**
+- [x] Write failing tests.
+- [x] Create `src/core/workspaceBackend.ts`.
+- [x] Run `npm run typescript`.
+- [x] Run `npm run lint`.
+- [x] Run `npx jest --no-coverage src/core/workspaceBackend.test.ts`.
+- [x] Run full test suite (63 suites, 733 tests pass).
+
+**Non-goals for this sub-step:**
+- Publish/write path (step 4b).
+- File watcher (step 4c).
+- Electron IPC (step 4d).
+- Renderer provider (step 4e).
+- Folder picker / app wiring (step 4f).
+
+---
+
+### Phase 2 — Step 4b: Read-only filesystem demo (Electron end-to-end)
+
+**Scope:** Smallest end-to-end slice that shows a real workspace rendering in the Electron app. Reuses the Step 4a `loadWorkspaceAsEvents` helper. No publish, no watcher, no folder picker yet — workspace location chosen via env var.
+
+**What shipped:**
+
+- `package.json` — `desktop:dev` and `desktop:build` now run `npm run build:cli` first, so `dist/core/workspaceBackend.js` is available for the Electron main process to `require`.
+- `electron/main.js` — resolves profile via `KNOWSTR_PROFILE` / `KNOWSTR_HOME` / `KNOWSTR_WORKSPACE` env vars (fallback `~/.knowstr/profile.json`), registers `workspace:load` IPC handler that returns `{pubkey, workspaceDir, events}` by calling the compiled `loadWorkspaceAsEvents`.
+- `electron/preload.js` — exposes `window.knowstrDesktop.workspace.load() → Promise<{pubkey, workspaceDir, events}>`.
+- `src/runtimeEnvironment.ts` — typed the new bridge surface (`DesktopWorkspaceLoad`, `DesktopShellBridge.workspace`).
+- `src/filesystemBootstrap.ts` — module-scoped event stash + `loadFilesystemWorkspaceBeforeReact()` that runs before React mounts: calls IPC, writes `publicKey` into localStorage (so `NostrAuthContextProvider` auto-logs-in on read), stashes events.
+- `src/FilesystemWorkspaceLoader.tsx` — component mounted inside `DocumentStoreProvider`. On mount, consumes stashed events and calls `useDocumentStore().addEvents`.
+- `src/Data.tsx` — mounts `<FilesystemWorkspaceLoader />` as a sibling of `<PermanentDocumentSyncBridge />` inside `<DocumentStoreProvider>`. No-op outside Electron since the stash is empty.
+- `src/index.tsx` — `bootstrap()` awaits the filesystem load before `createRoot().render()`.
+
+**How to try it:**
+
+```
+KNOWSTR_WORKSPACE=/path/to/test/workspace npm run desktop:dev
+```
+
+(Also accepts `KNOWSTR_HOME` = the `.knowstr` dir, or `KNOWSTR_PROFILE` = the direct path to `profile.json`.)
+
+**Known gaps (deferred to later sub-steps):**
+- No publish yet — editing will fail to persist (step 4c).
+- No file watcher — agent edits to markdown require app restart (step 4d).
+- No folder picker — workspace path from env var only (step 4f).
+- `permanentSync` still starts (but no-ops when no relays are configured; if `relays` is non-empty in profile.json, it'll try to connect).
+- Nostr publish is still the path if anything does publish — filesystem mode should route `backend.publish` to the filesystem, not Nostr (step 4c).
+
+**Verification:**
+- [x] `dist/core/workspaceBackend.js` produced by `npm run build:cli`.
+- [x] `node -e "require('./dist/core/workspaceBackend').loadWorkspaceAsEvents"` resolves a function.
+- [x] `npm run typescript` clean.
+- [x] `npm run lint` clean (one pre-existing "React unused" warning).
+- [x] Full test suite: 63 suites, 733 tests pass.
+- [ ] Manual: `KNOWSTR_WORKSPACE=... npm run desktop:dev` opens Electron, logs in, renders the workspace.
+
+---
+
 ### Phase 1: Electron wrapper with current Nostr backend
 
 - [x] Add Electron app scaffolding.

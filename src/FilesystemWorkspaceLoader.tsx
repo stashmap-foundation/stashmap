@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { Map as ImmutableMap } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
 import { useDocumentStore } from "./DocumentStore";

@@ -7,8 +7,8 @@ test("App renders a normalized workspace as a tree", async () => {
   write(
     path,
     "holidays.md",
-    `# Holiday Destinations
-
+    `
+# Holiday Destinations
 - Spain
 - France
 `

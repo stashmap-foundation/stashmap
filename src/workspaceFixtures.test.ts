@@ -26,8 +26,8 @@ test("knowstrInit + write + knowstrSave assigns ids and normalizes markdown", as
   write(
     workspaceDir,
     "hello.md",
-    `# Holiday Destinations
-
+    `
+# Holiday Destinations
 - Spain
 - France
 `
@@ -39,7 +39,8 @@ test("knowstrInit + write + knowstrSave assigns ids and normalizes markdown", as
   expectMarkdown(
     workspaceDir,
     "hello.md",
-    `# Holiday Destinations <!-- id:... -->
+    `
+# Holiday Destinations <!-- id:... -->
 
 - Spain <!-- id:... -->
 - France <!-- id:... -->

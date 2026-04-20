@@ -1,76 +1,55 @@
 /** @jest-environment node */
 
 import fs from "fs";
-import os from "os";
 import path from "path";
-import { runSaveCommand } from "./save";
-
-function makeTempDir(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-save-"));
-}
-
-function writeProfile(
-  workspaceDir: string,
-  profile: Record<string, unknown>
-): string {
-  const knowstrHome = path.join(workspaceDir, ".knowstr");
-  const profilePath = path.join(knowstrHome, "profile.json");
-  fs.mkdirSync(knowstrHome, { recursive: true });
-  fs.writeFileSync(profilePath, `${JSON.stringify(profile, null, 2)}\n`);
-  return profilePath;
-}
-
-function extractLine(content: string, pattern: string): string {
-  const line = content
-    .split("\n")
-    .find((candidate) => candidate.includes(pattern));
-  if (!line) {
-    throw new Error(`missing line matching ${pattern}`);
-  }
-  return line;
-}
+import {
+  expectMarkdown,
+  knowstrInit,
+  knowstrSave,
+  readNodeId,
+  write,
+} from "../testFixtures/workspace";
 
 test("save assigns knowstr_doc_id and node ids in place", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const notesDir = path.join(workspaceDir, "notes", "nested");
-  fs.mkdirSync(notesDir, { recursive: true });
-  const documentPath = path.join(notesDir, "project.md");
-  fs.writeFileSync(documentPath, "# Project\n- alpha\n- beta\n");
-
-  const result = await runSaveCommand(["--config", profilePath]);
-
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-
-  expect(result.changed_paths).toEqual([documentPath]);
-
-  const savedContent = fs.readFileSync(documentPath, "utf8");
-  expect(savedContent).toMatch(/^---\nknowstr_doc_id:\s.+\n/);
-  expect(savedContent).toMatch(/\n---\n\n# Project /);
-  expect(savedContent).toContain("# Project <!-- id:");
-  expect(savedContent).toContain("- alpha <!-- id:");
-  expect(savedContent).toContain("- beta <!-- id:");
-  expect(path.relative(workspaceDir, documentPath)).toBe(
-    "notes/nested/project.md"
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "notes/nested/project.md",
+    `
+# Project
+- alpha
+- beta
+`
   );
+
+  const result = await knowstrSave(workspaceDir);
+  expect(result.changed_paths).toEqual([
+    path.join(workspaceDir, "notes/nested/project.md"),
+  ]);
+
+  expectMarkdown(
+    workspaceDir,
+    "notes/nested/project.md",
+    `
+# Project <!-- id:... -->
+
+- alpha <!-- id:... -->
+- beta <!-- id:... -->
+`
+  );
+
+  const raw = fs.readFileSync(
+    path.join(workspaceDir, "notes/nested/project.md"),
+    "utf8"
+  );
+  expect(raw).toMatch(/^---\nknowstr_doc_id:\s.+\n/u);
 });
 
 test("save preserves existing frontmatter and only adds knowstr_doc_id", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "doc.md");
-  fs.writeFileSync(
-    documentPath,
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "doc.md",
     `---
 title: "Doc"
 custom: yes
@@ -80,28 +59,28 @@ custom: yes
 `
   );
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
+  await knowstrSave(workspaceDir);
 
-  const savedContent = fs.readFileSync(documentPath, "utf8");
-  expect(savedContent).toContain('title: "Doc"');
-  expect(savedContent).toContain("custom: yes");
-  expect(savedContent).toContain("knowstr_doc_id:");
-  expect(savedContent).toContain("# Doc <!-- id:");
+  const raw = fs.readFileSync(path.join(workspaceDir, "doc.md"), "utf8");
+  expect(raw).toContain('title: "Doc"');
+  expect(raw).toContain("custom: yes");
+  expect(raw).toContain("knowstr_doc_id:");
+  expectMarkdown(
+    workspaceDir,
+    "doc.md",
+    `
+# Doc <!-- id:... -->
+
+- one <!-- id:... -->
+`
+  );
 });
 
 test("save inserts blank line after frontmatter and is idempotent", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "doc.md");
-  fs.writeFileSync(
-    documentPath,
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "doc.md",
     `---
 title: "Doc"
 ---
@@ -110,939 +89,629 @@ title: "Doc"
 `
   );
 
-  await runSaveCommand(["--config", profilePath]);
+  await knowstrSave(workspaceDir);
+  const raw = fs.readFileSync(path.join(workspaceDir, "doc.md"), "utf8");
+  expect(raw).toMatch(/\n---\n\n# /u);
 
-  const savedContent = fs.readFileSync(documentPath, "utf8");
-  expect(savedContent).toMatch(/\n---\n\n# /);
-
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
+  const second = await knowstrSave(workspaceDir);
   expect(second.changed_paths).toEqual([]);
 });
 
 test("save inserts blank lines around headings but not between siblings", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "blank-lines.md");
-  fs.writeFileSync(
-    documentPath,
-    "# Project\n## Section A\n- item 1\n- item 2\n## Section B\n1. step one\n"
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "blank-lines.md",
+    `
+# Project
+## Section A
+- item 1
+- item 2
+## Section B
+1. step one
+`
   );
 
-  await runSaveCommand(["--config", profilePath]);
+  await knowstrSave(workspaceDir);
 
-  const saved = fs.readFileSync(documentPath, "utf8");
-  const lines = saved.split("\n");
+  expectMarkdown(
+    workspaceDir,
+    "blank-lines.md",
+    `
+# Project <!-- id:... -->
 
-  const findIndex = (needle: string): number => {
-    const index = lines.findIndex((line) => line.includes(needle));
-    if (index === -1) {
-      throw new Error(`missing line containing ${needle}`);
-    }
-    return index;
-  };
+## Section A <!-- id:... -->
 
-  const sectionAIndex = findIndex("## Section A");
-  const item1Index = findIndex("- item 1 <!-- id:");
-  const item2Index = findIndex("- item 2 <!-- id:");
-  const sectionBIndex = findIndex("## Section B");
-  const stepOneIndex = findIndex("1. step one <!-- id:");
+- item 1 <!-- id:... -->
+- item 2 <!-- id:... -->
 
-  expect(lines[sectionAIndex - 1]).toBe("");
-  expect(lines[item1Index - 1]).toBe("");
-  expect(lines[sectionBIndex - 1]).toBe("");
-  expect(lines[stepOneIndex - 1]).toBe("");
-  expect(item2Index).toBe(item1Index + 1);
+## Section B <!-- id:... -->
 
-  lines.forEach((line, index) => {
-    if (index === 0) return;
-    expect(line === "" && lines[index - 1] === "").toBe(false);
-  });
+1. step one <!-- id:... -->
+`
+  );
 
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
+  const second = await knowstrSave(workspaceDir);
   expect(second.changed_paths).toEqual([]);
 });
 
 test("save is a no-op when nothing changed", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "doc.md");
-  fs.writeFileSync(documentPath, "# Doc\n- one\n");
+  const { path: workspaceDir } = knowstrInit();
+  write(workspaceDir, "doc.md", "# Doc\n- one\n");
 
-  await runSaveCommand(["--config", profilePath]);
-  const second = await runSaveCommand(["--config", profilePath]);
-
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-
+  await knowstrSave(workspaceDir);
+  const second = await knowstrSave(workspaceDir);
   expect(second.changed_paths).toEqual([]);
 });
 
 test("save allows moving a node from one document to another", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const docAPath = path.join(workspaceDir, "a.md");
-  const docBPath = path.join(workspaceDir, "b.md");
-  fs.writeFileSync(docAPath, "# Alpha\n- keep here\n- move me\n");
-  fs.writeFileSync(docBPath, "# Beta\n- keep there\n");
+  const { path: workspaceDir } = knowstrInit();
+  write(workspaceDir, "a.md", "# Alpha\n- keep here\n- move me\n");
+  write(workspaceDir, "b.md", "# Beta\n- keep there\n");
 
-  await runSaveCommand(["--config", profilePath]);
+  await knowstrSave(workspaceDir);
 
-  const docA = fs.readFileSync(docAPath, "utf8");
-  const docB = fs.readFileSync(docBPath, "utf8");
-  const movedLine = extractLine(docA, "move me");
-  const targetLine = extractLine(docB, "keep there");
+  const moveMeId = readNodeId(workspaceDir, "a.md", "- move me");
+  const targetId = readNodeId(workspaceDir, "b.md", "- keep there");
 
-  fs.writeFileSync(docAPath, docA.replace(`${movedLine}\n`, ""));
+  // Remove the `move me` line from a.md, and append it after `keep there` in b.md
+  const aAfterFirst = fs.readFileSync(path.join(workspaceDir, "a.md"), "utf8");
+  const moveLine = aAfterFirst
+    .split("\n")
+    .find((l) => l.includes("- move me")) as string;
   fs.writeFileSync(
-    docBPath,
-    docB.replace(`${targetLine}\n`, `${targetLine}\n${movedLine}\n`)
+    path.join(workspaceDir, "a.md"),
+    aAfterFirst.replace(`${moveLine}\n`, "")
+  );
+  const bAfterFirst = fs.readFileSync(path.join(workspaceDir, "b.md"), "utf8");
+  const targetLine = bAfterFirst
+    .split("\n")
+    .find((l) => l.includes("- keep there")) as string;
+  fs.writeFileSync(
+    path.join(workspaceDir, "b.md"),
+    bAfterFirst.replace(`${targetLine}\n`, `${targetLine}\n${moveLine}\n`)
   );
 
-  const result = await runSaveCommand(["--config", profilePath]);
+  await knowstrSave(workspaceDir);
 
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-
-  expect(fs.readFileSync(docAPath, "utf8")).not.toContain("move me");
-  expect(fs.readFileSync(docBPath, "utf8")).toContain("move me");
+  expect(readNodeId(workspaceDir, "b.md", "- move me")).toBe(moveMeId);
+  expect(readNodeId(workspaceDir, "b.md", "- keep there")).toBe(targetId);
+  const aAfter = fs.readFileSync(path.join(workspaceDir, "a.md"), "utf8");
+  expect(aAfter).not.toContain("move me");
 });
 
 test("save succeeds when a previously saved node id is removed", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "doc.md");
-  fs.writeFileSync(documentPath, "# Doc\n- keep\n- remove me\n");
+  const { path: workspaceDir } = knowstrInit();
+  write(workspaceDir, "doc.md", "# Doc\n- keep\n- remove me\n");
 
-  await runSaveCommand(["--config", profilePath]);
+  await knowstrSave(workspaceDir);
 
-  const saved = fs.readFileSync(documentPath, "utf8");
-  const removedLine = extractLine(saved, "remove me");
-  fs.writeFileSync(documentPath, saved.replace(`${removedLine}\n`, ""));
+  const firstSave = fs.readFileSync(path.join(workspaceDir, "doc.md"), "utf8");
+  const removeLine = firstSave
+    .split("\n")
+    .find((l) => l.includes("- remove me")) as string;
+  fs.writeFileSync(
+    path.join(workspaceDir, "doc.md"),
+    firstSave.replace(`${removeLine}\n`, "")
+  );
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-  const rewritten = fs.readFileSync(documentPath, "utf8");
-  expect(rewritten).not.toContain("remove me");
-  expect(rewritten).toContain("- keep <!-- id:");
+  await knowstrSave(workspaceDir);
+
+  expectMarkdown(
+    workspaceDir,
+    "doc.md",
+    `
+# Doc <!-- id:... -->
+
+- keep <!-- id:... -->
+`
+  );
 });
 
 test("save rejects duplicate node ids across documents", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
+  const { path: workspaceDir } = knowstrInit();
+  write(workspaceDir, "a.md", "# Alpha\n- item one\n");
+  write(workspaceDir, "b.md", "# Beta\n- item two\n");
+
+  await knowstrSave(workspaceDir);
+
+  const itemOneLine = fs
+    .readFileSync(path.join(workspaceDir, "a.md"), "utf8")
+    .split("\n")
+    .find((l) => l.includes("- item one")) as string;
+
+  fs.appendFileSync(path.join(workspaceDir, "b.md"), `${itemOneLine}\n`);
+
+  await expect(knowstrSave(workspaceDir)).rejects.toMatchObject({
+    message: expect.stringContaining("Workspace contains duplicate node ids"),
   });
-  const docAPath = path.join(workspaceDir, "a.md");
-  const docBPath = path.join(workspaceDir, "b.md");
-  fs.writeFileSync(docAPath, "# Alpha\n- item one\n");
-  fs.writeFileSync(docBPath, "# Beta\n- item two\n");
-
-  await runSaveCommand(["--config", profilePath]);
-
-  const docA = fs.readFileSync(docAPath, "utf8");
-  const docB = fs.readFileSync(docBPath, "utf8");
-  const itemOneLine = extractLine(docA, "item one");
-
-  fs.writeFileSync(docBPath, `${docB}${itemOneLine}\n`);
-
-  await expect(runSaveCommand(["--config", profilePath])).rejects.toMatchObject(
-    {
-      message: expect.stringContaining("Workspace contains duplicate node ids"),
-    }
-  );
 });
 
 test("save preserves heading levels", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "headings.md");
-  fs.writeFileSync(
-    documentPath,
-    "# Project\n## Section\n### Subsection\n- bullet under sub\n"
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "headings.md",
+    `
+# Project
+## Section
+### Subsection
+- bullet under sub
+`
   );
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-  expect(result.changed_paths).toEqual([documentPath]);
+  await knowstrSave(workspaceDir);
+  expectMarkdown(
+    workspaceDir,
+    "headings.md",
+    `
+# Project <!-- id:... -->
 
-  const saved = fs.readFileSync(documentPath, "utf8");
-  expect(saved).toContain("# Project <!-- id:");
-  expect(saved).toContain("## Section <!-- id:");
-  expect(saved).toContain("### Subsection <!-- id:");
-  expect(saved).toContain("- bullet under sub <!-- id:");
+## Section <!-- id:... -->
 
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
+### Subsection <!-- id:... -->
+
+- bullet under sub <!-- id:... -->
+`
+  );
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save preserves ordered lists", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "recipe.md");
-  fs.writeFileSync(documentPath, "# Recipe\n1. one\n2. two\n3. three\n");
+  const { path: workspaceDir } = knowstrInit();
+  write(workspaceDir, "recipe.md", "# Recipe\n1. one\n2. two\n3. three\n");
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-  expect(result.changed_paths).toEqual([documentPath]);
+  await knowstrSave(workspaceDir);
+  expectMarkdown(
+    workspaceDir,
+    "recipe.md",
+    `
+# Recipe <!-- id:... -->
 
-  const saved = fs.readFileSync(documentPath, "utf8");
-  expect(saved).toContain("1. one <!-- id:");
-  expect(saved).toContain("2. two <!-- id:");
-  expect(saved).toContain("3. three <!-- id:");
-
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
+1. one <!-- id:... -->
+2. two <!-- id:... -->
+3. three <!-- id:... -->
+`
+  );
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save preserves mixed structure with ordered items and nested bullets", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "mixed.md");
-  fs.writeFileSync(
-    documentPath,
-    "# Project\n## Steps\n1. first\n   - nested a\n   - nested b\n2. second\n"
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "mixed.md",
+    `
+# Project
+## Steps
+1. first
+   - nested a
+   - nested b
+2. second
+`
   );
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-  expect(result.changed_paths).toEqual([documentPath]);
+  await knowstrSave(workspaceDir);
+  expectMarkdown(
+    workspaceDir,
+    "mixed.md",
+    `
+# Project <!-- id:... -->
 
-  const saved = fs.readFileSync(documentPath, "utf8");
-  expect(saved).toContain("# Project <!-- id:");
-  expect(saved).toContain("## Steps <!-- id:");
-  expect(saved).toContain("1. first <!-- id:");
-  expect(saved).toContain("   - nested a <!-- id:");
-  expect(saved).toContain("   - nested b <!-- id:");
-  expect(saved).toContain("2. second <!-- id:");
+## Steps <!-- id:... -->
 
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
+1. first <!-- id:... -->
+   - nested a <!-- id:... -->
+   - nested b <!-- id:... -->
+2. second <!-- id:... -->
+`
+  );
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save preserves siblings under multiple headings", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "siblings.md");
-  fs.writeFileSync(
-    documentPath,
-    "# Project\n## Section A\n- one\n- two\n## Section B\n- three\n"
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "siblings.md",
+    `
+# Project
+## Section A
+- one
+- two
+## Section B
+- three
+`
   );
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-  expect(result.changed_paths).toEqual([documentPath]);
+  await knowstrSave(workspaceDir);
+  expectMarkdown(
+    workspaceDir,
+    "siblings.md",
+    `
+# Project <!-- id:... -->
 
-  const saved = fs.readFileSync(documentPath, "utf8");
-  expect(saved).toContain("## Section A <!-- id:");
-  expect(saved).toContain("## Section B <!-- id:");
-  expect(saved).toContain("- one <!-- id:");
-  expect(saved).toContain("- two <!-- id:");
-  expect(saved).toContain("- three <!-- id:");
+## Section A <!-- id:... -->
 
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
-});
+- one <!-- id:... -->
+- two <!-- id:... -->
 
-test("save preserves headings, ordered lists, and bullets end-to-end", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "kitchen-sink.md");
-  fs.writeFileSync(
-    documentPath,
-    [
-      "# Project",
-      "## Section",
-      "### Subsection",
-      "1. one",
-      "2. two",
-      "- bullet",
-      "",
-    ].join("\n")
+## Section B <!-- id:... -->
+
+- three <!-- id:... -->
+`
   );
-
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-  expect(result.changed_paths).toEqual([documentPath]);
-
-  const saved = fs.readFileSync(documentPath, "utf8");
-  expect(saved).toContain("# Project <!-- id:");
-  expect(saved).toContain("## Section <!-- id:");
-  expect(saved).toContain("### Subsection <!-- id:");
-  expect(saved).toContain("1. one <!-- id:");
-  expect(saved).toContain("2. two <!-- id:");
-  expect(saved).toContain("- bullet <!-- id:");
-
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save preserves ordered list numbers when preceded by bullet siblings", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "mixed-siblings.md");
-  fs.writeFileSync(
-    documentPath,
-    [
-      "# Topic",
-      "- intro bullet",
-      "37. first ordered",
-      "38. second ordered",
-      "39. third ordered",
-      "",
-    ].join("\n")
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "mixed-siblings.md",
+    `
+# Topic
+- intro bullet
+37. first ordered
+38. second ordered
+39. third ordered
+`
   );
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-  expect(result.changed_paths).toEqual([documentPath]);
+  await knowstrSave(workspaceDir);
+  expectMarkdown(
+    workspaceDir,
+    "mixed-siblings.md",
+    `
+# Topic <!-- id:... -->
 
-  const saved = fs.readFileSync(documentPath, "utf8");
-  expect(saved).toContain("- intro bullet <!-- id:");
-  expect(saved).toContain("37. first ordered <!-- id:");
-  expect(saved).toContain("38. second ordered <!-- id:");
-  expect(saved).toContain("39. third ordered <!-- id:");
-
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
+- intro bullet <!-- id:... -->
+37. first ordered <!-- id:... -->
+38. second ordered <!-- id:... -->
+39. third ordered <!-- id:... -->
+`
+  );
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save preserves inline code in bullet items", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "inline-code.md");
-  fs.writeFileSync(
-    documentPath,
-    "# Project\n- run `knowstr save` after editing\n- nothing fancy here\n"
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "inline-code.md",
+    `
+# Project
+- run \`knowstr save\` after editing
+- nothing fancy here
+`
   );
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-  expect(result.changed_paths).toEqual([documentPath]);
+  await knowstrSave(workspaceDir);
+  expectMarkdown(
+    workspaceDir,
+    "inline-code.md",
+    `
+# Project <!-- id:... -->
 
-  const saved = fs.readFileSync(documentPath, "utf8");
-  expect(saved).toContain("- run `knowstr save` after editing <!-- id:");
-  expect(saved).toContain("- nothing fancy here <!-- id:");
-
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
+- run \`knowstr save\` after editing <!-- id:... -->
+- nothing fancy here <!-- id:... -->
+`
+  );
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save preserves inline code in headings", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "heading-code.md");
-  fs.writeFileSync(
-    documentPath,
-    "# Using `knowstr`\n## The `save` command\n- sub\n"
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "heading-code.md",
+    `
+# Using \`knowstr\`
+## The \`save\` command
+- sub
+`
   );
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-  expect(result.changed_paths).toEqual([documentPath]);
+  await knowstrSave(workspaceDir);
+  expectMarkdown(
+    workspaceDir,
+    "heading-code.md",
+    `
+# Using \`knowstr\` <!-- id:... -->
 
-  const saved = fs.readFileSync(documentPath, "utf8");
-  expect(saved).toContain("# Using `knowstr` <!-- id:");
-  expect(saved).toContain("## The `save` command <!-- id:");
+## The \`save\` command <!-- id:... -->
 
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
+- sub <!-- id:... -->
+`
+  );
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save preserves backtick-wrapped link markdown literally", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "backtick-link.md");
-  fs.writeFileSync(
-    documentPath,
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "backtick-link.md",
     "# Project\n- to demo use `[Title](#abc)` syntax\n"
   );
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-  expect(result.changed_paths).toEqual([documentPath]);
+  await knowstrSave(workspaceDir);
+  expectMarkdown(
+    workspaceDir,
+    "backtick-link.md",
+    `
+# Project <!-- id:... -->
 
-  const saved = fs.readFileSync(documentPath, "utf8");
-  expect(saved).toContain("- to demo use `[Title](#abc)` syntax <!-- id:");
-
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
+- to demo use \`[Title](#abc)\` syntax <!-- id:... -->
+`
+  );
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save preserves inline code combined with prefix markers", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "prefix-code.md");
-  fs.writeFileSync(
-    documentPath,
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "prefix-code.md",
     "# Project\n- (!) see `foo.ts`\n- (?) maybe `bar`\n"
   );
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-  expect(result.changed_paths).toEqual([documentPath]);
+  await knowstrSave(workspaceDir);
+  expectMarkdown(
+    workspaceDir,
+    "prefix-code.md",
+    `
+# Project <!-- id:... -->
 
-  const saved = fs.readFileSync(documentPath, "utf8");
-  expect(saved).toContain("- (!) see `foo.ts` <!-- id:");
-  expect(saved).toContain("- (?) maybe `bar` <!-- id:");
-
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
+- (!) see \`foo.ts\` <!-- id:... -->
+- (?) maybe \`bar\` <!-- id:... -->
+`
+  );
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save round-trips combined prefix markers like (-!) and (-~)", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "combined-markers.md");
-  fs.writeFileSync(
-    documentPath,
-    "# Project\n- (-!) contra relevant\n- (-~) contra little\n- (+!) confirms relevant\n"
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "combined-markers.md",
+    `
+# Project
+- (-!) contra relevant
+- (-~) contra little
+- (+!) confirms relevant
+`
   );
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-  expect(result.changed_paths).toEqual([documentPath]);
+  await knowstrSave(workspaceDir);
+  expectMarkdown(
+    workspaceDir,
+    "combined-markers.md",
+    `
+# Project <!-- id:... -->
 
-  const saved = fs.readFileSync(documentPath, "utf8");
-  expect(saved).toContain("- (-!) contra relevant <!-- id:");
-  expect(saved).toContain("- (-~) contra little <!-- id:");
-  expect(saved).toContain("- (+!) confirms relevant <!-- id:");
-
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
+- (-!) contra relevant <!-- id:... -->
+- (-~) contra little <!-- id:... -->
+- (+!) confirms relevant <!-- id:... -->
+`
+  );
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save preserves bold and italic emphasis", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "emphasis.md");
-  fs.writeFileSync(
-    documentPath,
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "emphasis.md",
     "# Project\n- this is **bold** and *italic*\n"
   );
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-  expect(result.changed_paths).toEqual([documentPath]);
+  await knowstrSave(workspaceDir);
+  expectMarkdown(
+    workspaceDir,
+    "emphasis.md",
+    `
+# Project <!-- id:... -->
 
-  const saved = fs.readFileSync(documentPath, "utf8");
-  expect(saved).toContain("- this is **bold** and *italic* <!-- id:");
-
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
+- this is **bold** and *italic* <!-- id:... -->
+`
+  );
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save preserves non-ref external link markdown literally", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "external-link.md");
-  fs.writeFileSync(
-    documentPath,
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "external-link.md",
     "# Project\n- see [docs](https://example.com) for details\n"
   );
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-  expect(result.changed_paths).toEqual([documentPath]);
+  await knowstrSave(workspaceDir);
+  expectMarkdown(
+    workspaceDir,
+    "external-link.md",
+    `
+# Project <!-- id:... -->
 
-  const saved = fs.readFileSync(documentPath, "utf8");
-  expect(saved).toContain(
-    "- see [docs](https://example.com) for details <!-- id:"
+- see [docs](https://example.com) for details <!-- id:... -->
+`
   );
-
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save still treats whole-line ref-style link as ref node", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "ref-node.md");
-  fs.writeFileSync(documentPath, "# Project\n- target\n");
+  const { path: workspaceDir } = knowstrInit();
+  write(workspaceDir, "ref-node.md", "# Project\n- target\n");
 
-  await runSaveCommand(["--config", profilePath]);
+  await knowstrSave(workspaceDir);
+  const targetId = readNodeId(workspaceDir, "ref-node.md", "- target");
 
-  const firstSave = fs.readFileSync(documentPath, "utf8");
-  const targetLine = extractLine(firstSave, "- target <!-- id:");
-  const idMatch = targetLine.match(/id:(\S+)/);
-  if (!idMatch?.[1]) {
-    throw new Error("missing target id");
-  }
-  const targetId = idMatch[1];
-
+  const firstSave = fs.readFileSync(
+    path.join(workspaceDir, "ref-node.md"),
+    "utf8"
+  );
+  const targetLine = firstSave
+    .split("\n")
+    .find((l) => l.includes("- target <!-- id:")) as string;
   fs.writeFileSync(
-    documentPath,
+    path.join(workspaceDir, "ref-node.md"),
     firstSave.replace(
       `${targetLine}\n`,
       `${targetLine}\n- [Linked](#${targetId})\n`
     )
   );
 
-  const secondResult = await runSaveCommand(["--config", profilePath]);
-  if ("help" in secondResult) {
-    throw new Error("unexpected help");
-  }
+  await knowstrSave(workspaceDir);
 
-  const secondSave = fs.readFileSync(documentPath, "utf8");
-  expect(secondSave).toContain(`- [Linked](#${targetId})`);
-  const linkedLine = extractLine(secondSave, `- [Linked](#${targetId})`);
+  const second = fs.readFileSync(
+    path.join(workspaceDir, "ref-node.md"),
+    "utf8"
+  );
+  const linkedLine = second
+    .split("\n")
+    .find((l) => l.includes(`- [Linked](#${targetId})`)) as string;
   expect(linkedLine).toBe(`- [Linked](#${targetId})`);
-
-  const third = await runSaveCommand(["--config", profilePath]);
-  if ("help" in third) {
-    throw new Error("unexpected help");
-  }
-  expect(third.changed_paths).toEqual([]);
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save still treats prefixed whole-line ref-style link as ref node", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "prefixed-ref-node.md");
-  fs.writeFileSync(documentPath, "# Project\n- target\n");
+  const { path: workspaceDir } = knowstrInit();
+  write(workspaceDir, "prefixed-ref-node.md", "# Project\n- target\n");
 
-  await runSaveCommand(["--config", profilePath]);
+  await knowstrSave(workspaceDir);
+  const targetId = readNodeId(workspaceDir, "prefixed-ref-node.md", "- target");
 
-  const firstSave = fs.readFileSync(documentPath, "utf8");
-  const targetLine = extractLine(firstSave, "- target <!-- id:");
-  const idMatch = targetLine.match(/id:(\S+)/);
-  if (!idMatch?.[1]) {
-    throw new Error("missing target id");
-  }
-  const targetId = idMatch[1];
-
+  const firstSave = fs.readFileSync(
+    path.join(workspaceDir, "prefixed-ref-node.md"),
+    "utf8"
+  );
+  const targetLine = firstSave
+    .split("\n")
+    .find((l) => l.includes("- target <!-- id:")) as string;
   fs.writeFileSync(
-    documentPath,
+    path.join(workspaceDir, "prefixed-ref-node.md"),
     firstSave.replace(
       `${targetLine}\n`,
       `${targetLine}\n- (!) [Linked](#${targetId})\n`
     )
   );
 
-  const secondResult = await runSaveCommand(["--config", profilePath]);
-  if ("help" in secondResult) {
-    throw new Error("unexpected help");
-  }
+  await knowstrSave(workspaceDir);
 
-  const secondSave = fs.readFileSync(documentPath, "utf8");
-  expect(secondSave).toContain(`- (!) [Linked](#${targetId})`);
-  const linkedLine = extractLine(secondSave, `- (!) [Linked](#${targetId})`);
+  const second = fs.readFileSync(
+    path.join(workspaceDir, "prefixed-ref-node.md"),
+    "utf8"
+  );
+  const linkedLine = second
+    .split("\n")
+    .find((l) => l.includes(`- (!) [Linked](#${targetId})`)) as string;
   expect(linkedLine).toBe(`- (!) [Linked](#${targetId})`);
-
-  const third = await runSaveCommand(["--config", profilePath]);
-  if ("help" in third) {
-    throw new Error("unexpected help");
-  }
-  expect(third.changed_paths).toEqual([]);
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save treats ref-style link with bracketed text as ref node", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "bracketed-ref.md");
-  fs.writeFileSync(documentPath, "# Project\n- target\n");
+  const { path: workspaceDir } = knowstrInit();
+  write(workspaceDir, "bracketed-ref.md", "# Project\n- target\n");
 
-  await runSaveCommand(["--config", profilePath]);
+  await knowstrSave(workspaceDir);
+  const targetId = readNodeId(workspaceDir, "bracketed-ref.md", "- target");
 
-  const firstSave = fs.readFileSync(documentPath, "utf8");
-  const targetLine = extractLine(firstSave, "- target <!-- id:");
-  const idMatch = targetLine.match(/id:(\S+)/);
-  if (!idMatch?.[1]) {
-    throw new Error("missing target id");
-  }
-  const targetId = idMatch[1];
-
+  const firstSave = fs.readFileSync(
+    path.join(workspaceDir, "bracketed-ref.md"),
+    "utf8"
+  );
+  const targetLine = firstSave
+    .split("\n")
+    .find((l) => l.includes("- target <!-- id:")) as string;
   const linkedText = `Kant […] took the argument (p. 43)`;
   fs.writeFileSync(
-    documentPath,
+    path.join(workspaceDir, "bracketed-ref.md"),
     firstSave.replace(
       `${targetLine}\n`,
       `${targetLine}\n- [${linkedText}](#${targetId})\n`
     )
   );
 
-  const secondResult = await runSaveCommand(["--config", profilePath]);
-  if ("help" in secondResult) {
-    throw new Error("unexpected help");
-  }
+  await knowstrSave(workspaceDir);
 
-  const secondSave = fs.readFileSync(documentPath, "utf8");
-  const linkedLine = extractLine(secondSave, `- [${linkedText}](#${targetId})`);
+  const second = fs.readFileSync(
+    path.join(workspaceDir, "bracketed-ref.md"),
+    "utf8"
+  );
+  const linkedLine = second
+    .split("\n")
+    .find((l) => l.includes(`- [${linkedText}](#${targetId})`)) as string;
   expect(linkedLine).toBe(`- [${linkedText}](#${targetId})`);
-
-  const third = await runSaveCommand(["--config", profilePath]);
-  if ("help" in third) {
-    throw new Error("unexpected help");
-  }
-  expect(third.changed_paths).toEqual([]);
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save kitchen-sink idempotency for inline formatting", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "inline-kitchen-sink.md");
-  fs.writeFileSync(
-    documentPath,
-    [
-      "# Using `knowstr`",
-      "## The `save` command",
-      "1. run `knowstr save` then **verify**",
-      "2. check *output* carefully",
-      "- (!) see `foo.ts` for details",
-      "",
-    ].join("\n")
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "inline-kitchen-sink.md",
+    `
+# Using \`knowstr\`
+## The \`save\` command
+1. run \`knowstr save\` then **verify**
+2. check *output* carefully
+- (!) see \`foo.ts\` for details
+`
   );
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-  expect(result.changed_paths).toEqual([documentPath]);
+  await knowstrSave(workspaceDir);
+  expectMarkdown(
+    workspaceDir,
+    "inline-kitchen-sink.md",
+    `
+# Using \`knowstr\` <!-- id:... -->
 
-  const saved = fs.readFileSync(documentPath, "utf8");
-  expect(saved).toContain("# Using `knowstr` <!-- id:");
-  expect(saved).toContain("## The `save` command <!-- id:");
-  expect(saved).toContain("1. run `knowstr save` then **verify** <!-- id:");
-  expect(saved).toContain("2. check *output* carefully <!-- id:");
-  expect(saved).toContain("- (!) see `foo.ts` for details <!-- id:");
+## The \`save\` command <!-- id:... -->
 
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
-});
-
-test("save kitchen-sink blank-line layout around headings and chains", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "blank-kitchen-sink.md");
-  fs.writeFileSync(
-    documentPath,
-    [
-      "# Project",
-      "## Overview",
-      "- intro bullet",
-      "- another intro",
-      "## Steps",
-      "### Prep",
-      "1. prep one",
-      "2. prep two",
-      "## Followups",
-      "### Notes",
-      "- note one",
-      "",
-    ].join("\n")
+1. run \`knowstr save\` then **verify** <!-- id:... -->
+2. check *output* carefully <!-- id:... -->
+- (!) see \`foo.ts\` for details <!-- id:... -->
+`
   );
-
-  await runSaveCommand(["--config", profilePath]);
-
-  const saved = fs.readFileSync(documentPath, "utf8");
-  const lines = saved.split("\n");
-
-  const findIndex = (needle: string): number => {
-    const index = lines.findIndex((line) => line.includes(needle));
-    if (index === -1) {
-      throw new Error(`missing line containing ${needle}`);
-    }
-    return index;
-  };
-
-  const headingNeedles = [
-    "# Project",
-    "## Overview",
-    "## Steps",
-    "### Prep",
-    "## Followups",
-    "### Notes",
-  ];
-  const headingIndices = headingNeedles.map(findIndex);
-  headingIndices.forEach((index, position) => {
-    if (position === 0) {
-      return;
-    }
-    expect(lines[index - 1]).toBe("");
-  });
-  headingIndices.forEach((index) => {
-    if (index + 1 >= lines.length) {
-      return;
-    }
-    const nextLine = lines[index + 1];
-    expect(nextLine === "").toBe(true);
-  });
-
-  const overviewIndex = findIndex("## Overview");
-  const stepsIndex = findIndex("## Steps");
-  const prepIndex = findIndex("### Prep");
-  const adjacentHeadingPairs: [number, number][] = [
-    [stepsIndex, prepIndex],
-    [findIndex("## Followups"), findIndex("### Notes")],
-  ];
-  adjacentHeadingPairs.forEach(([first, second]) => {
-    expect(second - first).toBe(2);
-    expect(lines[first + 1]).toBe("");
-  });
-
-  const introIndex = findIndex("- intro bullet <!-- id:");
-  const anotherIntroIndex = findIndex("- another intro <!-- id:");
-  expect(anotherIntroIndex).toBe(introIndex + 1);
-  expect(introIndex - 1).toBe(overviewIndex + 1);
-
-  lines.forEach((line, index) => {
-    if (index === 0) return;
-    expect(line === "" && lines[index - 1] === "").toBe(false);
-  });
-
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
-test("save skips .knowstr, .git, and node_modules and does not need nsec", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    nsec_file: "./.knowstr/missing.nsec",
-    relays: [],
-  });
+test("save ignores .git, node_modules, and .knowstr directories", async () => {
+  const { path: workspaceDir } = knowstrInit();
   fs.mkdirSync(path.join(workspaceDir, ".git"), { recursive: true });
-  fs.mkdirSync(path.join(workspaceDir, "node_modules", "pkg"), {
-    recursive: true,
-  });
-  fs.mkdirSync(path.join(workspaceDir, ".knowstr", "ignored"), {
-    recursive: true,
-  });
   fs.writeFileSync(path.join(workspaceDir, ".git", "ignored.md"), "# Ignore\n");
-  fs.writeFileSync(
-    path.join(workspaceDir, "node_modules", "pkg", "ignored.md"),
-    "# Ignore\n"
-  );
-  fs.writeFileSync(
-    path.join(workspaceDir, ".knowstr", "ignored", "ignored.md"),
-    "# Ignore\n"
-  );
-  const documentPath = path.join(workspaceDir, "notes.md");
-  fs.writeFileSync(documentPath, "# Real Doc\n- one\n");
+  write(workspaceDir, "node_modules/pkg/ignored.md", "# Ignore\n");
+  write(workspaceDir, ".knowstr/ignored/ignored.md", "# Ignore\n");
+  write(workspaceDir, "notes.md", "# Real Doc\n- one\n");
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-
-  expect(result.changed_paths).toEqual([documentPath]);
+  const result = await knowstrSave(workspaceDir);
+  expect(result.changed_paths).toEqual([path.join(workspaceDir, "notes.md")]);
   expect(
     fs.readFileSync(path.join(workspaceDir, ".git", "ignored.md"), "utf8")
   ).toBe("# Ignore\n");
 });
 
-test("save writes editing instructions with markers and save command hint into frontmatter", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "notes.md");
-  fs.writeFileSync(documentPath, "# Notes\n- one\n");
+test("save writes editing instructions into the frontmatter", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  write(workspaceDir, "notes.md", "# Notes\n- one\n");
 
-  await runSaveCommand(["--config", profilePath]);
+  await knowstrSave(workspaceDir);
 
-  const savedContent = fs.readFileSync(documentPath, "utf8");
-  expect(savedContent).toContain("editing: |");
-  expect(savedContent).toContain(
+  const raw = fs.readFileSync(path.join(workspaceDir, "notes.md"), "utf8");
+  expect(raw).toContain("editing: |");
+  expect(raw).toContain(
     "Edit text freely. Never modify <!-- id:... --> comments."
   );
-  expect(savedContent).toContain(
-    "Never add <!-- id:... --> to new items. knowstr save will reject invented IDs."
-  );
-  expect(savedContent).toContain(
-    "Markers: (!) relevant (?) maybe (~) little relevant (x) not relevant (+) confirms (-) contra. Combine: (-!) contra+relevant (-~) contra+little relevant"
-  );
-  expect(savedContent).toContain("Save changes with: knowstr save");
-
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
+  expect(raw).toContain("Save changes with: knowstr save");
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save refreshes a stale editing block next to existing user frontmatter", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "doc.md");
-  fs.writeFileSync(
-    documentPath,
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "doc.md",
     `---
 title: "Doc"
 editing: |
@@ -1056,263 +725,169 @@ custom: yes
 `
   );
 
-  await runSaveCommand(["--config", profilePath]);
+  await knowstrSave(workspaceDir);
 
-  const savedContent = fs.readFileSync(documentPath, "utf8");
-  expect(savedContent).toContain('title: "Doc"');
-  expect(savedContent).toContain("custom: yes");
-  expect(savedContent).toContain("knowstr_doc_id:");
-  expect(savedContent).not.toContain("stale instructions");
-  expect(savedContent).not.toContain("second stale line");
-  expect(savedContent).toContain("Save changes with: knowstr save");
-  expect(savedContent).toContain("Markers: (!) relevant (?) maybe (~)");
-
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
+  const raw = fs.readFileSync(path.join(workspaceDir, "doc.md"), "utf8");
+  expect(raw).toContain('title: "Doc"');
+  expect(raw).toContain("custom: yes");
+  expect(raw).not.toContain("stale instructions");
+  expect(raw).not.toContain("second stale line");
+  expect(raw).toContain("Save changes with: knowstr save");
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
-test("save preserves an HTML id-comment placeholder inside an inline code span", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "comment-in-code.md");
-  fs.writeFileSync(
-    documentPath,
+test("save preserves HTML-comment-looking content inside inline code spans", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "comment-in-code.md",
     "# Project\n- Every node has a UUID stored as an HTML comment: `<!-- id:uuid -->`.\n"
   );
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-  expect(result.changed_paths).toEqual([documentPath]);
+  await knowstrSave(workspaceDir);
+  expectMarkdown(
+    workspaceDir,
+    "comment-in-code.md",
+    `
+# Project <!-- id:... -->
 
-  const saved = fs.readFileSync(documentPath, "utf8");
-  expect(saved).toContain(
-    "- Every node has a UUID stored as an HTML comment: `<!-- id:uuid -->`. <!-- id:"
+- Every node has a UUID stored as an HTML comment: \`<!-- id:uuid -->\`. <!-- id:... -->
+`
   );
-
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save preserves two inline code spans that look like HTML id comments", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "two-code-comments.md");
-  fs.writeFileSync(
-    documentPath,
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "two-code-comments.md",
     "# Project\n- Two code spans: `<!-- id:xxxx -->` and `<!-- id:yyyy -->` both inside.\n"
   );
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
+  await knowstrSave(workspaceDir);
+  expectMarkdown(
+    workspaceDir,
+    "two-code-comments.md",
+    `
+# Project <!-- id:... -->
 
-  const saved = fs.readFileSync(documentPath, "utf8");
-  expect(saved).toContain(
-    "- Two code spans: `<!-- id:xxxx -->` and `<!-- id:yyyy -->` both inside. <!-- id:"
+- Two code spans: \`<!-- id:xxxx -->\` and \`<!-- id:yyyy -->\` both inside. <!-- id:... -->
+`
   );
-
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save preserves a trailing inline code span with comment-like content", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "trailing-code-comment.md");
-  fs.writeFileSync(
-    documentPath,
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "trailing-code-comment.md",
     "# Project\n- Trailing code span with comment-like content: ending in `<!-- id:qqqq -->`\n"
   );
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
+  await knowstrSave(workspaceDir);
+  expectMarkdown(
+    workspaceDir,
+    "trailing-code-comment.md",
+    `
+# Project <!-- id:... -->
 
-  const saved = fs.readFileSync(documentPath, "utf8");
-  expect(saved).toContain(
-    "- Trailing code span with comment-like content: ending in `<!-- id:qqqq -->` <!-- id:"
+- Trailing code span with comment-like content: ending in \`<!-- id:qqqq -->\` <!-- id:... -->
+`
   );
-
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
-  expect(second.changed_paths).toEqual([]);
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
 test("save ignores the top-level inbox folder", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const inboxDir = path.join(workspaceDir, "inbox");
-  fs.mkdirSync(inboxDir, { recursive: true });
-  fs.writeFileSync(
-    path.join(inboxDir, "foreign.md"),
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "inbox/foreign.md",
     "# Foreign\n- should stay untouched\n"
   );
-  const documentPath = path.join(workspaceDir, "public.md");
-  fs.writeFileSync(documentPath, "# Public\n- visible\n");
+  write(workspaceDir, "public.md", "# Public\n- visible\n");
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-
-  expect(result.changed_paths).toEqual([documentPath]);
-  expect(fs.readFileSync(path.join(inboxDir, "foreign.md"), "utf8")).toBe(
-    "# Foreign\n- should stay untouched\n"
-  );
+  const result = await knowstrSave(workspaceDir);
+  expect(result.changed_paths).toEqual([path.join(workspaceDir, "public.md")]);
+  expect(
+    fs.readFileSync(path.join(workspaceDir, "inbox", "foreign.md"), "utf8")
+  ).toBe("# Foreign\n- should stay untouched\n");
 });
 
 test(".knowstrignore ignores a directory", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const draftsDir = path.join(workspaceDir, "drafts");
-  fs.mkdirSync(draftsDir, { recursive: true });
-  fs.writeFileSync(path.join(draftsDir, "secret.md"), "# Secret\n- hidden\n");
-  const documentPath = path.join(workspaceDir, "public.md");
-  fs.writeFileSync(documentPath, "# Public\n- visible\n");
-  fs.writeFileSync(path.join(workspaceDir, ".knowstrignore"), "drafts/\n");
+  const { path: workspaceDir } = knowstrInit();
+  write(workspaceDir, "drafts/secret.md", "# Secret\n- hidden\n");
+  write(workspaceDir, "public.md", "# Public\n- visible\n");
+  write(workspaceDir, ".knowstrignore", "drafts/\n");
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-
-  expect(result.changed_paths).toEqual([documentPath]);
-  expect(fs.readFileSync(path.join(draftsDir, "secret.md"), "utf8")).toBe(
-    "# Secret\n- hidden\n"
-  );
+  const result = await knowstrSave(workspaceDir);
+  expect(result.changed_paths).toEqual([path.join(workspaceDir, "public.md")]);
+  expect(
+    fs.readFileSync(path.join(workspaceDir, "drafts", "secret.md"), "utf8")
+  ).toBe("# Secret\n- hidden\n");
 });
 
 test(".knowstrignore ignores a specific file", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  fs.writeFileSync(
-    path.join(workspaceDir, "secret.md"),
-    "# Secret\n- hidden\n"
-  );
-  const documentPath = path.join(workspaceDir, "public.md");
-  fs.writeFileSync(documentPath, "# Public\n- visible\n");
-  fs.writeFileSync(path.join(workspaceDir, ".knowstrignore"), "secret.md\n");
+  const { path: workspaceDir } = knowstrInit();
+  write(workspaceDir, "secret.md", "# Secret\n- hidden\n");
+  write(workspaceDir, "public.md", "# Public\n- visible\n");
+  write(workspaceDir, ".knowstrignore", "secret.md\n");
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-
-  expect(result.changed_paths).toEqual([documentPath]);
+  const result = await knowstrSave(workspaceDir);
+  expect(result.changed_paths).toEqual([path.join(workspaceDir, "public.md")]);
   expect(fs.readFileSync(path.join(workspaceDir, "secret.md"), "utf8")).toBe(
     "# Secret\n- hidden\n"
   );
 });
 
 test(".knowstrignore supports glob patterns", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  fs.writeFileSync(
-    path.join(workspaceDir, "temp-notes.md"),
-    "# Temp\n- scratch\n"
-  );
-  const documentPath = path.join(workspaceDir, "real-notes.md");
-  fs.writeFileSync(documentPath, "# Real\n- keep\n");
-  fs.writeFileSync(path.join(workspaceDir, ".knowstrignore"), "temp-*\n");
+  const { path: workspaceDir } = knowstrInit();
+  write(workspaceDir, "temp-notes.md", "# Temp\n- scratch\n");
+  write(workspaceDir, "real-notes.md", "# Real\n- keep\n");
+  write(workspaceDir, ".knowstrignore", "temp-*\n");
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-
-  expect(result.changed_paths).toEqual([documentPath]);
+  const result = await knowstrSave(workspaceDir);
+  expect(result.changed_paths).toEqual([
+    path.join(workspaceDir, "real-notes.md"),
+  ]);
   expect(
     fs.readFileSync(path.join(workspaceDir, "temp-notes.md"), "utf8")
   ).toBe("# Temp\n- scratch\n");
 });
 
 test(".knowstrignore handles comments and blank lines", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  fs.writeFileSync(
-    path.join(workspaceDir, "secret.md"),
-    "# Secret\n- hidden\n"
-  );
-  const documentPath = path.join(workspaceDir, "public.md");
-  fs.writeFileSync(documentPath, "# Public\n- visible\n");
-  fs.writeFileSync(
-    path.join(workspaceDir, ".knowstrignore"),
+  const { path: workspaceDir } = knowstrInit();
+  write(workspaceDir, "secret.md", "# Secret\n- hidden\n");
+  write(workspaceDir, "public.md", "# Public\n- visible\n");
+  write(
+    workspaceDir,
+    ".knowstrignore",
     "# This is a comment\n\nsecret.md\n\n# Another comment\n"
   );
 
-  const result = await runSaveCommand(["--config", profilePath]);
-  if ("help" in result) {
-    throw new Error("unexpected help");
-  }
-
-  expect(result.changed_paths).toEqual([documentPath]);
+  const result = await knowstrSave(workspaceDir);
+  expect(result.changed_paths).toEqual([path.join(workspaceDir, "public.md")]);
 });
 
 test("save survives an inline code span whose content equals the line's id comment", async () => {
-  const workspaceDir = makeTempDir();
-  const profilePath = writeProfile(workspaceDir, {
-    pubkey: "a".repeat(64),
-    workspace_dir: ".",
-    relays: [],
-  });
-  const documentPath = path.join(workspaceDir, "code-id-collision.md");
-  fs.writeFileSync(
-    documentPath,
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "code-id-collision.md",
     "# Project\n- collision line `<!-- id:placeholder -->` end\n"
   );
 
-  await runSaveCommand(["--config", profilePath]);
+  await knowstrSave(workspaceDir);
 
-  const firstSave = fs.readFileSync(documentPath, "utf8");
-  const collisionLine = extractLine(firstSave, "- collision line");
-  const idMatch = collisionLine.match(/<!-- id:(\S+) -->\s*$/);
+  const firstSave = fs.readFileSync(
+    path.join(workspaceDir, "code-id-collision.md"),
+    "utf8"
+  );
+  const collisionLine = firstSave
+    .split("\n")
+    .find((l) => l.includes("- collision line")) as string;
+  const idMatch = collisionLine.match(/<!-- id:(\S+) -->\s*$/u);
   if (!idMatch?.[1]) {
     throw new Error("missing assigned id");
   }
@@ -1320,26 +895,19 @@ test("save survives an inline code span whose content equals the line's id comme
 
   const collidingLine = `- collision line \`<!-- id:${assignedId} -->\` end <!-- id:${assignedId} -->`;
   fs.writeFileSync(
-    documentPath,
+    path.join(workspaceDir, "code-id-collision.md"),
     firstSave.replace(collisionLine, collidingLine)
   );
 
-  const second = await runSaveCommand(["--config", profilePath]);
-  if ("help" in second) {
-    throw new Error("unexpected help");
-  }
+  await knowstrSave(workspaceDir);
 
-  const afterSecond = fs.readFileSync(documentPath, "utf8");
-  expect(afterSecond).toContain(collidingLine);
-  expect(afterSecond).not.toContain("collision line `` end");
-  const collidingLineCount = afterSecond
+  const afterSecond = fs.readFileSync(
+    path.join(workspaceDir, "code-id-collision.md"),
+    "utf8"
+  );
+  const count = afterSecond
     .split("\n")
-    .filter((line) => line === collidingLine).length;
-  expect(collidingLineCount).toBe(1);
-
-  const third = await runSaveCommand(["--config", profilePath]);
-  if ("help" in third) {
-    throw new Error("unexpected help");
-  }
-  expect(third.changed_paths).toEqual([]);
+    .filter((l) => l === collidingLine).length;
+  expect(count).toBe(1);
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });

@@ -97,6 +97,30 @@ function normalizeMarkdownForComparison(content: string): string {
     .replace(/\n+$/u, "");
 }
 
+// Reads the assigned id from the line that contains `needle` in the given
+// workspace file. Use after knowstrSave to pick up ids that knowstr generated.
+export function readNodeId(
+  workspaceDir: string,
+  relativePath: string,
+  needle: string
+): string {
+  const full = path.join(workspaceDir, relativePath);
+  const content = fs.readFileSync(full, "utf8");
+  const line = content
+    .split("\n")
+    .find((candidate) => candidate.includes(needle));
+  if (!line) {
+    throw new Error(
+      `readNodeId: no line containing "${needle}" in ${relativePath}`
+    );
+  }
+  const match = line.match(/<!--\s*id:(\S+)\s*-->/u);
+  if (!match?.[1]) {
+    throw new Error(`readNodeId: no id in line "${line}"`);
+  }
+  return match[1];
+}
+
 export function expectMarkdown(
   workspaceDir: string,
   relativePath: string,

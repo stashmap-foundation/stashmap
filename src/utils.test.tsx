@@ -241,7 +241,7 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
   panes: [{ id: "pane-0", stack: [], author: ALICE.publicKey }],
 };
 
-function applyDefaults(props?: Partial<TestAppState>): TestAppState {
+export function applyDefaults(props?: Partial<TestAppState>): TestAppState {
   return {
     ...applyApis(props),
     ...DEFAULT_DATA_CONTEXT_PROPS,
@@ -292,6 +292,8 @@ export function setup(
   });
 }
 
+type ProviderComponent = React.ComponentType<{ children: React.ReactNode }>;
+
 type RenderApis = Partial<TestApis> &
   Partial<DataContextProps> & {
     initialRoute?: string;
@@ -299,9 +301,11 @@ type RenderApis = Partial<TestApis> &
     defaultRelays?: Array<string>;
     initialStack?: ID[];
     db?: StashmapDB | null;
+    BackendProvider?: ProviderComponent;
+    IdentityProvider?: ProviderComponent;
   };
 
-function TestPublishProvider({
+export function TestPublishProvider({
   children,
   initialDataContextProps,
 }: {
@@ -385,6 +389,16 @@ export function renderApis(
     fileStore.setLocalStorage("privateKey", bytesToHex(user.privateKey));
   }
   window.history.pushState({}, "", options?.initialRoute || "/");
+  const BackendProvider = options?.BackendProvider ?? NostrBackendProvider;
+  const defaultRelayUrls =
+    optionsWithDefaultUser.defaultRelays || TEST_RELAYS.map((r) => r.url);
+  const IdentityProvider =
+    options?.IdentityProvider ??
+    (({ children: c }: { children: React.ReactNode }) => (
+      <NostrAuthContextProvider defaultRelayUrls={defaultRelayUrls}>
+        {c}
+      </NostrAuthContextProvider>
+    ));
   const utils = render(
     <BrowserRouter>
       <ApiProvider
@@ -397,16 +411,11 @@ export function renderApis(
           timeToStorePreLoginEvents: 0,
         }}
       >
-        <NostrBackendProvider>
+        <BackendProvider>
           <TestPublishProvider
             initialDataContextProps={initialDataContextProps}
           >
-            <NostrAuthContextProvider
-              defaultRelayUrls={
-                optionsWithDefaultUser.defaultRelays ||
-                TEST_RELAYS.map((r) => r.url)
-              }
-            >
+            <IdentityProvider>
               <UserRelayContextProvider>
                 <PaneIndexProvider index={0}>
                   <VirtuosoMockContext.Provider
@@ -416,9 +425,9 @@ export function renderApis(
                   </VirtuosoMockContext.Provider>
                 </PaneIndexProvider>
               </UserRelayContextProvider>
-            </NostrAuthContextProvider>
+            </IdentityProvider>
           </TestPublishProvider>
-        </NostrBackendProvider>
+        </BackendProvider>
       </ApiProvider>
     </BrowserRouter>
   );
@@ -511,6 +520,8 @@ export function renderWithTestData(
   options?: Partial<TestAppState> & {
     initialRoute?: string;
     db?: StashmapDB | null;
+    BackendProvider?: ProviderComponent;
+    IdentityProvider?: ProviderComponent;
   }
 ): TestAppState & RenderResult {
   const props = applyDefaults(options);

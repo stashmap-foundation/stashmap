@@ -14,8 +14,8 @@ import { useData } from "./DataContext";
 import { execute, republishEvents } from "./infra/nostr/transport/executor";
 import { useApis } from "./Apis";
 import { useBackend } from "./BackendContext";
-import { createPublishQueue } from "./infra/nostr/replica/PublishQueue";
-import type { StashmapDB } from "./infra/nostr/replica/indexedDB";
+import { createPublishQueue } from "./infra/nostr/cache/PublishQueue";
+import type { StashmapDB } from "./infra/nostr/cache/indexedDB";
 import { newDB } from "./knowledge";
 import { buildDocumentEvent } from "./markdownDocument";
 import {

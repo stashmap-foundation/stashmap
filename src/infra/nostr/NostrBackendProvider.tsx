@@ -1,11 +1,12 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { getPublicKey } from "nostr-tools";
 import { hexToBytes } from "@noble/hashes/utils";
 import { useApis } from "../../Apis";
 import { Backend, BackendProvider } from "../../BackendContext";
 import { DEFAULT_RELAYS } from "../../nostr";
 import { sanitizeRelays } from "../../relays";
-import { clearDatabase } from "./replica/indexedDB";
+import { clearDatabase, openDB, StashmapDB } from "./cache/indexedDB";
+import { CacheDBProvider } from "./cache/CacheDBContext";
 
 function userFromPrivateKey(privateKey: string): User {
   const key = hexToBytes(privateKey);
@@ -42,6 +43,18 @@ export function NostrBackendProvider({
         defaultRelayUrls.map((url) => ({ url, read: true, write: true }))
       )
     : DEFAULT_RELAYS;
+
+  const [db, setDb] = useState<StashmapDB | null | undefined>(undefined);
+  useEffect(() => {
+    openDB().then((database) => setDb(database || null));
+  }, []);
+  useEffect(() => {
+    return () => {
+      if (db && typeof db.close === "function") {
+        db.close();
+      }
+    };
+  }, [db]);
 
   const backend: Backend = useMemo(() => {
     const login = (privateKey: string): User => {
@@ -80,5 +93,9 @@ export function NostrBackendProvider({
     };
   }, [relayPool, fileStore, user, relays]);
 
-  return <BackendProvider backend={backend}>{children}</BackendProvider>;
+  return (
+    <BackendProvider backend={backend}>
+      <CacheDBProvider db={db}>{children}</CacheDBProvider>
+    </BackendProvider>
+  );
 }

@@ -1,7 +1,7 @@
 import React from "react";
 import { Map } from "immutable";
 import { Event } from "nostr-tools";
-import { QueueStatus } from "../infra/nostr/replica/PublishQueue";
+import { QueueStatus } from "../infra/nostr/cache/PublishQueue";
 
 export function mergePublishResultsOfEvents(
   existing: PublishResultsEventMap,

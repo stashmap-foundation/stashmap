@@ -63,7 +63,7 @@ import {
 } from "./components/DroppableContainer";
 import { findContacts } from "./contacts";
 import { UserRelayContextProvider } from "./UserRelayContext";
-import { StashmapDB } from "./infra/nostr/replica/indexedDB";
+import { StashmapDB } from "./infra/nostr/cache/indexedDB";
 import { createEmptySemanticIndex } from "./semanticIndex";
 
 import {

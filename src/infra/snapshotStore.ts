@@ -7,14 +7,8 @@ import { parseDocumentEvent } from "../markdownNodes";
 import { storedDocumentToEvent } from "../documentMaterialization";
 import { joinID } from "../connections";
 import { getStoredEventID } from "../permanentSync";
-import type {
-  StashmapDB,
-  StoredSnapshotRecord,
-} from "./nostr/replica/indexedDB";
-import {
-  getStoredSnapshot,
-  putStoredSnapshot,
-} from "./nostr/replica/indexedDB";
+import type { StashmapDB, StoredSnapshotRecord } from "./nostr/cache/indexedDB";
+import { getStoredSnapshot, putStoredSnapshot } from "./nostr/cache/indexedDB";
 
 export type SnapshotRequest = {
   readonly author: PublicKey;

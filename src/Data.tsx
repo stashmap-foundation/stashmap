@@ -11,17 +11,14 @@ import {
 import { DataContextProvider, MergeKnowledgeDB } from "./DataContext";
 import { useApis } from "./Apis";
 import { useBackend } from "./BackendContext";
-import { FilesystemWorkspaceLoader } from "./FilesystemWorkspaceLoader";
+import { FilesystemWorkspaceLoader } from "./infra/filesystem/FilesystemWorkspaceLoader";
 import { PlanningContextProvider, replaceUnauthenticatedUser } from "./planner";
 import { useUserRelayContext } from "./UserRelayContext";
 import { flattenRelays, usePreloadRelays } from "./relays";
 import { useDefaultRelays } from "./NostrAuthContext";
 import { useEventQuery } from "./commons/useNostrQuery";
-import {
-  openDB,
-  StashmapDB,
-  getOutboxEvents,
-} from "./infra/nostr/replica/indexedDB";
+import { getOutboxEvents } from "./infra/nostr/cache/indexedDB";
+import { useCacheDB } from "./infra/nostr/cache/CacheDBContext";
 import {
   pathToStack,
   parseNodeRouteUrl,
@@ -43,8 +40,8 @@ import {
   newProcessedEvents,
   processEvents,
 } from "./eventProcessing";
-import { DocumentStoreProvider, useDocumentStore } from "./DocumentStore";
-import { usePermanentDocumentSync } from "./infra/nostr/replica/usePermanentDocumentSync";
+import { DocumentStoreProvider } from "./DocumentStore";
+import { PermanentDocumentSyncBridge } from "./infra/nostr/cache/PermanentDocumentSyncBridge";
 import { createEmptySemanticIndex } from "./semanticIndex";
 
 export const defaultPane = (author: PublicKey, rootItemID?: ID): Pane => ({
@@ -151,40 +148,6 @@ type DataProps = {
   children: React.ReactNode;
 };
 
-function PermanentDocumentSyncBridge({
-  db,
-  myself,
-  contacts,
-  extraAuthors,
-  defaultRelays,
-  userRelays,
-  contactsRelays,
-}: {
-  db: StashmapDB | null | undefined;
-  myself: PublicKey;
-  contacts: Contacts;
-  extraAuthors: PublicKey[];
-  defaultRelays: Relays;
-  userRelays: Relays;
-  contactsRelays: Map<PublicKey, Relays>;
-}): null {
-  const addLiveEvents = useDocumentStore()?.addEvents;
-
-  usePermanentDocumentSync({
-    enabled: db !== undefined,
-    db: db || null,
-    myself,
-    contacts,
-    extraAuthors,
-    addLiveEvents,
-    defaultRelays,
-    userRelays,
-    contactsRelays,
-  });
-
-  return null;
-}
-
 export const KIND_SEARCH = [KIND_KNOWLEDGE_DOCUMENT];
 
 export const KINDS_META = [KIND_SETTINGS, KIND_CONTACTLIST];
@@ -252,13 +215,11 @@ function Data({ user, children }: DataProps): JSX.Element {
   const defaultRelays = useDefaultRelays();
   const backend = useBackend();
 
-  const [db, setDb] = useState<StashmapDB | null | undefined>(undefined);
+  const db = useCacheDB();
 
   useEffect(() => {
-    openDB().then(async (database) => {
-      setDb(database || null);
-      if (!database) return;
-      const outbox = await getOutboxEvents(database);
+    if (!db) return;
+    getOutboxEvents(db).then((outbox) => {
       if (outbox.length > 0) {
         setNewEventsAndPublishResults((prev) => ({
           ...prev,
@@ -268,14 +229,6 @@ function Data({ user, children }: DataProps): JSX.Element {
         }));
       }
     });
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (db && typeof db.close === "function") {
-        db.close();
-      }
-    };
   }, [db]);
 
   const initialPublicKeyRef = useRef(myPublicKey);
@@ -400,21 +353,19 @@ function Data({ user, children }: DataProps): JSX.Element {
       panes={panes}
     >
       <DocumentStoreProvider
-        db={backend.workspace !== undefined ? null : db || null}
+        db={db || null}
         unpublishedEvents={newEventsAndPublishResults.unsignedEvents}
       >
         <FilesystemWorkspaceLoader />
-        {!backend.workspace !== undefined && (
-          <PermanentDocumentSyncBridge
-            db={db}
-            myself={myPublicKey}
-            contacts={contacts}
-            extraAuthors={extraAuthors}
-            defaultRelays={defaultRelays}
-            userRelays={userRelays}
-            contactsRelays={contactsRelays}
-          />
-        )}
+        <PermanentDocumentSyncBridge
+          myself={myPublicKey}
+          contacts={contacts}
+          extraAuthors={extraAuthors}
+          defaultRelays={defaultRelays}
+          userRelays={userRelays}
+          contactsRelays={contactsRelays}
+        />
+
         <MergeKnowledgeDB>
           <PlanningContextProvider
             setPublishEvents={setNewEventsAndPublishResults}

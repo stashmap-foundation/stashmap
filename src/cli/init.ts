@@ -1,7 +1,6 @@
 import fs from "fs";
 import path from "path";
 import { generateSecretKey, getPublicKey, nip19 } from "nostr-tools";
-import { decodePublicKeyInputSync } from "../nostrPublicKeys";
 import { requireValue } from "./args";
 
 type InitCliArgs = {
@@ -12,7 +11,7 @@ type InitCliArgs = {
 
 type InitResult = {
   config_path: string;
-  pubkey: string;
+  pubkey: PublicKey;
   npub: string;
   relays: string[];
 };
@@ -61,6 +60,54 @@ export function initHelp(): string {
   ].join("\n");
 }
 
+type CreateWorkspaceProfileArgs = {
+  workspaceDir: string;
+  secretKey?: Uint8Array;
+  relays?: Relays;
+  documentDir?: string;
+};
+
+type CreatedWorkspaceProfile = {
+  profilePath: string;
+  nsecPath: string;
+  pubkey: PublicKey;
+  npub: string;
+};
+
+export function createWorkspaceProfile({
+  workspaceDir,
+  secretKey,
+  relays = [],
+  documentDir,
+}: CreateWorkspaceProfileArgs): CreatedWorkspaceProfile {
+  const knowstrDir = path.join(workspaceDir, ".knowstr");
+  const profilePath = path.join(knowstrDir, "profile.json");
+
+  if (fs.existsSync(profilePath)) {
+    throw new Error(`${profilePath} already exists`);
+  }
+
+  fs.mkdirSync(knowstrDir, { recursive: true });
+
+  const sk = secretKey ?? generateSecretKey();
+  const nsec = nip19.nsecEncode(sk);
+  const pubkey = getPublicKey(sk) as PublicKey;
+  const npub = nip19.npubEncode(pubkey);
+
+  const nsecPath = path.join(knowstrDir, "me.nsec");
+  fs.writeFileSync(nsecPath, `${nsec}\n`, { mode: 0o600 });
+
+  const profile = {
+    pubkey: npub,
+    nsec_file: "./.knowstr/me.nsec",
+    relays,
+    ...(documentDir ? { workspace_dir: documentDir } : {}),
+  };
+  fs.writeFileSync(profilePath, `${JSON.stringify(profile, null, 2)}\n`);
+
+  return { profilePath, nsecPath, pubkey, npub };
+}
+
 function buildRelays(parsed: InitCliArgs): Relays {
   if (parsed.relayUrls.length > 0) {
     return parsed.relayUrls.map((url) => ({
@@ -72,26 +119,6 @@ function buildRelays(parsed: InitCliArgs): Relays {
   return [];
 }
 
-function buildWriteProfile(
-  knowstrDir: string,
-  parsed: InitCliArgs,
-  relays: Relays
-): Record<string, unknown> {
-  const secretKey = generateSecretKey();
-  const nsec = nip19.nsecEncode(secretKey);
-  const pubkey = getPublicKey(secretKey) as PublicKey;
-
-  const nsecPath = path.join(knowstrDir, "me.nsec");
-  fs.writeFileSync(nsecPath, `${nsec}\n`, { mode: 0o600 });
-
-  return {
-    pubkey: nip19.npubEncode(pubkey),
-    nsec_file: "./.knowstr/me.nsec",
-    relays,
-    ...(parsed.doc ? { workspace_dir: parsed.doc } : {}),
-  };
-}
-
 export function runInitCommand(
   args: string[],
   cwd: string = process.cwd()
@@ -101,28 +128,17 @@ export function runInitCommand(
     return { help: true, text: initHelp() };
   }
 
-  const knowstrDir = path.join(cwd, ".knowstr");
-  const configPath = path.join(knowstrDir, "profile.json");
-
-  if (fs.existsSync(configPath)) {
-    throw new Error(`${configPath} already exists`);
-  }
-
-  fs.mkdirSync(knowstrDir, { recursive: true });
-
   const relays = buildRelays(parsed);
-  const profile = buildWriteProfile(knowstrDir, parsed, relays);
-
-  fs.writeFileSync(configPath, `${JSON.stringify(profile, null, 2)}\n`);
-  const writtenProfile = JSON.parse(fs.readFileSync(configPath, "utf8")) as {
-    pubkey: string;
-  };
-  const pubkey = decodePublicKeyInputSync(writtenProfile.pubkey) as PublicKey;
+  const { profilePath, pubkey, npub } = createWorkspaceProfile({
+    workspaceDir: cwd,
+    relays,
+    documentDir: parsed.doc,
+  });
 
   return {
-    config_path: configPath,
+    config_path: profilePath,
     pubkey,
-    npub: nip19.npubEncode(pubkey),
+    npub,
     relays: relays.map((r) => r.url),
   };
 }

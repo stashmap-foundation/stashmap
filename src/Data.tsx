@@ -12,7 +12,6 @@ import { DataContextProvider, MergeKnowledgeDB } from "./DataContext";
 import { useApis } from "./Apis";
 import { useBackend } from "./BackendContext";
 import { FilesystemWorkspaceLoader } from "./FilesystemWorkspaceLoader";
-import { isFilesystemModeActive } from "./filesystemBootstrap";
 import { PlanningContextProvider, replaceUnauthenticatedUser } from "./planner";
 import { useUserRelayContext } from "./UserRelayContext";
 import { flattenRelays, usePreloadRelays } from "./relays";
@@ -397,11 +396,11 @@ function Data({ user, children }: DataProps): JSX.Element {
       panes={panes}
     >
       <DocumentStoreProvider
-        db={isFilesystemModeActive() ? null : db || null}
+        db={backend.workspace !== undefined ? null : db || null}
         unpublishedEvents={newEventsAndPublishResults.unsignedEvents}
       >
         <FilesystemWorkspaceLoader />
-        {!isFilesystemModeActive() && (
+        {!backend.workspace !== undefined && (
           <PermanentDocumentSyncBridge
             db={db}
             myself={myPublicKey}

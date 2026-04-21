@@ -2,22 +2,15 @@ import { useEffect } from "react";
 import { Map as ImmutableMap } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
 import { useDocumentStore } from "./DocumentStore";
-import { consumeInitialWorkspaceEvents } from "./filesystemBootstrap";
+import { useBackend } from "./BackendContext";
 
 export function FilesystemWorkspaceLoader(): null {
   const addEvents = useDocumentStore()?.addEvents;
+  const events = useBackend().workspace?.events;
   useEffect(() => {
-    if (!addEvents) {
+    if (!addEvents || !events || events.length === 0) {
       return;
     }
-    const events = consumeInitialWorkspaceEvents();
-    if (events.length === 0) {
-      return;
-    }
-    // eslint-disable-next-line no-console
-    console.log(
-      `[filesystem] injecting ${events.length} events into DocumentStore`
-    );
     addEvents(
       ImmutableMap<string, Event | UnsignedEvent>(
         events.map(
@@ -26,6 +19,6 @@ export function FilesystemWorkspaceLoader(): null {
         )
       )
     );
-  }, [addEvents]);
+  }, [addEvents, events]);
   return null;
 }

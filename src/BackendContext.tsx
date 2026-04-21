@@ -1,5 +1,21 @@
 import React from "react";
-import { Event, Filter, SubCloser, SubscribeManyParams } from "nostr-tools";
+import {
+  Event,
+  Filter,
+  SubCloser,
+  SubscribeManyParams,
+  UnsignedEvent,
+} from "nostr-tools";
+import { LoadedCliProfile } from "./cli/config";
+
+export type WorkspaceState = {
+  pickFolder: () => Promise<string | null>;
+  open: (folder: string) => Promise<void>;
+  create: (args: { folder: string; secretKeyInput?: string }) => Promise<void>;
+  isInitialised: (folder: string) => Promise<boolean>;
+  profile: LoadedCliProfile | null;
+  events: UnsignedEvent[];
+};
 
 export type Backend = {
   subscribe: (
@@ -8,6 +24,12 @@ export type Backend = {
     params: SubscribeManyParams
   ) => SubCloser;
   publish: (relays: string[], event: Event) => Promise<string>[];
+  user: User | undefined;
+  login?: (privateKey: string) => User;
+  loginWithExtension?: (publicKey: PublicKey) => User;
+  logout?: () => Promise<void>;
+  defaultRelays: Relays;
+  workspace?: WorkspaceState;
 };
 
 const BackendContext = React.createContext<Backend | undefined>(undefined);

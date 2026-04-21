@@ -29,26 +29,19 @@ import { sha256 } from "@noble/hashes/sha256";
 import { schnorr } from "@noble/curves/secp256k1";
 import { VirtuosoMockContext } from "react-virtuoso";
 import { KIND_CONTACTLIST } from "./nostr";
-import { RequireLogin, UNAUTHENTICATED_USER_PK } from "./AppState";
-import {
-  createPlan,
-  planUpsertContact,
-  planRemoveContact,
-  PlanningContextProvider,
-} from "./planner";
+import { createPlan, planUpsertContact, planRemoveContact } from "./planner";
 import { execute } from "./infra/nostr/executor";
 import { ApiProvider, Apis, FinalizeEvent } from "./Apis";
 import { Backend } from "./BackendContext";
 import { NostrBackendProvider } from "./infra/nostr/NostrBackendProvider";
+import { NostrDataProvider } from "./infra/nostr/NostrDataProvider";
 import { App } from "./App";
-import {
-  DataContextProps,
-  DataContextProvider,
-  MergeKnowledgeDB,
-} from "./DataContext";
-import { DocumentStoreProvider } from "./DocumentStore";
+import { DataContextProps } from "./DataContext";
 import { MockRelayPool, mockRelayPool } from "./nostrMock.test";
-import { isUserLoggedInWithSeed } from "./NostrAuthContext";
+import {
+  isUserLoggedInWithSeed,
+  UNAUTHENTICATED_USER_PK,
+} from "./NostrAuthContext";
 import { AuthProvider } from "./AuthProvider";
 import { EMPTY_SEMANTIC_ID } from "./connections";
 import { RootViewContextProvider } from "./ViewContext";
@@ -303,48 +296,8 @@ type RenderApis = Partial<TestApis> &
     initialStack?: ID[];
     db?: StashmapDB | null;
     BackendProvider?: ProviderComponent;
+    DataProvider?: ProviderComponent;
   };
-
-export function TestPublishProvider({
-  children,
-  initialDataContextProps,
-}: {
-  children: React.ReactNode;
-  initialDataContextProps: DataContextProps;
-}): JSX.Element {
-  const [publishEventsStatus, setPublishEventsStatus] = React.useState(
-    initialDataContextProps.publishEventsStatus
-  );
-  const [views, setViews] = React.useState(initialDataContextProps.views);
-  return (
-    <DataContextProvider
-      user={initialDataContextProps.user}
-      contacts={initialDataContextProps.contacts}
-      contactsRelays={initialDataContextProps.contactsRelays}
-      knowledgeDBs={initialDataContextProps.knowledgeDBs}
-      semanticIndex={initialDataContextProps.semanticIndex}
-      relaysInfos={initialDataContextProps.relaysInfos}
-      publishEventsStatus={publishEventsStatus}
-      snapshotNodes={initialDataContextProps.snapshotNodes}
-      views={views}
-      panes={initialDataContextProps.panes}
-    >
-      <DocumentStoreProvider
-        unpublishedEvents={publishEventsStatus.unsignedEvents}
-      >
-        <MergeKnowledgeDB>
-          <PlanningContextProvider
-            setPublishEvents={setPublishEventsStatus}
-            setPanes={() => {}}
-            setViews={setViews}
-          >
-            {children}
-          </PlanningContextProvider>
-        </MergeKnowledgeDB>
-      </DocumentStoreProvider>
-    </DataContextProvider>
-  );
-}
 
 export function renderApis(
   children: React.ReactElement,
@@ -352,23 +305,6 @@ export function renderApis(
 ): TestApis & RenderResult {
   const { fileStore, relayPool, backend, finalizeEvent, nip11 } =
     applyApis(options);
-  const initialDataContextProps: DataContextProps = {
-    user: options?.user || DEFAULT_DATA_CONTEXT_PROPS.user,
-    contacts: options?.contacts || DEFAULT_DATA_CONTEXT_PROPS.contacts,
-    contactsRelays:
-      options?.contactsRelays || DEFAULT_DATA_CONTEXT_PROPS.contactsRelays,
-    knowledgeDBs:
-      options?.knowledgeDBs || DEFAULT_DATA_CONTEXT_PROPS.knowledgeDBs,
-    semanticIndex:
-      options?.semanticIndex || DEFAULT_DATA_CONTEXT_PROPS.semanticIndex,
-    relaysInfos: options?.relaysInfos || DEFAULT_DATA_CONTEXT_PROPS.relaysInfos,
-    publishEventsStatus:
-      options?.publishEventsStatus ||
-      DEFAULT_DATA_CONTEXT_PROPS.publishEventsStatus,
-    snapshotNodes: DEFAULT_DATA_CONTEXT_PROPS.snapshotNodes,
-    views: options?.views || DEFAULT_DATA_CONTEXT_PROPS.views,
-    panes: options?.panes || DEFAULT_DATA_CONTEXT_PROPS.panes,
-  };
 
   // If user is explicity undefined it will be overwritten, if not set default Alice is used
   const optionsWithDefaultUser = {
@@ -398,6 +334,7 @@ export function renderApis(
         {c}
       </NostrBackendProvider>
     ));
+  const DataProviderComponent = options?.DataProvider ?? NostrDataProvider;
   const utils = render(
     <BrowserRouter>
       <ApiProvider
@@ -412,10 +349,8 @@ export function renderApis(
       >
         <BackendProviderComponent>
           <AuthProvider>
-            <TestPublishProvider
-              initialDataContextProps={initialDataContextProps}
-            >
-              <UserRelayContextProvider>
+            <UserRelayContextProvider>
+              <DataProviderComponent>
                 <PaneIndexProvider index={0}>
                   <VirtuosoMockContext.Provider
                     value={{ viewportHeight: 10000, itemHeight: 100 }}
@@ -423,8 +358,8 @@ export function renderApis(
                     {children}
                   </VirtuosoMockContext.Provider>
                 </PaneIndexProvider>
-              </UserRelayContextProvider>
-            </TestPublishProvider>
+              </DataProviderComponent>
+            </UserRelayContextProvider>
           </AuthProvider>
         </BackendProviderComponent>
       </ApiProvider>
@@ -520,26 +455,25 @@ export function renderWithTestData(
     initialRoute?: string;
     db?: StashmapDB | null;
     BackendProvider?: ProviderComponent;
+    DataProvider?: ProviderComponent;
   }
 ): TestAppState & RenderResult {
   const props = applyDefaults(options);
   const utils = renderApis(
     <Routes>
-      <Route element={<RequireLogin />}>
-        {["*", "n/*", "r/:nodeId", "d/:openItemID", "join/:projectID"].map(
-          (path) => (
-            <Route
-              key={path}
-              path={path}
-              element={
-                <TemporaryViewProvider>
-                  <DND>{children}</DND>
-                </TemporaryViewProvider>
-              }
-            />
-          )
-        )}
-      </Route>
+      {["*", "n/*", "r/:nodeId", "d/:openItemID", "join/:projectID"].map(
+        (path) => (
+          <Route
+            key={path}
+            path={path}
+            element={
+              <TemporaryViewProvider>
+                <DND>{children}</DND>
+              </TemporaryViewProvider>
+            }
+          />
+        )
+      )}
     </Routes>,
     props
   );

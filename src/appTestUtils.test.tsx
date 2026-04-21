@@ -2,6 +2,7 @@ import React from "react";
 import { RenderResult } from "@testing-library/react";
 import { nip19 } from "nostr-tools";
 import { FilesystemBackendProvider } from "./infra/filesystem/FilesystemBackendProvider";
+import { FilesystemDataProvider } from "./infra/filesystem/FilesystemDataProvider";
 import { FilesystemAppRoot } from "./desktop/FilesystemAppRoot";
 import {
   MockWorkspaceIpc,
@@ -61,6 +62,7 @@ export async function renderAppTree(
           {children}
         </FilesystemBackendProvider>
       ),
+      DataProvider: FilesystemDataProvider,
     }
   );
 

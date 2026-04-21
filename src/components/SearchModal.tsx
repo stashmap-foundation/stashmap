@@ -3,7 +3,7 @@ import { useEventQuery } from "../commons/useNostrQuery";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
 import { useData } from "../DataContext";
 import { useBackend } from "../BackendContext";
-import { KIND_SEARCH } from "../Data";
+import { KIND_SEARCH } from "../infra/nostr/NostrDataProvider";
 import { findDocumentNodes } from "../documentMaterialization";
 import { buildTextNodesFromGraphNodes } from "../connections";
 import type { TextSeed } from "../connections";

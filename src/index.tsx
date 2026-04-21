@@ -10,7 +10,9 @@ import "./App.css";
 import { App } from "./App";
 import { AuthProvider } from "./AuthProvider";
 import { FilesystemBackendProvider } from "./infra/filesystem/FilesystemBackendProvider";
+import { FilesystemDataProvider } from "./infra/filesystem/FilesystemDataProvider";
 import { NostrBackendProvider } from "./infra/nostr/NostrBackendProvider";
+import { NostrDataProvider } from "./infra/nostr/NostrDataProvider";
 import { NostrProvider } from "./NostrProvider";
 import { UserRelayContextProvider } from "./UserRelayContext";
 import {
@@ -46,9 +48,9 @@ function bootstrap(): void {
           <FilesystemBackendProvider ipc={ipc}>
             <AuthProvider>
               <FilesystemAppRoot>
-                <UserRelayContextProvider>
+                <FilesystemDataProvider>
                   <App />
-                </UserRelayContextProvider>
+                </FilesystemDataProvider>
               </FilesystemAppRoot>
             </AuthProvider>
           </FilesystemBackendProvider>
@@ -63,7 +65,9 @@ function bootstrap(): void {
         <NostrBackendProvider defaultRelayUrls={defaultRelayUrls}>
           <AuthProvider>
             <UserRelayContextProvider>
-              <App />
+              <NostrDataProvider>
+                <App />
+              </NostrDataProvider>
             </UserRelayContextProvider>
           </AuthProvider>
         </NostrBackendProvider>

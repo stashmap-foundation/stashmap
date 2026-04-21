@@ -1,5 +1,6 @@
 import React from "react";
-import { UNAUTHENTICATED_USER_PK } from "./AppState";
+
+export const UNAUTHENTICATED_USER_PK = "UNAUTHENTICATEDUSERPK" as PublicKey;
 
 type IdentityContextValue = {
   user: User | undefined;

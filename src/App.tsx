@@ -2,7 +2,6 @@ import React, { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Dashboard from "./components/Dashboard";
 import { RelaysWrapper } from "./components/Relays";
-import { RequireLogin } from "./AppState";
 import { SignUp } from "./SignUp";
 import { SignInModal } from "./SignIn";
 
@@ -39,16 +38,14 @@ export function App(): JSX.Element {
 
   return (
     <Routes>
-      <Route element={<RequireLogin />}>
-        <Route path="/" element={<Dashboard />}>
-          <Route path="follow" element={<Navigate replace to="/" />} />
-          <Route path="relays" element={<RelaysWrapper />} />
-          <Route path="signin" element={<SignInModal />} />
-          <Route path="signup" element={<SignUp />} />
-        </Route>
-        <Route path="/n/*" element={<Dashboard />} />
-        <Route path="/r/:nodeId" element={<Dashboard />} />
+      <Route path="/" element={<Dashboard />}>
+        <Route path="follow" element={<Navigate replace to="/" />} />
+        <Route path="relays" element={<RelaysWrapper />} />
+        <Route path="signin" element={<SignInModal />} />
+        <Route path="signup" element={<SignUp />} />
       </Route>
+      <Route path="/n/*" element={<Dashboard />} />
+      <Route path="/r/:nodeId" element={<Dashboard />} />
     </Routes>
   );
 }

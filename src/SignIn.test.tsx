@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { UNAUTHENTICATED_USER_PK } from "./AppState";
+import { UNAUTHENTICATED_USER_PK } from "./NostrAuthContext";
 import { renderApp, findNewNodeEditor } from "./utils.test";
 import * as runtimeEnvironment from "./runtimeEnvironment";
 

@@ -12,7 +12,7 @@ import {
 import { useData } from "./DataContext";
 import { planRewriteUnpublishedEvents, usePlanner } from "./planner";
 import { useBackend } from "./BackendContext";
-import { KINDS_META } from "./Data";
+import { KINDS_META } from "./infra/nostr/NostrDataProvider";
 import { useStorePreLoginEvents } from "./StorePreLoginContext";
 import { convertInputToPrivateKey } from "./nostrKey";
 import { supportsExtensionLogin } from "./runtimeEnvironment";

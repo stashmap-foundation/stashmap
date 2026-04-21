@@ -58,7 +58,7 @@ import {
   getPaneIndex,
 } from "./ViewContext";
 import { newRefNode } from "./nodeFactory";
-import { UNAUTHENTICATED_USER_PK } from "./AppState";
+import { UNAUTHENTICATED_USER_PK } from "./NostrAuthContext";
 import { useRelaysToCreatePlan } from "./relays";
 import { mergePublishResultsOfEvents } from "./commons/PublishingStatus";
 import { createRootAnchor } from "./rootAnchor";

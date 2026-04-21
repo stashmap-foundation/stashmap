@@ -5,7 +5,6 @@ import { useApis } from "./Apis";
 import { useBackend } from "./BackendContext";
 import { KIND_CONTACTLIST } from "./nostr";
 import { planAddContacts, usePlanner } from "./planner";
-import { execute } from "./infra/nostr/transport/executor";
 
 type StorePreLoginData = (eventKinds: List<number>) => void;
 
@@ -27,7 +26,7 @@ export function StorePreLoginContext({
   children: React.ReactNode;
 }): JSX.Element {
   const { createPlan, setPublishEvents } = usePlanner();
-  const { finalizeEvent, timeToStorePreLoginEvents } = useApis();
+  const { timeToStorePreLoginEvents } = useApis();
   const backend = useBackend();
 
   const storeMergeEvents = useDebouncedCallback(
@@ -39,11 +38,7 @@ export function StorePreLoginContext({
       const withContacts = eventKinds.includes(KIND_CONTACTLIST)
         ? planAddContacts(plan, plan.contacts.keySeq().toList())
         : plan;
-      const results = await execute({
-        plan: withContacts,
-        backend,
-        finalizeEvent,
-      });
+      const results = await backend.execute(withContacts);
       setPublishEvents((current) => {
         return {
           unsignedEvents: current.unsignedEvents,

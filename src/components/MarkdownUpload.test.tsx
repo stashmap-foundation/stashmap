@@ -1,6 +1,6 @@
 import { List } from "immutable";
 import { newNode, ViewPath } from "../ViewContext";
-import { execute } from "../infra/nostr/transport/executor";
+import { execute } from "../infra/nostr/executor";
 import { createPlan, planUpsertNodes } from "../planner";
 import { processEvents } from "../eventProcessing";
 import { ALICE, setup, UpdateState } from "../utils.test";

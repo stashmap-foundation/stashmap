@@ -1,6 +1,6 @@
 import { Event } from "nostr-tools";
 import { Map } from "immutable";
-import { Backend } from "../../../BackendContext";
+import { Backend } from "../../BackendContext";
 
 export const PUBLISH_TIMEOUT = 5000;
 

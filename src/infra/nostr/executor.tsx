@@ -1,13 +1,13 @@
 import { Event, EventTemplate, VerifiedEvent } from "nostr-tools";
 import { List, Map } from "immutable";
-import { buildDocumentEvents, GraphPlan } from "../../../planner";
-import { FinalizeEvent } from "../../../Apis";
-import { Backend } from "../../../BackendContext";
+import { buildDocumentEvents, GraphPlan } from "../../planner";
+import { FinalizeEvent } from "../../Apis";
+import { Backend } from "../../BackendContext";
 import {
   isUserLoggedIn,
   isUserLoggedInWithExtension,
-} from "../../../NostrAuthContext";
-import { applyWriteRelayConfig } from "../../../relays";
+} from "../../NostrAuthContext";
+import { applyWriteRelayConfig } from "../../relays";
 import { publishEventToRelays, PUBLISH_TIMEOUT } from "./nostrPublish";
 
 export { PUBLISH_TIMEOUT };

@@ -11,8 +11,6 @@ import {
 } from "./NostrAuthContext";
 import { useData } from "./DataContext";
 import { planRewriteUnpublishedEvents, usePlanner } from "./planner";
-import { execute } from "./infra/nostr/transport/executor";
-import { useApis } from "./Apis";
 import { useBackend } from "./BackendContext";
 import { KINDS_META } from "./Data";
 import { useStorePreLoginEvents } from "./StorePreLoginContext";
@@ -187,7 +185,6 @@ export function SignInModal(): JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
   const { publishEventsStatus } = useData();
-  const { finalizeEvent } = useApis();
   const backend = useBackend();
   const { createPlan, setPublishEvents } = usePlanner();
   const referrer = (location.state as LocationState | undefined)?.referrer;
@@ -238,19 +235,17 @@ export function SignInModal(): JSX.Element {
           temporaryEvents: current.temporaryEvents,
         };
       });
-      execute({
-        plan: { ...plan, publishEvents: nonMergeEvents },
-        backend,
-        finalizeEvent,
-      }).then((results) => {
-        setPublishEvents((current) => {
-          return {
-            ...current,
-            results,
-            isLoading: false,
-          };
+      backend
+        .execute({ ...plan, publishEvents: nonMergeEvents })
+        .then((results) => {
+          setPublishEvents((current) => {
+            return {
+              ...current,
+              results,
+              isLoading: false,
+            };
+          });
         });
-      });
     } else {
       setPublishEvents((current) => {
         return {

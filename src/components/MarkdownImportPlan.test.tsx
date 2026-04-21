@@ -11,7 +11,7 @@ import {
   renderTree,
   setup,
 } from "../utils.test";
-import { execute } from "../infra/nostr/transport/executor";
+import { execute } from "../infra/nostr/executor";
 import { processEvents } from "../eventProcessing";
 import {
   buildRootTreeForEmptyRootDrop,

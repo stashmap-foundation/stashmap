@@ -36,7 +36,7 @@ import {
   planRemoveContact,
   PlanningContextProvider,
 } from "./planner";
-import { execute } from "./infra/nostr/transport/executor";
+import { execute } from "./infra/nostr/executor";
 import { ApiProvider, Apis, FinalizeEvent } from "./Apis";
 import { Backend } from "./BackendContext";
 import { NostrBackendProvider } from "./infra/nostr/NostrBackendProvider";
@@ -178,6 +178,7 @@ function applyApis(props?: Partial<TestApis>): TestApis {
     subscribe: (relays, filters, params) =>
       relayPool.subscribeMany(relays, filters, params),
     publish: (relays, event) => relayPool.publish(relays, event),
+    execute: () => Promise.resolve(Map() as PublishResultsEventMap),
     user: undefined,
     defaultRelays: [] as Relays,
   };

@@ -11,7 +11,7 @@ import {
   msTag,
 } from "./nostr";
 import { useData } from "./DataContext";
-import { execute, republishEvents } from "./infra/nostr/transport/executor";
+import { republishEvents } from "./infra/nostr/executor";
 import { useApis } from "./Apis";
 import { useBackend } from "./BackendContext";
 import { createPublishQueue } from "./infra/nostr/cache/PublishQueue";
@@ -1632,11 +1632,7 @@ export function PlanningContextProvider({
       affectedRoots: ImmutableSet<ID>(),
     };
 
-    const results = await execute({
-      plan: filteredPlan,
-      backend,
-      finalizeEvent,
-    });
+    const results = await backend.execute(filteredPlan);
 
     setPublishEvents((prevStatus) => {
       return {

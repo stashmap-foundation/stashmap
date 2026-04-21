@@ -26,7 +26,7 @@ import {
   processEvents,
 } from "../../eventProcessing";
 import { DocumentStoreProvider } from "../../DocumentStore";
-import { PermanentDocumentSyncBridge } from "./cache/PermanentDocumentSyncBridge";
+import { NostrCacheSync } from "./cache/NostrCacheSync";
 import { createEmptySemanticIndex } from "../../semanticIndex";
 import { useUserSessionState } from "../../userSessionState";
 
@@ -186,10 +186,9 @@ export function NostrDataProvider({
       panes={session.panes}
     >
       <DocumentStoreProvider
-        db={db || null}
         unpublishedEvents={session.publishStatus.unsignedEvents}
       >
-        <PermanentDocumentSyncBridge />
+        <NostrCacheSync />
         <MergeKnowledgeDB>
           <PlanningContextProvider
             setPublishEvents={session.setPublishStatus}

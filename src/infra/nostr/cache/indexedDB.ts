@@ -1,5 +1,5 @@
 /* eslint-disable functional/immutable-data */
-import { UnsignedEvent } from "nostr-tools";
+import { Event, UnsignedEvent } from "nostr-tools";
 
 const DB_NAME = "stashmap";
 const DB_VERSION = 4;
@@ -190,18 +190,21 @@ export const removeOutboxEvent = (db: StashmapDB, key: string): Promise<void> =>
     request.onerror = () => reject(request.error);
   });
 
+export type CachedEvent = (Event | UnsignedEvent) & { id: string };
+
 export const getCachedEvents = (
   db: StashmapDB
-): Promise<ReadonlyArray<Record<string, unknown>>> =>
+): Promise<ReadonlyArray<CachedEvent>> =>
   new Promise((resolve, reject) => {
     const request = txStore(db, EVENT_CACHE_STORE, "readonly").getAll();
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () =>
+      resolve(request.result as ReadonlyArray<CachedEvent>);
     request.onerror = () => reject(request.error);
   });
 
 export const putCachedEvents = (
   db: StashmapDB,
-  events: ReadonlyArray<Record<string, unknown>>
+  events: ReadonlyArray<CachedEvent>
 ): Promise<void> =>
   new Promise((resolve, reject) => {
     const tx = db.transaction(EVENT_CACHE_STORE, "readwrite");

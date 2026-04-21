@@ -35,7 +35,6 @@ export function FilesystemDataProvider({
       panes={session.panes}
     >
       <DocumentStoreProvider
-        db={null}
         unpublishedEvents={session.publishStatus.unsignedEvents}
       >
         <FilesystemWorkspaceLoader />

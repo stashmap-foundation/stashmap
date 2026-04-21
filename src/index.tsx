@@ -48,9 +48,11 @@ function bootstrap(): void {
           <FilesystemBackendProvider ipc={ipc}>
             <AuthProvider>
               <FilesystemAppRoot>
-                <FilesystemDataProvider>
-                  <App />
-                </FilesystemDataProvider>
+                <UserRelayContextProvider>
+                  <FilesystemDataProvider>
+                    <App />
+                  </FilesystemDataProvider>
+                </UserRelayContextProvider>
               </FilesystemAppRoot>
             </AuthProvider>
           </FilesystemBackendProvider>

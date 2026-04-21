@@ -48,10 +48,8 @@ import {
 } from "./DataContext";
 import { DocumentStoreProvider } from "./DocumentStore";
 import { MockRelayPool, mockRelayPool } from "./nostrMock.test";
-import {
-  NostrAuthContextProvider,
-  isUserLoggedInWithSeed,
-} from "./NostrAuthContext";
+import { isUserLoggedInWithSeed } from "./NostrAuthContext";
+import { AuthProvider } from "./AuthProvider";
 import { EMPTY_SEMANTIC_ID } from "./connections";
 import { RootViewContextProvider } from "./ViewContext";
 import { LoadSearchData } from "./LoadSearchData";
@@ -180,6 +178,8 @@ function applyApis(props?: Partial<TestApis>): TestApis {
     subscribe: (relays, filters, params) =>
       relayPool.subscribeMany(relays, filters, params),
     publish: (relays, event) => relayPool.publish(relays, event),
+    user: undefined,
+    defaultRelays: [] as Relays,
   };
   return {
     eventLoadingTimeout: 0,
@@ -302,7 +302,6 @@ type RenderApis = Partial<TestApis> &
     initialStack?: ID[];
     db?: StashmapDB | null;
     BackendProvider?: ProviderComponent;
-    IdentityProvider?: ProviderComponent;
   };
 
 export function TestPublishProvider({
@@ -389,15 +388,14 @@ export function renderApis(
     fileStore.setLocalStorage("privateKey", bytesToHex(user.privateKey));
   }
   window.history.pushState({}, "", options?.initialRoute || "/");
-  const BackendProvider = options?.BackendProvider ?? NostrBackendProvider;
   const defaultRelayUrls =
     optionsWithDefaultUser.defaultRelays || TEST_RELAYS.map((r) => r.url);
-  const IdentityProvider =
-    options?.IdentityProvider ??
+  const BackendProviderComponent =
+    options?.BackendProvider ??
     (({ children: c }: { children: React.ReactNode }) => (
-      <NostrAuthContextProvider defaultRelayUrls={defaultRelayUrls}>
+      <NostrBackendProvider defaultRelayUrls={defaultRelayUrls}>
         {c}
-      </NostrAuthContextProvider>
+      </NostrBackendProvider>
     ));
   const utils = render(
     <BrowserRouter>
@@ -411,11 +409,11 @@ export function renderApis(
           timeToStorePreLoginEvents: 0,
         }}
       >
-        <BackendProvider>
-          <TestPublishProvider
-            initialDataContextProps={initialDataContextProps}
-          >
-            <IdentityProvider>
+        <BackendProviderComponent>
+          <AuthProvider>
+            <TestPublishProvider
+              initialDataContextProps={initialDataContextProps}
+            >
               <UserRelayContextProvider>
                 <PaneIndexProvider index={0}>
                   <VirtuosoMockContext.Provider
@@ -425,9 +423,9 @@ export function renderApis(
                   </VirtuosoMockContext.Provider>
                 </PaneIndexProvider>
               </UserRelayContextProvider>
-            </IdentityProvider>
-          </TestPublishProvider>
-        </BackendProvider>
+            </TestPublishProvider>
+          </AuthProvider>
+        </BackendProviderComponent>
       </ApiProvider>
     </BrowserRouter>
   );
@@ -521,7 +519,6 @@ export function renderWithTestData(
     initialRoute?: string;
     db?: StashmapDB | null;
     BackendProvider?: ProviderComponent;
-    IdentityProvider?: ProviderComponent;
   }
 ): TestAppState & RenderResult {
   const props = applyDefaults(options);

@@ -11,6 +11,8 @@
   "include": [
     "src/cli/**/*",
     "src/core/**/*",
+    "src/electronMain/**/*",
+    "src/nostrKey.ts",
     "src/types.ts",
     "src/**/*.d.ts"
   ]

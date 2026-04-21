@@ -8,17 +8,17 @@ import "./assets/fonts/nostr/css/nostr.css";
 import "./Workspace.scss";
 import "./App.css";
 import { App } from "./App";
+import { AuthProvider } from "./AuthProvider";
 import { FilesystemBackendProvider } from "./FilesystemBackendProvider";
-import { FilesystemIdentityProvider } from "./FilesystemIdentityProvider";
-import { NostrAuthContextProvider } from "./NostrAuthContext";
 import { NostrBackendProvider } from "./NostrBackendProvider";
 import { NostrProvider } from "./NostrProvider";
 import { UserRelayContextProvider } from "./UserRelayContext";
-import { shouldUseHashRouter } from "./runtimeEnvironment";
 import {
-  isFilesystemModeActive,
-  loadFilesystemWorkspaceBeforeReact,
-} from "./filesystemBootstrap";
+  isElectronDesktopShell,
+  shouldUseHashRouter,
+} from "./runtimeEnvironment";
+import { electronWorkspaceIpc } from "./desktop/electronWorkspaceIpc";
+import { FilesystemAppRoot } from "./desktop/FilesystemAppRoot";
 
 const defaultRelayUrls = process.env.DEFAULT_RELAYS?.split(",");
 
@@ -33,32 +33,40 @@ function createFileStore(): LocalStorage {
 
 const Router = shouldUseHashRouter() ? HashRouter : BrowserRouter;
 
-async function bootstrap(): Promise<void> {
-  await loadFilesystemWorkspaceBeforeReact();
+function bootstrap(): void {
   const root = document.getElementById("root");
   if (root === null) {
     return;
   }
-  const Backend = isFilesystemModeActive()
-    ? FilesystemBackendProvider
-    : NostrBackendProvider;
-  const Identity = isFilesystemModeActive()
-    ? FilesystemIdentityProvider
-    : (props: { children: React.ReactNode }) => (
-        <NostrAuthContextProvider defaultRelayUrls={defaultRelayUrls}>
-          {props.children}
-        </NostrAuthContextProvider>
-      );
+  if (isElectronDesktopShell()) {
+    const ipc = electronWorkspaceIpc();
+    createRoot(root).render(
+      <Router>
+        <NostrProvider apis={{ fileStore: createFileStore() }}>
+          <FilesystemBackendProvider ipc={ipc}>
+            <AuthProvider>
+              <FilesystemAppRoot>
+                <UserRelayContextProvider>
+                  <App />
+                </UserRelayContextProvider>
+              </FilesystemAppRoot>
+            </AuthProvider>
+          </FilesystemBackendProvider>
+        </NostrProvider>
+      </Router>
+    );
+    return;
+  }
   createRoot(root).render(
     <Router>
       <NostrProvider apis={{ fileStore: createFileStore() }}>
-        <Backend>
-          <Identity>
+        <NostrBackendProvider defaultRelayUrls={defaultRelayUrls}>
+          <AuthProvider>
             <UserRelayContextProvider>
               <App />
             </UserRelayContextProvider>
-          </Identity>
-        </Backend>
+          </AuthProvider>
+        </NostrBackendProvider>
       </NostrProvider>
     </Router>
   );

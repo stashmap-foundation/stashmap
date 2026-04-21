@@ -2,13 +2,12 @@ import React from "react";
 import { RenderResult } from "@testing-library/react";
 import { nip19 } from "nostr-tools";
 import { FilesystemBackendProvider } from "./FilesystemBackendProvider";
-import { FilesystemIdentityProvider } from "./FilesystemIdentityProvider";
+import { FilesystemAppRoot } from "./desktop/FilesystemAppRoot";
 import {
-  loadFilesystemWorkspaceBeforeReact,
-  resetFilesystemBootstrapForTest,
-} from "./filesystemBootstrap";
+  MockWorkspaceIpc,
+  mockWorkspaceIpc,
+} from "./testFixtures/mockWorkspaceIpc";
 import { loadCliProfile } from "./cli/config";
-import { loadWorkspaceAsEvents } from "./core/workspaceBackend";
 import { knowstrInit } from "./testFixtures/workspace";
 import {
   RootViewOrPaneIsLoading,
@@ -21,81 +20,63 @@ import { PaneView } from "./components/Workspace";
 test.skip("skip", () => {});
 
 type AppRenderOptions = {
+  /**
+   * Absolute path to a workspace folder. Defaults to a fresh `knowstrInit()`
+   * temp dir.
+   */
   path?: string;
-  // Navigate pane 0 to the node with this label via the search UI after mount.
+  /**
+   * Navigate pane 0 to the node with this label via the search UI after mount.
+   */
   search?: string;
+  /**
+   * Start the app with no workspace selected (the "no workspace" empty state).
+   * Tests must drive the pick/create flow via the returned `ipc`.
+   */
+  empty?: boolean;
 };
 
 type AppRenderResult = RenderResult & {
-  path: string;
-  npub: string;
-  pubkey: PublicKey;
+  ipc: MockWorkspaceIpc;
+  path?: string;
+  pubkey?: PublicKey;
+  npub?: string;
 };
-
-function installDesktopBridge(workspaceDir: string): void {
-  // eslint-disable-next-line functional/immutable-data
-  (window as unknown as { knowstrDesktop: unknown }).knowstrDesktop = {
-    isElectron: true,
-    platform: "test",
-    workspace: {
-      load: async () => {
-        const profile = loadCliProfile({ cwd: workspaceDir });
-        const events = await loadWorkspaceAsEvents({
-          pubkey: profile.pubkey,
-          workspaceDir: profile.workspaceDir,
-        });
-        return {
-          pubkey: profile.pubkey,
-          workspaceDir: profile.workspaceDir,
-          events,
-        };
-      },
-    },
-  };
-}
-
-function uninstallDesktopBridge(): void {
-  // eslint-disable-next-line functional/immutable-data
-  delete (window as unknown as { knowstrDesktop?: unknown }).knowstrDesktop;
-}
-
-afterEach(() => {
-  resetFilesystemBootstrapForTest();
-  uninstallDesktopBridge();
-});
-
-function readIdentityFromWorkspace(workspaceDir: string): {
-  pubkey: PublicKey;
-  npub: string;
-} {
-  const profile = loadCliProfile({ cwd: workspaceDir });
-  return { pubkey: profile.pubkey, npub: nip19.npubEncode(profile.pubkey) };
-}
 
 export async function renderAppTree(
   options: AppRenderOptions = {}
 ): Promise<AppRenderResult> {
-  const workspaceDir = options.path ?? knowstrInit().path;
-  const { pubkey, npub } = readIdentityFromWorkspace(workspaceDir);
-
-  installDesktopBridge(workspaceDir);
-  await loadFilesystemWorkspaceBeforeReact();
+  const path = options.empty ? undefined : options.path ?? knowstrInit().path;
+  const ipc = mockWorkspaceIpc(path ?? null);
 
   const utils = renderWithTestData(
-    <RootViewOrPaneIsLoading>
-      <PaneView />
-    </RootViewOrPaneIsLoading>,
+    <FilesystemAppRoot>
+      <RootViewOrPaneIsLoading>
+        <PaneView />
+      </RootViewOrPaneIsLoading>
+    </FilesystemAppRoot>,
     {
-      user: { publicKey: pubkey },
-      panes: [{ id: "pane-0", stack: [], author: pubkey }],
-      BackendProvider: FilesystemBackendProvider,
-      IdentityProvider: FilesystemIdentityProvider,
+      BackendProvider: ({ children }) => (
+        <FilesystemBackendProvider ipc={ipc}>
+          {children}
+        </FilesystemBackendProvider>
+      ),
     }
   );
 
+  if (path === undefined) {
+    return { ...utils, ipc };
+  }
+
+  const profile = loadCliProfile({ cwd: path });
   if (options.search) {
     await navigateToNodeViaSearch(0, options.search);
   }
-
-  return { ...utils, path: workspaceDir, pubkey, npub };
+  return {
+    ...utils,
+    ipc,
+    path,
+    pubkey: profile.pubkey,
+    npub: nip19.npubEncode(profile.pubkey),
+  };
 }

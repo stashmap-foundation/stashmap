@@ -1,6 +1,6 @@
 import { Event } from "nostr-tools";
 import { Map } from "immutable";
-import type { StashmapDB } from "./indexedDB";
+import type { StashmapDB } from "./infra/nostr/replica/indexedDB";
 import {
   KIND_DELETE,
   KIND_KNOWLEDGE_DOCUMENT,
@@ -21,7 +21,7 @@ import {
   toStoredDocumentRecord,
 } from "./permanentSync";
 
-jest.mock("./indexedDB", () => ({
+jest.mock("./infra/nostr/replica/indexedDB", () => ({
   getSyncCheckpoint: jest.fn(),
   getStoredDocument: jest.fn(),
   getStoredDelete: jest.fn(),
@@ -32,7 +32,7 @@ jest.mock("./indexedDB", () => ({
   putSyncCheckpoint: jest.fn(() => Promise.resolve()),
 }));
 
-const indexedDBModule = jest.requireMock("./indexedDB") as {
+const indexedDBModule = jest.requireMock("./infra/nostr/replica/indexedDB") as {
   getSyncCheckpoint: jest.Mock;
   getStoredDocument: jest.Mock;
   getStoredDelete: jest.Mock;

@@ -11,7 +11,7 @@ import {
 } from "./NostrAuthContext";
 import { useData } from "./DataContext";
 import { planRewriteUnpublishedEvents, usePlanner } from "./planner";
-import { execute } from "./executor";
+import { execute } from "./infra/nostr/transport/executor";
 import { useApis } from "./Apis";
 import { useBackend } from "./BackendContext";
 import { KINDS_META } from "./Data";

@@ -1,5 +1,5 @@
 import { Event } from "nostr-tools";
-import type { StashmapDB } from "../indexedDB";
+import type { StashmapDB } from "./nostr/replica/indexedDB";
 import type { EventQueryClient } from "../eventQuery";
 import {
   KIND_KNOWLEDGE_DOCUMENT,
@@ -7,8 +7,8 @@ import {
 } from "../nostr";
 import { toStoredSnapshotRecord, fetchSnapshots } from "./snapshotStore";
 
-jest.mock("../indexedDB", () => ({
-  ...jest.requireActual("../indexedDB"),
+jest.mock("./nostr/replica/indexedDB", () => ({
+  ...jest.requireActual("./nostr/replica/indexedDB"),
   getStoredSnapshot: jest.fn(),
   putStoredSnapshot: jest.fn(() => Promise.resolve()),
 }));
@@ -18,7 +18,7 @@ jest.mock("../eventQuery", () => ({
   collectEventsUntilIdle: jest.fn(() => Promise.resolve([])),
 }));
 
-const indexedDBModule = jest.requireMock("../indexedDB") as {
+const indexedDBModule = jest.requireMock("./nostr/replica/indexedDB") as {
   getStoredSnapshot: jest.Mock;
   putStoredSnapshot: jest.Mock;
 };

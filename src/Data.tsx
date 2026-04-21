@@ -17,7 +17,11 @@ import { useUserRelayContext } from "./UserRelayContext";
 import { flattenRelays, usePreloadRelays } from "./relays";
 import { useDefaultRelays } from "./NostrAuthContext";
 import { useEventQuery } from "./commons/useNostrQuery";
-import { openDB, StashmapDB, getOutboxEvents } from "./indexedDB";
+import {
+  openDB,
+  StashmapDB,
+  getOutboxEvents,
+} from "./infra/nostr/replica/indexedDB";
 import {
   pathToStack,
   parseNodeRouteUrl,
@@ -40,7 +44,7 @@ import {
   processEvents,
 } from "./eventProcessing";
 import { DocumentStoreProvider, useDocumentStore } from "./DocumentStore";
-import { usePermanentDocumentSync } from "./usePermanentDocumentSync";
+import { usePermanentDocumentSync } from "./infra/nostr/replica/usePermanentDocumentSync";
 import { createEmptySemanticIndex } from "./semanticIndex";
 
 export const defaultPane = (author: PublicKey, rootItemID?: ID): Pane => ({

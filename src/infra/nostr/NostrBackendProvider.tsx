@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from "react";
 import { getPublicKey } from "nostr-tools";
 import { hexToBytes } from "@noble/hashes/utils";
-import { useApis } from "./Apis";
-import { Backend, BackendProvider } from "./BackendContext";
-import { DEFAULT_RELAYS } from "./nostr";
-import { sanitizeRelays } from "./relays";
-import { clearDatabase } from "./indexedDB";
+import { useApis } from "../../Apis";
+import { Backend, BackendProvider } from "../../BackendContext";
+import { DEFAULT_RELAYS } from "../../nostr";
+import { sanitizeRelays } from "../../relays";
+import { clearDatabase } from "./replica/indexedDB";
 
 function userFromPrivateKey(privateKey: string): User {
   const key = hexToBytes(privateKey);

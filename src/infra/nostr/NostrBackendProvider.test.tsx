@@ -1,10 +1,10 @@
 import React from "react";
 import { render } from "@testing-library/react";
-import { ApiProvider } from "./Apis";
+import { ApiProvider } from "../../Apis";
 import { NostrBackendProvider } from "./NostrBackendProvider";
-import { Backend, useBackend } from "./BackendContext";
-import { mockRelayPool } from "./nostrMock.test";
-import { mockFinalizeEvent } from "./utils.test";
+import { Backend, useBackend } from "../../BackendContext";
+import { mockRelayPool } from "../../nostrMock.test";
+import { mockFinalizeEvent } from "../../utils.test";
 
 function CaptureBackend({
   capture,

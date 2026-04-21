@@ -1,6 +1,6 @@
 import { UnsignedEvent } from "nostr-tools";
-import { LoadedCliProfile } from "../cli/config";
-import { WorkspaceIpc, WorkspaceLoaded } from "../FilesystemBackendProvider";
+import { LoadedCliProfile } from "../../cli/config";
+import { WorkspaceIpc, WorkspaceLoaded } from "./FilesystemBackendProvider";
 
 type IpcChannel = {
   load: () => Promise<{

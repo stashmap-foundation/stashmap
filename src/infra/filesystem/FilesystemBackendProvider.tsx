@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { UnsignedEvent } from "nostr-tools";
-import { Backend, BackendProvider, WorkspaceState } from "./BackendContext";
-import { LoadedCliProfile } from "./cli/config";
+import { Backend, BackendProvider, WorkspaceState } from "../../BackendContext";
+import { LoadedCliProfile } from "../../cli/config";
 
 export type WorkspaceLoaded = {
   profile: LoadedCliProfile;

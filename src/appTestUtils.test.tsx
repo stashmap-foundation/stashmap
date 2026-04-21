@@ -1,7 +1,7 @@
 import React from "react";
 import { RenderResult } from "@testing-library/react";
 import { nip19 } from "nostr-tools";
-import { FilesystemBackendProvider } from "./FilesystemBackendProvider";
+import { FilesystemBackendProvider } from "./infra/filesystem/FilesystemBackendProvider";
 import { FilesystemAppRoot } from "./desktop/FilesystemAppRoot";
 import {
   MockWorkspaceIpc,

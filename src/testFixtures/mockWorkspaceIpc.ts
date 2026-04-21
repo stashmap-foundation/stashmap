@@ -5,7 +5,10 @@ import { loadCliProfile } from "../cli/config";
 import { createWorkspaceProfile } from "../cli/init";
 import { loadWorkspaceAsEvents } from "../core/workspaceBackend";
 import { convertInputToPrivateKey } from "../nostrKey";
-import { WorkspaceIpc, WorkspaceLoaded } from "../FilesystemBackendProvider";
+import {
+  WorkspaceIpc,
+  WorkspaceLoaded,
+} from "../infra/filesystem/FilesystemBackendProvider";
 
 export type MockWorkspaceIpc = WorkspaceIpc & {
   setCurrent: (workspaceDir: string | null) => void;

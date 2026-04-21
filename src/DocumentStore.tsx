@@ -7,14 +7,14 @@ import type {
   StoredDeleteRecord,
   StoredDocumentRecord,
   StoredSnapshotRecord,
-} from "./indexedDB";
+} from "./infra/nostr/replica/indexedDB";
 import {
   getCachedEvents,
   getStoredDeletes,
   getStoredDocuments,
   putCachedEvents,
   subscribeDocumentStore,
-} from "./indexedDB";
+} from "./infra/nostr/replica/indexedDB";
 import {
   buildKnowledgeDBFromDocumentNodes,
   storedDocumentToEvent,

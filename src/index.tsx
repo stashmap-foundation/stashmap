@@ -9,15 +9,15 @@ import "./Workspace.scss";
 import "./App.css";
 import { App } from "./App";
 import { AuthProvider } from "./AuthProvider";
-import { FilesystemBackendProvider } from "./FilesystemBackendProvider";
-import { NostrBackendProvider } from "./NostrBackendProvider";
+import { FilesystemBackendProvider } from "./infra/filesystem/FilesystemBackendProvider";
+import { NostrBackendProvider } from "./infra/nostr/NostrBackendProvider";
 import { NostrProvider } from "./NostrProvider";
 import { UserRelayContextProvider } from "./UserRelayContext";
 import {
   isElectronDesktopShell,
   shouldUseHashRouter,
 } from "./runtimeEnvironment";
-import { electronWorkspaceIpc } from "./desktop/electronWorkspaceIpc";
+import { electronWorkspaceIpc } from "./infra/filesystem/electronWorkspaceIpc";
 import { FilesystemAppRoot } from "./desktop/FilesystemAppRoot";
 
 const defaultRelayUrls = process.env.DEFAULT_RELAYS?.split(",");

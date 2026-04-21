@@ -1,7 +1,7 @@
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Event } from "nostr-tools";
-import { clearDatabase } from "./indexedDB";
+import { clearDatabase } from "./infra/nostr/replica/indexedDB";
 import {
   KIND_DELETE,
   KIND_KNOWLEDGE_DOCUMENT,

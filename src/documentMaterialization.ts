@@ -6,7 +6,7 @@ import {
   shortID,
   splitID,
 } from "./connections";
-import type { StoredDocumentRecord } from "./indexedDB";
+import type { StoredDocumentRecord } from "./infra/nostr/replica/indexedDB";
 import { newDB } from "./knowledge";
 import { parseDocumentEvent } from "./markdownNodes";
 import {

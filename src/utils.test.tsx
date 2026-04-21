@@ -36,10 +36,10 @@ import {
   planRemoveContact,
   PlanningContextProvider,
 } from "./planner";
-import { execute } from "./executor";
+import { execute } from "./infra/nostr/transport/executor";
 import { ApiProvider, Apis, FinalizeEvent } from "./Apis";
 import { Backend } from "./BackendContext";
-import { NostrBackendProvider } from "./NostrBackendProvider";
+import { NostrBackendProvider } from "./infra/nostr/NostrBackendProvider";
 import { App } from "./App";
 import {
   DataContextProps,
@@ -63,7 +63,7 @@ import {
 } from "./components/DroppableContainer";
 import { findContacts } from "./contacts";
 import { UserRelayContextProvider } from "./UserRelayContext";
-import { StashmapDB } from "./indexedDB";
+import { StashmapDB } from "./infra/nostr/replica/indexedDB";
 import { createEmptySemanticIndex } from "./semanticIndex";
 
 import {

@@ -5,7 +5,7 @@ import { useApis } from "./Apis";
 import { useBackend } from "./BackendContext";
 import { KIND_CONTACTLIST } from "./nostr";
 import { planAddContacts, usePlanner } from "./planner";
-import { execute } from "./executor";
+import { execute } from "./infra/nostr/transport/executor";
 
 type StorePreLoginData = (eventKinds: List<number>) => void;
 

@@ -1,10 +1,10 @@
 import { hexToBytes } from "@noble/hashes/utils";
 import { List } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
-import { KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
-import { mockRelayPool, MockRelayPool } from "./nostrMock.test";
+import { KIND_KNOWLEDGE_DOCUMENT } from "../../../nostr";
+import { mockRelayPool, MockRelayPool } from "../../../nostrMock.test";
 import { createPublishQueue, FlushDeps } from "./PublishQueue";
-import { mockFinalizeEvent, ALICE_PRIVATE_KEY } from "./utils.test";
+import { mockFinalizeEvent, ALICE_PRIVATE_KEY } from "../../../utils.test";
 
 jest.mock("./indexedDB");
 

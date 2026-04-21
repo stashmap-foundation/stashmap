@@ -13,7 +13,7 @@ import type {
   StoredDeleteRecord,
   StoredDocumentRecord,
   SyncCheckpointRecord,
-} from "./indexedDB";
+} from "./infra/nostr/replica/indexedDB";
 import {
   getSyncCheckpoint,
   getStoredDelete,
@@ -23,7 +23,7 @@ import {
   putSyncCheckpoint,
   removeStoredDelete,
   removeStoredDocument,
-} from "./indexedDB";
+} from "./infra/nostr/replica/indexedDB";
 import { collectEventsUntilIdle } from "./eventQuery";
 
 const PERMANENT_SYNC_BACKFILL_PAGE_LIMIT = 200;

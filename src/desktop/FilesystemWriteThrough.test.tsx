@@ -1,4 +1,12 @@
-import { expectMarkdown, ls } from "../testFixtures/workspace";
+import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import {
+  expectMarkdown,
+  knowstrInit,
+  knowstrSave,
+  ls,
+  write,
+} from "../testFixtures/workspace";
 import { renderAppTree } from "../appTestUtils.test";
 import { expectTree, findNewNodeEditor, type } from "../utils.test";
 
@@ -28,4 +36,49 @@ Holiday Destinations
 `
   );
   expect(ls(path)).toEqual(["holiday-destinations.md", "log.md"]);
+});
+
+test("adding a sibling after a heading writes unambiguous markdown", async () => {
+  const { path } = knowstrInit();
+  write(
+    path,
+    "holidays.md",
+    `
+# Holiday Destinations
+## Bali
+- Beaches
+`
+  );
+  await knowstrSave(path);
+
+  await renderAppTree({ path, search: "Holiday Destinations" });
+
+  await expectTree(`
+Holiday Destinations
+  Bali
+`);
+
+  await userEvent.click(await screen.findByLabelText("edit Bali"));
+  await userEvent.keyboard("{Enter}Spain{Escape}");
+
+  await expectTree(`
+Holiday Destinations
+  Bali
+  Spain
+`);
+
+  expect(ls(path)).toEqual(["holidays.md"]);
+  await expectMarkdown(
+    path,
+    "holidays.md",
+    `
+# Holiday Destinations <!-- id:... -->
+
+## Bali <!-- id:... -->
+
+- Beaches <!-- id:... -->
+
+## Spain <!-- id:... -->
+`
+  );
 });

@@ -7,6 +7,7 @@ import {
   WorkspaceSaveProfile,
 } from "./workspaceSave";
 import { buildDocumentEventFromMarkdownTree } from "../standaloneDocumentEvent";
+import { extractImportedFrontMatter } from "../markdownFrontMatter";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
 
 export async function loadWorkspaceAsEvents(
@@ -22,11 +23,7 @@ export async function loadWorkspaceAsEvents(
   });
 }
 
-function extractDocIdFromDocument(event: UnsignedEvent): string | undefined {
-  return event.tags.find((tag) => tag[0] === "d")?.[1];
-}
-
-function extractDocIdFromDelete(event: UnsignedEvent): string | undefined {
+function extractNodeIdFromDelete(event: UnsignedEvent): string | undefined {
   const aTag = event.tags.find((tag) => tag[0] === "a")?.[1];
   if (!aTag) return undefined;
   const parts = aTag.split(":");
@@ -35,11 +32,8 @@ function extractDocIdFromDelete(event: UnsignedEvent): string | undefined {
 }
 
 function extractRootTitle(content: string): string | undefined {
-  const withoutFrontMatter = content.replace(
-    /^---\r?\n[\s\S]*?\r?\n---\r?\n?/u,
-    ""
-  );
-  const match = withoutFrontMatter.match(/^#{1,6}\s+(.+?)\s*$/mu);
+  const { body } = extractImportedFrontMatter(content);
+  const match = body.match(/^#{1,6}\s+(.+?)\s*$/mu);
   if (!match?.[1]) return undefined;
   return match[1].replace(/<!--.*?-->/gu, "").trim();
 }
@@ -54,18 +48,13 @@ function slugify(text: string): string {
   return slug.length > 0 ? slug : "document";
 }
 
-function ensureFrontMatter(content: string, docId: string): string {
-  if (/^---\r?\n[\s\S]*?knowstr_doc_id:\s*\S+[\s\S]*?\r?\n---/u.test(content)) {
-    return content;
-  }
-  const { frontMatter } = ensureKnowstrDocIdFrontMatter(
-    `knowstr_doc_id: ${docId}`
-  );
-  const withoutExistingFrontMatter = content.replace(
-    /^---\r?\n[\s\S]*?\r?\n---\r?\n?/u,
-    ""
-  );
-  return `${frontMatter}\n${withoutExistingFrontMatter}`;
+function normalizeFrontMatter(content: string): {
+  content: string;
+  docId: string;
+} {
+  const { body, frontMatter: existing } = extractImportedFrontMatter(content);
+  const { docId, frontMatter } = ensureKnowstrDocIdFrontMatter(existing);
+  return { content: `${frontMatter}${body}`, docId };
 }
 
 function uniqueFilePath(
@@ -98,6 +87,7 @@ function planTargets(
   profile: WorkspaceSaveProfile,
   events: ReadonlyArray<UnsignedEvent>,
   initialDocIdToPath: ReadonlyMap<string, string>,
+  initialNodeIdToPath: ReadonlyMap<string, string>,
   initialPaths: ReadonlySet<string>
 ): PlannedTargets {
   const relevantEvents = events.filter(
@@ -120,10 +110,8 @@ function planTargets(
       ]);
 
       if (event.kind === KIND_KNOWLEDGE_DOCUMENT) {
-        const docId = extractDocIdFromDocument(event);
-        if (!docId) return state;
+        const { content, docId } = normalizeFrontMatter(event.content);
         const existingPath = docIdToPath.get(docId);
-        const content = ensureFrontMatter(event.content, docId);
         const title = extractRootTitle(event.content);
         const filePath =
           existingPath ??
@@ -134,9 +122,9 @@ function planTargets(
         };
       }
 
-      const docId = extractDocIdFromDelete(event);
-      if (!docId) return state;
-      const existingPath = docIdToPath.get(docId);
+      const nodeId = extractNodeIdFromDelete(event);
+      if (!nodeId) return state;
+      const existingPath = initialNodeIdToPath.get(nodeId);
       if (!existingPath) return state;
       return {
         ...state,
@@ -155,12 +143,21 @@ export async function saveEventsToWorkspace(
   const initialDocIdToPath = new Map(
     scanned.map((document) => [document.docId, document.filePath])
   );
+  const initialNodeIdToPath = new Map(
+    scanned
+      .filter((document) => document.mainRoot.uuid)
+      .map(
+        (document) =>
+          [document.mainRoot.uuid as string, document.filePath] as const
+      )
+  );
   const initialPaths = new Set(scanned.map((document) => document.filePath));
 
   const { writes, deletes } = planTargets(
     profile,
     events,
     initialDocIdToPath,
+    initialNodeIdToPath,
     initialPaths
   );
 

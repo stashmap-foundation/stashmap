@@ -31,6 +31,11 @@ function getSerializableNodeText(
   return getNodeText(node) || shortID(getSemanticID(knowledgeDBs, node));
 }
 
+type SerializeReduceState = SerializeResult & {
+  orderedCount: number;
+  promoteToHeadingLevel?: number;
+};
+
 function serializeNodeItems(
   knowledgeDBs: KnowledgeDBs,
   author: PublicKey,
@@ -38,7 +43,7 @@ function serializeNodeItems(
   indent: string,
   current: SerializeResult
 ): SerializeResult {
-  const result = children.reduce<SerializeResult & { orderedCount: number }>(
+  const result = children.reduce<SerializeReduceState>(
     (acc, childID) => {
       if (childID === EMPTY_SEMANTIC_ID) {
         return acc;
@@ -62,12 +67,15 @@ function serializeNodeItems(
         }
         const linkText = item.linkText || ref.text;
         const prefix = formatPrefixMarkers(item.relevance, item.argument);
+        const body = `${prefix}[${linkText}](#${targetNodeID})`;
+        const line =
+          acc.promoteToHeadingLevel !== undefined
+            ? `${"#".repeat(acc.promoteToHeadingLevel)} ${body}`
+            : `${indent}- ${body}`;
         return {
+          ...acc,
           orderedCount: 0,
-          lines: [
-            ...acc.lines,
-            `${indent}- ${prefix}[${linkText}](#${targetNodeID})`,
-          ],
+          lines: [...acc.lines, line],
         };
       }
 
@@ -95,6 +103,28 @@ function serializeNodeItems(
             next
           ),
           orderedCount: 0,
+          promoteToHeadingLevel: level,
+        };
+      }
+
+      if (acc.promoteToHeadingLevel !== undefined) {
+        const promotedLevel = acc.promoteToHeadingLevel;
+        const next: SerializeResult = {
+          lines: [
+            ...acc.lines,
+            formatHeadingLine(promotedLevel, prefix, text, attrs),
+          ],
+        };
+        return {
+          ...serializeNodeItems(
+            knowledgeDBs,
+            author,
+            resolvedChild.children,
+            "",
+            next
+          ),
+          orderedCount: 0,
+          promoteToHeadingLevel: promotedLevel,
         };
       }
 

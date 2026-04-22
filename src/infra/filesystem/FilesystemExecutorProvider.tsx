@@ -1,6 +1,7 @@
 import React, { Dispatch, SetStateAction } from "react";
 import { Map as ImmutableMap } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
+import { useBackend } from "../../BackendContext";
 import { useDocumentStore } from "../../DocumentStore";
 import { ExecutorProvider } from "../../ExecutorContext";
 import { buildDocumentEvents, Plan } from "../../planner";
@@ -18,8 +19,9 @@ export function FilesystemExecutorProvider({
   children: React.ReactNode;
 }): JSX.Element {
   const addEvents = useDocumentStore()?.addEvents;
+  const { workspace } = useBackend();
 
-  const executePlan = (plan: Plan): Promise<void> => {
+  const executePlan = async (plan: Plan): Promise<void> => {
     setPanes(plan.panes);
     setViews(plan.views);
     const filteredEvents = buildDocumentEvents(plan);
@@ -35,36 +37,34 @@ export function FilesystemExecutorProvider({
       };
     });
 
-    if (filteredEvents.size === 0) return Promise.resolve();
+    if (filteredEvents.size === 0) return;
 
     const writable = filteredEvents.filter(
       (event) =>
         event.kind === KIND_KNOWLEDGE_DOCUMENT || event.kind === KIND_DELETE
     );
 
-    if (writable.size === 0 || !addEvents) return Promise.resolve();
+    if (writable.size === 0) return;
 
-    addEvents(
-      ImmutableMap<string, Event | UnsignedEvent>(
-        writable
-          .map(
-            (event, index) =>
-              [`exec-${Date.now()}-${index}`, event] as [
-                string,
-                Event | UnsignedEvent
-              ]
-          )
-          .toArray()
-      )
-    );
+    if (addEvents) {
+      addEvents(
+        ImmutableMap<string, Event | UnsignedEvent>(
+          writable
+            .map(
+              (event, index) =>
+                [`exec-${Date.now()}-${index}`, event] as [
+                  string,
+                  Event | UnsignedEvent
+                ]
+            )
+            .toArray()
+        )
+      );
+    }
 
-    // eslint-disable-next-line no-console
-    console.warn(
-      "Filesystem executor: disk write not yet implemented",
-      writable.size,
-      "events"
-    );
-    return Promise.resolve();
+    if (workspace) {
+      await workspace.save(writable.toArray());
+    }
   };
 
   const republishEventsOnRelay = (): Promise<void> => {

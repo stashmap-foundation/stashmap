@@ -1,5 +1,41 @@
 # Lessons Learned
 
+## Stop when the stated goal is met; don't extrapolate from offhand architectural comments
+
+**Date**: 2026-04-22
+**Context**: User asked to unify two markdown serializers into one path. Earlier in the thread they also said "we shouldn't create nostr events directly [for filesystem persistence]." I bundled both into one plan — unified renderer (Phases 1-3) + restructured IPC with new `DocumentChange` / `WorkspaceChange` union types (Phases 4-6). User stopped me twice, asking "what are these change and delete types" — the types were solving a problem they hadn't asked me to solve yet.
+
+**Mistake**: Treating a side comment as committed scope. The user's "principle" framing ≠ "do this now." The original stated task (one renderer) was a self-contained fix; everything after was additive architectural work.
+
+**Rule**:
+1. When asked to fix a specific bug, land the smallest thing that fixes it.
+2. Side remarks ("we shouldn't do X", "the pipeline should be Y") describe a direction, not a task. Log them as a follow-up, don't fold them into the current change.
+3. If you think the scope should expand, propose it and wait for an explicit yes — don't assume agreement.
+
+## Test helpers used across both React and Node contexts must not import from @testing-library/react
+
+**Date**: 2026-04-22
+**Context**: Made `expectMarkdown` (in `src/testFixtures/workspace.ts`) async with polling, using `waitFor` from `@testing-library/react`. This fixture is called from both renderer tests (DOM context) and CLI tests (pure Node). CLI tests broke with "Could not find default container" because testing-library's `waitFor` needs a rendered React root.
+
+**Mistake**: Picked the most familiar polling primitive without checking whether the fixture's callers all share its runtime dependencies.
+
+**Rule**:
+1. Test fixtures in `src/testFixtures/` are shared between renderer and CLI — use pure-Node primitives (manual `setTimeout` poll, `fs`, etc.).
+2. `@testing-library/*` imports belong only in files that render React components.
+3. When making a sync helper async, check every call site's runtime before picking the async primitive.
+
+## Don't assume `await userEvent.type(...)` waits for fire-and-forget async handlers
+
+**Date**: 2026-04-22
+**Context**: Debated whether `FilesystemWriteThrough.test.tsx` needed polling to observe disk writes after typing. Single-run passed; full-suite runs flaked. Traced it to `executePlan` being called without `await` from handler call sites like `src/SplitPanesContext.tsx:80`.
+
+**Mistake**: Concluded "no race" from a single green run and proposed removing the wait. The race was real and timing-dependent.
+
+**Rule**:
+1. `userEvent.type` awaits input events and React commits, not downstream async chains started inside handlers.
+2. For tests that assert on side effects produced by fire-and-forget async handlers (network, fs, IPC), assume a race and build in a deterministic wait.
+3. Confirm no-race claims with at least 3 consecutive runs before committing to the simpler code.
+
 ## When the user has already manually verified behavior, record it instead of restating uncertainty
 
 **Date**: 2026-04-16

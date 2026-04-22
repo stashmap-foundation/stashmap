@@ -54,7 +54,7 @@ test("apply --dry-run reports a new child under a known parent", async () => {
       target_path: path.join(workspaceDir, "holidays.md"),
     },
   ]);
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "holidays.md",
     `
@@ -102,7 +102,7 @@ test("apply assigns ids to new inbox nodes before inserting them", async () => {
 
   const result = await knowstrApply(workspaceDir);
 
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "holidays.md",
     `
@@ -153,7 +153,7 @@ test("apply writes a new child under a known parent with preserved id and clears
   const result = await knowstrApply(workspaceDir);
 
   expect(result.dry_run).toBe(false);
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "holidays.md",
     `
@@ -196,7 +196,7 @@ test("apply puts a fully unknown subtree into maybe_relevant", async () => {
   expect(result.maybe_relevant_paths).toEqual([
     path.join(workspaceDir, "maybe_relevant", "unknown.md"),
   ]);
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "maybe_relevant/unknown.md",
     `

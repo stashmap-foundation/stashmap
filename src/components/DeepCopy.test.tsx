@@ -20,7 +20,7 @@ import {
   KIND_KNOWLEDGE_DOCUMENT,
   KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
 } from "../nostr";
-import { parseMarkdownHierarchy } from "../markdownDocument";
+import { parseMarkdownHierarchy } from "../markdownTree";
 
 const maybeExpand = async (label: string): Promise<void> => {
   const btn = screen.queryByLabelText(label);

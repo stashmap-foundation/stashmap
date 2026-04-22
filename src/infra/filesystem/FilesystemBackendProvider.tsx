@@ -14,6 +14,9 @@ export type WorkspaceIpc = {
   open: (folder: string) => Promise<void>;
   create: (args: { folder: string; secretKeyInput?: string }) => Promise<void>;
   isInitialised: (folder: string) => Promise<boolean>;
+  save: (
+    events: ReadonlyArray<UnsignedEvent>
+  ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
 };
 
 type LoadState =
@@ -64,6 +67,7 @@ export function FilesystemBackendProvider({
         await ipc.create(args);
         refresh();
       },
+      save: (eventsToWrite) => ipc.save(eventsToWrite),
     };
     return {
       subscribe: (_relays, _filters, params) => {

@@ -1,9 +1,9 @@
 import { ViewPath } from "../ViewContext";
 import { Plan, ParsedLine, parseClipboardText } from "../planner";
-import { MarkdownTreeNode, parseMarkdownHierarchy } from "../markdownDocument";
+import { MarkdownTreeNode, parseMarkdownHierarchy } from "../markdownTree";
 import { planInsertMarkdownTrees } from "../markdownPlan";
 
-export { parseMarkdownHierarchy } from "../markdownDocument";
+export { parseMarkdownHierarchy } from "../markdownTree";
 export type { MarkdownImportFile } from "../markdownImport";
 export {
   dropLeadingYamlEchoRoots,

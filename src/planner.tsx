@@ -13,9 +13,8 @@ import {
 import { useData } from "./DataContext";
 import { useExecutor } from "./ExecutorContext";
 import { newDB } from "./knowledge";
-import { buildDocumentEvent } from "./markdownDocument";
 import {
-  buildDocumentEventFromNodes,
+  buildDocumentEvent,
   buildSnapshotEventFromNodes,
 } from "./nodesDocumentEvent";
 import {
@@ -1487,15 +1486,9 @@ export function buildDocumentEvents(
           snapshotSourceRoot
         ) as UnsignedEvent & EventAttachment)
       : undefined;
-    const workspacePlan = plan as Partial<WorkspacePlan>;
-    const event =
-      workspacePlan.views !== undefined && workspacePlan.panes !== undefined
-        ? buildDocumentEvent(workspacePlan as Data, rootNode, {
-            snapshotDTag: rootNode.snapshotDTag ?? createdSnapshotDTag,
-          })
-        : buildDocumentEventFromNodes(plan.knowledgeDBs, rootNode, {
-            snapshotDTag: rootNode.snapshotDTag ?? createdSnapshotDTag,
-          });
+    const event = buildDocumentEvent(plan.knowledgeDBs, rootNode, {
+      snapshotDTag: rootNode.snapshotDTag ?? createdSnapshotDTag,
+    });
     return snapshotEvent
       ? events
           .push(snapshotEvent)

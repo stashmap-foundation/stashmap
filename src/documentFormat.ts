@@ -130,3 +130,20 @@ export function formatWithFrontMatter(
   }
   return `${frontMatter}\n${content}`;
 }
+
+const HEADING_LINE_RE = /^#{1,6} /;
+
+export function addBlankLinesAroundHeadings(lines: string[]): string[] {
+  return lines.reduce<string[]>((acc, line, index) => {
+    const isHeading = HEADING_LINE_RE.test(line);
+    const prevLine = acc.length > 0 ? acc[acc.length - 1] : undefined;
+    const prevIsHeading =
+      prevLine !== undefined && HEADING_LINE_RE.test(prevLine);
+    const needsBlankBefore = isHeading && index > 0 && prevLine !== "";
+    const needsBlankAfterPrev = prevIsHeading && !isHeading && prevLine !== "";
+    if (needsBlankBefore || needsBlankAfterPrev) {
+      return [...acc, "", line];
+    }
+    return [...acc, line];
+  }, []);
+}

@@ -36,7 +36,7 @@ test("knowstrInit + write + knowstrSave assigns ids and normalizes markdown", as
   const result = await knowstrSave(workspaceDir);
   expect(result.changed_paths).toEqual([path.join(workspaceDir, "hello.md")]);
 
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "hello.md",
     `

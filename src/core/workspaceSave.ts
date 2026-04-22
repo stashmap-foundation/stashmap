@@ -320,6 +320,27 @@ function validateWorkspaceIntegrity(
   }
 }
 
+export type WorkspaceWrite = {
+  filePath: string;
+  content: string;
+};
+
+export async function applyWorkspaceChanges(
+  writes: ReadonlyArray<WorkspaceWrite>,
+  deletions: ReadonlyArray<string> = []
+): Promise<{ changed_paths: string[]; removed_paths: string[] }> {
+  await Promise.all([
+    ...writes.map((write) =>
+      fs.writeFile(write.filePath, write.content, "utf8")
+    ),
+    ...deletions.map((filePath) => fs.unlink(filePath)),
+  ]);
+  return {
+    changed_paths: writes.map((write) => write.filePath),
+    removed_paths: [...deletions],
+  };
+}
+
 export async function saveEditedWorkspaceDocuments(
   profile: WorkspaceSaveProfile
 ): Promise<{
@@ -331,16 +352,13 @@ export async function saveEditedWorkspaceDocuments(
   );
   validateWorkspaceIntegrity(normalizedDocuments);
 
-  const changedDocuments = normalizedDocuments.filter(
-    (document) => document.changed
-  );
-  await Promise.all(
-    changedDocuments.map((document) =>
-      fs.writeFile(document.filePath, document.normalizedContent, "utf8")
-    )
-  );
+  const writes = normalizedDocuments
+    .filter((document) => document.changed)
+    .map((document) => ({
+      filePath: document.filePath,
+      content: document.normalizedContent,
+    }));
 
-  return {
-    changed_paths: changedDocuments.map((document) => document.filePath),
-  };
+  const result = await applyWorkspaceChanges(writes);
+  return { changed_paths: result.changed_paths };
 }

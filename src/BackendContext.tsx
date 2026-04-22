@@ -13,6 +13,9 @@ export type WorkspaceState = {
   open: (folder: string) => Promise<void>;
   create: (args: { folder: string; secretKeyInput?: string }) => Promise<void>;
   isInitialised: (folder: string) => Promise<boolean>;
+  save: (
+    events: ReadonlyArray<UnsignedEvent>
+  ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
   profile: LoadedCliProfile | null;
   events: UnsignedEvent[];
 };

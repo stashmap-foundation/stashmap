@@ -11,6 +11,9 @@ type IpcChannel = {
   open: (folder: string) => Promise<void>;
   create: (args: { folder: string; secretKeyInput?: string }) => Promise<void>;
   isInitialised: (folder: string) => Promise<boolean>;
+  save: (
+    events: ReadonlyArray<UnsignedEvent>
+  ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
 };
 
 function getChannel(): IpcChannel | undefined {
@@ -58,6 +61,13 @@ export function electronWorkspaceIpc(): WorkspaceIpc {
         return false;
       }
       return channel.isInitialised(folder);
+    },
+    save: async (events) => {
+      const channel = getChannel();
+      if (!channel) {
+        return { changed_paths: [], removed_paths: [] };
+      }
+      return channel.save(events);
     },
   };
 }

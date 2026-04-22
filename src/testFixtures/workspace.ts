@@ -121,14 +121,59 @@ export function readNodeId(
   return match[1];
 }
 
-export function expectMarkdown(
+async function pollUntil(
+  check: () => void,
+  deadline: number,
+  intervalMs = 10
+): Promise<void> {
+  try {
+    check();
+  } catch (err) {
+    if (Date.now() >= deadline) throw err;
+    await new Promise((resolve) => {
+      setTimeout(resolve, intervalMs);
+    });
+    await pollUntil(check, deadline, intervalMs);
+  }
+}
+
+export async function expectMarkdown(
   workspaceDir: string,
   relativePath: string,
   expected: string
-): void {
+): Promise<void> {
   const full = path.join(workspaceDir, relativePath);
-  const raw = fs.readFileSync(full, "utf8");
-  expect(normalizeMarkdownForComparison(raw)).toBe(
-    normalizeMarkdownForComparison(expected)
-  );
+  const expectedNormalized = normalizeMarkdownForComparison(expected);
+  const read = (): string =>
+    fs.existsSync(full)
+      ? normalizeMarkdownForComparison(fs.readFileSync(full, "utf8"))
+      : "";
+  try {
+    await pollUntil(() => {
+      expect(read()).toBe(expectedNormalized);
+    }, Date.now() + 1000);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.log(`ACTUAL MARKDOWN (${relativePath}):\n${read()}`);
+    // eslint-disable-next-line no-console
+    console.log(`EXPECTED MARKDOWN:\n${expectedNormalized}`);
+    throw error;
+  }
+}
+
+const ALWAYS_HIDDEN_ENTRIES = new Set([".knowstr", ".knowstrignore"]);
+
+export function ls(workspaceDir: string, relativeDir = ""): string[] {
+  const dirPath = path.join(workspaceDir, relativeDir);
+  const entries = fs
+    .readdirSync(dirPath, { withFileTypes: true })
+    .filter((entry) => !ALWAYS_HIDDEN_ENTRIES.has(entry.name))
+    .flatMap((entry) => {
+      const relativeEntryPath = path.join(relativeDir, entry.name);
+      if (entry.isDirectory()) {
+        return ls(workspaceDir, relativeEntryPath);
+      }
+      return [relativeEntryPath];
+    });
+  return [...entries].sort();
 }

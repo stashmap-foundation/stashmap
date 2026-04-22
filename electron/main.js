@@ -11,7 +11,10 @@ const path = require("path");
 // eslint-disable-next-line import/no-unresolved
 const { loadCliProfile } = require("../dist/cli/config");
 // eslint-disable-next-line import/no-unresolved
-const { loadWorkspaceAsEvents } = require("../dist/core/workspaceBackend");
+const {
+  loadWorkspaceAsEvents,
+  saveEventsToWorkspace,
+} = require("../dist/core/workspaceBackend");
 // eslint-disable-next-line import/no-unresolved
 const { createWorkspaceProfile } = require("../dist/cli/init");
 // eslint-disable-next-line import/no-unresolved
@@ -287,6 +290,24 @@ app.whenReady().then(() => {
     createWorkspaceProfile({ workspaceDir: folder, secretKey });
     recordOpenedWorkspace(folder);
     buildAndSetMenu();
+  });
+  ipcMain.handle("workspace:save", async (_event, events) => {
+    const envArgs = envCliProfileArgs();
+    const pruned = recentWorkspaces.listAndPrune();
+    const autoOpenId = pickAutoOpenId(pruned);
+    const autoOpenEntry = autoOpenId ? pruned.workspaces[autoOpenId] : undefined;
+    const profile = envArgs
+      ? loadCliProfile(envArgs)
+      : autoOpenEntry
+        ? loadCliProfile({ cwd: autoOpenEntry.path })
+        : null;
+    if (!profile) {
+      throw new Error("workspace:save has no active workspace");
+    }
+    return saveEventsToWorkspace(
+      { pubkey: profile.pubkey, workspaceDir: profile.workspaceDir },
+      events
+    );
   });
 
   buildAndSetMenu();

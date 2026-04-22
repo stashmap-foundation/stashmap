@@ -10,5 +10,6 @@ contextBridge.exposeInMainWorld("knowstrDesktop", {
     create: (args) => ipcRenderer.invoke("workspace:create", args),
     isInitialised: (folder) =>
       ipcRenderer.invoke("workspace:isInitialised", folder),
+    save: (events) => ipcRenderer.invoke("workspace:save", events),
   },
 });

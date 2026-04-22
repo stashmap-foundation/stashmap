@@ -27,7 +27,7 @@ test("save assigns knowstr_doc_id and node ids in place", async () => {
     path.join(workspaceDir, "notes/nested/project.md"),
   ]);
 
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "notes/nested/project.md",
     `
@@ -65,7 +65,7 @@ custom: yes
   expect(raw).toContain('title: "Doc"');
   expect(raw).toContain("custom: yes");
   expect(raw).toContain("knowstr_doc_id:");
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "doc.md",
     `
@@ -114,7 +114,7 @@ test("save inserts blank lines around headings but not between siblings", async 
 
   await knowstrSave(workspaceDir);
 
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "blank-lines.md",
     `
@@ -197,7 +197,7 @@ test("save succeeds when a previously saved node id is removed", async () => {
 
   await knowstrSave(workspaceDir);
 
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "doc.md",
     `
@@ -241,7 +241,7 @@ test("save preserves heading levels", async () => {
   );
 
   await knowstrSave(workspaceDir);
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "headings.md",
     `
@@ -262,7 +262,7 @@ test("save preserves ordered lists", async () => {
   write(workspaceDir, "recipe.md", "# Recipe\n1. one\n2. two\n3. three\n");
 
   await knowstrSave(workspaceDir);
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "recipe.md",
     `
@@ -292,7 +292,7 @@ test("save preserves mixed structure with ordered items and nested bullets", asy
   );
 
   await knowstrSave(workspaceDir);
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "mixed.md",
     `
@@ -325,7 +325,7 @@ test("save preserves siblings under multiple headings", async () => {
   );
 
   await knowstrSave(workspaceDir);
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "siblings.md",
     `
@@ -359,7 +359,7 @@ test("save preserves ordered list numbers when preceded by bullet siblings", asy
   );
 
   await knowstrSave(workspaceDir);
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "mixed-siblings.md",
     `
@@ -387,7 +387,7 @@ test("save preserves inline code in bullet items", async () => {
   );
 
   await knowstrSave(workspaceDir);
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "inline-code.md",
     `
@@ -413,7 +413,7 @@ test("save preserves inline code in headings", async () => {
   );
 
   await knowstrSave(workspaceDir);
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "heading-code.md",
     `
@@ -436,7 +436,7 @@ test("save preserves backtick-wrapped link markdown literally", async () => {
   );
 
   await knowstrSave(workspaceDir);
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "backtick-link.md",
     `
@@ -457,7 +457,7 @@ test("save preserves inline code combined with prefix markers", async () => {
   );
 
   await knowstrSave(workspaceDir);
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "prefix-code.md",
     `
@@ -484,7 +484,7 @@ test("save round-trips combined prefix markers like (-!) and (-~)", async () => 
   );
 
   await knowstrSave(workspaceDir);
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "combined-markers.md",
     `
@@ -507,7 +507,7 @@ test("save preserves bold and italic emphasis", async () => {
   );
 
   await knowstrSave(workspaceDir);
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "emphasis.md",
     `
@@ -528,7 +528,7 @@ test("save preserves non-ref external link markdown literally", async () => {
   );
 
   await knowstrSave(workspaceDir);
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "external-link.md",
     `
@@ -661,7 +661,7 @@ test("save kitchen-sink idempotency for inline formatting", async () => {
   );
 
   await knowstrSave(workspaceDir);
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "inline-kitchen-sink.md",
     `
@@ -745,7 +745,7 @@ test("save preserves HTML-comment-looking content inside inline code spans", asy
   );
 
   await knowstrSave(workspaceDir);
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "comment-in-code.md",
     `
@@ -766,7 +766,7 @@ test("save preserves two inline code spans that look like HTML id comments", asy
   );
 
   await knowstrSave(workspaceDir);
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "two-code-comments.md",
     `
@@ -787,7 +787,7 @@ test("save preserves a trailing inline code span with comment-like content", asy
   );
 
   await knowstrSave(workspaceDir);
-  expectMarkdown(
+  await expectMarkdown(
     workspaceDir,
     "trailing-code-comment.md",
     `

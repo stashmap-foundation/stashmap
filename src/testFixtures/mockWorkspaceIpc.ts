@@ -3,7 +3,10 @@ import path from "path";
 import { hexToBytes } from "@noble/hashes/utils";
 import { loadCliProfile } from "../cli/config";
 import { createWorkspaceProfile } from "../cli/init";
-import { loadWorkspaceAsEvents } from "../core/workspaceBackend";
+import {
+  loadWorkspaceAsEvents,
+  saveEventsToWorkspace,
+} from "../core/workspaceBackend";
 import { convertInputToPrivateKey } from "../nostrKey";
 import {
   WorkspaceIpc,
@@ -71,6 +74,16 @@ export function mockWorkspaceIpc(
       Promise.resolve(
         fs.existsSync(path.join(folder, ".knowstr", "profile.json"))
       ),
+    save: async (events) => {
+      if (!state.current) {
+        return { changed_paths: [], removed_paths: [] };
+      }
+      const profile = loadCliProfile({ cwd: state.current });
+      return saveEventsToWorkspace(
+        { pubkey: profile.pubkey, workspaceDir: profile.workspaceDir },
+        events
+      );
+    },
     setCurrent: (folder) => {
       // eslint-disable-next-line functional/immutable-data
       state.current = folder;

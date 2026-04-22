@@ -7,7 +7,6 @@ import {
   UnsignedEvent,
 } from "nostr-tools";
 import { LoadedCliProfile } from "./cli/config";
-import type { GraphPlan } from "./planner";
 
 export type WorkspaceState = {
   pickFolder: () => Promise<string | null>;
@@ -25,7 +24,6 @@ export type Backend = {
     params: SubscribeManyParams
   ) => SubCloser;
   publish: (relays: string[], event: Event) => Promise<string>[];
-  execute: (plan: GraphPlan) => Promise<PublishResultsEventMap>;
   user: User | undefined;
   login?: (privateKey: string) => User;
   loginWithExtension?: (publicKey: PublicKey) => User;

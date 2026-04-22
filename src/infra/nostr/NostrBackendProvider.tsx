@@ -7,7 +7,6 @@ import { DEFAULT_RELAYS } from "../../nostr";
 import { sanitizeRelays } from "../../relays";
 import { clearDatabase, openDB, StashmapDB } from "./cache/indexedDB";
 import { CacheDBProvider } from "./cache/CacheDBContext";
-import { execute as executeNostrPlan } from "./executor";
 
 function userFromPrivateKey(privateKey: string): User {
   const key = hexToBytes(privateKey);
@@ -25,7 +24,7 @@ export function NostrBackendProvider({
   defaultRelayUrls?: Array<string>;
   children: React.ReactNode;
 }): JSX.Element {
-  const { relayPool, fileStore, finalizeEvent } = useApis();
+  const { relayPool, fileStore } = useApis();
   const privKeyFromStorage = fileStore.getLocalStorage("privateKey");
   const userFromStorage =
     privKeyFromStorage !== null
@@ -82,24 +81,17 @@ export function NostrBackendProvider({
       window.history.replaceState(null, "", "/");
       window.location.reload();
     };
-    const nostrBackend: Backend = {
+    return {
       subscribe: (relayList, filters, params) =>
         relayPool.subscribeMany(relayList, filters, params),
       publish: (relayList, event) => relayPool.publish(relayList, event),
-      execute: (plan) =>
-        executeNostrPlan({
-          plan,
-          backend: nostrBackend,
-          finalizeEvent,
-        }),
       user,
       login,
       loginWithExtension,
       logout,
       defaultRelays: relays,
     };
-    return nostrBackend;
-  }, [relayPool, fileStore, finalizeEvent, user, relays]);
+  }, [relayPool, fileStore, user, relays]);
 
   return (
     <BackendProvider backend={backend}>

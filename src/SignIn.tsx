@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { List } from "immutable";
 import { Form, Modal } from "react-bootstrap";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ErrorMessage } from "./commons/ErrorMessage";
@@ -10,8 +11,8 @@ import {
   useLoginWithExtension,
 } from "./NostrAuthContext";
 import { useData } from "./DataContext";
-import { planRewriteUnpublishedEvents, usePlanner } from "./planner";
-import { useBackend } from "./BackendContext";
+import { Plan, planRewriteUnpublishedEvents, usePlanner } from "./planner";
+import { useExecutor } from "./ExecutorContext";
 import { KINDS_META } from "./infra/nostr/NostrDataProvider";
 import { useStorePreLoginEvents } from "./StorePreLoginContext";
 import { convertInputToPrivateKey } from "./nostrKey";
@@ -185,7 +186,7 @@ export function SignInModal(): JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
   const { publishEventsStatus } = useData();
-  const backend = useBackend();
+  const executor = useExecutor();
   const { createPlan, setPublishEvents } = usePlanner();
   const referrer = (location.state as LocationState | undefined)?.referrer;
   const signInReferrer = `${location.pathname}${location.search}${location.hash}`;
@@ -227,25 +228,12 @@ export function SignInModal(): JSX.Element {
     if (nonMergeEvents.size > 0) {
       setPublishEvents((current) => {
         return {
-          unsignedEvents: nonMergeEvents,
-          results: current.results,
-          isLoading: true,
+          ...current,
+          unsignedEvents: List(),
           preLoginEvents: mergeEvents,
-          temporaryView: current.temporaryView,
-          temporaryEvents: current.temporaryEvents,
         };
       });
-      backend
-        .execute({ ...plan, publishEvents: nonMergeEvents })
-        .then((results) => {
-          setPublishEvents((current) => {
-            return {
-              ...current,
-              results,
-              isLoading: false,
-            };
-          });
-        });
+      executor.executePlan({ ...plan, publishEvents: nonMergeEvents } as Plan);
     } else {
       setPublishEvents((current) => {
         return {

@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Map } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
 import { Backend, BackendProvider, WorkspaceState } from "../../BackendContext";
 import { LoadedCliProfile } from "../../cli/config";
@@ -78,14 +77,6 @@ export function FilesystemBackendProvider({
           event.kind
         );
         return relayList.map(() => Promise.resolve(""));
-      },
-      execute: (plan) => {
-        // eslint-disable-next-line no-console
-        console.warn(
-          "Filesystem execute not yet implemented; dropping plan",
-          plan.affectedRoots.size
-        );
-        return Promise.resolve(Map() as PublishResultsEventMap);
       },
       user,
       defaultRelays,

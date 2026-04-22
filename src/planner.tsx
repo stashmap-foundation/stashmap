@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data, no-continue, no-nested-ternary */
-import React, { Dispatch, SetStateAction, useEffect, useRef } from "react";
+import React, { Dispatch, SetStateAction, useRef } from "react";
 import { List, Map, OrderedSet, Set as ImmutableSet } from "immutable";
-import { UnsignedEvent, Event } from "nostr-tools";
+import { UnsignedEvent } from "nostr-tools";
 import {
   KIND_DELETE,
   KIND_KNOWLEDGE_DOCUMENT,
@@ -11,11 +11,7 @@ import {
   msTag,
 } from "./nostr";
 import { useData } from "./DataContext";
-import { republishEvents } from "./infra/nostr/executor";
-import { useApis } from "./Apis";
-import { useBackend } from "./BackendContext";
-import { createPublishQueue } from "./infra/nostr/cache/PublishQueue";
-import type { StashmapDB } from "./infra/nostr/cache/indexedDB";
+import { useExecutor } from "./ExecutorContext";
 import { newDB } from "./knowledge";
 import { buildDocumentEvent } from "./markdownDocument";
 import {
@@ -60,7 +56,6 @@ import {
 import { newRefNode } from "./nodeFactory";
 import { UNAUTHENTICATED_USER_PK } from "./NostrAuthContext";
 import { useRelaysToCreatePlan } from "./relays";
-import { mergePublishResultsOfEvents } from "./commons/PublishingStatus";
 import { createRootAnchor } from "./rootAnchor";
 import {
   MultiSelectionState,
@@ -1514,158 +1509,22 @@ export function PlanningContextProvider({
   setPublishEvents,
   setPanes,
   setViews,
-  db,
-  getRelays,
 }: {
   children: React.ReactNode;
   setPublishEvents: Dispatch<SetStateAction<EventState>>;
   setPanes: Dispatch<SetStateAction<Pane[]>>;
   setViews: Dispatch<SetStateAction<Views>>;
-  db?: StashmapDB | null;
-  getRelays?: () => AllRelays;
 }): JSX.Element {
-  const { finalizeEvent } = useApis();
-  const backend = useBackend();
-  const { user } = useData();
-
-  const depsRef = useRef({
-    user,
-    relays: getRelays
-      ? getRelays()
-      : {
-          defaultRelays: [] as Relays,
-          userRelays: [] as Relays,
-          contactsRelays: [] as Relays,
-        },
-    backend,
-    finalizeEvent,
-  });
+  const executor = useExecutor();
+  const setViewsRef = useRef(setViews);
   // eslint-disable-next-line functional/immutable-data
-  depsRef.current = {
-    user,
-    relays: getRelays ? getRelays() : depsRef.current.relays,
-    backend,
-    finalizeEvent,
-  };
-
-  const setPublishEventsRef = useRef(setPublishEvents);
-  // eslint-disable-next-line functional/immutable-data
-  setPublishEventsRef.current = setPublishEvents;
-
-  const queueRef = useRef<ReturnType<typeof createPublishQueue> | null>(null);
-
-  useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    if (!db) return () => {};
-    const queue = createPublishQueue({
-      db,
-      getDeps: () => depsRef.current,
-      onResults: (results) => {
-        setPublishEventsRef.current((prevStatus) => ({
-          ...prevStatus,
-          results: mergePublishResultsOfEvents(prevStatus.results, results),
-          isLoading: false,
-          queueStatus: queueRef.current?.getStatus(),
-        }));
-      },
-    });
-    // eslint-disable-next-line functional/immutable-data
-    queueRef.current = queue;
-    queue.init().then(() => {
-      setPublishEventsRef.current((prev) => ({
-        ...prev,
-        queueStatus: queue.getStatus(),
-      }));
-    });
-    return () => {
-      // eslint-disable-next-line functional/immutable-data
-      queueRef.current = null;
-      queue.destroy();
-    };
-  }, [db]);
-
-  const executePlan = async (plan: Plan): Promise<void> => {
-    setPanes(plan.panes);
-    setViews(plan.views);
-    const filteredEvents = buildDocumentEvents(plan);
-
-    if (filteredEvents.size === 0) {
-      setPublishEvents((prevStatus) => {
-        const newTemporaryEvents = prevStatus.temporaryEvents.concat(
-          plan.temporaryEvents
-        );
-        return {
-          ...prevStatus,
-          temporaryView: plan.temporaryView,
-          temporaryEvents: newTemporaryEvents,
-        };
-      });
-      return;
-    }
-
-    setPublishEvents((prevStatus) => {
-      const newTemporaryEvents = prevStatus.temporaryEvents.concat(
-        plan.temporaryEvents
-      );
-      return {
-        unsignedEvents: prevStatus.unsignedEvents.concat(filteredEvents),
-        results: prevStatus.results,
-        isLoading: !queueRef.current,
-        preLoginEvents: prevStatus.preLoginEvents,
-        temporaryView: plan.temporaryView,
-        temporaryEvents: newTemporaryEvents,
-      };
-    });
-
-    if (queueRef.current) {
-      queueRef.current.enqueue(filteredEvents);
-      setPublishEvents((prev) => ({
-        ...prev,
-        queueStatus: queueRef.current?.getStatus(),
-      }));
-      return;
-    }
-
-    const filteredPlan = {
-      ...plan,
-      publishEvents: filteredEvents,
-      affectedRoots: ImmutableSet<ID>(),
-    };
-
-    const results = await backend.execute(filteredPlan);
-
-    setPublishEvents((prevStatus) => {
-      return {
-        ...prevStatus,
-        results: mergePublishResultsOfEvents(prevStatus.results, results),
-        isLoading: false,
-      };
-    });
-  };
-
-  const republishEventsOnRelay = async (
-    events: List<Event>,
-    relayUrl: string
-  ): Promise<void> => {
-    const results = await republishEvents({
-      events,
-      backend,
-      writeRelayUrl: relayUrl,
-    });
-    setPublishEvents((prevStatus) => {
-      return {
-        ...prevStatus,
-        results: mergePublishResultsOfEvents(prevStatus.results, results),
-        isLoading: false,
-      };
-    });
-  };
+  setViewsRef.current = setViews;
 
   return (
     <PlanningContext.Provider
       value={{
-        executePlan,
-        republishEvents: republishEventsOnRelay,
+        executePlan: executor.executePlan,
+        republishEvents: executor.republishEvents,
         setPublishEvents,
         setPanes,
       }}

@@ -12,6 +12,7 @@ import { DataContextProvider, MergeKnowledgeDB } from "../../DataContext";
 import { useApis } from "../../Apis";
 import { useBackend } from "../../BackendContext";
 import { PlanningContextProvider } from "../../planner";
+import { NostrExecutorProvider } from "./NostrExecutorProvider";
 import { useUserRelayContext } from "../../UserRelayContext";
 import { flattenRelays, usePreloadRelays } from "../../relays";
 import { useDefaultRelays, useUserOrAnon } from "../../NostrAuthContext";
@@ -190,19 +191,24 @@ export function NostrDataProvider({
       >
         <NostrCacheSync />
         <MergeKnowledgeDB>
-          <PlanningContextProvider
+          <NostrExecutorProvider
             setPublishEvents={session.setPublishStatus}
             setPanes={session.setPanes}
             setViews={session.setViews}
-            db={db || null}
             getRelays={() => ({
               defaultRelays,
               userRelays,
               contactsRelays: flattenRelays(contactsRelays),
             })}
           >
-            <NavigationStateProvider>{children}</NavigationStateProvider>
-          </PlanningContextProvider>
+            <PlanningContextProvider
+              setPublishEvents={session.setPublishStatus}
+              setPanes={session.setPanes}
+              setViews={session.setViews}
+            >
+              <NavigationStateProvider>{children}</NavigationStateProvider>
+            </PlanningContextProvider>
+          </NostrExecutorProvider>
         </MergeKnowledgeDB>
       </DocumentStoreProvider>
     </DataContextProvider>

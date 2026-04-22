@@ -171,7 +171,6 @@ function applyApis(props?: Partial<TestApis>): TestApis {
     subscribe: (relays, filters, params) =>
       relayPool.subscribeMany(relays, filters, params),
     publish: (relays, event) => relayPool.publish(relays, event),
-    execute: () => Promise.resolve(Map() as PublishResultsEventMap),
     user: undefined,
     defaultRelays: [] as Relays,
   };

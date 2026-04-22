@@ -1,11 +1,11 @@
 import React from "react";
 import { Map } from "immutable";
-import { useBackend } from "../../BackendContext";
-import { useUserOrAnon, useDefaultRelays } from "../../NostrAuthContext";
+import { useUserOrAnon } from "../../NostrAuthContext";
 import { useUserSessionState } from "../../userSessionState";
 import { DataContextProvider, MergeKnowledgeDB } from "../../DataContext";
 import { DocumentStoreProvider } from "../../DocumentStore";
 import { PlanningContextProvider } from "../../planner";
+import { FilesystemExecutorProvider } from "./FilesystemExecutorProvider";
 import { NavigationStateProvider } from "../../NavigationStateContext";
 import { createEmptySemanticIndex } from "../../semanticIndex";
 import { FilesystemWorkspaceLoader } from "./FilesystemWorkspaceLoader";
@@ -16,10 +16,7 @@ export function FilesystemDataProvider({
   children: React.ReactNode;
 }): JSX.Element {
   const user = useUserOrAnon();
-  const backend = useBackend();
-  const defaultRelays = useDefaultRelays();
   const session = useUserSessionState(user);
-  const userRelays = backend.workspace?.profile?.relays ?? [];
 
   return (
     <DataContextProvider
@@ -39,19 +36,19 @@ export function FilesystemDataProvider({
       >
         <FilesystemWorkspaceLoader />
         <MergeKnowledgeDB>
-          <PlanningContextProvider
+          <FilesystemExecutorProvider
             setPublishEvents={session.setPublishStatus}
             setPanes={session.setPanes}
             setViews={session.setViews}
-            db={null}
-            getRelays={() => ({
-              defaultRelays,
-              userRelays,
-              contactsRelays: [],
-            })}
           >
-            <NavigationStateProvider>{children}</NavigationStateProvider>
-          </PlanningContextProvider>
+            <PlanningContextProvider
+              setPublishEvents={session.setPublishStatus}
+              setPanes={session.setPanes}
+              setViews={session.setViews}
+            >
+              <NavigationStateProvider>{children}</NavigationStateProvider>
+            </PlanningContextProvider>
+          </FilesystemExecutorProvider>
         </MergeKnowledgeDB>
       </DocumentStoreProvider>
     </DataContextProvider>

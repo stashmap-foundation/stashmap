@@ -122,7 +122,8 @@ export function getStoredEventID(
 }
 
 export function toStoredDocumentRecord(
-  event: Event | UnsignedEvent
+  event: Event | UnsignedEvent,
+  filePath?: string
 ): StoredDocumentRecord | undefined {
   if (event.kind !== KIND_KNOWLEDGE_DOCUMENT) {
     return undefined;
@@ -141,6 +142,7 @@ export function toStoredDocumentRecord(
     updatedMs: getEventMs(event),
     content: event.content,
     tags: event.tags,
+    ...(filePath !== undefined && { filePath }),
   };
 }
 

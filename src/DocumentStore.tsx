@@ -1,17 +1,9 @@
 import React from "react";
 import { List, Map as ImmutableMap } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
-import type {
-  StoredDeleteRecord,
-  StoredDocumentRecord,
-  StoredSnapshotRecord,
-} from "./infra/nostr/cache/indexedDB";
-import {
-  buildKnowledgeDBFromDocumentNodes,
-  storedDocumentToEvent,
-} from "./documentMaterialization";
-import { toStoredDeleteRecord, toStoredDocumentRecord } from "./permanentSync";
-import { parseDocumentEvent } from "./markdownNodes";
+import type { StoredSnapshotRecord } from "./infra/nostr/cache/indexedDB";
+import { buildKnowledgeDBFromDocumentNodes } from "./documentMaterialization";
+import { parseDocumentContent } from "./markdownNodes";
 import {
   toStoredSnapshotRecord,
   materializeSnapshot,
@@ -21,10 +13,14 @@ import {
   createEmptySemanticIndex,
   removeNodesFromSemanticIndex,
 } from "./semanticIndex";
+import { eventToDocument, eventToDocumentDelete } from "./nostrEvents";
+import { Document, DocumentDelete, documentKeyOf } from "./Document";
+
+export type { Document, DocumentDelete };
 
 type DocumentSnapshot = {
-  documents: ImmutableMap<string, StoredDocumentRecord>;
-  deletes: ImmutableMap<string, StoredDeleteRecord>;
+  documents: ImmutableMap<string, Document>;
+  deletes: ImmutableMap<string, DocumentDelete>;
   nodesByDocumentKey: ImmutableMap<string, ImmutableMap<string, GraphNode>>;
   knowledgeDBs: KnowledgeDBs;
   semanticIndex: SemanticIndex;
@@ -34,6 +30,8 @@ type DocumentStoreState = {
   knowledgeDBs: KnowledgeDBs;
   semanticIndex: SemanticIndex;
   snapshotNodes: SnapshotNodes;
+  upsertDocument: (doc: Document) => void;
+  deleteDocument: (del: DocumentDelete) => void;
   addEvents: (events: ImmutableMap<string, Event | UnsignedEvent>) => void;
 };
 
@@ -43,31 +41,33 @@ const DocumentStoreContext = React.createContext<
 
 function createEmptySnapshot(): DocumentSnapshot {
   return {
-    documents: ImmutableMap<string, StoredDocumentRecord>(),
-    deletes: ImmutableMap<string, StoredDeleteRecord>(),
+    documents: ImmutableMap<string, Document>(),
+    deletes: ImmutableMap<string, DocumentDelete>(),
     nodesByDocumentKey: ImmutableMap<string, ImmutableMap<string, GraphNode>>(),
     knowledgeDBs: ImmutableMap<PublicKey, KnowledgeData>(),
     semanticIndex: createEmptySemanticIndex(),
   };
 }
 
-function parseStoredDocumentNodes(
-  document: StoredDocumentRecord
-): ImmutableMap<string, GraphNode> {
-  return parseDocumentEvent(storedDocumentToEvent(document));
+function parseDocumentNodes(doc: Document): ImmutableMap<string, GraphNode> {
+  return parseDocumentContent({
+    content: doc.content,
+    author: doc.author,
+    filePath: doc.filePath,
+    updatedMs: doc.updatedMs,
+  });
 }
 
 function getAuthorDocumentNodes(
   snapshot: DocumentSnapshot,
   author: PublicKey
 ): ImmutableMap<string, GraphNode> {
-  return snapshot.documents.valueSeq().reduce((acc, document) => {
-    if (document.author !== author) {
+  return snapshot.documents.entrySeq().reduce((acc, [key, doc]) => {
+    if (doc.author !== author) {
       return acc;
     }
     return acc.merge(
-      snapshot.nodesByDocumentKey.get(document.replaceableKey) ||
-        ImmutableMap<string, GraphNode>()
+      snapshot.nodesByDocumentKey.get(key) || ImmutableMap<string, GraphNode>()
     );
   }, ImmutableMap<string, GraphNode>());
 }
@@ -91,25 +91,25 @@ function rebuildAuthors(
 
 function applyDocumentToSnapshot(
   snapshot: DocumentSnapshot,
-  document: StoredDocumentRecord
+  doc: Document
 ): DocumentSnapshot {
-  const nextNodes = parseStoredDocumentNodes(document);
-  const existingDocument = snapshot.documents.get(document.replaceableKey);
-  const existingDelete = snapshot.deletes.get(document.replaceableKey);
+  const key = documentKeyOf(doc.author, doc.dTag);
+  const nextNodes = parseDocumentNodes(doc);
+  const existingDocument = snapshot.documents.get(key);
+  const existingDelete = snapshot.deletes.get(key);
   const existingNodes =
-    snapshot.nodesByDocumentKey.get(document.replaceableKey) ||
-    ImmutableMap<string, GraphNode>();
+    snapshot.nodesByDocumentKey.get(key) || ImmutableMap<string, GraphNode>();
 
-  if (existingDelete && existingDelete.deletedAt >= document.updatedMs) {
+  if (existingDelete && existingDelete.deletedAt >= doc.updatedMs) {
     return snapshot;
   }
-  if (existingDocument && existingDocument.updatedMs >= document.updatedMs) {
+  if (existingDocument && existingDocument.updatedMs >= doc.updatedMs) {
     return snapshot;
   }
 
   const nextDeletes =
-    existingDelete && document.updatedMs > existingDelete.deletedAt
-      ? snapshot.deletes.remove(document.replaceableKey)
+    existingDelete && doc.updatedMs > existingDelete.deletedAt
+      ? snapshot.deletes.remove(key)
       : snapshot.deletes;
   const withoutExistingNodes =
     existingNodes.size > 0
@@ -117,15 +117,12 @@ function applyDocumentToSnapshot(
       : snapshot.semanticIndex;
   const nextSnapshotBase = {
     ...snapshot,
-    documents: snapshot.documents.set(document.replaceableKey, document),
+    documents: snapshot.documents.set(key, doc),
     deletes: nextDeletes,
-    nodesByDocumentKey: snapshot.nodesByDocumentKey.set(
-      document.replaceableKey,
-      nextNodes
-    ),
+    nodesByDocumentKey: snapshot.nodesByDocumentKey.set(key, nextNodes),
     semanticIndex: addNodesToSemanticIndex(withoutExistingNodes, nextNodes),
   };
-  const knowledgeDBs = rebuildAuthors(nextSnapshotBase, [document.author]);
+  const knowledgeDBs = rebuildAuthors(nextSnapshotBase, [doc.author]);
   return {
     ...nextSnapshotBase,
     knowledgeDBs,
@@ -134,10 +131,11 @@ function applyDocumentToSnapshot(
 
 function applyDeleteToSnapshot(
   snapshot: DocumentSnapshot,
-  deletion: StoredDeleteRecord
+  deletion: DocumentDelete
 ): DocumentSnapshot {
-  const existingDocument = snapshot.documents.get(deletion.replaceableKey);
-  const existingDelete = snapshot.deletes.get(deletion.replaceableKey);
+  const key = documentKeyOf(deletion.author, deletion.dTag);
+  const existingDocument = snapshot.documents.get(key);
+  const existingDelete = snapshot.deletes.get(key);
 
   if (existingDelete && existingDelete.deletedAt >= deletion.deletedAt) {
     return snapshot;
@@ -147,18 +145,18 @@ function applyDeleteToSnapshot(
     ...snapshot,
     documents:
       existingDocument && existingDocument.updatedMs <= deletion.deletedAt
-        ? snapshot.documents.remove(deletion.replaceableKey)
+        ? snapshot.documents.remove(key)
         : snapshot.documents,
-    deletes: snapshot.deletes.set(deletion.replaceableKey, deletion),
+    deletes: snapshot.deletes.set(key, deletion),
     nodesByDocumentKey:
       existingDocument && existingDocument.updatedMs <= deletion.deletedAt
-        ? snapshot.nodesByDocumentKey.remove(deletion.replaceableKey)
+        ? snapshot.nodesByDocumentKey.remove(key)
         : snapshot.nodesByDocumentKey,
     semanticIndex:
       existingDocument && existingDocument.updatedMs <= deletion.deletedAt
         ? removeNodesFromSemanticIndex(
             snapshot.semanticIndex,
-            snapshot.nodesByDocumentKey.get(deletion.replaceableKey) ||
+            snapshot.nodesByDocumentKey.get(key) ||
               ImmutableMap<string, GraphNode>()
           )
         : snapshot.semanticIndex,
@@ -172,11 +170,11 @@ function applyDeleteToSnapshot(
 
 function applyRecordsToSnapshot(
   snapshot: DocumentSnapshot,
-  documents: ReadonlyArray<StoredDocumentRecord>,
-  deletes: ReadonlyArray<StoredDeleteRecord>
+  documents: ReadonlyArray<Document>,
+  deletes: ReadonlyArray<DocumentDelete>
 ): DocumentSnapshot {
   const withDocuments = documents.reduce(
-    (acc, document) => applyDocumentToSnapshot(acc, document),
+    (acc, doc) => applyDocumentToSnapshot(acc, doc),
     snapshot
   );
   return deletes.reduce(
@@ -185,17 +183,17 @@ function applyRecordsToSnapshot(
   );
 }
 
-function eventsToStoredRecords(events: ReadonlyArray<Event | UnsignedEvent>): {
-  readonly documents: ReadonlyArray<StoredDocumentRecord>;
-  readonly deletes: ReadonlyArray<StoredDeleteRecord>;
+function eventsToDocuments(events: ReadonlyArray<Event | UnsignedEvent>): {
+  readonly documents: ReadonlyArray<Document>;
+  readonly deletes: ReadonlyArray<DocumentDelete>;
 } {
   return {
     documents: events
-      .map((event) => toStoredDocumentRecord(event))
-      .filter((record): record is StoredDocumentRecord => record !== undefined),
+      .map((event) => eventToDocument(event))
+      .filter((doc): doc is Document => doc !== undefined),
     deletes: events
-      .map((event) => toStoredDeleteRecord(event))
-      .filter((record): record is StoredDeleteRecord => record !== undefined),
+      .map((event) => eventToDocumentDelete(event))
+      .filter((del): del is DocumentDelete => del !== undefined),
   };
 }
 
@@ -212,10 +210,18 @@ export function DocumentStoreProvider({
     ImmutableMap()
   );
 
+  const upsertDocument = React.useCallback((doc: Document) => {
+    setSnapshot((current) => applyDocumentToSnapshot(current, doc));
+  }, []);
+
+  const deleteDocument = React.useCallback((del: DocumentDelete) => {
+    setSnapshot((current) => applyDeleteToSnapshot(current, del));
+  }, []);
+
   const addEvents = React.useCallback(
     (events: ImmutableMap<string, Event | UnsignedEvent>) => {
       const eventList = events.valueSeq().toArray();
-      const { documents, deletes } = eventsToStoredRecords(eventList);
+      const { documents, deletes } = eventsToDocuments(eventList);
 
       const snapshotRecords = eventList
         .map((event) => toStoredSnapshotRecord(event))
@@ -246,14 +252,8 @@ export function DocumentStoreProvider({
   );
 
   const activeSnapshot = React.useMemo(() => {
-    const documents = unpublishedEvents
-      .map((event) => toStoredDocumentRecord(event))
-      .filter((record): record is StoredDocumentRecord => record !== undefined)
-      .toArray();
-    const deletes = unpublishedEvents
-      .map((event) => toStoredDeleteRecord(event))
-      .filter((record): record is StoredDeleteRecord => record !== undefined)
-      .toArray();
+    const eventList = unpublishedEvents.toArray();
+    const { documents, deletes } = eventsToDocuments(eventList);
     return applyRecordsToSnapshot(snapshot, documents, deletes);
   }, [snapshot, unpublishedEvents]);
 
@@ -274,9 +274,11 @@ export function DocumentStoreProvider({
       knowledgeDBs: activeSnapshot.knowledgeDBs,
       semanticIndex: activeSnapshot.semanticIndex,
       snapshotNodes,
+      upsertDocument,
+      deleteDocument,
       addEvents,
     }),
-    [activeSnapshot, addEvents, snapshotNodes]
+    [activeSnapshot, upsertDocument, deleteDocument, addEvents, snapshotNodes]
   );
 
   return (

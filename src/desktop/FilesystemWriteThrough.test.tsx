@@ -1,3 +1,4 @@
+import fs from "fs";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
@@ -36,6 +37,68 @@ Holiday Destinations
 `
   );
   expect(ls(path)).toEqual(["holiday-destinations.md", "log.md"]);
+});
+
+test("adding a sibling to a hand-written file updates the same file (no duplicate)", async () => {
+  const { path } = knowstrInit();
+  write(
+    path,
+    "holidays.md",
+    `
+# Holiday Destinations
+## Bali
+- Beaches
+`
+  );
+
+  await renderAppTree({ path, search: "Holiday Destinations" });
+
+  await expectTree(`
+Holiday Destinations
+  Bali
+`);
+
+  await userEvent.click(await screen.findByLabelText("edit Bali"));
+  await userEvent.keyboard("{Enter}Spain{Escape}");
+
+  await expectTree(`
+Holiday Destinations
+  Bali
+  Spain
+`);
+
+  expect(ls(path)).toEqual(["holidays.md"]);
+  await expectMarkdown(
+    path,
+    "holidays.md",
+    `
+# Holiday Destinations <!-- id:... -->
+
+## Bali <!-- id:... -->
+
+- Beaches <!-- id:... -->
+
+## Spain <!-- id:... -->
+`
+  );
+});
+
+test("opening a workspace does not write to any file on disk", async () => {
+  const { path } = knowstrInit();
+  const before = `
+# Doc
+- one
+`;
+  write(path, "doc.md", before);
+
+  await renderAppTree({ path, search: "Doc" });
+  await expectTree(`
+Doc
+  one
+`);
+
+  expect(ls(path)).toEqual(["doc.md"]);
+  expect(fs.readFileSync(`${path}/doc.md`, "utf8")).toBe(before);
 });
 
 test("adding a sibling after a heading writes unambiguous markdown", async () => {

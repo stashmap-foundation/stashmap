@@ -12,8 +12,8 @@ const path = require("path");
 const { loadCliProfile } = require("../dist/cli/config");
 // eslint-disable-next-line import/no-unresolved
 const {
-  loadWorkspaceAsEvents,
-  saveEventsToWorkspace,
+  loadWorkspaceAsDocuments,
+  saveDocumentsToWorkspace,
 } = require("../dist/core/workspaceBackend");
 // eslint-disable-next-line import/no-unresolved
 const { createWorkspaceProfile } = require("../dist/cli/init");
@@ -46,11 +46,11 @@ function envCliProfileArgs() {
 const recentWorkspaces = createRecentWorkspacesStore();
 
 async function loadProfileAndEvents(profile) {
-  const events = await loadWorkspaceAsEvents({
+  const documents = await loadWorkspaceAsDocuments({
     pubkey: profile.pubkey,
     workspaceDir: profile.workspaceDir,
   });
-  return { profile, events };
+  return { profile, documents };
 }
 
 function isInitialisedFolder(folder) {
@@ -291,7 +291,7 @@ app.whenReady().then(() => {
     recordOpenedWorkspace(folder);
     buildAndSetMenu();
   });
-  ipcMain.handle("workspace:save", async (_event, events) => {
+  ipcMain.handle("workspace:save", async (_event, documents, deletedPaths) => {
     const envArgs = envCliProfileArgs();
     const pruned = recentWorkspaces.listAndPrune();
     const autoOpenId = pickAutoOpenId(pruned);
@@ -304,9 +304,10 @@ app.whenReady().then(() => {
     if (!profile) {
       throw new Error("workspace:save has no active workspace");
     }
-    return saveEventsToWorkspace(
+    return saveDocumentsToWorkspace(
       { pubkey: profile.pubkey, workspaceDir: profile.workspaceDir },
-      events
+      documents,
+      deletedPaths
     );
   });
 

@@ -151,6 +151,7 @@ export function parseWorkspaceDocumentRoots(
   return {
     ...mainRoot,
     frontMatter,
+    filePath: relativePath,
   } as MarkdownTreeNode;
 }
 

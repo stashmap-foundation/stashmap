@@ -31,6 +31,7 @@ export type StoredDocumentRecord = {
   readonly updatedMs: number;
   readonly content: string;
   readonly tags: string[][];
+  readonly filePath?: string;
 };
 
 export type StoredDeleteRecord = {

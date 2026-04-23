@@ -1,12 +1,7 @@
 import React from "react";
-import {
-  Event,
-  Filter,
-  SubCloser,
-  SubscribeManyParams,
-  UnsignedEvent,
-} from "nostr-tools";
+import { Event, Filter, SubCloser, SubscribeManyParams } from "nostr-tools";
 import { LoadedCliProfile } from "./cli/config";
+import type { Document } from "./DocumentStore";
 
 export type WorkspaceState = {
   pickFolder: () => Promise<string | null>;
@@ -14,10 +9,11 @@ export type WorkspaceState = {
   create: (args: { folder: string; secretKeyInput?: string }) => Promise<void>;
   isInitialised: (folder: string) => Promise<boolean>;
   save: (
-    events: ReadonlyArray<UnsignedEvent>
+    documents: ReadonlyArray<Document>,
+    deletedPaths?: ReadonlyArray<string>
   ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
   profile: LoadedCliProfile | null;
-  events: UnsignedEvent[];
+  documents: Document[];
 };
 
 export type Backend = {

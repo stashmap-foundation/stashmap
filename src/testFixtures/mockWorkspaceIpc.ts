@@ -4,8 +4,8 @@ import { hexToBytes } from "@noble/hashes/utils";
 import { loadCliProfile } from "../cli/config";
 import { createWorkspaceProfile } from "../cli/init";
 import {
-  loadWorkspaceAsEvents,
-  saveEventsToWorkspace,
+  loadWorkspaceAsDocuments,
+  saveDocumentsToWorkspace,
 } from "../core/workspaceBackend";
 import { convertInputToPrivateKey } from "../nostrKey";
 import {
@@ -21,11 +21,11 @@ export type MockWorkspaceIpc = WorkspaceIpc & {
 
 async function loadFolder(workspaceDir: string): Promise<WorkspaceLoaded> {
   const profile = loadCliProfile({ cwd: workspaceDir });
-  const events = await loadWorkspaceAsEvents({
+  const documents = await loadWorkspaceAsDocuments({
     pubkey: profile.pubkey,
     workspaceDir: profile.workspaceDir,
   });
-  return { profile, events: [...events] };
+  return { profile, documents: [...documents] };
 }
 
 export function mockWorkspaceIpc(
@@ -74,14 +74,15 @@ export function mockWorkspaceIpc(
       Promise.resolve(
         fs.existsSync(path.join(folder, ".knowstr", "profile.json"))
       ),
-    save: async (events) => {
+    save: async (documents, deletedPaths) => {
       if (!state.current) {
         return { changed_paths: [], removed_paths: [] };
       }
       const profile = loadCliProfile({ cwd: state.current });
-      return saveEventsToWorkspace(
+      return saveDocumentsToWorkspace(
         { pubkey: profile.pubkey, workspaceDir: profile.workspaceDir },
-        events
+        documents,
+        deletedPaths
       );
     },
     setCurrent: (folder) => {

@@ -3,7 +3,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { loadWorkspaceAsEvents } from "./workspaceBackend";
+import { loadWorkspaceAsDocuments } from "./workspaceBackend";
 
 const TEST_PUBKEY = "a".repeat(64) as PublicKey;
 
@@ -11,33 +11,34 @@ function makeTempWorkspace(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "knowstr-backend-"));
 }
 
-test("loadWorkspaceAsEvents returns empty array for an empty workspace", async () => {
+test("loadWorkspaceAsDocuments returns empty array for an empty workspace", async () => {
   const workspaceDir = makeTempWorkspace();
-  const events = await loadWorkspaceAsEvents({
+  const documents = await loadWorkspaceAsDocuments({
     pubkey: TEST_PUBKEY,
     workspaceDir,
   });
-  expect(events).toEqual([]);
+  expect(documents).toEqual([]);
 });
 
-test("loadWorkspaceAsEvents returns one UnsignedEvent per markdown file", async () => {
+test("loadWorkspaceAsDocuments returns one Document per markdown file", async () => {
   const workspaceDir = makeTempWorkspace();
   fs.writeFileSync(
     path.join(workspaceDir, "project.md"),
     "# Project\n- alpha\n- beta\n"
   );
 
-  const events = await loadWorkspaceAsEvents({
+  const documents = await loadWorkspaceAsDocuments({
     pubkey: TEST_PUBKEY,
     workspaceDir,
   });
 
-  expect(events).toHaveLength(1);
-  expect(events[0].pubkey).toBe(TEST_PUBKEY);
-  expect(events[0].content).toContain("# Project");
+  expect(documents).toHaveLength(1);
+  expect(documents[0].author).toBe(TEST_PUBKEY);
+  expect(documents[0].filePath).toBe("project.md");
+  expect(documents[0].content).toContain("# Project");
 });
 
-test("loadWorkspaceAsEvents returns one event per file across multiple files", async () => {
+test("loadWorkspaceAsDocuments returns one Document per file across multiple files", async () => {
   const workspaceDir = makeTempWorkspace();
   fs.writeFileSync(path.join(workspaceDir, "one.md"), "# One\n- x\n");
   fs.writeFileSync(path.join(workspaceDir, "two.md"), "# Two\n- y\n");
@@ -47,25 +48,37 @@ test("loadWorkspaceAsEvents returns one event per file across multiple files", a
     "# Three\n- z\n"
   );
 
-  const events = await loadWorkspaceAsEvents({
+  const documents = await loadWorkspaceAsDocuments({
     pubkey: TEST_PUBKEY,
     workspaceDir,
   });
 
-  expect(events).toHaveLength(3);
+  expect(documents).toHaveLength(3);
 });
 
-test("loadWorkspaceAsEvents respects .knowstrignore", async () => {
+test("loadWorkspaceAsDocuments respects .knowstrignore", async () => {
   const workspaceDir = makeTempWorkspace();
   fs.writeFileSync(path.join(workspaceDir, "keep.md"), "# Keep\n- a\n");
   fs.writeFileSync(path.join(workspaceDir, "skip.md"), "# Skip\n- b\n");
   fs.writeFileSync(path.join(workspaceDir, ".knowstrignore"), "skip.md\n");
 
-  const events = await loadWorkspaceAsEvents({
+  const documents = await loadWorkspaceAsDocuments({
     pubkey: TEST_PUBKEY,
     workspaceDir,
   });
 
-  expect(events).toHaveLength(1);
-  expect(events[0].content).toContain("# Keep");
+  expect(documents).toHaveLength(1);
+  expect(documents[0].content).toContain("# Keep");
+});
+
+test("loadWorkspaceAsDocuments does not mutate files on disk", async () => {
+  const workspaceDir = makeTempWorkspace();
+  const before = "# Notes\n- alpha\n";
+  fs.writeFileSync(path.join(workspaceDir, "notes.md"), before);
+
+  await loadWorkspaceAsDocuments({ pubkey: TEST_PUBKEY, workspaceDir });
+
+  expect(fs.readFileSync(path.join(workspaceDir, "notes.md"), "utf8")).toBe(
+    before
+  );
 });

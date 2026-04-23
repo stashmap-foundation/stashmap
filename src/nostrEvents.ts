@@ -1,5 +1,7 @@
 import { Collection, List } from "immutable";
-import { EventTemplate, Filter } from "nostr-tools";
+import { Event, EventTemplate, Filter, UnsignedEvent } from "nostr-tools";
+import type { Document, DocumentDelete } from "./Document";
+import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
 
 export function findAllTags(
   event: EventTemplate,
@@ -64,4 +66,40 @@ export function sanitizeAuthorsFilter(filter: Filter): Filter {
   return filter.authors
     ? { ...filter, authors: filter.authors.filter(isValidHexPubkey) }
     : filter;
+}
+
+export function eventToDocument(
+  event: Event | UnsignedEvent
+): Document | undefined {
+  if (event.kind !== KIND_KNOWLEDGE_DOCUMENT) return undefined;
+  const dTag = findTag(event, "d");
+  if (!dTag) return undefined;
+  return {
+    author: event.pubkey as PublicKey,
+    dTag,
+    updatedMs: getEventMs(event),
+    content: event.content,
+  };
+}
+
+export function eventToDocumentDelete(
+  event: Event | UnsignedEvent
+): DocumentDelete | undefined {
+  if (
+    event.kind !== KIND_DELETE ||
+    findTag(event, "k") !== `${KIND_KNOWLEDGE_DOCUMENT}`
+  ) {
+    return undefined;
+  }
+  const aTag = findTag(event, "a");
+  if (!aTag) return undefined;
+  const parts = aTag.split(":");
+  const author = parts[1] as PublicKey | undefined;
+  const dTag = parts.slice(2).join(":");
+  if (!author || !dTag) return undefined;
+  return {
+    author,
+    dTag,
+    deletedAt: getEventMs(event),
+  };
 }

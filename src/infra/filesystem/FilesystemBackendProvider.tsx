@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { UnsignedEvent } from "nostr-tools";
 import { Backend, BackendProvider, WorkspaceState } from "../../BackendContext";
 import { LoadedCliProfile } from "../../cli/config";
+import type { Document } from "../../DocumentStore";
 
 export type WorkspaceLoaded = {
   profile: LoadedCliProfile;
-  events: UnsignedEvent[];
+  documents: Document[];
 };
 
 export type WorkspaceIpc = {
@@ -15,7 +15,8 @@ export type WorkspaceIpc = {
   create: (args: { folder: string; secretKeyInput?: string }) => Promise<void>;
   isInitialised: (folder: string) => Promise<boolean>;
   save: (
-    events: ReadonlyArray<UnsignedEvent>
+    documents: ReadonlyArray<Document>,
+    deletedPaths?: ReadonlyArray<string>
   ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
 };
 
@@ -51,12 +52,12 @@ export function FilesystemBackendProvider({
   const backend: Backend = useMemo(() => {
     const data = state.status === "loaded" ? state.data : null;
     const profile = data?.profile ?? null;
-    const events = data?.events ?? [];
+    const documents = data?.documents ?? [];
     const user = profile ? { publicKey: profile.pubkey } : undefined;
     const defaultRelays = profile?.relays ?? [];
     const workspace: WorkspaceState = {
       profile,
-      events,
+      documents,
       pickFolder: () => ipc.pickFolder(),
       isInitialised: (folder) => ipc.isInitialised(folder),
       open: async (folder) => {
@@ -67,7 +68,8 @@ export function FilesystemBackendProvider({
         await ipc.create(args);
         refresh();
       },
-      save: (eventsToWrite) => ipc.save(eventsToWrite),
+      save: (documentsToWrite, deletedPaths) =>
+        ipc.save(documentsToWrite, deletedPaths),
     };
     return {
       subscribe: (_relays, _filters, params) => {

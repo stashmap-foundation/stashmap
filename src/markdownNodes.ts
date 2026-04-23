@@ -48,6 +48,7 @@ function materializeTreeNode(
     ...baseNode,
     parent,
     frontMatter: parent ? undefined : treeNode.frontMatter,
+    filePath: parent ? undefined : treeNode.filePath,
     anchor: parent
       ? undefined
       : treeNode.anchor ?? createRootAnchor(semanticContext),
@@ -155,29 +156,45 @@ export function createNodesFromMarkdownTrees(
     );
 }
 
-export function parseDocumentEvent(
-  event: UnsignedEvent
-): Map<string, GraphNode> {
-  const dTagValue = findTag(event, "d");
-  if (!dTagValue) {
-    return Map();
-  }
-
-  const author = event.pubkey as PublicKey;
-  const { body, frontMatter } = extractImportedFrontMatter(event.content);
+export function parseDocumentContent(params: {
+  content: string;
+  author: PublicKey;
+  filePath?: string;
+  updatedMs?: number;
+}): Map<string, GraphNode> {
+  const { content, author, filePath, updatedMs } = params;
+  const { body, frontMatter } = extractImportedFrontMatter(content);
   const trees = dropLeadingYamlEchoRoots(
     parseMarkdownHierarchy(body),
     frontMatter
   ).map((tree, index) =>
-    index === 0 && frontMatter ? { ...tree, frontMatter } : tree
+    index === 0
+      ? {
+          ...tree,
+          ...(frontMatter && { frontMatter }),
+          ...(filePath && { filePath }),
+        }
+      : tree
   );
   const ctx: WalkContext = {
     knowledgeDBs: Map<PublicKey, KnowledgeData>(),
     publicKey: author,
     affectedRoots: ImmutableSet<ID>(),
-    updated: Number(findTag(event, "ms")) || event.created_at * 1000,
+    updated: updatedMs ?? Date.now(),
   };
   const [result] = createNodesFromMarkdownTrees(ctx, trees);
   const db = result.knowledgeDBs.get(author);
   return db?.nodes ?? Map<string, GraphNode>();
+}
+
+export function parseDocumentEvent(
+  event: UnsignedEvent,
+  options: { filePath?: string } = {}
+): Map<string, GraphNode> {
+  return parseDocumentContent({
+    content: event.content,
+    author: event.pubkey as PublicKey,
+    filePath: options.filePath,
+    updatedMs: Number(findTag(event, "ms")) || event.created_at * 1000,
+  });
 }

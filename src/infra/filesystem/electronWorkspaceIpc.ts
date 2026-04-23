@@ -1,18 +1,19 @@
-import { UnsignedEvent } from "nostr-tools";
 import { LoadedCliProfile } from "../../cli/config";
 import { WorkspaceIpc, WorkspaceLoaded } from "./FilesystemBackendProvider";
+import type { Document } from "../../Document";
 
 type IpcChannel = {
   load: () => Promise<{
     profile: LoadedCliProfile;
-    events: UnsignedEvent[];
+    documents: Document[];
   } | null>;
   pickFolder: () => Promise<string | null>;
   open: (folder: string) => Promise<void>;
   create: (args: { folder: string; secretKeyInput?: string }) => Promise<void>;
   isInitialised: (folder: string) => Promise<boolean>;
   save: (
-    events: ReadonlyArray<UnsignedEvent>
+    documents: ReadonlyArray<Document>,
+    deletedPaths?: ReadonlyArray<string>
   ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
 };
 
@@ -62,12 +63,12 @@ export function electronWorkspaceIpc(): WorkspaceIpc {
       }
       return channel.isInitialised(folder);
     },
-    save: async (events) => {
+    save: async (documents, deletedPaths) => {
       const channel = getChannel();
       if (!channel) {
         return { changed_paths: [], removed_paths: [] };
       }
-      return channel.save(events);
+      return channel.save(documents, deletedPaths);
     },
   };
 }

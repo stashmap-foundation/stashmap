@@ -82,3 +82,59 @@ Holiday Destinations
 `
   );
 });
+
+test("paragraph siblings are preserved on round-trip", async () => {
+  const { path } = knowstrInit();
+  write(
+    path,
+    "doc.md",
+    `
+# Root
+
+A standalone paragraph.
+
+## Heading
+`
+  );
+  await knowstrSave(path);
+
+  await renderAppTree({ path, search: "Root" });
+
+  await expectTree(`
+Root
+  A standalone paragraph.
+  Heading
+`);
+
+  await userEvent.click(
+    await screen.findByLabelText("edit A standalone paragraph.")
+  );
+  await userEvent.keyboard("{Enter}Mid{Escape}");
+
+  await userEvent.click(await screen.findByLabelText("edit Heading"));
+  await userEvent.keyboard("{Enter}Trailing{Escape}");
+
+  await expectTree(`
+Root
+  A standalone paragraph.
+  Mid
+  Heading
+  Trailing
+`);
+
+  await expectMarkdown(
+    path,
+    "doc.md",
+    `
+# Root <!-- id:... -->
+
+A standalone paragraph. <!-- id:... -->
+
+- Mid <!-- id:... -->
+
+## Heading <!-- id:... -->
+
+## Trailing <!-- id:... -->
+`
+  );
+});

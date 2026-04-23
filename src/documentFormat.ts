@@ -131,16 +131,24 @@ export function formatWithFrontMatter(
   return `${frontMatter}\n${content}`;
 }
 
-const HEADING_LINE_RE = /^#{1,6} /;
+const BULLET_LINE_RE = /^\s*-\s/;
+const ORDERED_LINE_RE = /^\s*\d+\.\s/;
+
+function isBlockLine(line: string): boolean {
+  if (line.length === 0) return false;
+  if (BULLET_LINE_RE.test(line)) return false;
+  if (ORDERED_LINE_RE.test(line)) return false;
+  return true;
+}
 
 export function addBlankLinesAroundHeadings(lines: string[]): string[] {
   return lines.reduce<string[]>((acc, line, index) => {
-    const isHeading = HEADING_LINE_RE.test(line);
     const prevLine = acc.length > 0 ? acc[acc.length - 1] : undefined;
-    const prevIsHeading =
-      prevLine !== undefined && HEADING_LINE_RE.test(prevLine);
-    const needsBlankBefore = isHeading && index > 0 && prevLine !== "";
-    const needsBlankAfterPrev = prevIsHeading && !isHeading && prevLine !== "";
+    const prevIsBlock = prevLine !== undefined && isBlockLine(prevLine);
+    const currentIsBlock = isBlockLine(line);
+    const needsBlankBefore = currentIsBlock && index > 0 && prevLine !== "";
+    const needsBlankAfterPrev =
+      prevIsBlock && !currentIsBlock && line !== "" && prevLine !== "";
     if (needsBlankBefore || needsBlankAfterPrev) {
       return [...acc, "", line];
     }

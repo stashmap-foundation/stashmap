@@ -107,6 +107,22 @@ function serializeNodeItems(
         };
       }
 
+      if (resolvedChild.blockKind === "paragraph") {
+        const next: SerializeResult = {
+          lines: [...acc.lines, `${prefix}${text}${attrs}`],
+        };
+        return {
+          ...serializeNodeItems(
+            knowledgeDBs,
+            author,
+            resolvedChild.children,
+            "",
+            next
+          ),
+          orderedCount: 0,
+        };
+      }
+
       if (acc.promoteToHeadingLevel !== undefined) {
         const promotedLevel = acc.promoteToHeadingLevel;
         const next: SerializeResult = {

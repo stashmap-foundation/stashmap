@@ -1,5 +1,5 @@
 import fs from "fs";
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   expectMarkdown,
@@ -258,6 +258,75 @@ A standalone paragraph. <!-- id:... -->
 ## Heading <!-- id:... -->
 
 ## Trailing <!-- id:... -->
+`
+);
+});
+
+test("dragging nodes reorders markdown in the workspace file", async () => {
+  const { path } = knowstrInit();
+  write(path, "tasks.md", "# Root\n- A\n- B\n- C\n");
+  await knowstrSave(path);
+
+  await renderAppTree({ path, search: "Root" });
+  await expectTree(`
+Root
+  A
+  B
+  C
+`);
+
+  fireEvent.dragStart(screen.getByText("C"));
+  fireEvent.drop(screen.getByText("A"));
+
+  await expectTree(`
+Root
+  C
+  A
+  B
+`);
+
+  await expectMarkdown(
+    path,
+    "tasks.md",
+    `
+# Root <!-- id:... -->
+
+- C <!-- id:... -->
+- A <!-- id:... -->
+- B <!-- id:... -->
+`
+  );
+});
+
+test("dragging nodes under another node persists markdown indentation", async () => {
+  const { path } = knowstrInit();
+  write(path, "tasks.md", "# Root\n- Parent\n- Child\n");
+  await knowstrSave(path);
+
+  await renderAppTree({ path, search: "Root" });
+  await expectTree(`
+Root
+  Parent
+  Child
+`);
+
+  fireEvent.dragStart(screen.getByText("Child"));
+  fireEvent.drop(screen.getByText("Parent"));
+
+  await expectTree(`
+Root
+  Parent
+    Child
+`);
+
+  await expectMarkdown(
+    path,
+    "tasks.md",
+    `
+# Root <!-- id:... -->
+
+- Parent <!-- id:... -->
+  - Child <!-- id:... -->
 `
   );
 });

@@ -13,15 +13,14 @@ export async function loadWorkspaceAsDocuments(
     const rootTree = {
       ...doc.mainRoot,
       frontMatter: doc.frontMatter,
-      filePath: doc.relativePath,
     };
-    const { event, rootUuid } = buildDocumentEventFromMarkdownTree(
+    const { event } = buildDocumentEventFromMarkdownTree(
       profile.pubkey,
       rootTree
     );
     return {
       author: profile.pubkey,
-      dTag: rootUuid,
+      docId: doc.docId,
       updatedMs: getEventMs(event),
       content: event.content,
       filePath: doc.relativePath,

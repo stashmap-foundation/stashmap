@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Backend, BackendProvider, WorkspaceState } from "../../BackendContext";
 import { LoadedCliProfile } from "../../cli/config";
 import type { Document } from "../../DocumentStore";
+import type { FsEventHandler } from "../../core/workspaceWatcher";
 
 export type WorkspaceLoaded = {
   profile: LoadedCliProfile;
@@ -18,6 +19,7 @@ export type WorkspaceIpc = {
     documents: ReadonlyArray<Document>,
     deletedPaths?: ReadonlyArray<string>
   ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
+  subscribeFsEvents: (handler: FsEventHandler) => () => void;
 };
 
 type LoadState =

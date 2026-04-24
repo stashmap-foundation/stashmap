@@ -72,11 +72,11 @@ export function eventToDocument(
   event: Event | UnsignedEvent
 ): Document | undefined {
   if (event.kind !== KIND_KNOWLEDGE_DOCUMENT) return undefined;
-  const dTag = findTag(event, "d");
-  if (!dTag) return undefined;
+  const docId = findTag(event, "d");
+  if (!docId) return undefined;
   return {
     author: event.pubkey as PublicKey,
-    dTag,
+    docId,
     updatedMs: getEventMs(event),
     content: event.content,
   };
@@ -95,11 +95,11 @@ export function eventToDocumentDelete(
   if (!aTag) return undefined;
   const parts = aTag.split(":");
   const author = parts[1] as PublicKey | undefined;
-  const dTag = parts.slice(2).join(":");
-  if (!author || !dTag) return undefined;
+  const docId = parts.slice(2).join(":");
+  if (!author || !docId) return undefined;
   return {
     author,
-    dTag,
+    docId,
     deletedAt: getEventMs(event),
   };
 }

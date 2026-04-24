@@ -1,6 +1,6 @@
 export type Document = {
   author: PublicKey;
-  dTag: string;
+  docId: string;
   updatedMs: number;
   content: string;
   filePath?: string;
@@ -8,10 +8,10 @@ export type Document = {
 
 export type DocumentDelete = {
   author: PublicKey;
-  dTag: string;
+  docId: string;
   deletedAt: number;
 };
 
-export function documentKeyOf(author: PublicKey, dTag: string): string {
-  return `${author}:${dTag}`;
+export function documentKeyOf(author: PublicKey, docId: string): string {
+  return `${author}:${docId}`;
 }

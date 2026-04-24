@@ -15,7 +15,7 @@ export function buildDocumentEvent(
     snapshotDTag?: string;
   }
 ): UnsignedEvent {
-  const rootUuid = shortID(rootNode.id);
+  const docId = rootNode.docId ?? shortID(rootNode.id);
   const systemRoleTags = rootNode.systemRole
     ? ([["s", rootNode.systemRole]] as string[][])
     : [];
@@ -23,7 +23,7 @@ export function buildDocumentEvent(
     kind: KIND_KNOWLEDGE_DOCUMENT,
     pubkey: rootNode.author,
     created_at: newTimestamp(),
-    tags: [["d", rootUuid], ...systemRoleTags, msTag()],
+    tags: [["d", docId], ...systemRoleTags, msTag()],
     content: renderDocumentMarkdown(knowledgeDBs, rootNode, options),
   };
 }

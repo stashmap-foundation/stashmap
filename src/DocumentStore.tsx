@@ -30,6 +30,7 @@ type DocumentStoreState = {
   knowledgeDBs: KnowledgeDBs;
   semanticIndex: SemanticIndex;
   snapshotNodes: SnapshotNodes;
+  documents: ImmutableMap<string, Document>;
   upsertDocument: (doc: Document) => void;
   deleteDocument: (del: DocumentDelete) => void;
   addEvents: (events: ImmutableMap<string, Event | UnsignedEvent>) => void;
@@ -53,7 +54,7 @@ function parseDocumentNodes(doc: Document): ImmutableMap<string, GraphNode> {
   return parseDocumentContent({
     content: doc.content,
     author: doc.author,
-    filePath: doc.filePath,
+    docId: doc.docId,
     updatedMs: doc.updatedMs,
   });
 }
@@ -93,7 +94,7 @@ function applyDocumentToSnapshot(
   snapshot: DocumentSnapshot,
   doc: Document
 ): DocumentSnapshot {
-  const key = documentKeyOf(doc.author, doc.dTag);
+  const key = documentKeyOf(doc.author, doc.docId);
   const nextNodes = parseDocumentNodes(doc);
   const existingDocument = snapshot.documents.get(key);
   const existingDelete = snapshot.deletes.get(key);
@@ -133,7 +134,7 @@ function applyDeleteToSnapshot(
   snapshot: DocumentSnapshot,
   deletion: DocumentDelete
 ): DocumentSnapshot {
-  const key = documentKeyOf(deletion.author, deletion.dTag);
+  const key = documentKeyOf(deletion.author, deletion.docId);
   const existingDocument = snapshot.documents.get(key);
   const existingDelete = snapshot.deletes.get(key);
 
@@ -274,6 +275,7 @@ export function DocumentStoreProvider({
       knowledgeDBs: activeSnapshot.knowledgeDBs,
       semanticIndex: activeSnapshot.semanticIndex,
       snapshotNodes,
+      documents: activeSnapshot.documents,
       upsertDocument,
       deleteDocument,
       addEvents,
@@ -306,5 +308,12 @@ export function useDocumentSemanticIndex(): SemanticIndex {
 export function useDocumentSnapshotNodes(): SnapshotNodes {
   return (
     React.useContext(DocumentStoreContext)?.snapshotNodes || ImmutableMap()
+  );
+}
+
+export function useDocuments(): ImmutableMap<string, Document> {
+  return (
+    React.useContext(DocumentStoreContext)?.documents ||
+    ImmutableMap<string, Document>()
   );
 }

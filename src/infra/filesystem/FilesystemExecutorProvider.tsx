@@ -1,13 +1,13 @@
 import React, { Dispatch, SetStateAction } from "react";
+import { Map as ImmutableMap } from "immutable";
 import { UnsignedEvent } from "nostr-tools";
 import { useBackend } from "../../BackendContext";
-import { useDocumentStore } from "../../DocumentStore";
-import { useData } from "../../DataContext";
+import { useDocumentStore, useDocuments } from "../../DocumentStore";
 import { ExecutorProvider } from "../../ExecutorContext";
 import { buildDocumentEvents, Plan } from "../../planner";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../../nostr";
 import { eventToDocument, eventToDocumentDelete } from "../../nostrEvents";
-import { Document, DocumentDelete } from "../../Document";
+import { Document, DocumentDelete, documentKeyOf } from "../../Document";
 import { extractImportedFrontMatter } from "../../markdownFrontMatter";
 
 function extractRootTitle(content: string): string | undefined {
@@ -35,38 +35,36 @@ function uniqueSlugPath(baseSlug: string, taken: ReadonlySet<string>): string {
   return firstFree(1);
 }
 
-function collectTakenPaths(knowledgeDBs: KnowledgeDBs): Set<string> {
+function collectTakenPaths(
+  documents: ImmutableMap<string, Document>
+): Set<string> {
   const paths = new Set<string>();
-  knowledgeDBs.forEach((db) => {
-    db.nodes.forEach((node) => {
-      if (!node.parent && node.filePath) {
-        paths.add(node.filePath);
-      }
-    });
+  documents.forEach((doc) => {
+    if (doc.filePath) paths.add(doc.filePath);
   });
   return paths;
 }
 
 function lookupFilePath(
-  knowledgeDBs: KnowledgeDBs,
+  documents: ImmutableMap<string, Document>,
   author: PublicKey,
-  dTag: string
+  docId: string
 ): string | undefined {
-  return knowledgeDBs.get(author)?.nodes.get(dTag)?.filePath;
+  return documents.get(documentKeyOf(author, docId))?.filePath;
 }
 
 function enrichWithFilePath(
   event: UnsignedEvent,
-  knowledgeDBs: KnowledgeDBs,
+  documents: ImmutableMap<string, Document>,
   taken: Set<string>
 ): Document | undefined {
   const base = eventToDocument(event);
   if (!base) return undefined;
-  const existing = lookupFilePath(knowledgeDBs, base.author, base.dTag);
+  const existing = lookupFilePath(documents, base.author, base.docId);
   const filePath =
     existing ??
     uniqueSlugPath(
-      slugify(extractRootTitle(event.content) ?? base.dTag),
+      slugify(extractRootTitle(event.content) ?? base.docId),
       taken
     );
   // eslint-disable-next-line functional/immutable-data
@@ -76,13 +74,13 @@ function enrichWithFilePath(
 
 function enrichDelete(
   event: UnsignedEvent,
-  knowledgeDBs: KnowledgeDBs
+  documents: ImmutableMap<string, Document>
 ): { del: DocumentDelete; filePath?: string } | undefined {
   const del = eventToDocumentDelete(event);
   if (!del) return undefined;
   return {
     del,
-    filePath: lookupFilePath(knowledgeDBs, del.author, del.dTag),
+    filePath: lookupFilePath(documents, del.author, del.docId),
   };
 }
 
@@ -98,7 +96,7 @@ export function FilesystemExecutorProvider({
   children: React.ReactNode;
 }): JSX.Element {
   const store = useDocumentStore();
-  const { knowledgeDBs } = useData();
+  const documents = useDocuments();
   const { workspace } = useBackend();
 
   const executePlan = async (plan: Plan): Promise<void> => {
@@ -123,13 +121,13 @@ export function FilesystemExecutorProvider({
 
     if (writable.length === 0) return;
 
-    const taken = collectTakenPaths(knowledgeDBs);
+    const taken = collectTakenPaths(documents);
     const documentsToWrite = writable
-      .map((event) => enrichWithFilePath(event, knowledgeDBs, taken))
+      .map((event) => enrichWithFilePath(event, documents, taken))
       .filter((doc): doc is Document => doc !== undefined);
 
     const deletions = writable
-      .map((event) => enrichDelete(event, knowledgeDBs))
+      .map((event) => enrichDelete(event, documents))
       .filter(
         (item): item is { del: DocumentDelete; filePath?: string } =>
           item !== undefined

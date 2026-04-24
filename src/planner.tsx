@@ -104,6 +104,7 @@ type GraphPlanData = Pick<
 export type GraphPlan = GraphPlanData & {
   publishEvents: List<UnsignedEvent & EventAttachment>;
   affectedRoots: ImmutableSet<ID>;
+  deletedDocs: ImmutableSet<string>;
   relays: AllRelays;
 };
 
@@ -1316,13 +1317,26 @@ export function planDeleteNodes<T extends GraphPlan>(
     ...userDB,
     nodes: updatedNodes,
   };
-  const affectedRoot = node?.root;
+  const nextKnowledgeDBs = plan.knowledgeDBs.set(
+    plan.user.publicKey,
+    updatedDB
+  );
+  if (!node) {
+    return { ...plan, knowledgeDBs: nextKnowledgeDBs };
+  }
+  const { docId } = node;
+  if (!node.parent && docId) {
+    return {
+      ...plan,
+      knowledgeDBs: nextKnowledgeDBs,
+      affectedRoots: plan.affectedRoots.remove(node.root),
+      deletedDocs: plan.deletedDocs.add(docId),
+    };
+  }
   return {
     ...plan,
-    knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
-    affectedRoots: affectedRoot
-      ? plan.affectedRoots.add(affectedRoot)
-      : plan.affectedRoots,
+    knowledgeDBs: nextKnowledgeDBs,
+    affectedRoots: plan.affectedRoots.add(node.root),
   };
 }
 
@@ -1447,7 +1461,7 @@ export function buildDocumentEvents(
 ): List<UnsignedEvent & EventAttachment> {
   const author = plan.user.publicKey;
   const userDB = plan.knowledgeDBs.get(author, newDB());
-  return plan.affectedRoots.reduce((events, rootId) => {
+  const withUpserts = plan.affectedRoots.reduce((events, rootId) => {
     const rootNode = userDB.nodes.find(
       (r) =>
         !r.parent &&
@@ -1457,19 +1471,7 @@ export function buildDocumentEvents(
           r.root === shortID(rootId as ID))
     );
     if (!rootNode) {
-      const rootDTag = shortID(rootId as ID);
-      const deleteEvent = {
-        kind: KIND_DELETE,
-        pubkey: author,
-        created_at: newTimestamp(),
-        tags: [
-          ["a", `${KIND_KNOWLEDGE_DOCUMENT}:${author}:${rootDTag}`],
-          ["k", `${KIND_KNOWLEDGE_DOCUMENT}`],
-          msTag(),
-        ],
-        content: "",
-      };
-      return events.push(deleteEvent as UnsignedEvent & EventAttachment);
+      return events;
     }
     const snapshotSourceRoot =
       rootNode.basedOn && !rootNode.snapshotDTag
@@ -1495,6 +1497,20 @@ export function buildDocumentEvents(
           .push(event as UnsignedEvent & EventAttachment)
       : events.push(event as UnsignedEvent & EventAttachment);
   }, plan.publishEvents);
+  return plan.deletedDocs.reduce((events, docId) => {
+    const deleteEvent = {
+      kind: KIND_DELETE,
+      pubkey: author,
+      created_at: newTimestamp(),
+      tags: [
+        ["a", `${KIND_KNOWLEDGE_DOCUMENT}:${author}:${docId}`],
+        ["k", `${KIND_KNOWLEDGE_DOCUMENT}`],
+        msTag(),
+      ],
+      content: "",
+    };
+    return events.push(deleteEvent as UnsignedEvent & EventAttachment);
+  }, withUpserts);
 }
 
 export function PlanningContextProvider({
@@ -1538,6 +1554,7 @@ export function createGraphPlan(props: CreateGraphPlanProps): GraphPlan {
     publishEvents:
       props.publishEvents || List<UnsignedEvent & EventAttachment>([]),
     affectedRoots: ImmutableSet<ID>(),
+    deletedDocs: ImmutableSet<string>(),
   };
 }
 

@@ -7,6 +7,11 @@ import {
   loadWorkspaceAsDocuments,
   saveDocumentsToWorkspace,
 } from "../core/workspaceBackend";
+import {
+  FsEventHandler,
+  WorkspaceWatcher,
+  watchWorkspace,
+} from "../core/workspaceWatcher";
 import { convertInputToPrivateKey } from "../nostrKey";
 import {
   WorkspaceIpc,
@@ -17,6 +22,7 @@ export type MockWorkspaceIpc = WorkspaceIpc & {
   setCurrent: (workspaceDir: string | null) => void;
   queuePickedFolder: (folder: string | null) => void;
   getCurrent: () => string | null;
+  dispose: () => Promise<void>;
 };
 
 async function loadFolder(workspaceDir: string): Promise<WorkspaceLoaded> {
@@ -34,7 +40,40 @@ export function mockWorkspaceIpc(
   const state: {
     current: string | null;
     pickerQueue: (string | null)[];
-  } = { current: initialCurrent, pickerQueue: [] };
+    fsHandlers: Set<FsEventHandler>;
+    watcher: Promise<WorkspaceWatcher> | null;
+  } = {
+    current: initialCurrent,
+    pickerQueue: [],
+    fsHandlers: new Set(),
+    watcher: null,
+  };
+
+  const emit: FsEventHandler = (event) => {
+    state.fsHandlers.forEach((handler) => handler(event));
+  };
+
+  const ensureWatcher = (): void => {
+    if (state.watcher || !state.current) return;
+    // eslint-disable-next-line functional/immutable-data
+    state.watcher = watchWorkspace(state.current, emit);
+  };
+
+  const stopWatcher = async (): Promise<void> => {
+    if (!state.watcher) return;
+    const pending = state.watcher;
+    // eslint-disable-next-line functional/immutable-data
+    state.watcher = null;
+    const instance = await pending;
+    await instance.close();
+  };
+
+  const setCurrentFolder = async (folder: string | null): Promise<void> => {
+    await stopWatcher();
+    // eslint-disable-next-line functional/immutable-data
+    state.current = folder;
+    ensureWatcher();
+  };
 
   return {
     load: () =>
@@ -48,12 +87,10 @@ export function mockWorkspaceIpc(
       // eslint-disable-next-line functional/immutable-data
       return Promise.resolve(state.pickerQueue.shift() ?? null);
     },
-    open: (folder) => {
-      // eslint-disable-next-line functional/immutable-data
-      state.current = folder;
-      return Promise.resolve();
+    open: async (folder) => {
+      await setCurrentFolder(folder);
     },
-    create: ({ folder, secretKeyInput }) => {
+    create: async ({ folder, secretKeyInput }) => {
       const secretKey = secretKeyInput
         ? (() => {
             const hex = convertInputToPrivateKey(secretKeyInput);
@@ -66,9 +103,7 @@ export function mockWorkspaceIpc(
           })()
         : undefined;
       createWorkspaceProfile({ workspaceDir: folder, secretKey });
-      // eslint-disable-next-line functional/immutable-data
-      state.current = folder;
-      return Promise.resolve();
+      await setCurrentFolder(folder);
     },
     isInitialised: (folder) =>
       Promise.resolve(
@@ -85,14 +120,24 @@ export function mockWorkspaceIpc(
         deletedPaths
       );
     },
+    subscribeFsEvents: (handler) => {
+      state.fsHandlers.add(handler);
+      ensureWatcher();
+      return () => {
+        state.fsHandlers.delete(handler);
+      };
+    },
     setCurrent: (folder) => {
-      // eslint-disable-next-line functional/immutable-data
-      state.current = folder;
+      setCurrentFolder(folder);
     },
     queuePickedFolder: (folder) => {
       // eslint-disable-next-line functional/immutable-data
       state.pickerQueue.push(folder);
     },
     getCurrent: () => state.current,
+    dispose: async () => {
+      state.fsHandlers.clear();
+      await stopWatcher();
+    },
   };
 }

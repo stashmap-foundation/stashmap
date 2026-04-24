@@ -245,7 +245,7 @@ export type MarkdownTreeNode = {
   text: string;
   children: MarkdownTreeNode[];
   frontMatter?: string;
-  filePath?: string;
+  docId?: string;
   uuid?: string;
   relevance?: Relevance;
   argument?: Argument;

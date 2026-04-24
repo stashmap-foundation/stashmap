@@ -48,7 +48,7 @@ function materializeTreeNode(
     ...baseNode,
     parent,
     frontMatter: parent ? undefined : treeNode.frontMatter,
-    filePath: parent ? undefined : treeNode.filePath,
+    docId: parent ? undefined : treeNode.docId,
     anchor: parent
       ? undefined
       : treeNode.anchor ?? createRootAnchor(semanticContext),
@@ -159,10 +159,10 @@ export function createNodesFromMarkdownTrees(
 export function parseDocumentContent(params: {
   content: string;
   author: PublicKey;
-  filePath?: string;
+  docId?: string;
   updatedMs?: number;
 }): Map<string, GraphNode> {
-  const { content, author, filePath, updatedMs } = params;
+  const { content, author, docId, updatedMs } = params;
   const { body, frontMatter } = extractImportedFrontMatter(content);
   const trees = dropLeadingYamlEchoRoots(
     parseMarkdownHierarchy(body),
@@ -172,7 +172,7 @@ export function parseDocumentContent(params: {
       ? {
           ...tree,
           ...(frontMatter && { frontMatter }),
-          ...(filePath && { filePath }),
+          ...(docId && { docId }),
         }
       : tree
   );
@@ -189,12 +189,12 @@ export function parseDocumentContent(params: {
 
 export function parseDocumentEvent(
   event: UnsignedEvent,
-  options: { filePath?: string } = {}
+  options: { docId?: string } = {}
 ): Map<string, GraphNode> {
   return parseDocumentContent({
     content: event.content,
     author: event.pubkey as PublicKey,
-    filePath: options.filePath,
+    docId: options.docId,
     updatedMs: Number(findTag(event, "ms")) || event.created_at * 1000,
   });
 }

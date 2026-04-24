@@ -3,10 +3,6 @@ import { v4 } from "uuid";
 import { joinID } from "./connections";
 import { createRootAnchor } from "./rootAnchor";
 
-function newRootFrontMatter(): string {
-  return `---\nknowstr_doc_id: ${v4()}\n---\n`;
-}
-
 export function newNode(
   text: string,
   semanticContext: Context,
@@ -16,13 +12,15 @@ export function newNode(
   systemRole?: RootSystemRole
 ): GraphNode {
   const id = joinID(myself, v4());
+  const docId = !parent ? v4() : undefined;
   return {
     children: List<ID>(),
     id,
     text,
     parent,
     anchor: !parent ? createRootAnchor(semanticContext) : undefined,
-    frontMatter: !parent ? newRootFrontMatter() : undefined,
+    frontMatter: docId ? `---\nknowstr_doc_id: ${docId}\n---\n` : undefined,
+    docId,
     systemRole: !parent ? systemRole : undefined,
     updated: Date.now(),
     author: myself,

@@ -233,7 +233,7 @@ declare global {
     id: ID;
     text: string;
     frontMatter?: string;
-    filePath?: string;
+    docId?: string;
     parent?: LongID;
     anchor?: RootAnchor;
     systemRole?: RootSystemRole;

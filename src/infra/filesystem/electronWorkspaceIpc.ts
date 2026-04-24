@@ -1,6 +1,7 @@
 import { LoadedCliProfile } from "../../cli/config";
 import { WorkspaceIpc, WorkspaceLoaded } from "./FilesystemBackendProvider";
 import type { Document } from "../../Document";
+import type { FsEvent, FsEventHandler } from "../../core/workspaceWatcher";
 
 type IpcChannel = {
   load: () => Promise<{
@@ -15,6 +16,7 @@ type IpcChannel = {
     documents: ReadonlyArray<Document>,
     deletedPaths?: ReadonlyArray<string>
   ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
+  onFsEvent: (listener: (event: FsEvent) => void) => () => void;
 };
 
 function getChannel(): IpcChannel | undefined {
@@ -69,6 +71,13 @@ export function electronWorkspaceIpc(): WorkspaceIpc {
         return { changed_paths: [], removed_paths: [] };
       }
       return channel.save(documents, deletedPaths);
+    },
+    subscribeFsEvents: (handler: FsEventHandler) => {
+      const channel = getChannel();
+      if (!channel) {
+        return () => undefined;
+      }
+      return channel.onFsEvent(handler);
     },
   };
 }

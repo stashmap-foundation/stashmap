@@ -151,11 +151,10 @@ export function parseWorkspaceDocumentRoots(
   return {
     ...mainRoot,
     frontMatter,
-    filePath: relativePath,
   } as MarkdownTreeNode;
 }
 
-async function loadIgnorePatterns(
+export async function loadIgnorePatterns(
   workspaceDir: string,
   ignoredPatterns: string[] = RESERVED_WORKSPACE_IGNORES
 ): Promise<Ignore> {
@@ -245,7 +244,7 @@ export async function scanWorkspaceDocuments(
         currentContent,
         docId,
         frontMatter,
-        mainRoot,
+        mainRoot: { ...mainRoot, docId },
       };
     })
   );

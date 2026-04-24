@@ -9,6 +9,7 @@ import { FilesystemExecutorProvider } from "./FilesystemExecutorProvider";
 import { NavigationStateProvider } from "../../NavigationStateContext";
 import { createEmptySemanticIndex } from "../../semanticIndex";
 import { FilesystemWorkspaceLoader } from "./FilesystemWorkspaceLoader";
+import { FilesystemWatcher } from "./FilesystemWatcher";
 
 export function FilesystemDataProvider({
   children,
@@ -35,6 +36,7 @@ export function FilesystemDataProvider({
         unpublishedEvents={session.publishStatus.unsignedEvents}
       >
         <FilesystemWorkspaceLoader />
+        <FilesystemWatcher />
         <MergeKnowledgeDB>
           <FilesystemExecutorProvider
             setPublishEvents={session.setPublishStatus}

@@ -72,6 +72,7 @@ export function FilesystemBackendProvider({
       },
       save: (documentsToWrite, deletedPaths) =>
         ipc.save(documentsToWrite, deletedPaths),
+      subscribeFsEvents: (handler) => ipc.subscribeFsEvents(handler),
     };
     return {
       subscribe: (_relays, _filters, params) => {

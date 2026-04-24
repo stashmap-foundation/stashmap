@@ -2,6 +2,7 @@ import React from "react";
 import { Event, Filter, SubCloser, SubscribeManyParams } from "nostr-tools";
 import { LoadedCliProfile } from "./cli/config";
 import type { Document } from "./DocumentStore";
+import type { FsEventHandler } from "./core/workspaceWatcher";
 
 export type WorkspaceState = {
   pickFolder: () => Promise<string | null>;
@@ -12,6 +13,7 @@ export type WorkspaceState = {
     documents: ReadonlyArray<Document>,
     deletedPaths?: ReadonlyArray<string>
   ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
+  subscribeFsEvents: (handler: FsEventHandler) => () => void;
   profile: LoadedCliProfile | null;
   documents: Document[];
 };

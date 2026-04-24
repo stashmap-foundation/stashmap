@@ -26,6 +26,81 @@ const {
 // eslint-disable-next-line import/no-unresolved
 const { convertInputToPrivateKey } = require("../dist/nostrKey");
 const { hexToBytes } = require("@noble/hashes/utils");
+// eslint-disable-next-line import/no-unresolved
+const { watchWorkspace } = require("../dist/core/workspaceWatcher");
+const crypto = require("crypto");
+
+const ECHO_TTL_MS = 2000;
+
+function hashContent(content) {
+  return crypto.createHash("sha256").update(content).digest("hex");
+}
+
+const watcherState = {
+  watcher: null,
+  workspaceDir: null,
+  pendingEchoes: new Map(),
+  pendingUnlinkEchoes: new Map(),
+};
+
+function isOwnEcho(event) {
+  const now = Date.now();
+  if (event.type === "unlink") {
+    const expiresAt = watcherState.pendingUnlinkEchoes.get(event.relativePath);
+    if (expiresAt && expiresAt > now) {
+      watcherState.pendingUnlinkEchoes.delete(event.relativePath);
+      return true;
+    }
+    return false;
+  }
+  const pending = watcherState.pendingEchoes.get(event.relativePath);
+  if (
+    pending &&
+    pending.expiresAt > now &&
+    pending.hash === hashContent(event.content)
+  ) {
+    watcherState.pendingEchoes.delete(event.relativePath);
+    return true;
+  }
+  return false;
+}
+
+function broadcastFsEvent(event) {
+  if (isOwnEcho(event)) return;
+  BrowserWindow.getAllWindows().forEach((win) => {
+    win.webContents.send("workspace:fs-event", event);
+  });
+}
+
+async function stopWatcher() {
+  if (!watcherState.watcher) return;
+  const pending = watcherState.watcher;
+  watcherState.watcher = null;
+  watcherState.workspaceDir = null;
+  const instance = await pending;
+  await instance.close();
+}
+
+async function startWatcher(workspaceDir) {
+  await stopWatcher();
+  watcherState.workspaceDir = workspaceDir;
+  watcherState.watcher = watchWorkspace(workspaceDir, broadcastFsEvent);
+}
+
+function recordSaveEchoes(documents, deletedPaths) {
+  const expiresAt = Date.now() + ECHO_TTL_MS;
+  documents.forEach((doc) => {
+    if (doc.filePath !== undefined) {
+      watcherState.pendingEchoes.set(doc.filePath, {
+        hash: hashContent(doc.content),
+        expiresAt,
+      });
+    }
+  });
+  (deletedPaths || []).forEach((relativePath) => {
+    watcherState.pendingUnlinkEchoes.set(relativePath, expiresAt);
+  });
+}
 
 const devServerUrl = process.env.ELECTRON_START_URL;
 const isDev = !!devServerUrl;
@@ -50,6 +125,9 @@ async function loadProfileAndEvents(profile) {
     pubkey: profile.pubkey,
     workspaceDir: profile.workspaceDir,
   });
+  if (watcherState.workspaceDir !== profile.workspaceDir) {
+    await startWatcher(profile.workspaceDir);
+  }
   return { profile, documents };
 }
 
@@ -219,7 +297,7 @@ function createWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
-      preload: path.join(__dirname, "preload.js"),
+      preload: path.join(__dirname, "..", "dist", "electronMain", "preload.js"),
     },
   });
 
@@ -304,6 +382,7 @@ app.whenReady().then(() => {
     if (!profile) {
       throw new Error("workspace:save has no active workspace");
     }
+    recordSaveEchoes(documents, deletedPaths);
     return saveDocumentsToWorkspace(
       { pubkey: profile.pubkey, workspaceDir: profile.workspaceDir },
       documents,
@@ -325,4 +404,8 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("before-quit", () => {
+  stopWatcher();
 });

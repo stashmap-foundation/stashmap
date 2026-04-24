@@ -3,7 +3,7 @@ import { WorkspaceIpc, WorkspaceLoaded } from "./FilesystemBackendProvider";
 import type { Document } from "../../Document";
 import type { FsEvent, FsEventHandler } from "../../core/workspaceWatcher";
 
-type IpcChannel = {
+export type IpcChannel = {
   load: () => Promise<{
     profile: LoadedCliProfile;
     documents: Document[];

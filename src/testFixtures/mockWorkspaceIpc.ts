@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { hexToBytes } from "@noble/hashes/utils";
 import { loadCliProfile } from "../cli/config";
 import { createWorkspaceProfile } from "../cli/init";
@@ -8,6 +9,7 @@ import {
   saveDocumentsToWorkspace,
 } from "../core/workspaceBackend";
 import {
+  FsEvent,
   FsEventHandler,
   WorkspaceWatcher,
   watchWorkspace,
@@ -17,6 +19,12 @@ import {
   WorkspaceIpc,
   WorkspaceLoaded,
 } from "../infra/filesystem/FilesystemBackendProvider";
+
+const ECHO_TTL_MS = 2000;
+
+function hashContent(content: string): string {
+  return crypto.createHash("sha256").update(content).digest("hex");
+}
 
 export type MockWorkspaceIpc = WorkspaceIpc & {
   setCurrent: (workspaceDir: string | null) => void;
@@ -42,14 +50,41 @@ export function mockWorkspaceIpc(
     pickerQueue: (string | null)[];
     fsHandlers: Set<FsEventHandler>;
     watcher: Promise<WorkspaceWatcher> | null;
+    pendingEchoes: Map<string, { hash: string; expiresAt: number }>;
+    pendingUnlinkEchoes: Map<string, number>;
   } = {
     current: initialCurrent,
     pickerQueue: [],
     fsHandlers: new Set(),
     watcher: null,
+    pendingEchoes: new Map(),
+    pendingUnlinkEchoes: new Map(),
+  };
+
+  const isOwnEcho = (event: FsEvent): boolean => {
+    const now = Date.now();
+    if (event.type === "unlink") {
+      const expiresAt = state.pendingUnlinkEchoes.get(event.relativePath);
+      if (expiresAt && expiresAt > now) {
+        state.pendingUnlinkEchoes.delete(event.relativePath);
+        return true;
+      }
+      return false;
+    }
+    const pending = state.pendingEchoes.get(event.relativePath);
+    if (
+      pending &&
+      pending.expiresAt > now &&
+      pending.hash === hashContent(event.content)
+    ) {
+      state.pendingEchoes.delete(event.relativePath);
+      return true;
+    }
+    return false;
   };
 
   const emit: FsEventHandler = (event) => {
+    if (isOwnEcho(event)) return;
     state.fsHandlers.forEach((handler) => handler(event));
   };
 
@@ -114,6 +149,18 @@ export function mockWorkspaceIpc(
         return { changed_paths: [], removed_paths: [] };
       }
       const profile = loadCliProfile({ cwd: state.current });
+      const expiresAt = Date.now() + ECHO_TTL_MS;
+      documents.forEach((doc) => {
+        if (doc.filePath !== undefined) {
+          state.pendingEchoes.set(doc.filePath, {
+            hash: hashContent(doc.content),
+            expiresAt,
+          });
+        }
+      });
+      (deletedPaths ?? []).forEach((relativePath) => {
+        state.pendingUnlinkEchoes.set(relativePath, expiresAt);
+      });
       return saveDocumentsToWorkspace(
         { pubkey: profile.pubkey, workspaceDir: profile.workspaceDir },
         documents,

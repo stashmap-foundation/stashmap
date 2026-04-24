@@ -83,6 +83,66 @@ Holiday Destinations
   );
 });
 
+test("creating a new document via the app persists knowstr_doc_id frontmatter to disk", async () => {
+  const { path } = await renderAppTree();
+  if (!path) {
+    throw new Error("expected renderAppTree to return a workspace path");
+  }
+  await findNewNodeEditor();
+  await type("My Notes{Enter}{Tab}Spain{Escape}");
+
+  const content = fs.readFileSync(`${path}/my-notes.md`, "utf8");
+  expect(content).toMatch(/^---\n[\s\S]*knowstr_doc_id:/u);
+});
+
+test("adding a sibling to holidays.md persists frontmatter", async () => {
+  const { path } = knowstrInit();
+  write(path, "holidays.md", "# Holiday Destinations\n- France\n- Paris\n");
+
+  await renderAppTree({ path, search: "Holiday Destinations" });
+  await expectTree(`
+Holiday Destinations
+  France
+  Paris
+`);
+
+  await userEvent.click(await screen.findByLabelText("edit Paris"));
+  await userEvent.keyboard("{Enter}Spain{Escape}");
+
+  await expectTree(`
+Holiday Destinations
+  France
+  Paris
+  Spain
+`);
+
+  const content = fs.readFileSync(`${path}/holidays.md`, "utf8");
+  expect(content).toMatch(/^---\n[\s\S]*knowstr_doc_id:/u);
+});
+
+test("editing a hand-written file persists knowstr_doc_id frontmatter to disk", async () => {
+  const { path } = knowstrInit();
+  write(path, "notes.md", "# Notes\n- alpha\n");
+
+  await renderAppTree({ path, search: "Notes" });
+  await expectTree(`
+Notes
+  alpha
+`);
+
+  await userEvent.click(await screen.findByLabelText("edit alpha"));
+  await userEvent.keyboard("{Enter}beta{Escape}");
+
+  await expectTree(`
+Notes
+  alpha
+  beta
+`);
+
+  const content = fs.readFileSync(`${path}/notes.md`, "utf8");
+  expect(content).toMatch(/^---\n[\s\S]*knowstr_doc_id:/u);
+});
+
 test("opening a workspace does not write to any file on disk", async () => {
   const { path } = knowstrInit();
   const before = `

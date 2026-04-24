@@ -360,7 +360,7 @@ body {
 
 // Indicator gutter - fixed column for semantic indicators
 .indicator-gutter {
-  width: 20px;
+  width: 12px;
   height: var(--row-height, 22px);
   flex-shrink: 0;
   display: flex;
@@ -491,8 +491,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  min-width: 20px;
+  width: 12px;
+  min-width: 12px;
   height: var(--row-height, 22px);
   color: var(--base01);
   font-size: 0.9rem;

@@ -1,5 +1,5 @@
 import fs from "fs";
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   expectMarkdown,
@@ -259,5 +259,58 @@ A standalone paragraph. <!-- id:... -->
 
 ## Trailing <!-- id:... -->
 `
+  );
+});
+
+test("dragging task-view nodes preserves external node ids in markdown", async () => {
+  const { path } = knowstrInit();
+  write(
+    path,
+    "lucas.md",
+    `
+---
+type: task-view
+owner: "lucas"
+generated_on: "2026-04-25"
+source: "TASKS.md"
+mode: "read-only-projection"
+---
+
+# @lucas <!-- id:person-lucas -->
+
+- (?) [ ] Alpha <!-- id:task-20 -->
+- (?) [ ] Beta <!-- id:task-1s -->
+- (?) [ ] Gamma <!-- id:task-22 -->
+`
+  );
+  await knowstrSave(path);
+
+  await renderAppTree({ path, search: "@lucas" });
+  await expectTree(`
+@lucas
+  Alpha
+  Beta
+  Gamma
+`);
+
+  fireEvent.dragStart(screen.getByText("Gamma"));
+  fireEvent.drop(screen.getByText("Alpha"));
+
+  await expectTree(`
+@lucas
+  Gamma
+  Alpha
+  Beta
+`);
+
+  const content = fs.readFileSync(`${path}/lucas.md`, "utf8");
+  expect(content).toContain("- (?) [ ] Gamma <!-- id:task-22 -->");
+  expect(content).toContain("- (?) [ ] Alpha <!-- id:task-20 -->");
+  expect(content).toContain("- (?) [ ] Beta <!-- id:task-1s -->");
+  expect(content.indexOf("id:task-22")).toBeLessThan(
+    content.indexOf("id:task-20")
+  );
+  expect(content.indexOf("id:task-20")).toBeLessThan(
+    content.indexOf("id:task-1s")
   );
 });

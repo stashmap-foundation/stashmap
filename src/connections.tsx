@@ -3,6 +3,12 @@ import { List, Set, Map } from "immutable";
 import { newRefNode, newNode } from "./nodeFactory";
 import { SEARCH_PREFIX } from "./constants";
 import { getRootAnchorContext, rootAnchorsEqual } from "./rootAnchor";
+import {
+  getBlockLinkTarget,
+  isBlockLink,
+  nodeText,
+  plainSpans,
+} from "./nodeSpans";
 
 // Empty text remains the sentinel for an empty placeholder row
 export const EMPTY_SEMANTIC_ID = "" as ID;
@@ -24,17 +30,13 @@ export function createRefTarget(
   return { targetID, linkText };
 }
 
-export function isRefNode(
-  node: GraphNode | undefined
-): node is GraphNode & { targetID: LongID } {
-  return !!node && (node.isRef === true || node.targetID !== undefined);
-}
+export const isRefNode = isBlockLink;
 
 function getTargetNode(
   knowledgeDBs: KnowledgeDBs,
   node: GraphNode | undefined
 ): GraphNode | undefined {
-  const targetID = node?.targetID;
+  const targetID = getBlockLinkTarget(node);
   return targetID && node
     ? getNode(knowledgeDBs, targetID, node.author)
     : undefined;
@@ -47,7 +49,7 @@ export function resolveNode(
   if (!node) {
     return undefined;
   }
-  return isRefNode(node) ? getTargetNode(knowledgeDBs, node) : node;
+  return isBlockLink(node) ? getTargetNode(knowledgeDBs, node) : node;
 }
 
 export function isSearchId(id: ID): boolean {
@@ -94,8 +96,9 @@ export function getNodeText(node: GraphNode | undefined): string | undefined {
   if (!node) {
     return undefined;
   }
-  if (node.text !== "") {
-    return node.text;
+  const text = nodeText(node);
+  if (text !== "") {
+    return text;
   }
   const nodeID = shortID(node.id) as ID;
   return isSearchId(nodeID) ? parseSearchId(nodeID) || "" : undefined;
@@ -169,7 +172,7 @@ export function getNodeSemanticID(node: GraphNode): ID {
   if (isSearchId(nodeID)) {
     return nodeID;
   }
-  return node.text as ID;
+  return nodeText(node) as ID;
 }
 
 export function getSemanticID(knowledgeDBs: KnowledgeDBs, node: GraphNode): ID {
@@ -406,21 +409,15 @@ export function ensureNodeNativeFields(
   const existingNode = knowledgeDBs
     .get(node.author)
     ?.nodes.get(shortID(node.id));
-  const text = node.text || existingNode?.text || "";
   const parent = node.parent || existingNode?.parent;
   const anchor = parent ? undefined : node.anchor ?? existingNode?.anchor;
 
-  if (
-    node.text === text &&
-    node.parent === parent &&
-    rootAnchorsEqual(node.anchor, anchor)
-  ) {
+  if (node.parent === parent && rootAnchorsEqual(node.anchor, anchor)) {
     return node;
   }
 
   return {
     ...node,
-    text,
     parent,
     anchor,
   };
@@ -454,7 +451,7 @@ export function getSearchNodes(
         : {
             children: List<ID>(),
             id: semanticID,
-            text: "",
+            spans: plainSpans(""),
             parent: searchId as LongID,
             updated: rel.updated,
             author: rel.author,

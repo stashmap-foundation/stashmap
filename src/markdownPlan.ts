@@ -12,6 +12,7 @@ import {
   planUpsertNodes,
 } from "./planner";
 import { newNode } from "./nodeFactory";
+import { nodeText } from "./nodeSpans";
 import { getNodeForView, ViewPath } from "./ViewContext";
 
 export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
@@ -75,7 +76,10 @@ export function planCreateNodesFromMarkdown<T extends GraphPlan>(
     List<ID>(),
     nextPlan.user.publicKey
   );
-  return [planUpsertNodes(nextPlan, fallbackNode), fallbackNode.text as ID];
+  return [
+    planUpsertNodes(nextPlan, fallbackNode),
+    nodeText(fallbackNode) as ID,
+  ];
 }
 
 function removeTransientRootAffects<T extends GraphPlan>(

@@ -11,6 +11,7 @@ import {
   getNodeContext,
 } from "./connections";
 import { getTextForSemanticID } from "./semanticProjection";
+import { getBlockLinkText } from "./nodeSpans";
 import {
   ViewPath,
   getParentView,
@@ -299,7 +300,7 @@ export function buildReferenceItem(
     return buildDeletedReference(
       refId,
       data.user.publicKey,
-      parentItem?.linkText
+      getBlockLinkText(parentItem)
     );
   }
 

@@ -4,10 +4,10 @@ import {
   getNodeContext,
   getNodeText,
   getSemanticID,
-  isRefNode,
   shortID,
 } from "./connections";
 import { buildOutgoingReference } from "./buildReferenceRow";
+import { getBlockLinkTarget, getBlockLinkText, isBlockLink } from "./nodeSpans";
 import {
   addBlankLinesAroundHeadings,
   formatBulletLine,
@@ -52,8 +52,8 @@ function serializeNodeItems(
       if (!item) {
         throw new Error(`Missing child node: ${childID}`);
       }
-      if (isRefNode(item)) {
-        const targetNodeID = item.targetID;
+      if (isBlockLink(item)) {
+        const targetNodeID = getBlockLinkTarget(item);
         if (!targetNodeID) {
           return acc;
         }
@@ -65,7 +65,7 @@ function serializeNodeItems(
         if (!ref) {
           return acc;
         }
-        const linkText = item.linkText || ref.text;
+        const linkText = getBlockLinkText(item) || ref.text;
         const prefix = formatPrefixMarkers(item.relevance, item.argument);
         const body = `${prefix}[${linkText}](#${targetNodeID})`;
         const line =

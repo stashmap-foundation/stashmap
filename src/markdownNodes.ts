@@ -10,6 +10,7 @@ import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
 import { newRefNode, newNode } from "./nodeFactory";
 import { extractImportedFrontMatter } from "./markdownFrontMatter";
 import { dropLeadingYamlEchoRoots } from "./markdownImport";
+import { nodeText, spansText } from "./nodeSpans";
 
 export type WalkContext = {
   knowledgeDBs: KnowledgeDBs;
@@ -31,6 +32,10 @@ function walkUpsertNode(ctx: WalkContext, node: GraphNode): WalkContext {
   };
 }
 
+function isSingleLinkSpans(spans: InlineSpan[]): boolean {
+  return spans.length === 1 && spans[0].kind === "link";
+}
+
 function materializeTreeNode(
   ctx: WalkContext,
   treeNode: MarkdownTreeNode,
@@ -38,14 +43,16 @@ function materializeTreeNode(
   root: LongID,
   parent?: LongID
 ): [WalkContext, ID, GraphNode] {
+  const treeText = spansText(treeNode.spans);
   const baseNode = treeNode.uuid
     ? {
-        ...newNode(treeNode.text, semanticContext, ctx.publicKey, root),
+        ...newNode(treeText, semanticContext, ctx.publicKey, root),
         id: joinID(ctx.publicKey, treeNode.uuid),
       }
-    : newNode(treeNode.text, semanticContext, ctx.publicKey, root);
+    : newNode(treeText, semanticContext, ctx.publicKey, root);
   const nodeBaseWithFields: GraphNode = {
     ...baseNode,
+    spans: treeNode.spans,
     parent,
     frontMatter: parent ? undefined : treeNode.frontMatter,
     docId: parent ? undefined : treeNode.docId,
@@ -66,21 +73,25 @@ function materializeTreeNode(
   };
 
   const childSemanticContext = semanticContext.push(
-    nodeBaseWithFields.text as ID
+    nodeText(nodeBaseWithFields) as ID
   );
   const visibleChildren = treeNode.children.filter((child) => !child.hidden);
   const [withVisible, childIDs] = visibleChildren.reduce(
     ([accCtx, accChildren], childNode) => {
-      if (childNode.linkHref) {
+      if (isSingleLinkSpans(childNode.spans)) {
+        const link = childNode.spans[0];
+        if (link.kind !== "link") {
+          throw new Error("unreachable");
+        }
         const refNode = newRefNode(
           ctx.publicKey,
           root,
-          childNode.linkHref as LongID,
+          link.targetID,
           nodeBaseWithFields.id,
           childNode.relevance,
           childNode.argument,
-          childNode.text,
-          childNode.text
+          link.text,
+          link.text
         );
         return [
           walkUpsertNode(accCtx, refNode),
@@ -121,7 +132,7 @@ function materializeTreeNode(
       ? { updated: withVisible.updated }
       : {}),
   };
-  return [walkUpsertNode(withVisible, node), node.text as ID, node];
+  return [walkUpsertNode(withVisible, node), nodeText(node) as ID, node];
 }
 
 export function createNodesFromMarkdownTrees(

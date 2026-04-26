@@ -2,6 +2,7 @@ import { List } from "immutable";
 import { v4 } from "uuid";
 import { joinID } from "./connections";
 import { createRootAnchor } from "./rootAnchor";
+import { plainSpans, linkSpan } from "./nodeSpans";
 
 export function newNode(
   text: string,
@@ -16,7 +17,7 @@ export function newNode(
   return {
     children: List<ID>(),
     id,
-    text,
+    spans: plainSpans(text),
     parent,
     anchor: !parent ? createRootAnchor(semanticContext) : undefined,
     frontMatter: docId ? `---\nknowstr_doc_id: ${docId}\n---\n` : undefined,
@@ -39,19 +40,16 @@ export function newRefNode(
   text?: string,
   linkText?: string
 ): GraphNode {
+  const label = linkText || text || "";
   return {
     children: List<ID>(),
     id: joinID(myself, v4()),
-    text: text || "",
+    spans: [linkSpan(targetID, label)],
     parent,
     updated: Date.now(),
     author: myself,
     root,
     relevance,
     argument,
-    isRef: true,
-    isCref: true,
-    targetID,
-    linkText,
   };
 }

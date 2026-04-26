@@ -22,6 +22,7 @@ import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
 import { useTemporaryView } from "./TemporaryViewContext";
 import { planBatchRelevance, EditorInfo } from "./batchOperations";
+import { nodeText } from "../nodeSpans";
 
 type RelevanceSelectorProps = {
   virtualType?: VirtualType;
@@ -97,7 +98,10 @@ export function RelevanceSelector({
   const isContains = displayLevel === -1;
   const displayText = isVirtual
     ? versionedDisplayText
-    : editorText.trim() || versionedDisplayText || currentNode?.text || "";
+    : editorText.trim() ||
+      versionedDisplayText ||
+      (currentNode ? nodeText(currentNode) : "") ||
+      "";
 
   const isInSelection = selection.has(viewKey) && selection.size > 1;
 

@@ -2,7 +2,8 @@ import React from "react";
 import { List, OrderedSet, Set } from "immutable";
 import { DndProvider, useDragLayer, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { moveNodes, createRefTarget, isRefNode } from "./connections";
+import { moveNodes, createRefTarget } from "./connections";
+import { getBlockLinkTarget, getBlockLinkText, isBlockLink } from "./nodeSpans";
 import {
   parseViewPath,
   upsertNodes,
@@ -273,7 +274,7 @@ export function dnd(
       accPlan,
       createRefTarget(
         sourceNode?.id || (sourceItemID as LongID),
-        sourceNode?.linkText
+        getBlockLinkText(sourceNode)
       ),
       toView,
       stack,
@@ -369,7 +370,7 @@ export function dnd(
     if (isCopyDrag) {
       return true;
     }
-    const sourceIsReference = isRefNode(sourceNode);
+    const sourceIsReference = isBlockLink(sourceNode);
     if (sourceIsReference) {
       return true;
     }
@@ -379,7 +380,10 @@ export function dnd(
   const toReferenceTarget = (
     sourceNode: GraphNode
   ): ReturnType<typeof createRefTarget> =>
-    createRefTarget(sourceNode.targetID || sourceNode.id, sourceNode.linkText);
+    createRefTarget(
+      getBlockLinkTarget(sourceNode) || sourceNode.id,
+      getBlockLinkText(sourceNode)
+    );
 
   const getSuggestionTargetID = (
     isPrimarySource: boolean,
@@ -389,7 +393,7 @@ export function dnd(
       return sourceDrag.targetId || sourceDrag.nodeId;
     }
     if (sourceNode) {
-      return sourceNode.targetID || sourceNode.id;
+      return getBlockLinkTarget(sourceNode) || sourceNode.id;
     }
     return undefined;
   };

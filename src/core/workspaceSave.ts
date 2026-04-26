@@ -5,6 +5,7 @@ import { buildDocumentEventFromMarkdownTree } from "../standaloneDocumentEvent";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "../markdownTree";
 import { extractMarkdownImportPayload } from "../markdownImport";
 import { ensureKnowstrDocIdFrontMatter } from "../knowstrFrontmatter";
+import { plainSpans } from "../nodeSpans";
 
 export type WorkspaceSaveProfile = {
   pubkey: PublicKey;
@@ -73,7 +74,7 @@ export function parseWorkspaceDocumentRoots(
       : undefined;
   const titledRoot = title
     ? {
-        text: title,
+        spans: plainSpans(title),
         children: roots,
       }
     : undefined;

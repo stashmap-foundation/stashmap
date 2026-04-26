@@ -12,7 +12,8 @@ import {
   useIsViewingOtherUserContent,
   useCurrentEdge,
 } from "../ViewContext";
-import { isEmptySemanticID, isRefNode } from "../connections";
+import { isEmptySemanticID } from "../connections";
+import { getBlockLinkTarget, getBlockLinkText } from "../nodeSpans";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
 import {
@@ -85,8 +86,8 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
           text: displayText,
           isCopyDrag: copyDrag || undefined,
           nodeId: dragNode?.id,
-          targetId: isRefNode(dragNode) ? dragNode.targetID : undefined,
-          linkText: dragNode?.linkText,
+          targetId: getBlockLinkTarget(dragNode),
+          linkText: getBlockLinkText(dragNode),
         };
       },
       collect: (monitor) => ({
@@ -188,7 +189,7 @@ function DraggableSuggestion({
         text: displayText,
         isSuggestion: true,
         nodeId: node?.id,
-        targetId: currentRow?.targetID || undefined,
+        targetId: getBlockLinkTarget(currentRow),
       };
     },
     collect: (monitor) => ({

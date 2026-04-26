@@ -11,6 +11,7 @@ import {
   type,
 } from "../utils.test";
 import { updateNodeItemMetadata } from "../nodeItemMetadata";
+import { plainSpans } from "../nodeSpans";
 
 function makeItem(
   id: ID,
@@ -22,7 +23,7 @@ function makeItem(
   return {
     children: List<ID>(),
     id,
-    text: "",
+    spans: plainSpans(""),
     updated: Date.now(),
     author,
     root,

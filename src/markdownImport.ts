@@ -1,5 +1,6 @@
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
 import { extractImportedFrontMatter } from "./markdownFrontMatter";
+import { plainSpans, spansText } from "./nodeSpans";
 
 export type MarkdownImportFile = {
   name: string;
@@ -12,7 +13,7 @@ export type MarkdownImportMetadata = {
 
 function looksLikeYamlMetadataNode(node: MarkdownTreeNode): boolean {
   return (
-    /^[A-Za-z0-9_-]+:\s*.*$/u.test(node.text) &&
+    /^[A-Za-z0-9_-]+:\s*.*$/u.test(spansText(node.spans)) &&
     (node.blockKind === "paragraph" ||
       node.blockKind === "list_item" ||
       node.blockKind === "heading" ||
@@ -71,7 +72,7 @@ function normalizeRootsForSingleFile(
 
   return [
     {
-      text: metadata.title || titleFromFileName(fileName),
+      spans: plainSpans(metadata.title || titleFromFileName(fileName)),
       children: roots,
     },
   ];

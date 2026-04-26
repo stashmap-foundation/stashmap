@@ -6,6 +6,7 @@ import { processEvents } from "../eventProcessing";
 import { ALICE, setup, UpdateState } from "../utils.test";
 import { parseMarkdownHierarchy, planPasteMarkdownTrees } from "./FileDropZone";
 import { joinID, shortID } from "../connections";
+import { linkSpan, nodeText, plainSpans } from "../nodeSpans";
 
 const TEST_FILE = `# Programming Languages
 
@@ -37,7 +38,7 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
     basePlan,
     parseMarkdownHierarchy(TEST_FILE),
     workspacePath,
-    [workspaceNode.text as ID],
+    [nodeText(workspaceNode) as ID],
     0
   );
 
@@ -55,7 +56,9 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
 }
 
 function getRequiredNode(knowledgeDB: KnowledgeData, text: string): GraphNode {
-  const node = knowledgeDB.nodes.find((candidate) => candidate.text === text);
+  const node = knowledgeDB.nodes.find(
+    (candidate) => nodeText(candidate) === text
+  );
   if (!node) {
     throw new Error(`Missing node: ${text}`);
   }
@@ -64,7 +67,10 @@ function getRequiredNode(knowledgeDB: KnowledgeData, text: string): GraphNode {
 
 function getChildTexts(knowledgeDB: KnowledgeData, node: GraphNode): string[] {
   return node.children
-    .map((childID) => knowledgeDB.nodes.get(shortID(childID))?.text || "")
+    .map((childID) => {
+      const child = knowledgeDB.nodes.get(shortID(childID));
+      return child ? nodeText(child) : "";
+    })
     .toArray();
 }
 
@@ -98,10 +104,9 @@ test("Markdown parser extracts ref link whose text contains brackets", () => {
 
   expect(parsed).toEqual([
     {
-      text: linkedText,
+      spans: [linkSpan(targetId as LongID, linkedText)],
       blockKind: "list_item",
       children: [],
-      linkHref: targetId,
     },
   ]);
 });
@@ -115,12 +120,12 @@ test("Markdown parser preserves list nesting and strips list markers", () => {
 
   expect(parsed).toEqual([
     {
-      text: "Parent",
+      spans: plainSpans("Parent"),
       blockKind: "list_item",
       children: [
-        { text: "Child", children: [], blockKind: "list_item" },
+        { spans: plainSpans("Child"), children: [], blockKind: "list_item" },
         {
-          text: "Numbered child",
+          spans: plainSpans("Numbered child"),
           children: [],
           blockKind: "list_item",
           listOrdered: true,

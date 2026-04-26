@@ -1,9 +1,5 @@
-import {
-  createRefTarget,
-  isEmptySemanticID,
-  getNode,
-  isRefNode,
-} from "./connections";
+import { createRefTarget, isEmptySemanticID, getNode } from "./connections";
+import { getBlockLinkTarget, isBlockLink, nodeText } from "./nodeSpans";
 import { planUpdateNodeItemMetadataById } from "./dataPlanner";
 import { NodeItemMetadata } from "./nodeItemMetadata";
 import {
@@ -25,8 +21,9 @@ import {
 
 export type { NodeItemMetadata } from "./nodeItemMetadata";
 
-function getNodeText(plan: Plan, viewPath: ViewPath, stack: ID[]): string {
-  return getNodeForView(plan, viewPath, stack)?.text ?? "";
+function getViewNodeText(plan: Plan, viewPath: ViewPath, stack: ID[]): string {
+  const node = getNodeForView(plan, viewPath, stack);
+  return node ? nodeText(node) : "";
 }
 
 function planUpdateExistingItemMetadata(
@@ -79,7 +76,7 @@ export function planUpdateViewItemMetadata(
     if (!virtualRow) {
       return plan;
     }
-    if (virtualRow.virtualType === "suggestion" && !isRefNode(virtualRow)) {
+    if (virtualRow.virtualType === "suggestion" && !isBlockLink(virtualRow)) {
       return planDeepCopyNode(
         plan,
         viewPath,
@@ -90,7 +87,7 @@ export function planUpdateViewItemMetadata(
         metadata.argument
       )[0];
     }
-    const targetID = virtualRow.targetID || undefined;
+    const targetID = getBlockLinkTarget(virtualRow);
     const targetItem = targetID ? createRefTarget(targetID) : rowID;
     const inheritedSourceNode = targetID
       ? getNode(plan.knowledgeDBs, targetID, plan.user.publicKey)
@@ -108,7 +105,7 @@ export function planUpdateViewItemMetadata(
 
   const trimmed = editorText.trim();
   const basePlan =
-    trimmed && trimmed !== getNodeText(plan, viewPath, stack)
+    trimmed && trimmed !== getViewNodeText(plan, viewPath, stack)
       ? planSaveNodeAndEnsureNodes(plan, editorText, viewPath, stack).plan
       : plan;
 

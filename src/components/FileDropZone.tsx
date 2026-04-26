@@ -2,6 +2,7 @@ import { ViewPath } from "../ViewContext";
 import { Plan, ParsedLine, parseClipboardText } from "../planner";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "../markdownTree";
 import { planInsertMarkdownTrees } from "../markdownPlan";
+import { plainSpans } from "../nodeSpans";
 
 export { parseMarkdownHierarchy } from "../markdownTree";
 export type { MarkdownImportFile } from "../markdownImport";
@@ -23,7 +24,10 @@ export function parsedLinesToTrees(children: ParsedLine[]): MarkdownTreeNode[] {
   const stack: MarkdownTreeNode[] = [];
   children.forEach((item) => {
     const depth = item.depth - minDepth;
-    const node: MarkdownTreeNode = { text: item.text, children: [] };
+    const node: MarkdownTreeNode = {
+      spans: plainSpans(item.text),
+      children: [],
+    };
     stack.length = Math.min(depth, stack.length);
     if (stack.length === 0) {
       roots.push(node);
@@ -54,7 +58,7 @@ export function buildRootTreeForEmptyRootDrop(
     return importedTrees[0];
   }
   return {
-    text: "Imported Markdown Files",
+    spans: plainSpans("Imported Markdown Files"),
     children: importedTrees,
   };
 }

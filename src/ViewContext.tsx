@@ -23,6 +23,7 @@ import { Plan, planUpsertNodes, getPane } from "./planner";
 import { usePaneStack } from "./SplitPanesContext";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
 import { newNode } from "./nodeFactory";
+import { nodeText } from "./nodeSpans";
 import { getNodeUserPublicKey } from "./userEntry";
 
 export { newNode } from "./nodeFactory";
@@ -664,7 +665,7 @@ export function getDisplayTextForView(
   if (contactPetname) {
     return contactPetname;
   }
-  return ownNode?.text ?? "";
+  return ownNode ? nodeText(ownNode) : "";
 }
 
 export function useDisplayText(): string {

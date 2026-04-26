@@ -15,6 +15,7 @@ import {
   resolveNode,
   isRefNode,
 } from "./connections";
+import { getBlockLinkTarget, nodeText } from "./nodeSpans";
 import { suggestionSettings } from "./constants";
 import { LOG_ROOT_ROLE } from "./systemRoots";
 import { computeVersionDiff } from "./domain/snapshotBaseline";
@@ -85,7 +86,7 @@ function getConcreteNodesForSemanticID(
           (node) =>
             !isRefNode(node) &&
             (shortID(getNodeSemanticID(node)) === localID ||
-              node.text === localID)
+              nodeText(node) === localID)
         )
         .toArray()
     )
@@ -133,9 +134,9 @@ export function getTextForSemanticID(
   }
 
   const node = getConcreteNodeForSemanticID(knowledgeDBs, semanticID, author);
-  const nodeText = getNodeText(node);
-  if (nodeText !== undefined) {
-    return nodeText;
+  const text = getNodeText(node);
+  if (text !== undefined) {
+    return text;
   }
 
   const fallbackText = getFallbackSemanticText(semanticID);
@@ -506,10 +507,13 @@ export function getAlternativeFooterData(
     .toSet();
   const declinedTargetIDs = currentNodeChildren
     .filter((item) => isRefNode(item) && item.relevance === "not_relevant")
-    .flatMap((item) => (item.targetID ? [item.targetID] : []))
+    .flatMap((item) => {
+      const t = getBlockLinkTarget(item);
+      return t ? [t] : [];
+    })
     .toSet();
   const existingCrefTargetIDs = currentNodeChildren
-    .map((item) => (isRefNode(item) ? item.targetID : undefined))
+    .map((item) => getBlockLinkTarget(item))
     .filter((id): id is LongID => !!id)
     .toSet();
 

@@ -17,6 +17,7 @@ import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
 import { useTemporaryView } from "./TemporaryViewContext";
 import { planBatchArgument, EditorInfo } from "./batchOperations";
+import { nodeText } from "../nodeSpans";
 
 function getArgumentColor(argument: Argument): string {
   if (argument === "confirms") {
@@ -67,7 +68,10 @@ export function EvidenceSelector(): JSX.Element | null {
   if (!isVisible && !isAcceptableVirtual) return null;
 
   const nodeName =
-    editorText.trim() || versionedDisplayText || currentNode?.text || "row";
+    editorText.trim() ||
+    versionedDisplayText ||
+    (currentNode ? nodeText(currentNode) : "") ||
+    "row";
 
   const isInSelection = selection.has(viewKey) && selection.size > 1;
 

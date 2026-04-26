@@ -5,6 +5,7 @@ import markdownItFrontMatter from "markdown-it-front-matter";
 // eslint-disable-next-line import/no-unresolved
 import Token from "markdown-it/lib/token";
 import { LOG_ROOT_ROLE } from "./systemRoots";
+import { linkSpan, plainSpans, spansText } from "./nodeSpans";
 
 const markdown = new MarkdownIt({ html: true });
 markdown.use(markdownItFrontMatter, () => undefined);
@@ -203,8 +204,7 @@ function extractPrefixMarkers(text: string): {
 }
 
 function extractInlineContent(inline: Token): {
-  text: string;
-  linkHref?: string;
+  spans: InlineSpan[];
   relevance?: Relevance;
   argument?: Argument;
 } {
@@ -212,7 +212,7 @@ function extractInlineContent(inline: Token): {
     const raw = inline.content.trim();
     const { cleanText, relevance, argument } = extractPrefixMarkers(raw);
     return {
-      text: cleanText,
+      spans: plainSpans(cleanText),
       relevance,
       argument,
     };
@@ -221,8 +221,7 @@ function extractInlineContent(inline: Token): {
   if (refLink) {
     const { relevance, argument } = extractPrefixMarkers(refLink.prefixSource);
     return {
-      text: refLink.text,
-      linkHref: refLink.linkHref,
+      spans: [linkSpan(refLink.linkHref as LongID, refLink.text)],
       relevance,
       argument,
     };
@@ -235,21 +234,20 @@ function extractInlineContent(inline: Token): {
   const raw = stripped.replace(/\n/g, " ").trim();
   const { cleanText, relevance, argument } = extractPrefixMarkers(raw);
   return {
-    text: cleanText,
+    spans: plainSpans(cleanText),
     relevance,
     argument,
   };
 }
 
 export type MarkdownTreeNode = {
-  text: string;
+  spans: InlineSpan[];
   children: MarkdownTreeNode[];
   frontMatter?: string;
   docId?: string;
   uuid?: string;
   relevance?: Relevance;
   argument?: Argument;
-  linkHref?: string;
   blockKind?: "heading" | "list_item" | "paragraph";
   headingLevel?: number;
   listOrdered?: boolean;
@@ -323,8 +321,8 @@ export function parseMarkdownHierarchy(
       if (!inline || inline.type !== "inline") {
         continue;
       }
-      const { text, relevance, argument } = extractInlineContent(inline);
-      if (!text) {
+      const { spans, relevance, argument } = extractInlineContent(inline);
+      if (spansText(spans) === "") {
         continue;
       }
       const commentAttrs = extractCommentAttrs(inline);
@@ -338,7 +336,7 @@ export function parseMarkdownHierarchy(
         getLastDefinedListItem(listItemStack) ||
         headingStack[headingStack.length - 1]?.node;
       const node: MarkdownTreeNode = {
-        text,
+        spans,
         children: [],
         blockKind: "heading",
         headingLevel,
@@ -385,9 +383,8 @@ export function parseMarkdownHierarchy(
     if (!inline || inline.type !== "inline") {
       continue;
     }
-    const { text, linkHref, relevance, argument } =
-      extractInlineContent(inline);
-    if (!text) {
+    const { spans, relevance, argument } = extractInlineContent(inline);
+    if (spansText(spans) === "") {
       continue;
     }
     const commentAttrs = extractCommentAttrs(inline);
@@ -403,7 +400,7 @@ export function parseMarkdownHierarchy(
         const effectiveArgument = argument;
         const currentListKind = listKindStack[listKindStack.length - 1];
         const node: MarkdownTreeNode = {
-          text,
+          spans,
           children: [],
           blockKind: "list_item",
           ...(currentListKind?.ordered && {
@@ -417,7 +414,6 @@ export function parseMarkdownHierarchy(
           ...(effectiveArgument !== undefined && {
             argument: effectiveArgument,
           }),
-          ...(linkHref !== undefined && { linkHref }),
           ...(commentAttrs?.hidden && { hidden: true }),
           ...(commentAttrs?.basedOn !== undefined && {
             basedOn: commentAttrs.basedOn,
@@ -434,10 +430,9 @@ export function parseMarkdownHierarchy(
         continue;
       }
       currentListNode.children.push({
-        text,
+        spans,
         children: [],
         blockKind: "paragraph",
-        ...(linkHref !== undefined && { linkHref }),
         ...(relevance !== undefined && { relevance }),
         ...(argument !== undefined && { argument }),
       });
@@ -445,7 +440,7 @@ export function parseMarkdownHierarchy(
     }
 
     const paragraphNode: MarkdownTreeNode = {
-      text,
+      spans,
       children: [],
       blockKind: "paragraph",
     };

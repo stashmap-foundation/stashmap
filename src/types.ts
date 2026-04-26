@@ -228,10 +228,14 @@ declare global {
 
   type RootSystemRole = "log";
 
+  type InlineSpan =
+    | { kind: "text"; text: string }
+    | { kind: "link"; targetID: LongID; text: string };
+
   type GraphNode = {
     children: List<ID>;
     id: ID;
-    text: string;
+    spans: InlineSpan[];
     frontMatter?: string;
     docId?: string;
     parent?: LongID;
@@ -247,10 +251,6 @@ declare global {
     argument?: Argument;
     virtualType?: VirtualType;
     versionMeta?: VersionMeta;
-    isRef?: boolean;
-    isCref?: boolean;
-    targetID?: LongID;
-    linkText?: string;
     blockKind?: "heading" | "list_item" | "paragraph";
     headingLevel?: number;
     listOrdered?: boolean;

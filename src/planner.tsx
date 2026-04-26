@@ -53,6 +53,7 @@ import {
   getPaneIndex,
 } from "./ViewContext";
 import { newRefNode } from "./nodeFactory";
+import { nodeText, plainSpans } from "./nodeSpans";
 import { UNAUTHENTICATED_USER_PK } from "./NostrAuthContext";
 import { useRelaysToCreatePlan } from "./relays";
 import { createRootAnchor } from "./rootAnchor";
@@ -302,12 +303,12 @@ export function planUpdateNodeText(
   if (!currentNode || currentNode.author !== plan.user.publicKey) {
     return plan;
   }
-  if (currentNode.text === text) {
+  if (nodeText(currentNode) === text) {
     return plan;
   }
   const updatedNode = withUsersEntryPublicKey({
     ...currentNode,
-    text,
+    spans: plainSpans(text),
     updated: Date.now(),
   });
   const basePlan = planUpsertNodes(plan, updatedNode);
@@ -563,7 +564,7 @@ export function planAddTargetsToNode<T extends GraphPlan>(
           : ({
               children: List<ID>(),
               id: objectID,
-              text: "",
+              spans: plainSpans(""),
               parent: parentNode.id,
               updated: Date.now(),
               author: accPlan.user.publicKey,
@@ -808,7 +809,7 @@ function planCopyDescendantNodes<T extends GraphPlan>(
       const baseNode = newNode(
         isRootNode && typeof targetSemanticID === "string"
           ? targetSemanticID
-          : node.text,
+          : nodeText(node),
         newSemanticContext,
         plan.user.publicKey,
         acc.copiedRoot
@@ -866,7 +867,7 @@ function planCopyDescendantNodes<T extends GraphPlan>(
             getAnchorSnapshotLabels(accPlan.knowledgeDBs, source)
           );
         })(),
-        text: source.text,
+        spans: source.spans,
         basedOn: source.id,
         relevance: source.relevance,
         argument: source.argument,
@@ -1274,7 +1275,7 @@ export function planSaveNodeAndEnsureNodes(
     return { plan, viewPath };
   }
 
-  const displayText = currentNode?.text ?? "";
+  const displayText = currentNode ? nodeText(currentNode) : "";
 
   if (trimmedText === displayText) return { plan, viewPath };
 
@@ -1631,7 +1632,7 @@ export function planSetEmptyNodePosition(
       nodeItem: {
         children: List<ID>(),
         id: EMPTY_SEMANTIC_ID,
-        text: "",
+        spans: plainSpans(""),
         parent: nodes.id,
         updated: Date.now(),
         author: plan.user.publicKey,

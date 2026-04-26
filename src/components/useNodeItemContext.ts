@@ -18,6 +18,7 @@ import {
 import { usePaneStack } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 import { useEditorText } from "./EditorTextContext";
+import { nodeText as getNodeSpanText } from "../nodeSpans";
 
 type NodeItemContext = {
   // Current state
@@ -58,7 +59,7 @@ export function useNodeItemContext(): NodeItemContext {
     ? getNodeForView(data, parentView, stack)?.id
     : undefined;
   const editorTextContext = useEditorText();
-  const nodeText = currentNode?.text || "";
+  const nodeText = currentNode ? getNodeSpanText(currentNode) : "";
 
   const isVisible =
     !isInSearchView && nodeIndex !== undefined && parentView !== undefined;

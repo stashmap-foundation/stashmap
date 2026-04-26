@@ -23,14 +23,12 @@ import {
   planCreateNodesFromMarkdownFiles,
   planCreateNodesFromMarkdownTrees,
 } from "./FileDropZone";
+import { MarkdownTreeNode } from "../markdownTree";
+import { nodeText, plainSpans, spansText } from "../nodeSpans";
 
-function flattenTexts(
-  nodes: { text: string; children: unknown[] }[]
-): string[] {
+function flattenTexts(nodes: MarkdownTreeNode[]): string[] {
   return nodes.reduce((acc: string[], node) => {
-    // eslint-disable-next-line testing-library/no-node-access
-    const children = node.children as { text: string; children: unknown[] }[];
-    return [...acc, node.text, ...flattenTexts(children)];
+    return [...acc, spansText(node.spans), ...flattenTexts(node.children)];
   }, []);
 }
 
@@ -52,16 +50,16 @@ test("Single file with multiple top-level roots is wrapped by filename", () => {
 
   expect(trees).toEqual([
     {
-      text: "roadmap",
+      spans: plainSpans("roadmap"),
       children: [
         {
-          text: "Phase 1",
+          spans: plainSpans("Phase 1"),
           children: [],
           blockKind: "heading",
           headingLevel: 1,
         },
         {
-          text: "Phase 2",
+          spans: plainSpans("Phase 2"),
           children: [],
           blockKind: "heading",
           headingLevel: 1,
@@ -88,7 +86,7 @@ source_id: "src_problem"
 
   expect(trees).toEqual([
     {
-      text: "Imported Title",
+      spans: plainSpans("Imported Title"),
       frontMatter: `---
 title: "Imported Title"
 source_id: "src_problem"
@@ -96,12 +94,12 @@ source_id: "src_problem"
 `,
       children: [
         {
-          text: "first",
+          spans: plainSpans("first"),
           children: [],
           blockKind: "list_item",
         },
         {
-          text: "second",
+          spans: plainSpans("second"),
           children: [],
           blockKind: "list_item",
         },
@@ -137,7 +135,7 @@ tags:
   const knowledgeDB = processed.get(alice().user.publicKey)?.knowledgeDB;
   const texts = knowledgeDB?.nodes
     .valueSeq()
-    .map((node) => node.text)
+    .map((node) => nodeText(node))
     .toArray();
 
   expect(texts).toContain("Alice and Bob Huddle");
@@ -155,15 +153,26 @@ tags:
 test("Leading YAML-like roots are dropped when front matter exists", () => {
   const cleaned = dropLeadingYamlEchoRoots(
     [
-      { text: 'source_id: "src_1"', children: [], blockKind: "paragraph" },
-      { text: "authors:", children: [{ text: "Alice", children: [] }] },
-      { text: "First point", children: [], blockKind: "list_item" },
+      {
+        spans: plainSpans('source_id: "src_1"'),
+        children: [],
+        blockKind: "paragraph",
+      },
+      {
+        spans: plainSpans("authors:"),
+        children: [{ spans: plainSpans("Alice"), children: [] }],
+      },
+      {
+        spans: plainSpans("First point"),
+        children: [],
+        blockKind: "list_item",
+      },
     ],
     '---\ntitle: "Doc"\n---\n'
   );
 
   expect(cleaned).toEqual([
-    { text: "First point", children: [], blockKind: "list_item" },
+    { spans: plainSpans("First point"), children: [], blockKind: "list_item" },
   ]);
 });
 
@@ -173,7 +182,7 @@ test("Multiple markdown files preserve file order", () => {
     { name: "b.md", markdown: "# Beta" },
   ]);
 
-  expect(trees.map((tree) => tree.text)).toEqual(["Alpha", "Beta"]);
+  expect(trees.map((tree) => spansText(tree.spans))).toEqual(["Alpha", "Beta"]);
 });
 
 test("Parser strips leading list markers and keeps nesting", () => {
@@ -185,12 +194,12 @@ test("Parser strips leading list markers and keeps nesting", () => {
 
   expect(trees).toEqual([
     {
-      text: "Parent",
+      spans: plainSpans("Parent"),
       blockKind: "list_item",
       children: [
-        { text: "Child", children: [], blockKind: "list_item" },
+        { spans: plainSpans("Child"), children: [], blockKind: "list_item" },
         {
-          text: "Numbered Child",
+          spans: plainSpans("Numbered Child"),
           children: [],
           blockKind: "list_item",
           listOrdered: true,
@@ -215,13 +224,15 @@ social pressures, influences and inducements. He stands in stark contrast
 
   expect(trees).toEqual([
     {
-      text: [
-        "The Endogenous personality is the 'inner' Man; a person whose outlook on life",
-        "is 'inward.' He is inner-directed, inner-driven, inner-motivated; one who uses",
-        "inner modes of thinking, inner evaluations, intuition; one who is to a high",
-        "degree autonomous, self-sufficient; one who is relatively indifferent to",
-        "social pressures, influences and inducements. He stands in stark contrast",
-      ].join(" "),
+      spans: plainSpans(
+        [
+          "The Endogenous personality is the 'inner' Man; a person whose outlook on life",
+          "is 'inward.' He is inner-directed, inner-driven, inner-motivated; one who uses",
+          "inner modes of thinking, inner evaluations, intuition; one who is to a high",
+          "degree autonomous, self-sufficient; one who is relatively indifferent to",
+          "social pressures, influences and inducements. He stands in stark contrast",
+        ].join(" ")
+      ),
       blockKind: "list_item",
       children: [],
     },
@@ -229,15 +240,17 @@ social pressures, influences and inducements. He stands in stark contrast
 });
 
 test("Empty-root drop wrapper is only used for multiple imported trees", () => {
-  const singleTree = [{ text: "Only", children: [] }];
+  const singleTree: MarkdownTreeNode[] = [
+    { spans: plainSpans("Only"), children: [] },
+  ];
   expect(buildRootTreeForEmptyRootDrop(singleTree)).toEqual(singleTree[0]);
 
-  const multipleTrees = [
-    { text: "One", children: [] },
-    { text: "Two", children: [] },
+  const multipleTrees: MarkdownTreeNode[] = [
+    { spans: plainSpans("One"), children: [] },
+    { spans: plainSpans("Two"), children: [] },
   ];
   expect(buildRootTreeForEmptyRootDrop(multipleTrees)).toEqual({
-    text: "Imported Markdown Files",
+    spans: plainSpans("Imported Markdown Files"),
     children: multipleTrees,
   });
 });
@@ -281,18 +294,18 @@ test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
     : undefined;
 
   expect(parentNode).toBeDefined();
-  expect(childNode?.text).toBe("Child");
-  expect(grandchildNode?.text).toBe("Grandchild");
+  expect(childNode && nodeText(childNode)).toBe("Child");
+  expect(grandchildNode && nodeText(grandchildNode)).toBe("Grandchild");
 
   expect(parentItemID).toEqual(getSemanticID(plan.knowledgeDBs, parentNode!));
   expect(
     nodeChildren(plan.knowledgeDBs, parentNode, plan.user.publicKey).first()?.id
   ).toEqual(childNode?.id);
-  expect(childNode?.text).toBe("Child");
+  expect(childNode && nodeText(childNode)).toBe("Child");
   expect(
     nodeChildren(plan.knowledgeDBs, childNode, plan.user.publicKey).first()?.id
   ).toEqual(grandchildNode?.id);
-  expect(grandchildNode?.text).toBe("Grandchild");
+  expect(grandchildNode && nodeText(grandchildNode)).toBe("Grandchild");
 });
 
 test("Planning multiple markdown files returns top nodes in import order", () => {
@@ -305,14 +318,15 @@ test("Planning multiple markdown files returns top nodes in import order", () =>
   ]);
 
   const topTexts = topNodeIDs.map((semanticID) => {
-    return plan.knowledgeDBs
+    const found = plan.knowledgeDBs
       .get(plan.user.publicKey)
       ?.nodes.valueSeq()
       .find(
         (node) =>
           isStandaloneRoot(node) &&
           getSemanticID(plan.knowledgeDBs, node) === semanticID
-      )?.text;
+      );
+    return found ? nodeText(found) : undefined;
   });
 
   expect(topTexts).toEqual(["One", "Two"]);
@@ -370,10 +384,10 @@ test("parseTextToTrees detects markdown headers", () => {
   const headerTrees = parseTextToTrees("# Root\n## Child");
   expect(headerTrees).toEqual([
     {
-      text: "Root",
+      spans: plainSpans("Root"),
       children: [
         {
-          text: "Child",
+          spans: plainSpans("Child"),
           children: [],
           blockKind: "heading",
           headingLevel: 2,
@@ -389,10 +403,10 @@ test("parseMarkdownHierarchy parses combined prefix markers (-!)", () => {
   const trees = parseMarkdownHierarchy("# Root\n- (-!) contra and relevant\n");
   expect(trees).toEqual([
     expect.objectContaining({
-      text: "Root",
+      spans: plainSpans("Root"),
       children: [
         expect.objectContaining({
-          text: "contra and relevant",
+          spans: plainSpans("contra and relevant"),
           argument: "contra",
           relevance: "relevant",
         }),
@@ -409,7 +423,7 @@ test("parseMarkdownHierarchy parses combined prefix markers (-~)", () => {
     expect.objectContaining({
       children: [
         expect.objectContaining({
-          text: "contra and little relevant",
+          spans: plainSpans("contra and little relevant"),
           argument: "contra",
           relevance: "little_relevant",
         }),
@@ -426,7 +440,7 @@ test("parseMarkdownHierarchy parses combined prefix markers (+!)", () => {
     expect.objectContaining({
       children: [
         expect.objectContaining({
-          text: "confirms and relevant",
+          spans: plainSpans("confirms and relevant"),
           argument: "confirms",
           relevance: "relevant",
         }),
@@ -443,11 +457,11 @@ test("parseMarkdownHierarchy still parses single prefix markers", () => {
     expect.objectContaining({
       children: [
         expect.objectContaining({
-          text: "relevant only",
+          spans: plainSpans("relevant only"),
           relevance: "relevant",
         }),
         expect.objectContaining({
-          text: "contra only",
+          spans: plainSpans("contra only"),
           argument: "contra",
         }),
       ],
@@ -459,11 +473,11 @@ test("parseTextToTrees falls back to indentation parser", () => {
   const indentTrees = parseTextToTrees("Root\n\tChild\n\t\tGrandchild");
   expect(indentTrees).toEqual([
     {
-      text: "Root",
+      spans: plainSpans("Root"),
       children: [
         {
-          text: "Child",
-          children: [{ text: "Grandchild", children: [] }],
+          spans: plainSpans("Child"),
+          children: [{ spans: plainSpans("Grandchild"), children: [] }],
         },
       ],
     },

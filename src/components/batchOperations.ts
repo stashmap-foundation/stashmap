@@ -18,6 +18,7 @@ import {
   NodeItemMetadata,
 } from "../nodeItemMutations";
 import { planMoveNodeWithView } from "../treeMutations";
+import { nodeText } from "../nodeSpans";
 
 export type EditorInfo = {
   text: string;
@@ -57,7 +58,8 @@ function getEditorTextForPath(
 }
 
 function getNodeText(plan: Plan, viewPath: ViewPath, stack: ID[]): string {
-  return getNodeForView(plan, viewPath, stack)?.text ?? "";
+  const node = getNodeForView(plan, viewPath, stack);
+  return node ? nodeText(node) : "";
 }
 
 function planUpdateOneMetadata(
@@ -241,8 +243,8 @@ export function planBatchIndent(
       if (!editorText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
-      const nodeText = getNodeText(state.plan, viewPath, stack);
-      if (editorText === nodeText) {
+      const currentText = getNodeText(state.plan, viewPath, stack);
+      if (editorText === currentText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
       return {
@@ -306,8 +308,8 @@ export function planBatchOutdent(
       if (!editorText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
-      const nodeText = getNodeText(state.plan, viewPath, stack);
-      if (editorText === nodeText) {
+      const currentText = getNodeText(state.plan, viewPath, stack);
+      if (editorText === currentText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
       return {

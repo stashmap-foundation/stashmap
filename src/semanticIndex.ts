@@ -1,5 +1,6 @@
 import { Map as ImmutableMap } from "immutable";
-import { EMPTY_SEMANTIC_ID, isRefNode } from "./connections";
+import { EMPTY_SEMANTIC_ID } from "./connections";
+import { getAllLinks, nodeText } from "./nodeSpans";
 
 export function createEmptySemanticIndex(): SemanticIndex {
   return {
@@ -70,7 +71,7 @@ function addNodeSemanticEntries(
   semanticIndex: SemanticIndex,
   node: GraphNode
 ): void {
-  addToSetMap(semanticIndex.semantic, node.text, node.id);
+  addToSetMap(semanticIndex.semantic, nodeText(node), node.id);
   if (node.basedOn) {
     addToNodeMap(semanticIndex.basedOnIndex, node.basedOn, node.id);
   }
@@ -83,10 +84,9 @@ function addNodeSemanticEntries(
     if (!childNode || childNode.relevance === "not_relevant") {
       return;
     }
-    const targetNodeID = isRefNode(childNode) ? childNode.targetID : undefined;
-    if (targetNodeID) {
-      addToNodeMap(semanticIndex.incomingCrefs, targetNodeID, node.id);
-    }
+    getAllLinks(childNode).forEach(({ targetID }) => {
+      addToNodeMap(semanticIndex.incomingCrefs, targetID, node.id);
+    });
   });
 }
 
@@ -94,7 +94,7 @@ function removeNodeSemanticEntries(
   semanticIndex: SemanticIndex,
   node: GraphNode
 ): void {
-  removeFromSetMap(semanticIndex.semantic, node.text, node.id);
+  removeFromSetMap(semanticIndex.semantic, nodeText(node), node.id);
   if (node.basedOn) {
     removeFromNodeMap(semanticIndex.basedOnIndex, node.basedOn, node.id);
   }
@@ -107,10 +107,9 @@ function removeNodeSemanticEntries(
     if (!childNode || childNode.relevance === "not_relevant") {
       return;
     }
-    const targetNodeID = isRefNode(childNode) ? childNode.targetID : undefined;
-    if (targetNodeID) {
-      removeFromNodeMap(semanticIndex.incomingCrefs, targetNodeID, node.id);
-    }
+    getAllLinks(childNode).forEach(({ targetID }) => {
+      removeFromNodeMap(semanticIndex.incomingCrefs, targetID, node.id);
+    });
   });
 }
 

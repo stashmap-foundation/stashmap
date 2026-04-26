@@ -19,8 +19,14 @@ import {
   itemPassesFilters,
   getSemanticID,
   resolveNode,
-  isRefNode,
 } from "./connections";
+import {
+  getBlockLinkTarget,
+  getBlockLinkText,
+  isBlockLink,
+  linkSpan,
+  plainSpans,
+} from "./nodeSpans";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
 import {
   getAlternativeFooterData,
@@ -48,7 +54,7 @@ function getChildrenForConcreteRef(
 ): TreeResult {
   const refNode = currentRow || getCurrentEdgeForView(data, parentPath);
   const sourceNode =
-    refNode && isRefNode(refNode)
+    refNode && isBlockLink(refNode)
       ? resolveNode(data.knowledgeDBs, refNode)
       : getNode(data.knowledgeDBs, parentRowID, data.user.publicKey);
   if (!sourceNode || sourceNode.children.size === 0) {
@@ -161,7 +167,7 @@ function getChildrenForRegularNode(
       virtualType === "suggestion"
         ? getNode(data.knowledgeDBs, rowID, data.user.publicKey)
         : undefined;
-    const suggestionTargetID = sourceRowNode?.targetID;
+    const suggestionTargetID = getBlockLinkTarget(sourceRowNode);
     const targetID =
       virtualType === "incoming" || virtualType === "version"
         ? (rowID as LongID)
@@ -171,7 +177,9 @@ function getChildrenForRegularNode(
     return {
       children: List<ID>(),
       id: (targetID || rowID) as ID,
-      text: sourceRowNode?.text || "",
+      spans: targetID
+        ? [linkSpan(targetID, getBlockLinkText(sourceRowNode) ?? "")]
+        : plainSpans(""),
       parent: nodeId,
       updated: sourceRowNode?.updated ?? nodes?.updated ?? Date.now(),
       author: sourceRowNode?.author ?? nodes?.author ?? data.user.publicKey,
@@ -180,14 +188,6 @@ function getChildrenForRegularNode(
       argument: sourceRowNode?.argument,
       virtualType,
       versionMeta,
-      ...(targetID
-        ? {
-            isRef: true,
-            isCref: true,
-            targetID,
-            linkText: sourceRowNode?.linkText,
-          }
-        : {}),
     };
   };
 
@@ -250,7 +250,7 @@ export function getTreeChildren(
     virtualRows.get(viewPathToString(parentPath)) ||
     getCurrentEdgeForView(data, parentPath);
 
-  if (isRefNode(currentEdge)) {
+  if (isBlockLink(currentEdge)) {
     return getChildrenForConcreteRef(
       data,
       parentPath,
@@ -302,7 +302,7 @@ export function getNodesInTree(
         result.virtualRows.get(viewPathToString(childPath)) ||
         getCurrentEdgeForView(data, childPath);
       const shouldRecurse = options?.isMarkdownExport
-        ? !isRefNode(childEdge)
+        ? !isBlockLink(childEdge)
         : childView.expanded;
       if (shouldRecurse) {
         const sub = getNodesInTree(

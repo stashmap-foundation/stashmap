@@ -1,19 +1,20 @@
 import { decodePublicKeyInputSync } from "./nostrPublicKeys";
+import { nodeText } from "./nodeSpans";
 
 export function getNodeUserPublicKey(
   node?: GraphNode,
-  text = node?.text
+  text = node ? nodeText(node) : undefined
 ): PublicKey | undefined {
   return (
     decodePublicKeyInputSync(text) ||
     node?.userPublicKey ||
-    decodePublicKeyInputSync(node?.text)
+    decodePublicKeyInputSync(node ? nodeText(node) : undefined)
   );
 }
 
 export function withUsersEntryPublicKey(
   node: GraphNode,
-  text = node.text
+  text = nodeText(node)
 ): GraphNode {
   const userPublicKey = getNodeUserPublicKey(node, text);
   if (!userPublicKey) {

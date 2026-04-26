@@ -19,6 +19,7 @@ export function createHeadlessPlan(
     knowledgeDBs,
     semanticIndex: createEmptySemanticIndex(),
     documents: Map(),
+    documentByFilePath: Map(),
     relaysInfos: Map(),
     snapshotNodes: Map(),
     relays: EMPTY_RELAYS,

@@ -208,6 +208,7 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
   knowledgeDBs: Map<PublicKey, KnowledgeData>(),
   semanticIndex: createEmptySemanticIndex(),
   documents: Map(),
+  documentByFilePath: Map(),
   relaysInfos: Map<string, RelayInformation | undefined>(),
   publishEventsStatus: {
     isLoading: false,

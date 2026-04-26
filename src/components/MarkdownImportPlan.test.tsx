@@ -483,3 +483,73 @@ test("parseTextToTrees falls back to indentation parser", () => {
     },
   ]);
 });
+
+test("parseMarkdownHierarchy parses .md path link as fileLink span", () => {
+  const trees = parseMarkdownHierarchy("# Root\n- [Open B](../foo/b.md)\n");
+  expect(trees).toEqual([
+    expect.objectContaining({
+      children: [
+        expect.objectContaining({
+          spans: [{ kind: "fileLink", path: "../foo/b.md", text: "Open B" }],
+          blockKind: "list_item",
+        }),
+      ],
+    }),
+  ]);
+});
+
+test("parseMarkdownHierarchy still parses #anchor links as node link spans", () => {
+  const trees = parseMarkdownHierarchy("# Root\n- [Bitcoin](#abc)\n");
+  expect(trees).toEqual([
+    expect.objectContaining({
+      children: [
+        expect.objectContaining({
+          spans: [{ kind: "link", targetID: "abc", text: "Bitcoin" }],
+        }),
+      ],
+    }),
+  ]);
+});
+
+test("parseMarkdownHierarchy ignores http(s) links (no fileLink span)", () => {
+  const trees = parseMarkdownHierarchy(
+    "# Root\n- [Web](https://example.com)\n"
+  );
+  expect(trees).toEqual([
+    expect.objectContaining({
+      children: [
+        expect.objectContaining({
+          spans: plainSpans(""),
+        }),
+      ],
+    }),
+  ]);
+});
+
+test("parseMarkdownHierarchy ignores non-md path links (no fileLink span)", () => {
+  const trees = parseMarkdownHierarchy("# Root\n- [Image](./foo.png)\n");
+  expect(trees).toEqual([
+    expect.objectContaining({
+      children: [
+        expect.objectContaining({
+          spans: plainSpans(""),
+        }),
+      ],
+    }),
+  ]);
+});
+
+test("parseMarkdownHierarchy preserves prefix markers on file-link bullet", () => {
+  const trees = parseMarkdownHierarchy("# Root\n- (!+)[Open B](./b.md)\n");
+  expect(trees).toEqual([
+    expect.objectContaining({
+      children: [
+        expect.objectContaining({
+          spans: [{ kind: "fileLink", path: "./b.md", text: "Open B" }],
+          relevance: "relevant",
+          argument: "confirms",
+        }),
+      ],
+    }),
+  ]);
+});

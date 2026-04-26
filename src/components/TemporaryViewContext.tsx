@@ -3,6 +3,7 @@ import { OrderedSet, Set } from "immutable";
 import { useViewKey } from "../ViewContext";
 import { useData } from "../DataContext";
 import { isRefNode } from "../connections";
+import { isBlockFileLink } from "../nodeSpans";
 import { deselectAllChildren } from "../selection";
 
 export { deselectAllChildren };
@@ -65,7 +66,7 @@ export function useIsEditingOn(): boolean {
 }
 
 export function isEditableNode(node: GraphNode | undefined): boolean {
-  return !!node && !isRefNode(node);
+  return !!node && !isRefNode(node) && !isBlockFileLink(node);
 }
 
 export function TemporaryViewProvider({

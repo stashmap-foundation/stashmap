@@ -159,7 +159,8 @@ declare global {
     knowledgeDBs: KnowledgeDBs;
     snapshotNodes: SnapshotNodes;
     semanticIndex: SemanticIndex;
-    documents: Map<string, import("./Document").Document>;
+    documents: Map<string, DocumentType>;
+    documentByFilePath: Map<string, DocumentType>;
     relaysInfos: Map<string, RelayInformation | undefined>;
     publishEventsStatus: EventState;
 

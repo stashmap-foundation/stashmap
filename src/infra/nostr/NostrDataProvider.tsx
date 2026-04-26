@@ -181,6 +181,7 @@ export function NostrDataProvider({
       knowledgeDBs={Map<PublicKey, KnowledgeData>()}
       semanticIndex={createEmptySemanticIndex()}
       documents={Map()}
+      documentByFilePath={Map()}
       relaysInfos={searchRelaysInfo}
       publishEventsStatus={session.publishStatus}
       snapshotNodes={Map()}

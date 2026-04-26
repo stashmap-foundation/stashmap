@@ -11,7 +11,10 @@ import {
   getNodeContext,
 } from "./connections";
 import { getTextForSemanticID } from "./semanticProjection";
-import { getBlockLinkText } from "./nodeSpans";
+import { getBlockLinkText, getBlockFileLinkPath, isBlockFileLink } from "./nodeSpans";
+import { Document, documentKeyOf } from "./Document";
+import { Map as ImmutableMap } from "immutable";
+import { resolveLinkPath } from "./linkPath";
 import {
   ViewPath,
   getParentView,
@@ -56,13 +59,49 @@ type ParsedRef = {
   sourceItem?: GraphNode;
 };
 
+function resolveFileLinkRoot(
+  sourceItem: GraphNode,
+  knowledgeDBs: KnowledgeDBs,
+  documents: ImmutableMap<string, Document>,
+  documentByFilePath: ImmutableMap<string, Document>
+): GraphNode | undefined {
+  const linkPath = getBlockFileLinkPath(sourceItem);
+  if (!linkPath) return undefined;
+  const sourceRoot =
+    sourceItem.id === sourceItem.root
+      ? sourceItem
+      : getNode(knowledgeDBs, sourceItem.root, sourceItem.author);
+  const sourceFilePath = sourceRoot?.docId
+    ? documents.get(documentKeyOf(sourceRoot.author, sourceRoot.docId))
+        ?.filePath
+    : undefined;
+  const resolved = resolveLinkPath(linkPath, sourceFilePath);
+  const targetDoc = documentByFilePath.get(resolved);
+  if (!targetDoc) return undefined;
+  return knowledgeDBs
+    .get(targetDoc.author)
+    ?.nodes.valueSeq()
+    .find((node) => node.docId === targetDoc.docId && !node.parent);
+}
+
 function parseRef(
   refId: LongID,
   knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey
+  myself: PublicKey,
+  documents?: ImmutableMap<string, Document>,
+  documentByFilePath?: ImmutableMap<string, Document>
 ): ParsedRef | undefined {
   const sourceItem = getNode(knowledgeDBs, refId, myself);
-  const node = resolveNode(knowledgeDBs, sourceItem);
+  const fileLinkTarget =
+    sourceItem && isBlockFileLink(sourceItem) && documents && documentByFilePath
+      ? resolveFileLinkRoot(
+          sourceItem,
+          knowledgeDBs,
+          documents,
+          documentByFilePath
+        )
+      : undefined;
+  const node = fileLinkTarget ?? resolveNode(knowledgeDBs, sourceItem);
   if (!node) {
     return undefined;
   }
@@ -130,9 +169,17 @@ function buildDeletedReference(
 export function buildOutgoingReference(
   refId: LongID,
   knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey
+  myself: PublicKey,
+  documents?: ImmutableMap<string, Document>,
+  documentByFilePath?: ImmutableMap<string, Document>
 ): ReferenceRow | undefined {
-  const ref = parseRef(refId, knowledgeDBs, myself);
+  const ref = parseRef(
+    refId,
+    knowledgeDBs,
+    myself,
+    documents,
+    documentByFilePath
+  );
   if (!ref) return buildDeletedReference(refId, myself);
 
   const { contextLabels, targetLabel, fullContext } = resolveLabels(
@@ -235,14 +282,28 @@ function findCrefToNode(
   children: List<ID>,
   targetNode: GraphNode,
   knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey
+  myself: PublicKey,
+  documents?: ImmutableMap<string, Document>,
+  documentByFilePath?: ImmutableMap<string, Document>
 ): GraphNode | undefined {
   return children
     .map((childID) => getNode(knowledgeDBs, childID, myself))
     .find((item) => {
-      if (!isRefNode(item)) return false;
-      const resolvedTarget = resolveNode(knowledgeDBs, item);
-      return resolvedTarget?.id === targetNode.id;
+      if (!item) return false;
+      if (isRefNode(item)) {
+        const resolvedTarget = resolveNode(knowledgeDBs, item);
+        return resolvedTarget?.id === targetNode.id;
+      }
+      if (isBlockFileLink(item) && documents && documentByFilePath) {
+        const resolvedTarget = resolveFileLinkRoot(
+          item,
+          knowledgeDBs,
+          documents,
+          documentByFilePath
+        );
+        return resolvedTarget?.id === targetNode.id;
+      }
+      return false;
     });
 }
 
@@ -274,7 +335,9 @@ function findIncomingCrefItem(
         sourceNode.children,
         parentNode,
         data.knowledgeDBs,
-        data.user.publicKey
+        data.user.publicKey,
+        data.documents,
+        data.documentByFilePath
       )
     )
     .find((item) => item !== undefined);
@@ -288,7 +351,13 @@ export function buildReferenceItem(
   virtualType?: VirtualType,
   versionMeta?: VersionMeta
 ): ReferenceRow | undefined {
-  const ref = parseRef(refId, data.knowledgeDBs, data.user.publicKey);
+  const ref = parseRef(
+    refId,
+    data.knowledgeDBs,
+    data.user.publicKey,
+    data.documents,
+    data.documentByFilePath
+  );
   if (!ref) {
     const parentPath = getParentView(viewPath);
     const parentNode = parentPath
@@ -308,7 +377,9 @@ export function buildReferenceItem(
     const outgoing = buildOutgoingReference(
       refId,
       data.knowledgeDBs,
-      data.user.publicKey
+      data.user.publicKey,
+      data.documents,
+      data.documentByFilePath
     );
     if (!outgoing) return undefined;
     return { ...outgoing, text: outgoing.targetLabel };
@@ -318,7 +389,9 @@ export function buildReferenceItem(
     const outgoing = buildOutgoingReference(
       refId,
       data.knowledgeDBs,
-      data.user.publicKey
+      data.user.publicKey,
+      data.documents,
+      data.documentByFilePath
     );
     if (!outgoing) return undefined;
     const crefItem =
@@ -347,7 +420,9 @@ export function buildReferenceItem(
     const outgoing = buildOutgoingReference(
       refId,
       data.knowledgeDBs,
-      data.user.publicKey
+      data.user.publicKey,
+      data.documents,
+      data.documentByFilePath
     );
     if (!outgoing) return undefined;
     const isOtherUser = outgoing.author !== data.user.publicKey;

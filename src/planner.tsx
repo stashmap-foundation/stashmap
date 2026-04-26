@@ -100,6 +100,7 @@ type GraphPlanData = Pick<
   | "snapshotNodes"
   | "semanticIndex"
   | "documents"
+  | "documentByFilePath"
   | "relaysInfos"
 >;
 

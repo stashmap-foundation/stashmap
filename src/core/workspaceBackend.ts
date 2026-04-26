@@ -1,31 +1,19 @@
 import path from "path";
 import fs from "fs/promises";
 import { scanWorkspaceDocuments, WorkspaceSaveProfile } from "./workspaceSave";
-import { buildDocumentEventFromMarkdownTree } from "../standaloneDocumentEvent";
-import { getEventMs } from "../nostrEvents";
 import type { Document } from "../DocumentStore";
 
 export async function loadWorkspaceAsDocuments(
   profile: WorkspaceSaveProfile
 ): Promise<ReadonlyArray<Document>> {
   const scanned = await scanWorkspaceDocuments(profile);
-  return scanned.map((doc) => {
-    const rootTree = {
-      ...doc.mainRoot,
-      frontMatter: doc.frontMatter,
-    };
-    const { event } = buildDocumentEventFromMarkdownTree(
-      profile.pubkey,
-      rootTree
-    );
-    return {
-      author: profile.pubkey,
-      docId: doc.docId,
-      updatedMs: getEventMs(event),
-      content: event.content,
-      filePath: doc.relativePath,
-    };
-  });
+  return scanned.map((doc) => ({
+    author: profile.pubkey,
+    docId: doc.docId,
+    updatedMs: Date.now(),
+    content: doc.currentContent,
+    filePath: doc.relativePath,
+  }));
 }
 
 export async function saveDocumentsToWorkspace(

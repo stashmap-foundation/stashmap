@@ -3,7 +3,7 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import fs from "fs";
 import path from "path";
-import { renderAppTree } from "../appTestUtils.test";
+import { renderAppTree as baseRenderAppTree } from "../appTestUtils.test";
 import {
   expectTree,
   getPane,
@@ -13,9 +13,13 @@ import {
 import {
   knowstrInit,
   knowstrSave,
+  readNodeId,
   write,
 } from "../testFixtures/workspace";
-import { mockWorkspaceIpc } from "../testFixtures/mockWorkspaceIpc";
+import {
+  MockWorkspaceIpc,
+  mockWorkspaceIpc,
+} from "../testFixtures/mockWorkspaceIpc";
 import { FilesystemBackendProvider } from "../infra/filesystem/FilesystemBackendProvider";
 import { FilesystemDataProvider } from "../infra/filesystem/FilesystemDataProvider";
 import { FilesystemAppRoot } from "../desktop/FilesystemAppRoot";
@@ -23,8 +27,19 @@ import { SplitPaneLayout } from "./SplitPaneLayout";
 import { PaneHistoryProvider } from "../PaneHistoryContext";
 import { DND } from "../dnd";
 
+const ipcsToDispose: MockWorkspaceIpc[] = [];
+
+async function renderAppTree(
+  options: Parameters<typeof baseRenderAppTree>[0]
+): Promise<Awaited<ReturnType<typeof baseRenderAppTree>>> {
+  const result = await baseRenderAppTree(options);
+  ipcsToDispose.push(result.ipc);
+  return result;
+}
+
 function renderAppTreeMultiPane(workspacePath: string): void {
   const ipc = mockWorkspaceIpc(workspacePath);
+  ipcsToDispose.push(ipc);
   renderWithTestData(
     <FilesystemAppRoot>
       <DND>
@@ -43,6 +58,11 @@ function renderAppTreeMultiPane(workspacePath: string): void {
     }
   );
 }
+
+afterEach(async () => {
+  cleanup();
+  await Promise.all(ipcsToDispose.splice(0).map((ipc) => ipc.dispose()));
+});
 
 test("Cross-file link round-trips through save and renders in tree", async () => {
   const { path: workspacePath } = knowstrInit();
@@ -125,18 +145,81 @@ test("Mixed node-links and file-links all render", async () => {
   const { path: workspacePath } = knowstrInit();
   write(
     workspacePath,
-    "links.md",
-    "# Links\n\n- [Holiday / France](#abc_def)\n- [Barna](#xyz)\n- [Hello](./hello.md)\n"
+    "destinations.md",
+    "# Holiday Destinations\n\n- France\n- Spain\n"
   );
   write(workspacePath, "hello.md", "# Hello Doc\n\n- Hello-child\n");
-
   await knowstrSave(workspacePath);
-  // eslint-disable-next-line no-console
-  console.log("links.md after save:", fs.readFileSync(path.join(workspacePath, "links.md"), "utf8"));
+
+  const franceID = readNodeId(workspacePath, "destinations.md", "France");
+  const helloRootID = readNodeId(workspacePath, "hello.md", "Hello Doc");
+
+  write(
+    workspacePath,
+    "links.md",
+    `# Links\n\n- [Holiday / France](#${franceID})\n- [Hello Doc](#${helloRootID})\n- [Hello](./hello.md)\n`
+  );
+  await knowstrSave(workspacePath);
   await renderAppTree({ path: workspacePath, search: "Links" });
 
-  await screen.findByText(/Holiday \/ France/u);
-  await screen.findByText("Barna");
+  await screen.findByText(/Holiday Destinations \/ France/u);
+  await screen.findByText("Hello Doc");
+  await screen.findByText("Hello");
+});
+
+test("Cross-document node links survive a save round-trip", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(
+    workspacePath,
+    "destinations.md",
+    "# Holiday Destinations\n\n- France\n- Spain\n"
+  );
+  write(workspacePath, "hello.md", "# Hello Doc\n\n- Hello-child\n");
+  await knowstrSave(workspacePath);
+
+  const franceID = readNodeId(workspacePath, "destinations.md", "France");
+  const helloRootID = readNodeId(workspacePath, "hello.md", "Hello Doc");
+
+  write(
+    workspacePath,
+    "links.md",
+    `# Links\n\n- [Holiday / France](#${franceID})\n- [Hello Doc](#${helloRootID})\n- [Hello](./hello.md)\n`
+  );
+  await knowstrSave(workspacePath);
+
+  const after = fs.readFileSync(path.join(workspacePath, "links.md"), "utf8");
+  expect(after).toContain(`[Holiday / France](#${franceID})`);
+  expect(after).toContain(`[Hello Doc](#${helloRootID})`);
+  expect(after).toContain("[Hello](./hello.md)");
+});
+
+test("Cross-document node links survive an app reload", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(
+    workspacePath,
+    "destinations.md",
+    "# Holiday Destinations\n\n- France\n- Spain\n"
+  );
+  write(workspacePath, "hello.md", "# Hello Doc\n\n- Hello-child\n");
+  await knowstrSave(workspacePath);
+
+  const franceID = readNodeId(workspacePath, "destinations.md", "France");
+
+  write(
+    workspacePath,
+    "links.md",
+    `# Links\n\n- [Holiday / France](#${franceID})\n- [Hello](./hello.md)\n`
+  );
+  await knowstrSave(workspacePath);
+
+  await renderAppTree({ path: workspacePath, search: "Links" });
+  await screen.findByText(/Holiday Destinations \/ France/u);
+  await screen.findByText("Hello");
+
+  cleanup();
+  await renderAppTree({ path: workspacePath, search: "Links" });
+
+  await screen.findByText(/Holiday Destinations \/ France/u);
   await screen.findByText("Hello");
 });
 
@@ -158,4 +241,3 @@ B
   );
 });
 
-afterEach(cleanup);

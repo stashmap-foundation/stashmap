@@ -64,15 +64,12 @@ function serializeNodeItems(
         if (!targetNodeID) {
           return acc;
         }
-        const ref = buildOutgoingReference(
-          item.id as LongID,
-          knowledgeDBs,
-          author
-        );
-        if (!ref) {
-          return acc;
-        }
-        const linkText = getBlockLinkText(item) || ref.text;
+        const explicitLinkText = getBlockLinkText(item);
+        const linkText =
+          explicitLinkText ||
+          buildOutgoingReference(item.id as LongID, knowledgeDBs, author)
+            ?.text ||
+          "";
         const prefix = formatPrefixMarkers(item.relevance, item.argument);
         const body = `${prefix}[${linkText}](#${targetNodeID})`;
         const line =

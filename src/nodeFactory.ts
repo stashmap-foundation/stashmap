@@ -2,7 +2,7 @@ import { List } from "immutable";
 import { v4 } from "uuid";
 import { joinID } from "./connections";
 import { createRootAnchor } from "./rootAnchor";
-import { plainSpans, linkSpan } from "./nodeSpans";
+import { plainSpans, linkSpan, fileLinkSpan } from "./nodeSpans";
 
 export function newNode(
   text: string,
@@ -45,6 +45,28 @@ export function newRefNode(
     children: List<ID>(),
     id: joinID(myself, v4()),
     spans: [linkSpan(targetID, label)],
+    parent,
+    updated: Date.now(),
+    author: myself,
+    root,
+    relevance,
+    argument,
+  };
+}
+
+export function newFileLinkNode(
+  myself: PublicKey,
+  root: LongID,
+  path: string,
+  parent?: LongID,
+  relevance?: Relevance,
+  argument?: Argument,
+  text?: string
+): GraphNode {
+  return {
+    children: List<ID>(),
+    id: joinID(myself, v4()),
+    spans: [fileLinkSpan(path, text || "")],
     parent,
     updated: Date.now(),
     author: myself,

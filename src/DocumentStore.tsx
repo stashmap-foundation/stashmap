@@ -20,6 +20,7 @@ export type { Document, DocumentDelete };
 
 type DocumentSnapshot = {
   documents: ImmutableMap<string, Document>;
+  documentByFilePath: ImmutableMap<string, Document>;
   deletes: ImmutableMap<string, DocumentDelete>;
   nodesByDocumentKey: ImmutableMap<string, ImmutableMap<string, GraphNode>>;
   knowledgeDBs: KnowledgeDBs;
@@ -31,6 +32,7 @@ type DocumentStoreState = {
   semanticIndex: SemanticIndex;
   snapshotNodes: SnapshotNodes;
   documents: ImmutableMap<string, Document>;
+  documentByFilePath: ImmutableMap<string, Document>;
   upsertDocument: (doc: Document) => void;
   deleteDocument: (del: DocumentDelete) => void;
   addEvents: (events: ImmutableMap<string, Event | UnsignedEvent>) => void;
@@ -43,11 +45,31 @@ const DocumentStoreContext = React.createContext<
 function createEmptySnapshot(): DocumentSnapshot {
   return {
     documents: ImmutableMap<string, Document>(),
+    documentByFilePath: ImmutableMap<string, Document>(),
     deletes: ImmutableMap<string, DocumentDelete>(),
     nodesByDocumentKey: ImmutableMap<string, ImmutableMap<string, GraphNode>>(),
     knowledgeDBs: ImmutableMap<PublicKey, KnowledgeData>(),
     semanticIndex: createEmptySemanticIndex(),
   };
+}
+
+function withDocumentInFilePathIndex(
+  index: ImmutableMap<string, Document>,
+  doc: Document
+): ImmutableMap<string, Document> {
+  return doc.filePath ? index.set(doc.filePath, doc) : index;
+}
+
+function withoutDocumentInFilePathIndex(
+  index: ImmutableMap<string, Document>,
+  doc: Document | undefined
+): ImmutableMap<string, Document> {
+  if (!doc?.filePath) return index;
+  const current = index.get(doc.filePath);
+  if (current && current.docId === doc.docId) {
+    return index.remove(doc.filePath);
+  }
+  return index;
 }
 
 function parseDocumentNodes(doc: Document): ImmutableMap<string, GraphNode> {
@@ -114,14 +136,30 @@ function applyDocumentToSnapshot(
       : snapshot.deletes;
   const withoutExistingNodes =
     existingNodes.size > 0
-      ? removeNodesFromSemanticIndex(snapshot.semanticIndex, existingNodes)
+      ? removeNodesFromSemanticIndex(
+          snapshot.semanticIndex,
+          existingNodes,
+          existingDocument?.filePath
+        )
       : snapshot.semanticIndex;
+  const documentByFilePathAfterRemove = withoutDocumentInFilePathIndex(
+    snapshot.documentByFilePath,
+    existingDocument
+  );
   const nextSnapshotBase = {
     ...snapshot,
     documents: snapshot.documents.set(key, doc),
+    documentByFilePath: withDocumentInFilePathIndex(
+      documentByFilePathAfterRemove,
+      doc
+    ),
     deletes: nextDeletes,
     nodesByDocumentKey: snapshot.nodesByDocumentKey.set(key, nextNodes),
-    semanticIndex: addNodesToSemanticIndex(withoutExistingNodes, nextNodes),
+    semanticIndex: addNodesToSemanticIndex(
+      withoutExistingNodes,
+      nextNodes,
+      doc.filePath
+    ),
   };
   const knowledgeDBs = rebuildAuthors(nextSnapshotBase, [doc.author]);
   return {
@@ -142,25 +180,29 @@ function applyDeleteToSnapshot(
     return snapshot;
   }
 
+  const willDelete =
+    !!existingDocument && existingDocument.updatedMs <= deletion.deletedAt;
   const nextSnapshot = {
     ...snapshot,
-    documents:
-      existingDocument && existingDocument.updatedMs <= deletion.deletedAt
-        ? snapshot.documents.remove(key)
-        : snapshot.documents,
+    documents: willDelete ? snapshot.documents.remove(key) : snapshot.documents,
+    documentByFilePath: willDelete
+      ? withoutDocumentInFilePathIndex(
+          snapshot.documentByFilePath,
+          existingDocument
+        )
+      : snapshot.documentByFilePath,
     deletes: snapshot.deletes.set(key, deletion),
-    nodesByDocumentKey:
-      existingDocument && existingDocument.updatedMs <= deletion.deletedAt
-        ? snapshot.nodesByDocumentKey.remove(key)
-        : snapshot.nodesByDocumentKey,
-    semanticIndex:
-      existingDocument && existingDocument.updatedMs <= deletion.deletedAt
-        ? removeNodesFromSemanticIndex(
-            snapshot.semanticIndex,
-            snapshot.nodesByDocumentKey.get(key) ||
-              ImmutableMap<string, GraphNode>()
-          )
-        : snapshot.semanticIndex,
+    nodesByDocumentKey: willDelete
+      ? snapshot.nodesByDocumentKey.remove(key)
+      : snapshot.nodesByDocumentKey,
+    semanticIndex: willDelete
+      ? removeNodesFromSemanticIndex(
+          snapshot.semanticIndex,
+          snapshot.nodesByDocumentKey.get(key) ||
+            ImmutableMap<string, GraphNode>(),
+          existingDocument?.filePath
+        )
+      : snapshot.semanticIndex,
   };
   const affectedAuthor = existingDocument?.author || deletion.author;
   return {
@@ -276,6 +318,7 @@ export function DocumentStoreProvider({
       semanticIndex: activeSnapshot.semanticIndex,
       snapshotNodes,
       documents: activeSnapshot.documents,
+      documentByFilePath: activeSnapshot.documentByFilePath,
       upsertDocument,
       deleteDocument,
       addEvents,
@@ -316,4 +359,12 @@ export function useDocuments(): ImmutableMap<string, Document> {
     React.useContext(DocumentStoreContext)?.documents ||
     ImmutableMap<string, Document>()
   );
+}
+
+export function useDocumentByFilePath(): ImmutableMap<string, Document> {
+  const ctx = React.useContext(DocumentStoreContext);
+  if (!ctx) {
+    throw new Error("useDocumentByFilePath used outside DocumentStoreProvider");
+  }
+  return ctx.documentByFilePath;
 }

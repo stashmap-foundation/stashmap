@@ -27,6 +27,7 @@ import {
   linkSpan,
   plainSpans,
 } from "./nodeSpans";
+import { documentKeyOf } from "./Document";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
 import {
   getAlternativeFooterData,
@@ -136,6 +137,10 @@ function getChildrenForRegularNode(
     .add(author)
     .add(effectiveAuthor);
 
+  const currentDoc =
+    nodes?.docId && nodes.author
+      ? data.documents.get(documentKeyOf(nodes.author, nodes.docId))
+      : undefined;
   const incomingCrefs = getIncomingCrefsForNode(
     data.knowledgeDBs,
     data.semanticIndex,
@@ -144,7 +149,9 @@ function getChildrenForRegularNode(
     containingNodeID,
     nodes?.id,
     author,
-    childNodes
+    childNodes,
+    currentDoc?.filePath,
+    nodes?.author
   );
 
   const visibleIncomingCrefs = activeFilters.includes("incoming")

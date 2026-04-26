@@ -16,6 +16,7 @@ import {
   isRefNode,
 } from "./connections";
 import { getBlockLinkTarget, nodeText } from "./nodeSpans";
+import { fileLinkIndexKey } from "./linkPath";
 import { suggestionSettings } from "./constants";
 import { LOG_ROOT_ROLE } from "./systemRoots";
 import { computeVersionDiff } from "./domain/snapshotBaseline";
@@ -290,6 +291,17 @@ export function deduplicateRefsByContext(
     .toList();
 }
 
+function incomingFileLinkSourceIDs(
+  semanticIndex: SemanticIndex,
+  rootFilePath: string | undefined,
+  rootAuthor: PublicKey | undefined
+): LongID[] {
+  if (!rootFilePath || !rootAuthor) return [];
+  const key = fileLinkIndexKey(rootAuthor, rootFilePath);
+  const ids = semanticIndex.incomingFileLinks.get(key);
+  return ids ? [...ids] : [];
+}
+
 export function getIncomingCrefsForNode(
   knowledgeDBs: KnowledgeDBs,
   semanticIndex: SemanticIndex,
@@ -298,7 +310,9 @@ export function getIncomingCrefsForNode(
   parentNodeID: LongID | undefined,
   currentNodeID: LongID | undefined,
   effectiveAuthor: PublicKey,
-  currentItems?: List<GraphNode>
+  currentItems?: List<GraphNode>,
+  currentNodeFilePath?: string,
+  currentNodeAuthor?: PublicKey
 ): List<LongID> {
   const outgoingCrefIDs = (currentItems || List<GraphNode>())
     .filter(isRefNode)
@@ -317,29 +331,37 @@ export function getIncomingCrefsForNode(
     ImmutableSet<LongID>()
   );
 
+  const crefSourceIDs = currentNodeID
+    ? [
+        ...(semanticIndex.incomingCrefs.get(currentNodeID) ||
+          new globalThis.Set<LongID>()),
+      ]
+    : [];
+  const fileLinkSourceIDs = incomingFileLinkSourceIDs(
+    semanticIndex,
+    currentNodeFilePath,
+    currentNodeAuthor
+  );
+  const sourceIDs = [...new globalThis.Set([...crefSourceIDs, ...fileLinkSourceIDs])];
+
   const refs = List(
-    currentNodeID
-      ? [
-          ...(semanticIndex.incomingCrefs.get(currentNodeID) ||
-            new globalThis.Set<LongID>()),
-        ]
-          .map((nodeID) => semanticIndex.nodeByID.get(nodeID))
-          .filter((node): node is GraphNode => node !== undefined)
-          .filter((node) => visibleAuthors.has(node.author))
-          .filter((node) => node.id !== parentNodeID)
-          .filter((node) => node.id !== currentNodeID)
-          .filter(
-            (node) =>
-              node.systemRole !== LOG_ROOT_ROLE &&
-              !isInSystemRoot(knowledgeDBs, node, LOG_ROOT_ROLE)
-          )
-          .filter((node) => !outgoingTargetRelIDs.has(node.id))
-          .map((node) => ({
-            nodeID: node.id,
-            context: getNodeContext(knowledgeDBs, node),
-            updated: node.updated,
-          }))
-      : []
+    sourceIDs
+      .map((nodeID) => semanticIndex.nodeByID.get(nodeID))
+      .filter((node): node is GraphNode => node !== undefined)
+      .filter((node) => visibleAuthors.has(node.author))
+      .filter((node) => node.id !== parentNodeID)
+      .filter((node) => node.id !== currentNodeID)
+      .filter(
+        (node) =>
+          node.systemRole !== LOG_ROOT_ROLE &&
+          !isInSystemRoot(knowledgeDBs, node, LOG_ROOT_ROLE)
+      )
+      .filter((node) => !outgoingTargetRelIDs.has(node.id))
+      .map((node) => ({
+        nodeID: node.id,
+        context: getNodeContext(knowledgeDBs, node),
+        updated: node.updated,
+      }))
   );
 
   const deduped = deduplicateRefsByContext(refs, knowledgeDBs, effectiveAuthor);

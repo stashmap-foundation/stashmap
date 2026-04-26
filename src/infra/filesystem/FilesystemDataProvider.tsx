@@ -26,6 +26,7 @@ export function FilesystemDataProvider({
       contactsRelays={Map()}
       knowledgeDBs={Map<PublicKey, KnowledgeData>()}
       semanticIndex={createEmptySemanticIndex()}
+      documents={Map()}
       relaysInfos={Map()}
       publishEventsStatus={session.publishStatus}
       snapshotNodes={Map()}

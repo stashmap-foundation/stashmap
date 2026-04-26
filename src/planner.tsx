@@ -99,6 +99,7 @@ type GraphPlanData = Pick<
   | "knowledgeDBs"
   | "snapshotNodes"
   | "semanticIndex"
+  | "documents"
   | "relaysInfos"
 >;
 

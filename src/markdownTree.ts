@@ -5,7 +5,8 @@ import markdownItFrontMatter from "markdown-it-front-matter";
 // eslint-disable-next-line import/no-unresolved
 import Token from "markdown-it/lib/token";
 import { LOG_ROOT_ROLE } from "./systemRoots";
-import { linkSpan, plainSpans, spansText } from "./nodeSpans";
+import { fileLinkSpan, linkSpan, plainSpans, spansText } from "./nodeSpans";
+import { isMarkdownPath } from "./linkPath";
 
 const markdown = new MarkdownIt({ html: true });
 markdown.use(markdownItFrontMatter, () => undefined);
@@ -144,9 +145,25 @@ function childrenToText(children: readonly Token[]): string {
     .join("");
 }
 
+type RefLinkTarget =
+  | { kind: "node"; targetID: string }
+  | { kind: "file"; path: string };
+
+function classifyHref(href: string): RefLinkTarget | undefined {
+  if (href.startsWith("#")) {
+    return { kind: "node", targetID: href.slice(1) };
+  }
+  if (isMarkdownPath(href)) {
+    return { kind: "file", path: href };
+  }
+  return undefined;
+}
+
 function extractRefLink(
   children: readonly Token[]
-): { prefixSource: string; text: string; linkHref: string } | undefined {
+):
+  | { prefixSource: string; text: string; target: RefLinkTarget }
+  | undefined {
   const tokens = children.filter((c) => !isIdComment(c));
   const openIdx = tokens.findIndex((c) => c.type === "link_open");
   if (openIdx < 0) return undefined;
@@ -156,7 +173,9 @@ function extractRefLink(
   if (closeIdx < 0) return undefined;
 
   const href = tokens[openIdx].attrGet("href");
-  if (!href || !href.startsWith("#")) return undefined;
+  if (!href) return undefined;
+  const target = classifyHref(href);
+  if (!target) return undefined;
 
   const trailing = tokens.slice(closeIdx + 1);
   const trailingIsBlank = trailing.every(
@@ -170,7 +189,7 @@ function extractRefLink(
 
   const inner = tokens.slice(openIdx + 1, closeIdx);
   const text = childrenToText(inner).replace(/\n/g, " ").trim();
-  return { prefixSource, text, linkHref: href.slice(1) };
+  return { prefixSource, text, target };
 }
 
 function extractPrefixMarkers(text: string): {
@@ -220,8 +239,12 @@ function extractInlineContent(inline: Token): {
   const refLink = extractRefLink(inline.children);
   if (refLink) {
     const { relevance, argument } = extractPrefixMarkers(refLink.prefixSource);
+    const span =
+      refLink.target.kind === "node"
+        ? linkSpan(refLink.target.targetID as LongID, refLink.text)
+        : fileLinkSpan(refLink.target.path, refLink.text);
     return {
-      spans: [linkSpan(refLink.linkHref as LongID, refLink.text)],
+      spans: [span],
       relevance,
       argument,
     };

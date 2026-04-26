@@ -7,7 +7,7 @@ import { newDB } from "./knowledge";
 import { findTag } from "./nostrEvents";
 import { createRootAnchor } from "./rootAnchor";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
-import { newRefNode, newNode } from "./nodeFactory";
+import { newRefNode, newNode, newFileLinkNode } from "./nodeFactory";
 import { extractImportedFrontMatter } from "./markdownFrontMatter";
 import { dropLeadingYamlEchoRoots } from "./markdownImport";
 import { nodeText, spansText } from "./nodeSpans";
@@ -32,8 +32,13 @@ function walkUpsertNode(ctx: WalkContext, node: GraphNode): WalkContext {
   };
 }
 
-function isSingleLinkSpans(spans: InlineSpan[]): boolean {
-  return spans.length === 1 && spans[0].kind === "link";
+function singleBlockLinkSpan(
+  spans: InlineSpan[]
+): InlineSpan | undefined {
+  if (spans.length !== 1) return undefined;
+  const span = spans[0];
+  if (span.kind === "link" || span.kind === "fileLink") return span;
+  return undefined;
 }
 
 function materializeTreeNode(
@@ -78,24 +83,36 @@ function materializeTreeNode(
   const visibleChildren = treeNode.children.filter((child) => !child.hidden);
   const [withVisible, childIDs] = visibleChildren.reduce(
     ([accCtx, accChildren], childNode) => {
-      if (isSingleLinkSpans(childNode.spans)) {
-        const link = childNode.spans[0];
-        if (link.kind !== "link") {
-          throw new Error("unreachable");
-        }
+      const blockLink = singleBlockLinkSpan(childNode.spans);
+      if (blockLink && blockLink.kind === "link") {
         const refNode = newRefNode(
           ctx.publicKey,
           root,
-          link.targetID,
+          blockLink.targetID,
           nodeBaseWithFields.id,
           childNode.relevance,
           childNode.argument,
-          link.text,
-          link.text
+          blockLink.text,
+          blockLink.text
         );
         return [
           walkUpsertNode(accCtx, refNode),
           [...accChildren, refNode.id],
+        ] as [WalkContext, ID[]];
+      }
+      if (blockLink && blockLink.kind === "fileLink") {
+        const fileNode = newFileLinkNode(
+          ctx.publicKey,
+          root,
+          blockLink.path,
+          nodeBaseWithFields.id,
+          childNode.relevance,
+          childNode.argument,
+          blockLink.text
+        );
+        return [
+          walkUpsertNode(accCtx, fileNode),
+          [...accChildren, fileNode.id],
         ] as [WalkContext, ID[]];
       }
       const [afterChild, , materializedChild] = materializeTreeNode(

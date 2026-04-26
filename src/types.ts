@@ -3,6 +3,7 @@ import { Event, EventTemplate, UnsignedEvent } from "nostr-tools";
 // eslint-disable-next-line import/no-unresolved
 import { RelayInformation } from "nostr-tools/lib/types/nip11";
 import { QueueStatus } from "./infra/nostr/cache/PublishQueue";
+import { Document as DocumentType } from "./Document";
 
 declare global {
   type Children = {
@@ -158,6 +159,7 @@ declare global {
     knowledgeDBs: KnowledgeDBs;
     snapshotNodes: SnapshotNodes;
     semanticIndex: SemanticIndex;
+    documents: Map<string, import("./Document").Document>;
     relaysInfos: Map<string, RelayInformation | undefined>;
     publishEventsStatus: EventState;
 
@@ -230,7 +232,8 @@ declare global {
 
   type InlineSpan =
     | { kind: "text"; text: string }
-    | { kind: "link"; targetID: LongID; text: string };
+    | { kind: "link"; targetID: LongID; text: string }
+    | { kind: "fileLink"; path: string; text: string };
 
   type GraphNode = {
     children: List<ID>;
@@ -290,6 +293,7 @@ declare global {
     nodeByID: globalThis.Map<LongID, GraphNode>;
     semantic: globalThis.Map<string, globalThis.Set<LongID>>;
     incomingCrefs: globalThis.Map<LongID, globalThis.Set<LongID>>;
+    incomingFileLinks: globalThis.Map<string, globalThis.Set<LongID>>;
     basedOnIndex: globalThis.Map<LongID, globalThis.Set<LongID>>;
   };
 

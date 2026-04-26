@@ -9,6 +9,7 @@ import {
   nodeText,
   plainSpans,
 } from "./nodeSpans";
+import { Document, documentKeyOf } from "./Document";
 
 // Empty text remains the sentinel for an empty placeholder row
 export const EMPTY_SEMANTIC_ID = "" as ID;
@@ -366,6 +367,31 @@ export function getRefTargetInfo(
     stack,
     author: node.author,
     rootNodeId: node.id,
+  };
+}
+
+export function getFileLinkTargetInfo(
+  resolvedPath: string,
+  documentByFilePath: Map<string, Document>,
+  knowledgeDBs: KnowledgeDBs
+): RefTargetInfo | undefined {
+  const targetDoc = documentByFilePath.get(resolvedPath);
+  if (!targetDoc) {
+    return undefined;
+  }
+  const targetKey = documentKeyOf(targetDoc.author, targetDoc.docId);
+  const targetRoot = knowledgeDBs
+    .get(targetDoc.author)
+    ?.nodes.valueSeq()
+    .find((node) => node.docId === targetDoc.docId && !node.parent);
+  if (!targetRoot) {
+    return undefined;
+  }
+  return {
+    stack: getNodeStack(knowledgeDBs, targetRoot),
+    author: targetRoot.author,
+    rootNodeId: targetRoot.id as LongID,
+    scrollToId: targetKey ? undefined : undefined,
   };
 }
 

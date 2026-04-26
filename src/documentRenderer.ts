@@ -7,7 +7,14 @@ import {
   shortID,
 } from "./connections";
 import { buildOutgoingReference } from "./buildReferenceRow";
-import { getBlockLinkTarget, getBlockLinkText, isBlockLink } from "./nodeSpans";
+import {
+  getBlockFileLinkPath,
+  getBlockFileLinkText,
+  getBlockLinkTarget,
+  getBlockLinkText,
+  isBlockFileLink,
+  isBlockLink,
+} from "./nodeSpans";
 import {
   addBlankLinesAroundHeadings,
   formatBulletLine,
@@ -68,6 +75,22 @@ function serializeNodeItems(
         const linkText = getBlockLinkText(item) || ref.text;
         const prefix = formatPrefixMarkers(item.relevance, item.argument);
         const body = `${prefix}[${linkText}](#${targetNodeID})`;
+        const line =
+          acc.promoteToHeadingLevel !== undefined
+            ? `${"#".repeat(acc.promoteToHeadingLevel)} ${body}`
+            : `${indent}- ${body}`;
+        return {
+          ...acc,
+          orderedCount: 0,
+          lines: [...acc.lines, line],
+        };
+      }
+
+      if (isBlockFileLink(item)) {
+        const linkPath = getBlockFileLinkPath(item);
+        const linkText = getBlockFileLinkText(item) ?? "";
+        const prefix = formatPrefixMarkers(item.relevance, item.argument);
+        const body = `${prefix}[${linkText}](${linkPath})`;
         const line =
           acc.promoteToHeadingLevel !== undefined
             ? `${"#".repeat(acc.promoteToHeadingLevel)} ${body}`

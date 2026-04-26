@@ -207,6 +207,7 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
   contactsRelays: Map<PublicKey, Relays>(),
   knowledgeDBs: Map<PublicKey, KnowledgeData>(),
   semanticIndex: createEmptySemanticIndex(),
+  documents: Map(),
   relaysInfos: Map<string, RelayInformation | undefined>(),
   publishEventsStatus: {
     isLoading: false,

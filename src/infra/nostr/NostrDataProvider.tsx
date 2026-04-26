@@ -180,6 +180,7 @@ export function NostrDataProvider({
       contactsRelays={contactsRelays}
       knowledgeDBs={Map<PublicKey, KnowledgeData>()}
       semanticIndex={createEmptySemanticIndex()}
+      documents={Map()}
       relaysInfos={searchRelaysInfo}
       publishEventsStatus={session.publishStatus}
       snapshotNodes={Map()}

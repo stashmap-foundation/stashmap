@@ -18,6 +18,7 @@ export function createHeadlessPlan(
     contactsRelays: Map<PublicKey, Relays>(),
     knowledgeDBs,
     semanticIndex: createEmptySemanticIndex(),
+    documents: Map(),
     relaysInfos: Map(),
     snapshotNodes: Map(),
     relays: EMPTY_RELAYS,

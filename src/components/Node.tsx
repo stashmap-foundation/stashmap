@@ -24,6 +24,8 @@ import {
 import { isEditableNode } from "./TemporaryViewContext";
 import { planBatchIndent, planBatchOutdent } from "./batchOperations";
 import {
+  getFileLinkTargetInfo,
+  getNode,
   getRefLinkTargetInfo,
   getRefTargetInfo,
   isEmptySemanticID,
@@ -31,6 +33,10 @@ import {
   resolveNode,
   isRefNode,
 } from "../connections";
+import { isBlockFileLink, getBlockFileLinkPath } from "../nodeSpans";
+import { resolveLinkPath } from "../linkPath";
+import { useDocumentByFilePath } from "../DocumentStore";
+import { documentKeyOf } from "../Document";
 import { ReferenceDisplay } from "./referenceDisplay";
 import { MiniEditor, preventEditorBlur } from "./AddNode";
 import { useOnToggleExpanded } from "./SelectNodes";
@@ -550,6 +556,20 @@ function InteractiveNodeContent(): JSX.Element {
   return <NodeContent />;
 }
 
+function getCurrentNodeFilePath(
+  data: Data,
+  node: GraphNode | undefined
+): string | undefined {
+  if (!node) return undefined;
+  const rootNode =
+    node.id === node.root
+      ? node
+      : getNode(data.knowledgeDBs, node.root, node.author);
+  if (!rootNode?.docId) return undefined;
+  return data.documents.get(documentKeyOf(rootNode.author, rootNode.docId))
+    ?.filePath;
+}
+
 function NodeAutoLink({
   children,
 }: {
@@ -557,6 +577,7 @@ function NodeAutoLink({
 }): JSX.Element | null {
   const data = useData();
   const { knowledgeDBs } = data;
+  const documentByFilePath = useDocumentByFilePath();
   const viewPath = useViewPath();
   const stack = usePaneStack();
   const displayText = useDisplayText();
@@ -564,6 +585,36 @@ function NodeAutoLink({
   const effectiveAuthor = useEffectiveAuthor();
   const currentRow = useCurrentEdge();
   const virtualType = currentRow?.virtualType;
+
+  const fileLinkPath = isBlockFileLink(currentRow)
+    ? getBlockFileLinkPath(currentRow)
+    : undefined;
+  if (fileLinkPath) {
+    const sourceFilePath = getCurrentNodeFilePath(data, currentRow);
+    const resolved = resolveLinkPath(fileLinkPath, sourceFilePath);
+    const refInfo = getFileLinkTargetInfo(
+      resolved,
+      documentByFilePath,
+      knowledgeDBs
+    );
+    if (refInfo?.rootNodeId) {
+      const href = buildNodeRouteUrl(refInfo.rootNodeId, refInfo.scrollToId);
+      return (
+        <a
+          href={href}
+          className="reference-link-btn"
+          onClick={(e) => {
+            e.preventDefault();
+            navigatePane(href);
+          }}
+          aria-label={`Navigate to ${displayText}`}
+        >
+          {children}
+        </a>
+      );
+    }
+  }
+
   const node = getCurrentReferenceForView(
     data,
     viewPath,

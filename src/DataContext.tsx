@@ -6,6 +6,7 @@ import {
   useDocumentKnowledgeDBs,
   useDocumentSemanticIndex,
   useDocumentSnapshotNodes,
+  useDocuments,
 } from "./DocumentStore";
 
 export type DataContextProps = Data;
@@ -67,6 +68,7 @@ export function MergeKnowledgeDB({
   const documentDBs = useDocumentKnowledgeDBs();
   const semanticIndex = useDocumentSemanticIndex();
   const snapshotNodes = useDocumentSnapshotNodes();
+  const documents = useDocuments();
   const mergedDataDBs = mergeKnowledgeDBs(data.knowledgeDBs, documentDBs);
   const baseDBs = knowledgeDBs
     ? mergeKnowledgeDBs(knowledgeDBs, mergedDataDBs)
@@ -85,6 +87,7 @@ export function MergeKnowledgeDB({
         knowledgeDBs: injectedDBs,
         semanticIndex,
         snapshotNodes,
+        documents,
       }}
     >
       {children}

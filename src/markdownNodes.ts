@@ -32,9 +32,7 @@ function walkUpsertNode(ctx: WalkContext, node: GraphNode): WalkContext {
   };
 }
 
-function singleBlockLinkSpan(
-  spans: InlineSpan[]
-): InlineSpan | undefined {
+function singleBlockLinkSpan(spans: InlineSpan[]): InlineSpan | undefined {
   if (spans.length !== 1) return undefined;
   const span = spans[0];
   if (span.kind === "link" || span.kind === "fileLink") return span;

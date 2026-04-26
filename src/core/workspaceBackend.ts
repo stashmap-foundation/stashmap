@@ -2,6 +2,7 @@ import path from "path";
 import fs from "fs/promises";
 import { scanWorkspaceDocuments, WorkspaceSaveProfile } from "./workspaceSave";
 import type { Document } from "../DocumentStore";
+import { ensureKnowstrDocIdFrontMatter } from "../knowstrFrontmatter";
 
 export async function loadWorkspaceAsDocuments(
   profile: WorkspaceSaveProfile
@@ -14,6 +15,14 @@ export async function loadWorkspaceAsDocuments(
     content: doc.currentContent,
     filePath: doc.relativePath,
   }));
+}
+
+function withEnsuredFrontMatter(content: string, docId: string): string {
+  const stripped = content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/u, "");
+  const { frontMatter } = ensureKnowstrDocIdFrontMatter(
+    `---\nknowstr_doc_id: ${docId}\n---`
+  );
+  return `${frontMatter}${stripped}`;
 }
 
 export async function saveDocumentsToWorkspace(
@@ -29,7 +38,11 @@ export async function saveDocumentsToWorkspace(
     relevant.map(async (doc) => {
       const absolute = path.join(profile.workspaceDir, doc.filePath as string);
       await fs.mkdir(path.dirname(absolute), { recursive: true });
-      await fs.writeFile(absolute, doc.content, "utf8");
+      await fs.writeFile(
+        absolute,
+        withEnsuredFrontMatter(doc.content, doc.docId),
+        "utf8"
+      );
       return absolute;
     })
   );

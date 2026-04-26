@@ -3,7 +3,7 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import fs from "fs";
 import path from "path";
-import { renderAppTree as baseRenderAppTree } from "../appTestUtils.test";
+import { renderAppTree } from "../appTestUtils.test";
 import {
   expectTree,
   getPane,
@@ -27,18 +27,13 @@ import { SplitPaneLayout } from "./SplitPaneLayout";
 import { PaneHistoryProvider } from "../PaneHistoryContext";
 import { DND } from "../dnd";
 
+/* eslint-disable functional/immutable-data */
 const ipcsToDispose: MockWorkspaceIpc[] = [];
-
-async function renderAppTree(
-  options: Parameters<typeof baseRenderAppTree>[0]
-): Promise<Awaited<ReturnType<typeof baseRenderAppTree>>> {
-  const result = await baseRenderAppTree(options);
-  ipcsToDispose.push(result.ipc);
-  return result;
-}
+/* eslint-enable functional/immutable-data */
 
 function renderAppTreeMultiPane(workspacePath: string): void {
   const ipc = mockWorkspaceIpc(workspacePath);
+  // eslint-disable-next-line functional/immutable-data
   ipcsToDispose.push(ipc);
   renderWithTestData(
     <FilesystemAppRoot>
@@ -61,7 +56,9 @@ function renderAppTreeMultiPane(workspacePath: string): void {
 
 afterEach(async () => {
   cleanup();
-  await Promise.all(ipcsToDispose.splice(0).map((ipc) => ipc.dispose()));
+  // eslint-disable-next-line functional/immutable-data
+  const pending = ipcsToDispose.splice(0);
+  await Promise.all(pending.map((ipc) => ipc.dispose()));
 });
 
 test("Cross-file link round-trips through save and renders in tree", async () => {
@@ -76,7 +73,10 @@ test("Cross-file link round-trips through save and renders in tree", async () =>
 
   await renderAppTree({ path: workspacePath, search: "A" });
 
-  await screen.findByText("Open B");
+  await expectTree(`
+A
+  [R] B
+  `);
 });
 
 test("Cross-directory link resolves and is clickable to target root", async () => {
@@ -87,8 +87,7 @@ test("Cross-directory link resolves and is clickable to target root", async () =
   await knowstrSave(workspacePath);
   await renderAppTree({ path: workspacePath, search: "A" });
 
-  await screen.findByText("Open B");
-  const navigateLink = await screen.findByLabelText("Navigate to Open B");
+  const navigateLink = await screen.findByLabelText("Navigate to B");
   await userEvent.click(navigateLink);
 
   await screen.findByLabelText(/^edit B(\s|$)/);
@@ -111,7 +110,7 @@ test("DnD copy of a file-link bullet between panes preserves resolution to origi
   );
   await navigateToNodeViaSearch(1, "C");
 
-  const sourceLink = getPane(0).getByText("Open B");
+  const sourceLink = getPane(0).getByText("B");
   const targetC = getPane(1).getByRole("treeitem", { name: "C" });
 
   await userEvent.keyboard("{Alt>}");
@@ -162,9 +161,12 @@ test("Mixed node-links and file-links all render", async () => {
   await knowstrSave(workspacePath);
   await renderAppTree({ path: workspacePath, search: "Links" });
 
-  await screen.findByText(/Holiday Destinations \/ France/u);
-  await screen.findByText("Hello Doc");
-  await screen.findByText("Hello");
+  await expectTree(`
+Links
+  [R] Holiday Destinations / France
+  [R] Hello Doc
+  [R] Hello Doc
+  `);
 });
 
 test("Cross-document node links survive a save round-trip", async () => {
@@ -213,14 +215,20 @@ test("Cross-document node links survive an app reload", async () => {
   await knowstrSave(workspacePath);
 
   await renderAppTree({ path: workspacePath, search: "Links" });
-  await screen.findByText(/Holiday Destinations \/ France/u);
-  await screen.findByText("Hello");
+  await expectTree(`
+Links
+  [R] Holiday Destinations / France
+  [R] Hello Doc
+  `);
 
   cleanup();
   await renderAppTree({ path: workspacePath, search: "Links" });
 
-  await screen.findByText(/Holiday Destinations \/ France/u);
-  await screen.findByText("Hello");
+  await expectTree(`
+Links
+  [R] Holiday Destinations / France
+  [R] Hello Doc
+  `);
 });
 
 test("File link with prefix markers preserves them on the incoming reference", async () => {
@@ -240,4 +248,3 @@ B
     { showGutter: true }
   );
 });
-

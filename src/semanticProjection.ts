@@ -342,7 +342,9 @@ export function getIncomingCrefsForNode(
     currentNodeFilePath,
     currentNodeAuthor
   );
-  const sourceIDs = [...new globalThis.Set([...crefSourceIDs, ...fileLinkSourceIDs])];
+  const sourceIDs = [
+    ...new globalThis.Set([...crefSourceIDs, ...fileLinkSourceIDs]),
+  ];
 
   const refs = List(
     sourceIDs

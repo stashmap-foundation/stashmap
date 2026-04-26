@@ -161,9 +161,7 @@ function classifyHref(href: string): RefLinkTarget | undefined {
 
 function extractRefLink(
   children: readonly Token[]
-):
-  | { prefixSource: string; text: string; target: RefLinkTarget }
-  | undefined {
+): { prefixSource: string; text: string; target: RefLinkTarget } | undefined {
   const tokens = children.filter((c) => !isIdComment(c));
   const openIdx = tokens.findIndex((c) => c.type === "link_open");
   if (openIdx < 0) return undefined;

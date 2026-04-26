@@ -1,4 +1,4 @@
-import { List } from "immutable";
+import { List, Map as ImmutableMap } from "immutable";
 import {
   getChildNodes,
   getNode,
@@ -11,9 +11,12 @@ import {
   getNodeContext,
 } from "./connections";
 import { getTextForSemanticID } from "./semanticProjection";
-import { getBlockLinkText, getBlockFileLinkPath, isBlockFileLink } from "./nodeSpans";
+import {
+  getBlockLinkText,
+  getBlockFileLinkPath,
+  isBlockFileLink,
+} from "./nodeSpans";
 import { Document, documentKeyOf } from "./Document";
-import { Map as ImmutableMap } from "immutable";
 import { resolveLinkPath } from "./linkPath";
 import {
   ViewPath,
@@ -440,7 +443,9 @@ export function buildReferenceItem(
   const outgoing = buildOutgoingReference(
     refId,
     data.knowledgeDBs,
-    data.user.publicKey
+    data.user.publicKey,
+    data.documents,
+    data.documentByFilePath
   );
   if (!outgoing || !ref) return outgoing;
 

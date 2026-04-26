@@ -4,12 +4,15 @@ import { newRefNode, newNode } from "./nodeFactory";
 import { SEARCH_PREFIX } from "./constants";
 import { getRootAnchorContext, rootAnchorsEqual } from "./rootAnchor";
 import {
+  getBlockFileLinkPath,
   getBlockLinkTarget,
+  isBlockFileLink,
   isBlockLink,
   nodeText,
   plainSpans,
 } from "./nodeSpans";
 import { Document, documentKeyOf } from "./Document";
+import { resolveLinkPath } from "./linkPath";
 
 // Empty text remains the sentinel for an empty placeholder row
 export const EMPTY_SEMANTIC_ID = "" as ID;
@@ -395,14 +398,72 @@ export function getFileLinkTargetInfo(
   };
 }
 
+function resolveAnyLink(
+  knowledgeDBs: KnowledgeDBs,
+  documents: Map<string, Document> | undefined,
+  documentByFilePath: Map<string, Document> | undefined,
+  source: GraphNode | undefined
+): GraphNode | undefined {
+  if (!source) {
+    return undefined;
+  }
+  if (isBlockLink(source)) {
+    return getTargetNode(knowledgeDBs, source);
+  }
+  if (
+    isBlockFileLink(source) &&
+    documents !== undefined &&
+    documentByFilePath !== undefined
+  ) {
+    return resolveFileLinkRootByDocs(
+      knowledgeDBs,
+      documents,
+      documentByFilePath,
+      source
+    );
+  }
+  return source;
+}
+
+function resolveFileLinkRootByDocs(
+  knowledgeDBs: KnowledgeDBs,
+  documents: Map<string, Document>,
+  documentByFilePath: Map<string, Document>,
+  source: GraphNode
+): GraphNode | undefined {
+  const linkPath = getBlockFileLinkPath(source);
+  if (!linkPath) return undefined;
+  const sourceRoot =
+    source.id === source.root
+      ? source
+      : getNode(knowledgeDBs, source.root, source.author);
+  const sourceFilePath = sourceRoot?.docId
+    ? documents.get(documentKeyOf(sourceRoot.author, sourceRoot.docId))
+        ?.filePath
+    : undefined;
+  const resolved = resolveLinkPath(linkPath, sourceFilePath);
+  const targetDoc = documentByFilePath.get(resolved);
+  if (!targetDoc) return undefined;
+  return knowledgeDBs
+    .get(targetDoc.author)
+    ?.nodes.valueSeq()
+    .find((node) => node.docId === targetDoc.docId && !node.parent);
+}
+
+
 export function getRefLinkTargetInfo(
   refId: ID,
   knowledgeDBs: KnowledgeDBs,
-  effectiveAuthor: PublicKey
+  effectiveAuthor: PublicKey,
+  documents?: Map<string, Document>,
+  documentByFilePath?: Map<string, Document>
 ): RefTargetInfo | undefined {
-  const node = resolveNode(
+  const source = getNode(knowledgeDBs, refId, effectiveAuthor);
+  const node = resolveAnyLink(
     knowledgeDBs,
-    getNode(knowledgeDBs, refId, effectiveAuthor)
+    documents,
+    documentByFilePath,
+    source
   );
   if (!node) {
     return undefined;

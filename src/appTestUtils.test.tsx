@@ -20,6 +20,15 @@ import { PaneView } from "./components/Workspace";
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 test.skip("skip", () => {});
 
+/* eslint-disable functional/immutable-data */
+const PENDING_IPCS: MockWorkspaceIpc[] = [];
+
+afterEach(async () => {
+  const pending = PENDING_IPCS.splice(0);
+  await Promise.all(pending.map((ipc) => ipc.dispose()));
+});
+/* eslint-enable functional/immutable-data */
+
 type AppRenderOptions = {
   /**
    * Absolute path to a workspace folder. Defaults to a fresh `knowstrInit()`
@@ -49,6 +58,8 @@ export async function renderAppTree(
 ): Promise<AppRenderResult> {
   const path = options.empty ? undefined : options.path ?? knowstrInit().path;
   const ipc = mockWorkspaceIpc(path ?? null);
+  // eslint-disable-next-line functional/immutable-data
+  PENDING_IPCS.push(ipc);
 
   const utils = renderWithTestData(
     <FilesystemAppRoot>

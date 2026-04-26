@@ -23,7 +23,7 @@ import { Plan, planUpsertNodes, getPane } from "./planner";
 import { usePaneStack } from "./SplitPanesContext";
 import { DEFAULT_TYPE_FILTERS } from "./constants";
 import { newNode } from "./nodeFactory";
-import { nodeText } from "./nodeSpans";
+import { isBlockLinkAny, nodeText } from "./nodeSpans";
 import { getNodeUserPublicKey } from "./userEntry";
 
 export { newNode } from "./nodeFactory";
@@ -387,17 +387,12 @@ export function getCurrentReferenceForView(
 ): ReferenceRow | undefined {
   const currentEdge = currentRow || getCurrentEdgeForView(data, viewPath);
   const currentNode = getNodeForView(data, viewPath, stack);
-  let referenceID: LongID | undefined;
-  if (isRefNode(currentEdge)) {
-    referenceID = currentEdge.id as LongID;
-  } else if (isRefNode(currentNode)) {
-    referenceID = currentNode.id as LongID;
-  }
-  if (!referenceID) {
+  const referenceNode = isBlockLinkAny(currentEdge) ? currentEdge : currentNode;
+  if (!isBlockLinkAny(referenceNode)) {
     return undefined;
   }
   return buildReferenceItem(
-    referenceID,
+    referenceNode.id as LongID,
     data,
     viewPath,
     stack,

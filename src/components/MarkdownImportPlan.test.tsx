@@ -519,7 +519,7 @@ test("parseMarkdownHierarchy ignores http(s) links (no fileLink span)", () => {
     expect.objectContaining({
       children: [
         expect.objectContaining({
-          spans: plainSpans(""),
+          spans: plainSpans("[Web](https://example.com)"),
         }),
       ],
     }),
@@ -532,7 +532,7 @@ test("parseMarkdownHierarchy ignores non-md path links (no fileLink span)", () =
     expect.objectContaining({
       children: [
         expect.objectContaining({
-          spans: plainSpans(""),
+          spans: plainSpans("[Image](./foo.png)"),
         }),
       ],
     }),

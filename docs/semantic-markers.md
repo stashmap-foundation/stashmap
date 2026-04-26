@@ -79,3 +79,40 @@ Examples:
 - (-?) This passage contradicts the statement.
 ```
 
+## Typed Contains Orders
+
+`contains` is the default structural edge. It can be interpreted by node type,
+so the same stable node can appear in multiple curated orders without being
+duplicated.
+
+- `topic contains topic`: logical outline
+- `topic contains statement`: thematic placement
+- `statement contains statement`: nested argument or excerpt structure
+- `source contains statement`: provenance; the statement comes from the source
+- `person contains source`: works by a person, usually chronological
+- `person contains task`: operational work related to a person
+
+This lets a statement-first view stay focused on the logical topic tree:
+
+```markdown
+# Praxeology
+
+- (!) Human action is purposeful behavior. <!-- ref:statement-action-purposeful -->
+```
+
+The source view can contain the same statement ID:
+
+```markdown
+# Human Action
+
+- Human action is purposeful behavior. <!-- ref:statement-action-purposeful -->
+```
+
+The UI can then answer "which source and person does this statement come from?"
+with a reverse `contains` index:
+
+1. Find `source` parents that contain the statement ID.
+2. Find `person` parents that contain those source IDs.
+3. Show source/person in a side panel or lazy expansion without forcing every
+   topic view to inline provenance details.
+

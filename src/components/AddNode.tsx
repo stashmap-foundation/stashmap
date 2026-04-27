@@ -34,6 +34,7 @@ type MiniEditorProps = {
   initialText?: string;
   initialCursorPosition?: number;
   onSave: (text: string, imageUrl?: string, submitted?: boolean) => void;
+  style?: React.CSSProperties;
   onClose?: () => void;
   onTab?: (text: string, cursorPosition: number) => void;
   onShiftTab?: (text: string, cursorPosition: number) => void;
@@ -53,6 +54,7 @@ export function MiniEditor({
   initialText,
   initialCursorPosition,
   onSave,
+  style,
   onClose,
   onTab,
   onShiftTab,
@@ -275,6 +277,7 @@ export function MiniEditor({
         role="textbox"
         tabIndex={0}
         className="mini-editor"
+        style={style}
         contentEditable
         suppressContentEditableWarning
         onKeyDown={handleKeyDown}

@@ -67,12 +67,11 @@ My Notes
     // Enable not_relevant filter to verify node was created
     await userEvent.click(screen.getByLabelText("toggle Not Relevant filter"));
 
-    // Check strikethrough styling - style is on parent span
+    // Check strikethrough styling on the editable text itself. The mini editor
+    // is inline-block, so relying on the parent span's decoration misses the
+    // visible regression.
     const hiddenNode = await screen.findByLabelText("edit Hidden");
-    const styledSpan = hiddenNode.closest(
-      "span[style*='text-decoration']"
-    ) as HTMLElement;
-    expect(styledSpan?.style.textDecoration).toBe("line-through");
+    expect(hiddenNode.style.textDecoration).toBe("line-through");
   });
 });
 

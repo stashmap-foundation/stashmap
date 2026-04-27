@@ -238,6 +238,7 @@ function EditableContent(): JSX.Element {
   const stack = usePaneStack();
   const paneIndex = usePaneIndex();
   const data = useData();
+  const { textStyle } = useItemStyle();
   const { createPlan, executePlan } = usePlanner();
   const currentNode = useCurrentNode();
   const [rowID] = useCurrentRowID();
@@ -497,6 +498,7 @@ function EditableContent(): JSX.Element {
     <MiniEditor
       key={`${viewPathToString(viewPath)}:${nodeIndex}`}
       initialText={displayText}
+      style={textStyle}
       onSave={handleSave}
       onTab={handleTab}
       onShiftTab={handleShiftTab}

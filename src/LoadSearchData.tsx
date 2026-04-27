@@ -33,10 +33,9 @@ function SearchCrefBuilder({
       knowledgeDBs,
       effectiveAuthor
     );
-    if (deduped.size === 0) {
-      return List<ID>();
-    }
-    return deduped.map((ref) => ref.nodeID as ID);
+    return List<ID>([semanticID]).concat(
+      deduped.map((ref) => ref.nodeID as ID)
+    );
   });
 
   const { node: searchNode, childNodes } = getSearchNodes(

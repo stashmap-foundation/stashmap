@@ -15,28 +15,41 @@ const OTHER_PK = "other-author" as PublicKey;
 function knowledgeDBWithTexts(
   author: PublicKey,
   texts: string[]
-): KnowledgeDBs {
-  const nodes = texts.reduce((acc, text) => {
-    const node = newNode(text, List<ID>(), author);
-    return acc.set(shortID(node.id), node);
-  }, Map<string, GraphNode>());
+): { knowledgeDBs: KnowledgeDBs; nodes: GraphNode[] } {
+  const nodesWithCreated = texts.reduce(
+    (acc, text) => {
+      const node = newNode(text, List<ID>(), author);
+      return {
+        nodes: acc.nodes.set(shortID(node.id), node),
+        created: [...acc.created, node],
+      };
+    },
+    { nodes: Map<string, GraphNode>(), created: [] as GraphNode[] }
+  );
+  const { nodes } = nodesWithCreated;
   const db: KnowledgeData = {
     ...newDB(),
     nodes,
   };
-  return Map<PublicKey, KnowledgeData>({ [author]: db });
+  return {
+    knowledgeDBs: Map<PublicKey, KnowledgeData>({ [author]: db }),
+    nodes: nodesWithCreated.created,
+  };
 }
 
-test("buildNodeUrl and pathToStack round-trip preserves node IDs", () => {
-  const knowledgeDBs = knowledgeDBWithTexts(ALICE_PK, [
+test("buildNodeUrl renders concrete node IDs as readable path labels", () => {
+  const { knowledgeDBs, nodes } = knowledgeDBWithTexts(ALICE_PK, [
     "Holiday Destinations",
     "Barcelona",
   ]);
-  const stack = ["Holiday Destinations", "Barcelona"] as ID[];
+  const stack = nodes.map((node) => node.id as ID);
 
   const path = buildNodeUrl(stack, knowledgeDBs, ALICE_PK);
   expect(path).toBe("/n/Holiday%20Destinations/Barcelona");
-  expect(pathToStack(path as string)).toEqual(stack);
+  expect(pathToStack(path as string)).toEqual([
+    "Holiday Destinations",
+    "Barcelona",
+  ]);
 });
 
 test("buildNodeUrl returns undefined when node text cannot be resolved", () => {
@@ -53,16 +66,16 @@ test("buildNodeUrl with empty stack returns /", () => {
 });
 
 test("buildNodeUrl includes author param for other user", () => {
-  const knowledgeDBs = knowledgeDBWithTexts(OTHER_PK, ["My Notes"]);
-  const stack = ["My Notes"] as ID[];
+  const { knowledgeDBs, nodes } = knowledgeDBWithTexts(OTHER_PK, ["My Notes"]);
+  const stack = [nodes[0].id as ID];
 
   const path = buildNodeUrl(stack, knowledgeDBs, ALICE_PK, OTHER_PK);
   expect(path).toBe("/n/My%20Notes?author=other-author");
 });
 
 test("buildNodeUrl omits author param for own content", () => {
-  const knowledgeDBs = knowledgeDBWithTexts(ALICE_PK, ["My Notes"]);
-  const stack = ["My Notes"] as ID[];
+  const { knowledgeDBs, nodes } = knowledgeDBWithTexts(ALICE_PK, ["My Notes"]);
+  const stack = [nodes[0].id as ID];
 
   const path = buildNodeUrl(stack, knowledgeDBs, ALICE_PK, ALICE_PK);
   expect(path).toBe("/n/My%20Notes");

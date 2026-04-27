@@ -10,6 +10,7 @@ import {
   type,
   expectTree,
   openReadonlyRoute,
+  readonlyRouteForRenderedNode,
 } from "./utils.test";
 import { UNAUTHENTICATED_USER_PK } from "./NostrAuthContext";
 import { defaultPane } from "./userSessionState";
@@ -23,15 +24,17 @@ test("App defaults to empty pane with new node editor when visiting /", async ()
   });
 });
 
-test("Navigate to specific node via URL using human-readable path", async () => {
+test("Navigate to specific node via concrete node URL", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
   await type("Test Node{Escape}");
+  // eslint-disable-next-line testing-library/render-result-naming-convention
+  const concretePath = readonlyRouteForRenderedNode("Test Node");
   cleanup();
 
   renderApp({
     ...alice(),
-    initialRoute: `/n/${encodeURIComponent("Test Node")}`,
+    initialRoute: concretePath,
   });
 
   await screen.findByRole("treeitem", { name: "Test Node" });
@@ -189,20 +192,19 @@ test("Clicking breadcrumb while viewing other user's content preserves READONLY"
   `);
 });
 
-test("Opening /n/ URL with author param shows READONLY", async () => {
+test("Opening node URL from another author shows READONLY", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
 
   renderApp(alice());
   await type(
     "My Notes{Enter}{Tab}Cities{Enter}{Tab}Paris{Enter}London{Escape}"
   );
+  const nodeUrl = await openReadonlyRoute("Cities");
   cleanup();
 
   renderApp({
     ...bob(),
-    initialRoute: `/n/${encodeURIComponent("My Notes")}/${encodeURIComponent(
-      "Cities"
-    )}?author=${alice().user.publicKey}`,
+    initialRoute: nodeUrl,
   });
 
   await screen.findByText("READONLY");

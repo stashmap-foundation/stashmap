@@ -15,7 +15,7 @@ import {
   resolveNode,
   isRefNode,
 } from "./connections";
-import { getBlockLinkTarget, nodeText } from "./nodeSpans";
+import { getBlockLinkTarget } from "./nodeSpans";
 import { fileLinkIndexKey } from "./linkPath";
 import { suggestionSettings } from "./constants";
 import { LOG_ROOT_ROLE } from "./systemRoots";
@@ -65,47 +65,7 @@ function getConcreteNodesForSemanticID(
     }
     return [directNode];
   }
-
-  const [remote, localID] = splitID(semanticID as ID);
-  const preferredAuthor = remote || author;
-  const preferredDB = knowledgeDBs.get(preferredAuthor);
-  const otherDBs = remote
-    ? []
-    : knowledgeDBs
-        .filter((_, pk) => pk !== preferredAuthor)
-        .valueSeq()
-        .toArray();
-  const candidateDBs = [preferredDB, ...otherDBs].filter(
-    (db): db is KnowledgeData => db !== undefined
-  );
-
-  return List(
-    candidateDBs.flatMap((db) =>
-      db.nodes
-        .valueSeq()
-        .filter(
-          (node) =>
-            !isRefNode(node) &&
-            (shortID(getNodeSemanticID(node)) === localID ||
-              nodeText(node) === localID)
-        )
-        .toArray()
-    )
-  )
-    .sort((left, right) => {
-      const leftExact = shortID(getNodeSemanticID(left)) === localID ? 0 : 1;
-      const rightExact = shortID(getNodeSemanticID(right)) === localID ? 0 : 1;
-      if (leftExact !== rightExact) {
-        return leftExact - rightExact;
-      }
-      const leftPreferred = left.author === preferredAuthor ? 0 : 1;
-      const rightPreferred = right.author === preferredAuthor ? 0 : 1;
-      if (leftPreferred !== rightPreferred) {
-        return leftPreferred - rightPreferred;
-      }
-      return right.updated - left.updated;
-    })
-    .toArray();
+  return [];
 }
 
 function getConcreteNodeForSemanticID(
@@ -114,6 +74,21 @@ function getConcreteNodeForSemanticID(
   author: PublicKey
 ): GraphNode | undefined {
   return getConcreteNodesForSemanticID(knowledgeDBs, semanticID, author)[0];
+}
+
+function getNodeOriginKey(
+  semanticIndex: SemanticIndex,
+  node: GraphNode,
+  seen = new Set<string>()
+): string {
+  const originID = (node.basedOn ?? node.id) as LongID;
+  if (seen.has(originID)) {
+    return originID;
+  }
+  const originNode = semanticIndex.nodeByID.get(originID);
+  return originNode
+    ? getNodeOriginKey(semanticIndex, originNode, new Set(seen).add(originID))
+    : originID;
 }
 
 export function getTextForSemanticID(
@@ -157,11 +132,10 @@ function contextsSemanticallyMatch(
   return getContextKey(leftContext) === getContextKey(rightContext);
 }
 
-function getSemanticCandidates(
+function getNodesByIDs(
   semanticIndex: SemanticIndex,
-  semanticKey: string
+  nodeIDs: Iterable<LongID> | undefined
 ): List<GraphNode> {
-  const nodeIDs = semanticIndex.semantic.get(semanticKey);
   if (!nodeIDs) {
     return List<GraphNode>();
   }
@@ -182,9 +156,19 @@ export function findRefsToNode(
   targetAuthor?: PublicKey,
   targetRoot?: ID
 ): List<ReferencedByRef> {
-  const targetSemanticKey =
-    targetAuthor && targetRoot ? semanticID : (shortID(semanticID as ID) as ID);
-  const resolvedRefs = getSemanticCandidates(semanticIndex, targetSemanticKey)
+  const targetIDs = getConcreteNodesForSemanticID(
+    knowledgeDBs,
+    semanticID,
+    targetAuthor || ("" as PublicKey)
+  ).map((node) => node.id);
+  const sourceIDs = targetIDs.reduce<LongID[]>(
+    (acc, targetID) => [
+      ...acc,
+      ...(semanticIndex.incomingCrefs.get(targetID) || []),
+    ],
+    []
+  );
+  const resolvedRefs = getNodesByIDs(semanticIndex, sourceIDs)
     .filter((node) => !isSearchId(getSemanticID(knowledgeDBs, node)))
     .filter(
       (node) =>
@@ -520,14 +504,14 @@ export function getAlternativeFooterData(
     currentNode.author
   );
   const currentOriginKeys = currentNodeChildren
-    .map((item) => (item.basedOn ?? item.id) as string)
+    .map((item) => getNodeOriginKey(semanticIndex, item))
     .toSet();
   const currentSemanticIDs = currentNodeChildren
     .map((item) => getNodeSemanticID(item) as string)
     .toSet();
   const currentFilteredOutOriginKeys = currentNodeChildren
     .filter((item) => !itemPassesFilters(item, filterTypes))
-    .map((item) => (item.basedOn ?? item.id) as string)
+    .map((item) => getNodeOriginKey(semanticIndex, item))
     .toSet();
   const declinedTargetIDs = currentNodeChildren
     .filter((item) => isRefNode(item) && item.relevance === "not_relevant")
@@ -554,7 +538,7 @@ export function getAlternativeFooterData(
             additions
               .filter((item) => itemPassesFilters(item, filterTypes))
               .reduce((itemAcc, item) => {
-                const originKey = (item.basedOn ?? item.id) as string;
+                const originKey = getNodeOriginKey(semanticIndex, item);
                 if (
                   currentOriginKeys.has(originKey) ||
                   currentSemanticIDs.has(getNodeSemanticID(item) as string) ||
@@ -585,7 +569,7 @@ export function getAlternativeFooterData(
           const addCount = additions.filter(
             (item) =>
               itemPassesFilters(item, filterTypes) &&
-              !currentOriginKeys.has((item.basedOn ?? item.id) as string) &&
+              !currentOriginKeys.has(getNodeOriginKey(semanticIndex, item)) &&
               !currentSemanticIDs.has(getNodeSemanticID(item) as string)
           ).size;
           const uncoveredAddCount =
@@ -593,10 +577,10 @@ export function getAlternativeFooterData(
             additions.filter(
               (item) =>
                 itemPassesFilters(item, filterTypes) &&
-                !currentOriginKeys.has((item.basedOn ?? item.id) as string) &&
+                !currentOriginKeys.has(getNodeOriginKey(semanticIndex, item)) &&
                 !currentSemanticIDs.has(getNodeSemanticID(item) as string) &&
                 displayedSuggestionOriginKeys.has(
-                  (item.basedOn ?? item.id) as string
+                  getNodeOriginKey(semanticIndex, item)
                 )
             ).size;
           const removeCount = deletions.filter(

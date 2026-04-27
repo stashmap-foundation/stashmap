@@ -795,7 +795,6 @@ function planCopyDescendantNodes<T extends GraphPlan>(
   getSemanticContext: (node: GraphNode) => Context,
   filterNode?: (node: GraphNode) => boolean,
   targetParentNodeID?: LongID,
-  targetSemanticID?: ID,
   root?: ID
 ): [T, NodesIdMapping] {
   const descendants = getNodeSubtree(
@@ -807,11 +806,8 @@ function planCopyDescendantNodes<T extends GraphPlan>(
   const { copiedNodes } = descendants.reduce(
     (acc, node) => {
       const newSemanticContext = getSemanticContext(node);
-      const isRootNode = node.id === sourceNode.id;
       const baseNode = newNode(
-        isRootNode && typeof targetSemanticID === "string"
-          ? targetSemanticID
-          : nodeText(node),
+        nodeText(node),
         newSemanticContext,
         plan.user.publicKey,
         acc.copiedRoot
@@ -972,6 +968,7 @@ export function planForkPane(
       ? {
           ...p,
           author: plan.user.publicKey,
+          stack: p.stack.map((id) => nodesIdMapping.get(id) ?? id) as ID[],
           rootNodeId: newRootNodeId,
         }
       : p
@@ -1089,7 +1086,6 @@ export function planDeepCopyNode(
     },
     undefined,
     targetParentNode.id,
-    undefined,
     targetParentNode.root
   );
 

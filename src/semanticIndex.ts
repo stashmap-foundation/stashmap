@@ -1,12 +1,11 @@
 import { Map as ImmutableMap } from "immutable";
 import { EMPTY_SEMANTIC_ID } from "./connections";
-import { getAllFileLinks, getAllLinks, nodeText } from "./nodeSpans";
+import { getAllFileLinks, getAllLinks } from "./nodeSpans";
 import { fileLinkIndexKey, resolveLinkPath } from "./linkPath";
 
 export function createEmptySemanticIndex(): SemanticIndex {
   return {
     nodeByID: new globalThis.Map<LongID, GraphNode>(),
-    semantic: new globalThis.Map<string, globalThis.Set<LongID>>(),
     incomingCrefs: new globalThis.Map<LongID, globalThis.Set<LongID>>(),
     incomingFileLinks: new globalThis.Map<string, globalThis.Set<LongID>>(),
     basedOnIndex: new globalThis.Map<LongID, globalThis.Set<LongID>>(),
@@ -74,7 +73,6 @@ function addNodeSemanticEntries(
   node: GraphNode,
   sourceFilePath: string | undefined
 ): void {
-  addToSetMap(semanticIndex.semantic, nodeText(node), node.id);
   if (node.basedOn) {
     addToNodeMap(semanticIndex.basedOnIndex, node.basedOn, node.id);
   }
@@ -103,7 +101,6 @@ function removeNodeSemanticEntries(
   node: GraphNode,
   sourceFilePath: string | undefined
 ): void {
-  removeFromSetMap(semanticIndex.semantic, nodeText(node), node.id);
   if (node.basedOn) {
     removeFromNodeMap(semanticIndex.basedOnIndex, node.basedOn, node.id);
   }
@@ -130,12 +127,6 @@ function removeNodeSemanticEntries(
 function cloneIndex(semanticIndex: SemanticIndex): SemanticIndex {
   return {
     nodeByID: new globalThis.Map<LongID, GraphNode>(semanticIndex.nodeByID),
-    semantic: new globalThis.Map<string, globalThis.Set<LongID>>(
-      [...semanticIndex.semantic.entries()].map(([key, ids]) => [
-        key,
-        new globalThis.Set<LongID>(ids),
-      ])
-    ),
     incomingCrefs: new globalThis.Map<LongID, globalThis.Set<LongID>>(
       [...semanticIndex.incomingCrefs.entries()].map(([key, ids]) => [
         key,

@@ -8,7 +8,7 @@ import {
   follow,
   forkReadonlyRoot,
   unfollow,
-  readonlyRoute,
+  readonlyRouteForTextPath,
   renderTree,
   renderApp,
   findNewNodeEditor,
@@ -342,6 +342,7 @@ Recipes
     await expectTree(`
 Recipes
   Pasta
+  [S] Pasta
     `);
   });
 
@@ -435,21 +436,17 @@ My Notes
       "Holiday Destinations"
     );
     await userEvent.click(
-      await screen.findByLabelText("open Holiday Destinations in fullscreen")
-    );
-    await userEvent.click(
       await screen.findByLabelText("edit Holiday Destinations")
     );
     await userEvent.keyboard("{Enter}");
     await type("Austria{Enter}Berlin{Enter}Rome{Enter}Vienna{Escape}");
+    cleanup();
+
     await forkReadonlyRoot(
       bob(),
       alice().user.publicKey,
       "My Notes",
       "Holiday Destinations"
-    );
-    await userEvent.click(
-      await screen.findByLabelText("open Holiday Destinations in fullscreen")
     );
     await userEvent.click(
       await screen.findByLabelText("edit Holiday Destinations")
@@ -512,7 +509,11 @@ Topic
     cleanup();
     renderApp({
       ...alice(),
-      initialRoute: readonlyRoute(bob().user.publicKey, "Topic"),
+      initialRoute: readonlyRouteForTextPath(
+        alice(),
+        bob().user.publicKey,
+        "Topic"
+      ),
     });
     await screen.findByText("READONLY");
 
@@ -718,7 +719,7 @@ Recipes
 });
 
 describe("Cref suggestions", () => {
-  test("declining cref suggestion hides it permanently", async () => {
+  test("declining one concrete cref suggestion leaves independent same-text suggestions visible", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
     await follow(bob, alice().user.publicKey);
@@ -769,6 +770,7 @@ Target
     await expectTree(`
 Target
   Items
+  [S] Source
     `);
   });
 });

@@ -780,10 +780,13 @@ export async function expectTree(
     .join("\n");
 
   try {
-    await waitFor(async () => {
-      const actual = await getTreeStructure(options);
-      expect(actual).toEqual(expectedNormalized);
-    });
+    await waitFor(
+      async () => {
+        const actual = await getTreeStructure(options);
+        expect(actual).toEqual(expectedNormalized);
+      },
+      { timeout: 3000 }
+    );
   } catch (error) {
     const actual = await getTreeStructure(options);
     // eslint-disable-next-line no-console

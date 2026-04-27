@@ -18,7 +18,7 @@ import {
   NodeItemMetadata,
 } from "../nodeItemMutations";
 import { planMoveNodeWithView } from "../treeMutations";
-import { nodeText } from "../nodeSpans";
+import { isBlockLinkAny, nodeText } from "../nodeSpans";
 
 export type EditorInfo = {
   text: string;
@@ -194,6 +194,8 @@ export function planBatchIndent(
 
   const prevSibling = getPreviousSibling(plan, firstPath, stack);
   if (!prevSibling) return undefined;
+  const prevSiblingRow = getCurrentEdgeForView(plan, prevSibling.viewPath);
+  if (isBlockLinkAny(prevSiblingRow)) return undefined;
 
   const planWithExpand = planExpandNode(
     plan,

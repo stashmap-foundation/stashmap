@@ -20,6 +20,7 @@ import {
   useEffectiveAuthor,
   useCurrentNode,
   getCurrentReferenceForView,
+  getCurrentEdgeForView,
 } from "../ViewContext";
 import { isEditableNode } from "./TemporaryViewContext";
 import { planBatchIndent, planBatchOutdent } from "./batchOperations";
@@ -31,6 +32,7 @@ import {
   resolveNode,
   isRefNode,
 } from "../connections";
+import { isBlockLinkAny } from "../nodeSpans";
 import { ReferenceDisplay } from "./referenceDisplay";
 import { MiniEditor, preventEditorBlur } from "./AddNode";
 import { useOnToggleExpanded } from "./SelectNodes";
@@ -323,6 +325,11 @@ function EditableContent(): JSX.Element {
 
     if (isEmptyNode) {
       if (!prevSibling || !parentPath) return;
+      const prevSiblingRow = getCurrentEdgeForView(
+        basePlan,
+        prevSibling.viewPath
+      );
+      if (isBlockLinkAny(prevSiblingRow)) return;
       const currentParentNode = getNodeForView(basePlan, parentPath, stack);
       const planWithoutEmpty = currentParentNode
         ? planRemoveEmptyNodePosition(basePlan, currentParentNode.id)
@@ -566,7 +573,6 @@ function NodeAutoLink({
   const effectiveAuthor = useEffectiveAuthor();
   const currentRow = useCurrentEdge();
   const virtualType = currentRow?.virtualType;
-
 
   const node = getCurrentReferenceForView(
     data,

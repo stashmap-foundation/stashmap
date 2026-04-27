@@ -8,6 +8,8 @@ import {
 
 import {
   getDisplayTextForView,
+  getNodeIndexForView,
+  getParentView,
   parseViewPath,
   ViewPath,
   VirtualRowsMap,
@@ -50,6 +52,7 @@ import {
   usePlanner,
   planForkPane,
   planClearTemporarySelection,
+  planSetEmptyNodePosition,
   planSelectAllTemporaryRows,
   planShiftTemporarySelection,
   planToggleTemporarySelection,
@@ -86,6 +89,7 @@ import {
 import { planDeleteNodeFromView } from "../treeMutations";
 import { IS_MOBILE } from "./responsive";
 import { MobileActionBar } from "./MobileActionBar";
+import { isBlockLinkAny } from "../nodeSpans";
 
 function BreadcrumbItem({
   label,
@@ -789,7 +793,7 @@ function focusFirstChildRow(root: HTMLElement, activeRow: HTMLElement): void {
   focusRow(child);
 }
 
-function focusRowEditor(activeRow: HTMLElement): void {
+function focusRowEditor(activeRow: HTMLElement): boolean {
   const editor = activeRow.querySelector(
     '[role="textbox"][aria-label^="edit "], [role="textbox"][aria-label="new node editor"]'
   );
@@ -801,12 +805,12 @@ function focusRowEditor(activeRow: HTMLElement): void {
     ) {
       const end = editor.value.length;
       editor.setSelectionRange(end, end);
-      return;
+      return true;
     }
     if (editor.isContentEditable) {
       const selection = window.getSelection();
       if (!selection) {
-        return;
+        return true;
       }
       const range = document.createRange();
       range.selectNodeContents(editor);
@@ -814,7 +818,9 @@ function focusRowEditor(activeRow: HTMLElement): void {
       selection.removeAllRanges();
       selection.addRange(range);
     }
+    return true;
   }
+  return false;
 }
 
 function focusAdjacentRowEditor(
@@ -1432,7 +1438,33 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "Enter" || e.key === "i") {
       e.preventDefault();
-      focusRowEditor(activeRow);
+      if (focusRowEditor(activeRow)) {
+        return;
+      }
+
+      const activeRowKey = getRowKey(activeRow);
+      const activeViewPath = parseViewPath(activeRowKey);
+      const activeGraphRow = getCurrentRow(
+        data,
+        activeViewPath,
+        virtualRowsMap
+      );
+      const parentPath = getParentView(activeViewPath);
+      const activeNodeIndex = getNodeIndexForView(data, activeViewPath);
+      if (
+        isBlockLinkAny(activeGraphRow) &&
+        parentPath &&
+        activeNodeIndex !== undefined
+      ) {
+        executePlan(
+          planSetEmptyNodePosition(
+            createPlan(),
+            parentPath,
+            stack,
+            activeNodeIndex + 1
+          )
+        );
+      }
       return;
     }
 

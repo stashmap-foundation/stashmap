@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
@@ -11,6 +11,20 @@ import {
   navigateToNodeViaSearch,
   type,
 } from "../utils.test";
+import { focusRow } from "./keyboardNavigation";
+
+function focusReferenceRow(index: number): void {
+  const reference = screen.getAllByTestId("reference-row")[index];
+  /* eslint-disable testing-library/no-node-access */
+  const row = reference.closest('[data-row-focusable="true"]');
+  /* eslint-enable testing-library/no-node-access */
+  if (!(row instanceof HTMLElement)) {
+    throw new Error("Reference row is not focusable");
+  }
+  act(() => {
+    focusRow(row);
+  });
+}
 
 describe("Tree Editor - Comprehensive Tests", () => {
   describe("Root Empty Node Flow", () => {
@@ -288,6 +302,74 @@ My Notes
   First
   Last
   After Last
+      `);
+    });
+  });
+
+  describe("Block reference row keyboard behavior", () => {
+    async function createLogWithTwoReferences(): Promise<void> {
+      const [alice] = setup([ALICE]);
+      renderApp(alice());
+
+      await type("First Note{Escape}");
+      await userEvent.click(await screen.findByLabelText("Create new note"));
+      await type("Second Note{Escape}");
+      await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+      await expectTree(`
+~Log
+  [R] Second Note
+  [R] First Note
+      `);
+    }
+
+    test("Enter on a block reference opens a new sibling editor below it", async () => {
+      await createLogWithTwoReferences();
+
+      focusReferenceRow(0);
+      await userEvent.keyboard("{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "Log note");
+
+      await expectTree(`
+~Log
+  [R] Second Note
+  [NEW NODE: Log note]
+  [R] First Note
+      `);
+    });
+
+    test("Tab in a new sibling after a block reference does not indent under the reference", async () => {
+      await createLogWithTwoReferences();
+
+      focusReferenceRow(0);
+      await userEvent.keyboard("{Enter}");
+      const editor = await findNewNodeEditor();
+      await userEvent.type(editor, "Log note");
+      await userEvent.keyboard("{Tab}");
+
+      await expectTree(`
+~Log
+  [R] Second Note
+  [NEW NODE: Log note]
+  [R] First Note
+      `);
+    });
+
+    test("Normal-mode Tab does not indent an existing row under a block reference", async () => {
+      await createLogWithTwoReferences();
+
+      focusReferenceRow(0);
+      await userEvent.keyboard("{Enter}");
+      await userEvent.type(await findNewNodeEditor(), "Log note{Escape}");
+      await userEvent.click(await screen.findByLabelText("edit Log note"));
+      await userEvent.keyboard("{Escape}");
+      await userEvent.keyboard("{Tab}");
+
+      await expectTree(`
+~Log
+  [R] Second Note
+  Log note
+  [R] First Note
       `);
     });
   });

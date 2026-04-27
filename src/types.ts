@@ -148,6 +148,7 @@ declare global {
       | "incoming"
       | "contains"
     )[];
+    nodeKindFilters?: NodeKind[];
     scrollToId?: string;
   };
 
@@ -208,6 +209,8 @@ declare global {
   // Argument types (evidence) for node children
   type Argument = "confirms" | "contra" | undefined;
 
+  type NodeKind = "topic" | "author" | "source" | "statement" | "task";
+
   // Each item in a node has relevance and optional argument
   type VirtualType = "suggestion" | "search" | "incoming" | "version";
 
@@ -251,6 +254,7 @@ declare global {
     isCref?: boolean;
     targetID?: LongID;
     linkText?: string;
+    nodeKind?: NodeKind;
     blockKind?: "heading" | "list_item" | "paragraph";
     headingLevel?: number;
     listOrdered?: boolean;

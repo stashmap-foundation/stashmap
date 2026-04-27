@@ -1783,6 +1783,22 @@ body:not(.keyboard-input-mode) .hover-light-bg:hover {
   }
 }
 
+.node-kind-filter-symbol {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+
+  svg {
+    fill: none;
+    height: 15px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.7;
+    width: 15px;
+  }
+}
+
 .filter-symbol {
   font-size: 12px;
   font-weight: bold;

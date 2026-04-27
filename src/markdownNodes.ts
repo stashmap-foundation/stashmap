@@ -63,6 +63,7 @@ function materializeTreeNode(
       listOrdered: treeNode.listOrdered,
     }),
     ...(treeNode.listStart !== undefined && { listStart: treeNode.listStart }),
+    ...(treeNode.nodeKind !== undefined && { nodeKind: treeNode.nodeKind }),
   };
 
   const childSemanticContext = semanticContext.push(

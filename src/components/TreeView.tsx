@@ -72,13 +72,15 @@ export function PaneTreeResultProvider({
       List<ViewPath>(),
       pane.rootNodeId,
       pane.author,
-      pane.typeFilters
+      pane.typeFilters,
+      pane.nodeKindFilters
     );
   }, [
     data,
     isRootExpanded,
     pane.author,
     pane.rootNodeId,
+    pane.nodeKindFilters,
     pane.typeFilters,
     stack,
     viewPath,
@@ -104,6 +106,7 @@ function VirtuosoForColumn({
   onRowClick,
   scrollToId,
   firstVirtualKeys,
+  displayDepths,
 }: {
   nodes: List<ViewPath>;
   startIndexFromStorage: number;
@@ -117,6 +120,7 @@ function VirtuosoForColumn({
   onRowClick?: (e: React.MouseEvent, viewKey: string) => void;
   scrollToId?: string;
   firstVirtualKeys: ImmutableSet<string>;
+  displayDepths: Map<string, number>;
 }): JSX.Element {
   const data = useData();
   const location = useLocation();
@@ -207,12 +211,18 @@ function VirtuosoForColumn({
             index < nodes.size - 1 ? nodes.get(index + 1) : undefined;
           const pathKey = viewPathToString(path);
           const isFirstVirtual = firstVirtualKeys.has(pathKey);
+          const displayDepth = displayDepths.get(pathKey) ?? path.length - 1;
+          const nextDepth = nextPath
+            ? displayDepths.get(viewPathToString(nextPath)) ??
+              nextPath.length - 1
+            : undefined;
           return (
             <ViewContext.Provider value={path} key={pathKey}>
               <ListItem
                 index={index}
                 treeViewPath={viewPath}
-                nextDepth={nextPath ? nextPath.length - 1 : undefined}
+                rowDepth={displayDepth}
+                nextDepth={nextDepth}
                 nextViewPathStr={
                   nextPath ? viewPathToString(nextPath) : undefined
                 }
@@ -416,6 +426,7 @@ function Tree(): JSX.Element | null {
           onRowClick={onRowClick}
           scrollToId={pane.scrollToId}
           firstVirtualKeys={firstVirtualKeys}
+          displayDepths={treeResult?.displayDepths || Map<string, number>()}
         />
       </div>
     </VirtualRowsProvider>

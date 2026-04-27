@@ -44,6 +44,7 @@ type DraggableProps = {
   rowViewKey?: string;
   rowIndex?: number;
   rowDepth?: number;
+  displayDepth?: number;
   isActiveRow?: boolean;
   isSelected?: boolean;
   onRowFocus?: (key: string, index: number, mode: KeyboardMode) => void;
@@ -58,6 +59,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
       rowViewKey = "",
       rowIndex = 0,
       rowDepth = 0,
+      displayDepth,
       isActiveRow = false,
       isSelected = false,
       onRowFocus = () => {},
@@ -148,7 +150,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
         onClick={handleClick}
         onKeyDown={() => {}}
       >
-        <Node className={className} />
+        <Node className={className} displayDepth={displayDepth} />
       </div>
     );
   }
@@ -159,6 +161,7 @@ function DraggableSuggestion({
   rowViewKey,
   rowIndex,
   rowDepth,
+  displayDepth,
   isActiveRow,
   isSelected = false,
   onRowFocus,
@@ -168,6 +171,7 @@ function DraggableSuggestion({
   rowViewKey: string;
   rowIndex: number;
   rowDepth: number;
+  displayDepth?: number;
   isActiveRow: boolean;
   isSelected?: boolean;
   onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
@@ -248,7 +252,7 @@ function DraggableSuggestion({
       onClick={handleClick}
       onKeyDown={() => {}}
     >
-      <Node className={className} isSuggestion />
+      <Node className={className} isSuggestion displayDepth={displayDepth} />
     </div>
   );
 }
@@ -262,9 +266,11 @@ export function ListItem({
   onRowFocus,
   onRowClick,
   isFirstVirtual,
+  rowDepth,
 }: {
   index: number;
   treeViewPath: ViewPath;
+  rowDepth?: number;
   nextDepth?: number;
   nextViewPathStr?: string;
   activeRowKey: string;
@@ -285,7 +291,7 @@ export function ListItem({
   const isInSearchView = useIsInSearchView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const selected = useIsSelected();
-  const rowDepth = viewPath.length - 1;
+  const effectiveRowDepth = rowDepth ?? viewPath.length - 1;
   const isActiveRow = activeRowKey === viewKey;
   const isEmptyNode = isEmptySemanticID(rowID);
 
@@ -309,7 +315,8 @@ export function ListItem({
         <DraggableSuggestion
           rowViewKey={viewKey}
           rowIndex={index}
-          rowDepth={rowDepth}
+          rowDepth={effectiveRowDepth}
+          displayDepth={effectiveRowDepth}
           isActiveRow={isActiveRow}
           isSelected={selected}
           onRowFocus={onRowFocus}
@@ -335,7 +342,8 @@ export function ListItem({
         copyDrag={isCopyDrag}
         rowViewKey={viewKey}
         rowIndex={index}
-        rowDepth={rowDepth}
+        rowDepth={effectiveRowDepth}
+        displayDepth={effectiveRowDepth}
         isActiveRow={isActiveRow}
         isSelected={selected}
         onRowFocus={onRowFocus}

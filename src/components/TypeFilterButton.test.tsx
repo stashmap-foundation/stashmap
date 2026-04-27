@@ -71,12 +71,54 @@ My Notes
     await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
 
     // Inline filter dots should exist
+    expect(
+      screen.getByLabelText("toggle Themen node kind filter")
+    ).toBeDefined();
+    expect(
+      screen.getByLabelText("toggle Notizen node kind filter")
+    ).toBeDefined();
+    expect(
+      screen.getByLabelText("toggle Autoren node kind filter")
+    ).toBeDefined();
+    expect(
+      screen.getByLabelText("toggle Quellen node kind filter")
+    ).toBeDefined();
+    expect(
+      screen.getByLabelText("toggle Tasks node kind filter")
+    ).toBeDefined();
     expect(screen.getByLabelText("toggle Relevant filter")).toBeDefined();
     expect(screen.getByLabelText("toggle Maybe Relevant filter")).toBeDefined();
     expect(
       screen.getByLabelText("toggle Little Relevant filter")
     ).toBeDefined();
     expect(screen.getByLabelText("toggle Not Relevant filter")).toBeDefined();
+  });
+
+  test("node kind filter buttons are additive", async () => {
+    const [alice] = setup([ALICE]);
+    renderTree(alice);
+
+    await type("My Notes{Enter}{Tab}Parent{Enter}{Tab}Child{Escape}");
+
+    const topics = screen.getByLabelText("toggle Themen node kind filter");
+    const notes = screen.getByLabelText("toggle Notizen node kind filter");
+    const authors = screen.getByLabelText("toggle Autoren node kind filter");
+
+    expect(topics.getAttribute("aria-pressed")).toBe("true");
+    expect(notes.getAttribute("aria-pressed")).toBe("true");
+    expect(authors.getAttribute("aria-pressed")).toBe("true");
+
+    await userEvent.click(notes);
+
+    expect(topics.getAttribute("aria-pressed")).toBe("true");
+    expect(notes.getAttribute("aria-pressed")).toBe("false");
+    expect(authors.getAttribute("aria-pressed")).toBe("true");
+
+    await userEvent.click(authors);
+
+    expect(topics.getAttribute("aria-pressed")).toBe("true");
+    expect(notes.getAttribute("aria-pressed")).toBe("false");
+    expect(authors.getAttribute("aria-pressed")).toBe("false");
   });
 
   test("toggling filter hides/shows children", async () => {

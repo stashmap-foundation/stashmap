@@ -26,6 +26,19 @@ const ARGUMENT_CHARS: Record<string, Argument> = {
 
 const PREFIX_RE = /^(\([!?~x+-]{1,2}\)\s*)+/;
 
+function parseNodeKind(value: string | undefined): NodeKind | undefined {
+  if (
+    value === "topic" ||
+    value === "author" ||
+    value === "source" ||
+    value === "statement" ||
+    value === "task"
+  ) {
+    return value;
+  }
+  return undefined;
+}
+
 type ParsedComment = {
   uuid: string;
   hidden: boolean;
@@ -34,6 +47,7 @@ type ParsedComment = {
   anchor: RootAnchor | undefined;
   systemRole: RootSystemRole | undefined;
   userPublicKey: PublicKey | undefined;
+  nodeKind: NodeKind | undefined;
 };
 
 function parseIdComment(content: string): ParsedComment | undefined {
@@ -66,6 +80,7 @@ function parseIdComment(content: string): ParsedComment | undefined {
   const userPublicKey = (attrsMap.userPublicKey || undefined) as
     | PublicKey
     | undefined;
+  const nodeKind = parseNodeKind(attrsMap.nodeKind);
 
   const anchor =
     anchorContext ||
@@ -100,6 +115,7 @@ function parseIdComment(content: string): ParsedComment | undefined {
     anchor,
     systemRole,
     userPublicKey,
+    nodeKind,
   };
 }
 
@@ -260,6 +276,7 @@ export type MarkdownTreeNode = {
   anchor?: RootAnchor;
   systemRole?: RootSystemRole;
   userPublicKey?: PublicKey;
+  nodeKind?: NodeKind;
 };
 
 function appendNode(
@@ -361,6 +378,9 @@ export function parseMarkdownHierarchy(
         ...(commentAttrs?.userPublicKey !== undefined && {
           userPublicKey: commentAttrs.userPublicKey,
         }),
+        ...(commentAttrs?.nodeKind !== undefined && {
+          nodeKind: commentAttrs.nodeKind,
+        }),
       };
       appendNode(roots, parent, node);
       headingStack.push({ level: headingLevel, node });
@@ -428,6 +448,9 @@ export function parseMarkdownHierarchy(
           ...(commentAttrs?.userPublicKey !== undefined && {
             userPublicKey: commentAttrs.userPublicKey,
           }),
+          ...(commentAttrs?.nodeKind !== undefined && {
+            nodeKind: commentAttrs.nodeKind,
+          }),
         };
         appendNode(roots, parent, node);
         listItemStack[currentItemIndex] = node;
@@ -440,6 +463,9 @@ export function parseMarkdownHierarchy(
         ...(linkHref !== undefined && { linkHref }),
         ...(relevance !== undefined && { relevance }),
         ...(argument !== undefined && { argument }),
+        ...(commentAttrs?.nodeKind !== undefined && {
+          nodeKind: commentAttrs.nodeKind,
+        }),
       });
       continue;
     }
@@ -448,6 +474,9 @@ export function parseMarkdownHierarchy(
       text,
       children: [],
       blockKind: "paragraph",
+      ...(commentAttrs?.nodeKind !== undefined && {
+        nodeKind: commentAttrs.nodeKind,
+      }),
     };
     appendNode(
       roots,

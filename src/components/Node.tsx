@@ -95,7 +95,8 @@ function useNodeHasChildren(): boolean {
     stack,
     pane.rootNodeId,
     pane.author,
-    pane.typeFilters
+    pane.typeFilters,
+    pane.nodeKindFilters
   );
   return result.paths.size > 0;
 }
@@ -699,13 +700,15 @@ export function Node({
   className,
   cardBodyClassName,
   isSuggestion,
+  displayDepth,
 }: {
   className?: string;
   cardBodyClassName?: string;
   isSuggestion?: boolean;
+  displayDepth?: number;
 }): JSX.Element | null {
   const viewPath = useViewPath();
-  const levels = getLevels(viewPath);
+  const levels = displayDepth ?? getLevels(viewPath);
   const searchDepth = useSearchDepth();
   const { cardStyle, textStyle, textClassName, relevance } = useItemStyle();
   const cls =

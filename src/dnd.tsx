@@ -156,7 +156,8 @@ export function getDropDestinationFromTreeView(
     List<ViewPath>(),
     rootNode,
     pane.author,
-    pane.typeFilters
+    pane.typeFilters,
+    pane.nodeKindFilters
   );
   const adjustedIndex = destinationIndex - 1;
   const dropBefore = nodes.get(adjustedIndex);

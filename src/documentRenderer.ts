@@ -87,6 +87,7 @@ function serializeNodeItems(
         ...(resolvedChild.userPublicKey
           ? { userPublicKey: resolvedChild.userPublicKey }
           : {}),
+        ...(resolvedChild.nodeKind ? { nodeKind: resolvedChild.nodeKind } : {}),
       });
 
       if (resolvedChild.blockKind === "heading") {
@@ -209,7 +210,8 @@ export function renderDocumentMarkdown(
     rootNode.basedOn,
     options?.snapshotDTag ?? rootNode.snapshotDTag,
     rootNode.anchor ?? createRootAnchor(getNodeContext(knowledgeDBs, rootNode)),
-    rootNode.systemRole
+    rootNode.systemRole,
+    rootNode.nodeKind
   );
   return formatWithFrontMatter(
     `${addBlankLinesAroundHeadings([rootLine, ...serialized.lines]).join(

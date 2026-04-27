@@ -96,6 +96,42 @@ function parseTypeFilters(
     );
 }
 
+function parseNodeKind(value: string): NodeKind | undefined {
+  if (
+    value === "topic" ||
+    value === "author" ||
+    value === "source" ||
+    value === "statement" ||
+    value === "task"
+  ) {
+    return value;
+  }
+  return undefined;
+}
+
+function parseNodeKindFilters(arr: Array<Serializable>): NodeKind[] {
+  return arr
+    .map((item) => parseNodeKind(asString(item)))
+    .filter((parsed): parsed is NodeKind => parsed !== undefined);
+}
+
+function parseLegacySemanticViewMode(value: string): NodeKind[] | undefined {
+  const nodeKind = parseNodeKind(value);
+  return nodeKind ? [nodeKind] : undefined;
+}
+
+function parsePaneNodeKindFilters(obj: {
+  [key: string]: Serializable;
+}): NodeKind[] | undefined {
+  if (obj.k !== undefined) {
+    return parseNodeKindFilters(asArray(obj.k));
+  }
+  if (obj.m !== undefined) {
+    return parseLegacySemanticViewMode(asString(obj.m));
+  }
+  return undefined;
+}
+
 function viewToJSON(attributes: View): Serializable {
   return {
     e: attributes.expanded !== undefined ? attributes.expanded : undefined,
@@ -141,6 +177,7 @@ export function paneToJSON(pane: Pane): Serializable {
     a: pane.author,
     r: pane.rootNodeId,
     t: pane.typeFilters,
+    k: pane.nodeKindFilters,
   };
 }
 
@@ -158,6 +195,7 @@ function jsonToPane(s: Serializable): Pane | undefined {
       obj.t !== undefined
         ? (asArray(obj.t).map((f) => asString(f)) as Pane["typeFilters"])
         : undefined,
+    nodeKindFilters: parsePaneNodeKindFilters(obj),
   };
 }
 

@@ -4,7 +4,8 @@ export function formatRootHeading(
   basedOn?: LongID,
   snapshotDTag?: string,
   anchor?: RootAnchor,
-  systemRole?: RootSystemRole
+  systemRole?: RootSystemRole,
+  nodeKind?: NodeKind
 ): string {
   const parts = [
     `id:${rootUuid}`,
@@ -27,6 +28,7 @@ export function formatRootHeading(
       ? [`sourceParent="${anchor.sourceParentNodeID}"`]
       : []),
     ...(systemRole ? [`systemRole="${systemRole}"`] : []),
+    ...(nodeKind ? [`nodeKind="${nodeKind}"`] : []),
   ];
   return `# ${rootText} <!-- ${parts.join(" ")} -->`;
 }
@@ -37,6 +39,7 @@ export function formatNodeAttrs(
     hidden?: boolean;
     basedOn?: LongID;
     userPublicKey?: PublicKey;
+    nodeKind?: NodeKind;
   }
 ): string {
   const parts: string[] = [
@@ -46,6 +49,7 @@ export function formatNodeAttrs(
       : []),
     ...(options?.hidden ? ["hidden"] : []),
     ...(options?.basedOn ? [`basedOn="${options.basedOn}"`] : []),
+    ...(options?.nodeKind ? [`nodeKind="${options.nodeKind}"`] : []),
   ];
   if (parts.length === 0) {
     return "";

@@ -16,6 +16,14 @@ export const DEFAULT_TYPE_FILTERS: (
   "incoming",
 ];
 
+export const ALL_NODE_KIND_FILTERS: NodeKind[] = [
+  "topic",
+  "author",
+  "source",
+  "statement",
+  "task",
+];
+
 export const suggestionSettings = { maxSuggestions: 5 };
 
 // Solarized accent colors for relevance and argument types

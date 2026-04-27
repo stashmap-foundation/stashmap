@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useLayoutEffect } from "react";
 import { useEditorText } from "./EditorTextContext";
 import { isEditableElement } from "./keyboardNavigation";
 import { ParsedLine, parseClipboardText } from "../planner";
@@ -9,31 +9,10 @@ export function preventEditorBlur(e: React.MouseEvent): void {
   }
 }
 
-function getUrlFromText(text: string): string | undefined {
-  const urlRegex = /(https?:\/\/[^\s/$.?#].[^\s]*|www\.[^\s/$.?#].[^\s]*)/i;
-  const match = text.match(urlRegex);
-  return match ? match[0] : undefined;
-}
-
-async function getImageUrlFromText(text: string): Promise<string | undefined> {
-  const url = getUrlFromText(text);
-  if (!url) {
-    return Promise.resolve(undefined);
-  }
-  /* eslint-disable functional/immutable-data */
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve(url);
-    img.onerror = () => resolve(undefined);
-    img.src = url;
-  });
-  /* eslint-enable functional/immutable-data */
-}
-
 type MiniEditorProps = {
   initialText?: string;
   initialCursorPosition?: number;
-  onSave: (text: string, imageUrl?: string, submitted?: boolean) => void;
+  onSave: (text: string, submitted?: boolean) => void;
   style?: React.CSSProperties;
   onClose?: () => void;
   onTab?: (text: string, cursorPosition: number) => void;
@@ -76,7 +55,7 @@ export function MiniEditor({
     lastSavedTextRef.current = initialText;
   }, [initialText]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (autoFocus && editorRef.current) {
       editorRef.current.focus();
       const range = document.createRange();
@@ -110,13 +89,12 @@ export function MiniEditor({
     editorTextContext?.setText(getText());
   };
 
-  const saveIfChanged = async (): Promise<void> => {
+  const saveIfChanged = (): void => {
     const text = getText().trim();
     if (text && text !== lastSavedTextRef.current) {
       // eslint-disable-next-line functional/immutable-data
       lastSavedTextRef.current = text; // Update immediately to prevent duplicate saves
-      const imageUrl = await getImageUrlFromText(text);
-      onSave(text, imageUrl);
+      onSave(text);
     }
   };
 
@@ -129,9 +107,7 @@ export function MiniEditor({
 
   // Track if we're handling a key event to prevent blur from re-triggering save
   const handlingKeyRef = React.useRef(false);
-  const handleKeyDown = async (
-    e: React.KeyboardEvent<HTMLSpanElement>
-  ): Promise<void> => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLSpanElement>): void => {
     if (e.key === "Escape") {
       e.preventDefault();
       const currentRow = editorRef.current?.closest(
@@ -149,8 +125,7 @@ export function MiniEditor({
       if (hasChanges) {
         // eslint-disable-next-line functional/immutable-data
         lastSavedTextRef.current = text;
-        const imageUrl = await getImageUrlFromText(text);
-        onSave(text, imageUrl);
+        onSave(text);
       } else if (!text && lastSavedTextRef.current && onDelete) {
         onDelete();
       } else {
@@ -185,8 +160,7 @@ export function MiniEditor({
       }
       // eslint-disable-next-line functional/immutable-data
       lastSavedTextRef.current = text; // Update immediately to prevent duplicate saves
-      const imageUrl = await getImageUrlFromText(text);
-      onSave(text, imageUrl, true);
+      onSave(text, true);
     } else if (e.key === "Tab" && !e.shiftKey && onTab) {
       e.preventDefault();
       onTab(getText().trim(), getCursorPosition());

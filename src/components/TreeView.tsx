@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { List, Map, Set as ImmutableSet } from "immutable";
-import { ListRange, Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import { useLocation } from "react-router-dom";
 import { useDragAutoScroll } from "../useDragAutoScroll";
 import { ListItem } from "./Draggable";
@@ -91,12 +90,9 @@ export function PaneTreeResultProvider({
   );
 }
 
-function VirtuosoForColumn({
+function PlainTreeRows({
   nodes,
   startIndexFromStorage,
-  range,
-  setRange,
-  onStopScrolling,
   viewPath,
   ariaLabel,
   activeRowKey,
@@ -107,10 +103,7 @@ function VirtuosoForColumn({
 }: {
   nodes: List<ViewPath>;
   startIndexFromStorage: number;
-  range: ListRange;
-  setRange: React.Dispatch<React.SetStateAction<ListRange>>;
   viewPath: ViewPath;
-  onStopScrolling: (isScrolling: boolean) => void;
   ariaLabel: string | undefined;
   activeRowKey: string;
   onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
@@ -120,7 +113,6 @@ function VirtuosoForColumn({
 }): JSX.Element {
   const data = useData();
   const location = useLocation();
-  const virtuosoRef = useRef<VirtuosoHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollParent, setScrollParent] = useState<HTMLElement | undefined>(
     undefined
@@ -137,10 +129,15 @@ function VirtuosoForColumn({
 
   useEffect(() => {
     const treeRoot = containerRef.current?.closest("[data-keyboard-mode]");
-    if (treeRoot instanceof HTMLElement && virtuosoRef.current) {
-      const ref = virtuosoRef;
+    if (treeRoot instanceof HTMLElement) {
       registerScrollToRow(treeRoot, (index, done) => {
-        ref.current?.scrollIntoView({ index, behavior: "auto", done });
+        const row = containerRef.current?.querySelector(
+          `[data-row-index="${index}"]`
+        );
+        if (row instanceof HTMLElement) {
+          row.scrollIntoView({ block: "nearest" });
+        }
+        done?.();
       });
       return () => unregisterScrollToRow(treeRoot);
     }
@@ -148,19 +145,18 @@ function VirtuosoForColumn({
   }, [scrollParent]);
 
   useEffect(() => {
-    if (virtuosoRef.current) {
-      virtuosoRef.current.scrollToIndex({
-        align: "start",
-        behavior: "auto",
-        index: startIndexFromStorage,
-      });
+    const row = containerRef.current?.querySelector(
+      `[data-row-index="${startIndexFromStorage}"]`
+    );
+    if (row instanceof HTMLElement) {
+      row.scrollIntoView({ block: "start" });
     }
   }, [location]);
 
   const handledScrollToIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    if (!scrollToId || !virtuosoRef.current) {
+    if (!scrollToId) {
       // eslint-disable-next-line functional/immutable-data
       handledScrollToIdRef.current = undefined;
       return;
@@ -174,60 +170,40 @@ function VirtuosoForColumn({
         getRowIDFromView(data, path)[0] === scrollToId
     );
     if (index >= 0) {
-      virtuosoRef.current.scrollToIndex({
-        index,
-        align: "center",
-        behavior: "auto",
-      });
+      const row = containerRef.current?.querySelector(
+        `[data-row-index="${index}"]`
+      );
+      if (row instanceof HTMLElement) {
+        row.scrollIntoView({ block: "center" });
+      }
       // eslint-disable-next-line functional/immutable-data
       handledScrollToIdRef.current = scrollToId;
     }
   }, [data, nodes, scrollToId]);
 
+  const rows = nodes.map((path, index) => {
+    const nextPath = index < nodes.size - 1 ? nodes.get(index + 1) : undefined;
+    const pathKey = viewPathToString(path);
+    const isFirstVirtual = firstVirtualKeys.has(pathKey);
+    return (
+      <ViewContext.Provider value={path} key={pathKey}>
+        <ListItem
+          index={index}
+          treeViewPath={viewPath}
+          nextDepth={nextPath ? nextPath.length - 1 : undefined}
+          nextViewPathStr={nextPath ? viewPathToString(nextPath) : undefined}
+          activeRowKey={activeRowKey}
+          onRowFocus={onRowFocus}
+          onRowClick={onRowClick}
+          isFirstVirtual={isFirstVirtual}
+        />
+      </ViewContext.Provider>
+    );
+  });
   return (
     <div ref={containerRef} aria-label={ariaLabel}>
-      <Virtuoso
-        ref={virtuosoRef}
-        customScrollParent={scrollParent}
-        data={nodes.toArray()}
-        rangeChanged={(r): void => {
-          if (r.startIndex === 0 && r.endIndex === 0) {
-            return;
-          }
-          if (
-            r.startIndex !== range.startIndex ||
-            r.endIndex !== range.endIndex
-          ) {
-            setRange(r);
-          }
-        }}
-        isScrolling={onStopScrolling}
-        itemContent={(index, path) => {
-          const nextPath =
-            index < nodes.size - 1 ? nodes.get(index + 1) : undefined;
-          const pathKey = viewPathToString(path);
-          const isFirstVirtual = firstVirtualKeys.has(pathKey);
-          return (
-            <ViewContext.Provider value={path} key={pathKey}>
-              <ListItem
-                index={index}
-                treeViewPath={viewPath}
-                nextDepth={nextPath ? nextPath.length - 1 : undefined}
-                nextViewPathStr={
-                  nextPath ? viewPathToString(nextPath) : undefined
-                }
-                activeRowKey={activeRowKey}
-                onRowFocus={onRowFocus}
-                onRowClick={onRowClick}
-                isFirstVirtual={isFirstVirtual}
-              />
-            </ViewContext.Provider>
-          );
-        }}
-        components={{
-          Footer: () => <div style={{ height: "50vh" }} />,
-        }}
-      />
+      {rows}
+      <div style={{ height: "50vh" }} />
     </div>
   );
 }
@@ -243,14 +219,10 @@ function Tree(): JSX.Element | null {
   const data = useData();
   const pane = useCurrentPane();
   const { fileStore } = useApis();
-  const { getLocalStorage, setLocalStorage } = fileStore;
+  const { getLocalStorage } = fileStore;
   const paneIndex = usePaneIndex();
   const scrollableId = useViewKey();
   const startIndexFromStorage = Number(getLocalStorage(scrollableId)) || 0;
-  const [range, setRange] = useState<ListRange>({
-    startIndex: startIndexFromStorage,
-    endIndex: startIndexFromStorage,
-  });
   const viewPath = useViewPath();
   const [activeRow, setActiveRow] = useState<ActiveRowState>({
     activeRowKey: "",
@@ -381,20 +353,7 @@ function Tree(): JSX.Element | null {
     rowFocusIntent?.nodeId,
     rowFocusIntent?.rowIndex,
     nodeKeys,
-    range.startIndex,
-    range.endIndex,
   ]);
-
-  const onStopScrolling = (isScrolling: boolean): void => {
-    // don't set the storage if the index is 0 since onStopStrolling is called on initial render
-    if (isScrolling || nodes.size <= 1 || range.startIndex === 0) {
-      return;
-    }
-    const indexFromStorage = Number(getLocalStorage(scrollableId)) || 0;
-    if (indexFromStorage !== range.startIndex) {
-      setLocalStorage(scrollableId, range.startIndex.toString());
-    }
-  };
 
   return (
     <VirtualRowsProvider value={virtualRows}>
@@ -403,13 +362,10 @@ function Tree(): JSX.Element | null {
         data-keyboard-mode={keyboardMode}
         data-total-rows={nodes.size}
       >
-        <VirtuosoForColumn
+        <PlainTreeRows
           nodes={nodes}
-          range={range}
-          setRange={setRange}
           startIndexFromStorage={startIndexFromStorage}
           viewPath={viewPath}
-          onStopScrolling={onStopScrolling}
           ariaLabel={ariaLabel}
           activeRowKey={activeRow.activeRowKey}
           onRowFocus={onRowFocus}

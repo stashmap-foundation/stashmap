@@ -1,4 +1,4 @@
-import { List, Map as ImmutableMap } from "immutable";
+import { List, Map as ImmutableMap, Set } from "immutable";
 import {
   getChildNodes,
   getNode,
@@ -10,11 +10,11 @@ import {
   getSemanticID,
   getNodeContext,
 } from "./connections";
-import { getTextForSemanticID } from "./semanticProjection";
 import {
   getBlockLinkText,
   getBlockFileLinkPath,
   isBlockFileLink,
+  nodeText,
 } from "./nodeSpans";
 import { Document, documentKeyOf } from "./Document";
 import { resolveLinkPath } from "./linkPath";
@@ -38,27 +38,9 @@ function argumentPrefix(argument?: Argument): string {
   return "";
 }
 
-function resolveNodeLabel(
-  knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey,
-  nodeId: ID
-): string {
-  return getTextForSemanticID(knowledgeDBs, nodeId, myself) || "Loading...";
-}
-
-function resolveContextLabels(
-  knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey,
-  context: List<ID>
-): string[] {
-  return context
-    .map((nodeId) => resolveNodeLabel(knowledgeDBs, myself, nodeId))
-    .toArray();
-}
-
 type ParsedRef = {
   node: GraphNode;
-  nodeContext: List<ID>;
+  contextNodes: List<GraphNode>;
   sourceItem?: GraphNode;
 };
 
@@ -87,6 +69,36 @@ function resolveFileLinkRoot(
     .find((node) => node.docId === targetDoc.docId && !node.parent);
 }
 
+function getConcreteContextNodes(
+  knowledgeDBs: KnowledgeDBs,
+  node: GraphNode
+): List<GraphNode> {
+  const loop = (
+    currentParentID: LongID | undefined,
+    visited: Set<string>,
+    nodes: List<GraphNode>
+  ): List<GraphNode> => {
+    if (!currentParentID) {
+      return nodes;
+    }
+    const parentKey = shortID(currentParentID);
+    if (visited.has(parentKey)) {
+      return nodes;
+    }
+    const parentNode = getNode(knowledgeDBs, currentParentID, node.author);
+    if (!parentNode) {
+      return nodes;
+    }
+    return loop(
+      parentNode.parent,
+      visited.add(parentKey),
+      nodes.unshift(parentNode)
+    );
+  };
+
+  return loop(node.parent, Set<string>([shortID(node.id)]), List<GraphNode>());
+}
+
 function parseRef(
   refId: LongID,
   knowledgeDBs: KnowledgeDBs,
@@ -109,26 +121,24 @@ function parseRef(
     return undefined;
   }
 
-  const nodeContext = getNodeContext(knowledgeDBs, node).map(
-    (id) => shortID(id) as ID
-  );
+  const contextNodes = getConcreteContextNodes(knowledgeDBs, node);
 
-  return { node, nodeContext, sourceItem: sourceItem || node };
+  return { node, contextNodes, sourceItem: sourceItem || node };
 }
 
 function resolveLabels(
   knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey,
   node: GraphNode,
-  nodeContext: List<ID>
+  contextNodes: List<GraphNode>
 ): { contextLabels: string[]; targetLabel: string; fullContext: List<ID> } {
-  const contextLabels = resolveContextLabels(knowledgeDBs, myself, nodeContext);
-  const targetLabel = resolveNodeLabel(
-    knowledgeDBs,
-    myself,
-    getSemanticID(knowledgeDBs, node)
+  const contextLabels = contextNodes.map((contextNode) =>
+    nodeText(contextNode)
   );
-  return { contextLabels, targetLabel, fullContext: nodeContext };
+  const targetLabel = nodeText(node);
+  const fullContext = contextNodes.map((contextNode) =>
+    getSemanticID(knowledgeDBs, contextNode)
+  );
+  return { contextLabels: contextLabels.toArray(), targetLabel, fullContext };
 }
 
 function nodesMatchForVersion(
@@ -187,9 +197,8 @@ export function buildOutgoingReference(
 
   const { contextLabels, targetLabel, fullContext } = resolveLabels(
     knowledgeDBs,
-    myself,
     ref.node,
-    ref.nodeContext
+    ref.contextNodes
   );
   const contextPath = contextLabels.join(" / ");
   const text = contextPath ? `${contextPath} / ${targetLabel}` : targetLabel;
@@ -369,11 +378,12 @@ export function buildReferenceItem(
     const parentItem = parentNode
       ? getNode(data.knowledgeDBs, refId, data.user.publicKey)
       : undefined;
-    return buildDeletedReference(
+    const deleted = buildDeletedReference(
       refId,
       data.user.publicKey,
       getBlockLinkText(parentItem)
     );
+    return deleted;
   }
 
   if (virtualType === "suggestion") {
@@ -384,8 +394,7 @@ export function buildReferenceItem(
       data.documents,
       data.documentByFilePath
     );
-    if (!outgoing) return undefined;
-    return { ...outgoing, text: outgoing.targetLabel };
+    return outgoing ? { ...outgoing, text: outgoing.targetLabel } : undefined;
   }
 
   if (virtualType === "incoming") {
@@ -396,7 +405,9 @@ export function buildReferenceItem(
       data.documents,
       data.documentByFilePath
     );
-    if (!outgoing) return undefined;
+    if (!outgoing) {
+      return undefined;
+    }
     const crefItem =
       virtualType === "incoming"
         ? findIncomingCrefItem(ref, data, viewPath, stack)
@@ -404,7 +415,7 @@ export function buildReferenceItem(
     const incomingRelevance = crefItem?.relevance ?? ref.sourceItem?.relevance;
     const incomingArgument = crefItem?.argument ?? ref.sourceItem?.argument;
     const text = referenceToText({
-      displayAs: "incoming",
+      displayAs: "incoming" as const,
       contextLabels: outgoing.contextLabels,
       targetLabel: outgoing.targetLabel,
       incomingRelevance,
@@ -413,7 +424,7 @@ export function buildReferenceItem(
     return {
       ...outgoing,
       text,
-      displayAs: "incoming",
+      displayAs: "incoming" as const,
       incomingRelevance,
       incomingArgument,
     };
@@ -427,7 +438,9 @@ export function buildReferenceItem(
       data.documents,
       data.documentByFilePath
     );
-    if (!outgoing) return undefined;
+    if (!outgoing) {
+      return undefined;
+    }
     const isOtherUser = outgoing.author !== data.user.publicKey;
     const dateStr = new Date(versionMeta.updated).toLocaleString();
     const parts = [
@@ -447,10 +460,14 @@ export function buildReferenceItem(
     data.documents,
     data.documentByFilePath
   );
-  if (!outgoing || !ref) return outgoing;
+  if (!outgoing || !ref) {
+    return outgoing;
+  }
 
   const parentPath = getParentView(viewPath);
-  if (!parentPath) return outgoing;
+  if (!parentPath) {
+    return outgoing;
+  }
 
   const parentNode = getNodeForView(data, parentPath, stack);
   if (
@@ -464,7 +481,9 @@ export function buildReferenceItem(
       versionMeta: computedVersionMeta,
     };
   }
-  if (!parentNode) return outgoing;
+  if (!parentNode) {
+    return outgoing;
+  }
 
   const storedItem = getNode(data.knowledgeDBs, refId, data.user.publicKey);
   const isNotRelevant = storedItem?.relevance === "not_relevant";
@@ -483,7 +502,7 @@ export function buildReferenceItem(
   const hasActiveIncoming =
     !!incomingCref && incomingCref.relevance !== "not_relevant";
 
-  const displayAs = (() => {
+  const displayAs: ReferenceRow["displayAs"] = (() => {
     if (!hasActiveIncoming) return undefined;
     return isNotRelevant ? "incoming" : "bidirectional";
   })();

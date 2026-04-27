@@ -27,7 +27,6 @@ import userEvent from "@testing-library/user-event";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { sha256 } from "@noble/hashes/sha256";
 import { schnorr } from "@noble/curves/secp256k1";
-import { VirtuosoMockContext } from "react-virtuoso";
 import { KIND_CONTACTLIST } from "./nostr";
 import { createPlan, planUpsertContact, planRemoveContact } from "./planner";
 import { execute } from "./infra/nostr/executor";
@@ -67,6 +66,11 @@ import {
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 test.skip("skip", () => {});
+
+const TestListViewportContext = React.createContext({
+  viewportHeight: 10000,
+  itemHeight: 100,
+});
 
 export const ALICE_PRIVATE_KEY =
   "04d22f1cf58c28647c7b7dc198dcbc4de860948933e56001ab9fc17e1b8d072e";
@@ -353,11 +357,11 @@ export function renderApis(
             <UserRelayContextProvider>
               <DataProviderComponent>
                 <PaneIndexProvider index={0}>
-                  <VirtuosoMockContext.Provider
+                  <TestListViewportContext.Provider
                     value={{ viewportHeight: 10000, itemHeight: 100 }}
                   >
                     {children}
-                  </VirtuosoMockContext.Provider>
+                  </TestListViewportContext.Provider>
                 </PaneIndexProvider>
               </DataProviderComponent>
             </UserRelayContextProvider>

@@ -274,11 +274,7 @@ function EditableContent(): JSX.Element {
     });
   };
 
-  const handleSave = (
-    text: string,
-    _imageUrl?: string,
-    submitted?: boolean
-  ): void => {
+  const handleSave = (text: string, submitted?: boolean): void => {
     const { plan: basePlan, viewPath: updatedViewPath } =
       planSaveNodeAndEnsureNodes(createPlan(), text, viewPath, stack);
     const planWithEscFocus = escapeFocusPendingRef.current

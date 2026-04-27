@@ -3,15 +3,6 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MiniEditor } from "./AddNode";
 
-// Mock getImageUrlFromText to avoid async image loading in tests
-jest.mock("./AddNode", () => {
-  const actual = jest.requireActual("./AddNode");
-  return {
-    ...actual,
-    getImageUrlFromText: jest.fn().mockResolvedValue(undefined),
-  };
-});
-
 describe("MiniEditor", () => {
   describe("save deduplication", () => {
     test("multiple blur events with same text only call onSave once", async () => {
@@ -31,11 +22,8 @@ describe("MiniEditor", () => {
       fireEvent.blur(editor, { relatedTarget: document.body });
       fireEvent.blur(editor, { relatedTarget: document.body });
 
-      // Wait for async operations
-      await waitFor(() => {
-        expect(onSave).toHaveBeenCalledTimes(1);
-      });
-      expect(onSave).toHaveBeenCalledWith("Changed", undefined);
+      expect(onSave).toHaveBeenCalledTimes(1);
+      expect(onSave).toHaveBeenCalledWith("Changed");
     });
 
     test("blur with unchanged text does not call onSave", async () => {
@@ -66,10 +54,8 @@ describe("MiniEditor", () => {
       // Press Escape
       await userEvent.keyboard("{Escape}");
 
-      await waitFor(() => {
-        expect(onSave).toHaveBeenCalledTimes(1);
-      });
-      expect(onSave).toHaveBeenCalledWith("Changed", undefined);
+      expect(onSave).toHaveBeenCalledTimes(1);
+      expect(onSave).toHaveBeenCalledWith("Changed");
     });
 
     test("Enter key calls onSave with submitted flag", async () => {
@@ -85,10 +71,8 @@ describe("MiniEditor", () => {
       // Press Enter
       await userEvent.keyboard("{Enter}");
 
-      await waitFor(() => {
-        expect(onSave).toHaveBeenCalledTimes(1);
-      });
-      expect(onSave).toHaveBeenCalledWith("Changed", undefined, true);
+      expect(onSave).toHaveBeenCalledTimes(1);
+      expect(onSave).toHaveBeenCalledWith("Changed", true);
     });
 
     test("Enter followed by blur does not duplicate save", async () => {
@@ -161,10 +145,8 @@ describe("MiniEditor", () => {
       await userEvent.type(editor, "Changed Again");
       fireEvent.blur(editor, { relatedTarget: document.body });
 
-      await waitFor(() => {
-        expect(onSave).toHaveBeenCalledTimes(2);
-      });
-      expect(onSave).toHaveBeenLastCalledWith("Changed Again", undefined);
+      expect(onSave).toHaveBeenCalledTimes(2);
+      expect(onSave).toHaveBeenLastCalledWith("Changed Again");
     });
 
     test("same text typed after prop update does not trigger save", async () => {

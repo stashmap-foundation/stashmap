@@ -4,7 +4,7 @@ import { ConnectDropTarget, DropTargetMonitor, useDrop } from "react-dnd";
 import { NativeTypes } from "react-dnd-html5-backend";
 import { dnd, getDropDestinationFromTreeView } from "../dnd";
 import { isEmptySemanticID } from "../connections";
-import { deselectAllChildren, useTemporaryView } from "./TemporaryViewContext";
+import { useTemporaryView } from "./TemporaryViewContext";
 import {
   Plan,
   planSetTemporarySelectionState,
@@ -15,7 +15,6 @@ import {
   ViewPath,
   buildPaneTarget,
   getRowIDFromView,
-  getParentKey,
   useViewPath,
   viewPathToString,
 } from "../ViewContext";
@@ -487,14 +486,14 @@ export function useDroppable({
         targetDepth,
         dragItem.isCopyDrag
       );
-      const parentKey = getParentKey(viewPathToString(dragItem.path));
       executePlan(
         planSetTemporarySelectionState(dropped, {
-          baseSelection: deselectAllChildren(selection, parentKey),
+          baseSelection: OrderedSet<string>(),
           shiftSelection: OrderedSet<string>(),
           anchor,
         })
       );
+      (document.activeElement as HTMLElement | null)?.blur();
       return dragItem;
     },
   });

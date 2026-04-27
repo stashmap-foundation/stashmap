@@ -3,10 +3,12 @@ export function formatRootHeading(
   rootUuid: string,
   basedOn?: LongID,
   snapshotDTag?: string,
-  anchor?: RootAnchor
+  anchor?: RootAnchor,
+  nodeKind?: NodeKind
 ): string {
   const parts = [
     `id:${rootUuid}`,
+    ...(nodeKind ? [`nodeKind="${nodeKind}"`] : []),
     ...(basedOn ? [`basedOn="${basedOn}"`] : []),
     ...(snapshotDTag ? [`snapshot="${snapshotDTag}"`] : []),
     ...(anchor?.snapshotContext.size
@@ -35,10 +37,12 @@ export function formatNodeAttrs(
     hidden?: boolean;
     basedOn?: LongID;
     userPublicKey?: PublicKey;
+    nodeKind?: NodeKind;
   }
 ): string {
   const parts: string[] = [
     ...(uuid ? [`id:${uuid}`] : []),
+    ...(options?.nodeKind ? [`nodeKind="${options.nodeKind}"`] : []),
     ...(options?.userPublicKey
       ? [`userPublicKey="${options.userPublicKey}"`]
       : []),

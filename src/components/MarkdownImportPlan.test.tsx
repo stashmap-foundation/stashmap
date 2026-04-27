@@ -32,6 +32,20 @@ function flattenTexts(nodes: MarkdownTreeNode[]): string[] {
   }, []);
 }
 
+function findTreeNodeByText(
+  nodes: MarkdownTreeNode[],
+  text: string
+): MarkdownTreeNode | undefined {
+  return nodes.reduce<MarkdownTreeNode | undefined>((found, node) => {
+    return (
+      found ||
+      (spansText(node.spans) === text
+        ? node
+        : findTreeNodeByText(node.children, text))
+    );
+  }, undefined);
+}
+
 function nodeChildren(
   knowledgeDBs: KnowledgeDBs,
   node: GraphNode | undefined,
@@ -211,6 +225,31 @@ test("Parser strips leading list markers and keeps nesting", () => {
 
   const allTexts = flattenTexts(trees);
   expect(allTexts.every((text) => !/^[-+*]|\d+\./u.test(text))).toBe(true);
+});
+
+test("Parser reads explicit node kinds from id comments", () => {
+  const trees = parseMarkdownHierarchy(`
+# Praxis <!-- id:topic-praxis nodeKind="topic" -->
+- Rahim Taghizadegan <!-- id:person-rahim nodeKind="person" -->
+  - Seminar 40 <!-- id:source-seminar-40 nodeKind="source" -->
+    - Proof of work limits cheap identity claims. <!-- id:statement-pow nodeKind="statement" -->
+    - Review transcript gate <!-- id:task-transcript nodeKind="task" -->
+- Unknown kind <!-- id:unknown-kind nodeKind="collection" -->
+`);
+
+  expect(findTreeNodeByText(trees, "Praxis")?.nodeKind).toBe("topic");
+  expect(findTreeNodeByText(trees, "Rahim Taghizadegan")?.nodeKind).toBe(
+    "person"
+  );
+  expect(findTreeNodeByText(trees, "Seminar 40")?.nodeKind).toBe("source");
+  expect(
+    findTreeNodeByText(trees, "Proof of work limits cheap identity claims.")
+      ?.nodeKind
+  ).toBe("statement");
+  expect(findTreeNodeByText(trees, "Review transcript gate")?.nodeKind).toBe(
+    "task"
+  );
+  expect(findTreeNodeByText(trees, "Unknown kind")?.nodeKind).toBeUndefined();
 });
 
 test("Parser turns hard-wrapped list item breaks into spaces", () => {

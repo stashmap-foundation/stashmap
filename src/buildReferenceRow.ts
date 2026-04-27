@@ -13,6 +13,7 @@ import {
 import {
   getBlockLinkText,
   getBlockFileLinkPath,
+  getBlockFileLinkText,
   isBlockFileLink,
   nodeText,
 } from "./nodeSpans";
@@ -107,16 +108,23 @@ function parseRef(
   documentByFilePath?: ImmutableMap<string, Document>
 ): ParsedRef | undefined {
   const sourceItem = getNode(knowledgeDBs, refId, myself);
-  const fileLinkTarget =
-    sourceItem && isBlockFileLink(sourceItem) && documents && documentByFilePath
-      ? resolveFileLinkRoot(
-          sourceItem,
-          knowledgeDBs,
-          documents,
-          documentByFilePath
-        )
-      : undefined;
-  const node = fileLinkTarget ?? resolveNode(knowledgeDBs, sourceItem);
+  if (
+    sourceItem &&
+    isBlockFileLink(sourceItem) &&
+    documents &&
+    documentByFilePath
+  ) {
+    const fileLinkTarget = resolveFileLinkRoot(
+      sourceItem,
+      knowledgeDBs,
+      documents,
+      documentByFilePath
+    );
+    if (!fileLinkTarget) return undefined;
+    const contextNodes = getConcreteContextNodes(knowledgeDBs, fileLinkTarget);
+    return { node: fileLinkTarget, contextNodes, sourceItem };
+  }
+  const node = resolveNode(knowledgeDBs, sourceItem);
   if (!node) {
     return undefined;
   }
@@ -193,7 +201,14 @@ export function buildOutgoingReference(
     documents,
     documentByFilePath
   );
-  if (!ref) return buildDeletedReference(refId, myself);
+  if (!ref) {
+    const sourceItem = getNode(knowledgeDBs, refId, myself);
+    return buildDeletedReference(
+      refId,
+      myself,
+      getBlockLinkText(sourceItem) ?? getBlockFileLinkText(sourceItem)
+    );
+  }
 
   const { contextLabels, targetLabel, fullContext } = resolveLabels(
     knowledgeDBs,
@@ -381,7 +396,7 @@ export function buildReferenceItem(
     const deleted = buildDeletedReference(
       refId,
       data.user.publicKey,
-      getBlockLinkText(parentItem)
+      getBlockLinkText(parentItem) ?? getBlockFileLinkText(parentItem)
     );
     return deleted;
   }

@@ -142,6 +142,22 @@ B
   `);
 });
 
+test("Deleted file link target renders as deleted reference", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "a.md", "# A\n\n- [Open B](./b.md)\n");
+  write(workspacePath, "b.md", "# B\n\n- B-child\n");
+
+  await knowstrSave(workspacePath);
+  fs.unlinkSync(path.join(workspacePath, "b.md"));
+  await knowstrSave(workspacePath);
+  await renderAppTree({ path: workspacePath, search: "A" });
+
+  await expectTree(`
+A
+  [D] (deleted) Open B
+  `);
+});
+
 test("Mixed node-links and file-links all render", async () => {
   const { path: workspacePath } = knowstrInit();
   write(

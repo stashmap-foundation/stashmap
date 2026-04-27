@@ -276,6 +276,42 @@ test("save preserves ordered lists", async () => {
   expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
+test("save round-trips explicit node kind comments", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "ebibliothek.md",
+    `
+# Praxis <!-- id:topic-praxis nodeKind="topic" -->
+- Rahim Taghizadegan <!-- id:person-rahim nodeKind="person" -->
+  - Seminar 40 <!-- id:source-seminar-40 nodeKind="source" -->
+    - Proof of work limits cheap identity claims. <!-- id:statement-pow nodeKind="statement" -->
+    - Review transcript gate <!-- id:task-transcript nodeKind="task" -->
+`
+  );
+
+  await knowstrSave(workspaceDir);
+
+  const raw = fs.readFileSync(
+    path.join(workspaceDir, "ebibliothek.md"),
+    "utf8"
+  );
+  expect(raw).toContain('# Praxis <!-- id:topic-praxis nodeKind="topic" -->');
+  expect(raw).toContain(
+    '- Rahim Taghizadegan <!-- id:person-rahim nodeKind="person" -->'
+  );
+  expect(raw).toContain(
+    '  - Seminar 40 <!-- id:source-seminar-40 nodeKind="source" -->'
+  );
+  expect(raw).toContain(
+    '    - Proof of work limits cheap identity claims. <!-- id:statement-pow nodeKind="statement" -->'
+  );
+  expect(raw).toContain(
+    '    - Review transcript gate <!-- id:task-transcript nodeKind="task" -->'
+  );
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
+});
+
 test("save preserves mixed structure with ordered items and nested bullets", async () => {
   const { path: workspaceDir } = knowstrInit();
   write(

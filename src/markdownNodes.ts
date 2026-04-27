@@ -66,6 +66,7 @@ function materializeTreeNode(
     userPublicKey: treeNode.userPublicKey,
     snapshotDTag: parent ? undefined : treeNode.snapshotDTag,
     ...(treeNode.blockKind !== undefined && { blockKind: treeNode.blockKind }),
+    ...(treeNode.nodeKind !== undefined && { nodeKind: treeNode.nodeKind }),
     ...(treeNode.headingLevel !== undefined && {
       headingLevel: treeNode.headingLevel,
     }),

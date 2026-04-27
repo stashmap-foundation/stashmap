@@ -1,5 +1,17 @@
 # Lessons Learned
 
+## Use `person` for semantic people nodes, not `author`
+
+**Date**: 2026-04-27
+**Context**: While adding a small hidden `nodeKind` foundation, I initially named the people-like node kind `author`.
+
+**Mistake**: In Knowstr, `author` is already a technical Nostr/document authorship field. In the eBibliothek context the semantic entity is broader: authors, speakers, teachers, and other people all belong under `person`.
+
+**Rule**:
+1. Use `person` for semantic human/person nodes.
+2. Reserve `author` for existing technical authorship/public-key ownership fields.
+3. Before naming a new metadata value, check the surrounding product vocabulary and existing field names.
+
 ## Stop when the stated goal is met; don't extrapolate from offhand architectural comments
 
 **Date**: 2026-04-22

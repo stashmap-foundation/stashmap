@@ -29,8 +29,10 @@ suggestionSettings.maxSuggestions = 3;
 /* eslint-enable functional/immutable-data */
 
 afterEach(() => {
-  if (typeof localStorage !== "undefined") {
-    localStorage.clear();
+  const storage =
+    typeof window !== "undefined" ? window.localStorage : global.localStorage;
+  if (storage && typeof storage.clear === "function") {
+    storage.clear();
   }
   if (typeof window !== "undefined") {
     window.history.pushState({}, "", "/");

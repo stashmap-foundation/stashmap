@@ -212,6 +212,8 @@ declare global {
   // Argument types (evidence) for node children
   type Argument = "confirms" | "contra" | undefined;
 
+  type NodeKind = "topic" | "person" | "source" | "statement" | "task";
+
   // Each item in a node has relevance and optional argument
   type VirtualType = "suggestion" | "search" | "incoming" | "version";
 
@@ -254,6 +256,7 @@ declare global {
     root: ID;
     relevance: Relevance;
     argument?: Argument;
+    nodeKind?: NodeKind;
     virtualType?: VirtualType;
     versionMeta?: VersionMeta;
     blockKind?: "heading" | "list_item" | "paragraph";

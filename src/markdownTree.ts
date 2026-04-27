@@ -6,6 +6,7 @@ import markdownItFrontMatter from "markdown-it-front-matter";
 import Token from "markdown-it/lib/token";
 import { fileLinkSpan, linkSpan, plainSpans, spansText } from "./nodeSpans";
 import { isMarkdownPath } from "./linkPath";
+import { parseNodeKind } from "./nodeKind";
 
 const markdown = new MarkdownIt({ html: true });
 markdown.use(markdownItFrontMatter, () => undefined);
@@ -35,6 +36,7 @@ type ParsedComment = {
   anchor: RootAnchor | undefined;
   systemRole: RootSystemRole | undefined;
   userPublicKey: PublicKey | undefined;
+  nodeKind: NodeKind | undefined;
 };
 
 function parseIdComment(content: string): ParsedComment | undefined {
@@ -64,6 +66,7 @@ function parseIdComment(content: string): ParsedComment | undefined {
   const userPublicKey = (attrsMap.userPublicKey || undefined) as
     | PublicKey
     | undefined;
+  const nodeKind = parseNodeKind(attrsMap.nodeKind);
 
   const anchor =
     anchorContext ||
@@ -98,6 +101,7 @@ function parseIdComment(content: string): ParsedComment | undefined {
     anchor,
     systemRole: undefined,
     userPublicKey,
+    nodeKind,
   };
 }
 
@@ -275,6 +279,7 @@ export type MarkdownTreeNode = {
   anchor?: RootAnchor;
   systemRole?: RootSystemRole;
   userPublicKey?: PublicKey;
+  nodeKind?: NodeKind;
 };
 
 function appendNode(
@@ -376,6 +381,9 @@ export function parseMarkdownHierarchy(
         ...(commentAttrs?.userPublicKey !== undefined && {
           userPublicKey: commentAttrs.userPublicKey,
         }),
+        ...(commentAttrs?.nodeKind !== undefined && {
+          nodeKind: commentAttrs.nodeKind,
+        }),
       };
       appendNode(roots, parent, node);
       headingStack.push({ level: headingLevel, node });
@@ -441,6 +449,9 @@ export function parseMarkdownHierarchy(
           ...(commentAttrs?.userPublicKey !== undefined && {
             userPublicKey: commentAttrs.userPublicKey,
           }),
+          ...(commentAttrs?.nodeKind !== undefined && {
+            nodeKind: commentAttrs.nodeKind,
+          }),
         };
         appendNode(roots, parent, node);
         listItemStack[currentItemIndex] = node;
@@ -462,6 +473,9 @@ export function parseMarkdownHierarchy(
         }),
         ...(commentAttrs?.userPublicKey !== undefined && {
           userPublicKey: commentAttrs.userPublicKey,
+        }),
+        ...(commentAttrs?.nodeKind !== undefined && {
+          nodeKind: commentAttrs.nodeKind,
         }),
       });
       continue;
@@ -489,6 +503,9 @@ export function parseMarkdownHierarchy(
       }),
       ...(commentAttrs?.userPublicKey !== undefined && {
         userPublicKey: commentAttrs.userPublicKey,
+      }),
+      ...(commentAttrs?.nodeKind !== undefined && {
+        nodeKind: commentAttrs.nodeKind,
       }),
     };
     appendNode(

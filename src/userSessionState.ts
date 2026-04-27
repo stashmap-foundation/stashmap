@@ -92,7 +92,7 @@ function saveViewsToStorage(publicKey: PublicKey, views: Views): void {
   }
 }
 
-function getInitialPanes(publicKey: PublicKey): Pane[] {
+function getUrlPanes(publicKey: PublicKey): Pane[] | undefined {
   const nodeID = parseNodeRouteUrl(window.location.pathname);
   if (nodeID) {
     const nodeAuthor = splitID(nodeID)[0] || publicKey;
@@ -110,6 +110,14 @@ function getInitialPanes(publicKey: PublicKey): Pane[] {
     const urlAuthor =
       parseAuthorFromSearch(window.location.search) || publicKey;
     return [{ id: generatePaneId(), stack: urlStack, author: urlAuthor }];
+  }
+  return undefined;
+}
+
+function getInitialPanes(publicKey: PublicKey): Pane[] {
+  const urlPanes = getUrlPanes(publicKey);
+  if (urlPanes) {
+    return urlPanes;
   }
   const historyState = window.history.state as {
     panes?: Pane[];
@@ -150,14 +158,20 @@ export function useUserSessionState(user: User): UserSessionState {
     temporaryEvents: List(),
   });
 
+  const initialUrlRouteRef = useRef(getUrlPanes(myPublicKey) !== undefined);
   const initialPublicKeyRef = useRef(myPublicKey);
   useEffect(() => {
     if (myPublicKey === initialPublicKeyRef.current) {
       return;
     }
+    const urlPanes = initialUrlRouteRef.current
+      ? getUrlPanes(myPublicKey)
+      : undefined;
     const savedPanes = loadPanesFromStorage(myPublicKey);
     const savedViews = loadViewsFromStorage(myPublicKey);
-    if (savedPanes) {
+    if (urlPanes) {
+      setPanes(urlPanes);
+    } else if (savedPanes) {
       setPanes(savedPanes);
     } else {
       setPanes((current) =>

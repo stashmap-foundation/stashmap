@@ -450,7 +450,6 @@ function resolveFileLinkRootByDocs(
     .find((node) => node.docId === targetDoc.docId && !node.parent);
 }
 
-
 export function getRefLinkTargetInfo(
   refId: ID,
   knowledgeDBs: KnowledgeDBs,

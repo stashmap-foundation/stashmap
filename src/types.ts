@@ -142,6 +142,7 @@ declare global {
     author: PublicKey;
     rootNodeId?: ID;
     searchQuery?: string;
+    searchResultIDs?: ID[];
     typeFilters?: (
       | Relevance
       | "suggestions"

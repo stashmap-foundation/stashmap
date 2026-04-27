@@ -22,12 +22,13 @@ import { useData } from "../DataContext";
 import { isUserLoggedIn, useLogout } from "../NostrAuthContext";
 import { useDragAutoScroll } from "../useDragAutoScroll";
 import { IS_MOBILE } from "./responsive";
+import { getLocalSearchResultIDs } from "../localSearch";
 
 export function PaneSearchButton(): JSX.Element {
   const { setPane } = useSplitPanes();
   const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
-  const { user } = useData();
+  const { user, knowledgeDBs } = useData();
   const [showInput, setShowInput] = useState(false);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -40,12 +41,18 @@ export function PaneSearchButton(): JSX.Element {
 
   const handleSubmit = (): void => {
     if (query.trim()) {
-      const searchId = createSearchId(query.trim());
+      const trimmedQuery = query.trim();
+      const searchId = createSearchId(trimmedQuery);
+      const searchResultIDs = getLocalSearchResultIDs(
+        knowledgeDBs,
+        trimmedQuery
+      ).toArray();
       setPane({
         ...pane,
         stack: [searchId],
         author: user.publicKey,
         rootNodeId: undefined,
+        searchResultIDs,
       });
       setShowInput(false);
       setQuery("");

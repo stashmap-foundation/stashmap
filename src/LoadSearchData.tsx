@@ -4,22 +4,13 @@ import {
   isSearchId,
   parseSearchId,
   getSearchNodes,
-  buildTextNodesFromGraphNodes,
   shortID,
 } from "./connections";
-import type { TextSeed } from "./connections";
 import { MergeKnowledgeDB, useData } from "./DataContext";
 import { deduplicateRefsByContext, findRefsToNode } from "./semanticProjection";
-import { useReadRelays } from "./relays";
-import { useSearchQuery, filterForKeyword } from "./components/SearchModal";
 import { useCurrentPane } from "./SplitPanesContext";
 import { newDB } from "./knowledge";
-
-function getAllNodesFromDBs(knowledgeDBs: KnowledgeDBs): Map<string, TextSeed> {
-  return buildTextNodesFromGraphNodes(
-    knowledgeDBs.valueSeq().flatMap((db) => db.nodes.valueSeq())
-  ) as Map<string, TextSeed>;
-}
+import { getLocalSearchResultIDs } from "./localSearch";
 
 function SearchCrefBuilder({
   children,
@@ -82,12 +73,8 @@ export function LoadSearchData({
   children: React.ReactNode;
   itemIDs: ID[];
 }): JSX.Element {
-  const { relaysInfos, knowledgeDBs } = useData();
-  const relays = useReadRelays({ user: true, contacts: true });
-
-  const nip50Relays = relays.filter((r) => {
-    return relaysInfos.get(r.url)?.supported_nips?.includes(50);
-  });
+  const { knowledgeDBs } = useData();
+  const pane = useCurrentPane();
 
   const searchEntries = itemIDs
     .filter((id) => isSearchId(id as ID))
@@ -97,22 +84,15 @@ export function LoadSearchData({
   const firstSearch = searchEntries[0];
   const query = firstSearch?.query || "";
 
-  const [searchResults] = useSearchQuery(query, nip50Relays, true);
-  const [slowSearchResults] = useSearchQuery(query, relays, false);
-
-  const localNodes = getAllNodesFromDBs(knowledgeDBs);
-  const localSearchResults = filterForKeyword(localNodes, query);
-
-  const allSearchResults = localSearchResults.merge(
-    slowSearchResults.merge(searchResults)
-  );
-
   if (!firstSearch) {
     return <>{children}</>;
   }
 
   const searchId = firstSearch.id as ID;
-  const foundSemanticIDs = List(allSearchResults.keySeq().toArray() as ID[]);
+  const foundSemanticIDs =
+    pane.stack[0] === searchId && pane.searchResultIDs
+      ? List(pane.searchResultIDs)
+      : getLocalSearchResultIDs(knowledgeDBs, query);
 
   return (
     <SearchCrefBuilder searchId={searchId} foundSemanticIDs={foundSemanticIDs}>

@@ -140,6 +140,7 @@ export function paneToJSON(pane: Pane): Serializable {
     s: pane.stack,
     a: pane.author,
     r: pane.rootNodeId,
+    q: pane.searchResultIDs,
     t: pane.typeFilters,
   };
 }
@@ -154,6 +155,10 @@ function jsonToPane(s: Serializable): Pane | undefined {
     stack: asArray(obj.s).map((id) => asString(id) as ID),
     author: asString(obj.a) as PublicKey,
     rootNodeId: obj.r !== undefined ? (asString(obj.r) as LongID) : undefined,
+    searchResultIDs:
+      obj.q !== undefined
+        ? asArray(obj.q).map((id) => asString(id) as ID)
+        : undefined,
     typeFilters:
       obj.t !== undefined
         ? (asArray(obj.t).map((f) => asString(f)) as Pane["typeFilters"])

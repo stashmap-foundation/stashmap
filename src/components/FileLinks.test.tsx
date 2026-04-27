@@ -106,7 +106,9 @@ test("DnD copy of a file-link bullet between panes preserves resolution to origi
   await navigateToNodeViaSearch(0, "A");
 
   await userEvent.click(
-    (await screen.findAllByLabelText("open in split pane"))[0]
+    (
+      await screen.findAllByLabelText("open in split pane")
+    )[0]
   );
   await navigateToNodeViaSearch(1, "C");
 

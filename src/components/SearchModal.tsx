@@ -1,13 +1,5 @@
 import { Map } from "immutable";
-import { useEventQuery } from "../commons/useNostrQuery";
-import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../nostr";
-import { useData } from "../DataContext";
-import { useBackend } from "../BackendContext";
-import { KIND_SEARCH } from "../infra/nostr/NostrDataProvider";
-import { findDocumentNodes } from "../documentMaterialization";
-import { buildTextNodesFromGraphNodes } from "../connections";
 import type { TextSeed } from "../connections";
-import { useReadRelays } from "../relays";
 
 function isMatch(input: string, test: string): boolean {
   const searchStr = input.toLowerCase().replace(/\n/g, "");
@@ -26,67 +18,4 @@ export function filterForKeyword(
           return isMatch(filter, node.text);
         })
         .slice(0, 25);
-}
-
-export function useSearchQuery(
-  query: string,
-  relays: Relays,
-  nip50: boolean
-): [Map<string, TextSeed>, boolean] {
-  const backend = useBackend();
-  const { contacts, user } = useData();
-  const authors = contacts.keySeq().toSet().add(user.publicKey).toArray();
-  const enabled = query !== "" && relays.length > 0;
-
-  const basicFilter = {
-    authors,
-    kinds: KIND_SEARCH,
-    limit: 3000,
-  };
-
-  const filter = nip50
-    ? {
-        ...basicFilter,
-        search: query,
-      }
-    : basicFilter;
-
-  const searchFilters = [
-    filter,
-    {
-      authors,
-      kinds: [KIND_DELETE],
-      "#k": [`${KIND_KNOWLEDGE_DOCUMENT}`],
-    },
-  ];
-
-  const { events: preFilteredEvents, eose } = useEventQuery(
-    backend,
-    searchFilters,
-    {
-      enabled,
-      readFromRelays: useReadRelays({
-        user: true,
-        contacts: true,
-      }),
-      discardOld: true,
-    }
-  );
-
-  const events = nip50
-    ? preFilteredEvents
-    : preFilteredEvents.filter(
-        (event) => event.kind === KIND_DELETE || isMatch(query, event.content)
-      );
-
-  const eventsAsList = events.toList();
-  const documentNodes = findDocumentNodes(eventsAsList).valueSeq();
-  const textNodes = buildTextNodesFromGraphNodes(documentNodes);
-  const nodesFromKnowledgeEvents = nip50
-    ? textNodes.slice(0, 25)
-    : filterForKeyword(textNodes, query);
-
-  const isQueryFinished = eose;
-  const isEose = isQueryFinished || relays.length === 0;
-  return [nodesFromKnowledgeEvents, isEose];
 }

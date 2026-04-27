@@ -5,6 +5,7 @@ import { hexToBytes } from "@noble/hashes/utils";
 import { loadCliProfile } from "../cli/config";
 import { createWorkspaceProfile } from "../cli/init";
 import {
+  buildWorkspaceDocumentContent,
   loadWorkspaceAsDocuments,
   saveDocumentsToWorkspace,
 } from "../core/workspaceBackend";
@@ -153,7 +154,9 @@ export function mockWorkspaceIpc(
       documents.forEach((doc) => {
         if (doc.filePath !== undefined) {
           state.pendingEchoes.set(doc.filePath, {
-            hash: hashContent(doc.content),
+            hash: hashContent(
+              buildWorkspaceDocumentContent(doc.content, doc.docId)
+            ),
             expiresAt,
           });
         }

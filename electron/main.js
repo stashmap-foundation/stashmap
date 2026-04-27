@@ -12,6 +12,7 @@ const path = require("path");
 const { loadCliProfile } = require("../dist/cli/config");
 // eslint-disable-next-line import/no-unresolved
 const {
+  buildWorkspaceDocumentContent,
   loadWorkspaceAsDocuments,
   saveDocumentsToWorkspace,
 } = require("../dist/core/workspaceBackend");
@@ -92,7 +93,9 @@ function recordSaveEchoes(documents, deletedPaths) {
   documents.forEach((doc) => {
     if (doc.filePath !== undefined) {
       watcherState.pendingEchoes.set(doc.filePath, {
-        hash: hashContent(doc.content),
+        hash: hashContent(
+          buildWorkspaceDocumentContent(doc.content, doc.docId)
+        ),
         expiresAt,
       });
     }

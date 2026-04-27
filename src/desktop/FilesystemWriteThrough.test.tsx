@@ -1,5 +1,5 @@
 import fs from "fs";
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   expectMarkdown,
@@ -10,6 +10,16 @@ import {
 } from "../testFixtures/workspace";
 import { renderAppTree } from "../appTestUtils.test";
 import { expectTree, findNewNodeEditor, type } from "../utils.test";
+
+async function expectKnowstrDocIdFrontmatter(
+  workspacePath: string,
+  relativePath: string
+): Promise<void> {
+  await waitFor(() => {
+    const content = fs.readFileSync(`${workspacePath}/${relativePath}`, "utf8");
+    expect(content).toMatch(/^---\n[\s\S]*knowstr_doc_id:/u);
+  });
+}
 
 test("typing in the editor writes markdown files to the workspace", async () => {
   const { path } = await renderAppTree();
@@ -91,8 +101,7 @@ test("creating a new document via the app persists knowstr_doc_id frontmatter to
   await findNewNodeEditor();
   await type("My Notes{Enter}{Tab}Spain{Escape}");
 
-  const content = fs.readFileSync(`${path}/my-notes.md`, "utf8");
-  expect(content).toMatch(/^---\n[\s\S]*knowstr_doc_id:/u);
+  await expectKnowstrDocIdFrontmatter(path, "my-notes.md");
 });
 
 test("adding a sibling to holidays.md persists frontmatter", async () => {
@@ -116,8 +125,7 @@ Holiday Destinations
   Spain
 `);
 
-  const content = fs.readFileSync(`${path}/holidays.md`, "utf8");
-  expect(content).toMatch(/^---\n[\s\S]*knowstr_doc_id:/u);
+  await expectKnowstrDocIdFrontmatter(path, "holidays.md");
 });
 
 test("editing a hand-written file persists knowstr_doc_id frontmatter to disk", async () => {
@@ -139,8 +147,7 @@ Notes
   beta
 `);
 
-  const content = fs.readFileSync(`${path}/notes.md`, "utf8");
-  expect(content).toMatch(/^---\n[\s\S]*knowstr_doc_id:/u);
+  await expectKnowstrDocIdFrontmatter(path, "notes.md");
 });
 
 test("opening a workspace does not write to any file on disk", async () => {

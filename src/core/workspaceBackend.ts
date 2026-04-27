@@ -22,7 +22,10 @@ export async function loadWorkspaceAsDocuments(
   });
 }
 
-function withEnsuredFrontMatter(content: string, docId: string): string {
+export function buildWorkspaceDocumentContent(
+  content: string,
+  docId: string
+): string {
   const stripped = content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/u, "");
   const { frontMatter } = ensureKnowstrDocIdFrontMatter(
     `---\nknowstr_doc_id: ${docId}\n---`
@@ -45,7 +48,7 @@ export async function saveDocumentsToWorkspace(
       await fs.mkdir(path.dirname(absolute), { recursive: true });
       await fs.writeFile(
         absolute,
-        withEnsuredFrontMatter(doc.content, doc.docId),
+        buildWorkspaceDocumentContent(doc.content, doc.docId),
         "utf8"
       );
       return absolute;

@@ -9,6 +9,7 @@ import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../../nostr";
 import { eventToDocument, eventToDocumentDelete } from "../../nostrEvents";
 import { Document, DocumentDelete, documentKeyOf } from "../../Document";
 import { extractImportedFrontMatter } from "../../markdownFrontMatter";
+import { LOG_ROOT_FILE } from "../../systemRoots";
 
 function extractRootTitle(content: string): string | undefined {
   const { body } = extractImportedFrontMatter(content);
@@ -62,11 +63,13 @@ function enrichWithFilePath(
   if (!base) return undefined;
   const existing = lookupFilePath(documents, base.author, base.docId);
   const filePath =
-    existing ??
-    uniqueSlugPath(
-      slugify(extractRootTitle(event.content) ?? base.docId),
-      taken
-    );
+    base.systemRole === "log"
+      ? LOG_ROOT_FILE
+      : existing ??
+        uniqueSlugPath(
+          slugify(extractRootTitle(event.content) ?? base.docId),
+          taken
+        );
   // eslint-disable-next-line functional/immutable-data
   taken.add(filePath);
   return { ...base, filePath };

@@ -74,11 +74,13 @@ export function eventToDocument(
   if (event.kind !== KIND_KNOWLEDGE_DOCUMENT) return undefined;
   const docId = findTag(event, "d");
   if (!docId) return undefined;
+  const systemRole = findTag(event, "s");
   return {
     author: event.pubkey as PublicKey,
     docId,
     updatedMs: getEventMs(event),
     content: event.content,
+    ...(systemRole === "log" ? { systemRole: "log" as RootSystemRole } : {}),
   };
 }
 

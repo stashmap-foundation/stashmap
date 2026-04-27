@@ -34,7 +34,7 @@ function createLogDocumentEvent({
       ["ms", `${createdAt * 1000}`],
       ["s", LOG_ROOT_ROLE],
     ],
-    content: `# ~Log <!-- id:${rootUuid} systemRole="${LOG_ROOT_ROLE}" -->\n${body}`,
+    content: `# ~Log <!-- id:${rootUuid} -->\n${body}`,
   };
 }
 

@@ -206,6 +206,35 @@ Holiday Destinations
   );
 });
 
+test("a manually-created log.md does not collide with the auto-created Log root", async () => {
+  const { path } = knowstrInit();
+  write(path, "log.md", "# My Log\n- alpha\n");
+
+  await renderAppTree({ path });
+  await screen.findByLabelText("Navigate to Log");
+  await findNewNodeEditor();
+
+  await type("Holiday Destinations{Escape}");
+
+  await expectTree(`
+Holiday Destinations
+`);
+
+  const files = ls(path);
+  expect(files).toContain("log.md");
+  expect(files).toContain("holiday-destinations.md");
+  expect(files).not.toContain("log-2.md");
+  expect(files).not.toContain("~log.md");
+
+  await userEvent.click(await screen.findByLabelText("Navigate to Log"));
+
+  await expectTree(`
+My Log
+  [R] Holiday Destinations
+  alpha
+`);
+});
+
 test("paragraph siblings are preserved on round-trip", async () => {
   const { path } = knowstrInit();
   write(

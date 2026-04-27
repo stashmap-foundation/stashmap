@@ -228,8 +228,7 @@ export function renderDocumentMarkdown(
     rootUuid,
     rootNode.basedOn,
     options?.snapshotDTag ?? rootNode.snapshotDTag,
-    rootNode.anchor ?? createRootAnchor(getNodeContext(knowledgeDBs, rootNode)),
-    rootNode.systemRole
+    rootNode.anchor ?? createRootAnchor(getNodeContext(knowledgeDBs, rootNode))
   );
   return formatWithFrontMatter(
     `${addBlankLinesAroundHeadings([rootLine, ...serialized.lines]).join(

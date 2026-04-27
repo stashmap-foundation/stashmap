@@ -187,8 +187,9 @@ export function parseDocumentContent(params: {
   author: PublicKey;
   docId?: string;
   updatedMs?: number;
+  systemRole?: RootSystemRole;
 }): Map<string, GraphNode> {
-  const { content, author, docId, updatedMs } = params;
+  const { content, author, docId, updatedMs, systemRole } = params;
   const { body, frontMatter } = extractImportedFrontMatter(content);
   const trees = dropLeadingYamlEchoRoots(
     parseMarkdownHierarchy(body),
@@ -199,6 +200,7 @@ export function parseDocumentContent(params: {
           ...tree,
           ...(frontMatter && { frontMatter }),
           ...(docId && { docId }),
+          ...(systemRole && { systemRole }),
         }
       : tree
   );
@@ -217,10 +219,12 @@ export function parseDocumentEvent(
   event: UnsignedEvent,
   options: { docId?: string } = {}
 ): Map<string, GraphNode> {
+  const sTag = findTag(event, "s");
   return parseDocumentContent({
     content: event.content,
     author: event.pubkey as PublicKey,
     docId: options.docId,
     updatedMs: Number(findTag(event, "ms")) || event.created_at * 1000,
+    ...(sTag === "log" ? { systemRole: "log" as RootSystemRole } : {}),
   });
 }

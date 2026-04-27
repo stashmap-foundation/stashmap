@@ -3,8 +3,7 @@ export function formatRootHeading(
   rootUuid: string,
   basedOn?: LongID,
   snapshotDTag?: string,
-  anchor?: RootAnchor,
-  systemRole?: RootSystemRole
+  anchor?: RootAnchor
 ): string {
   const parts = [
     `id:${rootUuid}`,
@@ -26,7 +25,6 @@ export function formatRootHeading(
     ...(anchor?.sourceParentNodeID
       ? [`sourceParent="${anchor.sourceParentNodeID}"`]
       : []),
-    ...(systemRole ? [`systemRole="${systemRole}"`] : []),
   ];
   return `# ${rootText} <!-- ${parts.join(" ")} -->`;
 }

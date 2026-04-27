@@ -1,4 +1,5 @@
 export const LOG_ROOT_ROLE: RootSystemRole = "log";
+export const LOG_ROOT_FILE = "log.md";
 const LOG_ROOT_TEXT = "~Log";
 
 export function isStandaloneRoot(node: GraphNode): boolean {

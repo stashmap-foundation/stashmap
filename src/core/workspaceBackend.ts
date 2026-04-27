@@ -2,19 +2,24 @@ import path from "path";
 import fs from "fs/promises";
 import { scanWorkspaceDocuments, WorkspaceSaveProfile } from "./workspaceSave";
 import type { Document } from "../DocumentStore";
+import { systemRoleFromFilePath } from "../Document";
 import { ensureKnowstrDocIdFrontMatter } from "../knowstrFrontmatter";
 
 export async function loadWorkspaceAsDocuments(
   profile: WorkspaceSaveProfile
 ): Promise<ReadonlyArray<Document>> {
   const scanned = await scanWorkspaceDocuments(profile);
-  return scanned.map((doc) => ({
-    author: profile.pubkey,
-    docId: doc.docId,
-    updatedMs: Date.now(),
-    content: doc.currentContent,
-    filePath: doc.relativePath,
-  }));
+  return scanned.map((doc) => {
+    const systemRole = systemRoleFromFilePath(doc.relativePath);
+    return {
+      author: profile.pubkey,
+      docId: doc.docId,
+      updatedMs: Date.now(),
+      content: doc.currentContent,
+      filePath: doc.relativePath,
+      ...(systemRole !== undefined && { systemRole }),
+    };
+  });
 }
 
 function withEnsuredFrontMatter(content: string, docId: string): string {

@@ -78,6 +78,7 @@ function parseDocumentNodes(doc: Document): ImmutableMap<string, GraphNode> {
     author: doc.author,
     docId: doc.docId,
     updatedMs: doc.updatedMs,
+    ...(doc.systemRole !== undefined && { systemRole: doc.systemRole }),
   });
 }
 

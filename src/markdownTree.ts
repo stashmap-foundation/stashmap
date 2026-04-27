@@ -4,7 +4,6 @@ import MarkdownIt from "markdown-it";
 import markdownItFrontMatter from "markdown-it-front-matter";
 // eslint-disable-next-line import/no-unresolved
 import Token from "markdown-it/lib/token";
-import { LOG_ROOT_ROLE } from "./systemRoots";
 import { fileLinkSpan, linkSpan, plainSpans, spansText } from "./nodeSpans";
 import { isMarkdownPath } from "./linkPath";
 
@@ -62,9 +61,6 @@ function parseIdComment(content: string): ParsedComment | undefined {
   const sourceParentNodeID = (attrsMap.sourceParent || undefined) as
     | LongID
     | undefined;
-  const rawSystemRole = attrsMap.systemRole || undefined;
-  const systemRole =
-    rawSystemRole === LOG_ROOT_ROLE ? LOG_ROOT_ROLE : undefined;
   const userPublicKey = (attrsMap.userPublicKey || undefined) as
     | PublicKey
     | undefined;
@@ -100,7 +96,7 @@ function parseIdComment(content: string): ParsedComment | undefined {
     basedOn,
     snapshotDTag,
     anchor,
-    systemRole,
+    systemRole: undefined,
     userPublicKey,
   };
 }

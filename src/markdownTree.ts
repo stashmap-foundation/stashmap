@@ -450,8 +450,19 @@ export function parseMarkdownHierarchy(
         spans,
         children: [],
         blockKind: "paragraph",
+        ...(commentAttrs?.uuid !== undefined && { uuid: commentAttrs.uuid }),
         ...(relevance !== undefined && { relevance }),
         ...(argument !== undefined && { argument }),
+        ...(commentAttrs?.hidden && { hidden: true }),
+        ...(commentAttrs?.basedOn !== undefined && {
+          basedOn: commentAttrs.basedOn,
+        }),
+        ...(commentAttrs?.snapshotDTag !== undefined && {
+          snapshotDTag: commentAttrs.snapshotDTag,
+        }),
+        ...(commentAttrs?.userPublicKey !== undefined && {
+          userPublicKey: commentAttrs.userPublicKey,
+        }),
       });
       continue;
     }
@@ -460,6 +471,25 @@ export function parseMarkdownHierarchy(
       spans,
       children: [],
       blockKind: "paragraph",
+      ...(commentAttrs?.uuid !== undefined && { uuid: commentAttrs.uuid }),
+      ...(relevance !== undefined && { relevance }),
+      ...(argument !== undefined && { argument }),
+      ...(commentAttrs?.hidden && { hidden: true }),
+      ...(commentAttrs?.basedOn !== undefined && {
+        basedOn: commentAttrs.basedOn,
+      }),
+      ...(commentAttrs?.snapshotDTag !== undefined && {
+        snapshotDTag: commentAttrs.snapshotDTag,
+      }),
+      ...(commentAttrs?.anchor !== undefined && {
+        anchor: commentAttrs.anchor,
+      }),
+      ...(commentAttrs?.systemRole !== undefined && {
+        systemRole: commentAttrs.systemRole,
+      }),
+      ...(commentAttrs?.userPublicKey !== undefined && {
+        userPublicKey: commentAttrs.userPublicKey,
+      }),
     };
     appendNode(
       roots,

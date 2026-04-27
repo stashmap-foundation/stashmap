@@ -297,3 +297,54 @@ A standalone paragraph. <!-- id:... -->
 `
   );
 });
+
+test("paragraph prefix marks render in the gutter and can be updated", async () => {
+  const { path } = knowstrInit();
+  write(
+    path,
+    "doc.md",
+    `
+# Root
+
+(?-) marked paragraph
+
+plain paragraph
+`
+  );
+
+  await renderAppTree({ path, search: "Root" });
+
+  await expectTree(
+    `
+Root
+  {?-} marked paragraph
+  plain paragraph
+`,
+    { showGutter: true }
+  );
+
+  await userEvent.click(
+    await screen.findByLabelText("set plain paragraph to relevant")
+  );
+
+  await expectTree(
+    `
+Root
+  {?-} marked paragraph
+  {!} plain paragraph
+`,
+    { showGutter: true }
+  );
+
+  await expectMarkdown(
+    path,
+    "doc.md",
+    `
+# Root <!-- id:... -->
+
+(-?) marked paragraph <!-- id:... -->
+
+(!) plain paragraph <!-- id:... -->
+`
+  );
+});

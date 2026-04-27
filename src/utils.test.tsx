@@ -601,17 +601,24 @@ function getItemPrefix(innerNode: Element | null, isRef: boolean): string {
 
 function getGutter(row: Element): string | undefined {
   /* eslint-disable testing-library/no-node-access */
-  const selector = row.querySelector(".relevance-selector");
+  const relevanceSelector = row.querySelector(".relevance-selector");
+  const evidenceSelector = row.querySelector(".evidence-selector");
   /* eslint-enable testing-library/no-node-access */
-  const title = selector?.getAttribute("title");
-  if (!title) return undefined;
+  const relevanceTitle = relevanceSelector?.getAttribute("title");
   const gutterMap: Record<string, string> = {
     Relevant: "!",
     "Maybe Relevant": "?",
     "Little Relevant": "~",
     "Not Relevant": "x",
   };
-  return gutterMap[title];
+  const evidenceMap: Record<string, string> = {
+    Confirms: "+",
+    Contradicts: "-",
+  };
+  const relevance = relevanceTitle ? gutterMap[relevanceTitle] : undefined;
+  const evidenceTitle = evidenceSelector?.getAttribute("title");
+  const evidence = evidenceTitle ? evidenceMap[evidenceTitle] : undefined;
+  return `${relevance ?? ""}${evidence ?? ""}` || undefined;
 }
 
 function classifyRow(row: Element): RowInfo | null {

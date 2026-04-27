@@ -469,6 +469,29 @@ test("parseMarkdownHierarchy still parses single prefix markers", () => {
   ]);
 });
 
+test("parseMarkdownHierarchy parses prefix markers on paragraph blocks", () => {
+  const trees = parseMarkdownHierarchy(
+    "# Root\n\n(-!) paragraph contra relevant\n\n(+) paragraph confirms\n"
+  );
+  expect(trees).toEqual([
+    expect.objectContaining({
+      children: [
+        expect.objectContaining({
+          spans: plainSpans("paragraph contra relevant"),
+          blockKind: "paragraph",
+          argument: "contra",
+          relevance: "relevant",
+        }),
+        expect.objectContaining({
+          spans: plainSpans("paragraph confirms"),
+          blockKind: "paragraph",
+          argument: "confirms",
+        }),
+      ],
+    }),
+  ]);
+});
+
 test("parseTextToTrees falls back to indentation parser", () => {
   const indentTrees = parseTextToTrees("Root\n\tChild\n\t\tGrandchild");
   expect(indentTrees).toEqual([

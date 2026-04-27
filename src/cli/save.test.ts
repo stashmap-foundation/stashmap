@@ -498,6 +498,35 @@ test("save round-trips combined prefix markers like (-!) and (-~)", async () => 
   expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
+test("save preserves prefix markers on paragraphs", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "paragraph-markers.md",
+    `
+# Project
+
+(-!) paragraph contra relevant
+
+(+) paragraph confirms
+`
+  );
+
+  await knowstrSave(workspaceDir);
+  await expectMarkdown(
+    workspaceDir,
+    "paragraph-markers.md",
+    `
+# Project <!-- id:... -->
+
+(-!) paragraph contra relevant <!-- id:... -->
+
+(+) paragraph confirms <!-- id:... -->
+`
+  );
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
+});
+
 test("save preserves bold and italic emphasis", async () => {
   const { path: workspaceDir } = knowstrInit();
   write(

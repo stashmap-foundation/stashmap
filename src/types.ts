@@ -293,6 +293,7 @@ declare global {
 
   type SemanticIndex = {
     nodeByID: globalThis.Map<LongID, GraphNode>;
+    semantic: globalThis.Map<string, globalThis.Set<LongID>>;
     incomingCrefs: globalThis.Map<LongID, globalThis.Set<LongID>>;
     incomingFileLinks: globalThis.Map<string, globalThis.Set<LongID>>;
     basedOnIndex: globalThis.Map<LongID, globalThis.Set<LongID>>;

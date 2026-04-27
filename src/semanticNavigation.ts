@@ -1,17 +1,70 @@
-/* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let */
-import { getChildNodes, getNode, getSemanticID, shortID } from "./connections";
+/* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data */
+import { newDB } from "./knowledge";
+import {
+  getIndexedNodesForKeys,
+  getChildNodes,
+  getSemanticID,
+  getNode,
+  shortID,
+} from "./connections";
+import { isStandaloneRoot } from "./systemRoots";
 
-function nodeMatchesRequestedID(node: GraphNode, requestedID: ID): boolean {
-  return shortID(node.id) === shortID(requestedID);
+function nodeMatchesRequestedSemanticID(
+  knowledgeDBs: KnowledgeDBs,
+  node: GraphNode,
+  requestedSemanticID: ID
+): boolean {
+  return (
+    shortID(getSemanticID(knowledgeDBs, node)) === shortID(requestedSemanticID)
+  );
+}
+
+function getAuthorCandidateNodes(
+  knowledgeDBs: KnowledgeDBs,
+  author: PublicKey,
+  semanticID: ID
+): GraphNode[] {
+  const authorDB = knowledgeDBs.get(author, newDB());
+  return getIndexedNodesForKeys(knowledgeDBs, authorDB, [shortID(semanticID)]);
+}
+
+function getNewestStandaloneRootBySemanticID(
+  knowledgeDBs: KnowledgeDBs,
+  author: PublicKey,
+  semanticID: ID
+): GraphNode | undefined {
+  return getAuthorCandidateNodes(knowledgeDBs, author, semanticID)
+    .filter((node) => node.author === author && isStandaloneRoot(node))
+    .sort((left, right) => right.updated - left.updated)
+    .find((node) =>
+      nodeMatchesRequestedSemanticID(knowledgeDBs, node, semanticID)
+    );
+}
+
+function getStandaloneRootByRootID(
+  knowledgeDBs: KnowledgeDBs,
+  author: PublicKey,
+  root: ID
+): GraphNode | undefined {
+  return knowledgeDBs
+    .get(author, newDB())
+    .nodes.valueSeq()
+    .filter(
+      (node) =>
+        node.author === author && node.root === root && isStandaloneRoot(node)
+    )
+    .sort((left, right) => right.updated - left.updated)
+    .first();
 }
 
 function getMatchingChildNode(
   knowledgeDBs: KnowledgeDBs,
   parentNode: GraphNode,
-  requestedID: ID
+  requestedSemanticID: ID
 ): GraphNode | undefined {
   return getChildNodes(knowledgeDBs, parentNode, parentNode.author).find(
-    (node): node is GraphNode => nodeMatchesRequestedID(node, requestedID)
+    (node): node is GraphNode =>
+      nodeMatchesRequestedSemanticID(knowledgeDBs, node, requestedSemanticID)
   );
 }
 
@@ -23,40 +76,68 @@ function resolveRequestedStackFromRoot(
   if (requestedStack.length === 0) {
     return { actualStack: [] };
   }
-  if (!nodeMatchesRequestedID(rootNode, requestedStack[0] as ID)) {
+  if (
+    !nodeMatchesRequestedSemanticID(
+      knowledgeDBs,
+      rootNode,
+      requestedStack[0] as ID
+    )
+  ) {
     return undefined;
   }
 
-  return requestedStack.slice(1).reduce<ResolvedStack | undefined>(
-    (acc, requestedID) => {
-      if (!acc?.node) {
-        return undefined;
-      }
-      const nextNode = getMatchingChildNode(
-        knowledgeDBs,
-        acc.node,
-        requestedID as ID
-      );
-      if (!nextNode) {
-        return undefined;
-      }
-      return {
-        actualStack: [
-          ...acc.actualStack,
-          getSemanticID(knowledgeDBs, nextNode),
-        ],
-        node: nextNode,
-      };
-    },
-    {
-      actualStack: [getSemanticID(knowledgeDBs, rootNode)],
-      node: rootNode,
+  let currentNode: GraphNode | undefined = rootNode;
+  const actualStack: ID[] = [getSemanticID(knowledgeDBs, rootNode)];
+
+  for (let index = 1; index < requestedStack.length; index += 1) {
+    if (!currentNode) {
+      return undefined;
     }
-  );
+    const nextNode = getMatchingChildNode(
+      knowledgeDBs,
+      currentNode,
+      requestedStack[index] as ID
+    );
+    if (!nextNode) {
+      return undefined;
+    }
+    actualStack.push(getSemanticID(knowledgeDBs, nextNode));
+    currentNode = nextNode;
+  }
+
+  return { actualStack, node: currentNode };
 }
 
-function buildRequestedPath(context: Context, itemID: ID): ID[] {
-  return [...context.toArray(), itemID];
+function buildRequestedSemanticPath(
+  semanticContext: Context,
+  itemID: ID
+): ID[] {
+  return [...semanticContext.toArray(), shortID(itemID) as ID];
+}
+
+function resolveNodeFromKnownRoot(
+  knowledgeDBs: KnowledgeDBs,
+  paneAuthor: PublicKey,
+  semanticPath: ID[],
+  preferredRoot: ID
+): GraphNode | undefined {
+  const root = getStandaloneRootByRootID(
+    knowledgeDBs,
+    paneAuthor,
+    preferredRoot
+  );
+  return root
+    ? resolveRequestedStackFromRoot(knowledgeDBs, root, semanticPath)?.node
+    : undefined;
+}
+
+function resolveStandaloneNodeFromSemanticPath(
+  knowledgeDBs: KnowledgeDBs,
+  paneAuthor: PublicKey,
+  semanticPath: ID[]
+): GraphNode | undefined {
+  return resolveSemanticStackToActualIDs(knowledgeDBs, paneAuthor, semanticPath)
+    ?.node;
 }
 
 type ResolvedStack = {
@@ -73,19 +154,27 @@ export function resolveSemanticStackToActualIDs(
     return { actualStack: [] };
   }
 
-  const rootNode = getNode(knowledgeDBs, requestedStack[0] as ID, author);
-  if (!rootNode) {
+  const standaloneRoot = getNewestStandaloneRootBySemanticID(
+    knowledgeDBs,
+    author,
+    requestedStack[0] as ID
+  );
+  if (!standaloneRoot) {
     return undefined;
   }
 
-  return resolveRequestedStackFromRoot(knowledgeDBs, rootNode, requestedStack);
+  return resolveRequestedStackFromRoot(
+    knowledgeDBs,
+    standaloneRoot,
+    requestedStack
+  );
 }
 
 export function resolveSemanticNodeInCurrentTree(
   knowledgeDBs: KnowledgeDBs,
   paneAuthor: PublicKey,
   itemID: ID,
-  context: Context,
+  semanticContext: Context,
   rootNodeId: LongID | undefined,
   isRootNode: boolean,
   currentRoot?: ID
@@ -97,12 +186,7 @@ export function resolveSemanticNodeInCurrentTree(
     }
   }
 
-  const directNode = getNode(knowledgeDBs, itemID, paneAuthor);
-  if (directNode) {
-    return directNode;
-  }
-
-  const requestedPath = buildRequestedPath(context, itemID);
+  const semanticPath = buildRequestedSemanticPath(semanticContext, itemID);
   const preferredRoot =
     currentRoot ||
     (rootNodeId
@@ -110,19 +194,21 @@ export function resolveSemanticNodeInCurrentTree(
       : undefined);
 
   if (preferredRoot) {
-    const root = getNode(knowledgeDBs, preferredRoot, paneAuthor);
-    return root
-      ? resolveRequestedStackFromRoot(knowledgeDBs, root, requestedPath)?.node
-      : undefined;
+    return resolveNodeFromKnownRoot(
+      knowledgeDBs,
+      paneAuthor,
+      semanticPath,
+      preferredRoot
+    );
   }
 
   if (!isRootNode) {
     return undefined;
   }
 
-  return resolveSemanticStackToActualIDs(
+  return resolveStandaloneNodeFromSemanticPath(
     knowledgeDBs,
     paneAuthor,
-    requestedPath
-  )?.node;
+    semanticPath
+  );
 }

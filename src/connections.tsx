@@ -108,10 +108,37 @@ export function getNodeText(node: GraphNode | undefined): string | undefined {
   return isSearchId(nodeID) ? parseSearchId(nodeID) || "" : undefined;
 }
 
+type NodeLookupIndex = globalThis.Map<string, GraphNode[]>;
+
 const nodeContextCache = new WeakMap<
   KnowledgeData,
   globalThis.Map<string, Context>
 >();
+
+function getNodeLookupIndex(
+  knowledgeDBs: KnowledgeDBs,
+  db: KnowledgeData
+): NodeLookupIndex {
+  const index = new globalThis.Map<string, GraphNode[]>();
+  const addToIndex = (key: string, node: GraphNode): void => {
+    const existing = index.get(key);
+    if (existing) {
+      existing.push(node);
+      return;
+    }
+    index.set(key, [node]);
+  };
+
+  db.nodes.valueSeq().forEach((node) => {
+    addToIndex(getSemanticID(knowledgeDBs, node), node);
+  });
+
+  index.forEach((nodes) => {
+    nodes.sort((left, right) => right.updated - left.updated);
+  });
+
+  return index;
+}
 
 function getNodeContextIndex(
   db: KnowledgeData
@@ -125,12 +152,31 @@ function getNodeContextIndex(
   return index;
 }
 
+export function getIndexedNodesForKeys(
+  knowledgeDBs: KnowledgeDBs,
+  db: KnowledgeData,
+  keys: string[]
+): GraphNode[] {
+  const uniqueKeys = Array.from(new globalThis.Set(keys));
+  const seen = new globalThis.Set<string>();
+  return uniqueKeys.flatMap((key) =>
+    (getNodeLookupIndex(knowledgeDBs, db).get(key) || []).filter((node) => {
+      const nodeKey = shortID(node.id);
+      if (seen.has(nodeKey)) {
+        return false;
+      }
+      seen.add(nodeKey);
+      return true;
+    })
+  );
+}
+
 export function getNodeSemanticID(node: GraphNode): ID {
   const nodeID = shortID(node.id) as ID;
   if (isSearchId(nodeID)) {
     return nodeID;
   }
-  return node.id as ID;
+  return nodeText(node) as ID;
 }
 
 export function getSemanticID(knowledgeDBs: KnowledgeDBs, node: GraphNode): ID {

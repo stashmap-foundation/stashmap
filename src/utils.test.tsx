@@ -27,8 +27,7 @@ import userEvent from "@testing-library/user-event";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { sha256 } from "@noble/hashes/sha256";
 import { schnorr } from "@noble/curves/secp256k1";
-import { KIND_CONTACTLIST, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
-import { parseDocumentEvent } from "./markdownNodes";
+import { KIND_CONTACTLIST } from "./nostr";
 import { createPlan, planUpsertContact, planRemoveContact } from "./planner";
 import { execute } from "./infra/nostr/executor";
 import { ApiProvider, Apis, FinalizeEvent } from "./Apis";
@@ -58,7 +57,6 @@ import { findContacts } from "./contacts";
 import { UserRelayContextProvider } from "./UserRelayContext";
 import { StashmapDB } from "./infra/nostr/cache/indexedDB";
 import { createEmptySemanticIndex } from "./semanticIndex";
-import { nodeText } from "./nodeSpans";
 
 import {
   PaneIndexProvider,
@@ -397,83 +395,15 @@ export function readonlyRoute(author: string, ...segments: string[]): string {
   return `/n/${segments.map(encodeURIComponent).join("/")}?author=${author}`;
 }
 
-function nodeIdForTextPath(
-  state: TestAppState,
-  author: PublicKey,
-  segments: string[]
-): LongID {
-  const eventNodes = state.relayPool
-    .getEvents()
-    .filter((event) => event.kind === KIND_KNOWLEDGE_DOCUMENT)
-    .filter((event) => event.pubkey === author)
-    .reduce(
-      (acc, event) => acc.merge(parseDocumentEvent(event)),
-      Map<ID, GraphNode>()
-    );
-  const nodes = (
-    state.knowledgeDBs.get(author)?.nodes ?? Map<ID, GraphNode>()
-  ).merge(eventNodes);
-  const found = segments.reduce<GraphNode | undefined>((parent, text) => {
-    return nodes
-      ?.valueSeq()
-      .find(
-        (node) =>
-          nodeText(node) === text &&
-          (parent ? node.parent === parent.id : !node.parent)
-      );
-  }, undefined);
-
-  if (!found) {
-    throw new Error(`No test node found for ${segments.join("/")}`);
-  }
-  return found.id;
-}
-
-export function readonlyRouteForTextPath(
-  state: Partial<TestAppState>,
-  author: PublicKey,
-  ...segments: string[]
-): string {
-  return `/r/${encodeURIComponent(
-    nodeIdForTextPath(applyDefaults(state), author, segments)
-  )}`;
-}
-
-export function readonlyRouteForRenderedNode(label: string): string {
-  // eslint-disable-next-line testing-library/no-node-access
-  const node = Array.from(document.querySelectorAll("[data-node-id]")).find(
-    (candidate) =>
-      candidate.getAttribute("data-node-text") === label ||
-      candidate.getAttribute("aria-label") === label ||
-      candidate.textContent?.trim() === label
-  );
-  const nodeID = node?.getAttribute("data-node-id");
-  if (!nodeID) {
-    throw new Error(`No rendered node found for ${label}`);
-  }
-  return `/r/${encodeURIComponent(nodeID)}`;
-}
-
 export async function forkReadonlyRoot(
   viewer: RenderApis,
-  _author: string,
+  author: string,
   ...segments: string[]
 ): Promise<void> {
-  const initialRoute = (() => {
-    try {
-      return readonlyRouteForRenderedNode(segments[segments.length - 1]);
-    } catch {
-      return readonlyRouteForTextPath(
-        viewer,
-        _author as PublicKey,
-        ...segments
-      );
-    }
-  })();
   cleanup();
   renderApp({
     ...viewer,
-    initialRoute,
+    initialRoute: readonlyRoute(author, ...segments),
   });
   await screen.findByText("READONLY");
   const copyAction = await screen.findByLabelText(

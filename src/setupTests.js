@@ -1,6 +1,8 @@
 import { Buffer } from "buffer";
 import crypto from "crypto";
 import { TextEncoder, TextDecoder } from "util";
+// eslint-disable-next-line import/no-extraneous-dependencies
+import { cleanup } from "@testing-library/react";
 import { suggestionSettings } from "./core/constants";
 
 // Not a typescript file so disable typescript linting rules
@@ -29,6 +31,7 @@ suggestionSettings.maxSuggestions = 3;
 /* eslint-enable functional/immutable-data */
 
 afterEach(() => {
+  cleanup();
   if (typeof localStorage !== "undefined") {
     localStorage.clear();
   }

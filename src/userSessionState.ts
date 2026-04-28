@@ -143,6 +143,7 @@ export type UserSessionState = {
 
 export function useUserSessionState(user: User): UserSessionState {
   const myPublicKey = user.publicKey;
+  const isMountedRef = useRef(false);
   const [panes, setPanes] = useState<Pane[]>(() =>
     getInitialPanes(myPublicKey)
   );
@@ -160,6 +161,15 @@ export function useUserSessionState(user: User): UserSessionState {
 
   const initialUrlRouteRef = useRef(getUrlPanes(myPublicKey) !== undefined);
   const initialPublicKeyRef = useRef(myPublicKey);
+  useEffect(() => {
+    // eslint-disable-next-line functional/immutable-data
+    isMountedRef.current = true;
+    return () => {
+      // eslint-disable-next-line functional/immutable-data
+      isMountedRef.current = false;
+    };
+  }, []);
+
   useEffect(() => {
     if (myPublicKey === initialPublicKeyRef.current) {
       return;
@@ -187,10 +197,16 @@ export function useUserSessionState(user: User): UserSessionState {
   }, [myPublicKey]);
 
   useEffect(() => {
+    if (!isMountedRef.current) {
+      return;
+    }
     savePanesToStorage(myPublicKey, panes);
   }, [panes, myPublicKey]);
 
   useEffect(() => {
+    if (!isMountedRef.current) {
+      return;
+    }
     saveViewsToStorage(myPublicKey, views);
   }, [views, myPublicKey]);
 

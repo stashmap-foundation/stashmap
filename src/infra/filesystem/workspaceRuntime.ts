@@ -48,7 +48,10 @@ function logWorkspaceRuntimeDebug(
 
 export function createWorkspaceRuntime(workspaceDir: string): WorkspaceRuntime {
   const handlers = new Set<FsEventHandler>();
-  const pendingEchoes = new Map<string, { hash: string; expiresAt: number }>();
+  const pendingEchoes = new Map<
+    string,
+    ReadonlyArray<{ hash: string; expiresAt: number }>
+  >();
   const pendingUnlinkEchoes = new Map<string, number>();
   const state: { watcher: Promise<WorkspaceWatcher> | null } = {
     watcher: null,
@@ -65,12 +68,14 @@ export function createWorkspaceRuntime(workspaceDir: string): WorkspaceRuntime {
       return expiresAt !== undefined;
     }
 
-    const pending = pendingEchoes.get(event.relativePath);
-    if (pending && pending.expiresAt <= now) {
+    const pending = pendingEchoes.get(event.relativePath) ?? [];
+    const active = pending.filter((entry) => entry.expiresAt > now);
+    if (active.length === 0) {
       pendingEchoes.delete(event.relativePath);
       return false;
     }
-    return pending !== undefined && pending.hash === hashContent(event.content);
+    pendingEchoes.set(event.relativePath, active);
+    return active.some((entry) => entry.hash === hashContent(event.content));
   };
 
   const emit: FsEventHandler = (event) => {
@@ -104,12 +109,18 @@ export function createWorkspaceRuntime(workspaceDir: string): WorkspaceRuntime {
     const expiresAt = Date.now() + ECHO_TTL_MS;
     documents.forEach((doc) => {
       if (doc.filePath !== undefined) {
-        pendingEchoes.set(doc.filePath, {
-          hash: hashContent(
-            buildWorkspaceDocumentContent(doc.content, doc.docId)
-          ),
-          expiresAt,
-        });
+        const active = (pendingEchoes.get(doc.filePath) ?? []).filter(
+          (entry) => entry.expiresAt > Date.now()
+        );
+        pendingEchoes.set(doc.filePath, [
+          ...active,
+          {
+            hash: hashContent(
+              buildWorkspaceDocumentContent(doc.content, doc.docId)
+            ),
+            expiresAt,
+          },
+        ]);
       }
     });
     deletedPaths.forEach((relativePath) => {

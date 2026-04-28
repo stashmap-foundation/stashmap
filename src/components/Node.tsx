@@ -28,6 +28,9 @@ import {
   getRefLinkTargetInfo,
   getRefTargetInfo,
   getNodeText,
+  getNode,
+  getNodeContext,
+  getSemanticID,
   isEmptySemanticID,
   computeEmptyNodeMetadata,
   resolveNode,
@@ -177,9 +180,16 @@ function logNodeNotFoundDebug({
   const logKey = `${window.location.pathname}${window.location.search}|${viewKey}`;
   const count = (nodeNotFoundCounts.get(logKey) || 0) + 1;
   nodeNotFoundCounts.set(logKey, count);
-  if (count !== 5) {
-    return;
-  }
+  const dbs = data.knowledgeDBs
+    .entrySeq()
+    .map(([author, db]) => ({ author, nodeCount: db.nodes.size }))
+    .toArray();
+  const totalNodeCount = dbs.reduce((sum, db) => sum + db.nodeCount, 0);
+  const shouldLog =
+    (rowID !== "My Notes" && (count === 1 || count === 5)) ||
+    (totalNodeCount > 0 && count % 5 === 0) ||
+    count === 30 ||
+    count === 100;
   const matchingNodes = data.knowledgeDBs
     .entrySeq()
     .flatMap(([author, db]) =>
@@ -195,13 +205,29 @@ function logNodeNotFoundDebug({
         }))
     )
     .toArray();
-  const dbs = data.knowledgeDBs
-    .entrySeq()
-    .map(([author, db]) => ({ author, nodeCount: db.nodes.size }))
-    .toArray();
+  const userNode = getNode(data.knowledgeDBs, rowID, data.user.publicKey);
+  const paneNode = getNode(data.knowledgeDBs, rowID, pane?.author);
+  const rootNode = getNode(data.knowledgeDBs, pane?.rootNodeId, pane?.author);
+  const nodeSummary = (node: typeof userNode): Record<string, unknown> | null =>
+    node
+      ? {
+          id: node.id,
+          author: node.author,
+          root: node.root,
+          parent: node.parent,
+          text: getNodeText(node),
+          semanticID: getSemanticID(data.knowledgeDBs, node),
+          context: getNodeContext(data.knowledgeDBs, node).toArray(),
+          children: node.children.toArray(),
+        }
+      : null;
+  if (!shouldLog) {
+    return;
+  }
   const historyState = window.history.state as { panes?: unknown } | null;
   // eslint-disable-next-line no-console
   console.log("[node-not-found-debug]", {
+    count,
     location: window.location.pathname + window.location.search,
     historyPanes: historyState?.panes,
     viewPath,
@@ -211,7 +237,12 @@ function logNodeNotFoundDebug({
     displayText,
     pane,
     user: data.user.publicKey,
+    totalNodeCount,
     dbs,
+    documents: data.documents.size,
+    userNode: nodeSummary(userNode),
+    paneNode: nodeSummary(paneNode),
+    rootNode: nodeSummary(rootNode),
     matchingNodes,
   });
 }

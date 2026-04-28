@@ -20,7 +20,7 @@ import {
   removeOutboxEvent,
   OutboxEntry,
 } from "./infra/nostr/cache/indexedDB";
-import { PaneView } from "./components/Workspace";
+import { PaneView } from "./editor/Workspace";
 
 jest.mock("./infra/nostr/cache/indexedDB");
 

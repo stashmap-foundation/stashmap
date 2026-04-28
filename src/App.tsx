@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import Dashboard from "./components/Dashboard";
-import { RelaysWrapper } from "./components/Relays";
+import Dashboard from "./editor/Dashboard";
+import { RelaysWrapper } from "./editor/Relays";
 import { SignUp } from "./SignUp";
 import { SignInModal } from "./SignIn";
 

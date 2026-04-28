@@ -46,13 +46,13 @@ import { EMPTY_SEMANTIC_ID } from "./core/connections";
 import { RootViewContextProvider } from "./ViewContext";
 import { LoadSearchData } from "./LoadSearchData";
 import { StorePreLoginContext } from "./StorePreLoginContext";
-import { TemporaryViewProvider } from "./components/TemporaryViewContext";
-import { PaneView } from "./components/Workspace";
+import { TemporaryViewProvider } from "./editor/TemporaryViewContext";
+import { PaneView } from "./editor/Workspace";
 import { DND } from "./dnd";
 import {
   computeDepthLimits,
   setDropIndentDepth,
-} from "./components/DroppableContainer";
+} from "./editor/DroppableContainer";
 import { findContacts } from "./contacts";
 import { UserRelayContextProvider } from "./UserRelayContext";
 import { StashmapDB } from "./infra/nostr/cache/indexedDB";

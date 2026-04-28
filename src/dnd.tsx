@@ -22,7 +22,7 @@ import {
   viewPathToString,
   getCurrentEdgeForView,
 } from "./ViewContext";
-import { getNodesInTree } from "./components/Node";
+import { getNodesInTree } from "./editor/Node";
 import {
   Plan,
   planUpdateViews,

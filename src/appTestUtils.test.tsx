@@ -15,7 +15,7 @@ import {
   navigateToNodeViaSearch,
   renderWithTestData,
 } from "./utils.test";
-import { PaneView } from "./components/Workspace";
+import { PaneView } from "./editor/Workspace";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 test.skip("skip", () => {});

@@ -148,6 +148,25 @@
           }
         },
         {
+          "files": ["src/editor/**/*.{ts,tsx}"],
+          "excludedFiles": [
+            "src/editor/**/*.test.tsx",
+            "src/editor/**/*.test.ts",
+            "src/editor/Node.tsx",
+            "src/editor/RightMenu.tsx"
+          ],
+          "rules": {
+            "no-restricted-imports": [
+              "error",
+              {
+                "patterns": [
+                  { "group": ["**/infra/**"], "message": "src/editor must not depend on src/infra. Adapters are wired in at the app layer; editor takes nostr/IO concerns via context or props." }
+                ]
+              }
+            ]
+          }
+        },
+        {
           "files": ["*.test.tsx", "*.test.ts", "setupTests.js", "setupProxy.js", "**/testutils/*.tsx"],
           "rules": {
             "@typescript-eslint/no-unsafe-member-access": 0,

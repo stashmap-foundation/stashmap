@@ -8,6 +8,17 @@
 - Don't add any comments to the code, except when they are really necessary, which is very rare. Code should be self-explanatory. Don't add any comments where you tell me waht you are doing.
 - Don't use inline imports in type declarations (e.g., `import("./Foo").Bar`). Use regular top-level imports instead.
 
+## Layering: Core → Editor → Adapter / App
+
+The codebase is organized into layers. Each layer can depend on layers above it but never below:
+
+- **`src/core/`** — Pure graph + markdown + document model. No React, no nostr-tools, no electron, no fs, no infra. Enforced by ESLint.
+- **`src/editor/`** — Shared React editor (was `src/components/`). May import from core. Must NOT import from `src/infra/**`. Enforced by ESLint with two grandfathered exceptions (`Node.tsx`, `RightMenu.tsx` for read-time nostr identity helpers — to be decoupled later).
+- **`src/infra/filesystem/`**, **`src/infra/nostr/`** — Adapters. May import from core. Apps wire adapters into the editor at the boundary.
+- **App glue** — `src/index.tsx`, `src/App.tsx`, `src/Apis.tsx`, `BackendContext`, etc. Composes the others.
+
+When adding new files, place them in the appropriate layer. When adding a new feature, ask: is this graph data (core), UI presentation (editor), IO/protocol (infra), or composition (app)?
+
 ## Testing
 
 - In order to create test data, just use the keyboard. For example, Holiday Destinations{Enter}{Tab}Spain{Enter}France{Enter} will create a nice Tree with Holiday Destinations as root and Spain and France as children.

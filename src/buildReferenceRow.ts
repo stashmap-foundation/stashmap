@@ -27,7 +27,7 @@ import {
 } from "./ViewContext";
 import { getPane } from "./planner";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
-import { referenceToText } from "./components/referenceText";
+import { referenceToText } from "./editor/referenceText";
 
 function argumentPrefix(argument?: Argument): string {
   if (argument === "confirms") {

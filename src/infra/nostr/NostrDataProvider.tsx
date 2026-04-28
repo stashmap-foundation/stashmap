@@ -47,6 +47,7 @@ function useRelaysInfo(
     if (!eose) {
       return;
     }
+    const controller = new AbortController();
 
     (async () => {
       const fetchedInfos = await Promise.all(
@@ -61,8 +62,12 @@ function useRelaysInfo(
           }
         )
       );
+      if (controller.signal.aborted) {
+        return;
+      }
       setInfos(Map(fetchedInfos));
     })();
+    return () => controller.abort();
   }, [JSON.stringify(relays.map((r) => r.url)), eose]);
   return infos;
 }
@@ -83,7 +88,11 @@ export function NostrDataProvider({
 
   useEffect(() => {
     if (!db) return;
+    const controller = new AbortController();
     getOutboxEvents(db).then((outbox) => {
+      if (controller.signal.aborted) {
+        return;
+      }
       if (outbox.length > 0) {
         session.setPublishStatus((prev) => ({
           ...prev,
@@ -93,6 +102,7 @@ export function NostrDataProvider({
         }));
       }
     });
+    return () => controller.abort();
   }, [db]);
 
   const { events: mE, eose: metaEventsEose } = useEventQuery(
@@ -162,17 +172,6 @@ export function NostrDataProvider({
   const contactsRelays = processedContactRelayEvents.reduce((rdx, p, key) => {
     return rdx.set(key, p.relays);
   }, Map<PublicKey, Relays>());
-  const searchRelaysInfo = useRelaysInfo(
-    [
-      ...usePreloadRelays({
-        defaultRelays: false,
-        user: true,
-      }),
-      ...flattenRelays(contactsRelays),
-    ],
-    isRelaysLoaded
-  );
-
   return (
     <DataContextProvider
       contacts={contacts}
@@ -182,7 +181,7 @@ export function NostrDataProvider({
       semanticIndex={createEmptySemanticIndex()}
       documents={Map()}
       documentByFilePath={Map()}
-      relaysInfos={searchRelaysInfo}
+      relaysInfos={Map<string, RelayInformation | undefined>()}
       publishEventsStatus={session.publishStatus}
       snapshotNodes={Map()}
       views={session.views}

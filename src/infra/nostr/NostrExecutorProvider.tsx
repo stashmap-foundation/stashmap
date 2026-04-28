@@ -47,6 +47,16 @@ export function NostrExecutorProvider({
   // eslint-disable-next-line functional/immutable-data
   setPublishEventsRef.current = setPublishEvents;
 
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    // eslint-disable-next-line functional/immutable-data
+    mountedRef.current = true;
+    return () => {
+      // eslint-disable-next-line functional/immutable-data
+      mountedRef.current = false;
+    };
+  }, []);
+
   const queueRef = useRef<ReturnType<typeof createPublishQueue> | null>(null);
 
   useEffect(() => {
@@ -56,6 +66,7 @@ export function NostrExecutorProvider({
       db,
       getDeps: () => depsRef.current,
       onResults: (results) => {
+        if (!mountedRef.current) return;
         setPublishEventsRef.current((prevStatus) => ({
           ...prevStatus,
           results: mergePublishResultsOfEvents(prevStatus.results, results),
@@ -67,6 +78,7 @@ export function NostrExecutorProvider({
     // eslint-disable-next-line functional/immutable-data
     queueRef.current = queue;
     queue.init().then(() => {
+      if (!mountedRef.current) return;
       setPublishEventsRef.current((prev) => ({
         ...prev,
         queueStatus: queue.getStatus(),
@@ -133,6 +145,9 @@ export function NostrExecutorProvider({
       finalizeEvent,
     });
 
+    if (!mountedRef.current) {
+      return;
+    }
     setPublishEvents((prevStatus) => {
       return {
         ...prevStatus,
@@ -151,6 +166,9 @@ export function NostrExecutorProvider({
       backend,
       writeRelayUrl: relayUrl,
     });
+    if (!mountedRef.current) {
+      return;
+    }
     setPublishEvents((prevStatus) => {
       return {
         ...prevStatus,

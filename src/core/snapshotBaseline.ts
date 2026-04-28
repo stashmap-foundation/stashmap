@@ -1,5 +1,5 @@
 import { List, Map as ImmutableMap } from "immutable";
-import { getChildNodes, getNode } from "../core/connections";
+import { getChildNodes, getNode } from "./connections";
 
 export type VersionDiff = {
   readonly node: GraphNode;

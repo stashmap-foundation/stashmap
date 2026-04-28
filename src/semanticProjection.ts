@@ -19,7 +19,7 @@ import { getBlockLinkTarget, nodeText } from "./core/nodeSpans";
 import { fileLinkIndexKey } from "./core/linkPath";
 import { suggestionSettings } from "./core/constants";
 import { LOG_ROOT_ROLE } from "./core/systemRoots";
-import { computeVersionDiff } from "./domain/snapshotBaseline";
+import { computeVersionDiff } from "./core/snapshotBaseline";
 
 type FooterTypeFilters = (
   | Relevance

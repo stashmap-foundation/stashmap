@@ -19,6 +19,7 @@ export type WorkspaceIpc = {
     documents: ReadonlyArray<Document>,
     deletedPaths?: ReadonlyArray<string>
   ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
+  ready?: () => Promise<void>;
   subscribeFsEvents: (handler: FsEventHandler) => () => void;
 };
 
@@ -38,7 +39,10 @@ export function FilesystemBackendProvider({
 
   useEffect(() => {
     const controller = new AbortController();
-    ipc.load().then((data) => {
+    ipc.load().then(async (data) => {
+      if (data) {
+        await ipc.ready?.();
+      }
       if (!controller.signal.aborted) {
         setState({ status: "loaded", data });
       }

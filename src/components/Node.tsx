@@ -27,6 +27,7 @@ import { planBatchIndent, planBatchOutdent } from "./batchOperations";
 import {
   getRefLinkTargetInfo,
   getRefTargetInfo,
+  getNodeText,
   isEmptySemanticID,
   computeEmptyNodeMetadata,
   resolveNode,
@@ -151,6 +152,68 @@ function LoadingNode(): JSX.Element {
 
 function ErrorContent(): JSX.Element {
   return <span className="text-danger">Error: Node not found</span>;
+}
+
+const nodeNotFoundCounts = new Map<string, number>();
+
+function logNodeNotFoundDebug({
+  data,
+  viewPath,
+  stack,
+  rowID,
+  displayText,
+}: {
+  data: Data;
+  viewPath: ViewPath;
+  stack: ID[];
+  rowID: ID;
+  displayText: string;
+}): void {
+  if (process.env.DEBUG_NODE_NOT_FOUND !== "1") {
+    return;
+  }
+  const pane = data.panes[viewPath[0] as number];
+  const viewKey = viewPathToString(viewPath);
+  const logKey = `${window.location.pathname}${window.location.search}|${viewKey}`;
+  const count = (nodeNotFoundCounts.get(logKey) || 0) + 1;
+  nodeNotFoundCounts.set(logKey, count);
+  if (count !== 5) {
+    return;
+  }
+  const matchingNodes = data.knowledgeDBs
+    .entrySeq()
+    .flatMap(([author, db]) =>
+      db.nodes
+        .valueSeq()
+        .filter((node) => getNodeText(node) === displayText)
+        .map((node) => ({
+          author,
+          id: node.id,
+          root: node.root,
+          parent: node.parent,
+          text: getNodeText(node),
+        }))
+    )
+    .toArray();
+  const dbs = data.knowledgeDBs
+    .entrySeq()
+    .map(([author, db]) => ({ author, nodeCount: db.nodes.size }))
+    .toArray();
+  const historyState = window.history.state as { panes?: unknown } | null;
+  // eslint-disable-next-line no-console
+  console.log("[node-not-found-debug]", {
+    location: window.location.pathname + window.location.search,
+    historyPanes: historyState?.panes,
+    viewPath,
+    viewKey,
+    stack,
+    rowID,
+    displayText,
+    pane,
+    user: data.user.publicKey,
+    dbs,
+    matchingNodes,
+  });
 }
 
 function VersionContent({
@@ -544,6 +607,13 @@ function InteractiveNodeContent(): JSX.Element {
   }
 
   if (!currentNode && !reference && displayText === "") {
+    logNodeNotFoundDebug({
+      data,
+      viewPath,
+      stack,
+      rowID,
+      displayText,
+    });
     return <ErrorContent />;
   }
 

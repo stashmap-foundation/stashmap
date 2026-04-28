@@ -11,12 +11,6 @@ const path = require("path");
 // eslint-disable-next-line import/no-unresolved
 const { loadCliProfile } = require("../dist/cli/config");
 // eslint-disable-next-line import/no-unresolved
-const {
-  buildWorkspaceDocumentContent,
-  loadWorkspaceAsDocuments,
-  saveDocumentsToWorkspace,
-} = require("../dist/core/workspaceBackend");
-// eslint-disable-next-line import/no-unresolved
 const { createWorkspaceProfile } = require("../dist/cli/init");
 // eslint-disable-next-line import/no-unresolved
 const {
@@ -28,81 +22,42 @@ const {
 const { convertInputToPrivateKey } = require("../dist/nostrKey");
 const { hexToBytes } = require("@noble/hashes/utils");
 // eslint-disable-next-line import/no-unresolved
-const { watchWorkspace } = require("../dist/core/workspaceWatcher");
-const crypto = require("crypto");
+const {
+  createWorkspaceRuntime,
+} = require("../dist/infra/filesystem/workspaceRuntime");
 
-const ECHO_TTL_MS = 2000;
-
-function hashContent(content) {
-  return crypto.createHash("sha256").update(content).digest("hex");
-}
-
-const watcherState = {
-  watcher: null,
+const workspaceRuntimeState = {
+  runtime: null,
   workspaceDir: null,
-  pendingEchoes: new Map(),
-  pendingUnlinkEchoes: new Map(),
 };
 
-function isOwnEcho(event) {
-  const now = Date.now();
-  if (event.type === "unlink") {
-    const expiresAt = watcherState.pendingUnlinkEchoes.get(event.relativePath);
-    if (expiresAt && expiresAt > now) {
-      watcherState.pendingUnlinkEchoes.delete(event.relativePath);
-      return true;
-    }
-    return false;
-  }
-  const pending = watcherState.pendingEchoes.get(event.relativePath);
-  if (
-    pending &&
-    pending.expiresAt > now &&
-    pending.hash === hashContent(event.content)
-  ) {
-    watcherState.pendingEchoes.delete(event.relativePath);
-    return true;
-  }
-  return false;
-}
-
-function broadcastFsEvent(event) {
-  if (isOwnEcho(event)) return;
+function sendFsEventToWindows(event) {
   BrowserWindow.getAllWindows().forEach((win) => {
     win.webContents.send("workspace:fs-event", event);
   });
 }
 
-async function stopWatcher() {
-  if (!watcherState.watcher) return;
-  const pending = watcherState.watcher;
-  watcherState.watcher = null;
-  watcherState.workspaceDir = null;
-  const instance = await pending;
-  await instance.close();
+async function stopWorkspaceRuntime() {
+  if (!workspaceRuntimeState.runtime) return;
+  const runtime = workspaceRuntimeState.runtime;
+  workspaceRuntimeState.runtime = null;
+  workspaceRuntimeState.workspaceDir = null;
+  await runtime.dispose();
 }
 
-async function startWatcher(workspaceDir) {
-  await stopWatcher();
-  watcherState.workspaceDir = workspaceDir;
-  watcherState.watcher = watchWorkspace(workspaceDir, broadcastFsEvent);
-}
-
-function recordSaveEchoes(documents, deletedPaths) {
-  const expiresAt = Date.now() + ECHO_TTL_MS;
-  documents.forEach((doc) => {
-    if (doc.filePath !== undefined) {
-      watcherState.pendingEchoes.set(doc.filePath, {
-        hash: hashContent(
-          buildWorkspaceDocumentContent(doc.content, doc.docId)
-        ),
-        expiresAt,
-      });
-    }
-  });
-  (deletedPaths || []).forEach((relativePath) => {
-    watcherState.pendingUnlinkEchoes.set(relativePath, expiresAt);
-  });
+async function getWorkspaceRuntime(workspaceDir) {
+  if (
+    workspaceRuntimeState.runtime &&
+    workspaceRuntimeState.workspaceDir === workspaceDir
+  ) {
+    return workspaceRuntimeState.runtime;
+  }
+  await stopWorkspaceRuntime();
+  const runtime = createWorkspaceRuntime(workspaceDir);
+  runtime.subscribeFsEvents(sendFsEventToWindows);
+  workspaceRuntimeState.runtime = runtime;
+  workspaceRuntimeState.workspaceDir = workspaceDir;
+  return runtime;
 }
 
 const devServerUrl = process.env.ELECTRON_START_URL;
@@ -124,14 +79,10 @@ function envCliProfileArgs() {
 const recentWorkspaces = createRecentWorkspacesStore();
 
 async function loadProfileAndEvents(profile) {
-  const documents = await loadWorkspaceAsDocuments({
-    pubkey: profile.pubkey,
-    workspaceDir: profile.workspaceDir,
-  });
-  if (watcherState.workspaceDir !== profile.workspaceDir) {
-    await startWatcher(profile.workspaceDir);
-  }
-  return { profile, documents };
+  const runtime = await getWorkspaceRuntime(profile.workspaceDir);
+  const loaded = await runtime.load();
+  await runtime.ready();
+  return { profile: loaded.profile, documents: loaded.documents };
 }
 
 function isInitialisedFolder(folder) {
@@ -385,12 +336,8 @@ app.whenReady().then(() => {
     if (!profile) {
       throw new Error("workspace:save has no active workspace");
     }
-    recordSaveEchoes(documents, deletedPaths);
-    return saveDocumentsToWorkspace(
-      { pubkey: profile.pubkey, workspaceDir: profile.workspaceDir },
-      documents,
-      deletedPaths
-    );
+    const runtime = await getWorkspaceRuntime(profile.workspaceDir);
+    return runtime.save(documents, deletedPaths);
   });
 
   buildAndSetMenu();
@@ -410,5 +357,5 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
-  stopWatcher();
+  stopWorkspaceRuntime();
 });

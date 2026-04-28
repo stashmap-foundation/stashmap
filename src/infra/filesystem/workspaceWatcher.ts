@@ -11,6 +11,7 @@ export type FsEvent =
 export type FsEventHandler = (event: FsEvent) => void;
 
 export type WorkspaceWatcher = {
+  ready: Promise<void>;
   close: () => Promise<void>;
 };
 
@@ -25,6 +26,8 @@ export async function watchWorkspace(
   const watcher: FSWatcher = chokidar.watch(`${workspaceDir}/**/*.md`, {
     ignoreInitial: true,
     persistent: true,
+    usePolling: process.env.NODE_ENV === "test",
+    interval: 50,
     ignored: (absolutePath: string) => {
       const relative = toRelative(absolutePath);
       if (relative === "" || relative === ".") return false;
@@ -51,5 +54,9 @@ export async function watchWorkspace(
     emit({ type: "unlink", relativePath: toRelative(absolute) });
   });
 
-  return { close: () => watcher.close() };
+  const ready = new Promise<void>((resolve) => {
+    watcher.on("ready", resolve);
+  });
+
+  return { ready, close: () => watcher.close() };
 }

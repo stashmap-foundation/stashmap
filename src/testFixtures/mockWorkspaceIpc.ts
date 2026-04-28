@@ -1,30 +1,26 @@
 import fs from "fs";
 import path from "path";
-import crypto from "crypto";
 import { hexToBytes } from "@noble/hashes/utils";
-import { loadCliProfile } from "../cli/config";
 import { createWorkspaceProfile } from "../cli/init";
-import {
-  buildWorkspaceDocumentContent,
-  loadWorkspaceAsDocuments,
-  saveDocumentsToWorkspace,
-} from "../infra/filesystem/workspaceBackend";
-import {
-  FsEvent,
-  FsEventHandler,
-  WorkspaceWatcher,
-  watchWorkspace,
-} from "../infra/filesystem/workspaceWatcher";
 import { convertInputToPrivateKey } from "../nostrKey";
 import {
   WorkspaceIpc,
   WorkspaceLoaded,
 } from "../infra/filesystem/FilesystemBackendProvider";
+import {
+  createWorkspaceRuntime,
+  WorkspaceRuntime,
+} from "../infra/filesystem/workspaceRuntime";
 
-const ECHO_TTL_MS = 2000;
-
-function hashContent(content: string): string {
-  return crypto.createHash("sha256").update(content).digest("hex");
+function logMockWorkspaceDebug(
+  label: string,
+  details: Record<string, unknown>
+): void {
+  if (process.env.DEBUG_FS_WATCHER !== "1") {
+    return;
+  }
+  // eslint-disable-next-line no-console
+  console.log("[mock-workspace-debug]", { label, ...details });
 }
 
 export type MockWorkspaceIpc = WorkspaceIpc & {
@@ -34,86 +30,52 @@ export type MockWorkspaceIpc = WorkspaceIpc & {
   dispose: () => Promise<void>;
 };
 
-async function loadFolder(workspaceDir: string): Promise<WorkspaceLoaded> {
-  const profile = loadCliProfile({ cwd: workspaceDir });
-  const documents = await loadWorkspaceAsDocuments({
-    pubkey: profile.pubkey,
-    workspaceDir: profile.workspaceDir,
-  });
-  return { profile, documents: [...documents] };
-}
-
 export function mockWorkspaceIpc(
   initialCurrent: string | null = null
 ): MockWorkspaceIpc {
   const state: {
     current: string | null;
     pickerQueue: (string | null)[];
-    fsHandlers: Set<FsEventHandler>;
-    watcher: Promise<WorkspaceWatcher> | null;
-    pendingEchoes: Map<string, { hash: string; expiresAt: number }>;
-    pendingUnlinkEchoes: Map<string, number>;
+    runtime: WorkspaceRuntime | null;
   } = {
     current: initialCurrent,
     pickerQueue: [],
-    fsHandlers: new Set(),
-    watcher: null,
-    pendingEchoes: new Map(),
-    pendingUnlinkEchoes: new Map(),
-  };
-
-  const isOwnEcho = (event: FsEvent): boolean => {
-    const now = Date.now();
-    if (event.type === "unlink") {
-      const expiresAt = state.pendingUnlinkEchoes.get(event.relativePath);
-      if (expiresAt && expiresAt > now) {
-        state.pendingUnlinkEchoes.delete(event.relativePath);
-        return true;
-      }
-      return false;
-    }
-    const pending = state.pendingEchoes.get(event.relativePath);
-    if (
-      pending &&
-      pending.expiresAt > now &&
-      pending.hash === hashContent(event.content)
-    ) {
-      state.pendingEchoes.delete(event.relativePath);
-      return true;
-    }
-    return false;
-  };
-
-  const emit: FsEventHandler = (event) => {
-    if (isOwnEcho(event)) return;
-    state.fsHandlers.forEach((handler) => handler(event));
-  };
-
-  const ensureWatcher = (): void => {
-    if (state.watcher || !state.current) return;
-    // eslint-disable-next-line functional/immutable-data
-    state.watcher = watchWorkspace(state.current, emit);
-  };
-
-  const stopWatcher = async (): Promise<void> => {
-    if (!state.watcher) return;
-    const pending = state.watcher;
-    // eslint-disable-next-line functional/immutable-data
-    state.watcher = null;
-    const instance = await pending;
-    await instance.close();
+    runtime: initialCurrent ? createWorkspaceRuntime(initialCurrent) : null,
   };
 
   const setCurrentFolder = async (folder: string | null): Promise<void> => {
-    await stopWatcher();
+    await state.runtime?.dispose();
     // eslint-disable-next-line functional/immutable-data
     state.current = folder;
-    ensureWatcher();
+    // eslint-disable-next-line functional/immutable-data
+    state.runtime = folder ? createWorkspaceRuntime(folder) : null;
+  };
+
+  const getRuntime = (): WorkspaceRuntime | null => {
+    if (!state.current) {
+      return null;
+    }
+    if (!state.runtime) {
+      // eslint-disable-next-line functional/immutable-data
+      state.runtime = createWorkspaceRuntime(state.current);
+    }
+    return state.runtime;
   };
 
   return {
     load: () =>
-      state.current ? loadFolder(state.current) : Promise.resolve(null),
+      getRuntime()
+        ?.load()
+        .then(
+          (loaded): WorkspaceLoaded => ({
+            profile: loaded.profile,
+            documents: [...loaded.documents],
+          })
+        ) ?? Promise.resolve(null),
+    ready: async () => {
+      await getRuntime()?.ready();
+      logMockWorkspaceDebug("ready", { current: state.current });
+    },
     pickFolder: () => {
       if (state.pickerQueue.length === 0) {
         throw new Error(
@@ -146,35 +108,24 @@ export function mockWorkspaceIpc(
         fs.existsSync(path.join(folder, ".knowstr", "profile.json"))
       ),
     save: async (documents, deletedPaths) => {
-      if (!state.current) {
-        return { changed_paths: [], removed_paths: [] };
-      }
-      const profile = loadCliProfile({ cwd: state.current });
-      const expiresAt = Date.now() + ECHO_TTL_MS;
-      documents.forEach((doc) => {
-        if (doc.filePath !== undefined) {
-          state.pendingEchoes.set(doc.filePath, {
-            hash: hashContent(
-              buildWorkspaceDocumentContent(doc.content, doc.docId)
-            ),
-            expiresAt,
-          });
+      return (
+        (await getRuntime()?.save(documents, deletedPaths)) ?? {
+          changed_paths: [],
+          removed_paths: [],
         }
-      });
-      (deletedPaths ?? []).forEach((relativePath) => {
-        state.pendingUnlinkEchoes.set(relativePath, expiresAt);
-      });
-      return saveDocumentsToWorkspace(
-        { pubkey: profile.pubkey, workspaceDir: profile.workspaceDir },
-        documents,
-        deletedPaths
       );
     },
     subscribeFsEvents: (handler) => {
-      state.fsHandlers.add(handler);
-      ensureWatcher();
+      logMockWorkspaceDebug("subscribe", {
+        current: state.current,
+      });
+      const unsubscribe =
+        getRuntime()?.subscribeFsEvents(handler) ?? (() => {});
       return () => {
-        state.fsHandlers.delete(handler);
+        logMockWorkspaceDebug("unsubscribe", {
+          current: state.current,
+        });
+        unsubscribe();
       };
     },
     setCurrent: (folder) => {
@@ -186,8 +137,9 @@ export function mockWorkspaceIpc(
     },
     getCurrent: () => state.current,
     dispose: async () => {
-      state.fsHandlers.clear();
-      await stopWatcher();
+      await state.runtime?.dispose();
+      // eslint-disable-next-line functional/immutable-data
+      state.runtime = null;
     },
   };
 }

@@ -1,11 +1,12 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { renderApp, setup, ALICE } from "../utils.test";
 
 test("menu no longer exposes a dedicated users entry point", async () => {
   const [alice] = setup([ALICE]);
   renderApp(alice());
 
-  fireEvent.click(await screen.findByLabelText("open menu"));
+  await userEvent.click(await screen.findByLabelText("open menu"));
   expect(screen.queryByLabelText("open users")).toBeNull();
   expect(screen.queryByLabelText("copy invite link")).toBeNull();
 });

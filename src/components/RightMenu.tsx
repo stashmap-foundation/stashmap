@@ -16,8 +16,8 @@ import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
 import { usePlanner, planUpsertContact, planRemoveContact } from "../planner";
 import { preventEditorBlur } from "./AddNode";
-import { getNodeUserPublicKey } from "../userEntry";
-import { decodePublicKeyInputSync } from "../nostrPublicKeys";
+import { getNodeUserPublicKey } from "../infra/nostr/userEntry";
+import { decodePublicKeyInputSync } from "../infra/nostr/publicKeys";
 
 function useCurrentUserEntryPublicKey(): PublicKey | undefined {
   return getNodeUserPublicKey(useCurrentNode());

@@ -65,7 +65,7 @@ import { RightMenu } from "./RightMenu";
 import { useItemStyle } from "./useItemStyle";
 import { EditorTextProvider } from "./EditorTextContext";
 import { getTreeChildren } from "../treeTraversal";
-import { getNodeUserPublicKey } from "../userEntry";
+import { getNodeUserPublicKey } from "../infra/nostr/userEntry";
 
 export { getNodesInTree } from "../treeTraversal";
 

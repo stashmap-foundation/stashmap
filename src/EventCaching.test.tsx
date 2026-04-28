@@ -4,7 +4,6 @@ import userEvent from "@testing-library/user-event";
 import { Event } from "nostr-tools";
 import {
   ALICE,
-  renderTree,
   renderWithTestData,
   RootViewOrPaneIsLoading,
   setup,

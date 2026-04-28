@@ -24,7 +24,7 @@ import { usePaneStack } from "./SplitPanesContext";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
 import { newNode } from "./core/nodeFactory";
 import { isBlockLinkAny, nodeText } from "./core/nodeSpans";
-import { getNodeUserPublicKey } from "./userEntry";
+import { getNodeUserPublicKey } from "./infra/nostr/userEntry";
 
 export { newNode } from "./core/nodeFactory";
 

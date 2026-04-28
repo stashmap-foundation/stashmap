@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { decodePublicKeyInputSync } from "../nostrPublicKeys";
+import { decodePublicKeyInputSync } from "../infra/nostr/publicKeys";
 import { sanitizeRelays } from "../relayUtils";
 
 type RawRelay =

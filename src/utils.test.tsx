@@ -335,7 +335,10 @@ export function renderApis(
   const BackendProviderComponent =
     options?.BackendProvider ??
     (({ children: c }: { children: React.ReactNode }) => (
-      <NostrBackendProvider defaultRelayUrls={defaultRelayUrls}>
+      <NostrBackendProvider
+        defaultRelayUrls={defaultRelayUrls}
+        db={options?.db ?? null}
+      >
         {c}
       </NostrBackendProvider>
     ));

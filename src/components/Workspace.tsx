@@ -1048,7 +1048,8 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (
       !activeElement ||
       activeElement === document.body ||
-      activeElement === document.documentElement
+      activeElement === document.documentElement ||
+      !document.contains(activeElement)
     ) {
       root.focus();
     }

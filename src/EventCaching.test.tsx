@@ -98,7 +98,7 @@ beforeEach(() => {
 });
 
 test("published events are cached and available on reload", async () => {
-  const [alice] = setup([ALICE]);
+  const [alice] = setup([ALICE], { db: { __fake: true } as never });
   renderTree(alice);
 
   await type("My Notes{Enter}{Tab}Spain{Enter}France{Escape}");

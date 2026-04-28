@@ -11,7 +11,7 @@ import { App } from "./App";
 import { AuthProvider } from "./AuthProvider";
 import { FilesystemBackendProvider } from "./infra/filesystem/FilesystemBackendProvider";
 import { FilesystemDataProvider } from "./infra/filesystem/FilesystemDataProvider";
-import { NostrBackendProvider } from "./infra/nostr/NostrBackendProvider";
+import { NostrBackendDbProvider } from "./infra/nostr/NostrBackendProvider";
 import { NostrDataProvider } from "./infra/nostr/NostrDataProvider";
 import { NostrProvider } from "./NostrProvider";
 import { UserRelayContextProvider } from "./UserRelayContext";
@@ -64,7 +64,7 @@ function bootstrap(): void {
   createRoot(root).render(
     <Router>
       <NostrProvider apis={{ fileStore: createFileStore() }}>
-        <NostrBackendProvider defaultRelayUrls={defaultRelayUrls}>
+        <NostrBackendDbProvider defaultRelayUrls={defaultRelayUrls}>
           <AuthProvider>
             <UserRelayContextProvider>
               <NostrDataProvider>
@@ -72,7 +72,7 @@ function bootstrap(): void {
               </NostrDataProvider>
             </UserRelayContextProvider>
           </AuthProvider>
-        </NostrBackendProvider>
+        </NostrBackendDbProvider>
       </NostrProvider>
     </Router>
   );

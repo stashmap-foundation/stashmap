@@ -19,9 +19,11 @@ function userFromPrivateKey(privateKey: string): User {
 
 export function NostrBackendProvider({
   defaultRelayUrls,
+  db,
   children,
 }: {
   defaultRelayUrls?: Array<string>;
+  db: StashmapDB | null;
   children: React.ReactNode;
 }): JSX.Element {
   const { relayPool, fileStore } = useApis();
@@ -44,10 +46,6 @@ export function NostrBackendProvider({
       )
     : DEFAULT_RELAYS;
 
-  const [db, setDb] = useState<StashmapDB | null | undefined>(undefined);
-  useEffect(() => {
-    openDB().then((database) => setDb(database || null));
-  }, []);
   useEffect(() => {
     return () => {
       if (db && typeof db.close === "function") {
@@ -97,5 +95,39 @@ export function NostrBackendProvider({
     <BackendProvider backend={backend}>
       <CacheDBProvider db={db}>{children}</CacheDBProvider>
     </BackendProvider>
+  );
+}
+
+export function NostrBackendDbProvider({
+  defaultRelayUrls,
+  children,
+}: {
+  defaultRelayUrls?: Array<string>;
+  children: React.ReactNode;
+}): JSX.Element | null {
+  const [db, setDb] = useState<StashmapDB | null | undefined>(undefined);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    openDB().then((database) => {
+      if (controller.signal.aborted) {
+        if (database && typeof database.close === "function") {
+          database.close();
+        }
+        return;
+      }
+      setDb(database || null);
+    });
+    return () => controller.abort();
+  }, []);
+
+  if (db === undefined) {
+    return null;
+  }
+
+  return (
+    <NostrBackendProvider defaultRelayUrls={defaultRelayUrls} db={db}>
+      {children}
+    </NostrBackendProvider>
   );
 }

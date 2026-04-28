@@ -40,7 +40,7 @@ test("NostrBackendProvider exposes subscribe and publish that delegate to relayP
         timeToStorePreLoginEvents: 0,
       }}
     >
-      <NostrBackendProvider>
+      <NostrBackendProvider db={null}>
         <CaptureBackend
           capture={(b) => {
             captured = b;

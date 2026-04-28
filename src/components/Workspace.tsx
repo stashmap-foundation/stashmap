@@ -1072,7 +1072,11 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         }
         return;
       }
-      if (e.key !== "ArrowDown" && e.key !== "j" && e.key !== "Escape") {
+      if (
+        e.key !== "ArrowDown" &&
+        e.key !== "j" &&
+        e.key !== "Escape"
+      ) {
         return;
       }
       if (e.metaKey || e.ctrlKey || e.altKey) {
@@ -1327,6 +1331,62 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       return;
     }
 
+    if (e.key === "/") {
+      e.preventDefault();
+      const searchButton = root.querySelector('[data-pane-action="search"]');
+      if (searchButton instanceof HTMLElement) {
+        searchButton.click();
+      }
+      return;
+    }
+
+    if (e.key === "N") {
+      e.preventDefault();
+      const newNoteButton = root.querySelector('[data-pane-action="new-note"]');
+      if (newNoteButton instanceof HTMLElement) {
+        window.setTimeout(() => newNoteButton.click(), 0);
+      }
+      return;
+    }
+
+    if (e.key === "P") {
+      e.preventDefault();
+      const newPaneButton = root.querySelector('[data-pane-action="new-pane"]');
+      if (newPaneButton instanceof HTMLElement) {
+        window.setTimeout(() => newPaneButton.click(), 0);
+      }
+      return;
+    }
+
+    if (e.key === "q") {
+      e.preventDefault();
+      const closePaneButton = root.querySelector(
+        '[data-pane-action="close-pane"]'
+      );
+      if (closePaneButton instanceof HTMLElement) {
+        closePaneButton.click();
+      }
+      return;
+    }
+
+    if (e.key === "]") {
+      e.preventDefault();
+      switchPane(1);
+      return;
+    }
+
+    if (e.key === "[") {
+      e.preventDefault();
+      switchPane(-1);
+      return;
+    }
+
+    if (e.key === "H") {
+      e.preventDefault();
+      triggerPaneHome(root);
+      return;
+    }
+
     const activeRow = getActiveRow(root);
     if (!activeRow) {
       return;
@@ -1466,62 +1526,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
           )
         );
       }
-      return;
-    }
-
-    if (e.key === "/") {
-      e.preventDefault();
-      const searchButton = root.querySelector('[data-pane-action="search"]');
-      if (searchButton instanceof HTMLElement) {
-        searchButton.click();
-      }
-      return;
-    }
-
-    if (e.key === "N") {
-      e.preventDefault();
-      const newNoteButton = root.querySelector('[data-pane-action="new-note"]');
-      if (newNoteButton instanceof HTMLElement) {
-        window.setTimeout(() => newNoteButton.click(), 0);
-      }
-      return;
-    }
-
-    if (e.key === "P") {
-      e.preventDefault();
-      const newPaneButton = root.querySelector('[data-pane-action="new-pane"]');
-      if (newPaneButton instanceof HTMLElement) {
-        window.setTimeout(() => newPaneButton.click(), 0);
-      }
-      return;
-    }
-
-    if (e.key === "q") {
-      e.preventDefault();
-      const closePaneButton = root.querySelector(
-        '[data-pane-action="close-pane"]'
-      );
-      if (closePaneButton instanceof HTMLElement) {
-        closePaneButton.click();
-      }
-      return;
-    }
-
-    if (e.key === "]") {
-      e.preventDefault();
-      switchPane(1);
-      return;
-    }
-
-    if (e.key === "[") {
-      e.preventDefault();
-      switchPane(-1);
-      return;
-    }
-
-    if (e.key === "H") {
-      e.preventDefault();
-      triggerPaneHome(root);
       return;
     }
 

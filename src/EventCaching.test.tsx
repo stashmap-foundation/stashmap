@@ -98,8 +98,16 @@ beforeEach(() => {
 });
 
 test("published events are cached and available on reload", async () => {
-  const [alice] = setup([ALICE], { db: { __fake: true } as never });
-  renderTree(alice);
+  const [alice] = setup([ALICE]);
+  renderWithTestData(
+    <RootViewOrPaneIsLoading>
+      <PaneView />
+    </RootViewOrPaneIsLoading>,
+    {
+      ...alice(),
+      db: { __fake: true } as never,
+    }
+  );
 
   await type("My Notes{Enter}{Tab}Spain{Enter}France{Escape}");
   await expectTree(`
@@ -114,7 +122,15 @@ My Notes
     ...alice(),
     relayPool: mockRelayPool(),
   });
-  renderTree(freshAlice);
+  renderWithTestData(
+    <RootViewOrPaneIsLoading>
+      <PaneView />
+    </RootViewOrPaneIsLoading>,
+    {
+      ...freshAlice(),
+      db: { __fake: true } as never,
+    }
+  );
 
   await expectTree(`
 My Notes

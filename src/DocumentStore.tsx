@@ -244,12 +244,15 @@ function eventsToDocuments(events: ReadonlyArray<Event | UnsignedEvent>): {
 export function DocumentStoreProvider({
   children,
   unpublishedEvents = List<UnsignedEvent>(),
+  initialDocuments = [],
 }: {
   children: React.ReactNode;
   unpublishedEvents?: List<UnsignedEvent>;
+  initialDocuments?: ReadonlyArray<Document>;
 }): JSX.Element {
-  const [snapshot, setSnapshot] =
-    React.useState<DocumentSnapshot>(createEmptySnapshot);
+  const [snapshot, setSnapshot] = React.useState<DocumentSnapshot>(() =>
+    applyRecordsToSnapshot(createEmptySnapshot(), initialDocuments, [])
+  );
   const [snapshotNodes, setSnapshotNodes] = React.useState<SnapshotNodes>(
     ImmutableMap()
   );

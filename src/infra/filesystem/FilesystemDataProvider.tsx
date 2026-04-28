@@ -2,13 +2,13 @@ import React from "react";
 import { Map } from "immutable";
 import { useUserOrAnon } from "../../NostrAuthContext";
 import { useUserSessionState } from "../../userSessionState";
+import { useBackend } from "../../BackendContext";
 import { DataContextProvider, MergeKnowledgeDB } from "../../DataContext";
 import { DocumentStoreProvider } from "../../DocumentStore";
 import { PlanningContextProvider } from "../../planner";
 import { FilesystemExecutorProvider } from "./FilesystemExecutorProvider";
 import { NavigationStateProvider } from "../../NavigationStateContext";
 import { createEmptySemanticIndex } from "../../semanticIndex";
-import { FilesystemWorkspaceLoader } from "./FilesystemWorkspaceLoader";
 import { FilesystemWatcher } from "./FilesystemWatcher";
 
 export function FilesystemDataProvider({
@@ -18,6 +18,9 @@ export function FilesystemDataProvider({
 }): JSX.Element {
   const user = useUserOrAnon();
   const session = useUserSessionState(user);
+  const { workspace } = useBackend();
+  const workspaceKey = workspace?.profile?.workspaceDir ?? "no-workspace";
+  const initialDocuments = workspace?.documents ?? [];
 
   return (
     <DataContextProvider
@@ -35,9 +38,10 @@ export function FilesystemDataProvider({
       panes={session.panes}
     >
       <DocumentStoreProvider
+        key={workspaceKey}
+        initialDocuments={initialDocuments}
         unpublishedEvents={session.publishStatus.unsignedEvents}
       >
-        <FilesystemWorkspaceLoader />
         <FilesystemWatcher />
         <MergeKnowledgeDB>
           <FilesystemExecutorProvider

@@ -836,7 +836,8 @@ export function getPane(paneIndex: number): ReturnType<typeof within> {
 
 export async function navigateToNodeViaSearch(
   paneIndex: number,
-  nodeName: string
+  nodeName: string,
+  options: { waitForFullscreen?: boolean } = {}
 ): Promise<void> {
   await userEvent.click(
     await screen.findByLabelText(`Search to change pane ${paneIndex} content`)
@@ -880,6 +881,20 @@ export async function navigateToNodeViaSearch(
 
   // Search results are crefs, so navigation lands on the parent context.
   // Click the fullscreen button to make the target node the pane root.
+  if (options.waitForFullscreen) {
+    await waitFor(
+      () => {
+        const alreadyOnConcreteRoute =
+          window.location.pathname.match(/^\/r\//u) !== null;
+        const hasFullscreenButton =
+          screen.queryAllByLabelText(`open ${nodeName} in fullscreen`).length >
+          0;
+        expect(alreadyOnConcreteRoute || hasFullscreenButton).toBe(true);
+      },
+      { timeout: 1000 }
+    );
+  }
+
   const fullscreenButtons = screen.queryAllByLabelText(
     `open ${nodeName} in fullscreen`
   );
@@ -891,6 +906,12 @@ export async function navigateToNodeViaSearch(
       const hasTreeRow =
         screen.queryAllByRole("treeitem", { name: nodeName }).length > 0;
       expect(hasEditor || hasTreeRow).toBe(true);
+    });
+  }
+
+  if (options.waitForFullscreen) {
+    await waitFor(() => {
+      expect(window.location.pathname).toMatch(/^\/r\//u);
     });
   }
 }

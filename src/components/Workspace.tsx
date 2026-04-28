@@ -1072,11 +1072,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         }
         return;
       }
-      if (
-        e.key !== "ArrowDown" &&
-        e.key !== "j" &&
-        e.key !== "Escape"
-      ) {
+      if (e.key !== "ArrowDown" && e.key !== "j" && e.key !== "Escape") {
         return;
       }
       if (e.metaKey || e.ctrlKey || e.altKey) {

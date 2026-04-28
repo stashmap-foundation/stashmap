@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo } from "react";
 import { List, Map } from "immutable";
 // eslint-disable-next-line import/no-unresolved
 import { RelayInformation } from "nostr-tools/lib/types/nip11";
@@ -9,7 +9,6 @@ import {
   KIND_RELAY_METADATA_EVENT,
 } from "../../nostr";
 import { DataContextProvider, MergeKnowledgeDB } from "../../DataContext";
-import { useApis } from "../../Apis";
 import { useBackend } from "../../BackendContext";
 import { PlanningContextProvider } from "../../planner";
 import { NostrExecutorProvider } from "./NostrExecutorProvider";
@@ -35,43 +34,6 @@ export const KIND_SEARCH = [KIND_KNOWLEDGE_DOCUMENT];
 
 export const KINDS_META = [KIND_SETTINGS, KIND_CONTACTLIST];
 
-function useRelaysInfo(
-  relays: Array<Relay>,
-  eose: boolean
-): Map<string, RelayInformation | undefined> {
-  const { nip11 } = useApis();
-  const [infos, setInfos] = useState<Map<string, RelayInformation | undefined>>(
-    Map<string, RelayInformation | undefined>()
-  );
-  useEffect(() => {
-    if (!eose) {
-      return;
-    }
-    const controller = new AbortController();
-
-    (async () => {
-      const fetchedInfos = await Promise.all(
-        relays.map(
-          async (relay): Promise<[string, RelayInformation | undefined]> => {
-            try {
-              const info = await nip11.fetchRelayInformation(relay.url);
-              return [relay.url, info];
-            } catch {
-              return [relay.url, undefined];
-            }
-          }
-        )
-      );
-      if (controller.signal.aborted) {
-        return;
-      }
-      setInfos(Map(fetchedInfos));
-    })();
-    return () => controller.abort();
-  }, [JSON.stringify(relays.map((r) => r.url)), eose]);
-  return infos;
-}
-
 export function NostrDataProvider({
   children,
 }: {
@@ -80,14 +42,16 @@ export function NostrDataProvider({
   const user = useUserOrAnon();
   const myPublicKey = user.publicKey;
   const session = useUserSessionState(user);
-  const { isRelaysLoaded, userRelays } = useUserRelayContext();
+  const { userRelays } = useUserRelayContext();
   const defaultRelays = useDefaultRelays();
   const backend = useBackend();
 
   const db = useCacheDB();
 
   useEffect(() => {
-    if (!db) return;
+    if (!db) {
+      return undefined;
+    }
     const controller = new AbortController();
     getOutboxEvents(db).then((outbox) => {
       if (controller.signal.aborted) {

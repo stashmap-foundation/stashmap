@@ -8,13 +8,13 @@ import {
   buildWorkspaceDocumentContent,
   loadWorkspaceAsDocuments,
   saveDocumentsToWorkspace,
-} from "../core/workspaceBackend";
+} from "../infra/filesystem/workspaceBackend";
 import {
   FsEvent,
   FsEventHandler,
   WorkspaceWatcher,
   watchWorkspace,
-} from "../core/workspaceWatcher";
+} from "../infra/filesystem/workspaceWatcher";
 import { convertInputToPrivateKey } from "../nostrKey";
 import {
   WorkspaceIpc,

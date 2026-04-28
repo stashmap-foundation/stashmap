@@ -12,7 +12,7 @@ import {
 } from "./nostr";
 import { useData } from "./DataContext";
 import { useExecutor } from "./ExecutorContext";
-import { newDB } from "./knowledge";
+import { newDB } from "./core/knowledge";
 import {
   buildDocumentEvent,
   buildSnapshotEventFromNodes,
@@ -30,13 +30,13 @@ import {
   getSemanticID,
   getNodeText,
   isRefNode,
-} from "./connections";
-import type { RefTargetSeed, TextSeed } from "./connections";
+} from "./core/connections";
+import type { RefTargetSeed, TextSeed } from "./core/connections";
 import {
   getOwnSystemRoot,
   getSystemRoleText,
   LOG_ROOT_ROLE,
-} from "./systemRoots";
+} from "./core/systemRoots";
 import {
   newNode,
   upsertNodes,
@@ -52,17 +52,17 @@ import {
   addNodeToPathWithNodes,
   getPaneIndex,
 } from "./ViewContext";
-import { newRefNode } from "./nodeFactory";
-import { nodeText, plainSpans } from "./nodeSpans";
+import { newRefNode } from "./core/nodeFactory";
+import { nodeText, plainSpans } from "./core/nodeSpans";
 import { UNAUTHENTICATED_USER_PK } from "./NostrAuthContext";
 import { useRelaysToCreatePlan } from "./relays";
-import { createRootAnchor } from "./rootAnchor";
+import { createRootAnchor } from "./core/rootAnchor";
 import {
   MultiSelectionState,
   clearSelection,
   shiftSelect,
   toggleSelect,
-} from "./selection";
+} from "./core/selection";
 import { withUsersEntryPublicKey, getNodeUserPublicKey } from "./userEntry";
 import { decodePublicKeyInputSync } from "./nostrPublicKeys";
 

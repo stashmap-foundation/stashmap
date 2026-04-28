@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { TYPE_COLORS } from "../constants";
+import { TYPE_COLORS } from "../core/constants";
 import {
   useUpdateRelevance,
   relevanceToLevel,
@@ -22,7 +22,7 @@ import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
 import { useTemporaryView } from "./TemporaryViewContext";
 import { planBatchRelevance, EditorInfo } from "./batchOperations";
-import { nodeText } from "../nodeSpans";
+import { nodeText } from "../core/nodeSpans";
 
 type RelevanceSelectorProps = {
   virtualType?: VirtualType;

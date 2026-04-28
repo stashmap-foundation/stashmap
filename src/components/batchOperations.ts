@@ -18,7 +18,7 @@ import {
   NodeItemMetadata,
 } from "../nodeItemMutations";
 import { planMoveNodeWithView } from "../treeMutations";
-import { isBlockLinkAny, nodeText } from "../nodeSpans";
+import { isBlockLinkAny, nodeText } from "../core/nodeSpans";
 
 export type EditorInfo = {
   text: string;

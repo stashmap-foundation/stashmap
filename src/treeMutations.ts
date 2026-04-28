@@ -1,4 +1,4 @@
-import { getSemanticID, isSearchId, shortID } from "./connections";
+import { getSemanticID, isSearchId, shortID } from "./core/connections";
 import { planRemoveNodeItemById } from "./dataPlanner";
 import {
   ViewPath,

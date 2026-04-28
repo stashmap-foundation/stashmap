@@ -1,11 +1,14 @@
 import fs from "fs/promises";
 import path from "path";
 import ignore, { Ignore } from "ignore";
-import { buildDocumentEventFromMarkdownTree } from "../standaloneDocumentEvent";
-import { MarkdownTreeNode, parseMarkdownHierarchy } from "../markdownTree";
-import { extractMarkdownImportPayload } from "../markdownImport";
-import { ensureKnowstrDocIdFrontMatter } from "../knowstrFrontmatter";
-import { plainSpans } from "../nodeSpans";
+import { buildDocumentEventFromMarkdownTree } from "../../standaloneDocumentEvent";
+import {
+  MarkdownTreeNode,
+  parseMarkdownHierarchy,
+} from "../../core/markdownTree";
+import { extractMarkdownImportPayload } from "../../core/markdownImport";
+import { ensureKnowstrDocIdFrontMatter } from "../../core/knowstrFrontmatter";
+import { plainSpans } from "../../core/nodeSpans";
 
 export type WorkspaceSaveProfile = {
   pubkey: PublicKey;

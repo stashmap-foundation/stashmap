@@ -1,8 +1,12 @@
 import fs from "fs/promises";
 import { hexToBytes } from "@noble/hashes/utils";
 import { Event, UnsignedEvent, finalizeEvent, getPublicKey } from "nostr-tools";
-import { convertInputToPrivateKey } from "../nostrKey";
-import { getWriteRelays, relaysFromUrls, uniqueRelayUrls } from "../relayUtils";
+import { convertInputToPrivateKey } from "../../nostrKey";
+import {
+  getWriteRelays,
+  relaysFromUrls,
+  uniqueRelayUrls,
+} from "../../relayUtils";
 
 export type WriteProfile = {
   pubkey: PublicKey;

@@ -2,7 +2,7 @@ import { List, Map } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
 import { findContacts } from "./contacts";
 import { buildKnowledgeDBFromDocumentEvents } from "./documentMaterialization";
-import { newDB } from "./knowledge";
+import { newDB } from "./core/knowledge";
 import { findRelays } from "./relayUtils";
 
 type ProcessedEvents = {

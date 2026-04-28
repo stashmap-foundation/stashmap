@@ -1,5 +1,5 @@
 import { Map } from "immutable";
-import type { TextSeed } from "../connections";
+import type { TextSeed } from "../core/connections";
 
 function isMatch(input: string, test: string): boolean {
   const searchStr = input.toLowerCase().replace(/\n/g, "");

@@ -1,5 +1,5 @@
 import React from "react";
-import { TYPE_COLORS } from "../constants";
+import { TYPE_COLORS } from "../core/constants";
 import { useUpdateArgument } from "./useUpdateArgument";
 import {
   ViewPath,
@@ -17,7 +17,7 @@ import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
 import { useTemporaryView } from "./TemporaryViewContext";
 import { planBatchArgument, EditorInfo } from "./batchOperations";
-import { nodeText } from "../nodeSpans";
+import { nodeText } from "../core/nodeSpans";
 
 function getArgumentColor(argument: Argument): string {
   if (argument === "confirms") {

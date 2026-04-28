@@ -1,5 +1,5 @@
 import { decodePublicKeyInputSync } from "./nostrPublicKeys";
-import { nodeText } from "./nodeSpans";
+import { nodeText } from "./core/nodeSpans";
 
 export function getNodeUserPublicKey(
   node?: GraphNode,

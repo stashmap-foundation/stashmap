@@ -3,7 +3,7 @@ import { List, Map as ImmutableMap } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
 import type { StoredSnapshotRecord } from "./infra/nostr/cache/indexedDB";
 import { buildKnowledgeDBFromDocumentNodes } from "./documentMaterialization";
-import { parseDocumentContent } from "./markdownNodes";
+import { parseDocumentContent } from "./core/markdownNodes";
 import {
   toStoredSnapshotRecord,
   materializeSnapshot,
@@ -14,7 +14,7 @@ import {
   removeNodesFromSemanticIndex,
 } from "./semanticIndex";
 import { eventToDocument, eventToDocumentDelete } from "./nostrEvents";
-import { Document, DocumentDelete, documentKeyOf } from "./Document";
+import { Document, DocumentDelete, documentKeyOf } from "./core/Document";
 
 export type { Document, DocumentDelete };
 

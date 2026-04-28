@@ -19,7 +19,7 @@ import {
   toStoredDeleteRecord,
   toStoredDocumentRecord,
 } from "../../../permanentSync";
-import { splitID } from "../../../connections";
+import { splitID } from "../../../core/connections";
 import { storedDocumentToEvent } from "../../../documentMaterialization";
 import { useCacheDB } from "./CacheDBContext";
 import {

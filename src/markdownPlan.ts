@@ -1,8 +1,19 @@
 import { List } from "immutable";
-import { getNodeContext, getSemanticID, getNode, shortID } from "./connections";
-import { MarkdownImportFile, parseMarkdownImportFiles } from "./markdownImport";
-import { createNodesFromMarkdownTrees, WalkContext } from "./markdownNodes";
-import { MarkdownTreeNode } from "./markdownTree";
+import {
+  getNodeContext,
+  getSemanticID,
+  getNode,
+  shortID,
+} from "./core/connections";
+import {
+  MarkdownImportFile,
+  parseMarkdownImportFiles,
+} from "./core/markdownImport";
+import {
+  createNodesFromMarkdownTrees,
+  WalkContext,
+} from "./core/markdownNodes";
+import { MarkdownTreeNode } from "./core/markdownTree";
 import {
   AddToParentTarget,
   GraphPlan,
@@ -11,8 +22,8 @@ import {
   planMoveDescendantNodes,
   planUpsertNodes,
 } from "./planner";
-import { newNode } from "./nodeFactory";
-import { nodeText } from "./nodeSpans";
+import { newNode } from "./core/nodeFactory";
+import { nodeText } from "./core/nodeSpans";
 import { getNodeForView, ViewPath } from "./ViewContext";
 
 export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(

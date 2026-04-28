@@ -8,7 +8,7 @@ import {
   useCurrentNode,
   useDisplayText,
 } from "../ViewContext";
-import { isEmptySemanticID } from "../connections";
+import { isEmptySemanticID } from "../core/connections";
 import { useData } from "../DataContext";
 import { RelevanceSelector } from "./RelevanceSelector";
 import { EvidenceSelector } from "./EvidenceSelector";

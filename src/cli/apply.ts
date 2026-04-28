@@ -1,6 +1,6 @@
 import { loadCliProfile } from "./config";
 import { requireValue } from "./args";
-import { applyWorkspaceInbox } from "../core/workspaceApply";
+import { applyWorkspaceInbox } from "../infra/filesystem/workspaceApply";
 
 type ApplyCliArgs = {
   configPath?: string;

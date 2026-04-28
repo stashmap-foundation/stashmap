@@ -1,5 +1,5 @@
 import { UnsignedEvent } from "nostr-tools";
-import { shortID } from "./connections";
+import { shortID } from "./core/connections";
 import { renderDocumentMarkdown } from "./documentRenderer";
 import {
   KIND_KNOWLEDGE_DOCUMENT,

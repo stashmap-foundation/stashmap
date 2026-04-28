@@ -1,7 +1,7 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron";
 import type { IpcChannel } from "../infra/filesystem/electronWorkspaceIpc";
-import type { FsEvent } from "../core/workspaceWatcher";
+import type { FsEvent } from "../infra/filesystem/workspaceWatcher";
 
 const workspace: IpcChannel = {
   load: () => ipcRenderer.invoke("workspace:load"),

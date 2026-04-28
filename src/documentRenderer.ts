@@ -5,7 +5,7 @@ import {
   getNodeText,
   getSemanticID,
   shortID,
-} from "./connections";
+} from "./core/connections";
 import { buildOutgoingReference } from "./buildReferenceRow";
 import {
   getBlockFileLinkPath,
@@ -14,7 +14,7 @@ import {
   getBlockLinkText,
   isBlockFileLink,
   isBlockLink,
-} from "./nodeSpans";
+} from "./core/nodeSpans";
 import {
   addBlankLinesAroundHeadings,
   formatBulletLine,
@@ -25,7 +25,7 @@ import {
   formatRootHeading,
   formatWithFrontMatter,
 } from "./documentFormat";
-import { createRootAnchor } from "./rootAnchor";
+import { createRootAnchor } from "./core/rootAnchor";
 
 type SerializeResult = {
   lines: string[];

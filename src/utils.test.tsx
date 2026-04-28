@@ -42,7 +42,7 @@ import {
   UNAUTHENTICATED_USER_PK,
 } from "./NostrAuthContext";
 import { AuthProvider } from "./AuthProvider";
-import { EMPTY_SEMANTIC_ID } from "./connections";
+import { EMPTY_SEMANTIC_ID } from "./core/connections";
 import { RootViewContextProvider } from "./ViewContext";
 import { LoadSearchData } from "./LoadSearchData";
 import { StorePreLoginContext } from "./StorePreLoginContext";

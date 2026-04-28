@@ -1,8 +1,8 @@
 import fs from "fs/promises";
 import path from "path";
-import { buildDocumentEventFromMarkdownTree } from "../standaloneDocumentEvent";
-import { extractMarkdownImportPayload } from "../markdownImport";
-import { MarkdownTreeNode } from "../markdownTree";
+import { buildDocumentEventFromMarkdownTree } from "../../standaloneDocumentEvent";
+import { extractMarkdownImportPayload } from "../../core/markdownImport";
+import { MarkdownTreeNode } from "../../core/markdownTree";
 import {
   ScannedWorkspaceDocument,
   WorkspaceSaveProfile,

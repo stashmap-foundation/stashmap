@@ -5,7 +5,7 @@ import {
   getNode,
   isRefNode,
   shortID,
-} from "./connections";
+} from "./core/connections";
 import {
   GraphPlan,
   planDeleteDescendantNodes,

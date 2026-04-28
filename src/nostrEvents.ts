@@ -1,8 +1,8 @@
 import { Collection, List, Map } from "immutable";
 import { Event, EventTemplate, Filter, UnsignedEvent } from "nostr-tools";
-import type { Document, DocumentDelete } from "./Document";
+import type { Document, DocumentDelete } from "./core/Document";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
-import { parseDocumentContent } from "./markdownNodes";
+import { parseDocumentContent } from "./core/markdownNodes";
 
 export function findAllTags(
   event: EventTemplate,

@@ -11,7 +11,7 @@ import {
   type,
 } from "../utils.test";
 import { updateNodeItemMetadata } from "../nodeItemMetadata";
-import { plainSpans } from "../nodeSpans";
+import { plainSpans } from "../core/nodeSpans";
 
 function makeItem(
   id: ID,

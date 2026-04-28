@@ -1,7 +1,7 @@
 import { CSSProperties } from "react";
 import { useIsViewingOtherUserContent, useCurrentEdge } from "../ViewContext";
-import { isRefNode } from "../connections";
-import { TYPE_COLORS } from "../constants";
+import { isRefNode } from "../core/connections";
+import { TYPE_COLORS } from "../core/constants";
 
 type ItemStyle = {
   cardStyle: CSSProperties;

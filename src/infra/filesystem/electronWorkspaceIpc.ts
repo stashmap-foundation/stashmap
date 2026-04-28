@@ -1,7 +1,7 @@
 import { LoadedCliProfile } from "../../cli/config";
 import { WorkspaceIpc, WorkspaceLoaded } from "./FilesystemBackendProvider";
-import type { Document } from "../../Document";
-import type { FsEvent, FsEventHandler } from "../../core/workspaceWatcher";
+import type { Document } from "../../core/Document";
+import type { FsEvent, FsEventHandler } from "./workspaceWatcher";
 
 export type IpcChannel = {
   load: () => Promise<{

@@ -1,6 +1,6 @@
 import { Map } from "immutable";
-import { createGraphPlan, GraphPlan } from "../planner";
-import { createEmptySemanticIndex } from "../semanticIndex";
+import { createGraphPlan, GraphPlan } from "../../planner";
+import { createEmptySemanticIndex } from "../../semanticIndex";
 
 const EMPTY_RELAYS: AllRelays = {
   defaultRelays: [],

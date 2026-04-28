@@ -1,7 +1,7 @@
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import { List, Map, Set, OrderedSet } from "immutable";
 import { UNAUTHENTICATED_USER_PK } from "./NostrAuthContext";
-import { splitID } from "./connections";
+import { splitID } from "./core/connections";
 import { generatePaneId } from "./SplitPanesContext";
 import {
   jsonToPanes,

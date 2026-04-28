@@ -6,7 +6,7 @@ import React, {
   useState,
 } from "react";
 import { useData } from "./DataContext";
-import { getNodeRouteTargetInfo } from "./connections";
+import { getNodeRouteTargetInfo } from "./core/connections";
 import {
   pathToStack,
   buildNodeUrl,

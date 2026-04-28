@@ -8,7 +8,7 @@ import {
   setup,
   type,
 } from "../utils.test";
-import { DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
+import { DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../core/constants";
 
 describe("TYPE_COLORS", () => {
   test("has correct colors for relevance types", () => {

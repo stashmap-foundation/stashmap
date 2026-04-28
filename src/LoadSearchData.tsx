@@ -5,11 +5,11 @@ import {
   parseSearchId,
   getSearchNodes,
   shortID,
-} from "./connections";
+} from "./core/connections";
 import { MergeKnowledgeDB, useData } from "./DataContext";
 import { deduplicateRefsByContext, findRefsToNode } from "./semanticProjection";
 import { useCurrentPane } from "./SplitPanesContext";
-import { newDB } from "./knowledge";
+import { newDB } from "./core/knowledge";
 import { getLocalSearchResultIDs } from "./localSearch";
 
 function SearchCrefBuilder({

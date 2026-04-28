@@ -19,7 +19,7 @@ import { useDefaultRelays, useUserOrAnon } from "../../NostrAuthContext";
 import { useEventQuery } from "../../commons/useNostrQuery";
 import { getOutboxEvents } from "./cache/indexedDB";
 import { useCacheDB } from "./cache/CacheDBContext";
-import { splitID } from "../../connections";
+import { splitID } from "../../core/connections";
 import { NavigationStateProvider } from "../../NavigationStateContext";
 import {
   mergeEvents,

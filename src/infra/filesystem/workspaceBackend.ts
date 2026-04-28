@@ -1,9 +1,9 @@
 import path from "path";
 import fs from "fs/promises";
 import { scanWorkspaceDocuments, WorkspaceSaveProfile } from "./workspaceSave";
-import type { Document } from "../DocumentStore";
-import { systemRoleFromFilePath } from "../Document";
-import { ensureKnowstrDocIdFrontMatter } from "../knowstrFrontmatter";
+import type { Document } from "../../DocumentStore";
+import { systemRoleFromFilePath } from "../../core/Document";
+import { ensureKnowstrDocIdFrontMatter } from "../../core/knowstrFrontmatter";
 
 export async function loadWorkspaceAsDocuments(
   profile: WorkspaceSaveProfile

@@ -2,7 +2,7 @@ import React from "react";
 import { Event, Filter, SubCloser, SubscribeManyParams } from "nostr-tools";
 import { LoadedCliProfile } from "./cli/config";
 import type { Document } from "./DocumentStore";
-import type { FsEventHandler } from "./core/workspaceWatcher";
+import type { FsEventHandler } from "./infra/filesystem/workspaceWatcher";
 
 export type WorkspaceState = {
   pickFolder: () => Promise<string | null>;

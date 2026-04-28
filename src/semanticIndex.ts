@@ -1,7 +1,7 @@
 import { Map as ImmutableMap } from "immutable";
-import { EMPTY_SEMANTIC_ID } from "./connections";
-import { getAllFileLinks, getAllLinks, nodeText } from "./nodeSpans";
-import { fileLinkIndexKey, resolveLinkPath } from "./linkPath";
+import { EMPTY_SEMANTIC_ID } from "./core/connections";
+import { getAllFileLinks, getAllLinks, nodeText } from "./core/nodeSpans";
+import { fileLinkIndexKey, resolveLinkPath } from "./core/linkPath";
 
 export function createEmptySemanticIndex(): SemanticIndex {
   return {

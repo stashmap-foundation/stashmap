@@ -1,6 +1,6 @@
 import { List, Map } from "immutable";
-import { shortID } from "./connections";
-import { newDB } from "./knowledge";
+import { shortID } from "./core/connections";
+import { newDB } from "./core/knowledge";
 import { newNode } from "./ViewContext";
 import {
   buildNodeUrl,

@@ -2,9 +2,9 @@ import React, { useState } from "react";
 import { OrderedSet, Set } from "immutable";
 import { useViewKey } from "../ViewContext";
 import { useData } from "../DataContext";
-import { isRefNode } from "../connections";
-import { isBlockFileLink } from "../nodeSpans";
-import { deselectAllChildren } from "../selection";
+import { isRefNode } from "../core/connections";
+import { isBlockFileLink } from "../core/nodeSpans";
+import { deselectAllChildren } from "../core/selection";
 
 export { deselectAllChildren };
 

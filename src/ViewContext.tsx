@@ -15,18 +15,18 @@ import {
   getRefLinkTargetInfo,
   getRefTargetInfo,
   isRefNode,
-} from "./connections";
+} from "./core/connections";
 import { buildReferenceItem } from "./buildReferenceRow";
 import { resolveSemanticNodeInCurrentTree } from "./semanticNavigation";
 import { useData } from "./DataContext";
 import { Plan, planUpsertNodes, getPane } from "./planner";
 import { usePaneStack } from "./SplitPanesContext";
-import { DEFAULT_TYPE_FILTERS } from "./constants";
-import { newNode } from "./nodeFactory";
-import { isBlockLinkAny, nodeText } from "./nodeSpans";
+import { DEFAULT_TYPE_FILTERS } from "./core/constants";
+import { newNode } from "./core/nodeFactory";
+import { isBlockLinkAny, nodeText } from "./core/nodeSpans";
 import { getNodeUserPublicKey } from "./userEntry";
 
-export { newNode } from "./nodeFactory";
+export { newNode } from "./core/nodeFactory";
 
 type ViewPathSegment = ID;
 

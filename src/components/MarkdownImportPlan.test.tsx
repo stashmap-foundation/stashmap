@@ -1,8 +1,8 @@
 import { List } from "immutable";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { createPlan, buildDocumentEvents } from "../planner";
-import { getChildNodes, getNode, getSemanticID } from "../connections";
-import { isStandaloneRoot } from "../systemRoots";
+import { getChildNodes, getNode, getSemanticID } from "../core/connections";
+import { isStandaloneRoot } from "../core/systemRoots";
 import {
   ALICE,
   expectTree,
@@ -23,8 +23,8 @@ import {
   planCreateNodesFromMarkdownFiles,
   planCreateNodesFromMarkdownTrees,
 } from "./FileDropZone";
-import { MarkdownTreeNode } from "../markdownTree";
-import { nodeText, plainSpans, spansText } from "../nodeSpans";
+import { MarkdownTreeNode } from "../core/markdownTree";
+import { nodeText, plainSpans, spansText } from "../core/nodeSpans";
 
 function flattenTexts(nodes: MarkdownTreeNode[]): string[] {
   return nodes.reduce((acc: string[], node) => {

@@ -31,8 +31,8 @@ import {
   computeEmptyNodeMetadata,
   resolveNode,
   isRefNode,
-} from "../connections";
-import { isBlockLinkAny } from "../nodeSpans";
+} from "../core/connections";
+import { isBlockLinkAny } from "../core/nodeSpans";
 import { ReferenceDisplay } from "./referenceDisplay";
 import { MiniEditor, preventEditorBlur } from "./AddNode";
 import { useOnToggleExpanded } from "./SelectNodes";

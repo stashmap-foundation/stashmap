@@ -14,7 +14,7 @@ import {
   getRefLinkTargetInfo,
   getRefTargetInfo,
   isRefNode,
-} from "../connections";
+} from "../core/connections";
 import { useData } from "../DataContext";
 import { buildNodeRouteUrl } from "../navigationUrl";
 import { IS_MOBILE } from "./responsive";

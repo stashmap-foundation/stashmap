@@ -5,8 +5,8 @@ import { createPlan, planUpsertNodes } from "../planner";
 import { processEvents } from "../eventProcessing";
 import { ALICE, setup, UpdateState } from "../utils.test";
 import { parseMarkdownHierarchy, planPasteMarkdownTrees } from "./FileDropZone";
-import { joinID, shortID } from "../connections";
-import { linkSpan, nodeText, plainSpans } from "../nodeSpans";
+import { joinID, shortID } from "../core/connections";
+import { linkSpan, nodeText, plainSpans } from "../core/nodeSpans";
 
 const TEST_FILE = `# Programming Languages
 

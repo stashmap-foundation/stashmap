@@ -3,7 +3,7 @@ import { Event, EventTemplate, UnsignedEvent } from "nostr-tools";
 // eslint-disable-next-line import/no-unresolved
 import { RelayInformation } from "nostr-tools/lib/types/nip11";
 import { QueueStatus } from "./infra/nostr/cache/PublishQueue";
-import { Document as DocumentType } from "./Document";
+import { Document as DocumentType } from "./core/Document";
 
 declare global {
   type Children = {

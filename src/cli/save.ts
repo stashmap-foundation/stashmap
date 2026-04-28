@@ -1,6 +1,6 @@
 import { loadCliProfile } from "./config";
 import { requireValue } from "./args";
-import { saveEditedWorkspaceDocuments } from "../core/workspaceSave";
+import { saveEditedWorkspaceDocuments } from "../infra/filesystem/workspaceSave";
 
 type SaveCliArgs = {
   configPath?: string;

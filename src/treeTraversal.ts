@@ -19,16 +19,16 @@ import {
   itemPassesFilters,
   getSemanticID,
   resolveNode,
-} from "./connections";
+} from "./core/connections";
 import {
   getBlockLinkTarget,
   getBlockLinkText,
   isBlockLink,
   linkSpan,
   plainSpans,
-} from "./nodeSpans";
-import { documentKeyOf } from "./Document";
-import { DEFAULT_TYPE_FILTERS } from "./constants";
+} from "./core/nodeSpans";
+import { documentKeyOf } from "./core/Document";
+import { DEFAULT_TYPE_FILTERS } from "./core/constants";
 import {
   getAlternativeFooterData,
   getIncomingCrefsForNode,

@@ -212,4 +212,3 @@ export function parseDocumentContent(params: {
   const db = result.knowledgeDBs.get(author);
   return db?.nodes ?? Map<string, GraphNode>();
 }
-

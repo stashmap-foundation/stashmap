@@ -1,5 +1,9 @@
-import { createRefTarget, isEmptySemanticID, getNode } from "./connections";
-import { getBlockLinkTarget, isBlockLink, nodeText } from "./nodeSpans";
+import {
+  createRefTarget,
+  isEmptySemanticID,
+  getNode,
+} from "./core/connections";
+import { getBlockLinkTarget, isBlockLink, nodeText } from "./core/nodeSpans";
 import { planUpdateNodeItemMetadataById } from "./dataPlanner";
 import { NodeItemMetadata } from "./nodeItemMetadata";
 import {

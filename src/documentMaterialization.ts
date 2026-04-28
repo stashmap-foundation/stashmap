@@ -5,9 +5,9 @@ import {
   getNodeDepth,
   shortID,
   splitID,
-} from "./connections";
+} from "./core/connections";
 import type { StoredDocumentRecord } from "./infra/nostr/cache/indexedDB";
-import { newDB } from "./knowledge";
+import { newDB } from "./core/knowledge";
 import {
   KIND_DELETE,
   KIND_KNOWLEDGE_DOCUMENT,

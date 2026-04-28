@@ -1,8 +1,8 @@
 import { UnsignedEvent } from "nostr-tools";
-import { shortID } from "./connections";
-import { createHeadlessPlan } from "./core/headlessPlan";
+import { shortID } from "./core/connections";
+import { createHeadlessPlan } from "./infra/filesystem/headlessPlan";
 import { planCreateNodesFromMarkdownTrees } from "./markdownPlan";
-import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
+import { MarkdownTreeNode, parseMarkdownHierarchy } from "./core/markdownTree";
 import { buildDocumentEvent } from "./nodesDocumentEvent";
 
 export function requireSingleRootMarkdownTree(

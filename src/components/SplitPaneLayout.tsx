@@ -16,7 +16,7 @@ import {
 } from "../ViewContext";
 import { LoadSearchData } from "../LoadSearchData";
 import { PaneView } from "./Workspace";
-import { EMPTY_SEMANTIC_ID, createSearchId } from "../connections";
+import { EMPTY_SEMANTIC_ID, createSearchId } from "../core/connections";
 import { planUpdateViews, planUpdatePanes, usePlanner } from "../planner";
 import { useData } from "../DataContext";
 import { isUserLoggedIn, useLogout } from "../NostrAuthContext";

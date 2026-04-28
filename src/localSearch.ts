@@ -1,5 +1,5 @@
 import { List, Set } from "immutable";
-import { getNodeSemanticID, getNodeText, isRefNode } from "./connections";
+import { getNodeSemanticID, getNodeText, isRefNode } from "./core/connections";
 
 function normalizeSearchText(input: string): string {
   return input.toLowerCase().replace(/\n/g, "");

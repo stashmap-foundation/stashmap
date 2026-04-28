@@ -66,8 +66,8 @@ import {
   resolveNode,
   isSearchId,
   shortID,
-} from "../connections";
-import { getOwnLogRoot } from "../systemRoots";
+} from "../core/connections";
+import { getOwnLogRoot } from "../core/systemRoots";
 import { buildNodeUrl, buildNodeRouteUrl } from "../navigationUrl";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import {
@@ -89,7 +89,7 @@ import {
 import { planDeleteNodeFromView } from "../treeMutations";
 import { IS_MOBILE } from "./responsive";
 import { MobileActionBar } from "./MobileActionBar";
-import { isBlockLinkAny } from "../nodeSpans";
+import { isBlockLinkAny } from "../core/nodeSpans";
 
 function BreadcrumbItem({
   label,

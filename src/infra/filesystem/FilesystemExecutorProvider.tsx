@@ -7,9 +7,9 @@ import { ExecutorProvider } from "../../ExecutorContext";
 import { buildDocumentEvents, Plan } from "../../planner";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../../nostr";
 import { eventToDocument, eventToDocumentDelete } from "../../nostrEvents";
-import { Document, DocumentDelete, documentKeyOf } from "../../Document";
-import { extractImportedFrontMatter } from "../../markdownFrontMatter";
-import { LOG_ROOT_FILE } from "../../systemRoots";
+import { Document, DocumentDelete, documentKeyOf } from "../../core/Document";
+import { extractImportedFrontMatter } from "../../core/markdownFrontMatter";
+import { LOG_ROOT_FILE } from "../../core/systemRoots";
 
 function extractRootTitle(content: string): string | undefined {
   const { body } = extractImportedFrontMatter(content);

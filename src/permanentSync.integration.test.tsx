@@ -7,7 +7,7 @@ import {
   KIND_KNOWLEDGE_DOCUMENT,
   KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
 } from "./nostr";
-import { LOG_ROOT_ROLE } from "./systemRoots";
+import { LOG_ROOT_ROLE } from "./core/systemRoots";
 import { ALICE, mockRelayPool, renderApp, setup } from "./utils.test";
 
 const TEST_RELAY = "wss://relay.test.first.success/";

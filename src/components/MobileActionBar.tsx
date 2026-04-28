@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMediaQuery } from "react-responsive";
 import { List, Map } from "immutable";
-import { TYPE_COLORS } from "../constants";
+import { TYPE_COLORS } from "../core/constants";
 import { IS_MOBILE } from "./responsive";
 import { useData } from "../DataContext";
 import { useCurrentPane, usePaneStack } from "../SplitPanesContext";
@@ -28,7 +28,7 @@ import {
   refocusPaneAfterRowMutation,
 } from "./Workspace";
 import { preventEditorBlur } from "./AddNode";
-import { isSearchId } from "../connections";
+import { isSearchId } from "../core/connections";
 
 const LEVEL_SYMBOLS: Record<number, string> = {
   0: "x",

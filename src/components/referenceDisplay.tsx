@@ -1,5 +1,5 @@
 import React from "react";
-import { TYPE_COLORS } from "../constants";
+import { TYPE_COLORS } from "../core/constants";
 import { useData } from "../DataContext";
 
 type ReferencePart =

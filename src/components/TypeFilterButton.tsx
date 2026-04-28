@@ -4,7 +4,7 @@ import { Dropdown } from "react-bootstrap";
 import { planUpdatePanes, usePlanner } from "../planner";
 import { useData } from "../DataContext";
 import { useCurrentPane } from "../SplitPanesContext";
-import { DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../constants";
+import { DEFAULT_TYPE_FILTERS, TYPE_COLORS } from "../core/constants";
 import { IS_SMALL_SCREEN } from "./responsive";
 
 const RELEVANCE_FILTERS: {

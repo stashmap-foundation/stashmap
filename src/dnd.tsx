@@ -2,8 +2,12 @@ import React from "react";
 import { List, OrderedSet, Set } from "immutable";
 import { DndProvider, useDragLayer, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { moveNodes, createRefTarget } from "./connections";
-import { getBlockLinkTarget, getBlockLinkText, isBlockLink } from "./nodeSpans";
+import { moveNodes, createRefTarget } from "./core/connections";
+import {
+  getBlockLinkTarget,
+  getBlockLinkText,
+  isBlockLink,
+} from "./core/nodeSpans";
 import {
   parseViewPath,
   upsertNodes,

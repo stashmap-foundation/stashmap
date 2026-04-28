@@ -1,15 +1,15 @@
 import { ViewPath } from "../ViewContext";
 import { Plan, ParsedLine, parseClipboardText } from "../planner";
-import { MarkdownTreeNode, parseMarkdownHierarchy } from "../markdownTree";
+import { MarkdownTreeNode, parseMarkdownHierarchy } from "../core/markdownTree";
 import { planInsertMarkdownTrees } from "../markdownPlan";
-import { plainSpans } from "../nodeSpans";
+import { plainSpans } from "../core/nodeSpans";
 
-export { parseMarkdownHierarchy } from "../markdownTree";
-export type { MarkdownImportFile } from "../markdownImport";
+export { parseMarkdownHierarchy } from "../core/markdownTree";
+export type { MarkdownImportFile } from "../core/markdownImport";
 export {
   dropLeadingYamlEchoRoots,
   parseMarkdownImportFiles,
-} from "../markdownImport";
+} from "../core/markdownImport";
 export {
   planCreateNodesFromMarkdown,
   planCreateNodesFromMarkdownFiles,

@@ -1,7 +1,7 @@
 import React from "react";
 import { Map } from "immutable";
-import { newDB } from "./knowledge";
-import { injectEmptyNodesIntoKnowledgeDBs } from "./connections";
+import { newDB } from "./core/knowledge";
+import { injectEmptyNodesIntoKnowledgeDBs } from "./core/connections";
 import {
   useDocumentKnowledgeDBs,
   useDocumentSemanticIndex,

@@ -6,7 +6,7 @@ import {
   parseNodeRouteUrl,
   parseAuthorFromSearch,
 } from "./navigationUrl";
-import { splitID } from "./connections";
+import { splitID } from "./core/connections";
 import { usePaneHistory } from "./PaneHistoryContext";
 
 const PaneIndexContext = createContext<number>(0);

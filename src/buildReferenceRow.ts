@@ -9,16 +9,16 @@ import {
   itemPassesFilters,
   getSemanticID,
   getNodeContext,
-} from "./connections";
+} from "./core/connections";
 import {
   getBlockLinkText,
   getBlockFileLinkPath,
   getBlockFileLinkText,
   isBlockFileLink,
   nodeText,
-} from "./nodeSpans";
-import { Document, documentKeyOf } from "./Document";
-import { resolveLinkPath } from "./linkPath";
+} from "./core/nodeSpans";
+import { Document, documentKeyOf } from "./core/Document";
+import { resolveLinkPath } from "./core/linkPath";
 import {
   ViewPath,
   getParentView,
@@ -26,7 +26,7 @@ import {
   getNodeForView,
 } from "./ViewContext";
 import { getPane } from "./planner";
-import { DEFAULT_TYPE_FILTERS } from "./constants";
+import { DEFAULT_TYPE_FILTERS } from "./core/constants";
 import { referenceToText } from "./components/referenceDisplay";
 
 function argumentPrefix(argument?: Argument): string {

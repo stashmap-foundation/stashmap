@@ -14,11 +14,11 @@ import {
   getNode,
   resolveNode,
   isRefNode,
-} from "./connections";
-import { getBlockLinkTarget, nodeText } from "./nodeSpans";
-import { fileLinkIndexKey } from "./linkPath";
-import { suggestionSettings } from "./constants";
-import { LOG_ROOT_ROLE } from "./systemRoots";
+} from "./core/connections";
+import { getBlockLinkTarget, nodeText } from "./core/nodeSpans";
+import { fileLinkIndexKey } from "./core/linkPath";
+import { suggestionSettings } from "./core/constants";
+import { LOG_ROOT_ROLE } from "./core/systemRoots";
 import { computeVersionDiff } from "./domain/snapshotBaseline";
 
 type FooterTypeFilters = (

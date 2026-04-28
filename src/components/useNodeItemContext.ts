@@ -9,7 +9,7 @@ import {
   getCurrentEdgeForView,
   ViewPath,
 } from "../ViewContext";
-import { isEmptySemanticID } from "../connections";
+import { isEmptySemanticID } from "../core/connections";
 import { usePlanner } from "../planner";
 import {
   planUpdateViewItemMetadata,
@@ -18,7 +18,7 @@ import {
 import { usePaneStack } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 import { useEditorText } from "./EditorTextContext";
-import { nodeText as getNodeSpanText } from "../nodeSpans";
+import { nodeText as getNodeSpanText } from "../core/nodeSpans";
 
 type NodeItemContext = {
   // Current state

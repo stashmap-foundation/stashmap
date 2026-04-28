@@ -12,8 +12,8 @@ import {
   useIsViewingOtherUserContent,
   useCurrentEdge,
 } from "../ViewContext";
-import { isEmptySemanticID } from "../connections";
-import { getBlockLinkTarget, getBlockLinkText } from "../nodeSpans";
+import { isEmptySemanticID } from "../core/connections";
+import { getBlockLinkTarget, getBlockLinkText } from "../core/nodeSpans";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
 import {

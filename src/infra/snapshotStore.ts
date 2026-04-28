@@ -4,7 +4,7 @@ import { KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT, getReplaceableKey } from "../nostr";
 import { findTag, getEventMs, parseDocumentEvent } from "../nostrEvents";
 import { collectEventsUntilIdle, EventQueryClient } from "../eventQuery";
 import { storedDocumentToEvent } from "../documentMaterialization";
-import { joinID } from "../connections";
+import { joinID } from "../core/connections";
 import { getStoredEventID } from "../permanentSync";
 import type { StashmapDB, StoredSnapshotRecord } from "./nostr/cache/indexedDB";
 import { getStoredSnapshot, putStoredSnapshot } from "./nostr/cache/indexedDB";

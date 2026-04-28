@@ -2,8 +2,8 @@ import { useEffect } from "react";
 import { Map as ImmutableMap } from "immutable";
 import { useBackend } from "../../BackendContext";
 import { useDocumentStore, useDocuments } from "../../DocumentStore";
-import { Document, contentToDocument } from "../../Document";
-import { FsEvent } from "../../core/workspaceWatcher";
+import { Document, contentToDocument } from "../../core/Document";
+import { FsEvent } from "./workspaceWatcher";
 
 function findExistingByFilePath(
   documents: ImmutableMap<string, Document>,

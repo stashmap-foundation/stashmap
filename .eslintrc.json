@@ -122,6 +122,32 @@
           }
         },
         {
+          "files": ["src/core/**/*.{ts,tsx}"],
+          "rules": {
+            "no-restricted-imports": [
+              "error",
+              {
+                "paths": [
+                  { "name": "react", "message": "src/core must stay free of React. Move React-aware logic to the editor or app layer." },
+                  { "name": "react-dom", "message": "src/core must stay free of React. Move React-aware logic to the editor or app layer." },
+                  { "name": "nostr-tools", "message": "src/core must stay free of nostr-tools. Move nostr-aware logic to src/infra/nostr/." },
+                  { "name": "electron", "message": "src/core must stay free of electron." },
+                  { "name": "fs", "message": "src/core must stay free of node:fs. Use the filesystem adapter instead." },
+                  { "name": "fs/promises", "message": "src/core must stay free of node:fs. Use the filesystem adapter instead." },
+                  { "name": "path", "message": "src/core must stay free of node:path. Path handling belongs in the filesystem adapter." },
+                  { "name": "chokidar", "message": "src/core must stay free of chokidar. File watching belongs in the filesystem adapter." }
+                ],
+                "patterns": [
+                  { "group": ["nostr-tools/**"], "message": "src/core must stay free of nostr-tools." },
+                  { "group": ["**/infra/**"], "message": "src/core must not depend on src/infra. Adapters depend on core, not the other way around." },
+                  { "group": ["../semanticProjection", "./semanticProjection"], "message": "Semantic projection helpers are restricted to semantic projection and navigation boundary files." },
+                  { "group": ["../semanticNavigation", "./semanticNavigation"], "message": "Semantic navigation helpers are restricted to navigation boundary files." }
+                ]
+              }
+            ]
+          }
+        },
+        {
           "files": ["*.test.tsx", "*.test.ts", "setupTests.js", "setupProxy.js", "**/testutils/*.tsx"],
           "rules": {
             "@typescript-eslint/no-unsafe-member-access": 0,

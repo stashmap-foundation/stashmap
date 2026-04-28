@@ -1,9 +1,8 @@
 import { Map } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
 import { KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT, getReplaceableKey } from "../nostr";
-import { findTag, getEventMs } from "../nostrEvents";
+import { findTag, getEventMs, parseDocumentEvent } from "../nostrEvents";
 import { collectEventsUntilIdle, EventQueryClient } from "../eventQuery";
-import { parseDocumentEvent } from "../markdownNodes";
 import { storedDocumentToEvent } from "../documentMaterialization";
 import { joinID } from "../connections";
 import { getStoredEventID } from "../permanentSync";

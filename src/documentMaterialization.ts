@@ -8,13 +8,17 @@ import {
 } from "./connections";
 import type { StoredDocumentRecord } from "./infra/nostr/cache/indexedDB";
 import { newDB } from "./knowledge";
-import { parseDocumentEvent } from "./markdownNodes";
 import {
   KIND_DELETE,
   KIND_KNOWLEDGE_DOCUMENT,
   getReplaceableKey,
 } from "./nostr";
-import { findTag, getEventMs, sortEvents } from "./nostrEvents";
+import {
+  findTag,
+  getEventMs,
+  parseDocumentEvent,
+  sortEvents,
+} from "./nostrEvents";
 
 export function storedDocumentToEvent(
   document: StoredDocumentRecord

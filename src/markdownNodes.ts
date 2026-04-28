@@ -1,10 +1,8 @@
 /* eslint-disable functional/immutable-data */
 import { List, Map, Set as ImmutableSet } from "immutable";
 import { v4 } from "uuid";
-import { UnsignedEvent } from "nostr-tools";
 import { ensureNodeNativeFields, joinID, shortID } from "./connections";
 import { newDB } from "./knowledge";
-import { findTag } from "./nostrEvents";
 import { createRootAnchor } from "./rootAnchor";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
 import { newRefNode, newNode, newFileLinkNode } from "./nodeFactory";
@@ -215,16 +213,3 @@ export function parseDocumentContent(params: {
   return db?.nodes ?? Map<string, GraphNode>();
 }
 
-export function parseDocumentEvent(
-  event: UnsignedEvent,
-  options: { docId?: string } = {}
-): Map<string, GraphNode> {
-  const sTag = findTag(event, "s");
-  return parseDocumentContent({
-    content: event.content,
-    author: event.pubkey as PublicKey,
-    docId: options.docId,
-    updatedMs: Number(findTag(event, "ms")) || event.created_at * 1000,
-    ...(sTag === "log" ? { systemRole: "log" as RootSystemRole } : {}),
-  });
-}

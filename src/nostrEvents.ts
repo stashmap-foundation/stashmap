@@ -1,7 +1,8 @@
-import { Collection, List } from "immutable";
+import { Collection, List, Map } from "immutable";
 import { Event, EventTemplate, Filter, UnsignedEvent } from "nostr-tools";
 import type { Document, DocumentDelete } from "./Document";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
+import { parseDocumentContent } from "./markdownNodes";
 
 export function findAllTags(
   event: EventTemplate,
@@ -104,4 +105,18 @@ export function eventToDocumentDelete(
     docId,
     deletedAt: getEventMs(event),
   };
+}
+
+export function parseDocumentEvent(
+  event: UnsignedEvent,
+  options: { docId?: string } = {}
+): Map<string, GraphNode> {
+  const sTag = findTag(event, "s");
+  return parseDocumentContent({
+    content: event.content,
+    author: event.pubkey as PublicKey,
+    docId: options.docId,
+    updatedMs: Number(findTag(event, "ms")) || event.created_at * 1000,
+    ...(sTag === "log" ? { systemRole: "log" as RootSystemRole } : {}),
+  });
 }

@@ -2046,6 +2046,9 @@ Root
     fireEvent.dragStart(screen.getAllByText("A")[0]);
     fireEvent.drop(targetInPane1);
 
+    await screen.findByText(/syncing/);
+    await screen.findByText("synced");
+
     const collapseA = screen.getAllByLabelText("collapse A");
     expect(collapseA.length).toBeGreaterThanOrEqual(2);
     const collapseB = screen.getAllByLabelText("collapse B");

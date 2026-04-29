@@ -7,8 +7,11 @@ import Token from "markdown-it/lib/token";
 import { fileLinkSpan, linkSpan, plainSpans, spansText } from "./nodeSpans";
 import { isMarkdownPath } from "./linkPath";
 
+const captured: { value?: string } = {};
 const markdown = new MarkdownIt({ html: true });
-markdown.use(markdownItFrontMatter, () => undefined);
+markdown.use(markdownItFrontMatter, (raw: string) => {
+  captured.value = raw;
+});
 
 const ID_COMMENT_RE = /^<!--\s+id:(\S+)(.*?)-->$/;
 const ATTR_RE = /(\w+)="([^"]*)"/g;
@@ -303,10 +306,7 @@ function getLastDefinedListItem(
 
 type ListKind = { ordered: boolean; start: number };
 
-export function parseMarkdownHierarchy(
-  markdownText: string
-): MarkdownTreeNode[] {
-  const tokens = markdown.parse(markdownText, {});
+function buildTreeFromTokens(tokens: Token[]): MarkdownTreeNode[] {
   const roots: MarkdownTreeNode[] = [];
   const headingStack: Array<{ level: number; node: MarkdownTreeNode }> = [];
   const listItemStack: Array<MarkdownTreeNode | undefined> = [];
@@ -498,4 +498,22 @@ export function parseMarkdownHierarchy(
     );
   }
   return roots;
+}
+
+export function parseMarkdownDocument(markdownText: string): {
+  tree: MarkdownTreeNode[];
+  frontMatter?: string;
+} {
+  captured.value = undefined;
+  const tree = buildTreeFromTokens(markdown.parse(markdownText, {}));
+  return {
+    tree,
+    ...(captured.value !== undefined ? { frontMatter: captured.value } : {}),
+  };
+}
+
+export function parseMarkdownHierarchy(
+  markdownText: string
+): MarkdownTreeNode[] {
+  return parseMarkdownDocument(markdownText).tree;
 }

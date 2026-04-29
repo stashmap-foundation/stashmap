@@ -75,7 +75,7 @@ function isEditingFrontMatter(content: string): boolean {
   );
 }
 
-function extractTitle(content: string): string | undefined {
+export function extractTitle(content: string): string | undefined {
   const titleLine = content
     .split(/\r?\n/u)
     .find((line) => /^title:\s+/u.test(line.trim()));

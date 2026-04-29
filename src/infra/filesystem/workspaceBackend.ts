@@ -2,7 +2,7 @@ import path from "path";
 import fs from "fs/promises";
 import { scanWorkspaceDocuments, WorkspaceSaveProfile } from "./workspaceSave";
 import type { Document } from "../../DocumentStore";
-import { systemRoleFromFilePath } from "../../core/Document";
+import { contentToDocument } from "../../core/Document";
 import { ensureKnowstrDocIdFrontMatter } from "../../core/knowstrFrontmatter";
 
 export async function loadWorkspaceAsDocuments(
@@ -10,15 +10,14 @@ export async function loadWorkspaceAsDocuments(
 ): Promise<ReadonlyArray<Document>> {
   const scanned = await scanWorkspaceDocuments(profile);
   return scanned.map((doc) => {
-    const systemRole = systemRoleFromFilePath(doc.relativePath);
-    return {
-      author: profile.pubkey,
-      docId: doc.docId,
-      updatedMs: Date.now(),
-      content: doc.currentContent,
-      filePath: doc.relativePath,
-      ...(systemRole !== undefined && { systemRole }),
-    };
+    const fallbackTitle = path.basename(doc.relativePath, ".md") || undefined;
+    const parsed = contentToDocument(
+      profile.pubkey,
+      doc.currentContent,
+      doc.relativePath,
+      fallbackTitle
+    );
+    return { ...parsed, docId: doc.docId };
   });
 }
 

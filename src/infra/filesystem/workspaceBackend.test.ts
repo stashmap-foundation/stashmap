@@ -71,6 +71,37 @@ test("loadWorkspaceAsDocuments respects .knowstrignore", async () => {
   expect(documents[0].content).toContain("# Keep");
 });
 
+test("loadWorkspaceAsDocuments falls back to filename basename when frontmatter has no title", async () => {
+  const workspaceDir = makeTempWorkspace();
+  fs.writeFileSync(
+    path.join(workspaceDir, "holiday-destinations.md"),
+    "# Spain\n- Madrid\n"
+  );
+
+  const documents = await loadWorkspaceAsDocuments({
+    pubkey: TEST_PUBKEY,
+    workspaceDir,
+  });
+
+  expect(documents[0].title).toBe("holiday-destinations");
+});
+
+test("loadWorkspaceAsDocuments populates Document.title from frontmatter", async () => {
+  const workspaceDir = makeTempWorkspace();
+  fs.writeFileSync(
+    path.join(workspaceDir, "trip.md"),
+    `---\ntitle: "Holiday Destinations"\n---\n# Spain\n- Madrid\n`
+  );
+
+  const documents = await loadWorkspaceAsDocuments({
+    pubkey: TEST_PUBKEY,
+    workspaceDir,
+  });
+
+  expect(documents).toHaveLength(1);
+  expect(documents[0].title).toBe("Holiday Destinations");
+});
+
 test("loadWorkspaceAsDocuments does not mutate files on disk", async () => {
   const workspaceDir = makeTempWorkspace();
   const before = "# Notes\n- alpha\n";

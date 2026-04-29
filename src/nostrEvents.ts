@@ -1,6 +1,7 @@
 import { Collection, List, Map } from "immutable";
 import { Event, EventTemplate, Filter, UnsignedEvent } from "nostr-tools";
 import type { Document, DocumentDelete } from "./core/Document";
+import { contentToDocument } from "./core/Document";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
 import { parseDocumentContent } from "./core/markdownNodes";
 
@@ -76,11 +77,11 @@ export function eventToDocument(
   const docId = findTag(event, "d");
   if (!docId) return undefined;
   const systemRole = findTag(event, "s");
+  const parsed = contentToDocument(event.pubkey as PublicKey, event.content);
   return {
-    author: event.pubkey as PublicKey,
+    ...parsed,
     docId,
     updatedMs: getEventMs(event),
-    content: event.content,
     ...(systemRole === "log" ? { systemRole: "log" as RootSystemRole } : {}),
   };
 }

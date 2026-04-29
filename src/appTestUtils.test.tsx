@@ -10,12 +10,10 @@ import {
 } from "./testFixtures/mockWorkspaceIpc";
 import { loadCliProfile } from "./cli/config";
 import { knowstrInit } from "./testFixtures/workspace";
-import {
-  RootViewOrPaneIsLoading,
-  navigateToNodeViaSearch,
-  renderWithTestData,
-} from "./utils.test";
-import { PaneView } from "./editor/Workspace";
+import { navigateToNodeViaSearch, renderWithTestData } from "./utils.test";
+import { SplitPaneLayout } from "./editor/SplitPaneLayout";
+import { PaneHistoryProvider } from "./PaneHistoryContext";
+import { DND } from "./dnd";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 test.skip("skip", () => {});
@@ -63,9 +61,11 @@ export async function renderAppTree(
 
   const utils = renderWithTestData(
     <FilesystemAppRoot>
-      <RootViewOrPaneIsLoading>
-        <PaneView />
-      </RootViewOrPaneIsLoading>
+      <DND>
+        <PaneHistoryProvider>
+          <SplitPaneLayout />
+        </PaneHistoryProvider>
+      </DND>
     </FilesystemAppRoot>,
     {
       BackendProvider: ({ children }) => (

@@ -1,5 +1,5 @@
 import fs from "fs";
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   expectMarkdown,
@@ -9,7 +9,12 @@ import {
   write,
 } from "../testFixtures/workspace";
 import { renderAppTree } from "../appTestUtils.test";
-import { expectTree, findNewNodeEditor, type } from "../utils.test";
+import {
+  expectTree,
+  findNewNodeEditor,
+  navigateToNodeViaSearch,
+  type,
+} from "../utils.test";
 
 async function expectKnowstrDocIdFrontmatter(
   workspacePath: string,
@@ -347,4 +352,57 @@ Root
 (!) plain paragraph <!-- id:... -->
 `
   );
+});
+
+test("alt-drag link from a hand-written file points to the same id persisted on disk", async () => {
+  const { path } = knowstrInit();
+  write(path, "notes.md", "# First\n- Item One\n");
+  write(path, "links.md", "# My Links");
+
+  await renderAppTree({ path });
+
+  await navigateToNodeViaSearch(0, "First");
+  await userEvent.click(await screen.findByLabelText("Open new pane"));
+  await navigateToNodeViaSearch(1, "My Links");
+
+  await expectTree(`
+First
+  Item One
+My Links
+`);
+
+  const myLinksItems = screen.getAllByRole("treeitem", { name: "My Links" });
+  const myLinksInPane1 = myLinksItems[myLinksItems.length - 1];
+
+  await userEvent.keyboard("{Alt>}");
+  fireEvent.dragStart(screen.getAllByText("Item One")[0]);
+  fireEvent.dragOver(myLinksInPane1, { altKey: true });
+  fireEvent.drop(myLinksInPane1, { altKey: true });
+  await userEvent.keyboard("{/Alt}");
+
+  await expectTree(`
+First
+  Item One
+My Links
+  [R] First / Item One
+`);
+
+  await waitFor(() => {
+    const notes = fs.readFileSync(`${path}/notes.md`, "utf8");
+    expect(notes).toMatch(/Item One <!-- id:([0-9a-f-]+) -->/u);
+    const links = fs.readFileSync(`${path}/links.md`, "utf8");
+    expect(links).toMatch(/\]\(#[^)]+\)/u);
+  });
+
+  const notesContent = fs.readFileSync(`${path}/notes.md`, "utf8");
+  const linksContent = fs.readFileSync(`${path}/links.md`, "utf8");
+
+  const itemOneIdMatch = notesContent.match(
+    /Item One <!-- id:([0-9a-f-]+) -->/u
+  );
+  const linkTargetMatch = linksContent.match(/\]\(#[^)]*?_?([0-9a-f-]+)\)/u);
+
+  expect(itemOneIdMatch?.[1]).toBeDefined();
+  expect(linkTargetMatch?.[1]).toBeDefined();
+  expect(linkTargetMatch?.[1]).toBe(itemOneIdMatch?.[1]);
 });

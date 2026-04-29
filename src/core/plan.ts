@@ -643,8 +643,21 @@ export function planAddTargetsToNode<T extends GraphPlan>(
               argument,
             } as GraphNode);
         const planWithChild = planUpsertNodes(accPlan, childNode);
+        const sourceNode = refTarget
+          ? getNode(
+              planWithChild.knowledgeDBs,
+              refTarget.targetID,
+              planWithChild.user.publicKey
+            )
+          : undefined;
+        const planWithSourceRoot = sourceNode
+          ? {
+              ...planWithChild,
+              affectedRoots: planWithChild.affectedRoots.add(sourceNode.root),
+            }
+          : planWithChild;
         return [
-          planWithChild,
+          planWithSourceRoot,
           [
             ...accItems,
             {

@@ -9,7 +9,11 @@ import {
 } from "../../core/markdownTree";
 import { ensureKnowstrDocIdFrontMatter } from "../../core/knowstrFrontmatter";
 import { plainSpans } from "../../core/nodeSpans";
-import { createNodesFromMarkdownTrees } from "../../core/markdownNodes";
+import { shortID } from "../../core/connections";
+import {
+  WalkContext,
+  createNodesFromMarkdownTrees,
+} from "../../core/markdownNodes";
 
 export type WorkspaceSaveProfile = {
   pubkey: PublicKey;
@@ -24,6 +28,12 @@ export type ScannedWorkspaceDocument = {
   frontMatter: string;
   title: string;
   mainRoot: MarkdownTreeNode;
+  rootShortId: string;
+};
+
+export type WorkspaceScanResult = {
+  documents: ScannedWorkspaceDocument[];
+  knowledgeDBs: KnowledgeDBs;
 };
 
 const ALWAYS_IGNORED = [".git", ".knowstr", "node_modules"];
@@ -151,30 +161,30 @@ export async function scanWorkspaceDocuments(
   options: {
     ignoredPatterns?: string[];
   } = {}
-): Promise<ScannedWorkspaceDocument[]> {
+): Promise<WorkspaceScanResult> {
   const ig = await loadIgnorePatterns(
     profile.workspaceDir,
     options.ignoredPatterns
   );
   const markdownFiles = await collectMarkdownFiles(profile.workspaceDir, ig);
 
-  const documents = await Promise.all(
+  const parsed = await Promise.all(
     markdownFiles.map(async (filePath) => {
       const relativePath = path.relative(profile.workspaceDir, filePath);
       const currentContent = await fs.readFile(filePath, "utf8");
-      const parsed = parseMarkdownDocument(currentContent);
+      const parsedDoc = parseMarkdownDocument(currentContent);
       const { docId, frontMatter } = ensureKnowstrDocIdFrontMatter(
-        parsed.frontMatter
+        parsedDoc.frontMatter
       );
       const fallbackTitle = path.basename(relativePath, ".md") || undefined;
       const title =
-        parsed.title ??
+        parsedDoc.title ??
         fallbackTitle ??
-        firstTopLevelNodeText(parsed.tree) ??
+        firstTopLevelNodeText(parsedDoc.tree) ??
         "Untitled";
       const mainRoot = parseWorkspaceDocumentRoots(
-        parsed.tree,
-        parsed.title,
+        parsedDoc.tree,
+        parsedDoc.title,
         frontMatter,
         relativePath
       );
@@ -191,16 +201,35 @@ export async function scanWorkspaceDocuments(
     })
   );
 
-  checkDuplicateDocIds(documents);
+  checkDuplicateDocIds(parsed);
 
-  documents.reduce(
-    (ctx, doc) => createNodesFromMarkdownTrees(ctx, [doc.mainRoot])[0],
+  const initialCtx: WalkContext = {
+    knowledgeDBs: ImmutableMap<PublicKey, KnowledgeData>(),
+    publicKey: profile.pubkey,
+    affectedRoots: ImmutableSet<ID>(),
+  };
+  const { ctx, documents } = parsed.reduce(
+    (acc, doc) => {
+      const [nextCtx, , topNodeIDs] = createNodesFromMarkdownTrees(acc.ctx, [
+        doc.mainRoot,
+      ]);
+      const rootLongId = topNodeIDs[0];
+      if (!rootLongId) {
+        throw new Error(`Materialization produced no root for ${doc.filePath}`);
+      }
+      return {
+        ctx: nextCtx,
+        documents: [
+          ...acc.documents,
+          { ...doc, rootShortId: shortID(rootLongId) },
+        ],
+      };
+    },
     {
-      knowledgeDBs: ImmutableMap<PublicKey, KnowledgeData>(),
-      publicKey: profile.pubkey,
-      affectedRoots: ImmutableSet<ID>(),
+      ctx: initialCtx,
+      documents: [] as ScannedWorkspaceDocument[],
     }
   );
 
-  return documents;
+  return { documents, knowledgeDBs: ctx.knowledgeDBs };
 }

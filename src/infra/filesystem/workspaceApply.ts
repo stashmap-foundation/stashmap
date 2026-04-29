@@ -1,16 +1,21 @@
 import fs from "fs/promises";
 import path from "path";
-import { buildDocumentEventFromMarkdownTree } from "../../standaloneDocumentEvent";
-import { extractTitle } from "../../core/markdownFrontMatter";
+import { Map as ImmutableMap, Set as ImmutableSet, List } from "immutable";
+import { renderDocumentMarkdown } from "../../documentRenderer";
+import { joinID, shortID } from "../../core/connections";
 import {
-  MarkdownTreeNode,
+  WalkContext,
+  createNodesFromMarkdownTrees,
+} from "../../core/markdownNodes";
+import {
+  firstTopLevelNodeText,
   parseMarkdownDocument,
 } from "../../core/markdownTree";
+import { ensureKnowstrDocIdFrontMatter } from "../../core/knowstrFrontmatter";
 import { saveEditedWorkspaceDocuments } from "./workspaceSave";
 import {
   ScannedWorkspaceDocument,
   WorkspaceSaveProfile,
-  collectNodeIds,
   parseWorkspaceDocumentRoots,
   scanWorkspaceDocuments,
 } from "./workspaceScan";
@@ -18,30 +23,28 @@ import {
 type InboxDocument = {
   filePath: string;
   relativePath: string;
-  mainRoot: MarkdownTreeNode;
+  nodes: ImmutableMap<string, GraphNode>;
+  rootShortId: string;
 };
 
-type LocalNodeLocation = {
-  filePath: string;
-  node: MarkdownTreeNode;
-};
-
-type GraphAdditionCandidate = {
-  parentId: string;
-  node: MarkdownTreeNode;
+type GraphAddition = {
+  parentShortId: string;
+  nodeShortId: string;
   sourcePath: string;
   targetPath: string;
+  inboxNodes: ImmutableMap<string, GraphNode>;
 };
 
-type MaybeRelevantCandidate = {
-  sourcePath: string;
-  root: MarkdownTreeNode;
-};
-
-type DuplicateCandidateConflict = {
-  nodeId: string;
+type DuplicateConflict = {
+  nodeShortId: string;
   conflicting: boolean;
-  candidate?: GraphAdditionCandidate;
+  addition?: GraphAddition;
+};
+
+type MaybeRelevantPlan = {
+  filePath: string;
+  rootShortId: string;
+  nodes: ImmutableMap<string, GraphNode>;
 };
 
 export type ApplyWorkspaceResult = {
@@ -64,175 +67,6 @@ export type ApplyWorkspaceResult = {
 const INBOX_DIR = "inbox";
 const MAYBE_RELEVANT_DIR = "maybe_relevant";
 const LOG_FILE = "knowstr_log.md";
-const DUMMY_PUBKEY = "a".repeat(64) as PublicKey;
-
-function normalizeLineEndings(value: string): string {
-  return value.replace(/\r\n/gu, "\n");
-}
-
-function cloneTree(node: MarkdownTreeNode): MarkdownTreeNode {
-  return {
-    ...node,
-    children: node.children.map((child) => cloneTree(child)),
-  };
-}
-
-function markMaybeRelevantRoot(node: MarkdownTreeNode): MarkdownTreeNode {
-  return {
-    ...cloneTree(node),
-    relevance: "maybe_relevant",
-  };
-}
-
-function collectNodeIndex(
-  node: MarkdownTreeNode,
-  filePath: string
-): Record<string, LocalNodeLocation> {
-  const ownEntry = node.uuid
-    ? {
-        [node.uuid]: {
-          filePath,
-          node,
-        },
-      }
-    : {};
-
-  return node.children.reduce(
-    (acc, child) => ({
-      ...acc,
-      ...collectNodeIndex(child, filePath),
-    }),
-    ownEntry
-  );
-}
-
-function collectKnownNodeIds(
-  node: MarkdownTreeNode,
-  knownIds: Set<string>
-): string[] {
-  return [
-    ...(node.uuid && knownIds.has(node.uuid) ? [node.uuid] : []),
-    ...node.children.flatMap((child) => collectKnownNodeIds(child, knownIds)),
-  ];
-}
-
-function collectGraphAdditionCandidates(
-  node: MarkdownTreeNode,
-  knownIds: Set<string>,
-  targetPathById: Record<string, string>
-): GraphAdditionCandidate[] {
-  const isKnown = !!node.uuid && knownIds.has(node.uuid);
-  const targetPath = node.uuid ? targetPathById[node.uuid] : undefined;
-
-  return node.children.flatMap((child) => {
-    const childIsKnown = !!child.uuid && knownIds.has(child.uuid);
-    return isKnown && !childIsKnown && node.uuid && targetPath
-      ? [
-          {
-            parentId: node.uuid,
-            node: markMaybeRelevantRoot(child),
-            sourcePath: "",
-            targetPath,
-          },
-        ]
-      : collectGraphAdditionCandidates(child, knownIds, targetPathById);
-  });
-}
-
-function trimMaybeRelevantTree(
-  node: MarkdownTreeNode,
-  knownIds: Set<string>,
-  insertedRootIds: Set<string>
-): MarkdownTreeNode | undefined {
-  if (node.uuid && insertedRootIds.has(node.uuid)) {
-    return undefined;
-  }
-
-  const trimmedChildren = node.children
-    .map((child) => trimMaybeRelevantTree(child, knownIds, insertedRootIds))
-    .filter((child): child is MarkdownTreeNode => !!child);
-  const isKnown = !!node.uuid && knownIds.has(node.uuid);
-  const keepNode = !isKnown || trimmedChildren.length > 0;
-
-  return keepNode
-    ? {
-        ...cloneTree(node),
-        relevance: isKnown ? undefined : node.relevance,
-        children: trimmedChildren,
-      }
-    : undefined;
-}
-
-function serializeTreeForComparison(node: MarkdownTreeNode): string {
-  return normalizeLineEndings(
-    buildDocumentEventFromMarkdownTree(DUMMY_PUBKEY, node).event.content
-  );
-}
-
-function sameCandidate(
-  left: GraphAdditionCandidate,
-  right: GraphAdditionCandidate
-): boolean {
-  return (
-    left.parentId === right.parentId &&
-    serializeTreeForComparison(left.node) ===
-      serializeTreeForComparison(right.node)
-  );
-}
-
-function dedupeGraphCandidates(
-  candidates: GraphAdditionCandidate[]
-): DuplicateCandidateConflict[] {
-  const grouped = candidates.reduce((acc, candidate) => {
-    const nodeId = candidate.node.uuid;
-    if (!nodeId) {
-      return acc;
-    }
-    const existing = acc[nodeId];
-    if (!existing) {
-      return {
-        ...acc,
-        [nodeId]: {
-          nodeId,
-          conflicting: false,
-          candidate,
-        },
-      };
-    }
-    if (existing.conflicting || !existing.candidate) {
-      return acc;
-    }
-    return {
-      ...acc,
-      [nodeId]: sameCandidate(existing.candidate, candidate)
-        ? existing
-        : {
-            nodeId,
-            conflicting: true,
-          },
-    };
-  }, {} as Record<string, DuplicateCandidateConflict>);
-
-  return Object.values(grouped);
-}
-
-function appendChildByParentId(
-  node: MarkdownTreeNode,
-  parentId: string,
-  childToAppend: MarkdownTreeNode
-): MarkdownTreeNode {
-  return node.uuid === parentId
-    ? {
-        ...node,
-        children: [...node.children, cloneTree(childToAppend)],
-      }
-    : {
-        ...node,
-        children: node.children.map((child) =>
-          appendChildByParentId(child, parentId, childToAppend)
-        ),
-      };
-}
 
 async function collectMarkdownFilesRecursively(
   dirPath: string
@@ -255,22 +89,12 @@ async function collectMarkdownFilesRecursively(
   }, Promise.resolve([] as string[]));
 }
 
-function hasMissingNodeIds(node: MarkdownTreeNode): boolean {
-  return !node.uuid || node.children.some((child) => hasMissingNodeIds(child));
-}
-
-function normalizeInboxRoot(
-  profile: WorkspaceSaveProfile,
-  root: MarkdownTreeNode,
-  relativePath: string
-): MarkdownTreeNode {
-  const normalizedContent = buildDocumentEventFromMarkdownTree(
-    profile.pubkey,
-    root
-  ).event.content;
-  const { tree, frontMatter } = parseMarkdownDocument(normalizedContent);
-  const title = frontMatter ? extractTitle(frontMatter) : undefined;
-  return parseWorkspaceDocumentRoots(tree, title, "", relativePath);
+function freshWalkContext(pubkey: PublicKey): WalkContext {
+  return {
+    knowledgeDBs: ImmutableMap<PublicKey, KnowledgeData>(),
+    publicKey: pubkey,
+    affectedRoots: ImmutableSet<ID>(),
+  };
 }
 
 async function scanInboxDocuments(
@@ -281,63 +105,85 @@ async function scanInboxDocuments(
     .stat(inboxDir)
     .then((stats) => stats.isDirectory())
     .catch(() => false);
-
   if (!exists) {
-    return {
-      documents: [],
-      invalidPaths: [],
-    };
+    return { documents: [], invalidPaths: [] };
   }
 
   const markdownFiles = await collectMarkdownFilesRecursively(inboxDir);
-  const scanned = await Promise.all(
+  const documents = await Promise.all(
     markdownFiles.map(async (filePath) => {
       const currentContent = await fs.readFile(filePath, "utf8");
       const relativePath = path.relative(profile.workspaceDir, filePath);
-      const { tree, frontMatter } = parseMarkdownDocument(currentContent);
-      const title = frontMatter ? extractTitle(frontMatter) : undefined;
-      const parsedRoot = parseWorkspaceDocumentRoots(
-        tree,
+      const parsed = parseMarkdownDocument(currentContent);
+      const fallbackTitle = path.basename(relativePath, ".md") || undefined;
+      const title =
+        parsed.title ??
+        fallbackTitle ??
+        firstTopLevelNodeText(parsed.tree) ??
+        "Untitled";
+      const { frontMatter } = ensureKnowstrDocIdFrontMatter(parsed.frontMatter);
+      const mainRoot = parseWorkspaceDocumentRoots(
+        parsed.tree,
         title,
-        "",
+        frontMatter,
         relativePath
       );
+      const [ctx, , topNodeIDs] = createNodesFromMarkdownTrees(
+        freshWalkContext(profile.pubkey),
+        [mainRoot]
+      );
+      const rootLongId = topNodeIDs[0];
+      if (!rootLongId) {
+        throw new Error(`Inbox file ${relativePath} has no root`);
+      }
+      const nodes = ctx.knowledgeDBs.get(profile.pubkey)?.nodes;
+      if (!nodes) {
+        throw new Error(`Inbox file ${relativePath} produced no nodes`);
+      }
       return {
         filePath,
         relativePath,
-        mainRoot: normalizeInboxRoot(profile, parsedRoot, relativePath),
+        nodes,
+        rootShortId: shortID(rootLongId),
       };
     })
   );
 
-  return scanned.reduce(
-    (acc, document) =>
-      hasMissingNodeIds(document.mainRoot)
-        ? {
-            ...acc,
-            invalidPaths: [...acc.invalidPaths, document.filePath],
-          }
-        : {
-            ...acc,
-            documents: [...acc.documents, document],
-          },
-    {
-      documents: [] as InboxDocument[],
-      invalidPaths: [] as string[],
-    }
+  return { documents, invalidPaths: [] };
+}
+
+function indexDocumentTree(
+  workspaceNodes: ImmutableMap<string, GraphNode>,
+  filePath: string,
+  shortId: string,
+  acc: Record<string, string>
+): Record<string, string> {
+  if (acc[shortId]) return acc;
+  const node = workspaceNodes.get(shortId);
+  if (!node) return acc;
+  return node.children.reduce(
+    (next, childId) =>
+      indexDocumentTree(workspaceNodes, filePath, shortID(childId), next),
+    { ...acc, [shortId]: filePath }
   );
 }
 
-function makeLocalNodeIndex(
+function buildLocalIndex(
+  workspaceNodes: ImmutableMap<string, GraphNode>,
   documents: ScannedWorkspaceDocument[]
-): Record<string, LocalNodeLocation> {
-  return documents.reduce(
-    (acc, document) => ({
-      ...acc,
-      ...collectNodeIndex(document.mainRoot, document.filePath),
-    }),
-    {} as Record<string, LocalNodeLocation>
+): {
+  knownIds: Set<string>;
+  targetPathByShortId: Record<string, string>;
+} {
+  const targetPathByShortId = documents.reduce(
+    (acc, doc) =>
+      indexDocumentTree(workspaceNodes, doc.filePath, doc.rootShortId, acc),
+    {} as Record<string, string>
   );
+  return {
+    knownIds: new Set(Object.keys(targetPathByShortId)),
+    targetPathByShortId,
+  };
 }
 
 function makeUniqueMaybeRelevantPath(
@@ -346,18 +192,261 @@ function makeUniqueMaybeRelevantPath(
   usedPaths: string[]
 ): string {
   const baseName = path.basename(sourcePath, ".md") || "incoming";
-  const extension = ".md";
   const directory = path.join(workspaceDir, MAYBE_RELEVANT_DIR);
   const candidate = (index: number): string =>
-    path.join(
-      directory,
-      `${baseName}${index === 0 ? "" : `-${index + 1}`}${extension}`
-    );
+    path.join(directory, `${baseName}${index === 0 ? "" : `-${index + 1}`}.md`);
   const pick = (index: number): string => {
     const filePath = candidate(index);
     return usedPaths.includes(filePath) ? pick(index + 1) : filePath;
   };
   return pick(0);
+}
+
+type Classification = {
+  additions: GraphAddition[];
+  maybeRelevantPlan?: MaybeRelevantPlan;
+  skippedKnownIds: string[];
+};
+
+type WalkAcc = {
+  additions: GraphAddition[];
+  skipped: string[];
+  inserted: ImmutableSet<string>;
+};
+
+function walkInboxNode(
+  inbox: InboxDocument,
+  nodeShortId: string,
+  parentShortId: string | undefined,
+  knownIds: Set<string>,
+  targetPathByShortId: Record<string, string>,
+  acc: WalkAcc
+): WalkAcc {
+  const node = inbox.nodes.get(nodeShortId);
+  if (!node) return acc;
+  if (knownIds.has(nodeShortId)) {
+    return node.children.reduce(
+      (next, childId) =>
+        walkInboxNode(
+          inbox,
+          shortID(childId),
+          nodeShortId,
+          knownIds,
+          targetPathByShortId,
+          next
+        ),
+      { ...acc, skipped: [...acc.skipped, nodeShortId] }
+    );
+  }
+  const targetPath =
+    parentShortId && knownIds.has(parentShortId)
+      ? targetPathByShortId[parentShortId]
+      : undefined;
+  if (parentShortId && targetPath) {
+    return {
+      ...acc,
+      additions: [
+        ...acc.additions,
+        {
+          parentShortId,
+          nodeShortId,
+          sourcePath: inbox.filePath,
+          targetPath,
+          inboxNodes: inbox.nodes,
+        },
+      ],
+      inserted: acc.inserted.add(nodeShortId),
+    };
+  }
+  return node.children.reduce(
+    (next, childId) =>
+      walkInboxNode(
+        inbox,
+        shortID(childId),
+        nodeShortId,
+        knownIds,
+        targetPathByShortId,
+        next
+      ),
+    acc
+  );
+}
+
+type TrimAcc = {
+  nodes: ImmutableMap<string, GraphNode>;
+};
+
+type TrimResult = {
+  shortId: string | undefined;
+  acc: TrimAcc;
+};
+
+function trimMaybeRelevant(
+  inbox: InboxDocument,
+  nodeShortId: string,
+  knownIds: Set<string>,
+  inserted: ImmutableSet<string>,
+  acc: TrimAcc
+): TrimResult {
+  if (inserted.has(nodeShortId)) return { shortId: undefined, acc };
+  const node = inbox.nodes.get(nodeShortId);
+  if (!node) return { shortId: undefined, acc };
+  const childResult = node.children.reduce<{
+    childIds: string[];
+    acc: TrimAcc;
+  }>(
+    (next, childId) => {
+      const result = trimMaybeRelevant(
+        inbox,
+        shortID(childId),
+        knownIds,
+        inserted,
+        next.acc
+      );
+      return {
+        childIds: result.shortId
+          ? [...next.childIds, result.shortId]
+          : next.childIds,
+        acc: result.acc,
+      };
+    },
+    { childIds: [] as string[], acc }
+  );
+  const isKnown = knownIds.has(nodeShortId);
+  if (isKnown && childResult.childIds.length === 0) {
+    return { shortId: undefined, acc: childResult.acc };
+  }
+  const trimmedNode: GraphNode = {
+    ...node,
+    children: List(
+      childResult.childIds.map((id) => joinID(node.author, id) as ID)
+    ),
+    ...(isKnown ? { relevance: undefined } : {}),
+  };
+  return {
+    shortId: nodeShortId,
+    acc: { nodes: childResult.acc.nodes.set(nodeShortId, trimmedNode) },
+  };
+}
+
+function classifyInboxDoc(
+  inbox: InboxDocument,
+  knownIds: Set<string>,
+  targetPathByShortId: Record<string, string>,
+  workspaceDir: string,
+  usedPaths: string[]
+): Classification {
+  const walked = walkInboxNode(
+    inbox,
+    inbox.rootShortId,
+    undefined,
+    knownIds,
+    targetPathByShortId,
+    {
+      additions: [],
+      skipped: [],
+      inserted: ImmutableSet<string>(),
+    }
+  );
+  const trimmed = trimMaybeRelevant(
+    inbox,
+    inbox.rootShortId,
+    knownIds,
+    walked.inserted,
+    { nodes: ImmutableMap<string, GraphNode>() }
+  );
+  const maybeRelevantPlan =
+    trimmed.shortId && !knownIds.has(trimmed.shortId)
+      ? {
+          filePath: makeUniqueMaybeRelevantPath(
+            workspaceDir,
+            inbox.filePath,
+            usedPaths
+          ),
+          rootShortId: trimmed.shortId,
+          nodes: trimmed.acc.nodes,
+        }
+      : undefined;
+
+  return {
+    additions: walked.additions,
+    ...(maybeRelevantPlan ? { maybeRelevantPlan } : {}),
+    skippedKnownIds: walked.skipped,
+  };
+}
+
+function renderAdditionSubtree(addition: GraphAddition): string {
+  const root = addition.inboxNodes.get(addition.nodeShortId);
+  if (!root) return "";
+  const dbs: KnowledgeDBs = ImmutableMap<PublicKey, KnowledgeData>().set(
+    root.author,
+    { nodes: addition.inboxNodes } as KnowledgeData
+  );
+  return renderDocumentMarkdown(dbs, root);
+}
+
+function dedupeAdditions(additions: GraphAddition[]): DuplicateConflict[] {
+  const grouped = additions.reduce<Record<string, DuplicateConflict>>(
+    (acc, addition) => {
+      const key = addition.nodeShortId;
+      const existing = acc[key];
+      if (!existing) {
+        return {
+          ...acc,
+          [key]: { nodeShortId: key, conflicting: false, addition },
+        };
+      }
+      if (existing.conflicting || !existing.addition) return acc;
+      const same =
+        existing.addition.parentShortId === addition.parentShortId &&
+        renderAdditionSubtree(existing.addition) ===
+          renderAdditionSubtree(addition);
+      return same
+        ? acc
+        : {
+            ...acc,
+            [key]: { nodeShortId: key, conflicting: true },
+          };
+    },
+    {}
+  );
+  return Object.values(grouped);
+}
+
+function collectAdditionDescendants(
+  addition: GraphAddition,
+  workspaceAuthor: PublicKey,
+  workspaceRoot: ID
+): ImmutableMap<string, GraphNode> {
+  const collected = new globalThis.Map<string, GraphNode>();
+  const visit = (shortId: string, parent: LongID | undefined): void => {
+    const node = addition.inboxNodes.get(shortId);
+    if (!node) return;
+    const isAdditionRoot = shortId === addition.nodeShortId;
+    // eslint-disable-next-line functional/immutable-data
+    collected.set(shortId, {
+      ...node,
+      author: workspaceAuthor,
+      root: workspaceRoot,
+      ...(parent !== undefined ? { parent } : {}),
+      ...(isAdditionRoot ? { relevance: "maybe_relevant" } : {}),
+    });
+    node.children.forEach((childId) =>
+      visit(shortID(childId), node.id as LongID)
+    );
+  };
+  visit(addition.nodeShortId, undefined);
+  return ImmutableMap(collected);
+}
+
+async function ensureDirectory(dirPath: string): Promise<void> {
+  await fs.mkdir(dirPath, { recursive: true });
+}
+
+async function removeInboxFiles(filePaths: string[]): Promise<void> {
+  await Promise.all(
+    filePaths.map((filePath) => fs.rm(filePath, { force: true }))
+  );
 }
 
 function buildLogContent(
@@ -371,200 +460,169 @@ function buildLogContent(
   return `${baseContent}${lines.map((line) => `- ${line}`).join("\n")}\n`;
 }
 
-function getDocumentByPath(
-  documents: ScannedWorkspaceDocument[],
-  filePath: string
-): ScannedWorkspaceDocument {
-  const document = documents.find((item) => item.filePath === filePath);
-  if (!document) {
-    throw new Error(`Missing workspace document: ${filePath}`);
-  }
-  return document;
-}
-
-async function ensureDirectory(dirPath: string): Promise<void> {
-  await fs.mkdir(dirPath, { recursive: true });
-}
-
-async function removeInboxFiles(filePaths: string[]): Promise<void> {
-  await Promise.all(
-    filePaths.map((filePath) => fs.rm(filePath, { force: true }))
-  );
-}
-
 export async function applyWorkspaceInbox(
   profile: WorkspaceSaveProfile,
-  options: {
-    dryRun?: boolean;
-  } = {}
+  options: { dryRun?: boolean } = {}
 ): Promise<ApplyWorkspaceResult> {
-  const localDocuments = await scanWorkspaceDocuments(profile);
-  const localIndex = makeLocalNodeIndex(localDocuments);
-  const knownIds = new Set(Object.keys(localIndex));
-  const targetPathById = Object.fromEntries(
-    Object.entries(localIndex).map(([id, value]) => [id, value.filePath])
+  const { documents: localDocuments, knowledgeDBs: workspaceDBs } =
+    await scanWorkspaceDocuments(profile);
+  const workspaceNodes =
+    workspaceDBs.get(profile.pubkey)?.nodes ??
+    ImmutableMap<string, GraphNode>();
+  const { knownIds, targetPathByShortId } = buildLocalIndex(
+    workspaceNodes,
+    localDocuments
   );
+
   const { documents: inboxDocuments, invalidPaths } = await scanInboxDocuments(
     profile
   );
 
-  const classified = inboxDocuments.reduce(
-    (acc, document) => {
-      const rawGraphCandidates = collectGraphAdditionCandidates(
-        document.mainRoot,
+  const classifyAcc = inboxDocuments.reduce(
+    (acc, inbox) => {
+      const classification = classifyInboxDoc(
+        inbox,
         knownIds,
-        targetPathById
-      ).map((candidate) => ({
-        ...candidate,
-        sourcePath: document.filePath,
-      }));
-      const insertedRootIds = new Set(
-        rawGraphCandidates
-          .map((candidate) => candidate.node.uuid)
-          .filter((value): value is string => !!value)
-      );
-      const maybeRelevantRoot = trimMaybeRelevantTree(
-        document.mainRoot,
-        knownIds,
-        insertedRootIds
+        targetPathByShortId,
+        profile.workspaceDir,
+        acc.usedMaybeRelevantPaths
       );
       return {
-        graphCandidates: [...acc.graphCandidates, ...rawGraphCandidates],
-        maybeRelevantCandidates:
-          maybeRelevantRoot &&
-          maybeRelevantRoot.uuid &&
-          !knownIds.has(maybeRelevantRoot.uuid)
-            ? [
-                ...acc.maybeRelevantCandidates,
-                {
-                  sourcePath: document.filePath,
-                  root: maybeRelevantRoot,
-                },
-              ]
-            : acc.maybeRelevantCandidates,
-        skippedExistingIds: [
-          ...acc.skippedExistingIds,
-          ...collectKnownNodeIds(document.mainRoot, knownIds),
+        additions: [...acc.additions, ...classification.additions],
+        maybeRelevantPlans: classification.maybeRelevantPlan
+          ? [...acc.maybeRelevantPlans, classification.maybeRelevantPlan]
+          : acc.maybeRelevantPlans,
+        skippedKnownIds: [
+          ...acc.skippedKnownIds,
+          ...classification.skippedKnownIds,
         ],
+        usedMaybeRelevantPaths: classification.maybeRelevantPlan
+          ? [
+              ...acc.usedMaybeRelevantPaths,
+              classification.maybeRelevantPlan.filePath,
+            ]
+          : acc.usedMaybeRelevantPaths,
       };
     },
     {
-      graphCandidates: [] as GraphAdditionCandidate[],
-      maybeRelevantCandidates: [] as MaybeRelevantCandidate[],
-      skippedExistingIds: [] as string[],
+      additions: [] as GraphAddition[],
+      maybeRelevantPlans: [] as MaybeRelevantPlan[],
+      skippedKnownIds: [] as string[],
+      usedMaybeRelevantPaths: [] as string[],
     }
   );
 
-  const dedupedGraphCandidates = dedupeGraphCandidates(
-    classified.graphCandidates
-  );
-  const graphCandidates = dedupedGraphCandidates
-    .filter((candidate) => !candidate.conflicting && candidate.candidate)
-    .map((candidate) => candidate.candidate as GraphAdditionCandidate);
-  const conflictingIds = dedupedGraphCandidates
-    .filter((candidate) => candidate.conflicting)
-    .map((candidate) => candidate.nodeId)
+  const dedupedAdditions = dedupeAdditions(classifyAcc.additions);
+  const additions = dedupedAdditions
+    .filter((d) => !d.conflicting && d.addition)
+    .map((d) => d.addition as GraphAddition);
+  const conflictingIds = dedupedAdditions
+    .filter((d) => d.conflicting)
+    .map((d) => d.nodeShortId)
     .sort();
-  const graphCandidateIds = graphCandidates
-    .map((candidate) => candidate.node.uuid)
-    .filter((value): value is string => !!value);
-  const skippedExistingIds = [...new Set(classified.skippedExistingIds)].sort();
-  const graphAdditionResults = graphCandidates.map((candidate) => ({
-    parent_id: candidate.parentId,
-    node_id: candidate.node.uuid as string,
-    source_path: candidate.sourcePath,
-    target_path: candidate.targetPath,
+  const additionShortIds = new Set(additions.map((a) => a.nodeShortId));
+  const skippedExistingIds = [...new Set(classifyAcc.skippedKnownIds)].sort();
+
+  // Filter maybe_relevant plans whose ids overlap with known/added/conflicting.
+  const usableMaybeRelevant = classifyAcc.maybeRelevantPlans.filter((plan) => {
+    const ids = Array.from(plan.nodes.keys());
+    return !ids.some(
+      (id) =>
+        knownIds.has(id) ||
+        additionShortIds.has(id) ||
+        conflictingIds.includes(id)
+    );
+  });
+
+  const graphAdditionResults = additions.map((addition) => ({
+    parent_id: addition.parentShortId,
+    node_id: addition.nodeShortId,
+    source_path: addition.sourcePath,
+    target_path: addition.targetPath,
   }));
-  const maybeRelevantPlans = classified.maybeRelevantCandidates.reduce(
-    (acc, candidate) => {
-      const candidateIds = collectNodeIds(candidate.root);
-      const usedIds = new Set(acc.usedIds);
-      const overlaps = candidateIds.some(
-        (id) =>
-          knownIds.has(id) ||
-          graphCandidateIds.includes(id) ||
-          conflictingIds.includes(id) ||
-          usedIds.has(id)
-      );
-      if (overlaps) {
-        return acc;
-      }
-      const filePath = makeUniqueMaybeRelevantPath(
-        profile.workspaceDir,
-        candidate.sourcePath,
-        acc.usedPaths
-      );
-      return {
-        plans: [
-          ...acc.plans,
-          {
-            filePath,
-            root: candidate.root,
-          },
-        ],
-        usedIds: [...acc.usedIds, ...candidateIds],
-        usedPaths: [...acc.usedPaths, filePath],
-      };
-    },
-    {
-      plans: [] as Array<{ filePath: string; root: MarkdownTreeNode }>,
-      usedIds: [] as string[],
-      usedPaths: [] as string[],
-    }
-  ).plans;
 
   if (options.dryRun) {
     return {
       dry_run: true,
       graph_additions: graphAdditionResults,
-      maybe_relevant_paths: maybeRelevantPlans.map((plan) => plan.filePath),
+      maybe_relevant_paths: usableMaybeRelevant.map((plan) => plan.filePath),
       skipped_existing_ids: skippedExistingIds,
       conflicting_ids: conflictingIds,
       invalid_inbox_paths: [...invalidPaths].sort(),
       changed_paths: [],
       cleared_inbox_paths: [],
-      ...(graphAdditionResults.length > 0 || maybeRelevantPlans.length > 0
+      ...(graphAdditionResults.length > 0 || usableMaybeRelevant.length > 0
         ? { log_path: path.join(profile.workspaceDir, LOG_FILE) }
         : {}),
     };
   }
 
-  const updatedRootsByPath = graphCandidates.reduce(
-    (acc, candidate) => ({
-      ...acc,
-      [candidate.targetPath]: appendChildByParentId(
-        acc[candidate.targetPath] ||
-          getDocumentByPath(localDocuments, candidate.targetPath).mainRoot,
-        candidate.parentId,
-        candidate.node
-      ),
-    }),
-    {} as Record<string, MarkdownTreeNode>
+  // Apply additions: render each target workspace doc with the candidate appended.
+  const additionsByTarget = additions.reduce<Record<string, GraphAddition[]>>(
+    (acc, addition) => {
+      const list = acc[addition.targetPath] ?? [];
+      return { ...acc, [addition.targetPath]: [...list, addition] };
+    },
+    {}
   );
 
   await Promise.all(
-    Object.entries(updatedRootsByPath).map(async ([filePath, root]) => {
-      const currentDocument = getDocumentByPath(localDocuments, filePath);
-      await fs.writeFile(
-        filePath,
-        buildDocumentEventFromMarkdownTree(profile.pubkey, {
-          ...root,
-          frontMatter: currentDocument.frontMatter,
-        }).event.content,
-        "utf8"
-      );
+    Object.entries(additionsByTarget).map(async ([targetPath, group]) => {
+      const targetDoc = localDocuments.find((d) => d.filePath === targetPath);
+      if (!targetDoc) return;
+      const targetRoot = workspaceNodes.get(targetDoc.rootShortId);
+      if (!targetRoot) return;
+      // Build a per-doc nodes Map containing the workspace doc's nodes plus
+      // the addition subtrees, with parents updated to point at the workspace.
+      const updatedNodes = group.reduce((nodes, addition) => {
+        const parent = nodes.get(addition.parentShortId);
+        if (!parent) return nodes;
+        const newDescendants = collectAdditionDescendants(
+          addition,
+          profile.pubkey,
+          targetRoot.root
+        );
+        const additionRoot = newDescendants.get(addition.nodeShortId);
+        if (!additionRoot) return nodes;
+        const additionRootWithParent: GraphNode = {
+          ...additionRoot,
+          parent: parent.id as LongID,
+        };
+        const merged = nodes
+          .merge(newDescendants)
+          .set(addition.nodeShortId, additionRootWithParent);
+        return merged.set(addition.parentShortId, {
+          ...parent,
+          children: parent.children.push(
+            joinID(profile.pubkey, addition.nodeShortId) as ID
+          ),
+        });
+      }, workspaceNodes);
+      const updatedRoot = updatedNodes.get(targetDoc.rootShortId);
+      if (!updatedRoot) return;
+      const dbs = ImmutableMap<PublicKey, KnowledgeData>().set(profile.pubkey, {
+        nodes: updatedNodes,
+      } as KnowledgeData);
+      // eslint-disable-next-line testing-library/render-result-naming-convention
+      const markdown = renderDocumentMarkdown(dbs, updatedRoot);
+      await fs.writeFile(targetPath, markdown, "utf8");
     })
   );
 
   await ensureDirectory(path.join(profile.workspaceDir, MAYBE_RELEVANT_DIR));
   await Promise.all(
-    maybeRelevantPlans.map(({ filePath, root }) =>
-      fs.writeFile(
-        filePath,
-        buildDocumentEventFromMarkdownTree(profile.pubkey, root).event.content,
+    usableMaybeRelevant.map(async (plan) => {
+      const root = plan.nodes.get(plan.rootShortId);
+      if (!root) return;
+      const dbs = ImmutableMap<PublicKey, KnowledgeData>().set(root.author, {
+        nodes: plan.nodes,
+      } as KnowledgeData);
+      await fs.writeFile(
+        plan.filePath,
+        renderDocumentMarkdown(dbs, root),
         "utf8"
-      )
-    )
+      );
+    })
   );
 
   const logPath = path.join(profile.workspaceDir, LOG_FILE);
@@ -576,8 +634,8 @@ export async function applyWorkspaceInbox(
           sourcePath
         )}`
     ),
-    ...maybeRelevantPlans.map(
-      ({ filePath }) => `created maybe_relevant/${path.basename(filePath)}`
+    ...usableMaybeRelevant.map(
+      (plan) => `created maybe_relevant/${path.basename(plan.filePath)}`
     ),
     ...conflictingIds.map((id) => `conflict on incoming id ${id}`),
     ...invalidPaths.map(
@@ -601,13 +659,13 @@ export async function applyWorkspaceInbox(
   }
 
   const saveResult = await saveEditedWorkspaceDocuments(profile);
-  const inboxPaths = inboxDocuments.map((document) => document.filePath);
+  const inboxPaths = inboxDocuments.map((doc) => doc.filePath);
   await removeInboxFiles(inboxPaths);
 
   return {
     dry_run: false,
     graph_additions: graphAdditionResults,
-    maybe_relevant_paths: maybeRelevantPlans.map((plan) => plan.filePath),
+    maybe_relevant_paths: usableMaybeRelevant.map((plan) => plan.filePath),
     skipped_existing_ids: skippedExistingIds,
     conflicting_ids: conflictingIds,
     invalid_inbox_paths: [...invalidPaths].sort(),

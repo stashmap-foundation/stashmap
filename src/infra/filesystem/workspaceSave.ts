@@ -1,5 +1,5 @@
 import fs from "fs/promises";
-import { buildDocumentEventFromMarkdownTree } from "../../standaloneDocumentEvent";
+import { renderDocumentMarkdown } from "../../documentRenderer";
 import {
   ScannedWorkspaceDocument,
   WorkspaceSaveProfile,
@@ -15,18 +15,18 @@ type NormalizedWorkspaceDocument = {
 };
 
 function normalizeWorkspaceDocument(
+  knowledgeDBs: KnowledgeDBs,
   profile: WorkspaceSaveProfile,
   document: ScannedWorkspaceDocument
 ): NormalizedWorkspaceDocument {
-  const rootTree = {
-    ...document.mainRoot,
-    frontMatter: document.frontMatter,
-  };
-  const builtEvent = buildDocumentEventFromMarkdownTree(
-    profile.pubkey,
-    rootTree
-  );
-  const normalizedContent = builtEvent.event.content;
+  const rootNode = knowledgeDBs
+    .get(profile.pubkey)
+    ?.nodes.get(document.rootShortId);
+  if (!rootNode) {
+    throw new Error(`Materialized root not found for ${document.relativePath}`);
+  }
+  // eslint-disable-next-line testing-library/render-result-naming-convention
+  const normalizedContent = renderDocumentMarkdown(knowledgeDBs, rootNode);
   return {
     filePath: document.filePath,
     relativePath: document.relativePath,
@@ -62,9 +62,10 @@ export async function saveEditedWorkspaceDocuments(
 ): Promise<{
   changed_paths: string[];
 }> {
-  const scannedDocuments = await scanWorkspaceDocuments(profile);
+  const { documents: scannedDocuments, knowledgeDBs } =
+    await scanWorkspaceDocuments(profile);
   const normalizedDocuments = scannedDocuments.map((document) =>
-    normalizeWorkspaceDocument(profile, document)
+    normalizeWorkspaceDocument(knowledgeDBs, profile, document)
   );
 
   const writes = normalizedDocuments

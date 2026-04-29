@@ -8,8 +8,8 @@ import { ensureKnowstrDocIdFrontMatter } from "../../core/knowstrFrontmatter";
 export async function loadWorkspaceAsDocuments(
   profile: WorkspaceSaveProfile
 ): Promise<ReadonlyArray<Document>> {
-  const scanned = await scanWorkspaceDocuments(profile);
-  return scanned.map((doc) => {
+  const { documents } = await scanWorkspaceDocuments(profile);
+  return documents.map((doc) => {
     const systemRole = systemRoleFromFilePath(doc.relativePath);
     return {
       author: profile.pubkey,

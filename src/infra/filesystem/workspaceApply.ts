@@ -6,14 +6,14 @@ import {
   MarkdownTreeNode,
   parseMarkdownDocument,
 } from "../../core/markdownTree";
+import { saveEditedWorkspaceDocuments } from "./workspaceSave";
 import {
   ScannedWorkspaceDocument,
   WorkspaceSaveProfile,
   collectNodeIds,
   parseWorkspaceDocumentRoots,
-  saveEditedWorkspaceDocuments,
   scanWorkspaceDocuments,
-} from "./workspaceSave";
+} from "./workspaceScan";
 
 type InboxDocument = {
   filePath: string;

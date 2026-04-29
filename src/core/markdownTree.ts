@@ -6,6 +6,8 @@ import markdownItFrontMatter from "markdown-it-front-matter";
 import Token from "markdown-it/lib/token";
 import { fileLinkSpan, linkSpan, plainSpans, spansText } from "./nodeSpans";
 import { isMarkdownPath } from "./linkPath";
+import { extractTitle } from "./markdownFrontMatter";
+import { extractDocId } from "./knowstrFrontmatter";
 
 const captured: { value?: string } = {};
 const markdown = new MarkdownIt({ html: true });
@@ -500,18 +502,33 @@ function buildTreeFromTokens(tokens: Token[]): MarkdownTreeNode[] {
   return roots;
 }
 
+export function firstTopLevelNodeText(
+  tree: MarkdownTreeNode[]
+): string | undefined {
+  const root = tree.find((node) => !node.hidden);
+  if (!root) return undefined;
+  const text = spansText(root.spans);
+  return text || undefined;
+}
+
 export function parseMarkdownDocument(markdownText: string): {
   tree: MarkdownTreeNode[];
   frontMatter?: string;
+  title?: string;
+  docId?: string;
 } {
   captured.value = undefined;
   const tree = buildTreeFromTokens(markdown.parse(markdownText, {}));
   const innerYaml = captured.value as string | undefined;
   const frontMatter =
     innerYaml !== undefined ? `---\n${innerYaml}\n---\n` : undefined;
+  const title = innerYaml !== undefined ? extractTitle(innerYaml) : undefined;
+  const docId = innerYaml !== undefined ? extractDocId(innerYaml) : undefined;
   return {
     tree,
     ...(frontMatter !== undefined ? { frontMatter } : {}),
+    ...(title !== undefined ? { title } : {}),
+    ...(docId !== undefined ? { docId } : {}),
   };
 }
 

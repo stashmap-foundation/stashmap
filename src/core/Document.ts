@@ -1,7 +1,5 @@
 import { ensureKnowstrDocIdFrontMatter } from "./knowstrFrontmatter";
-import { extractTitle } from "./markdownFrontMatter";
-import { parseMarkdownDocument, MarkdownTreeNode } from "./markdownTree";
-import { spansText } from "./nodeSpans";
+import { firstTopLevelNodeText, parseMarkdownDocument } from "./markdownTree";
 import { LOG_ROOT_FILE, LOG_ROOT_ROLE } from "./systemRoots";
 
 export type Document = {
@@ -30,27 +28,19 @@ export function systemRoleFromFilePath(
   return filePath === LOG_ROOT_FILE ? LOG_ROOT_ROLE : undefined;
 }
 
-function firstTopLevelNodeText(tree: MarkdownTreeNode[]): string | undefined {
-  const root = tree.find((node) => !node.hidden);
-  if (!root) return undefined;
-  const text = spansText(root.spans);
-  return text || undefined;
-}
-
 export function contentToDocument(
   author: PublicKey,
   content: string,
   filePath?: string,
   fallbackTitle?: string
 ): Document {
-  const { tree, frontMatter } = parseMarkdownDocument(content);
-  const { docId } = ensureKnowstrDocIdFrontMatter(frontMatter);
+  const parsed = parseMarkdownDocument(content);
+  const { docId } = ensureKnowstrDocIdFrontMatter(parsed.frontMatter);
   const systemRole = systemRoleFromFilePath(filePath);
-  const frontMatterTitle = frontMatter ? extractTitle(frontMatter) : undefined;
   const title =
-    frontMatterTitle ??
+    parsed.title ??
     fallbackTitle ??
-    firstTopLevelNodeText(tree) ??
+    firstTopLevelNodeText(parsed.tree) ??
     "Untitled";
   return {
     author,

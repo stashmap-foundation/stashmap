@@ -35,6 +35,11 @@ function stripWrappingQuotes(value: string): string {
   return trimmed;
 }
 
+export function extractDocId(frontMatter: string): string | undefined {
+  const match = frontMatter.match(DOC_ID_RE);
+  return match?.[1] ? stripWrappingQuotes(match[1]) : undefined;
+}
+
 export function ensureKnowstrDocIdFrontMatter(
   frontMatterRaw: string | undefined
 ): {

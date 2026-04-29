@@ -1,7 +1,7 @@
 import fsp from "fs/promises";
 import path from "path";
 import chokidar, { FSWatcher } from "chokidar";
-import { loadIgnorePatterns } from "./workspaceSave";
+import { loadIgnorePatterns } from "./workspaceScan";
 
 export type FsEvent =
   | { type: "add"; relativePath: string; content: string }

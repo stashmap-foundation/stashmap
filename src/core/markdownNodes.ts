@@ -4,9 +4,8 @@ import { v4 } from "uuid";
 import { ensureNodeNativeFields, joinID, shortID } from "./connections";
 import { newDB } from "./knowledge";
 import { createRootAnchor } from "./rootAnchor";
-import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
+import { MarkdownTreeNode, parseMarkdownDocument } from "./markdownTree";
 import { newRefNode, newNode, newFileLinkNode } from "./nodeFactory";
-import { extractImportedFrontMatter } from "./markdownFrontMatter";
 import { dropLeadingYamlEchoRoots } from "./markdownImport";
 import { nodeText, spansText } from "./nodeSpans";
 
@@ -188,19 +187,17 @@ export function parseDocumentContent(params: {
   systemRole?: RootSystemRole;
 }): Map<string, GraphNode> {
   const { content, author, docId, updatedMs, systemRole } = params;
-  const { body, frontMatter } = extractImportedFrontMatter(content);
-  const trees = dropLeadingYamlEchoRoots(
-    parseMarkdownHierarchy(body),
-    frontMatter
-  ).map((tree, index) =>
-    index === 0
-      ? {
-          ...tree,
-          ...(frontMatter && { frontMatter }),
-          ...(docId && { docId }),
-          ...(systemRole && { systemRole }),
-        }
-      : tree
+  const { tree: parsedTree, frontMatter } = parseMarkdownDocument(content);
+  const trees = dropLeadingYamlEchoRoots(parsedTree, frontMatter).map(
+    (tree, index) =>
+      index === 0
+        ? {
+            ...tree,
+            ...(frontMatter && { frontMatter }),
+            ...(docId && { docId }),
+            ...(systemRole && { systemRole }),
+          }
+        : tree
   );
   const ctx: WalkContext = {
     knowledgeDBs: Map<PublicKey, KnowledgeData>(),

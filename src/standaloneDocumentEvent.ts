@@ -2,14 +2,16 @@ import { UnsignedEvent } from "nostr-tools";
 import { shortID } from "./core/connections";
 import { createHeadlessPlan } from "./infra/filesystem/headlessPlan";
 import { planCreateNodesFromMarkdownTrees } from "./markdownPlan";
-import { MarkdownTreeNode, parseMarkdownHierarchy } from "./core/markdownTree";
+import { MarkdownTreeNode, parseMarkdownDocument } from "./core/markdownTree";
 import { buildDocumentEvent } from "./nodesDocumentEvent";
 
 export function requireSingleRootMarkdownTree(
   markdown: string,
   errorMessage = "stdin markdown must resolve to exactly one top-level root"
 ): MarkdownTreeNode {
-  const roots = parseMarkdownHierarchy(markdown).filter((root) => !root.hidden);
+  const roots = parseMarkdownDocument(markdown).tree.filter(
+    (root) => !root.hidden
+  );
   const rootTree = roots[0];
   if (!rootTree || roots.length !== 1) {
     throw new Error(errorMessage);

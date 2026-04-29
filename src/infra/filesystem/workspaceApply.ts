@@ -1,8 +1,11 @@
 import fs from "fs/promises";
 import path from "path";
 import { buildDocumentEventFromMarkdownTree } from "../../standaloneDocumentEvent";
-import { extractMarkdownImportPayload } from "../../core/markdownImport";
-import { MarkdownTreeNode } from "../../core/markdownTree";
+import { extractTitle } from "../../core/markdownFrontMatter";
+import {
+  MarkdownTreeNode,
+  parseMarkdownDocument,
+} from "../../core/markdownTree";
 import {
   ScannedWorkspaceDocument,
   WorkspaceSaveProfile,
@@ -265,8 +268,9 @@ function normalizeInboxRoot(
     profile.pubkey,
     root
   ).event.content;
-  const { body, metadata } = extractMarkdownImportPayload(normalizedContent);
-  return parseWorkspaceDocumentRoots(body, metadata.title, "", relativePath);
+  const { tree, frontMatter } = parseMarkdownDocument(normalizedContent);
+  const title = frontMatter ? extractTitle(frontMatter) : undefined;
+  return parseWorkspaceDocumentRoots(tree, title, "", relativePath);
 }
 
 async function scanInboxDocuments(
@@ -290,10 +294,11 @@ async function scanInboxDocuments(
     markdownFiles.map(async (filePath) => {
       const currentContent = await fs.readFile(filePath, "utf8");
       const relativePath = path.relative(profile.workspaceDir, filePath);
-      const { body, metadata } = extractMarkdownImportPayload(currentContent);
+      const { tree, frontMatter } = parseMarkdownDocument(currentContent);
+      const title = frontMatter ? extractTitle(frontMatter) : undefined;
       const parsedRoot = parseWorkspaceDocumentRoots(
-        body,
-        metadata.title,
+        tree,
+        title,
         "",
         relativePath
       );

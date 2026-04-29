@@ -4,9 +4,9 @@ import ignore, { Ignore } from "ignore";
 import { buildDocumentEventFromMarkdownTree } from "../../standaloneDocumentEvent";
 import {
   MarkdownTreeNode,
-  parseMarkdownHierarchy,
+  parseMarkdownDocument,
 } from "../../core/markdownTree";
-import { extractMarkdownImportPayload } from "../../core/markdownImport";
+import { extractTitle } from "../../core/markdownFrontMatter";
 import { ensureKnowstrDocIdFrontMatter } from "../../core/knowstrFrontmatter";
 import { plainSpans } from "../../core/nodeSpans";
 
@@ -59,12 +59,12 @@ function findDuplicateIds(values: string[]): string[] {
 }
 
 export function parseWorkspaceDocumentRoots(
-  body: string,
+  tree: MarkdownTreeNode[],
   title: string | undefined,
   frontMatter: string,
   relativePath: string
 ): MarkdownTreeNode {
-  const roots = parseMarkdownHierarchy(body).filter((root) => !root.hidden);
+  const roots = tree.filter((root) => !root.hidden);
   if (roots.length === 0) {
     throw new Error(
       `Document ${relativePath} must contain exactly one main root`
@@ -164,16 +164,16 @@ export async function scanWorkspaceDocuments(
     markdownFiles.map(async (filePath) => {
       const relativePath = path.relative(profile.workspaceDir, filePath);
       const currentContent = await fs.readFile(filePath, "utf8");
-      const {
-        body,
-        frontMatter: currentFrontMatter,
-        metadata,
-      } = extractMarkdownImportPayload(currentContent);
+      const { tree, frontMatter: currentFrontMatter } =
+        parseMarkdownDocument(currentContent);
+      const title = currentFrontMatter
+        ? extractTitle(currentFrontMatter)
+        : undefined;
       const { docId, frontMatter } =
         ensureKnowstrDocIdFrontMatter(currentFrontMatter);
       const mainRoot = parseWorkspaceDocumentRoots(
-        body,
-        metadata.title,
+        tree,
+        title,
         frontMatter,
         relativePath
       );
@@ -204,11 +204,14 @@ function normalizeWorkspaceDocument(
     rootTree
   );
   const normalizedContent = builtEvent.event.content;
-  const { body: normalizedBody, metadata: normalizedMetadata } =
-    extractMarkdownImportPayload(normalizedContent);
+  const { tree: normalizedTree, frontMatter: normalizedFrontMatter } =
+    parseMarkdownDocument(normalizedContent);
+  const normalizedTitle = normalizedFrontMatter
+    ? extractTitle(normalizedFrontMatter)
+    : undefined;
   const normalizedRoot = parseWorkspaceDocumentRoots(
-    normalizedBody,
-    normalizedMetadata.title,
+    normalizedTree,
+    normalizedTitle,
     document.frontMatter,
     document.relativePath
   );

@@ -506,9 +506,12 @@ export function parseMarkdownDocument(markdownText: string): {
 } {
   captured.value = undefined;
   const tree = buildTreeFromTokens(markdown.parse(markdownText, {}));
+  const innerYaml = captured.value as string | undefined;
+  const frontMatter =
+    innerYaml !== undefined ? `---\n${innerYaml}\n---\n` : undefined;
   return {
     tree,
-    ...(captured.value !== undefined ? { frontMatter: captured.value } : {}),
+    ...(frontMatter !== undefined ? { frontMatter } : {}),
   };
 }
 

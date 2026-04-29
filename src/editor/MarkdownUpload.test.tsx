@@ -4,7 +4,8 @@ import { execute } from "../infra/nostr/executor";
 import { createPlan, planUpsertNodes } from "../planner";
 import { processEvents } from "../eventProcessing";
 import { ALICE, setup, UpdateState } from "../utils.test";
-import { parseMarkdownHierarchy, planPasteMarkdownTrees } from "./FileDropZone";
+import { planPasteMarkdownTrees } from "./FileDropZone";
+import { parseMarkdownHierarchy } from "../core/markdownTree";
 import { joinID, shortID } from "../core/connections";
 import { linkSpan, nodeText, plainSpans } from "../core/nodeSpans";
 

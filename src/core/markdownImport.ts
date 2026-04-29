@@ -1,5 +1,8 @@
-import { MarkdownTreeNode, parseMarkdownHierarchy } from "./markdownTree";
-import { extractImportedFrontMatter } from "./markdownFrontMatter";
+import { MarkdownTreeNode, parseMarkdownDocument } from "./markdownTree";
+import {
+  extractImportedFrontMatter,
+  extractTitle,
+} from "./markdownFrontMatter";
 import { plainSpans, spansText } from "./nodeSpans";
 
 export type MarkdownImportFile = {
@@ -104,13 +107,13 @@ export function parseMarkdownImportFiles(
   files: MarkdownImportFile[]
 ): MarkdownTreeNode[] {
   return files.reduce((acc: MarkdownTreeNode[], file: MarkdownImportFile) => {
-    const { body, frontMatter, metadata } = extractMarkdownImportPayload(
-      file.markdown
-    );
-    const roots = dropLeadingYamlEchoRoots(
-      parseMarkdownHierarchy(body),
-      frontMatter
-    );
+    const { tree, frontMatter } = parseMarkdownDocument(file.markdown);
+    const metadata: MarkdownImportMetadata = {
+      ...(frontMatter && {
+        title: extractTitle(frontMatter),
+      }),
+    };
+    const roots = dropLeadingYamlEchoRoots(tree, frontMatter);
     const normalizedRoots = attachFrontMatter(
       normalizeRootsForSingleFile(roots, file.name, metadata),
       frontMatter

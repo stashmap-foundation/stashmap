@@ -1,10 +1,9 @@
 import { ViewPath } from "../ViewContext";
 import { Plan, ParsedLine, parseClipboardText } from "../planner";
-import { MarkdownTreeNode, parseMarkdownHierarchy } from "../core/markdownTree";
+import { MarkdownTreeNode, parseMarkdownDocument } from "../core/markdownTree";
 import { planInsertMarkdownTrees } from "../markdownPlan";
 import { plainSpans } from "../core/nodeSpans";
 
-export { parseMarkdownHierarchy } from "../core/markdownTree";
 export type { MarkdownImportFile } from "../core/markdownImport";
 export {
   dropLeadingYamlEchoRoots,
@@ -43,7 +42,7 @@ export function parsedLinesToTrees(children: ParsedLine[]): MarkdownTreeNode[] {
 export function parseTextToTrees(text: string): MarkdownTreeNode[] {
   const hasHeaders = text.split("\n").some((line) => /^#{1,6}\s/.test(line));
   if (hasHeaders) {
-    return parseMarkdownHierarchy(text);
+    return parseMarkdownDocument(text).tree;
   }
   return parsedLinesToTrees(parseClipboardText(text));
 }

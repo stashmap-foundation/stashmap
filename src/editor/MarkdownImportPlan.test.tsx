@@ -16,14 +16,13 @@ import { processEvents } from "../eventProcessing";
 import {
   buildRootTreeForEmptyRootDrop,
   dropLeadingYamlEchoRoots,
-  parseMarkdownHierarchy,
   parseMarkdownImportFiles,
   parseTextToTrees,
   planCreateNodesFromMarkdown,
   planCreateNodesFromMarkdownFiles,
   planCreateNodesFromMarkdownTrees,
 } from "./FileDropZone";
-import { MarkdownTreeNode } from "../core/markdownTree";
+import { MarkdownTreeNode, parseMarkdownHierarchy } from "../core/markdownTree";
 import { nodeText, plainSpans, spansText } from "../core/nodeSpans";
 
 function flattenTexts(nodes: MarkdownTreeNode[]): string[] {

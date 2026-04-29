@@ -43,6 +43,16 @@ function materializeTreeNode(
   root: LongID,
   parent?: LongID
 ): [WalkContext, ID, GraphNode] {
+  if (treeNode.uuid) {
+    const existing = ctx.knowledgeDBs
+      .get(ctx.publicKey)
+      ?.nodes.get(treeNode.uuid);
+    if (existing) {
+      throw new Error(
+        `Workspace contains duplicate node ids: ${treeNode.uuid}`
+      );
+    }
+  }
   const treeText = spansText(treeNode.spans);
   const baseNode = treeNode.uuid
     ? {

@@ -1,5 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
+import { Map as ImmutableMap, Set as ImmutableSet } from "immutable";
 import ignore, { Ignore } from "ignore";
 import {
   MarkdownTreeNode,
@@ -8,6 +9,7 @@ import {
 } from "../../core/markdownTree";
 import { ensureKnowstrDocIdFrontMatter } from "../../core/knowstrFrontmatter";
 import { plainSpans } from "../../core/nodeSpans";
+import { createNodesFromMarkdownTrees } from "../../core/markdownNodes";
 
 export type WorkspaceSaveProfile = {
   pubkey: PublicKey;
@@ -124,6 +126,26 @@ async function collectMarkdownFiles(
   }, Promise.resolve([] as string[]));
 }
 
+function checkDuplicateDocIds(
+  documents: ReadonlyArray<{ docId: string }>
+): void {
+  const counts = documents.reduce(
+    (acc, doc) => ({ ...acc, [doc.docId]: (acc[doc.docId] || 0) + 1 }),
+    {} as Record<string, number>
+  );
+  const duplicates = Object.entries(counts)
+    .filter(([, count]) => count > 1)
+    .map(([docId]) => docId)
+    .sort();
+  if (duplicates.length > 0) {
+    throw new Error(
+      `Workspace contains duplicate knowstr_doc_id values: ${duplicates.join(
+        ", "
+      )}`
+    );
+  }
+}
+
 export async function scanWorkspaceDocuments(
   profile: WorkspaceSaveProfile,
   options: {
@@ -136,7 +158,7 @@ export async function scanWorkspaceDocuments(
   );
   const markdownFiles = await collectMarkdownFiles(profile.workspaceDir, ig);
 
-  return Promise.all(
+  const documents = await Promise.all(
     markdownFiles.map(async (filePath) => {
       const relativePath = path.relative(profile.workspaceDir, filePath);
       const currentContent = await fs.readFile(filePath, "utf8");
@@ -168,4 +190,17 @@ export async function scanWorkspaceDocuments(
       };
     })
   );
+
+  checkDuplicateDocIds(documents);
+
+  documents.reduce(
+    (ctx, doc) => createNodesFromMarkdownTrees(ctx, [doc.mainRoot])[0],
+    {
+      knowledgeDBs: ImmutableMap<PublicKey, KnowledgeData>(),
+      publicKey: profile.pubkey,
+      affectedRoots: ImmutableSet<ID>(),
+    }
+  );
+
+  return documents;
 }

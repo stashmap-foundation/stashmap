@@ -207,3 +207,55 @@ test("apply puts a fully unknown subtree into maybe_relevant", async () => {
   );
   expect(fs.readdirSync(path.join(workspaceDir, "inbox"))).toEqual([]);
 });
+
+test("apply rejects an inbox file with duplicate node ids within the same file", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  await knowstrSave(workspaceDir);
+
+  write(
+    workspaceDir,
+    "inbox/bad.md",
+    `
+# Notes <!-- id:dup -->
+- one <!-- id:dup -->
+`
+  );
+
+  await expect(
+    knowstrApply(workspaceDir, { dryRun: true })
+  ).rejects.toMatchObject({
+    message: expect.stringContaining("duplicate node ids"),
+  });
+});
+
+test("apply accepts an inbox file with no ids and mints them on apply", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "holidays.md",
+    `
+# Holiday Destinations
+- Spain
+`
+  );
+  await knowstrSave(workspaceDir);
+
+  const rootId = readNodeId(
+    workspaceDir,
+    "holidays.md",
+    "# Holiday Destinations"
+  );
+
+  write(
+    workspaceDir,
+    "inbox/fresh.md",
+    `
+# Holiday Destinations <!-- id:${rootId} -->
+- Germany
+`
+  );
+
+  const result = await knowstrApply(workspaceDir, { dryRun: true });
+  expect(result.invalid_inbox_paths).toEqual([]);
+  expect(result.graph_additions).toHaveLength(1);
+});

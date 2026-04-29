@@ -1,302 +1,147 @@
-# Unified storage-backend plan
+# Document Containers And Multi-Root Documents
 
 ## Goal
 
-Collapse the product onto one collaboration model: inbox/merge with stable node UUIDs.
+Move from "one document must have one root" to:
 
-Only backend differences should remain:
-
-- filesystem storage
-- Nostr storage
-
-The current frontend follow/deep-copy multi-user mechanic is out of direction and should be removed rather than preserved.
-
-## Decision
-
-- Kill frontend multi-user product semantics for now.
-- Make the CLI inbox/apply model the canonical collaboration model.
-- Reuse the existing editor/planner/UI where possible.
-- Build one desktop app that can eventually run on two storage backends.
-- Start with an Electron wrapper around the existing Nostr-backed app.
-- Add the filesystem backend after Electron is working.
-
-## Tests
-
-### Phase 1: Electron wrapper with Nostr backend
-
-- [ ] Add an Electron bootstrap smoke test or minimal verification step for main/preload startup if test tooling is introduced.
-- [x] Add an integration smoke test or manual verification checklist that the app still logs in, loads relays, edits, publishes, and can create a new account in the Electron shell.
-- [x] Run targeted jest tests for any extracted Electron-specific code.
-- [x] Run `npm run typescript`.
-- [x] Run `npm run lint`.
-
-### Phase 2: Unified backend boundary + filesystem backend
-
-- [ ] Add a backend-agnostic document-store test that loads canonical document content into the app graph without relying on follow-based visibility.
-- [ ] Add a filesystem backend test that loads a temp workspace with real markdown files and materializes the expected tree.
-- [ ] Add a filesystem backend write test that edits a node through the planner, persists to disk, and preserves existing node ids.
-- [ ] Add a filesystem backend write test for creating a new root and writing it to a deterministic new file.
-- [ ] Add a filesystem backend write test for deleting a root and applying the chosen file policy.
-- [ ] Add a filesystem backend refresh test where an external file change is reflected in the app graph.
-- [ ] Add an integration UI test that renders the app in filesystem mode, types to create/edit/reorder content, and verifies the resulting markdown on disk.
-- [ ] Add an integration UI test that relay/follow-specific affordances are absent in the unified single-user/inbox app.
-- [ ] Run targeted jest tests for the new backend boundary and filesystem mode.
-- [ ] Run `npm run typescript`.
-- [ ] Run `npm run lint`.
-
-## Implementation
-
-### Phase 2 — Step 1: Introduce `BackendContext` + `NostrBackendProvider`
-
-**Scope:** Stand up the new context/provider seam without changing any existing callers. After this step, all current behavior is identical; we just have a new provider in the tree that exposes the same capabilities via a new API surface, ready for callers to migrate in step 2.
-
-**Design (short-term shape per architecture.md):**
-
-New file `src/BackendContext.tsx`:
-- `type Backend = { subscribe, publish }` where:
-  - `subscribe(relays: Relay[], filters: Filter[], callbacks: { onevent, oneose }) => { close: () => void }` — thin wrapper over `relayPool.subscribeMany`
-  - `publish(relays: Relay[], event: Event) => Promise<string[]>` — wraps `relayPool.publish` collecting per-relay results
-- `BackendContext = React.createContext<Backend | undefined>(undefined)`
-- `useBackend(): Backend` hook that throws if not provided (mirrors `useApis` convention from `Apis.tsx:25`)
-- `BackendProvider({ backend, children })` is a pass-through
-
-New file `src/NostrBackendProvider.tsx`:
-- Consumes `useApis()` internally to get `relayPool` and `finalizeEvent`
-- Builds the `Backend` object that wraps those
-- Wraps children in `BackendProvider`
-- Mounts inside `NostrProvider` in `src/index.tsx` so it has access to the `Apis` context
-
-Provider tree after this step (`src/index.tsx`):
-```
-NostrProvider
-  NostrBackendProvider        ← NEW
-    NostrAuthContextProvider
-      UserRelayContextProvider
-        App
+```text
+Document container / top-level graph node / child
 ```
 
-**Tests (before implementation):**
+A document is a storage/sync container. It can contain zero, one, or many top-level graph nodes. Root nodes remain graph nodes. Filesystem and Nostr sync identify documents by `docId` / `knowstr_doc_id`, not by filename, title, or root text.
 
-- [x] `src/BackendContext.test.tsx`: `useBackend` throws with a clear error when no provider is in the tree (mirrors the error shape of `useApis`). One test, minimal.
-- [x] `src/NostrBackendProvider.test.tsx`: integration-style — mount a tiny test component inside `NostrProvider` + `NostrBackendProvider`, assert `useBackend()` returns an object with `subscribe` and `publish` functions. No real relay traffic; just verifies wiring.
-- [x] Full existing suite must still pass unchanged (`npm test`, `npm run typescript`, `npm run lint`). This is the real verification that step 1 is non-invasive.
+## Decisions
 
-**Implementation:**
+- Breadcrumbs become container-first: `Document / Root / Child`.
+- The first breadcrumb segment is not a graph node.
+- Selecting the document/container segment should show all top-level roots in that document.
+- Display name precedence: explicit `title`, filesystem basename without `.md`, then `Document <short docId>`.
+- Filesystem-first plain markdown derives its initial display name from the filename.
+- Nostr-first document creation stores a title as document metadata.
+- First filesystem sync for a Nostr-first document slugifies the title into the initial filename.
+- After a file exists, title changes must not silently rename the file.
+- A document may have paragraph/list/heading roots; roots are not constrained by document naming.
 
-- [x] Write failing tests for `BackendContext` and `NostrBackendProvider`.
-- [x] Create `src/BackendContext.tsx` with `Backend` type, `BackendContext`, `useBackend`, `BackendProvider`.
-- [x] Create `src/NostrBackendProvider.tsx` that reads `useApis()` and wraps `relayPool.subscribeMany` / `relayPool.publish` into the `Backend` shape.
-- [x] Mount `NostrBackendProvider` in `src/index.tsx` between `NostrProvider` and `NostrAuthContextProvider`.
-- [x] Run `npm test -- --runInBand src/BackendContext.test.tsx src/NostrBackendProvider.test.tsx`.
-- [x] Run `npm run typescript`.
-- [x] Run `npm run lint`.
-- [x] Run full test suite to confirm no regressions (62 suites, 729 tests pass).
+## Iteration 1: Document Name Model
 
-**Non-goals for this step (deferred to later steps):**
+Add document naming without changing graph/root behavior yet.
 
-- Not migrating `useEventQuery` callers.
-- Not touching `planner.execute()`.
-- Not replacing `useApis().relayPool` anywhere.
-- Not designing the target document-centric shape — that's after filesystem backend exists.
+- [ ] Extend the `Document` model with optional `title`.
+- [ ] Add a document display-name helper:
+  - [ ] explicit `title`
+  - [ ] filename basename without `.md`
+  - [ ] `Document <short docId>`
+- [ ] Parse `title` from markdown frontmatter when present.
+- [ ] Filesystem load derives fallback display name from `relativePath`.
+- [ ] Add `title` metadata to Nostr document events.
+- [ ] For now, derive the Nostr event `title` from the first top-level node when no explicit document title exists.
+- [ ] Keep root parsing and save behavior unchanged in this iteration.
 
----
+Tests:
 
-### Phase 2 — Step 2: Migrate `useEventQuery` callers to `useBackend()`
+- [ ] explicit title wins over filename
+- [ ] filename fallback works
+- [ ] doc id fallback works
+- [ ] title does not affect node parsing
+- [ ] Nostr document event gets a `title` derived from the first node when no explicit title exists
 
-**Scope:** `useEventQuery` is the last Nostr-specific subscription surface in the renderer. Swap its parameter from `SimplePool` to `Backend`, then update every call site to pass `useBackend()` instead of `useApis().relayPool`. Behavior is identical since `Backend.subscribe` is a direct passthrough to `relayPool.subscribeMany`.
+## Iteration 2: Breadcrumb Uses Document Container
 
-**Callers to migrate** (found via `rg useEventQuery`):
-- `src/commons/useNostrQuery.tsx:33` — signature change
-- `src/UserRelayContext.tsx:34` — drop `useApis().relayPool`, use `useBackend()`
-- `src/Data.tsx:305, 343` — drop `useApis().relayPool` (line 247), use `useBackend()`
-- `src/components/SearchModal.tsx:63` — drop `useApis().relayPool` (line 36), use `useBackend()`
+Keep single-root documents for now, but change UI semantics.
 
-**Test harness update:**
-- `src/utils.test.tsx` — wrap children in `NostrBackendProvider` inside `ApiProvider` so `useBackend()` resolves in tests. This is the one place all integration tests mount the provider stack.
+- [ ] Find breadcrumb construction and document ownership lookup.
+- [ ] Replace the visible root segment with document display name when document ownership is known.
+- [ ] Keep the current root selection/open behavior internally.
+- [ ] Make the document segment inert or route to the current root until document overview exists.
 
-**Tests:**
-- [x] Full existing suite must still pass unchanged — since behavior is identical, this is the verification. No new tests needed (`useEventQuery` has no direct test today; integration tests exercise it via `UserRelayContext`, `Data`, `SearchModal`).
+Tests:
 
-**Implementation:**
-- [x] Change `useEventQuery` signature: `relayPool: SimplePool` → `backend: Backend`; body: `relayPool.subscribeMany` → `backend.subscribe`.
-- [x] Migrate `UserRelayContext.tsx`.
-- [x] Migrate `Data.tsx` (two call sites, one `useApis` declaration to swap).
-- [x] Migrate `SearchModal.tsx`.
-- [x] Update `src/utils.test.tsx` harness to include `NostrBackendProvider`.
-- [x] Run `npm run typescript`.
-- [x] Run `npm run lint`.
-- [x] Run full test suite (62 suites, 729 tests pass).
+- [ ] single-root file shows document-name-first breadcrumb
+- [ ] matching document/root names do not render as duplicate adjacent labels
+- [ ] no-file fallback shows `Document <short docId>`
 
----
+## Iteration 3: Parse And Load Multi-Root Documents
 
-### Phase 2 — Step 3: Migrate publish path to `useBackend()`
+Remove the read-side blocker.
 
-**Scope:** `relayPool.publish` is the last Nostr-specific dependency in the planner/executor/publish-queue. Swap it to `Backend.publish` so the planner becomes backend-agnostic. `Backend.publish` has the exact same signature as `SimplePool.publish`, so this is mechanical.
+- [ ] Change filesystem scan shape from `mainRoot` to `roots`.
+- [ ] Replace `parseWorkspaceDocumentRoots` with a document-forest parser.
+- [ ] Do not synthesize wrapper roots.
+- [ ] Keep one `Document` per file/event.
+- [ ] Lean on existing `parseDocumentContent`, which already materializes multiple top-level roots.
 
-**Type change:**
-- `Pick<SimplePool, "publish">` → `Pick<Backend, "publish">` (same structural shape).
+Tests:
 
-**Call-site migrations:**
-- `src/nostrPublish.ts` — `publishEventToRelays(relayPool, ...)` → `publishEventToRelays(backend, ...)`.
-- `src/executor.tsx` — `execute({plan, relayPool, finalizeEvent})` → `execute({plan, backend, finalizeEvent})`; same for `republishEvents`.
-- `src/PublishQueue.ts` — `FlushDeps.relayPool` → `FlushDeps.backend`; internal `publishToRelays` helper.
-- `src/planner.tsx` — `useApis()` no longer destructures `relayPool`; pull `backend` from `useBackend()`. Pass through to `depsRef`, `execute`, `republishEvents`.
-- `src/SignIn.tsx:189, 238` — drop `relayPool` from `useApis()` destructure, add `useBackend()`.
-- `src/StorePreLoginContext.tsx:29, 42` — same.
+- [ ] one markdown file with two headings materializes both as top-level roots
+- [ ] a top-level paragraph root is accepted
+- [ ] existing single-root files still load
+- [ ] decide whether empty documents are accepted now or deferred
 
-**Test harness:**
-- `src/utils.test.tsx:applyApis` — add `backend` to `TestApis` derived from `relayPool` so test spreads `{ ...utils, plan }` work.
-- `src/PublishQueue.test.ts` — update `getDeps` FlushDeps from `relayPool: ...` to `backend: ...`.
+## Iteration 4: Render And Save Multi-Root Documents
 
-**Tests:** Full existing suite passes (behavior is identical; publish surface is structurally the same). No new tests needed.
+Make write-back preserve document forests.
 
-**Implementation:**
-- [x] Update `nostrPublish.ts`.
-- [x] Update `executor.tsx`.
-- [x] Update `PublishQueue.ts`.
-- [x] Update `planner.tsx`.
-- [x] Update `SignIn.tsx`.
-- [x] Update `StorePreLoginContext.tsx`.
-- [x] Update `utils.test.tsx` harness (add `backend` to `TestApis`).
-- [x] Update `PublishQueue.test.ts` getDeps.
-- [x] Run `npm run typescript`.
-- [x] Run `npm run lint`.
-- [x] Run full test suite (62 suites, 729 tests pass).
+- [ ] Add graph-to-markdown rendering for a list of root nodes in one document.
+- [ ] Update filesystem save to render all roots belonging to a document/file.
+- [ ] Preserve one `docId` and one frontmatter block per document.
+- [ ] Do not auto-rename a file when a second root appears.
 
-**After step 3**, the renderer no longer references `relayPool` except inside `NostrBackendProvider`. The seam is complete; step 4 can begin on the filesystem backend.
+Tests:
 
----
+- [ ] two top-level roots save back into one file
+- [ ] no synthetic wrapper root appears
+- [ ] node ids are preserved
+- [ ] adding a second root changes content only, not file path
+- [ ] deleting one root from a multi-root document leaves the file if other roots remain
 
-### Phase 2 — Step 4a: `loadWorkspaceAsEvents` (pure Node helper)
+## Iteration 5: Document Overview Selection
 
-**Scope:** Build the smallest slice of the filesystem backend — a pure Node function that reads a workspace directory and returns unsigned Nostr events, composing two existing helpers (`scanWorkspaceDocuments` + `buildDocumentEventFromMarkdownTree`). No IPC, no Electron, no renderer. Just a library function with a jest test against a temp directory. This is what `Backend.subscribe` will emit on first load.
+Make the container segment real UX.
 
-**Key finding from investigation:** The pure helpers (`parseWorkspaceDocumentRoots`, `buildDocumentEventFromMarkdownTree`, `extractMarkdownImportPayload`, `parseDocumentEvent`) are already isomorphic. Only `scanWorkspaceDocuments`/`saveEditedWorkspaceDocuments` do fs I/O, which is fine for main-process code. We just need to compose them into a `Backend`-shaped load call.
+- [ ] Add a document overview view state: selected document container, no selected root.
+- [ ] Overview renders all top-level roots as siblings.
+- [ ] Clicking a root enters normal graph navigation.
+- [ ] Breadcrumb first segment selects the overview.
 
-**Design:**
+Tests:
 
-New file `src/core/workspaceBackend.ts`:
-- `loadWorkspaceAsEvents(profile: WorkspaceSaveProfile) => Promise<ReadonlyArray<UnsignedEvent>>` — composes `scanWorkspaceDocuments` + `buildDocumentEventFromMarkdownTree` into one call. Attaches `frontMatter` to the root tree before building (mirrors `normalizeWorkspaceDocument` in `workspaceSave.ts`).
+- [ ] selecting document segment shows all roots
+- [ ] selecting a root shows graph path under the same document
+- [ ] single-root documents still work naturally
 
-**Tests** (node jest env, using `fs.mkdtempSync` pattern from `src/cli/save.test.ts`):
+## Iteration 6: New Document Creation And Filename Policy
 
-New file `src/core/workspaceBackend.test.ts`:
-- [x] Empty workspace → empty array of events.
-- [x] One markdown file with `# Title\n- a\n- b` → one `UnsignedEvent` with correct `pubkey`.
-- [x] Multiple markdown files → matching number of events.
-- [x] `.knowstrignore` excluded files not returned.
+Fix new-document naming for future multi-root documents.
 
-**Implementation:**
-- [x] Write failing tests.
-- [x] Create `src/core/workspaceBackend.ts`.
-- [x] Run `npm run typescript`.
-- [x] Run `npm run lint`.
-- [x] Run `npx jest --no-coverage src/core/workspaceBackend.test.ts`.
-- [x] Run full test suite (63 suites, 733 tests pass).
+- [ ] `New` creates a document container with a title.
+- [ ] Initial filesystem path is `slug(title).md`.
+- [ ] First graph content is separate from title.
+- [ ] After file exists, title changes update metadata only.
+- [ ] Defer explicit "rename file to match title" UI unless needed immediately.
 
-**Non-goals for this sub-step:**
-- Publish/write path (step 4b).
-- File watcher (step 4c).
-- Electron IPC (step 4d).
-- Renderer provider (step 4e).
-- Folder picker / app wiring (step 4f).
+Tests:
 
----
+- [ ] document named `Projects` first syncs to `projects.md`
+- [ ] adding a second root does not rename `projects.md`
+- [ ] title rename updates metadata only, not file path
 
-### Phase 2 — Step 4b: Read-only filesystem demo (Electron end-to-end)
+## Iteration 7: Filesystem/Nostr Sync Metadata
 
-**Scope:** Smallest end-to-end slice that shows a real workspace rendering in the Electron app. Reuses the Step 4a `loadWorkspaceAsEvents` helper. No publish, no watcher, no folder picker yet — workspace location chosen via env var.
+Make filesystem and Nostr round-trip the same document identity/name.
 
-**What shipped:**
+- [ ] Keep `docId` as the sync key.
+- [ ] Publish title metadata on Nostr document events.
+- [ ] On filesystem -> Nostr sync, preserve `docId` and `title`.
+- [ ] On Nostr -> filesystem first sync, create filename from title.
+- [ ] On later sync, match existing files by `docId`.
 
-- `package.json` — `desktop:dev` and `desktop:build` now run `npm run build:cli` first, so `dist/core/workspaceBackend.js` is available for the Electron main process to `require`.
-- `electron/main.js` — resolves profile via `KNOWSTR_PROFILE` / `KNOWSTR_HOME` / `KNOWSTR_WORKSPACE` env vars (fallback `~/.knowstr/profile.json`), registers `workspace:load` IPC handler that returns `{pubkey, workspaceDir, events}` by calling the compiled `loadWorkspaceAsEvents`.
-- `electron/preload.js` — exposes `window.knowstrDesktop.workspace.load() → Promise<{pubkey, workspaceDir, events}>`.
-- `src/runtimeEnvironment.ts` — typed the new bridge surface (`DesktopWorkspaceLoad`, `DesktopShellBridge.workspace`).
-- `src/filesystemBootstrap.ts` — module-scoped event stash + `loadFilesystemWorkspaceBeforeReact()` that runs before React mounts: calls IPC, writes `publicKey` into localStorage (so `NostrAuthContextProvider` auto-logs-in on read), stashes events.
-- `src/FilesystemWorkspaceLoader.tsx` — component mounted inside `DocumentStoreProvider`. On mount, consumes stashed events and calls `useDocumentStore().addEvents`.
-- `src/Data.tsx` — mounts `<FilesystemWorkspaceLoader />` as a sibling of `<PermanentDocumentSyncBridge />` inside `<DocumentStoreProvider>`. No-op outside Electron since the stash is empty.
-- `src/index.tsx` — `bootstrap()` awaits the filesystem load before `createRoot().render()`.
+Tests:
 
-**How to try it:**
+- [ ] filesystem title publishes to Nostr
+- [ ] Nostr title creates expected first filename
+- [ ] filename rename does not create a duplicate Nostr document
+- [ ] title rename does not create a duplicate filesystem file
 
-```
-KNOWSTR_WORKSPACE=/path/to/test/workspace npm run desktop:dev
-```
+## Suggested First PR
 
-(Also accepts `KNOWSTR_HOME` = the `.knowstr` dir, or `KNOWSTR_PROFILE` = the direct path to `profile.json`.)
-
-**Known gaps (deferred to later sub-steps):**
-- No publish yet — editing will fail to persist (step 4c).
-- No file watcher — agent edits to markdown require app restart (step 4d).
-- No folder picker — workspace path from env var only (step 4f).
-- `permanentSync` still starts (but no-ops when no relays are configured; if `relays` is non-empty in profile.json, it'll try to connect).
-- Nostr publish is still the path if anything does publish — filesystem mode should route `backend.publish` to the filesystem, not Nostr (step 4c).
-
-**Verification:**
-- [x] `dist/core/workspaceBackend.js` produced by `npm run build:cli`.
-- [x] `node -e "require('./dist/core/workspaceBackend').loadWorkspaceAsEvents"` resolves a function.
-- [x] `npm run typescript` clean.
-- [x] `npm run lint` clean (one pre-existing "React unused" warning).
-- [x] Full test suite: 63 suites, 733 tests pass.
-- [ ] Manual: `KNOWSTR_WORKSPACE=... npm run desktop:dev` opens Electron, logs in, renders the workspace.
-
----
-
-### Phase 1: Electron wrapper with current Nostr backend
-
-- [x] Add Electron app scaffolding.
-- [x] Decide minimal Electron shape:
-  - [x] main process
-  - [x] preload
-  - [x] renderer hosting the existing React app
-- [x] Keep the first desktop UX identical to the current Nostr app.
-- [x] Make sure login, relay access, edit, and publish flows work in Electron.
-- [x] Restore desktop account creation flow so Electron users can generate a new nsec/private key without extension login.
-- [x] Keep knowstr.com unchanged.
-
-### Phase 2: Unified app semantics
-
-- [ ] Extract a backend boundary from `Data.tsx` and `PlanningContextProvider` so the editor no longer assumes the current Nostr follow model.
-- [ ] Keep deployment UX simple: do not add a generic workspace/source chooser to knowstr.com unless the web surface truly supports multiple sources.
-- [ ] Remove or gate legacy follow/multi-user UI flows that are specific to the old frontend model.
-- [ ] Make the core app model single-user + inbox/merge, independent of storage backend.
-
-### Phase 3: Filesystem backend in Electron
-
-- [ ] Add a filesystem backend:
-  - [ ] load `.knowstr/profile.json`
-  - [ ] scan workspace documents via the existing workspace pipeline
-  - [ ] materialize them into the document store
-  - [ ] maintain a root/file ownership index
-  - [ ] persist affected roots back to disk
-  - [ ] support explicit refresh
-- [ ] Decide the filesystem root file policy:
-  - [ ] new root -> deterministic new file path
-  - [ ] deleted root -> remove or archive file
-- [ ] Keep `knowstr save` and `knowstr apply` as the canonical normalization/inbox operations and wire them into the filesystem backend as needed.
-- [ ] After filesystem mode works, reshape the Nostr backend so it uses the same inbox/merge semantics instead of the old follow/deep-copy semantics.
-
-## Open questions
-
-- [ ] Exact backend interface shape.
-- [ ] Exact Electron packaging/build setup.
-- [ ] Save model: autosave, explicit save, or hybrid.
-- [ ] New-root file naming policy.
-- [ ] Delete policy: delete file vs archive.
-- [ ] How Nostr should represent inbox/raw/merged state while staying semantically aligned with the filesystem model.
-
-## Review
-
-- [x] Architecture updated in `tasks/architecture.md`.
-- [x] Plan reflects the new product decision: one collaboration model, two storage backends.
-- [ ] Implementation verified with real temp-workspace tests, not mocked contexts.
-- [x] Electron scaffolding added under `electron/` with desktop build/dev scripts.
-- [x] Desktop renderer now switches to `HashRouter` in Electron and hides extension-only sign-in.
-- [x] Verified with:
-  - [x] `npm test -- --runInBand src/runtimeEnvironment.test.ts src/SignIn.test.tsx`
-  - [x] `npm test -- --runInBand src/SignIn.test.tsx src/SignUp.test.tsx src/runtimeEnvironment.test.ts`
-  - [x] `npm run typescript`
-  - [x] `npm run lint`
-  - [x] `npm run desktop:build`
-  - [x] Manual Electron smoke pass confirmed by user: app opens, Electron works, and core flow looks good
+Do Iteration 1 only. It creates the document naming primitive and starts publishing Nostr `title` metadata without changing the single-root behavior yet.

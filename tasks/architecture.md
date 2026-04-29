@@ -35,9 +35,43 @@ Regardless of backend, the user experience should be built around:
 - your own graph
 - stable node UUIDs as the semantic identity
 - optional `knowstr_doc_id` as document-thread packaging metadata
+- first-class documents as containers for zero, one, or many top-level graph nodes
 - when more than one identity writes: incoming inbox content and `knowstr apply`-style merge/triage
 
 Cross-user collaboration, when it exists, should happen through inbox/merge — not through foreign trees appearing live in the main graph and being copied with fresh ids. Single-trust setups skip the inbox entirely.
+
+### Document containers and root nodes
+
+Documents are storage/sync containers. Root nodes are graph nodes.
+
+Do not force a document to contain exactly one graph root. A document may contain:
+
+- no top-level nodes yet
+- one top-level node
+- many top-level nodes
+- a top-level paragraph, list item, heading, or any other supported graph node shape
+
+The editor should not create fake wrapper roots to satisfy storage. The document container is a UI/storage object above the graph, not a graph node.
+
+Breadcrumbs should therefore be container-first:
+
+```
+Document container / Top-level node / Child / Child
+```
+
+The first segment is the document/container name. Selecting it shows the document's top-level roots as siblings. The remaining segments are graph nodes. This lets the current visible root segment be replaced by the document name without spending more horizontal space, while keeping multi-root documents understandable.
+
+Document naming rules:
+
+- `docId` is stable identity across filesystem, IndexedDB, and Nostr.
+- `title` is the user-facing document/container name when explicitly known.
+- `filePath` is one storage location, not identity.
+- Display name precedence is `title`, then filesystem basename without `.md`, then `Document <short doc id>`.
+- Filesystem-first documents derive their initial title from the opened filename unless frontmatter already contains an explicit title.
+- Nostr-first documents keep their title as document metadata; when filesystem sync is enabled for the first time, that title is slugified into the initial filename.
+- After a file exists, changing the title should not silently rename the file. Offer an explicit rename-file action or setting.
+
+For filesystem/Nostr sync, match by `knowstr_doc_id`/`docId`, not filename or title. A filename change with the same `docId` is a move/rename. A title change with the same `docId` is metadata update.
 
 ### The only backend difference
 
@@ -92,14 +126,13 @@ The editor mostly wants graph state plus a persistence backend.
 
 Keep and reuse:
 
-- `src/core/workspaceSave.ts`
-- `src/core/workspaceApply.ts`
+- `src/infra/filesystem/workspaceSave.ts`
+- `src/infra/filesystem/workspaceApply.ts`
 - `extractMarkdownImportPayload()`
-- `parseWorkspaceDocumentRoots()`
-- `buildDocumentEventFromMarkdownTree()`
+- the markdown parser/materializer, which already supports multiple top-level roots inside one document
 - `parseDocumentEvent()`
 
-This is already the canonical filesystem representation.
+The existing filesystem save/apply helpers still contain single-root assumptions and should be migrated to document-forest helpers rather than preserved as product policy.
 
 ## BackendProvider boundary (decided 2026-04-17)
 

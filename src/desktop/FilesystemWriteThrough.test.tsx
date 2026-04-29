@@ -406,3 +406,53 @@ My Links
   expect(linkTargetMatch?.[1]).toBeDefined();
   expect(linkTargetMatch?.[1]).toBe(itemOneIdMatch?.[1]);
 });
+
+test("deep-copy across files writes basedOn pointing at an id persisted on disk", async () => {
+  const { path } = knowstrInit();
+  write(path, "notes.md", "# First\n- Item One\n");
+  write(path, "links.md", "# My Links");
+
+  await renderAppTree({ path });
+
+  await navigateToNodeViaSearch(0, "First");
+  await userEvent.click(await screen.findByLabelText("Open new pane"));
+  await navigateToNodeViaSearch(1, "My Links");
+
+  await expectTree(`
+First
+  Item One
+My Links
+`);
+
+  const myLinksItems = screen.getAllByRole("treeitem", { name: "My Links" });
+  const myLinksInPane1 = myLinksItems[myLinksItems.length - 1];
+
+  fireEvent.dragStart(screen.getAllByText("Item One")[0]);
+  fireEvent.drop(myLinksInPane1);
+
+  await expectTree(`
+First
+  Item One
+My Links
+  Item One
+`);
+
+  await waitFor(() => {
+    const notes = fs.readFileSync(`${path}/notes.md`, "utf8");
+    expect(notes).toMatch(/Item One <!-- id:([0-9a-f-]+) -->/u);
+    const links = fs.readFileSync(`${path}/links.md`, "utf8");
+    expect(links).toMatch(/basedOn="[^"]+"/u);
+  });
+
+  const notesContent = fs.readFileSync(`${path}/notes.md`, "utf8");
+  const linksContent = fs.readFileSync(`${path}/links.md`, "utf8");
+
+  const itemOneIdMatch = notesContent.match(
+    /Item One <!-- id:([0-9a-f-]+) -->/u
+  );
+  const basedOnMatch = linksContent.match(/basedOn="[^"]*?_?([0-9a-f-]+)"/u);
+
+  expect(itemOneIdMatch?.[1]).toBeDefined();
+  expect(basedOnMatch?.[1]).toBeDefined();
+  expect(basedOnMatch?.[1]).toBe(itemOneIdMatch?.[1]);
+});

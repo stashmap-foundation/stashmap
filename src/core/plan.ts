@@ -422,7 +422,12 @@ export function planCopyDescendantNodes<T extends GraphPlan>(
     plan
   );
 
-  return [resultPlan as T, resultMapping];
+  const planWithSourceRoot = {
+    ...resultPlan,
+    affectedRoots: resultPlan.affectedRoots.add(sourceNode.root),
+  };
+
+  return [planWithSourceRoot as T, resultMapping];
 }
 
 export function planMoveDescendantNodes<T extends GraphPlan>(

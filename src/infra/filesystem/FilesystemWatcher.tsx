@@ -43,7 +43,6 @@ export function FilesystemWatcher(): null {
             filePath: doc.filePath,
             docId: doc.docId,
             updatedMs: doc.updatedMs,
-            content: doc.content,
           }))
           .toArray(),
       });
@@ -62,16 +61,17 @@ export function FilesystemWatcher(): null {
         }
         return;
       }
+      const existing = findExistingByFilePath(documents, event.relativePath);
       const parsed = parseToDocument(profile.pubkey, event.content, {
         filePath: event.relativePath,
         relativePath: event.relativePath,
         updatedMsOverride: Date.now(),
+        ...(existing && { docIdFallback: existing.docId }),
       });
       logFilesystemWatcherDebug("upsert", {
         relativePath: event.relativePath,
         docId: parsed.document.docId,
         updatedMs: parsed.document.updatedMs,
-        content: parsed.document.content,
       });
       store.upsertDocument(parsed);
     };

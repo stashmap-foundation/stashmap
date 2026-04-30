@@ -106,14 +106,14 @@ type ScanAcc = {
 
 async function readAndParseFile(
   profile: WorkspaceSaveProfile,
-  filePath: string,
+  absolutePath: string,
   context: WalkContext | undefined
 ): Promise<{ scanned: ScannedWorkspaceDocument; context: WalkContext }> {
-  const relativePath = path.relative(profile.workspaceDir, filePath);
-  const currentContent = await fs.readFile(filePath, "utf8");
+  const relativePath = path.relative(profile.workspaceDir, absolutePath);
+  const currentContent = await fs.readFile(absolutePath, "utf8");
   const fallbackTitle = path.basename(relativePath, ".md") || undefined;
   const parsed = parseToDocument(profile.pubkey, currentContent, {
-    filePath,
+    filePath: relativePath,
     relativePath,
     ...(fallbackTitle !== undefined ? { fallbackTitle } : {}),
     ...(context !== undefined ? { context } : {}),
@@ -121,7 +121,7 @@ async function readAndParseFile(
   return {
     scanned: {
       ...parsed.document,
-      filePath,
+      filePath: relativePath,
       relativePath,
       currentContent,
       nodes: parsed.nodes,

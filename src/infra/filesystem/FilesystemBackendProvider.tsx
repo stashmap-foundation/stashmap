@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Backend, BackendProvider, WorkspaceState } from "../../BackendContext";
 import { LoadedCliProfile } from "../../cli/config";
-import type { Document } from "../../core/Document";
 import { ScannedWorkspaceDocument } from "./workspaceScan";
+import type { WorkspaceWriteRequest } from "./workspaceBackend";
 import type { FsEventHandler } from "./workspaceWatcher";
 
 export type WorkspaceLoaded = {
@@ -17,7 +17,7 @@ export type WorkspaceIpc = {
   create: (args: { folder: string; secretKeyInput?: string }) => Promise<void>;
   isInitialised: (folder: string) => Promise<boolean>;
   save: (
-    documents: ReadonlyArray<Document>,
+    writes: ReadonlyArray<WorkspaceWriteRequest>,
     deletedPaths?: ReadonlyArray<string>
   ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
   ready?: () => Promise<void>;
@@ -75,8 +75,7 @@ export function FilesystemBackendProvider({
         await ipc.create(args);
         refresh();
       },
-      save: (documentsToWrite, deletedPaths) =>
-        ipc.save(documentsToWrite, deletedPaths),
+      save: (writes, deletedPaths) => ipc.save(writes, deletedPaths),
       subscribeFsEvents: (handler) => ipc.subscribeFsEvents(handler),
     };
     return {

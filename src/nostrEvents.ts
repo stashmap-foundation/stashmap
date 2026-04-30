@@ -73,10 +73,12 @@ export function eventToParsed(
   event: Event | UnsignedEvent
 ): ParsedDocument | undefined {
   if (event.kind !== KIND_KNOWLEDGE_DOCUMENT) return undefined;
-  if (!findTag(event, "d")) return undefined;
+  const dTag = findTag(event, "d");
+  if (!dTag) return undefined;
   const systemRole = findTag(event, "s");
   const parsed = parseToDocument(event.pubkey as PublicKey, event.content, {
     updatedMsOverride: getEventMs(event),
+    docIdFallback: dTag,
     ...(systemRole === "log"
       ? { systemRoleOverride: "log" as RootSystemRole }
       : {}),

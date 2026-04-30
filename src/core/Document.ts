@@ -3,7 +3,7 @@ import { shortID } from "./connections";
 import { ensureKnowstrDocId } from "./knowstrFrontmatter";
 import { parseMarkdown } from "./markdownTree";
 import { WalkContext, materializeTree } from "./markdownNodes";
-import { spansText } from "./nodeSpans";
+import { nodeText, spansText } from "./nodeSpans";
 import { LOG_ROOT_FILE, LOG_ROOT_ROLE } from "./systemRoots";
 
 export type Document = {
@@ -11,7 +11,6 @@ export type Document = {
   docId: string;
   rootShortId?: string;
   updatedMs: number;
-  content: string;
   title: string;
   frontMatter?: FrontMatter;
   filePath?: string;
@@ -34,6 +33,11 @@ export type ParseToDocumentOptions = {
   filePath?: string;
   relativePath?: string;
   fallbackTitle?: string;
+  // Used when the parsed content has no knowstr_doc_id in frontmatter.
+  // The filesystem watcher passes the existing doc's id so that an edit
+  // which strips the frontmatter does not change the document's identity.
+  // If frontmatter already has knowstr_doc_id, it wins.
+  docIdFallback?: string;
   updatedMsOverride?: number;
   systemRoleOverride?: RootSystemRole;
   context?: WalkContext;
@@ -47,6 +51,21 @@ export type ParseToDocumentResult = {
 
 export function documentKeyOf(author: PublicKey, docId: string): string {
   return `${author}:${docId}`;
+}
+
+export function createDocumentFromRootNode(rootNode: GraphNode): Document {
+  const docId = rootNode.docId ?? shortID(rootNode.id);
+  return {
+    author: rootNode.author,
+    docId,
+    rootShortId: shortID(rootNode.id),
+    updatedMs: rootNode.updated,
+    title: nodeText(rootNode) || "Untitled",
+    frontMatter: { knowstr_doc_id: docId },
+    ...(rootNode.systemRole !== undefined && {
+      systemRole: rootNode.systemRole,
+    }),
+  };
 }
 
 export function systemRoleFromFilePath(
@@ -70,7 +89,7 @@ export function parseToDocument(
   options: ParseToDocumentOptions = {}
 ): ParseToDocumentResult {
   const parsed = parseMarkdown(content);
-  const ensured = ensureKnowstrDocId(parsed.frontMatter);
+  const ensured = ensureKnowstrDocId(parsed.frontMatter, options.docIdFallback);
 
   const updatedMs = options.updatedMsOverride ?? Date.now();
   const systemRole =
@@ -86,7 +105,8 @@ export function parseToDocument(
     firstTopLevelNodeText(parsed.tree) ??
     "Untitled";
 
-  const trees = parsed.tree.map((tree, index) =>
+  const visibleRoots = parsed.tree.filter((tree) => !tree.hidden);
+  const trees = visibleRoots.map((tree, index) =>
     index === 0
       ? {
           ...tree,
@@ -113,7 +133,6 @@ export function parseToDocument(
     author,
     docId: ensured.docId,
     updatedMs,
-    content,
     title,
     ...(rootShortId !== undefined && { rootShortId }),
     ...(ensured.frontMatter && { frontMatter: ensured.frontMatter }),

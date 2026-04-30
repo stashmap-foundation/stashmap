@@ -1,8 +1,8 @@
 import React from "react";
 import { Event, Filter, SubCloser, SubscribeManyParams } from "nostr-tools";
 import { LoadedCliProfile } from "./cli/config";
-import type { Document } from "./core/Document";
 import type { ScannedWorkspaceDocument } from "./infra/filesystem/workspaceScan";
+import type { WorkspaceWriteRequest } from "./infra/filesystem/workspaceBackend";
 import type { FsEventHandler } from "./infra/filesystem/workspaceWatcher";
 
 export type WorkspaceState = {
@@ -11,7 +11,7 @@ export type WorkspaceState = {
   create: (args: { folder: string; secretKeyInput?: string }) => Promise<void>;
   isInitialised: (folder: string) => Promise<boolean>;
   save: (
-    documents: ReadonlyArray<Document>,
+    writes: ReadonlyArray<WorkspaceWriteRequest>,
     deletedPaths?: ReadonlyArray<string>
   ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
   subscribeFsEvents: (handler: FsEventHandler) => () => void;

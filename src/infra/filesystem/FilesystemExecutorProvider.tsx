@@ -35,12 +35,11 @@ function uniqueSlugPath(baseSlug: string, taken: ReadonlySet<string>): string {
 
 function collectTakenPaths(
   documents: ImmutableMap<string, Document>
-): Set<string> {
-  const paths = new Set<string>();
-  documents.forEach((doc) => {
-    if (doc.filePath) paths.add(doc.filePath);
-  });
-  return paths;
+): ReadonlySet<string> {
+  return documents.reduce(
+    (paths, doc) => (doc.filePath ? new Set([...paths, doc.filePath]) : paths),
+    new Set<string>()
+  );
 }
 
 function lookupFilePath(
@@ -51,11 +50,17 @@ function lookupFilePath(
   return documents.get(documentKeyOf(author, docId))?.filePath;
 }
 
+type EnrichedWrite = {
+  parsed: ParsedDocument;
+  filePath: string;
+  content: string;
+};
+
 function enrichWithFilePath(
   event: UnsignedEvent,
   documents: ImmutableMap<string, Document>,
-  taken: Set<string>
-): ParsedDocument | undefined {
+  taken: ReadonlySet<string>
+): EnrichedWrite | undefined {
   const parsed = eventToParsed(event);
   if (!parsed) return undefined;
   const { document } = parsed;
@@ -65,11 +70,10 @@ function enrichWithFilePath(
       ? LOG_ROOT_FILE
       : existing ??
         uniqueSlugPath(slugify(document.title || document.docId), taken);
-  // eslint-disable-next-line functional/immutable-data
-  taken.add(filePath);
   return {
-    ...parsed,
-    document: { ...document, filePath },
+    parsed: { ...parsed, document: { ...document, filePath } },
+    filePath,
+    content: event.content,
   };
 }
 
@@ -122,10 +126,20 @@ export function FilesystemExecutorProvider({
 
     if (writable.length === 0) return;
 
-    const taken = collectTakenPaths(documents);
-    const parsedToWrite = writable
-      .map((event) => enrichWithFilePath(event, documents, taken))
-      .filter((parsed): parsed is ParsedDocument => parsed !== undefined);
+    const enriched = writable.reduce<{
+      items: EnrichedWrite[];
+      taken: ReadonlySet<string>;
+    }>(
+      (acc, event) => {
+        const result = enrichWithFilePath(event, documents, acc.taken);
+        if (!result) return acc;
+        return {
+          items: [...acc.items, result],
+          taken: new Set([...acc.taken, result.filePath]),
+        };
+      },
+      { items: [], taken: collectTakenPaths(documents) }
+    );
 
     const deletions = writable
       .map((event) => enrichDelete(event, documents))
@@ -135,7 +149,7 @@ export function FilesystemExecutorProvider({
       );
 
     if (store) {
-      parsedToWrite.forEach((parsed) => store.upsertDocument(parsed));
+      enriched.items.forEach((write) => store.upsertDocument(write.parsed));
       deletions.forEach(({ del }) => store.deleteDocument(del));
     }
 
@@ -144,7 +158,10 @@ export function FilesystemExecutorProvider({
         .map((item) => item.filePath)
         .filter((p): p is string => p !== undefined);
       await workspace.save(
-        parsedToWrite.map((parsed) => parsed.document),
+        enriched.items.map((write) => ({
+          relativePath: write.filePath,
+          content: write.content,
+        })),
         deletedPaths
       );
     }

@@ -138,6 +138,7 @@ function indexDocumentTree(
 }
 
 function buildLocalIndex(
+  workspaceDir: string,
   workspaceNodes: ImmutableMap<string, GraphNode>,
   documents: ScannedWorkspaceDocument[]
 ): {
@@ -147,7 +148,12 @@ function buildLocalIndex(
   const targetPathByShortId = documents.reduce(
     (acc, doc) =>
       doc.rootShortId
-        ? indexDocumentTree(workspaceNodes, doc.filePath, doc.rootShortId, acc)
+        ? indexDocumentTree(
+            workspaceNodes,
+            path.join(workspaceDir, doc.filePath),
+            doc.rootShortId,
+            acc
+          )
         : acc,
     {} as Record<string, string>
   );
@@ -441,6 +447,7 @@ export async function applyWorkspaceInbox(
     workspaceDBs.get(profile.pubkey)?.nodes ??
     ImmutableMap<string, GraphNode>();
   const { knownIds, targetPathByShortId } = buildLocalIndex(
+    profile.workspaceDir,
     workspaceNodes,
     localDocuments
   );
@@ -539,7 +546,9 @@ export async function applyWorkspaceInbox(
 
   await Promise.all(
     Object.entries(additionsByTarget).map(async ([targetPath, group]) => {
-      const targetDoc = localDocuments.find((d) => d.filePath === targetPath);
+      const targetDoc = localDocuments.find(
+        (d) => path.join(profile.workspaceDir, d.filePath) === targetPath
+      );
       if (!targetDoc?.rootShortId) return;
       const { rootShortId } = targetDoc;
       const targetRoot = workspaceNodes.get(rootShortId);

@@ -34,8 +34,8 @@ test("loadWorkspaceAsDocuments returns one Document per markdown file", async ()
 
   expect(documents).toHaveLength(1);
   expect(documents[0].author).toBe(TEST_PUBKEY);
-  expect(documents[0].filePath).toBe("project.md");
-  expect(documents[0].content).toContain("# Project");
+  expect(documents[0].relativePath).toBe("project.md");
+  expect(documents[0].currentContent).toContain("# Project");
 });
 
 test("loadWorkspaceAsDocuments returns one Document per file across multiple files", async () => {
@@ -68,7 +68,7 @@ test("loadWorkspaceAsDocuments respects .knowstrignore", async () => {
   });
 
   expect(documents).toHaveLength(1);
-  expect(documents[0].content).toContain("# Keep");
+  expect(documents[0].currentContent).toContain("# Keep");
 });
 
 test("loadWorkspaceAsDocuments falls back to filename basename when frontmatter has no title", async () => {

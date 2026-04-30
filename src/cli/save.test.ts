@@ -55,6 +55,8 @@ title: "Doc"
 custom: yes
 ---
 
+# Doc
+
 - one
 `
   );
@@ -62,7 +64,7 @@ custom: yes
   await knowstrSave(workspaceDir);
 
   const raw = fs.readFileSync(path.join(workspaceDir, "doc.md"), "utf8");
-  expect(raw).toContain('title: "Doc"');
+  expect(raw).toContain("title: Doc");
   expect(raw).toContain("custom: yes");
   expect(raw).toContain("knowstr_doc_id:");
   await expectMarkdown(
@@ -757,7 +759,7 @@ custom: yes
   await knowstrSave(workspaceDir);
 
   const raw = fs.readFileSync(path.join(workspaceDir, "doc.md"), "utf8");
-  expect(raw).toContain('title: "Doc"');
+  expect(raw).toContain("title: Doc");
   expect(raw).toContain("custom: yes");
   expect(raw).not.toContain("stale instructions");
   expect(raw).not.toContain("second stale line");

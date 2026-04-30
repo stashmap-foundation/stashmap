@@ -1,4 +1,5 @@
 import { List } from "immutable";
+import { v4 } from "uuid";
 import {
   getNodeContext,
   getSemanticID,
@@ -19,6 +20,7 @@ import {
   planMoveDescendantNodes,
   planUpsertNodes,
 } from "./planner";
+import { planUpsertRootDocument } from "./core/plan";
 import { newNode } from "./core/nodeFactory";
 import { nodeText } from "./core/nodeSpans";
 import { getNodeForView, ViewPath } from "./ViewContext";
@@ -33,19 +35,25 @@ export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
     publicKey: plan.user.publicKey,
     affectedRoots: plan.affectedRoots,
   };
-  const result = materializeTree(trees, plan.user.publicKey, {
+  const treesWithDocIds = trees.map((tree) => ({
+    ...tree,
+    docId: tree.docId ?? v4(),
+  }));
+  const result = materializeTree(treesWithDocIds, plan.user.publicKey, {
     context: walkContext,
     semanticContext: context,
   });
-  return [
-    {
-      ...plan,
-      knowledgeDBs: result.context.knowledgeDBs,
-      affectedRoots: result.context.affectedRoots,
-    },
-    result.topSemanticIds,
-    result.topNodeIds,
-  ];
+  const planWithNodes: T = {
+    ...plan,
+    knowledgeDBs: result.context.knowledgeDBs,
+    affectedRoots: result.context.affectedRoots,
+  };
+  const userNodes = result.context.knowledgeDBs.get(plan.user.publicKey)?.nodes;
+  const planWithDocs = result.topNodeIds.reduce<T>((acc, longId) => {
+    const rootNode = userNodes?.get(shortID(longId));
+    return rootNode ? planUpsertRootDocument(acc, rootNode) : acc;
+  }, planWithNodes);
+  return [planWithDocs, result.topSemanticIds, result.topNodeIds];
 }
 
 export function planCreateNodesFromMarkdownFiles<T extends GraphPlan>(

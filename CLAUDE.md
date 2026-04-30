@@ -1,5 +1,6 @@
 # Remember
 
+- MOST IMPORTANT: PUSH BACK. If you think something I say is wrong, say so.
 - To run typescript use: npm run typescript
 - To run lint use: npm run lint
 - Ignore "React is declared but its value is never read" warnings - they are almost always stale
@@ -7,17 +8,6 @@
 - We program purely functional, don't use let or var, only const.
 - Don't add any comments to the code, except when they are really necessary, which is very rare. Code should be self-explanatory. Don't add any comments where you tell me waht you are doing.
 - Don't use inline imports in type declarations (e.g., `import("./Foo").Bar`). Use regular top-level imports instead.
-
-## Layering: Core → Editor → Adapter / App
-
-The codebase is organized into layers. Each layer can depend on layers above it but never below:
-
-- **`src/core/`** — Pure graph + markdown + document model. No React, no nostr-tools, no electron, no fs, no infra. Enforced by ESLint.
-- **`src/editor/`** — Shared React editor (was `src/components/`). May import from core. Must NOT import from `src/infra/**`. Enforced by ESLint with two grandfathered exceptions (`Node.tsx`, `RightMenu.tsx` for read-time nostr identity helpers — to be decoupled later).
-- **`src/infra/filesystem/`**, **`src/infra/nostr/`** — Adapters. May import from core. Apps wire adapters into the editor at the boundary.
-- **App glue** — `src/index.tsx`, `src/App.tsx`, `src/Apis.tsx`, `BackendContext`, etc. Composes the others.
-
-When adding new files, place them in the appropriate layer. When adding a new feature, ask: is this graph data (core), UI presentation (editor), IO/protocol (infra), or composition (app)?
 
 ## Testing
 
@@ -68,41 +58,8 @@ Key principles:
 - Each test creates its own data by typing, no shared setup with pre-existing nodes
 - Test the actual user flow, not isolated components with mocked contexts
 
-# Workflow Orchestration
-
-## Architecture File
-
-- Maintain an architecture document using knowstr (the app we are building) use the cli to push and pull updates
-- Read that file before starting a task and update it whenever you have learnings about the system architecture or whenever we make architectural decisions.
-
-## Plan Mode Default
-- Use plan mode for verification steps, not just building
-- Write detailed specs upfront to reduce ambiguity
-- **Tests are a fundamental part of every plan.** Plans MUST include a concrete test section describing which test cases to write, BEFORE the implementation section. Tests should generally be written first (TDD). Never treat tests as an afterthought or "verification step" — they are the primary deliverable alongside the code.
-
-## Subagent Strategy
-- Use subagents liberally to keep main context window clean
-- Offload research, exploration, and parallel analysis to subagents
-- For complex problems, throw more compute at it via subagents
-- One tack per subagent for focused execution
-
-## Self-Improvement Loop
-- After ANY correction from the user: update `tasks/lessons.md` with the pattern. NEVER put project lessons into MEMORY.md — that file is only for codebase architecture notes and code style reminders, not correction-driven lessons.
-- Write rules for yourself that prevent the same mistake
-- Ruthlessly iterate on these lessons until mistake rate drops
-- Review lessons at session start for relevant project
-
 ## Verification Before Done
-- Never mark a task complete without proving it works
-- Diff behavior between main and your changes when relevant
-- Ask yourself: "Would a staff engineer approve this?"
-- Run tests, check logs, demonstrate correctness
-
-## Demand Elegance (Balanced)
-- For non-trivial changes: pause and ask "is there a more elegant way?"
-- If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
-- Skip this for simple, obvious fixes - don't over-engineer
-- Challenge your own work before presenting it
+- Run tests, lint and typescript
 
 ## Bug Fixes
 
@@ -110,16 +67,8 @@ Key principles:
 
 # Task Management
 
-1. **Plan First**: Write plan to `tasks/todo.md` with checkable items
-2. **Verify Plan**: Check in before starting implementation
-3. **Track Progress**: Mark items complete as you go
-4. **Explain Changes**: High-level summary at each step
-5. **Document Results**: Add review section to `tasks/todo.md`
-6. **Capture Lessons**: Update `tasks/lessons.md` after corrections
-
 ## Core Principles
 
 - **Simplicity First**: Make every change as simple as possible. Impact minimal code.
 - **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
 - **Minimat Impact**: Changes should only touch what's necessary. Avoid introducing bugs.
-

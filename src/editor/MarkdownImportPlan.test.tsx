@@ -88,11 +88,6 @@ source_id: "src_problem"
   expect(trees).toEqual([
     {
       spans: plainSpans("Imported Title"),
-      frontMatter: `---
-title: "Imported Title"
-source_id: "src_problem"
----
-`,
       children: [
         {
           spans: plainSpans("first"),

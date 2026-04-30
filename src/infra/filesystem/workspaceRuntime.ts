@@ -1,11 +1,10 @@
 import crypto from "crypto";
 import { loadCliProfile } from "../../cli/config";
-import type { Document } from "../../core/Document";
 import { ScannedWorkspaceDocument } from "./workspaceScan";
 import {
-  buildWorkspaceDocumentContent,
   loadWorkspaceAsDocuments,
   saveDocumentsToWorkspace,
+  WorkspaceWriteRequest,
 } from "./workspaceBackend";
 import type {
   FsEvent,
@@ -25,7 +24,7 @@ export type WorkspaceRuntime = {
   load: () => Promise<WorkspaceRuntimeLoaded>;
   ready: () => Promise<void>;
   save: (
-    documents: ReadonlyArray<Document>,
+    writes: ReadonlyArray<WorkspaceWriteRequest>,
     deletedPaths?: ReadonlyArray<string>
   ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
   subscribeFsEvents: (handler: FsEventHandler) => () => void;
@@ -104,25 +103,18 @@ export function createWorkspaceRuntime(workspaceDir: string): WorkspaceRuntime {
   };
 
   const recordSaveEchoes = (
-    documents: ReadonlyArray<Document>,
+    writes: ReadonlyArray<WorkspaceWriteRequest>,
     deletedPaths: ReadonlyArray<string> = []
   ): void => {
     const expiresAt = Date.now() + ECHO_TTL_MS;
-    documents.forEach((doc) => {
-      if (doc.filePath !== undefined) {
-        const active = (pendingEchoes.get(doc.filePath) ?? []).filter(
-          (entry) => entry.expiresAt > Date.now()
-        );
-        pendingEchoes.set(doc.filePath, [
-          ...active,
-          {
-            hash: hashContent(
-              buildWorkspaceDocumentContent(doc.content, doc.docId)
-            ),
-            expiresAt,
-          },
-        ]);
-      }
+    writes.forEach((write) => {
+      const active = (pendingEchoes.get(write.relativePath) ?? []).filter(
+        (entry) => entry.expiresAt > Date.now()
+      );
+      pendingEchoes.set(write.relativePath, [
+        ...active,
+        { hash: hashContent(write.content), expiresAt },
+      ]);
     });
     deletedPaths.forEach((relativePath) => {
       pendingUnlinkEchoes.set(relativePath, expiresAt);

@@ -119,6 +119,18 @@ function applyDocumentToSnapshot(
   const existingDocument = snapshot.documents.get(key);
   const existingDelete = snapshot.deletes.get(key);
 
+  // eslint-disable-next-line no-console
+  console.log("[apply]", {
+    key,
+    docTitle: doc.title,
+    docRootShortId: doc.rootShortId,
+    existingTitle: existingDocument?.title,
+    existingRootShortId: existingDocument?.rootShortId,
+    docUpdatedMs: doc.updatedMs,
+    existingUpdatedMs: existingDocument?.updatedMs,
+    nodeCount: parsed.nodes.size,
+  });
+
   if (existingDelete && existingDelete.deletedAt >= doc.updatedMs) {
     return snapshot;
   }

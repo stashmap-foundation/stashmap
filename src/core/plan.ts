@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data, no-continue, no-nested-ternary */
 import { List, Map, Set as ImmutableSet } from "immutable";
+import { v4 } from "uuid";
 import {
   KIND_CONTACTLIST,
   KIND_RELAY_METADATA_EVENT,
@@ -16,6 +17,7 @@ import {
   shortID,
 } from "./connections";
 import type { RefTargetSeed, TextSeed } from "./connections";
+import { createDocumentFromRootNode, documentKeyOf } from "./Document";
 import { newDB } from "./knowledge";
 import { newNode, newRefNode } from "./nodeFactory";
 import { nodeText, plainSpans } from "./nodeSpans";
@@ -181,26 +183,41 @@ export function planRemoveContact<T extends GraphPlan>(
   };
 }
 
+export function planUpsertRootDocument<T extends GraphPlan>(
+  plan: T,
+  rootNode: GraphNode
+): T {
+  if (rootNode.parent || !rootNode.docId) {
+    return plan;
+  }
+  const key = documentKeyOf(rootNode.author, rootNode.docId);
+  const existing = plan.documents.get(key);
+  const next = existing
+    ? { ...existing, updatedMs: rootNode.updated }
+    : createDocumentFromRootNode(rootNode);
+  return { ...plan, documents: plan.documents.set(key, next) };
+}
+
 export function upsertNodesCore<T extends GraphPlan>(
   plan: T,
   nodes: GraphNode
 ): T {
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
-  const normalizedNodes = ensureNodeNativeFields(plan.knowledgeDBs, nodes);
-  const updatedNodes = userDB.nodes.set(
-    shortID(normalizedNodes.id),
-    normalizedNodes
-  );
+  const normalized = ensureNodeNativeFields(plan.knowledgeDBs, nodes);
+  const node: GraphNode =
+    !normalized.parent && !normalized.docId
+      ? { ...normalized, docId: v4() }
+      : normalized;
   const updatedDB = {
     ...userDB,
-    nodes: updatedNodes,
+    nodes: userDB.nodes.set(shortID(node.id), node),
   };
-  const affectedRoot = normalizedNodes.root;
-  return {
+  const planWithNode: T = {
     ...plan,
     knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
-    affectedRoots: plan.affectedRoots.add(affectedRoot),
+    affectedRoots: plan.affectedRoots.add(node.root),
   };
+  return planUpsertRootDocument(planWithNode, node);
 }
 
 function addCrefToLog<T extends GraphPlan>(plan: T, nodeID: LongID): T {

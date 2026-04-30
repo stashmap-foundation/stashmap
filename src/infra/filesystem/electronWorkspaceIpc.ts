@@ -1,7 +1,7 @@
 import { LoadedCliProfile } from "../../cli/config";
 import { WorkspaceIpc, WorkspaceLoaded } from "./FilesystemBackendProvider";
-import type { Document } from "../../core/Document";
 import type { ScannedWorkspaceDocument } from "./workspaceScan";
+import type { WorkspaceWriteRequest } from "./workspaceBackend";
 import type { FsEvent, FsEventHandler } from "./workspaceWatcher";
 
 export type IpcChannel = {
@@ -14,7 +14,7 @@ export type IpcChannel = {
   create: (args: { folder: string; secretKeyInput?: string }) => Promise<void>;
   isInitialised: (folder: string) => Promise<boolean>;
   save: (
-    documents: ReadonlyArray<Document>,
+    writes: ReadonlyArray<WorkspaceWriteRequest>,
     deletedPaths?: ReadonlyArray<string>
   ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
   onFsEvent: (listener: (event: FsEvent) => void) => () => void;
@@ -66,12 +66,12 @@ export function electronWorkspaceIpc(): WorkspaceIpc {
       }
       return channel.isInitialised(folder);
     },
-    save: async (documents, deletedPaths) => {
+    save: async (writes, deletedPaths) => {
       const channel = getChannel();
       if (!channel) {
         return { changed_paths: [], removed_paths: [] };
       }
-      return channel.save(documents, deletedPaths);
+      return channel.save(writes, deletedPaths);
     },
     subscribeFsEvents: (handler: FsEventHandler) => {
       const channel = getChannel();

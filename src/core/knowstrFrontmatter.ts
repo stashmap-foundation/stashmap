@@ -14,16 +14,19 @@ export function parseFrontMatter(inner: string): FrontMatter {
 }
 
 export function serializeFrontMatter(fm: FrontMatter): string {
-  const body = YAML.stringify(fm);
+  const body = YAML.stringify(fm, { blockQuote: "literal", lineWidth: 0 });
   return `---\n${body}---\n`;
 }
 
-export function ensureKnowstrDocId(fm: FrontMatter | undefined): {
+export function ensureKnowstrDocId(
+  fm: FrontMatter | undefined,
+  fallback?: string
+): {
   docId: string;
   frontMatter: FrontMatter;
 } {
   const existing = fm?.knowstr_doc_id;
-  const docId = typeof existing === "string" ? existing : v4();
+  const docId = typeof existing === "string" ? existing : fallback ?? v4();
   return {
     docId,
     frontMatter: {

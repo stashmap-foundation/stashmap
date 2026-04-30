@@ -1,4 +1,5 @@
 import fs from "fs/promises";
+import path from "path";
 import { renderDocumentMarkdown } from "../../documentRenderer";
 import {
   ScannedWorkspaceDocument,
@@ -64,7 +65,7 @@ export async function saveEditedWorkspaceDocuments(
   const writes = normalizedDocuments
     .filter((document) => document.changed)
     .map((document) => ({
-      filePath: document.filePath,
+      filePath: path.join(profile.workspaceDir, document.filePath),
       content: document.normalizedContent,
     }));
 

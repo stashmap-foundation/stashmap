@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Backend, BackendProvider, WorkspaceState } from "../../BackendContext";
 import { LoadedCliProfile } from "../../cli/config";
-import type { Document } from "../../DocumentStore";
+import type { Document } from "../../core/Document";
+import { ScannedWorkspaceDocument } from "./workspaceScan";
 import type { FsEventHandler } from "./workspaceWatcher";
 
 export type WorkspaceLoaded = {
   profile: LoadedCliProfile;
-  documents: Document[];
+  documents: ScannedWorkspaceDocument[];
 };
 
 export type WorkspaceIpc = {

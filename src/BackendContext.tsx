@@ -1,7 +1,8 @@
 import React from "react";
 import { Event, Filter, SubCloser, SubscribeManyParams } from "nostr-tools";
 import { LoadedCliProfile } from "./cli/config";
-import type { Document } from "./DocumentStore";
+import type { Document } from "./core/Document";
+import type { ScannedWorkspaceDocument } from "./infra/filesystem/workspaceScan";
 import type { FsEventHandler } from "./infra/filesystem/workspaceWatcher";
 
 export type WorkspaceState = {
@@ -15,7 +16,7 @@ export type WorkspaceState = {
   ) => Promise<{ changed_paths: string[]; removed_paths: string[] }>;
   subscribeFsEvents: (handler: FsEventHandler) => () => void;
   profile: LoadedCliProfile | null;
-  documents: Document[];
+  documents: ScannedWorkspaceDocument[];
 };
 
 export type Backend = {

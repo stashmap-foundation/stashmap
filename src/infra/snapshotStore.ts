@@ -1,7 +1,7 @@
 import { Map } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
 import { KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT, getReplaceableKey } from "../nostr";
-import { findTag, getEventMs, parseDocumentEvent } from "../nostrEvents";
+import { eventToParsed, findTag, getEventMs } from "../nostrEvents";
 import { collectEventsUntilIdle, EventQueryClient } from "../eventQuery";
 import { storedDocumentToEvent } from "../documentMaterialization";
 import { joinID } from "../core/connections";
@@ -115,11 +115,11 @@ export function materializeSnapshot(
   record: StoredSnapshotRecord
 ): Map<string, GraphNode> {
   const event = storedDocumentToEvent(record);
-  const nodes = parseDocumentEvent({
-    ...event,
-    pubkey: record.sourceAuthor,
-  });
-  return nodes.mapKeys((shortId) => joinID(record.sourceAuthor, shortId));
+  const parsed = eventToParsed({ ...event, pubkey: record.sourceAuthor });
+  const nodes = parsed?.nodes ?? Map<string, GraphNode>();
+  return nodes.mapKeys((shortId: string) =>
+    joinID(record.sourceAuthor, shortId)
+  );
 }
 
 export async function loadAndMaterializeSnapshots(

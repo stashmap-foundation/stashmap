@@ -20,7 +20,6 @@ export function newNode(
     spans: plainSpans(text),
     parent,
     anchor: !parent ? createRootAnchor(semanticContext) : undefined,
-    frontMatter: docId ? `---\nknowstr_doc_id: ${docId}\n---\n` : undefined,
     docId,
     systemRole: !parent ? systemRole : undefined,
     updated: Date.now(),

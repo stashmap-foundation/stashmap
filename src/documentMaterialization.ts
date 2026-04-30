@@ -13,12 +13,7 @@ import {
   KIND_KNOWLEDGE_DOCUMENT,
   getReplaceableKey,
 } from "./nostr";
-import {
-  findTag,
-  getEventMs,
-  parseDocumentEvent,
-  sortEvents,
-} from "./nostrEvents";
+import { eventToParsed, findTag, getEventMs, sortEvents } from "./nostrEvents";
 
 export function storedDocumentToEvent(
   document: StoredDocumentRecord
@@ -76,7 +71,10 @@ export function findDocumentNodes(
     .toList();
 
   const parsedNodes = sortEvents(deduped)
-    .flatMap((event) => parseDocumentEvent(event).valueSeq())
+    .flatMap<GraphNode>((event) => {
+      const parsed = eventToParsed(event);
+      return parsed ? parsed.nodes.valueSeq().toList() : List<GraphNode>();
+    })
     .toList();
 
   return parsedNodes.reduce((acc, node) => {

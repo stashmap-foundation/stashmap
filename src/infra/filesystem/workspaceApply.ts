@@ -1,22 +1,16 @@
 import fs from "fs/promises";
 import path from "path";
 import { Map as ImmutableMap, Set as ImmutableSet, List } from "immutable";
-import { renderDocumentMarkdown } from "../../documentRenderer";
+import {
+  renderDocumentMarkdown,
+  renderRootedMarkdown,
+} from "../../documentRenderer";
 import { joinID, shortID } from "../../core/connections";
-import {
-  WalkContext,
-  createNodesFromMarkdownTrees,
-} from "../../core/markdownNodes";
-import {
-  firstTopLevelNodeText,
-  parseMarkdownDocument,
-} from "../../core/markdownTree";
-import { ensureKnowstrDocIdFrontMatter } from "../../core/knowstrFrontmatter";
+import { parseToDocument } from "../../core/Document";
 import { saveEditedWorkspaceDocuments } from "./workspaceSave";
 import {
   ScannedWorkspaceDocument,
   WorkspaceSaveProfile,
-  parseWorkspaceDocumentRoots,
   scanWorkspaceDocuments,
 } from "./workspaceScan";
 
@@ -89,14 +83,6 @@ async function collectMarkdownFilesRecursively(
   }, Promise.resolve([] as string[]));
 }
 
-function freshWalkContext(pubkey: PublicKey): WalkContext {
-  return {
-    knowledgeDBs: ImmutableMap<PublicKey, KnowledgeData>(),
-    publicKey: pubkey,
-    affectedRoots: ImmutableSet<ID>(),
-  };
-}
-
 async function scanInboxDocuments(
   profile: WorkspaceSaveProfile
 ): Promise<{ documents: InboxDocument[]; invalidPaths: string[] }> {
@@ -114,37 +100,20 @@ async function scanInboxDocuments(
     markdownFiles.map(async (filePath) => {
       const currentContent = await fs.readFile(filePath, "utf8");
       const relativePath = path.relative(profile.workspaceDir, filePath);
-      const parsed = parseMarkdownDocument(currentContent);
       const fallbackTitle = path.basename(relativePath, ".md") || undefined;
-      const title =
-        parsed.title ??
-        fallbackTitle ??
-        firstTopLevelNodeText(parsed.tree) ??
-        "Untitled";
-      const { frontMatter } = ensureKnowstrDocIdFrontMatter(parsed.frontMatter);
-      const mainRoot = parseWorkspaceDocumentRoots(
-        parsed.tree,
-        title,
-        frontMatter,
-        relativePath
-      );
-      const [ctx, , topNodeIDs] = createNodesFromMarkdownTrees(
-        freshWalkContext(profile.pubkey),
-        [mainRoot]
-      );
-      const rootLongId = topNodeIDs[0];
-      if (!rootLongId) {
+      const parsed = parseToDocument(profile.pubkey, currentContent, {
+        filePath,
+        relativePath,
+        ...(fallbackTitle !== undefined ? { fallbackTitle } : {}),
+      });
+      if (!parsed.document.rootShortId) {
         throw new Error(`Inbox file ${relativePath} has no root`);
-      }
-      const nodes = ctx.knowledgeDBs.get(profile.pubkey)?.nodes;
-      if (!nodes) {
-        throw new Error(`Inbox file ${relativePath} produced no nodes`);
       }
       return {
         filePath,
         relativePath,
-        nodes,
-        rootShortId: shortID(rootLongId),
+        nodes: parsed.nodes,
+        rootShortId: parsed.document.rootShortId,
       };
     })
   );
@@ -177,7 +146,9 @@ function buildLocalIndex(
 } {
   const targetPathByShortId = documents.reduce(
     (acc, doc) =>
-      indexDocumentTree(workspaceNodes, doc.filePath, doc.rootShortId, acc),
+      doc.rootShortId
+        ? indexDocumentTree(workspaceNodes, doc.filePath, doc.rootShortId, acc)
+        : acc,
     {} as Record<string, string>
   );
   return {
@@ -382,7 +353,7 @@ function renderAdditionSubtree(addition: GraphAddition): string {
     root.author,
     { nodes: addition.inboxNodes } as KnowledgeData
   );
-  return renderDocumentMarkdown(dbs, root);
+  return renderRootedMarkdown(dbs, root);
 }
 
 function dedupeAdditions(additions: GraphAddition[]): DuplicateConflict[] {
@@ -569,11 +540,10 @@ export async function applyWorkspaceInbox(
   await Promise.all(
     Object.entries(additionsByTarget).map(async ([targetPath, group]) => {
       const targetDoc = localDocuments.find((d) => d.filePath === targetPath);
-      if (!targetDoc) return;
-      const targetRoot = workspaceNodes.get(targetDoc.rootShortId);
+      if (!targetDoc?.rootShortId) return;
+      const { rootShortId } = targetDoc;
+      const targetRoot = workspaceNodes.get(rootShortId);
       if (!targetRoot) return;
-      // Build a per-doc nodes Map containing the workspace doc's nodes plus
-      // the addition subtrees, with parents updated to point at the workspace.
       const updatedNodes = group.reduce((nodes, addition) => {
         const parent = nodes.get(addition.parentShortId);
         if (!parent) return nodes;
@@ -598,13 +568,11 @@ export async function applyWorkspaceInbox(
           ),
         });
       }, workspaceNodes);
-      const updatedRoot = updatedNodes.get(targetDoc.rootShortId);
-      if (!updatedRoot) return;
       const dbs = ImmutableMap<PublicKey, KnowledgeData>().set(profile.pubkey, {
         nodes: updatedNodes,
       } as KnowledgeData);
       // eslint-disable-next-line testing-library/render-result-naming-convention
-      const markdown = renderDocumentMarkdown(dbs, updatedRoot);
+      const markdown = renderDocumentMarkdown(dbs, targetDoc);
       await fs.writeFile(targetPath, markdown, "utf8");
     })
   );
@@ -619,7 +587,7 @@ export async function applyWorkspaceInbox(
       } as KnowledgeData);
       await fs.writeFile(
         plan.filePath,
-        renderDocumentMarkdown(dbs, root),
+        renderRootedMarkdown(dbs, root),
         "utf8"
       );
     })

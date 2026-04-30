@@ -68,7 +68,8 @@
     "url-loader": "^4.1.1",
     "use-debounce": "^7.0.1",
     "uuid": "^8.3.2",
-    "vm-browserify": "^1.1.2"
+    "vm-browserify": "^1.1.2",
+    "yaml": "^2.8.3"
   },
   "devDependencies": {
     "@swc/cli": "^0.1.57",

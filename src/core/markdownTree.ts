@@ -6,8 +6,7 @@ import markdownItFrontMatter from "markdown-it-front-matter";
 import Token from "markdown-it/lib/token";
 import { fileLinkSpan, linkSpan, plainSpans, spansText } from "./nodeSpans";
 import { isMarkdownPath } from "./linkPath";
-import { extractTitle } from "./markdownFrontMatter";
-import { extractDocId } from "./knowstrFrontmatter";
+import { parseFrontMatter } from "./knowstrFrontmatter";
 
 const captured: { value?: string } = {};
 const markdown = new MarkdownIt({ html: true });
@@ -265,7 +264,6 @@ function extractInlineContent(inline: Token): {
 export type MarkdownTreeNode = {
   spans: InlineSpan[];
   children: MarkdownTreeNode[];
-  frontMatter?: string;
   docId?: string;
   uuid?: string;
   relevance?: Relevance;
@@ -502,38 +500,19 @@ function buildTreeFromTokens(tokens: Token[]): MarkdownTreeNode[] {
   return roots;
 }
 
-export function firstTopLevelNodeText(
-  tree: MarkdownTreeNode[]
-): string | undefined {
-  const root = tree.find((node) => !node.hidden);
-  if (!root) return undefined;
-  const text = spansText(root.spans);
-  return text || undefined;
-}
-
-export function parseMarkdownDocument(markdownText: string): {
+export type ParsedMarkdown = {
   tree: MarkdownTreeNode[];
-  frontMatter?: string;
-  title?: string;
-  docId?: string;
-} {
+  frontMatter?: FrontMatter;
+};
+
+export function parseMarkdown(markdownText: string): ParsedMarkdown {
   captured.value = undefined;
   const tree = buildTreeFromTokens(markdown.parse(markdownText, {}));
   const innerYaml = captured.value as string | undefined;
   const frontMatter =
-    innerYaml !== undefined ? `---\n${innerYaml}\n---\n` : undefined;
-  const title = innerYaml !== undefined ? extractTitle(innerYaml) : undefined;
-  const docId = innerYaml !== undefined ? extractDocId(innerYaml) : undefined;
+    innerYaml !== undefined ? parseFrontMatter(innerYaml) : undefined;
   return {
     tree,
     ...(frontMatter !== undefined ? { frontMatter } : {}),
-    ...(title !== undefined ? { title } : {}),
-    ...(docId !== undefined ? { docId } : {}),
   };
-}
-
-export function parseMarkdownHierarchy(
-  markdownText: string
-): MarkdownTreeNode[] {
-  return parseMarkdownDocument(markdownText).tree;
 }

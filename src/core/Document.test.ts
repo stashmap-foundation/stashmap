@@ -1,42 +1,37 @@
-import { contentToDocument } from "./Document";
+import { parseToDocument } from "./Document";
 
 const TEST_PUBKEY = "a".repeat(64) as PublicKey;
 
-test("contentToDocument extracts title from frontmatter", () => {
+test("parseToDocument extracts title from frontmatter", () => {
   const markdown = `---\ntitle: "Holiday Destinations"\n---\n# Spain\n`;
-  const doc = contentToDocument(TEST_PUBKEY, markdown);
-  expect(doc.title).toBe("Holiday Destinations");
+  const { document } = parseToDocument(TEST_PUBKEY, markdown);
+  expect(document.title).toBe("Holiday Destinations");
 });
 
-test("contentToDocument frontmatter title beats fallbackTitle", () => {
+test("parseToDocument frontmatter title beats fallbackTitle", () => {
   const markdown = `---\ntitle: "Frontmatter Wins"\n---\n# Body Heading\n`;
-  const doc = contentToDocument(
-    TEST_PUBKEY,
-    markdown,
-    undefined,
-    "Fallback Loses"
-  );
-  expect(doc.title).toBe("Frontmatter Wins");
+  const { document } = parseToDocument(TEST_PUBKEY, markdown, {
+    fallbackTitle: "Fallback Loses",
+  });
+  expect(document.title).toBe("Frontmatter Wins");
 });
 
-test("contentToDocument falls back to fallbackTitle when no frontmatter title", () => {
+test("parseToDocument falls back to fallbackTitle when no frontmatter title", () => {
   const markdown = "# Body Heading\n- alpha\n";
-  const doc = contentToDocument(
-    TEST_PUBKEY,
-    markdown,
-    "notes/projects.md",
-    "projects"
-  );
-  expect(doc.title).toBe("projects");
+  const { document } = parseToDocument(TEST_PUBKEY, markdown, {
+    filePath: "notes/projects.md",
+    fallbackTitle: "projects",
+  });
+  expect(document.title).toBe("projects");
 });
 
-test("contentToDocument falls back to first top-level node text", () => {
+test("parseToDocument falls back to first top-level node text", () => {
   const markdown = "# Holiday Destinations\n- Spain\n";
-  const doc = contentToDocument(TEST_PUBKEY, markdown);
-  expect(doc.title).toBe("Holiday Destinations");
+  const { document } = parseToDocument(TEST_PUBKEY, markdown);
+  expect(document.title).toBe("Holiday Destinations");
 });
 
-test("contentToDocument falls back to 'Untitled' when nothing else is available", () => {
-  const doc = contentToDocument(TEST_PUBKEY, "");
-  expect(doc.title).toBe("Untitled");
+test("parseToDocument falls back to 'Untitled' when nothing else is available", () => {
+  const { document } = parseToDocument(TEST_PUBKEY, "");
+  expect(document.title).toBe("Untitled");
 });

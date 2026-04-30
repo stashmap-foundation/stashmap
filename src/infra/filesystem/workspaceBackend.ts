@@ -1,26 +1,21 @@
 import path from "path";
 import fs from "fs/promises";
-import { scanWorkspaceDocuments, WorkspaceSaveProfile } from "./workspaceScan";
-import type { Document } from "../../DocumentStore";
-import { systemRoleFromFilePath } from "../../core/Document";
-import { ensureKnowstrDocIdFrontMatter } from "../../core/knowstrFrontmatter";
+import {
+  ScannedWorkspaceDocument,
+  scanWorkspaceDocuments,
+  WorkspaceSaveProfile,
+} from "./workspaceScan";
+import type { Document } from "../../core/Document";
+import {
+  ensureKnowstrDocId,
+  serializeFrontMatter,
+} from "../../core/knowstrFrontmatter";
 
 export async function loadWorkspaceAsDocuments(
   profile: WorkspaceSaveProfile
-): Promise<ReadonlyArray<Document>> {
+): Promise<ReadonlyArray<ScannedWorkspaceDocument>> {
   const { documents } = await scanWorkspaceDocuments(profile);
-  return documents.map((doc) => {
-    const systemRole = systemRoleFromFilePath(doc.relativePath);
-    return {
-      author: profile.pubkey,
-      docId: doc.docId,
-      updatedMs: Date.now(),
-      content: doc.currentContent,
-      title: doc.title,
-      filePath: doc.relativePath,
-      ...(systemRole !== undefined && { systemRole }),
-    };
-  });
+  return documents;
 }
 
 export function buildWorkspaceDocumentContent(
@@ -28,10 +23,8 @@ export function buildWorkspaceDocumentContent(
   docId: string
 ): string {
   const stripped = content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/u, "");
-  const { frontMatter } = ensureKnowstrDocIdFrontMatter(
-    `---\nknowstr_doc_id: ${docId}\n---`
-  );
-  return `${frontMatter}${stripped}`;
+  const { frontMatter } = ensureKnowstrDocId({ knowstr_doc_id: docId });
+  return `${serializeFrontMatter(frontMatter)}${stripped}`;
 }
 
 export async function saveDocumentsToWorkspace(

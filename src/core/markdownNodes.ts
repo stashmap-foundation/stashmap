@@ -1,12 +1,11 @@
 /* eslint-disable functional/immutable-data */
-import { List, Map, Set as ImmutableSet } from "immutable";
+import { List, Map as ImmutableMap, Set as ImmutableSet } from "immutable";
 import { v4 } from "uuid";
 import { ensureNodeNativeFields, joinID, shortID } from "./connections";
 import { newDB } from "./knowledge";
 import { createRootAnchor } from "./rootAnchor";
-import { MarkdownTreeNode, parseMarkdownDocument } from "./markdownTree";
+import { MarkdownTreeNode } from "./markdownTree";
 import { newRefNode, newNode, newFileLinkNode } from "./nodeFactory";
-import { dropLeadingYamlEchoRoots } from "./markdownImport";
 import { nodeText, spansText } from "./nodeSpans";
 
 export type WalkContext = {
@@ -54,7 +53,6 @@ function materializeTreeNode(
     ...baseNode,
     spans: treeNode.spans,
     parent,
-    frontMatter: parent ? undefined : treeNode.frontMatter,
     docId: parent ? undefined : treeNode.docId,
     anchor: parent
       ? undefined
@@ -157,65 +155,56 @@ function materializeTreeNode(
   return [walkUpsertNode(withVisible, node), nodeText(node) as ID, node];
 }
 
-export function createNodesFromMarkdownTrees(
-  ctx: WalkContext,
+export type MaterializeOptions = {
+  context?: WalkContext;
+  updatedMs?: number;
+  semanticContext?: List<ID>;
+};
+
+export type MaterializeResult = {
+  context: WalkContext;
+  topSemanticIds: ID[];
+  topNodeIds: LongID[];
+};
+
+export function materializeTree(
   trees: MarkdownTreeNode[],
-  semanticContext: List<ID> = List<ID>()
-): [WalkContext, topSemanticIDs: ID[], topNodeIDs: LongID[]] {
+  author: PublicKey,
+  options: MaterializeOptions = {}
+): MaterializeResult {
+  const baseContext: WalkContext = options.context ?? {
+    knowledgeDBs: ImmutableMap<PublicKey, KnowledgeData>(),
+    publicKey: author,
+    affectedRoots: ImmutableSet<ID>(),
+  };
+  const ctx: WalkContext =
+    options.updatedMs !== undefined
+      ? { ...baseContext, updated: options.updatedMs }
+      : baseContext;
+  const semanticContext = options.semanticContext ?? List<ID>();
   return trees
     .filter((treeNode) => !treeNode.hidden)
-    .reduce(
-      ([accCtx, accTopSemanticIDs, accTopNodeIDs], treeNode) => {
+    .reduce<MaterializeResult>(
+      (acc, treeNode) => {
         const rootUuid = treeNode.uuid ?? v4();
-        const rootNodeID = joinID(ctx.publicKey, rootUuid);
+        const rootNodeID = joinID(author, rootUuid);
         const treeWithUuid = treeNode.uuid
           ? treeNode
           : { ...treeNode, uuid: rootUuid };
         const treeSemanticContext =
           treeNode.anchor?.snapshotContext ?? semanticContext;
         const [nextCtx, topSemanticID, topNodeID] = materializeTreeNode(
-          accCtx,
+          acc.context,
           treeWithUuid,
           treeSemanticContext,
           rootNodeID
         );
-        return [
-          nextCtx,
-          [...accTopSemanticIDs, topSemanticID],
-          [...accTopNodeIDs, topNodeID.id as LongID],
-        ];
+        return {
+          context: nextCtx,
+          topSemanticIds: [...acc.topSemanticIds, topSemanticID],
+          topNodeIds: [...acc.topNodeIds, topNodeID.id as LongID],
+        };
       },
-      [ctx, [] as ID[], [] as LongID[]] as [WalkContext, ID[], LongID[]]
+      { context: ctx, topSemanticIds: [], topNodeIds: [] }
     );
-}
-
-export function parseDocumentContent(params: {
-  content: string;
-  author: PublicKey;
-  docId?: string;
-  updatedMs?: number;
-  systemRole?: RootSystemRole;
-}): Map<string, GraphNode> {
-  const { content, author, docId, updatedMs, systemRole } = params;
-  const { tree: parsedTree, frontMatter } = parseMarkdownDocument(content);
-  const trees = dropLeadingYamlEchoRoots(parsedTree, frontMatter).map(
-    (tree, index) =>
-      index === 0
-        ? {
-            ...tree,
-            ...(frontMatter && { frontMatter }),
-            ...(docId && { docId }),
-            ...(systemRole && { systemRole }),
-          }
-        : tree
-  );
-  const ctx: WalkContext = {
-    knowledgeDBs: Map<PublicKey, KnowledgeData>(),
-    publicKey: author,
-    affectedRoots: ImmutableSet<ID>(),
-    updated: updatedMs ?? Date.now(),
-  };
-  const [result] = createNodesFromMarkdownTrees(ctx, trees);
-  const db = result.knowledgeDBs.get(author);
-  return db?.nodes ?? Map<string, GraphNode>();
 }

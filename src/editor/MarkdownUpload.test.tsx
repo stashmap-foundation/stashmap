@@ -5,9 +5,12 @@ import { createPlan, planUpsertNodes } from "../planner";
 import { processEvents } from "../eventProcessing";
 import { ALICE, setup, UpdateState } from "../utils.test";
 import { planPasteMarkdownTrees } from "./FileDropZone";
-import { parseMarkdownHierarchy } from "../core/markdownTree";
+import { parseMarkdown } from "../core/markdownTree";
 import { joinID, shortID } from "../core/connections";
 import { linkSpan, nodeText, plainSpans } from "../core/nodeSpans";
+
+const parseTree = (text: string): ReturnType<typeof parseMarkdown>["tree"] =>
+  parseMarkdown(text).tree;
 
 const TEST_FILE = `# Programming Languages
 
@@ -37,7 +40,7 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
   const workspacePath: ViewPath = [0, workspaceNode.id];
   const plan = planPasteMarkdownTrees(
     basePlan,
-    parseMarkdownHierarchy(TEST_FILE),
+    parseTree(TEST_FILE),
     workspacePath,
     [nodeText(workspaceNode) as ID],
     0
@@ -101,7 +104,7 @@ test("Markdown upload persists imported tree structure", async () => {
 test("Markdown parser extracts ref link whose text contains brackets", () => {
   const targetId = "abc123_def456";
   const linkedText = `Kant […] took the argument (p. 43)`;
-  const parsed = parseMarkdownHierarchy(`- [${linkedText}](#${targetId})\n`);
+  const parsed = parseTree(`- [${linkedText}](#${targetId})\n`);
 
   expect(parsed).toEqual([
     {
@@ -113,7 +116,7 @@ test("Markdown parser extracts ref link whose text contains brackets", () => {
 });
 
 test("Markdown parser preserves list nesting and strips list markers", () => {
-  const parsed = parseMarkdownHierarchy(`
+  const parsed = parseTree(`
 - Parent
   - Child
   1. Numbered child

@@ -15,15 +15,17 @@ import { execute } from "../infra/nostr/executor";
 import { processEvents } from "../eventProcessing";
 import {
   buildRootTreeForEmptyRootDrop,
-  dropLeadingYamlEchoRoots,
   parseMarkdownImportFiles,
   parseTextToTrees,
   planCreateNodesFromMarkdown,
   planCreateNodesFromMarkdownFiles,
   planCreateNodesFromMarkdownTrees,
 } from "./FileDropZone";
-import { MarkdownTreeNode, parseMarkdownHierarchy } from "../core/markdownTree";
+import { MarkdownTreeNode, parseMarkdown } from "../core/markdownTree";
 import { nodeText, plainSpans, spansText } from "../core/nodeSpans";
+
+const parseTree = (text: string): MarkdownTreeNode[] =>
+  parseMarkdown(text).tree;
 
 function flattenTexts(nodes: MarkdownTreeNode[]): string[] {
   return nodes.reduce((acc: string[], node) => {
@@ -149,32 +151,6 @@ tags:
   expect(texts).not.toContain("meeting");
 });
 
-test("Leading YAML-like roots are dropped when front matter exists", () => {
-  const cleaned = dropLeadingYamlEchoRoots(
-    [
-      {
-        spans: plainSpans('source_id: "src_1"'),
-        children: [],
-        blockKind: "paragraph",
-      },
-      {
-        spans: plainSpans("authors:"),
-        children: [{ spans: plainSpans("Alice"), children: [] }],
-      },
-      {
-        spans: plainSpans("First point"),
-        children: [],
-        blockKind: "list_item",
-      },
-    ],
-    '---\ntitle: "Doc"\n---\n'
-  );
-
-  expect(cleaned).toEqual([
-    { spans: plainSpans("First point"), children: [], blockKind: "list_item" },
-  ]);
-});
-
 test("Multiple markdown files preserve file order", () => {
   const trees = parseMarkdownImportFiles([
     { name: "a.md", markdown: "# Alpha" },
@@ -185,7 +161,7 @@ test("Multiple markdown files preserve file order", () => {
 });
 
 test("Parser strips leading list markers and keeps nesting", () => {
-  const trees = parseMarkdownHierarchy(`
+  const trees = parseTree(`
 - Parent
   - Child
   1. Numbered Child
@@ -213,7 +189,7 @@ test("Parser strips leading list markers and keeps nesting", () => {
 });
 
 test("Parser turns hard-wrapped list item breaks into spaces", () => {
-  const trees = parseMarkdownHierarchy(`
+  const trees = parseTree(`
 - The Endogenous personality is the 'inner' Man; a person whose outlook on life
 is 'inward.' He is inner-directed, inner-driven, inner-motivated; one who uses
 inner modes of thinking, inner evaluations, intuition; one who is to a high
@@ -399,7 +375,7 @@ test("parseTextToTrees detects markdown headers", () => {
 });
 
 test("parseMarkdownHierarchy parses combined prefix markers (-!)", () => {
-  const trees = parseMarkdownHierarchy("# Root\n- (-!) contra and relevant\n");
+  const trees = parseTree("# Root\n- (-!) contra and relevant\n");
   expect(trees).toEqual([
     expect.objectContaining({
       spans: plainSpans("Root"),
@@ -415,9 +391,7 @@ test("parseMarkdownHierarchy parses combined prefix markers (-!)", () => {
 });
 
 test("parseMarkdownHierarchy parses combined prefix markers (-~)", () => {
-  const trees = parseMarkdownHierarchy(
-    "# Root\n- (-~) contra and little relevant\n"
-  );
+  const trees = parseTree("# Root\n- (-~) contra and little relevant\n");
   expect(trees).toEqual([
     expect.objectContaining({
       children: [
@@ -432,9 +406,7 @@ test("parseMarkdownHierarchy parses combined prefix markers (-~)", () => {
 });
 
 test("parseMarkdownHierarchy parses combined prefix markers (+!)", () => {
-  const trees = parseMarkdownHierarchy(
-    "# Root\n- (+!) confirms and relevant\n"
-  );
+  const trees = parseTree("# Root\n- (+!) confirms and relevant\n");
   expect(trees).toEqual([
     expect.objectContaining({
       children: [
@@ -449,9 +421,7 @@ test("parseMarkdownHierarchy parses combined prefix markers (+!)", () => {
 });
 
 test("parseMarkdownHierarchy still parses single prefix markers", () => {
-  const trees = parseMarkdownHierarchy(
-    "# Root\n- (!) relevant only\n- (-) contra only\n"
-  );
+  const trees = parseTree("# Root\n- (!) relevant only\n- (-) contra only\n");
   expect(trees).toEqual([
     expect.objectContaining({
       children: [
@@ -469,7 +439,7 @@ test("parseMarkdownHierarchy still parses single prefix markers", () => {
 });
 
 test("parseMarkdownHierarchy parses prefix markers on paragraph blocks", () => {
-  const trees = parseMarkdownHierarchy(
+  const trees = parseTree(
     "# Root\n\n(-!) paragraph contra relevant\n\n(+) paragraph confirms\n"
   );
   expect(trees).toEqual([
@@ -507,7 +477,7 @@ test("parseTextToTrees falls back to indentation parser", () => {
 });
 
 test("parseMarkdownHierarchy parses .md path link as fileLink span", () => {
-  const trees = parseMarkdownHierarchy("# Root\n- [Open B](../foo/b.md)\n");
+  const trees = parseTree("# Root\n- [Open B](../foo/b.md)\n");
   expect(trees).toEqual([
     expect.objectContaining({
       children: [
@@ -521,7 +491,7 @@ test("parseMarkdownHierarchy parses .md path link as fileLink span", () => {
 });
 
 test("parseMarkdownHierarchy still parses #anchor links as node link spans", () => {
-  const trees = parseMarkdownHierarchy("# Root\n- [Bitcoin](#abc)\n");
+  const trees = parseTree("# Root\n- [Bitcoin](#abc)\n");
   expect(trees).toEqual([
     expect.objectContaining({
       children: [
@@ -534,9 +504,7 @@ test("parseMarkdownHierarchy still parses #anchor links as node link spans", () 
 });
 
 test("parseMarkdownHierarchy ignores http(s) links (no fileLink span)", () => {
-  const trees = parseMarkdownHierarchy(
-    "# Root\n- [Web](https://example.com)\n"
-  );
+  const trees = parseTree("# Root\n- [Web](https://example.com)\n");
   expect(trees).toEqual([
     expect.objectContaining({
       children: [
@@ -549,7 +517,7 @@ test("parseMarkdownHierarchy ignores http(s) links (no fileLink span)", () => {
 });
 
 test("parseMarkdownHierarchy ignores non-md path links (no fileLink span)", () => {
-  const trees = parseMarkdownHierarchy("# Root\n- [Image](./foo.png)\n");
+  const trees = parseTree("# Root\n- [Image](./foo.png)\n");
   expect(trees).toEqual([
     expect.objectContaining({
       children: [
@@ -562,7 +530,7 @@ test("parseMarkdownHierarchy ignores non-md path links (no fileLink span)", () =
 });
 
 test("parseMarkdownHierarchy preserves prefix markers on file-link bullet", () => {
-  const trees = parseMarkdownHierarchy("# Root\n- (!+)[Open B](./b.md)\n");
+  const trees = parseTree("# Root\n- (!+)[Open B](./b.md)\n");
   expect(trees).toEqual([
     expect.objectContaining({
       children: [

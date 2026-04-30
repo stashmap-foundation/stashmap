@@ -1,3 +1,5 @@
+import { serializeFrontMatter } from "./core/knowstrFrontmatter";
+
 export function formatRootHeading(
   rootText: string,
   rootUuid: string,
@@ -121,12 +123,12 @@ export function formatOrderedLine(
 
 export function formatWithFrontMatter(
   content: string,
-  frontMatter?: string
+  frontMatter?: FrontMatter
 ): string {
   if (!frontMatter) {
     return content;
   }
-  return `${frontMatter}\n${content}`;
+  return `${serializeFrontMatter(frontMatter)}\n${content}`;
 }
 
 const BULLET_LINE_RE = /^\s*-\s/;

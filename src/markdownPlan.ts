@@ -9,10 +9,7 @@ import {
   MarkdownImportFile,
   parseMarkdownImportFiles,
 } from "./core/markdownImport";
-import {
-  createNodesFromMarkdownTrees,
-  WalkContext,
-} from "./core/markdownNodes";
+import { materializeTree, WalkContext } from "./core/markdownNodes";
 import { MarkdownTreeNode } from "./core/markdownTree";
 import {
   AddToParentTarget,
@@ -36,19 +33,18 @@ export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
     publicKey: plan.user.publicKey,
     affectedRoots: plan.affectedRoots,
   };
-  const [resultContext, topItemIDs, topNodeIDs] = createNodesFromMarkdownTrees(
-    walkContext,
-    trees,
-    context
-  );
+  const result = materializeTree(trees, plan.user.publicKey, {
+    context: walkContext,
+    semanticContext: context,
+  });
   return [
     {
       ...plan,
-      knowledgeDBs: resultContext.knowledgeDBs,
-      affectedRoots: resultContext.affectedRoots,
+      knowledgeDBs: result.context.knowledgeDBs,
+      affectedRoots: result.context.affectedRoots,
     },
-    topItemIDs,
-    topNodeIDs,
+    result.topSemanticIds,
+    result.topNodeIds,
   ];
 }
 

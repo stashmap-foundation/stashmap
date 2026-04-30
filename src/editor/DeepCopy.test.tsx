@@ -20,7 +20,7 @@ import {
   KIND_KNOWLEDGE_DOCUMENT,
   KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
 } from "../nostr";
-import { parseMarkdownHierarchy } from "../core/markdownTree";
+import { parseMarkdown } from "../core/markdownTree";
 
 const maybeExpand = async (label: string): Promise<void> => {
   const btn = screen.queryByLabelText(label);
@@ -1516,8 +1516,8 @@ My Notes
         (e) => e.kind === KIND_KNOWLEDGE_DOCUMENT && e.pubkey === BOB.publicKey
       );
     const bobNodeDTags = bobNodeEvents.flatMap((event) => {
-      const trees = parseMarkdownHierarchy(event.content);
-      return collectTreeValues(trees as MarkdownTreeValue[]).uuids;
+      const { tree } = parseMarkdown(event.content);
+      return collectTreeValues(tree as MarkdownTreeValue[]).uuids;
     });
 
     const utils = renderApp(alice());
@@ -1557,9 +1557,9 @@ Target
     expect(aliceCopyEvents.length).toBeGreaterThan(0);
 
     aliceCopyEvents.forEach((e) => {
-      const trees = parseMarkdownHierarchy(e.content);
+      const { tree } = parseMarkdown(e.content);
       const basedOnValues = collectTreeValues(
-        trees as MarkdownTreeValue[]
+        tree as MarkdownTreeValue[]
       ).basedOn;
       basedOnValues.forEach((basedOnValue) => {
         const sourceDTag = basedOnValue.split("_").slice(1).join("_");

@@ -11,6 +11,7 @@ import {
 import { useData } from "./DataContext";
 import { useExecutor } from "./ExecutorContext";
 import { newDB } from "./core/knowledge";
+import { documentKeyOf } from "./core/Document";
 import {
   buildDocumentEvent,
   buildSnapshotEventFromNodes,
@@ -824,25 +825,34 @@ export function buildDocumentEvents(
           r.root === rootId ||
           r.root === shortID(rootId as ID))
     );
-    if (!rootNode) {
+    if (!rootNode || !rootNode.docId) {
+      return events;
+    }
+    const document = plan.documents.get(documentKeyOf(author, rootNode.docId));
+    if (!document) {
       return events;
     }
     const snapshotSourceRoot =
       rootNode.basedOn && !rootNode.snapshotDTag
         ? getNode(plan.knowledgeDBs, rootNode.basedOn, author)
         : undefined;
-    const createdSnapshotDTag = snapshotSourceRoot
+    const sourceDocument = snapshotSourceRoot?.docId
+      ? plan.documents.get(
+          documentKeyOf(snapshotSourceRoot.author, snapshotSourceRoot.docId)
+        )
+      : undefined;
+    const createdSnapshotDTag = sourceDocument
       ? `snapshot-${shortID(rootNode.id as ID)}`
       : undefined;
-    const snapshotEvent = snapshotSourceRoot
+    const snapshotEvent = sourceDocument
       ? (buildSnapshotEventFromNodes(
           plan.knowledgeDBs,
           author,
           createdSnapshotDTag as string,
-          snapshotSourceRoot
+          sourceDocument
         ) as UnsignedEvent & EventAttachment)
       : undefined;
-    const event = buildDocumentEvent(plan.knowledgeDBs, rootNode, {
+    const event = buildDocumentEvent(plan.knowledgeDBs, document, {
       snapshotDTag: rootNode.snapshotDTag ?? createdSnapshotDTag,
     });
     return snapshotEvent

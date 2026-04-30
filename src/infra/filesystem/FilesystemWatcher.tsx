@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Map as ImmutableMap } from "immutable";
 import { useBackend } from "../../BackendContext";
 import { useDocumentStore, useDocuments } from "../../DocumentStore";
-import { Document, contentToDocument } from "../../core/Document";
+import { Document, parseToDocument } from "../../core/Document";
 import { FsEvent } from "./workspaceWatcher";
 
 function findExistingByFilePath(
@@ -62,18 +62,18 @@ export function FilesystemWatcher(): null {
         }
         return;
       }
-      const existing = findExistingByFilePath(documents, event.relativePath);
-      const doc = existing
-        ? { ...existing, updatedMs: Date.now(), content: event.content }
-        : contentToDocument(profile.pubkey, event.content, event.relativePath);
+      const parsed = parseToDocument(profile.pubkey, event.content, {
+        filePath: event.relativePath,
+        relativePath: event.relativePath,
+        updatedMsOverride: Date.now(),
+      });
       logFilesystemWatcherDebug("upsert", {
         relativePath: event.relativePath,
-        existingDocId: existing?.docId,
-        docId: doc.docId,
-        updatedMs: doc.updatedMs,
-        content: doc.content,
+        docId: parsed.document.docId,
+        updatedMs: parsed.document.updatedMs,
+        content: parsed.document.content,
       });
-      store.upsertDocument(doc);
+      store.upsertDocument(parsed);
     };
     return subscribeFsEvents(handler);
   }, [store, profile, documents, subscribeFsEvents]);

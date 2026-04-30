@@ -6,6 +6,7 @@ import {
   getSemanticID,
   shortID,
 } from "./core/connections";
+import type { Document } from "./core/Document";
 import { buildOutgoingReference } from "./buildReferenceRow";
 import {
   getBlockFileLinkPath,
@@ -207,7 +208,7 @@ function serializeNodeItems(
   return { lines: result.lines };
 }
 
-export function renderDocumentMarkdown(
+export function renderRootedMarkdown(
   knowledgeDBs: KnowledgeDBs,
   rootNode: GraphNode,
   options?: {
@@ -230,10 +231,29 @@ export function renderDocumentMarkdown(
     options?.snapshotDTag ?? rootNode.snapshotDTag,
     rootNode.anchor ?? createRootAnchor(getNodeContext(knowledgeDBs, rootNode))
   );
+  return `${addBlankLinesAroundHeadings([rootLine, ...serialized.lines]).join(
+    "\n"
+  )}\n`;
+}
+
+export function renderDocumentMarkdown(
+  knowledgeDBs: KnowledgeDBs,
+  document: Document,
+  options?: {
+    snapshotDTag?: string;
+  }
+): string {
+  if (!document.rootShortId) {
+    return formatWithFrontMatter("", document.frontMatter);
+  }
+  const rootNode = knowledgeDBs
+    .get(document.author)
+    ?.nodes.get(document.rootShortId);
+  if (!rootNode) {
+    return formatWithFrontMatter("", document.frontMatter);
+  }
   return formatWithFrontMatter(
-    `${addBlankLinesAroundHeadings([rootLine, ...serialized.lines]).join(
-      "\n"
-    )}\n`,
-    rootNode.frontMatter
+    renderRootedMarkdown(knowledgeDBs, rootNode, options),
+    document.frontMatter
   );
 }

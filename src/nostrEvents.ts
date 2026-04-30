@@ -1,9 +1,8 @@
-import { Collection, List, Map } from "immutable";
+import { Collection, List } from "immutable";
 import { Event, EventTemplate, Filter, UnsignedEvent } from "nostr-tools";
-import type { Document, DocumentDelete } from "./core/Document";
-import { contentToDocument } from "./core/Document";
+import type { DocumentDelete, ParsedDocument } from "./core/Document";
+import { parseToDocument } from "./core/Document";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "./nostr";
-import { parseDocumentContent } from "./core/markdownNodes";
 
 export function findAllTags(
   event: EventTemplate,
@@ -70,20 +69,19 @@ export function sanitizeAuthorsFilter(filter: Filter): Filter {
     : filter;
 }
 
-export function eventToDocument(
+export function eventToParsed(
   event: Event | UnsignedEvent
-): Document | undefined {
+): ParsedDocument | undefined {
   if (event.kind !== KIND_KNOWLEDGE_DOCUMENT) return undefined;
-  const docId = findTag(event, "d");
-  if (!docId) return undefined;
+  if (!findTag(event, "d")) return undefined;
   const systemRole = findTag(event, "s");
-  const parsed = contentToDocument(event.pubkey as PublicKey, event.content);
-  return {
-    ...parsed,
-    docId,
-    updatedMs: getEventMs(event),
-    ...(systemRole === "log" ? { systemRole: "log" as RootSystemRole } : {}),
-  };
+  const parsed = parseToDocument(event.pubkey as PublicKey, event.content, {
+    updatedMsOverride: getEventMs(event),
+    ...(systemRole === "log"
+      ? { systemRoleOverride: "log" as RootSystemRole }
+      : {}),
+  });
+  return { document: parsed.document, nodes: parsed.nodes };
 }
 
 export function eventToDocumentDelete(
@@ -106,18 +104,4 @@ export function eventToDocumentDelete(
     docId,
     deletedAt: getEventMs(event),
   };
-}
-
-export function parseDocumentEvent(
-  event: UnsignedEvent,
-  options: { docId?: string } = {}
-): Map<string, GraphNode> {
-  const sTag = findTag(event, "s");
-  return parseDocumentContent({
-    content: event.content,
-    author: event.pubkey as PublicKey,
-    docId: options.docId,
-    updatedMs: Number(findTag(event, "ms")) || event.created_at * 1000,
-    ...(sTag === "log" ? { systemRole: "log" as RootSystemRole } : {}),
-  });
 }

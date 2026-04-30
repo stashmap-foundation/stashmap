@@ -4,7 +4,7 @@ import { useUserOrAnon } from "../../NostrAuthContext";
 import { useUserSessionState } from "../../userSessionState";
 import { useBackend } from "../../BackendContext";
 import { DataContextProvider, MergeKnowledgeDB } from "../../DataContext";
-import { DocumentStoreProvider } from "../../DocumentStore";
+import { DocumentStoreProvider, ParsedDocument } from "../../DocumentStore";
 import { PlanningContextProvider } from "../../planner";
 import { FilesystemExecutorProvider } from "./FilesystemExecutorProvider";
 import { NavigationStateProvider } from "../../NavigationStateContext";
@@ -20,7 +20,9 @@ export function FilesystemDataProvider({
   const session = useUserSessionState(user);
   const { workspace } = useBackend();
   const workspaceKey = workspace?.profile?.workspaceDir ?? "no-workspace";
-  const initialDocuments = workspace?.documents ?? [];
+  const initialDocuments: ReadonlyArray<ParsedDocument> = (
+    workspace?.documents ?? []
+  ).map((doc) => ({ document: doc, nodes: doc.nodes }));
 
   return (
     <DataContextProvider

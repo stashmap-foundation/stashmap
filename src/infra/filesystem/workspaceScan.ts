@@ -1,34 +1,20 @@
 import fs from "fs/promises";
 import path from "path";
-import { Map as ImmutableMap, Set as ImmutableSet } from "immutable";
+import { Map as ImmutableMap } from "immutable";
 import ignore, { Ignore } from "ignore";
-import {
-  MarkdownTreeNode,
-  firstTopLevelNodeText,
-  parseMarkdownDocument,
-} from "../../core/markdownTree";
-import { ensureKnowstrDocIdFrontMatter } from "../../core/knowstrFrontmatter";
-import { plainSpans } from "../../core/nodeSpans";
-import { shortID } from "../../core/connections";
-import {
-  WalkContext,
-  createNodesFromMarkdownTrees,
-} from "../../core/markdownNodes";
+import { Document, parseToDocument } from "../../core/Document";
+import { WalkContext } from "../../core/markdownNodes";
 
 export type WorkspaceSaveProfile = {
   pubkey: PublicKey;
   workspaceDir: string;
 };
 
-export type ScannedWorkspaceDocument = {
+export type ScannedWorkspaceDocument = Document & {
   filePath: string;
   relativePath: string;
   currentContent: string;
-  docId: string;
-  frontMatter: string;
-  title: string;
-  mainRoot: MarkdownTreeNode;
-  rootShortId: string;
+  nodes: ImmutableMap<string, GraphNode>;
 };
 
 export type WorkspaceScanResult = {
@@ -38,49 +24,6 @@ export type WorkspaceScanResult = {
 
 const ALWAYS_IGNORED = [".git", ".knowstr", "node_modules"];
 const RESERVED_WORKSPACE_IGNORES = ["inbox/"];
-
-export function collectNodeIds(node: MarkdownTreeNode): string[] {
-  return [
-    ...(node.uuid ? [node.uuid] : []),
-    ...node.children.flatMap((child) => collectNodeIds(child)),
-  ];
-}
-
-export function parseWorkspaceDocumentRoots(
-  tree: MarkdownTreeNode[],
-  title: string | undefined,
-  frontMatter: string,
-  relativePath: string
-): MarkdownTreeNode {
-  const roots = tree.filter((root) => !root.hidden);
-  if (roots.length === 0) {
-    throw new Error(
-      `Document ${relativePath} must contain exactly one main root`
-    );
-  }
-
-  const singleRoot =
-    roots.length === 1 && (!title || roots[0]?.blockKind === "heading")
-      ? roots[0]
-      : undefined;
-  const titledRoot = title
-    ? {
-        spans: plainSpans(title),
-        children: roots,
-      }
-    : undefined;
-  const mainRoot = singleRoot || titledRoot;
-  if (!mainRoot) {
-    throw new Error(
-      `Document ${relativePath} must contain exactly one top-level root`
-    );
-  }
-
-  return {
-    ...mainRoot,
-    frontMatter,
-  } as MarkdownTreeNode;
-}
 
 export async function loadIgnorePatterns(
   workspaceDir: string,
@@ -156,6 +99,37 @@ function checkDuplicateDocIds(
   }
 }
 
+type ScanAcc = {
+  documents: ScannedWorkspaceDocument[];
+  context: WalkContext | undefined;
+};
+
+async function readAndParseFile(
+  profile: WorkspaceSaveProfile,
+  filePath: string,
+  context: WalkContext | undefined
+): Promise<{ scanned: ScannedWorkspaceDocument; context: WalkContext }> {
+  const relativePath = path.relative(profile.workspaceDir, filePath);
+  const currentContent = await fs.readFile(filePath, "utf8");
+  const fallbackTitle = path.basename(relativePath, ".md") || undefined;
+  const parsed = parseToDocument(profile.pubkey, currentContent, {
+    filePath,
+    relativePath,
+    ...(fallbackTitle !== undefined ? { fallbackTitle } : {}),
+    ...(context !== undefined ? { context } : {}),
+  });
+  return {
+    scanned: {
+      ...parsed.document,
+      filePath,
+      relativePath,
+      currentContent,
+      nodes: parsed.nodes,
+    },
+    context: parsed.context,
+  };
+}
+
 export async function scanWorkspaceDocuments(
   profile: WorkspaceSaveProfile,
   options: {
@@ -168,68 +142,25 @@ export async function scanWorkspaceDocuments(
   );
   const markdownFiles = await collectMarkdownFiles(profile.workspaceDir, ig);
 
-  const parsed = await Promise.all(
-    markdownFiles.map(async (filePath) => {
-      const relativePath = path.relative(profile.workspaceDir, filePath);
-      const currentContent = await fs.readFile(filePath, "utf8");
-      const parsedDoc = parseMarkdownDocument(currentContent);
-      const { docId, frontMatter } = ensureKnowstrDocIdFrontMatter(
-        parsedDoc.frontMatter
-      );
-      const fallbackTitle = path.basename(relativePath, ".md") || undefined;
-      const title =
-        parsedDoc.title ??
-        fallbackTitle ??
-        firstTopLevelNodeText(parsedDoc.tree) ??
-        "Untitled";
-      const mainRoot = parseWorkspaceDocumentRoots(
-        parsedDoc.tree,
-        parsedDoc.title,
-        frontMatter,
-        relativePath
-      );
-
-      return {
+  const final = await markdownFiles.reduce<Promise<ScanAcc>>(
+    async (previous, filePath) => {
+      const acc = await previous;
+      const { scanned, context } = await readAndParseFile(
+        profile,
         filePath,
-        relativePath,
-        currentContent,
-        docId,
-        frontMatter,
-        title,
-        mainRoot: { ...mainRoot, docId },
-      };
-    })
-  );
-
-  checkDuplicateDocIds(parsed);
-
-  const initialCtx: WalkContext = {
-    knowledgeDBs: ImmutableMap<PublicKey, KnowledgeData>(),
-    publicKey: profile.pubkey,
-    affectedRoots: ImmutableSet<ID>(),
-  };
-  const { ctx, documents } = parsed.reduce(
-    (acc, doc) => {
-      const [nextCtx, , topNodeIDs] = createNodesFromMarkdownTrees(acc.ctx, [
-        doc.mainRoot,
-      ]);
-      const rootLongId = topNodeIDs[0];
-      if (!rootLongId) {
-        throw new Error(`Materialization produced no root for ${doc.filePath}`);
-      }
+        acc.context
+      );
       return {
-        ctx: nextCtx,
-        documents: [
-          ...acc.documents,
-          { ...doc, rootShortId: shortID(rootLongId) },
-        ],
+        documents: [...acc.documents, scanned],
+        context,
       };
     },
-    {
-      ctx: initialCtx,
-      documents: [] as ScannedWorkspaceDocument[],
-    }
+    Promise.resolve({ documents: [], context: undefined })
   );
 
-  return { documents, knowledgeDBs: ctx.knowledgeDBs };
+  checkDuplicateDocIds(final.documents);
+
+  const knowledgeDBs =
+    final.context?.knowledgeDBs ?? ImmutableMap<PublicKey, KnowledgeData>();
+  return { documents: final.documents, knowledgeDBs };
 }

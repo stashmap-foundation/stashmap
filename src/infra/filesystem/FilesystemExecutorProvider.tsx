@@ -6,17 +6,14 @@ import { useDocumentStore, useDocuments } from "../../DocumentStore";
 import { ExecutorProvider } from "../../ExecutorContext";
 import { buildDocumentEvents, Plan } from "../../planner";
 import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../../nostr";
-import { eventToDocument, eventToDocumentDelete } from "../../nostrEvents";
-import { Document, DocumentDelete, documentKeyOf } from "../../core/Document";
-import { extractImportedFrontMatter } from "../../core/markdownFrontMatter";
+import { eventToParsed, eventToDocumentDelete } from "../../nostrEvents";
+import {
+  Document,
+  DocumentDelete,
+  ParsedDocument,
+  documentKeyOf,
+} from "../../core/Document";
 import { LOG_ROOT_FILE } from "../../core/systemRoots";
-
-function extractRootTitle(content: string): string | undefined {
-  const { body } = extractImportedFrontMatter(content);
-  const match = body.match(/^#{1,6}\s+(.+?)\s*$/mu);
-  if (!match?.[1]) return undefined;
-  return match[1].replace(/<!--.*?-->/gu, "").trim();
-}
 
 function slugify(text: string): string {
   const slug = text
@@ -58,21 +55,22 @@ function enrichWithFilePath(
   event: UnsignedEvent,
   documents: ImmutableMap<string, Document>,
   taken: Set<string>
-): Document | undefined {
-  const base = eventToDocument(event);
-  if (!base) return undefined;
-  const existing = lookupFilePath(documents, base.author, base.docId);
+): ParsedDocument | undefined {
+  const parsed = eventToParsed(event);
+  if (!parsed) return undefined;
+  const { document } = parsed;
+  const existing = lookupFilePath(documents, document.author, document.docId);
   const filePath =
-    base.systemRole === "log"
+    document.systemRole === "log"
       ? LOG_ROOT_FILE
       : existing ??
-        uniqueSlugPath(
-          slugify(extractRootTitle(event.content) ?? base.docId),
-          taken
-        );
+        uniqueSlugPath(slugify(document.title || document.docId), taken);
   // eslint-disable-next-line functional/immutable-data
   taken.add(filePath);
-  return { ...base, filePath };
+  return {
+    ...parsed,
+    document: { ...document, filePath },
+  };
 }
 
 function enrichDelete(
@@ -125,9 +123,9 @@ export function FilesystemExecutorProvider({
     if (writable.length === 0) return;
 
     const taken = collectTakenPaths(documents);
-    const documentsToWrite = writable
+    const parsedToWrite = writable
       .map((event) => enrichWithFilePath(event, documents, taken))
-      .filter((doc): doc is Document => doc !== undefined);
+      .filter((parsed): parsed is ParsedDocument => parsed !== undefined);
 
     const deletions = writable
       .map((event) => enrichDelete(event, documents))
@@ -137,7 +135,7 @@ export function FilesystemExecutorProvider({
       );
 
     if (store) {
-      documentsToWrite.forEach((doc) => store.upsertDocument(doc));
+      parsedToWrite.forEach((parsed) => store.upsertDocument(parsed));
       deletions.forEach(({ del }) => store.deleteDocument(del));
     }
 
@@ -145,7 +143,10 @@ export function FilesystemExecutorProvider({
       const deletedPaths = deletions
         .map((item) => item.filePath)
         .filter((p): p is string => p !== undefined);
-      await workspace.save(documentsToWrite, deletedPaths);
+      await workspace.save(
+        parsedToWrite.map((parsed) => parsed.document),
+        deletedPaths
+      );
     }
   };
 

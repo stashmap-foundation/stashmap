@@ -1,5 +1,5 @@
 import { UnsignedEvent } from "nostr-tools";
-import { shortID } from "./core/connections";
+import type { Document } from "./core/Document";
 import { renderDocumentMarkdown } from "./documentRenderer";
 import {
   KIND_KNOWLEDGE_DOCUMENT,
@@ -10,21 +10,20 @@ import {
 
 export function buildDocumentEvent(
   knowledgeDBs: KnowledgeDBs,
-  rootNode: GraphNode,
+  document: Document,
   options?: {
     snapshotDTag?: string;
   }
 ): UnsignedEvent {
-  const docId = rootNode.docId ?? shortID(rootNode.id);
-  const systemRoleTags = rootNode.systemRole
-    ? ([["s", rootNode.systemRole]] as string[][])
+  const systemRoleTags = document.systemRole
+    ? ([["s", document.systemRole]] as string[][])
     : [];
   return {
     kind: KIND_KNOWLEDGE_DOCUMENT,
-    pubkey: rootNode.author,
+    pubkey: document.author,
     created_at: newTimestamp(),
-    tags: [["d", docId], ...systemRoleTags, msTag()],
-    content: renderDocumentMarkdown(knowledgeDBs, rootNode, options),
+    tags: [["d", document.docId], ...systemRoleTags, msTag()],
+    content: renderDocumentMarkdown(knowledgeDBs, document, options),
   };
 }
 
@@ -32,7 +31,7 @@ export function buildSnapshotEventFromNodes(
   knowledgeDBs: KnowledgeDBs,
   snapshotAuthor: PublicKey,
   snapshotDTag: string,
-  sourceRootNode: GraphNode
+  sourceDocument: Document
 ): UnsignedEvent {
   return {
     kind: KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
@@ -40,10 +39,10 @@ export function buildSnapshotEventFromNodes(
     created_at: newTimestamp(),
     tags: [
       ["d", snapshotDTag],
-      ["source", shortID(sourceRootNode.id)],
-      ["source_author", sourceRootNode.author],
+      ["source", sourceDocument.rootShortId ?? sourceDocument.docId],
+      ["source_author", sourceDocument.author],
       msTag(),
     ],
-    content: renderDocumentMarkdown(knowledgeDBs, sourceRootNode),
+    content: renderDocumentMarkdown(knowledgeDBs, sourceDocument),
   };
 }

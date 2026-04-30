@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { loadCliProfile } from "../../cli/config";
-import type { Document } from "../../DocumentStore";
+import type { Document } from "../../core/Document";
+import { ScannedWorkspaceDocument } from "./workspaceScan";
 import {
   buildWorkspaceDocumentContent,
   loadWorkspaceAsDocuments,
@@ -17,7 +18,7 @@ const ECHO_TTL_MS = 2000;
 
 export type WorkspaceRuntimeLoaded = {
   profile: ReturnType<typeof loadCliProfile>;
-  documents: ReadonlyArray<Document>;
+  documents: ReadonlyArray<ScannedWorkspaceDocument>;
 };
 
 export type WorkspaceRuntime = {

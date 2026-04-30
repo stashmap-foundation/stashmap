@@ -1,9 +1,5 @@
-import { MarkdownTreeNode, parseMarkdownDocument } from "./markdownTree";
-import {
-  extractImportedFrontMatter,
-  extractTitle,
-} from "./markdownFrontMatter";
-import { plainSpans, spansText } from "./nodeSpans";
+import { MarkdownTreeNode, parseMarkdown } from "./markdownTree";
+import { plainSpans } from "./nodeSpans";
 
 export type MarkdownImportFile = {
   name: string;
@@ -14,47 +10,12 @@ export type MarkdownImportMetadata = {
   title?: string;
 };
 
-function looksLikeYamlMetadataNode(node: MarkdownTreeNode): boolean {
-  return (
-    /^[A-Za-z0-9_-]+:\s*.*$/u.test(spansText(node.spans)) &&
-    (node.blockKind === "paragraph" ||
-      node.blockKind === "list_item" ||
-      node.blockKind === "heading" ||
-      node.blockKind === undefined)
-  );
-}
-
-export function dropLeadingYamlEchoRoots(
-  roots: MarkdownTreeNode[],
-  frontMatter?: string
-): MarkdownTreeNode[] {
-  if (!frontMatter) {
-    return roots;
-  }
-
-  const firstContentIndex = roots.findIndex(
-    (root) => !looksLikeYamlMetadataNode(root)
-  );
-  if (firstContentIndex <= 0) {
-    return roots;
-  }
-  return roots.slice(firstContentIndex);
-}
-
 function titleFromFileName(fileName: string): string {
   const baseName = fileName.replace(/\.[^/.]+$/u, "").trim();
   if (baseName) {
     return baseName;
   }
   return "Imported Markdown";
-}
-
-export function extractMarkdownImportPayload(markdown: string): {
-  body: string;
-  frontMatter?: string;
-  metadata: MarkdownImportMetadata;
-} {
-  return extractImportedFrontMatter(markdown);
 }
 
 function normalizeRootsForSingleFile(
@@ -81,43 +42,15 @@ function normalizeRootsForSingleFile(
   ];
 }
 
-function attachFrontMatter(
-  roots: MarkdownTreeNode[],
-  frontMatter?: string
-): MarkdownTreeNode[] {
-  if (!frontMatter || roots.length === 0) {
-    return roots;
-  }
-
-  const [firstRoot, ...rest] = roots;
-  if (!firstRoot) {
-    return roots;
-  }
-
-  return [
-    {
-      ...firstRoot,
-      frontMatter,
-    },
-    ...rest,
-  ];
-}
-
 export function parseMarkdownImportFiles(
   files: MarkdownImportFile[]
 ): MarkdownTreeNode[] {
   return files.reduce((acc: MarkdownTreeNode[], file: MarkdownImportFile) => {
-    const { tree, frontMatter } = parseMarkdownDocument(file.markdown);
-    const metadata: MarkdownImportMetadata = {
-      ...(frontMatter && {
-        title: extractTitle(frontMatter),
-      }),
-    };
-    const roots = dropLeadingYamlEchoRoots(tree, frontMatter);
-    const normalizedRoots = attachFrontMatter(
-      normalizeRootsForSingleFile(roots, file.name, metadata),
-      frontMatter
-    );
-    return [...acc, ...normalizedRoots];
+    const { tree, frontMatter } = parseMarkdown(file.markdown);
+    const title =
+      typeof frontMatter?.title === "string"
+        ? (frontMatter.title as string)
+        : undefined;
+    return [...acc, ...normalizeRootsForSingleFile(tree, file.name, { title })];
   }, []);
 }

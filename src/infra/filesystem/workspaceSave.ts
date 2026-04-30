@@ -16,17 +16,10 @@ type NormalizedWorkspaceDocument = {
 
 function normalizeWorkspaceDocument(
   knowledgeDBs: KnowledgeDBs,
-  profile: WorkspaceSaveProfile,
   document: ScannedWorkspaceDocument
 ): NormalizedWorkspaceDocument {
-  const rootNode = knowledgeDBs
-    .get(profile.pubkey)
-    ?.nodes.get(document.rootShortId);
-  if (!rootNode) {
-    throw new Error(`Materialized root not found for ${document.relativePath}`);
-  }
   // eslint-disable-next-line testing-library/render-result-naming-convention
-  const normalizedContent = renderDocumentMarkdown(knowledgeDBs, rootNode);
+  const normalizedContent = renderDocumentMarkdown(knowledgeDBs, document);
   return {
     filePath: document.filePath,
     relativePath: document.relativePath,
@@ -65,7 +58,7 @@ export async function saveEditedWorkspaceDocuments(
   const { documents: scannedDocuments, knowledgeDBs } =
     await scanWorkspaceDocuments(profile);
   const normalizedDocuments = scannedDocuments.map((document) =>
-    normalizeWorkspaceDocument(knowledgeDBs, profile, document)
+    normalizeWorkspaceDocument(knowledgeDBs, document)
   );
 
   const writes = normalizedDocuments

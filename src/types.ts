@@ -12,6 +12,8 @@ declare global {
 
   type PublicKey = string & { readonly "": unique symbol };
 
+  type FrontMatter = Record<string, unknown>;
+
   type Relay = {
     url: string;
     read: boolean;
@@ -241,7 +243,6 @@ declare global {
     children: List<ID>;
     id: ID;
     spans: InlineSpan[];
-    frontMatter?: string;
     docId?: string;
     parent?: LongID;
     anchor?: RootAnchor;

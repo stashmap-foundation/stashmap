@@ -871,40 +871,32 @@ export async function navigateToNodeViaSearch(
   await userEvent.click(exactNavigateButton);
 
   // Navigation can finish before descendants are rendered; wait for the target
-  // row/editor without relying on expand/collapse controls.
+  // row/editor in the requested pane without relying on expand/collapse controls.
   await waitFor(() => {
-    const hasEditor = screen.queryAllByLabelText(`edit ${nodeName}`).length > 0;
+    const hasEditor =
+      // eslint-disable-next-line testing-library/prefer-screen-queries
+      paneScope.queryAllByLabelText(`edit ${nodeName}`).length > 0;
     const hasTreeRow =
-      screen.queryAllByRole("treeitem", { name: nodeName }).length > 0;
+      // eslint-disable-next-line testing-library/prefer-screen-queries
+      paneScope.queryAllByRole("treeitem", { name: nodeName }).length > 0;
     expect(hasEditor || hasTreeRow).toBe(true);
   });
 
-  // Search results are crefs, so navigation lands on the parent context.
-  // Click the fullscreen button to make the target node the pane root.
-  if (options.waitForFullscreen) {
-    await waitFor(
-      () => {
-        const alreadyOnConcreteRoute =
-          window.location.pathname.match(/^\/r\//u) !== null;
-        const hasFullscreenButton =
-          screen.queryAllByLabelText(`open ${nodeName} in fullscreen`).length >
-          0;
-        expect(alreadyOnConcreteRoute || hasFullscreenButton).toBe(true);
-      },
-      { timeout: 1000 }
-    );
-  }
-
-  const fullscreenButtons = screen.queryAllByLabelText(
+  // Search result navigation may land on the parent context, so make the
+  // target node the pane root when that pane renders a matching control.
+  // eslint-disable-next-line testing-library/prefer-screen-queries
+  const fullscreenButtons = paneScope.queryAllByLabelText(
     `open ${nodeName} in fullscreen`
   );
   if (fullscreenButtons.length > 0) {
     await userEvent.click(fullscreenButtons[fullscreenButtons.length - 1]);
     await waitFor(() => {
       const hasEditor =
-        screen.queryAllByLabelText(`edit ${nodeName}`).length > 0;
+        // eslint-disable-next-line testing-library/prefer-screen-queries
+        paneScope.queryAllByLabelText(`edit ${nodeName}`).length > 0;
       const hasTreeRow =
-        screen.queryAllByRole("treeitem", { name: nodeName }).length > 0;
+        // eslint-disable-next-line testing-library/prefer-screen-queries
+        paneScope.queryAllByRole("treeitem", { name: nodeName }).length > 0;
       expect(hasEditor || hasTreeRow).toBe(true);
     });
   }

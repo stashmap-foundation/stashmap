@@ -9,7 +9,7 @@ const EDITING_BLOCK = `${[
 ].join("\n")}\n`;
 
 export function parseFrontMatter(inner: string): FrontMatter {
-  const parsed = YAML.parse(inner);
+  const parsed: unknown = YAML.parse(inner);
   return parsed && typeof parsed === "object" ? (parsed as FrontMatter) : {};
 }
 

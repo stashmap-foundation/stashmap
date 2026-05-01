@@ -82,7 +82,7 @@ async function loadProfileAndEvents(profile) {
   const runtime = await getWorkspaceRuntime(profile.workspaceDir);
   const loaded = await runtime.load();
   await runtime.ready();
-  return { profile: loaded.profile, documents: loaded.documents };
+  return { profile: loaded.profile, files: loaded.files };
 }
 
 function isInitialisedFolder(folder) {

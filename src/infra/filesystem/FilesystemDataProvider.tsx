@@ -1,5 +1,5 @@
 import React from "react";
-import { Map } from "immutable";
+import { List, Map } from "immutable";
 import { useUserOrAnon } from "../../NostrAuthContext";
 import { useUserSessionState } from "../../userSessionState";
 import { useBackend } from "../../BackendContext";
@@ -10,6 +10,67 @@ import { FilesystemExecutorProvider } from "./FilesystemExecutorProvider";
 import { NavigationStateProvider } from "../../NavigationStateContext";
 import { createEmptySemanticIndex } from "../../semanticIndex";
 import { FilesystemWatcher } from "./FilesystemWatcher";
+import { parseToDocument } from "../../core/Document";
+import { WalkContext } from "../../core/markdownNodes";
+import { WorkspaceMarkdownFile } from "./workspaceBackend";
+
+function fallbackTitleFromRelativePath(relativePath: string): string {
+  const pieces = relativePath.split(/[\\/]/);
+  const filename = pieces[pieces.length - 1] ?? relativePath;
+  return filename.endsWith(".md") ? filename.slice(0, -3) : filename;
+}
+
+function assertUniqueDocIds(documents: ReadonlyArray<ParsedDocument>): void {
+  const counts = documents.reduce(
+    (acc, parsed) => ({
+      ...acc,
+      [parsed.document.docId]: (acc[parsed.document.docId] || 0) + 1,
+    }),
+    {} as Record<string, number>
+  );
+  const duplicates = List(Object.entries(counts))
+    .filter(([, count]) => count > 1)
+    .map(([docId]) => docId)
+    .sort()
+    .toArray();
+  if (duplicates.length > 0) {
+    throw new Error(
+      `Workspace contains duplicate knowstr_doc_id values: ${duplicates.join(
+        ", "
+      )}`
+    );
+  }
+}
+
+function parseWorkspaceFiles(
+  files: ReadonlyArray<WorkspaceMarkdownFile>,
+  author: PublicKey
+): ReadonlyArray<ParsedDocument> {
+  const result = files.reduce<{
+    documents: ParsedDocument[];
+    context: WalkContext | undefined;
+  }>(
+    (acc, file) => {
+      const fallbackTitle = fallbackTitleFromRelativePath(file.relativePath);
+      const parsed = parseToDocument(author, file.currentContent, {
+        filePath: file.relativePath,
+        relativePath: file.relativePath,
+        ...(fallbackTitle !== "" ? { fallbackTitle } : {}),
+        ...(acc.context !== undefined ? { context: acc.context } : {}),
+      });
+      return {
+        documents: [
+          ...acc.documents,
+          { document: parsed.document, nodes: parsed.nodes },
+        ],
+        context: parsed.context,
+      };
+    },
+    { documents: [], context: undefined }
+  );
+  assertUniqueDocIds(result.documents);
+  return result.documents;
+}
 
 export function FilesystemDataProvider({
   children,
@@ -20,9 +81,10 @@ export function FilesystemDataProvider({
   const session = useUserSessionState(user);
   const { workspace } = useBackend();
   const workspaceKey = workspace?.profile?.workspaceDir ?? "no-workspace";
-  const initialDocuments: ReadonlyArray<ParsedDocument> = (
-    workspace?.documents ?? []
-  ).map((doc) => ({ document: doc, nodes: doc.nodes }));
+  const initialDocuments = React.useMemo(
+    () => parseWorkspaceFiles(workspace?.files ?? [], user.publicKey),
+    [workspace?.files, user.publicKey]
+  );
 
   return (
     <DataContextProvider

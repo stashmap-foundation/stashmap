@@ -203,8 +203,7 @@ export function getNodeDocumentId(
   node: GraphNode
 ): string | undefined {
   return (
-    node.docId ??
-    getNode(plan.knowledgeDBs, node.root, node.author)?.docId
+    node.docId ?? getNode(plan.knowledgeDBs, node.root, node.author)?.docId
   );
 }
 
@@ -236,7 +235,10 @@ export function upsertNodesCore<T extends GraphPlan>(
     ...plan,
     knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
   };
-  return planMarkDocumentAffected(planUpsertRootDocument(planWithNode, node), node);
+  return planMarkDocumentAffected(
+    planUpsertRootDocument(planWithNode, node),
+    node
+  );
 }
 
 function addCrefToLog<T extends GraphPlan>(plan: T, nodeID: LongID): T {
@@ -608,7 +610,7 @@ export function createGraphPlan(props: CreateGraphPlanProps): GraphPlan {
   };
 }
 
-export type AddToParentTarget = ID | LongID | TextSeed | RefTargetSeed;
+export type AddToParentTarget = ID | TextSeed | RefTargetSeed;
 
 export function planAddTargetsToNode<T extends GraphPlan>(
   plan: T,

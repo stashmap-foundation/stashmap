@@ -1,10 +1,16 @@
 import path from "path";
 import fs from "fs/promises";
 import {
+  collectWorkspaceMarkdownFiles,
   ScannedWorkspaceDocument,
   scanWorkspaceDocuments,
   WorkspaceSaveProfile,
 } from "./workspaceScan";
+
+export type WorkspaceMarkdownFile = {
+  relativePath: string;
+  currentContent: string;
+};
 
 export type WorkspaceWriteRequest = {
   relativePath: string;
@@ -16,6 +22,18 @@ export async function loadWorkspaceAsDocuments(
 ): Promise<ReadonlyArray<ScannedWorkspaceDocument>> {
   const { documents } = await scanWorkspaceDocuments(profile);
   return documents;
+}
+
+export async function loadWorkspaceFiles(
+  profile: Pick<WorkspaceSaveProfile, "workspaceDir">
+): Promise<ReadonlyArray<WorkspaceMarkdownFile>> {
+  const filePaths = await collectWorkspaceMarkdownFiles(profile.workspaceDir);
+  return Promise.all(
+    filePaths.map(async (filePath) => ({
+      relativePath: path.relative(profile.workspaceDir, filePath),
+      currentContent: await fs.readFile(filePath, "utf8"),
+    }))
+  );
 }
 
 export async function saveDocumentsToWorkspace(

@@ -10,7 +10,6 @@ import {
 } from "./nostr";
 import { useData } from "./DataContext";
 import { useExecutor } from "./ExecutorContext";
-import { newDB } from "./core/knowledge";
 import { documentKeyOf } from "./core/Document";
 import {
   buildDocumentEvent,
@@ -832,9 +831,10 @@ export function buildDocumentEvents(
           documentKeyOf(snapshotSourceRoot.author, snapshotSourceRoot.docId)
         )
       : undefined;
-    const createdSnapshotDTag = sourceDocument && rootNode
-      ? `snapshot-${shortID(rootNode.id as ID)}`
-      : undefined;
+    const createdSnapshotDTag =
+      sourceDocument && rootNode
+        ? `snapshot-${shortID(rootNode.id as ID)}`
+        : undefined;
     const snapshotEvent = sourceDocument
       ? (buildSnapshotEventFromNodes(
           plan.knowledgeDBs,

@@ -69,7 +69,7 @@ export function mockWorkspaceIpc(
         .then(
           (loaded): WorkspaceLoaded => ({
             profile: loaded.profile,
-            documents: [...loaded.documents],
+            files: [...loaded.files],
           })
         ) ?? Promise.resolve(null),
     ready: async () => {

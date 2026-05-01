@@ -79,6 +79,14 @@ async function collectMarkdownFiles(
   }, Promise.resolve([] as string[]));
 }
 
+export async function collectWorkspaceMarkdownFiles(
+  workspaceDir: string,
+  ignoredPatterns?: string[]
+): Promise<string[]> {
+  const ig = await loadIgnorePatterns(workspaceDir, ignoredPatterns);
+  return collectMarkdownFiles(workspaceDir, ig);
+}
+
 function checkDuplicateDocIds(
   documents: ReadonlyArray<{ docId: string }>
 ): void {
@@ -136,11 +144,10 @@ export async function scanWorkspaceDocuments(
     ignoredPatterns?: string[];
   } = {}
 ): Promise<WorkspaceScanResult> {
-  const ig = await loadIgnorePatterns(
+  const markdownFiles = await collectWorkspaceMarkdownFiles(
     profile.workspaceDir,
     options.ignoredPatterns
   );
-  const markdownFiles = await collectMarkdownFiles(profile.workspaceDir, ig);
 
   const final = await markdownFiles.reduce<Promise<ScanAcc>>(
     async (previous, filePath) => {

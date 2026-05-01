@@ -1,13 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Backend, BackendProvider, WorkspaceState } from "../../BackendContext";
 import { LoadedCliProfile } from "../../cli/config";
-import { ScannedWorkspaceDocument } from "./workspaceScan";
-import type { WorkspaceWriteRequest } from "./workspaceBackend";
+import type {
+  WorkspaceMarkdownFile,
+  WorkspaceWriteRequest,
+} from "./workspaceBackend";
 import type { FsEventHandler } from "./workspaceWatcher";
 
 export type WorkspaceLoaded = {
   profile: LoadedCliProfile;
-  documents: ScannedWorkspaceDocument[];
+  files: WorkspaceMarkdownFile[];
 };
 
 export type WorkspaceIpc = {
@@ -59,12 +61,12 @@ export function FilesystemBackendProvider({
   const backend: Backend = useMemo(() => {
     const data = state.status === "loaded" ? state.data : null;
     const profile = data?.profile ?? null;
-    const documents = data?.documents ?? [];
+    const files = data?.files ?? [];
     const user = profile ? { publicKey: profile.pubkey } : undefined;
     const defaultRelays = profile?.relays ?? [];
     const workspace: WorkspaceState = {
       profile,
-      documents,
+      files,
       pickFolder: () => ipc.pickFolder(),
       isInitialised: (folder) => ipc.isInitialised(folder),
       open: async (folder) => {

@@ -1,13 +1,15 @@
 import { LoadedCliProfile } from "../../cli/config";
 import { WorkspaceIpc, WorkspaceLoaded } from "./FilesystemBackendProvider";
-import type { ScannedWorkspaceDocument } from "./workspaceScan";
-import type { WorkspaceWriteRequest } from "./workspaceBackend";
+import type {
+  WorkspaceMarkdownFile,
+  WorkspaceWriteRequest,
+} from "./workspaceBackend";
 import type { FsEvent, FsEventHandler } from "./workspaceWatcher";
 
 export type IpcChannel = {
   load: () => Promise<{
     profile: LoadedCliProfile;
-    documents: ScannedWorkspaceDocument[];
+    files: WorkspaceMarkdownFile[];
   } | null>;
   pickFolder: () => Promise<string | null>;
   open: (folder: string) => Promise<void>;

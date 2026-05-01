@@ -13,7 +13,6 @@ import {
 import { materializeTree, WalkContext } from "./core/markdownNodes";
 import { MarkdownTreeNode } from "./core/markdownTree";
 import {
-  AddToParentTarget,
   GraphPlan,
   Plan,
   planAddTargetsToNode,

@@ -1,8 +1,8 @@
 import crypto from "crypto";
 import { loadCliProfile } from "../../cli/config";
-import { ScannedWorkspaceDocument } from "./workspaceScan";
 import {
-  loadWorkspaceAsDocuments,
+  loadWorkspaceFiles,
+  WorkspaceMarkdownFile,
   saveDocumentsToWorkspace,
   WorkspaceWriteRequest,
 } from "./workspaceBackend";
@@ -17,7 +17,7 @@ const ECHO_TTL_MS = 2000;
 
 export type WorkspaceRuntimeLoaded = {
   profile: ReturnType<typeof loadCliProfile>;
-  documents: ReadonlyArray<ScannedWorkspaceDocument>;
+  files: ReadonlyArray<WorkspaceMarkdownFile>;
 };
 
 export type WorkspaceRuntime = {
@@ -124,12 +124,11 @@ export function createWorkspaceRuntime(workspaceDir: string): WorkspaceRuntime {
   return {
     load: async () => {
       const profile = loadCliProfile({ cwd: workspaceDir });
-      const documents = await loadWorkspaceAsDocuments({
-        pubkey: profile.pubkey,
+      const files = await loadWorkspaceFiles({
         workspaceDir: profile.workspaceDir,
       });
       ensureWatcher();
-      return { profile, documents: [...documents] };
+      return { profile, files: [...files] };
     },
     ready: async () => {
       ensureWatcher();

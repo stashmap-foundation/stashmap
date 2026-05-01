@@ -27,12 +27,7 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
   const wsID = joinID(alice().user.publicKey, "my-first-workspace");
   const workspaceText = "my-first-workspace";
   const workspaceNode: GraphNode = {
-    ...newNode(
-      workspaceText,
-      List(),
-      alice().user.publicKey,
-      wsID
-    ),
+    ...newNode(workspaceText, List(), alice().user.publicKey, wsID),
     id: wsID,
     root: wsID,
   };

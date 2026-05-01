@@ -56,7 +56,7 @@ import {
 import { findContacts } from "./contacts";
 import { UserRelayContextProvider } from "./UserRelayContext";
 import { StashmapDB } from "./infra/nostr/cache/indexedDB";
-import { createEmptySemanticIndex } from "./semanticIndex";
+import { createEmptyGraphIndex } from "./graphIndex";
 
 import {
   PaneIndexProvider,
@@ -210,7 +210,7 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
   contacts: Map<PublicKey, Contact>(),
   contactsRelays: Map<PublicKey, Relays>(),
   knowledgeDBs: Map<PublicKey, KnowledgeData>(),
-  semanticIndex: createEmptySemanticIndex(),
+  graphIndex: createEmptyGraphIndex(),
   documents: Map(),
   documentByFilePath: Map(),
   relaysInfos: Map<string, RelayInformation | undefined>(),

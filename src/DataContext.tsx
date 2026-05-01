@@ -4,7 +4,7 @@ import { newDB } from "./core/knowledge";
 import { injectEmptyNodesIntoKnowledgeDBs } from "./core/connections";
 import {
   useDocumentKnowledgeDBs,
-  useDocumentSemanticIndex,
+  useDocumentGraphIndex,
   useDocumentSnapshotNodes,
   useDocuments,
   useDocumentByFilePath,
@@ -67,7 +67,7 @@ export function MergeKnowledgeDB({
   const myself = data.user.publicKey;
 
   const documentDBs = useDocumentKnowledgeDBs();
-  const semanticIndex = useDocumentSemanticIndex();
+  const graphIndex = useDocumentGraphIndex();
   const snapshotNodes = useDocumentSnapshotNodes();
   const documents = useDocuments();
   const documentByFilePath = useDocumentByFilePath();
@@ -87,7 +87,7 @@ export function MergeKnowledgeDB({
       value={{
         ...data,
         knowledgeDBs: injectedDBs,
-        semanticIndex,
+        graphIndex,
         snapshotNodes,
         documents,
         documentByFilePath,

@@ -27,7 +27,7 @@ import {
 } from "../../eventProcessing";
 import { DocumentStoreProvider } from "../../DocumentStore";
 import { NostrCacheSync } from "./cache/NostrCacheSync";
-import { createEmptySemanticIndex } from "../../semanticIndex";
+import { createEmptyGraphIndex } from "../../graphIndex";
 import { useUserSessionState } from "../../userSessionState";
 
 export const KIND_SEARCH = [KIND_KNOWLEDGE_DOCUMENT];
@@ -142,7 +142,7 @@ export function NostrDataProvider({
       user={user}
       contactsRelays={contactsRelays}
       knowledgeDBs={Map<PublicKey, KnowledgeData>()}
-      semanticIndex={createEmptySemanticIndex()}
+      graphIndex={createEmptyGraphIndex()}
       documents={Map()}
       documentByFilePath={Map()}
       relaysInfos={Map<string, RelayInformation | undefined>()}

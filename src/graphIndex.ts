@@ -3,7 +3,7 @@ import { EMPTY_SEMANTIC_ID } from "./core/connections";
 import { getAllFileLinks, getAllLinks, nodeText } from "./core/nodeSpans";
 import { fileLinkIndexKey, resolveLinkPath } from "./core/linkPath";
 
-export function createEmptySemanticIndex(): SemanticIndex {
+export function createEmptyGraphIndex(): GraphIndex {
   return {
     nodeByID: new globalThis.Map<LongID, GraphNode>(),
     semantic: new globalThis.Map<string, globalThis.Set<LongID>>(),
@@ -70,86 +70,86 @@ function removeFromNodeMap(
 }
 
 function addNodeSemanticEntries(
-  semanticIndex: SemanticIndex,
+  graphIndex: GraphIndex,
   node: GraphNode,
   sourceFilePath: string | undefined
 ): void {
-  addToSetMap(semanticIndex.semantic, nodeText(node), node.id);
+  addToSetMap(graphIndex.semantic, nodeText(node), node.id);
   if (node.basedOn) {
-    addToNodeMap(semanticIndex.basedOnIndex, node.basedOn, node.id);
+    addToNodeMap(graphIndex.basedOnIndex, node.basedOn, node.id);
   }
 
   node.children.forEach((childID) => {
     if (childID === EMPTY_SEMANTIC_ID) {
       return;
     }
-    const childNode = semanticIndex.nodeByID.get(childID as LongID);
+    const childNode = graphIndex.nodeByID.get(childID as LongID);
     if (!childNode || childNode.relevance === "not_relevant") {
       return;
     }
     getAllLinks(childNode).forEach(({ targetID }) => {
-      addToNodeMap(semanticIndex.incomingCrefs, targetID, node.id);
+      addToNodeMap(graphIndex.incomingCrefs, targetID, node.id);
     });
     getAllFileLinks(childNode).forEach(({ path }) => {
       const resolved = resolveLinkPath(path, sourceFilePath);
       const key = fileLinkIndexKey(childNode.author, resolved);
-      addToSetMap(semanticIndex.incomingFileLinks, key, node.id);
+      addToSetMap(graphIndex.incomingFileLinks, key, node.id);
     });
   });
 }
 
 function removeNodeSemanticEntries(
-  semanticIndex: SemanticIndex,
+  graphIndex: GraphIndex,
   node: GraphNode,
   sourceFilePath: string | undefined
 ): void {
-  removeFromSetMap(semanticIndex.semantic, nodeText(node), node.id);
+  removeFromSetMap(graphIndex.semantic, nodeText(node), node.id);
   if (node.basedOn) {
-    removeFromNodeMap(semanticIndex.basedOnIndex, node.basedOn, node.id);
+    removeFromNodeMap(graphIndex.basedOnIndex, node.basedOn, node.id);
   }
 
   node.children.forEach((childID) => {
     if (childID === EMPTY_SEMANTIC_ID) {
       return;
     }
-    const childNode = semanticIndex.nodeByID.get(childID as LongID);
+    const childNode = graphIndex.nodeByID.get(childID as LongID);
     if (!childNode || childNode.relevance === "not_relevant") {
       return;
     }
     getAllLinks(childNode).forEach(({ targetID }) => {
-      removeFromNodeMap(semanticIndex.incomingCrefs, targetID, node.id);
+      removeFromNodeMap(graphIndex.incomingCrefs, targetID, node.id);
     });
     getAllFileLinks(childNode).forEach(({ path }) => {
       const resolved = resolveLinkPath(path, sourceFilePath);
       const key = fileLinkIndexKey(childNode.author, resolved);
-      removeFromSetMap(semanticIndex.incomingFileLinks, key, node.id);
+      removeFromSetMap(graphIndex.incomingFileLinks, key, node.id);
     });
   });
 }
 
-function cloneIndex(semanticIndex: SemanticIndex): SemanticIndex {
+function cloneIndex(graphIndex: GraphIndex): GraphIndex {
   return {
-    nodeByID: new globalThis.Map<LongID, GraphNode>(semanticIndex.nodeByID),
+    nodeByID: new globalThis.Map<LongID, GraphNode>(graphIndex.nodeByID),
     semantic: new globalThis.Map<string, globalThis.Set<LongID>>(
-      [...semanticIndex.semantic.entries()].map(([key, ids]) => [
+      [...graphIndex.semantic.entries()].map(([key, ids]) => [
         key,
         new globalThis.Set<LongID>(ids),
       ])
     ),
     incomingCrefs: new globalThis.Map<LongID, globalThis.Set<LongID>>(
-      [...semanticIndex.incomingCrefs.entries()].map(([key, ids]) => [
+      [...graphIndex.incomingCrefs.entries()].map(([key, ids]) => [
         key,
         new globalThis.Set<LongID>(ids),
       ])
     ),
     incomingFileLinks: new globalThis.Map<string, globalThis.Set<LongID>>(
-      [...semanticIndex.incomingFileLinks.entries()].map(([key, ids]) => [
+      [...graphIndex.incomingFileLinks.entries()].map(([key, ids]) => [
         key,
         new globalThis.Set<LongID>(ids),
       ])
     ),
     basedOnIndex: new globalThis.Map<LongID, globalThis.Set<LongID>>(
-      [...semanticIndex.basedOnIndex.entries()].map(([key, ids]) => [
+      [...graphIndex.basedOnIndex.entries()].map(([key, ids]) => [
         key,
         new globalThis.Set<LongID>(ids),
       ])
@@ -157,16 +157,16 @@ function cloneIndex(semanticIndex: SemanticIndex): SemanticIndex {
   };
 }
 
-export function addNodesToSemanticIndex(
-  semanticIndex: SemanticIndex,
+export function addNodesToGraphIndex(
+  graphIndex: GraphIndex,
   nodes: ImmutableMap<string, GraphNode>,
   sourceFilePath?: string
-): SemanticIndex {
+): GraphIndex {
   if (nodes.size === 0) {
-    return semanticIndex;
+    return graphIndex;
   }
 
-  const nextIndex = cloneIndex(semanticIndex);
+  const nextIndex = cloneIndex(graphIndex);
 
   nodes.valueSeq().forEach((node) => {
     nextIndex.nodeByID.set(node.id, node);
@@ -178,16 +178,16 @@ export function addNodesToSemanticIndex(
   return nextIndex;
 }
 
-export function removeNodesFromSemanticIndex(
-  semanticIndex: SemanticIndex,
+export function removeNodesFromGraphIndex(
+  graphIndex: GraphIndex,
   nodes: ImmutableMap<string, GraphNode>,
   sourceFilePath?: string
-): SemanticIndex {
+): GraphIndex {
   if (nodes.size === 0) {
-    return semanticIndex;
+    return graphIndex;
   }
 
-  const nextIndex = cloneIndex(semanticIndex);
+  const nextIndex = cloneIndex(graphIndex);
 
   nodes.valueSeq().forEach((node) => {
     removeNodeSemanticEntries(nextIndex, node, sourceFilePath);
@@ -198,15 +198,15 @@ export function removeNodesFromSemanticIndex(
   return nextIndex;
 }
 
-export function buildSemanticIndexFromDocuments(
+export function buildGraphIndexFromDocuments(
   nodesByDocumentKey: ImmutableMap<string, ImmutableMap<string, GraphNode>>,
   filePathByDocumentKey: ImmutableMap<string, string> = ImmutableMap()
-): SemanticIndex {
+): GraphIndex {
   return nodesByDocumentKey
     .entrySeq()
     .reduce(
       (acc, [key, nodes]) =>
-        addNodesToSemanticIndex(acc, nodes, filePathByDocumentKey.get(key)),
-      createEmptySemanticIndex()
+        addNodesToGraphIndex(acc, nodes, filePathByDocumentKey.get(key)),
+      createEmptyGraphIndex()
     );
 }

@@ -143,7 +143,7 @@ function getChildrenForRegularNode(
       : undefined;
   const incomingCrefs = getIncomingCrefsForNode(
     data.knowledgeDBs,
-    data.semanticIndex,
+    data.graphIndex,
     visibleAuthors,
     coordinateSemanticID,
     containingNodeID,
@@ -161,7 +161,7 @@ function getChildrenForRegularNode(
   const isOwnContent = effectiveAuthor === data.user.publicKey;
   const { suggestions: diffItems, versionMetas } = getAlternativeFooterData(
     data.knowledgeDBs,
-    data.semanticIndex,
+    data.graphIndex,
     visibleAuthors,
     activeFilters,
     nodes,

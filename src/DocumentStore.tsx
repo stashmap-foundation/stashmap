@@ -7,10 +7,10 @@ import {
   materializeSnapshot,
 } from "./infra/snapshotStore";
 import {
-  addNodesToSemanticIndex,
-  createEmptySemanticIndex,
-  removeNodesFromSemanticIndex,
-} from "./semanticIndex";
+  addNodesToGraphIndex,
+  createEmptyGraphIndex,
+  removeNodesFromGraphIndex,
+} from "./graphIndex";
 import { eventToParsed, eventToDocumentDelete } from "./nostrEvents";
 import {
   Document,
@@ -28,12 +28,12 @@ type DocumentSnapshot = {
   documentByFilePath: ImmutableMap<string, Document>;
   deletes: ImmutableMap<string, DocumentDelete>;
   knowledgeDBs: KnowledgeDBs;
-  semanticIndex: SemanticIndex;
+  graphIndex: GraphIndex;
 };
 
 type DocumentStoreState = {
   knowledgeDBs: KnowledgeDBs;
-  semanticIndex: SemanticIndex;
+  graphIndex: GraphIndex;
   snapshotNodes: SnapshotNodes;
   documents: ImmutableMap<string, Document>;
   documentByFilePath: ImmutableMap<string, Document>;
@@ -52,7 +52,7 @@ function createEmptySnapshot(): DocumentSnapshot {
     documentByFilePath: ImmutableMap<string, Document>(),
     deletes: ImmutableMap<string, DocumentDelete>(),
     knowledgeDBs: ImmutableMap<PublicKey, KnowledgeData>(),
-    semanticIndex: createEmptySemanticIndex(),
+    graphIndex: createEmptyGraphIndex(),
   };
 }
 
@@ -139,12 +139,12 @@ function applyDocumentToSnapshot(
       : snapshot.deletes;
   const withoutExistingNodes =
     existingNodes.size > 0
-      ? removeNodesFromSemanticIndex(
-          snapshot.semanticIndex,
+      ? removeNodesFromGraphIndex(
+          snapshot.graphIndex,
           existingNodes,
           existingDocument?.filePath
         )
-      : snapshot.semanticIndex;
+      : snapshot.graphIndex;
   const documentByFilePathAfterRemove = withoutDocumentInFilePathIndex(
     snapshot.documentByFilePath,
     existingDocument
@@ -166,7 +166,7 @@ function applyDocumentToSnapshot(
     ),
     deletes: nextDeletes,
     knowledgeDBs,
-    semanticIndex: addNodesToSemanticIndex(
+    graphIndex: addNodesToGraphIndex(
       withoutExistingNodes,
       parsed.nodes,
       doc.filePath
@@ -206,14 +206,14 @@ function applyDeleteToSnapshot(
     ),
     deletes: snapshot.deletes.set(key, deletion),
     knowledgeDBs: withoutDocNodes(snapshot.knowledgeDBs, existingDocument),
-    semanticIndex:
+    graphIndex:
       existingNodes.size > 0
-        ? removeNodesFromSemanticIndex(
-            snapshot.semanticIndex,
+        ? removeNodesFromGraphIndex(
+            snapshot.graphIndex,
             existingNodes,
             existingDocument.filePath
           )
-        : snapshot.semanticIndex,
+        : snapshot.graphIndex,
   };
 }
 
@@ -324,7 +324,7 @@ export function DocumentStoreProvider({
   const contextValue = React.useMemo(
     () => ({
       knowledgeDBs: activeSnapshot.knowledgeDBs,
-      semanticIndex: activeSnapshot.semanticIndex,
+      graphIndex: activeSnapshot.graphIndex,
       snapshotNodes,
       documents: activeSnapshot.documents,
       documentByFilePath: activeSnapshot.documentByFilePath,
@@ -350,10 +350,10 @@ export function useDocumentKnowledgeDBs(): KnowledgeDBs {
   return React.useContext(DocumentStoreContext)?.knowledgeDBs || ImmutableMap();
 }
 
-export function useDocumentSemanticIndex(): SemanticIndex {
+export function useDocumentGraphIndex(): GraphIndex {
   return (
-    React.useContext(DocumentStoreContext)?.semanticIndex ||
-    createEmptySemanticIndex()
+    React.useContext(DocumentStoreContext)?.graphIndex ||
+    createEmptyGraphIndex()
   );
 }
 

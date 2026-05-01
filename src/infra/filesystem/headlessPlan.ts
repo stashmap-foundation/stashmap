@@ -1,6 +1,6 @@
 import { Map } from "immutable";
 import { createGraphPlan, GraphPlan } from "../../planner";
-import { createEmptySemanticIndex } from "../../semanticIndex";
+import { createEmptyGraphIndex } from "../../graphIndex";
 
 const EMPTY_RELAYS: AllRelays = {
   defaultRelays: [],
@@ -17,7 +17,7 @@ export function createHeadlessPlan(
     user: { publicKey: viewer },
     contactsRelays: Map<PublicKey, Relays>(),
     knowledgeDBs,
-    semanticIndex: createEmptySemanticIndex(),
+    graphIndex: createEmptyGraphIndex(),
     documents: Map(),
     documentByFilePath: Map(),
     relaysInfos: Map(),

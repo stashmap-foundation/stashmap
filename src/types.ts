@@ -161,7 +161,7 @@ declare global {
     contactsRelays: Map<PublicKey, Relays>;
     knowledgeDBs: KnowledgeDBs;
     snapshotNodes: SnapshotNodes;
-    semanticIndex: SemanticIndex;
+    graphIndex: GraphIndex;
     documents: Map<string, DocumentType>;
     documentByFilePath: Map<string, DocumentType>;
     relaysInfos: Map<string, RelayInformation | undefined>;
@@ -292,7 +292,7 @@ declare global {
     nodes: Map<ID, GraphNode>;
   };
 
-  type SemanticIndex = {
+  type GraphIndex = {
     nodeByID: globalThis.Map<LongID, GraphNode>;
     semantic: globalThis.Map<string, globalThis.Set<LongID>>;
     incomingCrefs: globalThis.Map<LongID, globalThis.Set<LongID>>;

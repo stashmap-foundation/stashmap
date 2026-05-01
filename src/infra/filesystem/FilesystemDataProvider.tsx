@@ -8,7 +8,7 @@ import { DocumentStoreProvider, ParsedDocument } from "../../DocumentStore";
 import { PlanningContextProvider } from "../../planner";
 import { FilesystemExecutorProvider } from "./FilesystemExecutorProvider";
 import { NavigationStateProvider } from "../../NavigationStateContext";
-import { createEmptySemanticIndex } from "../../semanticIndex";
+import { createEmptyGraphIndex } from "../../graphIndex";
 import { FilesystemWatcher } from "./FilesystemWatcher";
 import { parseToDocument } from "../../core/Document";
 import { WalkContext } from "../../core/markdownNodes";
@@ -92,7 +92,7 @@ export function FilesystemDataProvider({
       user={user}
       contactsRelays={Map()}
       knowledgeDBs={Map<PublicKey, KnowledgeData>()}
-      semanticIndex={createEmptySemanticIndex()}
+      graphIndex={createEmptyGraphIndex()}
       documents={Map()}
       documentByFilePath={Map()}
       relaysInfos={Map()}

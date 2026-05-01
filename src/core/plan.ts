@@ -43,7 +43,7 @@ type GraphPlanData = Pick<
   | "contactsRelays"
   | "knowledgeDBs"
   | "snapshotNodes"
-  | "semanticIndex"
+  | "graphIndex"
   | "documents"
   | "documentByFilePath"
   | "relaysInfos"

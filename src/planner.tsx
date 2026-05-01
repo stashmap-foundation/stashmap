@@ -815,25 +815,16 @@ export function buildDocumentEvents(
   plan: GraphPlan
 ): List<UnsignedEvent & EventAttachment> {
   const author = plan.user.publicKey;
-  const userDB = plan.knowledgeDBs.get(author, newDB());
-  const withUpserts = plan.affectedRoots.reduce((events, rootId) => {
-    const rootNode = userDB.nodes.find(
-      (r) =>
-        !r.parent &&
-        (r.id === rootId ||
-          shortID(r.id) === rootId ||
-          r.root === rootId ||
-          r.root === shortID(rootId as ID))
-    );
-    if (!rootNode || !rootNode.docId) {
-      return events;
-    }
-    const document = plan.documents.get(documentKeyOf(author, rootNode.docId));
+  const withUpserts = plan.affectedDocuments.reduce((events, docId) => {
+    const document = plan.documents.get(documentKeyOf(author, docId));
     if (!document) {
       return events;
     }
+    const rootNode = document.rootShortId
+      ? plan.knowledgeDBs.get(author)?.nodes.get(document.rootShortId)
+      : undefined;
     const snapshotSourceRoot =
-      rootNode.basedOn && !rootNode.snapshotDTag
+      rootNode?.basedOn && !rootNode.snapshotDTag
         ? getNode(plan.knowledgeDBs, rootNode.basedOn, author)
         : undefined;
     const sourceDocument = snapshotSourceRoot?.docId
@@ -841,7 +832,7 @@ export function buildDocumentEvents(
           documentKeyOf(snapshotSourceRoot.author, snapshotSourceRoot.docId)
         )
       : undefined;
-    const createdSnapshotDTag = sourceDocument
+    const createdSnapshotDTag = sourceDocument && rootNode
       ? `snapshot-${shortID(rootNode.id as ID)}`
       : undefined;
     const snapshotEvent = sourceDocument
@@ -853,7 +844,7 @@ export function buildDocumentEvents(
         ) as UnsignedEvent & EventAttachment)
       : undefined;
     const event = buildDocumentEvent(plan.knowledgeDBs, document, {
-      snapshotDTag: rootNode.snapshotDTag ?? createdSnapshotDTag,
+      snapshotDTag: rootNode?.snapshotDTag ?? createdSnapshotDTag,
     });
     return snapshotEvent
       ? events

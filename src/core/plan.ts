@@ -51,7 +51,7 @@ type GraphPlanData = Pick<
 
 export type GraphPlan = GraphPlanData & {
   publishEvents: List<CoreOutboundEvent & EventAttachment>;
-  affectedRoots: ImmutableSet<ID>;
+  affectedDocuments: ImmutableSet<string>;
   deletedDocs: ImmutableSet<string>;
   relays: AllRelays;
 };
@@ -198,6 +198,26 @@ export function planUpsertRootDocument<T extends GraphPlan>(
   return { ...plan, documents: plan.documents.set(key, next) };
 }
 
+export function getNodeDocumentId(
+  plan: Pick<GraphPlan, "knowledgeDBs">,
+  node: GraphNode
+): string | undefined {
+  return (
+    node.docId ??
+    getNode(plan.knowledgeDBs, node.root, node.author)?.docId
+  );
+}
+
+export function planMarkDocumentAffected<T extends GraphPlan>(
+  plan: T,
+  node: GraphNode
+): T {
+  const docId = getNodeDocumentId(plan, node);
+  return docId
+    ? { ...plan, affectedDocuments: plan.affectedDocuments.add(docId) }
+    : plan;
+}
+
 export function upsertNodesCore<T extends GraphPlan>(
   plan: T,
   nodes: GraphNode
@@ -215,9 +235,8 @@ export function upsertNodesCore<T extends GraphPlan>(
   const planWithNode: T = {
     ...plan,
     knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
-    affectedRoots: plan.affectedRoots.add(node.root),
   };
-  return planUpsertRootDocument(planWithNode, node);
+  return planMarkDocumentAffected(planUpsertRootDocument(planWithNode, node), node);
 }
 
 function addCrefToLog<T extends GraphPlan>(plan: T, nodeID: LongID): T {
@@ -439,12 +458,7 @@ export function planCopyDescendantNodes<T extends GraphPlan>(
     plan
   );
 
-  const planWithSourceRoot = {
-    ...resultPlan,
-    affectedRoots: resultPlan.affectedRoots.add(sourceNode.root),
-  };
-
-  return [planWithSourceRoot as T, resultMapping];
+  return [planMarkDocumentAffected(resultPlan as T, sourceNode), resultMapping];
 }
 
 export function planMoveDescendantNodes<T extends GraphPlan>(
@@ -509,14 +523,14 @@ export function planDeleteNodes<T extends GraphPlan>(
     return {
       ...plan,
       knowledgeDBs: nextKnowledgeDBs,
-      affectedRoots: plan.affectedRoots.remove(node.root),
+      affectedDocuments: plan.affectedDocuments.remove(docId),
       deletedDocs: plan.deletedDocs.add(docId),
     };
   }
   return {
     ...plan,
     knowledgeDBs: nextKnowledgeDBs,
-    affectedRoots: plan.affectedRoots.add(node.root),
+    affectedDocuments: planMarkDocumentAffected(plan, node).affectedDocuments,
   };
 }
 
@@ -589,12 +603,12 @@ export function createGraphPlan(props: CreateGraphPlanProps): GraphPlan {
     ...props,
     publishEvents:
       props.publishEvents || List<CoreOutboundEvent & EventAttachment>([]),
-    affectedRoots: ImmutableSet<ID>(),
+    affectedDocuments: ImmutableSet<string>(),
     deletedDocs: ImmutableSet<string>(),
   };
 }
 
-export type AddToParentTarget = ID | TextSeed | RefTargetSeed;
+export type AddToParentTarget = ID | LongID | TextSeed | RefTargetSeed;
 
 export function planAddTargetsToNode<T extends GraphPlan>(
   plan: T,
@@ -673,10 +687,7 @@ export function planAddTargetsToNode<T extends GraphPlan>(
             )
           : undefined;
         const planWithSourceRoot = sourceNode
-          ? {
-              ...planWithChild,
-              affectedRoots: planWithChild.affectedRoots.add(sourceNode.root),
-            }
+          ? planMarkDocumentAffected(planWithChild, sourceNode)
           : planWithChild;
         return [
           planWithSourceRoot,

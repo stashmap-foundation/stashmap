@@ -28,17 +28,21 @@ import { getNodeForView, ViewPath } from "./ViewContext";
 export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
   plan: T,
   trees: MarkdownTreeNode[],
-  context: List<ID> = List<ID>()
+  context: List<ID> = List<ID>(),
+  options: { createDocuments?: boolean } = {}
 ): [T, topItemIDs: ID[], topNodeIDs: LongID[]] {
+  const createDocuments = options.createDocuments ?? true;
   const walkContext: WalkContext = {
     knowledgeDBs: plan.knowledgeDBs,
     publicKey: plan.user.publicKey,
-    affectedRoots: plan.affectedRoots,
+    affectedDocuments: plan.affectedDocuments,
   };
-  const treesWithDocIds = trees.map((tree) => ({
-    ...tree,
-    docId: tree.docId ?? v4(),
-  }));
+  const treesWithDocIds = createDocuments
+    ? trees.map((tree) => ({
+        ...tree,
+        docId: tree.docId ?? v4(),
+      }))
+    : trees;
   const result = materializeTree(treesWithDocIds, plan.user.publicKey, {
     context: walkContext,
     semanticContext: context,
@@ -46,8 +50,11 @@ export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
   const planWithNodes: T = {
     ...plan,
     knowledgeDBs: result.context.knowledgeDBs,
-    affectedRoots: result.context.affectedRoots,
+    affectedDocuments: result.context.affectedDocuments,
   };
+  if (!createDocuments) {
+    return [planWithNodes, result.topSemanticIds, result.topNodeIds];
+  }
   const userNodes = result.context.knowledgeDBs.get(plan.user.publicKey)?.nodes;
   const planWithDocs = result.topNodeIds.reduce<T>((acc, longId) => {
     const rootNode = userNodes?.get(shortID(longId));
@@ -95,29 +102,6 @@ export function planCreateNodesFromMarkdown<T extends GraphPlan>(
     planUpsertNodes(nextPlan, fallbackNode),
     nodeText(fallbackNode) as ID,
   ];
-}
-
-function removeTransientRootAffects<T extends GraphPlan>(
-  plan: T,
-  nodeIds: LongID[]
-): T {
-  const transientRootIds = nodeIds.filter((nodeId) => {
-    const node = plan.knowledgeDBs
-      .get(plan.user.publicKey)
-      ?.nodes.get(shortID(nodeId));
-    return !!node && node.parent !== undefined;
-  });
-  if (transientRootIds.length === 0) {
-    return plan;
-  }
-  return {
-    ...plan,
-    affectedRoots: transientRootIds.reduce(
-      (affectedRoots, nodeId) =>
-        affectedRoots.remove(nodeId).remove(shortID(nodeId)),
-      plan.affectedRoots
-    ),
-  };
 }
 
 function moveCreatedTreesToParentContext<T extends GraphPlan>(
@@ -185,30 +169,32 @@ function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
   }
 
   const [planWithNodes, topItemIDs, topNodeIDs] =
-    planCreateNodesFromMarkdownTrees(plan, trees);
-  const [planWithAdded, actualItemIDs] = planAddTargetsToNode(
+    planCreateNodesFromMarkdownTrees(plan, trees, List<ID>(), {
+      createDocuments: false,
+    });
+  const targetSemanticContext = getNodeContext(
+    planWithNodes.knowledgeDBs,
+    parentNode
+  ).push(getSemanticID(planWithNodes.knowledgeDBs, parentNode));
+  const movedPlan = moveCreatedTreesToParentContext(
     planWithNodes,
+    topItemIDs,
+    topNodeIDs,
+    topNodeIDs,
+    targetSemanticContext,
+    parentNode
+  );
+  const [planWithAdded, actualItemIDs] = planAddTargetsToNode(
+    movedPlan,
     parentNode,
-    topNodeIDs as AddToParentTarget[],
+    topNodeIDs,
     insertAtIndex,
     relevance,
     argument
   );
-  const targetSemanticContext = getNodeContext(
-    planWithAdded.knowledgeDBs,
-    parentNode
-  ).push(getSemanticID(planWithAdded.knowledgeDBs, parentNode));
-  const movedPlan = moveCreatedTreesToParentContext(
-    planWithAdded,
-    topItemIDs,
-    topNodeIDs,
-    actualItemIDs,
-    targetSemanticContext,
-    parentNode
-  );
 
   return {
-    plan: removeTransientRootAffects(movedPlan, topNodeIDs),
+    plan: planWithAdded,
     topItemIDs,
     topNodeIDs,
     actualItemIDs,

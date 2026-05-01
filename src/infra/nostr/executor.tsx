@@ -71,7 +71,7 @@ export async function execute({
 }): Promise<PublishResultsEventMap> {
   // buildDocumentEvents returns plan.publishEvents + generated document events.
   // In production executePlan pre-builds documents for the publish queue, so
-  // affectedRoots is cleared before calling execute() making this a passthrough.
+  // affectedDocuments is cleared before calling execute() making this a passthrough.
   // In tests execute() is called directly and this generates the document events.
   const allEvents = buildDocumentEvents(plan);
 

@@ -31,10 +31,10 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
       workspaceText,
       List(),
       alice().user.publicKey,
-      shortID(wsID) as ID
+      wsID
     ),
     id: wsID,
-    root: shortID(wsID) as ID,
+    root: wsID,
   };
   const basePlan = planUpsertNodes(createPlan(alice()), workspaceNode);
   const workspacePath: ViewPath = [0, workspaceNode.id];
@@ -45,7 +45,6 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
     [nodeText(workspaceNode) as ID],
     0
   );
-
   await execute({
     ...alice(),
     plan,

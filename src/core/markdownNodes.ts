@@ -11,7 +11,7 @@ import { nodeText, spansText } from "./nodeSpans";
 export type WalkContext = {
   knowledgeDBs: KnowledgeDBs;
   publicKey: PublicKey;
-  affectedRoots: ImmutableSet<ID>;
+  affectedDocuments: ImmutableSet<string>;
   updated?: number;
 };
 
@@ -24,7 +24,9 @@ function walkUpsertNode(ctx: WalkContext, node: GraphNode): WalkContext {
       ...db,
       nodes: db.nodes.set(shortID(normalizedNode.id), normalizedNode),
     }),
-    affectedRoots: ctx.affectedRoots.add(normalizedNode.root),
+    affectedDocuments: normalizedNode.docId
+      ? ctx.affectedDocuments.add(normalizedNode.docId)
+      : ctx.affectedDocuments,
   };
 }
 
@@ -175,7 +177,7 @@ export function materializeTree(
   const baseContext: WalkContext = options.context ?? {
     knowledgeDBs: ImmutableMap<PublicKey, KnowledgeData>(),
     publicKey: author,
-    affectedRoots: ImmutableSet<ID>(),
+    affectedDocuments: ImmutableSet<string>(),
   };
   const ctx: WalkContext =
     options.updatedMs !== undefined

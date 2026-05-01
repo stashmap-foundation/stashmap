@@ -136,7 +136,7 @@ export function NostrExecutorProvider({
     const filteredPlan = {
       ...plan,
       publishEvents: filteredEvents,
-      affectedRoots: ImmutableSet<ID>(),
+      affectedDocuments: ImmutableSet<string>(),
     };
 
     const results = await execute({

@@ -19,6 +19,7 @@ import {
   itemPassesFilters,
   getSemanticID,
   resolveNode,
+  joinID,
 } from "./core/connections";
 import {
   getBlockLinkTarget,
@@ -28,6 +29,7 @@ import {
   plainSpans,
 } from "./core/nodeSpans";
 import { documentKeyOf } from "./core/Document";
+import type { Document } from "./core/Document";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
 import {
   getAlternativeFooterData,
@@ -330,5 +332,55 @@ export function getNodesInTree(
       virtualRows: childResult.virtualRows,
       firstVirtualKeys: childResult.firstVirtualKeys,
     }
+  );
+}
+
+function emptyTreeResult(paths: List<ViewPath> = List<ViewPath>()): TreeResult {
+  return {
+    paths,
+    virtualRows: EMPTY_VIRTUAL_ROWS,
+    firstVirtualKeys: EMPTY_FIRST_VIRTUAL_KEYS,
+  };
+}
+
+export function getNodesInDocument(
+  data: Data,
+  paneIndex: number,
+  document: Document,
+  typeFilters: Pane["typeFilters"]
+): TreeResult {
+  return document.topNodeShortIds.reduce<TreeResult>(
+    (result, topNodeShortId) => {
+      const topNodePath: ViewPath = [
+        paneIndex,
+        joinID(document.author, topNodeShortId),
+      ];
+      const [, topNodeView] = getRowIDFromView(data, topNodePath);
+      const withTopNode = {
+        ...result,
+        paths: result.paths.push(topNodePath),
+      };
+      if (!topNodeView.expanded) {
+        return withTopNode;
+      }
+      const sub = getNodesInTree(
+        data,
+        topNodePath,
+        withTopNode.paths,
+        undefined,
+        document.author,
+        typeFilters,
+        undefined,
+        withTopNode.virtualRows
+      );
+      return {
+        paths: sub.paths,
+        virtualRows: withTopNode.virtualRows.merge(sub.virtualRows),
+        firstVirtualKeys: withTopNode.firstVirtualKeys.union(
+          sub.firstVirtualKeys
+        ),
+      };
+    },
+    emptyTreeResult()
   );
 }

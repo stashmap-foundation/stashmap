@@ -9,7 +9,7 @@ import { LOG_ROOT_FILE, LOG_ROOT_ROLE } from "./systemRoots";
 export type Document = {
   author: PublicKey;
   docId: string;
-  rootShortId?: string;
+  topNodeShortIds: string[];
   updatedMs: number;
   title: string;
   frontMatter?: FrontMatter;
@@ -58,7 +58,7 @@ export function createDocumentFromRootNode(rootNode: GraphNode): Document {
   return {
     author: rootNode.author,
     docId,
-    rootShortId: shortID(rootNode.id),
+    topNodeShortIds: [shortID(rootNode.id)],
     updatedMs: rootNode.updated,
     title: nodeText(rootNode) || "Untitled",
     frontMatter: { knowstr_doc_id: docId },
@@ -120,21 +120,23 @@ export function parseToDocument(
     context: options.context,
     updatedMs,
   });
-  const rootLongId = result.topNodeIds[0];
-  const rootShortId = rootLongId ? shortID(rootLongId) : undefined;
+  const topNodeLongIds = result.topNodeIds;
+  const topNodeShortIds = topNodeLongIds.map(shortID);
   const allNodes =
     result.context.knowledgeDBs.get(author)?.nodes ??
     ImmutableMap<string, GraphNode>();
-  const nodes = rootLongId
-    ? allNodes.filter((node) => node.root === rootLongId)
-    : ImmutableMap<string, GraphNode>();
+  const topNodeLongIdSet = new Set(topNodeLongIds);
+  const nodes =
+    topNodeLongIdSet.size > 0
+      ? allNodes.filter((node) => topNodeLongIdSet.has(node.root))
+      : ImmutableMap<string, GraphNode>();
 
   const document: Document = {
     author,
     docId: ensured.docId,
+    topNodeShortIds,
     updatedMs,
     title,
-    ...(rootShortId !== undefined && { rootShortId }),
     ...(ensured.frontMatter && { frontMatter: ensured.frontMatter }),
     ...(options.filePath !== undefined && { filePath: options.filePath }),
     ...(options.relativePath !== undefined && {

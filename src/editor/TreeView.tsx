@@ -3,7 +3,6 @@ import { List, Map, Set as ImmutableSet } from "immutable";
 import { useLocation } from "react-router-dom";
 import { useDragAutoScroll } from "../useDragAutoScroll";
 import { ListItem } from "./Draggable";
-import { getNodesInTree } from "./Node";
 import {
   useViewPath,
   ViewPath,
@@ -35,7 +34,12 @@ import {
   planToggleTemporarySelection,
   usePlanner,
 } from "../planner";
-import type { TreeResult } from "../treeTraversal";
+import {
+  getNodesInDocument,
+  getNodesInTree,
+  type TreeResult,
+} from "../treeTraversal";
+import { documentKeyOf } from "../core/Document";
 
 const PaneTreeResultContext = React.createContext<TreeResult | undefined>(
   undefined
@@ -52,10 +56,17 @@ export function PaneTreeResultProvider({
 }): JSX.Element {
   const data = useData();
   const pane = useCurrentPane();
+  const paneIndex = usePaneIndex();
   const viewPath = useViewPath();
   const rootKey = viewPathToString(viewPath);
   const isRootExpanded = isExpanded(data, rootKey);
+  const document = pane.documentId
+    ? data.documents.get(documentKeyOf(pane.author, pane.documentId))
+    : undefined;
   const treeResult = useMemo(() => {
+    if (document) {
+      return getNodesInDocument(data, paneIndex, document, pane.typeFilters);
+    }
     if (!isRootExpanded) {
       return undefined;
     }
@@ -69,8 +80,10 @@ export function PaneTreeResultProvider({
     );
   }, [
     data,
+    document,
     isRootExpanded,
     pane.author,
+    paneIndex,
     pane.rootNodeId,
     pane.typeFilters,
     viewPath,
@@ -231,8 +244,9 @@ function Tree(): JSX.Element | null {
   const virtualRows = treeResult?.virtualRows || Map<string, GraphNode>();
   const firstVirtualKeys =
     treeResult?.firstVirtualKeys || ImmutableSet<string>();
-  // Include ROOT as the first node, followed by its children
-  const nodes = List<ViewPath>([viewPath]).concat(childNodes);
+  const nodes = pane.documentId
+    ? childNodes
+    : List<ViewPath>([viewPath]).concat(childNodes);
   const nodeKeys = nodes.map((path) => viewPathToString(path)).toArray();
   const displayText = useDisplayText();
   const ariaLabel = displayText ? `related to ${displayText}` : undefined;

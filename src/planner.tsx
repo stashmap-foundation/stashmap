@@ -794,22 +794,25 @@ export function buildDocumentEvents(
     if (!document) {
       return events;
     }
-    const rootNode = document.rootShortId
-      ? plan.knowledgeDBs.get(author)?.nodes.get(document.rootShortId)
+    const topNodes = document.topNodeShortIds
+      .map((topNodeShortId) =>
+        plan.knowledgeDBs.get(author)?.nodes.get(topNodeShortId)
+      )
+      .filter((node): node is GraphNode => node !== undefined);
+    const snapshotAnchorNode = topNodes.find(
+      (topNode) => topNode.basedOn && !topNode.snapshotDTag
+    );
+    const snapshotSourceRoot = snapshotAnchorNode?.basedOn
+      ? getNode(plan.knowledgeDBs, snapshotAnchorNode.basedOn, author)
       : undefined;
-    const snapshotSourceRoot =
-      rootNode?.basedOn && !rootNode.snapshotDTag
-        ? getNode(plan.knowledgeDBs, rootNode.basedOn, author)
-        : undefined;
     const sourceDocument = snapshotSourceRoot?.docId
       ? plan.documents.get(
           documentKeyOf(snapshotSourceRoot.author, snapshotSourceRoot.docId)
         )
       : undefined;
-    const createdSnapshotDTag =
-      sourceDocument && rootNode
-        ? `snapshot-${shortID(rootNode.id as ID)}`
-        : undefined;
+    const createdSnapshotDTag = sourceDocument
+      ? `snapshot-${document.docId}`
+      : undefined;
     const snapshotEvent = sourceDocument
       ? (buildSnapshotEventFromNodes(
           plan.knowledgeDBs,
@@ -819,7 +822,9 @@ export function buildDocumentEvents(
         ) as UnsignedEvent & EventAttachment)
       : undefined;
     const event = buildDocumentEvent(plan.knowledgeDBs, document, {
-      snapshotDTag: rootNode?.snapshotDTag ?? createdSnapshotDTag,
+      snapshotDTag:
+        topNodes.find((topNode) => topNode.snapshotDTag)?.snapshotDTag ??
+        createdSnapshotDTag,
     });
     return snapshotEvent
       ? events

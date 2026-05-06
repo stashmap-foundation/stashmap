@@ -38,6 +38,10 @@ type AppRenderOptions = {
    */
   search?: string;
   /**
+   * Initial browser route before mounting the filesystem app.
+   */
+  initialRoute?: string;
+  /**
    * Start the app with no workspace selected (the "no workspace" empty state).
    * Tests must drive the pick/create flow via the returned `ipc`.
    */
@@ -74,6 +78,7 @@ export async function renderAppTree(
         </FilesystemBackendProvider>
       ),
       DataProvider: FilesystemDataProvider,
+      initialRoute: options.initialRoute,
     }
   );
 

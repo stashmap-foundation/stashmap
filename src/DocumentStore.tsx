@@ -56,29 +56,32 @@ function createEmptySnapshot(): DocumentSnapshot {
   };
 }
 
-function nodesForRoot(
+function nodesForDocument(
   knowledgeDBs: KnowledgeDBs,
-  author: PublicKey,
-  rootShortId: string
+  document: Document
 ): ImmutableMap<string, GraphNode> {
-  const nodes = knowledgeDBs.get(author)?.nodes;
+  const nodes = knowledgeDBs.get(document.author)?.nodes;
   if (!nodes) return ImmutableMap<string, GraphNode>();
-  const rootLongId = joinID(author, rootShortId);
-  return nodes.filter((node) => node.root === rootLongId);
+  const topNodeLongIds = new Set(
+    document.topNodeShortIds.map((topNodeShortId) =>
+      joinID(document.author, topNodeShortId)
+    )
+  );
+  return nodes.filter((node) => topNodeLongIds.has(node.root));
 }
 
-function withoutDocNodes(
+function withoutDocumentNodes(
   knowledgeDBs: KnowledgeDBs,
-  doc: Document | undefined
+  document: Document | undefined
 ): KnowledgeDBs {
-  if (!doc?.rootShortId) return knowledgeDBs;
-  const db = knowledgeDBs.get(doc.author);
+  if (!document) return knowledgeDBs;
+  const db = knowledgeDBs.get(document.author);
   if (!db) return knowledgeDBs;
-  const rootLongId = joinID(doc.author, doc.rootShortId);
-  const filtered = db.nodes.filter((node) => node.root !== rootLongId);
+  const documentNodes = nodesForDocument(knowledgeDBs, document);
+  const filtered = db.nodes.filter((_, nodeId) => !documentNodes.has(nodeId));
   return filtered.size === 0
-    ? knowledgeDBs.remove(doc.author)
-    : knowledgeDBs.set(doc.author, { ...db, nodes: filtered });
+    ? knowledgeDBs.remove(document.author)
+    : knowledgeDBs.set(document.author, { ...db, nodes: filtered });
 }
 
 function withDocNodes(
@@ -126,12 +129,8 @@ function applyDocumentToSnapshot(
     return snapshot;
   }
 
-  const existingNodes = existingDocument?.rootShortId
-    ? nodesForRoot(
-        snapshot.knowledgeDBs,
-        existingDocument.author,
-        existingDocument.rootShortId
-      )
+  const existingNodes = existingDocument
+    ? nodesForDocument(snapshot.knowledgeDBs, existingDocument)
     : ImmutableMap<string, GraphNode>();
   const nextDeletes =
     existingDelete && doc.updatedMs > existingDelete.deletedAt
@@ -149,7 +148,7 @@ function applyDocumentToSnapshot(
     snapshot.documentByFilePath,
     existingDocument
   );
-  const knowledgeDBsAfterRemove = withoutDocNodes(
+  const knowledgeDBsAfterRemove = withoutDocumentNodes(
     snapshot.knowledgeDBs,
     existingDocument
   );
@@ -191,13 +190,10 @@ function applyDeleteToSnapshot(
   if (!willDelete) {
     return { ...snapshot, deletes: snapshot.deletes.set(key, deletion) };
   }
-  const existingNodes = existingDocument.rootShortId
-    ? nodesForRoot(
-        snapshot.knowledgeDBs,
-        existingDocument.author,
-        existingDocument.rootShortId
-      )
-    : ImmutableMap<string, GraphNode>();
+  const existingNodes = nodesForDocument(
+    snapshot.knowledgeDBs,
+    existingDocument
+  );
   return {
     documents: snapshot.documents.remove(key),
     documentByFilePath: withoutDocumentInFilePathIndex(
@@ -205,7 +201,7 @@ function applyDeleteToSnapshot(
       existingDocument
     ),
     deletes: snapshot.deletes.set(key, deletion),
-    knowledgeDBs: withoutDocNodes(snapshot.knowledgeDBs, existingDocument),
+    knowledgeDBs: withoutDocumentNodes(snapshot.knowledgeDBs, existingDocument),
     graphIndex:
       existingNodes.size > 0
         ? removeNodesFromGraphIndex(

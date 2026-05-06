@@ -39,7 +39,7 @@ export function buildSnapshotEventFromNodes(
     created_at: newTimestamp(),
     tags: [
       ["d", snapshotDTag],
-      ["source", sourceDocument.rootShortId ?? sourceDocument.docId],
+      ["source", sourceDocument.docId],
       ["source_author", sourceDocument.author],
       msTag(),
     ],

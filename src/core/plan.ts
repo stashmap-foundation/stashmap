@@ -193,7 +193,13 @@ export function planUpsertRootDocument<T extends GraphPlan>(
   const key = documentKeyOf(rootNode.author, rootNode.docId);
   const existing = plan.documents.get(key);
   const next = existing
-    ? { ...existing, updatedMs: rootNode.updated }
+    ? {
+        ...existing,
+        topNodeShortIds: existing.topNodeShortIds.includes(shortID(rootNode.id))
+          ? existing.topNodeShortIds
+          : [...existing.topNodeShortIds, shortID(rootNode.id)],
+        updatedMs: rootNode.updated,
+      }
     : createDocumentFromRootNode(rootNode);
   return { ...plan, documents: plan.documents.set(key, next) };
 }

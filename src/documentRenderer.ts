@@ -243,17 +243,20 @@ export function renderDocumentMarkdown(
     snapshotDTag?: string;
   }
 ): string {
-  if (!document.rootShortId) {
+  if (document.topNodeShortIds.length === 0) {
     return formatWithFrontMatter("", document.frontMatter);
   }
-  const rootNode = knowledgeDBs
-    .get(document.author)
-    ?.nodes.get(document.rootShortId);
-  if (!rootNode) {
+  const nodes = knowledgeDBs.get(document.author)?.nodes;
+  const topNodes = document.topNodeShortIds
+    .map((topNodeShortId) => nodes?.get(topNodeShortId))
+    .filter((node): node is GraphNode => node !== undefined);
+  if (topNodes.length === 0) {
     return formatWithFrontMatter("", document.frontMatter);
   }
-  return formatWithFrontMatter(
-    renderRootedMarkdown(knowledgeDBs, rootNode, options),
-    document.frontMatter
-  );
+  const markdown = topNodes
+    .map((topNode) =>
+      renderRootedMarkdown(knowledgeDBs, topNode, options).trim()
+    )
+    .join("\n\n");
+  return formatWithFrontMatter(`${markdown}\n`, document.frontMatter);
 }

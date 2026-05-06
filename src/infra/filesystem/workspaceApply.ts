@@ -18,7 +18,7 @@ type InboxDocument = {
   filePath: string;
   relativePath: string;
   nodes: ImmutableMap<string, GraphNode>;
-  rootShortId: string;
+  topNodeShortId: string;
 };
 
 type GraphAddition = {
@@ -37,7 +37,7 @@ type DuplicateConflict = {
 
 type MaybeRelevantPlan = {
   filePath: string;
-  rootShortId: string;
+  topNodeShortId: string;
   nodes: ImmutableMap<string, GraphNode>;
 };
 
@@ -106,14 +106,14 @@ async function scanInboxDocuments(
         relativePath,
         ...(fallbackTitle !== undefined ? { fallbackTitle } : {}),
       });
-      if (!parsed.document.rootShortId) {
-        throw new Error(`Inbox file ${relativePath} has no root`);
+      if (parsed.document.topNodeShortIds.length !== 1) {
+        throw new Error(`Inbox file ${relativePath} must have one top node`);
       }
       return {
         filePath,
         relativePath,
         nodes: parsed.nodes,
-        rootShortId: parsed.document.rootShortId,
+        topNodeShortId: parsed.document.topNodeShortIds[0] as string,
       };
     })
   );
@@ -147,14 +147,16 @@ function buildLocalIndex(
 } {
   const targetPathByShortId = documents.reduce(
     (acc, doc) =>
-      doc.rootShortId
-        ? indexDocumentTree(
+      doc.topNodeShortIds.reduce(
+        (next, topNodeShortId) =>
+          indexDocumentTree(
             workspaceNodes,
             path.join(workspaceDir, doc.filePath),
-            doc.rootShortId,
-            acc
-          )
-        : acc,
+            topNodeShortId,
+            next
+          ),
+        acc
+      ),
     {} as Record<string, string>
   );
   return {
@@ -315,7 +317,7 @@ function classifyInboxDoc(
 ): Classification {
   const walked = walkInboxNode(
     inbox,
-    inbox.rootShortId,
+    inbox.topNodeShortId,
     undefined,
     knownIds,
     targetPathByShortId,
@@ -327,7 +329,7 @@ function classifyInboxDoc(
   );
   const trimmed = trimMaybeRelevant(
     inbox,
-    inbox.rootShortId,
+    inbox.topNodeShortId,
     knownIds,
     walked.inserted,
     { nodes: ImmutableMap<string, GraphNode>() }
@@ -340,7 +342,7 @@ function classifyInboxDoc(
             inbox.filePath,
             usedPaths
           ),
-          rootShortId: trimmed.shortId,
+          topNodeShortId: trimmed.shortId,
           nodes: trimmed.acc.nodes,
         }
       : undefined;
@@ -549,17 +551,14 @@ export async function applyWorkspaceInbox(
       const targetDoc = localDocuments.find(
         (d) => path.join(profile.workspaceDir, d.filePath) === targetPath
       );
-      if (!targetDoc?.rootShortId) return;
-      const { rootShortId } = targetDoc;
-      const targetRoot = workspaceNodes.get(rootShortId);
-      if (!targetRoot) return;
+      if (!targetDoc) return;
       const updatedNodes = group.reduce((nodes, addition) => {
         const parent = nodes.get(addition.parentShortId);
         if (!parent) return nodes;
         const newDescendants = collectAdditionDescendants(
           addition,
           profile.pubkey,
-          targetRoot.root
+          parent.root
         );
         const additionRoot = newDescendants.get(addition.nodeShortId);
         if (!additionRoot) return nodes;
@@ -589,14 +588,14 @@ export async function applyWorkspaceInbox(
   await ensureDirectory(path.join(profile.workspaceDir, MAYBE_RELEVANT_DIR));
   await Promise.all(
     usableMaybeRelevant.map(async (plan) => {
-      const root = plan.nodes.get(plan.rootShortId);
-      if (!root) return;
-      const dbs = ImmutableMap<PublicKey, KnowledgeData>().set(root.author, {
+      const topNode = plan.nodes.get(plan.topNodeShortId);
+      if (!topNode) return;
+      const dbs = ImmutableMap<PublicKey, KnowledgeData>().set(topNode.author, {
         nodes: plan.nodes,
       } as KnowledgeData);
       await fs.writeFile(
         plan.filePath,
-        renderRootedMarkdown(dbs, root),
+        renderRootedMarkdown(dbs, topNode),
         "utf8"
       );
     })

@@ -141,6 +141,7 @@ declare global {
   type Pane = {
     id: string;
     author: PublicKey;
+    documentId?: string;
     rootNodeId?: ID;
     searchQuery?: string;
     searchResultIDs?: ID[];

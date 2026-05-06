@@ -7,7 +7,9 @@ import React, {
 } from "react";
 import { useData } from "./DataContext";
 import {
+  buildDocumentRouteUrl,
   buildNodeRouteUrl,
+  parseDocumentRouteUrl,
   parseNodeRouteUrl,
   parseAuthorFromSearch,
 } from "./navigationUrl";
@@ -41,6 +43,13 @@ type HistoryState = {
 };
 
 function paneToUrl(activePane: Pane): string | undefined {
+  if (activePane.documentId) {
+    return buildDocumentRouteUrl(
+      activePane.author,
+      activePane.documentId,
+      activePane.scrollToId
+    );
+  }
   if (activePane.rootNodeId) {
     return buildNodeRouteUrl(activePane.rootNodeId, activePane.scrollToId);
   }
@@ -54,6 +63,14 @@ function urlToPane(
   fallbackAuthor: PublicKey
 ): Pane {
   const author = parseAuthorFromSearch(search) || fallbackAuthor;
+  const documentRoute = parseDocumentRouteUrl(pathname);
+  if (documentRoute) {
+    return {
+      id: generatePaneId(),
+      author: documentRoute.author,
+      documentId: documentRoute.docId,
+    };
+  }
   const nodeID = parseNodeRouteUrl(pathname);
   if (nodeID) {
     return {

@@ -10,7 +10,7 @@ import {
   Serializable,
   viewDataToJSON,
 } from "./serializer";
-import { parseNodeRouteUrl } from "./navigationUrl";
+import { parseDocumentRouteUrl, parseNodeRouteUrl } from "./navigationUrl";
 import { replaceUnauthenticatedUser } from "./planner";
 
 export const defaultPane = (author: PublicKey, rootItemID?: ID): Pane => ({
@@ -89,6 +89,16 @@ function saveViewsToStorage(publicKey: PublicKey, views: Views): void {
 }
 
 function getUrlPanes(publicKey: PublicKey): Pane[] | undefined {
+  const documentRoute = parseDocumentRouteUrl(window.location.pathname);
+  if (documentRoute) {
+    return [
+      {
+        id: generatePaneId(),
+        author: documentRoute.author,
+        documentId: documentRoute.docId,
+      },
+    ];
+  }
   const nodeID = parseNodeRouteUrl(window.location.pathname);
   if (nodeID) {
     const nodeAuthor = splitID(nodeID)[0] || publicKey;

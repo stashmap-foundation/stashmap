@@ -138,6 +138,7 @@ export function paneToJSON(pane: Pane): Serializable {
   return {
     i: pane.id,
     a: pane.author,
+    d: pane.documentId,
     r: pane.rootNodeId,
     h: pane.searchQuery,
     q: pane.searchResultIDs,
@@ -153,6 +154,7 @@ function jsonToPane(s: Serializable): Pane | undefined {
   return {
     id: asString(obj.i),
     author: asString(obj.a) as PublicKey,
+    documentId: obj.d !== undefined ? asString(obj.d) : undefined,
     rootNodeId: obj.r !== undefined ? (asString(obj.r) as LongID) : undefined,
     searchQuery: obj.h !== undefined ? asString(obj.h) : undefined,
     searchResultIDs:

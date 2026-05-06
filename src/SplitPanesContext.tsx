@@ -1,7 +1,11 @@
 import React, { createContext, useContext } from "react";
 import { planUpdatePanes, usePlanner } from "./planner";
 import { useData } from "./DataContext";
-import { parseNodeRouteUrl, parseAuthorFromSearch } from "./navigationUrl";
+import {
+  parseDocumentRouteUrl,
+  parseNodeRouteUrl,
+  parseAuthorFromSearch,
+} from "./navigationUrl";
 import { splitID } from "./core/connections";
 import { usePaneHistory } from "./PaneHistoryContext";
 
@@ -115,6 +119,16 @@ export function useNavigatePane(): (url: string) => void {
     const search =
       questionMarkIndex >= 0 ? urlWithoutHash.slice(questionMarkIndex) : "";
     const author = parseAuthorFromSearch(search) || user.publicKey;
+    const documentRoute = parseDocumentRouteUrl(pathname);
+    if (documentRoute) {
+      setPane({
+        id: pane.id,
+        author: documentRoute.author,
+        documentId: documentRoute.docId,
+        scrollToId,
+      });
+      return;
+    }
     const nodeID = parseNodeRouteUrl(pathname);
     if (nodeID) {
       setPane({

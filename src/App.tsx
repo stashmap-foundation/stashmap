@@ -44,7 +44,6 @@ export function App(): JSX.Element {
         <Route path="signin" element={<SignInModal />} />
         <Route path="signup" element={<SignUp />} />
       </Route>
-      <Route path="/n/*" element={<Dashboard />} />
       <Route path="/r/:nodeId" element={<Dashboard />} />
     </Routes>
   );

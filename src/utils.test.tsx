@@ -309,11 +309,13 @@ function normalizeTestInitialRoute(
   if (!pathname.startsWith("/n/") || !options?.knowledgeDBs) {
     return route;
   }
-  const encodedLastSegment = pathname.split("/").filter(Boolean).at(-1);
-  if (!encodedLastSegment) {
+  const segments = pathname
+    .split("/")
+    .filter((segment) => segment !== "" && segment !== "n")
+    .map(decodeURIComponent);
+  if (segments.length === 0) {
     return route;
   }
-  const lastSegment = decodeURIComponent(encodedLastSegment);
 
   const queryAuthor = new URLSearchParams(search).get(
     "author"
@@ -326,9 +328,23 @@ function normalizeTestInitialRoute(
     : undefined;
   const nodes =
     options.knowledgeDBs.get(author)?.nodes || eventKnowledgeDB?.nodes;
-  const targetNode = nodes
-    ?.valueSeq()
-    .find((candidate) => nodeText(candidate) === lastSegment);
+  const targetNode = segments.reduce<GraphNode | undefined>(
+    (parentNode, segment, index) => {
+      if (index > 0 && !parentNode) {
+        return undefined;
+      }
+      return nodes?.valueSeq().find((candidate) => {
+        if (nodeText(candidate) !== segment) {
+          return false;
+        }
+        if (index === 0) {
+          return candidate.parent === undefined;
+        }
+        return candidate.parent === parentNode?.id;
+      });
+    },
+    undefined
+  );
   return targetNode ? buildNodeRouteUrl(targetNode.id) : route;
 }
 

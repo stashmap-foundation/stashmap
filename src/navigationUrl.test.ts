@@ -1,77 +1,18 @@
-import { List, Map } from "immutable";
-import { shortID } from "./core/connections";
-import { newDB } from "./core/knowledge";
-import { newNode } from "./ViewContext";
 import {
-  buildNodeUrl,
-  pathToStack,
+  buildNodeRouteUrl,
   parseNodeRouteUrl,
   parseAuthorFromSearch,
 } from "./navigationUrl";
 
-const ALICE_PK = "alice-pub-key" as PublicKey;
-const OTHER_PK = "other-author" as PublicKey;
-
-function knowledgeDBWithTexts(
-  author: PublicKey,
-  texts: string[]
-): KnowledgeDBs {
-  const nodes = texts.reduce((acc, text) => {
-    const node = newNode(text, List<ID>(), author);
-    return acc.set(shortID(node.id), node);
-  }, Map<string, GraphNode>());
-  const db: KnowledgeData = {
-    ...newDB(),
-    nodes,
-  };
-  return Map<PublicKey, KnowledgeData>({ [author]: db });
-}
-
-test("buildNodeUrl and pathToStack round-trip preserves node IDs", () => {
-  const knowledgeDBs = knowledgeDBWithTexts(ALICE_PK, [
-    "Holiday Destinations",
-    "Barcelona",
-  ]);
-  const stack = ["Holiday Destinations", "Barcelona"] as ID[];
-
-  const path = buildNodeUrl(stack, knowledgeDBs, ALICE_PK);
-  expect(path).toBe("/n/Holiday%20Destinations/Barcelona");
-  expect(pathToStack(path as string)).toEqual(stack);
+test("buildNodeRouteUrl creates node route", () => {
+  expect(buildNodeRouteUrl("some-node-id" as LongID)).toBe("/r/some-node-id");
+  expect(buildNodeRouteUrl("encoded/id" as LongID)).toBe("/r/encoded%2Fid");
 });
 
-test("buildNodeUrl returns undefined when node text cannot be resolved", () => {
-  const emptyDBs = Map<PublicKey, KnowledgeData>();
-  const stack = ["Some Node"] as ID[];
-
-  const path = buildNodeUrl(stack, emptyDBs, ALICE_PK);
-  expect(path).toBeUndefined();
-});
-
-test("buildNodeUrl with empty stack returns /", () => {
-  const emptyDBs = Map<PublicKey, KnowledgeData>();
-  expect(buildNodeUrl([], emptyDBs, ALICE_PK)).toBe("/");
-});
-
-test("buildNodeUrl includes author param for other user", () => {
-  const knowledgeDBs = knowledgeDBWithTexts(OTHER_PK, ["My Notes"]);
-  const stack = ["My Notes"] as ID[];
-
-  const path = buildNodeUrl(stack, knowledgeDBs, ALICE_PK, OTHER_PK);
-  expect(path).toBe("/n/My%20Notes?author=other-author");
-});
-
-test("buildNodeUrl omits author param for own content", () => {
-  const knowledgeDBs = knowledgeDBWithTexts(ALICE_PK, ["My Notes"]);
-  const stack = ["My Notes"] as ID[];
-
-  const path = buildNodeUrl(stack, knowledgeDBs, ALICE_PK, ALICE_PK);
-  expect(path).toBe("/n/My%20Notes");
-});
-
-test("pathToStack with non /n/ path returns empty array", () => {
-  expect(pathToStack("/")).toEqual([]);
-  expect(pathToStack("/profile")).toEqual([]);
-  expect(pathToStack("/n/")).toEqual([]);
+test("buildNodeRouteUrl includes scroll target as hash", () => {
+  expect(buildNodeRouteUrl("some-node-id" as LongID, "child/id" as ID)).toBe(
+    "/r/some-node-id#child%2Fid"
+  );
 });
 
 test("parseNodeRouteUrl extracts node ID", () => {

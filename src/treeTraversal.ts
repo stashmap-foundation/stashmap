@@ -79,7 +79,6 @@ function getChildrenForRegularNode(
   data: Data,
   parentPath: ViewPath,
   parentRowID: ID,
-  stack: ID[],
   rootNode: LongID | undefined,
   author: PublicKey,
   typeFilters: Pane["typeFilters"],
@@ -89,7 +88,7 @@ function getChildrenForRegularNode(
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
   const directNodes = isSearchId(parentRowID as ID)
     ? getNode(data.knowledgeDBs, parentRowID as ID, data.user.publicKey)
-    : getNodeForView(data, parentPath, stack);
+    : getNodeForView(data, parentPath);
   const nodes = directNodes;
   const childNodes = nodes
     ? getNodeChildren(data.knowledgeDBs, nodes, data.user.publicKey)
@@ -245,7 +244,6 @@ function getChildrenForRegularNode(
 export function getTreeChildren(
   data: Data,
   parentPath: ViewPath,
-  stack: ID[],
   rootNode: LongID | undefined,
   author: PublicKey,
   typeFilters: Pane["typeFilters"],
@@ -270,7 +268,6 @@ export function getTreeChildren(
     data,
     parentPath,
     parentRowID,
-    stack,
     rootNode,
     author,
     typeFilters,
@@ -281,7 +278,6 @@ export function getTreeChildren(
 export function getNodesInTree(
   data: Data,
   parentPath: ViewPath,
-  stack: ID[],
   ctx: List<ViewPath>,
   rootNode: LongID | undefined,
   author: PublicKey,
@@ -292,7 +288,6 @@ export function getNodesInTree(
   const childResult = getTreeChildren(
     data,
     parentPath,
-    stack,
     rootNode,
     author,
     typeFilters,
@@ -315,7 +310,6 @@ export function getNodesInTree(
         const sub = getNodesInTree(
           data,
           childPath,
-          stack,
           withChild,
           rootNode,
           author,

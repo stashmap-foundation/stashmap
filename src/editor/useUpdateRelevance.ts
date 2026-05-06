@@ -1,5 +1,4 @@
 import { usePlanner } from "../planner";
-import { usePaneStack } from "../SplitPanesContext";
 import { planDisconnectFromParent } from "../treeMutations";
 import { useNodeItemContext } from "./useNodeItemContext";
 
@@ -68,7 +67,6 @@ type UseUpdateRelevanceResult = {
  * Used by RelevanceSelector.
  */
 export function useUpdateRelevance(): UseUpdateRelevanceResult {
-  const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
   const { isVisible, nodeText, currentRow, viewPath, updateMetadata } =
     useNodeItemContext();
@@ -88,7 +86,7 @@ export function useUpdateRelevance(): UseUpdateRelevanceResult {
 
   const removeFromList = (): void => {
     if (!isVisible) return;
-    const plan = planDisconnectFromParent(createPlan(), viewPath, stack);
+    const plan = planDisconnectFromParent(createPlan(), viewPath);
     executePlan(plan);
   };
 

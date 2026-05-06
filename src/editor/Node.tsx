@@ -59,7 +59,6 @@ import { planDisconnectFromParent } from "../treeMutations";
 import { useNodeIsLoading } from "../LoadingStatus";
 import { NodeCard } from "../commons/Ui";
 import {
-  usePaneStack,
   usePaneIndex,
   useCurrentPane,
   useNavigatePane,
@@ -76,7 +75,6 @@ export { getNodesInTree } from "../treeTraversal";
 function useNodeHasChildren(): boolean {
   const data = useData();
   const viewPath = useViewPath();
-  const stack = usePaneStack();
   const pane = useCurrentPane();
   const currentRow = useCurrentEdge();
   const currentNode = useCurrentNode();
@@ -98,7 +96,6 @@ function useNodeHasChildren(): boolean {
   const result = getTreeChildren(
     data,
     viewPath,
-    stack,
     pane.rootNodeId,
     pane.author,
     pane.typeFilters
@@ -162,13 +159,11 @@ const nodeNotFoundCounts = new Map<string, number>();
 function logNodeNotFoundDebug({
   data,
   viewPath,
-  stack,
   rowID,
   displayText,
 }: {
   data: Data;
   viewPath: ViewPath;
-  stack: ID[];
   rowID: ID;
   displayText: string;
 }): void {
@@ -232,7 +227,6 @@ function logNodeNotFoundDebug({
     historyPanes: historyState?.panes,
     viewPath,
     viewKey,
-    stack,
     rowID,
     displayText,
     pane,
@@ -304,13 +298,11 @@ function ReferenceContent({
 function NodeContent(): JSX.Element {
   const data = useData();
   const viewPath = useViewPath();
-  const stack = usePaneStack();
   const currentRow = useCurrentEdge();
   const virtualType = currentRow?.virtualType;
   const reference = getCurrentReferenceForView(
     data,
     viewPath,
-    stack,
     virtualType,
     currentRow
   );
@@ -325,7 +317,6 @@ function NodeContent(): JSX.Element {
 
 function EditableContent(): JSX.Element {
   const viewPath = useViewPath();
-  const stack = usePaneStack();
   const paneIndex = usePaneIndex();
   const data = useData();
   const { textStyle } = useItemStyle();
@@ -345,9 +336,7 @@ function EditableContent(): JSX.Element {
   const emptyNodeMetadata = computeEmptyNodeMetadata(
     data.publishEventsStatus.temporaryEvents
   );
-  const parentNode = parentPath
-    ? getNodeForView(data, parentPath, stack)
-    : undefined;
+  const parentNode = parentPath ? getNodeForView(data, parentPath) : undefined;
   const emptyData = parentNode
     ? emptyNodeMetadata.get(parentNode.id)
     : undefined;
@@ -370,7 +359,7 @@ function EditableContent(): JSX.Element {
 
   const handleSave = (text: string, submitted?: boolean): void => {
     const { plan: basePlan, viewPath: updatedViewPath } =
-      planSaveNodeAndEnsureNodes(createPlan(), text, viewPath, stack);
+      planSaveNodeAndEnsureNodes(createPlan(), text, viewPath);
     const planWithEscFocus = escapeFocusPendingRef.current
       ? planWithRowFocusIntent(basePlan, updatedViewPath)
       : basePlan;
@@ -395,12 +384,10 @@ function EditableContent(): JSX.Element {
       return;
     }
 
-    const [targetPath, newStack, insertIndex] = nextPosition;
     const plan = planSetEmptyNodePosition(
       basePlan,
-      targetPath,
-      newStack,
-      insertIndex
+      nextPosition.parentPath,
+      nextPosition.insertAt
     );
     executePlan(plan);
   };
@@ -420,7 +407,7 @@ function EditableContent(): JSX.Element {
         prevSibling.viewPath
       );
       if (isBlockLinkAny(prevSiblingRow)) return;
-      const currentParentNode = getNodeForView(basePlan, parentPath, stack);
+      const currentParentNode = getNodeForView(basePlan, parentPath);
       const planWithoutEmpty = currentParentNode
         ? planRemoveEmptyNodePosition(basePlan, currentParentNode.id)
         : basePlan;
@@ -436,23 +423,18 @@ function EditableContent(): JSX.Element {
           trimmedText
         );
         executePlan(
-          planAddToParent(planWithNode, newNode, prevSibling.viewPath, stack)[0]
+          planAddToParent(planWithNode, newNode, prevSibling.viewPath)[0]
         );
       } else {
         executePlan(
-          planSetEmptyNodePosition(
-            planWithExpand,
-            prevSibling.viewPath,
-            stack,
-            0
-          )
+          planSetEmptyNodePosition(planWithExpand, prevSibling.viewPath, 0)
         );
       }
       return;
     }
 
     const viewKey = viewPathToString(viewPath);
-    const result = planBatchIndent(basePlan, [viewKey], stack, {
+    const result = planBatchIndent(basePlan, [viewKey], {
       text: trimmedText,
       viewPath,
     });
@@ -470,7 +452,7 @@ function EditableContent(): JSX.Element {
       const parentNodeIndex = getNodeIndexForView(basePlan, parentPath);
       if (parentNodeIndex === undefined) return;
 
-      const currentParentNode = getNodeForView(basePlan, parentPath, stack);
+      const currentParentNode = getNodeForView(basePlan, parentPath);
       const planWithoutEmpty = currentParentNode
         ? planRemoveEmptyNodePosition(basePlan, currentParentNode.id)
         : basePlan;
@@ -480,7 +462,6 @@ function EditableContent(): JSX.Element {
           planSetEmptyNodePosition(
             planWithoutEmpty,
             grandParentPath,
-            stack,
             parentNodeIndex + 1
           )
         );
@@ -496,7 +477,6 @@ function EditableContent(): JSX.Element {
           planWithNode,
           newNode,
           grandParentPath,
-          stack,
           parentNodeIndex + 1
         )[0]
       );
@@ -506,7 +486,7 @@ function EditableContent(): JSX.Element {
     if (!isEditableNode(currentNode)) return;
 
     const viewKey = viewPathToString(viewPath);
-    const result = planBatchOutdent(basePlan, [viewKey], stack, {
+    const result = planBatchOutdent(basePlan, [viewKey], {
       text: trimmedText,
       viewPath,
     });
@@ -545,24 +525,22 @@ function EditableContent(): JSX.Element {
     currentText: string
   ): void => {
     const { plan: basePlan, viewPath: updatedViewPath } =
-      planSaveNodeAndEnsureNodes(createPlan(), currentText, viewPath, stack);
+      planSaveNodeAndEnsureNodes(createPlan(), currentText, viewPath);
     const trees = parsedLinesToTrees(children);
     const parentOfSaved = getParentView(updatedViewPath);
     if (!parentOfSaved) {
-      executePlan(
-        planPasteMarkdownTrees(basePlan, trees, updatedViewPath, stack, 0)
-      );
+      executePlan(planPasteMarkdownTrees(basePlan, trees, updatedViewPath, 0));
       return;
     }
     const savedIndex = getNodeIndexForView(basePlan, updatedViewPath);
     const insertAt = savedIndex !== undefined ? savedIndex + 1 : 0;
     executePlan(
-      planPasteMarkdownTrees(basePlan, trees, parentOfSaved, stack, insertAt)
+      planPasteMarkdownTrees(basePlan, trees, parentOfSaved, insertAt)
     );
   };
 
   const handleDelete = (): void => {
-    const plan = planDisconnectFromParent(createPlan(), viewPath, stack);
+    const plan = planDisconnectFromParent(createPlan(), viewPath);
     executePlan(plan);
   };
 
@@ -575,7 +553,7 @@ function EditableContent(): JSX.Element {
   const handleClose = (): void => {
     if (!isEmptyNode || !parentPath) return;
     const plan = createPlan();
-    const closeParentNode = getNodeForView(plan, parentPath, stack);
+    const closeParentNode = getNodeForView(plan, parentPath);
     if (closeParentNode) {
       executePlan(planRemoveEmptyNodePosition(plan, closeParentNode.id));
     }
@@ -607,7 +585,6 @@ function EditableContent(): JSX.Element {
 function InteractiveNodeContent(): JSX.Element {
   const data = useData();
   const viewPath = useViewPath();
-  const stack = usePaneStack();
   const currentNode = useCurrentNode();
   const [rowID] = useCurrentRowID();
   const isLoading = useNodeIsLoading();
@@ -620,7 +597,6 @@ function InteractiveNodeContent(): JSX.Element {
   const reference = getCurrentReferenceForView(
     data,
     viewPath,
-    stack,
     virtualType,
     currentRow
   );
@@ -641,7 +617,6 @@ function InteractiveNodeContent(): JSX.Element {
     logNodeNotFoundDebug({
       data,
       viewPath,
-      stack,
       rowID,
       displayText,
     });
@@ -664,7 +639,6 @@ function NodeAutoLink({
   const data = useData();
   const { knowledgeDBs, documents, documentByFilePath } = data;
   const viewPath = useViewPath();
-  const stack = usePaneStack();
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();
   const effectiveAuthor = useEffectiveAuthor();
@@ -674,7 +648,6 @@ function NodeAutoLink({
   const node = getCurrentReferenceForView(
     data,
     viewPath,
-    stack,
     virtualType,
     currentRow
   );
@@ -828,7 +801,6 @@ export function Node({
 
   const { user } = useData();
   const data = useData();
-  const stack = usePaneStack();
   const currentRow = useCurrentEdge();
   const isConcreteRef = isRefNode(currentRow);
   const virtualType = currentRow?.virtualType;
@@ -837,7 +809,6 @@ export function Node({
   const node = getCurrentReferenceForView(
     data,
     viewPath,
-    stack,
     virtualType,
     currentRow
   );

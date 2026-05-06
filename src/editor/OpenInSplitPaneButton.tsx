@@ -6,11 +6,7 @@ import {
   buildPaneTarget,
   useCurrentEdge,
 } from "../ViewContext";
-import {
-  useSplitPanes,
-  usePaneIndex,
-  usePaneStack,
-} from "../SplitPanesContext";
+import { useSplitPanes, usePaneIndex } from "../SplitPanesContext";
 import { IS_MOBILE } from "./responsive";
 import { planUpdateViews, usePlanner } from "../planner";
 import { useData } from "../DataContext";
@@ -18,7 +14,6 @@ import { useData } from "../DataContext";
 export function OpenInSplitPaneButton(): JSX.Element | null {
   const { addPaneAt } = useSplitPanes();
   const paneIndex = usePaneIndex();
-  const stack = usePaneStack();
   const viewPath = useViewPath();
   const data = useData();
   const isMobile = useMediaQuery(IS_MOBILE);
@@ -38,14 +33,8 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
     );
     executePlan(planUpdateViews(plan, shiftedViews));
 
-    const target = buildPaneTarget(data, viewPath, stack, currentRow);
-    addPaneAt(
-      insertIndex,
-      target.stack,
-      target.author,
-      target.rootNodeId,
-      target.scrollToId
-    );
+    const target = buildPaneTarget(data, viewPath, currentRow);
+    addPaneAt(insertIndex, target.author, target.rootNodeId, target.scrollToId);
   };
 
   return (
@@ -81,7 +70,7 @@ export function NewPaneButton(): JSX.Element | null {
       insertIndex
     );
     executePlan(planUpdateViews(plan, shiftedViews));
-    addPaneAt(insertIndex, [], user.publicKey);
+    addPaneAt(insertIndex, user.publicKey);
   };
 
   return (

@@ -15,7 +15,6 @@ import {
   planUpdateViewItemMetadata,
   NodeItemMetadata,
 } from "../nodeItemMutations";
-import { usePaneStack } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 import { useEditorText } from "./EditorTextContext";
 import { nodeText as getNodeSpanText } from "../core/nodeSpans";
@@ -47,7 +46,6 @@ export function useNodeItemContext(): NodeItemContext {
   const data = useData();
   const viewPath = useViewPath();
   const nodeIndex = useNodeIndex();
-  const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
   const isInSearchView = useIsInSearchView();
   const currentNode = useCurrentNode();
@@ -55,9 +53,7 @@ export function useNodeItemContext(): NodeItemContext {
 
   const [rowID] = useCurrentRowID();
   const isEmptyNode = isEmptySemanticID(rowID);
-  const nodeID = parentView
-    ? getNodeForView(data, parentView, stack)?.id
-    : undefined;
+  const nodeID = parentView ? getNodeForView(data, parentView)?.id : undefined;
   const editorTextContext = useEditorText();
   const nodeText = currentNode ? getNodeSpanText(currentNode) : "";
 
@@ -75,13 +71,7 @@ export function useNodeItemContext(): NodeItemContext {
       return;
 
     executePlan(
-      planUpdateViewItemMetadata(
-        createPlan(),
-        viewPath,
-        stack,
-        metadata,
-        editorText
-      )
+      planUpdateViewItemMetadata(createPlan(), viewPath, metadata, editorText)
     );
   };
 

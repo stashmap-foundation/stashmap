@@ -17,7 +17,6 @@ import {
   useVirtualRowsMap,
 } from "../ViewContext";
 import { usePlanner } from "../planner";
-import { usePaneStack } from "../SplitPanesContext";
 import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
 import { useTemporaryView } from "./TemporaryViewContext";
@@ -77,7 +76,6 @@ export function RelevanceSelector({
   const viewPath = useViewPath();
   const viewKey = useViewKey();
   const currentNode = useCurrentNode();
-  const stack = usePaneStack();
   const virtualRowsMap = useVirtualRowsMap();
   const { createPlan, executePlan } = usePlanner();
   const parentPath = getParentView(viewPath);
@@ -117,7 +115,6 @@ export function RelevanceSelector({
       planBatchRelevance(
         createPlan(),
         getActionPaths(),
-        stack,
         relevance,
         virtualRowsMap,
         getEditorInfo()
@@ -133,7 +130,6 @@ export function RelevanceSelector({
       planBatchRelevance(
         createPlan(),
         getActionPaths(),
-        stack,
         relevance,
         virtualRowsMap,
         getEditorInfo()

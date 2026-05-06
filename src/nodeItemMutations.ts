@@ -25,19 +25,18 @@ import {
 
 export type { NodeItemMetadata } from "./nodeItemMetadata";
 
-function getViewNodeText(plan: Plan, viewPath: ViewPath, stack: ID[]): string {
-  const node = getNodeForView(plan, viewPath, stack);
+function getViewNodeText(plan: Plan, viewPath: ViewPath): string {
+  const node = getNodeForView(plan, viewPath);
   return node ? nodeText(node) : "";
 }
 
 function planUpdateExistingItemMetadata(
   plan: Plan,
   parentViewPath: ViewPath,
-  stack: ID[],
   nodeIndex: number,
   metadata: NodeItemMetadata
 ): Plan {
-  const nodes = getNodeForView(plan, parentViewPath, stack);
+  const nodes = getNodeForView(plan, parentViewPath);
   const itemId = nodes?.children.get(nodeIndex);
   return nodes && itemId
     ? planUpdateNodeItemMetadataById(plan, nodes.id, itemId, metadata)
@@ -47,7 +46,6 @@ function planUpdateExistingItemMetadata(
 export function planUpdateViewItemMetadata(
   plan: Plan,
   viewPath: ViewPath,
-  stack: ID[],
   metadata: NodeItemMetadata,
   editorText: string,
   virtualRowsMap?: VirtualRowsMap
@@ -65,12 +63,11 @@ export function planUpdateViewItemMetadata(
         plan,
         trimmed,
         viewPath,
-        stack,
         metadata.relevance,
         metadata.argument
       ).plan;
     }
-    const nodes = getNodeForView(plan, parentView, stack);
+    const nodes = getNodeForView(plan, parentView);
     return nodes ? planUpdateEmptyNodeMetadata(plan, nodes.id, metadata) : plan;
   }
 
@@ -85,7 +82,6 @@ export function planUpdateViewItemMetadata(
         plan,
         viewPath,
         parentView,
-        stack,
         undefined,
         metadata.relevance,
         metadata.argument
@@ -100,7 +96,6 @@ export function planUpdateViewItemMetadata(
       plan,
       targetItem,
       parentView,
-      stack,
       undefined,
       metadata.relevance ?? inheritedSourceNode?.relevance,
       metadata.argument ?? inheritedSourceNode?.argument
@@ -109,14 +104,13 @@ export function planUpdateViewItemMetadata(
 
   const trimmed = editorText.trim();
   const basePlan =
-    trimmed && trimmed !== getViewNodeText(plan, viewPath, stack)
-      ? planSaveNodeAndEnsureNodes(plan, editorText, viewPath, stack).plan
+    trimmed && trimmed !== getViewNodeText(plan, viewPath)
+      ? planSaveNodeAndEnsureNodes(plan, editorText, viewPath).plan
       : plan;
 
   return planUpdateExistingItemMetadata(
     basePlan,
     parentView,
-    stack,
     nodeIndex,
     metadata
   );

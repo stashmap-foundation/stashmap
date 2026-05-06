@@ -42,10 +42,9 @@ type DragSource = {
 
 function getDropDestinationEndOfRoot(
   data: Data,
-  root: ViewPath,
-  stack: ID[]
+  root: ViewPath
 ): [ViewPath, number] {
-  const nodes = getNodeForView(data, root, stack);
+  const nodes = getNodeForView(data, root);
   return [root, nodes?.children.size || 0];
 }
 
@@ -81,7 +80,6 @@ function getAncestorAtDepth(
 function resolveDropByDepth(
   data: Data,
   root: ViewPath,
-  stack: ID[],
   prevNode: ViewPath | undefined,
   dropBefore: ViewPath | undefined,
   targetDepth: number
@@ -93,11 +91,11 @@ function resolveDropByDepth(
 
   if (!prevNode) {
     if (!dropBefore) {
-      return getDropDestinationEndOfRoot(data, root, stack);
+      return getDropDestinationEndOfRoot(data, root);
     }
     const parentView = getParentView(dropBefore);
     if (!parentView) {
-      return getDropDestinationEndOfRoot(data, root, stack);
+      return getDropDestinationEndOfRoot(data, root);
     }
     const idx = getNodeIndexForView(data, dropBefore);
     return [parentView, idx || 0];
@@ -109,7 +107,7 @@ function resolveDropByDepth(
       const idx = getNodeIndexForView(data, dropBefore);
       return [prevNode, idx ?? 0];
     }
-    const node = getNodeForView(data, prevNode, stack);
+    const node = getNodeForView(data, prevNode);
     return [prevNode, node?.children.size || 0];
   }
 
@@ -121,7 +119,7 @@ function resolveDropByDepth(
     }
   }
 
-  return getDropDestinationEndOfRoot(data, root, stack);
+  return getDropDestinationEndOfRoot(data, root);
 }
 
 function findNextNonSource(
@@ -147,7 +145,6 @@ function findNextNonSource(
 export function getDropDestinationFromTreeView(
   data: Data,
   root: ViewPath,
-  stack: ID[],
   destinationIndex: number,
   rootNode: LongID | undefined,
   targetDepth?: number,
@@ -157,7 +154,6 @@ export function getDropDestinationFromTreeView(
   const { paths: nodes } = getNodesInTree(
     data,
     root,
-    stack,
     List<ViewPath>(),
     rootNode,
     pane.author,
@@ -174,7 +170,6 @@ export function getDropDestinationFromTreeView(
     return resolveDropByDepth(
       data,
       root,
-      stack,
       prevNode,
       realDropBefore,
       targetDepth
@@ -189,7 +184,7 @@ export function getDropDestinationFromTreeView(
         return afterLast;
       }
     }
-    return getDropDestinationEndOfRoot(data, root, stack);
+    return getDropDestinationEndOfRoot(data, root);
   }
   if (prevNode && prevNode.length > dropBefore.length) {
     const afterPrev = getInsertAfterNode(data, prevNode);
@@ -199,7 +194,7 @@ export function getDropDestinationFromTreeView(
   }
   const parentView = getParentView(dropBefore);
   if (!parentView) {
-    return getDropDestinationEndOfRoot(data, root, stack);
+    return getDropDestinationEndOfRoot(data, root);
   }
   const index = getNodeIndexForView(data, dropBefore);
   return [parentView, index || 0];
@@ -210,7 +205,6 @@ export function dnd(
   selection: OrderedSet<string>,
   sourceDrag: DragSource,
   to: ViewPath,
-  stack: ID[],
   indexTo: number | undefined,
   rootNode: LongID | undefined,
   isSuggestion?: boolean,
@@ -236,7 +230,6 @@ export function dnd(
       : getDropDestinationFromTreeView(
           plan,
           rootView,
-          stack,
           indexTo,
           rootNode,
           targetDepth,
@@ -244,9 +237,9 @@ export function dnd(
         );
 
   const fromNode = sourceParentPath
-    ? getNodeForView(plan, sourceParentPath, stack)
+    ? getNodeForView(plan, sourceParentPath)
     : undefined;
-  const toNode = getNodeForView(plan, toView, stack);
+  const toNode = getNodeForView(plan, toView);
 
   const sourcePaneIndex = getPaneIndex(sourceViewPath);
   const targetPaneIndex = getPaneIndex(rootView);
@@ -272,8 +265,7 @@ export function dnd(
     insertAt: number
   ): Plan => {
     const [sourceItemID] = getRowIDFromView(accPlan, sourcePath);
-    const sourceStack = getPane(accPlan, sourcePath).stack;
-    const sourceNode = getNodeForView(accPlan, sourcePath, sourceStack);
+    const sourceNode = getNodeForView(accPlan, sourcePath);
     return planAddToParent(
       accPlan,
       createRefTarget(
@@ -281,7 +273,6 @@ export function dnd(
         getBlockLinkText(sourceNode)
       ),
       toView,
-      stack,
       insertAt
     )[0];
   };
@@ -296,14 +287,9 @@ export function dnd(
     const sourceIndices = List(
       realSources.map((n) => getNodeIndexForView(plan, parseViewPath(n)))
     ).filter((n) => n !== undefined) as List<number>;
-    const updatedNodesPlan = upsertNodes(
-      plan,
-      toView,
-      stack,
-      (nodes: GraphNode) => {
-        return moveNodes(nodes, sourceIndices.toArray(), dropIndex);
-      }
-    );
+    const updatedNodesPlan = upsertNodes(plan, toView, (nodes: GraphNode) => {
+      return moveNodes(nodes, sourceIndices.toArray(), dropIndex);
+    });
     const updatedViews = updateViewPathsAfterMoveNodes(updatedNodesPlan);
     const reorderedPlan = planUpdateViews(updatedNodesPlan, updatedViews);
     return virtualSources
@@ -341,13 +327,7 @@ export function dnd(
       .reduce((accPlan: Plan, s: string, idx: number) => {
         const sourcePath = parseViewPath(s);
         const insertAt = dropIndex + idx;
-        return planMoveNodeWithView(
-          accPlan,
-          sourcePath,
-          toView,
-          stack,
-          insertAt
-        );
+        return planMoveNodeWithView(accPlan, sourcePath, toView, insertAt);
       }, plan);
     return virtualSources
       .toList()
@@ -407,12 +387,10 @@ export function dnd(
     .reduce((accPlan: Plan, s: string, idx: number) => {
       const sourcePath = parseViewPath(s);
       const [sourceItemID] = getRowIDFromView(accPlan, sourcePath);
-      const sourceStack = getPane(accPlan, sourcePath).stack;
       const sourceEdge = getCurrentEdgeForView(accPlan, sourcePath);
       const sourceEdgeRelevance = sourceEdge?.relevance;
       const sourceEdgeArgument = sourceEdge?.argument;
-      const sourceNode =
-        getNodeForView(accPlan, sourcePath, sourceStack) || sourceEdge;
+      const sourceNode = getNodeForView(accPlan, sourcePath) || sourceEdge;
       const insertAt = dropIndex !== undefined ? dropIndex + idx : undefined;
 
       if (shouldCreateReference(sourceItemID, sourceNode)) {
@@ -426,7 +404,6 @@ export function dnd(
               accPlan,
               createRefTarget(sourceTargetID),
               toView,
-              stack,
               insertAt
             )[0];
           }
@@ -438,7 +415,6 @@ export function dnd(
             accPlan,
             createRefTarget(dragTargetID, sourceDrag.linkText),
             toView,
-            stack,
             insertAt,
             sourceEdgeRelevance,
             sourceEdgeArgument
@@ -449,41 +425,24 @@ export function dnd(
             accPlan,
             toReferenceTarget(sourceNode),
             toView,
-            stack,
             insertAt,
             sourceEdgeRelevance,
             sourceEdgeArgument
           )[0];
         }
-        const planWithNode = upsertNodes(
-          accPlan,
-          sourcePath,
-          sourceStack,
-          (r) => r
-        );
-        const sourceNodeWithUpsert = getNodeForView(
-          planWithNode,
-          sourcePath,
-          sourceStack
-        )!;
+        const planWithNode = upsertNodes(accPlan, sourcePath, (r) => r);
+        const sourceNodeWithUpsert = getNodeForView(planWithNode, sourcePath)!;
         return planAddToParent(
           planWithNode,
           toReferenceTarget(sourceNodeWithUpsert),
           toView,
-          stack,
           insertAt,
           sourceEdgeRelevance,
           sourceEdgeArgument
         )[0];
       }
 
-      return planDeepCopyNodeWithView(
-        accPlan,
-        sourcePath,
-        toView,
-        stack,
-        insertAt
-      );
+      return planDeepCopyNodeWithView(accPlan, sourcePath, toView, insertAt);
     }, expandedPlan);
 }
 

@@ -90,7 +90,7 @@ export function LoadSearchData({
 
   const searchId = firstSearch.id as ID;
   const foundSemanticIDs =
-    pane.stack[0] === searchId && pane.searchResultIDs
+    pane.searchQuery === query && pane.searchResultIDs
       ? List(pane.searchResultIDs)
       : getLocalSearchResultIDs(knowledgeDBs, query);
 

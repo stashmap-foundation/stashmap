@@ -22,7 +22,6 @@ import {
 import { useData } from "../DataContext";
 import {
   useCurrentPane,
-  usePaneStack,
   usePaneIndex,
   useNavigatePane,
   useSplitPanes,
@@ -59,16 +58,13 @@ import {
 } from "../planner";
 import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
 import {
-  getNodeStack,
   getNodeText,
   getSemanticID,
   getNode,
-  resolveNode,
-  isSearchId,
   shortID,
 } from "../core/connections";
 import { getOwnLogRoot } from "../core/systemRoots";
-import { buildNodeUrl, buildNodeRouteUrl } from "../navigationUrl";
+import { buildNodeRouteUrl } from "../navigationUrl";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import {
   focusRow,
@@ -143,7 +139,6 @@ function BreadcrumbItem({
 }
 
 type BreadcrumbTarget = {
-  stack: ID[];
   author: PublicKey;
   rootNodeId?: LongID;
   scrollToId?: string;
@@ -163,72 +158,6 @@ function getBreadcrumbLabel(
 ): string {
   return (
     getNodeText(node) || shortID(getSemanticID(knowledgeDBs, node)) || "..."
-  );
-}
-
-function getStandaloneRootNode(
-  knowledgeDBs: KnowledgeDBs,
-  node: GraphNode
-): GraphNode | undefined {
-  return knowledgeDBs
-    .get(node.author)
-    ?.nodes.valueSeq()
-    .find(
-      (candidate) =>
-        candidate.author === node.author &&
-        candidate.root === node.root &&
-        !candidate.parent &&
-        candidate.root === candidate.id
-    );
-}
-
-function resolveNodeFromSegments(
-  knowledgeDBs: KnowledgeDBs,
-  currentNode: GraphNode,
-  semanticStack: ID[]
-): GraphNode | undefined {
-  if (semanticStack.length === 0) {
-    return currentNode;
-  }
-
-  const [nextSemanticID, ...rest] = semanticStack;
-  const matchingNode = currentNode.children
-    .map((itemID) => getNode(knowledgeDBs, itemID, currentNode.author))
-    .find(
-      (item): item is GraphNode =>
-        !!item &&
-        shortID(getSemanticID(knowledgeDBs, item)) ===
-          shortID(nextSemanticID as ID)
-    );
-  if (!matchingNode) {
-    return undefined;
-  }
-
-  const nextNode = resolveNode(knowledgeDBs, matchingNode) || matchingNode;
-  return nextNode
-    ? resolveNodeFromSegments(knowledgeDBs, nextNode, rest as ID[])
-    : undefined;
-}
-
-function resolveNodeFromRootStack(
-  knowledgeDBs: KnowledgeDBs,
-  rootNode: GraphNode,
-  semanticStack: ID[]
-): GraphNode | undefined {
-  if (semanticStack.length === 0) {
-    return undefined;
-  }
-  const treeRoot = getStandaloneRootNode(knowledgeDBs, rootNode) || rootNode;
-  const rootSemanticID = shortID(getSemanticID(knowledgeDBs, treeRoot));
-  const pathWithoutRoot =
-    shortID(semanticStack[0]) === rootSemanticID
-      ? semanticStack.slice(1)
-      : semanticStack;
-
-  return resolveNodeFromSegments(
-    knowledgeDBs,
-    treeRoot,
-    pathWithoutRoot as ID[]
   );
 }
 
@@ -263,7 +192,6 @@ function createNodeBreadcrumbEntry(
     key: `node:${node.id}`,
     label: getBreadcrumbLabel(knowledgeDBs, node),
     target: {
-      stack: getNodeStack(knowledgeDBs, node),
       author: node.author,
       rootNodeId: node.id,
     },
@@ -343,7 +271,6 @@ function SourceButton(): JSX.Element | null {
 
   const target: Pane = {
     ...pane,
-    stack: getNodeStack(knowledgeDBs, sourceNode),
     author: sourceNode.author,
     rootNodeId: sourceNode.id,
     scrollToId: undefined,
@@ -368,75 +295,17 @@ function SourceButton(): JSX.Element | null {
 
 function Breadcrumbs(): JSX.Element {
   const { knowledgeDBs, user } = useData();
-  const stack = usePaneStack();
   const pane = useCurrentPane();
   const navigatePane = useNavigatePane();
   const { setPane } = useSplitPanes();
   const paneHistory = usePaneHistory();
   const currentNode = useCurrentNode();
-  const visibleStack = stack.filter((id) => !isSearchId(id as ID));
   const rootNode = pane.rootNodeId
     ? getNode(knowledgeDBs, pane.rootNodeId, user.publicKey)
     : currentNode;
-  const anchoredEntries = (() => {
-    if (!rootNode?.anchor) {
-      return undefined;
-    }
-
-    const sourceEntries: BreadcrumbEntry[] = buildAnchoredLineageEntries(
-      knowledgeDBs,
-      rootNode
-    )
-      .slice(0, -1)
-      .map((entry) => ({ ...entry, isSource: true }));
-    const anchorPrefix = rootNode.anchor.snapshotContext;
-    const localStack = visibleStack.slice(anchorPrefix.size);
-    const localEntries: BreadcrumbEntry[] = localStack.map(
-      (semanticID, index) => {
-        const nextTargetStack = [
-          ...anchorPrefix.toArray(),
-          ...localStack.slice(0, index + 1),
-        ] as ID[];
-        const localNode = resolveNodeFromRootStack(
-          knowledgeDBs,
-          rootNode,
-          localStack.slice(0, index + 1) as ID[]
-        );
-        const entry: BreadcrumbEntry = {
-          key: `local:${pane.rootNodeId}:${nextTargetStack.join(":")}`,
-          label: localNode
-            ? getBreadcrumbLabel(knowledgeDBs, localNode)
-            : shortID(semanticID as ID),
-          target: {
-            stack: nextTargetStack,
-            author: pane.author,
-            ...(localNode ? { rootNodeId: localNode.id } : {}),
-          },
-        };
-        return entry;
-      }
-    );
-    return [...sourceEntries, ...localEntries];
-  })();
-  const entries: BreadcrumbEntry[] =
-    anchoredEntries ||
-    visibleStack.map((semanticID, index) => {
-      const targetStack = visibleStack.slice(0, index + 1) as ID[];
-      const targetNode = rootNode
-        ? resolveNodeFromRootStack(knowledgeDBs, rootNode, targetStack)
-        : undefined;
-      return {
-        key: `stack:${semanticID}:${index}`,
-        label: targetNode
-          ? getBreadcrumbLabel(knowledgeDBs, targetNode)
-          : shortID(semanticID as ID),
-        target: {
-          stack: targetStack,
-          author: pane.author,
-          ...(targetNode ? { rootNodeId: targetNode.id } : {}),
-        },
-      };
-    });
+  const entries: BreadcrumbEntry[] = rootNode
+    ? buildAnchoredLineageEntries(knowledgeDBs, rootNode)
+    : [];
 
   return (
     <nav className="breadcrumbs" aria-label="Navigation breadcrumbs">
@@ -446,26 +315,15 @@ function Breadcrumbs(): JSX.Element {
           if (target?.rootNodeId) {
             return buildNodeRouteUrl(target.rootNodeId, target.scrollToId);
           }
-          if (!target) {
-            return undefined;
-          }
-          return (
-            buildNodeUrl(
-              target.stack,
-              knowledgeDBs,
-              user.publicKey,
-              target.author
-            ) || "#"
-          );
+          return undefined;
         })();
         const onClick = target
           ? (e: React.MouseEvent): void => {
               e.preventDefault();
               paneHistory?.push(pane.id, pane);
-              if (anchoredEntries || target.rootNodeId) {
+              if (target.rootNodeId) {
                 setPane({
                   ...pane,
-                  stack: target.stack,
                   author: target.author,
                   ...(target.rootNodeId
                     ? { rootNodeId: target.rootNodeId }
@@ -499,7 +357,6 @@ function ForkButton(): JSX.Element | null {
   const currentPane = useCurrentPane();
   const currentNode = useCurrentNode();
   const viewPath = useViewPath();
-  const stack = usePaneStack();
   const navigatePane = useNavigatePane();
   const { createPlan, executePlan } = usePlanner();
 
@@ -515,7 +372,7 @@ function ForkButton(): JSX.Element | null {
   }
 
   const handleFork = (): void => {
-    const plan = planForkPane(createPlan(), viewPath, stack);
+    const plan = planForkPane(createPlan(), viewPath);
     executePlan(plan);
   };
 
@@ -674,10 +531,9 @@ function PaneHeader(): JSX.Element {
 }
 
 function CurrentNodeName(): JSX.Element {
-  const stack = usePaneStack();
   const displayName = useDisplayText();
 
-  if (!stack[stack.length - 1]) {
+  if (!displayName) {
     return <span>New Note</span>;
   }
 
@@ -954,13 +810,9 @@ function computeFocusIndexAfterDeletion(
   return survivors.length - 1;
 }
 
-function getDisplayTextForViewKey(
-  data: Data,
-  stack: ID[],
-  viewKey: string
-): string {
+function getDisplayTextForViewKey(data: Data, viewKey: string): string {
   const viewPath = parseViewPath(viewKey);
-  return getDisplayTextForView(data, viewPath, stack);
+  return getDisplayTextForView(data, viewPath);
 }
 
 export function getActionTargetKeys(
@@ -987,7 +839,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
   const { setActivePaneIndex } = useNavigationState();
   const { selection, anchor } = useTemporaryView();
   const data = useData();
-  const stack = usePaneStack();
   const toggleFilter = useToggleFilter();
   const viewPath = useViewPath();
   const { createPlan, executePlan } = usePlanner();
@@ -1205,8 +1056,8 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       const keys = getActionTargetKeys(selection, activeRow, orderedViewKeys);
       const plan = createPlan();
       const result = e.shiftKey
-        ? planBatchOutdent(plan, keys, stack)
-        : planBatchIndent(plan, keys, stack);
+        ? planBatchOutdent(plan, keys)
+        : planBatchIndent(plan, keys);
       if (result) {
         executePlan(result);
         refocusPaneAfterRowMutation(root);
@@ -1296,7 +1147,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       const minDepth = Math.min(...depths);
       const lines = selectedKeys.map((viewKey) => {
         const depth = getRowDepthFromViewKey(viewKey) - minDepth;
-        const text = getDisplayTextForViewKey(data, stack, viewKey);
+        const text = getDisplayTextForViewKey(data, viewKey);
         return "\t".repeat(depth) + text;
       });
       navigator.clipboard.writeText(lines.join("\n"));
@@ -1316,9 +1167,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         if (trees.length === 0) {
           return;
         }
-        executePlan(
-          planPasteMarkdownTrees(createPlan(), trees, parentPath, stack, 0)
-        );
+        executePlan(planPasteMarkdownTrees(createPlan(), trees, parentPath, 0));
       });
       return;
     }
@@ -1517,7 +1366,6 @@ function usePaneKeyboardNavigation(paneIndex: number): {
           planSetEmptyNodePosition(
             createPlan(),
             parentPath,
-            stack,
             activeNodeIndex + 1
           )
         );
@@ -1532,7 +1380,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       const paths = keys.map(parseViewPath);
       const result = planClearTemporarySelection(
         paths.reduce(
-          (acc, path) => planDeleteNodeFromView(acc, path, stack),
+          (acc, path) => planDeleteNodeFromView(acc, path),
           createPlan()
         )
       );
@@ -1567,9 +1415,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       const currentRow = getCurrentRow(plan, activeViewPath, virtualRowsMap);
       const relevance =
         currentRow?.relevance === targetRelevance ? undefined : targetRelevance;
-      executePlan(
-        planBatchRelevance(plan, paths, stack, relevance, virtualRowsMap)
-      );
+      executePlan(planBatchRelevance(plan, paths, relevance, virtualRowsMap));
       refocusPaneAfterRowMutation(root);
       return;
     }
@@ -1588,9 +1434,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       const currentRow = getCurrentRow(plan, activeViewPath, virtualRowsMap);
       const argument: Argument =
         currentRow?.argument === targetArgument ? undefined : targetArgument;
-      executePlan(
-        planBatchArgument(plan, paths, stack, argument, virtualRowsMap)
-      );
+      executePlan(planBatchArgument(plan, paths, argument, virtualRowsMap));
       refocusPaneAfterRowMutation(root);
       return;
     }
@@ -1650,9 +1494,9 @@ function PaneViewInner(): JSX.Element {
       <PaneHeader />
       <DroppableContainer
         className={`pane-content${
-          !pane.stack.length ? " empty-pane-drop-zone" : ""
+          !pane.rootNodeId && !pane.searchQuery ? " empty-pane-drop-zone" : ""
         }`}
-        disabled={!!pane.stack.length}
+        disabled={!!pane.rootNodeId || !!pane.searchQuery}
       >
         <TreeView />
       </DroppableContainer>

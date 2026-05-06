@@ -63,14 +63,8 @@ export function planPasteMarkdownTrees(
   plan: Plan,
   trees: MarkdownTreeNode[],
   parentViewPath: ViewPath,
-  stack: ID[],
   insertAtIndex?: number
 ): Plan {
-  return planInsertMarkdownTrees(
-    plan,
-    trees,
-    parentViewPath,
-    stack,
-    insertAtIndex
-  ).plan;
+  return planInsertMarkdownTrees(plan, trees, parentViewPath, insertAtIndex)
+    .plan;
 }

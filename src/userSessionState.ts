@@ -10,17 +10,13 @@ import {
   Serializable,
   viewDataToJSON,
 } from "./serializer";
-import {
-  pathToStack,
-  parseNodeRouteUrl,
-  parseAuthorFromSearch,
-} from "./navigationUrl";
+import { parseNodeRouteUrl } from "./navigationUrl";
 import { replaceUnauthenticatedUser } from "./planner";
 
 export const defaultPane = (author: PublicKey, rootItemID?: ID): Pane => ({
   id: generatePaneId(),
-  stack: rootItemID ? [rootItemID] : [],
   author,
+  ...(rootItemID ? { rootNodeId: rootItemID } : {}),
 });
 
 const DEFAULT_TEMPORARY_VIEW: TemporaryViewState = {
@@ -99,17 +95,10 @@ function getUrlPanes(publicKey: PublicKey): Pane[] | undefined {
     return [
       {
         id: generatePaneId(),
-        stack: [],
         author: nodeAuthor,
         rootNodeId: nodeID,
       },
     ];
-  }
-  const urlStack = pathToStack(window.location.pathname);
-  if (urlStack.length > 0) {
-    const urlAuthor =
-      parseAuthorFromSearch(window.location.search) || publicKey;
-    return [{ id: generatePaneId(), stack: urlStack, author: urlAuthor }];
   }
   return undefined;
 }
@@ -188,6 +177,12 @@ export function useUserSessionState(user: User): UserSessionState {
         current.map((p) => ({
           ...p,
           author: replaceUnauthenticatedUser(p.author, myPublicKey),
+          ...(p.rootNodeId !== undefined && {
+            rootNodeId: replaceUnauthenticatedUser(p.rootNodeId, myPublicKey),
+          }),
+          ...(p.scrollToId !== undefined && {
+            scrollToId: replaceUnauthenticatedUser(p.scrollToId, myPublicKey),
+          }),
         }))
       );
     }

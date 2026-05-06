@@ -204,7 +204,6 @@ export function planInsertMarkdownTrees(
   plan: Plan,
   trees: MarkdownTreeNode[],
   parentViewPath: ViewPath,
-  stack: ID[],
   insertAtIndex?: number,
   relevance?: Relevance,
   argument?: Argument
@@ -214,7 +213,7 @@ export function planInsertMarkdownTrees(
   topNodeIDs: LongID[];
   actualItemIDs: Array<ID>;
 } {
-  const parentNode = getNodeForView(plan, parentViewPath, stack);
+  const parentNode = getNodeForView(plan, parentViewPath);
   return parentNode
     ? planInsertMarkdownTreesByParentId(
         plan,

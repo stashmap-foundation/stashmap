@@ -12,7 +12,6 @@ import {
   useVirtualRowsMap,
 } from "../ViewContext";
 import { usePlanner } from "../planner";
-import { usePaneStack } from "../SplitPanesContext";
 import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
 import { useTemporaryView } from "./TemporaryViewContext";
@@ -60,7 +59,6 @@ export function EvidenceSelector(): JSX.Element | null {
   const versionedDisplayText = useDisplayText();
   const editorTextContext = useEditorText();
   const editorText = editorTextContext?.text ?? "";
-  const stack = usePaneStack();
   const { createPlan, executePlan } = usePlanner();
   const { selection } = useTemporaryView();
   const virtualRowsMap = useVirtualRowsMap();
@@ -87,7 +85,6 @@ export function EvidenceSelector(): JSX.Element | null {
       planBatchArgument(
         createPlan(),
         getActionPaths(),
-        stack,
         nextArgument,
         virtualRowsMap,
         getEditorInfo()

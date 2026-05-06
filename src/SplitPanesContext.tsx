@@ -1,11 +1,7 @@
 import React, { createContext, useContext } from "react";
 import { planUpdatePanes, usePlanner } from "./planner";
 import { useData } from "./DataContext";
-import {
-  pathToStack,
-  parseNodeRouteUrl,
-  parseAuthorFromSearch,
-} from "./navigationUrl";
+import { parseNodeRouteUrl, parseAuthorFromSearch } from "./navigationUrl";
 import { splitID } from "./core/connections";
 import { usePaneHistory } from "./PaneHistoryContext";
 
@@ -40,14 +36,13 @@ export function useCurrentPane(): Pane {
 }
 
 export function usePaneStack(): ID[] {
-  return useCurrentPane().stack;
+  return [];
 }
 
 type PaneOperations = {
   panes: Pane[];
   addPaneAt: (
     index: number,
-    stack: ID[],
     author: PublicKey,
     rootNodeId?: LongID,
     scrollToId?: string
@@ -63,14 +58,12 @@ export function useSplitPanes(): PaneOperations {
 
   const addPaneAt = (
     index: number,
-    stack: ID[],
     author: PublicKey,
     rootNodeId?: LongID,
     scrollToId?: string
   ): void => {
     const newPane: Pane = {
       id: generatePaneId(),
-      stack,
       author,
       rootNodeId,
       scrollToId,
@@ -126,7 +119,6 @@ export function useNavigatePane(): (url: string) => void {
     if (nodeID) {
       setPane({
         id: pane.id,
-        stack: [],
         author:
           parseAuthorFromSearch(search) || splitID(nodeID)[0] || user.publicKey,
         rootNodeId: nodeID,
@@ -135,7 +127,6 @@ export function useNavigatePane(): (url: string) => void {
     } else {
       setPane({
         id: pane.id,
-        stack: pathToStack(pathname),
         author,
       });
     }

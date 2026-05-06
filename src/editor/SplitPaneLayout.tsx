@@ -42,16 +42,15 @@ export function PaneSearchButton(): JSX.Element {
   const handleSubmit = (): void => {
     if (query.trim()) {
       const trimmedQuery = query.trim();
-      const searchId = createSearchId(trimmedQuery);
       const searchResultIDs = getLocalSearchResultIDs(
         knowledgeDBs,
         trimmedQuery
       ).toArray();
       setPane({
         ...pane,
-        stack: [searchId],
         author: user.publicKey,
         rootNodeId: undefined,
+        searchQuery: trimmedQuery,
         searchResultIDs,
       });
       setShowInput(false);
@@ -117,7 +116,6 @@ export function ClosePaneButton(): JSX.Element | null {
     if (panes.length <= 1) {
       const freshPane: Pane = {
         id: generatePaneId(),
-        stack: [],
         author: user.publicKey,
       };
       executePlan(planUpdatePanes(plan, [freshPane]));
@@ -251,12 +249,34 @@ export function PaneSettingsMenu({
   );
 }
 
+export function PaneRootViewProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}): JSX.Element {
+  const pane = useCurrentPane();
+  const paneIndex = usePaneIndex();
+  const searchId = pane.searchQuery
+    ? createSearchId(pane.searchQuery)
+    : undefined;
+  const rootItemID = pane.rootNodeId || searchId || EMPTY_SEMANTIC_ID;
+
+  return (
+    <LoadSearchData itemIDs={searchId ? [searchId] : []}>
+      <RootViewContextProvider
+        root={rootItemID as LongID}
+        paneIndex={paneIndex}
+      >
+        {children}
+      </RootViewContextProvider>
+    </LoadSearchData>
+  );
+}
+
 function PaneContent(): JSX.Element {
   const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
   const { user } = useData();
-  const rootItemID = pane.stack[pane.stack.length - 1] || EMPTY_SEMANTIC_ID;
-
   const isOtherUserContent = pane.author !== user.publicKey;
 
   const paneClassName = isOtherUserContent
@@ -265,14 +285,9 @@ function PaneContent(): JSX.Element {
 
   return (
     <div className={paneClassName} data-pane-index={paneIndex}>
-      <LoadSearchData itemIDs={pane.stack}>
-        <RootViewContextProvider
-          root={rootItemID as LongID}
-          paneIndex={paneIndex}
-        >
-          <PaneView />
-        </RootViewContextProvider>
-      </LoadSearchData>
+      <PaneRootViewProvider>
+        <PaneView />
+      </PaneRootViewProvider>
     </div>
   );
 }

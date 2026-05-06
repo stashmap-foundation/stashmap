@@ -17,15 +17,13 @@ function TestSplitPanes(): JSX.Element {
       <div data-testid="pane-ids">{panes.map((p) => p.id).join(",")}</div>
       <button
         type="button"
-        onClick={() => addPaneAt(panes.length, [], ALICE.publicKey)}
+        onClick={() => addPaneAt(panes.length, ALICE.publicKey)}
       >
         Add Pane
       </button>
       <button
         type="button"
-        onClick={() =>
-          addPaneAt(1, ["node1" as LongID, "node2" as LongID], ALICE.publicKey)
-        }
+        onClick={() => addPaneAt(1, ALICE.publicKey, "node2" as LongID)}
       >
         Add Pane At 1
       </button>
@@ -52,7 +50,7 @@ test("addPaneAt adds a new pane to the end", async () => {
   expect(screen.getByTestId("pane-count").textContent).toBe("3");
 });
 
-test("addPaneAt inserts pane at specific index with initialStack", async () => {
+test("addPaneAt inserts pane at specific index with root node", async () => {
   renderWithTestData(<TestSplitPanes />);
 
   await screen.findByTestId("pane-count");
@@ -125,82 +123,32 @@ test("usePaneIndex returns correct index for different panes", () => {
 function TestPaneNavigation(): JSX.Element {
   const { setPane } = useSplitPanes();
   const pane = useCurrentPane();
-  const rootItemID = pane.stack[pane.stack.length - 1];
+  const rootItemID = pane.rootNodeId || "";
 
-  const popTo = (index: number): void => {
-    if (index >= 0 && index < pane.stack.length) {
-      setPane({ ...pane, stack: pane.stack.slice(0, index + 1) });
-    }
-  };
-
-  const setStack = (newStack: ID[]): void => {
-    setPane({ ...pane, stack: newStack });
+  const setRoot = (rootNodeId?: LongID): void => {
+    setPane({ ...pane, rootNodeId });
   };
 
   return (
     <div>
-      <div data-testid="stack">{pane.stack.join(",")}</div>
+      <div data-testid="root-node-id">{rootItemID}</div>
       <div data-testid="root-item-id">{rootItemID}</div>
-      <button type="button" onClick={() => popTo(pane.stack.length - 2)}>
-        Pop
+      <button type="button" onClick={() => setRoot(undefined)}>
+        Clear Root
       </button>
-      <button type="button" onClick={() => popTo(0)}>
-        Pop To 0
-      </button>
-      <button
-        type="button"
-        onClick={() =>
-          setStack(["new1" as LongID, "new2" as LongID, "new3" as LongID])
-        }
-      >
-        Set Stack
+      <button type="button" onClick={() => setRoot("new3" as LongID)}>
+        Set Root
       </button>
     </div>
   );
 }
 
-test("popTo(length-2) removes last item and updates rootItemID", async () => {
+test("setPane sets root node id", async () => {
   renderWithTestData(<TestPaneNavigation />);
 
-  await screen.findByTestId("stack");
-  await act(async () => fireEvent.click(screen.getByText("Set Stack")));
-  expect(screen.getByTestId("stack").textContent).toBe("new1,new2,new3");
-
-  await act(async () => fireEvent.click(screen.getByText("Pop")));
-  expect(screen.getByTestId("stack").textContent).toBe("new1,new2");
-  expect(screen.getByTestId("root-item-id").textContent).toBe("new2");
-});
-
-test("popTo with invalid index does not change stack", async () => {
-  renderWithTestData(<TestPaneNavigation />);
-
-  await screen.findByTestId("stack");
-  expect(screen.getByTestId("stack").textContent).toBe("");
-
-  await act(async () => fireEvent.click(screen.getByText("Pop")));
-  expect(screen.getByTestId("stack").textContent).toBe("");
-  expect(screen.getByTestId("root-item-id").textContent).toBe("");
-});
-
-test("popTo navigates to specific stack index", async () => {
-  renderWithTestData(<TestPaneNavigation />);
-
-  await screen.findByTestId("stack");
-  await act(async () => fireEvent.click(screen.getByText("Set Stack")));
-  expect(screen.getByTestId("stack").textContent).toBe("new1,new2,new3");
-
-  await act(async () => fireEvent.click(screen.getByText("Pop To 0")));
-  expect(screen.getByTestId("stack").textContent).toBe("new1");
-  expect(screen.getByTestId("root-item-id").textContent).toBe("new1");
-});
-
-test("setPane replaces entire stack with new path", async () => {
-  renderWithTestData(<TestPaneNavigation />);
-
-  await screen.findByTestId("stack");
-  expect(screen.getByTestId("stack").textContent).toBe("");
-
-  await act(async () => fireEvent.click(screen.getByText("Set Stack")));
-  expect(screen.getByTestId("stack").textContent).toBe("new1,new2,new3");
+  await screen.findByTestId("root-node-id");
+  expect(screen.getByTestId("root-node-id").textContent).toBe("");
+  await act(async () => fireEvent.click(screen.getByText("Set Root")));
+  expect(screen.getByTestId("root-node-id").textContent).toBe("new3");
   expect(screen.getByTestId("root-item-id").textContent).toBe("new3");
 });

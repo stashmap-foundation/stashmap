@@ -4,7 +4,6 @@ import { List, Map } from "immutable";
 import {
   computeEmptyNodeMetadata,
   getNode,
-  shortID,
   isSearchId,
   parseSearchId,
   EMPTY_SEMANTIC_ID,
@@ -17,10 +16,8 @@ import {
   isRefNode,
 } from "./core/connections";
 import { buildReferenceItem } from "./buildReferenceRow";
-import { resolveSemanticNodeInCurrentTree } from "./semanticNavigation";
 import { useData } from "./DataContext";
 import { Plan, planUpsertNodes, getPane } from "./planner";
-import { usePaneStack } from "./SplitPanesContext";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
 import { newNode } from "./core/nodeFactory";
 import { isBlockLinkAny, nodeText } from "./core/nodeSpans";
@@ -110,10 +107,6 @@ function convertViewPathToString(viewContext: ViewPath): string {
 // TODO: delete this export
 export const viewPathToString = convertViewPathToString;
 
-function getContextFromStack(stack: ID[]): Context {
-  return List(stack.slice(0, -1));
-}
-
 export function isRoot(viewPath: ViewPath): boolean {
   return viewPath.length === 2;
 }
@@ -129,11 +122,7 @@ export function getParentView(viewContext: ViewPath): ViewPath | undefined {
   return viewContext.slice(0, -1) as unknown as ViewPath;
 }
 
-export function getContext(
-  data: Data,
-  viewPath: ViewPath,
-  stack: ID[]
-): Context {
+export function getContext(data: Data, viewPath: ViewPath): Context {
   const directNode = getViewNodeByID(
     data.knowledgeDBs,
     getLast(viewPath),
@@ -142,20 +131,18 @@ export function getContext(
   if (directNode) {
     return getNodeContext(data.knowledgeDBs, directNode);
   }
-  if (isRoot(viewPath)) {
-    return getContextFromStack(stack);
-  }
+
   const parentPath = getParentView(viewPath);
   if (!parentPath) {
-    throw new Error("Cannot determine context: no parent path found");
+    return List<ID>();
   }
-  const parentContext = getContext(data, parentPath, stack);
-  const parentNode = getNodeForView(data, parentPath, stack);
-  if (parentNode) {
-    return parentContext.push(getSemanticID(data.knowledgeDBs, parentNode));
-  }
-  const [parentRowID] = getRowIDFromView(data, parentPath);
-  return parentContext.push(shortID(parentRowID as ID) as ID);
+
+  const parentNode = getNodeForView(data, parentPath);
+  return parentNode
+    ? getNodeContext(data.knowledgeDBs, parentNode).push(
+        getSemanticID(data.knowledgeDBs, parentNode)
+      )
+    : List<ID>();
 }
 
 function getViewExactMatch(views: Views, path: ViewPath): View | undefined {
@@ -220,13 +207,6 @@ export function getRowIDFromView(data: Data, viewPath: ViewPath): [ID, View] {
   return [getRowIDFromPath(data, viewPath), view];
 }
 
-function getRowIDsForViewPath(data: Data, viewPath: ViewPath): Array<ID> {
-  const paneIndex = getPaneIndex(viewPath);
-  return (viewPath.slice(1) as ViewPathSegment[]).map((_, index, segments) =>
-    getRowIDFromPath(data, [paneIndex, ...segments.slice(0, index + 1)])
-  );
-}
-
 export function getParentNode(
   data: Data,
   viewPath: ViewPath
@@ -234,8 +214,9 @@ export function getParentNode(
   if (isRoot(viewPath)) {
     return undefined;
   }
+  const pane = getPane(data, viewPath);
   const parentID = viewPath[viewPath.length - 2] as ViewPathSegment;
-  return getNode(data.knowledgeDBs, parentID, data.user.publicKey);
+  return getNode(data.knowledgeDBs, parentID, pane.author);
 }
 
 export function getEffectiveAuthor(data: Data, viewPath: ViewPath): PublicKey {
@@ -246,47 +227,22 @@ export function getEffectiveAuthor(data: Data, viewPath: ViewPath): PublicKey {
 
 export function getNodeForView(
   data: Data,
-  viewPath: ViewPath,
-  stack: ID[]
+  viewPath: ViewPath
 ): GraphNode | undefined {
   const currentID = getLast(viewPath);
-  const directNode = getViewNodeByID(
+  const pane = getPane(data, viewPath);
+  return getViewNodeByID(
     data.knowledgeDBs,
     currentID,
-    data.user.publicKey
-  );
-  if (directNode) {
-    return directNode;
-  }
-
-  if (!isRoot(viewPath)) {
-    return undefined;
-  }
-
-  const [rowID] = getRowIDFromView(data, viewPath);
-  const semanticContext = getContext(data, viewPath, stack);
-  const pane = getPane(data, viewPath);
-  const parentRoot = getParentNode(data, viewPath)?.root;
-  const author = getEffectiveAuthor(data, viewPath);
-
-  return resolveSemanticNodeInCurrentTree(
-    data.knowledgeDBs,
-    author,
-    rowID,
-    semanticContext,
-    pane.rootNodeId,
-    isRoot(viewPath),
-    parentRoot
+    pane.author || data.user.publicKey
   );
 }
 
 export function buildPaneTarget(
   data: Data,
   viewPath: ViewPath,
-  paneStack: ID[],
   currentRow?: GraphNode
 ): {
-  stack: ID[];
   author: PublicKey;
   rootNodeId?: LongID;
   scrollToId?: string;
@@ -295,11 +251,10 @@ export function buildPaneTarget(
   const effectiveAuthor = getEffectiveAuthor(data, viewPath);
   const currentEdge = currentRow || getCurrentEdgeForView(data, viewPath);
   const virtualType = currentEdge?.virtualType;
-  const currentNode = getNodeForView(data, viewPath, paneStack);
+  const currentNode = getNodeForView(data, viewPath);
   const currentReference = getCurrentReferenceForView(
     data,
     viewPath,
-    paneStack,
     virtualType,
     currentEdge
   );
@@ -335,21 +290,14 @@ export function buildPaneTarget(
   })();
   if (refInfo) {
     return {
-      stack: refInfo.stack,
       author: refInfo.author,
       rootNodeId: refInfo.rootNodeId,
       scrollToId: refInfo.scrollToId,
     };
   }
 
-  const paneStackWithoutRoot = paneStack.slice(0, -1);
-  const fullStack = [
-    ...paneStackWithoutRoot,
-    ...getRowIDsForViewPath(data, viewPath),
-  ];
-  const node = getNodeForView(data, viewPath, paneStack);
+  const node = getNodeForView(data, viewPath);
   return {
-    stack: fullStack,
     author: effectiveAuthor,
     rootNodeId: node?.id,
   };
@@ -381,12 +329,11 @@ export function useIsInSearchView(): boolean {
 export function getCurrentReferenceForView(
   data: Data,
   viewPath: ViewPath,
-  stack: ID[],
   virtualType?: VirtualType,
   currentRow?: GraphNode
 ): ReferenceRow | undefined {
   const currentEdge = currentRow || getCurrentEdgeForView(data, viewPath);
-  const currentNode = getNodeForView(data, viewPath, stack);
+  const currentNode = getNodeForView(data, viewPath);
   const referenceNode = isBlockLinkAny(currentEdge) ? currentEdge : currentNode;
   if (!isBlockLinkAny(referenceNode)) {
     return undefined;
@@ -395,7 +342,6 @@ export function getCurrentReferenceForView(
     referenceNode.id as LongID,
     data,
     viewPath,
-    stack,
     virtualType,
     currentRow?.versionMeta
   );
@@ -431,13 +377,8 @@ export function addNodeToPathWithNodes(
   return [...pathWithNodes, nextSegment] as ViewPath;
 }
 
-function addNodeToPath(
-  data: Data,
-  path: ViewPath,
-  index: number,
-  stack: ID[]
-): ViewPath {
-  const nodes = getNodeForView(data, path, stack);
+function addNodeToPath(data: Data, path: ViewPath, index: number): ViewPath {
+  const nodes = getNodeForView(data, path);
   if (!nodes) {
     throw new Error("Parent doesn't have nodes, cannot add to path");
   }
@@ -453,8 +394,7 @@ export function useEffectiveAuthor(): PublicKey {
 export function useCurrentNode(): GraphNode | undefined {
   const data = useData();
   const viewPath = useViewPath();
-  const stack = usePaneStack();
-  return getNodeForView(data, viewPath, stack);
+  return getNodeForView(data, viewPath);
 }
 
 export function useIsViewingOtherUserContent(): boolean {
@@ -528,8 +468,7 @@ type SiblingInfo = {
 
 export function getPreviousSibling(
   data: Data,
-  viewPath: ViewPath,
-  stack: ID[]
+  viewPath: ViewPath
 ): SiblingInfo | undefined {
   const nodeIndex = getNodeIndexForView(data, viewPath);
   if (nodeIndex === undefined || nodeIndex === 0) {
@@ -570,7 +509,7 @@ export function getPreviousSibling(
   }
 
   try {
-    const prevSiblingPath = addNodeToPath(data, parentPath, prevIndex, stack);
+    const prevSiblingPath = addNodeToPath(data, parentPath, prevIndex);
     const [prevRowID, prevView] = getRowIDFromView(data, prevSiblingPath);
     return {
       viewPath: prevSiblingPath,
@@ -585,8 +524,7 @@ export function getPreviousSibling(
 export function usePreviousSibling(): SiblingInfo | undefined {
   const data = useData();
   const viewPath = useViewPath();
-  const stack = usePaneStack();
-  return getPreviousSibling(data, viewPath, stack);
+  return getPreviousSibling(data, viewPath);
 }
 
 export function RootViewContextProvider({
@@ -601,22 +539,13 @@ export function RootViewContextProvider({
   indices?: List<number>;
 }): JSX.Element {
   const data = useData();
-  const stack = usePaneStack();
   const pane = data.panes[paneIndex];
-  const rootContext = getContextFromStack(stack);
   const resolvedRootNode = pane?.rootNodeId
-    ? getNode(data.knowledgeDBs, pane.rootNodeId, data.user.publicKey)
-    : resolveSemanticNodeInCurrentTree(
-        data.knowledgeDBs,
-        pane?.author || data.user.publicKey,
-        root,
-        rootContext,
-        undefined,
-        true
-      );
+    ? getNode(data.knowledgeDBs, pane.rootNodeId, pane.author)
+    : undefined;
   const startPath: ViewPath = [paneIndex, resolvedRootNode?.id || root];
   const finalPath = (indices || List<number>()).reduce(
-    (acc, index) => addNodeToPath(data, acc, index, stack),
+    (acc, index) => addNodeToPath(data, acc, index),
     startPath
   );
   return (
@@ -633,14 +562,12 @@ export function useCurrentRowID(): [ID, View] {
 export function getDisplayTextForView(
   data: Data,
   viewPath: ViewPath,
-  stack: ID[],
   virtualType?: VirtualType,
   currentRow?: GraphNode
 ): string {
   const reference = getCurrentReferenceForView(
     data,
     viewPath,
-    stack,
     virtualType,
     currentRow
   );
@@ -652,7 +579,7 @@ export function getDisplayTextForView(
     const query = parseSearchId(rowID as ID) || "";
     return `Search: ${query}`;
   }
-  const ownNode = getNodeForView(data, viewPath, stack);
+  const ownNode = getNodeForView(data, viewPath);
   const userPublicKey = getNodeUserPublicKey(ownNode);
   const contactPetname = userPublicKey
     ? data.contacts.get(userPublicKey)?.userName
@@ -666,10 +593,9 @@ export function getDisplayTextForView(
 export function useDisplayText(): string {
   const data = useData();
   const viewPath = useViewPath();
-  const stack = usePaneStack();
   const currentRow = useCurrentEdge();
   const virtualType = currentRow?.virtualType;
-  return getDisplayTextForView(data, viewPath, stack, virtualType, currentRow);
+  return getDisplayTextForView(data, viewPath, virtualType, currentRow);
 }
 
 export function isExpanded(data: Data, viewKey: string): boolean {
@@ -744,13 +670,12 @@ export function copyViewsWithNodesMapping(
 export function upsertNodes(
   plan: Plan,
   viewPath: ViewPath,
-  stack: ID[],
   modify: (nodes: GraphNode) => GraphNode
 ): Plan {
-  const semanticContext = getContext(plan, viewPath, stack);
+  const semanticContext = getContext(plan, viewPath);
   const parentNode = getParentNode(plan, viewPath);
   const parentRoot = parentNode?.root;
-  const currentNode = getNodeForView(plan, viewPath, stack);
+  const currentNode = getNodeForView(plan, viewPath);
 
   if (currentNode && currentNode.author !== plan.user.publicKey) {
     throw new Error("Cannot edit another user's nodes");

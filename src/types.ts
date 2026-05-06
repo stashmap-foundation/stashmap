@@ -140,7 +140,6 @@ declare global {
 
   type Pane = {
     id: string;
-    stack: ID[];
     author: PublicKey;
     rootNodeId?: ID;
     searchQuery?: string;

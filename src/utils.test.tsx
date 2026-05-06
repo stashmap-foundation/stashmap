@@ -42,12 +42,11 @@ import {
   UNAUTHENTICATED_USER_PK,
 } from "./NostrAuthContext";
 import { AuthProvider } from "./AuthProvider";
-import { EMPTY_SEMANTIC_ID } from "./core/connections";
-import { RootViewContextProvider } from "./ViewContext";
-import { LoadSearchData } from "./LoadSearchData";
+import { nodeText } from "./core/nodeSpans";
 import { StorePreLoginContext } from "./StorePreLoginContext";
 import { TemporaryViewProvider } from "./editor/TemporaryViewContext";
 import { PaneView } from "./editor/Workspace";
+import { PaneRootViewProvider } from "./editor/SplitPaneLayout";
 import { DND } from "./dnd";
 import {
   computeDepthLimits,
@@ -57,12 +56,10 @@ import { findContacts } from "./contacts";
 import { UserRelayContextProvider } from "./UserRelayContext";
 import { StashmapDB } from "./infra/nostr/cache/indexedDB";
 import { createEmptyGraphIndex } from "./graphIndex";
+import { buildNodeRouteUrl } from "./navigationUrl";
+import { processEvents } from "./eventProcessing";
 
-import {
-  PaneIndexProvider,
-  useCurrentPane,
-  usePaneIndex,
-} from "./SplitPanesContext";
+import { PaneIndexProvider } from "./SplitPanesContext";
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 test.skip("skip", () => {});
@@ -237,7 +234,7 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
     userRelays: [{ url: "wss://user.relay", read: true, write: true }],
     contactsRelays: [{ url: "wss://contacts.relay", read: true, write: true }],
   },
-  panes: [{ id: "pane-0", stack: [], author: ALICE.publicKey }],
+  panes: [{ id: "pane-0", author: ALICE.publicKey }],
 };
 
 export function applyDefaults(props?: Partial<TestAppState>): TestAppState {
@@ -304,6 +301,37 @@ type RenderApis = Partial<TestApis> &
     DataProvider?: ProviderComponent;
   };
 
+function normalizeTestInitialRoute(
+  route: string,
+  options?: RenderApis
+): string {
+  const [pathname, search = ""] = route.split("?");
+  if (!pathname.startsWith("/n/") || !options?.knowledgeDBs) {
+    return route;
+  }
+  const encodedLastSegment = pathname.split("/").filter(Boolean).at(-1);
+  if (!encodedLastSegment) {
+    return route;
+  }
+  const lastSegment = decodeURIComponent(encodedLastSegment);
+
+  const queryAuthor = new URLSearchParams(search).get(
+    "author"
+  ) as PublicKey | null;
+  const author: PublicKey =
+    queryAuthor || options.user?.publicKey || ALICE.publicKey;
+  const eventKnowledgeDB = options.relayPool
+    ? processEvents(List(options.relayPool.getEvents())).get(author)
+        ?.knowledgeDB
+    : undefined;
+  const nodes =
+    options.knowledgeDBs.get(author)?.nodes || eventKnowledgeDB?.nodes;
+  const targetNode = nodes
+    ?.valueSeq()
+    .find((candidate) => nodeText(candidate) === lastSegment);
+  return targetNode ? buildNodeRouteUrl(targetNode.id) : route;
+}
+
 export function renderApis(
   children: React.ReactElement,
   options?: RenderApis
@@ -329,7 +357,11 @@ export function renderApis(
   } else if (user && user.privateKey) {
     fileStore.setLocalStorage("privateKey", bytesToHex(user.privateKey));
   }
-  window.history.pushState({}, "", options?.initialRoute || "/");
+  window.history.pushState(
+    {},
+    "",
+    normalizeTestInitialRoute(options?.initialRoute || "/", options)
+  );
   const defaultRelayUrls =
     optionsWithDefaultUser.defaultRelays || TEST_RELAYS.map((r) => r.url);
   const BackendProviderComponent =
@@ -404,9 +436,10 @@ export async function forkReadonlyRoot(
   ...segments: string[]
 ): Promise<void> {
   cleanup();
+  const [rootSegment] = segments;
   renderApp({
     ...viewer,
-    initialRoute: readonlyRoute(author, ...segments),
+    initialRoute: rootSegment ? readonlyRoute(author, rootSegment) : "/",
   });
   await screen.findByText("READONLY");
   const copyAction = await screen.findByLabelText(
@@ -519,19 +552,10 @@ function RootViewOrPaneIsLoadingInner({
 }: {
   children: React.ReactNode;
 }): JSX.Element {
-  const pane = useCurrentPane();
-  const paneIndex = usePaneIndex();
-  const rootItemID = pane.stack[pane.stack.length - 1] || EMPTY_SEMANTIC_ID;
-
   return (
-    <LoadSearchData itemIDs={pane.stack}>
-      <RootViewContextProvider
-        root={rootItemID as LongID}
-        paneIndex={paneIndex}
-      >
-        <StorePreLoginContext>{children}</StorePreLoginContext>
-      </RootViewContextProvider>
-    </LoadSearchData>
+    <PaneRootViewProvider>
+      <StorePreLoginContext>{children}</StorePreLoginContext>
+    </PaneRootViewProvider>
   );
 }
 

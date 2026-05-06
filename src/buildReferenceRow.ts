@@ -276,11 +276,7 @@ function computeNodeDiff(
   };
 }
 
-function computeVersionMeta(
-  data: Data,
-  viewPath: ViewPath,
-  stack: ID[]
-): VersionMeta {
+function computeVersionMeta(data: Data, viewPath: ViewPath): VersionMeta {
   const refId = getLast(viewPath);
   const node = resolveNode(
     data.knowledgeDBs,
@@ -292,9 +288,7 @@ function computeVersionMeta(
   const activeFilters = pane.typeFilters || DEFAULT_TYPE_FILTERS;
 
   const parentPath = getParentView(viewPath);
-  const parentNode = parentPath
-    ? getNodeForView(data, parentPath, stack)
-    : undefined;
+  const parentNode = parentPath ? getNodeForView(data, parentPath) : undefined;
 
   const { addCount, removeCount } = computeNodeDiff(
     data.knowledgeDBs,
@@ -349,12 +343,11 @@ function getReferenceSourceNodes(
 function findIncomingCrefItem(
   ref: ParsedRef,
   data: Data,
-  viewPath: ViewPath,
-  stack: ID[]
+  viewPath: ViewPath
 ): GraphNode | undefined {
   const parentPath = getParentView(viewPath);
   if (!parentPath) return undefined;
-  const parentNode = getNodeForView(data, parentPath, stack);
+  const parentNode = getNodeForView(data, parentPath);
   if (!parentNode) return undefined;
   return getReferenceSourceNodes(ref, data.knowledgeDBs)
     .map((sourceNode) =>
@@ -374,7 +367,6 @@ export function buildReferenceItem(
   refId: LongID,
   data: Data,
   viewPath: ViewPath,
-  stack: ID[],
   virtualType?: VirtualType,
   versionMeta?: VersionMeta
 ): ReferenceRow | undefined {
@@ -388,7 +380,7 @@ export function buildReferenceItem(
   if (!ref) {
     const parentPath = getParentView(viewPath);
     const parentNode = parentPath
-      ? getNodeForView(data, parentPath, stack)
+      ? getNodeForView(data, parentPath)
       : undefined;
     const parentItem = parentNode
       ? getNode(data.knowledgeDBs, refId, data.user.publicKey)
@@ -425,7 +417,7 @@ export function buildReferenceItem(
     }
     const crefItem =
       virtualType === "incoming"
-        ? findIncomingCrefItem(ref, data, viewPath, stack)
+        ? findIncomingCrefItem(ref, data, viewPath)
         : undefined;
     const incomingRelevance = crefItem?.relevance ?? ref.sourceItem?.relevance;
     const incomingArgument = crefItem?.argument ?? ref.sourceItem?.argument;
@@ -484,12 +476,12 @@ export function buildReferenceItem(
     return outgoing;
   }
 
-  const parentNode = getNodeForView(data, parentPath, stack);
+  const parentNode = getNodeForView(data, parentPath);
   if (
     parentNode &&
     nodesMatchForVersion(data.knowledgeDBs, ref.node, parentNode)
   ) {
-    const computedVersionMeta = computeVersionMeta(data, viewPath, stack);
+    const computedVersionMeta = computeVersionMeta(data, viewPath);
     return {
       ...outgoing,
       text: outgoing.text,

@@ -19,7 +19,7 @@ import {
   viewPathToString,
 } from "../ViewContext";
 import { NOTE_TYPE, INDENTATION } from "./Node";
-import { usePaneStack, useCurrentPane } from "../SplitPanesContext";
+import { useCurrentPane } from "../SplitPanesContext";
 import {
   buildRootTreeForEmptyRootDrop,
   MarkdownImportFile,
@@ -89,8 +89,7 @@ function planMaterializeImportedRoot(
     }
     return {
       ...paneState,
-      stack: [rootItemID],
-      rootNodeId: undefined,
+      rootNodeId: rootItemID,
     };
   });
   return planUpdatePanes(plan, updatedPanes);
@@ -216,7 +215,6 @@ export function useDroppable({
 ] {
   const { selection, anchor } = useTemporaryView();
   const { createPlan, executePlan } = usePlanner();
-  const stack = usePaneStack();
   const pane = useCurrentPane();
   const path = useViewPath();
   const invertCopyModeRef = useRef(false);
@@ -415,7 +413,6 @@ export function useDroppable({
               : getDropDestinationFromTreeView(
                   plan,
                   destination,
-                  stack,
                   destinationIndex,
                   pane.rootNodeId
                 );
@@ -443,7 +440,6 @@ export function useDroppable({
               plan,
               importedTrees,
               dropParentPath,
-              stack,
               insertAtIndex
             )
           );
@@ -456,14 +452,12 @@ export function useDroppable({
       const [destinationRootItemID] = getRowIDFromView(plan, destination);
 
       if (isEmptySemanticID(destinationRootItemID)) {
-        const sourcePane = plan.panes[dragItem.path[0] as number];
-        const target = buildPaneTarget(plan, dragItem.path, sourcePane.stack);
+        const target = buildPaneTarget(plan, dragItem.path);
         const targetPaneIndex = destination[0] as number;
         const updatedPanes = plan.panes.map((p, idx) => {
           if (idx !== targetPaneIndex) return p;
           return {
             id: p.id,
-            stack: target.stack,
             author: target.author,
             rootNodeId: target.rootNodeId,
             scrollToId: target.scrollToId,
@@ -478,7 +472,6 @@ export function useDroppable({
         selection,
         dragItem,
         destination,
-        stack,
         calcIndex(index, direction),
         pane.rootNodeId,
         dragItem.isSuggestion,

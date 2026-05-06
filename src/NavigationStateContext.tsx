@@ -6,17 +6,14 @@ import React, {
   useState,
 } from "react";
 import { useData } from "./DataContext";
-import { getNodeRouteTargetInfo } from "./core/connections";
 import {
-  pathToStack,
-  buildNodeUrl,
   buildNodeRouteUrl,
   parseNodeRouteUrl,
   parseAuthorFromSearch,
 } from "./navigationUrl";
-import { resolveSemanticStackToActualIDs } from "./semanticNavigation";
 import { usePlanner } from "./planner";
 import { generatePaneId } from "./SplitPanesContext";
+import { splitID } from "./core/connections";
 
 type NavigationStateContextType = {
   activePaneIndex: number;
@@ -43,32 +40,12 @@ type HistoryState = {
   activePaneIndex: number;
 };
 
-function paneToUrl(
-  activePane: Pane,
-  knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey
-): string | undefined {
+function paneToUrl(activePane: Pane): string | undefined {
   if (activePane.rootNodeId) {
     return buildNodeRouteUrl(activePane.rootNodeId, activePane.scrollToId);
   }
 
-  if (activePane.stack.length > 0) {
-    const resolved = resolveSemanticStackToActualIDs(
-      knowledgeDBs,
-      activePane.author,
-      activePane.stack as ID[]
-    );
-    if (resolved?.node) {
-      return buildNodeRouteUrl(resolved.node.id, activePane.scrollToId);
-    }
-  }
-
-  return buildNodeUrl(
-    activePane.stack,
-    knowledgeDBs,
-    myself,
-    activePane.author
-  );
+  return "/";
 }
 
 function urlToPane(
@@ -81,14 +58,12 @@ function urlToPane(
   if (nodeID) {
     return {
       id: generatePaneId(),
-      stack: [],
-      author: fallbackAuthor,
+      author: splitID(nodeID)[0] || author,
       rootNodeId: nodeID,
     };
   }
   return {
     id: generatePaneId(),
-    stack: pathToStack(pathname),
     author,
   };
 }
@@ -98,7 +73,7 @@ export function NavigationStateProvider({
 }: {
   children: React.ReactNode;
 }): JSX.Element {
-  const { panes, knowledgeDBs, user } = useData();
+  const { panes, user } = useData();
   const { setPanes } = usePlanner();
   const [activePaneIndex, setActivePaneIndexState] = useState(
     () =>
@@ -125,57 +100,11 @@ export function NavigationStateProvider({
   };
 
   useEffect(() => {
-    const needsResolution = panes.some(
-      (p) => (p.rootNodeId && p.stack.length === 0) || p.stack.length > 0
-    );
-    if (!needsResolution) {
-      return;
-    }
-    const resolved = panes.map((p) => {
-      if (p.rootNodeId && p.stack.length === 0) {
-        const nodeInfo = getNodeRouteTargetInfo(
-          p.rootNodeId,
-          knowledgeDBs,
-          p.author
-        );
-        if (!nodeInfo) {
-          return p;
-        }
-        return {
-          ...p,
-          stack: nodeInfo.stack,
-          author: nodeInfo.author,
-          rootNodeId: nodeInfo.rootNodeId,
-        };
-      }
-
-      if (p.stack.length === 0) {
-        return p;
-      }
-      const resolvedStack = resolveSemanticStackToActualIDs(
-        knowledgeDBs,
-        p.author,
-        p.stack as ID[]
-      )?.actualStack;
-      if (!resolvedStack) {
-        return p;
-      }
-      const stackChanged = resolvedStack.some(
-        (id, index) => id !== p.stack[index]
-      );
-      return stackChanged ? { ...p, stack: resolvedStack } : p;
-    });
-    if (resolved.some((p, i) => p !== panes[i])) {
-      setPanes(resolved);
-    }
-  }, [knowledgeDBs, panes, user.publicKey, setPanes]);
-
-  useEffect(() => {
     const activePane = panes[safeActivePaneIndex];
     if (!activePane) {
       return;
     }
-    const fullUrl = paneToUrl(activePane, knowledgeDBs, user.publicKey);
+    const fullUrl = paneToUrl(activePane);
 
     if (fullUrl === undefined) {
       return;
@@ -212,7 +141,7 @@ export function NavigationStateProvider({
     }
     // eslint-disable-next-line functional/immutable-data
     prevUrlRef.current = fullUrl;
-  }, [panes, safeActivePaneIndex, knowledgeDBs, user.publicKey]);
+  }, [panes, safeActivePaneIndex, user.publicKey]);
 
   useEffect(() => {
     const onPopState = (e: PopStateEvent): void => {

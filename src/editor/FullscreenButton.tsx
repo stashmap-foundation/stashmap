@@ -9,7 +9,7 @@ import {
   getCurrentReferenceForView,
   useCurrentEdge,
 } from "../ViewContext";
-import { usePaneStack, useNavigatePane } from "../SplitPanesContext";
+import { useNavigatePane } from "../SplitPanesContext";
 import {
   getRefLinkTargetInfo,
   getRefTargetInfo,
@@ -21,7 +21,6 @@ import { IS_MOBILE } from "./responsive";
 
 export function FullscreenButton(): JSX.Element | null {
   const isMobile = useMediaQuery(IS_MOBILE);
-  const stack = usePaneStack();
   const viewPath = useViewPath();
   const [rowID] = useCurrentRowID();
   const data = useData();
@@ -35,7 +34,6 @@ export function FullscreenButton(): JSX.Element | null {
   const currentReference = getCurrentReferenceForView(
     data,
     viewPath,
-    stack,
     virtualType,
     currentRow
   );

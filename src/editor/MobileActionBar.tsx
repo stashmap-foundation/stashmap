@@ -5,7 +5,7 @@ import { List, Map } from "immutable";
 import { TYPE_COLORS } from "../core/constants";
 import { IS_MOBILE } from "./responsive";
 import { useData } from "../DataContext";
-import { useCurrentPane, usePaneStack } from "../SplitPanesContext";
+import { useCurrentPane } from "../SplitPanesContext";
 import { useTemporaryView } from "./TemporaryViewContext";
 import { usePaneTreeResult } from "./TreeView";
 import { usePlanner } from "../planner";
@@ -28,7 +28,6 @@ import {
   refocusPaneAfterRowMutation,
 } from "./Workspace";
 import { preventEditorBlur } from "./AddNode";
-import { isSearchId } from "../core/connections";
 
 const LEVEL_SYMBOLS: Record<number, string> = {
   0: "x",
@@ -91,7 +90,6 @@ export function MobileActionBar({
   const [activeRow, setActiveRow] = useState<HTMLElement | null>(null);
   const data = useData();
   const pane = useCurrentPane();
-  const stack = usePaneStack();
   const { selection } = useTemporaryView();
   const { createPlan, executePlan } = usePlanner();
   const treeResult = usePaneTreeResult();
@@ -108,8 +106,7 @@ export function MobileActionBar({
     treeResult?.virtualRows || Map<string, GraphNode>();
 
   const isOtherUser = pane.author !== data.user.publicKey;
-  const lastStackId = pane.stack[pane.stack.length - 1];
-  const isInSearch = lastStackId ? isSearchId(lastStackId) : false;
+  const isInSearch = pane.searchQuery !== undefined;
 
   const handleFocusIn = useCallback((e: FocusEvent) => {
     const { target } = e;
@@ -169,9 +166,7 @@ export function MobileActionBar({
       currentRowData?.relevance === targetRelevance
         ? undefined
         : targetRelevance;
-    executePlan(
-      planBatchRelevance(plan, paths, stack, relevance, virtualRowsMap)
-    );
+    executePlan(planBatchRelevance(plan, paths, relevance, virtualRowsMap));
     refocusPaneAfterRowMutation(root);
   };
 
@@ -182,9 +177,7 @@ export function MobileActionBar({
     const keys = getActionTargetKeys(selection, activeRow, orderedViewKeys);
     const paths = keys.map(parseViewPath);
     const argument: Argument = currentArgument === target ? undefined : target;
-    executePlan(
-      planBatchArgument(plan, paths, stack, argument, virtualRowsMap)
-    );
+    executePlan(planBatchArgument(plan, paths, argument, virtualRowsMap));
     refocusPaneAfterRowMutation(root);
   };
 

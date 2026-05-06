@@ -37,7 +37,6 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
     basePlan,
     parseTree(TEST_FILE),
     workspacePath,
-    [nodeText(workspaceNode) as ID],
     0
   );
   await execute({

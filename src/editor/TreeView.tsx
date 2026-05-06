@@ -17,11 +17,7 @@ import {
   getLast,
 } from "../ViewContext";
 import { useData } from "../DataContext";
-import {
-  usePaneStack,
-  useCurrentPane,
-  usePaneIndex,
-} from "../SplitPanesContext";
+import { useCurrentPane, usePaneIndex } from "../SplitPanesContext";
 import { useApis } from "../Apis";
 import {
   ActiveRowState,
@@ -55,7 +51,6 @@ export function PaneTreeResultProvider({
   children: React.ReactNode;
 }): JSX.Element {
   const data = useData();
-  const stack = usePaneStack();
   const pane = useCurrentPane();
   const viewPath = useViewPath();
   const rootKey = viewPathToString(viewPath);
@@ -67,7 +62,6 @@ export function PaneTreeResultProvider({
     return getNodesInTree(
       data,
       viewPath,
-      stack,
       List<ViewPath>(),
       pane.rootNodeId,
       pane.author,
@@ -79,7 +73,6 @@ export function PaneTreeResultProvider({
     pane.author,
     pane.rootNodeId,
     pane.typeFilters,
-    stack,
     viewPath,
   ]);
 

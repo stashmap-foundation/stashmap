@@ -57,15 +57,14 @@ function getEditorTextForPath(
   return editorInfo.text;
 }
 
-function getNodeText(plan: Plan, viewPath: ViewPath, stack: ID[]): string {
-  const node = getNodeForView(plan, viewPath, stack);
+function getNodeText(plan: Plan, viewPath: ViewPath): string {
+  const node = getNodeForView(plan, viewPath);
   return node ? nodeText(node) : "";
 }
 
 function planUpdateOneMetadata(
   acc: Plan,
   viewPath: ViewPath,
-  stack: ID[],
   metadata: NodeItemMetadata,
   editorText: string,
   virtualRowsMap: VirtualRowsMap
@@ -73,7 +72,6 @@ function planUpdateOneMetadata(
   return planUpdateViewItemMetadata(
     acc,
     viewPath,
-    stack,
     metadata,
     editorText,
     virtualRowsMap
@@ -83,7 +81,6 @@ function planUpdateOneMetadata(
 export function planBatchRelevance(
   plan: Plan,
   viewPaths: ViewPath[],
-  stack: ID[],
   relevance: Relevance,
   virtualRowsMap: VirtualRowsMap,
   editorInfo?: EditorInfo
@@ -93,7 +90,6 @@ export function planBatchRelevance(
       planUpdateOneMetadata(
         acc,
         viewPath,
-        stack,
         { relevance },
         getEditorTextForPath(editorInfo, viewPath),
         virtualRowsMap
@@ -106,7 +102,6 @@ export function planBatchRelevance(
 export function planBatchArgument(
   plan: Plan,
   viewPaths: ViewPath[],
-  stack: ID[],
   argument: Argument,
   virtualRowsMap: VirtualRowsMap,
   editorInfo?: EditorInfo
@@ -116,7 +111,6 @@ export function planBatchArgument(
       planUpdateOneMetadata(
         acc,
         viewPath,
-        stack,
         { argument },
         getEditorTextForPath(editorInfo, viewPath),
         virtualRowsMap
@@ -184,7 +178,6 @@ function sortByNodeIndex(plan: Plan, viewPaths: ViewPath[]): ViewPath[] {
 export function planBatchIndent(
   plan: Plan,
   viewKeys: string[],
-  stack: ID[],
   editorInfo?: EditorInfo
 ): Plan | undefined {
   if (!allSameParent(viewKeys)) return undefined;
@@ -192,7 +185,7 @@ export function planBatchIndent(
   const viewPaths = sortByNodeIndex(plan, viewKeys.map(parseViewPath));
   const firstPath = viewPaths[0];
 
-  const prevSibling = getPreviousSibling(plan, firstPath, stack);
+  const prevSibling = getPreviousSibling(plan, firstPath);
   if (!prevSibling) return undefined;
   const prevSiblingRow = getCurrentEdgeForView(plan, prevSibling.viewPath);
   if (isBlockLinkAny(prevSiblingRow)) return undefined;
@@ -206,24 +199,15 @@ export function planBatchIndent(
   const { plan: updated, remappedKeys } = viewPaths.reduce(
     (state, viewPath) => {
       const fromKey = viewPathToString(viewPath);
-      const targetNodeBefore = getNodeForView(
-        state.plan,
-        prevSibling.viewPath,
-        stack
-      );
+      const targetNodeBefore = getNodeForView(state.plan, prevSibling.viewPath);
       const insertAt = targetNodeBefore?.children.size ?? 0;
       const moved = planMoveNodeWithView(
         state.plan,
         viewPath,
         prevSibling.viewPath,
-        stack,
         insertAt
       );
-      const targetNodeAfter = getNodeForView(
-        moved,
-        prevSibling.viewPath,
-        stack
-      );
+      const targetNodeAfter = getNodeForView(moved, prevSibling.viewPath);
       const updatedViewPath =
         targetNodeAfter && insertAt < targetNodeAfter.children.size
           ? addNodeToPathWithNodes(
@@ -245,13 +229,13 @@ export function planBatchIndent(
       if (!editorText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
-      const currentText = getNodeText(state.plan, viewPath, stack);
+      const currentText = getNodeText(state.plan, viewPath);
       if (editorText === currentText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
       return {
         plan: updatedViewPath
-          ? planUpdateNodeText(moved, updatedViewPath, stack, editorText)
+          ? planUpdateNodeText(moved, updatedViewPath, editorText)
           : moved,
         remappedKeys: nextRemappedKeys,
       };
@@ -265,7 +249,6 @@ export function planBatchIndent(
 export function planBatchOutdent(
   plan: Plan,
   viewKeys: string[],
-  stack: ID[],
   editorInfo?: EditorInfo
 ): Plan | undefined {
   if (!allSameParent(viewKeys)) return undefined;
@@ -289,10 +272,9 @@ export function planBatchOutdent(
         state.plan,
         viewPath,
         grandParentPath,
-        stack,
         insertAt
       );
-      const targetNodeAfter = getNodeForView(moved, grandParentPath, stack);
+      const targetNodeAfter = getNodeForView(moved, grandParentPath);
       const updatedViewPath =
         targetNodeAfter && insertAt < targetNodeAfter.children.size
           ? addNodeToPathWithNodes(grandParentPath, targetNodeAfter, insertAt)
@@ -310,13 +292,13 @@ export function planBatchOutdent(
       if (!editorText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
-      const currentText = getNodeText(state.plan, viewPath, stack);
+      const currentText = getNodeText(state.plan, viewPath);
       if (editorText === currentText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
       return {
         plan: updatedViewPath
-          ? planUpdateNodeText(moved, updatedViewPath, stack, editorText)
+          ? planUpdateNodeText(moved, updatedViewPath, editorText)
           : moved,
         remappedKeys: nextRemappedKeys,
       };

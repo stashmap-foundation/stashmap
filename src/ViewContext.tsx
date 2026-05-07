@@ -19,8 +19,15 @@ import { buildReferenceItem } from "./buildReferenceRow";
 import { useData } from "./DataContext";
 import { Plan, planUpsertNodes, getPane } from "./planner";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
+import { documentKeyOf } from "./core/Document";
+import { resolveLinkPath } from "./core/linkPath";
 import { newNode } from "./core/nodeFactory";
-import { isBlockLinkAny, nodeText } from "./core/nodeSpans";
+import {
+  getBlockFileLinkPath,
+  isBlockFileLink,
+  isBlockLinkAny,
+  nodeText,
+} from "./core/nodeSpans";
 import { getNodeUserPublicKey } from "./infra/nostr/userEntry";
 
 export { newNode } from "./core/nodeFactory";
@@ -244,6 +251,7 @@ export function buildPaneTarget(
   currentRow?: GraphNode
 ): {
   author: PublicKey;
+  documentId?: string;
   rootNodeId?: LongID;
   scrollToId?: string;
 } {
@@ -252,6 +260,36 @@ export function buildPaneTarget(
   const currentEdge = currentRow || getCurrentEdgeForView(data, viewPath);
   const virtualType = currentEdge?.virtualType;
   const currentNode = getNodeForView(data, viewPath);
+  const fileLinkNode =
+    virtualType === "incoming"
+      ? undefined
+      : (isBlockFileLink(currentEdge) && currentEdge) ||
+        (isBlockFileLink(currentNode) && currentNode) ||
+        undefined;
+  if (fileLinkNode) {
+    const sourceRoot =
+      fileLinkNode.id === fileLinkNode.root
+        ? fileLinkNode
+        : getNode(data.knowledgeDBs, fileLinkNode.root, fileLinkNode.author);
+    const sourceFilePath = sourceRoot?.docId
+      ? data.documents.get(documentKeyOf(sourceRoot.author, sourceRoot.docId))
+          ?.filePath
+      : undefined;
+    const linkPath = getBlockFileLinkPath(fileLinkNode);
+    if (linkPath) {
+      const resolvedLinkPath = resolveLinkPath(linkPath, sourceFilePath);
+      const targetDocument =
+        data.documentByFilePath.get(resolvedLinkPath) ||
+        data.documents.get(documentKeyOf(fileLinkNode.author, linkPath));
+      if (targetDocument) {
+        return {
+          author: targetDocument.author,
+          documentId: targetDocument.docId,
+        };
+      }
+    }
+  }
+
   const currentReference = getCurrentReferenceForView(
     data,
     viewPath,

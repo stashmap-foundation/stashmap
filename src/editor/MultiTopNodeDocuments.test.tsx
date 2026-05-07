@@ -144,8 +144,43 @@ test("Alt-dragging document graph nodes creates graph refs", async () => {
   );
   await navigateToNodeViaSearch(1, "Target");
 
+  await expectTree(`
+Holiday Destinations
+  Spain
+Packlist
+  Charger
+Target
+  Drop here
+  `);
+
   await altDropFromPane0ToPane1("Holiday Destinations", "Target", 2);
+
+  await expectTree(`
+Holiday Destinations
+  Spain
+  [I] Target
+Packlist
+  Charger
+Target
+  [R] Holiday Destinations
+  Drop here
+  `);
+
   await altDropFromPane0ToPane1("Packlist", "Target", 2);
+
+  await expectTree(`
+Holiday Destinations
+  Spain
+  [I] Target
+Packlist
+  Charger
+  [I] Target
+Target
+  [R] Packlist
+  [R] Holiday Destinations
+  Drop here
+  `);
+
   await altDropFromPane0ToPane1("Spain", "Target", 2);
 
   await expectTree(`
@@ -327,6 +362,80 @@ Links
   await expectTree(`
 Holiday Destinations
   Spain
+Pack List
+  Charger
+[I] Links
+  `);
+
+  await userEvent.click(await screen.findByLabelText("Navigate to Links"));
+
+  await expectTree(`
+Links
+  [R] Holiday Destinations
+  `);
+
+  cleanup();
+});
+
+test("Document file link row actions open the document target", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "files.md", "# Links\n\n[Holidays](./holidays.md)\n");
+  write(
+    workspacePath,
+    "holidays.md",
+    "# Holiday Destinations\n\nSpain\n\n# Pack List\n\n- Charger\n"
+  );
+
+  await renderDocumentRoute(workspacePath, "files.md");
+
+  const holidaysLink = await screen.findByLabelText(
+    "Navigate to Holiday Destinations"
+  );
+  expect(holidaysLink).toBeTruthy();
+  const splitButtons = await screen.findAllByLabelText("open in split pane");
+  await userEvent.click(splitButtons[splitButtons.length - 1]);
+
+  await expectTree(`
+Links
+  [R] Holiday Destinations
+Holiday Destinations
+  Spain
+Pack List
+  Charger
+[I] Links
+  `);
+
+  cleanup();
+  await renderDocumentRoute(workspacePath, "files.md");
+
+  const reloadedLink = await screen.findByLabelText(
+    "Navigate to Holiday Destinations"
+  );
+  expect(reloadedLink).toBeTruthy();
+  await userEvent.click(
+    await screen.findByLabelText("open Holiday Destinations in fullscreen")
+  );
+
+  await expectTree(`
+Holiday Destinations
+  Spain
+Pack List
+  Charger
+[I] Links
+  `);
+
+  await userEvent.keyboard("{Alt>}");
+  fireEvent.dragStart(getPane(0).getByRole("treeitem", { name: "Links" }));
+  const spain = getPane(0).getByRole("treeitem", { name: "Spain" });
+  setDropIndentLevel("Links", "Spain", 3);
+  fireEvent.dragOver(spain, { altKey: true });
+  fireEvent.drop(spain, { altKey: true });
+  await userEvent.keyboard("{/Alt}");
+
+  await expectTree(`
+Holiday Destinations
+  Spain
+  [R] Links
 Pack List
   Charger
 [I] Links

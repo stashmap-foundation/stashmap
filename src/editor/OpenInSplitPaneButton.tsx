@@ -34,7 +34,13 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
     executePlan(planUpdateViews(plan, shiftedViews));
 
     const target = buildPaneTarget(data, viewPath, currentRow);
-    addPaneAt(insertIndex, target.author, target.rootNodeId, target.scrollToId);
+    addPaneAt(
+      insertIndex,
+      target.author,
+      target.rootNodeId,
+      target.scrollToId,
+      target.documentId
+    );
   };
 
   return (

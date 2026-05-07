@@ -1,70 +1,40 @@
 import React from "react";
 import { useMediaQuery } from "react-responsive";
 import {
-  useCurrentRowID,
   useViewPath,
   useDisplayText,
-  useEffectiveAuthor,
-  useCurrentNode,
-  getCurrentReferenceForView,
+  buildPaneTarget,
   useCurrentEdge,
 } from "../ViewContext";
 import { useNavigatePane } from "../SplitPanesContext";
-import {
-  getRefLinkTargetInfo,
-  getRefTargetInfo,
-  isRefNode,
-} from "../core/connections";
 import { useData } from "../DataContext";
-import { buildNodeRouteUrl } from "../navigationUrl";
+import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
 import { IS_MOBILE } from "./responsive";
 
 export function FullscreenButton(): JSX.Element | null {
   const isMobile = useMediaQuery(IS_MOBILE);
   const viewPath = useViewPath();
-  const [rowID] = useCurrentRowID();
   const data = useData();
-  const { knowledgeDBs } = data;
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();
-  const effectiveAuthor = useEffectiveAuthor();
-  const node = useCurrentNode();
   const currentRow = useCurrentEdge();
-  const virtualType = currentRow?.virtualType;
-  const currentReference = getCurrentReferenceForView(
-    data,
-    viewPath,
-    virtualType,
-    currentRow
-  );
   const isFullscreenNode = viewPath.length === 2;
   if (isFullscreenNode || isMobile) {
     return null;
   }
 
-  const refInfo = (() => {
-    if (!currentReference) {
-      if (isRefNode(node)) {
-        return getRefLinkTargetInfo(node.id, knowledgeDBs, effectiveAuthor);
-      }
-      return getRefTargetInfo(rowID, knowledgeDBs, effectiveAuthor);
-    }
-    return virtualType === "version"
-      ? getRefTargetInfo(currentReference.id, knowledgeDBs, effectiveAuthor)
-      : getRefLinkTargetInfo(
-          currentReference.id,
-          knowledgeDBs,
-          effectiveAuthor
-        );
-  })();
-  const fullscreenNode = node;
+  const target = buildPaneTarget(data, viewPath, currentRow);
 
   const href = (() => {
-    if (refInfo?.rootNodeId) {
-      return buildNodeRouteUrl(refInfo.rootNodeId, refInfo.scrollToId);
+    if (target.documentId) {
+      return buildDocumentRouteUrl(
+        target.author,
+        target.documentId,
+        target.scrollToId
+      );
     }
-    if (fullscreenNode) {
-      return buildNodeRouteUrl(fullscreenNode.id);
+    if (target.rootNodeId) {
+      return buildNodeRouteUrl(target.rootNodeId, target.scrollToId);
     }
     return undefined;
   })();

@@ -11,6 +11,7 @@ import {
   useDisplayText,
   useIsViewingOtherUserContent,
   useCurrentEdge,
+  getCurrentReferenceForView,
 } from "../ViewContext";
 import { useData } from "../DataContext";
 import { documentKeyOf } from "../core/Document";
@@ -81,6 +82,13 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     const [rowID] = useCurrentRowID();
     const node = useCurrentNode();
     const currentRow = useCurrentEdge();
+    const virtualType = currentRow?.virtualType;
+    const currentReference = getCurrentReferenceForView(
+      data,
+      path,
+      virtualType,
+      currentRow
+    );
     const displayText = useDisplayText();
     const isEmptyNode = isEmptySemanticID(rowID);
     const disableDrag = isNodeBeeingEdited || isEmptyNode;
@@ -91,6 +99,10 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
         clearDropIndent();
         markDragDescendants(rowViewKey);
         const dragNode = node || currentRow;
+        const dragNodeId =
+          virtualType === "incoming" && currentReference
+            ? currentReference.id
+            : dragNode?.id;
         const fileLinkPath = getBlockFileLinkPath(currentRow);
         const sourceRoot =
           currentRow && currentRow.id === currentRow.root
@@ -107,7 +119,10 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
             )?.filePath
           : undefined;
         const fileLinkDocument =
-          currentRow && isBlockFileLink(currentRow) && fileLinkPath
+          virtualType !== "incoming" &&
+          currentRow &&
+          isBlockFileLink(currentRow) &&
+          fileLinkPath
             ? data.documentByFilePath.get(
                 resolveLinkPath(fileLinkPath, sourceFilePath)
               ) ||
@@ -117,7 +132,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
           path,
           text: displayText,
           isCopyDrag: copyDrag || undefined,
-          nodeId: dragNode?.id,
+          nodeId: dragNodeId,
           targetId: getBlockLinkTarget(dragNode),
           linkText: getBlockLinkText(dragNode),
           documentLinkTarget: (() => {

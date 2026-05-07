@@ -49,7 +49,8 @@ type PaneOperations = {
     index: number,
     author: PublicKey,
     rootNodeId?: LongID,
-    scrollToId?: string
+    scrollToId?: string,
+    documentId?: string
   ) => void;
   removePane: (paneId: string) => void;
   setPane: (pane: Pane) => void;
@@ -64,11 +65,13 @@ export function useSplitPanes(): PaneOperations {
     index: number,
     author: PublicKey,
     rootNodeId?: LongID,
-    scrollToId?: string
+    scrollToId?: string,
+    documentId?: string
   ): void => {
     const newPane: Pane = {
       id: generatePaneId(),
       author,
+      documentId,
       rootNodeId,
       scrollToId,
     };

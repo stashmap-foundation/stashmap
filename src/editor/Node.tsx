@@ -652,9 +652,11 @@ function NodeAutoLink({
   const virtualType = currentRow?.virtualType;
   const currentNode = useCurrentNode();
   const fileLinkNode =
-    (isBlockFileLink(currentRow) && currentRow) ||
-    (isBlockFileLink(currentNode) && currentNode) ||
-    undefined;
+    virtualType === "incoming"
+      ? undefined
+      : (isBlockFileLink(currentRow) && currentRow) ||
+        (isBlockFileLink(currentNode) && currentNode) ||
+        undefined;
   if (fileLinkNode) {
     const sourceRoot =
       fileLinkNode.id === fileLinkNode.root

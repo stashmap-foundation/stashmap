@@ -26,7 +26,7 @@ import {
   viewPathToString,
   getCurrentEdgeForView,
 } from "./ViewContext";
-import { documentKeyOf } from "./core/Document";
+import { getDocumentByIdOrFilePath } from "./core/Document";
 import { getNodesInDocument, getNodesInTree } from "./treeTraversal";
 import {
   Plan,
@@ -166,10 +166,15 @@ export function getDropDestinationFromTreeView(
 ): [ViewPath, number] {
   const pane = getPane(data, root);
   const document = pane.documentId
-    ? data.documents.get(documentKeyOf(pane.author, pane.documentId))
+    ? getDocumentByIdOrFilePath(
+        data.documents,
+        data.documentByFilePath,
+        pane.author,
+        pane.documentId
+      )
     : undefined;
   const { paths: nodes } = document
-    ? getNodesInDocument(data, getPaneIndex(root), document, pane.typeFilters)
+    ? getNodesInDocument(data, root, document, pane.typeFilters)
     : getNodesInTree(
         data,
         root,

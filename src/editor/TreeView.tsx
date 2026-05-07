@@ -39,7 +39,7 @@ import {
   getNodesInTree,
   type TreeResult,
 } from "../treeTraversal";
-import { documentKeyOf } from "../core/Document";
+import { getDocumentByIdOrFilePath } from "../core/Document";
 
 const PaneTreeResultContext = React.createContext<TreeResult | undefined>(
   undefined
@@ -56,16 +56,20 @@ export function PaneTreeResultProvider({
 }): JSX.Element {
   const data = useData();
   const pane = useCurrentPane();
-  const paneIndex = usePaneIndex();
   const viewPath = useViewPath();
   const rootKey = viewPathToString(viewPath);
   const isRootExpanded = isExpanded(data, rootKey);
   const document = pane.documentId
-    ? data.documents.get(documentKeyOf(pane.author, pane.documentId))
+    ? getDocumentByIdOrFilePath(
+        data.documents,
+        data.documentByFilePath,
+        pane.author,
+        pane.documentId
+      )
     : undefined;
   const treeResult = useMemo(() => {
     if (document) {
-      return getNodesInDocument(data, paneIndex, document, pane.typeFilters);
+      return getNodesInDocument(data, viewPath, document, pane.typeFilters);
     }
     if (!isRootExpanded) {
       return undefined;
@@ -83,7 +87,6 @@ export function PaneTreeResultProvider({
     document,
     isRootExpanded,
     pane.author,
-    paneIndex,
     pane.rootNodeId,
     pane.typeFilters,
     viewPath,

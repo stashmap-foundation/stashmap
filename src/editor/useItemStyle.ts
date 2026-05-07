@@ -1,6 +1,7 @@
 import { CSSProperties } from "react";
 import { useIsViewingOtherUserContent, useCurrentEdge } from "../ViewContext";
 import { isRefNode } from "../core/connections";
+import { isBlockFileLink } from "../core/nodeSpans";
 import { TYPE_COLORS } from "../core/constants";
 
 type ItemStyle = {
@@ -86,7 +87,7 @@ export function useItemStyle(): ItemStyle {
   const argument = currentRow?.argument;
   const normalizedRelevance =
     relevance === ("" as string) ? undefined : relevance;
-  const isOutgoingRef = isRefNode(currentRow);
+  const isOutgoingRef = isRefNode(currentRow) || isBlockFileLink(currentRow);
 
   return {
     cardStyle: {},

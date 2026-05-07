@@ -53,6 +53,7 @@ type DroppableContainerProps = {
   children: React.ReactNode;
   className?: string;
   disabled?: boolean;
+  ariaLabel?: string;
 };
 
 function isMarkdownFile(file: File): boolean {
@@ -515,6 +516,7 @@ export function DroppableContainer({
   children,
   className: extraClassName,
   disabled,
+  ariaLabel,
 }: DroppableContainerProps): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const path = useViewPath();
@@ -528,7 +530,7 @@ export function DroppableContainer({
   drop(disabled ? null : ref);
 
   return (
-    <div ref={ref} className={className}>
+    <div ref={ref} className={className} aria-label={ariaLabel}>
       {children}
     </div>
   );

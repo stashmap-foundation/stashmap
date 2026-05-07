@@ -1493,10 +1493,13 @@ function PaneViewInner(): JSX.Element {
       />
       <PaneHeader />
       <DroppableContainer
+        ariaLabel={`Pane ${paneIndex} content`}
         className={`pane-content${
-          !pane.rootNodeId && !pane.searchQuery ? " empty-pane-drop-zone" : ""
+          !pane.rootNodeId && !pane.documentId && !pane.searchQuery
+            ? " empty-pane-drop-zone"
+            : ""
         }`}
-        disabled={!!pane.rootNodeId || !!pane.searchQuery}
+        disabled={!!pane.rootNodeId || !!pane.documentId || !!pane.searchQuery}
       >
         <TreeView />
       </DroppableContainer>

@@ -140,7 +140,7 @@ test("File link surfaces as incoming reference on target's root", async () => {
   await expectTree(`
 B
   B-child
-  [I] A
+[I] A
   `);
 });
 
@@ -263,7 +263,7 @@ test("File link with prefix markers preserves them on the incoming reference", a
     `
 B
   B-child
-  [I] A !+
+[I] A !+
   `,
     { showGutter: true }
   );

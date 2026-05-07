@@ -189,6 +189,43 @@ function buildDeletedReference(
   };
 }
 
+function buildSourceParentReference(
+  ref: ParsedRef,
+  knowledgeDBs: KnowledgeDBs,
+  myself: PublicKey
+): ReferenceRow | undefined {
+  const { sourceItem } = ref;
+  if (!sourceItem?.parent) {
+    return undefined;
+  }
+  const sourceParent = getNode(
+    knowledgeDBs,
+    sourceItem.parent,
+    sourceItem.author
+  );
+  if (!sourceParent) {
+    return undefined;
+  }
+  const contextNodes = getConcreteContextNodes(knowledgeDBs, sourceParent);
+  const { contextLabels, targetLabel, fullContext } = resolveLabels(
+    knowledgeDBs,
+    sourceParent,
+    contextNodes
+  );
+  const contextPath = contextLabels.join(" / ");
+  const text = contextPath ? `${contextPath} / ${targetLabel}` : targetLabel;
+
+  return {
+    id: sourceParent.id,
+    type: "reference",
+    text,
+    targetContext: fullContext,
+    contextLabels,
+    targetLabel,
+    author: sourceParent.author || myself,
+  };
+}
+
 export function buildOutgoingReference(
   refId: LongID,
   knowledgeDBs: KnowledgeDBs,
@@ -407,13 +444,20 @@ export function buildReferenceItem(
   }
 
   if (virtualType === "incoming") {
-    const outgoing = buildOutgoingReference(
-      refId,
-      data.knowledgeDBs,
-      data.user.publicKey,
-      data.documents,
-      data.documentByFilePath
-    );
+    const outgoing =
+      ref.sourceItem && isBlockFileLink(ref.sourceItem)
+        ? buildSourceParentReference(
+            ref,
+            data.knowledgeDBs,
+            data.user.publicKey
+          )
+        : buildOutgoingReference(
+            refId,
+            data.knowledgeDBs,
+            data.user.publicKey,
+            data.documents,
+            data.documentByFilePath
+          );
     if (!outgoing) {
       return undefined;
     }

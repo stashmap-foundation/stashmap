@@ -93,7 +93,7 @@ function addNodeSemanticEntries(
     getAllFileLinks(childNode).forEach(({ path }) => {
       const resolved = resolveLinkPath(path, sourceFilePath);
       const key = fileLinkIndexKey(childNode.author, resolved);
-      addToSetMap(graphIndex.incomingFileLinks, key, node.id);
+      addToSetMap(graphIndex.incomingFileLinks, key, childNode.id);
     });
   });
 }
@@ -122,7 +122,7 @@ function removeNodeSemanticEntries(
     getAllFileLinks(childNode).forEach(({ path }) => {
       const resolved = resolveLinkPath(path, sourceFilePath);
       const key = fileLinkIndexKey(childNode.author, resolved);
-      removeFromSetMap(graphIndex.incomingFileLinks, key, node.id);
+      removeFromSetMap(graphIndex.incomingFileLinks, key, childNode.id);
     });
   });
 }

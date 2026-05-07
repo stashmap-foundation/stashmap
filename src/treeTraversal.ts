@@ -28,11 +28,11 @@ import {
   linkSpan,
   plainSpans,
 } from "./core/nodeSpans";
-import { documentKeyOf } from "./core/Document";
 import type { Document } from "./core/Document";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
 import {
   getAlternativeFooterData,
+  getIncomingCrefsForDocument,
   getIncomingCrefsForNode,
 } from "./semanticProjection";
 
@@ -138,10 +138,6 @@ function getChildrenForRegularNode(
     .add(author)
     .add(effectiveAuthor);
 
-  const currentDoc =
-    nodes?.docId && nodes.author
-      ? data.documents.get(documentKeyOf(nodes.author, nodes.docId))
-      : undefined;
   const incomingCrefs = getIncomingCrefsForNode(
     data.knowledgeDBs,
     data.graphIndex,
@@ -151,7 +147,7 @@ function getChildrenForRegularNode(
     nodes?.id,
     author,
     childNodes,
-    currentDoc?.filePath,
+    undefined,
     nodes?.author
   );
 
@@ -343,44 +339,118 @@ function emptyTreeResult(paths: List<ViewPath> = List<ViewPath>()): TreeResult {
   };
 }
 
+function treeResultWithVirtualRows(
+  paths: List<ViewPath>,
+  virtualRows: VirtualRowsMap
+): TreeResult {
+  return {
+    ...emptyTreeResult(paths),
+    virtualRows,
+  };
+}
+
+function getNodesInForest(
+  data: Data,
+  rootPaths: List<ViewPath>,
+  ctx: List<ViewPath>,
+  author: PublicKey,
+  typeFilters: Pane["typeFilters"],
+  options?: TreeTraversalOptions,
+  virtualRows: VirtualRowsMap = EMPTY_VIRTUAL_ROWS
+): TreeResult {
+  return rootPaths.reduce<TreeResult>((result, rootPath) => {
+    const [, rootView] = getRowIDFromView(data, rootPath);
+    const withRoot = {
+      ...result,
+      paths: result.paths.push(rootPath),
+    };
+    if (!rootView.expanded) {
+      return withRoot;
+    }
+    const sub = getNodesInTree(
+      data,
+      rootPath,
+      withRoot.paths,
+      undefined,
+      author,
+      typeFilters,
+      options,
+      withRoot.virtualRows
+    );
+    return {
+      paths: sub.paths,
+      virtualRows: withRoot.virtualRows.merge(sub.virtualRows),
+      firstVirtualKeys: withRoot.firstVirtualKeys.union(sub.firstVirtualKeys),
+    };
+  }, treeResultWithVirtualRows(ctx, virtualRows));
+}
+
 export function getNodesInDocument(
   data: Data,
-  paneIndex: number,
+  documentRootPath: ViewPath,
   document: Document,
   typeFilters: Pane["typeFilters"]
 ): TreeResult {
-  return document.topNodeShortIds.reduce<TreeResult>(
-    (result, topNodeShortId) => {
-      const topNodePath: ViewPath = [
-        paneIndex,
-        joinID(document.author, topNodeShortId),
-      ];
-      const [, topNodeView] = getRowIDFromView(data, topNodePath);
-      const withTopNode = {
-        ...result,
-        paths: result.paths.push(topNodePath),
-      };
-      if (!topNodeView.expanded) {
-        return withTopNode;
-      }
-      const sub = getNodesInTree(
-        data,
-        topNodePath,
-        withTopNode.paths,
-        undefined,
-        document.author,
-        typeFilters,
-        undefined,
-        withTopNode.virtualRows
-      );
-      return {
-        paths: sub.paths,
-        virtualRows: withTopNode.virtualRows.merge(sub.virtualRows),
-        firstVirtualKeys: withTopNode.firstVirtualKeys.union(
-          sub.firstVirtualKeys
-        ),
-      };
-    },
-    emptyTreeResult()
+  const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
+  const topNodePaths = List(
+    document.topNodeShortIds.map((topNodeShortId) =>
+      addNodesToLastElement(
+        documentRootPath,
+        joinID(document.author, topNodeShortId)
+      )
+    )
   );
+  const treeResult = getNodesInForest(
+    data,
+    topNodePaths,
+    List<ViewPath>(),
+    document.author,
+    activeFilters
+  );
+
+  if (!activeFilters.includes("incoming")) {
+    return treeResult;
+  }
+
+  const visibleAuthors = data.contacts
+    .keySeq()
+    .toSet()
+    .add(data.user.publicKey)
+    .add(document.author);
+  const incomingCrefs = getIncomingCrefsForDocument(
+    data.knowledgeDBs,
+    data.graphIndex,
+    visibleAuthors,
+    document,
+    document.author
+  );
+
+  return incomingCrefs.reduce<TreeResult>((result, rowID) => {
+    const sourceRowNode = getNode(
+      data.knowledgeDBs,
+      rowID,
+      data.user.publicKey
+    );
+    const virtualRow: GraphNode = {
+      children: List<ID>(),
+      id: rowID,
+      spans: [linkSpan(rowID, getBlockLinkText(sourceRowNode) ?? "")],
+      updated: sourceRowNode?.updated ?? Date.now(),
+      author: sourceRowNode?.author ?? document.author,
+      root: sourceRowNode?.root ?? rowID,
+      relevance: sourceRowNode?.relevance,
+      argument: sourceRowNode?.argument,
+      virtualType: "incoming",
+    };
+    const path = addNodesToLastElement(documentRootPath, virtualRow.id);
+    const pathKey = viewPathToString(path);
+    return {
+      paths: result.paths.push(path),
+      virtualRows: result.virtualRows.set(pathKey, virtualRow),
+      firstVirtualKeys:
+        result.firstVirtualKeys.size === 0
+          ? result.firstVirtualKeys.add(pathKey)
+          : result.firstVirtualKeys,
+    };
+  }, treeResult);
 }

@@ -11,7 +11,7 @@ import { deduplicateRefsByContext, findRefsToNode } from "./semanticProjection";
 import { useCurrentPane } from "./SplitPanesContext";
 import { newDB } from "./core/knowledge";
 import { getLocalSearchResultIDs } from "./localSearch";
-import { documentKeyOf } from "./core/Document";
+import { documentKeyOf, documentLinkPath } from "./core/Document";
 import { newFileLinkNode, newNode, newRefNode } from "./core/nodeFactory";
 
 function SearchCrefBuilder({
@@ -59,7 +59,7 @@ function SearchCrefBuilder({
         ? newFileLinkNode(
             user.publicKey,
             searchId as LongID,
-            targetDocument.filePath ?? targetDocument.docId,
+            documentLinkPath(targetDocument),
             searchId as LongID,
             undefined,
             undefined,

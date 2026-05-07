@@ -20,6 +20,7 @@ import { fileLinkIndexKey } from "./core/linkPath";
 import { suggestionSettings } from "./core/constants";
 import { LOG_ROOT_ROLE } from "./core/systemRoots";
 import { computeVersionDiff } from "./core/snapshotBaseline";
+import type { Document } from "./core/Document";
 
 type FooterTypeFilters = (
   | Relevance
@@ -300,6 +301,41 @@ function incomingFileLinkSourceIDs(
   const key = fileLinkIndexKey(rootAuthor, rootFilePath);
   const ids = graphIndex.incomingFileLinks.get(key);
   return ids ? [...ids] : [];
+}
+
+export function getIncomingCrefsForDocument(
+  knowledgeDBs: KnowledgeDBs,
+  graphIndex: GraphIndex,
+  visibleAuthors: ImmutableSet<PublicKey>,
+  document: Pick<Document, "author" | "filePath">,
+  effectiveAuthor: PublicKey
+): List<LongID> {
+  const sourceIDs = incomingFileLinkSourceIDs(
+    graphIndex,
+    document.filePath,
+    document.author
+  );
+  const refs = List(
+    sourceIDs
+      .map((nodeID) => graphIndex.nodeByID.get(nodeID))
+      .filter((node): node is GraphNode => node !== undefined)
+      .filter((node) => visibleAuthors.has(node.author))
+      .filter(
+        (node) =>
+          node.systemRole !== LOG_ROOT_ROLE &&
+          !isInSystemRoot(knowledgeDBs, node, LOG_ROOT_ROLE)
+      )
+      .map((node) => ({
+        nodeID: node.id,
+        context: getNodeContext(knowledgeDBs, node),
+        updated: node.updated,
+      }))
+  );
+
+  return deduplicateRefsByContext(refs, knowledgeDBs, effectiveAuthor)
+    .sortBy((ref) => `${-ref.updated}:${ref.context.join(":")}`)
+    .map((ref) => ref.nodeID)
+    .toList();
 }
 
 export function getIncomingCrefsForNode(

@@ -53,6 +53,24 @@ export function documentKeyOf(author: PublicKey, docId: string): string {
   return `${author}:${docId}`;
 }
 
+export function getDocumentByIdOrFilePath(
+  documents: ImmutableMap<string, Document>,
+  documentByFilePath: ImmutableMap<string, Document>,
+  author: PublicKey,
+  idOrFilePath: string
+): Document | undefined {
+  const documentById = documents.get(documentKeyOf(author, idOrFilePath));
+  if (documentById) {
+    return documentById;
+  }
+  const documentByPath = documentByFilePath.get(idOrFilePath);
+  return documentByPath?.author === author ? documentByPath : undefined;
+}
+
+export function documentLinkPath(document: Document): string {
+  return document.filePath ?? document.docId;
+}
+
 export function createDocumentFromRootNode(rootNode: GraphNode): Document {
   const docId = rootNode.docId ?? shortID(rootNode.id);
   return {

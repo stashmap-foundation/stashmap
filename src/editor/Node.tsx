@@ -675,6 +675,7 @@ function NodeAutoLink({
         <a
           href={href}
           className="reference-link-btn"
+          style={{ fontStyle: "italic" }}
           onClick={(e) => {
             e.preventDefault();
             navigatePane(href);

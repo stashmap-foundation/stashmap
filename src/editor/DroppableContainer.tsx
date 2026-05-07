@@ -35,6 +35,12 @@ type DragItemType = {
   nodeId?: LongID;
   targetId?: LongID;
   linkText?: string;
+  documentLinkTarget?: {
+    author: PublicKey;
+    docId: string;
+    filePath?: string;
+    linkText?: string;
+  };
 };
 
 type NativeFileDropItem = {
@@ -379,6 +385,9 @@ export function useDroppable({
       updateTargetDepth(monitor);
     },
     drop(item: DropItemType, monitor: DropTargetMonitor<DropItemType>) {
+      if (monitor.didDrop()) {
+        return item;
+      }
       const { targetDepth } = globalDragIndent;
       clearDropIndent();
       const rawDirection = calcDragDirection(ref, monitor, path);
@@ -449,13 +458,23 @@ export function useDroppable({
 
       const dragItem = item as DragItemType;
       const plan = createPlan();
-      const [destinationRootItemID] = getRowIDFromView(plan, destination);
+      const [targetRowItemID] = getRowIDFromView(plan, path);
+      const isDroppingOnEmptyRootNode =
+        isEmptySemanticID(targetRowItemID) &&
+        viewPathToString(path) === viewPathToString(destination);
 
-      if (isEmptySemanticID(destinationRootItemID)) {
+      if (isDroppingOnEmptyRootNode) {
         const target = buildPaneTarget(plan, dragItem.path);
         const targetPaneIndex = destination[0] as number;
         const updatedPanes = plan.panes.map((p, idx) => {
           if (idx !== targetPaneIndex) return p;
+          if (dragItem.documentLinkTarget) {
+            return {
+              id: p.id,
+              author: dragItem.documentLinkTarget.author,
+              documentId: dragItem.documentLinkTarget.docId,
+            };
+          }
           return {
             id: p.id,
             author: target.author,

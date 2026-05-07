@@ -150,8 +150,10 @@ type RefLinkTarget =
   | { kind: "file"; path: string };
 
 function classifyHref(href: string): RefLinkTarget | undefined {
-  if (href.startsWith("#")) {
-    return { kind: "node", targetID: href.slice(1) };
+  const hashIndex = href.indexOf("#");
+  if (hashIndex >= 0) {
+    const targetID = href.slice(hashIndex + 1);
+    return targetID ? { kind: "node", targetID } : undefined;
   }
   if (isMarkdownPath(href)) {
     return { kind: "file", path: href };

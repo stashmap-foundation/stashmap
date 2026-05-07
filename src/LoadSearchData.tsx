@@ -1,9 +1,9 @@
 import React from "react";
 import { Map, List } from "immutable";
 import {
+  getNodeText,
   isSearchId,
   parseSearchId,
-  getSearchNodes,
   shortID,
 } from "./core/connections";
 import { MergeKnowledgeDB, useData } from "./DataContext";
@@ -11,6 +11,8 @@ import { deduplicateRefsByContext, findRefsToNode } from "./semanticProjection";
 import { useCurrentPane } from "./SplitPanesContext";
 import { newDB } from "./core/knowledge";
 import { getLocalSearchResultIDs } from "./localSearch";
+import { documentKeyOf } from "./core/Document";
+import { newFileLinkNode, newNode, newRefNode } from "./core/nodeFactory";
 
 function SearchCrefBuilder({
   children,
@@ -21,7 +23,7 @@ function SearchCrefBuilder({
   searchId: ID;
   foundSemanticIDs: List<ID>;
 }): JSX.Element {
-  const { knowledgeDBs, graphIndex, user } = useData();
+  const { documents, knowledgeDBs, graphIndex, user } = useData();
   const pane = useCurrentPane();
   const effectiveAuthor = pane.author;
 
@@ -39,12 +41,46 @@ function SearchCrefBuilder({
     return deduped.map((ref) => ref.nodeID as ID);
   });
 
-  const { node: searchNode, childNodes } = getSearchNodes(
-    searchId,
-    crefItems.toList(),
-    user.publicKey,
-    true
-  );
+  const searchNodeBase = {
+    ...newNode("", List<ID>(), user.publicKey),
+    id: searchId as LongID,
+    root: searchId as LongID,
+  };
+  const childNodes = crefItems
+    .toSet()
+    .toList()
+    .map((nodeID): GraphNode => {
+      const targetNode = graphIndex.nodeByID.get(nodeID as LongID);
+      const targetDocument =
+        targetNode?.docId && !targetNode.parent
+          ? documents.get(documentKeyOf(targetNode.author, targetNode.docId))
+          : undefined;
+      const node = targetDocument
+        ? newFileLinkNode(
+            user.publicKey,
+            searchId as LongID,
+            targetDocument.filePath ?? targetDocument.docId,
+            searchId as LongID,
+            undefined,
+            undefined,
+            getNodeText(targetNode) ?? targetDocument.title
+          )
+        : newRefNode(
+            user.publicKey,
+            searchId as LongID,
+            nodeID as LongID,
+            searchId as LongID
+          );
+      return {
+        ...node,
+        updated: searchNodeBase.updated,
+        virtualType: "search",
+      };
+    });
+  const searchNode = {
+    ...searchNodeBase,
+    children: childNodes.map((node) => node.id).toList(),
+  };
   const syntheticEntries: [ID, GraphNode][] = [
     [searchId, searchNode] as [ID, GraphNode],
     ...childNodes

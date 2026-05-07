@@ -498,6 +498,19 @@ test("parseMarkdownHierarchy still parses #anchor links as node link spans", () 
   ]);
 });
 
+test("parseMarkdownHierarchy parses file path with #anchor as node link span", () => {
+  const trees = parseTree("# Root\n- [Bitcoin](./notes.md#abc)\n");
+  expect(trees).toEqual([
+    expect.objectContaining({
+      children: [
+        expect.objectContaining({
+          spans: [{ kind: "link", targetID: "abc", text: "Bitcoin" }],
+        }),
+      ],
+    }),
+  ]);
+});
+
 test("parseMarkdownHierarchy ignores http(s) links (no fileLink span)", () => {
   const trees = parseTree("# Root\n- [Web](https://example.com)\n");
   expect(trees).toEqual([

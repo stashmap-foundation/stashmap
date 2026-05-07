@@ -36,7 +36,13 @@ import {
   resolveNode,
   isRefNode,
 } from "../core/connections";
-import { isBlockLinkAny } from "../core/nodeSpans";
+import {
+  getBlockFileLinkPath,
+  isBlockFileLink,
+  isBlockLinkAny,
+} from "../core/nodeSpans";
+import { documentKeyOf } from "../core/Document";
+import { resolveLinkPath } from "../core/linkPath";
 import { ReferenceDisplay } from "./referenceDisplay";
 import { MiniEditor, preventEditorBlur } from "./AddNode";
 import { useOnToggleExpanded } from "./SelectNodes";
@@ -63,7 +69,7 @@ import {
   useCurrentPane,
   useNavigatePane,
 } from "../SplitPanesContext";
-import { buildNodeRouteUrl } from "../navigationUrl";
+import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
 import { RightMenu } from "./RightMenu";
 import { useItemStyle } from "./useItemStyle";
 import { EditorTextProvider } from "./EditorTextContext";
@@ -644,6 +650,42 @@ function NodeAutoLink({
   const effectiveAuthor = useEffectiveAuthor();
   const currentRow = useCurrentEdge();
   const virtualType = currentRow?.virtualType;
+  const currentNode = useCurrentNode();
+  const fileLinkNode =
+    (isBlockFileLink(currentRow) && currentRow) ||
+    (isBlockFileLink(currentNode) && currentNode) ||
+    undefined;
+  if (fileLinkNode) {
+    const sourceRoot =
+      fileLinkNode.id === fileLinkNode.root
+        ? fileLinkNode
+        : getNode(knowledgeDBs, fileLinkNode.root, fileLinkNode.author);
+    const sourceFilePath = sourceRoot?.docId
+      ? documents.get(documentKeyOf(sourceRoot.author, sourceRoot.docId))
+          ?.filePath
+      : undefined;
+    const linkPath = getBlockFileLinkPath(fileLinkNode);
+    const targetDoc = linkPath
+      ? documentByFilePath.get(resolveLinkPath(linkPath, sourceFilePath)) ||
+        documents.get(documentKeyOf(fileLinkNode.author, linkPath))
+      : undefined;
+    if (targetDoc) {
+      const href = buildDocumentRouteUrl(targetDoc.author, targetDoc.docId);
+      return (
+        <a
+          href={href}
+          className="reference-link-btn"
+          onClick={(e) => {
+            e.preventDefault();
+            navigatePane(href);
+          }}
+          aria-label={`Navigate to ${displayText}`}
+        >
+          {children}
+        </a>
+      );
+    }
+  }
 
   const node = getCurrentReferenceForView(
     data,

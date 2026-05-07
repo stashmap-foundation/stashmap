@@ -9,6 +9,7 @@ import {
   getPane,
   navigateToNodeViaSearch,
   renderWithTestData,
+  setDropIndentLevel,
 } from "../utils.test";
 import {
   knowstrInit,
@@ -117,6 +118,7 @@ test("DnD copy of a file-link bullet between panes preserves resolution to origi
 
   await userEvent.keyboard("{Alt>}");
   fireEvent.dragStart(sourceLink);
+  setDropIndentLevel("B", "C", 2);
   fireEvent.dragOver(targetC, { altKey: true });
   fireEvent.drop(targetC, { altKey: true });
   await userEvent.keyboard("{/Alt}");

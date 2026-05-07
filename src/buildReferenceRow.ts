@@ -62,7 +62,9 @@ function resolveFileLinkRoot(
         ?.filePath
     : undefined;
   const resolved = resolveLinkPath(linkPath, sourceFilePath);
-  const targetDoc = documentByFilePath.get(resolved);
+  const targetDoc =
+    documentByFilePath.get(resolved) ||
+    documents.get(documentKeyOf(sourceItem.author, resolved));
   if (!targetDoc) return undefined;
   return knowledgeDBs
     .get(targetDoc.author)

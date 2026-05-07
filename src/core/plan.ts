@@ -16,10 +16,14 @@ import {
   isSearchId,
   shortID,
 } from "./connections";
-import type { RefTargetSeed, TextSeed } from "./connections";
+import type {
+  DocumentLinkTargetSeed,
+  RefTargetSeed,
+  TextSeed,
+} from "./connections";
 import { createDocumentFromRootNode, documentKeyOf } from "./Document";
 import { newDB } from "./knowledge";
-import { newNode, newRefNode } from "./nodeFactory";
+import { newNode, newRefNode, newFileLinkNode } from "./nodeFactory";
 import { nodeText, plainSpans } from "./nodeSpans";
 import { createRootAnchor } from "./rootAnchor";
 import {
@@ -616,7 +620,11 @@ export function createGraphPlan(props: CreateGraphPlanProps): GraphPlan {
   };
 }
 
-export type AddToParentTarget = ID | TextSeed | RefTargetSeed;
+export type AddToParentTarget =
+  | ID
+  | TextSeed
+  | RefTargetSeed
+  | DocumentLinkTargetSeed;
 
 export function planAddTargetsToNode<T extends GraphPlan>(
   plan: T,
@@ -648,12 +656,38 @@ export function planAddTargetsToNode<T extends GraphPlan>(
         typeof objectOrID !== "string" && "targetID" in objectOrID
           ? objectOrID
           : undefined;
+      const documentLinkTarget =
+        typeof objectOrID !== "string" && "docId" in objectOrID
+          ? objectOrID
+          : undefined;
+      if (documentLinkTarget) {
+        const childNode = newFileLinkNode(
+          accPlan.user.publicKey,
+          parentNode.root,
+          documentLinkTarget.filePath ?? documentLinkTarget.docId,
+          parentNode.id,
+          relevance,
+          argument,
+          documentLinkTarget.linkText
+        );
+        return [
+          planUpsertNodes(accPlan, childNode),
+          [
+            ...accItems,
+            {
+              childID: childNode.id,
+            },
+          ],
+        ];
+      }
       const objectID =
         typeof objectOrID === "string"
           ? objectOrID
           : "id" in objectOrID
           ? objectOrID.id
-          : objectOrID.targetID;
+          : "targetID" in objectOrID
+          ? objectOrID.targetID
+          : objectOrID.docId;
       const objectText =
         typeof objectOrID !== "string" && "text" in objectOrID
           ? objectOrID.text

@@ -49,7 +49,9 @@ export function PaneSearchButton(): JSX.Element {
       setPane({
         ...pane,
         author: user.publicKey,
+        documentId: undefined,
         rootNodeId: undefined,
+        scrollToId: undefined,
         searchQuery: trimmedQuery,
         searchResultIDs,
       });

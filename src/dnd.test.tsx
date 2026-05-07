@@ -9,6 +9,7 @@ import {
   follow,
   getPane,
   navigateToNodeViaSearch,
+  openNodeInFullscreen,
   renderApp,
   renderTree,
   setup,
@@ -64,6 +65,7 @@ Root
   await userEvent.click(splitPaneButtons[0]);
 
   await navigateToNodeViaSearch(1, "Parent");
+  await openNodeInFullscreen(1, "Parent");
 
   const collapseParentButtons = await screen.findAllByLabelText(
     "collapse Parent"
@@ -101,6 +103,7 @@ Root
 
   await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
   await navigateToNodeViaSearch(1, "Target");
+  await openNodeInFullscreen(1, "Target");
 
   const targetTreeItems = screen.getAllByRole("treeitem", { name: "Target" });
   const targetInPane1 = targetTreeItems[targetTreeItems.length - 1];
@@ -268,6 +271,7 @@ Spain
 
   await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
   await navigateToNodeViaSearch(1, "Target");
+  await openNodeInFullscreen(1, "Target");
 
   const spainTreeItems = screen.getAllByRole("treeitem", { name: "Spain" });
   const targetDropTargets = screen.getAllByRole("treeitem", { name: "Target" });
@@ -414,6 +418,7 @@ Search: Source
 
   await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
   await navigateToNodeViaSearch(1, "Target");
+  await openNodeInFullscreen(1, "Target");
 
   fireEvent.dragStart(getPane(0).getByText(textContent("My Notes / Source")));
   fireEvent.drop(getPane(1).getByRole("treeitem", { name: "Target" }));
@@ -808,6 +813,7 @@ Root
   const splitPaneButtons = screen.getAllByLabelText("open in split pane");
   await userEvent.click(splitPaneButtons[0]);
   await navigateToNodeViaSearch(1, "Root");
+  await openNodeInFullscreen(1, "Root");
 
   const collapseButtons = await screen.findAllByLabelText("collapse Root");
   expect(collapseButtons.length).toBe(2);

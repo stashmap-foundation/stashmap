@@ -2,11 +2,15 @@ import React from "react";
 import { List, OrderedSet, Set } from "immutable";
 import { DndProvider, useDragLayer, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { moveNodes, createRefTarget } from "./core/connections";
+import {
+  moveNodes,
+  createDocumentLinkTarget,
+  createRefTarget,
+} from "./core/connections";
 import {
   getBlockLinkTarget,
   getBlockLinkText,
-  isBlockLink,
+  isBlockLinkAny,
 } from "./core/nodeSpans";
 import {
   parseViewPath,
@@ -22,7 +26,8 @@ import {
   viewPathToString,
   getCurrentEdgeForView,
 } from "./ViewContext";
-import { getNodesInTree } from "./editor/Node";
+import { documentKeyOf } from "./core/Document";
+import { getNodesInDocument, getNodesInTree } from "./treeTraversal";
 import {
   Plan,
   planUpdateViews,
@@ -38,6 +43,12 @@ type DragSource = {
   nodeId?: LongID;
   targetId?: LongID;
   linkText?: string;
+  documentLinkTarget?: {
+    author: PublicKey;
+    docId: string;
+    filePath?: string;
+    linkText?: string;
+  };
 };
 
 function getDropDestinationEndOfRoot(
@@ -92,6 +103,9 @@ function resolveDropByDepth(
   if (!prevNode) {
     if (!dropBefore) {
       return getDropDestinationEndOfRoot(data, root);
+    }
+    if (clampedDepth === dropBefore.length) {
+      return getDropDestinationEndOfRoot(data, dropBefore);
     }
     const parentView = getParentView(dropBefore);
     if (!parentView) {
@@ -151,15 +165,20 @@ export function getDropDestinationFromTreeView(
   sourceKeys?: Set<string>
 ): [ViewPath, number] {
   const pane = getPane(data, root);
-  const { paths: nodes } = getNodesInTree(
-    data,
-    root,
-    List<ViewPath>(),
-    rootNode,
-    pane.author,
-    pane.typeFilters
-  );
-  const adjustedIndex = destinationIndex - 1;
+  const document = pane.documentId
+    ? data.documents.get(documentKeyOf(pane.author, pane.documentId))
+    : undefined;
+  const { paths: nodes } = document
+    ? getNodesInDocument(data, getPaneIndex(root), document, pane.typeFilters)
+    : getNodesInTree(
+        data,
+        root,
+        List<ViewPath>(),
+        rootNode,
+        pane.author,
+        pane.typeFilters
+      );
+  const adjustedIndex = document ? destinationIndex : destinationIndex - 1;
   const dropBefore = nodes.get(adjustedIndex);
   const prevNode = adjustedIndex > 0 ? nodes.get(adjustedIndex - 1) : undefined;
 
@@ -354,7 +373,7 @@ export function dnd(
     if (isCopyDrag) {
       return true;
     }
-    const sourceIsReference = isBlockLink(sourceNode);
+    const sourceIsReference = isBlockLinkAny(sourceNode);
     if (sourceIsReference) {
       return true;
     }
@@ -392,7 +411,6 @@ export function dnd(
       const sourceEdgeArgument = sourceEdge?.argument;
       const sourceNode = getNodeForView(accPlan, sourcePath) || sourceEdge;
       const insertAt = dropIndex !== undefined ? dropIndex + idx : undefined;
-
       if (shouldCreateReference(sourceItemID, sourceNode)) {
         if (isSuggestion) {
           const sourceTargetID = getSuggestionTargetID(
@@ -410,6 +428,23 @@ export function dnd(
         }
         const dragTargetID =
           s === source ? sourceDrag.targetId || sourceDrag.nodeId : undefined;
+        const documentLinkTarget =
+          s === source ? sourceDrag.documentLinkTarget : undefined;
+        if (documentLinkTarget) {
+          return planAddToParent(
+            accPlan,
+            createDocumentLinkTarget(
+              documentLinkTarget.author,
+              documentLinkTarget.docId,
+              documentLinkTarget.filePath,
+              documentLinkTarget.linkText
+            ),
+            toView,
+            insertAt,
+            sourceEdgeRelevance,
+            sourceEdgeArgument
+          )[0];
+        }
         if (dragTargetID) {
           return planAddToParent(
             accPlan,

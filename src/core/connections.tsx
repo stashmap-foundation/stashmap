@@ -28,11 +28,32 @@ export type RefTargetSeed = {
   linkText?: string;
 };
 
+export type DocumentLinkTargetSeed = {
+  author: PublicKey;
+  docId: string;
+  filePath?: string;
+  linkText?: string;
+};
+
 export function createRefTarget(
   targetID: LongID,
   linkText?: string
 ): RefTargetSeed {
   return { targetID, linkText };
+}
+
+export function createDocumentLinkTarget(
+  author: PublicKey,
+  docId: string,
+  filePath?: string,
+  linkText?: string
+): DocumentLinkTargetSeed {
+  return {
+    author,
+    docId,
+    ...(filePath !== undefined ? { filePath } : {}),
+    linkText,
+  };
 }
 
 export const isRefNode = isBlockLink;

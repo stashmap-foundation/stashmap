@@ -12,8 +12,17 @@ import {
   useIsViewingOtherUserContent,
   useCurrentEdge,
 } from "../ViewContext";
-import { isEmptySemanticID } from "../core/connections";
-import { getBlockLinkTarget, getBlockLinkText } from "../core/nodeSpans";
+import { useData } from "../DataContext";
+import { documentKeyOf } from "../core/Document";
+import { getNode, isEmptySemanticID } from "../core/connections";
+import {
+  getBlockFileLinkPath,
+  getBlockFileLinkText,
+  getBlockLinkTarget,
+  getBlockLinkText,
+  isBlockFileLink,
+} from "../core/nodeSpans";
+import { resolveLinkPath } from "../core/linkPath";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
 import {
@@ -67,6 +76,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     ref
   ): JSX.Element => {
     const path = useViewPath();
+    const data = useData();
     const isNodeBeeingEdited = useIsEditingOn();
     const [rowID] = useCurrentRowID();
     const node = useCurrentNode();
@@ -81,6 +91,28 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
         clearDropIndent();
         markDragDescendants(rowViewKey);
         const dragNode = node || currentRow;
+        const fileLinkPath = getBlockFileLinkPath(currentRow);
+        const sourceRoot =
+          currentRow && currentRow.id === currentRow.root
+            ? currentRow
+            : undefined;
+        const sourceParentRoot =
+          currentRow && currentRow.id !== currentRow.root
+            ? getNode(data.knowledgeDBs, currentRow.root, currentRow.author)
+            : undefined;
+        const sourceDocumentRoot = sourceRoot || sourceParentRoot;
+        const sourceFilePath = sourceDocumentRoot?.docId
+          ? data.documents.get(
+              documentKeyOf(sourceDocumentRoot.author, sourceDocumentRoot.docId)
+            )?.filePath
+          : undefined;
+        const fileLinkDocument =
+          currentRow && isBlockFileLink(currentRow) && fileLinkPath
+            ? data.documentByFilePath.get(
+                resolveLinkPath(fileLinkPath, sourceFilePath)
+              ) ||
+              data.documents.get(documentKeyOf(currentRow.author, fileLinkPath))
+            : undefined;
         return {
           path,
           text: displayText,
@@ -88,6 +120,17 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
           nodeId: dragNode?.id,
           targetId: getBlockLinkTarget(dragNode),
           linkText: getBlockLinkText(dragNode),
+          documentLinkTarget: (() => {
+            if (fileLinkDocument) {
+              return {
+                author: fileLinkDocument.author,
+                docId: fileLinkDocument.docId,
+                filePath: fileLinkPath,
+                linkText: getBlockFileLinkText(currentRow),
+              };
+            }
+            return undefined;
+          })(),
         };
       },
       collect: (monitor) => ({

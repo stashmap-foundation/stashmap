@@ -874,11 +874,33 @@ export function getPane(paneIndex: number): ReturnType<typeof within> {
   return within(el);
 }
 
+function isPaneFocusedOnNode(
+  paneScope: ReturnType<typeof within>,
+  nodeName: string
+): boolean {
+  // eslint-disable-next-line testing-library/prefer-screen-queries
+  const rows = paneScope.queryAllByRole("treeitem");
+  const firstRow = rows[0];
+  return firstRow?.getAttribute("data-node-text") === nodeName;
+}
+
 export async function navigateToNodeViaSearch(
   paneIndex: number,
   nodeName: string,
   options: { waitForFullscreen?: boolean } = {}
 ): Promise<void> {
+  // eslint-disable-next-line testing-library/no-node-access
+  const existingPaneContainer = document.querySelector(
+    `[data-pane-index="${paneIndex}"]`
+  ) as HTMLElement;
+  const existingPaneScope = existingPaneContainer
+    ? within(existingPaneContainer)
+    : screen;
+  const isOnConcreteRoute = /^\/[rd]\//u.test(window.location.pathname);
+  if (isOnConcreteRoute && isPaneFocusedOnNode(existingPaneScope, nodeName)) {
+    return;
+  }
+
   await userEvent.click(
     await screen.findByLabelText(`Search to change pane ${paneIndex} content`)
   );
@@ -931,21 +953,36 @@ export async function navigateToNodeViaSearch(
   if (fullscreenButtons.length > 0) {
     await userEvent.click(fullscreenButtons[fullscreenButtons.length - 1]);
     await waitFor(() => {
-      const hasEditor =
-        // eslint-disable-next-line testing-library/prefer-screen-queries
-        paneScope.queryAllByLabelText(`edit ${nodeName}`).length > 0;
-      const hasTreeRow =
-        // eslint-disable-next-line testing-library/prefer-screen-queries
-        paneScope.queryAllByRole("treeitem", { name: nodeName }).length > 0;
-      expect(hasEditor || hasTreeRow).toBe(true);
+      expect(isPaneFocusedOnNode(paneScope, nodeName)).toBe(true);
     });
   }
 
   if (options.waitForFullscreen) {
     await waitFor(() => {
-      expect(window.location.pathname).toMatch(/^\/r\//u);
+      expect(window.location.pathname).toMatch(/^\/[rd]\//u);
     });
   }
+}
+
+export async function openNodeInFullscreen(
+  paneIndex: number,
+  nodeName: string
+): Promise<void> {
+  // eslint-disable-next-line testing-library/no-node-access
+  const paneContainer = document.querySelector(
+    `[data-pane-index="${paneIndex}"]`
+  ) as HTMLElement;
+  const paneScope = paneContainer ? within(paneContainer) : screen;
+  // eslint-disable-next-line testing-library/prefer-screen-queries
+  const fullscreenButtons = paneScope.queryAllByLabelText(
+    `open ${nodeName} in fullscreen`
+  );
+  if (fullscreenButtons.length > 0) {
+    await userEvent.click(fullscreenButtons[fullscreenButtons.length - 1]);
+  }
+  await waitFor(() => {
+    expect(isPaneFocusedOnNode(paneScope, nodeName)).toBe(true);
+  });
 }
 
 function getDropDepthLimits(

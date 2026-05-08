@@ -351,7 +351,7 @@ export function getChildNodes(
   }, List<GraphNode>());
 }
 
-type RefTargetInfo = {
+export type RefTargetInfo = {
   stack: ID[];
   author: PublicKey;
   rootNodeId?: LongID;

@@ -19,16 +19,14 @@ import { buildReferenceItem } from "./buildReferenceRow";
 import { useData } from "./DataContext";
 import { Plan, planUpsertNodes, getPane } from "./planner";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
-import { documentKeyOf } from "./core/Document";
-import { resolveLinkPath } from "./core/linkPath";
 import { newNode } from "./core/nodeFactory";
-import {
-  getBlockFileLinkPath,
-  isBlockFileLink,
-  isBlockLinkAny,
-  nodeText,
-} from "./core/nodeSpans";
+import { isBlockLinkAny, nodeText } from "./core/nodeSpans";
 import { getNodeUserPublicKey } from "./infra/nostr/userEntry";
+import { getBlockLink } from "./core/blockLink";
+import {
+  EditorNavigationTarget,
+  linkToNavigationTarget,
+} from "./editor/blockLinkNavigation";
 
 export { newNode } from "./core/nodeFactory";
 
@@ -249,45 +247,26 @@ export function buildPaneTarget(
   data: Data,
   viewPath: ViewPath,
   currentRow?: GraphNode
-): {
-  author: PublicKey;
-  documentId?: string;
-  rootNodeId?: LongID;
-  scrollToId?: string;
-} {
+): EditorNavigationTarget {
   const [rowID] = getRowIDFromView(data, viewPath);
   const effectiveAuthor = getEffectiveAuthor(data, viewPath);
   const currentEdge = currentRow || getCurrentEdgeForView(data, viewPath);
   const virtualType = currentEdge?.virtualType;
   const currentNode = getNodeForView(data, viewPath);
-  const fileLinkNode =
+  const blockLink =
     virtualType === "incoming"
       ? undefined
-      : (isBlockFileLink(currentEdge) && currentEdge) ||
-        (isBlockFileLink(currentNode) && currentNode) ||
-        undefined;
-  if (fileLinkNode) {
-    const sourceRoot =
-      fileLinkNode.id === fileLinkNode.root
-        ? fileLinkNode
-        : getNode(data.knowledgeDBs, fileLinkNode.root, fileLinkNode.author);
-    const sourceFilePath = sourceRoot?.docId
-      ? data.documents.get(documentKeyOf(sourceRoot.author, sourceRoot.docId))
-          ?.filePath
-      : undefined;
-    const linkPath = getBlockFileLinkPath(fileLinkNode);
-    if (linkPath) {
-      const resolvedLinkPath = resolveLinkPath(linkPath, sourceFilePath);
-      const targetDocument =
-        data.documentByFilePath.get(resolvedLinkPath) ||
-        data.documents.get(documentKeyOf(fileLinkNode.author, linkPath));
-      if (targetDocument) {
-        return {
-          author: targetDocument.author,
-          documentId: targetDocument.docId,
-        };
-      }
-    }
+      : getBlockLink(currentEdge) || getBlockLink(currentNode);
+  const blockLinkTarget = blockLink
+    ? linkToNavigationTarget(
+        data,
+        blockLink,
+        effectiveAuthor,
+        virtualType === "version" ? "target" : "link"
+      )
+    : undefined;
+  if (blockLinkTarget) {
+    return blockLinkTarget;
   }
 
   const currentReference = getCurrentReferenceForView(

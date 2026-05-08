@@ -7,6 +7,7 @@ import { isEmptySemanticID } from "../core/connections";
 import { useTemporaryView } from "./TemporaryViewContext";
 import {
   Plan,
+  AddToParentTarget,
   planSetTemporarySelectionState,
   planUpdatePanes,
   usePlanner,
@@ -35,12 +36,7 @@ type DragItemType = {
   nodeId?: LongID;
   targetId?: LongID;
   linkText?: string;
-  documentLinkTarget?: {
-    author: PublicKey;
-    docId: string;
-    filePath?: string;
-    linkText?: string;
-  };
+  insertTarget?: AddToParentTarget;
 };
 
 type NativeFileDropItem = {
@@ -469,16 +465,10 @@ export function useDroppable({
         const targetPaneIndex = destination[0] as number;
         const updatedPanes = plan.panes.map((p, idx) => {
           if (idx !== targetPaneIndex) return p;
-          if (dragItem.documentLinkTarget) {
-            return {
-              id: p.id,
-              author: dragItem.documentLinkTarget.author,
-              documentId: dragItem.documentLinkTarget.docId,
-            };
-          }
           return {
             id: p.id,
             author: target.author,
+            documentId: target.documentId,
             rootNodeId: target.rootNodeId,
             scrollToId: target.scrollToId,
           };

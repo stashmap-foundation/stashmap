@@ -14,16 +14,10 @@ import {
   getCurrentReferenceForView,
 } from "../ViewContext";
 import { useData } from "../DataContext";
-import { documentKeyOf } from "../core/Document";
-import { getNode, isEmptySemanticID } from "../core/connections";
-import {
-  getBlockFileLinkPath,
-  getBlockFileLinkText,
-  getBlockLinkTarget,
-  getBlockLinkText,
-  isBlockFileLink,
-} from "../core/nodeSpans";
-import { resolveLinkPath } from "../core/linkPath";
+import { isEmptySemanticID } from "../core/connections";
+import { getBlockLink } from "../core/blockLink";
+import { getBlockLinkTarget, getBlockLinkText } from "../core/nodeSpans";
+import { linkToInsertTarget } from "./blockLinkNavigation";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
 import {
@@ -103,31 +97,9 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
           virtualType === "incoming" && currentReference
             ? currentReference.id
             : dragNode?.id;
-        const fileLinkPath = getBlockFileLinkPath(currentRow);
-        const sourceRoot =
-          currentRow && currentRow.id === currentRow.root
-            ? currentRow
-            : undefined;
-        const sourceParentRoot =
-          currentRow && currentRow.id !== currentRow.root
-            ? getNode(data.knowledgeDBs, currentRow.root, currentRow.author)
-            : undefined;
-        const sourceDocumentRoot = sourceRoot || sourceParentRoot;
-        const sourceFilePath = sourceDocumentRoot?.docId
-          ? data.documents.get(
-              documentKeyOf(sourceDocumentRoot.author, sourceDocumentRoot.docId)
-            )?.filePath
-          : undefined;
-        const fileLinkDocument =
-          virtualType !== "incoming" &&
-          currentRow &&
-          isBlockFileLink(currentRow) &&
-          fileLinkPath
-            ? data.documentByFilePath.get(
-                resolveLinkPath(fileLinkPath, sourceFilePath)
-              ) ||
-              data.documents.get(documentKeyOf(currentRow.author, fileLinkPath))
-            : undefined;
+        const blockLink =
+          virtualType === "incoming" ? undefined : getBlockLink(currentRow);
+        const insertTarget = linkToInsertTarget(data, blockLink);
         return {
           path,
           text: displayText,
@@ -135,17 +107,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
           nodeId: dragNodeId,
           targetId: getBlockLinkTarget(dragNode),
           linkText: getBlockLinkText(dragNode),
-          documentLinkTarget: (() => {
-            if (fileLinkDocument) {
-              return {
-                author: fileLinkDocument.author,
-                docId: fileLinkDocument.docId,
-                filePath: fileLinkPath,
-                linkText: getBlockFileLinkText(currentRow),
-              };
-            }
-            return undefined;
-          })(),
+          insertTarget,
         };
       },
       collect: (monitor) => ({

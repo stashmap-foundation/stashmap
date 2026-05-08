@@ -2,11 +2,7 @@ import React from "react";
 import { List, OrderedSet, Set } from "immutable";
 import { DndProvider, useDragLayer, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import {
-  moveNodes,
-  createDocumentLinkTarget,
-  createRefTarget,
-} from "./core/connections";
+import { moveNodes, createRefTarget } from "./core/connections";
 import {
   getBlockLinkTarget,
   getBlockLinkText,
@@ -35,6 +31,7 @@ import {
   planExpandNode,
   planAddToParent,
   getPane,
+  AddToParentTarget,
 } from "./planner";
 import { planMoveNodeWithView } from "./treeMutations";
 
@@ -43,12 +40,7 @@ type DragSource = {
   nodeId?: LongID;
   targetId?: LongID;
   linkText?: string;
-  documentLinkTarget?: {
-    author: PublicKey;
-    docId: string;
-    filePath?: string;
-    linkText?: string;
-  };
+  insertTarget?: AddToParentTarget;
 };
 
 function getDropDestinationEndOfRoot(
@@ -431,19 +423,13 @@ export function dnd(
             )[0];
           }
         }
+        const insertTarget = s === source ? sourceDrag.insertTarget : undefined;
         const dragTargetID =
           s === source ? sourceDrag.targetId || sourceDrag.nodeId : undefined;
-        const documentLinkTarget =
-          s === source ? sourceDrag.documentLinkTarget : undefined;
-        if (documentLinkTarget) {
+        if (insertTarget) {
           return planAddToParent(
             accPlan,
-            createDocumentLinkTarget(
-              documentLinkTarget.author,
-              documentLinkTarget.docId,
-              documentLinkTarget.filePath,
-              documentLinkTarget.linkText
-            ),
+            insertTarget,
             toView,
             insertAt,
             sourceEdgeRelevance,

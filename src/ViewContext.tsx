@@ -26,7 +26,7 @@ import { getBlockLink } from "./core/blockLink";
 import {
   EditorNavigationTarget,
   linkToNavigationTarget,
-} from "./editor/blockLinkNavigation";
+} from "./editor/linkOperations";
 
 export { newNode } from "./core/nodeFactory";
 
@@ -364,10 +364,7 @@ export function getCurrentReferenceForView(
   );
 }
 
-export function addNodesToLastElement(
-  path: ViewPath,
-  nodeID: LongID
-): ViewPath {
+export function addNodesToLastElement(path: ViewPath, nodeID: ID): ViewPath {
   const last = getLast(path);
   if (last === nodeID) {
     return path;

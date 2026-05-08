@@ -15,12 +15,17 @@ import {
   resolveNode,
   isRefNode,
 } from "./core/connections";
-import { getBlockLinkTarget, nodeText } from "./core/nodeSpans";
-import { fileLinkIndexKey } from "./core/linkPath";
+import {
+  getBlockFileLinkPath,
+  getBlockLinkTarget,
+  isBlockFileLink,
+  nodeText,
+} from "./core/nodeSpans";
+import { fileLinkIndexKey, resolveLinkPath } from "./core/linkPath";
 import { suggestionSettings } from "./core/constants";
 import { LOG_ROOT_ROLE } from "./core/systemRoots";
 import { computeVersionDiff } from "./core/snapshotBaseline";
-import type { Document } from "./core/Document";
+import { documentKeyOf, type Document } from "./core/Document";
 
 type FooterTypeFilters = (
   | Relevance
@@ -256,6 +261,49 @@ function coveredContextKeys(
   }, ImmutableSet<string>());
 }
 
+function sourceDocumentKey(
+  knowledgeDBs: KnowledgeDBs,
+  documents: Map<string, Document> | undefined,
+  node: GraphNode
+): string | undefined {
+  const rootNode =
+    node.id === node.root
+      ? node
+      : getNode(knowledgeDBs, node.root, node.author);
+  if (!rootNode?.docId) {
+    return undefined;
+  }
+  const key = documentKeyOf(rootNode.author, rootNode.docId);
+  return documents?.has(key) ? key : undefined;
+}
+
+function coveredDocumentKeys(
+  currentItems: List<GraphNode>,
+  sourceFilePath: string | undefined,
+  documents: Map<string, Document> | undefined,
+  documentByFilePath: Map<string, Document> | undefined
+): ImmutableSet<string> {
+  if (!documents || !documentByFilePath) {
+    return ImmutableSet<string>();
+  }
+
+  return currentItems.reduce((covered, item) => {
+    if (!isBlockFileLink(item)) {
+      return covered;
+    }
+    const linkPath = getBlockFileLinkPath(item);
+    if (!linkPath) {
+      return covered;
+    }
+    const targetDocument =
+      documentByFilePath.get(resolveLinkPath(linkPath, sourceFilePath)) ??
+      documents.get(documentKeyOf(item.author, linkPath));
+    return targetDocument
+      ? covered.add(documentKeyOf(targetDocument.author, targetDocument.docId))
+      : covered;
+  }, ImmutableSet<string>());
+}
+
 function isInSystemRoot(
   knowledgeDBs: KnowledgeDBs,
   node: GraphNode | undefined,
@@ -348,9 +396,12 @@ export function getIncomingCrefsForNode(
   effectiveAuthor: PublicKey,
   currentItems?: List<GraphNode>,
   currentNodeFilePath?: string,
-  currentNodeAuthor?: PublicKey
+  currentNodeAuthor?: PublicKey,
+  documents?: Map<string, Document>,
+  documentByFilePath?: Map<string, Document>
 ): List<LongID> {
-  const outgoingCrefIDs = (currentItems || List<GraphNode>())
+  const current = currentItems || List<GraphNode>();
+  const outgoingCrefIDs = current
     .filter(isRefNode)
     .map((item) => item.id)
     .toList();
@@ -359,13 +410,16 @@ export function getIncomingCrefsForNode(
     outgoingCrefIDs,
     effectiveAuthor
   );
-  const outgoingTargetRelIDs = (currentItems || List<GraphNode>()).reduce(
-    (acc, item) => {
-      const targetNode = resolveNode(knowledgeDBs, item);
-      return targetNode ? acc.add(targetNode.id) : acc;
-    },
-    ImmutableSet<LongID>()
+  const coveredDocuments = coveredDocumentKeys(
+    current,
+    currentNodeFilePath,
+    documents,
+    documentByFilePath
   );
+  const outgoingTargetRelIDs = current.reduce((acc, item) => {
+    const targetNode = resolveNode(knowledgeDBs, item);
+    return targetNode ? acc.add(targetNode.id) : acc;
+  }, ImmutableSet<LongID>());
 
   const crefSourceIDs = currentNodeID
     ? [
@@ -389,6 +443,10 @@ export function getIncomingCrefsForNode(
       .filter((node) => visibleAuthors.has(node.author))
       .filter((node) => node.id !== parentNodeID)
       .filter((node) => node.id !== currentNodeID)
+      .filter((node) => {
+        const key = sourceDocumentKey(knowledgeDBs, documents, node);
+        return key === undefined || !coveredDocuments.has(key);
+      })
       .filter(
         (node) =>
           node.systemRole !== LOG_ROOT_ROLE &&

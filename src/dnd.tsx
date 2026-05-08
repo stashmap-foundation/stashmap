@@ -169,13 +169,13 @@ export function getDropDestinationFromTreeView(
     ? getNodesInDocument(data, root, document, pane.typeFilters)
     : getNodesInTree(
         data,
-        root,
+        List<ViewPath>([root]),
         List<ViewPath>(),
         rootNode,
         pane.author,
         pane.typeFilters
       );
-  const adjustedIndex = document ? destinationIndex : destinationIndex - 1;
+  const adjustedIndex = destinationIndex;
   const dropBefore = nodes.get(adjustedIndex);
   const prevNode = adjustedIndex > 0 ? nodes.get(adjustedIndex - 1) : undefined;
 

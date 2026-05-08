@@ -38,7 +38,7 @@ import {
 } from "../core/connections";
 import { isBlockLinkAny } from "../core/nodeSpans";
 import { getBlockLink } from "../core/blockLink";
-import { linkStyle, linkToHref } from "./blockLinkNavigation";
+import { linkStyle, linkToHref } from "./linkOperations";
 import { ReferenceDisplay } from "./referenceDisplay";
 import { MiniEditor, preventEditorBlur } from "./AddNode";
 import { useOnToggleExpanded } from "./SelectNodes";

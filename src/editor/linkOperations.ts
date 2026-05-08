@@ -6,8 +6,8 @@ import {
   createDocumentLinkTarget,
   createRefTarget,
 } from "../core/connections";
-import { BlockLink } from "../core/blockLink";
 import { Document, documentKeyOf } from "../core/Document";
+import { Link } from "../core/link";
 import { resolveLinkPath } from "../core/linkPath";
 import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
 import { AddToParentTarget } from "../planner";
@@ -34,7 +34,7 @@ function sourceFilePath(data: Data, source: GraphNode): string | undefined {
 
 function documentTarget(
   data: Data,
-  link: Extract<BlockLink, { kind: "document" }>
+  link: Extract<Link, { kind: "document" }>
 ): Document | undefined {
   const resolvedPath = resolveLinkPath(
     link.path,
@@ -56,7 +56,7 @@ function refInfoToTarget(refInfo: RefTargetInfo): EditorNavigationTarget {
 
 export function linkToNavigationTarget(
   data: Data,
-  link: BlockLink,
+  link: Link,
   effectiveAuthor: PublicKey,
   mode: LinkNavigationMode = "link"
 ): EditorNavigationTarget | undefined {
@@ -80,7 +80,7 @@ export function linkToNavigationTarget(
 
 export function linkToHref(
   data: Data,
-  link: BlockLink,
+  link: Link,
   effectiveAuthor: PublicKey,
   mode: LinkNavigationMode = "link"
 ): string | undefined {
@@ -115,13 +115,13 @@ export function navigationTargetToHref(
     : undefined;
 }
 
-export function linkStyle(link: BlockLink): React.CSSProperties {
+export function linkStyle(link: Link): React.CSSProperties {
   return link.kind === "document" ? { fontStyle: "italic" } : {};
 }
 
 export function linkToInsertTarget(
   data: Data,
-  link: BlockLink | undefined
+  link: Link | undefined
 ): AddToParentTarget | undefined {
   if (!link) {
     return undefined;

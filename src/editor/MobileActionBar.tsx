@@ -14,7 +14,6 @@ import {
   ViewPath,
   VirtualRowsMap,
   viewPathToString,
-  useViewPath,
 } from "../ViewContext";
 import { getRowKey } from "./keyboardNavigation";
 import {
@@ -93,14 +92,12 @@ export function MobileActionBar({
   const { selection } = useTemporaryView();
   const { createPlan, executePlan } = usePlanner();
   const treeResult = usePaneTreeResult();
-  const rootViewPath = useViewPath();
   const orderedViewKeys = useMemo(
     () =>
-      List<ViewPath>([rootViewPath])
-        .concat(treeResult?.paths || List<ViewPath>())
+      (treeResult?.paths || List<ViewPath>())
         .map((path) => viewPathToString(path))
         .toArray(),
-    [rootViewPath, treeResult]
+    [treeResult]
   );
   const virtualRowsMap: VirtualRowsMap =
     treeResult?.virtualRows || Map<string, GraphNode>();

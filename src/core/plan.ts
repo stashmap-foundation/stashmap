@@ -21,9 +21,18 @@ import type {
   RefTargetSeed,
   TextSeed,
 } from "./connections";
-import { createDocumentFromRootNode, documentKeyOf } from "./Document";
+import {
+  createDocumentFromRootNode,
+  Document,
+  documentKeyOf,
+} from "./Document";
 import { newDB } from "./knowledge";
-import { newNode, newRefNode, newFileLinkNode } from "./nodeFactory";
+import {
+  newNode,
+  newRefNode,
+  newFileLinkNode,
+  newTopFileLinkNode,
+} from "./nodeFactory";
 import { nodeText, plainSpans } from "./nodeSpans";
 import { createRootAnchor } from "./rootAnchor";
 import {
@@ -819,5 +828,65 @@ export function planAddTargetsToNode<T extends GraphPlan>(
   return [
     planUpsertNodes(planWithChildren, insertedNode),
     nodeItemPayload.map((item) => item.childID),
+  ];
+}
+
+export function planAddTopTargetsToDocument<T extends GraphPlan>(
+  plan: T,
+  document: Document,
+  targets: AddToParentTarget | AddToParentTarget[],
+  relevance?: Relevance,
+  argument?: Argument
+): [T, ID[]] {
+  const targetsArray = Array.isArray(targets) ? targets : [targets];
+  if (targetsArray.length === 0) {
+    return [plan, []];
+  }
+
+  const [planWithNodes, topNodeIds] = targetsArray.reduce<[T, ID[]]>(
+    ([accPlan, accIds], target) => {
+      const documentLinkTarget =
+        typeof target !== "string" && "docId" in target ? target : undefined;
+      if (!documentLinkTarget) {
+        return [accPlan, accIds];
+      }
+      const topNode = newTopFileLinkNode(
+        accPlan.user.publicKey,
+        document.docId,
+        documentLinkTarget.filePath ?? documentLinkTarget.docId,
+        relevance,
+        argument,
+        documentLinkTarget.linkText
+      );
+      return [planUpsertNodes(accPlan, topNode), [...accIds, topNode.id]];
+    },
+    [plan, []]
+  );
+
+  if (topNodeIds.length === 0) {
+    return [planWithNodes, []];
+  }
+
+  const nextDocument: Document = {
+    ...document,
+    topNodeShortIds: [
+      ...document.topNodeShortIds,
+      ...topNodeIds.map((id) => shortID(id)),
+    ],
+    updatedMs: Date.now(),
+  };
+
+  return [
+    {
+      ...planWithNodes,
+      documents: planWithNodes.documents.set(
+        documentKeyOf(nextDocument.author, nextDocument.docId),
+        nextDocument
+      ),
+      affectedDocuments: planWithNodes.affectedDocuments.add(
+        nextDocument.docId
+      ),
+    },
+    topNodeIds,
   ];
 }

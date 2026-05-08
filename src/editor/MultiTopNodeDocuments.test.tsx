@@ -305,7 +305,7 @@ My Links
     `
 # My Links <!-- id:... -->
 
-- [Open B](./b.md)
+- [Open B](./b.md) <!-- id:... -->
 `
   );
 
@@ -340,9 +340,9 @@ test("Document file links are italic and incoming refs render at document level"
   write(
     workspacePath,
     "holidays.md",
-    "# Holiday Destinations\n\nSpain\n\n# Pack List\n\n- Charger\n"
+    "- Holiday Destinations\n  - Spain\n- Pack List\n  - Charger\n"
   );
-  write(workspacePath, "files.md", "# Links\n\n[Holidays](./holidays.md)\n");
+  write(workspacePath, "files.md", "- Links\n  - [Holidays](./holidays.md)\n");
 
   await renderDocumentRoute(workspacePath, "files.md");
 
@@ -439,6 +439,148 @@ Holiday Destinations
 Pack List
   Charger
 [I] Links
+  `);
+
+  cleanup();
+});
+
+test("Document heading file link incoming refs can become bidirectional", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(
+    workspacePath,
+    "holidays.md",
+    "# Holiday Destinations\n\nSpain\n\n# Pack List\n\n- Charger\n"
+  );
+  write(workspacePath, "files.md", "# Links\n\n[Holidays](./holidays.md)\n");
+
+  await renderDocumentRoute(workspacePath, "holidays.md");
+
+  await expectTree(`
+Holiday Destinations
+  Spain
+Pack List
+  Charger
+[I] Links
+  `);
+
+  await userEvent.click(getPane(0).getByRole("treeitem", { name: "Links" }));
+  await userEvent.keyboard("!");
+
+  await expectTree(`
+Holiday Destinations
+  Spain
+Pack List
+  Charger
+[R] Links
+  `);
+
+  await userEvent.click(await screen.findByLabelText("Navigate to Links"));
+
+  await expectTree(`
+Links
+  [R] Holiday Destinations
+  `);
+
+  await expectMarkdown(
+    workspacePath,
+    "files.md",
+    `
+# Links
+
+[Holidays](./holidays.md)
+`
+  );
+
+  await expectMarkdown(
+    workspacePath,
+    "holidays.md",
+    `
+# Holiday Destinations <!-- id:... -->
+
+Spain <!-- id:... -->
+
+# Pack List <!-- id:... -->
+
+- Charger <!-- id:... -->
+
+# (!) [Links](files.md) <!-- id:... -->
+`
+  );
+
+  cleanup();
+  await renderDocumentRoute(workspacePath, "holidays.md");
+
+  await expectTree(`
+Holiday Destinations
+  Spain
+Pack List
+  Charger
+[R] Links
+  `);
+
+  cleanup();
+});
+
+test("Document list file link incoming refs can become bidirectional", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(
+    workspacePath,
+    "holidays.md",
+    "- Holiday Destinations\n  - Spain\n- Pack List\n  - Charger\n"
+  );
+  write(workspacePath, "files.md", "- Links\n  - [Holidays](./holidays.md)\n");
+
+  await renderDocumentRoute(workspacePath, "holidays.md");
+
+  await expectTree(`
+Holiday Destinations
+  Spain
+Pack List
+  Charger
+[I] Links
+  `);
+
+  await userEvent.click(getPane(0).getByRole("treeitem", { name: "Links" }));
+  await userEvent.keyboard("!");
+
+  await expectTree(`
+Holiday Destinations
+  Spain
+Pack List
+  Charger
+[R] Links
+  `);
+
+  await expectMarkdown(
+    workspacePath,
+    "files.md",
+    `
+- Links
+  - [Holidays](./holidays.md)
+`
+  );
+
+  await expectMarkdown(
+    workspacePath,
+    "holidays.md",
+    `
+- Holiday Destinations <!-- id:... -->
+  - Spain <!-- id:... -->
+- Pack List <!-- id:... -->
+  - Charger <!-- id:... -->
+- (!) [Links](files.md) <!-- id:... -->
+`
+  );
+
+  cleanup();
+  await renderDocumentRoute(workspacePath, "holidays.md");
+
+  await expectTree(`
+Holiday Destinations
+  Spain
+Pack List
+  Charger
+[R] Links
   `);
 
   cleanup();

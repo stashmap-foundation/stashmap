@@ -6,24 +6,9 @@ import {
   isBlockFileLink,
   isBlockLink,
 } from "./nodeSpans";
+import { Link } from "./link";
 
-export type BlockLink =
-  | {
-      kind: "node";
-      source: GraphNode;
-      targetID: LongID;
-      text: string;
-    }
-  | {
-      kind: "document";
-      source: GraphNode;
-      path: string;
-      text: string;
-    };
-
-export function getBlockLink(
-  node: GraphNode | undefined
-): BlockLink | undefined {
+export function getBlockLink(node: GraphNode | undefined): Link | undefined {
   const targetID = getBlockLinkTarget(node);
   if (node && isBlockLink(node) && targetID) {
     return {

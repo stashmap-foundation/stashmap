@@ -93,7 +93,7 @@ title: "Doc"
 
   await knowstrSave(workspaceDir);
   const raw = fs.readFileSync(path.join(workspaceDir, "doc.md"), "utf8");
-  expect(raw).toMatch(/\n---\n\n# /u);
+  expect(raw).toMatch(/\n---\n\n- /u);
 
   const second = await knowstrSave(workspaceDir);
   expect(second.changed_paths).toEqual([]);
@@ -602,7 +602,9 @@ test("save still treats whole-line ref-style link as ref node", async () => {
   const linkedLine = second
     .split("\n")
     .find((l) => l.includes(`- [Linked](#${targetId})`)) as string;
-  expect(linkedLine).toBe(`- [Linked](#${targetId})`);
+  expect(linkedLine).toMatch(
+    new RegExp(`^- \\[Linked\\]\\(#${targetId}\\) <!-- id:[^>]+ -->$`, "u")
+  );
   expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
@@ -637,7 +639,12 @@ test("save still treats prefixed whole-line ref-style link as ref node", async (
   const linkedLine = second
     .split("\n")
     .find((l) => l.includes(`- (!) [Linked](#${targetId})`)) as string;
-  expect(linkedLine).toBe(`- (!) [Linked](#${targetId})`);
+  expect(linkedLine).toMatch(
+    new RegExp(
+      `^- \\(!\\) \\[Linked\\]\\(#${targetId}\\) <!-- id:[^>]+ -->$`,
+      "u"
+    )
+  );
   expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
@@ -673,7 +680,15 @@ test("save treats ref-style link with bracketed text as ref node", async () => {
   const linkedLine = second
     .split("\n")
     .find((l) => l.includes(`- [${linkedText}](#${targetId})`)) as string;
-  expect(linkedLine).toBe(`- [${linkedText}](#${targetId})`);
+  expect(linkedLine).toMatch(
+    new RegExp(
+      `^- \\[${linkedText.replace(
+        /[.*+?^${}()|[\]\\]/gu,
+        "\\$&"
+      )}\\]\\(#${targetId}\\) <!-- id:[^>]+ -->$`,
+      "u"
+    )
+  );
   expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 

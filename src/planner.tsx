@@ -72,6 +72,7 @@ export {
   createGraphPlan,
   planAddContacts,
   planAddTargetsToNode,
+  planAddTopTargetsToDocument,
   planDeleteDescendantNodes,
   planDeleteNodes,
   planMoveDescendantNodes,

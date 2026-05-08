@@ -1,9 +1,20 @@
 import {
   createRefTarget,
+  createDocumentLinkTarget,
   isEmptySemanticID,
   getNode,
 } from "./core/connections";
-import { getBlockLinkTarget, isBlockLink, nodeText } from "./core/nodeSpans";
+import {
+  getBlockLinkTarget,
+  isBlockFileLink,
+  isBlockLink,
+  nodeText,
+} from "./core/nodeSpans";
+import {
+  documentKeyOf,
+  documentLinkPath,
+  getDocumentByIdOrFilePath,
+} from "./core/Document";
 import { planUpdateNodeItemMetadataById } from "./dataPlanner";
 import { NodeItemMetadata } from "./nodeItemMetadata";
 import {
@@ -17,7 +28,9 @@ import {
 } from "./ViewContext";
 import {
   Plan,
+  getPane,
   planAddToParent,
+  planAddTopTargetsToDocument,
   planDeepCopyNode,
   planSaveNodeAndEnsureNodes,
   planUpdateEmptyNodeMetadata,
@@ -43,6 +56,76 @@ function planUpdateExistingItemMetadata(
     : plan;
 }
 
+function getSourceDocumentTarget(
+  plan: Plan,
+  sourceRow: GraphNode
+): ReturnType<typeof createDocumentLinkTarget> | undefined {
+  const sourceRoot =
+    sourceRow.id === sourceRow.root
+      ? sourceRow
+      : getNode(plan.knowledgeDBs, sourceRow.root, sourceRow.author);
+  if (!sourceRoot) {
+    return undefined;
+  }
+  const sourceDocument = sourceRoot?.docId
+    ? plan.documents.get(documentKeyOf(sourceRoot.author, sourceRoot.docId))
+    : undefined;
+  return sourceDocument
+    ? createDocumentLinkTarget(
+        sourceDocument.author,
+        sourceDocument.docId,
+        documentLinkPath(sourceDocument),
+        nodeText(sourceRoot) || sourceDocument.title
+      )
+    : undefined;
+}
+
+function planAcceptDocumentTopIncoming(
+  plan: Plan,
+  viewPath: ViewPath,
+  metadata: NodeItemMetadata,
+  virtualRowsMap?: VirtualRowsMap
+): Plan | undefined {
+  const pane = getPane(plan, viewPath);
+  const parentView = getParentView(viewPath);
+  const isDocumentTopLevel =
+    !parentView || getParentView(parentView) === undefined;
+  const document = pane.documentId
+    ? getDocumentByIdOrFilePath(
+        plan.documents,
+        plan.documentByFilePath,
+        pane.author,
+        pane.documentId
+      )
+    : undefined;
+  const virtualRow = virtualRowsMap?.get(viewPathToString(viewPath));
+  if (
+    !isDocumentTopLevel ||
+    !document ||
+    virtualRow?.virtualType !== "incoming"
+  ) {
+    return undefined;
+  }
+  const sourceRow = getNode(
+    plan.knowledgeDBs,
+    virtualRow.id,
+    plan.user.publicKey
+  );
+  if (!sourceRow || !isBlockFileLink(sourceRow)) {
+    return undefined;
+  }
+  const target = getSourceDocumentTarget(plan, sourceRow);
+  return target
+    ? planAddTopTargetsToDocument(
+        plan,
+        document,
+        target,
+        metadata.relevance,
+        metadata.argument
+      )[0]
+    : undefined;
+}
+
 export function planUpdateViewItemMetadata(
   plan: Plan,
   viewPath: ViewPath,
@@ -51,6 +134,15 @@ export function planUpdateViewItemMetadata(
   virtualRowsMap?: VirtualRowsMap
 ): Plan {
   const [rowID] = getRowIDFromView(plan, viewPath);
+  const documentTopIncomingPlan = planAcceptDocumentTopIncoming(
+    plan,
+    viewPath,
+    metadata,
+    virtualRowsMap
+  );
+  if (documentTopIncomingPlan) {
+    return documentTopIncomingPlan;
+  }
   const parentView = getParentView(viewPath);
   if (!parentView) {
     return plan;

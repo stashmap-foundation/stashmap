@@ -308,6 +308,30 @@ function getLastDefinedListItem(
 
 type ListKind = { ordered: boolean; start: number };
 
+function commentNodeAttrs(
+  commentAttrs: ParsedComment | undefined
+): Partial<MarkdownTreeNode> {
+  return {
+    ...(commentAttrs?.uuid !== undefined && { uuid: commentAttrs.uuid }),
+    ...(commentAttrs?.hidden && { hidden: true }),
+    ...(commentAttrs?.basedOn !== undefined && {
+      basedOn: commentAttrs.basedOn,
+    }),
+    ...(commentAttrs?.snapshotDTag !== undefined && {
+      snapshotDTag: commentAttrs.snapshotDTag,
+    }),
+    ...(commentAttrs?.anchor !== undefined && {
+      anchor: commentAttrs.anchor,
+    }),
+    ...(commentAttrs?.systemRole !== undefined && {
+      systemRole: commentAttrs.systemRole,
+    }),
+    ...(commentAttrs?.userPublicKey !== undefined && {
+      userPublicKey: commentAttrs.userPublicKey,
+    }),
+  };
+}
+
 function buildTreeFromTokens(tokens: Token[]): MarkdownTreeNode[] {
   const roots: MarkdownTreeNode[] = [];
   const headingStack: Array<{ level: number; node: MarkdownTreeNode }> = [];
@@ -359,25 +383,9 @@ function buildTreeFromTokens(tokens: Token[]): MarkdownTreeNode[] {
         children: [],
         blockKind: "heading",
         headingLevel,
-        ...(commentAttrs?.uuid !== undefined && { uuid: commentAttrs.uuid }),
+        ...commentNodeAttrs(commentAttrs),
         ...(relevance !== undefined && { relevance }),
         ...(argument !== undefined && { argument }),
-        ...(commentAttrs?.hidden && { hidden: true }),
-        ...(commentAttrs?.basedOn !== undefined && {
-          basedOn: commentAttrs.basedOn,
-        }),
-        ...(commentAttrs?.snapshotDTag !== undefined && {
-          snapshotDTag: commentAttrs.snapshotDTag,
-        }),
-        ...(commentAttrs?.anchor !== undefined && {
-          anchor: commentAttrs.anchor,
-        }),
-        ...(commentAttrs?.systemRole !== undefined && {
-          systemRole: commentAttrs.systemRole,
-        }),
-        ...(commentAttrs?.userPublicKey !== undefined && {
-          userPublicKey: commentAttrs.userPublicKey,
-        }),
       };
       appendNode(roots, parent, node);
       headingStack.push({ level: headingLevel, node });
@@ -426,22 +434,12 @@ function buildTreeFromTokens(tokens: Token[]): MarkdownTreeNode[] {
             listOrdered: true,
             listStart: currentListKind.start,
           }),
-          ...(commentAttrs?.uuid !== undefined && { uuid: commentAttrs.uuid }),
+          ...commentNodeAttrs(commentAttrs),
           ...(effectiveRelevance !== undefined && {
             relevance: effectiveRelevance,
           }),
           ...(effectiveArgument !== undefined && {
             argument: effectiveArgument,
-          }),
-          ...(commentAttrs?.hidden && { hidden: true }),
-          ...(commentAttrs?.basedOn !== undefined && {
-            basedOn: commentAttrs.basedOn,
-          }),
-          ...(commentAttrs?.snapshotDTag !== undefined && {
-            snapshotDTag: commentAttrs.snapshotDTag,
-          }),
-          ...(commentAttrs?.userPublicKey !== undefined && {
-            userPublicKey: commentAttrs.userPublicKey,
           }),
         };
         appendNode(roots, parent, node);
@@ -452,19 +450,9 @@ function buildTreeFromTokens(tokens: Token[]): MarkdownTreeNode[] {
         spans,
         children: [],
         blockKind: "paragraph",
-        ...(commentAttrs?.uuid !== undefined && { uuid: commentAttrs.uuid }),
+        ...commentNodeAttrs(commentAttrs),
         ...(relevance !== undefined && { relevance }),
         ...(argument !== undefined && { argument }),
-        ...(commentAttrs?.hidden && { hidden: true }),
-        ...(commentAttrs?.basedOn !== undefined && {
-          basedOn: commentAttrs.basedOn,
-        }),
-        ...(commentAttrs?.snapshotDTag !== undefined && {
-          snapshotDTag: commentAttrs.snapshotDTag,
-        }),
-        ...(commentAttrs?.userPublicKey !== undefined && {
-          userPublicKey: commentAttrs.userPublicKey,
-        }),
       });
       continue;
     }
@@ -473,25 +461,9 @@ function buildTreeFromTokens(tokens: Token[]): MarkdownTreeNode[] {
       spans,
       children: [],
       blockKind: "paragraph",
-      ...(commentAttrs?.uuid !== undefined && { uuid: commentAttrs.uuid }),
+      ...commentNodeAttrs(commentAttrs),
       ...(relevance !== undefined && { relevance }),
       ...(argument !== undefined && { argument }),
-      ...(commentAttrs?.hidden && { hidden: true }),
-      ...(commentAttrs?.basedOn !== undefined && {
-        basedOn: commentAttrs.basedOn,
-      }),
-      ...(commentAttrs?.snapshotDTag !== undefined && {
-        snapshotDTag: commentAttrs.snapshotDTag,
-      }),
-      ...(commentAttrs?.anchor !== undefined && {
-        anchor: commentAttrs.anchor,
-      }),
-      ...(commentAttrs?.systemRole !== undefined && {
-        systemRole: commentAttrs.systemRole,
-      }),
-      ...(commentAttrs?.userPublicKey !== undefined && {
-        userPublicKey: commentAttrs.userPublicKey,
-      }),
     };
     appendNode(
       roots,

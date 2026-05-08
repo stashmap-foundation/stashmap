@@ -36,6 +36,8 @@ export function formatNodeAttrs(
   options?: {
     hidden?: boolean;
     basedOn?: LongID;
+    snapshotDTag?: string;
+    anchor?: RootAnchor;
     userPublicKey?: PublicKey;
   }
 ): string {
@@ -46,6 +48,29 @@ export function formatNodeAttrs(
       : []),
     ...(options?.hidden ? ["hidden"] : []),
     ...(options?.basedOn ? [`basedOn="${options.basedOn}"`] : []),
+    ...(options?.snapshotDTag ? [`snapshot="${options.snapshotDTag}"`] : []),
+    ...(options?.anchor?.snapshotContext.size
+      ? [`anchorContext="${options.anchor.snapshotContext.join(":")}"`]
+      : []),
+    ...(options?.anchor?.snapshotLabels?.length
+      ? [
+          `anchorLabels="${options.anchor.snapshotLabels
+            .map((label) => encodeURIComponent(label))
+            .join("|")}"`,
+        ]
+      : []),
+    ...(options?.anchor?.sourceAuthor
+      ? [`sourceAuthor="${options.anchor.sourceAuthor}"`]
+      : []),
+    ...(options?.anchor?.sourceRootID
+      ? [`sourceRoot="${options.anchor.sourceRootID}"`]
+      : []),
+    ...(options?.anchor?.sourceNodeID
+      ? [`sourceNode="${options.anchor.sourceNodeID}"`]
+      : []),
+    ...(options?.anchor?.sourceParentNodeID
+      ? [`sourceParent="${options.anchor.sourceParentNodeID}"`]
+      : []),
   ];
   if (parts.length === 0) {
     return "";

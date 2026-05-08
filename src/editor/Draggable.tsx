@@ -17,7 +17,7 @@ import { useData } from "../DataContext";
 import { isEmptySemanticID } from "../core/connections";
 import { getBlockLink } from "../core/blockLink";
 import { getBlockLinkTarget, getBlockLinkText } from "../core/nodeSpans";
-import { linkToInsertTarget } from "./blockLinkNavigation";
+import { linkToInsertTarget } from "./linkOperations";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
 import {

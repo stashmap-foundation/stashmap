@@ -840,16 +840,14 @@ function usePaneKeyboardNavigation(paneIndex: number): {
   const { selection, anchor } = useTemporaryView();
   const data = useData();
   const toggleFilter = useToggleFilter();
-  const viewPath = useViewPath();
   const { createPlan, executePlan } = usePlanner();
   const treeResult = usePaneTreeResult();
   const orderedViewKeys = useMemo(
     () =>
-      List<ViewPath>([viewPath])
-        .concat(treeResult?.paths || List<ViewPath>())
+      (treeResult?.paths || List<ViewPath>())
         .map((path) => viewPathToString(path))
         .toArray(),
-    [viewPath, treeResult]
+    [treeResult]
   );
   const virtualRowsMap: VirtualRowsMap =
     treeResult?.virtualRows || Map<string, GraphNode>();

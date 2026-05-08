@@ -1,7 +1,6 @@
 import {
   EMPTY_SEMANTIC_ID,
   getNode,
-  getNodeContext,
   getNodeText,
   getSemanticID,
   shortID,
@@ -23,10 +22,8 @@ import {
   formatNodeAttrs,
   formatOrderedLine,
   formatPrefixMarkers,
-  formatRootHeading,
   formatWithFrontMatter,
 } from "./documentFormat";
-import { createRootAnchor } from "./core/rootAnchor";
 
 type SerializeResult = {
   lines: string[];
@@ -44,71 +41,91 @@ type SerializeReduceState = SerializeResult & {
   promoteToHeadingLevel?: number;
 };
 
-function serializeNodeItems(
+function getSerializableNodeBody(
+  knowledgeDBs: KnowledgeDBs,
+  node: GraphNode,
+  author: PublicKey
+): string | undefined {
+  if (isBlockLink(node)) {
+    const targetNodeID = getBlockLinkTarget(node);
+    if (!targetNodeID) {
+      return undefined;
+    }
+    const explicitLinkText = getBlockLinkText(node);
+    const linkText =
+      explicitLinkText ||
+      buildOutgoingReference(node.id as LongID, knowledgeDBs, author)?.text ||
+      "";
+    return `[${linkText}](#${targetNodeID})`;
+  }
+  if (isBlockFileLink(node)) {
+    const linkPath = getBlockFileLinkPath(node);
+    const linkText = getBlockFileLinkText(node) ?? "";
+    return linkPath ? `[${linkText}](${linkPath})` : undefined;
+  }
+  return getSerializableNodeText(knowledgeDBs, node);
+}
+
+function getSerializableNodeAttrs(
+  node: GraphNode,
+  options?: { snapshotDTag?: string }
+): string {
+  return formatNodeAttrs(shortID(node.id), {
+    ...(node.basedOn ? { basedOn: node.basedOn } : {}),
+    ...(node.userPublicKey ? { userPublicKey: node.userPublicKey } : {}),
+    ...(options?.snapshotDTag || node.snapshotDTag
+      ? { snapshotDTag: options?.snapshotDTag ?? node.snapshotDTag }
+      : {}),
+    ...(node.anchor ? { anchor: node.anchor } : {}),
+  });
+}
+
+function serializeNodeSequence(
   knowledgeDBs: KnowledgeDBs,
   author: PublicKey,
-  children: GraphNode["children"],
+  nodes: readonly GraphNode[],
   indent: string,
-  current: SerializeResult
+  current: SerializeResult,
+  options?: {
+    snapshotDTag?: string;
+  }
 ): SerializeResult {
-  const result = children.reduce<SerializeReduceState>(
-    (acc, childID) => {
-      if (childID === EMPTY_SEMANTIC_ID) {
+  const serializeChildren = (
+    children: GraphNode["children"],
+    childIndent: string,
+    next: SerializeResult
+  ): SerializeResult => {
+    const childNodes = children
+      .filter((childID) => childID !== EMPTY_SEMANTIC_ID)
+      .map((childID) => {
+        const child = getNode(knowledgeDBs, childID, author);
+        if (!child) {
+          throw new Error(`Missing child node: ${childID}`);
+        }
+        return child;
+      })
+      .toArray();
+    return serializeNodeSequence(
+      knowledgeDBs,
+      author,
+      childNodes,
+      childIndent,
+      next
+    );
+  };
+
+  const result = nodes.reduce<SerializeReduceState>(
+    (acc, item, index) => {
+      const resolvedChild = item;
+      const text = getSerializableNodeBody(knowledgeDBs, resolvedChild, author);
+      if (text === undefined) {
         return acc;
       }
-      const item = getNode(knowledgeDBs, childID, author);
-      if (!item) {
-        throw new Error(`Missing child node: ${childID}`);
-      }
-      if (isBlockLink(item)) {
-        const targetNodeID = getBlockLinkTarget(item);
-        if (!targetNodeID) {
-          return acc;
-        }
-        const explicitLinkText = getBlockLinkText(item);
-        const linkText =
-          explicitLinkText ||
-          buildOutgoingReference(item.id as LongID, knowledgeDBs, author)
-            ?.text ||
-          "";
-        const prefix = formatPrefixMarkers(item.relevance, item.argument);
-        const body = `${prefix}[${linkText}](#${targetNodeID})`;
-        const line =
-          acc.promoteToHeadingLevel !== undefined
-            ? `${"#".repeat(acc.promoteToHeadingLevel)} ${body}`
-            : `${indent}- ${body}`;
-        return {
-          ...acc,
-          orderedCount: 0,
-          lines: [...acc.lines, line],
-        };
-      }
-
-      if (isBlockFileLink(item)) {
-        const linkPath = getBlockFileLinkPath(item);
-        const linkText = getBlockFileLinkText(item) ?? "";
-        const prefix = formatPrefixMarkers(item.relevance, item.argument);
-        const body = `${prefix}[${linkText}](${linkPath})`;
-        const line =
-          acc.promoteToHeadingLevel !== undefined
-            ? `${"#".repeat(acc.promoteToHeadingLevel)} ${body}`
-            : `${indent}- ${body}`;
-        return {
-          ...acc,
-          orderedCount: 0,
-          lines: [...acc.lines, line],
-        };
-      }
-
-      const resolvedChild = item;
-      const text = getSerializableNodeText(knowledgeDBs, resolvedChild);
       const prefix = formatPrefixMarkers(item.relevance, item.argument);
-      const attrs = formatNodeAttrs(shortID(resolvedChild.id), {
-        ...(resolvedChild.basedOn ? { basedOn: resolvedChild.basedOn } : {}),
-        ...(resolvedChild.userPublicKey
-          ? { userPublicKey: resolvedChild.userPublicKey }
-          : {}),
-      });
+      const attrs = getSerializableNodeAttrs(
+        resolvedChild,
+        index === 0 ? options : undefined
+      );
 
       if (resolvedChild.blockKind === "heading") {
         const level = resolvedChild.headingLevel ?? 2;
@@ -116,13 +133,7 @@ function serializeNodeItems(
           lines: [...acc.lines, formatHeadingLine(level, prefix, text, attrs)],
         };
         return {
-          ...serializeNodeItems(
-            knowledgeDBs,
-            author,
-            resolvedChild.children,
-            "",
-            next
-          ),
+          ...serializeChildren(resolvedChild.children, "", next),
           orderedCount: 0,
           promoteToHeadingLevel: level,
         };
@@ -133,13 +144,7 @@ function serializeNodeItems(
           lines: [...acc.lines, `${prefix}${text}${attrs}`],
         };
         return {
-          ...serializeNodeItems(
-            knowledgeDBs,
-            author,
-            resolvedChild.children,
-            "",
-            next
-          ),
+          ...serializeChildren(resolvedChild.children, "", next),
           orderedCount: 0,
         };
       }
@@ -153,13 +158,7 @@ function serializeNodeItems(
           ],
         };
         return {
-          ...serializeNodeItems(
-            knowledgeDBs,
-            author,
-            resolvedChild.children,
-            "",
-            next
-          ),
+          ...serializeChildren(resolvedChild.children, "", next),
           orderedCount: 0,
           promoteToHeadingLevel: promotedLevel,
         };
@@ -178,13 +177,7 @@ function serializeNodeItems(
           ],
         };
         return {
-          ...serializeNodeItems(
-            knowledgeDBs,
-            author,
-            resolvedChild.children,
-            childIndent,
-            next
-          ),
+          ...serializeChildren(resolvedChild.children, childIndent, next),
           orderedCount: acc.orderedCount + 1,
         };
       }
@@ -193,13 +186,7 @@ function serializeNodeItems(
         lines: [...acc.lines, formatBulletLine(indent, prefix, text, attrs)],
       };
       return {
-        ...serializeNodeItems(
-          knowledgeDBs,
-          author,
-          resolvedChild.children,
-          `${indent}  `,
-          next
-        ),
+        ...serializeChildren(resolvedChild.children, `${indent}  `, next),
         orderedCount: 0,
       };
     },
@@ -215,25 +202,15 @@ export function renderRootedMarkdown(
     snapshotDTag?: string;
   }
 ): string {
-  const rootText = getSerializableNodeText(knowledgeDBs, rootNode);
-  const rootUuid = shortID(rootNode.id);
-  const serialized = serializeNodeItems(
+  const serialized = serializeNodeSequence(
     knowledgeDBs,
     rootNode.author,
-    rootNode.children,
+    [rootNode],
     "",
-    { lines: [] }
+    { lines: [] },
+    options
   );
-  const rootLine = formatRootHeading(
-    rootText,
-    rootUuid,
-    rootNode.basedOn,
-    options?.snapshotDTag ?? rootNode.snapshotDTag,
-    rootNode.anchor ?? createRootAnchor(getNodeContext(knowledgeDBs, rootNode))
-  );
-  return `${addBlankLinesAroundHeadings([rootLine, ...serialized.lines]).join(
-    "\n"
-  )}\n`;
+  return `${addBlankLinesAroundHeadings(serialized.lines).join("\n")}\n`;
 }
 
 export function renderDocumentMarkdown(
@@ -253,10 +230,14 @@ export function renderDocumentMarkdown(
   if (topNodes.length === 0) {
     return formatWithFrontMatter("", document.frontMatter);
   }
-  const markdown = topNodes
-    .map((topNode) =>
-      renderRootedMarkdown(knowledgeDBs, topNode, options).trim()
-    )
-    .join("\n\n");
+  const serialized = serializeNodeSequence(
+    knowledgeDBs,
+    document.author,
+    topNodes,
+    "",
+    { lines: [] },
+    options
+  );
+  const markdown = addBlankLinesAroundHeadings(serialized.lines).join("\n");
   return formatWithFrontMatter(`${markdown}\n`, document.frontMatter);
 }

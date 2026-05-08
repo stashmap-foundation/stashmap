@@ -551,3 +551,16 @@ test("parseMarkdownHierarchy preserves prefix markers on file-link bullet", () =
     }),
   ]);
 });
+
+test("parseMarkdownHierarchy preserves prefix markers on file-link heading", () => {
+  const trees = parseTree("# (!+)[Open B](./b.md)\n");
+  expect(trees).toEqual([
+    expect.objectContaining({
+      spans: [{ kind: "fileLink", path: "./b.md", text: "Open B" }],
+      blockKind: "heading",
+      headingLevel: 1,
+      relevance: "relevant",
+      argument: "confirms",
+    }),
+  ]);
+});

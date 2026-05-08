@@ -5,7 +5,7 @@ import { ensureNodeNativeFields, joinID, shortID } from "./connections";
 import { newDB } from "./knowledge";
 import { createRootAnchor } from "./rootAnchor";
 import { MarkdownTreeNode } from "./markdownTree";
-import { newRefNode, newNode, newFileLinkNode } from "./nodeFactory";
+import { newFileLinkNode, newNode, newRefNode } from "./nodeFactory";
 import { nodeText, spansText } from "./nodeSpans";
 
 export type WalkContext = {
@@ -30,6 +30,21 @@ function walkUpsertNode(ctx: WalkContext, node: GraphNode): WalkContext {
   };
 }
 
+function assertUnusedTreeNodeId(
+  ctx: WalkContext,
+  treeNode: MarkdownTreeNode
+): void {
+  if (!treeNode.uuid) {
+    return;
+  }
+  const existing = ctx.knowledgeDBs
+    .get(ctx.publicKey)
+    ?.nodes.get(treeNode.uuid);
+  if (existing) {
+    throw new Error(`Workspace contains duplicate node ids: ${treeNode.uuid}`);
+  }
+}
+
 function singleBlockLinkSpan(spans: InlineSpan[]): InlineSpan | undefined {
   if (spans.length !== 1) return undefined;
   const span = spans[0];
@@ -45,12 +60,15 @@ function materializeTreeNode(
   parent?: LongID
 ): [WalkContext, ID, GraphNode] {
   const treeText = spansText(treeNode.spans);
-  const baseNode = treeNode.uuid
-    ? {
-        ...newNode(treeText, semanticContext, ctx.publicKey, root),
-        id: joinID(ctx.publicKey, treeNode.uuid),
-      }
-    : newNode(treeText, semanticContext, ctx.publicKey, root);
+  const baseNode = newNode(
+    treeText,
+    semanticContext,
+    ctx.publicKey,
+    root,
+    undefined,
+    undefined,
+    { uuid: treeNode.uuid }
+  );
   const nodeBaseWithFields: GraphNode = {
     ...baseNode,
     spans: treeNode.spans,
@@ -80,6 +98,7 @@ function materializeTreeNode(
     ([accCtx, accChildren], childNode) => {
       const blockLink = singleBlockLinkSpan(childNode.spans);
       if (blockLink && blockLink.kind === "link") {
+        assertUnusedTreeNodeId(accCtx, childNode);
         const refNode = newRefNode(
           ctx.publicKey,
           root,
@@ -88,7 +107,8 @@ function materializeTreeNode(
           childNode.relevance,
           childNode.argument,
           blockLink.text,
-          blockLink.text
+          blockLink.text,
+          { uuid: childNode.uuid }
         );
         return [
           walkUpsertNode(accCtx, refNode),
@@ -96,6 +116,7 @@ function materializeTreeNode(
         ] as [WalkContext, ID[]];
       }
       if (blockLink && blockLink.kind === "fileLink") {
+        assertUnusedTreeNodeId(accCtx, childNode);
         const fileNode = newFileLinkNode(
           ctx.publicKey,
           root,
@@ -103,7 +124,8 @@ function materializeTreeNode(
           nodeBaseWithFields.id,
           childNode.relevance,
           childNode.argument,
-          blockLink.text
+          blockLink.text,
+          { uuid: childNode.uuid }
         );
         return [
           walkUpsertNode(accCtx, fileNode),
@@ -130,16 +152,7 @@ function materializeTreeNode(
     [ctx, [] as ID[]] as [WalkContext, ID[]]
   );
 
-  if (treeNode.uuid) {
-    const existing = withVisible.knowledgeDBs
-      .get(withVisible.publicKey)
-      ?.nodes.get(treeNode.uuid);
-    if (existing) {
-      throw new Error(
-        `Workspace contains duplicate node ids: ${treeNode.uuid}`
-      );
-    }
-  }
+  assertUnusedTreeNodeId(withVisible, treeNode);
   const node: GraphNode = {
     ...nodeBaseWithFields,
     children: List(childIDs),

@@ -45,10 +45,9 @@ Holiday Destinations
     path,
     "holiday-destinations.md",
     `
-# Holiday Destinations <!-- id:... -->
-
-- Spain <!-- id:... -->
-- France <!-- id:... -->
+- Holiday Destinations <!-- id:... -->
+  - Spain <!-- id:... -->
+  - France <!-- id:... -->
 `
   );
   expect(ls(path)).toEqual(["holiday-destinations.md", "log.md"]);

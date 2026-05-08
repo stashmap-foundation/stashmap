@@ -10,7 +10,6 @@ import {
   ViewContext,
   useViewKey,
   getRowIDFromView,
-  isExpanded,
   useDisplayText,
   VirtualRowsProvider,
   getLast,
@@ -57,8 +56,6 @@ export function PaneTreeResultProvider({
   const data = useData();
   const pane = useCurrentPane();
   const viewPath = useViewPath();
-  const rootKey = viewPathToString(viewPath);
-  const isRootExpanded = isExpanded(data, rootKey);
   const document = pane.documentId
     ? getDocumentByIdOrFilePath(
         data.documents,
@@ -71,12 +68,9 @@ export function PaneTreeResultProvider({
     if (document) {
       return getNodesInDocument(data, viewPath, document, pane.typeFilters);
     }
-    if (!isRootExpanded) {
-      return undefined;
-    }
     return getNodesInTree(
       data,
-      viewPath,
+      List<ViewPath>([viewPath]),
       List<ViewPath>(),
       pane.rootNodeId,
       pane.author,
@@ -85,7 +79,6 @@ export function PaneTreeResultProvider({
   }, [
     data,
     document,
-    isRootExpanded,
     pane.author,
     pane.rootNodeId,
     pane.typeFilters,
@@ -247,9 +240,7 @@ function Tree(): JSX.Element | null {
   const virtualRows = treeResult?.virtualRows || Map<string, GraphNode>();
   const firstVirtualKeys =
     treeResult?.firstVirtualKeys || ImmutableSet<string>();
-  const nodes = pane.documentId
-    ? childNodes
-    : List<ViewPath>([viewPath]).concat(childNodes);
+  const nodes = childNodes;
   const nodeKeys = nodes.map((path) => viewPathToString(path)).toArray();
   const displayText = useDisplayText();
   const ariaLabel = displayText ? `related to ${displayText}` : undefined;

@@ -410,6 +410,18 @@ export function dnd(
       const insertAt = dropIndex !== undefined ? dropIndex + idx : undefined;
       if (shouldCreateReference(sourceItemID, sourceNode)) {
         if (isSuggestion) {
+          const insertTarget =
+            s === source ? sourceDrag.insertTarget : undefined;
+          if (insertTarget) {
+            return planAddToParent(
+              accPlan,
+              insertTarget,
+              toView,
+              insertAt,
+              sourceEdgeRelevance,
+              sourceEdgeArgument
+            )[0];
+          }
           const sourceTargetID = getSuggestionTargetID(
             s === source,
             sourceNode

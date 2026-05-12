@@ -28,6 +28,7 @@ import {
 } from "./ViewContext";
 import {
   Plan,
+  AddToParentTarget,
   getPane,
   planAddToParent,
   planAddTopTargetsToDocument,
@@ -80,6 +81,19 @@ function getSourceDocumentTarget(
     : undefined;
 }
 
+function getBlockLinkInsertTarget(
+  plan: Plan,
+  sourceRow: GraphNode
+): AddToParentTarget | undefined {
+  const targetID = getBlockLinkTarget(sourceRow);
+  if (targetID) {
+    return createRefTarget(targetID);
+  }
+  return isBlockFileLink(sourceRow)
+    ? getSourceDocumentTarget(plan, sourceRow)
+    : undefined;
+}
+
 function planAcceptDocumentTopIncoming(
   plan: Plan,
   viewPath: ViewPath,
@@ -114,7 +128,7 @@ function planAcceptDocumentTopIncoming(
   if (!sourceRow || !isBlockFileLink(sourceRow)) {
     return undefined;
   }
-  const target = getSourceDocumentTarget(plan, sourceRow);
+  const target = getBlockLinkInsertTarget(plan, sourceRow);
   return target
     ? planAddTopTargetsToDocument(
         plan,
@@ -179,8 +193,8 @@ export function planUpdateViewItemMetadata(
         metadata.argument
       )[0];
     }
+    const targetItem = getBlockLinkInsertTarget(plan, virtualRow) ?? rowID;
     const targetID = getBlockLinkTarget(virtualRow);
-    const targetItem = targetID ? createRefTarget(targetID) : rowID;
     const inheritedSourceNode = targetID
       ? getNode(plan.knowledgeDBs, targetID, plan.user.publicKey)
       : undefined;

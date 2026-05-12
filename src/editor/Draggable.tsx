@@ -16,7 +16,6 @@ import {
 import { useData } from "../DataContext";
 import { isEmptySemanticID } from "../core/connections";
 import { getBlockLink } from "../core/blockLink";
-import { getBlockLinkTarget, getBlockLinkText } from "../core/nodeSpans";
 import { linkToInsertTarget } from "./linkOperations";
 import { NOTE_TYPE, Node } from "./Node";
 import { useDroppable, clearDropIndent } from "./DroppableContainer";
@@ -98,15 +97,15 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
             ? currentReference.id
             : dragNode?.id;
         const blockLink =
-          virtualType === "incoming" ? undefined : getBlockLink(currentRow);
+          virtualType === "incoming"
+            ? undefined
+            : getBlockLink(currentRow) || getBlockLink(dragNode);
         const insertTarget = linkToInsertTarget(data, blockLink);
         return {
           path,
           text: displayText,
           isCopyDrag: copyDrag || undefined,
           nodeId: dragNodeId,
-          targetId: getBlockLinkTarget(dragNode),
-          linkText: getBlockLinkText(dragNode),
           insertTarget,
         };
       },
@@ -199,17 +198,19 @@ function DraggableSuggestion({
   const currentRow = useCurrentEdge();
   const node = useCurrentNode();
   const displayText = useDisplayText();
+  const data = useData();
 
   const [{ isDragging }, drag, preview] = useDrag({
     type: NOTE_TYPE,
     item: () => {
       clearDropIndent();
+      const blockLink = getBlockLink(currentRow);
       return {
         path,
         text: displayText,
         isSuggestion: true,
         nodeId: node?.id,
-        targetId: getBlockLinkTarget(currentRow),
+        insertTarget: linkToInsertTarget(data, blockLink),
       };
     },
     collect: (monitor) => ({

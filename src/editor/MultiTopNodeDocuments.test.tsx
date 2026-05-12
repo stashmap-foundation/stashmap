@@ -419,6 +419,56 @@ B
   cleanup();
 });
 
+test("Dragging a document search result creates a document link", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "holidays.md", "# Holiday Destinations\n\n- Spain\n");
+  write(workspacePath, "links.md", "# My Links\n");
+
+  await renderDocumentRoute(workspacePath, "links.md");
+  await userEvent.click(
+    (
+      await screen.findAllByLabelText("open in split pane")
+    )[0]
+  );
+
+  await userEvent.click(
+    await screen.findByLabelText("Search to change pane 1 content")
+  );
+  await userEvent.type(
+    await screen.findByLabelText("search input"),
+    "Holiday Destinations{Enter}"
+  );
+
+  const searchResult = await getPane(1).findByRole("treeitem", {
+    name: "Holiday Destinations",
+  });
+  const myLinks = getPane(0).getByRole("treeitem", { name: "My Links" });
+
+  await userEvent.keyboard("{Alt>}");
+  fireEvent.dragStart(searchResult);
+  setDropIndentLevel("Holiday Destinations", "My Links", 2);
+  fireEvent.dragOver(myLinks, { altKey: true });
+  fireEvent.drop(myLinks, { altKey: true });
+  await userEvent.keyboard("{/Alt}");
+
+  await expectMarkdown(
+    workspacePath,
+    "links.md",
+    `
+# My Links <!-- id:... -->
+
+- [Holiday Destinations](holidays.md) <!-- id:... -->
+`
+  );
+
+  const copiedLink = await getPane(0).findByLabelText(
+    "Navigate to Holiday Destinations"
+  );
+  expect(copiedLink.getAttribute("href")).toMatch(/^\/d\//u);
+
+  cleanup();
+});
+
 test("Document file links are italic and incoming refs render at document level", async () => {
   const { path: workspacePath } = knowstrInit();
   write(

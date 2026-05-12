@@ -7,7 +7,12 @@ import {
   navigateToNodeViaSearch,
   setDropIndentLevel,
 } from "../utils.test";
-import { expectMarkdown, knowstrInit, write } from "../testFixtures/workspace";
+import {
+  expectMarkdown,
+  knowstrInit,
+  readNodeId,
+  write,
+} from "../testFixtures/workspace";
 import { loadCliProfile } from "../cli/config";
 import { buildDocumentRouteUrl } from "../navigationUrl";
 
@@ -264,6 +269,85 @@ My Links
 My Links
   [R] Holiday Destinations / Spain
   `);
+
+  cleanup();
+});
+
+test("Deep-copying a node with graph refs keeps the copied ref live in markdown", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "graph.md", "# Source\n\n# Target\n\n# Copy Here\n");
+
+  await renderDocumentRoute(workspacePath, "graph.md");
+  await userEvent.click(
+    (
+      await screen.findAllByLabelText("open in split pane")
+    )[0]
+  );
+  await navigateToNodeViaSearch(1, "Source");
+
+  await userEvent.keyboard("{Alt>}");
+  fireEvent.dragStart(getPane(0).getByRole("treeitem", { name: "Target" }));
+  const source = getPane(1).getByRole("treeitem", { name: "Source" });
+  setDropIndentLevel("Target", "Source", 2);
+  fireEvent.dragOver(source, { altKey: true });
+  fireEvent.drop(source, { altKey: true });
+  await userEvent.keyboard("{/Alt}");
+
+  await expectTree(`
+Source
+  [R] Target
+Target
+  [I] Source
+Copy Here
+Source
+  [R] Target
+  `);
+
+  await navigateToNodeViaSearch(1, "Copy Here");
+  fireEvent.dragStart(
+    getPane(0).getAllByRole("treeitem", { name: "Source" })[0]
+  );
+  const copyHere = getPane(1).getByRole("treeitem", { name: "Copy Here" });
+  setDropIndentLevel("Source", "Copy Here", 2);
+  fireEvent.dragOver(copyHere);
+  fireEvent.drop(copyHere);
+  await userEvent.click(await getPane(1).findByLabelText("expand Source"));
+
+  await expectTree(`
+Source
+  [R] Target
+Target
+  [I] Source
+  [I] Source <<< Copy Here
+Copy Here
+  Source
+Copy Here
+  Source
+    [R] Target
+  `);
+
+  const profile = loadCliProfile({ cwd: workspacePath });
+  const targetId = `${profile.pubkey}_${readNodeId(
+    workspacePath,
+    "graph.md",
+    "# Target"
+  )}`;
+  await expectMarkdown(
+    workspacePath,
+    "graph.md",
+    `
+# Source <!-- id:... -->
+
+- [Target](#${targetId}) <!-- id:... -->
+
+# Target <!-- id:... -->
+
+# Copy Here <!-- id:... -->
+
+- Source <!-- id:... basedOn="..." -->
+  - [Target](#${targetId}) <!-- id:... basedOn="..." -->
+`
+  );
 
   cleanup();
 });

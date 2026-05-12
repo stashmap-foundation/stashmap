@@ -5,8 +5,8 @@ import { ensureNodeNativeFields, joinID, shortID } from "./connections";
 import { newDB } from "./knowledge";
 import { createRootAnchor } from "./rootAnchor";
 import { MarkdownTreeNode } from "./markdownTree";
-import { newFileLinkNode, newNode, newRefNode } from "./nodeFactory";
-import { nodeText, spansText } from "./nodeSpans";
+import { newGraphNode } from "./nodeFactory";
+import { fileLinkSpan, linkSpan, nodeText } from "./nodeSpans";
 
 export type WalkContext = {
   knowledgeDBs: KnowledgeDBs;
@@ -59,16 +59,11 @@ function materializeTreeNode(
   root: LongID,
   parent?: LongID
 ): [WalkContext, ID, GraphNode] {
-  const treeText = spansText(treeNode.spans);
-  const baseNode = newNode(
-    treeText,
-    semanticContext,
-    ctx.publicKey,
+  const baseNode = newGraphNode(ctx.publicKey, treeNode.spans, {
     root,
-    undefined,
-    undefined,
-    { uuid: treeNode.uuid }
-  );
+    semanticContext,
+    uuid: treeNode.uuid,
+  });
   const nodeBaseWithFields: GraphNode = {
     ...baseNode,
     spans: treeNode.spans,
@@ -99,16 +94,16 @@ function materializeTreeNode(
       const blockLink = singleBlockLinkSpan(childNode.spans);
       if (blockLink && blockLink.kind === "link") {
         assertUnusedTreeNodeId(accCtx, childNode);
-        const refNode = newRefNode(
+        const refNode = newGraphNode(
           ctx.publicKey,
-          root,
-          blockLink.targetID,
-          nodeBaseWithFields.id,
-          childNode.relevance,
-          childNode.argument,
-          blockLink.text,
-          blockLink.text,
-          { uuid: childNode.uuid }
+          [linkSpan(blockLink.targetID, blockLink.text)],
+          {
+            root,
+            parent: nodeBaseWithFields.id,
+            relevance: childNode.relevance,
+            argument: childNode.argument,
+            uuid: childNode.uuid,
+          }
         );
         return [
           walkUpsertNode(accCtx, refNode),
@@ -117,15 +112,16 @@ function materializeTreeNode(
       }
       if (blockLink && blockLink.kind === "fileLink") {
         assertUnusedTreeNodeId(accCtx, childNode);
-        const fileNode = newFileLinkNode(
+        const fileNode = newGraphNode(
           ctx.publicKey,
-          root,
-          blockLink.path,
-          nodeBaseWithFields.id,
-          childNode.relevance,
-          childNode.argument,
-          blockLink.text,
-          { uuid: childNode.uuid }
+          [fileLinkSpan(blockLink.path, blockLink.text)],
+          {
+            root,
+            parent: nodeBaseWithFields.id,
+            relevance: childNode.relevance,
+            argument: childNode.argument,
+            uuid: childNode.uuid,
+          }
         );
         return [
           walkUpsertNode(accCtx, fileNode),

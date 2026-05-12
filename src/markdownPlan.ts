@@ -19,9 +19,9 @@ import {
   planMoveDescendantNodes,
   planUpsertNodes,
 } from "./planner";
-import { planUpsertRootDocument } from "./core/plan";
-import { newNode } from "./core/nodeFactory";
-import { nodeText } from "./core/nodeSpans";
+import { planUpsertRootDocument, withDocumentRoot } from "./core/plan";
+import { newGraphNode } from "./core/nodeFactory";
+import { nodeText, plainSpans } from "./core/nodeSpans";
 import { getNodeForView, ViewPath } from "./ViewContext";
 
 export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
@@ -92,10 +92,10 @@ export function planCreateNodesFromMarkdown<T extends GraphPlan>(
   }
 
   const fallbackText = "Imported Markdown";
-  const fallbackNode = newNode(
-    fallbackText,
-    List<ID>(),
-    nextPlan.user.publicKey
+  const fallbackNode = withDocumentRoot(
+    newGraphNode(nextPlan.user.publicKey, plainSpans(fallbackText), {
+      semanticContext: List<ID>(),
+    })
   );
   return [
     planUpsertNodes(nextPlan, fallbackNode),

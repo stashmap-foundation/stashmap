@@ -27,13 +27,8 @@ import {
   documentKeyOf,
 } from "./Document";
 import { newDB } from "./knowledge";
-import {
-  newNode,
-  newRefNode,
-  newFileLinkNode,
-  newTopFileLinkNode,
-} from "./nodeFactory";
-import { nodeText, plainSpans } from "./nodeSpans";
+import { newGraphNode } from "./nodeFactory";
+import { fileLinkSpan, linkSpan, nodeText, plainSpans } from "./nodeSpans";
 import { createRootAnchor } from "./rootAnchor";
 import {
   LOG_ROOT_ROLE,
@@ -147,13 +142,15 @@ function planEnsureSystemRoot<T extends GraphPlan>(
     return [plan, existing];
   }
 
-  const node = newNode(
-    getSystemRoleText(systemRole),
-    List<ID>(),
-    plan.user.publicKey,
-    undefined,
-    undefined,
-    systemRole
+  const node = withDocumentRoot(
+    newGraphNode(
+      plan.user.publicKey,
+      plainSpans(getSystemRoleText(systemRole)),
+      {
+        semanticContext: List<ID>(),
+        systemRole,
+      }
+    )
   );
 
   return [upsertNodesCore(plan, node), node];
@@ -217,6 +214,16 @@ export function planUpsertRootDocument<T extends GraphPlan>(
   return { ...plan, documents: plan.documents.set(key, next) };
 }
 
+export function withDocumentRoot(
+  node: GraphNode,
+  docId: string = v4()
+): GraphNode {
+  if (node.parent) {
+    throw new Error("Only top-level nodes can become document roots");
+  }
+  return { ...node, docId };
+}
+
 export function getNodeDocumentId(
   plan: Pick<GraphPlan, "knowledgeDBs">,
   node: GraphNode
@@ -262,12 +269,10 @@ export function upsertNodesCore<T extends GraphPlan>(
 
 function addCrefToLog<T extends GraphPlan>(plan: T, nodeID: LongID): T {
   const [planWithLog, nodes] = planEnsureSystemRoot(plan, LOG_ROOT_ROLE);
-  const crefNode = newRefNode(
-    plan.user.publicKey,
-    nodes.root as LongID,
-    nodeID,
-    nodes.id as LongID
-  );
+  const crefNode = newGraphNode(plan.user.publicKey, [linkSpan(nodeID, "")], {
+    root: nodes.root as LongID,
+    parent: nodes.id as LongID,
+  });
   const planWithCref = upsertNodesCore(planWithLog, crefNode);
   return upsertNodesCore(planWithCref, {
     ...nodes,
@@ -396,7 +401,6 @@ export function planCopyDescendantNodes<T extends GraphPlan>(
   getSemanticContext: (node: GraphNode) => Context,
   filterNode?: (node: GraphNode) => boolean,
   targetParentNodeID?: LongID,
-  targetSemanticID?: ID,
   root?: ID
 ): [T, NodesIdMapping] {
   const descendants = getNodeSubtree(
@@ -408,15 +412,10 @@ export function planCopyDescendantNodes<T extends GraphPlan>(
   const { copiedNodes } = descendants.reduce(
     (acc, node) => {
       const newSemanticContext = getSemanticContext(node);
-      const isRootNode = node.id === sourceNode.id;
-      const baseNode = newNode(
-        isRootNode && typeof targetSemanticID === "string"
-          ? targetSemanticID
-          : nodeText(node),
-        newSemanticContext,
-        plan.user.publicKey,
-        acc.copiedRoot
-      );
+      const baseNode = newGraphNode(plan.user.publicKey, node.spans, {
+        root: acc.copiedRoot,
+        semanticContext: newSemanticContext,
+      });
       const nextCopiedRoot = acc.copiedRoot ?? baseNode.root;
       return {
         copiedRoot: nextCopiedRoot,
@@ -670,14 +669,20 @@ export function planAddTargetsToNode<T extends GraphPlan>(
           ? objectOrID
           : undefined;
       if (documentLinkTarget) {
-        const childNode = newFileLinkNode(
+        const childNode = newGraphNode(
           accPlan.user.publicKey,
-          parentNode.root,
-          documentLinkTarget.filePath ?? documentLinkTarget.docId,
-          parentNode.id,
-          relevance,
-          argument,
-          documentLinkTarget.linkText
+          [
+            fileLinkSpan(
+              documentLinkTarget.filePath ?? documentLinkTarget.docId,
+              documentLinkTarget.linkText || ""
+            ),
+          ],
+          {
+            root: parentNode.root,
+            parent: parentNode.id,
+            relevance,
+            argument,
+          }
         );
         return [
           planUpsertNodes(accPlan, childNode),
@@ -708,15 +713,15 @@ export function planAddTargetsToNode<T extends GraphPlan>(
       const localID = shortID(objectID as ID) as ID;
       if (refTarget || isSearchId(localID)) {
         const childNode = refTarget
-          ? newRefNode(
+          ? newGraphNode(
               accPlan.user.publicKey,
-              parentNode.root,
-              refTarget.targetID,
-              parentNode.id,
-              relevance,
-              argument,
-              undefined,
-              refTarget.linkText
+              [linkSpan(refTarget.targetID, refTarget.linkText || "")],
+              {
+                root: parentNode.root,
+                parent: parentNode.id,
+                relevance,
+                argument,
+              }
             )
           : ({
               children: List<ID>(),
@@ -776,12 +781,14 @@ export function planAddTargetsToNode<T extends GraphPlan>(
         ];
       }
 
-      const childNode = newNode(
-        objectText || "",
-        childContext,
+      const childNode = newGraphNode(
         accPlan.user.publicKey,
-        parentNode.root,
-        parentNode.id
+        plainSpans(objectText || ""),
+        {
+          root: parentNode.root,
+          parent: parentNode.id,
+          semanticContext: childContext,
+        }
       );
       const nodeWithUserPublicKey = objectUserPublicKey
         ? { ...childNode, userPublicKey: objectUserPublicKey }
@@ -850,13 +857,19 @@ export function planAddTopTargetsToDocument<T extends GraphPlan>(
       if (!documentLinkTarget) {
         return [accPlan, accIds];
       }
-      const topNode = newTopFileLinkNode(
+      const topNode = newGraphNode(
         accPlan.user.publicKey,
-        document.docId,
-        documentLinkTarget.filePath ?? documentLinkTarget.docId,
-        relevance,
-        argument,
-        documentLinkTarget.linkText
+        [
+          fileLinkSpan(
+            documentLinkTarget.filePath ?? documentLinkTarget.docId,
+            documentLinkTarget.linkText || ""
+          ),
+        ],
+        {
+          docId: document.docId,
+          relevance,
+          argument,
+        }
       );
       return [planUpsertNodes(accPlan, topNode), [...accIds, topNode.id]];
     },

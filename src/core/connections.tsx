@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/immutable-data, functional/no-let */
 import { List, Set, Map } from "immutable";
-import { newRefNode, newNode } from "./nodeFactory";
+import { newGraphNode } from "./nodeFactory";
 import { SEARCH_PREFIX } from "./constants";
 import { getRootAnchorContext, rootAnchorsEqual } from "./rootAnchor";
 import {
@@ -9,6 +9,7 @@ import {
   isBlockFileLink,
   isBlockLink,
   nodeText,
+  linkSpan,
   plainSpans,
 } from "./nodeSpans";
 import { Document, documentKeyOf } from "./Document";
@@ -538,7 +539,7 @@ export function getSearchNodes(
   asRefs: boolean = false
 ): { node: GraphNode; childNodes: List<GraphNode> } {
   const rel = {
-    ...newNode("", List<ID>(), myself),
+    ...newGraphNode(myself, plainSpans(""), { semanticContext: List<ID>() }),
     id: searchId as LongID,
     root: searchId as LongID,
   };
@@ -547,12 +548,10 @@ export function getSearchNodes(
     (semanticID): GraphNode =>
       asRefs
         ? {
-            ...newRefNode(
-              rel.author,
-              searchId as LongID,
-              semanticID as LongID,
-              searchId as LongID
-            ),
+            ...newGraphNode(rel.author, [linkSpan(semanticID as LongID, "")], {
+              root: searchId as LongID,
+              parent: searchId as LongID,
+            }),
             updated: rel.updated,
             virtualType: "search",
           }

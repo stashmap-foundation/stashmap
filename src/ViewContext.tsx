@@ -19,8 +19,8 @@ import { buildReferenceItem } from "./buildReferenceRow";
 import { useData } from "./DataContext";
 import { Plan, planUpsertNodes, getPane } from "./planner";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
-import { newNode } from "./core/nodeFactory";
-import { isBlockLinkAny, nodeText } from "./core/nodeSpans";
+import { newGraphNode } from "./core/nodeFactory";
+import { isBlockLinkAny, nodeText, plainSpans } from "./core/nodeSpans";
 import { getNodeUserPublicKey } from "./infra/nostr/userEntry";
 import { getBlockLink } from "./core/blockLink";
 import {
@@ -28,7 +28,7 @@ import {
   linkToNavigationTarget,
 } from "./editor/linkOperations";
 
-export { newNode } from "./core/nodeFactory";
+export { newGraphNode } from "./core/nodeFactory";
 
 type ViewPathSegment = ID;
 
@@ -697,13 +697,11 @@ export function upsertNodes(
 
   const base =
     currentNode ||
-    newNode(
-      "",
+    newGraphNode(plan.user.publicKey, plainSpans(""), {
+      root: parentRoot,
+      parent: parentNode?.id,
       semanticContext,
-      plan.user.publicKey,
-      parentRoot,
-      parentNode?.id
-    );
+    });
 
   // Apply modification
   const updatedNodes = modify(base);

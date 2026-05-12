@@ -12,7 +12,8 @@ import { useCurrentPane } from "./SplitPanesContext";
 import { newDB } from "./core/knowledge";
 import { getLocalSearchResultIDs } from "./localSearch";
 import { documentKeyOf, documentLinkPath } from "./core/Document";
-import { newFileLinkNode, newNode, newRefNode } from "./core/nodeFactory";
+import { newGraphNode } from "./core/nodeFactory";
+import { fileLinkSpan, linkSpan, plainSpans } from "./core/nodeSpans";
 
 function SearchCrefBuilder({
   children,
@@ -42,7 +43,9 @@ function SearchCrefBuilder({
   });
 
   const searchNodeBase = {
-    ...newNode("", List<ID>(), user.publicKey),
+    ...newGraphNode(user.publicKey, plainSpans(""), {
+      semanticContext: List<ID>(),
+    }),
     id: searchId as LongID,
     root: searchId as LongID,
   };
@@ -56,21 +59,23 @@ function SearchCrefBuilder({
           ? documents.get(documentKeyOf(targetNode.author, targetNode.docId))
           : undefined;
       const node = targetDocument
-        ? newFileLinkNode(
+        ? newGraphNode(
             user.publicKey,
-            searchId as LongID,
-            documentLinkPath(targetDocument),
-            searchId as LongID,
-            undefined,
-            undefined,
-            getNodeText(targetNode) ?? targetDocument.title
+            [
+              fileLinkSpan(
+                documentLinkPath(targetDocument),
+                getNodeText(targetNode) ?? targetDocument.title
+              ),
+            ],
+            {
+              root: searchId as LongID,
+              parent: searchId as LongID,
+            }
           )
-        : newRefNode(
-            user.publicKey,
-            searchId as LongID,
-            nodeID as LongID,
-            searchId as LongID
-          );
+        : newGraphNode(user.publicKey, [linkSpan(nodeID as LongID, "")], {
+            root: searchId as LongID,
+            parent: searchId as LongID,
+          });
       return {
         ...node,
         updated: searchNodeBase.updated,

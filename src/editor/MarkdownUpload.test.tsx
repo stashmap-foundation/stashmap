@@ -1,5 +1,5 @@
 import { List } from "immutable";
-import { newNode, ViewPath } from "../ViewContext";
+import { newGraphNode, ViewPath } from "../ViewContext";
 import { execute } from "../infra/nostr/executor";
 import { createPlan, planUpsertNodes } from "../planner";
 import { processEvents } from "../eventProcessing";
@@ -27,7 +27,10 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
   const wsID = joinID(alice().user.publicKey, "my-first-workspace");
   const workspaceText = "my-first-workspace";
   const workspaceNode: GraphNode = {
-    ...newNode(workspaceText, List(), alice().user.publicKey, wsID),
+    ...newGraphNode(alice().user.publicKey, plainSpans(workspaceText), {
+      root: wsID,
+      semanticContext: List(),
+    }),
     id: wsID,
     root: wsID,
   };

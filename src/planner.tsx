@@ -36,9 +36,10 @@ import {
   planCopyDescendantNodes,
   planUpsertContact,
   planUpsertNodes,
+  withDocumentRoot,
 } from "./core/plan";
 import {
-  newNode,
+  newGraphNode,
   upsertNodes,
   ViewPath,
   getRowIDFromView,
@@ -515,7 +516,6 @@ export function planDeepCopyNode(
     },
     undefined,
     targetParentNode.id,
-    undefined,
     targetParentNode.root
   );
 
@@ -619,9 +619,13 @@ function planCreateNoteAtRoot(
   viewPath: ViewPath
 ): SaveNodeResult {
   const [planWithSeed, createdSeed] = planCreateNode(plan, text);
-  const createdNode = withUsersEntryPublicKey(
-    newNode(createdSeed.text, List<ID>(), plan.user.publicKey),
-    createdSeed.text
+  const createdNode = withDocumentRoot(
+    withUsersEntryPublicKey(
+      newGraphNode(plan.user.publicKey, plainSpans(createdSeed.text), {
+        semanticContext: List<ID>(),
+      }),
+      createdSeed.text
+    )
   );
   const planWithNode = planUpsertNodes(planWithSeed, createdNode);
 

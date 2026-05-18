@@ -612,7 +612,7 @@ Pack List
 
   await expectTree(`
 Links
-  [R] Holiday Destinations
+  [R] Links <<< >>> ! Holiday Destinations
   `);
 
   await expectMarkdown(
@@ -683,6 +683,13 @@ Holiday Destinations
 Pack List
   Charger
 [R] Links
+  `);
+
+  await userEvent.click(await screen.findByLabelText("Navigate to Links"));
+
+  await expectTree(`
+Links
+  [R] Links <<< >>> ! Holiday Destinations
   `);
 
   await expectMarkdown(

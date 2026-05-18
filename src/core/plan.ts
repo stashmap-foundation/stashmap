@@ -28,7 +28,7 @@ import {
 } from "./Document";
 import { newDB } from "./knowledge";
 import { newGraphNode } from "./nodeFactory";
-import { fileLinkSpan, linkSpan, nodeText, plainSpans } from "./nodeSpans";
+import { fileLinkSpan, linkSpan, plainSpans } from "./nodeSpans";
 import { createRootAnchor } from "./rootAnchor";
 import {
   LOG_ROOT_ROLE,

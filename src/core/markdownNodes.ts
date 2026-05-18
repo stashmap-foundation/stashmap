@@ -61,6 +61,8 @@ function materializeTreeNode(
 ): [WalkContext, ID, GraphNode] {
   const baseNode = newGraphNode(ctx.publicKey, treeNode.spans, {
     root,
+    relevance: treeNode.relevance,
+    argument: treeNode.argument,
     semanticContext,
     uuid: treeNode.uuid,
   });

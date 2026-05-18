@@ -94,6 +94,18 @@ function getBlockLinkInsertTarget(
     : undefined;
 }
 
+function getIncomingFileLinkSource(
+  plan: Plan,
+  virtualRow: GraphNode
+): GraphNode | undefined {
+  if (virtualRow.virtualType !== "incoming") {
+    return undefined;
+  }
+  const sourceID = getBlockLinkTarget(virtualRow) ?? virtualRow.id;
+  const sourceRow = getNode(plan.knowledgeDBs, sourceID, plan.user.publicKey);
+  return isBlockFileLink(sourceRow) ? sourceRow : undefined;
+}
+
 function planAcceptDocumentTopIncoming(
   plan: Plan,
   viewPath: ViewPath,
@@ -193,7 +205,13 @@ export function planUpdateViewItemMetadata(
         metadata.argument
       )[0];
     }
-    const targetItem = getBlockLinkInsertTarget(plan, virtualRow) ?? rowID;
+    const incomingFileLinkSource = getIncomingFileLinkSource(plan, virtualRow);
+    const targetItem =
+      (incomingFileLinkSource
+        ? getBlockLinkInsertTarget(plan, incomingFileLinkSource)
+        : undefined) ??
+      getBlockLinkInsertTarget(plan, virtualRow) ??
+      rowID;
     const targetID = getBlockLinkTarget(virtualRow);
     const inheritedSourceNode = targetID
       ? getNode(plan.knowledgeDBs, targetID, plan.user.publicKey)

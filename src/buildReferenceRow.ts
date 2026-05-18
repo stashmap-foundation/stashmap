@@ -338,6 +338,30 @@ function computeVersionMeta(data: Data, viewPath: ViewPath): VersionMeta {
   return { updated: node.updated, addCount, removeCount };
 }
 
+function nodeLinksToTarget(
+  item: GraphNode | undefined,
+  targetNode: GraphNode,
+  knowledgeDBs: KnowledgeDBs,
+  documents?: ImmutableMap<string, Document>,
+  documentByFilePath?: ImmutableMap<string, Document>
+): item is GraphNode {
+  if (!item) return false;
+  if (isRefNode(item)) {
+    const resolvedTarget = resolveNode(knowledgeDBs, item);
+    return resolvedTarget?.id === targetNode.id;
+  }
+  if (isBlockFileLink(item) && documents && documentByFilePath) {
+    const resolvedTarget = resolveFileLinkRoot(
+      item,
+      knowledgeDBs,
+      documents,
+      documentByFilePath
+    );
+    return resolvedTarget?.id === targetNode.id;
+  }
+  return false;
+}
+
 function findCrefToNode(
   children: List<ID>,
   targetNode: GraphNode,
@@ -348,23 +372,15 @@ function findCrefToNode(
 ): GraphNode | undefined {
   return children
     .map((childID) => getNode(knowledgeDBs, childID, myself))
-    .find((item) => {
-      if (!item) return false;
-      if (isRefNode(item)) {
-        const resolvedTarget = resolveNode(knowledgeDBs, item);
-        return resolvedTarget?.id === targetNode.id;
-      }
-      if (isBlockFileLink(item) && documents && documentByFilePath) {
-        const resolvedTarget = resolveFileLinkRoot(
-          item,
-          knowledgeDBs,
-          documents,
-          documentByFilePath
-        );
-        return resolvedTarget?.id === targetNode.id;
-      }
-      return false;
-    });
+    .find((item) =>
+      nodeLinksToTarget(
+        item,
+        targetNode,
+        knowledgeDBs,
+        documents,
+        documentByFilePath
+      )
+    );
 }
 
 function getReferenceSourceNodes(
@@ -400,6 +416,33 @@ function findIncomingCrefItem(
       )
     )
     .find((item) => item !== undefined);
+}
+
+function findDocumentTopCrefItem(
+  ref: ParsedRef,
+  data: Data,
+  targetNode: GraphNode
+): GraphNode | undefined {
+  if (!ref.node.docId) {
+    return undefined;
+  }
+  const document = data.documents.get(
+    documentKeyOf(ref.node.author, ref.node.docId)
+  );
+  if (!document) {
+    return undefined;
+  }
+  return List(document.topNodeShortIds)
+    .map((nodeID) => getNode(data.knowledgeDBs, nodeID as ID, ref.node.author))
+    .find((item) =>
+      nodeLinksToTarget(
+        item,
+        targetNode,
+        data.knowledgeDBs,
+        data.documents,
+        data.documentByFilePath
+      )
+    );
 }
 
 export function buildReferenceItem(
@@ -546,12 +589,16 @@ export function buildReferenceItem(
       children,
       parentNode,
       data.knowledgeDBs,
-      data.user.publicKey
+      data.user.publicKey,
+      data.documents,
+      data.documentByFilePath
     );
 
-  const incomingCref = getReferenceSourceNodes(ref, data.knowledgeDBs)
-    .map((sourceNode) => findReverseCref(sourceNode.children))
-    .find((item) => item !== undefined);
+  const incomingCref =
+    getReferenceSourceNodes(ref, data.knowledgeDBs)
+      .map((sourceNode) => findReverseCref(sourceNode.children))
+      .find((item) => item !== undefined) ??
+    findDocumentTopCrefItem(ref, data, parentNode);
   const hasActiveIncoming =
     !!incomingCref && incomingCref.relevance !== "not_relevant";
 
@@ -580,9 +627,16 @@ export function buildReferenceItem(
 
   const incomingRel = incomingCref!.relevance;
   const incomingArg = incomingCref!.argument;
+  const contextLabels =
+    outgoing.contextLabels.length === 0 &&
+    ref.sourceItem &&
+    isBlockFileLink(ref.sourceItem) &&
+    (incomingRel || incomingArg)
+      ? [nodeText(parentNode)]
+      : outgoing.contextLabels;
   const text = referenceToText({
     displayAs,
-    contextLabels: outgoing.contextLabels,
+    contextLabels,
     targetLabel: outgoing.targetLabel,
     incomingRelevance: incomingRel,
     incomingArgument: incomingArg,
@@ -590,6 +644,7 @@ export function buildReferenceItem(
   return {
     ...outgoing,
     text,
+    contextLabels,
     displayAs,
     incomingRelevance: incomingRel,
     incomingArgument: incomingArg,

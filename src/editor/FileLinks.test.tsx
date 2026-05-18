@@ -144,6 +144,40 @@ B
   `);
 });
 
+test("Accepting a file-link incoming ref creates a document link back to the source file", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "a.md", "# A\n\n- [Open B](./b.md)\n");
+  write(workspacePath, "b.md", "# B\n\n- B-child\n");
+
+  await knowstrSave(workspacePath);
+  await renderAppTree({ path: workspacePath, search: "B" });
+
+  await expectTree(`
+B
+  B-child
+[I] A
+  `);
+
+  await userEvent.click(await screen.findByLabelText("A"));
+  await userEvent.keyboard("!");
+
+  await expectTree(`
+B
+  B-child
+[R] A
+  `);
+
+  const reverseLink = await screen.findByLabelText("Navigate to A");
+  expect(reverseLink.getAttribute("href")).toMatch(/^\/d\//u);
+
+  await userEvent.click(reverseLink);
+
+  await expectTree(`
+A
+  [R] A <<< >>> ! B
+  `);
+});
+
 test("Deleted file link target renders as deleted reference", async () => {
   const { path: workspacePath } = knowstrInit();
   write(workspacePath, "a.md", "# A\n\n- [Open B](./b.md)\n");

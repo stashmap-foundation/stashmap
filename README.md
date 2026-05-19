@@ -2,6 +2,11 @@
 
 - node v16.14.2
 
+## Semantic Markers
+
+The proposed compact relation/review marker grammar is documented in
+[docs/semantic-markers.md](docs/semantic-markers.md).
+
 # Build cli
 
   npx esbuild src/cli/index.ts \

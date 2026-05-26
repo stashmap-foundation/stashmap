@@ -78,10 +78,11 @@ function getFilesFromNativeDrop(item: NativeFileDropItem): File[] {
   return Array.from(files);
 }
 
-function planMaterializeImportedRoot(
+export function planMaterializeImportedRoot(
   plan: Plan,
   paneIndex: number,
-  rootItemID: ID
+  rootItemID: ID,
+  rootNodeID: LongID
 ): Plan {
   const updatedPanes = plan.panes.map((paneState, idx) => {
     if (idx !== paneIndex) {
@@ -90,7 +91,7 @@ function planMaterializeImportedRoot(
     return {
       ...paneState,
       stack: [rootItemID],
-      rootNodeId: undefined,
+      rootNodeId: rootNodeID,
     };
   });
   return planUpdatePanes(plan, updatedPanes);
@@ -385,9 +386,6 @@ export function useDroppable({
       clearDropIndent();
       const rawDirection = calcDragDirection(ref, monitor, path);
       const direction = rawDirection;
-      if (isListItem && direction === undefined) {
-        return item;
-      }
 
       if (monitor.getItemType() === NativeTypes.FILE) {
         const fileDropItem = item as NativeFileDropItem;
@@ -426,14 +424,20 @@ export function useDroppable({
             if (!rootTree) {
               return;
             }
-            const [planWithMarkdown, topItemIDs] =
+            const [planWithMarkdown, topItemIDs, topNodeIDs] =
               planCreateNodesFromMarkdownTrees(plan, [rootTree]);
             const rootItemID = topItemIDs[0];
-            if (!rootItemID) {
+            const rootNodeID = topNodeIDs[0];
+            if (!rootItemID || !rootNodeID) {
               return;
             }
             await executePlan(
-              planMaterializeImportedRoot(planWithMarkdown, path[0], rootItemID)
+              planMaterializeImportedRoot(
+                planWithMarkdown,
+                path[0],
+                rootItemID,
+                rootNodeID
+              )
             );
             return;
           }
@@ -448,6 +452,10 @@ export function useDroppable({
             )
           );
         })();
+        return item;
+      }
+
+      if (isListItem && direction === undefined) {
         return item;
       }
 

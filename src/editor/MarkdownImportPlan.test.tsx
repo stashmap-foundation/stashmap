@@ -22,6 +22,7 @@ import {
   planCreateNodesFromMarkdownFiles,
   planCreateNodesFromMarkdownTrees,
 } from "./FileDropZone";
+import { planMaterializeImportedRoot } from "./DroppableContainer";
 import { MarkdownTreeNode, parseMarkdownHierarchy } from "../core/markdownTree";
 import { nodeText, plainSpans, spansText } from "../core/nodeSpans";
 
@@ -305,6 +306,26 @@ test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
     nodeChildren(plan.knowledgeDBs, childNode, plan.user.publicKey).first()?.id
   ).toEqual(grandchildNode?.id);
   expect(grandchildNode && nodeText(grandchildNode)).toBe("Grandchild");
+});
+
+test("empty-root markdown import points pane at imported root node", () => {
+  const [alice] = setup([ALICE]);
+  const basePlan = createPlan(alice());
+
+  const trees = parseMarkdownImportFiles([
+    { name: "smoke.md", markdown: "# Smoke\n\n- A\n  - B" },
+  ]);
+  const [planWithMarkdown, topItemIDs, topNodeIDs] =
+    planCreateNodesFromMarkdownTrees(basePlan, trees);
+  const materialized = planMaterializeImportedRoot(
+    planWithMarkdown,
+    0,
+    topItemIDs[0] as ID,
+    topNodeIDs[0] as LongID
+  );
+
+  expect(materialized.panes[0].stack).toEqual(["Smoke"]);
+  expect(materialized.panes[0].rootNodeId).toEqual(topNodeIDs[0]);
 });
 
 test("Planning multiple markdown files returns top nodes in import order", () => {

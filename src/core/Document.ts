@@ -67,6 +67,26 @@ export function getDocumentByIdOrFilePath(
   return documentByPath?.author === author ? documentByPath : undefined;
 }
 
+function basenameWithoutMarkdownExtension(path: string): string {
+  const pieces = path.split(/[\\/]/u);
+  const filename = pieces[pieces.length - 1] ?? path;
+  return filename.endsWith(".md") ? filename.slice(0, -3) : filename;
+}
+
+export function documentDisplayName(document: Document): string {
+  const title = document.title.trim();
+  if (title) {
+    return title;
+  }
+  const filePathName = document.filePath
+    ? basenameWithoutMarkdownExtension(document.filePath)
+    : undefined;
+  if (filePathName) {
+    return filePathName;
+  }
+  return `Document ${document.docId.slice(0, 8)}`;
+}
+
 export function documentLinkPath(document: Document): string {
   return document.filePath ?? document.docId;
 }

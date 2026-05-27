@@ -64,7 +64,12 @@ import {
   shortID,
 } from "../core/connections";
 import { getOwnLogRoot } from "../core/systemRoots";
-import { buildNodeRouteUrl } from "../navigationUrl";
+import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
+import {
+  documentDisplayName,
+  getDocumentByIdOrFilePath,
+  type Document,
+} from "../core/Document";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import {
   focusRow,
@@ -140,6 +145,7 @@ function BreadcrumbItem({
 
 type BreadcrumbTarget = {
   author: PublicKey;
+  documentId?: string;
   rootNodeId?: LongID;
   scrollToId?: string;
 };
@@ -159,6 +165,33 @@ function getBreadcrumbLabel(
   return (
     getNodeText(node) || shortID(getSemanticID(knowledgeDBs, node)) || "..."
   );
+}
+
+function createDocumentBreadcrumbEntry(document: Document): BreadcrumbEntry {
+  return {
+    key: `document:${document.author}:${document.docId}`,
+    label: documentDisplayName(document),
+    target: {
+      author: document.author,
+      documentId: document.docId,
+    },
+  };
+}
+
+function breadcrumbEntriesWithDocument(
+  document: Document | undefined,
+  nodeEntries: BreadcrumbEntry[]
+): BreadcrumbEntry[] {
+  if (!document) {
+    return nodeEntries;
+  }
+  const documentEntry = createDocumentBreadcrumbEntry(document);
+  const firstNodeEntry = nodeEntries[0];
+  const visibleNodeEntries =
+    firstNodeEntry?.label === documentEntry.label
+      ? nodeEntries.slice(1)
+      : nodeEntries;
+  return [documentEntry, ...visibleNodeEntries];
 }
 
 function getLiveAnchorSourceNode(
@@ -294,24 +327,42 @@ function SourceButton(): JSX.Element | null {
 }
 
 function Breadcrumbs(): JSX.Element {
-  const { knowledgeDBs, user } = useData();
+  const data = useData();
+  const { knowledgeDBs } = data;
   const pane = useCurrentPane();
   const navigatePane = useNavigatePane();
   const { setPane } = useSplitPanes();
   const paneHistory = usePaneHistory();
   const currentNode = useCurrentNode();
   const rootNode = pane.rootNodeId
-    ? getNode(knowledgeDBs, pane.rootNodeId, user.publicKey)
+    ? getNode(knowledgeDBs, pane.rootNodeId, pane.author)
     : currentNode;
-  const entries: BreadcrumbEntry[] = rootNode
+  const paneDocument = pane.documentId
+    ? getDocumentByIdOrFilePath(
+        data.documents,
+        data.documentByFilePath,
+        pane.author,
+        pane.documentId
+      )
+    : undefined;
+  const document = paneDocument;
+  const nodeEntries: BreadcrumbEntry[] = rootNode
     ? buildAnchoredLineageEntries(knowledgeDBs, rootNode)
     : [];
+  const entries = breadcrumbEntriesWithDocument(document, nodeEntries);
 
   return (
     <nav className="breadcrumbs" aria-label="Navigation breadcrumbs">
       {entries.map((entry, index) => {
         const { target } = entry;
         const targetUrl = (() => {
+          if (target?.documentId) {
+            return buildDocumentRouteUrl(
+              target.author,
+              target.documentId,
+              target.scrollToId
+            );
+          }
           if (target?.rootNodeId) {
             return buildNodeRouteUrl(target.rootNodeId, target.scrollToId);
           }
@@ -321,13 +372,26 @@ function Breadcrumbs(): JSX.Element {
           ? (e: React.MouseEvent): void => {
               e.preventDefault();
               paneHistory?.push(pane.id, pane);
+              if (target.documentId) {
+                setPane({
+                  ...pane,
+                  author: target.author,
+                  documentId: target.documentId,
+                  rootNodeId: undefined,
+                  searchQuery: undefined,
+                  searchResultIDs: undefined,
+                  scrollToId: target.scrollToId,
+                });
+                return;
+              }
               if (target.rootNodeId) {
                 setPane({
                   ...pane,
                   author: target.author,
-                  ...(target.rootNodeId
-                    ? { rootNodeId: target.rootNodeId }
-                    : {}),
+                  documentId: undefined,
+                  rootNodeId: target.rootNodeId,
+                  searchQuery: undefined,
+                  searchResultIDs: undefined,
                   scrollToId: target.scrollToId,
                 });
                 return;

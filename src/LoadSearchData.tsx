@@ -58,13 +58,18 @@ function SearchCrefBuilder({
         targetNode?.docId && !targetNode.parent
           ? documents.get(documentKeyOf(targetNode.author, targetNode.docId))
           : undefined;
-      const node = targetDocument
+      const primaryTargetDocument =
+        targetNode &&
+        targetDocument?.topNodeShortIds[0] === shortID(targetNode.id)
+          ? targetDocument
+          : undefined;
+      const node = primaryTargetDocument
         ? newGraphNode(
             user.publicKey,
             [
               fileLinkSpan(
-                documentLinkPath(targetDocument),
-                getNodeText(targetNode) ?? targetDocument.title
+                documentLinkPath(primaryTargetDocument),
+                getNodeText(targetNode) ?? primaryTargetDocument.title
               ),
             ],
             {

@@ -406,10 +406,14 @@ export function getFileLinkTargetInfo(
     return undefined;
   }
   const targetKey = documentKeyOf(targetDoc.author, targetDoc.docId);
-  const targetRoot = knowledgeDBs
-    .get(targetDoc.author)
-    ?.nodes.valueSeq()
-    .find((node) => node.docId === targetDoc.docId && !node.parent);
+  const topNodeShortId = targetDoc.topNodeShortIds[0];
+  const targetRoot = topNodeShortId
+    ? getNode(
+        knowledgeDBs,
+        joinID(targetDoc.author, topNodeShortId as ID),
+        targetDoc.author
+      )
+    : undefined;
   if (!targetRoot) {
     return undefined;
   }
@@ -467,10 +471,14 @@ function resolveFileLinkRootByDocs(
   const resolved = resolveLinkPath(linkPath, sourceFilePath);
   const targetDoc = documentByFilePath.get(resolved);
   if (!targetDoc) return undefined;
-  return knowledgeDBs
-    .get(targetDoc.author)
-    ?.nodes.valueSeq()
-    .find((node) => node.docId === targetDoc.docId && !node.parent);
+  const topNodeShortId = targetDoc.topNodeShortIds[0];
+  return topNodeShortId
+    ? getNode(
+        knowledgeDBs,
+        joinID(targetDoc.author, topNodeShortId as ID),
+        targetDoc.author
+      )
+    : undefined;
 }
 
 export function getRefLinkTargetInfo(

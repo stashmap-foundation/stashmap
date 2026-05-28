@@ -2,6 +2,18 @@ import { parseToDocument } from "./Document";
 
 const TEST_PUBKEY = "a".repeat(64) as PublicKey;
 
+test("parseToDocument assigns the document id to every top-level root", () => {
+  const { document, nodes } = parseToDocument(
+    TEST_PUBKEY,
+    "# First\n\n# Second\n",
+    { docIdFallback: "doc-1" }
+  );
+
+  const rootDocIds = document.topNodeShortIds.map((id) => nodes.get(id)?.docId);
+
+  expect(rootDocIds).toEqual(["doc-1", "doc-1"]);
+});
+
 test("parseToDocument extracts title from frontmatter", () => {
   const markdown = `---\ntitle: "Holiday Destinations"\n---\n# Spain\n`;
   const { document } = parseToDocument(TEST_PUBKEY, markdown);

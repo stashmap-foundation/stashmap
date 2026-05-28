@@ -98,6 +98,83 @@ Source
   cleanup();
 });
 
+test("Editing under the second top-level root persists to the same markdown file", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "multi.md", "# First\n\n- one\n\n# Second\n\n- two\n");
+
+  await renderDocumentRoute(workspacePath, "multi.md");
+
+  await expectTree(`
+First
+  one
+Second
+  two
+  `);
+
+  await userEvent.click(await screen.findByLabelText("edit two"));
+  await userEvent.keyboard("{Enter}three{Escape}");
+
+  await expectTree(`
+First
+  one
+Second
+  two
+  three
+  `);
+
+  await expectMarkdown(
+    workspacePath,
+    "multi.md",
+    `
+# First <!-- id:... -->
+
+- one <!-- id:... -->
+
+# Second <!-- id:... -->
+
+- two <!-- id:... -->
+- three <!-- id:... -->
+`
+  );
+
+  cleanup();
+});
+
+test("Editing the second top-level root text persists to the same markdown file", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "multi.md", "# First\n\n- one\n\n# Second\n\n- two\n");
+
+  await renderDocumentRoute(workspacePath, "multi.md");
+
+  const editor = await screen.findByLabelText("edit Second");
+  await userEvent.click(editor);
+  await userEvent.clear(editor);
+  await userEvent.type(editor, "Updated Second{Escape}");
+
+  await expectTree(`
+First
+  one
+Updated Second
+  two
+  `);
+
+  await expectMarkdown(
+    workspacePath,
+    "multi.md",
+    `
+# First <!-- id:... -->
+
+- one <!-- id:... -->
+
+# Updated Second <!-- id:... -->
+
+- two <!-- id:... -->
+`
+  );
+
+  cleanup();
+});
+
 test("Searching from a document pane replaces document content with search results", async () => {
   const { path: workspacePath } = knowstrInit();
   write(

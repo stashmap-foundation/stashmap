@@ -1,12 +1,11 @@
 import {
-  getNode,
   getRefLinkTargetInfo,
   getRefTargetInfo,
   RefTargetInfo,
   createDocumentLinkTarget,
   createRefTarget,
 } from "../core/connections";
-import { Document, documentKeyOf } from "../core/Document";
+import { Document, getDocumentForNode, documentKeyOf } from "../core/Document";
 import { Link } from "../core/link";
 import { resolveLinkPath } from "../core/linkPath";
 import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
@@ -22,14 +21,8 @@ export type EditorNavigationTarget = {
 };
 
 function sourceFilePath(data: Data, source: GraphNode): string | undefined {
-  const sourceRoot =
-    source.id === source.root
-      ? source
-      : getNode(data.knowledgeDBs, source.root, source.author);
-  return sourceRoot?.docId
-    ? data.documents.get(documentKeyOf(sourceRoot.author, sourceRoot.docId))
-        ?.filePath
-    : undefined;
+  return getDocumentForNode(data.knowledgeDBs, data.documents, source)
+    ?.filePath;
 }
 
 function documentTarget(

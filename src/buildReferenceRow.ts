@@ -9,6 +9,7 @@ import {
   itemPassesFilters,
   getSemanticID,
   getNodeContext,
+  joinID,
 } from "./core/connections";
 import {
   getBlockLinkText,
@@ -66,10 +67,14 @@ function resolveFileLinkRoot(
     documentByFilePath.get(resolved) ||
     documents.get(documentKeyOf(sourceItem.author, resolved));
   if (!targetDoc) return undefined;
-  return knowledgeDBs
-    .get(targetDoc.author)
-    ?.nodes.valueSeq()
-    .find((node) => node.docId === targetDoc.docId && !node.parent);
+  const topNodeShortId = targetDoc.topNodeShortIds[0];
+  return topNodeShortId
+    ? getNode(
+        knowledgeDBs,
+        joinID(targetDoc.author, topNodeShortId as ID),
+        targetDoc.author
+      )
+    : undefined;
 }
 
 function getConcreteContextNodes(

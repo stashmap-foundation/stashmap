@@ -1,5 +1,5 @@
 import { Map as ImmutableMap } from "immutable";
-import { shortID } from "./connections";
+import { getNode, shortID } from "./connections";
 import { ensureKnowstrDocId } from "./knowstrFrontmatter";
 import { parseMarkdown } from "./markdownTree";
 import { WalkContext, materializeTree } from "./markdownNodes";
@@ -65,6 +65,19 @@ export function getDocumentByIdOrFilePath(
   }
   const documentByPath = documentByFilePath.get(idOrFilePath);
   return documentByPath?.author === author ? documentByPath : undefined;
+}
+
+export function getDocumentForNode(
+  knowledgeDBs: KnowledgeDBs,
+  documents: ImmutableMap<string, Document>,
+  node: GraphNode
+): Document | undefined {
+  const rootNode =
+    node.id === node.root
+      ? node
+      : getNode(knowledgeDBs, node.root, node.author);
+  const docId = node.docId ?? rootNode?.docId;
+  return docId ? documents.get(documentKeyOf(node.author, docId)) : undefined;
 }
 
 function basenameWithoutMarkdownExtension(path: string): string {
@@ -144,15 +157,11 @@ export function parseToDocument(
     "Untitled";
 
   const visibleRoots = parsed.tree.filter((tree) => !tree.hidden);
-  const trees = visibleRoots.map((tree, index) =>
-    index === 0
-      ? {
-          ...tree,
-          docId: ensured.docId,
-          ...(systemRole !== undefined && { systemRole }),
-        }
-      : tree
-  );
+  const trees = visibleRoots.map((tree, index) => ({
+    ...tree,
+    docId: ensured.docId,
+    ...(index === 0 && systemRole !== undefined && { systemRole }),
+  }));
 
   const result = materializeTree(trees, author, {
     context: options.context,

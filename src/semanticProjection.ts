@@ -277,7 +277,29 @@ function sourceDocumentKey(
   return documents?.has(key) ? key : undefined;
 }
 
+function documentKeyForFileLink(
+  item: GraphNode,
+  sourceFilePath: string | undefined,
+  documents: Map<string, Document>,
+  documentByFilePath: Map<string, Document>
+): string | undefined {
+  if (!isBlockFileLink(item)) {
+    return undefined;
+  }
+  const linkPath = getBlockFileLinkPath(item);
+  if (!linkPath) {
+    return undefined;
+  }
+  const targetDocument =
+    documentByFilePath.get(resolveLinkPath(linkPath, sourceFilePath)) ??
+    documents.get(documentKeyOf(item.author, linkPath));
+  return targetDocument
+    ? documentKeyOf(targetDocument.author, targetDocument.docId)
+    : undefined;
+}
+
 function coveredDocumentKeys(
+  knowledgeDBs: KnowledgeDBs,
   currentItems: List<GraphNode>,
   sourceFilePath: string | undefined,
   documents: Map<string, Document> | undefined,
@@ -287,21 +309,24 @@ function coveredDocumentKeys(
     return ImmutableSet<string>();
   }
 
-  return currentItems.reduce((covered, item) => {
-    if (!isBlockFileLink(item)) {
-      return covered;
-    }
-    const linkPath = getBlockFileLinkPath(item);
-    if (!linkPath) {
-      return covered;
-    }
-    const targetDocument =
-      documentByFilePath.get(resolveLinkPath(linkPath, sourceFilePath)) ??
-      documents.get(documentKeyOf(item.author, linkPath));
-    return targetDocument
-      ? covered.add(documentKeyOf(targetDocument.author, targetDocument.docId))
-      : covered;
-  }, ImmutableSet<string>());
+  const collect = (
+    covered: ImmutableSet<string>,
+    item: GraphNode
+  ): ImmutableSet<string> => {
+    const documentKey = documentKeyForFileLink(
+      item,
+      sourceFilePath,
+      documents,
+      documentByFilePath
+    );
+    const withCurrent = documentKey ? covered.add(documentKey) : covered;
+    return getChildNodes(knowledgeDBs, item, item.author).reduce(
+      collect,
+      withCurrent
+    );
+  };
+
+  return currentItems.reduce(collect, ImmutableSet<string>());
 }
 
 function isInSystemRoot(
@@ -411,6 +436,7 @@ export function getIncomingCrefsForNode(
     effectiveAuthor
   );
   const coveredDocuments = coveredDocumentKeys(
+    knowledgeDBs,
     current,
     currentNodeFilePath,
     documents,

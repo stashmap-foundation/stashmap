@@ -69,6 +69,40 @@ function removeFromNodeMap(
   }
 }
 
+function addNodeLinkEntries(
+  graphIndex: GraphIndex,
+  node: GraphNode,
+  sourceFilePath: string | undefined,
+  crefSourceID: LongID,
+  fileLinkSourceID: LongID
+): void {
+  getAllLinks(node).forEach(({ targetID }) => {
+    addToNodeMap(graphIndex.incomingCrefs, targetID, crefSourceID);
+  });
+  getAllFileLinks(node).forEach(({ path }) => {
+    const resolved = resolveLinkPath(path, sourceFilePath);
+    const key = fileLinkIndexKey(node.author, resolved);
+    addToSetMap(graphIndex.incomingFileLinks, key, fileLinkSourceID);
+  });
+}
+
+function removeNodeLinkEntries(
+  graphIndex: GraphIndex,
+  node: GraphNode,
+  sourceFilePath: string | undefined,
+  crefSourceID: LongID,
+  fileLinkSourceID: LongID
+): void {
+  getAllLinks(node).forEach(({ targetID }) => {
+    removeFromNodeMap(graphIndex.incomingCrefs, targetID, crefSourceID);
+  });
+  getAllFileLinks(node).forEach(({ path }) => {
+    const resolved = resolveLinkPath(path, sourceFilePath);
+    const key = fileLinkIndexKey(node.author, resolved);
+    removeFromSetMap(graphIndex.incomingFileLinks, key, fileLinkSourceID);
+  });
+}
+
 function addNodeSemanticEntries(
   graphIndex: GraphIndex,
   node: GraphNode,
@@ -79,6 +113,10 @@ function addNodeSemanticEntries(
     addToNodeMap(graphIndex.basedOnIndex, node.basedOn, node.id);
   }
 
+  if (!node.parent && node.relevance !== "not_relevant") {
+    addNodeLinkEntries(graphIndex, node, sourceFilePath, node.id, node.id);
+  }
+
   node.children.forEach((childID) => {
     if (childID === EMPTY_SEMANTIC_ID) {
       return;
@@ -87,14 +125,13 @@ function addNodeSemanticEntries(
     if (!childNode || childNode.relevance === "not_relevant") {
       return;
     }
-    getAllLinks(childNode).forEach(({ targetID }) => {
-      addToNodeMap(graphIndex.incomingCrefs, targetID, node.id);
-    });
-    getAllFileLinks(childNode).forEach(({ path }) => {
-      const resolved = resolveLinkPath(path, sourceFilePath);
-      const key = fileLinkIndexKey(childNode.author, resolved);
-      addToSetMap(graphIndex.incomingFileLinks, key, childNode.id);
-    });
+    addNodeLinkEntries(
+      graphIndex,
+      childNode,
+      sourceFilePath,
+      node.id,
+      childNode.id
+    );
   });
 }
 
@@ -108,6 +145,10 @@ function removeNodeSemanticEntries(
     removeFromNodeMap(graphIndex.basedOnIndex, node.basedOn, node.id);
   }
 
+  if (!node.parent && node.relevance !== "not_relevant") {
+    removeNodeLinkEntries(graphIndex, node, sourceFilePath, node.id, node.id);
+  }
+
   node.children.forEach((childID) => {
     if (childID === EMPTY_SEMANTIC_ID) {
       return;
@@ -116,14 +157,13 @@ function removeNodeSemanticEntries(
     if (!childNode || childNode.relevance === "not_relevant") {
       return;
     }
-    getAllLinks(childNode).forEach(({ targetID }) => {
-      removeFromNodeMap(graphIndex.incomingCrefs, targetID, node.id);
-    });
-    getAllFileLinks(childNode).forEach(({ path }) => {
-      const resolved = resolveLinkPath(path, sourceFilePath);
-      const key = fileLinkIndexKey(childNode.author, resolved);
-      removeFromSetMap(graphIndex.incomingFileLinks, key, childNode.id);
-    });
+    removeNodeLinkEntries(
+      graphIndex,
+      childNode,
+      sourceFilePath,
+      node.id,
+      childNode.id
+    );
   });
 }
 

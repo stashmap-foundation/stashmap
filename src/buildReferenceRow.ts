@@ -498,6 +498,13 @@ export function buildReferenceItem(
             ref,
             data.knowledgeDBs,
             data.user.publicKey
+          ) ??
+          buildOutgoingReference(
+            refId,
+            data.knowledgeDBs,
+            data.user.publicKey,
+            data.documents,
+            data.documentByFilePath
           )
         : buildOutgoingReference(
             refId,

@@ -579,6 +579,82 @@ Copy Here
   cleanup();
 });
 
+test("Relative file links under the second top-level root resolve and show incoming refs", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(
+    workspacePath,
+    "docs/a.md",
+    "# First\n\n- one\n\n# Second\n\n- [Open B](./b.md)\n"
+  );
+  write(workspacePath, "docs/b.md", "# B\n\n- B-child\n");
+
+  await renderDocumentRoute(workspacePath, "docs/a.md");
+
+  await expectTree(`
+First
+  one
+Second
+  [R] B
+  `);
+
+  const bLink = await screen.findByLabelText("Navigate to B");
+  expect(bLink.getAttribute("href")).toMatch(/^\/d\//u);
+  await userEvent.click(bLink);
+
+  await expectTree(`
+B
+  B-child
+[I] Second
+  `);
+
+  cleanup();
+});
+
+test("Top-level file-link roots render as document links and incoming refs", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "files.md", "[Holidays](./holidays.md)\n");
+  write(workspacePath, "holidays.md", "# Holiday Destinations\n\n- Spain\n");
+
+  await renderDocumentRoute(workspacePath, "files.md");
+
+  await expectTree(`
+[R] Holiday Destinations
+  `);
+
+  const holidaysLink = await screen.findByLabelText(
+    "Navigate to Holiday Destinations"
+  );
+  expect(holidaysLink.getAttribute("href")).toMatch(/^\/d\//u);
+  await userEvent.click(holidaysLink);
+
+  await expectTree(`
+Holiday Destinations
+  Spain
+[I] Holiday Destinations
+  `);
+
+  cleanup();
+});
+
+test("Document incoming refs are hidden when any descendant links back", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "files.md", "# Links\n\n- [Holidays](./holidays.md)\n");
+  write(
+    workspacePath,
+    "holidays.md",
+    "# Holiday Destinations\n\n- [Files](./files.md)\n"
+  );
+
+  await renderDocumentRoute(workspacePath, "holidays.md");
+
+  await expectTree(`
+Holiday Destinations
+  [R] Links
+  `);
+
+  cleanup();
+});
+
 test("Dragging an existing file link preserves document-link behavior", async () => {
   const { path: workspacePath } = knowstrInit();
   write(workspacePath, "a.md", "# A\n\n- [Open B](./b.md)\n");

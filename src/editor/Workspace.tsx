@@ -68,6 +68,7 @@ import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
 import {
   documentDisplayName,
   getDocumentByIdOrFilePath,
+  getDocumentForNode,
   type Document,
 } from "../core/Document";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
@@ -345,7 +346,11 @@ function Breadcrumbs(): JSX.Element {
         pane.documentId
       )
     : undefined;
-  const document = paneDocument;
+  const document =
+    paneDocument ??
+    (rootNode
+      ? getDocumentForNode(data.knowledgeDBs, data.documents, rootNode)
+      : undefined);
   const nodeEntries: BreadcrumbEntry[] = rootNode
     ? buildAnchoredLineageEntries(knowledgeDBs, rootNode)
     : [];

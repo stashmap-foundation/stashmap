@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderAppTree } from "../appTestUtils.test";
 import {
@@ -6,15 +12,17 @@ import {
   getPane,
   navigateToNodeViaSearch,
   setDropIndentLevel,
+  textContent,
 } from "../utils.test";
 import {
   expectMarkdown,
   knowstrInit,
+  knowstrSave,
   readNodeId,
   write,
 } from "../testFixtures/workspace";
 import { loadCliProfile } from "../cli/config";
-import { buildDocumentRouteUrl } from "../navigationUrl";
+import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
 
 async function renderDocumentRoute(
   workspacePath: string,
@@ -26,6 +34,42 @@ async function renderDocumentRoute(
     initialRoute: buildDocumentRouteUrl(profile.pubkey, relativePath),
   });
 }
+
+async function renderNodeRoute(
+  workspacePath: string,
+  nodeId: LongID
+): Promise<void> {
+  await renderAppTree({
+    path: workspacePath,
+    initialRoute: buildNodeRouteUrl(nodeId),
+  });
+}
+
+function savedNodeId(
+  workspacePath: string,
+  relativePath: string,
+  needle: string
+): LongID {
+  const profile = loadCliProfile({ cwd: workspacePath });
+  return `${profile.pubkey}_${readNodeId(
+    workspacePath,
+    relativePath,
+    needle
+  )}` as LongID;
+}
+
+const titledMultiRootMarkdown = `---
+title: First
+---
+
+# First
+
+- one
+
+# Second
+
+- two
+`;
 
 async function altDropFromPane0ToPane1(
   sourceName: string,
@@ -41,6 +85,90 @@ async function altDropFromPane0ToPane1(
   fireEvent.drop(target, { altKey: true });
   await userEvent.keyboard("{/Alt}");
 }
+
+test("Graph route to a second document root shows the document breadcrumb", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "multi.md", titledMultiRootMarkdown);
+  await knowstrSave(workspacePath);
+
+  await renderNodeRoute(
+    workspacePath,
+    savedNodeId(workspacePath, "multi.md", "# Second")
+  );
+
+  await expectTree(`
+Second
+  two
+  `);
+
+  const breadcrumbs = await screen.findByRole("navigation", {
+    name: "Navigation breadcrumbs",
+  });
+  await within(breadcrumbs).findByLabelText("Navigate to First");
+  within(breadcrumbs).getByText("Second");
+
+  cleanup();
+});
+
+test("Document breadcrumb from graph routes opens the document overview", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "multi.md", titledMultiRootMarkdown);
+  await knowstrSave(workspacePath);
+
+  await renderNodeRoute(
+    workspacePath,
+    savedNodeId(workspacePath, "multi.md", "# Second")
+  );
+
+  const breadcrumbs = await screen.findByRole("navigation", {
+    name: "Navigation breadcrumbs",
+  });
+  await userEvent.click(
+    await within(breadcrumbs).findByLabelText("Navigate to First")
+  );
+
+  await expectTree(`
+First
+  one
+Second
+  two
+  `);
+
+  cleanup();
+});
+
+test("Document breadcrumbs suppress duplicate document and first-root labels", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "multi.md", titledMultiRootMarkdown);
+  await knowstrSave(workspacePath);
+
+  await renderNodeRoute(
+    workspacePath,
+    savedNodeId(workspacePath, "multi.md", "one")
+  );
+
+  await expectTree(`
+one
+  `);
+
+  expect(screen.queryByText(textContent("First/First/one"))).toBeNull();
+
+  const breadcrumbs = await screen.findByRole("navigation", {
+    name: "Navigation breadcrumbs",
+  });
+  await userEvent.click(
+    await within(breadcrumbs).findByLabelText("Navigate to First")
+  );
+
+  await expectTree(`
+First
+  one
+Second
+  two
+  `);
+
+  cleanup();
+});
 
 test("Dropping onto a row inside a document pane keeps the document open", async () => {
   const { path: workspacePath } = knowstrInit();

@@ -16,7 +16,7 @@ import {
   getDocumentByIdOrFilePath,
 } from "./core/Document";
 import { planUpdateNodeItemMetadataById } from "./dataPlanner";
-import { NodeItemMetadata } from "./nodeItemMetadata";
+import { NodeItemMetadata, updateNodeItemMetadata } from "./nodeItemMetadata";
 import {
   getParentView,
   getNodeForView,
@@ -35,6 +35,7 @@ import {
   planDeepCopyNode,
   planSaveNodeAndEnsureNodes,
   planUpdateEmptyNodeMetadata,
+  planUpsertNodes,
 } from "./planner";
 
 export type { NodeItemMetadata } from "./nodeItemMetadata";
@@ -55,6 +56,36 @@ function planUpdateExistingItemMetadata(
   return nodes && itemId
     ? planUpdateNodeItemMetadataById(plan, nodes.id, itemId, metadata)
     : plan;
+}
+
+function planUpdateDocumentTopNodeMetadata(
+  plan: Plan,
+  viewPath: ViewPath,
+  metadata: NodeItemMetadata,
+  editorText: string
+): Plan {
+  const pane = getPane(plan, viewPath);
+  const currentNode = getNodeForView(plan, viewPath);
+  if (
+    pane.documentId === undefined ||
+    !currentNode ||
+    currentNode.parent ||
+    !currentNode.docId ||
+    currentNode.author !== plan.user.publicKey
+  ) {
+    return plan;
+  }
+
+  const trimmed = editorText.trim();
+  const basePlan =
+    trimmed && trimmed !== getViewNodeText(plan, viewPath)
+      ? planSaveNodeAndEnsureNodes(plan, editorText, viewPath).plan
+      : plan;
+  const updatedNode = getNodeForView(basePlan, viewPath);
+
+  return updatedNode
+    ? planUpsertNodes(basePlan, updateNodeItemMetadata(updatedNode, metadata))
+    : basePlan;
 }
 
 function getSourceDocumentTarget(
@@ -171,7 +202,12 @@ export function planUpdateViewItemMetadata(
   }
   const parentView = getParentView(viewPath);
   if (!parentView) {
-    return plan;
+    return planUpdateDocumentTopNodeMetadata(
+      plan,
+      viewPath,
+      metadata,
+      editorText
+    );
   }
 
   if (isEmptySemanticID(rowID)) {

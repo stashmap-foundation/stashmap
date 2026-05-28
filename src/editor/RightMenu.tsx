@@ -10,6 +10,7 @@ import {
 } from "../ViewContext";
 import { isEmptySemanticID } from "../core/connections";
 import { useData } from "../DataContext";
+import { useCurrentPane } from "../SplitPanesContext";
 import { RelevanceSelector } from "./RelevanceSelector";
 import { EvidenceSelector } from "./EvidenceSelector";
 import { FullscreenButton } from "./FullscreenButton";
@@ -74,13 +75,19 @@ export function RightMenu(): JSX.Element {
     virtualType === "incoming" ||
     virtualType === "version";
   const isRoot = useIsRoot();
+  const pane = useCurrentPane();
+  const currentNode = useCurrentNode();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const isInSearchView = useIsInSearchView();
   const userEntryPublicKey = useCurrentUserEntryPublicKey();
   const [rowID] = useCurrentRowID();
+  const isDocumentTopLevel =
+    isRoot && pane.documentId !== undefined && !isVirtualItem && !!currentNode;
 
   const isReadonly =
-    isRoot || isInSearchView || (isViewingOtherUserContent && !isVirtualItem);
+    (isRoot && !isDocumentTopLevel) ||
+    isInSearchView ||
+    (isViewingOtherUserContent && !isVirtualItem);
 
   return (
     <div className="right-menu">

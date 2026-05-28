@@ -175,6 +175,87 @@ Updated Second
   cleanup();
 });
 
+test("Setting relevance on the second top-level root persists to markdown", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "multi.md", "# First\n\n# Second\n\n- child\n");
+
+  await renderDocumentRoute(workspacePath, "multi.md");
+  fireEvent.click(await screen.findByLabelText("set Second to relevant"));
+
+  await screen.findByLabelText("Relevant for Second");
+  await expectMarkdown(
+    workspacePath,
+    "multi.md",
+    `
+# First <!-- id:... -->
+
+# (!) Second <!-- id:... -->
+
+- child <!-- id:... -->
+`
+  );
+
+  cleanup();
+});
+
+test("Setting argument on a top-level root persists to markdown", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "multi.md", "# First\n\n# Second\n\n- child\n");
+
+  await renderDocumentRoute(workspacePath, "multi.md");
+  fireEvent.click(
+    await screen.findByLabelText("Evidence for Second: No evidence type")
+  );
+
+  await screen.findByLabelText("Evidence for Second: Confirms");
+  await expectMarkdown(
+    workspacePath,
+    "multi.md",
+    `
+# First <!-- id:... -->
+
+# (+) Second <!-- id:... -->
+
+- child <!-- id:... -->
+`
+  );
+
+  cleanup();
+});
+
+test("Editing top-level root text keeps the same node id", async () => {
+  const { path: workspacePath } = knowstrInit();
+  const secondId = "22222222-2222-4222-8222-222222222222";
+  write(
+    workspacePath,
+    "multi.md",
+    `# First <!-- id:11111111-1111-4111-8111-111111111111 -->\n\n# Second <!-- id:${secondId} -->\n\n- child <!-- id:33333333-3333-4333-8333-333333333333 -->\n`
+  );
+
+  await renderDocumentRoute(workspacePath, "multi.md");
+  const editor = await screen.findByLabelText("edit Second");
+  await userEvent.click(editor);
+  await userEvent.clear(editor);
+  await userEvent.type(editor, "Updated Second{Escape}");
+
+  await expectMarkdown(
+    workspacePath,
+    "multi.md",
+    `
+# First <!-- id:... -->
+
+# Updated Second <!-- id:... -->
+
+- child <!-- id:... -->
+`
+  );
+  expect(readNodeId(workspacePath, "multi.md", "# Updated Second")).toBe(
+    secondId
+  );
+
+  cleanup();
+});
+
 test("Deleting the first top-level root keeps the document with remaining roots", async () => {
   const { path: workspacePath } = knowstrInit();
   write(workspacePath, "multi.md", "# First\n\n- one\n\n# Second\n\n- two\n");

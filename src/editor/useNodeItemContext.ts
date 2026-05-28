@@ -16,6 +16,7 @@ import {
   NodeItemMetadata,
 } from "../nodeItemMutations";
 import { useData } from "../DataContext";
+import { useCurrentPane } from "../SplitPanesContext";
 import { useEditorText } from "./EditorTextContext";
 import { nodeText as getNodeSpanText } from "../core/nodeSpans";
 
@@ -50,24 +51,48 @@ export function useNodeItemContext(): NodeItemContext {
   const isInSearchView = useIsInSearchView();
   const currentNode = useCurrentNode();
   const parentView = getParentView(viewPath);
+  const pane = useCurrentPane();
+  const isDocumentTopLevel =
+    pane.documentId !== undefined && parentView === undefined && !!currentNode;
 
   const [rowID] = useCurrentRowID();
   const isEmptyNode = isEmptySemanticID(rowID);
-  const nodeID = parentView ? getNodeForView(data, parentView)?.id : undefined;
+  const nodeID = (() => {
+    if (parentView) {
+      return getNodeForView(data, parentView)?.id;
+    }
+    if (isDocumentTopLevel) {
+      return currentNode.id;
+    }
+    return undefined;
+  })();
   const editorTextContext = useEditorText();
   const nodeText = currentNode ? getNodeSpanText(currentNode) : "";
 
   const isVisible =
-    !isInSearchView && nodeIndex !== undefined && parentView !== undefined;
+    !isInSearchView &&
+    (isDocumentTopLevel ||
+      (nodeIndex !== undefined && parentView !== undefined));
 
   // Get the current row using context-aware lookup
-  const currentRow =
-    isVisible && parentView ? getCurrentEdgeForView(data, viewPath) : undefined;
+  const currentRow = (() => {
+    if (isDocumentTopLevel) {
+      return currentNode;
+    }
+    if (isVisible && parentView) {
+      return getCurrentEdgeForView(data, viewPath);
+    }
+    return undefined;
+  })();
 
   const updateMetadata = (metadata: NodeItemMetadata): void => {
     const editorText = editorTextContext?.text ?? "";
     if (isEmptyNode && !nodeID) return;
-    if (!isEmptyNode && (!isVisible || !parentView || nodeIndex === undefined))
+    if (
+      !isEmptyNode &&
+      !isDocumentTopLevel &&
+      (!isVisible || !parentView || nodeIndex === undefined)
+    )
       return;
 
     executePlan(

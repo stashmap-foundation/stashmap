@@ -241,7 +241,7 @@ Holiday Destinations
 
   await expectTree(`
 My Log
-  [R] Holiday Destinations
+  [R] Holiday Destinations >>>
   alpha
 `);
 });
@@ -383,7 +383,7 @@ My Links
 First
   Item One
 My Links
-  [R] First / Item One
+  [R] First / Item One >>>
 `);
 
   await waitFor(() => {

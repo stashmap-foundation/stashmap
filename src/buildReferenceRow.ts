@@ -3,7 +3,6 @@ import {
   getChildNodes,
   getNode,
   resolveNode,
-  isRefNode,
   shortID,
   splitID,
   itemPassesFilters,
@@ -18,8 +17,13 @@ import {
   isBlockFileLink,
   nodeText,
 } from "./core/nodeSpans";
-import { Document, documentKeyOf } from "./core/Document";
-import { resolveLinkPath } from "./core/linkPath";
+import {
+  Document,
+  documentKeyOf,
+  getDocumentByIdOrFilePath,
+  getDocumentForNode,
+} from "./core/Document";
+import { fileLinkIndexKey, resolveLinkPath } from "./core/linkPath";
 import {
   ViewPath,
   getParentView,
@@ -343,51 +347,6 @@ function computeVersionMeta(data: Data, viewPath: ViewPath): VersionMeta {
   return { updated: node.updated, addCount, removeCount };
 }
 
-function nodeLinksToTarget(
-  item: GraphNode | undefined,
-  targetNode: GraphNode,
-  knowledgeDBs: KnowledgeDBs,
-  documents?: ImmutableMap<string, Document>,
-  documentByFilePath?: ImmutableMap<string, Document>
-): item is GraphNode {
-  if (!item) return false;
-  if (isRefNode(item)) {
-    const resolvedTarget = resolveNode(knowledgeDBs, item);
-    return resolvedTarget?.id === targetNode.id;
-  }
-  if (isBlockFileLink(item) && documents && documentByFilePath) {
-    const resolvedTarget = resolveFileLinkRoot(
-      item,
-      knowledgeDBs,
-      documents,
-      documentByFilePath
-    );
-    return resolvedTarget?.id === targetNode.id;
-  }
-  return false;
-}
-
-function findCrefToNode(
-  children: List<ID>,
-  targetNode: GraphNode,
-  knowledgeDBs: KnowledgeDBs,
-  myself: PublicKey,
-  documents?: ImmutableMap<string, Document>,
-  documentByFilePath?: ImmutableMap<string, Document>
-): GraphNode | undefined {
-  return children
-    .map((childID) => getNode(knowledgeDBs, childID, myself))
-    .find((item) =>
-      nodeLinksToTarget(
-        item,
-        targetNode,
-        knowledgeDBs,
-        documents,
-        documentByFilePath
-      )
-    );
-}
-
 function getReferenceSourceNodes(
   ref: ParsedRef,
   knowledgeDBs: KnowledgeDBs
@@ -400,54 +359,130 @@ function getReferenceSourceNodes(
     : [ref.node];
 }
 
+function uniqueNodes(nodes: GraphNode[]): GraphNode[] {
+  const seen = new globalThis.Set<LongID>();
+  return nodes.filter((node) => {
+    if (seen.has(node.id)) return false;
+    seen.add(node.id);
+    return true;
+  });
+}
+
+function getDocumentTopSourceNodes(ref: ParsedRef, data: Data): GraphNode[] {
+  const document = getDocumentForNode(
+    data.knowledgeDBs,
+    data.documents,
+    ref.node
+  );
+  if (!document) return [];
+  return document.topNodeShortIds
+    .map((nodeID) =>
+      getNode(
+        data.knowledgeDBs,
+        joinID(document.author, nodeID as ID),
+        document.author
+      )
+    )
+    .filter((node): node is GraphNode => node !== undefined);
+}
+
+function linkOwnerID(item: GraphNode): LongID {
+  return (item.parent as LongID | undefined) ?? item.id;
+}
+
+function findIndexedGraphLinkItem(
+  data: Data,
+  targetNode: GraphNode,
+  sourceNodes: GraphNode[]
+): GraphNode | undefined {
+  const sourceIDs = new globalThis.Set(sourceNodes.map((node) => node.id));
+  const itemIDs = data.graphIndex.incomingCrefs.get(targetNode.id);
+  if (!itemIDs) return undefined;
+  return [...itemIDs]
+    .map((itemID) => data.graphIndex.nodeByID.get(itemID))
+    .filter((item): item is GraphNode => item !== undefined)
+    .find((item) => sourceIDs.has(linkOwnerID(item)));
+}
+
+function findIndexedFileLinkItem(
+  data: Data,
+  targetNode: GraphNode,
+  sourceNodes: GraphNode[]
+): GraphNode | undefined {
+  const targetDocument = getDocumentForNode(
+    data.knowledgeDBs,
+    data.documents,
+    targetNode
+  );
+  if (
+    !targetDocument ||
+    !targetDocument.filePath ||
+    targetDocument.topNodeShortIds[0] !== shortID(targetNode.id)
+  ) {
+    return undefined;
+  }
+  const itemIDs = data.graphIndex.incomingFileLinks.get(
+    fileLinkIndexKey(targetDocument.author, targetDocument.filePath)
+  );
+  if (!itemIDs) return undefined;
+  const sourceIDs = new globalThis.Set(sourceNodes.map((node) => node.id));
+  return [...itemIDs]
+    .map((itemID) => data.graphIndex.nodeByID.get(itemID))
+    .filter((item): item is GraphNode => item !== undefined)
+    .find((item) => sourceIDs.has(linkOwnerID(item)));
+}
+
+function findIndexedIncomingLinkItem(
+  ref: ParsedRef,
+  data: Data,
+  targetNode: GraphNode
+): GraphNode | undefined {
+  const sourceNodes = uniqueNodes([
+    ...getReferenceSourceNodes(ref, data.knowledgeDBs),
+    ...getDocumentTopSourceNodes(ref, data),
+  ]);
+  return (
+    findIndexedGraphLinkItem(data, targetNode, sourceNodes) ??
+    findIndexedFileLinkItem(data, targetNode, sourceNodes)
+  );
+}
+
+function getDocumentRootNodeForView(
+  data: Data,
+  viewPath: ViewPath
+): GraphNode | undefined {
+  const pane = getPane(data, viewPath);
+  const document = pane.documentId
+    ? getDocumentByIdOrFilePath(
+        data.documents,
+        data.documentByFilePath,
+        pane.author,
+        pane.documentId
+      )
+    : undefined;
+  const topNodeShortId = document?.topNodeShortIds[0];
+  return topNodeShortId && document
+    ? getNode(
+        data.knowledgeDBs,
+        joinID(document.author, topNodeShortId as ID),
+        document.author
+      )
+    : undefined;
+}
+
 function findIncomingCrefItem(
   ref: ParsedRef,
   data: Data,
   viewPath: ViewPath
 ): GraphNode | undefined {
   const parentPath = getParentView(viewPath);
-  if (!parentPath) return undefined;
-  const parentNode = getNodeForView(data, parentPath);
-  if (!parentNode) return undefined;
-  return getReferenceSourceNodes(ref, data.knowledgeDBs)
-    .map((sourceNode) =>
-      findCrefToNode(
-        sourceNode.children,
-        parentNode,
-        data.knowledgeDBs,
-        data.user.publicKey,
-        data.documents,
-        data.documentByFilePath
-      )
-    )
-    .find((item) => item !== undefined);
-}
-
-function findDocumentTopCrefItem(
-  ref: ParsedRef,
-  data: Data,
-  targetNode: GraphNode
-): GraphNode | undefined {
-  if (!ref.node.docId) {
-    return undefined;
-  }
-  const document = data.documents.get(
-    documentKeyOf(ref.node.author, ref.node.docId)
-  );
-  if (!document) {
-    return undefined;
-  }
-  return List(document.topNodeShortIds)
-    .map((nodeID) => getNode(data.knowledgeDBs, nodeID as ID, ref.node.author))
-    .find((item) =>
-      nodeLinksToTarget(
-        item,
-        targetNode,
-        data.knowledgeDBs,
-        data.documents,
-        data.documentByFilePath
-      )
-    );
+  const parentNode = parentPath
+    ? getNodeForView(data, parentPath) ??
+      getDocumentRootNodeForView(data, viewPath)
+    : getDocumentRootNodeForView(data, viewPath);
+  return parentNode
+    ? findIndexedIncomingLinkItem(ref, data, parentNode)
+    : undefined;
 }
 
 export function buildReferenceItem(
@@ -573,14 +608,14 @@ export function buildReferenceItem(
   }
 
   const parentPath = getParentView(viewPath);
-  if (!parentPath) {
-    return outgoing;
-  }
-
-  const parentNode = getNodeForView(data, parentPath);
+  const actualParentNode = parentPath
+    ? getNodeForView(data, parentPath)
+    : undefined;
+  const parentNode =
+    actualParentNode ?? getDocumentRootNodeForView(data, viewPath);
   if (
-    parentNode &&
-    nodesMatchForVersion(data.knowledgeDBs, ref.node, parentNode)
+    actualParentNode &&
+    nodesMatchForVersion(data.knowledgeDBs, ref.node, actualParentNode)
   ) {
     const computedVersionMeta = computeVersionMeta(data, viewPath);
     return {
@@ -596,21 +631,7 @@ export function buildReferenceItem(
   const storedItem = getNode(data.knowledgeDBs, refId, data.user.publicKey);
   const isNotRelevant = storedItem?.relevance === "not_relevant";
 
-  const findReverseCref = (children: List<ID>): GraphNode | undefined =>
-    findCrefToNode(
-      children,
-      parentNode,
-      data.knowledgeDBs,
-      data.user.publicKey,
-      data.documents,
-      data.documentByFilePath
-    );
-
-  const incomingCref =
-    getReferenceSourceNodes(ref, data.knowledgeDBs)
-      .map((sourceNode) => findReverseCref(sourceNode.children))
-      .find((item) => item !== undefined) ??
-    findDocumentTopCrefItem(ref, data, parentNode);
+  const incomingCref = findIndexedIncomingLinkItem(ref, data, parentNode);
   const hasActiveIncoming =
     !!incomingCref && incomingCref.relevance !== "not_relevant";
 
@@ -639,13 +660,9 @@ export function buildReferenceItem(
 
   const incomingRel = incomingCref!.relevance;
   const incomingArg = incomingCref!.argument;
-  const contextLabels =
-    outgoing.contextLabels.length === 0 && (incomingRel || incomingArg)
-      ? [nodeText(parentNode)]
-      : outgoing.contextLabels;
   const text = referenceToText({
     displayAs,
-    contextLabels,
+    contextLabels: outgoing.contextLabels,
     targetLabel: outgoing.targetLabel,
     incomingRelevance: incomingRel,
     incomingArgument: incomingArg,
@@ -653,7 +670,6 @@ export function buildReferenceItem(
   return {
     ...outgoing,
     text,
-    contextLabels,
     displayAs,
     incomingRelevance: incomingRel,
     incomingArgument: incomingArg,

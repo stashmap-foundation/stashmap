@@ -150,7 +150,7 @@ My Notes
 
       await expectTree(`
 ~Log
-  [R] First Note
+  [R] First Note >>>
       `);
     });
 
@@ -166,8 +166,8 @@ My Notes
 
       await expectTree(`
 ~Log
-  [R] Second Note
-  [R] First Note
+  [R] Second Note >>>
+  [R] First Note >>>
       `);
     });
 
@@ -209,9 +209,9 @@ My Notes
 
       await expectTree(`
 ~Log
-  [R] Third Note
-  [R] Second Note
-  [R] First Note
+  [R] Third Note >>>
+  [R] Second Note >>>
+  [R] First Note >>>
       `);
 
       cleanup();
@@ -223,9 +223,9 @@ My Notes
 
       await expectTree(`
 ~Log
-  [R] Third Note
-  [R] Second Note
-  [R] First Note
+  [R] Third Note >>>
+  [R] Second Note >>>
+  [R] First Note >>>
       `);
     });
 
@@ -245,7 +245,7 @@ My Notes
 
       await expectTree(`
 ~Log
-  [R] Reloaded Note
+  [R] Reloaded Note >>>
       `);
 
       cleanup();
@@ -256,7 +256,7 @@ My Notes
 
       await expectTree(`
 ~Log
-  [R] Reloaded Note
+  [R] Reloaded Note >>>
       `);
     });
 
@@ -276,7 +276,7 @@ My Notes
 
       await expectTree(`
 ~Log
-  [R] My Notes
+  [R] My Notes >>>
       `);
 
       await userEvent.click(await screen.findByText("My Notes"));

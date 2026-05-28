@@ -63,35 +63,7 @@ export function buildReferenceParts(
     ];
   }
 
-  if (displayAs === "incoming") {
-    const reversedContext = [...contextLabels].reverse().join(" / ");
-    return [
-      target,
-      ...indicator,
-      ...(reversedContext
-        ? [
-            { type: "arrow" as const, value: "<<<" as const },
-            { type: "text" as const, value: reversedContext },
-          ]
-        : []),
-    ];
-  }
-
-  if (displayAs === "bidirectional") {
-    return [
-      ...(contextPath
-        ? [
-            { type: "text" as const, value: contextPath },
-            { type: "arrow" as const, value: "<<<" as const },
-            { type: "arrow" as const, value: ">>>" as const },
-            ...indicator,
-          ]
-        : []),
-      target,
-    ];
-  }
-
-  return [
+  const endpoint = [
     ...(contextPath
       ? [
           { type: "text" as const, value: contextPath },
@@ -100,6 +72,25 @@ export function buildReferenceParts(
       : []),
     target,
   ];
+
+  if (displayAs === "incoming") {
+    return [
+      ...endpoint,
+      ...indicator,
+      { type: "arrow" as const, value: "<<<" as const },
+    ];
+  }
+
+  if (displayAs === "bidirectional") {
+    return [
+      ...endpoint,
+      { type: "arrow" as const, value: ">>>" as const },
+      ...indicator,
+      { type: "arrow" as const, value: "<<<" as const },
+    ];
+  }
+
+  return [...endpoint, { type: "arrow" as const, value: ">>>" as const }];
 }
 
 function partToText(part: ReferencePart): string {
@@ -109,6 +100,23 @@ function partToText(part: ReferencePart): string {
   return part.value;
 }
 
+export function needsReferencePartSpace(
+  parts: readonly ReferencePart[],
+  index: number
+): boolean {
+  if (index === 0) return false;
+  const previous = parts[index - 1];
+  const current = parts[index];
+  return !(previous.type === "indicator" && current.type === "arrow");
+}
+
 export function referenceToText(config: ReferenceDisplayConfig): string {
-  return buildReferenceParts(config).map(partToText).join(" ");
+  const parts = buildReferenceParts(config);
+  return parts.reduce(
+    (text, part, index) =>
+      `${text}${needsReferencePartSpace(parts, index) ? " " : ""}${partToText(
+        part
+      )}`,
+    ""
+  );
 }

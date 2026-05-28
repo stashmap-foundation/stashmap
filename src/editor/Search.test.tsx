@@ -23,7 +23,7 @@ Notes
 
     await expectTree(`
 Search: Bitcoin
-  [R] Notes / Bitcoin
+  [R] Notes / Bitcoin >>>
     `);
 
     await waitFor(() => {

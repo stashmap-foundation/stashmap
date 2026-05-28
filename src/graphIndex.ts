@@ -73,11 +73,10 @@ function addNodeLinkEntries(
   graphIndex: GraphIndex,
   node: GraphNode,
   sourceFilePath: string | undefined,
-  crefSourceID: LongID,
   fileLinkSourceID: LongID
 ): void {
   getAllLinks(node).forEach(({ targetID }) => {
-    addToNodeMap(graphIndex.incomingCrefs, targetID, crefSourceID);
+    addToNodeMap(graphIndex.incomingCrefs, targetID, node.id);
   });
   getAllFileLinks(node).forEach(({ path }) => {
     const resolved = resolveLinkPath(path, sourceFilePath);
@@ -90,11 +89,10 @@ function removeNodeLinkEntries(
   graphIndex: GraphIndex,
   node: GraphNode,
   sourceFilePath: string | undefined,
-  crefSourceID: LongID,
   fileLinkSourceID: LongID
 ): void {
   getAllLinks(node).forEach(({ targetID }) => {
-    removeFromNodeMap(graphIndex.incomingCrefs, targetID, crefSourceID);
+    removeFromNodeMap(graphIndex.incomingCrefs, targetID, node.id);
   });
   getAllFileLinks(node).forEach(({ path }) => {
     const resolved = resolveLinkPath(path, sourceFilePath);
@@ -114,7 +112,7 @@ function addNodeSemanticEntries(
   }
 
   if (!node.parent && node.relevance !== "not_relevant") {
-    addNodeLinkEntries(graphIndex, node, sourceFilePath, node.id, node.id);
+    addNodeLinkEntries(graphIndex, node, sourceFilePath, node.id);
   }
 
   node.children.forEach((childID) => {
@@ -125,13 +123,7 @@ function addNodeSemanticEntries(
     if (!childNode || childNode.relevance === "not_relevant") {
       return;
     }
-    addNodeLinkEntries(
-      graphIndex,
-      childNode,
-      sourceFilePath,
-      node.id,
-      childNode.id
-    );
+    addNodeLinkEntries(graphIndex, childNode, sourceFilePath, childNode.id);
   });
 }
 
@@ -146,7 +138,7 @@ function removeNodeSemanticEntries(
   }
 
   if (!node.parent && node.relevance !== "not_relevant") {
-    removeNodeLinkEntries(graphIndex, node, sourceFilePath, node.id, node.id);
+    removeNodeLinkEntries(graphIndex, node, sourceFilePath, node.id);
   }
 
   node.children.forEach((childID) => {
@@ -157,13 +149,7 @@ function removeNodeSemanticEntries(
     if (!childNode || childNode.relevance === "not_relevant") {
       return;
     }
-    removeNodeLinkEntries(
-      graphIndex,
-      childNode,
-      sourceFilePath,
-      node.id,
-      childNode.id
-    );
+    removeNodeLinkEntries(graphIndex, childNode, sourceFilePath, childNode.id);
   });
 }
 

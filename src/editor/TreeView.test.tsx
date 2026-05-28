@@ -61,8 +61,8 @@ test("search shows matches from different roots", async () => {
 
   await expectTree(`
 Search: Bitcoin
-  [R] P2P / Bitcoin
-  [R] Crypto / Bitcoin
+  [R] P2P / Bitcoin >>>
+  [R] Crypto / Bitcoin >>>
   `);
 });
 
@@ -88,8 +88,8 @@ test("search shows each matching context path", async () => {
 
   await expectTree(`
 Search: Target
-  [R] Work / Projects / Target
-  [R] Notes / Level1 / Level2 / Target
+  [R] Work / Projects / Target >>>
+  [R] Notes / Level1 / Level2 / Target >>>
   `);
 });
 
@@ -112,7 +112,7 @@ test("other user's search result shows other-user indicator", async () => {
 
   await expectTree(`
 Search: Shared
-  [OR] Bob Root / Shared
+  [OR] Bob Root / Shared >>>
   `);
 });
 

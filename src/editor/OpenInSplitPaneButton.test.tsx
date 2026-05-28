@@ -30,7 +30,7 @@ Root
   Target
   OtherParent
 Target
-  [R] Root / Source
+  [R] Root / Source >>>
   `);
 }
 
@@ -79,7 +79,7 @@ test("open reference row in split pane uses reference path", async () => {
 
   await expectTree(`
 Search: Spain
-  [R] My Notes / Holiday Destinations / Spain
+  [R] My Notes / Holiday Destinations / Spain >>>
   `);
 
   const splitButtons = await screen.findAllByLabelText("open in split pane");
@@ -87,7 +87,7 @@ Search: Spain
 
   await expectTree(`
 Search: Spain
-  [R] My Notes / Holiday Destinations / Spain
+  [R] My Notes / Holiday Destinations / Spain >>>
 Holiday Destinations
   Spain
   `);
@@ -128,7 +128,7 @@ Root
   Target
   OtherParent
 Target
-  [R] Root / Source
+  [R] Root / Source >>>
 Root
   Source
   Target

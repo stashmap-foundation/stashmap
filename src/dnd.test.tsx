@@ -120,7 +120,7 @@ Root
   Target
   OtherParent
 Target
-  [R] Root / Source
+  [R] Root / Source >>>
   `);
 
   cleanup();
@@ -132,7 +132,7 @@ Root
   Target
   OtherParent
 Target
-  [R] Root / Source
+  [R] Root / Source >>>
   `);
 
   const source = screen.getAllByRole("treeitem", { name: "Source" })[0];
@@ -150,7 +150,7 @@ Root
   OtherParent
     Source
 Target
-  [R] Root / OtherParent / Source
+  [R] Root / OtherParent / Source >>>
   `);
 
   await userEvent.click(await screen.findByLabelText("edit Source"));
@@ -167,9 +167,9 @@ Root
     Source
       Child1
       Child2
-      [I] Target <<< Root
+      [I] Root / Target <<<
 Target
-  [R] Root / OtherParent / Source
+  [R] Root / OtherParent / Source >>>
   `);
 
   await userEvent.click(
@@ -185,7 +185,7 @@ Root
     Source
       Child1
       Child2
-      [I] Target <<< Root
+      [I] Root / Target <<<
 OtherParent
   Source
   `);
@@ -347,7 +347,7 @@ test("search result path updates when source is moved", async () => {
 
   await expectTree(`
 Search: Barcelona
-  [R] My Notes / Holiday Destinations / Spain / Barcelona
+  [R] My Notes / Holiday Destinations / Spain / Barcelona >>>
   `);
 
   await userEvent.click(await screen.findByLabelText("Navigate to Log"));
@@ -393,7 +393,7 @@ My Notes
 
   await expectTree(`
 Search: Barcelona
-  [R] My Notes / Spain / Barcelona
+  [R] My Notes / Spain / Barcelona >>>
   `);
 });
 
@@ -413,21 +413,23 @@ test("dragging a search result to another pane adds it as a reference", async ()
 
   await expectTree(`
 Search: Source
-  [R] My Notes / Source
+  [R] My Notes / Source >>>
   `);
 
   await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
   await navigateToNodeViaSearch(1, "Target");
   await openNodeInFullscreen(1, "Target");
 
-  fireEvent.dragStart(getPane(0).getByText(textContent("My Notes / Source")));
+  fireEvent.dragStart(
+    getPane(0).getByText(textContent("My Notes / Source >>>"))
+  );
   fireEvent.drop(getPane(1).getByRole("treeitem", { name: "Target" }));
 
   await expectTree(`
 Search: Source
-  [R] My Notes / Source
+  [R] My Notes / Source >>>
 Target
-  [R] My Notes / Source
+  [R] My Notes / Source >>>
   `);
 });
 

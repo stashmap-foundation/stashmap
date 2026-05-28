@@ -5,6 +5,7 @@ import {
   ReferencePart,
   argumentChar,
   buildReferenceParts,
+  needsReferencePartSpace,
   relevanceChar,
 } from "./referenceText";
 
@@ -78,7 +79,7 @@ export function ReferenceDisplay({
     <span className={className} data-testid="reference-row">
       {parts.map((part, i) => (
         <React.Fragment key={partKey(part, i)}>
-          {i > 0 && " "}
+          {needsReferencePartSpace(parts, i) && " "}
           <RenderPart part={part} />
         </React.Fragment>
       ))}

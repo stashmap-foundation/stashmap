@@ -376,6 +376,26 @@ function incomingFileLinkSourceIDs(
   return ids ? [...ids] : [];
 }
 
+function getGraphLinkOwner(
+  graphIndex: GraphIndex,
+  linkItemID: LongID
+): GraphNode | undefined {
+  const item = graphIndex.nodeByID.get(linkItemID);
+  if (!item) return undefined;
+  return item.parent
+    ? graphIndex.nodeByID.get(item.parent as LongID) ?? item
+    : item;
+}
+
+function uniqueNodes(nodes: GraphNode[]): GraphNode[] {
+  const seen = new globalThis.Set<LongID>();
+  return nodes.filter((node) => {
+    if (seen.has(node.id)) return false;
+    seen.add(node.id);
+    return true;
+  });
+}
+
 export function getIncomingCrefsForDocument(
   knowledgeDBs: KnowledgeDBs,
   graphIndex: GraphIndex,
@@ -447,25 +467,28 @@ export function getIncomingCrefsForNode(
     return targetNode ? acc.add(targetNode.id) : acc;
   }, ImmutableSet<LongID>());
 
-  const crefSourceIDs = currentNodeID
+  const graphLinkSourceNodes = currentNodeID
     ? [
         ...(graphIndex.incomingCrefs.get(currentNodeID) ||
           new globalThis.Set<LongID>()),
       ]
+        .map((nodeID) => getGraphLinkOwner(graphIndex, nodeID))
+        .filter((node): node is GraphNode => node !== undefined)
     : [];
-  const fileLinkSourceIDs = incomingFileLinkSourceIDs(
+  const fileLinkSourceNodes = incomingFileLinkSourceIDs(
     graphIndex,
     currentNodeFilePath,
     currentNodeAuthor
-  );
-  const sourceIDs = [
-    ...new globalThis.Set([...crefSourceIDs, ...fileLinkSourceIDs]),
-  ];
+  )
+    .map((nodeID) => graphIndex.nodeByID.get(nodeID))
+    .filter((node): node is GraphNode => node !== undefined);
+  const sourceNodes = uniqueNodes([
+    ...graphLinkSourceNodes,
+    ...fileLinkSourceNodes,
+  ]);
 
   const refs = List(
-    sourceIDs
-      .map((nodeID) => graphIndex.nodeByID.get(nodeID))
-      .filter((node): node is GraphNode => node !== undefined)
+    sourceNodes
       .filter((node) => visibleAuthors.has(node.author))
       .filter((node) => node.id !== parentNodeID)
       .filter((node) => node.id !== currentNodeID)

@@ -407,7 +407,7 @@ A
       D
         E
 My links
-  [R] A / B / C / D / E
+  [R] A / B / C / D / E >>>
     `);
 
     await userEvent.click(screen.getAllByLabelText("edit C")[0]);
@@ -460,7 +460,7 @@ A
       D
         E
 My links
-  [R] A / B / C / D / E
+  [R] A / B / C / D / E >>>
     `);
 
     cleanup();
@@ -473,7 +473,7 @@ A
       D
         E
 My links
-  [R] A / B / C / D / E
+  [R] A / B / C / D / E >>>
     `);
 
     await userEvent.click(screen.getAllByLabelText("edit C")[0]);

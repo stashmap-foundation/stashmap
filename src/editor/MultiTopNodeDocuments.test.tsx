@@ -203,6 +203,21 @@ Source
   Child
   `);
 
+  await expectMarkdown(
+    workspacePath,
+    "multi.md",
+    `
+# Holiday Destinations
+
+- Spain
+  - Barcelona
+
+# Packlist
+
+- Charger
+`
+  );
+
   await userEvent.keyboard("{Alt>}");
   fireEvent.dragStart(getPane(1).getByRole("treeitem", { name: "Source" }));
   const spain = getPane(0).getByRole("treeitem", { name: "Spain" });
@@ -222,6 +237,139 @@ Source
   Child
   [I] Holiday Destinations / Spain <<<
   `);
+
+  cleanup();
+});
+
+test("Dragging document top-level roots does not reorder or create refs", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "multi.md", "# First\n\n# Second\n\n# Third\n");
+
+  await renderDocumentRoute(workspacePath, "multi.md");
+
+  fireEvent.dragStart(getPane(0).getByRole("treeitem", { name: "First" }));
+  const third = getPane(0).getByRole("treeitem", { name: "Third" });
+  setDropIndentLevel("First", "Third", 2);
+  fireEvent.dragOver(third);
+  fireEvent.drop(third);
+
+  await expectTree(`
+First
+Second
+Third
+  `);
+
+  await expectMarkdown(
+    workspacePath,
+    "multi.md",
+    `
+# First
+
+# Second
+
+# Third
+`
+  );
+
+  cleanup();
+});
+
+test("Dragging a document top-level root under another root is ignored", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "multi.md", "# Parent\n\n# Child Root\n\n# Third\n");
+
+  await renderDocumentRoute(workspacePath, "multi.md");
+
+  fireEvent.dragStart(getPane(0).getByRole("treeitem", { name: "Child Root" }));
+  const parent = getPane(0).getByRole("treeitem", { name: "Parent" });
+  setDropIndentLevel("Child Root", "Parent", 2);
+  fireEvent.dragOver(parent);
+  fireEvent.drop(parent);
+
+  await expectTree(`
+Parent
+Child Root
+Third
+  `);
+
+  await expectMarkdown(
+    workspacePath,
+    "multi.md",
+    `
+# Parent
+
+# Child Root
+
+# Third
+`
+  );
+
+  cleanup();
+});
+
+test("Dragging a child to document top level is ignored", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "multi.md", "# First\n\n- one\n\n# Second\n");
+
+  await renderDocumentRoute(workspacePath, "multi.md");
+
+  fireEvent.dragStart(getPane(0).getByRole("treeitem", { name: "one" }));
+  const documentPane = getPane(0).getByLabelText("Pane 0 content");
+  fireEvent.dragOver(documentPane);
+  fireEvent.drop(documentPane);
+
+  await expectTree(`
+First
+  one
+Second
+  `);
+
+  await expectMarkdown(
+    workspacePath,
+    "multi.md",
+    `
+# First
+
+- one
+
+# Second
+`
+  );
+
+  cleanup();
+});
+
+test("Child-level drag inside a document root still works", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "multi.md", "# First\n\n- one\n- two\n\n# Second\n");
+
+  await renderDocumentRoute(workspacePath, "multi.md");
+
+  fireEvent.dragStart(getPane(0).getByRole("treeitem", { name: "one" }));
+  const two = getPane(0).getByRole("treeitem", { name: "two" });
+  setDropIndentLevel("one", "two", 2);
+  fireEvent.dragOver(two);
+  fireEvent.drop(two);
+
+  await expectTree(`
+First
+  two
+  one
+Second
+  `);
+
+  await expectMarkdown(
+    workspacePath,
+    "multi.md",
+    `
+# First <!-- id:... -->
+
+- two <!-- id:... -->
+- one <!-- id:... -->
+
+# Second <!-- id:... -->
+`
+  );
 
   cleanup();
 });

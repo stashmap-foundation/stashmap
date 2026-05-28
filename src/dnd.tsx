@@ -2,7 +2,7 @@ import React from "react";
 import { List, OrderedSet, Set } from "immutable";
 import { DndProvider, useDragLayer, XYCoord } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { moveNodes, createRefTarget } from "./core/connections";
+import { moveNodes, createRefTarget, shortID } from "./core/connections";
 import {
   getBlockLinkTarget,
   getBlockLinkText,
@@ -21,6 +21,7 @@ import {
   getPaneIndex,
   viewPathToString,
   getCurrentEdgeForView,
+  isRoot,
 } from "./ViewContext";
 import { getDocumentByIdOrFilePath } from "./core/Document";
 import { getNodesInDocument, getNodesInTree } from "./treeTraversal";
@@ -260,6 +261,28 @@ export function dnd(
   const sourcePaneIndex = getPaneIndex(sourceViewPath);
   const targetPaneIndex = getPaneIndex(rootView);
   const isSamePane = sourcePaneIndex === targetPaneIndex;
+  const targetPane = getPane(plan, rootView);
+  const targetDocument = targetPane.documentId
+    ? getDocumentByIdOrFilePath(
+        plan.documents,
+        plan.documentByFilePath,
+        targetPane.author,
+        targetPane.documentId
+      )
+    : undefined;
+  const sourceDocumentNode = getNodeForView(plan, sourceViewPath);
+  const isDocumentTopLevelSource =
+    isSamePane &&
+    isRoot(sourceViewPath) &&
+    sourceDocumentNode !== undefined &&
+    targetDocument?.author === sourceDocumentNode.author &&
+    targetDocument.topNodeShortIds.includes(shortID(sourceDocumentNode.id));
+  const isDocumentRootDropTarget =
+    targetDocument !== undefined && isRoot(toView) && !toNode;
+
+  if (isDocumentTopLevelSource || isDocumentRootDropTarget) {
+    return plan;
+  }
 
   const sourceParentKey = getParentKey(source);
   const allSourcesSameParent =

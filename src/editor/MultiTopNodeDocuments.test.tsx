@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderAppTree } from "../appTestUtils.test";
 import {
@@ -171,6 +171,75 @@ Updated Second
 - two <!-- id:... -->
 `
   );
+
+  cleanup();
+});
+
+test("Deleting the first top-level root keeps the document with remaining roots", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "multi.md", "# First\n\n- one\n\n# Second\n\n- two\n");
+
+  await renderDocumentRoute(workspacePath, "multi.md");
+  await userEvent.click(await screen.findByLabelText("edit First"));
+  await userEvent.keyboard("{Escape}{Delete}");
+
+  await expectTree(`
+Second
+  two
+  `);
+
+  await expectMarkdown(
+    workspacePath,
+    "multi.md",
+    `
+# Second <!-- id:... -->
+
+- two <!-- id:... -->
+`
+  );
+
+  cleanup();
+});
+
+test("Deleting the second top-level root keeps the document with remaining roots", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "multi.md", "# First\n\n- one\n\n# Second\n\n- two\n");
+
+  await renderDocumentRoute(workspacePath, "multi.md");
+  await userEvent.click(await screen.findByLabelText("edit Second"));
+  await userEvent.keyboard("{Escape}{Delete}");
+
+  await expectTree(`
+First
+  one
+  `);
+
+  await expectMarkdown(
+    workspacePath,
+    "multi.md",
+    `
+# First <!-- id:... -->
+
+- one <!-- id:... -->
+`
+  );
+
+  cleanup();
+});
+
+test("Deleting the last top-level root removes the document file", async () => {
+  const { path: workspacePath } = knowstrInit();
+  write(workspacePath, "only.md", "# Only\n\n- child\n");
+
+  await renderDocumentRoute(workspacePath, "only.md");
+  await userEvent.click(await screen.findByLabelText("edit Only"));
+  await userEvent.keyboard("{Escape}{Delete}");
+
+  await expectMarkdown(workspacePath, "only.md", "");
+  await waitFor(() => {
+    expect(screen.queryByText("Only")).toBeNull();
+    expect(screen.queryByText("child")).toBeNull();
+  });
 
   cleanup();
 });

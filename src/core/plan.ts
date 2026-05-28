@@ -520,6 +520,78 @@ export function planMoveDescendantNodes<T extends GraphPlan>(
   }, plan);
 }
 
+function withDocumentInFilePathIndex<T extends GraphPlan>(
+  plan: T,
+  document: Document
+): T {
+  return document.filePath
+    ? {
+        ...plan,
+        documentByFilePath: plan.documentByFilePath.set(
+          document.filePath,
+          document
+        ),
+      }
+    : plan;
+}
+
+function withoutDocumentInFilePathIndex<T extends GraphPlan>(
+  plan: T,
+  document: Document | undefined
+): T {
+  if (!document?.filePath) {
+    return plan;
+  }
+  const current = plan.documentByFilePath.get(document.filePath);
+  return current?.docId === document.docId
+    ? {
+        ...plan,
+        documentByFilePath: plan.documentByFilePath.remove(document.filePath),
+      }
+    : plan;
+}
+
+function planDeleteDocumentRoot<T extends GraphPlan>(
+  plan: T,
+  node: GraphNode,
+  nextKnowledgeDBs: KnowledgeDBs,
+  docId: string
+): T {
+  const key = documentKeyOf(node.author, docId);
+  const document = plan.documents.get(key);
+  const remainingTopNodeShortIds =
+    document?.topNodeShortIds.filter((id) => id !== shortID(node.id)) ?? [];
+
+  if (document && remainingTopNodeShortIds.length > 0) {
+    const nextDocument: Document = {
+      ...document,
+      topNodeShortIds: remainingTopNodeShortIds,
+      updatedMs: Date.now(),
+    };
+    return withDocumentInFilePathIndex(
+      {
+        ...plan,
+        knowledgeDBs: nextKnowledgeDBs,
+        documents: plan.documents.set(key, nextDocument),
+        affectedDocuments: plan.affectedDocuments.add(docId),
+        deletedDocs: plan.deletedDocs.remove(docId),
+      },
+      nextDocument
+    );
+  }
+
+  return withoutDocumentInFilePathIndex(
+    {
+      ...plan,
+      knowledgeDBs: nextKnowledgeDBs,
+      documents: plan.documents.remove(key),
+      affectedDocuments: plan.affectedDocuments.remove(docId),
+      deletedDocs: plan.deletedDocs.add(docId),
+    },
+    document
+  );
+}
+
 export function planDeleteNodes<T extends GraphPlan>(
   plan: T,
   nodeID: LongID
@@ -540,12 +612,7 @@ export function planDeleteNodes<T extends GraphPlan>(
   }
   const { docId } = node;
   if (!node.parent && docId) {
-    return {
-      ...plan,
-      knowledgeDBs: nextKnowledgeDBs,
-      affectedDocuments: plan.affectedDocuments.remove(docId),
-      deletedDocs: plan.deletedDocs.add(docId),
-    };
+    return planDeleteDocumentRoot(plan, node, nextKnowledgeDBs, docId);
   }
   return {
     ...plan,

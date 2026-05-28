@@ -610,6 +610,44 @@ B
   cleanup();
 });
 
+test("Graph links under the second top-level root resolve and show incoming refs", async () => {
+  const { path: workspacePath } = knowstrInit();
+  const profile = loadCliProfile({ cwd: workspacePath });
+  const targetShortId = "22222222-2222-4222-8222-222222222222";
+  const targetId = `${profile.pubkey}_${targetShortId}`;
+  write(
+    workspacePath,
+    "source.md",
+    `# First\n\n- one\n\n# Second\n\n- [Target](#${targetId})\n`
+  );
+  write(
+    workspacePath,
+    "target.md",
+    `# Target <!-- id:${targetShortId} -->\n\n- Target child\n`
+  );
+
+  await renderDocumentRoute(workspacePath, "source.md");
+
+  await expectTree(`
+First
+  one
+Second
+  [R] Target
+  `);
+
+  const targetLink = await screen.findByLabelText("Navigate to Target");
+  expect(targetLink.getAttribute("href")).toMatch(/^\/r\//u);
+  await userEvent.click(targetLink);
+
+  await expectTree(`
+Target
+  Target child
+  [I] Second
+  `);
+
+  cleanup();
+});
+
 test("Top-level file-link roots render as document links and incoming refs", async () => {
   const { path: workspacePath } = knowstrInit();
   write(workspacePath, "files.md", "[Holidays](./holidays.md)\n");
@@ -636,7 +674,38 @@ Holiday Destinations
   cleanup();
 });
 
-test("Document incoming refs are hidden when any descendant links back", async () => {
+test("Top-level graph-link roots render as graph refs and incoming refs", async () => {
+  const { path: workspacePath } = knowstrInit();
+  const profile = loadCliProfile({ cwd: workspacePath });
+  const targetShortId = "22222222-2222-4222-8222-222222222222";
+  const targetId = `${profile.pubkey}_${targetShortId}`;
+  write(workspacePath, "links.md", `[Target](#${targetId})\n`);
+  write(
+    workspacePath,
+    "target.md",
+    `# Target <!-- id:${targetShortId} -->\n\n- Target child\n`
+  );
+
+  await renderDocumentRoute(workspacePath, "links.md");
+
+  await expectTree(`
+[R] Target
+  `);
+
+  const targetLink = await screen.findByLabelText("Navigate to Target");
+  expect(targetLink.getAttribute("href")).toMatch(/^\/r\//u);
+  await userEvent.click(targetLink);
+
+  await expectTree(`
+Target
+  Target child
+  [I] Target
+  `);
+
+  cleanup();
+});
+
+test("Mutual file links show outgoing from both sides without duplicate incoming refs", async () => {
   const { path: workspacePath } = knowstrInit();
   write(workspacePath, "files.md", "# Links\n\n- [Holidays](./holidays.md)\n");
   write(
@@ -650,6 +719,89 @@ test("Document incoming refs are hidden when any descendant links back", async (
   await expectTree(`
 Holiday Destinations
   [R] Links
+  `);
+
+  cleanup();
+  await renderDocumentRoute(workspacePath, "files.md");
+
+  await expectTree(`
+Links
+  [R] Holiday Destinations
+  `);
+
+  cleanup();
+});
+
+test("Mutual graph links show outgoing from both sides without duplicate incoming refs", async () => {
+  const { path: workspacePath } = knowstrInit();
+  const profile = loadCliProfile({ cwd: workspacePath });
+  const aShortId = "11111111-1111-4111-8111-111111111111";
+  const bShortId = "22222222-2222-4222-8222-222222222222";
+  const aId = `${profile.pubkey}_${aShortId}`;
+  const bId = `${profile.pubkey}_${bShortId}`;
+  write(
+    workspacePath,
+    "a.md",
+    `# A <!-- id:${aShortId} -->\n\n- [B](#${bId})\n`
+  );
+  write(
+    workspacePath,
+    "b.md",
+    `# B <!-- id:${bShortId} -->\n\n- [A](#${aId})\n`
+  );
+
+  await renderDocumentRoute(workspacePath, "a.md");
+
+  await expectTree(`
+A
+  [R] B
+  `);
+
+  cleanup();
+  await renderDocumentRoute(workspacePath, "b.md");
+
+  await expectTree(`
+B
+  [R] A
+  `);
+
+  cleanup();
+});
+
+test("Graph incoming refs can become bidirectional from both sides", async () => {
+  const { path: workspacePath } = knowstrInit();
+  const profile = loadCliProfile({ cwd: workspacePath });
+  const targetShortId = "22222222-2222-4222-8222-222222222222";
+  const targetId = `${profile.pubkey}_${targetShortId}`;
+  write(workspacePath, "source.md", `# Source\n\n- [Target](#${targetId})\n`);
+  write(
+    workspacePath,
+    "target.md",
+    `# Target <!-- id:${targetShortId} -->\n\n- Target child\n`
+  );
+
+  await renderDocumentRoute(workspacePath, "target.md");
+
+  await expectTree(`
+Target
+  Target child
+  [I] Source
+  `);
+
+  await userEvent.click(getPane(0).getByRole("treeitem", { name: "Source" }));
+  await userEvent.keyboard("!");
+
+  await expectTree(`
+Target
+  Target child
+  [R] Source
+  `);
+
+  await userEvent.click(await screen.findByLabelText("Navigate to Source"));
+
+  await expectTree(`
+Source
+  [R] Source <<< >>> ! Target
   `);
 
   cleanup();

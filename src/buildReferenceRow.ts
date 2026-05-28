@@ -640,10 +640,7 @@ export function buildReferenceItem(
   const incomingRel = incomingCref!.relevance;
   const incomingArg = incomingCref!.argument;
   const contextLabels =
-    outgoing.contextLabels.length === 0 &&
-    ref.sourceItem &&
-    isBlockFileLink(ref.sourceItem) &&
-    (incomingRel || incomingArg)
+    outgoing.contextLabels.length === 0 && (incomingRel || incomingArg)
       ? [nodeText(parentNode)]
       : outgoing.contextLabels;
   const text = referenceToText({

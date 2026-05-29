@@ -41,7 +41,7 @@ function nodeChildren(
   return node ? getChildNodes(knowledgeDBs, node, myself) : List<GraphNode>();
 }
 
-test("Single file with multiple top-level roots is wrapped by filename", () => {
+test("Single file with multiple top-level roots imports each root directly", () => {
   const trees = parseMarkdownImportFiles([
     {
       name: "roadmap.md",
@@ -51,26 +51,21 @@ test("Single file with multiple top-level roots is wrapped by filename", () => {
 
   expect(trees).toEqual([
     {
-      spans: plainSpans("roadmap"),
-      children: [
-        {
-          spans: plainSpans("Phase 1"),
-          children: [],
-          blockKind: "heading",
-          headingLevel: 1,
-        },
-        {
-          spans: plainSpans("Phase 2"),
-          children: [],
-          blockKind: "heading",
-          headingLevel: 1,
-        },
-      ],
+      spans: plainSpans("Phase 1"),
+      children: [],
+      blockKind: "heading",
+      headingLevel: 1,
+    },
+    {
+      spans: plainSpans("Phase 2"),
+      children: [],
+      blockKind: "heading",
+      headingLevel: 1,
     },
   ]);
 });
 
-test("Front matter is not rendered and title can supply the import root", () => {
+test("Front matter is not rendered and title does not supply an import root", () => {
   const trees = parseMarkdownImportFiles([
     {
       name: "problem.md",
@@ -87,19 +82,14 @@ source_id: "src_problem"
 
   expect(trees).toEqual([
     {
-      spans: plainSpans("Imported Title"),
-      children: [
-        {
-          spans: plainSpans("first"),
-          children: [],
-          blockKind: "list_item",
-        },
-        {
-          spans: plainSpans("second"),
-          children: [],
-          blockKind: "list_item",
-        },
-      ],
+      spans: plainSpans("first"),
+      children: [],
+      blockKind: "list_item",
+    },
+    {
+      spans: plainSpans("second"),
+      children: [],
+      blockKind: "list_item",
     },
   ]);
 });
@@ -134,7 +124,7 @@ tags:
     .map((node) => nodeText(node))
     .toArray();
 
-  expect(texts).toContain("Alice and Bob Huddle");
+  expect(texts).not.toContain("Alice and Bob Huddle");
   expect(texts).toContain("First point");
   expect(texts).toContain("Second point");
   expect(texts).not.toContain('title: "Alice and Bob Huddle"');
@@ -285,6 +275,29 @@ test("Planning multiple markdown files returns top nodes in import order", () =>
   const [plan, topNodeIDs] = planCreateNodesFromMarkdownFiles(basePlan, [
     { name: "one.md", markdown: "# One" },
     { name: "two.md", markdown: "# Two" },
+  ]);
+
+  const topTexts = topNodeIDs.map((semanticID) => {
+    const found = plan.knowledgeDBs
+      .get(plan.user.publicKey)
+      ?.nodes.valueSeq()
+      .find(
+        (node) =>
+          isStandaloneRoot(node) &&
+          getSemanticID(plan.knowledgeDBs, node) === semanticID
+      );
+    return found ? nodeText(found) : undefined;
+  });
+
+  expect(topTexts).toEqual(["One", "Two"]);
+});
+
+test("Planning one markdown file with multiple roots returns top nodes in source order", () => {
+  const [alice] = setup([ALICE]);
+  const basePlan = createPlan(alice());
+
+  const [plan, topNodeIDs] = planCreateNodesFromMarkdownFiles(basePlan, [
+    { name: "multi.md", markdown: "# One\n\n# Two" },
   ]);
 
   const topTexts = topNodeIDs.map((semanticID) => {

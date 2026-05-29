@@ -1,8 +1,9 @@
-import { List } from "immutable";
+import { List, Map as ImmutableMap } from "immutable";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { createPlan, buildDocumentEvents } from "../planner";
 import { getChildNodes, getNode, getSemanticID } from "../core/connections";
 import { isStandaloneRoot } from "../core/systemRoots";
+import { newDB } from "../core/knowledge";
 import {
   ALICE,
   expectTree,
@@ -14,15 +15,22 @@ import {
 import { execute } from "../infra/nostr/executor";
 import { processEvents } from "../eventProcessing";
 import {
-  buildRootTreeForEmptyRootDrop,
   parseMarkdownImportFiles,
   parseTextToTrees,
   planCreateNodesFromMarkdown,
   planCreateNodesFromMarkdownFiles,
   planCreateNodesFromMarkdownTrees,
+  planImportMarkdownFilesAtEmptyRoot,
 } from "./FileDropZone";
 import { MarkdownTreeNode, parseMarkdown } from "../core/markdownTree";
-import { nodeText, plainSpans, spansText } from "../core/nodeSpans";
+import {
+  getBlockFileLinkPath,
+  nodeText,
+  plainSpans,
+  spansText,
+} from "../core/nodeSpans";
+import { documentKeyOf } from "../core/Document";
+import { eventToParsed } from "../nostrEvents";
 
 const parseTree = (text: string): MarkdownTreeNode[] =>
   parseMarkdown(text).tree;
@@ -199,20 +207,142 @@ social pressures, influences and inducements. He stands in stark contrast
   ]);
 });
 
-test("Empty-root drop wrapper is only used for multiple imported trees", () => {
-  const singleTree: MarkdownTreeNode[] = [
-    { spans: plainSpans("Only"), children: [] },
-  ];
-  expect(buildRootTreeForEmptyRootDrop(singleTree)).toEqual(singleTree[0]);
+test("Empty-root markdown file drop opens one document with all roots from the file", () => {
+  const [alice] = setup([ALICE]);
+  const user = alice();
+  const plan = planImportMarkdownFilesAtEmptyRoot(
+    createPlan(user),
+    [
+      {
+        name: "source.md",
+        markdown: "# First Root\n\n# Second Root",
+      },
+    ],
+    0
+  );
 
-  const multipleTrees: MarkdownTreeNode[] = [
-    { spans: plainSpans("One"), children: [] },
-    { spans: plainSpans("Two"), children: [] },
-  ];
-  expect(buildRootTreeForEmptyRootDrop(multipleTrees)).toEqual({
-    spans: plainSpans("Imported Markdown Files"),
-    children: multipleTrees,
+  const pane = plan.panes[0];
+  const document = pane.documentId
+    ? plan.documents.get(documentKeyOf(plan.user.publicKey, pane.documentId))
+    : undefined;
+  const nodes = plan.knowledgeDBs.get(plan.user.publicKey)?.nodes;
+  const topTexts = document?.topNodeShortIds.map((id) => {
+    const node = nodes?.get(id);
+    return node ? nodeText(node) : undefined;
   });
+  const rootDocIds = document?.topNodeShortIds.map(
+    (id) => nodes?.get(id)?.docId
+  );
+
+  expect(pane.rootNodeId).toBeUndefined();
+  expect(document?.title).toBe("source");
+  expect(document?.filePath).toBe("source.md");
+  expect(document?.relativePath).toBe("source.md");
+  expect(topTexts).toEqual(["First Root", "Second Root"]);
+  expect(rootDocIds).toEqual([document?.docId, document?.docId]);
+});
+
+test("Empty-root markdown file drop creates a wrapper document for multiple files", () => {
+  const [alice] = setup([ALICE]);
+  const user = alice();
+  const plan = planImportMarkdownFilesAtEmptyRoot(
+    createPlan(user),
+    [
+      {
+        name: "first.md",
+        markdown: "# First Markdown File",
+      },
+      {
+        name: "second.md",
+        markdown: "# Second Markdown File",
+      },
+    ],
+    0
+  );
+
+  const pane = plan.panes[0];
+  const wrapperDocument = pane.documentId
+    ? plan.documents.get(documentKeyOf(plan.user.publicKey, pane.documentId))
+    : undefined;
+  const importedDocuments = plan.documents
+    .valueSeq()
+    .filter(
+      (document) =>
+        document.docId !== wrapperDocument?.docId &&
+        document.systemRole !== "log"
+    )
+    .toArray();
+  const nodes = plan.knowledgeDBs.get(plan.user.publicKey)?.nodes;
+  const wrapperRoot = wrapperDocument
+    ? nodes?.get(wrapperDocument.topNodeShortIds[0])
+    : undefined;
+  const wrapperLinks = nodeChildren(
+    plan.knowledgeDBs,
+    wrapperRoot,
+    plan.user.publicKey
+  ).toArray();
+  const importedRootTexts = importedDocuments.map((document) =>
+    document.topNodeShortIds.map((id) => {
+      const node = nodes?.get(id);
+      return node ? nodeText(node) : undefined;
+    })
+  );
+  const wrapperEvent = buildDocumentEvents(plan).find((event) =>
+    event.tags.some(
+      (tag) => tag[0] === "d" && tag[1] === wrapperDocument?.docId
+    )
+  );
+  const parsedWrapper = wrapperEvent ? eventToParsed(wrapperEvent) : undefined;
+  const parsedWrapperRoot = parsedWrapper?.nodes.get(
+    parsedWrapper.document.topNodeShortIds[0]
+  );
+  const parsedKnowledgeDBs = parsedWrapper
+    ? ImmutableMap<PublicKey, KnowledgeData>([
+        [
+          plan.user.publicKey,
+          {
+            ...newDB(),
+            nodes: parsedWrapper.nodes,
+          },
+        ],
+      ])
+    : undefined;
+  const parsedWrapperLinks =
+    parsedKnowledgeDBs && parsedWrapperRoot
+      ? getChildNodes(
+          parsedKnowledgeDBs,
+          parsedWrapperRoot,
+          plan.user.publicKey
+        ).toArray()
+      : [];
+
+  expect(pane.rootNodeId).toBeUndefined();
+  expect(wrapperDocument?.title).toBe("Imported Files");
+  expect(wrapperRoot ? nodeText(wrapperRoot) : undefined).toBe(
+    "Imported Files"
+  );
+  expect(importedDocuments.map((document) => document.title).sort()).toEqual([
+    "first",
+    "second",
+  ]);
+  expect(importedDocuments.map((document) => document.filePath)).toEqual([
+    "first.md",
+    "second.md",
+  ]);
+  expect(importedRootTexts).toEqual([
+    ["First Markdown File"],
+    ["Second Markdown File"],
+  ]);
+  expect(wrapperLinks.map((node) => nodeText(node))).toEqual([
+    "first",
+    "second",
+  ]);
+  expect(wrapperLinks.map((node) => getBlockFileLinkPath(node))).toEqual(
+    importedDocuments.map((document) => document.docId)
+  );
+  expect(parsedWrapperLinks.map((node) => getBlockFileLinkPath(node))).toEqual(
+    importedDocuments.map((document) => document.docId)
+  );
 });
 
 test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
@@ -491,6 +621,21 @@ test("parseMarkdownHierarchy parses .md path link as fileLink span", () => {
       children: [
         expect.objectContaining({
           spans: [{ kind: "fileLink", path: "../foo/b.md", text: "Open B" }],
+          blockKind: "list_item",
+        }),
+      ],
+    }),
+  ]);
+});
+
+test("parseMarkdownHierarchy parses knowstr document id links as fileLink spans", () => {
+  const docId = "123e4567-e89b-12d3-a456-426614174000";
+  const trees = parseTree(`# Root\n- [Imported](${docId})\n`);
+  expect(trees).toEqual([
+    expect.objectContaining({
+      children: [
+        expect.objectContaining({
+          spans: [{ kind: "fileLink", path: docId, text: "Imported" }],
           blockKind: "list_item",
         }),
       ],

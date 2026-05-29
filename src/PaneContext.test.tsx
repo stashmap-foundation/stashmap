@@ -213,7 +213,7 @@ test("Opening /n/ URL with author param shows READONLY", async () => {
   `);
 });
 
-test("Breadcrumb navigation uses node URLs when a concrete target exists", async () => {
+test("Breadcrumb navigation opens document URLs for document roots", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
 
   renderApp(alice());
@@ -238,7 +238,7 @@ test("Breadcrumb navigation uses node URLs when a concrete target exists", async
   await userEvent.click(await screen.findByLabelText("Navigate to My Notes"));
 
   await waitFor(() => {
-    expect(window.location.pathname).toMatch(/^\/r\//);
+    expect(window.location.pathname).toMatch(/^\/d\//);
   });
   await screen.findByText("READONLY");
 });

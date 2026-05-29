@@ -6,7 +6,6 @@ import { dnd, getDropDestinationFromTreeView } from "../dnd";
 import { isEmptySemanticID } from "../core/connections";
 import { useTemporaryView } from "./TemporaryViewContext";
 import {
-  Plan,
   AddToParentTarget,
   planSetTemporarySelectionState,
   planUpdatePanes,
@@ -22,10 +21,9 @@ import {
 import { NOTE_TYPE, INDENTATION } from "./Node";
 import { useCurrentPane } from "../SplitPanesContext";
 import {
-  buildRootTreeForEmptyRootDrop,
   MarkdownImportFile,
   parseMarkdownImportFiles,
-  planCreateNodesFromMarkdownTrees,
+  planImportMarkdownFilesAtEmptyRoot,
   planPasteMarkdownTrees,
 } from "./FileDropZone";
 
@@ -79,23 +77,6 @@ function getFilesFromNativeDrop(item: NativeFileDropItem): File[] {
     return files;
   }
   return Array.from(files);
-}
-
-function planMaterializeImportedRoot(
-  plan: Plan,
-  paneIndex: number,
-  rootItemID: ID
-): Plan {
-  const updatedPanes = plan.panes.map((paneState, idx) => {
-    if (idx !== paneIndex) {
-      return paneState;
-    }
-    return {
-      ...paneState,
-      rootNodeId: rootItemID,
-    };
-  });
-  return planUpdatePanes(plan, updatedPanes);
 }
 
 function calcDragDirection(
@@ -407,8 +388,7 @@ export function useDroppable({
                 };
               })
           );
-          const importedTrees = parseMarkdownImportFiles(markdownFiles);
-          if (importedTrees.length === 0) {
+          if (markdownFiles.length === 0) {
             return;
           }
 
@@ -425,19 +405,14 @@ export function useDroppable({
           const [dropParentItemID] = getRowIDFromView(plan, dropParentPath);
 
           if (isEmptySemanticID(dropParentItemID)) {
-            const rootTree = buildRootTreeForEmptyRootDrop(importedTrees);
-            if (!rootTree) {
-              return;
-            }
-            const [planWithMarkdown, topItemIDs] =
-              planCreateNodesFromMarkdownTrees(plan, [rootTree]);
-            const rootItemID = topItemIDs[0];
-            if (!rootItemID) {
-              return;
-            }
             await executePlan(
-              planMaterializeImportedRoot(planWithMarkdown, path[0], rootItemID)
+              planImportMarkdownFilesAtEmptyRoot(plan, markdownFiles, path[0])
             );
+            return;
+          }
+
+          const importedTrees = parseMarkdownImportFiles(markdownFiles);
+          if (importedTrees.length === 0) {
             return;
           }
 

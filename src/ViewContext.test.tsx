@@ -314,7 +314,9 @@ Programming Languages
     name: "Navigation breadcrumbs",
   });
   await within(breadcrumbs).findByLabelText("Navigate to My Notes");
-  expect(within(breadcrumbs).getByText("Programming Languages")).toBeDefined();
+  expect(
+    within(breadcrumbs).getByLabelText("Navigate to Programming Languages")
+  ).toBeDefined();
 
   await userEvent.click(
     within(breadcrumbs).getByLabelText("Navigate to My Notes")

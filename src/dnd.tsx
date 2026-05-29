@@ -18,7 +18,6 @@ import {
   getNodeIndexForView,
   getRowIDFromView,
   getNodeForView,
-  getPaneIndex,
   viewPathToString,
   getCurrentEdgeForView,
   isRoot,
@@ -258,10 +257,17 @@ export function dnd(
     : undefined;
   const toNode = getNodeForView(plan, toView);
 
-  const sourcePaneIndex = getPaneIndex(sourceViewPath);
-  const targetPaneIndex = getPaneIndex(rootView);
-  const isSamePane = sourcePaneIndex === targetPaneIndex;
+  const sourcePane = getPane(plan, sourceViewPath);
   const targetPane = getPane(plan, rootView);
+  const isSamePane = sourcePane.id === targetPane.id;
+  const sourceDocument = sourcePane.documentId
+    ? getDocumentByIdOrFilePath(
+        plan.documents,
+        plan.documentByFilePath,
+        sourcePane.author,
+        sourcePane.documentId
+      )
+    : undefined;
   const targetDocument = targetPane.documentId
     ? getDocumentByIdOrFilePath(
         plan.documents,
@@ -272,15 +278,18 @@ export function dnd(
     : undefined;
   const sourceDocumentNode = getNodeForView(plan, sourceViewPath);
   const isDocumentTopLevelSource =
-    isSamePane &&
+    sourceDocument !== undefined &&
     isRoot(sourceViewPath) &&
     sourceDocumentNode !== undefined &&
-    targetDocument?.author === sourceDocumentNode.author &&
-    targetDocument.topNodeShortIds.includes(shortID(sourceDocumentNode.id));
+    sourceDocument.author === sourceDocumentNode.author &&
+    sourceDocument.topNodeShortIds.includes(shortID(sourceDocumentNode.id));
   const isDocumentRootDropTarget =
     targetDocument !== undefined && isRoot(toView) && !toNode;
 
-  if (isDocumentTopLevelSource || isDocumentRootDropTarget) {
+  if (
+    isDocumentRootDropTarget ||
+    (isDocumentTopLevelSource && isSamePane && !invertCopyMode && !isCopyDrag)
+  ) {
     return plan;
   }
 

@@ -6,7 +6,7 @@ The collaboration problem is not shared mutable editing. In an agent-centric wor
 
 The model is:
 
-> A Knowstr workspace is my editable graph. Sources are read-only inputs. Importing creates my editable fork from a source. Suggesting reads sources and adds local `(?)` suggestion nodes into my graph. Documents are markdown containers. Nodes carry lineage through `basedOn` and `snapshot`.
+> A Knowstr workspace is my editable graph. Sources are read-only inputs. Importing creates my editable fork from a source. Suggesting reads sources and derives local `(?)` suggestion overlays. Accepting/copying creates editable local nodes. Documents are markdown containers. Nodes carry lineage through `basedOn` and node-centric `snapshot` baselines.
 
 This is not Google Docs. It is not shared mutable node IDs. But it can still consume shared mutable markdown directories, Git repos, FTP folders, or Nostr documents as sources.
 
@@ -37,7 +37,7 @@ A source may be authored by someone else, by me, by a shared group, or by no exp
 
 Knowstr only follows this rule:
 
-- workspace files may be rewritten by Knowstr commands such as `save`, `import`, and `suggest`
+- workspace files may be rewritten by Knowstr commands/actions such as `save`, `import`, and accepting/copying suggestions
 - source files are never rewritten by Knowstr
 
 ### 2. Plain markdown remains valid
@@ -52,15 +52,19 @@ A markdown file with no Knowstr metadata is valid:
 
 When saved in the workspace, Knowstr may add frontmatter, document IDs, and node IDs.
 
-### 3. Node IDs are UUIDs
+### 3. Node IDs are UUIDs, with a temporary internal author prefix
 
-New Knowstr node IDs should be UUID-like and globally unique in practice:
+New Knowstr node IDs in markdown should be UUID-like and globally unique in practice:
 
 ```md
 - Spain <!-- id:550e8400-e29b-41d4-a716-446655440000 -->
 ```
 
-Because IDs are UUIDs, `knowstr_author` is not needed for collision avoidance. It is optional provenance/attribution metadata, not an edit permission mechanism.
+The current implementation still represents internal graph IDs as `author_uuid`. That is a compatibility detail, not part of the collaboration semantics. Moving forward, the author prefix must not decide editability, permissions, source status, or merge behavior. Workspace/source declaration decides editability.
+
+A future migration should remove author significance from concrete node identity and move fully to globally unique UUID node IDs.
+
+Because IDs are UUIDs, no author metadata is needed for collision avoidance.
 
 ### 4. Documents are containers, not lineage
 
@@ -72,10 +76,12 @@ Documents do not have lineage. Nodes do.
 
 ```text
 knowstr_doc_id = concrete document container ID
-basedOn        = node provenance
-snapshot       = immutable fork-time/source baseline
+basedOn        = node provenance/source node for a lineage edge
+snapshot       = immutable source baseline for that node's basedOn edge
 knowstr_vote_id = optional future voting scope
 ```
+
+`basedOn` and `snapshot` belong together. They describe a node-level lineage edge from my local node to a source node and the exact source state used as the baseline for later diffs.
 
 ### 5. Import creates a fork
 
@@ -87,35 +93,56 @@ source document -> my workspace document
 
 Import creates new local node IDs, points them to source node IDs with `basedOn`, creates a `snapshot`, and writes an editable workspace file.
 
-### 6. Suggest adds local suggestion nodes
+### 6. Suggest derives local suggestion overlays
 
-Suggest is the explicit operation that crosses source variants into my graph as suggestions:
+Suggest is the explicit operation that crosses source variants into my workspace as derived suggestions:
 
 ```text
-source node -> my local (?) suggestion node
+source/current variants + my local graph + snapshots -> local (?) overlays
 ```
 
-A suggestion node is mine. It gets my local node ID. It points back to the source node with `basedOn` and `snapshot`.
+A suggestion is derived from the node-centric diff. It is not proof that a source file was scanned, and it does not require a separate source-run or suggestion-status log. The UI may render suggestions as `(?)` overlays. A CLI may render them in text/JSON or materialize proposal markup, but the source node itself is not inserted into my editable graph.
 
-Example:
-
-```md
-- (?) Kroatia <!-- id:alice-new-uuid basedOn="bob-source-uuid" snapshot="snap_sha256_..." -->
-```
+Ordinary suggestion computation does not create a new snapshot. It uses existing `basedOn` + `snapshot` lineage edges to compute three-way diffs where available.
 
 The source file is untouched.
 
-### 8. Snapshots are immutable baselines
+### 7. Accepting/copying creates node lineage edges with snapshots
 
-A snapshot records the source markdown as seen when importing or suggesting.
+When a suggestion or source node is accepted/copied into the workspace, Knowstr creates local node IDs and records a node-level lineage edge:
 
-- created by the importer/suggester
+```md
+- Kroatia <!-- id:alice-new-uuid basedOn="bob-source-uuid" snapshot="snap_bob_state_at_accept" -->
+```
+
+The `snapshot` is the source state at the time this edge was created. It is not only document/root metadata. Each copied node with `basedOn` must either carry its own `snapshot` or resolve to an explicit node-centric snapshot for that same lineage edge.
+
+This allows later diffs such as:
+
+```text
+base   = bob-source-uuid in snap_bob_state_at_accept
+local  = alice-new-uuid now
+source = bob-source-uuid now
+```
+
+So later source edits can be inferred from the diff, e.g. Bob changing `Kroatia` to `Croatia`, without storing an explicit accepted/ignored status.
+
+### 8. Snapshots are immutable node-edge baselines
+
+A snapshot records source markdown/subtree state as seen when a lineage edge is created: import, fork, copy, or accept.
+
+- created by the workspace owner when importing/forking/copying/accepting source nodes
+- not created by ordinary `suggest` overlay computation
 - immutable
-- can be a hash of raw source markdown
-- local CLI/desktop storage: `.knowstr/snapshots/<snapshot-id>.md`
-- browser/Nostr storage: immutable Nostr snapshot events plus IndexedDB cache
+- may be shared by many nodes copied from the same source state
+- the snapshot ID may be a hash of raw source markdown
+- workspace-backed storage: `.knowstr/snapshots/<snapshot-id>.md`
+- IndexedDB may cache snapshots, but should not be the only durable store for workspace/CLI/desktop use
+- browser/Nostr-only storage may use immutable Nostr snapshot events plus IndexedDB cache until workspace-backed storage is available
 
 `snapshot` must not point only to a mutable source path or current document address.
+
+Snapshot lookup must be node-centric, not root/document-centric. To diff a local node against a source node, Knowstr should use the snapshot attached to that node's `basedOn` edge. Inheriting a snapshot from an ancestor/root is allowed only when it explicitly represents the same copied source baseline for the descendant edge.
 
 ### 9. Voting is future work
 
@@ -192,7 +219,7 @@ Current URL meanings:
 
 `show` does not import, save, register a source, or create editable IDs. It is read/render/export.
 
-When showing a node/subtree, output should include enough frontmatter for safe portable markdown. If `knowstr_author` is known, include it. If the containing document has `knowstr_vote_id`, preserve it.
+When showing a node/subtree, output should include enough frontmatter for safe portable markdown. If the containing document has `knowstr_vote_id`, preserve it.
 
 Example:
 
@@ -218,7 +245,6 @@ It should:
 - register the source file as a source, unless already covered by a source directory
 - create an immutable snapshot of the source as seen now
 - create a new `knowstr_doc_id`
-- set `knowstr_author` to me if Knowstr writes author metadata
 - mint new local UUID node IDs
 - copy visible content and tree structure
 - for source nodes with IDs, write `basedOn="<source-node-id>"`
@@ -243,7 +269,6 @@ It should:
 - scan workspace markdown, excluding `.knowstr`, ignored paths, and configured sources
 - assign missing `knowstr_doc_id` values
 - assign missing UUID node IDs
-- optionally add `knowstr_author: <me>` to workspace files that lack author provenance
 - preserve existing `basedOn`, `snapshot`, and `knowstr_vote_id`
 - reject duplicate document IDs in the editable workspace
 - reject duplicate node IDs in the editable workspace
@@ -259,7 +284,7 @@ UI equivalent: save/normalize/preflight current workspace.
 knowstr suggest [--dry-run] [--json]
 ```
 
-Reads configured sources and adds suggestions into my editable workspace.
+Reads configured sources and derives suggestions for my editable workspace.
 
 It should:
 
@@ -268,24 +293,49 @@ It should:
 - never rewrite, delete, clear, or move source files
 - compare source lineage/IDs against my local workspace graph
 - find additions/variants relevant to my documents
-- add suggestions as my local `(?)` nodes
-- mint my local node IDs
-- write `basedOn` to the source node ID
-- write `snapshot` to the immutable source baseline
+- derive suggestions as local `(?)` overlays/proposals
+- suppress repeated suggestions from existing local graph state and node-centric diffs, not from a source-run log
+- never insert source nodes directly as my editable nodes
+- when a suggestion is accepted/copied, mint local node IDs
+- when a suggestion is accepted/copied, write `basedOn` to the source node ID
+- when a suggestion is accepted/copied, write a node-centric `snapshot` baseline for that lineage edge
+- not create new snapshots during ordinary suggestion computation
+- use existing node-centric snapshots from source lineage where available to compute three-way diffs
 - preserve `knowstr_vote_id` when relevant
-- print a CLI summary of added/skipped/conflicting suggestions
+- print a CLI summary of found/already-known/conflicting suggestions
 - not write `knowstr_log.md` by default
 
 Example output:
 
 ```text
-Added 1 suggestion:
+Found 1 suggestion:
   holidays.md: Holiday Destinations <- Kroatia from /ftp/bob/holidays.md
 Skipped 2 already-known nodes.
 0 conflicts.
 ```
 
-UI equivalent: “Add suggestions from sources”.
+UI equivalent: “Show suggestions from sources”.
+
+### Removed legacy command: `knowstr apply`
+
+The old `knowstr apply` / `./inbox` workflow is incompatible with this model and should be deleted, not repaired.
+
+It is wrong because it:
+
+- treats incoming files as a mutable staging area instead of declared read-only sources
+- depends on shared concrete node IDs to find insertion points
+- may preserve or insert source node IDs directly into my editable workspace
+- clears/deletes inbox files after applying them
+- writes `knowstr_log.md` as part of the merge flow
+- creates materialized `(?)` nodes without the required local IDs, `basedOn` provenance, and node-centric `snapshot` baselines
+
+The replacements are:
+
+- `knowstr source add <file-or-dir>` for read-only inputs
+- `knowstr import <source-file> [workspace-path]` for editable forks
+- `knowstr suggest` for local suggestion overlays derived from sources
+
+There should be no v2 command that silently ingests other people's markdown into my graph. Crossing from source to workspace must always be explicit as `import` or as accepting/copying a derived suggestion. Ordinary `suggest` only derives/displays proposals.
 
 ### Future convenience: `knowstr fork`
 
@@ -332,7 +382,6 @@ Knowstr normalizes it:
 
 ```md
 ---
-knowstr_author: alice
 knowstr_doc_id: kdoc_alice_holidays_8f6b
 ---
 
@@ -370,7 +419,6 @@ Bob gets his own editable fork:
 
 ```md
 ---
-knowstr_author: bob
 knowstr_doc_id: kdoc_bob_holidays_32ad
 ---
 
@@ -401,22 +449,22 @@ knowstr source add /ftp/bob/holidays.md
 knowstr suggest
 ```
 
-Knowstr adds a local suggestion node to Alice’s document:
+Knowstr derives a local suggestion overlay for Alice’s document:
 
 ```md
 # Holiday Destinations <!-- id:uuid-a1 -->
 - Spain <!-- id:uuid-a2 -->
 - Italy <!-- id:uuid-a3 -->
-- (?) Kroatia <!-- id:uuid-a9 basedOn="uuid-b4" snapshot="snap_sha256_bob_holidays" -->
+- (?) Kroatia <!-- virtual suggestion from uuid-b4; not yet a local node -->
 ```
 
-Alice can later accept it by editing the marker:
+Alice can later accept/copy it. That creates a local node with a lineage edge back to Bob’s source node and a snapshot of Bob’s source state at accept time:
 
 ```md
-- Kroatia <!-- id:uuid-a9 basedOn="uuid-b4" snapshot="snap_sha256_bob_holidays" -->
+- Kroatia <!-- id:uuid-a9 basedOn="uuid-b4" snapshot="snap_sha256_bob_holidays_at_accept" -->
 ```
 
-### Workflow 5: Shared mutable markdown repo
+### Workflow 5: External shared mutable markdown repo
 
 A team can also maintain a shared markdown directory or Git repo:
 
@@ -425,31 +473,36 @@ shared-repo/
   locations.md
 ```
 
-Several people may edit it directly using Git/FTP/shared drive conflict resolution. Knowstr does not own that concurrency model.
+This is external collaboration, not Knowstr-managed collaboration. Several people may edit the shared repo directly using Git/FTP/shared-drive conflict resolution. Knowstr does not own locking, conflict resolution, permissions, or commit/merge policy for that repo.
 
-Each user can consume it as a source:
+Each user can consume the shared repo as a read-only source:
 
 ```sh
 knowstr source add ../shared-repo
 knowstr suggest
 ```
 
-This allows shared mutable markdown and personal authored graphs to coexist:
+This allows external shared markdown and personal Knowstr workspaces to coexist:
 
-- shared repo handles simultaneous document edits
+- the shared repo handles simultaneous document edits outside Knowstr
 - Knowstr treats the shared repo as read-only input
+- `knowstr save` must not rewrite files in the configured source
 - each user decides what to import or suggest into their own graph
+- contributing back to the shared repo is done by the external tool/process, not by `suggest`
 
 ## Safety invariants
 
-- Workspace/source declaration decides editability, not `knowstr_author`.
+- Workspace/source declaration decides editability.
 - Knowstr never rewrites configured sources.
+- Knowstr does not use an `apply`/`inbox` shortcut to ingest other people's markdown.
 - `import` creates editable forks explicitly.
-- `suggest` creates local `(?)` suggestion nodes explicitly.
+- `suggest` derives local `(?)` suggestion overlays from diffs.
+- Accepting/copying suggestions creates local nodes explicitly.
 - Source nodes are never inserted directly as my editable nodes.
 - Documents have identity but not lineage.
 - Nodes use `basedOn` for provenance.
-- `snapshot` is immutable and created by the importer/suggester.
+- `snapshot` is immutable and created by import/fork/copy/accept, not by ordinary suggestion computation.
+- `snapshot` lookup is node-centric, not root/document-centric.
 - `knowstr_doc_id` is not a voting scope.
 - `knowstr_vote_id`, if set, is preserved.
 - Transport security, access control, merge conflicts, and signatures are handled outside the core graph model.

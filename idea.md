@@ -21,11 +21,13 @@ workspace = editable / part of my graph / saved by knowstr save
 sources   = read-only input / used by knowstr suggest
 ```
 
-A Knowstr repo/workspace is created with:
+A stateful Knowstr workspace is created explicitly with:
 
 ```sh
 knowstr init
 ```
+
+No command creates `.knowstr` implicitly. Commands that need persistent workspace state must fail with a clear message if no initialized workspace exists.
 
 Additional read-only inputs are declared with:
 
@@ -40,7 +42,28 @@ Knowstr only follows this rule:
 - workspace files may be rewritten by Knowstr commands/actions such as `save`, `import`, and accepting/copying suggestions
 - source files are never rewritten by Knowstr
 
-### 2. Plain markdown remains valid
+### 2. Standalone save does not require a workspace
+
+A single markdown file or explicit set of files can be normalized without creating a Knowstr workspace:
+
+```sh
+knowstr save notes.md
+knowstr save docs/a.md docs/b.md
+```
+
+Standalone save is stateless. It may assign missing document IDs and node IDs in the given files, preserve existing `basedOn`, `snapshot`, and `knowstr_vote_id`, and reject duplicates within the explicit file set. It does not track sources, create snapshots, read workspace config, or create `.knowstr`.
+
+Stateful collaboration commands require an explicit workspace created by `knowstr init`:
+
+```sh
+knowstr source add <file-or-dir>   # requires .knowstr
+knowstr import <source-file> ...   # requires .knowstr
+knowstr suggest                    # requires .knowstr
+```
+
+This keeps markdown-first single-file usage lightweight while making persistent collaboration state intentional.
+
+### 3. Plain markdown remains valid
 
 A markdown file with no Knowstr metadata is valid:
 
@@ -50,9 +73,9 @@ A markdown file with no Knowstr metadata is valid:
 - Italy
 ```
 
-When saved in the workspace, Knowstr may add frontmatter, document IDs, and node IDs.
+When normalized by `knowstr save`, Knowstr may add frontmatter, document IDs, and node IDs.
 
-### 3. Node IDs are UUIDs, with a temporary internal author prefix
+### 4. Node IDs are UUIDs, with a temporary internal author prefix
 
 New Knowstr node IDs in markdown should be UUID-like and globally unique in practice:
 
@@ -66,7 +89,7 @@ A future migration should remove author significance from concrete node identity
 
 Because IDs are UUIDs, no author metadata is needed for collision avoidance.
 
-### 4. Documents are containers, not lineage
+### 5. Documents are containers, not lineage
 
 A document is a markdown container for one or more root nodes.
 
@@ -83,7 +106,7 @@ knowstr_vote_id = optional future voting scope
 
 `basedOn` and `snapshot` belong together. They describe a node-level lineage edge from my local node to a source node and the exact source state used as the baseline for later diffs.
 
-### 5. Import creates a fork
+### 6. Import creates a fork
 
 Import is the explicit operation that crosses from source into my graph:
 
@@ -93,7 +116,7 @@ source document -> my workspace document
 
 Import creates new local node IDs, points them to source node IDs with `basedOn`, creates a `snapshot`, and writes an editable workspace file.
 
-### 6. Suggest derives local suggestion overlays
+### 7. Suggest derives local suggestion overlays
 
 Suggest is the explicit operation that crosses source variants into my workspace as derived suggestions:
 
@@ -107,7 +130,7 @@ Ordinary suggestion computation does not create a new snapshot. It uses existing
 
 The source file is untouched.
 
-### 7. Accepting/copying creates node lineage edges with snapshots
+### 8. Accepting/copying creates node lineage edges with snapshots
 
 When a suggestion or source node is accepted/copied into the workspace, Knowstr creates local node IDs and records a node-level lineage edge:
 
@@ -127,7 +150,7 @@ source = bob-source-uuid now
 
 So later source edits can be inferred from the diff, e.g. Bob changing `Kroatia` to `Croatia`, without storing an explicit accepted/ignored status.
 
-### 8. Snapshots are immutable node-edge baselines
+### 9. Snapshots are immutable node-edge baselines
 
 A snapshot records source markdown/subtree state as seen when a lineage edge is created: import, fork, copy, or accept.
 
@@ -144,7 +167,7 @@ A snapshot records source markdown/subtree state as seen when a lineage edge is 
 
 Snapshot lookup must be node-centric, not root/document-centric. To diff a local node against a source node, Knowstr should use the snapshot attached to that node's `basedOn` edge. Inheriting a snapshot from an ancestor/root is allowed only when it explicitly represents the same copied source baseline for the descendant edge.
 
-### 9. Voting is future work
+### 10. Voting is future work
 
 If `knowstr_vote_id` is set, Knowstr preserves it.
 
@@ -160,19 +183,24 @@ V1 does not need to compute voting aggregates.
 knowstr init [--doc <dir>] [--relay <url> ...]
 ```
 
-Creates a local Knowstr workspace/profile.
+Explicitly creates a local Knowstr workspace/state directory.
+
+It is required before commands that need persistent collaboration state, such as `source`, `import`, and `suggest`. It is not required for standalone `knowstr save <file>` or read-only `knowstr show`.
 
 It should:
 
 - create `.knowstr/profile.json`
-- create or reference local key material, e.g. `.knowstr/me.nsec`
-- set my local identity
+- create `.knowstr/sources.json` or equivalent source configuration
+- create `.knowstr/snapshots/` or equivalent durable snapshot storage
+- optionally create or reference local key material when Nostr/relay features are enabled, e.g. `.knowstr/me.nsec`
 - optionally configure a document workspace with `--doc <dir>`
 - optionally configure relays with `--relay <url>`
 
 It should not import, save, fork, suggest, or publish documents.
 
-UI equivalent: first-run onboarding, identity setup, workspace picker, relay settings.
+No other command should auto-run `init` or implicitly create `.knowstr`.
+
+UI equivalent: first-run onboarding, workspace/state setup, source settings, optional identity/relay settings.
 
 ### `knowstr source`
 
@@ -182,7 +210,9 @@ knowstr source list
 knowstr source remove <file-or-dir>
 ```
 
-Registers read-only source files/directories.
+Registers read-only source files/directories in an initialized workspace.
+
+`knowstr source` requires `.knowstr` and must not create it implicitly. If no workspace exists, it should fail and tell the user to run `knowstr init` first.
 
 A source can be:
 
@@ -237,6 +267,8 @@ knowstr import <source-file> [workspace-path]
 
 Creates my editable fork from a source markdown file.
 
+`knowstr import` requires an initialized workspace because it registers/uses sources and creates durable snapshots. It must not create `.knowstr` implicitly. If no workspace exists, it should fail and tell the user to run `knowstr init` first.
+
 If `[workspace-path]` is omitted, Knowstr may derive a path from the source filename or document title.
 
 It should:
@@ -259,12 +291,32 @@ UI equivalent: “Import/Fork source into my workspace”.
 ### `knowstr save`
 
 ```sh
-knowstr save [--config <path>]
+knowstr save [--config <path>] [file-or-dir ...]
 ```
 
-Normalizes and commits the editable workspace as my graph.
+Normalizes markdown as Knowstr-compatible markdown.
 
-It should:
+With explicit paths, `save` can run in standalone mode, even outside a Knowstr workspace:
+
+```sh
+knowstr save notes.md
+knowstr save docs/a.md docs/b.md
+```
+
+Standalone path mode should:
+
+- scan only the explicit files/directories given on the command line
+- assign missing `knowstr_doc_id` values
+- assign missing UUID node IDs
+- preserve existing `basedOn`, `snapshot`, and `knowstr_vote_id`
+- reject duplicate document IDs within the explicit file set
+- reject duplicate node IDs within the explicit file set
+- reject malformed IDs/lineage where possible
+- not read or write source configuration
+- not create snapshots
+- not create `.knowstr`
+
+With no explicit paths, `save` is workspace mode and requires an initialized workspace. Workspace mode should:
 
 - scan workspace markdown, excluding `.knowstr`, ignored paths, and configured sources
 - assign missing `knowstr_doc_id` values
@@ -274,9 +326,9 @@ It should:
 - reject duplicate node IDs in the editable workspace
 - reject malformed IDs/lineage where possible
 
-`save` is not for ingesting other people’s files. Use `source add` for read-only input and `import` for editable forks.
+`save` is not for ingesting other people’s files. Use `source add` for read-only input and `import` for editable forks. `save` never creates a workspace implicitly; run `knowstr init` first for workspace mode.
 
-UI equivalent: save/normalize/preflight current workspace.
+UI equivalent: save/normalize/preflight current document set or workspace.
 
 ### `knowstr suggest`
 
@@ -285,6 +337,8 @@ knowstr suggest [--dry-run] [--json]
 ```
 
 Reads configured sources and derives suggestions for my editable workspace.
+
+`knowstr suggest` requires an initialized workspace with source configuration. It must not create `.knowstr` implicitly. If no workspace exists, it should fail and tell the user to run `knowstr init` first.
 
 It should:
 
@@ -348,7 +402,7 @@ knowstr show <address> > temp.md
 knowstr import temp.md <workspace-path>
 ```
 
-It must not introduce different graph semantics from import.
+Because it uses `import`, it requires an initialized workspace and must not create `.knowstr` implicitly. It must not introduce different graph semantics from import.
 
 ### Future: `knowstr aggregate`
 
@@ -362,9 +416,25 @@ Computes a voting/ranking aggregate over visible documents with the same `knowst
 
 ## User workflows
 
+### Workflow 0: Standalone markdown normalization
+
+A user can normalize one markdown file without creating a Knowstr workspace:
+
+```sh
+knowstr save holidays.md
+```
+
+This may add `knowstr_doc_id` and node IDs to `holidays.md`, but it does not create `.knowstr`, does not track sources, and does not create snapshots.
+
 ### Workflow 1: Alice creates and shares a document
 
-Alice creates `holidays.md` in her workspace:
+Alice explicitly creates a workspace:
+
+```sh
+knowstr init
+```
+
+Then she creates `holidays.md` in her workspace:
 
 ```md
 # Holiday Destinations
@@ -398,9 +468,10 @@ cp holidays.md /ftp/alice/holidays.md
 
 ### Workflow 2: Bob only wants to observe Alice’s document
 
-Bob adds Alice’s file as a source:
+Bob initializes a workspace and adds Alice’s file as a source:
 
 ```sh
+knowstr init
 knowstr source add /ftp/alice/holidays.md
 knowstr suggest --dry-run
 ```
@@ -409,9 +480,10 @@ If Bob has no local related document, Knowstr may report that Alice’s document
 
 ### Workflow 3: Bob wants to edit Alice’s document
 
-Bob imports Alice’s source into his workspace:
+Bob initializes a workspace if needed, then imports Alice’s source into it:
 
 ```sh
+knowstr init  # if not already initialized
 knowstr import /ftp/alice/holidays.md holidays.md
 ```
 
@@ -475,9 +547,10 @@ shared-repo/
 
 This is external collaboration, not Knowstr-managed collaboration. Several people may edit the shared repo directly using Git/FTP/shared-drive conflict resolution. Knowstr does not own locking, conflict resolution, permissions, or commit/merge policy for that repo.
 
-Each user can consume the shared repo as a read-only source:
+Each user can consume the shared repo as a read-only source from an initialized workspace:
 
 ```sh
+knowstr init
 knowstr source add ../shared-repo
 knowstr suggest
 ```
@@ -493,6 +566,8 @@ This allows external shared markdown and personal Knowstr workspaces to coexist:
 ## Safety invariants
 
 - Workspace/source declaration decides editability.
+- `.knowstr` is created only by explicit `knowstr init`, never implicitly.
+- Standalone `knowstr save <file-or-dir ...>` may normalize markdown without a workspace.
 - Knowstr never rewrites configured sources.
 - Knowstr does not use an `apply`/`inbox` shortcut to ingest other people's markdown.
 - `import` creates editable forks explicitly.

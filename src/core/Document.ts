@@ -49,8 +49,8 @@ export type ParseToDocumentResult = {
   context: WalkContext;
 };
 
-export function documentKeyOf(author: PublicKey, docId: string): string {
-  return `${author}:${docId}`;
+export function documentKeyOf(author: PublicKey, docId: string): DocumentKey {
+  return JSON.stringify([author, docId]) as DocumentKey;
 }
 
 export function getDocumentByIdOrFilePath(

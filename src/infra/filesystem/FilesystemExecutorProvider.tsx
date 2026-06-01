@@ -105,7 +105,9 @@ export function FilesystemExecutorProvider({
   const { workspace } = useBackend();
 
   const executePlan = async (plan: Plan): Promise<void> => {
-    setPanes(plan.panes);
+    if (plan.panesChanged) {
+      setPanes(plan.panes);
+    }
     setViews(plan.views);
     const filteredEvents = buildDocumentEvents(plan);
 

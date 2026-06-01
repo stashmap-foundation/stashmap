@@ -39,6 +39,7 @@ import {
   type TreeResult,
 } from "../treeTraversal";
 import { getDocumentByIdOrFilePath } from "../core/Document";
+import { projectDocumentByFilePath } from "../core/graphData";
 
 const PaneTreeResultContext = React.createContext<TreeResult | undefined>(
   undefined
@@ -59,7 +60,7 @@ export function PaneTreeResultProvider({
   const document = pane.documentId
     ? getDocumentByIdOrFilePath(
         data.documents,
-        data.documentByFilePath,
+        projectDocumentByFilePath(data),
         pane.author,
         pane.documentId
       )

@@ -34,6 +34,7 @@ import {
   AddToParentTarget,
 } from "./planner";
 import { planMoveNodeWithView } from "./treeMutations";
+import { projectDocumentByFilePath } from "./core/graphData";
 
 type DragSource = {
   path: ViewPath;
@@ -160,7 +161,7 @@ export function getDropDestinationFromTreeView(
   const document = pane.documentId
     ? getDocumentByIdOrFilePath(
         data.documents,
-        data.documentByFilePath,
+        projectDocumentByFilePath(data),
         pane.author,
         pane.documentId
       )
@@ -263,7 +264,7 @@ export function dnd(
   const sourceDocument = sourcePane.documentId
     ? getDocumentByIdOrFilePath(
         plan.documents,
-        plan.documentByFilePath,
+        projectDocumentByFilePath(plan),
         sourcePane.author,
         sourcePane.documentId
       )
@@ -271,7 +272,7 @@ export function dnd(
   const targetDocument = targetPane.documentId
     ? getDocumentByIdOrFilePath(
         plan.documents,
-        plan.documentByFilePath,
+        projectDocumentByFilePath(plan),
         targetPane.author,
         targetPane.documentId
       )

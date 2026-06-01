@@ -42,6 +42,30 @@ function clearDragDescendants(): void {
   });
 }
 
+function activateRowElement(
+  row: HTMLElement | null,
+  rowViewKey: string,
+  rowIndex: number,
+  mode: KeyboardMode,
+  onRowFocus: (key: string, index: number, mode: KeyboardMode) => void
+): void {
+  if (!row) {
+    onRowFocus(rowViewKey, rowIndex, mode);
+    return;
+  }
+  const treeRoot = row.closest("[data-keyboard-mode]");
+  treeRoot
+    ?.querySelectorAll('[data-row-focusable="true"]')
+    .forEach((candidate) => {
+      if (candidate instanceof HTMLElement) {
+        candidate.tabIndex = candidate === row ? 0 : -1;
+      }
+    });
+  row.tabIndex = 0;
+  row.focus();
+  onRowFocus(rowViewKey, rowIndex, mode);
+}
+
 type DraggableProps = {
   className?: string;
   copyDrag?: boolean;
@@ -139,6 +163,13 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
       ) {
         return;
       }
+      activateRowElement(
+        target.closest('[data-row-focusable="true"]'),
+        rowViewKey,
+        rowIndex,
+        "normal",
+        onRowFocus
+      );
       onRowClick(e, rowViewKey);
     };
 
@@ -239,6 +270,13 @@ function DraggableSuggestion({
     ) {
       return;
     }
+    activateRowElement(
+      target.closest('[data-row-focusable="true"]'),
+      rowViewKey,
+      rowIndex,
+      "normal",
+      onRowFocus
+    );
     onRowClick(e, rowViewKey);
   };
 

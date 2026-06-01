@@ -26,7 +26,7 @@ import {
 } from "../../eventProcessing";
 import { DocumentStoreProvider } from "../../DocumentStore";
 import { NostrCacheSync } from "./cache/NostrCacheSync";
-import { createEmptyGraphIndex } from "../../graphIndex";
+import { createEmptyGraphData } from "../../core/graphData";
 import { useUserSessionState } from "../../userSessionState";
 
 export const KIND_SEARCH = [KIND_KNOWLEDGE_DOCUMENT];
@@ -134,10 +134,7 @@ export function NostrDataProvider({
       contacts={contacts}
       user={user}
       contactsRelays={contactsRelays}
-      knowledgeDBs={Map<PublicKey, KnowledgeData>()}
-      graphIndex={createEmptyGraphIndex()}
-      documents={Map()}
-      documentByFilePath={Map()}
+      {...createEmptyGraphData()}
       relaysInfos={Map<string, RelayInformation | undefined>()}
       publishEventsStatus={session.publishStatus}
       snapshotNodes={Map()}

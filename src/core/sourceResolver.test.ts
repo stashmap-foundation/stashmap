@@ -1,9 +1,13 @@
 import { List, Map } from "immutable";
-import { addNodesToGraphIndex, createEmptyGraphIndex } from "../graphIndex";
+import {
+  createEmptyGraphData,
+  getNodeFromGraphData,
+  getSourceNodeCandidates,
+  upsertNode,
+} from "./graphData";
 import {
   buildNodeLookupIndexes,
   resolveNodeReference,
-  resolveNodeReferenceFromGraphIndex,
 } from "./sourceResolver";
 import { plainSpans } from "./nodeSpans";
 
@@ -73,31 +77,25 @@ test("local scope falls back to source candidates with priority and ambiguity", 
   ]);
 });
 
-test("graph index resolver uses prebuilt source candidates", () => {
+test("canonical graph data keeps same ids in different sources addressable", () => {
   const sourceA = node("remote-only", SOURCE_A);
   const sourceB = node("remote-only", SOURCE_B);
-  const graphIndex = addNodesToGraphIndex(
-    addNodesToGraphIndex(
-      createEmptyGraphIndex(),
-      Map<ID, GraphNode>([[sourceA.id, sourceA]])
-    ),
-    Map<ID, GraphNode>([[sourceB.id, sourceB]])
+  const graphData = upsertNode(
+    upsertNode(createEmptyGraphData(), sourceA),
+    sourceB
   );
 
-  const resolved = resolveNodeReferenceFromGraphIndex(
-    graphIndex,
-    "remote-only",
-    { type: "local" },
-    LOCAL,
-    [SOURCE_B, SOURCE_A]
+  expect(getNodeFromGraphData(graphData, "remote-only", SOURCE_A)).toBe(
+    sourceA
   );
-
-  expect(resolved?.node).toBe(sourceB);
-  expect(resolved?.ambiguous).toBe(true);
-  expect(resolved?.candidates.map((candidate) => candidate.sourceId)).toEqual([
-    SOURCE_B,
-    SOURCE_A,
-  ]);
+  expect(getNodeFromGraphData(graphData, "remote-only", SOURCE_B)).toBe(
+    sourceB
+  );
+  expect(
+    getSourceNodeCandidates(graphData, "remote-only").map(
+      (candidate) => candidate.sourceId
+    )
+  ).toEqual([SOURCE_A, SOURCE_B]);
 });
 
 test("source scope resolves only inside that source", () => {

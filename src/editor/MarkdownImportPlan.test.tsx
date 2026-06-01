@@ -31,6 +31,7 @@ import {
 } from "../core/nodeSpans";
 import { documentKeyOf } from "../core/Document";
 import { eventToParsed } from "../nostrEvents";
+import { projectKnowledgeDBs } from "../core/graphData";
 
 const parseTree = (text: string): MarkdownTreeNode[] =>
   parseMarkdown(text).tree;
@@ -225,7 +226,7 @@ test("Empty-root markdown file drop opens one document with all roots from the f
   const document = pane.documentId
     ? plan.documents.get(documentKeyOf(plan.user.publicKey, pane.documentId))
     : undefined;
-  const nodes = plan.knowledgeDBs.get(plan.user.publicKey)?.nodes;
+  const nodes = projectKnowledgeDBs(plan).get(plan.user.publicKey)?.nodes;
   const topTexts = document?.topNodeShortIds.map((id) => {
     const node = nodes?.get(id);
     return node ? nodeText(node) : undefined;
@@ -272,12 +273,12 @@ test("Empty-root markdown file drop creates a wrapper document for multiple file
         document.systemRole !== "log"
     )
     .toArray();
-  const nodes = plan.knowledgeDBs.get(plan.user.publicKey)?.nodes;
+  const nodes = projectKnowledgeDBs(plan).get(plan.user.publicKey)?.nodes;
   const wrapperRoot = wrapperDocument
     ? nodes?.get(wrapperDocument.topNodeShortIds[0])
     : undefined;
   const wrapperLinks = nodeChildren(
-    plan.knowledgeDBs,
+    projectKnowledgeDBs(plan),
     wrapperRoot,
     plan.user.publicKey
   ).toArray();
@@ -362,38 +363,38 @@ test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
   const parentItemID = topItemIDs[0];
   const parentNodeID = topNodeIDs[0];
   const parentNode = getNode(
-    plan.knowledgeDBs,
+    projectKnowledgeDBs(plan),
     parentNodeID,
     plan.user.publicKey
   );
   const childNodeID = nodeChildren(
-    plan.knowledgeDBs,
+    projectKnowledgeDBs(plan),
     parentNode,
     plan.user.publicKey
   ).first()?.id as LongID | undefined;
   const childNode = childNodeID
-    ? getNode(plan.knowledgeDBs, childNodeID, plan.user.publicKey)
+    ? getNode(projectKnowledgeDBs(plan), childNodeID, plan.user.publicKey)
     : undefined;
   const grandchildNodeID = nodeChildren(
-    plan.knowledgeDBs,
+    projectKnowledgeDBs(plan),
     childNode,
     plan.user.publicKey
   ).first()?.id as LongID | undefined;
   const grandchildNode = grandchildNodeID
-    ? getNode(plan.knowledgeDBs, grandchildNodeID, plan.user.publicKey)
+    ? getNode(projectKnowledgeDBs(plan), grandchildNodeID, plan.user.publicKey)
     : undefined;
 
   expect(parentNode).toBeDefined();
   expect(childNode && nodeText(childNode)).toBe("Child");
   expect(grandchildNode && nodeText(grandchildNode)).toBe("Grandchild");
 
-  expect(parentItemID).toEqual(getSemanticID(plan.knowledgeDBs, parentNode!));
+  expect(parentItemID).toEqual(getSemanticID(projectKnowledgeDBs(plan), parentNode!));
   expect(
-    nodeChildren(plan.knowledgeDBs, parentNode, plan.user.publicKey).first()?.id
+    nodeChildren(projectKnowledgeDBs(plan), parentNode, plan.user.publicKey).first()?.id
   ).toEqual(childNode?.id);
   expect(childNode && nodeText(childNode)).toBe("Child");
   expect(
-    nodeChildren(plan.knowledgeDBs, childNode, plan.user.publicKey).first()?.id
+    nodeChildren(projectKnowledgeDBs(plan), childNode, plan.user.publicKey).first()?.id
   ).toEqual(grandchildNode?.id);
   expect(grandchildNode && nodeText(grandchildNode)).toBe("Grandchild");
 });
@@ -408,13 +409,13 @@ test("Planning multiple markdown files returns top nodes in import order", () =>
   ]);
 
   const topTexts = topNodeIDs.map((semanticID) => {
-    const found = plan.knowledgeDBs
+    const found = projectKnowledgeDBs(plan)
       .get(plan.user.publicKey)
       ?.nodes.valueSeq()
       .find(
         (node) =>
           isStandaloneRoot(node) &&
-          getSemanticID(plan.knowledgeDBs, node) === semanticID
+          getSemanticID(projectKnowledgeDBs(plan), node) === semanticID
       );
     return found ? nodeText(found) : undefined;
   });
@@ -431,13 +432,13 @@ test("Planning one markdown file with multiple roots returns top nodes in source
   ]);
 
   const topTexts = topNodeIDs.map((semanticID) => {
-    const found = plan.knowledgeDBs
+    const found = projectKnowledgeDBs(plan)
       .get(plan.user.publicKey)
       ?.nodes.valueSeq()
       .find(
         (node) =>
           isStandaloneRoot(node) &&
-          getSemanticID(plan.knowledgeDBs, node) === semanticID
+          getSemanticID(projectKnowledgeDBs(plan), node) === semanticID
       );
     return found ? nodeText(found) : undefined;
   });

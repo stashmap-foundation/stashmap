@@ -20,6 +20,7 @@ import {
   viewPathToString,
   copyViewsWithNewPrefix,
 } from "./ViewContext";
+import { projectKnowledgeDBs } from "./core/graphData";
 import {
   Plan,
   planAddToParent,
@@ -38,7 +39,7 @@ function resetInvalidPanes(plan: Plan, paneIndexToReset?: number): Plan {
     if (!p.rootNodeId) {
       return false;
     }
-    return getNode(plan.knowledgeDBs, p.rootNodeId, p.author) === undefined;
+    return getNode(projectKnowledgeDBs(plan), p.rootNodeId, p.author) === undefined;
   };
 
   const newPanes = plan.panes.map((p, i) =>
@@ -140,7 +141,7 @@ export function planMoveNodeWithView(
   const targetContext = targetParentContext.push(
     shortID(
       (actualTargetParentNode
-        ? getSemanticID(planWithAdd.knowledgeDBs, actualTargetParentNode)
+        ? getSemanticID(projectKnowledgeDBs(planWithAdd), actualTargetParentNode)
         : targetParentRowID) as ID
     )
   );

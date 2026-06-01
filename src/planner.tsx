@@ -67,6 +67,11 @@ import {
   getNodeUserPublicKey,
 } from "./infra/nostr/userEntry";
 import { decodePublicKeyInputSync } from "./infra/nostr/publicKeys";
+import {
+  graphDataFromKnowledgeDBs,
+  getNodesForSource,
+  projectKnowledgeDBs,
+} from "./core/graphData";
 
 export type { AddToParentTarget, GraphPlan } from "./core/plan";
 export {
@@ -93,6 +98,7 @@ type WorkspacePlan = GraphPlan &
   Pick<Data, "publishEventsStatus" | "views" | "panes"> & {
     temporaryView: TemporaryViewState;
     temporaryEvents: List<TemporaryEvent>;
+    panesChanged: boolean;
   };
 
 export type Plan = WorkspacePlan;
@@ -170,6 +176,7 @@ export function planUpdatePanes(plan: Plan, panes: Pane[]): Plan {
   return {
     ...plan,
     panes,
+    panesChanged: true,
   };
 }
 
@@ -280,13 +287,17 @@ export function planSelectAllTemporaryRows(
 }
 
 export function planRemoveEmptyNodePosition(plan: Plan, nodeID: LongID): Plan {
+  const updatedKnowledgeDBs = removeEmptyNodeFromKnowledgeDBs(
+    projectKnowledgeDBs(plan),
+    plan.user.publicKey,
+    nodeID
+  );
   return {
     ...plan,
-    knowledgeDBs: removeEmptyNodeFromKnowledgeDBs(
-      plan.knowledgeDBs,
-      plan.user.publicKey,
-      nodeID
-    ),
+    ...graphDataFromKnowledgeDBs(updatedKnowledgeDBs, {
+      documents: plan.documents,
+      documentsByFilePath: plan.documentsByFilePath,
+    }),
     temporaryEvents: plan.temporaryEvents.push({
       type: "REMOVE_EMPTY_NODE",
       nodeID,
@@ -372,7 +383,7 @@ export function planForkPane(plan: Plan, viewPath: ViewPath): Plan {
 
   const rootNode = pane.rootNodeId
     ? getNode(
-        plan.knowledgeDBs,
+        projectKnowledgeDBs(plan),
         pane.rootNodeId,
         pane.author || plan.user.publicKey
       )
@@ -385,7 +396,7 @@ export function planForkPane(plan: Plan, viewPath: ViewPath): Plan {
   const [planWithNodes, nodesIdMapping] = planCopyDescendantNodes(
     plan,
     sourceNode,
-    (node) => getNodeContext(plan.knowledgeDBs, node),
+    (node) => getNodeContext(projectKnowledgeDBs(plan), node),
     (node) => node.author === pane.author
   );
   const updatedViews = updateViewsWithNodesMapping(
@@ -420,7 +431,7 @@ export function planDeepCopyNode(
   const [sourceItemID] = getRowIDFromView(plan, sourceViewPath);
   const sourceNode = getNodeForView(plan, sourceViewPath);
   const sourceSemanticContext = sourceNode
-    ? getNodeContext(plan.knowledgeDBs, sourceNode)
+    ? getNodeContext(projectKnowledgeDBs(plan), sourceNode)
     : getContext(plan, sourceViewPath);
 
   const resolveSource = (): {
@@ -429,16 +440,16 @@ export function planDeepCopyNode(
     node?: GraphNode;
   } => {
     const sourceItemNode = getNode(
-      plan.knowledgeDBs,
+      projectKnowledgeDBs(plan),
       sourceItemID,
       plan.user.publicKey
     );
     if (isRefNode(sourceItemNode)) {
-      const node = resolveNode(plan.knowledgeDBs, sourceItemNode);
+      const node = resolveNode(projectKnowledgeDBs(plan), sourceItemNode);
       if (node) {
         return {
-          itemID: getSemanticID(plan.knowledgeDBs, node),
-          semanticContext: getNodeContext(plan.knowledgeDBs, node),
+          itemID: getSemanticID(projectKnowledgeDBs(plan), node),
+          semanticContext: getNodeContext(projectKnowledgeDBs(plan), node),
           node,
         };
       }
@@ -485,7 +496,7 @@ export function planDeepCopyNode(
   );
   const targetRootContext = targetParentSemanticContext.push(
     targetParentNode
-      ? getSemanticID(planWithParent.knowledgeDBs, targetParentNode)
+      ? getSemanticID(projectKnowledgeDBs(planWithParent), targetParentNode)
       : (shortID(targetParentRowID as ID) as ID)
   );
   const sourceRootChildContext = resolvedSemanticContext.push(
@@ -505,7 +516,7 @@ export function planDeepCopyNode(
     (node) => {
       const isRootNode = node.id === resolvedNode.id;
       const sourceNodeContext = getNodeContext(
-        planWithParent.knowledgeDBs,
+        projectKnowledgeDBs(planWithParent),
         node
       );
       return isRootNode
@@ -698,7 +709,7 @@ export function planSaveNodeAndEnsureNodes(
     return { plan: resultPlan, viewPath };
   }
 
-  const currentItem = getNode(plan.knowledgeDBs, itemID, plan.user.publicKey);
+  const currentItem = getNode(projectKnowledgeDBs(plan), itemID, plan.user.publicKey);
   if ((currentItem && isRefNode(currentItem)) || isSearchId(itemID as ID)) {
     return { plan, viewPath };
   }
@@ -801,7 +812,7 @@ export function buildDocumentEvents(
     }
     const topNodes = document.topNodeShortIds
       .map((topNodeShortId) =>
-        plan.knowledgeDBs.get(author)?.nodes.get(topNodeShortId)
+        projectKnowledgeDBs(plan).get(author)?.nodes.get(topNodeShortId)
       )
       .filter((node): node is GraphNode => node !== undefined);
     const snapshotAnchorNode = topNodes.find(
@@ -809,7 +820,7 @@ export function buildDocumentEvents(
     );
     const snapshotSourceRoot = snapshotAnchorNode?.basedOn
       ? getNode(
-          plan.knowledgeDBs,
+          projectKnowledgeDBs(plan),
           snapshotAnchorNode.basedOn,
           snapshotAnchorNode.anchor?.sourceAuthor ?? author
         )
@@ -824,13 +835,13 @@ export function buildDocumentEvents(
       : undefined;
     const snapshotEvent = sourceDocument
       ? (buildSnapshotEventFromNodes(
-          plan.knowledgeDBs,
+          projectKnowledgeDBs(plan),
           author,
           createdSnapshotDTag as string,
           sourceDocument
         ) as UnsignedEvent & EventAttachment)
       : undefined;
-    const event = buildDocumentEvent(plan.knowledgeDBs, document, {
+    const event = buildDocumentEvent(projectKnowledgeDBs(plan), document, {
       snapshotDTag:
         topNodes.find((topNode) => topNode.snapshotDTag)?.snapshotDTag ??
         createdSnapshotDTag,
@@ -900,6 +911,7 @@ export function createPlan(
     panes: props.panes,
     temporaryView: props.publishEventsStatus.temporaryView,
     temporaryEvents: List<TemporaryEvent>(),
+    panesChanged: false,
   };
 }
 

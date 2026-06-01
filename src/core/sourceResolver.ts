@@ -85,57 +85,6 @@ export function buildNodeLookupIndexes(
   };
 }
 
-export function resolveNodeReferenceFromGraphIndex(
-  graphIndex: GraphIndex,
-  id: ID,
-  scope: NodeLookupScope,
-  localSourceId: SourceId,
-  sourceOrder: readonly SourceId[] = []
-): NodeResolution | undefined {
-  if (scope.type === "local") {
-    const localNode = graphIndex.nodesBySource.get(localSourceId)?.get(id);
-    if (localNode) {
-      return {
-        node: localNode,
-        scope,
-        candidates: [],
-        ambiguous: false,
-      };
-    }
-
-    const candidates = sortCandidates(
-      (graphIndex.sourceCandidatesById.get(id) ?? []).filter(
-        (candidate) => candidate.sourceId !== localSourceId
-      ),
-      sourceOrder
-    );
-    const candidate = candidates[0];
-    return candidate
-      ? {
-          node: candidate.node,
-          scope: { type: "source", sourceId: candidate.sourceId },
-          candidate,
-          candidates,
-          ambiguous: candidates.length > 1,
-        }
-      : undefined;
-  }
-
-  const sourceNode = graphIndex.nodesBySource.get(scope.sourceId)?.get(id);
-  return sourceNode
-    ? {
-        node: sourceNode,
-        scope,
-        candidate: { sourceId: scope.sourceId, node: sourceNode },
-        candidates:
-          scope.sourceId === localSourceId
-            ? []
-            : [{ sourceId: scope.sourceId, node: sourceNode }],
-        ambiguous: false,
-      }
-    : undefined;
-}
-
 export function resolveNodeReferenceFromKnowledgeDBs(
   knowledgeDBs: KnowledgeDBs,
   id: ID,

@@ -27,6 +27,11 @@ import {
   EditorNavigationTarget,
   linkToNavigationTarget,
 } from "./editor/linkOperations";
+import {
+  getNodeFromGraphData,
+  getSourceNodeCandidates,
+  projectKnowledgeDBs,
+} from "./core/graphData";
 
 export { newGraphNode } from "./core/nodeFactory";
 
@@ -129,12 +134,12 @@ export function getParentView(viewContext: ViewPath): ViewPath | undefined {
 
 export function getContext(data: Data, viewPath: ViewPath): Context {
   const directNode = getViewNodeByID(
-    data.knowledgeDBs,
+    projectKnowledgeDBs(data),
     getLast(viewPath),
     data.user.publicKey
   );
   if (directNode) {
-    return getNodeContext(data.knowledgeDBs, directNode);
+    return getNodeContext(projectKnowledgeDBs(data), directNode);
   }
 
   const parentPath = getParentView(viewPath);
@@ -144,8 +149,8 @@ export function getContext(data: Data, viewPath: ViewPath): Context {
 
   const parentNode = getNodeForView(data, parentPath);
   return parentNode
-    ? getNodeContext(data.knowledgeDBs, parentNode).push(
-        getSemanticID(data.knowledgeDBs, parentNode)
+    ? getNodeContext(projectKnowledgeDBs(data), parentNode).push(
+        getSemanticID(projectKnowledgeDBs(data), parentNode)
       )
     : List<ID>();
 }
@@ -197,8 +202,11 @@ function getRowIDFromPath(data: Data, viewPath: ViewPath): ID {
   if (isEmptyViewPathID(currentID)) {
     return EMPTY_SEMANTIC_ID;
   }
+  if (isSearchId(currentID as ID)) {
+    return currentID as ID;
+  }
   const pane = getPane(data, viewPath);
-  const node = getNode(data.knowledgeDBs, currentID, pane.author);
+  const node = getNode(projectKnowledgeDBs(data), currentID, pane.author);
   if (!node) {
     return currentID;
   }
@@ -223,8 +231,9 @@ export function getParentNode(
   const pane = getPane(data, viewPath);
   const parentID = viewPath[viewPath.length - 2] as ViewPathSegment;
   return (
-    getNode(data.knowledgeDBs, parentID, pane.author) ??
-    data.graphIndex.nodeByID.get(parentID as LongID)
+    getNode(projectKnowledgeDBs(data), parentID, pane.author) ??
+    getNodeFromGraphData(data, parentID, pane.author as SourceId) ??
+    getSourceNodeCandidates(data, parentID)[0]?.node
   );
 }
 
@@ -246,10 +255,16 @@ export function getNodeForView(
   const pane = getPane(data, viewPath);
   return (
     getViewNodeByID(
-      data.knowledgeDBs,
+      projectKnowledgeDBs(data),
       currentID,
       pane.author || data.user.publicKey
-    ) ?? data.graphIndex.nodeByID.get(currentID as LongID)
+    ) ??
+    getNodeFromGraphData(
+      data,
+      currentID,
+      (pane.author || data.user.publicKey) as SourceId
+    ) ??
+    getSourceNodeCandidates(data, currentID)[0]?.node
   );
 }
 
@@ -290,28 +305,28 @@ export function buildPaneTarget(
       if (isRefNode(currentEdge)) {
         return getRefLinkTargetInfo(
           currentEdge.id,
-          data.knowledgeDBs,
+          projectKnowledgeDBs(data),
           effectiveAuthor
         );
       }
       if (isRefNode(currentNode)) {
         return getRefLinkTargetInfo(
           currentNode.id,
-          data.knowledgeDBs,
+          projectKnowledgeDBs(data),
           effectiveAuthor
         );
       }
-      return getRefTargetInfo(rowID, data.knowledgeDBs, effectiveAuthor);
+      return getRefTargetInfo(rowID, projectKnowledgeDBs(data), effectiveAuthor);
     }
     return virtualType === "version"
       ? getRefTargetInfo(
           currentReference.id,
-          data.knowledgeDBs,
+          projectKnowledgeDBs(data),
           effectiveAuthor
         )
       : getRefLinkTargetInfo(
           currentReference.id,
-          data.knowledgeDBs,
+          projectKnowledgeDBs(data),
           effectiveAuthor
         );
   })();
@@ -469,7 +484,7 @@ export function getCurrentEdgeForView(
   if (childID === EMPTY_SEMANTIC_ID) {
     return getEmptyNodeItem(data, parentNode);
   }
-  return getNode(data.knowledgeDBs, childID, parentNode.author);
+  return getNode(projectKnowledgeDBs(data), childID, parentNode.author);
 }
 
 export function useCurrentEdge(): GraphNode | undefined {
@@ -519,7 +534,7 @@ export function getPreviousSibling(
         return found;
       }
       const childNode = getNode(
-        data.knowledgeDBs,
+        projectKnowledgeDBs(data),
         childID,
         data.user.publicKey
       );
@@ -565,7 +580,7 @@ export function RootViewContextProvider({
   const data = useData();
   const pane = data.panes[paneIndex];
   const resolvedRootNode = pane?.rootNodeId
-    ? getNode(data.knowledgeDBs, pane.rootNodeId, pane.author)
+    ? getNode(projectKnowledgeDBs(data), pane.rootNodeId, pane.author)
     : undefined;
   const startPath: ViewPath = [paneIndex, resolvedRootNode?.id || root];
   const finalPath = (indices || List<number>()).reduce(

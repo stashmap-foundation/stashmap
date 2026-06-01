@@ -26,7 +26,16 @@ import {
   Document,
   documentKeyOf,
 } from "./Document";
-import { newDB } from "./knowledge";
+import {
+  deleteDocument,
+  getNodeFromGraphData,
+  getNodesForSource,
+  projectKnowledgeDBs,
+  removeNode,
+  nodeKeyOf,
+  upsertDocumentMetadata,
+  upsertNode,
+} from "./graphData";
 import { newGraphNode } from "./nodeFactory";
 import { fileLinkSpan, linkSpan, plainSpans } from "./nodeSpans";
 import { createRootAnchor } from "./rootAnchor";
@@ -49,11 +58,15 @@ type GraphPlanData = Pick<
   | "contacts"
   | "user"
   | "contactsRelays"
-  | "knowledgeDBs"
-  | "snapshotNodes"
-  | "graphIndex"
+  | "nodesByID"
   | "documents"
-  | "documentByFilePath"
+  | "documentsByFilePath"
+  | "incomingCrefs"
+  | "incomingFileLinks"
+  | "basedOnIndex"
+  | "semantic"
+  | "nodeKeysByDocument"
+  | "snapshotNodes"
   | "relaysInfos"
 >;
 
@@ -133,8 +146,9 @@ function planEnsureSystemRoot<T extends GraphPlan>(
   plan: T,
   systemRole: RootSystemRole
 ): [T, GraphNode] {
+  const knowledgeDBs = projectKnowledgeDBs(plan);
   const existing = getOwnSystemRoot(
-    plan.knowledgeDBs,
+    knowledgeDBs,
     plan.user.publicKey,
     systemRole
   );
@@ -211,7 +225,7 @@ export function planUpsertRootDocument<T extends GraphPlan>(
         updatedMs: rootNode.updated,
       }
     : createDocumentFromRootNode(rootNode);
-  return { ...plan, documents: plan.documents.set(key, next) };
+  return upsertDocumentMetadata(plan, next);
 }
 
 export function withDocumentRoot(
@@ -225,11 +239,12 @@ export function withDocumentRoot(
 }
 
 export function getNodeDocumentId(
-  plan: Pick<GraphPlan, "knowledgeDBs">,
+  plan: Pick<GraphPlan, "nodesByID">,
   node: GraphNode
 ): string | undefined {
   return (
-    node.docId ?? getNode(plan.knowledgeDBs, node.root, node.author)?.docId
+    node.docId ??
+    getNode(projectKnowledgeDBs(plan), node.root, node.author)?.docId
   );
 }
 
@@ -247,20 +262,13 @@ export function upsertNodesCore<T extends GraphPlan>(
   plan: T,
   nodes: GraphNode
 ): T {
-  const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
-  const normalized = ensureNodeNativeFields(plan.knowledgeDBs, nodes);
+  const knowledgeDBs = projectKnowledgeDBs(plan);
+  const normalized = ensureNodeNativeFields(knowledgeDBs, nodes);
   const node: GraphNode =
     !normalized.parent && !normalized.docId
       ? { ...normalized, docId: v4() }
       : normalized;
-  const updatedDB = {
-    ...userDB,
-    nodes: userDB.nodes.set(shortID(node.id), node),
-  };
-  const planWithNode: T = {
-    ...plan,
-    knowledgeDBs: plan.knowledgeDBs.set(plan.user.publicKey, updatedDB),
-  };
+  const planWithNode: T = upsertNode(plan, node);
   return planMarkDocumentAffected(
     planUpsertRootDocument(planWithNode, node),
     node
@@ -284,8 +292,8 @@ export function planUpsertNodes<T extends GraphPlan>(
   plan: T,
   nodes: GraphNode
 ): T {
-  const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
-  const isNewNode = !userDB.nodes.has(shortID(nodes.id));
+  const userNodes = getNodesForSource(plan, plan.user.publicKey as SourceId);
+  const isNewNode = !userNodes.has(shortID(nodes.id) as ID);
   const basePlan = upsertNodesCore(plan, nodes);
 
   const isRootNode = isNewNode && !nodes.parent;
@@ -351,9 +359,12 @@ function getNodeSubtree(
   sourceNode: GraphNode,
   filterNode: (node: GraphNode) => boolean = () => true
 ): List<GraphNode> {
-  const authorNodes =
-    plan.knowledgeDBs.get(sourceNode.author)?.nodes.valueSeq().toList() ||
-    List<GraphNode>();
+  const authorNodes = getNodesForSource(
+    plan,
+    sourceNode.author as SourceId
+  )
+    .valueSeq()
+    .toList();
   const authorNodesByID = authorNodes.reduce(
     (acc, node) => acc.set(shortID(node.id), node),
     Map<ID, GraphNode>()
@@ -466,11 +477,12 @@ export function planCopyDescendantNodes<T extends GraphPlan>(
           return createRootAnchor(
             newSemanticContext,
             source,
-            getAnchorSnapshotLabels(accPlan.knowledgeDBs, source)
+            getAnchorSnapshotLabels(projectKnowledgeDBs(accPlan), source)
           );
         })(),
         spans: source.spans,
         basedOn: source.id,
+        basedOnSource: source.author as SourceId,
         relevance: source.relevance,
         argument: source.argument,
       });
@@ -490,8 +502,9 @@ export function planMoveDescendantNodes<T extends GraphPlan>(
   root?: ID
 ): T {
   const descendants = getNodeSubtree(plan, sourceNode);
-  const sourceSemanticID = getSemanticID(plan.knowledgeDBs, sourceNode);
-  const sourceSemanticContext = getNodeContext(plan.knowledgeDBs, sourceNode);
+  const knowledgeDBs = projectKnowledgeDBs(plan);
+  const sourceSemanticID = getSemanticID(knowledgeDBs, sourceNode);
+  const sourceSemanticContext = getNodeContext(knowledgeDBs, sourceNode);
   const effectiveTargetSemanticID = targetSemanticID ?? sourceSemanticID;
   const sourceChildContext = sourceSemanticContext.push(
     shortID(sourceSemanticID)
@@ -502,7 +515,10 @@ export function planMoveDescendantNodes<T extends GraphPlan>(
 
   return descendants.reduce((accPlan, node) => {
     const isRootNode = node.id === sourceNode.id;
-    const nodeSemanticContext = getNodeContext(accPlan.knowledgeDBs, node);
+    const nodeSemanticContext = getNodeContext(
+      projectKnowledgeDBs(accPlan),
+      node
+    );
     const newSemanticContext = isRootNode
       ? targetSemanticContext
       : targetChildContext.concat(
@@ -520,41 +536,9 @@ export function planMoveDescendantNodes<T extends GraphPlan>(
   }, plan);
 }
 
-function withDocumentInFilePathIndex<T extends GraphPlan>(
-  plan: T,
-  document: Document
-): T {
-  return document.filePath
-    ? {
-        ...plan,
-        documentByFilePath: plan.documentByFilePath.set(
-          document.filePath,
-          document
-        ),
-      }
-    : plan;
-}
-
-function withoutDocumentInFilePathIndex<T extends GraphPlan>(
-  plan: T,
-  document: Document | undefined
-): T {
-  if (!document?.filePath) {
-    return plan;
-  }
-  const current = plan.documentByFilePath.get(document.filePath);
-  return current?.docId === document.docId
-    ? {
-        ...plan,
-        documentByFilePath: plan.documentByFilePath.remove(document.filePath),
-      }
-    : plan;
-}
-
 function planDeleteDocumentRoot<T extends GraphPlan>(
   plan: T,
   node: GraphNode,
-  nextKnowledgeDBs: KnowledgeDBs,
   docId: string
 ): T {
   const key = documentKeyOf(node.author, docId);
@@ -568,11 +552,9 @@ function planDeleteDocumentRoot<T extends GraphPlan>(
       topNodeShortIds: remainingTopNodeShortIds,
       updatedMs: Date.now(),
     };
-    return withDocumentInFilePathIndex(
+    return upsertDocumentMetadata(
       {
-        ...plan,
-        knowledgeDBs: nextKnowledgeDBs,
-        documents: plan.documents.set(key, nextDocument),
+        ...removeNode(plan, nodeKeyOf(node.author as SourceId, node.id)),
         affectedDocuments: plan.affectedDocuments.add(docId),
         deletedDocs: plan.deletedDocs.remove(docId),
       },
@@ -580,43 +562,35 @@ function planDeleteDocumentRoot<T extends GraphPlan>(
     );
   }
 
-  return withoutDocumentInFilePathIndex(
-    {
-      ...plan,
-      knowledgeDBs: nextKnowledgeDBs,
-      documents: plan.documents.remove(key),
-      affectedDocuments: plan.affectedDocuments.remove(docId),
-      deletedDocs: plan.deletedDocs.add(docId),
-    },
-    document
-  );
+  return {
+    ...deleteDocument(plan, key),
+    affectedDocuments: plan.affectedDocuments.remove(docId),
+    deletedDocs: plan.deletedDocs.add(docId),
+  };
 }
 
 export function planDeleteNodes<T extends GraphPlan>(
   plan: T,
   nodeID: LongID
 ): T {
-  const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
-  const node = userDB.nodes.get(shortID(nodeID));
-  const updatedNodes = userDB.nodes.remove(shortID(nodeID));
-  const updatedDB = {
-    ...userDB,
-    nodes: updatedNodes,
-  };
-  const nextKnowledgeDBs = plan.knowledgeDBs.set(
-    plan.user.publicKey,
-    updatedDB
+  const node = getNodeFromGraphData(
+    plan,
+    nodeID as ID,
+    plan.user.publicKey as SourceId
   );
   if (!node) {
-    return { ...plan, knowledgeDBs: nextKnowledgeDBs };
+    return plan;
   }
   const { docId } = node;
   if (!node.parent && docId) {
-    return planDeleteDocumentRoot(plan, node, nextKnowledgeDBs, docId);
+    return planDeleteDocumentRoot(plan, node, docId);
   }
+  const withoutNode = removeNode(
+    plan,
+    nodeKeyOf(node.author as SourceId, node.id)
+  );
   return {
-    ...plan,
-    knowledgeDBs: nextKnowledgeDBs,
+    ...withoutNode,
     affectedDocuments: planMarkDocumentAffected(plan, node).affectedDocuments,
   };
 }
@@ -625,10 +599,10 @@ export function planDeleteDescendantNodes<T extends GraphPlan>(
   plan: T,
   sourceNode: GraphNode
 ): T {
-  const userNodesByID = plan.knowledgeDBs.get(
-    plan.user.publicKey,
-    newDB()
-  ).nodes;
+  const userNodesByID = getNodesForSource(
+    plan,
+    plan.user.publicKey as SourceId
+  );
   const descendants = getNodeSubtree(plan, sourceNode)
     .filter((node) => node.id !== sourceNode.id)
     .filter((node) => node.author === plan.user.publicKey)
@@ -718,10 +692,9 @@ export function planAddTargetsToNode<T extends GraphPlan>(
     return [plan, []];
   }
 
-  const parentContext = getNodeContext(plan.knowledgeDBs, parentNode);
-  const childContext = parentContext.push(
-    getSemanticID(plan.knowledgeDBs, parentNode)
-  );
+  const knowledgeDBs = projectKnowledgeDBs(plan);
+  const parentContext = getNodeContext(knowledgeDBs, parentNode);
+  const childContext = parentContext.push(getSemanticID(knowledgeDBs, parentNode));
 
   const [planWithChildren, nodeItemPayload] = targetsArray.reduce<
     [T, ChildPayload[]]
@@ -804,7 +777,7 @@ export function planAddTargetsToNode<T extends GraphPlan>(
         const planWithChild = planUpsertNodes(accPlan, childNode);
         const sourceNode = refTarget
           ? getNode(
-              planWithChild.knowledgeDBs,
+              projectKnowledgeDBs(planWithChild),
               refTarget.targetID,
               planWithChild.user.publicKey
             )
@@ -824,7 +797,7 @@ export function planAddTargetsToNode<T extends GraphPlan>(
       }
 
       const existingNode = getNode(
-        accPlan.knowledgeDBs,
+        projectKnowledgeDBs(accPlan),
         objectID,
         accPlan.user.publicKey
       );
@@ -959,10 +932,7 @@ export function planAddTopTargetsToDocument<T extends GraphPlan>(
   return [
     {
       ...planWithNodes,
-      documents: planWithNodes.documents.set(
-        documentKeyOf(nextDocument.author, nextDocument.docId),
-        nextDocument
-      ),
+      ...upsertDocumentMetadata(planWithNodes, nextDocument),
       affectedDocuments: planWithNodes.affectedDocuments.add(
         nextDocument.docId
       ),

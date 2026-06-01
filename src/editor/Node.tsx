@@ -71,6 +71,10 @@ import { useItemStyle } from "./useItemStyle";
 import { EditorTextProvider } from "./EditorTextContext";
 import { getTreeChildren } from "../treeTraversal";
 import { getNodeUserPublicKey } from "../infra/nostr/userEntry";
+import {
+  projectDocumentByFilePath,
+  projectKnowledgeDBs,
+} from "../core/graphData";
 
 export { getNodesInTree } from "../treeTraversal";
 
@@ -89,7 +93,7 @@ function useNodeHasChildren(): boolean {
   }
 
   if (currentRow && isRefNode(currentRow)) {
-    const targetNode = resolveNode(data.knowledgeDBs, currentRow);
+    const targetNode = resolveNode(projectKnowledgeDBs(data), currentRow);
     if (targetNode?.children.size) {
       return true;
     }
@@ -177,7 +181,7 @@ function logNodeNotFoundDebug({
   const logKey = `${window.location.pathname}${window.location.search}|${viewKey}`;
   const count = (nodeNotFoundCounts.get(logKey) || 0) + 1;
   nodeNotFoundCounts.set(logKey, count);
-  const dbs = data.knowledgeDBs
+  const dbs = projectKnowledgeDBs(data)
     .entrySeq()
     .map(([author, db]) => ({ author, nodeCount: db.nodes.size }))
     .toArray();
@@ -187,7 +191,7 @@ function logNodeNotFoundDebug({
     (totalNodeCount > 0 && count % 5 === 0) ||
     count === 30 ||
     count === 100;
-  const matchingNodes = data.knowledgeDBs
+  const matchingNodes = projectKnowledgeDBs(data)
     .entrySeq()
     .flatMap(([author, db]) =>
       db.nodes
@@ -202,9 +206,9 @@ function logNodeNotFoundDebug({
         }))
     )
     .toArray();
-  const userNode = getNode(data.knowledgeDBs, rowID, data.user.publicKey);
-  const paneNode = getNode(data.knowledgeDBs, rowID, pane?.author);
-  const rootNode = getNode(data.knowledgeDBs, pane?.rootNodeId, pane?.author);
+  const userNode = getNode(projectKnowledgeDBs(data), rowID, data.user.publicKey);
+  const paneNode = getNode(projectKnowledgeDBs(data), rowID, pane?.author);
+  const rootNode = getNode(projectKnowledgeDBs(data), pane?.rootNodeId, pane?.author);
   const nodeSummary = (node: typeof userNode): Record<string, unknown> | null =>
     node
       ? {
@@ -213,8 +217,8 @@ function logNodeNotFoundDebug({
           root: node.root,
           parent: node.parent,
           text: getNodeText(node),
-          semanticID: getSemanticID(data.knowledgeDBs, node),
-          context: getNodeContext(data.knowledgeDBs, node).toArray(),
+          semanticID: getSemanticID(projectKnowledgeDBs(data), node),
+          context: getNodeContext(projectKnowledgeDBs(data), node).toArray(),
           children: node.children.toArray(),
         }
       : null;
@@ -639,7 +643,9 @@ function NodeAutoLink({
   children: React.ReactNode;
 }): JSX.Element | null {
   const data = useData();
-  const { knowledgeDBs, documents, documentByFilePath } = data;
+  const knowledgeDBs = projectKnowledgeDBs(data);
+  const documents = data.documents;
+  const documentByFilePath = projectDocumentByFilePath(data);
   const viewPath = useViewPath();
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();

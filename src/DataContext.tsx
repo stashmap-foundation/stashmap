@@ -1,14 +1,17 @@
 import React from "react";
 import { Map } from "immutable";
-import { newDB } from "./core/knowledge";
 import { injectEmptyNodesIntoKnowledgeDBs } from "./core/connections";
 import {
-  useDocumentKnowledgeDBs,
-  useDocumentGraphIndex,
+  useDocumentGraphData,
   useDocumentSnapshotNodes,
-  useDocuments,
-  useDocumentByFilePath,
 } from "./DocumentStore";
+import {
+  GraphDataFields,
+  createEmptyGraphData,
+  graphDataFromKnowledgeDBs,
+  mergeGraphData,
+  projectKnowledgeDBs,
+} from "./core/graphData";
 
 export type DataContextProps = Data;
 
@@ -33,26 +36,17 @@ export function DataContextProvider({
   return <DataContext.Provider value={props}>{children}</DataContext.Provider>;
 }
 
-function mergeDBNodesAndNodes(
-  a: KnowledgeData | undefined,
-  b: KnowledgeData | undefined
-): KnowledgeData {
-  const existing = a || newDB();
-  if (b === undefined) {
-    return existing;
-  }
+function graphDataFromData(data: Data): GraphDataFields {
   return {
-    nodes: existing.nodes.merge(b.nodes),
+    nodesByID: data.nodesByID,
+    documents: data.documents,
+    documentsByFilePath: data.documentsByFilePath,
+    incomingCrefs: data.incomingCrefs,
+    incomingFileLinks: data.incomingFileLinks,
+    basedOnIndex: data.basedOnIndex,
+    semantic: data.semantic,
+    nodeKeysByDocument: data.nodeKeysByDocument,
   };
-}
-
-function mergeKnowledgeDBs(a: KnowledgeDBs, b: KnowledgeDBs): KnowledgeDBs {
-  const allUsers = a.keySeq().toSet().union(b.keySeq().toSet());
-  return Map<PublicKey, KnowledgeData>(
-    allUsers.toArray().map((userPK) => {
-      return [userPK, mergeDBNodesAndNodes(a.get(userPK), b.get(userPK))];
-    })
-  );
 }
 
 export function MergeKnowledgeDB({
@@ -66,34 +60,38 @@ export function MergeKnowledgeDB({
   const { temporaryEvents } = data.publishEventsStatus;
   const myself = data.user.publicKey;
 
-  const documentDBs = useDocumentKnowledgeDBs();
-  const graphIndex = useDocumentGraphIndex();
+  const documentGraphData = useDocumentGraphData();
   const snapshotNodes = useDocumentSnapshotNodes();
-  const documents = useDocuments();
-  const documentByFilePath = useDocumentByFilePath();
-  const mergedDataDBs = mergeKnowledgeDBs(data.knowledgeDBs, documentDBs);
-  const baseDBs = knowledgeDBs
-    ? mergeKnowledgeDBs(knowledgeDBs, mergedDataDBs)
-    : mergedDataDBs;
+  const mergedData = mergeGraphData(graphDataFromData(data), documentGraphData);
+  const baseGraphData = knowledgeDBs
+    ? mergeGraphData(graphDataFromKnowledgeDBs(knowledgeDBs), mergedData)
+    : mergedData;
 
-  const injectedDBs = injectEmptyNodesIntoKnowledgeDBs(
-    baseDBs,
+  const injectedKnowledgeDBs = injectEmptyNodesIntoKnowledgeDBs(
+    projectKnowledgeDBs(baseGraphData),
     temporaryEvents,
     myself
   );
+  const injectedGraphData =
+    temporaryEvents.size > 0
+      ? graphDataFromKnowledgeDBs(injectedKnowledgeDBs, {
+          documents: baseGraphData.documents,
+          documentsByFilePath: baseGraphData.documentsByFilePath,
+        })
+      : baseGraphData;
 
   return (
     <DataContext.Provider
       value={{
         ...data,
-        knowledgeDBs: injectedDBs,
-        graphIndex,
+        ...injectedGraphData,
         snapshotNodes,
-        documents,
-        documentByFilePath,
       }}
     >
       {children}
     </DataContext.Provider>
   );
 }
+
+export const EMPTY_GRAPH_DATA = createEmptyGraphData();
+export const EMPTY_CONTACTS = Map<PublicKey, Contact>();

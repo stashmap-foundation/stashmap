@@ -14,6 +14,11 @@ import { getLocalSearchResultIDs } from "./localSearch";
 import { documentKeyOf, documentLinkPath } from "./core/Document";
 import { newGraphNode } from "./core/nodeFactory";
 import { fileLinkSpan, linkSpan, plainSpans } from "./core/nodeSpans";
+import {
+  getNodeFromGraphData,
+  getSourceNodeCandidates,
+  projectKnowledgeDBs,
+} from "./core/graphData";
 
 function SearchCrefBuilder({
   children,
@@ -24,13 +29,15 @@ function SearchCrefBuilder({
   searchId: ID;
   foundSemanticIDs: List<ID>;
 }): JSX.Element {
-  const { documents, knowledgeDBs, graphIndex, user } = useData();
+  const data = useData();
+  const { documents, user } = data;
+  const knowledgeDBs = projectKnowledgeDBs(data);
   const pane = useCurrentPane();
   const effectiveAuthor = pane.author;
 
   const uniqueSemanticIDs = foundSemanticIDs.toSet().toList();
   const crefItems = uniqueSemanticIDs.flatMap((semanticID) => {
-    const refs = findRefsToNode(knowledgeDBs, graphIndex, semanticID);
+    const refs = findRefsToNode(knowledgeDBs, data, semanticID);
     const deduped = deduplicateRefsByContext(
       refs,
       knowledgeDBs,
@@ -53,7 +60,9 @@ function SearchCrefBuilder({
     .toSet()
     .toList()
     .map((nodeID): GraphNode => {
-      const targetNode = graphIndex.nodeByID.get(nodeID as LongID);
+      const targetNode =
+        getNodeFromGraphData(data, nodeID, effectiveAuthor as SourceId) ??
+        getSourceNodeCandidates(data, nodeID)[0]?.node;
       const targetDocument =
         targetNode?.docId && !targetNode.parent
           ? documents.get(documentKeyOf(targetNode.author, targetNode.docId))
@@ -63,7 +72,7 @@ function SearchCrefBuilder({
         targetDocument?.topNodeShortIds[0] === shortID(targetNode.id)
           ? targetDocument
           : undefined;
-      const sourceAuthor = targetNode?.author ?? user.publicKey;
+      const sourceAuthor = user.publicKey;
       const node = primaryTargetDocument
         ? newGraphNode(
             sourceAuthor,
@@ -120,7 +129,8 @@ export function LoadSearchData({
   children: React.ReactNode;
   itemIDs: ID[];
 }): JSX.Element {
-  const { knowledgeDBs } = useData();
+  const data = useData();
+  const knowledgeDBs = projectKnowledgeDBs(data);
   const pane = useCurrentPane();
 
   const searchEntries = itemIDs
@@ -136,10 +146,15 @@ export function LoadSearchData({
   }
 
   const searchId = firstSearch.id as ID;
-  const foundSemanticIDs =
+  const localSearchResultIDs = getLocalSearchResultIDs(knowledgeDBs, query);
+  const providerSearchResultIDs =
     pane.searchQuery === query && pane.searchResultIDs
       ? List(pane.searchResultIDs)
-      : getLocalSearchResultIDs(knowledgeDBs, query);
+      : List<ID>();
+  const foundSemanticIDs = providerSearchResultIDs
+    .concat(localSearchResultIDs)
+    .toSet()
+    .toList();
 
   return (
     <SearchCrefBuilder searchId={searchId} foundSemanticIDs={foundSemanticIDs}>

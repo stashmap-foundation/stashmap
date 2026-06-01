@@ -1,4 +1,6 @@
 import {
+  getNode,
+  getNodeStack,
   getRefLinkTargetInfo,
   getRefTargetInfo,
   RefTargetInfo,
@@ -10,6 +12,12 @@ import { Link } from "../core/link";
 import { resolveLinkPath } from "../core/linkPath";
 import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
 import { AddToParentTarget } from "../planner";
+import {
+  getNodeFromGraphData,
+  getSourceNodeCandidates,
+  projectDocumentByFilePath,
+  projectKnowledgeDBs,
+} from "../core/graphData";
 
 export type LinkNavigationMode = "link" | "target";
 
@@ -21,7 +29,7 @@ export type EditorNavigationTarget = {
 };
 
 function sourceFilePath(data: Data, source: GraphNode): string | undefined {
-  return getDocumentForNode(data.knowledgeDBs, data.documents, source)
+  return getDocumentForNode(projectKnowledgeDBs(data), data.documents, source)
     ?.filePath;
 }
 
@@ -34,7 +42,7 @@ function documentTarget(
     sourceFilePath(data, link.source)
   );
   return (
-    data.documentByFilePath.get(resolvedPath) ||
+    projectDocumentByFilePath(data).get(resolvedPath) ||
     data.documents.get(documentKeyOf(link.source.author, link.path))
   );
 }
@@ -45,6 +53,34 @@ function refInfoToTarget(refInfo: RefTargetInfo): EditorNavigationTarget {
     rootNodeId: refInfo.rootNodeId,
     scrollToId: refInfo.scrollToId,
   };
+}
+
+function nodeRefInfo(data: Data, node: GraphNode): RefTargetInfo {
+  const knowledgeDBs = projectKnowledgeDBs(data);
+  const containingParent = knowledgeDBs
+    .get(node.author)
+    ?.nodes.valueSeq()
+    .find((candidate) =>
+      candidate.children.some((childID) => childID === node.id)
+    );
+  const parentNode =
+    (node.parent ? getNode(knowledgeDBs, node.parent, node.author) : undefined) ||
+    containingParent;
+  const targetRoot = parentNode || node;
+  return {
+    stack: getNodeStack(knowledgeDBs, targetRoot),
+    author: targetRoot.author,
+    rootNodeId: targetRoot.id,
+    scrollToId: targetRoot.id === node.id ? undefined : node.id,
+  };
+}
+
+function graphLinkRefInfo(data: Data, link: Extract<Link, { kind: "node" }>): RefTargetInfo | undefined {
+  const target = link.targetID as ID;
+  const targetNode =
+    getNodeFromGraphData(data, target, link.source.author as SourceId) ??
+    getSourceNodeCandidates(data, target)[0]?.node;
+  return targetNode ? nodeRefInfo(data, targetNode) : undefined;
 }
 
 export function linkToNavigationTarget(
@@ -62,10 +98,15 @@ export function linkToNavigationTarget(
 
   const refInfo =
     mode === "target"
-      ? getRefTargetInfo(link.source.id, data.knowledgeDBs, effectiveAuthor)
-      : getRefLinkTargetInfo(
+      ? getRefTargetInfo(
           link.source.id,
-          data.knowledgeDBs,
+          projectKnowledgeDBs(data),
+          effectiveAuthor
+        )
+      : graphLinkRefInfo(data, link) ??
+        getRefLinkTargetInfo(
+          link.source.id,
+          projectKnowledgeDBs(data),
           effectiveAuthor
         );
   return refInfo ? refInfoToTarget(refInfo) : undefined;

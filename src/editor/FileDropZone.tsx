@@ -20,6 +20,7 @@ import {
 } from "../core/Document";
 import type { Document } from "../core/Document";
 import type { MarkdownImportFile } from "../core/markdownImport";
+import { projectKnowledgeDBs, replaceDocument } from "../core/graphData";
 
 export type { MarkdownImportFile } from "../core/markdownImport";
 export { parseMarkdownImportFiles } from "../core/markdownImport";
@@ -97,21 +98,15 @@ function upsertParsedDocument(
     relativePath: file.name,
     fallbackTitle: titleFromFileName(file.name),
     context: {
-      knowledgeDBs: plan.knowledgeDBs,
+      knowledgeDBs: projectKnowledgeDBs(plan),
       publicKey: plan.user.publicKey,
       affectedDocuments: plan.affectedDocuments,
     },
   });
   const { document } = parsed;
-  const key = documentKeyOf(document.author, document.docId);
   return {
     plan: {
-      ...plan,
-      knowledgeDBs: parsed.context.knowledgeDBs,
-      documents: plan.documents.set(key, document),
-      documentByFilePath: document.filePath
-        ? plan.documentByFilePath.set(document.filePath, document)
-        : plan.documentByFilePath,
+      ...replaceDocument(plan, { document, nodes: parsed.nodes }),
       affectedDocuments: parsed.context.affectedDocuments.add(document.docId),
     },
     document,

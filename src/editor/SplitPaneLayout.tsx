@@ -23,12 +23,15 @@ import { isUserLoggedIn, useLogout } from "../NostrAuthContext";
 import { useDragAutoScroll } from "../useDragAutoScroll";
 import { IS_MOBILE } from "./responsive";
 import { getLocalSearchResultIDs } from "../localSearch";
+import { projectKnowledgeDBs } from "../core/graphData";
 
 export function PaneSearchButton(): JSX.Element {
   const { setPane } = useSplitPanes();
   const pane = useCurrentPane();
   const paneIndex = usePaneIndex();
-  const { user, knowledgeDBs } = useData();
+  const data = useData();
+  const { user } = data;
+  const knowledgeDBs = projectKnowledgeDBs(data);
   const [showInput, setShowInput] = useState(false);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);

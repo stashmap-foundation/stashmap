@@ -23,6 +23,10 @@ import { planUpsertRootDocument, withDocumentRoot } from "./core/plan";
 import { newGraphNode } from "./core/nodeFactory";
 import { nodeText, plainSpans } from "./core/nodeSpans";
 import { getNodeForView, ViewPath } from "./ViewContext";
+import {
+  graphDataFromKnowledgeDBs,
+  projectKnowledgeDBs,
+} from "./core/graphData";
 
 export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
   plan: T,
@@ -32,7 +36,7 @@ export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
 ): [T, topItemIDs: ID[], topNodeIDs: LongID[]] {
   const createDocuments = options.createDocuments ?? true;
   const walkContext: WalkContext = {
-    knowledgeDBs: plan.knowledgeDBs,
+    knowledgeDBs: projectKnowledgeDBs(plan),
     publicKey: plan.user.publicKey,
     affectedDocuments: plan.affectedDocuments,
   };
@@ -48,7 +52,10 @@ export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
   });
   const planWithNodes: T = {
     ...plan,
-    knowledgeDBs: result.context.knowledgeDBs,
+    ...graphDataFromKnowledgeDBs(result.context.knowledgeDBs, {
+      documents: plan.documents,
+      documentsByFilePath: plan.documentsByFilePath,
+    }),
     affectedDocuments: result.context.affectedDocuments,
   };
   if (!createDocuments) {
@@ -115,7 +122,11 @@ function moveCreatedTreesToParentContext<T extends GraphPlan>(
     const actualID = actualNodeIDs[index];
     const sourceNodeID = sourceNodeIDs[index];
     const sourceNode = sourceNodeID
-      ? getNode(accPlan.knowledgeDBs, sourceNodeID, accPlan.user.publicKey)
+      ? getNode(
+          projectKnowledgeDBs(accPlan),
+          sourceNodeID,
+          accPlan.user.publicKey
+        )
       : undefined;
     if (!sourceNode) {
       return accPlan;
@@ -154,7 +165,7 @@ function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
   }
 
   const parentNode = getNode(
-    plan.knowledgeDBs,
+    projectKnowledgeDBs(plan),
     parentNodeId,
     plan.user.publicKey
   );
@@ -172,9 +183,9 @@ function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
       createDocuments: false,
     });
   const targetSemanticContext = getNodeContext(
-    planWithNodes.knowledgeDBs,
+    projectKnowledgeDBs(planWithNodes),
     parentNode
-  ).push(getSemanticID(planWithNodes.knowledgeDBs, parentNode));
+  ).push(getSemanticID(projectKnowledgeDBs(planWithNodes), parentNode));
   const movedPlan = moveCreatedTreesToParentContext(
     planWithNodes,
     topItemIDs,

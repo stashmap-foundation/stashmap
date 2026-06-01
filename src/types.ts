@@ -98,6 +98,10 @@ declare global {
 
   type KnowledgeDBs = Map<PublicKey, KnowledgeData>;
 
+  type NodeKey = string & { readonly __nodeKey: unique symbol };
+  type DocumentKey = string & { readonly __documentKey: unique symbol };
+  type FilePathKey = string & { readonly __filePathKey: unique symbol };
+
   type SnapshotNodes = Map<string, Map<string, GraphNode>>;
 
   type LocationState = {
@@ -159,11 +163,15 @@ declare global {
     contacts: Contacts;
     user: User;
     contactsRelays: Map<PublicKey, Relays>;
-    knowledgeDBs: KnowledgeDBs;
+    nodesByID: Map<ID, Map<SourceId, GraphNode>>;
+    documents: Map<DocumentKey, DocumentType>;
+    documentsByFilePath: Map<FilePathKey, DocumentKey>;
+    incomingCrefs: globalThis.Map<NodeKey, globalThis.Set<NodeKey>>;
+    incomingFileLinks: globalThis.Map<FilePathKey, globalThis.Set<NodeKey>>;
+    basedOnIndex: globalThis.Map<NodeKey, globalThis.Set<NodeKey>>;
+    semantic: globalThis.Map<string, globalThis.Set<NodeKey>>;
+    nodeKeysByDocument: globalThis.Map<DocumentKey, globalThis.Set<NodeKey>>;
     snapshotNodes: SnapshotNodes;
-    graphIndex: GraphIndex;
-    documents: Map<string, DocumentType>;
-    documentByFilePath: Map<string, DocumentType>;
     relaysInfos: Map<string, RelayInformation | undefined>;
     publishEventsStatus: EventState;
 
@@ -253,6 +261,7 @@ declare global {
     updated: number;
     author: PublicKey;
     basedOn?: LongID;
+    basedOnSource?: SourceId;
     root: ID;
     relevance: Relevance;
     argument?: Argument;
@@ -291,19 +300,6 @@ declare global {
 
   type KnowledgeData = {
     nodes: Map<ID, GraphNode>;
-  };
-
-  type GraphIndex = {
-    nodeByID: globalThis.Map<LongID, GraphNode>;
-    nodesBySource: globalThis.Map<SourceId, globalThis.Map<ID, GraphNode>>;
-    sourceCandidatesById: globalThis.Map<
-      ID,
-      { sourceId: SourceId; node: GraphNode }[]
-    >;
-    semantic: globalThis.Map<string, globalThis.Set<LongID>>;
-    incomingCrefs: globalThis.Map<LongID, globalThis.Set<LongID>>;
-    incomingFileLinks: globalThis.Map<string, globalThis.Set<LongID>>;
-    basedOnIndex: globalThis.Map<LongID, globalThis.Set<LongID>>;
   };
 
   // Temporary UI state (not persisted to Nostr)

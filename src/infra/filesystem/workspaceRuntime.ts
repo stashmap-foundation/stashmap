@@ -13,7 +13,10 @@ import type {
 } from "./workspaceWatcher";
 import { watchWorkspace } from "./workspaceWatcher";
 
-const ECHO_TTL_MS = 2000;
+// Filesystem events can be delayed substantially under parallel test/CPU load.
+// Keep own-write echo fingerprints long enough that delayed watcher events do not
+// get re-applied with a newer timestamp and overwrite newer in-memory state.
+const ECHO_TTL_MS = 30_000;
 
 export type WorkspaceRuntimeLoaded = {
   profile: ReturnType<typeof loadCliProfile>;
@@ -75,7 +78,11 @@ export function createWorkspaceRuntime(workspaceDir: string): WorkspaceRuntime {
       return false;
     }
     pendingEchoes.set(event.relativePath, active);
-    return active.some((entry) => entry.hash === hashContent(event.content));
+    // Watcher delivery can lag behind subsequent app writes; by the time a
+    // delayed self-echo is read from disk, the content may no longer match the
+    // original pending hash. Treat any near-term event for a path we just wrote
+    // as our own echo to avoid re-parsing generated-id markdown with fresh IDs.
+    return true;
   };
 
   const emit: FsEventHandler = (event) => {

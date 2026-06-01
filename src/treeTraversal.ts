@@ -35,6 +35,11 @@ import {
   getAlternativeFooterData,
   getIncomingCrefsForNode,
 } from "./semanticProjection";
+import {
+  getSourceNodeCandidates,
+  projectDocumentByFilePath,
+  projectKnowledgeDBs,
+} from "./core/graphData";
 
 export type TreeResult = {
   paths: List<ViewPath>;
@@ -74,14 +79,14 @@ function createVirtualRow(
   rowID: ID,
   virtualType: VirtualType
 ): GraphNode {
-  const indexedRowNode = data.graphIndex.nodeByID.get(rowID as LongID);
+  const indexedRowNode = getSourceNodeCandidates(data, rowID)[0]?.node;
   const sourceRowNode =
     virtualType === "suggestion"
-      ? indexedRowNode ?? getNode(data.knowledgeDBs, rowID, input.parentAuthor)
+      ? indexedRowNode ?? getNode(projectKnowledgeDBs(data), rowID, input.parentAuthor)
       : undefined;
   const incomingRowNode =
     virtualType === "incoming"
-      ? indexedRowNode ?? getNode(data.knowledgeDBs, rowID, input.parentAuthor)
+      ? indexedRowNode ?? getNode(projectKnowledgeDBs(data), rowID, input.parentAuthor)
       : undefined;
   const versionRowNode = virtualType === "version" ? indexedRowNode : undefined;
   const suggestionTargetID = getBlockLinkTarget(sourceRowNode);
@@ -185,9 +190,9 @@ function getChildrenForConcreteRef(
   const refNode = currentRow || getCurrentEdgeForView(data, parentPath);
   const sourceNode =
     refNode && isBlockLink(refNode)
-      ? resolveNode(data.knowledgeDBs, refNode)
+      ? resolveNode(projectKnowledgeDBs(data), refNode)
       : getNode(
-          data.knowledgeDBs,
+          projectKnowledgeDBs(data),
           parentRowID,
           refNode?.author ?? data.user.publicKey
         );
@@ -220,14 +225,14 @@ function getChildrenForRegularNode(
   const effectiveAuthor = getEffectiveAuthor(data, parentPath);
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
   const directNodes = isSearchId(parentRowID as ID)
-    ? getNode(data.knowledgeDBs, parentRowID as ID, author)
+    ? getNode(projectKnowledgeDBs(data), parentRowID as ID, author)
     : getNodeForView(data, parentPath);
   const nodes = directNodes;
   const childNodes = nodes
-    ? getNodeChildren(data.knowledgeDBs, nodes, nodes.author)
+    ? getNodeChildren(projectKnowledgeDBs(data), nodes, nodes.author)
     : List<GraphNode>();
   const nodeSemanticID = nodes
-    ? getSemanticID(data.knowledgeDBs, nodes)
+    ? getSemanticID(projectKnowledgeDBs(data), nodes)
     : parentRowID;
   const coordinateSemanticID = nodes ? nodeSemanticID : parentRowID;
 
@@ -238,7 +243,7 @@ function getChildrenForRegularNode(
           childNode:
             childID === EMPTY_SEMANTIC_ID
               ? undefined
-              : getNode(data.knowledgeDBs, childID, nodes.author),
+              : getNode(projectKnowledgeDBs(data), childID, nodes.author),
           index,
         }))
         .filter(({ childID, childNode }) =>
@@ -270,8 +275,8 @@ function getChildrenForRegularNode(
     .add(effectiveAuthor);
 
   const incomingCrefs = getIncomingCrefsForNode(
-    data.knowledgeDBs,
-    data.graphIndex,
+    projectKnowledgeDBs(data),
+    data,
     visibleAuthors,
     coordinateSemanticID,
     containingNodeID,
@@ -281,7 +286,7 @@ function getChildrenForRegularNode(
     undefined,
     nodes?.author,
     data.documents,
-    data.documentByFilePath
+    projectDocumentByFilePath(data)
   );
 
   const visibleIncomingCrefs = activeFilters.includes("incoming")
@@ -290,8 +295,8 @@ function getChildrenForRegularNode(
 
   const isOwnContent = effectiveAuthor === data.user.publicKey;
   const { suggestions: diffItems, versionMetas } = getAlternativeFooterData(
-    data.knowledgeDBs,
-    data.graphIndex,
+    projectKnowledgeDBs(data),
+    data,
     visibleAuthors,
     activeFilters,
     nodes,
@@ -431,7 +436,7 @@ export function getNodesInDocument(
     document.topNodeShortIds
       .map((topNodeShortId) =>
         getNode(
-          data.knowledgeDBs,
+          projectKnowledgeDBs(data),
           joinID(document.author, topNodeShortId),
           document.author
         )
@@ -457,8 +462,8 @@ export function getNodesInDocument(
     .add(data.user.publicKey)
     .add(document.author);
   const incomingCrefs = getIncomingCrefsForNode(
-    data.knowledgeDBs,
-    data.graphIndex,
+    projectKnowledgeDBs(data),
+    data,
     visibleAuthors,
     EMPTY_SEMANTIC_ID,
     undefined,
@@ -468,7 +473,7 @@ export function getNodesInDocument(
     document.filePath,
     document.author,
     data.documents,
-    data.documentByFilePath
+    projectDocumentByFilePath(data)
   );
 
   return appendVirtualFooterRows(

@@ -55,7 +55,7 @@ import {
 import { findContacts } from "./contacts";
 import { UserRelayContextProvider } from "./UserRelayContext";
 import { StashmapDB } from "./infra/nostr/cache/indexedDB";
-import { createEmptyGraphIndex } from "./graphIndex";
+import { createEmptyGraphData, projectKnowledgeDBs } from "./core/graphData";
 import { buildNodeRouteUrl } from "./navigationUrl";
 import { processEvents } from "./eventProcessing";
 
@@ -206,10 +206,7 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
   user: ALICE,
   contacts: Map<PublicKey, Contact>(),
   contactsRelays: Map<PublicKey, Relays>(),
-  knowledgeDBs: Map<PublicKey, KnowledgeData>(),
-  graphIndex: createEmptyGraphIndex(),
-  documents: Map(),
-  documentByFilePath: Map(),
+  ...createEmptyGraphData(),
   relaysInfos: Map<string, RelayInformation | undefined>(),
   publishEventsStatus: {
     isLoading: false,
@@ -292,6 +289,7 @@ type ProviderComponent = React.ComponentType<{ children: React.ReactNode }>;
 
 type RenderApis = Partial<TestApis> &
   Partial<DataContextProps> & {
+    knowledgeDBs?: KnowledgeDBs;
     initialRoute?: string;
     user?: User;
     defaultRelays?: Array<string>;
@@ -306,7 +304,10 @@ function normalizeTestInitialRoute(
   options?: RenderApis
 ): string {
   const [pathname, search = ""] = route.split("?");
-  if (!pathname.startsWith("/n/") || !options?.knowledgeDBs) {
+  const optionKnowledgeDBs =
+    options?.knowledgeDBs ??
+    (options?.nodesByID ? projectKnowledgeDBs(options as DataContextProps) : undefined);
+  if (!pathname.startsWith("/n/") || !optionKnowledgeDBs) {
     return route;
   }
   const segments = pathname
@@ -321,13 +322,12 @@ function normalizeTestInitialRoute(
     "source"
   ) as PublicKey | null;
   const author: PublicKey =
-    querySource || options.user?.publicKey || ALICE.publicKey;
-  const eventKnowledgeDB = options.relayPool
+    querySource || options?.user?.publicKey || ALICE.publicKey;
+  const eventKnowledgeDB = options?.relayPool
     ? processEvents(List(options.relayPool.getEvents())).get(author)
         ?.knowledgeDB
     : undefined;
-  const nodes =
-    options.knowledgeDBs.get(author)?.nodes || eventKnowledgeDB?.nodes;
+  const nodes = optionKnowledgeDBs.get(author)?.nodes || eventKnowledgeDB?.nodes;
   const targetNode = segments.reduce<GraphNode | undefined>(
     (parentNode, segment, index) => {
       if (index > 0 && !parentNode) {

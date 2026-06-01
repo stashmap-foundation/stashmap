@@ -17,6 +17,24 @@ type SignedEventWithConf = {
   readonly writeRelayConf?: WriteRelayConf;
 };
 
+function signEventsWithSeed(
+  events: List<EventTemplate & EventAttachment>,
+  user: User,
+  finalizeEvent: FinalizeEvent
+): List<SignedEventWithConf> {
+  if (!isUserLoggedIn(user) || isUserLoggedInWithExtension(user)) {
+    return List();
+  }
+  return events.map((e) => {
+    const { writeRelayConf, ...template } = e;
+    const event = finalizeEvent(
+      template,
+      (user as KeyPair).privateKey
+    ) as VerifiedEvent;
+    return { event, writeRelayConf };
+  });
+}
+
 export async function signEvents(
   events: List<EventTemplate & EventAttachment>,
   user: User,
@@ -50,14 +68,7 @@ export async function signEvents(
           })
         )
       )
-    : events.map((e) => {
-        const { writeRelayConf, ...template } = e;
-        const event = finalizeEvent(
-          template,
-          (user as KeyPair).privateKey
-        ) as VerifiedEvent;
-        return { event, writeRelayConf };
-      });
+    : signEventsWithSeed(events, user, finalizeEvent);
 }
 
 export async function execute({
@@ -81,7 +92,9 @@ export async function execute({
     return Map();
   }
 
-  const finalizedEvents = await signEvents(allEvents, plan.user, finalizeEvent);
+  const finalizedEvents = isUserLoggedInWithExtension(plan.user)
+    ? await signEvents(allEvents, plan.user, finalizeEvent)
+    : signEventsWithSeed(allEvents, plan.user, finalizeEvent);
 
   if (finalizedEvents.size === 0) {
     return Map();

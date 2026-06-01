@@ -88,6 +88,11 @@ import {
   planBatchOutdent,
   getCurrentRow,
 } from "./batchOperations";
+import {
+  getSourceNodeCandidates,
+  projectDocumentByFilePath,
+  projectKnowledgeDBs,
+} from "../core/graphData";
 import { planDeleteNodeFromView } from "../treeMutations";
 import { IS_MOBILE } from "./responsive";
 import { MobileActionBar } from "./MobileActionBar";
@@ -286,7 +291,9 @@ function buildAnchoredLineageEntries(
 }
 
 function SourceButton(): JSX.Element | null {
-  const { knowledgeDBs, user } = useData();
+  const data = useData();
+  const knowledgeDBs = projectKnowledgeDBs(data);
+  const { user } = data;
   const pane = useCurrentPane();
   const { setPane } = useSplitPanes();
   const paneHistory = usePaneHistory();
@@ -329,7 +336,7 @@ function SourceButton(): JSX.Element | null {
 
 function Breadcrumbs(): JSX.Element {
   const data = useData();
-  const { knowledgeDBs } = data;
+  const knowledgeDBs = projectKnowledgeDBs(data);
   const pane = useCurrentPane();
   const navigatePane = useNavigatePane();
   const { setPane } = useSplitPanes();
@@ -337,12 +344,12 @@ function Breadcrumbs(): JSX.Element {
   const currentNode = useCurrentNode();
   const rootNode = pane.rootNodeId
     ? getNode(knowledgeDBs, pane.rootNodeId, pane.author) ??
-      data.graphIndex.nodeByID.get(pane.rootNodeId)
+      getSourceNodeCandidates(data, pane.rootNodeId)[0]?.node
     : currentNode;
   const paneDocument = pane.documentId
     ? getDocumentByIdOrFilePath(
         data.documents,
-        data.documentByFilePath,
+        projectDocumentByFilePath(data),
         pane.author,
         pane.documentId
       )
@@ -350,7 +357,7 @@ function Breadcrumbs(): JSX.Element {
   const document =
     paneDocument ??
     (rootNode
-      ? getDocumentForNode(data.knowledgeDBs, data.documents, rootNode)
+      ? getDocumentForNode(knowledgeDBs, data.documents, rootNode)
       : undefined);
   const nodeEntries: BreadcrumbEntry[] = rootNode
     ? buildAnchoredLineageEntries(knowledgeDBs, rootNode)
@@ -480,7 +487,9 @@ function ForkButton(): JSX.Element | null {
 }
 
 function HomeButton(): JSX.Element | null {
-  const { knowledgeDBs, user } = useData();
+  const data = useData();
+  const knowledgeDBs = projectKnowledgeDBs(data);
+  const { user } = data;
   const navigatePane = useNavigatePane();
   const logNode = getOwnLogRoot(knowledgeDBs, user.publicKey);
   if (!logNode) {
@@ -525,7 +534,9 @@ function NewNoteButton(): JSX.Element {
 }
 
 function useHomeShortcut(): void {
-  const { knowledgeDBs, user } = useData();
+  const data = useData();
+  const knowledgeDBs = projectKnowledgeDBs(data);
+  const { user } = data;
   const navigatePane = useNavigatePane();
 
   useEffect(() => {

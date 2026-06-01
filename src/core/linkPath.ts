@@ -54,10 +54,3 @@ export function resolveLinkPath(
   const combined = sourceDir === "." ? link : `${sourceDir}/${link}`;
   return normalizePosix(combined);
 }
-
-export function fileLinkIndexKey(
-  author: PublicKey,
-  normalizedPath: string
-): string {
-  return `${author}:${normalizedPath}`;
-}

@@ -7,10 +7,12 @@ import {
   materializeSnapshot,
 } from "./infra/snapshotStore";
 import {
-  addNodesToGraphIndex,
-  createEmptyGraphIndex,
-  removeNodesFromGraphIndex,
-} from "./graphIndex";
+  GraphDataFields,
+  createEmptyGraphData,
+  deleteDocument as deleteGraphDocument,
+  projectKnowledgeDBs,
+  replaceDocument,
+} from "./core/graphData";
 import { eventToParsed, eventToDocumentDelete } from "./nostrEvents";
 import {
   Document,
@@ -18,24 +20,15 @@ import {
   ParsedDocument,
   documentKeyOf,
 } from "./core/Document";
-import { newDB } from "./core/knowledge";
 
 export type { Document, DocumentDelete, ParsedDocument };
 
-type DocumentSnapshot = {
-  documents: ImmutableMap<string, Document>;
-  documentByFilePath: ImmutableMap<string, Document>;
-  deletes: ImmutableMap<string, DocumentDelete>;
-  knowledgeDBs: KnowledgeDBs;
-  graphIndex: GraphIndex;
+type DocumentSnapshot = GraphDataFields & {
+  deletes: ImmutableMap<DocumentKey, DocumentDelete>;
 };
 
-type DocumentStoreState = {
-  knowledgeDBs: KnowledgeDBs;
-  graphIndex: GraphIndex;
+type DocumentStoreState = GraphDataFields & {
   snapshotNodes: SnapshotNodes;
-  documents: ImmutableMap<string, Document>;
-  documentByFilePath: ImmutableMap<string, Document>;
   upsertDocument: (parsed: ParsedDocument) => void;
   deleteDocument: (del: DocumentDelete) => void;
   addEvents: (events: ImmutableMap<string, Event | UnsignedEvent>) => void;
@@ -47,65 +40,9 @@ const DocumentStoreContext = React.createContext<
 
 function createEmptySnapshot(): DocumentSnapshot {
   return {
-    documents: ImmutableMap<string, Document>(),
-    documentByFilePath: ImmutableMap<string, Document>(),
-    deletes: ImmutableMap<string, DocumentDelete>(),
-    knowledgeDBs: ImmutableMap<PublicKey, KnowledgeData>(),
-    graphIndex: createEmptyGraphIndex(),
+    ...createEmptyGraphData(),
+    deletes: ImmutableMap<DocumentKey, DocumentDelete>(),
   };
-}
-
-function nodesForDocument(
-  knowledgeDBs: KnowledgeDBs,
-  document: Document
-): ImmutableMap<string, GraphNode> {
-  const nodes = knowledgeDBs.get(document.author)?.nodes;
-  if (!nodes) return ImmutableMap<string, GraphNode>();
-  const topNodeLongIds = new Set(document.topNodeShortIds);
-  return nodes.filter((node) => topNodeLongIds.has(node.root));
-}
-
-function withoutDocumentNodes(
-  knowledgeDBs: KnowledgeDBs,
-  document: Document | undefined
-): KnowledgeDBs {
-  if (!document) return knowledgeDBs;
-  const db = knowledgeDBs.get(document.author);
-  if (!db) return knowledgeDBs;
-  const documentNodes = nodesForDocument(knowledgeDBs, document);
-  const filtered = db.nodes.filter((_, nodeId) => !documentNodes.has(nodeId));
-  return filtered.size === 0
-    ? knowledgeDBs.remove(document.author)
-    : knowledgeDBs.set(document.author, { ...db, nodes: filtered });
-}
-
-function withDocNodes(
-  knowledgeDBs: KnowledgeDBs,
-  author: PublicKey,
-  nodes: ImmutableMap<string, GraphNode>
-): KnowledgeDBs {
-  if (nodes.size === 0) return knowledgeDBs;
-  const db = knowledgeDBs.get(author) ?? newDB();
-  return knowledgeDBs.set(author, { ...db, nodes: db.nodes.merge(nodes) });
-}
-
-function withDocumentInFilePathIndex(
-  index: ImmutableMap<string, Document>,
-  doc: Document
-): ImmutableMap<string, Document> {
-  return doc.filePath ? index.set(doc.filePath, doc) : index;
-}
-
-function withoutDocumentInFilePathIndex(
-  index: ImmutableMap<string, Document>,
-  doc: Document | undefined
-): ImmutableMap<string, Document> {
-  if (!doc?.filePath) return index;
-  const current = index.get(doc.filePath);
-  if (current && current.docId === doc.docId) {
-    return index.remove(doc.filePath);
-  }
-  return index;
 }
 
 function applyDocumentToSnapshot(
@@ -124,47 +61,13 @@ function applyDocumentToSnapshot(
     return snapshot;
   }
 
-  const existingNodes = existingDocument
-    ? nodesForDocument(snapshot.knowledgeDBs, existingDocument)
-    : ImmutableMap<string, GraphNode>();
   const nextDeletes =
     existingDelete && doc.updatedMs > existingDelete.deletedAt
       ? snapshot.deletes.remove(key)
       : snapshot.deletes;
-  const withoutExistingNodes =
-    existingNodes.size > 0
-      ? removeNodesFromGraphIndex(
-          snapshot.graphIndex,
-          existingNodes,
-          existingDocument?.filePath
-        )
-      : snapshot.graphIndex;
-  const documentByFilePathAfterRemove = withoutDocumentInFilePathIndex(
-    snapshot.documentByFilePath,
-    existingDocument
-  );
-  const knowledgeDBsAfterRemove = withoutDocumentNodes(
-    snapshot.knowledgeDBs,
-    existingDocument
-  );
-  const knowledgeDBs = withDocNodes(
-    knowledgeDBsAfterRemove,
-    doc.author,
-    parsed.nodes
-  );
   return {
-    documents: snapshot.documents.set(key, doc),
-    documentByFilePath: withDocumentInFilePathIndex(
-      documentByFilePathAfterRemove,
-      doc
-    ),
+    ...replaceDocument(snapshot, parsed),
     deletes: nextDeletes,
-    knowledgeDBs,
-    graphIndex: addNodesToGraphIndex(
-      withoutExistingNodes,
-      parsed.nodes,
-      doc.filePath
-    ),
   };
 }
 
@@ -185,26 +88,10 @@ function applyDeleteToSnapshot(
   if (!willDelete) {
     return { ...snapshot, deletes: snapshot.deletes.set(key, deletion) };
   }
-  const existingNodes = nodesForDocument(
-    snapshot.knowledgeDBs,
-    existingDocument
-  );
+
   return {
-    documents: snapshot.documents.remove(key),
-    documentByFilePath: withoutDocumentInFilePathIndex(
-      snapshot.documentByFilePath,
-      existingDocument
-    ),
+    ...deleteGraphDocument(snapshot, key),
     deletes: snapshot.deletes.set(key, deletion),
-    knowledgeDBs: withoutDocumentNodes(snapshot.knowledgeDBs, existingDocument),
-    graphIndex:
-      existingNodes.size > 0
-        ? removeNodesFromGraphIndex(
-            snapshot.graphIndex,
-            existingNodes,
-            existingDocument.filePath
-          )
-        : snapshot.graphIndex,
   };
 }
 
@@ -314,11 +201,15 @@ export function DocumentStoreProvider({
 
   const contextValue = React.useMemo(
     () => ({
-      knowledgeDBs: activeSnapshot.knowledgeDBs,
-      graphIndex: activeSnapshot.graphIndex,
-      snapshotNodes,
+      nodesByID: activeSnapshot.nodesByID,
       documents: activeSnapshot.documents,
-      documentByFilePath: activeSnapshot.documentByFilePath,
+      documentsByFilePath: activeSnapshot.documentsByFilePath,
+      incomingCrefs: activeSnapshot.incomingCrefs,
+      incomingFileLinks: activeSnapshot.incomingFileLinks,
+      basedOnIndex: activeSnapshot.basedOnIndex,
+      semantic: activeSnapshot.semantic,
+      nodeKeysByDocument: activeSnapshot.nodeKeysByDocument,
+      snapshotNodes,
       upsertDocument,
       deleteDocument,
       addEvents,
@@ -337,15 +228,25 @@ export function useDocumentStore(): DocumentStoreState | undefined {
   return React.useContext(DocumentStoreContext);
 }
 
-export function useDocumentKnowledgeDBs(): KnowledgeDBs {
-  return React.useContext(DocumentStoreContext)?.knowledgeDBs || ImmutableMap();
+export function useDocumentGraphData(): GraphDataFields {
+  const ctx = React.useContext(DocumentStoreContext);
+  if (!ctx) {
+    return createEmptyGraphData();
+  }
+  return {
+    nodesByID: ctx.nodesByID,
+    documents: ctx.documents,
+    documentsByFilePath: ctx.documentsByFilePath,
+    incomingCrefs: ctx.incomingCrefs,
+    incomingFileLinks: ctx.incomingFileLinks,
+    basedOnIndex: ctx.basedOnIndex,
+    semantic: ctx.semantic,
+    nodeKeysByDocument: ctx.nodeKeysByDocument,
+  };
 }
 
-export function useDocumentGraphIndex(): GraphIndex {
-  return (
-    React.useContext(DocumentStoreContext)?.graphIndex ||
-    createEmptyGraphIndex()
-  );
+export function useDocumentKnowledgeDBs(): KnowledgeDBs {
+  return projectKnowledgeDBs(useDocumentGraphData());
 }
 
 export function useDocumentSnapshotNodes(): SnapshotNodes {
@@ -354,17 +255,9 @@ export function useDocumentSnapshotNodes(): SnapshotNodes {
   );
 }
 
-export function useDocuments(): ImmutableMap<string, Document> {
+export function useDocuments(): ImmutableMap<DocumentKey, Document> {
   return (
     React.useContext(DocumentStoreContext)?.documents ||
-    ImmutableMap<string, Document>()
+    ImmutableMap<DocumentKey, Document>()
   );
-}
-
-export function useDocumentByFilePath(): ImmutableMap<string, Document> {
-  const ctx = React.useContext(DocumentStoreContext);
-  if (!ctx) {
-    throw new Error("useDocumentByFilePath used outside DocumentStoreProvider");
-  }
-  return ctx.documentByFilePath;
 }

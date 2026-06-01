@@ -22,7 +22,7 @@ import {
   getDocumentByIdOrFilePath,
   getDocumentForNode,
 } from "./core/Document";
-import { fileLinkIndexKey, resolveLinkPath } from "./core/linkPath";
+import { resolveLinkPath } from "./core/linkPath";
 import {
   ViewPath,
   getParentView,
@@ -32,10 +32,17 @@ import {
 import { getPane } from "./planner";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
 import { referenceToText } from "./editor/referenceText";
+import { resolveNodeReferenceFromKnowledgeDBs } from "./core/sourceResolver";
 import {
-  resolveNodeReferenceFromGraphIndex,
-  resolveNodeReferenceFromKnowledgeDBs,
-} from "./core/sourceResolver";
+  GraphDataFields,
+  filePathKeyOf,
+  getNodeByKey,
+  getNodeFromGraphData,
+  getSourceNodeCandidates,
+  nodeKeyOf,
+  projectDocumentByFilePath,
+  projectKnowledgeDBs,
+} from "./core/graphData";
 
 function argumentPrefix(argument?: Argument): string {
   if (argument === "confirms") {
@@ -52,6 +59,26 @@ type ParsedRef = {
   contextNodes: List<GraphNode>;
   sourceItem?: GraphNode;
 };
+
+function resolveNodeReferenceFromGraphDataFields(
+  graphData: GraphDataFields,
+  id: ID,
+  scope: { type: "local" } | { type: "source"; sourceId: SourceId },
+  localSourceId: SourceId
+): { node: GraphNode } | undefined {
+  if (scope.type === "local") {
+    const localNode = getNodeFromGraphData(graphData, id, localSourceId);
+    if (localNode) {
+      return { node: localNode };
+    }
+    const candidate = getSourceNodeCandidates(graphData, id).find(
+      (entry) => entry.sourceId !== localSourceId
+    );
+    return candidate ? { node: candidate.node } : undefined;
+  }
+  const sourceNode = getNodeFromGraphData(graphData, id, scope.sourceId);
+  return sourceNode ? { node: sourceNode } : undefined;
+}
 
 function resolveFileLinkRoot(
   sourceItem: GraphNode,
@@ -111,7 +138,7 @@ function getConcreteContextNodes(
 }
 
 function resolveNodeInSourceScope(
-  graphIndex: GraphIndex | undefined,
+  graphData: GraphDataFields | undefined,
   knowledgeDBs: KnowledgeDBs,
   localSourceId: SourceId,
   sourceItem: GraphNode | undefined,
@@ -125,9 +152,9 @@ function resolveNodeInSourceScope(
     sourceItem.author === localSourceId
       ? ({ type: "local" } as const)
       : ({ type: "source", sourceId: sourceItem.author } as const);
-  const indexedNode = graphIndex
-    ? resolveNodeReferenceFromGraphIndex(
-        graphIndex,
+  const indexedNode = graphData
+    ? resolveNodeReferenceFromGraphDataFields(
+        graphData,
         targetID,
         scope,
         localSourceId
@@ -135,8 +162,8 @@ function resolveNodeInSourceScope(
     : undefined;
   return (
     indexedNode ??
-    (allowIndexedTargetFallback
-      ? graphIndex?.nodeByID.get(targetID)
+    (allowIndexedTargetFallback && graphData
+      ? getSourceNodeCandidates(graphData, targetID as ID)[0]?.node
       : undefined) ??
     resolveNodeReferenceFromKnowledgeDBs(
       knowledgeDBs,
@@ -149,18 +176,18 @@ function resolveNodeInSourceScope(
 
 function semanticIDInSourceScope(
   knowledgeDBs: KnowledgeDBs,
-  graphIndex: GraphIndex | undefined,
+  graphData: GraphDataFields | undefined,
   localSourceId: SourceId,
   node: GraphNode
 ): ID {
   const target = resolveNodeInSourceScope(
-    graphIndex,
+    graphData,
     knowledgeDBs,
     localSourceId,
     node
   );
   return target && target !== node
-    ? semanticIDInSourceScope(knowledgeDBs, graphIndex, localSourceId, target)
+    ? semanticIDInSourceScope(knowledgeDBs, graphData, localSourceId, target)
     : getNodeSemanticID(node);
 }
 
@@ -170,14 +197,14 @@ function parseRef(
   myself: PublicKey,
   documents?: ImmutableMap<string, Document>,
   documentByFilePath?: ImmutableMap<string, Document>,
-  graphIndex?: GraphIndex,
+  graphData?: GraphDataFields,
   localSourceId: SourceId = myself,
   allowIndexedTargetFallback: boolean = false
 ): ParsedRef | undefined {
   const sourceItem =
-    (graphIndex
-      ? resolveNodeReferenceFromGraphIndex(
-          graphIndex,
+    (graphData
+      ? resolveNodeReferenceFromGraphDataFields(
+          graphData,
           refId,
           { type: "source", sourceId: myself },
           localSourceId
@@ -200,7 +227,7 @@ function parseRef(
     return { node: fileLinkTarget, contextNodes, sourceItem };
   }
   const node = resolveNodeInSourceScope(
-    graphIndex,
+    graphData,
     knowledgeDBs,
     localSourceId,
     sourceItem,
@@ -308,7 +335,7 @@ export function buildOutgoingReference(
   myself: PublicKey,
   documents?: ImmutableMap<string, Document>,
   documentByFilePath?: ImmutableMap<string, Document>,
-  graphIndex?: GraphIndex,
+  graphData?: GraphDataFields,
   localSourceId: SourceId = myself,
   allowIndexedTargetFallback: boolean = false
 ): ReferenceRow | undefined {
@@ -318,14 +345,14 @@ export function buildOutgoingReference(
     myself,
     documents,
     documentByFilePath,
-    graphIndex,
+    graphData,
     localSourceId,
     allowIndexedTargetFallback
   );
   if (!ref) {
-    const sourceItem = graphIndex
-      ? resolveNodeReferenceFromGraphIndex(
-          graphIndex,
+    const sourceItem = graphData
+      ? resolveNodeReferenceFromGraphDataFields(
+          graphData,
           refId,
           { type: "source", sourceId: myself },
           localSourceId
@@ -367,7 +394,7 @@ function effectiveIDs(
     | "incoming"
     | "contains"
   )[],
-  graphIndex?: GraphIndex,
+  graphData?: GraphDataFields,
   localSourceId: SourceId = node.author
 ): List<string> {
   return getChildNodes(knowledgeDBs, node, node.author)
@@ -377,7 +404,7 @@ function effectiveIDs(
         item.relevance !== "not_relevant"
     )
     .map((item) =>
-      semanticIDInSourceScope(knowledgeDBs, graphIndex, localSourceId, item)
+      semanticIDInSourceScope(knowledgeDBs, graphData, localSourceId, item)
     )
     .toList();
 }
@@ -393,14 +420,14 @@ function computeNodeDiff(
     | "incoming"
     | "contains"
   )[],
-  graphIndex?: GraphIndex,
+  graphData?: GraphDataFields,
   localSourceId: SourceId = versionNode.author
 ): { addCount: number; removeCount: number } {
   const versionIDs = effectiveIDs(
     knowledgeDBs,
     versionNode,
     activeFilters,
-    graphIndex,
+    graphData,
     localSourceId
   ).toSet();
   const parentIDs = parentNode
@@ -408,7 +435,7 @@ function computeNodeDiff(
         knowledgeDBs,
         parentNode,
         activeFilters,
-        graphIndex,
+        graphData,
         localSourceId
       ).toSet()
     : List<string>().toSet();
@@ -421,18 +448,18 @@ function computeNodeDiff(
 function computeVersionMeta(data: Data, viewPath: ViewPath): VersionMeta {
   const refId = getLast(viewPath);
   const lookupSource =
-    data.graphIndex.nodeByID.get(refId as LongID)?.author ??
+    (getSourceNodeCandidates(data, refId)[0]?.sourceId as PublicKey | undefined) ??
     data.user.publicKey;
   const sourceItem =
-    resolveNodeReferenceFromGraphIndex(
-      data.graphIndex,
+    resolveNodeReferenceFromGraphDataFields(
+      data,
       refId,
       { type: "source", sourceId: lookupSource },
       data.user.publicKey
-    )?.node ?? getNode(data.knowledgeDBs, refId, lookupSource);
+    )?.node ?? getNode(projectKnowledgeDBs(data), refId, lookupSource);
   const node = resolveNodeInSourceScope(
-    data.graphIndex,
-    data.knowledgeDBs,
+    data,
+    projectKnowledgeDBs(data),
     data.user.publicKey,
     sourceItem
   );
@@ -445,11 +472,11 @@ function computeVersionMeta(data: Data, viewPath: ViewPath): VersionMeta {
   const parentNode = parentPath ? getNodeForView(data, parentPath) : undefined;
 
   const { addCount, removeCount } = computeNodeDiff(
-    data.knowledgeDBs,
+    projectKnowledgeDBs(data),
     node,
     parentNode,
     activeFilters,
-    data.graphIndex,
+    data,
     data.user.publicKey
   );
   return { updated: node.updated, addCount, removeCount };
@@ -478,13 +505,15 @@ function uniqueNodes(nodes: GraphNode[]): GraphNode[] {
 
 function getDocumentTopSourceNodes(ref: ParsedRef, data: Data): GraphNode[] {
   const document = getDocumentForNode(
-    data.knowledgeDBs,
+    projectKnowledgeDBs(data),
     data.documents,
     ref.node
   );
   if (!document) return [];
   return document.topNodeShortIds
-    .map((nodeID) => getNode(data.knowledgeDBs, nodeID as ID, document.author))
+    .map((nodeID) =>
+      getNode(projectKnowledgeDBs(data), nodeID as ID, document.author)
+    )
     .filter((node): node is GraphNode => node !== undefined);
 }
 
@@ -498,10 +527,12 @@ function findIndexedGraphLinkItem(
   sourceNodes: GraphNode[]
 ): GraphNode | undefined {
   const sourceIDs = new globalThis.Set(sourceNodes.map((node) => node.id));
-  const itemIDs = data.graphIndex.incomingCrefs.get(targetNode.id);
+  const itemIDs = data.incomingCrefs.get(
+    nodeKeyOf(targetNode.author as SourceId, targetNode.id)
+  );
   if (!itemIDs) return undefined;
   return [...itemIDs]
-    .map((itemID) => data.graphIndex.nodeByID.get(itemID))
+    .map((itemID) => getNodeByKey(data, itemID))
     .filter((item): item is GraphNode => item !== undefined)
     .find((item) => sourceIDs.has(linkOwnerID(item)));
 }
@@ -512,7 +543,7 @@ function findIndexedFileLinkItem(
   sourceNodes: GraphNode[]
 ): GraphNode | undefined {
   const targetDocument = getDocumentForNode(
-    data.knowledgeDBs,
+    projectKnowledgeDBs(data),
     data.documents,
     targetNode
   );
@@ -523,13 +554,13 @@ function findIndexedFileLinkItem(
   ) {
     return undefined;
   }
-  const itemIDs = data.graphIndex.incomingFileLinks.get(
-    fileLinkIndexKey(targetDocument.author, targetDocument.filePath)
+  const itemIDs = data.incomingFileLinks.get(
+    filePathKeyOf(targetDocument.author as SourceId, targetDocument.filePath)
   );
   if (!itemIDs) return undefined;
   const sourceIDs = new globalThis.Set(sourceNodes.map((node) => node.id));
   return [...itemIDs]
-    .map((itemID) => data.graphIndex.nodeByID.get(itemID))
+    .map((itemID) => getNodeByKey(data, itemID))
     .filter((item): item is GraphNode => item !== undefined)
     .find((item) => sourceIDs.has(linkOwnerID(item)));
 }
@@ -540,7 +571,7 @@ function findIndexedIncomingLinkItem(
   targetNode: GraphNode
 ): GraphNode | undefined {
   const sourceNodes = uniqueNodes([
-    ...getReferenceSourceNodes(ref, data.knowledgeDBs),
+    ...getReferenceSourceNodes(ref, projectKnowledgeDBs(data)),
     ...getDocumentTopSourceNodes(ref, data),
   ]);
   return (
@@ -557,14 +588,14 @@ function getDocumentRootNodeForView(
   const document = pane.documentId
     ? getDocumentByIdOrFilePath(
         data.documents,
-        data.documentByFilePath,
+        projectDocumentByFilePath(data),
         pane.author,
         pane.documentId
       )
     : undefined;
   const topNodeShortId = document?.topNodeShortIds[0];
   return topNodeShortId && document
-    ? getNode(data.knowledgeDBs, topNodeShortId as ID, document.author)
+    ? getNode(projectKnowledgeDBs(data), topNodeShortId as ID, document.author)
     : undefined;
 }
 
@@ -591,25 +622,27 @@ export function buildReferenceItem(
   versionMeta?: VersionMeta
 ): ReferenceRow | undefined {
   const lookupAuthor =
-    data.graphIndex.nodeByID.get(refId)?.author ?? data.user.publicKey;
+    (getSourceNodeCandidates(data, refId as ID)[0]?.sourceId as
+      | PublicKey
+      | undefined) ?? data.user.publicKey;
   const ref = parseRef(
     refId,
-    data.knowledgeDBs,
+    projectKnowledgeDBs(data),
     lookupAuthor,
     data.documents,
-    data.documentByFilePath,
-    data.graphIndex,
+    projectDocumentByFilePath(data),
+    data,
     data.user.publicKey,
     virtualType === "incoming"
   );
   const buildScopedOutgoingReference = (): ReferenceRow | undefined =>
     buildOutgoingReference(
       refId,
-      data.knowledgeDBs,
+      projectKnowledgeDBs(data),
       lookupAuthor,
       data.documents,
-      data.documentByFilePath,
-      data.graphIndex,
+      projectDocumentByFilePath(data),
+      data,
       data.user.publicKey,
       virtualType === "incoming"
     );
@@ -620,12 +653,12 @@ export function buildReferenceItem(
       ? getNodeForView(data, parentPath)
       : undefined;
     const parentItem = parentNode
-      ? resolveNodeReferenceFromGraphIndex(
-          data.graphIndex,
+      ? resolveNodeReferenceFromGraphDataFields(
+          data,
           refId,
           { type: "source", sourceId: lookupAuthor },
           data.user.publicKey
-        )?.node ?? getNode(data.knowledgeDBs, refId, lookupAuthor)
+        )?.node ?? getNode(projectKnowledgeDBs(data), refId, lookupAuthor)
       : undefined;
     const deleted = buildDeletedReference(
       refId,
@@ -643,7 +676,7 @@ export function buildReferenceItem(
   if (virtualType === "incoming") {
     const outgoing =
       ref.sourceItem && isBlockFileLink(ref.sourceItem)
-        ? buildSourceParentReference(ref, data.knowledgeDBs, lookupAuthor) ??
+        ? buildSourceParentReference(ref, projectKnowledgeDBs(data), lookupAuthor) ??
           buildScopedOutgoingReference()
         : buildScopedOutgoingReference();
     if (!outgoing) {
@@ -701,7 +734,7 @@ export function buildReferenceItem(
     actualParentNode ?? getDocumentRootNodeForView(data, viewPath);
   if (
     actualParentNode &&
-    nodesMatchForVersion(data.knowledgeDBs, ref.node, actualParentNode)
+    nodesMatchForVersion(projectKnowledgeDBs(data), ref.node, actualParentNode)
   ) {
     const computedVersionMeta = computeVersionMeta(data, viewPath);
     return {
@@ -714,7 +747,7 @@ export function buildReferenceItem(
     return outgoing;
   }
 
-  const storedItem = getNode(data.knowledgeDBs, refId, lookupAuthor);
+  const storedItem = getNode(projectKnowledgeDBs(data), refId, lookupAuthor);
   const isNotRelevant = storedItem?.relevance === "not_relevant";
 
   const incomingCref = findIndexedIncomingLinkItem(ref, data, parentNode);

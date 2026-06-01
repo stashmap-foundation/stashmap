@@ -285,10 +285,15 @@ async function queryPermanentSyncFilters(
     eventMap.set(event.id, event);
   });
   return [...eventMap.values()].sort((left, right) => {
+    const leftMs = getEventMs(left);
+    const rightMs = getEventMs(right);
+    if (leftMs !== rightMs) {
+      return leftMs - rightMs;
+    }
     if (left.created_at !== right.created_at) {
       return left.created_at - right.created_at;
     }
-    return left.id.localeCompare(right.id);
+    return 0;
   });
 }
 

@@ -27,6 +27,10 @@ import {
   VirtualRowsMap,
 } from "./ViewContext";
 import {
+  projectDocumentByFilePath,
+  projectKnowledgeDBs,
+} from "./core/graphData";
+import {
   Plan,
   AddToParentTarget,
   getPane,
@@ -95,7 +99,7 @@ function getSourceDocumentTarget(
   const sourceRoot =
     sourceRow.id === sourceRow.root
       ? sourceRow
-      : getNode(plan.knowledgeDBs, sourceRow.root, sourceRow.author);
+      : getNode(projectKnowledgeDBs(plan), sourceRow.root, sourceRow.author);
   if (!sourceRoot) {
     return undefined;
   }
@@ -133,7 +137,11 @@ function getIncomingFileLinkSource(
     return undefined;
   }
   const sourceID = getBlockLinkTarget(virtualRow) ?? virtualRow.id;
-  const sourceRow = getNode(plan.knowledgeDBs, sourceID, plan.user.publicKey);
+  const sourceRow = getNode(
+    projectKnowledgeDBs(plan),
+    sourceID,
+    plan.user.publicKey
+  );
   return isBlockFileLink(sourceRow) ? sourceRow : undefined;
 }
 
@@ -150,7 +158,7 @@ function planAcceptDocumentTopIncoming(
   const document = pane.documentId
     ? getDocumentByIdOrFilePath(
         plan.documents,
-        plan.documentByFilePath,
+        projectDocumentByFilePath(plan),
         pane.author,
         pane.documentId
       )
@@ -164,7 +172,7 @@ function planAcceptDocumentTopIncoming(
     return undefined;
   }
   const sourceRow = getNode(
-    plan.knowledgeDBs,
+    projectKnowledgeDBs(plan),
     virtualRow.id,
     plan.user.publicKey
   );
@@ -250,7 +258,7 @@ export function planUpdateViewItemMetadata(
       rowID;
     const targetID = getBlockLinkTarget(virtualRow);
     const inheritedSourceNode = targetID
-      ? getNode(plan.knowledgeDBs, targetID, plan.user.publicKey)
+      ? getNode(projectKnowledgeDBs(plan), targetID, plan.user.publicKey)
       : undefined;
     return planAddToParent(
       plan,

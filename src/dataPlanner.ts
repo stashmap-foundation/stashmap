@@ -14,12 +14,13 @@ import {
   planUpsertNodes,
 } from "./planner";
 import { NodeItemMetadata, updateNodeItemMetadata } from "./nodeItemMetadata";
+import { projectKnowledgeDBs } from "./core/graphData";
 
 function getWritableNode(
   plan: GraphPlan,
   nodeId: LongID
 ): GraphNode | undefined {
-  const node = getNode(plan.knowledgeDBs, nodeId, plan.user.publicKey);
+  const node = getNode(projectKnowledgeDBs(plan), nodeId, plan.user.publicKey);
   if (!node || node.author !== plan.user.publicKey) {
     return undefined;
   }
@@ -39,7 +40,7 @@ function requireNodeItem(
   const index = getNodeItemIndex(node, itemId);
   const childID = index === undefined ? undefined : node.children.get(index);
   return childID
-    ? getNode(plan.knowledgeDBs, childID, plan.user.publicKey)
+    ? getNode(projectKnowledgeDBs(plan), childID, plan.user.publicKey)
     : undefined;
 }
 
@@ -86,7 +87,7 @@ export function planRemoveNodeItemById<T extends GraphPlan>(
     return withoutItem;
   }
   const sourceNode = getNode(
-    withoutItem.knowledgeDBs,
+    projectKnowledgeDBs(withoutItem),
     item.id,
     withoutItem.user.publicKey
   );
@@ -97,7 +98,7 @@ export function planRemoveNodeItemById<T extends GraphPlan>(
     return planMoveDescendantNodes(
       withoutItem,
       sourceNode,
-      getNodeContext(withoutItem.knowledgeDBs, sourceNode),
+      getNodeContext(projectKnowledgeDBs(withoutItem), sourceNode),
       undefined,
       undefined,
       shortID(sourceNode.id)

@@ -1,10 +1,5 @@
 /** @jest-environment node */
 
-jest.mock("./apply", () => ({
-  applyHelp: () => "apply help",
-  runApplyCommand: jest.fn(),
-}));
-
 jest.mock("./init", () => ({
   initHelp: () => "init help",
   runInitCommand: jest.fn(() => ({
@@ -19,6 +14,24 @@ jest.mock("./save", () => ({
   saveHelp: () => "save help",
   runSaveCommand: jest.fn(),
 }));
+
+test("runCli prints general help without apply", async () => {
+  const { runCli } = (await import("./main")) as typeof import("./main");
+  const writeSpy = jest
+    .spyOn(process.stdout, "write")
+    .mockImplementation(() => true);
+
+  await runCli(["--help"]);
+
+  expect(writeSpy).toHaveBeenCalledWith(
+    expect.stringContaining("Usage: knowstr <command>")
+  );
+  expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("init help"));
+  expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining("save help"));
+  expect(writeSpy).not.toHaveBeenCalledWith(expect.stringContaining("apply"));
+
+  writeSpy.mockRestore();
+});
 
 test("runCli dispatches knowstr save", async () => {
   const { runCli } = (await import("./main")) as typeof import("./main");
@@ -50,44 +63,8 @@ test("runCli dispatches knowstr save", async () => {
   writeSpy.mockRestore();
 });
 
-test("runCli dispatches knowstr apply", async () => {
+test("runCli rejects knowstr apply as an unknown command", async () => {
   const { runCli } = (await import("./main")) as typeof import("./main");
-  const { runApplyCommand } = (await import(
-    "./apply"
-  )) as typeof import("./apply");
-  (runApplyCommand as jest.Mock).mockResolvedValue({
-    dry_run: true,
-    graph_additions: [],
-    maybe_relevant_paths: [],
-    skipped_existing_ids: [],
-    conflicting_ids: [],
-    invalid_inbox_paths: [],
-    changed_paths: [],
-    cleared_inbox_paths: [],
-  });
-  const writeSpy = jest
-    .spyOn(process.stdout, "write")
-    .mockImplementation(() => true);
 
-  await runCli(["apply", "--dry-run"]);
-
-  expect(runApplyCommand).toHaveBeenCalledWith(["--dry-run"]);
-  expect(writeSpy).toHaveBeenCalledWith(
-    `${JSON.stringify(
-      {
-        dry_run: true,
-        graph_additions: [],
-        maybe_relevant_paths: [],
-        skipped_existing_ids: [],
-        conflicting_ids: [],
-        invalid_inbox_paths: [],
-        changed_paths: [],
-        cleared_inbox_paths: [],
-      },
-      null,
-      2
-    )}\n`
-  );
-
-  writeSpy.mockRestore();
+  await expect(runCli(["apply"])).rejects.toThrow("Unknown command: apply");
 });

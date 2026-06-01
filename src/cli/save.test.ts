@@ -845,20 +845,35 @@ test("save preserves a trailing inline code span with comment-like content", asy
   expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
 });
 
-test("save ignores the top-level inbox folder", async () => {
+test("save treats the top-level inbox folder as ordinary workspace content", async () => {
   const { path: workspaceDir } = knowstrInit();
-  write(
-    workspaceDir,
-    "inbox/foreign.md",
-    "# Foreign\n- should stay untouched\n"
-  );
+  write(workspaceDir, "inbox/foreign.md", "# Foreign\n- should get ids\n");
   write(workspaceDir, "public.md", "# Public\n- visible\n");
 
   const result = await knowstrSave(workspaceDir);
-  expect(result.changed_paths).toEqual([path.join(workspaceDir, "public.md")]);
-  expect(
-    fs.readFileSync(path.join(workspaceDir, "inbox", "foreign.md"), "utf8")
-  ).toBe("# Foreign\n- should stay untouched\n");
+  expect(result.changed_paths).toEqual([
+    path.join(workspaceDir, "inbox", "foreign.md"),
+    path.join(workspaceDir, "public.md"),
+  ]);
+
+  await expectMarkdown(
+    workspaceDir,
+    "inbox/foreign.md",
+    `
+# Foreign <!-- id:... -->
+
+- should get ids <!-- id:... -->
+`
+  );
+  await expectMarkdown(
+    workspaceDir,
+    "public.md",
+    `
+# Public <!-- id:... -->
+
+- visible <!-- id:... -->
+`
+  );
 });
 
 test(".knowstrignore ignores a directory", async () => {

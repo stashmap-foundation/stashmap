@@ -23,11 +23,10 @@ export type WorkspaceScanResult = {
 };
 
 const ALWAYS_IGNORED = [".git", ".knowstr", "node_modules"];
-const RESERVED_WORKSPACE_IGNORES = ["inbox/"];
 
 export async function loadIgnorePatterns(
   workspaceDir: string,
-  ignoredPatterns: string[] = RESERVED_WORKSPACE_IGNORES
+  ignoredPatterns: string[] = []
 ): Promise<Ignore> {
   const ig = ignore().add([...ALWAYS_IGNORED, ...ignoredPatterns]);
   const ignorePath = path.join(workspaceDir, ".knowstrignore");

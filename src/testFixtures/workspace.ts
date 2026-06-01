@@ -3,7 +3,6 @@ import os from "os";
 import path from "path";
 import { runInitCommand } from "../cli/init";
 import { runSaveCommand } from "../cli/save";
-import { runApplyCommand } from "../cli/apply";
 
 type InitResult = {
   nsec: string;
@@ -58,27 +57,6 @@ export async function knowstrSave(
   ]);
   if ("help" in result) {
     throw new Error("knowstrSave: unexpected help output");
-  }
-  return result;
-}
-
-type ApplyResult = Exclude<
-  Awaited<ReturnType<typeof runApplyCommand>>,
-  { help: true; text: string }
->;
-
-export async function knowstrApply(
-  workspaceDir: string,
-  options: { dryRun?: boolean } = {}
-): Promise<ApplyResult> {
-  const args = [
-    "--config",
-    profilePathFor(workspaceDir),
-    ...(options.dryRun ? ["--dry-run"] : []),
-  ];
-  const result = await runApplyCommand(args);
-  if ("help" in result) {
-    throw new Error("knowstrApply: unexpected help output");
   }
   return result;
 }

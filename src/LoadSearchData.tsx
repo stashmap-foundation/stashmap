@@ -63,9 +63,10 @@ function SearchCrefBuilder({
         targetDocument?.topNodeShortIds[0] === shortID(targetNode.id)
           ? targetDocument
           : undefined;
+      const sourceAuthor = targetNode?.author ?? user.publicKey;
       const node = primaryTargetDocument
         ? newGraphNode(
-            user.publicKey,
+            sourceAuthor,
             [
               fileLinkSpan(
                 documentLinkPath(primaryTargetDocument),
@@ -77,7 +78,7 @@ function SearchCrefBuilder({
               parent: searchId as LongID,
             }
           )
-        : newGraphNode(user.publicKey, [linkSpan(nodeID as LongID, "")], {
+        : newGraphNode(sourceAuthor, [linkSpan(nodeID as LongID, "")], {
             root: searchId as LongID,
             parent: searchId as LongID,
           });

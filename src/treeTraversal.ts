@@ -74,14 +74,16 @@ function createVirtualRow(
   rowID: ID,
   virtualType: VirtualType
 ): GraphNode {
+  const indexedRowNode = data.graphIndex.nodeByID.get(rowID as LongID);
   const sourceRowNode =
     virtualType === "suggestion"
-      ? getNode(data.knowledgeDBs, rowID, data.user.publicKey)
+      ? indexedRowNode ?? getNode(data.knowledgeDBs, rowID, input.parentAuthor)
       : undefined;
   const incomingRowNode =
     virtualType === "incoming"
-      ? getNode(data.knowledgeDBs, rowID, data.user.publicKey)
+      ? indexedRowNode ?? getNode(data.knowledgeDBs, rowID, input.parentAuthor)
       : undefined;
+  const versionRowNode = virtualType === "version" ? indexedRowNode : undefined;
   const suggestionTargetID = getBlockLinkTarget(sourceRowNode);
   const targetID =
     virtualType === "incoming" || virtualType === "version"
@@ -106,9 +108,15 @@ function createVirtualRow(
       : plainSpans(""),
     parent: input.parentID,
     updated:
-      sourceRowNode?.updated ?? incomingRowNode?.updated ?? input.parentUpdated,
+      sourceRowNode?.updated ??
+      incomingRowNode?.updated ??
+      versionRowNode?.updated ??
+      input.parentUpdated,
     author:
-      sourceRowNode?.author ?? incomingRowNode?.author ?? input.parentAuthor,
+      sourceRowNode?.author ??
+      incomingRowNode?.author ??
+      versionRowNode?.author ??
+      input.parentAuthor,
     root: input.parentRoot,
     relevance: sourceRowNode?.relevance ?? incomingRowNode?.relevance,
     argument: sourceRowNode?.argument ?? incomingRowNode?.argument,
@@ -178,7 +186,11 @@ function getChildrenForConcreteRef(
   const sourceNode =
     refNode && isBlockLink(refNode)
       ? resolveNode(data.knowledgeDBs, refNode)
-      : getNode(data.knowledgeDBs, parentRowID, data.user.publicKey);
+      : getNode(
+          data.knowledgeDBs,
+          parentRowID,
+          refNode?.author ?? data.user.publicKey
+        );
   if (!sourceNode || sourceNode.children.size === 0) {
     return {
       paths: List(),
@@ -208,11 +220,11 @@ function getChildrenForRegularNode(
   const effectiveAuthor = getEffectiveAuthor(data, parentPath);
   const activeFilters = typeFilters || DEFAULT_TYPE_FILTERS;
   const directNodes = isSearchId(parentRowID as ID)
-    ? getNode(data.knowledgeDBs, parentRowID as ID, data.user.publicKey)
+    ? getNode(data.knowledgeDBs, parentRowID as ID, author)
     : getNodeForView(data, parentPath);
   const nodes = directNodes;
   const childNodes = nodes
-    ? getNodeChildren(data.knowledgeDBs, nodes, data.user.publicKey)
+    ? getNodeChildren(data.knowledgeDBs, nodes, nodes.author)
     : List<GraphNode>();
   const nodeSemanticID = nodes
     ? getSemanticID(data.knowledgeDBs, nodes)
@@ -226,7 +238,7 @@ function getChildrenForRegularNode(
           childNode:
             childID === EMPTY_SEMANTIC_ID
               ? undefined
-              : getNode(data.knowledgeDBs, childID, data.user.publicKey),
+              : getNode(data.knowledgeDBs, childID, nodes.author),
           index,
         }))
         .filter(({ childID, childNode }) =>

@@ -7,6 +7,7 @@ import Token from "markdown-it/lib/token";
 import { fileLinkSpan, linkSpan, plainSpans, spansText } from "./nodeSpans";
 import { isMarkdownPath } from "./linkPath";
 import { parseFrontMatter } from "./knowstrFrontmatter";
+import { assertSafeMarkdownId } from "./idValidation";
 
 const captured: { value?: string } = {};
 const markdown = new MarkdownIt({ html: true });
@@ -14,7 +15,8 @@ markdown.use(markdownItFrontMatter, (raw: string) => {
   captured.value = raw;
 });
 
-const ID_COMMENT_RE = /^<!--\s+id:(\S+)(.*?)-->$/;
+const ID_COMMENT_RE = /^<!--\s*id:(\S+)(.*?)-->$/u;
+const ID_COMMENT_START_RE = /^<!--\s*id:/u;
 const ATTR_RE = /(\w+)="([^"]*)"/g;
 
 const RELEVANCE_CHARS: Record<string, Relevance> = {
@@ -44,15 +46,26 @@ type ParsedComment = {
 function parseIdComment(content: string): ParsedComment | undefined {
   const match = content.trim().match(ID_COMMENT_RE);
   if (!match) {
+    if (ID_COMMENT_START_RE.test(content.trim())) {
+      throw new Error(`Invalid node id comment: ${content.trim()}`);
+    }
     return undefined;
   }
   const uuid = match[1];
+  assertSafeMarkdownId(uuid, "Node id");
   const rest = match[2];
 
   const attrsMap: Record<string, string> = {};
   [...rest.matchAll(ATTR_RE)].forEach(([, key, value]) => {
     attrsMap[key] = value;
   });
+  const unparsedRest = rest
+    .replace(ATTR_RE, "")
+    .replace(/\bhidden\b/u, "")
+    .trim();
+  if (unparsedRest !== "") {
+    throw new Error(`Invalid node id comment: ${content.trim()}`);
+  }
 
   const hidden = rest.includes(" hidden");
   const basedOn = attrsMap.basedOn || undefined;
@@ -120,7 +133,8 @@ function stripTrailingHtmlComment(
 
 function isIdComment(token: Token): boolean {
   return (
-    token.type === "html_inline" && ID_COMMENT_RE.test(token.content.trim())
+    token.type === "html_inline" &&
+    ID_COMMENT_START_RE.test(token.content.trim())
   );
 }
 

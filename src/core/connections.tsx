@@ -94,29 +94,12 @@ export function parseSearchId(id: ID): string | undefined {
   return id.slice(SEARCH_PREFIX.length);
 }
 
-export function splitID(id: ID): [PublicKey | undefined, string] {
-  if (!id) {
-    return [undefined, ""];
-  }
-  const split = id.split("_");
-  if (split.length === 1) {
-    return [undefined, split[0]];
-  }
-  return [split[0] as PublicKey, split.slice(1).join(":")];
-}
-
-export function joinID(remote: PublicKey | string, id: string): LongID {
-  return `${remote}_${id}` as LongID;
+export function joinID(_remote: PublicKey | string, id: string): LongID {
+  return id as LongID;
 }
 
 export function shortID(id: ID): string {
-  if (!id) {
-    return "";
-  }
-  if (isSearchId(id)) {
-    return id;
-  }
-  return splitID(id)[1];
+  return id || "";
 }
 
 export function getNodeText(node: GraphNode | undefined): string | undefined {
@@ -334,11 +317,7 @@ export function getNode(
   if (!nodeID) {
     return undefined;
   }
-  const [remote, id] = splitID(nodeID);
-  if (remote) {
-    return knowledgeDBs.get(remote)?.nodes.get(id);
-  }
-  return knowledgeDBs.get(myself)?.nodes.get(nodeID);
+  return knowledgeDBs.get(myself)?.nodes.get(shortID(nodeID));
 }
 
 export function getChildNodes(
@@ -689,8 +668,8 @@ export function injectEmptyNodesIntoKnowledgeDBs(
 
   // For each empty node, insert into the corresponding nodes with its metadata
   const updatedNodes = emptyNodeMetadata.reduce((nodes, data, nodeID) => {
-    const shortNodesID = splitID(nodeID)[1];
-    const existingNodes = nodes.get(shortNodesID);
+    const nodeKey = shortID(nodeID);
+    const existingNodes = nodes.get(nodeKey);
     if (!existingNodes) {
       return nodes;
     }
@@ -708,7 +687,7 @@ export function injectEmptyNodesIntoKnowledgeDBs(
       data.index,
       EMPTY_SEMANTIC_ID
     );
-    return nodes.set(shortNodesID, {
+    return nodes.set(nodeKey, {
       ...existingNodes,
       children: updatedItems,
     });

@@ -19,7 +19,6 @@ import {
   toStoredDeleteRecord,
   toStoredDocumentRecord,
 } from "../../../permanentSync";
-import { splitID } from "../../../core/connections";
 import { storedDocumentToEvent } from "../../../documentMaterialization";
 import { useCacheDB } from "./CacheDBContext";
 import {
@@ -116,15 +115,7 @@ export function NostrCacheSync(): null {
   const defaultRelays = useDefaultRelays();
 
   const extraAuthors = useMemo(
-    () => [
-      ...new globalThis.Set(
-        panes.flatMap((pane) =>
-          pane.rootNodeId
-            ? [pane.author, splitID(pane.rootNodeId)[0] || pane.author]
-            : [pane.author]
-        )
-      ),
-    ],
+    () => [...new globalThis.Set(panes.flatMap((pane) => [pane.author]))],
     [panes]
   );
 

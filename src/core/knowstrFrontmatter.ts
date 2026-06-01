@@ -1,5 +1,6 @@
 import { v4 } from "uuid";
 import * as YAML from "yaml";
+import { assertSafeMarkdownId } from "./idValidation";
 
 const EDITING_BLOCK = `${[
   "Edit text freely. Never modify <!-- id:... --> comments.",
@@ -27,6 +28,7 @@ export function ensureKnowstrDocId(
 } {
   const existing = fm?.knowstr_doc_id;
   const docId = typeof existing === "string" ? existing : fallback ?? v4();
+  assertSafeMarkdownId(docId, "knowstr_doc_id");
   return {
     docId,
     frontMatter: {

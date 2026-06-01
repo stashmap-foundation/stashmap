@@ -6,6 +6,14 @@ import { fileLinkIndexKey, resolveLinkPath } from "./core/linkPath";
 export function createEmptyGraphIndex(): GraphIndex {
   return {
     nodeByID: new globalThis.Map<LongID, GraphNode>(),
+    nodesBySource: new globalThis.Map<
+      SourceId,
+      globalThis.Map<ID, GraphNode>
+    >(),
+    sourceCandidatesById: new globalThis.Map<
+      ID,
+      { sourceId: SourceId; node: GraphNode }[]
+    >(),
     semantic: new globalThis.Map<string, globalThis.Set<LongID>>(),
     incomingCrefs: new globalThis.Map<LongID, globalThis.Set<LongID>>(),
     incomingFileLinks: new globalThis.Map<string, globalThis.Set<LongID>>(),
@@ -101,6 +109,45 @@ function removeNodeLinkEntries(
   });
 }
 
+function addNodeSourceEntry(graphIndex: GraphIndex, node: GraphNode): void {
+  const sourceId = node.author as SourceId;
+  const sourceNodes =
+    graphIndex.nodesBySource.get(sourceId) ??
+    new globalThis.Map<ID, GraphNode>();
+  sourceNodes.set(node.id, node);
+  graphIndex.nodesBySource.set(sourceId, sourceNodes);
+
+  const candidates = graphIndex.sourceCandidatesById.get(node.id) ?? [];
+  graphIndex.sourceCandidatesById.set(node.id, [
+    ...candidates.filter((candidate) => candidate.sourceId !== sourceId),
+    { sourceId, node },
+  ]);
+}
+
+function removeNodeSourceEntry(graphIndex: GraphIndex, node: GraphNode): void {
+  const sourceId = node.author as SourceId;
+  const sourceNodes = graphIndex.nodesBySource.get(sourceId);
+  if (sourceNodes) {
+    sourceNodes.delete(node.id);
+    if (sourceNodes.size === 0) {
+      graphIndex.nodesBySource.delete(sourceId);
+    }
+  }
+
+  const candidates = graphIndex.sourceCandidatesById.get(node.id);
+  if (!candidates) {
+    return;
+  }
+  const updatedCandidates = candidates.filter(
+    (candidate) => candidate.sourceId !== sourceId
+  );
+  if (updatedCandidates.length === 0) {
+    graphIndex.sourceCandidatesById.delete(node.id);
+    return;
+  }
+  graphIndex.sourceCandidatesById.set(node.id, updatedCandidates);
+}
+
 function addNodeSemanticEntries(
   graphIndex: GraphIndex,
   node: GraphNode,
@@ -156,6 +203,21 @@ function removeNodeSemanticEntries(
 function cloneIndex(graphIndex: GraphIndex): GraphIndex {
   return {
     nodeByID: new globalThis.Map<LongID, GraphNode>(graphIndex.nodeByID),
+    nodesBySource: new globalThis.Map<SourceId, globalThis.Map<ID, GraphNode>>(
+      [...graphIndex.nodesBySource.entries()].map(([sourceId, nodes]) => [
+        sourceId,
+        new globalThis.Map<ID, GraphNode>(nodes),
+      ])
+    ),
+    sourceCandidatesById: new globalThis.Map<
+      ID,
+      { sourceId: SourceId; node: GraphNode }[]
+    >(
+      [...graphIndex.sourceCandidatesById.entries()].map(([id, candidates]) => [
+        id,
+        candidates.slice(),
+      ])
+    ),
     semantic: new globalThis.Map<string, globalThis.Set<LongID>>(
       [...graphIndex.semantic.entries()].map(([key, ids]) => [
         key,
@@ -196,6 +258,7 @@ export function addNodesToGraphIndex(
 
   nodes.valueSeq().forEach((node) => {
     nextIndex.nodeByID.set(node.id, node);
+    addNodeSourceEntry(nextIndex, node);
   });
 
   nodes.valueSeq().forEach((node) => {
@@ -220,6 +283,7 @@ export function removeNodesFromGraphIndex(
   });
   nodes.valueSeq().forEach((node) => {
     nextIndex.nodeByID.delete(node.id);
+    removeNodeSourceEntry(nextIndex, node);
   });
   return nextIndex;
 }

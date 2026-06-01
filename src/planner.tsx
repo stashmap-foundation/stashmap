@@ -136,8 +136,8 @@ function removeEmptyNodeFromKnowledgeDBs(
     return knowledgeDBs;
   }
 
-  const shortNodesID = nodeID.includes("_") ? nodeID.split("_")[1] : nodeID;
-  const existingNodes = myDB.nodes.get(shortNodesID);
+  const nodeKey = shortID(nodeID);
+  const existingNodes = myDB.nodes.get(nodeKey);
   if (!existingNodes) {
     return knowledgeDBs;
   }
@@ -149,7 +149,7 @@ function removeEmptyNodeFromKnowledgeDBs(
     return knowledgeDBs;
   }
 
-  const updatedNodes = myDB.nodes.set(shortNodesID, {
+  const updatedNodes = myDB.nodes.set(nodeKey, {
     ...existingNodes,
     children: filteredItems,
   });
@@ -808,7 +808,11 @@ export function buildDocumentEvents(
       (topNode) => topNode.basedOn && !topNode.snapshotDTag
     );
     const snapshotSourceRoot = snapshotAnchorNode?.basedOn
-      ? getNode(plan.knowledgeDBs, snapshotAnchorNode.basedOn, author)
+      ? getNode(
+          plan.knowledgeDBs,
+          snapshotAnchorNode.basedOn,
+          snapshotAnchorNode.anchor?.sourceAuthor ?? author
+        )
       : undefined;
     const sourceDocument = snapshotSourceRoot?.docId
       ? plan.documents.get(

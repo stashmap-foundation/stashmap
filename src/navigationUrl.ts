@@ -1,6 +1,12 @@
-export function buildNodeRouteUrl(rootNode: LongID, scrollToId?: ID): string {
+export function buildNodeRouteUrl(
+  rootNode: LongID,
+  scrollToId?: ID,
+  source?: SourceId
+): string {
   const base = `/r/${encodeURIComponent(rootNode)}`;
-  return scrollToId ? `${base}#${encodeURIComponent(scrollToId)}` : base;
+  const query = source ? `?source=${encodeURIComponent(source)}` : "";
+  const hash = scrollToId ? `#${encodeURIComponent(scrollToId)}` : "";
+  return `${base}${query}${hash}`;
 }
 
 export function buildDocumentRouteUrl(
@@ -33,8 +39,8 @@ export function parseDocumentRouteUrl(
   };
 }
 
-export function parseAuthorFromSearch(search: string): PublicKey | undefined {
+export function parseSourceFromSearch(search: string): SourceId | undefined {
   const params = new URLSearchParams(search);
-  const author = params.get("author");
-  return author ? (author as PublicKey) : undefined;
+  const source = params.get("source");
+  return source || undefined;
 }

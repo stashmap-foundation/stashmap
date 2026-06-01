@@ -701,7 +701,7 @@ function NodeAutoLink({
     return <>{children}</>;
   }
   const href = refInfo.rootNodeId
-    ? buildNodeRouteUrl(refInfo.rootNodeId, refInfo.scrollToId)
+    ? buildNodeRouteUrl(refInfo.rootNodeId, refInfo.scrollToId, refInfo.author)
     : "#";
   return (
     <a

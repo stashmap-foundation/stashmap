@@ -197,7 +197,8 @@ function getRowIDFromPath(data: Data, viewPath: ViewPath): ID {
   if (isEmptyViewPathID(currentID)) {
     return EMPTY_SEMANTIC_ID;
   }
-  const node = getNode(data.knowledgeDBs, currentID, data.user.publicKey);
+  const pane = getPane(data, viewPath);
+  const node = getNode(data.knowledgeDBs, currentID, pane.author);
   if (!node) {
     return currentID;
   }
@@ -221,13 +222,20 @@ export function getParentNode(
   }
   const pane = getPane(data, viewPath);
   const parentID = viewPath[viewPath.length - 2] as ViewPathSegment;
-  return getNode(data.knowledgeDBs, parentID, pane.author);
+  return (
+    getNode(data.knowledgeDBs, parentID, pane.author) ??
+    data.graphIndex.nodeByID.get(parentID as LongID)
+  );
 }
 
 export function getEffectiveAuthor(data: Data, viewPath: ViewPath): PublicKey {
   const pane = getPane(data, viewPath);
   const parentNode = getParentNode(data, viewPath);
-  return parentNode?.author || pane.author;
+  if (parentNode) {
+    return parentNode.author;
+  }
+  const currentNode = getNodeForView(data, viewPath);
+  return currentNode?.author || pane.author;
 }
 
 export function getNodeForView(
@@ -236,10 +244,12 @@ export function getNodeForView(
 ): GraphNode | undefined {
   const currentID = getLast(viewPath);
   const pane = getPane(data, viewPath);
-  return getViewNodeByID(
-    data.knowledgeDBs,
-    currentID,
-    pane.author || data.user.publicKey
+  return (
+    getViewNodeByID(
+      data.knowledgeDBs,
+      currentID,
+      pane.author || data.user.publicKey
+    ) ?? data.graphIndex.nodeByID.get(currentID as LongID)
   );
 }
 
@@ -459,7 +469,7 @@ export function getCurrentEdgeForView(
   if (childID === EMPTY_SEMANTIC_ID) {
     return getEmptyNodeItem(data, parentNode);
   }
-  return getNode(data.knowledgeDBs, childID, data.user.publicKey);
+  return getNode(data.knowledgeDBs, childID, parentNode.author);
 }
 
 export function useCurrentEdge(): GraphNode | undefined {

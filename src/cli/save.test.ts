@@ -229,6 +229,57 @@ test("save rejects duplicate node ids across documents", async () => {
   });
 });
 
+test("save preserves user-supplied non-UUID ids with underscores", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "doc.md",
+    `---
+knowstr_doc_id: local_doc_1
+---
+
+# Project <!-- id:root_node -->
+- target <!-- id:target_node -->
+- [Linked](#target_node) <!-- id:link_node -->
+`
+  );
+
+  await knowstrSave(workspaceDir);
+
+  const raw = fs.readFileSync(path.join(workspaceDir, "doc.md"), "utf8");
+  expect(raw).toContain("knowstr_doc_id: local_doc_1");
+  expect(raw).toContain("# Project <!-- id:root_node -->");
+  expect(raw).toContain("- target <!-- id:target_node -->");
+  expect(raw).toContain("- [Linked](#target_node) <!-- id:link_node -->");
+});
+
+test("save rejects unsafe local node ids", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  write(workspaceDir, "doc.md", "# Project <!-- id:bad id -->\n");
+
+  await expect(knowstrSave(workspaceDir)).rejects.toMatchObject({
+    message: expect.stringContaining("Invalid node id comment"),
+  });
+});
+
+test("save rejects unsafe local document ids", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "doc.md",
+    `---
+knowstr_doc_id: "bad doc"
+---
+
+# Project
+`
+  );
+
+  await expect(knowstrSave(workspaceDir)).rejects.toMatchObject({
+    message: expect.stringContaining("knowstr_doc_id must be a non-empty"),
+  });
+});
+
 test("save preserves heading levels", async () => {
   const { path: workspaceDir } = knowstrInit();
   write(

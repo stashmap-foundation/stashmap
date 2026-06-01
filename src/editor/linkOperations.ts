@@ -89,7 +89,7 @@ export function linkToHref(
     );
   }
   return target.rootNodeId
-    ? buildNodeRouteUrl(target.rootNodeId, target.scrollToId)
+    ? buildNodeRouteUrl(target.rootNodeId, target.scrollToId, target.author)
     : undefined;
 }
 
@@ -104,7 +104,7 @@ export function navigationTargetToHref(
     );
   }
   return target.rootNodeId
-    ? buildNodeRouteUrl(target.rootNodeId, target.scrollToId)
+    ? buildNodeRouteUrl(target.rootNodeId, target.scrollToId, target.author)
     : undefined;
 }
 

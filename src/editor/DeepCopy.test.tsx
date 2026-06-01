@@ -1564,8 +1564,7 @@ Target
         tree as MarkdownTreeValue[]
       ).basedOn;
       basedOnValues.forEach((basedOnValue) => {
-        const sourceDTag = basedOnValue.split("_").slice(1).join("_");
-        expect(bobNodeDTags).toContain(sourceDTag);
+        expect(bobNodeDTags).toContain(basedOnValue);
       });
     });
   });

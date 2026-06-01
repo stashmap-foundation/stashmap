@@ -11,11 +11,10 @@ import {
   buildNodeRouteUrl,
   parseDocumentRouteUrl,
   parseNodeRouteUrl,
-  parseAuthorFromSearch,
+  parseSourceFromSearch,
 } from "./navigationUrl";
 import { usePlanner } from "./planner";
 import { generatePaneId } from "./SplitPanesContext";
-import { splitID } from "./core/connections";
 
 type NavigationStateContextType = {
   activePaneIndex: number;
@@ -51,7 +50,11 @@ function paneToUrl(activePane: Pane): string | undefined {
     );
   }
   if (activePane.rootNodeId) {
-    return buildNodeRouteUrl(activePane.rootNodeId, activePane.scrollToId);
+    return buildNodeRouteUrl(
+      activePane.rootNodeId,
+      activePane.scrollToId,
+      activePane.author
+    );
   }
 
   return "/";
@@ -62,7 +65,8 @@ function urlToPane(
   search: string,
   fallbackAuthor: PublicKey
 ): Pane {
-  const author = parseAuthorFromSearch(search) || fallbackAuthor;
+  const source = parseSourceFromSearch(search) as PublicKey | undefined;
+  const author = source || fallbackAuthor;
   const documentRoute = parseDocumentRouteUrl(pathname);
   if (documentRoute) {
     return {
@@ -75,7 +79,7 @@ function urlToPane(
   if (nodeID) {
     return {
       id: generatePaneId(),
-      author: splitID(nodeID)[0] || author,
+      author,
       rootNodeId: nodeID,
     };
   }

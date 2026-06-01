@@ -422,7 +422,13 @@ export function dnd(
     sourceNode?: GraphNode
   ): LongID | undefined => {
     if (isPrimarySource) {
-      return sourceDrag.targetId || sourceDrag.nodeId;
+      return (
+        sourceDrag.targetId ||
+        sourceDrag.nodeId ||
+        (sourceNode
+          ? getBlockLinkTarget(sourceNode) || sourceNode.id
+          : undefined)
+      );
     }
     if (sourceNode) {
       return getBlockLinkTarget(sourceNode) || sourceNode.id;

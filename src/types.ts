@@ -190,6 +190,7 @@ declare global {
   type Hash = string;
   type ID = string;
   type LongID = string;
+  type SourceId = string;
 
   type View = {
     expanded?: boolean;
@@ -294,6 +295,11 @@ declare global {
 
   type GraphIndex = {
     nodeByID: globalThis.Map<LongID, GraphNode>;
+    nodesBySource: globalThis.Map<SourceId, globalThis.Map<ID, GraphNode>>;
+    sourceCandidatesById: globalThis.Map<
+      ID,
+      { sourceId: SourceId; node: GraphNode }[]
+    >;
     semantic: globalThis.Map<string, globalThis.Set<LongID>>;
     incomingCrefs: globalThis.Map<LongID, globalThis.Set<LongID>>;
     incomingFileLinks: globalThis.Map<string, globalThis.Set<LongID>>;

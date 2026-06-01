@@ -3,7 +3,6 @@ import {
   EMPTY_SEMANTIC_ID,
   getChildNodes,
   shortID,
-  splitID,
   isSearchId,
   parseSearchId,
   itemPassesFilters,
@@ -15,6 +14,7 @@ import {
   resolveNode,
   isRefNode,
 } from "./core/connections";
+import { resolveNodeReferenceFromGraphIndex } from "./core/sourceResolver";
 import {
   getBlockFileLinkPath,
   getBlockLinkTarget,
@@ -72,15 +72,13 @@ function getConcreteNodesForSemanticID(
     return [directNode];
   }
 
-  const [remote, localID] = splitID(semanticID as ID);
-  const preferredAuthor = remote || author;
+  const localID = shortID(semanticID as ID);
+  const preferredAuthor = author;
   const preferredDB = knowledgeDBs.get(preferredAuthor);
-  const otherDBs = remote
-    ? []
-    : knowledgeDBs
-        .filter((_, pk) => pk !== preferredAuthor)
-        .valueSeq()
-        .toArray();
+  const otherDBs = knowledgeDBs
+    .filter((_, pk) => pk !== preferredAuthor)
+    .valueSeq()
+    .toArray();
   const candidateDBs = [preferredDB, ...otherDBs].filter(
     (db): db is KnowledgeData => db !== undefined
   );
@@ -235,14 +233,40 @@ function getRefContextKey(
   return getContextKey(ref.context);
 }
 
+function resolveCrefTargetNode(
+  knowledgeDBs: KnowledgeDBs,
+  graphIndex: GraphIndex,
+  source: GraphNode | undefined,
+  effectiveAuthor: PublicKey
+): GraphNode | undefined {
+  const targetID = getBlockLinkTarget(source);
+  if (!targetID) {
+    return resolveNode(knowledgeDBs, source);
+  }
+  return (
+    resolveNodeReferenceFromGraphIndex(
+      graphIndex,
+      targetID,
+      { type: "local" },
+      effectiveAuthor
+    )?.node ?? resolveNode(knowledgeDBs, source)
+  );
+}
+
 function contextKeyForCref(
   knowledgeDBs: KnowledgeDBs,
+  graphIndex: GraphIndex,
   crefID: ID,
   effectiveAuthor: PublicKey
 ): string | undefined {
-  const targetNode = resolveNode(
+  const source =
+    getNode(knowledgeDBs, crefID, effectiveAuthor) ??
+    graphIndex.nodeByID.get(crefID as LongID);
+  const targetNode = resolveCrefTargetNode(
     knowledgeDBs,
-    getNode(knowledgeDBs, crefID, effectiveAuthor)
+    graphIndex,
+    source,
+    effectiveAuthor
   );
   if (!targetNode) {
     return undefined;
@@ -252,11 +276,17 @@ function contextKeyForCref(
 
 function coveredContextKeys(
   knowledgeDBs: KnowledgeDBs,
+  graphIndex: GraphIndex,
   crefIDs: List<ID>,
   effectiveAuthor: PublicKey
 ): ImmutableSet<string> {
   return crefIDs.reduce((acc, crefID) => {
-    const key = contextKeyForCref(knowledgeDBs, crefID, effectiveAuthor);
+    const key = contextKeyForCref(
+      knowledgeDBs,
+      graphIndex,
+      crefID,
+      effectiveAuthor
+    );
     return key !== undefined ? acc.add(key) : acc;
   }, ImmutableSet<string>());
 }
@@ -352,11 +382,11 @@ export function deduplicateRefsByContext(
       (group) =>
         group
           .sortBy((ref) => {
-            const [author] = splitID(ref.nodeID);
+            const node = preferAuthor
+              ? getNode(knowledgeDBs, ref.nodeID, preferAuthor)
+              : undefined;
             const isOther =
-              preferAuthor && author !== undefined && author !== preferAuthor
-                ? 1
-                : 0;
+              preferAuthor && node?.author !== preferAuthor ? 1 : 0;
             return [isOther, -ref.updated];
           })
           .first()!
@@ -452,6 +482,7 @@ export function getIncomingCrefsForNode(
     .toList();
   const covered = coveredContextKeys(
     knowledgeDBs,
+    graphIndex,
     outgoingCrefIDs,
     effectiveAuthor
   );
@@ -463,7 +494,12 @@ export function getIncomingCrefsForNode(
     documentByFilePath
   );
   const outgoingTargetRelIDs = current.reduce((acc, item) => {
-    const targetNode = resolveNode(knowledgeDBs, item);
+    const targetNode = resolveCrefTargetNode(
+      knowledgeDBs,
+      graphIndex,
+      item,
+      effectiveAuthor
+    );
     return targetNode ? acc.add(targetNode.id) : acc;
   }, ImmutableSet<LongID>());
 

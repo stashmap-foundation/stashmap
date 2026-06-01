@@ -1,6 +1,5 @@
 import { List } from "immutable";
 import { v4 } from "uuid";
-import { joinID } from "./connections";
 import { createRootAnchor } from "./rootAnchor";
 
 export type NewGraphNodeOptions = {
@@ -14,8 +13,8 @@ export type NewGraphNodeOptions = {
   uuid?: string;
 };
 
-function graphNodeId(myself: PublicKey, uuid?: string): LongID {
-  return joinID(myself, uuid ?? v4());
+function graphNodeId(_myself: PublicKey, uuid?: string): LongID {
+  return (uuid ?? v4()) as LongID;
 }
 
 export function newGraphNode(

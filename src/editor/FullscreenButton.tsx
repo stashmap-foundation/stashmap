@@ -34,7 +34,11 @@ export function FullscreenButton(): JSX.Element | null {
       );
     }
     if (target.rootNodeId) {
-      return buildNodeRouteUrl(target.rootNodeId, target.scrollToId);
+      return buildNodeRouteUrl(
+        target.rootNodeId,
+        target.scrollToId,
+        target.author
+      );
     }
     return undefined;
   })();

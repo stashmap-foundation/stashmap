@@ -4,9 +4,8 @@ import { useData } from "./DataContext";
 import {
   parseDocumentRouteUrl,
   parseNodeRouteUrl,
-  parseAuthorFromSearch,
+  parseSourceFromSearch,
 } from "./navigationUrl";
-import { splitID } from "./core/connections";
 import { usePaneHistory } from "./PaneHistoryContext";
 
 const PaneIndexContext = createContext<number>(0);
@@ -121,7 +120,8 @@ export function useNavigatePane(): (url: string) => void {
         : urlWithoutHash;
     const search =
       questionMarkIndex >= 0 ? urlWithoutHash.slice(questionMarkIndex) : "";
-    const author = parseAuthorFromSearch(search) || user.publicKey;
+    const source = parseSourceFromSearch(search) as PublicKey | undefined;
+    const author = source || user.publicKey;
     const documentRoute = parseDocumentRouteUrl(pathname);
     if (documentRoute) {
       setPane({
@@ -136,8 +136,7 @@ export function useNavigatePane(): (url: string) => void {
     if (nodeID) {
       setPane({
         id: pane.id,
-        author:
-          parseAuthorFromSearch(search) || splitID(nodeID)[0] || user.publicKey,
+        author,
         rootNodeId: nodeID,
         scrollToId,
       });

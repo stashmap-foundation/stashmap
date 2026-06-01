@@ -336,7 +336,8 @@ function Breadcrumbs(): JSX.Element {
   const paneHistory = usePaneHistory();
   const currentNode = useCurrentNode();
   const rootNode = pane.rootNodeId
-    ? getNode(knowledgeDBs, pane.rootNodeId, pane.author)
+    ? getNode(knowledgeDBs, pane.rootNodeId, pane.author) ??
+      data.graphIndex.nodeByID.get(pane.rootNodeId)
     : currentNode;
   const paneDocument = pane.documentId
     ? getDocumentByIdOrFilePath(
@@ -369,7 +370,11 @@ function Breadcrumbs(): JSX.Element {
             );
           }
           if (target?.rootNodeId) {
-            return buildNodeRouteUrl(target.rootNodeId, target.scrollToId);
+            return buildNodeRouteUrl(
+              target.rootNodeId,
+              target.scrollToId,
+              target.author
+            );
           }
           return undefined;
         })();
@@ -446,7 +451,7 @@ function ForkButton(): JSX.Element | null {
   };
 
   if (!isAtRoot) {
-    const href = buildNodeRouteUrl(rootNodeId);
+    const href = buildNodeRouteUrl(rootNodeId, undefined, currentPane.author);
     return (
       <a
         href={href}
@@ -481,7 +486,7 @@ function HomeButton(): JSX.Element | null {
   if (!logNode) {
     return null;
   }
-  const href = buildNodeRouteUrl(logNode.id);
+  const href = buildNodeRouteUrl(logNode.id, undefined, user.publicKey);
 
   return (
     <a
@@ -530,7 +535,7 @@ function useHomeShortcut(): void {
         if (!logNode) {
           return;
         }
-        const href = buildNodeRouteUrl(logNode.id);
+        const href = buildNodeRouteUrl(logNode.id, undefined, user.publicKey);
         e.preventDefault();
         navigatePane(href);
       }

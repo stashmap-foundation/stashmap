@@ -4,7 +4,6 @@ import {
   ensureNodeNativeFields,
   getNodeDepth,
   shortID,
-  splitID,
 } from "./core/connections";
 import type { StoredDocumentRecord } from "./infra/nostr/cache/indexedDB";
 import { newDB } from "./core/knowledge";
@@ -78,7 +77,7 @@ export function findDocumentNodes(
     .toList();
 
   return parsedNodes.reduce((acc, node) => {
-    const id = splitID(node.id)[1];
+    const id = shortID(node.id);
     const existing = acc.get(id);
     if (!existing || node.updated >= existing.updated) {
       return acc.set(id, node);

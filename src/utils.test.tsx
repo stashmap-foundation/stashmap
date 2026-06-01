@@ -317,11 +317,11 @@ function normalizeTestInitialRoute(
     return route;
   }
 
-  const queryAuthor = new URLSearchParams(search).get(
-    "author"
+  const querySource = new URLSearchParams(search).get(
+    "source"
   ) as PublicKey | null;
   const author: PublicKey =
-    queryAuthor || options.user?.publicKey || ALICE.publicKey;
+    querySource || options.user?.publicKey || ALICE.publicKey;
   const eventKnowledgeDB = options.relayPool
     ? processEvents(List(options.relayPool.getEvents())).get(author)
         ?.knowledgeDB
@@ -345,7 +345,9 @@ function normalizeTestInitialRoute(
     },
     undefined
   );
-  return targetNode ? buildNodeRouteUrl(targetNode.id) : route;
+  return targetNode
+    ? buildNodeRouteUrl(targetNode.id, undefined, author)
+    : route;
 }
 
 export function renderApis(
@@ -443,7 +445,7 @@ function renderApp(props: RenderApis): RenderViewResult {
 }
 
 export function readonlyRoute(author: string, ...segments: string[]): string {
-  return `/n/${segments.map(encodeURIComponent).join("/")}?author=${author}`;
+  return `/n/${segments.map(encodeURIComponent).join("/")}?source=${author}`;
 }
 
 export async function forkReadonlyRoot(
@@ -479,7 +481,7 @@ export async function openReadonlyRoute(nodeLabel: string): Promise<string> {
     expect(window.location.pathname).toMatch(/^\/r\//);
   });
 
-  return window.location.pathname;
+  return `${window.location.pathname}${window.location.search}`;
 }
 
 export async function follow(
@@ -931,6 +933,15 @@ export async function navigateToNodeViaSearch(
         button.getAttribute("aria-label") === `Navigate to ${nodeName}`
     ) || navigateButtons[0];
   await userEvent.click(exactNavigateButton);
+
+  // Avoid treating the stale search result row itself as completed navigation.
+  await waitFor(() => {
+    // eslint-disable-next-line testing-library/no-node-access
+    const searchResult = (paneContainer ?? document.body).querySelector(
+      '[data-virtual-type="search"]'
+    );
+    expect(searchResult).toBeNull();
+  });
 
   // Navigation can finish before descendants are rendered; wait for the target
   // row/editor in the requested pane without relying on expand/collapse controls.

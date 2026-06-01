@@ -1,7 +1,7 @@
 /* eslint-disable functional/immutable-data */
 import { List, Map as ImmutableMap, Set as ImmutableSet } from "immutable";
 import { v4 } from "uuid";
-import { ensureNodeNativeFields, joinID, shortID } from "./connections";
+import { ensureNodeNativeFields, shortID } from "./connections";
 import { newDB } from "./knowledge";
 import { createRootAnchor } from "./rootAnchor";
 import { MarkdownTreeNode } from "./markdownTree";
@@ -154,13 +154,7 @@ function materializeTreeNode(
   const node: GraphNode = {
     ...nodeBaseWithFields,
     children: List(childIDs),
-    ...(treeNode.basedOn
-      ? {
-          basedOn: (treeNode.basedOn.includes("_")
-            ? treeNode.basedOn
-            : joinID(withVisible.publicKey, treeNode.basedOn)) as LongID,
-        }
-      : {}),
+    ...(treeNode.basedOn ? { basedOn: treeNode.basedOn as LongID } : {}),
     ...(withVisible.updated !== undefined
       ? { updated: withVisible.updated }
       : {}),
@@ -200,7 +194,7 @@ export function materializeTree(
     .reduce<MaterializeResult>(
       (acc, treeNode) => {
         const rootUuid = treeNode.uuid ?? v4();
-        const rootNodeID = joinID(author, rootUuid);
+        const rootNodeID = rootUuid as LongID;
         const treeWithUuid = treeNode.uuid
           ? treeNode
           : { ...treeNode, uuid: rootUuid };

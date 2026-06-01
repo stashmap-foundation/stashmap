@@ -39,9 +39,10 @@ async function renderNodeRoute(
   workspacePath: string,
   nodeId: LongID
 ): Promise<void> {
+  const profile = loadCliProfile({ cwd: workspacePath });
   await renderAppTree({
     path: workspacePath,
-    initialRoute: buildNodeRouteUrl(nodeId),
+    initialRoute: buildNodeRouteUrl(nodeId, undefined, profile.pubkey),
   });
 }
 
@@ -50,12 +51,7 @@ function savedNodeId(
   relativePath: string,
   needle: string
 ): LongID {
-  const profile = loadCliProfile({ cwd: workspacePath });
-  return `${profile.pubkey}_${readNodeId(
-    workspacePath,
-    relativePath,
-    needle
-  )}` as LongID;
+  return readNodeId(workspacePath, relativePath, needle) as LongID;
 }
 
 const titledMultiRootMarkdown = `---
@@ -829,12 +825,7 @@ Copy Here
     [R] Target >>>
   `);
 
-  const profile = loadCliProfile({ cwd: workspacePath });
-  const targetId = `${profile.pubkey}_${readNodeId(
-    workspacePath,
-    "graph.md",
-    "# Target"
-  )}`;
+  const targetId = readNodeId(workspacePath, "graph.md", "# Target");
   await expectMarkdown(
     workspacePath,
     "graph.md",
@@ -888,9 +879,8 @@ B
 
 test("Graph links under the second top-level root resolve and show incoming refs", async () => {
   const { path: workspacePath } = knowstrInit();
-  const profile = loadCliProfile({ cwd: workspacePath });
   const targetShortId = "22222222-2222-4222-8222-222222222222";
-  const targetId = `${profile.pubkey}_${targetShortId}`;
+  const targetId = targetShortId;
   write(
     workspacePath,
     "source.md",
@@ -952,9 +942,8 @@ Holiday Destinations
 
 test("Top-level graph-link roots render as graph refs and incoming refs", async () => {
   const { path: workspacePath } = knowstrInit();
-  const profile = loadCliProfile({ cwd: workspacePath });
   const targetShortId = "22222222-2222-4222-8222-222222222222";
-  const targetId = `${profile.pubkey}_${targetShortId}`;
+  const targetId = targetShortId;
   write(workspacePath, "links.md", `[Target](#${targetId})\n`);
   write(
     workspacePath,
@@ -1010,11 +999,10 @@ Links
 
 test("Mutual graph links show outgoing from both sides without duplicate incoming refs", async () => {
   const { path: workspacePath } = knowstrInit();
-  const profile = loadCliProfile({ cwd: workspacePath });
   const aShortId = "11111111-1111-4111-8111-111111111111";
   const bShortId = "22222222-2222-4222-8222-222222222222";
-  const aId = `${profile.pubkey}_${aShortId}`;
-  const bId = `${profile.pubkey}_${bShortId}`;
+  const aId = aShortId;
+  const bId = bShortId;
   write(
     workspacePath,
     "a.md",
@@ -1046,9 +1034,8 @@ B
 
 test("Graph incoming refs can become bidirectional from both sides", async () => {
   const { path: workspacePath } = knowstrInit();
-  const profile = loadCliProfile({ cwd: workspacePath });
   const targetShortId = "22222222-2222-4222-8222-222222222222";
-  const targetId = `${profile.pubkey}_${targetShortId}`;
+  const targetId = targetShortId;
   write(workspacePath, "source.md", `# Source\n\n- [Target](#${targetId})\n`);
   write(
     workspacePath,
@@ -1089,9 +1076,8 @@ Source
 
 test("Bidirectional graph link labels keep endpoint paths intact", async () => {
   const { path: workspacePath } = knowstrInit();
-  const profile = loadCliProfile({ cwd: workspacePath });
   const spainShortId = "22222222-2222-4222-8222-222222222222";
-  const spainId = `${profile.pubkey}_${spainShortId}`;
+  const spainId = spainShortId;
   write(
     workspacePath,
     "holidays.md",

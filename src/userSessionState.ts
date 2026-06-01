@@ -1,7 +1,6 @@
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import { List, Map, Set, OrderedSet } from "immutable";
 import { UNAUTHENTICATED_USER_PK } from "./NostrAuthContext";
-import { splitID } from "./core/connections";
 import { generatePaneId } from "./SplitPanesContext";
 import {
   jsonToPanes,
@@ -10,7 +9,11 @@ import {
   Serializable,
   viewDataToJSON,
 } from "./serializer";
-import { parseDocumentRouteUrl, parseNodeRouteUrl } from "./navigationUrl";
+import {
+  parseDocumentRouteUrl,
+  parseNodeRouteUrl,
+  parseSourceFromSearch,
+} from "./navigationUrl";
 import { replaceUnauthenticatedUser } from "./planner";
 
 export const defaultPane = (author: PublicKey, rootItemID?: ID): Pane => ({
@@ -101,7 +104,10 @@ function getUrlPanes(publicKey: PublicKey): Pane[] | undefined {
   }
   const nodeID = parseNodeRouteUrl(window.location.pathname);
   if (nodeID) {
-    const nodeAuthor = splitID(nodeID)[0] || publicKey;
+    const nodeAuthor =
+      (parseSourceFromSearch(window.location.search) as
+        | PublicKey
+        | undefined) || publicKey;
     return [
       {
         id: generatePaneId(),

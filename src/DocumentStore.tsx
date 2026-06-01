@@ -18,7 +18,6 @@ import {
   ParsedDocument,
   documentKeyOf,
 } from "./core/Document";
-import { joinID } from "./core/connections";
 import { newDB } from "./core/knowledge";
 
 export type { Document, DocumentDelete, ParsedDocument };
@@ -62,11 +61,7 @@ function nodesForDocument(
 ): ImmutableMap<string, GraphNode> {
   const nodes = knowledgeDBs.get(document.author)?.nodes;
   if (!nodes) return ImmutableMap<string, GraphNode>();
-  const topNodeLongIds = new Set(
-    document.topNodeShortIds.map((topNodeShortId) =>
-      joinID(document.author, topNodeShortId)
-    )
-  );
+  const topNodeLongIds = new Set(document.topNodeShortIds);
   return nodes.filter((node) => topNodeLongIds.has(node.root));
 }
 
@@ -125,7 +120,7 @@ function applyDocumentToSnapshot(
   if (existingDelete && existingDelete.deletedAt >= doc.updatedMs) {
     return snapshot;
   }
-  if (existingDocument && existingDocument.updatedMs >= doc.updatedMs) {
+  if (existingDocument && existingDocument.updatedMs > doc.updatedMs) {
     return snapshot;
   }
 

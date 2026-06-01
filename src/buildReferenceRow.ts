@@ -2,18 +2,17 @@ import { List, Map as ImmutableMap, Set } from "immutable";
 import {
   getChildNodes,
   getNode,
-  resolveNode,
   shortID,
-  splitID,
   itemPassesFilters,
   getSemanticID,
   getNodeContext,
-  joinID,
+  getNodeSemanticID,
 } from "./core/connections";
 import {
   getBlockLinkText,
   getBlockFileLinkPath,
   getBlockFileLinkText,
+  getBlockLinkTarget,
   isBlockFileLink,
   nodeText,
 } from "./core/nodeSpans";
@@ -33,6 +32,10 @@ import {
 import { getPane } from "./planner";
 import { DEFAULT_TYPE_FILTERS } from "./core/constants";
 import { referenceToText } from "./editor/referenceText";
+import {
+  resolveNodeReferenceFromGraphIndex,
+  resolveNodeReferenceFromKnowledgeDBs,
+} from "./core/sourceResolver";
 
 function argumentPrefix(argument?: Argument): string {
   if (argument === "confirms") {
@@ -73,11 +76,7 @@ function resolveFileLinkRoot(
   if (!targetDoc) return undefined;
   const topNodeShortId = targetDoc.topNodeShortIds[0];
   return topNodeShortId
-    ? getNode(
-        knowledgeDBs,
-        joinID(targetDoc.author, topNodeShortId as ID),
-        targetDoc.author
-      )
+    ? getNode(knowledgeDBs, topNodeShortId as ID, targetDoc.author)
     : undefined;
 }
 
@@ -111,14 +110,79 @@ function getConcreteContextNodes(
   return loop(node.parent, Set<string>([shortID(node.id)]), List<GraphNode>());
 }
 
+function resolveNodeInSourceScope(
+  graphIndex: GraphIndex | undefined,
+  knowledgeDBs: KnowledgeDBs,
+  localSourceId: SourceId,
+  sourceItem: GraphNode | undefined,
+  allowIndexedTargetFallback: boolean = false
+): GraphNode | undefined {
+  const targetID = getBlockLinkTarget(sourceItem);
+  if (!targetID || !sourceItem) {
+    return sourceItem;
+  }
+  const scope =
+    sourceItem.author === localSourceId
+      ? ({ type: "local" } as const)
+      : ({ type: "source", sourceId: sourceItem.author } as const);
+  const indexedNode = graphIndex
+    ? resolveNodeReferenceFromGraphIndex(
+        graphIndex,
+        targetID,
+        scope,
+        localSourceId
+      )?.node
+    : undefined;
+  return (
+    indexedNode ??
+    (allowIndexedTargetFallback
+      ? graphIndex?.nodeByID.get(targetID)
+      : undefined) ??
+    resolveNodeReferenceFromKnowledgeDBs(
+      knowledgeDBs,
+      targetID,
+      scope,
+      localSourceId
+    )?.node
+  );
+}
+
+function semanticIDInSourceScope(
+  knowledgeDBs: KnowledgeDBs,
+  graphIndex: GraphIndex | undefined,
+  localSourceId: SourceId,
+  node: GraphNode
+): ID {
+  const target = resolveNodeInSourceScope(
+    graphIndex,
+    knowledgeDBs,
+    localSourceId,
+    node
+  );
+  return target && target !== node
+    ? semanticIDInSourceScope(knowledgeDBs, graphIndex, localSourceId, target)
+    : getNodeSemanticID(node);
+}
+
 function parseRef(
   refId: LongID,
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
   documents?: ImmutableMap<string, Document>,
-  documentByFilePath?: ImmutableMap<string, Document>
+  documentByFilePath?: ImmutableMap<string, Document>,
+  graphIndex?: GraphIndex,
+  localSourceId: SourceId = myself,
+  allowIndexedTargetFallback: boolean = false
 ): ParsedRef | undefined {
-  const sourceItem = getNode(knowledgeDBs, refId, myself);
+  const sourceItem =
+    (graphIndex
+      ? resolveNodeReferenceFromGraphIndex(
+          graphIndex,
+          refId,
+          { type: "source", sourceId: myself },
+          localSourceId
+        )?.node
+      : undefined) ?? getNode(knowledgeDBs, refId, myself);
   if (
     sourceItem &&
     isBlockFileLink(sourceItem) &&
@@ -135,7 +199,13 @@ function parseRef(
     const contextNodes = getConcreteContextNodes(knowledgeDBs, fileLinkTarget);
     return { node: fileLinkTarget, contextNodes, sourceItem };
   }
-  const node = resolveNode(knowledgeDBs, sourceItem);
+  const node = resolveNodeInSourceScope(
+    graphIndex,
+    knowledgeDBs,
+    localSourceId,
+    sourceItem,
+    allowIndexedTargetFallback
+  );
   if (!node) {
     return undefined;
   }
@@ -178,9 +248,6 @@ function buildDeletedReference(
   myself: PublicKey,
   linkText?: string
 ): ReferenceRow | undefined {
-  const [remote] = splitID(refId);
-  const author = remote || myself;
-
   if (!linkText) return undefined;
 
   const parts = linkText.split(" / ");
@@ -193,7 +260,7 @@ function buildDeletedReference(
     targetContext: List<ID>(),
     contextLabels,
     targetLabel,
-    author,
+    author: myself,
     deleted: true,
   };
 }
@@ -240,17 +307,30 @@ export function buildOutgoingReference(
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
   documents?: ImmutableMap<string, Document>,
-  documentByFilePath?: ImmutableMap<string, Document>
+  documentByFilePath?: ImmutableMap<string, Document>,
+  graphIndex?: GraphIndex,
+  localSourceId: SourceId = myself,
+  allowIndexedTargetFallback: boolean = false
 ): ReferenceRow | undefined {
   const ref = parseRef(
     refId,
     knowledgeDBs,
     myself,
     documents,
-    documentByFilePath
+    documentByFilePath,
+    graphIndex,
+    localSourceId,
+    allowIndexedTargetFallback
   );
   if (!ref) {
-    const sourceItem = getNode(knowledgeDBs, refId, myself);
+    const sourceItem = graphIndex
+      ? resolveNodeReferenceFromGraphIndex(
+          graphIndex,
+          refId,
+          { type: "source", sourceId: myself },
+          localSourceId
+        )?.node
+      : getNode(knowledgeDBs, refId, myself);
     return buildDeletedReference(
       refId,
       myself,
@@ -286,7 +366,9 @@ function effectiveIDs(
     | "versions"
     | "incoming"
     | "contains"
-  )[]
+  )[],
+  graphIndex?: GraphIndex,
+  localSourceId: SourceId = node.author
 ): List<string> {
   return getChildNodes(knowledgeDBs, node, node.author)
     .filter(
@@ -294,7 +376,9 @@ function effectiveIDs(
         itemPassesFilters(item, activeFilters) &&
         item.relevance !== "not_relevant"
     )
-    .map((item) => getSemanticID(knowledgeDBs, item))
+    .map((item) =>
+      semanticIDInSourceScope(knowledgeDBs, graphIndex, localSourceId, item)
+    )
     .toList();
 }
 
@@ -308,15 +392,25 @@ function computeNodeDiff(
     | "versions"
     | "incoming"
     | "contains"
-  )[]
+  )[],
+  graphIndex?: GraphIndex,
+  localSourceId: SourceId = versionNode.author
 ): { addCount: number; removeCount: number } {
   const versionIDs = effectiveIDs(
     knowledgeDBs,
     versionNode,
-    activeFilters
+    activeFilters,
+    graphIndex,
+    localSourceId
   ).toSet();
   const parentIDs = parentNode
-    ? effectiveIDs(knowledgeDBs, parentNode, activeFilters).toSet()
+    ? effectiveIDs(
+        knowledgeDBs,
+        parentNode,
+        activeFilters,
+        graphIndex,
+        localSourceId
+      ).toSet()
     : List<string>().toSet();
   return {
     addCount: versionIDs.filter((id) => !parentIDs.has(id)).size,
@@ -326,9 +420,21 @@ function computeNodeDiff(
 
 function computeVersionMeta(data: Data, viewPath: ViewPath): VersionMeta {
   const refId = getLast(viewPath);
-  const node = resolveNode(
+  const lookupSource =
+    data.graphIndex.nodeByID.get(refId as LongID)?.author ??
+    data.user.publicKey;
+  const sourceItem =
+    resolveNodeReferenceFromGraphIndex(
+      data.graphIndex,
+      refId,
+      { type: "source", sourceId: lookupSource },
+      data.user.publicKey
+    )?.node ?? getNode(data.knowledgeDBs, refId, lookupSource);
+  const node = resolveNodeInSourceScope(
+    data.graphIndex,
     data.knowledgeDBs,
-    getNode(data.knowledgeDBs, refId, data.user.publicKey)
+    data.user.publicKey,
+    sourceItem
   );
   if (!node) return { updated: 0, addCount: 0, removeCount: 0 };
 
@@ -342,7 +448,9 @@ function computeVersionMeta(data: Data, viewPath: ViewPath): VersionMeta {
     data.knowledgeDBs,
     node,
     parentNode,
-    activeFilters
+    activeFilters,
+    data.graphIndex,
+    data.user.publicKey
   );
   return { updated: node.updated, addCount, removeCount };
 }
@@ -376,13 +484,7 @@ function getDocumentTopSourceNodes(ref: ParsedRef, data: Data): GraphNode[] {
   );
   if (!document) return [];
   return document.topNodeShortIds
-    .map((nodeID) =>
-      getNode(
-        data.knowledgeDBs,
-        joinID(document.author, nodeID as ID),
-        document.author
-      )
-    )
+    .map((nodeID) => getNode(data.knowledgeDBs, nodeID as ID, document.author))
     .filter((node): node is GraphNode => node !== undefined);
 }
 
@@ -462,11 +564,7 @@ function getDocumentRootNodeForView(
     : undefined;
   const topNodeShortId = document?.topNodeShortIds[0];
   return topNodeShortId && document
-    ? getNode(
-        data.knowledgeDBs,
-        joinID(document.author, topNodeShortId as ID),
-        document.author
-      )
+    ? getNode(data.knowledgeDBs, topNodeShortId as ID, document.author)
     : undefined;
 }
 
@@ -492,62 +590,62 @@ export function buildReferenceItem(
   virtualType?: VirtualType,
   versionMeta?: VersionMeta
 ): ReferenceRow | undefined {
+  const lookupAuthor =
+    data.graphIndex.nodeByID.get(refId)?.author ?? data.user.publicKey;
   const ref = parseRef(
     refId,
     data.knowledgeDBs,
-    data.user.publicKey,
+    lookupAuthor,
     data.documents,
-    data.documentByFilePath
+    data.documentByFilePath,
+    data.graphIndex,
+    data.user.publicKey,
+    virtualType === "incoming"
   );
+  const buildScopedOutgoingReference = (): ReferenceRow | undefined =>
+    buildOutgoingReference(
+      refId,
+      data.knowledgeDBs,
+      lookupAuthor,
+      data.documents,
+      data.documentByFilePath,
+      data.graphIndex,
+      data.user.publicKey,
+      virtualType === "incoming"
+    );
+
   if (!ref) {
     const parentPath = getParentView(viewPath);
     const parentNode = parentPath
       ? getNodeForView(data, parentPath)
       : undefined;
     const parentItem = parentNode
-      ? getNode(data.knowledgeDBs, refId, data.user.publicKey)
+      ? resolveNodeReferenceFromGraphIndex(
+          data.graphIndex,
+          refId,
+          { type: "source", sourceId: lookupAuthor },
+          data.user.publicKey
+        )?.node ?? getNode(data.knowledgeDBs, refId, lookupAuthor)
       : undefined;
     const deleted = buildDeletedReference(
       refId,
-      data.user.publicKey,
+      lookupAuthor,
       getBlockLinkText(parentItem) ?? getBlockFileLinkText(parentItem)
     );
     return deleted;
   }
 
   if (virtualType === "suggestion") {
-    const outgoing = buildOutgoingReference(
-      refId,
-      data.knowledgeDBs,
-      data.user.publicKey,
-      data.documents,
-      data.documentByFilePath
-    );
+    const outgoing = buildScopedOutgoingReference();
     return outgoing ? { ...outgoing, text: outgoing.targetLabel } : undefined;
   }
 
   if (virtualType === "incoming") {
     const outgoing =
       ref.sourceItem && isBlockFileLink(ref.sourceItem)
-        ? buildSourceParentReference(
-            ref,
-            data.knowledgeDBs,
-            data.user.publicKey
-          ) ??
-          buildOutgoingReference(
-            refId,
-            data.knowledgeDBs,
-            data.user.publicKey,
-            data.documents,
-            data.documentByFilePath
-          )
-        : buildOutgoingReference(
-            refId,
-            data.knowledgeDBs,
-            data.user.publicKey,
-            data.documents,
-            data.documentByFilePath
-          );
+        ? buildSourceParentReference(ref, data.knowledgeDBs, lookupAuthor) ??
+          buildScopedOutgoingReference()
+        : buildScopedOutgoingReference();
     if (!outgoing) {
       return undefined;
     }
@@ -574,13 +672,7 @@ export function buildReferenceItem(
   }
 
   if (virtualType === "version" && versionMeta) {
-    const outgoing = buildOutgoingReference(
-      refId,
-      data.knowledgeDBs,
-      data.user.publicKey,
-      data.documents,
-      data.documentByFilePath
-    );
+    const outgoing = buildScopedOutgoingReference();
     if (!outgoing) {
       return undefined;
     }
@@ -596,13 +688,7 @@ export function buildReferenceItem(
     return { ...outgoing, text, versionMeta };
   }
 
-  const outgoing = buildOutgoingReference(
-    refId,
-    data.knowledgeDBs,
-    data.user.publicKey,
-    data.documents,
-    data.documentByFilePath
-  );
+  const outgoing = buildScopedOutgoingReference();
   if (!outgoing || !ref) {
     return outgoing;
   }
@@ -628,7 +714,7 @@ export function buildReferenceItem(
     return outgoing;
   }
 
-  const storedItem = getNode(data.knowledgeDBs, refId, data.user.publicKey);
+  const storedItem = getNode(data.knowledgeDBs, refId, lookupAuthor);
   const isNotRelevant = storedItem?.relevance === "not_relevant";
 
   const incomingCref = findIndexedIncomingLinkItem(ref, data, parentNode);

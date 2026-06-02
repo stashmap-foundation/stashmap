@@ -96,77 +96,133 @@ These phases are scope/order placeholders only. `(draft)` means the phase is not
 
 The first five phases are intentionally ordered to validate whether the source/import/suggest model works in practice before investing in all surrounding polish. Local filesystem snapshot storage is pulled forward because `import` cannot be correct if Electron/CLI workspaces still rely on IndexedDB-only snapshot durability.
 
-## Phase 1A — Namespace-scoped ID foundation (draft)
+## Phase 1A — Namespace-scoped ID foundation (redo plan)
 
-Split out from the former broad metadata phase. Do this before source/import/suggest so later phases do not bake in author-prefix semantics.
+The first Phase 1A attempt proved the model is right but the order/API was wrong. Reimplement this phase from a clean pre-Phase-1A base. The goal is bare node IDs plus explicit source scope, without scattering graph-index guessing through UI/rendering code.
+
+### Lessons to preserve
+
+- Do not remove author-prefixed/global IDs before source-aware lookup is centralized.
+- Do not expose `graphIndex.nodesBySource`, `graphIndex.sourceCandidatesById`, or `graphIndex.nodeByID` to ordinary callsites.
+- Do not make `GraphNode.author` mean lookup source. `GraphNode.author` is provenance/publisher; `NodeRef.sourceId` is lookup scope.
+- Do not export low-level resolver names that force callsites to construct env objects. Use small pure domain functions.
+- Do not let planner code use graph-index-backed lookup. Planner mutates `knowledgeDBs`; `graphIndex` is stale during a plan.
+- Do not turn `joinID`/`shortID` into no-ops until boundary types carry source explicitly.
 
 ### Decisions to encode
 
-- Concrete markdown node IDs are bare strings. They are not required to be UUID-shaped.
-- Generated node IDs should still be UUIDs to avoid accidental collisions, but user-supplied IDs are allowed.
-- Local document IDs and local node IDs are user-controlled strings, not required to be UUID-shaped.
+- Concrete markdown node IDs are bare strings and are not required to be UUID-shaped.
+- Generated node IDs should still be UUIDs to avoid accidental local collisions.
+- Local document IDs and local node IDs are user-controlled strings when safe and unique.
 - Local IDs must be non-empty, parseable, and safe in markdown HTML-comment attributes.
-- The editable local graph must have globally unique node IDs across all local workspace documents.
-- Source graphs are read-only candidate graphs. Duplicate node IDs across sources are allowed.
-- Remove author/public-key prefixes from concrete node identity. `author_id` / `LongID` should no longer be the core identity model.
-- Nostr public keys identify Nostr sources, not node ID namespaces. A followed author is a source containing that author's public documents. Opening `/r/<id>?source=<npub-or-pubkey>` can create/use a temporary source for an author that is not followed.
-- Existing `currentAuthor` / `effectiveAuthor` / `pane.author` concepts are source-scope concepts. In the current Nostr implementation a source ID happens to be a public key, but it must be treated as the current lookup source, not as part of node identity.
-- Source paths, source registry entries, and Nostr authors are locators/source scopes for lookup. They are not embedded into ordinary node IDs.
-- Rename route/query source selection from `author` to `source`; no compatibility alias is required.
-- The legacy `_` delimiter and current `splitID` behavior that joins the local part with `:` must be removed for node references. No backwards compatibility is required.
-- Source/read-only status comes from the current graph/source context, not from any ID prefix or public key.
+- The editable local graph must have globally unique node IDs across local workspace documents.
+- Source graphs are read-only candidate graphs. Duplicate node IDs across different sources are allowed.
+- Source/read-only/editable semantics come from graph/source context, not ID shape.
+- Routes use `/r/<id>?source=<source-id>`; remove `?author=` compatibility.
+- Plan the migration away from `LongID`; keep it only temporarily where needed.
 
-### Lookup rules to encode
+### Core lookup rules
 
-- A node reference is resolved against a current graph/source scope first.
-- If the current scope is local and the ID is not found locally, look in the wider source candidate index.
-- If the current scope is not local and the ID is not found in that same source, stop. A source must not implicitly reference local nodes or other sources.
-- Local workspace lookup is single-valued because local IDs are unique.
-- Source lookup is candidate-valued because duplicate IDs across sources are allowed.
-- If a local link falls back to multiple source candidates, choose a deterministic priority target for navigation using registered source order. Ambiguity display/exposing alternate candidates is later UI work, not required in Phase 1A.
-- Once a source candidate is selected, traversal of its parent/children/links stays within that candidate's source scope.
+Centralize exactly these rules:
+
+1. Resolve an ID in the current source first.
+2. If not found and the current source is local, try source candidates in deterministic source order.
+3. If the current source is non-local, stop. A source must not implicitly reference local nodes or other sources.
+4. Once a source candidate is selected, parent/child/link traversal stays in that selected source.
+
+### Functional read model
+
+Add a functional read-side module, e.g. `src/core/graphLookup.ts`. Do not use methods/OOP.
+
+```ts
+type NodeRef = { sourceId: SourceId; id: ID };
+type ResolvedNode = { ref: NodeRef; node: GraphNode };
+
+type GraphLookup = {
+  knowledgeDBs: KnowledgeDBs;
+  graphIndex: GraphIndex;
+  localSourceId: SourceId;
+  sourceOrder: readonly SourceId[];
+};
+```
+
+Export only domain-level pure functions:
+
+```ts
+graphLookupFromData(data: Data): GraphLookup;
+getNodeInSource(graph: GraphLookup, ref: NodeRef): ResolvedNode | undefined;
+lookupNode(graph: GraphLookup, id: ID, currentSourceId: SourceId): ResolvedNode | undefined;
+resolveBlockLinkTarget(graph: GraphLookup, source: ResolvedNode): ResolvedNode | undefined;
+parentOf(graph: GraphLookup, node: ResolvedNode): ResolvedNode | undefined;
+childrenOf(graph: GraphLookup, node: ResolvedNode): ResolvedNode[];
+resolveReferenceForView(graph: GraphLookup, panes: Pane[], viewPath: ViewPath, refId: ID): ResolvedReference | undefined;
+```
+
+Callsites should look like this:
+
+```ts
+const graph = graphLookupFromData(data);
+const sourceItem = lookupNode(graph, refId, paneSourceId);
+const target = sourceItem ? resolveBlockLinkTarget(graph, sourceItem) : undefined;
+```
+
+They must not construct inline resolver env objects and must not read graph-index internals.
+
+### Planner-safe lookup
+
+Add a separate planner-safe module, e.g. `src/core/planLookup.ts`, that never imports or reads `graphIndex`.
+
+- Planner lookup is exact source lookup from `knowledgeDBs` only.
+- Planner functions should receive already-resolved `NodeRef`/`ResolvedNode` from the read side when needed.
+- Planner functions must not perform source-candidate fallback while mutating a plan.
+
+### Lint rules first
+
+Before reimplementation, add lint restrictions:
+
+- In `src/planner.tsx` and `src/core/plan.ts`, ban imports of graph lookup modules that use `graphIndex`, ban imports of `graphIndex`, and ban `*.graphIndex` member access.
+- Outside `src/core/graphLookup.ts`, `src/graphIndex.ts`, and tests, ban direct reads of:
+  - `graphIndex.nodeByID`
+  - `graphIndex.nodesBySource`
+  - `graphIndex.sourceCandidatesById`
+- After migrating callsites, ban `sourceCandidatesById.get(...)?[0]`-style first-candidate guessing everywhere except inside `graphLookup.ts`.
+
+### Implementation order
+
+1. Add lint restrictions above.
+2. Add `NodeRef`, `ResolvedNode`, and pure `graphLookup.ts` while old IDs still work.
+3. Update `graphIndex` APIs to take explicit `sourceId` when indexing source documents. Do not infer source from `GraphNode.author`.
+4. Migrate read/rendering callsites to `graphLookup.ts` helpers before changing ID shape. Start with `ViewContext`, then `buildReferenceRow`, then `semanticProjection`/incoming refs/search/virtual rows.
+5. Update boundary/view types to carry source explicitly where a bare ID crosses layers: routes, pane/root state, `ReferenceRow`, `ReferencedByRef`, virtual rows, incoming refs, and version refs.
+6. Only after callsites carry source explicitly, remove author/public-key prefixes from concrete node identity.
+7. Delete legacy `_` splitting behavior. Prefer deleting `joinID`/`shortID` callsites over turning them into semantic no-ops.
+8. Remove remaining `LongID` assumptions incrementally, with tests.
 
 ### Tests first
 
-- Add markdown round-trip tests showing user-supplied non-UUID IDs are preserved when unique.
-- Add validation tests for duplicate node IDs across local workspace documents.
-- Add validation tests showing duplicate node IDs across sources are representable as multiple candidates rather than a local workspace error.
-- Add resolver tests for:
-  - current local scope resolves local first.
-  - local scope falls back to source candidates when local is missing.
-  - source scope resolves only inside that source.
-  - source scope does not fall back to local or other sources.
-  - local fallback with multiple source candidates returns priority plus ambiguity metadata.
-- Update URL/navigation tests for `/r/<id>?source=<npub-or-pubkey>` temporary-source lookup and remove `?author=` expectations.
-- Add migration tests around existing author-named state, proving the current source scope, not an ID prefix, controls lookup.
-
-### Implementation notes
-
-- Introduce explicit graph/source scope types. Suggested vocabulary:
-  - `SourceId`: opaque source-scope identifier. For followed Nostr documents this is currently the author's public key; for filesystem sources it can later be a path/registry ID.
-  - local graph/source scope: the editable workspace graph.
-  - source graph/source scope: a read-only source such as a followed author's public documents, a filesystem source, or a temporary author source.
-  - source candidate: a node plus the source/document context required to traverse it safely.
-- Migrate the existing author-named lookup plumbing to source terminology: `currentAuthor` / `effectiveAuthor` / `pane.author` should become `currentSource` / `effectiveSource` / `pane.source` where they mean lookup scope. `GraphNode.author` may remain temporarily only as provenance/Nostr-publisher metadata.
-- It is acceptable to keep the current author-keyed `KnowledgeDBs` shape during the first iteration if the key is treated as `SourceId` by lookup code. The important migration is semantic: lookups are `getNode(id, currentSource)`, never `getNode(author_id)`.
-- Maintain two lookup indexes:
-  - `localNodesById` / `localNodeIndex`: single-valued editable local graph index.
-  - `sourceCandidatesById` / `sourceNodeIndex`: multi-valued read-only source candidate index.
-- Prefer `sourceCandidatesById` in new code when duplicate source IDs can exist.
-- Existing `author` fields may remain temporarily only as provenance/Nostr-publisher metadata. New lookup code must not use author as part of node identity.
-- Keep markdown output stable for ordinary files: write `<!-- id:<id> -->`, not an author/source-qualified ID.
-- Plan the type migration away from `LongID` toward bare `ID`/node ID strings. This may be incremental, but Phase 1A should remove the assumption that `_` means namespace.
+- Unit tests for `graphLookup.ts`:
+  - current source resolves first;
+  - local scope falls back to source candidates;
+  - non-local source scope does not fall back;
+  - duplicate source candidates are deterministic and expose ambiguity;
+  - parent/child/link traversal stays in the selected source.
+- Tests proving `graphIndex` indexes nodes under an explicit `sourceId`, not `GraphNode.author`.
+- Markdown round-trip tests preserving safe user-supplied non-UUID IDs.
+- Validation tests rejecting duplicate local node IDs across workspace documents.
+- Tests allowing duplicate IDs across sources as separate candidates.
+- URL/navigation tests for `/r/<id>?source=<source-id>` and removal of `?author=`.
+- Integration tests for reference rows, incoming refs, suggestions, versions, search rows, and breadcrumbs with duplicate source IDs.
+- Lint verification that planner code cannot read or import `graphIndex`/graph-index-backed lookup.
 
 ### Acceptance criteria
 
-- Node identity no longer depends on author/public-key prefixes.
-- Local IDs containing underscores no longer get corrupted by splitting/rejoining.
-- User-provided non-UUID document IDs and node IDs are accepted when unique and safe.
-- Local workspace duplicate node IDs are rejected clearly.
-- Duplicate node IDs across sources are allowed and exposed as source candidates.
-- Resolver behavior is current-source-scope-first, with source fallback only from local scope.
-- Existing read-only followed-user behavior is preserved by treating followed authors as read-only Nostr sources.
-- Source/read-only/editable semantics are determined by graph/source context, not ID shape.
+- Ordinary UI/rendering code never reads graph-index internals directly.
+- Planner code has no access to `graphIndex` or graph-index-backed lookup.
+- Lookup behavior is implemented once in functional helpers and matches the three core lookup rules.
+- Source identity is carried as `NodeRef.sourceId`, not inferred from `GraphNode.author`.
+- Bare IDs in markdown are preserved, and local IDs with underscores are not corrupted.
+- Duplicate IDs across sources are represented as candidates, not collapsed into one `nodeByID` value at callsites.
+- Existing read-only followed-user behavior still works by treating followed authors as source scopes.
 
 ## Phase 1B — Node-level lineage metadata and hash snapshot IDs (draft)
 

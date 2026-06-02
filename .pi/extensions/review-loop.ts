@@ -9,9 +9,10 @@
  * Each pass starts a fresh pi process with --no-session and the requested
  * thinking level. The child agent reviews the current branch against the base
  * ref, fixes actionable issues, runs the mandatory project checks, and emits a
- * status marker. The parent verifies npm run test, npm run lint, and
- * npm run typescript after every pass. If a successful pass changed code, the
- * parent creates a `wip: ...` commit before starting the next fresh-context pass.
+ * status marker plus a short fix report. The parent verifies npm run test,
+ * npm run lint, and npm run typescript after every pass. If a successful pass
+ * changed code, the parent creates a descriptive review-fix commit before
+ * starting the next fresh-context pass.
  */
 
 import { spawn } from "node:child_process";
@@ -41,8 +42,14 @@ interface UsageStats {
   turns: number;
 }
 
+interface ReviewReport {
+  summary?: string;
+  fixes: string[];
+}
+
 interface ReviewPassResult {
   status: ReviewStatus;
+  report: ReviewReport;
   output: string;
   stderr: string;
   exitCode: number;
@@ -157,7 +164,7 @@ function usage(): string {
     "  --model <pattern>         Model for child review agents (default: current model)",
     "  --no-child-extensions     Start child agents with --no-extensions",
     "",
-    "The loop ignores idea.md, implementation.md, and .idea/**, verifies npm run test/lint/typescript after each pass, and creates wip: commits for successful code changes.",
+    "The loop ignores idea.md, implementation.md, and .idea/**, verifies npm run test/lint/typescript after each pass, writes bug regression-test guidance into each child prompt, and creates descriptive commits for successful code changes.",
   ].join("\n");
 }
 
@@ -488,6 +495,13 @@ function buildReviewPrompt(input: {
     "- Violations of the project's coding standards and local conventions.",
     "- Performance regressions, unnecessary repeated work, or avoidable expensive operations.",
     "",
+    "Bug reproduction workflow (mandatory when you find a bug):",
+    "- If you identify a behavioral bug, edge case, broken error handling, race/state bug, or incorrect assumption, write an integration-level regression test before changing production code.",
+    "- Prefer the closest existing integration/e2e/system test style. If the project has no explicit integration harness, write a high-level test through public APIs, CLI/UI flows, or rendered component behavior rather than a narrow private-helper unit test.",
+    "- Run the new targeted test before the production fix and confirm it fails for the bug whenever practical. If the environment prevents a pre-fix run, say so in the final fix report.",
+    "- Then implement the fix and rerun the targeted test plus the mandatory validation below.",
+    "- Do not mark FIXED for a bug unless the regression is covered by an integration-level test. If such a test cannot be written safely, leave the bug unfixed, explain why, and mark BLOCKED.",
+    "",
     "Mandatory validation before your final status:",
     "- Run npm run test exactly as written. Do not use --runInBand and do not pass it through after --.",
     "- Run npm run lint.",
@@ -509,10 +523,16 @@ function buildReviewPrompt(input: {
     "Task:",
     "1. If a previous validation failure is shown above, fix that first.",
     "2. Inspect the relevant diff and enough surrounding project code to understand intent and conventions.",
-    "3. If you find actionable issues, fix them directly using the available tools.",
+    "3. If you find actionable issues, fix them directly using the available tools. For bugs, follow the bug reproduction workflow before changing production code.",
     "4. Run all mandatory validation commands listed above; tests must not use --runInBand.",
     "5. If no actionable issue remains and validation passes, leave files unchanged.",
     "6. If an issue or validation failure is real but cannot be safely fixed in this pass, explain why and mark BLOCKED.",
+    "",
+    "Final report contract:",
+    "- Include REVIEW_LOOP_SUMMARY: <one concise sentence> before the final status marker. For FIXED, make it suitable for a commit subject and describe what changed.",
+    "- If you fixed anything, include REVIEW_LOOP_FIXES: followed by bullets. Each bullet must state the issue, how you fixed it, and the regression/integration test or validation evidence. For bug fixes, the Test field must name the integration test path/test name and whether it failed before the fix. Example: - Issue: ... Fix: ... Test: ...",
+    "- For CLEAN, use REVIEW_LOOP_SUMMARY to say that no actionable issue remained and validation passed; omit REVIEW_LOOP_FIXES or write - none.",
+    "- For BLOCKED, use REVIEW_LOOP_SUMMARY plus a bullet explaining the blocker and the safest next step.",
     "",
     "Final status contract:",
     "- Use REVIEW_LOOP_STATUS: CLEAN only if you found no actionable issue in scope, made no file changes in this pass, and npm run test, npm run lint, and npm run typescript all pass.",
@@ -556,6 +576,95 @@ function statusFromOutput(output: string): ReviewStatus {
   );
   if (matches.length === 0) return "UNKNOWN";
   return matches[matches.length - 1][1].toUpperCase() as ReviewStatus;
+}
+
+function normalizeReportLine(text: string): string {
+  return text
+    .replace(/^\s*[-*]\s+/, "")
+    .replace(/^\s*\d+\.\s+/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isEmptyReportLine(text: string): boolean {
+  const normalized = text.trim().replace(/[.!?]+$/, "");
+  return /^(?:none|n\/a|no fixes?(?: needed)?|no changes?|not applicable)$/i.test(
+    normalized
+  );
+}
+
+function parseReviewSummary(output: string): string | undefined {
+  const summaries: string[] = [];
+  for (const line of output.replace(/\r/g, "").split("\n")) {
+    const match = line.match(/^REVIEW_LOOP_SUMMARY:\s*(.*)$/i);
+    if (match) summaries.push(match[1]);
+  }
+
+  const summary = normalizeReportLine(summaries[summaries.length - 1] || "");
+  return summary && !isEmptyReportLine(summary) ? summary : undefined;
+}
+
+function parseReviewFixes(output: string): string[] {
+  const sections: string[][] = [];
+  let current: string[] | undefined;
+
+  for (const rawLine of output.replace(/\r/g, "").split("\n")) {
+    const fixesMatch = rawLine.match(/^REVIEW_LOOP_FIXES:\s*(.*)$/i);
+    if (fixesMatch) {
+      if (current) sections.push(current);
+      current = [];
+      if (fixesMatch[1].trim()) current.push(fixesMatch[1]);
+      continue;
+    }
+
+    if (!current) continue;
+    if (/^REVIEW_LOOP_(?:SUMMARY|STATUS):/i.test(rawLine)) {
+      sections.push(current);
+      current = undefined;
+      continue;
+    }
+
+    current.push(rawLine);
+  }
+  if (current) sections.push(current);
+
+  const section = sections[sections.length - 1];
+  if (!section) return [];
+
+  const fixes: string[] = [];
+  let pending = "";
+  const flushPending = () => {
+    const line = normalizeReportLine(pending);
+    pending = "";
+    if (!line || isEmptyReportLine(line)) return;
+    fixes.push(line);
+  };
+
+  for (const rawLine of section) {
+    const line = rawLine.trim();
+    if (!line) {
+      flushPending();
+      continue;
+    }
+
+    if (/^(?:[-*]|\d+\.)\s+/.test(line)) {
+      flushPending();
+      pending = line;
+      continue;
+    }
+
+    pending = pending ? `${pending} ${line}` : line;
+  }
+  flushPending();
+
+  return fixes;
+}
+
+function parseReviewReport(output: string): ReviewReport {
+  return {
+    summary: parseReviewSummary(output),
+    fixes: parseReviewFixes(output),
+  };
 }
 
 function emptyUsage(): UsageStats {
@@ -669,6 +778,7 @@ async function runReviewPass(input: {
       const output = assistantOutputs.join("\n\n").trim();
       resolve({
         status: aborted ? "UNKNOWN" : statusFromOutput(output),
+        report: parseReviewReport(output),
         output,
         stderr,
         exitCode: aborted ? 130 : code ?? 1,
@@ -782,12 +892,121 @@ async function getChangedUncommittedReviewFilesSince(
   return changed.sort();
 }
 
+function truncateSentence(text: string, maxChars: number): string {
+  const normalized = normalizeReportLine(text).replace(/[.!?]+$/, "");
+  if (normalized.length <= maxChars) return normalized;
+
+  const truncated = normalized.slice(0, Math.max(1, maxChars - 1));
+  const trimmed = truncated.replace(/\s+\S*$/, "").trimEnd();
+  return `${trimmed || truncated.trimEnd()}…`;
+}
+
+function fallbackCommitSummary(
+  files: string[],
+  level: ThinkingLevel,
+  pass: number
+): string {
+  if (files.length === 1) {
+    return `address review finding in ${path.posix.basename(files[0])}`;
+  }
+  if (files.length > 1 && files.length <= 3) {
+    return `address review findings in ${files
+      .map((file) => path.posix.basename(file))
+      .join(", ")}`;
+  }
+  return `address review findings from ${level} pass ${pass}`;
+}
+
+function commitSummaryFromReport(
+  report: ReviewReport,
+  files: string[],
+  level: ThinkingLevel,
+  pass: number
+): string {
+  let summary = normalizeReportLine(report.summary || report.fixes[0] || "");
+  const issueMatch = summary.match(/Issue:\s*(.+?)(?:\s+Fix:|\s+Test:|$)/i);
+  if (issueMatch) summary = normalizeReportLine(issueMatch[1]);
+  summary = summary.replace(/^fixed\s+/i, "fix ");
+  summary = summary.replace(/^fixes\s+/i, "fix ");
+
+  if (!summary || isEmptyReportLine(summary)) {
+    summary = fallbackCommitSummary(files, level, pass);
+  }
+
+  return truncateSentence(summary, 72 - "review: ".length);
+}
+
+function formatCommitValidation(
+  validation: ValidationResult | undefined
+): string[] {
+  if (!validation) return ["- validation was not run"];
+  return validation.commands.map(
+    (command) =>
+      `- ${command.name}: ${
+        command.exitCode === 0
+          ? `passed in ${formatDuration(command.durationMs)}`
+          : `failed with exit ${command.exitCode} after ${formatDuration(
+              command.durationMs
+            )}`
+      }`
+  );
+}
+
+function formatCommitFileList(files: string[]): string[] {
+  const visibleFiles = files.slice(0, 30).map((file) => `- ${file}`);
+  if (files.length > visibleFiles.length) {
+    visibleFiles.push(`- ... and ${files.length - visibleFiles.length} more`);
+  }
+  return visibleFiles;
+}
+
+function buildCommitMessage(input: {
+  level: ThinkingLevel;
+  pass: number;
+  files: string[];
+  report: ReviewReport;
+  validation?: ValidationResult;
+}): { subject: string; body: string } {
+  const summary = commitSummaryFromReport(
+    input.report,
+    input.files,
+    input.level,
+    input.pass
+  );
+  const fixes = input.report.fixes.length
+    ? input.report.fixes
+    : [input.report.summary || summary];
+
+  const body = [
+    `Review loop: ${input.level} pass ${input.pass}`,
+    "",
+    "Summary:",
+    input.report.summary || summary,
+    "",
+    "Fixes:",
+    ...fixes.slice(0, 12).map((fix) => `- ${normalizeReportLine(fix)}`),
+    ...(fixes.length > 12
+      ? [`- ... and ${fixes.length - 12} more reported fixes`]
+      : []),
+    "",
+    "Validation:",
+    ...formatCommitValidation(input.validation),
+    "",
+    "Files:",
+    ...formatCommitFileList(input.files),
+  ].join("\n");
+
+  return { subject: `review: ${summary}`, body };
+}
+
 async function commitReviewChanges(
   pi: ExtensionAPI,
   root: string,
   level: ThinkingLevel,
   pass: number,
-  files: string[]
+  files: string[],
+  report: ReviewReport,
+  validation?: ValidationResult
 ): Promise<string | undefined> {
   const reviewFiles = Array.from(
     new Set(files.filter(isReviewableCodePath))
@@ -815,13 +1034,21 @@ async function commitReviewChanges(
     throw new Error(`Unable to inspect staged review changes: ${message}`);
   }
 
-  const message = `wip: review fixes (${level} pass ${pass})`;
+  const message = buildCommitMessage({
+    level,
+    pass,
+    files: reviewFiles,
+    report,
+    validation,
+  });
   const commit = await pi.exec("git", [
     "-C",
     root,
     "commit",
     "-m",
-    message,
+    message.subject,
+    "-m",
+    message.body,
     "--",
     ...reviewFiles,
   ]);
@@ -831,7 +1058,9 @@ async function commitReviewChanges(
       commit.stdout ||
       "git commit failed"
     ).trim();
-    throw new Error(`Unable to create ${message} commit: ${errorMessage}`);
+    throw new Error(
+      `Unable to create ${message.subject} commit: ${errorMessage}`
+    );
   }
 
   return (await git(pi, root, ["rev-parse", "--short", "HEAD"])).trim();
@@ -893,6 +1122,40 @@ function currentModelPattern(ctx: any): string | undefined {
     : model.id;
 }
 
+function reportInlineSummary(report: ReviewReport): string | undefined {
+  const summary = normalizeReportLine(report.summary || report.fixes[0] || "");
+  return summary && !isEmptyReportLine(summary)
+    ? truncateSentence(summary, 140)
+    : undefined;
+}
+
+function formatFixReportLines(runs: RecordedPass[]): string[] {
+  const fixedRuns = runs.filter(
+    (run) =>
+      run.effectiveStatus === "FIXED" &&
+      run.validation?.ok &&
+      (run.commitHash || run.workingTreeChanged) &&
+      (run.report.summary || run.report.fixes.length > 0)
+  );
+  if (fixedRuns.length === 0) return [];
+
+  const lines = ["", "Fixes:"];
+  for (const run of fixedRuns) {
+    const commit = run.commitHash ? ` (${run.commitHash})` : "";
+    const summary = reportInlineSummary(run.report) || "review fix applied";
+    lines.push(`- ${run.level} pass ${run.pass}${commit}: ${summary}`);
+
+    for (const fix of run.report.fixes.slice(0, 6)) {
+      lines.push(`  - ${truncateSentence(fix, 220)}`);
+    }
+    if (run.report.fixes.length > 6) {
+      lines.push(`  - ... and ${run.report.fixes.length - 6} more`);
+    }
+  }
+
+  return lines;
+}
+
 function formatSummary(input: {
   success: boolean;
   base: string;
@@ -928,14 +1191,21 @@ function formatSummary(input: {
     const committed = run.commitHash ? `, committed ${run.commitHash}` : "";
     const validation = `, ${formatValidationSummary(run.validation)}`;
     const cost = run.usage.cost ? `, $${run.usage.cost.toFixed(4)}` : "";
+    const reportSummary =
+      run.effectiveStatus === "FIXED" || run.effectiveStatus === "BLOCKED"
+        ? reportInlineSummary(run.report)
+        : undefined;
+    const reportText = reportSummary ? ` - ${reportSummary}` : "";
     lines.push(
       `- ${icon} ${run.level} pass ${run.pass}: ${
         run.effectiveStatus
-      } (${formatDuration(
+      }${reportText} (${formatDuration(
         run.durationMs
       )}${changed}${committed}${validation}${cost})`
     );
   }
+
+  lines.push(...formatFixReportLines(input.runs));
 
   const lastValidationFailure = [...input.runs]
     .reverse()
@@ -967,7 +1237,7 @@ function updateUi(ctx: any, lines: string[]): void {
 export default function (pi: ExtensionAPI) {
   pi.registerCommand("review-loop", {
     description:
-      "Review/fix against master in clean-context passes, verify npm checks, and WIP-commit fixes",
+      "Review/fix against master in clean-context passes, verify npm checks, and commit described fixes",
     handler: async (args, ctx) => {
       const parsed = parseArgs(args);
       if ("help" in parsed) {
@@ -1126,14 +1396,16 @@ export default function (pi: ExtensionAPI) {
                 `review-loop: ${level} pass ${pass}`,
                 `base: ${options.base}`,
                 `files: ${changedFiles.length}`,
-                "creating wip commit...",
+                "creating review-fix commit...",
               ]);
               commitHash = await commitReviewChanges(
                 pi,
                 root,
                 level,
                 pass,
-                changedReviewFiles
+                changedReviewFiles,
+                result.report,
+                validation
               );
               const remainingReviewFiles =
                 await getChangedUncommittedReviewFilesSince(
@@ -1143,7 +1415,7 @@ export default function (pi: ExtensionAPI) {
                 );
               if (remainingReviewFiles.length > 0) {
                 throw new Error(
-                  `Review pass left uncommitted reviewable files after WIP commit: ${remainingReviewFiles.join(
+                  `Review pass left uncommitted reviewable files after review-fix commit: ${remainingReviewFiles.join(
                     ", "
                   )}`
                 );

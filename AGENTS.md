@@ -18,12 +18,14 @@
 
 ## Testing rules
 
+- Keep the repo green at all times. Break non-trivial work into small checkpoints before editing; a checkpoint should be one narrow behavior change or one subsystem migration, not a broad batch.
+- Before each checkpoint, identify the expected tests/checks. After every checkpoint, run the full gate: `npm run typescript && npm run lint && npm test`.
 - Don't run tests with `--runInBand`. The tests can and should always be able to be executed in parallel.
 - Running the full test suite is cheap: `npm test` takes about 40 seconds without `--runInBand`. Use the full suite as the normal checkpoint gate.
-- For any non-trivial refactor, define small checkpoints before editing. After every checkpoint, run `npm test` and do not continue while it is red.
 - Focused tests may be run while debugging, but they do not replace the full-suite checkpoint gate.
+- Do not continue to the next checkpoint while `typescript`, `lint`, or tests are red. Fix the central regression or revert the checkpoint first.
 - If `npm test` fails broadly after a checkpoint, stop and fix the central regression or revert that checkpoint. Do not patch individual failing tests around a broken shared invariant.
-- Never report a checkpoint or phase as complete with failing tests unless the user explicitly instructs you to do so.
+- Never report a checkpoint or phase as complete with failing checks unless the user explicitly instructs you to do so.
 - Prefer integration, e2e, system, CLI/UI flow, or public API tests over unit tests.
 - Do not introduce new unit tests unless an integration-level test is genuinely impractical or cannot cover the behavior safely.
 - Before writing tests, inspect existing tests and follow the closest existing project pattern.

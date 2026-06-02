@@ -147,6 +147,7 @@ const CODE_BASENAMES = new Set([
   "procfile",
   "jenkinsfile",
   "brewfile",
+  "agents.md",
   ".babelrc",
   ".eslintrc",
   ".prettierrc",
@@ -451,6 +452,12 @@ function formatFileList(files: string[]): string {
   return visible.join("\n");
 }
 
+async function readAgentsMd(root: string): Promise<string> {
+  const agentsPath = path.join(root, "AGENTS.md");
+  if (!existsSync(agentsPath)) return "(No AGENTS.md file found.)";
+  return fs.readFile(agentsPath, "utf8");
+}
+
 function buildReviewPrompt(input: {
   base: string;
   branch: string;
@@ -458,6 +465,7 @@ function buildReviewPrompt(input: {
   level: ThinkingLevel;
   pass: number;
   changedFiles: string[];
+  agentsMd: string;
   validationFailure?: string;
 }): string {
   const range = shellQuote(`${input.base}...HEAD`);
@@ -482,25 +490,36 @@ function buildReviewPrompt(input: {
     `Pass number at this level: ${input.pass}`,
     "",
     ...validationFailureSection,
+    "Project instructions from AGENTS.md (authoritative hard gates):",
+    "--- BEGIN AGENTS.md ---",
+    truncateTail(input.agentsMd, 12000),
+    "--- END AGENTS.md ---",
+    "",
     "Review scope:",
     `- Review the current branch against ${input.base}. Include committed branch changes (${input.base}...HEAD), staged changes, unstaged changes, and untracked code/configuration files.`,
     "- Review only code/configuration. Ignore prose/docs unless they are executable inputs or configuration.",
+    "- AGENTS.md is a reviewable project instruction file; enforce it when it changes.",
     "- Do not read, review, or edit idea.md, implementation.md, or .idea/**.",
     "- Stay focused on issues introduced by this branch; avoid unrelated cleanup and preference-only refactors.",
     "- Do not create commits; the parent review-loop extension commits successful fixes for you.",
     "",
-    "Most important checks:",
-    "- Code redundancies introduced by the branch.",
-    "- Bugs, edge cases, broken error handling, race/state issues, or incorrect assumptions.",
-    "- Violations of the project's coding standards and local conventions.",
-    "- Performance regressions, unnecessary repeated work, or avoidable expensive operations.",
+    "Mandatory adversarial review checks:",
+    "- Do not assume the implementation is acceptable because tests pass.",
+    "- Treat AGENTS.md as the project checklist. Inspect every applicable rule in it and do not report CLEAN if changed code violates it.",
+    "- Compare the implementation to the user request and flag code that solves more than was asked.",
+    "- Ask what could be deleted while preserving behavior. Prefer merging, deleting, or simplifying over layering another abstraction.",
+    "- Check bugs, edge cases, broken error handling, race/state issues, incorrect assumptions, performance regressions, unnecessary repeated work, and avoidable expensive operations.",
+    "",
+    "Hard fail handling:",
+    "- If the branch violates AGENTS.md, do not report CLEAN.",
+    "- Fix the problem directly when safe. If it cannot be fixed safely in this pass, explain why and report BLOCKED.",
     "",
     "Bug reproduction workflow (mandatory when you find a bug):",
-    "- If you identify a behavioral bug, edge case, broken error handling, race/state bug, or incorrect assumption, write an integration-level regression test before changing production code.",
-    "- Prefer the closest existing integration/e2e/system test style. If the project has no explicit integration harness, write a high-level test through public APIs, CLI/UI flows, or rendered component behavior rather than a narrow private-helper unit test.",
+    "- If you identify a behavioral bug, edge case, broken error handling, race/state bug, or incorrect assumption, write a regression test before changing production code.",
+    "- Follow the AGENTS.md testing rules and the closest existing project test pattern.",
     "- Run the new targeted test before the production fix and confirm it fails for the bug whenever practical. If the environment prevents a pre-fix run, say so in the final fix report.",
     "- Then implement the fix and rerun the targeted test plus the mandatory validation below.",
-    "- Do not mark FIXED for a bug unless the regression is covered by an integration-level test. If such a test cannot be written safely, leave the bug unfixed, explain why, and mark BLOCKED.",
+    "- Do not mark FIXED for a bug unless the regression is covered according to AGENTS.md. If such a test cannot be written safely, leave the bug unfixed, explain why, and mark BLOCKED.",
     "",
     "Mandatory validation before your final status:",
     "- Run npm run test exactly as written. Do not use --runInBand and do not pass it through after --.",
@@ -522,16 +541,17 @@ function buildReviewPrompt(input: {
     "",
     "Task:",
     "1. If a previous validation failure is shown above, fix that first.",
-    "2. Inspect the relevant diff and enough surrounding project code to understand intent and conventions.",
-    "3. If you find actionable issues, fix them directly using the available tools. For bugs, follow the bug reproduction workflow before changing production code.",
-    "4. Run all mandatory validation commands listed above; tests must not use --runInBand.",
-    "5. If no actionable issue remains and validation passes, leave files unchanged.",
-    "6. If an issue or validation failure is real but cannot be safely fixed in this pass, explain why and mark BLOCKED.",
+    "2. Inspect the AGENTS.md instructions supplied above, then inspect the relevant diff and enough surrounding project code to understand intent and conventions.",
+    "3. Explicitly perform an AGENTS.md compliance check before deciding the status.",
+    "4. If you find actionable issues, fix them directly using the available tools. For bugs, follow the bug reproduction workflow before changing production code.",
+    "5. Run all mandatory validation commands listed above; tests must not use --runInBand.",
+    "6. If no actionable issue remains and validation passes, leave files unchanged.",
+    "7. If an issue or validation failure is real but cannot be safely fixed in this pass, explain why and mark BLOCKED.",
     "",
     "Final report contract:",
     "- Include REVIEW_LOOP_SUMMARY: <one concise sentence> before the final status marker. For FIXED, make it suitable for a commit subject and describe what changed.",
     "- If you fixed anything, include REVIEW_LOOP_FIXES: followed by bullets. Each bullet must state the issue, how you fixed it, and the regression/integration test or validation evidence. For bug fixes, the Test field must name the integration test path/test name and whether it failed before the fix. Example: - Issue: ... Fix: ... Test: ...",
-    "- For CLEAN, use REVIEW_LOOP_SUMMARY to say that no actionable issue remained and validation passed; omit REVIEW_LOOP_FIXES or write - none.",
+    "- For CLEAN, use REVIEW_LOOP_SUMMARY to say that no actionable issue remained; explicitly mention that AGENTS.md hard gates found no blockers and validation passed. Omit REVIEW_LOOP_FIXES or write - none.",
     "- For BLOCKED, use REVIEW_LOOP_SUMMARY plus a bullet explaining the blocker and the safest next step.",
     "",
     "Final status contract:",
@@ -1306,6 +1326,7 @@ export default function (pi: ExtensionAPI) {
               "starting child review agent...",
             ]);
 
+            const agentsMd = await readAgentsMd(root);
             const prompt = buildReviewPrompt({
               base: options.base,
               branch,
@@ -1313,6 +1334,7 @@ export default function (pi: ExtensionAPI) {
               level,
               pass,
               changedFiles,
+              agentsMd,
               validationFailure,
             });
             const beforeReviewState = await getUncommittedReviewFileState(

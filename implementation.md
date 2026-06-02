@@ -96,23 +96,66 @@ These phases are scope/order placeholders only. `(draft)` means the phase is not
 
 The first five phases are intentionally ordered to validate whether the source/import/suggest model works in practice before investing in all surrounding polish. Local filesystem snapshot storage is pulled forward because `import` cannot be correct if Electron/CLI workspaces still rely on IndexedDB-only snapshot durability.
 
-## Phase 1A — Namespace-scoped ID foundation (redo plan)
+## Phase 1A — Namespace-scoped ID foundation
 
-The first Phase 1A attempt proved the model is right but the order/API was wrong. Reimplement this phase from a clean pre-Phase-1A base. The goal is bare node IDs plus explicit source scope, without scattering graph-index guessing through UI/rendering code.
+Goal: source-aware graph identity and lookup. Bare node IDs from markdown/import boundaries must be preserved, duplicate IDs across sources must be represented explicitly, and ordinary planner/domain code must not depend on read-side graph-index internals.
 
-### Lessons to preserve
+### Required pre-read
 
-- Do not remove author-prefixed/global IDs before source-aware lookup is centralized.
-- Do not expose `graphIndex.nodesBySource`, `graphIndex.sourceCandidatesById`, or `graphIndex.nodeByID` to ordinary callsites.
+Before editing Phase 1A, read the current implementations and representative integration tests that exercise the shared tree/view invariants:
+
+- `src/core/connections.tsx`
+- `src/core/nodeFactory.ts`
+- `src/graphIndex.ts`
+- `src/ViewContext.tsx`
+- `src/treeTraversal.ts`
+- `src/semanticProjection.ts`
+- `src/buildReferenceRow.ts`
+- `src/planner.tsx`
+- `src/core/plan.ts`
+- `src/documentMaterialization.ts`
+- `src/documentRenderer.ts`
+- `src/navigationUrl.ts`
+- `src/editor/TreeEditor.test.tsx`
+- `src/PaneContext.test.tsx`
+- `src/ViewContext.test.tsx`
+- `src/editor/References.test.tsx`
+- `src/editor/IncomingRefInteraction.test.tsx`
+- `src/desktop/FilesystemWriteThrough.test.tsx`
+
+### Checkpoint discipline
+
+Phase 1A must be implemented in small checkpoints. A checkpoint is one narrow change or one subsystem migration, not a broad batch of related edits.
+
+Before the first edit and after every checkpoint, run:
+
+```sh
+npm run typescript
+npm run lint
+npm test
+```
+
+Do not use `--runInBand` for normal verification. The full test suite is expected to be cheap enough to run at every checkpoint. Focused tests may be run while debugging, but they do not replace the full-suite checkpoint gate.
+
+Do not continue to the next checkpoint while any of these commands are red. If the suite fails broadly after a checkpoint, stop and fix the shared invariant or revert that checkpoint before continuing. Do not patch individual failing tests around a broken central behavior.
+
+Stop immediately if editor/tree tests show merged labels or lost row focus, e.g. output like `SpainBali`, `ldRoot`, `InfotcoinCrypto`, or any case where typing `Enter`/`Tab` continues in the previous row instead of creating/focusing the expected row. That indicates a broken shared tree/view invariant, not a test expectation problem.
+
+### Non-negotiable compatibility constraints
+
+- Keep existing UI/editor/tree behavior green at every checkpoint.
+- Do not remove author-prefixed/global generated IDs before source-aware lookup is centralized and all relevant boundaries carry source explicitly.
+- Do not change generated UI node ID shape, `joinID`, `shortID`, `splitID`, view-path semantics, or row-focus behavior in the same checkpoint as a lookup migration.
+- Preserve safe bare IDs from markdown/import boundaries. Generated node IDs should still be UUID-based to avoid accidental local collisions; they may remain in the existing legacy-compatible generated form until all boundary types carry `sourceId` explicitly and the full suite is green.
 - Do not make `GraphNode.author` mean lookup source. `GraphNode.author` is provenance/publisher; `NodeRef.sourceId` is lookup scope.
-- Do not export low-level resolver names that force callsites to construct env objects. Use small pure domain functions.
-- Do not let planner code use graph-index-backed lookup. Planner mutates `knowledgeDBs`; `graphIndex` is stale during a plan.
-- Do not turn `joinID`/`shortID` into no-ops until boundary types carry source explicitly.
+- Do not expose `graphIndex.nodesBySource`, `graphIndex.sourceCandidatesById`, or `graphIndex.nodeByID` to ordinary callsites.
+- Do not export low-level resolver APIs that force callsites to construct ad hoc resolver/env objects. Use small pure domain functions.
+- Do not let planner code use graph-index-backed lookup. Planner mutates `knowledgeDBs`; `graphIndex` can be stale during a plan.
 
 ### Decisions to encode
 
 - Concrete markdown node IDs are bare strings and are not required to be UUID-shaped.
-- Generated node IDs should still be UUIDs to avoid accidental local collisions.
+- Generated node IDs should still be UUID-based to avoid accidental local collisions.
 - Local document IDs and local node IDs are user-controlled strings when safe and unique.
 - Local IDs must be non-empty, parseable, and safe in markdown HTML-comment attributes.
 - The editable local graph must have globally unique node IDs across local workspace documents.
@@ -178,7 +221,7 @@ Add a separate planner-safe module, e.g. `src/core/planLookup.ts`, that never im
 
 ### Lint rules first
 
-Before reimplementation, add lint restrictions:
+As the first implementation checkpoint, add lint restrictions:
 
 - In `src/planner.tsx` and `src/core/plan.ts`, ban imports of graph lookup modules that use `graphIndex`, ban imports of `graphIndex`, and ban `*.graphIndex` member access.
 - Outside `src/core/graphLookup.ts`, `src/graphIndex.ts`, and tests, ban direct reads of:
@@ -187,18 +230,35 @@ Before reimplementation, add lint restrictions:
   - `graphIndex.sourceCandidatesById`
 - After migrating callsites, ban `sourceCandidatesById.get(...)?[0]`-style first-candidate guessing everywhere except inside `graphLookup.ts`.
 
-### Implementation order
+Run the full checkpoint verification after adding the lint rules before continuing.
+
+### Implementation checkpoints
+
+Run the full checkpoint verification after each numbered item below. For items that name multiple subsystems, migrate one subsystem at a time and run the full checkpoint verification after each subsystem.
 
 1. Add lint restrictions above.
-2. Add `NodeRef`, `ResolvedNode`, and pure `graphLookup.ts` while old IDs still work.
-3. Update `graphIndex` APIs to take explicit `sourceId` when indexing source documents. Do not infer source from `GraphNode.author`.
-4. Migrate read/rendering callsites to `graphLookup.ts` helpers before changing ID shape. Start with `ViewContext`, then `buildReferenceRow`, then `semanticProjection`/incoming refs/search/virtual rows.
-5. Update boundary/view types to carry source explicitly where a bare ID crosses layers: routes, pane/root state, `ReferenceRow`, `ReferencedByRef`, virtual rows, incoming refs, and version refs.
-6. Only after callsites carry source explicitly, remove author/public-key prefixes from concrete node identity.
-7. Delete legacy `_` splitting behavior. Prefer deleting `joinID`/`shortID` callsites over turning them into semantic no-ops.
-8. Remove remaining `LongID` assumptions incrementally, with tests.
+2. Add `NodeRef`, `ResolvedNode`, ID normalization helpers, and pure `graphLookup.ts` while old IDs still work. Do not migrate UI callsites or change generated ID shape in this checkpoint.
+3. Add graph lookup unit tests for the core lookup rules and ambiguity behavior.
+4. Update `graphIndex` internals/APIs to index by explicit `sourceId` when indexing source documents. Keep legacy compatibility fields internal; do not infer lookup source from `GraphNode.author` when an explicit source is available.
+5. Add tests proving `graphIndex` indexes nodes under explicit `sourceId`, not `GraphNode.author`, and allows duplicate IDs across different sources.
+6. Migrate read/rendering callsites to `graphLookup.ts` helpers before changing concrete ID shape. Suggested order, each as its own checkpoint:
+   - `ViewContext` and `treeTraversal`;
+   - `buildReferenceRow` and reference-row rendering;
+   - `semanticProjection`, incoming refs, suggestions, versions, search, and virtual rows;
+   - breadcrumbs/navigation helpers that read current nodes.
+7. Update boundary/view types to carry source explicitly where a bare ID crosses layers. Suggested order, each as its own checkpoint:
+   - `Pane` root/source state;
+   - `ReferenceRow` / referenced-by / incoming/version refs;
+   - virtual rows;
+   - route parsing/building and navigation URLs.
+8. Update markdown parsing/materialization/rendering so safe explicit markdown IDs remain bare and local duplicate IDs across workspace documents are rejected. Do not change generated UI node ID behavior in the same checkpoint.
+9. Switch routes to `/r/<id>?source=<source-id>` and remove `?author=` compatibility as its own checkpoint.
+10. Only after all callsites carry source explicitly and the full suite is green, consider removing remaining author/public-key prefixes from concrete node identity. Prefer deleting `joinID`/`shortID` callsites over turning those functions into semantic no-ops. If legacy splitting remains necessary for compatibility, leave it isolated and document the remaining migration work.
+11. Remove remaining `LongID` assumptions incrementally, with tests, only in separate green checkpoints.
 
 ### Tests first
+
+Add or update tests before each behavior change where practical:
 
 - Unit tests for `graphLookup.ts`:
   - current source resolves first;
@@ -211,14 +271,16 @@ Before reimplementation, add lint restrictions:
 - Validation tests rejecting duplicate local node IDs across workspace documents.
 - Tests allowing duplicate IDs across sources as separate candidates.
 - URL/navigation tests for `/r/<id>?source=<source-id>` and removal of `?author=`.
-- Integration tests for reference rows, incoming refs, suggestions, versions, search rows, and breadcrumbs with duplicate source IDs.
+- Integration tests for reference rows, incoming refs, suggestions, versions, search rows, breadcrumbs, and editor tree behavior with duplicate source IDs.
 - Lint verification that planner code cannot read or import `graphIndex`/graph-index-backed lookup.
 
 ### Acceptance criteria
 
+- `npm run typescript`, `npm run lint`, and `npm test` pass without `--runInBand`.
+- Existing editor/tree typing, Enter/Tab insertion, row focus, breadcrumbs, and pane behavior remain green.
 - Ordinary UI/rendering code never reads graph-index internals directly.
 - Planner code has no access to `graphIndex` or graph-index-backed lookup.
-- Lookup behavior is implemented once in functional helpers and matches the three core lookup rules.
+- Lookup behavior is implemented once in functional helpers and matches the four core lookup rules.
 - Source identity is carried as `NodeRef.sourceId`, not inferred from `GraphNode.author`.
 - Bare IDs in markdown are preserved, and local IDs with underscores are not corrupted.
 - Duplicate IDs across sources are represented as candidates, not collapsed into one `nodeByID` value at callsites.

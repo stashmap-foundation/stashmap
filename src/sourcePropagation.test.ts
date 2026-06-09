@@ -2,7 +2,7 @@ import { List, Map, OrderedSet, Set as ImmutableSet } from "immutable";
 import { addNodesToGraphIndex, createEmptyGraphIndex } from "./graphIndex";
 import { buildReferenceItem } from "./buildReferenceRow";
 import { graphLookupFromData } from "./core/graphLookup";
-import { buildPaneTarget, ViewPath } from "./ViewContext";
+import { buildPaneTarget, ViewPath } from "./rowModel";
 import { getTreeChildren } from "./treeTraversal";
 import { linkSpan, plainSpans } from "./core/nodeSpans";
 

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { OrderedSet, Set } from "immutable";
-import { useRow } from "../ViewContext";
+import { useRow } from "../rowModel";
 import { useData } from "../DataContext";
 import { isRefNode } from "../core/connections";
 import { isBlockFileLink } from "../core/nodeSpans";
@@ -33,20 +33,20 @@ type EditorOpen = EditorOpenState & {
 
 type TemporaryView = MultiSelection & Editing & EditorOpen;
 
-const TemporaryViewContext = React.createContext<TemporaryView | undefined>(
-  undefined
-);
+const TemporaryViewStateContext = React.createContext<
+  TemporaryView | undefined
+>(undefined);
 
-function getTemporaryViewContextOrThrow(): TemporaryView {
-  const context = React.useContext(TemporaryViewContext);
+function getTemporaryViewStateContextOrThrow(): TemporaryView {
+  const context = React.useContext(TemporaryViewStateContext);
   if (context === undefined) {
-    throw new Error("TemporaryViewContext not provided");
+    throw new Error("TemporaryViewStateContext not provided");
   }
   return context;
 }
 
 export function useTemporaryView(): TemporaryView {
-  return getTemporaryViewContextOrThrow();
+  return getTemporaryViewStateContextOrThrow();
 }
 
 export function useIsSelected(): boolean {
@@ -87,7 +87,7 @@ export function TemporaryViewProvider({
   });
 
   return (
-    <TemporaryViewContext.Provider
+    <TemporaryViewStateContext.Provider
       value={{
         selection: baseSelection.union(shiftSelection),
         baseSelection,
@@ -100,6 +100,6 @@ export function TemporaryViewProvider({
       }}
     >
       {children}
-    </TemporaryViewContext.Provider>
+    </TemporaryViewStateContext.Provider>
   );
 }

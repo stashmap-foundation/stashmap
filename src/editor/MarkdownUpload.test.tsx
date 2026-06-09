@@ -1,5 +1,5 @@
 import { List } from "immutable";
-import { newGraphNode } from "../ViewContext";
+import { newGraphNode } from "../rowModel";
 import { execute } from "../infra/nostr/executor";
 import { createPlan, planUpsertNodes } from "../planner";
 import { processEvents } from "../eventProcessing";

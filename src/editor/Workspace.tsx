@@ -1,12 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useMediaQuery } from "react-responsive";
 import { List, OrderedSet } from "immutable";
-import {
-  TemporaryViewProvider,
-  useTemporaryView,
-} from "./TemporaryViewContext";
+import { TemporaryViewProvider, useTemporaryView } from "./temporaryViewState";
 
-import { getDisplayTextForRow, getIndependentRows } from "../ViewContext";
+import { getDisplayTextForRow, getIndependentRows } from "../rowModel";
 import { useData } from "../DataContext";
 import {
   useCurrentPane,

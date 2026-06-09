@@ -1,4 +1,4 @@
-import { updateView, useCurrentRowID, useRow } from "../ViewContext";
+import { updateView, useCurrentRowID, useRow } from "../rowModel";
 import { useData } from "../DataContext";
 import { planUpdateViews, usePlanner } from "../planner";
 

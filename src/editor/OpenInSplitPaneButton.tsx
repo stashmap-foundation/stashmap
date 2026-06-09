@@ -4,7 +4,7 @@ import {
   updateViewPathsAfterPaneInsert,
   buildPaneTarget,
   useRow,
-} from "../ViewContext";
+} from "../rowModel";
 import { useSplitPanes, usePaneIndex } from "../SplitPanesContext";
 import { IS_MOBILE } from "./responsive";
 import { planUpdateViews, usePlanner } from "../planner";

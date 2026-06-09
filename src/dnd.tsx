@@ -16,10 +16,7 @@ import {
   getBlockLinkText,
   isBlockLinkAny,
 } from "./core/nodeSpans";
-import {
-  getIndependentRows,
-  updateViewPathsAfterMoveNodes,
-} from "./ViewContext";
+import { getIndependentRows, updateViewPathsAfterMoveNodes } from "./rowModel";
 import { getDocumentByIdOrFilePath } from "./core/Document";
 import {
   Plan,

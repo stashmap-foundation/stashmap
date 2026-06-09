@@ -6,11 +6,11 @@ import {
   levelToRelevance,
   RELEVANCE_LABELS,
 } from "./useUpdateRelevance";
-import { useCurrentNode, useDisplayText, useRow } from "../ViewContext";
+import { useCurrentNode, useDisplayText, useRow } from "../rowModel";
 import { usePlanner } from "../planner";
 import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
-import { useTemporaryView } from "./TemporaryViewContext";
+import { useTemporaryView } from "./temporaryViewState";
 import { planBatchRelevance, EditorInfo } from "./batchOperations";
 import { nodeText } from "../core/nodeSpans";
 import { usePaneTreeResult } from "./TreeView";

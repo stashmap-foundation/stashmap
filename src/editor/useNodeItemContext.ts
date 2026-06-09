@@ -4,7 +4,7 @@ import {
   useCurrentRowID,
   ViewPath,
   useRow,
-} from "../ViewContext";
+} from "../rowModel";
 import { isEmptySemanticID } from "../core/connections";
 import { usePlanner } from "../planner";
 import {

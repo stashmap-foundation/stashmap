@@ -129,7 +129,7 @@
         "src/semanticNavigation.ts",
         "src/navigationUrl.ts",
         "src/NavigationStateContext.tsx",
-        "src/ViewContext.tsx",
+        "src/rowModel.tsx",
         "src/markdownDocument.tsx",
         "src/buildReferenceRow.ts",
         "src/treeTraversal.ts",

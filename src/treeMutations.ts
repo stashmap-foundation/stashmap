@@ -11,7 +11,7 @@ import {
   addNodeToPathWithNodes,
   viewPathToString,
   copyViewsWithNewPrefix,
-} from "./ViewContext";
+} from "./rowModel";
 import {
   Plan,
   planAddToParent,

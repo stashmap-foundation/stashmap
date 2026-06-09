@@ -7,7 +7,7 @@ import {
   getViewForRowID,
   isEmptyViewPathID,
   viewPathToString,
-} from "./ViewContext";
+} from "./rowModel";
 import {
   EMPTY_SEMANTIC_ID,
   computeEmptyNodeMetadata,

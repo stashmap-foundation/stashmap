@@ -11,7 +11,7 @@ import {
   useCurrentEdge,
   getCurrentReferenceForRow,
   useRow,
-} from "../ViewContext";
+} from "../rowModel";
 import { useData } from "../DataContext";
 import {
   getNodeContext,
@@ -27,7 +27,7 @@ import {
   useIsEditingOn,
   useIsSelected,
   useTemporaryView,
-} from "./TemporaryViewContext";
+} from "./temporaryViewState";
 import { isEditableElement, KeyboardMode } from "./keyboardNavigation";
 import { usePaneIndex } from "../SplitPanesContext";
 

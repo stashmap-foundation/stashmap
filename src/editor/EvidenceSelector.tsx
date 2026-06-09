@@ -1,11 +1,11 @@
 import React from "react";
 import { TYPE_COLORS } from "../core/constants";
 import { useUpdateArgument } from "./useUpdateArgument";
-import { useCurrentNode, useDisplayText, useRow } from "../ViewContext";
+import { useCurrentNode, useDisplayText, useRow } from "../rowModel";
 import { usePlanner } from "../planner";
 import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
-import { useTemporaryView } from "./TemporaryViewContext";
+import { useTemporaryView } from "./temporaryViewState";
 import { planBatchArgument, EditorInfo } from "./batchOperations";
 import { nodeText } from "../core/nodeSpans";
 import { usePaneTreeResult } from "./TreeView";

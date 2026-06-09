@@ -28,7 +28,7 @@ import {
   updateViewPathsAfterPaneInsert,
   updateViewPathsAfterMoveNodes,
   ViewPath,
-} from "./ViewContext";
+} from "./rowModel";
 
 test("Move View Settings on Delete", async () => {
   const [alice] = setup([ALICE]);

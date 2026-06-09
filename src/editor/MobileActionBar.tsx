@@ -6,7 +6,7 @@ import { TYPE_COLORS } from "../core/constants";
 import { IS_MOBILE } from "./responsive";
 import { useData } from "../DataContext";
 import { useCurrentPane } from "../SplitPanesContext";
-import { useTemporaryView } from "./TemporaryViewContext";
+import { useTemporaryView } from "./temporaryViewState";
 import { usePaneTreeResult } from "./TreeView";
 import { usePlanner } from "../planner";
 import { getRowKey } from "./keyboardNavigation";

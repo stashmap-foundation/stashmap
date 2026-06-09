@@ -10,7 +10,7 @@ import {
   useCurrentPane,
   generatePaneId,
 } from "../SplitPanesContext";
-import { updateViewPathsAfterPaneDelete } from "../ViewContext";
+import { updateViewPathsAfterPaneDelete } from "../rowModel";
 import { LoadSearchData } from "../LoadSearchData";
 import { PaneView } from "./Workspace";
 import { createSearchId } from "../core/connections";

@@ -14,8 +14,8 @@ import {
   useCurrentNode,
   getCurrentReferenceForRow,
   useRow,
-} from "../ViewContext";
-import { isEditableNode } from "./TemporaryViewContext";
+} from "../rowModel";
+import { isEditableNode } from "./temporaryViewState";
 import {
   getVisibleParentRow,
   planBatchIndent,

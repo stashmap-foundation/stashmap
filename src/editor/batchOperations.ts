@@ -1,5 +1,5 @@
 import { List, OrderedSet } from "immutable";
-import { addNodeToPathWithNodes, viewPathToString } from "../ViewContext";
+import { addNodeToPathWithNodes, viewPathToString } from "../rowModel";
 import { Plan, planExpandNode, planUpdateNodeText } from "../planner";
 import {
   planUpdateViewItemMetadata,

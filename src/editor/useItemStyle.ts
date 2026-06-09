@@ -1,5 +1,5 @@
 import { CSSProperties } from "react";
-import { useIsViewingOtherUserContent, useRow } from "../ViewContext";
+import { useIsViewingOtherUserContent, useRow } from "../rowModel";
 import { isRefNode } from "../core/connections";
 import { isBlockFileLink } from "../core/nodeSpans";
 import { TYPE_COLORS } from "../core/constants";

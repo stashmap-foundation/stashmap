@@ -45,7 +45,7 @@ import {
   copyViewsWithNodesMapping,
   viewPathToString,
   addNodeToPathWithNodes,
-} from "./ViewContext";
+} from "./rowModel";
 import { nodeText, plainSpans } from "./core/nodeSpans";
 import { UNAUTHENTICATED_USER_PK } from "./NostrAuthContext";
 import { useRelaysToCreatePlan } from "./relays";

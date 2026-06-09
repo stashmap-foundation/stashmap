@@ -1,6 +1,6 @@
 import React from "react";
 import { useMediaQuery } from "react-responsive";
-import { useDisplayText, buildPaneTarget, useRow } from "../ViewContext";
+import { useDisplayText, buildPaneTarget, useRow } from "../rowModel";
 import { useNavigatePane } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";

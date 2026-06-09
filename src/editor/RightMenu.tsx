@@ -7,7 +7,7 @@ import {
   useCurrentNode,
   useDisplayText,
   useRow,
-} from "../ViewContext";
+} from "../rowModel";
 import { isEmptySemanticID } from "../core/connections";
 import { useData } from "../DataContext";
 import { useCurrentPane } from "../SplitPanesContext";

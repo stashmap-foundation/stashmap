@@ -22,7 +22,7 @@ import {
 } from "./core/Document";
 import { planUpdateNodeItemMetadataById } from "./dataPlanner";
 import { NodeItemMetadata, updateNodeItemMetadata } from "./nodeItemMetadata";
-import { ViewPath } from "./ViewContext";
+import { ViewPath } from "./rowModel";
 import {
   Plan,
   AddToParentTarget,

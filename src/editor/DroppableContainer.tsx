@@ -3,14 +3,14 @@ import { List, OrderedSet } from "immutable";
 import { ConnectDropTarget, DropTargetMonitor, useDrop } from "react-dnd";
 import { NativeTypes } from "react-dnd-html5-backend";
 import { dnd, getDropDestinationFromRows } from "../dnd";
-import { useTemporaryView } from "./TemporaryViewContext";
+import { useTemporaryView } from "./temporaryViewState";
 import {
   AddToParentTarget,
   planSetTemporarySelectionState,
   planUpdatePanes,
   usePlanner,
 } from "../planner";
-import { buildPaneTarget } from "../ViewContext";
+import { buildPaneTarget } from "../rowModel";
 import { NOTE_TYPE, INDENTATION } from "./Node";
 import { usePaneIndex } from "../SplitPanesContext";
 import {

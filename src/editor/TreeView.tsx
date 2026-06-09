@@ -9,7 +9,7 @@ import {
   getDisplayTextForRow,
   getPaneRootItemID,
   viewPathToString,
-} from "../ViewContext";
+} from "../rowModel";
 import { useData } from "../DataContext";
 import { useCurrentPane, usePaneIndex } from "../SplitPanesContext";
 import { useApis } from "../Apis";
@@ -22,7 +22,7 @@ import {
   registerScrollToRow,
   unregisterScrollToRow,
 } from "./keyboardNavigation";
-import { useTemporaryView } from "./TemporaryViewContext";
+import { useTemporaryView } from "./temporaryViewState";
 import {
   planClearTemporarySelection,
   planShiftTemporarySelection,

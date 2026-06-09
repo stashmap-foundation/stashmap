@@ -1,5 +1,5 @@
 import { Map } from "immutable";
-import { parseViewPath } from "./ViewContext";
+import { parseViewPath } from "./rowModel";
 
 export type Serializable =
   | string

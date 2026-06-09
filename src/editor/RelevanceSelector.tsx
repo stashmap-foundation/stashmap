@@ -6,25 +6,17 @@ import {
   levelToRelevance,
   RELEVANCE_LABELS,
 } from "./useUpdateRelevance";
-import {
-  ViewPath,
-  useViewPath,
-  parseViewPath,
-  getParentView,
-  useCurrentNode,
-  useDisplayText,
-  useViewKey,
-  useVirtualRowsMap,
-} from "../ViewContext";
+import { useCurrentNode, useDisplayText, useRow } from "../ViewContext";
 import { usePlanner } from "../planner";
 import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
 import { useTemporaryView } from "./TemporaryViewContext";
 import { planBatchRelevance, EditorInfo } from "./batchOperations";
 import { nodeText } from "../core/nodeSpans";
+import { usePaneTreeResult } from "./TreeView";
 
 type RelevanceSelectorProps = {
-  virtualType?: VirtualType;
+  virtualType: Row["virtualType"];
 };
 
 const LEVEL_SYMBOLS: Record<number, string> = {
@@ -73,12 +65,12 @@ export function RelevanceSelector({
 
   const { currentRelevance, isVisible } = useUpdateRelevance();
 
-  const viewPath = useViewPath();
-  const viewKey = useViewKey();
+  const row = useRow();
+  const { viewKey } = row;
   const currentNode = useCurrentNode();
-  const virtualRowsMap = useVirtualRowsMap();
+  const rows = usePaneTreeResult()?.rows.toArray() ?? [row];
   const { createPlan, executePlan } = usePlanner();
-  const parentPath = getParentView(viewPath);
+  const parentPath = row.parentViewPath;
   const { selection } = useTemporaryView();
 
   const isVirtual = virtualType !== undefined;
@@ -103,20 +95,21 @@ export function RelevanceSelector({
 
   const isInSelection = selection.has(viewKey) && selection.size > 1;
 
-  const getActionPaths = (): ViewPath[] =>
-    isInSelection ? selection.toArray().map(parseViewPath) : [viewPath];
+  const getActionRows = (): Row[] =>
+    isInSelection
+      ? rows.filter((currentRow) => selection.has(currentRow.viewKey))
+      : [row];
 
   const getEditorInfo = (): EditorInfo | undefined =>
-    editorText ? { text: editorText, viewPath } : undefined;
+    editorText ? { text: editorText, viewKey } : undefined;
 
   const handleSetLevel = (level: number): void => {
     const relevance = levelToRelevance(level === currentLevel ? -1 : level);
     executePlan(
       planBatchRelevance(
         createPlan(),
-        getActionPaths(),
+        getActionRows(),
         relevance,
-        virtualRowsMap,
         getEditorInfo()
       )
     );
@@ -129,9 +122,8 @@ export function RelevanceSelector({
     executePlan(
       planBatchRelevance(
         createPlan(),
-        getActionPaths(),
+        getActionRows(),
         relevance,
-        virtualRowsMap,
         getEditorInfo()
       )
     );

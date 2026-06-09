@@ -1,7 +1,6 @@
 import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react";
 import { List, Map, Set, OrderedSet } from "immutable";
 import { UNAUTHENTICATED_USER_PK } from "./NostrAuthContext";
-import { splitID } from "./core/connections";
 import { generatePaneId } from "./SplitPanesContext";
 import {
   jsonToPanes,
@@ -10,12 +9,17 @@ import {
   Serializable,
   viewDataToJSON,
 } from "./serializer";
-import { parseDocumentRouteUrl, parseNodeRouteUrl } from "./navigationUrl";
+import {
+  parseDocumentRouteUrl,
+  parseNodeRouteUrl,
+  parseSourceFromSearch,
+} from "./navigationUrl";
 import { replaceUnauthenticatedUser } from "./planner";
 
 export const defaultPane = (author: PublicKey, rootItemID?: ID): Pane => ({
   id: generatePaneId(),
   author,
+  sourceId: author,
   ...(rootItemID ? { rootNodeId: rootItemID } : {}),
 });
 
@@ -95,17 +99,22 @@ function getUrlPanes(publicKey: PublicKey): Pane[] | undefined {
       {
         id: generatePaneId(),
         author: documentRoute.author,
+        sourceId: documentRoute.author,
         documentId: documentRoute.docId,
       },
     ];
   }
   const nodeID = parseNodeRouteUrl(window.location.pathname);
   if (nodeID) {
-    const nodeAuthor = splitID(nodeID)[0] || publicKey;
+    const nodeSource =
+      (parseSourceFromSearch(window.location.search) as
+        | PublicKey
+        | undefined) || publicKey;
     return [
       {
         id: generatePaneId(),
-        author: nodeAuthor,
+        author: nodeSource,
+        sourceId: nodeSource,
         rootNodeId: nodeID,
       },
     ];
@@ -129,6 +138,20 @@ function getInitialPanes(publicKey: PublicKey): Pane[] {
     return stored;
   }
   return [defaultPane(publicKey)];
+}
+
+function replacePaneUser(pane: Pane, publicKey: PublicKey): Pane {
+  return {
+    ...pane,
+    author: replaceUnauthenticatedUser(pane.author, publicKey),
+    sourceId: replaceUnauthenticatedUser(pane.sourceId, publicKey),
+    ...(pane.rootNodeId !== undefined && {
+      rootNodeId: replaceUnauthenticatedUser(pane.rootNodeId, publicKey),
+    }),
+    ...(pane.scrollToId !== undefined && {
+      scrollToId: replaceUnauthenticatedUser(pane.scrollToId, publicKey),
+    }),
+  };
 }
 
 export type UserSessionState = {
@@ -173,27 +196,19 @@ export function useUserSessionState(user: User): UserSessionState {
     if (myPublicKey === initialPublicKeyRef.current) {
       return;
     }
+    const savedViews = loadViewsFromStorage(myPublicKey);
     const urlPanes = initialUrlRouteRef.current
       ? getUrlPanes(myPublicKey)
       : undefined;
-    const savedPanes = loadPanesFromStorage(myPublicKey);
-    const savedViews = loadViewsFromStorage(myPublicKey);
-    if (urlPanes) {
-      setPanes(urlPanes);
-    } else if (savedPanes) {
-      setPanes(savedPanes);
+    const savedPanes = initialUrlRouteRef.current
+      ? undefined
+      : loadPanesFromStorage(myPublicKey);
+    const nextPanes = urlPanes ?? savedPanes;
+    if (nextPanes) {
+      setPanes(nextPanes);
     } else {
       setPanes((current) =>
-        current.map((p) => ({
-          ...p,
-          author: replaceUnauthenticatedUser(p.author, myPublicKey),
-          ...(p.rootNodeId !== undefined && {
-            rootNodeId: replaceUnauthenticatedUser(p.rootNodeId, myPublicKey),
-          }),
-          ...(p.scrollToId !== undefined && {
-            scrollToId: replaceUnauthenticatedUser(p.scrollToId, myPublicKey),
-          }),
-        }))
+        current.map((p) => replacePaneUser(p, myPublicKey))
       );
     }
     if (savedViews) {

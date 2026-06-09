@@ -1,10 +1,9 @@
 import React from "react";
 import { useMediaQuery } from "react-responsive";
 import {
-  useViewPath,
   updateViewPathsAfterPaneInsert,
   buildPaneTarget,
-  useCurrentEdge,
+  useRow,
 } from "../ViewContext";
 import { useSplitPanes, usePaneIndex } from "../SplitPanesContext";
 import { IS_MOBILE } from "./responsive";
@@ -14,11 +13,10 @@ import { useData } from "../DataContext";
 export function OpenInSplitPaneButton(): JSX.Element | null {
   const { addPaneAt } = useSplitPanes();
   const paneIndex = usePaneIndex();
-  const viewPath = useViewPath();
   const data = useData();
   const isMobile = useMediaQuery(IS_MOBILE);
   const { createPlan, executePlan } = usePlanner();
-  const currentRow = useCurrentEdge();
+  const row = useRow();
 
   if (isMobile) {
     return null;
@@ -33,13 +31,14 @@ export function OpenInSplitPaneButton(): JSX.Element | null {
     );
     executePlan(planUpdateViews(plan, shiftedViews));
 
-    const target = buildPaneTarget(data, viewPath, currentRow);
+    const target = buildPaneTarget(data, row);
     addPaneAt(
       insertIndex,
       target.author,
       target.rootNodeId,
       target.scrollToId,
-      target.documentId
+      target.documentId,
+      target.sourceId
     );
   };
 

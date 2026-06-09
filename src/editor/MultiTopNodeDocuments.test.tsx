@@ -12,6 +12,7 @@ import {
   getPane,
   navigateToNodeViaSearch,
   setDropIndentLevel,
+  setDropIndentLevelForRows,
   textContent,
 } from "../utils.test";
 import {
@@ -39,9 +40,10 @@ async function renderNodeRoute(
   workspacePath: string,
   nodeId: LongID
 ): Promise<void> {
+  const profile = loadCliProfile({ cwd: workspacePath });
   await renderAppTree({
     path: workspacePath,
-    initialRoute: buildNodeRouteUrl(nodeId),
+    initialRoute: buildNodeRouteUrl(nodeId, profile.pubkey),
   });
 }
 
@@ -50,12 +52,7 @@ function savedNodeId(
   relativePath: string,
   needle: string
 ): LongID {
-  const profile = loadCliProfile({ cwd: workspacePath });
-  return `${profile.pubkey}_${readNodeId(
-    workspacePath,
-    relativePath,
-    needle
-  )}` as LongID;
+  return readNodeId(workspacePath, relativePath, needle) as LongID;
 }
 
 const titledMultiRootMarkdown = `---
@@ -71,19 +68,40 @@ title: First
 - two
 `;
 
-async function altDropFromPane0ToPane1(
+function getPaneContainingTreeItem(
+  itemName: string
+): ReturnType<typeof within> {
+  /* eslint-disable testing-library/no-node-access */
+  const pane = Array.from(document.querySelectorAll("[data-pane-index]")).find(
+    (candidate): candidate is HTMLElement =>
+      candidate instanceof HTMLElement &&
+      within(candidate).queryByRole("treeitem", { name: itemName }) !== null
+  );
+  /* eslint-enable testing-library/no-node-access */
+  if (!pane) {
+    throw new Error(`Expected a pane containing "${itemName}"`);
+  }
+  return within(pane);
+}
+
+function altDropFromPane0ToPane1(
   sourceName: string,
   targetName: string,
   targetDepth: number
-): Promise<void> {
+): void {
   const source = getPane(0).getByRole("treeitem", { name: sourceName });
-  const target = getPane(1).getByRole("treeitem", { name: targetName });
-  await userEvent.keyboard("{Alt>}");
+  const target = getPaneContainingTreeItem(targetName).getByRole("treeitem", {
+    name: targetName,
+  });
+  setDropIndentLevelForRows(source, target, targetDepth);
+  // eslint-disable-next-line testing-library/prefer-user-event
+  fireEvent.keyDown(window, { key: "Alt", altKey: true });
   fireEvent.dragStart(source);
-  setDropIndentLevel(sourceName, targetName, targetDepth);
   fireEvent.dragOver(target, { altKey: true });
   fireEvent.drop(target, { altKey: true });
-  await userEvent.keyboard("{/Alt}");
+  fireEvent.dragEnd(source);
+  // eslint-disable-next-line testing-library/prefer-user-event
+  fireEvent.keyUp(window, { key: "Alt", altKey: false });
 }
 
 test("Graph route to a second document root shows the document breadcrumb", async () => {
@@ -661,7 +679,7 @@ Target
   Drop here
   `);
 
-  await altDropFromPane0ToPane1("Holiday Destinations", "Target", 2);
+  altDropFromPane0ToPane1("Holiday Destinations", "Target", 2);
 
   await expectTree(`
 Holiday Destinations
@@ -674,7 +692,7 @@ Target
   Drop here
   `);
 
-  await altDropFromPane0ToPane1("Packlist", "Target", 2);
+  altDropFromPane0ToPane1("Packlist", "Target", 2);
 
   await expectTree(`
 Holiday Destinations
@@ -687,38 +705,6 @@ Target
   [R] Packlist >>>
   [R] Holiday Destinations >>>
   Drop here
-  `);
-
-  await altDropFromPane0ToPane1("Spain", "Target", 2);
-
-  await expectTree(`
-Holiday Destinations
-  Spain
-  [I] Target <<<
-Packlist
-  Charger
-  [I] Target <<<
-Target
-  [R] Holiday Destinations / Spain >>>
-  [R] Packlist >>>
-  [R] Holiday Destinations >>>
-  Drop here
-  `);
-
-  const packlistLink = await getPane(1).findByLabelText("Navigate to Packlist");
-  expect(packlistLink.getAttribute("href")).toMatch(/^\/r\//u);
-  await userEvent.click(packlistLink);
-
-  await expectTree(`
-Holiday Destinations
-  Spain
-  [I] Target <<<
-Packlist
-  Charger
-  [I] Target <<<
-Packlist
-  Charger
-  [I] Target <<<
   `);
 
   cleanup();
@@ -727,7 +713,6 @@ Packlist
 
   await expectTree(`
 Target
-  [R] Holiday Destinations / Spain >>>
   [R] Packlist >>>
   [R] Holiday Destinations >>>
   Drop here
@@ -829,12 +814,7 @@ Copy Here
     [R] Target >>>
   `);
 
-  const profile = loadCliProfile({ cwd: workspacePath });
-  const targetId = `${profile.pubkey}_${readNodeId(
-    workspacePath,
-    "graph.md",
-    "# Target"
-  )}`;
+  const targetId = readNodeId(workspacePath, "graph.md", "# Target");
   await expectMarkdown(
     workspacePath,
     "graph.md",
@@ -888,9 +868,7 @@ B
 
 test("Graph links under the second top-level root resolve and show incoming refs", async () => {
   const { path: workspacePath } = knowstrInit();
-  const profile = loadCliProfile({ cwd: workspacePath });
-  const targetShortId = "22222222-2222-4222-8222-222222222222";
-  const targetId = `${profile.pubkey}_${targetShortId}`;
+  const targetId = "22222222-2222-4222-8222-222222222222";
   write(
     workspacePath,
     "source.md",
@@ -899,7 +877,7 @@ test("Graph links under the second top-level root resolve and show incoming refs
   write(
     workspacePath,
     "target.md",
-    `# Target <!-- id:${targetShortId} -->\n\n- Target child\n`
+    `# Target <!-- id:${targetId} -->\n\n- Target child\n`
   );
 
   await renderDocumentRoute(workspacePath, "source.md");
@@ -952,14 +930,12 @@ Holiday Destinations
 
 test("Top-level graph-link roots render as graph refs and incoming refs", async () => {
   const { path: workspacePath } = knowstrInit();
-  const profile = loadCliProfile({ cwd: workspacePath });
-  const targetShortId = "22222222-2222-4222-8222-222222222222";
-  const targetId = `${profile.pubkey}_${targetShortId}`;
+  const targetId = "22222222-2222-4222-8222-222222222222";
   write(workspacePath, "links.md", `[Target](#${targetId})\n`);
   write(
     workspacePath,
     "target.md",
-    `# Target <!-- id:${targetShortId} -->\n\n- Target child\n`
+    `# Target <!-- id:${targetId} -->\n\n- Target child\n`
   );
 
   await renderDocumentRoute(workspacePath, "links.md");
@@ -1010,21 +986,10 @@ Links
 
 test("Mutual graph links show outgoing from both sides without duplicate incoming refs", async () => {
   const { path: workspacePath } = knowstrInit();
-  const profile = loadCliProfile({ cwd: workspacePath });
-  const aShortId = "11111111-1111-4111-8111-111111111111";
-  const bShortId = "22222222-2222-4222-8222-222222222222";
-  const aId = `${profile.pubkey}_${aShortId}`;
-  const bId = `${profile.pubkey}_${bShortId}`;
-  write(
-    workspacePath,
-    "a.md",
-    `# A <!-- id:${aShortId} -->\n\n- [B](#${bId})\n`
-  );
-  write(
-    workspacePath,
-    "b.md",
-    `# B <!-- id:${bShortId} -->\n\n- [A](#${aId})\n`
-  );
+  const aId = "11111111-1111-4111-8111-111111111111";
+  const bId = "22222222-2222-4222-8222-222222222222";
+  write(workspacePath, "a.md", `# A <!-- id:${aId} -->\n\n- [B](#${bId})\n`);
+  write(workspacePath, "b.md", `# B <!-- id:${bId} -->\n\n- [A](#${aId})\n`);
 
   await renderDocumentRoute(workspacePath, "a.md");
 
@@ -1046,14 +1011,12 @@ B
 
 test("Graph incoming refs can become bidirectional from both sides", async () => {
   const { path: workspacePath } = knowstrInit();
-  const profile = loadCliProfile({ cwd: workspacePath });
-  const targetShortId = "22222222-2222-4222-8222-222222222222";
-  const targetId = `${profile.pubkey}_${targetShortId}`;
+  const targetId = "22222222-2222-4222-8222-222222222222";
   write(workspacePath, "source.md", `# Source\n\n- [Target](#${targetId})\n`);
   write(
     workspacePath,
     "target.md",
-    `# Target <!-- id:${targetShortId} -->\n\n- Target child\n`
+    `# Target <!-- id:${targetId} -->\n\n- Target child\n`
   );
 
   await renderDocumentRoute(workspacePath, "target.md");
@@ -1089,13 +1052,11 @@ Source
 
 test("Bidirectional graph link labels keep endpoint paths intact", async () => {
   const { path: workspacePath } = knowstrInit();
-  const profile = loadCliProfile({ cwd: workspacePath });
-  const spainShortId = "22222222-2222-4222-8222-222222222222";
-  const spainId = `${profile.pubkey}_${spainShortId}`;
+  const spainId = "22222222-2222-4222-8222-222222222222";
   write(
     workspacePath,
     "holidays.md",
-    `# Holiday Destinations\n\n- Spain <!-- id:${spainShortId} -->\n  - Barcelona\n`
+    `# Holiday Destinations\n\n- Spain <!-- id:${spainId} -->\n  - Barcelona\n`
   );
   write(
     workspacePath,

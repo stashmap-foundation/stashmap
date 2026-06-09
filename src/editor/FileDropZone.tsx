@@ -1,4 +1,3 @@
-import { ViewPath } from "../ViewContext";
 import {
   Plan,
   ParsedLine,
@@ -78,6 +77,7 @@ function setPaneToDocument(
     return {
       ...paneState,
       author: document.author,
+      sourceId: document.author,
       documentId: document.docId,
       rootNodeId: undefined,
       searchQuery: undefined,
@@ -192,9 +192,8 @@ export function planImportMarkdownFilesAtEmptyRoot(
 export function planPasteMarkdownTrees(
   plan: Plan,
   trees: MarkdownTreeNode[],
-  parentViewPath: ViewPath,
+  parentNode: GraphNode,
   insertAtIndex?: number
 ): Plan {
-  return planInsertMarkdownTrees(plan, trees, parentViewPath, insertAtIndex)
-    .plan;
+  return planInsertMarkdownTrees(plan, trees, parentNode, insertAtIndex).plan;
 }

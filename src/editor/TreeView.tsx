@@ -1,18 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { List, Map, Set as ImmutableSet } from "immutable";
+import { List } from "immutable";
 import { useLocation } from "react-router-dom";
 import { useDragAutoScroll } from "../useDragAutoScroll";
 import { ListItem } from "./Draggable";
 import {
-  useViewPath,
+  RowContext,
   ViewPath,
+  getDisplayTextForRow,
+  getPaneRootItemID,
   viewPathToString,
-  ViewContext,
-  useViewKey,
-  getRowIDFromView,
-  useDisplayText,
-  VirtualRowsProvider,
-  getLast,
 } from "../ViewContext";
 import { useData } from "../DataContext";
 import { useCurrentPane, usePaneIndex } from "../SplitPanesContext";
@@ -44,6 +40,10 @@ const PaneTreeResultContext = React.createContext<TreeResult | undefined>(
   undefined
 );
 
+function getPaneTraversalRootPath(pane: Pane, paneIndex: number): ViewPath {
+  return [paneIndex, getPaneRootItemID(pane)];
+}
+
 export function usePaneTreeResult(): TreeResult | undefined {
   return React.useContext(PaneTreeResultContext);
 }
@@ -55,7 +55,11 @@ export function PaneTreeResultProvider({
 }): JSX.Element {
   const data = useData();
   const pane = useCurrentPane();
-  const viewPath = useViewPath();
+  const paneIndex = usePaneIndex();
+  const viewPath = useMemo(
+    () => getPaneTraversalRootPath(pane, paneIndex),
+    [pane.rootNodeId, pane.searchQuery, paneIndex]
+  );
   const document = pane.documentId
     ? getDocumentByIdOrFilePath(
         data.documents,
@@ -93,27 +97,22 @@ export function PaneTreeResultProvider({
 }
 
 function PlainTreeRows({
-  nodes,
+  rows,
   startIndexFromStorage,
-  viewPath,
   ariaLabel,
   activeRowKey,
   onRowFocus,
   onRowClick,
   scrollToId,
-  firstVirtualKeys,
 }: {
-  nodes: List<ViewPath>;
+  rows: List<Row>;
   startIndexFromStorage: number;
-  viewPath: ViewPath;
   ariaLabel: string | undefined;
   activeRowKey: string;
   onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
   onRowClick?: (e: React.MouseEvent, viewKey: string) => void;
   scrollToId?: string;
-  firstVirtualKeys: ImmutableSet<string>;
 }): JSX.Element {
-  const data = useData();
   const location = useLocation();
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollParent, setScrollParent] = useState<HTMLElement | undefined>(
@@ -153,7 +152,7 @@ function PlainTreeRows({
     if (row instanceof HTMLElement) {
       row.scrollIntoView({ block: "start" });
     }
-  }, [location]);
+  }, [location, startIndexFromStorage]);
 
   const handledScrollToIdRef = useRef<string | undefined>(undefined);
 
@@ -166,10 +165,8 @@ function PlainTreeRows({
     if (handledScrollToIdRef.current === scrollToId) {
       return;
     }
-    const index = nodes.findIndex(
-      (path) =>
-        getLast(path) === scrollToId ||
-        getRowIDFromView(data, path)[0] === scrollToId
+    const index = rows.findIndex(
+      (row) => row.node.id === scrollToId || row.rowID === scrollToId
     );
     if (index >= 0) {
       const row = containerRef.current?.querySelector(
@@ -181,30 +178,26 @@ function PlainTreeRows({
       // eslint-disable-next-line functional/immutable-data
       handledScrollToIdRef.current = scrollToId;
     }
-  }, [data, nodes, scrollToId]);
+  }, [rows, scrollToId]);
 
-  const rows = nodes.map((path, index) => {
-    const nextPath = index < nodes.size - 1 ? nodes.get(index + 1) : undefined;
-    const pathKey = viewPathToString(path);
-    const isFirstVirtual = firstVirtualKeys.has(pathKey);
+  const renderedRows = rows.map((row, index) => {
+    const nextRow = index < rows.size - 1 ? rows.get(index + 1) : undefined;
     return (
-      <ViewContext.Provider value={path} key={pathKey}>
+      <RowContext.Provider value={row} key={row.viewKey}>
         <ListItem
-          index={index}
-          treeViewPath={viewPath}
-          nextDepth={nextPath ? nextPath.length - 1 : undefined}
-          nextViewPathStr={nextPath ? viewPathToString(nextPath) : undefined}
+          row={row}
+          rows={rows}
+          nextRow={nextRow}
           activeRowKey={activeRowKey}
           onRowFocus={onRowFocus}
           onRowClick={onRowClick}
-          isFirstVirtual={isFirstVirtual}
         />
-      </ViewContext.Provider>
+      </RowContext.Provider>
     );
   });
   return (
     <div ref={containerRef} aria-label={ariaLabel}>
-      {rows}
+      {renderedRows}
       <div style={{ height: "50vh" }} />
     </div>
   );
@@ -223,9 +216,9 @@ function Tree(): JSX.Element | null {
   const { fileStore } = useApis();
   const { getLocalStorage } = fileStore;
   const paneIndex = usePaneIndex();
-  const scrollableId = useViewKey();
+  const viewPath = getPaneTraversalRootPath(pane, paneIndex);
+  const scrollableId = viewPathToString(viewPath);
   const startIndexFromStorage = Number(getLocalStorage(scrollableId)) || 0;
-  const viewPath = useViewPath();
   const [activeRow, setActiveRow] = useState<ActiveRowState>({
     activeRowKey: "",
     activeRowIndex: 0,
@@ -236,13 +229,10 @@ function Tree(): JSX.Element | null {
   const treeRootRef = useRef<HTMLDivElement>(null);
   const [keyboardMode, setKeyboardMode] = useKeyboardMode();
   const treeResult = usePaneTreeResult();
-  const childNodes = treeResult?.paths || List<ViewPath>();
-  const virtualRows = treeResult?.virtualRows || Map<string, GraphNode>();
-  const firstVirtualKeys =
-    treeResult?.firstVirtualKeys || ImmutableSet<string>();
-  const nodes = childNodes;
-  const nodeKeys = nodes.map((path) => viewPathToString(path)).toArray();
-  const displayText = useDisplayText();
+  const rows = treeResult?.rows || List<Row>();
+  const nodeKeys = rows.map((row) => row.viewKey).toArray();
+  const rootRow = rows.first();
+  const displayText = rootRow ? getDisplayTextForRow(data, rootRow) : "";
   const ariaLabel = displayText ? `related to ${displayText}` : undefined;
   const rowFocusIntent =
     data.publishEventsStatus.temporaryView.rowFocusIntents.get(paneIndex);
@@ -357,25 +347,21 @@ function Tree(): JSX.Element | null {
   ]);
 
   return (
-    <VirtualRowsProvider value={virtualRows}>
-      <div
-        ref={treeRootRef}
-        data-keyboard-mode={keyboardMode}
-        data-total-rows={nodes.size}
-      >
-        <PlainTreeRows
-          nodes={nodes}
-          startIndexFromStorage={startIndexFromStorage}
-          viewPath={viewPath}
-          ariaLabel={ariaLabel}
-          activeRowKey={activeRow.activeRowKey}
-          onRowFocus={onRowFocus}
-          onRowClick={onRowClick}
-          scrollToId={pane.scrollToId}
-          firstVirtualKeys={firstVirtualKeys}
-        />
-      </div>
-    </VirtualRowsProvider>
+    <div
+      ref={treeRootRef}
+      data-keyboard-mode={keyboardMode}
+      data-total-rows={rows.size}
+    >
+      <PlainTreeRows
+        rows={rows}
+        startIndexFromStorage={startIndexFromStorage}
+        ariaLabel={ariaLabel}
+        activeRowKey={activeRow.activeRowKey}
+        onRowFocus={onRowFocus}
+        onRowClick={onRowClick}
+        scrollToId={pane.scrollToId}
+      />
+    </div>
   );
 }
 

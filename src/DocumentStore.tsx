@@ -18,7 +18,6 @@ import {
   ParsedDocument,
   documentKeyOf,
 } from "./core/Document";
-import { joinID } from "./core/connections";
 import { newDB } from "./core/knowledge";
 
 export type { Document, DocumentDelete, ParsedDocument };
@@ -62,12 +61,8 @@ function nodesForDocument(
 ): ImmutableMap<string, GraphNode> {
   const nodes = knowledgeDBs.get(document.author)?.nodes;
   if (!nodes) return ImmutableMap<string, GraphNode>();
-  const topNodeLongIds = new Set(
-    document.topNodeShortIds.map((topNodeShortId) =>
-      joinID(document.author, topNodeShortId)
-    )
-  );
-  return nodes.filter((node) => topNodeLongIds.has(node.root));
+  const topNodeIds = new Set(document.topNodeShortIds);
+  return nodes.filter((node) => topNodeIds.has(node.root));
 }
 
 function withoutDocumentNodes(
@@ -141,7 +136,8 @@ function applyDocumentToSnapshot(
       ? removeNodesFromGraphIndex(
           snapshot.graphIndex,
           existingNodes,
-          existingDocument?.filePath
+          existingDocument?.filePath,
+          existingDocument?.author
         )
       : snapshot.graphIndex;
   const documentByFilePathAfterRemove = withoutDocumentInFilePathIndex(
@@ -168,7 +164,8 @@ function applyDocumentToSnapshot(
     graphIndex: addNodesToGraphIndex(
       withoutExistingNodes,
       parsed.nodes,
-      doc.filePath
+      doc.filePath,
+      doc.author
     ),
   };
 }
@@ -207,7 +204,8 @@ function applyDeleteToSnapshot(
         ? removeNodesFromGraphIndex(
             snapshot.graphIndex,
             existingNodes,
-            existingDocument.filePath
+            existingDocument.filePath,
+            existingDocument.author
           )
         : snapshot.graphIndex,
   };

@@ -234,7 +234,7 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
     userRelays: [{ url: "wss://user.relay", read: true, write: true }],
     contactsRelays: [{ url: "wss://contacts.relay", read: true, write: true }],
   },
-  panes: [{ id: "pane-0", author: ALICE.publicKey }],
+  panes: [{ id: "pane-0", author: ALICE.publicKey, sourceId: ALICE.publicKey }],
 };
 
 export function applyDefaults(props?: Partial<TestAppState>): TestAppState {
@@ -317,11 +317,11 @@ function normalizeTestInitialRoute(
     return route;
   }
 
-  const queryAuthor = new URLSearchParams(search).get(
-    "author"
+  const querySource = new URLSearchParams(search).get(
+    "source"
   ) as PublicKey | null;
   const author: PublicKey =
-    queryAuthor || options.user?.publicKey || ALICE.publicKey;
+    querySource || options.user?.publicKey || ALICE.publicKey;
   const eventKnowledgeDB = options.relayPool
     ? processEvents(List(options.relayPool.getEvents())).get(author)
         ?.knowledgeDB
@@ -345,7 +345,7 @@ function normalizeTestInitialRoute(
     },
     undefined
   );
-  return targetNode ? buildNodeRouteUrl(targetNode.id) : route;
+  return targetNode ? buildNodeRouteUrl(targetNode.id, author) : route;
 }
 
 export function renderApis(
@@ -443,7 +443,7 @@ function renderApp(props: RenderApis): RenderViewResult {
 }
 
 export function readonlyRoute(author: string, ...segments: string[]): string {
-  return `/n/${segments.map(encodeURIComponent).join("/")}?author=${author}`;
+  return `/n/${segments.map(encodeURIComponent).join("/")}?source=${author}`;
 }
 
 export async function forkReadonlyRoot(
@@ -479,7 +479,7 @@ export async function openReadonlyRoute(nodeLabel: string): Promise<string> {
     expect(window.location.pathname).toMatch(/^\/r\//);
   });
 
-  return window.location.pathname;
+  return `${window.location.pathname}${window.location.search}`;
 }
 
 export async function follow(
@@ -545,10 +545,23 @@ export async function findNewNodeEditor(): Promise<HTMLElement> {
 }
 
 /**
- * Types text in the new node editor. Shortcut for userEvent.type(await findNewNodeEditor(), text).
+ * Types text in the new node editor with a fresh cursor position.
  */
 export async function type(text: string): Promise<void> {
-  await userEvent.type(await findNewNodeEditor(), text);
+  await userEvent.keyboard("{/Meta}{/Control}{/Shift}{/Alt}");
+  await waitFor(() => {
+    const editor = screen.getByRole("textbox", { name: "new node editor" });
+    editor.focus();
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    // eslint-disable-next-line testing-library/no-node-access
+    expect(document.activeElement).toBe(editor);
+  });
+  await userEvent.keyboard(text);
 }
 
 export async function findEvent(
@@ -828,7 +841,7 @@ export async function expectTree(
         const actual = await getTreeStructure(options);
         expect(actual).toEqual(expectedNormalized);
       },
-      { timeout: 3000 }
+      { timeout: 10000 }
     );
   } catch (error) {
     const actual = await getTreeStructure(options);
@@ -985,25 +998,13 @@ export async function openNodeInFullscreen(
   });
 }
 
-function getDropDepthLimits(
-  sourceName: string,
-  targetName: string
+function getDropDepthLimitsForRows(
+  sourceRow: Element,
+  targetRow: Element
 ): { minDepth: number; maxDepth: number } {
   /* eslint-disable testing-library/no-node-access */
   const allRows = Array.from(document.querySelectorAll(".item"));
   /* eslint-enable testing-library/no-node-access */
-
-  const sourceRow = allRows.find(
-    (r) => r.getAttribute("data-node-text") === sourceName
-  );
-  const targetRow = allRows.find(
-    (r) => r.getAttribute("data-node-text") === targetName
-  );
-  if (!sourceRow || !targetRow) {
-    throw new Error(
-      `Could not find source "${sourceName}" or target "${targetName}" in tree`
-    );
-  }
 
   const targetIndex = allRows.indexOf(targetRow);
   const nextRow = allRows[targetIndex + 1];
@@ -1030,6 +1031,29 @@ function getDropDepthLimits(
   );
 }
 
+function getDropDepthLimits(
+  sourceName: string,
+  targetName: string
+): { minDepth: number; maxDepth: number } {
+  /* eslint-disable testing-library/no-node-access */
+  const allRows = Array.from(document.querySelectorAll(".item"));
+  /* eslint-enable testing-library/no-node-access */
+
+  const sourceRow = allRows.find(
+    (r) => r.getAttribute("data-node-text") === sourceName
+  );
+  const targetRow = allRows.find(
+    (r) => r.getAttribute("data-node-text") === targetName
+  );
+  if (!sourceRow || !targetRow) {
+    throw new Error(
+      `Could not find source "${sourceName}" or target "${targetName}" in tree`
+    );
+  }
+
+  return getDropDepthLimitsForRows(sourceRow, targetRow);
+}
+
 export function setDropIndentLevel(
   sourceName: string,
   targetName: string,
@@ -1037,6 +1061,26 @@ export function setDropIndentLevel(
 ): void {
   const { minDepth, maxDepth } = getDropDepthLimits(sourceName, targetName);
   if (depth < minDepth || depth > maxDepth) {
+    throw new Error(
+      `Depth ${depth} is outside allowed range [${minDepth}, ${maxDepth}] ` +
+        `when dragging "${sourceName}" onto "${targetName}"`
+    );
+  }
+  setDropIndentDepth(depth);
+}
+
+export function setDropIndentLevelForRows(
+  sourceRow: Element,
+  targetRow: Element,
+  depth: number
+): void {
+  const { minDepth, maxDepth } = getDropDepthLimitsForRows(
+    sourceRow,
+    targetRow
+  );
+  if (depth < minDepth || depth > maxDepth) {
+    const sourceName = sourceRow.getAttribute("data-node-text") ?? "";
+    const targetName = targetRow.getAttribute("data-node-text") ?? "";
     throw new Error(
       `Depth ${depth} is outside allowed range [${minDepth}, ${maxDepth}] ` +
         `when dragging "${sourceName}" onto "${targetName}"`

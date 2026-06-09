@@ -1,11 +1,6 @@
 import React from "react";
 import { Map, List } from "immutable";
-import {
-  getNodeText,
-  isSearchId,
-  parseSearchId,
-  shortID,
-} from "./core/connections";
+import { getNodeText, isSearchId, parseSearchId } from "./core/connections";
 import { MergeKnowledgeDB, useData } from "./DataContext";
 import { deduplicateRefsByContext, findRefsToNode } from "./semanticProjection";
 import { useCurrentPane } from "./SplitPanesContext";
@@ -14,6 +9,7 @@ import { getLocalSearchResultIDs } from "./localSearch";
 import { documentKeyOf, documentLinkPath } from "./core/Document";
 import { newGraphNode } from "./core/nodeFactory";
 import { fileLinkSpan, linkSpan, plainSpans } from "./core/nodeSpans";
+import { graphLookupFromData, lookupNode } from "./core/graphLookup";
 
 function SearchCrefBuilder({
   children,
@@ -24,13 +20,15 @@ function SearchCrefBuilder({
   searchId: ID;
   foundSemanticIDs: List<ID>;
 }): JSX.Element {
-  const { documents, knowledgeDBs, graphIndex, user } = useData();
+  const data = useData();
+  const { documents, knowledgeDBs, user } = data;
+  const graph = graphLookupFromData(data);
   const pane = useCurrentPane();
   const effectiveAuthor = pane.author;
 
   const uniqueSemanticIDs = foundSemanticIDs.toSet().toList();
   const crefItems = uniqueSemanticIDs.flatMap((semanticID) => {
-    const refs = findRefsToNode(knowledgeDBs, graphIndex, semanticID);
+    const refs = findRefsToNode(graph, semanticID);
     const deduped = deduplicateRefsByContext(
       refs,
       knowledgeDBs,
@@ -53,14 +51,19 @@ function SearchCrefBuilder({
     .toSet()
     .toList()
     .map((nodeID): GraphNode => {
-      const targetNode = graphIndex.nodeByID.get(nodeID as LongID);
+      const targetNode = lookupNode(
+        graph,
+        nodeID as LongID,
+        user.publicKey
+      )?.node;
       const targetDocument =
         targetNode?.docId && !targetNode.parent
           ? documents.get(documentKeyOf(targetNode.author, targetNode.docId))
           : undefined;
       const primaryTargetDocument =
         targetNode &&
-        targetDocument?.topNodeShortIds[0] === shortID(targetNode.id)
+        targetNode.author === user.publicKey &&
+        targetDocument?.topNodeShortIds[0] === targetNode.id
           ? targetDocument
           : undefined;
       const node = primaryTargetDocument
@@ -84,7 +87,6 @@ function SearchCrefBuilder({
       return {
         ...node,
         updated: searchNodeBase.updated,
-        virtualType: "search",
       };
     });
   const searchNode = {
@@ -93,9 +95,7 @@ function SearchCrefBuilder({
   };
   const syntheticEntries: [ID, GraphNode][] = [
     [searchId, searchNode] as [ID, GraphNode],
-    ...childNodes
-      .map((node) => [shortID(node.id) as ID, node] as [ID, GraphNode])
-      .toArray(),
+    ...childNodes.map((node) => [node.id, node] as [ID, GraphNode]).toArray(),
   ];
 
   const syntheticDB: KnowledgeData = {

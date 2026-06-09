@@ -1,11 +1,6 @@
 import { List, Map } from "immutable";
 import { Event, UnsignedEvent } from "nostr-tools";
-import {
-  ensureNodeNativeFields,
-  getNodeDepth,
-  shortID,
-  splitID,
-} from "./core/connections";
+import { ensureNodeNativeFields, getNodeDepth } from "./core/connections";
 import type { StoredDocumentRecord } from "./infra/nostr/cache/indexedDB";
 import { newDB } from "./core/knowledge";
 import {
@@ -78,10 +73,9 @@ export function findDocumentNodes(
     .toList();
 
   return parsedNodes.reduce((acc, node) => {
-    const id = splitID(node.id)[1];
-    const existing = acc.get(id);
+    const existing = acc.get(node.id);
     if (!existing || node.updated >= existing.updated) {
-      return acc.set(id, node);
+      return acc.set(node.id, node);
     }
     return acc;
   }, Map<string, GraphNode>());
@@ -109,7 +103,7 @@ export function buildKnowledgeDBFromDocumentNodes(
         nodes: acc,
       });
       const normalized = ensureNodeNativeFields(knowledgeDBs, node);
-      return acc.set(shortID(normalized.id), normalized);
+      return acc.set(normalized.id, normalized);
     }, Map<string, GraphNode>());
 
   return {

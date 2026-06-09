@@ -1,6 +1,5 @@
 import { List } from "immutable";
 import { v4 } from "uuid";
-import { joinID } from "./connections";
 import { createRootAnchor } from "./rootAnchor";
 
 export type NewGraphNodeOptions = {
@@ -14,8 +13,8 @@ export type NewGraphNodeOptions = {
   uuid?: string;
 };
 
-function graphNodeId(myself: PublicKey, uuid?: string): LongID {
-  return joinID(myself, uuid ?? v4());
+function graphNodeId(uuid?: string): ID {
+  return uuid ?? v4();
 }
 
 export function newGraphNode(
@@ -23,7 +22,7 @@ export function newGraphNode(
   spans: InlineSpan[],
   options: NewGraphNodeOptions = {}
 ): GraphNode {
-  const id = graphNodeId(myself, options.uuid);
+  const id = graphNodeId(options.uuid);
   const { parent } = options;
   const root = options.root ?? id;
   return {

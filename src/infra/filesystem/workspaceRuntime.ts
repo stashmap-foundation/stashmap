@@ -13,7 +13,7 @@ import type {
 } from "./workspaceWatcher";
 import { watchWorkspace } from "./workspaceWatcher";
 
-const ECHO_TTL_MS = 2000;
+const ECHO_TTL_MS = 30000;
 
 export type WorkspaceRuntimeLoaded = {
   profile: ReturnType<typeof loadCliProfile>;
@@ -74,8 +74,14 @@ export function createWorkspaceRuntime(workspaceDir: string): WorkspaceRuntime {
       pendingEchoes.delete(event.relativePath);
       return false;
     }
-    pendingEchoes.set(event.relativePath, active);
-    return active.some((entry) => entry.hash === hashContent(event.content));
+    const eventHash = hashContent(event.content);
+    const remaining = active.filter((entry) => entry.hash !== eventHash);
+    if (remaining.length > 0) {
+      pendingEchoes.set(event.relativePath, remaining);
+    } else {
+      pendingEchoes.delete(event.relativePath);
+    }
+    return true;
   };
 
   const emit: FsEventHandler = (event) => {

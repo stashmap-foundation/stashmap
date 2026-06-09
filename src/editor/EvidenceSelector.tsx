@@ -1,22 +1,14 @@
 import React from "react";
 import { TYPE_COLORS } from "../core/constants";
 import { useUpdateArgument } from "./useUpdateArgument";
-import {
-  ViewPath,
-  useViewPath,
-  parseViewPath,
-  useCurrentNode,
-  useDisplayText,
-  useViewKey,
-  useCurrentEdge,
-  useVirtualRowsMap,
-} from "../ViewContext";
+import { useCurrentNode, useDisplayText, useRow } from "../ViewContext";
 import { usePlanner } from "../planner";
 import { preventEditorBlur } from "./AddNode";
 import { useEditorText } from "./EditorTextContext";
 import { useTemporaryView } from "./TemporaryViewContext";
 import { planBatchArgument, EditorInfo } from "./batchOperations";
 import { nodeText } from "../core/nodeSpans";
+import { usePaneTreeResult } from "./TreeView";
 
 function getArgumentColor(argument: Argument): string {
   if (argument === "confirms") {
@@ -49,19 +41,18 @@ function getArgumentLabel(argument: Argument): string {
 
 export function EvidenceSelector(): JSX.Element | null {
   const { currentArgument, isVisible } = useUpdateArgument();
-  const currentRow = useCurrentEdge();
-  const virtualType = currentRow?.virtualType;
+  const row = useRow();
+  const { virtualType } = row;
   const isAcceptableVirtual =
     virtualType === "incoming" || virtualType === "version";
-  const viewPath = useViewPath();
-  const viewKey = useViewKey();
+  const { viewKey } = row;
   const currentNode = useCurrentNode();
   const versionedDisplayText = useDisplayText();
   const editorTextContext = useEditorText();
   const editorText = editorTextContext?.text ?? "";
   const { createPlan, executePlan } = usePlanner();
   const { selection } = useTemporaryView();
-  const virtualRowsMap = useVirtualRowsMap();
+  const rows = usePaneTreeResult()?.rows.toArray() ?? [row];
 
   if (!isVisible && !isAcceptableVirtual) return null;
 
@@ -73,20 +64,21 @@ export function EvidenceSelector(): JSX.Element | null {
 
   const isInSelection = selection.has(viewKey) && selection.size > 1;
 
-  const getActionPaths = (): ViewPath[] =>
-    isInSelection ? selection.toArray().map(parseViewPath) : [viewPath];
+  const getActionRows = (): Row[] =>
+    isInSelection
+      ? rows.filter((selectedRow) => selection.has(selectedRow.viewKey))
+      : [row];
 
   const getEditorInfo = (): EditorInfo | undefined =>
-    editorText ? { text: editorText, viewPath } : undefined;
+    editorText ? { text: editorText, viewKey } : undefined;
 
   const handleClick = (): void => {
     const nextArgument = getNextArgument(currentArgument);
     executePlan(
       planBatchArgument(
         createPlan(),
-        getActionPaths(),
+        getActionRows(),
         nextArgument,
-        virtualRowsMap,
         getEditorInfo()
       )
     );

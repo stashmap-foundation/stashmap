@@ -1,24 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useMediaQuery } from "react-responsive";
-import { List, Map, OrderedSet } from "immutable";
+import { List, OrderedSet } from "immutable";
 import {
   TemporaryViewProvider,
   useTemporaryView,
 } from "./TemporaryViewContext";
 
-import {
-  getDisplayTextForView,
-  getNodeIndexForView,
-  getParentView,
-  parseViewPath,
-  ViewPath,
-  VirtualRowsMap,
-  viewPathToString,
-  useCurrentNode,
-  useDisplayText,
-  useViewPath,
-  useIsViewingOtherUserContent,
-} from "../ViewContext";
+import { getDisplayTextForRow, getIndependentRows } from "../ViewContext";
 import { useData } from "../DataContext";
 import {
   useCurrentPane,
@@ -57,14 +45,14 @@ import {
   planToggleTemporarySelection,
 } from "../planner";
 import { parseTextToTrees, planPasteMarkdownTrees } from "./FileDropZone";
-import {
-  getNodeText,
-  getSemanticID,
-  getNode,
-  shortID,
-} from "../core/connections";
+import { getNodeText, getSemanticID, getNode } from "../core/connections";
 import { getOwnLogRoot } from "../core/systemRoots";
 import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
+import {
+  getNodeInSource,
+  graphLookupFromData,
+  lookupNode,
+} from "../core/graphLookup";
 import {
   documentDisplayName,
   getDocumentByIdOrFilePath,
@@ -82,16 +70,16 @@ import {
   isEditableElement,
 } from "./keyboardNavigation";
 import {
+  getVisibleParentRow,
   planBatchRelevance,
   planBatchArgument,
   planBatchIndent,
   planBatchOutdent,
-  getCurrentRow,
 } from "./batchOperations";
-import { planDeleteNodeFromView } from "../treeMutations";
+import { planDeleteNode } from "../treeMutations";
 import { IS_MOBILE } from "./responsive";
 import { MobileActionBar } from "./MobileActionBar";
-import { isBlockLinkAny } from "../core/nodeSpans";
+import { isBlockLinkAny, nodeText } from "../core/nodeSpans";
 
 function BreadcrumbItem({
   label,
@@ -146,6 +134,7 @@ function BreadcrumbItem({
 
 type BreadcrumbTarget = {
   author: PublicKey;
+  sourceId: SourceId;
   documentId?: string;
   rootNodeId?: LongID;
   scrollToId?: string;
@@ -163,9 +152,7 @@ function getBreadcrumbLabel(
   knowledgeDBs: KnowledgeDBs,
   node: GraphNode
 ): string {
-  return (
-    getNodeText(node) || shortID(getSemanticID(knowledgeDBs, node)) || "..."
-  );
+  return getNodeText(node) || getSemanticID(knowledgeDBs, node) || "...";
 }
 
 function createDocumentBreadcrumbEntry(document: Document): BreadcrumbEntry {
@@ -174,6 +161,7 @@ function createDocumentBreadcrumbEntry(document: Document): BreadcrumbEntry {
     label: documentDisplayName(document),
     target: {
       author: document.author,
+      sourceId: document.author,
       documentId: document.docId,
     },
   };
@@ -206,27 +194,27 @@ function getLiveAnchorSourceNode(
   if (!node.anchor?.sourceRootID) {
     return undefined;
   }
-  return knowledgeDBs
-    .get(sourceAuthor)
-    ?.nodes.valueSeq()
-    .find(
-      (candidate) =>
-        candidate.author === sourceAuthor &&
-        candidate.root === node.anchor?.sourceRootID &&
-        !candidate.parent &&
-        candidate.root === candidate.id
-    );
+  const sourceRoot = getNode(
+    knowledgeDBs,
+    node.anchor.sourceRootID,
+    sourceAuthor
+  );
+  return sourceRoot && !sourceRoot.parent && sourceRoot.root === sourceRoot.id
+    ? sourceRoot
+    : undefined;
 }
 
 function createNodeBreadcrumbEntry(
   knowledgeDBs: KnowledgeDBs,
-  node: GraphNode
+  node: GraphNode,
+  sourceId: SourceId
 ): BreadcrumbEntry {
   return {
-    key: `node:${node.id}`,
+    key: `node:${sourceId}:${node.id}`,
     label: getBreadcrumbLabel(knowledgeDBs, node),
     target: {
       author: node.author,
+      sourceId,
       rootNodeId: node.id,
     },
   };
@@ -242,56 +230,73 @@ function createSnapshotBreadcrumbEntries(
   const author = anchor.sourceAuthor || fallbackAuthor;
   return anchor.snapshotContext.toArray().map((semanticID, index) => ({
     key: `snapshot:${author}:${semanticID}:${index}`,
-    label: anchor.snapshotLabels?.[index] || shortID(semanticID as ID),
+    label: anchor.snapshotLabels?.[index] || semanticID,
     disabled: true,
     isSource: true,
   }));
 }
 
 function buildAnchoredLineageEntries(
-  knowledgeDBs: KnowledgeDBs,
+  data: Data,
+  graph: ReturnType<typeof graphLookupFromData>,
   node: GraphNode,
+  sourceId: SourceId,
   seen = new Set<string>()
 ): BreadcrumbEntry[] {
-  if (seen.has(node.id)) {
-    return [createNodeBreadcrumbEntry(knowledgeDBs, node)];
+  const seenKey = `${sourceId}:${node.id}`;
+  if (seen.has(seenKey)) {
+    return [createNodeBreadcrumbEntry(data.knowledgeDBs, node, sourceId)];
   }
 
-  const nextSeen = new Set(seen).add(node.id);
+  const nextSeen = new Set(seen).add(seenKey);
   if (node.parent) {
-    const parentNode = getNode(knowledgeDBs, node.parent, node.author);
+    const parentNode = getNodeInSource(graph, {
+      sourceId,
+      id: node.parent,
+    })?.node;
     if (parentNode) {
       return [
-        ...buildAnchoredLineageEntries(knowledgeDBs, parentNode, nextSeen),
-        createNodeBreadcrumbEntry(knowledgeDBs, node),
+        ...buildAnchoredLineageEntries(
+          data,
+          graph,
+          parentNode,
+          sourceId,
+          nextSeen
+        ),
+        createNodeBreadcrumbEntry(data.knowledgeDBs, node, sourceId),
       ];
     }
   }
 
-  const sourceNode = getLiveAnchorSourceNode(knowledgeDBs, node);
+  const sourceNode = getLiveAnchorSourceNode(data.knowledgeDBs, node);
   if (sourceNode) {
     return [
-      ...buildAnchoredLineageEntries(knowledgeDBs, sourceNode, nextSeen).slice(
-        0,
-        -1
-      ),
-      createNodeBreadcrumbEntry(knowledgeDBs, node),
+      ...buildAnchoredLineageEntries(
+        data,
+        graph,
+        sourceNode,
+        sourceNode.author,
+        nextSeen
+      ).slice(0, -1),
+      createNodeBreadcrumbEntry(data.knowledgeDBs, node, sourceId),
     ];
   }
 
   return [
     ...createSnapshotBreadcrumbEntries(node.anchor, node.author),
-    createNodeBreadcrumbEntry(knowledgeDBs, node),
+    createNodeBreadcrumbEntry(data.knowledgeDBs, node, sourceId),
   ];
 }
 
 function SourceButton(): JSX.Element | null {
-  const { knowledgeDBs, user } = useData();
+  const data = useData();
+  const { knowledgeDBs } = data;
   const pane = useCurrentPane();
   const { setPane } = useSplitPanes();
   const paneHistory = usePaneHistory();
+  const graph = graphLookupFromData(data);
   const rootNode = pane.rootNodeId
-    ? getNode(knowledgeDBs, pane.rootNodeId, user.publicKey)
+    ? lookupNode(graph, pane.rootNodeId, pane.sourceId)?.node
     : undefined;
 
   if (!rootNode?.anchor) {
@@ -306,6 +311,7 @@ function SourceButton(): JSX.Element | null {
   const target: Pane = {
     ...pane,
     author: sourceNode.author,
+    sourceId: sourceNode.author,
     rootNodeId: sourceNode.id,
     scrollToId: undefined,
   };
@@ -329,15 +335,14 @@ function SourceButton(): JSX.Element | null {
 
 function Breadcrumbs(): JSX.Element {
   const data = useData();
-  const { knowledgeDBs } = data;
   const pane = useCurrentPane();
   const navigatePane = useNavigatePane();
   const { setPane } = useSplitPanes();
   const paneHistory = usePaneHistory();
-  const currentNode = useCurrentNode();
+  const graph = graphLookupFromData(data);
   const rootNode = pane.rootNodeId
-    ? getNode(knowledgeDBs, pane.rootNodeId, pane.author)
-    : currentNode;
+    ? lookupNode(graph, pane.rootNodeId, pane.sourceId)?.node
+    : undefined;
   const paneDocument = pane.documentId
     ? getDocumentByIdOrFilePath(
         data.documents,
@@ -352,7 +357,7 @@ function Breadcrumbs(): JSX.Element {
       ? getDocumentForNode(data.knowledgeDBs, data.documents, rootNode)
       : undefined);
   const nodeEntries: BreadcrumbEntry[] = rootNode
-    ? buildAnchoredLineageEntries(knowledgeDBs, rootNode)
+    ? buildAnchoredLineageEntries(data, graph, rootNode, pane.sourceId)
     : [];
   const entries = breadcrumbEntriesWithDocument(document, nodeEntries);
 
@@ -369,7 +374,11 @@ function Breadcrumbs(): JSX.Element {
             );
           }
           if (target?.rootNodeId) {
-            return buildNodeRouteUrl(target.rootNodeId, target.scrollToId);
+            return buildNodeRouteUrl(
+              target.rootNodeId,
+              target.sourceId,
+              target.scrollToId
+            );
           }
           return undefined;
         })();
@@ -381,6 +390,7 @@ function Breadcrumbs(): JSX.Element {
                 setPane({
                   ...pane,
                   author: target.author,
+                  sourceId: target.sourceId,
                   documentId: target.documentId,
                   rootNodeId: undefined,
                   searchQuery: undefined,
@@ -393,6 +403,7 @@ function Breadcrumbs(): JSX.Element {
                 setPane({
                   ...pane,
                   author: target.author,
+                  sourceId: target.sourceId,
                   documentId: undefined,
                   rootNodeId: target.rootNodeId,
                   searchQuery: undefined,
@@ -422,10 +433,14 @@ function Breadcrumbs(): JSX.Element {
 
 function ForkButton(): JSX.Element | null {
   const isMobile = useMediaQuery(IS_MOBILE);
-  const isViewingOtherUserContent = useIsViewingOtherUserContent();
+  const data = useData();
   const currentPane = useCurrentPane();
-  const currentNode = useCurrentNode();
-  const viewPath = useViewPath();
+  const isViewingOtherUserContent = currentPane.author !== data.user.publicKey;
+  const graph = graphLookupFromData(data);
+  const currentNode = currentPane.rootNodeId
+    ? lookupNode(graph, currentPane.rootNodeId, currentPane.sourceId)?.node
+    : undefined;
+  const paneIndex = usePaneIndex();
   const navigatePane = useNavigatePane();
   const { createPlan, executePlan } = usePlanner();
 
@@ -441,12 +456,20 @@ function ForkButton(): JSX.Element | null {
   }
 
   const handleFork = (): void => {
-    const plan = planForkPane(createPlan(), viewPath);
+    if (!currentNode) {
+      return;
+    }
+    const plan = planForkPane(
+      createPlan(),
+      paneIndex,
+      currentPane,
+      currentNode
+    );
     executePlan(plan);
   };
 
   if (!isAtRoot) {
-    const href = buildNodeRouteUrl(rootNodeId);
+    const href = buildNodeRouteUrl(rootNodeId, currentPane.sourceId);
     return (
       <a
         href={href}
@@ -481,7 +504,7 @@ function HomeButton(): JSX.Element | null {
   if (!logNode) {
     return null;
   }
-  const href = buildNodeRouteUrl(logNode.id);
+  const href = buildNodeRouteUrl(logNode.id, user.publicKey);
 
   return (
     <a
@@ -530,7 +553,7 @@ function useHomeShortcut(): void {
         if (!logNode) {
           return;
         }
-        const href = buildNodeRouteUrl(logNode.id);
+        const href = buildNodeRouteUrl(logNode.id, user.publicKey);
         e.preventDefault();
         navigatePane(href);
       }
@@ -600,7 +623,29 @@ function PaneHeader(): JSX.Element {
 }
 
 function CurrentNodeName(): JSX.Element {
-  const displayName = useDisplayText();
+  const data = useData();
+  const pane = useCurrentPane();
+  const document = pane.documentId
+    ? getDocumentByIdOrFilePath(
+        data.documents,
+        data.documentByFilePath,
+        pane.author,
+        pane.documentId
+      )
+    : undefined;
+  const graph = graphLookupFromData(data);
+  const rootNode = pane.rootNodeId
+    ? lookupNode(graph, pane.rootNodeId, pane.sourceId)?.node
+    : undefined;
+  const displayName = (() => {
+    if (document) {
+      return documentDisplayName(document);
+    }
+    if (rootNode) {
+      return nodeText(rootNode);
+    }
+    return "";
+  })();
 
   if (!displayName) {
     return <span>New Note</span>;
@@ -618,8 +663,10 @@ function PaneStatusLine({
   onShowShortcuts?: () => void;
 }): JSX.Element {
   const paneIndex = usePaneIndex();
+  const pane = useCurrentPane();
+  const { user } = useData();
   const isFirstPane = paneIndex === 0;
-  const isViewingOtherUserContent = useIsViewingOtherUserContent();
+  const isViewingOtherUserContent = pane.author !== user.publicKey;
 
   return (
     <footer className="pane-status-line">
@@ -834,37 +881,39 @@ export function refocusPaneAfterRowMutation(root: HTMLElement): void {
   }, 0);
 }
 
-function getRowDepthFromViewKey(viewKey: string): number {
-  return parseViewPath(viewKey).length - 1;
-}
-
-function getSubtreeKeysFromOrderedKeys(
-  orderedKeys: string[],
+function getSubtreeKeysFromRows(
+  rows: List<Row>,
   activeRowKey: string
 ): string[] {
-  const activeIndex = orderedKeys.indexOf(activeRowKey);
+  const activeIndex = rows.findIndex((row) => row.viewKey === activeRowKey);
   if (activeIndex === -1) {
     return [activeRowKey];
   }
-  const activeDepth = getRowDepthFromViewKey(activeRowKey);
-  const endIndex = orderedKeys
+  const activeRow = rows.get(activeIndex);
+  if (!activeRow) {
+    return [activeRowKey];
+  }
+  const endIndex = rows
     .slice(activeIndex + 1)
-    .findIndex((viewKey) => getRowDepthFromViewKey(viewKey) <= activeDepth);
-  const finalIndex =
-    endIndex === -1 ? orderedKeys.length : activeIndex + 1 + endIndex;
-  return orderedKeys.slice(activeIndex, finalIndex);
+    .findIndex((row) => row.depth <= activeRow.depth);
+  const finalIndex = endIndex === -1 ? rows.size : activeIndex + 1 + endIndex;
+  return rows
+    .slice(activeIndex, finalIndex)
+    .map((row) => row.viewKey)
+    .toArray();
 }
 
 function computeFocusIndexAfterDeletion(
   keys: string[],
-  orderedViewKeys: string[]
+  rows: List<Row>
 ): number | undefined {
   const removedSet = new Set(
-    keys.flatMap((key) => getSubtreeKeysFromOrderedKeys(orderedViewKeys, key))
+    keys.flatMap((key) => getSubtreeKeysFromRows(rows, key))
   );
-  if (removedSet.size >= orderedViewKeys.length) {
+  if (removedSet.size >= rows.size) {
     return undefined;
   }
+  const orderedViewKeys = rows.map((row) => row.viewKey).toArray();
   const survivors = orderedViewKeys.filter((key) => !removedSet.has(key));
   const maxRemovedIndex = orderedViewKeys.reduce(
     (max, key, i) => (removedSet.has(key) ? Math.max(max, i) : max),
@@ -879,20 +928,16 @@ function computeFocusIndexAfterDeletion(
   return survivors.length - 1;
 }
 
-function getDisplayTextForViewKey(data: Data, viewKey: string): string {
-  const viewPath = parseViewPath(viewKey);
-  return getDisplayTextForView(data, viewPath);
-}
-
-export function getActionTargetKeys(
+export function getActionTargetRows(
   selection: OrderedSet<string>,
   activeRow: HTMLElement,
-  orderedViewKeys: string[]
-): string[] {
+  rows: List<Row>
+): Row[] {
+  const activeKey = getRowKey(activeRow);
   if (selection.size === 0) {
-    return [getRowKey(activeRow)];
+    return rows.filter((row) => row.viewKey === activeKey).toArray();
   }
-  return orderedViewKeys.filter((viewKey) => selection.contains(viewKey));
+  return rows.filter((row) => selection.contains(row.viewKey)).toArray();
 }
 
 function usePaneKeyboardNavigation(paneIndex: number): {
@@ -911,15 +956,11 @@ function usePaneKeyboardNavigation(paneIndex: number): {
   const toggleFilter = useToggleFilter();
   const { createPlan, executePlan } = usePlanner();
   const treeResult = usePaneTreeResult();
+  const rows = treeResult?.rows || List<Row>();
   const orderedViewKeys = useMemo(
-    () =>
-      (treeResult?.paths || List<ViewPath>())
-        .map((path) => viewPathToString(path))
-        .toArray(),
-    [treeResult]
+    () => rows.map((row) => row.viewKey).toArray(),
+    [rows]
   );
-  const virtualRowsMap: VirtualRowsMap =
-    treeResult?.virtualRows || Map<string, GraphNode>();
 
   const switchPane = (direction: -1 | 1): void => {
     const root = wrapperRef.current;
@@ -1120,11 +1161,13 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         root.focus();
         return;
       }
-      const keys = getActionTargetKeys(selection, activeRow, orderedViewKeys);
+      const targetRows = getIndependentRows(
+        getActionTargetRows(selection, activeRow, rows)
+      );
       const plan = createPlan();
       const result = e.shiftKey
-        ? planBatchOutdent(plan, keys)
-        : planBatchIndent(plan, keys);
+        ? planBatchOutdent(plan, targetRows, rows)
+        : planBatchIndent(plan, targetRows, rows);
       if (result) {
         executePlan(result);
         refocusPaneAfterRowMutation(root);
@@ -1204,17 +1247,18 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       const selectedKeys =
         selection.size > 0
           ? orderedViewKeys.filter((viewKey) => selection.contains(viewKey))
-          : getSubtreeKeysFromOrderedKeys(orderedViewKeys, activeRowKey);
+          : getSubtreeKeysFromRows(rows, activeRowKey);
       if (selectedKeys.length === 0) {
         return;
       }
-      const depths = selectedKeys.map((viewKey) =>
-        getRowDepthFromViewKey(viewKey)
-      );
+      const selectedRows = rows
+        .filter((row) => selectedKeys.includes(row.viewKey))
+        .toArray();
+      const depths = selectedRows.map((row) => row.depth);
       const minDepth = Math.min(...depths);
-      const lines = selectedKeys.map((viewKey) => {
-        const depth = getRowDepthFromViewKey(viewKey) - minDepth;
-        const text = getDisplayTextForViewKey(data, viewKey);
+      const lines = selectedRows.map((row) => {
+        const depth = row.depth - minDepth;
+        const text = getDisplayTextForRow(data, row);
         return "\t".repeat(depth) + text;
       });
       navigator.clipboard.writeText(lines.join("\n"));
@@ -1228,13 +1272,18 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       }
       e.preventDefault();
       const activeRowKey = getRowKey(activeRow);
-      const parentPath = parseViewPath(activeRowKey);
+      const parentRow = rows.find((row) => row.viewKey === activeRowKey);
+      if (!parentRow) {
+        return;
+      }
       navigator.clipboard.readText().then((text) => {
         const trees = parseTextToTrees(text);
         if (trees.length === 0) {
           return;
         }
-        executePlan(planPasteMarkdownTrees(createPlan(), trees, parentPath, 0));
+        executePlan(
+          planPasteMarkdownTrees(createPlan(), trees, parentRow.node, 0)
+        );
       });
       return;
     }
@@ -1416,23 +1465,24 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       }
 
       const activeRowKey = getRowKey(activeRow);
-      const activeViewPath = parseViewPath(activeRowKey);
-      const activeGraphRow = getCurrentRow(
-        data,
-        activeViewPath,
-        virtualRowsMap
-      );
-      const parentPath = getParentView(activeViewPath);
-      const activeNodeIndex = getNodeIndexForView(data, activeViewPath);
+      const activeRowData = rows.find((row) => row.viewKey === activeRowKey);
+      const activeGraphRow = activeRowData?.node;
+      const parentRow = activeRowData
+        ? getVisibleParentRow(rows, activeRowData)
+        : undefined;
+      const activeNodeIndex = activeRowData?.childIndex;
       if (
         isBlockLinkAny(activeGraphRow) &&
-        parentPath &&
+        parentRow &&
         activeNodeIndex !== undefined
       ) {
         executePlan(
           planSetEmptyNodePosition(
             createPlan(),
-            parentPath,
+            parentRow.node,
+            parentRow.view,
+            parentRow.viewPath,
+            paneIndex,
             activeNodeIndex + 1
           )
         );
@@ -1442,12 +1492,22 @@ function usePaneKeyboardNavigation(paneIndex: number): {
 
     if (e.key === "Backspace" || e.key === "Delete") {
       e.preventDefault();
-      const keys = getActionTargetKeys(selection, activeRow, orderedViewKeys);
-      const focusIndex = computeFocusIndexAfterDeletion(keys, orderedViewKeys);
-      const paths = keys.map(parseViewPath);
+      const targetRows = getIndependentRows(
+        getActionTargetRows(selection, activeRow, rows)
+      );
+      const keys = targetRows.map((row) => row.viewKey);
+      const focusIndex = computeFocusIndexAfterDeletion(keys, rows);
       const result = planClearTemporarySelection(
-        paths.reduce(
-          (acc, path) => planDeleteNodeFromView(acc, path),
+        targetRows.reduce(
+          (acc, row) =>
+            planDeleteNode(
+              acc,
+              row.node,
+              row.rowID,
+              row.parentNode,
+              row.node.id,
+              paneIndex
+            ),
           createPlan()
         )
       );
@@ -1475,14 +1535,16 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (e.key === "x" || e.key === "~" || e.key === "!" || e.key === "?") {
       e.preventDefault();
       const plan = createPlan();
-      const keys = getActionTargetKeys(selection, activeRow, orderedViewKeys);
-      const paths = keys.map(parseViewPath);
-      const activeViewPath = parseViewPath(getRowKey(activeRow));
+      const targetRows = getActionTargetRows(selection, activeRow, rows);
+      const activeRowData = rows.find(
+        (row) => row.viewKey === getRowKey(activeRow)
+      );
       const targetRelevance = SYMBOL_TO_RELEVANCE[e.key];
-      const currentRow = getCurrentRow(plan, activeViewPath, virtualRowsMap);
       const relevance =
-        currentRow?.relevance === targetRelevance ? undefined : targetRelevance;
-      executePlan(planBatchRelevance(plan, paths, relevance, virtualRowsMap));
+        activeRowData?.node.relevance === targetRelevance
+          ? undefined
+          : targetRelevance;
+      executePlan(planBatchRelevance(plan, targetRows, relevance));
       refocusPaneAfterRowMutation(root);
       return;
     }
@@ -1490,18 +1552,20 @@ function usePaneKeyboardNavigation(paneIndex: number): {
     if (e.key === "+" || e.key === "-" || e.key === "o") {
       e.preventDefault();
       const plan = createPlan();
-      const keys = getActionTargetKeys(selection, activeRow, orderedViewKeys);
-      const paths = keys.map(parseViewPath);
-      const activeViewPath = parseViewPath(getRowKey(activeRow));
+      const targetRows = getActionTargetRows(selection, activeRow, rows);
+      const activeRowData = rows.find(
+        (row) => row.viewKey === getRowKey(activeRow)
+      );
       const targetArgument: Argument = (() => {
         if (e.key === "+") return "confirms" as const;
         if (e.key === "-") return "contra" as const;
         return undefined;
       })();
-      const currentRow = getCurrentRow(plan, activeViewPath, virtualRowsMap);
       const argument: Argument =
-        currentRow?.argument === targetArgument ? undefined : targetArgument;
-      executePlan(planBatchArgument(plan, paths, argument, virtualRowsMap));
+        activeRowData?.node.argument === targetArgument
+          ? undefined
+          : targetArgument;
+      executePlan(planBatchArgument(plan, targetRows, argument));
       refocusPaneAfterRowMutation(root);
       return;
     }

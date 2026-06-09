@@ -3,7 +3,6 @@ import {
   getNode,
   getNodeText,
   getSemanticID,
-  shortID,
 } from "./core/connections";
 import type { Document } from "./core/Document";
 import { buildOutgoingReference } from "./buildReferenceRow";
@@ -33,7 +32,7 @@ function getSerializableNodeText(
   knowledgeDBs: KnowledgeDBs,
   node: GraphNode
 ): string {
-  return getNodeText(node) || shortID(getSemanticID(knowledgeDBs, node));
+  return getNodeText(node) || getSemanticID(knowledgeDBs, node);
 }
 
 type SerializeReduceState = SerializeResult & {
@@ -70,7 +69,7 @@ function getSerializableNodeAttrs(
   node: GraphNode,
   options?: { snapshotDTag?: string }
 ): string {
-  return formatNodeAttrs(shortID(node.id), {
+  return formatNodeAttrs(node.id, {
     ...(node.basedOn ? { basedOn: node.basedOn } : {}),
     ...(node.userPublicKey ? { userPublicKey: node.userPublicKey } : {}),
     ...(options?.snapshotDTag || node.snapshotDTag

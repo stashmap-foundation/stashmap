@@ -10,13 +10,10 @@ import {
   useCurrentPane,
   generatePaneId,
 } from "../SplitPanesContext";
-import {
-  RootViewContextProvider,
-  updateViewPathsAfterPaneDelete,
-} from "../ViewContext";
+import { updateViewPathsAfterPaneDelete } from "../ViewContext";
 import { LoadSearchData } from "../LoadSearchData";
 import { PaneView } from "./Workspace";
-import { EMPTY_SEMANTIC_ID, createSearchId } from "../core/connections";
+import { createSearchId } from "../core/connections";
 import { planUpdateViews, planUpdatePanes, usePlanner } from "../planner";
 import { useData } from "../DataContext";
 import { isUserLoggedIn, useLogout } from "../NostrAuthContext";
@@ -49,6 +46,7 @@ export function PaneSearchButton(): JSX.Element {
       setPane({
         ...pane,
         author: user.publicKey,
+        sourceId: user.publicKey,
         documentId: undefined,
         rootNodeId: undefined,
         scrollToId: undefined,
@@ -119,6 +117,7 @@ export function ClosePaneButton(): JSX.Element | null {
       const freshPane: Pane = {
         id: generatePaneId(),
         author: user.publicKey,
+        sourceId: user.publicKey,
       };
       executePlan(planUpdatePanes(plan, [freshPane]));
       return;
@@ -257,20 +256,13 @@ export function PaneRootViewProvider({
   children: React.ReactNode;
 }): JSX.Element {
   const pane = useCurrentPane();
-  const paneIndex = usePaneIndex();
   const searchId = pane.searchQuery
     ? createSearchId(pane.searchQuery)
     : undefined;
-  const rootItemID = pane.rootNodeId || searchId || EMPTY_SEMANTIC_ID;
 
   return (
     <LoadSearchData itemIDs={searchId ? [searchId] : []}>
-      <RootViewContextProvider
-        root={rootItemID as LongID}
-        paneIndex={paneIndex}
-      >
-        {children}
-      </RootViewContextProvider>
+      {children}
     </LoadSearchData>
   );
 }

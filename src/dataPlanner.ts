@@ -4,7 +4,6 @@ import {
   getNodeContext,
   getNode,
   isRefNode,
-  shortID,
 } from "./core/connections";
 import {
   GraphPlan,
@@ -100,7 +99,7 @@ export function planRemoveNodeItemById<T extends GraphPlan>(
       getNodeContext(withoutItem.knowledgeDBs, sourceNode),
       undefined,
       undefined,
-      shortID(sourceNode.id)
+      sourceNode.id
     );
   }
   return planDeleteNodes(

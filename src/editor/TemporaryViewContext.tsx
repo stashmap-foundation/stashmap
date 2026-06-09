@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { OrderedSet, Set } from "immutable";
-import { useViewKey } from "../ViewContext";
+import { useRow } from "../ViewContext";
 import { useData } from "../DataContext";
 import { isRefNode } from "../core/connections";
 import { isBlockFileLink } from "../core/nodeSpans";
@@ -51,7 +51,7 @@ export function useTemporaryView(): TemporaryView {
 
 export function useIsSelected(): boolean {
   const { selection } = useTemporaryView();
-  const viewKey = useViewKey();
+  const { viewKey } = useRow();
   return selection.contains(viewKey);
 }
 
@@ -61,7 +61,7 @@ function isEditingOn(editingViews: Set<string>, viewKey: string): boolean {
 
 export function useIsEditingOn(): boolean {
   const { editingViews } = useTemporaryView();
-  const viewKey = useViewKey();
+  const { viewKey } = useRow();
   return isEditingOn(editingViews, viewKey);
 }
 

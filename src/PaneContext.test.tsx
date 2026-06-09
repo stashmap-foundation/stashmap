@@ -79,7 +79,7 @@ test("Bob can view Alice's node via /r/ URL without following her", async () => 
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/r\//);
   });
-  const nodeUrl = window.location.pathname;
+  const nodeUrl = `${window.location.pathname}${window.location.search}`;
   cleanup();
 
   renderApp({ ...bob(), initialRoute: nodeUrl });
@@ -106,7 +106,7 @@ test("Anonymous user can view node via /r/ URL", async () => {
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/r\//);
   });
-  const nodeUrl = window.location.pathname;
+  const nodeUrl = `${window.location.pathname}${window.location.search}`;
   cleanup();
 
   renderApp({ ...anon(), initialRoute: nodeUrl });
@@ -138,7 +138,7 @@ test("Anonymous user sees versioned node text via /r/ URL", async () => {
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/r\//);
   });
-  const nodeUrl = window.location.pathname;
+  const nodeUrl = `${window.location.pathname}${window.location.search}`;
   cleanup();
 
   renderApp({ ...anon(), initialRoute: nodeUrl });
@@ -165,7 +165,7 @@ test("Clicking breadcrumb while viewing other user's content preserves READONLY"
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/r\//);
   });
-  const nodeUrl = window.location.pathname;
+  const nodeUrl = `${window.location.pathname}${window.location.search}`;
   cleanup();
 
   renderApp({ ...bob(), initialRoute: nodeUrl });
@@ -189,7 +189,7 @@ test("Clicking breadcrumb while viewing other user's content preserves READONLY"
   `);
 });
 
-test("Opening /n/ URL with author param shows READONLY", async () => {
+test("Opening /n/ URL with source param shows READONLY", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
 
   renderApp(alice());
@@ -202,7 +202,7 @@ test("Opening /n/ URL with author param shows READONLY", async () => {
     ...bob(),
     initialRoute: `/n/${encodeURIComponent("My Notes")}/${encodeURIComponent(
       "Cities"
-    )}?author=${alice().user.publicKey}`,
+    )}?source=${alice().user.publicKey}`,
   });
 
   await screen.findByText("READONLY");
@@ -228,7 +228,7 @@ test("Breadcrumb navigation opens document URLs for document roots", async () =>
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/r\//);
   });
-  const nodeUrl = window.location.pathname;
+  const nodeUrl = `${window.location.pathname}${window.location.search}`;
   cleanup();
 
   renderApp({ ...bob(), initialRoute: nodeUrl });
@@ -258,7 +258,7 @@ test("Clicking fullscreen while viewing other user's content preserves READONLY"
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/r\//);
   });
-  const nodeUrl = window.location.pathname;
+  const nodeUrl = `${window.location.pathname}${window.location.search}`;
   cleanup();
 
   renderApp({ ...bob(), initialRoute: nodeUrl });
@@ -295,7 +295,7 @@ test("Relay filters never contain invalid pubkeys when anonymous user views /r/ 
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/r\//);
   });
-  const nodeUrl = window.location.pathname;
+  const nodeUrl = `${window.location.pathname}${window.location.search}`;
   cleanup();
 
   const { relayPool } = renderApp({ ...anon(), initialRoute: nodeUrl });
@@ -326,7 +326,7 @@ test("/r/ URL takes priority over stale history state", async () => {
   await waitFor(() => {
     expect(window.location.pathname).toMatch(/^\/r\//);
   });
-  const nodeUrl = window.location.pathname;
+  const nodeUrl = `${window.location.pathname}${window.location.search}`;
   cleanup();
 
   const stalePanes = [defaultPane(bob().user.publicKey)];

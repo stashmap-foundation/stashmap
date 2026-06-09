@@ -3,18 +3,24 @@ import {
   buildNodeRouteUrl,
   parseDocumentRouteUrl,
   parseNodeRouteUrl,
-  parseAuthorFromSearch,
+  parseSourceFromSearch,
 } from "./navigationUrl";
 
-test("buildNodeRouteUrl creates node route", () => {
-  expect(buildNodeRouteUrl("some-node-id" as LongID)).toBe("/r/some-node-id");
-  expect(buildNodeRouteUrl("encoded/id" as LongID)).toBe("/r/encoded%2Fid");
+const ALICE_SOURCE = "alice";
+
+test("buildNodeRouteUrl creates source-scoped node route", () => {
+  expect(buildNodeRouteUrl("some-node-id" as LongID, ALICE_SOURCE)).toBe(
+    "/r/some-node-id?source=alice"
+  );
+  expect(buildNodeRouteUrl("encoded/id" as LongID, "source/id")).toBe(
+    "/r/encoded%2Fid?source=source%2Fid"
+  );
 });
 
 test("buildNodeRouteUrl includes scroll target as hash", () => {
-  expect(buildNodeRouteUrl("some-node-id" as LongID, "child/id" as ID)).toBe(
-    "/r/some-node-id#child%2Fid"
-  );
+  expect(
+    buildNodeRouteUrl("some-node-id" as LongID, ALICE_SOURCE, "child/id" as ID)
+  ).toBe("/r/some-node-id?source=alice#child%2Fid");
 });
 
 test("buildDocumentRouteUrl creates document route", () => {
@@ -52,8 +58,9 @@ test("parseDocumentRouteUrl extracts author and document ID", () => {
   expect(parseDocumentRouteUrl("/")).toBeUndefined();
 });
 
-test("parseAuthorFromSearch extracts author", () => {
-  expect(parseAuthorFromSearch("?author=abc123")).toBe("abc123");
-  expect(parseAuthorFromSearch("?foo=bar")).toBeUndefined();
-  expect(parseAuthorFromSearch("")).toBeUndefined();
+test("parseSourceFromSearch extracts source", () => {
+  expect(parseSourceFromSearch("?source=abc123")).toBe("abc123");
+  expect(parseSourceFromSearch("?author=abc123")).toBeUndefined();
+  expect(parseSourceFromSearch("?foo=bar")).toBeUndefined();
+  expect(parseSourceFromSearch("")).toBeUndefined();
 });

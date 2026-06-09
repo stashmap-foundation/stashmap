@@ -141,6 +141,7 @@ declare global {
   type Pane = {
     id: string;
     author: PublicKey;
+    sourceId: SourceId;
     documentId?: string;
     rootNodeId?: ID;
     searchQuery?: string;
@@ -190,6 +191,56 @@ declare global {
   type Hash = string;
   type ID = string;
   type LongID = string;
+  type SourceId = string;
+
+  type NodeRef = {
+    sourceId: SourceId;
+    id: ID;
+  };
+
+  type Row = {
+    viewPath: readonly [number, ...ID[]];
+    viewKey: string;
+    index: number;
+    depth: number;
+    node: GraphNode;
+    sourceId: SourceId;
+    ref: NodeRef;
+    rowID: ID;
+    view: View;
+    parentViewPath: readonly [number, ...ID[]] | undefined;
+    parentRef: NodeRef | undefined;
+    parentNode: GraphNode | undefined;
+    parentChildIndex: number | undefined;
+    childIndex: number | undefined;
+    hasChildren: boolean;
+    isFirstVirtual: boolean;
+    virtualType: "suggestion" | "search" | "incoming" | "version" | undefined;
+    versionMeta:
+      | {
+          updated: number;
+          addCount: number;
+          removeCount: number;
+        }
+      | undefined;
+    reference:
+      | {
+          id: ID;
+          sourceId: SourceId;
+          type: "reference";
+          text: string;
+          targetContext: List<ID>;
+          contextLabels: string[];
+          targetLabel: string;
+          author: PublicKey;
+          incomingRelevance?: Relevance;
+          incomingArgument?: Argument;
+          displayAs?: "bidirectional" | "incoming";
+          versionMeta?: Row["versionMeta"];
+          deleted?: boolean;
+        }
+      | undefined;
+  };
 
   type View = {
     expanded?: boolean;
@@ -213,15 +264,6 @@ declare global {
 
   // Argument types (evidence) for node children
   type Argument = "confirms" | "contra" | undefined;
-
-  // Each item in a node has relevance and optional argument
-  type VirtualType = "suggestion" | "search" | "incoming" | "version";
-
-  type VersionMeta = {
-    updated: number;
-    addCount: number;
-    removeCount: number;
-  };
 
   type RootAnchor = {
     snapshotContext: Context;
@@ -255,28 +297,10 @@ declare global {
     root: ID;
     relevance: Relevance;
     argument?: Argument;
-    virtualType?: VirtualType;
-    versionMeta?: VersionMeta;
     blockKind?: "heading" | "list_item" | "paragraph";
     headingLevel?: number;
     listOrdered?: boolean;
     listStart?: number;
-  };
-
-  // Pure View layer type representing a ref row in the UI, derived from GraphNode but with additional display-related fields
-  type ReferenceRow = {
-    id: ID;
-    type: "reference";
-    text: string;
-    targetContext: Context;
-    contextLabels: string[];
-    targetLabel: string;
-    author: PublicKey;
-    incomingRelevance?: Relevance;
-    incomingArgument?: Argument;
-    displayAs?: "bidirectional" | "incoming";
-    versionMeta?: VersionMeta;
-    deleted?: boolean;
   };
 
   type Views = Map<string, View>;
@@ -294,9 +318,13 @@ declare global {
 
   type GraphIndex = {
     nodeByID: globalThis.Map<LongID, GraphNode>;
+    nodesBySource: globalThis.Map<SourceId, globalThis.Map<ID, GraphNode>>;
+    sourceCandidatesById: globalThis.Map<ID, NodeRef[]>;
     semantic: globalThis.Map<string, globalThis.Set<LongID>>;
-    incomingCrefs: globalThis.Map<LongID, globalThis.Set<LongID>>;
-    incomingFileLinks: globalThis.Map<string, globalThis.Set<LongID>>;
+    semanticRefs: globalThis.Map<string, NodeRef[]>;
+    incomingCrefs: globalThis.Map<LongID, NodeRef[]>;
+    incomingCrefsByTarget: globalThis.Map<string, NodeRef[]>;
+    incomingFileLinks: globalThis.Map<string, NodeRef[]>;
     basedOnIndex: globalThis.Map<LongID, globalThis.Set<LongID>>;
   };
 

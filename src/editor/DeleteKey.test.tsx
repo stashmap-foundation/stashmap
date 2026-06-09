@@ -98,6 +98,30 @@ Root
     `);
   });
 
+  test("batch delete ignores selected descendants of selected parents", async () => {
+    const [alice] = setup([ALICE]);
+    renderApp(alice());
+
+    await type(
+      "Root{Enter}{Tab}Parent{Enter}{Tab}Child{Enter}{Enter}Sibling{Escape}"
+    );
+
+    await expectTree(`
+Root
+  Parent
+    Child
+  Sibling
+    `);
+
+    await userEvent.click(await screen.findByLabelText("edit Parent"));
+    await userEvent.keyboard("{Escape}{Shift>}j{/Shift}{Delete}");
+
+    await expectTree(`
+Root
+  Sibling
+    `);
+  });
+
   test("delete cleans up orphaned descendant nodes and resets invalid panes", async () => {
     const [alice] = setup([ALICE]);
     renderApp(alice());

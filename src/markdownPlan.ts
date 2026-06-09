@@ -1,11 +1,6 @@
 import { List } from "immutable";
 import { v4 } from "uuid";
-import {
-  getNodeContext,
-  getSemanticID,
-  getNode,
-  shortID,
-} from "./core/connections";
+import { getNodeContext, getSemanticID, getNode } from "./core/connections";
 import {
   MarkdownImportFile,
   parseMarkdownImportFiles,
@@ -22,7 +17,6 @@ import {
 import { planUpsertRootDocument, withDocumentRoot } from "./core/plan";
 import { newGraphNode } from "./core/nodeFactory";
 import { nodeText, plainSpans } from "./core/nodeSpans";
-import { getNodeForView, ViewPath } from "./ViewContext";
 
 export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
   plan: T,
@@ -56,7 +50,7 @@ export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
   }
   const userNodes = result.context.knowledgeDBs.get(plan.user.publicKey)?.nodes;
   const planWithDocs = result.topNodeIds.reduce<T>((acc, longId) => {
-    const rootNode = userNodes?.get(shortID(longId));
+    const rootNode = userNodes?.get(longId);
     return rootNode ? planUpsertRootDocument(acc, rootNode) : acc;
   }, planWithNodes);
   return [planWithDocs, result.topSemanticIds, result.topNodeIds];
@@ -203,7 +197,7 @@ function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
 export function planInsertMarkdownTrees(
   plan: Plan,
   trees: MarkdownTreeNode[],
-  parentViewPath: ViewPath,
+  parentNode: GraphNode,
   insertAtIndex?: number,
   relevance?: Relevance,
   argument?: Argument
@@ -213,20 +207,12 @@ export function planInsertMarkdownTrees(
   topNodeIDs: LongID[];
   actualItemIDs: Array<ID>;
 } {
-  const parentNode = getNodeForView(plan, parentViewPath);
-  return parentNode
-    ? planInsertMarkdownTreesByParentId(
-        plan,
-        trees,
-        parentNode.id,
-        insertAtIndex,
-        relevance,
-        argument
-      )
-    : {
-        plan,
-        topItemIDs: [],
-        topNodeIDs: [],
-        actualItemIDs: [],
-      };
+  return planInsertMarkdownTreesByParentId(
+    plan,
+    trees,
+    parentNode.id,
+    insertAtIndex,
+    relevance,
+    argument
+  );
 }

@@ -18,7 +18,6 @@ import { useDefaultRelays, useUserOrAnon } from "../../NostrAuthContext";
 import { useEventQuery } from "../../commons/useNostrQuery";
 import { getOutboxEvents } from "./cache/indexedDB";
 import { useCacheDB } from "./cache/CacheDBContext";
-import { splitID } from "../../core/connections";
 import { NavigationStateProvider } from "../../NavigationStateContext";
 import {
   mergeEvents,
@@ -95,15 +94,7 @@ export function NostrDataProvider({
   );
 
   const extraAuthors = useMemo(
-    () => [
-      ...new globalThis.Set(
-        session.panes.flatMap((pane) =>
-          pane.rootNodeId
-            ? [pane.author, splitID(pane.rootNodeId)[0] || pane.author]
-            : [pane.author]
-        )
-      ),
-    ],
+    () => [...new globalThis.Set(session.panes.map((pane) => pane.author))],
     [session.panes]
   );
 

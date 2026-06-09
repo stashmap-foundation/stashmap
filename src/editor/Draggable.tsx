@@ -1,20 +1,23 @@
 import React, { useEffect, useRef } from "react";
+import { List } from "immutable";
 import { ConnectableElement, useDrag } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
 import {
-  ViewPath,
   useIsInSearchView,
-  useViewPath,
-  useViewKey,
   useCurrentRowID,
   useCurrentNode,
   useDisplayText,
   useIsViewingOtherUserContent,
   useCurrentEdge,
-  getCurrentReferenceForView,
+  getCurrentReferenceForRow,
+  useRow,
 } from "../ViewContext";
 import { useData } from "../DataContext";
-import { isEmptySemanticID } from "../core/connections";
+import {
+  getNodeContext,
+  getSemanticID,
+  isEmptySemanticID,
+} from "../core/connections";
 import { getBlockLink } from "../core/blockLink";
 import { linkToInsertTarget } from "./linkOperations";
 import { NOTE_TYPE, Node } from "./Node";
@@ -23,8 +26,22 @@ import {
   isEditableNode,
   useIsEditingOn,
   useIsSelected,
+  useTemporaryView,
 } from "./TemporaryViewContext";
 import { isEditableElement, KeyboardMode } from "./keyboardNavigation";
+import { usePaneIndex } from "../SplitPanesContext";
+
+function nodePathText(
+  data: Data,
+  node: GraphNode | undefined
+): string | undefined {
+  if (!node) {
+    return undefined;
+  }
+  return getNodeContext(data.knowledgeDBs, node)
+    .push(getSemanticID(data.knowledgeDBs, node))
+    .join(" / ");
+}
 
 function markDragDescendants(sourceViewKey: string): void {
   const prefix = `${sourceViewKey}:`;
@@ -48,6 +65,7 @@ type DraggableProps = {
   rowViewKey?: string;
   rowIndex?: number;
   rowDepth?: number;
+  rows: List<Row>;
   isActiveRow?: boolean;
   isSelected?: boolean;
   onRowFocus?: (key: string, index: number, mode: KeyboardMode) => void;
@@ -62,6 +80,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
       rowViewKey = "",
       rowIndex = 0,
       rowDepth = 0,
+      rows,
       isActiveRow = false,
       isSelected = false,
       onRowFocus = () => {},
@@ -69,19 +88,16 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
     }: DraggableProps,
     ref
   ): JSX.Element => {
-    const path = useViewPath();
+    const row = useRow();
+    const paneIndex = usePaneIndex();
+    const { selection } = useTemporaryView();
     const data = useData();
     const isNodeBeeingEdited = useIsEditingOn();
     const [rowID] = useCurrentRowID();
     const node = useCurrentNode();
     const currentRow = useCurrentEdge();
-    const virtualType = currentRow?.virtualType;
-    const currentReference = getCurrentReferenceForView(
-      data,
-      path,
-      virtualType,
-      currentRow
-    );
+    const { virtualType, viewKey } = row;
+    const currentReference = getCurrentReferenceForRow(data, row);
     const displayText = useDisplayText();
     const isEmptyNode = isEmptySemanticID(rowID);
     const disableDrag = isNodeBeeingEdited || isEmptyNode;
@@ -91,6 +107,11 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
       item: () => {
         clearDropIndent();
         markDragDescendants(rowViewKey);
+        const draggedRows = selection.has(viewKey)
+          ? rows
+              .filter((candidate) => selection.has(candidate.viewKey))
+              .toArray()
+          : [row];
         const dragNode = node || currentRow;
         const dragNodeId =
           virtualType === "incoming" && currentReference
@@ -102,10 +123,14 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
             : getBlockLink(currentRow) || getBlockLink(dragNode);
         const insertTarget = linkToInsertTarget(data, blockLink);
         return {
-          path,
+          row,
+          draggedRows,
+          sourcePaneIndex: paneIndex,
           text: displayText,
+          virtualType,
           isCopyDrag: copyDrag || undefined,
           nodeId: dragNodeId,
+          linkText: nodePathText(data, dragNode),
           insertTarget,
         };
       },
@@ -168,7 +193,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
         onClick={handleClick}
         onKeyDown={() => {}}
       >
-        <Node className={className} />
+        <Node className={className} rows={rows} />
       </div>
     );
   }
@@ -179,6 +204,7 @@ function DraggableSuggestion({
   rowViewKey,
   rowIndex,
   rowDepth,
+  rows,
   isActiveRow,
   isSelected = false,
   onRowFocus,
@@ -188,13 +214,17 @@ function DraggableSuggestion({
   rowViewKey: string;
   rowIndex: number;
   rowDepth: number;
+  rows: List<Row>;
   isActiveRow: boolean;
   isSelected?: boolean;
   onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
   onRowClick?: (e: React.MouseEvent, viewKey: string) => void;
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
-  const path = useViewPath();
+  const row = useRow();
+  const paneIndex = usePaneIndex();
+  const { viewKey } = row;
+  const { selection } = useTemporaryView();
   const currentRow = useCurrentEdge();
   const node = useCurrentNode();
   const displayText = useDisplayText();
@@ -204,10 +234,16 @@ function DraggableSuggestion({
     type: NOTE_TYPE,
     item: () => {
       clearDropIndent();
+      const draggedRows = selection.has(viewKey)
+        ? rows.filter((candidate) => selection.has(candidate.viewKey)).toArray()
+        : [row];
       const blockLink = getBlockLink(currentRow);
       return {
-        path,
+        row,
+        draggedRows,
+        sourcePaneIndex: paneIndex,
         text: displayText,
+        virtualType: row.virtualType,
         isSuggestion: true,
         nodeId: node?.id,
         insertTarget: linkToInsertTarget(data, blockLink),
@@ -270,35 +306,29 @@ function DraggableSuggestion({
       onClick={handleClick}
       onKeyDown={() => {}}
     >
-      <Node className={className} isSuggestion />
+      <Node className={className} isSuggestion rows={rows} />
     </div>
   );
 }
 
 export function ListItem({
-  index,
-  treeViewPath,
-  nextDepth,
-  nextViewPathStr,
+  row,
+  rows,
+  nextRow,
   activeRowKey,
   onRowFocus,
   onRowClick,
-  isFirstVirtual,
 }: {
-  index: number;
-  treeViewPath: ViewPath;
-  nextDepth?: number;
-  nextViewPathStr?: string;
+  row: Row;
+  rows: List<Row>;
+  nextRow: Row | undefined;
   activeRowKey: string;
   onRowFocus: (key: string, index: number, mode: KeyboardMode) => void;
   onRowClick?: (e: React.MouseEvent, viewKey: string) => void;
-  isFirstVirtual?: boolean;
 }): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
-  const viewKey = useViewKey();
-  const viewPath = useViewPath();
+  const { viewKey, virtualType } = row;
   const [rowID] = useCurrentRowID();
-  const virtualType = useCurrentEdge()?.virtualType;
   const isSuggestion = virtualType === "suggestion";
   const isCopyDrag =
     virtualType === "incoming" ||
@@ -307,31 +337,33 @@ export function ListItem({
   const isInSearchView = useIsInSearchView();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const selected = useIsSelected();
-  const rowDepth = viewPath.length - 1;
+  const rowDepth = row.depth;
+  const paneIndex = usePaneIndex();
   const isActiveRow = activeRowKey === viewKey;
   const isEmptyNode = isEmptySemanticID(rowID);
 
   const isReadonly = isInSearchView || isViewingOtherUserContent;
 
   const [{ dragDirection }, drop] = useDroppable({
-    destination: treeViewPath,
-    index,
+    row,
     ref,
-    nextDepth,
-    nextViewPathStr,
+    nextRow,
+    rows,
+    paneIndex,
   });
 
   if (isSuggestion) {
     return (
       <div
         className={`visible-on-hover suggestion-item-container${
-          isFirstVirtual ? " first-virtual" : ""
+          row.isFirstVirtual ? " first-virtual" : ""
         }`}
       >
         <DraggableSuggestion
           rowViewKey={viewKey}
-          rowIndex={index}
+          rowIndex={row.index}
           rowDepth={rowDepth}
+          rows={rows}
           isActiveRow={isActiveRow}
           isSelected={selected}
           onRowFocus={onRowFocus}
@@ -341,7 +373,7 @@ export function ListItem({
     );
   }
 
-  if (!isReadonly && !isCopyDrag) {
+  if (!isReadonly && !isCopyDrag && !isEmptyNode) {
     drop(ref);
   }
 
@@ -349,15 +381,18 @@ export function ListItem({
     dragDirection === -1 && !isEmptyNode ? "dragging-over-bottom" : "";
   return (
     <div
-      className={`visible-on-hover${isFirstVirtual ? " first-virtual" : ""}`}
+      className={`visible-on-hover${
+        row.isFirstVirtual ? " first-virtual" : ""
+      }`}
     >
       <Draggable
         ref={ref}
         className={className}
         copyDrag={isCopyDrag}
         rowViewKey={viewKey}
-        rowIndex={index}
+        rowIndex={row.index}
         rowDepth={rowDepth}
+        rows={rows}
         isActiveRow={isActiveRow}
         isSelected={selected}
         onRowFocus={onRowFocus}

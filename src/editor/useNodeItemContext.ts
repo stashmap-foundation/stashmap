@@ -1,13 +1,9 @@
 import {
-  useNodeIndex,
-  useViewPath,
-  getParentView,
   useIsInSearchView,
   useCurrentNode,
   useCurrentRowID,
-  getNodeForView,
-  getCurrentEdgeForView,
   ViewPath,
+  useRow,
 } from "../ViewContext";
 import { isEmptySemanticID } from "../core/connections";
 import { usePlanner } from "../planner";
@@ -15,8 +11,7 @@ import {
   planUpdateViewItemMetadata,
   NodeItemMetadata,
 } from "../nodeItemMutations";
-import { useData } from "../DataContext";
-import { useCurrentPane } from "../SplitPanesContext";
+import { useCurrentPane, usePaneIndex } from "../SplitPanesContext";
 import { useEditorText } from "./EditorTextContext";
 import { nodeText as getNodeSpanText } from "../core/nodeSpans";
 
@@ -31,6 +26,8 @@ type NodeItemContext = {
   viewPath: ViewPath;
   parentView: ViewPath | undefined;
   nodeID: LongID | undefined;
+  parentNode: GraphNode | undefined;
+  childID: ID;
   // Update function
   updateMetadata: (metadata: NodeItemMetadata) => void;
 };
@@ -44,14 +41,15 @@ type NodeItemContext = {
  * - Regular nodes: optionally save text, then update nodes
  */
 export function useNodeItemContext(): NodeItemContext {
-  const data = useData();
-  const viewPath = useViewPath();
-  const nodeIndex = useNodeIndex();
+  const row = useRow();
+  const { viewPath } = row;
+  const nodeIndex = row.childIndex;
   const { createPlan, executePlan } = usePlanner();
   const isInSearchView = useIsInSearchView();
   const currentNode = useCurrentNode();
-  const parentView = getParentView(viewPath);
+  const parentView = row.parentViewPath;
   const pane = useCurrentPane();
+  const paneIndex = usePaneIndex();
   const isDocumentTopLevel =
     pane.documentId !== undefined && parentView === undefined && !!currentNode;
 
@@ -59,7 +57,7 @@ export function useNodeItemContext(): NodeItemContext {
   const isEmptyNode = isEmptySemanticID(rowID);
   const nodeID = (() => {
     if (parentView) {
-      return getNodeForView(data, parentView)?.id;
+      return row.parentNode?.id;
     }
     if (isDocumentTopLevel) {
       return currentNode.id;
@@ -80,7 +78,7 @@ export function useNodeItemContext(): NodeItemContext {
       return currentNode;
     }
     if (isVisible && parentView) {
-      return getCurrentEdgeForView(data, viewPath);
+      return row.node;
     }
     return undefined;
   })();
@@ -96,7 +94,24 @@ export function useNodeItemContext(): NodeItemContext {
       return;
 
     executePlan(
-      planUpdateViewItemMetadata(createPlan(), viewPath, metadata, editorText)
+      planUpdateViewItemMetadata(
+        createPlan(),
+        {
+          node: row.node,
+          rowID,
+          viewPath,
+          parentNode: row.parentNode,
+          parentViewPath: row.parentViewPath,
+          childIndex: row.childIndex,
+          virtualType: row.virtualType,
+          paneIndex,
+          paneAuthor: pane.author,
+          documentId: pane.documentId,
+          isDocumentTopLevel,
+        },
+        metadata,
+        editorText
+      )
     );
   };
 
@@ -109,6 +124,8 @@ export function useNodeItemContext(): NodeItemContext {
     viewPath,
     parentView,
     nodeID,
+    parentNode: row.parentNode,
+    childID: row.node.id,
     updateMetadata,
   };
 }

@@ -1,9 +1,8 @@
 import React, { RefObject, useEffect, useRef } from "react";
-import { OrderedSet } from "immutable";
+import { List, OrderedSet } from "immutable";
 import { ConnectDropTarget, DropTargetMonitor, useDrop } from "react-dnd";
 import { NativeTypes } from "react-dnd-html5-backend";
-import { dnd, getDropDestinationFromTreeView } from "../dnd";
-import { isEmptySemanticID } from "../core/connections";
+import { dnd, getDropDestinationFromRows } from "../dnd";
 import { useTemporaryView } from "./TemporaryViewContext";
 import {
   AddToParentTarget,
@@ -11,15 +10,9 @@ import {
   planUpdatePanes,
   usePlanner,
 } from "../planner";
-import {
-  ViewPath,
-  buildPaneTarget,
-  getRowIDFromView,
-  useViewPath,
-  viewPathToString,
-} from "../ViewContext";
+import { buildPaneTarget } from "../ViewContext";
 import { NOTE_TYPE, INDENTATION } from "./Node";
-import { useCurrentPane } from "../SplitPanesContext";
+import { usePaneIndex } from "../SplitPanesContext";
 import {
   MarkdownImportFile,
   parseMarkdownImportFiles,
@@ -28,9 +21,12 @@ import {
 } from "./FileDropZone";
 
 type DragItemType = {
-  path: ViewPath;
+  row: Row;
+  draggedRows: Row[];
+  sourcePaneIndex: number;
   isSuggestion?: boolean;
   isCopyDrag?: boolean;
+  virtualType: Row["virtualType"];
   nodeId?: LongID;
   targetId?: LongID;
   linkText?: string;
@@ -42,6 +38,16 @@ type NativeFileDropItem = {
 };
 
 type DropItemType = DragItemType | NativeFileDropItem;
+
+function isDragItem(
+  item: DropItemType | null | undefined
+): item is DragItemType {
+  return item !== null && item !== undefined && "row" in item;
+}
+
+function isNativeFileDropItem(item: DropItemType): item is NativeFileDropItem {
+  return "files" in item;
+}
 
 type DroppableContainerProps = {
   children: React.ReactNode;
@@ -82,7 +88,7 @@ function getFilesFromNativeDrop(item: NativeFileDropItem): File[] {
 function calcDragDirection(
   ref: RefObject<HTMLElement>,
   monitor: DropTargetMonitor<DropItemType>,
-  path: ViewPath
+  row: Row
 ): number | undefined {
   if (!monitor.isOver({ shallow: true })) {
     return undefined;
@@ -90,25 +96,15 @@ function calcDragDirection(
   if (!ref.current) {
     return undefined;
   }
-  const item = monitor.getItem() as DragItemType | undefined;
-  if (item?.path) {
-    const sourceStr = viewPathToString(item.path);
-    const targetStr = viewPathToString(path);
+  const item = monitor.getItem();
+  if (isDragItem(item)) {
+    const sourceStr = item.row.viewKey;
+    const targetStr = row.viewKey;
     if (targetStr === sourceStr || targetStr.startsWith(`${sourceStr}:`)) {
       return undefined;
     }
   }
   return -1;
-}
-
-function calcIndex(
-  index: number | undefined,
-  direction: number | undefined
-): number | undefined {
-  if (index === undefined || direction === undefined) {
-    return undefined;
-  }
-  return direction === 1 ? index : index + 1;
 }
 
 const INDICATOR_GUTTER_WIDTH = 20;
@@ -162,8 +158,8 @@ export function clearDropIndent(): void {
 export function computeDepthLimits(
   currentDepth: number,
   nextDepth: number | undefined,
-  nextViewPathStr: string | undefined,
-  sourcePathStr: string | undefined,
+  nextViewKey: string | undefined,
+  sourceViewKey: string | undefined,
   rootDepth: number
 ): { minDepth: number; maxDepth: number } {
   const maxDepth = currentDepth + 1;
@@ -171,39 +167,43 @@ export function computeDepthLimits(
     return { minDepth: rootDepth + 1, maxDepth };
   }
   if (
-    sourcePathStr &&
-    nextViewPathStr &&
-    (nextViewPathStr === sourcePathStr ||
-      nextViewPathStr.startsWith(`${sourcePathStr}:`))
+    sourceViewKey &&
+    nextViewKey &&
+    (nextViewKey === sourceViewKey ||
+      nextViewKey.startsWith(`${sourceViewKey}:`))
   ) {
     return { minDepth: rootDepth + 1, maxDepth };
   }
   return { minDepth: nextDepth, maxDepth };
 }
 
+function getRootDepth(rows: List<Row>): number {
+  const firstRow = rows.first();
+  if (!firstRow) {
+    return 0;
+  }
+  return firstRow.parentRef ? firstRow.depth - 1 : firstRow.depth;
+}
+
 export function useDroppable({
-  destination,
-  index,
+  row,
   ref,
-  nextDepth,
-  nextViewPathStr,
+  nextRow,
+  rows,
+  paneIndex,
 }: {
-  destination: ViewPath;
-  index?: number;
+  row: Row;
   ref: RefObject<HTMLElement>;
-  nextDepth?: number;
-  nextViewPathStr?: string;
+  nextRow: Row | undefined;
+  rows: List<Row>;
+  paneIndex: number;
 }): [
   { dragDirection: number | undefined; isOver: boolean },
   ConnectDropTarget
 ] {
-  const { selection, anchor } = useTemporaryView();
+  const { anchor } = useTemporaryView();
   const { createPlan, executePlan } = usePlanner();
-  const pane = useCurrentPane();
-  const path = useViewPath();
   const invertCopyModeRef = useRef(false);
-
-  const isListItem = index !== undefined;
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
@@ -234,25 +234,25 @@ export function useDroppable({
     };
   }, []);
 
-  const currentDepth = path.length - 1;
+  const currentDepth = row.depth;
 
-  const rootDepth = destination.length - 1;
+  const rootDepth = getRootDepth(rows);
 
   const calcDepthLimits = (
-    sourcePathStr?: string
+    sourceViewKey?: string
   ): { minDepth: number; maxDepth: number } =>
     computeDepthLimits(
       currentDepth,
-      nextDepth,
-      nextViewPathStr,
-      sourcePathStr,
+      nextRow?.depth,
+      nextRow?.viewKey,
+      sourceViewKey,
       rootDepth
     );
 
   const updateTargetDepth = (
     monitor: DropTargetMonitor<DropItemType>
   ): void => {
-    const direction = calcDragDirection(ref, monitor, path);
+    const direction = calcDragDirection(ref, monitor, row);
     const clientOffset = monitor.getClientOffset();
     if (!clientOffset || !ref.current || direction === undefined) {
       return;
@@ -276,11 +276,10 @@ export function useDroppable({
       globalDragIndent.activeElement = parentEl;
     }
 
-    const dragItem = monitor.getItem() as DragItemType | undefined;
-    const sourcePathStr = dragItem?.path
-      ? viewPathToString(dragItem.path)
-      : undefined;
-    const { minDepth, maxDepth } = calcDepthLimits(sourcePathStr);
+    const dragItem = monitor.getItem();
+    const { minDepth, maxDepth } = calcDepthLimits(
+      isDragItem(dragItem) ? dragItem.row.viewKey : undefined
+    );
 
     if (globalDragIndent.anchorX === undefined) {
       globalDragIndent.anchorX = clientOffset.x;
@@ -328,7 +327,7 @@ export function useDroppable({
   >({
     accept: [NOTE_TYPE, NativeTypes.FILE],
     collect(monitor) {
-      const rawDirection = calcDragDirection(ref, monitor, path);
+      const rawDirection = calcDragDirection(ref, monitor, row);
       const direction = rawDirection;
       const isOver = monitor.isOver({ shallow: true });
       if (isOver && direction !== undefined) {
@@ -336,13 +335,12 @@ export function useDroppable({
         if (parentEl) {
           /* eslint-disable functional/immutable-data */
           if (globalDragIndent.targetDepth === undefined) {
-            const collectDragItem = monitor.getItem() as
-              | DragItemType
-              | undefined;
-            const collectSourcePath = collectDragItem?.path
-              ? viewPathToString(collectDragItem.path)
+            const collectDragItem = monitor.getItem();
+            const collectSourceViewKey = isDragItem(collectDragItem)
+              ? collectDragItem.row.viewKey
               : undefined;
-            const { minDepth, maxDepth } = calcDepthLimits(collectSourcePath);
+            const { minDepth, maxDepth } =
+              calcDepthLimits(collectSourceViewKey);
             globalDragIndent.targetDepth = Math.max(
               minDepth,
               Math.min(maxDepth, currentDepth)
@@ -368,15 +366,17 @@ export function useDroppable({
       }
       const { targetDepth } = globalDragIndent;
       clearDropIndent();
-      const rawDirection = calcDragDirection(ref, monitor, path);
+      const rawDirection = calcDragDirection(ref, monitor, row);
       const direction = rawDirection;
-      if (isListItem && direction === undefined) {
+      if (direction === undefined) {
         return item;
       }
 
       if (monitor.getItemType() === NativeTypes.FILE) {
-        const fileDropItem = item as NativeFileDropItem;
-        const destinationIndex = calcIndex(index, direction);
+        if (!isNativeFileDropItem(item)) {
+          return item;
+        }
+        const fileDropItem = item;
         (async () => {
           const markdownFiles = await Promise.all(
             getFilesFromNativeDrop(fileDropItem)
@@ -393,21 +393,13 @@ export function useDroppable({
           }
 
           const plan = createPlan();
-          const [dropParentPath, insertAtIndex] =
-            destinationIndex === undefined
-              ? [destination, undefined]
-              : getDropDestinationFromTreeView(
-                  plan,
-                  destination,
-                  destinationIndex,
-                  pane.rootNodeId
-                );
-          const [dropParentItemID] = getRowIDFromView(plan, dropParentPath);
-
-          if (isEmptySemanticID(dropParentItemID)) {
-            await executePlan(
-              planImportMarkdownFilesAtEmptyRoot(plan, markdownFiles, path[0])
-            );
+          const dropDestination = getDropDestinationFromRows(
+            rows,
+            row,
+            undefined,
+            []
+          );
+          if (!dropDestination) {
             return;
           }
 
@@ -420,49 +412,35 @@ export function useDroppable({
             planPasteMarkdownTrees(
               plan,
               importedTrees,
-              dropParentPath,
-              insertAtIndex
+              dropDestination.parentRow.node,
+              dropDestination.insertAtIndex
             )
           );
         })();
         return item;
       }
 
-      const dragItem = item as DragItemType;
-      const plan = createPlan();
-      const [targetRowItemID] = getRowIDFromView(plan, path);
-      const isDroppingOnEmptyRootNode =
-        isEmptySemanticID(targetRowItemID) &&
-        viewPathToString(path) === viewPathToString(destination);
-
-      if (isDroppingOnEmptyRootNode) {
-        const target = buildPaneTarget(plan, dragItem.path);
-        const targetPaneIndex = destination[0] as number;
-        const updatedPanes = plan.panes.map((p, idx) => {
-          if (idx !== targetPaneIndex) return p;
-          return {
-            id: p.id,
-            author: target.author,
-            documentId: target.documentId,
-            rootNodeId: target.rootNodeId,
-            scrollToId: target.scrollToId,
-          };
-        });
-        executePlan(planUpdatePanes(plan, updatedPanes));
-        return dragItem;
+      if (!isDragItem(item)) {
+        return item;
       }
-
+      const dragItem = item;
+      const plan = createPlan();
+      const dropDestination = getDropDestinationFromRows(
+        rows,
+        row,
+        targetDepth,
+        dragItem.draggedRows.length ? dragItem.draggedRows : [dragItem.row]
+      );
+      if (!dropDestination) {
+        return item;
+      }
       const dropped = dnd(
         plan,
-        selection,
         dragItem,
-        destination,
-        calcIndex(index, direction),
-        pane.rootNodeId,
-        dragItem.isSuggestion,
-        invertCopyModeRef.current,
-        targetDepth,
-        dragItem.isCopyDrag
+        paneIndex,
+        dropDestination.parentRow,
+        dropDestination.insertAtIndex,
+        invertCopyModeRef.current
       );
       executePlan(
         planSetTemporarySelectionState(dropped, {
@@ -477,18 +455,81 @@ export function useDroppable({
   });
 }
 
+function useEmptyPaneDrop({
+  paneIndex,
+}: {
+  paneIndex: number;
+}): [{ isOver: boolean }, ConnectDropTarget] {
+  const { createPlan, executePlan } = usePlanner();
+  return useDrop<DropItemType, DropItemType, { isOver: boolean }>({
+    accept: [NOTE_TYPE, NativeTypes.FILE],
+    collect(monitor) {
+      return { isOver: monitor.isOver({ shallow: true }) };
+    },
+    drop(item: DropItemType, monitor: DropTargetMonitor<DropItemType>) {
+      if (monitor.didDrop()) {
+        return item;
+      }
+
+      if (monitor.getItemType() === NativeTypes.FILE) {
+        if (!isNativeFileDropItem(item)) {
+          return item;
+        }
+        const fileDropItem = item;
+        (async () => {
+          const markdownFiles = await Promise.all(
+            getFilesFromNativeDrop(fileDropItem)
+              .filter(isMarkdownFile)
+              .map(async (file): Promise<MarkdownImportFile> => {
+                return {
+                  name: file.name,
+                  markdown: await readFileAsText(file),
+                };
+              })
+          );
+          if (markdownFiles.length === 0) {
+            return;
+          }
+          const plan = createPlan();
+          await executePlan(
+            planImportMarkdownFilesAtEmptyRoot(plan, markdownFiles, paneIndex)
+          );
+        })();
+        return item;
+      }
+
+      if (!isDragItem(item)) {
+        return item;
+      }
+      const dragItem = item;
+      const plan = createPlan();
+      const paneTarget = buildPaneTarget(plan, dragItem.row);
+      const updatedPanes = plan.panes.map((p, idx) => {
+        if (idx !== paneIndex) return p;
+        return {
+          id: p.id,
+          author: paneTarget.author,
+          sourceId: paneTarget.sourceId,
+          documentId: paneTarget.documentId,
+          rootNodeId: paneTarget.rootNodeId,
+          scrollToId: paneTarget.scrollToId,
+        };
+      });
+      executePlan(planUpdatePanes(plan, updatedPanes));
+      return dragItem;
+    },
+  });
+}
+
 export function DroppableContainer({
   children,
   className: extraClassName,
   disabled,
   ariaLabel,
 }: DroppableContainerProps): JSX.Element {
+  const paneIndex = usePaneIndex();
   const ref = useRef<HTMLDivElement>(null);
-  const path = useViewPath();
-  const [{ isOver }, drop] = useDroppable({
-    destination: path,
-    ref,
-  });
+  const [{ isOver }, drop] = useEmptyPaneDrop({ paneIndex });
   const className = [!disabled && isOver ? "dimmed" : "", extraClassName]
     .filter(Boolean)
     .join(" ");

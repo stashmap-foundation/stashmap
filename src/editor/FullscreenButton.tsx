@@ -1,11 +1,6 @@
 import React from "react";
 import { useMediaQuery } from "react-responsive";
-import {
-  useViewPath,
-  useDisplayText,
-  buildPaneTarget,
-  useCurrentEdge,
-} from "../ViewContext";
+import { useDisplayText, buildPaneTarget, useRow } from "../ViewContext";
 import { useNavigatePane } from "../SplitPanesContext";
 import { useData } from "../DataContext";
 import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
@@ -13,17 +8,16 @@ import { IS_MOBILE } from "./responsive";
 
 export function FullscreenButton(): JSX.Element | null {
   const isMobile = useMediaQuery(IS_MOBILE);
-  const viewPath = useViewPath();
   const data = useData();
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();
-  const currentRow = useCurrentEdge();
-  const isFullscreenNode = viewPath.length === 2;
+  const row = useRow();
+  const isFullscreenNode = row.depth === 1;
   if (isFullscreenNode || isMobile) {
     return null;
   }
 
-  const target = buildPaneTarget(data, viewPath, currentRow);
+  const target = buildPaneTarget(data, row);
 
   const href = (() => {
     if (target.documentId) {
@@ -34,7 +28,11 @@ export function FullscreenButton(): JSX.Element | null {
       );
     }
     if (target.rootNodeId) {
-      return buildNodeRouteUrl(target.rootNodeId, target.scrollToId);
+      return buildNodeRouteUrl(
+        target.rootNodeId,
+        target.sourceId,
+        target.scrollToId
+      );
     }
     return undefined;
   })();

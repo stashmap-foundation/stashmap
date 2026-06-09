@@ -14,7 +14,6 @@ import {
   getNodeText,
   getSemanticID,
   isSearchId,
-  shortID,
 } from "./connections";
 import type {
   DocumentLinkTargetSeed,
@@ -205,9 +204,9 @@ export function planUpsertRootDocument<T extends GraphPlan>(
   const next = existing
     ? {
         ...existing,
-        topNodeShortIds: existing.topNodeShortIds.includes(shortID(rootNode.id))
+        topNodeShortIds: existing.topNodeShortIds.includes(rootNode.id)
           ? existing.topNodeShortIds
-          : [...existing.topNodeShortIds, shortID(rootNode.id)],
+          : [...existing.topNodeShortIds, rootNode.id],
         updatedMs: rootNode.updated,
       }
     : createDocumentFromRootNode(rootNode);
@@ -255,7 +254,7 @@ export function upsertNodesCore<T extends GraphPlan>(
       : normalized;
   const updatedDB = {
     ...userDB,
-    nodes: userDB.nodes.set(shortID(node.id), node),
+    nodes: userDB.nodes.set(node.id, node),
   };
   const planWithNode: T = {
     ...plan,
@@ -285,7 +284,7 @@ export function planUpsertNodes<T extends GraphPlan>(
   nodes: GraphNode
 ): T {
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
-  const isNewNode = !userDB.nodes.has(shortID(nodes.id));
+  const isNewNode = !userDB.nodes.has(nodes.id);
   const basePlan = upsertNodesCore(plan, nodes);
 
   const isRootNode = isNewNode && !nodes.parent;
@@ -308,8 +307,7 @@ function getAnchorSnapshotLabels(
       break;
     }
     labels.unshift(
-      getNodeText(parentNode) ||
-        shortID(getSemanticID(knowledgeDBs, parentNode))
+      getNodeText(parentNode) || getSemanticID(knowledgeDBs, parentNode)
     );
     parentNodeID = parentNode.parent;
   }
@@ -331,7 +329,7 @@ function getNodeParentDepth(
   const seen = new Set<ID>();
 
   while (currentNode?.parent) {
-    const parentID = shortID(currentNode.parent) as ID;
+    const parentID: ID = currentNode.parent;
     if (seen.has(parentID)) {
       break;
     }
@@ -355,7 +353,7 @@ function getNodeSubtree(
     plan.knowledgeDBs.get(sourceNode.author)?.nodes.valueSeq().toList() ||
     List<GraphNode>();
   const authorNodesByID = authorNodes.reduce(
-    (acc, node) => acc.set(shortID(node.id), node),
+    (acc, node) => acc.set(node.id, node),
     Map<ID, GraphNode>()
   );
   const childrenByParent = authorNodes
@@ -493,11 +491,9 @@ export function planMoveDescendantNodes<T extends GraphPlan>(
   const sourceSemanticID = getSemanticID(plan.knowledgeDBs, sourceNode);
   const sourceSemanticContext = getNodeContext(plan.knowledgeDBs, sourceNode);
   const effectiveTargetSemanticID = targetSemanticID ?? sourceSemanticID;
-  const sourceChildContext = sourceSemanticContext.push(
-    shortID(sourceSemanticID)
-  );
+  const sourceChildContext = sourceSemanticContext.push(sourceSemanticID);
   const targetChildContext = targetSemanticContext.push(
-    shortID(effectiveTargetSemanticID)
+    effectiveTargetSemanticID
   );
 
   return descendants.reduce((accPlan, node) => {
@@ -560,7 +556,7 @@ function planDeleteDocumentRoot<T extends GraphPlan>(
   const key = documentKeyOf(node.author, docId);
   const document = plan.documents.get(key);
   const remainingTopNodeShortIds =
-    document?.topNodeShortIds.filter((id) => id !== shortID(node.id)) ?? [];
+    document?.topNodeShortIds.filter((id) => id !== node.id) ?? [];
 
   if (document && remainingTopNodeShortIds.length > 0) {
     const nextDocument: Document = {
@@ -597,8 +593,8 @@ export function planDeleteNodes<T extends GraphPlan>(
   nodeID: LongID
 ): T {
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
-  const node = userDB.nodes.get(shortID(nodeID));
-  const updatedNodes = userDB.nodes.remove(shortID(nodeID));
+  const node = userDB.nodes.get(nodeID);
+  const updatedNodes = userDB.nodes.remove(nodeID);
   const updatedDB = {
     ...userDB,
     nodes: updatedNodes,
@@ -777,8 +773,7 @@ export function planAddTargetsToNode<T extends GraphPlan>(
         typeof objectOrID !== "string" && "userPublicKey" in objectOrID
           ? objectOrID.userPublicKey
           : undefined;
-      const localID = shortID(objectID as ID) as ID;
-      if (refTarget || isSearchId(localID)) {
+      if (refTarget || isSearchId(objectID as ID)) {
         const childNode = refTarget
           ? newGraphNode(
               accPlan.user.publicKey,
@@ -949,10 +944,7 @@ export function planAddTopTargetsToDocument<T extends GraphPlan>(
 
   const nextDocument: Document = {
     ...document,
-    topNodeShortIds: [
-      ...document.topNodeShortIds,
-      ...topNodeIds.map((id) => shortID(id)),
-    ],
+    topNodeShortIds: [...document.topNodeShortIds, ...topNodeIds],
     updatedMs: Date.now(),
   };
 

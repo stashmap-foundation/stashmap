@@ -229,6 +229,40 @@ test("save rejects duplicate node ids across documents", async () => {
   });
 });
 
+test("save preserves safe explicit markdown ids exactly", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  write(
+    workspaceDir,
+    "custom-ids.md",
+    [
+      "# Project <!-- id:foo_bar -->",
+      "- dash <!-- id:foo-bar -->",
+      "- colon <!-- id:foo:bar -->",
+      "- dot <!-- id:custom.id -->",
+      "",
+    ].join("\n")
+  );
+
+  await knowstrSave(workspaceDir);
+
+  expect(readNodeId(workspaceDir, "custom-ids.md", "# Project")).toBe(
+    "foo_bar"
+  );
+  expect(readNodeId(workspaceDir, "custom-ids.md", "- dash")).toBe("foo-bar");
+  expect(readNodeId(workspaceDir, "custom-ids.md", "- colon")).toBe("foo:bar");
+  expect(readNodeId(workspaceDir, "custom-ids.md", "- dot")).toBe("custom.id");
+  expect((await knowstrSave(workspaceDir)).changed_paths).toEqual([]);
+});
+
+test("save rejects unsafe explicit markdown ids", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  write(workspaceDir, "bad-id.md", '# Bad <!-- id:bad"id -->\n');
+
+  await expect(knowstrSave(workspaceDir)).rejects.toMatchObject({
+    message: expect.stringContaining('Invalid markdown node id: bad"id'),
+  });
+});
+
 test("save preserves heading levels", async () => {
   const { path: workspaceDir } = knowstrInit();
   write(

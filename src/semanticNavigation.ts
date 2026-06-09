@@ -5,7 +5,6 @@ import {
   getChildNodes,
   getSemanticID,
   getNode,
-  shortID,
 } from "./core/connections";
 import { isStandaloneRoot } from "./core/systemRoots";
 
@@ -14,9 +13,7 @@ function nodeMatchesRequestedSemanticID(
   node: GraphNode,
   requestedSemanticID: ID
 ): boolean {
-  return (
-    shortID(getSemanticID(knowledgeDBs, node)) === shortID(requestedSemanticID)
-  );
+  return getSemanticID(knowledgeDBs, node) === requestedSemanticID;
 }
 
 function getAuthorCandidateNodes(
@@ -25,7 +22,7 @@ function getAuthorCandidateNodes(
   semanticID: ID
 ): GraphNode[] {
   const authorDB = knowledgeDBs.get(author, newDB());
-  return getIndexedNodesForKeys(knowledgeDBs, authorDB, [shortID(semanticID)]);
+  return getIndexedNodesForKeys(knowledgeDBs, authorDB, [semanticID]);
 }
 
 function getNewestStandaloneRootBySemanticID(
@@ -112,7 +109,7 @@ function buildRequestedSemanticPath(
   semanticContext: Context,
   itemID: ID
 ): ID[] {
-  return [...semanticContext.toArray(), shortID(itemID) as ID];
+  return [...semanticContext.toArray(), itemID];
 }
 
 function resolveNodeFromKnownRoot(

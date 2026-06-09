@@ -7,6 +7,7 @@ import Token from "markdown-it/lib/token";
 import { fileLinkSpan, linkSpan, plainSpans, spansText } from "./nodeSpans";
 import { isMarkdownPath } from "./linkPath";
 import { parseFrontMatter } from "./knowstrFrontmatter";
+import { isSafeMarkdownNodeId } from "./graphLookup";
 
 const captured: { value?: string } = {};
 const markdown = new MarkdownIt({ html: true });
@@ -47,6 +48,9 @@ function parseIdComment(content: string): ParsedComment | undefined {
     return undefined;
   }
   const uuid = match[1];
+  if (!isSafeMarkdownNodeId(uuid)) {
+    throw new Error(`Invalid markdown node id: ${uuid}`);
+  }
   const rest = match[2];
 
   const attrsMap: Record<string, string> = {};

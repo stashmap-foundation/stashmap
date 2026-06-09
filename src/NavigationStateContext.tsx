@@ -11,11 +11,10 @@ import {
   buildNodeRouteUrl,
   parseDocumentRouteUrl,
   parseNodeRouteUrl,
-  parseAuthorFromSearch,
+  parseSourceFromSearch,
 } from "./navigationUrl";
 import { usePlanner } from "./planner";
 import { generatePaneId } from "./SplitPanesContext";
-import { splitID } from "./core/connections";
 
 type NavigationStateContextType = {
   activePaneIndex: number;
@@ -51,7 +50,11 @@ function paneToUrl(activePane: Pane): string | undefined {
     );
   }
   if (activePane.rootNodeId) {
-    return buildNodeRouteUrl(activePane.rootNodeId, activePane.scrollToId);
+    return buildNodeRouteUrl(
+      activePane.rootNodeId,
+      activePane.sourceId,
+      activePane.scrollToId
+    );
   }
 
   return "/";
@@ -62,26 +65,31 @@ function urlToPane(
   search: string,
   fallbackAuthor: PublicKey
 ): Pane {
-  const author = parseAuthorFromSearch(search) || fallbackAuthor;
+  const sourceId = parseSourceFromSearch(search);
+  const author = (sourceId || fallbackAuthor) as PublicKey;
   const documentRoute = parseDocumentRouteUrl(pathname);
   if (documentRoute) {
     return {
       id: generatePaneId(),
       author: documentRoute.author,
+      sourceId: documentRoute.author,
       documentId: documentRoute.docId,
     };
   }
   const nodeID = parseNodeRouteUrl(pathname);
   if (nodeID) {
+    const nodeSourceId = sourceId || fallbackAuthor;
     return {
       id: generatePaneId(),
-      author: splitID(nodeID)[0] || author,
+      author: nodeSourceId as PublicKey,
+      sourceId: nodeSourceId,
       rootNodeId: nodeID,
     };
   }
   return {
     id: generatePaneId(),
     author,
+    sourceId: sourceId || fallbackAuthor,
   };
 }
 

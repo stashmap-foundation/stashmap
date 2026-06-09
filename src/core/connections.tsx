@@ -94,31 +94,6 @@ export function parseSearchId(id: ID): string | undefined {
   return id.slice(SEARCH_PREFIX.length);
 }
 
-export function splitID(id: ID): [PublicKey | undefined, string] {
-  if (!id) {
-    return [undefined, ""];
-  }
-  const split = id.split("_");
-  if (split.length === 1) {
-    return [undefined, split[0]];
-  }
-  return [split[0] as PublicKey, split.slice(1).join(":")];
-}
-
-export function joinID(remote: PublicKey | string, id: string): LongID {
-  return `${remote}_${id}` as LongID;
-}
-
-export function shortID(id: ID): string {
-  if (!id) {
-    return "";
-  }
-  if (isSearchId(id)) {
-    return id;
-  }
-  return splitID(id)[1];
-}
-
 export function getNodeText(node: GraphNode | undefined): string | undefined {
   if (!node) {
     return undefined;
@@ -127,8 +102,7 @@ export function getNodeText(node: GraphNode | undefined): string | undefined {
   if (text !== "") {
     return text;
   }
-  const nodeID = shortID(node.id) as ID;
-  return isSearchId(nodeID) ? parseSearchId(nodeID) || "" : undefined;
+  return isSearchId(node.id) ? parseSearchId(node.id) || "" : undefined;
 }
 
 type NodeLookupIndex = globalThis.Map<string, GraphNode[]>;
@@ -184,7 +158,7 @@ export function getIndexedNodesForKeys(
   const seen = new globalThis.Set<string>();
   return uniqueKeys.flatMap((key) =>
     (getNodeLookupIndex(knowledgeDBs, db).get(key) || []).filter((node) => {
-      const nodeKey = shortID(node.id);
+      const nodeKey = node.id;
       if (seen.has(nodeKey)) {
         return false;
       }
@@ -195,9 +169,8 @@ export function getIndexedNodesForKeys(
 }
 
 export function getNodeSemanticID(node: GraphNode): ID {
-  const nodeID = shortID(node.id) as ID;
-  if (isSearchId(nodeID)) {
-    return nodeID;
+  if (isSearchId(node.id)) {
+    return node.id;
   }
   return nodeText(node) as ID;
 }
@@ -215,7 +188,7 @@ export function getNodeContext(
   node: GraphNode
 ): Context {
   const db = knowledgeDBs.get(node.author);
-  const nodeKey = shortID(node.id);
+  const nodeKey = node.id;
   if (db) {
     const cached = getNodeContextIndex(db).get(nodeKey);
     if (cached) {
@@ -236,7 +209,7 @@ export function getNodeContext(
   let currentParentID: LongID | undefined = node.parent;
 
   while (currentParentID) {
-    const parentKey = shortID(currentParentID);
+    const parentKey = currentParentID;
     if (visited.has(parentKey)) {
       if (db) {
         getNodeContextIndex(db).set(nodeKey, fallbackContext);
@@ -302,7 +275,7 @@ export function buildTextNodesFromGraphNodes(
       nodes: Map<string, GraphNode>(),
     });
     return acc.set(node.author, {
-      nodes: authorDB.nodes.set(shortID(node.id), node),
+      nodes: authorDB.nodes.set(node.id, node),
     });
   }, Map<PublicKey, KnowledgeData>());
 
@@ -329,16 +302,12 @@ export function buildTextNodesFromGraphNodes(
 export function getNode(
   knowledgeDBs: KnowledgeDBs,
   nodeID: ID | undefined,
-  myself: PublicKey
+  sourceId: PublicKey
 ): GraphNode | undefined {
   if (!nodeID) {
     return undefined;
   }
-  const [remote, id] = splitID(nodeID);
-  if (remote) {
-    return knowledgeDBs.get(remote)?.nodes.get(id);
-  }
-  return knowledgeDBs.get(myself)?.nodes.get(nodeID);
+  return knowledgeDBs.get(sourceId)?.nodes.get(nodeID);
 }
 
 export function getChildNodes(
@@ -355,6 +324,7 @@ export function getChildNodes(
 export type RefTargetInfo = {
   stack: ID[];
   author: PublicKey;
+  sourceId: SourceId;
   rootNodeId?: LongID;
   scrollToId?: string;
 };
@@ -371,6 +341,7 @@ export function getNodeRouteTargetInfo(
   return {
     stack: getNodeStack(knowledgeDBs, node),
     author: node.author,
+    sourceId: node.author,
     rootNodeId: node.id,
   };
 }
@@ -392,6 +363,7 @@ export function getRefTargetInfo(
   return {
     stack,
     author: node.author,
+    sourceId: node.author,
     rootNodeId: node.id,
   };
 }
@@ -408,11 +380,7 @@ export function getFileLinkTargetInfo(
   const targetKey = documentKeyOf(targetDoc.author, targetDoc.docId);
   const topNodeShortId = targetDoc.topNodeShortIds[0];
   const targetRoot = topNodeShortId
-    ? getNode(
-        knowledgeDBs,
-        joinID(targetDoc.author, topNodeShortId as ID),
-        targetDoc.author
-      )
+    ? getNode(knowledgeDBs, topNodeShortId as ID, targetDoc.author)
     : undefined;
   if (!targetRoot) {
     return undefined;
@@ -420,6 +388,7 @@ export function getFileLinkTargetInfo(
   return {
     stack: getNodeStack(knowledgeDBs, targetRoot),
     author: targetRoot.author,
+    sourceId: targetRoot.author,
     rootNodeId: targetRoot.id as LongID,
     scrollToId: targetKey ? undefined : undefined,
   };
@@ -473,11 +442,7 @@ function resolveFileLinkRootByDocs(
   if (!targetDoc) return undefined;
   const topNodeShortId = targetDoc.topNodeShortIds[0];
   return topNodeShortId
-    ? getNode(
-        knowledgeDBs,
-        joinID(targetDoc.author, topNodeShortId as ID),
-        targetDoc.author
-      )
+    ? getNode(knowledgeDBs, topNodeShortId as ID, targetDoc.author)
     : undefined;
 }
 
@@ -499,21 +464,15 @@ export function getRefLinkTargetInfo(
     return undefined;
   }
 
-  const containingParent = knowledgeDBs
-    .get(node.author)
-    ?.nodes.valueSeq()
-    .find((candidate) =>
-      candidate.children.some((childID) => childID === node.id)
-    );
-  const parentNode =
-    (node.parent
-      ? getNode(knowledgeDBs, node.parent, node.author)
-      : undefined) || containingParent;
+  const parentNode = node.parent
+    ? getNode(knowledgeDBs, node.parent, node.author)
+    : undefined;
   const targetRoot = parentNode || node;
 
   return {
     stack: getNodeStack(knowledgeDBs, targetRoot),
     author: targetRoot.author,
+    sourceId: targetRoot.author,
     rootNodeId: targetRoot.id,
     scrollToId: targetRoot.id === node.id ? undefined : node.id,
   };
@@ -523,9 +482,7 @@ export function ensureNodeNativeFields(
   knowledgeDBs: KnowledgeDBs,
   node: GraphNode
 ): GraphNode {
-  const existingNode = knowledgeDBs
-    .get(node.author)
-    ?.nodes.get(shortID(node.id));
+  const existingNode = knowledgeDBs.get(node.author)?.nodes.get(node.id);
   const parent = node.parent || existingNode?.parent;
   const anchor = parent ? undefined : node.anchor ?? existingNode?.anchor;
 
@@ -551,8 +508,8 @@ export function getSearchNodes(
     id: searchId as LongID,
     root: searchId as LongID,
   };
-  const uniqueNodeIDs = foundNodeIDs.toSet().toList();
-  const childNodes = uniqueNodeIDs.map(
+  const uniqueFoundNodeIDs = foundNodeIDs.toSet().toList();
+  const childNodes = uniqueFoundNodeIDs.map(
     (semanticID): GraphNode =>
       asRefs
         ? {
@@ -561,7 +518,6 @@ export function getSearchNodes(
               parent: searchId as LongID,
             }),
             updated: rel.updated,
-            virtualType: "search",
           }
         : {
             children: List<ID>(),
@@ -572,7 +528,6 @@ export function getSearchNodes(
             author: rel.author,
             root: searchId as LongID,
             relevance: undefined,
-            virtualType: "search",
           }
   );
   return {
@@ -689,8 +644,8 @@ export function injectEmptyNodesIntoKnowledgeDBs(
 
   // For each empty node, insert into the corresponding nodes with its metadata
   const updatedNodes = emptyNodeMetadata.reduce((nodes, data, nodeID) => {
-    const shortNodesID = splitID(nodeID)[1];
-    const existingNodes = nodes.get(shortNodesID);
+    const existingNodeID = nodeID;
+    const existingNodes = nodes.get(existingNodeID);
     if (!existingNodes) {
       return nodes;
     }
@@ -708,7 +663,7 @@ export function injectEmptyNodesIntoKnowledgeDBs(
       data.index,
       EMPTY_SEMANTIC_ID
     );
-    return nodes.set(shortNodesID, {
+    return nodes.set(existingNodeID, {
       ...existingNodes,
       children: updatedItems,
     });

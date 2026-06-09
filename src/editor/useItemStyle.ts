@@ -1,5 +1,5 @@
 import { CSSProperties } from "react";
-import { useIsViewingOtherUserContent, useCurrentEdge } from "../ViewContext";
+import { useIsViewingOtherUserContent, useRow } from "../ViewContext";
 import { isRefNode } from "../core/connections";
 import { isBlockFileLink } from "../core/nodeSpans";
 import { TYPE_COLORS } from "../core/constants";
@@ -38,14 +38,15 @@ function getArgumentTextStyle(argument: Argument | undefined): CSSProperties {
   return {};
 }
 
-function isReferenceVirtualType(virtualType: VirtualType | undefined): boolean {
+function isReferenceVirtualType(virtualType: Row["virtualType"]): boolean {
   return virtualType === "incoming" || virtualType === "version";
 }
 
 export function useItemStyle(): ItemStyle {
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
-  const currentRow = useCurrentEdge();
-  const virtualType = currentRow?.virtualType;
+  const row = useRow();
+  const currentRow = row.node;
+  const { virtualType } = row;
 
   if (virtualType === "suggestion") {
     return {

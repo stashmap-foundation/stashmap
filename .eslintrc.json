@@ -1,187 +1,320 @@
 {
-    "parser": "@typescript-eslint/parser",
-    "env": {
-        "browser": true,
-        "es6": true,
-        "jest/globals": true
+  "parser": "@typescript-eslint/parser",
+  "env": {
+    "browser": true,
+    "es6": true,
+    "jest/globals": true
+  },
+  "extends": [
+    "plugin:@typescript-eslint/recommended",
+    "plugin:@typescript-eslint/recommended-requiring-type-checking",
+    "airbnb",
+    "plugin:prettier/recommended",
+    "plugin:functional/external-typescript-recommended",
+    "plugin:functional/no-mutations",
+    "plugin:functional/no-other-paradigms",
+    "plugin:testing-library/react"
+  ],
+  "globals": {
+    "Atomics": "readonly",
+    "SharedArrayBuffer": "readonly"
+  },
+  "parserOptions": {
+    "ecmaFeatures": {
+      "jsx": true
     },
-    "extends": [
-      "plugin:@typescript-eslint/recommended", "plugin:@typescript-eslint/recommended-requiring-type-checking",
-      "airbnb", 
-      "plugin:prettier/recommended", 
-      "plugin:functional/external-typescript-recommended",
-      "plugin:functional/no-mutations",
-      "plugin:functional/no-other-paradigms",
-      "plugin:testing-library/react"
-    ],
-    "globals": {
-        "Atomics": "readonly",
-        "SharedArrayBuffer": "readonly"
-    },
-    "parserOptions": {
-        "ecmaFeatures": {
-            "jsx": true
-        },
-        "ecmaVersion": 2018,
-        "sourceType": "module",
-        "project": "./tsconfig.json"
-    },
-    "plugins": [
-        "@typescript-eslint",
-        "prettier",
-        "react",
-        "jest",
-        "functional",
-        "testing-library"
-    ],
-    "settings": { 
-      "import/resolver": { 
-        "node": { 
-          "extensions": [
-            ".js", 
-            ".jsx",
-            ".ts", 
-            ".tsx"
-          ] 
-        } 
-      } 
-    },
-    "rules": {
-        "react/jsx-filename-extension": [1, { "extensions": [".js", ".jsx", ".ts", "tsx"] }],
-        "react/prop-types": 0,
-        "@typescript-eslint/camelcase": 0,
-        "@typescript-eslint/no-explicit-any": 2,
-        "@typescript-eslint/prefer-readonly-parameter-types": 0,
-        "@typescript-eslint/explicit-function-return-type": [1, { "allowExpressions": true }],
-        "import/no-extraneous-dependencies": ["error", {"devDependencies": ["**/*.test.ts", "**/*.test.tsx", "**/*.test.js", "**/testutils/**"]}],
-        "functional/no-mixed-type": 0,
-        "functional/prefer-readonly-type": 0,
-        "functional/prefer-immutable-types": 0,
-        "functional/type-declaration-immutability": 0,
-        "functional/no-mixed-types": 0,
-        "import/prefer-default-export": 0,
-        "import/extensions": 0,
-        "no-undef": 0,
-        "no-use-before-define": "off",
-        "no-unused-vars": 0,
-        "no-shadow": 0,
-        "@typescript-eslint/no-unused-vars": 1,
-        "@typescript-eslint/no-shadow": 1,
-        "@typescript-eslint/no-use-before-define": ["error"],
-        "@typescript-eslint/no-misused-promises": 0,
-        "react/require-default-props": 0,
-        "@typescript-eslint/no-floating-promises": 0,
-        "@typescript-eslint/unbound-method": 0,
-        "@typescript-eslint/no-unnecessary-type-assertion": 0,
-        "react/jsx-no-constructed-context-values": 0,
-        "react/jsx-no-bind": 0,
-        "react/jsx-no-useless-fragment": 0,
-        "react/function-component-definition": 0,
-        "react/no-unstable-nested-components": 0
-    },
-    "overrides": [
-        {
-          "files": ["src/**/*.{ts,tsx}"],
-          "excludedFiles": [
-            "src/semanticProjection.ts",
-            "src/semanticNavigation.ts",
-            "src/navigationUrl.ts",
-            "src/NavigationStateContext.tsx",
-            "src/ViewContext.tsx",
-            "src/markdownDocument.tsx",
-            "src/buildReferenceRow.ts",
-            "src/treeTraversal.ts",
-            "src/LoadSearchData.tsx",
-            "src/dataQuery.tsx",
-            "src/planner.tsx"
-          ],
-          "rules": {
-            "no-restricted-imports": [
-              "error",
-              {
-                "paths": [
-                  {
-                    "name": "./semanticProjection",
-                    "message": "Semantic projection helpers are restricted to semantic projection and navigation boundary files."
-                  },
-                  {
-                    "name": "../semanticProjection",
-                    "message": "Semantic projection helpers are restricted to semantic projection and navigation boundary files."
-                  },
-                  {
-                    "name": "./semanticNavigation",
-                    "message": "Semantic navigation helpers are restricted to navigation boundary files."
-                  },
-                  {
-                    "name": "../semanticNavigation",
-                    "message": "Semantic navigation helpers are restricted to navigation boundary files."
-                  }
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "files": ["src/core/**/*.{ts,tsx}"],
-          "rules": {
-            "no-restricted-imports": [
-              "error",
-              {
-                "paths": [
-                  { "name": "react", "message": "src/core must stay free of React. Move React-aware logic to the editor or app layer." },
-                  { "name": "react-dom", "message": "src/core must stay free of React. Move React-aware logic to the editor or app layer." },
-                  { "name": "nostr-tools", "message": "src/core must stay free of nostr-tools. Move nostr-aware logic to src/infra/nostr/." },
-                  { "name": "electron", "message": "src/core must stay free of electron." },
-                  { "name": "fs", "message": "src/core must stay free of node:fs. Use the filesystem adapter instead." },
-                  { "name": "fs/promises", "message": "src/core must stay free of node:fs. Use the filesystem adapter instead." },
-                  { "name": "path", "message": "src/core must stay free of node:path. Path handling belongs in the filesystem adapter." },
-                  { "name": "chokidar", "message": "src/core must stay free of chokidar. File watching belongs in the filesystem adapter." }
-                ],
-                "patterns": [
-                  { "group": ["nostr-tools/**"], "message": "src/core must stay free of nostr-tools." },
-                  { "group": ["**/infra/**"], "message": "src/core must not depend on src/infra. Adapters depend on core, not the other way around." },
-                  { "group": ["../semanticProjection", "./semanticProjection"], "message": "Semantic projection helpers are restricted to semantic projection and navigation boundary files." },
-                  { "group": ["../semanticNavigation", "./semanticNavigation"], "message": "Semantic navigation helpers are restricted to navigation boundary files." }
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "files": ["src/editor/**/*.{ts,tsx}"],
-          "excludedFiles": [
-            "src/editor/**/*.test.tsx",
-            "src/editor/**/*.test.ts",
-            "src/editor/Node.tsx",
-            "src/editor/RightMenu.tsx"
-          ],
-          "rules": {
-            "no-restricted-imports": [
-              "error",
-              {
-                "patterns": [
-                  { "group": ["**/infra/**"], "message": "src/editor must not depend on src/infra. Adapters are wired in at the app layer; editor takes nostr/IO concerns via context or props." }
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "files": ["*.test.tsx", "*.test.ts", "setupTests.js", "setupProxy.js", "**/testutils/*.tsx"],
-          "rules": {
-            "@typescript-eslint/no-unsafe-member-access": 0,
-            "@typescript-eslint/ban-types": 0,
-            "@typescript-eslint/no-unsafe-assignment": 0,
-            "@typescript-eslint/no-unsafe-call": 0,
-            "@typescript-eslint/no-unsafe-return": 0,
-            "@typescript-eslint/no-unsafe-argument": 0,
-            "@typescript-eslint/restrict-template-expressions": 0,
-            "testing-library/no-wait-for-multiple-assertions": 0,
-            "testing-library/no-wait-for-side-effects": 0,
-            "testing-library/prefer-user-event": ["error", { "allowedMethods": ["click"]}],
-            "testing-library/no-manual-cleanup": 0,
-            "prettier/prettier": ["error", { "endOfLine": "auto" }]
-          }
+    "ecmaVersion": 2018,
+    "sourceType": "module",
+    "project": "./tsconfig.json"
+  },
+  "plugins": [
+    "@typescript-eslint",
+    "prettier",
+    "react",
+    "jest",
+    "functional",
+    "testing-library"
+  ],
+  "settings": {
+    "import/resolver": {
+      "node": {
+        "extensions": [".js", ".jsx", ".ts", ".tsx"]
       }
-    ]
+    }
+  },
+  "rules": {
+    "react/jsx-filename-extension": [
+      1,
+      {
+        "extensions": [".js", ".jsx", ".ts", "tsx"]
+      }
+    ],
+    "react/prop-types": 0,
+    "@typescript-eslint/camelcase": 0,
+    "@typescript-eslint/no-explicit-any": 2,
+    "@typescript-eslint/prefer-readonly-parameter-types": 0,
+    "@typescript-eslint/explicit-function-return-type": [
+      1,
+      {
+        "allowExpressions": true
+      }
+    ],
+    "import/no-extraneous-dependencies": [
+      "error",
+      {
+        "devDependencies": [
+          "**/*.test.ts",
+          "**/*.test.tsx",
+          "**/*.test.js",
+          "**/testutils/**"
+        ]
+      }
+    ],
+    "functional/no-mixed-type": 0,
+    "functional/prefer-readonly-type": 0,
+    "functional/prefer-immutable-types": 0,
+    "functional/type-declaration-immutability": 0,
+    "functional/no-mixed-types": 0,
+    "import/prefer-default-export": 0,
+    "import/extensions": 0,
+    "no-undef": 0,
+    "no-use-before-define": "off",
+    "no-unused-vars": 0,
+    "no-shadow": 0,
+    "@typescript-eslint/no-unused-vars": 1,
+    "@typescript-eslint/no-shadow": 1,
+    "@typescript-eslint/no-use-before-define": ["error"],
+    "@typescript-eslint/no-misused-promises": 0,
+    "react/require-default-props": 0,
+    "@typescript-eslint/no-floating-promises": 0,
+    "@typescript-eslint/unbound-method": 0,
+    "@typescript-eslint/no-unnecessary-type-assertion": 0,
+    "react/jsx-no-constructed-context-values": 0,
+    "react/jsx-no-bind": 0,
+    "react/jsx-no-useless-fragment": 0,
+    "react/function-component-definition": 0,
+    "react/no-unstable-nested-components": 0
+  },
+  "overrides": [
+    {
+      "files": ["src/**/*.{ts,tsx}"],
+      "excludedFiles": [
+        "src/core/graphLookup.ts",
+        "src/graphIndex.ts",
+        "src/**/*.test.ts",
+        "src/**/*.test.tsx"
+      ],
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "MemberExpression[property.name='nodeByID']",
+            "message": "Use core graphLookup helpers instead of reading graphIndex.nodeByID directly."
+          },
+          {
+            "selector": "MemberExpression[property.name='nodesBySource']",
+            "message": "Use core graphLookup helpers instead of reading graphIndex.nodesBySource directly."
+          },
+          {
+            "selector": "MemberExpression[property.name='sourceCandidatesById']",
+            "message": "Use core graphLookup helpers instead of reading graphIndex.sourceCandidatesById directly."
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/**/*.{ts,tsx}"],
+      "excludedFiles": [
+        "src/semanticProjection.ts",
+        "src/semanticNavigation.ts",
+        "src/navigationUrl.ts",
+        "src/NavigationStateContext.tsx",
+        "src/ViewContext.tsx",
+        "src/markdownDocument.tsx",
+        "src/buildReferenceRow.ts",
+        "src/treeTraversal.ts",
+        "src/LoadSearchData.tsx",
+        "src/dataQuery.tsx",
+        "src/planner.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "./semanticProjection",
+                "message": "Semantic projection helpers are restricted to semantic projection and navigation boundary files."
+              },
+              {
+                "name": "../semanticProjection",
+                "message": "Semantic projection helpers are restricted to semantic projection and navigation boundary files."
+              },
+              {
+                "name": "./semanticNavigation",
+                "message": "Semantic navigation helpers are restricted to navigation boundary files."
+              },
+              {
+                "name": "../semanticNavigation",
+                "message": "Semantic navigation helpers are restricted to navigation boundary files."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/core/**/*.{ts,tsx}"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "react",
+                "message": "src/core must stay free of React. Move React-aware logic to the editor or app layer."
+              },
+              {
+                "name": "react-dom",
+                "message": "src/core must stay free of React. Move React-aware logic to the editor or app layer."
+              },
+              {
+                "name": "nostr-tools",
+                "message": "src/core must stay free of nostr-tools. Move nostr-aware logic to src/infra/nostr/."
+              },
+              {
+                "name": "electron",
+                "message": "src/core must stay free of electron."
+              },
+              {
+                "name": "fs",
+                "message": "src/core must stay free of node:fs. Use the filesystem adapter instead."
+              },
+              {
+                "name": "fs/promises",
+                "message": "src/core must stay free of node:fs. Use the filesystem adapter instead."
+              },
+              {
+                "name": "path",
+                "message": "src/core must stay free of node:path. Path handling belongs in the filesystem adapter."
+              },
+              {
+                "name": "chokidar",
+                "message": "src/core must stay free of chokidar. File watching belongs in the filesystem adapter."
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["nostr-tools/**"],
+                "message": "src/core must stay free of nostr-tools."
+              },
+              {
+                "group": ["**/infra/**"],
+                "message": "src/core must not depend on src/infra. Adapters depend on core, not the other way around."
+              },
+              {
+                "group": ["../semanticProjection", "./semanticProjection"],
+                "message": "Semantic projection helpers are restricted to semantic projection and navigation boundary files."
+              },
+              {
+                "group": ["../semanticNavigation", "./semanticNavigation"],
+                "message": "Semantic navigation helpers are restricted to navigation boundary files."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/editor/**/*.{ts,tsx}"],
+      "excludedFiles": [
+        "src/editor/**/*.test.tsx",
+        "src/editor/**/*.test.ts",
+        "src/editor/Node.tsx",
+        "src/editor/RightMenu.tsx"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/infra/**"],
+                "message": "src/editor must not depend on src/infra. Adapters are wired in at the app layer; editor takes nostr/IO concerns via context or props."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "*.test.tsx",
+        "*.test.ts",
+        "setupTests.js",
+        "setupProxy.js",
+        "**/testutils/*.tsx"
+      ],
+      "rules": {
+        "@typescript-eslint/no-unsafe-member-access": 0,
+        "@typescript-eslint/ban-types": 0,
+        "@typescript-eslint/no-unsafe-assignment": 0,
+        "@typescript-eslint/no-unsafe-call": 0,
+        "@typescript-eslint/no-unsafe-return": 0,
+        "@typescript-eslint/no-unsafe-argument": 0,
+        "@typescript-eslint/restrict-template-expressions": 0,
+        "testing-library/no-wait-for-multiple-assertions": 0,
+        "testing-library/no-wait-for-side-effects": 0,
+        "testing-library/prefer-user-event": [
+          "error",
+          {
+            "allowedMethods": ["click"]
+          }
+        ],
+        "testing-library/no-manual-cleanup": 0,
+        "prettier/prettier": [
+          "error",
+          {
+            "endOfLine": "auto"
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/planner.tsx", "src/core/plan.ts"],
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "MemberExpression[property.name='graphIndex']",
+            "message": "Planner code must not read graphIndex; graphIndex can be stale during a plan."
+          },
+          {
+            "selector": "ImportDeclaration[source.value='./graphIndex']",
+            "message": "Planner code must not import graphIndex."
+          },
+          {
+            "selector": "ImportDeclaration[source.value='../graphIndex']",
+            "message": "Planner code must not import graphIndex."
+          },
+          {
+            "selector": "ImportDeclaration[source.value='./core/graphLookup']",
+            "message": "Planner code must not use graph-index-backed lookup. Use planLookup or already-resolved refs."
+          },
+          {
+            "selector": "ImportDeclaration[source.value='../core/graphLookup']",
+            "message": "Planner code must not use graph-index-backed lookup. Use planLookup or already-resolved refs."
+          },
+          {
+            "selector": "ImportDeclaration[source.value='./graphLookup']",
+            "message": "Planner code must not use graph-index-backed lookup. Use planLookup or already-resolved refs."
+          },
+          {
+            "selector": "ImportDeclaration[source.value='../graphLookup']",
+            "message": "Planner code must not use graph-index-backed lookup. Use planLookup or already-resolved refs."
+          }
+        ]
+      }
+    }
+  ]
 }

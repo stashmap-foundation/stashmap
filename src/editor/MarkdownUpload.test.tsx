@@ -1,12 +1,12 @@
 import { List } from "immutable";
-import { newGraphNode, ViewPath } from "../ViewContext";
+import { newGraphNode } from "../ViewContext";
 import { execute } from "../infra/nostr/executor";
 import { createPlan, planUpsertNodes } from "../planner";
 import { processEvents } from "../eventProcessing";
 import { ALICE, setup, UpdateState } from "../utils.test";
 import { planPasteMarkdownTrees } from "./FileDropZone";
 import { parseMarkdown } from "../core/markdownTree";
-import { joinID, shortID } from "../core/connections";
+
 import { linkSpan, nodeText, plainSpans } from "../core/nodeSpans";
 
 const parseTree = (text: string): ReturnType<typeof parseMarkdown>["tree"] =>
@@ -24,7 +24,7 @@ Python is a programming language
 `;
 
 async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
-  const wsID = joinID(alice().user.publicKey, "my-first-workspace");
+  const wsID = "my-first-workspace" as LongID;
   const workspaceText = "my-first-workspace";
   const workspaceNode: GraphNode = {
     ...newGraphNode(alice().user.publicKey, plainSpans(workspaceText), {
@@ -35,11 +35,10 @@ async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
     root: wsID,
   };
   const basePlan = planUpsertNodes(createPlan(alice()), workspaceNode);
-  const workspacePath: ViewPath = [0, workspaceNode.id];
   const plan = planPasteMarkdownTrees(
     basePlan,
     parseTree(TEST_FILE),
-    workspacePath,
+    workspaceNode,
     0
   );
   await execute({
@@ -68,7 +67,7 @@ function getRequiredNode(knowledgeDB: KnowledgeData, text: string): GraphNode {
 function getChildTexts(knowledgeDB: KnowledgeData, node: GraphNode): string[] {
   return node.children
     .map((childID) => {
-      const child = knowledgeDB.nodes.get(shortID(childID));
+      const child = knowledgeDB.nodes.get(childID);
       return child ? nodeText(child) : "";
     })
     .toArray();

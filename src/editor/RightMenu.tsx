@@ -1,12 +1,12 @@
 import React from "react";
 import {
-  useCurrentEdge,
   useIsRoot,
   useIsInSearchView,
   useIsViewingOtherUserContent,
   useCurrentRowID,
   useCurrentNode,
   useDisplayText,
+  useRow,
 } from "../ViewContext";
 import { isEmptySemanticID } from "../core/connections";
 import { useData } from "../DataContext";
@@ -69,7 +69,7 @@ function FollowUserEntryButton(): JSX.Element | null {
 }
 
 export function RightMenu(): JSX.Element {
-  const virtualType = useCurrentEdge()?.virtualType;
+  const { virtualType } = useRow();
   const isVirtualItem =
     virtualType === "suggestion" ||
     virtualType === "incoming" ||

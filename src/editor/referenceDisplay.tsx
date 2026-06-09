@@ -59,7 +59,15 @@ function partKey(part: ReferencePart, index: number): string {
 export function ReferenceDisplay({
   reference,
 }: {
-  reference: ReferenceRow;
+  reference: {
+    displayAs?: "bidirectional" | "incoming";
+    contextLabels: string[];
+    targetLabel: string;
+    incomingRelevance?: Relevance;
+    incomingArgument?: Argument;
+    deleted?: boolean;
+    author: PublicKey;
+  };
 }): JSX.Element {
   const { user } = useData();
   const parts = buildReferenceParts({

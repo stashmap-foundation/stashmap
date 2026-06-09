@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMediaQuery } from "react-responsive";
-import { List, Map } from "immutable";
+import { List } from "immutable";
 import { TYPE_COLORS } from "../core/constants";
 import { IS_MOBILE } from "./responsive";
 import { useData } from "../DataContext";
@@ -9,20 +9,10 @@ import { useCurrentPane } from "../SplitPanesContext";
 import { useTemporaryView } from "./TemporaryViewContext";
 import { usePaneTreeResult } from "./TreeView";
 import { usePlanner } from "../planner";
-import {
-  parseViewPath,
-  ViewPath,
-  VirtualRowsMap,
-  viewPathToString,
-} from "../ViewContext";
 import { getRowKey } from "./keyboardNavigation";
+import { planBatchRelevance, planBatchArgument } from "./batchOperations";
 import {
-  planBatchRelevance,
-  planBatchArgument,
-  getCurrentRow,
-} from "./batchOperations";
-import {
-  getActionTargetKeys,
+  getActionTargetRows,
   SYMBOL_TO_RELEVANCE,
   refocusPaneAfterRowMutation,
 } from "./Workspace";
@@ -59,21 +49,16 @@ type MobileActionBarProps = {
 };
 
 function isRowReadonly(
-  row: HTMLElement,
+  row: Row,
   isOtherUser: boolean,
   isInSearch: boolean
 ): boolean {
-  const viewKey = getRowKey(row);
-  const viewPath = parseViewPath(viewKey);
-  const isRoot = viewPath.length <= 2;
-  if (isRoot || isInSearch) return true;
+  if (row.depth === 1 || isInSearch) return true;
   if (!isOtherUser) return false;
-  const innerNode = row.querySelector(".inner-node");
-  const virtualType = innerNode?.getAttribute("data-virtual-type");
   return (
-    virtualType !== "suggestion" &&
-    virtualType !== "incoming" &&
-    virtualType !== "version"
+    row.virtualType !== "suggestion" &&
+    row.virtualType !== "incoming" &&
+    row.virtualType !== "version"
   );
 }
 
@@ -92,16 +77,7 @@ export function MobileActionBar({
   const { selection } = useTemporaryView();
   const { createPlan, executePlan } = usePlanner();
   const treeResult = usePaneTreeResult();
-  const orderedViewKeys = useMemo(
-    () =>
-      (treeResult?.paths || List<ViewPath>())
-        .map((path) => viewPathToString(path))
-        .toArray(),
-    [treeResult]
-  );
-  const virtualRowsMap: VirtualRowsMap =
-    treeResult?.virtualRows || Map<string, GraphNode>();
-
+  const rows = treeResult?.rows || List<Row>();
   const isOtherUser = pane.author !== data.user.publicKey;
   const isInSearch = pane.searchQuery !== undefined;
 
@@ -137,33 +113,31 @@ export function MobileActionBar({
   }, [wrapperRef, isMobile, handleFocusIn, handleFocusOut]);
 
   if (!isMobile || !activeRow) return null;
-  if (isRowReadonly(activeRow, isOtherUser, isInSearch)) return null;
+  const currentRow = rows.find((row) => row.viewKey === getRowKey(activeRow));
+  if (!currentRow) return null;
+  if (isRowReadonly(currentRow, isOtherUser, isInSearch)) return null;
   if (isUserEntryRow(activeRow)) return null;
-  const activeViewPath = parseViewPath(getRowKey(activeRow));
-  const currentRowData = getCurrentRow(data, activeViewPath, virtualRowsMap);
-  const currentLevel = relevanceToLevel(currentRowData?.relevance);
-  const currentArgument = currentRowData?.argument;
+  const currentLevel = relevanceToLevel(currentRow.node.relevance);
+  const currentArgument = currentRow.node.argument;
 
   const innerNode = activeRow.querySelector(".inner-node");
   if (!innerNode) return null;
-  const virtualType = innerNode.getAttribute("data-virtual-type");
-  const isSuggestion = virtualType === "suggestion";
+  const isSuggestion = currentRow.virtualType === "suggestion";
 
   const handleRelevance = (level: number): void => {
     const root = wrapperRef.current;
     if (!root) return;
     const plan = createPlan();
-    const keys = getActionTargetKeys(selection, activeRow, orderedViewKeys);
-    const paths = keys.map(parseViewPath);
+    const targetRows = getActionTargetRows(selection, activeRow, rows);
     const targetRelevance =
       level === 0
         ? ("not_relevant" as Relevance)
         : SYMBOL_TO_RELEVANCE[LEVEL_SYMBOLS[level]];
     const relevance: Relevance =
-      currentRowData?.relevance === targetRelevance
+      currentRow.node.relevance === targetRelevance
         ? undefined
         : targetRelevance;
-    executePlan(planBatchRelevance(plan, paths, relevance, virtualRowsMap));
+    executePlan(planBatchRelevance(plan, targetRows, relevance));
     refocusPaneAfterRowMutation(root);
   };
 
@@ -171,10 +145,9 @@ export function MobileActionBar({
     const root = wrapperRef.current;
     if (!root) return;
     const plan = createPlan();
-    const keys = getActionTargetKeys(selection, activeRow, orderedViewKeys);
-    const paths = keys.map(parseViewPath);
+    const targetRows = getActionTargetRows(selection, activeRow, rows);
     const argument: Argument = currentArgument === target ? undefined : target;
-    executePlan(planBatchArgument(plan, paths, argument, virtualRowsMap));
+    executePlan(planBatchArgument(plan, targetRows, argument));
     refocusPaneAfterRowMutation(root);
   };
 

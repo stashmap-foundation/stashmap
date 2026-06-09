@@ -1,8 +1,14 @@
 import { Map as ImmutableMap } from "immutable";
-import { getNode, shortID } from "./connections";
+import { getNode } from "./connections";
 import { ensureKnowstrDocId } from "./knowstrFrontmatter";
-import { parseMarkdown } from "./markdownTree";
-import { WalkContext, materializeTree } from "./markdownNodes";
+import { MarkdownTreeNode, parseMarkdown } from "./markdownTree";
+import {
+  MaterializeOptions,
+  MaterializeResult,
+  WalkContext,
+  materializeTree,
+  materializeTreePreservingExplicitIds,
+} from "./markdownNodes";
 import { nodeText, spansText } from "./nodeSpans";
 import { LOG_ROOT_FILE, LOG_ROOT_ROLE } from "./systemRoots";
 
@@ -105,11 +111,11 @@ export function documentLinkPath(document: Document): string {
 }
 
 export function createDocumentFromRootNode(rootNode: GraphNode): Document {
-  const docId = rootNode.docId ?? shortID(rootNode.id);
+  const docId = rootNode.docId ?? rootNode.id;
   return {
     author: rootNode.author,
     docId,
-    topNodeShortIds: [shortID(rootNode.id)],
+    topNodeShortIds: [rootNode.id],
     updatedMs: rootNode.updated,
     title: nodeText(rootNode) || "Untitled",
     frontMatter: { knowstr_doc_id: docId },
@@ -134,10 +140,17 @@ function firstTopLevelNodeText(
   return text || undefined;
 }
 
-export function parseToDocument(
+type TreeMaterializer = (
+  trees: MarkdownTreeNode[],
+  author: PublicKey,
+  options: MaterializeOptions
+) => MaterializeResult;
+
+function parseToDocumentWithMaterializer(
   author: PublicKey,
   content: string,
-  options: ParseToDocumentOptions = {}
+  options: ParseToDocumentOptions,
+  materialize: TreeMaterializer
 ): ParseToDocumentResult {
   const parsed = parseMarkdown(content);
   const ensured = ensureKnowstrDocId(parsed.frontMatter, options.docIdFallback);
@@ -163,12 +176,12 @@ export function parseToDocument(
     ...(index === 0 && systemRole !== undefined && { systemRole }),
   }));
 
-  const result = materializeTree(trees, author, {
+  const result = materialize(trees, author, {
     context: options.context,
     updatedMs,
   });
   const topNodeLongIds = result.topNodeIds;
-  const topNodeShortIds = topNodeLongIds.map(shortID);
+  const topNodeShortIds = topNodeLongIds;
   const allNodes =
     result.context.knowledgeDBs.get(author)?.nodes ??
     ImmutableMap<string, GraphNode>();
@@ -197,4 +210,30 @@ export function parseToDocument(
     nodes,
     context: result.context,
   };
+}
+
+export function parseToDocument(
+  author: PublicKey,
+  content: string,
+  options: ParseToDocumentOptions = {}
+): ParseToDocumentResult {
+  return parseToDocumentWithMaterializer(
+    author,
+    content,
+    options,
+    materializeTree
+  );
+}
+
+export function parseToDocumentPreservingExplicitIds(
+  author: PublicKey,
+  content: string,
+  options: ParseToDocumentOptions
+): ParseToDocumentResult {
+  return parseToDocumentWithMaterializer(
+    author,
+    content,
+    options,
+    materializeTreePreservingExplicitIds
+  );
 }

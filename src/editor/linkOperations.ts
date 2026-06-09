@@ -1,11 +1,12 @@
-import {
-  getRefLinkTargetInfo,
-  getRefTargetInfo,
-  RefTargetInfo,
-  createDocumentLinkTarget,
-  createRefTarget,
-} from "../core/connections";
+import { createDocumentLinkTarget, createRefTarget } from "../core/connections";
 import { Document, getDocumentForNode, documentKeyOf } from "../core/Document";
+import {
+  getNodeInSource,
+  graphLookupFromData,
+  lookupNode,
+  resolveBlockLinkTarget,
+  ResolvedNode,
+} from "../core/graphLookup";
 import { Link } from "../core/link";
 import { resolveLinkPath } from "../core/linkPath";
 import { buildDocumentRouteUrl, buildNodeRouteUrl } from "../navigationUrl";
@@ -15,6 +16,7 @@ export type LinkNavigationMode = "link" | "target";
 
 export type EditorNavigationTarget = {
   author: PublicKey;
+  sourceId: SourceId;
   documentId?: string;
   rootNodeId?: LongID;
   scrollToId?: string;
@@ -39,45 +41,72 @@ function documentTarget(
   );
 }
 
-function refInfoToTarget(refInfo: RefTargetInfo): EditorNavigationTarget {
+function sourceResolvedNode(
+  graph: ReturnType<typeof graphLookupFromData>,
+  link: Extract<Link, { kind: "node" }>,
+  sourceId: SourceId
+): ResolvedNode {
+  return (
+    lookupNode(graph, link.source.id, sourceId) ?? {
+      ref: { sourceId, id: link.source.id },
+      node: link.source,
+    }
+  );
+}
+
+function nodeTarget(
+  data: Data,
+  link: Extract<Link, { kind: "node" }>,
+  mode: LinkNavigationMode
+): EditorNavigationTarget | undefined {
+  const graph = graphLookupFromData(data);
+  const source = sourceResolvedNode(graph, link, link.source.author);
+  const target =
+    mode === "target" ? source : resolveBlockLinkTarget(graph, source);
+  if (!target) {
+    return undefined;
+  }
+  const parent = target.node.parent
+    ? getNodeInSource(graph, {
+        sourceId: target.ref.sourceId,
+        id: target.node.parent,
+      })
+    : undefined;
+  const targetRoot = mode === "target" ? target : parent ?? target;
   return {
-    author: refInfo.author,
-    rootNodeId: refInfo.rootNodeId,
-    scrollToId: refInfo.scrollToId,
+    author: targetRoot.node.author,
+    sourceId: targetRoot.ref.sourceId,
+    rootNodeId: targetRoot.node.id,
+    scrollToId:
+      targetRoot.node.id === target.node.id ? undefined : target.node.id,
   };
 }
 
 export function linkToNavigationTarget(
   data: Data,
   link: Link,
-  effectiveAuthor: PublicKey,
   mode: LinkNavigationMode = "link"
 ): EditorNavigationTarget | undefined {
   if (link.kind === "document") {
     const document = documentTarget(data, link);
     return document
-      ? { author: document.author, documentId: document.docId }
+      ? {
+          author: document.author,
+          sourceId: document.author,
+          documentId: document.docId,
+        }
       : undefined;
   }
 
-  const refInfo =
-    mode === "target"
-      ? getRefTargetInfo(link.source.id, data.knowledgeDBs, effectiveAuthor)
-      : getRefLinkTargetInfo(
-          link.source.id,
-          data.knowledgeDBs,
-          effectiveAuthor
-        );
-  return refInfo ? refInfoToTarget(refInfo) : undefined;
+  return nodeTarget(data, link, mode);
 }
 
 export function linkToHref(
   data: Data,
   link: Link,
-  effectiveAuthor: PublicKey,
   mode: LinkNavigationMode = "link"
 ): string | undefined {
-  const target = linkToNavigationTarget(data, link, effectiveAuthor, mode);
+  const target = linkToNavigationTarget(data, link, mode);
   if (!target) {
     return undefined;
   }
@@ -89,7 +118,7 @@ export function linkToHref(
     );
   }
   return target.rootNodeId
-    ? buildNodeRouteUrl(target.rootNodeId, target.scrollToId)
+    ? buildNodeRouteUrl(target.rootNodeId, target.sourceId, target.scrollToId)
     : undefined;
 }
 
@@ -104,7 +133,7 @@ export function navigationTargetToHref(
     );
   }
   return target.rootNodeId
-    ? buildNodeRouteUrl(target.rootNodeId, target.scrollToId)
+    ? buildNodeRouteUrl(target.rootNodeId, target.sourceId, target.scrollToId)
     : undefined;
 }
 

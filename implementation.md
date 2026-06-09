@@ -149,7 +149,7 @@ Known remaining debt after this checkpoint:
 - Route/pane parsing still has some fallback paths that infer source from ID shape when no `source` query is present.
 - `GraphPlan` still carries `graphIndex` as data, even though planner code is linted against reading `*.graphIndex` members.
 
-### Phase 1A.2 — Source propagation and read-callsite closeout — Remaining
+### Phase 1A.2 — Source propagation and read-callsite closeout — Done
 
 Goal: all read/render/navigation layers that carry a node ID also carry the source explicitly, and duplicate IDs across sources render/navigate correctly.
 

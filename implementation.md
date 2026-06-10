@@ -381,7 +381,8 @@ Markdown round-trips must carry everything the collaboration model needs at the 
 - `snapshot` is node-level metadata. Preserve, parse, and render it on every node, not just roots.
 - Node-level snapshot lookup uses only the node's own `snapshotId`. Do not fall back to root/document snapshot metadata for a node's lineage edge.
 - `basedOn` parsing/rendering uses the Phase 1A scoped-ref model for cross-namespace references.
-- Document ownership is part of the markdown format: `author` persists in frontmatter and survives save/parse/disk round-trips. The internal `Document.author` field exists; the markdown serialization boundary must read and write it.
+- Document ownership is part of the markdown format: `author` persists in frontmatter and survives save/parse/disk round-trips. The internal `Document.author` field exists; the markdown boundary must read and write it. Parsing covers both directions: a file with `author: alice` parses as alice's document, and a file without `author` parses as unowned. Follow the existing `ensureKnowstrDocId` frontmatter pattern in `src/core/Document.ts`.
+- Snapshot events must not be replaceable. Today `KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT = 34773` sits in the NIP-33 parameterized-replaceable range, so a snapshot can be silently overwritten by republishing with the same `d` tag (`getReplaceableKey` in `src/nostr.ts`, used by `src/infra/snapshotStore.ts`). Move snapshots to a regular, non-replaceable event kind, carry the content-addressed `snap_sha256_…` ID in a tag, and look snapshots up by that ID. Consumers can verify integrity by hashing the content. The document event (`34772`) stays replaceable — documents are mutable; snapshots are not.
 - Preserve `knowstr_vote_id` in frontmatter.
 - Whole-document snapshots are sufficient for now. The ID/lookup model should not prevent subtree snapshots later, but this phase does not need to create them.
 
@@ -394,36 +395,65 @@ Markdown round-trips must carry everything the collaboration model needs at the 
 - Malformed `snapshot` IDs are rejected in filesystem save paths.
 - Snapshot baseline lookup uses the node's own `snapshotId` only, with no root fallback.
 
+### Files expected to change
+
+- `src/types.ts` — `GraphNode.snapshotDTag` becomes `snapshotId` (26 references across 8 files today).
+- `src/core/markdownNodes.ts` — materialization currently forces snapshots to roots only (`snapshotDTag: parent ? undefined : …` around line 110); node-level snapshots must survive on every node.
+- `src/core/markdownTree.ts`, `src/documentRenderer.ts` — parse/render side of node-level `basedOn`/`snapshot`.
+- `src/core/Document.ts` — `author` frontmatter read/write next to `ensureKnowstrDocId`.
+- `src/planner.tsx` `buildDocumentEvents` — creates the mutable ID `` `snapshot-${document.docId}` `` (plus an `as string` cast) around line 754; replace with content-addressed IDs and remove the cast.
+- `src/nodesDocumentEvent.ts`, `src/infra/snapshotStore.ts` — snapshot event/store keyed by snapshot ID, immutable.
+
 ### Implementation notes
 
-- Update `GraphNode` and related functions from `snapshotDTag` to `snapshotId` where practical.
-- Update snapshot stores/materialization to key by snapshot ID terminology.
-- Snapshot creation that uses mutable/non-hash IDs such as `snapshot-${document.docId}` must be removed or replaced before paths that create snapshots are considered valid.
 - Filesystem/CLI parsing should throw clear validation errors for malformed local workspace markdown. Remote/Nostr ingestion should avoid crashing the app on malformed remote documents.
 
 ### Acceptance criteria
 
 - `knowstr save` preserves node-level `basedOn`, `snapshot`, `author`, and `knowstr_vote_id` metadata.
-- Node-level snapshots are accepted only with `snap_sha256_<64 lowercase hex chars>` IDs.
+- A file with a foreign `author` parses as that author's document; a file without `author` parses as unowned.
+- Node-level snapshots are accepted only with `snap_sha256_<64 lowercase hex chars>` IDs; no `snapshot-${docId}`-style mutable IDs remain:
+
+  ```sh
+  rg "snapshotDTag|snapshot-\$\{" src
+  ```
+
+  has no hits.
 - Snapshot diff/baseline lookup for a node uses that node's own snapshot ID and does not inherit from root metadata.
+- Snapshot events are published on a non-replaceable kind; no snapshot read or write goes through replaceable-key addressing.
 - Existing save/render/navigation behavior remains green.
+
+### Verification
+
+```sh
+npm run typescript && npm run lint && npm test
+```
+
+Focused suites while debugging:
+
+```sh
+npm test -- src/cli/save.test.ts src/core/Document.test.ts
+npm test -- src/editor/MarkdownImportPlan.test.tsx src/editor/SuggestionDisplay.test.tsx
+```
 
 ## Phase 2 — `knowstr join` visibility configuration (draft)
 
 The minimal visibility layer: which folders Knowstr can see other people's documents in.
 
 - Add `.knowstr/spaces.json` for joined folders.
-- Add `knowstr join <folder>`, plus list/remove management of joined folders.
-- Require an existing `.knowstr`; never create it implicitly. Fail with a clear message pointing to `knowstr init`.
+- Add `knowstr join <folder>`, plus list/remove management of joined folders. The CLI today dispatches only `init` and `save` in `src/cli/main.ts`; follow that dispatch/help pattern with a new `src/cli/join.ts`.
+- Require an existing `.knowstr`; never create it implicitly. Fail with a clear message pointing to `knowstr init` (today: `.knowstr/profile.json` + `me.nsec`, created by `src/cli/init.ts`).
 - Joining never copies, rewrites, normalizes, or deletes anything in the folder. A joined folder keeps whatever structure it has; Knowstr imposes none.
-- Exclude joined folders from workspace save scanning and from filesystem watching/write-through claiming.
-- Ownership of documents inside joined folders is read from their `author` metadata, not from paths.
+- Exclude joined folders from workspace save scanning and from filesystem watching/write-through claiming. `src/infra/filesystem/workspaceScan.ts` already has the exclusion mechanism (`ALWAYS_IGNORED` + `.knowstrignore` via the `ignore` package); extend it rather than adding a parallel one.
+- Ownership of documents inside joined folders is read from their `author` metadata (Phase 1B), not from paths.
 
 UI equivalent: "Shared folders" settings; Follow / open-link / groups are the web instantiations (Phase 9).
 
 ## Phase 3 — Local filesystem snapshot storage for Electron/CLI workspaces (draft)
 
 A filesystem workspace must durably store snapshots under `.knowstr/snapshots/`; IndexedDB can remain a cache/browser-only fallback but must not be the only durable store when running in Electron or CLI workspace mode. Pulled forward because forking cannot be correct without durable baselines.
+
+Current state: `src/infra/snapshotStore.ts` is Nostr/IndexedDB-only (snapshot events fetched by author + dTag, cached in `src/infra/nostr/cache/indexedDB.ts`). Nothing filesystem-backed exists.
 
 - Add snapshot storage primitives for initialized filesystem workspaces.
 - Store immutable snapshot markdown at `.knowstr/snapshots/<snapshot-id>.md`.
@@ -437,6 +467,8 @@ A filesystem workspace must durably store snapshots under `.knowstr/snapshots/`;
 ## Phase 4 — `knowstr save`: claiming and fork rules (draft)
 
 `save` is the single crossing point from foreign documents into the workspace on the filesystem. Copying a file into your tree is the consent; `save` does the bookkeeping.
+
+Current state: `src/cli/save.ts` has no ownership logic at all — every scanned file is treated as the local user's. The app side already has a related flow: `buildDocumentEvents` in `src/planner.tsx` creates a snapshot when a document's top node has `basedOn` without a snapshot, and a "copy to edit" action exists in `src/editor/Workspace.tsx`. Reuse the same lineage/snapshot primitives rather than building a parallel CLI path.
 
 ### Standalone mode (explicit paths, no workspace required)
 
@@ -478,6 +510,8 @@ Duplicate document/node IDs are rejected across the editable workspace. If a for
 ## Phase 5 — `knowstr status`, `knowstr diff`, `knowstr accept` (draft)
 
 Suggestions as a computed view, with a text/JSON surface for humans and agents and a materialized surface for editor-centric users.
+
+Current state: the three-way diff machinery exists — `computeVersionDiff` in `src/core/snapshotBaseline.ts` drives the version/suggestion rows the app already renders (`getAlternativeFooterData` in `src/semanticProjection.ts`). This phase gives it a CLI surface; it should not reimplement the diff.
 
 ### `knowstr status [--json]`
 
@@ -525,25 +559,25 @@ For users whose interface is their editor:
 
 ## Phase 7 — Accept convergence across surfaces (draft)
 
-- The UI accept (✓ on a `(?)` row) and `knowstr accept` converge on the same lineage code path.
+- The UI accept (today in `src/nodeItemMutations.ts`, e.g. `planAcceptDocumentTopIncoming`) and `knowstr accept` converge on the same lineage code path.
 - Accepting mints local IDs; foreign node IDs are never inserted as editable local node IDs.
 - Every copied node with `basedOn` gets or resolves a node-centric `snapshot` baseline.
 - Fork and accept share the same snapshot primitives.
 
 ## Phase 8 — `knowstr show` read-only render/export (draft)
 
-- Add `knowstr show <address>`.
-- Support `/d/<author>/<doc-id>` document addresses and `/r/<node-id>` subtree addresses.
-- Render the visible document/node as portable markdown with enough frontmatter for safe export; preserve `knowstr_vote_id`.
+- Add `knowstr show <address>`; no such command exists today.
+- Support `/d/<author>/<doc-id>` document addresses and `/r/<node-id>` subtree addresses (current app routes).
+- Render the visible document/node as portable markdown with enough frontmatter for safe export; reuse `renderDocumentMarkdown` (`src/nodesDocumentEvent.ts` / `src/documentRenderer.ts`); preserve `knowstr_vote_id`.
 - Read-only: no save, no fork, no visibility changes, no editable IDs, no `.knowstr`.
 
 ## Phase 9 — App visibility and fork-on-write (draft)
 
 The web/Electron instantiation of the same model:
 
-- Visibility: people you follow, share links you open; groups later.
-- Foreign documents render read-only. The first edit shows a lightweight "this creates your copy" affordance and forks — same lineage semantics as `save` (fresh document, minted IDs, `basedOn`, snapshot event/file).
-- Suggestions render live as `(?)` overlays wherever lineage relatives differ; no command, no refresh. The overlay rendering exists; wire it to the lineage three-way diffs.
+- Visibility: people you follow (contacts exist today), share links you open; groups later.
+- Foreign documents render read-only. The first edit shows a lightweight "this creates your copy" affordance and forks — same lineage semantics as `save` (fresh document, minted IDs, `basedOn`, snapshot event/file). The existing "copy to edit" action in `src/editor/Workspace.tsx` is the seed of this flow.
+- Suggestions render live as `(?)` overlays wherever lineage relatives differ; no command, no refresh. The overlay rendering exists (`Row.virtualType` rows from `getAlternativeFooterData`); wire it to the lineage three-way diffs.
 - App fork/accept paths and CLI paths produce identical metadata, so a document moving between surfaces behaves identically.
 
 ## Phase 10 — Regression, cleanup, and docs (draft)

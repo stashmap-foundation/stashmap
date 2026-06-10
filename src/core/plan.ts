@@ -349,14 +349,10 @@ function getNodeSubtree(
   sourceNode: GraphNode,
   filterNode: (node: GraphNode) => boolean = () => true
 ): List<GraphNode> {
-  const authorNodes =
-    plan.knowledgeDBs.get(sourceNode.author)?.nodes.valueSeq().toList() ||
-    List<GraphNode>();
-  const authorNodesByID = authorNodes.reduce(
-    (acc, node) => acc.set(node.id, node),
-    Map<ID, GraphNode>()
-  );
-  const childrenByParent = authorNodes
+  const authorNodesByID =
+    plan.knowledgeDBs.get(sourceNode.author)?.nodes || Map<ID, GraphNode>();
+  const childrenByParent = authorNodesByID
+    .valueSeq()
     .filter((node) => node.root === sourceNode.root)
     .reduce((acc, node) => {
       const parentID = getEffectiveParentNodeID(node);

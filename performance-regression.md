@@ -25,6 +25,26 @@ Open leads, in order of suspicion:
 
 Attributing the residual requires timing the same suite at the pre-migration commit (e.g. a throwaway worktree at `3e1203b`) — without that baseline, further optimization is forward-looking tuning, not regression hunting.
 
+## O(N) lookup audit (2026-06-10)
+
+Swept all production `valueSeq()/filter/find` whole-collection scans and per-row linear searches after the row-model migration.
+
+Removed (dead code found by the audit):
+
+- `src/semanticNavigation.ts` — entire file had no importers; its `getStandaloneRootByRootID` did an all-nodes scan per call.
+- `getIndexedNodesForKeys`/`getNodeLookupIndex` in `src/core/connections.tsx` — rebuilt a full per-author semantic index (O(N) + sort) on every call, only the dead navigation code used it.
+- `getIncomingCrefsForDocument` in `src/semanticProjection.ts` — no callers.
+- `getTreeChildrenForRow` in `src/treeTraversal.ts` — no callers.
+- `getNodeSubtree` in `src/core/plan.ts` no longer rebuilds an ID map that already exists as `db.nodes`.
+
+Known remaining O(N) scans, deliberately kept:
+
+- `getOwnSystemRoot` (`src/core/systemRoots.ts`) — scans the author's nodes; runs once per `HomeButton` render pass and per log-append plan. Not indexable cheaply: the planner is linted away from `graphIndex`, and `data.documents` is not guaranteed to contain a Document for a freshly planned system root. Revisit if profiling shows it.
+- `getNodeSubtree` (`src/core/plan.ts`) — builds a parent→children map from an author-nodes scan per delete/copy mutation (user action, not render). The planner-no-graphIndex rule makes this the intended data flow; the duplicate-map waste is removed.
+- `localSearch.ts`, document materialization, and event processing scans are feature/boundary work, not hot paths.
+
+Per-row/per-event linear searches over visible rows (`rows.find` in `Workspace.tsx` handlers, `getIndependentRows` over the selection) are bounded by viewport/selection size, not dataset size.
+
 ## Tooling
 
 CPU profile: `node --cpu-prof --cpu-prof-dir=<dir> node_modules/.bin/jest <suite> --runInBand`, then aggregate self/inclusive time from the `.cpuprofile` (analysis scripts used for this audit were throwaway, under `/tmp/prof/`).

@@ -361,42 +361,6 @@ function uniqueNodes(nodes: ResolvedNode[]): ResolvedNode[] {
   });
 }
 
-export function getIncomingCrefsForDocument(
-  graph: GraphLookup,
-  visibleAuthors: ImmutableSet<PublicKey>,
-  document: Pick<Document, "author" | "filePath">,
-  effectiveAuthor: PublicKey
-): List<NodeRef> {
-  const { graphIndex, knowledgeDBs } = graph;
-  const sourceRefs = incomingFileLinkSourceRefs(
-    graphIndex,
-    document.filePath,
-    document.author
-  );
-  const refs = List(
-    sourceRefs
-      .map((ref) => getNodeInSource(graph, ref))
-      .filter((node): node is ResolvedNode => node !== undefined)
-      .filter(({ node }) => visibleAuthors.has(node.author))
-      .filter(
-        ({ node }) =>
-          node.systemRole !== LOG_ROOT_ROLE &&
-          !isInSystemRoot(knowledgeDBs, node, LOG_ROOT_ROLE)
-      )
-      .map(({ ref, node }) => ({
-        nodeID: node.id,
-        sourceId: ref.sourceId,
-        context: getNodeContext(knowledgeDBs, node),
-        updated: node.updated,
-      }))
-  );
-
-  return deduplicateRefsByContext(refs, knowledgeDBs, effectiveAuthor)
-    .sortBy((ref) => `${-ref.updated}:${ref.context.join(":")}`)
-    .map((ref) => ({ sourceId: ref.sourceId, id: ref.nodeID }))
-    .toList();
-}
-
 export function getIncomingCrefsForNode(
   graph: GraphLookup,
   visibleAuthors: ImmutableSet<PublicKey>,

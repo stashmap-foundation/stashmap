@@ -633,30 +633,6 @@ function getTreeChildrenForResolvedRow(
   );
 }
 
-export function getTreeChildrenForRow(
-  data: Data,
-  parentRow: Row,
-  rootNode: LongID | undefined,
-  author: PublicKey,
-  typeFilters: Pane["typeFilters"],
-  options?: TreeTraversalOptions
-): TreeResult {
-  const graph = graphLookupFromData(data);
-  return {
-    rows: reindexRows(
-      getTreeChildrenForResolvedRow(
-        data,
-        graph,
-        parentRow,
-        rootNode,
-        author,
-        typeFilters,
-        options
-      ).rows
-    ),
-  };
-}
-
 export function getTreeChildren(
   data: Data,
   parentPath: ViewPath,

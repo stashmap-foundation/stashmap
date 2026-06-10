@@ -4,13 +4,13 @@ export function formatRootHeading(
   rootText: string,
   rootUuid: string,
   basedOn?: ID,
-  snapshotDTag?: string,
+  snapshotId?: string,
   anchor?: RootAnchor
 ): string {
   const parts = [
     `id:${rootUuid}`,
     ...(basedOn ? [`basedOn="${basedOn}"`] : []),
-    ...(snapshotDTag ? [`snapshot="${snapshotDTag}"`] : []),
+    ...(snapshotId ? [`snapshot="${snapshotId}"`] : []),
     ...(anchor?.snapshotContext.size
       ? [`anchorContext="${anchor.snapshotContext.join(":")}"`]
       : []),
@@ -36,7 +36,7 @@ export function formatNodeAttrs(
   options?: {
     hidden?: boolean;
     basedOn?: ID;
-    snapshotDTag?: string;
+    snapshotId?: string;
     anchor?: RootAnchor;
     userPublicKey?: PublicKey;
   }
@@ -48,7 +48,7 @@ export function formatNodeAttrs(
       : []),
     ...(options?.hidden ? ["hidden"] : []),
     ...(options?.basedOn ? [`basedOn="${options.basedOn}"`] : []),
-    ...(options?.snapshotDTag ? [`snapshot="${options.snapshotDTag}"`] : []),
+    ...(options?.snapshotId ? [`snapshot="${options.snapshotId}"`] : []),
     ...(options?.anchor?.snapshotContext.size
       ? [`anchorContext="${options.anchor.snapshotContext.join(":")}"`]
       : []),

@@ -1,4 +1,6 @@
 import { UnsignedEvent } from "nostr-tools";
+import { sha256 } from "@noble/hashes/sha256";
+import { bytesToHex } from "@noble/hashes/utils";
 import type { Document } from "./core/Document";
 import { renderDocumentMarkdown } from "./documentRenderer";
 import {
@@ -8,11 +10,15 @@ import {
   newTimestamp,
 } from "./nostr";
 
+export function snapshotIdForContent(content: string): string {
+  return `snap_sha256_${bytesToHex(sha256(new TextEncoder().encode(content)))}`;
+}
+
 export function buildDocumentEvent(
   knowledgeDBs: KnowledgeDBs,
   document: Document,
   options?: {
-    snapshotDTag?: string;
+    snapshotId?: string;
   }
 ): UnsignedEvent {
   const systemRoleTags = document.systemRole
@@ -30,19 +36,19 @@ export function buildDocumentEvent(
 export function buildSnapshotEventFromNodes(
   knowledgeDBs: KnowledgeDBs,
   snapshotAuthor: PublicKey,
-  snapshotDTag: string,
   sourceDocument: Document
 ): UnsignedEvent {
+  const content = renderDocumentMarkdown(knowledgeDBs, sourceDocument);
   return {
     kind: KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
     pubkey: snapshotAuthor,
     created_at: newTimestamp(),
     tags: [
-      ["d", snapshotDTag],
+      ["d", snapshotIdForContent(content)],
       ["source", sourceDocument.docId],
       ["source_author", sourceDocument.author],
       msTag(),
     ],
-    content: renderDocumentMarkdown(knowledgeDBs, sourceDocument),
+    content,
   };
 }

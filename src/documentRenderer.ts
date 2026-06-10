@@ -67,13 +67,13 @@ function getSerializableNodeBody(
 
 function getSerializableNodeAttrs(
   node: GraphNode,
-  options?: { snapshotDTag?: string }
+  options?: { snapshotId?: string }
 ): string {
   return formatNodeAttrs(node.id, {
     ...(node.basedOn ? { basedOn: node.basedOn } : {}),
     ...(node.userPublicKey ? { userPublicKey: node.userPublicKey } : {}),
-    ...(options?.snapshotDTag || node.snapshotDTag
-      ? { snapshotDTag: options?.snapshotDTag ?? node.snapshotDTag }
+    ...(options?.snapshotId || node.snapshotId
+      ? { snapshotId: options?.snapshotId ?? node.snapshotId }
       : {}),
     ...(node.anchor ? { anchor: node.anchor } : {}),
   });
@@ -86,7 +86,7 @@ function serializeNodeSequence(
   indent: string,
   current: SerializeResult,
   options?: {
-    snapshotDTag?: string;
+    snapshotId?: string;
   }
 ): SerializeResult {
   const serializeChildren = (
@@ -198,7 +198,7 @@ export function renderRootedMarkdown(
   knowledgeDBs: KnowledgeDBs,
   rootNode: GraphNode,
   options?: {
-    snapshotDTag?: string;
+    snapshotId?: string;
   }
 ): string {
   const serialized = serializeNodeSequence(
@@ -216,7 +216,7 @@ export function renderDocumentMarkdown(
   knowledgeDBs: KnowledgeDBs,
   document: Document,
   options?: {
-    snapshotDTag?: string;
+    snapshotId?: string;
   }
 ): string {
   if (document.topNodeShortIds.length === 0) {

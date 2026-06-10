@@ -30,10 +30,10 @@ function findSnapshotBaseline(
     return undefined;
   }
   const rootNode = getNode(knowledgeDBs, forkedNode.root, forkedNode.author);
-  if (!rootNode?.snapshotDTag) {
+  if (!rootNode?.snapshotId) {
     return undefined;
   }
-  const snapshotMap = snapshotNodes.get(rootNode.snapshotDTag);
+  const snapshotMap = snapshotNodes.get(rootNode.snapshotId);
   if (!snapshotMap) {
     return undefined;
   }

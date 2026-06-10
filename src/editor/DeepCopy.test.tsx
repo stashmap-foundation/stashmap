@@ -16,10 +16,13 @@ import {
   type,
   type UpdateState,
 } from "../utils.test";
+import { sha256 } from "@noble/hashes/sha256";
+import { bytesToHex } from "@noble/hashes/utils";
 import {
   KIND_KNOWLEDGE_DOCUMENT,
   KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
 } from "../nostr";
+import { findTag } from "../nostrEvents";
 import { parseMarkdown } from "../core/markdownTree";
 
 const maybeExpand = async (label: string): Promise<void> => {
@@ -1640,6 +1643,41 @@ My Notes
     expect(
       bobDocumentEvents.some((event) => event.content.includes('snapshot="'))
     ).toBe(true);
+  });
+
+  test("Fork snapshot IDs are content-addressed snap_sha256 hashes", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(alice);
+    await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}Child{Escape}");
+    cleanup();
+
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+
+    const bobEvents = bob().relayPool.getEvents();
+    const snapshotEvent = bobEvents.find(
+      (event) =>
+        event.kind === KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT &&
+        event.pubkey === BOB.publicKey
+    );
+    expect(snapshotEvent).toBeDefined();
+    if (!snapshotEvent) {
+      throw new Error("missing snapshot event");
+    }
+
+    const snapshotId = findTag(snapshotEvent, "d");
+    expect(snapshotId).toMatch(/^snap_sha256_[0-9a-f]{64}$/);
+    expect(snapshotId).toBe(
+      `snap_sha256_${bytesToHex(
+        sha256(new TextEncoder().encode(snapshotEvent.content))
+      )}`
+    );
+
+    const bobDocumentEvent = bobEvents.find(
+      (event) =>
+        event.kind === KIND_KNOWLEDGE_DOCUMENT && event.pubkey === BOB.publicKey
+    );
+    expect(bobDocumentEvent?.content).toContain(`snapshot="${snapshotId}"`);
   });
 });
 

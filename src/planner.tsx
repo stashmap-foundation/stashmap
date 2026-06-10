@@ -15,6 +15,7 @@ import {
   buildDocumentEvent,
   buildSnapshotEventFromNodes,
 } from "./nodesDocumentEvent";
+import { findTag } from "./nostrEvents";
 import {
   EMPTY_SEMANTIC_ID,
   isEmptySemanticID,
@@ -738,7 +739,7 @@ export function buildDocumentEvents(
       )
       .filter((node): node is GraphNode => node !== undefined);
     const snapshotAnchorNode = topNodes.find(
-      (topNode) => topNode.basedOn && !topNode.snapshotDTag
+      (topNode) => topNode.basedOn && !topNode.snapshotId
     );
     const snapshotSourceRoot = getSnapshotSourceRoot(
       plan.knowledgeDBs,
@@ -750,21 +751,17 @@ export function buildDocumentEvents(
           documentKeyOf(snapshotSourceRoot.author, snapshotSourceRoot.docId)
         )
       : undefined;
-    const createdSnapshotDTag = sourceDocument
-      ? `snapshot-${document.docId}`
-      : undefined;
     const snapshotEvent = sourceDocument
       ? (buildSnapshotEventFromNodes(
           plan.knowledgeDBs,
           author,
-          createdSnapshotDTag as string,
           sourceDocument
         ) as UnsignedEvent & EventAttachment)
       : undefined;
     const event = buildDocumentEvent(plan.knowledgeDBs, document, {
-      snapshotDTag:
-        topNodes.find((topNode) => topNode.snapshotDTag)?.snapshotDTag ??
-        createdSnapshotDTag,
+      snapshotId:
+        topNodes.find((topNode) => topNode.snapshotId)?.snapshotId ??
+        (snapshotEvent ? findTag(snapshotEvent, "d") : undefined),
     });
     return snapshotEvent
       ? events

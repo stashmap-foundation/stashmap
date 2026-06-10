@@ -36,7 +36,7 @@ type ParsedComment = {
   uuid: string;
   hidden: boolean;
   basedOn: string | undefined;
-  snapshotDTag: string | undefined;
+  snapshotId: string | undefined;
   anchor: RootAnchor | undefined;
   systemRole: RootSystemRole | undefined;
   userPublicKey: PublicKey | undefined;
@@ -60,7 +60,7 @@ function parseIdComment(content: string): ParsedComment | undefined {
 
   const hidden = rest.includes(" hidden");
   const basedOn = attrsMap.basedOn || undefined;
-  const snapshotDTag = attrsMap.snapshot || undefined;
+  const snapshotId = attrsMap.snapshot || undefined;
   const anchorContext = attrsMap.anchorContext || undefined;
   const anchorLabelsAttr = attrsMap.anchorLabels || undefined;
   const sourceAuthor = attrsMap.sourceAuthor || undefined;
@@ -102,7 +102,7 @@ function parseIdComment(content: string): ParsedComment | undefined {
     uuid,
     hidden,
     basedOn,
-    snapshotDTag,
+    snapshotId,
     anchor,
     systemRole: undefined,
     userPublicKey,
@@ -280,7 +280,7 @@ export type MarkdownTreeNode = {
   listStart?: number;
   hidden?: boolean;
   basedOn?: string;
-  snapshotDTag?: string;
+  snapshotId?: string;
   anchor?: RootAnchor;
   systemRole?: RootSystemRole;
   userPublicKey?: PublicKey;
@@ -321,8 +321,8 @@ function commentNodeAttrs(
     ...(commentAttrs?.basedOn !== undefined && {
       basedOn: commentAttrs.basedOn,
     }),
-    ...(commentAttrs?.snapshotDTag !== undefined && {
-      snapshotDTag: commentAttrs.snapshotDTag,
+    ...(commentAttrs?.snapshotId !== undefined && {
+      snapshotId: commentAttrs.snapshotId,
     }),
     ...(commentAttrs?.anchor !== undefined && {
       anchor: commentAttrs.anchor,

@@ -556,11 +556,6 @@ function getChildrenForRegularNode(
     return { rows: childRows };
   }
 
-  const nodeSemanticID = getSemanticID(data.knowledgeDBs, nodes);
-  const coordinateSemanticID = isSearchId(parentRow.rowID as ID)
-    ? parentRow.rowID
-    : nodeSemanticID;
-
   const containingNodeID = parentRow.parentNode?.id;
   const effectiveAuthor = nodes.author;
   const visibleAuthors = data.contacts
@@ -573,15 +568,13 @@ function getChildrenForRegularNode(
   const incomingCrefs = getIncomingCrefsForNode(
     graph,
     visibleAuthors,
-    coordinateSemanticID,
     containingNodeID,
     nodes.id,
     author,
     allChildNodes,
     undefined,
     nodes.author,
-    data.documents,
-    data.documentByFilePath
+    data.documents
   );
 
   const visibleIncomingCrefs = activeFilters.includes("incoming")
@@ -814,15 +807,13 @@ export function getNodesInDocument(
   const incomingCrefs = getIncomingCrefsForNode(
     graph,
     visibleAuthors,
-    EMPTY_SEMANTIC_ID,
     undefined,
     undefined,
     document.author,
     topNodes,
     document.filePath,
     document.author,
-    data.documents,
-    data.documentByFilePath
+    data.documents
   );
 
   const withFooter = appendVirtualFooterRows(

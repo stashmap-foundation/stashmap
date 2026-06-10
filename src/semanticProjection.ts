@@ -13,11 +13,7 @@ import {
   resolveNode,
   isRefNode,
 } from "./core/connections";
-import {
-  getBlockFileLinkPath,
-  getBlockLinkTarget,
-  isBlockFileLink,
-} from "./core/nodeSpans";
+import { getBlockLinkTarget } from "./core/nodeSpans";
 import { fileLinkIndexKey, resolveLinkPath } from "./core/linkPath";
 import { suggestionSettings } from "./core/constants";
 import { LOG_ROOT_ROLE } from "./core/systemRoots";
@@ -209,56 +205,89 @@ function sourceDocumentKey(
   return documents?.has(key) ? key : undefined;
 }
 
-function documentKeyForFileLink(
-  item: GraphNode,
-  sourceFilePath: string | undefined,
-  documents: Map<string, Document>,
-  documentByFilePath: Map<string, Document>
-): string | undefined {
-  if (!isBlockFileLink(item)) {
-    return undefined;
-  }
-  const linkPath = getBlockFileLinkPath(item);
-  if (!linkPath) {
-    return undefined;
-  }
-  const targetDocument =
-    documentByFilePath.get(resolveLinkPath(linkPath, sourceFilePath)) ??
-    documents.get(documentKeyOf(item.author, linkPath));
-  return targetDocument
-    ? documentKeyOf(targetDocument.author, targetDocument.docId)
-    : undefined;
+function documentLinkerRefs(
+  graphIndex: GraphIndex,
+  effectiveAuthor: PublicKey,
+  candidateDocument: Document,
+  currentNodeFilePath: string | undefined
+): NodeRef[] {
+  const lookupPaths = ImmutableSet<string>([
+    ...(candidateDocument.filePath ? [candidateDocument.filePath] : []),
+    candidateDocument.docId,
+    ...(currentNodeFilePath
+      ? [resolveLinkPath(candidateDocument.docId, currentNodeFilePath)]
+      : []),
+  ]);
+  return lookupPaths
+    .toArray()
+    .flatMap(
+      (path) =>
+        graphIndex.incomingFileLinks.get(
+          fileLinkIndexKey(effectiveAuthor, path)
+        ) ?? []
+    );
 }
 
-function coveredDocumentKeys(
+function isWithinSubtree(
   knowledgeDBs: KnowledgeDBs,
-  currentItems: List<GraphNode>,
-  sourceFilePath: string | undefined,
-  documents: Map<string, Document> | undefined,
-  documentByFilePath: Map<string, Document> | undefined
-): ImmutableSet<string> {
-  if (!documents || !documentByFilePath) {
-    return ImmutableSet<string>();
+  nodeID: ID,
+  author: PublicKey,
+  subtreeRootIDs: ImmutableSet<ID>,
+  visited: ImmutableSet<ID>
+): boolean {
+  if (subtreeRootIDs.has(nodeID)) {
+    return true;
   }
+  if (visited.has(nodeID)) {
+    return false;
+  }
+  const node = getNode(knowledgeDBs, nodeID, author);
+  if (!node?.parent) {
+    return false;
+  }
+  return isWithinSubtree(
+    knowledgeDBs,
+    node.parent,
+    node.author,
+    subtreeRootIDs,
+    visited.add(nodeID)
+  );
+}
 
-  const collect = (
-    covered: ImmutableSet<string>,
-    item: GraphNode
-  ): ImmutableSet<string> => {
-    const documentKey = documentKeyForFileLink(
-      item,
-      sourceFilePath,
-      documents,
-      documentByFilePath
+function subtreeLinksToDocument(
+  graph: GraphLookup,
+  documents: Map<string, Document> | undefined,
+  candidate: GraphNode,
+  currentNodeID: LongID | undefined,
+  currentNodeFilePath: string | undefined,
+  effectiveAuthor: PublicKey,
+  subtreeRootIDs: ImmutableSet<ID>
+): boolean {
+  const { graphIndex, knowledgeDBs } = graph;
+  const key = sourceDocumentKey(knowledgeDBs, documents, candidate);
+  const candidateDocument = key === undefined ? undefined : documents?.get(key);
+  if (!candidateDocument) {
+    return false;
+  }
+  return documentLinkerRefs(
+    graphIndex,
+    effectiveAuthor,
+    candidateDocument,
+    currentNodeFilePath
+  ).some((ref) => {
+    const linker = getNodeInSource(graph, ref)?.node;
+    return (
+      linker !== undefined &&
+      linker.id !== currentNodeID &&
+      isWithinSubtree(
+        knowledgeDBs,
+        linker.id,
+        linker.author,
+        subtreeRootIDs,
+        ImmutableSet<ID>()
+      )
     );
-    const withCurrent = documentKey ? covered.add(documentKey) : covered;
-    return getChildNodes(knowledgeDBs, item, item.author).reduce(
-      collect,
-      withCurrent
-    );
-  };
-
-  return currentItems.reduce(collect, ImmutableSet<string>());
+  });
 }
 
 function isInSystemRoot(
@@ -371,43 +400,16 @@ export function getIncomingCrefsForDocument(
 export function getIncomingCrefsForNode(
   graph: GraphLookup,
   visibleAuthors: ImmutableSet<PublicKey>,
-  currentSemanticID: ID,
   parentNodeID: LongID | undefined,
   currentNodeID: LongID | undefined,
   effectiveAuthor: PublicKey,
   currentItems?: List<GraphNode>,
   currentNodeFilePath?: string,
   currentNodeAuthor?: PublicKey,
-  documents?: Map<string, Document>,
-  documentByFilePath?: Map<string, Document>
+  documents?: Map<string, Document>
 ): List<NodeRef> {
   const { graphIndex, knowledgeDBs } = graph;
   const current = currentItems || List<GraphNode>();
-  const outgoingCrefIDs = current
-    .filter(isRefNode)
-    .map((item) => item.id)
-    .toList();
-  const covered = coveredContextKeys(
-    knowledgeDBs,
-    outgoingCrefIDs,
-    effectiveAuthor
-  );
-  const coveredDocuments = coveredDocumentKeys(
-    knowledgeDBs,
-    current,
-    currentNodeFilePath,
-    documents,
-    documentByFilePath
-  );
-  const outgoingTargetRelIDs = current.reduce((acc, item) => {
-    const targetNode = isRefNode(item)
-      ? resolveBlockLinkTarget(graph, {
-          ref: { sourceId: item.author, id: item.id },
-          node: item,
-        })?.node
-      : resolveNode(knowledgeDBs, item);
-    return targetNode ? acc.add(targetNode.id) : acc;
-  }, ImmutableSet<LongID>());
 
   const graphLinkRefs = (() => {
     if (!currentNodeID) {
@@ -436,16 +438,49 @@ export function getIncomingCrefsForNode(
     ...graphLinkSourceNodes,
     ...fileLinkSourceNodes,
   ]);
+  if (sourceNodes.length === 0) {
+    return List<NodeRef>();
+  }
+
+  const outgoingCrefIDs = current
+    .filter(isRefNode)
+    .map((item) => item.id)
+    .toList();
+  const covered = coveredContextKeys(
+    knowledgeDBs,
+    outgoingCrefIDs,
+    effectiveAuthor
+  );
+  const outgoingTargetRelIDs = current.reduce((acc, item) => {
+    const targetNode = isRefNode(item)
+      ? resolveBlockLinkTarget(graph, {
+          ref: { sourceId: item.author, id: item.id },
+          node: item,
+        })?.node
+      : resolveNode(knowledgeDBs, item);
+    return targetNode ? acc.add(targetNode.id) : acc;
+  }, ImmutableSet<LongID>());
+  const subtreeRootIDs = ImmutableSet<ID>(current.map((item) => item.id)).union(
+    currentNodeID ? [currentNodeID] : []
+  );
 
   const refs = List(
     sourceNodes
       .filter(({ node }) => visibleAuthors.has(node.author))
       .filter(({ node }) => node.id !== parentNodeID)
       .filter(({ node }) => node.id !== currentNodeID)
-      .filter(({ node }) => {
-        const key = sourceDocumentKey(knowledgeDBs, documents, node);
-        return key === undefined || !coveredDocuments.has(key);
-      })
+      .filter(
+        ({ node }) =>
+          !subtreeLinksToDocument(
+            graph,
+            documents,
+            node,
+            currentNodeID,
+            currentNodeFilePath,
+            effectiveAuthor,
+            subtreeRootIDs
+          )
+      )
       .filter(
         ({ node }) =>
           node.systemRole !== LOG_ROOT_ROLE &&

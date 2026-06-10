@@ -5,10 +5,9 @@ Updated 2026-06-10 with measured data. Full-suite `npm test` wall time roughly d
 ## Measured and fixed
 
 1. **Per-row-render bech32 decode (fixed).** `getDisplayTextForRow`, `Node`, and `RightMenu` call `getNodeUserPublicKey(node)` on every row render; it ran `nip19.decode` on arbitrary node text (twice on the miss path). CPU profile: 2.7s self-time in `@scure/base decode` in the slow suite alone. Fixed in `src/infra/nostr/publicKeys.ts` by testing the hex shape first and requiring an `npub1`/`nprofile1` prefix before attempting `nip19.decode`. Won ~2s of full-suite wall time.
+2. **Per-row subtree walk in incoming-ref suppression (fixed for scaling, not a test-time win).** `coveredDocumentKeys` walked every expanded row's entire descendant data subtree per traversal — O(total nodes × depth) per render pass on large workspaces, though only 173ms on shallow test fixtures. Replaced with an inverted check: `getIncomingCrefsForNode` finds incoming candidates first and returns early when there are none; for candidates with a document, it queries `graphIndex.incomingFileLinks` for that document's linkers and tests subtree membership with a bounded parent-chain walk (`isWithinSubtree`). Cost is now proportional to link density, not subtree size. Known edge: docId-form file links written from subdirectory files are indexed under `<dir>/<docId>` and lose row-level suppression (document-level still resolves via `resolveLinkPath`).
 
 ## Measured and disproved (do not re-investigate without new evidence)
-
-- `getIncomingCrefsForNode` per-row subtree walks: 4,600 calls in the slow suite cost **173ms** total; `coveredDocumentKeys` did 5,956 node visits over 5,000 calls (trees are shallow). Real in theory, negligible in practice.
 - `getAlternativeFooterData`: 286ms total in the slow suite.
 - Traversal overall: `getNodesInTree` + `getNodesInDocument` inclusive ≈ **0.8s** of 36.6s.
 - Row render volume: ~8,000 `ListItem` renders across the whole suite (~240/test) — typing does not re-render the tree.

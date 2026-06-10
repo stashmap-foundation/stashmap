@@ -283,27 +283,26 @@ Completed:
 - All hard grep acceptance gates from `row-model-plan.md` and `implementation/02-delete-view-lookups.md` are clean.
 - Verified green with `npm run typescript`, `npm run lint`, and `npm test` (74 suites, 841 tests).
 
-### Phase 1A.5b — Performance closeout — Remaining
+### Phase 1A.5b — Performance closeout — In progress
 
-The row migration roughly doubled full-suite test time (about 30s before, about 65s now; `src/editor/IncomingRefInteraction.test.tsx` alone takes ~65s and is the long pole). See `performance-regression.md` for the audited per-item status.
+The row migration roughly doubled full-suite test time (about 30s before, about 63s now; `src/editor/IncomingRefInteraction.test.tsx` is the long pole and is byte-identical before/after the migration). See `performance-regression.md` for measured per-item status — several earlier suspects were profiled and disproved there; do not re-investigate them without new evidence.
 
-Resolved already:
+Resolved:
 
 - `findUniquePlanNodeByID` / `knowledgeDBs.valueSeq()` planner scans are deleted.
 - `buildReferenceItem` and reference-row helpers receive `graph` as a parameter instead of constructing lookups repeatedly.
+- Per-row-render `nip19.decode` on arbitrary node text (`getNodeUserPublicKey` via `getDisplayTextForRow`/`Node`/`RightMenu`) is fixed with a key-shape guard in `src/infra/nostr/publicKeys.ts` (~2s full-suite win).
 
-Remaining regressions to eliminate:
+Remaining:
 
-- `getIncomingCrefsForNode` is called from `getChildrenForRegularNode` for every expanded row; inside it `coveredDocumentKeys` recursively walks the row's entire child subtree and `outgoingTargetRelIDs` source-resolves every child. This is the main suspect for the suite slowdown. Fix the data flow/indexes directly; do not add caches.
-- `linkToHref`/`nodeTarget` in `src/editor/linkOperations.ts` constructs `graphLookupFromData(data)` per rendered link.
-- Delete dead/test-only traversal exports: `getTreeChildrenForRow` has no callers; `getTreeChildren` is used only by `src/sourcePropagation.test.ts`.
+- Attribute the residual slowdown (diffuse per-event/render cost and idle timer waits) via a baseline timing comparison against the pre-migration commit; see open leads in `performance-regression.md`.
+- Minor cleanups: `nodeTarget` in `src/editor/linkOperations.ts` constructs `graphLookupFromData(data)` per link (measured cheap); delete dead/test-only traversal exports `getTreeChildrenForRow` / `getTreeChildren`.
 
 Acceptance criteria:
 
 - No `graphLookupFromData(data)` construction inside per-row or per-link render paths; a traversal/render pass creates lookup data once and passes it through.
-- Incoming-ref computation does not redo full-subtree walks per visible row in a render pass.
 - No hot-path fallback that scans all DBs/all nodes to resolve a semantic or concrete node ID.
-- Full-suite `npm test` wall time returns to roughly the pre-migration baseline (~30–40s).
+- Full-suite `npm test` wall time returns to roughly the pre-migration baseline (~30–40s), with the residual attributed via baseline comparison first.
 - `npm run typescript`, `npm run lint`, and `npm test` pass.
 
 ### Phase 1A.6 — Remove remaining `LongID` assumptions incrementally — Remaining

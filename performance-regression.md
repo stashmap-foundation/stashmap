@@ -1,30 +1,37 @@
 # Performance regression audit
 
-Updated 2026-06-10 after the row-model migration landed (`34286bb`, `16ac683`). Full-suite `npm test` wall time roughly doubled from ~30s to ~65s. `src/editor/IncomingRefInteraction.test.tsx` alone takes ~65s and is the long pole; everything else finishes well before it.
+Updated 2026-06-10 with measured data. Full-suite `npm test` wall time roughly doubled after the row-model migration (`34286bb`): ~30s before, ~63–65s now. `src/editor/IncomingRefInteraction.test.tsx` is the long pole (~62s in the parallel run, ~35s alone); that test file is byte-identical before/after `34286bb`, so the slowdown is purely production-code behavior.
 
-`graphLookupFromData(data)` itself is cheap (it bundles references and builds a small deduplicated source-order array), so the cost is not in constructing the lookup but in what gets recomputed per row.
+## Measured and fixed
 
-## Resolved
+1. **Per-row-render bech32 decode (fixed).** `getDisplayTextForRow`, `Node`, and `RightMenu` call `getNodeUserPublicKey(node)` on every row render; it ran `nip19.decode` on arbitrary node text (twice on the miss path). CPU profile: 2.7s self-time in `@scure/base decode` in the slow suite alone. Fixed in `src/infra/nostr/publicKeys.ts` by testing the hex shape first and requiring an `npub1`/`nprofile1` prefix before attempting `nip19.decode`. Won ~2s of full-suite wall time.
 
-1. `findUniquePlanNodeByID` and the `knowledgeDBs.valueSeq()` planner scan are deleted. Planner lookup is exact source only. Verified: `rg "findUniquePlanNodeByID|knowledgeDBs\.valueSeq" src` has no production hits.
-2. `src/buildReferenceRow.ts` no longer constructs graph lookups repeatedly; `buildReferenceItem` and its helpers receive `graph` as a parameter from the traversal pass.
-3. `src/treeTraversal.ts` entry points (`getNodesInTree`, `getNodesInDocument`) construct the graph lookup once per traversal and pass it through.
+## Measured and disproved (do not re-investigate without new evidence)
 
-## Remaining
+- `getIncomingCrefsForNode` per-row subtree walks: 4,600 calls in the slow suite cost **173ms** total; `coveredDocumentKeys` did 5,956 node visits over 5,000 calls (trees are shallow). Real in theory, negligible in practice.
+- `getAlternativeFooterData`: 286ms total in the slow suite.
+- Traversal overall: `getNodesInTree` + `getNodesInDocument` inclusive ≈ **0.8s** of 36.6s.
+- Row render volume: ~8,000 `ListItem` renders across the whole suite (~240/test) — typing does not re-render the tree.
+- All-DB scans: `findUniquePlanNodeByID` is deleted; the only remaining all-node scan (`logNodeNotFoundDebug` in `src/editor/Node.tsx`) is gated behind `DEBUG_NODE_NOT_FOUND=1` and dormant.
 
-1. `src/semanticProjection.ts` `getIncomingCrefsForNode` — **main suspect** for the suite slowdown.
-   - Called from `getChildrenForRegularNode` in `src/treeTraversal.ts` for every expanded row in a traversal.
-   - Per call, `coveredDocumentKeys` recursively walks the row's entire child subtree via `getChildNodes`, so a traversal over a deep tree does O(n²)-shaped subtree walks.
-   - Per call, `outgoingTargetRelIDs` source-resolves every child (`resolveBlockLinkTarget` / `resolveNode`).
-   - Per call, it dedupes/sorts and calls `getNodeContext` for incoming candidates.
-   - Fix direction: restructure the data flow so a traversal computes covered-document/outgoing-target information once top-down instead of re-walking each row's subtree, per the no-caching rule in `AGENTS.md`.
-2. `src/editor/linkOperations.ts` `nodeTarget` constructs `graphLookupFromData(data)` per call; `linkToHref` runs during render for every block-link row (`NodeAutoLink` in `src/editor/Node.tsx`). Cheap per call but multiplies in link-heavy views; pass the traversal/render-pass lookup in instead.
-3. Dead/test-only traversal exports to delete: `getTreeChildrenForRow` (no callers) and `getTreeChildren` (used only by `src/sourcePropagation.test.ts`).
-4. Lower-confidence: `src/semanticProjection.ts` `getConcreteNodesForSemanticID` still scans all candidate DBs/nodes on direct lookup miss. Not confirmed as a hot path, but it is a whole-DB scan and should not be reachable from per-row rendering.
+## Remaining (diffuse, needs baseline comparison to attribute)
+
+Post-fix profile of the slow suite (36.6s in-band): jsdom 6.9s, idle 6.8s, react-dom 6.4s, other deps 4.2s, app src 3.8s (no file above 0.7s self). The cost is per-synthetic-event dispatch (`user-event` keyboard 8.6s + pointer 3.1s inclusive) and the React re-renders they trigger — flat across hundreds of frames, no single hotspot.
+
+Open leads, in order of suspicion:
+
+1. **Idle/timer waits (6.8s in-band).** Consistent with ~136 `waitFor`/`findBy` 50ms polling ticks. If state updates now settle one timer tick later than before (queue/scheduling change), every await in every suite pays 50ms.
+2. **Event signing inside keystrokes.** ~0.7s of `@noble/curves` secp256k1 work under `keyboard` events — plans are signed synchronously during typing interactions.
+3. **Per-event React/jsdom cost** (DOM size per row, dev-mode checks like `updatedAncestorInfo`, per-row `RowContext.Provider` propagation).
+
+Attributing the residual requires timing the same suite at the pre-migration commit (e.g. a throwaway worktree at `3e1203b`) — without that baseline, further optimization is forward-looking tuning, not regression hunting.
+
+## Tooling
+
+CPU profile: `node --cpu-prof --cpu-prof-dir=<dir> node_modules/.bin/jest <suite> --runInBand`, then aggregate self/inclusive time from the `.cpuprofile` (analysis scripts used for this audit were throwaway, under `/tmp/prof/`).
 
 ## Acceptance
 
-- No `graphLookupFromData(data)` construction in per-row or per-link render paths.
-- No per-row full-subtree re-walks for incoming-ref computation.
+- No `graphLookupFromData(data)` construction in per-row or per-link render paths (one known remaining: `nodeTarget` in `src/editor/linkOperations.ts`, measured cheap).
 - No hot-path all-DB/all-node fallback scans.
-- Full-suite `npm test` wall time returns to roughly the pre-migration baseline (~30–40s), with `IncomingRefInteraction.test.tsx` no longer an order of magnitude slower than other suites.
+- Full-suite `npm test` wall time returns to roughly the pre-migration baseline (~30–40s), with the residual attributed via baseline comparison first.

@@ -349,9 +349,22 @@ Phase 1A is complete only when all of the following are true:
 - `joinID`, `shortID`, `splitID`, and `LongID` have either been removed from ordinary domain code or isolated/documented as temporary compatibility debt with a deletion path.
 - No legacy public-key migration behavior exists.
 
-## Phase 1B — Node-level lineage and ownership metadata (draft)
+## Phase 1B — Node-level lineage and ownership metadata — In progress
 
 Markdown round-trips must carry everything the collaboration model needs at the file level: node-level lineage, hash-shaped snapshot IDs, and document ownership. Do this after Phase 1A so `basedOn` and snapshot lookup use the namespace-scoped ID model.
+
+### Completed checkpoints
+
+1. **Content-addressed snapshot IDs.** `snapshotDTag` renamed to `snapshotId` across all production files; `buildSnapshotEventFromNodes` derives its ID as `snap_sha256_<sha256(content)>` via `snapshotIdForContent` (`src/nodesDocumentEvent.ts`); the mutable `` `snapshot-${docId}` `` ID and its cast are deleted from `src/planner.tsx`. Covered by the fork integration test in `src/editor/DeepCopy.test.tsx` asserting ID shape, hash equality with event content, and the document event referencing the same ID.
+2. **Node-level snapshot metadata.** Materialization no longer drops `snapshot` on non-root nodes (`src/core/markdownNodes.ts`); parse and render sides already handled every node. Covered by the parse/render round-trip test in `src/core/Document.test.ts` proving root and child `basedOn`/`snapshot` survive both directions.
+
+### Remaining
+
+- Forks stamp a node-centric `snapshot` on every copied node with `basedOn` (currently root-only), and baseline lookup in `src/core/snapshotBaseline.ts` switches from `rootNode.snapshotId` to the node's own ID — these two must land together.
+- `author` frontmatter round-trip and parse-side ownership.
+- Malformed snapshot-ID validation in filesystem save paths.
+- Non-replaceable snapshot event kind.
+- `RootAnchor` provenance audit.
 
 ### Decisions to encode
 
@@ -375,14 +388,14 @@ Markdown round-trips must carry everything the collaboration model needs at the 
 - Malformed `snapshot` IDs are rejected in filesystem save paths.
 - Snapshot baseline lookup uses the node's own `snapshotId` only, with no root fallback.
 
-### Files expected to change
+### Files expected to change (remaining work)
 
-- `src/types.ts` — `GraphNode.snapshotDTag` becomes `snapshotId` (26 references across 8 files today).
-- `src/core/markdownNodes.ts` — materialization currently forces snapshots to roots only (`snapshotDTag: parent ? undefined : …` around line 110); node-level snapshots must survive on every node.
-- `src/core/markdownTree.ts`, `src/documentRenderer.ts` — parse/render side of node-level `basedOn`/`snapshot`.
+- `src/core/plan.ts` / `src/planner.tsx` — fork/copy paths stamp node-centric `snapshot` on every copied node with `basedOn`.
+- `src/core/snapshotBaseline.ts` — baseline lookup uses the node's own `snapshotId`, no root fallback.
 - `src/core/Document.ts` — `author` frontmatter read/write next to `ensureKnowstrDocId`.
-- `src/planner.tsx` `buildDocumentEvents` — creates the mutable ID `` `snapshot-${document.docId}` `` (plus an `as string` cast) around line 754; replace with content-addressed IDs and remove the cast.
-- `src/nodesDocumentEvent.ts`, `src/infra/snapshotStore.ts` — snapshot event/store keyed by snapshot ID, immutable.
+- `src/infra/filesystem/workspaceScan.ts` (or the markdown parse boundary it uses) — reject malformed snapshot IDs in filesystem save paths.
+- `src/nostr.ts`, `src/nodesDocumentEvent.ts`, `src/infra/snapshotStore.ts` — non-replaceable snapshot event kind, store lookup by snapshot ID.
+- `src/core/rootAnchor.ts` and its consumers — provenance audit.
 
 ### Implementation notes
 

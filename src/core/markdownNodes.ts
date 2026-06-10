@@ -107,7 +107,7 @@ function materializeTreeNode(
       : treeNode.anchor ?? createRootAnchor(semanticContext),
     systemRole: parent ? undefined : treeNode.systemRole,
     userPublicKey: treeNode.userPublicKey,
-    snapshotId: parent ? undefined : treeNode.snapshotId,
+    snapshotId: treeNode.snapshotId,
     ...(treeNode.blockKind !== undefined && { blockKind: treeNode.blockKind }),
     ...(treeNode.headingLevel !== undefined && {
       headingLevel: treeNode.headingLevel,

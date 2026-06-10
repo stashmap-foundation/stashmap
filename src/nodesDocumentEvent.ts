@@ -33,12 +33,11 @@ export function buildDocumentEvent(
   };
 }
 
-export function buildSnapshotEventFromNodes(
-  knowledgeDBs: KnowledgeDBs,
+function snapshotEventForContent(
   snapshotAuthor: PublicKey,
-  sourceDocument: Document
+  sourceDocument: Document,
+  content: string
 ): UnsignedEvent {
-  const content = renderDocumentMarkdown(knowledgeDBs, sourceDocument);
   return {
     kind: KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
     pubkey: snapshotAuthor,
@@ -51,4 +50,16 @@ export function buildSnapshotEventFromNodes(
     ],
     content,
   };
+}
+
+export function buildSnapshotEventFromNodes(
+  knowledgeDBs: KnowledgeDBs,
+  snapshotAuthor: PublicKey,
+  sourceDocument: Document
+): UnsignedEvent {
+  return snapshotEventForContent(
+    snapshotAuthor,
+    sourceDocument,
+    renderDocumentMarkdown(knowledgeDBs, sourceDocument)
+  );
 }

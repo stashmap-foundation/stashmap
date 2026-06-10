@@ -1,4 +1,9 @@
-import { parseToDocument } from "./Document";
+import { Map } from "immutable";
+import {
+  parseToDocument,
+  parseToDocumentPreservingExplicitIds,
+} from "./Document";
+import { renderDocumentMarkdown } from "../documentRenderer";
 
 const TEST_PUBKEY = "a".repeat(64) as PublicKey;
 
@@ -46,4 +51,36 @@ test("parseToDocument falls back to first top-level node text", () => {
 test("parseToDocument falls back to 'Untitled' when nothing else is available", () => {
   const { document } = parseToDocument(TEST_PUBKEY, "");
   expect(document.title).toBe("Untitled");
+});
+
+test("node-level basedOn and snapshot survive parse and render", () => {
+  const rootSnapshot = `snap_sha256_${"1".repeat(64)}`;
+  const childSnapshot = `snap_sha256_${"2".repeat(64)}`;
+  const markdown = [
+    `# Houses <!-- id:u1 basedOn="a1" snapshot="${rootSnapshot}" -->`,
+    "",
+    `- Brick house <!-- id:u2 basedOn="a2" snapshot="${childSnapshot}" -->`,
+    "",
+  ].join("\n");
+
+  const { document, nodes } = parseToDocumentPreservingExplicitIds(
+    TEST_PUBKEY,
+    markdown,
+    { docIdFallback: "doc-1" }
+  );
+
+  expect(nodes.get("u1")?.basedOn).toBe("a1");
+  expect(nodes.get("u1")?.snapshotId).toBe(rootSnapshot);
+  expect(nodes.get("u2")?.basedOn).toBe("a2");
+  expect(nodes.get("u2")?.snapshotId).toBe(childSnapshot);
+
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>([
+    [TEST_PUBKEY, { nodes }],
+  ]);
+  expect(renderDocumentMarkdown(knowledgeDBs, document)).toContain(
+    `snapshot="${rootSnapshot}"`
+  );
+  expect(renderDocumentMarkdown(knowledgeDBs, document)).toContain(
+    `snapshot="${childSnapshot}"`
+  );
 });

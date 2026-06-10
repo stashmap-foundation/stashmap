@@ -1,5 +1,7 @@
 # Row model plan
 
+Status: **Done** (2026-06-10). All checkpoints and final acceptance criteria are met: `treeTraversal` returns rows, rendering/DnD/multiselect/planner boundaries work from `Row` values, `ViewContext` and all view-key identity side channels are deleted, and every hard grep acceptance gate below is clean with `npm run typescript`, `npm run lint`, and `npm test` green. Remaining follow-up is performance closeout only — see `performance-regression.md` and Phase 1A.5b in `implementation.md`.
+
 ## Goal
 
 After `treeTraversal`, the editor works with rows, not with bare `ViewPath` / `viewKey` values.

@@ -267,20 +267,44 @@ Acceptance criteria:
 - No legacy public-key migration behavior is introduced.
 - `npm run typescript`, `npm run lint`, and `npm test` pass after each checkpoint.
 
-### Phase 1A.5 — Source-aware row identity and planner NodeRef boundary — Remaining
+### Phase 1A.5 — Source-aware row identity and planner NodeRef boundary — Done
 
+Status: **Done in commits `34286bb` (`Implement source-aware node and row identity`) and `16ac683` (`rename viewContext.tsx into rowModel.tsx`)**.
 
-Performance regressions to eliminate explicitly:
+The detailed execution prompts live in `row-model-plan.md`, `implementation/01-delete-view-path.md`, and `implementation/02-delete-view-lookups.md`.
 
-- No `findUniquePlanNodeByID` or equivalent `knowledgeDBs.valueSeq()` scan on planner lookup miss.
-- No `graphLookupFromData(data)` inside per-row loops (`createVirtualRow`, `buildReferenceItem`, link href helpers, or row child traversal helpers). A traversal/render pass creates lookup data once and passes it through.
-- `getIncomingCrefsForNode` must not recursively walk and dedupe the same row/document subtrees separately for every visible row in a render pass.
-- Reference-row rendering must not construct graph lookup repeatedly for parse, deleted-row fallback, stored-item lookup, graph-link lookup, and file-link lookup.
-- Link href/navigation rendering must not construct graph lookup once per link/span.
-- No hot-path fallback that scans all DBs/all nodes to resolve a semantic or concrete node ID.
+Completed:
+
+- `treeTraversal` returns ordered `Row` values as the editor model; virtual rows are rows, not side-map entries.
+- Editor rendering, multiselect, DnD payloads, and editor actions work from `Row` values.
+- Planner/core mutation functions receive `NodeRef`/explicit graph inputs; they do not accept `Row`, `ViewPath`, or `viewKey` as graph identity.
+- Deleted `ViewContext` (file renamed to `rowModel.tsx`), `useViewPath`, `getNodeForView`, `getRowIDFromView`, `getPaneRootViewPath`, `VirtualRowsMap`, and `findUniquePlanNodeByID`.
+- `GraphNode.virtualType` / `GraphNode.versionMeta` moved to `Row`; no view-key keyed identity maps exist.
+- All hard grep acceptance gates from `row-model-plan.md` and `implementation/02-delete-view-lookups.md` are clean.
+- Verified green with `npm run typescript`, `npm run lint`, and `npm test` (74 suites, 841 tests).
+
+### Phase 1A.5b — Performance closeout — Remaining
+
+The row migration roughly doubled full-suite test time (about 30s before, about 65s now; `src/editor/IncomingRefInteraction.test.tsx` alone takes ~65s and is the long pole). See `performance-regression.md` for the audited per-item status.
+
+Resolved already:
+
+- `findUniquePlanNodeByID` / `knowledgeDBs.valueSeq()` planner scans are deleted.
+- `buildReferenceItem` and reference-row helpers receive `graph` as a parameter instead of constructing lookups repeatedly.
+
+Remaining regressions to eliminate:
+
+- `getIncomingCrefsForNode` is called from `getChildrenForRegularNode` for every expanded row; inside it `coveredDocumentKeys` recursively walks the row's entire child subtree and `outgoingTargetRelIDs` source-resolves every child. This is the main suspect for the suite slowdown. Fix the data flow/indexes directly; do not add caches.
+- `linkToHref`/`nodeTarget` in `src/editor/linkOperations.ts` constructs `graphLookupFromData(data)` per rendered link.
+- Delete dead/test-only traversal exports: `getTreeChildrenForRow` has no callers; `getTreeChildren` is used only by `src/sourcePropagation.test.ts`.
 
 Acceptance criteria:
 
+- No `graphLookupFromData(data)` construction inside per-row or per-link render paths; a traversal/render pass creates lookup data once and passes it through.
+- Incoming-ref computation does not redo full-subtree walks per visible row in a render pass.
+- No hot-path fallback that scans all DBs/all nodes to resolve a semantic or concrete node ID.
+- Full-suite `npm test` wall time returns to roughly the pre-migration baseline (~30–40s).
+- `npm run typescript`, `npm run lint`, and `npm test` pass.
 
 ### Phase 1A.6 — Remove remaining `LongID` assumptions incrementally — Remaining
 

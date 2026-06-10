@@ -1,5 +1,7 @@
 # Multi-Root Document Finalization Execution Plan
 
+Status: **Completed/historical.** This was the execution plan for the `f/multi-root-fix` branch; that work landed and the branch no longer exists. All implementation phases (1–7b) are done; only the Phase 8 cleanup checkboxes were never ticked. Kept for the phase review notes. Current work lives in `implementation.md`.
+
 ## Current Branch And Scope
 
 - Branch: `f/multi-root-fix`

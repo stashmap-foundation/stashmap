@@ -1,5 +1,7 @@
 # Delete ViewPath migration prompt
 
+Status: **Done** (2026-06-10). `useViewPath()`, `useViewKey()`, and the `ViewContext` React context/provider are deleted; `ViewContext.tsx` was renamed to `rowModel.tsx`. All hard greps below and in `row-model-plan.md` are clean and the full gate passes.
+
 We are continuing the row-model migration. Read `AGENTS.md` and `row-model-plan.md` first. Treat `row-model-plan.md` acceptance criteria as mandatory.
 
 ## Core intent

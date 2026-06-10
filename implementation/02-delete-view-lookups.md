@@ -1,5 +1,7 @@
 # Delete view lookup helpers and DnD root-path migration prompt
 
+Status: **Done** (2026-06-10). All five checkpoints are complete: `getPaneRootViewPath`, `getNodeForView`, and `getRowIDFromView` no longer exist in `src`, DnD works from rows, planner/core functions take explicit graph inputs, and every hard grep acceptance gate below is clean with the full gate green.
+
 We are continuing the row-model migration after `delete-viewpath.md`. Read `AGENTS.md`, `row-model-plan.md`, and `delete-viewpath.md` first. Treat the row-model acceptance criteria as mandatory.
 
 ## Core correction

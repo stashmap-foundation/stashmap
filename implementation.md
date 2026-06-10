@@ -1,6 +1,6 @@
-# Knowstr collaboration model v2 implementation plan
+# Knowstr collaboration model implementation plan
 
-This plan implements `idea.md`. Phase 0 is intentionally removal-only: delete the incompatible legacy ingestion paths before adding the v2 source/import/suggest model.
+This plan implements `idea.md`: ownership in the document decides editability, visibility comes from joined folders/follows, editing foreign documents forks them with lineage, and differences render as suggestions. Phases 0 and 1A are completed groundwork; the draft phases build the collaboration loop on top of it.
 
 ## Phase 0 — Remove legacy `apply` / `inbox` ingestion — Done
 
@@ -94,7 +94,15 @@ npm test
 
 These phases are scope/order placeholders only. `(draft)` means the phase is not yet detailed enough to implement; before starting any draft phase, expand it with tests-first steps, exact files/functions, acceptance criteria, and verification commands.
 
-The first five phases are intentionally ordered to validate whether the source/import/suggest model works in practice before investing in all surrounding polish. Local filesystem snapshot storage is pulled forward because `import` cannot be correct if Electron/CLI workspaces still rely on IndexedDB-only snapshot durability.
+Phases 1B–5 are ordered to validate the core collaboration loop early, before investing in surrounding polish:
+
+```sh
+knowstr join ../shared-space
+cp ../shared-space/alice/houses.md . && knowstr save   # fork with lineage
+knowstr status --json                                  # suggestions from the three-way diff
+```
+
+Local filesystem snapshot storage is pulled forward because forking cannot be correct if Electron/CLI workspaces rely on IndexedDB-only snapshot durability.
 
 ## Phase 1A — Namespace-scoped ID foundation (split)
 
@@ -283,7 +291,9 @@ Completed:
 - All hard grep acceptance gates from `row-model-plan.md` and `implementation/02-delete-view-lookups.md` are clean.
 - Verified green with `npm run typescript`, `npm run lint`, and `npm test` (74 suites, 841 tests).
 
-### Phase 1A.5b — Performance closeout — In progress
+### Phase 1A.5b — Performance closeout — Parked
+
+Production-relevant regressions are fixed (per-row decode guard, index-based incoming-ref suppression, dead O(N) lookup removal). The remaining residual is test-environment render/event cost, deprioritized in favor of feature work; see `performance-regression.md`.
 
 The row migration roughly doubled full-suite test time (about 30s before, about 63s now; `src/editor/IncomingRefInteraction.test.tsx` is the long pole and is byte-identical before/after the migration). See `performance-regression.md` for measured per-item status — several earlier suspects were profiled and disproved there; do not re-investigate them without new evidence.
 
@@ -360,9 +370,9 @@ Phase 1A is complete only when all of the following are true:
 - `joinID`, `shortID`, `splitID`, and `LongID` have either been removed from ordinary domain code or isolated/documented as temporary compatibility debt with a deletion path.
 - No legacy public-key migration behavior exists.
 
-## Phase 1B — Node-level lineage metadata and hash snapshot IDs (draft)
+## Phase 1B — Node-level lineage and ownership metadata (draft)
 
-Second half of the former metadata phase. Do this after Phase 1A so `basedOn` and snapshot lookup can use the namespace-scoped ID model.
+Markdown round-trips must carry everything the collaboration model needs at the file level: node-level lineage, hash-shaped snapshot IDs, and document ownership. Do this after Phase 1A so `basedOn` and snapshot lookup use the namespace-scoped ID model.
 
 ### Decisions to encode
 
@@ -370,206 +380,183 @@ Second half of the former metadata phase. Do this after Phase 1A so `basedOn` an
 - Valid snapshot IDs are hash-shaped: `snap_sha256_<64 lowercase hex chars>`.
 - `snapshot` is node-level metadata. Preserve, parse, and render it on every node, not just roots.
 - Node-level snapshot lookup uses only the node's own `snapshotId`. Do not fall back to root/document snapshot metadata for a node's lineage edge.
-- `basedOn` parsing/rendering remains supported and should use the Phase 1A scoped-ref model for cross-namespace references.
+- `basedOn` parsing/rendering uses the Phase 1A scoped-ref model for cross-namespace references.
+- Document ownership is part of the markdown format: `author` persists in frontmatter and survives save/parse/disk round-trips. The internal `Document.author` field exists; the markdown serialization boundary must read and write it.
 - Preserve `knowstr_vote_id` in frontmatter.
-- Whole-document snapshots are sufficient for now. The ID/lookup model should not prevent subtree snapshots later, but this phase does not need to create subtree snapshots.
+- Whole-document snapshots are sufficient for now. The ID/lookup model should not prevent subtree snapshots later, but this phase does not need to create them.
 
 ### Tests first
 
-- Add markdown parser/materializer/renderer tests proving `snapshot` survives on child headings, list items, paragraphs, block links, and file links.
-- Add tests proving `basedOn` round-trips with scoped refs and local refs.
-- Add tests proving `knowstr_vote_id` survives save/round-trip.
-- Add tests for rejecting malformed `snapshot` IDs in filesystem save paths.
-- Add snapshot baseline tests proving lookup uses the node's own `snapshotId` only, with no root fallback.
+- Markdown parser/materializer/renderer tests proving `snapshot` survives on child headings, list items, paragraphs, block links, and file links.
+- `basedOn` round-trips with scoped refs and local refs.
+- `author` frontmatter round-trips through `knowstr save` and a disk readback.
+- `knowstr_vote_id` survives save/round-trip.
+- Malformed `snapshot` IDs are rejected in filesystem save paths.
+- Snapshot baseline lookup uses the node's own `snapshotId` only, with no root fallback.
 
 ### Implementation notes
 
 - Update `GraphNode` and related functions from `snapshotDTag` to `snapshotId` where practical.
 - Update snapshot stores/materialization to key by snapshot ID terminology.
-- Current snapshot creation that uses mutable/non-hash IDs such as `snapshot-${document.docId}` must be removed or replaced before paths that create snapshots are considered valid v2 behavior.
+- Snapshot creation that uses mutable/non-hash IDs such as `snapshot-${document.docId}` must be removed or replaced before paths that create snapshots are considered valid.
 - Filesystem/CLI parsing should throw clear validation errors for malformed local workspace markdown. Remote/Nostr ingestion should avoid crashing the app on malformed remote documents.
 
 ### Acceptance criteria
 
-- `knowstr save` preserves node-level `basedOn`, `snapshot`, and `knowstr_vote_id` metadata.
+- `knowstr save` preserves node-level `basedOn`, `snapshot`, `author`, and `knowstr_vote_id` metadata.
 - Node-level snapshots are accepted only with `snap_sha256_<64 lowercase hex chars>` IDs.
 - Snapshot diff/baseline lookup for a node uses that node's own snapshot ID and does not inherit from root metadata.
-- Existing non-legacy save/render/navigation behavior remains green.
+- Existing save/render/navigation behavior remains green.
 
-## Phase 2 — `knowstr source` (draft)
+## Phase 2 — `knowstr join` visibility configuration (draft)
 
-Former source registry phase. This is the minimal source declaration layer needed to try the model.
+The minimal visibility layer: which folders Knowstr can see other people's documents in.
 
-Minimal prerequisite: add `.knowstr/sources.json` support.
+- Add `.knowstr/spaces.json` for joined folders.
+- Add `knowstr join <folder>`, plus list/remove management of joined folders.
+- Require an existing `.knowstr`; never create it implicitly. Fail with a clear message pointing to `knowstr init`.
+- Joining never copies, rewrites, normalizes, or deletes anything in the folder. A joined folder keeps whatever structure it has; Knowstr imposes none.
+- Exclude joined folders from workspace save scanning and from filesystem watching/write-through claiming.
+- Ownership of documents inside joined folders is read from their `author` metadata, not from paths.
 
-- Add `knowstr source add <file-or-dir>`.
-- Add `knowstr source list`.
-- Add `knowstr source remove <file-or-dir>`.
-- Require existing `.knowstr`; do not initialize implicitly.
-- Do not copy, rewrite, normalize, delete, or fork source files.
-- Store source paths in workspace state.
-- Exclude configured source paths from workspace save.
-- Exclude configured source paths from filesystem workspace watching/write-through where relevant.
+UI equivalent: "Shared folders" settings; Follow / open-link / groups are the web instantiations (Phase 9).
 
 ## Phase 3 — Local filesystem snapshot storage for Electron/CLI workspaces (draft)
 
-Pulled forward before `import`. A filesystem workspace must durably store snapshots under `.knowstr/snapshots/`; IndexedDB can remain a cache/browser/Nostr-only fallback but must not be the only durable store when running in Electron or CLI workspace mode.
+A filesystem workspace must durably store snapshots under `.knowstr/snapshots/`; IndexedDB can remain a cache/browser-only fallback but must not be the only durable store when running in Electron or CLI workspace mode. Pulled forward because forking cannot be correct without durable baselines.
 
 - Add snapshot storage primitives for initialized filesystem workspaces.
 - Store immutable snapshot markdown at `.knowstr/snapshots/<snapshot-id>.md`.
-- Use content-addressed IDs where practical, e.g. `snap_sha256_<hash>`.
+- Use content-addressed IDs: `snap_sha256_<hash>`.
 - Add lookup by snapshot ID for CLI and Electron filesystem runtime.
 - Keep IndexedDB snapshot storage/caching for browser/Nostr-only mode.
-- Ensure snapshot creation is explicit and happens for import/copy/accept, not ordinary suggest.
-- Ensure snapshot writes are idempotent and never mutate existing snapshot content.
-- Make Electron filesystem mode prefer local `.knowstr/snapshots/` over IndexedDB for durable snapshot baselines.
+- Snapshot creation is explicit and happens for fork/accept, never for ordinary suggestion computation.
+- Snapshot writes are idempotent and never mutate existing snapshot content.
+- Electron filesystem mode prefers `.knowstr/snapshots/` over IndexedDB for durable baselines.
 
-## Phase 4 — `knowstr import` explicit fork workflow (draft)
+## Phase 4 — `knowstr save`: claiming and fork rules (draft)
 
-Former import phase. This is the first explicit crossing from source into editable workspace.
+`save` is the single crossing point from foreign documents into the workspace on the filesystem. Copying a file into your tree is the consent; `save` does the bookkeeping.
 
-- Require initialized workspace.
-- Read a source markdown file.
-- Register the source if needed, unless already covered by a source directory.
-- Create an immutable durable snapshot of the source as seen now using the local snapshot store from Phase 3.
-- Create a fresh `knowstr_doc_id` for the local workspace document.
-- Mint new local node IDs.
-- Copy visible content and tree structure.
-- For source nodes with IDs, write `basedOn` to the source node ID.
-- Write node-level `snapshot` for every copied node with `basedOn`.
-- Preserve `knowstr_vote_id`.
-- Write the editable fork to the requested workspace path.
-
-## Phase 5 — `knowstr suggest` read-only proposal computation (draft)
-
-Former suggest phase. This validates whether suggestions can be derived without apply/inbox/log state.
-
-- Require initialized workspace with source configuration.
-- Read configured sources.
-- Keep source files read-only.
-- Compare source lineage/IDs against the local workspace graph.
-- Use existing `basedOn` + node-centric `snapshot` baselines where available.
-- Find additions/variants relevant to local workspace documents.
-- Suppress already-known proposals from graph state and lineage, not from a run log.
-- Do not insert source nodes into editable workspace files.
-- Do not create snapshots during ordinary suggestion computation.
-- Print text summary by default.
-- Support `--json`.
-- Support `--dry-run` if useful, but ordinary suggest should already be non-mutating.
-
-## Why phases 1–5 come first
-
-This lets us test the core loop quickly:
+### Standalone mode (explicit paths, no workspace required)
 
 ```sh
-knowstr source add /shared/alice.md
-knowstr import /shared/alice.md holidays.md
-knowstr suggest --json
+knowstr save notes.md
+knowstr save docs/a.md docs/b.md
 ```
 
-Then we can manually inspect whether:
+- Scans only the explicit files/directories given.
+- Assigns missing `knowstr_doc_id` values and missing UUID node IDs.
+- Preserves existing `basedOn`, `snapshot`, `author`, and `knowstr_vote_id`.
+- Rejects duplicate document IDs and node IDs within the explicit file set.
+- Stateless: reads no visibility config, creates no snapshots, never creates `.knowstr`.
 
-- lineage is useful,
-- snapshots are sufficient,
-- source read-only boundaries feel right,
-- suggestions can be derived without logs/status files.
+### Workspace mode (no paths, requires `.knowstr`)
 
-The only caveat: `source`, local snapshots, and `import` need small pieces from the broader workspace foundation. Implement only the minimum needed in phases 2–4 instead of doing a big infrastructure phase first.
+Per-file behavior is decided by ownership:
+
+- **Own files**: normalized as always — IDs assigned, lineage metadata preserved.
+- **Unowned plain markdown** in the workspace: claimed — your ownership stamped along with the IDs.
+- **Foreign-authored files** in the workspace: forked — fresh `knowstr_doc_id`, your ownership, minted local node IDs, `basedOn` written for every source node that had an ID, a snapshot of the copied state created through the Phase 3 store, `knowstr_vote_id` preserved.
+- **Anything inside a joined folder**: never scanned, claimed, or written.
+
+Forks are never silent. `save` reports every fork it performs:
+
+```text
+houses.md: forked from alice (2 nodes linked, snapshot created)
+```
+
+Duplicate document/node IDs are rejected across the editable workspace. If a foreign source file has no Knowstr node IDs, the fork still works but carries no node-level lineage.
+
+### Acceptance criteria
+
+- A foreign-authored file copied into the workspace becomes an owned fork with lineage and a durable snapshot after one `knowstr save`.
+- The original file in the joined folder is byte-identical before and after.
+- Unowned markdown in the workspace is claimed; owned markdown is normalized; joined folders are untouched.
+- Fork reports appear in command output.
+
+## Phase 5 — `knowstr status`, `knowstr diff`, `knowstr accept` (draft)
+
+Suggestions as a computed view, with a text/JSON surface for humans and agents and a materialized surface for editor-centric users.
+
+### `knowstr status [--json]`
+
+- Reads documents in joined folders, keeps them read-only.
+- Computes three-way diffs from lineage: base = the node's `snapshot` baseline, theirs = the origin author's node now, mine = the local node now.
+- Prints additions/variants relevant to local documents as suggestions, grouped per document.
+- Suppression comes from local graph state and lineage edges only — no run log, no suggestion inbox, no tombstones. Ignored suggestions simply reappear; they disappear when accepted or when upstream reverts.
+- Creates no snapshots, mutates nothing.
+
+### `knowstr diff <doc> [--json]`
+
+- Detail view of the suggestions for one document.
+
+### `knowstr accept <ref>`
+
+- Mints a local node ID, writes `basedOn` to the origin node and a node-centric `snapshot` baseline for that lineage edge, and updates the local file.
+- Never inserts a foreign node ID into the editable graph.
+
+### `knowstr status --write` — materialization
+
+For users whose interface is their editor:
+
+- Writes suggestions into the user's own files as marked proposal rows. A suggestion row is an ordinary node line with `basedOn` but no `id`, carrying the `(?)` marker — no other markup exists:
+
+  ```md
+  - (?) Wooden house <!-- basedOn="a3" -->
+  ```
+
+- Only the user's own files are written; joined folders stay untouched.
+- The clean file is canonical; materialized markup is a temporary working view.
+- `knowstr save` resolves the markup without accept-specific parsing: a row whose `(?)` marker was removed is an ordinary node with `basedOn` and a missing `id`, handled by standard normalization — mint the ID, preserve `basedOn`, create the snapshot baseline for the new lineage edge (the same code path as `accept`). Rows still carrying `(?)` are stripped. Either way the file returns to canonical state.
+- A suggestion row is recognized by the combination of the `(?)` marker and `basedOn` metadata; plain text that merely starts with `(?)` is ordinary content.
+
+### Acceptance criteria
+
+- The loop `cp` + `save` → upstream edit → `status` → `accept`/`--write` + `save` works end to end against a joined folder.
+- `status` output is stable and `--json` is machine-consumable.
+- No source file is ever written; no snapshot is created by `status`/`diff`.
 
 ## Phase 6 — Workspace state foundation hardening (draft)
 
-Former workspace foundation phase, moved after the first model-validation loop.
+- `knowstr init` creates all required workspace state: `.knowstr/profile.json`, `.knowstr/spaces.json`, `.knowstr/snapshots/`, optional `.knowstr/me.nsec`.
+- Shared helpers for requiring an initialized workspace, loading/saving the visibility config, and snapshot path/hash lookup.
+- No command except `init` creates `.knowstr`; commands that need workspace state fail clearly when it is missing.
 
-- Complete explicit workspace semantics.
-- Ensure `knowstr init` creates all required workspace state:
-  - `.knowstr/profile.json`
-  - `.knowstr/sources.json`
-  - `.knowstr/snapshots/`
-  - optional `.knowstr/me.nsec`
-- Add shared helpers for requiring an initialized workspace.
-- Add shared helpers for loading/saving source config.
-- Add shared helpers for snapshot path/hash lookup.
-- Ensure no command except `init` creates `.knowstr`.
-- Ensure commands that need persistent workspace state fail clearly when no initialized workspace exists.
+## Phase 7 — Accept convergence across surfaces (draft)
 
-## Phase 7 — `knowstr save` v2 behavior (draft)
-
-Former save phase, moved after source/import/suggest validation.
-
-- Split save into standalone explicit-path mode and workspace mode.
-- `knowstr save file.md dir/` works without `.knowstr`.
-- Standalone save scans only explicit paths.
-- Standalone save assigns missing `knowstr_doc_id` and node IDs.
-- Standalone save preserves `basedOn`, `snapshot`, and `knowstr_vote_id`.
-- Standalone save rejects duplicate document IDs and node IDs within the explicit file set.
-- `knowstr save` with no explicit paths is workspace mode and requires `.knowstr`.
-- Workspace save excludes `.knowstr`, ignored files, and configured sources.
-- Save never creates snapshots.
-- Save never creates `.knowstr`.
-
-## Phase 8 — Accept/copy suggestion semantics (draft)
-
-Former accept/copy phase.
-
-- Update existing UI/planner copy paths to match v2 semantics.
-- Accepting/copying suggestions mints local IDs.
-- Accepting/copying source nodes never inserts source node IDs as editable local node IDs.
+- The UI accept (✓ on a `(?)` row) and `knowstr accept` converge on the same lineage code path.
+- Accepting mints local IDs; foreign node IDs are never inserted as editable local node IDs.
 - Every copied node with `basedOn` gets or resolves a node-centric `snapshot` baseline.
-- Reuse the same snapshot primitives as `import` where possible.
-- Make CLI-derived suggestions and UI-derived suggestions converge on the same lineage behavior.
+- Fork and accept share the same snapshot primitives.
 
-## Phase 9 — `knowstr show` read-only render/export (draft)
-
-Former show phase.
+## Phase 8 — `knowstr show` read-only render/export (draft)
 
 - Add `knowstr show <address>`.
-- Support `/d/<author>/<doc-id>` document addresses.
-- Support `/r/<node-id>` subtree addresses.
-- Render visible document/node as portable markdown.
-- Preserve enough frontmatter for safe export.
-- Preserve `knowstr_vote_id` when present.
-- Do not import.
-- Do not save.
-- Do not register sources.
-- Do not create editable IDs.
-- Do not create `.knowstr`.
+- Support `/d/<author>/<doc-id>` document addresses and `/r/<node-id>` subtree addresses.
+- Render the visible document/node as portable markdown with enough frontmatter for safe export; preserve `knowstr_vote_id`.
+- Read-only: no save, no fork, no visibility changes, no editable IDs, no `.knowstr`.
 
-## Phase 10 — Desktop/UI source settings and overlays (draft)
+## Phase 9 — App visibility and fork-on-write (draft)
 
-Former UI phase, after CLI semantics are proven.
+The web/Electron instantiation of the same model:
 
-- Add source settings UI.
-- Show configured read-only sources.
-- Add import/fork source action.
-- Show source-backed suggestions as local overlays.
-- Keep source files read-only in filesystem UI.
-- Ensure UI source import/accept paths use the same lineage/snapshot semantics as CLI.
+- Visibility: people you follow, share links you open; groups later.
+- Foreign documents render read-only. The first edit shows a lightweight "this creates your copy" affordance and forks — same lineage semantics as `save` (fresh document, minted IDs, `basedOn`, snapshot event/file).
+- Suggestions render live as `(?)` overlays wherever lineage relatives differ; no command, no refresh. The overlay rendering exists; wire it to the lineage three-way diffs.
+- App fork/accept paths and CLI paths produce identical metadata, so a document moving between surfaces behaves identically.
 
-## Phase 11 — Regression, cleanup, and docs (draft)
+## Phase 10 — Regression, cleanup, and docs (draft)
 
-Final v1 hardening phase.
-
-- Run full test suite and static checks.
-- Remove remaining legacy terminology from code/help/docs.
-- Update README/CLI help for v2 workflows.
-- Verify `idea.md` safety invariants one by one.
+- Full test suite and static checks.
+- Update README/CLI help for the collaboration workflows.
+- Verify the `idea.md` safety invariants one by one.
 - Document explicitly deferred work.
 
-## Future phase — `knowstr fork` convenience wrapper (draft)
+## Future phases
 
-Optional later wrapper around:
-
-```sh
-knowstr show <address> > temp.md
-knowstr import temp.md <workspace-path>
-```
-
-It must require an initialized workspace and must not introduce semantics different from import.
-
-## Future phase — `knowstr aggregate` voting aggregates (draft)
-
-Optional later voting/ranking command based on `knowstr_vote_id`. Not needed for v1 model validation.
-
-## Future phase — Remove author significance from concrete node identity (draft)
-
-Longer-term migration from internal `author_uuid` graph IDs to globally unique UUID node IDs. Do this only after v2 workspace/source semantics are stable.
+- **Groups** as a first-class visibility scope on Nostr (membership/token management out of scope).
+- **Voting aggregates** (`knowstr aggregate`) over `knowstr_vote_id`.
+- **Permanent dismissal** of suggestions, if ignoring proves insufficient in practice.
+- **Read-only flags** for own folders (consuming your own archive without claiming it).
+- **Remove author significance from concrete node identity**: migrate internal `author_uuid` graph IDs to globally unique UUID node IDs once workspace semantics are stable.

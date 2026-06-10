@@ -69,12 +69,12 @@ function getSerializableNodeAttrs(
   node: GraphNode,
   options?: { snapshotId?: string }
 ): string {
+  const snapshotId =
+    node.snapshotId ?? (node.basedOn ? options?.snapshotId : undefined);
   return formatNodeAttrs(node.id, {
     ...(node.basedOn ? { basedOn: node.basedOn } : {}),
     ...(node.userPublicKey ? { userPublicKey: node.userPublicKey } : {}),
-    ...(options?.snapshotId || node.snapshotId
-      ? { snapshotId: options?.snapshotId ?? node.snapshotId }
-      : {}),
+    ...(snapshotId ? { snapshotId } : {}),
     ...(node.anchor ? { anchor: node.anchor } : {}),
   });
 }
@@ -109,22 +109,20 @@ function serializeNodeSequence(
       author,
       childNodes,
       childIndent,
-      next
+      next,
+      options
     );
   };
 
   const result = nodes.reduce<SerializeReduceState>(
-    (acc, item, index) => {
+    (acc, item) => {
       const resolvedChild = item;
       const text = getSerializableNodeBody(knowledgeDBs, resolvedChild, author);
       if (text === undefined) {
         return acc;
       }
       const prefix = formatPrefixMarkers(item.relevance, item.argument);
-      const attrs = getSerializableNodeAttrs(
-        resolvedChild,
-        index === 0 ? options : undefined
-      );
+      const attrs = getSerializableNodeAttrs(resolvedChild, options);
 
       if (resolvedChild.blockKind === "heading") {
         const level = resolvedChild.headingLevel ?? 2;

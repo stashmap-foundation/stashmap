@@ -23,7 +23,7 @@ import {
   KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT,
 } from "../nostr";
 import { findTag } from "../nostrEvents";
-import { parseMarkdown } from "../core/markdownTree";
+import { parseMarkdown, type MarkdownTreeNode } from "../core/markdownTree";
 
 const maybeExpand = async (label: string): Promise<void> => {
   const btn = screen.queryByLabelText(label);
@@ -1643,6 +1643,53 @@ My Notes
     expect(
       bobDocumentEvents.some((event) => event.content.includes('snapshot="'))
     ).toBe(true);
+  });
+
+  test("Fork stamps the snapshot on every copied node, not only the root", async () => {
+    const [alice, bob] = setup([ALICE, BOB]);
+
+    renderTree(alice);
+    await type("My Notes{Enter}{Tab}Topic{Enter}{Tab}Child{Escape}");
+    cleanup();
+
+    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
+
+    const bobEvents = bob().relayPool.getEvents();
+    const snapshotEvent = bobEvents.find(
+      (event) =>
+        event.kind === KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT &&
+        event.pubkey === BOB.publicKey
+    );
+    if (!snapshotEvent) {
+      throw new Error("missing snapshot event");
+    }
+    const snapshotId = findTag(snapshotEvent, "d");
+
+    const docEvent = bobEvents.find(
+      (event) =>
+        event.kind === KIND_KNOWLEDGE_DOCUMENT &&
+        event.pubkey === BOB.publicKey &&
+        event.content.includes('basedOn="')
+    );
+    if (!docEvent) {
+      throw new Error("missing forked document event");
+    }
+
+    const collectLineage = (
+      nodes: MarkdownTreeNode[]
+    ): { basedOn?: string; snapshotId?: string }[] =>
+      nodes.flatMap(({ basedOn, snapshotId: nodeSnapshotId, children }) => [
+        { basedOn, snapshotId: nodeSnapshotId },
+        ...collectLineage(children),
+      ]);
+    const lineage = collectLineage(parseMarkdown(docEvent.content).tree).filter(
+      (entry) => entry.basedOn
+    );
+
+    expect(lineage.length).toBeGreaterThan(1);
+    lineage.forEach((entry) => {
+      expect(entry.snapshotId).toBe(snapshotId);
+    });
   });
 
   test("Fork snapshot IDs are content-addressed snap_sha256 hashes", async () => {

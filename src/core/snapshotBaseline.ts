@@ -1,5 +1,5 @@
 import { List, Map as ImmutableMap } from "immutable";
-import { getChildNodes, getNode } from "./connections";
+import { getChildNodes } from "./connections";
 
 export type VersionDiff = {
   readonly node: GraphNode;
@@ -19,25 +19,21 @@ function getSnapshotChildNodes(
 
 function findSnapshotBaseline(
   snapshotNodes: SnapshotNodes,
-  knowledgeDBs: KnowledgeDBs,
   currentNode: GraphNode,
   versionNode: GraphNode
 ): List<GraphNode> | undefined {
   const forkedByVersion = versionNode.basedOn ? versionNode : undefined;
   const forkedNode =
     forkedByVersion || (currentNode.basedOn ? currentNode : undefined);
-  if (!forkedNode) {
+  const basedOn = forkedNode?.basedOn;
+  if (!forkedNode || !basedOn || !forkedNode.snapshotId) {
     return undefined;
   }
-  const rootNode = getNode(knowledgeDBs, forkedNode.root, forkedNode.author);
-  if (!rootNode?.snapshotId) {
-    return undefined;
-  }
-  const snapshotMap = snapshotNodes.get(rootNode.snapshotId);
+  const snapshotMap = snapshotNodes.get(forkedNode.snapshotId);
   if (!snapshotMap) {
     return undefined;
   }
-  const snapshotNode = snapshotMap.get(forkedNode.basedOn as string);
+  const snapshotNode = snapshotMap.get(basedOn);
   if (!snapshotNode) {
     return undefined;
   }
@@ -45,7 +41,7 @@ function findSnapshotBaseline(
 }
 
 function originKey(node: GraphNode): string {
-  return (node.basedOn ?? node.id) as string;
+  return node.basedOn ?? node.id;
 }
 
 export function computeVersionDiff(
@@ -56,7 +52,6 @@ export function computeVersionDiff(
 ): VersionDiff {
   const snapshotChildren = findSnapshotBaseline(
     snapshotNodes,
-    knowledgeDBs,
     currentNode,
     versionNode
   );
@@ -68,7 +63,7 @@ export function computeVersionDiff(
     versionNode,
     versionNode.author
   );
-  const snapshotChildIDs = snapshotChildren.map((c) => c.id as string).toSet();
+  const snapshotChildIDs = snapshotChildren.map((c) => c.id).toSet();
   const versionMatchKeys = versionChildren.map(originKey).toSet();
   return {
     node: versionNode,
@@ -76,7 +71,7 @@ export function computeVersionDiff(
       (child) => !snapshotChildIDs.has(originKey(child))
     ),
     deletions: snapshotChildren.filter(
-      (child) => !versionMatchKeys.has(child.id as string)
+      (child) => !versionMatchKeys.has(child.id)
     ),
   };
 }

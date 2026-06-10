@@ -29,6 +29,7 @@
 - Avoid classes, inheritance, mutable instance state, factories, registries, manager/service/controller objects, and needless polymorphic abstractions.
 - Avoid duplicated or parallel logic: no repeated mapping/parsing/validation, copy-pasted branches, redundant wrappers, or reimplementation of existing utilities.
 - Keep code minimal. Every new file, function, type, parameter, and branch must justify its existence. Prefer deletion, merging, or simplification over adding abstraction.
+- Do not solve performance or correctness issues by adding memoization, caches, weak maps, registries, or stale derived state. Fix the data flow, indexes, or algorithm directly. Only use caching when it is an explicit domain storage requirement in implementation.md.
 - Treat slop as a blocker: vague names, dead code, TODO/placeholders, broad try/catch, ignored errors, needless files, over-generalized abstractions, excessive comments compensating for poor structure, inconsistent style, and large mixed-responsibility functions.
 
 ## Testing rules

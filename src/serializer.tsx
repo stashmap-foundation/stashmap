@@ -158,7 +158,7 @@ function jsonToPane(s: Serializable): Pane | undefined {
     author,
     sourceId: obj.s !== undefined ? asString(obj.s) : author,
     documentId: obj.d !== undefined ? asString(obj.d) : undefined,
-    rootNodeId: obj.r !== undefined ? (asString(obj.r) as LongID) : undefined,
+    rootNodeId: obj.r !== undefined ? (asString(obj.r) as ID) : undefined,
     searchQuery: obj.h !== undefined ? asString(obj.h) : undefined,
     searchResultIDs:
       obj.q !== undefined

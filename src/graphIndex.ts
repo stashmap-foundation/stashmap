@@ -6,51 +6,51 @@ import { nodeRefKey } from "./core/nodeRef";
 
 export function createEmptyGraphIndex(): GraphIndex {
   return {
-    nodeByID: new globalThis.Map<LongID, GraphNode>(),
+    nodeByID: new globalThis.Map<ID, GraphNode>(),
     nodesBySource: new globalThis.Map<
       SourceId,
       globalThis.Map<ID, GraphNode>
     >(),
     sourceCandidatesById: new globalThis.Map<ID, NodeRef[]>(),
-    semantic: new globalThis.Map<string, globalThis.Set<LongID>>(),
+    semantic: new globalThis.Map<string, globalThis.Set<ID>>(),
     semanticRefs: new globalThis.Map<string, NodeRef[]>(),
-    incomingCrefs: new globalThis.Map<LongID, NodeRef[]>(),
+    incomingCrefs: new globalThis.Map<ID, NodeRef[]>(),
     incomingCrefsByTarget: new globalThis.Map<string, NodeRef[]>(),
     incomingFileLinks: new globalThis.Map<string, NodeRef[]>(),
-    basedOnIndex: new globalThis.Map<LongID, globalThis.Set<LongID>>(),
+    basedOnIndex: new globalThis.Map<ID, globalThis.Set<ID>>(),
   };
 }
 
 function addToSetMap(
-  map: globalThis.Map<string, globalThis.Set<LongID>>,
+  map: globalThis.Map<string, globalThis.Set<ID>>,
   key: string,
-  value: LongID
+  value: ID
 ): void {
   const existing = map.get(key);
   if (existing) {
     existing.add(value);
     return;
   }
-  map.set(key, new globalThis.Set<LongID>([value]));
+  map.set(key, new globalThis.Set<ID>([value]));
 }
 
 function addToNodeMap(
-  map: globalThis.Map<LongID, globalThis.Set<LongID>>,
-  targetNodeID: LongID,
-  sourceNodeID: LongID
+  map: globalThis.Map<ID, globalThis.Set<ID>>,
+  targetNodeID: ID,
+  sourceNodeID: ID
 ): void {
   const existing = map.get(targetNodeID);
   if (existing) {
     existing.add(sourceNodeID);
     return;
   }
-  map.set(targetNodeID, new globalThis.Set<LongID>([sourceNodeID]));
+  map.set(targetNodeID, new globalThis.Set<ID>([sourceNodeID]));
 }
 
 function removeFromSetMap(
-  map: globalThis.Map<string, globalThis.Set<LongID>>,
+  map: globalThis.Map<string, globalThis.Set<ID>>,
   key: string,
-  value: LongID
+  value: ID
 ): void {
   const existing = map.get(key);
   if (!existing) {
@@ -63,9 +63,9 @@ function removeFromSetMap(
 }
 
 function removeFromNodeMap(
-  map: globalThis.Map<LongID, globalThis.Set<LongID>>,
-  targetNodeID: LongID,
-  sourceNodeID: LongID
+  map: globalThis.Map<ID, globalThis.Set<ID>>,
+  targetNodeID: ID,
+  sourceNodeID: ID
 ): void {
   const existing = map.get(targetNodeID);
   if (!existing) {
@@ -118,8 +118,8 @@ function removeRefFromMap(
 }
 
 function addRefToNodeMap(
-  map: globalThis.Map<LongID, NodeRef[]>,
-  key: LongID,
+  map: globalThis.Map<ID, NodeRef[]>,
+  key: ID,
   ref: NodeRef
 ): void {
   const existing = map.get(key) ?? [];
@@ -130,8 +130,8 @@ function addRefToNodeMap(
 }
 
 function removeRefFromNodeMap(
-  map: globalThis.Map<LongID, NodeRef[]>,
-  key: LongID,
+  map: globalThis.Map<ID, NodeRef[]>,
+  key: ID,
   ref: NodeRef
 ): void {
   const existing = map.get(key);
@@ -184,13 +184,10 @@ function addNodeSourceEntries(
   sourceNodes.set(node.id, node);
   addSourceCandidate(graphIndex, node.id, { sourceId, id: node.id });
   graphIndex.nodesBySource.set(sourceId, sourceNodes);
-  graphIndex.nodeByID.set(node.id as LongID, node);
+  graphIndex.nodeByID.set(node.id as ID, node);
 }
 
-function setNodeByIDFromCandidates(
-  graphIndex: GraphIndex,
-  nodeID: LongID
-): void {
+function setNodeByIDFromCandidates(graphIndex: GraphIndex, nodeID: ID): void {
   const candidates = graphIndex.sourceCandidatesById.get(nodeID as ID) ?? [];
   const replacement = candidates
     .map((ref) => getNodeInIndexedSource(graphIndex, ref.sourceId, ref.id))
@@ -209,7 +206,7 @@ function removeNodeSourceEntries(
 ): void {
   const existingSourceNodes = graphIndex.nodesBySource.get(sourceId);
   if (!existingSourceNodes) {
-    setNodeByIDFromCandidates(graphIndex, node.id as LongID);
+    setNodeByIDFromCandidates(graphIndex, node.id as ID);
     return;
   }
   const sourceNodes = new globalThis.Map<ID, GraphNode>(existingSourceNodes);
@@ -224,7 +221,7 @@ function removeNodeSourceEntries(
   } else {
     graphIndex.nodesBySource.set(sourceId, sourceNodes);
   }
-  setNodeByIDFromCandidates(graphIndex, node.id as LongID);
+  setNodeByIDFromCandidates(graphIndex, node.id as ID);
 }
 
 function addNodeLinkEntries(
@@ -232,7 +229,7 @@ function addNodeLinkEntries(
   node: GraphNode,
   sourceId: SourceId,
   sourceFilePath: string | undefined,
-  fileLinkSourceID: LongID
+  fileLinkSourceID: ID
 ): void {
   getAllLinks(node).forEach(({ targetID }) => {
     const ref = { sourceId, id: node.id };
@@ -258,7 +255,7 @@ function removeNodeLinkEntries(
   node: GraphNode,
   sourceId: SourceId,
   sourceFilePath: string | undefined,
-  fileLinkSourceID: LongID
+  fileLinkSourceID: ID
 ): void {
   getAllLinks(node).forEach(({ targetID }) => {
     const ref = { sourceId, id: node.id };
@@ -357,7 +354,7 @@ function removeNodeSemanticEntries(
 
 function cloneIndex(graphIndex: GraphIndex): GraphIndex {
   return {
-    nodeByID: new globalThis.Map<LongID, GraphNode>(graphIndex.nodeByID),
+    nodeByID: new globalThis.Map<ID, GraphNode>(graphIndex.nodeByID),
     nodesBySource: new globalThis.Map<SourceId, globalThis.Map<ID, GraphNode>>(
       [...graphIndex.nodesBySource.entries()].map(([sourceId, nodes]) => [
         sourceId,
@@ -369,10 +366,10 @@ function cloneIndex(graphIndex: GraphIndex): GraphIndex {
         ([key, candidates]) => [key, [...candidates]]
       )
     ),
-    semantic: new globalThis.Map<string, globalThis.Set<LongID>>(
+    semantic: new globalThis.Map<string, globalThis.Set<ID>>(
       [...graphIndex.semantic.entries()].map(([key, ids]) => [
         key,
-        new globalThis.Set<LongID>(ids),
+        new globalThis.Set<ID>(ids),
       ])
     ),
     semanticRefs: new globalThis.Map<string, NodeRef[]>(
@@ -381,7 +378,7 @@ function cloneIndex(graphIndex: GraphIndex): GraphIndex {
         [...refs],
       ])
     ),
-    incomingCrefs: new globalThis.Map<LongID, NodeRef[]>(
+    incomingCrefs: new globalThis.Map<ID, NodeRef[]>(
       [...graphIndex.incomingCrefs.entries()].map(([key, refs]) => [
         key,
         [...refs],
@@ -399,10 +396,10 @@ function cloneIndex(graphIndex: GraphIndex): GraphIndex {
         [...refs],
       ])
     ),
-    basedOnIndex: new globalThis.Map<LongID, globalThis.Set<LongID>>(
+    basedOnIndex: new globalThis.Map<ID, globalThis.Set<ID>>(
       [...graphIndex.basedOnIndex.entries()].map(([key, ids]) => [
         key,
-        new globalThis.Set<LongID>(ids),
+        new globalThis.Set<ID>(ids),
       ])
     ),
   };

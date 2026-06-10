@@ -118,12 +118,12 @@ declare global {
   type TemporaryEvent =
     | {
         type: "ADD_EMPTY_NODE";
-        nodeID: LongID;
+        nodeID: ID;
         index: number;
         nodeItem: GraphNode;
         paneIndex: number;
       }
-    | { type: "REMOVE_EMPTY_NODE"; nodeID: LongID };
+    | { type: "REMOVE_EMPTY_NODE"; nodeID: ID };
 
   type EventState = PublishEvents<EventAttachment> & {
     preLoginEvents: List<UnsignedEvent & EventAttachment>;
@@ -190,7 +190,6 @@ declare global {
 
   type Hash = string;
   type ID = string;
-  type LongID = string;
   type SourceId = string;
 
   type NodeRef = {
@@ -278,7 +277,7 @@ declare global {
 
   type InlineSpan =
     | { kind: "text"; text: string }
-    | { kind: "link"; targetID: LongID; text: string }
+    | { kind: "link"; targetID: ID; text: string }
     | { kind: "fileLink"; path: string; text: string };
 
   type GraphNode = {
@@ -286,14 +285,14 @@ declare global {
     id: ID;
     spans: InlineSpan[];
     docId?: string;
-    parent?: LongID;
+    parent?: ID;
     anchor?: RootAnchor;
     systemRole?: RootSystemRole;
     userPublicKey?: PublicKey;
     snapshotDTag?: string;
     updated: number;
     author: PublicKey;
-    basedOn?: LongID;
+    basedOn?: ID;
     root: ID;
     relevance: Relevance;
     argument?: Argument;
@@ -317,15 +316,15 @@ declare global {
   };
 
   type GraphIndex = {
-    nodeByID: globalThis.Map<LongID, GraphNode>;
+    nodeByID: globalThis.Map<ID, GraphNode>;
     nodesBySource: globalThis.Map<SourceId, globalThis.Map<ID, GraphNode>>;
     sourceCandidatesById: globalThis.Map<ID, NodeRef[]>;
-    semantic: globalThis.Map<string, globalThis.Set<LongID>>;
+    semantic: globalThis.Map<string, globalThis.Set<ID>>;
     semanticRefs: globalThis.Map<string, NodeRef[]>;
-    incomingCrefs: globalThis.Map<LongID, NodeRef[]>;
+    incomingCrefs: globalThis.Map<ID, NodeRef[]>;
     incomingCrefsByTarget: globalThis.Map<string, NodeRef[]>;
     incomingFileLinks: globalThis.Map<string, NodeRef[]>;
-    basedOnIndex: globalThis.Map<LongID, globalThis.Set<LongID>>;
+    basedOnIndex: globalThis.Map<ID, globalThis.Set<ID>>;
   };
 
   // Temporary UI state (not persisted to Nostr)

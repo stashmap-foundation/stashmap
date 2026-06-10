@@ -16,7 +16,7 @@ function testNode(
   text: string,
   options: {
     children?: List<ID>;
-    parent?: LongID;
+    parent?: ID;
     root?: ID;
     spans?: InlineSpan[];
   } = {}

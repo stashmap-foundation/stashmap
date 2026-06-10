@@ -23,7 +23,7 @@ function TestSplitPanes(): JSX.Element {
       </button>
       <button
         type="button"
-        onClick={() => addPaneAt(1, ALICE.publicKey, "node2" as LongID)}
+        onClick={() => addPaneAt(1, ALICE.publicKey, "node2" as ID)}
       >
         Add Pane At 1
       </button>
@@ -125,7 +125,7 @@ function TestPaneNavigation(): JSX.Element {
   const pane = useCurrentPane();
   const rootItemID = pane.rootNodeId || "";
 
-  const setRoot = (rootNodeId?: LongID): void => {
+  const setRoot = (rootNodeId?: ID): void => {
     setPane({ ...pane, rootNodeId });
   };
 
@@ -136,7 +136,7 @@ function TestPaneNavigation(): JSX.Element {
       <button type="button" onClick={() => setRoot(undefined)}>
         Clear Root
       </button>
-      <button type="button" onClick={() => setRoot("new3" as LongID)}>
+      <button type="button" onClick={() => setRoot("new3" as ID)}>
         Set Root
       </button>
     </div>

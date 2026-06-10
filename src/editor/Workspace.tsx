@@ -133,7 +133,7 @@ type BreadcrumbTarget = {
   author: PublicKey;
   sourceId: SourceId;
   documentId?: string;
-  rootNodeId?: LongID;
+  rootNodeId?: ID;
   scrollToId?: string;
 };
 

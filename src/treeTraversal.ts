@@ -72,7 +72,7 @@ type VirtualFooterInput = {
   incomingCrefs: List<NodeRef>;
   suggestions: List<ID>;
   versionMetas: Map<
-    LongID,
+    ID,
     {
       updated: number;
       addCount: number;
@@ -191,7 +191,7 @@ function getEmptyNodeItem(
     return undefined;
   }
   return computeEmptyNodeMetadata(data.publishEventsStatus.temporaryEvents).get(
-    parentNode.id as LongID
+    parentNode.id as ID
   )?.nodeItem;
 }
 
@@ -356,7 +356,7 @@ function createVirtualRowNode(
   const suggestionTargetID = getBlockLinkTarget(sourceRowNode);
   const targetID =
     virtualType === "incoming" || virtualType === "version"
-      ? (rowID as LongID)
+      ? (rowID as ID)
       : suggestionTargetID;
   const sourceNode = sourceRowNode ?? incomingRowNode ?? versionRowNode;
   return {
@@ -409,9 +409,7 @@ function createVirtualRow(
     ? { sourceId: input.parentSourceId, id: input.parentID }
     : undefined;
   const versionMeta =
-    virtualType === "version"
-      ? input.versionMetas.get(rowID as LongID)
-      : undefined;
+    virtualType === "version" ? input.versionMetas.get(rowID as ID) : undefined;
   return createRow(
     data,
     graph,
@@ -507,7 +505,7 @@ function getChildrenForRegularNode(
   data: Data,
   graph: GraphLookup,
   parentRow: Row,
-  rootNode: LongID | undefined,
+  rootNode: ID | undefined,
   author: PublicKey,
   typeFilters: Pane["typeFilters"],
   options?: TreeTraversalOptions
@@ -613,7 +611,7 @@ function getTreeChildrenForResolvedRow(
   data: Data,
   graph: GraphLookup,
   parentRow: Row,
-  rootNode: LongID | undefined,
+  rootNode: ID | undefined,
   author: PublicKey,
   typeFilters: Pane["typeFilters"],
   options?: TreeTraversalOptions
@@ -636,7 +634,7 @@ function getTreeChildrenForResolvedRow(
 export function getTreeChildren(
   data: Data,
   parentPath: ViewPath,
-  rootNode: LongID | undefined,
+  rootNode: ID | undefined,
   author: PublicKey,
   typeFilters: Pane["typeFilters"],
   options?: TreeTraversalOptions
@@ -666,7 +664,7 @@ function getNodesInRows(
   graph: GraphLookup,
   rootRows: List<Row>,
   ctx: List<Row>,
-  rootNode: LongID | undefined,
+  rootNode: ID | undefined,
   author: PublicKey,
   typeFilters: Pane["typeFilters"],
   options?: TreeTraversalOptions
@@ -709,7 +707,7 @@ export function getNodesInTree(
   data: Data,
   rootPaths: List<ViewPath>,
   ctx: List<ViewPath>,
-  rootNode: LongID | undefined,
+  rootNode: ID | undefined,
   author: PublicKey,
   typeFilters: Pane["typeFilters"],
   options?: TreeTraversalOptions
@@ -804,7 +802,7 @@ export function getNodesInDocument(
       incomingCrefs,
       suggestions: List<ID>(),
       versionMetas: Map<
-        LongID,
+        ID,
         { updated: number; addCount: number; removeCount: number }
       >(),
     },

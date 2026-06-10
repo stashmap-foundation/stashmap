@@ -81,8 +81,8 @@ function materializeTreeNode(
   ctx: WalkContext,
   treeNode: MarkdownTreeNode,
   semanticContext: List<ID>,
-  root: LongID,
-  parent: LongID | undefined,
+  root: ID,
+  parent: ID | undefined,
   mode: IdMaterializationMode
 ): [WalkContext, ID, GraphNode] {
   const baseNode = newMarkdownGraphNode(
@@ -188,7 +188,7 @@ function materializeTreeNode(
   const node: GraphNode = {
     ...nodeBaseWithFields,
     children: List(childIDs),
-    ...(treeNode.basedOn ? { basedOn: treeNode.basedOn as LongID } : {}),
+    ...(treeNode.basedOn ? { basedOn: treeNode.basedOn as ID } : {}),
     ...(withVisible.updated !== undefined
       ? { updated: withVisible.updated }
       : {}),
@@ -205,7 +205,7 @@ export type MaterializeOptions = {
 export type MaterializeResult = {
   context: WalkContext;
   topSemanticIds: ID[];
-  topNodeIds: LongID[];
+  topNodeIds: ID[];
 };
 
 function materializeTreeWithMode(
@@ -230,7 +230,7 @@ function materializeTreeWithMode(
       (acc, treeNode) => {
         const hasExplicitRootId = usesExactTreeNodeId(mode, treeNode);
         const rootUuid = treeNode.uuid ?? v4();
-        const rootNodeID = rootUuid as LongID;
+        const rootNodeID = rootUuid as ID;
         const treeWithUuid = hasExplicitRootId
           ? treeNode
           : { ...treeNode, uuid: rootUuid };
@@ -247,7 +247,7 @@ function materializeTreeWithMode(
         return {
           context: nextCtx,
           topSemanticIds: [...acc.topSemanticIds, topSemanticID],
-          topNodeIds: [...acc.topNodeIds, topNodeID.id as LongID],
+          topNodeIds: [...acc.topNodeIds, topNodeID.id as ID],
         };
       },
       { context: ctx, topSemanticIds: [], topNodeIds: [] }

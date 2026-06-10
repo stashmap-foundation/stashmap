@@ -65,9 +65,9 @@ function parseIdComment(content: string): ParsedComment | undefined {
   const anchorLabelsAttr = attrsMap.anchorLabels || undefined;
   const sourceAuthor = attrsMap.sourceAuthor || undefined;
   const sourceRootID = (attrsMap.sourceRoot || undefined) as ID | undefined;
-  const sourceNodeID = (attrsMap.sourceNode || undefined) as LongID | undefined;
+  const sourceNodeID = (attrsMap.sourceNode || undefined) as ID | undefined;
   const sourceParentNodeID = (attrsMap.sourceParent || undefined) as
-    | LongID
+    | ID
     | undefined;
   const userPublicKey = (attrsMap.userPublicKey || undefined) as
     | PublicKey
@@ -245,7 +245,7 @@ function extractInlineContent(inline: Token): {
     const { relevance, argument } = extractPrefixMarkers(refLink.prefixSource);
     const span =
       refLink.target.kind === "node"
-        ? linkSpan(refLink.target.targetID as LongID, refLink.text)
+        ? linkSpan(refLink.target.targetID as ID, refLink.text)
         : fileLinkSpan(refLink.target.path, refLink.text);
     return {
       spans: [span],

@@ -183,7 +183,7 @@ describe("updateNodeItemMetadata", () => {
     const item = makeItem(
       "node1" as ID,
       "author" as PublicKey,
-      "rel1" as LongID,
+      "rel1" as ID,
       undefined
     );
 
@@ -195,7 +195,7 @@ describe("updateNodeItemMetadata", () => {
     const item = makeItem(
       "node1" as ID,
       "author" as PublicKey,
-      "rel1" as LongID,
+      "rel1" as ID,
       undefined,
       "confirms"
     );
@@ -208,7 +208,7 @@ describe("updateNodeItemMetadata", () => {
     const item = makeItem(
       "node1" as ID,
       "author" as PublicKey,
-      "rel1" as LongID,
+      "rel1" as ID,
       undefined
     );
 

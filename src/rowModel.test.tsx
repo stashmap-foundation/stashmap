@@ -161,8 +161,8 @@ test("Alter View paths after disconnect", () => {
   });
   const updatedViews = updateViewPathsAfterDisconnect(
     views as unknown as Views,
-    "n" as LongID,
-    "r" as LongID
+    "n" as ID,
+    "r" as ID
   );
 
   const expectedResult = views
@@ -181,8 +181,8 @@ test("Alter View paths after disconnect with pane-prefixed paths", () => {
   });
   const updatedViews = updateViewPathsAfterDisconnect(
     views as unknown as Views,
-    "n" as LongID,
-    "r" as LongID
+    "n" as ID,
+    "r" as ID
   );
 
   const expectedResult = views
@@ -198,8 +198,8 @@ test("Parse View path", () => {
 });
 
 test("View path roundtrip preserves node IDs", () => {
-  const nodeId = "alice_550e8400-e29b-41d4-a716-446655440000" as LongID;
-  const viewPath: ViewPath = [0, "rel1" as LongID, nodeId];
+  const nodeId = "alice_550e8400-e29b-41d4-a716-446655440000" as ID;
+  const viewPath: ViewPath = [0, "rel1" as ID, nodeId];
 
   const serialized = viewPathToString(viewPath);
   const parsed = parseViewPath(serialized);
@@ -480,7 +480,7 @@ test("updateViewPathsAfterPaneInsert shifts pane indices at and after insertion 
 });
 
 test("updateViewPathsAfterMoveNodes preserves paths when nodeID starts with digit", () => {
-  const relID = "3abc_uuid" as LongID;
+  const relID = "3abc_uuid" as ID;
   const childAPath = `p0:root:${relID}:childA`;
   const childADeepPath = `p0:root:${relID}:childA:innerRel:grand`;
   const childBPath = `p0:root:${relID}:childB`;

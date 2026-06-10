@@ -1,5 +1,5 @@
 export function buildNodeRouteUrl(
-  rootNode: LongID,
+  rootNode: ID,
   sourceId: SourceId,
   scrollToId?: ID
 ): string {
@@ -18,12 +18,12 @@ export function buildDocumentRouteUrl(
   return scrollToId ? `${base}#${encodeURIComponent(scrollToId)}` : base;
 }
 
-export function parseNodeRouteUrl(pathname: string): LongID | undefined {
+export function parseNodeRouteUrl(pathname: string): ID | undefined {
   const match = pathname.match(/^\/r\/(.+)$/);
   if (!match) {
     return undefined;
   }
-  return decodeURIComponent(match[1]) as LongID;
+  return decodeURIComponent(match[1]) as ID;
 }
 
 export function parseDocumentRouteUrl(

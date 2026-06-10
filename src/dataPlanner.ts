@@ -14,10 +14,7 @@ import {
 } from "./planner";
 import { NodeItemMetadata, updateNodeItemMetadata } from "./nodeItemMetadata";
 
-function getWritableNode(
-  plan: GraphPlan,
-  nodeId: LongID
-): GraphNode | undefined {
+function getWritableNode(plan: GraphPlan, nodeId: ID): GraphNode | undefined {
   const node = getNode(plan.knowledgeDBs, nodeId, plan.user.publicKey);
   if (!node || node.author !== plan.user.publicKey) {
     return undefined;
@@ -44,7 +41,7 @@ function requireNodeItem(
 
 export function planUpdateNodeItemMetadataById<T extends GraphPlan>(
   plan: T,
-  parentNodeId: LongID,
+  parentNodeId: ID,
   itemId: ID,
   metadata: NodeItemMetadata
 ): T {
@@ -64,7 +61,7 @@ export function planUpdateNodeItemMetadataById<T extends GraphPlan>(
 
 export function planRemoveNodeItemById<T extends GraphPlan>(
   plan: T,
-  parentNodeId: LongID,
+  parentNodeId: ID,
   itemId: ID,
   preserveDescendants = false
 ): T {

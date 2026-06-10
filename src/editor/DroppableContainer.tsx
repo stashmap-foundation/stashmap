@@ -27,8 +27,8 @@ type DragItemType = {
   isSuggestion?: boolean;
   isCopyDrag?: boolean;
   virtualType: Row["virtualType"];
-  nodeId?: LongID;
-  targetId?: LongID;
+  nodeId?: ID;
+  targetId?: ID;
   linkText?: string;
   insertTarget?: AddToParentTarget;
 };

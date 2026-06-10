@@ -57,7 +57,7 @@ function decodePathID(encoded: string): string {
   return encoded.replace(/%3A/g, ":");
 }
 
-function createEmptyViewPathID(nodeID: LongID): string {
+function createEmptyViewPathID(nodeID: ID): string {
   return `${EMPTY_VIEW_PATH_PREFIX}${nodeID}`;
 }
 
@@ -334,7 +334,7 @@ export function copyViewsWithNodesMapping(
   views: Views,
   sourceKey: string,
   targetKey: string,
-  nodesIdMapping: Map<LongID, LongID>
+  nodesIdMapping: Map<ID, ID>
 ): Views {
   const viewsToCopy = views.filter(
     (_, k) => k.startsWith(`${sourceKey}:`) || k === sourceKey
@@ -370,7 +370,7 @@ export function updateViewPathsAfterMoveNodes(data: Data): Views {
 export function updateViewPathsAfterDisconnect(
   views: Views,
   disconnectNode: ID,
-  fromNode: LongID
+  fromNode: ID
 ): Views {
   return views.filterNot((_, key) => {
     try {

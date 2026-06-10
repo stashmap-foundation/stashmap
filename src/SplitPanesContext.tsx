@@ -47,7 +47,7 @@ type PaneOperations = {
   addPaneAt: (
     index: number,
     author: PublicKey,
-    rootNodeId?: LongID,
+    rootNodeId?: ID,
     scrollToId?: string,
     documentId?: string,
     sourceId?: SourceId
@@ -64,7 +64,7 @@ export function useSplitPanes(): PaneOperations {
   const addPaneAt = (
     index: number,
     author: PublicKey,
-    rootNodeId?: LongID,
+    rootNodeId?: ID,
     scrollToId?: string,
     documentId?: string,
     sourceId?: SourceId

@@ -25,7 +25,7 @@ export type TextSeed = {
 };
 
 export type RefTargetSeed = {
-  targetID: LongID;
+  targetID: ID;
   linkText?: string;
 };
 
@@ -37,7 +37,7 @@ export type DocumentLinkTargetSeed = {
 };
 
 export function createRefTarget(
-  targetID: LongID,
+  targetID: ID,
   linkText?: string
 ): RefTargetSeed {
   return { targetID, linkText };
@@ -160,7 +160,7 @@ export function getNodeContext(
 
   const visited = new globalThis.Set<string>([nodeKey]);
   const parentChain: GraphNode[] = [];
-  let currentParentID: LongID | undefined = node.parent;
+  let currentParentID: ID | undefined = node.parent;
 
   while (currentParentID) {
     const parentKey = currentParentID;
@@ -279,12 +279,12 @@ export type RefTargetInfo = {
   stack: ID[];
   author: PublicKey;
   sourceId: SourceId;
-  rootNodeId?: LongID;
+  rootNodeId?: ID;
   scrollToId?: string;
 };
 
 export function getNodeRouteTargetInfo(
-  nodeID: LongID,
+  nodeID: ID,
   knowledgeDBs: KnowledgeDBs,
   effectiveAuthor: PublicKey
 ): RefTargetInfo | undefined {
@@ -343,7 +343,7 @@ export function getFileLinkTargetInfo(
     stack: getNodeStack(knowledgeDBs, targetRoot),
     author: targetRoot.author,
     sourceId: targetRoot.author,
-    rootNodeId: targetRoot.id as LongID,
+    rootNodeId: targetRoot.id as ID,
     scrollToId: targetKey ? undefined : undefined,
   };
 }
@@ -459,17 +459,17 @@ export function getSearchNodes(
 ): { node: GraphNode; childNodes: List<GraphNode> } {
   const rel = {
     ...newGraphNode(myself, plainSpans(""), { semanticContext: List<ID>() }),
-    id: searchId as LongID,
-    root: searchId as LongID,
+    id: searchId as ID,
+    root: searchId as ID,
   };
   const uniqueFoundNodeIDs = foundNodeIDs.toSet().toList();
   const childNodes = uniqueFoundNodeIDs.map(
     (semanticID): GraphNode =>
       asRefs
         ? {
-            ...newGraphNode(rel.author, [linkSpan(semanticID as LongID, "")], {
-              root: searchId as LongID,
-              parent: searchId as LongID,
+            ...newGraphNode(rel.author, [linkSpan(semanticID as ID, "")], {
+              root: searchId as ID,
+              parent: searchId as ID,
             }),
             updated: rel.updated,
           }
@@ -477,10 +477,10 @@ export function getSearchNodes(
             children: List<ID>(),
             id: semanticID,
             spans: plainSpans(""),
-            parent: searchId as LongID,
+            parent: searchId as ID,
             updated: rel.updated,
             author: rel.author,
-            root: searchId as LongID,
+            root: searchId as ID,
             relevance: undefined,
           }
   );
@@ -556,7 +556,7 @@ type EmptyNodeData = {
 // Events are processed in order: ADD sets data, REMOVE clears it
 export function computeEmptyNodeMetadata(
   temporaryEvents: List<TemporaryEvent>
-): Map<LongID, EmptyNodeData> {
+): Map<ID, EmptyNodeData> {
   return temporaryEvents.reduce((metadata, event) => {
     if (event.type === "ADD_EMPTY_NODE") {
       return metadata.set(event.nodeID, {
@@ -569,7 +569,7 @@ export function computeEmptyNodeMetadata(
       return metadata.delete(event.nodeID);
     }
     return metadata;
-  }, Map<LongID, EmptyNodeData>());
+  }, Map<ID, EmptyNodeData>());
 }
 
 // Inject empty nodes back into nodes based on temporaryEvents

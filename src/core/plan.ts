@@ -266,11 +266,11 @@ export function upsertNodesCore<T extends GraphPlan>(
   );
 }
 
-function addCrefToLog<T extends GraphPlan>(plan: T, nodeID: LongID): T {
+function addCrefToLog<T extends GraphPlan>(plan: T, nodeID: ID): T {
   const [planWithLog, nodes] = planEnsureSystemRoot(plan, LOG_ROOT_ROLE);
   const crefNode = newGraphNode(plan.user.publicKey, [linkSpan(nodeID, "")], {
-    root: nodes.root as LongID,
-    parent: nodes.id as LongID,
+    root: nodes.root as ID,
+    parent: nodes.id as ID,
   });
   const planWithCref = upsertNodesCore(planWithLog, crefNode);
   return upsertNodesCore(planWithCref, {
@@ -314,9 +314,9 @@ function getAnchorSnapshotLabels(
   return labels;
 }
 
-type NodesIdMapping = Map<LongID, LongID>;
+type NodesIdMapping = Map<ID, ID>;
 
-function getEffectiveParentNodeID(node: GraphNode): LongID | undefined {
+function getEffectiveParentNodeID(node: GraphNode): ID | undefined {
   return node.parent;
 }
 
@@ -362,11 +362,11 @@ function getNodeSubtree(
       return acc.update(parentID, List<GraphNode>(), (nodes) =>
         nodes.push(node)
       );
-    }, Map<LongID, List<GraphNode>>());
+    }, Map<ID, List<GraphNode>>());
 
   const ordered: GraphNode[] = [];
   const queue: GraphNode[] = filterNode(sourceNode) ? [sourceNode] : [];
-  const seen = new Set<LongID>(queue.map((node) => node.id));
+  const seen = new Set<ID>(queue.map((node) => node.id));
 
   while (queue.length > 0) {
     const current = queue.shift();
@@ -394,7 +394,7 @@ export function planCopyDescendantNodes<T extends GraphPlan>(
   sourceNode: GraphNode,
   getSemanticContext: (node: GraphNode) => Context,
   filterNode?: (node: GraphNode) => boolean,
-  targetParentNodeID?: LongID,
+  targetParentNodeID?: ID,
   root?: ID
 ): [T, NodesIdMapping] {
   const descendants = getNodeSubtree(
@@ -426,7 +426,7 @@ export function planCopyDescendantNodes<T extends GraphPlan>(
       copiedNodes: List<{
         source: GraphNode;
         newSemanticContext: Context;
-        sourceParentID?: LongID;
+        sourceParentID?: ID;
         copy: GraphNode;
       }>(),
     }
@@ -434,14 +434,14 @@ export function planCopyDescendantNodes<T extends GraphPlan>(
 
   const resultMapping = copiedNodes.reduce(
     (acc, { source, copy }) => acc.set(source.id, copy.id),
-    Map<LongID, LongID>()
+    Map<ID, ID>()
   );
 
   const resultPlan = copiedNodes.reduce(
     (accPlan, { source, newSemanticContext, sourceParentID, copy }) => {
       const isRootNode = source.id === sourceNode.id;
       const children = source.children.map((childID) => {
-        const mappedID = resultMapping.get(childID as LongID);
+        const mappedID = resultMapping.get(childID as ID);
         return mappedID || childID;
       });
       const copiedParentID = isRootNode
@@ -479,7 +479,7 @@ export function planMoveDescendantNodes<T extends GraphPlan>(
   plan: T,
   sourceNode: GraphNode,
   targetSemanticContext: Context,
-  targetParentNodeID?: LongID,
+  targetParentNodeID?: ID,
   targetSemanticID?: ID,
   root?: ID
 ): T {
@@ -584,10 +584,7 @@ function planDeleteDocumentRoot<T extends GraphPlan>(
   );
 }
 
-export function planDeleteNodes<T extends GraphPlan>(
-  plan: T,
-  nodeID: LongID
-): T {
+export function planDeleteNodes<T extends GraphPlan>(plan: T, nodeID: ID): T {
   const userDB = plan.knowledgeDBs.get(plan.user.publicKey, newDB());
   const node = userDB.nodes.get(nodeID);
   const updatedNodes = userDB.nodes.remove(nodeID);

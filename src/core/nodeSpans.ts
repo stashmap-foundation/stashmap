@@ -30,7 +30,7 @@ export const isBlockLinkAny = (
 
 export const getBlockLinkTarget = (
   node: GraphNode | undefined
-): LongID | undefined => {
+): ID | undefined => {
   if (!isBlockLink(node)) return undefined;
   const link = node.spans[0];
   return link.kind === "link" ? link.targetID : undefined;
@@ -60,7 +60,7 @@ export const getBlockFileLinkText = (
 
 export const getAllLinks = (
   node: GraphNode
-): { targetID: LongID; text: string }[] =>
+): { targetID: ID; text: string }[] =>
   node.spans
     .filter((s): s is LinkSpan => s.kind === "link")
     .map((s) => ({ targetID: s.targetID, text: s.text }));
@@ -81,7 +81,7 @@ export const spansToMarkdown = (spans: InlineSpan[]): string =>
     })
     .join("");
 
-export const linkSpan = (targetID: LongID, text: string): InlineSpan => ({
+export const linkSpan = (targetID: ID, text: string): InlineSpan => ({
   kind: "link",
   targetID,
   text,

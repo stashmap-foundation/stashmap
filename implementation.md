@@ -315,39 +315,18 @@ Acceptance criteria:
 - Full-suite `npm test` wall time returns to roughly the pre-migration baseline (~30–40s), with the residual attributed via baseline comparison first.
 - `npm run typescript`, `npm run lint`, and `npm test` pass.
 
-### Phase 1A.6 — Remove remaining `LongID` assumptions incrementally — Remaining
+### Phase 1A.6 — Remove remaining `LongID` assumptions — Done
 
 Goal: remove the temporary `LongID` model where it no longer represents a real domain distinction.
 
-Tests first:
+Status: **Done**.
 
-- Public API and integration tests around:
-  - block links;
-  - file links;
-  - parent/root traversal;
-  - route parsing/building;
-  - serialization/deserialization;
-  - copy/import-style planner operations.
+Completed:
 
-Implementation checkpoints:
-
-1. Audit all `LongID` uses and classify them as:
-   - exact local `ID`;
-   - source-scoped `NodeRef`;
-   - route/path string;
-   - unresolved external reference;
-   - true temporary compatibility debt.
-2. Replace `LongID` with `ID` or `NodeRef` where source is already explicit.
-3. Keep unresolved external references narrow and parse them at boundaries.
-4. Avoid broad casts. Use narrowing and typed boundary parsers instead.
-5. Run the full suite after each narrow type replacement.
-
-Acceptance criteria:
-
-- Remaining long/scoped references are represented by explicit data, not by a string alias that hides source state.
-- New code does not introduce `LongID` assumptions.
-- Any leftover `LongID` use is documented as temporary compatibility debt with a deletion path.
-- `npm run typescript`, `npm run lint`, and `npm test` pass.
+- Audited all 160 `LongID` references across 27 files: both `ID` and `LongID` were plain `string` aliases, and no call site encoded source state in the type — scoped-ref handling for `basedOn` is specified in Phase 1B.
+- Replaced every `LongID` annotation with `ID` and deleted the `LongID` alias from `src/types.ts`.
+- `rg "LongID" src` has no hits.
+- Verified green with `npm run typescript`, `npm run lint`, and `npm test` (74 suites, 841 tests).
 
 ### Phase 1A final acceptance criteria
 
@@ -381,6 +360,7 @@ Markdown round-trips must carry everything the collaboration model needs at the 
 - `snapshot` is node-level metadata. Preserve, parse, and render it on every node, not just roots.
 - Node-level snapshot lookup uses only the node's own `snapshotId`. Do not fall back to root/document snapshot metadata for a node's lineage edge.
 - `basedOn` parsing/rendering uses the Phase 1A scoped-ref model for cross-namespace references.
+- `RootAnchor` carries a second provenance channel (`sourceAuthor`, `sourceRootID`, `sourceNodeID`, `sourceParentNodeID` — written in `src/core/rootAnchor.ts`, round-tripped through markdown in `src/core/markdownTree.ts`, consumed by `getSnapshotSourceRoot` in `src/planner.tsx` and source resolution in `src/editor/Workspace.tsx`). Audit it against the lineage model: fold the source fields into scoped `basedOn` + node-centric snapshots where they duplicate it, or document precisely which display concern (`snapshotContext` labels) remains anchor state. Two parallel provenance channels must not survive this phase.
 - Document ownership is part of the markdown format: `author` persists in frontmatter and survives save/parse/disk round-trips. The internal `Document.author` field exists; the markdown boundary must read and write it. Parsing covers both directions: a file with `author: alice` parses as alice's document, and a file without `author` parses as unowned. Follow the existing `ensureKnowstrDocId` frontmatter pattern in `src/core/Document.ts`.
 - Snapshot events must not be replaceable. Today `KIND_KNOWLEDGE_DOCUMENT_SNAPSHOT = 34773` sits in the NIP-33 parameterized-replaceable range, so a snapshot can be silently overwritten by republishing with the same `d` tag (`getReplaceableKey` in `src/nostr.ts`, used by `src/infra/snapshotStore.ts`). Move snapshots to a regular, non-replaceable event kind, carry the content-addressed `snap_sha256_…` ID in a tag, and look snapshots up by that ID. Consumers can verify integrity by hashing the content. The document event (`34772`) stays replaceable — documents are mutable; snapshots are not.
 - Preserve `knowstr_vote_id` in frontmatter.

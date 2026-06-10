@@ -2,7 +2,7 @@ export type Link =
   | {
       kind: "node";
       source: GraphNode;
-      targetID: LongID;
+      targetID: ID;
       text: string;
     }
   | {

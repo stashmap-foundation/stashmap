@@ -37,7 +37,7 @@ type FooterTypeFilters = (
 )[];
 
 type ReferencedByRef = {
-  nodeID: LongID;
+  nodeID: ID;
   sourceId: SourceId;
   context: Context;
   updated: number;
@@ -258,7 +258,7 @@ function subtreeLinksToDocument(
   graph: GraphLookup,
   documents: Map<string, Document> | undefined,
   candidate: GraphNode,
-  currentNodeID: LongID | undefined,
+  currentNodeID: ID | undefined,
   currentNodeFilePath: string | undefined,
   effectiveAuthor: PublicKey,
   subtreeRootIDs: ImmutableSet<ID>
@@ -364,8 +364,8 @@ function uniqueNodes(nodes: ResolvedNode[]): ResolvedNode[] {
 export function getIncomingCrefsForNode(
   graph: GraphLookup,
   visibleAuthors: ImmutableSet<PublicKey>,
-  parentNodeID: LongID | undefined,
-  currentNodeID: LongID | undefined,
+  parentNodeID: ID | undefined,
+  currentNodeID: ID | undefined,
   effectiveAuthor: PublicKey,
   currentItems?: List<GraphNode>,
   currentNodeFilePath?: string,
@@ -423,7 +423,7 @@ export function getIncomingCrefsForNode(
         })?.node
       : resolveNode(knowledgeDBs, item);
     return targetNode ? acc.add(targetNode.id) : acc;
-  }, ImmutableSet<LongID>());
+  }, ImmutableSet<ID>());
   const subtreeRootIDs = ImmutableSet<ID>(current.map((item) => item.id)).union(
     currentNodeID ? [currentNodeID] : []
   );
@@ -469,12 +469,12 @@ export function getIncomingCrefsForNode(
 
 type AlternativeFooterResult = {
   suggestions: List<ID>;
-  versionMetas: Map<LongID, NonNullable<Row["versionMeta"]>>;
+  versionMetas: Map<ID, NonNullable<Row["versionMeta"]>>;
 };
 
 const EMPTY_ALTERNATIVE_FOOTER_RESULT: AlternativeFooterResult = {
   suggestions: List<ID>(),
-  versionMetas: Map<LongID, NonNullable<Row["versionMeta"]>>(),
+  versionMetas: Map<ID, NonNullable<Row["versionMeta"]>>(),
 };
 
 function isVisibleVersion(
@@ -513,12 +513,12 @@ function getFutureVersions(
   graph: GraphLookup,
   visibleAuthors: ImmutableSet<PublicKey>,
   currentNode: GraphNode,
-  excludedIDs: ImmutableSet<LongID> = ImmutableSet<LongID>(),
-  visited: ImmutableSet<LongID> = ImmutableSet<LongID>([currentNode.id])
+  excludedIDs: ImmutableSet<ID> = ImmutableSet<ID>(),
+  visited: ImmutableSet<ID> = ImmutableSet<ID>([currentNode.id])
 ): List<GraphNode> {
   const futureIDs = List([
     ...(graph.graphIndex.basedOnIndex.get(currentNode.id) || []),
-  ] as LongID[]).filter((nextID) => !visited.has(nextID));
+  ] as ID[]).filter((nextID) => !visited.has(nextID));
 
   return futureIDs
     .reduce((collected, futureID) => {
@@ -545,7 +545,7 @@ function getFutureVersions(
             visibleAuthors,
             futureVersion,
             excludedIDs,
-            visited.add(futureID) as ImmutableSet<LongID>
+            visited.add(futureID) as ImmutableSet<ID>
           )
         )
         .toList();
@@ -561,8 +561,8 @@ function getVersions(
   const pastVersions = getPastVersions(graph, visibleAuthors, currentNode);
   const lineageNodes = List<GraphNode>([currentNode]).concat(pastVersions);
   const lineageIDs = lineageNodes
-    .map((node) => node.id as LongID)
-    .toSet() as ImmutableSet<LongID>;
+    .map((node) => node.id as ID)
+    .toSet() as ImmutableSet<ID>;
   const futureVersions = lineageNodes.reduce(
     (collected, lineageNode) =>
       collected
@@ -628,7 +628,7 @@ export function getAlternativeFooterData(
     .toSet();
   const existingCrefTargetIDs = currentNodeChildren
     .map((item) => getBlockLinkTarget(item))
-    .filter((id): id is LongID => !!id)
+    .filter((id): id is ID => !!id)
     .toSet();
 
   const versionNodes = getVersions(graph, visibleAuthors, currentNode);
@@ -702,8 +702,8 @@ export function getAlternativeFooterData(
             addCount,
             removeCount,
           });
-        }, Map<LongID, NonNullable<Row["versionMeta"]>>())
-    : Map<LongID, NonNullable<Row["versionMeta"]>>();
+        }, Map<ID, NonNullable<Row["versionMeta"]>>())
+    : Map<ID, NonNullable<Row["versionMeta"]>>();
 
   return { suggestions, versionMetas };
 }

@@ -120,7 +120,7 @@ export function planUpdateNodeText(
 function removeEmptyNodeFromKnowledgeDBs(
   knowledgeDBs: KnowledgeDBs,
   publicKey: PublicKey,
-  nodeID: LongID
+  nodeID: ID
 ): KnowledgeDBs {
   const myDB = knowledgeDBs.get(publicKey);
   if (!myDB) {
@@ -271,7 +271,7 @@ export function planSelectAllTemporaryRows(
   });
 }
 
-export function planRemoveEmptyNodePosition(plan: Plan, nodeID: LongID): Plan {
+export function planRemoveEmptyNodePosition(plan: Plan, nodeID: ID): Plan {
   return {
     ...plan,
     knowledgeDBs: removeEmptyNodeFromKnowledgeDBs(
@@ -324,11 +324,11 @@ export function planAddToParent(
   return [planUpdateViews(updatedNodesPlan, updatedViews), actualItemIDs];
 }
 
-type NodesIdMapping = Map<LongID, LongID>;
+type NodesIdMapping = Map<ID, ID>;
 
 function updateViewsWithNodesMapping(
   views: Views,
-  nodesIdMapping: Map<LongID, LongID>
+  nodesIdMapping: Map<ID, ID>
 ): Views {
   return views.mapEntries(([key, view]) => {
     const newKey = nodesIdMapping.reduce(
@@ -900,7 +900,7 @@ export function planSetEmptyNodePosition(
 
 export function planUpdateEmptyNodeMetadata(
   plan: Plan,
-  nodeID: LongID,
+  nodeID: ID,
   metadata: { relevance?: Relevance; argument?: Argument }
 ): Plan {
   const currentMetadata = computeEmptyNodeMetadata(

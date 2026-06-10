@@ -37,8 +37,8 @@ type DragSource = {
   isSuggestion?: boolean;
   isCopyDrag?: boolean;
   virtualType: Row["virtualType"];
-  nodeId?: LongID;
-  targetId?: LongID;
+  nodeId?: ID;
+  targetId?: ID;
   linkText?: string;
   insertTarget?: AddToParentTarget;
 };
@@ -430,7 +430,7 @@ export function dnd(
   const getSuggestionTargetID = (
     isPrimarySource: boolean,
     sourceNode: GraphNode
-  ): LongID | undefined => {
+  ): ID | undefined => {
     if (isPrimarySource) {
       return sourceDrag.targetId || sourceDrag.nodeId;
     }

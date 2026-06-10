@@ -370,7 +370,7 @@ test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
     plan.knowledgeDBs,
     parentNode,
     plan.user.publicKey
-  ).first()?.id as LongID | undefined;
+  ).first()?.id as ID | undefined;
   const childNode = childNodeID
     ? getNode(plan.knowledgeDBs, childNodeID, plan.user.publicKey)
     : undefined;
@@ -378,7 +378,7 @@ test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
     plan.knowledgeDBs,
     childNode,
     plan.user.publicKey
-  ).first()?.id as LongID | undefined;
+  ).first()?.id as ID | undefined;
   const grandchildNode = grandchildNodeID
     ? getNode(plan.knowledgeDBs, grandchildNodeID, plan.user.publicKey)
     : undefined;

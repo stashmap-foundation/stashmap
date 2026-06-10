@@ -38,7 +38,7 @@ async function renderDocumentRoute(
 
 async function renderNodeRoute(
   workspacePath: string,
-  nodeId: LongID
+  nodeId: ID
 ): Promise<void> {
   const profile = loadCliProfile({ cwd: workspacePath });
   await renderAppTree({
@@ -51,8 +51,8 @@ function savedNodeId(
   workspacePath: string,
   relativePath: string,
   needle: string
-): LongID {
-  return readNodeId(workspacePath, relativePath, needle) as LongID;
+): ID {
+  return readNodeId(workspacePath, relativePath, needle) as ID;
 }
 
 const titledMultiRootMarkdown = `---

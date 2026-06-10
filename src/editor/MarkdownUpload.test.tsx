@@ -24,7 +24,7 @@ Python is a programming language
 `;
 
 async function uploadMarkdown(alice: UpdateState): Promise<KnowledgeData> {
-  const wsID = "my-first-workspace" as LongID;
+  const wsID = "my-first-workspace" as ID;
   const workspaceText = "my-first-workspace";
   const workspaceNode: GraphNode = {
     ...newGraphNode(alice().user.publicKey, plainSpans(workspaceText), {
@@ -103,7 +103,7 @@ test("Markdown parser extracts ref link whose text contains brackets", () => {
 
   expect(parsed).toEqual([
     {
-      spans: [linkSpan(targetId as LongID, linkedText)],
+      spans: [linkSpan(targetId as ID, linkedText)],
       blockKind: "list_item",
       children: [],
     },

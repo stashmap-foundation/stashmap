@@ -77,7 +77,7 @@ function getConcreteContextNodes(
   node: GraphNode
 ): List<GraphNode> {
   const loop = (
-    currentParentID: LongID | undefined,
+    currentParentID: ID | undefined,
     visited: Set<string>,
     nodes: List<GraphNode>
   ): List<GraphNode> => {
@@ -103,7 +103,7 @@ function getConcreteContextNodes(
 }
 
 function parseRef(
-  refId: LongID,
+  refId: ID,
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
   documents?: ImmutableMap<string, Document>,
@@ -155,7 +155,7 @@ function getConcreteContextNodesInSource(
   sourceId: SourceId
 ): List<GraphNode> {
   const loop = (
-    currentParentID: LongID | undefined,
+    currentParentID: ID | undefined,
     visited: Set<string>,
     nodes: List<GraphNode>
   ): List<GraphNode> => {
@@ -391,7 +391,7 @@ function buildSourceParentReference(
 }
 
 export function buildOutgoingReference(
-  refId: LongID,
+  refId: ID,
   knowledgeDBs: KnowledgeDBs,
   myself: PublicKey,
   documents?: ImmutableMap<string, Document>,
@@ -484,7 +484,7 @@ function computeNodeDiff(
 function computeVersionMeta(
   graph: ReturnType<typeof graphLookupFromData>,
   data: Data,
-  refId: LongID,
+  refId: ID,
   sourceId: SourceId,
   parentNode: GraphNode | undefined,
   typeFilters: Pane["typeFilters"]
@@ -519,7 +519,7 @@ function getReferenceSourceNodes(
 }
 
 function uniqueNodes(nodes: GraphNode[]): GraphNode[] {
-  const seen = new globalThis.Set<LongID>();
+  const seen = new globalThis.Set<ID>();
   return nodes.filter((node) => {
     if (seen.has(node.id)) return false;
     seen.add(node.id);
@@ -539,8 +539,8 @@ function getDocumentTopSourceNodes(ref: ParsedRef, data: Data): GraphNode[] {
     .filter((node): node is GraphNode => node !== undefined);
 }
 
-function linkOwnerID(item: GraphNode): LongID {
-  return (item.parent as LongID | undefined) ?? item.id;
+function linkOwnerID(item: GraphNode): ID {
+  return (item.parent as ID | undefined) ?? item.id;
 }
 
 function findIndexedGraphLinkItem(

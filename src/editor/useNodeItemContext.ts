@@ -25,7 +25,7 @@ type NodeItemContext = {
   // For updating
   viewPath: ViewPath;
   parentView: ViewPath | undefined;
-  nodeID: LongID | undefined;
+  nodeID: ID | undefined;
   parentNode: GraphNode | undefined;
   childID: ID;
   // Update function

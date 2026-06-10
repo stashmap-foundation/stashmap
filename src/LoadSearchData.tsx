@@ -44,18 +44,14 @@ function SearchCrefBuilder({
     ...newGraphNode(user.publicKey, plainSpans(""), {
       semanticContext: List<ID>(),
     }),
-    id: searchId as LongID,
-    root: searchId as LongID,
+    id: searchId as ID,
+    root: searchId as ID,
   };
   const childNodes = crefItems
     .toSet()
     .toList()
     .map((nodeID): GraphNode => {
-      const targetNode = lookupNode(
-        graph,
-        nodeID as LongID,
-        user.publicKey
-      )?.node;
+      const targetNode = lookupNode(graph, nodeID as ID, user.publicKey)?.node;
       const targetDocument =
         targetNode?.docId && !targetNode.parent
           ? documents.get(documentKeyOf(targetNode.author, targetNode.docId))
@@ -76,13 +72,13 @@ function SearchCrefBuilder({
               ),
             ],
             {
-              root: searchId as LongID,
-              parent: searchId as LongID,
+              root: searchId as ID,
+              parent: searchId as ID,
             }
           )
-        : newGraphNode(user.publicKey, [linkSpan(nodeID as LongID, "")], {
-            root: searchId as LongID,
-            parent: searchId as LongID,
+        : newGraphNode(user.publicKey, [linkSpan(nodeID as ID, "")], {
+            root: searchId as ID,
+            parent: searchId as ID,
           });
       return {
         ...node,

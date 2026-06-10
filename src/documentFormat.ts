@@ -3,7 +3,7 @@ import { serializeFrontMatter } from "./core/knowstrFrontmatter";
 export function formatRootHeading(
   rootText: string,
   rootUuid: string,
-  basedOn?: LongID,
+  basedOn?: ID,
   snapshotDTag?: string,
   anchor?: RootAnchor
 ): string {
@@ -35,7 +35,7 @@ export function formatNodeAttrs(
   uuid: string,
   options?: {
     hidden?: boolean;
-    basedOn?: LongID;
+    basedOn?: ID;
     snapshotDTag?: string;
     anchor?: RootAnchor;
     userPublicKey?: PublicKey;

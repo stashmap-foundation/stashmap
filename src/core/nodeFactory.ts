@@ -3,8 +3,8 @@ import { v4 } from "uuid";
 import { createRootAnchor } from "./rootAnchor";
 
 export type NewGraphNodeOptions = {
-  root?: LongID;
-  parent?: LongID;
+  root?: ID;
+  parent?: ID;
   docId?: string;
   relevance?: Relevance;
   argument?: Argument;

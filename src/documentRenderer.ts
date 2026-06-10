@@ -53,7 +53,7 @@ function getSerializableNodeBody(
     const explicitLinkText = getBlockLinkText(node);
     const linkText =
       explicitLinkText ||
-      buildOutgoingReference(node.id as LongID, knowledgeDBs, author)?.text ||
+      buildOutgoingReference(node.id as ID, knowledgeDBs, author)?.text ||
       "";
     return `[${linkText}](#${targetNodeID})`;
   }

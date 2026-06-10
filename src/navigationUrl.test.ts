@@ -9,17 +9,17 @@ import {
 const ALICE_SOURCE = "alice";
 
 test("buildNodeRouteUrl creates source-scoped node route", () => {
-  expect(buildNodeRouteUrl("some-node-id" as LongID, ALICE_SOURCE)).toBe(
+  expect(buildNodeRouteUrl("some-node-id" as ID, ALICE_SOURCE)).toBe(
     "/r/some-node-id?source=alice"
   );
-  expect(buildNodeRouteUrl("encoded/id" as LongID, "source/id")).toBe(
+  expect(buildNodeRouteUrl("encoded/id" as ID, "source/id")).toBe(
     "/r/encoded%2Fid?source=source%2Fid"
   );
 });
 
 test("buildNodeRouteUrl includes scroll target as hash", () => {
   expect(
-    buildNodeRouteUrl("some-node-id" as LongID, ALICE_SOURCE, "child/id" as ID)
+    buildNodeRouteUrl("some-node-id" as ID, ALICE_SOURCE, "child/id" as ID)
   ).toBe("/r/some-node-id?source=alice#child%2Fid");
 });
 

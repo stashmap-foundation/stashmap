@@ -23,7 +23,7 @@ export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
   trees: MarkdownTreeNode[],
   context: List<ID> = List<ID>(),
   options: { createDocuments?: boolean } = {}
-): [T, topItemIDs: ID[], topNodeIDs: LongID[]] {
+): [T, topItemIDs: ID[], topNodeIDs: ID[]] {
   const createDocuments = options.createDocuments ?? true;
   const walkContext: WalkContext = {
     knowledgeDBs: plan.knowledgeDBs,
@@ -100,7 +100,7 @@ export function planCreateNodesFromMarkdown<T extends GraphPlan>(
 function moveCreatedTreesToParentContext<T extends GraphPlan>(
   plan: T,
   originalTopNodeIDs: ID[],
-  sourceNodeIDs: LongID[],
+  sourceNodeIDs: ID[],
   actualNodeIDs: ID[],
   targetSemanticContext: Context,
   parentNode: GraphNode
@@ -128,14 +128,14 @@ function moveCreatedTreesToParentContext<T extends GraphPlan>(
 function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
   plan: T,
   trees: MarkdownTreeNode[],
-  parentNodeId: LongID,
+  parentNodeId: ID,
   insertAtIndex?: number,
   relevance?: Relevance,
   argument?: Argument
 ): {
   plan: T;
   topItemIDs: ID[];
-  topNodeIDs: LongID[];
+  topNodeIDs: ID[];
   actualItemIDs: Array<ID>;
 } {
   if (trees.length === 0) {
@@ -204,7 +204,7 @@ export function planInsertMarkdownTrees(
 ): {
   plan: Plan;
   topItemIDs: ID[];
-  topNodeIDs: LongID[];
+  topNodeIDs: ID[];
   actualItemIDs: Array<ID>;
 } {
   return planInsertMarkdownTreesByParentId(

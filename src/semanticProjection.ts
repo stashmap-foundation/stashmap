@@ -5,7 +5,6 @@ import {
   isSearchId,
   parseSearchId,
   itemPassesFilters,
-  getNodeSemanticID,
   getSemanticID,
   getNodeContext,
   getNodeText,
@@ -612,9 +611,6 @@ export function getAlternativeFooterData(
   const currentOriginKeys = currentNodeChildren
     .map((item) => (item.basedOn ?? item.id) as string)
     .toSet();
-  const currentSemanticIDs = currentNodeChildren
-    .map((item) => getNodeSemanticID(item) as string)
-    .toSet();
   const currentFilteredOutOriginKeys = currentNodeChildren
     .filter((item) => !itemPassesFilters(item, filterTypes))
     .map((item) => (item.basedOn ?? item.id) as string)
@@ -631,6 +627,15 @@ export function getAlternativeFooterData(
     .filter((id): id is ID => !!id)
     .toSet();
 
+  const coveredTargetIDs = declinedTargetIDs.union(existingCrefTargetIDs);
+  const isCoveredItem = (item: GraphNode): boolean => {
+    if (currentOriginKeys.has((item.basedOn ?? item.id) as string)) {
+      return true;
+    }
+    const itemTarget = getBlockLinkTarget(item);
+    return itemTarget !== undefined && coveredTargetIDs.has(itemTarget);
+  };
+
   const versionNodes = getVersions(graph, visibleAuthors, currentNode);
   const versionDiffs = versionNodes.map((versionNode) =>
     computeVersionDiff(snapshotNodes, knowledgeDBs, currentNode, versionNode)
@@ -645,11 +650,7 @@ export function getAlternativeFooterData(
               .filter((item) => itemPassesFilters(item, filterTypes))
               .reduce((itemAcc, item) => {
                 const originKey = (item.basedOn ?? item.id) as string;
-                if (
-                  currentOriginKeys.has(originKey) ||
-                  currentSemanticIDs.has(getNodeSemanticID(item) as string) ||
-                  itemAcc.has(originKey)
-                ) {
+                if (isCoveredItem(item) || itemAcc.has(originKey)) {
                   return itemAcc;
                 }
                 return itemAcc.set(originKey, item.id);
@@ -674,17 +675,14 @@ export function getAlternativeFooterData(
         .reduce((acc, { node, additions, deletions }) => {
           const addCount = additions.filter(
             (item) =>
-              itemPassesFilters(item, filterTypes) &&
-              !currentOriginKeys.has((item.basedOn ?? item.id) as string) &&
-              !currentSemanticIDs.has(getNodeSemanticID(item) as string)
+              itemPassesFilters(item, filterTypes) && !isCoveredItem(item)
           ).size;
           const uncoveredAddCount =
             addCount -
             additions.filter(
               (item) =>
                 itemPassesFilters(item, filterTypes) &&
-                !currentOriginKeys.has((item.basedOn ?? item.id) as string) &&
-                !currentSemanticIDs.has(getNodeSemanticID(item) as string) &&
+                !isCoveredItem(item) &&
                 displayedSuggestionOriginKeys.has(
                   (item.basedOn ?? item.id) as string
                 )

@@ -307,7 +307,7 @@ Recipes
     `);
   });
 
-  test("Copied suggestion becomes regular item without [S] marker", async () => {
+  test("Typing identical text does not suppress a suggestion", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
     await follow(alice, bob().user.publicKey);
     await follow(bob, alice().user.publicKey);
@@ -342,6 +342,7 @@ Recipes
     await expectTree(`
 Recipes
   Pasta
+  [S] Pasta
     `);
   });
 

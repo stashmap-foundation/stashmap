@@ -5,7 +5,6 @@ import {
   resolveNode,
   itemPassesFilters,
   getSemanticID,
-  getNodeContext,
 } from "./core/connections";
 import {
   getBlockLinkText,
@@ -315,16 +314,11 @@ function buildReferenceFromParsed(
   };
 }
 
-function nodesMatchForVersion(
-  knowledgeDBs: KnowledgeDBs,
-  left: GraphNode,
-  right: GraphNode
-): boolean {
+function nodesShareLineage(left: GraphNode, right: GraphNode): boolean {
   return (
-    getSemanticID(knowledgeDBs, left) === getSemanticID(knowledgeDBs, right) &&
-    getNodeContext(knowledgeDBs, left).equals(
-      getNodeContext(knowledgeDBs, right)
-    )
+    left.basedOn === right.id ||
+    right.basedOn === left.id ||
+    (left.basedOn !== undefined && left.basedOn === right.basedOn)
   );
 }
 
@@ -709,10 +703,7 @@ export function buildReferenceItem(
     return undefined;
   }
 
-  if (
-    parentNode &&
-    nodesMatchForVersion(data.knowledgeDBs, ref.node, parentNode)
-  ) {
+  if (parentNode && nodesShareLineage(ref.node, parentNode)) {
     const computedVersionMeta = computeVersionMeta(
       graph,
       data,

@@ -99,7 +99,8 @@ Do not introduce:
 
 ```sh
 rg "nodesMatchForVersion" src
-rg "getNodeSemanticID|getSemanticID|currentSemanticIDs" src/semanticProjection.ts   # suggestion path is originKey-only
+rg "getNodeSemanticID|currentSemanticIDs" src/semanticProjection.ts   # suggestion path is originKey-only (getSemanticID stays in the kept incoming-refs/search substrate)
+rg "nodesMatchForVersion" src
 rg "findContacts|FollowList|planAddContacts|planRemoveContact|planUpsertContact|KIND_CONTACTLIST" src
 rg "contactsRelays|useContactsRelays|buildPermanentSyncAuthors" src
 rg "userPublicKey|withUsersEntryPublicKey|getNodeUserPublicKey" src

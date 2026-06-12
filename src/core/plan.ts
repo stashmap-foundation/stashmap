@@ -59,7 +59,7 @@ function planEnsureSystemRoot<T extends GraphPlan>(
   }
 
   const node = withDocumentRoot(
-    newGraphNode(LOCAL, plainSpans(getSystemRoleText(systemRole)), {
+    newGraphNode(plainSpans(getSystemRoleText(systemRole)), {
       systemRole,
     })
   );
@@ -74,7 +74,7 @@ export function planUpsertRootDocument<T extends GraphPlan>(
   if (rootNode.parent || !rootNode.docId) {
     return plan;
   }
-  const key = documentKeyOf(rootNode.author, rootNode.docId);
+  const key = documentKeyOf(LOCAL, rootNode.docId);
   const existing = plan.documents.get(key);
   const next = existing
     ? {
@@ -84,7 +84,7 @@ export function planUpsertRootDocument<T extends GraphPlan>(
           : [...existing.topNodeShortIds, rootNode.id],
         updatedMs: rootNode.updated,
       }
-    : createDocumentFromRootNode(rootNode);
+    : createDocumentFromRootNode(rootNode, LOCAL);
   return { ...plan, documents: plan.documents.set(key, next) };
 }
 
@@ -102,9 +102,7 @@ export function getNodeDocumentId(
   plan: Pick<GraphPlan, "knowledgeDBs">,
   node: GraphNode
 ): string | undefined {
-  return (
-    node.docId ?? getNode(plan.knowledgeDBs, node.root, node.author)?.docId
-  );
+  return node.docId ?? getNode(plan.knowledgeDBs, node.root, LOCAL)?.docId;
 }
 
 export function planMarkDocumentAffected<T extends GraphPlan>(
@@ -122,7 +120,7 @@ export function upsertNodesCore<T extends GraphPlan>(
   nodes: GraphNode
 ): T {
   const userDB = plan.knowledgeDBs.get(LOCAL, newDB());
-  const normalized = ensureNodeNativeFields(plan.knowledgeDBs, nodes);
+  const normalized = ensureNodeNativeFields(plan.knowledgeDBs, nodes, LOCAL);
   const node: GraphNode =
     !normalized.parent && !normalized.docId
       ? { ...normalized, docId: v4() }
@@ -143,7 +141,7 @@ export function upsertNodesCore<T extends GraphPlan>(
 
 function addCrefToLog<T extends GraphPlan>(plan: T, nodeID: ID): T {
   const [planWithLog, nodes] = planEnsureSystemRoot(plan, LOG_ROOT_ROLE);
-  const crefNode = newGraphNode(LOCAL, [linkSpan(nodeID, "")], {
+  const crefNode = newGraphNode([linkSpan(nodeID, "")], {
     root: nodes.root as ID,
     parent: nodes.id as ID,
   });
@@ -202,11 +200,12 @@ function getNodeParentDepth(
 
 function getNodeSubtree(
   plan: GraphPlan,
+  sourceId: SourceId,
   sourceNode: GraphNode,
   filterNode: (node: GraphNode) => boolean = () => true
 ): List<GraphNode> {
   const authorNodesByID =
-    plan.knowledgeDBs.get(sourceNode.author)?.nodes || Map<ID, GraphNode>();
+    plan.knowledgeDBs.get(sourceId)?.nodes || Map<ID, GraphNode>();
   const childrenByParent = authorNodesByID
     .valueSeq()
     .filter((node) => node.root === sourceNode.root)
@@ -247,20 +246,16 @@ function getNodeSubtree(
 
 export function planCopyDescendantNodes<T extends GraphPlan>(
   plan: T,
+  sourceId: SourceId,
   sourceNode: GraphNode,
-  filterNode?: (node: GraphNode) => boolean,
   targetParentNodeID?: ID,
   root?: ID
 ): [T, NodesIdMapping] {
-  const descendants = getNodeSubtree(
-    plan,
-    sourceNode,
-    filterNode ?? (() => true)
-  );
+  const descendants = getNodeSubtree(plan, sourceId, sourceNode);
 
   const { copiedNodes } = descendants.reduce(
     (acc, node) => {
-      const baseNode = newGraphNode(LOCAL, node.spans, {
+      const baseNode = newGraphNode(node.spans, {
         root: acc.copiedRoot,
       });
       const nextCopiedRoot = acc.copiedRoot ?? baseNode.root;
@@ -322,7 +317,7 @@ export function planMoveDescendantNodes<T extends GraphPlan>(
   targetParentNodeID?: ID,
   root?: ID
 ): T {
-  const descendants = getNodeSubtree(plan, sourceNode);
+  const descendants = getNodeSubtree(plan, LOCAL, sourceNode);
   return descendants.reduce((accPlan, node) => {
     const isRootNode = node.id === sourceNode.id;
     return planUpsertNodes(accPlan, {
@@ -370,7 +365,7 @@ function planDeleteDocumentRoot<T extends GraphPlan>(
   nextKnowledgeDBs: KnowledgeDBs,
   docId: string
 ): T {
-  const key = documentKeyOf(node.author, docId);
+  const key = documentKeyOf(LOCAL, docId);
   const document = plan.documents.get(key);
   const remainingTopNodeShortIds =
     document?.topNodeShortIds.filter((id) => id !== node.id) ?? [];
@@ -433,9 +428,8 @@ export function planDeleteDescendantNodes<T extends GraphPlan>(
   sourceNode: GraphNode
 ): T {
   const userNodesByID = plan.knowledgeDBs.get(LOCAL, newDB()).nodes;
-  const descendants = getNodeSubtree(plan, sourceNode)
+  const descendants = getNodeSubtree(plan, LOCAL, sourceNode)
     .filter((node) => node.id !== sourceNode.id)
-    .filter((node) => node.author === LOCAL)
     .sortBy((node) => -getNodeParentDepth(userNodesByID, node));
 
   return descendants.reduce(
@@ -536,7 +530,6 @@ export function planAddTargetsToNode<T extends GraphPlan>(
           : undefined;
       if (documentLinkTarget) {
         const childNode = newGraphNode(
-          LOCAL,
           [
             fileLinkSpan(
               documentLinkTarget.filePath ?? documentLinkTarget.docId,
@@ -575,7 +568,6 @@ export function planAddTargetsToNode<T extends GraphPlan>(
       if (refTarget || isSearchId(objectID as ID)) {
         const childNode = refTarget
           ? newGraphNode(
-              LOCAL,
               [linkSpan(refTarget.targetID, refTarget.linkText || "")],
               {
                 root: parentNode.root,
@@ -590,7 +582,6 @@ export function planAddTargetsToNode<T extends GraphPlan>(
               spans: plainSpans(""),
               parent: parentNode.id,
               updated: Date.now(),
-              author: LOCAL,
               root: parentNode.root,
               relevance,
               argument,
@@ -634,7 +625,7 @@ export function planAddTargetsToNode<T extends GraphPlan>(
         ];
       }
 
-      const childNode = newGraphNode(LOCAL, plainSpans(objectText || ""), {
+      const childNode = newGraphNode(plainSpans(objectText || ""), {
         root: parentNode.root,
         parent: parentNode.id,
       });
@@ -703,7 +694,6 @@ export function planAddTopTargetsToDocument<T extends GraphPlan>(
         return [accPlan, accIds];
       }
       const topNode = newGraphNode(
-        LOCAL,
         [
           fileLinkSpan(
             documentLinkTarget.filePath ?? documentLinkTarget.docId,

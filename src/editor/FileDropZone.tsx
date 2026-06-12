@@ -94,7 +94,7 @@ function upsertParsedDocument(
     fallbackTitle: titleFromFileName(file.name),
     context: {
       knowledgeDBs: plan.knowledgeDBs,
-      publicKey: LOCAL,
+      sourceId: LOCAL,
       affectedDocuments: plan.affectedDocuments,
     },
   });
@@ -134,17 +134,13 @@ function planCreateImportedFilesDocument(
   plan: Plan,
   importedDocuments: ReadonlyArray<Document>
 ): { plan: Plan; document: Document } {
-  const root = withDocumentRoot(
-    newGraphNode(LOCAL, plainSpans("Imported Files"))
-  );
+  const root = withDocumentRoot(newGraphNode(plainSpans("Imported Files")));
   const planWithRoot = planUpsertNodes(plan, root);
   const rootDocId = root.docId;
   if (!rootDocId) {
     throw new Error("Imported files document was not created");
   }
-  const document = planWithRoot.documents.get(
-    documentKeyOf(root.author, rootDocId)
-  );
+  const document = planWithRoot.documents.get(documentKeyOf(LOCAL, rootDocId));
   if (!document) {
     throw new Error("Imported files document was not created");
   }

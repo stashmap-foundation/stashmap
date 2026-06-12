@@ -14,12 +14,7 @@ export function getOwnSystemRoot(
   return knowledgeDBs
     .get(author)
     ?.nodes.valueSeq()
-    .filter(
-      (node) =>
-        node.author === author &&
-        node.systemRole === systemRole &&
-        isStandaloneRoot(node)
-    )
+    .filter((node) => node.systemRole === systemRole && isStandaloneRoot(node))
     .sortBy((node) => -node.updated)
     .first();
 }

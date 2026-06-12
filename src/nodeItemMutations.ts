@@ -66,12 +66,7 @@ function planUpdateDocumentTopNodeMetadata(
   editorText: string
 ): Plan {
   const { node, rowID, viewPath, paneIndex, documentId } = input;
-  if (
-    documentId === undefined ||
-    node.parent ||
-    !node.docId ||
-    node.author !== LOCAL
-  ) {
+  if (documentId === undefined || node.parent || !node.docId) {
     return plan;
   }
 
@@ -103,12 +98,12 @@ function getSourceDocumentTarget(
   const sourceRoot =
     sourceRow.id === sourceRow.root
       ? sourceRow
-      : getNode(plan.knowledgeDBs, sourceRow.root, sourceRow.author);
+      : getNode(plan.knowledgeDBs, sourceRow.root, LOCAL);
   if (!sourceRoot) {
     return undefined;
   }
   const sourceDocument = sourceRoot?.docId
-    ? plan.documents.get(documentKeyOf(sourceRoot.author, sourceRoot.docId))
+    ? plan.documents.get(documentKeyOf(LOCAL, sourceRoot.docId))
     : undefined;
   return sourceDocument
     ? createDocumentLinkTarget(
@@ -189,22 +184,30 @@ function planAcceptDocumentTopIncoming(
 function resolveDeepCopySource(
   plan: Plan,
   rowID: ID,
-  node: GraphNode
-): { itemID: ID; semanticContext: Context; node: GraphNode } {
+  node: GraphNode,
+  sourceId: SourceId
+): {
+  itemID: ID;
+  semanticContext: Context;
+  node: GraphNode;
+  sourceId: SourceId;
+} {
   if (isRefNode(node)) {
-    const resolved = resolveNode(plan.knowledgeDBs, node);
+    const resolved = resolveNode(plan.knowledgeDBs, node, sourceId);
     if (resolved) {
       return {
-        itemID: getSemanticID(plan.knowledgeDBs, resolved),
-        semanticContext: getNodeContext(plan.knowledgeDBs, resolved),
+        itemID: getSemanticID(plan.knowledgeDBs, resolved, sourceId),
+        semanticContext: getNodeContext(plan.knowledgeDBs, resolved, sourceId),
         node: resolved,
+        sourceId,
       };
     }
   }
   return {
     itemID: rowID,
-    semanticContext: getNodeContext(plan.knowledgeDBs, node),
+    semanticContext: getNodeContext(plan.knowledgeDBs, node, sourceId),
     node,
+    sourceId,
   };
 }
 
@@ -213,6 +216,7 @@ export function planUpdateViewItemMetadata(
   input: {
     node: GraphNode;
     rowID: ID;
+    sourceId: SourceId;
     viewPath: ViewPath;
     parentNode: GraphNode | undefined;
     parentViewPath: ViewPath | undefined;
@@ -283,9 +287,10 @@ export function planUpdateViewItemMetadata(
     }
     const currentParentNode = getCurrentPlanNode(plan, parentNode);
     if (virtualType === "suggestion" && !isBlockLink(node)) {
-      const source = resolveDeepCopySource(plan, rowID, node);
+      const source = resolveDeepCopySource(plan, rowID, node, input.sourceId);
       return planDeepCopyNode(
         plan,
+        source.sourceId,
         source.node,
         currentParentNode,
         viewPath,

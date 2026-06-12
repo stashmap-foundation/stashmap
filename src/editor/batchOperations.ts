@@ -52,6 +52,7 @@ function planUpdateOneMetadata(
     {
       node: row.node,
       rowID: row.rowID,
+      sourceId: row.sourceId,
       viewPath: row.viewPath,
       parentNode: row.parentNode,
       parentViewPath: row.parentViewPath,

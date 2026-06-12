@@ -66,7 +66,7 @@ function enrichWithFilePath(
   if (!rawParsed) return undefined;
   const parsed = {
     document: { ...rawParsed.document, author: LOCAL },
-    nodes: rawParsed.nodes.map((node) => ({ ...node, author: LOCAL })),
+    nodes: rawParsed.nodes,
   };
   const { document } = parsed;
   const existing = lookupFilePath(documents, document.author, document.docId);

@@ -248,21 +248,32 @@ export function getDropDestinationFromRows(
 function resolveDeepCopySource(
   plan: Plan,
   row: Row
-): { itemID: ID; semanticContext: Context; node: GraphNode } {
+): {
+  itemID: ID;
+  semanticContext: Context;
+  node: GraphNode;
+  sourceId: SourceId;
+} {
   if (isRefNode(row.node)) {
-    const resolved = resolveNode(plan.knowledgeDBs, row.node);
+    const resolved = resolveNode(plan.knowledgeDBs, row.node, row.sourceId);
     if (resolved) {
       return {
-        itemID: getSemanticID(plan.knowledgeDBs, resolved),
-        semanticContext: getNodeContext(plan.knowledgeDBs, resolved),
+        itemID: getSemanticID(plan.knowledgeDBs, resolved, row.sourceId),
+        semanticContext: getNodeContext(
+          plan.knowledgeDBs,
+          resolved,
+          row.sourceId
+        ),
         node: resolved,
+        sourceId: row.sourceId,
       };
     }
   }
   return {
     itemID: row.rowID,
-    semanticContext: getNodeContext(plan.knowledgeDBs, row.node),
+    semanticContext: getNodeContext(plan.knowledgeDBs, row.node, row.sourceId),
     node: row.node,
+    sourceId: row.sourceId,
   };
 }
 
@@ -297,7 +308,7 @@ export function dnd(
   const sourceDocumentNode = sourceDrag.row.node;
   const isDocumentTopLevelSource =
     sourceDocument !== undefined &&
-    sourceDocument.author === sourceDocumentNode.author &&
+    sourceDocument.author === sourceDrag.row.sourceId &&
     sourceDocument.topNodeShortIds.includes(sourceDocumentNode.id);
 
   if (
@@ -511,6 +522,7 @@ export function dnd(
     const deepCopySource = resolveDeepCopySource(accPlan, sourceRow);
     return planDeepCopyNode(
       accPlan,
+      deepCopySource.sourceId,
       deepCopySource.node,
       targetNode,
       sourceRow.viewPath,

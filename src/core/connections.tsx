@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/immutable-data, functional/no-let */
 import { List, Set, Map } from "immutable";
-import { newGraphNode } from "./nodeFactory";
 import { SEARCH_PREFIX } from "./constants";
 import {
   getBlockFileLinkPath,
@@ -8,8 +7,6 @@ import {
   isBlockFileLink,
   isBlockLink,
   nodeText,
-  linkSpan,
-  plainSpans,
 } from "./nodeSpans";
 import { Document, documentKeyOf } from "./Document";
 import { resolveLinkPath } from "./linkPath";
@@ -59,22 +56,24 @@ export const isRefNode = isBlockLink;
 
 function getTargetNode(
   knowledgeDBs: KnowledgeDBs,
-  node: GraphNode | undefined
+  node: GraphNode | undefined,
+  sourceId: SourceId
 ): GraphNode | undefined {
   const targetID = getBlockLinkTarget(node);
   return targetID && node
-    ? getNode(knowledgeDBs, targetID, node.author)
+    ? getNode(knowledgeDBs, targetID, sourceId)
     : undefined;
 }
 
 export function resolveNode(
   knowledgeDBs: KnowledgeDBs,
-  node: GraphNode | undefined
+  node: GraphNode | undefined,
+  sourceId: SourceId
 ): GraphNode | undefined {
   if (!node) {
     return undefined;
   }
-  return isBlockLink(node) ? getTargetNode(knowledgeDBs, node) : node;
+  return isBlockLink(node) ? getTargetNode(knowledgeDBs, node, sourceId) : node;
 }
 
 export function isSearchId(id: ID): boolean {
@@ -127,19 +126,24 @@ export function getNodeSemanticID(node: GraphNode): ID {
   return nodeText(node) as ID;
 }
 
-export function getSemanticID(knowledgeDBs: KnowledgeDBs, node: GraphNode): ID {
-  const targetNode = getTargetNode(knowledgeDBs, node);
+export function getSemanticID(
+  knowledgeDBs: KnowledgeDBs,
+  node: GraphNode,
+  sourceId: SourceId
+): ID {
+  const targetNode = getTargetNode(knowledgeDBs, node, sourceId);
   if (targetNode) {
-    return getSemanticID(knowledgeDBs, targetNode);
+    return getSemanticID(knowledgeDBs, targetNode, sourceId);
   }
   return getNodeSemanticID(node);
 }
 
 export function getNodeContext(
   knowledgeDBs: KnowledgeDBs,
-  node: GraphNode
+  node: GraphNode,
+  sourceId: SourceId
 ): Context {
-  const db = knowledgeDBs.get(node.author);
+  const db = knowledgeDBs.get(sourceId);
   const nodeKey = node.id;
   if (db) {
     const cached = getNodeContextIndex(db).get(nodeKey);
@@ -170,7 +174,7 @@ export function getNodeContext(
     }
     visited.add(parentKey);
 
-    const parentNode = getNode(knowledgeDBs, currentParentID, node.author);
+    const parentNode = getNode(knowledgeDBs, currentParentID, sourceId);
     if (!parentNode) {
       if (db) {
         getNodeContextIndex(db).set(nodeKey, fallbackContext);
@@ -183,9 +187,9 @@ export function getNodeContext(
 
   const derivedContext = parentChain.reduce(
     (context, parentNode) =>
-      context.push(getSemanticID(knowledgeDBs, parentNode)),
+      context.push(getSemanticID(knowledgeDBs, parentNode, sourceId)),
     parentChain.length > 0
-      ? getNodeContext(knowledgeDBs, parentChain[0] as GraphNode)
+      ? getNodeContext(knowledgeDBs, parentChain[0] as GraphNode, sourceId)
       : List<ID>()
   );
   if (db) {
@@ -196,59 +200,21 @@ export function getNodeContext(
 
 export function getNodeStack(
   knowledgeDBs: KnowledgeDBs,
-  node: GraphNode
+  node: GraphNode,
+  sourceId: SourceId
 ): ID[] {
   return [
-    ...getNodeContext(knowledgeDBs, node).toArray(),
-    getSemanticID(knowledgeDBs, node),
+    ...getNodeContext(knowledgeDBs, node, sourceId).toArray(),
+    getSemanticID(knowledgeDBs, node, sourceId),
   ];
 }
 
 export function getNodeDepth(
   knowledgeDBs: KnowledgeDBs,
-  node: GraphNode
+  node: GraphNode,
+  sourceId: SourceId
 ): number {
-  return getNodeContext(knowledgeDBs, node).size;
-}
-
-function createTextNodeFromGraphNode(node: GraphNode): TextSeed {
-  return {
-    id: getNodeSemanticID(node),
-    text: getNodeText(node) || "",
-  };
-}
-
-export function buildTextNodesFromGraphNodes(
-  nodes: Iterable<GraphNode>
-): Map<string, TextSeed> {
-  const nodeList = Array.from(nodes).filter((node) => !isRefNode(node));
-  const knowledgeDBs = nodeList.reduce((acc, node) => {
-    const authorDB = acc.get(node.author, {
-      nodes: Map<string, GraphNode>(),
-    });
-    return acc.set(node.author, {
-      nodes: authorDB.nodes.set(node.id, node),
-    });
-  }, Map<SourceId, KnowledgeData>());
-
-  const latestByHead = nodeList.reduce((acc, node) => {
-    const semanticID = getNodeSemanticID(node);
-    const existing = acc.get(semanticID);
-    const isNewer = !existing || node.updated > existing.updated;
-    const isSameVersionNewerDisplay =
-      !!existing &&
-      node.updated === existing.updated &&
-      getNodeDepth(knowledgeDBs, node) < getNodeDepth(knowledgeDBs, existing);
-    if (isNewer || isSameVersionNewerDisplay) {
-      return acc.set(semanticID, node);
-    }
-    return acc;
-  }, Map<ID, GraphNode>());
-
-  return latestByHead.map((node) => createTextNodeFromGraphNode(node)) as Map<
-    string,
-    TextSeed
-  >;
+  return getNodeContext(knowledgeDBs, node, sourceId).size;
 }
 
 export function getNode(
@@ -275,28 +241,10 @@ export function getChildNodes(
 
 export type RefTargetInfo = {
   stack: ID[];
-  author: SourceId;
   sourceId: SourceId;
   rootNodeId?: ID;
   scrollToId?: string;
 };
-
-export function getNodeRouteTargetInfo(
-  nodeID: ID,
-  knowledgeDBs: KnowledgeDBs,
-  effectiveAuthor: SourceId
-): RefTargetInfo | undefined {
-  const node = getNode(knowledgeDBs, nodeID, effectiveAuthor);
-  if (!node) {
-    return undefined;
-  }
-  return {
-    stack: getNodeStack(knowledgeDBs, node),
-    author: node.author,
-    sourceId: node.author,
-    rootNodeId: node.id,
-  };
-}
 
 export function getRefTargetInfo(
   refId: ID,
@@ -305,44 +253,18 @@ export function getRefTargetInfo(
 ): RefTargetInfo | undefined {
   const node = resolveNode(
     knowledgeDBs,
-    getNode(knowledgeDBs, refId, effectiveAuthor)
+    getNode(knowledgeDBs, refId, effectiveAuthor),
+    effectiveAuthor
   );
   if (!node) {
     return undefined;
   }
 
-  const stack = getNodeStack(knowledgeDBs, node);
+  const stack = getNodeStack(knowledgeDBs, node, effectiveAuthor);
   return {
     stack,
-    author: node.author,
-    sourceId: node.author,
+    sourceId: effectiveAuthor,
     rootNodeId: node.id,
-  };
-}
-
-export function getFileLinkTargetInfo(
-  resolvedPath: string,
-  documentByFilePath: Map<string, Document>,
-  knowledgeDBs: KnowledgeDBs
-): RefTargetInfo | undefined {
-  const targetDoc = documentByFilePath.get(resolvedPath);
-  if (!targetDoc) {
-    return undefined;
-  }
-  const targetKey = documentKeyOf(targetDoc.author, targetDoc.docId);
-  const topNodeShortId = targetDoc.topNodeShortIds[0];
-  const targetRoot = topNodeShortId
-    ? getNode(knowledgeDBs, topNodeShortId as ID, targetDoc.author)
-    : undefined;
-  if (!targetRoot) {
-    return undefined;
-  }
-  return {
-    stack: getNodeStack(knowledgeDBs, targetRoot),
-    author: targetRoot.author,
-    sourceId: targetRoot.author,
-    rootNodeId: targetRoot.id as ID,
-    scrollToId: targetKey ? undefined : undefined,
   };
 }
 
@@ -350,13 +272,15 @@ function resolveAnyLink(
   knowledgeDBs: KnowledgeDBs,
   documents: Map<string, Document> | undefined,
   documentByFilePath: Map<string, Document> | undefined,
-  source: GraphNode | undefined
-): GraphNode | undefined {
+  source: GraphNode | undefined,
+  sourceId: SourceId
+): { node: GraphNode; sourceId: SourceId } | undefined {
   if (!source) {
     return undefined;
   }
   if (isBlockLink(source)) {
-    return getTargetNode(knowledgeDBs, source);
+    const target = getTargetNode(knowledgeDBs, source, sourceId);
+    return target ? { node: target, sourceId } : undefined;
   }
   if (
     isBlockFileLink(source) &&
@@ -367,34 +291,38 @@ function resolveAnyLink(
       knowledgeDBs,
       documents,
       documentByFilePath,
-      source
+      source,
+      sourceId
     );
   }
-  return source;
+  return { node: source, sourceId };
 }
 
 function resolveFileLinkRootByDocs(
   knowledgeDBs: KnowledgeDBs,
   documents: Map<string, Document>,
   documentByFilePath: Map<string, Document>,
-  source: GraphNode
-): GraphNode | undefined {
+  source: GraphNode,
+  sourceId: SourceId
+): { node: GraphNode; sourceId: SourceId } | undefined {
   const linkPath = getBlockFileLinkPath(source);
   if (!linkPath) return undefined;
   const sourceRoot =
     source.id === source.root
       ? source
-      : getNode(knowledgeDBs, source.root, source.author);
+      : getNode(knowledgeDBs, source.root, sourceId);
   const sourceFilePath = sourceRoot?.docId
-    ? documents.get(documentKeyOf(sourceRoot.author, sourceRoot.docId))
-        ?.filePath
+    ? documents.get(documentKeyOf(sourceId, sourceRoot.docId))?.filePath
     : undefined;
   const resolved = resolveLinkPath(linkPath, sourceFilePath);
   const targetDoc = documentByFilePath.get(resolved);
   if (!targetDoc) return undefined;
   const topNodeShortId = targetDoc.topNodeShortIds[0];
-  return topNodeShortId
+  const targetRoot = topNodeShortId
     ? getNode(knowledgeDBs, topNodeShortId as ID, targetDoc.author)
+    : undefined;
+  return targetRoot
+    ? { node: targetRoot, sourceId: targetDoc.author }
     : undefined;
 }
 
@@ -406,25 +334,26 @@ export function getRefLinkTargetInfo(
   documentByFilePath?: Map<string, Document>
 ): RefTargetInfo | undefined {
   const source = getNode(knowledgeDBs, refId, effectiveAuthor);
-  const node = resolveAnyLink(
+  const resolved = resolveAnyLink(
     knowledgeDBs,
     documents,
     documentByFilePath,
-    source
+    source,
+    effectiveAuthor
   );
-  if (!node) {
+  if (!resolved) {
     return undefined;
   }
+  const { node } = resolved;
 
   const parentNode = node.parent
-    ? getNode(knowledgeDBs, node.parent, node.author)
+    ? getNode(knowledgeDBs, node.parent, resolved.sourceId)
     : undefined;
   const targetRoot = parentNode || node;
 
   return {
-    stack: getNodeStack(knowledgeDBs, targetRoot),
-    author: targetRoot.author,
-    sourceId: targetRoot.author,
+    stack: getNodeStack(knowledgeDBs, targetRoot, resolved.sourceId),
+    sourceId: resolved.sourceId,
     rootNodeId: targetRoot.id,
     scrollToId: targetRoot.id === node.id ? undefined : node.id,
   };
@@ -432,9 +361,10 @@ export function getRefLinkTargetInfo(
 
 export function ensureNodeNativeFields(
   knowledgeDBs: KnowledgeDBs,
-  node: GraphNode
+  node: GraphNode,
+  sourceId: SourceId
 ): GraphNode {
-  const existingNode = knowledgeDBs.get(node.author)?.nodes.get(node.id);
+  const existingNode = knowledgeDBs.get(sourceId)?.nodes.get(node.id);
   const parent = node.parent || existingNode?.parent;
 
   if (node.parent === parent) {
@@ -444,48 +374,6 @@ export function ensureNodeNativeFields(
   return {
     ...node,
     parent,
-  };
-}
-
-export function getSearchNodes(
-  searchId: ID,
-  foundNodeIDs: List<ID>,
-  myself: SourceId,
-  asRefs: boolean = false
-): { node: GraphNode; childNodes: List<GraphNode> } {
-  const rel = {
-    ...newGraphNode(myself, plainSpans("")),
-    id: searchId as ID,
-    root: searchId as ID,
-  };
-  const uniqueFoundNodeIDs = foundNodeIDs.toSet().toList();
-  const childNodes = uniqueFoundNodeIDs.map(
-    (semanticID): GraphNode =>
-      asRefs
-        ? {
-            ...newGraphNode(rel.author, [linkSpan(semanticID as ID, "")], {
-              root: searchId as ID,
-              parent: searchId as ID,
-            }),
-            updated: rel.updated,
-          }
-        : {
-            children: List<ID>(),
-            id: semanticID,
-            spans: plainSpans(""),
-            parent: searchId as ID,
-            updated: rel.updated,
-            author: rel.author,
-            root: searchId as ID,
-            relevance: undefined,
-          }
-  );
-  return {
-    node: {
-      ...rel,
-      children: childNodes.map((child) => child.id).toList(),
-    },
-    childNodes,
   };
 }
 

@@ -26,7 +26,7 @@ export function planCreateNodesFromMarkdownTrees<T extends GraphPlan>(
   const createDocuments = options.createDocuments ?? true;
   const walkContext: WalkContext = {
     knowledgeDBs: plan.knowledgeDBs,
-    publicKey: LOCAL,
+    sourceId: LOCAL,
     affectedDocuments: plan.affectedDocuments,
   };
   const treesWithDocIds = createDocuments
@@ -76,9 +76,7 @@ export function planCreateNodesFromMarkdown<T extends GraphPlan>(
   }
 
   const fallbackText = "Imported Markdown";
-  const fallbackNode = withDocumentRoot(
-    newGraphNode(LOCAL, plainSpans(fallbackText))
-  );
+  const fallbackNode = withDocumentRoot(newGraphNode(plainSpans(fallbackText)));
   return [
     planUpsertNodes(nextPlan, fallbackNode),
     nodeText(fallbackNode) as ID,

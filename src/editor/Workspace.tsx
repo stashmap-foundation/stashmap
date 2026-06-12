@@ -148,9 +148,12 @@ type BreadcrumbEntry = {
 
 function getBreadcrumbLabel(
   knowledgeDBs: KnowledgeDBs,
-  node: GraphNode
+  node: GraphNode,
+  sourceId: SourceId
 ): string {
-  return getNodeText(node) || getSemanticID(knowledgeDBs, node) || "...";
+  return (
+    getNodeText(node) || getSemanticID(knowledgeDBs, node, sourceId) || "..."
+  );
 }
 
 function createDocumentBreadcrumbEntry(document: Document): BreadcrumbEntry {
@@ -188,9 +191,9 @@ function createNodeBreadcrumbEntry(
 ): BreadcrumbEntry {
   return {
     key: `node:${sourceId}:${node.id}`,
-    label: getBreadcrumbLabel(knowledgeDBs, node),
+    label: getBreadcrumbLabel(knowledgeDBs, node, sourceId),
     target: {
-      author: node.author,
+      author: sourceId,
       sourceId,
       rootNodeId: node.id,
     },
@@ -253,7 +256,12 @@ function Breadcrumbs(): JSX.Element {
   const document =
     paneDocument ??
     (rootNode
-      ? getDocumentForNode(data.knowledgeDBs, data.documents, rootNode)
+      ? getDocumentForNode(
+          data.knowledgeDBs,
+          data.documents,
+          rootNode,
+          pane.sourceId
+        )
       : undefined);
   const nodeEntries: BreadcrumbEntry[] = rootNode
     ? buildAnchoredLineageEntries(data, graph, rootNode, pane.sourceId)
@@ -1391,7 +1399,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
       e.preventDefault();
       const targetRows = getIndependentRows(
         getActionTargetRows(selection, activeRow, rows)
-      );
+      ).filter((row) => row.sourceId === LOCAL);
       const keys = targetRows.map((row) => row.viewKey);
       const focusIndex = computeFocusIndexAfterDeletion(keys, rows);
       const result = planClearTemporarySelection(

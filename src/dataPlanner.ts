@@ -11,11 +11,7 @@ import {
 import { NodeItemMetadata, updateNodeItemMetadata } from "./nodeItemMetadata";
 
 function getWritableNode(plan: GraphPlan, nodeId: ID): GraphNode | undefined {
-  const node = getNode(plan.knowledgeDBs, nodeId, LOCAL);
-  if (!node || node.author !== LOCAL) {
-    return undefined;
-  }
-  return node;
+  return getNode(plan.knowledgeDBs, nodeId, LOCAL);
 }
 
 function getNodeItemIndex(node: GraphNode, itemId: ID): number | undefined {

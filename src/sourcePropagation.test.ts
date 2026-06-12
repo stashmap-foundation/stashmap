@@ -27,7 +27,6 @@ function testNode(
     spans: options.spans ?? plainSpans(text),
     parent: options.parent,
     updated: 1,
-    author,
     root: options.root ?? id,
     relevance: undefined,
   };
@@ -154,7 +153,7 @@ test("reference rows resolve duplicate bare ids in the current source", () => {
     undefined,
     undefined,
     parentNode,
-    parentNode,
+    { ref: { sourceId: SOURCE_B, id: parentNode.id }, node: parentNode },
     undefined
   );
 
@@ -254,9 +253,6 @@ test("incoming ref owner rows keep source identity when owner ids also collide",
   );
 
   expect(incomingRows.rows.map((row) => row.sourceId).toArray()).toEqual([
-    SOURCE_B,
-  ]);
-  expect(incomingRows.rows.map((row) => row.node.author).toArray()).toEqual([
     SOURCE_B,
   ]);
   expect(incomingRows.rows.map((row) => row.node.spans).toArray()).toEqual([

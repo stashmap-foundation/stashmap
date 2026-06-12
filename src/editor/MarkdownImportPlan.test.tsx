@@ -379,7 +379,9 @@ test("planCreateNodesFromMarkdownTrees creates only standalone nodes", () => {
   expect(childNode && nodeText(childNode)).toBe("Child");
   expect(grandchildNode && nodeText(grandchildNode)).toBe("Grandchild");
 
-  expect(parentItemID).toEqual(getSemanticID(plan.knowledgeDBs, parentNode!));
+  expect(parentItemID).toEqual(
+    getSemanticID(plan.knowledgeDBs, parentNode!, LOCAL)
+  );
   expect(
     nodeChildren(plan.knowledgeDBs, parentNode, LOCAL).first()?.id
   ).toEqual(childNode?.id);
@@ -406,7 +408,7 @@ test("Planning multiple markdown files returns top nodes in import order", () =>
       .find(
         (node) =>
           isStandaloneRoot(node) &&
-          getSemanticID(plan.knowledgeDBs, node) === semanticID
+          getSemanticID(plan.knowledgeDBs, node, LOCAL) === semanticID
       );
     return found ? nodeText(found) : undefined;
   });
@@ -429,7 +431,7 @@ test("Planning one markdown file with multiple roots returns top nodes in source
       .find(
         (node) =>
           isStandaloneRoot(node) &&
-          getSemanticID(plan.knowledgeDBs, node) === semanticID
+          getSemanticID(plan.knowledgeDBs, node, LOCAL) === semanticID
       );
     return found ? nodeText(found) : undefined;
   });

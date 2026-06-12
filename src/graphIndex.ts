@@ -235,7 +235,7 @@ function addNodeLinkEntries(
   });
   getAllFileLinks(node).forEach(({ path }) => {
     const resolved = resolveLinkPath(path, sourceFilePath);
-    const key = fileLinkIndexKey(node.author, resolved);
+    const key = fileLinkIndexKey(sourceId, resolved);
     addRefToMap(graphIndex.incomingFileLinks, key, {
       sourceId,
       id: fileLinkSourceID,
@@ -261,7 +261,7 @@ function removeNodeLinkEntries(
   });
   getAllFileLinks(node).forEach(({ path }) => {
     const resolved = resolveLinkPath(path, sourceFilePath);
-    const key = fileLinkIndexKey(node.author, resolved);
+    const key = fileLinkIndexKey(sourceId, resolved);
     removeRefFromMap(graphIndex.incomingFileLinks, key, {
       sourceId,
       id: fileLinkSourceID,
@@ -441,12 +441,9 @@ export function removeNodesFromGraphIndex(
   return nextIndex;
 }
 
-function sourceIdFromDocumentKey(
-  documentKey: string,
-  nodes: ImmutableMap<string, GraphNode>
-): SourceId {
-  const [author] = documentKey.split(":");
-  return author || nodes.valueSeq().first()?.author || LOCAL;
+function sourceIdFromDocumentKey(documentKey: string): SourceId {
+  const [sourceId] = documentKey.split(":");
+  return sourceId || LOCAL;
 }
 
 export function buildGraphIndexFromDocuments(
@@ -456,7 +453,7 @@ export function buildGraphIndexFromDocuments(
 ): GraphIndex {
   return nodesByDocumentKey.entrySeq().reduce((acc, [key, nodes]) => {
     const sourceId =
-      sourceIdByDocumentKey.get(key) ?? sourceIdFromDocumentKey(key, nodes);
+      sourceIdByDocumentKey.get(key) ?? sourceIdFromDocumentKey(key);
     return addNodesToGraphIndex(
       acc,
       nodes,

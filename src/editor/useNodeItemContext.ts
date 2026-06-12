@@ -99,6 +99,7 @@ export function useNodeItemContext(): NodeItemContext {
         {
           node: row.node,
           rowID,
+          sourceId: row.sourceId,
           viewPath,
           parentNode: row.parentNode,
           parentViewPath: row.parentViewPath,

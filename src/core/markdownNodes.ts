@@ -9,17 +9,21 @@ import { fileLinkSpan, linkSpan, nodeText } from "./nodeSpans";
 
 export type WalkContext = {
   knowledgeDBs: KnowledgeDBs;
-  publicKey: SourceId;
+  sourceId: SourceId;
   affectedDocuments: ImmutableSet<string>;
   updated?: number;
 };
 
 function walkUpsertNode(ctx: WalkContext, node: GraphNode): WalkContext {
-  const db = ctx.knowledgeDBs.get(ctx.publicKey, newDB());
-  const normalizedNode = ensureNodeNativeFields(ctx.knowledgeDBs, node);
+  const db = ctx.knowledgeDBs.get(ctx.sourceId, newDB());
+  const normalizedNode = ensureNodeNativeFields(
+    ctx.knowledgeDBs,
+    node,
+    ctx.sourceId
+  );
   return {
     ...ctx,
-    knowledgeDBs: ctx.knowledgeDBs.set(ctx.publicKey, {
+    knowledgeDBs: ctx.knowledgeDBs.set(ctx.sourceId, {
       ...db,
       nodes: db.nodes.set(normalizedNode.id, normalizedNode),
     }),
@@ -36,9 +40,7 @@ function assertUnusedTreeNodeId(
   if (!treeNode.uuid) {
     return;
   }
-  const existing = ctx.knowledgeDBs
-    .get(ctx.publicKey)
-    ?.nodes.get(treeNode.uuid);
+  const existing = ctx.knowledgeDBs.get(ctx.sourceId)?.nodes.get(treeNode.uuid);
   if (existing) {
     throw new Error(`Workspace contains duplicate node ids: ${treeNode.uuid}`);
   }
@@ -64,10 +66,10 @@ function newMarkdownGraphNode(
   ctx: WalkContext,
   treeNode: MarkdownTreeNode,
   spans: InlineSpan[],
-  options: Parameters<typeof newGraphNode>[2],
+  options: Parameters<typeof newGraphNode>[1],
   mode: IdMaterializationMode
 ): GraphNode {
-  const node = newGraphNode(ctx.publicKey, spans, {
+  const node = newGraphNode(spans, {
     ...options,
     uuid: treeNode.uuid,
   });
@@ -197,13 +199,13 @@ export type MaterializeResult = {
 
 function materializeTreeWithMode(
   trees: MarkdownTreeNode[],
-  author: SourceId,
+  sourceId: SourceId,
   options: MaterializeOptions,
   mode: IdMaterializationMode
 ): MaterializeResult {
   const baseContext: WalkContext = options.context ?? {
     knowledgeDBs: ImmutableMap<SourceId, KnowledgeData>(),
-    publicKey: author,
+    sourceId,
     affectedDocuments: ImmutableSet<string>(),
   };
   const ctx: WalkContext =
@@ -237,16 +239,16 @@ function materializeTreeWithMode(
 
 export function materializeTree(
   trees: MarkdownTreeNode[],
-  author: SourceId,
+  sourceId: SourceId,
   options: MaterializeOptions = {}
 ): MaterializeResult {
-  return materializeTreeWithMode(trees, author, options, "default");
+  return materializeTreeWithMode(trees, sourceId, options, "default");
 }
 
 export function materializeTreePreservingExplicitIds(
   trees: MarkdownTreeNode[],
-  author: SourceId,
+  sourceId: SourceId,
   options: MaterializeOptions
 ): MaterializeResult {
-  return materializeTreeWithMode(trees, author, options, "preserve-explicit");
+  return materializeTreeWithMode(trees, sourceId, options, "preserve-explicit");
 }

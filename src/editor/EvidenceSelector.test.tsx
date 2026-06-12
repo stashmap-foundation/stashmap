@@ -25,7 +25,6 @@ function makeItem(
     id,
     spans: plainSpans(""),
     updated: Date.now(),
-    author,
     root,
     relevance,
     ...(argument !== undefined ? { argument } : {}),

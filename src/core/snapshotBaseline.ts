@@ -1,5 +1,6 @@
 import { List, Map as ImmutableMap } from "immutable";
 import { getChildNodes } from "./connections";
+import { ResolvedNode } from "./graphLookup";
 
 export type VersionDiff = {
   readonly node: GraphNode;
@@ -48,8 +49,9 @@ export function computeVersionDiff(
   snapshotNodes: SnapshotNodes,
   knowledgeDBs: KnowledgeDBs,
   currentNode: GraphNode,
-  versionNode: GraphNode
+  version: ResolvedNode
 ): VersionDiff {
+  const versionNode = version.node;
   const snapshotChildren = findSnapshotBaseline(
     snapshotNodes,
     currentNode,
@@ -61,7 +63,7 @@ export function computeVersionDiff(
   const versionChildren = getChildNodes(
     knowledgeDBs,
     versionNode,
-    versionNode.author
+    version.ref.sourceId
   );
   const snapshotChildIDs = snapshotChildren.map((c) => c.id).toSet();
   const versionMatchKeys = versionChildren.map(originKey).toSet();

@@ -233,7 +233,7 @@ function parsedWithSource(
 ): ParsedDocument {
   return {
     document: { ...parsed.document, author: sourceId },
-    nodes: parsed.nodes.map((node) => ({ ...node, author: sourceId })),
+    nodes: parsed.nodes,
   };
 }
 

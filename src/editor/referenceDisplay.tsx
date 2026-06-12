@@ -66,7 +66,7 @@ export function ReferenceDisplay({
     incomingRelevance?: Relevance;
     incomingArgument?: Argument;
     deleted?: boolean;
-    author: SourceId;
+    sourceId: SourceId;
   };
 }): JSX.Element {
   const parts = buildReferenceParts({
@@ -77,7 +77,7 @@ export function ReferenceDisplay({
     incomingArgument: reference.incomingArgument,
     deleted: reference.deleted,
   });
-  const isOtherUser = reference.author !== LOCAL;
+  const isOtherUser = reference.sourceId !== LOCAL;
   const className = reference.deleted
     ? "break-word deleted-reference"
     : "break-word";

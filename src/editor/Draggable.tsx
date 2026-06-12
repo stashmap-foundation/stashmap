@@ -33,13 +33,14 @@ import { usePaneIndex } from "../SplitPanesContext";
 
 function nodePathText(
   data: Data,
-  node: GraphNode | undefined
+  node: GraphNode | undefined,
+  sourceId: SourceId
 ): string | undefined {
   if (!node) {
     return undefined;
   }
-  return getNodeContext(data.knowledgeDBs, node)
-    .push(getSemanticID(data.knowledgeDBs, node))
+  return getNodeContext(data.knowledgeDBs, node, sourceId)
+    .push(getSemanticID(data.knowledgeDBs, node, sourceId))
     .join(" / ");
 }
 
@@ -120,7 +121,8 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
         const blockLink =
           virtualType === "incoming"
             ? undefined
-            : getBlockLink(currentRow) || getBlockLink(dragNode);
+            : getBlockLink(currentRow, row.sourceId) ||
+              getBlockLink(dragNode, row.sourceId);
         const insertTarget = linkToInsertTarget(data, blockLink);
         return {
           row,
@@ -130,7 +132,7 @@ const Draggable = React.forwardRef<HTMLDivElement, DraggableProps>(
           virtualType,
           isCopyDrag: copyDrag || undefined,
           nodeId: dragNodeId,
-          linkText: nodePathText(data, dragNode),
+          linkText: nodePathText(data, dragNode, row.sourceId),
           insertTarget,
         };
       },
@@ -237,7 +239,7 @@ function DraggableSuggestion({
       const draggedRows = selection.has(viewKey)
         ? rows.filter((candidate) => selection.has(candidate.viewKey)).toArray()
         : [row];
-      const blockLink = getBlockLink(currentRow);
+      const blockLink = getBlockLink(currentRow, row.sourceId);
       return {
         row,
         draggedRows,

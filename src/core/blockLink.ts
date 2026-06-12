@@ -8,12 +8,16 @@ import {
 } from "./nodeSpans";
 import { Link } from "./link";
 
-export function getBlockLink(node: GraphNode | undefined): Link | undefined {
+export function getBlockLink(
+  node: GraphNode | undefined,
+  sourceId: SourceId
+): Link | undefined {
   const targetID = getBlockLinkTarget(node);
   if (node && isBlockLink(node) && targetID) {
     return {
       kind: "node",
       source: node,
+      sourceId,
       targetID,
       text: getBlockLinkText(node) ?? "",
     };
@@ -24,6 +28,7 @@ export function getBlockLink(node: GraphNode | undefined): Link | undefined {
     return {
       kind: "document",
       source: node,
+      sourceId,
       path,
       text: getBlockFileLinkText(node) ?? "",
     };

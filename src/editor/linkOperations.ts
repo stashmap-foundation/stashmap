@@ -22,8 +22,12 @@ export type EditorNavigationTarget = {
   scrollToId?: string;
 };
 
-function sourceFilePath(data: Data, source: GraphNode): string | undefined {
-  return getDocumentForNode(data.knowledgeDBs, data.documents, source)
+function sourceFilePath(
+  data: Data,
+  source: GraphNode,
+  sourceId: SourceId
+): string | undefined {
+  return getDocumentForNode(data.knowledgeDBs, data.documents, source, sourceId)
     ?.filePath;
 }
 
@@ -33,11 +37,11 @@ function documentTarget(
 ): Document | undefined {
   const resolvedPath = resolveLinkPath(
     link.path,
-    sourceFilePath(data, link.source)
+    sourceFilePath(data, link.source, link.sourceId)
   );
   return (
     data.documentByFilePath.get(resolvedPath) ||
-    data.documents.get(documentKeyOf(link.source.author, link.path))
+    data.documents.get(documentKeyOf(link.sourceId, link.path))
   );
 }
 
@@ -60,7 +64,7 @@ function nodeTarget(
   mode: LinkNavigationMode
 ): EditorNavigationTarget | undefined {
   const graph = graphLookupFromData(data);
-  const source = sourceResolvedNode(graph, link, link.source.author);
+  const source = sourceResolvedNode(graph, link, link.sourceId);
   const target =
     mode === "target" ? source : resolveBlockLinkTarget(graph, source);
   if (!target) {
@@ -74,7 +78,7 @@ function nodeTarget(
     : undefined;
   const targetRoot = mode === "target" ? target : parent ?? target;
   return {
-    author: targetRoot.node.author,
+    author: targetRoot.ref.sourceId,
     sourceId: targetRoot.ref.sourceId,
     rootNodeId: targetRoot.node.id,
     scrollToId:

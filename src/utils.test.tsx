@@ -456,7 +456,7 @@ export async function forkOwnRoot(
   }
   const knowledgeDBs = Map<SourceId, KnowledgeData>([[LOCAL, knowledgeDB]]);
   const plan = createPlan({ ...utils, knowledgeDBs });
-  const [forkPlan, mapping] = planCopyDescendantNodes(plan, rootNode);
+  const [forkPlan, mapping] = planCopyDescendantNodes(plan, LOCAL, rootNode);
   const forkRootID = mapping.get(rootNode.id);
   const forkRoot = forkRootID
     ? forkPlan.knowledgeDBs.get(LOCAL)?.nodes.get(forkRootID)

@@ -30,9 +30,10 @@ type SerializeResult = {
 
 function getSerializableNodeText(
   knowledgeDBs: KnowledgeDBs,
-  node: GraphNode
+  node: GraphNode,
+  sourceId: SourceId
 ): string {
-  return getNodeText(node) || getSemanticID(knowledgeDBs, node);
+  return getNodeText(node) || getSemanticID(knowledgeDBs, node, sourceId);
 }
 
 type SerializeReduceState = SerializeResult & {
@@ -62,7 +63,7 @@ function getSerializableNodeBody(
     const linkText = getBlockFileLinkText(node) ?? "";
     return linkPath ? `[${linkText}](${linkPath})` : undefined;
   }
-  return getSerializableNodeText(knowledgeDBs, node);
+  return getSerializableNodeText(knowledgeDBs, node, author);
 }
 
 function getSerializableNodeAttrs(
@@ -188,24 +189,6 @@ function serializeNodeSequence(
     { ...current, orderedCount: 0 }
   );
   return { lines: result.lines };
-}
-
-export function renderRootedMarkdown(
-  knowledgeDBs: KnowledgeDBs,
-  rootNode: GraphNode,
-  options?: {
-    snapshotId?: string;
-  }
-): string {
-  const serialized = serializeNodeSequence(
-    knowledgeDBs,
-    rootNode.author,
-    [rootNode],
-    "",
-    { lines: [] },
-    options
-  );
-  return `${addBlankLinesAroundHeadings(serialized.lines).join("\n")}\n`;
 }
 
 export function renderDocumentMarkdown(

@@ -76,14 +76,13 @@ export function getDocumentByIdOrFilePath(
 export function getDocumentForNode(
   knowledgeDBs: KnowledgeDBs,
   documents: ImmutableMap<string, Document>,
-  node: GraphNode
+  node: GraphNode,
+  sourceId: SourceId
 ): Document | undefined {
   const rootNode =
-    node.id === node.root
-      ? node
-      : getNode(knowledgeDBs, node.root, node.author);
+    node.id === node.root ? node : getNode(knowledgeDBs, node.root, sourceId);
   const docId = node.docId ?? rootNode?.docId;
-  return docId ? documents.get(documentKeyOf(node.author, docId)) : undefined;
+  return docId ? documents.get(documentKeyOf(sourceId, docId)) : undefined;
 }
 
 function basenameWithoutMarkdownExtension(path: string): string {
@@ -110,10 +109,13 @@ export function documentLinkPath(document: Document): string {
   return document.filePath ?? document.docId;
 }
 
-export function createDocumentFromRootNode(rootNode: GraphNode): Document {
+export function createDocumentFromRootNode(
+  rootNode: GraphNode,
+  sourceId: SourceId
+): Document {
   const docId = rootNode.docId ?? rootNode.id;
   return {
-    author: rootNode.author,
+    author: sourceId,
     docId,
     topNodeShortIds: [rootNode.id],
     updatedMs: rootNode.updated,

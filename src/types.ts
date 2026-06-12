@@ -212,7 +212,6 @@ declare global {
           targetContext: List<ID>;
           contextLabels: string[];
           targetLabel: string;
-          author: SourceId;
           incomingRelevance?: Relevance;
           incomingArgument?: Argument;
           displayAs?: "bidirectional" | "incoming";
@@ -261,7 +260,6 @@ declare global {
     systemRole?: RootSystemRole;
     snapshotId?: string;
     updated: number;
-    author: SourceId;
     basedOn?: ID;
     root: ID;
     relevance: Relevance;

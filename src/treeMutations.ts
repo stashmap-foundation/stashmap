@@ -41,10 +41,6 @@ export function planDisconnectFromParent(
   childID: ID,
   preserveDescendants?: boolean
 ): Plan {
-  if (parentNode.author !== LOCAL) {
-    return plan;
-  }
-
   const updatedNodesPlan = planRemoveNodeItemById(
     plan,
     parentNode.id,
@@ -76,10 +72,6 @@ export function planDeleteNode(
   }
 
   if (isSearchId(rowID)) {
-    return plan;
-  }
-
-  if (node.author !== LOCAL) {
     return plan;
   }
 

@@ -149,9 +149,11 @@ export function getViewForRowID(data: Data, path: ViewPath, rowID: ID): View {
 
 export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
   const { virtualType } = row;
-  const { author: effectiveAuthor } = row.node;
+  const effectiveAuthor = row.sourceId;
   const blockLink =
-    virtualType === "incoming" ? undefined : getBlockLink(row.node);
+    virtualType === "incoming"
+      ? undefined
+      : getBlockLink(row.node, row.sourceId);
   const blockLinkTarget = blockLink
     ? linkToNavigationTarget(
         data,
@@ -189,7 +191,7 @@ export function buildPaneTarget(data: Data, row: Row): EditorNavigationTarget {
   })();
   if (refInfo) {
     return {
-      author: refInfo.author,
+      author: refInfo.sourceId,
       sourceId: refInfo.sourceId,
       rootNodeId: refInfo.rootNodeId,
       scrollToId: refInfo.scrollToId,
@@ -258,11 +260,11 @@ export function useCurrentNode(): GraphNode {
 
 export function useIsViewingOtherUserContent(): boolean {
   const { user } = useData();
-  const { node } = useRow();
+  const row = useRow();
   if (user.publicKey === UNAUTHENTICATED_USER_PK) {
     return true;
   }
-  return node.author !== LOCAL;
+  return row.sourceId !== LOCAL;
 }
 
 export function useNodeIndex(): number | undefined {

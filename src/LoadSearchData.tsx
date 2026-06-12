@@ -42,7 +42,7 @@ function SearchCrefBuilder({
   });
 
   const searchNodeBase = {
-    ...newGraphNode(LOCAL, plainSpans("")),
+    ...newGraphNode(plainSpans("")),
     id: searchId as ID,
     root: searchId as ID,
   };
@@ -50,20 +50,21 @@ function SearchCrefBuilder({
     .toSet()
     .toList()
     .map((nodeID): GraphNode => {
-      const targetNode = lookupNode(graph, nodeID as ID, LOCAL)?.node;
+      const target = lookupNode(graph, nodeID as ID, LOCAL);
+      const targetNode = target?.node;
       const targetDocument =
-        targetNode?.docId && !targetNode.parent
-          ? documents.get(documentKeyOf(targetNode.author, targetNode.docId))
+        target && targetNode?.docId && !targetNode.parent
+          ? documents.get(documentKeyOf(target.ref.sourceId, targetNode.docId))
           : undefined;
       const primaryTargetDocument =
+        target &&
         targetNode &&
-        targetNode.author === LOCAL &&
+        target.ref.sourceId === LOCAL &&
         targetDocument?.topNodeShortIds[0] === targetNode.id
           ? targetDocument
           : undefined;
       const node = primaryTargetDocument
         ? newGraphNode(
-            LOCAL,
             [
               fileLinkSpan(
                 documentLinkPath(primaryTargetDocument),
@@ -75,7 +76,7 @@ function SearchCrefBuilder({
               parent: searchId as ID,
             }
           )
-        : newGraphNode(LOCAL, [linkSpan(nodeID as ID, "")], {
+        : newGraphNode([linkSpan(nodeID as ID, "")], {
             root: searchId as ID,
             parent: searchId as ID,
           });

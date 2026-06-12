@@ -67,7 +67,6 @@ type VirtualFooterInput = {
   parentRow?: Row;
   parentID?: ID;
   parentSourceId: SourceId;
-  parentAuthor: SourceId;
   parentRoot: ID;
   parentUpdated: number;
   incomingCrefs: List<NodeRef>;
@@ -84,13 +83,14 @@ type VirtualFooterInput = {
 
 function nodePathLabel(
   knowledgeDBs: KnowledgeDBs,
-  node: GraphNode | undefined
+  resolved: ResolvedNode | undefined
 ): string | undefined {
-  if (!node) {
+  if (!resolved) {
     return undefined;
   }
-  return getNodeContext(knowledgeDBs, node)
-    .push(getSemanticID(knowledgeDBs, node))
+  const { sourceId } = resolved.ref;
+  return getNodeContext(knowledgeDBs, resolved.node, sourceId)
+    .push(getSemanticID(knowledgeDBs, resolved.node, sourceId))
     .join(" / ");
 }
 
@@ -135,13 +135,17 @@ function createRow(
             )
           : undefined;
         const topNodeID = document?.topNodeShortIds[0];
-        const documentRootNode =
+        const documentRoot =
           topNodeID && document
             ? getNodeInSource(graph, {
                 sourceId: document.author,
                 id: topNodeID,
-              })?.node
+              })
             : undefined;
+        const containing =
+          parentNode && parentRef
+            ? { ref: parentRef, node: parentNode }
+            : documentRoot;
         return buildReferenceItem(
           graph,
           node.id,
@@ -150,7 +154,7 @@ function createRow(
           rowVirtualType,
           versionMeta,
           parentNode,
-          parentNode ?? documentRootNode,
+          containing,
           pane.typeFilters
         );
       })()
@@ -216,7 +220,6 @@ function emptyRootNode(): GraphNode {
     id: EMPTY_SEMANTIC_ID,
     spans: plainSpans(""),
     updated: Date.now(),
-    author: LOCAL,
     root: EMPTY_SEMANTIC_ID,
     relevance: undefined,
   };
@@ -270,7 +273,7 @@ function resolveRowForPath(
     graph,
     viewPath,
     node,
-    resolvedParentRow?.sourceId ?? resolved?.ref.sourceId ?? node.author,
+    resolvedParentRow?.sourceId ?? resolved?.ref.sourceId ?? paneSourceId,
     resolvedParentRow,
     resolvedParentRow?.node,
     resolvedParentRow?.ref,
@@ -303,7 +306,7 @@ function createChildRow(
           graph,
           viewPath,
           emptyNode,
-          emptyNode.author,
+          graph.localSourceId,
           parentRow,
           parentNode,
           parentRef,
@@ -342,47 +345,50 @@ function createVirtualRowNode(
   input: VirtualFooterInput,
   rowRef: NodeRef,
   virtualType: Row["virtualType"]
-): GraphNode {
+): { node: GraphNode; sourceId: SourceId } {
   const rowID = rowRef.id;
-  const sourceRowNode =
+  const sourceRow =
     virtualType === "suggestion"
-      ? lookupNode(graph, rowID, graph.localSourceId)?.node
+      ? lookupNode(graph, rowID, graph.localSourceId)
       : undefined;
-  const incomingRowNode =
-    virtualType === "incoming"
-      ? getNodeInSource(graph, rowRef)?.node
-      : undefined;
-  const versionRowNode =
+  const incomingRow =
+    virtualType === "incoming" ? getNodeInSource(graph, rowRef) : undefined;
+  const versionRow =
     virtualType === "version"
-      ? lookupNode(graph, rowID, graph.localSourceId)?.node
+      ? lookupNode(graph, rowID, graph.localSourceId)
       : undefined;
+  const sourceRowNode = sourceRow?.node;
+  const incomingRowNode = incomingRow?.node;
   const suggestionTargetID = getBlockLinkTarget(sourceRowNode);
   const targetID =
     virtualType === "incoming" || virtualType === "version"
       ? (rowID as ID)
       : suggestionTargetID;
-  const sourceNode = sourceRowNode ?? incomingRowNode ?? versionRowNode;
+  const resolvedSource = sourceRow ?? incomingRow ?? versionRow;
+  const sourceNode = resolvedSource?.node;
   return {
-    children: targetID ? List<ID>() : sourceNode?.children ?? List<ID>(),
-    id: (targetID || sourceNode?.id || rowID) as ID,
-    spans: targetID
-      ? [
-          linkSpan(
-            targetID,
-            getBlockLinkText(sourceRowNode) ??
-              getBlockFileLinkText(incomingRowNode) ??
-              nodePathLabel(data.knowledgeDBs, incomingRowNode) ??
-              nodePathLabel(data.knowledgeDBs, versionRowNode) ??
-              ""
-          ),
-        ]
-      : sourceNode?.spans ?? plainSpans(""),
-    parent: input.parentID,
-    updated: sourceNode?.updated ?? input.parentUpdated,
-    author: sourceNode?.author ?? input.parentAuthor,
-    root: sourceNode?.root ?? input.parentRoot,
-    relevance: sourceNode?.relevance,
-    argument: sourceNode?.argument,
+    node: {
+      children: targetID ? List<ID>() : sourceNode?.children ?? List<ID>(),
+      id: (targetID || sourceNode?.id || rowID) as ID,
+      spans: targetID
+        ? [
+            linkSpan(
+              targetID,
+              getBlockLinkText(sourceRowNode) ??
+                getBlockFileLinkText(incomingRowNode) ??
+                nodePathLabel(data.knowledgeDBs, incomingRow) ??
+                nodePathLabel(data.knowledgeDBs, versionRow) ??
+                ""
+            ),
+          ]
+        : sourceNode?.spans ?? plainSpans(""),
+      parent: input.parentID,
+      updated: sourceNode?.updated ?? input.parentUpdated,
+      root: sourceNode?.root ?? input.parentRoot,
+      relevance: sourceNode?.relevance,
+      argument: sourceNode?.argument,
+    },
+    sourceId: resolvedSource?.ref.sourceId ?? input.parentSourceId,
   };
 }
 
@@ -399,7 +405,13 @@ function createVirtualRow(
   isFirstVirtual: boolean
 ): Row {
   const rowID = rowRef.id;
-  const node = createVirtualRowNode(data, graph, input, rowRef, virtualType);
+  const { node, sourceId } = createVirtualRowNode(
+    data,
+    graph,
+    input,
+    rowRef,
+    virtualType
+  );
   const parentPath =
     input.parentID === undefined
       ? input.parentPath
@@ -418,7 +430,7 @@ function createVirtualRow(
     graph,
     viewPath,
     node,
-    node.author,
+    sourceId,
     input.parentRow,
     input.parentRow?.node,
     parentRef,
@@ -558,12 +570,7 @@ function getChildrenForRegularNode(
   }
 
   const containingNodeID = parentRow.parentNode?.id;
-  const effectiveAuthor = nodes.author;
-  const visibleAuthors = ImmutableSet<SourceId>([
-    LOCAL,
-    author,
-    effectiveAuthor,
-  ]);
+  const visibleAuthors = ImmutableSet<SourceId>([LOCAL, author, nodeSourceId]);
 
   const incomingCrefs = getIncomingCrefsForNode(
     graph,
@@ -571,9 +578,9 @@ function getChildrenForRegularNode(
     containingNodeID,
     nodes.id,
     author,
+    nodeSourceId,
     allChildNodes,
     undefined,
-    nodes.author,
     data.documents
   );
 
@@ -581,12 +588,12 @@ function getChildrenForRegularNode(
     ? incomingCrefs
     : List<NodeRef>();
 
-  const isOwnContent = effectiveAuthor === LOCAL;
+  const isOwnContent = nodeSourceId === LOCAL;
   const { suggestions: diffItems, versionMetas } = getAlternativeFooterData(
     graph,
     visibleAuthors,
     activeFilters,
-    nodes,
+    directNode,
     isOwnContent,
     data.snapshotNodes
   );
@@ -596,7 +603,6 @@ function getChildrenForRegularNode(
     parentRow,
     parentID: nodes.id,
     parentSourceId: nodeSourceId,
-    parentAuthor: nodes.author ?? LOCAL,
     parentRoot: nodes.root ?? rootNode ?? nodes.id,
     parentUpdated: nodes.updated ?? Date.now(),
     incomingCrefs: visibleIncomingCrefs,
@@ -782,9 +788,9 @@ export function getNodesInDocument(
     undefined,
     undefined,
     document.author,
+    document.author,
     topNodes,
     document.filePath,
-    document.author,
     data.documents
   );
 
@@ -794,7 +800,6 @@ export function getNodesInDocument(
     {
       parentPath: documentRootPath,
       parentSourceId: document.author,
-      parentAuthor: document.author,
       parentRoot: topNodes.first()?.root ?? EMPTY_SEMANTIC_ID,
       parentUpdated: document.updatedMs,
       incomingCrefs,

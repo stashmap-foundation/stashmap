@@ -164,16 +164,18 @@ function logNodeNotFoundDebug({
   const userNode = getNode(data.knowledgeDBs, rowID, LOCAL);
   const paneNode = getNode(data.knowledgeDBs, rowID, pane?.author);
   const rootNode = getNode(data.knowledgeDBs, pane?.rootNodeId, pane?.author);
-  const nodeSummary = (node: typeof userNode): Record<string, unknown> | null =>
+  const nodeSummary = (
+    node: typeof userNode,
+    sourceId: SourceId
+  ): Record<string, unknown> | null =>
     node
       ? {
           id: node.id,
-          author: node.author,
           root: node.root,
           parent: node.parent,
           text: getNodeText(node),
-          semanticID: getSemanticID(data.knowledgeDBs, node),
-          context: getNodeContext(data.knowledgeDBs, node).toArray(),
+          semanticID: getSemanticID(data.knowledgeDBs, node, sourceId),
+          context: getNodeContext(data.knowledgeDBs, node, sourceId).toArray(),
           children: node.children.toArray(),
         }
       : null;
@@ -195,9 +197,9 @@ function logNodeNotFoundDebug({
     totalNodeCount,
     dbs,
     documents: data.documents.size,
-    userNode: nodeSummary(userNode),
-    paneNode: nodeSummary(paneNode),
-    rootNode: nodeSummary(rootNode),
+    userNode: nodeSummary(userNode, LOCAL),
+    paneNode: nodeSummary(paneNode, pane?.author),
+    rootNode: nodeSummary(rootNode, pane?.author),
     matchingNodes,
   });
 }
@@ -206,12 +208,12 @@ function VersionContent({
   reference,
 }: {
   reference: {
-    author: SourceId;
+    sourceId: SourceId;
     versionMeta?: Row["versionMeta"];
   };
 }): JSX.Element {
   const meta = reference.versionMeta;
-  const isOtherUser = reference.author !== LOCAL;
+  const isOtherUser = reference.sourceId !== LOCAL;
   const dateStr = meta ? new Date(meta.updated).toLocaleString() : "";
   return (
     <span className="break-word" data-testid="reference-row">
@@ -243,7 +245,7 @@ function ReferenceContent({
     text: string;
     targetLabel: string;
     contextLabels: string[];
-    author: SourceId;
+    sourceId: SourceId;
     displayAs?: "bidirectional" | "incoming";
     incomingRelevance?: Relevance;
     incomingArgument?: Argument;
@@ -661,10 +663,12 @@ function NodeAutoLink({
   const row = useRow();
   const displayText = useDisplayText();
   const navigatePane = useNavigatePane();
-  const { author: effectiveAuthor } = row.node;
+  const effectiveAuthor = row.sourceId;
   const { virtualType } = row;
   const blockLink =
-    virtualType === "incoming" ? undefined : getBlockLink(row.node);
+    virtualType === "incoming"
+      ? undefined
+      : getBlockLink(row.node, row.sourceId);
   if (blockLink) {
     const href = linkToHref(
       data,
@@ -831,7 +835,7 @@ export function Node({
   const currentNode = useCurrentNode();
   const isViewingOtherUser = useIsViewingOtherUserContent();
   const node = getCurrentReferenceForRow(data, row);
-  const isOtherUser = (node && node.author !== LOCAL) || isViewingOtherUser;
+  const isOtherUser = (node && node.sourceId !== LOCAL) || isViewingOtherUser;
 
   const isVersion = virtualType === "version" || !!node?.versionMeta;
   const isSuggestionWithChildren =

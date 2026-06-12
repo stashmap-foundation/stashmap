@@ -81,9 +81,6 @@ export function planUpdateNodeText(
   currentNode: GraphNode,
   text: string
 ): Plan {
-  if (currentNode.author !== LOCAL) {
-    return plan;
-  }
   if (nodeText(currentNode) === text) {
     return plan;
   }
@@ -325,8 +322,8 @@ export function planForkPane(
 ): Plan {
   const [planWithNodes, nodesIdMapping] = planCopyDescendantNodes(
     plan,
-    sourceNode,
-    (node) => node.author === pane.author
+    pane.sourceId,
+    sourceNode
   );
   const updatedViews = updateViewsWithNodesMapping(
     planWithNodes.views,
@@ -386,6 +383,7 @@ function copyDeepNodeViewState(
 
 export function planDeepCopyNode(
   plan: Plan,
+  sourceId: SourceId,
   resolvedNode: GraphNode,
   targetParentNode: GraphNode,
   sourceViewPath: ViewPath,
@@ -396,8 +394,8 @@ export function planDeepCopyNode(
 ): Plan {
   const [planWithCopiedNodes, mapping] = planCopyDescendantNodes(
     plan,
+    sourceId,
     resolvedNode,
-    undefined,
     targetParentNode.id,
     targetParentNode.root
   );
@@ -471,7 +469,7 @@ function planCreateNoteAtRoot(
 ): SaveNodeResult {
   const [planWithSeed, createdSeed] = planCreateNode(plan, text);
   const createdNode = withDocumentRoot(
-    newGraphNode(LOCAL, plainSpans(createdSeed.text))
+    newGraphNode(plainSpans(createdSeed.text))
   );
   const planWithNode = planUpsertNodes(planWithSeed, createdNode);
 
@@ -616,34 +614,38 @@ function resolveBasedOnNode(
   knowledgeDBs: KnowledgeDBs,
   nodeID: ID,
   myself: SourceId
-): GraphNode | undefined {
+): { node: GraphNode; sourceId: SourceId } | undefined {
   const own = getNode(knowledgeDBs, nodeID, myself);
   if (own) {
-    return own;
+    return { node: own, sourceId: myself };
   }
   return knowledgeDBs
     .keySeq()
     .sort()
-    .map((author) => getNode(knowledgeDBs, nodeID, author))
-    .find((node) => node !== undefined);
+    .map((sourceId) => {
+      const node = getNode(knowledgeDBs, nodeID, sourceId);
+      return node ? { node, sourceId } : undefined;
+    })
+    .find((resolved) => resolved !== undefined);
 }
 
 function getSnapshotSourceRoot(
   knowledgeDBs: KnowledgeDBs,
   snapshotAnchorNode: GraphNode | undefined,
   fallbackAuthor: SourceId
-): GraphNode | undefined {
+): { node: GraphNode; sourceId: SourceId } | undefined {
   if (!snapshotAnchorNode?.basedOn) {
     return undefined;
   }
-  const sourceNode = resolveBasedOnNode(
+  const source = resolveBasedOnNode(
     knowledgeDBs,
     snapshotAnchorNode.basedOn,
     fallbackAuthor
   );
-  return sourceNode
-    ? getNode(knowledgeDBs, sourceNode.root, sourceNode.author)
+  const root = source
+    ? getNode(knowledgeDBs, source.node.root, source.sourceId)
     : undefined;
+  return root && source ? { node: root, sourceId: source.sourceId } : undefined;
 }
 
 export function buildDocumentEvents(
@@ -668,9 +670,12 @@ export function buildDocumentEvents(
       snapshotAnchorNode,
       LOCAL
     );
-    const sourceDocument = snapshotSourceRoot?.docId
+    const sourceDocument = snapshotSourceRoot?.node.docId
       ? plan.documents.get(
-          documentKeyOf(snapshotSourceRoot.author, snapshotSourceRoot.docId)
+          documentKeyOf(
+            snapshotSourceRoot.sourceId,
+            snapshotSourceRoot.node.docId
+          )
         )
       : undefined;
     const snapshotEvent = sourceDocument
@@ -791,9 +796,6 @@ export function planSetEmptyNodePosition(
   paneIndex: number,
   insertIndex: number
 ): Plan {
-  if (parentNode.author !== LOCAL) {
-    return plan;
-  }
   const planWithExpanded = planExpandNode(plan, parentView, parentViewPath);
 
   return {
@@ -808,7 +810,6 @@ export function planSetEmptyNodePosition(
         spans: plainSpans(""),
         parent: parentNode.id,
         updated: Date.now(),
-        author: LOCAL,
         root: parentNode.root,
         relevance: undefined,
       },

@@ -92,18 +92,18 @@ function contextsSemanticallyMatch(
 function getSemanticCandidates(
   graph: GraphLookup,
   semanticKey: string
-): List<GraphNode> {
+): List<ResolvedNode> {
   const refs = graph.graphIndex.semanticRefs.get(semanticKey);
   const nodes = refs
-    ? refs.map((ref) => getNodeInSource(graph, ref)?.node)
-    : [...(graph.graphIndex.semantic.get(semanticKey) ?? [])].map(
-        (nodeID) => lookupNode(graph, nodeID, graph.localSourceId)?.node
+    ? refs.map((ref) => getNodeInSource(graph, ref))
+    : [...(graph.graphIndex.semantic.get(semanticKey) ?? [])].map((nodeID) =>
+        lookupNode(graph, nodeID, graph.localSourceId)
       );
 
   return List(
     nodes
-      .filter((node): node is GraphNode => node !== undefined)
-      .sort((left, right) => right.updated - left.updated)
+      .filter((resolved): resolved is ResolvedNode => resolved !== undefined)
+      .sort((left, right) => right.node.updated - left.node.updated)
   );
 }
 
@@ -117,19 +117,24 @@ export function findRefsToNode(
   const { knowledgeDBs } = graph;
   const targetSemanticKey = semanticID;
   const resolvedRefs = getSemanticCandidates(graph, targetSemanticKey)
-    .filter((node) => !isSearchId(getSemanticID(knowledgeDBs, node)))
     .filter(
-      (node) =>
-        !getNodeContext(knowledgeDBs, node).some((id) => isSearchId(id as ID))
+      ({ node, ref }) =>
+        !isSearchId(getSemanticID(knowledgeDBs, node, ref.sourceId))
     )
-    .map((node) => ({
+    .filter(
+      ({ node, ref }) =>
+        !getNodeContext(knowledgeDBs, node, ref.sourceId).some((id) =>
+          isSearchId(id as ID)
+        )
+    )
+    .map(({ node, ref }) => ({
       ref: {
         nodeID: node.id,
-        sourceId: node.author,
-        context: getNodeContext(knowledgeDBs, node),
+        sourceId: ref.sourceId,
+        context: getNodeContext(knowledgeDBs, node, ref.sourceId),
         updated: node.updated,
       },
-      author: node.author,
+      author: ref.sourceId,
       root: node.root,
     }))
     .toList();
@@ -169,12 +174,15 @@ function contextKeyForCref(
 ): string | undefined {
   const targetNode = resolveNode(
     knowledgeDBs,
-    getNode(knowledgeDBs, crefID, effectiveAuthor)
+    getNode(knowledgeDBs, crefID, effectiveAuthor),
+    effectiveAuthor
   );
   if (!targetNode) {
     return undefined;
   }
-  return getContextKey(getNodeContext(knowledgeDBs, targetNode));
+  return getContextKey(
+    getNodeContext(knowledgeDBs, targetNode, effectiveAuthor)
+  );
 }
 
 function coveredContextKeys(
@@ -191,16 +199,15 @@ function coveredContextKeys(
 function sourceDocumentKey(
   knowledgeDBs: KnowledgeDBs,
   documents: Map<string, Document> | undefined,
-  node: GraphNode
+  node: GraphNode,
+  sourceId: SourceId
 ): string | undefined {
   const rootNode =
-    node.id === node.root
-      ? node
-      : getNode(knowledgeDBs, node.root, node.author);
+    node.id === node.root ? node : getNode(knowledgeDBs, node.root, sourceId);
   if (!rootNode?.docId) {
     return undefined;
   }
-  const key = documentKeyOf(rootNode.author, rootNode.docId);
+  const key = documentKeyOf(sourceId, rootNode.docId);
   return documents?.has(key) ? key : undefined;
 }
 
@@ -247,7 +254,7 @@ function isWithinSubtree(
   return isWithinSubtree(
     knowledgeDBs,
     node.parent,
-    node.author,
+    author,
     subtreeRootIDs,
     visited.add(nodeID)
   );
@@ -256,14 +263,19 @@ function isWithinSubtree(
 function subtreeLinksToDocument(
   graph: GraphLookup,
   documents: Map<string, Document> | undefined,
-  candidate: GraphNode,
+  candidate: ResolvedNode,
   currentNodeID: ID | undefined,
   currentNodeFilePath: string | undefined,
   effectiveAuthor: SourceId,
   subtreeRootIDs: ImmutableSet<ID>
 ): boolean {
   const { graphIndex, knowledgeDBs } = graph;
-  const key = sourceDocumentKey(knowledgeDBs, documents, candidate);
+  const key = sourceDocumentKey(
+    knowledgeDBs,
+    documents,
+    candidate.node,
+    candidate.ref.sourceId
+  );
   const candidateDocument = key === undefined ? undefined : documents?.get(key);
   if (!candidateDocument) {
     return false;
@@ -274,14 +286,14 @@ function subtreeLinksToDocument(
     candidateDocument,
     currentNodeFilePath
   ).some((ref) => {
-    const linker = getNodeInSource(graph, ref)?.node;
+    const linker = getNodeInSource(graph, ref);
     return (
       linker !== undefined &&
-      linker.id !== currentNodeID &&
+      linker.node.id !== currentNodeID &&
       isWithinSubtree(
         knowledgeDBs,
-        linker.id,
-        linker.author,
+        linker.node.id,
+        linker.ref.sourceId,
         subtreeRootIDs,
         ImmutableSet<ID>()
       )
@@ -292,12 +304,13 @@ function subtreeLinksToDocument(
 function isInSystemRoot(
   knowledgeDBs: KnowledgeDBs,
   node: GraphNode | undefined,
+  sourceId: SourceId,
   systemRole: RootSystemRole
 ): boolean {
   if (!node) {
     return false;
   }
-  const rootNode = getNode(knowledgeDBs, node.root, node.author);
+  const rootNode = getNode(knowledgeDBs, node.root, sourceId);
   return rootNode?.systemRole === systemRole;
 }
 
@@ -315,8 +328,7 @@ export function deduplicateRefsByContext(
             const node = preferAuthor
               ? getNode(knowledgeDBs, ref.nodeID, preferAuthor)
               : undefined;
-            const isOther =
-              preferAuthor && node?.author !== preferAuthor ? 1 : 0;
+            const isOther = preferAuthor && !node ? 1 : 0;
             return [isOther, -ref.updated];
           })
           .first()!
@@ -366,9 +378,9 @@ export function getIncomingCrefsForNode(
   parentNodeID: ID | undefined,
   currentNodeID: ID | undefined,
   effectiveAuthor: SourceId,
+  itemsSourceId: SourceId,
   currentItems?: List<GraphNode>,
   currentNodeFilePath?: string,
-  currentNodeAuthor?: SourceId,
   documents?: Map<string, Document>
 ): List<NodeRef> {
   const { graphIndex, knowledgeDBs } = graph;
@@ -378,11 +390,10 @@ export function getIncomingCrefsForNode(
     if (!currentNodeID) {
       return [];
     }
-    const sourceScopedRefs = currentNodeAuthor
-      ? graphIndex.incomingCrefsByTarget.get(
-          nodeRefKey({ sourceId: currentNodeAuthor, id: currentNodeID })
-        ) ?? []
-      : [];
+    const sourceScopedRefs =
+      graphIndex.incomingCrefsByTarget.get(
+        nodeRefKey({ sourceId: itemsSourceId, id: currentNodeID })
+      ) ?? [];
     return sourceScopedRefs.length > 0
       ? sourceScopedRefs
       : graphIndex.incomingCrefs.get(currentNodeID) ?? [];
@@ -393,7 +404,7 @@ export function getIncomingCrefsForNode(
   const fileLinkSourceNodes = incomingFileLinkSourceRefs(
     graphIndex,
     currentNodeFilePath,
-    currentNodeAuthor
+    itemsSourceId
   )
     .map((ref) => getNodeInSource(graph, ref))
     .filter((node): node is ResolvedNode => node !== undefined);
@@ -417,10 +428,10 @@ export function getIncomingCrefsForNode(
   const outgoingTargetRelIDs = current.reduce((acc, item) => {
     const targetNode = isRefNode(item)
       ? resolveBlockLinkTarget(graph, {
-          ref: { sourceId: item.author, id: item.id },
+          ref: { sourceId: itemsSourceId, id: item.id },
           node: item,
         })?.node
-      : resolveNode(knowledgeDBs, item);
+      : resolveNode(knowledgeDBs, item, itemsSourceId);
     return targetNode ? acc.add(targetNode.id) : acc;
   }, ImmutableSet<ID>());
   const subtreeRootIDs = ImmutableSet<ID>(current.map((item) => item.id)).union(
@@ -429,15 +440,15 @@ export function getIncomingCrefsForNode(
 
   const refs = List(
     sourceNodes
-      .filter(({ node }) => visibleAuthors.has(node.author))
+      .filter(({ ref }) => visibleAuthors.has(ref.sourceId))
       .filter(({ node }) => node.id !== parentNodeID)
       .filter(({ node }) => node.id !== currentNodeID)
       .filter(
-        ({ node }) =>
+        (resolved) =>
           !subtreeLinksToDocument(
             graph,
             documents,
-            node,
+            resolved,
             currentNodeID,
             currentNodeFilePath,
             effectiveAuthor,
@@ -445,15 +456,15 @@ export function getIncomingCrefsForNode(
           )
       )
       .filter(
-        ({ node }) =>
+        ({ ref, node }) =>
           node.systemRole !== LOG_ROOT_ROLE &&
-          !isInSystemRoot(knowledgeDBs, node, LOG_ROOT_ROLE)
+          !isInSystemRoot(knowledgeDBs, node, ref.sourceId, LOG_ROOT_ROLE)
       )
       .filter(({ node }) => !outgoingTargetRelIDs.has(node.id))
       .map(({ ref, node }) => ({
         nodeID: node.id,
         sourceId: ref.sourceId,
-        context: getNodeContext(knowledgeDBs, node),
+        context: getNodeContext(knowledgeDBs, node, ref.sourceId),
         updated: node.updated,
       }))
   );
@@ -477,31 +488,31 @@ const EMPTY_ALTERNATIVE_FOOTER_RESULT: AlternativeFooterResult = {
 };
 
 function isVisibleVersion(
-  node: GraphNode,
+  resolved: ResolvedNode,
   visibleAuthors: ImmutableSet<SourceId>
 ): boolean {
-  return !isRefNode(node) && visibleAuthors.has(node.author);
+  return !isRefNode(resolved.node) && visibleAuthors.has(resolved.ref.sourceId);
 }
 
 function getPastVersions(
   graph: GraphLookup,
   visibleAuthors: ImmutableSet<SourceId>,
-  currentNode: GraphNode
-): List<GraphNode> {
-  if (!currentNode.basedOn) {
-    return List<GraphNode>();
+  current: ResolvedNode
+): List<ResolvedNode> {
+  if (!current.node.basedOn) {
+    return List<ResolvedNode>();
   }
 
   const pastVersion =
-    lookupNode(graph, currentNode.basedOn, currentNode.author)?.node ??
-    lookupNode(graph, currentNode.basedOn, graph.localSourceId)?.node;
+    lookupNode(graph, current.node.basedOn, current.ref.sourceId) ??
+    lookupNode(graph, current.node.basedOn, graph.localSourceId);
   if (!pastVersion) {
-    return List<GraphNode>();
+    return List<ResolvedNode>();
   }
 
   const visiblePast = isVisibleVersion(pastVersion, visibleAuthors)
-    ? List<GraphNode>([pastVersion])
-    : List<GraphNode>();
+    ? List<ResolvedNode>([pastVersion])
+    : List<ResolvedNode>();
 
   return visiblePast
     .concat(getPastVersions(graph, visibleAuthors, pastVersion))
@@ -511,30 +522,26 @@ function getPastVersions(
 function getFutureVersions(
   graph: GraphLookup,
   visibleAuthors: ImmutableSet<SourceId>,
-  currentNode: GraphNode,
+  current: ResolvedNode,
   excludedIDs: ImmutableSet<ID> = ImmutableSet<ID>(),
-  visited: ImmutableSet<ID> = ImmutableSet<ID>([currentNode.id])
-): List<GraphNode> {
+  visited: ImmutableSet<ID> = ImmutableSet<ID>([current.node.id])
+): List<ResolvedNode> {
   const futureIDs = List([
-    ...(graph.graphIndex.basedOnIndex.get(currentNode.id) || []),
+    ...(graph.graphIndex.basedOnIndex.get(current.node.id) || []),
   ] as ID[]).filter((nextID) => !visited.has(nextID));
 
   return futureIDs
     .reduce((collected, futureID) => {
-      const futureVersion = lookupNode(
-        graph,
-        futureID,
-        graph.localSourceId
-      )?.node;
+      const futureVersion = lookupNode(graph, futureID, graph.localSourceId);
       if (!futureVersion) {
         return collected;
       }
 
       const visibleFuture =
         isVisibleVersion(futureVersion, visibleAuthors) &&
-        !excludedIDs.has(futureVersion.id)
-          ? List<GraphNode>([futureVersion])
-          : List<GraphNode>();
+        !excludedIDs.has(futureVersion.node.id)
+          ? List<ResolvedNode>([futureVersion])
+          : List<ResolvedNode>();
 
       return collected
         .concat(visibleFuture)
@@ -548,19 +555,19 @@ function getFutureVersions(
           )
         )
         .toList();
-    }, List<GraphNode>())
+    }, List<ResolvedNode>())
     .toList();
 }
 
 function getVersions(
   graph: GraphLookup,
   visibleAuthors: ImmutableSet<SourceId>,
-  currentNode: GraphNode
-): List<GraphNode> {
-  const pastVersions = getPastVersions(graph, visibleAuthors, currentNode);
-  const lineageNodes = List<GraphNode>([currentNode]).concat(pastVersions);
+  current: ResolvedNode
+): List<ResolvedNode> {
+  const pastVersions = getPastVersions(graph, visibleAuthors, current);
+  const lineageNodes = List<ResolvedNode>([current]).concat(pastVersions);
   const lineageIDs = lineageNodes
-    .map((node) => node.id as ID)
+    .map((resolved) => resolved.node.id as ID)
     .toSet() as ImmutableSet<ID>;
   const futureVersions = lineageNodes.reduce(
     (collected, lineageNode) =>
@@ -569,16 +576,16 @@ function getVersions(
           getFutureVersions(graph, visibleAuthors, lineageNode, lineageIDs)
         )
         .toList(),
-    List<GraphNode>()
+    List<ResolvedNode>()
   );
 
   return pastVersions
     .concat(futureVersions)
-    .groupBy((node) => node.id)
+    .groupBy((resolved) => resolved.node.id)
     .map((group) => group.first())
     .valueSeq()
-    .filter((node): node is GraphNode => node !== undefined)
-    .sortBy((node) => -node.updated)
+    .filter((resolved): resolved is ResolvedNode => resolved !== undefined)
+    .sortBy((resolved) => -resolved.node.updated)
     .toList();
 }
 
@@ -586,14 +593,15 @@ export function getAlternativeFooterData(
   graph: GraphLookup,
   visibleAuthors: ImmutableSet<SourceId>,
   filterTypes: FooterTypeFilters,
-  currentNode?: GraphNode,
+  current?: ResolvedNode,
   showSuggestions: boolean = true,
   snapshotNodes: SnapshotNodes = Map<string, Map<string, GraphNode>>()
 ): AlternativeFooterResult {
   const { knowledgeDBs } = graph;
-  if (!currentNode || !filterTypes || filterTypes.length === 0) {
+  if (!current || !filterTypes || filterTypes.length === 0) {
     return EMPTY_ALTERNATIVE_FOOTER_RESULT;
   }
+  const currentNode = current.node;
 
   const suggestionsEnabled =
     showSuggestions && filterTypes.includes("suggestions");
@@ -606,7 +614,7 @@ export function getAlternativeFooterData(
   const currentNodeChildren = getChildNodes(
     knowledgeDBs,
     currentNode,
-    currentNode.author
+    current.ref.sourceId
   );
   const currentOriginKeys = currentNodeChildren
     .map((item) => (item.basedOn ?? item.id) as string)
@@ -636,9 +644,9 @@ export function getAlternativeFooterData(
     return itemTarget !== undefined && coveredTargetIDs.has(itemTarget);
   };
 
-  const versionNodes = getVersions(graph, visibleAuthors, currentNode);
-  const versionDiffs = versionNodes.map((versionNode) =>
-    computeVersionDiff(snapshotNodes, knowledgeDBs, currentNode, versionNode)
+  const versionNodes = getVersions(graph, visibleAuthors, current);
+  const versionDiffs = versionNodes.map((version) =>
+    computeVersionDiff(snapshotNodes, knowledgeDBs, currentNode, version)
   );
 
   const allSuggestionCandidates = suggestionsEnabled

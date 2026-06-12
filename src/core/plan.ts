@@ -727,7 +727,7 @@ export function planAddTopTargetsToDocument<T extends GraphPlan>(
     {
       ...planWithNodes,
       documents: planWithNodes.documents.set(
-        documentKeyOf(nextDocument.author, nextDocument.docId),
+        documentKeyOf(nextDocument.sourceId, nextDocument.docId),
         nextDocument
       ),
       affectedDocuments: planWithNodes.affectedDocuments.add(

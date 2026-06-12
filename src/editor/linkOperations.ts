@@ -93,7 +93,7 @@ export function linkToNavigationTarget(
     const document = documentTarget(data, link);
     return document
       ? {
-          sourceId: document.author,
+          sourceId: document.sourceId,
           documentId: document.docId,
         }
       : undefined;
@@ -153,7 +153,7 @@ export function linkToInsertTarget(
     const document = documentTarget(data, link);
     return document
       ? createDocumentLinkTarget(
-          document.author,
+          document.sourceId,
           document.docId,
           link.path,
           link.text

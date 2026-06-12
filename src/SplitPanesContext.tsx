@@ -128,7 +128,7 @@ export function useNavigatePane(): (url: string) => void {
     );
     const documentRoute = parseDocumentRouteUrl(pathname);
     if (documentRoute) {
-      const docSource = resolveAddress(documentRoute.author, user?.publicKey);
+      const docSource = resolveAddress(documentRoute.address, user?.publicKey);
       setPane({
         id: pane.id,
         sourceId: docSource,

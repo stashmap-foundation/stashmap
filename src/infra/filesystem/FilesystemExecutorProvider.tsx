@@ -116,7 +116,7 @@ export function FilesystemExecutorProvider({
     const deletions = plan.deletedDocs
       .toArray()
       .map((docId): { del: DocumentDelete; filePath?: string } => ({
-        del: { author: LOCAL, docId, deletedAt: Date.now() },
+        del: { sourceId: LOCAL, docId, deletedAt: Date.now() },
         filePath: lookupFilePath(documents, docId),
       }));
 

@@ -58,13 +58,13 @@ export function parseNodeRouteUrl(pathname: string): ID | undefined {
 
 export function parseDocumentRouteUrl(
   pathname: string
-): { author: PublicKey; docId: string } | undefined {
+): { address: SourceId; docId: string } | undefined {
   const match = pathname.match(/^\/d\/([^/]+)\/(.+)$/);
   if (!match) {
     return undefined;
   }
   return {
-    author: decodeURIComponent(match[1] as string) as PublicKey,
+    address: decodeURIComponent(match[1] as string),
     docId: decodeURIComponent(match[2] as string),
   };
 }

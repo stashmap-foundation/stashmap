@@ -72,8 +72,8 @@ function setPaneToDocument(
     }
     return {
       ...paneState,
-      author: document.author,
-      sourceId: document.author,
+      author: document.sourceId,
+      sourceId: document.sourceId,
       documentId: document.docId,
       rootNodeId: undefined,
       searchQuery: undefined,
@@ -99,7 +99,7 @@ function upsertParsedDocument(
     },
   });
   const { document } = parsed;
-  const key = documentKeyOf(document.author, document.docId);
+  const key = documentKeyOf(document.sourceId, document.docId);
   return {
     plan: {
       ...plan,
@@ -146,7 +146,7 @@ function planCreateImportedFilesDocument(
   }
   const targets = importedDocuments.map((importedDocument) =>
     createDocumentLinkTarget(
-      importedDocument.author,
+      importedDocument.sourceId,
       importedDocument.docId,
       importedDocument.docId,
       documentDisplayName(importedDocument)
@@ -154,7 +154,7 @@ function planCreateImportedFilesDocument(
   );
   const [planWithLinks] = planAddTargetsToNode(planWithRoot, root.id, targets);
   const updatedDocument = planWithLinks.documents.get(
-    documentKeyOf(document.author, document.docId)
+    documentKeyOf(document.sourceId, document.docId)
   );
   return {
     plan: planWithLinks,

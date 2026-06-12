@@ -308,7 +308,7 @@ export function dnd(
   const sourceDocumentNode = sourceDrag.row.node;
   const isDocumentTopLevelSource =
     sourceDocument !== undefined &&
-    sourceDocument.author === sourceDrag.row.sourceId &&
+    sourceDocument.sourceId === sourceDrag.row.sourceId &&
     sourceDocument.topNodeShortIds.includes(sourceDocumentNode.id);
 
   if (

@@ -25,7 +25,7 @@ export type RefTargetSeed = {
 };
 
 export type DocumentLinkTargetSeed = {
-  author: SourceId;
+  sourceId: SourceId;
   docId: string;
   filePath?: string;
   linkText?: string;
@@ -39,13 +39,13 @@ export function createRefTarget(
 }
 
 export function createDocumentLinkTarget(
-  author: SourceId,
+  sourceId: SourceId,
   docId: string,
   filePath?: string,
   linkText?: string
 ): DocumentLinkTargetSeed {
   return {
-    author,
+    sourceId,
     docId,
     ...(filePath !== undefined ? { filePath } : {}),
     linkText,
@@ -319,10 +319,10 @@ function resolveFileLinkRootByDocs(
   if (!targetDoc) return undefined;
   const topNodeShortId = targetDoc.topNodeShortIds[0];
   const targetRoot = topNodeShortId
-    ? getNode(knowledgeDBs, topNodeShortId as ID, targetDoc.author)
+    ? getNode(knowledgeDBs, topNodeShortId as ID, targetDoc.sourceId)
     : undefined;
   return targetRoot
-    ? { node: targetRoot, sourceId: targetDoc.author }
+    ? { node: targetRoot, sourceId: targetDoc.sourceId }
     : undefined;
 }
 

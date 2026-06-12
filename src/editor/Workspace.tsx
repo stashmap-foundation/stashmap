@@ -157,10 +157,10 @@ function getBreadcrumbLabel(
 
 function createDocumentBreadcrumbEntry(document: Document): BreadcrumbEntry {
   return {
-    key: `document:${document.author}:${document.docId}`,
+    key: `document:${document.sourceId}:${document.docId}`,
     label: documentDisplayName(document),
     target: {
-      sourceId: document.author,
+      sourceId: document.sourceId,
       documentId: document.docId,
     },
   };

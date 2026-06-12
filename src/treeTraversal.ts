@@ -138,7 +138,7 @@ function createRow(
         const documentRoot =
           topNodeID && document
             ? getNodeInSource(graph, {
-                sourceId: document.author,
+                sourceId: document.sourceId,
                 id: topNodeID,
               })
             : undefined;
@@ -771,7 +771,7 @@ export function getNodesInDocument(
         topRows,
         List<Row>(),
         undefined,
-        document.author,
+        document.sourceId,
         activeFilters
       ).rows
     ),
@@ -781,14 +781,14 @@ export function getNodesInDocument(
     return treeResult;
   }
 
-  const visibleAuthors = ImmutableSet<SourceId>([LOCAL, document.author]);
+  const visibleAuthors = ImmutableSet<SourceId>([LOCAL, document.sourceId]);
   const incomingCrefs = getIncomingCrefsForNode(
     graph,
     visibleAuthors,
     undefined,
     undefined,
-    document.author,
-    document.author,
+    document.sourceId,
+    document.sourceId,
     topNodes,
     document.filePath,
     data.documents
@@ -799,7 +799,7 @@ export function getNodesInDocument(
     graph,
     {
       parentPath: documentRootPath,
-      parentSourceId: document.author,
+      parentSourceId: document.sourceId,
       parentRoot: topNodes.first()?.root ?? EMPTY_SEMANTIC_ID,
       parentUpdated: document.updatedMs,
       incomingCrefs,

@@ -76,7 +76,7 @@ function urlToPane(
   if (documentRoute) {
     return {
       id: generatePaneId(),
-      sourceId: resolveAddress(documentRoute.author, myPublicKey),
+      sourceId: resolveAddress(documentRoute.address, myPublicKey),
       documentId: documentRoute.docId,
     };
   }

@@ -201,7 +201,7 @@ export function renderDocumentMarkdown(
   if (document.topNodeShortIds.length === 0) {
     return formatWithFrontMatter("", document.frontMatter);
   }
-  const nodes = knowledgeDBs.get(document.author)?.nodes;
+  const nodes = knowledgeDBs.get(document.sourceId)?.nodes;
   const topNodes = document.topNodeShortIds
     .map((topNodeShortId) => nodes?.get(topNodeShortId))
     .filter((node): node is GraphNode => node !== undefined);
@@ -210,7 +210,7 @@ export function renderDocumentMarkdown(
   }
   const serialized = serializeNodeSequence(
     knowledgeDBs,
-    document.author,
+    document.sourceId,
     topNodes,
     "",
     { lines: [] },

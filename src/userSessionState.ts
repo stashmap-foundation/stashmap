@@ -112,7 +112,7 @@ function saveViewsToStorage(
 function getUrlPanes(myPublicKey: PublicKey | undefined): Pane[] | undefined {
   const documentRoute = parseDocumentRouteUrl(window.location.pathname);
   if (documentRoute) {
-    const docSource = resolveAddress(documentRoute.author, myPublicKey);
+    const docSource = resolveAddress(documentRoute.address, myPublicKey);
     return [
       {
         id: generatePaneId(),

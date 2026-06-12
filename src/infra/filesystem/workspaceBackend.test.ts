@@ -34,7 +34,7 @@ test("loadWorkspaceAsDocuments returns one Document per markdown file", async ()
   });
 
   expect(documents).toHaveLength(1);
-  expect(documents[0].author).toBe(LOCAL);
+  expect(documents[0].sourceId).toBe(LOCAL);
   expect(documents[0].relativePath).toBe("project.md");
   expect(documents[0].currentContent).toContain("# Project");
 });

@@ -14,7 +14,7 @@ import { nodeText, spansText } from "./nodeSpans";
 import { LOG_ROOT_FILE, LOG_ROOT_ROLE } from "./systemRoots";
 
 export type Document = {
-  author: SourceId;
+  sourceId: SourceId;
   docId: string;
   topNodeShortIds: string[];
   updatedMs: number;
@@ -31,7 +31,7 @@ export type ParsedDocument = {
 };
 
 export type DocumentDelete = {
-  author: SourceId;
+  sourceId: SourceId;
   docId: string;
   deletedAt: number;
 };
@@ -75,7 +75,7 @@ export function getDocumentByIdOrFilePath(
     return documentById;
   }
   const documentByPath = documentByFilePath.get(idOrFilePath);
-  return documentByPath?.author === author ? documentByPath : undefined;
+  return documentByPath?.sourceId === author ? documentByPath : undefined;
 }
 
 export function getDocumentForNode(
@@ -117,7 +117,7 @@ export function documentLinkPath(document: Document): string {
 export function createDocumentFromRootNode(rootNode: GraphNode): Document {
   const docId = rootNode.docId ?? rootNode.id;
   return {
-    author: LOCAL,
+    sourceId: LOCAL,
     docId,
     topNodeShortIds: [rootNode.id],
     updatedMs: rootNode.updated,
@@ -196,7 +196,7 @@ function parseToDocumentWithMaterializer(
       : ImmutableMap<string, GraphNode>();
 
   const document: Document = {
-    author,
+    sourceId: author,
     docId: ensured.docId,
     topNodeShortIds,
     updatedMs,

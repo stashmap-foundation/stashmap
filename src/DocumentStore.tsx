@@ -60,7 +60,7 @@ function nodesForDocument(
   knowledgeDBs: KnowledgeDBs,
   document: Document
 ): ImmutableMap<string, GraphNode> {
-  const nodes = knowledgeDBs.get(document.author)?.nodes;
+  const nodes = knowledgeDBs.get(document.sourceId)?.nodes;
   if (!nodes) return ImmutableMap<string, GraphNode>();
   const topNodeIds = new Set(document.topNodeShortIds);
   return nodes.filter((node) => topNodeIds.has(node.root));
@@ -71,13 +71,13 @@ function withoutDocumentNodes(
   document: Document | undefined
 ): KnowledgeDBs {
   if (!document) return knowledgeDBs;
-  const db = knowledgeDBs.get(document.author);
+  const db = knowledgeDBs.get(document.sourceId);
   if (!db) return knowledgeDBs;
   const documentNodes = nodesForDocument(knowledgeDBs, document);
   const filtered = db.nodes.filter((_, nodeId) => !documentNodes.has(nodeId));
   return filtered.size === 0
-    ? knowledgeDBs.remove(document.author)
-    : knowledgeDBs.set(document.author, { ...db, nodes: filtered });
+    ? knowledgeDBs.remove(document.sourceId)
+    : knowledgeDBs.set(document.sourceId, { ...db, nodes: filtered });
 }
 
 function withDocNodes(
@@ -114,7 +114,7 @@ function applyDocumentToSnapshot(
   parsed: ParsedDocument
 ): DocumentSnapshot {
   const doc = parsed.document;
-  const key = documentKeyOf(doc.author, doc.docId);
+  const key = documentKeyOf(doc.sourceId, doc.docId);
   const existingDocument = snapshot.documents.get(key);
   const existingDelete = snapshot.deletes.get(key);
 
@@ -138,7 +138,7 @@ function applyDocumentToSnapshot(
           snapshot.graphIndex,
           existingNodes,
           existingDocument.filePath,
-          existingDocument.author
+          existingDocument.sourceId
         )
       : snapshot.graphIndex;
   const documentByFilePathAfterRemove = withoutDocumentInFilePathIndex(
@@ -151,7 +151,7 @@ function applyDocumentToSnapshot(
   );
   const knowledgeDBs = withDocNodes(
     knowledgeDBsAfterRemove,
-    doc.author,
+    doc.sourceId,
     parsed.nodes
   );
   return {
@@ -166,7 +166,7 @@ function applyDocumentToSnapshot(
       withoutExistingNodes,
       parsed.nodes,
       doc.filePath,
-      doc.author
+      doc.sourceId
     ),
   };
 }
@@ -175,7 +175,7 @@ function applyDeleteToSnapshot(
   snapshot: DocumentSnapshot,
   deletion: DocumentDelete
 ): DocumentSnapshot {
-  const key = documentKeyOf(deletion.author, deletion.docId);
+  const key = documentKeyOf(deletion.sourceId, deletion.docId);
   const existingDocument = snapshot.documents.get(key);
   const existingDelete = snapshot.deletes.get(key);
 
@@ -206,7 +206,7 @@ function applyDeleteToSnapshot(
             snapshot.graphIndex,
             existingNodes,
             existingDocument.filePath,
-            existingDocument.author
+            existingDocument.sourceId
           )
         : snapshot.graphIndex,
   };
@@ -232,7 +232,7 @@ function parsedWithSource(
   sourceId: SourceId
 ): ParsedDocument {
   return {
-    document: { ...parsed.document, author: sourceId },
+    document: { ...parsed.document, sourceId },
     nodes: parsed.nodes,
   };
 }
@@ -249,7 +249,7 @@ function eventsToParsed(
       .map((event) => eventToParsed(event))
       .filter((parsed): parsed is ParsedDocument => parsed !== undefined)
       .map((parsed) =>
-        parsed.document.author === localPubkey
+        parsed.document.sourceId === localPubkey
           ? parsedWithSource(parsed, LOCAL)
           : parsed
       ),
@@ -257,7 +257,7 @@ function eventsToParsed(
       .map((event) => eventToDocumentDelete(event))
       .filter((del): del is DocumentDelete => del !== undefined)
       .map((del) =>
-        del.author === localPubkey ? { ...del, author: LOCAL } : del
+        del.sourceId === localPubkey ? { ...del, sourceId: LOCAL } : del
       ),
   };
 }

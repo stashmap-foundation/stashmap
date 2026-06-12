@@ -68,9 +68,9 @@ function resolveFileLinkRoot(
   if (!targetDoc) return undefined;
   const topNodeShortId = targetDoc.topNodeShortIds[0];
   const node = topNodeShortId
-    ? getNode(knowledgeDBs, topNodeShortId as ID, targetDoc.author)
+    ? getNode(knowledgeDBs, topNodeShortId as ID, targetDoc.sourceId)
     : undefined;
-  return node ? { node, sourceId: targetDoc.author } : undefined;
+  return node ? { node, sourceId: targetDoc.sourceId } : undefined;
 }
 
 function getConcreteContextNodes(
@@ -212,8 +212,12 @@ function resolveFileLinkRootInSource(
     documents.get(documentKeyOf(sourceId, resolved));
   const topNodeShortId = targetDoc?.topNodeShortIds[0];
   if (!targetDoc || !topNodeShortId) return undefined;
-  const node = lookupNode(graph, topNodeShortId as ID, targetDoc.author)?.node;
-  return node ? { node, sourceId: targetDoc.author } : undefined;
+  const node = lookupNode(
+    graph,
+    topNodeShortId as ID,
+    targetDoc.sourceId
+  )?.node;
+  return node ? { node, sourceId: targetDoc.sourceId } : undefined;
 }
 
 function parseRefInSource(
@@ -548,7 +552,9 @@ function getDocumentTopSourceNodes(ref: ParsedRef, data: Data): GraphNode[] {
   );
   if (!document) return [];
   return document.topNodeShortIds
-    .map((nodeID) => getNode(data.knowledgeDBs, nodeID as ID, document.author))
+    .map((nodeID) =>
+      getNode(data.knowledgeDBs, nodeID as ID, document.sourceId)
+    )
     .filter((node): node is GraphNode => node !== undefined);
 }
 
@@ -596,7 +602,7 @@ function findIndexedFileLinkItem(
     return undefined;
   }
   const itemRefs = data.graphIndex.incomingFileLinks.get(
-    fileLinkIndexKey(targetDocument.author, targetDocument.filePath)
+    fileLinkIndexKey(targetDocument.sourceId, targetDocument.filePath)
   );
   if (!itemRefs) return undefined;
   const sourceIDs = new globalThis.Set(sourceNodes.map((node) => node.id));

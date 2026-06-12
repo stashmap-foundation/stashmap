@@ -102,7 +102,7 @@ export function eventToDocumentDelete(
   const docId = parts.slice(2).join(":");
   if (!author || !docId) return undefined;
   return {
-    author,
+    sourceId: author,
     docId,
     deletedAt: getEventMs(event),
   };

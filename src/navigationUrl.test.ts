@@ -49,13 +49,13 @@ test("parseNodeRouteUrl extracts node ID", () => {
   expect(parseNodeRouteUrl("/")).toBeUndefined();
 });
 
-test("parseDocumentRouteUrl extracts author and document ID", () => {
+test("parseDocumentRouteUrl extracts address and document ID", () => {
   expect(parseDocumentRouteUrl("/d/alice/doc.md")).toEqual({
-    author: "alice",
+    address: "alice",
     docId: "doc.md",
   });
   expect(parseDocumentRouteUrl("/d/alice%2Fkey/docs%2Ffile.md")).toEqual({
-    author: "alice/key",
+    address: "alice/key",
     docId: "docs/file.md",
   });
   expect(parseDocumentRouteUrl("/r/something")).toBeUndefined();

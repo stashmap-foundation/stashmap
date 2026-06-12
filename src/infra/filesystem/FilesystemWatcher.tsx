@@ -55,7 +55,7 @@ export function FilesystemWatcher(): null {
             docId: existing.docId,
           });
           store.deleteDocument({
-            author: existing.author,
+            sourceId: existing.sourceId,
             docId: existing.docId,
             deletedAt: Date.now(),
           });

@@ -103,7 +103,7 @@ function getSourceDocumentTarget(
     : undefined;
   return sourceDocument
     ? createDocumentLinkTarget(
-        sourceDocument.author,
+        sourceDocument.sourceId,
         sourceDocument.docId,
         documentLinkPath(sourceDocument),
         nodeText(sourceRoot) || sourceDocument.title

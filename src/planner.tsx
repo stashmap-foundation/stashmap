@@ -10,12 +10,13 @@ import {
 } from "./nostr";
 import { useData } from "./DataContext";
 import { useExecutor } from "./ExecutorContext";
-import { documentKeyOf } from "./core/Document";
+import { Document as KnowstrDocument, documentKeyOf } from "./core/Document";
+import { renderDocumentMarkdown } from "./documentRenderer";
 import {
   buildDocumentEvent,
-  buildSnapshotEventFromNodes,
+  buildSnapshotEvent,
+  snapshotIdForContent,
 } from "./nodesDocumentEvent";
-import { findTag } from "./nostrEvents";
 import {
   EMPTY_SEMANTIC_ID,
   isEmptySemanticID,
@@ -650,17 +651,15 @@ function getSnapshotSourceRoot(
   return root && source ? { node: root, sourceId: source.sourceId } : undefined;
 }
 
-export function buildDocumentEvents(
-  plan: GraphPlan
-): List<UnsignedEvent & EventAttachment> {
-  if (!plan.user) {
-    return plan.publishEvents;
-  }
-  const pubkey = plan.user.publicKey;
-  const withUpserts = plan.affectedDocuments.reduce((events, docId) => {
+export function buildDocumentWrites(plan: GraphPlan): {
+  document: KnowstrDocument;
+  content: string;
+  snapshotContent: string | undefined;
+}[] {
+  return plan.affectedDocuments.toArray().flatMap((docId) => {
     const document = plan.documents.get(documentKeyOf(LOCAL, docId));
     if (!document) {
-      return events;
+      return [];
     }
     const topNodes = document.topNodeShortIds
       .map((topNodeShortId) =>
@@ -683,18 +682,37 @@ export function buildDocumentEvents(
           )
         )
       : undefined;
-    const snapshotEvent = sourceDocument
-      ? (buildSnapshotEventFromNodes(
-          plan.knowledgeDBs,
-          pubkey,
-          sourceDocument
-        ) as UnsignedEvent & EventAttachment)
+    const snapshotContent = sourceDocument
+      ? renderDocumentMarkdown(plan.knowledgeDBs, sourceDocument)
       : undefined;
-    const event = buildDocumentEvent(plan.knowledgeDBs, document, pubkey, {
-      snapshotId:
-        topNodes.find((topNode) => topNode.snapshotId)?.snapshotId ??
-        (snapshotEvent ? findTag(snapshotEvent, "d") : undefined),
-    });
+    const snapshotId =
+      topNodes.find((topNode) => topNode.snapshotId)?.snapshotId ??
+      (snapshotContent ? snapshotIdForContent(snapshotContent) : undefined);
+    return [
+      {
+        document,
+        content: renderDocumentMarkdown(plan.knowledgeDBs, document, {
+          snapshotId,
+        }),
+        snapshotContent,
+      },
+    ];
+  });
+}
+
+export function buildDocumentEvents(
+  plan: GraphPlan
+): List<UnsignedEvent & EventAttachment> {
+  if (!plan.user) {
+    return plan.publishEvents;
+  }
+  const pubkey = plan.user.publicKey;
+  const withUpserts = buildDocumentWrites(plan).reduce((events, write) => {
+    const snapshotEvent = write.snapshotContent
+      ? (buildSnapshotEvent(pubkey, write.snapshotContent) as UnsignedEvent &
+          EventAttachment)
+      : undefined;
+    const event = buildDocumentEvent(write.document, pubkey, write.content);
     return snapshotEvent
       ? events
           .push(snapshotEvent)

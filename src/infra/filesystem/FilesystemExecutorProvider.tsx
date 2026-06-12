@@ -1,18 +1,16 @@
 import React, { Dispatch, SetStateAction } from "react";
 import { Map as ImmutableMap } from "immutable";
-import { UnsignedEvent } from "nostr-tools";
 import { LOCAL } from "../../core/nodeRef";
 import { useBackend } from "../../BackendContext";
 import { useDocumentStore, useDocuments } from "../../DocumentStore";
 import { ExecutorProvider } from "../../ExecutorContext";
-import { buildDocumentEvents, Plan } from "../../planner";
-import { KIND_DELETE, KIND_KNOWLEDGE_DOCUMENT } from "../../nostr";
-import { eventToParsed, eventToDocumentDelete } from "../../nostrEvents";
+import { buildDocumentWrites, Plan } from "../../planner";
 import {
   Document,
   DocumentDelete,
   ParsedDocument,
   documentKeyOf,
+  parseToDocument,
 } from "../../core/Document";
 import { LOG_ROOT_FILE } from "../../core/systemRoots";
 
@@ -45,10 +43,9 @@ function collectTakenPaths(
 
 function lookupFilePath(
   documents: ImmutableMap<string, Document>,
-  author: SourceId,
   docId: string
 ): string | undefined {
-  return documents.get(documentKeyOf(author, docId))?.filePath;
+  return documents.get(documentKeyOf(LOCAL, docId))?.filePath;
 }
 
 type EnrichedWrite = {
@@ -58,40 +55,33 @@ type EnrichedWrite = {
 };
 
 function enrichWithFilePath(
-  event: UnsignedEvent,
+  write: { document: Document; content: string },
   documents: ImmutableMap<string, Document>,
   taken: ReadonlySet<string>
-): EnrichedWrite | undefined {
-  const rawParsed = eventToParsed(event);
-  if (!rawParsed) return undefined;
-  const parsed = {
-    document: { ...rawParsed.document, author: LOCAL },
-    nodes: rawParsed.nodes,
-  };
-  const { document } = parsed;
-  const existing = lookupFilePath(documents, document.author, document.docId);
+): EnrichedWrite {
+  const existing = lookupFilePath(documents, write.document.docId);
   const filePath =
-    document.systemRole === "log"
+    write.document.systemRole === "log"
       ? LOG_ROOT_FILE
       : existing ??
-        uniqueSlugPath(slugify(document.title || document.docId), taken);
+        uniqueSlugPath(
+          slugify(write.document.title || write.document.docId),
+          taken
+        );
+  const parsed = parseToDocument(LOCAL, write.content, {
+    updatedMsOverride: Date.now(),
+    docIdFallback: write.document.docId,
+    ...(write.document.systemRole !== undefined
+      ? { systemRoleOverride: write.document.systemRole }
+      : {}),
+  });
   return {
-    parsed: { ...parsed, document: { ...document, filePath } },
+    parsed: {
+      document: { ...parsed.document, filePath },
+      nodes: parsed.nodes,
+    },
     filePath,
-    content: event.content,
-  };
-}
-
-function enrichDelete(
-  event: UnsignedEvent,
-  documents: ImmutableMap<string, Document>
-): { del: DocumentDelete; filePath?: string } | undefined {
-  const rawDel = eventToDocumentDelete(event);
-  if (!rawDel) return undefined;
-  const del = { ...rawDel, author: LOCAL };
-  return {
-    del,
-    filePath: lookupFilePath(documents, del.author, del.docId),
+    content: write.content,
   };
 }
 
@@ -115,7 +105,6 @@ export function FilesystemExecutorProvider({
       setPanes(plan.panes);
     }
     setViews(plan.views);
-    const filteredEvents = buildDocumentEvents(plan);
 
     setPublishEvents((prevStatus) => ({
       ...prevStatus,
@@ -123,24 +112,22 @@ export function FilesystemExecutorProvider({
       temporaryEvents: prevStatus.temporaryEvents.concat(plan.temporaryEvents),
     }));
 
-    if (filteredEvents.size === 0) return;
+    const writes = buildDocumentWrites(plan);
+    const deletions = plan.deletedDocs
+      .toArray()
+      .map((docId): { del: DocumentDelete; filePath?: string } => ({
+        del: { author: LOCAL, docId, deletedAt: Date.now() },
+        filePath: lookupFilePath(documents, docId),
+      }));
 
-    const writable = filteredEvents
-      .filter(
-        (event) =>
-          event.kind === KIND_KNOWLEDGE_DOCUMENT || event.kind === KIND_DELETE
-      )
-      .toArray();
+    if (writes.length === 0 && deletions.length === 0) return;
 
-    if (writable.length === 0) return;
-
-    const enriched = writable.reduce<{
+    const enriched = writes.reduce<{
       items: EnrichedWrite[];
       taken: ReadonlySet<string>;
     }>(
-      (acc, event) => {
-        const result = enrichWithFilePath(event, documents, acc.taken);
-        if (!result) return acc;
+      (acc, write) => {
+        const result = enrichWithFilePath(write, documents, acc.taken);
         return {
           items: [...acc.items, result],
           taken: new Set([...acc.taken, result.filePath]),
@@ -148,13 +135,6 @@ export function FilesystemExecutorProvider({
       },
       { items: [], taken: collectTakenPaths(documents) }
     );
-
-    const deletions = writable
-      .map((event) => enrichDelete(event, documents))
-      .filter(
-        (item): item is { del: DocumentDelete; filePath?: string } =>
-          item !== undefined
-      );
 
     if (store) {
       enriched.items.forEach((write) => store.upsertDocument(write.parsed));

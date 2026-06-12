@@ -8,6 +8,7 @@ import {
   parseToDocumentPreservingExplicitIds,
 } from "../../core/Document";
 import { WalkContext } from "../../core/markdownNodes";
+import { MarkdownTreeNode, parseMarkdown } from "../../core/markdownTree";
 
 export type WorkspaceSaveProfile = {
   pubkey: PublicKey;
@@ -110,18 +111,60 @@ function checkDuplicateDocIds(
   }
 }
 
+function collectExplicitNodeIds(trees: MarkdownTreeNode[]): string[] {
+  return trees.flatMap((tree) => [
+    ...(tree.uuid !== undefined ? [tree.uuid] : []),
+    ...collectExplicitNodeIds(tree.children),
+  ]);
+}
+
+function describeDuplicate(id: string, paths: string[]): string {
+  const uniquePaths = [...new Set(paths)].sort();
+  if (uniquePaths.length === 1) {
+    return `${uniquePaths[0]} contains id:${id} more than once`;
+  }
+  return `${uniquePaths.join(" and ")} both contain id:${id}`;
+}
+
+function checkDuplicateNodeIds(
+  files: ReadonlyArray<{ relativePath: string; content: string }>
+): void {
+  const pathsById = files.reduce((acc, file) => {
+    collectExplicitNodeIds(parseMarkdown(file.content).tree).forEach((id) => {
+      acc.set(id, [...(acc.get(id) ?? []), file.relativePath]);
+    });
+    return acc;
+  }, new Map<string, string[]>());
+
+  const duplicates = [...pathsById.entries()]
+    .filter(([, paths]) => paths.length > 1)
+    .sort(([left], [right]) => left.localeCompare(right));
+  if (duplicates.length === 0) {
+    return;
+  }
+
+  const conflictLines = duplicates.map(([id, paths]) =>
+    describeDuplicate(id, paths)
+  );
+  throw new Error(
+    [
+      ...conflictLines,
+      "  - if a file is a variant, give it fresh IDs (future: knowstr fork)",
+      "  - if it's a backup, move it out or add it to .knowstrignore",
+    ].join("\n")
+  );
+}
+
 type ScanAcc = {
   documents: ScannedWorkspaceDocument[];
   context: WalkContext | undefined;
 };
 
-async function readAndParseFile(
-  profile: WorkspaceSaveProfile,
-  absolutePath: string,
+function parseFile(
+  file: { relativePath: string; content: string },
   context: WalkContext | undefined
-): Promise<{ scanned: ScannedWorkspaceDocument; context: WalkContext }> {
-  const relativePath = path.relative(profile.workspaceDir, absolutePath);
-  const currentContent = await fs.readFile(absolutePath, "utf8");
+): { scanned: ScannedWorkspaceDocument; context: WalkContext } {
+  const { relativePath, content: currentContent } = file;
   const fallbackTitle = path.basename(relativePath, ".md") || undefined;
   const parsed = parseToDocumentPreservingExplicitIds(LOCAL, currentContent, {
     filePath: relativePath,
@@ -152,20 +195,24 @@ export async function scanWorkspaceDocuments(
     options.ignoredPatterns
   );
 
-  const final = await markdownFiles.reduce<Promise<ScanAcc>>(
-    async (previous, filePath) => {
-      const acc = await previous;
-      const { scanned, context } = await readAndParseFile(
-        profile,
-        filePath,
-        acc.context
-      );
+  const files = await Promise.all(
+    markdownFiles.map(async (absolutePath) => ({
+      relativePath: path.relative(profile.workspaceDir, absolutePath),
+      content: await fs.readFile(absolutePath, "utf8"),
+    }))
+  );
+
+  checkDuplicateNodeIds(files);
+
+  const final = files.reduce<ScanAcc>(
+    (acc, file) => {
+      const { scanned, context } = parseFile(file, acc.context);
       return {
         documents: [...acc.documents, scanned],
         context,
       };
     },
-    Promise.resolve({ documents: [], context: undefined })
+    { documents: [], context: undefined }
   );
 
   checkDuplicateDocIds(final.documents);

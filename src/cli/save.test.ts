@@ -225,7 +225,50 @@ test("save rejects duplicate node ids across documents", async () => {
   fs.appendFileSync(path.join(workspaceDir, "b.md"), `${itemOneLine}\n`);
 
   await expect(knowstrSave(workspaceDir)).rejects.toMatchObject({
-    message: expect.stringContaining("Workspace contains duplicate node ids"),
+    message: expect.stringMatching(
+      /a\.md and b\.md both contain id:.+\n {2}- if a file is a variant, give it fresh IDs \(future: knowstr fork\)\n {2}- if it's a backup, move it out or add it to \.knowstrignore/u
+    ),
+  });
+});
+
+test("save reports every duplicate node id with its file paths", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  write(workspaceDir, "a.md", "# Alpha\n- item one\n- item two\n");
+  await knowstrSave(workspaceDir);
+
+  const lines = fs
+    .readFileSync(path.join(workspaceDir, "a.md"), "utf8")
+    .split("\n");
+  const itemOneLine = lines.find((l) => l.includes("- item one")) as string;
+  const itemTwoLine = lines.find((l) => l.includes("- item two")) as string;
+
+  write(workspaceDir, "b.md", `# Beta\n${itemOneLine}\n`);
+  write(workspaceDir, "c.md", `# Gamma\n${itemTwoLine}\n`);
+
+  const error = await knowstrSave(workspaceDir).then(
+    () => undefined,
+    (reason: Error) => reason
+  );
+  if (!error) {
+    throw new Error("save should have rejected duplicate node ids");
+  }
+  expect(error.message).toMatch(/a\.md and b\.md both contain id:/u);
+  expect(error.message).toMatch(/a\.md and c\.md both contain id:/u);
+});
+
+test("save rejects a node id repeated within one file", async () => {
+  const { path: workspaceDir } = knowstrInit();
+  write(workspaceDir, "a.md", "# Alpha\n- item one\n");
+  await knowstrSave(workspaceDir);
+
+  const itemOneLine = fs
+    .readFileSync(path.join(workspaceDir, "a.md"), "utf8")
+    .split("\n")
+    .find((l) => l.includes("- item one")) as string;
+  fs.appendFileSync(path.join(workspaceDir, "a.md"), `${itemOneLine}\n`);
+
+  await expect(knowstrSave(workspaceDir)).rejects.toMatchObject({
+    message: expect.stringMatching(/a\.md contains id:.+ more than once/u),
   });
 });
 

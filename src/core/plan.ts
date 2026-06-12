@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data, no-continue, no-nested-ternary */
 import { List, Map, Set as ImmutableSet } from "immutable";
 import { v4 } from "uuid";
-import { LOCAL } from "./nodeRef";
 import { KIND_RELAY_METADATA_EVENT, newTimestamp, msTag } from "../nostr";
-import { ensureNodeNativeFields, getNode, isSearchId } from "./connections";
+import { ensureNodeNativeFields, isSearchId } from "./connections";
 import type {
   DocumentLinkTargetSeed,
   RefTargetSeed,
@@ -13,8 +12,9 @@ import {
   createDocumentFromRootNode,
   Document,
   documentKeyOf,
+  workspaceDocumentKey,
 } from "./Document";
-import { newDB } from "./knowledge";
+import { getWorkspaceNode, withWorkspace, workspaceOf } from "./knowledge";
 import { newGraphNode } from "./nodeFactory";
 import { fileLinkSpan, linkSpan, plainSpans } from "./nodeSpans";
 import {
@@ -53,7 +53,7 @@ function planEnsureSystemRoot<T extends GraphPlan>(
   plan: T,
   systemRole: RootSystemRole
 ): [T, GraphNode] {
-  const existing = getOwnSystemRoot(plan.knowledgeDBs, LOCAL, systemRole);
+  const existing = getOwnSystemRoot(plan.knowledgeDBs, systemRole);
   if (existing) {
     return [plan, existing];
   }
@@ -74,7 +74,7 @@ export function planUpsertRootDocument<T extends GraphPlan>(
   if (rootNode.parent || !rootNode.docId) {
     return plan;
   }
-  const key = documentKeyOf(LOCAL, rootNode.docId);
+  const key = workspaceDocumentKey(rootNode.docId);
   const existing = plan.documents.get(key);
   const next = existing
     ? {
@@ -84,7 +84,7 @@ export function planUpsertRootDocument<T extends GraphPlan>(
           : [...existing.topNodeShortIds, rootNode.id],
         updatedMs: rootNode.updated,
       }
-    : createDocumentFromRootNode(rootNode, LOCAL);
+    : createDocumentFromRootNode(rootNode);
   return { ...plan, documents: plan.documents.set(key, next) };
 }
 
@@ -102,7 +102,7 @@ export function getNodeDocumentId(
   plan: Pick<GraphPlan, "knowledgeDBs">,
   node: GraphNode
 ): string | undefined {
-  return node.docId ?? getNode(plan.knowledgeDBs, node.root, LOCAL)?.docId;
+  return node.docId ?? getWorkspaceNode(plan.knowledgeDBs, node.root)?.docId;
 }
 
 export function planMarkDocumentAffected<T extends GraphPlan>(
@@ -119,8 +119,8 @@ export function upsertNodesCore<T extends GraphPlan>(
   plan: T,
   nodes: GraphNode
 ): T {
-  const userDB = plan.knowledgeDBs.get(LOCAL, newDB());
-  const normalized = ensureNodeNativeFields(plan.knowledgeDBs, nodes, LOCAL);
+  const userDB = workspaceOf(plan.knowledgeDBs);
+  const normalized = ensureNodeNativeFields(userDB, nodes);
   const node: GraphNode =
     !normalized.parent && !normalized.docId
       ? { ...normalized, docId: v4() }
@@ -131,7 +131,7 @@ export function upsertNodesCore<T extends GraphPlan>(
   };
   const planWithNode: T = {
     ...plan,
-    knowledgeDBs: plan.knowledgeDBs.set(LOCAL, updatedDB),
+    knowledgeDBs: withWorkspace(plan.knowledgeDBs, updatedDB),
   };
   return planMarkDocumentAffected(
     planUpsertRootDocument(planWithNode, node),
@@ -156,7 +156,7 @@ export function planUpsertNodes<T extends GraphPlan>(
   plan: T,
   nodes: GraphNode
 ): T {
-  const userDB = plan.knowledgeDBs.get(LOCAL, newDB());
+  const userDB = workspaceOf(plan.knowledgeDBs);
   const isNewNode = !userDB.nodes.has(nodes.id);
   const basePlan = upsertNodesCore(plan, nodes);
 
@@ -199,13 +199,11 @@ function getNodeParentDepth(
 }
 
 function getNodeSubtree(
-  plan: GraphPlan,
-  sourceId: SourceId,
+  sourceGraph: KnowledgeData,
   sourceNode: GraphNode,
   filterNode: (node: GraphNode) => boolean = () => true
 ): List<GraphNode> {
-  const authorNodesByID =
-    plan.knowledgeDBs.get(sourceId)?.nodes || Map<ID, GraphNode>();
+  const authorNodesByID = sourceGraph.nodes;
   const childrenByParent = authorNodesByID
     .valueSeq()
     .filter((node) => node.root === sourceNode.root)
@@ -246,12 +244,12 @@ function getNodeSubtree(
 
 export function planCopyDescendantNodes<T extends GraphPlan>(
   plan: T,
-  sourceId: SourceId,
+  sourceGraph: KnowledgeData,
   sourceNode: GraphNode,
   targetParentNodeID?: ID,
   root?: ID
 ): [T, NodesIdMapping] {
-  const descendants = getNodeSubtree(plan, sourceId, sourceNode);
+  const descendants = getNodeSubtree(sourceGraph, sourceNode);
 
   const { copiedNodes } = descendants.reduce(
     (acc, node) => {
@@ -317,7 +315,10 @@ export function planMoveDescendantNodes<T extends GraphPlan>(
   targetParentNodeID?: ID,
   root?: ID
 ): T {
-  const descendants = getNodeSubtree(plan, LOCAL, sourceNode);
+  const descendants = getNodeSubtree(
+    workspaceOf(plan.knowledgeDBs),
+    sourceNode
+  );
   return descendants.reduce((accPlan, node) => {
     const isRootNode = node.id === sourceNode.id;
     return planUpsertNodes(accPlan, {
@@ -365,7 +366,7 @@ function planDeleteDocumentRoot<T extends GraphPlan>(
   nextKnowledgeDBs: KnowledgeDBs,
   docId: string
 ): T {
-  const key = documentKeyOf(LOCAL, docId);
+  const key = workspaceDocumentKey(docId);
   const document = plan.documents.get(key);
   const remainingTopNodeShortIds =
     document?.topNodeShortIds.filter((id) => id !== node.id) ?? [];
@@ -401,14 +402,14 @@ function planDeleteDocumentRoot<T extends GraphPlan>(
 }
 
 export function planDeleteNodes<T extends GraphPlan>(plan: T, nodeID: ID): T {
-  const userDB = plan.knowledgeDBs.get(LOCAL, newDB());
+  const userDB = workspaceOf(plan.knowledgeDBs);
   const node = userDB.nodes.get(nodeID);
   const updatedNodes = userDB.nodes.remove(nodeID);
   const updatedDB = {
     ...userDB,
     nodes: updatedNodes,
   };
-  const nextKnowledgeDBs = plan.knowledgeDBs.set(LOCAL, updatedDB);
+  const nextKnowledgeDBs = withWorkspace(plan.knowledgeDBs, updatedDB);
   if (!node) {
     return { ...plan, knowledgeDBs: nextKnowledgeDBs };
   }
@@ -427,10 +428,10 @@ export function planDeleteDescendantNodes<T extends GraphPlan>(
   plan: T,
   sourceNode: GraphNode
 ): T {
-  const userNodesByID = plan.knowledgeDBs.get(LOCAL, newDB()).nodes;
-  const descendants = getNodeSubtree(plan, LOCAL, sourceNode)
+  const workspace = workspaceOf(plan.knowledgeDBs);
+  const descendants = getNodeSubtree(workspace, sourceNode)
     .filter((node) => node.id !== sourceNode.id)
-    .sortBy((node) => -getNodeParentDepth(userNodesByID, node));
+    .sortBy((node) => -getNodeParentDepth(workspace.nodes, node));
 
   return descendants.reduce(
     (accPlan, node) => planDeleteNodes(accPlan, node.id),
@@ -462,7 +463,7 @@ export function planPublishRelayMetadata<T extends GraphPlan>(
   const tags = relayTags(relays);
   const publishRelayMetadataEvent: CoreOutboundEvent & EventAttachment = {
     kind: KIND_RELAY_METADATA_EVENT,
-    pubkey: LOCAL,
+    pubkey: "",
     created_at: newTimestamp(),
     tags: [...tags, msTag()],
     content: "",
@@ -501,7 +502,7 @@ export type AddToParentTarget =
 
 export function planAddTargetsToNode<T extends GraphPlan>(
   plan: T,
-  parentNode: GraphNode,
+  parentID: ID,
   targets: AddToParentTarget | AddToParentTarget[],
   insertAtIndex?: number,
   relevance?: Relevance,
@@ -511,8 +512,9 @@ export function planAddTargetsToNode<T extends GraphPlan>(
     childID: ID;
   };
 
+  const parentNode = getWorkspaceNode(plan.knowledgeDBs, parentID);
   const targetsArray = Array.isArray(targets) ? targets : [targets];
-  if (targetsArray.length === 0) {
+  if (!parentNode || targetsArray.length === 0) {
     return [plan, []];
   }
 
@@ -588,7 +590,7 @@ export function planAddTargetsToNode<T extends GraphPlan>(
             } as GraphNode);
         const planWithChild = planUpsertNodes(accPlan, childNode);
         const sourceNode = refTarget
-          ? getNode(planWithChild.knowledgeDBs, refTarget.targetID, LOCAL)
+          ? getWorkspaceNode(planWithChild.knowledgeDBs, refTarget.targetID)
           : undefined;
         const planWithSourceRoot = sourceNode
           ? planMarkDocumentAffected(planWithChild, sourceNode)
@@ -604,7 +606,7 @@ export function planAddTargetsToNode<T extends GraphPlan>(
         ];
       }
 
-      const existingNode = getNode(accPlan.knowledgeDBs, objectID, LOCAL);
+      const existingNode = getWorkspaceNode(accPlan.knowledgeDBs, objectID);
       if (existingNode && existingNode.id === objectID) {
         const updatedChild = {
           ...existingNode,

@@ -1,6 +1,6 @@
 import { Set } from "immutable";
-import { LOCAL } from "./core/nodeRef";
-import { deleteNodes, getNode, isRefNode } from "./core/connections";
+import { getWorkspaceNode } from "./core/knowledge";
+import { deleteNodes, isRefNode } from "./core/connections";
 import {
   GraphPlan,
   planDeleteDescendantNodes,
@@ -11,7 +11,7 @@ import {
 import { NodeItemMetadata, updateNodeItemMetadata } from "./nodeItemMetadata";
 
 function getWritableNode(plan: GraphPlan, nodeId: ID): GraphNode | undefined {
-  return getNode(plan.knowledgeDBs, nodeId, LOCAL);
+  return getWorkspaceNode(plan.knowledgeDBs, nodeId);
 }
 
 function getNodeItemIndex(node: GraphNode, itemId: ID): number | undefined {
@@ -26,7 +26,7 @@ function requireNodeItem(
 ): GraphNode | undefined {
   const index = getNodeItemIndex(node, itemId);
   const childID = index === undefined ? undefined : node.children.get(index);
-  return childID ? getNode(plan.knowledgeDBs, childID, LOCAL) : undefined;
+  return childID ? getWorkspaceNode(plan.knowledgeDBs, childID) : undefined;
 }
 
 export function planUpdateNodeItemMetadataById<T extends GraphPlan>(
@@ -71,7 +71,7 @@ export function planRemoveNodeItemById<T extends GraphPlan>(
   if (!item || isRefNode(item)) {
     return withoutItem;
   }
-  const sourceNode = getNode(withoutItem.knowledgeDBs, item.id, LOCAL);
+  const sourceNode = getWorkspaceNode(withoutItem.knowledgeDBs, item.id);
   if (!sourceNode) {
     return withoutItem;
   }

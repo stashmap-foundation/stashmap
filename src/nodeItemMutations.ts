@@ -37,10 +37,6 @@ import {
 
 export type { NodeItemMetadata } from "./nodeItemMetadata";
 
-function getCurrentPlanNode(plan: Plan, node: GraphNode): GraphNode {
-  return getNode(plan.knowledgeDBs, node.id, LOCAL) ?? node;
-}
-
 function planUpdateExistingItemMetadata(
   plan: Plan,
   parentNode: GraphNode,
@@ -285,14 +281,13 @@ export function planUpdateViewItemMetadata(
     if (!virtualType || !parentNode) {
       return plan;
     }
-    const currentParentNode = getCurrentPlanNode(plan, parentNode);
     if (virtualType === "suggestion" && !isBlockLink(node)) {
       const source = resolveDeepCopySource(plan, rowID, node, input.sourceId);
       return planDeepCopyNode(
         plan,
         source.sourceId,
         source.node,
-        currentParentNode,
+        parentNode.id,
         viewPath,
         parentViewPath,
         undefined,
@@ -318,7 +313,7 @@ export function planUpdateViewItemMetadata(
     return planAddToParent(
       plan,
       targetItem,
-      currentParentNode,
+      parentNode.id,
       undefined,
       metadata.relevance ?? inheritedSourceNode?.relevance,
       metadata.argument ?? inheritedSourceNode?.argument

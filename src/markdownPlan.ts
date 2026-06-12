@@ -147,7 +147,7 @@ function planInsertMarkdownTreesByParentId<T extends GraphPlan>(
   );
   const [planWithAdded, actualItemIDs] = planAddTargetsToNode(
     movedPlan,
-    parentNode,
+    parentNode.id,
     topNodeIDs,
     insertAtIndex,
     relevance,

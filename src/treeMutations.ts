@@ -1,5 +1,5 @@
-import { LOCAL } from "./core/nodeRef";
 import { getNode, isSearchId } from "./core/connections";
+import { getWorkspaceNode } from "./core/knowledge";
 import { planRemoveNodeItemById } from "./dataPlanner";
 import {
   ViewPath,
@@ -37,13 +37,13 @@ function resetInvalidPanes(plan: Plan, paneIndexToReset?: number): Plan {
 
 export function planDisconnectFromParent(
   plan: Plan,
-  parentNode: GraphNode,
+  parentID: ID,
   childID: ID,
   preserveDescendants?: boolean
 ): Plan {
   const updatedNodesPlan = planRemoveNodeItemById(
     plan,
-    parentNode.id,
+    parentID,
     childID,
     preserveDescendants === undefined ? false : !!preserveDescendants
   );
@@ -51,7 +51,7 @@ export function planDisconnectFromParent(
   const updatedViews = updateViewPathsAfterDisconnect(
     updatedNodesPlan.views,
     childID,
-    parentNode.id
+    parentID
   );
 
   const planWithViews = planUpdateViews(updatedNodesPlan, updatedViews);
@@ -61,17 +61,21 @@ export function planDisconnectFromParent(
 
 export function planDeleteNode(
   plan: Plan,
-  node: GraphNode,
+  nodeID: ID,
   rowID: ID,
-  parentNode: GraphNode | undefined,
-  childID: ID,
+  parentID: ID | undefined,
   paneIndex: number
 ): Plan {
-  if (parentNode) {
-    return planDisconnectFromParent(plan, parentNode, childID);
+  if (parentID) {
+    return planDisconnectFromParent(plan, parentID, nodeID);
   }
 
   if (isSearchId(rowID)) {
+    return plan;
+  }
+
+  const node = getWorkspaceNode(plan.knowledgeDBs, nodeID);
+  if (!node) {
     return plan;
   }
 
@@ -82,29 +86,35 @@ export function planDeleteNode(
 
 export function planMoveNode(
   plan: Plan,
-  sourceNode: GraphNode,
+  sourceNodeID: ID,
   sourceChildID: ID,
-  sourceParentNode: GraphNode,
+  sourceParentID: ID,
   sourceViewPath: ViewPath,
-  targetParentNode: GraphNode,
+  targetParentID: ID,
   targetParentViewPath: ViewPath,
   insertAtIndex?: number
 ): Plan {
+  const sourceNode = getWorkspaceNode(plan.knowledgeDBs, sourceNodeID);
+  if (!sourceNode) {
+    return plan;
+  }
+
   const [planWithAdd] = planAddToParent(
     plan,
-    sourceNode.id,
-    targetParentNode,
+    sourceNodeID,
+    targetParentID,
     insertAtIndex
   );
 
-  const actualTargetParentNode =
-    getNode(planWithAdd.knowledgeDBs, targetParentNode.id, LOCAL) ??
-    targetParentNode;
+  const actualTargetParentNode = getWorkspaceNode(
+    planWithAdd.knowledgeDBs,
+    targetParentID
+  );
 
-  if (actualTargetParentNode.children.size === 0) {
+  if (!actualTargetParentNode || actualTargetParentNode.children.size === 0) {
     return planDisconnectFromParent(
       planWithAdd,
-      sourceParentNode,
+      sourceParentID,
       sourceChildID,
       true
     );
@@ -134,7 +144,7 @@ export function planMoveNode(
 
   const disconnectedPlan = planDisconnectFromParent(
     planWithViews,
-    sourceParentNode,
+    sourceParentID,
     sourceChildID,
     true
   );

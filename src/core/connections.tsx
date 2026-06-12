@@ -360,11 +360,10 @@ export function getRefLinkTargetInfo(
 }
 
 export function ensureNodeNativeFields(
-  knowledgeDBs: KnowledgeDBs,
-  node: GraphNode,
-  sourceId: SourceId
+  db: KnowledgeData,
+  node: GraphNode
 ): GraphNode {
-  const existingNode = knowledgeDBs.get(sourceId)?.nodes.get(node.id);
+  const existingNode = db.nodes.get(node.id);
   const parent = node.parent || existingNode?.parent;
 
   if (node.parent === parent) {

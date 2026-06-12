@@ -407,7 +407,7 @@ function ForkButton(): JSX.Element | null {
 function HomeButton(): JSX.Element | null {
   const { knowledgeDBs } = useData();
   const navigatePane = useNavigatePane();
-  const logNode = getOwnLogRoot(knowledgeDBs, LOCAL);
+  const logNode = getOwnLogRoot(knowledgeDBs);
   if (!logNode) {
     return null;
   }
@@ -456,7 +456,7 @@ function useHomeShortcut(): void {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       if ((e.metaKey || e.ctrlKey) && e.key === "h") {
-        const logNode = getOwnLogRoot(knowledgeDBs, LOCAL);
+        const logNode = getOwnLogRoot(knowledgeDBs);
         if (!logNode) {
           return;
         }
@@ -1384,7 +1384,7 @@ function usePaneKeyboardNavigation(paneIndex: number): {
         executePlan(
           planSetEmptyNodePosition(
             createPlan(),
-            parentRow.node,
+            parentRow.node.id,
             parentRow.view,
             parentRow.viewPath,
             paneIndex,
@@ -1407,10 +1407,9 @@ function usePaneKeyboardNavigation(paneIndex: number): {
           (acc, row) =>
             planDeleteNode(
               acc,
-              row.node,
-              row.rowID,
-              row.parentNode,
               row.node.id,
+              row.rowID,
+              row.parentNode?.id,
               paneIndex
             ),
           createPlan()

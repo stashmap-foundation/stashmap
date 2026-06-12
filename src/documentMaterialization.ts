@@ -98,11 +98,10 @@ export function buildKnowledgeDBFromDocumentNodes(
     .valueSeq()
     .sortBy((node) => getNodeDepth(baseKnowledgeDBs, node, author))
     .reduce((acc, node) => {
-      const knowledgeDBs = Map<SourceId, KnowledgeData>().set(author, {
-        ...newDB(),
-        nodes: acc,
-      });
-      const normalized = ensureNodeNativeFields(knowledgeDBs, node, author);
+      const normalized = ensureNodeNativeFields(
+        { ...newDB(), nodes: acc },
+        node
+      );
       return acc.set(normalized.id, normalized);
     }, Map<string, GraphNode>());
 

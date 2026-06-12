@@ -92,7 +92,7 @@ export function useUpdateRelevance(): UseUpdateRelevanceResult {
 
   const removeFromList = (): void => {
     if (!isVisible || !parentNode) return;
-    const plan = planDisconnectFromParent(createPlan(), parentNode, childID);
+    const plan = planDisconnectFromParent(createPlan(), parentNode.id, childID);
     executePlan(plan);
   };
 

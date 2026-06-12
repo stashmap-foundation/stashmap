@@ -152,7 +152,7 @@ function planCreateImportedFilesDocument(
       documentDisplayName(importedDocument)
     )
   );
-  const [planWithLinks] = planAddTargetsToNode(planWithRoot, root, targets);
+  const [planWithLinks] = planAddTargetsToNode(planWithRoot, root.id, targets);
   const updatedDocument = planWithLinks.documents.get(
     documentKeyOf(document.author, document.docId)
   );

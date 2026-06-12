@@ -1,3 +1,5 @@
+import { workspaceOf } from "./knowledge";
+
 export const LOG_ROOT_ROLE: RootSystemRole = "log";
 export const LOG_ROOT_FILE = "log.md";
 const LOG_ROOT_TEXT = "~Log";
@@ -8,22 +10,19 @@ export function isStandaloneRoot(node: GraphNode): boolean {
 
 export function getOwnSystemRoot(
   knowledgeDBs: KnowledgeDBs,
-  author: SourceId,
   systemRole: RootSystemRole
 ): GraphNode | undefined {
-  return knowledgeDBs
-    .get(author)
-    ?.nodes.valueSeq()
+  return workspaceOf(knowledgeDBs)
+    .nodes.valueSeq()
     .filter((node) => node.systemRole === systemRole && isStandaloneRoot(node))
     .sortBy((node) => -node.updated)
     .first();
 }
 
 export function getOwnLogRoot(
-  knowledgeDBs: KnowledgeDBs,
-  author: SourceId
+  knowledgeDBs: KnowledgeDBs
 ): GraphNode | undefined {
-  return getOwnSystemRoot(knowledgeDBs, author, LOG_ROOT_ROLE);
+  return getOwnSystemRoot(knowledgeDBs, LOG_ROOT_ROLE);
 }
 
 export function getSystemRoleText(systemRole: RootSystemRole): string {

@@ -396,7 +396,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
 
     const plan = planSetEmptyNodePosition(
       basePlan,
-      nextPosition.parentNode,
+      nextPosition.parentNode.id,
       nextPosition.parentView,
       nextPosition.parentViewPath,
       paneIndex,
@@ -431,13 +431,13 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
           trimmedText
         );
         executePlan(
-          planAddToParent(planWithNode, newNode, prevSibling.node)[0]
+          planAddToParent(planWithNode, newNode, prevSibling.node.id)[0]
         );
       } else {
         executePlan(
           planSetEmptyNodePosition(
             planWithExpand,
-            prevSibling.node,
+            prevSibling.node.id,
             prevSibling.view,
             prevSibling.viewPath,
             paneIndex,
@@ -476,7 +476,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         executePlan(
           planSetEmptyNodePosition(
             planWithoutEmpty,
-            parentRow.parentNode,
+            parentRow.parentNode.id,
             grandParentRow.view,
             grandParentRow.viewPath,
             paneIndex,
@@ -494,7 +494,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
         planAddToParent(
           planWithNode,
           newNode,
-          parentRow.parentNode,
+          parentRow.parentNode.id,
           parentNodeIndex + 1
         )[0]
       );
@@ -566,7 +566,7 @@ function EditableContent({ rows }: { rows: List<Row> }): JSX.Element {
     }
     const plan = planDisconnectFromParent(
       createPlan(),
-      parentNode,
+      parentNode.id,
       row.node.id
     );
     executePlan(plan);

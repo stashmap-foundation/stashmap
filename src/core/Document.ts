@@ -1,4 +1,5 @@
 import { Map as ImmutableMap } from "immutable";
+import { LOCAL } from "./nodeRef";
 import { getNode } from "./connections";
 import { ensureKnowstrDocId } from "./knowstrFrontmatter";
 import { MarkdownTreeNode, parseMarkdown } from "./markdownTree";
@@ -59,6 +60,10 @@ export function documentKeyOf(sourceId: SourceId, docId: string): string {
   return `${sourceId}:${docId}`;
 }
 
+export function workspaceDocumentKey(docId: string): string {
+  return documentKeyOf(LOCAL, docId);
+}
+
 export function getDocumentByIdOrFilePath(
   documents: ImmutableMap<string, Document>,
   documentByFilePath: ImmutableMap<string, Document>,
@@ -109,13 +114,10 @@ export function documentLinkPath(document: Document): string {
   return document.filePath ?? document.docId;
 }
 
-export function createDocumentFromRootNode(
-  rootNode: GraphNode,
-  sourceId: SourceId
-): Document {
+export function createDocumentFromRootNode(rootNode: GraphNode): Document {
   const docId = rootNode.docId ?? rootNode.id;
   return {
-    author: sourceId,
+    author: LOCAL,
     docId,
     topNodeShortIds: [rootNode.id],
     updatedMs: rootNode.updated,

@@ -46,6 +46,7 @@ import {
 } from "./rowModel";
 import { nodeText, plainSpans } from "./core/nodeSpans";
 import { LOCAL } from "./core/nodeRef";
+import { getWorkspaceNode, newDB } from "./core/knowledge";
 import { useRelaysToCreatePlan } from "./relays";
 import {
   MultiSelectionState,
@@ -76,12 +77,9 @@ type WorkspacePlan = GraphPlan &
 
 export type Plan = WorkspacePlan;
 
-export function planUpdateNodeText(
-  plan: Plan,
-  currentNode: GraphNode,
-  text: string
-): Plan {
-  if (nodeText(currentNode) === text) {
+export function planUpdateNodeText(plan: Plan, nodeID: ID, text: string): Plan {
+  const currentNode = getWorkspaceNode(plan.knowledgeDBs, nodeID);
+  if (!currentNode || nodeText(currentNode) === text) {
     return plan;
   }
   const updatedNode = {
@@ -281,14 +279,14 @@ export function planExpandNode(
 export function planAddToParent(
   plan: Plan,
   targets: AddToParentTarget | AddToParentTarget[],
-  parentNode: GraphNode,
+  parentID: ID,
   insertAtIndex?: number,
   relevance?: Relevance,
   argument?: Argument
 ): [Plan, ID[]] {
   const [updatedNodesPlan, actualItemIDs] = planAddTargetsToNode(
     plan,
-    parentNode,
+    parentID,
     targets,
     insertAtIndex,
     relevance,
@@ -322,7 +320,7 @@ export function planForkPane(
 ): Plan {
   const [planWithNodes, nodesIdMapping] = planCopyDescendantNodes(
     plan,
-    pane.sourceId,
+    plan.knowledgeDBs.get(pane.sourceId, newDB()),
     sourceNode
   );
   const updatedViews = updateViewsWithNodesMapping(
@@ -385,16 +383,20 @@ export function planDeepCopyNode(
   plan: Plan,
   sourceId: SourceId,
   resolvedNode: GraphNode,
-  targetParentNode: GraphNode,
+  targetParentID: ID,
   sourceViewPath: ViewPath,
   targetParentViewPath: ViewPath,
   insertAtIndex?: number,
   relevance?: Relevance,
   argument?: Argument
 ): Plan {
+  const targetParentNode = getWorkspaceNode(plan.knowledgeDBs, targetParentID);
+  if (!targetParentNode) {
+    return plan;
+  }
   const [planWithCopiedNodes, mapping] = planCopyDescendantNodes(
     plan,
-    sourceId,
+    plan.knowledgeDBs.get(sourceId, newDB()),
     resolvedNode,
     targetParentNode.id,
     targetParentNode.root
@@ -408,7 +410,7 @@ export function planDeepCopyNode(
   const [finalPlan] = planAddToParent(
     planWithCopiedNodes,
     copiedTopNodeID,
-    targetParentNode,
+    targetParentID,
     insertAtIndex,
     relevance,
     argument
@@ -542,7 +544,7 @@ export function planSaveNodeAndEnsureNodes(
       ? planAddToParent(
           planWithoutEmpty,
           createdNode,
-          parentNode,
+          parentNode.id,
           emptyNodeIndex,
           relevance ?? metadata?.nodeItem.relevance,
           argument ?? metadata?.nodeItem.argument
@@ -563,7 +565,7 @@ export function planSaveNodeAndEnsureNodes(
   }
 
   return {
-    plan: planUpdateNodeText(plan, currentNode, trimmedText),
+    plan: planUpdateNodeText(plan, currentNode.id, trimmedText),
     viewPath,
     node: currentNode,
   };
@@ -790,12 +792,16 @@ export function usePlanner(): Planner {
 // This is simpler than creating actual node events - just stores where to inject
 export function planSetEmptyNodePosition(
   plan: Plan,
-  parentNode: GraphNode,
+  parentID: ID,
   parentView: View,
   parentViewPath: ViewPath,
   paneIndex: number,
   insertIndex: number
 ): Plan {
+  const parentNode = getWorkspaceNode(plan.knowledgeDBs, parentID);
+  if (!parentNode) {
+    return plan;
+  }
   const planWithExpanded = planExpandNode(plan, parentView, parentViewPath);
 
   return {

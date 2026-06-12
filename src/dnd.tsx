@@ -341,7 +341,7 @@ export function dnd(
         getBlockLinkTarget(sourceRow.node) || sourceRow.rowID,
         getBlockLinkText(sourceRow.node)
       ),
-      getCurrentPlanNode(accPlan, targetParentRow.node),
+      targetParentRow.node.id,
       insertAt
     )[0];
   };
@@ -397,11 +397,11 @@ export function dnd(
       const insertAt = dropIndex + idx;
       return planMoveNode(
         accPlan,
-        sourceRow.node,
         sourceRow.node.id,
-        getCurrentPlanNode(accPlan, sourceRow.parentNode),
+        sourceRow.node.id,
+        sourceRow.parentNode.id,
         sourceRow.viewPath,
-        getCurrentPlanNode(accPlan, targetParentRow.node),
+        targetParentRow.node.id,
         targetParentRow.viewPath,
         insertAt
       );
@@ -464,7 +464,7 @@ export function dnd(
           return planAddToParent(
             accPlan,
             addFallbackLinkText(insertTarget, sourceDrag.text),
-            targetNode,
+            targetNode.id,
             insertAt,
             sourceEdgeRelevance,
             sourceEdgeArgument
@@ -478,7 +478,7 @@ export function dnd(
           return planAddToParent(
             accPlan,
             createRefTarget(sourceTargetID, sourceDrag.text),
-            targetNode,
+            targetNode.id,
             insertAt
           )[0];
         }
@@ -493,7 +493,7 @@ export function dnd(
         return planAddToParent(
           accPlan,
           addFallbackLinkText(insertTarget, sourceDrag.text),
-          targetNode,
+          targetNode.id,
           insertAt,
           sourceEdgeRelevance,
           sourceEdgeArgument
@@ -503,7 +503,7 @@ export function dnd(
         return planAddToParent(
           accPlan,
           createRefTarget(dragTargetID, sourceDrag.linkText ?? sourceDrag.text),
-          targetNode,
+          targetNode.id,
           insertAt,
           sourceEdgeRelevance,
           sourceEdgeArgument
@@ -512,7 +512,7 @@ export function dnd(
       return planAddToParent(
         accPlan,
         toReferenceTarget(sourceNode),
-        targetNode,
+        targetNode.id,
         insertAt,
         sourceEdgeRelevance,
         sourceEdgeArgument
@@ -524,7 +524,7 @@ export function dnd(
       accPlan,
       deepCopySource.sourceId,
       deepCopySource.node,
-      targetNode,
+      targetNode.id,
       sourceRow.viewPath,
       targetParentRow.viewPath,
       insertAt

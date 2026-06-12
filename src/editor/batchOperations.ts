@@ -237,11 +237,11 @@ export function planBatchIndent(
       const insertAt = targetNodeBefore.children.size;
       const moved = planMoveNode(
         state.plan,
-        row.node,
         row.node.id,
-        row.parentNode,
+        row.node.id,
+        row.parentNode.id,
         viewPath,
-        targetNodeBefore,
+        targetNodeBefore.id,
         prevSibling.viewPath,
         insertAt
       );
@@ -271,10 +271,9 @@ export function planBatchIndent(
       if (editorText === currentText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
-      const movedNode = getCurrentPlanNode(moved, row.node);
       return {
         plan: updatedViewPath
-          ? planUpdateNodeText(moved, movedNode, editorText)
+          ? planUpdateNodeText(moved, row.node.id, editorText)
           : moved,
         remappedKeys: nextRemappedKeys,
       };
@@ -319,11 +318,11 @@ export function planBatchOutdent(
       const insertAt = parentNodeIndex + 1 + idx;
       const moved = planMoveNode(
         state.plan,
-        row.node,
         row.node.id,
-        row.parentNode,
+        row.node.id,
+        row.parentNode.id,
         viewPath,
-        getCurrentPlanNode(state.plan, grandParentNode),
+        grandParentNode.id,
         grandParentPath,
         insertAt
       );
@@ -349,10 +348,9 @@ export function planBatchOutdent(
       if (editorText === currentText) {
         return { plan: moved, remappedKeys: nextRemappedKeys };
       }
-      const movedNode = getCurrentPlanNode(moved, row.node);
       return {
         plan: updatedViewPath
-          ? planUpdateNodeText(moved, movedNode, editorText)
+          ? planUpdateNodeText(moved, row.node.id, editorText)
           : moved,
         remappedKeys: nextRemappedKeys,
       };

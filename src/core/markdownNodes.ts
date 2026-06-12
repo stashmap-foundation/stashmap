@@ -16,11 +16,7 @@ export type WalkContext = {
 
 function walkUpsertNode(ctx: WalkContext, node: GraphNode): WalkContext {
   const db = ctx.knowledgeDBs.get(ctx.sourceId, newDB());
-  const normalizedNode = ensureNodeNativeFields(
-    ctx.knowledgeDBs,
-    node,
-    ctx.sourceId
-  );
+  const normalizedNode = ensureNodeNativeFields(db, node);
   return {
     ...ctx,
     knowledgeDBs: ctx.knowledgeDBs.set(ctx.sourceId, {

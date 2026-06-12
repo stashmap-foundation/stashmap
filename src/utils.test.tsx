@@ -456,7 +456,11 @@ export async function forkOwnRoot(
   }
   const knowledgeDBs = Map<SourceId, KnowledgeData>([[LOCAL, knowledgeDB]]);
   const plan = createPlan({ ...utils, knowledgeDBs });
-  const [forkPlan, mapping] = planCopyDescendantNodes(plan, LOCAL, rootNode);
+  const [forkPlan, mapping] = planCopyDescendantNodes(
+    plan,
+    knowledgeDB,
+    rootNode
+  );
   const forkRootID = mapping.get(rootNode.id);
   const forkRoot = forkRootID
     ? forkPlan.knowledgeDBs.get(LOCAL)?.nodes.get(forkRootID)
@@ -466,7 +470,7 @@ export async function forkOwnRoot(
   }
   await execute({
     ...utils,
-    plan: planUpdateNodeText(forkPlan, forkRoot, forkText),
+    plan: planUpdateNodeText(forkPlan, forkRoot.id, forkText),
   });
 }
 

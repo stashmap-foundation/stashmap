@@ -5,8 +5,7 @@ import {
   BOB,
   expectTree,
   findNewNodeEditor,
-  follow,
-  forkReadonlyRoot,
+  readonlyRoute,
   navigateToNodeViaSearch,
   renderApp,
   renderTree,
@@ -213,38 +212,16 @@ Child
 
   test("cannot delete other user's root", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
-    await follow(bob, alice().user.publicKey);
 
-    renderTree(alice);
-    await type(
-      "My Notes{Enter}{Tab}Holiday Destinations{Enter}{Tab}Spain{Escape}"
-    );
-
-    await expectTree(`
-My Notes
-  Holiday Destinations
-    Spain
-    `);
-
-    await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
-    await userEvent.click(await screen.findByLabelText("edit My Notes"));
-    await userEvent.keyboard("{Enter}");
+    renderTree(bob);
     await type("Travel Ideas{Escape}");
     cleanup();
 
-    await follow(alice, bob().user.publicKey);
-    renderTree(alice);
-
-    await expectTree(`
-My Notes
-  Holiday Destinations
-    Spain
-  [S] Travel Ideas
-    `);
-
-    await userEvent.click(
-      await screen.findByLabelText("open Travel Ideas in fullscreen")
-    );
+    renderApp({
+      ...alice(),
+      initialRoute: readonlyRoute(bob().user.publicKey, "Travel Ideas"),
+    });
+    await screen.findByText("READONLY");
 
     await expectTree(`
 [O] Travel Ideas

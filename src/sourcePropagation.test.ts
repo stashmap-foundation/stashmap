@@ -51,12 +51,7 @@ function indexedData(entries: ReadonlyArray<[PublicKey, GraphNode[]]>): Data {
     createEmptyGraphIndex()
   );
   return {
-    contacts: Map<PublicKey, Contact>([
-      [SOURCE_A, { publicKey: SOURCE_A }],
-      [SOURCE_B, { publicKey: SOURCE_B }],
-    ]),
     user: { publicKey: LOCAL },
-    contactsRelays: Map<PublicKey, Relays>(),
     knowledgeDBs,
     snapshotNodes: Map<string, Map<string, GraphNode>>(),
     graphIndex,
@@ -267,44 +262,5 @@ test("incoming ref owner rows keep source identity when owner ids also collide",
   ]);
   expect(incomingRows.rows.map((row) => row.node.spans).toArray()).toEqual([
     [linkSpan("root", "Root B")],
-  ]);
-});
-
-test("incoming refs can target a bare id in another source", () => {
-  const aliceTarget = testNode(SOURCE_A, "target", "Target A");
-  const bobRoot = testNode(SOURCE_B, "bob-root", "Bob Root", {
-    children: List<ID>(["bob-link"]),
-  });
-  const bobLink = testNode(SOURCE_B, "bob-link", "", {
-    parent: "bob-root",
-    root: "bob-root",
-    spans: [linkSpan("target", "")],
-  });
-  const baseData = indexedData([
-    [SOURCE_A, [aliceTarget]],
-    [SOURCE_B, [bobRoot, bobLink]],
-  ]);
-  const data = {
-    ...baseData,
-    panes: [
-      {
-        ...baseData.panes[0],
-        author: SOURCE_A,
-        sourceId: SOURCE_A,
-        rootNodeId: "target",
-      },
-    ],
-  };
-
-  const incomingRows = getTreeChildren(
-    data,
-    [0, "target"],
-    "target",
-    SOURCE_A,
-    undefined
-  );
-
-  expect(incomingRows.rows.map((row) => row.viewPath).toArray()).toEqual([
-    [0, "target", "bob-root"],
   ]);
 });

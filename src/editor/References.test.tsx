@@ -4,8 +4,8 @@ import {
   ALICE,
   BOB,
   expectTree,
+  forkOwnRoot,
   forkReadonlyRoot,
-  follow,
   getPane,
   navigateToNodeViaSearch,
   renderApp,
@@ -32,10 +32,8 @@ Knowstr
     `);
   });
 
-  test("Other user's version shows as suggestion and version entry", async () => {
-    const [alice, bob] = setup([ALICE, BOB]);
-    await follow(alice, bob().user.publicKey);
-    await follow(bob, alice().user.publicKey);
+  test("Fork's version shows as suggestion and version entry", async () => {
+    const [alice] = setup([ALICE]);
 
     renderTree(alice);
     await type(
@@ -43,7 +41,9 @@ Knowstr
     );
     cleanup();
 
-    await forkReadonlyRoot(bob(), alice().user.publicKey, "Notes");
+    await forkOwnRoot(alice, "Notes", "My Fork");
+    renderTree(alice);
+    await navigateToNodeViaSearch(0, "My Fork");
     await userEvent.click(
       await screen.findByLabelText("open Cities in fullscreen")
     );
@@ -55,7 +55,9 @@ Knowstr
     await type("Bob child{Escape}");
     cleanup();
 
+    window.history.pushState({}, "", "/");
     renderTree(alice);
+    await navigateToNodeViaSearch(0, "Notes");
     await expectTree(`
 Notes
   Cities
@@ -65,10 +67,8 @@ Notes
     `);
   });
 
-  test("Clicking version fullscreen opens with that author's content", async () => {
-    const [alice, bob] = setup([ALICE, BOB]);
-    await follow(alice, bob().user.publicKey);
-    await follow(bob, alice().user.publicKey);
+  test("Clicking version fullscreen opens with the fork's content", async () => {
+    const [alice] = setup([ALICE]);
 
     renderTree(alice);
     await type(
@@ -76,7 +76,9 @@ Notes
     );
     cleanup();
 
-    await forkReadonlyRoot(bob(), alice().user.publicKey, "Notes");
+    await forkOwnRoot(alice, "Notes", "My Fork");
+    renderTree(alice);
+    await navigateToNodeViaSearch(0, "My Fork");
     await userEvent.click(
       await screen.findByLabelText("open Cities in fullscreen")
     );
@@ -88,25 +90,25 @@ Notes
     await type("Bob child{Enter}Bob2{Enter}Bob3{Enter}Bob4{Escape}");
     cleanup();
 
+    window.history.pushState({}, "", "/");
     renderTree(alice);
+    await navigateToNodeViaSearch(0, "Notes");
     await userEvent.click(
       await screen.findByLabelText(/open .* \+4 in fullscreen/)
     );
 
     await expectTree(`
-[O] Barcelona
-  [O] Bob child
-  [O] Bob2
-  [O] Bob3
-  [O] Bob4
-  [O] Alice child
+Barcelona
+  Bob child
+  Bob2
+  Bob3
+  Bob4
+  Alice child
     `);
   });
 
   test("Descendant versions appear when viewing the base version", async () => {
-    const [alice, bob] = setup([ALICE, BOB]);
-    await follow(alice, bob().user.publicKey);
-    await follow(bob, alice().user.publicKey);
+    const [alice] = setup([ALICE]);
 
     renderTree(alice);
     await type(
@@ -114,7 +116,9 @@ Notes
     );
     cleanup();
 
-    await forkReadonlyRoot(bob(), alice().user.publicKey, "Notes");
+    await forkOwnRoot(alice, "Notes", "My Fork");
+    renderTree(alice);
+    await navigateToNodeViaSearch(0, "My Fork");
     await userEvent.click(
       await screen.findByLabelText("open Cities in fullscreen")
     );
@@ -126,7 +130,9 @@ Notes
     await type("Bob child{Enter}Bob2{Enter}Bob3{Enter}Bob4{Escape}");
     cleanup();
 
+    window.history.pushState({}, "", "/");
     renderTree(alice);
+    await navigateToNodeViaSearch(0, "Notes");
 
     await expectTree(`
 Notes
@@ -136,13 +142,12 @@ Notes
       [S] Bob child
       [S] Bob2
       [S] Bob3
-      [VO] +4
+      [V] +4
     `);
   });
 
   test("Ancestor versions appear when viewing a fork", async () => {
     const [alice, bob] = setup([ALICE, BOB]);
-    await follow(bob, alice().user.publicKey);
 
     renderTree(alice);
     await type(

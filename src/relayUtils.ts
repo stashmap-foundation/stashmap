@@ -96,15 +96,12 @@ export function findRelays(events: List<EventTemplate>): Relays {
 
 export function mergeRelays<T extends Relays>(relays: T, relaysToMerge: T): T {
   const combinedRelays = [...relays, ...relaysToMerge];
-  const uniqueRelays: T = combinedRelays.reduce(
-    (acc: T, current: Relay | SuggestedRelay) => {
-      if (!acc.some((relay) => relay.url === current.url)) {
-        return [...acc, current] as T;
-      }
-      return acc;
-    },
-    [] as unknown as T
-  );
+  const uniqueRelays: T = combinedRelays.reduce((acc: T, current: Relay) => {
+    if (!acc.some((relay) => relay.url === current.url)) {
+      return [...acc, current] as T;
+    }
+    return acc;
+  }, [] as unknown as T);
   return uniqueRelays;
 }
 

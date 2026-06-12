@@ -88,9 +88,7 @@ export function FilesystemDataProvider({
 
   return (
     <DataContextProvider
-      contacts={Map()}
       user={user}
-      contactsRelays={Map()}
       knowledgeDBs={Map<PublicKey, KnowledgeData>()}
       graphIndex={createEmptyGraphIndex()}
       documents={Map()}

@@ -31,7 +31,6 @@ import {
   createGraphPlan,
   planAddTargetsToNode,
   planCopyDescendantNodes,
-  planUpsertContact,
   planUpsertNodes,
   withDocumentRoot,
 } from "./core/plan";
@@ -54,24 +53,16 @@ import {
   shiftSelect,
   toggleSelect,
 } from "./core/selection";
-import {
-  withUsersEntryPublicKey,
-  getNodeUserPublicKey,
-} from "./infra/nostr/userEntry";
-import { decodePublicKeyInputSync } from "./infra/nostr/publicKeys";
 
 export type { AddToParentTarget, GraphPlan } from "./core/plan";
 export {
   createGraphPlan,
-  planAddContacts,
   planAddTargetsToNode,
   planAddTopTargetsToDocument,
   planDeleteDescendantNodes,
   planDeleteNodes,
   planMoveDescendantNodes,
   planPublishRelayMetadata,
-  planRemoveContact,
-  planUpsertContact,
   planUpsertNodes,
   relayTags,
 } from "./core/plan";
@@ -96,24 +87,12 @@ export function planUpdateNodeText(
   if (nodeText(currentNode) === text) {
     return plan;
   }
-  const updatedNode = withUsersEntryPublicKey({
+  const updatedNode = {
     ...currentNode,
     spans: plainSpans(text),
     updated: Date.now(),
-  });
-  const basePlan = planUpsertNodes(plan, updatedNode);
-  const userPublicKey = getNodeUserPublicKey(currentNode, text);
-  const isCustomName = !decodePublicKeyInputSync(text);
-  if (userPublicKey && basePlan.contacts.has(userPublicKey)) {
-    const contact = basePlan.contacts.get(userPublicKey);
-    return contact
-      ? planUpsertContact(basePlan, {
-          ...contact,
-          userName: isCustomName ? text : undefined,
-        })
-      : basePlan;
-  }
-  return basePlan;
+  };
+  return planUpsertNodes(plan, updatedNode);
 }
 
 function removeEmptyNodeFromKnowledgeDBs(
@@ -454,11 +433,9 @@ export function planDeepCopyNode(
  * Create a new node value for insertion into the current node tree.
  */
 export function planCreateNode(plan: Plan, text: string): [Plan, TextSeed] {
-  const userPublicKey = decodePublicKeyInputSync(text);
   const node: TextSeed = {
     id: text as ID,
     text,
-    ...(userPublicKey ? { userPublicKey } : {}),
   };
   return [plan, node];
 }
@@ -497,10 +474,7 @@ function planCreateNoteAtRoot(
 ): SaveNodeResult {
   const [planWithSeed, createdSeed] = planCreateNode(plan, text);
   const createdNode = withDocumentRoot(
-    withUsersEntryPublicKey(
-      newGraphNode(plan.user.publicKey, plainSpans(createdSeed.text)),
-      createdSeed.text
-    )
+    newGraphNode(plan.user.publicKey, plainSpans(createdSeed.text))
   );
   const planWithNode = planUpsertNodes(planWithSeed, createdNode);
 

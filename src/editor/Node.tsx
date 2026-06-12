@@ -60,7 +60,6 @@ import { buildNodeRouteUrl } from "../navigationUrl";
 import { RightMenu } from "./RightMenu";
 import { useItemStyle } from "./useItemStyle";
 import { EditorTextProvider } from "./EditorTextContext";
-import { getNodeUserPublicKey } from "../infra/nostr/userEntry";
 
 export { getNodesInTree } from "../treeTraversal";
 
@@ -789,25 +788,6 @@ function IncomingRefGutterIndicator(): JSX.Element {
   );
 }
 
-function UserEntryIndicator({
-  isFollowing,
-}: {
-  isFollowing: boolean;
-}): JSX.Element {
-  return (
-    <span
-      className={
-        isFollowing ? "user-entry-indicator-following" : "user-entry-indicator"
-      }
-      title={isFollowing ? "Followed user entry" : "User entry"}
-      aria-hidden="true"
-      data-testid="user-entry-indicator"
-    >
-      @
-    </span>
-  );
-}
-
 function VersionIndicator({
   isOtherUser,
 }: {
@@ -852,9 +832,6 @@ export function Node({
   const currentNode = useCurrentNode();
   const isViewingOtherUser = useIsViewingOtherUserContent();
   const node = getCurrentReferenceForRow(data, row);
-  const userEntryPublicKey = getNodeUserPublicKey(currentNode);
-  const isFollowingUserEntry =
-    !!userEntryPublicKey && data.contacts.has(userEntryPublicKey);
   const isOtherUser =
     (node && node.author !== user.publicKey) || isViewingOtherUser;
 
@@ -879,17 +856,9 @@ export function Node({
         data-deleted={
           node && "deleted" in node && node.deleted ? "true" : undefined
         }
-        data-user-entry={userEntryPublicKey ? "true" : undefined}
-        data-user-following={isFollowingUserEntry ? "true" : undefined}
       >
         <div className="indicator-gutter">
           {isSuggestion && <SuggestionIndicator />}
-          {!isSuggestion &&
-            !isVersion &&
-            !virtualType &&
-            userEntryPublicKey && (
-              <UserEntryIndicator isFollowing={isFollowingUserEntry} />
-            )}
           {isVersion && <VersionIndicator isOtherUser={!!isOtherUser} />}
           {virtualType === "incoming" && <IncomingRefGutterIndicator />}
           {relevance === "relevant" && !isSuggestion && (

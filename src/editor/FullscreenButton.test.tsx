@@ -2,27 +2,25 @@ import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
-  BOB,
   expectTree,
   findNewNodeEditor,
-  forkReadonlyRoot,
-  follow,
+  forkOwnRoot,
   navigateToNodeViaSearch,
   renderTree,
   setup,
 } from "../utils.test";
 
 test("Reference node opens with only reference path, not current pane stack", async () => {
-  const [alice, bob] = setup([ALICE, BOB]);
+  const [alice] = setup([ALICE]);
 
   renderTree(alice);
   await userEvent.type(await findNewNodeEditor(), "My Notes{Escape}");
-
   cleanup();
 
-  await follow(alice, bob().user.publicKey);
-  await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
-  await userEvent.click(await screen.findByLabelText("edit My Notes"));
+  await forkOwnRoot(alice, "My Notes", "My Fork");
+  renderTree(alice);
+  await navigateToNodeViaSearch(0, "My Fork");
+  await userEvent.click(await screen.findByLabelText("edit My Fork"));
   await userEvent.keyboard("{Enter}");
   await userEvent.type(
     await findNewNodeEditor(),
@@ -30,6 +28,7 @@ test("Reference node opens with only reference path, not current pane stack", as
   );
   cleanup();
 
+  window.history.pushState({}, "", "/");
   renderTree(alice);
   await navigateToNodeViaSearch(0, "My Notes");
 
@@ -43,11 +42,11 @@ My Notes
   );
 
   await expectTree(`
-[O] Holiday Destinations
-  [O] Spain
+Holiday Destinations
+  Spain
   `);
 
-  await screen.findByLabelText("Navigate to My Notes");
+  await screen.findByLabelText("Navigate to My Fork");
   expect(
     screen.queryByLabelText("Navigate to Holiday Destinations")
   ).toBeNull();

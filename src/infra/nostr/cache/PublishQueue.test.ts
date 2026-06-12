@@ -17,7 +17,6 @@ const ALICE_USER: User = {
 const TEST_RELAYS: AllRelays = {
   defaultRelays: [],
   userRelays: [{ url: "wss://relay.test/", read: true, write: true }],
-  contactsRelays: [],
 };
 
 const makeEvent = (dTag: string): UnsignedEvent & EventAttachment => ({
@@ -192,7 +191,6 @@ test("clears events from buffer when their target relay is removed from config",
         { url: RELAY_A, read: true, write: true },
         { url: RELAY_B, read: true, write: true },
       ],
-      contactsRelays: [],
     },
   };
 
@@ -219,7 +217,6 @@ test("clears events from buffer when their target relay is removed from config",
   relayConfig.current = {
     defaultRelays: [],
     userRelays: [{ url: RELAY_A, read: true, write: true }],
-    contactsRelays: [],
   };
 
   queue.enqueue(List([makeEvent("c")]));

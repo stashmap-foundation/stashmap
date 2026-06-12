@@ -5,68 +5,14 @@ import {
   useIsViewingOtherUserContent,
   useCurrentRowID,
   useCurrentNode,
-  useDisplayText,
   useRow,
 } from "../rowModel";
 import { isEmptySemanticID } from "../core/connections";
-import { useData } from "../DataContext";
 import { useCurrentPane } from "../SplitPanesContext";
 import { RelevanceSelector } from "./RelevanceSelector";
 import { EvidenceSelector } from "./EvidenceSelector";
 import { FullscreenButton } from "./FullscreenButton";
 import { OpenInSplitPaneButton } from "./OpenInSplitPaneButton";
-import { usePlanner, planUpsertContact, planRemoveContact } from "../planner";
-import { preventEditorBlur } from "./AddNode";
-import { getNodeUserPublicKey } from "../infra/nostr/userEntry";
-import { decodePublicKeyInputSync } from "../infra/nostr/publicKeys";
-
-function useCurrentUserEntryPublicKey(): PublicKey | undefined {
-  return getNodeUserPublicKey(useCurrentNode());
-}
-
-function FollowUserEntryButton(): JSX.Element | null {
-  const data = useData();
-  const displayText = useDisplayText();
-  const { createPlan, executePlan } = usePlanner();
-  const userPublicKey = useCurrentUserEntryPublicKey();
-  if (!userPublicKey) {
-    return null;
-  }
-
-  const isFollowing = data.contacts.has(userPublicKey);
-  const actionLabel = isFollowing ? "Unfollow" : "Follow";
-  const ariaLabel = `${actionLabel.toLowerCase()} ${
-    displayText || userPublicKey
-  }`;
-
-  const onClick = (): void => {
-    const basePlan = createPlan();
-    const userName = !decodePublicKeyInputSync(displayText)
-      ? displayText
-      : undefined;
-    executePlan(
-      isFollowing
-        ? planRemoveContact(basePlan, userPublicKey)
-        : planUpsertContact(basePlan, {
-            publicKey: userPublicKey,
-            userName,
-          })
-    );
-  };
-
-  return (
-    <button
-      type="button"
-      className="pill"
-      aria-label={ariaLabel}
-      onMouseDown={preventEditorBlur}
-      onClick={onClick}
-      title={actionLabel}
-    >
-      {actionLabel}
-    </button>
-  );
-}
 
 export function RightMenu(): JSX.Element {
   const { virtualType } = useRow();
@@ -79,7 +25,6 @@ export function RightMenu(): JSX.Element {
   const currentNode = useCurrentNode();
   const isViewingOtherUserContent = useIsViewingOtherUserContent();
   const isInSearchView = useIsInSearchView();
-  const userEntryPublicKey = useCurrentUserEntryPublicKey();
   const [rowID] = useCurrentRowID();
   const isDocumentTopLevel =
     isRoot && pane.documentId !== undefined && !isVirtualItem && !!currentNode;
@@ -92,18 +37,13 @@ export function RightMenu(): JSX.Element {
   return (
     <div className="right-menu">
       <div className="relevance-slot">
-        {!isReadonly && !userEntryPublicKey && (
-          <RelevanceSelector virtualType={virtualType} />
-        )}
+        {!isReadonly && <RelevanceSelector virtualType={virtualType} />}
       </div>
       <div className="evidence-slot">
-        {!isReadonly && !userEntryPublicKey && virtualType !== "suggestion" && (
-          <EvidenceSelector />
-        )}
+        {!isReadonly && virtualType !== "suggestion" && <EvidenceSelector />}
       </div>
       {!isEmptySemanticID(rowID) && (
         <div className="action-slot">
-          <FollowUserEntryButton />
           <FullscreenButton />
           <OpenInSplitPaneButton />
         </div>

@@ -23,10 +23,11 @@ export function isSafeMarkdownNodeId(id: string): boolean {
   return id.length > 0 && id.trim() === id && !UNSAFE_MARKDOWN_ID_RE.test(id);
 }
 
-function sourceOrderFromData(data: Data): SourceId[] {
+type GraphLookupData = Pick<Data, "user" | "knowledgeDBs" | "graphIndex">;
+
+function sourceOrderFromData(data: GraphLookupData): SourceId[] {
   const preferred = [
     data.user.publicKey,
-    ...data.contacts.keySeq().toArray(),
     ...data.knowledgeDBs.keySeq().toArray(),
     ...data.graphIndex.nodesBySource.keys(),
   ];
@@ -36,7 +37,7 @@ function sourceOrderFromData(data: Data): SourceId[] {
   );
 }
 
-export function graphLookupFromData(data: Data): GraphLookup {
+export function graphLookupFromData(data: GraphLookupData): GraphLookup {
   return {
     knowledgeDBs: data.knowledgeDBs,
     graphIndex: data.graphIndex,

@@ -20,7 +20,6 @@ export const EMPTY_SEMANTIC_ID = "" as ID;
 export type TextSeed = {
   id: ID;
   text: string;
-  userPublicKey?: PublicKey;
 };
 
 export type RefTargetSeed = {

@@ -2,11 +2,9 @@ import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
-  BOB,
   expectTree,
-  forkReadonlyRoot,
+  forkOwnRoot,
   findNewNodeEditor,
-  follow,
   getPane,
   navigateToNodeViaSearch,
   openNodeInFullscreen,
@@ -192,8 +190,7 @@ OtherParent
 });
 
 test("Deep copy preserves all children when forked duplicate nodes exist", async () => {
-  const [alice, bob] = setup([ALICE, BOB]);
-  await follow(alice, bob().user.publicKey);
+  const [alice] = setup([ALICE]);
 
   renderTree(alice);
   await type(
@@ -201,7 +198,9 @@ test("Deep copy preserves all children when forked duplicate nodes exist", async
   );
   cleanup();
 
-  await forkReadonlyRoot(bob(), alice().user.publicKey, "Holiday Destinations");
+  await forkOwnRoot(alice, "Holiday Destinations", "My Fork");
+  renderTree(alice);
+  await navigateToNodeViaSearch(0, "My Fork");
   await userEvent.click(
     await screen.findByLabelText("open Spain in fullscreen")
   );
@@ -209,6 +208,7 @@ test("Deep copy preserves all children when forked duplicate nodes exist", async
   await userEvent.keyboard("{Enter}");
   await type("Sevilla{Enter}Barcelona{Enter}Madrid{Enter}Granada{Escape}");
   cleanup();
+  window.history.pushState({}, "", "/");
 
   renderApp({
     ...alice(),
@@ -225,7 +225,7 @@ Spain
   [S] Sevilla
   [S] Barcelona
   [S] Madrid
-  [VO] +4
+  [V] +4
   `);
 
   cleanup();
@@ -251,7 +251,7 @@ Spain
   [S] Sevilla
   [S] Barcelona
   [S] Madrid
-  [VO] +4
+  [V] +4
   `);
 
   const versionFullscreenBtns = await screen.findAllByLabelText(
@@ -260,13 +260,13 @@ Spain
   await userEvent.click(versionFullscreenBtns[0]);
 
   await expectTree(`
-[O] Spain
-  [O] Sevilla
-  [O] Barcelona
-  [O] Madrid
-  [O] Granada
-  [O] Valencia
-  [O] Malaga
+Spain
+  Sevilla
+  Barcelona
+  Madrid
+  Granada
+  Valencia
+  Malaga
   `);
 
   await userEvent.click(screen.getAllByLabelText("open in split pane")[0]);
@@ -282,13 +282,13 @@ Spain
   await userEvent.click(expandButtons[expandButtons.length - 1]);
 
   await expectTree(`
-[O] Spain
-  [O] Sevilla
-  [O] Barcelona
-  [O] Madrid
-  [O] Granada
-  [O] Valencia
-  [O] Malaga
+Spain
+  Sevilla
+  Barcelona
+  Madrid
+  Granada
+  Valencia
+  Malaga
 Target
   Spain
     Sevilla

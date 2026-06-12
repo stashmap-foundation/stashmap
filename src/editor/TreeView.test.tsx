@@ -1,11 +1,9 @@
 import { Map } from "immutable";
-import { cleanup, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
-  BOB,
   expectTree,
-  follow,
   renderApp,
   renderTree,
   setup,
@@ -90,29 +88,6 @@ test("search shows each matching context path", async () => {
 Search: Target
   [R] Work / Projects / Target >>>
   [R] Notes / Level1 / Level2 / Target >>>
-  `);
-});
-
-test("other user's search result shows other-user indicator", async () => {
-  const [alice, bob] = setup([ALICE, BOB]);
-  await follow(alice, bob().user.publicKey);
-
-  renderTree(bob);
-  await type("Bob Root{Enter}{Tab}Shared{Escape}");
-  cleanup();
-
-  renderApp(alice());
-  await userEvent.click(
-    await screen.findByLabelText("Search to change pane 0 content")
-  );
-  await userEvent.type(
-    await screen.findByLabelText("search input"),
-    "Shared{Enter}"
-  );
-
-  await expectTree(`
-Search: Shared
-  [OR] Bob Root / Shared >>>
   `);
 });
 

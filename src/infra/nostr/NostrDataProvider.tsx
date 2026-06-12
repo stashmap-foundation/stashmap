@@ -4,7 +4,6 @@ import { List, Map } from "immutable";
 import { RelayInformation } from "nostr-tools/lib/types/nip11";
 import {
   KIND_KNOWLEDGE_DOCUMENT,
-  KIND_CONTACTLIST,
   KIND_SETTINGS,
   KIND_RELAY_METADATA_EVENT,
 } from "../../nostr";
@@ -13,17 +12,13 @@ import { useBackend } from "../../BackendContext";
 import { PlanningContextProvider } from "../../planner";
 import { NostrExecutorProvider } from "./NostrExecutorProvider";
 import { useUserRelayContext } from "../../UserRelayContext";
-import { flattenRelays, usePreloadRelays } from "../../relays";
+import { usePreloadRelays } from "../../relays";
 import { useDefaultRelays, useUserOrAnon } from "../../NostrAuthContext";
 import { useEventQuery } from "../../commons/useNostrQuery";
 import { getOutboxEvents } from "./cache/indexedDB";
 import { useCacheDB } from "./cache/CacheDBContext";
 import { NavigationStateProvider } from "../../NavigationStateContext";
-import {
-  mergeEvents,
-  newProcessedEvents,
-  processEvents,
-} from "../../eventProcessing";
+import { processEvents } from "../../eventProcessing";
 import { DocumentStoreProvider } from "../../DocumentStore";
 import { NostrCacheSync } from "./cache/NostrCacheSync";
 import { createEmptyGraphIndex } from "../../graphIndex";
@@ -31,7 +26,7 @@ import { useUserSessionState } from "../../userSessionState";
 
 export const KIND_SEARCH = [KIND_KNOWLEDGE_DOCUMENT];
 
-export const KINDS_META = [KIND_SETTINGS, KIND_CONTACTLIST];
+export const KINDS_META = [KIND_SETTINGS];
 
 export function NostrDataProvider({
   children,
@@ -68,46 +63,25 @@ export function NostrDataProvider({
     return () => controller.abort();
   }, [db]);
 
-  const { events: mE, eose: metaEventsEose } = useEventQuery(
+  const { eose: metaEventsEose } = useEventQuery(
     backend,
-    [
-      { authors: [myPublicKey], kinds: [KIND_SETTINGS], limit: 1 },
-      { authors: [myPublicKey], kinds: [KIND_CONTACTLIST], limit: 1 },
-    ],
+    [{ authors: [myPublicKey], kinds: [KIND_SETTINGS], limit: 1 }],
     {
       readFromRelays: usePreloadRelays({
         user: true,
       }),
     }
   );
-  const metaEvents = mE
-    .valueSeq()
-    .toList()
-    .merge(session.publishStatus.unsignedEvents);
-
-  const processedMetaEvents = mergeEvents(
-    processEvents(metaEvents).get(myPublicKey, newProcessedEvents()),
-    session.publishStatus.preLoginEvents
-  );
-  const contacts = processedMetaEvents.contacts.filter(
-    (_, k) => k !== myPublicKey
-  );
-
   const extraAuthors = useMemo(
     () => [...new globalThis.Set(session.panes.map((pane) => pane.author))],
     [session.panes]
   );
 
-  const { events: contactRelayEvents } = useEventQuery(
+  const { events: paneRelayEvents } = useEventQuery(
     backend,
     [
       {
-        authors: [
-          ...new globalThis.Set([
-            ...contacts.keySeq().toArray(),
-            ...extraAuthors.filter((a) => a !== myPublicKey),
-          ]),
-        ],
+        authors: extraAuthors.filter((a) => a !== myPublicKey),
         kinds: [KIND_RELAY_METADATA_EVENT],
       },
     ],
@@ -120,18 +94,16 @@ export function NostrDataProvider({
     }
   );
 
-  const processedContactRelayEvents = processEvents(
-    contactRelayEvents.valueSeq().toList()
+  const processedPaneRelayEvents = processEvents(
+    paneRelayEvents.valueSeq().toList()
   );
 
-  const contactsRelays = processedContactRelayEvents.reduce((rdx, p, key) => {
+  const paneRelays = processedPaneRelayEvents.reduce((rdx, p, key) => {
     return rdx.set(key, p.relays);
   }, Map<PublicKey, Relays>());
   return (
     <DataContextProvider
-      contacts={contacts}
       user={user}
-      contactsRelays={contactsRelays}
       knowledgeDBs={Map<PublicKey, KnowledgeData>()}
       graphIndex={createEmptyGraphIndex()}
       documents={Map()}
@@ -145,7 +117,7 @@ export function NostrDataProvider({
       <DocumentStoreProvider
         unpublishedEvents={session.publishStatus.unsignedEvents}
       >
-        <NostrCacheSync />
+        <NostrCacheSync paneRelays={paneRelays} />
         <MergeKnowledgeDB>
           <NostrExecutorProvider
             setPublishEvents={session.setPublishStatus}
@@ -154,7 +126,6 @@ export function NostrDataProvider({
             getRelays={() => ({
               defaultRelays,
               userRelays,
-              contactsRelays: flattenRelays(contactsRelays),
             })}
           >
             <PlanningContextProvider

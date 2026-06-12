@@ -1,14 +1,6 @@
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import {
-  ALICE,
-  BOB,
-  expectTree,
-  follow,
-  renderApp,
-  setup,
-  type,
-} from "../utils.test";
+import { ALICE, BOB, expectTree, renderApp, setup, type } from "../utils.test";
 
 describe("Search Results", () => {
   test("Search shows results as tree with search query as root", async () => {
@@ -57,8 +49,6 @@ Search: Apple
     await type("Notes{Enter}Shared Topic{Escape}");
 
     cleanup();
-
-    await follow(alice, bob().user.publicKey);
     renderApp(alice());
 
     await type("Notes{Enter}Shared Topic{Escape}");
@@ -84,8 +74,6 @@ Search: Shared Topic
     await type("Notes{Enter}Shared Topic{Escape}");
 
     cleanup();
-
-    await follow(alice, bob().user.publicKey);
     renderApp(bob());
     await type("Notes{Enter}Shared Topic{Escape}");
 
@@ -132,42 +120,6 @@ Notes
     await expectTree(`
 Search: Barcelona
   [R] Notes / Holiday Destinations / Spain / Barcelona >>>
-    `);
-
-    expect(screen.queryByText(/Loading/)).toBeNull();
-  });
-
-  test("Cross-user search result context paths never show Loading text", async () => {
-    const [alice, bob] = setup([ALICE, BOB]);
-
-    renderApp(bob());
-    await type(
-      "Notes{Enter}Holiday Destinations{Enter}{Tab}Spain{Enter}{Tab}Barcelona{Escape}"
-    );
-
-    await expectTree(`
-Notes
-  Holiday Destinations
-    Spain
-      Barcelona
-    `);
-
-    cleanup();
-
-    await follow(alice, bob().user.publicKey);
-    renderApp(alice());
-
-    await userEvent.click(
-      await screen.findByLabelText("Search to change pane 0 content")
-    );
-    await userEvent.type(
-      await screen.findByLabelText("search input"),
-      "Barcelona{Enter}"
-    );
-
-    await expectTree(`
-Search: Barcelona
-  [OR] Notes / Holiday Destinations / Spain / Barcelona >>>
     `);
 
     expect(screen.queryByText(/Loading/)).toBeNull();

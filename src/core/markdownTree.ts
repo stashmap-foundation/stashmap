@@ -36,7 +36,6 @@ type ParsedComment = {
   basedOn: string | undefined;
   snapshotId: string | undefined;
   systemRole: RootSystemRole | undefined;
-  userPublicKey: PublicKey | undefined;
 };
 
 function parseIdComment(content: string): ParsedComment | undefined {
@@ -57,16 +56,11 @@ function parseIdComment(content: string): ParsedComment | undefined {
 
   const basedOn = attrsMap.basedOn || undefined;
   const snapshotId = attrsMap.snapshot || undefined;
-  const userPublicKey = (attrsMap.userPublicKey || undefined) as
-    | PublicKey
-    | undefined;
-
   return {
     uuid,
     basedOn,
     snapshotId,
     systemRole: undefined,
-    userPublicKey,
   };
 }
 
@@ -242,7 +236,6 @@ export type MarkdownTreeNode = {
   basedOn?: string;
   snapshotId?: string;
   systemRole?: RootSystemRole;
-  userPublicKey?: PublicKey;
 };
 
 function appendNode(
@@ -284,9 +277,6 @@ function commentNodeAttrs(
     }),
     ...(commentAttrs?.systemRole !== undefined && {
       systemRole: commentAttrs.systemRole,
-    }),
-    ...(commentAttrs?.userPublicKey !== undefined && {
-      userPublicKey: commentAttrs.userPublicKey,
     }),
   };
 }

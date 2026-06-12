@@ -5,7 +5,6 @@ import { createEmptyGraphIndex } from "../../graphIndex";
 const EMPTY_RELAYS: AllRelays = {
   defaultRelays: [],
   userRelays: [],
-  contactsRelays: [],
 };
 
 export function createHeadlessPlan(
@@ -13,9 +12,7 @@ export function createHeadlessPlan(
   knowledgeDBs: KnowledgeDBs = Map<PublicKey, KnowledgeData>()
 ): GraphPlan {
   return createGraphPlan({
-    contacts: Map<PublicKey, Contact>(),
     user: { publicKey: viewer },
-    contactsRelays: Map<PublicKey, Relays>(),
     knowledgeDBs,
     graphIndex: createEmptyGraphIndex(),
     documents: Map(),

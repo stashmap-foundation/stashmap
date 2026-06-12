@@ -1,12 +1,7 @@
 /* eslint-disable @typescript-eslint/no-use-before-define, functional/no-let, functional/immutable-data, no-continue, no-nested-ternary */
 import { List, Map, Set as ImmutableSet } from "immutable";
 import { v4 } from "uuid";
-import {
-  KIND_CONTACTLIST,
-  KIND_RELAY_METADATA_EVENT,
-  newTimestamp,
-  msTag,
-} from "../nostr";
+import { KIND_RELAY_METADATA_EVENT, newTimestamp, msTag } from "../nostr";
 import { ensureNodeNativeFields, getNode, isSearchId } from "./connections";
 import type {
   DocumentLinkTargetSeed,
@@ -37,9 +32,7 @@ export type CoreOutboundEvent = {
 
 type GraphPlanData = Pick<
   Data,
-  | "contacts"
   | "user"
-  | "contactsRelays"
   | "knowledgeDBs"
   | "snapshotNodes"
   | "graphIndex"
@@ -54,71 +47,6 @@ export type GraphPlan = GraphPlanData & {
   deletedDocs: ImmutableSet<string>;
   relays: AllRelays;
 };
-
-function newContactListEvent(
-  contacts: Contacts,
-  user: User
-): CoreOutboundEvent {
-  const tags = contacts
-    .valueSeq()
-    .toArray()
-    .map((c) => {
-      if (c.mainRelay && c.userName) {
-        return ["p", c.publicKey, c.mainRelay, c.userName];
-      }
-      if (c.mainRelay) {
-        return ["p", c.publicKey, c.mainRelay];
-      }
-      if (c.userName) {
-        return ["p", c.publicKey, "", c.userName];
-      }
-      return ["p", c.publicKey];
-    });
-  return {
-    kind: KIND_CONTACTLIST,
-    pubkey: user.publicKey,
-    created_at: newTimestamp(),
-    tags: [...tags, msTag()],
-    content: "",
-  };
-}
-
-function setRelayConf(
-  event: CoreOutboundEvent,
-  conf: WriteRelayConf
-): CoreOutboundEvent & EventAttachment {
-  return {
-    ...event,
-    writeRelayConf: conf,
-  };
-}
-
-export function planUpsertContact<T extends GraphPlan>(
-  plan: T,
-  contact: Contact
-): T {
-  const existing = plan.contacts.get(contact.publicKey);
-  if (
-    existing?.publicKey === contact.publicKey &&
-    existing?.mainRelay === contact.mainRelay &&
-    existing?.userName === contact.userName
-  ) {
-    return plan;
-  }
-  const newContacts = plan.contacts.set(contact.publicKey, contact);
-  const contactListEvent = newContactListEvent(newContacts, plan.user);
-  return {
-    ...plan,
-    publishEvents: plan.publishEvents.push(
-      setRelayConf(contactListEvent, {
-        defaultRelays: false,
-        user: true,
-
-        contacts: false,
-      })
-    ),
-  };
-}
 
 function planEnsureSystemRoot<T extends GraphPlan>(
   plan: T,
@@ -144,43 +72,6 @@ function planEnsureSystemRoot<T extends GraphPlan>(
   );
 
   return [upsertNodesCore(plan, node), node];
-}
-
-export function planAddContacts<T extends GraphPlan>(
-  plan: T,
-  publicKeys: List<PublicKey>
-): T {
-  const newContacts = publicKeys.reduce((rdx, publicKey) => {
-    if (rdx.has(publicKey)) {
-      return rdx;
-    }
-    const newContact: Contact = {
-      publicKey,
-    };
-    return rdx.set(publicKey, newContact);
-  }, plan.contacts);
-
-  const contactListEvent = newContactListEvent(newContacts, plan.user);
-  return {
-    ...plan,
-    publishEvents: plan.publishEvents.push(contactListEvent),
-  };
-}
-
-export function planRemoveContact<T extends GraphPlan>(
-  plan: T,
-  publicKey: PublicKey
-): T {
-  const contactToRemove = plan.contacts.get(publicKey);
-  if (!contactToRemove) {
-    return plan;
-  }
-  const newContacts = plan.contacts.remove(publicKey);
-  const contactListEvent = newContactListEvent(newContacts, plan.user);
-  return {
-    ...plan,
-    publishEvents: plan.publishEvents.push(contactListEvent),
-  };
 }
 
 export function planUpsertRootDocument<T extends GraphPlan>(
@@ -694,10 +585,6 @@ export function planAddTargetsToNode<T extends GraphPlan>(
         typeof objectOrID !== "string" && "text" in objectOrID
           ? objectOrID.text
           : undefined;
-      const objectUserPublicKey =
-        typeof objectOrID !== "string" && "userPublicKey" in objectOrID
-          ? objectOrID.userPublicKey
-          : undefined;
       if (refTarget || isSearchId(objectID as ID)) {
         const childNode = refTarget
           ? newGraphNode(
@@ -776,11 +663,8 @@ export function planAddTargetsToNode<T extends GraphPlan>(
           parent: parentNode.id,
         }
       );
-      const nodeWithUserPublicKey = objectUserPublicKey
-        ? { ...childNode, userPublicKey: objectUserPublicKey }
-        : childNode;
       const nodeWithMetadata = {
-        ...nodeWithUserPublicKey,
+        ...childNode,
         relevance,
         argument,
       };

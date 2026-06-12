@@ -20,13 +20,7 @@ declare global {
     write: boolean;
   };
 
-  type SuggestedRelay = Relay & {
-    numberOfContacts: number;
-  };
-
   type Relays = Array<Relay>;
-
-  type SuggestedRelays = Array<SuggestedRelay>;
 
   type NotificationMessage = {
     title: string;
@@ -84,17 +78,9 @@ declare global {
         publicKey: PublicKey;
       };
 
-  export type Contact = {
-    publicKey: PublicKey;
-    mainRelay?: string;
-    userName?: string;
-  };
-
   export type HasPublicKey = {
     publicKey: PublicKey;
   };
-
-  type Contacts = Map<PublicKey, Contact>;
 
   type KnowledgeDBs = Map<PublicKey, KnowledgeData>;
 
@@ -107,7 +93,6 @@ declare global {
   type WriteRelayConf = {
     defaultRelays?: boolean;
     user?: boolean;
-    contacts?: boolean;
     extraRelays?: Relays;
   };
 
@@ -135,7 +120,6 @@ declare global {
   type AllRelays = {
     defaultRelays: Relays;
     userRelays: Relays;
-    contactsRelays: Relays;
   };
 
   type Pane = {
@@ -157,9 +141,7 @@ declare global {
   };
 
   type Data = {
-    contacts: Contacts;
     user: User;
-    contactsRelays: Map<PublicKey, Relays>;
     knowledgeDBs: KnowledgeDBs;
     snapshotNodes: SnapshotNodes;
     graphIndex: GraphIndex;
@@ -278,7 +260,6 @@ declare global {
     docId?: string;
     parent?: ID;
     systemRole?: RootSystemRole;
-    userPublicKey?: PublicKey;
     snapshotId?: string;
     updated: number;
     author: PublicKey;

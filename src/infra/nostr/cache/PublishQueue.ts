@@ -218,7 +218,6 @@ export const createPublishQueue = (
     const writeRelays = applyWriteRelayConfig(
       relays.defaultRelays,
       relays.userRelays,
-      relays.contactsRelays,
       writeRelayConf
     );
     return Array.from(new Set(writeRelays.map((r: Relay) => r.url)));

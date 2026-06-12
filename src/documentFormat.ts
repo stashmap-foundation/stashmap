@@ -5,14 +5,10 @@ export function formatNodeAttrs(
   options?: {
     basedOn?: ID;
     snapshotId?: string;
-    userPublicKey?: PublicKey;
   }
 ): string {
   const parts: string[] = [
     ...(uuid ? [`id:${uuid}`] : []),
-    ...(options?.userPublicKey
-      ? [`userPublicKey="${options.userPublicKey}"`]
-      : []),
     ...(options?.basedOn ? [`basedOn="${options.basedOn}"`] : []),
     ...(options?.snapshotId ? [`snapshot="${options.snapshotId}"`] : []),
   ];

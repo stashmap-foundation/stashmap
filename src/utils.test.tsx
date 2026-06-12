@@ -27,8 +27,8 @@ import userEvent from "@testing-library/user-event";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { sha256 } from "@noble/hashes/sha256";
 import { schnorr } from "@noble/curves/secp256k1";
-import { KIND_CONTACTLIST } from "./nostr";
-import { createPlan, planUpsertContact, planRemoveContact } from "./planner";
+import { createPlan, planUpdateNodeText } from "./planner";
+import { planCopyDescendantNodes } from "./core/plan";
 import { execute } from "./infra/nostr/executor";
 import { ApiProvider, Apis, FinalizeEvent } from "./Apis";
 import { Backend } from "./BackendContext";
@@ -52,7 +52,6 @@ import {
   computeDepthLimits,
   setDropIndentDepth,
 } from "./editor/DroppableContainer";
-import { findContacts } from "./contacts";
 import { UserRelayContextProvider } from "./UserRelayContext";
 import { StashmapDB } from "./infra/nostr/cache/indexedDB";
 import { createEmptyGraphIndex } from "./graphIndex";
@@ -83,17 +82,13 @@ const CAROL_PRIVATE_KEY =
 export const CAROL_PUBLIC_KEY =
   "074eb94a7a3d34102b563b540ac505e4fa8f71e3091f1e39a77d32e813c707d2" as PublicKey;
 
-const UNAUTHENTICATED_ALICE: Contact = {
-  publicKey:
-    "f0289b28573a7c9bb169f43102b26259b7a4b758aca66ea3ac8cd0fe516a3758" as PublicKey,
-};
-
 export const ANON: User = {
   publicKey: UNAUTHENTICATED_USER_PK,
 };
 
 const ALICE: User = {
-  publicKey: UNAUTHENTICATED_ALICE.publicKey,
+  publicKey:
+    "f0289b28573a7c9bb169f43102b26259b7a4b758aca66ea3ac8cd0fe516a3758" as PublicKey,
   privateKey: hexToBytes(ALICE_PRIVATE_KEY),
 };
 
@@ -204,8 +199,6 @@ type TestDataProps = DataContextProps & {
 
 const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
   user: ALICE,
-  contacts: Map<PublicKey, Contact>(),
-  contactsRelays: Map<PublicKey, Relays>(),
   knowledgeDBs: Map<PublicKey, KnowledgeData>(),
   graphIndex: createEmptyGraphIndex(),
   documents: Map(),
@@ -232,7 +225,6 @@ const DEFAULT_DATA_CONTEXT_PROPS: TestDataProps = {
   relays: {
     defaultRelays: [{ url: "wss://default.relay", read: true, write: true }],
     userRelays: [{ url: "wss://user.relay", read: true, write: true }],
-    contactsRelays: [{ url: "wss://contacts.relay", read: true, write: true }],
   },
   panes: [{ id: "pane-0", author: ALICE.publicKey, sourceId: ALICE.publicKey }],
 };
@@ -245,46 +237,16 @@ export function applyDefaults(props?: Partial<TestAppState>): TestAppState {
   };
 }
 
-function createContactsQuery(author: PublicKey): Filter {
-  return {
-    kinds: [KIND_CONTACTLIST],
-    authors: [author],
-  };
-}
-
-function getContactListEventsOfUser(
-  publicKey: PublicKey,
-  events: Array<Event>
-): List<Event> {
-  const query = createContactsQuery(publicKey);
-  return List<Event>(events).filter((e) => matchFilter(query, e));
-}
-
-function getContacts(appState: TestAppState): Contacts {
-  const events = getContactListEventsOfUser(
-    appState.user.publicKey,
-    appState.relayPool.getEvents()
-  );
-  return findContacts(events);
-}
-
 export function setup(
   users: User[],
   options?: Partial<TestAppState>
 ): UpdateState[] {
   const appState = applyDefaults(options);
   return users.map((user): UpdateState => {
-    return (): TestAppState => {
-      const updatedState = {
-        ...appState,
-        user,
-      };
-      const contacts = appState.contacts.merge(getContacts(updatedState));
-      return {
-        ...updatedState,
-        contacts,
-      };
-    };
+    return (): TestAppState => ({
+      ...appState,
+      user,
+    });
   });
 }
 
@@ -470,6 +432,41 @@ export async function forkReadonlyRoot(
   await userEvent.click(await screen.findByLabelText("copy root to edit"));
 }
 
+export async function forkOwnRoot(
+  cU: UpdateState,
+  rootText: string,
+  forkText: string
+): Promise<void> {
+  const utils = cU();
+  const author = utils.user.publicKey;
+  const knowledgeDB = processEvents(List(utils.relayPool.getEvents())).get(
+    author
+  )?.knowledgeDB;
+  const rootNode = knowledgeDB?.nodes
+    .valueSeq()
+    .find(
+      (candidate) =>
+        nodeText(candidate) === rootText && candidate.parent === undefined
+    );
+  if (!knowledgeDB || !rootNode) {
+    throw new Error(`forkOwnRoot: root not found: ${rootText}`);
+  }
+  const knowledgeDBs = Map<PublicKey, KnowledgeData>([[author, knowledgeDB]]);
+  const plan = createPlan({ ...utils, knowledgeDBs });
+  const [forkPlan, mapping] = planCopyDescendantNodes(plan, rootNode);
+  const forkRootID = mapping.get(rootNode.id);
+  const forkRoot = forkRootID
+    ? forkPlan.knowledgeDBs.get(author)?.nodes.get(forkRootID)
+    : undefined;
+  if (!forkRoot) {
+    throw new Error(`forkOwnRoot: fork failed for: ${rootText}`);
+  }
+  await execute({
+    ...utils,
+    plan: planUpdateNodeText(forkPlan, forkRoot, forkText),
+  });
+}
+
 export async function openReadonlyRoute(nodeLabel: string): Promise<string> {
   await userEvent.click(
     await screen.findByLabelText(`open ${nodeLabel} in fullscreen`)
@@ -480,30 +477,6 @@ export async function openReadonlyRoute(nodeLabel: string): Promise<string> {
   });
 
   return `${window.location.pathname}${window.location.search}`;
-}
-
-export async function follow(
-  cU: UpdateState,
-  publicKey: PublicKey
-): Promise<void> {
-  const utils = cU();
-  const plan = planUpsertContact(createPlan(utils), { publicKey });
-  await execute({
-    ...utils,
-    plan,
-  });
-}
-
-export async function unfollow(
-  cU: UpdateState,
-  publicKey: PublicKey
-): Promise<void> {
-  const utils = cU();
-  const plan = planRemoveContact(createPlan(utils), publicKey);
-  await execute({
-    ...utils,
-    plan,
-  });
 }
 
 export function renderWithTestData(

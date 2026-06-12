@@ -92,7 +92,6 @@ export async function execute({
       const writeRelayUrls = applyWriteRelayConfig(
         plan.relays.defaultRelays,
         plan.relays.userRelays,
-        plan.relays.contactsRelays,
         writeRelayConf
       );
       return publishEventToRelays(

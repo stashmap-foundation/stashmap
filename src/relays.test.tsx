@@ -3,7 +3,6 @@ import { cleanup, screen, fireEvent } from "@testing-library/react";
 import {
   ALICE,
   BOB,
-  follow,
   renderApp,
   renderTree,
   setup,
@@ -38,7 +37,6 @@ async function setupTest(): Promise<{
   alice: UpdateState;
 }> {
   const [alice, bob] = setup([ALICE, BOB]);
-  await follow(alice, bob().user.publicKey);
   const planPublishRelays = planPublishRelayMetadata(createPlan(bob()), [
     { url: "wss://relay.bob.lol/", read: true, write: true },
   ]);

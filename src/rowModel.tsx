@@ -12,7 +12,6 @@ import {
 } from "./core/connections";
 import { useData } from "./DataContext";
 import { nodeText } from "./core/nodeSpans";
-import { getNodeUserPublicKey } from "./infra/nostr/userEntry";
 import { getBlockLink } from "./core/blockLink";
 import {
   EditorNavigationTarget,
@@ -282,13 +281,6 @@ export function getDisplayTextForRow(data: Data, row: Row): string {
     const query = parseSearchId(row.rowID) || "";
     return `Search: ${query}`;
   }
-  const userPublicKey = getNodeUserPublicKey(row.node);
-  const contactPetname = userPublicKey
-    ? data.contacts.get(userPublicKey)?.userName
-    : undefined;
-  if (contactPetname) {
-    return contactPetname;
-  }
   return nodeText(row.node);
 }
 
@@ -363,7 +355,9 @@ function pathContainsSubpath(
   );
 }
 
-export function updateViewPathsAfterMoveNodes(data: Data): Views {
+export function updateViewPathsAfterMoveNodes(
+  data: Pick<Data, "views">
+): Views {
   return data.views;
 }
 

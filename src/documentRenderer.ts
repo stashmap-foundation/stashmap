@@ -73,7 +73,6 @@ function getSerializableNodeAttrs(
     node.snapshotId ?? (node.basedOn ? options?.snapshotId : undefined);
   return formatNodeAttrs(node.id, {
     ...(node.basedOn ? { basedOn: node.basedOn } : {}),
-    ...(node.userPublicKey ? { userPublicKey: node.userPublicKey } : {}),
     ...(snapshotId ? { snapshotId } : {}),
   });
 }

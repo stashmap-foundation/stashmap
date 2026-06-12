@@ -36,13 +36,6 @@ type PermanentSyncState = {
   checkpoints: Map<PublicKey, SyncCheckpointRecord>;
 };
 
-export function buildPermanentSyncAuthors(
-  myself: PublicKey,
-  contacts: Contacts
-): PublicKey[] {
-  return contacts.keySeq().toSet().add(myself).toArray().sort();
-}
-
 export function buildPermanentSyncFilters(authors: PublicKey[]): Filter[] {
   if (authors.length === 0) {
     return [];

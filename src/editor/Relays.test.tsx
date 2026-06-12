@@ -1,19 +1,9 @@
-import React from "react";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Map } from "immutable";
 import { Event } from "nostr-tools";
 import { KIND_RELAY_METADATA_EVENT } from "../nostr";
-import { Relays, addRelayWarningText } from "./Relays";
-import {
-  ALICE,
-  setup,
-  renderApp,
-  TEST_RELAYS,
-  BOB,
-  renderWithTestData,
-  CAROL,
-} from "../utils.test";
+import { Relays } from "./Relays";
+import { ALICE, setup, renderApp, TEST_RELAYS } from "../utils.test";
 import { relayTags } from "../planner";
 
 const filterRelayMetadataEvents = (event: Event): boolean =>
@@ -147,43 +137,6 @@ test("Stop writing to an existing Nostr Relay", async () => {
       content: "",
     })
   );
-});
-
-test("Suggest Relays of a contact", async () => {
-  const [alice] = setup([ALICE], {});
-  renderWithTestData(
-    <Relays
-      defaultRelays={TEST_RELAYS}
-      relays={TEST_RELAYS}
-      contactsRelays={Map<PublicKey, Relays>({
-        [BOB.publicKey]: [
-          { url: "wss://relay.test.contact/", read: true, write: true },
-        ],
-        [CAROL.publicKey]: [
-          ...TEST_RELAYS,
-          { url: "wss://relay.test.contact/", read: true, write: true },
-          { url: "wss://relay.test.contact.second/", read: true, write: true },
-          { url: "wss://relay.test.contact.third/", read: true, write: false },
-        ],
-      })}
-      onSubmit={jest.fn()}
-    />,
-    alice()
-  );
-  await screen.findByText("Edit Nostr Relays");
-  expect(
-    screen.getByLabelText("suggested relay wss://relay.test.contact/")
-      .textContent
-  ).toBe(
-    `wss://relay.test.contact/2 of your contacts write to this relay${addRelayWarningText}+`
-  );
-  expect(
-    screen.getByLabelText("suggested relay wss://relay.test.contact.second/")
-      .textContent
-  ).toBe("wss://relay.test.contact.second/One contact writes to this relay+");
-  expect(
-    screen.queryByLabelText("suggested relay wss://relay.test.contact.third/")
-  ).toBeNull();
 });
 
 // TODO: demonstrate that knowledge db is reloaded when editing a relay

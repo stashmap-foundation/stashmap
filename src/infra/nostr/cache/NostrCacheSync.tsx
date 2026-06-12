@@ -14,7 +14,6 @@ import {
 import {
   applyStoredDelete,
   applyStoredDocument,
-  buildPermanentSyncAuthors,
   startPermanentDocumentSync,
   toStoredDeleteRecord,
   toStoredDocumentRecord,
@@ -106,11 +105,15 @@ function changeToEvent(
   return undefined;
 }
 
-export function NostrCacheSync(): null {
+export function NostrCacheSync({
+  paneRelays,
+}: {
+  paneRelays: ImmutableMap<PublicKey, Relays>;
+}): null {
   const db = useCacheDB();
   const addEvents = useDocumentStore()?.addEvents;
   const { relayPool } = useApis();
-  const { user, contacts, contactsRelays, panes } = useData();
+  const { user, panes } = useData();
   const { userRelays } = useUserRelayContext();
   const defaultRelays = useDefaultRelays();
 
@@ -120,14 +123,8 @@ export function NostrCacheSync(): null {
   );
 
   const authors = useMemo(
-    () =>
-      [
-        ...new globalThis.Set([
-          ...buildPermanentSyncAuthors(user.publicKey, contacts),
-          ...extraAuthors,
-        ]),
-      ].sort(),
-    [user.publicKey, contacts, extraAuthors]
+    () => [...new globalThis.Set([user.publicKey, ...extraAuthors])].sort(),
+    [user.publicKey, extraAuthors]
   );
 
   const relayUrls = useMemo(
@@ -137,13 +134,13 @@ export function NostrCacheSync(): null {
           getReadRelays([
             ...defaultRelays,
             ...userRelays,
-            ...flattenRelays(contactsRelays),
+            ...flattenRelays(paneRelays),
           ])
             .flatMap((relay) => sanitizeRelays([relay]).map((r) => r.url))
             .map((url) => url.trim().replace(/\/$/, ""))
         ),
       ].sort(),
-    [defaultRelays, userRelays, contactsRelays]
+    [defaultRelays, userRelays, paneRelays]
   );
 
   // Load persisted state and subscribe to cross-tab changes

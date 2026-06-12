@@ -2,10 +2,8 @@ import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ALICE,
-  BOB,
   setup,
-  forkReadonlyRoot,
-  follow,
+  forkOwnRoot,
   navigateToNodeViaSearch,
   renderTree,
   expectTree,
@@ -30,15 +28,15 @@ Root
 });
 
 test("Shows dots when only other user has node (current user has none)", async () => {
-  const [alice, bob] = setup([ALICE, BOB]);
-  await follow(alice, bob().user.publicKey);
+  const [alice] = setup([ALICE]);
 
   renderTree(alice);
   await type("Root{Enter}Parent Node{Escape}");
-
   cleanup();
 
-  await forkReadonlyRoot(bob(), alice().user.publicKey, "Root");
+  await forkOwnRoot(alice, "Root", "My Fork");
+  renderTree(alice);
+  await navigateToNodeViaSearch(0, "My Fork");
   await userEvent.click(
     await screen.findByLabelText("open Parent Node in fullscreen")
   );
@@ -47,6 +45,7 @@ test("Shows dots when only other user has node (current user has none)", async (
   await type("Bob Child{Escape}");
   cleanup();
 
+  window.history.pushState({}, "", "/");
   renderTree(alice);
   await navigateToNodeViaSearch(0, "Root");
   await expectTree(`

@@ -1,5 +1,4 @@
 import { Event } from "nostr-tools";
-import { Map } from "immutable";
 import type { StashmapDB } from "./infra/nostr/cache/indexedDB";
 import {
   KIND_DELETE,
@@ -9,7 +8,6 @@ import {
 import {
   applyStoredDelete,
   applyStoredDocument,
-  buildPermanentSyncAuthors,
   buildPermanentCatchUpFilters,
   buildPermanentBackfillFilter,
   buildPermanentSyncFilters,
@@ -48,15 +46,6 @@ const BOB = "bob" as PublicKey;
 
 beforeEach(() => {
   jest.clearAllMocks();
-});
-
-test("buildPermanentSyncAuthors includes user and deduplicates contacts", () => {
-  const authors = buildPermanentSyncAuthors(
-    ALICE,
-    Map([[BOB, { publicKey: BOB }]])
-  );
-
-  expect(authors).toEqual([ALICE, BOB]);
 });
 
 test("buildPermanentSyncFilters creates broad document and delete filters", () => {

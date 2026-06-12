@@ -1,17 +1,13 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Map } from "immutable";
 import { Button } from "../commons/Ui";
 import { ModalForm } from "../commons/ModalForm";
 import { ErrorMessage } from "../commons/ErrorMessage";
 import {
   mergeRelays,
-  getSuggestedRelays,
-  getIsNecessaryReadRelays,
   sanitizeRelayUrl,
   useRelaysForRelayManagement,
 } from "../relays";
-import { useData } from "../DataContext";
 import { useDefaultRelays } from "../NostrAuthContext";
 import { planPublishRelayMetadata, usePlanner } from "../planner";
 
@@ -37,30 +33,21 @@ function ReadWriteButton({
   );
 }
 
-export const addRelayWarningText =
-  "If you don't read from one of these relays, you will miss notes from your contacts!";
-
 function RelayRow({
   relay,
   onUpdate,
   onDelete,
-  isNecessaryReadRelay,
   readonly,
 }: {
-  relay: Relay | SuggestedRelay;
+  relay: Relay;
   onUpdate: (newRelay: Relay) => void;
   onDelete: () => void;
-  isNecessaryReadRelay: boolean;
   readonly: boolean;
 }): JSX.Element {
-  const isNecessary = !relay.read && isNecessaryReadRelay;
   return (
     <div className="relay-row" aria-label={`relay details ${relay.url}`}>
       <div style={{ minWidth: 0, flex: 1 }}>
         <div className="relay-row-url">{relay.url}</div>
-        {isNecessary && (
-          <div className="danger font-size-small">{addRelayWarningText}</div>
-        )}
       </div>
       <div className="relay-row-controls">
         {!readonly && (
@@ -98,45 +85,6 @@ function RelayRow({
             <span aria-hidden="true">×</span>
           </Button>
         )}
-      </div>
-    </div>
-  );
-}
-
-function SuggestedRelayRow({
-  relay,
-  onUpdate,
-  isNecessaryReadRelay,
-}: {
-  relay: SuggestedRelay;
-  onUpdate: (newRelay: Relay) => void;
-  isNecessaryReadRelay: boolean;
-}): JSX.Element {
-  const number = relay.numberOfContacts;
-  const infoText =
-    number > 1
-      ? `${number} of your contacts write to this relay`
-      : "One contact writes to this relay";
-  return (
-    <div
-      className="relay-row black-dimmed"
-      aria-label={`suggested relay ${relay.url}`}
-    >
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div className="relay-row-url">{relay.url}</div>
-        {number > 0 && <div className="relay-info-text">{infoText}</div>}
-        {isNecessaryReadRelay && (
-          <div className="danger font-size-small">{addRelayWarningText}</div>
-        )}
-      </div>
-      <div className="relay-row-controls">
-        <Button
-          onClick={() => onUpdate(relay)}
-          className="btn font-size-small"
-          ariaLabel={`add relay ${relay.url}`}
-        >
-          <span aria-hidden="true">+</span>
-        </Button>
       </div>
     </div>
   );
@@ -210,83 +158,74 @@ function NewRelay({
   );
 }
 
+function SuggestedRelayRow({
+  relay,
+  onAdd,
+}: {
+  relay: Relay;
+  onAdd: (newRelay: Relay) => void;
+}): JSX.Element {
+  return (
+    <div
+      className="relay-row black-dimmed"
+      aria-label={`suggested relay ${relay.url}`}
+    >
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div className="relay-row-url">{relay.url}</div>
+      </div>
+      <div className="relay-row-controls">
+        <Button
+          onClick={() => onAdd(relay)}
+          className="btn font-size-small"
+          ariaLabel={`add relay ${relay.url}`}
+        >
+          <span aria-hidden="true">+</span>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function Relays({
   defaultRelays,
   relays,
-  contactsRelays,
   onSubmit,
   readonly,
 }: {
   defaultRelays: Relays;
   relays: Relays;
-  contactsRelays: Map<PublicKey, Relays>;
   onSubmit: (relayState: Relays) => Promise<void>;
   readonly?: boolean;
 }): JSX.Element {
   const navigate = useNavigate();
-  const suggestedRelays = getSuggestedRelays(contactsRelays);
-  const isNecessaryReadRelays = getIsNecessaryReadRelays(contactsRelays);
-  const defaultAndSuggestedRelays = mergeRelays(
-    defaultRelays.map((relay) => ({
-      ...relay,
-      numberOfContacts: 0,
-    })),
-    suggestedRelays.map((relay) => ({
-      ...relay,
-      read: true,
-      write: false,
-    }))
+  const [myRelays, setMyRelays] = useState<Relays>(relays);
+  const suggested = defaultRelays.filter(
+    (relay) => !myRelays.some((r) => r.url === relay.url)
   );
-  const relaysToSuggest = defaultAndSuggestedRelays.reduce((rdx, rel) => {
-    return relays.some((r) => r.url === rel.url) ? rdx : [...rdx, rel];
-  }, [] as SuggestedRelays);
-  const [relayState, setRelayState] = useState<{
-    myRelays: Relays;
-    suggested: SuggestedRelays;
-  }>({
-    myRelays: relays,
-    suggested: relaysToSuggest,
-  });
-
-  const necessaryReadRelays = isNecessaryReadRelays(relayState.myRelays);
 
   const deleteRelay = (index: number): void => {
-    setRelayState({
-      myRelays: relayState.myRelays.filter((_, i) => {
-        return i !== index;
-      }),
-      suggested: mergeRelays(
-        relayState.suggested,
-        relaysToSuggest.filter((r) => r.url === relayState.myRelays[index].url)
-      ),
-    });
+    setMyRelays(myRelays.filter((_, i) => i !== index));
   };
 
   const updateRelay = (updatedRelay: Relay, index: number): void => {
-    setRelayState({
-      ...relayState,
-      myRelays: relayState.myRelays.map((relay, i) =>
-        index !== i ? relay : updatedRelay
-      ),
-    });
+    setMyRelays(
+      myRelays.map((relay, i) => (index !== i ? relay : updatedRelay))
+    );
   };
 
   const addRelay = (newRelay: Relay): void => {
-    setRelayState({
-      myRelays: mergeRelays(relayState.myRelays, [newRelay]),
-      suggested: relayState.suggested.filter((r) => r.url !== newRelay.url),
-    });
+    setMyRelays(mergeRelays(myRelays, [newRelay]));
   };
 
   return (
     <ModalForm
-      submit={() => onSubmit(relayState.myRelays)}
+      submit={() => onSubmit(myRelays)}
       onHide={() => navigate("/")}
       title={readonly ? "Nostr Relays" : "Edit Nostr Relays"}
       hideFooter={!!readonly}
     >
       <div className="scroll">
-        {relayState.myRelays.map((relay: Relay, index: number) => (
+        {myRelays.map((relay: Relay, index: number) => (
           <RelayRow
             key={`relay ${relay.url}`}
             readonly={!!readonly}
@@ -297,24 +236,18 @@ export function Relays({
                 updateRelay(newRelay, index);
               }
             }}
-            isNecessaryReadRelay={necessaryReadRelays.some(
-              (r) => r.url === relay.url
-            )}
           />
         ))}
         {!readonly && (
           <>
-            {relayState.suggested.length > 0 && (
+            {suggested.length > 0 && (
               <div className="relay-section-header">suggested</div>
             )}
-            {relayState.suggested.map((suggestedRelay: SuggestedRelay) => (
+            {suggested.map((suggestedRelay: Relay) => (
               <SuggestedRelayRow
                 key={`suggested relay ${suggestedRelay.url}`}
                 relay={suggestedRelay}
-                onUpdate={(newRelay) => addRelay(newRelay)}
-                isNecessaryReadRelay={necessaryReadRelays.some(
-                  (r) => r.url === suggestedRelay.url
-                )}
+                onAdd={(newRelay) => addRelay(newRelay)}
               />
             ))}
             <NewRelay onSave={(newRelay) => addRelay(newRelay)} />
@@ -329,7 +262,6 @@ export function RelaysWrapper(): JSX.Element {
   const navigate = useNavigate();
   const { createPlan, executePlan } = usePlanner();
   const defaultRelays = useDefaultRelays();
-  const { contactsRelays } = useData();
   const relays = useRelaysForRelayManagement();
   const submit = async (relayState: Relays): Promise<void> => {
     const plan = planPublishRelayMetadata(createPlan(), relayState);
@@ -341,7 +273,6 @@ export function RelaysWrapper(): JSX.Element {
       readonly={false}
       defaultRelays={defaultRelays}
       relays={relays}
-      contactsRelays={contactsRelays}
       onSubmit={submit}
     />
   );

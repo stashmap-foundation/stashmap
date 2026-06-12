@@ -6,8 +6,7 @@ import {
   BOB,
   expectTree,
   findEvent,
-  forkReadonlyRoot,
-  follow,
+  readonlyRoute,
   renderApp,
   renderTree,
   setup,
@@ -48,34 +47,20 @@ describe("Home Navigation", () => {
 
     test("clicking home button from another user's content navigates to your own ~Log", async () => {
       const [alice, bob] = setup([ALICE, BOB]);
-      await follow(alice, bob().user.publicKey);
 
-      renderTree(alice);
-      await type("My Notes{Enter}{Tab}Programming Languages{Escape}");
-      cleanup();
-
-      await forkReadonlyRoot(bob(), alice().user.publicKey, "My Notes");
-      await userEvent.click(
-        await screen.findByLabelText("open Programming Languages in fullscreen")
-      );
-      await userEvent.click(
-        await screen.findByLabelText("edit Programming Languages")
-      );
-      await userEvent.keyboard("{Enter}");
+      renderTree(bob);
       await type("Rust{Enter}{Tab}Memory Safety{Escape}");
       cleanup();
 
       renderTree(alice);
       await userEvent.click(await screen.findByLabelText("Create new note"));
       await type("Alice Home Note{Escape}");
-      await navigateToNodeViaSearch(0, "My Notes");
+      cleanup();
 
-      await userEvent.click(
-        await screen.findByLabelText("expand Programming Languages")
-      );
-      await userEvent.click(
-        await screen.findByLabelText("open Rust in fullscreen")
-      );
+      renderApp({
+        ...alice(),
+        initialRoute: readonlyRoute(bob().user.publicKey, "Rust"),
+      });
       await screen.findByText("READONLY");
 
       await userEvent.click(await screen.findByLabelText("Navigate to Log"));

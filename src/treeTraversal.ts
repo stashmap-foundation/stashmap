@@ -1,4 +1,4 @@
-import { List, Map } from "immutable";
+import { List, Map, Set as ImmutableSet } from "immutable";
 import {
   ViewPath,
   addNodeToPathWithNodes,
@@ -115,11 +115,13 @@ function createRow(
   versionMeta: Row["versionMeta"] | undefined
 ): Row {
   const rowID = rowIDForNode(node);
+  const inheritedVirtualType =
+    parentRow?.virtualType === "search" ||
+    parentRow?.virtualType === "suggestion"
+      ? parentRow.virtualType
+      : undefined;
   const rowVirtualType =
-    virtualType ??
-    (isSearchId(rowID) || parentRow?.virtualType === "search"
-      ? "search"
-      : undefined);
+    virtualType ?? (isSearchId(rowID) ? "search" : inheritedVirtualType);
   const pane = data.panes[viewPath[0]];
   const reference = isBlockLinkAny(node)
     ? (() => {
@@ -556,12 +558,11 @@ function getChildrenForRegularNode(
 
   const containingNodeID = parentRow.parentNode?.id;
   const effectiveAuthor = nodes.author;
-  const visibleAuthors = data.contacts
-    .keySeq()
-    .toSet()
-    .add(data.user.publicKey)
-    .add(author)
-    .add(effectiveAuthor);
+  const visibleAuthors = ImmutableSet<PublicKey>([
+    data.user.publicKey,
+    author,
+    effectiveAuthor,
+  ]);
 
   const incomingCrefs = getIncomingCrefsForNode(
     graph,
@@ -773,11 +774,10 @@ export function getNodesInDocument(
     return treeResult;
   }
 
-  const visibleAuthors = data.contacts
-    .keySeq()
-    .toSet()
-    .add(data.user.publicKey)
-    .add(document.author);
+  const visibleAuthors = ImmutableSet<PublicKey>([
+    data.user.publicKey,
+    document.author,
+  ]);
   const incomingCrefs = getIncomingCrefsForNode(
     graph,
     visibleAuthors,

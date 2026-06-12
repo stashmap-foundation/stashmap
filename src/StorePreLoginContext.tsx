@@ -3,8 +3,7 @@ import { List } from "immutable";
 import { useDebouncedCallback } from "use-debounce";
 import { useApis } from "./Apis";
 import { useExecutor } from "./ExecutorContext";
-import { KIND_CONTACTLIST } from "./nostr";
-import { planAddContacts, usePlanner } from "./planner";
+import { usePlanner } from "./planner";
 
 type StorePreLoginData = (eventKinds: List<number>) => void;
 
@@ -35,10 +34,7 @@ export function StorePreLoginContext({
         return;
       }
       const plan = createPlan();
-      const withContacts = eventKinds.includes(KIND_CONTACTLIST)
-        ? planAddContacts(plan, plan.contacts.keySeq().toList())
-        : plan;
-      await executor.executePlan(withContacts);
+      await executor.executePlan(plan);
       setPublishEvents((current) => ({
         ...current,
         preLoginEvents: List(),

@@ -88,6 +88,16 @@ The product. Reuses `computeVersionDiff` (`src/core/snapshotBaseline.ts`).
 
 Acceptance: the `idea.md` walkthrough end to end against a folder, including late healing.
 
+**Re-coverage manifest** — behaviors whose tests were deleted in A1 because their data path (contacts) died; each must be re-pinned here or in B6 once foreign sources load through this engine:
+
+- removing a source removes its cached suggestions (was: "unfollowing removes cached suggestions from that user")
+- incoming refs from a foreign source render with a foreign marker (was `[OI]`)
+- accepting a foreign incoming ref creates a bidirectional link
+- declining a foreign incoming ref hides it
+- the same incoming ref offered by several sources is deduplicated to one row
+- search results include loaded foreign sources, marked as foreign, with context paths that never show a loading placeholder
+- incoming refs resolve bare ids across sources (cross-source ref targeting)
+
 ### Phase B4 — `--write` bulk materializer (draft)
 
 - Materializes every suggestion into workspace files as `(?)` rows carrying provenance: `- (?) Montenegro <!-- basedOn="a5" -->`. Only workspace files are written.

@@ -100,7 +100,6 @@ function materializeTreeNode(
     parent,
     docId: parent ? undefined : treeNode.docId,
     systemRole: parent ? undefined : treeNode.systemRole,
-    userPublicKey: treeNode.userPublicKey,
     snapshotId: treeNode.snapshotId,
     ...(treeNode.blockKind !== undefined && { blockKind: treeNode.blockKind }),
     ...(treeNode.headingLevel !== undefined && {

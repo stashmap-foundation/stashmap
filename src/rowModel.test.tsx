@@ -7,7 +7,6 @@ import {
   expectTree,
   findNewNodeEditor,
   BOB,
-  follow,
   forkReadonlyRoot,
   openReadonlyRoute,
   renderApp,
@@ -106,7 +105,6 @@ My Notes
 
 test("Contact views list via version and list remains unchanged", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
-  await follow(bob, alice().user.publicKey);
 
   renderTree(alice);
   await type(
@@ -204,7 +202,6 @@ test("View path roundtrip preserves node IDs", () => {
 
 test("View doesn't change if list is forked from contact", async () => {
   const [alice, bob] = setup([ALICE, BOB]);
-  await follow(alice, bob().user.publicKey);
 
   renderTree(bob);
   await type(
